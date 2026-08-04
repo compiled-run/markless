@@ -113,6 +113,17 @@ test('merges payload records over matching derived keys, including computed snap
 	);
 });
 
+test('rejects duplicate payload record keys while merging', () => {
+	const baseline = records({});
+	const duplicate = baseline.state.cells[0]!;
+	expect(() =>
+		mergeResumeRecordDelta(baseline, {
+			...baseline,
+			state: { ...baseline.state, cells: [duplicate, duplicate] },
+		}),
+	).toThrow(/MARKLESS_RESUME_RECORD_DELTA_DUPLICATE_KEY: payload record state:count/);
+});
+
 test('fails loudly when divergent resume records contain a non-serializable value', () => {
 	const request = records({ propValue: { route: '/feed' } });
 	const malformedRequest = {

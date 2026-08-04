@@ -260,16 +260,47 @@ export function collectSsrPropEvents(
 		readonly hostNodeId: string;
 		readonly hostPath: ReadonlyArray<number>;
 	}>,
+	semanticEvents: ReadonlyArray<{
+		readonly hostNodeId: string;
+		readonly eventName: string;
+		readonly handlerSources: ReadonlyArray<string>;
+	}> = [],
 ) {
 	const hostNodeIdByPath = new Map(
 		hostLocators.map((locator) => [JSON.stringify(locator.hostPath), locator.hostNodeId]),
 	);
-	return collectCsrPropEvents(root, propNames, source).flatMap((event) => {
+	const events = collectCsrPropEvents(root, propNames, source).flatMap((event) => {
 		const hostNodeId = hostNodeIdByPath.get(JSON.stringify(event.hostPath));
 		return hostNodeId
 			? [{ hostNodeId, eventName: event.eventName, propName: event.propName }]
 			: [];
 	});
+	const propNameSet = new Set(propNames);
+	for (const event of semanticEvents) {
+		for (const handlerSource of event.handlerSources) {
+			const invokedProps = [
+				...handlerSource.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g),
+			]
+				.map((match) => match[1]!)
+				.filter((name) => propNameSet.has(name));
+			if (invokedProps.length !== 1) continue;
+			const propName = invokedProps[0]!;
+			if (
+				!events.some(
+					(candidate) =>
+						candidate.hostNodeId === event.hostNodeId &&
+						candidate.eventName === event.eventName &&
+						candidate.propName === propName,
+				)
+			)
+				events.push({
+					hostNodeId: event.hostNodeId,
+					eventName: event.eventName,
+					propName,
+				});
+		}
+	}
+	return events;
 }
 
 export function collectCsrPropEvents(

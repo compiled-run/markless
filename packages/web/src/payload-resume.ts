@@ -113,6 +113,12 @@ async function startDecodedResume(
 		renderAsyncBoundary: input.renderAsyncBoundary,
 	});
 	await runtime.start();
+	// Reuse the existing streamed or staged dispatch authority.
+	input.root.__marklessDispatch ??= (handoff) =>
+		runtime!.dispatch(handoff.event, {
+			syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true,
+			ignoreUnmatched: true,
+		});
 	(
 		input.root as typeof input.root & { __asyncResumeRuntimeStarted?: boolean }
 	).__asyncResumeRuntimeStarted = true;

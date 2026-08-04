@@ -59,6 +59,46 @@ test('server source module carries the prerender wake URL beside the regular res
 	expect(code).toContain('prerenderWakeModuleUrl: "/build/prerender-wake-C3d4.js"');
 });
 
+test('prerender record entries do not concatenate the CSR renderer source', () => {
+	const code = emitSourceModule({
+		...baseInput,
+		prerenderRecords: true,
+		publicCsrModuleSource:
+			'const fetchLocalUpdates = () => {}; function initialWeight() { return 2; }',
+	});
+
+	expect(code).not.toContain('fetchLocalUpdates');
+	expect(code).not.toContain('initialWeight');
+});
+
+test('ordinary client entries pair initializer loaders with canonical render data', () => {
+	const code = emitSourceModule({
+		...baseInput,
+		renderDataId: 'virtual:markless:render-data:App',
+		canonicalRenderData: true,
+		publicSsrModuleSource: 'async function marklessRenderSsr() {}',
+		publicRenderSsrExportName: 'marklessRenderSsr',
+	});
+
+	expect(code).toContain(
+		`import { marklessPrerenderData } from 'virtual:markless:render-data:App';`,
+	);
+	expect(code).toContain('\trenderData: marklessPrerenderData,');
+	expect(code).toContain('\tloadSymbol: loadSymbol,');
+	expect(code).not.toContain('\trenderSsr(props, marklessRenderContext)');
+
+	const devCode = emitSourceModule({
+		...baseInput,
+		dev: true,
+		renderDataId: 'virtual:markless:render-data:App',
+		canonicalRenderData: true,
+		publicSsrModuleSource: 'async function marklessRenderSsr() {}',
+		publicRenderSsrExportName: 'marklessRenderSsr',
+	});
+	expect(devCode).toContain('\trenderData: marklessPrerenderData,');
+	expect(devCode).toContain('\trenderSsr(props, marklessRenderContext)');
+});
+
 test('emitSourceModule gives every authored behavior a direct mount-time loader', () => {
 	const code = emitSourceModule({
 		...baseInput,
@@ -105,9 +145,7 @@ test('emitResumeModule derives prerender records from linked render data on dema
 	expect(resumeCode).toContain(
 		`import { marklessPrerenderData } from 'virtual:markless:render-data:App';`,
 	);
-	expect(resumeCode).toContain(
-		'derivePrerenderResumeRecords(marklessPrerenderData, loadSymbol)',
-	);
+	expect(resumeCode).toContain('derivePrerenderResumeRecords(marklessPrerenderData, loadSymbol)');
 	expect(resumeCode).toContain('mergePrerenderPayloadRecords(records, handoff.root)');
 	expect(resumeCode).toContain('resumeFromPrerenderRecords');
 	expect(resumeCode).not.toContain('resumeFromPayloadDocument');
@@ -119,6 +157,7 @@ test('emitResumeModule keeps trigger staging behind the prerender wake boundary'
 	const ungated = emitResumeModule({
 		...baseInput,
 		needsFullResume: true,
+		payloadView: { asyncBoundaries: [{}] },
 	});
 	const staged = emitResumeModule({
 		...baseInput,
@@ -128,6 +167,14 @@ test('emitResumeModule keeps trigger staging behind the prerender wake boundary'
 		// first choice, prerenderDataId feeds the unmatched-interaction path.
 		prerenderDataId: 'virtual:markless:render-data:app',
 		prerenderTriggerGroups: [
+			{
+				id: 'self-wake',
+				hostNodeId: 'self-wake',
+				eventName: 'self-wake',
+				hostIndex: -1,
+				hostTagName: '*',
+				moduleId: 'virtual:markless:trigger-group:App:self-wake',
+			},
 			{
 				id: 'host:play:click',
 				hostNodeId: 'host:play',
@@ -151,13 +198,23 @@ test('emitResumeModule keeps trigger staging behind the prerender wake boundary'
 	});
 
 	expect(ungated).not.toContain('prerender-trigger-resume');
-	expect(ungated).not.toContain('__marklessDispatch');
+	expect(ungated).toContain('__marklessDispatch');
 	expect(staged).toContain("import('@markless/web/fns/prerender-trigger-resume')");
 	expect(staged).toContain('graphNodeIds: group.graphNodeIds');
+	expect(staged).not.toContain('const { renderPrerenderBoundary }');
+	expect(staged.match(/renderAsyncBoundary: \(boundaryId, status, graph\)/g)).toHaveLength(1);
+	expect(staged).toContain('const marklessPrerenderData = await marklessLoadPrerenderData()');
+	expect(staged).toContain("import('virtual:markless:render-data:app')");
+	expect(staged).not.toContain(
+		"import { marklessPrerenderData } from 'virtual:markless:render-data:app';",
+	);
 	expect(staged).toContain('__marklessDispatch');
-	expect(staged).toContain('handoff.root.__marklessRegisterDispatch?.(marklessDispatchFullRuntime)');
+	expect(staged).toContain(
+		'handoff.root.__marklessRegisterDispatch?.(marklessDispatchFullRuntime)',
+	);
 	expect(staged).toContain('function readMarklessWakeSourceSymbol');
 	expect(staged).toContain('marklessPrerenderBranchTriggerMatches');
+	expect(staged).toContain('input.event === 0');
 	expect(staged).not.toContain('function readMarklessSourceSymbol');
 });
 
@@ -242,6 +299,31 @@ test('emitResumeModule emits a specialized scalar dispatcher with resolved const
 	expect(resumeCode).not.toContain('resumeEventOnlyFromPayloadDocument');
 	expect(resumeCode).not.toContain("import('@markless/core/web/resume')");
 	expect(resumeCode).toContain('marklessScalarSpecializedHostMiss');
+});
+
+test('scalar dispatch and staged wake share one neutral DOM-order helper import', () => {
+	const resumeCode = emitResumeModule({
+		...scalarResumeInput(),
+		prerenderTriggerGroups: [
+			{
+				id: 'host:button:click',
+				hostNodeId: 'host:button',
+				eventName: 'click',
+				hostIndex: 3,
+				hostTagName: 'button',
+				moduleId: 'virtual:markless:trigger-group:Counter:0',
+			},
+		],
+	});
+
+	expect(
+		resumeCode.match(
+			/import \{ marklessFindElementAtDomOrderIndex \} from '@markless\/web\/fns\/dom-order';/g,
+		),
+	).toHaveLength(1);
+	expect(resumeCode).not.toMatch(
+		/import \{[^\n]*marklessFindElementAtDomOrderIndex[^\n]*\} from '@markless\/web\/fns\/scalar-specialized';/,
+	);
 });
 
 test('emitSourceModule carries compiled inline variants only on server artifacts', () => {
@@ -560,35 +642,35 @@ test('symbolVirtualModuleSourceFile rejects non-symbol and malformed virtual ids
 	).toBeNull();
 });
 
-test('the wake variant is records-only: lean payload routes never emit with recordsOnly', () => {
-	const rowDemand = {
+test('records-only wake uses generic staged resume without payload documents', () => {
+	const genericDemand = {
 		recordKinds: [
-			{ kind: 'keyed-repeat', replaced: true },
-			{ kind: 'dom-update', replaced: true },
+			{ kind: 'event', replaced: false },
+			{ kind: 'dom-update', replaced: false },
+			{ kind: 'keyed-repeat', replaced: false },
 		],
 	};
-	const leanCode = emitResumeModule({
+	const wakeCode = emitResumeModule({
 		...baseInput,
-		needsFullResume: false,
-		runtimeDemandMap: rowDemand,
+		needsFullResume: true,
+		recordsOnly: true,
+		runtimeDemandMap: genericDemand,
+		prerenderDataId: 'virtual:markless:render-data:app',
+		prerenderTriggerGroups: [
+			{
+				id: 'host:play:click',
+				hostNodeId: 'host:play',
+				eventName: 'click',
+				hostIndex: 1,
+				hostTagName: 'button',
+				moduleId: 'virtual:markless:trigger-group:App:0',
+			},
+		],
 	});
-	expect(leanCode).toContain('resumeScalarRowEventFromPayloadDocument');
-	// Lean pages keep their payload container until wake staging lands: a
-	// records-only wake variant for them must refuse to emit at all.
-	const wakeCode = (() => {
-		try {
-			emitResumeModule({
-				...baseInput,
-				needsFullResume: false,
-				runtimeDemandMap: rowDemand,
-				prerenderDataId: 'virtual:markless:render-data:app',
-				recordsOnly: true,
-			});
-			return 'emitted';
-		} catch (error) {
-			expect(String(error)).toContain('MARKLESS_WAKE_VARIANT_REQUIRES_FULL_RESUME');
-			return undefined;
-		}
-	})();
-	expect(wakeCode).toBeUndefined();
+	expect(wakeCode).toContain("import('@markless/web/fns/prerender-trigger-resume')");
+	expect(wakeCode).toContain('mergePrerenderPayloadRecords({ state: group.state, view: group.view }');
+	expect(wakeCode).toContain('resumePrerenderTriggerGroup');
+	expect(wakeCode).not.toContain('resumeFromPayloadDocument');
+	expect(wakeCode).not.toContain('resumeScalarRowEventFromPayloadDocument');
+	expect(wakeCode).not.toContain('@markless/web/event-only-lean/');
 });

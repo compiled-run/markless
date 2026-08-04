@@ -120,7 +120,7 @@ test('default compiler passes declare stable artifact boundaries', () => {
 					'protocolState',
 					'protocolView',
 				],
-				produces: ['runtimeDemandMap'],
+				produces: ['runtimeDemandMap', 'runtimeDemandMaps'],
 			}),
 			expect.objectContaining({
 				passId: 'trigger-groups',

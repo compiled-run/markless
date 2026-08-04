@@ -1,9 +1,17 @@
 import type {
+	RuntimeDemandMapAction,
 	RuntimeDemandMapArtifact,
 	SymbolResolverPlan,
 	TriggerGroupArtifact,
 } from '../artifacts.ts';
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
+import { PROTOCOL_EVENT_ACTION_KIND } from '@markless/serializer';
+
+const ACTION_STAGES_WAKE = {
+	[PROTOCOL_EVENT_ACTION_KIND.event]: true,
+	[PROTOCOL_EVENT_ACTION_KIND.externalDelegate]: false,
+	'keyed-repeat-row': true,
+} as const satisfies Record<RuntimeDemandMapAction['recordKind'], boolean>;
 
 // Build-computed interaction closure. The bundler composes these local groups
 // through bound component edges; the browser never guesses reachability.
@@ -24,33 +32,39 @@ export function createTriggerGroups(input: {
 	);
 	return {
 		passId: 'trigger-groups',
-		groups: input.runtimeDemandMap.actions.map((action) => {
-			const payloadRecordIds = [...action.payloadRecordIds, ...zeroInputBehaviorRecordIds];
-			const symbolIds = new Set<string>();
-			for (const recordId of payloadRecordIds)
-				for (const symbolId of payloadRecords.get(recordId)?.symbolIds ?? [])
-					symbolIds.add(symbolId);
-			const graphNodeIds = new Set<string>();
-			for (const symbolId of symbolIds) {
-				const symbol = symbols.get(symbolId);
-				if (!symbol) continue;
-				if ('reads' in symbol)
-					for (const read of symbol.reads ?? []) graphNodeIds.add(read.graphNodeId);
-				if ('writes' in symbol)
-					for (const write of symbol.writes ?? []) graphNodeIds.add(write.graphNodeId);
-			}
-			for (const recordId of payloadRecordIds)
-				addRecordGraphNodes(graphNodeIds, recordId, input.protocolView);
-			closeComputedDependencies(graphNodeIds, input.protocolState);
-			return {
-				id: `${action.hostNodeId}:${action.eventName}`,
-				hostNodeId: action.hostNodeId,
-				eventName: action.eventName,
-				graphNodeIds: [...graphNodeIds].sort(),
-				payloadRecordIds,
-				symbolIds: [...symbolIds].sort(),
-			};
-		}),
+		groups: input.runtimeDemandMap.actions
+			.filter((action) => ACTION_STAGES_WAKE[action.recordKind])
+			.map((action) => {
+				const payloadRecordIds = [
+					...action.payloadRecordIds,
+					...zeroInputBehaviorRecordIds,
+				];
+				const symbolIds = new Set<string>();
+				for (const recordId of payloadRecordIds)
+					for (const symbolId of payloadRecords.get(recordId)?.symbolIds ?? [])
+						symbolIds.add(symbolId);
+				const graphNodeIds = new Set<string>();
+				for (const symbolId of symbolIds) {
+					const symbol = symbols.get(symbolId);
+					if (!symbol) continue;
+					if ('reads' in symbol)
+						for (const read of symbol.reads ?? []) graphNodeIds.add(read.graphNodeId);
+					if ('writes' in symbol)
+						for (const write of symbol.writes ?? [])
+							graphNodeIds.add(write.graphNodeId);
+				}
+				for (const recordId of payloadRecordIds)
+					addRecordGraphNodes(graphNodeIds, recordId, input.protocolView);
+				closeComputedDependencies(graphNodeIds, input.protocolState);
+				return {
+					id: `${action.hostNodeId}:${action.eventName}`,
+					hostNodeId: action.hostNodeId,
+					eventName: action.eventName,
+					graphNodeIds: [...graphNodeIds].sort(),
+					payloadRecordIds,
+					symbolIds: [...symbolIds].sort(),
+				};
+			}),
 	};
 }
 
@@ -74,7 +88,8 @@ function addRecordGraphNodes(
 	}
 	if (recordId.startsWith('async-boundary:')) {
 		const id = recordId.slice('async-boundary:'.length);
-		for (const read of view.asyncBoundaries.find((record) => record.id === id)?.asyncReads ?? [])
+		for (const read of view.asyncBoundaries.find((record) => record.id === id)?.asyncReads ??
+			[])
 			graphNodeIds.add(read.graphNodeId);
 		return;
 	}
@@ -93,10 +108,7 @@ function addRecordGraphNodes(
 	}
 }
 
-function closeComputedDependencies(
-	graphNodeIds: Set<string>,
-	state: ProtocolStatePayload,
-): void {
+function closeComputedDependencies(graphNodeIds: Set<string>, state: ProtocolStatePayload): void {
 	let changed = true;
 	while (changed) {
 		changed = false;

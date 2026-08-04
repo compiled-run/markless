@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/compile-module.ts';
 
-test('T009b standard CSR emits a renderData chunk bootstrap without component-body execution', async () => {
+test('linked render data publishes component definitions without component-body execution', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/App.tsrx',
 		source: `
@@ -17,14 +17,49 @@ export function App() @{
 		symbols: [],
 	});
 
-	const source = result.publicRenderModule.csrModuleSource;
-	const native = JSON.stringify(result.publicRenderModule.csrNativeMarkup);
-	expect(source).toContain('createMarklessCsrChunkRenderer');
-	expect(native).toContain('template:App');
-	expect(native).toContain('child-component');
-	expect(source).not.toContain('__marklessBodyExecuted = true');
-	expect(source).not.toContain('marklessCsrComposeView');
-	expect(source).not.toContain('.renderCsr?.(');
+	const definitions = JSON.stringify(result.publicRenderModule.componentDefinitions);
+	expect(definitions).toContain('template:App');
+	expect(definitions).toContain('component-edge:0');
+	expect(definitions).not.toContain('__marklessBodyExecuted = true');
+	expect(result.publicRenderModule).not.toHaveProperty('csrModuleSource');
+	expect(result.publicRenderModule).not.toHaveProperty('csrNativeMarkup');
+});
+
+test('non-materialized InteractiveCounter keeps its linked component definition', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/InteractiveCounter.tsrx',
+		source: `import { state } from '@markless/core';
+		import { Link } from '@markless/core/router';
+export default function InteractiveCounter() @{
+	let count = state(0);
+	<section>
+		<button data-mdx-counter onClick={() => count++}>MDX Count {count}</button>
+		<Link href="/" data-router-home>Home</Link>
+	</section>
+}`,
+		symbols: [],
+	});
+
+	const registryKey = result.renderData.root?.componentName;
+	expect(registryKey).toBe('InteractiveCounter');
+	const definitionData = result.publicRenderModule.componentDefinitions.find(
+		(definition) => definition.name === registryKey,
+	) as {
+		readonly name: string;
+		readonly rootChunkId: string;
+		readonly chunks: ReadonlyArray<Readonly<Record<string, unknown>>>;
+	};
+	expect(definitionData.name).toBe('InteractiveCounter');
+	expect(definitionData.rootChunkId).toBe(result.renderData.root?.templateId);
+	for (const [index, renderChunk] of result.renderData.chunks.entries()) {
+		const definitionChunk = definitionData.chunks[index];
+		const { statics: _statics, ...nativeChunkShape } = renderChunk;
+		expect(definitionChunk).toEqual({
+			...nativeChunkShape,
+			nativeTemplateId: `markless-render-data:src%2FInteractiveCounter.tsrx:InteractiveCounter:template:${encodeURIComponent(renderChunk.id)}`,
+		});
+		expect(definitionChunk).not.toHaveProperty('statics');
+	}
 });
 
 test('direct-eligible child modules publish prerender component definitions without changing tiers', async () => {
@@ -35,8 +70,6 @@ test('direct-eligible child modules publish prerender component definitions with
 	});
 
 	expect(result.publicRenderModule.moduleSource).not.toBe('');
-	expect(result.publicRenderModule.csrModuleSource).toBe('');
-	expect(result.publicRenderModule.csrNativeMarkup).toEqual([]);
 	expect(result.publicRenderModule.componentDefinitions).toEqual([
 		expect.objectContaining({
 			name: 'Badge',
@@ -45,17 +78,33 @@ test('direct-eligible child modules publish prerender component definitions with
 	]);
 });
 
-test('T009b standard CSR exports component chunk data for parent modules', async () => {
+test('linked component definitions export chunk data for parent modules', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/Card.tsrx',
 		source: `export function Card({ title }) @{ <article><h2>{title}</h2></article> }`,
 		symbols: [],
 	});
 
-	expect(result.publicRenderModule.csrModuleSource).toContain(
-		'export const marklessCsrChunkComponents',
-	);
-	expect(JSON.stringify(result.publicRenderModule.csrNativeMarkup)).toContain('template:Card');
+	expect(JSON.stringify(result.publicRenderModule.componentDefinitions)).toContain('template:Card');
+});
+
+test('artifact children materialized at build time are data, never runtime component registry entries', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Page.tsrx',
+		source: `import { Link } from '@markless/core/router';
+export function Page() @{ <main><Link href="/docs">Docs</Link></main> }`,
+		symbols: [],
+		artifactChildMaterializations: {
+			'component-edge:0': {
+				html: '<a href="/docs" data-markless-router-link>Docs</a>',
+				elementCount: 1,
+			},
+		},
+	});
+
+	const definitions = JSON.stringify(result.publicRenderModule.componentDefinitions);
+	expect(definitions).toContain('data-markless-router-link');
+	expect(definitions).not.toContain('renderCsr');
 });
 
 test('T009b chunk statics preserve slot-adjacent text bytes', async () => {
@@ -87,13 +136,13 @@ export function App() @{ <main><First /><Second /></main> }
 		symbols: [],
 	});
 
-	const native = JSON.stringify(result.publicRenderModule.csrNativeMarkup);
-	expect(native).toContain('"hostPrefix":"c0:"');
-	expect(native).toContain('"hostPrefix":"c1:"');
-	expect(native).not.toContain('"hostPrefix":"c3:"');
+	const definitions = JSON.stringify(result.publicRenderModule.componentDefinitions);
+	expect(definitions).toContain('"hostPrefix":"c0:"');
+	expect(definitions).toContain('"hostPrefix":"c1:"');
+	expect(definitions).not.toContain('"hostPrefix":"c3:"');
 });
 
-test('T009d standard CSR transports statics and slot tables as inert native markup data', async () => {
+test('canonical render data transports statics and slot tables without a browser producer', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/App.tsrx',
 		source: `import { state } from '@markless/core';
@@ -105,15 +154,11 @@ export function App() @{
 		symbols: [],
 	});
 
-	const source = result.publicRenderModule.csrModuleSource;
-	expect(source).not.toContain('MARKLESS_CSR_NATIVE_START');
 	expect(result.publicRenderModule.renderDataModuleSource).toContain(
 		'export const marklessRenderData',
 	);
-	expect(source).toContain('dataId:');
-	expect(source).not.toContain('chunks:[{');
-	expect(source).not.toContain('initialValues:[{');
-	expect(source).not.toContain('template.innerHTML');
+	expect(result.publicRenderModule).not.toHaveProperty('csrModuleSource');
+	expect(result.publicRenderModule).not.toHaveProperty('csrNativeMarkup');
 });
 
 test('T009d callback bodies have one demand-loaded symbol representation', async () => {
@@ -126,8 +171,11 @@ export function App() @{
 		symbols: [],
 	});
 
-	const source = result.publicRenderModule.csrModuleSource;
-	expect(source.match(/globalThis\.__picked/g) ?? []).toHaveLength(0);
+	expect(
+		JSON.stringify(result.publicRenderModule.componentDefinitions).match(
+			/globalThis\.__picked/g,
+		) ?? [],
+	).toHaveLength(0);
 	expect(
 		result.symbolModules.modules.some((module) =>
 			module.source.includes('globalThis.__picked'),

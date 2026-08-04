@@ -1,8 +1,8 @@
 import { expect, test } from 'vitest';
 import { dispatchRouteUpdate, startRouteUpdateRenderer } from '@markless/core/router';
-import SlowPage from './fixtures/nav-page-slow.tsrx';
-import AlphaPage from './fixtures/nav-soak-alpha.tsrx';
-import BetaPage from './fixtures/nav-soak-beta.tsrx';
+import SlowPage from './fixtures/nav-page-slow.tsrx?markless-route';
+import AlphaPage from './fixtures/nav-soak-alpha.tsrx?markless-route';
+import BetaPage from './fixtures/nav-soak-beta.tsrx?markless-route';
 
 // T116 best-effort 6 — SOAK: many nav/settle cycles through the full D8
 // route-swap machinery (hold -> settle -> swap commit) must not accumulate

@@ -1,11 +1,18 @@
 import type { RuntimeGraph, RuntimeGraphUpdate } from '@markless/runtime';
+import type { ArmCommitUpdate } from '../resume-commit-arm.ts';
 import type { DecodedPayloadScripts } from '../../../serializer/src/protocol-client-storage.ts';
 import { decodePayloadScripts } from '../../../serializer/src/protocol-client-storage.ts';
 import {
 	mergeResumeRecordDelta,
 	type ResumeRecordSet,
-} from '@markless/serializer/resume-record-delta';
-import { createResumeRuntime, type ResumeDomElement, type ResumeRuntime } from '../resume.ts';
+} from '@markless/serializer/resume-record-merge';
+import {
+	createResumeRuntime,
+	type ResumeDomElement,
+	type ResumeDomEvent,
+	type ResumeRuntime,
+} from '../resume.ts';
+import type { ProtocolStatePayload } from '@markless/serializer/protocol';
 import type { ResumePayloadScriptsInput, ResumePayloadScriptsResult } from '../payload-full.ts';
 import { createRuntimeGraphFromResumePayload } from '../payload-graph-construct.ts';
 import {
@@ -13,11 +20,36 @@ import {
 	readPayloadScriptsFromDocument,
 	type PayloadScriptDocument,
 } from '../payload-document-common.ts';
+import {
+	attachPrerenderStagedGraphRegistration,
+	registerPrerenderStagedComputeds,
+	type PrerenderStagedComputedRegistration,
+} from '../prerender/staged-graph.ts';
+import {
+	attachPrerenderBoundaryAuthority,
+	beginPrerenderBoundaryArmCommit,
+	claimPrerenderBoundaryArmRegistration,
+	completePrerenderBoundaryArmRegistration,
+	resolvePrerenderBoundaryAuthority,
+	type PrerenderBoundaryArmRegistration,
+} from '../prerender/staged-boundary-authority.ts';
 
 type TriggerGroupInput = Omit<ResumePayloadScriptsInput, 'stateScript' | 'viewScript'> &
 	DecodedPayloadScripts & {
 		readonly groupId: string;
 		readonly graphNodeIds: ReadonlyArray<string>;
+		readonly renderBoundaryArm?: (
+			boundaryId: string,
+			status: 'fulfilled' | 'rejected',
+			graph: RuntimeGraph,
+		) => ArmCommitUpdate & {
+			readonly nodes: ReadonlyArray<import('../resume-types.ts').ResumeDomNode>;
+		};
+		readonly prepareBoundaryArm?: (
+			boundaryId: string,
+			status: 'fulfilled' | 'rejected',
+			graph: RuntimeGraph,
+		) => Promise<void>;
 	};
 
 type GraphSegment = {
@@ -29,6 +61,21 @@ type GraphSegment = {
 type StagedContainer = {
 	readonly groups: Map<string, Promise<ResumePayloadScriptsResult>>;
 	readonly segments: GraphSegment[];
+	readonly runtimes: Array<{
+		readonly segment: GraphSegment;
+		readonly runtime: ResumeRuntime;
+		readonly registerComputedRefreshes: (
+			records: ReadonlyArray<PrerenderStagedComputedRegistration>,
+		) => Promise<void> | undefined;
+	}>;
+	readonly computed: Map<
+		string,
+		{
+			readonly owner: GraphSegment;
+			readonly record: PrerenderStagedComputedRegistration;
+		}
+	>;
+	dispatchRegistered: boolean;
 };
 
 const stagedContainers = new WeakMap<ResumeDomElement, StagedContainer>();
@@ -49,8 +96,15 @@ export function resumePrerenderTriggerGroup(
 ): Promise<ResumePayloadScriptsResult> {
 	let container = stagedContainers.get(input.root);
 	if (!container) {
-		container = { groups: new Map(), segments: [] };
+		container = {
+			groups: new Map(),
+			segments: [],
+			runtimes: [],
+			computed: new Map(),
+			dispatchRegistered: false,
+		};
 		stagedContainers.set(input.root, container);
+		attachPrerenderBoundaryAuthority(input.root);
 	}
 	const existing = container.groups.get(input.groupId);
 	if (existing) return existing;
@@ -73,9 +127,7 @@ async function startTriggerGroup(
 				...adopted.state,
 				cells: adopted.state.cells.map((cell) =>
 					container.segments.some((segment) => segment.graphNodeIds.has(cell.graphNodeId))
-						? // A live graph read never crossed the HTML boundary — the
-							// shared decoder's directValue lane exists for exactly this;
-							// feeding it through `value` would hit the envelope decoder.
+						? // Live graph reads bypass the serialized-value envelope.
 							{ ...cell, value: undefined, directValue: prior.read(cell.graphNodeId) }
 						: cell,
 				),
@@ -96,6 +148,46 @@ async function startTriggerGroup(
 	};
 	container.segments.push(segment);
 	const graph = createStagedGraph(container, segment);
+	await registerPrerenderStagedComputeds(
+		graph,
+		(state.computed ?? [])
+			.filter(
+				(record) => record.async === false && typeof record.deriveSymbolId === 'string',
+			)
+			.map((record) => ({
+				...record,
+				value: graph.read(record.graphNodeId),
+			})),
+	);
+	const boundaryClaims: PrerenderBoundaryArmRegistration[] = [];
+	for (const [index, boundary] of adopted.view.asyncBoundaries.entries()) {
+		const canonical = resolvePrerenderBoundaryAuthority(adopted.root, boundary);
+		const claim = await claimPrerenderBoundaryArmRegistration(adopted.root, canonical);
+		if (claim) boundaryClaims.push(claim);
+		adopted.view.asyncBoundaries[index] = claim ? canonical : { ...canonical, armRecords: [] };
+	}
+	const renderAsyncBoundary = adopted.renderBoundaryArm
+		? async (
+				boundaryId: string,
+				status: 'fulfilled' | 'rejected',
+				renderGraph: RuntimeGraph,
+			) => {
+				await adopted.prepareBoundaryArm?.(boundaryId, status, renderGraph);
+				const rendered = adopted.renderBoundaryArm!(boundaryId, status, renderGraph);
+				const boundary = adopted.view.asyncBoundaries.find(
+					(candidate) => candidate.id === boundaryId,
+				);
+				if (boundary) {
+					const claim = beginPrerenderBoundaryArmCommit(
+						adopted.root,
+						boundary,
+						rendered.armRecords,
+					);
+					if (claim) completePrerenderBoundaryArmRegistration(adopted.root, claim, true);
+				}
+				return rendered;
+			}
+		: adopted.renderAsyncBoundary;
 	let runtime: ResumeRuntime | undefined;
 	const applyDomJournal =
 		adopted.applyDomJournal ??
@@ -117,24 +209,46 @@ async function startTriggerGroup(
 				},
 			});
 		});
-	runtime = createResumeRuntime({
-		root: adopted.root,
-		graph,
-		state: adopted.state,
-		view: adopted.view,
-		loadSymbol: adopted.loadSymbol,
-		createVisibilityObserver: adopted.createVisibilityObserver,
-		createRemovalObserver: adopted.createRemovalObserver,
-		applyDomJournal,
-		renderBranchHtml: adopted.renderBranchHtml,
-		renderAsyncBoundary: adopted.renderAsyncBoundary,
-	});
+	let registerComputedRefreshes:
+		| ((records: ProtocolStatePayload['computed']) => Promise<void>)
+		| undefined;
+	runtime = createResumeRuntime(
+		{
+			root: adopted.root,
+			graph,
+			state: adopted.state,
+			view: adopted.view,
+			loadSymbol: adopted.loadSymbol,
+			createVisibilityObserver: adopted.createVisibilityObserver,
+			createRemovalObserver: adopted.createRemovalObserver,
+			applyDomJournal,
+			renderBranchHtml: adopted.renderBranchHtml,
+			renderAsyncBoundary,
+		},
+		(register) => {
+			registerComputedRefreshes = register;
+		},
+	);
 	const eventTypes = new Set(
 		adopted.view.events
 			.filter((event) => event.eventName !== 'visible')
 			.map((event) => event.eventName),
 	);
-	await withoutCaptureListeners(adopted.root, eventTypes, () => runtime!.start());
+	let started = false;
+	try {
+		await withoutCaptureListeners(adopted.root, eventTypes, () => runtime!.start());
+		// Backfill settled-arm computeds onto their owning runtime.
+		await registerComputedRefreshes?.(
+			[...container.computed.values()]
+				.filter((computed) => computed.owner === segment)
+				.map((computed) => computed.record),
+		);
+		started = true;
+	} finally {
+		for (const claim of boundaryClaims)
+			completePrerenderBoundaryArmRegistration(adopted.root, claim, started);
+	}
+	// Keep each staged computed with the runtime owning its derive route.
 	const stagedRuntime: ResumeRuntime = {
 		...runtime,
 		dispatch: (event, options) =>
@@ -142,17 +256,61 @@ async function startTriggerGroup(
 				runtime!.dispatch(event, options),
 			),
 	};
+	container.runtimes.push({
+		segment,
+		runtime: stagedRuntime,
+		registerComputedRefreshes: (records) => registerComputedRefreshes?.(records),
+	});
+	if (!container.dispatchRegistered) {
+		type Handoff = {
+			readonly event: ResumeDomEvent;
+			readonly syncPolicyAlreadyApplied?: boolean;
+		};
+		(
+			adopted.root as typeof adopted.root & {
+				__marklessRegisterDispatch?: (
+					dispatch: (
+						handoff: Handoff,
+						fallback: (handoff: Handoff) => Promise<void> | void,
+					) => Promise<void> | void,
+				) => void;
+			}
+		).__marklessRegisterDispatch?.(async (handoff, fallback) => {
+			let matched = false;
+			for (const candidate of container.runtimes) {
+				try {
+					await candidate.runtime.dispatch(handoff.event, {
+						syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true,
+					});
+					matched = true;
+				} catch (error) {
+					if (!isUnmatchedDispatchError(error)) throw error;
+				}
+			}
+			if (!matched) await fallback(handoff);
+		});
+		container.dispatchRegistered = true;
+	}
 	(
 		adopted.root as typeof adopted.root & { __asyncResumeRuntimeStarted?: boolean }
 	).__asyncResumeRuntimeStarted = true;
 	return { decoded: adopted, graph, runtime: stagedRuntime };
 }
 
+function isUnmatchedDispatchError(error: unknown): boolean {
+	return (
+		typeof error === 'object' &&
+		error !== null &&
+		(error as { readonly code?: unknown }).code === 'MARKLESS_EVENT_DISPATCH_UNMATCHED'
+	);
+}
+
 function createStagedGraph(container: StagedContainer, local: GraphSegment): RuntimeGraph {
 	const matching = (graphNodeId: string) =>
 		container.segments.filter((segment) => segment.graphNodeIds.has(graphNodeId));
 	const graphFor = (graphNodeId: string) =>
-		(local.graphNodeIds.has(graphNodeId) ? local : matching(graphNodeId)[0])?.graph ?? local.graph;
+		(local.graphNodeIds.has(graphNodeId) ? local : matching(graphNodeId)[0])?.graph ??
+		local.graph;
 	const staged: RuntimeGraph = {
 		read: (graphNodeId, path) => graphFor(graphNodeId).read(graphNodeId, path),
 		...(local.graph.peekAsyncSnapshot
@@ -162,9 +320,9 @@ function createStagedGraph(container: StagedContainer, local: GraphSegment): Run
 				}
 			: {}),
 		readShared: (definitionId, propertyName, path) =>
-			(container.segments.find((segment) =>
-				segment.sharedDefinitionIds.has(definitionId),
-			)?.graph ?? local.graph
+			(
+				container.segments.find((segment) => segment.sharedDefinitionIds.has(definitionId))
+					?.graph ?? local.graph
 			).readShared(definitionId, propertyName, path),
 		writeShared: (write) => {
 			let wrote = false;
@@ -218,7 +376,50 @@ function createStagedGraph(container: StagedContainer, local: GraphSegment): Run
 		},
 		takeJournal: () => local.graph.takeJournal(),
 	};
+	attachPrerenderStagedGraphRegistration(staged, async (records) => {
+		registerStagedComputedClosure(container, local, records);
+		await Promise.all(
+			container.runtimes
+				.filter((runtime) => runtime.segment === local)
+				.map((runtime) => runtime.registerComputedRefreshes(records)),
+		);
+	});
 	return staged;
+}
+
+function registerStagedComputedClosure(
+	container: StagedContainer,
+	local: GraphSegment,
+	records: ReadonlyArray<PrerenderStagedComputedRegistration>,
+): void {
+	const discovered = new Map(records.map((record) => [record.graphNodeId, record]));
+	const graphNodeIds = new Set(records.map((record) => record.graphNodeId));
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const graphNodeId of graphNodeIds) {
+			for (const dependency of discovered.get(graphNodeId)?.dependencies ?? []) {
+				if (graphNodeIds.has(dependency.graphNodeId)) continue;
+				graphNodeIds.add(dependency.graphNodeId);
+				changed = true;
+			}
+		}
+	}
+	for (const graphNodeId of graphNodeIds) {
+		if (discovered.has(graphNodeId)) continue;
+		if (!container.segments.some((segment) => segment.graphNodeIds.has(graphNodeId))) {
+			throw new Error(
+				`Markless staged computed dependency ${graphNodeId} was not registered before settle render.`,
+			);
+		}
+	}
+	for (const record of records) {
+		container.computed.set(record.graphNodeId, { owner: local, record });
+		local.graphNodeIds.add(record.graphNodeId);
+		local.graph.write({ graphNodeId: record.graphNodeId, value: record.value });
+	}
+	// A subscribing segment must claim dependencies to receive broadcasts.
+	for (const graphNodeId of graphNodeIds) local.graphNodeIds.add(graphNodeId);
 }
 
 function broadcastUpdate(
@@ -266,7 +467,8 @@ async function withoutCaptureListeners<T>(
 	} finally {
 		if (addDescriptor) Object.defineProperty(target, 'addEventListener', addDescriptor);
 		else delete target.addEventListener;
-		if (removeDescriptor) Object.defineProperty(target, 'removeEventListener', removeDescriptor);
+		if (removeDescriptor)
+			Object.defineProperty(target, 'removeEventListener', removeDescriptor);
 		else delete target.removeEventListener;
 	}
 }

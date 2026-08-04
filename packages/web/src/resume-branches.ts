@@ -17,6 +17,9 @@ type ArmBehavior = ResumeBehaviorRecord & { readonly hostPath: ReadonlyArray<num
 type ArmHandle = ResumeViewRecord['elementHandles'][number] & {
 	readonly hostPath: ReadonlyArray<number>;
 };
+type RegisteredResumeBranch = ResumeBranchRecord & {
+	readonly armBoundaryId?: string;
+};
 
 export function wireBranches(input: any) {
 	const branchesById = new Map<string, ResumeBranchRecord>(),
@@ -26,9 +29,83 @@ export function wireBranches(input: any) {
 	// (the anchors are replaced); escalated records wire once per site.
 	const armFlipReleasesByBoundary = new Map<string, Array<() => void>>(),
 		wiredEscalationIds = new Set<string>();
-	function wireBranchRecord(
-		branch: ResumeBranchRecord & { readonly armBoundaryId?: string },
+	const { registerArmBranches, wireBranchRecord, wireEscalatedRecord } = createBranchRegistration(
+		input,
+		{
+			branchesById,
+			currentArmByBranchId,
+			armFlipReleasesByBoundary,
+			wiredEscalationIds,
+		},
+	);
+	for (const branch of materializeBranchLocators(input.root, input.view.branches ?? []))
+		wireBranchRecord(branch);
+	for (const record of input.view.branches ?? [])
+		if (record.armBoundaryId && !record.symbolId) wireEscalatedRecord(record);
+	for (const branch of branchesById.values()) {
+		const arm = currentArmByBranchId.get(branch.id);
+		if (
+			arm === undefined ||
+			input.skipStartupBranchIds?.has(branch.id) ||
+			!branch.armRecords?.[arm]
+		)
+			continue;
+		startupArmBehaviorHostIds.push(...materializeBranchArmRecords(input, branch, arm));
+	}
+	async function materializeFlippedBranchArms(
+		entries: ReadonlyArray<DomJournalEntry>,
+		activate: (hostNodeId: string) => Promise<void>,
+	): Promise<void> {
+		for (const entry of entries) {
+			if (
+				entry.type !== 'insertRange' ||
+				!entry.locator.startsWith('branch:') ||
+				!entry.locator.endsWith(':start')
+			)
+				continue;
+			const branchId = entry.locator.slice('branch:'.length, -':start'.length),
+				branch = branchesById.get(branchId),
+				arm = currentArmByBranchId.get(branchId);
+			if (!branch || arm === undefined || !branch.armRecords?.[arm]) continue;
+			for (const hostNodeId of materializeBranchArmRecords(input, branch, arm))
+				await activate(hostNodeId);
+		}
+	}
+	function disposeRemovedRangeHosts(
+		entries: ReadonlyArray<DomJournalEntry>,
+		disposeHost: (hostNodeId: string) => void,
+		asyncBoundaries: Map<
+			string,
+			{
+				readonly startAnchor: ResumeDomComment;
+				readonly endAnchor: ResumeDomComment;
+			}
+		>,
 	): void {
+		if (!entries.some((entry) => entry.type === 'removeRange')) return;
+		disposeRemovedHosts(input, entries, disposeHost, branchesById, asyncBoundaries);
+	}
+	return {
+		branchesById,
+		startupArmBehaviorHostIds,
+		materializeFlippedBranchArms,
+		disposeRemovedRangeHosts,
+		registerArmBranches,
+	};
+}
+
+function createBranchRegistration(
+	input: any,
+	state: {
+		readonly branchesById: Map<string, ResumeBranchRecord>;
+		readonly currentArmByBranchId: Map<string, number>;
+		readonly armFlipReleasesByBoundary: Map<string, Array<() => void>>;
+		readonly wiredEscalationIds: Set<string>;
+	},
+) {
+	const { branchesById, currentArmByBranchId, armFlipReleasesByBoundary, wiredEscalationIds } =
+		state;
+	function wireBranchRecord(branch: RegisteredResumeBranch): void {
 		branchesById.set(branch.id, branch);
 		for (const armRecordSet of branch.armRecords ?? [])
 			for (const armEvent of armRecordSet.events) input.eventTypes.add(armEvent.eventName);
@@ -85,6 +162,7 @@ export function wireBranches(input: any) {
 			input.storeContainerSubscription(release);
 		}
 	}
+
 	// Escalated arm-scoped toggles (content needs component execution): the
 	// test read re-renders the whole arm through the boundary's update module.
 	function wireEscalatedRecord(record: {
@@ -107,21 +185,13 @@ export function wireBranches(input: any) {
 				}),
 			);
 	}
-	for (const branch of materializeBranchLocators(input.root, input.view.branches ?? []))
-		wireBranchRecord(branch);
-	for (const record of input.view.branches ?? [])
-		if (record.armBoundaryId && !record.symbolId) wireEscalatedRecord(record);
-	for (const branch of branchesById.values()) {
-		const arm = currentArmByBranchId.get(branch.id);
-		if (arm !== undefined && !input.skipStartupBranchIds?.has(branch.id))
-			startupArmBehaviorHostIds.push(...materializeBranchArmRecords(input, branch, arm));
-	}
+
 	// Re-registration API for commitArm (T103/T104): a fresh arm brings fresh
 	// arm-branch anchors, so previous flip subscriptions release first (no
 	// leaks) and the current arm's in-branch records register like startup.
 	function registerArmBranches(
 		boundaryId: string,
-		records: ReadonlyArray<ResumeBranchRecord & { readonly armBoundaryId?: string }>,
+		records: ReadonlyArray<RegisteredResumeBranch>,
 	): string[] {
 		for (const release of armFlipReleasesByBoundary.get(boundaryId) ?? []) release();
 		armFlipReleasesByBoundary.delete(boundaryId);
@@ -139,66 +209,13 @@ export function wireBranches(input: any) {
 			const branch = { ...record, armBoundaryId: boundaryId };
 			wireBranchRecord(branch);
 			const arm = currentArmByBranchId.get(branch.id);
-			if (arm !== undefined)
-				behaviorHostIds.push(...materializeBranchArmRecords(input, branch, arm));
+			if (arm === undefined || !branch.armRecords?.[arm]) continue;
+			behaviorHostIds.push(...materializeBranchArmRecords(input, branch, arm));
 		}
 		return behaviorHostIds;
 	}
-	async function materializeFlippedBranchArms(
-		entries: ReadonlyArray<DomJournalEntry>,
-		activate: (hostNodeId: string) => Promise<void>,
-	): Promise<void> {
-		for (const entry of entries) {
-			if (
-				entry.type !== 'insertRange' ||
-				!entry.locator.startsWith('branch:') ||
-				!entry.locator.endsWith(':start')
-			)
-				continue;
-			const branchId = entry.locator.slice('branch:'.length, -':start'.length),
-				branch = branchesById.get(branchId),
-				arm = currentArmByBranchId.get(branchId);
-			if (!branch || arm === undefined) continue;
-			for (const hostNodeId of materializeBranchArmRecords(input, branch, arm))
-				await activate(hostNodeId);
-		}
-	}
-	function disposeRemovedRangeHosts(
-		entries: ReadonlyArray<DomJournalEntry>,
-		disposeHost: (hostNodeId: string) => void,
-		asyncBoundaries: Map<
-			string,
-			{
-				readonly startAnchor: import('./resume-types.ts').ResumeDomComment;
-				readonly endAnchor: import('./resume-types.ts').ResumeDomComment;
-			}
-		>,
-	): void {
-		for (const entry of entries) {
-			if (entry.type !== 'removeRange') continue;
-			const branch = entry.locator.startsWith('branch:')
-				? branchesById.get(entry.locator.slice('branch:'.length))
-				: undefined;
-			const range =
-				branch ??
-				(entry.locator.startsWith('async-boundary:')
-					? asyncBoundaries.get(entry.locator.slice('async-boundary:'.length))
-					: undefined);
-			if (!range) continue;
-			for (const id of hostIdsInsideRemovedElements(
-				input.elementsByHostId,
-				elementsBetweenAnchors(input.root, range.startAnchor, range.endAnchor),
-			))
-				disposeHost(id);
-		}
-	}
-	return {
-		branchesById,
-		startupArmBehaviorHostIds,
-		materializeFlippedBranchArms,
-		disposeRemovedRangeHosts,
-		registerArmBranches,
-	};
+
+	return { registerArmBranches, wireBranchRecord, wireEscalatedRecord };
 }
 
 function onceRelease(release: () => void): () => void {
@@ -209,12 +226,41 @@ function onceRelease(release: () => void): () => void {
 		if (typeof release === 'function') release();
 	};
 }
-function isLiveComment(value: unknown): value is ResumeDomComment {
+
+function readBranchArm(graph: RuntimeGraph, branch: ResumeBranchRecord): number {
+	const read = branch.testReads[0]!,
+		value = graph.read(read.graphNodeId, read.path);
+	if (branch.armTests) {
+		for (let i = 0; i < branch.armTests.length; i++)
+			if (branch.armTests[i] !== null && value === branch.armTests[i]) return i;
+		return branch.armTests.indexOf(null);
+	}
+	return value ? 0 : 1;
+}
+
+function isResumeBranchUpdate(value: unknown): value is ResumeBranchUpdate {
+	const update = value as { readonly arm?: unknown; readonly html?: unknown } | null;
+	return typeof update?.arm === 'number' && isBranchHtml(update.html);
+}
+
+function isBranchHtml(value: unknown): value is ResumeBranchUpdate['html'] {
+	if (typeof value === 'string') return true;
 	return (
-		!!value &&
-		typeof value === 'object' &&
-		(value as { readonly nodeType?: number }).nodeType === 8
+		Array.isArray(value) &&
+		value.every(
+			(record) =>
+				typeof record === 'string' ||
+				(typeof record === 'object' &&
+					record !== null &&
+					typeof (record as { readonly text?: unknown }).text === 'string'),
+		)
 	);
+}
+
+function branchHtmlToString(html: ResumeBranchUpdate['html']): string {
+	return typeof html === 'string'
+		? html
+		: html.map((record) => (typeof record === 'string' ? record : record.text)).join('');
 }
 
 function materializeBranchArmRecords(
@@ -281,43 +327,20 @@ function materializeBranchArmRecords(
 	}
 	return [...byHost.keys()];
 }
-function readBranchArm(graph: RuntimeGraph, branch: ResumeBranchRecord): number {
-	const read = branch.testReads[0]!,
-		value = graph.read(read.graphNodeId, read.path);
-	if (branch.armTests) {
-		for (let i = 0; i < branch.armTests.length; i++)
-			if (branch.armTests[i] !== null && value === branch.armTests[i]) return i;
-		return branch.armTests.indexOf(null);
-	}
-	return value ? 0 : 1;
-}
-function isResumeBranchUpdate(value: unknown): value is ResumeBranchUpdate {
-	const update = value as { readonly arm?: unknown; readonly html?: unknown } | null;
-	return typeof update?.arm === 'number' && isBranchHtml(update.html);
-}
-function isBranchHtml(value: unknown): value is ResumeBranchUpdate['html'] {
-	if (typeof value === 'string') return true;
+
+function isLiveComment(value: unknown): value is ResumeDomComment {
 	return (
-		Array.isArray(value) &&
-		value.every(
-			(record) =>
-				typeof record === 'string' ||
-				(typeof record === 'object' &&
-					record !== null &&
-					typeof (record as { readonly text?: unknown }).text === 'string'),
-		)
+		!!value &&
+		typeof value === 'object' &&
+		(value as { readonly nodeType?: number }).nodeType === 8
 	);
 }
-function branchHtmlToString(html: ResumeBranchUpdate['html']): string {
-	return typeof html === 'string'
-		? html
-		: html.map((record) => (typeof record === 'string' ? record : record.text)).join('');
-}
+
 function materializeBranchLocators(
 	root: ResumeDomElement,
 	branches: NonNullable<ResumeViewRecord['branches']>,
-): Array<ResumeBranchRecord & { readonly armBoundaryId?: string }> {
-	const records: Array<ResumeBranchRecord & { readonly armBoundaryId?: string }> = [],
+): Array<RegisteredResumeBranch> {
+	const records: RegisteredResumeBranch[] = [],
 		comments = walkComments(root);
 	for (const branch of branches) {
 		if (!branch.symbolId || !branch.testReads?.length) continue;
@@ -334,18 +357,15 @@ function materializeBranchLocators(
 			throw missingCommentAnchorError(branch.id, 'startAnchor', branch.startAnchor.index);
 		if (!endAnchor)
 			throw missingCommentAnchorError(branch.id, 'endAnchor', branch.endAnchor.index);
-		// The protocol record carries exactly the branch-record fields; only the
-		// index anchors are replaced with their live comments.
-		records.push({ ...branch, startAnchor, endAnchor } as ResumeBranchRecord & {
-			readonly armBoundaryId?: string;
-		});
+		records.push({ ...branch, startAnchor, endAnchor } as RegisteredResumeBranch);
 	}
 	return records;
 }
+
 function nodesBetweenAnchors(
 	root: ResumeDomElement,
-	startAnchor: ResumeDomComment,
-	endAnchor: ResumeDomComment,
+	startAnchor: ResumeDomNode,
+	endAnchor: ResumeDomNode,
 ): ResumeDomNode[] {
 	const nodes: ResumeDomNode[] = [];
 	function visit(node: ResumeDomNode): boolean {
@@ -364,6 +384,7 @@ function nodesBetweenAnchors(
 	visit(root);
 	return nodes;
 }
+
 function armRecordHost(
 	armNodes: ReadonlyArray<ResumeDomNode>,
 	hostPath: ReadonlyArray<number>,
@@ -372,6 +393,7 @@ function armRecordHost(
 		top = firstIndex === undefined ? undefined : armNodes[firstIndex];
 	return top?.nodeType === 1 ? rowEventHost(top as ResumeDomElement, childPath) : undefined;
 }
+
 function rowEventHost(
 	rowRoot: ResumeDomElement,
 	hostPath: ReadonlyArray<number>,
@@ -383,6 +405,39 @@ function rowEventHost(
 	}
 	return current.nodeType === 1 ? (current as ResumeDomElement) : undefined;
 }
+
+function disposeRemovedHosts(
+	input: any,
+	entries: ReadonlyArray<DomJournalEntry>,
+	disposeHost: (hostNodeId: string) => void,
+	branchesById: Map<string, ResumeBranchRecord>,
+	asyncBoundaries: Map<
+		string,
+		{
+			readonly startAnchor: ResumeDomComment;
+			readonly endAnchor: ResumeDomComment;
+		}
+	>,
+): void {
+	for (const entry of entries) {
+		if (entry.type !== 'removeRange') continue;
+		const branch = entry.locator.startsWith('branch:')
+			? branchesById.get(entry.locator.slice('branch:'.length))
+			: undefined;
+		const range =
+			branch ??
+			(entry.locator.startsWith('async-boundary:')
+				? asyncBoundaries.get(entry.locator.slice('async-boundary:'.length))
+				: undefined);
+		if (!range) continue;
+		for (const id of hostIdsInsideRemovedElements(
+			input.elementsByHostId,
+			elementsBetweenAnchors(input.root, range.startAnchor, range.endAnchor),
+		))
+			disposeHost(id);
+	}
+}
+
 // Local copies of the resume-locators DOM-walk helpers: importing that module
 // here regroups it (plus the resume-errors chunk) into this wall-counted
 // chunk, which costs more than the duplication saves (T120 measurement).
@@ -408,6 +463,7 @@ function elementsBetweenAnchors(
 	visit(root);
 	return inside;
 }
+
 function hostIdsInsideRemovedElements(
 	elementsByHostId: Map<string, ResumeDomElement>,
 	removed: Set<ResumeDomElement>,
@@ -421,12 +477,14 @@ function hostIdsInsideRemovedElements(
 			}
 	return ids;
 }
+
 function containsElement(root: ResumeDomElement, target: ResumeDomElement): boolean {
 	if (root === target) return true;
 	for (const child of root.childNodes ?? [])
 		if (child.nodeType === 1 && containsElement(child as ResumeDomElement, target)) return true;
 	return false;
 }
+
 function walkComments(root: ResumeDomElement): ResumeDomComment[] {
 	// Arm-branch anchors index in their boundary's own census, never here.
 	const comments: ResumeDomComment[] = [];
@@ -437,6 +495,7 @@ function walkComments(root: ResumeDomElement): ResumeDomComment[] {
 	})(root);
 	return comments;
 }
+
 function missingCommentAnchorError(
 	id: string,
 	name: 'startAnchor' | 'endAnchor',
@@ -448,6 +507,7 @@ function missingCommentAnchorError(
 		{},
 	);
 }
+
 // Shared diagnostic shape (message text stays authored per site; docsUrl
 // always mirrors the code).
 function branchRuntimeError(message: string, code: string, fields: Record<string, unknown>): Error {
@@ -458,6 +518,7 @@ function branchRuntimeError(message: string, code: string, fields: Record<string
 	error.docsUrl = `https://markless.dev/errors/${code}`;
 	return error;
 }
+
 function branchFragmentEmpty(fragment: unknown): boolean {
 	if (typeof fragment === 'string') return fragment.length === 0;
 	if (fragment && typeof fragment === 'object' && 'childNodes' in fragment)
@@ -470,6 +531,7 @@ function branchFragmentEmpty(fragment: unknown): boolean {
 		!fragment.some((node) => node && typeof node === 'object' && 'nodeType' in node)
 	);
 }
+
 function branchArmEmptyError(branch: ResumeBranchRecord, arm: number): Error {
 	return branchRuntimeError(
 		`MARKLESS_BRANCH_ARM_EMPTY: Branch ${branch.id} resolved arm ${String(arm)} to an empty fragment.`,

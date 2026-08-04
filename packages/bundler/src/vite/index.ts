@@ -9,7 +9,7 @@ import type {
 } from 'vite';
 import type { OutputOptions } from 'rolldown';
 import { resolve } from 'pathe';
-import { joinURL, parsePath } from 'ufo';
+import { joinURL, parsePath, withQuery } from 'ufo';
 import { createPreloadGraphAdder } from '../build/bundle-graph.ts';
 import {
 	deriveBuiltPrerenderRecords,
@@ -77,11 +77,14 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 	const prerenderRecordsBySource = new Map<string, BuiltPrerenderRecords>();
 	const rolldownOptions: InternalMarklessRolldownOptions = { ...options };
 	const prerender = process.env.MARKLESS_PRERENDER === '1';
+	const explicitPrerenderWake = process.env.MARKLESS_PRERENDER_WAKE;
 	rolldownOptions.prerender = false;
-	rolldownOptions.prerenderWakeChannel = process.env.MARKLESS_PRERENDER_WAKE === '1';
-	// T004 staging is a wake-module experiment until its byte and interaction
-	// walls are ratcheted. Ordinary prerender builds keep the established resume
-	// module; only the explicit channel may emit the staged wake surface.
+	rolldownOptions.prerenderWakeChannel = prerender
+		? explicitPrerenderWake !== '0'
+		: explicitPrerenderWake === '1';
+	// Prerendered pages use staged wake by default. Non-prerender builds keep
+	// native emission unless the channel is explicitly enabled; an explicit 0
+	// remains the legacy-path comparison seam for prerender builds.
 	const stagePrerenderWake = rolldownOptions.prerenderWakeChannel;
 	rolldownOptions.productionResumeModuleUrls = new Map();
 	rolldownOptions.productionPrerenderWakeModuleUrls = new Map();
@@ -235,11 +238,16 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				}
 				await buildMarklessEnvironments(builder, options);
 				if (prerender && prerenderEntry) {
-					const clientEnvironment = builder.environments[viteEnvironmentName('client', options)];
+					const source = resolve(resolvedRoot, prerenderEntry);
+					const clientEnvironment =
+						builder.environments[viteEnvironmentName('client', options)];
 					await emitPrerenderedPage({
 						root: clientEnvironment?.config.root ?? resolvedRoot,
 						entry: resolve(resolvedRoot, prerenderEntry),
 						outDir: clientEnvironment?.config.build?.outDir ?? clientOutDir,
+						resumeModuleUrl: rolldownOptions.productionResumeModuleUrls?.get(source),
+						prerenderWakeModuleUrl:
+							rolldownOptions.productionPrerenderWakeModuleUrls?.get(source),
 						serverPlugin: createMarklessRolldownPlugin({
 							environment: 'server',
 							options: {
@@ -259,6 +267,14 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			rolldownOptions.devServer = {
 				transformRequest: (url, environment) =>
 					transformMarklessRequest(server, url, environment, options),
+				invalidateModule: (id, environment) => {
+					const target =
+						server.environments[viteEnvironmentName(environment, options)];
+					const module = target?.moduleGraph?.getModuleById?.(id);
+					if (!module) return false;
+					target.moduleGraph.invalidateModule(module, new Set(), Date.now(), true);
+					return true;
+				},
 			};
 			hmr.configureServer(server);
 			devPrerender?.configureServer(server);
@@ -446,23 +462,24 @@ function withSsrSymbolInput(
 	input: RolldownInputConfig,
 	ssrSymbolInput: string,
 ): Record<string, string> {
+	const symbolInput = withQuery(ssrSymbolInput, { 'markless-symbols': null });
 	if (isRolldownInputRecord(input)) {
 		if (Object.keys(input).some((name) => /symbol/i.test(name))) return input;
-		return { ...input, symbols: ssrSymbolInput };
+		return { ...input, symbols: symbolInput };
 	}
 	if (typeof input === 'string') {
 		const name = input.endsWith('.html') ? 'index' : 'app';
 		return input === ssrSymbolInput
-			? { symbols: ssrSymbolInput }
-			: { [name]: input, symbols: ssrSymbolInput };
+			? { symbols: symbolInput }
+			: { [name]: input, symbols: symbolInput };
 	}
 	if (Array.isArray(input)) {
 		return Object.fromEntries([
 			...input.map((entry, index) => [`input${index}`, entry]),
-			['symbols', ssrSymbolInput],
+			['symbols', symbolInput],
 		]);
 	}
-	return { symbols: ssrSymbolInput };
+	return { symbols: symbolInput };
 }
 
 function isRolldownInputRecord(input: RolldownInputConfig): input is Record<string, string> {

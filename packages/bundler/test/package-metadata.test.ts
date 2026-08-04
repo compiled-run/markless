@@ -177,7 +177,7 @@ describe('package metadata', () => {
 		).rejects.toThrow();
 	});
 
-	test('live feed demo defaults to the internal prerender build', async () => {
+	test('live feed demo keeps prerender behind explicit opt-in', async () => {
 		const manifest = JSON.parse(
 			await readFile(resolve(root, 'demos/live-feed/package.json'), 'utf8'),
 		) as {
@@ -190,9 +190,8 @@ describe('package metadata', () => {
 		expect(manifest.scripts).not.toHaveProperty('smoke:ssr');
 		expect(config).not.toContain('@markless/router');
 		expect(config).toContain('...markless({ executionLog })');
-		// Live-feed's DEFAULT is legacy until wake staging (T008 successor) lands:
-		// un-staged prerendered settlement measured 65,379 executed vs the 30,371
-		// ceiling. Prerender stays opt-in (=== '1') and box-tested in both postures.
+		// The default stays on the accepted legacy ceiling while the prerendered
+		// posture remains explicitly exercised by the box config.
 		expect(config).toContain("process.env.MARKLESS_PRERENDER === '1'");
 		expect(config).toContain("input: { prerender: resolve(root, 'src/App.tsrx') }");
 		await expect(access(resolve(root, 'demos/live-feed/index.html'))).resolves.toBe(undefined);

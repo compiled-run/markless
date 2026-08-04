@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, normalize, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
@@ -95,12 +95,12 @@ test('every arm-record fold and prefix is compile-time exhaustive', () => {
 		'resume-arm-records.ts',
 		'resume-commit-arm.ts',
 		'resume-async-wiring.ts',
-		'resume-csr-coordinate.ts',
 		'fns/ssr.ts',
 	]) {
 		const source = readFileSync(join(repoRoot, 'packages/web/src', file), 'utf8');
 		expect(source).toMatch(/satisfies Record<keyof [^,>]+(?:\['armRecords'\])?, true>/);
 	}
+	expect(existsSync(join(repoRoot, 'packages/web/src/resume-csr-coordinate.ts'))).toBe(false);
 });
 
 function collectStaticImportClosure(startFile: string) {

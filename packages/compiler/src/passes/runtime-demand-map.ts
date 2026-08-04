@@ -5,11 +5,16 @@ import type {
 	PlannedSymbol,
 	RuntimeDemandMapActionPlan,
 	RuntimeDemandMapArtifact,
+	RuntimeDemandClass,
+	RuntimeDemandMapRecordKind,
 	SymbolModulesArtifact,
 	SymbolResolverPlan,
 } from '../artifacts.ts';
 import {
 	ASYNC_PROTOCOL_VERSION,
+	PROTOCOL_EVENT_ACTION_KIND,
+	protocolEventActionKind,
+	type ProtocolEventActionKind,
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
 } from '@markless/serializer';
@@ -28,6 +33,7 @@ const DISPATCH_CORE_COMMON = [
 	'web/runtime-error-reporting',
 ];
 const SCALAR_LEAN_DISPATCH_CORE = [
+	'web/fns/dom-order',
 	'web/fns/write-scalar',
 	'web/fns/update-text',
 	'web/runtime-error-reporting',
@@ -70,9 +76,23 @@ const RECORD_KINDS = [
 	'branch',
 	'dom-update',
 	'element-handle',
-	'event',
+	PROTOCOL_EVENT_ACTION_KIND.event,
+	PROTOCOL_EVENT_ACTION_KIND.externalDelegate,
 	'keyed-repeat',
-] as const;
+] as const satisfies ReadonlyArray<RuntimeDemandMapRecordKind>;
+
+const RUNTIME_DEMAND_CLASSIFIER = {
+	'plain-ssr': { scalarEvents: true, scalarRows: true },
+	prerender: { scalarEvents: false, scalarRows: false },
+} as const satisfies Record<
+	RuntimeDemandClass,
+	{ readonly scalarEvents: boolean; readonly scalarRows: boolean }
+>;
+
+const EVENT_ACTION_PHASES = {
+	[PROTOCOL_EVENT_ACTION_KIND.event]: { payloadRuntime: true },
+	[PROTOCOL_EVENT_ACTION_KIND.externalDelegate]: { payloadRuntime: false },
+} as const satisfies Record<ProtocolEventActionKind, { readonly payloadRuntime: boolean }>;
 
 export function createRuntimeDemandMap(input: {
 	readonly symbolResolver: SymbolResolverPlan;
@@ -81,7 +101,7 @@ export function createRuntimeDemandMap(input: {
 	readonly publicRenderModule: PublicRenderModuleArtifact;
 	readonly protocolView: ProtocolViewPayload;
 	readonly protocolState: ProtocolStatePayload;
-}): RuntimeDemandMapArtifact {
+}, demandClass: RuntimeDemandClass): RuntimeDemandMapArtifact {
 	const storageRequiresFullResume = (input.protocolState.storage?.length ?? 0) > 0;
 	const storageFreePayload = input.protocolState.version === ASYNC_PROTOCOL_VERSION;
 	const dispatchCore = [...payloadResumeModules(storageFreePayload), ...DISPATCH_CORE_COMMON];
@@ -91,7 +111,6 @@ export function createRuntimeDemandMap(input: {
 	);
 	const renderRuntimeModuleIds = runtimeModuleIdsFromSources([
 		input.publicRenderModule.moduleSource,
-		input.publicRenderModule.csrModuleSource,
 		input.publicRenderModule.ssrModuleSource,
 	]);
 	const symbols = input.symbolResolver.symbols.map((symbol) => ({
@@ -108,8 +127,11 @@ export function createRuntimeDemandMap(input: {
 		input.protocolView,
 		input.captureAnalysis,
 	);
-	const scalarEvents = !storageRequiresFullResume && scalarEventKeys.size > 0;
+	const classRouting = RUNTIME_DEMAND_CLASSIFIER[demandClass];
+	const scalarEvents =
+		classRouting.scalarEvents && !storageRequiresFullResume && scalarEventKeys.size > 0;
 	const scalarRows =
+		classRouting.scalarRows &&
 		!storageRequiresFullResume &&
 		isScalarOnlyKeyedRepeatModule(input.symbolResolver, input.protocolView);
 	const payloadRecords = payloadDemandRecords(
@@ -117,7 +139,7 @@ export function createRuntimeDemandMap(input: {
 		closedSymbolDemand,
 		renderRuntimeModuleIds,
 		{
-			scalarEventKeys,
+			scalarEventKeys: scalarEvents ? scalarEventKeys : new Set(),
 			scalarRows,
 		},
 		dispatchCore,
@@ -140,8 +162,8 @@ export function createRuntimeDemandMap(input: {
 		),
 		unknownRecordModuleIds: unique([
 			...dispatchCore,
-			...SCALAR_LEAN_DISPATCH_CORE,
-			...ROW_LEAN_DISPATCH_CORE,
+			...(classRouting.scalarEvents ? SCALAR_LEAN_DISPATCH_CORE : []),
+			...(classRouting.scalarRows ? ROW_LEAN_DISPATCH_CORE : []),
 			...SYNC_POLICY,
 			...DOM_UPDATE,
 			'web/dom-update',
@@ -189,6 +211,7 @@ function scalarCoreEventKeys(
 		(view.events ?? [])
 			.filter(
 				(event) =>
+					protocolEventActionKind(event) === PROTOCOL_EVENT_ACTION_KIND.event &&
 					transitiveSymbolIds(event.symbolIds ?? [], captureAnalysis).length ===
 						(event.symbolIds ?? []).length &&
 					(event.symbolIds ?? []).length === 1 &&
@@ -523,20 +546,28 @@ function payloadDemandRecords(
 ): RuntimeDemandMapArtifact['payloadRecords'] {
 	const rowDispatchCore = replacement.scalarRows ? ROW_LEAN_DISPATCH_CORE : fullTier;
 	return [
-		...(view.events ?? []).map((event) => ({
-			recordId: `event:${event.hostNodeId}:${event.eventName}`,
-			kind: 'event',
-			hostNodeId: event.hostNodeId,
-			eventName: event.eventName,
-			symbolIds: event.symbolIds ?? [],
-			runtimeModuleIds: unique([
-				...(replacement.scalarEventKeys.has(eventKey(event.hostNodeId, event.eventName))
-					? SCALAR_LEAN_DISPATCH_CORE
-					: dispatchCore),
-				...(event.syncPolicy ? SYNC_POLICY : []),
-				...symbolIdsDemand(event.symbolIds ?? [], symbolDemand),
-			]),
-		})),
+		...(view.events ?? []).map((event) => {
+			const kind = protocolEventActionKind(event);
+			const phase = EVENT_ACTION_PHASES[kind];
+			return {
+				recordId: `${kind}:${event.hostNodeId}:${event.eventName}`,
+				kind,
+				hostNodeId: event.hostNodeId,
+				eventName: event.eventName,
+				symbolIds: event.symbolIds ?? [],
+				runtimeModuleIds: phase.payloadRuntime
+					? unique([
+							...(replacement.scalarEventKeys.has(
+								eventKey(event.hostNodeId, event.eventName),
+							)
+								? SCALAR_LEAN_DISPATCH_CORE
+								: dispatchCore),
+							...(event.syncPolicy ? SYNC_POLICY : []),
+							...symbolIdsDemand(event.symbolIds ?? [], symbolDemand),
+						])
+					: [],
+			};
+		}),
 		...(view.domUpdates ?? []).map((record) => ({
 			recordId: `dom-update:${record.hostNodeId}:${record.symbolId ?? ''}`,
 			kind: 'dom-update',
@@ -619,6 +650,17 @@ function actionDemandRecords(
 	const branchKinds = view.branches?.length ? ['branch'] : [];
 	return [
 		...(view.events ?? []).map((event) => {
+			const kind = protocolEventActionKind(event);
+			if (!EVENT_ACTION_PHASES[kind].payloadRuntime) {
+				return {
+					hostNodeId: event.hostNodeId,
+					eventName: event.eventName,
+					recordKind: kind,
+					recordKinds: [kind],
+					payloadRecordIds: [`${kind}:${event.hostNodeId}:${event.eventName}`],
+					runtimeModuleIds: [],
+				};
+			}
 			const subscriberRecords = writeSubscriberRecords(
 				resolver,
 				transitiveSymbolIds(event.symbolIds ?? [], captureAnalysis),
@@ -631,18 +673,21 @@ function actionDemandRecords(
 			return {
 				hostNodeId: event.hostNodeId,
 				eventName: event.eventName,
-				recordKind: 'event' as const,
+				recordKind: PROTOCOL_EVENT_ACTION_KIND.event,
 				recordKinds: unique([
-					'event',
+					PROTOCOL_EVENT_ACTION_KIND.event,
 					...branchKinds,
 					...subscriberRecords.map((record) => record.kind),
 				]),
 				payloadRecordIds: unique([
-					`event:${event.hostNodeId}:${event.eventName}`,
+					`${PROTOCOL_EVENT_ACTION_KIND.event}:${event.hostNodeId}:${event.eventName}`,
 					...subscriberRecords.map((record) => record.recordId),
 				]),
 				runtimeModuleIds: unique([
-					...recordModules(records, `event:${event.hostNodeId}:${event.eventName}`),
+					...recordModules(
+						records,
+						`${PROTOCOL_EVENT_ACTION_KIND.event}:${event.hostNodeId}:${event.eventName}`,
+					),
 					...branchDemand,
 					...subscriberRecords.flatMap((record) => record.runtimeModuleIds),
 				]),

@@ -7,12 +7,6 @@ const e = (c, s) => {
 			: {},
 	);
 };
-export const marklessFindElementAtDomOrderIndex = (r, i) => {
-	const w = document.createTreeWalker(r, 1);
-	let n = r.nodeType === 1 ? r : w.nextNode();
-	for (; i-- && n; ) n = w.nextNode();
-	return n;
-};
 export const marklessReadScalarCell = (r, graphNodeId) => {
 	const script = r.querySelector('script[type="markless/state"]');
 	if (!script) return;

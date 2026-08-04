@@ -141,7 +141,7 @@ describe('Vite config integration', () => {
 
 		expect(config.build.rolldownOptions.input).toEqual({
 			index: 'index.html',
-			symbols: 'src/App.tsrx',
+			symbols: 'src/App.tsrx?markless-symbols',
 		});
 	});
 
@@ -231,44 +231,15 @@ describe('Vite config integration', () => {
 			chunkFileNames: 'build/chunk-[hash].js',
 			hoistTransitiveImports: false,
 		});
-		expect(clientOutput.codeSplitting?.groups?.map((group) => group.name)).toEqual([
-			'markless-direct-renderer',
-			'markless-resume-csr-coordinate',
-			'markless-resume-branches',
-			'markless-resume-behaviors',
-			'markless-resume-repeats',
-			'markless-resume-async',
-			'markless-resume-shared-patch',
-			'markless-resume-runtime',
-			'markless-resume-runtime-start',
-			'markless-resume-runtime-shared',
-			'markless-resume-events',
-			'markless-resume-handoff',
-			'markless-resume-locators',
-			'markless-resume-errors',
-			'markless-resume-sync-computed',
-			'markless-resume-sync-demand',
-			'markless-payload-full',
-			'markless-payload-resume',
-			'markless-inline-payload-document',
-			'markless-payload-document',
-			'markless-payload-graph-construct',
-			'markless-dom-journal',
-			'markless-protocol-decode',
-			'markless-value-decode',
-			'markless-payload-leaves',
-			'markless-dev-log',
-			'markless-resume-core',
-			'markless-runtime-graph-core',
-			'markless-runtime-graph-collections',
-			'markless-runtime-graph-computed',
-			'markless-runtime-graph-async',
-			'markless-runtime-graph-scheduler',
-			'markless-runtime-graph-shared',
-			'markless-graph',
-			'markless-serializer',
-			'markless-runtime',
-		]);
+		expect(clientOutput.codeSplitting?.groups?.map((group) => group.name)).toEqual(
+			expect.arrayContaining([
+				'markless-resume-runtime',
+				'markless-resume-branches',
+				'markless-protocol-decode',
+				'markless-runtime-graph-core',
+				'markless-runtime',
+			]),
+		);
 		expect(
 			callOutputOptions(plugin, { dir: 'dist/server' }, createViteHookContext('server')),
 		).toMatchObject({

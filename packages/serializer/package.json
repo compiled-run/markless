@@ -15,8 +15,10 @@
 	"sideEffects": false,
 	"exports": {
 		".": "./src/index.ts",
+		"./async-boundary-arm": "./src/async-boundary-arm.ts",
 		"./decode": "./src/value-decode.ts",
 		"./resume-record-delta": "./src/resume-record-delta.ts",
+		"./resume-record-merge": "./src/resume-record-merge.ts",
 		"./decode-client": "./src/value-decode-client.ts",
 		"./protocol": "./src/protocol.ts",
 		"./protocol-validation": "./src/protocol-validation-storage.ts"
@@ -28,6 +30,10 @@
 				"types": "./dist/index.d.ts",
 				"default": "./dist/index.js"
 			},
+			"./async-boundary-arm": {
+				"types": "./dist/async-boundary-arm.d.ts",
+				"default": "./dist/async-boundary-arm.js"
+			},
 			"./decode": {
 				"types": "./dist/decode.d.ts",
 				"default": "./dist/decode.js"
@@ -35,6 +41,10 @@
 			"./resume-record-delta": {
 				"types": "./dist/resume-record-delta.d.ts",
 				"default": "./dist/resume-record-delta.js"
+			},
+			"./resume-record-merge": {
+				"types": "./dist/resume-record-merge.d.ts",
+				"default": "./dist/resume-record-merge.js"
 			},
 			"./decode-client": {
 				"types": "./dist/decode-client.d.ts",

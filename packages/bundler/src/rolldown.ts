@@ -1,8 +1,9 @@
 import type { InputOptions, Plugin } from 'rolldown';
-import { dirname, isAbsolute, resolve } from 'pathe';
+import { existsSync, statSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
+import { dirname, isAbsolute, relative, resolve } from 'pathe';
 import { joinURL, parsePath, withQuery, withoutLeadingSlash } from 'ufo';
 import { type MarklessBuildMetadataBundle, createBuildMetadata } from './build/build-metadata.ts';
-import { injectCsrNativeMarkup } from './build/csr-native-markup.ts';
 import { MARKLESS_BUILD_PREFIX, MARKLESS_BUNDLE_GRAPH, outputDefaults } from './build/chunking.ts';
 import { MARKLESS_EXECUTION_SIZES, createExecutionSizesAsset } from './build/execution-sizes.ts';
 import { collectModulePreloadInjections, injectHeadLinks } from './build/head-links.ts';
@@ -30,6 +31,7 @@ import {
 	prerenderWakeVirtualModuleId,
 	symbolVirtualModuleSourceFile,
 } from './source-module.ts';
+import { ModuleMetadataRegistry } from './module-metadata-registry.ts';
 import {
 	MARKLESS_VIRTUAL_PREFIX,
 	compileTsrxModuleLinkArtifact,
@@ -46,6 +48,7 @@ import type {
 	MarklessVirtualModule,
 	TransformTsrxModuleInput,
 	TransformTsrxModuleResult,
+	ArtifactChildCandidate,
 } from './types.ts';
 import type { BuiltPrerenderRecords } from './build/prerender.ts';
 import { triggerGroupVirtualModuleSourceFile } from './trigger-groups.ts';
@@ -88,7 +91,9 @@ const TSRX_SOURCE_FILE = /\.tsrx(?:[?#].*)?$/;
 const MARKLESS_SYMBOL_SOURCE_QUERY_RE = /[?&]markless-symbols(?:[&#]|$)/;
 const MARKLESS_RESUME_SOURCE_QUERY_RE = /[?&]markless-resume(?:[&#]|$)/;
 const MARKLESS_RENDER_DATA_SOURCE_QUERY_RE = /[?&]markless-render-data(?:[&#]|$)/;
+const MARKLESS_REACHED_FROM_SOURCE_QUERY = 'markless-reached-from';
 const MARKLESS_PRERENDER_WAKE_SOURCE_QUERY_RE = /[?&]markless-prerender-wake(?:[&#]|$)/;
+const MARKLESS_ROUTE_SOURCE_QUERY_RE = /[?&]markless-route(?:[&#]|$)/;
 const RESUME_VIRTUAL_ID_RE = /^virtual:markless:resume:([^:]+)$/;
 const PRERENDER_WAKE_VIRTUAL_ID_RE = /^virtual:markless:prerender-wake:([^:]+)$/;
 const SYMBOL_VIRTUAL_STRING_RE = /(["'`])((?:virtual:markless:symbol:)[^"'`]+)\1/g;
@@ -108,15 +113,17 @@ export function createMarklessRolldownPlugin(input: {
 	const environment = input.environment;
 	const internalOptions = (input.options ?? {}) as InternalMarklessRolldownOptions;
 	const virtualModules = new Map<string, MarklessVirtualModule>();
-	const transformManifests = new Map<string, MarklessTransformManifest>();
+	const moduleMetadata = new ModuleMetadataRegistry();
 	const prerenderWakeCapabilities = new Map<string, boolean>();
 	const moduleLinkArtifacts = new Map<string, MarklessModuleLinkArtifact>();
 	const linkedTransformCache = new Map<
 		string,
 		{
 			readonly source: string;
+			readonly manifestSource: string;
 			readonly code: string;
 			readonly importedInterfaceHashes: string;
+			readonly importedSymbolClaims: string;
 			readonly input: TransformTsrxModuleInput;
 			readonly result: TransformTsrxModuleResult;
 			readonly linkedChildHasBrowserTriggers: boolean;
@@ -129,6 +136,12 @@ export function createMarklessRolldownPlugin(input: {
 	const virtualModuleOwners = new Map<string, Set<string>>();
 	const clientSymbolEntrySources = new Set<string>();
 	const prerenderWakeSources = new Set<string>();
+	const clientRouteArtifactSources = new Set<string>();
+	const clientRouteArtifactMaterializations = new Map<
+		string,
+		NonNullable<TransformTsrxModuleInput['artifactChildMaterializations']>
+	>();
+	const transformedClientPrimarySources = new Set<string>();
 	const executionLogEstimatedSizes = new Map<string, number>();
 	const dev = createMarklessDevGraph();
 	let root = internalOptions.rootDir;
@@ -152,11 +165,14 @@ export function createMarklessRolldownPlugin(input: {
 	) {
 		const changedSource = pathname(parent);
 		moduleLinkArtifacts.delete(changedSource);
-		transformManifests.delete(changedSource);
+		moduleMetadata.deleteCaptureMetadata(changedSource);
+		moduleMetadata.deleteSymbolClaims(changedSource);
 		prerenderWakeCapabilities.delete(changedSource);
 		prerenderWakeSources.delete(changedSource);
 		for (const [key, cached] of linkedTransformCache) {
-			if (cached.source === changedSource) linkedTransformCache.delete(key);
+			if (cached.source !== changedSource) continue;
+			moduleMetadata.deleteSymbolClaims(cached.manifestSource);
+			linkedTransformCache.delete(key);
 		}
 		const ids = dev.clear(parent, currentEnvironment);
 		const resolvedIds = new Set<string>();
@@ -230,7 +246,20 @@ export function createMarklessRolldownPlugin(input: {
 				interfaceHash: next.interfaceHash,
 				moduleImports: next.moduleImports,
 			});
-			transformManifests.set(changedSource, next.manifest);
+			moduleMetadata.recordCaptureMetadata(changedSource, next.manifest);
+			const symbolClaim = emittedSymbolClaim(
+				moduleMetadata,
+				changedSource,
+				cached.manifestSource,
+				next.manifest,
+				next.virtualModules,
+			);
+			moduleMetadata.recordSymbolClaims(
+				symbolClaim.owner,
+				isRenderDataSourceRequest(cached.manifestSource)
+					? renderDataClaimManifest(next.manifest, cached.manifestSource)
+					: symbolClaim.manifest,
+			);
 			prerenderWakeCapabilities.set(
 				changedSource,
 				manifestHasBrowserTriggers(next.manifest) || cached.linkedChildHasBrowserTriggers,
@@ -274,8 +303,11 @@ export function createMarklessRolldownPlugin(input: {
 				root = internalOptions.rootDir ?? input.cwd;
 			}
 			clientSymbolEntrySources.clear();
+			clientRouteArtifactSources.clear();
+			clientRouteArtifactMaterializations.clear();
+			transformedClientPrimarySources.clear();
 			virtualModules.clear();
-			transformManifests.clear();
+			moduleMetadata.clear();
 			moduleLinkArtifacts.clear();
 			linkedTransformCache.clear();
 			importedChildren.clear();
@@ -369,7 +401,7 @@ export function createMarklessRolldownPlugin(input: {
 					moduleSizes: embedsDevSizes ? executionLogEstimatedSizes : undefined,
 					attribution: embedsDevSizes
 						? executionAttributionTables(
-								transformManifests,
+								moduleMetadata.symbolClaimMap(),
 								getRoot(),
 								importedChildren.values(),
 							)
@@ -430,6 +462,15 @@ export function createMarklessRolldownPlugin(input: {
 			const source = pathname(id);
 			const renderDataRequest = isRenderDataSourceRequest(id);
 			const prerenderWakeRequest = isPrerenderWakeSourceRequest(id);
+			const clientRouteArtifact = MARKLESS_ROUTE_SOURCE_QUERY_RE.test(id);
+			const materializedRenderDataReach =
+				currentEnvironment === 'client' && renderDataRequest
+					? materializedRenderDataReachRoot(
+							id,
+							source,
+							clientRouteArtifactMaterializations,
+						)
+					: undefined;
 			if (currentEnvironment === 'client' && prerenderWakeRequest) {
 				clientSymbolEntrySources.add(source);
 				prerenderWakeSources.add(source);
@@ -449,32 +490,45 @@ export function createMarklessRolldownPlugin(input: {
 			// container-event stub, silently swallowing clicks.
 			const ssrPrerenderArtifacts =
 				currentEnvironment === 'client' &&
-				(internalOptions.prerenderWakeChannel === true ||
-					prerenderWakeSources.size > 0);
+				(internalOptions.prerenderWakeChannel === true || prerenderWakeSources.size > 0);
+			const prerenderRecords =
+				currentEnvironment === 'client' &&
+				(internalOptions.prerender === true ||
+					internalOptions.prerenderWakeChannel === true ||
+					materializedRenderDataReach !== undefined ||
+					prerenderWakeRequest ||
+					ssrPrerenderArtifacts);
 			const transformInput: TransformTsrxModuleInput = {
 				filename: source,
 				source: code,
-				dev: internalOptions.dev === true,
+				dev:
+					internalOptions.dev === true ||
+					(currentEnvironment === 'client' && clientRouteArtifactSources.has(source)),
 				buildId: internalOptions.buildId,
 				executionLog: normalizeExecutionLogMode(internalOptions.executionLog),
 				executionLogModuleHooks:
 					internalOptions.dev === true && currentEnvironment === 'client',
 				inlineResumerDebug: internalOptions.inlineResumerDebug === true,
-				prerenderRecords:
+				prerenderRecords,
+				runtimeDemandClass:
 					currentEnvironment === 'client' &&
-					(internalOptions.prerender === true ||
-						internalOptions.prerenderWakeChannel === true ||
-						renderDataRequest ||
-						prerenderWakeRequest ||
-						ssrPrerenderArtifacts),
+					internalOptions.emitResumeModules === true &&
+					!prerenderRecords &&
+					!clientRouteArtifactSources.has(source)
+						? 'plain-ssr'
+						: 'prerender',
 				prerenderWakeVariant:
 					internalOptions.prerenderWakeChannel === true &&
 					(prerenderWakeRequest ||
 						(ssrPrerenderArtifacts && clientSymbolEntrySources.has(source))),
+				prerenderWakeFacade: prerenderWakeRequest,
 				environment: currentEnvironment,
 				clientOutput:
 					currentEnvironment === 'client' &&
-					((clientSymbolEntrySources.has(source) && internalOptions.prerender !== true) ||
+					((clientSymbolEntrySources.has(source) &&
+						internalOptions.prerender !== true &&
+						!clientRouteArtifactSources.has(source) &&
+						isModuleEntry(this, id)) ||
 						isSymbolOnlySourceRequest(id))
 						? 'symbols-only'
 						: undefined,
@@ -517,12 +571,14 @@ export function createMarklessRolldownPlugin(input: {
 						? input.prerenderRecordsBySource?.get(source)
 						: undefined,
 			};
+			const manifestSource =
+				currentEnvironment === 'client' && !isClientPrimarySourceRequest(id) ? id : source;
 			// One source can be requested as a full environment entry, a symbols-only
 			// interaction entry, or a dev resume entry. Their linked interfaces are the
 			// same, but their emitted module shapes are deliberately different.
 			const cacheKey = [
 				currentEnvironment,
-				source,
+				manifestSource,
 				transformInput.clientOutput ?? 'full',
 				isResumeSourceRequest(id)
 					? 'resume'
@@ -539,19 +595,22 @@ export function createMarklessRolldownPlugin(input: {
 			if (cached?.code === code) {
 				const cachedImports = await resolveImportedModuleInterfaces.call(
 					this,
-					source,
+					manifestSource,
 					cached.result.moduleImports,
 				);
 				await forceImportedModules.call(
 					this,
 					cachedImports,
 					moduleLinkArtifacts,
+					moduleMetadata,
 					internalOptions,
 					currentEnvironment,
 				);
 				if (
 					cached.importedInterfaceHashes ===
-					importedInterfaceHashSignature(cachedImports, moduleLinkArtifacts)
+						importedInterfaceHashSignature(cachedImports, moduleLinkArtifacts) &&
+					cached.importedSymbolClaims ===
+						importedSymbolClaimSignature(cachedImports, moduleMetadata)
 				) {
 					transformed = cached.result;
 					linkedTransformInput = cached.input;
@@ -568,7 +627,7 @@ export function createMarklessRolldownPlugin(input: {
 					moduleLinkArtifacts.set(source, provisional);
 					const provisionalImports = await resolveImportedModuleInterfaces.call(
 						this,
-						source,
+						manifestSource,
 						provisional.moduleImports,
 					);
 					if (provisionalImports.length === 0) throw error;
@@ -576,6 +635,7 @@ export function createMarklessRolldownPlugin(input: {
 						this,
 						provisionalImports,
 						moduleLinkArtifacts,
+						moduleMetadata,
 						internalOptions,
 						currentEnvironment,
 					);
@@ -589,15 +649,61 @@ export function createMarklessRolldownPlugin(input: {
 					transformed = await transformTsrxModule(linkedTransformInput);
 				}
 			}
+			if (currentEnvironment === 'client' && clientRouteArtifact) {
+				const artifactChildMaterializations = await materializeArtifactChildren.call(
+					this,
+					source,
+					getRoot(),
+					transformed.artifactChildren,
+				);
+				if (Object.keys(artifactChildMaterializations).length > 0) {
+					clientRouteArtifactMaterializations.set(source, artifactChildMaterializations);
+				}
+				registerClientRouteArtifactSource(source);
+				return {
+					code: clientRouteArtifactReference(source),
+					map: null,
+				};
+			}
+			if (!reusedLinkedTransform) {
+				// Only client page composition materializes artifact children.
+				const pageRoot =
+					currentEnvironment === 'client' &&
+					!isSymbolOnlySourceRequest(id) &&
+					isModuleEntry(this, id);
+				const artifactChildMaterializations =
+					currentEnvironment === 'client' &&
+					clientRouteArtifactMaterializations.has(source)
+						? clientRouteArtifactMaterializations.get(source)!
+						: pageRoot || materializedRenderDataReach !== undefined
+							? await materializeArtifactChildren.call(
+									this,
+									source,
+									getRoot(),
+									transformed.artifactChildren,
+								)
+							: {};
+				if (Object.keys(artifactChildMaterializations).length > 0) {
+					linkedTransformInput = {
+						...linkedTransformInput,
+						artifactChildMaterializations,
+					};
+					transformed = await transformTsrxModuleWithPrerenderWakeClosure(
+						linkedTransformInput,
+						false,
+					);
+				}
+			}
 			// Register the first-pass artifact before loading children so the existing
 			// cross-module registry can validate both sides of the composition edge.
 			if (!renderDataRequest) {
 				registerTransformArtifacts({
 					owner: cacheKey,
 					source,
+					manifestSource,
 					result: transformed,
 					virtualModules,
-					transformManifests,
+					moduleMetadata,
 					moduleLinkArtifacts,
 					transformVirtualModules,
 					virtualModuleOwners,
@@ -607,6 +713,11 @@ export function createMarklessRolldownPlugin(input: {
 					updateDevPrerenderHashes: internalOptions.updateDevPrerenderHashes,
 				});
 			} else {
+				moduleMetadata.recordCaptureMetadata(source, transformed.manifest);
+				moduleMetadata.recordSymbolClaims(
+					manifestSource,
+					renderDataClaimManifest(transformed.manifest, manifestSource),
+				);
 				moduleLinkArtifacts.set(source, {
 					interfaceHash: transformed.interfaceHash,
 					moduleGraphInterface: transformed.moduleGraphInterface,
@@ -615,12 +726,12 @@ export function createMarklessRolldownPlugin(input: {
 			}
 			const resolvedInterfaceImports = await resolveImportedModuleInterfaces.call(
 				this,
-				source,
+				manifestSource,
 				transformed.moduleImports,
 			);
 			const resolvedChildren = await resolveImportedChildren.call(
 				this,
-				source,
+				manifestSource,
 				transformed.manifest,
 			);
 			for (const child of resolvedChildren) {
@@ -631,30 +742,44 @@ export function createMarklessRolldownPlugin(input: {
 				this,
 				uniqueImportedModules([...resolvedInterfaceImports, ...resolvedChildren]),
 				moduleLinkArtifacts,
+				moduleMetadata,
 				internalOptions,
 				currentEnvironment,
 			);
 			for (const child of resolvedChildren) {
 				if (internalOptions.dev === true) {
-					validateImportedChild(child, transformManifests);
+					validateImportedChild(child, moduleMetadata);
 				}
 			}
 			const linkedChildHasBrowserTriggers = linkedChildrenHaveBrowserTriggers(
 				resolvedChildren,
-				transformManifests,
+				moduleMetadata,
 				prerenderWakeCapabilities,
 			);
 			if (
 				!reusedLinkedTransform &&
 				(resolvedChildren.length > 0 || resolvedInterfaceImports.length > 0)
 			) {
+				const symbols = importedSymbolInputs(resolvedChildren, moduleMetadata);
+				const renderDataImportSources = materializedRenderDataReach
+					? Object.fromEntries(
+							resolvedInterfaceImports.map((imported) => [
+								imported.specifier,
+								materializedReachedRenderDataSource(
+									imported.source,
+									materializedRenderDataReach,
+								),
+							]),
+						)
+					: undefined;
 				linkedTransformInput = {
-					...transformInput,
-					symbols: importedSymbolInputs(resolvedChildren, transformManifests),
+					...linkedTransformInput,
+					symbols,
 					importedModuleInterfaces: importedModuleInterfaces(
 						resolvedInterfaceImports,
 						moduleLinkArtifacts,
 					),
+					...(renderDataImportSources ? { renderDataImportSources } : {}),
 				};
 				transformed = await transformTsrxModuleWithPrerenderWakeClosure(
 					linkedTransformInput,
@@ -669,9 +794,10 @@ export function createMarklessRolldownPlugin(input: {
 				registerTransformArtifacts({
 					owner: cacheKey,
 					source,
+					manifestSource,
 					result: transformed,
 					virtualModules,
-					transformManifests,
+					moduleMetadata,
 					moduleLinkArtifacts,
 					transformVirtualModules,
 					virtualModuleOwners,
@@ -681,22 +807,57 @@ export function createMarklessRolldownPlugin(input: {
 					replaceOwnedArtifacts: true,
 					updateDevPrerenderHashes: internalOptions.updateDevPrerenderHashes,
 				});
+			else {
+				moduleMetadata.recordCaptureMetadata(source, transformed.manifest);
+				moduleMetadata.recordSymbolClaims(
+					manifestSource,
+					renderDataClaimManifest(transformed.manifest, manifestSource),
+				);
+			}
 			linkedTransformCache.set(cacheKey, {
 				source,
+				manifestSource,
 				code,
 				importedInterfaceHashes: importedInterfaceHashSignature(
 					resolvedInterfaceImports,
 					moduleLinkArtifacts,
 				),
+				importedSymbolClaims: importedSymbolClaimSignature(
+					uniqueImportedModules([...resolvedInterfaceImports, ...resolvedChildren]),
+					moduleMetadata,
+				),
 				input: linkedTransformInput,
 				result: transformed,
 				linkedChildHasBrowserTriggers,
 			});
+			if (currentEnvironment === 'client' && isClientPrimarySourceRequest(id)) {
+				transformedClientPrimarySources.add(source);
+			}
 			if (currentEnvironment === 'client' && renderDataRequest) {
 				const renderDataModule = transformed.virtualModules.find(
 					(module) => module.type === 'render-data',
 				);
-				if (renderDataModule) return { code: renderDataModule.source, map: null };
+				if (renderDataModule) {
+					const styleModules = transformed.virtualModules.filter(
+						(module) => module.type === 'style',
+					);
+					registerRenderDataStyles({
+						owner: cacheKey,
+						source,
+						modules: styleModules,
+						virtualModules,
+						transformVirtualModules,
+						virtualModuleOwners,
+						dev,
+					});
+					return {
+						code: [
+							...styleModules.map((module) => `import ${JSON.stringify(module.id)};`),
+							renderDataModule.source,
+						].join('\n'),
+						map: null,
+					};
+				}
 			}
 			for (const child of resolvedChildren) {
 				dev.record(
@@ -765,7 +926,7 @@ export function createMarklessRolldownPlugin(input: {
 			order: 'post',
 			async handler(_, bundle) {
 				for (const child of importedChildren.values()) {
-					validateImportedChild(child, transformManifests);
+					validateImportedChild(child, moduleMetadata);
 				}
 				if (getEnvironment(this) !== 'client') return;
 
@@ -781,10 +942,6 @@ export function createMarklessRolldownPlugin(input: {
 						internalOptions.publicPath,
 					);
 				}
-					if (!internalOptions.prerender) {
-					injectCsrNativeMarkup(bundle, transformManifests.values());
-				}
-
 				stripEmptyPreloadWrappersFromChunks(bundle);
 				const removedSymbolFacades = rewriteGeneratedSymbolFacadeImports(bundle);
 				rewriteGeneratedSymbolInitExports(bundle);
@@ -796,9 +953,17 @@ export function createMarklessRolldownPlugin(input: {
 						`Markless symbol resolver table contains unresolved generated symbol chunks: ${tableRewrite.unresolved.join(', ')}. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`,
 					);
 				}
+				// The strip can erase a resolver together with every route it owned.
+				// Final symbol claims therefore follow exact emitted module identities.
+				const emittedSymbolClaims = moduleMetadata.emittedSymbolClaimMap(
+					emittedBundleModuleIds(manifestBundle),
+				);
+				const attributionClaims = symbolClaimsBySource(
+					moduleMetadata.symbolClaimManifests(),
+				);
 				const tableIntegrity = verifyGeneratedSymbolTableRoutes(
 					manifestBundle,
-					transformManifests.values(),
+					emittedSymbolClaims.values(),
 				);
 				if (tableIntegrity.errors.length > 0) {
 					this.error(
@@ -813,7 +978,7 @@ export function createMarklessRolldownPlugin(input: {
 
 				const clientManifest = createBuildMetadata(
 					manifestBundle,
-					transformManifests.values(),
+					emittedSymbolClaims.values(),
 					getRoot(),
 					{
 						bundleGraphAsset: MARKLESS_BUNDLE_GRAPH,
@@ -832,9 +997,10 @@ export function createMarklessRolldownPlugin(input: {
 					bundle,
 					collectModulePreloadInjections(clientManifest, {
 						publicPath: internalOptions.publicPath,
-						wakeChunks: internalOptions.prerender
-							? productionResumeModuleChunks(bundle)
-							: undefined,
+						wakeChunks:
+							internalOptions.prerender || internalOptions.prerenderWakeChannel === true
+								? productionWakeModuleChunks(bundle)
+								: undefined,
 						entryChunks: Object.values(bundle)
 							.filter(
 								(output) =>
@@ -861,7 +1027,7 @@ export function createMarklessRolldownPlugin(input: {
 						stripBuildPrefix,
 						executionLogInjection
 							? executionAttributionTables(
-									transformManifests,
+									attributionClaims,
 									getRoot(),
 									importedChildren.values(),
 								)
@@ -886,6 +1052,21 @@ export function createMarklessRolldownPlugin(input: {
 		},
 	} satisfies Plugin & { api: MarklessRolldownPluginApi };
 
+	function registerClientRouteArtifactSource(source: string) {
+		if (clientRouteArtifactSources.has(source)) return;
+		if (transformedClientPrimarySources.has(source)) {
+			if (internalOptions.dev !== true) {
+				throw new Error(
+					`MARKLESS_ROUTE_ARTIFACT_REGISTERED_LATE: Client route artifact ${JSON.stringify(source)} was registered after its primary module transformed. Register every production route artifact before transformation begins.`,
+				);
+			}
+			invalidateAllGeneratedModules(source, 'client');
+			transformedClientPrimarySources.delete(source);
+			internalOptions.devServer?.invalidateModule?.(source, 'client');
+		}
+		clientRouteArtifactSources.add(source);
+	}
+
 	return plugin;
 }
 
@@ -895,6 +1076,106 @@ type ImportedChild = {
 	readonly source: string;
 	readonly componentEdgeId?: string;
 };
+
+async function materializeArtifactChildren(
+	this: {
+		resolve(
+			source: string,
+			importer?: string,
+			options?: { readonly skipSelf?: boolean },
+		): Promise<{ readonly id: string } | string | null>;
+	},
+	parent: string,
+	appRoot: string | undefined,
+	candidates: ReadonlyArray<ArtifactChildCandidate>,
+): Promise<NonNullable<TransformTsrxModuleInput['artifactChildMaterializations']>> {
+	const materialized: Record<
+		string,
+		NonNullable<TransformTsrxModuleInput['artifactChildMaterializations']>[string]
+	> = {};
+	const loaded = new Map<string, Record<string, unknown>>();
+	for (const candidate of candidates) {
+		if (TSRX_SOURCE_FILE.test(candidate.importSource)) continue;
+		const resolved = await this.resolve(candidate.importSource, parent, { skipSelf: true });
+		const id = typeof resolved === 'string' ? resolved : resolved?.id;
+		if (!id) continue;
+		const source = pathname(id);
+		if (
+			!appRoot ||
+			!isAbsolute(source) ||
+			!existsSync(source) ||
+			!statSync(source).isFile() ||
+			isInsideRoot(source, appRoot)
+		)
+			continue;
+		let module = loaded.get(source);
+		if (!module) {
+			module = (await import(pathToFileURL(source).href)) as Record<string, unknown>;
+			loaded.set(source, module);
+		}
+		const component =
+			candidate.importKind === 'default'
+				? module.default
+				: candidate.importKind === 'namespace'
+					? module
+					: module[candidate.importedName ?? candidate.componentName];
+		const renderSsr = (component as { readonly renderSsr?: unknown } | undefined)?.renderSsr;
+		if (typeof renderSsr !== 'function') continue;
+		const underivable = candidate.props.find((prop) => prop.kind !== 'serializable');
+		if (underivable || (candidate.hasChildren && !candidate.projection)) {
+			const prop = underivable?.name ?? 'children';
+			throw new Error(
+				`MARKLESS_ARTIFACT_CHILD_PROP_NOT_BUILD_KNOWN: <${candidate.componentName}> prop ${JSON.stringify(prop)} must be a build-known static value. Runtime component execution is not a fallback.`,
+			);
+		}
+		const props = Object.fromEntries(
+			candidate.props.map((prop) => [prop.name, prop.value]),
+		) as Record<string, unknown>;
+		if (candidate.projection) props.children = candidate.projection.markup;
+		const output = await renderSsr.call(component, props);
+		if (
+			!output ||
+			typeof output !== 'object' ||
+			typeof (output as { readonly html?: unknown }).html !== 'string'
+		) {
+			throw new Error(
+				`MARKLESS_ARTIFACT_CHILD_RENDER_INVALID: <${candidate.componentName}> renderSsr must return static HTML.`,
+			);
+		}
+		const result = output as Record<string, unknown>;
+		materialized[candidate.edgeId] = {
+			html: result.html as string,
+			elementCount: typeof result.elementCount === 'number' ? result.elementCount : 0,
+			...(result.state ? { state: result.state as never } : {}),
+			...(result.view ? { view: result.view as never } : {}),
+			...(result.coordinates ? { coordinates: result.coordinates as never } : {}),
+			...(result.structure ? { structure: result.structure as never } : {}),
+			...(Array.isArray(result.structureTokens)
+				? { structureTokens: result.structureTokens as never }
+				: {}),
+		};
+	}
+	return materialized;
+}
+
+function isInsideRoot(source: string, root: string): boolean {
+	const path = relative(root, source);
+	return path === '' || (!isAbsolute(path) && path !== '..' && !path.startsWith('../'));
+}
+
+function isModuleEntry(
+	context: {
+		getModuleInfo?(id: string): { readonly isEntry?: boolean } | null;
+	},
+	id: string,
+): boolean {
+	try {
+		return context.getModuleInfo?.(id)?.isEntry === true;
+	} catch {
+		// Unknown entry posture cannot authorize page-root materialization.
+		return false;
+	}
+}
 
 async function resolveImportedChildren(
 	this: {
@@ -965,15 +1246,31 @@ async function forceImportedModules(
 	this: { load?: (input: { readonly id: string }) => Promise<unknown> | unknown },
 	imports: ReadonlyArray<ImportedChild>,
 	artifacts: ReadonlyMap<string, MarklessModuleLinkArtifact>,
+	metadata: ModuleMetadataRegistry,
 	options: Pick<InternalMarklessRolldownOptions, 'dev' | 'devServer'>,
 	environment: MarklessEnvironment,
 ) {
 	for (const imported of imports) {
-		if (artifacts.has(imported.source)) continue;
+		if (!artifacts.has(imported.source)) {
+			if (options.dev === true) {
+				await options.devServer?.transformRequest(imported.source, environment);
+			} else if (typeof this.load === 'function') {
+				await this.load({ id: imported.source });
+			}
+		}
+		// Materialize symbols before linking captures from a data-only facade.
+		const captureMetadata = metadata.captureMetadataForSource(imported.source);
+		if (
+			environment !== 'client' ||
+			!captureMetadata?.extractedSymbols.length
+		) {
+			continue;
+		}
+		const symbolSource = withQuery(imported.source, { 'markless-symbols': null });
 		if (options.dev === true) {
-			await options.devServer?.transformRequest(imported.source, environment);
+			await options.devServer?.transformRequest(symbolSource, environment);
 		} else if (typeof this.load === 'function') {
-			await this.load({ id: imported.source });
+			await this.load({ id: symbolSource });
 		}
 	}
 }
@@ -1003,13 +1300,14 @@ function uniqueImportedModules(imports: ReadonlyArray<ImportedChild>): ImportedC
 
 function importedSymbolInputs(
 	children: ReadonlyArray<ImportedChild>,
-	manifests: ReadonlyMap<string, MarklessTransformManifest>,
+	metadata: ModuleMetadataRegistry,
 ): NonNullable<TransformTsrxModuleInput['symbols']> {
 	return children.flatMap((child) => {
-		const manifest = manifests.get(child.source);
-		if (!manifest?.captureMetadata || !child.componentEdgeId) return [];
-		return manifest.symbols.flatMap((symbol) => {
-			const captureSymbol = manifest.captureMetadata?.extractedSymbols.find(
+		const captureMetadata = metadata.captureMetadataForSource(child.source);
+		const claimManifest = sourceSymbolManifest(metadata, child.source);
+		if (!captureMetadata || !claimManifest || !child.componentEdgeId) return [];
+		return claimManifest.symbols.flatMap((symbol) => {
+			const captureSymbol = captureMetadata.extractedSymbols.find(
 				(candidate) => candidate.symbolId === symbol.symbolId,
 			);
 			return captureSymbol?.captureSlots.some((slot) => slot.propName !== undefined)
@@ -1029,16 +1327,39 @@ function importedSymbolInputs(
 
 function linkedChildrenHaveBrowserTriggers(
 	children: ReadonlyArray<ImportedChild>,
-	manifests: ReadonlyMap<string, MarklessTransformManifest>,
+	metadata: ModuleMetadataRegistry,
 	capabilities: ReadonlyMap<string, boolean>,
 ): boolean {
 	return children.some((child) => {
-		const manifest = manifests.get(child.source);
+		const manifest = sourceSymbolManifest(metadata, child.source);
 		return (
 			(manifest !== undefined && manifestHasBrowserTriggers(manifest)) ||
 			capabilities.get(child.source) === true
 		);
 	});
+}
+
+function sourceSymbolManifest(
+	metadata: ModuleMetadataRegistry,
+	source: string,
+): MarklessTransformManifest | undefined {
+	const resolverId = `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodeURIComponent(source)}`;
+	const candidates = [...metadata.symbolClaimManifests()]
+		.filter(
+			(manifest) =>
+				manifest.resolver.virtualModuleId === resolverId && manifest.symbols.length > 0,
+		)
+		.sort((left, right) => left.source.localeCompare(right.source));
+	const selected = candidates[0];
+	if (!selected) return undefined;
+	const signature = JSON.stringify(selected.symbols);
+	const divergent = candidates.find((candidate) => JSON.stringify(candidate.symbols) !== signature);
+	if (divergent) {
+		throw new Error(
+			`MARKLESS_SOURCE_SYMBOL_CLAIMS_DIVERGED: Source ${JSON.stringify(source)} has incompatible emitted symbol claims in ${JSON.stringify(selected.source)} and ${JSON.stringify(divergent.source)}.`,
+		);
+	}
+	return selected;
 }
 
 function manifestHasBrowserTriggers(manifest: MarklessTransformManifest): boolean {
@@ -1056,12 +1377,9 @@ function importedChildKey(child: ImportedChild): string {
 	return `${child.parent}\0${child.specifier}\0${child.source}`;
 }
 
-function validateImportedChild(
-	child: ImportedChild,
-	manifests: ReadonlyMap<string, MarklessTransformManifest>,
-) {
-	const parentMetadata = manifests.get(child.parent)?.captureMetadata;
-	const childMetadata = manifests.get(child.source)?.captureMetadata;
+function validateImportedChild(child: ImportedChild, metadata: ModuleMetadataRegistry) {
+	const parentMetadata = metadata.captureMetadataForSource(pathname(child.parent));
+	const childMetadata = metadata.captureMetadataForSource(child.source);
 	// Plain TypeScript source components (for example @markless/router's Html)
 	// are author-time helpers, not compiled TSRX artifacts. A built JavaScript
 	// component remains subject to the fail-closed metadata check below.
@@ -1074,7 +1392,6 @@ function validateImportedChild(
 	) {
 		return;
 	}
-
 	throw new Error(
 		`MARKLESS_CAPTURE_METADATA_MISSING: Parent module ${JSON.stringify(child.parent)} composes imported child ${JSON.stringify(child.specifier)}, but its compiled artifact has no current capture metadata. Rebuild the child with the current Markless compiler and clear any stale build cache.`,
 	);
@@ -1219,9 +1536,10 @@ function pluginName(environment: Environment) {
 function registerTransformArtifacts(input: {
 	owner: string;
 	source: string;
+	manifestSource: string;
 	result: TransformTsrxModuleResult;
 	virtualModules: Map<string, MarklessVirtualModule>;
-	transformManifests: Map<string, MarklessTransformManifest>;
+	moduleMetadata: ModuleMetadataRegistry;
 	moduleLinkArtifacts: Map<string, MarklessModuleLinkArtifact>;
 	transformVirtualModules: Map<string, Set<string>>;
 	virtualModuleOwners: Map<string, Set<string>>;
@@ -1253,7 +1571,15 @@ function registerTransformArtifacts(input: {
 			input.executionLogEstimatedSizes.set(module.id, stored.source.length);
 		}
 	}
-	input.transformManifests.set(input.source, input.result.manifest);
+	input.moduleMetadata.recordCaptureMetadata(input.source, input.result.manifest);
+	const symbolClaim = emittedSymbolClaim(
+		input.moduleMetadata,
+		input.source,
+		input.manifestSource,
+		input.result.manifest,
+		input.result.virtualModules,
+	);
+	input.moduleMetadata.recordSymbolClaims(symbolClaim.owner, symbolClaim.manifest);
 	input.moduleLinkArtifacts.set(input.source, {
 		moduleGraphInterface: input.result.moduleGraphInterface,
 		interfaceHash: input.result.interfaceHash,
@@ -1276,6 +1602,95 @@ function registerTransformArtifacts(input: {
 	}
 	input.dev.record(input.source, ids, input.environment);
 	if (renderDataHashes.size > 0) input.updateDevPrerenderHashes?.(renderDataHashes);
+}
+
+function replaceClaimsWithPrerenderWakeOwner(
+	metadata: ModuleMetadataRegistry,
+	source: string,
+): void {
+	for (const emittedModule of metadata.symbolClaimMap().keys()) {
+		if (
+			pathname(emittedModule) === source &&
+			(emittedModule === source || isResumeSourceRequest(emittedModule))
+		) {
+			metadata.deleteSymbolClaims(emittedModule);
+		}
+	}
+}
+
+function emittedSymbolClaim(
+	metadata: ModuleMetadataRegistry,
+	source: string,
+	emittedModule: string,
+	manifest: MarklessTransformManifest,
+	virtualModules: ReadonlyArray<MarklessVirtualModule>,
+): { readonly owner: string; readonly manifest: MarklessTransformManifest } {
+	const claim = manifestForSource(manifest, emittedModule);
+	if (isPrerenderWakeSourceRequest(emittedModule) && manifest.symbols.length > 0) {
+		// The generated resolver owns wake-wrapper symbol routes when it survives
+		// the final strip; final claim selection drops this owner if it does not.
+		replaceClaimsWithPrerenderWakeOwner(metadata, source);
+		const resolver = virtualModules.find((module) => module.type === 'resolver');
+		if (!resolver) throw new Error('MARKLESS_PRERENDER_WAKE_RESOLVER_MISSING');
+		return {
+			owner: resolver.id,
+			manifest: {
+				...manifestForSource(manifest, source),
+				resolver: { virtualModuleId: resolver.id },
+			},
+		};
+	}
+	// An ineligible wake request emits no facade and therefore cannot displace
+	// the ordinary source or symbols sibling that still owns these claims.
+	const wakeOwnsRoutes = metadata.hasSymbolClaims(manifest.resolver.virtualModuleId);
+	return {
+		owner: emittedModule,
+		manifest:
+			wakeOwnsRoutes && (emittedModule === source || isResumeSourceRequest(emittedModule))
+				? { ...claim, symbols: [] }
+				: claim,
+	};
+}
+
+function registerRenderDataStyles(input: {
+	owner: string;
+	source: string;
+	modules: ReadonlyArray<MarklessVirtualModule>;
+	virtualModules: Map<string, MarklessVirtualModule>;
+	transformVirtualModules: Map<string, Set<string>>;
+	virtualModuleOwners: Map<string, Set<string>>;
+	dev: ReturnType<typeof createMarklessDevGraph>;
+}) {
+	if (input.modules.length === 0) return;
+	const ids = new Set(input.transformVirtualModules.get(input.owner) ?? []);
+	for (const module of input.modules) {
+		input.virtualModules.set(module.id, module);
+		ids.add(module.id);
+		const owners = input.virtualModuleOwners.get(module.id) ?? new Set<string>();
+		owners.add(input.owner);
+		input.virtualModuleOwners.set(module.id, owners);
+	}
+	input.transformVirtualModules.set(input.owner, ids);
+	input.dev.record(
+		input.source,
+		input.modules.map((module) => module.id),
+		'client',
+	);
+}
+
+function manifestForSource(
+	manifest: MarklessTransformManifest,
+	source: string,
+): MarklessTransformManifest {
+	return manifest.source === source ? manifest : { ...manifest, source };
+}
+
+function renderDataClaimManifest(
+	manifest: MarklessTransformManifest,
+	source: string,
+): MarklessTransformManifest {
+	// Data-only facades keep demand records but own no symbol claims.
+	return { ...manifestForSource(manifest, source), symbols: [] };
 }
 
 function renderDataHash(source: string): string {
@@ -1305,6 +1720,18 @@ function importedInterfaceHashSignature(
 		.join('|');
 }
 
+function importedSymbolClaimSignature(
+	imports: ReadonlyArray<ImportedChild>,
+	metadata: ModuleMetadataRegistry,
+): string {
+	return [...new Set(imports.map((imported) => imported.source))]
+		.sort()
+		.map((source) =>
+			JSON.stringify([source, sourceSymbolManifest(metadata, source)?.symbols ?? []]),
+		)
+		.join('|');
+}
+
 function isRenderDataOnlyTransformChange(
 	previous: TransformTsrxModuleResult,
 	next: TransformTsrxModuleResult,
@@ -1316,14 +1743,7 @@ function isRenderDataOnlyTransformChange(
 	if (JSON.stringify(withoutRenderData(previous)) !== JSON.stringify(withoutRenderData(next))) {
 		return false;
 	}
-	const withoutNativeMarkup = (manifest: MarklessTransformManifest) => {
-		const { csrNativeMarkup: _csrNativeMarkup, ...stable } = manifest;
-		return stable;
-	};
-	return (
-		JSON.stringify(withoutNativeMarkup(previous.manifest)) ===
-		JSON.stringify(withoutNativeMarkup(next.manifest))
-	);
+	return JSON.stringify(previous.manifest) === JSON.stringify(next.manifest);
 }
 
 function stripBuildPrefix(fileName: string) {
@@ -1409,8 +1829,58 @@ function isRenderDataSourceRequest(id: string): boolean {
 	return MARKLESS_RENDER_DATA_SOURCE_QUERY_RE.test(id);
 }
 
+function materializedRenderDataReachRoot(
+	id: string,
+	source: string,
+	materializations: ReadonlyMap<
+		string,
+		NonNullable<TransformTsrxModuleInput['artifactChildMaterializations']>
+	>,
+): string | undefined {
+	if (materializations.has(source)) return source;
+	return (
+		new URLSearchParams(parsePath(id).search).get(MARKLESS_REACHED_FROM_SOURCE_QUERY) ??
+		undefined
+	);
+}
+
+function materializedReachedRenderDataSource(source: string, routeRoot: string): string {
+	return withQuery(source, {
+		'markless-render-data': null,
+		[MARKLESS_REACHED_FROM_SOURCE_QUERY]: routeRoot,
+	});
+}
+
 function isPrerenderWakeSourceRequest(id: string): boolean {
 	return MARKLESS_PRERENDER_WAKE_SOURCE_QUERY_RE.test(id);
+}
+
+function isClientPrimarySourceRequest(id: string): boolean {
+	return !(
+		MARKLESS_SYMBOL_SOURCE_QUERY_RE.test(id) ||
+		MARKLESS_RESUME_SOURCE_QUERY_RE.test(id) ||
+		MARKLESS_RENDER_DATA_SOURCE_QUERY_RE.test(id) ||
+		MARKLESS_PRERENDER_WAKE_SOURCE_QUERY_RE.test(id) ||
+		MARKLESS_ROUTE_SOURCE_QUERY_RE.test(id)
+	);
+}
+
+function clientRouteArtifactReference(source: string): string {
+	// Keep the queried navigation facade outside the primary route chunk.
+	const symbolSource = source.includes('?')
+		? `${source}&markless-symbols`
+		: `${source}?markless-symbols`;
+	const renderDataSource = source.includes('?')
+		? `${source}&markless-render-data`
+		: `${source}?markless-render-data`;
+	return [
+		`const [symbolModule, renderDataModule] = await Promise.all([import(${JSON.stringify(symbolSource)}), import(${JSON.stringify(renderDataSource)})]);`,
+		'const marklessRouteArtifact = {',
+		'\trenderData: renderDataModule.marklessPrerenderData,',
+		'\tloadSymbol: symbolModule.loadSymbol,',
+		'};',
+		'export default marklessRouteArtifact;',
+	].join('\n');
 }
 
 function sourceForSymbolVirtualImporter(importer: string | undefined): string | null {
@@ -1486,7 +1956,7 @@ function recordProductionPrerenderWakeModuleUrls(
 	}
 }
 
-function productionResumeModuleChunks(bundle: Record<string, unknown>): string[] {
+function productionWakeModuleChunks(bundle: Record<string, unknown>): string[] {
 	const chunks: string[] = [];
 	for (const output of Object.values(bundle)) {
 		if (!output || typeof output !== 'object') continue;
@@ -1499,7 +1969,8 @@ function productionResumeModuleChunks(bundle: Record<string, unknown>): string[]
 			chunk.type === 'chunk' &&
 			typeof chunk.facadeModuleId === 'string' &&
 			typeof chunk.fileName === 'string' &&
-			sourceForResumeVirtualImporter(chunk.facadeModuleId)
+				(sourceForResumeVirtualImporter(chunk.facadeModuleId) ||
+					sourceForPrerenderWakeVirtualImporter(chunk.facadeModuleId))
 		) {
 			chunks.push(stripBuildPrefix(chunk.fileName));
 		}
@@ -1546,6 +2017,36 @@ function normalizeVirtualId(id: string) {
 			}
 		});
 	return `${MARKLESS_VIRTUAL_PREFIX}${segments.join(':')}`;
+}
+
+function emittedBundleModuleIds(bundle: Record<string, unknown>): Set<string> {
+	const ids = new Set<string>();
+	for (const output of Object.values(bundle)) {
+		if (!output || typeof output !== 'object') continue;
+		const chunk = output as {
+			readonly type?: unknown;
+			readonly facadeModuleId?: unknown;
+			readonly moduleIds?: unknown;
+		};
+		if (chunk.type !== 'chunk') continue;
+		if (typeof chunk.facadeModuleId === 'string') {
+			ids.add(normalizeVirtualId(chunk.facadeModuleId));
+		}
+		if (Array.isArray(chunk.moduleIds)) {
+			for (const id of chunk.moduleIds) {
+				if (typeof id === 'string') ids.add(normalizeVirtualId(id));
+			}
+		}
+	}
+	return ids;
+}
+
+function symbolClaimsBySource(
+	manifests: Iterable<MarklessTransformManifest>,
+): ReadonlyMap<string, MarklessTransformManifest> {
+	const claims = new Map<string, MarklessTransformManifest>();
+	for (const manifest of manifests) claims.set(manifest.source, manifest);
+	return claims;
 }
 
 function resolveVirtualId(id: string) {

@@ -44,6 +44,44 @@ export type ProtocolSyncPolicy =
 			readonly branches: ReadonlyArray<ProtocolSyncPolicyBranch>;
 	  };
 
+export const PROTOCOL_EVENT_ACTION_KIND = {
+	event: 'event',
+	externalDelegate: 'external-delegate',
+} as const;
+
+export type ProtocolEventActionKind =
+	(typeof PROTOCOL_EVENT_ACTION_KIND)[keyof typeof PROTOCOL_EVENT_ACTION_KIND];
+
+export type ProtocolEventAction = {
+	readonly kind: typeof PROTOCOL_EVENT_ACTION_KIND.externalDelegate;
+	readonly owner: string;
+};
+
+export type ProtocolEventRecord = {
+	readonly hostNodeId: string;
+	readonly eventName: string;
+	readonly syncPolicy?: ProtocolSyncPolicy;
+	readonly symbolIds: ReadonlyArray<string>;
+	readonly action?: ProtocolEventAction;
+};
+
+export function protocolEventActionKind(
+	record: Pick<ProtocolEventRecord, 'action'>,
+): ProtocolEventActionKind {
+	return record.action?.kind ?? PROTOCOL_EVENT_ACTION_KIND.event;
+}
+
+const PROTOCOL_EVENT_ACTION_DISPATCHES_MARKLESS = {
+	[PROTOCOL_EVENT_ACTION_KIND.event]: true,
+	[PROTOCOL_EVENT_ACTION_KIND.externalDelegate]: false,
+} as const satisfies Record<ProtocolEventActionKind, boolean>;
+
+export function protocolEventDispatchesMarkless(
+	record: Pick<ProtocolEventRecord, 'action'>,
+): boolean {
+	return PROTOCOL_EVENT_ACTION_DISPATCHES_MARKLESS[protocolEventActionKind(record)];
+}
+
 export type ProtocolStatePayload = {
 	readonly version: typeof ASYNC_PROTOCOL_VERSION | typeof STORAGE_PROTOCOL_VERSION;
 	readonly cells: ReadonlyArray<{
@@ -172,12 +210,7 @@ export type ProtocolViewPayload = {
 		readonly index: number;
 		readonly tagName: string;
 	}>;
-	readonly events: ReadonlyArray<{
-		readonly hostNodeId: string;
-		readonly eventName: string;
-		readonly syncPolicy?: ProtocolSyncPolicy;
-		readonly symbolIds: ReadonlyArray<string>;
-	}>;
+	readonly events: ReadonlyArray<ProtocolEventRecord>;
 	readonly domUpdates: ReadonlyArray<{
 		readonly hostNodeId: string;
 		readonly source: string;

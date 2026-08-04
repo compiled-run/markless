@@ -5,10 +5,12 @@ import {
 	type SsrDataResidue,
 	type SsrDataSlot,
 	type SsrRenderData,
+	type StructureToken,
 } from '../ssr-data/renderer.ts';
 import type { SsrRenderable, SsrRenderOutput } from '../render-to-string.ts';
 import type { ResumeArmRecordSet } from '../resume-types.ts';
 import type { RuntimeGraph } from '@markless/runtime';
+import { serializeRuntimeAsyncSnapshots } from '@markless/serializer';
 import type { ProtocolStatePayload } from '@markless/serializer';
 import { prepareSsrResumeRecords } from './records.ts';
 import {
@@ -18,6 +20,9 @@ import {
 	marklessSsrMergeBranches,
 	marklessSsrRemapGraphOutput,
 } from '../fns/ssr.ts';
+import { marklessCsrRemapChildGraph } from '../fns/composition.ts';
+import { marklessBoundSymbolId } from '../fns/bound-symbol.ts';
+import { registerPrerenderStagedComputeds } from './staged-graph.ts';
 
 type Awaitable<T> = T | Promise<T>;
 type GraphValues = ReadonlyMap<string, unknown>;
@@ -52,6 +57,7 @@ type PrerenderDataDefinition = {
 	readonly edges?: ReadonlyArray<{
 		readonly id: string;
 		readonly childComponentName: string;
+		readonly asyncBoundaryId?: string;
 		readonly hostPrefix: string;
 		readonly symbolPrefix: string;
 		readonly boundSymbols?: Readonly<Record<string, string>>;
@@ -64,6 +70,10 @@ type PrerenderDataDefinition = {
 			readonly symbolId?: string;
 			readonly source?: string;
 		}>;
+		readonly materialized?: SsrRenderOutput & {
+			readonly elementCount: number;
+			readonly structureTokens?: ReadonlyArray<StructureToken>;
+		};
 	}>;
 	readonly propCellId?: string | null;
 };
@@ -194,6 +204,31 @@ export async function derivePrerenderResumeRecords(
 	return prepareSsrResumeRecords(await evaluateBuiltPageClosure(page, propsOrLoadSymbol));
 }
 
+// Client route mounts evaluate the compiler-linked render-data closure directly.
+// This is markup/data evaluation only: no component render body participates.
+export async function renderPrerenderDataSurface(
+	surface: PrerenderDataSurface,
+	loadSymbol: PrerenderLoadSymbol,
+	props: unknown = {},
+): Promise<SsrRenderOutput> {
+	const output = await evaluatePrerenderDataSurface(
+		surface,
+		loadSymbol,
+		undefined,
+		true,
+		asPropsRecord(props),
+	);
+	return output.state
+		? {
+				...output,
+				state: {
+					...output.state,
+					computed: serializeRuntimeAsyncSnapshots(output.state.computed ?? []),
+				},
+			}
+		: output;
+}
+
 export async function renderPrerenderBoundary(
 	page: SsrRenderable | PrerenderDataSurface,
 	boundaryId: string,
@@ -225,13 +260,14 @@ async function evaluatePrerenderDataSurface(
 	loadSymbol: PrerenderLoadSymbol,
 	graph: RuntimeGraph | undefined,
 	requireHtml: boolean,
+	props: Readonly<Record<string, unknown>> = {},
 ): Promise<SsrRenderOutput> {
 	const rootName = surface.rootComponentName;
 	if (!rootName) throw new Error('MARKLESS_PRERENDER_DATA_ROOT_MISSING');
 	return evaluatePrerenderDataComponent({
 		surface,
 		componentName: rootName,
-		props: {},
+		props,
 		idPrefix: '',
 		symbolPrefix: '',
 		loadSymbol,
@@ -240,12 +276,25 @@ async function evaluatePrerenderDataSurface(
 	});
 }
 
+function asPropsRecord(value: unknown): Readonly<Record<string, unknown>> {
+	return value !== null && typeof value === 'object'
+		? (value as Readonly<Record<string, unknown>>)
+		: {};
+}
+
 async function evaluatePrerenderDataComponent(input: {
 	readonly surface: PrerenderDataSurface;
 	readonly componentName: string;
 	readonly props: Readonly<Record<string, unknown>>;
 	readonly idPrefix: string;
 	readonly symbolPrefix: string;
+	readonly boundSymbols?: Readonly<Record<string, string>>;
+	readonly graphProps?: ReadonlyArray<{
+		readonly name: string;
+		readonly kind: string;
+		readonly graphNodeId?: string;
+		readonly path?: ReadonlyArray<string>;
+	}>;
 	readonly loadSymbol: PrerenderLoadSymbol;
 	readonly graph: RuntimeGraph | undefined;
 	readonly requireHtml: boolean;
@@ -274,13 +323,20 @@ async function evaluatePrerenderDataComponent(input: {
 		if (graphNodeId.startsWith('prop:')) {
 			return readPath(input.props[graphNodeId.slice(5)], path);
 		}
+		// A settled child can introduce a sync computed that did not exist in the
+		// pending group's graph. Its derived value is already known here and must
+		// render from this component's evaluation before registration publishes it
+		// to the staged graph for later refreshes.
+		if (values.has(graphNodeId)) return readPath(values.get(graphNodeId), path);
 		return input.graph
 			? input.graph.read(graphNodeId, path)
 			: readPath(values.get(graphNodeId), path);
 	};
 	for (const initial of definition.initialValues ?? []) {
 		if (initial.value.kind !== 'symbol-function') continue;
-		const loaded = await input.loadSymbol(input.symbolPrefix + initial.value.symbolId);
+		const loaded = await input.loadSymbol(
+			input.boundSymbols?.[initial.value.symbolId] ?? input.symbolPrefix + initial.value.symbolId,
+		);
 		if (typeof loaded !== 'function') {
 			throw new Error(`MARKLESS_PRERENDER_DATA_SYMBOL_MISSING: ${initial.value.symbolId}`);
 		}
@@ -290,6 +346,25 @@ async function evaluatePrerenderDataComponent(input: {
 				: await loaded();
 		values.set(initial.graphNodeId, value);
 	}
+	await registerPrerenderStagedComputeds(
+		input.graph,
+		definition.state.computed.flatMap((computed) => {
+			if (computed.async !== false || !values.has(computed.graphNodeId)) return [];
+			return [
+				{
+					...computed,
+					...(computed.deriveSymbolId
+						? { deriveSymbolId: marklessBoundSymbolId(input, computed.deriveSymbolId) }
+						: {}),
+					value: values.get(computed.graphNodeId),
+					dependencies: (computed.dependencies ?? []).map((dependency) => {
+						const mapped = marklessCsrRemapChildGraph(dependency, input.graphProps);
+						return mapped ?? dependency;
+					}),
+				},
+			];
+		}),
+	);
 
 	const owned = new Set(definition.stateGraphNodeIds ?? []);
 	const state: ProtocolStatePayload = {
@@ -380,16 +455,34 @@ async function evaluatePrerenderDataComponent(input: {
 				: undefined;
 			return snapshot?.status === 'fulfilled' ? 0 : snapshot?.status === 'rejected' ? 2 : 1;
 		},
-		renderChild: async (slot) => {
+		renderChild: async (slot, context) => {
 			const edge = (definition.edges ?? []).find(
 				(candidate) => candidate.id === slot.componentEdgeId,
 			);
 			if (!edge) throw new Error(`MARKLESS_PRERENDER_CHILD_MISSING: ${slot.componentEdgeId}`);
+			if (edge.materialized) {
+				const materialized = placeMaterializedChild(
+					edge.materialized,
+					input.idPrefix + edge.hostPrefix,
+				);
+				children.push({
+					output: materialized,
+					hostPrefix: edge.hostPrefix,
+					symbolPrefix: edge.symbolPrefix,
+					graphProps: edge.props,
+					asyncBoundaryId: edge.asyncBoundaryId,
+					boundSymbols: edge.boundSymbols ?? {},
+					callbackProps: {},
+				});
+				return materialized;
+			}
 			const childProps: Record<string, unknown> = {};
 			const callbacks: Record<string, string> = {};
 			for (const prop of edge.props) {
 				if (prop.kind === 'graph-reference' && prop.graphNodeId) {
 					childProps[prop.name] = read(prop.graphNodeId, prop.path ?? []);
+				} else if (prop.kind === 'absent') {
+					childProps[prop.name] = undefined;
 				} else if (prop.kind === 'serializable' && 'value' in prop) {
 					childProps[prop.name] = prop.value;
 				} else if (prop.kind === 'callback') {
@@ -398,6 +491,9 @@ async function evaluatePrerenderDataComponent(input: {
 				} else {
 					throw new Error(`MARKLESS_PRERENDER_PROP_UNDERIVABLE: ${prop.name}`);
 				}
+			}
+			if (context.projectionHtml !== undefined) {
+				childProps.children = context.projectionHtml;
 			}
 			if (Object.keys(callbacks).length > 0) childProps.__marklessSsrCallbacks = callbacks;
 			const childSurface = input.surface.components[edge.childComponentName]
@@ -414,6 +510,8 @@ async function evaluatePrerenderDataComponent(input: {
 				props: childProps,
 				idPrefix: input.idPrefix + edge.hostPrefix,
 				symbolPrefix: input.symbolPrefix + edge.symbolPrefix,
+				boundSymbols: edge.boundSymbols,
+				graphProps: edge.props,
 				loadSymbol: input.loadSymbol,
 				graph: input.graph,
 				requireHtml: input.requireHtml,
@@ -423,6 +521,7 @@ async function evaluatePrerenderDataComponent(input: {
 				hostPrefix: edge.hostPrefix,
 				symbolPrefix: edge.symbolPrefix,
 				graphProps: edge.props,
+				asyncBoundaryId: edge.asyncBoundaryId,
 				boundSymbols: edge.boundSymbols ?? {},
 				callbackProps: callbacks,
 			});
@@ -489,4 +588,19 @@ function readPath(value: unknown, path: ReadonlyArray<string>): unknown {
 		current = (current as Record<string, unknown>)[segment];
 	}
 	return current;
+}
+
+function placeMaterializedChild<T extends { readonly structureTokens?: ReadonlyArray<StructureToken> }>(
+	output: T,
+	idPrefix: string,
+): T {
+	if (!output.structureTokens || idPrefix === '') return output;
+	return {
+		...output,
+		structureTokens: output.structureTokens.map((token) =>
+			token.kind === 'element'
+				? { ...token, hostNodeId: idPrefix + token.hostNodeId }
+				: { ...token, anchorId: idPrefix + token.anchorId },
+		),
+	};
 }

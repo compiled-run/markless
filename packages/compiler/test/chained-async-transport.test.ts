@@ -130,8 +130,6 @@ export function GlassArchive() @{
 		deriveSymbolId: syncDerive.symbolId,
 		dependencies: [{ graphNodeId: 'computed:furnaceReading', path: ['value', 'tone'] }],
 	});
-	expect(result.publicRenderModule.csrModuleSource).not.toContain('const displayCard = (');
-
 	const downstreamRunner = result.symbolModules.modules.find(
 		(module) =>
 			module.kind === 'async-computed-runner' &&
@@ -144,7 +142,7 @@ export function GlassArchive() @{
 	expect(downstreamRunner.source).toContain('const displayCard = read("computed:displayCard");');
 });
 
-test('sync computed without an async dependency keeps the cheap CSR inline', async () => {
+test('sync computed without an async dependency stays available to linked render data', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/InlineCard.tsrx',
 		source: `
@@ -160,12 +158,15 @@ export function InlineCard() @{
 		symbols: [],
 	});
 
-	expect(result.publicRenderModule.csrModuleSource).toContain(
-		`"computed:displayCard":"() => ({ caption: pigment + '-fired' })"`,
+	const definition = result.publicRenderModule.componentDefinitions[0];
+	expect(definition?.initialValueKinds).toEqual(
+		expect.objectContaining({ 'computed:displayCard': 'sync-computed-derive' }),
 	);
-	expect(result.publicRenderModule.csrModuleSource).not.toContain(
-		"const displayCard = (() => ({ caption: pigment + '-fired' }))();",
-	);
+	expect(
+		result.symbolModules.modules.some((module) =>
+			module.source.includes("caption: pigment + '-fired'"),
+		),
+	).toBe(true);
 });
 
 test('a template-read sync computed gates its boundary on every async ancestor', async () => {

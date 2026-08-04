@@ -1,4 +1,5 @@
 import type { DomJournalResult } from '@markless/runtime';
+import type { ProtocolStatePayload } from '@markless/serializer';
 import type { AsyncBoundarySettleTracker } from './resume-async-wiring.ts';
 import type { ArmCommitUpdate, ArmRegistrationDeps } from './resume-commit-arm.ts';
 import type {
@@ -12,18 +13,21 @@ import type {
 } from './resume-types.ts';
 
 const SHARED_PATCH_EVENT_TYPE = 'async:shared-patch';
+type RuntimeShared = ReturnType<
+	(typeof import('./resume-runtime-shared.ts'))['createResumeRuntimeShared']
+>;
 type BehaviorRuntime = ReturnType<
 	(typeof import('./resume-behaviors.ts'))['createBehaviorRuntime']
 >;
 type BranchRuntime = ReturnType<(typeof import('./resume-branches.ts'))['wireBranches']>;
 type EventWiring = ReturnType<(typeof import('./resume-events.ts'))['createEventWiring']>;
-type RuntimeShared = ReturnType<
-	(typeof import('./resume-runtime-shared.ts'))['createResumeRuntimeShared']
->;
 
 export function createResumeRuntime(
 	input: ResumeRuntimeInput,
 	prepared: ResumePreparedCore,
+	onRegisterComputedRefreshes?: (
+		register: (records: ProtocolStatePayload['computed']) => Promise<void>,
+	) => void,
 ): ResumeRuntime {
 	const { elementsByHostId, elementHandles } = prepared;
 	let storagePlane: import('./storage-plane.ts').StoragePlane | undefined;
@@ -59,14 +63,7 @@ export function createResumeRuntime(
 		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
 			? registrationGraphNodeCensus(input.state)
 			: undefined;
-	const registeredComputedRefreshIds = new Set(
-		(input.state?.computed ?? [])
-			.filter(
-				(computed) =>
-					computed.async === false && typeof computed.deriveSymbolId === 'string',
-			)
-			.map((computed) => computed.graphNodeId),
-	);
+	const registeredComputedRefreshIds = new Set<string>();
 	const getRuntimeShared = async (): Promise<RuntimeShared> =>
 		(runtimeShared ??= (await import('./resume-runtime-shared.ts')).createResumeRuntimeShared(
 			input,
@@ -96,6 +93,30 @@ export function createResumeRuntime(
 			release();
 		else containerSubscriptionReleases.push(release);
 	};
+	const registerComputedRefreshes = async (records: ProtocolStatePayload['computed']) => {
+		const fresh = records.filter(
+			(record) =>
+				record.async === false &&
+				typeof record.deriveSymbolId === 'string' &&
+				!registeredComputedRefreshIds.has(record.graphNodeId),
+		);
+		if (fresh.length === 0) return;
+		for (const record of fresh) {
+			registeredComputedRefreshIds.add(record.graphNodeId);
+			graphNodeIds?.add(record.graphNodeId);
+		}
+		(
+			await import('./resume-sync-demand.ts')
+		).wireSyncComputedDemandRecordsWithoutLoadingCapability({
+			graph: input.graph,
+			computed: fresh,
+			root: input.root,
+			loadSymbol: input.loadSymbol,
+			elementHandles,
+			storeContainerSubscription,
+		});
+	};
+	onRegisterComputedRefreshes?.(registerComputedRefreshes);
 	async function getEvents(): Promise<EventWiring> {
 		if (events) return events;
 		const { createEventWiring } = await import('./resume-events.ts');
@@ -119,6 +140,7 @@ export function createResumeRuntime(
 			behaviorHostIdsForAncestors: (element) =>
 				behaviorRuntime?.behaviorHostIdsForAncestors(element) ??
 				pendingBehaviorHostIdsForAncestors(element),
+			registerDelegatedEventRecord: input.registerDelegatedEventRecord,
 		});
 		for (const eventRecord of input.view.events) {
 			if (eventRecord.eventName === 'visible') continue;
@@ -249,26 +271,7 @@ export function createResumeRuntime(
 			registerElementHandle: elementHandles.register,
 			graph: input.graph,
 			...(graphNodeIds ? { graphNodeIds } : {}),
-			registerComputedRefreshes: async (records) => {
-				const fresh = records.filter(
-					(record) => !registeredComputedRefreshIds.has(record.graphNodeId),
-				);
-				if (fresh.length === 0) return;
-				for (const record of fresh) {
-					registeredComputedRefreshIds.add(record.graphNodeId);
-					graphNodeIds?.add(record.graphNodeId);
-				}
-				(
-					await import('./resume-sync-demand.ts')
-				).wireSyncComputedDemandRecordsWithoutLoadingCapability({
-					graph: input.graph,
-					computed: fresh,
-					root: input.root,
-					loadSymbol: input.loadSymbol,
-					elementHandles,
-					storeContainerSubscription,
-				});
-			},
+			registerComputedRefreshes,
 			loadSymbol: input.loadSymbol,
 			getElementHandle: elementHandles.get,
 			storeHostSubscription,
@@ -295,12 +298,8 @@ export function createResumeRuntime(
 				: undefined,
 			registerArmBranches: async (boundaryId, records) => {
 				const branches = await loadBranchRuntime();
-				for (const hostNodeId of branches.registerArmBranches(
-					boundaryId,
-					records as never,
-				)) {
+				for (const hostNodeId of branches.registerArmBranches(boundaryId, records as never))
 					await behaviorRuntime?.activateBehaviors(hostNodeId, { flush: false });
-				}
 			},
 		};
 	}
@@ -323,6 +322,7 @@ export function createResumeRuntime(
 			);
 		}
 	}
+
 	function disposeHost(
 		hostNodeId: string,
 		options: { readonly ignoreFutureEvents?: boolean } = {},
@@ -379,9 +379,8 @@ export function createResumeRuntime(
 	function pendingBehaviorHostIdsForAncestors(element: ResumeDomElement | undefined): string[] {
 		const ids: string[] = [];
 		for (let current = element; current; current = current.parentElement ?? undefined) {
-			for (const hostNodeId of behaviorHostIds) {
+			for (const hostNodeId of behaviorHostIds)
 				if (elementsByHostId.get(hostNodeId) === current) ids.push(hostNodeId);
-			}
 		}
 		return ids;
 	}
@@ -391,6 +390,7 @@ export function createResumeRuntime(
 				graph: input.graph,
 				state: input.state,
 			});
+		await registerComputedRefreshes(input.state?.computed ?? []);
 		await registerServedBoundaryArms();
 		settleTracker = await (
 			await import('./resume-runtime-start.ts')
@@ -498,7 +498,7 @@ export function createResumeRuntime(
 			}),
 		);
 	}
-	return {
+	const runtime: ResumeRuntime = {
 		start,
 		dispatch: async (event: ResumeDomEvent, options?: ResumeDispatchOptions) =>
 			(await getEvents()).dispatch(event, options),
@@ -521,11 +521,10 @@ export function createResumeRuntime(
 		disposeHost: (hostNodeId: string) => disposeHost(hostNodeId, { ignoreFutureEvents: true }),
 		dispose,
 	};
+	return runtime;
 }
 
-export function registrationGraphNodeCensus(
-	state: ResumeRuntimeInput['state'],
-): Set<string> {
+export function registrationGraphNodeCensus(state: ResumeRuntimeInput['state']): Set<string> {
 	const ids = new Set<string>();
 	for (const cell of state?.cells ?? []) ids.add(cell.graphNodeId);
 	for (const computed of state?.computed ?? []) ids.add(computed.graphNodeId);

@@ -10,7 +10,9 @@ import type {
 type BehaviorRuntime = ReturnType<
 	(typeof import('./resume-behaviors.ts'))['createBehaviorRuntime']
 >;
-type BranchRuntime = ReturnType<(typeof import('./resume-branches.ts'))['wireBranches']>;
+type BranchRuntime = Awaited<
+	ReturnType<(typeof import('./resume-branches.ts'))['wireBranches']>
+>;
 type EventWiring = ReturnType<(typeof import('./resume-events.ts'))['createEventWiring']>;
 type RuntimeShared = ReturnType<
 	(typeof import('./resume-runtime-shared.ts'))['createResumeRuntimeShared']
@@ -59,9 +61,14 @@ export async function startResumeRuntime(input: {
 		storeContainerSubscription(
 			runtimeInput.graph.subscribeJournal(async (entries) => {
 				await disposeRemovedAsyncRangeHosts(runtimeInput, prepared, entries, disposeHost);
-				input
-					.branchRuntime()
-					?.disposeRemovedRangeHosts(entries, disposeHost, prepared.asyncBoundariesById);
+				const branchRuntime = input.branchRuntime();
+				if (branchRuntime) {
+					await branchRuntime.disposeRemovedRangeHosts(
+						entries,
+						disposeHost,
+						prepared.asyncBoundariesById,
+					);
+				}
 				await runtimeInput.applyDomJournal!(entries);
 				await input
 					.branchRuntime()
@@ -70,25 +77,6 @@ export async function startResumeRuntime(input: {
 					);
 			}),
 		);
-	}
-	if (
-		(runtimeInput.state?.computed ?? []).some(
-			(computed) =>
-				computed.async === false &&
-				typeof (computed as { readonly deriveSymbolId?: unknown }).deriveSymbolId ===
-					'string',
-		)
-	) {
-		(
-			await import('./resume-sync-demand.ts')
-		).wireSyncComputedDemandTriggersWithoutLoadingCapability({
-			graph: runtimeInput.graph,
-			state: runtimeInput.state,
-			root: runtimeInput.root,
-			loadSymbol: runtimeInput.loadSymbol,
-			elementHandles: prepared.elementHandles,
-			storeContainerSubscription,
-		});
 	}
 	if ((runtimeInput.view.keyedRepeats ?? []).length > 0) {
 		(await import('./resume-keyed-repeats.ts')).wireKeyedRepeats({

@@ -8,6 +8,7 @@ import {
 	type StorageSeedMetadata,
 } from '@markless/serializer';
 import { renderPayloadScripts } from '@markless/serializer';
+import { protocolEventDispatchesMarkless } from '@markless/serializer/protocol';
 import {
 	classifyResumeRecordDelta,
 	mergeResumeRecordDelta,
@@ -54,6 +55,7 @@ export type SsrRenderable = (() => SsrRenderOutput) | SsrRenderArtifact;
 export type RenderToStringOptions = {
 	readonly nonce?: string;
 	readonly resumeModuleUrl?: string;
+	readonly prerenderWakeModuleUrl?: string;
 	readonly resumerSource?: string;
 	readonly containerId?: string;
 	// Static preloads, or a callback resolved against the rendered page html
@@ -103,7 +105,8 @@ export async function assembleSsrContainer(
 	const browserTriggers = hasBrowserTriggers(view, state);
 	const selfWake = hasUnsettledAsyncBoundaryRunner(view, state);
 	const resumeModuleUrl = options.resumeModuleUrl ?? artifactResumeModuleUrl(component);
-	const prerenderWakeModuleUrl = artifactPrerenderWakeModuleUrl(component);
+	const prerenderWakeModuleUrl =
+		options.prerenderWakeModuleUrl ?? artifactPrerenderWakeModuleUrl(component);
 	const wakeChannelEnabled =
 		hasPayload && browserTriggers && prerenderWakeModuleUrl !== undefined;
 	const baseline = wakeChannelEnabled
@@ -125,9 +128,7 @@ export async function assembleSsrContainer(
 		hasPayload && browserTriggers && classification?.kind !== 'empty'
 			? renderPayloadScripts(payloadRecords)
 			: undefined;
-	const selectedResumeModuleUrl = wakeChannelEnabled
-		? prerenderWakeModuleUrl
-		: resumeModuleUrl;
+	const selectedResumeModuleUrl = wakeChannelEnabled ? prerenderWakeModuleUrl : resumeModuleUrl;
 	const artifactSources = artifactInlineResumerSources(component);
 	const executionLog =
 		options.executionLog ??
@@ -171,18 +172,26 @@ export async function assembleSsrContainer(
 								{
 									...(typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' &&
 									__MARKLESS_DEBUG_ENABLED__
-										? { debug: { bootstrapSource: __marklessDebugBootstrapSource() } }
+										? {
+												debug: {
+													bootstrapSource:
+														__marklessDebugBootstrapSource(),
+												},
+											}
 										: {}),
 									executionLog,
 								},
 							)
-						: options.resumerSource ?? defaultSource,
+						: (options.resumerSource ?? defaultSource),
 					options.nonce,
 					selectedResumeModuleUrl,
 					selfWake,
 				)
 			: '';
-	const storageSeedScript = renderStorageSeedScript(artifactStorageSeeds(component), options.nonce);
+	const storageSeedScript = renderStorageSeedScript(
+		artifactStorageSeeds(component),
+		options.nonce,
+	);
 
 	return [
 		storageSeedScript,
@@ -217,7 +226,11 @@ export async function assemblePrerenderPageParts(
 ): Promise<{ readonly head: string; readonly container: string }> {
 	const { state, view } = await prepareSsrResumeRecords(output);
 	const browserTriggers = hasBrowserTriggers(view, state);
-	const resumeModuleUrl = options.resumeModuleUrl ?? artifactResumeModuleUrl(component);
+	const resumeModuleUrl =
+		options.prerenderWakeModuleUrl ??
+		options.resumeModuleUrl ??
+		artifactPrerenderWakeModuleUrl(component) ??
+		artifactResumeModuleUrl(component);
 	const optionPreloads =
 		typeof options.modulePreloads === 'function'
 			? options.modulePreloads(output.html)
@@ -381,7 +394,7 @@ function renderModulePreloadLinks(
 function hasBrowserTriggers(view: ProtocolViewPayload, state: ProtocolStatePayload): boolean {
 	return (
 		(state.storage?.length ?? 0) > 0 ||
-		view.events.length > 0 ||
+		view.events.some(protocolEventDispatchesMarkless) ||
 		state.computed.some(
 			(computed) =>
 				computed.async === false &&
@@ -397,7 +410,9 @@ function hasBrowserTriggers(view: ProtocolViewPayload, state: ProtocolStatePaylo
 		(view.keyedRepeats ?? []).some((repeat) => repeat.rowEvents.length > 0) ||
 		// Branch arm events live on armRecords, not view.events.
 		(view.branches ?? []).some((branch) =>
-			(branch.armRecords ?? []).some((arm) => arm.events.length > 0),
+			(branch.armRecords ?? []).some((arm) =>
+				arm.events.some(protocolEventDispatchesMarkless),
+			),
 		) ||
 		// Async boundary arm events also nest under armRecords (D3).
 		view.asyncBoundaries.some((boundary) => boundaryArmEventNames(boundary).length > 0)
@@ -439,14 +454,19 @@ function boundaryArmEventNames(
 	const armRecords = (
 		boundary as {
 			readonly armRecords?: {
-				readonly events?: ReadonlyArray<{ readonly eventName: string }>;
+				readonly events?: ReadonlyArray<{
+					readonly eventName: string;
+					readonly action?: ProtocolEventAction;
+				}>;
 				readonly keyedRepeats?: ProtocolViewPayload['keyedRepeats'];
 			};
 		}
 	).armRecords;
 	if (!armRecords || Array.isArray(armRecords)) return [];
 	return [
-		...(armRecords.events ?? []).map((event) => event.eventName),
+		...(armRecords.events ?? [])
+			.filter(protocolEventDispatchesMarkless)
+			.map((event) => event.eventName),
 		...(armRecords.keyedRepeats ?? []).flatMap((repeat) =>
 			repeat.rowEvents.map((event) => event.eventName),
 		),
@@ -456,13 +476,13 @@ function boundaryArmEventNames(
 function browserEventNames(view: ProtocolViewPayload): ReadonlyArray<string> {
 	return [
 		...new Set([
-			...view.events.map((event) => event.eventName),
+			...view.events.filter(protocolEventDispatchesMarkless).map((event) => event.eventName),
 			...(view.keyedRepeats ?? []).flatMap((repeat) =>
 				repeat.rowEvents.map((event) => event.eventName),
 			),
 			...(view.branches ?? []).flatMap((branch) =>
 				(branch.armRecords ?? []).flatMap((arm) =>
-					arm.events.map((event) => event.eventName),
+					arm.events.filter(protocolEventDispatchesMarkless).map((event) => event.eventName),
 				),
 			),
 			...view.asyncBoundaries.flatMap(boundaryArmEventNames),

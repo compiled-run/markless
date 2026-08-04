@@ -91,7 +91,7 @@ test('public render module literal gate accepts only directly embeddable state v
 	expect(isDirectPublicLiteralValue(recursive)).toBe(false);
 });
 
-test('public CSR and SSR composition bind sibling child events to distinct resolver IDs', async () => {
+test('public render definitions and SSR bind sibling child events to distinct resolver IDs', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/BoundChildren.tsrx',
 		source: `
@@ -107,8 +107,91 @@ export function App() @{
 	const ids = result.boundSymbolResolver.rows.map((row) => row.id);
 	expect(ids).toHaveLength(2);
 	expect(new Set(ids).size).toBe(2);
+	const definitions = JSON.stringify(result.publicRenderModule.componentDefinitions);
 	for (const id of ids) {
-		expect(result.publicRenderModule.csrModuleSource).toContain(id);
+		expect(definitions).toContain(id);
 		expect(result.publicRenderModule.ssrModuleSource).toContain(id);
 	}
+});
+
+test('same-module child SSR evaluates only template computed values owned by that child', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ComputedOwner.tsrx',
+		source: `
+import { state } from '@markless/core';
+function Child({ label }: { label: string }) @{
+	<button>{label}</button>
+}
+export function App() @{
+	let left = state('west');
+	let right = state('east');
+	<main><Child label="compass" /><output>{left + ':' + right}</output></main>
+}
+`,
+		symbols: [],
+	});
+	const source = result.publicRenderModule.ssrModuleSource;
+	const childStart = source.indexOf('async function marklessRenderSsrChild');
+	const rootStart = source.indexOf('const marklessSsrPropEvents');
+	expect(childStart).toBeGreaterThanOrEqual(0);
+	expect(rootStart).toBeGreaterThan(childStart);
+	expect(source.slice(childStart, rootStart)).not.toContain('computed:templateExpression:0');
+	expect(source.slice(rootStart)).toContain('computed:templateExpression:0');
+});
+
+test('SSR branch selection reads an async computed through its graph binding', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/TelescopePanel.tsrx',
+		source: `
+import { computed } from '@markless/core';
+export function TelescopePanel() @{
+	const scan = computed(async () => ({ tracking: true }));
+	<section>
+		@try {
+			@if (scan.tracking) { <strong>Tracking</strong> } @else { <em>Idle</em> }
+		} @pending { <p>Booting</p> } @catch { <p>Fault</p> }
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	const source = result.publicRenderModule.ssrModuleSource;
+	expect(source).toContain(
+		'marklessSsrReadPublicPath(marklessSsrRenderStateValues.get("computed:scan"),["tracking"])',
+	);
+	expect(source).not.toContain('const arm=((scan.tracking)?0:1)');
+});
+
+test('linked component definitions carry the async boundary owning a composed edge', async () => {
+	const child = await compileTsrxModule({
+		filename: 'src/StatusBadge.tsrx',
+		source: `export function StatusBadge({ active }) @{ <p>@if (active) { Live } @else { Idle }</p> }`,
+		symbols: [],
+	});
+	const result = await compileTsrxModule({
+		filename: 'src/Dashboard.tsrx',
+		source: `
+import { computed } from '@markless/core';
+import { StatusBadge } from './StatusBadge.tsrx';
+export function Dashboard() @{
+	const status = computed(async () => ({ active: true }));
+	<main>@try { <StatusBadge active={status.active} /> } @pending { <p>Wait</p> } @catch { <p>Failed</p> }</main>
+}
+`,
+		symbols: [],
+		importedModuleInterfaces: { './StatusBadge.tsrx': child.moduleGraphInterface },
+	});
+
+	expect(result.publicRenderModule.componentDefinitions).toEqual([
+		expect.objectContaining({
+			name: 'Dashboard',
+			edges: [
+				expect.objectContaining({
+					id: 'component-edge:0',
+					asyncBoundaryId: 'boundary:0',
+				}),
+			],
+		}),
+	]);
 });

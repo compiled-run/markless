@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
 import { box } from '@async/witness';
+import { ASYNC_BOUNDARY_ARM, ASYNC_PROTOCOL_VERSION } from '../../serializer/src/index.ts';
 import { marklessSsrAttachSnapshots, marklessSsrRunAsyncComputed } from '@markless/web/fns/ssr';
 import { renderToStream } from '@markless/web/render-to-stream';
 
@@ -332,6 +333,8 @@ function revealTrainArtifact() {
 		async renderSsr(_props?: unknown, renderContext?: unknown) {
 			const snapshots: unknown[] = [];
 			const arms: string[] = [];
+			const armBodies: string[] = [];
+			const servedArms: number[] = [];
 			for (const [index, panel] of panels.entries()) {
 				const snapshot = (await marklessSsrRunAsyncComputed(
 					snapshots as never,
@@ -347,15 +350,28 @@ function revealTrainArtifact() {
 					snapshot.status === 'fulfilled'
 						? `<em data-content="${panel.key}">${snapshot.value!.label}</em>`
 						: `<span data-waiting="${panel.key}">reading instruments</span>`;
+				armBodies.push(arm);
+				servedArms.push(
+					snapshot.status === 'fulfilled'
+						? ASYNC_BOUNDARY_ARM.try
+						: ASYNC_BOUNDARY_ARM.pending,
+				);
 				arms.push(
 					`<!--markless:async:reveal:${String(index)}-->${arm}<!--/markless:async:reveal:${String(index)}-->`,
 				);
 			}
 			return {
 				html: `<section>${arms.join('')}</section>`,
+				structure: {
+					anchors: armBodies.map((html, index) => ({
+						kind: 'async',
+						id: `reveal:${String(index)}`,
+						html,
+					})),
+				},
 				state: marklessSsrAttachSnapshots(
 					{
-						version: 1,
+						version: ASYNC_PROTOCOL_VERSION,
 						cells: [],
 						computed: panels.map((panel) => ({
 							graphNodeId: `computed:${panel.key}`,
@@ -374,7 +390,7 @@ function revealTrainArtifact() {
 					snapshots as never,
 				),
 				view: {
-					version: 1,
+					version: ASYNC_PROTOCOL_VERSION,
 					locators: [
 						{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
 					],
@@ -384,6 +400,8 @@ function revealTrainArtifact() {
 					elementHandles: [],
 					asyncBoundaries: panels.map((panel, index) => ({
 						id: `reveal:${String(index)}`,
+						runnerGraphNodeId: `computed:${panel.key}`,
+						initiallyServedArm: servedArms[index],
 						startAnchor: { strategy: 'dom-order-comment', index: index * 2 },
 						endAnchor: { strategy: 'dom-order-comment', index: index * 2 + 1 },
 						asyncReads: [

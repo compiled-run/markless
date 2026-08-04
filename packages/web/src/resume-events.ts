@@ -1,4 +1,5 @@
 import type { RuntimeGraph } from '@markless/runtime';
+import { protocolEventDispatchesMarkless } from '@markless/serializer/protocol';
 import type {
 	ElementHandleRegistry,
 	ResumeDispatchOptions,
@@ -54,6 +55,7 @@ export function createEventWiring(input: {
 	) => Promise<void>;
 	readonly activateBehaviorsFromTrigger: (hostNodeId: string) => Promise<void> | undefined;
 	readonly behaviorHostIdsForAncestors: (element: ResumeDomElement | undefined) => string[];
+	readonly registerDelegatedEventRecord?: ResumeRuntimeInput['registerDelegatedEventRecord'];
 }) {
 	const eventRecords = new WeakMap<ResumeDomElement, Map<string, ResumeEventRecord>>();
 	const rowEventRecords: ResumeRowEventRecords = new WeakMap();
@@ -77,6 +79,7 @@ export function createEventWiring(input: {
 		}
 		byName.set(record.eventName, record);
 		input.eventTypes.add(record.eventName);
+		input.registerDelegatedEventRecord?.(element, record);
 		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 			trackDebug(
 				recordDebugInteraction(
@@ -152,6 +155,7 @@ export function createEventWiring(input: {
 		if ('rowMatch' in matched)
 			return dispatchRowEvent(matched.element, matched.rowMatch, event, options);
 		const { element, eventRecord } = matched;
+		if (!protocolEventDispatchesMarkless(eventRecord)) return;
 		if (eventRecord.syncPolicy && !options.syncPolicyAlreadyApplied)
 			runPolicy?.(eventRecord.syncPolicy, input.graph, event);
 		let activeSymbolId: string | undefined;

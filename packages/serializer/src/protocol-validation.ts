@@ -1,7 +1,9 @@
 import {
 	ASYNC_BOUNDARY_ARM,
 	ASYNC_PROTOCOL_VERSION,
+	PROTOCOL_EVENT_ACTION_KIND,
 	STORAGE_PROTOCOL_VERSION,
+	type ProtocolEventActionKind,
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
 } from './protocol.ts';
@@ -205,6 +207,7 @@ export function assertProtocolViewPayload(
 		assertStringField(event, 'hostNodeId', context);
 		assertStringField(event, 'eventName', context);
 		assertStringArrayField(event, 'symbolIds', context);
+		assertOptionalEventAction(event.action, `${context}.action`);
 		if (event.syncPolicy !== undefined) {
 			assertSyncPolicy(event.syncPolicy, `${context}.syncPolicy`);
 		}
@@ -254,6 +257,31 @@ export function assertProtocolViewPayload(
 
 	assertOptionalKeyedRepeats(payload);
 	assertOptionalBranches(payload);
+}
+
+const EVENT_ACTION_VALIDATORS = {
+	[PROTOCOL_EVENT_ACTION_KIND.event]: () => {},
+	[PROTOCOL_EVENT_ACTION_KIND.externalDelegate]: (
+		action: Record<string, unknown>,
+		context: string,
+	) => assertStringField(action, 'owner', context),
+} satisfies Record<
+	ProtocolEventActionKind,
+	(action: Record<string, unknown>, context: string) => void
+>;
+
+function assertOptionalEventAction(value: unknown, context: string): void {
+	if (value === undefined) return;
+	assertRecordShape(value, context);
+	assertStringField(value, 'kind', context);
+	const kind = value.kind as ProtocolEventActionKind;
+	const validate = EVENT_ACTION_VALIDATORS[kind];
+	if (!validate)
+		throw invalidPayloadShapeError(
+			contextPayloadType(context),
+			`Invalid ${context}: unknown event action kind.`,
+		);
+	validate(value, context);
 }
 
 function assertNullableStringField(

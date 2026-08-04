@@ -1,4 +1,11 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
+import {
+	PROTOCOL_EVENT_ACTION_KIND,
+	protocolEventActionKind,
+	type ProtocolEventActionKind,
+	type ProtocolEventRecord,
+	type ProtocolStatePayload,
+	type ProtocolViewPayload,
+} from '@markless/serializer/protocol';
 import type { DomJournalEntry } from '@markless/runtime';
 import type { RuntimeGraph } from '@markless/runtime';
 import type { CsrRenderContainer, CsrRenderOptions, CsrRenderOutput } from './render.ts';
@@ -28,123 +35,7 @@ export async function renderCsrRuntime(input: {
 				),
 			)
 			.catch(() => {});
-	// CSR boundaries whose initial arm must settle are themselves a declared
-	// load-time capability. Keep their coordinate-only path; ordinary CSR pages
-	// remain graph-free until interaction.
-	if (!output.view?.asyncBoundaries.length) {
-		const state = output.state ?? emptyStatePayload();
-		const view = output.view ?? emptyViewPayload();
-		const loadSymbol = withCsrCallbackSymbols(
-			output.loadSymbol ?? options.loadSymbol ?? missingLoadSymbol,
-			view,
-		);
-
-		let graph: RuntimeGraph | undefined;
-		let runtime: ResumeRuntime | undefined;
-		let starting: Promise<ResumeRuntime> | undefined;
-		let disposed = false;
-		const cleanup = await activateAuthoredBehaviors(
-			output,
-			view,
-			output.loadBehaviorSymbol ?? loadSymbol,
-		);
-		const demandRuntime = async (): Promise<ResumeRuntime> => {
-			if (runtime) return runtime;
-			if (!starting)
-				starting = (async () => {
-					graph =
-						output.graph ??
-						(await createFullRuntimeGraph({
-							state,
-							view,
-							root: output.root,
-							loadSymbol,
-							hasAuthoredState: !!output.state,
-						}));
-					const { createResumeRuntime } = await import('./resume.ts');
-					const runtimeView = {
-						...view,
-						behaviors: [],
-					};
-					const applyDomJournal =
-						options.applyDomJournal ??
-						((entries: ReadonlyArray<DomJournalEntry>) =>
-							applyDefaultCsrDomJournal(entries, runtime!));
-					runtime = createResumeRuntime({
-						root: output.root,
-						graph,
-						state,
-						view: runtimeView,
-						liveHostNodes: output.liveHostNodes,
-						loadSymbol,
-						createVisibilityObserver: options.createVisibilityObserver,
-						createRemovalObserver: options.createRemovalObserver,
-						applyDomJournal,
-						renderBranchHtml: options.renderBranchHtml ?? globalDocumentBranchHtml(),
-						demandAsyncBoundaries: true,
-					});
-					output.connectRuntime?.({ graph, runtime });
-					await runtime.start();
-					if (disposed) runtime.dispose();
-					return runtime;
-				})();
-			return starting;
-		};
-		const deferredRuntime: ResumeRuntime = {
-			start: async () => void (await demandRuntime()),
-			async dispatch(event, dispatchOptions) {
-				if (!event) return;
-				await (await demandRuntime()).dispatch(event, dispatchOptions);
-			},
-			async activateBehaviors(hostNodeId) {
-				await (await demandRuntime()).activateBehaviors(hostNodeId);
-			},
-			getElement(hostNodeId) {
-				return runtime?.getElement(hostNodeId) ?? output.liveHostNodes?.get(hostNodeId);
-			},
-			getAsyncBoundary(boundaryId) {
-				return runtime?.getAsyncBoundary(boundaryId);
-			},
-			getBranch(branchId) {
-				return runtime?.getBranch(branchId);
-			},
-			disposeHost(hostNodeId) {
-				runtime?.disposeHost(hostNodeId);
-			},
-			dispose() {
-				disposed = true;
-				removeDelegatedTriggers();
-				for (const release of cleanup.splice(0).reverse()) release();
-				runtime?.dispose();
-			},
-			whenAsyncBoundariesSettled: async () =>
-				(await demandRuntime()).whenAsyncBoundariesSettled?.(),
-			holdPendingSettleCommits: async (ms) =>
-				(await demandRuntime()).holdPendingSettleCommits?.(ms),
-		};
-		const removeDelegatedTriggers = installDelegatedTriggers(output, view, async (event) => {
-			output.root.__marklessDelegatedDispatch = true;
-			await (await demandRuntime()).dispatch(event);
-		});
-		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
-			await registerDelegatedTriggerDebug(output, view);
-		if ((globalThis as ExecutionLogGlobal).__mxLog) await marklessLogCsrSummary();
-		return Object.defineProperty(
-			{
-				phase: 'csr' as const,
-				root: output.root,
-				runtime: deferredRuntime,
-			},
-			'graph',
-			{
-				enumerable: true,
-				get() {
-					if (!graph) throw new Error('MARKLESS_CSR_GRAPH_NOT_DEMANDED');
-					return graph;
-				},
-			},
-		) as CsrRenderContainer;
-	}
+	// Keep the graph and full runtime demand-loaded until interaction.
 	const state = output.state ?? emptyStatePayload();
 	const view = output.view ?? emptyViewPayload();
 	const loadSymbol = withCsrCallbackSymbols(
@@ -152,47 +43,128 @@ export async function renderCsrRuntime(input: {
 		view,
 	);
 
-	const graph =
-		output.graph ??
-		(await createFullRuntimeGraph({
-			state,
-			view,
-			root: output.root,
-			loadSymbol,
-			hasAuthoredState: !!output.state,
-		}));
-	if ((view.keyedRepeats?.length ?? 0) > 0) {
-		const { validateKeyedRepeatGraphKeys } = await import('./repeat-runtime.ts');
-		validateKeyedRepeatGraphKeys(graph, view);
-	}
-	const { createResumeRuntime } = await import('./resume.ts');
-	let runtime: ResumeRuntime;
-	const applyDomJournal =
-		options.applyDomJournal ??
-		((entries: ReadonlyArray<DomJournalEntry>) => applyDefaultCsrDomJournal(entries, runtime));
-	runtime = createResumeRuntime({
-		root: output.root,
-		graph,
-		state,
-		view,
-		liveHostNodes: output.liveHostNodes,
-		loadSymbol,
-		createVisibilityObserver: options.createVisibilityObserver,
-		createRemovalObserver: options.createRemovalObserver,
-		applyDomJournal,
-		renderBranchHtml: options.renderBranchHtml ?? globalDocumentBranchHtml(),
-		demandAsyncBoundaries: true,
-	});
-	output.connectRuntime?.({ graph, runtime });
-	await runtime.start();
-	if (view.behaviors.length) await activateCsrBehaviors(runtime, view);
-	if ((globalThis as ExecutionLogGlobal).__mxLog) await marklessLogCsrSummary();
-	return {
-		phase: 'csr',
-		root: output.root,
-		graph,
-		runtime,
+	let graph: RuntimeGraph | undefined;
+	let runtime: ResumeRuntime | undefined;
+	let starting: Promise<ResumeRuntime> | undefined;
+	let disposed = false;
+	type CsrDispatch = (
+		event: NonNullable<Parameters<ResumeRuntime['dispatch']>[0]>,
+		options?: Parameters<ResumeRuntime['dispatch']>[1],
+	) => Promise<void>;
+	let dispatchHandler: CsrDispatch;
+	let dispatchTail = Promise.resolve();
+	const dispatchQueued: CsrDispatch = (event, dispatchOptions) => {
+		const dispatch = () => dispatchHandler(event, dispatchOptions);
+		const next = dispatchTail.then(dispatch, dispatch);
+		dispatchTail = next.catch(() => {});
+		return next;
 	};
+	const cleanup = await activateAuthoredBehaviors(
+		output,
+		view,
+		output.loadBehaviorSymbol ?? loadSymbol,
+	);
+	const demandRuntime = async (): Promise<ResumeRuntime> => {
+		if (runtime) return runtime;
+		if (!starting)
+			starting = (async () => {
+				graph =
+					output.graph ??
+					(await createFullRuntimeGraph({
+						state,
+						view,
+						root: output.root,
+						loadSymbol,
+						hasAuthoredState: !!output.state,
+					}));
+				const { createResumeRuntime } = await import('./resume.ts');
+				const runtimeView = {
+					...view,
+					behaviors: [],
+				};
+				const applyDomJournal =
+					options.applyDomJournal ??
+					((entries: ReadonlyArray<DomJournalEntry>) =>
+						applyDefaultCsrDomJournal(entries, runtime!));
+				runtime = createResumeRuntime({
+					root: output.root,
+					graph,
+					state,
+					view: runtimeView,
+					liveHostNodes: output.liveHostNodes,
+					loadSymbol,
+					createVisibilityObserver: options.createVisibilityObserver,
+					createRemovalObserver: options.createRemovalObserver,
+					applyDomJournal,
+					renderBranchHtml: options.renderBranchHtml ?? globalDocumentBranchHtml(),
+					demandAsyncBoundaries: true,
+					registerDelegatedEventRecord: delegatedTriggers.registerEventRecord,
+				});
+				await runtime.start();
+				dispatchHandler = (event, dispatchOptions) =>
+					runtime!.dispatch(event, dispatchOptions);
+				if (disposed) runtime.dispose();
+				return runtime;
+			})();
+		return starting;
+	};
+	dispatchHandler = async (event, dispatchOptions) =>
+		(await demandRuntime()).dispatch(event, dispatchOptions);
+	const deferredRuntime: ResumeRuntime = {
+		start: async () => void (await demandRuntime()),
+		async dispatch(event, dispatchOptions) {
+			if (!event) return;
+			await dispatchQueued(event, dispatchOptions);
+		},
+		async activateBehaviors(hostNodeId) {
+			await (await demandRuntime()).activateBehaviors(hostNodeId);
+		},
+		getElement(hostNodeId) {
+			return runtime?.getElement(hostNodeId) ?? output.liveHostNodes?.get(hostNodeId);
+		},
+		getAsyncBoundary(boundaryId) {
+			return runtime?.getAsyncBoundary(boundaryId);
+		},
+		getBranch(branchId) {
+			return runtime?.getBranch(branchId);
+		},
+		disposeHost(hostNodeId) {
+			runtime?.disposeHost(hostNodeId);
+		},
+		dispose() {
+			disposed = true;
+			delegatedTriggers.dispose();
+			for (const release of cleanup.splice(0).reverse()) release();
+			runtime?.dispose();
+		},
+		whenAsyncBoundariesSettled: async () =>
+			(await demandRuntime()).whenAsyncBoundariesSettled?.(),
+		holdPendingSettleCommits: async (ms) =>
+			(await demandRuntime()).holdPendingSettleCommits?.(ms),
+	};
+	const delegatedTriggers = installDelegatedTriggers(output, view, dispatchQueued);
+	// A cold CSR boundary paints its compiler-selected pending arm, then starts
+	// its declared runner without waiting for settlement. Event-only pages keep
+	// the interaction-lazy path above.
+	if (view.asyncBoundaries.length > 0) await demandRuntime();
+	if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
+		await registerDelegatedTriggerDebug(output, view);
+	if ((globalThis as ExecutionLogGlobal).__mxLog) await marklessLogCsrSummary();
+	return Object.defineProperty(
+		{
+			phase: 'csr' as const,
+			root: output.root,
+			runtime: deferredRuntime,
+		},
+		'graph',
+		{
+			enumerable: true,
+			get() {
+				if (!graph) throw new Error('MARKLESS_CSR_GRAPH_NOT_DEMANDED');
+				return graph;
+			},
+		},
+	) as CsrRenderContainer;
 }
 
 async function registerDelegatedTriggerDebug(
@@ -246,8 +218,7 @@ async function activateAuthoredBehaviors(
 			(view.locators.length === 1 && view.locators[0]?.hostNodeId === behavior.hostNodeId
 				? output.root
 				: undefined);
-		if (!element)
-			throw new Error(`MARKLESS_CSR_BEHAVIOR_HOST_MISSING: ${behavior.hostNodeId}`);
+		if (!element) throw new Error(`MARKLESS_CSR_BEHAVIOR_HOST_MISSING: ${behavior.hostNodeId}`);
 		const symbol = await loadSymbol(behavior.symbolId);
 		const result = await symbol({
 			graph: undefined as unknown as RuntimeGraph,
@@ -264,8 +235,64 @@ function installDelegatedTriggers(
 	output: CsrRenderOutput,
 	view: ProtocolViewPayload,
 	dispatch: (event: NonNullable<Parameters<ResumeRuntime['dispatch']>[0]>) => Promise<void>,
-): () => void {
-	const recordsByElement = new Map<object, Set<string>>();
+): {
+	readonly registerEventRecord: (
+		element: object,
+		record: ProtocolEventRecord,
+	) => void;
+	readonly dispose: () => void;
+} {
+	// One capture listener remains the container's dispatch authority.
+	output.root.__marklessDelegatedDispatch = true;
+	const recordsByElement = new Map<object, Map<string, ProtocolEventRecord>>();
+	const rowEventNames = new Set(
+		(view.keyedRepeats ?? []).flatMap((repeat) =>
+			repeat.rowEvents.map((event) => event.eventName),
+		),
+	);
+	const releases: Array<() => void> = [];
+	const installedEventNames = new Set<string>();
+	const actions = {
+		[PROTOCOL_EVENT_ACTION_KIND.event]: dispatch,
+		[PROTOCOL_EVENT_ACTION_KIND.externalDelegate]: async () => {},
+	} satisfies Record<
+		ProtocolEventActionKind,
+		(event: NonNullable<Parameters<ResumeRuntime['dispatch']>[0]>) => Promise<void>
+	>;
+	const installEventListener = (eventName: string) => {
+		if (eventName === 'visible' || installedEventNames.has(eventName)) return;
+		installedEventNames.add(eventName);
+		const listener = async (event: NonNullable<Parameters<ResumeRuntime['dispatch']>[0]>) => {
+			let actionKind: ProtocolEventActionKind | undefined = rowEventNames.has(event.type)
+				? PROTOCOL_EVENT_ACTION_KIND.event
+				: undefined;
+			for (
+				let element = event.target;
+				element && !actionKind;
+				element = element.parentElement ?? null
+			) {
+				const record = recordsByElement.get(element)?.get(event.type);
+				if (record) actionKind = protocolEventActionKind(record);
+			}
+			if (!actionKind) {
+				if (typeof __MARKLESS_DEV_ENABLED__ === 'undefined' || __MARKLESS_DEV_ENABLED__)
+					throw new Error(`MARKLESS_CSR_DELEGATED_TRIGGER_UNMATCHED: ${event.type}`);
+				return;
+			}
+			await actions[actionKind](event);
+		};
+		output.root.addEventListener?.(eventName, listener, { capture: true });
+		releases.push(() =>
+			output.root.removeEventListener?.(eventName, listener, { capture: true }),
+		);
+	};
+	const registerEventRecord = (element: object, record: ProtocolEventRecord) => {
+		const records = recordsByElement.get(element) ?? new Map<string, ProtocolEventRecord>();
+		if (records.get(record.eventName) === record) return;
+		records.set(record.eventName, record);
+		recordsByElement.set(element, records);
+		installEventListener(record.eventName);
+	};
 	for (const record of view.events) {
 		if (record.eventName === 'visible') continue;
 		const element =
@@ -274,44 +301,14 @@ function installDelegatedTriggers(
 				? output.root
 				: undefined);
 		if (!element) continue;
-		const names = recordsByElement.get(element) ?? new Set<string>();
-		names.add(record.eventName);
-		recordsByElement.set(element, names);
+		registerEventRecord(element, record);
 	}
-	const rowEventNames = new Set(
-		(view.keyedRepeats ?? []).flatMap((repeat) =>
-			repeat.rowEvents.map((event) => event.eventName),
-		),
-	);
-	const eventNames = new Set([
-		...view.events.map((record) => record.eventName),
-		...rowEventNames,
-	]);
-	eventNames.delete('visible');
-	const releases: Array<() => void> = [];
-	for (const eventName of eventNames) {
-		const listener = async (event: NonNullable<Parameters<ResumeRuntime['dispatch']>[0]>) => {
-			let matched = rowEventNames.has(event.type);
-			for (
-				let element = event.target;
-				element && !matched;
-				element = element.parentElement ?? null
-			)
-				matched = recordsByElement.get(element)?.has(event.type) === true;
-			if (!matched) {
-				if (typeof __MARKLESS_DEV_ENABLED__ === 'undefined' || __MARKLESS_DEV_ENABLED__)
-					throw new Error(`MARKLESS_CSR_DELEGATED_TRIGGER_UNMATCHED: ${event.type}`);
-				return;
-			}
-			await dispatch(event);
-		};
-		output.root.addEventListener?.(eventName, listener, { capture: true });
-		releases.push(() =>
-			output.root.removeEventListener?.(eventName, listener, { capture: true }),
-		);
-	}
-	return () => {
-		for (const release of releases.splice(0)) release();
+	for (const eventName of rowEventNames) installEventListener(eventName);
+	return {
+		registerEventRecord,
+		dispose() {
+			for (const release of releases.splice(0)) release();
+		},
 	};
 }
 
@@ -415,19 +412,6 @@ function missingCsrJournalTargetError(locator: string): Error {
 function stringifyDomValue(value: unknown): string {
 	if (value == null) return '';
 	return String(value);
-}
-
-async function activateCsrBehaviors(
-	runtime: ResumeRuntime,
-	view: ProtocolViewPayload,
-): Promise<void> {
-	const hostNodeIds = new Set<string>();
-	for (const behavior of view.behaviors) {
-		if (behavior.symbolId) hostNodeIds.add(behavior.hostNodeId);
-	}
-	for (const hostNodeId of hostNodeIds) {
-		await runtime.activateBehaviors(hostNodeId);
-	}
 }
 
 const EMPTY_PROTOCOL_VERSION = 1 satisfies ProtocolStatePayload['version'];

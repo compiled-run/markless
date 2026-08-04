@@ -1,48 +1,17 @@
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vite-plus/test';
-import { startRouteUpdateRenderer } from '../src/route-renderer.ts';
-import { dispatchRouteUpdate } from '../src/route-state.ts';
 
 describe('route update renderer', () => {
-	it('does not run page artifact preloads during router CSR route render', async () => {
-		let mounted: unknown;
-		const document = Object.assign(new EventTarget(), {
-			body: {
-				replaceChildren(root: unknown) {
-					mounted = root;
-				},
-			},
-		}) as Document;
-		let preloadCalls = 0;
-		let renderedPathname = '';
+	it('mounts navigated routes only from linked render data', async () => {
+		const source = await readFile(
+			resolve(import.meta.dirname, '../src/route-renderer.ts'),
+			'utf8',
+		);
 
-		startRouteUpdateRenderer(document);
-		dispatchRouteUpdate(document, {
-			page: {
-				default: {
-					preload() {
-						preloadCalls++;
-					},
-					renderCsr(props: { readonly url: { readonly pathname: string } }) {
-						renderedPathname = props.url.pathname;
-						return {
-							graph: {},
-							root: 'root',
-							runtime: { dispatch: async () => {} },
-						};
-					},
-				},
-			},
-			route: {
-				file: 'pages/docs.tsrx',
-				params: {},
-				status: 200,
-				url: 'http://markless.test/docs',
-			},
-		});
-		await Promise.resolve();
-
-		expect(preloadCalls).toBe(0);
-		expect(renderedPathname).toBe('/docs');
-		expect(mounted).toBe('root');
+		expect(source).toContain('renderData: artifact.renderData');
+		expect(source).toContain('MARKLESS_ROUTER_RENDER_DATA_MISSING');
+		expect(source).not.toMatch(/(?:\.|\?\.)renderCsr(?:\?\.)?\s*\(/);
+		expect(source).not.toMatch(/\.innerHTML\s*=/);
 	});
 });

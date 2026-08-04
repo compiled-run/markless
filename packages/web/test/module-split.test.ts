@@ -83,6 +83,21 @@ test('storage-free resume statically selects only storage-free payload validatio
 		expect(source).not.toMatch(/storage-key|storage-record-client|isValidStorageKey/);
 });
 
+test('event action policy imports its protocol owner directly', async () => {
+	const sources = await Promise.all(
+		[
+			'../src/event-resume.ts',
+			'../src/fns/external-delegate.ts',
+			'../src/inline/resumer.ts',
+			'../src/render-csr.ts',
+			'../src/render-to-string.ts',
+			'../src/resume-events.ts',
+		].map(readSource),
+	);
+
+	for (const source of sources) expect(source).toContain("from '@markless/serializer/protocol'");
+});
+
 test('payload graph construction stays isolated in its own module', async () => {
 	const payloadSource = await readSource('../src/payload-full.ts');
 	const graphSource = await readSource('../src/payload-graph-construct.ts');
@@ -102,14 +117,22 @@ test('resume runtime split points keep capability code in separate modules', asy
 	const asyncWiringSource = await readSource('../src/resume-async-wiring.ts');
 	const sharedPatchSource = await readSource('../src/resume-shared-patch.ts');
 	const syncDemandSource = await readSource('../src/resume-sync-demand.ts');
+	const prerenderTriggerSource = await readSource('../src/fns/prerender-trigger-resume.ts');
 
 	// T007j moved startup wiring into resume-runtime-start.ts; the dynamic
 	// boundary lives there now.
 	const runtimeStartSource = await readSource('../src/resume-runtime-start.ts');
 	expect(runtimeStartSource).toContain("import('./resume-async-wiring.ts')");
 	expect(runtimeSource).toContain("import('./resume-runtime-shared.ts')");
+	expect(runtimeSource).toContain("import('./resume-events.ts')");
+	expect(runtimeSource).toContain("import('./resume-commit-arm.ts')");
 	expect(runtimeSharedSource).toContain("import('./resume-shared-patch.ts')");
-	expect(runtimeStartSource).toContain("import('./resume-sync-demand.ts')");
+	// Staged-wake work moved computed-refresh registration into the runtime
+	// core; the dynamic boundary moved with it (and the lean CSR coordinate
+	// settler shares it the same way).
+	expect(runtimeSource).toContain("import('./resume-sync-demand.ts')");
+	expect(runtimeSource).not.toContain("import('./prerender/staged-graph.ts')");
+	expect(prerenderTriggerSource).toContain("from '../prerender/staged-graph.ts'");
 	expect(runtimeSource).not.toContain('function wireAsyncBoundariesWithoutLoadingCapability');
 	expect(runtimeSource).not.toContain('function receiveSharedPatch');
 	expect(runtimeSharedSource).toContain('receiveSharedPatch');

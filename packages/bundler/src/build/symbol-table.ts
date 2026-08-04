@@ -64,6 +64,26 @@ export function rewriteGeneratedSymbolTableUrls(
 }
 
 /**
+ * Returns the final chunk routes encoded in generated symbol tables. These
+ * routes feed computed import() calls, so bundler dynamic-import metadata and
+ * a plain import-expression scan cannot observe them.
+ */
+export function scanGeneratedSymbolTableImports(
+	code: string,
+	chunkFileName: string,
+): string[] {
+	const imports = new Set<string>();
+	for (const match of code.matchAll(SYMBOL_MANIFEST_TUPLE_RE)) {
+		for (const specifier of parseStringList(match[2]!) ?? []) {
+			if (specifier.startsWith('.')) {
+				imports.add(resolveChunkSpecifier(chunkFileName, specifier));
+			}
+		}
+	}
+	return [...imports];
+}
+
+/**
  * Checks emitted resolver routes against compiler manifests and Rolldown's
  * chunk ownership/export metadata. Table source is read only to recover each
  * claimed file; termination evidence stays structural.

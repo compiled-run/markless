@@ -1,13 +1,9 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
 
-// Client-side route swaps mount pages through renderCsr. Lazy symbol modules
-// (async computed runners, event handlers) read captured page props through
-// the runtime graph as `prop:props` — during initial server render those reads
-// resolve from closure scope, and the browser resume path never re-runs a
-// props-only computed, so the missing cell stayed hidden until CSR mounts
-// demanded the runner (dashboard-migration need 14 on the CSR path). The
-// emitted CSR module must seed the prop cell from its props argument.
+// Linked component definitions retain prop-cell and graph-route metadata for
+// the prerender evaluator and lazy symbol modules without emitting a browser
+// component renderer.
 
 async function compilePage(params: string) {
 	return await compileTsrxModule({
@@ -30,14 +26,12 @@ export default function RepoPage(${params}) @{
 	});
 }
 
-test('CSR module seeds the prop:props cell from the renderCsr props argument', async () => {
+test('linked definitions identify the prop:props cell', async () => {
 	const result = await compilePage('{ params }');
-	const csrModule = result.publicRenderModule.csrModuleSource;
-
-	expect(csrModule).toContain('"propCellId":"prop:props"');
+	expect(result.publicRenderModule.componentDefinitions[0]?.propCellId).toBe('prop:props');
 });
 
-test('CSR module seeds an identifier-parameter page under its prop:<name> cell', async () => {
+test('linked definitions identify an identifier-parameter prop cell', async () => {
 	const result = await compileTsrxModule({
 		filename: 'pages/whole-props.tsrx',
 		source: `import { computed } from '@markless/core';
@@ -52,18 +46,15 @@ export default function Page(pageProps) @{
 		symbols: [],
 	});
 
-	expect(result.publicRenderModule.csrModuleSource).toContain('"propCellId":"prop:pageProps"');
+	expect(result.publicRenderModule.componentDefinitions[0]?.propCellId).toBe('prop:pageProps');
 });
 
-test('pages without props emit no prop cell seeding', async () => {
+test('pages without props publish no prop cell', async () => {
 	const result = await compilePage('');
-
-	expect(result.publicRenderModule.csrModuleSource).not.toContain(
-		'marklessCsrPayloadState.cells.push',
-	);
+	expect(result.publicRenderModule.componentDefinitions[0]?.propCellId).toBeNull();
 });
 
-test('prop-dependent computeds emit the composed graph remap hook in CSR and SSR', async () => {
+test('prop-dependent computeds publish linked graph metadata and the SSR remap hook', async () => {
 	const result = await compileTsrxModule({
 		filename: 'pages/computed-prop-chain.tsrx',
 		source: `import { computed, state } from '@markless/core';
@@ -81,7 +72,7 @@ export default function Page() @{
 		symbols: [],
 	});
 
-	expect(result.publicRenderModule.csrModuleSource).toContain(
+	expect(JSON.stringify(result.publicRenderModule.componentDefinitions)).toContain(
 		'"name":"input","kind":"graph-reference","graphNodeId":"computed:parentValue","path":[]',
 	);
 	expect(result.publicRenderModule.ssrModuleSource).toContain(
@@ -92,7 +83,7 @@ export default function Page() @{
 	);
 });
 
-test('capture routes hand parent state through same-named child prop metadata in CSR and SSR', async () => {
+test('capture routes hand parent state through linked child prop metadata and SSR', async () => {
 	const result = await compileTsrxModule({
 		filename: 'pages/state-prop-handoff.tsrx',
 		source: `import { state } from '@markless/core';
@@ -107,16 +98,16 @@ export default function Page() @{
 }`,
 		symbols: [],
 	});
-	const csrGraphProps =
+	const linkedGraphProps =
 		'{"name":"libraryOpen","kind":"graph-reference","graphNodeId":"state:libraryOpen","path":[],"source":"libraryOpen"}';
 	const ssrGraphProps =
 		'"graphProps":[{"name":"libraryOpen","graphNodeId":"state:libraryOpen","path":[]}]';
 
-	expect(result.publicRenderModule.csrModuleSource).toContain(csrGraphProps);
+	expect(JSON.stringify(result.publicRenderModule.componentDefinitions)).toContain(linkedGraphProps);
 	expect(result.publicRenderModule.ssrModuleSource).toContain(ssrGraphProps);
 });
 
-test('components without prop-dependent computeds do not import the graph remapper', async () => {
+test('components without prop-dependent computeds do not import the SSR graph remapper', async () => {
 	const result = await compileTsrxModule({
 		filename: 'pages/presentational-child.tsrx',
 		source: `function Child({ input }) @{
@@ -129,9 +120,6 @@ export default function Page({ input }) @{
 		symbols: [],
 	});
 
-	expect(result.publicRenderModule.csrModuleSource).not.toContain(
-		'marklessCsrRemapGraphOutput',
-	);
 	expect(result.publicRenderModule.ssrModuleSource).not.toContain(
 		'marklessSsrRemapGraphOutput',
 	);

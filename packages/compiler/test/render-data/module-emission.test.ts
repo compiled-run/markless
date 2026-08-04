@@ -13,6 +13,4 @@ export function App() @{ let count = state(1); <button>{count}</button> }`,
 	expect(result.publicRenderModule.renderDataModuleSource).toContain(renderData);
 	expect(result.publicRenderModule.ssrModuleSource).not.toContain(renderData);
 	expect(result.publicRenderModule.ssrModuleSource).toContain('marklessRenderData');
-	expect(result.publicRenderModule.csrModuleSource).not.toContain(renderData);
-	expect(result.publicRenderModule.csrModuleSource).not.toContain('MARKLESS_CSR_NATIVE_START');
 });

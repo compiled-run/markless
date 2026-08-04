@@ -6,7 +6,6 @@ import {
 	renderPayloadScripts,
 } from '../../serializer/src/index.ts';
 import { resumeFromPayloadScripts } from '../../web/src/payload.ts';
-import { render } from '../../web/src/render.ts';
 import type { ProtocolStatePayload, ProtocolViewPayload } from '../../serializer/src/index.ts';
 
 const source = `
@@ -242,8 +241,8 @@ test('compileTsrxModule keeps valid source output byte-identical', async () => {
 	expect(again.publicRenderModule.ssrModuleSource).toBe(
 		result.publicRenderModule.ssrModuleSource,
 	);
-	expect(again.publicRenderModule.csrModuleSource).toBe(
-		result.publicRenderModule.csrModuleSource,
+	expect(again.publicRenderModule.componentDefinitions).toEqual(
+		result.publicRenderModule.componentDefinitions,
 	);
 	expect(again.symbolResolverModule).toBe(result.symbolResolverModule);
 	expect(result.semanticGraph.diagnostics).toEqual([]);
@@ -575,16 +574,6 @@ function publicRenderTestDocument() {
 	};
 }
 
-async function renderTestCsr(
-	result: Awaited<ReturnType<typeof compileTsrxModule>>,
-	props?: unknown,
-) {
-	const module = await importPublicRenderTestModule(csrRenderTestModuleSource(result), {
-		document: publicRenderTestDocument(),
-	});
-	return (module.marklessRenderCsr as (props?: unknown) => unknown)(props);
-}
-
 async function renderTestSsr(
 	result: Awaited<ReturnType<typeof compileTsrxModule>>,
 	props?: unknown,
@@ -612,17 +601,11 @@ ${body}
 }`,
 		symbols: [],
 	});
-	const csrOutput = (await renderTestCsr(result)) as {
-		readonly root: PublicRenderTestElement;
-		readonly state: ProtocolStatePayload;
-	};
 	const ssrOutput = (await renderTestSsr(result)) as {
 		readonly html: string;
 		readonly state: ProtocolStatePayload;
 	};
 
-	expect(csrOutput.root.textContent).toBe(String(expected));
-	expect(payloadStateCellValue(csrOutput.state, 'state:n')).toBe(expected);
 	expect(ssrOutput.html).toBe(`<output>${expected}</output>`);
 	expect(payloadStateCellValue(ssrOutput.state, 'state:n')).toBe(expected);
 }
@@ -716,30 +699,6 @@ function ssrRenderTestModuleSource(
 		result.publicRenderModule.renderDataModuleSource,
 		ssrSource,
 		'export { marklessRenderSsr };',
-	].join('\n');
-}
-
-function csrRenderTestModuleSource(
-	result: Awaited<ReturnType<typeof compileTsrxModule>>,
-	options: { readonly replaceChildImport?: boolean } = {},
-): string {
-	const source = result.publicRenderModule.csrModuleSource ?? '';
-	const csrSource = options.replaceChildImport
-		? source.replace(
-				/import \* as __marklessCsrChunkModule0 from [^;]+;/,
-				'const __marklessCsrChunkModule0 = globalThis.__marklessPublicRenderTestChildComponent;',
-			)
-		: source;
-
-	return [
-		'const document = globalThis.__marklessPublicRenderTestDocument;',
-		'const loadSymbol = globalThis.__marklessPublicRenderTestLoadSymbol;',
-		'const loadBehaviorSymbol = loadSymbol;',
-		`const payloadState = ${JSON.stringify(result.protocolState)};`,
-		`const payloadView = ${JSON.stringify(result.protocolView)};`,
-		result.publicRenderModule.renderDataModuleSource,
-		csrSource,
-		'export { marklessRenderCsr };',
 	].join('\n');
 }
 
@@ -920,17 +879,14 @@ test('compileTsrxModule orchestrates source to payload scripts and resolver modu
 	);
 });
 
-test('public render helpers are imported when CSR and SSR library modules are combined', async () => {
+test('public SSR helpers are imported from the helper catalog', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/card.tsrx',
 		source: libraryComponentSource,
 		symbols: [],
 	});
 
-	const combinedModuleSource = [
-		result.publicRenderModule.csrModuleSource,
-		result.publicRenderModule.ssrModuleSource,
-	].join('\n');
+	const combinedModuleSource = result.publicRenderModule.ssrModuleSource;
 
 	expect(combinedModuleSource).not.toContain('function readMarklessPublicPath');
 	expect(combinedModuleSource).toContain("from '@markless/web/fns/");
@@ -950,19 +906,11 @@ export function App() @{
 		symbols: [],
 	});
 
-	for (const moduleSource of [
-		result.publicRenderModule.csrModuleSource,
-		result.publicRenderModule.ssrModuleSource,
-	]) {
+	for (const moduleSource of [result.publicRenderModule.ssrModuleSource]) {
 		expect(moduleSource).toContain("from '@markless/web/fns/");
 		expect(moduleSource).not.toMatch(/^function markless(?!Render(?:Csr|Ssr)\b)/m);
 		expect(moduleSource).not.toMatch(/^function readMarklessPublicPath\b/m);
 	}
-
-	const csrHelperImports = helperImports(result.publicRenderModule.csrModuleSource);
-	expect(csrHelperImports).toEqual(['createMarklessCsrChunkRenderer']);
-	expect(csrHelperImports).not.toContain('marklessCsrRootFromHtml');
-	expect(csrHelperImports).not.toContain('marklessCsrRepeatRows');
 
 	const ssrHelperImports = helperImports(result.publicRenderModule.ssrModuleSource);
 	expect(ssrHelperImports).toEqual(
@@ -1003,17 +951,15 @@ const n = state(base);`,
 	);
 });
 
-test('B910 sync computed over state renders derived value in executed CSR html and SSR html', async () => {
+test('B910 sync computed over state renders the derived value in SSR html', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/SyncComputed.tsrx',
 		source: syncComputedSource,
 		symbols: [],
 	});
 
-	const csrOutput = (await renderTestCsr(result)) as { readonly root: PublicRenderTestElement };
 	const ssrOutput = await renderTestSsr(result);
 
-	expect(csrOutput.root.textContent).toBe('4');
 	expect(ssrOutput.html).toBe('<p>4</p>');
 	expect(result.protocolView.domUpdates).toEqual([
 		expect.objectContaining({
@@ -1136,7 +1082,6 @@ export function Dashboard() @{
 	expect(result.semanticGraph.components).toEqual([{ name: 'Dashboard' }]);
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
 	expect(result.publicRenderModule.ssrModuleSource).toContain('function marklessRenderSsr');
-	expect(result.publicRenderModule.csrModuleSource).toContain('function marklessRenderCsr');
 });
 
 test('compileTsrxModule roots plan and module emit at the exported component', async () => {
@@ -1172,7 +1117,6 @@ function double(value) { return value * 2; }
 	});
 
 	expect(result.publicRenderModule.moduleSource).toBe('');
-	expect(result.publicRenderModule.csrModuleSource).toBe('');
 	expect(result.publicRenderModule.ssrModuleSource).toBe('');
 	expect(result.publicRenderModule.diagnostics).toEqual([
 		expect.objectContaining({
@@ -1206,7 +1150,7 @@ export function App() @{
 	expect(output.html).toBe('<section><h2>Stable</h2><p>Static</p></section>');
 });
 
-test('compileTsrxModule skips non-render body effects in CSR and preserves them in SSR', async () => {
+test('compileTsrxModule preserves authored body effects in SSR', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/RenderBodyLog.tsrx',
 		source: `
@@ -1224,12 +1168,6 @@ export function App({ kind = 'demo' }) @{
 	});
 	const log = vi.spyOn(console, 'log').mockImplementation(() => {});
 	try {
-		const csrOutput = (await renderTestCsr(result, { kind: 'demo' })) as {
-			readonly root: PublicRenderTestElement;
-		};
-		expect(csrOutput.root.textContent).toBe('7');
-		expect(log.mock.calls).toEqual([]);
-
 		const ssrOutput = await renderTestSsr(result, { kind: 'demo' });
 		expect(ssrOutput.html).toBe('<p data-kind="demo">7</p>');
 		expect(log.mock.calls).toEqual([['before'], [7]]);
@@ -1238,7 +1176,7 @@ export function App({ kind = 'demo' }) @{
 	}
 });
 
-test('compileTsrxModule keeps plain body statements in authored order in CSR and SSR modules', async () => {
+test('compileTsrxModule keeps plain body statements in authored order in SSR modules', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/RenderBodyPlainStatements.tsrx',
 		source: `
@@ -1253,10 +1191,9 @@ export function App({ suffix = 'tail' }) @{
 `,
 		symbols: [],
 	});
-	const csrSource = result.publicRenderModule.csrModuleSource;
 	const ssrSource = result.publicRenderModule.ssrModuleSource;
 
-	for (const source of [csrSource, ssrSource]) {
+	for (const source of [ssrSource]) {
 		expect(source.indexOf('let segments = [];')).toBeGreaterThan(-1);
 		expect(source.indexOf("segments.push('head');")).toBeGreaterThan(
 			source.indexOf('let segments = [];'),
@@ -1268,17 +1205,9 @@ export function App({ suffix = 'tail' }) @{
 			source.indexOf('segments.push(suffix);'),
 		);
 	}
-	expect(csrSource.indexOf('const marklessRenderCsrChunks')).toBeGreaterThan(
-		csrSource.indexOf("const label = segments.join('-');"),
-	);
 	expect(ssrSource.indexOf('const html = ')).toBeGreaterThan(
 		ssrSource.indexOf("const label = segments.join('-');"),
 	);
-
-	const csrOutput = (await renderTestCsr(result, { suffix: 'tail' })) as {
-		readonly root: PublicRenderTestElement;
-	};
-	expect(csrOutput.root.textContent).toBe('head-tail');
 
 	const ssrOutput = await renderTestSsr(result, { suffix: 'tail' });
 	expect(ssrOutput.html).toBe('<main>head-tail</main>');
@@ -1299,7 +1228,6 @@ test('compileTsrxModule diagnoses undeclared template reads before public render
 			docsUrl: 'https://markless.dev/errors/MARKLESS_TEMPLATE_READ_UNDECLARED',
 		}),
 	]);
-	expect(result.publicRenderModule.csrModuleSource).toBe('');
 	expect(result.publicRenderModule.ssrModuleSource).toBe('');
 	expect(result.publicRenderModule.moduleSource).not.toContain('missingLabel');
 });
@@ -1329,21 +1257,17 @@ export function App() @{
 	expect(result.publicRenderModule.moduleSource).not.toContain('marklessSsrText(rows)');
 });
 
-test('compileTsrxModule renders plain body local template reads in CSR and SSR modules', async () => {
+test('compileTsrxModule renders plain body local template reads in SSR modules', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/PlainBodyLocalTemplateRead.tsrx',
 		source: `export function App() @{ const label = 'render-once'; <main>{label}</main> }`,
 		symbols: [],
 	});
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
-	expect(
-		((await renderTestCsr(result)) as { readonly root: PublicRenderTestElement }).root
-			.textContent,
-	).toBe('render-once');
 	expect((await renderTestSsr(result)).html).toBe('<main>render-once</main>');
 });
 
-test('B913 compileTsrxModule renders component-body accumulator locals in CSR and SSR modules', async () => {
+test('B913 compileTsrxModule renders component-body accumulator locals in SSR modules', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/AccumulatorLocal.tsrx',
 		source: `export function App() @{ const rows = [1, 2, 3]; let total = 0; for (const row of rows) { total += row; } <main>{total}</main> }`,
@@ -1351,47 +1275,32 @@ test('B913 compileTsrxModule renders component-body accumulator locals in CSR an
 	});
 	expect(result.semanticGraph.diagnostics).toEqual([]);
 	expect(result.stateLowering.diagnostics).toEqual([]);
-	expect(
-		((await renderTestCsr(result)) as { readonly root: PublicRenderTestElement }).root
-			.textContent,
-	).toBe('6');
 	expect((await renderTestSsr(result)).html).toBe('<main>6</main>');
 });
 
-test('compileTsrxModule renders module-scope const template reads in CSR and SSR modules', async () => {
+test('compileTsrxModule renders module-scope const template reads in SSR modules', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/ModuleConstTemplateRead.tsrx',
 		source: `const title = 'Module title'; export function App() @{ <main>{title}</main> }`,
 		symbols: [],
 	});
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
-	expect(
-		((await renderTestCsr(result)) as { readonly root: PublicRenderTestElement }).root
-			.textContent,
-	).toBe('Module title');
 	expect((await renderTestSsr(result)).html).toBe('<main>Module title</main>');
 });
 
-test('compileTsrxModule renders prop template reads in CSR and SSR modules', async () => {
+test('compileTsrxModule renders prop template reads in SSR modules', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/PropTemplateRead.tsrx',
 		source: `export function App({ label = 'prop value' }) @{ <main>{label}</main> }`,
 		symbols: [],
 	});
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
-	expect(
-		(
-			(await renderTestCsr(result, { label: 'prop value' })) as {
-				readonly root: PublicRenderTestElement;
-			}
-		).root.textContent,
-	).toBe('prop value');
 	expect((await renderTestSsr(result, { label: 'prop value' })).html).toBe(
 		'<main>prop value</main>',
 	);
 });
 
-test('T005 compileTsrxModule renders pure composite template expressions in CSR and SSR modules', async () => {
+test('T005 compileTsrxModule renders pure composite template expressions in SSR modules', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/CompositeTemplateExpressions.tsrx',
 		source: `import { state } from '@markless/core';
@@ -1412,10 +1321,8 @@ export function App() @{
 		symbols: [],
 	});
 
-	const csr = (await renderTestCsr(result)) as { readonly root: PublicRenderTestElement };
 	const ssr = await renderTestSsr(result);
 
-	expect(csr.root.textContent).toBe('Closeguest3AdaanonHi Ada');
 	expect(ssr.html).toContain('<p>Close</p>');
 	expect(ssr.html).toContain('<p>guest</p>');
 	expect(ssr.html).toContain('<p>3</p>');
@@ -1447,7 +1354,7 @@ export function App() @{
 	]);
 });
 
-test('compileTsrxModule lets pre-root guard clauses render nothing in CSR modules', async () => {
+test('compileTsrxModule lets pre-root guard clauses render nothing in SSR modules', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/RenderBodyGuard.tsrx',
 		source: `
@@ -1459,11 +1366,10 @@ export function App({ hidden = false }) @{
 `,
 		symbols: [],
 	});
-	expect(await renderTestCsr(result, { hidden: true })).toBeNull();
-	const visible = (await renderTestCsr(result, { hidden: false })) as {
-		readonly root: PublicRenderTestElement;
-	};
-	expect(visible.root.textContent).toBe('Visible');
+	expect(await renderTestSsr(result, { hidden: true })).toBeNull();
+	expect((await renderTestSsr(result, { hidden: false })).html).toBe(
+		'<section>Visible</section>',
+	);
 });
 
 test('compileTsrxModule diagnoses conditional component roots instead of deleting statement flow', async () => {
@@ -1687,9 +1593,7 @@ export function App() @{ let count = state(0); const handlers = { onClick: () =>
 			severity: 'error',
 		}),
 	]);
-	expect(
-		result.publicRenderModule.ssrModuleSource + result.publicRenderModule.csrModuleSource,
-	).not.toContain('...(handlers)');
+	expect(result.publicRenderModule.ssrModuleSource).not.toContain('...(handlers)');
 });
 
 test('compileTsrxModule renders the @empty branch in the direct render module', async () => {
@@ -1926,7 +1830,7 @@ export function App() @{
 	);
 });
 
-test('compileTsrxModule renders positional-key repeat rows in SSR and CSR output', async () => {
+test('compileTsrxModule renders positional-key repeat rows in SSR output', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/PositionRows.tsrx',
 		source: `
@@ -1960,13 +1864,8 @@ export function App() @{
 	expect(result.renderData.repeats[0]).toEqual(expect.objectContaining({ directSupported: false }));
 
 	const ssrOutput = await renderTestSsr(result);
-	const csrOutput = (await renderTestCsr(result)) as { readonly root: PublicRenderTestElement };
 
 	expect(ssrOutput.html).toBe('<section><p>One</p><p>Two</p></section>');
-	expect(elementsByTag(csrOutput.root, 'p').map((element) => element.textContent)).toEqual([
-		'One',
-		'Two',
-	]);
 });
 
 test('compileTsrxModule keeps ordinary keyed repeat SSR html unchanged', async () => {
@@ -2151,10 +2050,8 @@ export function App() @{
 	});
 
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
-	// Direct module stays off; the standard CSR module renders fragments
-	// (owner-ratified target-as-root semantics).
+	// Fragment roots remain on the linked render-data and SSR paths.
 	expect(result.publicRenderModule.moduleSource).toBe('');
-	expect(result.publicRenderModule.csrModuleSource).not.toBe('');
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
 	const output = await (
 		ssrModule.marklessRenderSsr as () => {
@@ -2173,62 +2070,6 @@ export function App() @{
 		expect.objectContaining({ tagName: 'button', index: 1 }),
 	]);
 	expect(output.view.events).toEqual([expect.objectContaining({ eventName: 'click' })]);
-});
-
-test('compileTsrxModule builds fragment-rooted CSR output as a fragment with child locators', async () => {
-	const result = await compileTsrxModule({
-		filename: 'src/FragmentCard.tsrx',
-		source: `
-import { state } from '@markless/core';
-
-export function App() @{
-	let count = state(0);
-
-	<>
-		<header>Site</header>
-		<button onClick={() => count++}>{count}</button>
-	</>
-}
-`,
-		symbols: [],
-	});
-
-	const document = {
-		createTextNode(value: string) {
-			return new PublicRenderTestText(value);
-		},
-		createElement(tagName: string) {
-			return tagName === 'template'
-				? new PublicRenderTestTemplate()
-				: new PublicRenderTestElement(tagName);
-		},
-	};
-	const csrModule = await importPublicRenderTestModule(csrRenderTestModuleSource(result), {
-		document,
-	});
-	const output = (
-		csrModule.marklessRenderCsr as () => {
-			readonly root: {
-				readonly nodeType: number;
-				readonly childNodes: ReadonlyArray<PublicRenderTestElement>;
-			};
-			readonly view: { readonly locators: ReadonlyArray<Record<string, unknown>> };
-		}
-	)();
-
-	// The root is a document fragment holding both sibling roots.
-	expect(output.root.nodeType).toBe(11);
-	expect(
-		output.root.childNodes
-			.filter((child) => child.nodeType === 1)
-			.map((child) => child.tagName),
-	).toEqual(['header', 'button']);
-	// Locators are fragment-relative (no root element in the walk); the web
-	// render() entry offsets them +1 when the mount target becomes the root.
-	expect(output.view.locators).toEqual([
-		expect.objectContaining({ tagName: 'header', index: 0 }),
-		expect.objectContaining({ tagName: 'button', index: 1 }),
-	]);
 });
 
 test('compileTsrxModule places children as raw template projection', async () => {
@@ -2308,58 +2149,6 @@ test('compileTsrxModule parenthesizes non-atomic @if tests in SSR output', async
 	expect(result.publicRenderModule.ssrModuleSource).toContain(
 		'const arm=((primary ?? fallback)?0:1)',
 	);
-});
-
-test('compileTsrxModule resolves CSR host paths across branch anchor ranges', async () => {
-	const result = await compileTsrxModule({
-		filename: 'src/AfterBranch.tsrx',
-		source: `
-import { state } from '@markless/core';
-
-export function App() @{
-	let open = state(true);
-	let note = state('none');
-
-	<main>
-		@if (open) { <section><button onClick={() => note = 'clicked'}>Go</button></section> } @else { <p>Off</p> }
-		<output>{note}</output>
-	</main>
-}
-`,
-		symbols: [],
-	});
-
-	const document = {
-		createTextNode(value: string) {
-			return new PublicRenderTestText(value);
-		},
-		createElement(tagName: string) {
-			return tagName === 'template'
-				? new PublicRenderTestTemplate()
-				: new PublicRenderTestElement(tagName);
-		},
-	};
-	const csrModule = await importPublicRenderTestModule(csrRenderTestModuleSource(result), {
-		document,
-	});
-	const output = (
-		csrModule.marklessRenderCsr as () => {
-			readonly view: {
-				readonly locators: ReadonlyArray<{
-					readonly tagName: string;
-					readonly index: number;
-				}>;
-			};
-		}
-	)();
-	// The authored path counts the branch as ONE slot; the built DOM has
-	// anchors + arm content in that position. Hosts after the branch must
-	// still resolve (S3b browser finding: RuntimeResumeError locator
-	// mismatch for the trailing output).
-	const outputLocator = output.view.locators.find((locator) => locator.tagName === 'output');
-	expect(outputLocator).toBeDefined();
-	// dom-order elements: main(0), section(1), button(2), output(3).
-	expect(outputLocator!.index).toBe(3);
 });
 
 test('compileTsrxModule keeps arm behaviors and handles out of the flat streams', async () => {
@@ -2924,7 +2713,7 @@ export default function Document({ children }: { readonly children?: unknown }) 
 	);
 });
 
-test('compileTsrxModule passes component children into CSR component props', async () => {
+test('compileTsrxModule records component children in linked component definitions', async () => {
 	const result = await compileTsrxModule({
 		filename: 'pages/index.tsrx',
 		source: `
@@ -2942,9 +2731,9 @@ export default function Home() @{
 `,
 		symbols: [],
 	});
-	const csrSource = result.publicRenderModule.csrModuleSource;
-	expect(csrSource).toContain('"projection":{"kind":"static-markup","markup":"Docs"');
-	expect(csrSource).toContain('"name":"href","kind":"serializable","value":"/docs"');
+	const definitions = JSON.stringify(result.publicRenderModule.componentDefinitions);
+	expect(definitions).toContain('"projection":{"kind":"static-markup","markup":"Docs"');
+	expect(definitions).toContain('"name":"href","kind":"serializable","value":"/docs"');
 });
 
 test('compileTsrxModule awaits demanded async work and serves the resolved arm in SSR', async () => {
@@ -3036,353 +2825,6 @@ export function App() @{
 	]);
 });
 
-test('compileTsrxModule CSR settles a two-level async chain without interaction', async () => {
-	const result = await compileTsrxModule({
-		filename: 'src/CsrAsyncChain.tsrx',
-		source: `
-import { computed, state } from '@markless/core';
-
-export function App() @{
-	let version = state(0);
-	const first = computed(async () => ({ revision: version, value: 'first:' + version }));
-	const second = computed(async () => ({ value: 'second:' + first.revision }));
-
-	<main>
-		@try { <p>{first.value}</p> } @pending { <p>Loading first</p> } @catch { <p>Broken first</p> }
-		@try { <p>{second.value}</p> } @pending { <p>Loading second</p> } @catch { <p>Broken second</p> }
-	</main>
-}
-`,
-		symbols: [],
-	});
-	const symbolModules = new Map(
-		result.symbolModules.modules.map((module) => [module.symbolId, module]),
-	);
-	const symbolExports = new Map<string, Record<string, unknown>>();
-	for (const module of result.symbolModules.modules) {
-		symbolExports.set(module.symbolId, await importPublicRenderTestModule(module.source));
-	}
-	const loadedSymbols: string[] = [];
-	const loadSymbol = (symbolId: string) => {
-		loadedSymbols.push(symbolId);
-		const module = symbolModules.get(symbolId);
-		if (!module) throw new Error(`Unexpected async symbol ${symbolId}`);
-		return symbolExports.get(symbolId)?.[module.exportName];
-	};
-	const document = publicRenderTestDocument();
-	const csrModule = await importPublicRenderTestModule(csrRenderTestModuleSource(result), {
-		document,
-		loadSymbol,
-	});
-	const output = (
-		csrModule.marklessRenderCsr as () => {
-			readonly root: PublicRenderTestElement;
-		}
-	)();
-	const applied: Array<{ readonly type: string; readonly fragment?: unknown }> = [];
-	const container = await render(() => output as never, {
-		target: new PublicRenderTestElement('target') as never,
-		renderBranchHtml: (html) => html as never,
-		applyDomJournal: (entries) => applied.push(...entries),
-	});
-	await drainPublicRenderMicrotasks();
-	await container.graph.flush();
-	await drainPublicRenderMicrotasks();
-
-	expect(loadedSymbols).toEqual(
-		expect.arrayContaining(
-			result.symbolModules.modules
-				.filter((module) => module.kind === 'async-computed-runner')
-				.map((module) => module.symbolId),
-		),
-	);
-	expect(
-		result.symbolModules.modules
-			.filter((module) => module.kind === 'async-boundary-update')
-			.some((module) => loadedSymbols.includes(module.symbolId)),
-	).toBe(false);
-	expect(output.root.textContent).toContain('first:0');
-	expect(output.root.textContent).toContain('second:0');
-
-	applied.length = 0;
-	container.graph.write({ graphNodeId: 'state:version', value: 1 });
-	await container.graph.flush();
-	await drainPublicRenderMicrotasks();
-	await container.graph.flush();
-	await drainPublicRenderMicrotasks();
-
-	expect(output.root.textContent).toContain('first:1');
-	expect(output.root.textContent).toContain('second:1');
-	expect(output.root.textContent).not.toContain('[object Object]');
-});
-
-test('compileTsrxModule emits async boundary anchors and @pending in the CSR string path', async () => {
-	const result = await compileTsrxModule({
-		filename: 'src/CsrAsync.tsrx',
-		source: `
-import { computed, state } from '@markless/core';
-
-export function App() @{
-	let query = state('markless');
-	let details = computed(async () => {
-		return { title: 'Result: ' + query };
-	});
-
-	<main>
-		<h1>Search</h1>
-		@try { <p>{details.title}</p> } @pending { <p>Loading</p> } @catch { <p>Broken</p> }
-	</main>
-}
-`,
-		symbols: [],
-	});
-
-	// Boundary-bearing components must not take the direct CSR module: the
-	// direct module has no boundary handling, and the payload ships anchor
-	// records that would fail materialization.
-	expect(result.publicRenderModule.moduleSource).not.toContain(
-		'runtime: { async dispatch() {} }',
-	);
-
-	const document = {
-		createTextNode(value: string) {
-			return new PublicRenderTestText(value);
-		},
-		createElement(tagName: string) {
-			return tagName === 'template'
-				? new PublicRenderTestTemplate()
-				: new PublicRenderTestElement(tagName);
-		},
-	};
-	const csrModule = await importPublicRenderTestModule(csrRenderTestModuleSource(result), {
-		document,
-	});
-	const output = (
-		csrModule.marklessRenderCsr as () => { readonly root: PublicRenderTestElement }
-	)();
-	const kinds = output.root.childNodes.map((child) =>
-		child.nodeType === 8
-			? `#comment:${(child as { textContent?: string }).textContent}`
-			: (child as PublicRenderTestElement).tagName,
-	);
-	// CSR mount is a local demand: anchors + @pending render synchronously;
-	// the runner starts at runtime creation and settle replaces the range.
-	expect(kinds).toEqual([
-		'h1',
-		'#comment:markless:async:boundary:0',
-		'p',
-		'#comment:/markless:async:boundary:0',
-	]);
-});
-
-test('compileTsrxModule emits branch anchors in the CSR string path', async () => {
-	const result = await compileTsrxModule({
-		filename: 'src/CsrBranch.tsrx',
-		source: `
-import { state } from '@markless/core';
-
-export function App({ heading }) @{
-	let open = state(true);
-
-	<main>
-		<h1>{heading}</h1>
-		@if (open) { <p>Shown</p> } @else { <p>Hidden</p> }
-	</main>
-}
-`,
-		symbols: [],
-	});
-
-	const document = {
-		createTextNode(value: string) {
-			return new PublicRenderTestText(value);
-		},
-		createElement(tagName: string) {
-			return tagName === 'template'
-				? new PublicRenderTestTemplate()
-				: new PublicRenderTestElement(tagName);
-		},
-	};
-	const csrModule = await importPublicRenderTestModule(csrRenderTestModuleSource(result), {
-		document,
-	});
-	const output = (
-		csrModule.marklessRenderCsr as (props: { readonly heading: string }) => {
-			readonly root: PublicRenderTestElement;
-			readonly view: { readonly branches?: ReadonlyArray<Record<string, unknown>> };
-		}
-	)({ heading: 'Cards' });
-
-	// The CSR-built DOM contains the same anchor comments SSR emits, so the
-	// same resume runtime can flip the range on the live graph.
-	const kinds = output.root.childNodes.map((child) =>
-		child.nodeType === 8
-			? `#comment:${(child as { textContent?: string }).textContent}`
-			: (child as PublicRenderTestElement).tagName,
-	);
-	expect(kinds).toEqual([
-		'h1',
-		'#comment:markless:branch:branch-site:0',
-		'p',
-		'#comment:/markless:branch:branch-site:0',
-	]);
-	// The composed view carries the payload branch records for the runtime.
-	expect(output.view.branches).toEqual([
-		expect.objectContaining({ id: 'branch-site:0', symbolId: expect.any(String) }),
-	]);
-});
-
-test('compileTsrxModule renders @switch and dynamic tags in the CSR string path', async () => {
-	const result = await compileTsrxModule({
-		filename: 'src/CsrParity.tsrx',
-		source: `
-import { state } from '@markless/core';
-
-export function App({ heading }) @{
-	let kind = state('beta');
-	let tag = state('article');
-
-	<main>
-		<h1>{heading}</h1>
-		@switch (kind) {
-			@case 'alpha': { <p>A</p> }
-			@case 'beta': { <p>B</p> }
-			@default: { <p>D</p> }
-		}
-		<{tag} class="card">Hi</{tag}>
-	</main>
-}
-`,
-		symbols: [],
-	});
-
-	expect(result.publicRenderPlan.diagnostics).toEqual([]);
-	const document = {
-		createTextNode(value: string) {
-			return new PublicRenderTestText(value);
-		},
-		createElement(tagName: string) {
-			return tagName === 'template'
-				? new PublicRenderTestTemplate()
-				: new PublicRenderTestElement(tagName);
-		},
-	};
-	const csrModule = await importPublicRenderTestModule(csrRenderTestModuleSource(result), {
-		document,
-	});
-	const output = (
-		csrModule.marklessRenderCsr as (props: { readonly heading: string }) => {
-			readonly root: PublicRenderTestElement;
-		}
-	)({ heading: 'Cards' });
-
-	expect(elementsByTag(output.root, 'p').map((element) => element.textContent)).toEqual(['B']);
-	const articles = elementsByTag(output.root, 'article');
-	expect(articles).toHaveLength(1);
-	expect(articles[0]?.getAttribute('class')).toBe('card');
-	expect(articles[0]?.textContent).toBe('Hi');
-});
-
-test('compileTsrxModule renders keyed repeat rows in the CSR string path', async () => {
-	const result = await compileTsrxModule({
-		filename: 'src/CsrRows.tsrx',
-		source: `
-import { state } from '@markless/core';
-
-export function App({ heading }) @{
-	let items = state([
-		{ id: 'a', name: 'Alpha' },
-		{ id: 'b', name: 'Beta' },
-	]);
-
-	<main>
-		<h1>{heading}</h1>
-		<ul>
-			@for (const item of items; key item.id) {
-				<li>{item.name}</li>
-			} @empty {
-				<li>No items yet</li>
-			}
-		</ul>
-	</main>
-}
-`,
-		symbols: [],
-	});
-
-	const document = {
-		createTextNode(value: string) {
-			return new PublicRenderTestText(value);
-		},
-		createElement(tagName: string) {
-			return tagName === 'template'
-				? new PublicRenderTestTemplate()
-				: new PublicRenderTestElement(tagName);
-		},
-	};
-	const csrModule = await importPublicRenderTestModule(csrRenderTestModuleSource(result), {
-		document,
-	});
-	const output = (
-		csrModule.marklessRenderCsr as (props: { readonly heading: string }) => {
-			readonly root: PublicRenderTestElement;
-		}
-	)({ heading: 'Cards' });
-
-	expect(elementsByTag(output.root, 'li').map((element) => element.textContent)).toEqual([
-		'Alpha',
-		'Beta',
-	]);
-});
-
-test('compileTsrxModule renders the @empty branch in the CSR string path', async () => {
-	const result = await compileTsrxModule({
-		filename: 'src/CsrEmpty.tsrx',
-		source: `
-import { state } from '@markless/core';
-
-export function App({ heading }) @{
-	let items = state([]);
-
-	<main>
-		<h1>{heading}</h1>
-		<ul>
-			@for (const item of items; key item.id) {
-				<li>{item.name}</li>
-			} @empty {
-				<li>No items yet</li>
-			}
-		</ul>
-	</main>
-}
-`,
-		symbols: [],
-	});
-
-	const document = {
-		createTextNode(value: string) {
-			return new PublicRenderTestText(value);
-		},
-		createElement(tagName: string) {
-			return tagName === 'template'
-				? new PublicRenderTestTemplate()
-				: new PublicRenderTestElement(tagName);
-		},
-	};
-	const csrModule = await importPublicRenderTestModule(csrRenderTestModuleSource(result), {
-		document,
-	});
-	const output = (
-		csrModule.marklessRenderCsr as (props: { readonly heading: string }) => {
-			readonly root: PublicRenderTestElement;
-		}
-	)({ heading: 'Cards' });
-
-	expect(elementsByTag(output.root, 'li').map((element) => element.textContent)).toEqual([
-		'No items yet',
-	]);
-});
-
 test('compileTsrxModule preserves value imports used by public render expressions', async () => {
 	const result = await compileTsrxModule({
 		filename: 'pages/index.tsrx',
@@ -3400,9 +2842,6 @@ export default function Home() @{
 	});
 
 	expect(result.publicRenderModule.ssrModuleSource).toContain(
-		'import { routeHref } from "virtual:test-route-href";',
-	);
-	expect(result.publicRenderModule.csrModuleSource).toContain(
 		'import { routeHref } from "virtual:test-route-href";',
 	);
 
@@ -3451,7 +2890,7 @@ export function App() @{
 	);
 });
 
-test('B917 compileTsrxModule renders same-module child components in CSR and SSR', async () => {
+test('B917 compileTsrxModule renders same-module child components in SSR', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/SameModuleCard.tsrx',
 		source: `
@@ -3469,159 +2908,13 @@ function Card({ value }) @{
 
 	expect(result.renderData.root).toEqual({ componentName: 'App', templateId: 'template:App' });
 
-	const csrOutput = (await renderTestCsr(result)) as {
-		readonly root: PublicRenderTestElement;
-	};
 	const ssrOutput = (await renderTestSsr(result)) as {
 		readonly html: string;
 	};
 
-	expect(csrOutput.root.textContent).toBe('7+');
 	expect(ssrOutput.html).toBe(
 		'<main><article class="card"><strong>7</strong></article><button>+</button></main>',
 	);
-});
-
-test('deep same-module CSR delegates an imported-child route for computed and DOM writes', async () => {
-	const child = await compileTsrxModule({
-		filename: 'src/Leaf.tsrx',
-		source: `
-import { computed } from '@markless/core';
-
-export default function Leaf({ leafInput }) @{
-	const leafValue = computed(() => leafInput + 1);
-	<output>{leafValue}</output>
-}
-`,
-		symbols: [],
-	});
-	const parent = await compileTsrxModule({
-		filename: 'src/DeepSameModuleComputed.tsrx',
-		source: `
-import { computed, state } from '@markless/core';
-import Leaf from './Leaf.tsrx';
-
-function Deep({ deepInput }) @{
-	const deepValue = computed(() => deepInput + 1);
-	<div><output>{deepValue}</output><Leaf leafInput={deepValue} /></div>
-}
-
-function Middle({ middleInput }) @{
-	const middleValue = computed(() => middleInput + 1);
-	<section><output>{middleValue}</output><Deep deepInput={middleValue} /></section>
-}
-
-export function App() @{
-	let owner = state(0);
-	const rootValue = computed(() => owner + 1);
-	<main><Middle middleInput={rootValue} /></main>
-}
-`,
-		symbols: [],
-	});
-	const parentComputedBySymbolId = new Map(
-		parent.protocolState.computed.flatMap((computed) =>
-			computed.deriveSymbolId ? [[computed.deriveSymbolId, computed] as const] : [],
-		),
-	);
-	const parentDomUpdateIds = new Set(
-		parent.protocolView.domUpdates.flatMap((update) =>
-			update.symbolId ? [update.symbolId] : [],
-		),
-	);
-	const childComputedBySymbolId = new Map(
-		child.protocolState.computed.flatMap((computed) =>
-			computed.deriveSymbolId ? [[computed.deriveSymbolId, computed] as const] : [],
-		),
-	);
-	const childDomUpdateIds = new Set(
-		child.protocolView.domUpdates.flatMap((update) =>
-			update.symbolId ? [update.symbolId] : [],
-		),
-	);
-	const childLoaderCalls: string[] = [];
-	const childLoadSymbol = (symbolId: string) => {
-		childLoaderCalls.push(symbolId);
-		const computed = childComputedBySymbolId.get(symbolId);
-		if (computed) {
-			return ({ graph }: { readonly graph: PublicRenderTestGraph }) => {
-				const dependency = computed.dependencies![0]!;
-				return Number(graph.read(dependency.graphNodeId, dependency.path)) + 1;
-			};
-		}
-		if (childDomUpdateIds.has(symbolId)) {
-			return (context: {
-				readonly domUpdate: { readonly hostNodeId: string };
-				readonly value: unknown;
-			}) => ({
-				type: 'setText' as const,
-				locator: context.domUpdate.hostNodeId,
-				value: context.value,
-			});
-		}
-		throw new Error(`Unknown child async symbol ${symbolId}`);
-	};
-	const document = publicRenderTestDocument();
-	const childModule = await importPublicRenderTestModule(csrRenderTestModuleSource(child), {
-		document,
-		loadSymbol: childLoadSymbol,
-	});
-	const parentLoaderCalls: string[] = [];
-	const parentLoadSymbol = (requestedId: string) => {
-		parentLoaderCalls.push(requestedId);
-		const parentComputed = parentComputedBySymbolId.get(requestedId);
-		if (parentComputed) {
-			return ({ graph }: { readonly graph: PublicRenderTestGraph }) => {
-				const dependency = parentComputed.dependencies![0]!;
-				return Number(graph.read(dependency.graphNodeId, dependency.path)) + 1;
-			};
-		}
-		if (parentDomUpdateIds.has(requestedId)) {
-			return (context: {
-				readonly domUpdate: { readonly hostNodeId: string };
-				readonly value: unknown;
-			}) => ({
-				type: 'setText' as const,
-				locator: context.domUpdate.hostNodeId,
-				value: context.value,
-			});
-		}
-		throw new Error(`Unknown async symbol ${requestedId}`);
-	};
-	const parentModule = await importPublicRenderTestModule(
-		csrRenderTestModuleSource(parent, { replaceChildImport: true }),
-		{
-			document,
-			loadSymbol: parentLoadSymbol,
-			childComponent: childModule,
-		},
-	);
-	const output = (
-		parentModule.marklessRenderCsr as () => {
-			readonly root: PublicRenderTestElement;
-			readonly state: ProtocolStatePayload;
-			readonly view: ProtocolViewPayload;
-			readonly loadSymbol: typeof parentLoadSymbol;
-		}
-	)();
-	const container = await render(() => output as never, {
-		target: new PublicRenderTestElement('target') as never,
-	});
-	await container.runtime.start?.();
-
-	container.graph.write({ graphNodeId: 'state:owner', value: 1 });
-	await container.graph.flush();
-
-	expect(new Set(parentLoaderCalls)).toEqual(
-		new Set([...parentComputedBySymbolId.keys(), ...parentDomUpdateIds]),
-	);
-	expect(childLoaderCalls).toEqual(['symbol:1', 'symbol:0']);
-	expect(elementsByTag(output.root, 'output').map((element) => element.textContent)).toEqual([
-		'3',
-		'4',
-		'5',
-	]);
-	expect(output.root.textContent).toBe('345');
 });
 
 test('compileTsrxModule accepts the main authoring import', async () => {
@@ -4618,7 +3911,7 @@ export function Scoreboard() @{
 	expect(loadSymbolCalls.get(incrementSymbol!.id)).toBe(1);
 });
 
-test('B905s2 compile output renders and updates same-module helper-created state', async () => {
+test('B905s2 compile output updates same-module helper-created state', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/HelperCounter.tsrx',
 		source: `import { state } from '@markless/core'; function counterPair() { const n = state(5); return n; } export function App() @{ const count = counterPair(); <button onClick={() => count++}>{count}</button> }`,
@@ -4637,23 +3930,9 @@ test('B905s2 compile output renders and updates same-module helper-created state
 	expect(incrementModule?.source).toContain('graphNodeId: "state:App.count.counterPair.n"');
 
 	const incrementExports = await importPublicRenderTestModule(incrementModule!.source);
-	const document = {
-		createTextNode: (value: string) => new PublicRenderTestText(value),
-		createElement: (tagName: string) =>
-			tagName === 'template'
-				? new PublicRenderTestTemplate()
-				: new PublicRenderTestElement(tagName),
-	};
-	const csrSource = `const document = globalThis.__marklessPublicRenderTestDocument; const loadSymbol = () => undefined; const payloadState = ${JSON.stringify(result.protocolState)}; const payloadView = ${JSON.stringify(result.protocolView)}; const state = (value) => value;\n${result.publicRenderModule.csrModuleSource}\nexport { marklessRenderCsr };`;
-	const csrModule = await importPublicRenderTestModule(csrSource, { document });
-	const rendered = (csrModule.marklessRenderCsr as () => unknown)() as {
-		readonly root: PublicRenderTestElement;
-	};
-	const button = elementsByTag(rendered.root, 'button')[0]!;
 	let value = 5;
 	const handler = incrementExports[incrementModule!.exportName] as (context: any) => unknown;
 
-	expect(button.textContent).toBe('5');
 	handler({
 		graph: {
 			update(input) {
@@ -4664,166 +3943,6 @@ test('B905s2 compile output renders and updates same-module helper-created state
 		},
 	});
 	expect(value).toBe(6);
-});
-
-test('compileTsrxModule composes child-component branch records in CSR views', async () => {
-	const child = await compileTsrxModule({
-		filename: 'src/StatusBadge.tsrx',
-		source: `
-export function StatusBadge({ active }) @{
-	<span class="badge">
-		@if (active) { <em class="live">Live</em> } @else { <em class="idle">Idle</em> }
-	</span>
-}
-`,
-		symbols: [],
-	});
-	const parent = await compileTsrxModule({
-		filename: 'src/Dashboard.tsrx',
-		source: `
-import { state } from '@markless/core';
-import { StatusBadge } from './StatusBadge.tsrx';
-
-export function Dashboard() @{
-	let streaming = state(true);
-
-	<main>
-		<button onClick={() => streaming = !streaming}>Toggle</button>
-		<StatusBadge active={streaming} />
-	</main>
-}
-`,
-		symbols: [],
-	});
-
-	expect(child.renderData.branches).toEqual([
-		expect.objectContaining({ branchSiteId: 'branch-site:0' }),
-	]);
-
-	const document = {
-		createTextNode(value: string) {
-			return new PublicRenderTestText(value);
-		},
-		createElement(tagName: string) {
-			return tagName === 'template'
-				? new PublicRenderTestTemplate()
-				: new PublicRenderTestElement(tagName);
-		},
-	};
-	const childCsrModule = await importPublicRenderTestModule(csrRenderTestModuleSource(child), {
-		document,
-	});
-	const parentCsrModule = await importPublicRenderTestModule(
-		csrRenderTestModuleSource(parent, { replaceChildImport: true }),
-		{
-			document,
-			childComponent: childCsrModule,
-		},
-	);
-	const output = (
-		parentCsrModule.marklessRenderCsr as () => {
-			readonly root: PublicRenderTestElement;
-			readonly view: {
-				readonly branches?: ReadonlyArray<{
-					readonly id: string;
-					readonly startAnchor: { readonly nodeType: number };
-					readonly endAnchor: { readonly nodeType: number };
-					readonly testReads?: ReadonlyArray<{ readonly graphNodeId: string }>;
-				}>;
-			};
-		}
-	)();
-
-	// The child's @if record must reach the composed view: prefixed id,
-	// test read remapped to the parent graph node, with native live anchors.
-	expect(output.view.branches).toEqual([
-		expect.objectContaining({
-			id: 'c0:branch-site:0',
-			startAnchor: expect.objectContaining({ nodeType: 8 }),
-			endAnchor: expect.objectContaining({ nodeType: 8 }),
-			testReads: [expect.objectContaining({ graphNodeId: 'state:streaming' })],
-		}),
-	]);
-	// The composed DOM's anchor comments carry the prefixed id, so multiple
-	// instances of the same child cannot collide.
-	const comments: string[] = [];
-	const walk = (node: { childNodes?: ReadonlyArray<Record<string, unknown>> }): void => {
-		for (const childNode of node.childNodes ?? []) {
-			if (childNode.nodeType === 8) comments.push(String(childNode.textContent));
-			walk(childNode as never);
-		}
-	};
-	walk(output.root as never);
-	expect(comments).toEqual([
-		'markless:branch:c0:branch-site:0',
-		'/markless:branch:c0:branch-site:0',
-	]);
-});
-
-test('standard CSR applies an event patch after behavior activation', async () => {
-	const result = await compileTsrxModule({
-		filename: 'src/BehaviorCommand.tsrx',
-		source: `import { state } from '@markless/core';
-function Frame({ command }) @{ <div class="frame" data-command={command}></div> }
-function Controls({ onPlay }) @{ <button type="button" onClick={onPlay}>Play</button> }
-export function App() @{
-	let command = state('cue');
-	<main attach={installController}>
-		<Frame command={command} />
-		<Controls onPlay={() => command = 'play'} />
-	</main>
-}`,
-		symbols: [],
-	});
-	const activationCommands: string[] = [];
-	const loadSymbol = (symbolId: string) => {
-		const symbol = result.symbolResolver.symbols.find((candidate) => candidate.id === symbolId);
-		if (symbol?.kind === 'behavior') {
-			return ({ element }: { readonly element: PublicRenderTestElement }) => {
-				activationCommands.push(
-					elementsByTag(element, 'div')[0]?.getAttribute('data-command') ?? '<missing>',
-				);
-			};
-		}
-		if (symbol?.kind === 'event-handler')
-			return ({ graph }: { readonly graph: PublicRenderTestGraph }) =>
-				graph.write({ graphNodeId: 'state:command', value: 'play' });
-		if (symbol?.kind === 'dom-update') {
-			return (context: {
-				readonly domUpdate: {
-					readonly hostNodeId: string;
-					readonly target?: { readonly name?: string };
-				};
-				readonly value: unknown;
-			}) => ({
-				type: 'setAttr' as const,
-				locator: context.domUpdate.hostNodeId,
-				name: context.domUpdate.target?.name ?? 'data-command',
-				value: context.value,
-			});
-		}
-		throw new Error(`Unexpected behavior-ordering symbol ${symbolId}`);
-	};
-	const document = publicRenderTestDocument();
-	const csrModule = await importPublicRenderTestModule(csrRenderTestModuleSource(result), {
-		document,
-		loadSymbol,
-	});
-	const output = (
-		csrModule.marklessRenderCsr as () => {
-			readonly root: PublicRenderTestElement;
-		}
-	)();
-	const container = await render(() => output as never, {
-		target: new PublicRenderTestElement('target') as never,
-	});
-	const frame = elementsByTag(output.root, 'div')[0]!;
-	const button = elementsByTag(output.root, 'button')[0]!;
-
-	expect(activationCommands).toEqual(['cue']);
-	await container.runtime.dispatch({ type: 'click', target: button as never });
-	await container.graph.flush();
-	expect(frame.getAttribute('data-command')).toBe('play');
 });
 
 test('compileTsrxModule composes child-component branch records in SSR views', async () => {
@@ -6056,13 +5175,7 @@ export default function SignalCardSsr() @{
 	);
 });
 
-// D1 tier 4 parity: the arm-render module executes the composed @try content
-// in the browser and must produce the same html SSR served for the same
-// settled snapshot. Normalization note: both sides run through the test DOM's
-// parse/serialize round trip (entities stay as authored, attributes keep
-// insertion order); no other normalization is applied.
-
-test('component-rooted pages emit a CSR render module (route swaps need it)', async () => {
+test('component-rooted pages publish linked component definitions', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/App.tsrx',
 		source: `import { state } from '@markless/core';
@@ -6077,11 +5190,19 @@ export default function Page() @{
 		symbols: [],
 	});
 
-	expect(result.publicRenderModule.csrExportName).toBe('marklessRenderCsr');
-	expect(result.publicRenderModule.csrModuleSource).toContain('./shell.tsrx');
+	expect(result.publicRenderModule.componentDefinitions).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				name: 'Page',
+				edges: expect.arrayContaining([
+					expect.objectContaining({ childComponentName: 'Shell' }),
+				]),
+			}),
+		]),
+	);
 });
 
-test('component-rooted CSR returns an imported child as the rendered root', async () => {
+test('component-rooted render data records an imported child as the root slot', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/ImportedRoot.tsrx',
 		source: `import Child from './Child.tsrx';
@@ -6091,11 +5212,10 @@ export default function Page() @{
 }`,
 		symbols: [],
 	});
-	const csrSource = result.publicRenderModule.csrModuleSource;
-
-	expect(csrSource).toContain('"kind":"child-component"');
-	expect(csrSource).toContain('"coordinate":{"kind":"comment-anchor","path":[0]}');
-	expect(csrSource).not.toContain('marklessCsrRootFromHtml');
+	expect(JSON.stringify(result.renderData)).toContain('"kind":"child-component"');
+	expect(JSON.stringify(result.renderData)).toContain(
+		'"coordinate":{"kind":"comment-anchor","path":[0]}',
+	);
 });
 
 test('event-handler symbol modules import every referenced module import (need 13 tail)', async () => {

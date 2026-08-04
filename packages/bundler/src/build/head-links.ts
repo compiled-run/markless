@@ -59,9 +59,9 @@ export function collectModulePreloadInjections(
 		// via the script tag, so only interaction-reachable dynamic targets
 		// (the resume runtime's journal/settle modules) join the head links.
 		entryChunks?: readonly string[];
-		// A prerendered document already preloads its wake chunk. Extend that
-		// root through the built dependency graph without emitting the root link
-		// twice, so delegated child dispatch cannot introduce a first-click fetch.
+		// A prerendered document names its wake chunk in the inline resumer but
+		// does not fetch it until interaction. Preload that root and its complete
+		// built dependency closure so wake dispatch introduces no cold JS fetch.
 		wakeChunks?: readonly string[];
 	} = {},
 ): GlobalInjections[] {
@@ -87,7 +87,6 @@ export function collectModulePreloadInjections(
 		...(options.wakeChunks ?? []).map((name) => ({
 			name,
 			priority: 'auto' as const,
-			edges: 'dependencies-only' as const,
 		})),
 	];
 

@@ -502,12 +502,15 @@ test('renderToStream flushes the pending shell and appends the settled arm out o
 	expect(stream.shell).not.toContain('Relay report ready');
 	expect(stream.shell).toContain('"status":"pending"');
 	expect(stream.shell).toContain('data-async-resumer');
+	expect(stream.shell).not.toContain('__marklessDelegatedEventTypes');
 
 	const chunks = await collect(stream.appends());
 	expect(chunks).toHaveLength(1);
 	const chunk = chunks[0]!;
 	// Inert template + records + incremental snapshot + executor invocation.
 	expect(chunk).toContain('globalThis.__mArm');
+	expect(chunk).toContain('if (r.__marklessDispatch) return r.__marklessDispatch');
+	expect(chunk).not.toContain('if (installed.has(t)) continue');
 	expect(chunk).toContain('<template m:arm="boundary:0">');
 	expect(chunk).toContain('<h2>Relay report ready</h2>');
 	expect(chunk).toContain('<script type="markless/arm" data-boundary="boundary:0">');

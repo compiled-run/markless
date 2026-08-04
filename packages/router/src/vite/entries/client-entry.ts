@@ -12,7 +12,9 @@ import {
 import { preloadRouteModule } from 'virtual:markless-router/route-preloads';
 
 const routeDiscovery = createRouteDiscovery(
-	import.meta.glob(['/pages/**/*.tsrx', '/pages/**/*.mdx']),
+	import.meta.glob(['/pages/**/*.tsrx', '/pages/**/*.mdx'], {
+		query: '?markless-route',
+	}),
 );
 
 export const pageModules = routeDiscovery.pageModuleLoaders;

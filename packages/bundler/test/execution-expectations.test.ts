@@ -33,6 +33,9 @@ test('expectations derive allowed runtime modules from the generated demand map'
 	).not.toThrow();
 	expect(allowed).toContain('web/fns/write-scalar');
 	expect(allowed).toContain('web/fns/update-text');
+	expect(allowed).toContain('web/resume-runtime');
+	expect(allowed).toContain('web/payload-resume');
+	expect(allowed).not.toContain('web/fns/scalar-specialized');
 	expect(allowed).toContain('web/runtime-error-reporting');
 	expect(allowed).not.toContain('web/fns/scalar-core-graph');
 	expect(allowed).not.toContain('web/event-only-lean/scalar-core');
@@ -41,7 +44,14 @@ test('expectations derive allowed runtime modules from the generated demand map'
 	expect(allowed).toContain('web/execution-log-target');
 	expect(allowed).not.toContain('web/event-only-resume');
 	expect(allowed).not.toContain('web/event-only-graph');
-	expect(allowed).not.toContain('web/dom-journal');
+	expect(allowed).toContain('web/dom-journal');
+	expect(allowed).toContain('web/inline/resume-errors');
+	expect(allowed).toContain('web/payload-document-common');
+	expect(allowed).toContain('web/payload-resume-registry');
+	expect(allowed).toContain('web/resume-anchor-census');
+	expect(forbiddenExecutedModules(['web/fns/scalar-specialized'], allowed)).toEqual([
+		'web/fns/scalar-specialized',
+	]);
 });
 
 test('generated demand map carries per-kind replacement phase flags', async () => {
@@ -55,22 +65,18 @@ test('generated demand map carries per-kind replacement phase flags', async () =
 			'dom-update',
 			'element-handle',
 			'event',
+			'external-delegate',
 			'keyed-repeat',
-		].map((kind) => ({ kind, replaced: kind === 'dom-update' || kind === 'event' })),
+		].map((kind) => ({ kind, replaced: false })),
 	);
 	expect(payload.runtimeDemandMap.actions[0].payloadRecordIds).toEqual([
 		`dom-update:${payload.view.domUpdates[0].hostNodeId}:${payload.view.domUpdates[0].symbolId}`,
 		`event:${payload.view.events[0].hostNodeId}:${payload.view.events[0].eventName}`,
 	]);
-	expect(payload.runtimeDemandMap.actions[0].plan).toMatchObject({
-		version: 1,
-		kind: 'scalar',
-		cell: payload.view.domUpdates[0].graphNodeId,
-		symbolId: payload.view.events[0].symbolIds[0],
-	});
+	expect(payload.runtimeDemandMap.actions[0].plan).toBeUndefined();
 });
 
-test('alternate-shaped scalar action specializes from locator, cell, event, and text artifacts', async () => {
+test('alternate-shaped scalar action retains artifacts on the generic records path', async () => {
 	const result = await transformTsrxModule({
 		filename: '/workspace/app/Alternate.tsrx',
 		source: `
@@ -103,37 +109,45 @@ test('alternate-shaped scalar action specializes from locator, cell, event, and 
 	});
 
 	expect(event.eventName).toBe('keydown');
-	expect(payload.runtimeDemandMap.actions[0].plan).toMatchObject({
-		kind: 'scalar',
-		cell: 'state:tally',
-		textUpdates: [expect.objectContaining({ prefix: 'Total: ' })],
-	});
-	expect(resumeSource).toContain(
-		`marklessScalarEventMatches(input, marklessFindElementAtDomOrderIndex(input.root, ${eventLocator.index}), "input", "keydown", ${JSON.stringify(event.hostNodeId)})`,
-	);
-	expect(resumeSource).toContain('input.event?.type === eventName');
-	expect(resumeSource).toContain(
-		`marklessFindElementAtDomOrderIndex(input.root, ${eventLocator.index})`,
-	);
-	expect(resumeSource).toContain(
-		`marklessFindElementAtDomOrderIndex(input.root, ${updateLocator.index})`,
-	);
-	expect(resumeSource).toContain(
-		'marklessDecodeScalarCell(marklessReadScalarCell(input.root, "state:tally")',
-	);
-	expect(resumeSource).toContain('?? {"graphNodeId":"state:tally"');
-	expect(resumeSource).toContain('marklessUpdateText');
-	expect(resumeSource).toContain('"Total: " +');
-	expect(resumeSource).not.toContain('input.eventRecord');
+	expect(eventLocator).toMatchObject({ tagName: 'input' });
+	expect(updateLocator).toMatchObject({ tagName: 'output' });
+	expect(update.target).toMatchObject({ kind: 'text', prefix: 'Total: ' });
+	expect(payload.runtimeDemandMap.actions[0].plan).toBeUndefined();
+	expect(resumeSource).toContain("import('@markless/core/web/resume-storage-free')");
+	expect(resumeSource).not.toContain('marklessScalarEventMatches');
+	expect(resumeSource).not.toContain('marklessDecodeScalarCell');
 	expect(resumeSource).not.toContain('@markless/web/event-only-lean/scalar-core');
-	expect(resumeSource).not.toContain('payloadRuntimeDemandMap.actions.find');
-	expect(allowed).toContain('web/fns/write-scalar');
-	expect(allowed).toContain('web/fns/update-text');
+	expect([...allowed].sort()).toEqual([
+		'core/web/resume',
+		'core/web/resume-storage-free',
+		'web/dom-journal',
+		'web/fns/write-scalar',
+		'web/inline/resume-errors',
+		'web/payload-document-common',
+		'web/payload-full',
+		'web/payload-full-storage-free',
+		'web/payload-graph-construct',
+		'web/payload-resume',
+		'web/payload-resume-registry',
+		'web/resume',
+		'web/resume-anchor-census',
+		'web/resume-arm-records',
+		'web/resume-async-wiring',
+		'web/resume-commit-arm',
+		'web/resume-events',
+		'web/resume-locators',
+		'web/resume-runtime',
+		'web/resume-runtime-shared',
+		'web/resume-runtime-start',
+		'web/runtime-error-reporting',
+	]);
+	expect(allowed).not.toContain('web/fns/scalar-specialized');
+	expect(allowed).not.toContain('web/fns/update-text');
 	expect(allowed).not.toContain('web/event-only-lean/scalar-core');
 	expect(allowed).not.toContain('web/fns/scalar-core-graph');
 });
 
-test('wrapped scalar action emits served locator indexes for host and text updates', async () => {
+test('wrapped scalar action preserves served locators for generic dispatch', async () => {
 	const result = await transformTsrxModule({
 		filename: '/workspace/app/Wrapped.tsrx',
 		source: `
@@ -162,13 +176,9 @@ test('wrapped scalar action emits served locator indexes for host and text updat
 
 	expect(eventLocator).toMatchObject({ tagName: 'button' });
 	expect(updateLocator).toMatchObject({ tagName: 'button' });
-	expect(resumeSource).toContain(
-		`marklessScalarEventMatches(input, marklessFindElementAtDomOrderIndex(input.root, ${eventLocator.index}), "button", "click", ${JSON.stringify(event.hostNodeId)})`,
-	);
-	expect(resumeSource).toContain(
-		`marklessFindElementAtDomOrderIndex(input.root, ${updateLocator.index})`,
-	);
-	expect(resumeSource).not.toContain('?? input.element ?? input.event.target');
+	expect(eventLocator.index).toBe(updateLocator.index);
+	expect(resumeSource).toContain("import('@markless/core/web/resume-storage-free')");
+	expect(resumeSource).not.toContain('marklessFindElementAtDomOrderIndex');
 });
 
 test('scalar-looking actions with extra authored work stay on the full dispatch path', async () => {
@@ -201,6 +211,7 @@ test('scalar-looking actions with extra authored work stay on the full dispatch 
 			'dom-update',
 			'element-handle',
 			'event',
+			'external-delegate',
 			'keyed-repeat',
 		].map((kind) => ({ kind, replaced: false })),
 	);
@@ -236,6 +247,7 @@ test('mixed scalar modules leave replacement phase flags open', async () => {
 			'dom-update',
 			'element-handle',
 			'event',
+			'external-delegate',
 			'keyed-repeat',
 		].map((kind) => ({ kind, replaced: false })),
 	);
@@ -321,30 +333,25 @@ test('keyed repeat row actions allow render-module catalog helper imports', asyn
 
 	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({
 		kind: 'keyed-repeat',
-		replaced: true,
+		replaced: false,
 	});
 	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({
 		kind: 'dom-update',
-		replaced: true,
+		replaced: false,
 	});
-	expect(allowed).toContain('web/event-only-lean/row');
-	expect(allowed).toContain('web/event-only-lean/lean-shared');
+	expect(allowed).not.toContain('web/event-only-lean/row');
+	expect(allowed).not.toContain('web/event-only-lean/lean-shared');
 	expect(allowed).not.toContain('web/event-only-lean/scalar-core');
 	expect(allowed).toContain('web/resume-keyed-repeats');
-	expect([...allowed].filter((id) => JUDGE_COUNTER_INTERPRETER_CHAIN_SET.has(id))).toEqual([]);
+	expect(allowed).toContain('web/resume-runtime');
 	expect(
 		payload.runtimeDemandMap.actions.find(
 			(action: any) => action.recordKind === 'keyed-repeat-row',
 		)?.plan,
-	).toMatchObject({
-		version: 1,
-		kind: 'row',
-		cell: payload.view.domUpdates[0].graphNodeId,
-		repeatId: repeat.id,
-	});
+	).toBeUndefined();
 });
 
-test('mixed scalar and row actions keep exact lean modules per action', async () => {
+test('mixed scalar and row actions share generic records modules per action', async () => {
 	const result = await transformTsrxModule({
 		filename: '/workspace/app/MixedRows.tsrx',
 		source: `
@@ -377,17 +384,19 @@ test('mixed scalar and row actions keep exact lean modules per action', async ()
 		recordKind: 'keyed-repeat-row',
 	});
 
-	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({ kind: 'event', replaced: true });
+	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({ kind: 'event', replaced: false });
 	expect(payload.runtimeDemandMap.recordKinds).toContainEqual({
 		kind: 'keyed-repeat',
-		replaced: true,
+		replaced: false,
 	});
 	expect(counterAllowed).not.toContain('web/event-only-lean/scalar-core');
 	expect(counterAllowed).not.toContain('web/event-only-lean/lean-shared');
 	expect(counterAllowed).not.toContain('web/fns/scalar-core-graph');
 	expect(counterAllowed).not.toContain('web/event-only-lean/row');
-	expect(rowAllowed).toContain('web/event-only-lean/row');
+	expect(rowAllowed).not.toContain('web/event-only-lean/row');
 	expect(rowAllowed).not.toContain('web/event-only-lean/scalar-core');
+	expect(counterAllowed).toContain('web/resume-runtime');
+	expect(rowAllowed).toContain('web/resume-runtime');
 });
 
 test('keyed repeat row actions with non-text subscribers stay unreplaced', async () => {
@@ -416,7 +425,7 @@ test('keyed repeat row actions with non-text subscribers stay unreplaced', async
 	});
 });
 
-test('replaced action kinds tighten back to the exact demand set', async () => {
+test('synthetic replacement flags cannot erase generic action demand', async () => {
 	const { payload } = await counterPayload();
 	const click = payload.view.events[0];
 	const replacedPayload = {
@@ -439,7 +448,8 @@ test('replaced action kinds tighten back to the exact demand set', async () => {
 	expect(allowed).not.toContain('web/fns/scalar-core-graph');
 	expect(allowed).not.toContain('web/event-only-lean/scalar-core');
 	expect(allowed).not.toContain('web/event-only-lean/lean-shared');
-	expect([...allowed].filter((id) => JUDGE_COUNTER_INTERPRETER_CHAIN_SET.has(id))).toEqual([]);
+	expect(allowed).toContain('web/resume-runtime');
+	expect(allowed).toContain('web/payload-resume');
 });
 
 test('wrong demand map entries fail expectations and emitted-equals-required', async () => {

@@ -45,6 +45,11 @@ export function emitPublicSsrRenderModule(
 		rootInfo.propNames,
 		input.source.source,
 		hostLocators,
+		input.semanticGraph.events.filter((event) =>
+			input.renderData.chunks
+				.filter((chunk) => chunk.componentName === rootInfo.componentName)
+				.some((chunk) => chunk.hosts.some((host) => host.hostNodeId === event.hostNodeId)),
+		),
 	);
 	const remapsGraphProps = hasPropDependentComputed(input);
 	const internalGraphProps = composedGraphProps(input);
@@ -145,8 +150,7 @@ export function emitPublicSsrRenderModule(
 					'marklessSsrHost',
 					'marklessSsrCallbacks',
 					'marklessSsrCallbackSymbol',
-					// Aliased: the CSR module in the same emitted file imports the same
-					// helper name from fns/csr; duplicate import bindings are a JS error.
+					// Keep the emitted SSR helper distinct from authored bindings.
 					'marklessComposeState as marklessSsrComposeState',
 					'marklessSsrRemapGraphOutput',
 					'marklessViewWithoutAnchors',
@@ -185,6 +189,26 @@ function emitSsrDataRenderLines(
 	references: ReadonlyArray<{ readonly componentName: string; readonly localName: string }>,
 ): string[] {
 	const chunks = input.renderData.chunks.filter((chunk) => chunk.componentName === componentName);
+	const componentGraphNodeIds = new Set(
+		chunks.flatMap((chunk) =>
+			chunk.slots.flatMap((slot) => {
+				const residueIds =
+					'residue' in slot && slot.residue.kind === 'graph-read'
+						? [slot.residue.graphNodeId]
+						: [];
+				return slot.kind === 'dynamic-host'
+					? [
+							...residueIds,
+							...slot.attributeSlots.flatMap((attribute) =>
+								attribute.residue.kind === 'graph-read'
+									? [attribute.residue.graphNodeId]
+									: [],
+							),
+						]
+					: residueIds;
+			}),
+		),
+	);
 	const residueSources = new Set<string>();
 	for (const chunk of chunks) {
 		for (const slot of chunk.slots) {
@@ -213,9 +237,13 @@ function emitSsrDataRenderLines(
 	const branchCases = input.renderData.branches
 		.filter((branch) => branchIds.has(branch.branchSiteId))
 		.map((branch) => {
+			const testRead = branch.testReads.length === 1 ? branch.testReads[0] : undefined;
+			const testSource = testRead
+				? `marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(${JSON.stringify(testRead.graphNodeId)}),${JSON.stringify(testRead.path)})`
+				: branch.testSource;
 			const armSource = branch.kind === 'switch' && branch.armTests
-				? `(()=>{const value=(${branch.testSource});const tests=${JSON.stringify(branch.armTests)};const match=tests.findIndex((test)=>test!==null&&Object.is(test,value));return match===-1?Math.max(0,tests.indexOf(null)):match;})()`
-				: `((${branch.testSource})?0:1)`;
+				? `(()=>{const value=(${testSource});const tests=${JSON.stringify(branch.armTests)};const match=tests.findIndex((test)=>test!==null&&Object.is(test,value));return match===-1?Math.max(0,tests.indexOf(null)):match;})()`
+				: `((${testSource})?0:1)`;
 			return `case ${JSON.stringify(branch.branchSiteId)}:{const arm=${armSource};marklessSsrBranches.push({id:marklessSsrDataSlot.branchSiteId,takenArm:arm});return arm;}`;
 		});
 	const asyncRunners = collectSsrAsyncRunners(input);
@@ -277,7 +305,12 @@ function emitSsrDataRenderLines(
 			: [],
 	);
 	const templateComputedLines = input.renderData.initialValues.flatMap((initial) => {
-		if (!initial.graphNodeId.startsWith('computed:templateExpression:') || initial.value.kind !== 'symbol-function') return [];
+		if (
+			!componentGraphNodeIds.has(initial.graphNodeId) ||
+			!initial.graphNodeId.startsWith('computed:templateExpression:') ||
+			initial.value.kind !== 'symbol-function'
+		)
+			return [];
 		const symbol = input.symbolResolver.symbols.find((candidate) => candidate.id === initial.value.symbolId);
 		return symbol?.source
 			? [`marklessSsrRenderStateValues.set(${JSON.stringify(initial.graphNodeId)},(${symbol.source})());`]

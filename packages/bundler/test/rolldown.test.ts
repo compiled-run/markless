@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { resolve } from 'pathe';
 import { pathToFileURL } from 'node:url';
 import { build as viteBuild, type Plugin } from 'vite';
@@ -8,10 +8,12 @@ import {
 	marklessLib,
 	marklessClient,
 	marklessServer,
+	prerenderWakeVirtualModuleId,
 	resumeVirtualModuleId,
 	transformTsrxModule,
 } from '../src/rolldown.ts';
 import { MARKLESS_EXECUTION_LOG_MODULE_ID } from '../src/execution-log.ts';
+import { verifyGeneratedSymbolTableRoutes } from '../src/build/symbol-table.ts';
 import {
 	callBuildStart,
 	callGenerateBundle,
@@ -113,6 +115,7 @@ describe('TSRX Rolldown plugin structure', () => {
 		const result = await transformTsrxModule({
 			filename: '/workspace/app/src/App.tsrx',
 			source,
+			runtimeDemandClass: 'plain-ssr',
 		});
 
 		expect(result.code).not.toContain('export const marklessSource');
@@ -200,11 +203,29 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(result.code).not.toContain('state: payloadState');
 	});
 
-	test('client dev keeps native CSR chunk data available without build-time HTML injection', async () => {
+	test('client definitions use canonical render data without the retired CSR producer', async () => {
 		const production = await transformTsrxModule({
 			filename: '/workspace/app/src/App.tsrx',
 			source: styledSource,
 			environment: 'client',
+		});
+		const prerendered = await transformTsrxModule({
+			filename: '/workspace/app/pages/prerendered.tsrx',
+			source: styledSource,
+			environment: 'client',
+			prerenderRecords: true,
+		});
+		const materialized = await transformTsrxModule({
+			filename: '/workspace/app/pages/index.tsrx',
+			source: defaultRouteSource,
+			environment: 'client',
+			prerenderRecords: true,
+			artifactChildMaterializations: {
+				'component-edge:0': {
+					html: '<a href="/docs" data-markless-router-link>Docs</a>',
+					elementCount: 1,
+				},
+			},
 		});
 		const dev = await transformTsrxModule({
 			filename: '/workspace/app/src/App.tsrx',
@@ -213,9 +234,198 @@ describe('TSRX Rolldown plugin structure', () => {
 			dev: true,
 		});
 
-		expect(production.code).not.toContain('nativeFallback');
-		expect(dev.code).toContain('nativeFallback');
-		expect(dev.code).toContain('"statics"');
+		expect(renderDataModuleSource(production)).toContain('"statics"');
+		expect(renderDataModuleSource(prerendered)).toContain('marklessPrerenderData');
+		expect(renderDataModuleSource(materialized)).toContain('data-markless-router-link');
+		expect(renderDataModuleSource(materialized)).toContain('"materialized"');
+		expect(renderDataModuleSource(dev)).toContain('"statics"');
+		for (const result of [production, prerendered, materialized, dev]) {
+			expect(result.code).not.toContain('@markless/web/fns/csr');
+			expect(result.code).not.toContain('createMarklessCsrChunkRenderer');
+		}
+	});
+
+	test('artifact-child-free route queries emit only the renderer facade', async () => {
+		const emitFile = vi.fn();
+		const resolveImport = vi.fn();
+		const ordinaryResolve = vi.fn();
+		const queried = (await callTransform(
+			marklessClient(),
+			styledSource,
+			'/workspace/app/pages/docs.tsrx?markless-route',
+			{ emitFile, resolve: resolveImport },
+		)) as { code: string };
+		const ordinary = (await callTransform(
+			marklessClient(),
+			styledSource,
+			'/workspace/app/pages/docs.tsrx',
+			{ resolve: ordinaryResolve },
+		)) as { code: string };
+
+		expect(queried.code).not.toBe(ordinary.code);
+		expect(queried.code).toContain('import("/workspace/app/pages/docs.tsrx?markless-symbols")');
+		expect(queried.code).toContain(
+			'import("/workspace/app/pages/docs.tsrx?markless-render-data")',
+		);
+		expect(queried.code).toContain('renderData: renderDataModule.marklessPrerenderData');
+		expect(queried.code).toContain('loadSymbol: symbolModule.loadSymbol');
+		expect(queried.code).not.toContain('marklessCompiledApp');
+		expect(ordinary.code).toContain('marklessCompiledApp');
+		expect(emitFile).not.toHaveBeenCalledWith(
+			expect.objectContaining({ id: '/workspace/app/pages/docs.tsrx' }),
+		);
+		expect(resolveImport).not.toHaveBeenCalled();
+		expect(ordinaryResolve).not.toHaveBeenCalled();
+	});
+
+	test('artifact-child-free route builds retain the queried manifest identity', async () => {
+		const root = resolve(import.meta.dirname, '../../router/fixtures/router');
+		const filename = resolve(root, 'pages/harbor.tsrx');
+		const queriedId = `${filename}?markless-route`;
+		const output = await viteBuild({
+			configFile: false,
+			root,
+			logLevel: 'silent',
+			plugins: [marklessClient({ executionLog: 'never', rootDir: root })],
+			build: {
+				write: false,
+				minify: false,
+				target: 'es2022',
+				rolldownOptions: { input: { route: queriedId } },
+			},
+		});
+		const emitted = Array.isArray(output)
+			? output.flatMap((item) => item.output)
+			: output.output;
+		const chunks = emitted.filter((item) => item.type === 'chunk');
+		const normalizeModuleId = (id: string | null | undefined) =>
+			id?.startsWith('\0') ? id.slice(1) : id;
+		const routeChunk = chunks.find(
+			(chunk) => normalizeModuleId(chunk.facadeModuleId) === queriedId,
+		);
+		const demandAsset = emitted.find(
+			(item) => item.type === 'asset' && item.fileName === 'build/execution-demand.json',
+		);
+		const graphAsset = emitted.find(
+			(item) => item.type === 'asset' && item.fileName === MARKLESS_BUNDLE_GRAPH,
+		);
+
+		expect(routeChunk).toBeDefined();
+		expect(routeChunk?.code).not.toContain('@markless/web/fns/csr');
+		expect(
+			chunks.some((chunk) =>
+				chunk.moduleIds.some((id) => normalizeModuleId(id) === filename),
+			),
+		).toBe(false);
+		const demandSources = Object.keys(JSON.parse(String(demandAsset?.source)));
+		expect(demandSources).toContain(`${filename}?markless-symbols`);
+		expect(demandSources).toContain(`${filename}?markless-render-data`);
+		expect(demandSources).not.toContain(filename);
+		expect(JSON.parse(String(graphAsset?.source))).toEqual(
+			expect.arrayContaining(['symbol:0', 'symbol:5']),
+		);
+	});
+
+	test('route queries keep composed TSRX children behind the linked facade chain', async () => {
+		const routeSource = `import InteractiveCounter from '../components/InteractiveCounter.tsrx';
+export default function Docs() @{ <main><InteractiveCounter /></main> }`;
+		const resolveImport = vi.fn();
+		const ordinaryResolve = vi.fn();
+		const queried = (await callTransform(
+			marklessClient(),
+			routeSource,
+			'/workspace/app/pages/docs.tsrx?markless-route',
+			{ resolve: resolveImport },
+		)) as { code: string };
+		const ordinary = (await callTransform(
+			marklessClient(),
+			routeSource,
+			'/workspace/app/pages/docs.tsrx',
+			{ resolve: ordinaryResolve },
+		)) as { code: string };
+
+		expect(queried.code).not.toBe(ordinary.code);
+		expect(queried.code).not.toContain('../components/InteractiveCounter.tsrx');
+		expect(queried.code).toContain(
+			'import("/workspace/app/pages/docs.tsrx?markless-render-data")',
+		);
+		expect(queried.code).toContain('import("/workspace/app/pages/docs.tsrx?markless-symbols")');
+		expect(ordinary.code).toContain('../components/InteractiveCounter.tsrx');
+		expect(resolveImport).not.toHaveBeenCalled();
+		expect(ordinaryResolve).toHaveBeenCalled();
+	});
+
+	test('production route artifact verifies only claims owned by its emitted symbol facade', async () => {
+		const root = resolve(import.meta.dirname, '../../router/fixtures/router-app');
+		const filename = resolve(root, 'pages/index.tsrx');
+		const queriedId = `${filename}?markless-route`;
+		const output = await viteBuild({
+			configFile: false,
+			root,
+			logLevel: 'silent',
+			plugins: [marklessClient({ executionLog: 'never', rootDir: root })],
+			build: {
+				write: false,
+				minify: false,
+				target: 'es2022',
+				rolldownOptions: {
+					input: { route: queriedId, symbols: `${filename}?markless-symbols` },
+				},
+			},
+		});
+		const chunks = (
+			Array.isArray(output) ? output.flatMap((item) => item.output) : output.output
+		).filter((item) => item.type === 'chunk');
+		const normalizedModuleId = (id: string | null | undefined) =>
+			id?.startsWith('\0') ? id.slice(1) : id;
+		const queriedChunk = chunks.find(
+			(chunk) => normalizedModuleId(chunk.facadeModuleId) === queriedId,
+		);
+		const primaryChunk = chunks.find((chunk) =>
+			chunk.moduleIds.some((id) => normalizedModuleId(id) === filename),
+		);
+		const renderDataChunk = chunks.find((chunk) =>
+			chunk.moduleIds.some(
+				(id) => normalizedModuleId(id) === `${filename}?markless-render-data`,
+			),
+		);
+		const transformed = await transformTsrxModule({
+			filename,
+			source: await readFile(filename, 'utf8'),
+			environment: 'client',
+			dev: true,
+		});
+		const integrity = verifyGeneratedSymbolTableRoutes(
+			Object.fromEntries(chunks.map((chunk) => [chunk.fileName, chunk])),
+			[
+				{
+					...transformed.manifest,
+					source: `${filename}?markless-symbols`,
+				},
+			],
+		);
+
+		expect(queriedChunk?.code).not.toContain('@markless/web/fns/csr');
+		expect(primaryChunk).toBeUndefined();
+		expect(renderDataChunk).toBeDefined();
+		expect(renderDataChunk?.code).toContain('marklessPrerenderData');
+		expect(
+			chunks
+				.flatMap((chunk) => chunk.moduleIds)
+				.filter((id) => normalizedModuleId(id)?.startsWith('virtual:markless:symbol:')),
+		).not.toEqual(expect.arrayContaining([expect.stringContaining('?markless-route')]));
+		expect(integrity).toEqual({
+			verified: transformed.manifest.symbols.length,
+			errors: [],
+		});
+		expect(
+			verifyGeneratedSymbolTableRoutes(
+				Object.fromEntries(chunks.map((chunk) => [chunk.fileName, chunk])),
+				[],
+			),
+			'non-emitted canonical primaries register no orphan claims',
+		).toEqual({ verified: 0, errors: [] });
+		await assertOrdinaryRouteBuildControl();
 	});
 
 	test('transformTsrxModule scopes browser symbol export names by source file', async () => {
@@ -292,12 +502,13 @@ let count = state(0);
 		expect(result.code).toContain('function marklessSsrLoadSymbolRoute(symbolId)');
 		expect(result.code).toContain('import("./Child.tsrx?markless-symbols")');
 		expect(result.code).toContain('return marklessLoadLocalSymbol(symbolId);');
-		expect(result.code).toContain('renderCsr: marklessRenderCsr');
+		expect(result.code).not.toContain('@markless/web/fns/csr');
+		expect(result.code).not.toContain('createMarklessCsrChunkRenderer');
 		expect(result.code).toContain('export default marklessCompiledApp;');
 	});
 
 	test('client plugin emits symbol-only output for named symbols TSRX entries', async () => {
-		const plugin = marklessClient();
+		const plugin = marklessClient({ emitResumeModules: true } as never);
 
 		await callBuildStart(plugin, {
 			cwd: '/workspace/app',
@@ -406,7 +617,7 @@ let active = state(true);
 	});
 
 	test('base plugin transforms TSRX and serves generated virtual modules', async () => {
-		const plugin = marklessClient();
+		const plugin = marklessClient({ emitResumeModules: true } as never);
 
 		callBuildStart(plugin, { cwd: '/workspace/app' });
 		const result = (await callTransform(plugin, source, '/workspace/app/src/App.tsrx')) as {
@@ -511,7 +722,7 @@ let count = state(0);
 	});
 
 	test('client resume source requests serve the generated resume module only', async () => {
-		const plugin = marklessClient();
+		const plugin = marklessClient({ emitResumeModules: true } as never);
 		const filename = '/workspace/app/pages/index.tsrx';
 
 		callBuildStart(plugin, { cwd: '/workspace/app' });
@@ -527,6 +738,65 @@ let count = state(0);
 		expect(result.code).not.toContain('resumeScalarCoreEventFromPayloadDocument');
 		expect(result.code).not.toContain('const marklessCompiledApp = {');
 		expect(result.code).not.toContain('renderCsr:');
+	});
+
+	test.each(['markless-resume', 'markless-render-data'])(
+		'%s child validation reads capture metadata from the child source identity',
+		async (query) => {
+			const plugin = marklessClient();
+			const parentFilename = '/workspace/app/pages/index.tsrx';
+			const parentId = `${parentFilename}?${query}`;
+			const childFilename = '/workspace/app/components/UpdateSummary.tsrx';
+			const childSource = 'export default function UpdateSummary() @{ <p>Ready</p> }';
+			const parentSource = `import UpdateSummary from '../components/UpdateSummary.tsrx';
+export default function Page() @{ <main><UpdateSummary /></main> }`;
+			const resolveImport = vi.fn(async (specifier: string) =>
+				specifier === '../components/UpdateSummary.tsrx' ? { id: childFilename } : null,
+			);
+
+			callBuildStart(plugin, { cwd: '/workspace/app' });
+			await callTransform(plugin, childSource, childFilename, { resolve: resolveImport });
+			await callTransform(plugin, parentSource, parentId, { resolve: resolveImport });
+
+			await expect(callGenerateBundle(plugin, {}, vi.fn())).resolves.toBeUndefined();
+			expect(resolveImport).toHaveBeenCalledWith(
+				'../components/UpdateSummary.tsrx',
+				parentId,
+				{ skipSelf: true },
+			);
+		},
+	);
+
+	test('resume linking binds child-derived capture metadata recorded by the source module', async () => {
+		const plugin = marklessClient({ dev: true });
+		const parentFilename = '/workspace/app/pages/live-feed.tsrx';
+		const childFilename = '/workspace/app/components/UpdateSummary.tsrx';
+		const childSource = `import { computed } from '@markless/core';
+export function UpdateSummary({ updates, weight }) @{
+	const weightedCount = computed(() => updates.length * weight);
+	<p data-weighted-count>Weighted count {weightedCount}</p>
+}`;
+		const parentSource = `import { state } from '@markless/core';
+import { UpdateSummary } from '../components/UpdateSummary.tsrx';
+export default function LiveFeed() @{
+	let weight = state(2);
+	let updates = state([{ id: 'atlas' }, { id: 'beacon' }, { id: 'cedar' }]);
+	<main><UpdateSummary updates={updates} weight={weight} /></main>
+}`;
+		const resolveImport = vi.fn(async (specifier: string) =>
+			specifier === '../components/UpdateSummary.tsrx' ? { id: childFilename } : null,
+		);
+
+		callBuildStart(plugin, { cwd: '/workspace/app' });
+		await callTransform(plugin, childSource, childFilename, { resolve: resolveImport });
+		await callTransform(plugin, parentSource, `${parentFilename}?markless-resume`, {
+			resolve: resolveImport,
+		});
+
+		const resolverId = `virtual:markless:resolver:${encodeURIComponent(parentFilename)}`;
+		const resolverSource = (await callLoad(plugin, `\0${resolverId}`)) as string;
+		expect(resolverSource).toContain('bound:');
+		expect(resolverSource).toContain(encodeURIComponent(childFilename));
 	});
 
 	test('production client execution logging does not alter hash-bearing modules', async () => {
@@ -823,6 +1093,368 @@ export default function Document() @{ <Html><body>Ready</body></Html> }`,
 		await expect(callGenerateBundle(plugin, {}, vi.fn())).resolves.toBeUndefined();
 	});
 
+	test('client page roots never import artifact candidates from inside the app source tree', async () => {
+		const fixtureRoot = await mkdtemp(
+			resolve(import.meta.dirname, '.artifact-child-import-gate-'),
+		);
+		const appRoot = resolve(fixtureRoot, 'app');
+		const pageFilename = resolve(appRoot, 'pages/index.tsrx');
+		const localComponentFilename = resolve(appRoot, 'components/LocalFrame.mjs');
+		await mkdir(resolve(appRoot, 'pages'), { recursive: true });
+		await mkdir(resolve(appRoot, 'components'), { recursive: true });
+		await writeFile(
+			localComponentFilename,
+			`export const LocalFrame = { renderSsr() { return { html: '<aside data-local-frame>Local</aside>', elementCount: 1 }; } };`,
+		);
+		const plugin = marklessClient({ rootDir: appRoot, prerender: true });
+		const resolveImport = vi.fn(async (specifier: string) =>
+			specifier === '../components/LocalFrame.mjs' ? { id: localComponentFilename } : null,
+		);
+
+		try {
+			callBuildStart(plugin, { cwd: appRoot });
+			const result = (await callTransform(
+				plugin,
+				`import { LocalFrame } from '../components/LocalFrame.mjs';
+export default function Page() @{ <main><LocalFrame /></main> }`,
+				pageFilename,
+				{
+					resolve: resolveImport,
+					getModuleInfo: () => ({ isEntry: true }),
+				},
+			)) as { code: string; virtualModules: Array<{ type: string; source: string }> };
+
+			expect(result.code).not.toContain('data-local-frame');
+			expect(result.code).toContain('../components/LocalFrame.mjs');
+		} finally {
+			await rm(fixtureRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('only client page entries expose on-disk package artifact-child candidates', async () => {
+		const fixtureRoot = await mkdtemp(
+			resolve(import.meta.dirname, '.artifact-child-page-root-'),
+		);
+		const appRoot = resolve(fixtureRoot, 'app');
+		const packageFilename = resolve(fixtureRoot, 'packages/StaticFrame.mjs');
+		await mkdir(resolve(appRoot, 'pages'), { recursive: true });
+		await mkdir(resolve(fixtureRoot, 'packages'), { recursive: true });
+		await writeFile(
+			packageFilename,
+			`export const StaticFrame = { renderSsr() { return { html: '<aside data-package-frame>Package</aside>', elementCount: 1 }; } };`,
+		);
+		const plugin = marklessClient({ rootDir: appRoot });
+		const pageSource = `import { StaticFrame } from '@fixtures/static-frame';
+export default function Page() @{ <main><StaticFrame /></main> }`;
+		const resolvePackage = vi.fn(async (specifier: string) =>
+			specifier === '@fixtures/static-frame' ? { id: packageFilename } : null,
+		);
+
+		try {
+			callBuildStart(plugin, { cwd: appRoot });
+			const imported = (await callTransform(
+				plugin,
+				pageSource,
+				resolve(appRoot, 'components/ImportedPage.tsrx'),
+				{
+					resolve: resolvePackage,
+					getModuleInfo: () => ({ isEntry: false }),
+				},
+			)) as { code: string; virtualModules: Array<{ type: string; source: string }> };
+			expect(imported.code).not.toContain('data-package-frame');
+
+			const viteModuleInfo = {} as { readonly isEntry: boolean };
+			Object.defineProperty(viteModuleInfo, 'isEntry', {
+				get() {
+					throw new Error('The "isEntry" property of ModuleInfo is not supported.');
+				},
+			});
+			const viteImported = (await callTransform(
+				plugin,
+				pageSource,
+				resolve(appRoot, 'components/ViteImportedPage.tsrx'),
+				{
+					resolve: resolvePackage,
+					getModuleInfo: () => viteModuleInfo,
+				},
+			)) as { code: string };
+			expect(viteImported.code).not.toContain('data-package-frame');
+
+			const page = (await callTransform(
+				plugin,
+				pageSource,
+				resolve(appRoot, 'pages/index.tsrx'),
+				{
+					resolve: resolvePackage,
+					getModuleInfo: () => ({ isEntry: true }),
+				},
+			)) as {
+				code: string;
+				artifactChildren: Array<{ componentName: string; importSource: string }>;
+			};
+			expect(page.artifactChildren).toEqual([
+				expect.objectContaining({
+					componentName: 'StaticFrame',
+					importSource: '@fixtures/static-frame',
+				}),
+			]);
+			expect(page.code).not.toContain('@markless/web/fns/csr');
+		} finally {
+			await rm(fixtureRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('non-entry render-data requests reuse stored route-artifact materializations', async () => {
+		const fixtureRoot = await mkdtemp(resolve(import.meta.dirname, '.artifact-child-reuse-'));
+		const appRoot = resolve(fixtureRoot, 'app');
+		const pageFilename = resolve(appRoot, 'pages/index.tsrx');
+		const packageFilename = resolve(fixtureRoot, 'packages/StaticFrame.mjs');
+		await mkdir(resolve(appRoot, 'pages'), { recursive: true });
+		await mkdir(resolve(fixtureRoot, 'packages'), { recursive: true });
+		await writeFile(
+			packageFilename,
+			`export const StaticFrame = { renderSsr() { return { html: '<aside data-package-frame>Package</aside>', elementCount: 1 }; } };`,
+		);
+		const plugin = marklessClient({ rootDir: appRoot });
+		const pageSource = `import { StaticFrame } from '@fixtures/static-frame';
+export default function Page() @{ <main><StaticFrame /></main> }`;
+		const resolvePackage = vi.fn(async (specifier: string) =>
+			specifier === '@fixtures/static-frame' ? { id: packageFilename } : null,
+		);
+
+		try {
+			callBuildStart(plugin, { cwd: appRoot });
+			await callTransform(plugin, pageSource, `${pageFilename}?markless-route`, {
+				resolve: resolvePackage,
+				getModuleInfo: () => ({ isEntry: true }),
+			});
+			const renderData = (await callTransform(
+				plugin,
+				pageSource,
+				`${pageFilename}?markless-render-data`,
+				{
+					resolve: resolvePackage,
+					getModuleInfo: () => ({ isEntry: false }),
+				},
+			)) as { code: string };
+
+			expect(renderData.code).toContain('export const marklessPrerenderData');
+			expect(renderData.code).toContain('data-package-frame');
+			expect(renderData.code).toContain('"materialized"');
+		} finally {
+			await rm(fixtureRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('materialized route render data links only TSRX descendants reached from that route', async () => {
+		const fixtureRoot = await mkdtemp(resolve(import.meta.dirname, '.artifact-child-reach-'));
+		const appRoot = resolve(fixtureRoot, 'app');
+		const pageFilename = resolve(appRoot, 'pages/index.tsrx');
+		const childFilename = resolve(appRoot, 'components/StyledChild.tsrx');
+		const packageFilename = resolve(fixtureRoot, 'packages/StaticFrame.mjs');
+		await mkdir(resolve(appRoot, 'pages'), { recursive: true });
+		await mkdir(resolve(appRoot, 'components'), { recursive: true });
+		await mkdir(resolve(fixtureRoot, 'packages'), { recursive: true });
+		await writeFile(
+			packageFilename,
+			`export const StaticFrame = { renderSsr() { return { html: '<aside data-package-frame>Package</aside>', elementCount: 1 }; } };`,
+		);
+		const plugin = marklessClient({ rootDir: appRoot });
+		const pageSource = `import { StaticFrame } from '@fixtures/static-frame';
+import StyledChild from '../components/StyledChild.tsrx';
+export default function Page() @{ <main><StaticFrame /><StyledChild /></main> }`;
+		const childSource = `export default function StyledChild() @{ <div><p>Styled child</p><style>p { color: blue; }</style></div> }`;
+		const resolveImport = vi.fn(async (specifier: string) => {
+			if (specifier === '@fixtures/static-frame') return { id: packageFilename };
+			if (specifier === '../components/StyledChild.tsrx') return { id: childFilename };
+			return null;
+		});
+		const load = vi.fn(async ({ id }: { readonly id: string }) => {
+			if (id !== childFilename) return null;
+			return await callTransform(plugin, childSource, childFilename, {
+				resolve: resolveImport,
+				getModuleInfo: () => ({ isEntry: false }),
+			});
+		});
+
+		try {
+			callBuildStart(plugin, { cwd: appRoot });
+			await callTransform(plugin, pageSource, `${pageFilename}?markless-route`, {
+				resolve: resolveImport,
+				getModuleInfo: () => ({ isEntry: true }),
+			});
+			const pageRenderData = (await callTransform(
+				plugin,
+				pageSource,
+				`${pageFilename}?markless-render-data`,
+				{
+					resolve: resolveImport,
+					load,
+					getModuleInfo: () => ({ isEntry: false }),
+				},
+			)) as { code: string };
+			const reachedChildId = `${childFilename}?markless-render-data&markless-reached-from=${encodeURIComponent(pageFilename)}`;
+			const reachedChild = (await callTransform(plugin, childSource, reachedChildId, {
+				resolve: resolveImport,
+				getModuleInfo: () => ({ isEntry: false }),
+			})) as { code: string };
+			const canonicalChildId = `virtual:markless:render-data:${encodeURIComponent(childFilename)}`;
+			const canonicalChild = (await callLoad(plugin, `\0${canonicalChildId}`)) as string;
+
+			expect(pageRenderData.code).toContain(JSON.stringify(reachedChildId));
+			expect(reachedChild.code).toContain('export const marklessPrerenderData');
+			expect(reachedChild.code).toContain('virtual:markless:style:');
+			expect(canonicalChild).toContain('export const marklessRenderData');
+			expect(canonicalChild).toContain('export const marklessPrerenderData');
+		} finally {
+			await rm(fixtureRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('reached child render data materializes artifact-shaped descendants into its linked surface', async () => {
+		const fixtureRoot = await mkdtemp(resolve(import.meta.dirname, '.reached-artifact-child-'));
+		const appRoot = resolve(fixtureRoot, 'app');
+		const routeFilename = resolve(appRoot, 'pages/docs.mdx');
+		const childFilename = resolve(appRoot, 'components/InteractiveCounter.tsrx');
+		const packageFilename = resolve(fixtureRoot, 'packages/StaticLink.mjs');
+		await mkdir(resolve(appRoot, 'components'), { recursive: true });
+		await mkdir(resolve(fixtureRoot, 'packages'), { recursive: true });
+		await writeFile(
+			packageFilename,
+			`export const StaticLink = { renderSsr(props) { return { html: '<a data-static-link>' + props.label + '</a>', elementCount: 1 }; } };`,
+		);
+		const plugin = marklessClient({ rootDir: appRoot });
+		const childSource = `import { StaticLink } from '@fixtures/static-link';
+export default function InteractiveCounter() @{ <section><StaticLink label="Home" /></section> }`;
+		const resolvePackage = vi.fn(async (specifier: string) =>
+			specifier === '@fixtures/static-link' ? { id: packageFilename } : null,
+		);
+
+		try {
+			callBuildStart(plugin, { cwd: appRoot });
+			const reachedId = `${childFilename}?markless-render-data&markless-reached-from=${encodeURIComponent(routeFilename)}`;
+			const reached = (await callTransform(plugin, childSource, reachedId, {
+				resolve: resolvePackage,
+				getModuleInfo: () => ({ isEntry: false }),
+			})) as { code: string };
+
+			expect(reached.code).toContain('export const marklessPrerenderData');
+			expect(reached.code).toContain('data-static-link');
+			expect(reached.code).toContain('"materialized"');
+		} finally {
+			await rm(fixtureRoot, { recursive: true, force: true });
+		}
+	});
+
+	async function assertOrdinaryRouteBuildControl() {
+		const fixtureRoot = await mkdtemp(resolve(import.meta.dirname, '.ordinary-route-control-'));
+		const appRoot = resolve(fixtureRoot, 'app');
+		const pageFilename = resolve(appRoot, 'pages/index.tsrx');
+		const childFilename = resolve(appRoot, 'components/Child.tsrx');
+		const controlFilename = resolve(appRoot, 'control.mjs');
+		const controlRenderDataFilename = resolve(appRoot, 'control-render-data.mjs');
+		const pageSource = `import Child from '../components/Child.tsrx';
+export default function Page() @{ <main><Child /></main> }`;
+		const childSource = `export default function Child() @{ <p>Control child</p> }`;
+		await mkdir(resolve(appRoot, 'pages'), { recursive: true });
+		await mkdir(resolve(appRoot, 'components'), { recursive: true });
+		await writeFile(pageFilename, pageSource);
+		await writeFile(childFilename, childSource);
+
+		try {
+			const canonical = await transformTsrxModule({
+				filename: pageFilename,
+				source: pageSource,
+				environment: 'client',
+				dev: true,
+			});
+			await writeFile(controlRenderDataFilename, renderDataModuleSource(canonical));
+			await writeFile(
+				controlFilename,
+				`export default import('./control-render-data.mjs').then((module) => module.marklessRenderData);`,
+			);
+			const outputOptions = {
+				entryFileNames: '[name].js',
+				chunkFileNames: '[name].js',
+				minifyInternalExports: false,
+			} as const;
+			const routeOutput = await viteBuild({
+				configFile: false,
+				root: appRoot,
+				logLevel: 'silent',
+				plugins: [marklessClient({ executionLog: 'never', rootDir: appRoot })],
+				build: {
+					write: false,
+					minify: true,
+					target: 'es2022',
+					rolldownOptions: {
+						preserveEntrySignatures: 'strict',
+						input: { route: `${pageFilename}?markless-route` },
+						output: { ...outputOptions, preserveModules: true },
+					},
+				},
+			});
+			const controlOutput = await viteBuild({
+				configFile: false,
+				root: appRoot,
+				logLevel: 'silent',
+				build: {
+					write: false,
+					minify: true,
+					target: 'es2022',
+					rolldownOptions: {
+						preserveEntrySignatures: 'strict',
+						input: { control: controlFilename },
+						output: { ...outputOptions, preserveModules: true },
+					},
+				},
+			});
+			const routeChunks = (
+				Array.isArray(routeOutput)
+					? routeOutput.flatMap((item) => item.output)
+					: routeOutput.output
+			).filter((item) => item.type === 'chunk');
+			const controlChunk = (
+				Array.isArray(controlOutput)
+					? controlOutput.flatMap((item) => item.output)
+					: controlOutput.output
+			).find(
+				(item) =>
+					item.type === 'chunk' && item.moduleIds.includes(controlRenderDataFilename),
+			);
+			const renderDataChunk = routeChunks.find((chunk) =>
+				chunk.moduleIds.includes(`${pageFilename}?markless-render-data`),
+			);
+
+			const renderDataBytes = (code: string | undefined) => {
+				const start = code?.indexOf('{passId:') ?? -1;
+				const endMarker = 'interactions:[]}';
+				const end = code?.indexOf(endMarker, start) ?? -1;
+				return start >= 0 && end >= 0
+					? code!.slice(start, end + endMarker.length)
+					: undefined;
+			};
+			expect(renderDataBytes(renderDataChunk?.code)).toBe(
+				renderDataBytes(controlChunk?.code),
+			);
+			expect(renderDataChunk?.code).toContain('marklessRenderData');
+		expect(renderDataChunk?.code).toContain('marklessPrerenderData');
+			expect(
+				routeChunks.flatMap((chunk) => chunk.moduleIds),
+				'ordinary reach must not emit or request child render data',
+			).not.toEqual(
+				expect.arrayContaining([
+					expect.stringContaining(
+						`virtual:markless:render-data:${encodeURIComponent(childFilename)}`,
+					),
+					expect.stringContaining('markless-reached-from'),
+				]),
+			);
+		} finally {
+			await rm(fixtureRoot, { recursive: true, force: true });
+		}
+	}
+
 	test('prebuilt package components without current metadata still fail closed', async () => {
 		const childFilename = '/workspace/node_modules/stale-child/dist/index.js';
 		const parentFilename = '/workspace/app/pages/App.tsrx';
@@ -874,7 +1506,6 @@ export function App() @{
 		const parent = (await callTransform(plugin, parentSource, parentFilename)) as {
 			code: string;
 			manifest: {
-				csrNativeMarkup?: unknown;
 				captureMetadata: {
 					boundResolverRows: Array<{
 						id: string;
@@ -905,10 +1536,8 @@ export function App() @{
 			['component-edge:0'],
 			['component-edge:1'],
 		]);
-		const parentStartupTransport =
-			parent.code + JSON.stringify(parent.manifest.csrNativeMarkup);
-		for (const row of rows) expect(parentStartupTransport).toContain(row.id);
 		const resolver = parent.virtualModules.find((module) => module.type === 'resolver')!;
+		for (const row of rows) expect(resolver.source).toContain(row.id);
 		expect(resolver.source).toContain(rows[0]!.loaderSymbolId);
 		const childHandlerManifest = child.manifest.symbols.find(
 			(symbol) => symbol.symbolId === childHandler.symbolId,
@@ -1163,8 +1792,19 @@ export function App() @{
 			(symbol) => symbol.virtualModuleId,
 		);
 		const virtualIds = [...entryVirtualIds, ...symbolVirtualIds].map((id) => `\0${id}`);
-		const bundle = Object.fromEntries(
-			virtualIds.map((id, index) => {
+		const bundle = {
+			'build/source.js': {
+				type: 'chunk',
+				fileName: 'build/source.js',
+				name: 'source',
+				code: 'export default {};',
+				exports: ['default'],
+				imports: ['build/chunk-1.js'],
+				dynamicImports: [],
+				moduleIds: ['/workspace/app/src/App.tsrx'],
+				facadeModuleId: '/workspace/app/src/App.tsrx',
+			},
+			...Object.fromEntries(virtualIds.map((id, index) => {
 				const symbol = transformed.manifest.symbols.find(
 					(entry) => `\0${entry.virtualModuleId}` === id,
 				);
@@ -1198,8 +1838,8 @@ export function App() @{
 						facadeModuleId: id,
 					},
 				] as const;
-			}),
-		);
+			})),
+		};
 
 		await callGenerateBundle(plugin, bundle, emitFile);
 
@@ -1236,6 +1876,17 @@ export function App() @{
 
 		await expect(
 			callGenerateBundle(plugin, {
+				'build/source.js': {
+					type: 'chunk',
+					fileName: 'build/source.js',
+					name: 'source',
+					code: 'export default {};',
+					exports: ['default'],
+					imports: ['build/resolver.js'],
+					dynamicImports: [],
+					moduleIds: [filename],
+					facadeModuleId: filename,
+				},
 				'build/resolver.js': {
 					type: 'chunk',
 					fileName: 'build/resolver.js',
@@ -1294,6 +1945,17 @@ export function App() @{
 
 		await expect(
 			callGenerateBundle(plugin, {
+				'build/source.js': {
+					type: 'chunk',
+					fileName: 'build/source.js',
+					name: 'source',
+					code: 'export default {};',
+					exports: ['default'],
+					imports: ['build/resolver.js'],
+					dynamicImports: [],
+					moduleIds: [filename],
+					facadeModuleId: filename,
+				},
 				'build/resolver.js': {
 					type: 'chunk',
 					fileName: 'build/resolver.js',
@@ -1348,6 +2010,17 @@ export function App() @{
 			plugin,
 			{
 				'index.html': html,
+				'build/source.js': {
+					type: 'chunk',
+					fileName: 'build/source.js',
+					name: 'source',
+					code: 'export default {};',
+					exports: ['default'],
+					imports: ['build/resolver.js'],
+					dynamicImports: [],
+					moduleIds: [filename],
+					facadeModuleId: filename,
+				},
 				'build/resolver.js': {
 					type: 'chunk',
 					fileName: 'build/resolver.js',
@@ -1413,6 +2086,55 @@ export function App() @{
 	expect(resume?.source).toContain('derivePrerenderResumeRecords');
 	expect(resume?.source).not.toContain('/workspace/app/src/App.tsrx');
 	expect(resume?.source).not.toContain('marklessPrerenderPage');
+});
+
+test('materialized route definitions stay in canonical render data', async () => {
+	const filename = '/workspace/app/pages/index.tsrx';
+	const result = await transformTsrxModule({
+		filename,
+		source: defaultRouteSource,
+		environment: 'client',
+		prerenderRecords: true,
+		artifactChildMaterializations: {
+			'component-edge:0': {
+				html: '<a href="/docs" data-markless-router-link>Docs</a>',
+				elementCount: 1,
+			},
+		},
+	});
+	expect(renderDataModuleSource(result)).toContain('data-markless-router-link');
+	expect(renderDataModuleSource(result)).toContain('"materialized"');
+	expect(result.code).not.toContain('@markless/web/fns/csr');
+});
+
+test('a wake facade owns its claimed symbol routes while the prerender primary owns none', async () => {
+	const filename = '/workspace/app/src/WakePage.tsrx';
+	const primary = await transformTsrxModule({
+		filename,
+		source: fullResumeSource,
+		environment: 'client',
+		prerenderRecords: true,
+		prerenderWakeVariant: true,
+	});
+	const facade = await transformTsrxModule({
+		filename,
+		source: fullResumeSource,
+		environment: 'client',
+		clientOutput: 'symbols-only',
+		prerenderRecords: true,
+		prerenderWakeVariant: true,
+		prerenderWakeFacade: true,
+	});
+	const wake = facade.virtualModules.find((module) => module.type === 'prerender-wake');
+
+	expect(primary.manifest.symbols).toEqual([]);
+	expect(facade.manifest.resolver.virtualModuleId).toBe(prerenderWakeVirtualModuleId(filename));
+	expect(facade.manifest.symbols.length).toBeGreaterThan(0);
+	expect(wake).toBeDefined();
+	for (const symbol of facade.manifest.symbols) {
+		expect(wake?.source).toContain(`symbolId === ${JSON.stringify(symbol.symbolId)}`);
+		expect(wake?.source).toContain(`import('${symbol.virtualModuleId}')`);
+	}
 });
 
 test('capability-free prerender pages emit no full-resume wake import', async () => {
@@ -1494,6 +2216,7 @@ export function App() @{
 }
 `,
 		environment: 'client',
+		runtimeDemandClass: 'plain-ssr',
 	});
 	const plainResume = plain.virtualModules.find((module) => module.type === 'resume');
 	expect(plain.code).not.toContain('resumeEventOnlyFromPayloadDocument');
@@ -1525,6 +2248,7 @@ export function App() @{
 }
 `,
 		environment: 'client',
+		runtimeDemandClass: 'plain-ssr',
 	});
 	// Row events need graph subscriptions and locals dispatch: the resume entry
 	// dynamically hands off to the full runtime.
@@ -1549,8 +2273,9 @@ export function App() @{
 		<output>{chosen}</output>
 	</main>
 }
-`,
+		`,
 		environment: 'client',
+		runtimeDemandClass: 'plain-ssr',
 	});
 	const qualifyingKeyedResume = qualifyingKeyed.virtualModules.find(
 		(module) => module.type === 'resume',

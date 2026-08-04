@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { marklessComposeState as csrComposeState } from '../src/fns/csr.ts';
+import { marklessComposeState as csrComposeState } from '../src/fns/composition.ts';
 import { marklessComposeState as ssrComposeState } from '../src/fns/ssr.ts';
 
 // Graph node ids are NAME-based per module (state:report, computed:report),

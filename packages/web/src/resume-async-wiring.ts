@@ -1,5 +1,5 @@
 import type { DomJournalEntry, DomJournalResult } from '@markless/runtime';
-import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
+import { ASYNC_BOUNDARY_ARM } from '@markless/serializer/async-boundary-arm';
 import { boundaryArmRecordSet } from './resume-arm-records.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import type {
@@ -225,21 +225,14 @@ export async function settleAsyncBoundaryRange(
 			return;
 	}
 	const source = resolveBoundarySettleSource(input, boundary);
-	if (source === 'renderArm') {
-		const rendered = boundary.renderArm!(status);
-		if (!boundaryArmRecordSet(rendered?.armRecords)) throw emptySettleRenderError(boundary.id);
-		await input.commitArm!(boundary, rendered);
-		input.settleTracker?.markSettled(boundary.id);
-		return;
-	}
 	if (source === 'renderAsyncBoundary') {
 		const rendered = await input.renderAsyncBoundary(boundary.id, status, input.graph);
 		const armRecords = boundaryArmRecordSet(rendered.armRecords);
 		if (!armRecords) throw emptySettleRenderError(boundary.id);
 		await input.commitArm!(boundary, {
+			...rendered,
 			html: rendered.html,
 			armRecords: composedBoundaryArmRecords(boundary.id, armRecords),
-			computed: rendered.computed,
 		});
 		input.settleTracker?.markSettled(boundary.id);
 		return;
@@ -255,7 +248,13 @@ export async function settleAsyncBoundaryRange(
 	if (!isResumeBranchUpdate(update)) throw emptySettleRenderError(boundary.id);
 	if (input.commitArm) {
 		const rawArmRecords = (update as { readonly armRecords?: unknown }).armRecords;
-		const armRecords = boundaryArmRecordSet(rawArmRecords);
+		const plannedArmRecords = Array.isArray(boundary.armRecords)
+			? boundary.armRecords[
+					status === 'rejected' ? ASYNC_BOUNDARY_ARM.catch : ASYNC_BOUNDARY_ARM.try
+				]
+			: undefined;
+		const armRecords =
+			boundaryArmRecordSet(rawArmRecords) ?? boundaryArmRecordSet(plannedArmRecords);
 		if (rawArmRecords !== undefined && !armRecords) throw emptySettleRenderError(boundary.id);
 		if (armRecords) {
 			await input.commitArm(boundary, {
@@ -272,7 +271,7 @@ export async function settleAsyncBoundaryRange(
 	return boundaryRangeJournal(boundary.id, fragment);
 }
 
-type SettleSource = 'renderArm' | 'renderAsyncBoundary' | { readonly symbolId: string };
+type SettleSource = 'renderAsyncBoundary' | { readonly symbolId: string };
 
 function resolveBoundarySettleSource(
 	input: Pick<
@@ -282,7 +281,6 @@ function resolveBoundarySettleSource(
 	boundary: ResumeAsyncBoundaryRecord,
 ): SettleSource {
 	const byPrecedence = [
-		input.commitArm && boundary.renderArm ? ['renderArm' as const] : [],
 		input.commitArm && input.renderAsyncBoundary ? ['renderAsyncBoundary' as const] : [],
 		boundary.updateSymbolId ? [{ symbolId: boundary.updateSymbolId }] : [],
 	];

@@ -16,8 +16,8 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Lean scalar payload decoding accepts innerHTML only as a legacy script-text fallback.',
 	'packages/web/src/event-resume.ts :: const text = script?.textContent ?? script?.text ?? script?.innerHTML;':
 		'Event payload decoding accepts innerHTML only as a legacy script-text fallback.',
-	'packages/web/src/fns/scalar-specialized.ts :: const w = document.createTreeWalker(r, 1);':
-		'The generated scalar locator helper walks elements by compiler-recorded DOM order.',
+	'packages/web/src/fns/dom-order.ts :: const w = document.createTreeWalker(r, 1);':
+		'The neutral emitted locator helper walks elements by compiler-recorded DOM order.',
 	'packages/web/src/inline/payload-document.ts :: const text = element.textContent ?? element.text ?? element.innerHTML;':
 		'Inline payload decoding accepts innerHTML only as a legacy script-text fallback.',
 	"packages/web/src/inline/resumer.ts :: const preloaded = currentDocument.querySelectorAll('link[rel=modulepreload]').length;":

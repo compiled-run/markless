@@ -14,6 +14,7 @@ This page is static markdown.
 		expect(code).toContain('renderSsr()');
 		expect(code).toContain('<h1>Docs</h1>');
 		expect(code).toContain('<p>This page is static markdown.</p>');
+		expect(code).toContain('renderData: marklessMdxRenderData');
 		expect(code).toContain('export default marklessMdxPage');
 	});
 
@@ -47,15 +48,35 @@ This page is static markdown.
 			`import InteractiveCounter from "../../components/InteractiveCounter.tsrx";`,
 		);
 		expect(code).toContain('renderSsr(props = {})');
-		expect(code).toContain('renderCsr(props = {})');
+		expect(code).not.toContain('renderCsr(props = {})');
+		expect(code).toContain('renderData: marklessMdxRenderData');
 		expect(code).toContain('preload()');
 		expect(code).toContain('InteractiveCounter.preload?.()');
 		expect(code).toContain('resumeContainerEvent(input)');
 		expect(code).toContain(`'@markless/core/web/resume'`);
 		expect(code).toContain(`'@markless/router/vite/runtime/mdx-route'`);
 		expect(code).toContain(`../../components/InteractiveCounter.tsrx?markless-symbols`);
+		expect(code).toContain(`../../components/InteractiveCounter.tsrx?markless-render-data`);
+		expect(code).toContain('modules[0].marklessRenderData');
+		expect(code).not.toContain('modules[0].marklessPrerenderData');
 		expect(code).toContain('renderMdxChild(marklessMdxChildren, InteractiveCounter');
 		expect(code).toContain('<h1>Body</h1>');
+	});
+
+	it('links MDX child render data through the materialized route context', async () => {
+		const code = await transformMdxRoute(
+			`import InteractiveCounter from '../../components/InteractiveCounter.tsrx';
+
+<InteractiveCounter />
+`,
+			'/project/pages/docs/[...slug].mdx?markless-route',
+		);
+
+		expect(code).toContain(
+			'../../components/InteractiveCounter.tsrx?markless-render-data&markless-reached-from=%2Fproject%2Fpages%2Fdocs%2F%5B...slug%5D.mdx',
+		);
+		expect(code).toContain('modules[0].marklessPrerenderData');
+		expect(code).not.toContain('modules[0].marklessRenderData');
 	});
 
 	it('reads TSRX imports and component placeholders from the MDX AST', async () => {
@@ -107,7 +128,7 @@ This page is static markdown.
 			`renderMdxChild(marklessMdxChildren, Callout, { "title": "Docs", "featured": true, "count": 2, "tone": "info" }`,
 		);
 		expect(code).toContain(
-			`const marklessMdxChild0 = Callout.renderCsr?.({ "title": "Docs", "featured": true, "count": 2, "tone": "info" });`,
+			`props: { "title": "Docs", "featured": true, "count": 2, "tone": "info" }`,
 		);
 	});
 

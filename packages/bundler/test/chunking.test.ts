@@ -1,18 +1,58 @@
 import { describe, expect, test } from 'vitest';
 import { outputDefaults } from '../src/build/chunking.ts';
 
+type MarklessGroup = {
+	name: string;
+	test?: RegExp;
+};
 type MarklessOutputOptions = {
 	codeSplitting?: {
-		groups?: Array<{ name: string; test?: RegExp }>;
+		groups?: MarklessGroup[];
 	};
 };
+
+const runtimeGroupNames = [
+	'markless-direct-renderer',
+	'markless-resume-branches',
+	'markless-resume-behaviors',
+	'markless-resume-repeats',
+	'markless-resume-async',
+	'markless-resume-shared-patch',
+	'markless-resume-runtime',
+	'markless-resume-runtime-start',
+	'markless-resume-runtime-shared',
+	'markless-resume-events',
+	'markless-resume-handoff',
+	'markless-resume-locators',
+	'markless-resume-errors',
+	'markless-resume-sync-computed',
+	'markless-resume-sync-demand',
+	'markless-payload-full',
+	'markless-payload-resume',
+	'markless-inline-payload-document',
+	'markless-payload-document',
+	'markless-payload-graph-construct',
+	'markless-dom-journal',
+	'markless-protocol-decode',
+	'markless-value-decode',
+	'markless-payload-leaves',
+	'markless-dev-log',
+	'markless-resume-core',
+	'markless-runtime-graph-core',
+	'markless-runtime-graph-collections',
+	'markless-runtime-graph-computed',
+	'markless-runtime-graph-async',
+	'markless-runtime-graph-scheduler',
+	'markless-runtime-graph-shared',
+	'markless-graph',
+	'markless-serializer',
+	'markless-runtime',
+];
 
 describe('markless chunking defaults', () => {
 	test('uses explicit output defaults for each environment', () => {
 		const clientOutput = outputDefaults(
-			{
-				dir: 'dist/client',
-			},
+			{ dir: 'dist/client' },
 			'client',
 		) as MarklessOutputOptions;
 
@@ -25,42 +65,7 @@ describe('markless chunking defaults', () => {
 			strictExecutionOrder: true,
 		});
 		expect(clientOutput.codeSplitting?.groups?.map((group) => group.name)).toEqual(
-			expect.arrayContaining([
-				'markless-direct-renderer',
-				'markless-resume-csr-coordinate',
-				'markless-resume-branches',
-				'markless-resume-behaviors',
-				'markless-resume-repeats',
-				'markless-resume-async',
-				'markless-resume-shared-patch',
-				'markless-resume-runtime',
-				'markless-resume-runtime-start',
-				'markless-resume-runtime-shared',
-				'markless-resume-events',
-				'markless-resume-handoff',
-				'markless-resume-locators',
-				'markless-resume-errors',
-				'markless-resume-sync-computed',
-				'markless-resume-sync-demand',
-				'markless-payload-full',
-				'markless-runtime-graph-core',
-				'markless-runtime-graph-collections',
-				'markless-runtime-graph-computed',
-				'markless-runtime-graph-async',
-				'markless-runtime-graph-scheduler',
-				'markless-runtime-graph-shared',
-				'markless-payload-resume',
-				'markless-payload-graph-construct',
-				'markless-inline-payload-document',
-				'markless-payload-document',
-				'markless-dom-journal',
-				'markless-protocol-decode',
-				'markless-value-decode',
-				'markless-payload-leaves',
-				'markless-dev-log',
-				'markless-resume-core',
-				'markless-runtime',
-			]),
+			runtimeGroupNames,
 		);
 		expect(outputDefaults({ dir: 'dist/server' }, 'server')).toMatchObject({
 			dir: 'dist/server',
@@ -75,198 +80,78 @@ describe('markless chunking defaults', () => {
 	test('appends user code splitting groups after framework groups', () => {
 		const userGroup = { name: 'vendor', test: /vendor/ };
 		const output = outputDefaults(
-			{
-				codeSplitting: { groups: [userGroup] },
-			},
+			{ codeSplitting: { groups: [userGroup] } },
 			'client',
 		) as MarklessOutputOptions;
 
-		expect(output.codeSplitting?.groups?.map((group) => group.name)).toEqual(
-			expect.arrayContaining([
-				'markless-direct-renderer',
-				'markless-resume-csr-coordinate',
-				'markless-resume-branches',
-				'markless-resume-behaviors',
-				'markless-resume-repeats',
-				'markless-resume-async',
-				'markless-resume-shared-patch',
-				'markless-resume-runtime',
-				'markless-resume-runtime-start',
-				'markless-resume-runtime-shared',
-				'markless-resume-events',
-				'markless-resume-handoff',
-				'markless-resume-locators',
-				'markless-resume-errors',
-				'markless-resume-sync-computed',
-				'markless-resume-sync-demand',
-				'markless-payload-full',
-				'markless-runtime-graph-core',
-				'markless-runtime-graph-collections',
-				'markless-runtime-graph-computed',
-				'markless-runtime-graph-async',
-				'markless-runtime-graph-scheduler',
-				'markless-runtime-graph-shared',
-				'markless-payload-resume',
-				'markless-payload-graph-construct',
-				'markless-inline-payload-document',
-				'markless-payload-document',
-				'markless-dom-journal',
-				'markless-protocol-decode',
-				'markless-value-decode',
-				'markless-payload-leaves',
-				'markless-dev-log',
-				'markless-resume-core',
-				'markless-runtime',
-				'vendor',
-			]),
-		);
+		expect(output.codeSplitting?.groups?.map((group) => group.name)).toEqual([
+			...runtimeGroupNames,
+			'vendor',
+		]);
 		expect(output.codeSplitting?.groups?.at(-1)).toBe(userGroup);
 	});
 
 	test('does not force-merge virtual symbol modules into one chunk group', () => {
-		const output = outputDefaults({}, 'client') as MarklessOutputOptions;
-		const groups = new Map(
-			output.codeSplitting?.groups?.map((group) => [group.name, group.test]) ?? [],
-		);
-
+		const groups = runtimeGroups();
 		expect(groups.has('markless-symbols')).toBe(false);
 		expect(
 			firstMatchingGroupName(groups, 'virtual:markless:symbol:/src/root.tsrx:symbol:0'),
 		).toBe(undefined);
 	});
 
-	test('maps split resume capability files to bounded runtime groups', () => {
-		const output = outputDefaults({}, 'client') as MarklessOutputOptions;
-		const groups = new Map(
-			output.codeSplitting?.groups?.map((group) => [group.name, group.test]) ?? [],
-		);
+	test('maps resume capabilities to their historical bounded runtime groups', () => {
+		const groups = runtimeGroups();
 
 		expect(
 			groups
-				.get('markless-resume-csr-coordinate')
-				?.test('/repo/packages/web/src/resume-csr-coordinate.ts'),
+				.get('markless-resume-runtime')
+				?.test?.test('/repo/packages/web/src/resume-runtime.ts'),
 		).toBe(true);
-		expect(
-			groups.get('markless-direct-renderer')?.test('/repo/packages/web/src/fns/direct.ts'),
-		).toBe(true);
-		expect(
-			groups
-				.get('markless-resume-async')
-				?.test('/repo/packages/web/src/resume-async-wiring.ts'),
-		).toBe(true);
-		// The web fns leaves intentionally stay ungrouped: force-merging them
-		// defeated one-function-per-chunk execution and raised shipped bytes.
-		expect(firstMatchingGroupName(groups, '/repo/packages/web/src/fns/csr.ts')).toBe(undefined);
 		expect(
 			groups
 				.get('markless-resume-branches')
-				?.test('/repo/packages/core/src/web/resume-branches.ts'),
+				?.test?.test('/repo/packages/web/src/resume-branches.ts'),
 		).toBe(true);
 		expect(
 			groups
-				.get('markless-resume-repeats')
-				?.test('/repo/packages/web/src/resume-keyed-repeats.ts'),
+				.get('markless-payload-resume')
+				?.test?.test('/repo/packages/web/src/payload-resume.ts'),
 		).toBe(true);
 		expect(
 			groups
-				.get('markless-resume-behaviors')
-				?.test('/repo/packages/core/src/web/resume-behaviors.ts'),
+				.get('markless-direct-renderer')
+				?.test?.test('/repo/packages/web/src/fns/direct.ts'),
 		).toBe(true);
-		expect(
-			groups.get('markless-payload-resume')?.test('/repo/packages/web/src/payload-resume.ts'),
-		).toBe(true);
+		expect(firstMatchingGroupName(groups, '/repo/packages/web/src/fns/write-scalar.ts')).toBe(
+			undefined,
+		);
 		expect(
 			groups
-				.get('markless-payload-graph-construct')
-				?.test('/repo/packages/web/src/payload-graph-construct.ts'),
-		).toBe(true);
-		expect(
-			groups
-				.get('markless-payload-document')
-				?.test('/repo/packages/web/src/payload-document.ts'),
-		).toBe(true);
-		expect(
-			groups
-				.get('markless-payload-document')
-				?.test('/repo/packages/web/src/payload-resume-registry.ts'),
-		).toBe(true);
-		expect(
-			firstMatchingGroupName(groups, '/repo/packages/web/src/inline/payload-document.ts'),
-		).toBe('markless-inline-payload-document');
-		expect(
-			groups
-				.get('markless-resume-shared-patch')
-				?.test('/repo/packages/web/src/resume-shared-patch.ts'),
-		).toBe(true);
-		expect(
-			groups
-				.get('markless-resume-runtime-shared')
-				?.test('/repo/packages/web/src/resume-runtime-shared.ts'),
-		).toBe(true);
-		expect(
-			groups
-				.get('markless-resume-runtime-start')
-				?.test('/repo/packages/web/src/resume-runtime-start.ts'),
-		).toBe(true);
-		expect(
-			groups.get('markless-resume-events')?.test('/repo/packages/web/src/resume-events.ts'),
-		).toBe(true);
-		expect(
-			groups
-				.get('markless-resume-locators')
-				?.test('/repo/packages/web/src/resume-locators.ts'),
-		).toBe(true);
-		expect(
-			groups
-				.get('markless-resume-errors')
-				?.test('/repo/packages/web/src/inline/resume-errors.ts'),
-		).toBe(true);
-		expect(
-			groups
-				.get('markless-resume-sync-demand')
-				?.test('/repo/packages/web/src/resume-sync-demand.ts'),
+				.get('markless-protocol-decode')
+				?.test?.test('/repo/packages/serializer/src/protocol-client.ts'),
 		).toBe(true);
 	});
 
 	test('maps runtime graph planes to separate bounded groups', () => {
-		const output = outputDefaults({}, 'client') as MarklessOutputOptions;
-		const groups = new Map(
-			output.codeSplitting?.groups?.map((group) => [group.name, group.test]) ?? [],
-		);
+		const groups = runtimeGroups();
 
+		for (const plane of ['core', 'collections', 'computed', 'async', 'scheduler', 'shared'])
+			expect(
+				groups
+					.get(`markless-runtime-graph-${plane}`)
+					?.test?.test(`/repo/packages/runtime/src/graph-${plane}.ts`),
+			).toBe(true);
 		expect(
-			groups
-				.get('markless-runtime-graph-core')
-				?.test('/repo/packages/runtime/src/graph-core.ts'),
+			groups.get('markless-graph')?.test?.test('/repo/packages/runtime/src/graph-core.ts'),
+		).toBe(false);
+		expect(
+			groups.get('markless-graph')?.test?.test('/repo/packages/core/src/runtime/index.ts'),
 		).toBe(true);
 		expect(
 			groups
-				.get('markless-runtime-graph-collections')
-				?.test('/repo/packages/runtime/src/graph-collections.ts'),
+				.get('markless-runtime')
+				?.test?.test('/repo/node_modules/@markless/runtime/dist/index.js'),
 		).toBe(true);
-		expect(
-			groups
-				.get('markless-runtime-graph-computed')
-				?.test('/repo/packages/runtime/src/graph-computed.ts'),
-		).toBe(true);
-		expect(
-			groups
-				.get('markless-runtime-graph-async')
-				?.test('/repo/packages/runtime/src/graph-async.ts'),
-		).toBe(true);
-		expect(
-			groups
-				.get('markless-runtime-graph-scheduler')
-				?.test('/repo/packages/runtime/src/graph-scheduler.ts'),
-		).toBe(true);
-		expect(
-			groups
-				.get('markless-runtime-graph-shared')
-				?.test('/repo/packages/runtime/src/graph-shared.ts'),
-		).toBe(true);
-		expect(groups.get('markless-graph')?.test('/repo/packages/runtime/src/graph-core.ts')).toBe(
-			false,
-		);
 	});
 
 	test('rejects boolean code splitting for client builds', () => {
@@ -276,12 +161,17 @@ describe('markless chunking defaults', () => {
 	});
 });
 
+function runtimeGroups(): ReadonlyMap<string, MarklessGroup> {
+	const output = outputDefaults({}, 'client') as MarklessOutputOptions;
+	return new Map(output.codeSplitting?.groups?.map((group) => [group.name, group]) ?? []);
+}
+
 function firstMatchingGroupName(
-	groups: ReadonlyMap<string, RegExp | undefined>,
+	groups: ReadonlyMap<string, MarklessGroup>,
 	id: string,
 ): string | undefined {
-	for (const [name, test] of groups) {
-		if (test?.test(id)) return name;
+	for (const [name, group] of groups) {
+		if (group.test?.test(id)) return name;
 	}
 	return undefined;
 }

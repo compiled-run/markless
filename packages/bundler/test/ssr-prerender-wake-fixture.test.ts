@@ -5,6 +5,8 @@ import { promisify } from 'node:util';
 import { resolve } from 'pathe';
 import { expect, test } from 'vitest';
 import { renderToString, type SsrRenderable } from '@markless/web';
+import { MARKLESS_BUNDLE_GRAPH } from '../src/build/chunking.ts';
+import { planModulePreloadUrls } from '../src/build/preload-plan.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
@@ -35,6 +37,9 @@ test('SSR client builds contain canonical linked render data and only eligible w
 	expect(clientClosure).toMatch(/rootComponentName:[`"']WakePage[`"']/);
 	expect(clientClosure).toMatch(/rootComponentName:[`"']WakeChild[`"']/);
 	expect(clientClosure).toContain('resumeFromPrerenderRecords');
+	const bundleGraph = JSON.parse(
+		await readFile(resolve(dist, MARKLESS_BUNDLE_GRAPH), 'utf8'),
+	) as Array<string | number>;
 
 	const ineligible = chunks.find((chunk) =>
 		chunk.source.includes('non-prerender-page-entry'),
@@ -65,9 +70,35 @@ test('SSR client builds contain canonical linked render data and only eligible w
 		/data-markless-resume-module="(\/build\/chunk-[A-Za-z0-9_-]+\.js)"/,
 	)?.[1];
 	expect(resumeModuleUrl).toBeDefined();
+	const wakeFacade = clientChunks.find((chunk) => chunk.path.endsWith(resumeModuleUrl!));
+	expect(wakeFacade).toBeDefined();
+	// Each claimed page symbol resolves through code in the emitted per-page
+	// wake facade, and every emitted symbol chunk sits in both its planned
+	// preload closure and the concrete client HTML preload set.
 	expect(
-		clientChunks.some((chunk) => chunk.path.endsWith(resumeModuleUrl!)),
-	).toBe(true);
+		wakeFacade?.source.match(/symbol:\d+[^;]{0,180}?import\([`"'][^`"']+\.js[`"']\)/g)
+			?.length,
+	).toBeGreaterThanOrEqual(3);
+	const emittedSymbolChunks = clientChunks
+		.filter((chunk) => /export\{[^}]*symbol_\d+_[a-z0-9]+/.test(chunk.source))
+		.map((chunk) => `/build/${chunk.path.split('/build/')[1]}`)
+		.sort();
+	expect(emittedSymbolChunks.length).toBeGreaterThanOrEqual(3);
+	const wakePreloadClosure = planModulePreloadUrls({
+		bundleGraph,
+		roots: [
+			{
+				name: resumeModuleUrl!.slice('/build/'.length),
+				edges: 'dependencies-only',
+			},
+		],
+		base: '/build/',
+	});
+	expect(wakePreloadClosure).toEqual(expect.arrayContaining(emittedSymbolChunks));
+	const clientHtml = await readFile(resolve(dist, 'index.html'), 'utf8');
+	for (const symbolChunk of emittedSymbolChunks) {
+		expect(clientHtml).toContain(`rel=modulepreload href=${symbolChunk}`);
+	}
 }, 120_000);
 
 function withoutInlineScriptBodies(html: string) {

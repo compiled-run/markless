@@ -9,6 +9,7 @@ import type {
 	RenderDataArtifact,
 	RunnableCompilerPassDefinition,
 	RuntimeDemandMapArtifact,
+	RuntimeDemandMapsArtifact,
 	TriggerGroupArtifact,
 	SemanticGraphArtifact,
 	StateLoweringArtifact,
@@ -70,6 +71,7 @@ export async function compileTsrxModule(
 		readonly publicRenderModule: PublicRenderModuleArtifact;
 		readonly symbolModules: SymbolModulesArtifact;
 		readonly runtimeDemandMap: RuntimeDemandMapArtifact;
+		readonly runtimeDemandMaps: RuntimeDemandMapsArtifact;
 		readonly triggerGroups: TriggerGroupArtifact;
 		readonly symbolResolverModule: string;
 		readonly symbolResolverModuleManifest: SymbolResolverModuleManifest;
@@ -95,6 +97,7 @@ export async function compileTsrxModule(
 		publicRenderModule: artifacts.publicRenderModule,
 		symbolModules: artifacts.symbolModules,
 		runtimeDemandMap: artifacts.runtimeDemandMap,
+		runtimeDemandMaps: artifacts.runtimeDemandMaps,
 		triggerGroups: artifacts.triggerGroups,
 		symbolResolverModule: artifacts.symbolResolverModule,
 		symbolResolverModuleManifest: artifacts.symbolResolverModuleManifest,
@@ -316,18 +319,22 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 			return {
 				...pass,
 				run({ inputs }) {
+					const demandInput = {
+						symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
+						captureAnalysis: inputs.captureAnalysis as CaptureAnalysisArtifact,
+						symbolModules: inputs.symbolModules as SymbolModulesArtifact,
+						publicRenderModule:
+							inputs.publicRenderModule as CompileTsrxModuleResult['publicRenderModule'],
+						protocolView: inputs.protocolView as CompileTsrxModuleResult['protocolView'],
+						protocolState: inputs.protocolState as CompileTsrxModuleResult['protocolState'],
+					};
+					const runtimeDemandMaps = {
+						'plain-ssr': createRuntimeDemandMap(demandInput, 'plain-ssr'),
+						prerender: createRuntimeDemandMap(demandInput, 'prerender'),
+					} satisfies RuntimeDemandMapsArtifact;
 					return {
-						runtimeDemandMap: createRuntimeDemandMap({
-							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
-							captureAnalysis: inputs.captureAnalysis as CaptureAnalysisArtifact,
-							symbolModules: inputs.symbolModules as SymbolModulesArtifact,
-							publicRenderModule:
-								inputs.publicRenderModule as CompileTsrxModuleResult['publicRenderModule'],
-							protocolView:
-								inputs.protocolView as CompileTsrxModuleResult['protocolView'],
-							protocolState:
-								inputs.protocolState as CompileTsrxModuleResult['protocolState'],
-						}),
+						runtimeDemandMap: runtimeDemandMaps.prerender,
+						runtimeDemandMaps,
 					};
 				},
 			};
@@ -453,12 +460,9 @@ function emptyPublicRenderModuleArtifact(): PublicRenderModuleArtifact {
 		renderDataModuleSource: '',
 		moduleSource: '',
 		rootExportName: null,
-		csrModuleSource: '',
-		csrExportName: null,
 		ssrModuleSource: '',
 		ssrExportName: null,
 		componentDefinitions: [],
-		csrNativeMarkup: [],
 		diagnostics: [],
 	};
 }

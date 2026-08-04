@@ -10,6 +10,7 @@ import type {
 import { convertManifestToBundleGraph } from './bundle-graph.ts';
 import { scanEmittedDynamicImports } from './dynamic-import-scan.ts';
 import { collectHeadLinkInjections } from './head-links.ts';
+import { scanGeneratedSymbolTableImports } from './symbol-table.ts';
 
 export type MarklessBuildMetadataBundle = Record<string, MarklessBuildMetadataBundleItem>;
 
@@ -95,6 +96,11 @@ export function createBuildMetadata(
 				...mapBundleNames(
 					bundle,
 					scanEmittedDynamicImports(item.code, item.fileName),
+					canonPath,
+				),
+				...mapBundleNames(
+					bundle,
+					scanGeneratedSymbolTableImports(item.code, item.fileName),
 					canonPath,
 				),
 			]),

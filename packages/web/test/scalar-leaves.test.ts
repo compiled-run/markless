@@ -111,7 +111,14 @@ test('scalar specialized leaf stays limited to generic shared helpers', async ()
 	expect(source).not.toContain('marklessScalarSpecializedIncrement');
 	expect(source).not.toContain('marklessScalarSpecializedAssign');
 	expect(source).not.toContain('marklessScalarSpecializedShadowGraph');
-	expect(source).toContain('marklessFindElementAtDomOrderIndex');
+	expect(source).not.toContain('marklessFindElementAtDomOrderIndex');
 	expect(source).toContain('marklessDecodeScalarCell');
 	expect(source).toContain('marklessScalarSpecializedError');
+
+	const domOrderSource = await readFile(
+		resolve(import.meta.dirname, '../src/fns/dom-order.ts'),
+		'utf8',
+	);
+	expect(domOrderSource).toContain('marklessFindElementAtDomOrderIndex');
+	expect(domOrderSource).not.toContain('marklessDecodeScalarCell');
 });

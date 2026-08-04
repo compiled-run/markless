@@ -1,4 +1,8 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
+import type {
+	ProtocolEventActionKind,
+	ProtocolStatePayload,
+	ProtocolViewPayload,
+} from '@markless/serializer';
 import type { RenderedPayloadScripts } from '@markless/serializer';
 import type { CompilerDiagnostic, SourceSpan } from './diagnostics.ts';
 
@@ -8,7 +12,18 @@ export type SemanticGraphInput = {
 	readonly filename: string;
 	readonly source: string;
 	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
+	readonly artifactChildMaterializations?: Readonly<Record<string, ArtifactChildMaterialization>>;
 	readonly additionalFrameworkApiSources?: readonly string[];
+};
+
+export type ArtifactChildMaterialization = {
+	readonly html: string;
+	readonly elementCount: number;
+	readonly state?: ProtocolStatePayload;
+	readonly view?: ProtocolViewPayload;
+	readonly coordinates?: Readonly<Record<string, unknown>>;
+	readonly structure?: Readonly<Record<string, unknown>>;
+	readonly structureTokens?: ReadonlyArray<Readonly<Record<string, unknown>>>;
 };
 
 export type SemanticComponent = {
@@ -1153,9 +1168,18 @@ export type SymbolModulesArtifact = {
 	readonly diagnostics: ReadonlyArray<CaptureAnalysisDiagnostic>;
 };
 
+export type RuntimeDemandMapRecordKind =
+	| ProtocolEventActionKind
+	| 'async-boundary'
+	| 'behavior'
+	| 'branch'
+	| 'dom-update'
+	| 'element-handle'
+	| 'keyed-repeat';
+
 export type RuntimeDemandMapRecord = {
 	readonly recordId: string;
-	readonly kind: string;
+	readonly kind: RuntimeDemandMapRecordKind;
 	readonly hostNodeId?: string;
 	readonly eventName?: string;
 	readonly symbolIds?: ReadonlyArray<string>;
@@ -1165,8 +1189,8 @@ export type RuntimeDemandMapRecord = {
 export type RuntimeDemandMapAction = {
 	readonly hostNodeId: string;
 	readonly eventName: string;
-	readonly recordKind: 'event' | 'keyed-repeat-row';
-	readonly recordKinds: ReadonlyArray<string>;
+	readonly recordKind: ProtocolEventActionKind | 'keyed-repeat-row';
+	readonly recordKinds: ReadonlyArray<RuntimeDemandMapRecordKind>;
 	readonly payloadRecordIds: ReadonlyArray<string>;
 	readonly runtimeModuleIds: ReadonlyArray<string>;
 	readonly plan?: RuntimeDemandMapActionPlan;
@@ -1194,11 +1218,13 @@ export type RuntimeDemandMapActionPlan = {
 	readonly fullDecodeCells?: ReadonlyArray<string>;
 };
 
+export type RuntimeDemandClass = 'plain-ssr' | 'prerender';
+
 export type RuntimeDemandMapArtifact = {
 	readonly passId: 'runtime-demand-map';
 	readonly version: 1;
 	readonly recordKinds: ReadonlyArray<{
-		readonly kind: string;
+		readonly kind: RuntimeDemandMapRecordKind;
 		readonly replaced: boolean;
 	}>;
 	readonly symbols: ReadonlyArray<{
@@ -1210,6 +1236,8 @@ export type RuntimeDemandMapArtifact = {
 	readonly actions: ReadonlyArray<RuntimeDemandMapAction>;
 	readonly unknownRecordModuleIds: ReadonlyArray<string>;
 };
+
+export type RuntimeDemandMapsArtifact = Record<RuntimeDemandClass, RuntimeDemandMapArtifact>;
 
 export type TriggerGroupArtifact = {
 	readonly passId: 'trigger-groups';
@@ -1549,16 +1577,9 @@ export type PublicRenderModuleArtifact = {
 	readonly renderDataModuleSource: string;
 	readonly moduleSource: string;
 	readonly rootExportName: string | null;
-	readonly csrModuleSource: string;
-	readonly csrExportName: string | null;
 	readonly ssrModuleSource: string;
 	readonly ssrExportName: string | null;
 	readonly componentDefinitions: ReadonlyArray<Readonly<Record<string, unknown>>>;
-	readonly csrNativeMarkup: ReadonlyArray<{
-		readonly dataId: string;
-		readonly definition: Readonly<Record<string, unknown>>;
-		readonly templates: ReadonlyArray<{ readonly id: string; readonly markup: string }>;
-	}>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };
 
@@ -1630,6 +1651,7 @@ export type CompileTsrxModuleResult = {
 	readonly publicRenderModule: PublicRenderModuleArtifact;
 	readonly symbolModules: SymbolModulesArtifact;
 	readonly runtimeDemandMap: RuntimeDemandMapArtifact;
+	readonly runtimeDemandMaps: RuntimeDemandMapsArtifact;
 	readonly triggerGroups: TriggerGroupArtifact;
 	readonly symbolResolverModule: string;
 	readonly symbolResolverModuleManifest: SymbolResolverModuleManifest;

@@ -1,15 +1,14 @@
 import { parseModule } from '@tsrx/core';
 import type { PublicRenderModuleArtifact, PublicRenderModuleInput } from '../../artifacts.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
+import { collectPublicRenderComponentDefinitions } from './component-definitions.ts';
 import { emitDirectPublicRenderModule } from './direct-module.ts';
-import { emitPublicCsrRenderModule } from './csr-module.ts';
 import { emitPublicSsrRenderModule } from './ssr-module.ts';
 import { firstComponentRoot, selectPublicRenderRoot } from './plan.ts';
 import { hasExecutableBodyStatements } from './render-body.ts';
 import { componentPropNames, isFragmentNode } from './shared.ts';
 
 export { firstComponentRoot, planPublicRender, selectPublicRenderRoot } from './plan.ts';
-export { emitPublicCsrRenderModule } from './csr-module.ts';
 export { emitPublicSsrRenderModule } from './ssr-module.ts';
 export type { PublicRenderRoot } from './types.ts';
 
@@ -28,12 +27,9 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 			renderDataModuleSource: '',
 			moduleSource: '',
 			rootExportName: null,
-			csrModuleSource: '',
-			csrExportName: null,
 			ssrModuleSource: '',
 			ssrExportName: null,
 			componentDefinitions: [],
-			csrNativeMarkup: [],
 			diagnostics: input.publicRenderPlan.diagnostics,
 		};
 	}
@@ -75,10 +71,9 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 			})
 		: '';
 	const ssrModuleSource = root ? emitPublicSsrRenderModule(input, root) : '';
-	const publicCsrModule = root
-		? emitPublicCsrRenderModule(input, root)
-		: { source: '', nativeMarkup: [] };
-	const csrModule = moduleSource ? { source: '', nativeMarkup: [] } : publicCsrModule;
+	const componentDefinitions = root
+		? collectPublicRenderComponentDefinitions(input, root)
+		: [];
 	return {
 		passId: 'public-render-module',
 		renderDataModuleSource: root
@@ -86,12 +81,9 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 			: '',
 		moduleSource,
 		rootExportName: moduleSource ? (rootComponentName ?? null) : null,
-		csrModuleSource: csrModule.source,
-		csrExportName: csrModule.source ? 'marklessRenderCsr' : null,
 		ssrModuleSource,
 		ssrExportName: ssrModuleSource ? 'marklessRenderSsr' : null,
-		componentDefinitions: publicCsrModule.nativeMarkup.map((entry) => entry.definition),
-		csrNativeMarkup: csrModule.nativeMarkup,
+		componentDefinitions,
 		diagnostics: input.publicRenderPlan.diagnostics,
 	};
 }

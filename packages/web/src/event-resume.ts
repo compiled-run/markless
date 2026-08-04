@@ -1,4 +1,8 @@
-import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
+import {
+	protocolEventDispatchesMarkless,
+	type ProtocolStatePayload,
+	type ProtocolViewPayload,
+} from '@markless/serializer/protocol';
 import type {
 	DomJournalEntry,
 	DomJournalResult,
@@ -356,6 +360,7 @@ async function dispatchEvent(input: {
 			}
 		: findEventRecord(input.event.target, input.event.type, input.view, input.elementsByHostId);
 	if (!matched?.element) return;
+	if (!protocolEventDispatchesMarkless(matched.eventRecord)) return;
 
 	try {
 		const baseContext = {

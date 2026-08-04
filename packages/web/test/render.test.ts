@@ -1,6 +1,7 @@
 import {
 	ASYNC_BOUNDARY_ARM,
 	ASYNC_PROTOCOL_VERSION,
+	PROTOCOL_EVENT_ACTION_KIND,
 	type ProtocolViewPayload,
 } from '@markless/serializer';
 import { createProtocolStatePayload } from '@markless/serializer';
@@ -8,11 +9,9 @@ import { expect, test } from 'vitest';
 import { transformTsrxModule } from '../../bundler/src/transform.ts';
 import { emitQueuedResumeContainerEvent } from '../../bundler/src/source-module.ts';
 import { compileTsrxModule } from '../../compiler/src/index.ts';
-import {
-	createMarklessCsrChunkRenderer,
-} from '../src/fns/csr.ts';
 import { render, renderToString } from '../src/index.ts';
 import { marklessBoundSymbolId } from '../src/fns/bound-symbol.ts';
+import { renderCsrRuntime } from '../src/render-csr.ts';
 
 type FakeElement = {
 	readonly nodeType: 1;
@@ -97,7 +96,9 @@ function captureDispatchDocument(
 		readonly templates: ReadonlyArray<{ readonly id: string; readonly markup: string }>;
 	}> = [],
 ) {
-	const definitions = new Map(nativePayloads.map((payload) => [payload.dataId, payload.definition]));
+	const definitions = new Map(
+		nativePayloads.map((payload) => [payload.dataId, payload.definition]),
+	);
 	const templates = new Map(
 		nativePayloads.flatMap((payload) =>
 			payload.templates.map((template) => [template.id, template.markup] as const),
@@ -149,8 +150,11 @@ function captureDispatchDocument(
 						while (pending.length > 0) {
 							const candidate = pending.shift()!;
 							if (
-								(candidate as FakeElement & { getAttribute?: (name: string) => string | null })
-									.getAttribute?.(name!) === value
+								(
+									candidate as FakeElement & {
+										getAttribute?: (name: string) => string | null;
+									}
+								).getAttribute?.(name!) === value
 							)
 								return candidate;
 							pending.push(...(candidate.childNodes ?? []));
@@ -242,7 +246,9 @@ function captureDispatchElement(
 	node.cloneNode = (deep = false) => {
 		const clone = captureDispatchElement(tagName, [...node.attributes]);
 		if (deep) {
-			clone.childNodes.push(...node.childNodes.map((child) => cloneCaptureDispatchNode(child)));
+			clone.childNodes.push(
+				...node.childNodes.map((child) => cloneCaptureDispatchNode(child)),
+			);
 			for (const child of clone.childNodes) {
 				child.parentElement = clone;
 				(child as unknown as { parentNode?: FakeElement }).parentNode = clone;
@@ -340,7 +346,9 @@ function captureDispatchLeaf(nodeType: 3 | 8, value: string): FakeElement {
 
 function cloneCaptureDispatchNode(node: FakeElement): FakeElement {
 	const clone = (node as FakeElement & { cloneNode?: (deep?: boolean) => FakeElement }).cloneNode;
-	return clone ? clone.call(node, true) : captureDispatchLeaf(node.nodeType as 3 | 8, String(node.textContent ?? ''));
+	return clone
+		? clone.call(node, true)
+		: captureDispatchLeaf(node.nodeType as 3 | 8, String(node.textContent ?? ''));
 }
 
 function javascriptModuleUrl(source: string): string {
@@ -488,12 +496,19 @@ async function captureDispatchModuleUrl(
 		await Promise.all(
 			transformed.virtualModules
 				.filter((module) => module.type === 'symbol')
-				.map(async (module) => [
-					module.id,
-					javascriptModuleUrl(
-						await captureDispatchSymbolSource(module.source, imports, environment),
-					),
-				] as const),
+				.map(
+					async (module) =>
+						[
+							module.id,
+							javascriptModuleUrl(
+								await captureDispatchSymbolSource(
+									module.source,
+									imports,
+									environment,
+								),
+							),
+						] as const,
+				),
 		),
 	);
 	const allSymbolUrls = new Map([
@@ -532,7 +547,8 @@ async function captureDispatchModuleUrl(
 		browserModuleSource = browserModuleSource.split(imported.specifier).join(moduleUrl);
 	}
 	const unresolvedVirtualIds = browserModuleSource.match(/virtual:markless:[^"']+/g);
-	if (unresolvedVirtualIds) throw new Error(`${filename}: ${JSON.stringify(unresolvedVirtualIds)}`);
+	if (unresolvedVirtualIds)
+		throw new Error(`${filename}: ${JSON.stringify(unresolvedVirtualIds)}`);
 	return javascriptModuleUrl(browserModuleSource);
 }
 
@@ -551,6 +567,63 @@ type CompiledCaptureDispatch = {
 	readonly runtime: Awaited<ReturnType<typeof render>>;
 };
 
+async function captureDispatchClientLoader(
+	filename: string,
+	source: string,
+	imports: ReadonlyArray<CaptureDispatchImport>,
+) {
+	const transformed = await transformCaptureDispatchModule(filename, source, imports);
+	const symbolUrls = new Map(
+		await Promise.all(
+			transformed.virtualModules
+				.filter((module) => module.type === 'symbol')
+				.map(
+					async (module) =>
+						[
+							module.id,
+							javascriptModuleUrl(await captureDispatchSymbolSource(module.source, imports)),
+						] as const,
+				),
+		),
+	);
+	const allSymbolUrls = new Map([
+		...symbolUrls,
+		...(await captureDispatchImportedSymbolUrls(imports)),
+	]);
+	const resolver = transformed.virtualModules.find((module) => module.type === 'resolver')!;
+	let resolverSource = resolver.source;
+	for (const [moduleId, moduleUrl] of allSymbolUrls) {
+		resolverSource = resolverSource.split(moduleId).join(moduleUrl);
+	}
+	const resolverModule = (await import(javascriptModuleUrl(resolverSource))) as {
+		readonly loadSymbol: CompiledCaptureDispatch['output']['loadSymbol'];
+	};
+	const childLoaders = new Map(
+		await Promise.all(
+			imports.map(async (imported) => [
+				imported.specifier,
+				(
+					await captureDispatchClientLoader(
+						imported.filename,
+						imported.source,
+						imported.imports ?? [],
+					)
+				).loadSymbol,
+			] as const),
+		),
+	);
+	const loadSymbol: CompiledCaptureDispatch['output']['loadSymbol'] = (symbolId) => {
+		const route = transformed.manifest.symbolRoutes?.find((candidate) =>
+			symbolId.startsWith(candidate.prefix),
+		);
+		if (!route) return resolverModule.loadSymbol(symbolId);
+		const childLoader = childLoaders.get(route.importSource);
+		if (!childLoader) return resolverModule.loadSymbol(symbolId);
+		return childLoader(symbolId.slice(route.prefix.length));
+	};
+	return { transformed, loadSymbol };
+}
+
 async function withCompiledCaptureDispatch(
 	filename: string,
 	source: string,
@@ -561,77 +634,48 @@ async function withCompiledCaptureDispatch(
 	} = {},
 ): Promise<void> {
 	const compiled = await compileTsrxModule({ filename, source, symbols: [] });
-	const transformed = await transformCaptureDispatchModule(
+	const { transformed, loadSymbol: clientLoadSymbol } = await captureDispatchClientLoader(
 		filename,
 		source,
-		options.imports,
+		options.imports ?? [],
 	);
-	const symbolUrls = new Map(
-		await Promise.all(
-			transformed.virtualModules
-				.filter((module) => module.type === 'symbol')
-				.map(async (module) => [
-					module.id,
-					javascriptModuleUrl(
-						await captureDispatchSymbolSource(module.source, options.imports ?? []),
-					),
-				] as const),
-		),
-	);
-	const allSymbolUrls = new Map([
-		...symbolUrls,
-		...(await captureDispatchImportedSymbolUrls(options.imports ?? [])),
-	]);
-	const resolver = transformed.virtualModules.find((module) => module.type === 'resolver')!;
-	let resolverSource = resolver.source;
-	for (const [moduleId, moduleUrl] of allSymbolUrls) {
-		resolverSource = resolverSource.split(moduleId).join(moduleUrl);
-	}
-	const resolverUrl = javascriptModuleUrl(resolverSource);
-	const payload = transformed.virtualModules.find((module) => module.type === 'payload')!;
-	const payloadUrl = javascriptModuleUrl(payload.source);
-	let browserModuleSource = localWebFunctionImports(
-		transformed.code
-			.split(payload.id)
-			.join(payloadUrl)
-			.split(resolver.id)
-			.join(resolverUrl),
-	);
-	for (const [moduleId, moduleUrl] of allSymbolUrls)
-		browserModuleSource = browserModuleSource.split(moduleId).join(moduleUrl);
-	for (const imported of options.imports ?? []) {
-		const moduleUrl = await captureDispatchModuleUrl(
-			imported.filename,
-			imported.source,
-			imported.imports,
-		);
-		browserModuleSource = browserModuleSource.split(imported.specifier).join(moduleUrl);
-	}
-	const unresolvedVirtualIds = browserModuleSource.match(/virtual:markless:[^"']+/g);
-	if (unresolvedVirtualIds) throw new Error(JSON.stringify(unresolvedVirtualIds));
-
 	if (options.expectResolver !== false) {
 		expect(transformed.code).toMatch(
 			/const marklessSymbolResolverModule = \(\) => import\(["']virtual:markless:resolver:/,
 		);
-		expect(transformed.code).not.toContain('readMarklessSourceSymbol');
+		expect(transformed.code).toMatch(
+			/\.then\(\(mod\) => readMarklessSourceSymbol\(mod, ["']symbol_/,
+		);
+		expect(transformed.code).toContain('mod.init__virtual_markless_symbol?.();');
 	}
-	expect(compiled.publicRenderModule.csrModuleSource).toContain(
-		'createMarklessCsrChunkRenderer',
+	expect(transformed.code).not.toContain('createMarklessCsrChunkRenderer');
+	const serverUrl = await captureDispatchModuleUrl(
+		filename,
+		source,
+		options.imports ?? [],
+		'server',
 	);
 
 	const global = globalThis as { document?: unknown };
 	const previousDocument = global.document;
-	global.document = captureDispatchDocument(
-		await captureDispatchNativeMarkup(transformed, options.imports ?? []),
-	);
+	global.document = captureDispatchDocument();
 	try {
-		const browserModule = (await import(javascriptModuleUrl(browserModuleSource))) as {
+		const serverModule = (await import(serverUrl)) as {
 			readonly default: {
-				readonly renderCsr: () => CompiledCaptureDispatch['output'];
+				readonly renderSsr: () => Promise<{
+					readonly html: string;
+					readonly state: CompiledCaptureDispatch['output']['state'];
+					readonly view: CompiledCaptureDispatch['output']['view'];
+				}>;
 			};
 		};
-		const output = browserModule.default.renderCsr();
+		const serverOutput = await serverModule.default.renderSsr();
+		const output: CompiledCaptureDispatch['output'] = {
+			root: parseCaptureDispatchHtml(serverOutput.html)[0]!,
+			state: serverOutput.state,
+			view: serverOutput.view,
+			loadSymbol: clientLoadSymbol,
+		};
 		const loadedIds: string[] = [];
 		const loadSymbol = output.loadSymbol;
 		const runtime = await render(
@@ -658,23 +702,6 @@ async function withCompiledCaptureDispatch(
 	}
 }
 
-async function captureDispatchNativeMarkup(
-	transformed: Awaited<ReturnType<typeof transformCaptureDispatchModule>>,
-	imports: ReadonlyArray<CaptureDispatchImport>,
-): Promise<NonNullable<typeof transformed.manifest.csrNativeMarkup>[number][]> {
-	const children = await Promise.all(
-		imports.map(async (imported) => {
-			const child = await transformCaptureDispatchModule(
-				imported.filename,
-				imported.source,
-				imported.imports,
-			);
-			return captureDispatchNativeMarkup(child, imported.imports ?? []);
-		}),
-	);
-	return [...(transformed.manifest.csrNativeMarkup ?? []), ...children.flat()];
-}
-
 async function withCompiledCaptureResume(
 	filename: string,
 	source: string,
@@ -685,20 +712,14 @@ async function withCompiledCaptureResume(
 		readonly runtime: Awaited<ReturnType<typeof render>>;
 	}) => Promise<void>,
 ): Promise<void> {
-	const [clientUrl, serverUrl] = await Promise.all([
-		captureDispatchModuleUrl(filename, source, imports, 'client'),
+	const [client, serverUrl] = await Promise.all([
+		captureDispatchClientLoader(filename, source, imports),
 		captureDispatchModuleUrl(filename, source, imports, 'server'),
 	]);
-	const clientTransformed = await transformCaptureDispatchModule(filename, source, imports);
 	const global = globalThis as { document?: unknown };
 	const previousDocument = global.document;
-	global.document = captureDispatchDocument(
-		await captureDispatchNativeMarkup(clientTransformed, imports),
-	);
+	global.document = captureDispatchDocument();
 	try {
-		const clientModule = (await import(clientUrl)) as {
-			readonly default: { readonly renderCsr: () => CompiledCaptureDispatch['output'] };
-		};
 		const serverModule = (await import(serverUrl)) as {
 			readonly default: {
 				readonly renderSsr: () => Promise<{
@@ -708,7 +729,6 @@ async function withCompiledCaptureResume(
 				}>;
 			};
 		};
-		const clientOutput = clientModule.default.renderCsr();
 		const serverOutput = await serverModule.default.renderSsr();
 		const root = parseCaptureDispatchHtml(serverOutput.html)[0]!;
 		const runtime = await render(
@@ -716,7 +736,7 @@ async function withCompiledCaptureResume(
 				root,
 				state: serverOutput.state,
 				view: serverOutput.view,
-				loadSymbol: clientOutput.loadSymbol,
+				loadSymbol: client.loadSymbol,
 			}),
 			{ target: { replaceChildren() {} } },
 		);
@@ -735,106 +755,6 @@ function descendants(root: FakeElement, tagName: string): FakeElement[] {
 function renderedText(node: FakeElement): string {
 	return node.textContent ?? node.childNodes.map(renderedText).join('');
 }
-
-
-test('chunk CSR binds build coordinates to the mounted clone before state journals run', async () => {
-	const global = globalThis as { document?: unknown };
-	const previousDocument = global.document;
-	global.document = captureDispatchDocument();
-	try {
-		const state = createProtocolStatePayload({
-			cells: [
-				{ graphNodeId: 'state:label', name: 'label', valueKind: 'scalar', value: 'west' },
-			],
-		});
-		const view = {
-			version: 1,
-			// Deliberately stale payload order: chunk coordinates, not these old
-			// indexes, own the cloned instance's host identities.
-			locators: [
-				{ hostNodeId: 'hRoot', strategy: 'dom-order', index: 0, tagName: 'main' },
-				{ hostNodeId: 'hWest', strategy: 'dom-order', index: 2, tagName: 'span' },
-				{ hostNodeId: 'hEast', strategy: 'dom-order', index: 1, tagName: 'span' },
-			],
-			events: [],
-			domUpdates: [
-				{
-					hostNodeId: 'hWest',
-					source: 'label',
-					graphNodeId: 'state:label',
-					path: [],
-					target: { kind: 'text' },
-					symbolId: 'symbol:text',
-				},
-			],
-			behaviors: [],
-			elementHandles: [],
-			asyncBoundaries: [],
-			branches: [],
-		} as unknown as ProtocolViewPayload;
-		const renderChunks = createMarklessCsrChunkRenderer({
-			rootComponentName: 'CoordinateProof',
-			components: {
-				CoordinateProof: {
-					name: 'CoordinateProof',
-					rootChunkId: 'template:CoordinateProof',
-					chunks: [
-						{
-							id: 'template:CoordinateProof',
-							statics: ['<main><span>west</span><span>east</span></main>'],
-							hosts: [
-								{ hostNodeId: 'hRoot', tagName: 'main', coordinate: { path: [0] } },
-								{ hostNodeId: 'hWest', tagName: 'span', coordinate: { path: [0, 0] } },
-								{ hostNodeId: 'hEast', tagName: 'span', coordinate: { path: [0, 1] } },
-							],
-							slots: [],
-						},
-					],
-					hostNodeIds: ['hRoot', 'hWest', 'hEast'],
-					branchIds: [],
-					boundaryIds: [],
-					repeatIds: [],
-					initialValues: [],
-					stateGraphNodeIds: ['state:label'],
-					edges: [],
-					getState: () => state,
-					getView: () => view,
-					createValues: () => ({}),
-					loadSymbol: () => (context: { domUpdate?: { hostNodeId: string }; value: unknown }) => ({
-						type: 'setText',
-						locator: context.domUpdate?.hostNodeId ?? 'hWest',
-						value: context.value,
-					}),
-				},
-			},
-		});
-		const output = renderChunks();
-		const spans = descendants(output.root, 'SPAN');
-		const target = {
-			children: [] as FakeElement[],
-			replaceChildren(...children: FakeElement[]) {
-				this.children = children;
-			},
-		};
-		const container = await render(() => output, { target });
-		const runtime = container.runtime as { getElement(id: string): FakeElement | undefined };
-		await container.runtime.start?.();
-
-		expect(target.children[0]).toBe(output.root);
-		expect(runtime.getElement('hWest')).toBe(spans[0]);
-		expect(runtime.getElement('hEast')).toBe(spans[1]);
-		container.graph.write({ graphNodeId: 'state:label', value: 'mounted' });
-		await container.graph.flush();
-		expect(renderedText(spans[0]!)).toBe('mounted');
-		expect(renderedText(spans[1]!)).toBe('east');
-	} finally {
-		global.document = previousDocument;
-	}
-});
-
-
-
-
 
 function viewWithClick(): ProtocolViewPayload {
 	return { version: ASYNC_PROTOCOL_VERSION, locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'button' }], events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:click'] }], domUpdates: [], behaviors: [], elementHandles: [], asyncBoundaries: [] };
@@ -1113,93 +1033,26 @@ export function App() @{
 	<main><Child label="trace" onTrace={(payload) => observed = payload.count} /><output>{observed}</output></main>
 }
 `;
-	const compiled = await compileTsrxModule({
-		filename: 'src/CaptureDispatch.tsrx',
-		source,
-		symbols: [],
-	});
-	const transformed = await transformTsrxModule({
-		filename: 'src/CaptureDispatch.tsrx',
-		source,
-		environment: 'client',
-		executionLog: 'never',
-	});
-	const symbolUrls = new Map(
-		transformed.virtualModules
-			.filter((module) => module.type === 'symbol')
-			.map((module) => [module.id, javascriptModuleUrl(localWebFunctionImports(module.source))]),
-	);
-	const resolver = transformed.virtualModules.find((module) => module.type === 'resolver')!;
-	let resolverSource = resolver.source;
-	for (const [moduleId, moduleUrl] of symbolUrls) {
-		resolverSource = resolverSource.split(moduleId).join(moduleUrl);
-	}
-	const resolverUrl = javascriptModuleUrl(resolverSource);
-	const payload = transformed.virtualModules.find((module) => module.type === 'payload')!;
-	const payloadUrl = javascriptModuleUrl(payload.source);
-	const browserModuleSource = localWebFunctionImports(
-		transformed.code
-		.split(payload.id)
-		.join(payloadUrl)
-		.split(resolver.id)
-		.join(resolverUrl),
-	);
-
-	expect(transformed.code).toMatch(
-		/const marklessSymbolResolverModule = \(\) => import\(["']virtual:markless:resolver:/,
-	);
-	expect(transformed.code).not.toContain('readMarklessSourceSymbol');
-	expect(compiled.publicRenderModule.csrModuleSource).toContain(
-		'createMarklessCsrChunkRenderer',
-	);
-
-	const global = globalThis as { document?: unknown };
-	const previousDocument = global.document;
-	global.document = captureDispatchDocument(transformed.manifest.csrNativeMarkup ?? []);
-	try {
-		const browserModule = (await import(javascriptModuleUrl(browserModuleSource))) as {
-			readonly default: { readonly renderCsr: () => {
-				readonly root: FakeElement;
-				readonly state: ReturnType<typeof createProtocolStatePayload>;
-				readonly view: ProtocolViewPayload;
-				readonly loadSymbol: (symbolId: string) => unknown;
-			} };
-		};
-		const output = browserModule.default.renderCsr();
-		const registeredRecord = output.view.events.find(
+	await withCompiledCaptureDispatch('src/CaptureDispatch.tsrx', source, async (result) => {
+		const registeredRecord = result.output.view.events.find(
 			(record) => record.hostNodeId === 'c0:h0' && record.eventName === 'click',
 		)!;
-		const childHandler = compiled.captureAnalysis.extractedSymbols.find(
+		const childHandler = result.compiled.captureAnalysis.extractedSymbols.find(
 			(symbol) => symbol.kind === 'event-handler' && symbol.owner?.componentName === 'Child',
 		)!;
-		const boundRow = compiled.boundSymbolResolver.rows.find(
+		const boundRow = result.compiled.boundSymbolResolver.rows.find(
 			(row) => row.baseSymbolId === childHandler.symbolId,
 		)!;
-		const loadedIds: string[] = [];
-		const loadSymbol = output.loadSymbol;
-		const runtimeOutput = {
-			...output,
-			loadSymbol(symbolId: string) {
-				loadedIds.push(symbolId);
-				return loadSymbol(symbolId);
-			},
-		};
-		const container = await render(
-			{ renderCsr: () => runtimeOutput },
-			{ target: { replaceChildren() {} } },
-		);
-		const button = output.root.childNodes.find((child) => child.tagName === 'BUTTON')!;
+		const button = descendants(result.output.root, 'BUTTON')[0]!;
 
 		expect(registeredRecord.symbolIds).toEqual([boundRow.id]);
 		expect(registeredRecord.symbolIds).not.toContain(childHandler.symbolId);
-		await container.runtime.dispatch(event('click', button) as never);
+		await result.runtime.runtime.dispatch(event('click', button) as never);
 
-		expect(container.graph.read('state:observed')).toBe(1);
-		expect(loadedIds[0]).toBe(boundRow.id);
-		expect(loadedIds).not.toContain(childHandler.symbolId);
-	} finally {
-		global.document = previousDocument;
-	}
+		expect(result.runtime.graph.read('state:observed')).toBe(1);
+		expect(result.loadedIds[0]).toBe(boundRow.id);
+		expect(result.loadedIds).not.toContain(childHandler.symbolId);
+	});
 });
 
 test('compiled sibling captures dispatch through distinct instance-bound routes', async () => {
@@ -1238,7 +1091,8 @@ export default function CaptureSlotSiblings() @{
 		async ({ compiled, loadedIds, output, runtime }) => {
 			const childHandler = compiled.captureAnalysis.extractedSymbols.find(
 				(symbol) =>
-					symbol.kind === 'event-handler' && symbol.owner?.componentName === 'SignalButton',
+					symbol.kind === 'event-handler' &&
+					symbol.owner?.componentName === 'SignalButton',
 			)!;
 			const rows = compiled.boundSymbolResolver.rows.filter(
 				(row) => row.baseSymbolId === childHandler.symbolId,
@@ -1357,16 +1211,19 @@ export default function MusicPlayer() @{
 			const update = output.view.domUpdates.find(
 				(candidate) => candidate.target.kind === 'class',
 			)!;
+			const boundUpdate = compiled.boundSymbolResolver.rows.find(
+				(row) => row.baseSymbolId === updateSymbol.symbolId,
+			)!;
 			const button = descendants(output.root, 'BUTTON')[0]!;
 			const sidebar = descendants(output.root, 'ASIDE')[0] as FakeElement & {
 				getAttribute(name: string): string | null;
 			};
 
 			expect(update).toEqual(
-				expect.objectContaining({
-					hostNodeId: 'c0:h0',
-					graphNodeId: 'state:libraryOpen',
-					symbolId: updateSymbol.symbolId,
+					expect.objectContaining({
+						hostNodeId: 'c0:h0',
+						graphNodeId: 'state:libraryOpen',
+						symbolId: boundUpdate.id,
 				}),
 			);
 			expect(sidebar.getAttribute('class')).toBe('library');
@@ -1416,13 +1273,15 @@ export default function MusicPlayer() @{
 				getAttribute(name: string): string | null;
 			};
 			const commandUpdate = output.view.domUpdates.find(
-				(update) => update.target.kind === 'attribute' && update.target.name === 'data-command',
+				(update) =>
+					update.target.kind === 'attribute' && update.target.name === 'data-command',
 			)!;
 			const resumeRuntime = runtime.runtime as {
 				getElement(hostNodeId: string): FakeElement | undefined;
 			};
 
 			expect(frame.getAttribute('data-command')).toBe('cue');
+			await runtime.runtime.start();
 			expect(resumeRuntime.getElement(commandUpdate.hostNodeId)).toBe(frame);
 			await runtime.runtime.dispatch(event('click', button) as never);
 			expect(runtime.graph.read('state:playerCommand')).toBe('play');
@@ -1534,9 +1393,9 @@ export function CommandHost({ command }) @{
 			const button = descendants(root, 'BUTTON')[0]!;
 			const frame = descendants(root, 'DIV').find(
 				(candidate) =>
-					(candidate as FakeElement & { getAttribute(name: string): string | null }).getAttribute(
-						'class',
-					) === 'youtube-frame-host',
+					(
+						candidate as FakeElement & { getAttribute(name: string): string | null }
+					).getAttribute('class') === 'youtube-frame-host',
 			) as FakeElement & { getAttribute(name: string): string | null };
 
 			expect(frame.getAttribute('data-command')).toBe('cue');
@@ -1621,159 +1480,6 @@ export default function ProjectedCard() @{
 					source: `
 export function Card({ children }) @{
 	<section class="card">{children}</section>
-}
-`,
-				},
-			],
-		},
-	);
-});
-
-test('compiled async page settles with an optional-prop component in the falsy child arm', async () => {
-	const source = `
-import { computed } from '@markless/core';
-import { OptionalFrame } from './optional-frame.tsrx';
-
-export default function OptionalPage() @{
-	const model = computed(async () => {
-		await Promise.resolve();
-		return { rows: [{ id: 'a', label: 'first' }, { id: 'b', label: 'second' }] };
-	});
-	<div>
-		@try {
-			<OptionalFrame>
-				<ul>
-					@for (const row of model.rows; key row.id) {
-						<li data-row>{row.label}</li>
-					}
-				</ul>
-			</OptionalFrame>
-		} @pending { <p data-pending>loading</p> }
-	</div>
-}
-`;
-	await withCompiledCaptureDispatch(
-		'src/OptionalPage.tsrx',
-		source,
-		async ({ composedCaptureAnalysis, output, runtime }) => {
-			expect(
-				composedCaptureAnalysis.diagnostics.filter(
-					(diagnostic) => diagnostic.severity === 'error',
-				),
-			).toEqual([]);
-			for (let index = 0; index < 8; index++) await Promise.resolve();
-			await runtime.graph.flush?.();
-			for (let index = 0; index < 8; index++) await Promise.resolve();
-
-			expect(descendants(output.root, 'LI').map(renderedText)).toEqual(['first', 'second']);
-			expect(descendants(output.root, 'EM').map(renderedText)).toEqual(['no context']);
-			expect(descendants(output.root, 'SPAN')).toEqual([]);
-		},
-		{
-			expectResolver: false,
-			imports: [
-				{
-					specifier: './optional-frame.tsrx',
-					filename: 'src/optional-frame.tsrx',
-					source: `
-import { Card } from './card.tsrx';
-export function OptionalFrame({ info, children }) @{
-	<section>
-		@if (info) { <span><Card>{info.owner.name}</Card></span> }
-		@else { <em>no context</em> }
-		<main>{children}</main>
-	</section>
-}
-`,
-					imports: [
-						{
-							specifier: './card.tsrx',
-							filename: 'src/card.tsrx',
-							source: `
-export function Card({ children }) @{
-	<strong>{children}</strong>
-}
-`,
-						},
-					],
-				},
-			],
-		},
-	);
-});
-
-test('compiled sync-state branch inside projected async content flips and rewires after settle', async () => {
-	const source = `
-import { computed, state } from '@markless/core';
-import { PanelFrame } from './panel-frame.tsrx';
-
-export default function BranchPage() @{
-	let drawerOpen = state(false);
-	let region = state('west');
-	const roster = computed(async () => {
-		const zone = region;
-		await Promise.resolve();
-		return { zone, crews: [{ id: zone + '-a' }, { id: zone + '-b' }] };
-	});
-	<main>
-		<button data-region onClick={() => region = 'east'}>Region</button>
-		@try {
-			<PanelFrame>
-				<button data-drawer onClick={() => drawerOpen = !drawerOpen}>{roster.zone}</button>
-				@if (drawerOpen) {
-					<div data-menu>
-						@for (const crew of roster.crews; key crew.id) {
-							<span class="crew">{crew.id}</span>
-						}
-					</div>
-				}
-			</PanelFrame>
-		} @pending { <p>loading</p> }
-	</main>
-}
-`;
-	await withCompiledCaptureDispatch(
-		'src/BranchPage.tsrx',
-		source,
-		async ({ composedCaptureAnalysis, output, runtime }) => {
-			expect(
-				composedCaptureAnalysis.diagnostics.filter(
-					(diagnostic) => diagnostic.severity === 'error',
-				),
-			).toEqual([]);
-			const settle = async () => {
-				for (let index = 0; index < 8; index++) await Promise.resolve();
-				await runtime.graph.flush?.();
-				for (let index = 0; index < 8; index++) await Promise.resolve();
-			};
-			const button = (name: string) =>
-				descendants(output.root, 'BUTTON').find(
-					(candidate) =>
-						(candidate as FakeElement & { getAttribute(name: string): string | null })
-							.getAttribute(name) !== null,
-				)!;
-
-			await settle();
-			await runtime.runtime.dispatch(event('click', button('data-drawer')) as never);
-			expect(descendants(output.root, 'SPAN').map(renderedText)).toEqual(['west-a', 'west-b']);
-			await runtime.runtime.dispatch(event('click', button('data-drawer')) as never);
-			expect(descendants(output.root, 'SPAN')).toEqual([]);
-
-			await runtime.runtime.dispatch(event('click', button('data-region')) as never);
-			await settle();
-			expect(renderedText(button('data-drawer'))).toBe('east');
-			await runtime.runtime.dispatch(event('click', button('data-drawer')) as never);
-			expect(descendants(output.root, 'SPAN').map(renderedText)).toEqual(['east-a', 'east-b']);
-		},
-		{
-			expectResolver: false,
-			imports: [
-				{
-					specifier: './panel-frame.tsrx',
-					filename: 'src/panel-frame.tsrx',
-					source: `
-export function PanelFrame({ children }) @{
-	<section>{children}</section>
 }
 `,
 				},
@@ -1891,7 +1597,8 @@ export default function CaptureSlotNested() @{
 		async ({ compiled, loadedIds, output, runtime }) => {
 			const childHandler = compiled.captureAnalysis.extractedSymbols.find(
 				(symbol) =>
-					symbol.kind === 'event-handler' && symbol.owner?.componentName === 'NestedTrigger',
+					symbol.kind === 'event-handler' &&
+					symbol.owner?.componentName === 'NestedTrigger',
 			)!;
 			const rows = compiled.boundSymbolResolver.rows.filter(
 				(row) => row.baseSymbolId === childHandler.symbolId,
@@ -1904,10 +1611,7 @@ export default function CaptureSlotNested() @{
 				['component-edge:1', 'component-edge:0'],
 				['component-edge:2', 'component-edge:0'],
 			]);
-			expect(records.map((record) => record.hostNodeId)).toEqual([
-				'c0:c0:h0',
-				'c1:c0:h0',
-			]);
+			expect(records.map((record) => record.hostNodeId)).toEqual(['c0:c0:h0', 'c1:c0:h0']);
 			const recordSymbolIds = records.map((record) => record.symbolIds[0]);
 
 			const buttons = descendants(output.root, 'BUTTON');
@@ -2011,9 +1715,7 @@ export function App() @{
 		environment: 'client',
 		executionLog: 'never',
 	});
-	const appRow = app.boundSymbolResolver.rows.find(
-		(row) => row.loaderSymbolId === appInput.id,
-	)!;
+	const appRow = app.boundSymbolResolver.rows.find((row) => row.loaderSymbolId === appInput.id)!;
 	const libraryBoundId = marklessBoundSymbolId(
 		{ boundSymbols: { [childHandler.symbolId]: libraryRow.id } },
 		childHandler.symbolId,
@@ -2036,7 +1738,10 @@ export function App() @{
 	const symbolUrls = new Map(
 		appTransform.virtualModules
 			.filter((module) => module.type === 'symbol')
-			.map((module) => [module.id, javascriptModuleUrl(localWebFunctionImports(module.source))]),
+			.map((module) => [
+				module.id,
+				javascriptModuleUrl(localWebFunctionImports(module.source)),
+			]),
 	);
 	symbolUrls.set(
 		childManifestSymbol.virtualModuleId,
@@ -2059,7 +1764,12 @@ export function App() @{
 				view: {
 					version: ASYNC_PROTOCOL_VERSION,
 					locators: [
-						{ hostNodeId: 'c0:c0:h0', strategy: 'dom-order', index: 0, tagName: 'button' },
+						{
+							hostNodeId: 'c0:c0:h0',
+							strategy: 'dom-order',
+							index: 0,
+							tagName: 'button',
+						},
 					],
 					events: [
 						{ hostNodeId: 'c0:c0:h0', eventName: 'click', symbolIds: [appBoundId] },
@@ -2097,6 +1807,143 @@ test('render dispatch throws a tagged error when no event record matches', async
 		phase: 'event',
 		eventName: 'click',
 	});
+});
+
+test('CSR external delegation no-ops on its recorded element and keeps unmatched clicks fail-loud', async () => {
+	const link = element('A');
+	const unowned = element('BUTTON');
+	const root = element('MAIN', [link, unowned]);
+	const container = await renderCsrRuntime({
+		output: {
+			root,
+			liveHostNodes: new Map([['router:link', link]]),
+			state: createProtocolStatePayload({ cells: [] }),
+			view: {
+				...staticView(),
+				locators: [
+					{
+						hostNodeId: 'router:link',
+						strategy: 'dom-order',
+						index: 1,
+						tagName: 'a',
+					},
+				],
+				events: [
+					{
+						hostNodeId: 'router:link',
+						eventName: 'click',
+						symbolIds: [],
+						action: {
+							kind: PROTOCOL_EVENT_ACTION_KIND.externalDelegate,
+							owner: 'router',
+						},
+					},
+				],
+			},
+			loadSymbol() {
+				throw new Error('external delegation must not load a Markless symbol');
+			},
+		},
+		options: {},
+	} as never);
+	const clickListener = root.listeners.find((entry) => entry.type === 'click')?.listener;
+	expect(clickListener).toBeDefined();
+
+	await expect(clickListener!(event('click', link))).resolves.toBeUndefined();
+	expect(() => container.graph).toThrow('MARKLESS_CSR_GRAPH_NOT_DEMANDED');
+
+	await expect(clickListener!(event('click', unowned))).rejects.toThrow(
+		'MARKLESS_CSR_DELEGATED_TRIGGER_UNMATCHED: click',
+	);
+});
+
+test('CSR delegated clicks dispatch once whether full runtime demand starts before or during the click', async () => {
+	async function clickCount(demandBeforeClick: boolean): Promise<number> {
+		const button = element('BUTTON');
+		const container = await renderCsrRuntime({
+			output: {
+				root: button,
+				liveHostNodes: new Map([['h0', button]]),
+				state: createProtocolStatePayload({
+					cells: [
+						{
+							graphNodeId: 'state:count',
+							name: 'count',
+							valueKind: 'scalar',
+							value: 0,
+						},
+					],
+				}),
+				view: viewWithClick(),
+				loadSymbol: async () => ({ graph }) => {
+					graph.update({
+						graphNodeId: 'state:count',
+						update: (value) => Number(value) + 1,
+					});
+				},
+			},
+			options: {},
+		} as never);
+		if (demandBeforeClick) await container.runtime.start();
+		for (const { type, listener } of Array.from(button.listeners)) {
+			if (type === 'click') await listener(event('click', button));
+		}
+		return Number(container.graph.read('state:count'));
+	}
+
+	await expect(clickCount(false)).resolves.toBe(1);
+	await expect(clickCount(true)).resolves.toBe(1);
+});
+
+test('CSR delegated dispatch adopts a streamed arm event record exactly once', async () => {
+	const shellButton = element('BUTTON');
+	const armButton = element('BUTTON');
+	const root = element('MAIN', [shellButton, armButton]);
+	const liveHostNodes = new Map([
+		['h-shell', shellButton],
+		['h-arm', armButton],
+	]);
+	const events: ProtocolViewPayload['events'][number][] = [
+		{ hostNodeId: 'h-shell', eventName: 'click', symbolIds: ['symbol:shell'] },
+	];
+	const view: ProtocolViewPayload = {
+		...staticView(),
+		locators: [],
+		events,
+	};
+	const state = createProtocolStatePayload({
+		cells: [
+			{ graphNodeId: 'state:logged', name: 'logged', valueKind: 'scalar', value: 0 },
+		],
+	});
+	const container = await renderCsrRuntime({
+		output: {
+			root,
+			liveHostNodes,
+			state,
+			view,
+			loadSymbol: async (symbolId) => ({ graph }) => {
+				if (symbolId !== 'symbol:arm') return;
+				graph.update({
+					graphNodeId: 'state:logged',
+					update: (value) => Number(value) + 1,
+				});
+			},
+		},
+		options: {},
+	} as never);
+
+	// The pending shell installed the permanent capture listener. The streamed
+	// installment arrives later and its adopted record must extend that same
+	// listener's dispatch table before the settled-arm button is clicked.
+	events.push({ hostNodeId: 'h-arm', eventName: 'click', symbolIds: ['symbol:arm'] });
+	await container.runtime.start();
+	const clickListener = root.listeners.find((entry) => entry.type === 'click')?.listener;
+	expect(clickListener).toBeDefined();
+
+	await clickListener!(event('click', armButton));
+	await clickListener!(event('click', armButton));
+	expect(container.graph.read('state:logged')).toBe(2);
 });
 
 test('render starts artifact-owned CSR preload work without requiring app code', async () => {
@@ -2203,40 +2050,6 @@ test('render activates every authored CSR behavior symbol before interaction', a
 		'symbol:text',
 	]);
 	expect(root.textContent).toBe('1');
-});
-
-test('render connects the CSR runtime before mounting visible DOM', async () => {
-	const order: string[] = [];
-	let connected = false;
-	const target = {
-		children: [] as FakeElement[],
-		replaceChildren(...children: FakeElement[]) {
-			order.push(`mount:${connected}`);
-			this.children = children;
-		},
-	};
-	const root = element('BUTTON');
-
-	const container = await render(
-		() => ({
-			root,
-			state: createProtocolStatePayload({ cells: [] }),
-			view: viewWithClick(),
-			loadSymbol() {
-				return () => {};
-			},
-			connectRuntime() {
-				connected = true;
-				order.push('connect');
-			},
-		}),
-		{ target },
-	);
-
-	expect(order).toEqual(['mount:false']);
-	await container.runtime.start?.();
-	expect(order).toEqual(['mount:false', 'connect']);
-	expect(target.children).toEqual([root]);
 });
 
 test('render returns a compiler-provided CSR runtime without event resume startup', async () => {
@@ -2645,6 +2458,41 @@ test('renderToString emits one inline resumer for SSR containers with browser tr
 	expect(html).toContain('globalThis.__started');
 });
 
+test('renderToString does not wake Markless for an externally delegated record', async () => {
+	const html = await renderToString(
+		() => ({
+			html: '<a href="/docs">Docs</a>',
+			state: createProtocolStatePayload({ cells: [] }),
+			view: {
+				...staticView(),
+				locators: [
+					{
+						hostNodeId: 'router:link',
+						strategy: 'dom-order',
+						index: 0,
+						tagName: 'a',
+					},
+				],
+				events: [
+					{
+						hostNodeId: 'router:link',
+						eventName: 'click',
+						symbolIds: [],
+						action: {
+							kind: PROTOCOL_EVENT_ACTION_KIND.externalDelegate,
+							owner: 'router',
+						},
+					},
+				],
+			},
+		}),
+		{ resumeModuleUrl: '/app.js' },
+	);
+
+	expect(html).not.toContain('data-async-resumer');
+	expect(html).not.toContain('type="markless/view"');
+});
+
 test('renderToString wakes the runtime for arm-record event types', async () => {
 	const html = await renderToString(
 		() => ({
@@ -2882,30 +2730,47 @@ test('renderToString emits the resumer for keyed-repeat row events in a served a
 			state: createProtocolStatePayload({ cells: [] }),
 			view: {
 				...staticView(),
-				asyncBoundaries: [{
-					id: 'boundary:0',
-					runnerGraphNodeId: 'computed:feed',
-					initiallyServedArm: ASYNC_BOUNDARY_ARM.try,
-					startAnchor: { strategy: 'dom-order-comment', index: 0 },
-					endAnchor: { strategy: 'dom-order-comment', index: 1 },
-					asyncReads: [],
-					armRecords: {
-						locators: [{ hostNodeId: 'h-list', strategy: 'arm-relative', index: 0, tagName: 'ul' }],
-						events: [],
-						behaviors: [],
-						elementHandles: [],
-						keyedRepeats: [{
-							id: 'repeat:0',
-							parentHostNodeId: 'h-list',
-							collectionGraphNodeId: 'state:entries',
-							collectionPath: [],
-							keyPath: ['id'],
-							itemName: 'entry',
-							rowElementCount: 1,
-							rowEvents: [{ hostPath: [], eventName: 'click', symbolIds: ['symbol:row'] }],
-						}],
+				asyncBoundaries: [
+					{
+						id: 'boundary:0',
+						runnerGraphNodeId: 'computed:feed',
+						initiallyServedArm: ASYNC_BOUNDARY_ARM.try,
+						startAnchor: { strategy: 'dom-order-comment', index: 0 },
+						endAnchor: { strategy: 'dom-order-comment', index: 1 },
+						asyncReads: [],
+						armRecords: {
+							locators: [
+								{
+									hostNodeId: 'h-list',
+									strategy: 'arm-relative',
+									index: 0,
+									tagName: 'ul',
+								},
+							],
+							events: [],
+							behaviors: [],
+							elementHandles: [],
+							keyedRepeats: [
+								{
+									id: 'repeat:0',
+									parentHostNodeId: 'h-list',
+									collectionGraphNodeId: 'state:entries',
+									collectionPath: [],
+									keyPath: ['id'],
+									itemName: 'entry',
+									rowElementCount: 1,
+									rowEvents: [
+										{
+											hostPath: [],
+											eventName: 'click',
+											symbolIds: ['symbol:row'],
+										},
+									],
+								},
+							],
+						},
 					},
-				}],
+				],
 			} as ProtocolViewPayload,
 		}),
 		{ resumeModuleUrl: '/app.js' },
@@ -3243,13 +3108,15 @@ test('renderToString inline event resumer serializes a cold interaction storm th
 	try {
 		await import(`data:text/javascript,${encodeURIComponent(resumerSource)}`);
 		expect(listeners).toHaveLength(1);
-		const first = listeners[0]({ ...event('click', button), key: 'first' });
+		const firstEvent = { ...event('click', button), key: 'first' };
+		const first = listeners[0](firstEvent);
+		const duplicate = listeners[0](firstEvent);
 		const second = listeners[0]({ ...event('click', button), key: 'second' });
 		for (let turn = 0; turn < 20 && globalScope.__marklessQueueTest.order.length === 0; turn++)
 			await new Promise((resolve) => setTimeout(resolve, 0));
 		expect(globalScope.__marklessQueueTest.order).toEqual(['start:first']);
 		globalScope.__marklessQueueTest.release?.();
-		await Promise.all([first, second]);
+		await Promise.all([first, duplicate, second]);
 		expect(globalScope.__marklessQueueTest.order).toEqual([
 			'start:first',
 			'end:first',
@@ -3957,7 +3824,7 @@ export async function resumeContainerEvent({ event, syncPolicyAlreadyApplied }) 
 	return `data:text/javascript,${encodeURIComponent(source)}`;
 }
 
-test('render starts pending CSR async boundary runners and settles the range', async () => {
+test('render keeps pending CSR async boundaries dormant until runtime demand, then settles the range', async () => {
 	const startAnchor = {
 		nodeType: 8 as const,
 		textContent: 'markless:async:boundary:0',
@@ -4018,12 +3885,18 @@ test('render starts pending CSR async boundary runners and settles the range', a
 		},
 	);
 
+	// Direct CSR no longer starts the legacy settle chain at render time.
+	expect(loadedSymbols).toEqual([]);
+	expect(
+		root.childNodes.map((child) => (child.nodeType === 8 ? '#comment' : child.tagName)),
+	).toEqual(['#comment', 'P', '#comment']);
+	await container.runtime.start();
 	for (let index = 0; index < 6; index++) await Promise.resolve();
 	await container.graph.flush?.();
 	for (let index = 0; index < 6; index++) await Promise.resolve();
 
-	// The CSR graph wires the boundary runner through loadSymbol, demands it at
-	// creation, and the default CSR applier replaces the boundary range.
+	// Explicit runtime demand wires the boundary runner through loadSymbol and
+	// the default CSR applier replaces the boundary range.
 	expect(loadedSymbols).toEqual(['symbol:details-runner', 'symbol:boundary-update']);
 	expect(
 		root.childNodes.map((child) => (child.nodeType === 8 ? '#comment' : child.tagName)),

@@ -168,7 +168,8 @@ function interpreterModulesForUnreplacedKinds(
 }
 
 function interpreterChainForKind(kind: string): ReadonlyArray<string> {
-	return runtimeImportClosure(INTERPRETER_ROOTS_BY_KIND[kind] ?? []);
+	const roots = INTERPRETER_ROOTS_BY_KIND[kind];
+	return roots ? runtimeImportClosure([...roots, ...GENERIC_PATH_MODULES]) : [];
 }
 
 function runtimeImportsFromSource(source: string): string[] {
@@ -196,11 +197,20 @@ function isAllowedDispatchCoreVirtual(id: string): boolean {
 const INTERPRETER_ROOTS_BY_KIND: Record<string, ReadonlyArray<string>> = {
 	event: ['core/web/resume', 'web/resume'],
 	'dom-update': ['core/web/resume', 'web/resume'],
+	'keyed-repeat': ['core/web/resume', 'web/resume'],
 	branch: ['core/web/resume', 'web/resume'],
 	'async-boundary': ['core/web/resume', 'web/resume'],
 	behavior: ['core/web/resume', 'web/resume'],
 	'element-handle': ['core/web/resume', 'web/resume'],
 };
+
+const GENERIC_PATH_MODULES = [
+	'web/dom-journal', // Generic graph writes stage their DOM commits through the journal.
+	'web/inline/resume-errors', // Generic dispatch reports malformed resume state through fail-closed diagnostics.
+	'web/payload-document-common', // Generic payload lookup shares the document-script readers.
+	'web/payload-resume-registry', // Generic resume reuses decoded payload documents through the page registry.
+	'web/resume-anchor-census', // Generic arm registration resolves the served branch-anchor comments.
+];
 
 function runtimeImportClosure(roots: ReadonlyArray<string>): ReadonlyArray<string> {
 	const seen = new Set<string>();
@@ -210,16 +220,13 @@ function runtimeImportClosure(roots: ReadonlyArray<string>): ReadonlyArray<strin
 		seen.add(id);
 		for (const dep of RUNTIME_IMPORT_EDGES[id] ?? []) queue.push(dep);
 	}
-	return [...seen]
-		.filter((id) => isMarklessRuntimeModule(id) && !INTERPRETER_CHAIN_EXCLUDED_MODULES.has(id))
-		.sort();
+	return [...seen].filter((id) => isMarklessRuntimeModule(id)).sort();
 }
 
 function unique(values: ReadonlyArray<string | undefined>): string[] {
 	return [...new Set(values.filter((value): value is string => !!value))].sort();
 }
 
-const INTERPRETER_CHAIN_EXCLUDED_MODULES = new Set(['web/dom-journal']);
 const RUNTIME_IMPORT_EDGES: Record<string, ReadonlyArray<string>> = {
 	'core/web/resume': ['web/resume'],
 	'web/resume': [
@@ -235,5 +242,7 @@ const RUNTIME_IMPORT_EDGES: Record<string, ReadonlyArray<string>> = {
 		'web/resume-events',
 		'web/resume-runtime-shared',
 		'web/resume-runtime-start',
+		'web/resume-commit-arm',
+		'web/resume-arm-records',
 	],
 };

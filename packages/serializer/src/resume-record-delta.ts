@@ -1,10 +1,8 @@
 import type { ProtocolStatePayload, ProtocolViewPayload } from './protocol.ts';
+import type { ResumeRecordSet } from './resume-record-merge.ts';
 import { serializeGraphValue } from './value.ts';
 
-export type ResumeRecordSet = {
-	readonly state: ProtocolStatePayload;
-	readonly view: ProtocolViewPayload;
-};
+export { mergeResumeRecordDelta, type ResumeRecordSet } from './resume-record-merge.ts';
 
 export type ResumeRecordDeltaClassification =
 	| { readonly kind: 'empty' }
@@ -106,82 +104,6 @@ export function classifyResumeRecordDelta(
 	return hasDeltaRecords(delta) ? { kind: 'divergent', delta } : { kind: 'empty' };
 }
 
-// Payload records win by key. A delta cannot delete a build-derived record;
-// classification refuses that shape so this merge always reconstructs a full
-// request record set without tombstones or record-kind exceptions.
-export function mergeResumeRecordDelta(
-	baseline: ResumeRecordSet,
-	delta: ResumeRecordSet,
-): ResumeRecordSet {
-	assertMatchingVersion(baseline.state.version, delta.state.version, 'state');
-	assertMatchingVersion(baseline.view.version, delta.view.version, 'view');
-	return {
-		state: {
-			...baseline.state,
-			cells: mergeRecords(baseline.state.cells, delta.state.cells, stateCellKey),
-			computed: mergeRecords(baseline.state.computed, delta.state.computed, stateComputedKey),
-			...mergeOptionalRecords(
-				baseline.state,
-				delta.state,
-				'sharedDefinitions',
-				(record) => record.id,
-			),
-			...mergeOptionalRecords(
-				baseline.state,
-				delta.state,
-				'storage',
-				(record) => record.graphNodeId,
-			),
-		},
-		view: {
-			...baseline.view,
-			...mergeAsyncRunners(baseline.view, delta.view),
-			locators: mergeRecords(
-				baseline.view.locators,
-				delta.view.locators,
-				(record) => record.hostNodeId,
-			),
-			events: mergeRecords(
-				baseline.view.events,
-				delta.view.events,
-				(record) => `${record.hostNodeId}\0${record.eventName}`,
-			),
-			domUpdates: mergeRecords(
-				baseline.view.domUpdates,
-				delta.view.domUpdates,
-				(record) => `${record.hostNodeId}\0${record.graphNodeId}\0${record.source}`,
-			),
-			behaviors: mergeRecords(
-				baseline.view.behaviors,
-				delta.view.behaviors,
-				(record) => `${record.hostNodeId}\0${record.source}`,
-			),
-			elementHandles: mergeRecords(
-				baseline.view.elementHandles,
-				delta.view.elementHandles,
-				(record) => `${record.hostNodeId}\0${record.handleId}`,
-			),
-			...mergeOptionalRecords(
-				baseline.view,
-				delta.view,
-				'keyedRepeats',
-				(record) => record.id,
-			),
-			...mergeOptionalRecords(
-				baseline.view,
-				delta.view,
-				'branches',
-				(record) => record.id,
-			),
-			asyncBoundaries: mergeRecords(
-				baseline.view.asyncBoundaries,
-				delta.view.asyncBoundaries,
-				(record) => record.id,
-			),
-		},
-	};
-}
-
 function stateCellKey(record: ProtocolStatePayload['cells'][number]): string {
 	return record.graphNodeId;
 }
@@ -229,18 +151,6 @@ function uniqueRecords<T>(
 	return result;
 }
 
-function mergeRecords<T>(
-	baseline: ReadonlyArray<T>,
-	delta: ReadonlyArray<T>,
-	key: (record: T) => string,
-): ReadonlyArray<T> {
-	const payloadByKey = uniqueRecords(delta, key, 'payload record');
-	const merged = baseline.map((record) => payloadByKey.get(key(record)) ?? record);
-	const baselineKeys = new Set(baseline.map(key));
-	for (const record of delta) if (!baselineKeys.has(key(record))) merged.push(record);
-	return merged;
-}
-
 function optionalRecordDelta<
 	T extends object,
 	K extends {
@@ -265,23 +175,6 @@ function optionalRecordDelta<
 	} as Partial<Pick<T, K>>;
 }
 
-function mergeOptionalRecords<
-	T extends object,
-	K extends {
-		[P in keyof T]-?: T[P] extends ReadonlyArray<unknown> | undefined ? P : never;
-	}[keyof T],
->(
-	baseline: T,
-	delta: T,
-	property: K,
-	key: (record: NonNullable<T[K]> extends ReadonlyArray<infer R> ? R : never) => string,
-): Partial<Pick<T, K>> {
-	if (!(property in delta)) return {};
-	const baselineRecords = (baseline[property] ?? []) as ReadonlyArray<never>;
-	const deltaRecords = (delta[property] ?? []) as ReadonlyArray<never>;
-	return { [property]: mergeRecords(baselineRecords, deltaRecords, key) } as Partial<Pick<T, K>>;
-}
-
 function asyncRunnerDelta(
 	baseline: ProtocolViewPayload,
 	request: ProtocolViewPayload,
@@ -300,14 +193,6 @@ function asyncRunnerDelta(
 		if (baseline.asyncRunners?.[key] !== value) delta[key] = value;
 	}
 	return { asyncRunners: delta };
-}
-
-function mergeAsyncRunners(
-	baseline: ProtocolViewPayload,
-	delta: ProtocolViewPayload,
-): Pick<ProtocolViewPayload, 'asyncRunners'> | Record<never, never> {
-	if (!('asyncRunners' in delta)) return {};
-	return { asyncRunners: { ...baseline.asyncRunners, ...delta.asyncRunners } };
 }
 
 function hasDeltaRecords(delta: ResumeRecordSet): boolean {

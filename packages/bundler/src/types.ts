@@ -1,4 +1,5 @@
 import type {
+	ArtifactChildMaterialization,
 	ModuleGraphInterfaceArtifact,
 	SemanticGraphArtifact,
 	SemanticGraphInput,
@@ -10,6 +11,7 @@ export type MarklessExecutionLogMode = 'auto' | 'never' | 'always';
 
 export interface MarklessDevServer {
 	transformRequest: (url: string, environment: MarklessEnvironment) => Promise<unknown> | unknown;
+	invalidateModule?: (id: string, environment: MarklessEnvironment) => boolean;
 }
 
 export interface MarklessRolldownOptions {
@@ -51,6 +53,8 @@ export interface TransformTsrxModuleInput {
 	source: string;
 	dev?: boolean;
 	importedModuleInterfaces?: SemanticGraphInput['importedModuleInterfaces'];
+	renderDataImportSources?: Readonly<Record<string, string>>;
+	artifactChildMaterializations?: Readonly<Record<string, ArtifactChildMaterialization>>;
 	symbols?: import('@markless/compiler').SymbolResolverModuleInput['symbols'];
 	devResumeReexport?: boolean;
 	buildId?: string;
@@ -65,7 +69,9 @@ export interface TransformTsrxModuleInput {
 	inlineResumerDebug?: boolean;
 	prerenderRecords?: boolean;
 	prerenderWakeVariant?: boolean;
+	prerenderWakeFacade?: boolean;
 	prerenderRecordData?: BuiltPrerenderRecords;
+	runtimeDemandClass?: import('@markless/compiler').RuntimeDemandClass;
 }
 
 export interface TransformTsrxModuleResult {
@@ -76,7 +82,24 @@ export interface TransformTsrxModuleResult {
 	moduleGraphInterface: ModuleGraphInterfaceArtifact;
 	interfaceHash: string;
 	moduleImports: SemanticGraphArtifact['moduleImports'];
+	artifactChildren: ReadonlyArray<ArtifactChildCandidate>;
 }
+
+export type ArtifactChildCandidate = {
+	readonly edgeId: string;
+	readonly componentName: string;
+	readonly importSource: string;
+	readonly importKind: 'default' | 'named' | 'namespace';
+	readonly importedName?: string;
+	readonly hasChildren: boolean;
+	readonly props: ReadonlyArray<{
+		readonly name: string;
+		readonly kind: string;
+		readonly value?: unknown;
+		readonly source?: string;
+	}>;
+	readonly projection?: { readonly kind: 'static-markup'; readonly markup: string; readonly elementCount: number };
+};
 
 export type MarklessModuleLinkArtifact = Pick<
 	TransformTsrxModuleResult,
@@ -85,14 +108,6 @@ export type MarklessModuleLinkArtifact = Pick<
 
 export interface MarklessTransformManifest {
 	source: string;
-	csrNativeMarkup?: ReadonlyArray<{
-		readonly dataId: string;
-		readonly definition: Readonly<Record<string, unknown>>;
-		readonly templates: ReadonlyArray<{
-			readonly id: string;
-			readonly markup: string;
-		}>;
-	}>;
 	captureMetadata?: import('@markless/compiler').CaptureAnalysisArtifact;
 	symbolRoutes?: ReadonlyArray<{
 		readonly prefix: string;

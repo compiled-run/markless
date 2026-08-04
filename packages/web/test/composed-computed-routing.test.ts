@@ -3,7 +3,7 @@ import { expect, test } from 'vitest';
 import {
 	marklessComposeState as composeCsrState,
 	marklessCsrRemapGraphOutput,
-} from '../src/fns/csr.ts';
+} from '../src/fns/composition.ts';
 import {
 	marklessComposeState as composeSsrState,
 } from '../src/fns/ssr.ts';

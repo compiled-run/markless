@@ -15,7 +15,7 @@ import type {
 	ResumeRuntime,
 	ResumeRuntimeInput,
 } from './resume-types.ts';
-import type { CsrCoordinateSettler } from './resume-csr-coordinate.ts';
+import type { ProtocolStatePayload } from '@markless/serializer';
 
 export {
 	RuntimeResumeError,
@@ -25,10 +25,15 @@ export {
 export type { RuntimeResumeDiagnostic, RuntimeResumeErrorCode } from './inline/resume-errors.ts';
 export type * from './resume-types.ts';
 
-export function createResumeRuntime(runtimeInput: ResumeRuntimeInput): ResumeRuntime {
+export function createResumeRuntime(
+	runtimeInput: ResumeRuntimeInput,
+	onRegisterComputedRefreshes?: (
+		register: (records: ProtocolStatePayload['computed']) => Promise<void>,
+	) => void,
+): ResumeRuntime {
 	const boundaries = runtimeInput.view.asyncBoundaries;
 	const asyncBoundariesById = materializeAsyncBoundaryLocators(runtimeInput.root, boundaries);
-	let input = runtimeInput;
+	const input = runtimeInput;
 	const elementsByHostId = input.liveHostNodes
 		? new Map(input.liveHostNodes)
 		: materializeDomLocators(input.root, input.view.locators);
@@ -40,38 +45,24 @@ export function createResumeRuntime(runtimeInput: ResumeRuntimeInput): ResumeRun
 	const prepared = { elementsByHostId, elementHandles, asyncBoundariesById };
 	let runtime: ResumeRuntime | undefined;
 	let starting: Promise<ResumeRuntime> | undefined;
-	let coordinateSettler: CsrCoordinateSettler | undefined;
 
 	async function loadRuntime(): Promise<ResumeRuntime> {
 		if (runtime) return runtime;
 		if (!starting) {
 			starting = import('./resume-runtime.ts').then((module) => {
-				runtime = module.createResumeRuntime(input, prepared);
+				runtime = module.createResumeRuntime(input, prepared, onRegisterComputedRefreshes);
 				return runtime;
 			});
 		}
 		return starting;
 	}
 
-	return {
+	const facade: ResumeRuntime = {
 		async start() {
-			if (boundaries[0]?.renderArm && !coordinateSettler) {
-				const { tryStartCsrCoordinateSettler } = await import('./resume-csr-coordinate.ts');
-				coordinateSettler = tryStartCsrCoordinateSettler(
-					input,
-					prepared,
-					loadRuntime,
-					(next) => {
-						input = next;
-					},
-				);
-				if (coordinateSettler) return;
-			}
 			await (await loadRuntime()).start();
 		},
 		async dispatch(event: ResumeDomEvent, options?: ResumeDispatchOptions) {
 			if (!event) return;
-			if (coordinateSettler) return coordinateSettler.dispatch(event, options);
 			await (await loadRuntime()).dispatch(event, options);
 		},
 		async activateBehaviors(hostNodeId: string) {
@@ -95,17 +86,15 @@ export function createResumeRuntime(runtimeInput: ResumeRuntimeInput): ResumeRun
 			elementHandles.deleteHost(hostNodeId);
 		},
 		dispose() {
-			coordinateSettler?.dispose();
 			runtime?.dispose();
 			elementsByHostId.clear();
 		},
 		whenAsyncBoundariesSettled: async () =>
-			coordinateSettler?.whenSettled() ??
 			(await loadRuntime()).whenAsyncBoundariesSettled?.(),
 		holdPendingSettleCommits: async (ms: number) =>
-			coordinateSettler?.holdCommitsFor(ms) ??
-			(coordinateSettler ? undefined : (await loadRuntime()).holdPendingSettleCommits?.(ms)),
+			(await loadRuntime()).holdPendingSettleCommits?.(ms),
 	};
+	return facade;
 }
 
 function materializeAsyncBoundaryLocators(

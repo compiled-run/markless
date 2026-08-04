@@ -13,7 +13,7 @@ import {
 	type HastNode,
 	visitHastHandle,
 } from 'satteri';
-import { decodePath, parseURL } from 'ufo';
+import { decodePath, parsePath, parseURL, withQuery } from 'ufo';
 
 export function mdxTransformPlugin(): Plugin {
 	return {
@@ -40,7 +40,11 @@ export async function transformMdxRoute(source: string, id: string) {
 	const html = route.parts.map((part) => (part.kind === 'html' ? part.html : '')).join('');
 	if (route.components.length === 0) {
 		return [
+			`import { createMdxRenderDataSurface } from '@markless/router/vite/runtime/mdx-route';`,
+			`const marklessMdxParts = ${JSON.stringify(route.parts)};`,
+			'const marklessMdxRenderData = createMdxRenderDataSurface(marklessMdxParts, []);',
 			'const marklessMdxPage = {',
+			'  renderData: marklessMdxRenderData,',
 			'  renderSsr() {',
 			`    return { html: ${JSON.stringify(html)} };`,
 			'  }',
@@ -50,7 +54,7 @@ export async function transformMdxRoute(source: string, id: string) {
 		].join('\n');
 	}
 
-	return emitComposedMdxRoute(route);
+	return emitComposedMdxRoute(route, id);
 }
 
 type MdxRoute = {
@@ -68,6 +72,7 @@ type MdxComponent = {
 
 type MdxProp = {
 	readonly name: string;
+	readonly value: unknown;
 	readonly valueExpression: string;
 };
 
@@ -81,46 +86,32 @@ type MdxPart =
 			readonly kind: 'html';
 			readonly html: string;
 			readonly elementCount: number;
+			readonly elementTags: ReadonlyArray<string>;
 	  }
 	| {
 			readonly kind: 'component';
 			readonly componentIndex: number;
 	  };
 
-function emitComposedMdxRoute(route: MdxRoute): string {
+function emitComposedMdxRoute(route: MdxRoute, id: string): string {
 	return [
 		`import { resumeFromPayloadDocument } from '@markless/core/web/resume';`,
-		`import { composeMdxState, composeMdxView, loadMdxSymbol, renderMdxChild, replaceMdxChild, rootFromMdxHtml } from '@markless/router/vite/runtime/mdx-route';`,
+		`import { composeMdxState, composeMdxView, createMdxRenderDataSurface, loadMdxSymbol, renderMdxChild } from '@markless/router/vite/runtime/mdx-route';`,
 		...route.imports,
 		'',
 		`const marklessMdxParts = ${JSON.stringify(route.parts)};`,
 		`const marklessMdxSymbolLoaders = ${renderSymbolLoaders(route.components)};`,
+		`const marklessMdxRenderData = ${renderMdxRenderDataLoader(route.components, id)};`,
 		'',
 		'const marklessMdxPage = {',
+		'  renderData: marklessMdxRenderData,',
+		'  loadSymbol: marklessMdxLoadSymbol,',
 		'  async renderSsr(props = {}) {',
 		'    const marklessMdxChildren = [];',
-		`    const html = ${renderHtmlExpression(route, 'ssr')};`,
+		`    const html = ${renderHtmlExpression(route)};`,
 		'    const state = composeMdxState(marklessMdxChildren);',
 		'    const view = composeMdxView(marklessMdxParts, marklessMdxChildren, 0);',
 		'    return { html, ...(state ? { state } : {}), ...(view ? { view } : {}) };',
-		'  },',
-		'  renderCsr(props = {}) {',
-		'    const marklessMdxChildren = [];',
-		`    const root = rootFromMdxHtml(${renderCsrHtml(route)});`,
-		...route.components.flatMap((component, index) => [
-			`    const marklessMdxChild${index} = ${component.localName}.renderCsr?.(${componentPropsExpression(component)});`,
-			`    replaceMdxChild(root, ${index}, marklessMdxChild${index}?.root);`,
-			`    if (marklessMdxChild${index}) marklessMdxChildren.push({ componentIndex: ${index}, hostPrefix: ${JSON.stringify(component.prefix)}, symbolPrefix: ${JSON.stringify(component.prefix)}, output: marklessMdxChild${index} });`,
-		]),
-		'    const state = composeMdxState(marklessMdxChildren);',
-		'    const view = composeMdxView(marklessMdxParts, marklessMdxChildren, 1);',
-		'    return {',
-		'      root,',
-		'      ...(state ? { state } : {}),',
-		'      ...(view ? { view } : {}),',
-		'      loadSymbol(symbolId) { return marklessMdxLoadSymbol(symbolId, marklessMdxChildren); },',
-		'      connectRuntime(context) { for (const child of marklessMdxChildren) child.output?.connectRuntime?.(context); },',
-		'    };',
 		'  },',
 		...renderMdxPreload(route.components),
 		'};',
@@ -287,6 +278,7 @@ function componentPart(node: MdxJsxElementNode, context: RoutePartsContext): Mdx
 					...props,
 					{
 						name: 'children',
+						value: children,
 						valueExpression: JSON.stringify(children),
 					},
 				]
@@ -302,7 +294,8 @@ function appendHtmlPart(parts: MdxPart[], nodes: readonly HastNode[], id: string
 	const staticNodes = normalizeStaticHastNodes(nodes, id);
 	const html = toHtml({ type: 'root', children: staticNodes }, { allowDangerousHtml: true });
 	if (html) {
-		parts.push({ kind: 'html', html, elementCount: countHastElements(staticNodes) });
+		const elementTags = hastElementTags(staticNodes);
+		parts.push({ kind: 'html', html, elementCount: elementTags.length, elementTags });
 	}
 }
 
@@ -356,14 +349,16 @@ function componentProp(attribute: MdxJsxAttributeNode, id: string): MdxProp {
 	}
 	const value = attribute.value;
 	if (value == null) {
-		return { name: attribute.name, valueExpression: 'true' };
+		return { name: attribute.name, value: true, valueExpression: 'true' };
 	}
 	if (typeof value === 'string') {
-		return { name: attribute.name, valueExpression: JSON.stringify(value) };
+		return { name: attribute.name, value, valueExpression: JSON.stringify(value) };
 	}
+	const literal = literalSafeExpressionValue(value.value, id);
 	return {
 		name: attribute.name,
-		valueExpression: literalValueExpression(literalSafeExpressionValue(value.value, id), id),
+		value: literal,
+		valueExpression: literalValueExpression(literal, id),
 	};
 }
 
@@ -487,15 +482,10 @@ function literalExpressionError(id: string) {
 	);
 }
 
-function renderHtmlExpression(route: MdxRoute, mode: 'ssr' | 'csr'): string {
+function renderHtmlExpression(route: MdxRoute): string {
 	return joinExpressions(
 		route.parts.map((part) => {
 			if (part.kind === 'html') return JSON.stringify(part.html);
-			if (mode === 'csr')
-				return JSON.stringify(
-					`<span data-markless-mdx-child="${part.componentIndex}"></span>`,
-				);
-
 			const component = route.components[part.componentIndex]!;
 			return `(await renderMdxChild(marklessMdxChildren, ${component.localName}, ${componentPropsExpression(component)}, { componentIndex: ${part.componentIndex}, hostPrefix: ${JSON.stringify(component.prefix)}, symbolPrefix: ${JSON.stringify(component.prefix)} }))`;
 		}),
@@ -511,26 +501,22 @@ function componentPropsExpression(component: MdxComponent): string {
 		.join(', ')} }`;
 }
 
-function renderCsrHtml(route: MdxRoute): string {
-	return `"<main data-markless-mdx-root>" + ${renderHtmlExpression(route, 'csr')} + "</main>"`;
-}
-
 function joinExpressions(expressions: ReadonlyArray<string>): string {
 	const filtered = expressions.filter((expression) => expression !== '""');
 	return filtered.length === 0 ? '""' : filtered.join(' + ');
 }
 
-function countHastElements(nodes: readonly HastNode[]): number {
-	let count = 0;
+function hastElementTags(nodes: readonly HastNode[]): string[] {
+	const tags: string[] = [];
 	for (const node of nodes) {
 		if (node.type === 'element') {
-			count += 1;
+			tags.push(String((node as { readonly tagName?: unknown }).tagName));
 		}
 		if ('children' in node && Array.isArray(node.children)) {
-			count += countHastElements(node.children as HastNode[]);
+			tags.push(...hastElementTags(node.children as HastNode[]));
 		}
 	}
-	return count;
+	return tags;
 }
 
 function renderSymbolLoaders(components: ReadonlyArray<MdxComponent>): string {
@@ -540,6 +526,33 @@ function renderSymbolLoaders(components: ReadonlyArray<MdxComponent>): string {
 				`{ prefix: ${JSON.stringify(component.prefix)}, loadSymbol(symbolId) { return import(${JSON.stringify(`${component.specifier}?markless-symbols`)}).then((mod) => mod.loadSymbol(symbolId.slice(${component.prefix.length}))); } }`,
 		)
 		.join(', ')}]`;
+}
+
+function renderMdxRenderDataLoader(
+	components: ReadonlyArray<MdxComponent>,
+	id: string,
+): string {
+	const reachedFrom = mdxMaterializedReachRoot(id);
+	const imports = components.map((component) => {
+		const source = withQuery(component.specifier, {
+			'markless-render-data': null,
+			...(reachedFrom ? { 'markless-reached-from': reachedFrom } : {}),
+		});
+		return `import(${JSON.stringify(source)})`;
+	});
+	const exportName = reachedFrom ? 'marklessPrerenderData' : 'marklessRenderData';
+	const children = components.map(
+		(component, index) =>
+			`{ componentIndex: ${index}, hostPrefix: ${JSON.stringify(component.prefix)}, symbolPrefix: ${JSON.stringify(component.prefix)}, props: ${componentPropsExpression(component)}, surface: modules[${index}].${exportName} }`,
+	);
+	return `() => Promise.all([${imports.join(', ')}]).then(modules => createMdxRenderDataSurface(marklessMdxParts, [${children.join(', ')}]))`;
+}
+
+function mdxMaterializedReachRoot(id: string): string | undefined {
+	const query = new URLSearchParams(parsePath(id).search);
+	const reachedFrom = query.get('markless-reached-from');
+	if (reachedFrom) return reachedFrom;
+	return query.has('markless-route') ? decodePath(parseURL(id).pathname) : undefined;
 }
 
 function isMdxEsm(node: HastNode): node is Extract<HastNode, { type: 'mdxjsEsm' }> {

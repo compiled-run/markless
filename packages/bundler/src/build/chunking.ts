@@ -14,10 +14,6 @@ const WEB_RUNTIME_CAPABILITY_GROUPS = [
 	// Keep the sizeable direct renderer out of the public render chunk so both
 	// halves remain below the permanent runtime-heavy chunk walls.
 	{ name: 'markless-direct-renderer', test: fileBasenamePattern('direct') },
-	{
-		name: 'markless-resume-csr-coordinate',
-		test: fileBasenamePattern('resume-csr-coordinate'),
-	},
 	{ name: 'markless-resume-branches', test: fileBasenamePattern('resume-branches') },
 	{ name: 'markless-resume-behaviors', test: fileBasenamePattern('resume-behaviors') },
 	{

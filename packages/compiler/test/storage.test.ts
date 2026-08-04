@@ -178,7 +178,6 @@ test('derived storage bakes a stable literal key and lowers the executable call'
 
 	for (const emittedSource of [
 		result.publicRenderModule.moduleSource,
-		result.publicRenderModule.csrModuleSource,
 		result.publicRenderModule.ssrModuleSource,
 	]) {
 		expect(emittedSource).not.toContain('storage(');
@@ -233,7 +232,6 @@ test('public render lowering removes executable storage calls', async () => {
 	]);
 	const emittedSources = [
 		result.publicRenderModule.moduleSource,
-		result.publicRenderModule.csrModuleSource,
 		result.publicRenderModule.ssrModuleSource,
 	];
 	for (const emittedSource of emittedSources) expect(emittedSource).not.toContain('storage(');

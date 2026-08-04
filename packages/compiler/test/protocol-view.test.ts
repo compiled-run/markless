@@ -62,8 +62,8 @@ export function App() @{
 		]),
 	);
 	expect(result.protocolView.events[0]?.symbolIds).toEqual([boundRow?.id]);
-	expect(result.publicRenderModule.csrModuleSource).toContain(
-		`${JSON.stringify(childHandler?.symbolId)}:${JSON.stringify(boundRow?.id)}`,
+	expect(JSON.stringify(result.publicRenderModule.componentDefinitions)).toContain(
+		JSON.stringify(boundRow?.id),
 	);
 	expect(childModule?.source).toContain(
 		'{ count: context.graph.read("state:count"), label: context.capture.read(',
@@ -113,7 +113,7 @@ export function App() @{
 
 	expect(boundRow).toBeDefined();
 	expect(childEvent?.symbolIds).toEqual([boundRow?.id]);
-	expect(result.publicRenderModule.csrModuleSource).toContain(boundRow!.id);
+	expect(JSON.stringify(result.publicRenderModule.componentDefinitions)).toContain(boundRow!.id);
 	expect(result.publicRenderModule.ssrModuleSource).toContain(boundRow!.id);
 	expect(rootResult.boundSymbolResolver.rows).toEqual([]);
 	expect(rootResult.protocolView.events[0]?.symbolIds).toEqual([rootHandler?.id]);

@@ -11,6 +11,16 @@ const compiler = vi.hoisted(() => ({
 	},
 }));
 
+const runtimeDemandMap = (replaced: boolean) => ({
+	passId: 'runtime-demand-map' as const,
+	version: 1 as const,
+	recordKinds: [{ kind: 'event', replaced }],
+	symbols: [],
+	payloadRecords: [],
+	actions: [],
+	unknownRecordModuleIds: [],
+});
+
 vi.mock('@markless/compiler', () => ({
 	collectTsrxModuleDiagnostics: vi.fn(() => []),
 	compileTsrxModule: vi.fn(async () => ({
@@ -21,21 +31,47 @@ vi.mock('@markless/compiler', () => ({
 		// CompileTsrxModuleResult); transform.ts reads payloadArena.state.storage
 		// unguarded. Empty storage keeps this test focused on tier selection.
 		payloadArena: { state: { storage: [] } },
+		// runtimeDemandMap is likewise a required compiler artifact. This fixture
+		// predates that contract; an empty map represents its no-demand module.
+		runtimeDemandMap: runtimeDemandMap(false),
+		runtimeDemandMaps: {
+			'plain-ssr': runtimeDemandMap(true),
+			prerender: runtimeDemandMap(false),
+		},
 		symbolModules: { modules: [] },
 		boundSymbolResolver: { rows: [] },
 		publicRenderPlan: { styleScopes: [] },
 		payloadScripts: { state: compiler.protocolState, view: compiler.protocolView },
 		publicRenderModule: {
+			renderDataModuleSource: '',
 			moduleSource: '',
 			rootExportName: null,
-			csrModuleSource: '',
-			csrExportName: null,
 			ssrModuleSource: '',
 			ssrExportName: null,
+			componentDefinitions: [],
 		},
 	})),
 	emitSymbolResolverModule: vi.fn(() => 'export function loadSymbol() {}'),
 }));
+
+test('transform selects the explicit demand map for each build class', async () => {
+	const { transformTsrxModule } = await import('../src/transform.ts');
+	const input = {
+		filename: '/workspace/app/src/App.tsrx',
+		source: 'export function App() @{}',
+		environment: 'client' as const,
+	};
+
+	const plainSsr = await transformTsrxModule({ ...input, runtimeDemandClass: 'plain-ssr' });
+	const prerender = await transformTsrxModule({ ...input, runtimeDemandClass: 'prerender' });
+
+	expect(plainSsr.manifest.runtimeDemandMap?.recordKinds).toEqual([
+		{ kind: 'event', replaced: true },
+	]);
+	expect(prerender.manifest.runtimeDemandMap?.recordKinds).toEqual([
+		{ kind: 'event', replaced: false },
+	]);
+});
 
 test('payload tier selection does not escalate on component edges alone', async () => {
 	compiler.componentEdges = [{ childComponentName: 'Child', importSource: './Child.tsrx' }];

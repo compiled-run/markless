@@ -2,6 +2,7 @@ import { parseModule } from '@tsrx/core';
 import type { RouteManifestRoute } from '../route-manifest.ts';
 import { buildRouteManifestFromFileIds } from '../route-manifest.ts';
 import type { Plugin } from 'vite';
+import { __marklessRouteHref } from './entries/route-href.ts';
 import { discoverPageFiles, type RouteTypegenFileSystem } from './route-typegen.ts';
 
 const ROUTE_HREF_HELPER_ID = 'virtual:markless-router/route-href';
@@ -107,6 +108,7 @@ export function transformAnchorSource(
 	}
 
 	const edits: Edit[] = [];
+	let needsHrefHelper = false;
 	const linkNames = marklessRouterLinkImportNames(ast);
 
 	walk(ast, (current) => {
@@ -143,13 +145,22 @@ export function transformAnchorSource(
 
 		validateObjectLiteralParams(hrefValue, routeParams, paramsExpression);
 
-		edits.push({
-			...rangeOf(href),
-			text: `href={__marklessRouteHref(${JSON.stringify(hrefValue)}, ${slice(
-				code,
-				paramsExpression,
-			)})}`,
-		});
+		const staticParams = staticObjectValue(paramsExpression);
+		if (staticParams) {
+			edits.push({
+				...rangeOf(href),
+				text: `href=${JSON.stringify(__marklessRouteHref(hrefValue, staticParams))}`,
+			});
+		} else {
+			needsHrefHelper = true;
+			edits.push({
+				...rangeOf(href),
+				text: `href={__marklessRouteHref(${JSON.stringify(hrefValue)}, ${slice(
+					code,
+					paramsExpression,
+				)})}`,
+			});
+		}
 		edits.push({ ...attributeRemovalRange(code, params), text: '' });
 	});
 
@@ -157,7 +168,36 @@ export function transformAnchorSource(
 		return code;
 	}
 
-	return `${helperImport()}${applyEdits(code, edits)}`;
+	return `${needsHrefHelper ? helperImport() : ''}${applyEdits(code, edits)}`;
+}
+
+function staticObjectValue(expression: Node): Readonly<Record<string, unknown>> | undefined {
+	if (expression.type !== 'ObjectExpression') return undefined;
+	const value: Record<string, unknown> = {};
+	for (const property of nodes(expression.properties)) {
+		if (property.type !== 'Property' || property.computed === true) return undefined;
+		const key = node(property.key);
+		const name = key?.type === 'Identifier' ? string(key.name) : literalString(key);
+		const propertyValue = staticExpressionValue(node(property.value));
+		if (!name || !propertyValue.known) return undefined;
+		value[name] = propertyValue.value;
+	}
+	return value;
+}
+
+function staticExpressionValue(expression: Node | undefined): { known: boolean; value?: unknown } {
+	if (!expression) return { known: false };
+	if (expression.type === 'Literal') return { known: true, value: expression.value };
+	if (expression.type === 'ArrayExpression') {
+		const values: unknown[] = [];
+		for (const element of nodes(expression.elements)) {
+			const value = staticExpressionValue(element);
+			if (!value.known) return { known: false };
+			values.push(value.value);
+		}
+		return { known: true, value: values };
+	}
+	return { known: false };
 }
 
 function marklessRouterLinkImportNames(ast: Node) {

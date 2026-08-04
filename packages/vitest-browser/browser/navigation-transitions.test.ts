@@ -1,9 +1,9 @@
 import { afterEach, expect, test } from 'vitest';
 import { dispatchRouteUpdate, startRouteUpdateRenderer } from '@markless/core/router';
 import { render } from '@markless/web/render';
-import AlphaPage from './fixtures/nav-page-alpha.tsrx';
-import BetaPage from './fixtures/nav-page-beta.tsrx';
-import SlowPage from './fixtures/nav-page-slow.tsrx';
+import AlphaPage from './fixtures/nav-page-alpha.tsrx?markless-route';
+import BetaPage from './fixtures/nav-page-beta.tsrx?markless-route';
+import SlowPage from './fixtures/nav-page-slow.tsrx?markless-route';
 
 // T110 / spec D8 navigation transitions: a client route swap holds the
 // outgoing page LIVE AND INTERACTIVE while the destination renders and its

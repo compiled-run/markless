@@ -355,6 +355,7 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 			${debugSetup}
 			for (const t of names) {
 			r.addEventListener(t, async (e) => {
+				if (r.__marklessDispatch) return r.__marklessDispatch({ root: r, event: e, element: e.target, eventRecord: null });
 				if (r.__asyncResumeRuntimeStarted) return;
 				const mod = await import(${JSON.stringify(resumeModuleUrl)});
 				await mod.resumeContainerEvent({ root: r, event: e, element: e.target, eventRecord: null });

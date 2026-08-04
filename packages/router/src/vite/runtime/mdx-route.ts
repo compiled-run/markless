@@ -2,6 +2,8 @@ export type MdxRoutePart =
 	| {
 			readonly kind: 'html';
 			readonly elementCount: number;
+			readonly html?: string;
+			readonly elementTags?: ReadonlyArray<string>;
 	  }
 	| {
 			readonly kind: 'component';
@@ -14,7 +16,6 @@ export type MdxRenderOutput = {
 	readonly state?: MdxStatePayload;
 	readonly view?: MdxViewPayload;
 	readonly loadSymbol?: (symbolId: string) => unknown;
-	readonly connectRuntime?: (context: unknown) => unknown;
 };
 
 export type MdxChild = {
@@ -35,6 +36,141 @@ export type MdxSymbolLoader = {
 	readonly prefix: string;
 	readonly loadSymbol: (symbolId: string) => unknown;
 };
+
+type MdxRenderDataSurface = {
+	readonly rootComponentName: string | null;
+	readonly renderData: Readonly<Record<string, unknown>>;
+	readonly components: Readonly<Record<string, unknown>>;
+	readonly imports: Readonly<Record<string, MdxRenderDataSurface>>;
+};
+
+type MdxRenderDataChild = {
+	readonly componentIndex: number;
+	readonly hostPrefix: string;
+	readonly symbolPrefix: string;
+	readonly props: Readonly<Record<string, unknown>>;
+	readonly surface: MdxRenderDataSurface;
+};
+
+// MDX contributes only static markup records. Imported TSRX children keep their
+// compiler-emitted render-data surfaces and compose through ordinary child edges.
+export function createMdxRenderDataSurface(
+	parts: ReadonlyArray<MdxRoutePart>,
+	children: ReadonlyArray<MdxRenderDataChild>,
+): MdxRenderDataSurface {
+	const componentName = 'MarklessMdxRoute';
+	const rootChunkId = `template:${componentName}`;
+	const childrenByIndex = new Map(children.map((child) => [child.componentIndex, child]));
+	const statics: string[] = [];
+	const slots: Array<Record<string, unknown>> = [];
+	const hosts: Array<Record<string, unknown>> = [
+		{
+			hostNodeId: '__mdx:root',
+			tagName: 'main',
+			coordinate: { kind: 'child-index', path: [0] },
+		},
+	];
+	const edges: Array<Record<string, unknown>> = [];
+	let staticHtml = '<main data-markless-mdx-root>';
+	let slotIndex = 0;
+	for (const [partIndex, part] of parts.entries()) {
+		if (part.kind === 'html') {
+			staticHtml += part.html ?? '';
+			for (const [tagIndex, tagName] of (part.elementTags ?? []).entries()) {
+				hosts.push({
+					hostNodeId: `__mdx:static:${partIndex}:${tagIndex}`,
+					tagName,
+					coordinate: { kind: 'child-index', path: [0, partIndex, tagIndex] },
+				});
+			}
+			continue;
+		}
+		const child = childrenByIndex.get(part.componentIndex);
+		if (!child) throw new Error(`MARKLESS_MDX_RENDER_DATA_CHILD_MISSING: ${part.componentIndex}`);
+		const childComponentName = child.surface.rootComponentName;
+		if (!childComponentName) {
+			throw new Error(`MARKLESS_MDX_RENDER_DATA_ROOT_MISSING: ${part.componentIndex}`);
+		}
+		const edgeId = `mdx:edge:${part.componentIndex}`;
+		staticHtml += `<!--markless-slot:${slotIndex}-->`;
+		statics.push(staticHtml);
+		staticHtml = '';
+		slots.push({
+			kind: 'child-component',
+			componentEdgeId: edgeId,
+			childComponentName,
+			childTemplateId: `template:${childComponentName}`,
+			coordinate: { kind: 'comment-anchor', path: [0, partIndex] },
+			staticIndex: slotIndex,
+		});
+		edges.push({
+			id: edgeId,
+			childComponentName,
+			hostPrefix: child.hostPrefix,
+			symbolPrefix: child.symbolPrefix,
+			props: Object.entries(child.props).map(([name, value]) => ({
+				name,
+				kind: 'serializable',
+				value,
+			})),
+		});
+		slotIndex++;
+	}
+	statics.push(`${staticHtml}</main>`);
+	const state = { version: 1, cells: [], computed: [] };
+	const view = {
+		version: 1,
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const renderData = {
+		root: { componentName, templateId: rootChunkId },
+		chunks: [
+			{
+				id: rootChunkId,
+				kind: 'template',
+				componentName,
+				statics,
+				hosts,
+				slots,
+			},
+		],
+		initialValues: [],
+		branches: [],
+		repeats: [],
+		boundaries: [],
+		interactions: [],
+	};
+	return {
+		rootComponentName: componentName,
+		renderData,
+		components: {
+			[componentName]: {
+				name: componentName,
+				state,
+				view,
+				rootChunkId,
+				stateGraphNodeIds: [],
+				initialValues: [],
+				branches: [],
+				boundaries: [],
+				edges,
+				propCellId: null,
+			},
+		},
+		imports: Object.fromEntries(
+			children.flatMap((child) =>
+				child.surface.rootComponentName
+					? [[child.surface.rootComponentName, child.surface] as const]
+					: [],
+			),
+		),
+	};
+}
 
 type MdxStatePayload = {
 	readonly version: unknown;
@@ -83,25 +219,6 @@ export async function renderMdxChild(
 	const output = await component.renderSsr?.(props);
 	if (output) children.push({ ...child, output });
 	return output?.html ?? '';
-}
-
-export function rootFromMdxHtml(html: string): Element {
-	const template = document.createElement('template');
-	template.innerHTML = html;
-	const root = template.content.firstElementChild;
-	if (!root) {
-		throw new Error('Markless Router MDX render did not produce a root element.');
-	}
-	return root;
-}
-
-export function replaceMdxChild(root: ParentNode, index: number, child: ChildNode | undefined) {
-	const placeholder = root.querySelector?.(`[data-markless-mdx-child="${index}"]`);
-	if (placeholder && child) {
-		placeholder.replaceWith(child);
-		return;
-	}
-	placeholder?.remove();
 }
 
 export function composeMdxState(children: readonly MdxChild[]): MdxStatePayload | undefined {

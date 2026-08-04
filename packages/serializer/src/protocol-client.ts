@@ -4,7 +4,12 @@ import {
 	ASYNC_PROTOCOL_VERSION,
 	STORAGE_PROTOCOL_VERSION,
 } from './protocol-constants.ts';
-import type { ProtocolStatePayload, ProtocolViewPayload } from './protocol.ts';
+import {
+	PROTOCOL_EVENT_ACTION_KIND,
+	type ProtocolEventActionKind,
+	type ProtocolStatePayload,
+	type ProtocolViewPayload,
+} from './protocol.ts';
 export type EncodedPayloadScripts = { readonly stateScript: string; readonly viewScript: string };
 export type DecodedPayloadScripts = {
 	readonly state: ProtocolStatePayload;
@@ -119,6 +124,7 @@ function baseView(value: unknown): asserts value is ProtocolViewPayload {
 		str(record, 'hostNodeId', context);
 		str(record, 'eventName', context);
 		if (!Array.isArray(record.symbolIds)) invalid(context, 'expected symbolIds array.');
+		eventAction(record.action, `${context}.action`);
 	}
 	if (payload.asyncBoundaries.length > 0)
 		for (const [index, boundary] of payload.asyncBoundaries.entries()) {
@@ -137,6 +143,26 @@ function baseView(value: unknown): asserts value is ProtocolViewPayload {
 					'expected initiallyServedArm to name a protocol async boundary arm.',
 				);
 		}
+}
+
+const EVENT_ACTION_VALIDATORS = {
+	[PROTOCOL_EVENT_ACTION_KIND.event]: () => {},
+	[PROTOCOL_EVENT_ACTION_KIND.externalDelegate]: (
+		action: Record<string, unknown>,
+		context: string,
+	) => str(action, 'owner', context),
+} satisfies Record<
+	ProtocolEventActionKind,
+	(action: Record<string, unknown>, context: string) => void
+>;
+
+function eventAction(value: unknown, context: string): void {
+	if (value === undefined) return;
+	const action = obj(value, context);
+	str(action, 'kind', context);
+	const validate = EVENT_ACTION_VALIDATORS[action.kind as ProtocolEventActionKind];
+	if (!validate) invalid(context, 'unknown event action kind.');
+	validate(action, context);
 }
 function root(value: unknown, type: RuntimePayloadType): Record<string, unknown> {
 	const record = obj(value, type);

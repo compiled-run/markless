@@ -1,8 +1,14 @@
 import type {
 	BoundSymbolResolverRow,
+	SemanticComponentEdge,
 	SymbolResolverPlan,
 	TriggerGroupArtifact,
 } from '@markless/compiler';
+import {
+	PROTOCOL_EVENT_ACTION_KIND,
+	protocolEventActionKind,
+	type ProtocolEventActionKind,
+} from '@markless/serializer';
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
 import { emitSymbolResolverModule } from '@markless/compiler';
 import type { SourceSymbolRow } from './source-module.ts';
@@ -24,6 +30,11 @@ export type PrerenderTriggerGroup = {
 	readonly view: ProtocolViewPayload;
 };
 
+const EVENT_STAGES_BROWSER_TRIGGER = {
+	[PROTOCOL_EVENT_ACTION_KIND.event]: true,
+	[PROTOCOL_EVENT_ACTION_KIND.externalDelegate]: false,
+} as const satisfies Record<ProtocolEventActionKind, boolean>;
+
 export function triggerGroupVirtualModuleId(filename: string, index: number): string {
 	return `virtual:markless:trigger-group:${encodeURIComponent(filename)}:${index}`;
 }
@@ -44,6 +55,7 @@ export function emitPrerenderTriggerGroupModule(input: {
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
 	readonly boundRows: ReadonlyArray<BoundSymbolResolverRow>;
 	readonly symbolRoutes?: ReadonlyArray<SourceSymbolRoute>;
+	readonly armRendererModuleId?: string;
 }): string {
 	const ids = new Set(input.group.symbolIds);
 	const boundRows = input.boundRows.filter((row) => ids.has(row.id));
@@ -51,9 +63,7 @@ export function emitPrerenderTriggerGroupModule(input: {
 		symbols: input.symbols.filter((symbol) => ids.has(symbol.id)),
 		boundSymbols: boundRows,
 	});
-	// Routes are cheap build tables and remain exhaustive. Only the symbols
-	// behind them are demand-loaded; slicing routes makes complete structural
-	// records point at a resolver that cannot serve all of their lazy symbols.
+	// Keep routes exhaustive while demand-loading only their symbols.
 	const routes = input.symbolRoutes ?? [];
 	if (routes.length > 0) {
 		source = source.replaceAll('loadSymbol(', 'marklessLoadLocalSymbol(');
@@ -69,11 +79,44 @@ export function emitPrerenderTriggerGroupModule(input: {
 		].join('\n');
 	}
 	return [
-		adaptImportedCaptureResolver(source, boundRows.some((row) => row.loaderSymbolId !== undefined)),
+		input.armRendererModuleId
+			? [
+					`import { prepareBoundaryArm as marklessPrepareBoundaryArm, renderBoundaryArm as marklessRenderBoundaryArm } from ${JSON.stringify(input.armRendererModuleId)};`,
+					'export function prepareBoundaryArm(boundaryId, status, graph) {',
+					'\treturn marklessPrepareBoundaryArm(boundaryId, status, graph, loadSymbol);',
+					'}',
+					'export function renderBoundaryArm(boundaryId, status, graph) {',
+					'\treturn marklessRenderBoundaryArm(boundaryId, status, graph, loadSymbol);',
+					'}',
+				].join('\n')
+			: '',
+		adaptImportedCaptureResolver(
+			source,
+			boundRows.some((row) => row.loaderSymbolId !== undefined),
+		),
 		`export const groupId=${JSON.stringify(input.group.id)};`,
 		`export const state=${JSON.stringify(input.group.state)};`,
 		`export const view=${JSON.stringify(input.group.view)};`,
 		`export const graphNodeIds=${JSON.stringify(input.group.graphNodeIds)};`,
+	].join('\n');
+}
+
+export function emitPrerenderBoundaryRendererModule(renderDataId: string): string {
+	return [
+		`import { marklessPrerenderData } from ${JSON.stringify(renderDataId)};`,
+		"import { renderPrerenderBoundary } from '@markless/web/fns/prerender-resume';",
+		'const marklessPreparedBoundaryArms = new Map();',
+		'export async function prepareBoundaryArm(boundaryId, status, graph, loadSymbol) {',
+		'\tconst rendered = await renderPrerenderBoundary(marklessPrerenderData, boundaryId, status, graph, loadSymbol);',
+		'\tmarklessPreparedBoundaryArms.set(`${boundaryId}:${status}`, rendered);',
+		'}',
+		'export function renderBoundaryArm(boundaryId, status) {',
+		'\tconst key = `${boundaryId}:${status}`;',
+		'\tconst rendered = marklessPreparedBoundaryArms.get(key);',
+		'\tif (!rendered) throw new Error(`Markless prerender arm ${key} was not prepared.`);',
+		'\tmarklessPreparedBoundaryArms.delete(key);',
+		'\treturn rendered;',
+		'}',
 	].join('\n');
 }
 
@@ -87,14 +130,27 @@ export function planPrerenderTriggerGroups(input: {
 	readonly filename: string;
 	readonly state: ProtocolStatePayload;
 	readonly view: ProtocolViewPayload;
+	readonly completeView?: ProtocolViewPayload;
 	readonly triggerGroups: TriggerGroupArtifact;
 	readonly symbolResolver: SymbolResolverPlan;
 	readonly boundRows: ReadonlyArray<BoundSymbolResolverRow>;
+	readonly componentEdges?: ReadonlyArray<SemanticComponentEdge>;
 }): PrerenderTriggerGroup[] {
 	const symbols = new Map(input.symbolResolver.symbols.map((symbol) => [symbol.id, symbol]));
 	const bounds = new Map(input.boundRows.map((row) => [row.id, row]));
+	const selfWakeBoundaries = unsettledAsyncBoundaryIndexes(input.state, input.view);
 	const routes = [
-		...input.view.events.map((event) => ({ event })),
+		...(selfWakeBoundaries.length > 0
+			? [
+					{
+						event: { hostNodeId: 'self-wake', eventName: 'self-wake', symbolIds: [] },
+						selfWakeBoundaries,
+					},
+				]
+			: []),
+		...input.view.events
+			.filter((event) => EVENT_STAGES_BROWSER_TRIGGER[protocolEventActionKind(event)])
+			.map((event) => ({ event })),
 		...(input.view.branches ?? []).flatMap((branch, branchIndex) => {
 			const events = new Map<
 				string,
@@ -123,15 +179,15 @@ export function planPrerenderTriggerGroups(input: {
 			}));
 		}),
 	];
-	return routes.flatMap(({ event, branch, branchIndex, hostPath }) => {
+	return routes.flatMap(({ event, branch, branchIndex, hostPath, selfWakeBoundaries }) => {
+		const closureView = selfWakeBoundaries ? (input.completeView ?? input.view) : input.view;
 		if (event.eventName === 'visible') return [];
 		const host = branch
 			? undefined
 			: input.view.locators.find((locator) => locator.hostNodeId === event.hostNodeId);
-		if (!host && !branch) return [];
+		if (!host && !branch && !selfWakeBoundaries) return [];
 		const compilerGroup = input.triggerGroups.groups.find(
-			(group) =>
-				group.hostNodeId === event.hostNodeId && group.eventName === event.eventName,
+			(group) => group.hostNodeId === event.hostNodeId && group.eventName === event.eventName,
 		);
 		const graphNodeIds = new Set<string>();
 		const symbolIds = new Set(event.symbolIds ?? []);
@@ -150,11 +206,41 @@ export function planPrerenderTriggerGroups(input: {
 			for (const arm of branch.armRecords ?? [])
 				collectCompleteArmRecordClosure(arm, graphNodeIds, symbolIds);
 		}
-		input.view.behaviors.forEach((behavior, index) => {
+		for (const boundaryIndex of selfWakeBoundaries ?? []) {
+			const servedBoundary = input.view.asyncBoundaries[boundaryIndex]!;
+			const boundary =
+				closureView.asyncBoundaries.find(
+					(candidate) => candidate.id === servedBoundary.id,
+				) ?? servedBoundary;
+			selected.boundaries.add(boundaryIndex);
+			if (boundary.updateSymbolId) symbolIds.add(boundary.updateSymbolId);
+			for (const read of boundary.asyncReads) {
+				graphNodeIds.add(read.graphNodeId);
+				if (read.runnerSymbolId) symbolIds.add(read.runnerSymbolId);
+			}
+			const arms = Array.isArray(boundary.armRecords)
+				? boundary.armRecords
+				: boundary.armRecords
+					? [boundary.armRecords]
+					: [];
+			for (const arm of arms) collectCompleteArmRecordClosure(arm, graphNodeIds, symbolIds);
+			// Settled-arm child props belong to the same graph segment.
+			const settledEdgeIds = new Set<string>();
+			for (const edge of input.componentEdges ?? []) {
+				if (edge.asyncBoundaryId !== boundary.id) continue;
+				settledEdgeIds.add(edge.id);
+				for (const prop of edge.props)
+					if (prop.kind === 'graph-reference') graphNodeIds.add(prop.graphNodeId);
+			}
+			// Claim edge-bound derives before the settled arm registers them.
+			for (const row of input.boundRows)
+				if (row.componentEdgePath.some((edgeId) => settledEdgeIds.has(edgeId)))
+					symbolIds.add(row.id);
+		}
+		closureView.behaviors.forEach((behavior, index) => {
+			if (selfWakeBoundaries) return;
 			const recordId = `behavior:${behavior.hostNodeId}:${behavior.symbolId ?? ''}`;
-			// The compiler group is module-local. Composed child triggers are bound
-			// only after compilation, so a zero-input host behavior must also close
-			// over every final build-known trigger without inventing graph demand.
+			// Zero-input host behavior closes over linked child triggers too.
 			if (
 				(behavior.inputGraphReads?.length ?? 0) > 0 &&
 				!compilerGroup?.payloadRecordIds.includes(recordId)
@@ -185,50 +271,88 @@ export function planPrerenderTriggerGroups(input: {
 					for (const read of symbol.reads ?? []) graphNodeIds.add(read.graphNodeId);
 				if ('writes' in symbol)
 					for (const write of symbol.writes ?? []) graphNodeIds.add(write.graphNodeId);
-				if (symbol.kind === 'async-computed-runner' || symbol.kind === 'sync-computed-derive') {
+				if (
+					symbol.kind === 'async-computed-runner' ||
+					symbol.kind === 'sync-computed-derive'
+				) {
 					graphNodeIds.add(symbol.graphNodeId);
 					for (const dependency of symbol.dependencies ?? [])
 						graphNodeIds.add(dependency.graphNodeId);
 				}
 				if ('elementHandleCalls' in symbol)
 					for (const call of symbol.elementHandleCalls ?? [])
-						input.view.elementHandles.forEach((handle, index) => {
+						closureView.elementHandles.forEach((handle, index) => {
 							if (handle.name === call.handleName) selected.elementHandles.add(index);
 						});
 			}
 			closeComputedGraph(graphNodeIds, input.state);
-			selectViewSubscribers(input.view, graphNodeIds, symbolIds, selected);
+			for (const graphNodeId of graphNodeIds) {
+				const runnerSymbolId = closureView.asyncRunners?.[graphNodeId];
+				if (runnerSymbolId) symbolIds.add(runnerSymbolId);
+			}
+			selectViewSubscribers(closureView, graphNodeIds, symbolIds, selected);
+			if (selfWakeBoundaries) {
+				// Boundary rendering consumes render-data initial values through this
+				// group's resolver. Claim each non-literal initializer for its graph.
+				for (const symbol of symbols.values())
+					if (
+						symbol.kind === 'state-initializer' &&
+						graphNodeIds.has(symbol.graphNodeId)
+					)
+						symbolIds.add(symbol.id);
+			}
 			changed = closureSize(graphNodeIds, symbolIds, selected) !== before;
 		}
 
 		const neededHosts = new Set<string>(branch ? [] : [event.hostNodeId]);
-		for (const index of selected.domUpdates) neededHosts.add(input.view.domUpdates[index]!.hostNodeId);
-		for (const index of selected.behaviors) neededHosts.add(input.view.behaviors[index]!.hostNodeId);
+		for (const index of selected.domUpdates)
+			neededHosts.add(closureView.domUpdates[index]!.hostNodeId);
+		for (const index of selected.behaviors)
+			neededHosts.add(closureView.behaviors[index]!.hostNodeId);
 		for (const index of selected.repeats)
-			neededHosts.add(input.view.keyedRepeats![index]!.parentHostNodeId);
+			neededHosts.add(closureView.keyedRepeats![index]!.parentHostNodeId);
 		for (const index of selected.elementHandles)
-			neededHosts.add(input.view.elementHandles[index]!.hostNodeId);
+			neededHosts.add(closureView.elementHandles[index]!.hostNodeId);
+		const selectedBoundaryIds = new Set(
+			[...selected.boundaries].map((index) => closureView.asyncBoundaries[index]!.id),
+		);
 		const view: ProtocolViewPayload = {
 			...input.view,
-			locators: input.view.locators.filter((locator) => neededHosts.has(locator.hostNodeId)),
-			events: branch ? [] : [event],
-			domUpdates: input.view.domUpdates.filter((_, index) => selected.domUpdates.has(index)),
-			behaviors: input.view.behaviors.filter((_, index) => selected.behaviors.has(index)),
-			elementHandles: input.view.elementHandles.filter((_, index) =>
+			locators: closureView.locators.filter((locator) => neededHosts.has(locator.hostNodeId)),
+			events: branch || selfWakeBoundaries ? [] : [event],
+			domUpdates: closureView.domUpdates.filter((_, index) => selected.domUpdates.has(index)),
+			behaviors: closureView.behaviors.filter((_, index) => selected.behaviors.has(index)),
+			elementHandles: closureView.elementHandles.filter((_, index) =>
 				selected.elementHandles.has(index),
 			),
-			keyedRepeats: input.view.keyedRepeats?.filter((_, index) => selected.repeats.has(index)),
-			branches: input.view.branches?.filter((_, index) => selected.branches.has(index)),
-			asyncBoundaries: input.view.asyncBoundaries.filter((_, index) =>
-				selected.boundaries.has(index),
+			keyedRepeats: closureView.keyedRepeats?.filter((_, index) =>
+				selected.repeats.has(index),
 			),
+			branches: closureView.branches?.filter((_, index) => selected.branches.has(index)),
+			// Self-wake carries the build-emitted per-arm record sets. The demand-
+			// loaded update symbol renders HTML; settle selects the matching records
+			// here and commits both through the ordinary arm machinery.
+			asyncBoundaries: closureView.asyncBoundaries.filter((boundary) =>
+				selectedBoundaryIds.has(boundary.id),
+			),
+			...(closureView.asyncRunners
+				? {
+						asyncRunners: Object.fromEntries(
+							Object.entries(closureView.asyncRunners).filter(([graphNodeId]) =>
+								graphNodeIds.has(graphNodeId),
+							),
+						),
+					}
+				: {}),
 		};
 		const graphIds = [...graphNodeIds].sort();
 		return [
 			{
-				id: branch
-					? `branch:${branch.id}:${event.eventName}:${hostPath!.join('.')}`
-					: `${event.hostNodeId}:${event.eventName}`,
+				id: selfWakeBoundaries
+					? 'self-wake'
+					: branch
+						? `branch:${branch.id}:${event.eventName}:${hostPath!.join('.')}`
+						: `${event.hostNodeId}:${event.eventName}`,
 				hostNodeId: event.hostNodeId,
 				eventName: event.eventName,
 				hostIndex: host?.index ?? -1,
@@ -246,6 +370,33 @@ export function planPrerenderTriggerGroups(input: {
 				view,
 			},
 		];
+	});
+}
+
+function unsettledAsyncBoundaryIndexes(
+	state: ProtocolStatePayload,
+	view: ProtocolViewPayload,
+): number[] {
+	const computed = new Map(state.computed.map((record) => [record.graphNodeId, record]));
+	const runners = { ...view.asyncRunners };
+	for (const boundary of view.asyncBoundaries)
+		for (const read of boundary.asyncReads)
+			if (read.runnerSymbolId) runners[read.graphNodeId] ??= read.runnerSymbolId;
+	return view.asyncBoundaries.flatMap((boundary, index) => {
+		const reachable = new Set(boundary.asyncReads.map((read) => read.graphNodeId));
+		for (const graphNodeId of reachable) {
+			const record = computed.get(graphNodeId);
+			if (!record) continue;
+			if (
+				runners[graphNodeId] &&
+				record.snapshot?.status !== 'fulfilled' &&
+				record.snapshot?.status !== 'rejected'
+			)
+				return [index];
+			for (const dependency of record.dependencies ?? [])
+				reachable.add(dependency.graphNodeId);
+		}
+		return [];
 	});
 }
 
@@ -284,7 +435,8 @@ function selectViewSubscribers(
 		if (!record.asyncReads.some((read) => graphNodeIds.has(read.graphNodeId))) return;
 		selected.boundaries.add(index);
 		if (record.updateSymbolId) symbolIds.add(record.updateSymbolId);
-		for (const read of record.asyncReads) if (read.runnerSymbolId) symbolIds.add(read.runnerSymbolId);
+		for (const read of record.asyncReads)
+			if (read.runnerSymbolId) symbolIds.add(read.runnerSymbolId);
 		const arms = Array.isArray(record.armRecords)
 			? record.armRecords
 			: record.armRecords
@@ -315,7 +467,9 @@ function collectCompleteArmRecordClosure(
 		readonly branches?: ReadonlyArray<{
 			readonly symbolId?: string;
 			readonly testReads?: ReadonlyArray<{ readonly graphNodeId: string }>;
-			readonly armRecords?: NonNullable<ProtocolViewPayload['branches']>[number]['armRecords'];
+			readonly armRecords?: NonNullable<
+				ProtocolViewPayload['branches']
+			>[number]['armRecords'];
 		}>;
 	},
 	graphNodeIds: Set<string>,
@@ -369,7 +523,10 @@ function closeComputedGraph(graphNodeIds: Set<string>, state: ProtocolStatePaylo
 	}
 }
 
-function filterState(state: ProtocolStatePayload, graphNodeIds: ReadonlySet<string>): ProtocolStatePayload {
+function filterState(
+	state: ProtocolStatePayload,
+	graphNodeIds: ReadonlySet<string>,
+): ProtocolStatePayload {
 	return {
 		...state,
 		cells: state.cells.filter((cell) => graphNodeIds.has(cell.graphNodeId)),

@@ -311,6 +311,15 @@ test('router resume entry imports TSRX virtual resume modules instead of page mo
 	expect(source).not.toContain('pageModule.resumeContainerEvent');
 });
 
+test('router client entry requests self-contained client route artifacts', async () => {
+	const source = await readFile(
+		new URL('../src/vite/entries/client-entry.ts', import.meta.url),
+		'utf8',
+	);
+
+	expect(source).toContain("query: '?markless-route'");
+});
+
 test('scopes router virtual entry modules by resolved Vite root', () => {
 	const routePlugin = flattenPlugins([router()]).find(
 		(plugin) => plugin.name === 'markless-router:routes',

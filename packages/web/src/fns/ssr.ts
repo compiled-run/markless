@@ -1,11 +1,12 @@
 import {
 	marklessAssertComposableStateNames,
 	marklessComposeState,
+	marklessCsrChildReadIsStatic,
 	marklessCsrRemapChildGraph,
 	marklessCsrRemapChildDomUpdate,
 	marklessCsrRemapChildKeyedRepeat,
 	marklessCsrRemapGraphOutput,
-} from './csr.ts';
+} from './composition.ts';
 import {
 	marklessBaseSymbolId,
 	marklessBoundSymbolId,
@@ -378,6 +379,7 @@ export function marklessSsrComposeView(structure, view, children, asyncSnapshots
 	);
 	const asyncRunners = { ...view.asyncRunners };
 	const externalSymbolIds = new Set();
+	const boundaryArmBranches = new Map();
 	for (const child of childData) {
 		if (child.view)
 			marklessSsrAppendChildView({
@@ -393,6 +395,7 @@ export function marklessSsrComposeView(structure, view, children, asyncSnapshots
 				asyncBoundaries,
 				asyncRunners,
 				externalSymbolIds,
+				boundaryArmBranches,
 			});
 	}
 	const locatorByHostId = new Map(
@@ -410,12 +413,34 @@ export function marklessSsrComposeView(structure, view, children, asyncSnapshots
 		if (rendered) Object.assign(locator, { index: rendered.index, tagName: rendered.tagName });
 	}
 	locators.sort((a, b) => a.index - b.index);
+	const boundariesWithComposedBranches = asyncBoundaries.map((boundary) => {
+		const composed = boundaryArmBranches.get(boundary.id);
+		if (!composed?.length || !Array.isArray(boundary.armRecords)) return boundary;
+		return {
+			...boundary,
+			armRecords: boundary.armRecords.map((arm, index) =>
+				index === 0
+					? { ...arm, branches: [...(arm.branches ?? []), ...composed] }
+					: arm,
+			),
+		};
+	});
 	const armizedBoundaries = marklessSsrArmizeBoundaries(
 		structure,
-		marklessSsrResolveAnchorRecords(structure, 'async', asyncBoundaries, idPrefix),
+		marklessSsrResolveAnchorRecords(
+			structure,
+			'async',
+			boundariesWithComposedBranches,
+			idPrefix,
+		),
 		{ locators, events, domUpdates, behaviors, elementHandles, keyedRepeats },
 		asyncSnapshots,
 		idPrefix,
+	);
+	const renderedBranchIds = new Set(
+		structure.anchors
+			.filter((anchor) => anchor.kind === 'branch')
+			.map((anchor) => anchor.id),
 	);
 	return {
 		view: {
@@ -426,7 +451,12 @@ export function marklessSsrComposeView(structure, view, children, asyncSnapshots
 			keyedRepeats,
 			behaviors,
 			elementHandles,
-			branches: marklessSsrResolveAnchorRecords(structure, 'branch', branches, idPrefix),
+			branches: marklessSsrResolveAnchorRecords(
+				structure,
+				'branch',
+				branches.filter((branch) => renderedBranchIds.has(idPrefix + branch.id)),
+				idPrefix,
+			),
 			asyncBoundaries: armizedBoundaries,
 			...(Object.keys(asyncRunners).length > 0 ? { asyncRunners } : {}),
 		},
@@ -562,6 +592,16 @@ export function marklessSsrAppendChildView(context) {
 	const childView = context.child.view;
 	const propEvents = context.child.output?.propEvents ?? [];
 	const callbackProps = context.child.callbackProps ?? {};
+	const callbackSymbolIds = new Map();
+	for (const event of childView.events) {
+		const propEvent = propEvents.find(
+			(item) => item.hostNodeId === event.hostNodeId && item.eventName === event.eventName,
+		);
+		const callbackSymbolId = propEvent ? callbackProps[propEvent.propName] : undefined;
+		if (callbackSymbolId)
+			for (const symbolId of event.symbolIds)
+				callbackSymbolIds.set(symbolId, callbackSymbolId);
+	}
 	for (const [graphNodeId, symbolId] of Object.entries(childView.asyncRunners ?? {})) {
 		const mapped = marklessSsrRemapChildGraph(
 			{ graphNodeId, path: [] },
@@ -625,9 +665,14 @@ export function marklessSsrAppendChildView(context) {
 		if (!mapped) continue;
 		const rowEvents = repeat.rowEvents.map((event) => ({
 			...event,
-			symbolIds: event.symbolIds.map((symbolId) =>
-				marklessBoundSymbolId(context.child, symbolId),
-			),
+			symbolIds: event.symbolIds.map((symbolId) => {
+				const callbackSymbolId = callbackSymbolIds.get(symbolId);
+				if (callbackSymbolId) {
+					context.externalSymbolIds.add(callbackSymbolId);
+					return callbackSymbolId;
+				}
+				return marklessBoundSymbolId(context.child, symbolId);
+			}),
 		}));
 		context.keyedRepeats.push({
 			...repeat,
@@ -664,12 +709,18 @@ export function marklessSsrAppendChildView(context) {
 			...handle,
 			hostNodeId: context.child.hostPrefix + handle.hostNodeId,
 		});
-	for (const branch of childView.branches ?? [])
-		context.branches.push({
+	for (const branch of childView.branches ?? []) {
+		const liveTestReads = branch.testReads.filter(
+			(read) => !marklessCsrChildReadIsStatic(read, context.child.graphProps),
+		);
+		// A branch decided only by an explicitly constant/absent prop rendered
+		// its final arm with the child. It has no live parent graph route to wire.
+		if (liveTestReads.length === 0) continue;
+		const mappedBranch = {
 			...branch,
 			id: context.child.hostPrefix + branch.id,
 			testReads: marklessSsrRemapChildReads(
-				branch.testReads,
+				liveTestReads,
 				context.child.graphProps,
 				context.child.hostPrefix + branch.id,
 			),
@@ -683,7 +734,15 @@ export function marklessSsrAppendChildView(context) {
 						),
 					}
 				: {}),
-		});
+		};
+		if (context.child.asyncBoundaryId) {
+			const armBranches = context.boundaryArmBranches.get(context.child.asyncBoundaryId) ?? [];
+			armBranches.push(mappedBranch);
+			context.boundaryArmBranches.set(context.child.asyncBoundaryId, armBranches);
+		} else {
+			context.branches.push(mappedBranch);
+		}
+	}
 	for (const boundary of childView.asyncBoundaries ?? [])
 		context.asyncBoundaries.push({
 			...boundary,

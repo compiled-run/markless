@@ -1,4 +1,5 @@
 import { render } from '@markless/web/render';
+import type { CsrRenderArtifact } from '@markless/web/render';
 import { holdNavigationSwapUntilSettled, type NavigationHoldRuntime } from './navigation-hold.ts';
 import {
 	MARKLESS_ROUTER_RENDERER_STARTED,
@@ -6,6 +7,8 @@ import {
 	routePageProps,
 	type RouteUpdate,
 } from './route-state.ts';
+
+const CURRENT_ROUTE_CONTAINER = '__marklessRouterCurrentRouteContainer';
 
 export function startRouteUpdateRenderer(document: Document = window.document): void {
 	const state = document as unknown as Record<string, unknown>;
@@ -18,46 +21,50 @@ export function startRouteUpdateRenderer(document: Document = window.document): 
 }
 
 interface ClientPageArtifact {
-	readonly renderCsr?: (props?: unknown) => unknown;
-	// MaybePromise: compiled renderSsr is async — the sync type let an
-	// unawaited .html read pass vp check (fourth missed call site of the
-	// async migration).
-	readonly renderSsr?: (
-		props?: unknown,
-	) => { readonly html: string } | Promise<{ readonly html: string }>;
+	readonly renderData?: CsrRenderArtifact['renderData'];
+	readonly loadSymbol?: (symbolId: string) => unknown | Promise<unknown>;
 }
 
 async function renderRouteUpdate(document: Document, update: RouteUpdate): Promise<void> {
 	try {
 		const artifact = update.page.default as ClientPageArtifact | undefined;
 		if (!artifact || update.signal?.aborted) return;
+		if (!artifact.renderData) {
+			throw new Error(
+				`MARKLESS_ROUTER_RENDER_DATA_MISSING: Navigated route ${JSON.stringify(update.route.file)} has no linked render-data module.`,
+			);
+		}
 
 		const props = routePageProps(update.route);
-		if (typeof artifact.renderCsr === 'function') {
-			// D8 navigation transition: the destination renders fully live but
-			// unmounted (its boundary runners already run); the outgoing page
-			// stays interactive in the document until the hold commits.
-			await render(
-				{
-					renderCsr: () => artifact.renderCsr?.(props),
-				} as never,
-				{
-					target: document.body,
-					// The D8 hold/deadline/min-duration state machine lives in
-					// navigation-hold.ts (pure, fake-clock property-tested).
-					beforeMount: (container) =>
-						holdNavigationSwapUntilSettled({
-							runtime: container.runtime as NavigationHoldRuntime,
-							signal: update.signal,
-						}),
+		// D8 navigation transition: the destination evaluates its build-known
+		// render-data closure fully live but unmounted. The outgoing authority
+		// remains interactive until the hold approves the exact swap boundary.
+		const state = document as unknown as Record<string, unknown>;
+		const container = await render(
+			{
+				renderData: artifact.renderData,
+				loadSymbol: artifact.loadSymbol as never,
+				props,
+			},
+			{
+				target: document.body,
+				// The D8 hold/deadline/min-duration state machine lives in
+				// navigation-hold.ts (pure, fake-clock property-tested).
+				beforeMount: async (incoming) => {
+					const commit = await holdNavigationSwapUntilSettled({
+						runtime: incoming.runtime as NavigationHoldRuntime,
+						signal: update.signal,
+					});
+					if (commit === false) return false;
+					const outgoing = state[CURRENT_ROUTE_CONTAINER] as
+						| { readonly runtime?: { readonly dispose?: () => void } }
+						| undefined;
+					outgoing?.runtime?.dispose?.();
+					return true;
 				},
-			);
-			return;
-		}
-
-		if (typeof artifact.renderSsr === 'function') {
-			document.body.innerHTML = (await artifact.renderSsr(props)).html;
-		}
+			},
+		);
+		if (!update.signal?.aborted) state[CURRENT_ROUTE_CONTAINER] = container;
 	} finally {
 		update.onRendered?.();
 	}

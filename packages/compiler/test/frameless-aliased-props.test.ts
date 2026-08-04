@@ -9,7 +9,7 @@ async function compile(source: string) {
 	});
 }
 
-test('public CSR and SSR renders preserve authored prop keys for simple aliases', async () => {
+test('public SSR renders preserve authored prop keys for simple aliases', async () => {
 	const compiled = await compile(`
 		export function Child({ label: displayLabel }) @{
 			<span>{displayLabel}</span>
@@ -20,9 +20,6 @@ test('public CSR and SSR renders preserve authored prop keys for simple aliases'
 		expect.arrayContaining([
 			expect.objectContaining({ name: 'displayLabel', target: 'props.label' }),
 		]),
-	);
-	expect(compiled.publicRenderModule.csrModuleSource).toContain(
-		'const { label: displayLabel } = props ?? {};',
 	);
 	expect(compiled.publicRenderModule.ssrModuleSource).toContain(
 		'const { label: displayLabel } = props ?? {};',
@@ -40,9 +37,6 @@ test('same-module child factories preserve authored prop keys for simple aliases
 		}
 	`);
 
-	expect(compiled.publicRenderModule.csrModuleSource).toContain(
-		'const { label: displayLabel } = props ?? {};',
-	);
 	expect(compiled.publicRenderModule.ssrModuleSource).toContain(
 		'const { label: displayLabel } = props ?? {};',
 	);
@@ -61,9 +55,6 @@ test('plain and default-value prop destructuring emission stays unchanged', asyn
 	`);
 
 	for (const compiled of [plain, defaulted]) {
-		expect(compiled.publicRenderModule.csrModuleSource).toContain(
-			'const { label } = props ?? {};',
-		);
 		expect(compiled.publicRenderModule.ssrModuleSource).toContain(
 			'const { label } = props ?? {};',
 		);

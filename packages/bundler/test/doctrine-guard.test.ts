@@ -11,6 +11,11 @@ const doctrine =
 // allowlist named makes any future exception an explicit doctrine change here.
 const SYMBOLS_ONLY_ALLOWLIST: Readonly<Record<string, string>> = {};
 
+const EMITTED_DOM_ORDER_WALK_ALLOWLIST: Readonly<Record<string, string>> = {
+	'packages/web/src/fns/dom-order.ts :: const w = document.createTreeWalker(r, 1);':
+		'The neutral emitted locator helper walks elements by compiler-recorded DOM order.',
+};
+
 // Exact conditional sites are intentional: adding another environment decision
 // requires adding its reason beside the guard instead of quietly distributing posture.
 const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
@@ -22,10 +27,22 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Environment-less invalidation falls back to the already resolved client environment.',
 	"packages/bundler/src/rolldown.ts :: if (currentEnvironment !== 'client') {":
 		'Rolldown entry signatures are adjusted only for its resolved client build.',
+	"packages/bundler/src/rolldown.ts :: environment !== 'client' ||":
+		'Imported symbol facades are materialized only for the resolved client build.',
 	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'client' &&":
 		'Rolldown transform hooks project the resolved environment into client-only build behavior.',
+	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'client' && renderDataRequest":
+		'Reached-from lookup is limited to client render-data requests before materialized-route propagation is selected.',
 	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'client'":
 		'Prerender records are supplied only to the resolved client compilation that emits staged wake modules.',
+	"packages/bundler/src/rolldown.ts :: (currentEnvironment === 'client' && clientRouteArtifactSources.has(source)),":
+		'Client route artifacts opt their primary source into development-shaped diagnostics.',
+	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'client' && !isClientPrimarySourceRequest(id) ? id : source;":
+		'Client query facades retain their meaning-bearing manifest identity.',
+	"packages/bundler/src/rolldown.ts :: if (currentEnvironment === 'client' && clientRouteArtifact) {":
+		'Only client route-artifact requests run package-child materialization.',
+	"packages/bundler/src/rolldown.ts :: if (currentEnvironment === 'client' && isClientPrimarySourceRequest(id)) {":
+		'Primary-source tracking is scoped to the resolved client graph.',
 	"packages/bundler/src/rolldown.ts :: internalOptions.dev === true && currentEnvironment === 'client',":
 		'Development execution logging is emitted only into the resolved client graph.',
 	"packages/bundler/src/rolldown.ts :: if (currentEnvironment === 'client' && renderDataRequest) {":
@@ -52,22 +69,22 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Source emission creates symbol routes only for a client module shape.',
 	"packages/bundler/src/source-module.ts :: (input.environment === 'client' &&":
 		'Source emission omits render-data imports for the resolved client-only shape.',
-	"packages/bundler/src/source-module.ts :: (input.environment === 'client' && input.nativeCsr && !input.prerenderRecords)":
-		'Source emission omits payload imports for native client rendering.',
 	"packages/bundler/src/source-module.ts :: input.environment === 'client' && input.executionLog !== 'never'":
 		'Source emission includes execution logging only in client output.',
-	"packages/bundler/src/source-module.ts :: symbolsOnly || (input.environment === 'client' && input.nativeCsr)":
-		'Source emission hides resume payload exports from native client output.',
 	"packages/bundler/src/source-module.ts :: input.devResumeReexport && input.environment === 'client'":
 		'Source emission adds the development resume edge only to client output.',
 	"packages/bundler/src/source-module.ts :: input.environment === 'server' || symbolsOnly || input.prerenderRecords":
 		'Source emission excludes client render bodies from server and symbols-only shapes.',
-	"packages/bundler/src/source-module.ts :: input.environment === 'client' && (symbolsOnly || !input.prerenderRecords)":
-		'Source emission keeps SSR code out of ordinary and symbols-only client output.',
-	"packages/bundler/src/source-module.ts :: input.environment !== 'server' &&":
-		'Compiled app metadata includes a CSR entry outside server-only output.',
-	"packages/bundler/src/source-module.ts :: input.ssrExportName && (input.environment !== 'client' || input.prerenderRecords)":
-		'Compiled app metadata includes SSR rendering outside ordinary client output.',
+	"packages/bundler/src/source-module.ts :: input.environment === 'client' && (symbolsOnly || (!input.prerenderRecords && !input.dev))":
+		'Source emission omits the canonical SSR module from production ordinary and symbols-only client output while retaining it for server, prerender, and development output.',
+	"packages/bundler/src/source-module.ts :: input.environment === 'client' &&":
+		'Source emission keeps SSR code out of production ordinary and symbols-only client output while dev uses the canonical SSR surface for mounting.',
+	"packages/bundler/src/source-module.ts :: input.rootExportName && input.environment !== 'server' && !input.prerenderRecords":
+		'Compiled app metadata includes a direct render entry outside server-only output.',
+	"packages/bundler/src/source-module.ts :: input.environment !== 'server' && input.rootExportName === null":
+		'Non-server linked artifacts retain their emitted symbol loader when no direct render body exists.',
+	"packages/bundler/src/source-module.ts :: (input.environment !== 'client' || input.prerenderRecords || input.dev)":
+		'Compiled app metadata exposes canonical SSR rendering on servers, prerender builds, and development client mounts.',
 	"packages/bundler/src/source-module.ts :: input.resumeModuleUrl && input.environment !== 'client'":
 		'Compiled app metadata exposes resume URLs only from non-client output.',
 	"packages/bundler/src/source-module.ts :: input.prerenderWakeModuleUrl && input.environment !== 'client'":
@@ -82,17 +99,19 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Compiled app metadata emits module preloads from server output.',
 	"packages/bundler/src/source-module.ts :: input.environment === 'client'":
 		'Compiled app metadata omits server document fields from client output.',
+	"packages/bundler/src/transform.ts :: const linkedClientRenderData = input.environment === 'client' && !input.prerenderRecords;":
+		'Build-time source emission recursively links ordinary client render-data modules while prerender records use their separately resolved shape.',
 	"packages/bundler/src/vite/environment.ts :: if (environment === 'client') {":
 		'This file is the Vite environment-name resolver for client posture.',
 	"packages/bundler/src/vite/environment.ts :: if (environment === 'server') {":
 		'This file is the Vite environment-name resolver for server posture.',
 	"packages/bundler/src/vite/index.ts :: const prerender = process.env.MARKLESS_PRERENDER === '1';":
 		'The Vite host adapter reads the process flag once at plugin construction.',
-	"packages/bundler/src/vite/index.ts :: rolldownOptions.prerenderWakeChannel = process.env.MARKLESS_PRERENDER_WAKE === '1';":
-		'The Vite host adapter reads the wake-channel flag once at plugin construction.',
+	'packages/bundler/src/vite/index.ts :: const explicitPrerenderWake = process.env.MARKLESS_PRERENDER_WAKE;':
+		'The Vite host adapter reads the wake-channel override once at plugin construction.',
 	"packages/bundler/src/vite/index.ts :: ...(environment === 'client'":
 		'Vite configuration projects the resolved client environment into module preload settings.',
-	"packages/bundler/src/vite/index.ts :: if (config.build?.lib || config.build?.ssr) {":
+	'packages/bundler/src/vite/index.ts :: if (config.build?.lib || config.build?.ssr) {':
 		'Vite setup preserves consumer-owned library and SSR build configuration.',
 	"packages/bundler/src/vite/index.ts :: if (environment === 'server') {":
 		'Vite output directories are selected from the resolved environment.',
@@ -141,7 +160,9 @@ describe('mechanical doctrine guard', () => {
 			}),
 		);
 
-		expect(files.length, 'the doctrine guard must cover fixture TSRX entries').toBeGreaterThan(0);
+		expect(files.length, 'the doctrine guard must cover fixture TSRX entries').toBeGreaterThan(
+			0,
+		);
 		assertSymbolsOnly(entries);
 	});
 
@@ -164,6 +185,25 @@ describe('mechanical doctrine guard', () => {
 		).flat();
 		assertAllowlisted('posture conditional', matches, POSTURE_CONDITIONAL_ALLOWLIST);
 	});
+
+	test('emitted DOM-order walks stay in the exact-line allowlist', async () => {
+		const file = 'packages/web/src/fns/dom-order.ts';
+		const matches = sourceMatches(file, await readFile(resolve(repoRoot, file), 'utf8'), [
+			/\bcreateTreeWalker\b/,
+		]);
+		assertAllowlisted('emitted DOM-order walk', matches, EMITTED_DOM_ORDER_WALK_ALLOWLIST);
+	});
+
+	test('native mount paths never invoke component renderCsr artifacts', async () => {
+		const invocation = /(?:\.|\?\.)renderCsr(?:\?\.)?\s*\(/;
+		expect(invocation.test('artifact.renderCsr(props)')).toBe(true);
+		for (const file of [
+			'packages/web/src/render-csr.ts',
+			'packages/router/src/route-renderer.ts',
+		]) {
+			expect(await readFile(resolve(repoRoot, file), 'utf8'), file).not.toMatch(invocation);
+		}
+	});
 });
 
 function assertSymbolsOnly(entries: readonly ClientGraphEntry[]): void {
@@ -173,9 +213,9 @@ function assertSymbolsOnly(entries: readonly ClientGraphEntry[]): void {
 		for (const name of entry.componentNames) {
 			const escaped = escapeRegExp(name);
 			if (
-				new RegExp(`\\bexport\\s+(?:default\\s+)?(?:async\\s+)?function\\s+${escaped}\\b`).test(
-					entry.code,
-				) ||
+				new RegExp(
+					`\\bexport\\s+(?:default\\s+)?(?:async\\s+)?function\\s+${escaped}\\b`,
+				).test(entry.code) ||
 				new RegExp(`\\bexport\\s*\\{[^}]*\\b${escaped}\\b`, 's').test(entry.code)
 			) {
 				violations.push(`${entry.file}: exported component symbol ${name}`);
@@ -186,7 +226,11 @@ function assertSymbolsOnly(entries: readonly ClientGraphEntry[]): void {
 		}
 	}
 	if (violations.length > 0) {
-		throw doctrineError('client graphs must export symbols only', violations, 'SYMBOLS_ONLY_ALLOWLIST');
+		throw doctrineError(
+			'client graphs must export symbols only',
+			violations,
+			'SYMBOLS_ONLY_ALLOWLIST',
+		);
 	}
 }
 
@@ -242,7 +286,12 @@ function assertAllowlisted(
 
 function doctrineError(kind: string, violations: readonly string[], allowlist: string): Error {
 	return new Error(
-		[`DOCTRINE GUARD FAILED: ${kind}.`, doctrine, ...violations, `Allowlist: ${allowlist} in ${relative(repoRoot, import.meta.filename)}`].join('\n'),
+		[
+			`DOCTRINE GUARD FAILED: ${kind}.`,
+			doctrine,
+			...violations,
+			`Allowlist: ${allowlist} in ${relative(repoRoot, import.meta.filename)}`,
+		].join('\n'),
 	);
 }
 
@@ -251,7 +300,9 @@ async function findFiles(root: string, suffix: string): Promise<string[]> {
 	const files = await Promise.all(
 		entries.map((entry) => {
 			const path = resolve(root, entry.name);
-			return entry.isDirectory() ? findFiles(path, suffix) : Promise.resolve(path.endsWith(suffix) ? [path] : []);
+			return entry.isDirectory()
+				? findFiles(path, suffix)
+				: Promise.resolve(path.endsWith(suffix) ? [path] : []);
 		}),
 	);
 	return files.flat().sort();

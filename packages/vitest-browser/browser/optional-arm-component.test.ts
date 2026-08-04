@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from 'vitest';
 import { dispatchRouteUpdate, startRouteUpdateRenderer } from '@markless/core/router';
-import OptionalContextPage from './fixtures/optional-context-page.tsrx';
+import OptionalContextPage from './fixtures/optional-context-page.tsrx?markless-route';
 
 // T115 / D2: a component inside a FALSY @if arm must never execute during a
 // client-side render. The org-link defect: the page's settled arm rendered a

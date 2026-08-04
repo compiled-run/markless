@@ -1,6 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import { marklessClient, marklessServer, transformTsrxModule } from '../src/rolldown.ts';
 import { callBuildStart, callLoad, callResolveId, callTransform } from './helpers.ts';
+import { resolve } from 'pathe';
 
 const helperFilename = '/workspace/app/src/counter.tsrx';
 const importerFilename = '/workspace/app/src/App.tsrx';
@@ -103,6 +104,75 @@ test('linked child symbol resolution fails loudly when its registered module is 
 	await expect(callResolveId(plugin, childSymbolId)).rejects.toThrow(
 		`MARKLESS_CHILD_SYMBOL_MISSING: Linked child ${JSON.stringify(childFilename)} does not provide requested symbol module ${JSON.stringify(childSymbolId)}.`,
 	);
+});
+
+test('artifact-shaped package children expose static materialization candidates without CSR emission', async () => {
+	const plugin = marklessClient({ dev: true });
+	const routerModule = resolve(import.meta.dirname, '../../router/src/index.ts');
+	const source = `import { Link } from '@markless/core/router';
+export function App() @{ <main><Link href="/docs">Docs</Link></main> }`;
+	callBuildStart(plugin, { cwd: '/workspace/app' });
+	const result = await callTransform(plugin, source, importerFilename, {
+		resolve: vi.fn(async (specifier: string) =>
+			specifier === '@markless/core/router' ? { id: routerModule } : null,
+		),
+	});
+
+	expect(result.artifactChildren).toEqual([
+		expect.objectContaining({
+			componentName: 'Link',
+			props: [expect.objectContaining({ name: 'href', kind: 'serializable', value: '/docs' })],
+			projection: expect.objectContaining({ kind: 'static-markup', markup: 'Docs' }),
+		}),
+	]);
+	expect(result.code).not.toContain('@markless/web/fns/csr');
+	expect(result.code).not.toContain('createMarklessCsrChunkRenderer');
+});
+
+test('artifact-shaped package children preserve non-build-known props for route materialization', async () => {
+	const plugin = marklessClient({ dev: true });
+	const routerModule = resolve(import.meta.dirname, '../../router/src/index.ts');
+	const source = `import { Link } from '@markless/core/router';
+export function App({ href }) @{ <main><Link href={href}>Docs</Link></main> }`;
+	callBuildStart(plugin, { cwd: '/workspace/app' });
+
+	const result = await callTransform(plugin, source, importerFilename, {
+		resolve: vi.fn(async (specifier: string) =>
+			specifier === '@markless/core/router' ? { id: routerModule } : null,
+		),
+	});
+	expect(result.artifactChildren).toEqual([
+		expect.objectContaining({
+			componentName: 'Link',
+			props: [
+				expect.objectContaining({
+					name: 'href',
+					kind: 'graph-reference',
+					source: 'href',
+				}),
+			],
+		}),
+	]);
+});
+
+test('server document children stay in request-time composition and are not materialized', async () => {
+	const plugin = marklessServer({ dev: true });
+	const routerModule = resolve(import.meta.dirname, '../../router/src/index.ts');
+	const source = `import { Html } from '@markless/core/router';
+export default function Document({ children }) @{ <Html>{children}</Html> }`;
+	callBuildStart(plugin, { cwd: '/workspace/app' });
+	const result = await callTransform(plugin, source, '/workspace/app/document.tsrx', {
+		resolve: vi.fn(async (specifier: string) =>
+			specifier === '@markless/core/router' ? { id: routerModule } : null,
+		),
+	});
+
+	expect(result.code).toContain(
+		'import { Html as __marklessSsrComponent0 } from "@markless/core/router";',
+	);
+	expect(result.code).toContain('__marklessSsrComponent0?.renderSsr?.(');
+	expect(result.code).not.toContain('@markless/web/fns/csr');
+	expect(result.code).not.toContain('createMarklessCsrChunkRenderer');
 });
 
 test('prerender child render-data imports use the linked interface filename', async () => {

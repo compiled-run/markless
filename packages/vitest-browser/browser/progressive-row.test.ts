@@ -24,7 +24,7 @@ afterEach(async () => {
 	await cleanup();
 });
 
-test('progressive execution: qualifying row dispatch stays on the lean keyed-repeat path', async () => {
+test('progressive execution: qualifying row dispatch uses generic keyed-repeat records', async () => {
 	const screen = await renderProgressiveSSR(renderSSRPhased(RowQualifying));
 	const container = screen.container;
 	const view = readViewPayload(container);
@@ -39,17 +39,24 @@ test('progressive execution: qualifying row dispatch stays on the lean keyed-rep
 	const executed = executedModules();
 	const allowed = deriveAllowedModules(view, rowQualifyingRuntimeDemandMap, rowAction);
 	expect(forbiddenExecutedModules(executed, allowed)).toEqual([]);
-	expect(executed).toContain('web/event-only-lean/row');
+	expect(
+		rowQualifyingRuntimeDemandMap.actions.find(
+			(action) => action.recordKind === 'keyed-repeat-row',
+		)?.plan,
+	).toBeUndefined();
+	expect(executed).not.toContain('web/event-only-lean/row');
+	expect(executed).not.toContain('web/event-only-lean/lean-shared');
 	expect(executed).not.toContain('web/event-only-lean/scalar-core');
 	expect(executed).not.toContain('web/event-only-lean/scalar-resume');
 	expect(executed).toContain('web/resume-keyed-repeats');
+	expect(executed).toContain('web/resume-runtime');
 	expect(executed).not.toContain('web/resume-async-boundaries');
 	expect(executed).not.toContain('web/resume-branches');
 	expect(executed).not.toContain('web/resume-behaviors');
 	expect(executed).not.toContain('web/event-only-behaviors');
 });
 
-test('progressive execution: repeated row updates preserve warm scalar state on the lean path', async () => {
+test('progressive execution: repeated row updates preserve warm state on generic records', async () => {
 	const screen = await renderProgressiveSSR(renderSSRPhased(RowIncrement));
 	const container = screen.container;
 	const view = readViewPayload(container);
@@ -68,14 +75,13 @@ test('progressive execution: repeated row updates preserve warm scalar state on 
 	const executed = executedModules();
 	const allowed = deriveAllowedModules(view, rowIncrementRuntimeDemandMap, rowAction);
 	expect(forbiddenExecutedModules(executed, allowed)).toEqual([]);
-	expect(rowIncrementRuntimeDemandMap.actions).toContainEqual(
-		expect.objectContaining({
-			recordKind: 'keyed-repeat-row',
-			plan: expect.objectContaining({ kind: 'row' }),
-		}),
-	);
-	// The previous test already imported the shared row module in this browser
-	// module graph, so execution logging may correctly report it as warm here.
+	expect(
+		rowIncrementRuntimeDemandMap.actions.find(
+			(action) => action.recordKind === 'keyed-repeat-row',
+		)?.plan,
+	).toBeUndefined();
+	expect(executed).not.toContain('web/event-only-lean/row');
+	expect(executed).not.toContain('web/event-only-lean/lean-shared');
 	expect(executed).not.toContain('web/event-only-lean/scalar-core');
 	expect(executed).not.toContain('web/resume-branches');
 });

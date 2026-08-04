@@ -3,7 +3,7 @@ import { decodePayloadScripts } from '../../../serializer/src/protocol-client-st
 import {
 	mergeResumeRecordDelta,
 	type ResumeRecordSet,
-} from '@markless/serializer/resume-record-delta';
+} from '@markless/serializer/resume-record-merge';
 import type { ResumePayloadScriptsInput } from '../payload-full.ts';
 import {
 	documentTemplateBranchHtml,

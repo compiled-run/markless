@@ -18,7 +18,8 @@ const diseaseFixtures = [
 			return {
 				diagnostics: collectTsrxModuleDiagnostics(result).map(diagnosticIdentity),
 				keyedRepeatCount: result.payloadArena.view.keyedRepeats.length,
-				repeatGateCount: result.publicRenderPlan.repeatGates.length,
+				directRepeatCount: result.renderData.repeats.filter((repeat) => repeat.directSupported)
+					.length,
 			};
 		},
 	},

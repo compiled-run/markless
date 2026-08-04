@@ -95,6 +95,10 @@ export type SsrRenderData = {
 		readonly initiallyServedArm: number;
 		readonly armChunkIds: Readonly<{ readonly try: string; readonly pending?: string; readonly catch?: string }>;
 	}>;
+	readonly branches?: ReadonlyArray<{
+		readonly branchSiteId: string;
+		readonly asyncBoundaryId?: string;
+	}>;
 };
 
 export type SsrDataReadContext = {
@@ -183,7 +187,7 @@ export type StructureToken =
 	| { readonly kind: 'element'; readonly hostNodeId: string; readonly tagName: string }
 	| {
 			readonly kind: 'comment';
-			readonly anchorKind: 'branch' | 'async';
+			readonly anchorKind: 'branch' | 'async' | 'arm-branch';
 			readonly anchorId: string;
 			readonly edge: 'start' | 'end';
 			readonly anchorHtml?: string;
@@ -305,7 +309,10 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 				}));
 				return {
 					html: child.html,
-					tokens: childTokens ?? [...countTokens, ...(projection?.tokens ?? [])],
+					tokens: [
+						...(childTokens ?? countTokens),
+						...(projection?.tokens ?? []),
+					],
 				};
 			}
 			case 'branch': {
@@ -316,9 +323,15 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 				const armChunkId = slot.armTemplateIds[arm];
 				const body = armChunkId ? await renderChunk(armChunkId, {}) : { html: '', tokens: [] };
 				const id = `${idPrefix}${slot.branchSiteId}`;
+				const marker = input.renderData.branches?.some(
+					(branch) =>
+						branch.branchSiteId === slot.branchSiteId && branch.asyncBoundaryId !== undefined,
+				)
+					? 'arm-branch'
+					: 'branch';
 				return {
-					html: `<!--markless:branch:${id}-->${body.html}<!--/markless:branch:${id}-->`,
-					tokens: [commentToken('branch', id, 'start', body.html), ...body.tokens, commentToken('branch', id, 'end')],
+					html: `<!--markless:${marker}:${id}-->${body.html}<!--/markless:${marker}:${id}-->`,
+					tokens: [commentToken(marker, id, 'start', body.html), ...body.tokens, commentToken(marker, id, 'end')],
 				};
 			}
 			case 'repeat': {
@@ -397,7 +410,7 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 }
 
 function commentToken(
-	anchorKind: 'branch' | 'async',
+	anchorKind: 'branch' | 'async' | 'arm-branch',
 	anchorId: string,
 	edge: 'start' | 'end',
 	anchorHtml?: string,
@@ -423,6 +436,9 @@ function materializeStructure(tokens: ReadonlyArray<StructureToken>): SsrDataStr
 			locators.push({ hostNodeId: token.hostNodeId, tagName: token.tagName, index: locators.length });
 			continue;
 		}
+		// Arm-branch comments live in their owning boundary's local census.
+		// Page-level anchor indexes deliberately do not count them.
+		if (token.anchorKind === 'arm-branch') continue;
 		if (token.edge === 'start')
 			starts.set(token.anchorId, {
 				comment: commentIndex,

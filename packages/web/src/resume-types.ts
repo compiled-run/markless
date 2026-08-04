@@ -25,6 +25,13 @@ export type ResumeDomElement = ResumeDomNode & {
 	// Full and staged runtimes register records only; they never add a second
 	// listener authority while this marker is present.
 	__marklessDelegatedDispatch?: boolean;
+	__marklessDispatch?: (input: {
+		readonly root: ResumeDomElement;
+		readonly event: ResumeDomEvent;
+		readonly element?: ResumeDomElement | null;
+		readonly eventRecord?: ResumeEventRecord | null;
+		readonly syncPolicyAlreadyApplied?: boolean;
+	}) => Promise<void>;
 	__marklessEventOnlyGraph?: Map<string, unknown>;
 };
 export type ResumeDomComment = ResumeDomNode & { readonly nodeType: 8; readonly data?: string };
@@ -77,17 +84,7 @@ export type ResumeAsyncBoundaryRecord = {
 	readonly startAnchor: ResumeDomComment;
 	readonly endAnchor: ResumeDomComment;
 	readonly asyncReads: ProtocolViewPayload['asyncBoundaries'][number]['asyncReads'];
-	readonly renderArm?: (
-		status: 'fulfilled' | 'rejected',
-	) => {
-		readonly nodes: ReadonlyArray<ResumeDomNode>;
-		readonly armRecords: ResumeArmRecordSet;
-		readonly elementsByHostId: ReadonlyMap<string, ResumeDomElement>;
-		readonly eventElementsByHostId?: ReadonlyMap<
-			string,
-			ReadonlyArray<ResumeDomElement>
-		>;
-	};
+	readonly armRecords?: ResumeArmRecordSet | ReadonlyArray<unknown>;
 };
 export type ResumeBehaviorRecord = ProtocolViewPayload['behaviors'][number];
 export type ResumeKeyedRepeatRecord = NonNullable<ProtocolViewPayload['keyedRepeats']>[number];
@@ -230,8 +227,14 @@ export type ResumeRuntimeInput = {
 		status: 'fulfilled' | 'rejected',
 		graph: RuntimeGraph,
 	) => Promise<{
-		readonly html: string;
+		readonly html?: string;
+		readonly nodes?: ReadonlyArray<ResumeDomNode>;
 		readonly armRecords: ResumeArmRecordSet;
+		readonly elementsByHostId?: ReadonlyMap<string, ResumeDomElement>;
+		readonly eventElementsByHostId?: ReadonlyMap<
+			string,
+			ReadonlyArray<ResumeDomElement>
+		>;
 		readonly computed?: ProtocolStatePayload['computed'];
 	}>;
 	readonly createVisibilityObserver?: ResumeVisibilityObserverFactory;
@@ -240,6 +243,10 @@ export type ResumeRuntimeInput = {
 		entries: ReadonlyArray<import('@markless/runtime').DomJournalEntry>,
 	) => void | Promise<void>;
 	readonly dispatchSharedPatch?: ResumeSharedPatchDispatcher;
+	readonly registerDelegatedEventRecord?: (
+		element: ResumeDomElement,
+		record: ProtocolViewPayload['events'][number],
+	) => void;
 	readonly onError?: ResumeRuntimeErrorHook;
 	readonly demandAsyncBoundaries?: boolean;
 };

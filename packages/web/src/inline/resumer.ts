@@ -1,9 +1,11 @@
 import type {
+	ProtocolEventActionKind,
 	ProtocolStatePayload,
 	ProtocolSyncPolicy,
 	ProtocolSyncPolicyCondition,
 	ProtocolViewPayload,
-} from '@markless/serializer';
+} from '@markless/serializer/protocol';
+import { PROTOCOL_EVENT_ACTION_KIND } from '@markless/serializer/protocol';
 import type { MarklessExecutionLogMode } from '../dev-log.ts';
 
 type InlineDebugControls = {
@@ -104,6 +106,11 @@ type SerializedRecord = {
 	readonly byteLength?: number;
 	readonly length?: number;
 };
+
+const _INLINE_EVENT_ACTIONS = {
+	[PROTOCOL_EVENT_ACTION_KIND.event]: 'forward',
+	[PROTOCOL_EVENT_ACTION_KIND.externalDelegate]: 'noop',
+} as const satisfies Record<ProtocolEventActionKind, 'forward' | 'noop'>;
 
 export function createInlineResumerSource(options: InlineResumerBuildOptions): string {
 	if (options.debug && (!options.debugBootstrapSource || !options.debugRegistrationSource)) {
@@ -249,7 +256,9 @@ function runInlineResumerSelfWake(fallbackResumeModuleUrl: string | undefined): 
 			queueMicrotask(async () => {
 				if (!root.__asyncResumeRuntimeStarted) {
 					root.__marklessDelegatedDispatch = true;
-					const module = (await import(/* @vite-ignore */ resumeModuleUrl)) as InlineResumeModule;
+					const module = (await import(
+						/* @vite-ignore */ resumeModuleUrl
+					)) as InlineResumeModule;
 					await module.resumeContainerEvent({ root, event: 0 });
 				}
 			});
@@ -583,6 +592,7 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 						? events.get(`${hostNodeId}\n${event.type}`)
 						: undefined;
 					if (eventRecord) {
+						if (eventRecord.action) return;
 						let syncPolicyAlreadyApplied = false;
 						if (__MARKLESS_INLINE_SYNC_POLICY__ && eventRecord.syncPolicy) {
 							runSyncPolicy!(eventRecord.syncPolicy, event);
@@ -594,8 +604,9 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 							eventRecord,
 						};
 						if (__MARKLESS_INLINE_SYNC_POLICY__) {
-							(input as { syncPolicyAlreadyApplied?: boolean }).syncPolicyAlreadyApplied =
-								syncPolicyAlreadyApplied;
+							(
+								input as { syncPolicyAlreadyApplied?: boolean }
+							).syncPolicyAlreadyApplied = syncPolicyAlreadyApplied;
 						}
 						return forward(input);
 					}

@@ -5,8 +5,10 @@ import {
 	type CompilerDiagnostic,
 	type CompileTsrxModuleResult,
 	type RuntimeDemandMapArtifact,
+	type RuntimeDemandMapRecordKind,
 } from '@markless/compiler';
 import {
+	PROTOCOL_EVENT_ACTION_KIND,
 	createStorageSeedMetadataFromGraphNodeId,
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
@@ -32,6 +34,7 @@ import { injectExecutionLogModuleHook } from './execution-log.ts';
 import { compileInlineResumerSources } from './inline-resumer.ts';
 import { createCompileErrorPayload, MarklessCompileError } from './dev-error/index.ts';
 import {
+	emitPrerenderBoundaryRendererModule,
 	emitPrerenderTriggerGroupModule,
 	planPrerenderTriggerGroups,
 	triggerGroupVirtualModuleId,
@@ -94,25 +97,37 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	const resolverId = `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodedFilename}`;
 	const resumeId = resumeVirtualModuleId(input.filename);
 	const prerenderWakeId = prerenderWakeVirtualModuleId(input.filename);
-	const { compiled, blockingDiagnostics } = await compileWithBlockingDiagnostics(
+	const { compiled: compiledForAllClasses, blockingDiagnostics } =
+		await compileWithBlockingDiagnostics(
 		input,
 		resolverId,
 	);
 	throwIfBlocked(input, blockingDiagnostics);
-	const csrNative = compiled.publicRenderModule.csrNativeMarkup ?? [];
-	const symbolRows = compiled.symbolModules.modules.map((module) => ({
+	const runtimeDemandClass = input.runtimeDemandClass ?? 'prerender';
+	const compiled = {
+		...compiledForAllClasses,
+		runtimeDemandMap:
+			compiledForAllClasses.runtimeDemandMaps?.[runtimeDemandClass] ??
+			compiledForAllClasses.runtimeDemandMap,
+	};
+	const compilerSymbolRows = compiled.symbolModules.modules.map((module) => ({
 		id: module.symbolId,
 		chunk: symbolVirtualModuleId(input.filename, module.symbolId),
 		exportName: scopedSymbolExportName(input.filename, module.exportName),
 	}));
+	const linkedBoundarySymbols = linkedRenderDataBoundarySymbols({
+		compiled,
+		input,
+		renderDataId,
+		resolverId,
+	});
+	const symbolRows = [...compilerSymbolRows, ...linkedBoundarySymbols.map((symbol) => symbol.row)];
 	const behaviorSymbolIds = new Set(
 		(compiled.protocolView.behaviors ?? []).flatMap((behavior) =>
 			behavior.symbolId ? [behavior.symbolId] : [],
 		),
 	);
-	const behaviorSymbols = symbolRows.filter((symbol) =>
-		behaviorSymbolIds.has(symbol.id),
-	);
+	const behaviorSymbols = compilerSymbolRows.filter((symbol) => behaviorSymbolIds.has(symbol.id));
 	const importedBoundRows = compiled.boundSymbolResolver.rows.map((row) =>
 		row.loaderSymbolId ? { ...row, baseSymbolId: row.loaderSymbolId } : row,
 	);
@@ -125,36 +140,36 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		importedBoundRows.some((row) => row.loaderSymbolId !== undefined),
 	);
 	const symbolRoutes = compiled.semanticGraph.componentEdges.flatMap((edge, index) =>
-		edge.importSource
+		edge.importSource && !input.artifactChildMaterializations?.[edge.id]
 			? [{ prefix: `c${index}:`, importSource: edge.importSource, componentEdgeId: edge.id }]
 			: [],
 	);
 	const executionLogModuleHookMode =
 		input.executionLogModuleHooks === false ? 'never' : input.executionLog;
-	const manifest: MarklessTransformManifest = {
-		source: input.filename,
-		...(csrNative.length > 0 ? { csrNativeMarkup: csrNative } : {}),
-		captureMetadata: compiled.captureAnalysis,
-		symbolRoutes,
-		payload: { virtualModuleId: payloadId },
-		resolver: { virtualModuleId: resolverId },
-		symbols: compiled.symbolModules.modules.map((module, index) => ({
+	const symbolManifestEntries = [
+		...compiled.symbolModules.modules.map((module, index) => ({
 			symbolId: module.symbolId,
 			kind: module.kind,
-			exportName: symbolRows[index]!.exportName,
+			exportName: compilerSymbolRows[index]!.exportName,
 			virtualModuleId: symbolVirtualModuleId(input.filename, module.symbolId),
 		})),
-		runtimeDemandMap: compiled.runtimeDemandMap,
-	};
-	const prerenderTriggerGroups = input.prerenderRecordData && input.prerenderWakeVariant
-		? planPrerenderTriggerGroups({
-				filename: input.filename,
-				...input.prerenderRecordData,
-				triggerGroups: compiled.triggerGroups,
-				symbolResolver: compiled.symbolResolver,
-				boundRows: importedBoundRows,
-			})
-		: [];
+		...linkedBoundarySymbols.map((symbol) => symbol.manifest),
+	];
+	const prerenderTriggerGroups =
+		input.prerenderRecordData && input.prerenderWakeVariant
+			? planPrerenderTriggerGroups({
+					filename: input.filename,
+					...input.prerenderRecordData,
+					completeView: containerScopedResumeView(compiled.protocolView),
+					triggerGroups: compiled.triggerGroups,
+					symbolResolver: compiled.symbolResolver,
+					boundRows: importedBoundRows,
+					componentEdges: compiled.semanticGraph.componentEdges,
+				})
+			: [];
+	const selfWakeArmRendererId = prerenderTriggerGroups.some((group) => group.id === 'self-wake')
+		? triggerGroupVirtualModuleId(input.filename, prerenderTriggerGroups.length)
+		: undefined;
 	// Scoped <style> CSS ships through the bundler's CSS pipeline: a virtual
 	// .css module imported by the transformed module, never inline JS.
 	const styleScope = compiled.publicRenderPlan.styleScopes[0];
@@ -166,6 +181,28 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	);
 	const prerenderClosureNeedsWake =
 		pageNeedsFullResume || (input.prerenderRecords === true && linkedChildHasBrowserTriggers);
+	const emitsPrerenderWakeFacade =
+		input.prerenderWakeFacade === true &&
+		input.prerenderWakeVariant === true &&
+		compiled.publicRenderModule.renderDataModuleSource !== undefined &&
+		prerenderInterfacesComplete(compiled, input) &&
+		prerenderClosureNeedsWake;
+	// The per-page wake facade owns wake-shaped symbol routes.
+	const manifestOwnsSymbolRoutes =
+		input.prerenderWakeVariant !== true || emitsPrerenderWakeFacade;
+	const manifest: MarklessTransformManifest = {
+		source: input.filename,
+		captureMetadata: compiled.captureAnalysis,
+		symbolRoutes,
+		payload: { virtualModuleId: payloadId },
+		resolver: {
+			virtualModuleId: emitsPrerenderWakeFacade ? prerenderWakeId : resolverId,
+		},
+		symbols: manifestOwnsSymbolRoutes ? symbolManifestEntries : [],
+		runtimeDemandMap: compiled.runtimeDemandMap,
+	};
+	// Keep ordinary client render-data modules recursively linkable.
+	const linkedClientRenderData = input.environment === 'client' && !input.prerenderRecords;
 	const virtualModules: MarklessVirtualModule[] = [
 		...(compiled.publicRenderModule.renderDataModuleSource
 			? [
@@ -179,9 +216,14 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 						// children (e.g. the router's Link) stay on the payload
 						// container until artifact-child prerender lands.
 						source:
-							input.prerenderRecords &&
-							prerenderInterfacesComplete(compiled, input.importedModuleInterfaces)
-								? prerenderDataModuleSource(compiled, input.importedModuleInterfaces)
+							(input.prerenderRecords || linkedClientRenderData) &&
+							prerenderInterfacesComplete(compiled, input)
+								? prerenderDataModuleSource(
+										compiled,
+										input.importedModuleInterfaces,
+										input.renderDataImportSources,
+										input.artifactChildMaterializations,
+									)
 								: compiled.publicRenderModule.renderDataModuleSource,
 					},
 				]
@@ -223,8 +265,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				// the unmatched-interaction fallback derives from the render-data
 				// surface, so staged modules keep their prerenderDataId.
 				prerenderDataId:
-					input.prerenderRecords &&
-					prerenderInterfacesComplete(compiled, input.importedModuleInterfaces)
+					input.prerenderRecords && prerenderInterfacesComplete(compiled, input)
 						? renderDataId
 						: undefined,
 				hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
@@ -234,7 +275,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		},
 		...(input.prerenderWakeVariant &&
 		compiled.publicRenderModule.renderDataModuleSource &&
-		prerenderInterfacesComplete(compiled, input.importedModuleInterfaces) &&
+		prerenderInterfacesComplete(compiled, input) &&
 		prerenderClosureNeedsWake
 			? [
 					{
@@ -262,16 +303,30 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					},
 				]
 			: []),
-		...(input.prerenderWakeVariant ? prerenderTriggerGroups : []).map((group, index): MarklessVirtualModule => ({
-			id: triggerGroupVirtualModuleId(input.filename, index),
-			type: 'trigger-group',
-			source: emitPrerenderTriggerGroupModule({
-				group,
-				symbols: uniqueSymbolsById([...(input.symbols ?? []), ...symbolRows]),
-				boundRows: importedBoundRows,
-				symbolRoutes,
+		...(input.prerenderWakeVariant ? prerenderTriggerGroups : []).map(
+			(group, index): MarklessVirtualModule => ({
+				id: triggerGroupVirtualModuleId(input.filename, index),
+				type: 'trigger-group',
+				source: emitPrerenderTriggerGroupModule({
+					group,
+					symbols: uniqueSymbolsById([...(input.symbols ?? []), ...symbolRows]),
+					boundRows: importedBoundRows,
+					symbolRoutes,
+					armRendererModuleId:
+						group.id === 'self-wake' ? selfWakeArmRendererId : undefined,
+				}),
 			}),
-		})),
+		),
+		...(selfWakeArmRendererId
+			? [
+					{
+						id: selfWakeArmRendererId,
+						type: 'trigger-group' as const,
+						source: emitPrerenderBoundaryRendererModule(renderDataId),
+					},
+				]
+			: []),
+		...linkedBoundarySymbols.map((symbol) => symbol.module),
 		...(await Promise.all(
 			compiled.symbolModules.modules.map(
 				async (module, index): Promise<MarklessVirtualModule> => ({
@@ -334,8 +389,9 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		code:
 			styleImport +
 			(await stripEmittedTypes(
-				emitSourceModule({
-					filename: input.filename,
+					emitSourceModule({
+						filename: input.filename,
+						dev: input.dev,
 					payloadId,
 					resolverId,
 					renderDataId,
@@ -354,13 +410,9 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					prerenderWakeModuleUrl: input.prerenderWakeModuleUrl,
 					publicRenderModuleSource: compiled.publicRenderModule.moduleSource,
 					publicRenderRootExportName: compiled.publicRenderModule.rootExportName,
-					publicCsrModuleSource: input.dev
-						? compiled.publicRenderModule.csrModuleSource
-						: stripCsrTestFallback(compiled.publicRenderModule.csrModuleSource),
-					nativeCsr: csrNative.length > 0,
-					publicRenderCsrExportName: compiled.publicRenderModule.csrExportName,
 					publicSsrModuleSource: compiled.publicRenderModule.ssrModuleSource,
 					publicRenderSsrExportName: compiled.publicRenderModule.ssrExportName,
+					canonicalRenderData: prerenderInterfacesComplete(compiled, input),
 					hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
 					symbols: symbolRows,
 					behaviorSymbols,
@@ -373,25 +425,178 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		moduleGraphInterface: compiled.moduleGraphInterface,
 		interfaceHash: moduleInterfaceHash(compiled.moduleGraphInterface),
 		moduleImports: compiled.semanticGraph.moduleImports,
+		artifactChildren: artifactChildCandidates(compiled),
 	};
+}
+
+function linkedRenderDataBoundarySymbols(input: {
+	readonly compiled: CompileTsrxModuleResult;
+	readonly input: TransformTsrxModuleInput;
+	readonly renderDataId: string;
+	readonly resolverId: string;
+}): ReadonlyArray<{
+	readonly row: { readonly id: string; readonly chunk: string; readonly exportName: string };
+	readonly manifest: {
+		readonly symbolId: string;
+		readonly kind: 'async-boundary-update';
+		readonly exportName: string;
+		readonly virtualModuleId: string;
+	};
+	readonly module: MarklessVirtualModule;
+}> {
+	if (
+		input.input.environment !== 'client' ||
+		!input.compiled.publicRenderModule.renderDataModuleSource ||
+		!prerenderInterfacesComplete(input.compiled, input.input)
+	)
+		return [];
+
+	const emittedSymbolIds = new Set(
+		input.compiled.symbolModules.modules.map((module) => module.symbolId),
+	);
+	const plannedSymbols = new Map(
+		input.compiled.symbolResolver.symbols.map((symbol) => [symbol.id, symbol]),
+	);
+	const routes = input.compiled.semanticGraph.componentEdges.flatMap((edge, index) =>
+		edge.importSource && !input.input.artifactChildMaterializations?.[edge.id]
+			? [{ prefix: `c${index}:`, importSource: edge.importSource }]
+			: [],
+	);
+
+	return input.compiled.protocolView.asyncBoundaries.flatMap((boundary, index) => {
+		const symbolId = boundary.updateSymbolId;
+		if (!symbolId || emittedSymbolIds.has(symbolId)) return [];
+		const planned = plannedSymbols.get(symbolId);
+		if (planned?.kind !== 'async-boundary-update') return [];
+
+		const virtualModuleId = symbolVirtualModuleId(input.input.filename, symbolId);
+		const exportName = scopedSymbolExportName(
+			input.input.filename,
+			`marklessLinkedBoundaryUpdate${index}`,
+		);
+		const row = { id: symbolId, chunk: virtualModuleId, exportName };
+		return [
+			{
+				row,
+				manifest: {
+					symbolId,
+					kind: 'async-boundary-update' as const,
+					exportName,
+					virtualModuleId,
+				},
+				module: {
+					id: virtualModuleId,
+					type: 'symbol' as const,
+					symbolId,
+					exportName,
+					source: linkedRenderDataBoundarySymbolSource({
+						boundaryId: boundary.id,
+						exportName,
+						renderDataId: input.renderDataId,
+						resolverId: input.resolverId,
+						routes,
+					}),
+				},
+			},
+		];
+	});
+}
+
+function linkedRenderDataBoundarySymbolSource(input: {
+	readonly boundaryId: string;
+	readonly exportName: string;
+	readonly renderDataId: string;
+	readonly resolverId: string;
+	readonly routes: ReadonlyArray<{ readonly prefix: string; readonly importSource: string }>;
+}): string {
+	return [
+		`import { marklessPrerenderData } from ${JSON.stringify(input.renderDataId)};`,
+		`import { loadSymbol as marklessLoadLocalSymbol } from ${JSON.stringify(input.resolverId)};`,
+		"import { renderPrerenderBoundary } from '@markless/web/fns/prerender-resume';",
+		'function marklessLoadLinkedSymbol(symbolId) {',
+		...input.routes.flatMap((route) => [
+			`\tif (symbolId.startsWith(${JSON.stringify(route.prefix)})) {`,
+			`\t\treturn import(${JSON.stringify(linkedRenderDataSymbolRouteSource(route.importSource))}).then((module) => module.loadSymbol(symbolId.slice(${route.prefix.length})));`,
+			'\t}',
+		]),
+		'\treturn marklessLoadLocalSymbol(symbolId);',
+		'}',
+		`export async function ${input.exportName}(context) {`,
+		`\tconst rendered = await renderPrerenderBoundary(marklessPrerenderData, ${JSON.stringify(input.boundaryId)}, context.status, context.graph, marklessLoadLinkedSymbol);`,
+		'\treturn { ...rendered, arm: context.status === "rejected" ? 2 : 0 };',
+		'}',
+	].join('\n');
+}
+
+function linkedRenderDataSymbolRouteSource(importSource: string): string {
+	return importSource.includes('?')
+		? `${importSource}&markless-symbols`
+		: `${importSource}?markless-symbols`;
 }
 
 function prerenderInterfacesComplete(
 	compiled: CompileTsrxModuleResult,
-	importedModuleInterfaces: TransformTsrxModuleInput['importedModuleInterfaces'],
+	input: Pick<
+		TransformTsrxModuleInput,
+		'artifactChildMaterializations' | 'importedModuleInterfaces'
+	>,
 ): boolean {
 	return compiled.semanticGraph.componentEdges.every(
-		(edge) => !edge.importSource || importedModuleInterfaces?.[edge.importSource] !== undefined,
+		(edge) =>
+			!edge.importSource ||
+			input.artifactChildMaterializations?.[edge.id] !== undefined ||
+			input.importedModuleInterfaces?.[edge.importSource] !== undefined,
 	);
+}
+
+function artifactChildCandidates(
+	compiled: CompileTsrxModuleResult,
+): TransformTsrxModuleResult['artifactChildren'] {
+	const definitions = compiled.publicRenderModule.componentDefinitions as ReadonlyArray<{
+		readonly edges?: ReadonlyArray<{
+			readonly id: string;
+			readonly props: TransformTsrxModuleResult['artifactChildren'][number]['props'];
+			readonly projection?: TransformTsrxModuleResult['artifactChildren'][number]['projection'];
+		}>;
+	}>;
+	const definitionsByEdge = new Map(
+		definitions.flatMap((definition) =>
+			(definition.edges ?? []).map((edge) => [edge.id, edge] as const),
+		),
+	);
+	return compiled.semanticGraph.componentEdges.flatMap((edge) => {
+		if (!edge.importSource || !edge.importKind) return [];
+		const definition = definitionsByEdge.get(edge.id);
+		return definition
+			? [
+					{
+						edgeId: edge.id,
+						componentName: edge.childComponentName,
+						importSource: edge.importSource,
+						importKind: edge.importKind,
+						...(edge.importedName ? { importedName: edge.importedName } : {}),
+						hasChildren: edge.children.childCount > 0,
+						props: definition.props,
+						...(definition.projection ? { projection: definition.projection } : {}),
+					},
+				]
+			: [];
+	});
 }
 
 function prerenderDataModuleSource(
 	compiled: CompileTsrxModuleResult,
 	importedModuleInterfaces: TransformTsrxModuleInput['importedModuleInterfaces'],
+	renderDataImportSources: TransformTsrxModuleInput['renderDataImportSources'],
+	artifactChildMaterializations: TransformTsrxModuleInput['artifactChildMaterializations'],
 ): string {
-	const importedComponents = new Map<string, { readonly source: string; readonly local: string }>();
+	const importedComponents = new Map<
+		string,
+		{ readonly source: string; readonly local: string }
+	>();
 	for (const edge of compiled.semanticGraph.componentEdges) {
 		if (!edge.importSource || importedComponents.has(edge.childComponentName)) continue;
+		if (artifactChildMaterializations?.[edge.id]) continue;
 		const linked = importedModuleInterfaces?.[edge.importSource];
 		if (!linked) {
 			throw new Error(
@@ -399,7 +604,9 @@ function prerenderDataModuleSource(
 			);
 		}
 		importedComponents.set(edge.childComponentName, {
-			source: `${MARKLESS_VIRTUAL_PREFIX}render-data:${encodeURIComponent(linked.filename)}`,
+			source:
+				renderDataImportSources?.[edge.importSource] ??
+				`${MARKLESS_VIRTUAL_PREFIX}render-data:${encodeURIComponent(linked.filename)}`,
 			local: `marklessPrerenderImport${importedComponents.size}`,
 		});
 	}
@@ -423,13 +630,6 @@ function prerenderDataModuleSource(
 		`\timports: {${[...importedComponents].map(([name, entry]) => `${JSON.stringify(name)}:${entry.local}`).join(',')}},`,
 		'};',
 	].join('\n');
-}
-
-function stripCsrTestFallback(source: string): string {
-	return source.replace(
-		/\/\*MARKLESS_CSR_TEST_START\*\/[\s\S]*?\/\*MARKLESS_CSR_TEST_END\*\//g,
-		'',
-	);
 }
 
 export async function compileTsrxModuleLinkArtifact(
@@ -476,7 +676,12 @@ export async function preflightTsrxModuleDiagnostics(
 async function compileWithBlockingDiagnostics(
 	input: Pick<
 		TransformTsrxModuleInput,
-		'filename' | 'source' | 'buildId' | 'symbols' | 'importedModuleInterfaces'
+		| 'filename'
+		| 'source'
+		| 'buildId'
+		| 'symbols'
+		| 'importedModuleInterfaces'
+		| 'artifactChildMaterializations'
 	>,
 	resolverId: string,
 ) {
@@ -487,6 +692,7 @@ async function compileWithBlockingDiagnostics(
 		resolverId,
 		symbols: input.symbols ?? [],
 		importedModuleInterfaces: input.importedModuleInterfaces,
+		artifactChildMaterializations: input.artifactChildMaterializations,
 	});
 	return {
 		compiled,
@@ -568,18 +774,33 @@ function containerScopedResumeView(view: ProtocolViewPayload): ProtocolViewPaylo
 
 function needsFullResume(
 	state: ProtocolStatePayload,
-	view: ProtocolViewPayload,
+	_view: ProtocolViewPayload,
 	runtimeDemandMap: RuntimeDemandMapArtifact,
 ): boolean {
 	if ((state.storage?.length ?? 0) > 0) return true;
-	if ((view.branches?.length ?? 0) > 0) return true;
-	if ((view.elementHandles?.length ?? 0) > 0) return true;
-	if ((view.asyncBoundaries?.length ?? 0) > 0) return true;
-	if ((view.keyedRepeats?.length ?? 0) === 0) return false;
-	return !recordKindReplaced(runtimeDemandMap, 'keyed-repeat');
+	return runtimeDemandMap.payloadRecords.some((record) =>
+		RECORD_NEEDS_FULL_RESUME[record.kind](runtimeDemandMap),
+	);
 }
 
-function recordKindReplaced(runtimeDemandMap: RuntimeDemandMapArtifact, kind: string): boolean {
+const RECORD_NEEDS_FULL_RESUME = {
+	'async-boundary': () => true,
+	behavior: () => false,
+	branch: () => true,
+	'dom-update': () => false,
+	'element-handle': () => true,
+	[PROTOCOL_EVENT_ACTION_KIND.event]: () => false,
+	[PROTOCOL_EVENT_ACTION_KIND.externalDelegate]: () => false,
+	'keyed-repeat': (runtimeDemandMap) => !recordKindReplaced(runtimeDemandMap, 'keyed-repeat'),
+} satisfies Record<
+	RuntimeDemandMapRecordKind,
+	(runtimeDemandMap: RuntimeDemandMapArtifact) => boolean
+>;
+
+function recordKindReplaced(
+	runtimeDemandMap: RuntimeDemandMapArtifact,
+	kind: RuntimeDemandMapRecordKind,
+): boolean {
 	return runtimeDemandMap.recordKinds.some(
 		(record) => record.kind === kind && record.replaced === true,
 	);

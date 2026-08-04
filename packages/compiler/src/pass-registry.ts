@@ -101,7 +101,7 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 			'protocolState',
 			'protocolView',
 		],
-		produces: ['runtimeDemandMap'],
+		produces: ['runtimeDemandMap', 'runtimeDemandMaps'],
 	},
 	{
 		passId: 'trigger-groups',

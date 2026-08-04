@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
 import { createFakeClock } from '../../../scripts/test-utils/fake-clock.ts';
 import {
@@ -194,6 +194,44 @@ test('settled render fails loudly when the selected source returns no record set
 			{ status: 'fulfilled' },
 		),
 	).rejects.toThrow('MARKLESS_ASYNC_SETTLE_RECORDS_MISSING: empty');
+});
+
+test('settled update commits the build-emitted arm record set without an evaluator', async () => {
+	const tryRecords = {
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		keyedRepeats: [],
+		branches: [],
+	};
+	const pendingRecords = { ...tryRecords };
+	const catchRecords = { ...tryRecords };
+	const boundary = {
+		...boundaryRecord('build-emitted', 'symbol:update'),
+		armRecords: [tryRecords, pendingRecords, catchRecords],
+	} as ResumeAsyncBoundaryRecord;
+	const commitArm = vi.fn(async () => {});
+
+	await settleAsyncBoundaryRange(
+		{
+			graph: { read: () => 'fulfilled' } as never,
+			root: {} as never,
+			loadSymbol: async () => (() => ({ arm: 0, html: '<p>settled</p>' })) as never,
+			renderBranchHtml: undefined,
+			elementHandles: { get: () => undefined } as never,
+			commitArm,
+		},
+		boundary,
+		{ status: 'fulfilled' },
+	);
+
+	expect(commitArm).toHaveBeenCalledOnce();
+	expect(commitArm).toHaveBeenCalledWith(boundary, {
+		html: '<p>settled</p>',
+		armRecords: tryRecords,
+	});
 });
 
 test('no active floor: the settle commits immediately without registering a wait', async () => {

@@ -1452,6 +1452,28 @@ test('prerender trigger groups stage graph segments without adding a second capt
 	const play = element('BUTTON');
 	const preview = element('BUTTON');
 	const root = element('SECTION', [play, preview]);
+	type Handoff = {
+		readonly event: FakeEvent;
+		readonly syncPolicyAlreadyApplied?: boolean;
+	};
+	type Dispatch = (handoff: Handoff) => Promise<void>;
+	type RegisteredDispatch = (handoff: Handoff, fallback: Dispatch) => Promise<void>;
+	let registeredDispatch:
+		| Dispatch
+		| undefined;
+	let fallbackDispatches = 0;
+	let activeDispatch: Dispatch = async () => {
+		fallbackDispatches++;
+	};
+	(
+		root as FakeElement & {
+			__marklessRegisterDispatch?: (dispatch: RegisteredDispatch) => void;
+		}
+	).__marklessRegisterDispatch = (next) => {
+		const fallback = activeDispatch;
+		activeDispatch = (handoff) => next(handoff, fallback);
+		registeredDispatch = activeDispatch;
+	};
 	const emptyView = {
 		version: 1 as const,
 		domUpdates: [],
@@ -1489,8 +1511,27 @@ test('prerender trigger groups stage graph segments without adding a second capt
 			return ({ graph }) => graph.update({ graphNodeId: 'state:playing', update: (value) => !value });
 		},
 	});
-	await first.runtime.dispatch({ type: 'click', target: play });
+	expect(registeredDispatch).toBeTypeOf('function');
+	await registeredDispatch!({
+		event: {
+			type: 'click',
+			target: play,
+			key: '',
+			defaultPrevented: false,
+			preventDefault() {},
+		},
+	});
 	expect(first.graph.read('state:playing')).toBe(true);
+	await registeredDispatch!({
+		event: {
+			type: 'click',
+			target: preview,
+			key: '',
+			defaultPrevented: false,
+			preventDefault() {},
+		},
+	});
+	expect(fallbackDispatches).toBe(1);
 
 	const second = await resumePrerenderTriggerGroup({
 		groupId: 'preview:click',
@@ -1550,14 +1591,151 @@ test('prerender trigger groups stage graph segments without adding a second capt
 	expect(second.graph.read('state:playing')).toBe(true);
 	expect(second.graph.read('state:preview')).toBe(10);
 	expect(loaded).toEqual(['symbol:play']);
-	await second.runtime.dispatch({ type: 'click', target: preview });
+	await registeredDispatch!({
+		event: {
+			type: 'click',
+			target: preview,
+			key: '',
+			defaultPrevented: false,
+			preventDefault() {},
+		},
+	});
 	expect(second.graph.read('state:preview')).toBe(11);
 	expect(preview.textContent).toBe('11');
 	expect(loaded).toEqual(['symbol:play', 'symbol:preview', 'symbol:preview-text']);
-	await first.runtime.dispatch({ type: 'click', target: play });
+	await registeredDispatch!({
+		event: {
+			type: 'click',
+			target: play,
+			key: '',
+			defaultPrevented: false,
+			preventDefault() {},
+		},
+	});
 	expect(first.graph.read('state:playing')).toBe(false);
 	expect(second.graph.read('state:playing')).toBe(false);
 	expect(root.listeners).toEqual([]);
+});
+
+test('later trigger groups do not claim staged computeds owned by another symbol loader', async () => {
+	const increase = element('BUTTON');
+	const weighted = element('OUTPUT');
+	const root = element('SECTION', [increase, weighted]);
+	type Handoff = { readonly event: FakeEvent; readonly syncPolicyAlreadyApplied?: boolean };
+	type Dispatch = (handoff: Handoff) => Promise<void>;
+	let dispatch: Dispatch = async () => {};
+	(
+		root as FakeElement & {
+			__marklessRegisterDispatch?: (
+				next: (handoff: Handoff, fallback: Dispatch) => Promise<void>,
+			) => void;
+		}
+	).__marklessRegisterDispatch = (next) => {
+		const fallback = dispatch;
+		dispatch = (handoff) => next(handoff, fallback);
+	};
+	const computedState = {
+		...createProtocolStatePayload({
+			cells: [
+				{ graphNodeId: 'state:weight', name: 'weight', valueKind: 'scalar', value: 2 },
+			],
+		}),
+		computed: [
+			{
+				graphNodeId: 'computed:weightedCount',
+				name: 'weightedCount',
+				async: false,
+				deriveSymbolId: 'bound:symbol:weightedCount',
+				dependencies: [{ graphNodeId: 'state:weight', path: [] }],
+			},
+		],
+	};
+	const ownerLoads: string[] = [];
+	await resumePrerenderTriggerGroup({
+		groupId: 'settled-arm',
+		graphNodeIds: ['state:weight', 'computed:weightedCount'],
+		root,
+		...decodedRecords(computedState, {
+			version: 1,
+			locators: [
+				{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+				{ hostNodeId: 'h2', strategy: 'dom-order', index: 2, tagName: 'output' },
+			],
+			events: [],
+			domUpdates: [
+				{
+					hostNodeId: 'h2',
+					source: 'weightedCount',
+					graphNodeId: 'computed:weightedCount',
+					path: [],
+					target: { kind: 'text', prefix: 'Weighted count ' },
+					symbolId: 'symbol:weighted-text',
+				},
+			],
+			behaviors: [],
+			elementHandles: [],
+			asyncBoundaries: [],
+		}),
+		loadSymbol: async (symbolId) => {
+			ownerLoads.push(symbolId);
+			if (symbolId === 'bound:symbol:weightedCount')
+				return ({ graph }) => Number(graph.read('state:weight')) * 3;
+			return (context) =>
+				createDomUpdateEntry({
+					locator: context.domUpdate!.hostNodeId,
+					target: context.domUpdate!.target!,
+					value: context.value,
+				});
+		},
+	});
+
+	const laterLoads: string[] = [];
+	await resumePrerenderTriggerGroup({
+		groupId: 'increase:click',
+		graphNodeIds: ['state:weight'],
+		root,
+		...decodedRecords(
+			createProtocolStatePayload({
+				cells: [
+					{ graphNodeId: 'state:weight', name: 'weight', valueKind: 'scalar', value: 2 },
+				],
+			}),
+			{
+				version: 1,
+				locators: [
+					{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+					{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+				],
+				events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:increase'] }],
+				domUpdates: [],
+				behaviors: [],
+				elementHandles: [],
+				asyncBoundaries: [],
+			},
+		),
+		loadSymbol: async (symbolId) => {
+			laterLoads.push(symbolId);
+			if (symbolId !== 'symbol:increase') throw new Error(`foreign symbol: ${symbolId}`);
+			return ({ graph }) =>
+				graph.update({
+					graphNodeId: 'state:weight',
+					update: (value) => Number(value) + 1,
+				});
+		},
+	});
+
+	await dispatch({
+		event: {
+			type: 'click',
+			target: increase,
+			key: '',
+			defaultPrevented: false,
+			preventDefault() {},
+		},
+	});
+	expect(weighted.textContent).toBe('Weighted count 9');
+	expect(ownerLoads).toContain('bound:symbol:weightedCount');
+	expect(laterLoads).toEqual(['symbol:increase']);
 });
 
 test('concurrent payload resumes for one container share a single runtime startup', async () => {

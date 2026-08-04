@@ -30,10 +30,15 @@ export async function emitPrerenderedPage(input: {
 	readonly entry: string;
 	readonly outDir: string;
 	readonly serverPlugin: Plugin;
+	readonly resumeModuleUrl?: string;
+	readonly prerenderWakeModuleUrl?: string;
 }): Promise<void> {
 	const page = await withBuiltPrerenderPage(input, async (built) => {
 		const output = await evaluateBuiltPageClosure(built);
-		return assemblePrerenderPageParts(built, output, {});
+		return assemblePrerenderPageParts(built, output, {
+			resumeModuleUrl: input.resumeModuleUrl,
+			prerenderWakeModuleUrl: input.prerenderWakeModuleUrl,
+		});
 	});
 	const htmlFile = resolve(input.root, input.outDir, 'index.html');
 	const html = await readFile(htmlFile, 'utf8');

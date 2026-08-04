@@ -139,8 +139,9 @@ export default function Home() {
 		);
 
 		expect(result?.code).toContain(
-			'href={__marklessRouteHref("/blog/[slug]", { slug: "hello" })}',
+			'href="/blog/hello"',
 		);
+		expect(result?.code).not.toContain('virtual:markless-router/route-href');
 		expect(result?.code).not.toContain('params=');
 	});
 

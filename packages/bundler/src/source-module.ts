@@ -137,15 +137,14 @@ export function emitSourceModule(input: {
 	readonly executionLog?: MarklessExecutionLogMode;
 	readonly inlineResumerSources?: InlineResumerSourceVariants;
 	readonly needsFullResume?: boolean;
+	readonly dev?: boolean;
 	readonly devResumeReexport?: boolean;
 	readonly publicRenderModuleSource: string;
 	readonly publicRenderRootExportName: string | null;
-	readonly publicCsrModuleSource: string;
-	readonly nativeCsr?: boolean;
-	readonly publicRenderCsrExportName: string | null;
 	readonly publicSsrModuleSource: string;
 	readonly publicRenderSsrExportName: string | null;
 	readonly renderDataId?: string;
+	readonly canonicalRenderData?: boolean;
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
 	readonly behaviorSymbols?: ReadonlyArray<SourceSymbolRow>;
 	readonly symbolRoutes: ReadonlyArray<SourceSymbolRoute>;
@@ -154,17 +153,28 @@ export function emitSourceModule(input: {
 }) {
 	const symbolsOnly = input.environment === 'client' && input.clientOutput === 'symbols-only';
 	const routeSymbols = input.environment === 'client' && input.symbolRoutes.length > 0;
+	const canonicalRenderData =
+		input.environment === 'client' &&
+		!symbolsOnly &&
+		!input.prerenderRecords &&
+		input.canonicalRenderData === true &&
+		input.publicRenderRootExportName === null &&
+		!!input.publicSsrModuleSource &&
+		!!input.renderDataId;
 	return [
 		(!input.publicSsrModuleSource && !input.publicRenderModuleSource) ||
 		symbolsOnly ||
 		!input.renderDataId ||
 		(input.environment === 'client' &&
 			!input.publicRenderModuleSource &&
-			!input.prerenderRecords)
+			!input.prerenderRecords &&
+			!input.dev &&
+			!canonicalRenderData)
 			? ''
-			: `import { marklessRenderData } from '${input.renderDataId}';`,
-		symbolsOnly ||
-		(input.environment === 'client' && input.nativeCsr && !input.prerenderRecords)
+			: canonicalRenderData
+				? `import { marklessPrerenderData } from '${input.renderDataId}';`
+				: `import { marklessRenderData } from '${input.renderDataId}';`,
+		symbolsOnly
 			? ''
 			: `import { state as payloadState, view as payloadView, runtimeDemandMap as payloadRuntimeDemandMap } from '${input.payloadId}';`,
 		'',
@@ -179,13 +189,11 @@ export function emitSourceModule(input: {
 			? emitExecutionLogLoader()
 			: '',
 		routeSymbols ? 'const marklessLoadLocalSymbol = loadSymbol;' : '',
-		symbolsOnly && !routeSymbols ? 'export { loadSymbol };' : '',
-		symbolsOnly || (input.environment === 'client' && input.nativeCsr)
-			? ''
-			: 'export { payloadView };',
-		symbolsOnly || (input.environment === 'client' && input.nativeCsr)
-			? ''
-			: 'export { payloadRuntimeDemandMap };',
+		(symbolsOnly || input.publicRenderRootExportName === null) && !routeSymbols
+			? 'export { loadSymbol };'
+			: '',
+		symbolsOnly ? '' : 'export { payloadView };',
+		symbolsOnly ? '' : 'export { payloadRuntimeDemandMap };',
 		// Dev only: re-export the resume entry from the virtual resume module so the
 		// inline resumer can import THIS source module (keeping the .tsrx in the client
 		// module graph — vite's no-accepting-boundary full-reload depends on it).
@@ -202,10 +210,7 @@ export function emitSourceModule(input: {
 					executionLogEnabled: input.executionLog !== 'never',
 					rootExportName: input.publicRenderRootExportName,
 				}),
-		input.environment === 'server' || symbolsOnly || input.prerenderRecords
-			? ''
-			: input.publicCsrModuleSource,
-		input.environment === 'client' && (symbolsOnly || !input.prerenderRecords)
+		input.environment === 'client' && (symbolsOnly || (!input.prerenderRecords && !input.dev))
 			? ''
 			: input.publicSsrModuleSource,
 		routeSymbols
@@ -224,12 +229,14 @@ export function emitSourceModule(input: {
 					headInjections: input.headInjections,
 					storageSeeds: input.storageSeeds,
 					inlineResumerSources: input.inlineResumerSources,
-			resumeModuleUrl: input.resumeModuleUrl,
-			prerenderWakeModuleUrl: input.prerenderWakeModuleUrl,
+					resumeModuleUrl: input.resumeModuleUrl,
+					prerenderWakeModuleUrl: input.prerenderWakeModuleUrl,
 					rootExportName: input.publicRenderRootExportName,
-					csrExportName: input.publicRenderCsrExportName,
+					symbolLoaderName: routeSymbols ? 'marklessSsrLoadSymbolRoute' : 'loadSymbol',
 					ssrExportName: input.publicRenderSsrExportName,
+					canonicalRenderData,
 					prerenderRecords: input.prerenderRecords,
+					dev: input.dev,
 				}),
 		'',
 	]
@@ -269,14 +276,13 @@ export function emitResumeModule(input: {
 	const resumeSymbolLoader = routeSymbols ? 'marklessSsrLoadSymbolRoute' : 'loadSymbol';
 	const scalarSpecializations = scalarDispatcherSpecializations(input);
 	const stagedPrerender = (input.prerenderTriggerGroups?.length ?? 0) > 0;
-	if (input.recordsOnly && !input.needsFullResume) {
-		// Lean pages keep their payload container until wake staging lands;
-		// a records-only wake for them would strand lean routes payload-less.
-		throw new Error('MARKLESS_WAKE_VARIANT_REQUIRES_FULL_RESUME');
-	}
-	// The queue wrapper is part of the staged-wake contract; ungated builds
-	// keep their exact pre-staging emission (the CSR fixture walls are law
-	// until the tier demolition re-ratchets everything at once).
+	const streamedResume =
+		stagedPrerender ||
+		((input.payloadView as { readonly asyncBoundaries?: ReadonlyArray<unknown> } | undefined)
+			?.asyncBoundaries?.length ?? 0) > 0;
+	// Every streamed resume module owns dispatch through the same queue. Staged
+	// modules may replace the active handler, while ordinary modules remain the
+	// fallback authority for interactions outside the staged closure.
 	const bareResumeContainerEvent = emitResumeContainerEvent(
 		resumeSymbolLoader,
 		input.needsFullResume ?? false,
@@ -289,23 +295,28 @@ export function emitResumeModule(input: {
 		input.prerenderDataId,
 		stagedPrerender,
 	);
-	const resumeContainerEvent = stagedPrerender
+	const resumeContainerEvent = streamedResume
 		? emitQueuedResumeContainerEvent(bareResumeContainerEvent)
 		: bareResumeContainerEvent;
 	return [
-		input.prerenderDataId && resumeContainerEvent.includes('marklessPrerenderData')
+		input.prerenderDataId &&
+		!stagedPrerender &&
+		resumeContainerEvent.includes('marklessPrerenderData')
 			? `import { marklessPrerenderData } from '${input.prerenderDataId}';`
-			: '',
+			: null,
+		stagedPrerender && input.prerenderDataId
+			? `async function marklessLoadPrerenderData() { const module = await import('${input.prerenderDataId}'); return module.marklessPrerenderData; }`
+			: null,
 		`import { runtimeDemandMap as payloadRuntimeDemandMap } from '${input.payloadId}';`,
 		scalarSpecializations.length > 0
 			? [
-					"import { marklessDecodeScalarCell, marklessFindElementAtDomOrderIndex, marklessReadScalarCell, marklessScalarSpecializedError } from '@markless/web/fns/scalar-specialized';",
+					"import { marklessDecodeScalarCell, marklessReadScalarCell, marklessScalarSpecializedError } from '@markless/web/fns/scalar-specialized';",
 					"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
 					"import { marklessUpdateText } from '@markless/web/fns/update-text';",
 				].join('\n')
 			: '',
-		stagedPrerender
-			? "import { marklessFindElementAtDomOrderIndex } from '@markless/web/fns/scalar-specialized';"
+		scalarSpecializations.length > 0 || stagedPrerender
+			? "import { marklessFindElementAtDomOrderIndex } from '@markless/web/fns/dom-order';"
 			: '',
 		'',
 		input.executionLog === 'never' ? '' : emitExecutionLogLoader(),
@@ -323,9 +334,7 @@ export function emitResumeModule(input: {
 				)
 			: '',
 		routeSymbols ? 'export { marklessSsrLoadSymbolRoute as loadSymbol };' : '',
-		stagedPrerender
-			? emitPrerenderTriggerGroupLoader(input.prerenderTriggerGroups ?? [])
-			: '',
+		stagedPrerender ? emitPrerenderTriggerGroupLoader(input.prerenderTriggerGroups ?? []) : '',
 		resumeContainerEvent,
 		'',
 	]
@@ -343,22 +352,24 @@ export function emitQueuedResumeContainerEvent(source: string): string {
 	);
 	if (implementation === source) throw new Error('MARKLESS_RESUME_DISPATCH_EXPORT_MISSING');
 	return [
-		'function marklessQueueContainerDispatch(input) {',
+		implementation,
+		'export function resumeContainerEvent(input) {',
 		'\tconst root = input.root;',
 		'\tif (!root.__marklessDispatch) {',
-		'\t\tlet handler = marklessResumeContainerEvent, tail = Promise.resolve();',
-		'\t\troot.__marklessRegisterDispatch = next => { handler = next; };',
+		'\t\tlet handler = marklessResumeContainerEvent, tail = Promise.resolve(), lastEvent = null;',
+		'\t\troot.__marklessRegisterDispatch = next => {',
+		'\t\t\tconst fallback = handler;',
+		'\t\t\thandler = input => next(input, fallback);',
+		'\t\t};',
 		'\t\troot.__marklessDispatch = next => {',
-		'\t\t\tconst dispatched = tail.then(() => handler(next), () => handler(next));',
-		'\t\t\ttail = dispatched.catch(() => {});',
-		'\t\t\treturn dispatched;',
+		'\t\t\tconst event = next.event;',
+		'\t\t\tif (event === lastEvent) return tail;',
+		'\t\t\tlastEvent = event;',
+		'\t\t\tconst run = () => handler(next);',
+		'\t\t\treturn tail = tail.then(run, run);',
 		'\t\t};',
 		'\t}',
 		'\treturn root.__marklessDispatch(input);',
-		'}',
-		implementation,
-		'export async function resumeContainerEvent(input) {',
-		'\tawait marklessQueueContainerDispatch(input);',
 		'}',
 	].join('\n');
 }
@@ -401,20 +412,30 @@ function emitCompiledAppDefault(input: {
 	readonly resumeModuleUrl?: string;
 	readonly prerenderWakeModuleUrl?: string;
 	readonly rootExportName: string | null;
-	readonly csrExportName: string | null;
+	readonly symbolLoaderName: string;
 	readonly ssrExportName: string | null;
+	readonly canonicalRenderData: boolean;
 	readonly prerenderRecords?: boolean;
+	readonly dev?: boolean;
 }): string {
 	const renderCsrEntry =
-		(input.rootExportName || input.csrExportName) &&
-		input.environment !== 'server' &&
-		!input.prerenderRecords
-			? [`	renderCsr: ${input.rootExportName ?? input.csrExportName},`]
+		input.rootExportName && input.environment !== 'server' && !input.prerenderRecords
+			? [`	renderCsr: ${input.rootExportName},`]
 			: [];
+	const symbolLoaderEntry =
+		input.environment !== 'server' && input.rootExportName === null
+			? [`\tloadSymbol: ${input.symbolLoaderName},`]
+			: input.prerenderRecords === true
+				? [`\tloadSymbol: ${input.symbolLoaderName},`]
+				: [];
+	const renderDataEntry = input.canonicalRenderData
+		? ['\trenderData: marklessPrerenderData,']
+		: [];
 	// The optional render context is the per-request streaming channel (T107):
 	// dropping it here would silently force every page back to blocking SSR.
 	const renderSsrEntry =
-		input.ssrExportName && (input.environment !== 'client' || input.prerenderRecords)
+		input.ssrExportName &&
+		(input.environment !== 'client' || input.prerenderRecords || input.dev)
 			? [
 					'	renderSsr(props, marklessRenderContext) {',
 					`		return ${input.ssrExportName}(props, marklessRenderContext);`,
@@ -466,6 +487,8 @@ function emitCompiledAppDefault(input: {
 	return [
 		'const marklessCompiledApp = {',
 		...renderCsrEntry,
+		...renderDataEntry,
+		...symbolLoaderEntry,
 		...renderSsrEntry,
 		...metadataEntries,
 		'};',
@@ -487,66 +510,68 @@ function emitResumeContainerEvent(
 	const resumeEntry = storageFreePayload
 		? '@markless/core/web/resume-storage-free'
 		: '@markless/core/web/resume';
-	const fullResumeHandoff = stagedPrerender && prerenderDataId
-		? [
-				'async function marklessFullResumeHandoff(handoff) {',
-				'\thandoff.root.__asyncResumeRuntimeStarted = true;',
-				'\tconst group = await marklessLoadPrerenderTriggerGroup(handoff);',
-				"\tconst { mergePrerenderPayloadRecords, resumePrerenderTriggerGroup } = await import('@markless/web/fns/prerender-trigger-resume');",
-				// Staging is an optimization, never a correctness gate: interactions
-				// no group covers (branch-arm events today, future record kinds
-				// tomorrow) fall back to the full prerender resume.
-				'\tif (!group) {',
-				"\t\tconst { derivePrerenderResumeRecords, renderPrerenderBoundary, resumeFromPrerenderRecords } = await import('@markless/web/fns/prerender-resume');",
-				`\t\tconst fallbackRecords = mergePrerenderPayloadRecords(await derivePrerenderResumeRecords(marklessPrerenderData, ${loadSymbolName}), handoff.root);`,
-				'\t\tconst { runtime } = await resumeFromPrerenderRecords({',
-				'\t\t\t...fallbackRecords,',
-				'\t\t\troot: handoff.root,',
-				`\t\t\tloadSymbol: ${loadSymbolName},`,
-				`\t\t\trenderAsyncBoundary: (boundaryId, status, graph) => renderPrerenderBoundary(marklessPrerenderData, boundaryId, status, graph, ${loadSymbolName}),`,
-				'\t\t});',
-				'\t\tconst marklessDispatchFullRuntime = next => runtime.dispatch(next.event, { syncPolicyAlreadyApplied: next.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
-				'\t\thandoff.root.__marklessRegisterDispatch?.(marklessDispatchFullRuntime);',
-				'\t\tawait marklessDispatchFullRuntime(handoff);',
-				'\t\treturn;',
-				'\t}',
-				'\tconst records = mergePrerenderPayloadRecords({ state: group.state, view: group.view }, handoff.root);',
-				'\tconst { runtime } = await resumePrerenderTriggerGroup({',
-				'\t\t...records, groupId: group.groupId, graphNodeIds: group.graphNodeIds,',
-				'\t\troot: handoff.root, loadSymbol: group.loadSymbol,',
-				'\t});',
-				'\tawait runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
-				'}',
-			].join('\n')
-		: prerenderDataId
-		? [
-				'async function marklessFullResumeHandoff(handoff) {',
-				'\thandoff.root.__marklessLinkedRenderDataBoot = true;',
-				'\thandoff.root.__asyncResumeRuntimeStarted = true;',
-				"\tconst { derivePrerenderResumeRecords, mergePrerenderPayloadRecords, renderPrerenderBoundary, resumeFromPrerenderRecords } = await import('@markless/web/fns/prerender-resume');",
-				`\tconst records = await derivePrerenderResumeRecords(marklessPrerenderData, ${loadSymbolName});`,
-				'\tconst mergedRecords = mergePrerenderPayloadRecords(records, handoff.root);',
-				'\tconst { runtime } = await resumeFromPrerenderRecords({',
-				'\t\t...mergedRecords,',
-				'\t\troot: handoff.root,',
-				`\t\tloadSymbol: ${loadSymbolName},`,
-				`\t\trenderAsyncBoundary: (boundaryId, status, graph) => renderPrerenderBoundary(marklessPrerenderData, boundaryId, status, graph, ${loadSymbolName}),`,
-				'\t});',
-				'\tawait runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
-				'}',
-			].join('\n')
-		: [
-		'async function marklessFullResumeHandoff(handoff) {',
-		'	handoff.root.__asyncResumeRuntimeStarted = true;',
-		`	const { resumeFromPayloadDocument } = await import('${resumeEntry}');`,
-		'	const { runtime } = await resumeFromPayloadDocument({',
-		'		document: handoff.document,',
-		'		root: handoff.root,',
-		`		loadSymbol: ${loadSymbolName},`,
-		'	});',
-		'	await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
-		'}',
-		].join('\n');
+	const fullResumeHandoff =
+		stagedPrerender && prerenderDataId
+			? [
+					'async function marklessFullResumeHandoff(handoff) {',
+					'\thandoff.root.__asyncResumeRuntimeStarted = true;',
+					'\tconst group = await marklessLoadPrerenderTriggerGroup(handoff);',
+					"\tconst { mergePrerenderPayloadRecords, resumePrerenderTriggerGroup } = await import('@markless/web/fns/prerender-trigger-resume');",
+					// Staging is an optimization, never a correctness gate: interactions
+					// no group covers (branch-arm events today, future record kinds
+					// tomorrow) fall back to the full prerender resume.
+					'\tif (!group) {',
+					"\t\tconst { derivePrerenderResumeRecords, renderPrerenderBoundary, resumeFromPrerenderRecords } = await import('@markless/web/fns/prerender-resume');",
+					'\t\tconst marklessPrerenderData = await marklessLoadPrerenderData();',
+					`\t\tconst fallbackRecords = mergePrerenderPayloadRecords(await derivePrerenderResumeRecords(marklessPrerenderData, ${loadSymbolName}), handoff.root);`,
+					'\t\tconst { runtime } = await resumeFromPrerenderRecords({',
+					'\t\t\t...fallbackRecords,',
+					'\t\t\troot: handoff.root,',
+					`\t\t\tloadSymbol: ${loadSymbolName},`,
+					`\t\t\trenderAsyncBoundary: (boundaryId, status, graph) => renderPrerenderBoundary(marklessPrerenderData, boundaryId, status, graph, ${loadSymbolName}),`,
+					'\t\t});',
+					'\t\tconst marklessDispatchFullRuntime = next => runtime.dispatch(next.event, { syncPolicyAlreadyApplied: next.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
+					'\t\thandoff.root.__marklessRegisterDispatch?.(marklessDispatchFullRuntime);',
+					'\t\tawait marklessDispatchFullRuntime(handoff);',
+					'\t\treturn;',
+					'\t}',
+					'\tconst records = mergePrerenderPayloadRecords({ state: group.state, view: group.view }, handoff.root);',
+					'\tconst { runtime } = await resumePrerenderTriggerGroup({',
+					'\t\t...records, groupId: group.groupId, graphNodeIds: group.graphNodeIds,',
+					'\t\troot: handoff.root, loadSymbol: group.loadSymbol, prepareBoundaryArm: group.prepareBoundaryArm, renderBoundaryArm: group.renderBoundaryArm,',
+					'\t});',
+					'\tawait runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
+					'}',
+				].join('\n')
+			: prerenderDataId
+				? [
+						'async function marklessFullResumeHandoff(handoff) {',
+						'\thandoff.root.__marklessLinkedRenderDataBoot = true;',
+						'\thandoff.root.__asyncResumeRuntimeStarted = true;',
+						"\tconst { derivePrerenderResumeRecords, mergePrerenderPayloadRecords, renderPrerenderBoundary, resumeFromPrerenderRecords } = await import('@markless/web/fns/prerender-resume');",
+						`\tconst records = await derivePrerenderResumeRecords(marklessPrerenderData, ${loadSymbolName});`,
+						'\tconst mergedRecords = mergePrerenderPayloadRecords(records, handoff.root);',
+						'\tconst { runtime } = await resumeFromPrerenderRecords({',
+						'\t\t...mergedRecords,',
+						'\t\troot: handoff.root,',
+						`\t\tloadSymbol: ${loadSymbolName},`,
+						`\t\trenderAsyncBoundary: (boundaryId, status, graph) => renderPrerenderBoundary(marklessPrerenderData, boundaryId, status, graph, ${loadSymbolName}),`,
+						'\t});',
+						'\tawait runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
+						'}',
+					].join('\n')
+				: [
+						'async function marklessFullResumeHandoff(handoff) {',
+						'	handoff.root.__asyncResumeRuntimeStarted = true;',
+						`	const { resumeFromPayloadDocument } = await import('${resumeEntry}');`,
+						'	const { runtime } = await resumeFromPayloadDocument({',
+						'		document: handoff.document,',
+						'		root: handoff.root,',
+						`		loadSymbol: ${loadSymbolName},`,
+						'	});',
+						'	await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
+						'}',
+					].join('\n');
 	const scalarOnlySpecialized =
 		leanMode === 'scalar' &&
 		scalarSpecializations.length > 0 &&
@@ -664,14 +689,15 @@ function emitPrerenderTriggerGroupLoader(
 		'\treturn host?.nodeType === 1 && (host === target || (!!target?.nodeType && typeof host.contains === "function" && host.contains(target)));',
 		'}',
 		'function marklessLoadPrerenderTriggerGroup(input) {',
-		...groups.map(
-			(group) => {
-				const matches = group.hostPath
-					? `marklessPrerenderBranchTriggerMatches(input, ${group.branchStartIndex}, ${group.branchEndIndex}, ${JSON.stringify(group.hostPath)}, ${JSON.stringify(group.eventName)})`
-					: `marklessPrerenderTriggerMatches(input, ${group.hostIndex}, ${JSON.stringify(group.hostTagName.toLowerCase())}, ${JSON.stringify(group.eventName)})`;
-				return `\tif (${matches}) return import(${JSON.stringify(group.moduleId)});`;
-			},
-		),
+		...groups.map((group) => {
+			const matches =
+				group.eventName === 'self-wake'
+					? 'input.event === 0'
+					: group.hostPath
+						? `marklessPrerenderBranchTriggerMatches(input, ${group.branchStartIndex}, ${group.branchEndIndex}, ${JSON.stringify(group.hostPath)}, ${JSON.stringify(group.eventName)})`
+						: `marklessPrerenderTriggerMatches(input, ${group.hostIndex}, ${JSON.stringify(group.hostTagName.toLowerCase())}, ${JSON.stringify(group.eventName)})`;
+			return `\tif (${matches}) return import(${JSON.stringify(group.moduleId)});`;
+		}),
 		'\treturn Promise.resolve(null);',
 		'}',
 	].join('\n');
@@ -1006,17 +1032,24 @@ function emitExecutionLogLoader(): string {
 	return `globalThis.__mxLoadLog ||= () => import(${JSON.stringify(MARKLESS_EXECUTION_LOG_MODULE_ID)});`;
 }
 
-function emitLoadSymbol(input: {
-	readonly resolverId: string;
-	readonly symbols: ReadonlyArray<SourceSymbolRow>;
-	readonly hasBoundSymbols?: boolean;
-}, sourceReaderName?: string) {
-	if (
-		!input.hasBoundSymbols &&
-		input.symbols.length > 0 &&
-		input.symbols.length <= SMALL_SYMBOL_DIRECT_LOAD_LIMIT
-	) {
-		return emitDirectSourceSymbolLoader(input.symbols, sourceReaderName);
+function emitLoadSymbol(
+	input: {
+		readonly resolverId: string;
+		readonly symbols: ReadonlyArray<SourceSymbolRow>;
+		readonly hasBoundSymbols?: boolean;
+	},
+	sourceReaderName?: string,
+) {
+	if (input.symbols.length > 0 && input.symbols.length <= SMALL_SYMBOL_DIRECT_LOAD_LIMIT) {
+		const direct = emitDirectSourceSymbolLoader(input.symbols, sourceReaderName);
+		if (!input.hasBoundSymbols) return direct;
+		return [
+			`const marklessSymbolResolverModule = () => import('${input.resolverId}');`,
+			direct.replace(
+				'\treturn Promise.reject(new Error(`Unknown async symbol ${symbolId}`));',
+				'\treturn marklessSymbolResolverModule().then((mod) => mod.loadSymbol(symbolId));',
+			),
+		].join('\n');
 	}
 
 	return [

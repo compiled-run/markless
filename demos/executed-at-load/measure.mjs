@@ -24,8 +24,11 @@ const ACCEPTED_LOAD_BYTES = {
 	// boot measured 937 — ratcheted to the real number, not the allowance.
 	'music-player-csr': 937,
 	'music-player-ssr': 1_213,
-	// lf-csr ratcheted to the measured number 2026-08-03 (interim-audit item).
-	'live-feed-csr': 28_564,
+	// lf-csr INTERIM 36,000 — owner-ruled 2026-08-03 for the prerendered flip
+	// (measured 35,749 on the staged path; legacy accepted was 28,564). The
+	// raise is conditional: T999 hard-fails unless the post-demolition number
+	// lands back at or below 29,992 and re-ratchets to the measured value.
+	'live-feed-csr': 36_000,
 	// lf-ssr accepted stays 1,285; measures 1,320 — the +35 is documented
 	// irreducible (pre-first-click arm listener install, t010b3/T013 receipts)
 	// and passes within the 5% headroom by design.

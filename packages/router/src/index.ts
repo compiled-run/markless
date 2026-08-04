@@ -1,3 +1,8 @@
+import {
+	createExternalDelegateStructureTokens,
+	createExternalDelegateView,
+} from '@markless/web/fns/external-delegate';
+
 export {
 	buildRouteManifestFromFileIds,
 	matchRouteManifest,
@@ -31,10 +36,7 @@ export { startRouteUpdateRenderer } from './route-renderer.ts';
 // Consumed by the published vite-plugin client entry (src/vite/entries/
 // client-entry.ts), which can only reach this module through the package's
 // root export once installed from npm.
-export {
-	__marklessRouterStartSpaNavigation,
-	ensureNavigationRuntime,
-} from './spa-navigation.ts';
+export { __marklessRouterStartSpaNavigation, ensureNavigationRuntime } from './spa-navigation.ts';
 export { MARKLESS_ROUTER_ROUTE_EVENT, dispatchRouteUpdate, routePageProps } from './route-state.ts';
 export type {
 	RouteDocumentModule,
@@ -146,17 +148,39 @@ export const Link = Object.assign(
 				anchor.setAttribute(name, value);
 			}
 			anchor.innerHTML = linkChildrenHtml(props);
-			return { root: anchor };
+			return {
+				root: anchor,
+				view: linkExternalDelegateView(),
+				liveHostNodes: new Map([['router:link', anchor]]),
+			};
 		},
-		renderSsr(props: LinkProps = {}) {
+		renderSsr(props: LinkProps = {}, renderContext?: { readonly idPrefix?: string }) {
 			const attributes = linkAnchorAttributes(props).map(([name, value]) =>
 				value === '' ? name : `${name}="${escapeHtml(value)}"`,
 			);
 
-			return { html: `<a ${attributes.join(' ')}>${linkChildrenHtml(props)}</a>`, elementCount: 1 };
+			return {
+				html: `<a ${attributes.join(' ')}>${linkChildrenHtml(props)}</a>`,
+				elementCount: 1,
+				structureTokens: createExternalDelegateStructureTokens({
+					hostNodeId: 'router:link',
+					idPrefix: renderContext?.idPrefix,
+					tagName: 'a',
+				}),
+				view: linkExternalDelegateView(),
+			};
 		},
 	},
 );
+
+function linkExternalDelegateView() {
+	return createExternalDelegateView({
+		eventName: 'click',
+		hostNodeId: 'router:link',
+		owner: 'router',
+		tagName: 'a',
+	});
+}
 
 function linkAnchorAttributes(props: LinkProps): Array<readonly [string, string]> {
 	const attributes = new Map<string, string>();

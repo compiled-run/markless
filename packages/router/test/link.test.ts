@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from 'vitest';
+import { PROTOCOL_EVENT_ACTION_KIND } from '@markless/web/fns/external-delegate';
 import { Link } from '../src/index.ts';
 
 const documentDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'document');
@@ -57,8 +58,23 @@ test('Link renders router anchors while preserving user attributes', () => {
 	expect(root.hasAttribute('params')).toBe(false);
 	expect(root.hasAttribute('prefetch')).toBe(false);
 	expect(root.innerHTML).toBe('Docs <strong>now</strong>');
+	expect(output.view).toMatchObject({
+		locators: [expect.objectContaining({ hostNodeId: 'router:link', index: 0 })],
+		events: [
+			{
+				hostNodeId: 'router:link',
+				eventName: 'click',
+				symbolIds: [],
+				action: {
+					kind: PROTOCOL_EVENT_ACTION_KIND.externalDelegate,
+					owner: 'router',
+				},
+			},
+		],
+	});
 
-	const ssr = Link.renderSsr(props).html;
+	const ssrOutput = Link.renderSsr(props);
+	const ssr = ssrOutput.html;
 
 	expect(ssr).toContain('href="/docs/getting-started"');
 	expect(ssr).toContain('data-markless-router-link');
@@ -72,6 +88,18 @@ test('Link renders router anchors while preserving user attributes', () => {
 	expect(ssr).not.toContain('params=');
 	expect(ssr).not.toContain('prefetch=');
 	expect(ssr).not.toContain('onClick=');
+	expect(ssrOutput.view).toEqual(output.view);
+	expect(ssrOutput.structureTokens).toEqual([
+		{ kind: 'element', hostNodeId: 'router:link', tagName: 'a' },
+	]);
+});
+
+test('Link prefixes its SSR structure token for parent composition', () => {
+	const output = Link.renderSsr({ href: '/docs', children: 'Docs' }, { idPrefix: 'c0:' });
+
+	expect(output.structureTokens).toEqual([
+		{ kind: 'element', hostNodeId: 'c0:router:link', tagName: 'a' },
+	]);
 });
 
 class FakeElement {

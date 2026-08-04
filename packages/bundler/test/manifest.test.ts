@@ -390,7 +390,7 @@ describe('markless build metadata output', () => {
 			(injection) => (injection.attributes as { href: string }).href,
 		);
 
-		expect(hrefs).not.toContain('/build/resume.js');
+		expect(hrefs).toContain('/build/resume.js');
 		expect(hrefs).toContain('/build/linked-render-data.js');
 		expect(hrefs).toContain('/build/child-symbol.js');
 	});
