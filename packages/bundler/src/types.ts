@@ -46,6 +46,8 @@ export interface MarklessVirtualModule {
 	source: string;
 	symbolId?: string;
 	exportName?: string;
+	canonicalRenderData?: boolean;
+	symbolClaims?: ReadonlyArray<string>;
 }
 
 export interface TransformTsrxModuleInput {
@@ -68,8 +70,10 @@ export interface TransformTsrxModuleInput {
 	executionLogModuleHooks?: boolean;
 	inlineResumerDebug?: boolean;
 	prerenderRecords?: boolean;
+	directCsr?: boolean;
 	prerenderWakeVariant?: boolean;
 	prerenderWakeFacade?: boolean;
+	preserveWakeSiblingClaims?: boolean;
 	prerenderRecordData?: BuiltPrerenderRecords;
 	runtimeDemandClass?: import('@markless/compiler').RuntimeDemandClass;
 }
@@ -98,7 +102,11 @@ export type ArtifactChildCandidate = {
 		readonly value?: unknown;
 		readonly source?: string;
 	}>;
-	readonly projection?: { readonly kind: 'static-markup'; readonly markup: string; readonly elementCount: number };
+	readonly projection?: {
+		readonly kind: 'static-markup';
+		readonly markup: string;
+		readonly elementCount: number;
+	};
 };
 
 export type MarklessModuleLinkArtifact = Pick<

@@ -10,8 +10,8 @@ import {
 import type { SsrRenderable, SsrRenderOutput } from '../render-to-string.ts';
 import type { ResumeArmRecordSet } from '../resume-types.ts';
 import type { RuntimeGraph } from '@markless/runtime';
-import { serializeRuntimeAsyncSnapshots } from '@markless/serializer';
 import type { ProtocolStatePayload } from '@markless/serializer';
+import { SERIALIZED_NULL_GRAPH_PAYLOAD } from '../../../serializer/src/value-constants.ts';
 import { prepareSsrResumeRecords } from './records.ts';
 import {
 	marklessSsrAttachSnapshots,
@@ -211,22 +211,7 @@ export async function renderPrerenderDataSurface(
 	loadSymbol: PrerenderLoadSymbol,
 	props: unknown = {},
 ): Promise<SsrRenderOutput> {
-	const output = await evaluatePrerenderDataSurface(
-		surface,
-		loadSymbol,
-		undefined,
-		true,
-		asPropsRecord(props),
-	);
-	return output.state
-		? {
-				...output,
-				state: {
-					...output.state,
-					computed: serializeRuntimeAsyncSnapshots(output.state.computed ?? []),
-				},
-			}
-		: output;
+	return evaluatePrerenderDataSurface(surface, loadSymbol, undefined, true, asPropsRecord(props));
 }
 
 export async function renderPrerenderBoundary(
@@ -334,14 +319,15 @@ async function evaluatePrerenderDataComponent(input: {
 	};
 	for (const initial of definition.initialValues ?? []) {
 		if (initial.value.kind !== 'symbol-function') continue;
+		const symbolId = initial.value.symbolId;
 		const loaded = await input.loadSymbol(
-			input.boundSymbols?.[initial.value.symbolId] ?? input.symbolPrefix + initial.value.symbolId,
+			input.boundSymbols?.[symbolId] ?? input.symbolPrefix + symbolId,
 		);
 		if (typeof loaded !== 'function') {
-			throw new Error(`MARKLESS_PRERENDER_DATA_SYMBOL_MISSING: ${initial.value.symbolId}`);
+			throw new Error(`MARKLESS_PRERENDER_DATA_SYMBOL_MISSING: ${symbolId}`);
 		}
 		const value =
-			definition.initialValueKinds?.[initial.graphNodeId] === 'sync-computed-derive'
+			loaded.length > 0
 				? await loaded({ graph: { read }, read })
 				: await loaded();
 		values.set(initial.graphNodeId, value);
@@ -384,7 +370,11 @@ async function evaluatePrerenderDataComponent(input: {
 							...computed,
 							snapshot: input.graph
 								? (input.graph.read(computed.graphNodeId, []) as never)
-								: { status: 'pending' as const, version: 1, key: null },
+								: {
+										status: 'pending' as const,
+										version: 1,
+										key: SERIALIZED_NULL_GRAPH_PAYLOAD,
+									},
 						}
 					: computed,
 			),
@@ -590,10 +580,9 @@ function readPath(value: unknown, path: ReadonlyArray<string>): unknown {
 	return current;
 }
 
-function placeMaterializedChild<T extends { readonly structureTokens?: ReadonlyArray<StructureToken> }>(
-	output: T,
-	idPrefix: string,
-): T {
+function placeMaterializedChild<
+	T extends { readonly structureTokens?: ReadonlyArray<StructureToken> },
+>(output: T, idPrefix: string): T {
 	if (!output.structureTokens || idPrefix === '') return output;
 	return {
 		...output,

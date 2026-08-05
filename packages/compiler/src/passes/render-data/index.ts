@@ -259,6 +259,7 @@ function repeatRecord(
 		...(eventControls.length > 0 ? { eventControls } : {}),
 		...(rowElementHandles && rowElementHandles.length > 0 ? { rowElementHandles } : {}),
 		...(rowBehaviors.length > 0 ? { rowBehaviors } : {}),
-		directSupported: repeat.indexName === undefined,
+		directSupported:
+			repeat.indexName === undefined && repeat.collectionGraphNodeId !== undefined,
 	};
 }

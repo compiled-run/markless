@@ -114,6 +114,28 @@ export function App() @{
 	}
 });
 
+test('SSR child props preserve callback symbols through a forwarding component', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ForwardedAction.tsrx',
+		source: `
+function Action({ onChoose }) @{
+	<button onClick={() => onChoose('cobalt')}>Choose</button>
+}
+function Panel({ onChoose }) @{
+	<section><Action onChoose={onChoose} /></section>
+}
+export function App() @{
+	<Panel onChoose={(value) => console.log(value)} />
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderModule.ssrModuleSource).toContain(
+		'"onChoose":marklessSsrCallbackSymbol(props,["onChoose"])',
+	);
+});
+
 test('same-module child SSR evaluates only template computed values owned by that child', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/ComputedOwner.tsrx',

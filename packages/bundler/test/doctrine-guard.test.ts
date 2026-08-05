@@ -27,10 +27,12 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Environment-less invalidation falls back to the already resolved client environment.',
 	"packages/bundler/src/rolldown.ts :: if (currentEnvironment !== 'client') {":
 		'Rolldown entry signatures are adjusted only for its resolved client build.',
-	"packages/bundler/src/rolldown.ts :: environment !== 'client' ||":
+	"packages/bundler/src/rolldown.ts :: if (environment !== 'client') {":
 		'Imported symbol facades are materialized only for the resolved client build.',
 	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'client' &&":
 		'Rolldown transform hooks project the resolved environment into client-only build behavior.',
+	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'client' && !renderDataRequest && !clientRouteArtifact;":
+		'Only claim-bearing client transforms participate in source publication readiness.',
 	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'client' && renderDataRequest":
 		'Reached-from lookup is limited to client render-data requests before materialized-route propagation is selected.',
 	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'client'":
@@ -101,6 +103,8 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Compiled app metadata omits server document fields from client output.',
 	"packages/bundler/src/transform.ts :: const linkedClientRenderData = input.environment === 'client' && !input.prerenderRecords;":
 		'Build-time source emission recursively links ordinary client render-data modules while prerender records use their separately resolved shape.',
+	"packages/bundler/src/transform.ts :: input.input.environment !== 'client' ||":
+		'Linked render-data boundary symbols are emitted only for the resolved client compilation that can demand them.',
 	"packages/bundler/src/vite/environment.ts :: if (environment === 'client') {":
 		'This file is the Vite environment-name resolver for client posture.',
 	"packages/bundler/src/vite/environment.ts :: if (environment === 'server') {":

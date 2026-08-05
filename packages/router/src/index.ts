@@ -137,7 +137,25 @@ export const Html = Object.assign(
 	},
 );
 
-export const Link = Object.assign(
+type LinkComponent = {
+	(props?: LinkProps): unknown;
+	renderCsr(props?: LinkProps): {
+		root: HTMLAnchorElement;
+		view: ReturnType<typeof createExternalDelegateView>;
+		liveHostNodes: Map<string, HTMLAnchorElement>;
+	};
+	renderSsr(
+		props?: LinkProps,
+		renderContext?: { readonly idPrefix?: string },
+	): {
+		html: string;
+		elementCount: number;
+		structureTokens: ReturnType<typeof createExternalDelegateStructureTokens>;
+		view: ReturnType<typeof createExternalDelegateView>;
+	};
+};
+
+export const Link: LinkComponent = Object.assign(
 	function Link(props: LinkProps = {}): unknown {
 		return props.children;
 	},

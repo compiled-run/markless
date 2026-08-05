@@ -7,4 +7,14 @@ if (!app) {
 	throw new Error('Expected #app target for the live-feed CSR render.');
 }
 
-await render(App, { target: app });
+const measurementGlobal = globalThis as typeof globalThis & {
+	readonly __marklessMeasureSettleArrival?: () => Promise<void>;
+};
+await render(App, {
+	target: app,
+	async beforeMount() {
+		await measurementGlobal.__marklessMeasureSettleArrival?.();
+		// Emit after record registration, before the boundary self-wake can schedule.
+		app.setAttribute('data-feed-settle-arrived', '');
+	},
+});

@@ -98,10 +98,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	const resumeId = resumeVirtualModuleId(input.filename);
 	const prerenderWakeId = prerenderWakeVirtualModuleId(input.filename);
 	const { compiled: compiledForAllClasses, blockingDiagnostics } =
-		await compileWithBlockingDiagnostics(
-		input,
-		resolverId,
-	);
+		await compileWithBlockingDiagnostics(input, resolverId);
 	throwIfBlocked(input, blockingDiagnostics);
 	const runtimeDemandClass = input.runtimeDemandClass ?? 'prerender';
 	const compiled = {
@@ -121,7 +118,10 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		renderDataId,
 		resolverId,
 	});
-	const symbolRows = [...compilerSymbolRows, ...linkedBoundarySymbols.map((symbol) => symbol.row)];
+	const symbolRows = [
+		...compilerSymbolRows,
+		...linkedBoundarySymbols.map((symbol) => symbol.row),
+	];
 	const behaviorSymbolIds = new Set(
 		(compiled.protocolView.behaviors ?? []).flatMap((behavior) =>
 			behavior.symbolId ? [behavior.symbolId] : [],
@@ -131,10 +131,11 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	const importedBoundRows = compiled.boundSymbolResolver.rows.map((row) =>
 		row.loaderSymbolId ? { ...row, baseSymbolId: row.loaderSymbolId } : row,
 	);
+	const resolverSymbols = uniqueSymbolsById([...(input.symbols ?? []), ...symbolRows]);
 	const resolverSource = adaptImportedCaptureResolver(
 		emitSymbolResolverModule({
 			buildId: input.buildId,
-			symbols: uniqueSymbolsById([...(input.symbols ?? []), ...symbolRows]),
+			symbols: resolverSymbols,
 			boundSymbols: importedBoundRows,
 		}),
 		importedBoundRows.some((row) => row.loaderSymbolId !== undefined),
@@ -189,7 +190,9 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		prerenderClosureNeedsWake;
 	// The per-page wake facade owns wake-shaped symbol routes.
 	const manifestOwnsSymbolRoutes =
-		input.prerenderWakeVariant !== true || emitsPrerenderWakeFacade;
+		input.prerenderWakeVariant !== true ||
+		input.preserveWakeSiblingClaims === true ||
+		emitsPrerenderWakeFacade;
 	const manifest: MarklessTransformManifest = {
 		source: input.filename,
 		captureMetadata: compiled.captureAnalysis,
@@ -203,28 +206,30 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	};
 	// Keep ordinary client render-data modules recursively linkable.
 	const linkedClientRenderData = input.environment === 'client' && !input.prerenderRecords;
+	const canonicalRenderData =
+		(input.prerenderRecords || linkedClientRenderData) &&
+		prerenderInterfacesComplete(compiled, input);
 	const virtualModules: MarklessVirtualModule[] = [
 		...(compiled.publicRenderModule.renderDataModuleSource
 			? [
 					{
 						id: renderDataId,
 						type: 'render-data' as const,
+						...(canonicalRenderData ? { canonicalRenderData: true } : {}),
 						// Prerender emission requires every imported child's linked
 						// render-data interface. An incomplete set is an ELIGIBILITY
 						// boundary, not a failure: the pre-link pass defers to the
 						// linked pass, and pages composing artifact-shaped package
 						// children (e.g. the router's Link) stay on the payload
 						// container until artifact-child prerender lands.
-						source:
-							(input.prerenderRecords || linkedClientRenderData) &&
-							prerenderInterfacesComplete(compiled, input)
-								? prerenderDataModuleSource(
-										compiled,
-										input.importedModuleInterfaces,
-										input.renderDataImportSources,
-										input.artifactChildMaterializations,
-									)
-								: compiled.publicRenderModule.renderDataModuleSource,
+						source: canonicalRenderData
+							? prerenderDataModuleSource(
+									compiled,
+									input.importedModuleInterfaces,
+									input.renderDataImportSources,
+									input.artifactChildMaterializations,
+								)
+							: compiled.publicRenderModule.renderDataModuleSource,
 					},
 				]
 			: []),
@@ -243,6 +248,12 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 			id: resolverId,
 			type: 'resolver',
 			source: resolverSource,
+			symbolClaims: [
+				...new Set([
+					...resolverSymbols.map((symbol) => symbol.id),
+					...importedBoundRows.map((symbol) => symbol.id),
+				]),
+			],
 		},
 		{
 			id: resumeId,
@@ -389,9 +400,9 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		code:
 			styleImport +
 			(await stripEmittedTypes(
-					emitSourceModule({
-						filename: input.filename,
-						dev: input.dev,
+				emitSourceModule({
+					filename: input.filename,
+					dev: input.dev,
 					payloadId,
 					resolverId,
 					renderDataId,
@@ -406,6 +417,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					// closure verdict, not the page-only one, decides its emission.
 					needsFullResume: prerenderClosureNeedsWake,
 					prerenderRecords: input.prerenderRecords,
+					directCsr: input.directCsr,
 					resumeModuleUrl: input.resumeModuleUrl,
 					prerenderWakeModuleUrl: input.prerenderWakeModuleUrl,
 					publicRenderModuleSource: compiled.publicRenderModule.moduleSource,

@@ -59,6 +59,8 @@ function installCueTier(
 		if ((host.dataset.command || 'cue') !== 'cue') void demandRuntime(player);
 	});
 	observer.observe(host, { attributeFilter: ['data-command', 'data-command-version'] });
+	// Lazy attach can start after the command was already set; the observer only sees future mutations.
+	if ((host.dataset.command || 'cue') !== 'cue') void demandRuntime(player);
 }
 
 function loadYouTubeApi(): Promise<YouTubeApi> {

@@ -150,7 +150,9 @@ export function emitSourceModule(input: {
 	readonly symbolRoutes: ReadonlyArray<SourceSymbolRoute>;
 	readonly hasBoundSymbols?: boolean;
 	readonly prerenderRecords?: boolean;
+	readonly directCsr?: boolean;
 }) {
+	if (input.directCsr && input.prerenderRecords) input = { ...input, prerenderRecords: false };
 	const symbolsOnly = input.environment === 'client' && input.clientOutput === 'symbols-only';
 	const routeSymbols = input.environment === 'client' && input.symbolRoutes.length > 0;
 	const canonicalRenderData =
@@ -180,10 +182,10 @@ export function emitSourceModule(input: {
 		'',
 		emitLoadSymbol(input),
 		input.behaviorSymbols?.length
-			? emitDirectSourceSymbolLoader(input.behaviorSymbols).replace(
-					'function loadSymbol(',
-					'function loadBehaviorSymbol(',
-				)
+			? emitDirectSourceSymbolLoader(
+					input.behaviorSymbols,
+					'readMarklessBehaviorSourceSymbol',
+				).replace('function loadSymbol(', 'function loadBehaviorSymbol(')
 			: '',
 		input.environment === 'client' && input.executionLog !== 'never'
 			? emitExecutionLogLoader()
@@ -356,15 +358,16 @@ export function emitQueuedResumeContainerEvent(source: string): string {
 		'export function resumeContainerEvent(input) {',
 		'\tconst root = input.root;',
 		'\tif (!root.__marklessDispatch) {',
-		'\t\tlet handler = marklessResumeContainerEvent, tail = Promise.resolve(), lastEvent = null;',
+		'\t\tlet handler = marklessResumeContainerEvent, tail = Promise.resolve(), lastEvent = null, lastEventTime = undefined;',
 		'\t\troot.__marklessRegisterDispatch = next => {',
 		'\t\t\tconst fallback = handler;',
 		'\t\t\thandler = input => next(input, fallback);',
 		'\t\t};',
 		'\t\troot.__marklessDispatch = next => {',
-		'\t\t\tconst event = next.event;',
-		'\t\t\tif (event === lastEvent) return tail;',
+		'\t\t\tconst event = next.event, eventTime = event?.timeStamp;',
+		'\t\t\tif (event === lastEvent && eventTime === lastEventTime) return tail;',
 		'\t\t\tlastEvent = event;',
+		'\t\t\tlastEventTime = eventTime;',
 		'\t\t\tconst run = () => handler(next);',
 		'\t\t\treturn tail = tail.then(run, run);',
 		'\t\t};',

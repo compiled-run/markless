@@ -203,6 +203,44 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(result.code).not.toContain('state: payloadState');
 	});
 
+	test('direct CSR emission stays native when staged wake records are also built', async () => {
+		const result = await transformTsrxModule({
+			filename: '/workspace/app/src/App.tsrx',
+			source,
+			environment: 'client',
+			prerenderRecords: true,
+			directCsr: true,
+			prerenderWakeVariant: true,
+		});
+
+		expect(result.code).toContain('renderCsr: App');
+		expect(result.code).not.toContain('renderSsr(props, marklessRenderContext) {');
+	});
+
+	test('staged wake selects native output only for builds without SSR resume entries', async () => {
+		const direct = marklessClient({ prerenderWakeChannel: true } as never);
+		const resumed = marklessClient({
+			prerenderWakeChannel: true,
+			emitResumeModules: true,
+		} as never);
+		callBuildStart(direct, { cwd: '/workspace/app' });
+		callBuildStart(resumed, { cwd: '/workspace/app' });
+
+		const directResult = (await callTransform(
+			direct,
+			source,
+			'/workspace/app/src/App.tsrx',
+		)) as { readonly code: string };
+		const resumedResult = (await callTransform(
+			resumed,
+			source,
+			'/workspace/app/src/App.tsrx',
+		)) as { readonly code: string };
+
+		expect(directResult.code).toContain('renderCsr: App');
+		expect(resumedResult.code).not.toContain('renderCsr: App');
+	});
+
 	test('client definitions use canonical render data without the retired CSR producer', async () => {
 		const production = await transformTsrxModule({
 			filename: '/workspace/app/src/App.tsrx',
@@ -738,6 +776,29 @@ let count = state(0);
 		expect(result.code).not.toContain('resumeScalarCoreEventFromPayloadDocument');
 		expect(result.code).not.toContain('const marklessCompiledApp = {');
 		expect(result.code).not.toContain('renderCsr:');
+	});
+
+	test('wake-first publication does not erase the resume sibling symbol claims', async () => {
+		const plugin = marklessClient({ prerenderWakeChannel: true } as never);
+		const filename = '/workspace/app/components/UpdateSummary.tsrx';
+		const source = `import { computed } from '@markless/core';
+export function UpdateSummary({ updates, weight }) @{
+	const weightedCount = computed(() => updates.length * weight);
+	<p>Weighted count {weightedCount}</p>
+}`;
+
+		callBuildStart(plugin, { cwd: '/workspace/app' });
+		await callTransform(plugin, source, `${filename}?markless-prerender-wake`);
+		await callTransform(plugin, source, `${filename}?markless-resume`, {
+			getModuleInfo: () => ({ isEntry: true }),
+		});
+		await callTransform(plugin, source, `${filename}?markless-symbols`, {
+			getModuleInfo: () => ({ isEntry: true }),
+		});
+
+		const resolverId = `virtual:markless:resolver:${encodeURIComponent(filename)}`;
+		const resolverSource = (await callLoad(plugin, `\0${resolverId}`)) as string;
+		expect(resolverSource).toContain('symbol:1');
 	});
 
 	test.each(['markless-resume', 'markless-render-data'])(
@@ -1438,7 +1499,7 @@ export default function Page() @{ <main><Child /></main> }`;
 				renderDataBytes(controlChunk?.code),
 			);
 			expect(renderDataChunk?.code).toContain('marklessRenderData');
-		expect(renderDataChunk?.code).toContain('marklessPrerenderData');
+			expect(renderDataChunk?.code).toContain('marklessPrerenderData');
 			expect(
 				routeChunks.flatMap((chunk) => chunk.moduleIds),
 				'ordinary reach must not emit or request child render data',
@@ -1804,41 +1865,43 @@ export function App() @{
 				moduleIds: ['/workspace/app/src/App.tsrx'],
 				facadeModuleId: '/workspace/app/src/App.tsrx',
 			},
-			...Object.fromEntries(virtualIds.map((id, index) => {
-				const symbol = transformed.manifest.symbols.find(
-					(entry) => `\0${entry.virtualModuleId}` === id,
-				);
-				return [
-					`build/chunk-${index}.js`,
-					{
-						type: 'chunk',
-						fileName: `build/chunk-${index}.js`,
-						name: `chunk-${index}`,
-						code:
-							id === `\0${resolverId}`
-								? resolverSource
-								: symbol
-									? `export function ${symbol.exportName}() {}`
-									: 'export default {};',
-						exports:
-							id === `\0${resolverId}`
-								? ['loadSymbol']
-								: symbol
-									? [symbol.exportName]
-									: ['default'],
-						imports: [],
-						dynamicImports:
-							id === `\0${resolverId}`
-								? symbolVirtualIds.map(
-										(_, symbolIndex) =>
-											`build/chunk-${entryVirtualIds.length + symbolIndex}.js`,
-									)
-								: [],
-						moduleIds: [id],
-						facadeModuleId: id,
-					},
-				] as const;
-			})),
+			...Object.fromEntries(
+				virtualIds.map((id, index) => {
+					const symbol = transformed.manifest.symbols.find(
+						(entry) => `\0${entry.virtualModuleId}` === id,
+					);
+					return [
+						`build/chunk-${index}.js`,
+						{
+							type: 'chunk',
+							fileName: `build/chunk-${index}.js`,
+							name: `chunk-${index}`,
+							code:
+								id === `\0${resolverId}`
+									? resolverSource
+									: symbol
+										? `export function ${symbol.exportName}() {}`
+										: 'export default {};',
+							exports:
+								id === `\0${resolverId}`
+									? ['loadSymbol']
+									: symbol
+										? [symbol.exportName]
+										: ['default'],
+							imports: [],
+							dynamicImports:
+								id === `\0${resolverId}`
+									? symbolVirtualIds.map(
+											(_, symbolIndex) =>
+												`build/chunk-${entryVirtualIds.length + symbolIndex}.js`,
+										)
+									: [],
+							moduleIds: [id],
+							facadeModuleId: id,
+						},
+					] as const;
+				}),
+			),
 		};
 
 		await callGenerateBundle(plugin, bundle, emitFile);

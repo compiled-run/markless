@@ -143,10 +143,6 @@ export async function renderCsrRuntime(input: {
 			(await demandRuntime()).holdPendingSettleCommits?.(ms),
 	};
 	const delegatedTriggers = installDelegatedTriggers(output, view, dispatchQueued);
-	// A cold CSR boundary paints its compiler-selected pending arm, then starts
-	// its declared runner without waiting for settlement. Event-only pages keep
-	// the interaction-lazy path above.
-	if (view.asyncBoundaries.length > 0) await demandRuntime();
 	if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 		await registerDelegatedTriggerDebug(output, view);
 	if ((globalThis as ExecutionLogGlobal).__mxLog) await marklessLogCsrSummary();

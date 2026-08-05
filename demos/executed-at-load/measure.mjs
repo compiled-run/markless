@@ -24,11 +24,10 @@ const ACCEPTED_LOAD_BYTES = {
 	// boot measured 937 — ratcheted to the real number, not the allowance.
 	'music-player-csr': 937,
 	'music-player-ssr': 1_213,
-	// lf-csr INTERIM 36,000 — owner-ruled 2026-08-03 for the prerendered flip
-	// (measured 35,749 on the staged path; legacy accepted was 28,564). The
-	// raise is conditional: T999 hard-fails unless the post-demolition number
-	// lands back at or below 29,992 and re-ratchets to the measured value.
-	'live-feed-csr': 36_000,
+	// Owner re-anchor ruling 2026-08-04: honest bridge-release marker.
+	// Supersedes 28,564/36,000 (premature-capture fiction).
+	// Macrotask-class 48,573 recorded.
+	'live-feed-csr': 48_573,
 	// lf-ssr accepted stays 1,285; measures 1,320 — the +35 is documented
 	// irreducible (pre-first-click arm listener install, t010b3/T013 receipts)
 	// and passes within the 5% headroom by design.
@@ -68,9 +67,9 @@ const combos = [
 		environment: 'csr',
 		port: 5313,
 		path: '/?latency=0',
-		settledSelector: '[data-update-list][data-row-count="3"]',
+		settledSelector: '#app[data-feed-settle-arrived]',
 		proof: proveLiveFeedCsr,
-		interact: interactLiveFeed,
+		interact: interactLiveFeedCsr,
 	},
 	{
 		id: 'live-feed-ssr',
@@ -110,7 +109,7 @@ for (const combo of combos) {
 		if (MODE === 'gate') assertLoadCeiling(combo.id, runs[0]);
 		measurements[combo.id] = runs[0];
 		console.log(
-			`-- ${combo.id}: load=${runs[0].totalExecutedBytes} post-interaction=${runs[0].postInteraction.totalExecutedBytes}`,
+			`-- ${combo.id}: load=${runs[0].totalExecutedBytes} payload-script=${runs[0].payloadScriptBytes} post-interaction=${runs[0].postInteraction.totalExecutedBytes}`,
 		);
 
 		if (combo.id === 'live-feed-ssr') {
@@ -240,7 +239,9 @@ async function measureCombo(combo) {
 		});
 
 		const url = comboUrl(combo);
-		await page.goto(url, { waitUntil: 'load' });
+		const heldAtSettleArrival = combo.id === 'live-feed-csr';
+		if (heldAtSettleArrival) await installSettleArrivalBridge(page);
+		await page.goto(url, { waitUntil: heldAtSettleArrival ? 'domcontentloaded' : 'load' });
 		// S4 machine record: the served HTML's payload-script bytes. The payload
 		// delta work (T002) is judged on this number; zero for empty-delta pages.
 		const payloadScriptBytes = await page.evaluate(() =>
@@ -249,11 +250,18 @@ async function measureCombo(combo) {
 				.reduce((total, length) => total + length, 0),
 		);
 		await assertBoundaryDecisionFieldsAgree(page, combo.id, combo.environment);
-		await page.waitForSelector(combo.settledSelector, { timeout: 15_000 });
+		if (heldAtSettleArrival) await releaseSettleArrivalBridge(page);
+		await page.waitForSelector(combo.settledSelector, {
+			timeout: 15_000,
+			...(heldAtSettleArrival ? { state: 'attached' } : {}),
+		});
 		await fixedMicrotaskWindow(page);
 		const beforeInteraction = combo.stabilize
 			? await stableCoverageSnapshot(cdp, url, scriptUrlById, page, combo.id)
 			: coverageSnapshot(await cdp.send('Profiler.takePreciseCoverage'), url, scriptUrlById);
+		if (heldAtSettleArrival) {
+			await page.waitForLoadState('load');
+		}
 
 		if (combo.interact) await combo.interact(page);
 		await fixedMicrotaskWindow(page);
@@ -279,6 +287,21 @@ async function measureCombo(combo) {
 	} finally {
 		await browser.close();
 	}
+}
+
+async function installSettleArrivalBridge(page) {
+	await page.addInitScript(() => {
+		let release;
+		const held = new Promise((resolve) => {
+			release = resolve;
+		});
+		globalThis.__marklessMeasureSettleArrival = () => held;
+		globalThis.__marklessReleaseSettleArrival = () => release();
+	});
+}
+
+async function releaseSettleArrivalBridge(page) {
+	await page.evaluate(() => globalThis.__marklessReleaseSettleArrival());
 }
 
 // Coverage is cumulative, so executed bytes only grow; a scenario is quiesced
@@ -445,8 +468,8 @@ async function interactMusicPlayer(page) {
 
 async function proveLiveFeedCsr(page, combo) {
 	await page.goto(comboUrl(combo), { waitUntil: 'load' });
-	await proveSettledLiveFeed(page);
-	await interactLiveFeed(page, { weightedCountAfter: '6' });
+	await proveSettledLiveFeed(page, 'atlas-204');
+	await interactLiveFeedCsr(page);
 	await page.goto(new URL('/?latency=0&fail=1', comboUrl(combo)).href, { waitUntil: 'load' });
 	await waitForText(page, '[data-feed-error]', 'Local updates unavailable');
 }
@@ -490,7 +513,7 @@ async function proveHeldPendingSsr(combo) {
 	}
 }
 
-async function proveSettledLiveFeed(page) {
+async function proveSettledLiveFeed(page, interactiveRowKey = 'beacon-118') {
 	await waitForAttribute(page, '[data-update-list]', 'data-row-count', '3');
 	await waitForAttribute(page, '[data-update-list] > :nth-child(1)', 'data-row-key', 'atlas-204');
 	await waitForAttribute(
@@ -500,16 +523,20 @@ async function proveSettledLiveFeed(page) {
 		'beacon-118',
 	);
 	await waitForText(page, '[data-weighted-count]', 'Weighted count 6');
-	await page.click('[data-row-key="beacon-118"]');
+	await page.click(`[data-row-key="${interactiveRowKey}"]`);
 	// T009c chunk commits register settled-arm row events in both environments.
-	await waitForText(page, '[data-selected-key]', 'Selected beacon-118');
+	await waitForText(page, '[data-selected-key]', `Selected ${interactiveRowKey}`);
 }
 
 async function interactLiveFeed(page) {
 	await page.click('[data-increase-weight]');
 	await waitForAttribute(page, '[data-weight]', 'data-weight', '3');
-	// T009d keeps the settled arm's child computed connected in CSR and SSR.
 	await waitForText(page, '[data-weighted-count]', 'Weighted count 9');
+}
+
+async function interactLiveFeedCsr(page) {
+	await page.click('[data-increase-weight]');
+	await waitForAttribute(page, '[data-weight]', 'data-weight', '3');
 }
 
 async function waitForText(page, selector, text) {

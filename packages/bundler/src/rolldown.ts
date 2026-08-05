@@ -393,7 +393,7 @@ export function createMarklessRolldownPlugin(input: {
 
 			return null;
 		},
-		load(id) {
+		async load(id) {
 			if (normalizeVirtualId(id) === MARKLESS_EXECUTION_LOG_MODULE_ID) {
 				const embedsDevSizes =
 					internalOptions.dev === true && getEnvironment(this) === 'client';
@@ -413,7 +413,27 @@ export function createMarklessRolldownPlugin(input: {
 								`/${MARKLESS_EXECUTION_SIZES}`),
 				});
 			}
-			const module = virtualModules.get(normalizeVirtualId(id));
+			const normalizedId = normalizeVirtualId(id);
+			const resolverSource = resolverVirtualModuleSourceFile(normalizedId);
+			if (
+				resolverSource &&
+				getEnvironment(this) === 'client' &&
+				internalOptions.dev !== true &&
+				internalOptions.prerenderWakeChannel === true &&
+				typeof this.getModuleInfo === 'function'
+			) {
+				const queryClaimSources = [
+					withQuery(resolverSource, { 'markless-resume': null }),
+					withQuery(resolverSource, { 'markless-prerender-wake': null }),
+					withQuery(resolverSource, { 'markless-symbols': null }),
+				];
+				moduleMetadata.expectSourceSymbolClaims(
+					resolverSource,
+					queryClaimSources.filter((source) => this.getModuleInfo(source) != null),
+				);
+				await moduleMetadata.sealSourceSymbolClaims(resolverSource);
+			}
+			const module = virtualModules.get(normalizedId);
 			if (module) {
 				return virtualModuleSourceForLoad(module, {
 					dev: internalOptions.dev === true && getEnvironment(this) === 'client',
@@ -510,6 +530,15 @@ export function createMarklessRolldownPlugin(input: {
 					internalOptions.dev === true && currentEnvironment === 'client',
 				inlineResumerDebug: internalOptions.inlineResumerDebug === true,
 				prerenderRecords,
+				directCsr:
+					currentEnvironment === 'client' &&
+					internalOptions.emitResumeModules !== true &&
+					internalOptions.prerender !== true &&
+					!renderDataRequest &&
+					!prerenderWakeRequest &&
+					!isResumeSourceRequest(id) &&
+					!isSymbolOnlySourceRequest(id) &&
+					!clientRouteArtifact,
 				runtimeDemandClass:
 					currentEnvironment === 'client' &&
 					internalOptions.emitResumeModules === true &&
@@ -522,12 +551,16 @@ export function createMarklessRolldownPlugin(input: {
 					(prerenderWakeRequest ||
 						(ssrPrerenderArtifacts && clientSymbolEntrySources.has(source))),
 				prerenderWakeFacade: prerenderWakeRequest,
+				preserveWakeSiblingClaims:
+					currentEnvironment === 'client' &&
+					(isResumeSourceRequest(id) || isSymbolOnlySourceRequest(id)),
 				environment: currentEnvironment,
 				clientOutput:
 					currentEnvironment === 'client' &&
 					((clientSymbolEntrySources.has(source) &&
 						internalOptions.prerender !== true &&
 						!clientRouteArtifactSources.has(source) &&
+						isClientPrimarySourceRequest(id) &&
 						isModuleEntry(this, id)) ||
 						isSymbolOnlySourceRequest(id))
 						? 'symbols-only'
@@ -573,6 +606,11 @@ export function createMarklessRolldownPlugin(input: {
 			};
 			const manifestSource =
 				currentEnvironment === 'client' && !isClientPrimarySourceRequest(id) ? id : source;
+			const publishesClientClaims =
+				currentEnvironment === 'client' && !renderDataRequest && !clientRouteArtifact;
+			if (publishesClientClaims) {
+				moduleMetadata.beginSourceSymbolClaims(source, manifestSource);
+			}
 			// One source can be requested as a full environment entry, a symbols-only
 			// interaction entry, or a dev resume entry. Their linked interfaces are the
 			// same, but their emitted module shapes are deliberately different.
@@ -710,6 +748,8 @@ export function createMarklessRolldownPlugin(input: {
 					executionLogEstimatedSizes,
 					dev,
 					environment: currentEnvironment,
+					finalPublication: false,
+					tracksSourceClaimPublication: false,
 					updateDevPrerenderHashes: internalOptions.updateDevPrerenderHashes,
 				});
 			} else {
@@ -790,6 +830,71 @@ export function createMarklessRolldownPlugin(input: {
 				source,
 				manifestHasBrowserTriggers(transformed.manifest) || linkedChildHasBrowserTriggers,
 			);
+			if (
+				publishesClientClaims &&
+				!isClientPrimarySourceRequest(id) &&
+				internalOptions.prerenderWakeChannel === true &&
+				typeof this.getModuleInfo === 'function'
+			) {
+				const aggregateInput = {
+					...linkedTransformInput,
+					clientOutput: undefined,
+					prerenderWakeFacade: false,
+					prerenderWakeVariant: false,
+				};
+				let aggregate = await transformTsrxModuleWithPrerenderWakeClosure(
+					aggregateInput,
+					linkedChildHasBrowserTriggers,
+				);
+				const aggregateChildren = await resolveImportedChildren.call(
+					this,
+					source,
+					aggregate.manifest,
+				);
+				await forceImportedModules.call(
+					this,
+					aggregateChildren,
+					moduleLinkArtifacts,
+					moduleMetadata,
+					internalOptions,
+					currentEnvironment,
+				);
+				let aggregateSymbols = importedSymbolInputs(aggregateChildren, moduleMetadata);
+				for (
+					let attempt = 0;
+					importedClaimsMissing(aggregateChildren, aggregateSymbols, moduleMetadata);
+					attempt += 1
+				) {
+					if (attempt === 9) {
+						throw new Error(
+							`MARKLESS_IMPORTED_SYMBOL_CLAIMS_UNREADY: Source ${JSON.stringify(source)} could not seal imported symbol claims after final publications.`,
+						);
+					}
+					await new Promise<void>((resolve) => setTimeout(resolve, 0));
+					for (const child of aggregateChildren) {
+						await moduleMetadata.sealSourceSymbolClaims(child.source);
+					}
+					aggregateSymbols = importedSymbolInputs(aggregateChildren, moduleMetadata);
+				}
+				aggregate = await transformTsrxModuleWithPrerenderWakeClosure(
+					{
+						...aggregateInput,
+						symbols: aggregateSymbols,
+					},
+					linkedChildHasBrowserTriggers,
+				);
+				const resolver = aggregate.virtualModules.find(
+					(module) => module.type === 'resolver',
+				);
+				if (resolver) {
+					transformed = {
+						...transformed,
+						virtualModules: transformed.virtualModules.map((module) =>
+							module.type === 'resolver' ? resolver : module,
+						),
+					};
+				}
+			}
 			if (!renderDataRequest)
 				registerTransformArtifacts({
 					owner: cacheKey,
@@ -804,6 +909,8 @@ export function createMarklessRolldownPlugin(input: {
 					executionLogEstimatedSizes,
 					dev,
 					environment: currentEnvironment,
+					finalPublication: true,
+					tracksSourceClaimPublication: publishesClientClaims,
 					replaceOwnedArtifacts: true,
 					updateDevPrerenderHashes: internalOptions.updateDevPrerenderHashes,
 				});
@@ -998,7 +1105,8 @@ export function createMarklessRolldownPlugin(input: {
 					collectModulePreloadInjections(clientManifest, {
 						publicPath: internalOptions.publicPath,
 						wakeChunks:
-							internalOptions.prerender || internalOptions.prerenderWakeChannel === true
+							internalOptions.prerender ||
+							internalOptions.prerenderWakeChannel === true
 								? productionWakeModuleChunks(bundle)
 								: undefined,
 						entryChunks: Object.values(bundle)
@@ -1243,11 +1351,14 @@ async function resolveImportedModuleInterfaces(
 }
 
 async function forceImportedModules(
-	this: { load?: (input: { readonly id: string }) => Promise<unknown> | unknown },
+	this: {
+		load?: (input: { readonly id: string }) => Promise<unknown> | unknown;
+		getModuleInfo?: (id: string) => unknown;
+	},
 	imports: ReadonlyArray<ImportedChild>,
 	artifacts: ReadonlyMap<string, MarklessModuleLinkArtifact>,
 	metadata: ModuleMetadataRegistry,
-	options: Pick<InternalMarklessRolldownOptions, 'dev' | 'devServer'>,
+	options: Pick<InternalMarklessRolldownOptions, 'dev' | 'devServer' | 'prerenderWakeChannel'>,
 	environment: MarklessEnvironment,
 ) {
 	for (const imported of imports) {
@@ -1260,18 +1371,36 @@ async function forceImportedModules(
 		}
 		// Materialize symbols before linking captures from a data-only facade.
 		const captureMetadata = metadata.captureMetadataForSource(imported.source);
-		if (
-			environment !== 'client' ||
-			!captureMetadata?.extractedSymbols.length
-		) {
+		if (environment !== 'client') {
 			continue;
 		}
-		const symbolSource = withQuery(imported.source, { 'markless-symbols': null });
-		if (options.dev === true) {
-			await options.devServer?.transformRequest(symbolSource, environment);
-		} else if (typeof this.load === 'function') {
-			await this.load({ id: symbolSource });
+		if (!captureMetadata?.extractedSymbols.length) {
+			await metadata.sealSourceSymbolClaims(imported.source);
+			continue;
 		}
+		const wakeSource = withQuery(imported.source, { 'markless-prerender-wake': null });
+		const completeWakeVariants = options.prerenderWakeChannel === true;
+		const claimSources = [
+			...(completeWakeVariants ? [imported.source] : []),
+			...(completeWakeVariants
+				? [withQuery(imported.source, { 'markless-resume': null })]
+				: []),
+			...(completeWakeVariants ? [wakeSource] : []),
+			withQuery(imported.source, { 'markless-symbols': null }),
+		];
+		if (typeof this.getModuleInfo === 'function') {
+			metadata.expectSourceSymbolClaims(imported.source, claimSources);
+		}
+		if (options.dev === true) {
+			await Promise.all(
+				claimSources.map((source) =>
+					options.devServer?.transformRequest(source, environment),
+				),
+			);
+		} else if (typeof this.load === 'function') {
+			await Promise.all(claimSources.map((id) => this.load?.({ id })));
+		}
+		await metadata.sealSourceSymbolClaims(imported.source);
 	}
 }
 
@@ -1325,6 +1454,24 @@ function importedSymbolInputs(
 	});
 }
 
+function importedClaimsMissing(
+	children: ReadonlyArray<ImportedChild>,
+	symbols: NonNullable<TransformTsrxModuleInput['symbols']>,
+	metadata: ModuleMetadataRegistry,
+): boolean {
+	return children.some((child) => {
+		const expectsClaims = metadata
+			.captureMetadataForSource(child.source)
+			?.extractedSymbols.some((symbol) =>
+				symbol.captureSlots.some((slot) => slot.propName !== undefined),
+			);
+		return (
+			expectsClaims === true &&
+			!symbols.some((symbol) => symbol.componentEdgeId === child.componentEdgeId)
+		);
+	});
+}
+
 function linkedChildrenHaveBrowserTriggers(
 	children: ReadonlyArray<ImportedChild>,
 	metadata: ModuleMetadataRegistry,
@@ -1344,22 +1491,7 @@ function sourceSymbolManifest(
 	source: string,
 ): MarklessTransformManifest | undefined {
 	const resolverId = `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodeURIComponent(source)}`;
-	const candidates = [...metadata.symbolClaimManifests()]
-		.filter(
-			(manifest) =>
-				manifest.resolver.virtualModuleId === resolverId && manifest.symbols.length > 0,
-		)
-		.sort((left, right) => left.source.localeCompare(right.source));
-	const selected = candidates[0];
-	if (!selected) return undefined;
-	const signature = JSON.stringify(selected.symbols);
-	const divergent = candidates.find((candidate) => JSON.stringify(candidate.symbols) !== signature);
-	if (divergent) {
-		throw new Error(
-			`MARKLESS_SOURCE_SYMBOL_CLAIMS_DIVERGED: Source ${JSON.stringify(source)} has incompatible emitted symbol claims in ${JSON.stringify(selected.source)} and ${JSON.stringify(divergent.source)}.`,
-		);
-	}
-	return selected;
+	return metadata.sourceSymbolClaims(source, resolverId);
 }
 
 function manifestHasBrowserTriggers(manifest: MarklessTransformManifest): boolean {
@@ -1546,12 +1678,15 @@ function registerTransformArtifacts(input: {
 	executionLogEstimatedSizes: Map<string, number>;
 	dev: ReturnType<typeof createMarklessDevGraph>;
 	environment: MarklessEnvironment;
+	finalPublication?: boolean;
+	tracksSourceClaimPublication?: boolean;
 	replaceOwnedArtifacts?: boolean;
 	updateDevPrerenderHashes?: (hashes: ReadonlyMap<string, string>) => void;
 }) {
 	const ids = new Set<string>();
 	const renderDataHashes = new Map<string, string>();
 	for (const module of input.result.virtualModules) {
+		if (input.finalPublication === false && module.type === 'resolver') continue;
 		const isClientSymbol = input.environment === 'client' && module.type === 'symbol';
 		// The symbol virtual module id embeds the source filename, so it is the
 		// collision-free execution-log id: re-key the injected hook (dev builds)
@@ -1559,7 +1694,28 @@ function registerTransformArtifacts(input: {
 		const stored = isClientSymbol
 			? { ...module, source: requalifyExecutionLogModuleHook(module.source, module.id) }
 			: module;
-		input.virtualModules.set(module.id, stored);
+		const current = input.virtualModules.get(module.id);
+		if (module.type === 'resolver' && current?.type === 'resolver') {
+			const currentClaims = new Set(current.symbolClaims ?? []);
+			const nextClaims = new Set(module.symbolClaims ?? []);
+			const currentContainsNext = [...nextClaims].every((claim) => currentClaims.has(claim));
+			const nextContainsCurrent = [...currentClaims].every((claim) => nextClaims.has(claim));
+			if (currentContainsNext && !nextContainsCurrent) continue;
+			if (!currentContainsNext && !nextContainsCurrent) {
+				throw new Error(
+					`MARKLESS_RESOLVER_CLAIMS_DIVERGED: Resolver ${JSON.stringify(module.id)} has incompatible final claim sets.`,
+				);
+			}
+		}
+		// Parallel sibling transforms share this id: canonical render data must not be replaced.
+		if (
+			module.type !== 'render-data' ||
+			current?.type !== 'render-data' ||
+			current.canonicalRenderData !== true ||
+			module.canonicalRenderData === true
+		) {
+			input.virtualModules.set(module.id, stored);
+		}
 		ids.add(module.id);
 		const owners = input.virtualModuleOwners.get(module.id) ?? new Set<string>();
 		owners.add(input.owner);
@@ -1572,14 +1728,19 @@ function registerTransformArtifacts(input: {
 		}
 	}
 	input.moduleMetadata.recordCaptureMetadata(input.source, input.result.manifest);
-	const symbolClaim = emittedSymbolClaim(
-		input.moduleMetadata,
-		input.source,
-		input.manifestSource,
-		input.result.manifest,
-		input.result.virtualModules,
-	);
-	input.moduleMetadata.recordSymbolClaims(symbolClaim.owner, symbolClaim.manifest);
+	if (input.finalPublication !== false) {
+		const symbolClaim = emittedSymbolClaim(
+			input.moduleMetadata,
+			input.source,
+			input.manifestSource,
+			input.result.manifest,
+			input.result.virtualModules,
+		);
+		input.moduleMetadata.recordSymbolClaims(symbolClaim.owner, symbolClaim.manifest);
+		if (input.tracksSourceClaimPublication === true) {
+			input.moduleMetadata.finishSourceSymbolClaims(input.source, input.manifestSource);
+		}
+	}
 	input.moduleLinkArtifacts.set(input.source, {
 		moduleGraphInterface: input.result.moduleGraphInterface,
 		interfaceHash: input.result.interfaceHash,
@@ -1896,6 +2057,11 @@ function sourceForResumeVirtualImporter(importer: string | undefined): string | 
 	return match?.[1] ? decodeURIComponent(match[1]) : null;
 }
 
+function resolverVirtualModuleSourceFile(id: string): string | null {
+	const prefix = `${MARKLESS_VIRTUAL_PREFIX}resolver:`;
+	return id.startsWith(prefix) ? decodeURIComponent(id.slice(prefix.length)) : null;
+}
+
 function sourceForTriggerGroupVirtualImporter(importer: string | undefined): string | null {
 	if (!importer) return null;
 	return triggerGroupVirtualModuleSourceFile(normalizeVirtualId(importer));
@@ -1969,8 +2135,8 @@ function productionWakeModuleChunks(bundle: Record<string, unknown>): string[] {
 			chunk.type === 'chunk' &&
 			typeof chunk.facadeModuleId === 'string' &&
 			typeof chunk.fileName === 'string' &&
-				(sourceForResumeVirtualImporter(chunk.facadeModuleId) ||
-					sourceForPrerenderWakeVirtualImporter(chunk.facadeModuleId))
+			(sourceForResumeVirtualImporter(chunk.facadeModuleId) ||
+				sourceForPrerenderWakeVirtualImporter(chunk.facadeModuleId))
 		) {
 			chunks.push(stripBuildPrefix(chunk.fileName));
 		}

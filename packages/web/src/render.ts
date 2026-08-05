@@ -79,10 +79,34 @@ export type CsrRenderContainer = {
 	readonly resumerScript?: undefined;
 };
 
-export async function render(
+type CsrRenderSettlement = {
+	readonly container: CsrRenderContainer;
+	readonly selfWake: boolean;
+};
+
+export function render(
 	component: CsrRenderable,
 	options: CsrRenderOptions,
 ): Promise<CsrRenderContainer> {
+	const rendered = renderCsr(component, options);
+	const settled = rendered.then(({ container }) => container);
+	// Defer the boundary self-wake past settlement: render stays symbol-load free.
+	void rendered.then(
+		({ container, selfWake }) => {
+			if (!selfWake) return;
+			queueMicrotask(() => {
+				void (container.runtime as { readonly start?: () => Promise<void> }).start?.();
+			});
+		},
+		() => {},
+	);
+	return settled;
+}
+
+async function renderCsr(
+	component: CsrRenderable,
+	options: CsrRenderOptions,
+): Promise<CsrRenderSettlement> {
 	startCsrPreload(component);
 	const output =
 		typeof component === 'function'
@@ -97,7 +121,10 @@ export async function render(
 	if (output.view && hasKeyedRepeats(output.view)) {
 		const repeats = await import('./repeat-runtime.ts');
 		if (output.state) {
-			await repeats.validateKeyedRepeatPayloadKeys({ state: output.state, view: output.view });
+			await repeats.validateKeyedRepeatPayloadKeys({
+				state: output.state,
+				view: output.view,
+			});
 		}
 		if (output.graph && output.runtime) {
 			repeats.validateKeyedRepeatGraphKeys(output.graph, output.view);
@@ -112,10 +139,10 @@ export async function render(
 			runtime: output.runtime,
 		};
 		if ((await options.beforeMount?.(container)) === false) {
-			return disposeCancelledMount(container);
+			return { container: disposeCancelledMount(container), selfWake: false };
 		}
 		mountRoot(options.target, output.root);
-		return container;
+		return csrRenderSettlement(container, output.view);
 	}
 
 	// Fragment-rooted components: DOM expands the fragment on mount, so the
@@ -142,25 +169,35 @@ export async function render(
 				view: fragmentView,
 			});
 			if ((await options.beforeMount!(container)) === false) {
-				return disposeCancelledMount(container);
+				return { container: disposeCancelledMount(container), selfWake: false };
 			}
 			mountRoot(options.target, holder);
-			return container;
+			return csrRenderSettlement(container, fragmentView);
 		}
 		mountRoot(options.target, output.root);
-		return await startCsrRuntime({
-			...output,
-			root: options.target as unknown as ResumeDomElement,
-			view: fragmentView,
-		});
+		return csrRenderSettlement(
+			await startCsrRuntime({
+				...output,
+				root: options.target as unknown as ResumeDomElement,
+				view: fragmentView,
+			}),
+			fragmentView,
+		);
 	}
 
 	const container = await startCsrRuntime(output);
 	if ((await options.beforeMount?.(container)) === false) {
-		return disposeCancelledMount(container);
+		return { container: disposeCancelledMount(container), selfWake: false };
 	}
 	mountRoot(options.target, output.root);
-	return container;
+	return csrRenderSettlement(container, output.view);
+}
+
+function csrRenderSettlement(
+	container: CsrRenderContainer,
+	view: ProtocolViewPayload | undefined,
+): CsrRenderSettlement {
+	return { container, selfWake: (view?.asyncBoundaries.length ?? 0) > 0 };
 }
 
 // A superseded navigation never mounts; release the held page's runtime

@@ -31,20 +31,20 @@
 				"default": "./dist/index.js"
 			},
 			"./async-boundary-arm": {
-				"types": "./dist/async-boundary-arm.d.ts",
-				"default": "./dist/async-boundary-arm.js"
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
 			},
 			"./decode": {
 				"types": "./dist/decode.d.ts",
 				"default": "./dist/decode.js"
 			},
 			"./resume-record-delta": {
-				"types": "./dist/resume-record-delta.d.ts",
-				"default": "./dist/resume-record-delta.js"
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
 			},
 			"./resume-record-merge": {
-				"types": "./dist/resume-record-merge.d.ts",
-				"default": "./dist/resume-record-merge.js"
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
 			},
 			"./decode-client": {
 				"types": "./dist/decode-client.d.ts",

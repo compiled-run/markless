@@ -581,7 +581,9 @@ async function captureDispatchClientLoader(
 					async (module) =>
 						[
 							module.id,
-							javascriptModuleUrl(await captureDispatchSymbolSource(module.source, imports)),
+							javascriptModuleUrl(
+								await captureDispatchSymbolSource(module.source, imports),
+							),
 						] as const,
 				),
 		),
@@ -600,16 +602,19 @@ async function captureDispatchClientLoader(
 	};
 	const childLoaders = new Map(
 		await Promise.all(
-			imports.map(async (imported) => [
-				imported.specifier,
-				(
-					await captureDispatchClientLoader(
-						imported.filename,
-						imported.source,
-						imported.imports ?? [],
-					)
-				).loadSymbol,
-			] as const),
+			imports.map(
+				async (imported) =>
+					[
+						imported.specifier,
+						(
+							await captureDispatchClientLoader(
+								imported.filename,
+								imported.source,
+								imported.imports ?? [],
+							)
+						).loadSymbol,
+					] as const,
+			),
 		),
 	);
 	const loadSymbol: CompiledCaptureDispatch['output']['loadSymbol'] = (symbolId) => {
@@ -757,41 +762,142 @@ function renderedText(node: FakeElement): string {
 }
 
 function viewWithClick(): ProtocolViewPayload {
-	return { version: ASYNC_PROTOCOL_VERSION, locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'button' }], events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:click'] }], domUpdates: [], behaviors: [], elementHandles: [], asyncBoundaries: [] };
+	return {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'button' }],
+		events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:click'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
 }
 
 function viewWithClickDomUpdate(): ProtocolViewPayload {
-	return { ...viewWithClick(), domUpdates: [{ hostNodeId: 'h0', source: 'count', graphNodeId: 'state:count', path: [], target: { kind: 'text' }, symbolId: 'symbol:text' }] };
+	return {
+		...viewWithClick(),
+		domUpdates: [
+			{
+				hostNodeId: 'h0',
+				source: 'count',
+				graphNodeId: 'state:count',
+				path: [],
+				target: { kind: 'text' },
+				symbolId: 'symbol:text',
+			},
+		],
+	};
 }
 
 function viewWithClickSyncComputedDomUpdate(): ProtocolViewPayload {
-	return { ...viewWithClick(), domUpdates: [{ hostNodeId: 'h0', source: 'doubled', graphNodeId: 'computed:doubled', path: [], target: { kind: 'text' }, symbolId: 'symbol:text' }] };
+	return {
+		...viewWithClick(),
+		domUpdates: [
+			{
+				hostNodeId: 'h0',
+				source: 'doubled',
+				graphNodeId: 'computed:doubled',
+				path: [],
+				target: { kind: 'text' },
+				symbolId: 'symbol:text',
+			},
+		],
+	};
 }
 
 function viewWithSyncPolicy(): ProtocolViewPayload {
-	return { ...viewWithClick(), events: [{ hostNodeId: 'h0', eventName: 'keydown', syncPolicy: { when: { type: 'event-equals', field: 'key', value: 'Escape' }, actions: ['preventDefault', 'stopPropagation'] }, symbolIds: ['symbol:key'] }] };
+	return {
+		...viewWithClick(),
+		events: [
+			{
+				hostNodeId: 'h0',
+				eventName: 'keydown',
+				syncPolicy: {
+					when: { type: 'event-equals', field: 'key', value: 'Escape' },
+					actions: ['preventDefault', 'stopPropagation'],
+				},
+				symbolIds: ['symbol:key'],
+			},
+		],
+	};
 }
 
 function viewWithElementHandle(): ProtocolViewPayload {
-	return { ...viewWithClick(), elementHandles: [{ hostNodeId: 'h0', handleId: 'handle:counter', name: 'counter' }] };
+	return {
+		...viewWithClick(),
+		elementHandles: [{ hostNodeId: 'h0', handleId: 'handle:counter', name: 'counter' }],
+	};
 }
 
 function viewWithAsyncBoundary(): ProtocolViewPayload {
-	return { version: ASYNC_PROTOCOL_VERSION, locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'p' }], events: [], domUpdates: [], behaviors: [], elementHandles: [], asyncBoundaries: [{ id: 'boundary:0', startAnchor: { strategy: 'dom-order-comment', index: 0 }, endAnchor: { strategy: 'dom-order-comment', index: 1 }, asyncReads: [{ source: 'details', graphNodeId: 'computed:details', path: ['title'], runnerSymbolId: 'symbol:details-runner' }] }] };
+	return {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'p' }],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [
+			{
+				id: 'boundary:0',
+				startAnchor: { strategy: 'dom-order-comment', index: 0 },
+				endAnchor: { strategy: 'dom-order-comment', index: 1 },
+				asyncReads: [
+					{
+						source: 'details',
+						graphNodeId: 'computed:details',
+						path: ['title'],
+						runnerSymbolId: 'symbol:details-runner',
+					},
+				],
+			},
+		],
+	};
 }
 
 function staticView(): ProtocolViewPayload {
-	return { version: ASYNC_PROTOCOL_VERSION, locators: [], events: [], domUpdates: [], behaviors: [], elementHandles: [], asyncBoundaries: [] };
+	return {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
 }
 
 function duplicateKeyRepeatView(): ProtocolViewPayload {
-	return { ...staticView(), locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'ul' }], keyedRepeats: [{ id: 'repeat:0', parentHostNodeId: 'h0', collectionGraphNodeId: 'state:rows', collectionPath: [], keyPath: ['category'], itemName: 'row', rowElementCount: 1, rowEvents: [] }] };
+	return {
+		...staticView(),
+		locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'ul' }],
+		keyedRepeats: [
+			{
+				id: 'repeat:0',
+				parentHostNodeId: 'h0',
+				collectionGraphNodeId: 'state:rows',
+				collectionPath: [],
+				keyPath: ['category'],
+				itemName: 'row',
+				rowElementCount: 1,
+				rowEvents: [],
+			},
+		],
+	};
 }
 
-const duplicateRows = [{ category: 'fruit', label: 'apple' }, { category: 'fruit', label: 'pear' }, { category: 'veg', label: 'kale' }];
+const duplicateRows = [
+	{ category: 'fruit', label: 'apple' },
+	{ category: 'fruit', label: 'pear' },
+	{ category: 'veg', label: 'kale' },
+];
 
 function duplicateRowsState() {
-	return createProtocolStatePayload({ cells: [{ graphNodeId: 'state:rows', name: 'rows', valueKind: 'array', value: duplicateRows }] });
+	return createProtocolStatePayload({
+		cells: [
+			{ graphNodeId: 'state:rows', name: 'rows', valueKind: 'array', value: duplicateRows },
+		],
+	});
 }
 
 test('render creates a CSR container without payload scripts or the inline resumer', async () => {
@@ -1220,10 +1326,10 @@ export default function MusicPlayer() @{
 			};
 
 			expect(update).toEqual(
-					expect.objectContaining({
-						hostNodeId: 'c0:h0',
-						graphNodeId: 'state:libraryOpen',
-						symbolId: boundUpdate.id,
+				expect.objectContaining({
+					hostNodeId: 'c0:h0',
+					graphNodeId: 'state:libraryOpen',
+					symbolId: boundUpdate.id,
 				}),
 			);
 			expect(sidebar.getAttribute('class')).toBe('library');
@@ -1875,12 +1981,14 @@ test('CSR delegated clicks dispatch once whether full runtime demand starts befo
 					],
 				}),
 				view: viewWithClick(),
-				loadSymbol: async () => ({ graph }) => {
-					graph.update({
-						graphNodeId: 'state:count',
-						update: (value) => Number(value) + 1,
-					});
-				},
+				loadSymbol:
+					async () =>
+					({ graph }) => {
+						graph.update({
+							graphNodeId: 'state:count',
+							update: (value) => Number(value) + 1,
+						});
+					},
 			},
 			options: {},
 		} as never);
@@ -1912,9 +2020,7 @@ test('CSR delegated dispatch adopts a streamed arm event record exactly once', a
 		events,
 	};
 	const state = createProtocolStatePayload({
-		cells: [
-			{ graphNodeId: 'state:logged', name: 'logged', valueKind: 'scalar', value: 0 },
-		],
+		cells: [{ graphNodeId: 'state:logged', name: 'logged', valueKind: 'scalar', value: 0 }],
 	});
 	const container = await renderCsrRuntime({
 		output: {
@@ -1922,13 +2028,15 @@ test('CSR delegated dispatch adopts a streamed arm event record exactly once', a
 			liveHostNodes,
 			state,
 			view,
-			loadSymbol: async (symbolId) => ({ graph }) => {
-				if (symbolId !== 'symbol:arm') return;
-				graph.update({
-					graphNodeId: 'state:logged',
-					update: (value) => Number(value) + 1,
-				});
-			},
+			loadSymbol:
+				async (symbolId) =>
+				({ graph }) => {
+					if (symbolId !== 'symbol:arm') return;
+					graph.update({
+						graphNodeId: 'state:logged',
+						update: (value) => Number(value) + 1,
+					});
+				},
 		},
 		options: {},
 	} as never);
@@ -3123,6 +3231,12 @@ test('renderToString inline event resumer serializes a cold interaction storm th
 			'start:second',
 			'end:second',
 		]);
+		Object.assign(firstEvent, { key: 'reused', timeStamp: 2 });
+		await listeners[0](firstEvent);
+		expect(globalScope.__marklessQueueTest.order.slice(-2)).toEqual([
+			'start:reused',
+			'end:reused',
+		]);
 		expect(listeners).toHaveLength(1);
 	} finally {
 		if (previousDocument === undefined) delete globalScope.document;
@@ -3824,7 +3938,7 @@ export async function resumeContainerEvent({ event, syncPolicyAlreadyApplied }) 
 	return `data:text/javascript,${encodeURIComponent(source)}`;
 }
 
-test('render keeps pending CSR async boundaries dormant until runtime demand, then settles the range', async () => {
+test('render self-wakes pending CSR async boundaries only after the render settlement', async () => {
 	const startAnchor = {
 		nodeType: 8 as const,
 		textContent: 'markless:async:boundary:0',
@@ -3890,13 +4004,12 @@ test('render keeps pending CSR async boundaries dormant until runtime demand, th
 	expect(
 		root.childNodes.map((child) => (child.nodeType === 8 ? '#comment' : child.tagName)),
 	).toEqual(['#comment', 'P', '#comment']);
+	// Join the self-wake's single-flight start deterministically.
+	await Promise.resolve();
 	await container.runtime.start();
-	for (let index = 0; index < 6; index++) await Promise.resolve();
 	await container.graph.flush?.();
 	for (let index = 0; index < 6; index++) await Promise.resolve();
 
-	// Explicit runtime demand wires the boundary runner through loadSymbol and
-	// the default CSR applier replaces the boundary range.
 	expect(loadedSymbols).toEqual(['symbol:details-runner', 'symbol:boundary-update']);
 	expect(
 		root.childNodes.map((child) => (child.nodeType === 8 ? '#comment' : child.tagName)),

@@ -1,3 +1,5 @@
+import { GRAPH_VALUE_PROTOCOL_VERSION } from './value-constants.ts';
+
 export type SerializedPrimitive =
 	| null
 	| string
@@ -85,7 +87,7 @@ export type TypedArrayName =
 	| 'BigUint64Array';
 
 export type SerializedGraphPayload = {
-	readonly version: 1;
+	readonly version: typeof GRAPH_VALUE_PROTOCOL_VERSION;
 	readonly root: SerializedSlot;
 	readonly records: ReadonlyArray<SerializedRecord>;
 };
@@ -133,7 +135,7 @@ export function serializeGraphValue(value: unknown): SerializationResult {
 	return {
 		ok: true,
 		payload: {
-			version: 1,
+			version: GRAPH_VALUE_PROTOCOL_VERSION,
 			root,
 			records,
 		},

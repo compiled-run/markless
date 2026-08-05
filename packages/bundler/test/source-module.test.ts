@@ -110,6 +110,8 @@ test('emitSourceModule gives every authored behavior a direct mount-time loader'
 	expect(code).toContain('function loadBehaviorSymbol(symbolId)');
 	expect(code).toContain(`symbolId === "symbol:attach"`);
 	expect(code).toContain(`import('./attach.js')`);
+	expect(code.match(/function readMarklessSourceSymbol/g)).toHaveLength(1);
+	expect(code).toContain('function readMarklessBehaviorSourceSymbol');
 });
 
 test('emitResumeModule routes non-lean event-only entries through the full handoff', () => {

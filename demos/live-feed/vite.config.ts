@@ -10,6 +10,7 @@ export function liveFeedConfig(
 ) {
 	// The ruled prerender build remains opt-in for its dedicated box and gate.
 	const prerender = process.env.MARKLESS_PRERENDER === '1';
+	process.env.MARKLESS_PRERENDER_WAKE = '1';
 	return {
 		plugins: [
 			...markless({ executionLog }),

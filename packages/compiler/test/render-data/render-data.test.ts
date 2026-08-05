@@ -147,6 +147,33 @@ export function App() @{
 	expect(root?.statics.join('')).toContain('<li>Trailing</li>');
 });
 
+test('renderData keeps call-expression collections off the direct repeat path', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/FilteredRows.tsrx',
+		source: `
+import { state } from '@markless/core';
+function visibleRows(rows: readonly { id: string; label: string }[]) {
+	return rows.filter((row) => row.id !== 'hidden');
+}
+export function App() @{
+	let rows = state([{ id: 'one', label: 'One' }, { id: 'hidden', label: 'Hidden' }]);
+	<ul>@for (const row of visibleRows(rows); key row.id) { <li>{row.label}</li> }</ul>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.semanticGraph.keyedRepeats).toEqual([
+		expect.objectContaining({
+			collectionSource: 'visibleRows(rows)',
+		}),
+	]);
+	expect(result.semanticGraph.keyedRepeats[0]?.collectionGraphNodeId).toBeUndefined();
+	expect(result.renderData.repeats).toEqual([
+		expect.objectContaining({ directSupported: false }),
+	]);
+});
+
 test('renderData keeps a same-file child async chunk visible while the legacy emitter fails loudly', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/AsyncChildLandmine.tsrx',

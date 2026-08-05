@@ -284,7 +284,17 @@ function emitSsrDataRenderLines(
 			props.push('children:marklessSsrDataContext.projectionHtml');
 		const callbackEntries = edge.props.flatMap((prop) => {
 			const symbolId = callbacks.get(`${edge.id}:${prop.name}`);
-			return symbolId ? [`${JSON.stringify(prop.name)}:${JSON.stringify(symbolId)}`] : [];
+			if (symbolId) return [`${JSON.stringify(prop.name)}:${JSON.stringify(symbolId)}`];
+			if (prop.kind !== 'graph-reference') return [];
+			if (prop.graphNodeId === 'prop:props')
+				return [
+					`${JSON.stringify(prop.name)}:marklessSsrCallbackSymbol(props,${JSON.stringify(prop.path)})`,
+				];
+			if (prop.graphNodeId.startsWith('prop:'))
+				return [
+					`${JSON.stringify(prop.name)}:marklessSsrCallbackSymbol(props,${JSON.stringify([prop.graphNodeId.slice(5), ...prop.path])})`,
+				];
+			return [];
 		});
 		if (callbackEntries.length)
 			props.push(`__marklessSsrCallbacks:marklessSsrCallbacks({${callbackEntries.join(',')}})`);

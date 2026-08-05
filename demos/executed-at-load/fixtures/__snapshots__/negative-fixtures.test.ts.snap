@@ -3,7 +3,7 @@
 exports[`pins the current disease for for-call-expression.tsrx 1`] = `
 {
   "diagnostics": [],
-  "keyedRepeatCount": 0,
   "directRepeatCount": 0,
+  "keyedRepeatCount": 0,
 }
 `;

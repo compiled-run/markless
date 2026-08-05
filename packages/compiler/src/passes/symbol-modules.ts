@@ -74,6 +74,8 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 				boundCallbackSymbolIds.has(symbol.id),
 				moduleDeclarations,
 				input.semanticGraph?.moduleImports ?? [],
+				input.semanticGraph,
+				input.renderData,
 			);
 		}),
 		diagnostics: input.captureAnalysis.diagnostics,
@@ -291,6 +293,8 @@ function emitSymbolModule(
 	usesArgumentVector: boolean,
 	moduleDeclarations: readonly string[],
 	moduleImports: readonly SemanticModuleImport[],
+	semanticGraph: SymbolModulesInput['semanticGraph'],
+	renderData: SymbolModulesInput['renderData'],
 ): GeneratedSymbolModule[] {
 	if (symbol.kind === 'event-handler' || symbol.kind === 'callback-prop') {
 		return [
@@ -331,7 +335,12 @@ function emitSymbolModule(
 				symbolId: symbol.id,
 				kind: symbol.kind,
 				exportName: symbolExportName(symbol.id),
-				source: emitStateInitializerModule(symbol, moduleDeclarations, moduleImports),
+				source: emitStateInitializerModule(
+					symbol,
+					moduleDeclarations,
+					moduleImports,
+					stateInitializerPropDeclarations(symbol, semanticGraph, renderData),
+				),
 			},
 		];
 	}
@@ -1273,6 +1282,7 @@ function emitStateInitializerModule(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'state-initializer' }>,
 	moduleDeclarations: readonly string[],
 	moduleImports: readonly SemanticModuleImport[],
+	propDeclarations: readonly string[],
 ): string {
 	const exportName = symbolExportName(symbol.id);
 	const declarations = referencedModuleDeclarations(symbol.source, moduleDeclarations);
@@ -1290,11 +1300,47 @@ function emitStateInitializerModule(
 		...(declarations.length > 0 ? [''] : []),
 		`export const authoredSource = ${JSON.stringify(symbol.source)};`,
 		'',
-		`export function ${exportName}() {`,
+		`export function ${exportName}(${propDeclarations.length > 0 ? 'context' : ''}) {`,
+		...propDeclarations,
 		`\treturn (${symbol.source});`,
 		'}',
 		'',
 	].join('\n');
+}
+
+function stateInitializerPropDeclarations(
+	symbol: Extract<PlannedSymbol, { readonly kind: 'state-initializer' }>,
+	semanticGraph: SymbolModulesInput['semanticGraph'],
+	renderData: SymbolModulesInput['renderData'],
+): string[] {
+	if (!semanticGraph) return [];
+	const componentName =
+		semanticGraph.localDeclarations.find(
+			(declaration) =>
+				declaration.scope === 'component' && declaration.name === symbol.name,
+		)?.componentName ?? renderData?.root?.componentName;
+	if (!componentName) return [];
+
+	const propBinding = semanticGraph.graphBindings.find(
+		(binding) => binding.kind === 'prop' && binding.componentName === componentName,
+	);
+	if (!propBinding) return [];
+	if (propBinding.id !== 'prop:props') {
+		return sourceReferencesIdentifier(symbol.source, propBinding.name)
+			? [
+					`\tconst ${propBinding.name} = context.graph.read(${JSON.stringify(propBinding.id)}, []);`,
+				]
+			: [];
+	}
+
+	return semanticGraph.componentPropBindings.flatMap((binding) =>
+		binding.componentName === componentName &&
+		sourceReferencesIdentifier(symbol.source, binding.localName)
+			? [
+					`\tconst ${binding.localName} = context.graph.read("prop:props", ${JSON.stringify(binding.propPath)});`,
+				]
+			: [],
+	);
 }
 
 function referencedModuleDeclarations(

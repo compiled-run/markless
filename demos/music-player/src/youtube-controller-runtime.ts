@@ -49,6 +49,8 @@ export function installYouTubeControllerRuntime(
 
 class YouTubeController {
 	private duration = 0;
+	private infoTime = 0;
+	private infoDuration = 0;
 	private lastCommandVersion = '';
 	private lastVideoId = '';
 	private pendingAutoplay = false;
@@ -69,6 +71,7 @@ class YouTubeController {
 	}
 
 	install(): void {
+		this.listenForPlayerInfo();
 		this.bindProgressInput();
 		this.observeCommands();
 		this.observeTrackColors();
@@ -235,14 +238,32 @@ class YouTubeController {
 
 	private resetProgress(): void {
 		this.duration = 0;
+		this.infoTime = 0;
+		this.infoDuration = 0;
 		this.writeProgress(0, 0);
+	}
+
+	// The widget's own status stream is authoritative; the api handle's cache can go stale.
+	private listenForPlayerInfo(): void {
+		window.addEventListener('message', (event) => {
+			if (typeof event.data !== 'string') return;
+			try {
+				const message = JSON.parse(event.data);
+				if (message?.event !== 'infoDelivery' || !message.info) return;
+				if (typeof message.info.currentTime === 'number') this.infoTime = message.info.currentTime;
+				if (typeof message.info.duration === 'number' && message.info.duration > 0)
+					this.infoDuration = message.info.duration;
+			} catch {
+				/* non-widget message */
+			}
+		});
 	}
 
 	private reportProgress(): void {
 		if (!this.ready || !this.player) return;
 
-		const currentTime = this.player.getCurrentTime() || 0;
-		const duration = this.player.getDuration() || 0;
+		const currentTime = this.infoTime || this.player.getCurrentTime() || 0;
+		const duration = this.infoDuration || this.player.getDuration() || 0;
 		this.duration = duration;
 		this.writeProgress(currentTime, duration);
 	}
