@@ -211,9 +211,10 @@ test('emitResumeModule keeps trigger staging behind the prerender wake boundary'
 		"import { marklessPrerenderData } from 'virtual:markless:render-data:app';",
 	);
 	expect(staged).toContain('__marklessDispatch');
-	expect(staged).toContain(
-		'handoff.root.__marklessRegisterDispatch?.(marklessDispatchFullRuntime)',
-	);
+	// The ungrouped fallback caches its runtime and never registers on the
+	// dispatch chain; a registered handler would starve the group loader.
+	expect(staged).toContain('handoff.root.__marklessFullResumeRuntime ??=');
+	expect(staged).not.toContain('__marklessRegisterDispatch?.(');
 	expect(staged).toContain('function readMarklessWakeSourceSymbol');
 	expect(staged).toContain('marklessPrerenderBranchTriggerMatches');
 	expect(staged).toContain('input.event === 0');
