@@ -37,6 +37,13 @@ export function callbackSymbolIds(input: PublicRenderModuleInput): ReadonlyMap<s
 }
 
 export function moduleScopeLines(source: string, filename: string): string[] {
+	return moduleScopeDeclarations(source, filename).map((declaration) => declaration.source);
+}
+
+export function moduleScopeDeclarations(
+	source: string,
+	filename: string,
+): ReadonlyArray<{ readonly names: ReadonlyArray<string>; readonly source: string }> {
 	const ast = parseModule(source, filename) as unknown as AnyNode;
 	const storageImports = storageImportNames(ast);
 	return asNodes(ast.body).flatMap((statement) => {
@@ -53,8 +60,19 @@ export function moduleScopeLines(source: string, filename: string): string[] {
 		)
 			return [];
 		const sourceText = lowerModuleStorageDeclaration(declaration, source, storageImports);
-		return sourceText ? [sourceText] : [];
+		return sourceText ? [{ names: declaredNames(declaration), source: sourceText }] : [];
 	});
+}
+
+function declaredNames(declaration: AnyNode): ReadonlyArray<string> {
+	if (declaration.type === 'VariableDeclaration') {
+		return asNodes(declaration.declarations).flatMap((declarator) => {
+			const name = getIdentifierName(declarator.id as AnyNode | undefined);
+			return name ? [name] : [];
+		});
+	}
+	const name = getIdentifierName(declaration.id as AnyNode | undefined);
+	return name ? [name] : [];
 }
 
 function storageImportNames(ast: AnyNode): ReadonlySet<string> {

@@ -76,6 +76,17 @@ type PrerenderDataDefinition = {
 		};
 	}>;
 	readonly propCellId?: string | null;
+	// Compiled by the same producer as the server module's reader; the browser
+	// never parses or evaluates authored source itself.
+	readonly readResidue?: (
+		residue: Extract<SsrDataResidue, { readonly kind: 'authored-expression' }>,
+		context: {
+			readonly repeatItem?: unknown;
+			readonly repeatIndex?: number;
+			readonly asyncError?: unknown;
+			readonly read: (graphNodeId: string, path?: ReadonlyArray<string>) => unknown;
+		},
+	) => unknown;
 };
 
 export type PrerenderDataSurface = {
@@ -313,8 +324,17 @@ async function evaluatePrerenderDataComponent(input: {
 		// render from this component's evaluation before registration publishes it
 		// to the staged graph for later refreshes.
 		if (values.has(graphNodeId)) return readPath(values.get(graphNodeId), path);
+		// A bare read of an async computed means its settled value, not the
+		// snapshot object — the same lowering the branch-update producer emits.
+		const graphPath =
+			path.length === 0 &&
+			definition.state.computed.some(
+				(computed) => computed.graphNodeId === graphNodeId && computed.async === true,
+			)
+				? ['value']
+				: path;
 		return input.graph
-			? input.graph.read(graphNodeId, path)
+			? input.graph.read(graphNodeId, graphPath)
 			: readPath(values.get(graphNodeId), path);
 	};
 	for (const initial of definition.initialValues ?? []) {
@@ -415,7 +435,15 @@ async function evaluatePrerenderDataComponent(input: {
 			// Initial wake consumes only the reconstructed state/view records. Its
 			// rendered HTML is discarded because the prerendered DOM is already live,
 			// so authored markup residue is not a dependency of record reconstruction.
+			// Skipping the reader here also keeps authored side effects single-run.
 			if (!input.requireHtml) return '';
+			if (definition.readResidue)
+				return definition.readResidue(residue, {
+					repeatItem: context.repeatItem,
+					repeatIndex: context.repeatIndex,
+					asyncError: context.asyncError,
+					read,
+				});
 			throw new Error(`MARKLESS_PRERENDER_RESIDUE_MISSING: ${residue.source}`);
 		},
 		selectBranchArm: (slot) => {

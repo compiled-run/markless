@@ -1,3 +1,4 @@
+import { dirname, isAbsolute, resolve } from 'pathe';
 import {
 	collectTsrxModuleDiagnostics,
 	compileTsrxModule,
@@ -276,6 +277,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 									input.importedModuleInterfaces,
 									input.renderDataImportSources,
 									input.artifactChildMaterializations,
+									input.filename,
 								)
 							: compiled.publicRenderModule.renderDataModuleSource,
 					},
@@ -653,11 +655,24 @@ function artifactChildCandidates(
 	});
 }
 
+// A relative specifier in the render-data virtual module would resolve against
+// the virtual id, not the authored file that wrote it, so it is rebound here.
+function resolveAuthoredSpecifier(specifier: string, sourceFilename: string): string {
+	if (!specifier.startsWith('.')) return specifier;
+	if (!isAbsolute(sourceFilename)) {
+		throw new Error(
+			`MARKLESS_RENDER_DATA_READER_SPECIFIER_UNRESOLVABLE: ${JSON.stringify(specifier)} needs an absolute module filename, got ${JSON.stringify(sourceFilename)}.`,
+		);
+	}
+	return resolve(dirname(sourceFilename), specifier);
+}
+
 function prerenderDataModuleSource(
 	compiled: CompileTsrxModuleResult,
 	importedModuleInterfaces: TransformTsrxModuleInput['importedModuleInterfaces'],
 	renderDataImportSources: TransformTsrxModuleInput['renderDataImportSources'],
 	artifactChildMaterializations: TransformTsrxModuleInput['artifactChildMaterializations'],
+	sourceFilename: string,
 ): string {
 	const importedComponents = new Map<
 		string,
@@ -679,19 +694,50 @@ function prerenderDataModuleSource(
 			local: `marklessPrerenderImport${importedComponents.size}`,
 		});
 	}
-	const components = Object.fromEntries(
-		compiled.publicRenderModule.componentDefinitions.map((definition) => [
-			String(definition.name),
-			definition,
-		]),
-	);
+	// The authored-expression reader is compiled code, not data: it is spliced
+	// into the component record instead of travelling through JSON.stringify.
+	// Its module-scope needs travel structurally so relative specifiers can be
+	// rebound to the authored file — this virtual module is not its neighbour.
+	const readerImports = new Map<string, string>();
+	const readerDeclarations = new Set<string>();
+	const componentEntries = compiled.publicRenderModule.componentDefinitions.map((definition) => {
+		const {
+			residueReaderSource,
+			residueReaderImports,
+			residueReaderDeclarations,
+			...record
+		} = definition as Readonly<Record<string, unknown>> & {
+			readonly residueReaderSource?: string;
+			readonly residueReaderImports?: ReadonlyArray<{
+				readonly source: string;
+				readonly line: string;
+			}>;
+			readonly residueReaderDeclarations?: ReadonlyArray<string>;
+		};
+		for (const entry of residueReaderImports ?? []) {
+			readerImports.set(
+				entry.line,
+				entry.line.replace(
+					JSON.stringify(entry.source),
+					JSON.stringify(resolveAuthoredSpecifier(entry.source, sourceFilename)),
+				),
+			);
+		}
+		for (const line of residueReaderDeclarations ?? []) readerDeclarations.add(line);
+		const data = JSON.stringify(record);
+		return `${JSON.stringify(String(definition.name))}:${
+			residueReaderSource ? `{...${data},readResidue:${residueReaderSource}}` : data
+		}`;
+	});
+	const preludes = [...readerImports.values(), ...readerDeclarations];
 	return [
 		...[...importedComponents.values()].map(
 			(entry) =>
 				`import { marklessPrerenderData as ${entry.local} } from ${JSON.stringify(entry.source)};`,
 		),
+		...preludes,
 		compiled.publicRenderModule.renderDataModuleSource,
-		`const marklessPrerenderComponents = ${JSON.stringify(components)};`,
+		`const marklessPrerenderComponents = {${componentEntries.join(',')}};`,
 		'export const marklessPrerenderData = {',
 		`\trootComponentName: ${JSON.stringify(compiled.renderData.root?.componentName ?? null)},`,
 		'\trenderData: marklessRenderData,',

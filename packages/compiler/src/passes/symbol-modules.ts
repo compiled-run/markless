@@ -52,8 +52,9 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 		),
 	);
 
-	const branchArmsBySite = renderBranchArms(input.renderData);
-	const boundaryArmsById = renderBoundaryArms(input.renderData);
+	const asyncComputedNodeIds = asyncComputedGraphNodeIds(input.semanticGraph);
+	const branchArmsBySite = renderBranchArms(input.renderData, asyncComputedNodeIds);
+	const boundaryArmsById = renderBoundaryArms(input.renderData, asyncComputedNodeIds);
 	return {
 		passId: 'symbol-modules',
 		modules: input.symbolResolver.symbols.flatMap((symbol) => {
@@ -94,13 +95,36 @@ function sourceModuleScopeLines(source: SymbolModulesInput['source']): string[] 
 	}
 }
 
+// A bare read of an async computed lands on the snapshot root, not the awaited
+// result; lower it the way the view-record producer already does.
+function asyncComputedGraphNodeIds(
+	semanticGraph: SymbolModulesInput['semanticGraph'],
+): ReadonlySet<string> {
+	return new Set(
+		(semanticGraph?.graphBindings ?? []).flatMap((binding) =>
+			binding.kind === 'computed' && binding.async === true ? [binding.id] : [],
+		),
+	);
+}
+
+function armPartReadPath(
+	graphNodeId: string,
+	path: ReadonlyArray<string>,
+	asyncComputedNodeIds: ReadonlySet<string>,
+): ReadonlyArray<string> {
+	return path.length === 0 && asyncComputedNodeIds.has(graphNodeId) ? ['value'] : path;
+}
+
 function renderBranchArms(
 	renderData: RenderDataArtifact | undefined,
+	asyncComputedNodeIds: ReadonlySet<string>,
 ): ReadonlyMap<string, PublicRenderPlanBranchArms> {
 	if (!renderData) return new Map();
 	return new Map((renderData.branches ?? []).flatMap((branch) => {
 		if (branch.update === 'boundary') return [];
-		const arms = branch.armChunkIds.map((chunkId) => renderChunkParts(renderData, chunkId));
+		const arms = branch.armChunkIds.map((chunkId) =>
+			renderChunkParts(renderData, chunkId, asyncComputedNodeIds),
+		);
 		if (arms.some((arm) => arm === null)) return [];
 		return [[branch.branchSiteId, {
 			branchSiteId: branch.branchSiteId,
@@ -114,13 +138,16 @@ function renderBranchArms(
 
 function renderBoundaryArms(
 	renderData: RenderDataArtifact | undefined,
+	asyncComputedNodeIds: ReadonlySet<string>,
 ): ReadonlyMap<string, PublicRenderPlanAsyncBoundaryArms> {
 	if (!renderData) return new Map();
 	return new Map((renderData.boundaries ?? []).flatMap((boundary) => {
 		const chunkIds = [boundary.armChunkIds.try, boundary.armChunkIds.catch].filter(
 			(candidate): candidate is string => candidate !== undefined,
 		);
-		const arms = chunkIds.map((chunkId) => renderChunkParts(renderData, chunkId));
+		const arms = chunkIds.map((chunkId) =>
+			renderChunkParts(renderData, chunkId, asyncComputedNodeIds),
+		);
 		if (arms.some((arm) => arm === null)) return [];
 		return [[boundary.boundaryId, {
 			boundaryId: boundary.boundaryId,
@@ -132,6 +159,7 @@ function renderBoundaryArms(
 function renderChunkParts(
 	renderData: RenderDataArtifact,
 	chunkId: string,
+	asyncComputedNodeIds: ReadonlySet<string>,
 ): PublicRenderPlanBranchArms['arms'][number] | null {
 	const chunk = renderData.chunks.find((candidate) => candidate.id === chunkId);
 	if (!chunk) return null;
@@ -149,7 +177,11 @@ function renderChunkParts(
 			if (slot.kind === 'text' && slot.residue.kind === 'graph-read') {
 				parts.push({ read: {
 					graphNodeId: slot.residue.graphNodeId,
-					path: slot.residue.path,
+					path: armPartReadPath(
+						slot.residue.graphNodeId,
+						slot.residue.path,
+						asyncComputedNodeIds,
+					),
 				} });
 				continue;
 			}
@@ -164,7 +196,7 @@ function renderChunkParts(
 					for (const rowSlot of row.slots.filter((candidate) => candidate.staticIndex === rowIndex)) {
 						if (rowSlot.kind !== 'text') return null;
 						if (rowSlot.residue.kind === 'repeat-item') rowParts.push({ itemPath: rowSlot.residue.path });
-						else if (rowSlot.residue.kind === 'graph-read') rowParts.push({ read: { graphNodeId: rowSlot.residue.graphNodeId, path: rowSlot.residue.path } });
+						else if (rowSlot.residue.kind === 'graph-read') rowParts.push({ read: { graphNodeId: rowSlot.residue.graphNodeId, path: armPartReadPath(rowSlot.residue.graphNodeId, rowSlot.residue.path, asyncComputedNodeIds) } });
 						else return null;
 					}
 				}

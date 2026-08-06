@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { renderToStream } from '@markless/web/render-to-stream';
 import { marklessSsrAttachSnapshots, marklessSsrRunAsyncComputed } from '@markless/web/fns/ssr';
+import { ASYNC_BOUNDARY_ARM, ASYNC_PROTOCOL_VERSION } from '../../serializer/src/index.ts';
 
 // T107 streaming, show half of the show-then-adopt split: the __mArm inline
 // executor commits a later-flushed inert <template m:arm> into the
@@ -28,16 +29,17 @@ function beaconArtifact(delayMs: number) {
 					: '<span data-waiting>Listening…</span>';
 			return {
 				html: `<section><!--markless:async:beacon:0-->${arm}<!--/markless:async:beacon:0--></section>`,
+				structure: { anchors: [{ kind: 'async', id: 'beacon:0', html: arm }] },
 				state: marklessSsrAttachSnapshots(
 					{
-						version: 1,
+						version: ASYNC_PROTOCOL_VERSION,
 						cells: [],
 						computed: [{ graphNodeId: 'computed:signal', name: 'signal', async: true }],
 					} as never,
 					snapshots as never,
 				),
 				view: {
-					version: 1,
+					version: ASYNC_PROTOCOL_VERSION,
 					locators: [
 						{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
 					],
@@ -48,6 +50,13 @@ function beaconArtifact(delayMs: number) {
 					asyncBoundaries: [
 						{
 							id: 'beacon:0',
+							runnerGraphNodeId: 'computed:signal',
+							initiallyServedArm:
+								snapshot.status === 'fulfilled'
+									? ASYNC_BOUNDARY_ARM.try
+									: snapshot.status === 'rejected'
+										? ASYNC_BOUNDARY_ARM.catch
+										: ASYNC_BOUNDARY_ARM.pending,
 							startAnchor: { strategy: 'dom-order-comment', index: 0 },
 							endAnchor: { strategy: 'dom-order-comment', index: 1 },
 							asyncReads: [
@@ -93,6 +102,8 @@ function tideArtifact(
 		async renderSsr(_props?: unknown, renderContext?: unknown) {
 			const snapshots: unknown[] = [];
 			const arms: string[] = [];
+			const armBodies: string[] = [];
+			const servedArms: number[] = [];
 			for (const [index, sensor] of sensors.entries()) {
 				const snapshot = (await marklessSsrRunAsyncComputed(
 					snapshots as never,
@@ -108,15 +119,30 @@ function tideArtifact(
 					snapshot.status === 'fulfilled'
 						? `<em data-tide="${sensor.key}">${snapshot.value!.label}</em>`
 						: `<span data-tide-waiting="${sensor.key}">reading gauges</span>`;
+				servedArms.push(
+					snapshot.status === 'fulfilled'
+						? ASYNC_BOUNDARY_ARM.try
+						: snapshot.status === 'rejected'
+							? ASYNC_BOUNDARY_ARM.catch
+							: ASYNC_BOUNDARY_ARM.pending,
+				);
 				arms.push(
 					`<!--markless:async:tide:${index}-->${arm}<!--/markless:async:tide:${index}-->`,
 				);
+				armBodies.push(arm);
 			}
 			return {
 				html: `<section>${arms.join('')}</section>`,
+				structure: {
+					anchors: armBodies.map((html, index) => ({
+						kind: 'async',
+						id: `tide:${index}`,
+						html,
+					})),
+				},
 				state: marklessSsrAttachSnapshots(
 					{
-						version: 1,
+						version: ASYNC_PROTOCOL_VERSION,
 						cells: [],
 						computed: sensors.map((sensor) => ({
 							graphNodeId: `computed:${sensor.key}`,
@@ -135,7 +161,7 @@ function tideArtifact(
 					snapshots as never,
 				),
 				view: {
-					version: 1,
+					version: ASYNC_PROTOCOL_VERSION,
 					locators: [
 						{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
 					],
@@ -145,6 +171,8 @@ function tideArtifact(
 					elementHandles: [],
 					asyncBoundaries: sensors.map((sensor, index) => ({
 						id: `tide:${index}`,
+						runnerGraphNodeId: `computed:${sensor.key}`,
+						initiallyServedArm: servedArms[index],
 						startAnchor: { strategy: 'dom-order-comment', index: index * 2 },
 						endAnchor: { strategy: 'dom-order-comment', index: index * 2 + 1 },
 						asyncReads: [

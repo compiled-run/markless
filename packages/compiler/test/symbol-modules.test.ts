@@ -3033,3 +3033,67 @@ export function Badge({ active }) @{
 	expect(run({ graph, arm: 0 })).toEqual({ arm: 0, html: '<em>Live</em>' });
 	expect(run({ graph, arm: 1 })).toEqual({ arm: 1, html: '<em>Idle</em>' });
 });
+
+test('branch-update arm parts read a bare async computed through its snapshot value', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/BareAsyncBranchArm.tsrx',
+		source: `
+import { computed, state } from '@markless/core';
+
+export function App() @{
+	let expanded = state(true);
+	const beacon = computed(async () => 'Vega signal');
+
+	<section>
+		@try {
+			@if (expanded) {
+				<kbd data-beacon-reading>{beacon}</kbd>
+			} @else {
+				<samp data-beacon-reading>{beacon}</samp>
+			}
+		} @pending {
+			<meter>Calibrating</meter>
+		} @catch {
+			<del>Signal lost</del>
+		}
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	const branchModule = result.symbolModules.modules.find(
+		(module) => module.kind === 'branch-update',
+	);
+	expect(branchModule).toBeDefined();
+	// A bare read of an async computed must be lowered to the snapshot's value
+	// path, matching what the view-record producer emits for the same host.
+	expect(branchModule!.source).toContain('{"graphNodeId":"computed:beacon","path":["value"]}');
+	expect(branchModule!.source).not.toContain('{"graphNodeId":"computed:beacon","path":[]}');
+
+	const imported = (await import(
+		`data:text/javascript;charset=utf-8,${encodeURIComponent(branchModule!.source)}`
+	)) as Record<string, (context: unknown) => { arm: number; html: string }>;
+	const run = imported[branchModule!.exportName]!;
+	const snapshot = { status: 'resolved', value: 'Vega signal' };
+	const graph = (expanded: boolean) => ({
+		read(graphNodeId: string, path?: ReadonlyArray<string>) {
+			if (graphNodeId === 'state:expanded') return expanded;
+			return path && path.length > 0
+				? path.reduce<unknown>(
+						(value, key) => (value == null ? value : (value as Record<string, unknown>)[key]),
+						snapshot,
+					)
+				: snapshot;
+		},
+	});
+
+	expect(run({ graph: graph(true) })).toEqual({
+		arm: 0,
+		html: '<kbd data-beacon-reading="">Vega signal</kbd>',
+	});
+	expect(run({ graph: graph(false) })).toEqual({
+		arm: 1,
+		html: '<samp data-beacon-reading="">Vega signal</samp>',
+	});
+});

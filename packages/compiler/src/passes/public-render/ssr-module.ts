@@ -19,6 +19,7 @@ import {
 	moduleScopeLines,
 	objectPropertyName,
 } from './shared.ts';
+import { authoredResidueReadCases, authoredResidueSources } from './residue-reader.ts';
 import { collectSsrPropEvents } from './component-wiring.ts';
 import { boundSymbolsForEdge, componentEdgeGraphRoutes } from './component-wiring.ts';
 import type { PublicRenderRoot } from './types.ts';
@@ -209,28 +210,14 @@ function emitSsrDataRenderLines(
 			}),
 		),
 	);
-	const residueSources = new Set<string>();
-	for (const chunk of chunks) {
-		for (const slot of chunk.slots) {
-			if ('residue' in slot && slot.residue.kind === 'authored-expression')
-				residueSources.add(slot.residue.source);
-			if (slot.kind === 'dynamic-host') {
-				if (slot.tag.kind === 'authored-expression') residueSources.add(slot.tag.source);
-				for (const attribute of slot.attributeSlots)
-					if (attribute.residue.kind === 'authored-expression')
-						residueSources.add(attribute.residue.source);
-			}
-		}
-	}
+	const residueSources = authoredResidueSources(chunks);
 	const repeats = input.semanticGraph.keyedRepeats;
 	const localLines = [
 		...repeats.map((repeat) => `const ${repeat.itemName}=marklessSsrDataContext.repeatItem;`),
 		...repeats.flatMap((repeat) => repeat.indexName ? [`const ${repeat.indexName}=marklessSsrDataContext.repeatIndex;`] : []),
 		'const error=marklessSsrDataContext.asyncError;',
 	];
-	const readCases = [...residueSources].map(
-		(source) => `case ${JSON.stringify(source)}:return (${source});`,
-	);
+	const readCases = authoredResidueReadCases(residueSources);
 	const branchIds = new Set(chunks.flatMap((chunk) =>
 		chunk.slots.flatMap((slot) => slot.kind === 'branch' ? [slot.branchSiteId] : []),
 	));

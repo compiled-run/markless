@@ -254,7 +254,8 @@ test('CSR: static children projection renders inside the wrapping component', as
 	const screen = await render(ProjectedCard);
 	const container = queryContainer(screen.container);
 
-	expect(elementOrder(container)).toEqual(['main', 'section', 'p', 'h2', 'button', 'output']);
+	// card.tsrx puts <h2> before {children}, so the projected <p> follows it.
+	expect(elementOrder(container)).toEqual(['main', 'section', 'h2', 'p', 'button', 'output']);
 
 	// Spec 01: children place as an opaque template projection.
 	const projected = container.querySelector('section.card p.projected');

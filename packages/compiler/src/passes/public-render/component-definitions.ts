@@ -2,6 +2,7 @@ import { parseModule } from '@tsrx/core';
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import { asNodes, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { firstComponentRoot } from './plan.ts';
+import { emitClientResidueReader, emitClientResidueReaderPrelude } from './residue-reader.ts';
 import {
 	callbackSymbolIds,
 	componentPropNames,
@@ -29,6 +30,8 @@ export function collectPublicRenderComponentDefinitions(
 			componentInvocations.set(node.start, node);
 		}
 	});
+
+	const residueReaderPrelude = emitClientResidueReaderPrelude(input, [...componentNames]);
 
 	return [...componentNames].flatMap((componentName) => {
 		const componentNode = componentMap.get(componentName);
@@ -166,8 +169,28 @@ export function collectPublicRenderComponentDefinitions(
 						? componentPropCellId(componentNode)
 						: null,
 				ownsModuleData: componentName === rootInfo.componentName,
+				...residueReaderFields(),
 			},
 		];
+
+		function residueReaderFields(): Record<string, unknown> {
+			const readerSource = emitClientResidueReader(
+				input,
+				componentName,
+				rootInfo.componentName,
+				componentNode,
+			);
+			if (!readerSource) return {};
+			return {
+				residueReaderSource: readerSource,
+				...(residueReaderPrelude.imports.length
+					? { residueReaderImports: residueReaderPrelude.imports }
+					: {}),
+				...(residueReaderPrelude.declarations.length
+					? { residueReaderDeclarations: residueReaderPrelude.declarations }
+					: {}),
+			};
+		}
 	});
 }
 
