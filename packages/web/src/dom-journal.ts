@@ -14,10 +14,13 @@ export type AsyncBoundarySnapshotFragment = {
 
 type DomRangeNode = {
 	readonly parentNode?: DomRangeParent | null;
+	readonly nodeType?: number;
+	readonly childNodes?: ArrayLike<DomRangeNode>;
 };
 
 type DomRangeParent = {
 	readonly childNodes: ArrayLike<DomRangeNode>;
+	readonly parentNode?: DomRangeParent | null;
 	insertBefore: (node: DomRangeNode, before: DomRangeNode | null) => DomRangeNode;
 	removeChild: (node: DomRangeNode) => DomRangeNode;
 };
@@ -118,6 +121,58 @@ export function applyDomJournalEntries(
 	}
 }
 
+// Range mutation renumbers the served shape, so every ancestor's pinned element
+// census is spliced by exactly what moved — re-deriving it from the live tree
+// would renumber around foreign nodes the framework does not own. The slot name
+// is shared with resume-locators by literal, not import: a value edge from here
+// regroups the chunk graph.
+function spliceDomOrderCensus(
+	parent: DomRangeParent,
+	removed: ReadonlyArray<DomRangeNode>,
+	inserted: ReadonlyArray<DomRangeNode>,
+): void {
+	for (let node: DomRangeParent | null | undefined = parent; node; node = node.parentNode) {
+		const census = (node as { __marklessCensus?: DomRangeNode[] }).__marklessCensus;
+		if (!census) continue;
+		for (const one of removed) {
+			const at = census.indexOf(one);
+			if (at >= 0) census.splice(at, blockEnd(census, at) - at);
+		}
+		if (inserted.length)
+			census.splice(insertionSlot(census, inserted[0]!), 0, ...censusElements(inserted));
+	}
+}
+
+function blockEnd(census: DomRangeNode[], at: number): number {
+	const inside = new Set<DomRangeNode>(censusElements([census[at]!]));
+	let end = at + 1;
+	while (end < census.length && inside.has(census[end]!)) end++;
+	return end;
+}
+
+function insertionSlot(census: DomRangeNode[], first: DomRangeNode): number {
+	const parent = first.parentNode;
+	if (!parent) return census.length;
+	let slot = -1;
+	for (const child of Array.from(parent.childNodes)) {
+		if (child === first) break;
+		const at = census.indexOf(child);
+		if (at >= 0) slot = blockEnd(census, at);
+	}
+	if (slot >= 0) return slot;
+	const at = census.indexOf(parent as DomRangeNode);
+	return at >= 0 ? at + 1 : census.length;
+}
+
+function censusElements(nodes: ArrayLike<DomRangeNode>): DomRangeNode[] {
+	const elements: DomRangeNode[] = [];
+	for (const node of Array.from(nodes)) {
+		if (node.nodeType === 1) elements.push(node);
+		if (node.childNodes) elements.push(...censusElements(node.childNodes));
+	}
+	return elements;
+}
+
 function renderInsertRangeFragment(
 	fragment: unknown,
 	entry: InsertRangeEntry,
@@ -155,9 +210,11 @@ function insertRange(anchor: unknown, fragment: unknown): void {
 	if (!parent) return;
 
 	const before = nextSibling(parent, anchor);
-	for (const node of fragmentNodes(fragment)) {
+	const nodes = fragmentNodes(fragment);
+	for (const node of nodes) {
 		parent.insertBefore(node, before);
 	}
+	spliceDomOrderCensus(parent, [], nodes);
 }
 
 function removeRange(start: unknown, end: unknown): void {
@@ -166,12 +223,9 @@ function removeRange(start: unknown, end: unknown): void {
 	const parent = start.parentNode;
 	if (!parent || parent !== end.parentNode) return;
 
-	let next = nextSibling(parent, start);
-	while (next && next !== end) {
-		const current = next;
-		next = nextSibling(parent, current);
-		parent.removeChild(current);
-	}
+	const removed = rangeContents(start, end);
+	for (const node of removed) parent.removeChild(node);
+	spliceDomOrderCensus(parent, removed, []);
 }
 
 function moveRange(start: unknown, end: unknown, before: unknown): void {
@@ -181,9 +235,11 @@ function moveRange(start: unknown, end: unknown, before: unknown): void {
 	const beforeParent = before.parentNode;
 	if (!parent || !beforeParent || parent !== end.parentNode) return;
 
-	for (const node of rangeContents(start, end)) {
+	const moved = rangeContents(start, end);
+	for (const node of moved) {
 		beforeParent.insertBefore(node, before);
 	}
+	spliceDomOrderCensus(beforeParent, moved, moved);
 }
 
 function rangeContents(start: DomRangeNode, end: DomRangeNode): DomRangeNode[] {

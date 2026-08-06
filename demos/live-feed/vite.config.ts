@@ -8,8 +8,12 @@ const root = import.meta.dirname;
 export function liveFeedConfig(
 	executionLog = process.env.MARKLESS_CONSUMER_BUILD ? ('never' as const) : ('auto' as const),
 ) {
-	// The ruled prerender build remains opt-in for its dedicated box and gate.
-	const prerender = process.env.MARKLESS_PRERENDER === '1';
+	// The prerender + settle path is this demo's shipped build (T014). The staged
+	// box forces MARKLESS_PRERENDER=0 to keep measuring the wake-only lane.
+	const prerender = process.env.MARKLESS_PRERENDER !== '0';
+	// markless() reads the same variable to decide the prerender lane, so the
+	// default has to be written back before the plugin factory runs.
+	process.env.MARKLESS_PRERENDER = prerender ? '1' : '0';
 	process.env.MARKLESS_PRERENDER_WAKE = '1';
 	return {
 		plugins: [

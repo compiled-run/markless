@@ -31,6 +31,7 @@ export type MarklessVirtualModuleType =
 	| 'render-data'
 	| 'resolver'
 	| 'resume'
+	| 'settle'
 	| 'symbol'
 	| 'trigger-group'
 	| 'style';
@@ -64,6 +65,7 @@ export interface TransformTsrxModuleInput {
 	clientOutput?: MarklessClientOutput;
 	resumeModuleUrl?: string;
 	prerenderWakeModuleUrl?: string;
+	settleModuleUrl?: string;
 	headInjections?: GlobalInjections[];
 	styleModuleUrl?: (virtualModuleId: string) => string;
 	executionLog?: MarklessExecutionLogMode;

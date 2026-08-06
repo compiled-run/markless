@@ -23,7 +23,7 @@ const fixtures = [
 			// Recalibrated to actuals for chained-async key-phase gating (runtime gate + self-wake + single-flight); zero slack.
 			// DE-MINIMIS INTERIM chain (settlement bridge +94); REPAYMENT OBLIGATION
 			// ANCHORED TO THE ORIGINAL: final audit fails unless returned to <=18,183.
-			maxEmittedRuntimeGzipBytes: 18_315, // owner receipt 2026-07-12: +15 for the lost-click window fix (pre-commit delegated listener install; measured 18,059); prior: anti-bloat wall, measured 17,962; re-baselined 2026-07-07 after tier-3 arm-branch flips became emit-reachable (demand-loaded; per-chunk caps + event-only budget unchanged); tighten-only from here; runtime-stdlib goal shrinks the library itself. consolidation debt: runtime-stdlib goal owns shrinking; two same-day re-baselines (commitArm, arm flips) — next expansion needs library shrink first.
+			maxEmittedRuntimeGzipBytes: 18_326, // interim 2026-08-05: +11 total for the foreign-DOM census pin + range-splice invalidation (locator fix), de-minimis auto-interim per proportionality order 2026-08-04; repayment folded into the T013 vite-pair obligation. prior: owner receipt 2026-07-12: +15 for the lost-click window fix (pre-commit delegated listener install; measured 18,059); prior: anti-bloat wall, measured 17,962; re-baselined 2026-07-07 after tier-3 arm-branch flips became emit-reachable (demand-loaded; per-chunk caps + event-only budget unchanged); tighten-only from here; runtime-stdlib goal shrinks the library itself. consolidation debt: runtime-stdlib goal owns shrinking; two same-day re-baselines (commitArm, arm flips) — next expansion needs library shrink first.
 			forbidVitePreloadHelper: true,
 		},
 	},
@@ -58,7 +58,7 @@ const fixtures = [
 			// Recalibrated to actuals for chained-async key-phase gating (runtime gate + self-wake + single-flight); zero slack. CI (Linux) emits slightly larger bytes than local macOS; wall tracks CI actuals.
 			// DE-MINIMIS INTERIM chain (settlement bridge +94); REPAYMENT OBLIGATION
 			// ANCHORED TO THE ORIGINAL: final audit fails unless returned to <=18,163.
-			maxEmittedRuntimeGzipBytes: 18_276, // owner receipt 2026-07-12: +5 for the lost-click window fix (measured 18,026); prior: anti-bloat wall, measured 17,926; re-baselined 2026-07-07 after tier-3 arm-branch flips became emit-reachable (demand-loaded; per-chunk caps + event-only budget unchanged); tighten-only from here; runtime-stdlib goal shrinks the library itself. consolidation debt: runtime-stdlib goal owns shrinking; two same-day re-baselines (commitArm, arm flips) — next expansion needs library shrink first.
+			maxEmittedRuntimeGzipBytes: 18_289, // interim 2026-08-05: +13 total for the foreign-DOM census pin + range-splice invalidation (locator fix), de-minimis auto-interim per proportionality order 2026-08-04; repayment folded into the T013 vite-pair obligation. prior: owner receipt 2026-07-12: +5 for the lost-click window fix (measured 18,026); prior: anti-bloat wall, measured 17,926; re-baselined 2026-07-07 after tier-3 arm-branch flips became emit-reachable (demand-loaded; per-chunk caps + event-only budget unchanged); tighten-only from here; runtime-stdlib goal shrinks the library itself. consolidation debt: runtime-stdlib goal owns shrinking; two same-day re-baselines (commitArm, arm flips) — next expansion needs library shrink first.
 			forbidVitePreloadHelper: true,
 		},
 	},

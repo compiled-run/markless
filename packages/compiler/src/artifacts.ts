@@ -1153,6 +1153,9 @@ export type SymbolModulesInput = {
 	readonly captureAnalysis: CaptureAnalysisArtifact;
 	readonly renderData?: RenderDataArtifact;
 	readonly publicRenderPlan?: PublicRenderPlanArtifact;
+	// Consumer builds drop the authored-source strings: nothing reads them at
+	// runtime, and every symbol chunk pays for them at load.
+	readonly omitAuthoredSource?: boolean;
 };
 
 export type GeneratedSymbolModule = {
@@ -1583,7 +1586,10 @@ export type PublicRenderModuleArtifact = {
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };
 
-export type CompileTsrxModuleInput = SemanticGraphInput & SymbolResolverModuleInput;
+export type CompileTsrxModuleInput = SemanticGraphInput &
+	SymbolResolverModuleInput & {
+		readonly omitAuthoredSource?: boolean;
+	};
 
 export type CompilerPassDefinition = {
 	readonly passId: string;

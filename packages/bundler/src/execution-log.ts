@@ -87,6 +87,7 @@ const marklessSizesUrl = ${JSON.stringify(options.sizesUrl ?? null)};
 let marklessSizesPromise;
 let marklessAttribution;
 let marklessInstallPromise;
+let marklessRenderSummaryTurn;
 function modules(log) { return log ? [...log] : []; }
 function sizeRecord(input) { return !input ? undefined : typeof input === 'number' ? { raw: input, estimated: true } : input; }
 function normalizeSizes(input) { if (!input) return undefined; const map = new Map(); for (const id of Object.keys(input)) if (id !== 'attribution') map.set(id, sizeRecord(input[id])); return map; }
@@ -168,11 +169,29 @@ export async function logMarklessSpecializedInteraction(input, before) {
 	const tag = typeof target?.tagName === 'string' ? target.tagName.toLowerCase() : 'element';
 	await logMarklessInteraction({ eventName: input.event?.type ?? 'event', eventRecord: input.eventRecord, before, selector: tag + (target?.id ? '#' + target.id : ''), after: new Set(globalThis.__mxLog) });
 }
+function marklessRenderSummaryTurnEnd() {
+	// Each injected entry module calls in from its own dynamic-import
+	// resolution, so a microtask window closes between callers of one render;
+	// a frame holds them all. The timeout is the backstop for a document that
+	// never paints, and whichever lands first ends the turn.
+	if (typeof requestAnimationFrame !== 'function') return Promise.resolve();
+	return new Promise((resolve) => { let ended; const end = () => { if (ended) return; ended = true; resolve(); }; requestAnimationFrame(end); setTimeout(end, 50); });
+}
+// Only the console line coalesces: the attribute mirror keeps its per-call
+// last-wins timing, which the interaction mirror interleaves with.
+function coalesceMarklessRenderSummaryLine(summary) {
+	if (marklessRenderSummaryTurn) { marklessRenderSummaryTurn.summary = summary; return marklessRenderSummaryTurn.printed; }
+	const turn = { summary };
+	turn.printed = marklessRenderSummaryTurnEnd().then(() => { marklessRenderSummaryTurn = undefined; console.log(turn.summary); });
+	marklessRenderSummaryTurn = turn;
+	return turn.printed;
+}
 export async function logMarklessRenderSummary(input = {}) {
 	const log = globalThis.__mxLog; if (!log) return;
 	const moduleSizes = await loadModuleSizes(input); const current = modules(log); const a = accounting(current, moduleSizes);
 	const summary = 'markless: rendered — ' + a.appModules + ' app module' + (a.appModules === 1 ? '' : 's') + ' executed (' + category(a, 'app') + ') · ' + a.instrumentModules + ' instrument module' + (a.instrumentModules === 1 ? '' : 's') + ' executed (' + category(a, 'instrument').replace(/ instrument$/, '') + ')';
-	console.log(summary); const root = document.documentElement; if (root) { root.setAttribute('data-markless-log-summary', summary); mirrorBytes(root, a); }
+	const root = document.documentElement; if (root) { root.setAttribute('data-markless-log-summary', summary); mirrorBytes(root, a); }
+	return coalesceMarklessRenderSummaryLine(summary);
 }
 `;
 }

@@ -18,6 +18,8 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Event payload decoding accepts innerHTML only as a legacy script-text fallback.',
 	'packages/web/src/fns/dom-order.ts :: const w = document.createTreeWalker(r, 1);':
 		'The neutral emitted locator helper walks elements by compiler-recorded DOM order.',
+	'packages/web/src/fns/settle-plan.ts :: const walker = root.ownerDocument!.createTreeWalker(root, 128);':
+		'The settle filler finds the build-emitted hole comments inside one arm template.',
 	'packages/web/src/inline/payload-document.ts :: const text = element.textContent ?? element.text ?? element.innerHTML;':
 		'Inline payload decoding accepts innerHTML only as a legacy script-text fallback.',
 	"packages/web/src/inline/resumer.ts :: const preloaded = currentDocument.querySelectorAll('link[rel=modulepreload]').length;":
@@ -26,6 +28,8 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'The prerender log summary counts module-preload links and does not locate components.',
 	'packages/web/src/inline/resumer.ts :: const walker = currentDocument.createTreeWalker(root, 1);':
 		'The inline resumer materializes compiler-recorded element locators in DOM order.',
+	'packages/web/src/inline/resumer.ts :: const walker = document.createTreeWalker(root, 128);':
+		'The settle boot censuses the build-emitted boundary comment anchors it fills between.',
 	'packages/web/src/payload-document-common.ts :: const text = element.textContent ?? element.text ?? element.innerHTML;':
 		'Shared payload decoding accepts innerHTML only as a legacy script-text fallback.',
 	'packages/web/src/payload.ts :: const text = element.textContent ?? element.text ?? element.innerHTML;':

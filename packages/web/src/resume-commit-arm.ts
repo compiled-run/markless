@@ -3,6 +3,7 @@ import {
 	containsElement,
 	elementsBetweenAnchors,
 	hostIdsInsideRemovedElements,
+	spliceDomOrderCensus,
 } from './resume-locators.ts';
 import type {
 	ResumeArmBranchRecord,
@@ -126,6 +127,7 @@ export function createArmCommitter(
 			deps.disposeHost(hostNodeId);
 		}
 		replaceAnchorRange(boundary, fresh);
+		spliceDomOrderCensus(deps.root, outgoing, fresh);
 		const materialized = await registerArmRecordSet(
 			deps,
 			installEventType,

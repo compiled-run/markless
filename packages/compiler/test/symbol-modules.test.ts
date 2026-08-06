@@ -20,6 +20,88 @@ export function App() @{ let weight = state(initialWeight()); <main>{weight}</ma
 	expect(initializer?.source).toContain('return (initialWeight());');
 });
 
+const AUTHORED_SOURCE_APP = `
+import { state, computed } from '@markless/core';
+export function App() @{
+	let weight = state(2);
+	let doubled = computed(() => weight * 2);
+	<main onclick={() => weight++}>{doubled}</main>
+}
+`;
+
+test('symbol modules carry authoredSource unless the build asks for it to be omitted', async () => {
+	const filename = '/workspace/app/src/App.tsrx';
+	const kept = await compileTsrxModule({
+		filename,
+		source: AUTHORED_SOURCE_APP,
+		symbols: [],
+	});
+	const cut = await compileTsrxModule({
+		filename,
+		source: AUTHORED_SOURCE_APP,
+		symbols: [],
+		omitAuthoredSource: true,
+	});
+
+	expect(kept.symbolModules.modules.some((module) => module.source.includes('authoredSource'))).toBe(
+		true,
+	);
+	expect(cut.symbolModules.modules.some((module) => module.source.includes('authoredSource'))).toBe(
+		false,
+	);
+	// Only the dead string leaves: same symbols, same exports, same executable bodies.
+	expect(cut.symbolModules.modules.map((module) => module.symbolId)).toEqual(
+		kept.symbolModules.modules.map((module) => module.symbolId),
+	);
+	expect(cut.symbolModules.modules.map((module) => module.exportName)).toEqual(
+		kept.symbolModules.modules.map((module) => module.exportName),
+	);
+	for (const [index, module] of cut.symbolModules.modules.entries()) {
+		const keptSource = kept.symbolModules.modules[index]!.source;
+		expect(keptSource.split('\n').filter((line) => !line.startsWith('export const authoredSource ='))).toEqual(
+			module.source.split('\n'),
+		);
+	}
+});
+
+test('omitAuthoredSource keeps the behavior module runnable', () => {
+	const input = {
+		symbolResolver: {
+			passId: 'symbol-resolver' as const,
+			dynamicImportOwner: 'generated-symbol-resolver' as const,
+			symbols: [
+				{
+					id: 'symbol:autofocus',
+					kind: 'behavior' as const,
+					hostNodeId: 'h1',
+					source: '(element) => element.focus()',
+					functionSource: '(element) => element.focus()',
+					inputSources: [],
+					order: 0,
+				},
+			],
+			syncPolicies: [],
+			diagnostics: [],
+		},
+		captureAnalysis: {
+			passId: 'capture-analysis' as const,
+			extractedSymbols: [],
+			diagnostics: [],
+		},
+	};
+
+	expect(emitSymbolModules({ ...input, omitAuthoredSource: true }).modules[0]!.source)
+		.toBe(`export const behaviorFunctionSource = "(element) => element.focus()";
+export const behaviorInputSources = [];
+
+export function symbol_autofocus(context) {
+	const inputs = [];
+	const behavior = (element) => element.focus();
+	return behavior(context.element);
+}
+`);
+});
+
 test('emitSymbolModules emits event, callback, and DOM update modules', () => {
 	const artifact = emitSymbolModules({
 		symbolResolver: {

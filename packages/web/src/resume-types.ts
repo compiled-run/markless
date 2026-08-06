@@ -33,6 +33,8 @@ export type ResumeDomElement = ResumeDomNode & {
 		readonly syncPolicyAlreadyApplied?: boolean;
 	}) => Promise<void>;
 	__marklessEventOnlyGraph?: Map<string, unknown>;
+	// Container-scoped element census in DOM order, shared by every wake.
+	__marklessCensus?: ResumeDomElement[];
 };
 export type ResumeDomComment = ResumeDomNode & { readonly nodeType: 8; readonly data?: string };
 export type ResumeDomEvent = {

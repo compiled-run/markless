@@ -67,7 +67,7 @@ const combos = [
 		environment: 'csr',
 		port: 5313,
 		path: '/?latency=0',
-		settledSelector: '#app[data-feed-settle-arrived]',
+		settledSelector: '[data-update-list][data-row-count="3"]',
 		proof: proveLiveFeedCsr,
 		interact: interactLiveFeedCsr,
 	},
@@ -244,8 +244,15 @@ async function measureCombo(combo) {
 		await page.goto(url, { waitUntil: heldAtSettleArrival ? 'domcontentloaded' : 'load' });
 		// S4 machine record: the served HTML's payload-script bytes. The payload
 		// delta work (T002) is judged on this number; zero for empty-delta pages.
+		// A settle fill plan is payload too — it is data the page ships so the
+		// browser need not execute a description, so it counts here or the
+		// executed number would fall by moving bytes rather than removing them.
 		const payloadScriptBytes = await page.evaluate(() =>
-			[...document.querySelectorAll('script[type="markless/state"],script[type="markless/view"]')]
+			[
+				...document.querySelectorAll(
+					'script[type="markless/state"],script[type="markless/view"],script[type="markless/fill-plan"]',
+				),
+			]
 				.map((script) => script.textContent?.length ?? 0)
 				.reduce((total, length) => total + length, 0),
 		);
@@ -534,9 +541,13 @@ async function interactLiveFeed(page) {
 	await waitForText(page, '[data-weighted-count]', 'Weighted count 9');
 }
 
+// Same assertion as interactLiveFeed: the weight bump must move the derived
+// count too, not just its own attribute. The CSR/SSR asymmetry that used to
+// live here recorded the cross-component computed bug (T002 ruling section 5).
 async function interactLiveFeedCsr(page) {
 	await page.click('[data-increase-weight]');
 	await waitForAttribute(page, '[data-weight]', 'data-weight', '3');
+	await waitForText(page, '[data-weighted-count]', 'Weighted count 9');
 }
 
 async function waitForText(page, selector, text) {

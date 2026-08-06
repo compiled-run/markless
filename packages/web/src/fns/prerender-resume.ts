@@ -11,12 +11,66 @@ import {
 	type PayloadScriptDocument,
 } from '../payload-document-common.ts';
 import { resumeFromPrerenderRecordsImpl } from '../payload-resume.ts';
-import {
-	derivePrerenderResumeRecords,
-	renderPrerenderBoundary,
-} from '../prerender/evaluator.ts';
+import { serializeRuntimeAsyncSnapshots } from '@markless/serializer';
+import { adoptFilledArms } from '../prerender/adopt-filled-arms.ts';
+import { isSettleKernelUnsupported, renderSettledArm } from '../settle-kernel.ts';
 
-export { derivePrerenderResumeRecords, renderPrerenderBoundary };
+// The full prerender evaluator re-evaluates the ENTIRE render-data surface to
+// obtain one boundary arm, and a static import of it here is what drags that
+// chunk into the load window. It now loads only where it is actually needed:
+// record derivation, and the settle fallback the kernel refuses.
+async function loadPrerenderEvaluator() {
+	return import('../prerender/evaluator.ts');
+}
+
+export async function derivePrerenderResumeRecords(
+	page: unknown,
+	propsOrLoadSymbol?: unknown,
+): Promise<ReturnType<Awaited<ReturnType<typeof loadPrerenderEvaluator>>['derivePrerenderResumeRecords']>> {
+	const evaluator = await loadPrerenderEvaluator();
+	return evaluator.derivePrerenderResumeRecords(page as never, propsOrLoadSymbol);
+}
+
+function isPrerenderDataSurface(value: unknown): boolean {
+	return !!value && typeof value === 'object' && 'renderData' in value && 'components' in value;
+}
+
+export async function renderPrerenderBoundary(
+	page: unknown,
+	boundaryId: string,
+	status: 'fulfilled' | 'rejected',
+	graph: { readonly read: (graphNodeId: string, path?: ReadonlyArray<string>) => unknown },
+	propsOrLoadSymbol?: unknown,
+) {
+	if (isPrerenderDataSurface(page)) {
+		try {
+			const kernel = renderSettledArm({
+				surface: page as never,
+				boundaryId,
+				status,
+				read: (graphNodeId, path = []) => graph.read(graphNodeId, path),
+				serializeComputed: serializeRuntimeAsyncSnapshots as never,
+			});
+			return {
+				html: kernel.html,
+				armRecords: kernel.armRecords as never,
+				computed: kernel.computed as never,
+			};
+		} catch (error) {
+			// Fail closed: anything the kernel cannot express exactly falls back to
+			// the full evaluation rather than committing a half-rendered arm.
+			if (!isSettleKernelUnsupported(error)) throw error;
+		}
+	}
+	const evaluator = await loadPrerenderEvaluator();
+	return evaluator.renderPrerenderBoundary(
+		page as never,
+		boundaryId,
+		status,
+		graph as never,
+		propsOrLoadSymbol,
+	);
+}
 
 export function mergePrerenderPayloadRecords(
 	derived: ResumeRecordSet,
@@ -59,5 +113,7 @@ export async function resumeFromPrerenderRecords(
 		...input,
 		renderBranchHtml: input.renderBranchHtml ?? documentTemplateBranchHtml(input.root),
 	});
-	return resumeFromPrerenderRecordsImpl(adopted);
+	return resumeFromPrerenderRecordsImpl(
+		await adoptFilledArms(adopted, adopted.root as never, adopted.renderAsyncBoundary as never),
+	);
 }

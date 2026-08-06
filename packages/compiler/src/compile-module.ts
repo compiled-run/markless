@@ -309,6 +309,8 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 							captureAnalysis: inputs.captureAnalysis as CaptureAnalysisArtifact,
 							renderData: inputs.renderData as RenderDataArtifact,
 							publicRenderPlan: inputs.publicRenderPlan as PublicRenderPlanArtifact,
+							omitAuthoredSource: (inputs.source as CompileTsrxModuleInput)
+								.omitAuthoredSource,
 						}),
 					};
 				},

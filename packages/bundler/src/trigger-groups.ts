@@ -28,6 +28,8 @@ export type PrerenderTriggerGroup = {
 	readonly symbolIds: ReadonlyArray<string>;
 	readonly state: ProtocolStatePayload;
 	readonly view: ProtocolViewPayload;
+	/** Set when this group adopts an arm the settle boot filled. */
+	readonly armRendererModuleId?: string;
 };
 
 const EVENT_STAGES_BROWSER_TRIGGER = {
@@ -57,6 +59,7 @@ export function emitPrerenderTriggerGroupModule(input: {
 	readonly symbolRoutes?: ReadonlyArray<SourceSymbolRoute>;
 	readonly armRendererModuleId?: string;
 }): string {
+	const armRendererModuleId = input.armRendererModuleId ?? input.group.armRendererModuleId;
 	const ids = new Set(input.group.symbolIds);
 	const boundRows = input.boundRows.filter((row) => ids.has(row.id));
 	let source = emitSymbolResolverModule({
@@ -79,9 +82,9 @@ export function emitPrerenderTriggerGroupModule(input: {
 		].join('\n');
 	}
 	return [
-		input.armRendererModuleId
+		armRendererModuleId
 			? [
-					`import { prepareBoundaryArm as marklessPrepareBoundaryArm, renderBoundaryArm as marklessRenderBoundaryArm } from ${JSON.stringify(input.armRendererModuleId)};`,
+					`import { prepareBoundaryArm as marklessPrepareBoundaryArm, renderBoundaryArm as marklessRenderBoundaryArm } from ${JSON.stringify(armRendererModuleId)};`,
 					'export function prepareBoundaryArm(boundaryId, status, graph) {',
 					'\treturn marklessPrepareBoundaryArm(boundaryId, status, graph, loadSymbol);',
 					'}',
@@ -138,6 +141,10 @@ export function planPrerenderTriggerGroups(input: {
 }): PrerenderTriggerGroup[] {
 	const symbols = new Map(input.symbolResolver.symbols.map((symbol) => [symbol.id, symbol]));
 	const bounds = new Map(input.boundRows.map((row) => [row.id, row]));
+	const completeView = input.completeView ?? input.view;
+	const completeBoundaries = new Map(
+		completeView.asyncBoundaries.map((boundary) => [boundary.id, boundary]),
+	);
 	const selfWakeBoundaries = unsettledAsyncBoundaryIndexes(input.state, input.view);
 	const routes = [
 		...(selfWakeBoundaries.length > 0
@@ -179,8 +186,9 @@ export function planPrerenderTriggerGroups(input: {
 			}));
 		}),
 	];
-	return routes.flatMap(({ event, branch, branchIndex, hostPath, selfWakeBoundaries }) => {
-		const closureView = selfWakeBoundaries ? (input.completeView ?? input.view) : input.view;
+	const groups: Array<PrerenderTriggerGroup & { adoptsSettledArm?: true }> = routes.flatMap(
+		({ event, branch, branchIndex, hostPath, selfWakeBoundaries }) => {
+		const closureView = selfWakeBoundaries ? completeView : input.view;
 		if (event.eventName === 'visible') return [];
 		const host = branch
 			? undefined
@@ -206,36 +214,16 @@ export function planPrerenderTriggerGroups(input: {
 			for (const arm of branch.armRecords ?? [])
 				collectCompleteArmRecordClosure(arm, graphNodeIds, symbolIds);
 		}
+		const adoptedBoundaryIds = new Set<string>();
 		for (const boundaryIndex of selfWakeBoundaries ?? []) {
 			const servedBoundary = input.view.asyncBoundaries[boundaryIndex]!;
-			const boundary =
-				closureView.asyncBoundaries.find(
-					(candidate) => candidate.id === servedBoundary.id,
-				) ?? servedBoundary;
 			selected.boundaries.add(boundaryIndex);
-			if (boundary.updateSymbolId) symbolIds.add(boundary.updateSymbolId);
-			for (const read of boundary.asyncReads) {
-				graphNodeIds.add(read.graphNodeId);
-				if (read.runnerSymbolId) symbolIds.add(read.runnerSymbolId);
-			}
-			const arms = Array.isArray(boundary.armRecords)
-				? boundary.armRecords
-				: boundary.armRecords
-					? [boundary.armRecords]
-					: [];
-			for (const arm of arms) collectCompleteArmRecordClosure(arm, graphNodeIds, symbolIds);
-			// Settled-arm child props belong to the same graph segment.
-			const settledEdgeIds = new Set<string>();
-			for (const edge of input.componentEdges ?? []) {
-				if (edge.asyncBoundaryId !== boundary.id) continue;
-				settledEdgeIds.add(edge.id);
-				for (const prop of edge.props)
-					if (prop.kind === 'graph-reference') graphNodeIds.add(prop.graphNodeId);
-			}
-			// Claim edge-bound derives before the settled arm registers them.
-			for (const row of input.boundRows)
-				if (row.componentEdgePath.some((edgeId) => settledEdgeIds.has(edgeId)))
-					symbolIds.add(row.id);
+			collectSettledBoundaryClosure(
+				input,
+				completeBoundaries.get(servedBoundary.id) ?? servedBoundary,
+				graphNodeIds,
+				symbolIds,
+			);
 		}
 		closureView.behaviors.forEach((behavior, index) => {
 			if (selfWakeBoundaries) return;
@@ -291,7 +279,32 @@ export function planPrerenderTriggerGroups(input: {
 				if (runnerSymbolId) symbolIds.add(runnerSymbolId);
 			}
 			selectViewSubscribers(closureView, graphNodeIds, symbolIds, selected);
-			if (selfWakeBoundaries) {
+			// A gesture whose cells the settled arm reads must OWN that arm, or its
+			// write lands on a graph no record inside the arm is bound to and the
+			// next interaction there forks a second runtime off the raw prerender
+			// records. Same closure the self-wake route takes, on the same arm.
+			if (!selfWakeBoundaries)
+				input.view.asyncBoundaries.forEach((servedBoundary, index) => {
+					if (adoptedBoundaryIds.has(servedBoundary.id)) return;
+					const boundary =
+						completeBoundaries.get(servedBoundary.id) ?? servedBoundary;
+					if (
+						!settledArmReadGraphNodeIds(input, boundary).some((graphNodeId) =>
+							graphNodeIds.has(graphNodeId),
+						)
+					)
+						return;
+					adoptedBoundaryIds.add(servedBoundary.id);
+					selected.boundaries.add(index);
+					collectSettledBoundaryClosure(input, boundary, graphNodeIds, symbolIds);
+					collectSettledArmHostRecordClosure(
+						completeView,
+						boundary,
+						graphNodeIds,
+						symbolIds,
+					);
+				});
+			if (selfWakeBoundaries || adoptedBoundaryIds.size > 0) {
 				// Boundary rendering consumes render-data initial values through this
 				// group's resolver. Claim each non-literal initializer for its graph.
 				for (const symbol of symbols.values())
@@ -331,10 +344,16 @@ export function planPrerenderTriggerGroups(input: {
 			branches: closureView.branches?.filter((_, index) => selected.branches.has(index)),
 			// Self-wake carries the build-emitted per-arm record sets. The demand-
 			// loaded update symbol renders HTML; settle selects the matching records
-			// here and commits both through the ordinary arm machinery.
-			asyncBoundaries: closureView.asyncBoundaries.filter((boundary) =>
-				selectedBoundaryIds.has(boundary.id),
-			),
+			// here and commits both through the ordinary arm machinery. An adopting
+			// gesture group takes the same complete record set: the served one
+			// describes @pending, which is not what its wake will find in the DOM.
+			asyncBoundaries: closureView.asyncBoundaries
+				.filter((boundary) => selectedBoundaryIds.has(boundary.id))
+				.map((boundary) =>
+					adoptedBoundaryIds.has(boundary.id)
+						? (completeBoundaries.get(boundary.id) ?? boundary)
+						: boundary,
+				),
 			...(closureView.asyncRunners
 				? {
 						asyncRunners: Object.fromEntries(
@@ -368,9 +387,110 @@ export function planPrerenderTriggerGroups(input: {
 				symbolIds: [...symbolIds].sort(),
 				state: filterState(input.state, new Set(graphIds)),
 				view,
+				...(adoptedBoundaryIds.size > 0 ? { adoptsSettledArm: true as const } : {}),
 			},
 		];
-	});
+		},
+	);
+	// The boundary renderer the self-wake group already ships is emitted one slot
+	// past the groups; an adopting group re-derives its arm through the same one.
+	const armRendererModuleId = groups.some((group) => group.id === 'self-wake')
+		? triggerGroupVirtualModuleId(input.filename, groups.length)
+		: undefined;
+	return groups.map(({ adoptsSettledArm, ...group }) =>
+		adoptsSettledArm && armRendererModuleId ? { ...group, armRendererModuleId } : group,
+	);
+}
+
+// Graph cells a settled arm reads: the arm's own records plus the props it
+// forwards to child components rendered inside it.
+function settledArmReadGraphNodeIds(
+	input: { readonly componentEdges?: ReadonlyArray<SemanticComponentEdge> },
+	boundary: ProtocolViewPayload['asyncBoundaries'][number],
+): string[] {
+	const graphNodeIds = new Set<string>();
+	for (const arm of boundaryArmRecordSets(boundary))
+		collectCompleteArmRecordClosure(arm, graphNodeIds, new Set<string>());
+	for (const edge of input.componentEdges ?? [])
+		if (edge.asyncBoundaryId === boundary.id)
+			for (const prop of edge.props)
+				if (prop.kind === 'graph-reference') graphNodeIds.add(prop.graphNodeId);
+	return [...graphNodeIds];
+}
+
+function collectSettledBoundaryClosure(
+	input: {
+		readonly componentEdges?: ReadonlyArray<SemanticComponentEdge>;
+		readonly boundRows: ReadonlyArray<BoundSymbolResolverRow>;
+	},
+	boundary: ProtocolViewPayload['asyncBoundaries'][number],
+	graphNodeIds: Set<string>,
+	symbolIds: Set<string>,
+): void {
+	if (boundary.updateSymbolId) symbolIds.add(boundary.updateSymbolId);
+	for (const read of boundary.asyncReads) {
+		graphNodeIds.add(read.graphNodeId);
+		if (read.runnerSymbolId) symbolIds.add(read.runnerSymbolId);
+	}
+	for (const arm of boundaryArmRecordSets(boundary))
+		collectCompleteArmRecordClosure(arm, graphNodeIds, symbolIds);
+	// Settled-arm child props belong to the same graph segment.
+	const settledEdgeIds = new Set<string>();
+	for (const edge of input.componentEdges ?? []) {
+		if (edge.asyncBoundaryId !== boundary.id) continue;
+		settledEdgeIds.add(edge.id);
+		for (const prop of edge.props)
+			if (prop.kind === 'graph-reference') graphNodeIds.add(prop.graphNodeId);
+	}
+	// Claim edge-bound derives before the settled arm registers them.
+	for (const row of input.boundRows)
+		if (row.componentEdgePath.some((edgeId) => settledEdgeIds.has(edgeId)))
+			symbolIds.add(row.id);
+}
+
+// The records binding a settled arm's own hosts sit at the complete view's top
+// level, not inside its arm record sets. The wake re-derives the arm from render
+// data and that rendering names these symbols, so an adopting group's resolver
+// has to carry them or the wake throws MARKLESS_SYMBOL_UNKNOWN.
+function collectSettledArmHostRecordClosure(
+	completeView: ProtocolViewPayload,
+	boundary: ProtocolViewPayload['asyncBoundaries'][number],
+	graphNodeIds: Set<string>,
+	symbolIds: Set<string>,
+): void {
+	const armHosts = new Set<string>();
+	for (const arm of boundaryArmRecordSets(boundary))
+		for (const locator of (arm as { readonly locators?: ReadonlyArray<{ hostNodeId: string }> })
+			.locators ?? [])
+			armHosts.add(locator.hostNodeId);
+	if (armHosts.size === 0) return;
+	for (const record of completeView.events)
+		if (armHosts.has(record.hostNodeId))
+			for (const symbolId of record.symbolIds ?? []) symbolIds.add(symbolId);
+	for (const record of completeView.domUpdates)
+		if (armHosts.has(record.hostNodeId)) {
+			graphNodeIds.add(record.graphNodeId);
+			if (record.symbolId) symbolIds.add(record.symbolId);
+		}
+	for (const record of completeView.behaviors)
+		if (armHosts.has(record.hostNodeId)) {
+			for (const read of record.inputGraphReads ?? []) graphNodeIds.add(read.graphNodeId);
+			if (record.symbolId) symbolIds.add(record.symbolId);
+		}
+	for (const record of completeView.keyedRepeats ?? [])
+		if (armHosts.has(record.parentHostNodeId)) {
+			graphNodeIds.add(record.collectionGraphNodeId);
+			for (const rowEvent of record.rowEvents)
+				for (const symbolId of rowEvent.symbolIds ?? []) symbolIds.add(symbolId);
+		}
+}
+
+function boundaryArmRecordSets(boundary: ProtocolViewPayload['asyncBoundaries'][number]) {
+	return Array.isArray(boundary.armRecords)
+		? boundary.armRecords
+		: boundary.armRecords
+			? [boundary.armRecords]
+			: [];
 }
 
 function unsettledAsyncBoundaryIndexes(

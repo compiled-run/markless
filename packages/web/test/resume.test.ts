@@ -1284,6 +1284,51 @@ test('resume runtime reports structured errors for mismatched DOM-order locators
 	});
 });
 
+test('a second resume runtime keeps its DOM-order hosts after foreign DOM replaced one of them', async () => {
+	const label = element('SPAN');
+	const button = element('BUTTON');
+	const readout = element('OUTPUT');
+	const root = element('SECTION', [label, button, readout]);
+	const graph = createRuntimeGraph({ cells: [{ graphNodeId: 'state:count', value: 0 }] });
+	const view: ResumeViewRecord = {
+		locators: [
+			{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+			{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'span' },
+			{ hostNodeId: 'h2', strategy: 'dom-order', index: 2, tagName: 'button' },
+			{ hostNodeId: 'h3', strategy: 'dom-order', index: 3, tagName: 'output' },
+		],
+		events: [{ hostNodeId: 'h2', eventName: 'click', symbolIds: ['symbol:click'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const loadSymbol =
+		() =>
+		({ graph: runtimeGraph }: { graph: RuntimeGraph }) => {
+			runtimeGraph.update({
+				graphNodeId: 'state:count',
+				update: (value) => Number(value) + 1,
+			});
+		};
+
+	const first = createResumeRuntime({ root, graph, view, loadSymbol });
+	await first.start();
+	expect(first.getElement('h2')).toBe(button);
+
+	// A third-party widget swaps a tracked element for its own and leaves an
+	// extra node behind, so every later element shifts against the served shape.
+	root.childNodes.splice(0, 1, element('IFRAME'), element('DIV'));
+
+	const second = createResumeRuntime({ root, graph, view, loadSymbol });
+	await second.start();
+
+	expect(second.getElement('h2')).toBe(button);
+	expect(second.getElement('h3')).toBe(readout);
+	await second.dispatch(event('click', button, ''));
+	expect(graph.read('state:count')).toBe(1);
+});
+
 test('resume runtime reports structured errors for missing async boundary anchors', async () => {
 	const start = comment('async:boundary:0:start');
 	const root = element('SECTION', [start]);
@@ -4474,4 +4519,223 @@ test('CSR direct-value prop cells resolve captured prop reads without an envelop
 	});
 
 	expect(graph.read('prop:props', ['params', 'repo'])).toBe('alpha');
+});
+
+// Foreign-DOM safety: after the first wake pins the container census, a third
+// party owns part of the live tree. Framework range mutations must splice that
+// pinned census, never drop it — a re-walk would renumber around foreign nodes.
+type CensusFixtureNode = {
+	readonly name: string;
+	readonly nodeType: number;
+	readonly tagName: string;
+	childNodes: CensusFixtureNode[];
+	parentNode: CensusFixtureNode | null;
+	parentElement: CensusFixtureNode | null;
+	insertBefore(node: CensusFixtureNode, before: CensusFixtureNode | null): CensusFixtureNode;
+	removeChild(node: CensusFixtureNode): CensusFixtureNode;
+};
+
+function censusFixtureNode(
+	name: string,
+	nodeType: number,
+	tagName: string,
+	children: CensusFixtureNode[] = [],
+): CensusFixtureNode {
+	const self: CensusFixtureNode = {
+		name,
+		nodeType,
+		tagName,
+		childNodes: [],
+		parentNode: null,
+		parentElement: null,
+		insertBefore(node, before) {
+			const current = this.childNodes.indexOf(node);
+			if (current >= 0) this.childNodes.splice(current, 1);
+			const beforeIndex = before === null ? -1 : this.childNodes.indexOf(before);
+			this.childNodes.splice(beforeIndex >= 0 ? beforeIndex : this.childNodes.length, 0, node);
+			node.parentNode = this;
+			node.parentElement = this.nodeType === 1 ? this : null;
+			return node;
+		},
+		removeChild(node) {
+			this.childNodes = this.childNodes.filter((child) => child !== node);
+			node.parentNode = null;
+			node.parentElement = null;
+			return node;
+		},
+	};
+	for (const child of children) self.insertBefore(child, null);
+	return self;
+}
+
+const fixtureElement = (name: string, tagName: string, children: CensusFixtureNode[] = []) =>
+	censusFixtureNode(name, 1, tagName, children);
+const fixtureComment = (name: string) => censusFixtureNode(name, 8, '#comment');
+
+function foreignReplace(target: CensusFixtureNode, replacement: CensusFixtureNode): void {
+	const parent = target.parentNode!;
+	parent.insertBefore(replacement, target);
+	parent.removeChild(target);
+}
+
+function locator(hostNodeId: string, index: number, tagName: string) {
+	return { hostNodeId, strategy: 'dom-order', index, tagName } as const;
+}
+
+test('journal range removal after a foreign element swap keeps every pinned locator resolvable', async () => {
+	const { materializeDomLocators } = await import('../src/resume-locators.ts');
+	const item = fixtureElement('item', 'SPAN');
+	const widget = fixtureElement('widget', 'DIV');
+	const tail = fixtureElement('tail', 'BUTTON');
+	const start = fixtureComment('start');
+	const end = fixtureComment('end');
+	const root = fixtureElement('root', 'MAIN', [
+		fixtureElement('header', 'H1'),
+		start,
+		item,
+		end,
+		widget,
+		tail,
+	]);
+
+	// Wake 1 pins the census on a pristine tree.
+	const first = materializeDomLocators(root as never, [
+		locator('h0', 0, 'main'),
+		locator('h1', 1, 'h1'),
+		locator('h2', 2, 'span'),
+		locator('h3', 3, 'div'),
+		locator('h4', 4, 'button'),
+	] as never);
+	expect(first.get('h3')).toBe(widget);
+
+	// The widget's attach behavior hands the div to a third party, which swaps
+	// in its own iframe (net zero elements, different tag at the same index).
+	foreignReplace(widget, fixtureElement('foreign', 'IFRAME'));
+	applyDomJournalEntries([{ type: 'removeRange', locator: 'range:items' }], {
+		resolveTarget: (target) =>
+			target === 'range:items:start' ? start : target === 'range:items:end' ? end : undefined,
+	});
+
+	const second = materializeDomLocators(root as never, [
+		locator('h0', 0, 'main'),
+		locator('h1', 1, 'h1'),
+		locator('h3', 2, 'div'),
+		locator('h4', 3, 'button'),
+	] as never);
+	expect(second.get('h3')).toBe(widget);
+	expect(second.get('h4')).toBe(tail);
+});
+
+test('journal range insertion after a foreign element insertion keeps pinned locators aligned', async () => {
+	const { materializeDomLocators } = await import('../src/resume-locators.ts');
+	const item = fixtureElement('item', 'SPAN');
+	const widget = fixtureElement('widget', 'DIV');
+	const tail = fixtureElement('tail', 'BUTTON');
+	const start = fixtureComment('start');
+	const root = fixtureElement('root', 'MAIN', [
+		fixtureElement('header', 'H1'),
+		start,
+		item,
+		fixtureComment('end'),
+		widget,
+		tail,
+	]);
+
+	materializeDomLocators(root as never, [
+		locator('h0', 0, 'main'),
+		locator('h1', 1, 'h1'),
+		locator('h2', 2, 'span'),
+		locator('h3', 3, 'div'),
+		locator('h4', 4, 'button'),
+	] as never);
+
+	// Net +1: the third party adds an element the framework never shipped.
+	root.insertBefore(fixtureElement('foreign', 'ASIDE'), widget);
+	const row = fixtureElement('row', 'LI', [fixtureElement('row-child', 'EM')]);
+	applyDomJournalEntries([{ type: 'insertRange', locator: 'anchor:start', fragment: [row] }], {
+		resolveTarget: () => start,
+	});
+
+	const second = materializeDomLocators(root as never, [
+		locator('h5', 2, 'li'),
+		locator('h6', 3, 'em'),
+		locator('h2', 4, 'span'),
+		locator('h3', 5, 'div'),
+		locator('h4', 6, 'button'),
+	] as never);
+	expect(second.get('h5')).toBe(row);
+	expect(second.get('h3')).toBe(widget);
+	expect(second.get('h4')).toBe(tail);
+});
+
+test('arm commit after a foreign element swap splices the pinned census instead of dropping it', async () => {
+	const [{ materializeDomLocators }, { createArmCommitter }] = await Promise.all([
+		import('../src/resume-locators.ts'),
+		import('../src/resume-commit-arm.ts'),
+	]);
+	const oldSection = fixtureElement('old-section', 'SECTION');
+	const widget = fixtureElement('widget', 'DIV');
+	const tail = fixtureElement('tail', 'BUTTON');
+	const start = fixtureComment('start');
+	const end = fixtureComment('end');
+	const root = fixtureElement('root', 'MAIN', [
+		fixtureElement('outside', 'OUTPUT'),
+		start,
+		oldSection,
+		end,
+		widget,
+		tail,
+	]);
+
+	materializeDomLocators(root as never, [
+		locator('h0', 0, 'main'),
+		locator('h1', 1, 'output'),
+		locator('h2', 2, 'section'),
+		locator('h3', 3, 'div'),
+		locator('h4', 4, 'button'),
+	] as never);
+	foreignReplace(widget, fixtureElement('foreign', 'IFRAME'));
+
+	const commitArm = createArmCommitter(
+		{
+			root: root as never,
+			elementsByHostId: new Map(),
+			disposedHosts: new Set(),
+			disposeHost: () => undefined,
+			addEventRecord: () => undefined,
+			registerElementHandle: () => undefined,
+			documentHost: {},
+		},
+		() => undefined,
+	);
+	const freshSection = fixtureElement('fresh-section', 'SECTION', [
+		fixtureElement('fresh-child', 'P'),
+	]);
+	await commitArm(
+		{
+			id: 'b0',
+			runnerGraphNodeId: null,
+			initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
+			updateSymbolId: 'symbol:update',
+			startAnchor: start as never,
+			endAnchor: end as never,
+			asyncReads: [],
+		} as never,
+		{
+			nodes: [freshSection as never],
+			armRecords: { locators: [], events: [], behaviors: [], elementHandles: [] },
+		},
+	);
+
+	const second = materializeDomLocators(root as never, [
+		locator('h0', 0, 'main'),
+		locator('h1', 1, 'output'),
+		locator('h2', 2, 'section'),
+		locator('h5', 3, 'p'),
+		locator('h3', 4, 'div'),
+		locator('h4', 5, 'button'),
+	] as never);
+	expect(second.get('h2')).toBe(freshSection);
+	expect(second.get('h3')).toBe(widget);
+	expect(second.get('h4')).toBe(tail);
 });

@@ -20,7 +20,9 @@ import {
 	createPrerenderInlineResumerSource,
 	createInlineResumerSelfWakeSource,
 	createInlineResumerSource,
+	renderPrerenderInlineResumerSource,
 	type InlineResumerSourceVariants,
+	type PrerenderBootArtifact,
 } from './inline/resumer.ts';
 import { prepareSsrResumeRecords } from './prerender/records.ts';
 import { derivePrerenderResumeRecords } from './prerender/evaluator.ts';
@@ -48,6 +50,7 @@ export type SsrRenderArtifact = {
 	readonly resumeModuleUrl?: string;
 	readonly executionLog?: MarklessExecutionLogMode;
 	readonly inlineResumerSources?: InlineResumerSourceVariants;
+	readonly prerenderBoot?: PrerenderBootArtifact;
 };
 
 export type SsrRenderable = (() => SsrRenderOutput) | SsrRenderArtifact;
@@ -67,6 +70,9 @@ export type RenderToStringOptions = {
 	readonly executionLog?: MarklessExecutionLogMode;
 	// Page props forwarded to the compiled renderSsr (router hosts).
 	readonly props?: unknown;
+	// Build-computed settled-arm templates plus their fill plan. Inert markup:
+	// it sits after the rendered page so no page element or comment index moves.
+	readonly armEmission?: string;
 };
 
 export type ModulePreloadInput =
@@ -239,13 +245,29 @@ export async function assemblePrerenderPageParts(
 		optionPreloads ?? (browserTriggers ? artifactModulePreloads(component) : undefined);
 	const eventNames = browserEventNames(view);
 	const selfWake = hasUnsettledAsyncBoundaryRunner(view, state);
+	const boot = artifactPrerenderBoot(component);
+	// The settle path replaces the self-wake: it fills the arm from the plan and
+	// never imports the resume module, so a page only takes it when the build
+	// produced BOTH the plan this document ships and the settle module it needs.
+	const settle = options.armEmission && selfWake ? boot?.settle : undefined;
 	const resumerScript =
 		browserTriggers && resumeModuleUrl
 			? renderInlineResumerScript(
-					createPrerenderInlineResumerSource(eventNames, resumeModuleUrl),
+					settle
+						? renderPrerenderInlineResumerSource(settle.boot, eventNames)
+						: boot
+							? renderPrerenderInlineResumerSource(
+									selfWake ? boot.prerenderSelfWake : boot.prerender,
+									eventNames,
+								)
+							: createPrerenderInlineResumerSource(eventNames, resumeModuleUrl),
 					options.nonce,
 					resumeModuleUrl,
-					selfWake,
+					selfWake && !settle,
+					settle?.moduleUrl,
+					// The precompiled self-wake variant already carries the self-wake
+					// body; only the authored fallback appends it separately.
+					!boot,
 				)
 			: '';
 
@@ -259,6 +281,7 @@ export async function assemblePrerenderPageParts(
 	const container = [
 		`<div${renderContainerAttributes(options.containerId)}>`,
 		output.html,
+		options.armEmission ?? '',
 		resumerScript,
 		'</div>',
 	]
@@ -290,6 +313,12 @@ export async function renderSsrOutput(
 
 export function artifactResumeModuleUrl(component: SsrRenderable): string | undefined {
 	return typeof component === 'object' ? component.resumeModuleUrl : undefined;
+}
+
+function artifactPrerenderBoot(component: SsrRenderable): PrerenderBootArtifact | undefined {
+	return typeof component === 'object'
+		? (component as SsrRenderArtifact).prerenderBoot
+		: undefined;
 }
 
 function artifactPrerenderWakeModuleUrl(component: SsrRenderable): string | undefined {
@@ -501,14 +530,20 @@ function renderInlineResumerScript(
 	nonce: string | undefined,
 	resumeModuleUrl: string | undefined,
 	selfWake: boolean,
+	settleModuleUrl?: string,
+	appendSelfWakeSource = true,
 ): string {
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 	const resumeModuleAttribute = resumeModuleUrl
 		? ` data-markless-resume-module="${escapeAttribute(resumeModuleUrl)}"`
 		: '';
+	const settleModuleAttribute = settleModuleUrl
+		? ` data-markless-settle-module="${escapeAttribute(settleModuleUrl)}"`
+		: '';
 	const selfWakeAttribute = selfWake ? ' data-markless-self-wake' : '';
-	const selfWakeSource = selfWake ? createInlineResumerSelfWakeSource(resumeModuleUrl) : '';
-	return `<script data-async-resumer${nonceAttribute}${resumeModuleAttribute}${selfWakeAttribute}>${escapeInlineScript(source + selfWakeSource)}</script>`;
+	const selfWakeSource =
+		selfWake && appendSelfWakeSource ? createInlineResumerSelfWakeSource(resumeModuleUrl) : '';
+	return `<script data-async-resumer${nonceAttribute}${resumeModuleAttribute}${settleModuleAttribute}${selfWakeAttribute}>${escapeInlineScript(source + selfWakeSource)}</script>`;
 }
 
 function hasSyncPolicies(view: ProtocolViewPayload): boolean {

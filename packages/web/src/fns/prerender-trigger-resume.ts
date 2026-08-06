@@ -20,6 +20,7 @@ import {
 	readPayloadScriptsFromDocument,
 	type PayloadScriptDocument,
 } from '../payload-document-common.ts';
+import { adoptFilledArms } from '../prerender/adopt-filled-arms.ts';
 import {
 	attachPrerenderStagedGraphRegistration,
 	registerPrerenderStagedComputeds,
@@ -117,10 +118,22 @@ async function startTriggerGroup(
 	input: TriggerGroupInput,
 	container: StagedContainer,
 ): Promise<ResumePayloadScriptsResult> {
-	const adopted = await adoptStreamedForWake({
-		...input,
-		renderBranchHtml: input.renderBranchHtml ?? documentTemplateBranchHtml(input.root),
-	});
+	// A page the settle boot already filled must hand its arm to whichever group
+	// wakes first, not only to the ungrouped fallback: without this the first
+	// group resumes with @pending records and a state change it owns cannot move
+	// a binding that lives inside the settled arm.
+	const adopted = await adoptFilledArms(
+		await adoptStreamedForWake({
+			...input,
+			renderBranchHtml: input.renderBranchHtml ?? documentTemplateBranchHtml(input.root),
+		}),
+		input.root as never,
+		input.renderBoundaryArm &&
+			(async (boundaryId, status, graph) => {
+				await input.prepareBoundaryArm?.(boundaryId, status, graph);
+				return input.renderBoundaryArm!(boundaryId, status, graph);
+			}),
+	);
 	const prior = container.segments[0] && createStagedGraph(container, container.segments[0]);
 	const state = prior
 		? {

@@ -82,6 +82,10 @@ type InternalMarklessRolldownOptions = MarklessRolldownOptions & {
 	prerender?: boolean;
 	productionResumeModuleUrls?: Map<string, string>;
 	productionPrerenderWakeModuleUrls?: Map<string, string>;
+	// Created here, not by the host: the settle chunk exists only for pages the
+	// client build actually emitted one for, and the server prerender pass reads
+	// the same options object back.
+	productionSettleModuleUrls?: Map<string, string>;
 	prerenderWakeChannel?: boolean;
 	publicPath?: (fileName: string) => string;
 	updateDevPrerenderHashes?: (hashes: ReadonlyMap<string, string>) => void;
@@ -96,6 +100,7 @@ const MARKLESS_PRERENDER_WAKE_SOURCE_QUERY_RE = /[?&]markless-prerender-wake(?:[
 const MARKLESS_ROUTE_SOURCE_QUERY_RE = /[?&]markless-route(?:[&#]|$)/;
 const RESUME_VIRTUAL_ID_RE = /^virtual:markless:resume:([^:]+)$/;
 const PRERENDER_WAKE_VIRTUAL_ID_RE = /^virtual:markless:prerender-wake:([^:]+)$/;
+const SETTLE_VIRTUAL_ID_RE = /^virtual:markless:settle:([^:]+)$/;
 const SYMBOL_VIRTUAL_STRING_RE = /(["'`])((?:virtual:markless:symbol:)[^"'`]+)\1/g;
 
 export const marklessClient = (options: MarklessRolldownOptions = {}) =>
@@ -581,6 +586,10 @@ export function createMarklessRolldownPlugin(input: {
 					currentEnvironment === 'server'
 						? internalOptions.productionPrerenderWakeModuleUrls?.get(source)
 						: undefined,
+				settleModuleUrl:
+					currentEnvironment === 'server'
+						? internalOptions.productionSettleModuleUrls?.get(source)
+						: undefined,
 				styleModuleUrl:
 					internalOptions.dev === true && currentEnvironment === 'server'
 						? (virtualId) =>
@@ -1002,6 +1011,7 @@ export function createMarklessRolldownPlugin(input: {
 				for (const module of transformed.virtualModules.filter((item) => {
 					if (item.type === 'symbol') return true;
 					if (item.type === 'trigger-group') return true;
+					if (item.type === 'settle') return clientSymbolEntrySources.has(source);
 					if (item.type === 'resolver') {
 						return (
 							(importedChildSources.has(source) ||
@@ -1046,6 +1056,11 @@ export function createMarklessRolldownPlugin(input: {
 					recordProductionPrerenderWakeModuleUrls(
 						bundle,
 						internalOptions.productionPrerenderWakeModuleUrls,
+						internalOptions.publicPath,
+					);
+					recordProductionSettleModuleUrls(
+						bundle,
+						(internalOptions.productionSettleModuleUrls ??= new Map()),
 						internalOptions.publicPath,
 					);
 				}
@@ -2072,6 +2087,36 @@ function sourceForPrerenderWakeVirtualImporter(importer: string | undefined): st
 
 	const match = normalizeVirtualId(importer).match(PRERENDER_WAKE_VIRTUAL_ID_RE);
 	return match?.[1] ? decodeURIComponent(match[1]) : null;
+}
+
+function sourceForSettleVirtualImporter(importer: string | undefined): string | null {
+	if (!importer) return null;
+
+	const match = normalizeVirtualId(importer).match(SETTLE_VIRTUAL_ID_RE);
+	return match?.[1] ? decodeURIComponent(match[1]) : null;
+}
+
+function recordProductionSettleModuleUrls(
+	bundle: Record<string, unknown>,
+	urls: Map<string, string>,
+	publicPath: ((fileName: string) => string) | undefined,
+): void {
+	for (const output of Object.values(bundle)) {
+		if (!output || typeof output !== 'object') continue;
+		const chunk = output as {
+			readonly type?: unknown;
+			readonly facadeModuleId?: unknown;
+			readonly fileName?: unknown;
+		};
+		if (
+			chunk.type !== 'chunk' ||
+			typeof chunk.facadeModuleId !== 'string' ||
+			typeof chunk.fileName !== 'string'
+		)
+			continue;
+		const source = sourceForSettleVirtualImporter(chunk.facadeModuleId);
+		if (source) urls.set(source, publicPath?.(chunk.fileName) ?? `/${chunk.fileName}`);
+	}
 }
 
 function recordProductionResumeModuleUrls(

@@ -332,6 +332,61 @@ test('rendered summary sizes every executed id the module hook can inject', asyn
 	);
 });
 
+test('render summary prints one line per turn no matter how many modules call in', async () => {
+	const attributes = stubExecutionLogDom();
+	(globalThis as ExecutionLogGlobal).__mxLog = new Set();
+	const logged: string[] = [];
+	vi.spyOn(console, 'log').mockImplementation((line: unknown) => logged.push(String(line)));
+
+	const mod = await importExecutionLogModule(
+		executionLogVirtualModuleSource({ moduleSizes: new Map([['app:one', 1024]]) }),
+	);
+	// Every injected client entry module calls in as it evaluates: one click
+	// evaluating eleven lazy modules must still read as one render.
+	await Promise.all([
+		mod.logMarklessRenderSummary(),
+		mod.logMarklessRenderSummary(),
+		mod.logMarklessRenderSummary(),
+	]);
+
+	expect(logged).toHaveLength(1);
+
+	(globalThis as ExecutionLogGlobal).__mxLog!.add('app:one');
+	await mod.logMarklessRenderSummary();
+
+	expect(logged).toHaveLength(2);
+	// The turn's last caller is the one printed, so the line carries the
+	// cumulative accounting rather than a stale snapshot.
+	expect(logged[1]).toContain('1 app module executed (1.0 KB est. source app)');
+	expect(attributes.get('data-markless-log-summary')).toBe(logged[1]);
+	expect(attributes.get('data-markless-log-app-bytes')).toBe('1024');
+});
+
+test('render summary coalesces callers arriving across separate task checkpoints', async () => {
+	stubExecutionLogDom();
+	(globalThis as ExecutionLogGlobal).__mxLog = new Set();
+	const logged: string[] = [];
+	vi.spyOn(console, 'log').mockImplementation((line: unknown) => logged.push(String(line)));
+	// The browser delivers each injected entry module's call from its own
+	// dynamic-import resolution, a fraction of a millisecond apart, so the
+	// window that holds one render turn is the frame, not the microtask queue.
+	vi.stubGlobal('requestAnimationFrame', (callback: () => void) => setTimeout(callback, 16));
+
+	const mod = await importExecutionLogModule(executionLogVirtualModuleSource());
+	const calls = [];
+	for (let index = 0; index < 3; index++) {
+		calls.push(mod.logMarklessRenderSummary());
+		await new Promise((resolve) => setTimeout(resolve, 1));
+	}
+	await Promise.all(calls);
+
+	expect(logged).toHaveLength(1);
+
+	await mod.logMarklessRenderSummary();
+
+	expect(logged).toHaveLength(2);
+});
+
 test('interaction rows resolve qualified symbol ids and display them short', async () => {
 	const attributes = stubExecutionLogDom();
 	const appSymbol = `virtual:markless:symbol:${encodeURIComponent('/workspace/src/App.tsrx')}:${encodeURIComponent('symbol:0')}`;

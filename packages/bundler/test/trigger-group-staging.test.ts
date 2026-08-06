@@ -479,6 +479,307 @@ test('keeps every arm record and its lazy symbols when a staged group touches a 
 	]);
 });
 
+// live-feed's shape: a prerendered page whose only async boundary is filled at
+// load by the settle boot, a button outside the arm writing a cell the settled
+// arm reads through a child component edge, and a row click inside the arm.
+function settledArmPageInput(withWeightButton: boolean) {
+	return {
+		filename: '/workspace/src/AsyncFeed.tsrx',
+		state: {
+			version: 1 as const,
+			cells: [
+				{ graphNodeId: 'state:seed', name: 'seed', valueKind: 'scalar', value: 1 },
+				{ graphNodeId: 'state:weight', name: 'weight', valueKind: 'scalar', value: 2 },
+			],
+			computed: [
+				{
+					graphNodeId: 'computed:feed',
+					name: 'feed',
+					valueKind: 'async',
+					dependencies: [{ graphNodeId: 'state:seed', path: [] }],
+				},
+			],
+		},
+		view: {
+			version: 1 as const,
+			locators: [
+				{ hostNodeId: 'h:main', strategy: 'dom-order', index: 0, tagName: 'main' },
+				{ hostNodeId: 'h:weight', strategy: 'dom-order', index: 1, tagName: 'button' },
+			],
+			events: withWeightButton
+				? [{ hostNodeId: 'h:weight', eventName: 'click', symbolIds: ['symbol:weight'] }]
+				: [],
+			domUpdates: [
+				{
+					hostNodeId: 'h:main',
+					source: 'weight',
+					graphNodeId: 'state:weight',
+					path: [],
+					target: { kind: 'attribute', name: 'data-weight' },
+					symbolId: 'symbol:weight-patch',
+				},
+			],
+			behaviors: [],
+			elementHandles: [],
+			keyedRepeats: [],
+			branches: [],
+			asyncRunners: { 'computed:feed': 'symbol:runner' },
+			asyncBoundaries: [
+				{
+					id: 'async:feed',
+					startAnchor: { strategy: 'dom-order-comment', index: 0 },
+					endAnchor: { strategy: 'dom-order-comment', index: 1 },
+					asyncReads: [
+						{
+							source: 'feed',
+							graphNodeId: 'computed:feed',
+							path: [],
+							runnerSymbolId: 'symbol:runner',
+						},
+					],
+					updateSymbolId: 'symbol:settle',
+					// The served page carries the @pending arm's records only.
+					armRecords: {
+						locators: [],
+						events: [],
+						domUpdates: [],
+						behaviors: [],
+						elementHandles: [],
+						keyedRepeats: [],
+						branches: [],
+					},
+				},
+			],
+		},
+		completeView: {
+			version: 1 as const,
+			locators: [
+				{ hostNodeId: 'h:main', strategy: 'dom-order', index: 0, tagName: 'main' },
+				{ hostNodeId: 'h:weight', strategy: 'dom-order', index: 1, tagName: 'button' },
+			],
+			events: withWeightButton
+				? [{ hostNodeId: 'h:weight', eventName: 'click', symbolIds: ['symbol:weight'] }]
+				: [],
+			// The records binding the settled arm's own hosts sit HERE, at the top
+			// level, not inside the arm record sets — live-feed's real shape.
+			domUpdates: [
+				{
+					hostNodeId: 'h:main',
+					source: 'weight',
+					graphNodeId: 'state:weight',
+					path: [],
+					target: { kind: 'attribute', name: 'data-weight' },
+					symbolId: 'symbol:weight-patch',
+				},
+				{
+					hostNodeId: 'h:summary',
+					source: 'weighted',
+					graphNodeId: 'computed:weighted',
+					path: [],
+					target: { kind: 'text' },
+					symbolId: 'symbol:weighted-patch',
+				},
+			],
+			behaviors: [],
+			elementHandles: [],
+			keyedRepeats: [
+				{
+					id: 'repeat:feed',
+					parentHostNodeId: 'h:list',
+					collectionGraphNodeId: 'computed:feed',
+					collectionPath: ['updates'],
+					keyPath: ['id'],
+					itemName: 'update',
+					rowElementCount: 1,
+					rowEvents: [{ hostPath: [], eventName: 'click', symbolIds: ['symbol:row'] }],
+				},
+			],
+			branches: [],
+			asyncRunners: { 'computed:feed': 'symbol:runner' },
+			asyncBoundaries: [
+				{
+					id: 'async:feed',
+					startAnchor: { strategy: 'dom-order-comment', index: 0 },
+					endAnchor: { strategy: 'dom-order-comment', index: 1 },
+					asyncReads: [
+						{
+							source: 'feed',
+							graphNodeId: 'computed:feed',
+							path: [],
+							runnerSymbolId: 'symbol:runner',
+						},
+					],
+					updateSymbolId: 'symbol:settle',
+					armRecords: [
+						{
+							locators: [
+								{
+									hostNodeId: 'h:summary',
+									strategy: 'arm-relative',
+									index: 0,
+									tagName: 'p',
+								},
+								{
+									hostNodeId: 'h:list',
+									strategy: 'arm-relative',
+									index: 1,
+									tagName: 'ul',
+								},
+								{
+									hostNodeId: 'h:row',
+									strategy: 'arm-relative',
+									index: 2,
+									tagName: 'li',
+								},
+							],
+							events: [
+								{
+									hostNodeId: 'h:row',
+									eventName: 'click',
+									symbolIds: ['symbol:select'],
+								},
+							],
+							behaviors: [],
+							elementHandles: [],
+						},
+					],
+				},
+			],
+		},
+		triggerGroups: { passId: 'trigger-groups', groups: [] },
+		componentEdges: [
+			{
+				id: 'component-edge:summary',
+				parentComponentName: 'AsyncFeed',
+				childComponentName: 'Summary',
+				asyncBoundaryId: 'async:feed',
+				props: [
+					{
+						name: 'weight',
+						source: 'weight',
+						kind: 'graph-reference',
+						graphNodeId: 'state:weight',
+						graphBindingKind: 'state',
+						path: [],
+					},
+				],
+				children: { childCount: 0 },
+				branchScopeIds: [],
+				keyedRepeatScopeIds: [],
+			},
+		],
+		symbolResolver: {
+			passId: 'symbol-resolver',
+			dynamicImportOwner: 'generated-symbol-resolver',
+			syncPolicies: [],
+			diagnostics: [],
+			symbols: [
+				{
+					id: 'symbol:runner',
+					kind: 'async-computed-runner',
+					graphNodeId: 'computed:feed',
+					source: 'loadFeed',
+					dependencies: [{ graphNodeId: 'state:seed', path: [] }],
+				},
+				{
+					id: 'symbol:settle',
+					kind: 'async-boundary-update',
+					boundaryId: 'async:feed',
+					source: 'feed',
+				},
+				{
+					id: 'symbol:weight-init',
+					kind: 'state-initializer',
+					graphNodeId: 'state:weight',
+					name: 'weight',
+					source: 'initialWeight()',
+				},
+				{
+					id: 'symbol:weight',
+					kind: 'event-handler',
+					hostNodeId: 'h:weight',
+					eventName: 'click',
+					source: '() => weight++',
+					parameters: [],
+					order: 0,
+					writes: [
+						{
+							source: 'weight++',
+							graphNodeId: 'state:weight',
+							path: [],
+							operation: 'update',
+						},
+					],
+				},
+			],
+		},
+		boundRows: [
+			{
+				id: 'bound:summary-derive',
+				baseSymbolId: 'c0:symbol:derive',
+				componentEdgePath: ['component-edge:summary'],
+				ancestry: [],
+				captureSlots: [
+					{
+						slotId: 'weight',
+						path: [],
+						route: {
+							kind: 'graph-reference',
+							componentEdgeId: 'component-edge:summary',
+							componentEdgePath: ['component-edge:summary'],
+							graphNodeId: 'state:weight',
+							path: [],
+						},
+					},
+				],
+			},
+		],
+	} as unknown as Parameters<typeof planPrerenderTriggerGroups>[0];
+}
+
+test('a button group whose cell a settled arm reads owns that arm and its renderer', () => {
+	const groups = planPrerenderTriggerGroups(settledArmPageInput(true));
+
+	const weight = groups.find((group) => group.id === 'h:weight:click');
+	expect(weight).toBeDefined();
+	// Without the arm the click can move `data-weight` but never the derived
+	// text inside the arm, and the row click has no group to land in.
+	expect(weight?.view.asyncBoundaries.map((boundary) => boundary.id)).toEqual(['async:feed']);
+	expect(Array.isArray(weight?.view.asyncBoundaries[0]?.armRecords)).toBe(true);
+	expect(weight?.graphNodeIds).toEqual([
+		'computed:feed',
+		'computed:weighted',
+		'state:seed',
+		'state:weight',
+	]);
+	// symbol:select + symbol:row + symbol:weighted-patch: the rendered arm names
+	// them, and symbol:weight-init: rendering it reads the initial cell value.
+	expect(weight?.symbolIds).toEqual([
+		'bound:summary-derive',
+		'c0:symbol:derive',
+		'symbol:row',
+		'symbol:runner',
+		'symbol:select',
+		'symbol:settle',
+		'symbol:weight',
+		'symbol:weight-init',
+		'symbol:weight-patch',
+		'symbol:weighted-patch',
+	]);
+	// Adoption re-derives the arm through the boundary renderer the self-wake
+	// group already ships; without it the group wakes against @pending records.
+	expect(weight?.armRendererModuleId).toBe(
+		'virtual:markless:trigger-group:%2Fworkspace%2Fsrc%2FAsyncFeed.tsrx:2',
+	);
+	expect(groups.find((group) => group.id === 'self-wake')?.armRendererModuleId).toBeUndefined();
+});
+
+test('a page with no settled-arm reader leaves the self-wake group sole arm owner', () => {
+	const groups = planPrerenderTriggerGroups(settledArmPageInput(false));
+
+	expect(groups.map((group) => group.id)).toEqual(['self-wake']);
+});
+
 test('plans event-less async settlement as a complete self-wake trigger group', () => {
 	const groups = planPrerenderTriggerGroups({
 		filename: '/workspace/src/AsyncFeed.tsrx',

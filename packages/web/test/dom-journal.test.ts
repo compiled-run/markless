@@ -320,6 +320,159 @@ test('runtime DOM journal applier moves retained-anchor range contents before a 
 	expect(secondContent.parentNode).toBe(root);
 });
 
+type CensusNode = {
+	readonly name: string;
+	readonly nodeType: number;
+	readonly tagName?: string;
+	childNodes: CensusNode[];
+	parentNode: CensusNode | null;
+	insertBefore(node: CensusNode, before: CensusNode | null): CensusNode;
+	removeChild(node: CensusNode): CensusNode;
+	__marklessCensus?: CensusNode[];
+};
+
+function censusNode(name: string, nodeType: number, children: CensusNode[] = []): CensusNode {
+	const self: CensusNode = {
+		name,
+		nodeType,
+		tagName: nodeType === 1 ? name.toUpperCase() : undefined,
+		childNodes: [],
+		parentNode: null,
+		insertBefore(node, before) {
+			const current = this.childNodes.indexOf(node);
+			if (current >= 0) this.childNodes.splice(current, 1);
+			const beforeIndex = before === null ? -1 : this.childNodes.indexOf(before);
+			this.childNodes.splice(
+				beforeIndex >= 0 ? beforeIndex : this.childNodes.length,
+				0,
+				node,
+			);
+			node.parentNode = this;
+			return node;
+		},
+		removeChild(node) {
+			this.childNodes = this.childNodes.filter((child) => child !== node);
+			node.parentNode = null;
+			return node;
+		},
+	};
+	for (const child of children) self.insertBefore(child, null);
+	return self;
+}
+
+const censusElement = (name: string, children: CensusNode[] = []) => censusNode(name, 1, children);
+const censusComment = (name: string) => censusNode(name, 8);
+
+function pinCensus(root: CensusNode): void {
+	const elements: CensusNode[] = [];
+	(function visit(node: CensusNode): void {
+		if (node.nodeType === 1) elements.push(node);
+		for (const child of node.childNodes) visit(child);
+	})(root);
+	root.__marklessCensus = elements;
+}
+
+function censusNames(root: CensusNode): string[] {
+	return (root.__marklessCensus ?? []).map((node) => node.name);
+}
+
+// The live tree stops being the framework's property the moment a third party
+// mutates it, so a framework range mutation may only splice the pinned census.
+function foreignSwap(parent: CensusNode, target: CensusNode, replacement: CensusNode): void {
+	parent.insertBefore(replacement, target);
+	parent.removeChild(target);
+}
+
+test('journal range removal splices the pinned census and keeps foreign-swapped entries', () => {
+	const item = censusElement('item');
+	const widget = censusElement('widget');
+	const start = censusComment('start');
+	const end = censusComment('end');
+	const root = censusElement('root', [
+		censusElement('header'),
+		start,
+		item,
+		end,
+		widget,
+		censusElement('tail'),
+	]);
+	pinCensus(root);
+	foreignSwap(root, widget, censusElement('foreign'));
+
+	applyDomJournalEntries([{ type: 'removeRange', locator: 'range:items' }], {
+		resolveTarget: (locator) =>
+			locator === 'range:items:start' ? start : locator === 'range:items:end' ? end : undefined,
+	});
+
+	expect(censusNames(root)).toEqual(['root', 'header', 'widget', 'tail']);
+	expect(root.__marklessCensus?.[2]).toBe(widget);
+});
+
+test('journal range insertion splices fresh framework elements into the pinned census', () => {
+	const item = censusElement('item');
+	const widget = censusElement('widget');
+	const start = censusComment('start');
+	const root = censusElement('root', [
+		censusElement('header'),
+		start,
+		item,
+		censusComment('end'),
+		widget,
+		censusElement('tail'),
+	]);
+	pinCensus(root);
+	foreignSwap(root, widget, censusElement('foreign'));
+	const rowChild = censusElement('row-child');
+	const row = censusElement('row', [rowChild]);
+
+	applyDomJournalEntries([{ type: 'insertRange', locator: 'anchor:start', fragment: [row] }], {
+		resolveTarget: () => start,
+	});
+
+	expect(censusNames(root)).toEqual([
+		'root',
+		'header',
+		'row',
+		'row-child',
+		'item',
+		'widget',
+		'tail',
+	]);
+	expect(root.__marklessCensus?.[5]).toBe(widget);
+});
+
+test('journal range move reorders the pinned census without re-deriving it', () => {
+	const first = censusElement('first');
+	const second = censusElement('second');
+	const firstStart = censusComment('first-start');
+	const secondStart = censusComment('second-start');
+	const secondEnd = censusComment('second-end');
+	const widget = censusElement('widget');
+	const root = censusElement('root', [
+		firstStart,
+		first,
+		censusComment('first-end'),
+		secondStart,
+		second,
+		secondEnd,
+		widget,
+	]);
+	pinCensus(root);
+	foreignSwap(root, widget, censusElement('foreign'));
+
+	applyDomJournalEntries([{ type: 'moveRange', locator: 'item:second', before: 'item:first' }], {
+		resolveTarget: (locator) =>
+			locator === 'item:second:start'
+				? secondStart
+				: locator === 'item:second:end'
+					? secondEnd
+					: firstStart,
+	});
+
+	expect(censusNames(root)).toEqual(['root', 'second', 'first', 'widget']);
+	expect(root.__marklessCensus?.[3]).toBe(widget);
+});
+
 test('createDomUpdateEntry maps DOM update targets to concrete DOM operations', () => {
 	expect(
 		createDomUpdateEntry({

@@ -11,3 +11,9 @@ export * from './pending-timing.ts';
 export * from './render.ts';
 export * from './render-to-string.ts';
 export * from './resume.ts';
+export {
+	isSettleKernelUnsupported,
+	renderSettledArm,
+	SETTLE_KERNEL_UNSUPPORTED,
+	SettleKernelUnsupportedError,
+} from './settle-kernel.ts';

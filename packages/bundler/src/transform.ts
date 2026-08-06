@@ -2,8 +2,10 @@ import {
 	collectTsrxModuleDiagnostics,
 	compileTsrxModule,
 	emitSymbolResolverModule,
+	type BoundSymbolResolverRow,
 	type CompilerDiagnostic,
 	type CompileTsrxModuleResult,
+	type RenderDataArtifact,
 	type RuntimeDemandMapArtifact,
 	type RuntimeDemandMapRecordKind,
 } from '@markless/compiler';
@@ -22,16 +24,25 @@ import type {
 import {
 	MARKLESS_VIRTUAL_PREFIX,
 	emitResumeModule,
+	emitSettleModule,
 	emitSourceModule,
 	payloadModule,
 	prerenderWakeVirtualModuleId,
 	resumeVirtualModuleId,
 	rewriteSymbolModuleExport,
 	scopedSymbolExportName,
+	settleVirtualModuleId,
 	symbolVirtualModuleId,
+	type BoundSymbolDescriptor,
+	type BoundSymbolDescriptorMap,
+	type SourceSymbolRow,
 } from './source-module.ts';
-import { injectExecutionLogModuleHook } from './execution-log.ts';
-import { compileInlineResumerSources } from './inline-resumer.ts';
+import type { PrerenderSettleBoundMap } from '@markless/web/inline/resumer';
+import { injectExecutionLogModuleHook, normalizeExecutionLogMode } from './execution-log.ts';
+import {
+	compileInlineResumerSources,
+	compilePrerenderInlineResumerSources,
+} from './inline-resumer.ts';
 import { createCompileErrorPayload, MarklessCompileError } from './dev-error/index.ts';
 import {
 	emitPrerenderBoundaryRendererModule,
@@ -97,6 +108,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	const resolverId = `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodedFilename}`;
 	const resumeId = resumeVirtualModuleId(input.filename);
 	const prerenderWakeId = prerenderWakeVirtualModuleId(input.filename);
+	const settleId = settleVirtualModuleId(input.filename);
 	const { compiled: compiledForAllClasses, blockingDiagnostics } =
 		await compileWithBlockingDiagnostics(input, resolverId);
 	throwIfBlocked(input, blockingDiagnostics);
@@ -130,6 +142,10 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	const behaviorSymbols = compilerSymbolRows.filter((symbol) => behaviorSymbolIds.has(symbol.id));
 	const importedBoundRows = compiled.boundSymbolResolver.rows.map((row) =>
 		row.loaderSymbolId ? { ...row, baseSymbolId: row.loaderSymbolId } : row,
+	);
+	const boundSymbolDescriptors = perBoundaryBoundSymbolDescriptors(
+		compiled.renderData,
+		importedBoundRows,
 	);
 	const resolverSymbols = uniqueSymbolsById([...(input.symbols ?? []), ...symbolRows]);
 	const resolverSource = adaptImportedCaptureResolver(
@@ -182,6 +198,11 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	);
 	const prerenderClosureNeedsWake =
 		pageNeedsFullResume || (input.prerenderRecords === true && linkedChildHasBrowserTriggers);
+	const emitsPrerenderWakeVariant =
+		input.prerenderWakeVariant === true &&
+		compiled.publicRenderModule.renderDataModuleSource !== undefined &&
+		prerenderInterfacesComplete(compiled, input) &&
+		prerenderClosureNeedsWake;
 	const emitsPrerenderWakeFacade =
 		input.prerenderWakeFacade === true &&
 		input.prerenderWakeVariant === true &&
@@ -204,6 +225,33 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		symbols: manifestOwnsSymbolRoutes ? symbolManifestEntries : [],
 		runtimeDemandMap: compiled.runtimeDemandMap,
 	};
+	// The settle module and the fill plan travel together: both exist only for a
+	// prerendered page whose wake variant is emitted, so a page that never ships
+	// a plan never ships a settle module either.
+	const settlePlan = planSettleModule({
+		boundaries: compiled.renderData?.boundaries,
+		asyncRunners: compiled.protocolView.asyncRunners,
+		descriptors: boundSymbolDescriptors,
+		// Imported children's base symbols reach this page through the resolver's
+		// symbol inputs, not through this page's own rows.
+		symbols: resolverSymbols,
+	});
+	const prerenderBootVariants =
+		input.environment === 'server' ? await compilePrerenderInlineResumerSources() : undefined;
+	const prerenderBoot = prerenderBootVariants
+		? {
+				...prerenderBootVariants,
+				...(input.settleModuleUrl && settlePlan
+					? {
+							settle: {
+								moduleUrl: input.settleModuleUrl,
+								boot: prerenderBootVariants.prerenderSettle,
+								bound: settlePlan.bound,
+							},
+						}
+					: {}),
+			}
+		: undefined;
 	// Keep ordinary client render-data modules recursively linkable.
 	const linkedClientRenderData = input.environment === 'client' && !input.prerenderRecords;
 	const canonicalRenderData =
@@ -280,14 +328,12 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 						? renderDataId
 						: undefined,
 				hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
+				boundSymbolDescriptors,
 				symbols: symbolRows,
 				symbolRoutes,
 			}),
 		},
-		...(input.prerenderWakeVariant &&
-		compiled.publicRenderModule.renderDataModuleSource &&
-		prerenderInterfacesComplete(compiled, input) &&
-		prerenderClosureNeedsWake
+		...(emitsPrerenderWakeVariant
 			? [
 					{
 						id: prerenderWakeId,
@@ -308,9 +354,19 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 							installResumeSummary: true,
 							recordsOnly: true,
 							hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
+							boundSymbolDescriptors,
 							symbols: symbolRows,
 							symbolRoutes,
 						}),
+					},
+				]
+			: []),
+		...(emitsPrerenderWakeVariant && settlePlan
+			? [
+					{
+						id: settleId,
+						type: 'settle' as const,
+						source: emitSettleModule(settlePlan),
 					},
 				]
 			: []),
@@ -412,6 +468,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					headInjections: headInjections.length > 0 ? headInjections : undefined,
 					storageSeeds: storageSeeds.length > 0 ? storageSeeds : undefined,
 					inlineResumerSources,
+					prerenderBoot,
 					devResumeReexport: input.devResumeReexport === true,
 					// The container-event route serves linked children too, so the
 					// closure verdict, not the page-only one, decides its emission.
@@ -694,6 +751,7 @@ async function compileWithBlockingDiagnostics(
 		| 'symbols'
 		| 'importedModuleInterfaces'
 		| 'artifactChildMaterializations'
+		| 'executionLog'
 	>,
 	resolverId: string,
 ) {
@@ -705,6 +763,9 @@ async function compileWithBlockingDiagnostics(
 		symbols: input.symbols ?? [],
 		importedModuleInterfaces: input.importedModuleInterfaces,
 		artifactChildMaterializations: input.artifactChildMaterializations,
+		// 'never' is the consumer posture (MARKLESS_CONSUMER_BUILD); the lab
+		// default 'auto' keeps the authored-source strings for dev tooling.
+		omitAuthoredSource: normalizeExecutionLogMode(input.executionLog) === 'never',
 	});
 	return {
 		compiled,
@@ -816,4 +877,122 @@ function recordKindReplaced(
 	return runtimeDemandMap.recordKinds.some(
 		(record) => record.kind === kind && record.replaced === true,
 	);
+}
+
+/**
+ * What the settle module must import, and what the document must carry to use
+ * it. Fails closed: a boundary whose runner symbol or whose bound base symbol
+ * is not in this page's symbol rows produces no settle module at all, so the
+ * page keeps the self-wake path rather than half a settle.
+ */
+export function planSettleModule(input: {
+	readonly boundaries: RenderDataArtifact['boundaries'] | undefined;
+	readonly asyncRunners?: Readonly<Record<string, string>>;
+	readonly descriptors?: BoundSymbolDescriptorMap;
+	readonly symbols: ReadonlyArray<SourceSymbolRow>;
+}):
+	| {
+			readonly runners: ReadonlyArray<{ readonly node: string; readonly symbol: SourceSymbolRow }>;
+			readonly derives: ReadonlyArray<{ readonly id: string; readonly symbol: SourceSymbolRow }>;
+			readonly bound: PrerenderSettleBoundMap;
+	  }
+	| undefined {
+	const symbolById = new Map(input.symbols.map((symbol) => [symbol.id, symbol]));
+	const runners: Array<{ node: string; symbol: SourceSymbolRow }> = [];
+	const derives: Array<{ id: string; symbol: SourceSymbolRow }> = [];
+	const bound: PrerenderSettleBoundMap = {};
+	// No render data means no settled arms to describe, not a build failure.
+	for (const boundary of input.boundaries ?? []) {
+		const node = boundary.runnerGraphNodeId;
+		if (!node || !boundary.protocolSupported) continue;
+		const runner = symbolById.get(input.asyncRunners?.[node] ?? '');
+		if (!runner) continue;
+		const descriptors = input.descriptors?.[boundary.boundaryId] ?? [];
+		const rows = descriptors.map((descriptor) => ({
+			descriptor,
+			symbol: symbolById.get(descriptor.base),
+		}));
+		// One unresolvable derive symbol means the arm's derived hole could never
+		// be filled, so this boundary contributes nothing.
+		if (rows.some((row) => !row.symbol)) continue;
+		runners.push({ node, symbol: runner });
+		for (const row of rows) {
+			derives.push({ id: row.descriptor.id, symbol: row.symbol! });
+			bound[boundary.boundaryId] = {
+				...bound[boundary.boundaryId],
+				[row.descriptor.id]: Object.fromEntries(
+					row.descriptor.slots.map((slot) => [
+						`${slot[0]}|${slot[1].join('.')}`,
+						[slot[2], slot[3]] as const,
+					]),
+				),
+			};
+		}
+	}
+	return runners.length > 0 ? { runners, derives, bound } : undefined;
+}
+
+// A settled arm filled without the generic resolver still needs to CALL the
+// child's compiled derive symbol, which reads the legacy prop cell. Each
+// descriptor carries the base symbol the loader resolves plus the parent routes
+// those legacy reads map onto — only for the bound symbols reachable from that
+// boundary's own arm chunks, so the emission stays a boundary-sized fact.
+export function perBoundaryBoundSymbolDescriptors(
+	renderData: RenderDataArtifact,
+	boundRows: ReadonlyArray<BoundSymbolResolverRow>,
+): BoundSymbolDescriptorMap | undefined {
+	if (boundRows.length === 0) return undefined;
+	const chunks = new Map(renderData.chunks.map((chunk) => [chunk.id, chunk]));
+	const descriptors: Record<string, ReadonlyArray<BoundSymbolDescriptor>> = {};
+	for (const boundary of renderData.boundaries) {
+		const edges = componentEdgesReachableFrom(chunks, boundary.armChunkIds.try);
+		const rows = boundRows.filter((row) =>
+			row.ancestry.some((step) => edges.has(step.componentEdgeId)),
+		);
+		if (rows.length === 0) continue;
+		descriptors[boundary.boundaryId] = rows.map((row) => ({
+			id: row.id,
+			base: row.baseSymbolId,
+			slots: row.captureSlots.flatMap((slot) =>
+				slot.legacyGraphRead && slot.route.kind === 'graph-reference'
+					? [
+							[
+								slot.legacyGraphRead.graphNodeId,
+								slot.legacyGraphRead.path,
+								slot.route.graphNodeId,
+								slot.route.path,
+							] as const,
+						]
+					: [],
+			),
+		}));
+	}
+	return Object.keys(descriptors).length > 0 ? descriptors : undefined;
+}
+
+function componentEdgesReachableFrom(
+	chunks: ReadonlyMap<string, RenderDataArtifact['chunks'][number]>,
+	rootChunkId: string,
+): ReadonlySet<string> {
+	const edges = new Set<string>();
+	const pending = [rootChunkId];
+	const visited = new Set<string>();
+	while (pending.length > 0) {
+		const id = pending.pop()!;
+		if (visited.has(id)) continue;
+		visited.add(id);
+		for (const slot of chunks.get(id)?.slots ?? []) {
+			if (slot.kind === 'child-component') {
+				edges.add(slot.componentEdgeId);
+				pending.push(slot.childTemplateId);
+				if (slot.projectionChunkId) pending.push(slot.projectionChunkId);
+			} else if (slot.kind === 'repeat') {
+				pending.push(slot.rowTemplateId);
+				if (slot.emptyTemplateId) pending.push(slot.emptyTemplateId);
+			} else if (slot.kind === 'branch') {
+				pending.push(...slot.armTemplateIds);
+			}
+		}
+	}
+	return edges;
 }

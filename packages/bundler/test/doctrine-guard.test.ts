@@ -93,6 +93,8 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Compiled app metadata exposes prerender-wake URLs only from non-client output.',
 	"packages/bundler/src/source-module.ts :: input.inlineResumerSources && input.environment !== 'client'":
 		'Compiled app metadata exposes inline resumers only from non-client output.',
+	"packages/bundler/src/source-module.ts :: input.prerenderBoot && input.environment !== 'client'":
+		'Compiled app metadata exposes the prerender settle boot only from non-client output.',
 	"packages/bundler/src/source-module.ts :: input.headInjections?.length && input.environment !== 'client'":
 		'Compiled app metadata exposes document head injections only from non-client output.',
 	"packages/bundler/src/source-module.ts :: input.storageSeeds?.length && input.environment !== 'client'":
@@ -103,6 +105,8 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Compiled app metadata omits server document fields from client output.',
 	"packages/bundler/src/transform.ts :: const linkedClientRenderData = input.environment === 'client' && !input.prerenderRecords;":
 		'Build-time source emission recursively links ordinary client render-data modules while prerender records use their separately resolved shape.',
+	"packages/bundler/src/transform.ts :: input.environment === 'server' ? await compilePrerenderInlineResumerSources() : undefined;":
+		'Prerender boot scripts are compiled once for the resolved server compilation that inlines them into the document.',
 	"packages/bundler/src/transform.ts :: input.input.environment !== 'client' ||":
 		'Linked render-data boundary symbols are emitted only for the resolved client compilation that can demand them.',
 	"packages/bundler/src/vite/environment.ts :: if (environment === 'client') {":

@@ -55,6 +55,32 @@ export type InlineResumerBuildOptions = {
 	readonly syncPolicy: boolean;
 };
 
+/**
+ * Per boundary, per bound symbol: the parent route that answers each of that
+ * symbol's own legacy graph reads. The read is keyed `node|a.b` — flattened at
+ * build time so the boot looks a slot up instead of matching one, because the
+ * matcher would be load-path bytes on every settled page.
+ */
+export type PrerenderSettleBoundMap = Record<
+	string,
+	Record<string, Record<string, readonly [string, ReadonlyArray<string>]>>
+>;
+
+/**
+ * The precompiled prerender boots a page can ship, each still carrying the
+ * unresolved event-names token. `settle` is present only when the build also
+ * produced a fill plan and a settle module for this page.
+ */
+export type PrerenderBootArtifact = {
+	readonly prerender: string;
+	readonly prerenderSelfWake: string;
+	readonly settle?: {
+		readonly moduleUrl: string;
+		readonly boot: string;
+		readonly bound: PrerenderSettleBoundMap;
+	};
+};
+
 export type InlineResumerSourceVariants = {
 	readonly debug: boolean;
 	readonly executionLog: MarklessExecutionLogMode;
@@ -66,9 +92,21 @@ export type InlineResumerSourceVariants = {
 
 type InlineView = ProtocolViewPayload;
 type InlineEventRecord = InlineView['events'][number];
+/**
+ * What the settle boot hands the wake path for one boundary it already filled:
+ * the boundary id, and a reader over the SAME settled value the fill used. The
+ * wake re-derives that boundary's arm records from it, so the runtime adopts
+ * the DOM the filler produced instead of re-rendering it.
+ */
+export type MarklessSettledArmHandoff = {
+	readonly boundaryId: string;
+	readonly read: (graphNodeId: string, path?: ReadonlyArray<string>) => unknown;
+};
+
 type InlineRoot = HTMLElement & {
 	__asyncResumeRuntimeStarted?: boolean;
 	__marklessDelegatedDispatch?: boolean;
+	__marklessSettledArms?: Array<MarklessSettledArmHandoff>;
 	__marklessEventOnlyGraph?: Map<string, unknown>;
 	__marklessEventOnlyGraphInitialized?: boolean;
 };
@@ -139,6 +177,20 @@ export function createInlineResumerSelfWakeSource(resumeModuleUrl: string | unde
 	return `;(${runInlineResumerSelfWake.toString()})(${JSON.stringify(resumeModuleUrl)});`;
 }
 
+// The page's event names vary, so a precompiled boot cannot bake them in. The
+// compiled source leaves this identifier unresolved and the emitter substitutes
+// the page's names; the bundler's compile step fails closed if a minifier ever
+// folded it away. Owned here because both producers of the boot source live in
+// this module.
+export const PRERENDER_INLINE_EVENT_NAMES_TOKEN = '__MARKLESS_PRERENDER_EVENT_NAMES__';
+
+export function renderPrerenderInlineResumerSource(
+	compiled: string,
+	eventNames: ReadonlyArray<string>,
+): string {
+	return compiled.replace(PRERENDER_INLINE_EVENT_NAMES_TOKEN, JSON.stringify(eventNames));
+}
+
 // Prerendered CSR already carries its rendered DOM, while its resume records
 // stay in demand-loaded chunks. Delegate only the compiler-known event names;
 // the demanded resume module derives records and performs exact target matching.
@@ -158,6 +210,188 @@ ${options?.debug ? `const __MARKLESS_PRERENDER_DEBUG_BOOTSTRAP__=${options.debug
 ${logging ? `(${runPrerenderInlineResumerLogSummary.toString()})(${JSON.stringify(options.executionLog)});` : ''}
 ${plain}
 }`;
+}
+
+// The settle boot: emitted only for a prerendered page that ships a fill plan
+// AND a settle module. It replaces the self-wake boot — nothing on this path
+// imports the resume module, so the runtime stays unloaded until a gesture.
+export function createPrerenderSettleInlineResumerSource(
+	eventNames: ReadonlyArray<string>,
+	resumeModuleUrl: string | undefined,
+): string {
+	return `(${runPrerenderSettleBoot.toString()})(${JSON.stringify(eventNames)},${JSON.stringify(resumeModuleUrl)},u=>import(u));`;
+}
+
+type SettlePlanDocument = {
+	readonly boundaries: ReadonlyArray<{
+		readonly id: string;
+		readonly node: string;
+		readonly key?: unknown;
+		readonly version?: number;
+	}>;
+	readonly bound?: PrerenderSettleBoundMap;
+	readonly initial?: Record<string, unknown>;
+};
+
+type SettleModule = {
+	// The DOM filler, the boundary runners by graph node, and the derive symbols
+	// by bound-symbol id. Data and import targets only: the module has no logic.
+	readonly f: (input: unknown) => void;
+	readonly r: Record<string, (input: { readonly key: unknown }) => Promise<unknown>>;
+	readonly d: Record<string, (input: unknown) => unknown>;
+};
+
+function runPrerenderSettleBoot(
+	eventNames: ReadonlyArray<string>,
+	fallbackResumeModuleUrl: string | undefined,
+	loadModule: (url: string) => Promise<InlineResumeModule & SettleModule>,
+): void {
+	const currentScript = document.currentScript as HTMLScriptElement | null;
+	const root = currentScript?.closest<InlineRoot>('[data-async-container]');
+	const resumeModuleUrl =
+		currentScript?.getAttribute?.('data-markless-resume-module') ?? fallbackResumeModuleUrl;
+	if (!root || !resumeModuleUrl) return;
+	const settleModuleUrl = currentScript?.getAttribute?.('data-markless-settle-module');
+	const planScript = root.querySelector('script[type="markless/fill-plan"]');
+	const filled: Array<readonly [Node, Node]> = [];
+	let replayed = false;
+	// Resolves when this page's arms are filled (or the fallback has taken the
+	// boundary). Gestures queue behind it, so the runtime a gesture boots always
+	// sees a settled arm it can adopt.
+	let ready: Promise<unknown> = Promise.resolve();
+	// Safety net for a pre-boot gesture on a filled arm. The wake normally adopts
+	// the filled arm and matches the event directly; if it cannot (the settle
+	// kernel refuses that arm, so the runtime re-renders it instead), the event
+	// would be dropped. Re-deliver it once, on the element that took the
+	// target's place, so a click landing before the runtime is never lost.
+	const replay = (target: Element) => {
+		if (replayed) return;
+		if (
+			!filled.some(
+				(range) =>
+					!!(range[0].compareDocumentPosition(target) & 4) &&
+					!!(range[1].compareDocumentPosition(target) & 2),
+			)
+		)
+			return;
+		replayed = true;
+		const elements = root.getElementsByTagName('*');
+		const index = [].indexOf.call(elements, target);
+		const observer = new MutationObserver(() => {
+			const next = elements[index];
+			if (!next || next === target) return;
+			observer.disconnect();
+			(next as HTMLElement).click();
+		});
+		observer.observe(root, { childList: true, subtree: true });
+	};
+	const resume = (input: InlineDispatchInput | { readonly root: InlineRoot; readonly event: 0 }) =>
+		loadModule(resumeModuleUrl).then((module) => module.resumeContainerEvent(input as never));
+	for (const eventName of eventNames) {
+		root.addEventListener(
+			eventName,
+			(event) => {
+				root.__marklessDelegatedDispatch = true;
+				replay(event.target as Element);
+				// Queued, not dropped: a gesture arriving before the arm settles
+				// waits for the fill. Dispatching it first would boot a runtime whose
+				// records still describe @pending — and whichever trigger group
+				// covered the gesture would leave the boundary unowned.
+				return ready.then(() =>
+					resume({ root, event, element: event.target, eventRecord: null }),
+				);
+			},
+			true,
+		);
+	}
+	// Only the failure paths reach the runtime without a gesture: no plan, no
+	// settle module, a rejected runner, or a filler that refused to place a hole.
+	const wake = () => {
+		if (root.__marklessDelegatedDispatch) return;
+		root.__marklessDelegatedDispatch = true;
+		resume({ root, event: 0 });
+	};
+	const plan = (
+		planScript && settleModuleUrl ? JSON.parse(planScript.textContent || 'null') : null
+	) as SettlePlanDocument | null;
+	if (!plan) {
+		wake();
+		return;
+	}
+	ready = loadModule(settleModuleUrl!)
+		.then(async (settle) => {
+			const comments: Record<string, Node> = {};
+			const walker = document.createTreeWalker(root, 128);
+			for (let node = walker.nextNode(); node; node = walker.nextNode())
+				comments[(node as Comment).data] = node;
+			for (const boundary of plan.boundaries) {
+				const value = await settle.r[boundary.node]!({ key: boundary.key ?? null });
+				// A gesture already landed: its own state change (a weight bump, say)
+				// is newer than anything this fill could place, so hand the boundary
+				// to the runtime and let it render the arm from the live graph. The
+				// event-less wake is what owns a boundary — the trigger group the
+				// gesture matched does not.
+				if (root.__marklessDelegatedDispatch) return resume({ root, event: 0 });
+				const anchors = [
+					comments[`markless:async:${boundary.id}`]!,
+					comments[`/markless:async:${boundary.id}`]!,
+				] as const;
+				const read = (node: string, path: ReadonlyArray<string>) => {
+					let current: unknown = node === boundary.node ? value : plan.initial![node];
+					for (const key of path)
+						current =
+							current == null ? undefined : (current as Record<string, unknown>)[key];
+					return current;
+				};
+				const template = (kind: string) =>
+					root.querySelector(`template[m\\:${kind}="${boundary.id}"]`);
+				settle.f({
+					plan: boundary,
+					templates: {
+						arm: template('arm'),
+						row: template('row'),
+						empty: template('empty'),
+					},
+					value,
+					anchors,
+					read,
+					// The plan names a compiled derive symbol; the descriptor answers
+					// that symbol's own legacy graph reads with this page's routes.
+					// Nothing here evaluates an expression.
+					derive: (symbolId: string) => {
+						const slots = plan.bound![boundary.id]![symbolId]!;
+						return settle.d[symbolId]!({
+							graph: {
+								read: (node: string, path: ReadonlyArray<string> = []) => {
+									const slot = slots[`${node}|${path.join('.')}`];
+									if (!slot) throw new Error('MARKLESS_SETTLE_SLOT_UNKNOWN');
+									return read(slot[0], slot[1]);
+								},
+							},
+						});
+					},
+				});
+				filled.push(anchors);
+				// The wake reads the boundary's own node with an empty path to get a
+				// SNAPSHOT (that is the graph's shape for an async computed); every
+				// other read is a plain value walk.
+				(root.__marklessSettledArms ??= []).push({
+					boundaryId: boundary.id,
+					read: (node, path) =>
+						node === boundary.node && !path?.length
+							? {
+									status: 'fulfilled',
+									version: boundary.version ?? 1,
+									key: boundary.key ?? null,
+									value,
+								}
+							: read(node, path ?? []),
+				});
+			}
+		})
+		// The fallback owns the boundary from here: nothing else on this page
+		// will settle it, so this wake runs even after a gesture set the flag.
+		.catch(() => resume({ root, event: 0 }));
 }
 
 // Flagged/log builds only: the empty-delta page executes nothing at load, so

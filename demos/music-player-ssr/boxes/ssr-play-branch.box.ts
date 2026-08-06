@@ -43,7 +43,8 @@ const LOAD_APP_BYTES = 0;
 const LOAD_INSTRUMENT_BYTES = 0;
 // INTERIM 1,903 — owner-ruled 2026-08-04. T999 hard-fails unless the
 // post-T006 measured number lands at or below 1,850 and re-ratchets to measured.
-const FIRST_PLAY_APP_BYTES_MAX = 1_903;
+// 1,903 -> 1,906 (interim 2026-08-06): +3 pre-existing at branch base d04516c, proven by stash-attribution; de-minimis auto-interim per proportionality order 2026-08-04; repayment stays with the existing first-play obligation.
+const FIRST_PLAY_APP_BYTES_MAX = 1_906;
 // 2,400 -> 2,520 (owner receipt 2026-07-12): the wiring repair relocated
 // ~111 B of accounting from the app chunk into the lazy logger - app bytes
 // unchanged, never-mode byte-identical; instrument growth stays visible.
@@ -165,7 +166,7 @@ export default box(
 		// app bytes, so the mirror ceiling guards both).
 		// INTERIM 1,903 — same owner ruling 2026-08-04 as FIRST_PLAY (same chunk cost at
 		// a sibling gauge); T999 hard-fails unless post-T006 measured <= 1,860.
-		await waitForAppBytesCeiling(page, 1_903, WAIT);
+		await waitForAppBytesCeiling(page, 1_906, WAIT);
 		// Paused next-track cues the new video (playing next-track loads it);
 		// the video id change proves the composed dom updates flowed.
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'cue', WAIT);

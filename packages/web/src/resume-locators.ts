@@ -14,7 +14,11 @@ export function materializeDomLocators(
 	root: ResumeDomElement,
 	locators: ResumeViewRecord['locators'],
 ): Map<string, ResumeDomElement> {
-	const elements = walkElements(root),
+	// Taken once per container, before any authored symbol can run, and held by
+	// element reference: a foreign node swap cannot renumber a pinned census.
+	// The slot lives on the root, not a module WeakMap, so the wake chunk
+	// (fns/dom-order.ts) shares it without a chunk-regrouping import edge.
+	const elements = (root.__marklessCensus ??= walkElements([root])),
 		byHostId = new Map<string, ResumeDomElement>();
 	for (const locator of locators) {
 		const element = elements[locator.index];
@@ -109,11 +113,49 @@ export function hostIdsInsideRemovedElements(
 			}
 	return ids;
 }
-function walkElements(root: ResumeDomElement): ResumeDomElement[] {
+// Framework range mutation renumbers the shipped shape, so the pinned census is
+// spliced by exactly what the mutator moved. Re-deriving it from the live tree
+// would renumber around foreign nodes the framework does not own.
+export function spliceDomOrderCensus(
+	root: ResumeDomElement,
+	removed: Iterable<ResumeDomNode>,
+	inserted: ReadonlyArray<ResumeDomNode>,
+): void {
+	const census = root.__marklessCensus;
+	if (!census) return;
+	for (const node of removed) {
+		const at = census.indexOf(node as ResumeDomElement);
+		if (at >= 0) census.splice(at, blockEnd(census, at) - at);
+	}
+	if (inserted.length)
+		census.splice(insertionSlot(census, inserted[0]!), 0, ...walkElements(inserted));
+}
+function blockEnd(census: ResumeDomElement[], at: number): number {
+	const inside = new Set<ResumeDomNode>(walkElements([census[at]!]));
+	let end = at + 1;
+	while (end < census.length && inside.has(census[end]!)) end++;
+	return end;
+}
+function insertionSlot(census: ResumeDomElement[], first: ResumeDomNode): number {
+	const parent = (first as ResumeDomElement).parentElement;
+	if (!parent) return census.length;
+	let slot = -1;
+	for (const child of parent.childNodes ?? []) {
+		if (child === first) break;
+		const at = census.indexOf(child as ResumeDomElement);
+		if (at >= 0) slot = blockEnd(census, at);
+	}
+	if (slot >= 0) return slot;
+	const at = census.indexOf(parent);
+	return at >= 0 ? at + 1 : census.length;
+}
+function walkElements(nodes: ReadonlyArray<ResumeDomNode>): ResumeDomElement[] {
 	const elements: ResumeDomElement[] = [];
-	(function visit(node: ResumeDomNode): void {
-		if (node.nodeType === 1) elements.push(node as ResumeDomElement);
-		for (const child of node.childNodes ?? []) visit(child);
-	})(root);
+	(function visit(list: ReadonlyArray<ResumeDomNode>): void {
+		for (const node of list) {
+			if (node.nodeType === 1) elements.push(node as ResumeDomElement);
+			visit(node.childNodes ?? []);
+		}
+	})(nodes);
 	return elements;
 }

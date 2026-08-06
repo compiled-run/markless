@@ -1617,6 +1617,148 @@ test('prerender trigger groups stage graph segments without adding a second capt
 	expect(root.listeners).toEqual([]);
 });
 
+test('a later trigger group still resolves its hosts after foreign DOM replaced a tracked element', async () => {
+	const widget = element('DIV');
+	const play = element('BUTTON');
+	const preview = element('BUTTON');
+	const readout = element('OUTPUT');
+	const root = element('SECTION', [widget, play, preview, readout]);
+	type Handoff = {
+		readonly event: FakeEvent;
+		readonly syncPolicyAlreadyApplied?: boolean;
+	};
+	type Dispatch = (handoff: Handoff) => Promise<void>;
+	type RegisteredDispatch = (handoff: Handoff, fallback: Dispatch) => Promise<void>;
+	let registeredDispatch: Dispatch | undefined;
+	let activeDispatch: Dispatch = async () => {};
+	(
+		root as FakeElement & {
+			__marklessRegisterDispatch?: (dispatch: RegisteredDispatch) => void;
+		}
+	).__marklessRegisterDispatch = (next) => {
+		const fallback = activeDispatch;
+		activeDispatch = (handoff) => next(handoff, fallback);
+		registeredDispatch = activeDispatch;
+	};
+	const emptyView = {
+		version: 1 as const,
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const first = await resumePrerenderTriggerGroup({
+		groupId: 'play:click',
+		graphNodeIds: ['state:playing'],
+		root,
+		...decodedRecords(
+			createProtocolStatePayload({
+				cells: [
+					{
+						graphNodeId: 'state:playing',
+						name: 'playing',
+						valueKind: 'scalar',
+						value: false,
+					},
+				],
+			}),
+			{
+				...emptyView,
+				locators: [
+					{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+					{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'div' },
+					{ hostNodeId: 'h2', strategy: 'dom-order', index: 2, tagName: 'button' },
+				],
+				events: [{ hostNodeId: 'h2', eventName: 'click', symbolIds: ['symbol:play'] }],
+			},
+		),
+		loadSymbol:
+			async () =>
+			({ graph }) =>
+				graph.update({ graphNodeId: 'state:playing', update: (value) => !value }),
+	});
+	await registeredDispatch!({
+		event: {
+			type: 'click',
+			target: play,
+			key: '',
+			defaultPrevented: false,
+			preventDefault() {},
+		},
+	});
+	expect(first.graph.read('state:playing')).toBe(true);
+
+	// The behavior woken above hands its host to a third party, which replaces
+	// the tracked element with its own and leaves an extra node behind: every
+	// element after it shifts by one against the shipped shape.
+	root.childNodes.splice(0, 1, element('IFRAME'), element('SPAN'));
+
+	const second = await resumePrerenderTriggerGroup({
+		groupId: 'preview:click',
+		graphNodeIds: ['state:preview'],
+		root,
+		...decodedRecords(
+			createProtocolStatePayload({
+				cells: [
+					{
+						graphNodeId: 'state:preview',
+						name: 'preview',
+						valueKind: 'scalar',
+						value: 10,
+					},
+				],
+			}),
+			{
+				...emptyView,
+				locators: [
+					{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+					{ hostNodeId: 'h3', strategy: 'dom-order', index: 3, tagName: 'button' },
+					{ hostNodeId: 'h4', strategy: 'dom-order', index: 4, tagName: 'output' },
+				],
+				events: [{ hostNodeId: 'h3', eventName: 'click', symbolIds: ['symbol:preview'] }],
+				domUpdates: [
+					{
+						hostNodeId: 'h4',
+						source: 'preview',
+						graphNodeId: 'state:preview',
+						path: [],
+						target: { kind: 'text' },
+						symbolId: 'symbol:preview-text',
+					},
+				],
+			},
+		),
+		loadSymbol: async (symbolId) => {
+			if (symbolId === 'symbol:preview-text') {
+				return (context) =>
+					createDomUpdateEntry({
+						locator: context.domUpdate!.hostNodeId,
+						target: context.domUpdate!.target!,
+						value: context.value,
+					});
+			}
+			return ({ graph }) =>
+				graph.update({
+					graphNodeId: 'state:preview',
+					update: (value) => Number(value) + 1,
+				});
+		},
+	});
+
+	await registeredDispatch!({
+		event: {
+			type: 'click',
+			target: preview,
+			key: '',
+			defaultPrevented: false,
+			preventDefault() {},
+		},
+	});
+	expect(second.graph.read('state:preview')).toBe(11);
+	expect(readout.textContent).toBe('11');
+	expect(preview.textContent).toBeUndefined();
+});
+
 test('later trigger groups do not claim staged computeds owned by another symbol loader', async () => {
 	const increase = element('BUTTON');
 	const weighted = element('OUTPUT');
@@ -1949,4 +2091,152 @@ test('payload document resume settles pending async boundaries through the defau
 	expect(
 		root.childNodes.map((child) => (child as { tagName?: string }).tagName ?? '#comment'),
 	).toEqual(['#comment', insertedTag, '#comment']);
+});
+
+test('a trigger group woken after the settle boot filled an arm adopts that arm', async () => {
+	const increase = element('BUTTON');
+	const weighted = element('OUTPUT');
+	const root = element('SECTION', [increase, comment('arm-start'), weighted, comment('arm-end')]);
+	type Handoff = { readonly event: FakeEvent; readonly syncPolicyAlreadyApplied?: boolean };
+	type Dispatch = (handoff: Handoff) => Promise<void>;
+	let fallbackDispatches = 0;
+	let dispatch: Dispatch = async () => {
+		fallbackDispatches++;
+	};
+	(
+		root as FakeElement & {
+			__marklessRegisterDispatch?: (
+				next: (handoff: Handoff, fallback: Dispatch) => Promise<void>,
+			) => void;
+		}
+	).__marklessRegisterDispatch = (next) => {
+		const fallback = dispatch;
+		dispatch = (handoff) => next(handoff, fallback);
+	};
+	// What the inline settle boot leaves behind: it filled the arm's DOM from
+	// the fill plan, so the wake must re-derive that boundary's records from the
+	// same settled value instead of resuming the @pending records it was built
+	// with.
+	(
+		root as FakeElement & {
+			__marklessSettledArms?: Array<{
+				readonly boundaryId: string;
+				readonly read: (graphNodeId: string) => unknown;
+			}>;
+		}
+	).__marklessSettledArms = [
+		{
+			boundaryId: 'async:feed',
+			read: (graphNodeId) =>
+				graphNodeId === 'computed:feed'
+					? { status: 'fulfilled', version: 1, key: null, value: { updates: [1, 2, 3] } }
+					: undefined,
+		},
+	];
+
+	const armRecords = {
+		locators: [{ hostNodeId: 'h2', strategy: 'dom-order' as const, index: 0, tagName: 'output' }],
+		events: [],
+		domUpdates: [
+			{
+				hostNodeId: 'h2',
+				source: 'weightedCount',
+				graphNodeId: 'computed:weightedCount',
+				path: [],
+				target: { kind: 'text' as const, prefix: 'Weighted count ' },
+				symbolId: 'symbol:weighted-text',
+			},
+		],
+		behaviors: [],
+		elementHandles: [],
+		keyedRepeats: [],
+		branches: [],
+	};
+
+	await resumePrerenderTriggerGroup({
+		groupId: 'increase:click',
+		graphNodeIds: ['state:weight'],
+		root,
+		renderBoundaryArm: () => ({
+			html: '',
+			nodes: [],
+			armRecords,
+			computed: [
+				{
+					graphNodeId: 'computed:weightedCount',
+					name: 'weightedCount',
+					async: false,
+					deriveSymbolId: 'bound:symbol:weightedCount',
+					dependencies: [{ graphNodeId: 'state:weight', path: [] }],
+				},
+			],
+		}),
+		...decodedRecords(
+			createProtocolStatePayload({
+				cells: [
+					{ graphNodeId: 'state:weight', name: 'weight', valueKind: 'scalar', value: 2 },
+				],
+			}),
+			{
+				version: 1,
+				locators: [
+					{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+					{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'button' },
+				],
+				events: [{ hostNodeId: 'h1', eventName: 'click', symbolIds: ['symbol:increase'] }],
+				domUpdates: [],
+				behaviors: [],
+				elementHandles: [],
+				asyncBoundaries: [
+					{
+						id: 'async:feed',
+						runnerGraphNodeId: 'computed:feed',
+						initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
+						startAnchor: { strategy: 'dom-order-comment', index: 0 },
+						endAnchor: { strategy: 'dom-order-comment', index: 1 },
+						asyncReads: [],
+						armRecords: {
+							locators: [],
+							events: [],
+							domUpdates: [],
+							behaviors: [],
+							elementHandles: [],
+							keyedRepeats: [],
+							branches: [],
+						},
+					},
+				],
+			},
+		),
+		loadSymbol: async (symbolId) => {
+			if (symbolId === 'symbol:increase')
+				return ({ graph }) =>
+					graph.update({
+						graphNodeId: 'state:weight',
+						update: (value) => Number(value) + 1,
+					});
+			if (symbolId === 'bound:symbol:weightedCount')
+				return ({ graph }) => Number(graph.read('state:weight')) * 3;
+			return (context) =>
+				createDomUpdateEntry({
+					locator: context.domUpdate!.hostNodeId,
+					target: context.domUpdate!.target!,
+					value: context.value,
+				});
+		},
+	} as never);
+
+	await dispatch({
+		event: {
+			type: 'click',
+			target: increase,
+			key: '',
+			defaultPrevented: false,
+			preventDefault() {},
+		},
+	});
+	// The state change belongs to this group; the text binding it must move
+	// belongs to the arm the settle boot filled.
+	expect(weighted.textContent).toBe('Weighted count 9');
+	expect(fallbackDispatches).toBe(0);
 });

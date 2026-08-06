@@ -1,7 +1,10 @@
 import type { MarklessClientOutput, MarklessEnvironment } from './types.ts';
 import { MARKLESS_EXECUTION_LOG_MODULE_ID } from './execution-log.ts';
 import type { MarklessExecutionLogMode } from './types.ts';
-import type { InlineResumerSourceVariants } from '@markless/web/inline/resumer';
+import type {
+	InlineResumerSourceVariants,
+	PrerenderBootArtifact,
+} from '@markless/web/inline/resumer';
 import type { StorageSeedMetadata } from '@markless/serializer';
 import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
 
@@ -19,6 +22,28 @@ export type SourceSymbolRoute = {
 	readonly prefix: string;
 	readonly importSource: string;
 };
+
+/**
+ * What a settle path needs to call ONE bound symbol without the generic
+ * resolver: the base symbol the loader resolves, and the legacy prop reads the
+ * child's compiled code performs, each paired with the parent route that
+ * answers it. `slots` entries are `[readNode, readPath, routeNode, routePath]`
+ * — positional because this ships in the emitted module and every key costs
+ * document bytes.
+ */
+export type BoundSymbolDescriptor = {
+	readonly id: string;
+	readonly base: string;
+	readonly slots: ReadonlyArray<
+		readonly [string, ReadonlyArray<string>, string, ReadonlyArray<string>]
+	>;
+};
+
+export type BoundSymbolDescriptorMap = Readonly<
+	Record<string, ReadonlyArray<BoundSymbolDescriptor>>
+>;
+
+export const MARKLESS_BOUND_SYMBOLS_EXPORT = 'marklessBoundSymbols';
 
 const SYMBOL_VIRTUAL_PREFIX = `${MARKLESS_VIRTUAL_PREFIX}symbol:`;
 
@@ -57,6 +82,40 @@ export function resumeVirtualModuleId(filename: string) {
 
 export function prerenderWakeVirtualModuleId(filename: string) {
 	return `${MARKLESS_VIRTUAL_PREFIX}prerender-wake:${encodeURIComponent(filename)}`;
+}
+
+export function settleVirtualModuleId(filename: string) {
+	return `${MARKLESS_VIRTUAL_PREFIX}settle:${encodeURIComponent(filename)}`;
+}
+
+/**
+ * The settle module: import targets and data, no logic. It carries the DOM
+ * filler, each boundary's async runner keyed by graph node, and each bound
+ * symbol's compiled derive function keyed by the id the fill plan references.
+ * Rolldown resolves the real chunk urls, so nothing here is a url the document
+ * has to carry, and a page that never settles an arm never loads it.
+ */
+export function emitSettleModule(input: {
+	readonly runners: ReadonlyArray<{ readonly node: string; readonly symbol: SourceSymbolRow }>;
+	readonly derives: ReadonlyArray<{ readonly id: string; readonly symbol: SourceSymbolRow }>;
+}): string {
+	const imports = [...input.runners, ...input.derives].map((entry) => entry.symbol);
+	const seen = new Map<string, string>();
+	const lines: string[] = ["export { marklessApplySettlePlan as f } from '@markless/web/fns/settle-plan';"];
+	for (const symbol of imports) {
+		if (seen.has(symbol.id)) continue;
+		seen.set(symbol.id, symbol.exportName);
+		lines.push(`import { ${symbol.exportName} } from ${JSON.stringify(symbol.chunk)};`);
+	}
+	const entries = (rows: ReadonlyArray<{ readonly key: string; readonly symbolId: string }>) =>
+		`{${rows.map((row) => `${JSON.stringify(row.key)}: ${seen.get(row.symbolId)}`).join(',')}}`;
+	lines.push(
+		`export const r = ${entries(input.runners.map((entry) => ({ key: entry.node, symbolId: entry.symbol.id })))};`,
+	);
+	lines.push(
+		`export const d = ${entries(input.derives.map((entry) => ({ key: entry.id, symbolId: entry.symbol.id })))};`,
+	);
+	return `${lines.join('\n')}\n`;
 }
 
 export function prerenderWakeVirtualModuleSourceFile(moduleId: string): string | null {
@@ -136,6 +195,7 @@ export function emitSourceModule(input: {
 	readonly storageSeeds?: ReadonlyArray<StorageSeedMetadata>;
 	readonly executionLog?: MarklessExecutionLogMode;
 	readonly inlineResumerSources?: InlineResumerSourceVariants;
+	readonly prerenderBoot?: PrerenderBootArtifact;
 	readonly needsFullResume?: boolean;
 	readonly dev?: boolean;
 	readonly devResumeReexport?: boolean;
@@ -231,6 +291,7 @@ export function emitSourceModule(input: {
 					headInjections: input.headInjections,
 					storageSeeds: input.storageSeeds,
 					inlineResumerSources: input.inlineResumerSources,
+					prerenderBoot: input.prerenderBoot,
 					resumeModuleUrl: input.resumeModuleUrl,
 					prerenderWakeModuleUrl: input.prerenderWakeModuleUrl,
 					rootExportName: input.publicRenderRootExportName,
@@ -257,6 +318,10 @@ export function emitResumeModule(input: {
 	readonly symbolRoutes: ReadonlyArray<SourceSymbolRoute>;
 	readonly executionLog?: MarklessExecutionLogMode;
 	readonly hasBoundSymbols?: boolean;
+	// Boundary-sized bound-symbol facts for the narrow settle path. Data only:
+	// nothing in this module reads them, so a page that never fills an arm pays
+	// their document bytes and no execution.
+	readonly boundSymbolDescriptors?: BoundSymbolDescriptorMap;
 	readonly prerenderDataId?: string;
 	readonly installResumeSummary?: boolean;
 	// The wake variant serves pages whose container carries no payload
@@ -301,6 +366,9 @@ export function emitResumeModule(input: {
 		? emitQueuedResumeContainerEvent(bareResumeContainerEvent)
 		: bareResumeContainerEvent;
 	return [
+		input.boundSymbolDescriptors
+			? `export const ${MARKLESS_BOUND_SYMBOLS_EXPORT} = ${emitBoundSymbolDescriptors(input.boundSymbolDescriptors)};`
+			: null,
 		input.prerenderDataId &&
 		!stagedPrerender &&
 		resumeContainerEvent.includes('marklessPrerenderData')
@@ -342,6 +410,18 @@ export function emitResumeModule(input: {
 	]
 		.filter((line): line is string => line !== null)
 		.join('\n');
+}
+
+// Key order is the compiler's boundary order, not object-literal chance, so the
+// emitted bytes are identical across builds of the same source.
+function emitBoundSymbolDescriptors(descriptors: BoundSymbolDescriptorMap): string {
+	return JSON.stringify(
+		Object.fromEntries(
+			Object.keys(descriptors)
+				.sort()
+				.map((boundaryId) => [boundaryId, descriptors[boundaryId]]),
+		),
+	);
 }
 
 // Exported for witness/unit tests that synthesize demand modules: their
@@ -405,6 +485,7 @@ function emitCompiledAppDefault(input: {
 	readonly environment: MarklessEnvironment;
 	readonly executionLog?: MarklessExecutionLogMode;
 	readonly inlineResumerSources?: InlineResumerSourceVariants;
+	readonly prerenderBoot?: PrerenderBootArtifact;
 	readonly headInjections?: ReadonlyArray<{
 		readonly tag: string;
 		readonly attributes?: Record<string, string>;
@@ -457,6 +538,10 @@ function emitCompiledAppDefault(input: {
 		input.inlineResumerSources && input.environment !== 'client'
 			? [`\tinlineResumerSources: ${JSON.stringify(input.inlineResumerSources)},`]
 			: [];
+	const prerenderBootEntry =
+		input.prerenderBoot && input.environment !== 'client'
+			? [`\tprerenderBoot: ${JSON.stringify(input.prerenderBoot)},`]
+			: [];
 	const headInjectionEntry =
 		input.headInjections?.length && input.environment !== 'client'
 			? [`	headInjections: ${JSON.stringify(input.headInjections)},`]
@@ -480,6 +565,7 @@ function emitCompiledAppDefault(input: {
 					...resumeModuleEntry,
 					...prerenderWakeModuleEntry,
 					...inlineResumerEntry,
+					...prerenderBootEntry,
 					...modulePreloadEntry,
 					input.executionLog && input.executionLog !== 'never'
 						? `	executionLog: ${JSON.stringify(input.executionLog)},`

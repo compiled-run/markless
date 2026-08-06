@@ -76,6 +76,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 				input.semanticGraph?.moduleImports ?? [],
 				input.semanticGraph,
 				input.renderData,
+				input.omitAuthoredSource === true,
 			);
 		}),
 		diagnostics: input.captureAnalysis.diagnostics,
@@ -295,6 +296,7 @@ function emitSymbolModule(
 	moduleImports: readonly SemanticModuleImport[],
 	semanticGraph: SymbolModulesInput['semanticGraph'],
 	renderData: SymbolModulesInput['renderData'],
+	omitAuthoredSource: boolean,
 ): GeneratedSymbolModule[] {
 	if (symbol.kind === 'event-handler' || symbol.kind === 'callback-prop') {
 		return [
@@ -313,7 +315,7 @@ function emitSymbolModule(
 				symbolId: symbol.id,
 				kind: symbol.kind,
 				exportName: symbolExportName(symbol.id),
-				source: emitBehaviorModule(symbol),
+				source: emitBehaviorModule(symbol, omitAuthoredSource),
 			},
 		];
 	}
@@ -324,7 +326,7 @@ function emitSymbolModule(
 				symbolId: symbol.id,
 				kind: symbol.kind,
 				exportName: symbolExportName(symbol.id),
-				source: emitAsyncComputedRunnerModule(symbol, captureSlots),
+				source: emitAsyncComputedRunnerModule(symbol, captureSlots, omitAuthoredSource),
 			},
 		];
 	}
@@ -340,6 +342,7 @@ function emitSymbolModule(
 					moduleDeclarations,
 					moduleImports,
 					stateInitializerPropDeclarations(symbol, semanticGraph, renderData),
+					omitAuthoredSource,
 				),
 			},
 		];
@@ -351,7 +354,7 @@ function emitSymbolModule(
 				symbolId: symbol.id,
 				kind: symbol.kind,
 				exportName: symbolExportName(symbol.id),
-				source: emitSyncComputedDeriveModule(symbol, captureSlots),
+				source: emitSyncComputedDeriveModule(symbol, captureSlots, omitAuthoredSource),
 			},
 		];
 	}
@@ -1202,7 +1205,16 @@ function textDomUpdateValueSource(
 	return `${JSON.stringify(target.prefix ?? '')} + (${base} == null ? "" : String(${base})) + ${JSON.stringify(target.suffix ?? '')}`;
 }
 
-function emitBehaviorModule(symbol: Extract<PlannedSymbol, { readonly kind: 'behavior' }>): string {
+// Nothing reads this export at runtime; consumer builds drop it rather than
+// ship one authored-source string per symbol chunk.
+function authoredSourceLines(source: string, omit: boolean): string[] {
+	return omit ? [] : [`export const authoredSource = ${JSON.stringify(source)};`];
+}
+
+function emitBehaviorModule(
+	symbol: Extract<PlannedSymbol, { readonly kind: 'behavior' }>,
+	omitAuthoredSource: boolean,
+): string {
 	const exportName = symbolExportName(symbol.id);
 	const inputCount = symbol.inputSources.length;
 	const imports = symbol.moduleImport ? [emitModuleImport(symbol.moduleImport), ''] : [];
@@ -1211,7 +1223,7 @@ function emitBehaviorModule(symbol: Extract<PlannedSymbol, { readonly kind: 'beh
 
 	return [
 		...imports,
-		`export const authoredSource = ${JSON.stringify(symbol.source)};`,
+		...authoredSourceLines(symbol.source, omitAuthoredSource),
 		`export const behaviorFunctionSource = ${JSON.stringify(symbol.functionSource)};`,
 		`export const behaviorInputSources = ${JSON.stringify(symbol.inputSources)};`,
 		'',
@@ -1255,6 +1267,7 @@ function isInlineFunctionSource(source: string): boolean {
 function emitAsyncComputedRunnerModule(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'async-computed-runner' }>,
 	captureSlots: ReadonlyArray<CaptureSlot>,
+	omitAuthoredSource: boolean,
 ): string {
 	const exportName = symbolExportName(symbol.id);
 	const imports = uniqueModuleImports(symbol.moduleImports ?? []);
@@ -1266,7 +1279,7 @@ function emitAsyncComputedRunnerModule(
 	return [
 		...imports.map(emitModuleImport),
 		...(imports.length > 0 ? [''] : []),
-		`export const authoredSource = ${JSON.stringify(symbol.source)};`,
+		...authoredSourceLines(symbol.source, omitAuthoredSource),
 		'',
 		`export function ${exportName}(context) {`,
 		'	const read = context.graph?.read ? context.graph.read.bind(context.graph) : context.read;',
@@ -1283,6 +1296,7 @@ function emitStateInitializerModule(
 	moduleDeclarations: readonly string[],
 	moduleImports: readonly SemanticModuleImport[],
 	propDeclarations: readonly string[],
+	omitAuthoredSource: boolean,
 ): string {
 	const exportName = symbolExportName(symbol.id);
 	const declarations = referencedModuleDeclarations(symbol.source, moduleDeclarations);
@@ -1298,7 +1312,7 @@ function emitStateInitializerModule(
 		...(imports.length > 0 ? [''] : []),
 		...declarations,
 		...(declarations.length > 0 ? [''] : []),
-		`export const authoredSource = ${JSON.stringify(symbol.source)};`,
+		...authoredSourceLines(symbol.source, omitAuthoredSource),
 		'',
 		`export function ${exportName}(${propDeclarations.length > 0 ? 'context' : ''}) {`,
 		...propDeclarations,
@@ -1382,6 +1396,7 @@ function moduleDeclarationNames(declaration: string): string[] {
 function emitSyncComputedDeriveModule(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'sync-computed-derive' }>,
 	captureSlots: ReadonlyArray<CaptureSlot>,
+	omitAuthoredSource: boolean,
 ): string {
 	const exportName = symbolExportName(symbol.id);
 	const body = syncComputedDeriveBody(symbol, captureSlots);
@@ -1394,7 +1409,7 @@ function emitSyncComputedDeriveModule(
 	return [
 		...imports.map(emitModuleImport),
 		...(imports.length > 0 ? [''] : []),
-		`export const authoredSource = ${JSON.stringify(symbol.source)};`,
+		...authoredSourceLines(symbol.source, omitAuthoredSource),
 		'',
 		`export function ${exportName}(context) {`,
 		...indentBody(body),
