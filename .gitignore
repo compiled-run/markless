@@ -26,6 +26,7 @@ goals/
 packages/vitest-browser/.vitest-attachments/
 packages/vitest-browser/browser/__screenshots__/
 .fable-codex/
+.fable-opus/
 
 # ruler apply backups
 *.bak
