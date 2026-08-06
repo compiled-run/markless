@@ -1,5 +1,7 @@
 import { spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { compileToVolarMappings } from '@markless/typescript-plugin/volar';
 import ts from 'typescript';
@@ -14,13 +16,41 @@ const expectedFeatureData = {
 	navigation: true,
 };
 
+// language.test.ts needs the same dist/ and runs as a separate worker, while build:cjs
+// opens by deleting dist/ - so the run builds it once behind this shared lock.
+const cjsBuildLockDir = join(
+	tmpdir(),
+	`markless-tsplugin-cjs-${process.env.MARKLESS_TSPLUGIN_CJS_BUILD_RUN ?? process.ppid}`,
+);
+
 beforeAll(() => {
-	const result = spawnSync('pnpm', ['--dir', 'packages/typescript-plugin', 'run', 'build:cjs'], {
-		cwd: process.cwd(),
-		encoding: 'utf8',
-	});
-	expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
-});
+	const builtMarker = join(cjsBuildLockDir, 'built');
+	const deadline = Date.now() + 120_000;
+	while (!existsSync(builtMarker)) {
+		try {
+			mkdirSync(cjsBuildLockDir);
+		} catch {
+			if (Date.now() > deadline) {
+				throw new Error(`Timed out waiting for the shared build at ${cjsBuildLockDir}.`);
+			}
+			Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+			continue;
+		}
+		try {
+			const result = spawnSync(
+				'pnpm',
+				['--dir', 'packages/typescript-plugin', 'run', 'build:cjs'],
+				{ cwd: process.cwd(), encoding: 'utf8' },
+			);
+			expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+			writeFileSync(builtMarker, '');
+		} catch (error) {
+			// Release the lock so the waiting worker fails on the build, not on a timeout.
+			rmSync(cjsBuildLockDir, { recursive: true, force: true });
+			throw error;
+		}
+	}
+}, 180_000);
 
 test('built CommonJS Volar entry resolves through the published package subpath', () => {
 	const require = createRequire(join(process.cwd(), 'package.json'));

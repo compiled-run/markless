@@ -4,6 +4,7 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
+	rmSync,
 	symlinkSync,
 	writeFileSync,
 } from 'node:fs';
@@ -495,23 +496,47 @@ function countMarklessParseErrors(diagnostics: readonly any[]): number {
 
 let generatedCjsBuildReady = false;
 
-// Five tests need the generated CommonJS build. Running it lazily inside
-// whichever test happened to run first meant that test paid the whole build
-// cost against the default 5s timeout, and it began timing out in CI at 5346ms
-// once the ./volar entry made build:cjs two `vp pack` passes instead of one.
-// It kept passing locally only because dist/ was already warm. Hoisting it into
-// beforeAll gives the build its own generous budget and stops the cost landing
-// on an arbitrary test.
+// Five tests need the generated CommonJS build, and volar.test.ts needs it too. Building
+// it per test cost an arbitrary test its 5s timeout, so it moved into beforeAll with its
+// own budget - but the two files run as separate workers and build:cjs opens by deleting
+// dist/, so one worker kept wiping the artifacts the other was asserting on. The build
+// now happens once per run behind a lock both files share; the loser waits for it.
 beforeAll(() => {
 	ensureGeneratedCjsBuild();
 }, 180_000);
 
+const cjsBuildLockDir = join(
+	tmpdir(),
+	`markless-tsplugin-cjs-${process.env.MARKLESS_TSPLUGIN_CJS_BUILD_RUN ?? process.ppid}`,
+);
+
 function ensureGeneratedCjsBuild(): void {
 	if (generatedCjsBuildReady) return;
-	const result = spawnSync('pnpm', ['--dir', 'packages/typescript-plugin', 'run', 'build:cjs'], {
-		cwd: process.cwd(),
-		encoding: 'utf8',
-	});
-	expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+	const builtMarker = join(cjsBuildLockDir, 'built');
+	const deadline = Date.now() + 120_000;
+	while (!existsSync(builtMarker)) {
+		try {
+			mkdirSync(cjsBuildLockDir);
+		} catch {
+			if (Date.now() > deadline) {
+				throw new Error(`Timed out waiting for the shared build at ${cjsBuildLockDir}.`);
+			}
+			Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+			continue;
+		}
+		try {
+			const result = spawnSync(
+				'pnpm',
+				['--dir', 'packages/typescript-plugin', 'run', 'build:cjs'],
+				{ cwd: process.cwd(), encoding: 'utf8' },
+			);
+			expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+			writeFileSync(builtMarker, '');
+		} catch (error) {
+			// Release the lock so the waiting worker fails on the build, not on a timeout.
+			rmSync(cjsBuildLockDir, { recursive: true, force: true });
+			throw error;
+		}
+	}
 	generatedCjsBuildReady = true;
 }

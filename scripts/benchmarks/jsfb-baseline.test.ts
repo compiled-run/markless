@@ -1,6 +1,7 @@
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { describe, expect, test } from 'vitest';
@@ -68,6 +69,148 @@ function jsfbResult(
 		},
 	});
 }
+
+const repositoryRoot = process.cwd();
+const fixtureConfigPath = join(
+	repositoryRoot,
+	'demos/js-framework-benchmark/frameworks/keyed/markless/vite.config.ts',
+);
+
+type FixtureAlias = { find: RegExp; replacement: string };
+
+async function loadFixtureModuleMap() {
+	process.env.MARKLESS_REPO_ROOT = repositoryRoot;
+	return import(pathToFileURL(fixtureConfigPath).href) as Promise<{
+		marklessWorkspaceAliases: (root: string) => FixtureAlias[];
+		unmappedMarklessSpecifierGuard: {
+			name: string;
+			resolveId: (
+				this: {
+					resolve: (
+						source: string,
+						importer: string | undefined,
+						options: Record<string, unknown>,
+					) => Promise<{ external?: boolean | string; id: string } | null>;
+				},
+				source: string,
+				importer?: string,
+				options?: Record<string, unknown>,
+			) => Promise<unknown>;
+		};
+	}>;
+}
+
+// Vite picks the first alias whose find matches, then rewrites the id with it.
+function applyAliases(aliases: FixtureAlias[], specifier: string) {
+	const match = aliases.find((alias) => alias.find.test(specifier));
+	return match ? specifier.replace(match.find, match.replacement) : undefined;
+}
+
+function declaredWorkspaceExports() {
+	const packagesDir = join(repositoryRoot, 'packages');
+	const declared: { specifier: string; target: string }[] = [];
+
+	for (const entry of readdirSync(packagesDir, { withFileTypes: true })) {
+		if (!entry.isDirectory()) continue;
+		const manifestPath = join(packagesDir, entry.name, 'package.json');
+		if (!existsSync(manifestPath)) continue;
+
+		const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+			exports?: Record<string, unknown>;
+			name?: string;
+		};
+		if (!manifest.name?.startsWith('@markless/') || !manifest.exports) continue;
+
+		for (const [subpath, value] of Object.entries(manifest.exports)) {
+			if (typeof value !== 'string' || !value.startsWith('./')) continue;
+			declared.push({
+				specifier: subpath === '.' ? manifest.name : `${manifest.name}/${subpath.slice(2)}`,
+				target: resolve(packagesDir, entry.name, value),
+			});
+		}
+	}
+
+	return declared;
+}
+
+describe('js-framework-benchmark fixture module map', () => {
+	test('maps every subpath a workspace package declares in its exports map', async () => {
+		const { marklessWorkspaceAliases } = await loadFixtureModuleMap();
+		const aliases = marklessWorkspaceAliases(repositoryRoot);
+		const declared = declaredWorkspaceExports();
+
+		expect(declared.length).toBeGreaterThan(20);
+		for (const { specifier, target } of declared) {
+			if (specifier.includes('*')) continue;
+			expect({ specifier, resolved: applyAliases(aliases, specifier) }).toEqual({
+				specifier,
+				resolved: target,
+			});
+		}
+	});
+
+	test('resolves the async-boundary-arm subpath the emitted browser entry imports', async () => {
+		const { marklessWorkspaceAliases } = await loadFixtureModuleMap();
+		const aliases = marklessWorkspaceAliases(repositoryRoot);
+
+		const resolved = applyAliases(aliases, '@markless/serializer/async-boundary-arm');
+
+		expect(resolved).toBe(join(repositoryRoot, 'packages/serializer/src/async-boundary-arm.ts'));
+		expect(existsSync(resolved as string)).toBe(true);
+	});
+
+	test('expands a wildcard export instead of matching it as a prefix', async () => {
+		const { marklessWorkspaceAliases } = await loadFixtureModuleMap();
+		const aliases = marklessWorkspaceAliases(repositoryRoot);
+
+		expect(applyAliases(aliases, '@markless/web/fns/update-text')).toBe(
+			join(repositoryRoot, 'packages/web/src/fns/update-text.ts'),
+		);
+	});
+
+	test('never rewrites an undeclared subpath through a catch-all', async () => {
+		const { marklessWorkspaceAliases } = await loadFixtureModuleMap();
+		const aliases = marklessWorkspaceAliases(repositoryRoot);
+
+		for (const specifier of [
+			'@markless/serializer/not-a-declared-subpath',
+			'@markless/core/not-a-declared-subpath',
+			'@markless/runtime/not-a-declared-subpath',
+		]) {
+			expect(applyAliases(aliases, specifier)).toBeUndefined();
+		}
+	});
+
+	test('fails the build on an @markless specifier nothing resolves', async () => {
+		const { unmappedMarklessSpecifierGuard } = await loadFixtureModuleMap();
+
+		const resolvedContext = {
+			resolve: async () => ({ id: '/resolved/by/another/plugin.ts' }),
+		};
+		await expect(
+			unmappedMarklessSpecifierGuard.resolveId.call(
+				resolvedContext,
+				'@markless/web/inline/sync-policy-core',
+				'/importer.ts',
+				{},
+			),
+		).resolves.toEqual({ id: '/resolved/by/another/plugin.ts' });
+
+		const unresolvedContext = { resolve: async () => null };
+		await expect(
+			unmappedMarklessSpecifierGuard.resolveId.call(
+				unresolvedContext,
+				'@markless/serializer/not-a-declared-subpath',
+				'/importer.ts',
+				{},
+			),
+		).rejects.toThrow(/not declared in any packages\/\*\/package\.json "exports" map/);
+
+		await expect(
+			unmappedMarklessSpecifierGuard.resolveId.call(unresolvedContext, 'vite', '/importer.ts', {}),
+		).resolves.toBeNull();
+	});
+});
 
 describe('js-framework-benchmark baseline guard', () => {
 	test('reads current Markless scores from JSFB result files', async () => {

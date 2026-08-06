@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve as pathResolve } from 'node:path';
 import { defineConfig } from 'vite-plus';
@@ -222,6 +223,9 @@ export default defineConfig({
 					environment: 'node',
 					include: ['packages/*/test/**/*.test.ts', 'scripts/**/*.test.ts'],
 					exclude: ['packages/typescript-plugin/test/completion-matrix.test.ts'],
+					// One id per run: the typescript-plugin test files build the same
+					// dist/ from separate workers and lock on it to build it once.
+					env: { MARKLESS_TSPLUGIN_CJS_BUILD_RUN: randomUUID() },
 				},
 			},
 			'packages/vitest-browser/vitest.config.ts',
