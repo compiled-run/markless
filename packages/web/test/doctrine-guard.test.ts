@@ -38,6 +38,8 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Stream debug code maps compiler-recorded locators across elements and comments.',
 	'packages/web/src/render-to-stream.ts :: const w = d.createTreeWalker(d.body, 128);':
 		'The streamed-arm executor finds its compiler-emitted boundary comment anchors.',
+	'packages/web/src/resume-arm-records.ts :: if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))':
+		'CSR mount maps serialized boundary indexes to compiler-emitted comment anchors before the runtime starts.',
 	'packages/web/src/resume-arm-records.ts :: if (within && node.nodeType === 8 && isArmBranchAnchorComment(node as ResumeDomComment)) {':
 		'Arm-record adoption censuses compiler-emitted branch anchors within an explicit range.',
 	'packages/web/src/resume-async-boundaries.ts :: if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))':

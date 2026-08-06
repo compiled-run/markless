@@ -312,6 +312,12 @@ async function evaluatePrerenderDataComponent(input: {
 			values.set(initial.graphNodeId, structuredClone(initial.value.value));
 		}
 	}
+	// Authored state cells belong to the live graph once one exists: an
+	// escalated arm re-settle renders what the interaction wrote, not the
+	// compile-time initial value seeded into `values`.
+	const liveCellIds = input.graph
+		? new Set(definition.state.cells.map((cell) => cell.graphNodeId))
+		: undefined;
 	const read = (graphNodeId: string, path: ReadonlyArray<string> = []) => {
 		if (graphNodeId === definition.propCellId || graphNodeId === 'prop:props') {
 			return readPath(input.props, path);
@@ -323,7 +329,8 @@ async function evaluatePrerenderDataComponent(input: {
 		// pending group's graph. Its derived value is already known here and must
 		// render from this component's evaluation before registration publishes it
 		// to the staged graph for later refreshes.
-		if (values.has(graphNodeId)) return readPath(values.get(graphNodeId), path);
+		if (values.has(graphNodeId) && !liveCellIds?.has(graphNodeId))
+			return readPath(values.get(graphNodeId), path);
 		// A bare read of an async computed means its settled value, not the
 		// snapshot object — the same lowering the branch-update producer emits.
 		const graphPath =

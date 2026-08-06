@@ -9,6 +9,8 @@ import {
 import type { DomJournalEntry } from '@markless/runtime';
 import type { RuntimeGraph } from '@markless/runtime';
 import type { CsrRenderContainer, CsrRenderOptions, CsrRenderOutput } from './render.ts';
+import { registerServedArmEventRecords } from './resume-arm-records.ts';
+import type { ResumeAsyncBoundaryPayload, ResumeDomElement } from './resume-types.ts';
 import type { ResumeRuntime, ResumeRuntimeInput, ResumeSymbol } from './resume.ts';
 
 declare const __MARKLESS_DEV_ENABLED__: boolean;
@@ -143,6 +145,11 @@ export async function renderCsrRuntime(input: {
 			(await demandRuntime()).holdPendingSettleCommits?.(ms),
 	};
 	const delegatedTriggers = installDelegatedTriggers(output, view, dispatchQueued);
+	registerServedArmEventRecords(
+		output.root as unknown as ResumeDomElement,
+		view.asyncBoundaries as ReadonlyArray<ResumeAsyncBoundaryPayload>,
+		delegatedTriggers.registerEventRecord,
+	);
 	if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 		await registerDelegatedTriggerDebug(output, view);
 	if ((globalThis as ExecutionLogGlobal).__mxLog) await marklessLogCsrSummary();

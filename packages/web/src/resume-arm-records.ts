@@ -7,6 +7,7 @@ import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
 import type {
 	ResumeArmBranchRecord,
 	ResumeArmRecordSet,
+	ResumeAsyncBoundaryPayload,
 	ResumeDomComment,
 	ResumeDomElement,
 	ResumeDomNode,
@@ -16,6 +17,45 @@ export function boundaryArmRecordSet(value: unknown): ResumeArmRecordSet | null 
 	if (!value || Array.isArray(value)) return null;
 	const set = value as ResumeArmRecordSet;
 	return Array.isArray(set.locators) ? set : null;
+}
+
+// CSR mount registers the served arm's event records before the deferred
+// runtime starts: the delegated capture listener is already live and fails
+// closed, so a synchronous first click inside the served arm must find a record.
+export function registerServedArmEventRecords(
+	root: ResumeDomElement,
+	boundaries: ReadonlyArray<ResumeAsyncBoundaryPayload>,
+	register: (element: object, record: ResumeArmRecordSet['events'][number]) => void,
+): void {
+	let comments: ReadonlyArray<ResumeDomComment> | undefined;
+	for (const boundary of boundaries) {
+		const armRecords = boundaryArmRecordSet(boundary.armRecords);
+		if (!armRecords?.events.length) continue;
+		comments ??= pageCommentCensus(root);
+		const startAnchor = comments[boundary.startAnchor.index];
+		if (!startAnchor) continue;
+		const arm = materializeArmRecords({
+			root,
+			startAnchor,
+			endAnchor: comments[boundary.endAnchor.index],
+			armRecords,
+		});
+		for (const record of arm.events) {
+			const element = arm.elementsByHostId.get(record.hostNodeId);
+			if (element) register(element, record);
+		}
+	}
+}
+
+function pageCommentCensus(root: ResumeDomElement): ReadonlyArray<ResumeDomComment> {
+	// Arm-branch anchors index in their boundary's own census, never here.
+	const comments: ResumeDomComment[] = [];
+	(function visit(node: ResumeDomNode): void {
+		if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))
+			comments.push(node as ResumeDomComment);
+		for (const child of node.childNodes ?? []) visit(child);
+	})(root);
+	return comments;
 }
 
 type ArmMaterializeInput = {
