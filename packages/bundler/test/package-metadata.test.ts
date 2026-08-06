@@ -1,4 +1,5 @@
 import { access, readFile } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
 import { resolve } from 'pathe';
 import { describe, expect, test } from 'vitest';
 
@@ -268,45 +269,42 @@ describe('package metadata', () => {
 		expect(router.files).toEqual(['dist', 'src/vite/entries']);
 	});
 
-	test('JSFB fixture aliases Markless subpath imports before the package root', async () => {
-		const config = await readFile(
-			resolve(root, 'demos/js-framework-benchmark/frameworks/keyed/markless/vite.config.ts'),
-			'utf8',
-		);
+	test('JSFB fixture resolves Markless subpaths through generated aliases, never a package root', async () => {
+		process.env.MARKLESS_REPO_ROOT = root;
+		const config = (await import(
+			pathToFileURL(
+				resolve(
+					root,
+					'demos/js-framework-benchmark/frameworks/keyed/markless/vite.config.ts',
+				),
+			).href
+		)) as {
+			readonly default: {
+				readonly plugins: readonly unknown[];
+				readonly resolve: { readonly alias: readonly { readonly find: unknown }[] };
+			};
+			readonly marklessWorkspaceAliases: (root: string) => readonly unknown[];
+			readonly unmappedMarklessSpecifierGuard: {
+				readonly enforce?: string;
+				readonly name: string;
+			};
+		};
 
-		const preloadAlias = config.indexOf("find: '@markless/core/preload'");
-		const eventOnlyResumeAlias = config.indexOf("find: '@markless/core/web/event-only-resume'");
-		const runtimeEventOnlyResumeAlias = config.indexOf(
-			"find: '@markless/core/runtime/event-only-resume'",
-		);
-		const webRenderAlias = config.indexOf("find: '@markless/web/render'");
-		const runtimeRenderAlias = config.indexOf("find: '@markless/runtime/render'");
-		const webEventOnlyResumeAlias = config.indexOf("find: '@markless/web/event-only-resume'");
-		const runtimePackageEventOnlyResumeAlias = config.indexOf(
-			"find: '@markless/runtime/event-only-resume'",
-		);
-		const runtimeRootAlias = config.indexOf("find: '@markless/runtime'");
-		const rootAlias = config.indexOf("find: '@markless/core'");
-
-		expect(preloadAlias).toBeGreaterThanOrEqual(0);
-		expect(eventOnlyResumeAlias).toBeGreaterThanOrEqual(0);
-		expect(runtimeEventOnlyResumeAlias).toBeGreaterThanOrEqual(0);
-		expect(webRenderAlias).toBeGreaterThanOrEqual(0);
-		expect(runtimeRenderAlias).toBeGreaterThanOrEqual(0);
-		expect(webEventOnlyResumeAlias).toBeGreaterThanOrEqual(0);
-		expect(runtimePackageEventOnlyResumeAlias).toBeGreaterThanOrEqual(0);
-		expect(runtimeRenderAlias).toBeLessThan(runtimeRootAlias);
-		expect(webEventOnlyResumeAlias).toBeLessThan(runtimeRootAlias);
-		expect(runtimePackageEventOnlyResumeAlias).toBeLessThan(runtimeRootAlias);
-		expect(preloadAlias).toBeLessThan(rootAlias);
-		expect(eventOnlyResumeAlias).toBeLessThan(rootAlias);
-		expect(runtimeEventOnlyResumeAlias).toBeLessThan(rootAlias);
-		expect(config).toContain('packages/web/src/render.ts');
-		expect(config).toContain('packages/runtime/src/render.ts');
-		expect(config).toContain('packages/core/src/preload.ts');
-		expect(config).toContain('packages/core/src/web/event-only-resume.ts');
-		expect(config).toContain('packages/core/src/runtime/event-only-resume.ts');
-		expect(config).toContain('packages/web/src/event-only-resume.ts');
-		expect(config).toContain('packages/runtime/src/event-only-resume.ts');
+		// scripts/benchmarks/jsfb-baseline.test.ts owns what the generator emits
+		// for a given exports map. Only the shipped config can show that the
+		// generator and its fail-closed guard are the ones actually wired in, and
+		// that every find is an anchored RegExp: a bare string find matches as a
+		// PREFIX, which is how `@markless/serializer` used to swallow
+		// `@markless/serializer/async-boundary-arm` onto index.ts + '/<subpath>'.
+		const aliases = config.default.resolve.alias;
+		expect(aliases).toEqual(config.marklessWorkspaceAliases(root));
+		expect(aliases.length).toBeGreaterThan(20);
+		for (const alias of aliases) {
+			expect(alias.find).toBeInstanceOf(RegExp);
+			expect((alias.find as RegExp).source.startsWith('^')).toBe(true);
+			expect((alias.find as RegExp).source.endsWith('$')).toBe(true);
+		}
+		expect(config.default.plugins).toContain(config.unmappedMarklessSpecifierGuard);
+		expect(config.unmappedMarklessSpecifierGuard.enforce).toBe('post');
 	});
 });

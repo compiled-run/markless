@@ -1,6 +1,10 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { createExecutionSizesAsset } from '../src/build/execution-sizes.ts';
 import {
+	UNSHIPPED_HOOK_REASON,
+	createExecutionSizesAsset,
+} from '../src/build/execution-sizes.ts';
+import {
+	EXECUTION_LOG_DISPATCH_MODULE_IDS,
 	MARKLESS_EXECUTION_LOG_MODULE_ID,
 	executionLogVirtualModuleSource,
 	injectExecutionLogModuleHook,
@@ -12,6 +16,7 @@ import { symbolVirtualModuleId } from '../src/source-module.ts';
 type ExecutionLogGlobal = typeof globalThis & {
 	__mxLog?: Set<string>;
 	__mxLogInteraction?: (event: unknown) => void;
+	__marklessExecutionLedger?: unknown;
 };
 
 afterEach(() => {
@@ -19,6 +24,7 @@ afterEach(() => {
 	vi.restoreAllMocks();
 	delete (globalThis as ExecutionLogGlobal).__mxLog;
 	delete (globalThis as ExecutionLogGlobal).__mxLogInteraction;
+	delete (globalThis as ExecutionLogGlobal).__marklessExecutionLedger;
 });
 
 test('execution log hooks strip completely when disabled', () => {
@@ -311,7 +317,7 @@ function stubExecutionLogDom(routeFile?: string) {
 }
 
 test('rendered summary sizes every executed id the module hook can inject', async () => {
-	stubExecutionLogDom();
+	const attributes = stubExecutionLogDom();
 	(globalThis as ExecutionLogGlobal).__mxLog = new Set();
 	const logged: string[] = [];
 	vi.spyOn(console, 'log').mockImplementation((line: unknown) => logged.push(String(line)));
@@ -327,9 +333,13 @@ test('rendered summary sizes every executed id the module hook can inject', asyn
 		MARKLESS_EXECUTION_LOG_MODULE_ID,
 	]);
 	expect(logged).toHaveLength(1);
-	expect(logged[0]).toMatch(
-		/^markless: rendered — 0 app modules executed \(0\.0 KB app\) · 1 instrument module executed \(\d+\.\d KB est\. source\)$/,
-	);
+	// The instrument keeps its own category and stays out of the headline, so
+	// the only proof its id joined the map is a non-zero instrument mirror and
+	// an absent unmapped list — a hole would show up as `unmapped`, not as 0.0.
+	expect(logged[0]).toBe('markless: 0.0 KB executed at load · total 0.0 KB');
+	expect(Number(attributes.get('data-markless-log-instrument-bytes'))).toBeGreaterThan(0);
+	expect(attributes.has('data-markless-log-incomplete')).toBe(false);
+	expect(attributes.get('data-markless-log-unit')).toBe('estimated-source-bytes');
 });
 
 test('render summary prints one line per turn no matter how many modules call in', async () => {
@@ -357,7 +367,7 @@ test('render summary prints one line per turn no matter how many modules call in
 	expect(logged).toHaveLength(2);
 	// The turn's last caller is the one printed, so the line carries the
 	// cumulative accounting rather than a stale snapshot.
-	expect(logged[1]).toContain('1 app module executed (1.0 KB est. source app)');
+	expect(logged[1]).toBe('markless: 1.0 KB executed at load · total 1.0 KB');
 	expect(attributes.get('data-markless-log-summary')).toBe(logged[1]);
 	expect(attributes.get('data-markless-log-app-bytes')).toBe('1024');
 });
@@ -412,9 +422,12 @@ test('interaction rows resolve qualified symbol ids and display them short', asy
 
 	expect(headers).toHaveLength(1);
 	// Woken id is the qualified id; warm id is the payload's local "symbol:0".
-	// Both must join the same size entry (counted once) instead of 0.0 KB.
-	expect(headers[0]).toContain('woke 1 modules');
-	expect(headers[0]).toMatch(/· 1\.0 KB est\. source app · 0\.0 KB instrument$/);
+	// Both must join the same size entry (counted once) instead of 0.0 KB, and
+	// the ledger charges that entry to this click exactly once.
+	expect(headers[0]).toBe(
+		'markless: 0.0 KB executed at load · this click +1.0 KB · total 1.0 KB',
+	);
+	expect(rows[0]).toBe('click [button] · woke 1 modules · ran warm 1 modules');
 	expect(
 		rows.some((row) => row.startsWith('woke symbol:0 (App.tsrx) (1.0 KB est. source)')),
 	).toBe(true);
@@ -456,16 +469,27 @@ test('pull attribution resolves both first-call lazy and direct installed-hook p
 	vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
 	vi.spyOn(console, 'log').mockImplementation(() => {});
 
+	// Raw bytes, and the dispatch module is framework rather than app: the click
+	// costs 182 of the page's own code plus 1646 of framework.
+	const expectSplit = () => {
+		expect(attributes.get('data-markless-log-app-bytes')).toBe('182');
+		expect(attributes.get('data-markless-log-framework-bytes')).toBe('1646');
+		expect(attributes.get('data-markless-log-turn-bytes')).toBe('1828');
+	};
+
 	(globalThis as ExecutionLogGlobal).__mxLog = new Set();
 	let mod = await importExecutionLogModule(loggerSource);
 	await mod.logMarklessInteraction(event);
-	expect(attributes.get('data-markless-log-app-bytes')).toBe('1830');
+	expectSplit();
 
+	// A fresh page: the ledger is cumulative and charges each id once, so the
+	// second path only re-proves the join if it starts from an empty ledger.
+	delete (globalThis as ExecutionLogGlobal).__marklessExecutionLedger;
 	(globalThis as ExecutionLogGlobal).__mxLog = new Set();
 	mod = await importExecutionLogModule(loggerSource);
 	await mod.installMarklessExecutionLog({ printResumeSummary: false });
 	await (globalThis as ExecutionLogGlobal).__mxLogInteraction!(event);
-	expect(attributes.get('data-markless-log-app-bytes')).toBe('1830');
+	expectSplit();
 });
 
 test('embedded attribution selects the child-owned symbol without fetching or guessing', async () => {
@@ -539,8 +563,11 @@ export default function ScorePad() @{
 	});
 
 	expect(fetch).not.toHaveBeenCalled();
-	expect(headers[0]).toContain('· 4.0 KB est. source app');
-	expect(headers[0]).not.toContain('bytes unknown');
+	expect(headers[0]).toBe(
+		'markless: 0.0 KB executed at load · this click +4.0 KB · total 4.0 KB',
+	);
+	expect(headers[0]).not.toContain('unmapped');
+	expect(attributes.get('data-markless-log-unit')).toBe('estimated-source-bytes');
 	expect(rows).toContainEqual(
 		expect.stringContaining('ran warm symbol:0 (ScorePad.tsrx) (4.0 KB est. source)'),
 	);
@@ -577,13 +604,14 @@ test('bound symbol attribution charges the base module once and preserves the ob
 		view: { behaviors: [{ hostNodeId: 'c1:h4' }] },
 	});
 
-	expect(headers[0]).toContain('woke 1 modules');
-	expect(headers[0]).toContain('ran warm 1 modules');
-	expect(headers[0]).toContain('· 4.0 KB est. source app');
+	// The base module is charged once even though the woken id and the warm
+	// bound id both resolve to it.
+	expect(headers[0]).toBe(
+		'markless: 0.0 KB executed at load · this click +4.0 KB · total 4.0 KB',
+	);
+	expect(rows[0]).toBe('click [button.score] · woke 1 modules · ran warm 1 modules');
 	expect(rows).toContainEqual(
-		expect.stringContaining(
-			`ran warm ${boundSymbolId} (ScorePad.tsrx) (4.0 KB est. source)`,
-		),
+		expect.stringContaining(`ran warm ${boundSymbolId} (ScorePad.tsrx) (4.0 KB est. source)`),
 	);
 	expect(attributes.get('data-markless-log-app-bytes')).toBe('4096');
 });
@@ -592,37 +620,44 @@ test.each([
 	['missing route', 'routes/missing.tsrx', 'c1:symbol:0', 'c1:h4'],
 	['unknown scope', 'routes/arena.tsrx', 'c9:symbol:0', 'c9:h4'],
 	['ambiguous local symbol', 'routes/arena.tsrx', 'symbol:0', 'h4'],
-])('embedded attribution keeps %s bytes unknown', async (_, routeFile, symbolId, hostNodeId) => {
-	const attributes = stubExecutionLogDom(routeFile);
-	const parentSource = '/workspace/routes/Arena.tsrx';
-	const childSource = '/workspace/widgets/ScorePad.tsrx';
-	(globalThis as ExecutionLogGlobal).__mxLog = new Set();
-	const headers: string[] = [];
-	vi.spyOn(console, 'groupCollapsed').mockImplementation((line: unknown) =>
-		headers.push(String(line)),
-	);
-	vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
-	vi.spyOn(console, 'log').mockImplementation(() => {});
-	const mod = await importExecutionLogModule(
-		executionLogVirtualModuleSource({
-			moduleSizes: new Map([
-				[symbolVirtualModuleId(parentSource, 'symbol:0'), 1024],
-				[symbolVirtualModuleId(childSource, 'symbol:0'), 4096],
-			]),
-			attribution: {
-				'routes/arena.tsrx': { 'c1:': encodeURIComponent(childSource) },
-			},
-		}),
-	);
-	await mod.logMarklessInteraction({
-		eventName: 'click',
-		eventRecord: { hostNodeId, symbolIds: [symbolId] },
-		before: new Set<string>([MARKLESS_EXECUTION_LOG_MODULE_ID]),
-	});
+])(
+	'embedded attribution excludes %s from the totals',
+	async (_, routeFile, symbolId, hostNodeId) => {
+		const attributes = stubExecutionLogDom(routeFile);
+		const parentSource = '/workspace/routes/Arena.tsrx';
+		const childSource = '/workspace/widgets/ScorePad.tsrx';
+		(globalThis as ExecutionLogGlobal).__mxLog = new Set();
+		const headers: string[] = [];
+		vi.spyOn(console, 'groupCollapsed').mockImplementation((line: unknown) =>
+			headers.push(String(line)),
+		);
+		vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+		vi.spyOn(console, 'log').mockImplementation(() => {});
+		const mod = await importExecutionLogModule(
+			executionLogVirtualModuleSource({
+				moduleSizes: new Map([
+					[symbolVirtualModuleId(parentSource, 'symbol:0'), 1024],
+					[symbolVirtualModuleId(childSource, 'symbol:0'), 4096],
+				]),
+				attribution: {
+					'routes/arena.tsrx': { 'c1:': encodeURIComponent(childSource) },
+				},
+			}),
+		);
+		await mod.logMarklessInteraction({
+			eventName: 'click',
+			eventRecord: { hostNodeId, symbolIds: [symbolId] },
+			before: new Set<string>([MARKLESS_EXECUTION_LOG_MODULE_ID]),
+		});
 
-	expect(headers[0]).toContain('bytes unknown; 1 unmapped');
-	expect(attributes.has('data-markless-log-app-bytes')).toBe(false);
-});
+		// An id the map cannot back is named and excluded, never folded into a
+		// number the ledger cannot defend.
+		expect(headers[0]).toContain('· 1 unmapped (excluded)');
+		expect(attributes.get('data-markless-log-incomplete')).toBe('1');
+		expect(attributes.get('data-markless-log-app-bytes')).toBe('0');
+		expect(attributes.get('data-markless-log-turn-bytes')).toBe('0');
+	},
+);
 
 test('generated logger inherits unprefixed symbol scope from the event host', async () => {
 	const attributes = stubExecutionLogDom('pages/player.tsrx');
@@ -674,7 +709,10 @@ test('generated logger inherits unprefixed symbol scope from the event host', as
 	expect(run('c2:h9', 'c7:symbol:4')).toBe('104');
 	expect(run('h1', 'symbol:1')).toBe('101');
 	expect(run('c1:c0:h2', 'symbol:5')).toBe('105');
-	expect(run('c9:h2', 'symbol:3')).toBeUndefined();
+	// A scope the attribution table does not name stays unjoined: the turn
+	// charges nothing and the id is listed as unmapped rather than guessed.
+	expect(run('c9:h2', 'symbol:3')).toBe('0');
+	expect(attributes.get('data-markless-log-incomplete')).toBe('1');
 });
 
 test('interaction accounting stays bounded by each caller snapshot', async () => {
@@ -709,10 +747,15 @@ test('interaction accounting stays bounded by each caller snapshot', async () =>
 	});
 	await Promise.all([first, second]);
 
-	expect(headers[0]).toContain('[first]');
-	expect(headers[0]).toContain('· 0.1 KB est. source app');
-	expect(headers[1]).toContain('[second]');
-	expect(headers[1]).toContain('· 0.3 KB est. source app');
+	// Each caller's own snapshot bounds its turn: the first click charges only
+	// app:first, the second only app:second — never the other's modules.
+	expect(headers[0]).toBe(
+		'markless: 0.0 KB executed at load · this click +0.1 KB · total 0.1 KB',
+	);
+	expect(headers[1]).toBe(
+		'markless: 0.0 KB executed at load · this click +0.2 KB · total 0.3 KB',
+	);
+	expect(attributes.get('data-markless-log-turn-label')).toBe('click [second]');
 	expect(attributes.get('data-markless-log-interactions')).toBe('2');
 });
 
@@ -770,9 +813,13 @@ test('generated logger accounts an instrument-only interaction', async () => {
 		before: new Set<string>(),
 	});
 
-	expect(headers[0]).toMatch(/· 0\.0 KB app · 0\.5 KB instrument$/);
+	// The instrument's raw bytes are charged and mirrored, but never enter the
+	// headline: the sentence is what the page cost, not what dev tooling cost.
+	expect(headers[0]).toBe(
+		'markless: 0.0 KB executed at load · this click +0.0 KB · total 0.0 KB (gzip 0.5 KB)',
+	);
 	expect(attributes.get('data-markless-log-app-bytes')).toBe('0');
-	expect(attributes.get('data-markless-log-instrument-bytes')).toBe('512');
+	expect(attributes.get('data-markless-log-instrument-bytes')).toBe('2048');
 });
 
 test('generated logger partitions mixed app and instrument interaction accounting', async () => {
@@ -804,9 +851,11 @@ test('generated logger partitions mixed app and instrument interaction accountin
 		before: new Set<string>(),
 	});
 
-	expect(headers[0]).toMatch(/· 1\.0 KB app · 0\.5 KB instrument$/);
-	expect(attributes.get('data-markless-log-app-bytes')).toBe('1024');
-	expect(attributes.get('data-markless-log-instrument-bytes')).toBe('512');
+	expect(headers[0]).toBe(
+		'markless: 0.0 KB executed at load · this click +4.0 KB · total 4.0 KB (gzip 1.5 KB)',
+	);
+	expect(attributes.get('data-markless-log-app-bytes')).toBe('4096');
+	expect(attributes.get('data-markless-log-instrument-bytes')).toBe('2048');
 });
 
 test('generated logger formats specialized interaction snapshots in the lazy bridge', async () => {
@@ -825,7 +874,8 @@ test('generated logger formats specialized interaction snapshots in the lazy bri
 		new Set<string>(),
 	);
 
-	expect(attributes.get('data-markless-log-last')).toContain('keydown [input#field]');
+	expect(attributes.get('data-markless-log-turn-label')).toBe('keydown [input#field]');
+	expect(attributes.get('data-markless-log-last')).toContain('this keydown +');
 });
 
 test('generated logger treats old unmarked object size maps as app entries', async () => {
@@ -849,15 +899,20 @@ test('generated logger treats old unmarked object size maps as app entries', asy
 		before: new Set<string>([MARKLESS_EXECUTION_LOG_MODULE_ID]),
 	});
 
-	expect(headers[0]).toMatch(/· 0\.8 KB app · 0\.0 KB instrument$/);
-	expect(attributes.get('data-markless-log-app-bytes')).toBe('768');
+	expect(headers[0]).toBe(
+		'markless: 0.0 KB executed at load · this click +3.0 KB · total 3.0 KB (gzip 0.8 KB)',
+	);
+	expect(attributes.get('data-markless-log-app-bytes')).toBe('3072');
 	expect(attributes.get('data-markless-log-instrument-bytes')).toBe('0');
 });
 
-test('generated logger uses emitted gzip bytes for both accounting partitions', async () => {
+test('emitted raw bytes are the headline and gzip rides along in parentheses', async () => {
 	const attributes = stubExecutionLogDom();
 	(globalThis as ExecutionLogGlobal).__mxLog = new Set(['app:emitted']);
-	vi.spyOn(console, 'groupCollapsed').mockImplementation(() => {});
+	const headers: string[] = [];
+	vi.spyOn(console, 'groupCollapsed').mockImplementation((line: unknown) =>
+		headers.push(String(line)),
+	);
 	vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
 	vi.spyOn(console, 'log').mockImplementation(() => {});
 
@@ -880,8 +935,14 @@ test('generated logger uses emitted gzip bytes for both accounting partitions', 
 		before: new Set<string>(),
 	});
 
-	expect(attributes.get('data-markless-log-app-bytes')).toBe('900');
-	expect(attributes.get('data-markless-log-instrument-bytes')).toBe('700');
+	// Raw is what a browser actually parses and runs, so it owns the sentence
+	// and the mirrors; gzip is the payload story, kept as a parenthetical.
+	expect(headers[0]).toBe(
+		'markless: 0.0 KB executed at load · this click +8.8 KB · total 8.8 KB (gzip 1.6 KB)',
+	);
+	expect(attributes.get('data-markless-log-app-bytes')).toBe('9000');
+	expect(attributes.get('data-markless-log-instrument-bytes')).toBe('7000');
+	expect(attributes.get('data-markless-log-unit')).toBe('chunk-raw-bytes');
 });
 
 test('no-match line has exact zero categories and integer mirrors', async () => {
@@ -897,11 +958,13 @@ test('no-match line has exact zero categories and integer mirrors', async () => 
 	});
 
 	expect(lines).toEqual([
-		'markless: click [button.play] — no event record matched · 0.0 KB app · 0.0 KB instrument',
+		'markless: 0.0 KB executed at load · this click +0.0 KB · total 0.0 KB · no event record matched [button.play]',
 	]);
 	expect(attributes.get('data-markless-log-last')).toBe(lines[0]);
 	expect(attributes.get('data-markless-log-app-bytes')).toBe('0');
+	expect(attributes.get('data-markless-log-framework-bytes')).toBe('0');
 	expect(attributes.get('data-markless-log-instrument-bytes')).toBe('0');
+	expect(attributes.has('data-markless-log-incomplete')).toBe(false);
 });
 
 test('ambiguous local symbol ids refuse to guess a size instead of joining wrong', async () => {
@@ -935,6 +998,408 @@ test('ambiguous local symbol ids refuse to guess a size instead of joining wrong
 	});
 
 	expect(rows.some((row) => row.startsWith('ran warm symbol:0 (bytes unknown)'))).toBe(true);
-	expect(attributes.has('data-markless-log-app-bytes')).toBe(false);
-	expect(attributes.has('data-markless-log-instrument-bytes')).toBe(false);
+	// Two sources own a `symbol:0`; guessing either would print a number the
+	// ledger cannot back, so the id is excluded and named instead.
+	expect(attributes.get('data-markless-log-app-bytes')).toBe('0');
+	expect(attributes.get('data-markless-log-turn-bytes')).toBe('0');
+	expect(attributes.get('data-markless-log-incomplete')).toBe('1');
+	// The only id this turn could back is the instrument's own module.
+	expect(attributes.get('data-markless-log-turn-modules')).toBe(MARKLESS_EXECUTION_LOG_MODULE_ID);
+});
+
+// --- Slice 1: complete, fail-closed size map -------------------------------
+
+const APP_SYMBOL_ID = 'virtual:markless:symbol:%2Fworkspace%2Fsrc%2FApp.tsrx:play';
+
+function sizeChunk(fileName: string, moduleIds: readonly string[], code = 'export const a = 1;') {
+	return {
+		type: 'chunk' as const,
+		fileName,
+		name: fileName.replace(/^build\//, '').replace(/\.js$/, ''),
+		code,
+		exports: [],
+		imports: [],
+		dynamicImports: [],
+		moduleIds: [...moduleIds],
+		facadeModuleId: null,
+	};
+}
+
+function sizeMetadata(symbol: { fileName?: string } = {}) {
+	return {
+		version: 1 as const,
+		modules: [
+			{
+				source: '/workspace/src/App.tsrx',
+				payload: { virtualModuleId: 'virtual:markless:payload' },
+				resolver: { virtualModuleId: 'virtual:markless:resolver' },
+				symbols: [
+					{
+						symbolId: 'play',
+						kind: 'event' as const,
+						exportName: 'play',
+						virtualModuleId: APP_SYMBOL_ID,
+						...symbol,
+					},
+				],
+			},
+		],
+		bundles: {},
+	};
+}
+
+const stripBuild = (fileName: string) => fileName.replace(/^build\//, '');
+
+test('execution log module keeps no second copy of the size-asset builder', async () => {
+	const module = await import('../src/execution-log.ts');
+
+	expect(Object.keys(module)).not.toContain('createExecutionSizesAsset');
+	expect(Object.keys(module)).not.toContain('MARKLESS_EXECUTION_SIZES');
+});
+
+test('execution sizes fail the build when a shipped symbol id joins no chunk', async () => {
+	await expect(
+		createExecutionSizesAsset(
+			{
+				'build/chunk-app.js': sizeChunk('build/chunk-app.js', [
+					'/workspace/packages/web/src/resume-events.ts',
+				]),
+			},
+			sizeMetadata({ fileName: 'chunk-vanished.js' }),
+			stripBuild,
+			undefined,
+			{ executionLogActive: true },
+		),
+	).rejects.toThrow(APP_SYMBOL_ID);
+});
+
+test('execution sizes source a symbol entry from the chunk that absorbed it', async () => {
+	const asset = await createExecutionSizesAsset(
+		{
+			'build/chunk-app.js': sizeChunk('build/chunk-app.js', [`\0${APP_SYMBOL_ID}`]),
+		},
+		sizeMetadata(),
+		stripBuild,
+		undefined,
+		{ executionLogActive: true },
+	);
+	const sizes = JSON.parse(String(asset.source)) as Record<string, { chunk: string }>;
+
+	expect(sizes[APP_SYMBOL_ID]?.chunk).toBe('chunk-app.js');
+});
+
+test('execution sizes resolve a required id from any workspace package chunk', async () => {
+	const asset = await createExecutionSizesAsset(
+		{
+			'build/chunk-router.js': sizeChunk('build/chunk-router.js', [
+				'/workspace/packages/router/src/preload.ts',
+			]),
+		},
+		sizeMetadata({ fileName: 'chunk-router.js' }),
+		stripBuild,
+		undefined,
+		{
+			executionLogActive: true,
+			hookedIds: new Map([['router:preload', '/workspace/packages/router/src/preload.ts']]),
+		},
+	);
+	const sizes = JSON.parse(String(asset.source)) as Record<string, { chunk: string }>;
+
+	expect(sizes['router:preload']?.chunk).toBe('chunk-router.js');
+});
+
+// Hooks are injected in `transform`, which runs before chunk assignment exists,
+// so the injection site cannot refuse to hook a module that will not ship. The
+// map therefore carries the exemption explicitly instead of dropping the id.
+test('execution sizes name a hooked id that no client chunk carries, with its reason', async () => {
+	const asset = await createExecutionSizesAsset(
+		{ 'build/chunk-app.js': sizeChunk('build/chunk-app.js', [`\0${APP_SYMBOL_ID}`]) },
+		sizeMetadata(),
+		stripBuild,
+		undefined,
+		{
+			executionLogActive: true,
+			hookedIds: new Map([
+				['web:never-bundled', '/workspace/packages/web/src/never-bundled.ts'],
+			]),
+		},
+	);
+	const payload = JSON.parse(String(asset.source)) as {
+		unshipped?: Record<string, string>;
+	};
+
+	expect(payload.unshipped).toEqual({ 'web:never-bundled': UNSHIPPED_HOOK_REASON });
+	expect(UNSHIPPED_HOOK_REASON).toContain('can never execute in a browser');
+});
+
+test('execution sizes fail the build when a hooked module ships but its log id joins nothing', async () => {
+	await expect(
+		createExecutionSizesAsset(
+			{
+				'build/chunk-app.js': sizeChunk('build/chunk-app.js', [
+					'/workspace/packages/mystery/src/thing.ts',
+				]),
+			},
+			sizeMetadata(),
+			stripBuild,
+			undefined,
+			{
+				executionLogActive: true,
+				// The bundle carries the hooked module, but this build's log-id
+				// derivation names it something the map cannot join: a real hole.
+				hookedIds: new Map([
+					['unjoinable:thing', '/workspace/packages/mystery/src/thing.ts'],
+				]),
+			},
+		),
+	).rejects.toThrow('unjoinable:thing');
+});
+
+test('execution sizes stay unenforced when the execution log is off', async () => {
+	const asset = await createExecutionSizesAsset(
+		{
+			'build/chunk-app.js': sizeChunk('build/chunk-app.js', [
+				'/workspace/packages/web/src/resume-events.ts',
+			]),
+		},
+		sizeMetadata({ fileName: 'chunk-vanished.js' }),
+		stripBuild,
+	);
+
+	// The chunk answers to its own emitted specifier as well as to the module ids
+	// it carries; what "unenforced" means is that the vanished symbol is absent.
+	expect(Object.keys(JSON.parse(String(asset.source)))).toEqual([
+		'./chunk-app.js',
+		'web:resume-events',
+	]);
+});
+
+test('every dispatchModuleId literal packages/web can emit is declared to the bundler', async () => {
+	const { readFileSync, readdirSync } = await import('node:fs');
+	const { resolve } = await import('pathe');
+	const webSrc = resolve(import.meta.dirname, '../../web/src');
+	const literals = new Set<string>();
+	for (const entry of readdirSync(webSrc, { recursive: true, encoding: 'utf8' })) {
+		if (!entry.endsWith('.ts')) continue;
+		const source = readFileSync(resolve(webSrc, entry), 'utf8');
+		for (const match of source.matchAll(/dispatchModuleId\s*[:=]\s*'([^']+)'/g))
+			literals.add(match[1]!);
+	}
+
+	expect([...literals].sort()).toEqual([...EXECUTION_LOG_DISPATCH_MODULE_IDS].sort());
+});
+
+test('every declared dispatch module id names a real framework source file', async () => {
+	const { existsSync } = await import('node:fs');
+	const { resolve } = await import('pathe');
+	const missing = EXECUTION_LOG_DISPATCH_MODULE_IDS.filter((id) => {
+		const [namespace, ...rest] = id.split(':');
+		return !existsSync(
+			resolve(import.meta.dirname, `../../${namespace}/src/${rest.join(':')}.ts`),
+		);
+	});
+
+	expect(missing).toEqual([]);
+});
+
+test('a dispatch id joins the emitted map and the runtime total is never nullable', async () => {
+	const asset = await createExecutionSizesAsset(
+		{
+			'build/chunk-resume.js': sizeChunk('build/chunk-resume.js', [
+				'/workspace/packages/web/src/resume-events.ts',
+			]),
+			'build/chunk-app.js': sizeChunk('build/chunk-app.js', [`\0${APP_SYMBOL_ID}`]),
+			'build/chunk-log.js': sizeChunk('build/chunk-log.js', [
+				`\0${MARKLESS_EXECUTION_LOG_MODULE_ID}`,
+			]),
+		},
+		sizeMetadata(),
+		stripBuild,
+		undefined,
+		{ executionLogActive: true },
+	);
+	const sizes = JSON.parse(String(asset.source)) as Record<string, { gzip: number; raw: number }>;
+	expect(sizes['web:resume-events']!.gzip).toBeGreaterThan(0);
+	expect(sizes[APP_SYMBOL_ID]!.gzip).toBeGreaterThan(0);
+	expect(sizes[MARKLESS_EXECUTION_LOG_MODULE_ID]!.gzip).toBeGreaterThan(0);
+
+	const attributes = stubExecutionLogDom();
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(async () => ({ ok: true, json: async () => sizes })),
+	);
+	vi.spyOn(console, 'groupCollapsed').mockImplementation(() => {});
+	vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+	vi.spyOn(console, 'log').mockImplementation(() => {});
+	(globalThis as ExecutionLogGlobal).__mxLog = new Set();
+	const mod = await importExecutionLogModule(
+		executionLogVirtualModuleSource({ sizesUrl: '/execution-sizes.json' }),
+	);
+	await mod.logMarklessInteraction({
+		eventName: 'click',
+		selector: 'li',
+		eventRecord: { hostNodeId: 'h1', symbolIds: [APP_SYMBOL_ID] },
+		dispatchModuleId: EXECUTION_LOG_DISPATCH_MODULE_IDS[1],
+		before: new Set<string>(),
+		view: { behaviors: [{ hostNodeId: 'h1' }] },
+	});
+
+	// The dispatch id is framework, the symbol is the page's own code, and the
+	// turn's arithmetic is the sum of the two — in raw chunk bytes, the unit the
+	// map actually holds.
+	expect(attributes.get('data-markless-log-last')).not.toContain('unmapped');
+	expect(attributes.has('data-markless-log-incomplete')).toBe(false);
+	expect(Number(attributes.get('data-markless-log-app-bytes'))).toBe(sizes[APP_SYMBOL_ID]!.raw);
+	expect(Number(attributes.get('data-markless-log-framework-bytes'))).toBe(
+		sizes['web:resume-events']!.raw,
+	);
+	expect(Number(attributes.get('data-markless-log-turn-bytes'))).toBe(
+		sizes['web:resume-events']!.raw + sizes[APP_SYMBOL_ID]!.raw,
+	);
+});
+
+test('one chunk reached under two names is charged once', async () => {
+	const attributes = stubExecutionLogDom('pages/index.tsrx');
+	const symbolId = `virtual:markless:symbol:${encodeURIComponent('/workspace/src/Player.tsrx')}:${encodeURIComponent('symbol:3')}`;
+	// Rolldown rewrites a symbol module's own hook literal to the specifier it
+	// emits, so the same chunk arrives once as `./chunk-play.js` (what executed)
+	// and once as the symbol id (what the event record names).
+	const shared = { raw: 512, gzip: 200, chunk: 'chunk-play.js' };
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(async () => ({
+			ok: true,
+			json: async () => ({
+				'./chunk-play.js': shared,
+				[symbolId]: shared,
+				'web:resume-events': { raw: 4000, gzip: 1500, chunk: 'chunk-events.js' },
+				'virtual:markless:dev-log': { raw: 900, gzip: 400, chunk: 'chunk-log.js', instrument: true },
+				attribution: {
+					'pages/index.tsrx': { 'c2:': encodeURIComponent('/workspace/src/Player.tsrx') },
+				},
+			}),
+		})),
+	);
+	vi.spyOn(console, 'groupCollapsed').mockImplementation(() => {});
+	vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+	vi.spyOn(console, 'log').mockImplementation(() => {});
+	(globalThis as ExecutionLogGlobal).__mxLog = new Set();
+	const mod = await importExecutionLogModule(
+		executionLogVirtualModuleSource({ sizesUrl: '/execution-sizes.json' }),
+	);
+	await mod.logMarklessInteraction({
+		eventName: 'click',
+		selector: 'button',
+		eventRecord: { hostNodeId: 'c2:h9', symbolIds: ['symbol:3'] },
+		before: new Set<string>(),
+		after: new Set(['./chunk-play.js']),
+	});
+
+	expect(attributes.has('data-markless-log-incomplete')).toBe(false);
+	// 512, not 1024: the accounting unit is the chunk.
+	expect(Number(attributes.get('data-markless-log-app-bytes'))).toBe(512);
+	const charged = attributes.get('data-markless-log-turn-modules')!.split(' ');
+	expect(charged).toContain('./chunk-play.js');
+	expect(charged).not.toContain(symbolId);
+});
+
+test('a prop-passed handler joins through the owning ancestor scope', async () => {
+	const attributes = stubExecutionLogDom('pages/index.tsrx');
+	const source = (name: string) => encodeURIComponent(`/workspace/src/${name}.tsrx`);
+	const appSymbol = `virtual:markless:symbol:${source('App')}:${encodeURIComponent('symbol:2')}`;
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(async () => ({
+			ok: true,
+			json: async () => ({
+				[appSymbol]: { raw: 400, gzip: 150, chunk: 'chunk-app-2.js' },
+				// Nav ships symbols of its own, but not symbol:2: the toggle handler
+				// is App's closure passed down as a prop and rendered at Nav's scope.
+				[`virtual:markless:symbol:${source('Nav')}:${encodeURIComponent('symbol:0')}`]: {
+					raw: 100,
+					gzip: 50,
+					chunk: 'chunk-nav-0.js',
+				},
+				'virtual:markless:dev-log': { raw: 900, gzip: 400, chunk: 'chunk-log.js', instrument: true },
+				attribution: {
+					'pages/index.tsrx': { '': source('App'), 'c0:': source('Nav') },
+				},
+			}),
+		})),
+	);
+	vi.spyOn(console, 'groupCollapsed').mockImplementation(() => {});
+	vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+	vi.spyOn(console, 'log').mockImplementation(() => {});
+	(globalThis as ExecutionLogGlobal).__mxLog = new Set();
+	const mod = await importExecutionLogModule(
+		executionLogVirtualModuleSource({ sizesUrl: '/execution-sizes.json' }),
+	);
+	await mod.logMarklessInteraction({
+		eventName: 'click',
+		selector: 'button',
+		eventRecord: { hostNodeId: 'c0:h2', symbolIds: ['symbol:2'] },
+		before: new Set<string>(),
+	});
+
+	expect(attributes.has('data-markless-log-incomplete')).toBe(false);
+	expect(Number(attributes.get('data-markless-log-app-bytes'))).toBe(400);
+	expect(attributes.get('data-markless-log-turn-modules')!.split(' ')).toContain(appSymbol);
+});
+
+test('a routeless document reads the single-root attribution table', async () => {
+	const attributes = stubExecutionLogDom();
+	const symbolId = `virtual:markless:symbol:${encodeURIComponent('/workspace/src/Player.tsrx')}:${encodeURIComponent('symbol:3')}`;
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(async () => ({
+			ok: true,
+			json: async () => ({
+				[symbolId]: { raw: 244, gzip: 90, chunk: 'chunk-play.js' },
+				'virtual:markless:dev-log': { raw: 900, gzip: 400, chunk: 'chunk-log.js', instrument: true },
+				attribution: {
+					// A CSR page names no route file; one root is the only page there is.
+					'src/App.tsrx': { 'c2:': encodeURIComponent('/workspace/src/Player.tsrx') },
+				},
+			}),
+		})),
+	);
+	vi.spyOn(console, 'groupCollapsed').mockImplementation(() => {});
+	vi.spyOn(console, 'groupEnd').mockImplementation(() => {});
+	vi.spyOn(console, 'log').mockImplementation(() => {});
+	(globalThis as ExecutionLogGlobal).__mxLog = new Set();
+	const mod = await importExecutionLogModule(
+		executionLogVirtualModuleSource({ sizesUrl: '/execution-sizes.json' }),
+	);
+	await mod.logMarklessInteraction({
+		eventName: 'click',
+		selector: 'span',
+		eventRecord: { hostNodeId: 'c2:h9', symbolIds: ['symbol:3'] },
+		before: new Set<string>(),
+	});
+
+	expect(attributes.has('data-markless-log-incomplete')).toBe(false);
+	expect(Number(attributes.get('data-markless-log-app-bytes'))).toBe(244);
+});
+
+test('the resume summary publishes into the ledger without printing a line', async () => {
+	const attributes = stubExecutionLogDom('pages/index.tsrx');
+	(globalThis as ExecutionLogGlobal).__mxLog = new Set();
+	const logged: string[] = [];
+	vi.spyOn(console, 'log').mockImplementation((line: unknown) => logged.push(String(line)));
+	const mod = await importExecutionLogModule(
+		executionLogVirtualModuleSource({ moduleSizes: new Map([['web:fns/csr', 2048]]) }),
+	);
+
+	await mod.installMarklessExecutionLog();
+
+	// The ledger's turn line is the only printed line; this summary mirrors and
+	// publishes, so a resume landing beside a render cannot print the same load
+	// figure twice.
+	expect(logged).toEqual([]);
+	expect(attributes.get('data-markless-log-summary')).toContain('executed at load');
+	expect(Number(attributes.get('data-markless-log-instrument-bytes'))).toBeGreaterThan(0);
+	const ledger = (globalThis as ExecutionLogGlobal).__marklessExecutionLedger as {
+		turns: ReadonlyArray<{ kind: string }>;
+	};
+	expect(ledger.turns.map((turn) => turn.kind)).toEqual(['resume']);
 });

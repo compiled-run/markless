@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vite-plus/test';
+import { describe, expect, it } from 'vitest';
 import { createFakeClock } from '../../../scripts/test-utils/fake-clock.ts';
 import { createAsyncBoundarySettleTracker } from '../../web/src/resume-async-wiring.ts';
 import type { ResumeAsyncBoundaryRecord } from '../../web/src/resume-types.ts';

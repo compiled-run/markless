@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vite-plus/test';
+import { describe, expect, it } from 'vitest';
 import { transformMdxRoute } from '../../src/vite/mdx.ts';
 
 describe('Markless Router MDX transform', () => {

@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { describe, expect, it, vi } from 'vite-plus/test';
+import { describe, expect, it, vi } from 'vitest';
 import { createServerEntry } from '../src/vite/runtime/create-server-entry.ts';
 
 describe('server entry with async compiled artifacts', () => {

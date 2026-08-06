@@ -41,19 +41,29 @@ const MAX_HEAD_LINKS = 128;
 // Permanent execution walls: owner ratification 2026-07-12, T006.
 const LOAD_APP_BYTES = 0;
 const LOAD_INSTRUMENT_BYTES = 0;
-// INTERIM 1,903 — owner-ruled 2026-08-04. T999 hard-fails unless the
-// post-T006 measured number lands at or below 1,850 and re-ratchets to measured.
-// 1,903 -> 1,906 (interim 2026-08-06): +3 pre-existing at branch base d04516c, proven by stash-attribution; de-minimis auto-interim per proportionality order 2026-08-04; repayment stays with the existing first-play obligation.
-const FIRST_PLAY_APP_BYTES_MAX = 1_906;
+// 1,906 -> 7,523 (re-derived 2026-08-06, execution-clarity ledger U7). The old
+// number is not comparable with the new one, for three reasons the slice itself
+// created: the unit is now raw chunk bytes rather than gzip; `web:resume-events`
+// moved into the framework category and left the app number; and the turn now
+// charges every module the click actually executed, not the two the event record
+// names. Measured on the box build, summing the served execution-sizes.json over
+// the ten app chunks this click wakes:
+//   4860 + 205 + 466 + 259 + 240 + 239 + 247 + 254 + 523 + 230 = 7,523 B
+// The box re-derives this every run rather than trusting the literal: it sums the
+// size map over data-markless-log-turn-modules and fails unless the mirrored app
+// delta equals that sum, so a newly waking module moves both sides.
+const FIRST_PLAY_APP_BYTES_MAX = 7_523;
 // 2,400 -> 2,520 (owner receipt 2026-07-12): the wiring repair relocated
 // ~111 B of accounting from the app chunk into the lazy logger - app bytes
 // unchanged, never-mode byte-identical; instrument growth stays visible.
-// 2,520 -> 2,610 PRE-EXISTING DEBT PIN (2026-08-01, precompute-first-architecture
-// T006 closure): red since the mid-July instrumentation goals — the dev-log chunk is
-// byte-identical pre/post T006 (7,036 raw / ~2,626 gzip both sides) and already over
-// 2,520 at the goal base; masked because the app-bytes assertion failed first. Pinned
-// at the measured value pending the owner's re-ratify-or-trim ruling; tighten then.
-const FIRST_PLAY_INSTRUMENT_BYTES_MAX = 2_610;
+// 2,610 -> 9,537 (re-derived 2026-08-06, execution-clarity ledger U7). Same unit
+// change as the app wall: 2,610 was the dev-log chunk's GZIP size (7,036 raw /
+// ~2,626 gzip at the T006 pin) and the ledger charges raw chunk bytes. Measured
+// dev-log chunk: 9,537 raw / 3,430 gzip. Raw growth over 7,036 is this slice's own
+// ledger arithmetic (the ledger, the attribution lookup, the chunk dedupe); it
+// stays in its own category and out of the headline, which is what the pin wanted
+// visible.
+const FIRST_PLAY_INSTRUMENT_BYTES_MAX = 9_537;
 
 export default box(
 	{
@@ -124,13 +134,17 @@ export default box(
 		await expect.page.text(page, PLAY_ICON, PLAYING_ICON, WAIT);
 		await expect.page.attribute(page, PLAY_TOGGLE, 'class', 'play active', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'play', WAIT);
-		const expectedAppBytes = await expectedFirstPlayAppBytes(preview);
-		if (Math.min(...expectedAppBytes) > FIRST_PLAY_APP_BYTES_MAX) {
+		const sizes = await servedExecutionSizes(preview);
+		const firstPlay = await waitForLogInteractionAttribute(page, 1, sizes, WAIT);
+		receipt.note(
+			`first-Play charge: app ${firstPlay.app} B, framework ${firstPlay.framework} B over ` +
+				`[${firstPlay.modules.join(', ')}]`,
+		);
+		if (firstPlay.app > FIRST_PLAY_APP_BYTES_MAX) {
 			throw new Error(
-				`Expected first-Play app bytes derived from execution-sizes.json to stay <= ${FIRST_PLAY_APP_BYTES_MAX}, got ${Math.min(...expectedAppBytes)}.`,
+				`Expected first-Play app bytes to stay <= ${FIRST_PLAY_APP_BYTES_MAX}, got ${firstPlay.app}.`,
 			);
 		}
-		await waitForLogInteractionAttribute(page, 1, expectedAppBytes, WAIT);
 		const afterClickScripts = await waitForQuietBuildJs(page);
 		const lazyChunks = afterClickScripts.filter((path) => !startupScripts.includes(path));
 		receipt.note(
@@ -154,19 +168,22 @@ export default box(
 		await expect.page.text(page, PLAY_ICON, PAUSED_ICON, WAIT);
 		await expect.page.attribute(page, PLAY_TOGGLE, 'class', 'play', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'pause', WAIT);
-		await waitForLogInteractionAttribute(page, 2, expectedAppBytes, WAIT);
+		// The second click charges only what the first did not: the ledger counts
+		// each module once, so this turn's own delta is smaller, never a re-charge.
+		const secondPlay = await waitForLogInteractionAttribute(page, 2, sizes, WAIT);
+		receipt.note(
+			`second-Play charge: app ${secondPlay.app} B, framework ${secondPlay.framework} B`,
+		);
 
 		// Track navigation exercises composed events and dom updates deeper in
 		// the tree (also absorbed from the retired tmp-ssr box).
 		await page.click('[aria-label="Next track"]', WAIT);
 		await expect.page.bodyText(page, { contains: 'Empty Crown' }, WAIT);
-		// Next-track app-execution wall (owner ratification 2026-07-12, T006:
-		// candidate 1,860 B activated after a fresh-page Next capture
-		// reconfirmed 1,838 B exactly; warm and fresh Next report the same
-		// app bytes, so the mirror ceiling guards both).
-		// INTERIM 1,903 — same owner ruling 2026-08-04 as FIRST_PLAY (same chunk cost at
-		// a sibling gauge); T999 hard-fails unless post-T006 measured <= 1,860.
-		await waitForAppBytesCeiling(page, 1_906, WAIT);
+		// Next-track app-execution wall. 1,906 -> 3,301 (re-derived 2026-08-06, U7):
+		// same unit and coverage change as the first-Play wall above — raw chunk
+		// bytes over the 11 modules this turn actually executed, measured on the box
+		// build (turn delta app 3,301 B, framework 358 B).
+		await waitForAppBytesCeiling(page, 3_301, WAIT);
 		// Paused next-track cues the new video (playing next-track loads it);
 		// the video id change proves the composed dom updates flowed.
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'cue', WAIT);
@@ -321,90 +338,108 @@ async function waitForLogSummaryAttribute(
 	throw new Error('Expected data-markless-log-summary to mirror the resume summary.');
 }
 
-// The first-Play app cost is derived from the served size map (resume-events +
-// the Player click symbol) rather than pinned as a literal: the assertion then
-// proves the accounting arithmetic end to end and survives byte drift, while a
-// composition change (a new module waking) still fails the woke/warm counts and
-// the derived sum.
-async function expectedFirstPlayAppBytes(preview: {
+type ExecutionSizeMap = Record<
+	string,
+	{ readonly raw?: number; readonly gzip?: number; readonly instrument?: true }
+>;
+
+const FRAMEWORK_LOG_ID = /^(?:web|runtime|serializer|router|core|analyzer):/;
+
+async function servedExecutionSizes(preview: {
 	request(path: string): Promise<string>;
-}): Promise<readonly number[]> {
-	const sizes = JSON.parse(await preview.request('/build/execution-sizes.json')) as Record<
-		string,
-		{ readonly gzip?: number; readonly instrument?: true }
-	>;
-	// The record-only wake routes the click through the component-edge bound
-	// handler, so the exact Player symbol differs from the payload path's;
-	// exactness holds as resume-events + exactly one Player handler.
-	const playerSymbolSizes = Object.keys(sizes)
-		.filter(
-			(key) =>
-				key.startsWith('virtual:markless:symbol:') &&
-				decodeURIComponent(key).includes('/components/Player.tsrx'),
-		)
-		.flatMap((key) => (sizes[key]?.gzip ? [sizes[key]!.gzip!] : []));
-	const resumeEvents = sizes['web:resume-events']?.gzip;
-	if (!resumeEvents || playerSymbolSizes.length === 0) {
-		throw new Error(
-			`Expected size-map entries for web:resume-events and Player symbols, got ${resumeEvents} and ${playerSymbolSizes.length}.`,
-		);
+}): Promise<ExecutionSizeMap> {
+	const sizes = JSON.parse(
+		await preview.request('/build/execution-sizes.json'),
+	) as ExecutionSizeMap;
+	if (!sizes['web:resume-events']?.raw) {
+		throw new Error('Expected the served size map to carry a raw size for web:resume-events.');
 	}
-	return playerSymbolSizes.map((symbolGzip) => resumeEvents + symbolGzip);
+	return sizes;
 }
 
+// The turn's cost is proven, not guessed: the ledger names the modules it
+// charged, and each one is joined against the served size map by category. The
+// arithmetic is checked end to end over the observed set, so a new module waking
+// changes the sum AND the module list rather than silently fitting a literal.
 async function waitForLogInteractionAttribute(
 	page: ContentPage,
 	count: number,
-	expectedAppBytesCandidates: readonly number[],
+	sizes: ExecutionSizeMap,
 	options: { readonly timeoutMs: number },
-): Promise<void> {
+): Promise<{ readonly app: number; readonly framework: number; readonly modules: string[] }> {
 	const started = Date.now();
 	const countPattern = new RegExp(`data-markless-log-interactions="${count}"`);
-	const appClauses = [
-		...new Set(expectedAppBytesCandidates.map((bytes) => (bytes / 1024).toFixed(1))),
-	];
-	const lastPattern = new RegExp(
-		`data-markless-log-last="markless: click \\[[^"]+\\] · woke \\d+ modules · ran warm \\d+ modules · (?:${appClauses.map((clause) => clause.replace('.', '\\.')).join('|')}) KB app · (\\d+(?:\\.\\d+)?) KB instrument"`,
-	);
-	const rejectedFixtures = [
-		'data-markless-log-last="markless: click [button.play] · woke 1 modules · ran warm 2 modules · 3.1 KB"',
-		'data-markless-log-last="markless: click [button.play] · woke 1 modules · ran warm 2 modules · 2 app modules (bytes unknown; 1 unmapped) · 1.9 KB instrument"',
-	];
-	for (const fixture of rejectedFixtures) {
-		if (lastPattern.test(fixture))
-			throw new Error(`Execution-log matcher accepted a rejected format: ${fixture}`);
+	// The owner's wording, and the shapes that must never come back: a bare
+	// total with no per-click clause, and any "bytes unknown" accounting.
+	const lastPattern =
+		/data-markless-log-last="markless: (\d+\.\d) KB executed at load · this click \+(\d+\.\d) KB · total (\d+\.\d) KB[^"]*"/;
+	// Self-check the matcher against the pre-ledger wording it must never accept.
+	if (
+		lastPattern.test(
+			'data-markless-log-last="markless: click [button.play] · woke 1 modules · ran warm 2 modules · 3.1 KB"',
+		)
+	) {
+		throw new Error('Execution-log matcher accepted the pre-ledger interaction wording.');
 	}
-	const appBytesPattern = new RegExp(
-		`data-markless-log-app-bytes="(?:${expectedAppBytesCandidates.join('|')})"`,
-	);
 	while (Date.now() - started < options.timeoutMs) {
 		const html = await page.content();
-		const readableInstrument = lastPattern.exec(html)?.[1];
-		const exactInstrument = /data-markless-log-instrument-bytes="(\d+)"/.exec(html)?.[1];
-		if (
-			countPattern.test(html) &&
-			readableInstrument !== undefined &&
-			exactInstrument !== undefined &&
-			(Number(exactInstrument) / 1024).toFixed(1) === readableInstrument &&
-			appBytesPattern.test(html) &&
-			!/data-markless-log-last="[^"]*est\./.test(html)
-		) {
-			const instrumentBytes = Number(exactInstrument);
-			if (
-				!Number.isInteger(instrumentBytes) ||
-				instrumentBytes > FIRST_PLAY_INSTRUMENT_BYTES_MAX
-			) {
+		const last = lastPattern.exec(html);
+		const read = (name: string) =>
+			new RegExp(`data-markless-log-${name}="([^"]*)"`).exec(html)?.[1];
+		if (!countPattern.test(html) || !last) {
+			await new Promise((resolve) => setTimeout(resolve, 25));
+			continue;
+		}
+		if (/data-markless-log-incomplete="/.test(html)) {
+			throw new Error(
+				`The ledger reported unmapped ids on interaction ${count}: ${read('last')}`,
+			);
+		}
+		const modules = (read('turn-modules') ?? '').split(' ').filter(Boolean);
+		if (modules.length === 0) {
+			throw new Error(
+				`Interaction ${count} charged no modules; the ledger mirrored nothing.`,
+			);
+		}
+		const expected = { app: 0, framework: 0, instrument: 0 };
+		for (const id of modules) {
+			const entry = sizes[id];
+			if (!entry?.raw) {
 				throw new Error(
-					`Expected first-Play instrument bytes to be an integer <= ${FIRST_PLAY_INSTRUMENT_BYTES_MAX}, got ${exactInstrument}.`,
+					`Interaction ${count} charged ${id}, which the served size map cannot back.`,
 				);
 			}
-			return;
+			expected[
+				entry.instrument ? 'instrument' : FRAMEWORK_LOG_ID.test(id) ? 'framework' : 'app'
+			] += entry.raw;
 		}
-		await new Promise((resolve) => setTimeout(resolve, 25));
+		const app = Number(read('app-bytes'));
+		const framework = Number(read('framework-bytes'));
+		if (app !== expected.app || framework !== expected.framework) {
+			throw new Error(
+				`Interaction ${count} accounting disagrees with the size map: mirrored ` +
+					`app=${app} framework=${framework}, size-map sum over [${modules.join(', ')}] ` +
+					`app=${expected.app} framework=${expected.framework}.`,
+			);
+		}
+		// The readable clause and the exact mirror must be the same number.
+		if ((Number(read('turn-bytes')) / 1024).toFixed(1) !== last[2]) {
+			throw new Error(
+				`Interaction ${count} printed +${last[2]} KB but mirrored ${read('turn-bytes')} B.`,
+			);
+		}
+		const instrumentBytes = Number(read('instrument-bytes'));
+		if (
+			!Number.isInteger(instrumentBytes) ||
+			instrumentBytes > FIRST_PLAY_INSTRUMENT_BYTES_MAX
+		) {
+			throw new Error(
+				`Expected first-Play instrument bytes to be an integer <= ${FIRST_PLAY_INSTRUMENT_BYTES_MAX}, got ${instrumentBytes}.`,
+			);
+		}
+		return { app, framework, modules };
 	}
-	throw new Error(
-		`Expected interaction ${count} to mirror app-bytes in [${expectedAppBytesCandidates.join(', ')}] derived from the size map.`,
-	);
+	throw new Error(`Expected interaction ${count} to mirror the owner-worded ledger line.`);
 }
 
 async function jsBuildRequestPaths(page: NetworkRequestPage): Promise<readonly string[]> {

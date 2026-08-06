@@ -13,6 +13,7 @@ import {
 	transformTsrxModule,
 } from '../src/rolldown.ts';
 import { MARKLESS_EXECUTION_LOG_MODULE_ID } from '../src/execution-log.ts';
+import { UNSHIPPED_HOOK_REASON } from '../src/build/execution-sizes.ts';
 import { verifyGeneratedSymbolTableRoutes } from '../src/build/symbol-table.ts';
 import {
 	callBuildStart,
@@ -860,26 +861,37 @@ export default function LiveFeed() @{
 		expect(resolverSource).toContain(encodeURIComponent(childFilename));
 	});
 
-	test('production client execution logging does not alter hash-bearing modules', async () => {
-		const plugin = marklessClient({ executionLog: 'auto' });
+	test('client execution logging follows the log mode, not the dev flag', async () => {
 		const filename = '/workspace/app/src/App.tsrx';
-
-		callBuildStart(plugin, { cwd: '/workspace/app' });
-
-		expect(
-			await callTransform(
-				plugin,
-				'export const runtime = true;',
-				'/workspace/app/packages/web/src/event-only-resume.ts',
-			),
-		).toBeNull();
-
-		await callTransform(plugin, source, filename);
+		const frameworkModule = '/workspace/app/packages/web/src/event-only-resume.ts';
 		const symbolId = `virtual:markless:symbol:${encodeURIComponent(filename)}:${encodeURIComponent('symbol:0')}`;
-		const symbolSource = (await callLoad(plugin, `\0${symbolId}`)) as string;
 
-		expect(symbolSource).not.toContain('__mxLog?.add');
-		expect(symbolSource).toContain('export function symbol_0_');
+		// `never` is the consumer posture: nothing is rewritten, so no
+		// hash-bearing module moves and no byte is added.
+		const consumer = marklessClient({ executionLog: 'never' });
+		callBuildStart(consumer, { cwd: '/workspace/app' });
+		expect(
+			await callTransform(consumer, 'export const runtime = true;', frameworkModule),
+		).toBeNull();
+		await callTransform(consumer, source, filename);
+		const consumerSymbol = (await callLoad(consumer, `\0${symbolId}`)) as string;
+		expect(consumerSymbol).not.toContain('__mxLog?.add');
+		expect(consumerSymbol).toContain('export function symbol_0_');
+
+		// `auto` instruments a production client build too. Without this the
+		// ledger has nothing to count outside dev, which was the whole defect.
+		const instrumented = marklessClient({ executionLog: 'auto' });
+		callBuildStart(instrumented, { cwd: '/workspace/app' });
+		const framework = await callTransform(
+			instrumented,
+			'export const runtime = true;',
+			frameworkModule,
+		);
+		expect(framework?.code).toContain('globalThis.__mxLog?.add("web:event-only-resume");');
+		await callTransform(instrumented, source, filename);
+		expect((await callLoad(instrumented, `\0${symbolId}`)) as string).toContain(
+			`globalThis.__mxLog?.add(${JSON.stringify(symbolId)});`,
+		);
 	});
 
 	test('dev client symbol modules log and size the same qualified execution id', async () => {
@@ -1035,6 +1047,80 @@ export default function LiveFeed() @{
 		expect(Object.keys(payload.attribution)).toEqual(['pages/a.tsrx', 'pages/b.tsrx']);
 		expect(payload.attribution['pages/a.tsrx']).toHaveProperty('c0:c0:');
 		expect(JSON.stringify(payload.attribution)).not.toContain('virtual:markless:');
+	});
+
+	test('attribution keys are the bare source paths the consumer looks up', async () => {
+		const plugin = marklessClient({ executionLog: 'always', rootDir: '/workspace/app' });
+		const emitFile = vi.fn();
+		callBuildStart(plugin, { cwd: '/workspace/app' });
+		const component = (name: string, child?: string) =>
+			`${
+				child ? `import Child from ${JSON.stringify(child)};` : ''
+			}\nexport default function ${name}() @{ <section>${child ? '<Child />' : name}</section> }`;
+		const route = component('RouteA', '../components/Branch.tsrx');
+		const branch = component('Branch');
+		await callTransform(plugin, route, '/workspace/app/pages/a.tsrx');
+		await callTransform(plugin, branch, '/workspace/app/components/Branch.tsrx');
+		// The same two sources requested again as interaction-only variants: the
+		// build names them with a transform query, the browser never can.
+		await callTransform(plugin, route, '/workspace/app/pages/a.tsrx?markless-symbols');
+		await callTransform(
+			plugin,
+			branch,
+			'/workspace/app/components/Branch.tsrx?markless-symbols',
+		);
+		await callGenerateBundle(plugin, {}, emitFile);
+
+		const sizes = emittedAsset(emitFile, 'build/execution-sizes.json');
+		const payload = JSON.parse(String(sizes?.source)) as {
+			attribution: Record<string, Record<string, string>>;
+		};
+		// One root, bare: the queried variants merged into their source, and the
+		// child stayed a child instead of surfacing as a second root under its
+		// queried name.
+		expect(Object.keys(payload.attribution)).toEqual(['pages/a.tsrx']);
+		expect(JSON.stringify(payload.attribution)).not.toContain('markless-symbols');
+		expect(payload.attribution['pages/a.tsrx']).toMatchObject({
+			'': encodeURIComponent('/workspace/app/pages/a.tsrx'),
+			'c0:': encodeURIComponent('/workspace/app/components/Branch.tsrx'),
+		});
+	});
+
+	test('a consumer build leaves the size map unenforced', async () => {
+		const plugin = marklessClient({
+			executionLog: 'never',
+			rootDir: '/workspace/app',
+			dev: true,
+		});
+		callBuildStart(plugin, { cwd: '/workspace/app' });
+		await callTransform(
+			plugin,
+			'export const resumeEvents = 1;',
+			'/workspace/packages/web/src/resume-events.ts',
+		);
+
+		await expect(callGenerateBundle(plugin, {}, vi.fn())).resolves.toBeUndefined();
+	});
+
+	test('a hooked module id that no client chunk carries is named in the map, not dropped', async () => {
+		const plugin = marklessClient({
+			executionLog: 'always',
+			rootDir: '/workspace/app',
+			dev: true,
+		});
+		const emitFile = vi.fn();
+		callBuildStart(plugin, { cwd: '/workspace/app' });
+		await callTransform(
+			plugin,
+			'export const resumeEvents = 1;',
+			'/workspace/packages/web/src/resume-events.ts',
+		);
+
+		await callGenerateBundle(plugin, {}, emitFile);
+		const sizes = emittedAsset(emitFile, 'build/execution-sizes.json');
+		const payload = JSON.parse(String(sizes?.source)) as { unshipped?: Record<string, string> };
+
+		expect(payload.unshipped?.['web:resume-events']).toBe(UNSHIPPED_HOOK_REASON);
 	});
 
 	test('attribution follows resolved package module ids', async () => {

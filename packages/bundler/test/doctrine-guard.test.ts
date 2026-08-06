@@ -45,8 +45,6 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Only client route-artifact requests run package-child materialization.',
 	"packages/bundler/src/rolldown.ts :: if (currentEnvironment === 'client' && isClientPrimarySourceRequest(id)) {":
 		'Primary-source tracking is scoped to the resolved client graph.',
-	"packages/bundler/src/rolldown.ts :: internalOptions.dev === true && currentEnvironment === 'client',":
-		'Development execution logging is emitted only into the resolved client graph.',
 	"packages/bundler/src/rolldown.ts :: if (currentEnvironment === 'client' && renderDataRequest) {":
 		'Client render-data requests are answered with the client-shaped module from the resolved build environment.',
 	"packages/bundler/src/rolldown.ts :: internalOptions.dev === true && currentEnvironment === 'server'":

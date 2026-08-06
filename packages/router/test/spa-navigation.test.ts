@@ -1,5 +1,5 @@
 import { buildRouteManifestFromFileIds } from '../src/route-manifest.ts';
-import { describe, expect, it } from 'vite-plus/test';
+import { describe, expect, it } from 'vitest';
 import {
 	__marklessRouterStartSpaNavigation,
 	handleNavigateEvent,

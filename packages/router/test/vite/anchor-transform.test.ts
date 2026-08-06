@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vite-plus/test';
+import { describe, expect, it } from 'vitest';
 import { parseAst } from 'vite';
 import { __marklessRouteHref } from '../../src/vite/entries/route-href.ts';
 import { anchorTransformPlugin, transformAnchorSource } from '../../src/vite/anchor-transform.ts';

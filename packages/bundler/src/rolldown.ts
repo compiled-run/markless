@@ -22,6 +22,7 @@ import {
 	MARKLESS_EXECUTION_LOG_MODULE_ID,
 	executionLogActivationInjection,
 	executionLogVirtualModuleSource,
+	hasExecutionLogModuleHook,
 	injectExecutionLogModuleHook,
 	normalizeExecutionLogMode,
 	requalifyExecutionLogModuleHook,
@@ -148,6 +149,9 @@ export function createMarklessRolldownPlugin(input: {
 	>();
 	const transformedClientPrimarySources = new Set<string>();
 	const executionLogEstimatedSizes = new Map<string, number>();
+	// Every id this build injects a hook for, keyed to the module it was injected
+	// into: the size map owes an entry to each one the bundle actually carries.
+	const executionLogEmittedIds = new Map<string, string>();
 	const dev = createMarklessDevGraph();
 	let root = internalOptions.rootDir;
 	const name = pluginName(environment);
@@ -321,6 +325,7 @@ export function createMarklessRolldownPlugin(input: {
 			transformVirtualModules.clear();
 			virtualModuleOwners.clear();
 			executionLogEstimatedSizes.clear();
+			executionLogEmittedIds.clear();
 			dev.reset();
 
 			const currentRoot = getRoot();
@@ -406,7 +411,7 @@ export function createMarklessRolldownPlugin(input: {
 					moduleSizes: embedsDevSizes ? executionLogEstimatedSizes : undefined,
 					attribution: embedsDevSizes
 						? executionAttributionTables(
-								moduleMetadata.symbolClaimMap(),
+								moduleMetadata.symbolClaimMap().values(),
 								getRoot(),
 								importedChildren.values(),
 							)
@@ -463,13 +468,16 @@ export function createMarklessRolldownPlugin(input: {
 						map: null,
 					};
 				}
+				// Hooks follow the log mode, not `dev`: the printer and the size
+				// map already ship in `auto`, so a dev-only hook gate made the
+				// console structurally blind in every built page.
 				if (
 					currentEnvironment === 'client' &&
-					internalOptions.dev === true &&
 					normalizeExecutionLogMode(internalOptions.executionLog) !== 'never' &&
 					isMarklessRuntimeModule(id)
 				) {
 					executionLogEstimatedSizes.set(executionLogRuntimeModuleId(id), code.length);
+					executionLogEmittedIds.set(executionLogRuntimeModuleId(id), pathname(id));
 					return {
 						code: injectExecutionLogModuleHook(
 							code,
@@ -532,7 +540,8 @@ export function createMarklessRolldownPlugin(input: {
 				buildId: internalOptions.buildId,
 				executionLog: normalizeExecutionLogMode(internalOptions.executionLog),
 				executionLogModuleHooks:
-					internalOptions.dev === true && currentEnvironment === 'client',
+					currentEnvironment === 'client' &&
+					normalizeExecutionLogMode(internalOptions.executionLog) !== 'never',
 				inlineResumerDebug: internalOptions.inlineResumerDebug === true,
 				prerenderRecords,
 				directCsr:
@@ -755,6 +764,7 @@ export function createMarklessRolldownPlugin(input: {
 					transformVirtualModules,
 					virtualModuleOwners,
 					executionLogEstimatedSizes,
+					executionLogEmittedIds,
 					dev,
 					environment: currentEnvironment,
 					finalPublication: false,
@@ -916,6 +926,7 @@ export function createMarklessRolldownPlugin(input: {
 					transformVirtualModules,
 					virtualModuleOwners,
 					executionLogEstimatedSizes,
+					executionLogEmittedIds,
 					dev,
 					environment: currentEnvironment,
 					finalPublication: true,
@@ -1080,9 +1091,7 @@ export function createMarklessRolldownPlugin(input: {
 				const emittedSymbolClaims = moduleMetadata.emittedSymbolClaimMap(
 					emittedBundleModuleIds(manifestBundle),
 				);
-				const attributionClaims = symbolClaimsBySource(
-					moduleMetadata.symbolClaimManifests(),
-				);
+				const attributionClaims = [...moduleMetadata.symbolClaimManifests()];
 				const tableIntegrity = verifyGeneratedSymbolTableRoutes(
 					manifestBundle,
 					emittedSymbolClaims.values(),
@@ -1155,6 +1164,10 @@ export function createMarklessRolldownPlugin(input: {
 									importedChildren.values(),
 								)
 							: undefined,
+						{
+							executionLogActive: executionLogInjection !== null,
+							hookedIds: executionLogEmittedIds,
+						},
 					),
 				);
 				// The demand map lives in payload-module exports (tree-shaken from built
@@ -1548,34 +1561,87 @@ function isPlainTypeScriptSource(source: string): boolean {
 	return /\.[cm]?tsx?$/.test(source);
 }
 
+type ExecutionAttributionNode = {
+	readonly source: string;
+	readonly symbolRoutes: ReadonlyArray<{ readonly prefix: string; readonly importSource: string }>;
+};
+
+// The consumer looks these tables up by the bare path the document names (the
+// route file, or the single root of a routeless build). A transform variant's
+// query — `?markless-symbols`, `?markless-resume`, `?markless-prerender-wake` —
+// is a build-side name for the same source file, so the variants of one source
+// merge into one node. Without this, a component reached as a child under its
+// bare path and as a root under its queried path is both, and no key the
+// consumer can produce ever matches.
+function canonicalExecutionAttributionSource(source: string): string {
+	return source.split('?')[0]!.split('#')[0]!;
+}
+
+function canonicalExecutionAttributionNodes(
+	manifests: Iterable<MarklessTransformManifest>,
+): ReadonlyMap<string, ExecutionAttributionNode> {
+	const routesBySource = new Map<string, Map<string, string>>();
+	// Sorted so a prefix claimed by two variants resolves the same way on every
+	// build; the emitted map is a permanent artifact, not a per-run reading.
+	const sorted = [...manifests].sort((left, right) => left.source.localeCompare(right.source));
+	for (const manifest of sorted) {
+		const source = canonicalExecutionAttributionSource(manifest.source);
+		const routes = routesBySource.get(source) ?? new Map<string, string>();
+		for (const route of manifest.symbolRoutes ?? [])
+			if (!routes.has(route.prefix)) routes.set(route.prefix, route.importSource);
+		routesBySource.set(source, routes);
+	}
+	return new Map(
+		[...routesBySource].map(([source, routes]) => [
+			source,
+			{
+				source,
+				symbolRoutes: [...routes].map(([prefix, importSource]) => ({ prefix, importSource })),
+			},
+		]),
+	);
+}
+
 function executionAttributionRoots(
-	manifests: ReadonlyMap<string, MarklessTransformManifest>,
+	nodes: ReadonlyMap<string, ExecutionAttributionNode>,
 	childrenByRoute: ReadonlyMap<string, string>,
 ): string[] {
 	const children = new Set<string>();
-	for (const manifest of manifests.values()) {
-		for (const route of manifest.symbolRoutes ?? []) {
-			const child = resolvedRouteSource(manifest.source, route.importSource, childrenByRoute);
-			if (manifests.has(child)) children.add(child);
+	for (const node of nodes.values()) {
+		for (const route of node.symbolRoutes) {
+			const child = resolvedRouteSource(node.source, route.importSource, childrenByRoute);
+			if (nodes.has(child)) children.add(child);
 		}
 	}
-	return [...manifests.keys()].filter((source) => !children.has(source));
+	return [...nodes.keys()].filter((source) => !children.has(source));
 }
 
 function executionAttributionTables(
-	manifests: ReadonlyMap<string, MarklessTransformManifest>,
+	manifests: Iterable<MarklessTransformManifest>,
 	root: string | undefined,
 	children: Iterable<ImportedChild>,
 ): Record<string, Record<string, string>> {
+	const nodes = canonicalExecutionAttributionNodes(manifests);
 	const childrenByRoute = new Map(
-		[...children].map((child) => [routeKey(child.parent, child.specifier), child.source]),
+		[...children]
+			.map(
+				(child) =>
+					[
+						routeKey(
+							canonicalExecutionAttributionSource(child.parent),
+							child.specifier,
+						),
+						canonicalExecutionAttributionSource(child.source),
+					] as const,
+			)
+			.sort((left, right) => left[0].localeCompare(right[0]) || left[1].localeCompare(right[1])),
 	);
 	return Object.fromEntries(
-		executionAttributionRoots(manifests, childrenByRoute)
+		executionAttributionRoots(nodes, childrenByRoute)
 			.sort()
 			.map((source) => [
 				executionAttributionRouteKey(source, root),
-				flattenExecutionAttributionScopes(source, manifests, childrenByRoute),
+				flattenExecutionAttributionScopes(source, nodes, childrenByRoute),
 			]),
 	);
 }
@@ -1590,17 +1656,17 @@ function executionAttributionRouteKey(source: string, root: string | undefined):
 
 function flattenExecutionAttributionScopes(
 	root: string,
-	manifests: ReadonlyMap<string, MarklessTransformManifest>,
+	nodes: ReadonlyMap<string, ExecutionAttributionNode>,
 	childrenByRoute: ReadonlyMap<string, string>,
 ): Record<string, string> {
 	const scopes: Record<string, string> = {};
 	const visit = (source: string, scope: string, seen: ReadonlySet<string>) => {
 		if (seen.has(source)) return;
 		scopes[scope] = encodedSymbolSource(source);
-		const manifest = manifests.get(source);
+		const manifest = nodes.get(source);
 		for (const route of manifest?.symbolRoutes ?? []) {
 			const child = resolvedRouteSource(source, route.importSource, childrenByRoute);
-			if (!manifests.has(child)) continue;
+			if (!nodes.has(child)) continue;
 			visit(child, scope + route.prefix, new Set([...seen, source]));
 		}
 	};
@@ -1691,6 +1757,7 @@ function registerTransformArtifacts(input: {
 	transformVirtualModules: Map<string, Set<string>>;
 	virtualModuleOwners: Map<string, Set<string>>;
 	executionLogEstimatedSizes: Map<string, number>;
+	executionLogEmittedIds: Map<string, string>;
 	dev: ReturnType<typeof createMarklessDevGraph>;
 	environment: MarklessEnvironment;
 	finalPublication?: boolean;
@@ -1740,6 +1807,8 @@ function registerTransformArtifacts(input: {
 		}
 		if (isClientSymbol) {
 			input.executionLogEstimatedSizes.set(module.id, stored.source.length);
+			if (hasExecutionLogModuleHook(stored.source))
+				input.executionLogEmittedIds.set(module.id, module.id);
 		}
 	}
 	input.moduleMetadata.recordCaptureMetadata(input.source, input.result.manifest);
@@ -2250,14 +2319,6 @@ function emittedBundleModuleIds(bundle: Record<string, unknown>): Set<string> {
 		}
 	}
 	return ids;
-}
-
-function symbolClaimsBySource(
-	manifests: Iterable<MarklessTransformManifest>,
-): ReadonlyMap<string, MarklessTransformManifest> {
-	const claims = new Map<string, MarklessTransformManifest>();
-	for (const manifest of manifests) claims.set(manifest.source, manifest);
-	return claims;
 }
 
 function resolveVirtualId(id: string) {

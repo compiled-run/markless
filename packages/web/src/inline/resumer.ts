@@ -156,6 +156,9 @@ export function createInlineResumerSource(options: InlineResumerBuildOptions): s
 	}
 	const debugBootstrap = options.debug ? options.debugBootstrapSource : 'undefined';
 	const debugRegistration = options.debug ? options.debugRegistrationSource : 'undefined';
+	// Composed in, not runtime-gated: a `never` document must not carry the
+	// logging text at all, which is what the prerender variant already does.
+	const logging = options.executionLog !== 'never';
 	return `{
 const __MARKLESS_INLINE_SYNC_POLICY__=${JSON.stringify(options.syncPolicy)};
 const __MARKLESS_INLINE_GRAPH_SYNC_POLICY__=${JSON.stringify(options.graphSyncPolicy)};
@@ -165,7 +168,7 @@ const __MARKLESS_INLINE_EXECUTION_LOG__=${JSON.stringify(options.executionLog)};
 const __MARKLESS_INLINE_RESUME_MODULE_URL__=${JSON.stringify(options.resumeModuleUrl)};
 const __MARKLESS_INLINE_DEBUG_BOOTSTRAP__=${debugBootstrap};
 const __MARKLESS_INLINE_DEBUG_REGISTER__=${debugRegistration};
-(${runInlineResumer.toString()})((url) => import(/* @vite-ignore */ url));
+${logging ? `(${runGeneralInlineLogSummary.toString()})(${JSON.stringify(options.executionLog)});\n` : ''}(${runInlineResumer.toString()})((url) => import(/* @vite-ignore */ url));
 }`;
 }
 
@@ -285,8 +288,9 @@ function runPrerenderSettleBoot(
 		});
 		observer.observe(root, { childList: true, subtree: true });
 	};
-	const resume = (input: InlineDispatchInput | { readonly root: InlineRoot; readonly event: 0 }) =>
-		loadModule(resumeModuleUrl).then((module) => module.resumeContainerEvent(input as never));
+	const resume = (
+		input: InlineDispatchInput | { readonly root: InlineRoot; readonly event: 0 },
+	) => loadModule(resumeModuleUrl).then((module) => module.resumeContainerEvent(input as never));
 	for (const eventName of eventNames) {
 		root.addEventListener(
 			eventName,
@@ -394,9 +398,26 @@ function runPrerenderSettleBoot(
 		.catch(() => resume({ root, event: 0 }));
 }
 
-// Flagged/log builds only: the empty-delta page executes nothing at load, so
-// the truthful summary and byte mirrors are written inline, matching the
-// standard resumer's wording so witness expectations hold across containers.
+// Log builds only, composed into both inline boots: the empty-delta page
+// executes nothing at load, so the truthful summary and byte mirrors are
+// written inline. Never mode composes it out, so it costs a `never` page zero.
+type MarklessInlineLedger = {
+	unit: string;
+	load: { app: number; framework: number; instrument: number; inline: number; modules: string[] };
+	total: { app: number; framework: number; instrument: number; inline: number };
+	turns: Array<{
+		kind: string;
+		label?: string;
+		delta: { app: number; framework: number; instrument: number };
+		modules: string[];
+	}>;
+	incomplete: null | { reason: string; ids: string[] };
+	loadClosed?: boolean;
+};
+
+// These bodies are serialized with Function.prototype.toString and inlined into
+// the document, so every one of them has to carry its own ledger arithmetic: a
+// module-scope helper would not survive the trip.
 function runPrerenderInlineResumerLogSummary(mode: 'always' | 'auto'): void {
 	const shouldLog = (() => {
 		if (mode === 'always') return true;
@@ -413,21 +434,125 @@ function runPrerenderInlineResumerLogSummary(mode: 'always' | 'auto'): void {
 		}
 	})();
 	if (!shouldLog) return;
-	const globalScope = globalThis as typeof globalThis & { __mxLog?: Set<string> };
+	const globalScope = globalThis as typeof globalThis & {
+		__mxLog?: Set<string>;
+		__marklessExecutionLedger?: MarklessInlineLedger;
+	};
+	// The one figure an inline script can back without a size map: its own
+	// shipped bytes — which for an SSR page is 100% of the JS executed at load.
+	const ledger = (globalScope.__marklessExecutionLedger ||= {
+		unit: 'chunk-raw-bytes',
+		load: { app: 0, framework: 0, instrument: 0, inline: 0, modules: [] },
+		total: { app: 0, framework: 0, instrument: 0, inline: 0 },
+		turns: [],
+		incomplete: null,
+	});
+	const ownBytes = (document.currentScript as HTMLScriptElement | null)?.textContent?.length ?? 0;
+	ledger.total.inline += ownBytes;
+	if (!ledger.loadClosed) ledger.load.inline += ownBytes;
+	// Load ends at the first user gesture, and an inline document script is the
+	// only observer early enough to see it. A module-scope helper cannot be used:
+	// these bodies are serialized with toString and would lose the reference.
+	for (const type of ['pointerdown', 'touchstart', 'keydown'])
+		addEventListener(type, (event) => { if (event.isTrusted) ledger.loadClosed = true; }, { capture: true, passive: true });
+	ledger.turns.push({
+		kind: 'resume',
+		delta: { app: 0, framework: 0, instrument: 0 },
+		modules: [],
+	});
 	const executed = [...(globalScope.__mxLog ||= new Set())];
 	const preloaded = document.querySelectorAll('link[rel=modulepreload]').length;
-	const app =
+	const loadBytes = ledger.load.app + ledger.load.framework + ledger.load.inline;
+	const totalBytes = ledger.total.app + ledger.total.framework + ledger.total.inline;
+	// Zero executed modules is the honest whole story for a resumed SSR page, so
+	// that arm keeps its exact sentence and its exact zero mirrors; anything else
+	// has to come from the ledger, which is the only thing that can back it.
+	const summary =
 		executed.length === 0
-			? '0.0 KB app'
-			: `${executed.length} app module${executed.length === 1 ? '' : 's'}`;
-	const summary = `markless: resumed — ${app} executed, ${preloaded} modules preloaded (${executed.length} app executed) · 0.0 KB instrument`;
+			? `markless: resumed — 0.0 KB app executed, ${preloaded} modules preloaded (0 app executed) · 0.0 KB instrument`
+			: `markless: ${(loadBytes / 1024).toFixed(1)} KB executed at load · total ${(totalBytes / 1024).toFixed(1)} KB · ${executed.length} modules pending sizes`;
 	console.log(summary);
 	const documentElement = document.documentElement;
 	if (documentElement) {
 		documentElement.setAttribute('data-markless-log-summary', summary);
+		documentElement.setAttribute('data-markless-log-inline-bytes', String(ledger.total.inline));
+		documentElement.setAttribute('data-markless-log-load-bytes', String(loadBytes));
 		if (executed.length === 0) {
 			documentElement.setAttribute('data-markless-log-app-bytes', '0');
 			documentElement.setAttribute('data-markless-log-instrument-bytes', '0');
+		} else {
+			documentElement.removeAttribute('data-markless-log-app-bytes');
+		}
+	}
+}
+
+// The general resumer's copy of the same summary. It was inline in
+// runInlineResumer and gated on a baked-in const, which shipped its text into
+// `never` documents; composed in here, a consumer page carries none of it.
+function runGeneralInlineLogSummary(mode: 'always' | 'auto'): void {
+	const shouldLog = (() => {
+		if (mode === 'always') return true;
+		const currentLocation = location;
+		if (
+			/^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::|$)/.test(currentLocation.origin) ||
+			new URLSearchParams(currentLocation.search).has('markless-log')
+		)
+			return true;
+		try {
+			return localStorage.getItem('marklessLog') === '1';
+		} catch {
+			return false;
+		}
+	})();
+	if (!shouldLog) return;
+	const currentDocument = document;
+	const currentScript = currentDocument.currentScript as HTMLScriptElement | null;
+	const globalScope = globalThis as typeof globalThis & {
+		__mxLog?: Set<string>;
+		__marklessExecutionLedger?: MarklessInlineLedger;
+	};
+	const executionLog = (globalScope.__mxLog ||= new Set());
+	// Same ledger, same one figure this script can back: its own bytes.
+	const ledger = (globalScope.__marklessExecutionLedger ||= {
+		unit: 'chunk-raw-bytes',
+		load: { app: 0, framework: 0, instrument: 0, inline: 0, modules: [] },
+		total: { app: 0, framework: 0, instrument: 0, inline: 0 },
+		turns: [],
+		incomplete: null,
+	});
+	const ownBytes = currentScript?.textContent?.length ?? 0;
+	ledger.total.inline += ownBytes;
+	if (!ledger.loadClosed) ledger.load.inline += ownBytes;
+	// Load ends at the first user gesture, and an inline document script is the
+	// only observer early enough to see it. A module-scope helper cannot be used:
+	// these bodies are serialized with toString and would lose the reference.
+	for (const type of ['pointerdown', 'touchstart', 'keydown'])
+		addEventListener(type, (event) => { if (event.isTrusted) ledger.loadClosed = true; }, { capture: true, passive: true });
+	ledger.turns.push({
+		kind: 'resume',
+		delta: { app: 0, framework: 0, instrument: 0 },
+		modules: [],
+	});
+	const executed = [...executionLog];
+	const preloaded = currentDocument.querySelectorAll('link[rel=modulepreload]').length;
+	const loadBytes = ledger.load.app + ledger.load.framework + ledger.load.inline;
+	const totalBytes = ledger.total.app + ledger.total.framework + ledger.total.inline;
+	const summary =
+		executed.length === 0
+			? `markless: resumed — 0.0 KB app executed, ${preloaded} modules preloaded (0 app executed) · 0.0 KB instrument`
+			: `markless: ${(loadBytes / 1024).toFixed(1)} KB executed at load · total ${(totalBytes / 1024).toFixed(1)} KB · ${executed.length} modules pending sizes`;
+	console.log(summary);
+	const documentElement = currentDocument.documentElement;
+	if (documentElement) {
+		documentElement.setAttribute('data-markless-log-summary', summary);
+		documentElement.setAttribute('data-markless-log-inline-bytes', String(ledger.total.inline));
+		documentElement.setAttribute('data-markless-log-load-bytes', String(loadBytes));
+		if (executed.length === 0) {
+			documentElement.setAttribute('data-markless-log-app-bytes', '0');
+			documentElement.setAttribute('data-markless-log-instrument-bytes', '0');
+		} else {
+			documentElement.removeAttribute('data-markless-log-app-bytes');
+			documentElement.removeAttribute('data-markless-log-instrument-bytes');
 		}
 	}
 }
@@ -545,48 +670,6 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 			module.resumeContainerEvent({ root, ...input }),
 		);
 	};
-
-	if (__MARKLESS_INLINE_EXECUTION_LOG__ !== 'never') {
-		const shouldLog = (() => {
-			if (__MARKLESS_INLINE_EXECUTION_LOG__ === 'always') return true;
-			const currentLocation = location;
-			if (
-				/^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::|$)/.test(
-					currentLocation.origin,
-				) ||
-				new URLSearchParams(currentLocation.search).has('markless-log')
-			)
-				return true;
-			try {
-				return localStorage.getItem('marklessLog') === '1';
-			} catch {
-				return false;
-			}
-		})();
-		if (shouldLog) {
-			const globalScope = globalThis as typeof globalThis & { __mxLog?: Set<string> };
-			const executionLog = (globalScope.__mxLog ||= new Set());
-			const executed = [...executionLog];
-			const preloaded = currentDocument.querySelectorAll('link[rel=modulepreload]').length;
-			const app =
-				executed.length === 0
-					? '0.0 KB app'
-					: `${executed.length} app module${executed.length === 1 ? '' : 's'}`;
-			const summary = `markless: resumed — ${app} executed, ${preloaded} modules preloaded (${executed.length} app executed) · 0.0 KB instrument`;
-			console.log(summary);
-			const documentElement = currentDocument.documentElement;
-			if (documentElement) {
-				documentElement.setAttribute('data-markless-log-summary', summary);
-				if (executed.length === 0) {
-					documentElement.setAttribute('data-markless-log-app-bytes', '0');
-					documentElement.setAttribute('data-markless-log-instrument-bytes', '0');
-				} else {
-					documentElement.removeAttribute('data-markless-log-app-bytes');
-					documentElement.removeAttribute('data-markless-log-instrument-bytes');
-				}
-			}
-		}
-	}
 
 	const viewScript = root.querySelector<HTMLScriptElement>('script[type="markless/view"]');
 	if (!viewScript) return;

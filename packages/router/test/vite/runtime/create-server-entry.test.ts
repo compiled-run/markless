@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vite-plus/test';
+import { describe, expect, it, vi } from 'vitest';
 import { MarklessCompileError, serializeMarklessDevError } from '@markless/bundler/dev-error';
 import { ASYNC_BOUNDARY_ARM } from '../../../../serializer/src/index.ts';
 import { marklessSsrAttachSnapshots, marklessSsrRunAsyncComputed } from '@markless/web/fns/ssr';

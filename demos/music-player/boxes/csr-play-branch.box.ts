@@ -23,6 +23,10 @@ export default box(
 		});
 		const preview = await pipeline.preview(build);
 
+		// The served size map is the box's independent source for what a module
+		// costs, so every charge the ledger mirrors is re-derived, never trusted.
+		const sizes = await servedExecutionSizes(preview);
+
 		// Mount truth: the app renders paused — the @else arm shows the play
 		// glyph and the toggle button carries the paused class binding.
 		const page = await preview.browser.visit('/');
@@ -43,7 +47,14 @@ export default box(
 		await expect.page.text(page, PLAY_ICON, PLAYING_ICON, WAIT);
 		await expect.page.attribute(page, PLAY_TOGGLE, 'class', 'play active', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'play', WAIT);
-		await waitForLogInteractionAttribute(page, 1, WAIT);
+		const firstPlay = await waitForLogInteractionAttribute(page, 1, sizes, WAIT);
+		receipt.note(
+			`first-Play charge: app ${firstPlay.app} B, framework ${firstPlay.framework} B over ` +
+				`[${firstPlay.modules.join(', ')}]`,
+		);
+		if (firstPlay.modules.length === 0) {
+			throw new Error('The first Play click charged no modules; the ledger mirrored nothing.');
+		}
 		// Exactness contract: no chunk may load post-click that was not in the
 		// startup preloaded set.
 		const afterClickScripts = await jsBuildRequestPaths(page);
@@ -58,7 +69,19 @@ export default box(
 		await expect.page.text(page, PLAY_ICON, PAUSED_ICON, WAIT);
 		await expect.page.attribute(page, PLAY_TOGGLE, 'class', 'play', WAIT);
 		await expect.page.attribute(page, '.youtube-frame-host', 'data-command', 'pause', WAIT);
-		await waitForLogInteractionAttribute(page, 2, WAIT);
+		// The ledger charges each module once, so this turn's own delta is only what
+		// the first click did not already pay for — smaller, never a re-charge.
+		const secondPlay = await waitForLogInteractionAttribute(page, 2, sizes, WAIT);
+		receipt.note(
+			`second-Play charge: app ${secondPlay.app} B, framework ${secondPlay.framework} B over ` +
+				`[${formatPaths(secondPlay.modules)}]`,
+		);
+		if (secondPlay.app > firstPlay.app || secondPlay.framework > firstPlay.framework) {
+			throw new Error(
+				`Expected the round-trip click to charge no more than the first (app ${firstPlay.app} B, ` +
+					`framework ${firstPlay.framework} B), got app ${secondPlay.app} B, framework ${secondPlay.framework} B.`,
+			);
+		}
 
 		await expect.page.outcome(page, { consoleErrors: 0, failedRequests: 0 }, WAIT);
 		await preview.close();
@@ -74,84 +97,142 @@ type ContentPage = {
 	content(): Promise<string>;
 };
 
+type ExecutionSizeMap = Record<
+	string,
+	{ readonly raw?: number; readonly gzip?: number; readonly instrument?: true }
+>;
+
+const FRAMEWORK_LOG_ID = /^(?:web|runtime|serializer|router|core|analyzer):/;
+
+async function servedExecutionSizes(preview: {
+	request(path: string): Promise<string>;
+}): Promise<ExecutionSizeMap> {
+	const sizes = JSON.parse(
+		await preview.request('/build/execution-sizes.json'),
+	) as ExecutionSizeMap;
+	if (!sizes['web:resume-events']?.raw) {
+		throw new Error('Expected the served size map to carry a raw size for web:resume-events.');
+	}
+	return sizes;
+}
+
+// The load line is the ledger's own wording: what executed before the first
+// gesture, and the running total. A per-turn clause here would mean load work
+// was attributed to a click that had not happened yet.
 async function waitForLogSummaryAttribute(
 	page: ContentPage,
 	options: { readonly timeoutMs: number },
 ): Promise<void> {
-	await waitForLogMirror(
-		page,
-		options,
-		/data-markless-log-summary="markless: rendered — \d+ app modules? executed \(\d+(?:\.\d+)? KB app\) · \d+ instrument modules? executed \(\d+(?:\.\d+)? KB\)"/,
-		/data-markless-log-summary="[^"]*est\./,
-		'Expected data-markless-log-summary to mirror the CSR render summary.',
-		undefined,
-		[/data-markless-log-app-bytes="\d+"/, /data-markless-log-instrument-bytes="\d+"/],
+	const summaryPattern =
+		/data-markless-log-summary="markless: (\d+\.\d) KB executed at load · total (\d+\.\d) KB[^"]*"/;
+	assertRejectsPreLedgerWording(summaryPattern, [
+		'data-markless-log-summary="markless: rendered — 3 app modules executed (1.8 KB app) · 1 instrument modules executed (9.4 KB)"',
+		'data-markless-log-summary="markless: click [button.play] · woke 1 modules · ran warm 2 modules · 3.1 KB"',
+	]);
+	const started = Date.now();
+	let lastSeen: string | null = null;
+	while (Date.now() - started < options.timeoutMs) {
+		const html = await page.content();
+		const summary = summaryPattern.exec(html);
+		if (summary) {
+			lastSeen = summary[0];
+			// The readable clause and the exact mirror must be the same number.
+			const loadBytes = Number(
+				/data-markless-log-load-bytes="([^"]*)"/.exec(html)?.[1] ?? Number.NaN,
+			);
+			if (!Number.isInteger(loadBytes)) {
+				throw new Error(`The load line printed ${summary[1]} KB with no byte mirror behind it.`);
+			}
+			if ((loadBytes / 1024).toFixed(1) === summary[1]) return;
+		}
+		await new Promise((resolve) => setTimeout(resolve, 25));
+	}
+	throw new Error(
+		`Expected data-markless-log-summary to mirror the ledger load line, saw ${lastSeen ?? '(absent)'}.`,
 	);
 }
 
+// The turn's cost is proven, not guessed: the ledger names the modules it
+// charged, and each one is joined against the served size map by category. The
+// arithmetic is checked end to end over the observed set, so a module waking for
+// the first time changes the sum AND the module list rather than silently
+// fitting a literal.
 async function waitForLogInteractionAttribute(
 	page: ContentPage,
 	count: number,
+	sizes: ExecutionSizeMap,
 	options: { readonly timeoutMs: number },
-): Promise<void> {
-	// Ruling 9 accepts honest-unknown here: CSR substitutes csr-callback ids, which
-	// intentionally do not guess source ownership in the pull-attribution design.
+): Promise<{ readonly app: number; readonly framework: number; readonly modules: string[] }> {
 	const lastPattern =
-		/data-markless-log-last="markless: click \[[^"]+\] · woke \d+ modules · ran warm \d+ modules · \d+ app modules \(bytes unknown; \d+ unmapped\) · \d+(?:\.\d+)? KB instrument"/;
-	const rejectedFixtures = [
+		/data-markless-log-last="markless: (\d+\.\d) KB executed at load · this click \+(\d+\.\d) KB · total (\d+\.\d) KB[^"]*"/;
+	assertRejectsPreLedgerWording(lastPattern, [
 		'data-markless-log-last="markless: click [button.play] · woke 1 modules · ran warm 2 modules · 3.1 KB"',
 		'data-markless-log-last="markless: click [button.play] · woke 1 modules · ran warm 2 modules · 1.8 KB app · 1.5 KB instrument"',
-	];
-	for (const fixture of rejectedFixtures) {
-		if (lastPattern.test(fixture))
-			throw new Error(`Execution-log matcher accepted a rejected format: ${fixture}`);
-	}
+		'data-markless-log-last="markless: click [button.play] · woke 1 modules · ran warm 2 modules · 3 app modules (bytes unknown; 1 unmapped) · 9.4 KB instrument"',
+	]);
 	const started = Date.now();
 	const countPattern = new RegExp(`data-markless-log-interactions="${count}"`);
 	while (Date.now() - started < options.timeoutMs) {
 		const html = await page.content();
-		if (
-			countPattern.test(html) &&
-			lastPattern.test(html) &&
-			!/data-markless-log-app-bytes=/.test(html) &&
-			!/data-markless-log-instrument-bytes=/.test(html) &&
-			!/data-markless-log-last="[^"]*est\./.test(html)
-		)
-			return;
-		await new Promise((resolve) => setTimeout(resolve, 25));
+		const last = lastPattern.exec(html);
+		const read = (name: string) =>
+			new RegExp(`data-markless-log-${name}="([^"]*)"`).exec(html)?.[1];
+		if (!countPattern.test(html) || !last) {
+			await new Promise((resolve) => setTimeout(resolve, 25));
+			continue;
+		}
+		if (/data-markless-log-incomplete="/.test(html)) {
+			throw new Error(
+				`The ledger reported unmapped ids on interaction ${count}: ${read('last')}`,
+			);
+		}
+		// Estimated source bytes are the ledger's own honest-unknown fallback; a
+		// preview build measures real chunks, so seeing it means the map went stale.
+		if (read('unit') !== 'chunk-raw-bytes') {
+			throw new Error(
+				`Expected interaction ${count} to be charged in chunk-raw-bytes, got ${read('unit')}.`,
+			);
+		}
+		const modules = (read('turn-modules') ?? '').split(' ').filter(Boolean);
+		const expected = { app: 0, framework: 0, instrument: 0 };
+		for (const id of modules) {
+			const entry = sizes[id];
+			if (!entry?.raw) {
+				throw new Error(
+					`Interaction ${count} charged ${id}, which the served size map cannot back.`,
+				);
+			}
+			expected[
+				entry.instrument ? 'instrument' : FRAMEWORK_LOG_ID.test(id) ? 'framework' : 'app'
+			] += entry.raw;
+		}
+		const app = Number(read('app-bytes'));
+		const framework = Number(read('framework-bytes'));
+		if (app !== expected.app || framework !== expected.framework) {
+			throw new Error(
+				`Interaction ${count} accounting disagrees with the size map: mirrored ` +
+					`app=${app} framework=${framework}, size-map sum over [${formatPaths(modules)}] ` +
+					`app=${expected.app} framework=${expected.framework}.`,
+			);
+		}
+		// The readable clause and the exact mirror must be the same number.
+		if ((Number(read('turn-bytes')) / 1024).toFixed(1) !== last[2]) {
+			throw new Error(
+				`Interaction ${count} printed +${last[2]} KB but mirrored ${read('turn-bytes')} B.`,
+			);
+		}
+		return { app, framework, modules };
 	}
-	throw new Error(
-		`Expected interaction ${count} to mirror an honest-unknown execution log line.`,
-	);
+	throw new Error(`Expected interaction ${count} to mirror the owner-worded ledger line.`);
 }
 
-async function waitForLogMirror(
-	page: ContentPage,
-	options: { readonly timeoutMs: number },
-	pattern: RegExp,
-	estPattern: RegExp,
-	message: string,
-	extraPattern?: RegExp,
-	structuredPatterns: readonly RegExp[] = [],
-): Promise<void> {
-	const oldTotalFixture =
-		'data-markless-log-last="markless: click [button.play] · woke 1 modules · ran warm 2 modules · 3.1 KB"';
-	if (pattern.test(oldTotalFixture))
-		throw new Error('Execution-log matcher accepted the old single-total format.');
-	const started = Date.now();
-	while (Date.now() - started < options.timeoutMs) {
-		const html = await page.content();
-		if (
-			(!extraPattern || extraPattern.test(html)) &&
-			structuredPatterns.every((structured) => structured.test(html)) &&
-			pattern.test(html) &&
-			!estPattern.test(html) &&
-			!/data-markless-log-(?:summary|last)="[^"]*· 3\.1 KB"/.test(html)
-		)
-			return;
-		await new Promise((resolve) => setTimeout(resolve, 25));
+// Self-check: the pre-ledger wording this box used to pin must never satisfy the
+// re-pointed matchers, so a regression to it fails instead of matching loosely.
+function assertRejectsPreLedgerWording(pattern: RegExp, fixtures: readonly string[]): void {
+	for (const fixture of fixtures) {
+		if (pattern.test(fixture))
+			throw new Error(`Execution-log matcher accepted a rejected format: ${fixture}`);
 	}
-	throw new Error(message);
 }
 
 async function jsBuildRequestPaths(page: NetworkRequestPage): Promise<readonly string[]> {
