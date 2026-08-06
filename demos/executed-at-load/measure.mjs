@@ -20,18 +20,19 @@ const FIXED_MICROTASK_TURNS = 8;
 const MODE = process.argv[2];
 const MAX_CEILING_HEADROOM = 0.05;
 const ACCEPTED_LOAD_BYTES = {
-	// Owner-signed 2026-08-02 ("parity is fine", ceiling <= 1,400): prerendered
-	// boot measured 937 — ratcheted to the real number, not the allowance.
-	'music-player-csr': 937,
-	'music-player-ssr': 1_213,
-	// Owner re-anchor ruling 2026-08-04: honest bridge-release marker.
-	// Supersedes 28,564/36,000 (premature-capture fiction).
-	// Macrotask-class 48,573 recorded.
-	'live-feed-csr': 48_573,
-	// lf-ssr accepted stays 1,285; measures 1,320 — the +35 is documented
-	// irreducible (pre-first-click arm listener install, t010b3/T013 receipts)
-	// and passes within the 5% headroom by design.
-	'live-feed-ssr': 1_285,
+	// Owner re-anchor directive 2026-08-06, all four lines set to the measured
+	// numbers of the full cache-purged baseline at main 99c1afe4 (live-feed
+	// diet + locator census pin landed). Tighten-only from here; the staleness
+	// guard below fails the gate if a line drifts far above reality again.
+	// Prior history: mp-csr 937 (owner-signed 2026-08-02, precompiled boot
+	// later shaved it); lf-csr 48,573 (2026-08-04 bridge marker, superseded by
+	// the Arm Templates + Fill Plan diet); lf-ssr 1,285 (+35 documented
+	// irreducible, now folded into the anchor); mp-ssr 1,213 (+3 pre-existing,
+	// same family as the first-play +3 interim).
+	'music-player-csr': 543,
+	'music-player-ssr': 1_216,
+	'live-feed-csr': 3_693,
+	'live-feed-ssr': 1_323,
 };
 const LOAD_BYTE_CEILINGS = Object.fromEntries(
 	Object.entries(ACCEPTED_LOAD_BYTES).map(([id, accepted]) => [
@@ -615,6 +616,15 @@ function assertLoadCeiling(label, run) {
 	if (run.totalExecutedBytes > ceiling) {
 		throw new Error(
 			`${label} executed ${run.totalExecutedBytes} bytes at load, above its hard ceiling of ${ceiling} (accepted ${ACCEPTED_LOAD_BYTES[label]}, maximum headroom ${MAX_CEILING_HEADROOM * 100}%).`,
+		);
+	}
+	// Staleness guard (owner directive 2026-08-06): an accepted line far above
+	// today's measurement protects nothing and misleads every reader. Fail loud
+	// so the owner re-anchors instead of anyone trusting the stale number.
+	const staleFloor = Math.floor(ACCEPTED_LOAD_BYTES[label] * (1 - MAX_CEILING_HEADROOM));
+	if (run.totalExecutedBytes < staleFloor) {
+		throw new Error(
+			`${label} executed ${run.totalExecutedBytes} bytes at load, far below its accepted line of ${ACCEPTED_LOAD_BYTES[label]}. The accepted line is STALE: re-anchor it (owner-only) to the measured number instead of citing it.`,
 		);
 	}
 }
