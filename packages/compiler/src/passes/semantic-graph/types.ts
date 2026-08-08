@@ -6,6 +6,7 @@ import type {
 	SemanticComponentEdge,
 	SemanticBehavior,
 	SemanticElementHandleBinding,
+	SemanticElementHandleIdref,
 	SemanticEvent,
 	SemanticGraphAlias,
 	SemanticGraphBinding,
@@ -46,6 +47,7 @@ export type MutableSemanticGraphArtifact = {
 	behaviors: SemanticBehavior[];
 	overlays: SemanticOverlay[];
 	elementHandleBindings: SemanticElementHandleBinding[];
+	elementHandleIdrefs: SemanticElementHandleIdref[];
 	localBindings: SemanticLocalBinding[];
 	localDeclarations: SemanticLocalDeclaration[];
 	aliases: SemanticGraphAlias[];
@@ -62,6 +64,18 @@ export type MutableSemanticGraphArtifact = {
 	diagnostics: SemanticGraphDiagnostic[];
 	moduleGraphInterface: ModuleGraphInterfaceArtifact;
 };
+
+/**
+ * An IDREF reference seen during the walk, before the graph knows whether its
+ * handle is ever bound. `boundHostNodeId` is exactly what the walk cannot know
+ * yet - `el={handle}` may appear later in the file - so it is missing here and
+ * supplied by the resolution pass, which is also where a never-bound handle
+ * becomes an error instead of a record.
+ */
+export type PendingElementHandleIdref = Omit<
+	SemanticElementHandleIdref,
+	'boundHostNodeId' | 'order'
+>;
 
 export type WalkState = {
 	readonly filename: string;
@@ -87,6 +101,7 @@ export type WalkState = {
 	// graph binding of the same name, so a write to one is never a graph write.
 	computedBodyLocalNames: ReadonlySet<string> | null;
 	deferredComputedWrites: DeferredComputedWrite[];
+	pendingElementHandleIdrefs: PendingElementHandleIdref[];
 	currentHelperCall: HelperStateCallSite | null;
 	helperFunctions: Map<string, AnyNode>;
 	pendingComputedDependencies: Array<{
@@ -148,6 +163,7 @@ export function createMutableSemanticGraphArtifact(filename: string): MutableSem
 		behaviors: [],
 		overlays: [],
 		elementHandleBindings: [],
+		elementHandleIdrefs: [],
 		localBindings: [],
 		localDeclarations: [],
 		aliases: [],
@@ -195,6 +211,7 @@ export function createWalkState(input: {
 		currentFunctionSite: null,
 		computedBodyLocalNames: null,
 		deferredComputedWrites: [],
+		pendingElementHandleIdrefs: [],
 		currentHelperCall: null,
 		helperFunctions: new Map(),
 		pendingComputedDependencies: [],

@@ -585,6 +585,7 @@ test('lowerStateAccess resolves array destructured aliases to indexed graph path
 		behaviors: [],
 		overlays: [],
 		elementHandleBindings: [],
+		elementHandleIdrefs: [],
 		localBindings: [],
 		aliases: [
 			{
@@ -656,6 +657,7 @@ test('lowerStateAccess reports a structured diagnostic for dynamic graph path wr
 		behaviors: [],
 		overlays: [],
 		elementHandleBindings: [],
+		elementHandleIdrefs: [],
 		localBindings: [],
 		aliases: [],
 		stateReads: [{ source: 'index' }],
@@ -725,6 +727,7 @@ test('lowerStateAccess reports a structured diagnostic for dynamic graph path re
 		behaviors: [],
 		overlays: [],
 		elementHandleBindings: [],
+		elementHandleIdrefs: [],
 		localBindings: [],
 		aliases: [],
 		stateReads: [],
@@ -794,6 +797,7 @@ test('lowerStateAccess reports a structured diagnostic for writes to paths exclu
 		behaviors: [],
 		overlays: [],
 		elementHandleBindings: [],
+		elementHandleIdrefs: [],
 		localBindings: [],
 		aliases: [
 			{
@@ -870,6 +874,7 @@ test('lowerStateAccess reports a structured diagnostic for optional graph writes
 		behaviors: [],
 		overlays: [],
 		elementHandleBindings: [],
+		elementHandleIdrefs: [],
 		localBindings: [],
 		aliases: [],
 		stateReads: [],

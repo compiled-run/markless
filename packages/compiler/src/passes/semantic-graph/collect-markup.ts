@@ -26,6 +26,7 @@ import type {
 	SemanticMarkupResidue,
 	SemanticMarkupSlot,
 } from '../../artifacts.ts';
+import { isIdrefAttribute } from './idref-attributes.ts';
 import { collectStyleScopes } from '../public-render/style-scopes.ts';
 import type { MutableSemanticGraphArtifact } from './types.ts';
 
@@ -356,7 +357,8 @@ function emitNode(
 			isEventAttribute(name) ||
 			name === 'attach' ||
 			name === 'el' ||
-			name === 'overlay'
+			name === 'overlay' ||
+			isElementHandleIdref(context, node, name)
 		)
 			continue;
 		if (name === 'class') classSeen = true;
@@ -388,8 +390,23 @@ function emitNode(
 	return 1;
 }
 
-function directClassMatch(
-	expression: AnyNode,
+/**
+ * An IDREF attribute whose value resolved to an element() handle is a recorded
+ * relationship, not a value binding, so it must not reach the statics at all.
+ * Emitting the slot anyway would ship `aria-labelledby=""` - an id reference
+ * pointing at nothing, which is worse than an absent attribute. The consuming
+ * emitter writes both sides of the relationship from the record.
+ */
+function isElementHandleIdref(context: CollectionContext, node: AnyNode, name: string): boolean {
+	if (!isIdrefAttribute(name)) return false;
+	const hostNodeId = context.hostIds.get(node);
+	if (!hostNodeId) return false;
+	return context.graph.elementHandleIdrefs.some(
+		(idref) => idref.hostNodeId === hostNodeId && idref.attributeName === name,
+	);
+}
+
+function directClassMatch(expression: AnyNode,
 	context: CollectionContext,
 	repeat: { readonly id: string; readonly itemName: string },
 ) {
@@ -457,7 +474,8 @@ function emitDynamicHost(
 			isEventAttribute(name) ||
 			name === 'attach' ||
 			name === 'el' ||
-			name === 'overlay'
+			name === 'overlay' ||
+			isElementHandleIdref(context, node, name)
 		)
 			continue;
 		const value = attribute.value as AnyNode | undefined;

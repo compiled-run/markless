@@ -11,6 +11,13 @@ declare namespace __MarklessTypeService {
 
 	type Child = Element | string | number | null | undefined | readonly Child[];
 	type AttributeValue = string | number | boolean | undefined;
+	/**
+	 * An IDREF position - an attribute that names another element by id. An
+	 * element() handle is valid here: the compiler resolves the relationship and
+	 * the emitter mints the id, so the author never spells one. A plain string id
+	 * still works for elements markless did not render.
+	 */
+	type IdrefValue = AttributeValue | globalThis.Element;
 	type Cleanup = () => void;
 	type NativeElementBehavior<E extends globalThis.Element> = (
 		element: E,
@@ -82,7 +89,14 @@ declare namespace __MarklessTypeService {
 		title?: string;
 		translate?: 'yes' | 'no';
 		[key: `data-${string}`]: AttributeValue;
-		[key: `aria-${string}`]: AttributeValue;
+		/**
+		 * IDREF positions (`aria-labelledby`, `aria-controls`, `aria-describedby`)
+		 * accept an element() handle, which is why this is IdrefValue rather than
+		 * AttributeValue. A pattern index signature cannot name exceptions, so the
+		 * type is looser than the compiler: the compiler's IDREF_ATTRIBUTES set is
+		 * the authority on which aria attributes actually resolve a handle.
+		 */
+		[key: `aria-${string}`]: IdrefValue;
 	};
 
 	type FormAttributes = {
@@ -140,6 +154,8 @@ declare namespace __MarklessTypeService {
 		multiple?: boolean;
 		pattern?: string;
 		placeholder?: string;
+		popovertarget?: IdrefValue;
+		popovertargetaction?: 'hide' | 'show' | 'toggle';
 		readonly?: boolean;
 		required?: boolean;
 		size?: number;
@@ -207,6 +223,8 @@ declare namespace __MarklessTypeService {
 				: Tag extends 'button'
 					? FormAttributes & {
 							disabled?: boolean;
+							popovertarget?: IdrefValue;
+							popovertargetaction?: 'hide' | 'show' | 'toggle';
 							type?: 'button' | 'reset' | 'submit';
 							value?: string;
 						}
@@ -240,7 +258,7 @@ declare namespace __MarklessTypeService {
 									: Tag extends 'input'
 										? InputAttributes
 										: Tag extends 'label'
-											? { for?: string }
+											? { for?: IdrefValue }
 											: Tag extends 'link'
 												? AnchorAttributes & { as?: string; disabled?: boolean; sizes?: string }
 												: Tag extends 'source'

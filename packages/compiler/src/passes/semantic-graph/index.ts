@@ -113,7 +113,7 @@ export async function buildSemanticGraph(
 	finalizeComputedDependencies(state);
 	propagateAsyncComputedCapability(graph);
 	collectComputedDependencyCycleDiagnostics(graph);
-	collectElementHandleDiagnostics(graph);
+	collectElementHandleDiagnostics(graph, state.pendingElementHandleIdrefs);
 	collectAsyncBoundaryDiagnostics(graph);
 	graph.markup = collectSemanticMarkup({
 		ast,

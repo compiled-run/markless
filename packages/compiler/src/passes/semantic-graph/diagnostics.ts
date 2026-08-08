@@ -10,7 +10,7 @@ import type {
 	SourceSpan,
 } from '../../artifacts.ts';
 import type { FrameworkApiName } from './imports.ts';
-import type { WalkState } from './types.ts';
+import type { PendingElementHandleIdref, WalkState } from './types.ts';
 
 export function storageKeyStaticDiagnostic(input: {
 	readonly argument: 'key' | 'fallback';
@@ -699,6 +699,79 @@ export function unboundElementHandleDiagnostic(input: {
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_UNBOUND',
 	};
+}
+
+/**
+ * A dangling IDREF handle is an error, not a warning, and it is its own code
+ * rather than a promotion of MARKLESS_ELEMENT_HANDLE_UNBOUND.
+ *
+ * The two failures are not the same failure. An unbound handle READ renders
+ * `undefined` where you can see it, and `// markless-allow` can legitimately
+ * say the read is intentional - which only works because that code is a
+ * warning; markless-allow cannot suppress errors. A dangling IDREF renders
+ * nothing wrong at all: the page looks right, the relationship is simply
+ * absent, and nothing downstream ever notices. That is the worst accessibility
+ * bug class there is, so it stops the build and cannot be waived.
+ */
+export function unboundIdrefElementHandleDiagnostic(
+	reference: PendingElementHandleIdref,
+): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_ELEMENT_HANDLE_IDREF_UNBOUND',
+		title: 'element() handle is referenced but never bound',
+		message: `Cannot resolve ${reference.attributeName}={${reference.source}} because "${reference.handleName}" is never bound with el={${reference.handleName}} in this component.`,
+		why: 'An IDREF position names another element. With no el={handle} binding there is no element to name, so the compiler would emit an attribute pointing at nothing - a silently broken relationship that renders correctly and helps nobody.',
+		span: reference.sourceSpan,
+		suggestion: `Bind the handle to the element it names with el={${reference.handleName}}, or remove the ${reference.attributeName} attribute.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_UNBOUND',
+	});
+}
+
+/**
+ * An IDREF position takes exactly one handle, written directly. Lists
+ * (`aria-labelledby={[a, b]}`), joins, and choices are refused in this slice
+ * rather than lowered.
+ *
+ * Refusal is a decision about ownership, not difficulty. Joining ids would make
+ * the compiler mint several ids, choose their order, and pick a separator - all
+ * of which are id SPELLING, which these records deliberately do not own. A
+ * refusal is loud and reversible; a silent join would bake one emitter's
+ * spelling into the graph.
+ */
+export function compositeIdrefElementHandleDiagnostic(input: {
+	readonly attributeName: string;
+	readonly source: string;
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE',
+		title: 'One element() handle per IDREF attribute',
+		message: `Cannot resolve ${input.attributeName}={${input.source}}. An IDREF position takes exactly one element() handle written directly, not a list, a join, or a choice between handles.`,
+		why: 'The compiler resolves the relationship and the emitter mints the id. Combining handles would require the compiler to spell and order several ids inside one attribute value, and id spelling is not something this record owns.',
+		span: input.span,
+		suggestion: `Reference one element() handle directly, as ${input.attributeName}={handle}.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE',
+	});
+}
+
+/**
+ * A handle bound inside a keyed repeat locates one element per row. Naming it
+ * from an IDREF position asks which row, and this slice deliberately does not
+ * answer: per-row identity belongs with the code that owns row identity.
+ * Refusing keeps the ambiguity visible instead of resolving it to row one.
+ */
+export function rowOwnedIdrefElementHandleDiagnostic(
+	reference: PendingElementHandleIdref,
+): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_ELEMENT_HANDLE_IDREF_ROW_OWNED',
+		title: 'A repeated element() handle cannot be named by an IDREF',
+		message: `Cannot resolve ${reference.attributeName}={${reference.source}} because "${reference.handleName}" is bound inside a keyed repeat, so it names one element per row rather than one element.`,
+		why: 'Every row owns its own element and would need its own id. One authored handle cannot name one of them, and picking a row silently would make the relationship point at whichever row happened to render first.',
+		span: reference.sourceSpan,
+		suggestion: 'Bind a separate element() handle outside the repeat for the element this attribute names, or move the relationship inside the row so each row names its own element.',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_ROW_OWNED',
+	});
 }
 
 export function elementHandleRenderReadDiagnostic(input: {

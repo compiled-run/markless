@@ -50,8 +50,17 @@ import {
 	styleObjectUnsupportedDiagnostic,
 	unsupportedRowElementHandleDiagnostic,
 	unboundElementHandleDiagnostic,
+	compositeIdrefElementHandleDiagnostic,
+	rowOwnedIdrefElementHandleDiagnostic,
+	unboundIdrefElementHandleDiagnostic,
 } from './diagnostics.ts';
-import type { MutableSemanticGraphArtifact, SemanticGraphWalk, WalkState } from './types.ts';
+import { isIdrefAttribute } from './idref-attributes.ts';
+import type {
+	MutableSemanticGraphArtifact,
+	PendingElementHandleIdref,
+	SemanticGraphWalk,
+	WalkState,
+} from './types.ts';
 
 export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGraphWalk): void {
 	collectComponentEdge(node, state, walk);
@@ -319,7 +328,10 @@ export function collectConditionalBranchText(node: AnyNode, state: WalkState): v
 	}
 }
 
-export function collectElementHandleDiagnostics(graph: MutableSemanticGraphArtifact): void {
+export function collectElementHandleDiagnostics(
+	graph: MutableSemanticGraphArtifact,
+	pendingIdrefs: ReadonlyArray<PendingElementHandleIdref> = [],
+): void {
 	const bindings = graphBindingMap(graph);
 	const aliases = semanticAliasMap(graph);
 	const validElementHandleBindings: SemanticElementHandleBinding[] = [];
@@ -412,6 +424,37 @@ export function collectElementHandleDiagnostics(graph: MutableSemanticGraphArtif
 				}),
 			);
 		}
+	}
+
+	resolveElementHandleIdrefs(graph, pendingIdrefs, firstBindingByHandle);
+}
+
+/**
+ * Turns the walk's pending IDREF references into records, now that every
+ * `el={handle}` binding in the file is known. A reference whose handle was never
+ * bound never becomes a record: it becomes an error, because an IDREF pointing
+ * at nothing is invisible at runtime.
+ */
+function resolveElementHandleIdrefs(
+	graph: MutableSemanticGraphArtifact,
+	pendingIdrefs: ReadonlyArray<PendingElementHandleIdref>,
+	boundByHandle: ReadonlyMap<string, SemanticElementHandleBinding>,
+): void {
+	for (const reference of pendingIdrefs) {
+		const bound = boundByHandle.get(reference.handleName);
+		if (!bound) {
+			graph.diagnostics.push(unboundIdrefElementHandleDiagnostic(reference));
+			continue;
+		}
+		if (bound.rowOwner || bound.keyedRepeatScopeIds.length > 0) {
+			graph.diagnostics.push(rowOwnedIdrefElementHandleDiagnostic(reference));
+			continue;
+		}
+		graph.elementHandleIdrefs.push({
+			...reference,
+			boundHostNodeId: bound.hostNodeId,
+			order: graph.elementHandleIdrefs.length,
+		});
 	}
 }
 
@@ -571,6 +614,45 @@ function collectAttribute(
 			});
 		}
 		return;
+	}
+
+	// Must sit above the generic attribute branch: an element() handle in an IDREF
+	// position is identity, not a value. Left to fall through it becomes an
+	// ordinary attribute binding that writes a DOM element into a string
+	// attribute - the page renders, the relationship does not exist, and nothing
+	// says so. Non-handle values in these same attributes are untouched.
+	if (expressionValue && isIdrefAttribute(attributeName)) {
+		const classified = classifyIdrefValue(expressionValue, state);
+		if (classified?.kind === 'composite') {
+			state.graph.diagnostics.push(
+				compositeIdrefElementHandleDiagnostic({
+					attributeName,
+					source: expressionSource(expressionValue, state.source),
+					span: sourceSpan(expressionValue, state.filename),
+				}),
+			);
+			walk(expressionValue, state);
+			return;
+		}
+		if (classified?.kind === 'handle') {
+			// No templateRead and no boundHostNodeId yet: whether this handle is ever
+			// bound is not knowable until the whole file has been walked.
+			state.pendingElementHandleIdrefs.push({
+				hostNodeId,
+				attributeName,
+				handleName: classified.handleName,
+				source: expressionSource(expressionValue, state.source),
+				componentName: state.currentComponentName ?? undefined,
+				sourceSpan: sourceSpan(expressionValue, state.filename),
+				...(state.currentKeyedRepeatScopeIds.length > 0
+					? { keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds] }
+					: {}),
+				...(state.currentAsyncBoundaryId
+					? { asyncBoundaryId: state.currentAsyncBoundaryId }
+					: {}),
+			});
+			return;
+		}
 	}
 
 	const conditionalClass = conditionalClassTarget(attributeName, expressionValue);
@@ -764,6 +846,49 @@ function resolvePropForwardedElementHandle(
 	if (!handle || handle.kind !== 'element') return null;
 
 	return { name: handle.name };
+}
+
+type IdrefValueClassification =
+	| { readonly kind: 'handle'; readonly handleName: string }
+	| { readonly kind: 'composite' };
+
+/**
+ * Classifies an IDREF attribute value. `handle` is one element() handle written
+ * directly, the only form this slice records. `composite` is any expression that
+ * mentions a handle without being one - a list, a join, a choice - which is
+ * refused rather than lowered. `null` is everything else, including an ordinary
+ * id string, which keeps its existing templateRead.
+ */
+function classifyIdrefValue(
+	expression: AnyNode,
+	state: WalkState,
+): IdrefValueClassification | null {
+	const handleName = resolvedElementHandleName(expression, state);
+	if (handleName) return { kind: 'handle', handleName };
+	return mentionsElementHandle(expression, state) ? { kind: 'composite' } : null;
+}
+
+function resolvedElementHandleName(expression: AnyNode, state: WalkState): string | null {
+	const source = expressionSource(expression, state.source);
+	if (!source) return null;
+	const resolved = resolveGraphPath(
+		source,
+		graphBindingMap(state.graph),
+		semanticAliasMap(state.graph),
+	);
+	// A member path such as `label.id` is a render-time DOM read, not identity;
+	// it keeps falling through to MARKLESS_ELEMENT_HANDLE_RENDER_READ.
+	if (!resolved || resolved.binding.kind !== 'element' || resolved.path.length > 0) return null;
+	return resolved.binding.name;
+}
+
+function mentionsElementHandle(expression: AnyNode, state: WalkState): boolean {
+	let found = false;
+	walkNode(expression, (node) => {
+		if (found || node.type !== 'Identifier') return;
+		if (resolvedElementHandleName(node, state)) found = true;
+	});
+	return found;
 }
 
 function conditionalClassTarget(

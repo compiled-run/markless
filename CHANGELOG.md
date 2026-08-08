@@ -100,6 +100,49 @@ error, `MARKLESS_OVERLAY_HOST_ELEMENT_REQUIRED`, because a component is not a
 DOM locator and may render zero, one, or many host nodes. It cannot be worked
 around by forwarding a prop either — a forwarded value is not a literal.
 
+### `element()` handles are identity in IDREF positions
+
+There is no `useId` in Markless, and none is coming. An id has no render
+lifecycle to hook into, so instead of handing you a string to place yourself, an
+`element()` handle is now valid wherever the platform expects an id reference:
+
+```tsx
+const label = element<HTMLSpanElement>();
+
+<span el={label}>Notifications</span>
+<div role="group" aria-labelledby={label}>…</div>
+```
+
+The compiler resolves the relationship and the emitter writes the id onto both
+sides. You never see the string, never invent a naming scheme for it, and can
+never collide with someone else's.
+
+The IDREF positions are `aria-labelledby`, `aria-controls`, `aria-describedby`,
+`popovertarget`, and `for`. `aria-activedescendant` is deliberately not one of
+them: it names one row of a live collection, which needs per-row identity that
+this release does not do.
+
+A handle referenced in one of those positions and never bound with `el={handle}`
+is a compile error, `MARKLESS_ELEMENT_HANDLE_IDREF_UNBOUND`. It is an error and
+not a warning because of how the failure looks: the page renders correctly, and
+the relationship is simply absent. Nothing else in your toolchain will catch
+that. The existing `MARKLESS_ELEMENT_HANDLE_UNBOUND` warning, for reading a
+handle before it is bound, keeps its severity — that read renders `undefined`
+where you can see it, and `// markless-allow` can still say it was intentional.
+
+One handle per attribute in this release. `aria-labelledby={[first, second]}`,
+`` aria-describedby={`${first} legacy-id`} ``, and a choice between two handles
+are all refused with `MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE` rather than
+joined, because joining ids means minting them, ordering them, and picking a
+separator — id spelling the compiler deliberately does not own. A handle bound
+inside a keyed repeat is refused too, with
+`MARKLESS_ELEMENT_HANDLE_IDREF_ROW_OWNED`: one authored handle there names one
+element per row, and choosing a row silently would point the relationship at
+whichever rendered first.
+
+Plain string ids in those attributes are untouched, and so is every attribute
+outside the set.
+
 ## 0.2.1
 
 A type-only fix. No runtime behavior changes, and no code that worked on 0.2.0

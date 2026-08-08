@@ -332,6 +332,9 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED'
 		| 'MARKLESS_ELEMENT_MODULE_SCOPE'
 		| 'MARKLESS_ELEMENT_HANDLE_RENDER_READ'
+		| 'MARKLESS_ELEMENT_HANDLE_IDREF_UNBOUND'
+		| 'MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE'
+		| 'MARKLESS_ELEMENT_HANDLE_IDREF_ROW_OWNED'
 		| 'MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED'
 		| 'MARKLESS_OVERLAY_VALUE_UNSUPPORTED'
 		| 'MARKLESS_OVERLAY_HOST_ELEMENT_REQUIRED'
@@ -435,6 +438,42 @@ export type SemanticElementHandleBinding = {
 		readonly repeatId: string;
 		readonly keyPath: ReadonlyArray<string>;
 	};
+};
+
+/**
+ * One authored relationship between an element that carries an IDREF attribute
+ * and the element that an element() handle is bound to. markless has no useId:
+ * an id has no render lifecycle to hook into, so the author names the
+ * relationship and never sees a string.
+ *
+ * This is deliberately its own family rather than a field on
+ * SemanticElementHandleBinding, because the two records answer different
+ * questions with different owners. A binding says "this handle locates that
+ * host"; an IDREF reference says "this OTHER host points at it through this
+ * attribute". Folding them together would make `hostNodeId` mean two things.
+ *
+ * Like SemanticOverlay it carries no inputs: identity is structural and can
+ * never re-run. And like SemanticOverlay it records the relationship only. There
+ * is no id string anywhere in this record - spelling the id, and writing it onto
+ * `boundHostNodeId`, is the consuming emitter's lowering concern.
+ */
+export type SemanticElementHandleIdref = {
+	/** The host element that carries the IDREF attribute. */
+	readonly hostNodeId: string;
+	/** The IDREF attribute on that host, e.g. `aria-labelledby`. */
+	readonly attributeName: string;
+	/** The resolved element() handle binding name. */
+	readonly handleName: string;
+	/** The authored expression, which differs from handleName through an alias. */
+	readonly source: string;
+	/** The host element bound with `el={handle}`; the element that needs the id. */
+	readonly boundHostNodeId: string;
+	readonly componentName?: string;
+	readonly sourceSpan?: SourceSpan;
+	// Document order of the IDREF references in this file; stable across compiles.
+	readonly order: number;
+	readonly keyedRepeatScopeIds?: ReadonlyArray<string>;
+	readonly asyncBoundaryId?: string;
 };
 
 export type SemanticBehavior = {
@@ -629,6 +668,7 @@ export type SemanticGraphArtifact = {
 	readonly behaviors: ReadonlyArray<SemanticBehavior>;
 	readonly overlays: ReadonlyArray<SemanticOverlay>;
 	readonly elementHandleBindings: ReadonlyArray<SemanticElementHandleBinding>;
+	readonly elementHandleIdrefs: ReadonlyArray<SemanticElementHandleIdref>;
 	readonly localBindings: ReadonlyArray<SemanticLocalBinding>;
 	readonly localDeclarations: ReadonlyArray<SemanticLocalDeclaration>;
 	readonly aliases: ReadonlyArray<SemanticGraphAlias>;
