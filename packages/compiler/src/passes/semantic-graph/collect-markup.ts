@@ -348,7 +348,17 @@ function emitNode(
 			continue;
 		}
 		const name = getIdentifierName(attribute.name as AnyNode | undefined);
-		if (!name || isEventAttribute(name) || name === 'attach' || name === 'el') continue;
+		// overlay is a compiler-side elevation mark, not a DOM attribute: without this
+		// skip staticAttributeValue leaks ` overlay=""` (bare) or ` overlay="true"`
+		// ({true}) straight into the emitted statics.
+		if (
+			!name ||
+			isEventAttribute(name) ||
+			name === 'attach' ||
+			name === 'el' ||
+			name === 'overlay'
+		)
+			continue;
 		if (name === 'class') classSeen = true;
 		const value = attribute.value as AnyNode | undefined;
 		const expression = unwrapExpressionContainer(value);
@@ -439,7 +449,17 @@ function emitDynamicHost(
 			continue;
 		}
 		const name = getIdentifierName(attribute.name as AnyNode | undefined);
-		if (!name || isEventAttribute(name) || name === 'attach' || name === 'el') continue;
+		// overlay is a compiler-side elevation mark, not a DOM attribute: without this
+		// skip staticAttributeValue leaks ` overlay=""` (bare) or ` overlay="true"`
+		// ({true}) straight into the emitted statics.
+		if (
+			!name ||
+			isEventAttribute(name) ||
+			name === 'attach' ||
+			name === 'el' ||
+			name === 'overlay'
+		)
+			continue;
 		const value = attribute.value as AnyNode | undefined;
 		const expression = unwrapExpressionContainer(value);
 		const literal = staticAttributeValue(value, expression);

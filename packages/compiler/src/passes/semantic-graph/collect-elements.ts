@@ -44,6 +44,8 @@ import {
 	elementHandlePropUnsupportedDiagnostic,
 	elementHandleRenderReadDiagnostic,
 	eventSpreadUnsupportedDiagnostic,
+	overlayHostElementRequiredDiagnostic,
+	overlayValueUnsupportedDiagnostic,
 	spreadStaticSnapshotDiagnostic,
 	styleObjectUnsupportedDiagnostic,
 	unsupportedRowElementHandleDiagnostic,
@@ -447,6 +449,24 @@ function collectAttribute(
 		return;
 	}
 
+	// overlay on a component element. Unlike attach this fires even with no value,
+	// because bare `overlay` is the common form. Silence here would be the worst
+	// outcome: overlay cannot be prop-forwarded (a forwarded value is non-literal),
+	// so <Dialog overlay /> would elevate nothing and say nothing.
+	if (attributeName === 'overlay' && !isHostElement) {
+		state.graph.diagnostics.push(
+			overlayHostElementRequiredDiagnostic({
+				ownerTagName,
+				span: sourceSpan(attribute, state.filename),
+			}),
+		);
+		if (expressionValue) {
+			collectExpressionReads(expressionValue, state);
+			walk(expressionValue, state);
+		}
+		return;
+	}
+
 	if (!hostNodeId) return;
 
 	if (isEventAttribute(attributeName)) {
@@ -518,6 +538,41 @@ function collectAttribute(
 		return;
 	}
 
+	// Must sit above the generic attribute branch below: without it a non-literal
+	// overlay falls through and becomes a real DOM attribute binding named
+	// "overlay", which is exactly the silent lowering the diagnostic exists to stop.
+	if (attributeName === 'overlay') {
+		const elevated = overlayLiteralValue(value, expressionValue);
+		if (elevated === null) {
+			const invalid = expressionValue ?? (value as AnyNode);
+			state.graph.diagnostics.push(
+				overlayValueUnsupportedDiagnostic({
+					source: expressionSource(invalid, state.source),
+					carrier: 'attribute',
+					span: sourceSpan(invalid, state.filename),
+				}),
+			);
+			if (expressionValue) {
+				collectExpressionReads(expressionValue, state);
+				walk(expressionValue, state);
+			}
+			return;
+		}
+
+		// overlay={false} is the absent case: no record, no diagnostic, no attribute.
+		if (elevated) {
+			state.graph.overlays.push({
+				hostNodeId,
+				componentName: state.currentComponentName ?? undefined,
+				order: state.graph.overlays.length,
+				...(state.currentKeyedRepeatScopeIds.length > 0
+					? { keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds] }
+					: {}),
+			});
+		}
+		return;
+	}
+
 	const conditionalClass = conditionalClassTarget(attributeName, expressionValue);
 	if (conditionalClass) {
 		state.graph.templateReads.push({
@@ -556,6 +611,8 @@ function collectDuplicateAttributeDiagnostics(
 	for (const attribute of getElementAttributes(node)) {
 		if (isSpreadAttribute(attribute)) continue;
 		const name = getIdentifierName(attribute.name as AnyNode | undefined);
+		// overlay is deliberately absent from this skip list: <div overlay overlay>
+		// is still a duplicate attribute and should keep firing MARKLESS_ATTRIBUTE_DUPLICATE.
 		if (!name || isEventAttribute(name) || name === 'attach' || name === 'el') continue;
 		const previous = seen.get(name);
 		if (previous) {
@@ -596,6 +653,21 @@ function collectSpreadAttribute(
 				keys: eventKeys,
 				node: argument,
 				filename: state.filename,
+			}),
+		);
+		walk(argument, state);
+		return;
+	}
+
+	// Separate from isSpreadEventKey on purpose: that key set feeds an
+	// event-specific diagnostic. A spread can never carry overlay, because the
+	// mark has to be readable as a literal on the element itself.
+	if (objectKeys.includes('overlay')) {
+		state.graph.diagnostics.push(
+			overlayValueUnsupportedDiagnostic({
+				source: spreadSource,
+				carrier: 'spread',
+				span: sourceSpan(argument, state.filename),
 			}),
 		);
 		walk(argument, state);
@@ -772,6 +844,24 @@ function singleStaticTextChild(node: AnyNode): string | null {
 	return text === '' ? null : text;
 }
 
+// The whole value grammar for overlay: bare (true), {true}, {false}. Anything
+// else - identifier, member access, call, template, non-boolean literal - is a
+// null return, which the caller turns into MARKLESS_OVERLAY_VALUE_UNSUPPORTED.
+function overlayLiteralValue(
+	value: AnyNode | undefined,
+	expression: AnyNode | undefined,
+): boolean | null {
+	if (!value) return true;
+	const literal = expression ?? value;
+	if (literal.type === 'Literal' && typeof literal.value === 'boolean') return literal.value;
+	return null;
+}
+
+// No overlay case here on purpose: bare `overlay` already keys as
+// ["overlay","true"] via the !value branch, and overlay={true} keys identically
+// via the expression branch, so @if arm merging already treats the two spellings
+// as the same arm shape. Skipping overlay would instead merge an elevated arm
+// with a non-elevated one.
 function staticAttributeKey(node: AnyNode): string | null {
 	const attributes: Array<readonly [string, string]> = [];
 	for (const attribute of getElementAttributes(node)) {

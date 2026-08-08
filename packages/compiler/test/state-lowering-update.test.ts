@@ -32,6 +32,7 @@ test('lowerStateAccess preserves update expression operator and prefix metadata'
 		hostNodes: [],
 		events: [],
 		behaviors: [],
+		overlays: [],
 		elementHandleBindings: [],
 		localBindings: [],
 		aliases: [],

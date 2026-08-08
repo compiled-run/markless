@@ -20,6 +20,7 @@ import type {
 	SemanticLocalBinding,
 	SemanticLocalDeclaration,
 	SemanticMarkupArtifact,
+	SemanticOverlay,
 	SemanticBranchSite,
 	SemanticStateRead,
 	SemanticStateWrite,
@@ -43,6 +44,7 @@ export type MutableSemanticGraphArtifact = {
 	events: SemanticEvent[];
 	syncPolicyConstants: SemanticSyncPolicyConstant[];
 	behaviors: SemanticBehavior[];
+	overlays: SemanticOverlay[];
 	elementHandleBindings: SemanticElementHandleBinding[];
 	localBindings: SemanticLocalBinding[];
 	localDeclarations: SemanticLocalDeclaration[];
@@ -144,6 +146,7 @@ export function createMutableSemanticGraphArtifact(filename: string): MutableSem
 		events: [],
 		syncPolicyConstants: [],
 		behaviors: [],
+		overlays: [],
 		elementHandleBindings: [],
 		localBindings: [],
 		localDeclarations: [],

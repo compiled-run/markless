@@ -67,6 +67,39 @@ and it now ships the TypeScript types for the browser commands it registers.
 `vitest` is a required peer dependency (`^4.1.5`) because the package imports it
 directly; `vite` is optional.
 
+### `overlay` marks an element for elevation
+
+`overlay` is a new element attribute. It renders the element above the rest of
+the UI, escaping any clipping or stacking ancestor:
+
+```tsx
+<div overlay class="sheet">Menu</div>
+<div overlay={true}>The same thing, spelled out</div>
+<div overlay={false}>Not elevated</div>
+```
+
+That is the whole feature. `overlay` does not dismiss on an outside click, does
+not move focus, does not position or animate anything, and adds no ARIA roles.
+Those stay yours to write, which is what keeps one attribute from turning into a
+dialog framework.
+
+The value has to be a literal. `overlay={isOpen}` is a compile error,
+`MARKLESS_OVERLAY_VALUE_UNSUPPORTED`, because elevation is structural rather
+than reactive: the record the compiler emits carries no inputs, so it has no
+dependencies and can never re-run. Drive existence with `@if` and leave
+`overlay` a literal on the element inside the branch:
+
+```tsx
+@if (isOpen) {
+	<div overlay class="sheet">Menu</div>
+}
+```
+
+`overlay` also has to sit on a host element. `<Dialog overlay />` is a compile
+error, `MARKLESS_OVERLAY_HOST_ELEMENT_REQUIRED`, because a component is not a
+DOM locator and may render zero, one, or many host nodes. It cannot be worked
+around by forwarding a prop either — a forwarded value is not a literal.
+
 ## 0.2.1
 
 A type-only fix. No runtime behavior changes, and no code that worked on 0.2.0

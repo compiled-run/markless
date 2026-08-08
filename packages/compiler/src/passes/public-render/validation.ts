@@ -385,7 +385,8 @@ function emittedTemplateReads(
 			if (
 				isEventAttribute(attributeName) ||
 				attributeName === 'attach' ||
-				attributeName === 'el'
+				attributeName === 'el' ||
+				attributeName === 'overlay'
 			)
 				continue;
 			add(

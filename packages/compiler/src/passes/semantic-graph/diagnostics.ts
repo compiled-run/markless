@@ -880,6 +880,56 @@ export function attachHostElementRequiredDiagnostic(
 	};
 }
 
+/**
+ * overlay marks structural elevation and carries no inputs, so its value has to
+ * be readable at compile time. A non-literal is refused rather than lowered:
+ * there is no dependency edge that could re-elevate the host when it changes.
+ */
+export function overlayValueUnsupportedDiagnostic(input: {
+	readonly source: string;
+	readonly carrier: 'attribute' | 'spread';
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	const bound =
+		input.carrier === 'spread'
+			? `Cannot carry overlay through {...${input.source}}`
+			: `Cannot bind overlay={${input.source}}`;
+
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_OVERLAY_VALUE_UNSUPPORTED',
+		title: 'overlay accepts only a literal',
+		message: `${bound}. overlay must be written on the element itself as bare \`overlay\`, \`overlay={true}\`, or \`overlay={false}\`.`,
+		why: 'Elevation is structural, not reactive. The overlay record carries no inputs, so it has no dependencies and can never re-run; a value that varies at runtime would have nothing to re-elevate the element.',
+		span: input.span,
+		suggestion:
+			'Let `@if` decide whether the element exists and keep `overlay` a literal on the element inside the branch.',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_OVERLAY_VALUE_UNSUPPORTED',
+	});
+}
+
+/**
+ * Mirrors MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED. overlay cannot be prop-forwarded
+ * either, because `overlay={props.overlay}` is non-literal by design - so a
+ * component-level overlay would be useless but silent without this diagnostic.
+ */
+export function overlayHostElementRequiredDiagnostic(input: {
+	readonly ownerTagName: string | null;
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	const owner = input.ownerTagName ? `<${input.ownerTagName}>` : 'a non-host element';
+
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_OVERLAY_HOST_ELEMENT_REQUIRED',
+		title: 'overlay can only be marked on host elements',
+		message: `Cannot mark overlay on component ${owner}. overlay elevates one concrete host element above the rest of the UI and needs a host element owner.`,
+		why: 'Elevation is applied to a DOM element. A component is not a DOM locator and may render zero, one, or many host nodes, and overlay cannot be forwarded to one as a prop because its value must be a literal.',
+		span: input.span,
+		suggestion:
+			'Move overlay onto the host element that should be elevated, inside the component TSRX body.',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_OVERLAY_HOST_ELEMENT_REQUIRED',
+	});
+}
+
 type AttributeDisciplineNode = { readonly node: AnyNode; readonly filename: string };
 
 export function eventSpreadUnsupportedDiagnostic(

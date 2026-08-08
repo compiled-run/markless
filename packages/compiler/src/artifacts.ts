@@ -333,6 +333,8 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_ELEMENT_MODULE_SCOPE'
 		| 'MARKLESS_ELEMENT_HANDLE_RENDER_READ'
 		| 'MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED'
+		| 'MARKLESS_OVERLAY_VALUE_UNSUPPORTED'
+		| 'MARKLESS_OVERLAY_HOST_ELEMENT_REQUIRED'
 		| 'MARKLESS_EVENT_HANDLER_NOT_A_FUNCTION'
 		| 'MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED'
 		| 'MARKLESS_EVENT_SPREAD_UNSUPPORTED'
@@ -440,6 +442,28 @@ export type SemanticBehavior = {
 	readonly source: string;
 	readonly functionSource: string;
 	readonly inputSources: ReadonlyArray<string>;
+	readonly keyedRepeatScopeIds?: ReadonlyArray<string>;
+};
+
+/**
+ * An element marked for cross-platform elevation: it renders above the rest of
+ * the UI, escaping clipping and stacking ancestors. Elevation only - no
+ * dismissal, focus, positioning, ARIA, or animation policy rides on this record.
+ *
+ * There is deliberately no `inputs` field. No inputs means no dependencies,
+ * which means this record can never re-run: elevation is structural, not
+ * reactive. Elevation must never be driven by shown-ness. `@if` owns whether the
+ * element exists; a reactive `overlay={isOpen}` would re-elevate the host on
+ * every toggle. Adaptive elevation is a recorded non-goal for the same reason: a
+ * value that varies with nothing declared to depend on is incoherent, and the
+ * missing `inputs` field is what makes non-reactivity structural rather than a
+ * convention a later pass could quietly break.
+ */
+export type SemanticOverlay = {
+	readonly hostNodeId: string;
+	readonly componentName?: string;
+	// Document order of the overlay marks in this file; stable across compiles.
+	readonly order: number;
 	readonly keyedRepeatScopeIds?: ReadonlyArray<string>;
 };
 
@@ -603,6 +627,7 @@ export type SemanticGraphArtifact = {
 	readonly events: ReadonlyArray<SemanticEvent>;
 	readonly syncPolicyConstants?: ReadonlyArray<SemanticSyncPolicyConstant>;
 	readonly behaviors: ReadonlyArray<SemanticBehavior>;
+	readonly overlays: ReadonlyArray<SemanticOverlay>;
 	readonly elementHandleBindings: ReadonlyArray<SemanticElementHandleBinding>;
 	readonly localBindings: ReadonlyArray<SemanticLocalBinding>;
 	readonly localDeclarations: ReadonlyArray<SemanticLocalDeclaration>;

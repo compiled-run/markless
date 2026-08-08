@@ -40,6 +40,15 @@ declare namespace __MarklessTypeService {
 		attach?: OneOrMany<NativeElementBehavior<E>>;
 		children?: Child;
 		el?: E | undefined;
+		/**
+		 * Render this element above the rest of the UI, escaping clipping and
+		 * stacking ancestors. Elevation only: no dismissal, focus, positioning,
+		 * ARIA, or animation policy. The compiler requires a literal here -
+		 * `overlay`, `overlay={true}`, or `overlay={false}` - because elevation is
+		 * structural and never re-runs. Use `@if` to control whether the element
+		 * exists.
+		 */
+		overlay?: boolean;
 	};
 
 	type GlobalAttributes = {
