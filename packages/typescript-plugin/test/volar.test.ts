@@ -139,6 +139,8 @@ test('style mappings have stable document-scoped embedded IDs', () => {
 
 	expect(firstIds).toHaveLength(2);
 	expect(firstIds.every((id) => typeof id === 'string' && id.length > 0)).toBe(true);
+	// URI-authority-safe: the host lowercases the authority, so any other charset breaks lookup.
+	expect(firstIds.every((id) => /^[a-z0-9_-]+$/.test(id as string))).toBe(true);
 	expect(new Set(firstIds).size).toBe(firstIds.length);
 	expect(secondIds).toEqual(firstIds);
 	expect(
@@ -288,6 +290,75 @@ test('a bare @ construct keeps the rest of the file compiled and mapped', () => 
 		verification: true,
 		completion: true,
 	});
+});
+
+// `<style>` content is parsed as structured CSS, so a mid-typing rule throws even though
+// the rest of the file is intact - the style text has to be recovered, not the whole file.
+test('a half-typed CSS selector keeps the file compiling with its authored style text', () => {
+	const source = `export default function Card() @{
+	let hits = 1;
+	<article class="card">
+		<button onClick={() => hits++}>Hits {hits}</button>
+		<style>
+			.card { display: grid; }
+			.
+		</style>
+	</article>
+}`;
+	const result = compileToVolarMappings(source, 'Card.tsrx', { loose: true });
+	const styleStart = source.indexOf('<style>') + '<style>'.length;
+	const styleEnd = source.indexOf('</style>');
+
+	expect(result.code).toContain('<button onClick={() => hits++}>');
+	expect(result.cssMappings).toHaveLength(1);
+	expect(result.cssMappings[0]?.data.customData.content).toBe(
+		source.slice(styleStart, styleEnd),
+	);
+	expect(result.cssMappings[0]?.sourceOffsets).toEqual([styleStart]);
+	expect(result.cssMappings[0]?.lengths).toEqual([styleEnd - styleStart]);
+	expect(
+		exactMappingAt(result, source, source.indexOf('hits'), 'hits'.length)?.data,
+	).toMatchObject(expectedFeatureData);
+});
+
+test('an unclosed CSS rule keeps the file compiling with its authored style text', () => {
+	const source = `export default function Toolbar() @{
+	const label = 'Save';
+	<nav class="toolbar">
+		<button>{label}</button>
+		<style>
+			.toolbar { display: flex; }
+			.my-button {
+		</style>
+	</nav>
+}`;
+	const result = compileToVolarMappings(source, 'Toolbar.tsrx', { loose: true });
+	const styleStart = source.indexOf('<style>') + '<style>'.length;
+	const styleEnd = source.indexOf('</style>');
+
+	expect(result.code).toContain("const label = 'Save';");
+	expect(result.cssMappings).toHaveLength(1);
+	expect(result.cssMappings[0]?.data.customData.content).toBe(
+		source.slice(styleStart, styleEnd),
+	);
+	expect(result.cssMappings[0]?.sourceOffsets).toEqual([styleStart]);
+	expect(result.cssMappings[0]?.lengths).toEqual([styleEnd - styleStart]);
+	expect(
+		exactMappingAt(result, source, source.indexOf('label'), 'label'.length)?.data,
+	).toMatchObject(expectedFeatureData);
+});
+
+test('an unusable file without a style element still throws as fatal', () => {
+	let fatal: unknown;
+	try {
+		compileToVolarMappings('export default function Sketch() @{ <section>', 'Sketch.tsrx', {
+			loose: true,
+		});
+	} catch (error) {
+		fatal = error;
+	}
+
+	expect(fatal).toMatchObject({ type: 'fatal' });
 });
 
 test('an import clause maps its interior, not only its specifier tokens', () => {

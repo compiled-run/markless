@@ -44,11 +44,22 @@ export function compileToVolarMappings(
 				...mapping.data,
 				customData: {
 					...mapping.data.customData,
-					embeddedId: `style:${filename}:${index}`,
+					embeddedId: `style-${fnv1a(filename)}-${index}`,
 				},
 			},
 		})),
 	};
+}
+
+// The editor host carries this id in a URI authority, which lowercases on parse, so the
+// id must stay within [a-z0-9_-] or the host's embedded-code lookup misses.
+function fnv1a(text: string): string {
+	let hash = 0x811c9dc5;
+	for (let index = 0; index < text.length; index++) {
+		hash ^= text.charCodeAt(index);
+		hash = Math.imul(hash, 0x01000193) >>> 0;
+	}
+	return hash.toString(16).padStart(8, '0');
 }
 
 type AstNode = {
@@ -132,6 +143,27 @@ function compileRecoverableSource(
 	fileName: string,
 	options: TsrxTypeServiceOptions,
 ): MarklessTsrxTypeServiceResult | undefined {
+	const recovered = compileWithTypeScriptRecovery(source, fileName, options);
+	if (recovered) return recovered;
+
+	// A half-typed CSS rule fails the whole file; blanking keeps every other offset valid.
+	const regions = styleInteriorRegions(source);
+	if (regions.length === 0) return undefined;
+	const blanked = compileWithTypeScriptRecovery(
+		blankStyleInteriors(source, regions),
+		fileName,
+		options,
+	);
+	if (!blanked) return undefined;
+	blanked.cssMappings = authoredCssMappings(blanked, source, regions);
+	return blanked;
+}
+
+function compileWithTypeScriptRecovery(
+	source: string,
+	fileName: string,
+	options: TsrxTypeServiceOptions,
+): MarklessTsrxTypeServiceResult | undefined {
 	const dotPositions = danglingMemberDotPositions(source);
 	let recoverableSource = removeCharactersAt(source, dotPositions);
 
@@ -154,6 +186,63 @@ function compileRecoverableSource(
 			return undefined;
 		}
 	}
+}
+
+type StyleRegion = { readonly start: number; readonly end: number };
+
+function styleInteriorRegions(source: string): StyleRegion[] {
+	const regions: StyleRegion[] = [];
+	for (const match of source.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi)) {
+		const start = match.index + match[0].indexOf('>') + 1;
+		regions.push({ start, end: start + match[1].length });
+	}
+	return regions;
+}
+
+function blankStyleInteriors(source: string, regions: readonly StyleRegion[]): string {
+	let blanked = source;
+	for (const region of regions) {
+		const blank = source.slice(region.start, region.end).replace(/[^\n]/g, ' ');
+		blanked = `${blanked.slice(0, region.start)}${blank}${blanked.slice(region.end)}`;
+	}
+	return blanked;
+}
+
+const styleMappingData: TsrxCodeMapping['data'] = {
+	verification: true,
+	completion: true,
+	semantic: true,
+	navigation: true,
+	structure: true,
+	format: false,
+	customData: {},
+};
+
+/**
+ * Put the authored CSS back on mappings compiled from blanked style interiors, so the
+ * embedded CSS document still serves the text being typed. A region the parser dropped
+ * gets a mapping synthesized in the shape a style element normally compiles to.
+ */
+function authoredCssMappings(
+	compiled: MarklessTsrxTypeServiceResult,
+	source: string,
+	regions: readonly StyleRegion[],
+): TsrxCodeMapping[] {
+	return regions.map((region) => {
+		const content = source.slice(region.start, region.end);
+		const data =
+			compiled.cssMappings.find(
+				(mapping) =>
+					mapping.sourceOffsets[0] >= region.start && mapping.sourceOffsets[0] <= region.end,
+			)?.data ?? styleMappingData;
+		return {
+			sourceOffsets: [region.start],
+			generatedOffsets: [0],
+			lengths: [content.length],
+			generatedLengths: [content.length],
+			data: { ...data, customData: { ...data.customData, content } },
+		};
+	});
 }
 
 type RecoveryEdit = { readonly offset: number; readonly replacement: string };
