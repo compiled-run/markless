@@ -1,4 +1,5 @@
 import type {
+	ProtocolArmRecordSet,
 	ProtocolEventActionKind,
 	ProtocolStatePayload,
 	ProtocolSyncPolicy,
@@ -123,7 +124,7 @@ type InlineResumeModule = {
 type InlineSyncPolicyRuntime = {
 	decode?: (slot: unknown, records: ReadonlyMap<number, SerializedRecord>) => unknown;
 	graph?: (root: InlineRoot) => Map<string, unknown>;
-	read?: (root: InlineRoot, graphNodeId: string, path: ReadonlyArray<string>) => unknown;
+	read?: (root: InlineRoot, graphNodeId: string, path?: ReadonlyArray<string>) => unknown;
 	matches?: (condition: ProtocolSyncPolicyCondition, event: Event, root: InlineRoot) => boolean;
 	run?: (policy: ProtocolSyncPolicy, event: Event, root: InlineRoot) => void;
 };
@@ -279,7 +280,8 @@ function runPrerenderSettleBoot(
 			return;
 		replayed = true;
 		const elements = root.getElementsByTagName('*');
-		const index = [].indexOf.call(elements, target);
+		// HTMLCollection is array-like, not an Array; borrowing indexOf avoids a copy.
+		const index = ([] as Element[]).indexOf.call(elements as unknown as Element[], target);
 		const observer = new MutationObserver(() => {
 			const next = elements[index];
 			if (!next || next === target) return;
@@ -879,7 +881,8 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 			(branch.armRecords ?? []).flatMap((arm) => arm.events.map((event) => event.eventName)),
 		),
 		...view.asyncBoundaries.flatMap((boundary) => {
-			const armRecords = boundary.armRecords;
+			// Array.isArray cannot narrow the readonly per-arm plan out of the union.
+			const armRecords = boundary.armRecords as ProtocolArmRecordSet | undefined;
 			return armRecords && !Array.isArray(armRecords)
 				? [
 						...(armRecords.events ?? []).map((event) => event.eventName),

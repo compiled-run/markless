@@ -96,7 +96,7 @@ function addRecordGraphNodes(
 	if (recordId.startsWith('keyed-repeat:')) {
 		const id = recordId.slice('keyed-repeat:'.length);
 		const repeat = view.keyedRepeats?.find((record) => record.id === id);
-		if (repeat) graphNodeIds.add(repeat.collectionGraphNodeId);
+		if (repeat?.collectionGraphNodeId) graphNodeIds.add(repeat.collectionGraphNodeId);
 		return;
 	}
 	if (recordId.startsWith('behavior:')) {

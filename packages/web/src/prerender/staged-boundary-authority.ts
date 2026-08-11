@@ -1,8 +1,13 @@
 import type {
 	ResumeArmRecordSet,
+	ResumeAsyncBoundaryPayload,
 	ResumeAsyncBoundaryRecord,
 	ResumeDomElement,
 } from '../resume-types.ts';
+
+// The authority only keys off the boundary id, so it holds either the decoded
+// payload form (index anchors) or the materialized record (live comments).
+type BoundaryLike = ResumeAsyncBoundaryRecord | ResumeAsyncBoundaryPayload;
 
 export type PrerenderBoundaryArmRegistration = {
 	readonly boundaryId: string;
@@ -16,7 +21,7 @@ type PendingRegistration = {
 };
 
 type BoundaryAuthorityState = {
-	readonly boundary: ResumeAsyncBoundaryRecord;
+	readonly boundary: BoundaryLike;
 	revision: number;
 	registeredRevision: number;
 	registering?: PendingRegistration;
@@ -30,14 +35,14 @@ export function attachPrerenderBoundaryAuthority(root: ResumeDomElement): void {
 	authorities.set(root, new Map());
 }
 
-export function resolvePrerenderBoundaryAuthority(
+export function resolvePrerenderBoundaryAuthority<T extends BoundaryLike>(
 	root: ResumeDomElement,
-	boundary: ResumeAsyncBoundaryRecord,
-): ResumeAsyncBoundaryRecord {
+	boundary: T,
+): T {
 	const authority = authorities.get(root);
 	if (!authority) return boundary;
 	const current = authority.get(boundary.id);
-	if (current) return current.boundary;
+	if (current) return current.boundary as T;
 	authority.set(boundary.id, {
 		boundary,
 		revision: 0,
@@ -48,7 +53,7 @@ export function resolvePrerenderBoundaryAuthority(
 
 export async function claimPrerenderBoundaryArmRegistration(
 	root: ResumeDomElement,
-	boundary: ResumeAsyncBoundaryRecord,
+	boundary: BoundaryLike,
 ): Promise<PrerenderBoundaryArmRegistration | undefined> {
 	const state = authorities.get(root)?.get(boundary.id);
 	if (!state) return { boundaryId: boundary.id, revision: -1 };
@@ -66,7 +71,7 @@ export async function claimPrerenderBoundaryArmRegistration(
 
 export function beginPrerenderBoundaryArmCommit(
 	root: ResumeDomElement,
-	boundary: ResumeAsyncBoundaryRecord,
+	boundary: BoundaryLike,
 	armRecords: ResumeArmRecordSet,
 ): PrerenderBoundaryArmRegistration | undefined {
 	const state = authorities.get(root)?.get(boundary.id);

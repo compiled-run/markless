@@ -28,7 +28,8 @@ const seamIds = new Set([
 ]);
 const externalId = /^MLA-EXT-[A-Z0-9]+(?:-[A-Z0-9]+)*$/;
 
-const fail = (path: string, message: string): never => {
+// Annotated on the binding, not the arrow: TS only narrows past a never-returning call when the callee has a declared type.
+const fail: (path: string, message: string) => never = (path, message) => {
 	throw new Error(`Analyzer verdict schema violation at ${path}: ${message}`);
 };
 const record = (value: unknown, path: string): Record<string, unknown> => {

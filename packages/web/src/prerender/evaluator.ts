@@ -4,6 +4,7 @@ import {
 	type SsrDataReadContext,
 	type SsrDataResidue,
 	type SsrDataSlot,
+	type SsrDataStructure,
 	type SsrRenderData,
 	type StructureToken,
 } from '../ssr-data/renderer.ts';
@@ -19,10 +20,19 @@ import {
 	marklessSsrComposeView,
 	marklessSsrMergeBranches,
 	marklessSsrRemapGraphOutput,
+	type MarklessSsrComposedChild,
 } from '../fns/ssr.ts';
+import type { ComposeGraphProps } from '../fns/composition.ts';
 import { marklessCsrRemapChildGraph } from '../fns/composition.ts';
 import { marklessBoundSymbolId } from '../fns/bound-symbol.ts';
 import { registerPrerenderStagedComputeds } from './staged-graph.ts';
+
+// This evaluator is the seam where a SERIALIZED protocol payload meets the
+// mutable draft the SSR composer works on. They describe the same records; the
+// protocol types arm record sets coarsely (opaque bags), so the two shapes do
+// not line up structurally and the seam names the crossing explicitly.
+type SsrComposableView = Parameters<typeof marklessSsrComposeView>[1];
+type SsrComposableChildOutput = NonNullable<MarklessSsrComposedChild['output']>;
 
 type Awaitable<T> = T | Promise<T>;
 type GraphValues = ReadonlyMap<string, unknown>;
@@ -39,7 +49,7 @@ type PrerenderRenderData = SsrRenderData & {
 		readonly graphNodeId: string;
 		readonly value:
 			| { readonly kind: 'constant'; readonly value: unknown }
-			| { readonly kind: string; readonly [key: string]: unknown };
+			| { readonly kind: 'symbol-function'; readonly symbolId: string };
 	}>;
 };
 
@@ -71,6 +81,8 @@ type PrerenderDataDefinition = {
 			readonly source?: string;
 		}>;
 		readonly materialized?: SsrRenderOutput & {
+			// Render-data children carry the full ssr-data structure, not just anchors.
+			readonly structure?: SsrDataStructure;
 			readonly elementCount: number;
 			readonly structureTokens?: ReadonlyArray<StructureToken>;
 		};
@@ -97,6 +109,10 @@ export type PrerenderDataSurface = {
 };
 
 type PrerenderLoadSymbol = (symbolId: string) => unknown | Promise<unknown>;
+
+function isPrerenderLoadSymbol(value: unknown): value is PrerenderLoadSymbol {
+	return typeof value === 'function';
+}
 
 export type PrerenderPageClosure = {
 	readonly renderData: PrerenderRenderData;
@@ -205,7 +221,7 @@ export async function derivePrerenderResumeRecords(
 	propsOrLoadSymbol?: unknown | PrerenderLoadSymbol,
 ) {
 	if (isPrerenderDataSurface(page)) {
-		if (typeof propsOrLoadSymbol !== 'function') {
+		if (!isPrerenderLoadSymbol(propsOrLoadSymbol)) {
 			throw new TypeError('Prerender render data requires a symbol loader.');
 		}
 		return prepareSsrResumeRecords(
@@ -237,7 +253,7 @@ export async function renderPrerenderBoundary(
 	readonly computed: ProtocolStatePayload['computed'];
 }> {
 	if (isPrerenderDataSurface(page)) {
-		if (typeof propsOrLoadSymbol !== 'function') {
+		if (!isPrerenderLoadSymbol(propsOrLoadSymbol)) {
 			throw new TypeError('Prerender render data requires a symbol loader.');
 		}
 		const output = await evaluatePrerenderDataSurface(page, propsOrLoadSymbol, graph, true);
@@ -257,7 +273,7 @@ async function evaluatePrerenderDataSurface(
 	graph: RuntimeGraph | undefined,
 	requireHtml: boolean,
 	props: Readonly<Record<string, unknown>> = {},
-): Promise<SsrRenderOutput> {
+): Promise<SsrRenderOutput & { readonly structure?: SsrDataStructure }> {
 	const rootName = surface.rootComponentName;
 	if (!rootName) throw new Error('MARKLESS_PRERENDER_DATA_ROOT_MISSING');
 	return evaluatePrerenderDataComponent({
@@ -296,10 +312,12 @@ async function evaluatePrerenderDataComponent(input: {
 	readonly requireHtml: boolean;
 }): Promise<
 	SsrRenderOutput & {
+		// The render-data path emits the full ssr-data structure, not just anchors.
+		readonly structure?: SsrDataStructure;
 		readonly elementCount: number;
 		readonly propEvents: ReadonlyArray<unknown>;
 		readonly externalSymbolIds: ReadonlyArray<string>;
-		m?: (graphProps: ReadonlyArray<unknown>) => void;
+		m?: (graphProps: ComposeGraphProps) => void;
 	}
 > {
 	const definition = input.surface.components[input.componentName];
@@ -417,7 +435,7 @@ async function evaluatePrerenderDataComponent(input: {
 				directValue: input.props,
 			});
 	}
-	const children: Array<Record<string, unknown>> = [];
+	const children: Array<MarklessSsrComposedChild> = [];
 	const branches: Array<{ readonly id: string; readonly takenArm: number }> = [];
 	const asyncSnapshots = state.computed.flatMap((computed) =>
 		computed.async && computed.snapshot
@@ -457,7 +475,7 @@ async function evaluatePrerenderDataComponent(input: {
 			const branch = (definition.branches ?? []).find(
 				(candidate) => candidate.branchSiteId === slot.branchSiteId,
 			);
-			const testRead = branch?.testReads[0];
+			const testRead = branch?.testReads?.[0];
 			const value = testRead ? read(testRead.graphNodeId, testRead.path) : undefined;
 			let arm = value ? 0 : 1;
 			if (branch?.armTests) {
@@ -491,7 +509,7 @@ async function evaluatePrerenderDataComponent(input: {
 					input.idPrefix + edge.hostPrefix,
 				);
 				children.push({
-					output: materialized,
+					output: materialized as SsrComposableChildOutput,
 					hostPrefix: edge.hostPrefix,
 					symbolPrefix: edge.symbolPrefix,
 					graphProps: edge.props,
@@ -542,7 +560,7 @@ async function evaluatePrerenderDataComponent(input: {
 				requireHtml: input.requireHtml,
 			});
 			children.push({
-				output,
+				output: output as SsrComposableChildOutput,
 				hostPrefix: edge.hostPrefix,
 				symbolPrefix: edge.symbolPrefix,
 				graphProps: edge.props,
@@ -555,7 +573,7 @@ async function evaluatePrerenderDataComponent(input: {
 	});
 	const composition = marklessSsrComposeView(
 		rendered.structure,
-		structuredClone(definition.view),
+		structuredClone(definition.view) as SsrComposableView,
 		children,
 		asyncSnapshots,
 		input.idPrefix,
@@ -566,13 +584,13 @@ async function evaluatePrerenderDataComponent(input: {
 		view: {
 			...composition.view,
 			branches: marklessSsrMergeBranches(composition.view.branches, branches),
-		},
+		} as unknown as import('@markless/serializer').ProtocolViewPayload,
 		structure: rendered.structure,
 		structureTokens: rendered.structureTokens,
 		elementCount: composition.elementCount,
 		propEvents: [],
 		externalSymbolIds: composition.externalSymbolIds,
-		m(graphProps: ReadonlyArray<unknown>) {
+		m(graphProps: ComposeGraphProps) {
 			marklessSsrRemapGraphOutput(output, graphProps);
 		},
 	};
@@ -589,7 +607,12 @@ async function settledBoundaryResult(output: SsrRenderOutput, boundaryId: string
 	if (!anchor || !armRecords || Array.isArray(armRecords)) {
 		throw new Error(`MARKLESS_PRERENDER_BOUNDARY_MISSING: ${boundaryId}`);
 	}
-	return { html: anchor.html, armRecords, computed: records.state.computed };
+	// Array.isArray cannot narrow the readonly per-arm plan out of the union.
+	return {
+		html: anchor.html,
+		armRecords: armRecords as ResumeArmRecordSet,
+		computed: records.state.computed,
+	};
 }
 
 function renderBuiltPage(

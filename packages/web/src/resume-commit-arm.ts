@@ -261,7 +261,7 @@ function registerArmDomUpdates(
 				graphNodeId: domUpdate.graphNodeId,
 				path: domUpdate.path,
 				async run(value) {
-					const symbol = (await deps.loadSymbol(domUpdate.symbolId!)) as (
+					const symbol = (await deps.loadSymbol!(domUpdate.symbolId!)) as (
 						context: unknown,
 					) => unknown;
 					return symbol({

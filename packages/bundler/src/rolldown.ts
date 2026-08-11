@@ -645,7 +645,7 @@ export function createMarklessRolldownPlugin(input: {
 							: 'source',
 			].join('\0');
 			const cached = linkedTransformCache.get(cacheKey);
-			let transformed: TransformTsrxModuleResult;
+			let linkedTransformResult: TransformTsrxModuleResult | undefined;
 			let linkedTransformInput = transformInput;
 			let reusedLinkedTransform = false;
 			if (cached?.code === code) {
@@ -668,14 +668,15 @@ export function createMarklessRolldownPlugin(input: {
 					cached.importedSymbolClaims ===
 						importedSymbolClaimSignature(cachedImports, moduleMetadata)
 				) {
-					transformed = cached.result;
+					linkedTransformResult = cached.result;
 					linkedTransformInput = cached.input;
 					reusedLinkedTransform = true;
 				}
 			}
-			if (!reusedLinkedTransform) {
+			// Same predicate as `!reusedLinkedTransform`, phrased so the result is provably assigned.
+			if (linkedTransformResult === undefined) {
 				try {
-					transformed = await transformTsrxModule(transformInput);
+					linkedTransformResult = await transformTsrxModule(transformInput);
 				} catch (error) {
 					// Imported graph helpers can diagnose before their interface is linked.
 					// Publish only this compiler-owned link artifact so cycles never wait.
@@ -702,9 +703,10 @@ export function createMarklessRolldownPlugin(input: {
 							moduleLinkArtifacts,
 						),
 					};
-					transformed = await transformTsrxModule(linkedTransformInput);
+					linkedTransformResult = await transformTsrxModule(linkedTransformInput);
 				}
 			}
+			let transformed: TransformTsrxModuleResult = linkedTransformResult;
 			if (currentEnvironment === 'client' && clientRouteArtifact) {
 				const artifactChildMaterializations = await materializeArtifactChildren.call(
 					this,

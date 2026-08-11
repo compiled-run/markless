@@ -373,9 +373,10 @@ function decodeScalarSlot(slot: SerializedSlot | undefined): unknown {
 		typeof slot === 'boolean'
 	)
 		return slot;
-	if (slot?.$type === 'undefined') return undefined;
-	if (slot?.$type === 'bigint') return BigInt(slot.value);
-	if (slot?.$type === 'date') return new Date(slot.value);
+	if (!slot || !('$type' in slot)) return undefined;
+	if (slot.$type === 'undefined') return undefined;
+	if (slot.$type === 'bigint') return BigInt(slot.value);
+	if (slot.$type === 'date') return new Date(slot.value);
 	return undefined;
 }
 

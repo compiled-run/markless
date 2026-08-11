@@ -4,6 +4,7 @@ import {
 	isCancel,
 	multiselect as clackMultiselect,
 	note,
+	type Option,
 	outro,
 	select as clackSelect,
 	text as clackText,
@@ -86,7 +87,9 @@ export function createNodeRuntime(options: NodeRuntimeOptions = {}): ProgramRunt
 					throw error;
 				}
 			},
-			mkdir,
+			async mkdir(path, mkdirOptions) {
+				await mkdir(path, mkdirOptions);
+			},
 			async readDirectory(path) {
 				const entries = await readdir(path, { withFileTypes: true });
 				return entries.map((entry) => ({
@@ -137,27 +140,31 @@ function createClackPrompts(): ProgramPrompts {
 		intro,
 		note,
 		async select(options) {
+			// clack's Option<Value> is a conditional type, so it stays deferred against our generic.
+			const clackOptions = options.options.map((option) => ({
+				value: option.value,
+				label: option.label,
+				hint: option.hint || undefined,
+			})) as Option<typeof options.options[number]['value']>[];
 			const value = await clackSelect({
 				message: options.message,
-				options: options.options.map((option) => ({
-					value: option.value,
-					label: option.label,
-					hint: option.hint || undefined,
-				})),
+				options: clackOptions,
 				initialValue: options.initialValue,
 			});
 			if (isCancel(value)) exitCancelled();
 			return value;
 		},
 		async multiselect(options) {
+			// clack's Option<Value> is a conditional type, so it stays deferred against our generic.
+			const clackOptions = options.options.map((option) => ({
+				value: option.value,
+				label: option.label,
+				hint: option.hint || undefined,
+				disabled: option.disabled,
+			})) as Option<typeof options.options[number]['value']>[];
 			const value = await clackMultiselect({
 				message: options.message,
-				options: options.options.map((option) => ({
-					value: option.value,
-					label: option.label,
-					hint: option.hint || undefined,
-					disabled: option.disabled,
-				})),
+				options: clackOptions,
 				initialValues: [...options.initialValues],
 				required: options.required,
 			});
@@ -165,12 +172,14 @@ function createClackPrompts(): ProgramPrompts {
 			return value;
 		},
 		async text(options) {
+			// clack hands the validator undefined for an untouched field; our contract takes a string.
+			const { validate } = options;
 			const value = await clackText({
 				message: options.message,
 				placeholder: options.placeholder,
 				defaultValue: options.defaultValue,
 				initialValue: options.initialValue,
-				validate: options.validate,
+				validate: validate ? (entered) => validate(entered ?? '') : undefined,
 			});
 			if (isCancel(value)) exitCancelled();
 			return value;

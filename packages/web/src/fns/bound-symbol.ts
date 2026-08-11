@@ -39,7 +39,7 @@ export function marklessLiveBoundGraphRoute(binding: {
 	readonly kind?: string;
 	readonly graphNodeId?: unknown;
 	readonly path?: unknown;
-} | undefined):
+} | null | undefined):
 	| { readonly graphNodeId: string; readonly path: ReadonlyArray<string> }
 	| undefined {
 	if (

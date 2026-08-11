@@ -2139,6 +2139,67 @@ export function App() @{
 	);
 });
 
+test('compileTsrxModule names the nested component blocking a fragment root', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/FragmentNestedComponent.tsrx',
+		source: `
+import { Counter } from './counter.tsrx';
+
+export function App() @{
+	<>
+		<main>
+			<h1>Title</h1>
+			<Counter />
+		</main>
+	</>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderModule.diagnostics).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				code: 'MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
+				severity: 'error',
+				message: expect.stringContaining('the <Counter> component inside <main>'),
+			}),
+		]),
+	);
+	const diagnostic = result.publicRenderModule.diagnostics.find(
+		(entry) => entry.code === 'MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
+	);
+	expect(diagnostic?.suggestions?.[0]?.message).toContain('single root element');
+});
+
+test('compileTsrxModule fragment-root diagnostic skips supported control flow to name the offender', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/FragmentBranchThenComponent.tsrx',
+		source: `
+import { state } from '@markless/core';
+import { Widget } from './widget.tsrx';
+
+export function App() @{
+	let open = state(true);
+
+	<>
+		@if (open) { <p>Shown</p> } @else { <p>Hidden</p> }
+		<Widget />
+	</>
+}
+`,
+		symbols: [],
+	});
+
+	const diagnostic = result.publicRenderModule.diagnostics.find(
+		(entry) => entry.code === 'MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED',
+	);
+	// The @if child is supported, so the diagnostic must name the component,
+	// not misreport the control-flow block.
+	expect(diagnostic?.message).toContain('the <Widget> component');
+	expect(diagnostic?.message).not.toContain('control-flow');
+});
+
 test('compileTsrxModule parenthesizes non-atomic @if tests in SSR output', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/BranchPrecedence.tsrx',

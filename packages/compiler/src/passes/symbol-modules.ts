@@ -1128,7 +1128,7 @@ function eventHandlerBodyAllowsScalarLeaf(
 	const authoredWrite = authoredWriteSource(write);
 	if (!body || !authoredWrite) return false;
 	let remainder = body.source.replace(authoredWrite, '');
-	for (const parameter of symbol.parameters) {
+	for (const parameter of symbol.parameters ?? []) {
 		remainder = remainder.replaceAll(`${parameter}.preventDefault();`, '');
 		remainder = remainder.replaceAll(`${parameter}.stopPropagation();`, '');
 	}

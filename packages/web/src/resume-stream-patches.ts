@@ -1,5 +1,6 @@
 import type { DecodedPayloadScripts } from '../../serializer/src/protocol-client.ts';
 import type { ProtocolStatePayload, ProtocolStreamedArmPatch } from '@markless/serializer';
+import type { ResumeDomOwnerDocument } from './resume-types.ts';
 
 // Show-then-adopt, adopt half (T107 streaming): the __mArm executor already
 // swapped settled arm content into the boundary's anchor range pre-runtime;
@@ -16,15 +17,8 @@ import type { ProtocolStatePayload, ProtocolStreamedArmPatch } from '@markless/s
 // records nor its snapshot may be adopted — the runtime re-demands the
 // computed and owns the boundary (the queued commit no-ops at flush).
 
-type StreamPatchScript = {
-	readonly getAttribute: (name: string) => string | null;
-	readonly textContent?: string | null;
-};
-
 type StreamPatchDocumentRoot = {
-	readonly ownerDocument?: {
-		readonly querySelectorAll?: (selector: string) => Iterable<StreamPatchScript>;
-	} | null;
+	readonly ownerDocument?: ResumeDomOwnerDocument;
 };
 
 type StreamedStateDelta = Pick<ProtocolStatePayload, 'cells' | 'computed'>;
@@ -90,7 +84,7 @@ export function adoptStreamedArmPatches(
 }
 
 function mergeStateRecords<
-	T extends { readonly graphNodeId: string },
+	T extends StreamedStateDelta[keyof StreamedStateDelta][number],
 	K extends keyof StreamedStateDelta,
 >(
 	base: ReadonlyArray<T>,

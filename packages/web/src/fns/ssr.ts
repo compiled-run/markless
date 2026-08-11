@@ -7,18 +7,201 @@ import {
 	marklessCsrRemapChildKeyedRepeat,
 	marklessCsrRemapGraphOutput,
 } from './composition.ts';
+import type {
+	ComposeChild,
+	ComposeChildOutput,
+	ComposeGraphProps,
+	ComposeGraphRead,
+	ComposeStateDraft,
+} from './composition.ts';
 import {
 	marklessBaseSymbolId,
 	marklessBoundSymbolId,
 	marklessDomUpdateSymbolId,
 } from './bound-symbol.ts';
+import type { SsrDataStructure } from '../ssr-data/renderer.ts';
 import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
+
+// SSR composition works on DRAFT payload records: the shapes the protocol
+// eventually serializes, still mutable and still carrying producer-only fields.
+// Each type below names the fields composition reads and lets the rest ride
+// through the index signature.
+type SsrRecord = { readonly [key: string]: unknown };
+type SsrHostedRecord = SsrRecord & { readonly hostNodeId: string };
+type SsrLocatorRecord = SsrRecord & {
+	readonly hostNodeId: string;
+	index: number;
+	tagName: string;
+};
+type SsrEventRecord = SsrRecord & {
+	readonly hostNodeId: string;
+	symbolIds: ReadonlyArray<string>;
+	readonly eventName?: string;
+};
+type SsrDomUpdateRecord = SsrRecord & {
+	readonly hostNodeId: string;
+	readonly graphNodeId: string;
+	readonly path: ReadonlyArray<string>;
+	symbolId?: string;
+};
+type SsrBehaviorRecord = SsrRecord & {
+	readonly hostNodeId: string;
+	readonly symbolId?: string;
+	readonly inputGraphReads?: ReadonlyArray<ComposeGraphRead>;
+};
+// Row events address their element by a row-relative path, not a host id.
+type SsrRowEventRecord = SsrRecord & { readonly symbolIds: ReadonlyArray<string> };
+type SsrKeyedRepeatRecord = SsrRecord & {
+	readonly id: string;
+	readonly parentHostNodeId: string;
+	readonly collectionGraphNodeId?: string;
+	readonly collectionPath: ReadonlyArray<string>;
+	readonly rowEvents: ReadonlyArray<SsrRowEventRecord>;
+};
+type SsrAnchoredRecord = SsrRecord & {
+	readonly id: string;
+	readonly startAnchor?: SsrRecord;
+	readonly endAnchor?: SsrRecord;
+};
+type SsrBranchRecord = SsrAnchoredRecord & {
+	readonly testReads?: ReadonlyArray<ComposeGraphRead>;
+	readonly symbolId?: string;
+	readonly armRecords?: ReadonlyArray<SsrArmRecordSet>;
+};
+type SsrArmRecordSet = SsrRecord & {
+	readonly locators?: ReadonlyArray<SsrLocatorRecord>;
+	readonly events?: ReadonlyArray<SsrEventRecord>;
+	readonly domUpdates?: ReadonlyArray<SsrDomUpdateRecord>;
+	readonly behaviors?: ReadonlyArray<SsrBehaviorRecord>;
+	readonly elementHandles?: ReadonlyArray<SsrHostedRecord>;
+	readonly keyedRepeats?: ReadonlyArray<SsrKeyedRepeatRecord>;
+	readonly branches?: ReadonlyArray<SsrBranchRecord>;
+};
+type SsrAsyncReadRecord = ComposeGraphRead & { readonly runnerSymbolId?: string };
+type SsrBoundaryRecord = SsrAnchoredRecord & {
+	readonly runnerGraphNodeId?: string | null;
+	readonly updateSymbolId?: string;
+	readonly asyncReads?: ReadonlyArray<SsrAsyncReadRecord>;
+	readonly armRecords?: SsrArmRecordSet | ReadonlyArray<SsrArmRecordSet>;
+};
+type SsrViewDraft = SsrRecord & {
+	readonly locators: ReadonlyArray<SsrLocatorRecord>;
+	readonly events: ReadonlyArray<SsrEventRecord>;
+	readonly domUpdates: ReadonlyArray<SsrDomUpdateRecord>;
+	readonly behaviors: ReadonlyArray<SsrBehaviorRecord>;
+	readonly elementHandles: ReadonlyArray<SsrHostedRecord>;
+	readonly keyedRepeats?: ReadonlyArray<SsrKeyedRepeatRecord>;
+	readonly branches?: ReadonlyArray<SsrBranchRecord>;
+	readonly asyncBoundaries?: ReadonlyArray<SsrBoundaryRecord>;
+	readonly asyncRunners?: Readonly<Record<string, string>>;
+};
+type SsrPropEvent = {
+	readonly hostNodeId: string;
+	readonly eventName: string;
+	readonly propName: string;
+};
+type SsrChildOutput = ComposeChildOutput & {
+	readonly html?: string;
+	readonly view?: SsrViewDraft;
+	readonly externalSymbolIds?: ReadonlyArray<string>;
+	readonly propEvents?: ReadonlyArray<SsrPropEvent>;
+};
+type SsrChildComponent = {
+	readonly renderSsr?: (
+		props?: unknown,
+		renderContext?: unknown,
+	) => SsrChildOutput | undefined | Promise<SsrChildOutput | undefined>;
+};
+type SsrChildProps = Readonly<Record<string, unknown>> & {
+	readonly __marklessSsrCallbacks?: Readonly<Record<string, string>>;
+};
+export type MarklessSsrComposedChild = ComposeChild & {
+	readonly asyncBoundaryId?: string;
+	readonly callbackProps?: Readonly<Record<string, string>>;
+	readonly output?: SsrChildOutput;
+};
+type SsrComposedChild = MarklessSsrComposedChild;
+// The composed child once its rendered view is known: composition also carries
+// the child's external symbol ids as a lookup set.
+type SsrChildData = SsrComposedChild & {
+	readonly view: SsrViewDraft;
+	readonly externalSymbolIds: Set<string>;
+};
+// Prefixing only needs the child's identity fields, so arm-record prefixing
+// accepts any composed child shape carrying them.
+type SsrPrefixChild = {
+	readonly hostPrefix: string;
+	readonly symbolPrefix?: string;
+	readonly boundSymbols?: Readonly<Record<string, string>>;
+	readonly graphProps?: ComposeGraphProps;
+	readonly externalSymbolIds?: ReadonlySet<string>;
+};
+type SsrBranchArmSelection = { readonly id: string; readonly takenArm: number };
+type SsrAsyncSnapshot = {
+	readonly status: string;
+	readonly version: number;
+	readonly key?: unknown;
+	readonly value?: unknown;
+	readonly error?: unknown;
+};
+type SsrAsyncSnapshotEntry = {
+	readonly graphNodeId: string;
+	readonly snapshot: SsrAsyncSnapshot;
+};
+type SsrAsyncRead = (graphNodeId: string, path?: ReadonlyArray<string>) => unknown;
+type SsrAsyncRunner = (context: {
+	readonly key: unknown;
+	readonly signal: AbortSignal;
+	readonly read: SsrAsyncRead;
+}) => unknown;
+type SsrAsyncRunnerDefinition = {
+	readonly run: SsrAsyncRunner;
+	readonly dependencies?: ReadonlyArray<string>;
+	readonly async?: boolean;
+};
+type SsrAsyncRunEntry = {
+	async?: boolean;
+	promise?: Promise<SsrAsyncSnapshot>;
+	settled?: SsrAsyncSnapshot;
+};
+type SsrAsyncRuns = Map<string, SsrAsyncRunEntry>;
+type SsrRenderContext = SsrRecord & {
+	readonly prerender?: boolean;
+	readonly prerenderSettle?: {
+		readonly graph?: {
+			readonly read: (graphNodeId: string, path: ReadonlyArray<string>) => SsrAsyncSnapshot;
+		};
+	};
+	readonly streaming?: {
+		readonly runs?: SsrAsyncRuns;
+		readonly signal?: AbortSignal;
+		readonly prestart?: boolean;
+		readonly deadline?: Promise<unknown>;
+	};
+};
+// The SSR locator array doubles as the counter for elements that render
+// without a locator of their own (repeat rows, async arm hosts).
+export type MarklessSsrHostLocator = {
+	readonly hostNodeId: string;
+	readonly strategy: 'dom-order';
+	readonly index: number;
+	readonly tagName: string;
+};
+export type MarklessSsrHostLocators = Array<MarklessSsrHostLocator> & {
+	marklessSsrExtraElements?: number;
+};
 
 export { marklessAssertComposableStateNames, marklessComposeState };
 export const marklessSsrRemapChildGraph = marklessCsrRemapChildGraph;
 export const marklessSsrRemapGraphOutput = marklessCsrRemapGraphOutput;
 
-export async function marklessSsrRenderChild(children, component, props, child, renderContext) {
+export async function marklessSsrRenderChild(
+	children: SsrComposedChild[],
+	component: SsrChildComponent | undefined,
+	props: SsrChildProps | undefined,
+	child: SsrComposedChild,
+	renderContext?: SsrRenderContext,
+) {
 	const output = await component?.renderSsr?.(props, renderContext);
 	if (!output) return '';
 	const entry = {
@@ -34,13 +217,20 @@ export async function marklessSsrRenderChild(children, component, props, child, 
 // child output (own state, events, async content) would silently die after
 // resume, so it refuses loudly instead (D2). Prop-keyed dom updates are
 // allowed: prop values are static per row instance.
-export async function marklessSsrRowChild(component, props, componentName) {
+export async function marklessSsrRowChild(
+	component: SsrChildComponent | undefined,
+	props: SsrChildProps | undefined,
+	componentName: string,
+) {
 	const output = await component?.renderSsr?.(props);
 	if (!output) return '';
 	marklessAssertPresentationalRowChild(output, componentName);
 	return output.html ?? '';
 }
-export function marklessAssertPresentationalRowChild(output, componentName) {
+export function marklessAssertPresentationalRowChild(
+	output: SsrChildOutput,
+	componentName: string,
+) {
 	const view = output.view;
 	const state = output.state;
 	const interactive =
@@ -57,7 +247,7 @@ export function marklessAssertPresentationalRowChild(output, componentName) {
 		(output.propEvents?.length ?? 0) > 0;
 	if (!interactive) return;
 	const message = `MARKLESS_ROW_COMPONENT_INTERACTIVE: <${componentName}> inside a @for row has its own state, events, or async content, so its interactions cannot resume. Keep components in @for rows presentational (markup from item props, like <Link>), or move the interactive content out of the row.`;
-	const error = new Error(message);
+	const error = new Error(message) as Error & Record<string, unknown>;
 	error.code = 'MARKLESS_ROW_COMPONENT_INTERACTIVE';
 	error.severity = 'error';
 	error.phase = 'runtime';
@@ -65,24 +255,28 @@ export function marklessAssertPresentationalRowChild(output, componentName) {
 	error.docsUrl = 'https://markless.dev/errors/MARKLESS_ROW_COMPONENT_INTERACTIVE';
 	throw error;
 }
-export function marklessSsrBranchArm(branches, id, takenArm) {
+export function marklessSsrBranchArm(
+	branches: SsrBranchArmSelection[],
+	id: string,
+	takenArm: number,
+) {
 	branches.push({ id, takenArm });
 	return '';
 }
 export async function marklessSsrRunAsyncComputed(
-	snapshots,
-	graphNodeId,
-	run,
-	renderContext,
-	hasPendingArm,
-	runnerDefinitions,
-	requestRuns,
+	snapshots: SsrAsyncSnapshotEntry[],
+	graphNodeId: string,
+	run: SsrAsyncRunner,
+	renderContext?: SsrRenderContext,
+	hasPendingArm?: boolean,
+	runnerDefinitions?: ReadonlyMap<string, SsrAsyncRunnerDefinition>,
+	requestRuns?: SsrAsyncRuns,
 ) {
 	// Prerender records preserve the authored pending arm without executing a
 	// request-dependent runner at build time or during browser-side derivation.
 	// The resumed graph owns the one real runner invocation after self-wake.
 	if (renderContext?.prerender === true) {
-		const snapshot = { status: 'pending', version: 1, key: null };
+		const snapshot: SsrAsyncSnapshot = { status: 'pending', version: 1, key: null };
 		marklessSsrUpsertAsyncComputedSnapshot(graphNodeId, snapshot, snapshots);
 		return snapshot;
 	}
@@ -99,8 +293,9 @@ export async function marklessSsrRunAsyncComputed(
 	// Per-request tier: runners get until the shared first-flush deadline to
 	// settle inline; only still-pending boundaries stream.
 	const streaming = renderContext?.streaming;
-	const definitions = runnerDefinitions ?? new Map([[graphNodeId, { run, dependencies: [] }]]);
-	const runs = streaming?.runs ?? requestRuns ?? new Map();
+	const definitions: ReadonlyMap<string, SsrAsyncRunnerDefinition> =
+		runnerDefinitions ?? new Map([[graphNodeId, { run, dependencies: [] }]]);
+	const runs: SsrAsyncRuns = streaming?.runs ?? requestRuns ?? new Map();
 	const entry = marklessSsrEnsureAsyncComputedRun(
 		graphNodeId,
 		definitions,
@@ -110,7 +305,12 @@ export async function marklessSsrRunAsyncComputed(
 		streaming?.signal,
 	);
 	if (!entry) {
-		const snapshot = { status: 'rejected', version: 1, key: null, error: undefined };
+		const snapshot: SsrAsyncSnapshot = {
+			status: 'rejected',
+			version: 1,
+			key: null,
+			error: undefined,
+		};
 		marklessSsrUpsertAsyncComputedSnapshot(graphNodeId, snapshot, snapshots);
 		return snapshot;
 	}
@@ -120,7 +320,11 @@ export async function marklessSsrRunAsyncComputed(
 		// first-flush deadline, so every boundary's runner is in flight before
 		// the real render pass races any of them against the shared deadline.
 		if (streaming.prestart) {
-			const snapshot = entry.settled ?? { status: 'pending', version: 1, key: null };
+			const snapshot: SsrAsyncSnapshot = entry.settled ?? {
+				status: 'pending',
+				version: 1,
+				key: null,
+			};
 			marklessSsrMaterializeAsyncComputedSnapshots(runs, snapshots, definitions, graphNodeId);
 			return snapshot;
 		}
@@ -128,7 +332,11 @@ export async function marklessSsrRunAsyncComputed(
 			if (hasPendingArm !== true) await entry.promise;
 			else if (streaming.deadline) await Promise.race([entry.promise, streaming.deadline]);
 		}
-		const snapshot = entry.settled ?? { status: 'pending', version: 1, key: null };
+		const snapshot: SsrAsyncSnapshot = entry.settled ?? {
+			status: 'pending',
+			version: 1,
+			key: null,
+		};
 		marklessSsrMaterializeAsyncComputedSnapshots(runs, snapshots, definitions, graphNodeId);
 		return snapshot;
 	}
@@ -138,15 +346,20 @@ export async function marklessSsrRunAsyncComputed(
 }
 
 function marklessSsrEnsureAsyncComputedRun(
-	graphNodeId,
-	definitions,
-	runs,
-	snapshots,
-	visiting = new Set(),
-	signal,
-) {
+	graphNodeId: string,
+	definitions: ReadonlyMap<string, SsrAsyncRunnerDefinition>,
+	runs: SsrAsyncRuns,
+	snapshots: ReadonlyArray<SsrAsyncSnapshotEntry>,
+	visiting: ReadonlySet<string> = new Set(),
+	signal?: AbortSignal,
+): SsrAsyncRunEntry | undefined {
 	if (visiting.has(graphNodeId)) {
-		const snapshot = { status: 'rejected', version: 1, key: null, error: undefined };
+		const snapshot: SsrAsyncSnapshot = {
+			status: 'rejected',
+			version: 1,
+			key: null,
+			error: undefined,
+		};
 		return { settled: snapshot, promise: Promise.resolve(snapshot) };
 	}
 	const existing = runs.get(graphNodeId);
@@ -158,13 +371,13 @@ function marklessSsrEnsureAsyncComputedRun(
 	// Install the entry before traversing dependencies. Besides deduplicating
 	// arbitrary document order, this prevents a malformed cycle from creating
 	// unbounded recursive entries; valid computed graphs remain acyclic.
-	const entry = {};
+	const entry: SsrAsyncRunEntry = {};
 	entry.async = definition.async !== false;
 	runs.set(graphNodeId, entry);
 	const dependencyPath = new Set(visiting);
 	dependencyPath.add(graphNodeId);
 	entry.promise = Promise.resolve()
-		.then(async () => {
+		.then(async (): Promise<SsrAsyncSnapshot> => {
 			const dependencyEntries = [...new Set(definition.dependencies ?? [])].flatMap(
 				(dependencyGraphNodeId) => {
 					const dependency = marklessSsrEnsureAsyncComputedRun(
@@ -206,7 +419,12 @@ function marklessSsrEnsureAsyncComputedRun(
 	return entry;
 }
 
-function marklessSsrMaterializeAsyncComputedSnapshots(runs, snapshots, definitions, graphNodeId) {
+function marklessSsrMaterializeAsyncComputedSnapshots(
+	runs: SsrAsyncRuns,
+	snapshots: SsrAsyncSnapshotEntry[],
+	definitions: ReadonlyMap<string, SsrAsyncRunnerDefinition>,
+	graphNodeId: string,
+) {
 	const dependencyClosure = new Set([graphNodeId]);
 	for (const candidateGraphNodeId of dependencyClosure)
 		for (const dependencyGraphNodeId of definitions.get(candidateGraphNodeId)?.dependencies ??
@@ -216,31 +434,49 @@ function marklessSsrMaterializeAsyncComputedSnapshots(runs, snapshots, definitio
 		const entry = runs.get(candidateGraphNodeId);
 		if (!entry) continue;
 		if (entry.async === false) continue;
-		const snapshot = entry.settled ?? { status: 'pending', version: 1, key: null };
+		const snapshot: SsrAsyncSnapshot = entry.settled ?? {
+			status: 'pending',
+			version: 1,
+			key: null,
+		};
 		marklessSsrUpsertAsyncComputedSnapshot(candidateGraphNodeId, snapshot, snapshots);
 	}
 }
 
-function marklessSsrUpsertAsyncComputedSnapshot(graphNodeId, snapshot, snapshots) {
+function marklessSsrUpsertAsyncComputedSnapshot(
+	graphNodeId: string,
+	snapshot: SsrAsyncSnapshot,
+	snapshots: SsrAsyncSnapshotEntry[],
+) {
 	const index = snapshots.findIndex((entry) => entry.graphNodeId === graphNodeId);
 	const next = { graphNodeId, snapshot };
 	if (index === -1) snapshots.push(next);
 }
 
-function marklessSsrReadAsyncComputedSnapshot(graphNodeId, path = [], runs, snapshots) {
+function marklessSsrReadAsyncComputedSnapshot(
+	graphNodeId: string,
+	path: ReadonlyArray<string> = [],
+	runs: SsrAsyncRuns,
+	snapshots: ReadonlyArray<SsrAsyncSnapshotEntry>,
+): unknown {
 	const run = runs.get(graphNodeId);
-	let value = run?.settled;
-	if (run?.async === false && value?.status === 'fulfilled') value = value.value;
+	let value: unknown = run?.settled;
+	if (run?.async === false && run.settled?.status === 'fulfilled') value = run.settled.value;
 	if (value === undefined) {
 		for (const entry of snapshots) {
 			if (entry.graphNodeId === graphNodeId) value = entry.snapshot;
 		}
 	}
-	for (const segment of path) value = value?.[segment];
+	for (const segment of path)
+		value = (value as Readonly<Record<string, unknown>> | null | undefined)?.[segment];
 	return value;
 }
 
-async function marklessSsrSettleAsyncComputed(run, read, signal = new AbortController().signal) {
+async function marklessSsrSettleAsyncComputed(
+	run: SsrAsyncRunner,
+	read: SsrAsyncRead,
+	signal: AbortSignal = new AbortController().signal,
+): Promise<SsrAsyncSnapshot> {
 	try {
 		const value = await run({ key: null, signal, read });
 		return { status: 'fulfilled', version: 1, key: null, value };
@@ -248,7 +484,10 @@ async function marklessSsrSettleAsyncComputed(run, read, signal = new AbortContr
 		return { status: 'rejected', version: 1, key: null, error };
 	}
 }
-export function marklessSsrAttachSnapshots(state, snapshots) {
+export function marklessSsrAttachSnapshots<T extends ComposeStateDraft>(
+	state: T,
+	snapshots: ReadonlyArray<SsrAsyncSnapshotEntry>,
+) {
 	if (snapshots.length === 0) return state;
 	const byId = new Map(snapshots.map((entry) => [entry.graphNodeId, entry.snapshot]));
 	return {
@@ -260,24 +499,31 @@ export function marklessSsrAttachSnapshots(state, snapshots) {
 		),
 	};
 }
-export function marklessSsrMergeBranches(payloadBranches, runtimeBranches) {
+export function marklessSsrMergeBranches(
+	payloadBranches: ReadonlyArray<SsrBranchRecord> | undefined,
+	runtimeBranches: ReadonlyArray<SsrBranchArmSelection>,
+) {
 	const takenById = new Map(runtimeBranches.map((branch) => [branch.id, branch.takenArm]));
 	return (payloadBranches ?? []).map((branch) =>
 		takenById.has(branch.id) ? { ...branch, takenArm: takenById.get(branch.id) } : branch,
 	);
 }
-export function marklessSsrAsyncArm(snapshot) {
+export function marklessSsrAsyncArm(snapshot?: { readonly status?: string } | null) {
 	return snapshot?.status === 'fulfilled'
 		? ASYNC_BOUNDARY_ARM.try
 		: snapshot?.status === 'rejected'
 			? ASYNC_BOUNDARY_ARM.catch
 			: ASYNC_BOUNDARY_ARM.pending;
 }
-export function marklessSsrArmHost(hostLocators) {
+export function marklessSsrArmHost(hostLocators: MarklessSsrHostLocators) {
 	hostLocators.marklessSsrExtraElements = (hostLocators.marklessSsrExtraElements ?? 0) + 1;
 	return '';
 }
-export function marklessSsrHost(hostLocators, hostNodeId, tagName) {
+export function marklessSsrHost(
+	hostLocators: MarklessSsrHostLocators,
+	hostNodeId: string,
+	tagName: string,
+) {
 	hostLocators.push({
 		hostNodeId,
 		strategy: 'dom-order',
@@ -286,25 +532,32 @@ export function marklessSsrHost(hostLocators, hostNodeId, tagName) {
 	});
 	return '';
 }
-export function marklessSsrCallbacks(callbacks) {
-	const result = {};
-	for (const key of Object.keys(callbacks)) if (callbacks[key]) result[key] = callbacks[key];
+export function marklessSsrCallbacks(callbacks: Readonly<Record<string, string | undefined>>) {
+	const result: Record<string, string> = {};
+	for (const key of Object.keys(callbacks)) {
+		const callback = callbacks[key];
+		if (callback) result[key] = callback;
+	}
 	return result;
 }
-export function marklessSsrCallbackSymbol(props, path) {
-	let value = props?.__marklessSsrCallbacks;
-	for (const key of path) value = value?.[key];
+export function marklessSsrCallbackSymbol(
+	props: SsrChildProps | undefined,
+	path: ReadonlyArray<string>,
+) {
+	let value: unknown = props?.__marklessSsrCallbacks;
+	for (const key of path)
+		value = (value as Readonly<Record<string, unknown>> | null | undefined)?.[key];
 	return typeof value === 'string' ? value : undefined;
 }
-export function marklessViewWithoutAnchors(view) {
+export function marklessViewWithoutAnchors(view: SsrViewDraft) {
 	return { ...view, branches: [], asyncBoundaries: [] };
 }
 
-function marklessSsrUnbindLocalSymbolId(symbolId) {
+function marklessSsrUnbindLocalSymbolId(symbolId: string) {
 	return marklessBaseSymbolId(symbolId) ?? symbolId;
 }
 
-function marklessSsrUnbindLocalRecordSet(set) {
+function marklessSsrUnbindLocalRecordSet(set: SsrArmRecordSet) {
 	for (const event of set.events ?? [])
 		event.symbolIds = (event.symbolIds ?? []).map(marklessSsrUnbindLocalSymbolId);
 	for (const update of set.domUpdates ?? [])
@@ -314,7 +567,7 @@ function marklessSsrUnbindLocalRecordSet(set) {
 	return set;
 }
 
-function marklessSsrUnbindLocalView(view, localHostIds) {
+function marklessSsrUnbindLocalView(view: SsrViewDraft, localHostIds: ReadonlySet<string>) {
 	const events = view.events.filter((event) => localHostIds.has(event.hostNodeId));
 	for (const event of events)
 		event.symbolIds = event.symbolIds.map(marklessSsrUnbindLocalSymbolId);
@@ -347,16 +600,23 @@ function marklessSsrUnbindLocalView(view, localHostIds) {
 	};
 }
 
-export function marklessSsrComposeView(structure, view, children, asyncSnapshots, idPrefix = '') {
+export function marklessSsrComposeView(
+	structure: SsrDataStructure,
+	view: SsrViewDraft,
+	children: ReadonlyArray<SsrComposedChild>,
+	asyncSnapshots: ReadonlyArray<SsrAsyncSnapshotEntry>,
+	idPrefix = '',
+) {
 	const renderedHostIds = new Set(structure.locators.map((locator) => locator.hostNodeId));
 	const plannedArmHostIds = new Set(
-		(view.asyncBoundaries ?? []).flatMap((boundary) =>
-			Array.isArray(boundary.armRecords)
-				? boundary.armRecords.flatMap((arm) =>
-						(arm.locators ?? []).map((locator) => locator.hostNodeId),
-					)
-				: [],
-		),
+		(view.asyncBoundaries ?? []).flatMap((boundary) => {
+			const plannedArms: ReadonlyArray<SsrArmRecordSet> = Array.isArray(boundary.armRecords)
+				? boundary.armRecords
+				: [];
+			return plannedArms.flatMap((arm) =>
+				(arm.locators ?? []).map((locator) => locator.hostNodeId),
+			);
+		}),
 	);
 	const localHostIds = new Set(
 		[...view.locators.map((locator) => locator.hostNodeId), ...plannedArmHostIds].flatMap(
@@ -369,17 +629,17 @@ export function marklessSsrComposeView(structure, view, children, asyncSnapshots
 			view: child.output?.view,
 			externalSymbolIds: new Set(child.output?.externalSymbolIds ?? []),
 		}))
-		.filter((child) => child.view);
-	const locators = [];
+		.filter((child): child is SsrChildData => Boolean(child.view));
+	const locators: SsrLocatorRecord[] = [];
 	const { events, domUpdates, keyedRepeats, branches, asyncBoundaries } =
 		marklessSsrUnbindLocalView(view, localHostIds);
 	const behaviors = view.behaviors.filter((behavior) => localHostIds.has(behavior.hostNodeId));
 	const elementHandles = view.elementHandles.filter((handle) =>
 		localHostIds.has(handle.hostNodeId),
 	);
-	const asyncRunners = { ...view.asyncRunners };
-	const externalSymbolIds = new Set();
-	const boundaryArmBranches = new Map();
+	const asyncRunners: Record<string, string> = { ...view.asyncRunners };
+	const externalSymbolIds = new Set<string>();
+	const boundaryArmBranches = new Map<string, SsrBranchRecord[]>();
 	for (const child of childData) {
 		if (child.view)
 			marklessSsrAppendChildView({
@@ -398,7 +658,7 @@ export function marklessSsrComposeView(structure, view, children, asyncSnapshots
 				boundaryArmBranches,
 			});
 	}
-	const locatorByHostId = new Map(
+	const locatorByHostId = new Map<string, { readonly index: number; readonly tagName: string }>(
 		structure.locators.map((locator) => [locator.hostNodeId, locator]),
 	);
 	for (const locator of view.locators.filter((candidate) =>
@@ -472,30 +732,40 @@ export function marklessSsrComposeView(structure, view, children, asyncSnapshots
 // hostNodeId) merges in. Composed children inside arms are covered by the
 // same positional move, so no page-absolute offset surgery remains for arms.
 export function marklessSsrArmizeBoundaries(
-	structure,
-	boundaries,
-	streams,
-	asyncSnapshots,
+	structure: SsrDataStructure,
+	boundaries: ReadonlyArray<SsrBoundaryRecord>,
+	streams: {
+		locators: SsrLocatorRecord[];
+		events: SsrEventRecord[];
+		domUpdates: SsrDomUpdateRecord[];
+		behaviors: SsrBehaviorRecord[];
+		elementHandles: SsrHostedRecord[];
+		keyedRepeats: SsrKeyedRepeatRecord[];
+	},
+	asyncSnapshots: ReadonlyArray<SsrAsyncSnapshotEntry> | undefined,
 	idPrefix = '',
 ) {
 	if (boundaries.length === 0) return boundaries;
-	const anchorById = new Map(
+	const anchorById = new Map<string, { readonly elementStart: number; readonly elementEnd: number }>(
 		structure.anchors
 			.filter((anchor) => anchor.kind === 'async')
 			.map((anchor) => [anchor.id, anchor]),
 	);
-	const snapshotById = new Map(
+	// Keyed by the possibly-null runner id so a boundary without a runner looks
+	// up (and misses) exactly as it did untyped.
+	const snapshotById = new Map<string | null | undefined, SsrAsyncSnapshot | undefined>(
 		(asyncSnapshots ?? []).map((entry) => [entry.graphNodeId, entry.snapshot]),
 	);
 	return boundaries.map((boundary) => {
 		// Child-composed boundaries already carry a single armized record set;
 		// arm-relative coordinates survive composition untouched.
 		if (!Array.isArray(boundary.armRecords)) return boundary;
+		const plannedArms: ReadonlyArray<SsrArmRecordSet> = boundary.armRecords;
 		const anchor = anchorById.get(idPrefix + boundary.id);
 		if (!anchor) throw new Error(`MARKLESS_SSR_DATA_ANCHOR_MISSING: async:${boundary.id}`);
 		const opensStart = anchor.elementStart;
 		const opensEnd = anchor.elementEnd;
-		const armLocators = [];
+		const armLocators: SsrLocatorRecord[] = [];
 		for (let i = streams.locators.length - 1; i >= 0; i--) {
 			const locator = streams.locators[i];
 			if (locator.index < opensStart || locator.index >= opensEnd) continue;
@@ -507,12 +777,17 @@ export function marklessSsrArmizeBoundaries(
 			streams.locators.splice(i, 1);
 		}
 		const armHostIds = new Set(armLocators.map((locator) => locator.hostNodeId));
-		const moved = { events: [], domUpdates: [], behaviors: [], elementHandles: [] };
-		for (const key of Object.keys(moved)) {
-			const records = streams[key] ?? [];
+		const moved: {
+			events: SsrEventRecord[];
+			domUpdates: SsrDomUpdateRecord[];
+			behaviors: SsrBehaviorRecord[];
+			elementHandles: SsrHostedRecord[];
+		} = { events: [], domUpdates: [], behaviors: [], elementHandles: [] };
+		for (const key of Object.keys(moved) as ReadonlyArray<keyof typeof moved>) {
+			const records: SsrHostedRecord[] = streams[key] ?? [];
 			for (let i = records.length - 1; i >= 0; i--) {
 				if (armHostIds.has(records[i].hostNodeId))
-					moved[key].unshift(...records.splice(i, 1));
+					(moved[key] as SsrHostedRecord[]).unshift(...records.splice(i, 1));
 			}
 		}
 		const directStatus = snapshotById.get(boundary.runnerGraphNodeId)?.status;
@@ -537,8 +812,8 @@ export function marklessSsrArmizeBoundaries(
 				: status === 'rejected'
 					? ASYNC_BOUNDARY_ARM.catch
 					: ASYNC_BOUNDARY_ARM.pending;
-		const planned = boundary.armRecords[takenArm] ?? {};
-		const renderedArmLocators = new Map();
+		const planned: SsrArmRecordSet = plannedArms[takenArm] ?? {};
+		const renderedArmLocators = new Map<string, SsrDataStructure['locators'][number]>();
 		for (const locator of structure.locators) {
 			if (locator.index < opensStart || locator.index >= opensEnd) continue;
 			if (!renderedArmLocators.has(locator.hostNodeId))
@@ -558,7 +833,7 @@ export function marklessSsrArmizeBoundaries(
 		}
 		armLocators.sort((left, right) => left.index - right.index);
 		const completeArmHostIds = new Set(armLocators.map((locator) => locator.hostNodeId));
-		const movedKeyedRepeats = [];
+		const movedKeyedRepeats: SsrKeyedRepeatRecord[] = [];
 		for (let i = (streams.keyedRepeats ?? []).length - 1; i >= 0; i--) {
 			if (completeArmHostIds.has(streams.keyedRepeats[i].parentHostNodeId))
 				movedKeyedRepeats.unshift(...streams.keyedRepeats.splice(i, 1));
@@ -581,18 +856,32 @@ export function marklessSsrArmizeBoundaries(
 		};
 	});
 }
-export function marklessSsrIsArmBranchAnchor(text) {
+export function marklessSsrIsArmBranchAnchor(text: unknown) {
 	return (
 		typeof text === 'string' &&
 		(text.startsWith('markless:arm-branch:') || text.startsWith('/markless:arm-branch:'))
 	);
 }
 
-export function marklessSsrAppendChildView(context) {
+export function marklessSsrAppendChildView(context: {
+	readonly child: SsrChildData;
+	readonly baseIndex: number;
+	readonly locators: SsrLocatorRecord[];
+	readonly events: SsrEventRecord[];
+	readonly domUpdates: SsrDomUpdateRecord[];
+	readonly keyedRepeats: SsrKeyedRepeatRecord[];
+	readonly behaviors: SsrBehaviorRecord[];
+	readonly elementHandles: SsrHostedRecord[];
+	readonly branches: SsrBranchRecord[];
+	readonly asyncBoundaries: SsrBoundaryRecord[];
+	readonly asyncRunners: Record<string, string>;
+	readonly externalSymbolIds: Set<string>;
+	readonly boundaryArmBranches: Map<string, SsrBranchRecord[]>;
+}) {
 	const childView = context.child.view;
 	const propEvents = context.child.output?.propEvents ?? [];
 	const callbackProps = context.child.callbackProps ?? {};
-	const callbackSymbolIds = new Map();
+	const callbackSymbolIds = new Map<string, string>();
 	for (const event of childView.events) {
 		const propEvent = propEvents.find(
 			(item) => item.hostNodeId === event.hostNodeId && item.eventName === event.eventName,
@@ -602,7 +891,7 @@ export function marklessSsrAppendChildView(context) {
 			for (const symbolId of event.symbolIds)
 				callbackSymbolIds.set(symbolId, callbackSymbolId);
 	}
-	for (const [graphNodeId, symbolId] of Object.entries(childView.asyncRunners ?? {})) {
+	for (const [graphNodeId, symbolId] of Object.entries<string>(childView.asyncRunners ?? {})) {
 		const mapped = marklessSsrRemapChildGraph(
 			{ graphNodeId, path: [] },
 			context.child.graphProps,
@@ -710,7 +999,7 @@ export function marklessSsrAppendChildView(context) {
 			hostNodeId: context.child.hostPrefix + handle.hostNodeId,
 		});
 	for (const branch of childView.branches ?? []) {
-		const liveTestReads = branch.testReads.filter(
+		const liveTestReads = (branch.testReads ?? []).filter(
 			(read) => !marklessCsrChildReadIsStatic(read, context.child.graphProps),
 		);
 		// A branch decided only by an explicitly constant/absent prop rendered
@@ -762,8 +1051,10 @@ export function marklessSsrAppendChildView(context) {
 				: {}),
 			...(boundary.armRecords && !Array.isArray(boundary.armRecords)
 				? {
+						// The guard is the check; Array.isArray cannot narrow a
+						// readonly-array member out of the union.
 						armRecords: marklessSsrPrefixBoundaryArmRecords(
-							boundary.armRecords,
+							boundary.armRecords as SsrArmRecordSet,
 							context.child,
 						),
 					}
@@ -773,7 +1064,10 @@ export function marklessSsrAppendChildView(context) {
 // A child boundary's armized record set keeps its arm-relative coordinates
 // through composition (the anchor is located live at resume); only host ids,
 // symbol ids, and behavior graph reads need the child prefixes/remaps.
-export function marklessSsrPrefixBoundaryArmRecords(set, child) {
+export function marklessSsrPrefixBoundaryArmRecords(
+	set: SsrArmRecordSet,
+	child: SsrPrefixChild,
+) {
 	const exhaustive = {
 		locators: true,
 		events: true,
@@ -890,14 +1184,18 @@ export function marklessSsrPrefixBoundaryArmRecords(set, child) {
 			: {}),
 	};
 }
-export function marklessSsrRemapChildReads(reads, graphProps, recordId) {
+export function marklessSsrRemapChildReads<T extends ComposeGraphRead>(
+	reads: ReadonlyArray<T> | undefined,
+	graphProps: ComposeGraphProps,
+	recordId: string,
+): T[] {
 	return (reads ?? []).map((read) => {
 		const mapped = marklessSsrRemapChildGraph(read, graphProps);
 		if (!mapped) throw new Error('MARKLESS_COMPOSED_READ_UNMAPPED: ' + recordId);
 		return { ...read, graphNodeId: mapped.graphNodeId, path: mapped.path };
 	});
 }
-export function marklessSsrPrefixArmRecord(arm, child) {
+export function marklessSsrPrefixArmRecord(arm: SsrArmRecordSet, child: SsrPrefixChild) {
 	return {
 		...arm,
 		events: (arm.events ?? []).map((event) => ({
@@ -925,9 +1223,14 @@ export function marklessSsrPrefixArmRecord(arm, child) {
 		}),
 	};
 }
-export function marklessSsrResolveAnchorRecords(structure, kind, records, idPrefix = '') {
+export function marklessSsrResolveAnchorRecords<T extends SsrAnchoredRecord>(
+	structure: SsrDataStructure,
+	kind: 'branch' | 'async',
+	records: ReadonlyArray<T>,
+	idPrefix = '',
+): ReadonlyArray<T> {
 	if (records.length === 0) return records;
-	const anchors = new Map(
+	const anchors = new Map<string, { readonly startIndex: number; readonly endIndex: number }>(
 		structure.anchors
 			.filter((anchor) => anchor.kind === kind)
 			.map((anchor) => [anchor.id, anchor]),

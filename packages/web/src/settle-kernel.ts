@@ -328,12 +328,14 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 				return slot.emptyTemplateId ? renderChunk(slot.emptyTemplateId, undefined) : '';
 			return items.map((value) => renderChunk(slot.rowTemplateId, { value })).join('');
 		}
-		// child-component
-		const edge = edges.get(slot.componentEdgeId);
+		// child-component: SUPPORTED_SLOT_KINDS already rejected every other kind
+		// that reaches renderSlot, so this is the only remaining one.
+		const childSlot = slot as Extract<SsrDataSlot, { readonly kind: 'child-component' }>;
+		const edge = edges.get(childSlot.componentEdgeId);
 		if (!edge?.materialized)
-			throw new SettleKernelUnsupportedError(`live child edge: ${slot.componentEdgeId}`);
-		if (slot.projectionChunkId)
-			throw new SettleKernelUnsupportedError(`projected child edge: ${slot.componentEdgeId}`);
+			throw new SettleKernelUnsupportedError(`live child edge: ${childSlot.componentEdgeId}`);
+		if (childSlot.projectionChunkId)
+			throw new SettleKernelUnsupportedError(`projected child edge: ${childSlot.componentEdgeId}`);
 		const childView = edge.materialized.view;
 		if (
 			(childView?.locators?.length ?? 0) > 0 ||
@@ -343,7 +345,7 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 			(childView?.elementHandles?.length ?? 0) > 0 ||
 			(childView?.asyncBoundaries?.length ?? 0) > 0
 		)
-			throw new SettleKernelUnsupportedError(`interactive child edge: ${slot.componentEdgeId}`);
+			throw new SettleKernelUnsupportedError(`interactive child edge: ${childSlot.componentEdgeId}`);
 		const tokens = edge.materialized.structureTokens ?? [];
 		for (const token of tokens)
 			if (token.kind === 'element')
@@ -353,7 +355,7 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 				});
 		if (tokens.length === 0)
 			for (let index = 0; index < (edge.materialized.elementCount ?? 0); index++)
-				hosts.push({ hostNodeId: `__child:${slot.componentEdgeId}:${index}`, tagName: '*' });
+				hosts.push({ hostNodeId: `__child:${childSlot.componentEdgeId}:${index}`, tagName: '*' });
 		const holes = edge.materialized.holes ?? [];
 		if (holes.length === 0) return edge.materialized.html;
 		return fillMaterializedHoles(edge.materialized.html, holes, input.fillHole, read);

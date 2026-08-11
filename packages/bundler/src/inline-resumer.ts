@@ -100,7 +100,8 @@ export async function compileInlineResumerSource(
 	return minified.code.trim();
 }
 
-function assertOxcResult(phase: string, errors: ReadonlyArray<Error>): void {
+// OXC diagnostics are not Error instances; only the message is read here.
+function assertOxcResult(phase: string, errors: ReadonlyArray<{ readonly message: string }>): void {
 	if (errors.length === 0) return;
 	throw new Error(
 		`MARKLESS_INLINE_RESUMER_${phase.toUpperCase()}_FAILED:\n${errors

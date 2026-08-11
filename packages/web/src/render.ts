@@ -4,9 +4,13 @@ import type { RuntimeGraph } from '@markless/runtime';
 import type { ResumeDomElement, ResumeRuntime, ResumeRuntimeInput } from './resume.ts';
 import type { PrerenderDataSurface } from './prerender/evaluator.ts';
 
+// A mount target is a real DOM element in the browser and a structural stand-in in tests,
+// so the child parameter names both worlds.
 export type RenderTarget = {
-	readonly replaceChildren?: (...children: ReadonlyArray<ResumeDomElement>) => void;
-	readonly appendChild?: (child: ResumeDomElement) => unknown;
+	readonly replaceChildren?: (
+		...children: ReadonlyArray<ResumeDomElement | Node | string>
+	) => void;
+	readonly appendChild?: (child: ResumeDomElement | Node) => unknown;
 };
 
 export type CsrRenderOutput = {

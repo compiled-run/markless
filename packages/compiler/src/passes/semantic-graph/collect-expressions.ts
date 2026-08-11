@@ -1,4 +1,4 @@
-import { asNodes, childNodes, type AnyNode } from '../../ast/nodes.ts';
+import { asNodes, childNodes, isNode, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
 	graphBindingMap,
@@ -98,7 +98,7 @@ const templateValueTypes = new Set([
 
 export function findTemplateValue(node: AnyNode | undefined): AnyNode | null {
 	if (!node) return null;
-	if (templateValueTypes.has(node.type)) return node;
+	if (templateValueTypes.has(node.type ?? '')) return node;
 	if (node.type !== 'ArrayExpression') return null;
 	for (const element of asNodes(node.elements)) {
 		const found = findTemplateValue(element);
@@ -362,8 +362,8 @@ function unwrapChainExpression(node: AnyNode | undefined): AnyNode | undefined {
 	return node?.type === 'ChainExpression' ? (node.expression as AnyNode | undefined) : node;
 }
 
-function isChainExpression(node: AnyNode | undefined): boolean {
-	return node?.type === 'ChainExpression';
+function isChainExpression(node: unknown): boolean {
+	return isNode(node) && node.type === 'ChainExpression';
 }
 
 function addStateRead(node: AnyNode, state: WalkState): void {

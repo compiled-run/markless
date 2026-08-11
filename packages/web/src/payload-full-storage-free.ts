@@ -7,14 +7,16 @@ import {
 	type RuntimePayloadErrorCode,
 	type RuntimePayloadType,
 } from '../../serializer/src/protocol-client.ts';
-import type { ResumeDomElement } from './resume.ts';
 import type { ResumePayloadScriptsInput, ResumePayloadScriptsResult } from './payload-full.ts';
 import {
 	readPayloadScriptsFromDocument,
 	resumeFromPayloadDocumentWith,
 	type ResumePayloadDocumentInput,
 } from './payload-document-common.ts';
-import { deleteResumedPayload } from './payload-resume-registry.ts';
+import {
+	deleteResumedPayload,
+	type ResumeContainerKey,
+} from './payload-resume-registry.ts';
 
 export {
 	RuntimePayloadError,
@@ -87,9 +89,9 @@ export function decodePayloadScriptsFromDocument(
 	return decodePayloadScripts(readPayloadScriptsFromDocument(document));
 }
 
-export function disposeResumedPayload(root: ResumeDomElement): void {
+export function disposeResumedPayload(root: ResumeContainerKey): void {
 	const resumed = deleteResumedPayload(root);
 	resumed?.runtime.dispose();
-	delete (root as ResumeDomElement & { __asyncResumeRuntimeStarted?: boolean })
+	delete (root as ResumeContainerKey & { __asyncResumeRuntimeStarted?: boolean })
 		.__asyncResumeRuntimeStarted;
 }

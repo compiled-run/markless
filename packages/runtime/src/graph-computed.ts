@@ -30,12 +30,14 @@ export function createRuntimeComputedNodes(
 }
 
 export function readComputedNode(
-	computed: RuntimeComputedNode & { readonly compute: RuntimeGraphComputed['compute'] },
+	computed: RuntimeComputedNode,
 	readGraph: RuntimeGraphRead,
 	path: ReadonlyArray<string>,
 ): unknown {
-	if (computed.dirty) {
-		computed.value = computed.compute(readGraph);
+	// Dependency-only nodes carry no compute; callers already gate on it.
+	const { compute } = computed;
+	if (computed.dirty && compute) {
+		computed.value = compute(readGraph);
 		computed.dirty = false;
 	}
 

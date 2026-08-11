@@ -41,7 +41,7 @@ export type SettleTrackerClock = {
 };
 
 // An async snapshot only commits once its runner settled either way.
-function isSettledStatus(status: unknown): boolean {
+function isSettledStatus(status: unknown): status is 'fulfilled' | 'rejected' {
 	return status === 'fulfilled' || status === 'rejected';
 }
 
@@ -179,7 +179,7 @@ function boundaryGateSnapshot(
 				: graph.read(read.graphNodeId, [])) as {
 				readonly status?: unknown;
 				readonly error?: unknown;
-			} | null,
+			} | null | undefined,
 	);
 	const rejected = snapshots.find((snapshot) => snapshot?.status === 'rejected');
 	if (rejected) return { status: 'rejected', error: rejected.error };
@@ -226,7 +226,7 @@ export async function settleAsyncBoundaryRange(
 	}
 	const source = resolveBoundarySettleSource(input, boundary);
 	if (source === 'renderAsyncBoundary') {
-		const rendered = await input.renderAsyncBoundary(boundary.id, status, input.graph);
+		const rendered = await input.renderAsyncBoundary!(boundary.id, status, input.graph);
 		const armRecords = boundaryArmRecordSet(rendered.armRecords);
 		if (!armRecords) throw emptySettleRenderError(boundary.id);
 		await input.commitArm!(boundary, {

@@ -1,4 +1,21 @@
-const e = (c, s) => {
+// The specialized scalar reader decodes ONE cell straight out of the served
+// state script, so it names only the payload fields it inspects.
+type MarklessScalarRoot =
+	| { readonly $type: 'undefined' }
+	| { readonly $type: 'bigint'; readonly value: string }
+	| { readonly $type: 'date'; readonly value: string }
+	| { readonly $type?: undefined };
+type MarklessScalarCell = {
+	readonly graphNodeId?: string;
+	readonly valueKind?: string;
+	readonly value?: {
+		readonly version?: number;
+		readonly records?: ReadonlyArray<unknown>;
+		readonly root?: MarklessScalarRoot | string | number | boolean | null;
+	};
+};
+
+const e = (c: string, s: string): never => {
 	throw Object.assign(
 		Error(c),
 		{ code: c, site: s },
@@ -7,16 +24,22 @@ const e = (c, s) => {
 			: {},
 	);
 };
-export const marklessReadScalarCell = (r, graphNodeId) => {
+export const marklessReadScalarCell = (r: ParentNode, graphNodeId: string) => {
 	const script = r.querySelector('script[type="markless/state"]');
 	if (!script) return;
 	try {
-		return JSON.parse(script.textContent || 'null')?.cells?.find(
-			(cell) => cell?.graphNodeId === graphNodeId,
-		);
+		return (
+			JSON.parse(script.textContent || 'null') as {
+				readonly cells?: ReadonlyArray<MarklessScalarCell | null>;
+			} | null
+		)?.cells?.find((cell) => cell?.graphNodeId === graphNodeId);
 	} catch {}
 };
-export const marklessDecodeScalarCell = (c, g, s) => {
+export const marklessDecodeScalarCell = (
+	c: MarklessScalarCell | null | undefined,
+	g: string,
+	s: string,
+) => {
 	try {
 		const v = c?.value,
 			r = v?.root;

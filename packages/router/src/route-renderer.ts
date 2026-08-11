@@ -1,5 +1,5 @@
 import { render } from '@markless/web/render';
-import type { CsrRenderArtifact } from '@markless/web/render';
+import type { CsrRenderArtifact, RenderTarget } from '@markless/web/render';
 import { holdNavigationSwapUntilSettled, type NavigationHoldRuntime } from './navigation-hold.ts';
 import {
 	MARKLESS_ROUTER_RENDERER_STARTED,
@@ -47,7 +47,9 @@ async function renderRouteUpdate(document: Document, update: RouteUpdate): Promi
 				props,
 			},
 			{
-				target: document.body,
+				// A real element mounts through the same replaceChildren/appendChild pair
+				// the mount target describes; only its stand-in child type differs.
+				target: document.body as RenderTarget,
 				// The D8 hold/deadline/min-duration state machine lives in
 				// navigation-hold.ts (pure, fake-clock property-tested).
 				beforeMount: async (incoming) => {

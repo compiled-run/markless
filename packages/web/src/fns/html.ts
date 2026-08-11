@@ -1,20 +1,25 @@
-export function marklessCsrText(value) {
+// Authored expression values reach these helpers unconstrained; each one
+// narrows the value itself before use.
+export type MarklessPublicPath = ReadonlyArray<string | number>;
+type MarklessAttributeValues = Readonly<Record<string, unknown>> | null | undefined;
+
+export function marklessCsrText(value: unknown) {
 	return marklessCsrEscape(value == null ? '' : String(value));
 }
-export function marklessCsrChildrenHtml(value) {
+export function marklessCsrChildrenHtml(value: unknown) {
 	return value == null ? '' : String(value);
 }
-export function marklessCsrAttribute(name, value) {
+export function marklessCsrAttribute(name: string, value: unknown) {
 	return ` ${name}="${marklessCsrEscape(value == null ? '' : String(value))}"`;
 }
-export function marklessCsrDynamicTagName(value) {
+export function marklessCsrDynamicTagName(value: unknown) {
 	if (value === null || value === undefined || value === false || value === '') return null;
 	const tag = String(value);
 	if (!/^[a-zA-Z][a-zA-Z0-9:_.-]*$/.test(tag))
 		throw new Error('MARKLESS_DYNAMIC_TAG_INVALID: ' + tag);
 	return tag;
 }
-export function marklessCsrSpreadAttributes(values, scopeClass) {
+export function marklessCsrSpreadAttributes(values: MarklessAttributeValues, scopeClass?: string) {
 	let html = '';
 	let classSeen = false;
 	for (const key of Object.keys(values ?? {})) {
@@ -26,7 +31,7 @@ export function marklessCsrSpreadAttributes(values, scopeClass) {
 			key === 'children'
 		)
 			continue;
-		const value = values[key];
+		const value = values?.[key];
 		if (value === null || value === undefined || value === false) continue;
 		if (key === 'class' && scopeClass) {
 			classSeen = true;
@@ -41,30 +46,30 @@ export function marklessCsrSpreadAttributes(values, scopeClass) {
 	if (scopeClass && !classSeen) html += ` class="${scopeClass}"`;
 	return html;
 }
-export function marklessCsrEscape(value) {
+export function marklessCsrEscape(value: string) {
 	return value
 		.replaceAll('&', '&amp;')
 		.replaceAll('<', '&lt;')
 		.replaceAll('>', '&gt;')
 		.replaceAll('"', '&quot;');
 }
-export function marklessSsrText(value) {
+export function marklessSsrText(value: unknown) {
 	return marklessSsrEscape(value == null ? '' : String(value));
 }
-export function marklessSsrChildrenHtml(value) {
+export function marklessSsrChildrenHtml(value: unknown) {
 	return value == null ? '' : String(value);
 }
-export function marklessSsrAttribute(name, value) {
+export function marklessSsrAttribute(name: string, value: unknown) {
 	return ` ${name}="${marklessSsrEscape(value == null ? '' : String(value))}"`;
 }
-export function marklessSsrDynamicTagName(value) {
+export function marklessSsrDynamicTagName(value: unknown) {
 	if (value === null || value === undefined || value === false || value === '') return null;
 	const tag = String(value);
 	if (!/^[a-zA-Z][a-zA-Z0-9:_.-]*$/.test(tag))
 		throw new Error('MARKLESS_DYNAMIC_TAG_INVALID: ' + tag);
 	return tag;
 }
-export function marklessSsrSpreadAttributes(values, scopeClass) {
+export function marklessSsrSpreadAttributes(values: MarklessAttributeValues, scopeClass?: string) {
 	let html = '';
 	let classSeen = false;
 	for (const key of Object.keys(values ?? {})) {
@@ -76,7 +81,7 @@ export function marklessSsrSpreadAttributes(values, scopeClass) {
 			key === 'children'
 		)
 			continue;
-		const value = values[key];
+		const value = values?.[key];
 		if (value === null || value === undefined || value === false) continue;
 		if (key === 'class' && scopeClass) {
 			classSeen = true;
@@ -91,20 +96,20 @@ export function marklessSsrSpreadAttributes(values, scopeClass) {
 	if (scopeClass && !classSeen) html += ` class="${scopeClass}"`;
 	return html;
 }
-export function marklessSsrEscape(value) {
+export function marklessSsrEscape(value: string) {
 	return value
 		.replaceAll('&', '&amp;')
 		.replaceAll('<', '&lt;')
 		.replaceAll('>', '&gt;')
 		.replaceAll('"', '&quot;');
 }
-export function readMarklessPublicPath(value, path) {
+export function readMarklessPublicPath(value: unknown, path: MarklessPublicPath): unknown {
 	let current = value;
-	for (const key of path) current = current?.[key];
+	for (const key of path) current = (current as MarklessAttributeValues)?.[key];
 	return current;
 }
-export function marklessSsrReadPublicPath(value, path) {
+export function marklessSsrReadPublicPath(value: unknown, path: MarklessPublicPath): unknown {
 	let current = value;
-	for (const key of path) current = current?.[key];
+	for (const key of path) current = (current as MarklessAttributeValues)?.[key];
 	return current;
 }

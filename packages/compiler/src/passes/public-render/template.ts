@@ -1,8 +1,12 @@
 import { asNodes, childNodes, type AnyNode } from '../../ast/nodes.ts';
 import {
 	getComponentFunction,
+	getDynamicTagExpression,
+	getElementTagName,
+	isHostTagName,
 	isIgnorableStaticTextNode as isIgnorableTextNode,
 	isPlainHostTemplateNode,
+	isStaticTextNode,
 } from '../../ast/tsrx.ts';
 
 export type PublicRenderRootSelection = {
@@ -60,23 +64,56 @@ export function supportedFragmentRoot(fragment: AnyNode): AnyNode | null {
 	return supported ? fragment : null;
 }
 
-export function unsupportedFragmentChildKind(fragment: AnyNode): string {
-	for (const child of asNodes(fragment.children)) {
-		if (isIgnorableTextNode(child)) continue;
-		if (
-			child.type === 'JSXIfExpression' ||
-			child.type === 'JSXSwitchExpression' ||
-			child.type === 'JSXForExpression' ||
-			child.type === 'JSXTryExpression'
-		) return 'control-flow child';
-		if (child.type === 'Element' || child.type === 'JSXElement') {
-			if (!isPlainHostTemplateNode(child)) return 'component or dynamic child';
-			continue;
-		}
+const controlFlowBlockLabels: Record<string, string> = {
+	JSXIfExpression: 'an @if block',
+	JSXSwitchExpression: 'a @switch block',
+	JSXForExpression: 'a @for block',
+	JSXTryExpression: 'a @try block',
+};
+
+// Names the first thing that stops a fragment root from rendering, in the
+// user's own terms: "the <Counter> component inside <main>". Mirrors the
+// supportedFragmentRoot / isPlainHostTemplateNode walk so the description
+// always points at a real offender instead of a category. Returns null for a
+// fragment with no content.
+export function describeUnsupportedFragmentContent(fragment: AnyNode): string | null {
+	const children = asNodes(fragment.children).filter((child) => !isIgnorableTextNode(child));
+	if (children.length === 0) return null;
+	for (const child of children) {
+		// Control-flow blocks are supported as direct fragment children; the
+		// offender is whatever comes after them.
+		if (child.type !== undefined && controlFlowBlockLabels[child.type]) continue;
 		if (child.type === 'JSXExpressionContainer' || child.type === 'TSRXExpression') {
-			return 'expression child';
+			return 'a {expression} placed directly inside the fragment';
 		}
-		return `${String(child.type)} child`;
+		if (isStaticTextNode(child)) {
+			return 'text placed directly inside the fragment';
+		}
+		const offender = describeUnsupportedTemplateNode(child, null);
+		if (offender) return offender;
 	}
-	return 'empty fragment';
+	return 'content the fragment renderer does not recognize';
+}
+
+function describeUnsupportedTemplateNode(
+	node: AnyNode,
+	enclosingTag: string | null,
+): string | null {
+	const inside = enclosingTag ? ` inside <${enclosingTag}>` : '';
+	if (node.type !== 'Element' && node.type !== 'JSXElement') {
+		if (isStaticTextNode(node)) return null;
+		if (node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') return null;
+		const block = node.type !== undefined ? controlFlowBlockLabels[node.type] : undefined;
+		if (block) return `${block}${inside}`;
+		return `unsupported content${inside}`;
+	}
+	if (getDynamicTagExpression(node)) return `a dynamic <{...}> element${inside}`;
+	const tagName = getElementTagName(node);
+	if (!tagName) return `a component reference${inside}`;
+	if (!isHostTagName(tagName)) return `the <${tagName}> component${inside}`;
+	for (const child of asNodes(node.children)) {
+		const offender = describeUnsupportedTemplateNode(child, tagName);
+		if (offender) return offender;
+	}
+	return null;
 }

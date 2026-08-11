@@ -1,6 +1,16 @@
-import { marklessSetStatePayloadValue } from './state-payload.ts';
+import {
+	marklessSetStatePayloadValue,
+	type MarklessStatePayloadDraft,
+} from './state-payload.ts';
 
-export function marklessStateValue(values, state, graphNodeId, value) {
+// arguments.length distinguishes a read from a write of undefined, so the
+// value parameter stays optional.
+export function marklessStateValue(
+	values: Map<string, unknown>,
+	state: MarklessStatePayloadDraft,
+	graphNodeId: string,
+	value?: unknown,
+) {
 	if (arguments.length > 3) {
 		values.set(graphNodeId, value);
 		marklessSetStatePayloadValue(state, graphNodeId, value);

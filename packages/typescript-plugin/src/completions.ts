@@ -366,7 +366,9 @@ function componentsInScope(
 ): Map<string, TagCompletionKind> {
 	let program: AstNode;
 	try {
-		program = compileTsrxForTypeService(source, fileName, { loose: true }).sourceAst as AstNode;
+		const { sourceAst } = compileTsrxForTypeService(source, fileName, { loose: true });
+		if (!isAstNode(sourceAst)) return new Map();
+		program = sourceAst;
 	} catch {
 		return new Map();
 	}
@@ -537,8 +539,9 @@ function classifyConstructContext(
 		const candidate = buildClassifierCandidate(source, prefixStart, position, replacement);
 		try {
 			const compiled = compileTsrxForTypeService(candidate.source, fileName, { loose: true });
+			if (!isAstNode(compiled.sourceAst)) continue;
 			const location = findAstNodeAt(
-				compiled.sourceAst as AstNode,
+				compiled.sourceAst,
 				candidate.placeholderOffset,
 				(node) => node.type === 'Identifier' && node.name === placeholderName,
 			);
@@ -690,7 +693,8 @@ function componentImportDefinition(
 	} catch {
 		return undefined;
 	}
-	const program = compiled.sourceAst as AstNode;
+	if (!isAstNode(compiled.sourceAst)) return undefined;
+	const program = compiled.sourceAst;
 	const usage = findSmallestAstNode(program, (node) => {
 		return (
 			(node.type === 'JSXIdentifier' || node.type === 'Identifier') &&
@@ -703,14 +707,14 @@ function componentImportDefinition(
 	});
 	if (!usage?.name || usage.start === undefined || usage.end === undefined) return undefined;
 
-	const body = Array.isArray(program.body) ? (program.body as AstNode[]) : [];
+	const body = Array.isArray(program.body) ? program.body.filter(isAstNode) : [];
 	let moduleName: string | undefined;
 	for (const statement of body) {
 		if (statement.type !== 'ImportDeclaration' || !Array.isArray(statement.specifiers))
 			continue;
-		const importsUsage = (statement.specifiers as AstNode[]).some((specifier) => {
-			const local = specifier.local as AstNode | undefined;
-			return local?.name === usage.name;
+		const importsUsage = statement.specifiers.filter(isAstNode).some((specifier) => {
+			const local = specifier.local;
+			return isAstNode(local) && local.name === usage.name;
 		});
 		const moduleSource = statement.source as { readonly value?: unknown } | undefined;
 		if (importsUsage && typeof moduleSource?.value === 'string') {
@@ -728,8 +732,11 @@ function componentImportDefinition(
 	const targetSource = targetSnapshot.getText(0, targetSnapshot.getLength());
 	let targetProgram: AstNode;
 	try {
-		targetProgram = compileTsrxForTypeService(targetSource, targetFileName, { loose: true })
-			.sourceAst as AstNode;
+		const { sourceAst } = compileTsrxForTypeService(targetSource, targetFileName, {
+			loose: true,
+		});
+		if (!isAstNode(sourceAst)) return undefined;
+		targetProgram = sourceAst;
 	} catch {
 		return undefined;
 	}
@@ -877,11 +884,10 @@ function completionEntriesForImport(
 function exportedDeclarationNames(typeScript: TypeScript, sourceFile: ts.SourceFile): string[] {
 	const names: string[] = [];
 	for (const statement of sourceFile.statements) {
-		if (
-			!statement.modifiers?.some(
-				(modifier) => modifier.kind === typeScript.SyntaxKind.ExportKeyword,
-			)
-		) {
+		const modifiers = typeScript.canHaveModifiers(statement)
+			? typeScript.getModifiers(statement)
+			: undefined;
+		if (!modifiers?.some((modifier) => modifier.kind === typeScript.SyntaxKind.ExportKeyword)) {
 			continue;
 		}
 		if (

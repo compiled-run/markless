@@ -439,18 +439,6 @@ function hasExternalParseDiagnostic(semanticGraph: SemanticGraphArtifact): boole
 function emptyPublicRenderPlanArtifact(): PublicRenderPlanArtifact {
 	return {
 		passId: 'public-render-plan',
-		rootTemplateHtml: null,
-		directRenderTemplateHtml: null,
-		staticHostNodeIds: [],
-		staticHostLocators: [],
-		staticEventControls: [],
-		staticTextWrites: [],
-		repeatGates: [],
-		keyedRepeats: [],
-		asyncBoundaryGates: [],
-		branchReactivityGates: [],
-		branchArms: [],
-		asyncBoundaryArms: [],
 		styleScopes: [],
 		diagnostics: [],
 	};

@@ -299,7 +299,7 @@ function materializeBranchArmRecords(
 				id: `arm-dom-update:${host.hostNodeId}:${update.graphNodeId}:${update.path.join('.')}`,
 				graphNodeId: update.graphNodeId,
 				path: update.path,
-				async run(value) {
+				async run(value: unknown) {
 					const symbol = await input.loadSymbol(update.symbolId!);
 					return (await symbol({
 						graph: input.graph,

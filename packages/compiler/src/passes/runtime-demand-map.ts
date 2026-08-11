@@ -4,9 +4,11 @@ import type {
 	PublicRenderModuleArtifact,
 	PlannedSymbol,
 	RuntimeDemandMapActionPlan,
+	RuntimeDemandMapAction,
 	RuntimeDemandMapArtifact,
-	RuntimeDemandClass,
+	RuntimeDemandMapRecord,
 	RuntimeDemandMapRecordKind,
+	RuntimeDemandClass,
 	SymbolModulesArtifact,
 	SymbolResolverPlan,
 } from '../artifacts.ts';
@@ -546,7 +548,7 @@ function payloadDemandRecords(
 ): RuntimeDemandMapArtifact['payloadRecords'] {
 	const rowDispatchCore = replacement.scalarRows ? ROW_LEAN_DISPATCH_CORE : fullTier;
 	return [
-		...(view.events ?? []).map((event) => {
+		...(view.events ?? []).map((event): RuntimeDemandMapRecord => {
 			const kind = protocolEventActionKind(event);
 			const phase = EVENT_ACTION_PHASES[kind];
 			return {
@@ -568,7 +570,7 @@ function payloadDemandRecords(
 					: [],
 			};
 		}),
-		...(view.domUpdates ?? []).map((record) => ({
+		...(view.domUpdates ?? []).map((record): RuntimeDemandMapRecord => ({
 			recordId: `dom-update:${record.hostNodeId}:${record.symbolId ?? ''}`,
 			kind: 'dom-update',
 			hostNodeId: record.hostNodeId,
@@ -578,7 +580,7 @@ function payloadDemandRecords(
 				...symbolIdsDemand(record.symbolId ? [record.symbolId] : [], symbolDemand),
 			]),
 		})),
-		...(view.keyedRepeats ?? []).map((record) => ({
+		...(view.keyedRepeats ?? []).map((record): RuntimeDemandMapRecord => ({
 			recordId: `keyed-repeat:${record.id}`,
 			kind: 'keyed-repeat',
 			hostNodeId: record.parentHostNodeId,
@@ -588,7 +590,7 @@ function payloadDemandRecords(
 				...(replacement.scalarRows ? [] : renderRuntimeModuleIds),
 			]),
 		})),
-		...(view.branches ?? []).map((record) => ({
+		...(view.branches ?? []).map((record): RuntimeDemandMapRecord => ({
 			recordId: `branch:${record.id}`,
 			kind: 'branch',
 			symbolIds: record.symbolId ? [record.symbolId] : [],
@@ -597,7 +599,7 @@ function payloadDemandRecords(
 				...symbolIdsDemand(record.symbolId ? [record.symbolId] : [], symbolDemand),
 			]),
 		})),
-		...(view.asyncBoundaries ?? []).map((record) => ({
+		...(view.asyncBoundaries ?? []).map((record): RuntimeDemandMapRecord => ({
 			recordId: `async-boundary:${record.id}`,
 			kind: 'async-boundary',
 			symbolIds: unique(
@@ -618,7 +620,7 @@ function payloadDemandRecords(
 				),
 			]),
 		})),
-		...(view.behaviors ?? []).map((record) => ({
+		...(view.behaviors ?? []).map((record): RuntimeDemandMapRecord => ({
 			recordId: `behavior:${record.hostNodeId}:${record.symbolId ?? ''}`,
 			kind: 'behavior',
 			hostNodeId: record.hostNodeId,
@@ -628,7 +630,7 @@ function payloadDemandRecords(
 				...symbolIdsDemand(record.symbolId ? [record.symbolId] : [], symbolDemand),
 			]),
 		})),
-		...(view.elementHandles ?? []).map((record) => ({
+		...(view.elementHandles ?? []).map((record): RuntimeDemandMapRecord => ({
 			recordId: `element-handle:${record.hostNodeId}`,
 			kind: 'element-handle',
 			hostNodeId: record.hostNodeId,
@@ -647,9 +649,9 @@ function actionDemandRecords(
 	captureAnalysis?: CaptureAnalysisArtifact,
 ): RuntimeDemandMapArtifact['actions'] {
 	const branchDemand = view.branches?.length ? modulesForKind(records, 'branch') : [];
-	const branchKinds = view.branches?.length ? ['branch'] : [];
+	const branchKinds: RuntimeDemandMapRecordKind[] = view.branches?.length ? ['branch'] : [];
 	return [
-		...(view.events ?? []).map((event) => {
+		...(view.events ?? []).map((event): RuntimeDemandMapAction => {
 			const kind = protocolEventActionKind(event);
 			if (!EVENT_ACTION_PHASES[kind].payloadRuntime) {
 				return {
@@ -695,7 +697,7 @@ function actionDemandRecords(
 			};
 		}),
 		...(view.keyedRepeats ?? []).flatMap((repeat) =>
-			repeat.rowEvents.map((event) => {
+			repeat.rowEvents.map((event): RuntimeDemandMapAction => {
 				const subscriberRecords = writeSubscriberRecords(
 					resolver,
 					transitiveSymbolIds(event.symbolIds ?? [], captureAnalysis),
@@ -978,6 +980,6 @@ function eventKey(hostNodeId: string, eventName: string): string {
 	return `${hostNodeId}:${eventName}`;
 }
 
-function unique(values: ReadonlyArray<string | undefined>): string[] {
-	return [...new Set(values.filter((value): value is string => !!value))].sort();
+function unique<Value extends string>(values: ReadonlyArray<Value | undefined>): Value[] {
+	return [...new Set(values.filter((value): value is Value => !!value))].sort();
 }

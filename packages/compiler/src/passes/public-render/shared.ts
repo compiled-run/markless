@@ -247,6 +247,12 @@ export function componentReferences(
 	return references;
 }
 
+export function hasComponentImportSource(
+	reference: ComponentReference,
+): reference is ComponentReference & { readonly importSource: string } {
+	return !!reference.importSource;
+}
+
 export function emitComponentImport(
 	imported: ComponentReference & { readonly importSource: string },
 ): string {
@@ -382,8 +388,8 @@ export function joinSsrExpressions(parts: ReadonlyArray<string>): string {
 	return filtered.join(' + ');
 }
 
-export function componentPropNames(component: AnyNode): string[] {
-	const param = asNodes(component.params)[0];
+export function componentPropNames(component: AnyNode | undefined): string[] {
+	const param = asNodes(component?.params)[0];
 	if (!param) return [];
 	if (param.type === 'Identifier') {
 		const name = getIdentifierName(param);

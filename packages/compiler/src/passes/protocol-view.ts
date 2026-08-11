@@ -1,5 +1,6 @@
 import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
 import type {
+	PlannedSymbol,
 	ProtocolViewArmRecordSet,
 	ProtocolViewPayloadInput,
 	ProtocolViewPayloadWithArmRecords,
@@ -118,7 +119,11 @@ export function createProtocolViewPayload(
 
 function protocolAsyncBoundaryReads(
 	input: ProtocolViewPayloadInput,
-	boundary: ProtocolViewPayloadInput['payloadArena']['view']['asyncBoundaries'][number],
+	// Only the boundary's reads are walked, so partially projected boundaries qualify.
+	boundary: Pick<
+		ProtocolViewPayloadInput['payloadArena']['view']['asyncBoundaries'][number],
+		'asyncReads'
+	>,
 ): ProtocolViewPayloadInput['payloadArena']['view']['asyncBoundaries'][number]['asyncReads'] {
 	const computedByGraphNode = new Map(
 		input.payloadArena.state.computed.map((computed) => [computed.graphNodeId, computed]),
@@ -410,7 +415,7 @@ function eventSymbolsForHost(
 ): ReadonlyArray<string> {
 	return input.symbolResolver.symbols
 		.filter(
-			(symbol) =>
+			(symbol): symbol is Extract<PlannedSymbol, { kind: 'event-handler' }> =>
 				symbol.kind === 'event-handler' &&
 				symbol.hostNodeId === hostNodeId &&
 				symbol.eventName === eventName,
@@ -465,7 +470,7 @@ function armScopedBranchRecords(
 	input: ProtocolViewPayloadInput,
 	boundaryId: string,
 	arm: number,
-): ReadonlyArray<ProtocolViewArmRecordSet['branches'][number]> | undefined {
+): ReadonlyArray<NonNullable<ProtocolViewArmRecordSet['branches']>[number]> | undefined {
 	const branches = renderDataOf(input).branches.filter(
 		(branch) =>
 			branch.asyncBoundaryId === boundaryId && branch.asyncBoundaryArm === arm,

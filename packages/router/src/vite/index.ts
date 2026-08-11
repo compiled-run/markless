@@ -9,7 +9,7 @@ import {
 	type ResolvedConfig,
 	type UserConfig,
 } from 'vite';
-import type { InputOption } from 'rolldown';
+import type { InputOption, OutputChunk } from 'rolldown';
 import {
 	decodePath,
 	joinURL,
@@ -277,14 +277,14 @@ function routerConfigPlugin(
 				}
 
 				const resumeChunk = Object.values(bundle).find(
-					(item) =>
+					(item): item is OutputChunk =>
 						item.type === 'chunk' && isVirtualEntryChunk(item, RESUME_ENTRY_ORIGIN),
 				);
 				if (resumeChunk) {
 					resumeEntry.fileName = resumeChunk.fileName;
 				}
 				const prerenderWakeChunk = Object.values(bundle).find(
-					(item) =>
+					(item): item is OutputChunk =>
 						item.type === 'chunk' &&
 						isVirtualEntryChunk(item, PRERENDER_WAKE_ENTRY_ORIGIN),
 				);
@@ -292,7 +292,7 @@ function routerConfigPlugin(
 					prerenderWakeEntry.fileName = prerenderWakeChunk.fileName;
 				}
 				const navigationChunk = Object.values(bundle).find(
-					(item) =>
+					(item): item is OutputChunk =>
 						item.type === 'chunk' && isVirtualEntryChunk(item, NAVIGATION_ENTRY_ORIGIN),
 				);
 				if (navigationChunk) {
@@ -374,7 +374,11 @@ function configureRouteInputs(config: EnvironmentOptions): void {
 	}
 }
 
-function withExternal(external: unknown, id: string): unknown {
+type RolldownExternal = NonNullable<
+	NonNullable<NonNullable<EnvironmentOptions['build']>['rolldownOptions']>['external']
+>;
+
+function withExternal(external: RolldownExternal | undefined, id: string): RolldownExternal {
 	if (Array.isArray(external)) {
 		return external.includes(id) ? external : [...external, id];
 	}
@@ -446,7 +450,7 @@ function requestFileBuildTransformPlugin(root: string): Plugin {
 function createNitroConfig(
 	nitroConfig: UserConfig['nitro'] | undefined,
 	root = '.',
-	serverWatchIgnored: readonly unknown[] = [],
+	serverWatchIgnored: readonly WatchIgnorePattern[] = [],
 ): NonNullable<UserConfig['nitro']> {
 	const scanDirs = Array.isArray(nitroConfig?.scanDirs)
 		? nitroConfig.scanDirs.filter((dir): dir is string => typeof dir === 'string')
@@ -477,30 +481,42 @@ function createNitroConfig(
 	} as NonNullable<UserConfig['nitro']>;
 }
 
-function withWatchIgnores(
-	watchOptions: unknown,
-	extraIgnored: readonly unknown[] = [],
-): Record<string, unknown> & { ignored: unknown[] } {
+// Vite's watcher and nitro's watcher name their ignore patterns with different
+// types, so the pattern stays generic and each caller keeps its own.
+export type WatchIgnorePattern = Extract<
+	NonNullable<NonNullable<NonNullable<UserConfig['server']>['watch']>['ignored']>,
+	readonly unknown[]
+>[number];
+
+function withWatchIgnores<Pattern>(
+	watchOptions:
+		| { readonly ignored?: Pattern | readonly Pattern[]; readonly followSymlinks?: boolean }
+		| null
+		| undefined,
+	extraIgnored: readonly Pattern[] = [],
+): { followSymlinks: boolean; ignored: (Pattern | string)[] } {
 	const watchOptionsObject = isRecord(watchOptions) ? watchOptions : {};
 
 	return {
 		...watchOptionsObject,
 		followSymlinks: watchOptionsObject.followSymlinks ?? false,
 		ignored: [
-			...toArray(watchOptionsObject.ignored),
+			...toWatchIgnores(watchOptionsObject.ignored),
 			...extraIgnored,
 			...DEFAULT_WATCH_IGNORES,
 		],
 	};
 }
 
-function toArray(value: unknown): unknown[] {
-	if (value === undefined) {
-		return [];
-	}
-
-	return Array.isArray(value) ? value : [value];
+function toWatchIgnores<Pattern>(value: Pattern | readonly Pattern[] | undefined): Pattern[] {
+	if (value === undefined) return [];
+	return isPatternList(value) ? [...value] : [value];
 }
+
+function isPatternList<Pattern>(value: Pattern | readonly Pattern[]): value is readonly Pattern[] {
+	return Array.isArray(value);
+}
+
 
 function withRequestFileBuildPlugin(config: unknown, root: string): Record<string, unknown> {
 	const configObject = isRecord(config) ? config : {};
@@ -919,13 +935,21 @@ function routeModulePreloadsFromBundle(input: {
 			joinURL(input.base, fileName),
 		);
 		ssr[routeFile] = [...ssrFileNames].map((fileName) => joinURL(input.base, fileName));
-		styles[routeFile] = routeStylesheetsForChunk(routeChunk, chunksByFileName, input.base);
+		styles[routeFile] = routeStylesheetsForChunks(
+			routeFileChunks,
+			chunksByFileName,
+			input.base,
+		);
 	}
 	return { navigation, ssr, styles };
 }
 
-function routeStylesheetsForChunk(
-	routeChunk: OutputChunkLike,
+// A route source compiles into several client chunks (route, resume,
+// symbols-only, render-data), and the scoped-style import rides the
+// render-data module — not the primary route chunk. Every chunk the route owns
+// contributes, or the built page ships without its stylesheet link.
+function routeStylesheetsForChunks(
+	routeFileChunks: readonly OutputChunkLike[],
 	chunksByFileName: ReadonlyMap<string, OutputChunkLike>,
 	base: string,
 ): readonly string[] {
@@ -942,7 +966,7 @@ function routeStylesheetsForChunk(
 			styles.add(joinURL(base, stylesheet));
 		}
 	};
-	visit(routeChunk);
+	for (const chunk of routeFileChunks) visit(chunk);
 	return [...styles];
 }
 

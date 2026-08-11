@@ -81,13 +81,16 @@ function addImportClauseInteriorMappings(
 	source: string,
 ): void {
 	const program = compiled.sourceAst as AstNode | undefined;
-	if (program?.type !== 'Program' || !Array.isArray(program.body)) return;
+	if (program?.type !== 'Program') return;
+	// Array.isArray narrows a readonly array to any[], so the node type is restored here.
+	const body: readonly AstNode[] = Array.isArray(program.body) ? program.body : [];
 
-	for (const declaration of program.body) {
-		if (declaration.type !== 'ImportDeclaration' || !Array.isArray(declaration.specifiers)) {
-			continue;
-		}
-		const namedSpecifiers = declaration.specifiers.filter(
+	for (const declaration of body) {
+		if (declaration.type !== 'ImportDeclaration') continue;
+		const specifiers: readonly AstNode[] = Array.isArray(declaration.specifiers)
+			? declaration.specifiers
+			: [];
+		const namedSpecifiers = specifiers.filter(
 			(specifier) => specifier.type === 'ImportSpecifier',
 		);
 		const first = namedSpecifiers[0];

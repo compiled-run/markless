@@ -4,6 +4,7 @@ import type {
 	PayloadArmRecordSet,
 	PayloadBehavior,
 	PayloadKeyedRepeat,
+	SemanticComponentPropBinding,
 	SemanticGraphBinding,
 } from '../artifacts.ts';
 import {
@@ -303,7 +304,9 @@ function resolveElementHandleBinding(
 		.filter((edge) => edge.childComponentName === binding.componentName)
 		.flatMap((edge) => edge.props)
 		.find(
-			(candidate) =>
+			(
+				candidate,
+			): candidate is Extract<SemanticComponentPropBinding, { kind: 'graph-reference' }> =>
 				candidate.name === propName &&
 				candidate.kind === 'graph-reference' &&
 				candidate.graphBindingKind === 'element' &&

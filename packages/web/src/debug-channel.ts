@@ -431,7 +431,8 @@ export function __marklessDebugBootstrapSource(): string {
 	return `((root,phase,active)=>{const controls=(${installDebugChannelLayer.toString()})(root,phase,active);return Object.freeze({record:(element,eventName,input)=>controls.record(element,eventName,input),delegated:(eventNames)=>controls.delegated(eventNames),router:(source)=>controls.router(source),activate:()=>controls.activate()})})`;
 }
 export function __marklessDebugChannelForTest(): MarklessDebugChannelV1 | undefined {
-	return globalThis.__MARKLESS_DEBUG__;
+	return (globalThis as typeof globalThis & { __MARKLESS_DEBUG__?: MarklessDebugChannelV1 })
+		.__MARKLESS_DEBUG__;
 }
 export function __marklessDebugStartContainer(
 	root: Element,

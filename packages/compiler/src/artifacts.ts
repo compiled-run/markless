@@ -349,11 +349,13 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_REPEAT_KEY_REQUIRED'
 		| 'MARKLESS_REPEAT_KEY_IS_INDEX'
 		| 'MARKLESS_REPEAT_KEY_UNSTABLE'
+		| 'MARKLESS_TEMPLATE_AS_VALUE'
 		| 'MARKLESS_SUBMODULE_UNSUPPORTED'
 		| 'MARKLESS_ALLOW_ERROR_UNSUPPRESSIBLE'
 		| 'MARKLESS_ALLOW_REASON_REQUIRED'
 		| 'MARKLESS_ALLOW_STALE';
-	readonly phase: 'semantic-graph' | 'sync-policy';
+	// The external TSRX parser fails before the graph pass runs; that diagnostic carries phase 'parse'.
+	readonly phase: 'parse' | 'semantic-graph' | 'sync-policy';
 	readonly passId: 'tsrx-semantic-graph';
 };
 

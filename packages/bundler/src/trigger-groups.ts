@@ -8,6 +8,7 @@ import {
 	PROTOCOL_EVENT_ACTION_KIND,
 	protocolEventActionKind,
 	type ProtocolEventActionKind,
+	type ProtocolEventRecord,
 } from '@markless/serializer';
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
 import { emitSymbolResolverModule } from '@markless/compiler';
@@ -146,7 +147,14 @@ export function planPrerenderTriggerGroups(input: {
 		completeView.asyncBoundaries.map((boundary) => [boundary.id, boundary]),
 	);
 	const selfWakeBoundaries = unsettledAsyncBoundaryIndexes(input.state, input.view);
-	const routes = [
+	// One route shape for the three sources: self-wake, view events, branch-arm events.
+	const routes: ReadonlyArray<{
+		readonly event: ProtocolEventRecord;
+		readonly branch?: NonNullable<ProtocolViewPayload['branches']>[number];
+		readonly branchIndex?: number;
+		readonly hostPath?: ReadonlyArray<number>;
+		readonly selfWakeBoundaries?: ReadonlyArray<number>;
+	}> = [
 		...(selfWakeBoundaries.length > 0
 			? [
 					{
@@ -479,7 +487,7 @@ function collectSettledArmHostRecordClosure(
 		}
 	for (const record of completeView.keyedRepeats ?? [])
 		if (armHosts.has(record.parentHostNodeId)) {
-			graphNodeIds.add(record.collectionGraphNodeId);
+			if (record.collectionGraphNodeId) graphNodeIds.add(record.collectionGraphNodeId);
 			for (const rowEvent of record.rowEvents)
 				for (const symbolId of rowEvent.symbolIds ?? []) symbolIds.add(symbolId);
 		}
@@ -522,7 +530,8 @@ function unsettledAsyncBoundaryIndexes(
 
 function selectViewSubscribers(
 	view: ProtocolViewPayload,
-	graphNodeIds: ReadonlySet<string>,
+	// Arm-record closure grows the set, so this stays the caller's mutable set.
+	graphNodeIds: Set<string>,
 	symbolIds: Set<string>,
 	selected: {
 		domUpdates: Set<number>;
@@ -565,16 +574,21 @@ function selectViewSubscribers(
 		for (const arm of arms) collectCompleteArmRecordClosure(arm, graphNodeIds, symbolIds);
 	});
 	(view.keyedRepeats ?? []).forEach((record, index) => {
-		if (!graphNodeIds.has(record.collectionGraphNodeId)) return;
+		if (!record.collectionGraphNodeId || !graphNodeIds.has(record.collectionGraphNodeId)) return;
 		selected.repeats.add(index);
 		for (const rowEvent of record.rowEvents)
 			for (const symbolId of rowEvent.symbolIds ?? []) symbolIds.add(symbolId);
 	});
 }
 
+// Boundary arms carry view-shaped events; branch arms carry hostPath-keyed ones.
+type BranchArmRecord = NonNullable<
+	NonNullable<ProtocolViewPayload['branches']>[number]['armRecords']
+>[number];
+
 function collectCompleteArmRecordClosure(
 	arm: {
-		readonly events?: ProtocolViewPayload['events'];
+		readonly events?: ProtocolViewPayload['events'] | BranchArmRecord['events'];
 		readonly domUpdates?: ReadonlyArray<{
 			readonly graphNodeId?: unknown;
 			readonly symbolId?: unknown;

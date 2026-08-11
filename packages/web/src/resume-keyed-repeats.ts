@@ -83,6 +83,7 @@ export function wireKeyedRepeats(input: {
 				input.events.addRowEvent(host, { repeat, parent, rowRoot, rowKey, rowEvent });
 			}
 		}
+		if (!repeat.collectionGraphNodeId) continue;
 		input.storeContainerSubscription(
 			input.graph.subscribe({
 				id: `keyed-repeat:${repeat.id}:${repeat.collectionGraphNodeId}:${repeat.collectionPath.join('.')}`,

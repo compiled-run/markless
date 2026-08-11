@@ -24,8 +24,8 @@ import {
 import type { PublicRenderPlanArtifact } from '../../artifacts.ts';
 import {
 	firstComponentRoot,
+	describeUnsupportedFragmentContent,
 	supportedFragmentRoot,
-	unsupportedFragmentChildKind,
 } from './template.ts';
 
 export function emptyPlan(
@@ -192,13 +192,17 @@ export function componentRootDiagnostics(ast: AnyNode, filename: string) {
 					? ((fragment.argument as AnyNode | undefined) ?? fragment)
 					: fragment;
 			if (supportedFragmentRoot(fragmentNode)) continue;
+			const offender = describeUnsupportedFragmentContent(fragmentNode);
 			return [
 				unsupportedRenderRootDiagnostic({
-					message: `Fragment roots render only when every top-level child is a plain host element; this fragment has a ${unsupportedFragmentChildKind(fragmentNode)}, which needs the dynamic fragment anchor work.`,
+					message: offender
+						? `This component's root is a fragment (<>...</>). For now, a fragment root can only render static HTML: plain elements like <div>, text, and {expression} values, plus @if/@for/@switch/@try blocks as direct children. This fragment contains ${offender}, which needs a single root element to render.`
+						: `This component's root is an empty fragment (<>...</>), so there is nothing to render.`,
 					node: fragmentNode,
 					filename,
-					suggestion:
-						'Wrap the fragment children in a single host element such as <div> or <section>, or keep top-level children to plain host elements.',
+					suggestion: offender
+						? 'Wrap the template in a single root element such as <div> or <section> — components and dynamic content work normally once the component has one root element.'
+						: 'Add content to the fragment, or give the component a single root element such as <div>.',
 				}),
 			];
 		}
@@ -211,7 +215,7 @@ export function componentConditionalRootDiagnostics(ast: AnyNode, filename: stri
 	for (const statement of asNodes(ast.body)) {
 		const componentFunction = getComponentFunction(statement);
 		const body = componentFunction?.node.body as AnyNode | undefined;
-		if (!body) continue;
+		if (!componentFunction || !body) continue;
 
 		const returns = templateReturnStatements(body);
 		if (returns.length > 1)
@@ -250,7 +254,7 @@ export function componentUnsupportedBodyDiagnostics(
 	for (const statement of asNodes(ast.body)) {
 		const componentFunction = getComponentFunction(statement);
 		const body = componentFunction?.node.body as AnyNode | undefined;
-		if (!body) continue;
+		if (!componentFunction || !body) continue;
 		const root = firstComponentRoot(componentFunction.node);
 
 		for (const bodyStatement of childNodes(body)) {
@@ -289,7 +293,9 @@ export function collectUndeclaredTemplateReadDiagnostics(input: {
 			asNodes(input.ast.body).filter((statement) => !getComponentFunction(statement)),
 		),
 		...componentPropNames(input.component),
-		...declarations(childNodes(input.component.body as AnyNode | undefined)),
+		...declarations(
+			input.component.body ? childNodes(input.component.body as AnyNode) : [],
+		),
 		...catchNames(input.root),
 	]);
 	for (const read of emittedTemplateReads(input.root, input.source)) {

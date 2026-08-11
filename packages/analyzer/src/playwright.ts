@@ -298,7 +298,7 @@ export async function collectPayloadWiring(page: Page): Promise<PayloadWiringEva
 							hostNodeId: event.hostNodeId,
 							eventName: event.eventName,
 							kind: explanation.kind,
-							...(explanation.source ? { source: explanation.source } : {}),
+							...('source' in explanation ? { source: explanation.source } : {}),
 						});
 					}
 				};
@@ -427,7 +427,8 @@ export async function inventoryCandidates(
 					requiredEvents.add('click');
 				const explanations = Object.fromEntries(
 					[...requiredEvents].map((eventName) => {
-						let kind = channel.explainInteraction(element, eventName).kind;
+						// Widened because delegation prefixes the ancestor's kind; the contract carries kind as a string.
+						let kind: string = channel.explainInteraction(element, eventName).kind;
 						let ancestor = element.parentElement;
 						while (kind === 'none' && ancestor && ancestor !== document.body) {
 							const above = channel.explainInteraction(ancestor, eventName).kind;

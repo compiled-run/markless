@@ -22,6 +22,12 @@ test-results/
 # Local planning output
 goals/
 
+# Local Claude Code state (worktree copies pollute fmt/lint scans). The
+# generated agent files stay tracked so the ruler drift check still sees them.
+.claude/*
+!.claude/settings.json
+!.claude/skills/
+
 # Vitest browser-mode failure artifacts (churn on every red run)
 packages/vitest-browser/.vitest-attachments/
 packages/vitest-browser/browser/__screenshots__/

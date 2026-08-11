@@ -261,36 +261,44 @@ declare namespace __MarklessTypeService {
 											? { for?: IdrefValue }
 											: Tag extends 'link'
 												? AnchorAttributes & { as?: string; disabled?: boolean; sizes?: string }
-												: Tag extends 'source'
-													? { media?: string; sizes?: string; src?: string; srcset?: string; type?: string }
-													: Tag extends 'select'
-														? FormAttributes & {
-																disabled?: boolean;
-																multiple?: boolean;
-																required?: boolean;
-																size?: number;
-																value?: string | readonly string[];
-															}
-														: Tag extends 'textarea'
+												: Tag extends 'meta'
+													? {
+															charset?: string;
+															content?: string;
+															'http-equiv'?: string;
+															media?: string;
+															name?: string;
+														}
+													: Tag extends 'source'
+														? { media?: string; sizes?: string; src?: string; srcset?: string; type?: string }
+														: Tag extends 'select'
 															? FormAttributes & {
-																	cols?: number;
 																	disabled?: boolean;
-																	placeholder?: string;
-																	readonly?: boolean;
+																	multiple?: boolean;
 																	required?: boolean;
-																	rows?: number;
-																	value?: string;
+																	size?: number;
+																	value?: string | readonly string[];
 																}
-															: Tag extends 'video'
-																? MediaAttributes & {
-																		height?: number;
-																		playsinline?: boolean;
-																		poster?: string;
-																		width?: number;
+															: Tag extends 'textarea'
+																? FormAttributes & {
+																		cols?: number;
+																		disabled?: boolean;
+																		placeholder?: string;
+																		readonly?: boolean;
+																		required?: boolean;
+																		rows?: number;
+																		value?: string;
 																	}
-																: Tag extends keyof SVGElementTagNameMap
-																	? SvgAttributes
-																	: {};
+																: Tag extends 'video'
+																	? MediaAttributes & {
+																			height?: number;
+																			playsinline?: boolean;
+																			poster?: string;
+																			width?: number;
+																		}
+																	: Tag extends keyof SVGElementTagNameMap
+																		? SvgAttributes
+																		: {};
 
 	type IntrinsicElementFor<Tag extends PropertyKey> = Tag extends keyof HTMLElementTagNameMap
 		? Attributes<HTMLElementTagNameMap[Tag]> & TagNameSpecificAttributes<Tag>
@@ -302,12 +310,21 @@ declare namespace __MarklessTypeService {
 	type IntrinsicElements = {
 		[Tag in IntrinsicTagName]: IntrinsicElementFor<Tag>;
 	};
+
+	/**
+	 * Framework components authored in plain TypeScript (the router's Html and
+	 * Link) pass their children through and return `unknown`, which fails the
+	 * default JSX rule that a component must return a JSX element. Accept any
+	 * function as a tag; prop checking still comes from its signature.
+	 */
+	type ElementType = IntrinsicTagName | ((props: never) => unknown);
 }
 
 declare module '@markless/typescript-plugin/jsx-runtime' {
 	export namespace JSX {
 		type Element = __MarklessTypeService.Element;
 		type ElementClass = __MarklessTypeService.ElementClass;
+		type ElementType = __MarklessTypeService.ElementType;
 		interface ElementChildrenAttribute {
 			children: unknown;
 		}
@@ -319,6 +336,7 @@ declare module '@markless/typescript-plugin/jsx-dev-runtime' {
 	export namespace JSX {
 		type Element = __MarklessTypeService.Element;
 		type ElementClass = __MarklessTypeService.ElementClass;
+		type ElementType = __MarklessTypeService.ElementType;
 		interface ElementChildrenAttribute {
 			children: unknown;
 		}

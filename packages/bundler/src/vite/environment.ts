@@ -1,3 +1,4 @@
+import { isRunnableDevEnvironment } from 'vite';
 import type { Environment, ViteDevServer } from 'vite';
 import type { MarklessEnvironment } from '../types.ts';
 
@@ -78,16 +79,25 @@ export function transformMarklessRequest(
 	return server.environments[viteEnvironmentName(environment, options)]?.transformRequest(url);
 }
 
+// True when this process owns the environment's module runner, so a hot payload we
+// send reaches it. Nitro runs its runner in a separate worker instead.
+export function hasInProcessModuleRunner(environment: Environment | undefined) {
+	return !!environment && isRunnableDevEnvironment(environment);
+}
+
 export function fetchableDevEnvironment(environment: Environment | undefined) {
 	if (!environment) {
 		return undefined;
 	}
 
-	const maybeFetchable = environment as {
+	const maybeFetchable = environment as Environment & {
 		dispatchFetch?: (request: Request) => Promise<Response> | Response;
 	};
 	if (typeof maybeFetchable.dispatchFetch === 'function') {
-		return maybeFetchable;
+		// The typeof guard proved the method exists; the cast carries that into the return type.
+		return maybeFetchable as Environment & {
+			dispatchFetch: (request: Request) => Promise<Response> | Response;
+		};
 	}
 
 	return undefined;

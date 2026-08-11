@@ -98,6 +98,11 @@ export type SsrRenderData = {
 	readonly branches?: ReadonlyArray<{
 		readonly branchSiteId: string;
 		readonly asyncBoundaryId?: string;
+		readonly testReads?: ReadonlyArray<{
+			readonly graphNodeId: string;
+			readonly path: ReadonlyArray<string>;
+		}>;
+		readonly armTests?: ReadonlyArray<unknown>;
 	}>;
 };
 
@@ -220,7 +225,9 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 
 	async function renderChunk(
 		chunkId: string,
-		repeat: { readonly item?: unknown; readonly index?: number },
+		// The async-arm path forwards the caller's read context; only item/index
+		// are read here.
+		repeat: { readonly item?: unknown; readonly index?: number } & Partial<SsrDataReadContext>,
 	): Promise<RenderedPart> {
 		const chunk = chunks.get(chunkId);
 		if (!chunk) throw new Error(`MARKLESS_SSR_DATA_CHUNK_MISSING: ${chunkId}`);
@@ -302,7 +309,7 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 					: undefined;
 				if (!childTokens && childElementCount === undefined)
 					throw new Error(`MARKLESS_SSR_DATA_CHILD_STRUCTURE_MISSING: ${slot.componentEdgeId}`);
-				const countTokens = Array.from({ length: childElementCount }, (_, index) => ({
+				const countTokens = Array.from({ length: childElementCount ?? 0 }, (_, index) => ({
 					kind: 'element' as const,
 					hostNodeId: `${idPrefix}__child:${slot.componentEdgeId}:${index}`,
 					tagName: '*',

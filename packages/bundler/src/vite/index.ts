@@ -322,7 +322,9 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 					return await runHook(basePlugin.transform, this, code, id, transformOptions);
 				} catch (error) {
 					if (rolldownOptions.dev === true && TSRX_INPUT_FILE.test(id)) {
-						hmr.reportError(this.environment, error);
+						// Only a dev environment carries the HMR channel the error client listens on.
+						const environment = this.environment;
+						hmr.reportError(environment.mode === 'dev' ? environment : undefined, error);
 					}
 					throw error;
 				}

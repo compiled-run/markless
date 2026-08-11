@@ -1,4 +1,5 @@
-import type { ProtocolViewPayload, RenderDataArtifact } from '../../artifacts.ts';
+import type { ProtocolViewPayload } from '@markless/serializer';
+import type { RenderDataArtifact } from '../../artifacts.ts';
 
 // Keeps the direct browser module data-only: native markup comes from renderData
 // chunks, while the temporary repeat patch details retain the proven T009a plan

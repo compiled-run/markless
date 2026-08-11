@@ -1,5 +1,6 @@
 import type { ProtocolViewPayload } from '../../../serializer/src/protocol.ts';
 import type { DomJournalResult } from '@markless/runtime';
+import type { ResumeSymbolContext } from '../resume-types.ts';
 import type { RuntimeGraphCall, RuntimeGraphUpdate, RuntimeGraphWrite } from '@markless/runtime';
 
 export type EventOnlyResumeGraph = {
@@ -12,7 +13,7 @@ export type EventOnlyResumeGraph = {
 
 export type EventOnlyResumeDomNode = {
 	readonly nodeType: number;
-	readonly childNodes?: ArrayLike<EventOnlyResumeDomNode>;
+	readonly childNodes?: ReadonlyArray<EventOnlyResumeDomNode>;
 };
 
 export type EventOnlyResumeDomElement = EventOnlyResumeDomNode & {
@@ -22,12 +23,12 @@ export type EventOnlyResumeDomElement = EventOnlyResumeDomNode & {
 	textContent?: string | null;
 	addEventListener?: (
 		type: string,
-		listener: (event: EventOnlyResumeDomEvent) => Promise<void>,
+		listener: (event: EventOnlyResumeDomEvent) => void | Promise<void>,
 		options?: { readonly capture?: boolean },
 	) => void;
 	removeEventListener?: (
 		type: string,
-		listener: (event: EventOnlyResumeDomEvent) => Promise<void>,
+		listener: (event: EventOnlyResumeDomEvent) => void | Promise<void>,
 		options?: { readonly capture?: boolean },
 	) => void;
 	setAttribute?: (name: string, value: string) => void;
@@ -63,7 +64,9 @@ export type EventOnlyResumeSymbolContext = {
 	readonly graph: EventOnlyResumeGraph;
 	readonly event?: EventOnlyResumeDomEvent;
 	readonly element: EventOnlyResumeDomElement;
-	readonly getElementHandle: () => undefined;
+	// Lean resume owns no element handles, but the symbol contract it shares with
+	// full resume is the one the compiled symbol is typed against.
+	readonly getElementHandle: (handleIdOrName: string) => EventOnlyResumeDomElement | undefined;
 	readonly domUpdate?: EventOnlyResumeDomUpdateRecord;
 	readonly locals?: Readonly<Record<string, unknown>>;
 	readonly value?: unknown;
@@ -72,7 +75,7 @@ export type EventOnlyResumeSymbolContext = {
 	readonly invokeCallback?: (symbolId: string, args: ReadonlyArray<unknown>) => Promise<unknown>;
 	readonly invokeSymbol?: (
 		symbolId: string,
-		context: EventOnlyResumeSymbolContext,
+		context: ResumeSymbolContext,
 	) => Promise<unknown>;
 };
 

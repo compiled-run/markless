@@ -10,6 +10,7 @@ import {
 	destructureProps,
 	emitComponentImport,
 	emitValueImport,
+	hasComponentImportSource,
 	hasPropDependentComputed,
 	isComponentRoot,
 	publicRenderValueImports,
@@ -130,9 +131,7 @@ export function emitPublicSsrRenderModule(
 		.replaceAll('readMarklessPublicPath', 'marklessSsrReadPublicPath');
 	const helperReferenceSource = [...sameModuleComponents, bodySource].join('\n');
 	return [
-		...references.flatMap((reference) =>
-			reference.importSource ? [emitComponentImport(reference)] : [],
-		),
+		...references.filter(hasComponentImportSource).map(emitComponentImport),
 		...valueImports.map(emitValueImport),
 		...emitCatalogHelperImports(helperReferenceSource, [
 			{ module: 'ssr-data', names: ['renderSsrData'] },
@@ -302,15 +301,21 @@ function emitSsrDataRenderLines(
 			: [],
 	);
 	const templateComputedLines = input.renderData.initialValues.flatMap((initial) => {
+		// Held in a const so the discriminated narrowing survives into the callback.
+		const value = initial.value;
 		if (
 			!componentGraphNodeIds.has(initial.graphNodeId) ||
 			!initial.graphNodeId.startsWith('computed:templateExpression:') ||
-			initial.value.kind !== 'symbol-function'
+			value.kind !== 'symbol-function'
 		)
 			return [];
-		const symbol = input.symbolResolver.symbols.find((candidate) => candidate.id === initial.value.symbolId);
-		return symbol?.source
-			? [`marklessSsrRenderStateValues.set(${JSON.stringify(initial.graphNodeId)},(${symbol.source})());`]
+		const symbol = input.symbolResolver.symbols.find(
+			(candidate) => candidate.id === value.symbolId,
+		);
+		// Only authored symbol kinds carry source; the rest emit nothing.
+		const source = symbol && 'source' in symbol ? symbol.source : undefined;
+		return source
+			? [`marklessSsrRenderStateValues.set(${JSON.stringify(initial.graphNodeId)},(${source})());`]
 			: [];
 	});
 	return [

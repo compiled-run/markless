@@ -12,7 +12,11 @@ export type ResumeAlreadyResumedWarning = {
 	readonly docsUrl: string;
 };
 
-const resumedPayloadContainers = new WeakMap<ResumeDomElement, ResumePayloadScriptsResult>();
+// The registry keys containers by identity alone; browser callers hold real DOM
+// elements while resume-side callers hold the structural element surface.
+export type ResumeContainerKey = ResumeDomElement | Element;
+
+const resumedPayloadContainers = new WeakMap<ResumeContainerKey, ResumePayloadScriptsResult>();
 
 export function getAlreadyResumedPayload(
 	root: ResumeDomElement,
@@ -29,7 +33,7 @@ export function setResumedPayload(
 }
 
 export function deleteResumedPayload(
-	root: ResumeDomElement,
+	root: ResumeContainerKey,
 ): ResumePayloadScriptsResult | undefined {
 	const resumed = resumedPayloadContainers.get(root);
 	resumedPayloadContainers.delete(root);

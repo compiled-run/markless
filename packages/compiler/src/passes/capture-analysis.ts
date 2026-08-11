@@ -8,6 +8,8 @@ import type {
 	PlannedSymbol,
 	SemanticComponentEdge,
 	SemanticLocalBinding,
+	SemanticStateRead,
+	SemanticTemplateRead,
 } from '../artifacts.ts';
 import {
 	graphBindingMap,
@@ -235,11 +237,14 @@ function propReadForLazySymbol(
 ): ReadonlyArray<LoweredStateRead> {
 	if (!read.graphNodeId.startsWith('prop:')) return [];
 	const semanticRead = semanticReadForSymbol(symbol, read.source, input);
+	// Only state reads name the authored prop binding; template reads are host-scoped.
+	const stateRead =
+		semanticRead && !isTemplateRead(semanticRead) ? semanticRead : undefined;
 	const declaration = componentPropDeclarationForSymbol(
 		symbol,
 		semanticRead?.sourceSpan,
 		input,
-		semanticRead?.bindingId,
+		stateRead?.bindingId,
 	);
 	return [
 		{
@@ -248,11 +253,17 @@ function propReadForLazySymbol(
 			...(declaration?.bindingId ? { bindingId: declaration.bindingId } : {}),
 			...(declaration?.componentName
 				? { componentName: declaration.componentName }
-				: semanticRead?.componentName
-					? { componentName: semanticRead.componentName }
+				: stateRead?.componentName
+					? { componentName: stateRead.componentName }
 					: {}),
 		},
 	];
+}
+
+function isTemplateRead(
+	read: SemanticStateRead | SemanticTemplateRead,
+): read is SemanticTemplateRead {
+	return 'hostNodeId' in read;
 }
 
 function semanticReadForSymbol(

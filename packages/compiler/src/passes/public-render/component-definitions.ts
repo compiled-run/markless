@@ -45,7 +45,10 @@ export function collectPublicRenderComponentDefinitions(
 			const declaredInputs = childComponentInputs(input, componentMap, edge);
 			const passedInputs = new Set(edge.props.map((prop) => prop.name));
 			return {
-				...projectionProp(input.source.source, componentInvocations.get(edge.sourceSpan.start)),
+				...projectionProp(
+					input.source.source,
+					edge.sourceSpan ? componentInvocations.get(edge.sourceSpan.start) : undefined,
+				),
 				id: edge.id,
 				childComponentName: edge.childComponentName,
 				...(edge.asyncBoundaryId ? { asyncBoundaryId: edge.asyncBoundaryId } : {}),
@@ -129,9 +132,11 @@ export function collectPublicRenderComponentDefinitions(
 		);
 		const initialValueKinds = Object.fromEntries(
 			input.renderData.initialValues.flatMap((initial) => {
-				if (initial.value.kind !== 'symbol-function') return [];
+				// Held in a const so the discriminated narrowing survives into the callback.
+				const value = initial.value;
+				if (value.kind !== 'symbol-function') return [];
 				const symbol = input.symbolResolver.symbols.find(
-					(candidate) => candidate.id === initial.value.symbolId,
+					(candidate) => candidate.id === value.symbolId,
 				);
 				return symbol ? [[initial.graphNodeId, symbol.kind]] : [];
 			}),

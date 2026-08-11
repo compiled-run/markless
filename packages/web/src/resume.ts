@@ -105,13 +105,15 @@ function materializeAsyncBoundaryLocators(
 	if (boundaries.length === 0) return byId;
 	const comments = walkComments(root);
 	for (const boundary of boundaries) {
-		const live = boundary.startAnchor?.nodeType === 8 && boundary.endAnchor?.nodeType === 8;
-		const startAnchor = live ? boundary.startAnchor : comments[boundary.startAnchor.index],
-			endAnchor = live ? boundary.endAnchor : comments[boundary.endAnchor.index];
-		if (!startAnchor)
-			throw missingCommentAnchorError(boundary.id, 'startAnchor', boundary.startAnchor.index);
-		if (!endAnchor)
-			throw missingCommentAnchorError(boundary.id, 'endAnchor', boundary.endAnchor.index);
+		// CSR and prerender wake hand live comments in where a decoded payload
+		// carries a dom-order index; the nodeType check picks which field applies.
+		const start = boundary.startAnchor as typeof boundary.startAnchor & ResumeDomComment;
+		const end = boundary.endAnchor as typeof boundary.endAnchor & ResumeDomComment;
+		const live = start?.nodeType === 8 && end?.nodeType === 8;
+		const startAnchor = live ? start : comments[start.index],
+			endAnchor = live ? end : comments[end.index];
+		if (!startAnchor) throw missingCommentAnchorError(boundary.id, 'startAnchor', start.index);
+		if (!endAnchor) throw missingCommentAnchorError(boundary.id, 'endAnchor', end.index);
 		byId.set(boundary.id, { ...boundary, startAnchor, endAnchor });
 	}
 	return byId;

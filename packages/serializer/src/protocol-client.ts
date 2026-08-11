@@ -100,16 +100,17 @@ function baseView(value: unknown): asserts value is ProtocolViewPayload {
 				invalid(`markless/view asyncRunners.${graphNodeId}`, 'expected string.');
 		}
 	}
-	for (const key of [
-		'locators',
-		'events',
-		'domUpdates',
-		'behaviors',
-		'elementHandles',
-		'asyncBoundaries',
-	] as const)
-		arr(payload, key, 'markless/view');
-	for (const [index, locator] of payload.locators.entries()) {
+	const [locators, events, , , , asyncBoundaries] = (
+		[
+			'locators',
+			'events',
+			'domUpdates',
+			'behaviors',
+			'elementHandles',
+			'asyncBoundaries',
+		] as const
+	).map((key) => arr(payload, key, 'markless/view'));
+	for (const [index, locator] of locators.entries()) {
 		const context = `markless/view locator[${index}]`;
 		const record = obj(locator, context);
 		str(record, 'hostNodeId', context);
@@ -118,7 +119,7 @@ function baseView(value: unknown): asserts value is ProtocolViewPayload {
 		if (!Number.isInteger(record.index) || Number(record.index) < 0)
 			invalid(context, 'expected index non-negative integer.');
 	}
-	for (const [index, event] of payload.events.entries()) {
+	for (const [index, event] of events.entries()) {
 		const context = `markless/view event[${index}]`;
 		const record = obj(event, context);
 		str(record, 'hostNodeId', context);
@@ -126,8 +127,8 @@ function baseView(value: unknown): asserts value is ProtocolViewPayload {
 		if (!Array.isArray(record.symbolIds)) invalid(context, 'expected symbolIds array.');
 		eventAction(record.action, `${context}.action`);
 	}
-	if (payload.asyncBoundaries.length > 0)
-		for (const [index, boundary] of payload.asyncBoundaries.entries()) {
+	if (asyncBoundaries.length > 0)
+		for (const [index, boundary] of asyncBoundaries.entries()) {
 			const context = `markless/view asyncBoundary[${index}]`;
 			const record = obj(boundary, context);
 			if (record.runnerGraphNodeId !== null && typeof record.runnerGraphNodeId !== 'string')
@@ -171,7 +172,9 @@ function root(value: unknown, type: RuntimePayloadType): Record<string, unknown>
 	return record;
 }
 function obj(value: unknown, context: string): Record<string, unknown> {
-	if (typeof value === 'object' && value !== null && !Array.isArray(value)) return value;
+	if (typeof value === 'object' && value !== null && !Array.isArray(value))
+		// TS narrows `unknown` only to `object` here; the index signature is the JS truth.
+		return value as Record<string, unknown>;
 	throw invalid(context, 'expected object.');
 }
 function arr(record: Record<string, unknown>, key: string, type: RuntimePayloadType): unknown[] {

@@ -14,6 +14,7 @@ import {
 } from '../../ast/tsrx.ts';
 import type {
 	SemanticBehavior,
+	SemanticComponentPropBinding,
 	SemanticElementHandleBinding,
 	SemanticGraphDiagnostic,
 	SemanticGraphBinding,
@@ -832,7 +833,7 @@ function resolvePropForwardedElementHandle(
 		.filter((edge) => edge.childComponentName === binding.componentName)
 		.flatMap((edge) => edge.props)
 		.find(
-			(prop) =>
+			(prop): prop is Extract<SemanticComponentPropBinding, { kind: 'graph-reference' }> =>
 				prop.name === propName &&
 				prop.kind === 'graph-reference' &&
 				prop.graphBindingKind === 'element' &&

@@ -292,11 +292,7 @@ function marklessExecutionLogSnapshot(): Set<string> | undefined {
 }
 function describeResumeEventTarget(target: ResumeDomElement): string {
 	const tag = typeof target.tagName === 'string' ? target.tagName.toLowerCase() : 'element';
-	const id =
-		typeof (target as { readonly id?: unknown }).id === 'string' &&
-		(target as { readonly id?: string }).id
-			? `#${(target as { readonly id: string }).id}`
-			: '';
+	const id = typeof target.id === 'string' && target.id ? `#${target.id}` : '';
 	return `${tag}${id}`;
 }
 
@@ -328,7 +324,10 @@ function findDispatchMatch(
 	eventName: string,
 	eventRecords: WeakMap<ResumeDomElement, Map<string, ResumeEventRecord>>,
 	rowEventRecords: ResumeRowEventRecords,
-) {
+):
+	| { readonly element: ResumeDomElement; readonly rowMatch: ResumeRowEventMatch }
+	| { readonly element: ResumeDomElement; readonly eventRecord: ResumeEventRecord }
+	| null {
 	let current: ResumeDomElement | null | undefined = target;
 	while (current) {
 		const rowMatch = rowEventRecords.get(current)?.get(eventName);

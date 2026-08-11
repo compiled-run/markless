@@ -4,6 +4,11 @@ import {
 	type RuntimePayloadType,
 } from '../../serializer/src/protocol-client.ts';
 import type { ResumeRuntimeInput } from './resume.ts';
+import type {
+	ResumeDomCreatedElement,
+	ResumeDomElement,
+	ResumeDomOwnerDocument,
+} from './resume-types.ts';
 import { getAlreadyResumedPayload } from './payload-resume-registry.ts';
 import type { ResumePayloadScriptsInput, ResumePayloadScriptsResult } from './payload-full.ts';
 
@@ -95,20 +100,14 @@ function readPayloadScriptFromDocument(
 	return `<script type="${type}">${text}</script>`;
 }
 
+// Accepts either the host document or a root element inside it — the element
+// form reaches its document through ownerDocument.
 export function documentTemplateBranchHtml(
-	document: PayloadScriptDocument,
+	document: PayloadScriptDocument | ResumeDomElement,
 ): ResumeRuntimeInput['renderBranchHtml'] {
 	const documentLike = document as {
-		readonly createElement?: (tagName: string) => {
-			innerHTML: string;
-			readonly content?: { readonly childNodes?: ArrayLike<unknown> };
-		};
-		readonly ownerDocument?: {
-			readonly createElement?: (tagName: string) => {
-				innerHTML: string;
-				readonly content?: { readonly childNodes?: ArrayLike<unknown> };
-			};
-		};
+		readonly createElement?: (tagName: string) => ResumeDomCreatedElement;
+		readonly ownerDocument?: ResumeDomOwnerDocument;
 	};
 	const host = documentLike.createElement ? documentLike : documentLike.ownerDocument;
 	if (!host?.createElement) return undefined;

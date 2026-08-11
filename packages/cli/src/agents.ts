@@ -29,7 +29,7 @@ const CURSOR_REASON =
 	'Unavailable — Cursor has no documented conditional personal skill; User Rules apply to every project.';
 const MARKER_PREFIX = '<!-- markless-managed-skill sha256:';
 
-export const AGENT_REGISTRY = [
+export const AGENT_REGISTRY: readonly AgentRegistryEntry[] = [
 	{
 		id: 'claude-code',
 		label: 'Claude Code',
@@ -60,7 +60,7 @@ export const AGENT_REGISTRY = [
 		homeDirectory: '.copilot',
 		skillPath: '.copilot/skills/markless/SKILL.md',
 	},
-] as const satisfies readonly AgentRegistryEntry[];
+];
 
 export const AGENT_NOTE_COPY = `Markless apps are built to be agent-debuggable.
 Set this up and your agent knows Markless inside

@@ -11,6 +11,7 @@ import type { ResumeDomElement, ResumeRuntime, ResumeRuntimeInput } from './resu
 import {
 	deleteResumedPayload,
 	type ResumeAlreadyResumedWarning,
+	type ResumeContainerKey,
 } from './payload-resume-registry.ts';
 export type {
 	PayloadScriptDocument,
@@ -104,9 +105,9 @@ export async function resumeFromPayloadDocument(
 	return documentPayload.resumeFromPayloadDocument(input);
 }
 
-export function disposeResumedPayload(root: ResumeDomElement): void {
+export function disposeResumedPayload(root: ResumeContainerKey): void {
 	const resumed = deleteResumedPayload(root);
 	resumed?.runtime.dispose();
-	delete (root as ResumeDomElement & { __asyncResumeRuntimeStarted?: boolean })
+	delete (root as ResumeContainerKey & { __asyncResumeRuntimeStarted?: boolean })
 		.__asyncResumeRuntimeStarted;
 }

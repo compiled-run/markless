@@ -212,6 +212,92 @@ describe('SSR browser HMR', () => {
 		}
 	});
 
+	test('serves the added element after a structural edit to an imported component', async () => {
+		const fixture = await createComponentSsrFixture();
+		let server: ViteDevServer | undefined;
+		try {
+			server = await createServer({
+				configFile: false,
+				mode: 'ssr',
+				root: fixture.root,
+				environments: { ssr: { build: { rolldownOptions: { input: fixture.entry } } } },
+				plugins: [markless(), fixtureSsrHost()],
+				resolve: { alias: marklessSourceAliases() },
+				server: { hmr: true, middlewareMode: true, ws: false },
+			});
+
+			const send = vi.spyOn(server.environments.client.hot, 'send');
+			const first = await requestHtml(server);
+			expect(first).toContain('child original');
+			expect(first).not.toContain('child added');
+			expect(marklessViewPayload(first).locators).toHaveLength(5);
+
+			await editFile(
+				server,
+				fixture.child,
+				fixture.childSource.replace(
+					'\t</section>',
+					'\t\t<em data-child-added onClick={() => clicks += 2}>child added</em>\n\t</section>',
+				),
+			);
+			await waitForFullReloadCountAbove(send, 0);
+
+			const second = await requestHtml(server);
+			expect(second).toContain('data-child-added');
+			expect(second).toContain('child added');
+			const view = marklessViewPayload(second);
+			expect(view.locators.map((locator) => locator.tagName)).toContain('em');
+			expect(view.events).toHaveLength(3);
+		} finally {
+			await server?.close();
+		}
+	});
+
+	test('serves the edited component to a render started on the reload signal', async () => {
+		const fixture = await createComponentSsrFixture();
+		let server: ViteDevServer | undefined;
+		try {
+			server = await createServer({
+				configFile: false,
+				mode: 'ssr',
+				root: fixture.root,
+				environments: { ssr: { build: { rolldownOptions: { input: fixture.entry } } } },
+				plugins: [markless(), fixtureSsrHost(), slowServerHotUpdate(200)],
+				resolve: { alias: marklessSourceAliases() },
+				server: { hmr: true, middlewareMode: true, ws: false },
+			});
+
+			const send = vi.spyOn(server.environments.client.hot, 'send');
+			expect(await requestHtml(server)).toContain('child original');
+
+			// A browser reloads the instant the client environment's hotUpdate pass
+			// sends its signal, which is before any server environment's pass has
+			// run. That render must not serve the modules the edit replaced.
+			let reloaded: Promise<string> | undefined;
+			const reloadingServer = server;
+			send.mockImplementation((payload) => {
+				if ((payload as HotPayload | undefined)?.type === 'full-reload' && !reloaded) {
+					reloaded = requestHtml(reloadingServer);
+				}
+			});
+
+			await editFile(
+				server,
+				fixture.child,
+				fixture.childSource.replace(
+					'\t</section>',
+					'\t\t<em data-child-added>child added</em>\n\t</section>',
+				),
+			);
+			await waitForFullReloadCountAbove(send, 0);
+
+			expect(reloaded).toBeDefined();
+			expect(await reloaded).toContain('data-child-added');
+		} finally {
+			await server?.close();
+		}
+	});
+
 	test('sends full reloads for repeated TSRX edits after the page is refetched', async () => {
 		const fixture = await createSsrFixture();
 		let server: ViteDevServer | undefined;
@@ -272,6 +358,59 @@ async function createSsrFixture() {
 	const entry = join(src, 'root.tsrx');
 	await writeFile(entry, source);
 	return { entry, root, source };
+}
+
+function marklessViewPayload(html: string) {
+	const match = html.match(/<script type="markless\/view">([\s\S]*?)<\/script>/);
+	expect(match).not.toBeNull();
+	return JSON.parse(match![1]) as {
+		locators: { tagName?: string }[];
+		events: unknown[];
+	};
+}
+
+async function createComponentSsrFixture() {
+	const root = await realpath(await mkdtemp(join(tmpdir(), 'markless-ssr-hmr-child-')));
+	cleanupRoots.push(root);
+	const src = join(root, 'src');
+	await mkdir(src, { recursive: true });
+	await writeFile(join(root, 'index.html'), '<html><head></head><body></body></html>');
+
+	const childSource =
+		"import { state } from '@markless/core';\n\n" +
+		'export function Child({ label }) @{\n' +
+		'\tlet clicks = state(0);\n\n' +
+		'\t<section data-child>\n' +
+		'\t\t<p>{label}</p>\n' +
+		'\t\t<button data-child-button onClick={() => clicks++}>{clicks}</button>\n' +
+		'\t</section>\n}\n';
+	const child = join(src, 'child.tsrx');
+	await writeFile(child, childSource);
+
+	const source =
+		"import { state } from '@markless/core';\n" +
+		"import { Child } from './child.tsrx';\n\n" +
+		'export function App() @{\n' +
+		'\tlet count = state(0);\n\n' +
+		'\t<main>\n\t\t<button data-counter onClick={() => count++}>{count}</button>\n' +
+		'\t\t<Child label="child original" />\n\t</main>\n}\n';
+	const entry = join(src, 'root.tsrx');
+	await writeFile(entry, source);
+
+	return { child, childSource, entry, root, source };
+}
+
+// Puts the server environment's hotUpdate pass behind the client one by the
+// margin a loaded machine produces, so the reload signal reliably lands before
+// the edited modules are invalidated.
+function slowServerHotUpdate(delayMs: number) {
+	return {
+		name: 'test-slow-server-hot-update',
+		async hotUpdate(this: { environment: { name: string } }) {
+			if (this.environment.name === 'client') return;
+			await new Promise((resolve) => setTimeout(resolve, delayMs));
+		},
+	};
 }
 
 async function requestHtml(server: ViteDevServer) {

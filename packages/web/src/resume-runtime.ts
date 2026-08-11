@@ -3,6 +3,7 @@ import type { ProtocolStatePayload } from '@markless/serializer';
 import type { AsyncBoundarySettleTracker } from './resume-async-wiring.ts';
 import type { ArmCommitUpdate, ArmRegistrationDeps } from './resume-commit-arm.ts';
 import type {
+	ResumeArmRecordSet,
 	ResumeAsyncBoundaryRecord,
 	ResumeDispatchOptions,
 	ResumeDomElement,
@@ -312,7 +313,8 @@ export function createResumeRuntime(
 	async function registerServedBoundaryArms(): Promise<void> {
 		const { registerArmRecordSet } = await import('./resume-commit-arm.ts');
 		for (const boundary of asyncBoundariesById.values()) {
-			const armRecords = boundary.armRecords;
+			// Array.isArray cannot narrow the readonly per-arm plan out of the union.
+			const armRecords = boundary.armRecords as ResumeArmRecordSet | undefined;
 			if (!armRecords || Array.isArray(armRecords)) continue;
 			await registerArmRecordSet(
 				await armRegistrationDeps(armRecords),

@@ -31,8 +31,9 @@ export function runtimeResumeError(
 	});
 }
 
+// Arm-relative locators reach here too; only the described fields are read.
 export function missingElementLocatorError(
-	locator: ProtocolViewPayload['locators'][number],
+	locator: Pick<ProtocolViewPayload['locators'][number], 'hostNodeId' | 'tagName' | 'index'>,
 ): RuntimeResumeError {
 	return runtimeResumeError(
 		'MARKLESS_RESUME_LOCATOR_MISSING',
@@ -40,7 +41,7 @@ export function missingElementLocatorError(
 	);
 }
 export function mismatchedElementLocatorError(
-	locator: ProtocolViewPayload['locators'][number],
+	locator: Pick<ProtocolViewPayload['locators'][number], 'hostNodeId' | 'tagName' | 'index'>,
 	actualTagName: string,
 ): RuntimeResumeError {
 	return runtimeResumeError(

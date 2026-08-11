@@ -1,6 +1,7 @@
 import {
 	STORAGE_SLOT_SYMBOL_KEY,
 	storageAttributeName,
+	type ProtocolEventAction,
 	type ProtocolSyncPolicy,
 	type ProtocolSyncPolicyCondition,
 	type ProtocolStatePayload,
@@ -43,7 +44,9 @@ export type SsrRenderOutput = {
 };
 
 export type SsrRenderArtifact = {
-	readonly renderSsr: (props?: unknown) => SsrRenderOutput;
+	// renderContext carries the per-request prerender/streaming mode the compiled
+	// artifact reads; hosts that do not set a mode omit it.
+	readonly renderSsr: (props?: unknown, renderContext?: unknown) => SsrRenderOutput;
 	readonly headInjections?: ReadonlyArray<RenderHeadInjection>;
 	readonly storageSeeds?: ReadonlyArray<StorageSeedMetadata>;
 	readonly modulePreloads?: ReadonlyArray<ModulePreloadInput>;
@@ -93,7 +96,7 @@ export type RenderHeadInjection = {
 export async function renderToString(
 	component: SsrRenderable,
 	options: RenderToStringOptions = {},
-): string {
+): Promise<string> {
 	const output = await renderSsrOutput(component, options.props, undefined);
 	return assembleSsrContainer(component, output, options);
 }

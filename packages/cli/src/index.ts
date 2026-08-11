@@ -302,7 +302,7 @@ export class CreateProgram {
 		);
 		const starter =
 			input.starter ??
-			(await prompts.select({
+			(await prompts.select<Starter>({
 				initialValue: 'minimal',
 				message: 'What are you building today?',
 				options: STARTER_CHOICES,
@@ -318,7 +318,7 @@ export class CreateProgram {
 			}));
 		const format =
 			input.format ??
-			(await prompts.select({
+			(await prompts.select<ProjectFormat>({
 				initialValue: 'node',
 				message: 'Where should it run?',
 				options: PROJECT_FORMAT_CHOICES,

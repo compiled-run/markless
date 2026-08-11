@@ -182,7 +182,7 @@ function parseMdxRoute(source: string, id: string): MdxRoute {
 		dropHandle(handle);
 	}
 
-	const parts = routePartsFromHast(root.children ?? [], {
+	const parts = routePartsFromHast('children' in root ? root.children : [], {
 		components,
 		id,
 		importedComponents,
@@ -309,11 +309,14 @@ function renderStaticHtml(nodes: readonly HastNode[], id: string): string {
 	);
 }
 
-function normalizeStaticHastNodes(nodes: readonly HastNode[], id: string): HastNode[] {
+// Static output is root content: a hast root only ever holds non-root nodes.
+type StaticHastNode = Exclude<HastNode, { type: 'root' }>;
+
+function normalizeStaticHastNodes(nodes: readonly HastNode[], id: string): StaticHastNode[] {
 	return nodes.flatMap((node) => normalizeStaticHastNode(node, id));
 }
 
-function normalizeStaticHastNode(node: HastNode, id: string): HastNode[] {
+function normalizeStaticHastNode(node: HastNode, id: string): StaticHastNode[] {
 	if (isMdxEsm(node)) {
 		return [];
 	}
@@ -324,14 +327,17 @@ function normalizeStaticHastNode(node: HastNode, id: string): HastNode[] {
 	}
 	if (isMdxExpression(node)) {
 		const value = literalSafeExpressionValue(node.value, id);
-		return [{ type: 'text', value: value == null ? '' : String(value) } as HastNode];
+		return [{ type: 'text', value: value == null ? '' : String(value) }];
+	}
+	if (node.type === 'root') {
+		return normalizeStaticHastNodes(node.children, id);
 	}
 	if ('children' in node && Array.isArray(node.children)) {
 		return [
 			{
 				...node,
 				children: normalizeStaticHastNodes(node.children as HastNode[], id),
-			} as HastNode,
+			} as StaticHastNode,
 		];
 	}
 	return [node];
@@ -369,13 +375,13 @@ function literalSafeExpressionValue(source: string, id: string): unknown {
 			`Markless Router MDX only supports literal-safe expressions in attributes and markdown: ${id}`,
 		);
 	}
-	const statement = program.body[0] as EstreeNode | undefined;
+	const statement = program.body[0];
 	if (program.body.length !== 1 || statement?.type !== 'ExpressionStatement') {
 		throw new Error(
 			`Markless Router MDX only supports literal-safe expressions in attributes and markdown: ${id}`,
 		);
 	}
-	return evaluateLiteralExpression(statement.expression as EstreeNode, id);
+	return evaluateLiteralExpression(statement.expression, id);
 }
 
 function parseMdxExpressionValue(source: string, id: string): EstreeProgram | null {
@@ -404,8 +410,18 @@ function parseMdxExpressionValue(source: string, id: string): EstreeProgram | nu
 	}
 }
 
-function evaluateLiteralExpression(node: EstreeNode | undefined, id: string): unknown {
-	if (!node) {
+function literalPropertyName(key: EstreeNode): string | undefined {
+	if (key.type === 'Identifier' && typeof key.name === 'string') return key.name;
+	if (key.type === 'Literal' && typeof key.value === 'string') return key.value;
+	return undefined;
+}
+
+function isEstreeNode(value: unknown): value is EstreeNode {
+	return typeof value === 'object' && value !== null && typeof (value as EstreeNode).type === 'string';
+}
+
+function evaluateLiteralExpression(node: unknown, id: string): unknown {
+	if (!isEstreeNode(node)) {
 		throw literalExpressionError(id);
 	}
 	if (node.type === 'Literal') {
@@ -443,15 +459,10 @@ function evaluateLiteralExpression(node: EstreeNode | undefined, id: string): un
 			) {
 				throw literalExpressionError(id);
 			}
-			const key = property.key as EstreeNode;
-			const name =
-				key.type === 'Identifier'
-					? key.name
-					: key.type === 'Literal' && typeof key.value === 'string'
-						? key.value
-						: undefined;
+			const key = property.key;
+			const name = isEstreeNode(key) ? literalPropertyName(key) : undefined;
 			if (!name) throw literalExpressionError(id);
-			value[name] = evaluateLiteralExpression(property.value as EstreeNode, id);
+			value[name] = evaluateLiteralExpression(property.value, id);
 		}
 		return value;
 	}

@@ -48,11 +48,11 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Branch adoption validates that a supplied live anchor is a comment node.',
 	'packages/web/src/resume-branches.ts :: if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))':
 		'Branch adoption maps serialized indexes to compiler-emitted comment anchors.',
-	'packages/web/src/resume-stream-patches.ts :: readonly querySelectorAll?: (selector: string) => Iterable<StreamPatchScript>;':
-		'The streamed-patch document adapter declares the narrow script-query capability it consumes.',
 	'packages/web/src/resume-stream-patches.ts :: const query = root.ownerDocument?.querySelectorAll?.bind(root.ownerDocument);':
 		'Streamed-patch adoption selects inert patch scripts emitted by the server.',
-	'packages/web/src/resume.ts :: const live = boundary.startAnchor?.nodeType === 8 && boundary.endAnchor?.nodeType === 8;':
+	'packages/web/src/resume-types.ts :: readonly querySelectorAll?: (selector: string) => Iterable<ResumeDomHostElement>;':
+		'The resume host-document surface declares the narrow script-query capability it consumes.',
+	'packages/web/src/resume.ts :: const live = start?.nodeType === 8 && end?.nodeType === 8;':
 		'Async-boundary adoption validates caller-supplied live comment anchors.',
 	'packages/web/src/resume.ts :: if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))':
 		'Async-boundary adoption maps serialized indexes to compiler-emitted comment anchors.',

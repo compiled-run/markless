@@ -35,7 +35,44 @@ jobs:
                       exit 1
                   fi
 
+    # Fast static gate in front of the 30-minute `test` job, so type red kills
+    # the run in seconds instead of half an hour. tsc is the gate of record;
+    # `vp check --no-fmt` adds the lint stage (fmt is excluded: the tree has
+    # pre-existing formatting drift that is scheduled separately).
+    typecheck:
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        env:
+            NPM_CONFIG_AUDIT: 'false'
+            NPM_CONFIG_FUND: 'false'
+            NPM_CONFIG_PREFER_OFFLINE: 'true'
+            PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+            PUPPETEER_SKIP_DOWNLOAD: '1'
+            CHROMEDRIVER_SKIP_DOWNLOAD: 'true'
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - name: Install Markless dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Typecheck
+              run: pnpm exec tsc --noEmit -p tsconfig.json
+
+            - name: Lint
+              run: pnpm exec vp check --no-fmt
+
     test:
+        needs: typecheck
         runs-on: ubuntu-latest
         timeout-minutes: 30
         env:

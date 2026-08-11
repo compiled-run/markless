@@ -13,6 +13,7 @@ import {
 	type ResumeRuntime,
 } from '../resume.ts';
 import type { ProtocolStatePayload } from '@markless/serializer/protocol';
+import type { ResumeAsyncBoundaryPayload } from '../resume-types.ts';
 import type { ResumePayloadScriptsInput, ResumePayloadScriptsResult } from '../payload-full.ts';
 import { createRuntimeGraphFromResumePayload } from '../payload-graph-construct.ts';
 import {
@@ -55,7 +56,8 @@ type TriggerGroupInput = Omit<ResumePayloadScriptsInput, 'stateScript' | 'viewSc
 
 type GraphSegment = {
 	readonly graph: RuntimeGraph;
-	readonly graphNodeIds: ReadonlySet<string>;
+	// Segments grow as later trigger groups register their computed nodes.
+	readonly graphNodeIds: Set<string>;
 	readonly sharedDefinitionIds: ReadonlySet<string>;
 };
 
@@ -173,11 +175,14 @@ async function startTriggerGroup(
 			})),
 	);
 	const boundaryClaims: PrerenderBoundaryArmRegistration[] = [];
-	for (const [index, boundary] of adopted.view.asyncBoundaries.entries()) {
+	// The decoded view is rewritten in place so every later reader sees the
+	// authority's canonical boundary.
+	const asyncBoundaries = adopted.view.asyncBoundaries as ResumeAsyncBoundaryPayload[];
+	for (const [index, boundary] of asyncBoundaries.entries()) {
 		const canonical = resolvePrerenderBoundaryAuthority(adopted.root, boundary);
 		const claim = await claimPrerenderBoundaryArmRegistration(adopted.root, canonical);
 		if (claim) boundaryClaims.push(claim);
-		adopted.view.asyncBoundaries[index] = claim ? canonical : { ...canonical, armRecords: [] };
+		asyncBoundaries[index] = claim ? canonical : { ...canonical, armRecords: [] };
 	}
 	const renderAsyncBoundary = adopted.renderBoundaryArm
 		? async (

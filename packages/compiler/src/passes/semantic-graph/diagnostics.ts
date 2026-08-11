@@ -345,7 +345,8 @@ function helperReturnUnsupportedDiagnostic(input: {
 	readonly message: string;
 	readonly why: string;
 	readonly suggestion: string;
-	readonly span: SourceSpan;
+	// Spanless nodes stay reportable: primarySpan is optional on the diagnostic.
+	readonly span: SourceSpan | undefined;
 }): SemanticGraphDiagnostic {
 	return {
 		code: 'MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED',

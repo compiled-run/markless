@@ -5,6 +5,10 @@ import type {
 	ResumeEventOnlyFromPayloadDocumentInput,
 } from './types.ts';
 import type { LeanActionPlan, LeanPlan, RuntimeDemandMap } from './lean-shared.ts';
+
+// The scalar-core path only produces a plan when the event record is present,
+// so its plan type carries that record.
+type ScalarCorePlan = LeanPlan & { readonly eventRecord: EventOnlyResumeRecord };
 import { resumeFullEventOnly } from './lean-shared.ts';
 import type { ProtocolSyncPolicyCondition } from '../../../serializer/src/protocol.ts';
 
@@ -12,10 +16,14 @@ export async function resumeScalarCoreEventFromPayloadDocument(
 	input: ResumeEventOnlyFromPayloadDocumentInput,
 ): Promise<EventOnlyResumeContainer> {
 	if (!input.eventRecord) return resumeFullEventOnly(input);
+	// The guard above narrows the property, not the input object.
+	const withRecord = input as ResumeEventOnlyFromPayloadDocumentInput & {
+		readonly eventRecord: EventOnlyResumeRecord;
+	};
 	const action = scalarAction(input.eventRecord, input.runtimeDemandMap);
 	if (!action?.plan) return resumeFullEventOnly(input);
 	const graphNodeIds = syncPolicyGraphIds(input.eventRecord.syncPolicy);
-	const plan = readScalarCorePlanFromDocument(input, action.plan, graphNodeIds);
+	const plan = readScalarCorePlanFromDocument(withRecord, action.plan, graphNodeIds);
 	if (!plan) return resumeFullEventOnly(input);
 
 	const elementsByHostId = new Map<string, EventOnlyResumeDomElement>();
@@ -129,7 +137,7 @@ function readScalarCorePlanFromDocument(
 	},
 	actionPlan: LeanActionPlan,
 	graphNodeIds: ReadonlyArray<string>,
-): LeanPlan | null {
+): ScalarCorePlan | null {
 	return readScalarCorePlan({
 		state: readPayloadScript(input.document, 'markless/state'),
 		view: readPayloadScript(input.document, 'markless/view'),
@@ -149,7 +157,7 @@ function readScalarCorePlan(input: {
 	readonly eventRecord?: EventOnlyResumeRecord;
 	readonly plan: LeanActionPlan;
 	readonly graphNodeIds: ReadonlyArray<string>;
-}): LeanPlan | null {
+}): ScalarCorePlan | null {
 	if (!input.eventRecord || readComputedEntries(input.state.computed).length > 0) return null;
 	if ((input.view.behaviors?.length ?? 0) > 0) return null;
 	const cellIds = new Set([input.plan.cell, ...input.graphNodeIds]);

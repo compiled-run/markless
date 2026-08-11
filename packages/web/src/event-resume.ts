@@ -48,24 +48,31 @@ export type EventResumePayloadDocument = {
 export type EventResumeRecord = ProtocolViewPayload['events'][number];
 export type EventResumeDomUpdateRecord = ProtocolViewPayload['domUpdates'][number];
 
-export type EventResumeGraph = Pick<
-	RuntimeGraph,
-	| 'read'
-	| 'readShared'
-	| 'writeShared'
-	| 'getSharedDefinition'
-	| 'listSharedDefinitions'
-	| 'takeSharedPatches'
-	| 'applySharedPatch'
-	| 'write'
-	| 'update'
-	| 'call'
-	| 'delete'
-	| 'subscribe'
-	| 'subscribeJournal'
-	| 'flush'
-	| 'takeJournal'
->;
+export type EventResumeGraph = Omit<
+	Pick<
+		RuntimeGraph,
+		| 'read'
+		| 'readShared'
+		| 'writeShared'
+		| 'getSharedDefinition'
+		| 'listSharedDefinitions'
+		| 'takeSharedPatches'
+		| 'applySharedPatch'
+		| 'write'
+		| 'update'
+		| 'call'
+		| 'delete'
+		| 'subscribe'
+		| 'subscribeJournal'
+		| 'flush'
+		| 'takeJournal'
+	>,
+	'subscribe'
+> & {
+	// This graph serves one dispatch and is then discarded, so it registers a
+	// subscription without handing back an unsubscribe.
+	readonly subscribe: (subscription: RuntimeGraphSubscription) => void;
+};
 
 export type EventResumeSymbolContext = {
 	readonly graph: EventResumeGraph;

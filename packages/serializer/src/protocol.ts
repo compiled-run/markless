@@ -99,6 +99,8 @@ export type ProtocolStatePayload = {
 		readonly graphNodeId: string;
 		readonly name: string;
 		readonly async: boolean;
+		// Sync computeds only: the update symbol that recomputes this node on resume.
+		readonly deriveSymbolId?: string;
 		readonly dependencies?: ReadonlyArray<{
 			readonly graphNodeId: string;
 			readonly path: ReadonlyArray<string>;
@@ -288,6 +290,7 @@ export type ProtocolViewPayload = {
 				readonly eventName: string;
 				readonly symbolIds: ReadonlyArray<string>;
 				readonly syncPolicy?: ProtocolSyncPolicy;
+				readonly action?: ProtocolEventAction;
 			}>;
 			readonly domUpdates: ReadonlyArray<Record<string, unknown>>;
 			readonly behaviors: ReadonlyArray<Record<string, unknown>>;

@@ -10,6 +10,17 @@ if [ $status -ne 0 ]; then
 	exit $status
 fi
 
+# Block commits that introduce TypeScript errors. This is the type gate of
+# record: it matches the editor's tsserver semantics. ~2s warm.
+pnpm exec tsc --noEmit -p tsconfig.json
+status=$?
+if [ $status -ne 0 ]; then
+	echo ""
+	echo "pre-commit: tsc found type errors (see above)."
+	echo "Re-run with: pnpm exec tsc --noEmit -p tsconfig.json"
+	exit $status
+fi
+
 # Keep generated agent files in sync with .ruler/ sources.
 if git diff --cached --name-only | grep -q '^\.ruler/'; then
 	if command -v pnpm >/dev/null 2>&1 && pnpm rules >/dev/null 2>&1; then

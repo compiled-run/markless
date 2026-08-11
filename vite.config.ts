@@ -232,7 +232,10 @@ export default defineConfig({
 		],
 	},
 	lint: {
-		ignorePatterns: ['dist/**', 'node_modules/**'],
+		// No lint.options.typeCheck: tsgolint disagrees with the tsc gate of
+		// record (1253 vs 0) because it applies strict-family defaults and lints
+		// outside this tsconfig's include/exclude. Raw tsc is the type gate.
+		ignorePatterns: ['dist/**', 'node_modules/**', '.claude/**'],
 	},
 	fmt: {
 		useTabs: true,
@@ -240,6 +243,6 @@ export default defineConfig({
 		printWidth: 100,
 		endOfLine: 'lf',
 		singleQuote: true,
-		ignorePatterns: ['dist/**', 'node_modules/**'],
+		ignorePatterns: ['dist/**', 'node_modules/**', '.claude/**'],
 	},
 });

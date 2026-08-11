@@ -2,6 +2,7 @@ import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import type {
 	ModuleGraphInterfaceArtifact,
+	ModuleGraphInterfaceExport,
 	ModuleGraphInterfaceHelperReturn,
 	SemanticGraphBinding,
 	SemanticLocalBinding,
@@ -325,7 +326,7 @@ export function collectModuleGraphInterface(input: {
 	readonly statements: ReadonlyArray<AnyNode>;
 	readonly state: WalkState;
 }): ModuleGraphInterfaceArtifact {
-	const exportedHelpers: ModuleGraphInterfaceArtifact['exports'] = [];
+	const exportedHelpers: ModuleGraphInterfaceExport[] = [];
 	reportImportedModuleScopeGraphBindings(input.state);
 
 	for (const statement of input.statements) {
@@ -587,7 +588,8 @@ function collectImportedHelperBindingForCall(
 
 	const exportName = moduleImport.importedName ?? moduleImport.localName;
 	const helperExport = moduleInterface.exports.find(
-		(candidate) => candidate.exportName === exportName && candidate.kind === 'function',
+		(candidate): candidate is Extract<ModuleGraphInterfaceExport, { kind: 'function' }> =>
+			candidate.exportName === exportName && candidate.kind === 'function',
 	);
 	if (!helperExport) return null;
 

@@ -8,16 +8,17 @@ export type ResumeDomNode = {
 export type ResumeDomElement = ResumeDomNode & {
 	readonly nodeType: 1;
 	readonly tagName: string;
+	readonly id?: string;
 	readonly childNodes?: ReadonlyArray<ResumeDomNode>;
 	readonly parentElement?: ResumeDomElement | null;
 	readonly addEventListener?: (
 		type: string,
-		listener: (event: ResumeDomEvent) => Promise<void>,
+		listener: (event: ResumeDomEvent) => void | Promise<void>,
 		options?: { readonly capture?: boolean },
 	) => void;
 	readonly removeEventListener?: (
 		type: string,
-		listener: (event: ResumeDomEvent) => Promise<void>,
+		listener: (event: ResumeDomEvent) => void | Promise<void>,
 		options?: { readonly capture?: boolean },
 	) => void;
 	readonly dispatchEvent?: (event: ResumeSharedPatchEvent) => boolean;
@@ -35,6 +36,26 @@ export type ResumeDomElement = ResumeDomNode & {
 	__marklessEventOnlyGraph?: Map<string, unknown>;
 	// Container-scoped element census in DOM order, shared by every wake.
 	__marklessCensus?: ResumeDomElement[];
+	// Resume reads the host document off the root element (streamed arm patch
+	// scripts, template rendering); the DOM guarantees it, so the surface does too.
+	readonly ownerDocument?: ResumeDomOwnerDocument;
+};
+// Host-document surface resume actually touches: payload/arm script lookup and
+// detached template construction.
+export type ResumeDomOwnerDocument = {
+	readonly querySelector?: (selector: string) => ResumeDomHostElement | null;
+	readonly querySelectorAll?: (selector: string) => Iterable<ResumeDomHostElement>;
+	readonly createElement?: (tagName: string) => ResumeDomCreatedElement;
+};
+export type ResumeDomHostElement = {
+	readonly getAttribute: (name: string) => string | null;
+	readonly textContent?: string | null;
+	readonly innerHTML?: string | null;
+	readonly text?: string | null;
+};
+export type ResumeDomCreatedElement = {
+	innerHTML: string;
+	readonly content?: { readonly childNodes?: ArrayLike<unknown> };
 };
 export type ResumeDomComment = ResumeDomNode & { readonly nodeType: 8; readonly data?: string };
 export type ResumeDomEvent = {
@@ -162,6 +183,7 @@ export type ResumeViewRecord = Pick<
 	| 'elementHandles'
 	| 'branches'
 	| 'keyedRepeats'
+	| 'asyncRunners'
 > & {
 	readonly asyncBoundaries: ReadonlyArray<ResumeAsyncBoundaryPayload>;
 };

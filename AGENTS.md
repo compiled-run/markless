@@ -8,6 +8,7 @@
 Agent rules, skills, and MCP config for this repo are generated from `.ruler/` by [Ruler](https://github.com/intellectronica/ruler). Edit sources in `.ruler/` and run `pnpm rules` to sync; never edit generated files directly.
 
 A change known to affect a consuming application must pass that application's checks before it lands; the framework's own suite passing is not sufficient evidence.
+Every write-task verify array must include `pnpm exec tsc --noEmit -p tsconfig.json`; type red or test red blocks task completion, so never report a write task complete on a tree that does not typecheck or whose tests fail.
 Protocol and config facts are imported from their owning package, never restated as literals.
 The task packet or active goal card defines scope. Stay inside its named files and preserve unrelated work.
 If a required decision is missing from the packet, return blocked; do not improvise.
