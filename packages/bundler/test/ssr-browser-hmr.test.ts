@@ -115,9 +115,6 @@ describe('SSR browser HMR', () => {
 				server: { hmr: true, middlewareMode: true, ws: false },
 			});
 
-			// Vite page-reloads a changed index.html, and the fixture's setup writes arrive late.
-			server.watcher.unwatch(fixture.root);
-
 			const send = vi.spyOn(server.environments.client.hot, 'send');
 			const html = await requestHtml(server);
 			expect(html).toContain(`/@id/__x00__${MARKLESS_DEV_ERROR_CLIENT_ID}`);
@@ -229,9 +226,6 @@ describe('SSR browser HMR', () => {
 				server: { hmr: true, middlewareMode: true, ws: false },
 			});
 
-			// Vite page-reloads a changed index.html, and the fixture's setup writes arrive late.
-			server.watcher.unwatch(fixture.root);
-
 			const send = vi.spyOn(server.environments.client.hot, 'send');
 			const first = await requestHtml(server);
 			expect(first).toContain('child original');
@@ -273,9 +267,6 @@ describe('SSR browser HMR', () => {
 				server: { hmr: true, middlewareMode: true, ws: false },
 			});
 
-			// Vite page-reloads a changed index.html, and the fixture's setup writes arrive late.
-			server.watcher.unwatch(fixture.root);
-
 			const send = vi.spyOn(server.environments.client.hot, 'send');
 			expect(await requestHtml(server)).toContain('child original');
 
@@ -303,56 +294,6 @@ describe('SSR browser HMR', () => {
 			expect(reloaded).toBeDefined();
 			expect(await reloaded).toContain('data-child-added');
 		} finally {
-			await server?.close();
-		}
-	});
-
-	test('serves the edited component to an unbarriered render started on the reload signal', async () => {
-		const fixture = await createComponentSsrFixture();
-		let server: ViteDevServer | undefined;
-		vi.stubEnv('MARKLESS_NO_BARRIER', '1');
-		try {
-			server = await createServer({
-				configFile: false,
-				mode: 'ssr',
-				root: fixture.root,
-				environments: { ssr: { build: { rolldownOptions: { input: fixture.entry } } } },
-				plugins: [markless(), fixtureSsrHost(), slowServerHotUpdate(200)],
-				resolve: { alias: marklessSourceAliases() },
-				server: { hmr: true, middlewareMode: true, ws: false },
-			});
-
-			// Vite page-reloads a changed index.html, and the fixture's setup writes arrive late.
-			server.watcher.unwatch(fixture.root);
-
-			const send = vi.spyOn(server.environments.client.hot, 'send');
-			expect(await requestHtml(server)).toContain('child original');
-
-			// The escape hatch drops the wait that holds renders during a pass, so the
-			// only thing that can keep this render off the pre-edit modules is the first
-			// pass having invalidated every environment before it sent the reload.
-			let reloaded: Promise<string> | undefined;
-			const reloadingServer = server;
-			send.mockImplementation((payload) => {
-				if ((payload as HotPayload | undefined)?.type === 'full-reload' && !reloaded) {
-					reloaded = requestHtml(reloadingServer);
-				}
-			});
-
-			await editFile(
-				server,
-				fixture.child,
-				fixture.childSource.replace(
-					'\t</section>',
-					'\t\t<em data-child-added>child added</em>\n\t</section>',
-				),
-			);
-			await waitForFullReloadCountAbove(send, 0);
-
-			expect(reloaded).toBeDefined();
-			expect(await reloaded).toContain('data-child-added');
-		} finally {
-			vi.unstubAllEnvs();
 			await server?.close();
 		}
 	});

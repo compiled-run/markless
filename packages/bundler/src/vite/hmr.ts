@@ -63,10 +63,12 @@ export function createViteHmr(options: ViteHmrOptions) {
 	// Vite environment name. Only environments with the fetch gate installed appear.
 	const unreportedInvalidations = new Map<string, Set<string>>();
 
-	// A pass is where this file invalidates the module graphs a render transforms
-	// from, so a server render that starts mid-pass waits for that pass to finish.
-	// Passes for later environments need no waiting: the first pass to observe an
-	// edit already invalidated every environment for it.
+	// Vite runs the client environment's hotUpdate pass before every server one,
+	// so the browser reload the client pass sends can bring a page request back
+	// before the server module graphs have been invalidated for that same edit,
+	// and that render serves pre-edit modules with nothing left to re-invalidate
+	// it. A server render started while a pass is in flight waits for the whole
+	// cycle instead; with no edit being processed there is nothing to wait for.
 	let hotUpdatePasses = 0;
 	let hotUpdateCycle: { settled: Promise<void>; finish: () => void } | undefined;
 
@@ -85,9 +87,15 @@ export function createViteHmr(options: ViteHmrOptions) {
 		hotUpdatePasses -= 1;
 		if (hotUpdatePasses > 0) return;
 
+		// Vite starts the next environment's pass in a microtask, so a timer tick
+		// is the first moment at which the whole cycle is known to be over.
 		const cycle = hotUpdateCycle;
-		hotUpdateCycle = undefined;
-		cycle?.finish();
+		const timer = setTimeout(() => {
+			if (hotUpdatePasses > 0 || hotUpdateCycle !== cycle) return;
+			hotUpdateCycle = undefined;
+			cycle?.finish();
+		}, 0);
+		timer.unref?.();
 	}
 
 	function settledHotUpdate() {
@@ -308,14 +316,13 @@ export function createViteHmr(options: ViteHmrOptions) {
 			return undefined;
 		}
 
-		const targets = invalidationTargets(server, options, environment, env);
-
 		// The dev worker's module runner only drops evaluated modules when the reload
 		// arrives on its own environment channel, and it needs one per edit even when
 		// the client channel already reloaded for this file. Unmanaged server
 		// environments (nitro) render pages from their own runner but skip this hook,
-		// so whichever pass runs first has to deliver their reload too.
-		const runnerHots = moduleRunnerHots(targets, hot);
+		// so the server pass has to deliver their reload too.
+		const runnerHots =
+			env === 'server' ? moduleRunnerHots(server, options, environment, hot) : [];
 		const reloadModuleRunner = () => {
 			for (const runnerHot of runnerHots) runnerHot.send?.({ type: 'full-reload' });
 		};
@@ -375,14 +382,11 @@ export function createViteHmr(options: ViteHmrOptions) {
 			}
 		}
 
-		// A later pass for the same edit would only redo this; the reload that races it
-		// has already been sent, so nothing is left for a later invalidation to catch.
-		if (!sendMessages) {
-			return [];
-		}
-
-		const invalidationEnvironments = [...targets.keys()];
-		const invalidationScopes = generatedModuleScopes(targets);
+		const invalidationEnvironments = moduleGraphEnvironments(
+			environment,
+			env === 'server' ? server?.environments?.[options.clientEnvironment] : undefined,
+			env === 'server' ? unmanagedServerEnvironments(server, options) : [],
+		);
 		const invalidatedGeneratedIds = new Set<string>();
 		for (const file of files) {
 			const candidates =
@@ -390,27 +394,25 @@ export function createViteHmr(options: ViteHmrOptions) {
 					? [ctx.file]
 					: hmrCandidates(file, ctx.file);
 			for (const candidate of candidates) {
-				for (const scope of invalidationScopes) {
-					const invalidatedIds = await options.invalidateGeneratedModules?.(
-						candidate,
-						scope,
-						candidate === ctx.file ? editedSource : undefined,
-					);
-					for (const id of invalidatedIds ?? []) {
-						invalidatedGeneratedIds.add(id);
-						for (const targetEnvironment of invalidationEnvironments) {
-							const module = targetEnvironment.moduleGraph?.getModuleById?.(id);
-							if (!module) continue;
+				const invalidatedIds = await options.invalidateGeneratedModules?.(
+					candidate,
+					env,
+					candidate === ctx.file ? editedSource : undefined,
+				);
+				for (const id of invalidatedIds ?? []) {
+					invalidatedGeneratedIds.add(id);
+					for (const targetEnvironment of invalidationEnvironments) {
+						const module = targetEnvironment.moduleGraph?.getModuleById?.(id);
+						if (!module) continue;
 
-							const invalidated = new Set<EnvironmentModuleNode>();
-							targetEnvironment.moduleGraph?.invalidateModule?.(
-								module,
-								invalidated,
-								ctx.timestamp,
-								true,
-							);
-							recordUnreportedInvalidation(targetEnvironment, invalidated);
-						}
+						const invalidated = new Set<EnvironmentModuleNode>();
+						targetEnvironment.moduleGraph?.invalidateModule?.(
+							module,
+							invalidated,
+							ctx.timestamp,
+							true,
+						);
+						recordUnreportedInvalidation(targetEnvironment, invalidated);
 					}
 				}
 			}
@@ -440,11 +442,13 @@ export function createViteHmr(options: ViteHmrOptions) {
 		}
 
 		reloadModuleRunner();
-		hot.send({
-			type: 'full-reload',
-			path: firstChangedFile(files),
-			triggeredBy: ctx.file,
-		});
+		if (sendMessages) {
+			hot.send({
+				type: 'full-reload',
+				path: firstChangedFile(files),
+				triggeredBy: ctx.file,
+			});
+		}
 
 		return [];
 	}
@@ -524,51 +528,36 @@ function clientHot(
 	return environment.hot;
 }
 
-// Every environment this edit has to be invalidated in, each mapped to the Markless
-// environment its generated modules were recorded under. Vite runs one hotUpdate pass
-// per environment and the browser acts on the reload sent from the first of them, so
-// that pass invalidates all of them rather than only its own.
-function invalidationTargets(
-	server: ViteDevServer | undefined,
-	options: ViteHmrOptions,
-	environment: DevEnvironment,
-	env: MarklessEnvironment,
-) {
-	const targets = new Map<DevEnvironment, MarklessEnvironment>([[environment, env]]);
-	const clientEnvironment = server?.environments?.[options.clientEnvironment];
-	if (clientEnvironment) targets.set(clientEnvironment, 'client');
+// The server environments Vite calls server consumers while Markless declines to
+// manage them (nitro). They render pages from their own module runner but their
+// own hotUpdate pass is skipped by design, so the managed server pass speaks for them.
+function unmanagedServerEnvironments(server: ViteDevServer | undefined, options: ViteHmrOptions) {
+	const environments: DevEnvironment[] = [];
 	for (const [name, candidate] of Object.entries(server?.environments ?? {})) {
-		if (name === options.clientEnvironment || targets.has(candidate)) continue;
-
-		// Vite calls nitro a server consumer while Markless declines to manage it: it
-		// renders pages from its own runner but is given no hotUpdate pass of its own.
-		const unmanaged =
-			candidate.config?.consumer === 'server' && !isServerViteEnvironment(candidate);
-		if (!unmanaged && marklessEnvironment(candidate) !== 'server') continue;
-		targets.set(candidate, 'server');
+		if (name === options.clientEnvironment) continue;
+		if (candidate.config?.consumer !== 'server' || isServerViteEnvironment(candidate)) {
+			continue;
+		}
+		environments.push(candidate);
 	}
 
-	return targets;
-}
-
-// Generated modules are cached per Markless environment, so each one present has to
-// be invalidated by name; 'lib' environments never reach this hook.
-function generatedModuleScopes(targets: Map<DevEnvironment, MarklessEnvironment>) {
-	const scopes = new Set(targets.values());
-	return (['client', 'server'] as const).filter((scope) => scopes.has(scope));
+	return environments;
 }
 
 // Every server-side module runner that has to drop its evaluated modules for this edit.
 function moduleRunnerHots(
-	targets: Map<DevEnvironment, MarklessEnvironment>,
+	server: ViteDevServer | undefined,
+	options: ViteHmrOptions,
+	environment: DevEnvironment,
 	clientChannel: DevEnvironment['hot'] | undefined,
 ) {
 	const hots = new Set<DevEnvironment['hot']>();
-	for (const [environment, scope] of targets) {
-		if (scope !== 'server' || !environment.hot || environment.hot === clientChannel) {
+	if (environment.hot && environment.hot !== clientChannel) hots.add(environment.hot);
+	for (const unmanaged of unmanagedServerEnvironments(server, options)) {
+		if (unmanaged === environment || !unmanaged.hot || unmanaged.hot === clientChannel) {
 			continue;
 		}
-		hots.add(environment.hot);
+		hots.add(unmanaged.hot);
 	}
 
 	return [...hots];
@@ -599,6 +588,17 @@ function hmrCandidates(file: string, absoluteFile: string | undefined) {
 	const candidates = new Set<string>([file]);
 	if (absoluteFile) candidates.add(absoluteFile);
 	return candidates;
+}
+
+function moduleGraphEnvironments(
+	environment: DevEnvironment,
+	clientEnvironment: DevEnvironment | undefined,
+	unmanagedServers: readonly DevEnvironment[] = [],
+) {
+	const environments = new Set<DevEnvironment>([environment]);
+	if (clientEnvironment) environments.add(clientEnvironment);
+	for (const unmanaged of unmanagedServers) environments.add(unmanaged);
+	return [...environments];
 }
 
 function firstChangedFile(files: Set<string>) {
