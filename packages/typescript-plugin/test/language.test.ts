@@ -91,6 +91,37 @@ test('compiles TSRX source into type-checkable TSX for TypeScript', () => {
 	).toEqual([]);
 });
 
+// The document shell is authored against framework components like the router's
+// Html, which are plain .ts functions returning their children as `unknown`.
+test('document-shell markup type-checks: meta attributes and children-passthrough components', () => {
+	const source = `
+		function Shell(props: { readonly children?: unknown }): unknown {
+			return props.children;
+		}
+
+		export default function Document({ children }: { readonly children?: unknown }) @{
+			<Shell>
+				<head>
+					<meta charset="utf-8" />
+					<meta name="viewport" content="width=device-width, initial-scale=1" />
+					<link rel="stylesheet" href="/styles/global.css" />
+				</head>
+				<body>{children}</body>
+			</Shell>
+		}
+	`;
+	const fileName = join(process.cwd(), 'packages/core/src/Document.tsrx');
+	const virtualCode = new MarklessTsrxVirtualCode(fileName, ts.ScriptSnapshot.fromString(source));
+
+	// Known gap, not user-visible today: interpolating `unknown`-typed children
+	// fails the strict Child contract. Closing it needs a public children type
+	// for component authors, which is an API decision - see the M10 object-child
+	// rejection this strictness exists for.
+	expect(
+		formatDiagnostics(typeCheckVirtualSource(fileName, virtualCode.generatedCode)),
+	).toEqual(["Type 'unknown' is not assignable to type 'Child'."]);
+});
+
 test('populates virtual code from the Markless compiler type-service artifact', () => {
 	const source = `import { state } from '@markless/core';
 export function App() @{
@@ -256,6 +287,69 @@ test('a project that also lists the nested upstream plugin installs Markless beh
 	expect(result.parseErrorCount).toBe(1);
 	expect(result.cleanFileParseErrorCount).toBe(0);
 }, 20_000);
+
+test.each([
+	{
+		name: 'a static object style',
+		markup: `<div style={{ position: 'absolute' }}>ok</div>`,
+		typechecks: true,
+	},
+	{
+		name: 'an object style built from state',
+		markup: '<div style={{ transform: `translate(${x}%, ${y}%)` }}>ok</div>',
+		typechecks: true,
+	},
+	{
+		name: 'a custom property in an object style',
+		markup: `<div style={{ '--panel-offset': x, opacity: undefined }}>ok</div>`,
+		typechecks: true,
+	},
+	{ name: 'a css text string', markup: `<div style="position: absolute">ok</div>`, typechecks: true },
+	{
+		name: 'an interpolated css text string',
+		markup: '<div style={`transform: translate(${x}%, ${y}%)`}>ok</div>',
+		typechecks: true,
+	},
+	{
+		name: 'an array of style objects',
+		markup: `<div style={[{ position: 'absolute' }]}>ok</div>`,
+		typechecks: false,
+	},
+	{
+		name: 'an array of css text strings',
+		markup: `<div style={['position: absolute', 'top: 0']}>ok</div>`,
+		typechecks: false,
+	},
+	{
+		name: 'a nested object value',
+		markup: `<div style={{ nested: { x: 1 } }}>ok</div>`,
+		typechecks: false,
+	},
+])('type-checks $name on the style attribute', ({ name, markup, typechecks }) => {
+	const source = `export function Panel({ x, y }: { x: number; y: number }) @{\n\t${markup}\n}`;
+	const fileName = join(process.cwd(), `packages/core/src/Style-${name.replaceAll(' ', '-')}.tsrx`);
+	const virtualCode = new MarklessTsrxVirtualCode(fileName, ts.ScriptSnapshot.fromString(source));
+	const diagnostics = typeCheckVirtualSource(fileName, virtualCode.generatedCode);
+
+	if (typechecks) {
+		expect(formatDiagnostics(diagnostics)).toEqual([]);
+		return;
+	}
+	// Arrays and nested objects are not styles. Assert on where the error lands rather than
+	// its wording: the attribute itself has to go red, not some incidental scaffolding
+	// diagnostic elsewhere in the generated document.
+	const attributeStart = virtualCode.generatedCode.indexOf('style=');
+	expect(attributeStart).toBeGreaterThan(-1);
+	expect(
+		diagnostics.map((diagnostic) => ({
+			inAttribute:
+				diagnostic.start !== undefined &&
+				diagnostic.start >= attributeStart &&
+				diagnostic.start < attributeStart + markup.length,
+			message: ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
+		})),
+	).toEqual([{ inAttribute: true, message: expect.any(String) }]);
+});
 
 function typeCheckVirtualSource(
 	sourceFileName: string,

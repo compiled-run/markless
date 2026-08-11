@@ -56,6 +56,12 @@ import {
 	unboundIdrefElementHandleDiagnostic,
 } from './diagnostics.ts';
 import { isIdrefAttribute } from './idref-attributes.ts';
+import {
+	createStyleConstResolver,
+	lowerStyleObject,
+	type StyleConstResolver,
+	type StyleObjectLowering,
+} from './style-object.ts';
 import type {
 	MutableSemanticGraphArtifact,
 	PendingElementHandleIdref,
@@ -177,6 +183,22 @@ function collectCompositeTemplateExpression(
 	const readSources = pureCompositeReadSources(node, state);
 	if (!readSources) return null;
 
+	return mintTemplateExpressionComputed(
+		`() => ${expressionSource(node, state.source)}`,
+		readSources,
+		state,
+	);
+}
+
+/**
+ * Mints the synthetic computed that stands behind one recombined expression, so
+ * every graph read inside it wakes a single DOM update instead of none.
+ */
+function mintTemplateExpressionComputed(
+	functionSource: string,
+	readSources: ReadonlyArray<string>,
+	state: WalkState,
+): { readonly graphNodeId: string } | null {
 	const bindings = graphBindingMap(state.graph, state.currentSharedDefinitionId);
 	const aliases = semanticAliasMap(state.graph, state.currentSharedDefinitionId);
 	const dependencies: SemanticGraphDependency[] = [];
@@ -205,7 +227,7 @@ function collectCompositeTemplateExpression(
 		writable: false,
 		async: false,
 		asyncCapable: false,
-		functionSource: `() => ${expressionSource(node, state.source)}`,
+		functionSource,
 		dependencies: uniqueDependencies(dependencies),
 	});
 	return { graphNodeId };
@@ -669,9 +691,48 @@ function collectAttribute(
 		return;
 	}
 
+	if (attributeName === 'style' && expressionValue?.type === 'ObjectExpression') {
+		collectStyleObjectAttribute(expressionValue, expressionValue, state, walk, hostNodeId);
+		return;
+	}
+
+	// style={identifier}: a same-file const object literal is substituted and
+	// lowered exactly as if written inline. A named refusal fails closed here; an
+	// unclaimed identifier (graph binding, string const, unknown) falls through
+	// to the existing attribute handling below.
+	if (attributeName === 'style' && expressionValue?.type === 'Identifier') {
+		const name = getIdentifierName(expressionValue);
+		const resolved = name
+			? styleConstResolver(state).resolveObject(name, expressionValue.start ?? 0)
+			: null;
+		if (resolved?.object) {
+			collectStyleObjectAttribute(resolved.object, expressionValue, state, walk, hostNodeId);
+			return;
+		}
+		if (resolved?.reason !== undefined) {
+			state.graph.diagnostics.push(
+				styleObjectUnsupportedDiagnostic({
+					valueSource: expressionSource(expressionValue, state.source),
+					reason: resolved.reason,
+					node: expressionValue,
+					filename: state.filename,
+				}),
+			);
+			walk(expressionValue, state);
+			return;
+		}
+	}
+
 	if (expressionValue && expressionValue.type !== 'Literal') {
 		const attributeDiagnostic = attributeValueDiagnostic(attributeName, expressionValue, state);
 		if (attributeDiagnostic) state.graph.diagnostics.push(attributeDiagnostic);
+		// A refused style object owes no update record: writing one would bind the
+		// object itself into the attribute, which is the "[object Object]" the
+		// diagnostic exists to stop.
+		if (attributeDiagnostic?.code === 'MARKLESS_STYLE_OBJECT_UNSUPPORTED') {
+			walk(expressionValue, state);
+			return;
+		}
 		state.graph.templateReads.push({
 			hostNodeId,
 			source: expressionSource(expressionValue, state.source),
@@ -681,6 +742,76 @@ function collectAttribute(
 		});
 		walk(expressionValue, state);
 	}
+}
+
+/**
+ * Lowers `style={{ ... }}`. A literal-only object leaves no record at all - the
+ * markup pass writes its CSS text straight into the template - while an object
+ * with reactive values becomes one recombined CSS-text expression behind a
+ * single synthetic computed, so the server text and the live update are the
+ * same expression.
+ */
+function collectStyleObjectAttribute(
+	objectNode: AnyNode,
+	usageNode: AnyNode,
+	state: WalkState,
+	walk: SemanticGraphWalk,
+	hostNodeId: string,
+): void {
+	const lowering = lowerStyleObject(objectNode, state.source, {
+		resolver: styleConstResolver(state),
+		usagePos: usageNode.start ?? 0,
+		referenced: objectNode !== usageNode,
+	});
+	if (lowering?.kind === 'static') return;
+
+	const composite = lowering?.kind === 'dynamic' ? mintStyleObjectComputed(lowering, state) : null;
+	if (lowering?.kind === 'dynamic' && composite) {
+		state.graph.templateReads.push({
+			hostNodeId,
+			source: expressionSource(usageNode, state.source),
+			sourceSpan: sourceSpan(usageNode, state.filename),
+			target: bindingTargetForAttribute('style'),
+			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
+			computedGraphNodeId: composite.graphNodeId,
+		});
+		walk(usageNode, state);
+		return;
+	}
+
+	state.graph.diagnostics.push(
+		styleObjectUnsupportedDiagnostic({
+			valueSource: expressionSource(usageNode, state.source),
+			reason:
+				lowering?.kind === 'unsupported'
+					? lowering.reason
+					: 'a value that is not a plain read of state, a computed value, or a prop',
+			node: usageNode,
+			filename: state.filename,
+		}),
+	);
+	walk(usageNode, state);
+}
+
+function styleConstResolver(state: WalkState): StyleConstResolver {
+	state.styleConstResolver ??= createStyleConstResolver(state.source, state.filename);
+	return state.styleConstResolver;
+}
+
+function mintStyleObjectComputed(
+	lowering: Extract<StyleObjectLowering, { readonly kind: 'dynamic' }>,
+	state: WalkState,
+): { readonly graphNodeId: string } | null {
+	const readSources = joinReadSources(
+		lowering.valueExpressions.map((value) => pureCompositeReadSources(value, state)),
+	);
+	if (!readSources || readSources.length === 0) return null;
+
+	return mintTemplateExpressionComputed(
+		`() => ${lowering.expressionSource}`,
+		readSources,
+		state,
+	);
 }
 
 function collectDuplicateAttributeDiagnostics(
@@ -804,6 +935,10 @@ function attributeValueDiagnostic(
 	if (attributeName === 'style') {
 		return styleObjectUnsupportedDiagnostic({
 			valueSource,
+			reason:
+				expressionValue.type === 'ArrayExpression' || resolved?.binding.valueKind === 'array'
+					? 'an array of styles'
+					: 'a whole object held in state and passed as the style value — the object lives in the graph at runtime, so the compiler cannot freeze it into CSS text',
 			node: expressionValue,
 			filename: state.filename,
 		});

@@ -839,7 +839,7 @@ test('M10 intrinsic contract accepts Markless spellings, native events, element 
 	).toEqual([]);
 }, 20_000);
 
-test('M10 intrinsic contract rejects className, bogus and tag-wrong attributes, object style, and object children at authored tokens', async () => {
+test('M10 intrinsic contract rejects className, bogus and tag-wrong attributes, and object children at authored tokens', async () => {
 	const fixture = openFixture('intrinsic-contract-errors.tsrx');
 	const diagnostics = await server.semanticDiagnosticsSync(fixture.file);
 
@@ -849,14 +849,9 @@ test('M10 intrinsic contract rejects className, bogus and tag-wrong attributes, 
 		diagnosticMatching(diagnostics, /bogusAttribute/),
 		'bogusAttribute',
 	);
-	expectDiagnosticSpan(
-		fixture.source,
-		diagnosticMatching(diagnostics, /not assignable to type 'string'/),
-		'style',
-	);
 	expectDiagnosticSpan(fixture.source, diagnosticMatching(diagnostics, /src/), 'src');
 	expectDiagnosticSpan(fixture.source, diagnosticMatching(diagnostics, /invalid/), 'invalid');
-	expect(diagnostics).toHaveLength(5);
+	expect(diagnostics).toHaveLength(4);
 }, 20_000);
 
 test('M10 plugin does not add the Markless declaration to a project without TSRX', async () => {

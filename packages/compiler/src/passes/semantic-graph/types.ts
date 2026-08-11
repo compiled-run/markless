@@ -29,6 +29,7 @@ import type {
 	SemanticTemplateRead,
 } from '../../artifacts.ts';
 import type { FrameworkApiName } from './imports.ts';
+import type { StyleConstResolver } from './style-object.ts';
 
 export type MutableSemanticGraphArtifact = {
 	passId: 'tsrx-semantic-graph';
@@ -104,6 +105,9 @@ export type WalkState = {
 	pendingElementHandleIdrefs: PendingElementHandleIdref[];
 	currentHelperCall: HelperStateCallSite | null;
 	helperFunctions: Map<string, AnyNode>;
+	// Lazily created once per file: style attributes that reference same-file
+	// consts resolve through it.
+	styleConstResolver: StyleConstResolver | null;
 	pendingComputedDependencies: Array<{
 		readonly graphNodeId: string;
 		readonly body: AnyNode | undefined;
@@ -214,6 +218,7 @@ export function createWalkState(input: {
 		pendingElementHandleIdrefs: [],
 		currentHelperCall: null,
 		helperFunctions: new Map(),
+		styleConstResolver: null,
 		pendingComputedDependencies: [],
 		componentLocalBindings: new Map(),
 		resolvedComponentLocalBindingIds: new WeakMap<object, string>(),

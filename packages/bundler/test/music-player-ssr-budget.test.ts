@@ -17,7 +17,8 @@ const clientBuild = resolve(demo, '.output/public/build');
 // Recalibrated to actuals for chained-async key-phase gating (runtime gate + self-wake + single-flight); zero slack. CI (Linux) emits slightly larger bytes than local macOS; wall tracks CI actuals.
 // 62,657 -> 62,722 (interim 2026-08-05): +65 for the foreign-DOM census pin + range-splice invalidation (locator fix), de-minimis auto-interim per proportionality order 2026-08-04; repayment folded into T013's mp-ssr obligations.
 // 62,722 -> 62,925 (interim 2026-08-06, owner-accepted cost class): +203 for mount-time served-arm record registration + the client residue-reader call site (browser-lane correctness fixes); covers both environments (CI 62,915, local macOS 62,923) plus ~2-byte gzip run variance; repayment stays with the runtime-stdlib shrink obligation. Was: +193 CI-measured for mount-time served-arm record registration + the client residue-reader call site (browser-lane correctness fixes); wall tracks CI actuals per the note above; repayment stays with the runtime-stdlib shrink obligation.
-const MAX_SHIPPED_JS_GZIP_BYTES = 62_925;
+// 62,925 -> 62,940 (interim 2026-08-11): +13 local (62,938 measured post strict-everywhere landing 6b2134e9 + style-object lowering working tree), de-minimis auto-interim per proportionality order 2026-08-04; attribution not isolated between the two change sets - prime suspect is the composite functionSource extraction in collect-elements (touches all composite template expressions); T999 style-object audit owns confirming or repaying.
+const MAX_SHIPPED_JS_GZIP_BYTES = 62_940;
 
 test('music-player-ssr production build stays within its shipped JS budget', async () => {
 	await rm(resolve(demo, '.output'), { force: true, recursive: true });

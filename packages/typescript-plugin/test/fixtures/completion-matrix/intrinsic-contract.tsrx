@@ -8,7 +8,7 @@ export function IntrinsicContract() @{
 	};
 	<div
 		class="accepted"
-		style="color: rebeccapurple"
+		style={{ color: 'rebeccapurple', '--panel-offset': 4 }}
 		data-state="ready"
 		aria-label="contract"
 	>

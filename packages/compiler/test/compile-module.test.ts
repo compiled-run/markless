@@ -1354,6 +1354,78 @@ export function App() @{
 	]);
 });
 
+test('T003 compileTsrxModule renders object style attributes as CSS text in SSR modules', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/StyleObjects.tsrx',
+		source: `import { state } from '@markless/core';
+export function App() @{
+	let x = state(10);
+	let y = state(20);
+	let hue = state('teal');
+	let gap = state(4);
+	let missing = state(null);
+	<section>
+		<div style={{ position: 'absolute', marginTop: 0, lineHeight: 2 }}>Static</div>
+		<div style={{ transform: \`translate(\${x}%, \${y}%)\` }}>Canonical</div>
+		<div style={{ color: hue, marginTop: gap, zIndex: gap, background: missing }}>Mixed</div>
+	</section>
+}`,
+		symbols: [],
+	});
+
+	expect(result.diagnostics ?? []).toEqual([]);
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+
+	const ssr = await renderTestSsr(result);
+
+	expect(ssr.html).toContain(
+		'<div style="position:absolute;margin-top:0;line-height:2;">Static</div>',
+	);
+	expect(ssr.html).toContain('<div style="transform:translate(10%, 20%);">Canonical</div>');
+	expect(ssr.html).toContain(
+		'<div style="color:teal;margin-top:4px;z-index:4;">Mixed</div>',
+	);
+
+	const styleUpdates = result.protocolView.domUpdates.filter(
+		(update) => update.target.kind === 'style',
+	);
+	expect(styleUpdates).toHaveLength(2);
+	expect(new Set(styleUpdates.map((update) => update.graphNodeId)).size).toBe(2);
+});
+
+test('T011 compileTsrxModule renders referenced-const style objects identically to inline', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/StyleConstRefs.tsrx',
+		source: `import { state } from '@markless/core';
+const panel = { position: 'absolute', marginTop: 0 };
+export function App() @{
+	let x = state(10);
+	let y = state(20);
+	const sty = { transform: \`translate(\${x}%, \${y}%)\` };
+	<section>
+		<div style={panel}>Referenced</div>
+		<div style={sty}>Canonical</div>
+		<div style={{ ...panel, marginTop: 8 }}>Spread</div>
+	</section>
+}`,
+		symbols: [],
+	});
+
+	expect(result.diagnostics ?? []).toEqual([]);
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+
+	const ssr = await renderTestSsr(result);
+
+	expect(ssr.html).toContain('<div style="position:absolute;margin-top:0;">Referenced</div>');
+	expect(ssr.html).toContain('<div style="transform:translate(10%, 20%);">Canonical</div>');
+	expect(ssr.html).toContain('<div style="position:absolute;margin-top:8px;">Spread</div>');
+
+	const styleUpdates = result.protocolView.domUpdates.filter(
+		(update) => update.target.kind === 'style',
+	);
+	expect(styleUpdates).toHaveLength(1);
+});
+
 test('compileTsrxModule lets pre-root guard clauses render nothing in SSR modules', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/RenderBodyGuard.tsrx',

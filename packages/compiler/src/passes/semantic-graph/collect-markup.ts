@@ -27,6 +27,11 @@ import type {
 	SemanticMarkupSlot,
 } from '../../artifacts.ts';
 import { isIdrefAttribute } from './idref-attributes.ts';
+import {
+	createStyleConstResolver,
+	lowerStyleObject,
+	type StyleConstResolver,
+} from './style-object.ts';
 import { collectStyleScopes } from '../public-render/style-scopes.ts';
 import type { MutableSemanticGraphArtifact } from './types.ts';
 
@@ -40,6 +45,7 @@ type CollectionContext = {
 	branchIndex: number;
 	boundaryIndex: number;
 	styleScopeClass: string | null;
+	styleConstResolver: StyleConstResolver | null;
 };
 
 type ChunkBuilder = {
@@ -77,6 +83,7 @@ export function collectSemanticMarkup(input: {
 		branchIndex: 0,
 		boundaryIndex: 0,
 		styleScopeClass: null,
+		styleConstResolver: null,
 	};
 	const components: Array<{
 		readonly name: string;
@@ -364,6 +371,11 @@ function emitNode(
 		if (name === 'class') classSeen = true;
 		const value = attribute.value as AnyNode | undefined;
 		const expression = unwrapExpressionContainer(value);
+		const styleCss = staticStyleObjectCss(name, expression, context);
+		if (styleCss !== null) {
+			if (styleCss !== '') append(builder, ` style="${escapeAttribute(styleCss)}"`);
+			continue;
+		}
 		const literal = staticAttributeValue(value, expression);
 		if (literal !== null) {
 			append(builder, ` ${name}="${escapeAttribute(name === 'class' && context.styleScopeClass ? `${literal} ${context.styleScopeClass}` : literal)}"`);
@@ -480,6 +492,11 @@ function emitDynamicHost(
 			continue;
 		const value = attribute.value as AnyNode | undefined;
 		const expression = unwrapExpressionContainer(value);
+		const styleCss = staticStyleObjectCss(name, expression, context);
+		if (styleCss !== null) {
+			if (styleCss !== '') staticAttributes[name] = styleCss;
+			continue;
+		}
 		const literal = staticAttributeValue(value, expression);
 		if (literal !== null) {
 			staticAttributes[name] = literal;
@@ -722,6 +739,40 @@ function repeatItemName(node: AnyNode): string | null {
 	if (left.type !== 'VariableDeclaration') return getIdentifierName(left);
 	const [declaration] = asNodes(left.declarations);
 	return getIdentifierName(declaration?.id as AnyNode | undefined);
+}
+
+// A literal-only style object owes the browser nothing: its CSS text is known
+// while compiling, so it belongs in the statics rather than in a slot. A
+// same-file const reference resolves through the same resolver the semantic
+// pass used, so both passes agree on what the attribute lowers to.
+function staticStyleObjectCss(
+	name: string,
+	expression: AnyNode | undefined,
+	context: CollectionContext,
+): string | null {
+	if (name !== 'style' || !expression) return null;
+	let objectNode = expression;
+	if (expression.type === 'Identifier') {
+		const identifier = getIdentifierName(expression);
+		const resolved = identifier
+			? markupStyleConstResolver(context).resolveObject(identifier, expression.start ?? 0)
+			: null;
+		if (!resolved?.object) return null;
+		objectNode = resolved.object;
+	} else if (expression.type !== 'ObjectExpression') {
+		return null;
+	}
+	const lowering = lowerStyleObject(objectNode, context.source, {
+		resolver: markupStyleConstResolver(context),
+		usagePos: expression.start ?? 0,
+		referenced: objectNode !== expression,
+	});
+	return lowering?.kind === 'static' ? lowering.css : null;
+}
+
+function markupStyleConstResolver(context: CollectionContext): StyleConstResolver {
+	context.styleConstResolver ??= createStyleConstResolver(context.source, context.filename);
+	return context.styleConstResolver;
 }
 
 function staticAttributeValue(

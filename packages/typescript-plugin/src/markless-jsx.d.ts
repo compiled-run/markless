@@ -18,6 +18,15 @@ declare namespace __MarklessTypeService {
 	 * still works for elements markless did not render.
 	 */
 	type IdrefValue = AttributeValue | globalThis.Element;
+	type StyleValue = string | number | undefined;
+	/**
+	 * The object form of `style`: camelCase CSS property names and `--custom`
+	 * properties. Property names stay open because the compiler lowers any camelCase
+	 * key, while values stay primitive so arrays and nested objects remain errors.
+	 */
+	type StyleObject = {
+		[property: string]: StyleValue;
+	};
 	type Cleanup = () => void;
 	type NativeElementBehavior<E extends globalThis.Element> = (
 		element: E,
@@ -84,7 +93,7 @@ declare namespace __MarklessTypeService {
 		role?: string;
 		slot?: string;
 		spellcheck?: boolean | 'true' | 'false';
-		style?: string;
+		style?: string | StyleObject;
 		tabindex?: number;
 		title?: string;
 		translate?: 'yes' | 'no';

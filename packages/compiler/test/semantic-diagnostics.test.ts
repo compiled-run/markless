@@ -166,7 +166,7 @@ const eventExpressionSource = `import { state } from '@markless/core'; export fu
 const attributeDisciplineSource = `import { state } from '@markless/core';
 export function App() @{ let count = state(0); const menu = state({ open: false }); const handlers = { onClick: () => count++, onInput: (event) => { count++; } }; <section><input {...handlers} />
 // markless-allow MARKLESS_SPREAD_STATIC_SNAPSHOT: static attribute snapshot is intentional here
-<div {...menu}>Menu</div><div data-menu={menu}>Menu</div><div style={{ color: 'red' }}>Style</div><div id="a" id="b">Duplicate</div><button onclick={() => count++}>Bad case</button><p data-count={count} data-open={menu.open} hidden={false}>Scalars</p></section> }`;
+<div {...menu}>Menu</div><div data-menu={menu}>Menu</div><div style={{ color: 'red', ...menu }}>Style</div><div id="a" id="b">Duplicate</div><button onclick={() => count++}>Bad case</button><p data-count={count} data-open={menu.open} hidden={false}>Scalars</p></section> }`;
 
 function repeatAllowSource(...sites: readonly string[]): string {
 	return `import { state } from '@markless/core'; export function App() @{ const rows = state([{ id: 'a' }]); <ul>${sites.join('\n')}</ul> }`;
