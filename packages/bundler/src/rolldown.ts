@@ -36,6 +36,7 @@ import { ModuleMetadataRegistry } from './module-metadata-registry.ts';
 import {
 	MARKLESS_VIRTUAL_PREFIX,
 	compileTsrxModuleLinkArtifact,
+	marklessVirtualModuleSourceFile,
 	resumeVirtualModuleId,
 	transformTsrxModule,
 	transformTsrxModuleWithPrerenderWakeClosure,
@@ -282,6 +283,37 @@ export function createMarklessRolldownPlugin(input: {
 		return [...renderDataIds];
 	}
 
+	// Only an owner's transform registers its generated modules, and Vite reuses a
+	// soft-invalidated owner's cached result, so a fetch can miss with nothing left to
+	// re-register it; without regenerating here Vite reads the id off disk as a filename.
+	const regeneratingVirtualModules = new Set<string>();
+	async function virtualModuleForRequest(
+		normalizedId: string,
+		currentEnvironment: MarklessEnvironment,
+	) {
+		const registered = virtualModules.get(normalizedId);
+		if (registered || internalOptions.dev !== true) return registered;
+
+		const source = marklessVirtualModuleSourceFile(normalizedId);
+		if (
+			!source ||
+			!TSRX_SOURCE_FILE.test(source) ||
+			regeneratingVirtualModules.has(normalizedId)
+		) {
+			return undefined;
+		}
+
+		regeneratingVirtualModules.add(normalizedId);
+		try {
+			// Without dropping the cached result the re-request never reaches transform.
+			internalOptions.devServer?.invalidateModule?.(source, currentEnvironment);
+			await internalOptions.devServer?.transformRequest(source, currentEnvironment);
+		} finally {
+			regeneratingVirtualModules.delete(normalizedId);
+		}
+		return virtualModules.get(normalizedId);
+	}
+
 	const plugin = {
 		api: {
 			invalidateGeneratedModules(
@@ -368,7 +400,7 @@ export function createMarklessRolldownPlugin(input: {
 					moduleSideEffects: true,
 				};
 			}
-			const virtualModule = virtualModules.get(normalized);
+			const virtualModule = await virtualModuleForRequest(normalized, getEnvironment(this));
 			if (virtualModule) {
 				const directQuery =
 					virtualModule.type === 'style' && /(?:[?&])direct(?:[=&]|$)/.test(source)
@@ -443,7 +475,7 @@ export function createMarklessRolldownPlugin(input: {
 				);
 				await moduleMetadata.sealSourceSymbolClaims(resolverSource);
 			}
-			const module = virtualModules.get(normalizedId);
+			const module = await virtualModuleForRequest(normalizedId, getEnvironment(this));
 			if (module) {
 				return virtualModuleSourceForLoad(module, {
 					dev: internalOptions.dev === true && getEnvironment(this) === 'client',

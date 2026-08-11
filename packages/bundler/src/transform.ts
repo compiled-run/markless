@@ -97,6 +97,24 @@ export async function transformTsrxModule(
 	return transformTsrxModuleWithPrerenderWakeClosure(input, false);
 }
 
+// Reads back the owner of `virtual:markless:<kind>:<encoded source>[:<detail>]`,
+// the shape every generated id above is minted in; style ids append `.css`.
+// Accepts rolldown-resolved ids (leading `\0`); null when the id carries no source.
+export function marklessVirtualModuleSourceFile(moduleId: string): string | null {
+	const bare = moduleId.startsWith('\0') ? moduleId.slice(1) : moduleId;
+	if (!bare.startsWith(MARKLESS_VIRTUAL_PREFIX)) return null;
+	const rest = bare.slice(MARKLESS_VIRTUAL_PREFIX.length);
+	const kindEnd = rest.indexOf(':');
+	if (kindEnd <= 0) return null;
+	const encoded = rest.slice(kindEnd + 1).split(':')[0].replace(/\.css$/, '');
+	if (!encoded) return null;
+	try {
+		return decodeURIComponent(encoded);
+	} catch {
+		return null;
+	}
+}
+
 // Rolldown owns linked child manifests. Keep their capability closure internal
 // instead of adding it to the consumer-facing transform input contract.
 export async function transformTsrxModuleWithPrerenderWakeClosure(
