@@ -160,12 +160,18 @@ async function editFile(server: ViteDevServer, file: string, source: string, hot
 	server.watcher.emit('change', hotFile);
 }
 
+// Vite core page-reloads a changed index.html as `{ path: '*' }` with no `triggeredBy`,
+// and `unwatch` does not reliably suppress that on linux. Only the markless plugin's
+// edit-driven reload names the file that triggered it, so only that one may be counted.
+function isEditDrivenReload(payload: unknown) {
+	const message = payload as HotPayload | undefined;
+	return message?.type === 'full-reload' && typeof message.triggeredBy === 'string';
+}
+
 async function waitForFullReloadCountAbove(send: ReturnType<typeof vi.spyOn>, count: number) {
 	let fullReloads = 0;
 	await vi.waitFor(() => {
-		fullReloads = send.mock.calls.filter(([payload]) => {
-			return (payload as HotPayload | undefined)?.type === 'full-reload';
-		}).length;
+		fullReloads = send.mock.calls.filter(([payload]) => isEditDrivenReload(payload)).length;
 		expect(fullReloads).toBeGreaterThan(count);
 	});
 	return fullReloads;

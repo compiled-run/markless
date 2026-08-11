@@ -262,6 +262,7 @@ describe('SSR browser HMR', () => {
 	test('serves the edited component to a render started on the reload signal', async () => {
 		const fixture = await createComponentSsrFixture();
 		let server: ViteDevServer | undefined;
+		let capturing = true;
 		try {
 			server = await createServer({
 				configFile: false,
@@ -285,11 +286,13 @@ describe('SSR browser HMR', () => {
 			let reloaded: Promise<string> | undefined;
 			const reloadingServer = server;
 			send.mockImplementation((payload) => {
-				if ((payload as HotPayload | undefined)?.type === 'full-reload' && !reloaded) {
-					reloaded = requestHtml(reloadingServer);
-				}
+				if (!capturing || reloaded || !isEditDrivenReload(payload)) return;
+				reloaded = requestHtml(reloadingServer);
+				// A reload arriving past the assertions leaves this render unobserved.
+				reloaded.catch(() => undefined);
 			});
 
+			sendSpuriousPageReload(server);
 			await editFile(
 				server,
 				fixture.child,
@@ -303,6 +306,7 @@ describe('SSR browser HMR', () => {
 			expect(reloaded).toBeDefined();
 			expect(await reloaded).toContain('data-child-added');
 		} finally {
+			capturing = false;
 			await server?.close();
 		}
 	});
@@ -310,6 +314,7 @@ describe('SSR browser HMR', () => {
 	test('serves the edited component to an unbarriered render started on the reload signal', async () => {
 		const fixture = await createComponentSsrFixture();
 		let server: ViteDevServer | undefined;
+		let capturing = true;
 		vi.stubEnv('MARKLESS_NO_BARRIER', '1');
 		try {
 			server = await createServer({
@@ -334,11 +339,13 @@ describe('SSR browser HMR', () => {
 			let reloaded: Promise<string> | undefined;
 			const reloadingServer = server;
 			send.mockImplementation((payload) => {
-				if ((payload as HotPayload | undefined)?.type === 'full-reload' && !reloaded) {
-					reloaded = requestHtml(reloadingServer);
-				}
+				if (!capturing || reloaded || !isEditDrivenReload(payload)) return;
+				reloaded = requestHtml(reloadingServer);
+				// A reload arriving past the assertions leaves this render unobserved.
+				reloaded.catch(() => undefined);
 			});
 
+			sendSpuriousPageReload(server);
 			await editFile(
 				server,
 				fixture.child,
@@ -352,6 +359,7 @@ describe('SSR browser HMR', () => {
 			expect(reloaded).toBeDefined();
 			expect(await reloaded).toContain('data-child-added');
 		} finally {
+			capturing = false;
 			vi.unstubAllEnvs();
 			await server?.close();
 		}
@@ -488,21 +496,31 @@ async function editFile(server: ViteDevServer, file: string, source: string, hot
 	server.watcher.emit('change', hotFile);
 }
 
+// The payload linux's watcher produces for the fixture's index.html, replayed on every
+// platform so the edit-driven filter above is load-bearing wherever the suite runs.
+function sendSpuriousPageReload(server: ViteDevServer) {
+	server.environments.client.hot.send({ type: 'full-reload', path: '*' });
+}
+
+// Vite core page-reloads a changed index.html as `{ path: '*' }` with no `triggeredBy`,
+// and `unwatch` does not reliably suppress that on linux. Only the markless plugin's
+// edit-driven reload names the file that triggered it, so only that one may be counted.
+function isEditDrivenReload(payload: unknown) {
+	const message = payload as HotPayload | undefined;
+	return message?.type === 'full-reload' && typeof message.triggeredBy === 'string';
+}
+
 async function waitForFullReloadCountAbove(send: ReturnType<typeof vi.spyOn>, count: number) {
 	let fullReloads = 0;
 	await vi.waitFor(() => {
-		fullReloads = send.mock.calls.filter(([payload]) => {
-			return (payload as HotPayload | undefined)?.type === 'full-reload';
-		}).length;
+		fullReloads = fullReloadCount(send);
 		expect(fullReloads).toBeGreaterThan(count);
 	});
 	return fullReloads;
 }
 
 function fullReloadCount(send: ReturnType<typeof vi.spyOn>) {
-	return send.mock.calls.filter(
-		([payload]) => (payload as HotPayload | undefined)?.type === 'full-reload',
-	).length;
+	return send.mock.calls.filter(([payload]) => isEditDrivenReload(payload)).length;
 }
 
 function customMessages(send: ReturnType<typeof vi.spyOn>, event: string) {
