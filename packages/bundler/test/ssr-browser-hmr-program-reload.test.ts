@@ -2,8 +2,9 @@ import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { createServer, type HotPayload, type ViteDevServer } from 'vite';
+import { createServer, type HotPayload, type Plugin, type ViteDevServer } from 'vite';
 import { markless } from '../src/vite/index.ts';
+import type { MarklessRolldownPluginApi } from '../src/types.ts';
 import { MARKLESS_DEV_ERROR_CLIENT_ID } from '../src/dev-error/index.ts';
 import { fixtureSsrHost } from '../fixtures/vite-ssr/src/dev-server.ts';
 
@@ -92,7 +93,63 @@ describe('SSR module runner program reload', () => {
 			await server?.close();
 		}
 	});
+
+	test('transforms a parent whose imported child has no current capture metadata', async () => {
+		const fixture = await createComponentSsrFixture();
+		const plugins = markless();
+		let server: ViteDevServer | undefined;
+		try {
+			server = await createServer({
+				configFile: false,
+				mode: 'ssr',
+				root: fixture.root,
+				environments: { ssr: { build: { rolldownOptions: { input: fixture.entry } } } },
+				plugins: [...plugins, fixtureSsrHost()],
+				resolve: { alias: marklessSourceAliases() },
+				server: { hmr: true, middlewareMode: true, ws: false },
+			});
+
+			// Vite page-reloads a changed index.html, and the fixture's setup writes arrive late.
+			server.watcher.unwatch(fixture.root);
+
+			expect(await requestHtml(server)).toContain('child original');
+
+			// An edit clears the child's capture metadata through this seam, and Vite can
+			// still answer a re-request for the child off its cached transform result, so
+			// nothing re-records the metadata a re-transformed parent reads.
+			await invalidateGeneratedModules(plugins)(fixture.child, 'server');
+			hardInvalidateSsrModule(server, fixture.entry);
+
+			await expect(
+				server.environments.ssr.transformRequest(fixture.entry),
+			).resolves.toBeTruthy();
+			expect(await requestHtml(server)).toContain('child original');
+		} finally {
+			await server?.close();
+		}
+	});
 });
+
+function invalidateGeneratedModules(
+	plugins: readonly Plugin[],
+): MarklessRolldownPluginApi['invalidateGeneratedModules'] {
+	const api = plugins.find((plugin) => plugin.name === 'vite-plugin-markless')?.api as
+		| Partial<MarklessRolldownPluginApi>
+		| undefined;
+	const invalidate = api?.invalidateGeneratedModules;
+	if (!invalidate) throw new Error('markless plugin does not expose invalidateGeneratedModules');
+	return invalidate;
+}
+
+// A parent only re-enters transform when its own module is hard invalidated; every
+// other module keeps whatever Vite already has for it.
+function hardInvalidateSsrModule(server: ViteDevServer, file: string) {
+	const modules = server.environments.ssr.moduleGraph.getModulesByFile(file);
+	expect(modules?.size).toBeGreaterThan(0);
+	for (const module of modules ?? []) {
+		server.environments.ssr.moduleGraph.invalidateModule(module, new Set(), Date.now(), true);
+	}
+}
 
 type ModuleFetchLog = {
 	readonly ids: string[];
@@ -142,6 +199,37 @@ async function createSsrFixture() {
 	const entry = join(src, 'root.tsrx');
 	await writeFile(entry, source);
 	return { entry, root, source };
+}
+
+async function createComponentSsrFixture() {
+	const root = await realpath(await mkdtemp(join(tmpdir(), 'markless-ssr-hmr-reload-child-')));
+	cleanupRoots.push(root);
+	const src = join(root, 'src');
+	await mkdir(src, { recursive: true });
+	await writeFile(join(root, 'index.html'), '<html><head></head><body></body></html>');
+
+	const childSource =
+		"import { state } from '@markless/core';\n\n" +
+		'export function Child({ label }) @{\n' +
+		'\tlet clicks = state(0);\n\n' +
+		'\t<section data-child>\n' +
+		'\t\t<p>{label}</p>\n' +
+		'\t\t<button data-child-button onClick={() => clicks++}>{clicks}</button>\n' +
+		'\t</section>\n}\n';
+	const child = join(src, 'child.tsrx');
+	await writeFile(child, childSource);
+
+	const source =
+		"import { state } from '@markless/core';\n" +
+		"import { Child } from './child.tsrx';\n\n" +
+		'export function App() @{\n' +
+		'\tlet count = state(0);\n\n' +
+		'\t<main>\n\t\t<button data-counter onClick={() => count++}>{count}</button>\n' +
+		'\t\t<Child label="child original" />\n\t</main>\n}\n';
+	const entry = join(src, 'root.tsrx');
+	await writeFile(entry, source);
+
+	return { child, entry, root };
 }
 
 async function requestHtml(server: ViteDevServer) {

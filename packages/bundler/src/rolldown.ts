@@ -314,6 +314,28 @@ export function createMarklessRolldownPlugin(input: {
 		return virtualModules.get(normalizedId);
 	}
 
+	// An edit clears the child's capture metadata, and Vite can answer its re-request from cache.
+	const recoveringChildMetadata = new Set<string>();
+	async function recoverImportedChildMetadata(
+		child: ImportedChild,
+		currentEnvironment: MarklessEnvironment,
+	) {
+		if (
+			!TSRX_SOURCE_FILE.test(child.source) ||
+			moduleMetadata.captureMetadataForSource(child.source) !== undefined ||
+			recoveringChildMetadata.has(child.source)
+		) {
+			return;
+		}
+		recoveringChildMetadata.add(child.source);
+		try {
+			internalOptions.devServer?.invalidateModule?.(child.source, currentEnvironment);
+			await internalOptions.devServer?.transformRequest(child.source, currentEnvironment);
+		} finally {
+			recoveringChildMetadata.delete(child.source);
+		}
+	}
+
 	const plugin = {
 		api: {
 			invalidateGeneratedModules(
@@ -841,6 +863,7 @@ export function createMarklessRolldownPlugin(input: {
 			);
 			for (const child of resolvedChildren) {
 				if (internalOptions.dev === true) {
+					await recoverImportedChildMetadata(child, currentEnvironment);
 					validateImportedChild(child, moduleMetadata);
 				}
 			}
