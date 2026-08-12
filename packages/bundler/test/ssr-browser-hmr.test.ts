@@ -85,12 +85,13 @@ describe('SSR browser HMR', () => {
 			expect(first).not.toContain('type="markless/state"');
 
 			const send = vi.spyOn(server.environments.client.hot, 'send');
+			const reloadsBeforeEdit = fullReloadCount(send, fixture.root);
 			await editFile(
 				server,
 				fixture.entry,
 				fixture.source.replace('<span>hello</span>', '<span>fresh render data</span>'),
 			);
-			await waitForFullReloadCountAbove(send, 0, fixture.root);
+			await waitForFullReloadCountAbove(send, reloadsBeforeEdit, fixture.root);
 
 			const second = await server.transformIndexHtml('/', indexHtml);
 			expect(second).toContain('<span>fresh render data</span>');
@@ -238,6 +239,7 @@ describe('SSR browser HMR', () => {
 			expect(first).not.toContain('child added');
 			expect(marklessViewPayload(first).locators).toHaveLength(5);
 
+			const reloadsBeforeEdit = fullReloadCount(send, fixture.root);
 			await editFile(
 				server,
 				fixture.child,
@@ -246,7 +248,7 @@ describe('SSR browser HMR', () => {
 					'\t\t<em data-child-added onClick={() => clicks += 2}>child added</em>\n\t</section>',
 				),
 			);
-			await waitForFullReloadCountAbove(send, 0, fixture.root);
+			await waitForFullReloadCountAbove(send, reloadsBeforeEdit, fixture.root);
 
 			const second = await requestHtml(server);
 			expect(second).toContain('data-child-added');
@@ -284,24 +286,31 @@ describe('SSR browser HMR', () => {
 			// sends its signal, which is before any server environment's pass has
 			// run. That render must not serve the modules the edit replaced.
 			let reloaded: Promise<string> | undefined;
+			// The fixture's own setup writes surface as late watcher events whose reloads
+			// are indistinguishable from the edit's, so capture arms only once the edited
+			// bytes are on disk; any reload after that starts a render of the edited tree.
+			let armed = false;
 			const reloadingServer = server;
 			send.mockImplementation((payload) => {
-				if (!capturing || reloaded || !isEditDrivenReload(payload, fixture.root)) return;
+				if (!capturing || !armed || reloaded || !isEditDrivenReload(payload, fixture.root))
+					return;
 				reloaded = requestHtml(reloadingServer);
 				// A reload arriving past the assertions leaves this render unobserved.
 				reloaded.catch(() => undefined);
 			});
 
 			sendSpuriousPageReload(server);
-			await editFile(
-				server,
+			await writeFile(
 				fixture.child,
 				fixture.childSource.replace(
 					'\t</section>',
 					'\t\t<em data-child-added>child added</em>\n\t</section>',
 				),
 			);
-			await waitForFullReloadCountAbove(send, 0, fixture.root);
+			armed = true;
+			const reloadsBeforeEmit = fullReloadCount(send, fixture.root);
+			server.watcher.emit('change', fixture.child);
+			await waitForFullReloadCountAbove(send, reloadsBeforeEmit, fixture.root);
 
 			expect(reloaded).toBeDefined();
 			expect(await reloaded).toContain('data-child-added');
@@ -337,24 +346,31 @@ describe('SSR browser HMR', () => {
 			// only thing that can keep this render off the pre-edit modules is the first
 			// pass having invalidated every environment before it sent the reload.
 			let reloaded: Promise<string> | undefined;
+			// The fixture's own setup writes surface as late watcher events whose reloads
+			// are indistinguishable from the edit's, so capture arms only once the edited
+			// bytes are on disk; any reload after that starts a render of the edited tree.
+			let armed = false;
 			const reloadingServer = server;
 			send.mockImplementation((payload) => {
-				if (!capturing || reloaded || !isEditDrivenReload(payload, fixture.root)) return;
+				if (!capturing || !armed || reloaded || !isEditDrivenReload(payload, fixture.root))
+					return;
 				reloaded = requestHtml(reloadingServer);
 				// A reload arriving past the assertions leaves this render unobserved.
 				reloaded.catch(() => undefined);
 			});
 
 			sendSpuriousPageReload(server);
-			await editFile(
-				server,
+			await writeFile(
 				fixture.child,
 				fixture.childSource.replace(
 					'\t</section>',
 					'\t\t<em data-child-added>child added</em>\n\t</section>',
 				),
 			);
-			await waitForFullReloadCountAbove(send, 0, fixture.root);
+			armed = true;
+			const reloadsBeforeEmit = fullReloadCount(send, fixture.root);
+			server.watcher.emit('change', fixture.child);
+			await waitForFullReloadCountAbove(send, reloadsBeforeEmit, fixture.root);
 
 			expect(reloaded).toBeDefined();
 			expect(await reloaded).toContain('data-child-added');
@@ -386,12 +402,17 @@ describe('SSR browser HMR', () => {
 			const send = vi.spyOn(server.environments.client.hot, 'send');
 			await requestHtml(server);
 
+			const reloadsBeforeEdit = fullReloadCount(send, fixture.root);
 			await editFile(
 				server,
 				fixture.entry,
 				fixture.source.replace('count++', 'count = count + 1'),
 			);
-			const firstReloads = await waitForFullReloadCountAbove(send, 0, fixture.root);
+			const firstReloads = await waitForFullReloadCountAbove(
+				send,
+				reloadsBeforeEdit,
+				fixture.root,
+			);
 
 			await requestHtml(server);
 

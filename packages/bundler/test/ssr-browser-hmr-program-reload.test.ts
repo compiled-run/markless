@@ -38,12 +38,13 @@ describe('SSR module runner program reload', () => {
 			const send = vi.spyOn(server.environments.client.hot, 'send');
 			expect(await requestHtml(server)).toContain('<span>hello</span>');
 
+			const reloadsBeforeEdit = fullReloadCount(send, fixture.root);
 			await editFile(
 				server,
 				fixture.entry,
 				fixture.source.replace('<span>hello</span>', '<span>fresh render data</span>'),
 			);
-			await waitForFullReloadCountAbove(send, 0, fixture.root);
+			await waitForFullReloadCountAbove(send, reloadsBeforeEdit, fixture.root);
 
 			await forceProgramReload(server, fetches);
 
@@ -77,13 +78,14 @@ describe('SSR module runner program reload', () => {
 
 			// A browser reload can leave the client environment tracking the resume-source
 			// request, so the watcher path carries a query the module graph has no file for.
+			const reloadsBeforeEdit = fullReloadCount(send, fixture.root);
 			await editFile(
 				server,
 				fixture.entry,
 				fixture.source.replace('<span>hello</span>', '<span>fresh render data</span>'),
 				`${fixture.entry}?markless-resume`,
 			);
-			await waitForFullReloadCountAbove(send, 0, fixture.root);
+			await waitForFullReloadCountAbove(send, reloadsBeforeEdit, fixture.root);
 
 			await forceProgramReload(server, fetches);
 
@@ -260,6 +262,10 @@ function isEditDrivenReload(payload: unknown, fixtureRoot: string) {
 	);
 }
 
+function fullReloadCount(send: ReturnType<typeof vi.spyOn>, fixtureRoot: string) {
+	return send.mock.calls.filter(([payload]) => isEditDrivenReload(payload, fixtureRoot)).length;
+}
+
 async function waitForFullReloadCountAbove(
 	send: ReturnType<typeof vi.spyOn>,
 	count: number,
@@ -267,7 +273,7 @@ async function waitForFullReloadCountAbove(
 ) {
 	let fullReloads = 0;
 	await vi.waitFor(() => {
-		fullReloads = send.mock.calls.filter(([payload]) => isEditDrivenReload(payload, fixtureRoot)).length;
+		fullReloads = fullReloadCount(send, fixtureRoot);
 		expect(fullReloads).toBeGreaterThan(count);
 	});
 	return fullReloads;
