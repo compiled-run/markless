@@ -1,5 +1,6 @@
 import { compileTsrxForTypeService } from '@markless/compiler/type-service';
 import type * as ts from 'typescript';
+import { compileEditorSource } from './volar.ts';
 
 type TypeScript = typeof ts;
 
@@ -266,10 +267,7 @@ export function installMarklessCompletions(
 		const tagKind = fileName.endsWith('.tsrx')
 			? tagCompletionKindAtPosition(fileName, position, name, getSourceSnapshot, info)
 			: undefined;
-		if (
-			fileName.endsWith('.tsrx') &&
-			(tagKind !== undefined || catalogNames.has(name))
-		) {
+		if (fileName.endsWith('.tsrx') && (tagKind !== undefined || catalogNames.has(name))) {
 			return {
 				name,
 				kind: tagKind
@@ -285,15 +283,7 @@ export function installMarklessCompletions(
 				],
 			};
 		}
-		return getDetails(
-			fileName,
-			position,
-			name,
-			formatOptions,
-			sourceName,
-			preferences,
-			_data,
-		);
+		return getDetails(fileName, position, name, formatOptions, sourceName, preferences, _data);
 	};
 
 	languageService.getDefinitionAndBoundSpan = (fileName, position) => {
@@ -326,11 +316,7 @@ function tagNameCompletionEntries(
 		position,
 		'<div />',
 	).source;
-	const components = componentsInScope(
-		parseableSource,
-		fileName,
-		position - typedName.length,
-	);
+	const components = componentsInScope(parseableSource, fileName, position - typedName.length);
 	const entries = [...components]
 		.sort(([left], [right]) => left.localeCompare(right))
 		.map(
@@ -448,7 +434,9 @@ function findAstAncestorsAt(
 }
 
 function isComponentScope(node: AstNode): boolean {
-	return node.type === 'Program' || node.type === 'JSXCodeBlock' || node.type === 'BlockStatement';
+	return (
+		node.type === 'Program' || node.type === 'JSXCodeBlock' || node.type === 'BlockStatement'
+	);
 }
 
 function isComponentName(name: string): boolean {
@@ -536,14 +524,15 @@ function classifyConstructContext(
 	for (const replacement of replacements) {
 		const candidate = buildClassifierCandidate(source, prefixStart, position, replacement);
 		try {
-			const compiled = compileTsrxForTypeService(candidate.source, fileName, { loose: true });
+			const selection = compileEditorSource(candidate.source, fileName, { loose: true });
+			if (selection.result.errors.length !== 0) continue;
 			const location = findAstNodeAt(
-				compiled.sourceAst as AstNode,
-				candidate.placeholderOffset,
+				selection.result.sourceAst as AstNode,
+				selection.translateOffset(candidate.placeholderOffset),
 				(node) => node.type === 'Identifier' && node.name === placeholderName,
 			);
 			if (!location) continue;
-			const classified = classifyPlaceholder(location);
+			const classified = classifyPlaceholder(location, selection.source);
 			if (classified) return classified;
 		} catch {
 			// Try the recovery shape for the next structural context.
@@ -552,7 +541,10 @@ function classifyConstructContext(
 	return 'none';
 }
 
-function classifyPlaceholder(location: AstLocation): ConstructContext | undefined {
+function classifyPlaceholder(
+	location: AstLocation,
+	selectedSource: string,
+): ConstructContext | undefined {
 	const { node, ancestors } = location;
 	const parent = ancestors.at(-1);
 	if (!parent) return 'none';
@@ -567,7 +559,23 @@ function classifyPlaceholder(location: AstLocation): ConstructContext | undefine
 		}
 		const childIndex = childrenParent.children.indexOf(parent);
 		if (childIndex < 0) return 'none';
-		const previous = childrenParent.children[childIndex - 1] as AstNode | undefined;
+		let previousIndex = childIndex - 1;
+		while (previousIndex >= 0) {
+			const trivia = childrenParent.children[previousIndex] as AstNode | undefined;
+			if (
+				trivia?.type !== 'JSXText' ||
+				trivia.start === undefined ||
+				trivia.end === undefined ||
+				trivia.start < 0 ||
+				trivia.end < trivia.start ||
+				trivia.end > selectedSource.length ||
+				!/^\s*$/u.test(selectedSource.slice(trivia.start, trivia.end))
+			) {
+				break;
+			}
+			previousIndex -= 1;
+		}
+		const previous = childrenParent.children[previousIndex] as AstNode | undefined;
 		if (previous?.type === 'JSXIfExpression') return 'after-if';
 		if (previous?.type === 'JSXForExpression') return 'after-for';
 		return 'children';
@@ -610,34 +618,10 @@ function buildClassifierCandidate(
 	position: number,
 	targetReplacement: string,
 ): { readonly source: string; readonly placeholderOffset: number } {
-	const edits: Array<{ readonly offset: number; readonly replacement: string }> = [];
-	for (const match of source.matchAll(/@(?![\w{])/g)) {
-		const offset = match.index;
-		if (offset >= prefixStart && offset < position) continue;
-		const lineStart = source.lastIndexOf('\n', offset - 1) + 1;
-		const lineBefore = source.slice(lineStart, offset);
-		const before = source.slice(Math.max(0, offset - 96), offset).trimEnd();
-		let replacement = '@{}';
-		if (lineStart === offset || '=+-*/%?:,('.includes(before.at(-1) ?? '')) replacement = '0';
-		else if (/@try\b/.test(lineBefore)) replacement = '@pending {}';
-		else if (/@switch\b/.test(lineBefore)) replacement = '@default: {}';
-		edits.push({ offset, replacement });
-	}
-
-	let candidate = source;
-	for (const edit of edits.toReversed()) {
-		candidate = `${candidate.slice(0, edit.offset)}${edit.replacement}${candidate.slice(edit.offset + 1)}`;
-	}
-	const adjustedPrefixStart =
-		prefixStart +
-		edits
-			.filter((edit) => edit.offset < prefixStart)
-			.reduce((total, edit) => total + edit.replacement.length - 1, 0);
-	const adjustedPosition = adjustedPrefixStart + (position - prefixStart);
-	candidate = `${candidate.slice(0, adjustedPrefixStart)}${targetReplacement}${candidate.slice(adjustedPosition)}`;
+	const candidate = `${source.slice(0, prefixStart)}${targetReplacement}${source.slice(position)}`;
 	return {
 		source: candidate,
-		placeholderOffset: adjustedPrefixStart + targetReplacement.indexOf(placeholderName),
+		placeholderOffset: prefixStart + targetReplacement.indexOf(placeholderName),
 	};
 }
 

@@ -1,4 +1,4 @@
-import { isEventAttribute, normalizeEventName, parseModule } from '@tsrx/core';
+import { isEventAttribute, normalizeEventName, parseModule } from 'yuku-tsrx';
 
 export type SemanticGraphInput = {
 	readonly filename: string;

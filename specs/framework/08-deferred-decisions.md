@@ -54,7 +54,7 @@ their prerequisites exist:
   nonces, and the tradeoff between extra requests and per-container
   specialization.
 - OXC/Rust/native compiler backend or parser replacement. The first compiler
-  implementation uses JS/TS with `@tsrx/core`; native migration comes only after
+  implementation uses JS/TS with the self-contained `yuku-tsrx` host; native migration comes only after
   the artifact contracts and behavior fixtures are proven.
 - Standalone build/minify/transform stacks outside Rolldown or Vite. Do not add
   esbuild, terser, Rollup, SWC, webpack, Babel build pipelines, or similar tools
@@ -191,7 +191,7 @@ functions / RPC" deferred decision, and revisit C only if B proves unwanted.
 
 1. Reactive runtime core (graph + object state + async node status/versioning) —
    pure TS, testable standalone.
-2. Compiler in JS/TS on `@tsrx/core`: pass-boundary artifacts for TSRX semantic
+2. Compiler in JS/TS on `yuku-tsrx`: pass-boundary artifacts for TSRX semantic
    graph collection, state rewriting, template/view lowering, and diagnostics
    before any end-to-end demo path.
 3. Async computed lowering + `@try`/`@pending`/`@catch` boundary lowering.

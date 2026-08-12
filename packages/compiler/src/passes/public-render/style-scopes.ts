@@ -1,5 +1,6 @@
+import postcss, { type AtRule, type Rule } from 'postcss';
+import selectorParser, { type Selector } from 'postcss-selector-parser';
 import type { AnyNode } from '../../ast/nodes.ts';
-import { asNodes } from '../../ast/nodes.ts';
 import type { CompilerDiagnostic } from '../../diagnostics.ts';
 import { unsupportedRenderConstructDiagnostic } from './diagnostics.ts';
 
@@ -55,7 +56,7 @@ export function collectStyleScopes(
 
 	for (const styleNode of styleNodes) {
 		const css = typeof styleNode.css === 'string' ? styleNode.css : null;
-		const scoped = css === null ? null : scopeSelectors(css, styleNode, scopeId);
+		const scoped = css === null ? null : scopeSelectors(css, scopeId);
 		if (scoped === null) {
 			diagnostics.push(
 				unsupportedRenderConstructDiagnostic({
@@ -79,42 +80,47 @@ export function collectStyleScopes(
 	};
 }
 
-// Splices `.mk-<hash>` after each selector's subject compound, descending
-// at-rule blocks but skipping @keyframes (whose preludes are not selectors).
-function scopeSelectors(css: string, styleNode: AnyNode, scopeId: string): string | null {
-	const insertOffsets: number[] = [];
-
-	const visitRules = (node: AnyNode | undefined, insideKeyframes: boolean): boolean => {
-		if (!node || typeof node !== 'object') return true;
-		if (node.type === 'Rule' && !insideKeyframes) {
-			const selectors = asNodes((node.prelude as AnyNode | undefined)?.children);
-			if (selectors.length === 0) return false;
-			for (const selector of selectors) {
-				if (typeof selector.end !== 'number') return false;
-				insertOffsets.push(selector.end as number);
-			}
-			return true;
-		}
-		const keyframes =
-			insideKeyframes ||
-			(node.type === 'Atrule' && String(node.name ?? '').includes('keyframes'));
-		for (const child of asNodes(
-			(node.block as AnyNode | undefined)?.children ?? node.children,
-		)) {
-			if (!visitRules(child, keyframes)) return false;
-		}
-		return true;
-	};
-
-	for (const sheet of asNodes(styleNode.children)) {
-		if (!visitRules(sheet, false)) return null;
+// Inserts `.mk-<hash>` in the rightmost subject compound before pseudos.
+// PostCSS walks ordinary nested at-rules; keyframe selectors are excluded.
+function scopeSelectors(css: string, scopeId: string): string | null {
+	try {
+		const root = postcss.parse(css);
+		root.walkRules((rule) => {
+			if (isInsideKeyframes(rule)) return;
+			rule.selector = selectorParser((selectors) => {
+				selectors.each((selector) => insertScopeClass(selector, scopeId));
+			}).processSync(rule.selector);
+		});
+		return root.toString();
+	} catch {
+		return null;
 	}
+}
 
-	let scoped = css;
-	for (const offset of [...insertOffsets].sort((left, right) => right - left)) {
-		scoped = `${scoped.slice(0, offset)}.${scopeId}${scoped.slice(offset)}`;
+function insertScopeClass(selector: Selector, scopeId: string): void {
+	let compoundStart = 0;
+	for (let index = selector.nodes.length - 1; index >= 0; index -= 1) {
+		if (selector.nodes[index]?.type === 'combinator') {
+			compoundStart = index + 1;
+			break;
+		}
 	}
-	return scoped;
+	const pseudoIndex = selector.nodes.findIndex(
+		(node, index) => index >= compoundStart && node.type === 'pseudo',
+	);
+	const scopeClass = selectorParser.className({ value: scopeId });
+	const insertionPoint = pseudoIndex === -1 ? undefined : selector.nodes[pseudoIndex];
+	if (insertionPoint) selector.insertBefore(insertionPoint, scopeClass);
+	else selector.append(scopeClass);
+}
+
+function isInsideKeyframes(rule: Rule): boolean {
+	let parent = rule.parent;
+	while (parent) {
+		if (parent.type === 'atrule' && /keyframes$/i.test((parent as AtRule).name)) return true;
+		parent = parent.parent;
+	}
+	return false;
 }
 
 // FNV-1a over the filename: stable per component module, runtime-agnostic.

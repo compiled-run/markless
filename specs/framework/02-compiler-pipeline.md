@@ -132,7 +132,7 @@ target and migration order.
 
 ### Initial compiler substrate
 
-The first implementation uses JavaScript/TypeScript with `@tsrx/core` as the
+The first implementation uses JavaScript/TypeScript with the self-contained `yuku-tsrx` host as the
 parser, semantic, and codegen-plugin substrate. This is an initial
 implementation strategy, not a permanent architectural limit: prove the
 framework behavior first, then replace compiler internals later if needed.

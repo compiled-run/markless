@@ -8,9 +8,17 @@
 		"url": "git+https://github.com/markless-dev/markless.git",
 		"directory": "packages/compiler"
 	},
+	"files": [
+		"dist"
+	],
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		".": "./src/index.ts",
+		"./type-service": "./src/type-service.ts"
+	},
 	"publishConfig": {
 		"access": "public",
-		"provenance": true,
 		"exports": {
 			".": {
 				"types": "./dist/index.d.ts",
@@ -20,22 +28,16 @@
 				"types": "./dist/type-service.d.ts",
 				"default": "./dist/type-service.js"
 			}
-		}
+		},
+		"provenance": true
 	},
-	"type": "module",
-	"sideEffects": false,
-	"exports": {
-		".": "./src/index.ts",
-		"./type-service": "./src/type-service.ts"
+	"scripts": {
+		"prepublishOnly": "node ../../scripts/release/verify-publish-ready.mjs"
 	},
 	"dependencies": {
 		"@markless/serializer": "workspace:*",
-		"@tsrx/core": "catalog:"
-	},
-	"files": [
-		"dist"
-	],
-	"scripts": {
-		"prepublishOnly": "node ../../scripts/release/verify-publish-ready.mjs"
+		"postcss": "8.5.15",
+		"postcss-selector-parser": "7.1.5",
+		"yuku-tsrx": "link:../../../yuku-tsrx/zig-out/npm/yuku-tsrx"
 	}
 }

@@ -7,6 +7,6 @@
 		".": "./src/index.ts"
 	},
 	"dependencies": {
-		"@tsrx/core": "workspace:*"
+		"yuku-tsrx": "link:../../../../yuku-tsrx/zig-out/npm/yuku-tsrx"
 	}
 }

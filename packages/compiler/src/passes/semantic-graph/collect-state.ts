@@ -1233,6 +1233,9 @@ export function evaluateSyncPolicyConstant(
 	if (!node) return { ok: false };
 
 	if (node.type === 'Literal') return { ok: true, value: node.value };
+	if (node.type === 'ParenthesizedExpression') {
+		return evaluateSyncPolicyConstant(node.expression as AnyNode | undefined);
+	}
 	if (node.type === 'ObjectExpression') return evaluateSyncPolicyConstantObjectExpression(node);
 	if (node.type === 'ArrayExpression') return evaluateSyncPolicyConstantArrayExpression(node);
 	if (node.type === 'UnaryExpression') {

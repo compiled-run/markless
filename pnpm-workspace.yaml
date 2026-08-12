@@ -3,8 +3,7 @@ packages:
     - packages/*/fixtures/*
     - demos/*
     - docs
-    # Do not add ../native-tsrx here. @tsrx/core is an external dependency
-    # boundary for this repo, and native compiler work is explicitly deferred.
+    # yuku-tsrx is consumed through the generated self-contained local host.
 
 catalogs:
     default:
@@ -12,7 +11,6 @@ catalogs:
         '@noble/hashes': ^2.2.0
         '@sveltejs/acorn-typescript': ^1.0.9
         '@thi.ng/dgraph': ^2.1.205
-        '@tsrx/core': ^0.1.32
         '@types/estree': ^1.0.8
         '@types/estree-jsx': ^1.0.5
         '@types/node': ^24.3.0

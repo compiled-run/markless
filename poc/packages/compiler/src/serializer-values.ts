@@ -1,4 +1,4 @@
-import { parseModule } from '@tsrx/core';
+import { parseModule } from 'yuku-tsrx';
 import type { SourceSpan } from './semantic-graph.ts';
 
 export type SerializerValuesInput = {

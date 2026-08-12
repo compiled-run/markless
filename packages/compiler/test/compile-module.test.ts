@@ -181,7 +181,7 @@ export default function Home() @{
 }
 `;
 
-test('compileTsrxModule wraps @tsrx/core parse SyntaxErrors as structured diagnostics', async () => {
+test('compileTsrxModule wraps yuku-tsrx parse SyntaxErrors as structured diagnostics', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/DynamicTagCall.tsrx',
 		source: `
@@ -208,9 +208,11 @@ export function App() @{
 		}),
 	]);
 	expect(result.semanticGraph.diagnostics[0]?.message).toContain(
-		'Dynamic element names must be an identifier, member expression, static string, or runtime expression; calls, spreads, string concatenation, string interpolation, and static null, undefined, boolean, number, object, and array literals are not valid tag names.',
+		'TSRX dynamic tag expression must resolve to an element name',
 	);
-	expect(result.semanticGraph.diagnostics[0]?.why).toContain('phase parse (external @tsrx/core)');
+	expect(result.semanticGraph.diagnostics[0]?.why).toContain(
+		'yuku-tsrx parser failed at phase parse',
+	);
 	expect(result.semanticGraph.diagnostics[0]?.suggestions[0]?.message).toContain(
 		'https://tsrx.dev/specification',
 	);
@@ -1099,7 +1101,9 @@ export function Dashboard() @{
 		symbols: [],
 	});
 
-	expect(result.renderData.chunks.find((chunk) => chunk.id === 'template:Dashboard')?.statics).toEqual(['<main>Chosen root</main>']);
+	expect(
+		result.renderData.chunks.find((chunk) => chunk.id === 'template:Dashboard')?.statics,
+	).toEqual(['<main>Chosen root</main>']);
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
 	const output = await (ssrModule.marklessRenderSsr as () => { readonly html: string })();
 
@@ -1706,9 +1710,7 @@ export function App() @{
 		symbols: [],
 	});
 
-	expect(result.renderData.repeats).toEqual([
-		expect.objectContaining({ repeatId: 'repeat:0' }),
-	]);
+	expect(result.renderData.repeats).toEqual([expect.objectContaining({ repeatId: 'repeat:0' })]);
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
 	const output = await (
 		ssrModule.marklessRenderSsr as () => {
@@ -1812,7 +1814,9 @@ export function App() @{
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
 	// Index-reading rows stay off the direct-DOM runtime, which cannot rewrite
 	// index text on reorder yet.
-	expect(result.renderData.repeats[0]).toEqual(expect.objectContaining({ directSupported: false }));
+	expect(result.renderData.repeats[0]).toEqual(
+		expect.objectContaining({ directSupported: false }),
+	);
 
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
 	const output = await (
@@ -1861,7 +1865,9 @@ export function App() @{
 			suppressionReason: 'static list, order never changes',
 		}),
 	]);
-	expect(result.renderData.repeats[0]).toEqual(expect.objectContaining({ directSupported: false }));
+	expect(result.renderData.repeats[0]).toEqual(
+		expect.objectContaining({ directSupported: false }),
+	);
 
 	const ssrOutput = await renderTestSsr(result);
 
@@ -1891,9 +1897,7 @@ export function App() @{
 	});
 
 	expect(result.semanticGraph.diagnostics).toEqual([]);
-	expect(result.renderData.repeats).toEqual([
-		expect.objectContaining({ repeatId: 'repeat:0' }),
-	]);
+	expect(result.renderData.repeats).toEqual([expect.objectContaining({ repeatId: 'repeat:0' })]);
 	const ssrOutput = await renderTestSsr(result);
 
 	expect(ssrOutput.html).toBe('<section><p>One</p><p>Two</p></section>');
@@ -2000,6 +2004,9 @@ export function App() @{
 		<style>
 			.card { color: red; }
 			.card h2, .title { font-size: 2rem; }
+			.card:hover::before { content: 'hover'; }
+			@media (min-width: 40rem) { .card > h2:first-child { font-weight: 700; } }
+			@KEYFRAMES pulse { from { opacity: 0; } 50% { opacity: .5; } to { opacity: 1; } }
 		</style>
 		<h2 class="title">{label}</h2>
 		<footer>Done</footer>
@@ -2020,6 +2027,15 @@ export function App() @{
 	expect(styleScope!.cssText).toContain(
 		`.card h2.${scope}, .title.${scope} { font-size: 2rem; }`,
 	);
+	expect(styleScope!.cssText).toContain(`.card.${scope}:hover::before { content: 'hover'; }`);
+	expect(styleScope!.cssText).toContain(
+		`@media (min-width: 40rem) { .card > h2.${scope}:first-child { font-weight: 700; } }`,
+	);
+	expect(styleScope!.cssText).toContain(
+		`@KEYFRAMES pulse { from { opacity: 0; } 50% { opacity: .5; } to { opacity: 1; } }`,
+	);
+	expect(styleScope!.cssText).not.toContain(`from.${scope}`);
+	expect(styleScope!.cssText).not.toContain(`50%.${scope}`);
 
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
 	const output = await (ssrModule.marklessRenderSsr as () => { readonly html: string })();
@@ -2396,7 +2412,9 @@ export function App() @{
 	// Boundary 0 contains boundary 1 (both unsupported: nested); boundary 2 is
 	// inside <article> at the top level of its parent... it is conditional-free
 	// and non-nested, so it gates supported.
-	expect(result.renderData.boundaries.filter((boundary) => boundary.protocolSupported)).toHaveLength(1);
+	expect(
+		result.renderData.boundaries.filter((boundary) => boundary.protocolSupported),
+	).toHaveLength(1);
 
 	// The runtime payload must ship ONLY anchors that the SSR emitter actually
 	// emits, re-indexed contiguously — otherwise resume throws
@@ -3050,18 +3068,22 @@ export function App() @{
 	expect(addSymbol).toBeDefined();
 	expect(deleteDraftSymbol).toBeDefined();
 	const bootstrap = result.publicRenderModule.moduleSource;
-	expect(bootstrap).toContain(JSON.stringify({
-		eventName: 'click',
-		hostNodeId: addSymbol!.hostNodeId,
-		hostPath: [0],
-		symbolIds: [addSymbol!.id],
-	}).slice(1, -1));
-	expect(bootstrap).toContain(JSON.stringify({
-		eventName: 'click',
-		hostNodeId: deleteDraftSymbol!.hostNodeId,
-		hostPath: [1],
-		symbolIds: [deleteDraftSymbol!.id],
-	}).slice(1, -1));
+	expect(bootstrap).toContain(
+		JSON.stringify({
+			eventName: 'click',
+			hostNodeId: addSymbol!.hostNodeId,
+			hostPath: [0],
+			symbolIds: [addSymbol!.id],
+		}).slice(1, -1),
+	);
+	expect(bootstrap).toContain(
+		JSON.stringify({
+			eventName: 'click',
+			hostNodeId: deleteDraftSymbol!.hostNodeId,
+			hostPath: [1],
+			symbolIds: [deleteDraftSymbol!.id],
+		}).slice(1, -1),
+	);
 	/* retired plan projection previously duplicated these records:
 	expect([]).toEqual([
 		{
@@ -3836,7 +3858,9 @@ export function Scoreboard() @{
 
 	expect(incrementSymbol).toBeDefined();
 	expect(incrementModule).toBeDefined();
-	expect(result.renderData.chunks.find((chunk) => chunk.id === 'template:Scoreboard')?.slots).toContainEqual(
+	expect(
+		result.renderData.chunks.find((chunk) => chunk.id === 'template:Scoreboard')?.slots,
+	).toContainEqual(
 		expect.objectContaining({
 			kind: 'text',
 			residue: { kind: 'graph-read', graphNodeId: 'state:score', path: ['total'] },
@@ -4453,9 +4477,7 @@ let entries = state([]);
 		symbols: [],
 	});
 
-	expect(result.renderData.repeats).toEqual([
-		expect.objectContaining({ repeatId: 'repeat:0' }),
-	]);
+	expect(result.renderData.repeats).toEqual([expect.objectContaining({ repeatId: 'repeat:0' })]);
 	expect(result.publicRenderModule.moduleSource).toBe('');
 });
 
@@ -5273,9 +5295,7 @@ export function App() @{
 	});
 
 	expect(result.semanticGraph.diagnostics).toEqual([]);
-	expect(result.renderData.repeats).toEqual([
-		expect.objectContaining({ repeatId: 'repeat:0' }),
-	]);
+	expect(result.renderData.repeats).toEqual([expect.objectContaining({ repeatId: 'repeat:0' })]);
 	expect(result.publicRenderModule.rootExportName).toBe('App');
 	expect(result.publicRenderModule.moduleSource).toContain(
 		'"rowBehaviors":[{"hostPath":[],"symbolId":"symbol:5"',

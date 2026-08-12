@@ -1,4 +1,4 @@
-import { isEventAttribute, normalizeEventName, parseModule } from '@tsrx/core';
+import { isEventAttribute, normalizeEventName, parseModule } from 'yuku-tsrx';
 import type { SourceSpan } from './semantic-graph.ts';
 
 export type SyncEventPolicyInput = {

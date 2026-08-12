@@ -1,4 +1,4 @@
-import { parseModule } from '@tsrx/core';
+import { parseModule } from '../../yuku-tsrx-adapter.ts';
 import { childNodes, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { getElementTagName, isHostTagName } from '../../ast/tsrx.ts';
 import { parseJavaScriptModule } from '../../js-ast.ts';
@@ -71,28 +71,35 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 			const found = boundaryNodes[index];
 			const resolution = boundaryRunners.get(boundary.id);
 			if (!found || !resolution) return [];
-			if (resolution.reads.length === 0 && resolution.unresolvedSources.length === 0) return [];
+			if (resolution.reads.length === 0 && resolution.unresolvedSources.length === 0)
+				return [];
 			const runner = input.symbolResolver.symbols.find(
 				(symbol) =>
-					(symbol.kind === 'async-computed-runner' || symbol.kind === 'sync-computed-derive') &&
+					(symbol.kind === 'async-computed-runner' ||
+						symbol.kind === 'sync-computed-derive') &&
 					symbol.graphNodeId === resolution.runnerGraphNodeId,
 			);
 			if (resolution.runnerGraphNodeId && runner) return [];
 			const readNames = resolution.reads.map((item) => `"${item.source}"`);
-			return [gatePlanDisagreementDiagnostic({
-				label: '@try',
-				message: readNames.length > 1
-					? `This @try block reads more than one async value (${readNames.join(', ')}), so one runner cannot safely bind every name used by its settled content.`
-					: 'This @try block has no single resolvable async computed read, so no runner can settle its rendered content.',
-				node: found.node,
-				filename: input.source.filename,
-				suggestion: 'Make the @try content read one async computed value directly. Deriving additional values inside a settled browser arm is not supported yet.',
-			})];
+			return [
+				gatePlanDisagreementDiagnostic({
+					label: '@try',
+					message:
+						readNames.length > 1
+							? `This @try block reads more than one async value (${readNames.join(', ')}), so one runner cannot safely bind every name used by its settled content.`
+							: 'This @try block has no single resolvable async computed read, so no runner can settle its rendered content.',
+					node: found.node,
+					filename: input.source.filename,
+					suggestion:
+						'Make the @try content read one async computed value directly. Deriving additional values inside a settled browser arm is not supported yet.',
+				}),
+			];
 		},
 	);
 	const branchNodes: AnyNode[] = [];
 	walkNode(selectedRoot.root, (node) => {
-		if (node.type === 'JSXIfExpression' || node.type === 'JSXSwitchExpression') branchNodes.push(node);
+		if (node.type === 'JSXIfExpression' || node.type === 'JSXSwitchExpression')
+			branchNodes.push(node);
 	});
 	const armEscalationDiagnostics = input.semanticGraph.branchSites.flatMap((site, index) => {
 		if (!site.asyncBoundaryId) return [];
@@ -102,12 +109,14 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 			.some((chunk) => chunk.slots.some((slot) => slot.kind === 'child-component'));
 		const componentName = branchNode ? firstComponentName(branchNode) : null;
 		if (!branchNode || !containsComponent || !componentName) return [];
-		return [tryBlockToggleRerenderDiagnostic({
-			branchLabel: site.kind === 'switch' ? '@switch' : '@if',
-			componentName,
-			node: branchNode,
-			filename: input.source.filename,
-		})];
+		return [
+			tryBlockToggleRerenderDiagnostic({
+				branchLabel: site.kind === 'switch' ? '@switch' : '@if',
+				componentName,
+				node: branchNode,
+				filename: input.source.filename,
+			}),
+		];
 	});
 	return {
 		passId: 'public-render-plan',
@@ -119,10 +128,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 				selectedRoot.componentName,
 				input.source.filename,
 			),
-			...collectUnsupportedConstructDiagnostics(
-				selectedRoot.root,
-				input.source.filename,
-			),
+			...collectUnsupportedConstructDiagnostics(selectedRoot.root, input.source.filename),
 			...collectChildrenOpacityDiagnostics(ast, input.source.filename),
 			...boundaryRunnerDiagnostics,
 			...armEscalationDiagnostics,
@@ -155,7 +161,8 @@ function stripExtractedSyncPolicyCalls(
 				symbol.kind !== 'event-handler' ||
 				symbol.hostNodeId !== event.hostNodeId ||
 				symbol.eventName !== event.eventName
-			) continue;
+			)
+				continue;
 			const stripped = stripSyncPolicyCallsFromHandlerSource(
 				symbol.source,
 				symbol.parameters[0] ?? 'event',
@@ -191,7 +198,8 @@ function stripSyncPolicyCallsFromHandlerSource(
 				(node.type === 'ArrowFunctionExpression' ||
 					node.type === 'FunctionExpression' ||
 					node.type === 'FunctionDeclaration')
-			) handler = node;
+			)
+				handler = node;
 		});
 	} catch {
 		return source;
@@ -202,7 +210,11 @@ function stripSyncPolicyCallsFromHandlerSource(
 		source: wrappedSource,
 	})
 		.flatMap((node) =>
-			removableCallSpan(source, (node.start ?? 0) - prefix.length, (node.end ?? 0) - prefix.length),
+			removableCallSpan(
+				source,
+				(node.start ?? 0) - prefix.length,
+				(node.end ?? 0) - prefix.length,
+			),
 		)
 		.sort((left, right) => right.start - left.start);
 	let stripped = source;

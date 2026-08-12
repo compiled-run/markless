@@ -76,7 +76,7 @@ JSX/TSX is explicitly **not** supported.
 
 Four implementation areas:
 
-1. **Compiler** — first implemented in JS/TS on `@tsrx/core` as a TSRX codegen
+1. **Compiler** — first implemented in JS/TS on the self-contained `yuku-tsrx` host as a TSRX codegen
    plugin (the framework is a TSRX compile target, alongside React/Solid/Vue
    targets). Responsible for: rewriting state reads and writes, compiling
    templates to DOM instructions, extracting closures into lazily-loadable

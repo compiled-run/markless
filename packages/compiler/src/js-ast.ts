@@ -1,4 +1,4 @@
-import { parseModule } from '@tsrx/core';
+import { parseModule } from './yuku-tsrx-adapter.ts';
 
 export type JavaScriptAstNode = {
 	readonly type?: string;

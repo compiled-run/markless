@@ -1,4 +1,4 @@
-import { isEventAttribute } from '@tsrx/core';
+import { isEventAttribute } from '../../yuku-tsrx-adapter.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
@@ -101,7 +101,8 @@ export function collectSemanticMarkup(input: {
 	}
 
 	for (const component of components) {
-		context.styleScopeClass = collectStyleScopes(component.root, input.filename).styleScopes[0]?.scopeId ?? null;
+		context.styleScopeClass =
+			collectStyleScopes(component.root, input.filename).styleScopes[0]?.scopeId ?? null;
 		const builder = createChunk(`template:${component.name}`, 'template', component.name);
 		emitNode(component.root, [0], builder, context, null);
 		chunks.push(finishChunk(builder));
@@ -292,9 +293,10 @@ function emitNode(
 		const projected = asNodes(node.children).filter(
 			(child) => !isIgnorableStaticTextNode(child),
 		);
-		const projectionChunkId = projected.length > 0
-			? `projection:${edge?.id ?? `${tagName}:${span?.start ?? 0}`}`
-			: undefined;
+		const projectionChunkId =
+			projected.length > 0
+				? `projection:${edge?.id ?? `${tagName}:${span?.start ?? 0}`}`
+				: undefined;
 		if (projectionChunkId) {
 			const projection = createChunk(
 				projectionChunkId,
@@ -366,7 +368,10 @@ function emitNode(
 		const expression = unwrapExpressionContainer(value);
 		const literal = staticAttributeValue(value, expression);
 		if (literal !== null) {
-			append(builder, ` ${name}="${escapeAttribute(name === 'class' && context.styleScopeClass ? `${literal} ${context.styleScopeClass}` : literal)}"`);
+			append(
+				builder,
+				` ${name}="${escapeAttribute(name === 'class' && context.styleScopeClass ? `${literal} ${context.styleScopeClass}` : literal)}"`,
+			);
 			continue;
 		}
 		if (!expression) continue;
@@ -406,7 +411,8 @@ function isElementHandleIdref(context: CollectionContext, node: AnyNode, name: s
 	);
 }
 
-function directClassMatch(expression: AnyNode,
+function directClassMatch(
+	expression: AnyNode,
 	context: CollectionContext,
 	repeat: { readonly id: string; readonly itemName: string },
 ) {
@@ -422,10 +428,14 @@ function directClassMatch(expression: AnyNode,
 	const consequent = expression.consequent as AnyNode | undefined;
 	const alternate = expression.alternate as AnyNode | undefined;
 	if (
-		!graph || !item ||
-		consequent?.type !== 'Literal' || typeof consequent.value !== 'string' ||
-		alternate?.type !== 'Literal' || typeof alternate.value !== 'string'
-	) return undefined;
+		!graph ||
+		!item ||
+		consequent?.type !== 'Literal' ||
+		typeof consequent.value !== 'string' ||
+		alternate?.type !== 'Literal' ||
+		typeof alternate.value !== 'string'
+	)
+		return undefined;
 	return {
 		stateGraphNodeId: graph.graphNodeId,
 		statePath: graph.path,
@@ -569,11 +579,7 @@ function expressionResidue(
 		}
 	}
 	const resolved = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(source)
-		? resolveGraphPath(
-				source,
-				graphBindingMap(context.graph),
-				semanticAliasMap(context.graph),
-			)
+		? resolveGraphPath(source, graphBindingMap(context.graph), semanticAliasMap(context.graph))
 		: null;
 	if (resolved) {
 		return { kind: 'graph-read', graphNodeId: resolved.binding.id, path: resolved.path };
