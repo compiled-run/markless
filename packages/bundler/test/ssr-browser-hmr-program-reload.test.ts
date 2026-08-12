@@ -43,7 +43,7 @@ describe('SSR module runner program reload', () => {
 				fixture.entry,
 				fixture.source.replace('<span>hello</span>', '<span>fresh render data</span>'),
 			);
-			await waitForFullReloadCountAbove(send, 0);
+			await waitForFullReloadCountAbove(send, 0, fixture.root);
 
 			await forceProgramReload(server, fetches);
 
@@ -83,7 +83,7 @@ describe('SSR module runner program reload', () => {
 				fixture.source.replace('<span>hello</span>', '<span>fresh render data</span>'),
 				`${fixture.entry}?markless-resume`,
 			);
-			await waitForFullReloadCountAbove(send, 0);
+			await waitForFullReloadCountAbove(send, 0, fixture.root);
 
 			await forceProgramReload(server, fetches);
 
@@ -251,15 +251,23 @@ async function editFile(server: ViteDevServer, file: string, source: string, hot
 // Vite core page-reloads a changed index.html as `{ path: '*' }` with no `triggeredBy`,
 // and `unwatch` does not reliably suppress that on linux. Only the markless plugin's
 // edit-driven reload names the file that triggered it, so only that one may be counted.
-function isEditDrivenReload(payload: unknown) {
+function isEditDrivenReload(payload: unknown, fixtureRoot: string) {
 	const message = payload as HotPayload | undefined;
-	return message?.type === 'full-reload' && typeof message.triggeredBy === 'string';
+	return (
+		message?.type === 'full-reload' &&
+		typeof message.triggeredBy === 'string' &&
+		message.triggeredBy.startsWith(fixtureRoot)
+	);
 }
 
-async function waitForFullReloadCountAbove(send: ReturnType<typeof vi.spyOn>, count: number) {
+async function waitForFullReloadCountAbove(
+	send: ReturnType<typeof vi.spyOn>,
+	count: number,
+	fixtureRoot: string,
+) {
 	let fullReloads = 0;
 	await vi.waitFor(() => {
-		fullReloads = send.mock.calls.filter(([payload]) => isEditDrivenReload(payload)).length;
+		fullReloads = send.mock.calls.filter(([payload]) => isEditDrivenReload(payload, fixtureRoot)).length;
 		expect(fullReloads).toBeGreaterThan(count);
 	});
 	return fullReloads;

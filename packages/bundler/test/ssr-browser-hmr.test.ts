@@ -90,7 +90,7 @@ describe('SSR browser HMR', () => {
 				fixture.entry,
 				fixture.source.replace('<span>hello</span>', '<span>fresh render data</span>'),
 			);
-			await waitForFullReloadCountAbove(send, 0);
+			await waitForFullReloadCountAbove(send, 0, fixture.root);
 
 			const second = await server.transformIndexHtml('/', indexHtml);
 			expect(second).toContain('<span>fresh render data</span>');
@@ -121,7 +121,7 @@ describe('SSR browser HMR', () => {
 			const send = vi.spyOn(server.environments.client.hot, 'send');
 			const html = await requestHtml(server);
 			expect(html).toContain(`/@id/__x00__${MARKLESS_DEV_ERROR_CLIENT_ID}`);
-			const reloadsBefore = fullReloadCount(send);
+			const reloadsBefore = fullReloadCount(send, fixture.root);
 
 			await editFile(
 				server,
@@ -136,7 +136,7 @@ describe('SSR browser HMR', () => {
 					kind: 'compile',
 				});
 			});
-			expect(fullReloadCount(send)).toBe(reloadsBefore);
+			expect(fullReloadCount(send, fixture.root)).toBe(reloadsBefore);
 
 			await editFile(server, fixture.entry, fixture.source.replace('count++', 'count += 4'));
 			await vi.waitFor(() => {
@@ -155,7 +155,7 @@ describe('SSR browser HMR', () => {
 			});
 			expect(customMessages(send, MARKLESS_DEV_ERROR_EVENT)).toHaveLength(1);
 			expect(customMessages(send, MARKLESS_DEV_ERROR_CLEAR_EVENT)).toHaveLength(1);
-			expect(fullReloadCount(send) - reloadsBefore).toBe(1);
+			expect(fullReloadCount(send, fixture.root) - reloadsBefore).toBe(1);
 		} finally {
 			await server?.close();
 		}
@@ -246,7 +246,7 @@ describe('SSR browser HMR', () => {
 					'\t\t<em data-child-added onClick={() => clicks += 2}>child added</em>\n\t</section>',
 				),
 			);
-			await waitForFullReloadCountAbove(send, 0);
+			await waitForFullReloadCountAbove(send, 0, fixture.root);
 
 			const second = await requestHtml(server);
 			expect(second).toContain('data-child-added');
@@ -286,7 +286,7 @@ describe('SSR browser HMR', () => {
 			let reloaded: Promise<string> | undefined;
 			const reloadingServer = server;
 			send.mockImplementation((payload) => {
-				if (!capturing || reloaded || !isEditDrivenReload(payload)) return;
+				if (!capturing || reloaded || !isEditDrivenReload(payload, fixture.root)) return;
 				reloaded = requestHtml(reloadingServer);
 				// A reload arriving past the assertions leaves this render unobserved.
 				reloaded.catch(() => undefined);
@@ -301,7 +301,7 @@ describe('SSR browser HMR', () => {
 					'\t\t<em data-child-added>child added</em>\n\t</section>',
 				),
 			);
-			await waitForFullReloadCountAbove(send, 0);
+			await waitForFullReloadCountAbove(send, 0, fixture.root);
 
 			expect(reloaded).toBeDefined();
 			expect(await reloaded).toContain('data-child-added');
@@ -339,7 +339,7 @@ describe('SSR browser HMR', () => {
 			let reloaded: Promise<string> | undefined;
 			const reloadingServer = server;
 			send.mockImplementation((payload) => {
-				if (!capturing || reloaded || !isEditDrivenReload(payload)) return;
+				if (!capturing || reloaded || !isEditDrivenReload(payload, fixture.root)) return;
 				reloaded = requestHtml(reloadingServer);
 				// A reload arriving past the assertions leaves this render unobserved.
 				reloaded.catch(() => undefined);
@@ -354,7 +354,7 @@ describe('SSR browser HMR', () => {
 					'\t\t<em data-child-added>child added</em>\n\t</section>',
 				),
 			);
-			await waitForFullReloadCountAbove(send, 0);
+			await waitForFullReloadCountAbove(send, 0, fixture.root);
 
 			expect(reloaded).toBeDefined();
 			expect(await reloaded).toContain('data-child-added');
@@ -391,7 +391,7 @@ describe('SSR browser HMR', () => {
 				fixture.entry,
 				fixture.source.replace('count++', 'count = count + 1'),
 			);
-			const firstReloads = await waitForFullReloadCountAbove(send, 0);
+			const firstReloads = await waitForFullReloadCountAbove(send, 0, fixture.root);
 
 			await requestHtml(server);
 
@@ -403,7 +403,7 @@ describe('SSR browser HMR', () => {
 				// resume-source request rather than the bare TSRX module.
 				`${fixture.entry}?markless-resume`,
 			);
-			await waitForFullReloadCountAbove(send, firstReloads);
+			await waitForFullReloadCountAbove(send, firstReloads, fixture.root);
 		} finally {
 			await server?.close();
 		}
@@ -505,22 +505,30 @@ function sendSpuriousPageReload(server: ViteDevServer) {
 // Vite core page-reloads a changed index.html as `{ path: '*' }` with no `triggeredBy`,
 // and `unwatch` does not reliably suppress that on linux. Only the markless plugin's
 // edit-driven reload names the file that triggered it, so only that one may be counted.
-function isEditDrivenReload(payload: unknown) {
+function isEditDrivenReload(payload: unknown, fixtureRoot: string) {
 	const message = payload as HotPayload | undefined;
-	return message?.type === 'full-reload' && typeof message.triggeredBy === 'string';
+	return (
+		message?.type === 'full-reload' &&
+		typeof message.triggeredBy === 'string' &&
+		message.triggeredBy.startsWith(fixtureRoot)
+	);
 }
 
-async function waitForFullReloadCountAbove(send: ReturnType<typeof vi.spyOn>, count: number) {
+async function waitForFullReloadCountAbove(
+	send: ReturnType<typeof vi.spyOn>,
+	count: number,
+	fixtureRoot: string,
+) {
 	let fullReloads = 0;
 	await vi.waitFor(() => {
-		fullReloads = fullReloadCount(send);
+		fullReloads = fullReloadCount(send, fixtureRoot);
 		expect(fullReloads).toBeGreaterThan(count);
 	});
 	return fullReloads;
 }
 
-function fullReloadCount(send: ReturnType<typeof vi.spyOn>) {
-	return send.mock.calls.filter(([payload]) => isEditDrivenReload(payload)).length;
+function fullReloadCount(send: ReturnType<typeof vi.spyOn>, fixtureRoot: string) {
+	return send.mock.calls.filter(([payload]) => isEditDrivenReload(payload, fixtureRoot)).length;
 }
 
 function customMessages(send: ReturnType<typeof vi.spyOn>, event: string) {
