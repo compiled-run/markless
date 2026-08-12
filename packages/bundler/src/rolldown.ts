@@ -864,7 +864,7 @@ export function createMarklessRolldownPlugin(input: {
 			for (const child of resolvedChildren) {
 				if (internalOptions.dev === true) {
 					await recoverImportedChildMetadata(child, currentEnvironment);
-					validateImportedChild(child, moduleMetadata);
+					validateImportedChild(child, moduleMetadata, transformed.manifest);
 				}
 			}
 			const linkedChildHasBrowserTriggers = linkedChildrenHaveBrowserTriggers(
@@ -1594,8 +1594,14 @@ function importedChildKey(child: ImportedChild): string {
 	return `${child.parent}\0${child.specifier}\0${child.source}`;
 }
 
-function validateImportedChild(child: ImportedChild, metadata: ModuleMetadataRegistry) {
-	const parentMetadata = metadata.captureMetadataForSource(pathname(child.parent));
+function validateImportedChild(
+	child: ImportedChild,
+	metadata: ModuleMetadataRegistry,
+	parentManifest?: Pick<MarklessTransformManifest, 'captureMetadata'>,
+) {
+	// A parent mid-transform is not in the registry yet; validate against the pass it is minting.
+	const parentMetadata =
+		parentManifest?.captureMetadata ?? metadata.captureMetadataForSource(pathname(child.parent));
 	const childMetadata = metadata.captureMetadataForSource(child.source);
 	// Plain TypeScript source components (for example @markless/router's Html)
 	// are author-time helpers, not compiled TSRX artifacts. A built JavaScript
