@@ -262,6 +262,36 @@ test('the CommonJS volar entry compiles TSRX the way the host reaches it', () =>
 	expect(compiled.mappings.length).toBeGreaterThan(0);
 });
 
+// A `<` that cannot open a tag is literal markup text in TSRX, but the same character is
+// a malformed tag in TSX, so the generated document has to carry the entity instead. The
+// mappings around it must survive the three characters `&lt;` adds.
+test('escapes a literal less-than in markup text so the generated TSX type-checks', () => {
+	const source = `export function App() @{\n\t<span><3 <= x</span>\n}`;
+	const fileName = join(process.cwd(), 'packages/core/src/LessThanText.tsrx');
+	const virtualCode = new MarklessTsrxVirtualCode(fileName, ts.ScriptSnapshot.fromString(source));
+
+	expect(virtualCode.generatedCode).toContain('<span>&lt;3 &lt;= x</span>');
+	expect(virtualCode.generatedCode).not.toMatch(/<span><3/);
+	expect(formatDiagnostics(typeCheckVirtualSource(fileName, virtualCode.generatedCode))).toEqual(
+		[],
+	);
+
+	// The `&lt;` grows only the mapping that covers the text; every other mapping,
+	// including the tag punctuation on either side, still points at its own source text.
+	const pairs = virtualCode.mappings.map((mapping) => ({
+		source: source.slice(mapping.sourceOffsets[0], mapping.sourceOffsets[0] + mapping.lengths[0]),
+		generated: virtualCode.generatedCode.slice(
+			mapping.generatedOffsets[0],
+			mapping.generatedOffsets[0] + mapping.generatedLengths[0],
+		),
+	}));
+
+	expect(pairs).toContainEqual({ source: '<3 <= x', generated: '&lt;3 &lt;= x' });
+	for (const tagToken of ['<', 'span', '>', '</']) {
+		expect(pairs).toContainEqual({ source: tagToken, generated: tagToken });
+	}
+});
+
 test('tsserver protocol opens configured .tsrx files without JSX or parser diagnostics', async () => {
 	const result = await runTsrxTsserverProbe();
 
@@ -304,6 +334,26 @@ test.each([
 		markup: `<div style={{ '--panel-offset': x, opacity: undefined }}>ok</div>`,
 		typechecks: true,
 	},
+	{
+		name: 'a hyphenated object style key',
+		markup: `<div style={{ 'padding-top': 6 }}>ok</div>`,
+		typechecks: true,
+	},
+	{
+		name: 'a vendor-prefixed object style key',
+		markup: `<div style={{ WebkitTransform: 'none', msGridRows: 'none' }}>ok</div>`,
+		typechecks: true,
+	},
+	{
+		name: 'a bare number length in an object style',
+		markup: `<div style={{ top: 0, width: 100 }}>ok</div>`,
+		typechecks: true,
+	},
+	{
+		name: 'a plain-object spread into an object style',
+		markup: `const base = { color: 'red', marginTop: 4 };\n\t<div style={{ ...base, color: 'blue' }}>ok</div>`,
+		typechecks: true,
+	},
 	{ name: 'a css text string', markup: `<div style="position: absolute">ok</div>`, typechecks: true },
 	{
 		name: 'an interpolated css text string',
@@ -323,6 +373,16 @@ test.each([
 	{
 		name: 'a nested object value',
 		markup: `<div style={{ nested: { x: 1 } }}>ok</div>`,
+		typechecks: false,
+	},
+	{
+		name: 'an unknown object style property',
+		markup: `<div style={{ pozition: 'absolute' }}>ok</div>`,
+		typechecks: false,
+	},
+	{
+		name: 'a bad keyword value in an object style',
+		markup: `<div style={{ position: 'relatve' }}>ok</div>`,
 		typechecks: false,
 	},
 ])('type-checks $name on the style attribute', ({ name, markup, typechecks }) => {

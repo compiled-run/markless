@@ -10,8 +10,11 @@ catalogs:
       specifier: ^2.1.205
       version: 2.1.209
     '@tsrx/core':
-      specifier: ^0.1.32
-      version: 0.1.32
+      specifier: ^0.1.58
+      version: 0.1.58
+    csstype:
+      specifier: ^3.2.3
+      version: 3.2.3
     hast-util-to-html:
       specifier: ^9.0.5
       version: 9.0.5
@@ -781,7 +784,7 @@ importers:
         version: link:../serializer
       '@tsrx/core':
         specifier: 'catalog:'
-        version: 0.1.32
+        version: 0.1.58
 
   packages/core:
     dependencies:
@@ -805,7 +808,7 @@ importers:
         version: link:../web
       '@tsrx/core':
         specifier: 'catalog:'
-        version: 0.1.32
+        version: 0.1.58
       '@virtualstate/navigation':
         specifier: 1.0.1-alpha.212
         version: 1.0.1-alpha.212
@@ -930,6 +933,9 @@ importers:
       '@tsrx/typescript-plugin':
         specifier: 0.3.112
         version: 0.3.112(typescript@5.9.3)
+      csstype:
+        specifier: 'catalog:'
+        version: 3.2.3
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1575,8 +1581,8 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  '@sveltejs/acorn-typescript@1.0.10':
-    resolution: {integrity: sha512-4WfKk68eTih+MiJD4fSbxN7E8kVBmTMPWHUPYjvl2N0rMs53YLTT8/YjKU5Dtnz5LqDjl7LEw4U7lXR2W3J5WA==}
+  '@sveltejs/acorn-typescript@1.0.13':
+    resolution: {integrity: sha512-wgKggnhZVL9Bfx1OaKKTrYY9BFRk6C8UAkQNUcIv1+llzYrIqy+RZm5HPKzn0NpEBvTVhTqB4kQyllZywsRBRQ==}
     peerDependencies:
       acorn: ^8.9.0
 
@@ -1785,8 +1791,8 @@ packages:
     resolution: {integrity: sha512-BCHXY1lTSuB8gq9t2m5rT0B6Fd8TLGXgNXZmalqAyPYczWvc9ohTiREfXpbQLy0WyNCR+PEIQfredPxkT2Hmgg==}
     engines: {node: '>=18'}
 
-  '@tsrx/core@0.1.32':
-    resolution: {integrity: sha512-1U9etl7El6rVZvSOLcA83qpzfYMHhUXteovUliYJcc68CCI5+g9gzsQNFNcNnTCcWF54udLaon+xNIzUSUyPQw==}
+  '@tsrx/core@0.1.58':
+    resolution: {integrity: sha512-2dq/PYJZ5XDZ8nshfC4QHO/UACEivKegPQ4kmyse6sgxmE7Udsh56zX4v2KlNd2DjWaR34SELS3JnVr0XQzX8A==}
 
   '@tsrx/typescript-plugin@0.3.112':
     resolution: {integrity: sha512-Ug92WES2/Dsp3U5qCXFi98WZheQKUmL6Ee9l+uYyNVPfgdQ+yQ7J+qUhrhP8m1Fd2Ijdg5dycASsppGm5AGb3w==}
@@ -2158,6 +2164,9 @@ packages:
       srvx:
         optional: true
 
+  csstype@3.2.3:
+    resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
+
   db0@0.3.4:
     resolution: {integrity: sha512-RiXXi4WaNzPTHEOu8UPQKMooIbqOEyqA1t7Z6MsdxSCeb8iUC9ko3LcmsLmeUt2SM5bctfArZKkRQggKZz7JNw==}
     peerDependencies:
@@ -2261,8 +2270,8 @@ packages:
     resolution: {integrity: sha512-WUj2qlxaQtO4g6Pq5c29GTcWGDyd8itL8zTlipgECz3JesAiiOKotd8JU6otB3PACgG6xkJUyVhboMS+bje/jA==}
     engines: {node: '>=6'}
 
-  esrap@2.2.11:
-    resolution: {integrity: sha512-gPdx+I+BjYEinNMQaBXFjbaJVyoPMU4ZODg5mE+M4DqVG9VusAVHHjcBX+zqyITlI0DIARwDMMzZwAWj36dRoQ==}
+  esrap@2.3.4:
+    resolution: {integrity: sha512-CHnJXZDfBeOAjLIGNy/0BEsmDu5+irHgUXRW9pGptxCbO3uyjJ98crilzFgiBqizW94UodjX3GAPLg/dhEnUfA==}
     peerDependencies:
       '@typescript-eslint/types': ^8.2.0
     peerDependenciesMeta:
@@ -3618,7 +3627,7 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@sveltejs/acorn-typescript@1.0.10(acorn@8.17.0)':
+  '@sveltejs/acorn-typescript@1.0.13(acorn@8.17.0)':
     dependencies:
       acorn: 8.17.0
 
@@ -3932,15 +3941,15 @@ snapshots:
       '@thi.ng/random': 4.1.52
       '@thi.ng/timestamp': 1.1.45
 
-  '@tsrx/core@0.1.32':
+  '@tsrx/core@0.1.58':
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
       '@noble/hashes': 2.2.0
-      '@sveltejs/acorn-typescript': 1.0.10(acorn@8.17.0)
+      '@sveltejs/acorn-typescript': 1.0.13(acorn@8.17.0)
       '@types/estree': 1.0.9
       '@types/estree-jsx': 1.0.5
       acorn: 8.17.0
-      esrap: 2.2.11
+      esrap: 2.3.4
       is-reference: 3.0.3
       magic-string: 0.30.21
       zimmerframe: 1.1.4
@@ -4243,6 +4252,8 @@ snapshots:
     optionalDependencies:
       srvx: 0.11.17
 
+  csstype@3.2.3: {}
+
   db0@0.3.4: {}
 
   debug@4.4.3:
@@ -4297,7 +4308,7 @@ snapshots:
 
   escalade@3.2.0: {}
 
-  esrap@2.2.11:
+  esrap@2.3.4:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
 
