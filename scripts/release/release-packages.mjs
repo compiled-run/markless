@@ -20,12 +20,12 @@ import { fileURLToPath } from 'node:url';
 export const repoRoot = resolve(fileURLToPath(import.meta.url), '../../..');
 
 /** Every packages/<dir>/package.json that parses, in directory order. */
-export function workspacePackages() {
-	return readdirSync(resolve(repoRoot, 'packages'), { withFileTypes: true })
+export function workspacePackages(root = repoRoot) {
+	return readdirSync(resolve(root, 'packages'), { withFileTypes: true })
 		.filter((entry) => entry.isDirectory())
 		.map((entry) => {
 			const directory = `packages/${entry.name}`;
-			const manifestPath = resolve(repoRoot, directory, 'package.json');
+			const manifestPath = resolve(root, directory, 'package.json');
 			let manifest;
 			try {
 				manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
@@ -39,7 +39,7 @@ export function workspacePackages() {
 				name: manifest.name,
 				dir: entry.name,
 				directory,
-				packageDir: resolve(repoRoot, directory),
+				packageDir: resolve(root, directory),
 				manifestPath,
 				version: manifest.version,
 				manifest,
@@ -49,8 +49,8 @@ export function workspacePackages() {
 }
 
 /** Packages a release publishes to the registry. */
-export function releasePackages() {
-	return workspacePackages().filter((entry) => entry.manifest.private !== true);
+export function releasePackages(root = repoRoot) {
+	return workspacePackages(root).filter((entry) => entry.manifest.private !== true);
 }
 
 /** Packages whose tarball must be verified, published or not yet. */
@@ -62,8 +62,8 @@ export function releasePackageNames() {
 	return releasePackages().map((entry) => entry.name);
 }
 
-export function rootVersion() {
-	return JSON.parse(readFileSync(resolve(repoRoot, 'package.json'), 'utf8')).version;
+export function rootVersion(root = repoRoot) {
+	return JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')).version;
 }
 
 /**
