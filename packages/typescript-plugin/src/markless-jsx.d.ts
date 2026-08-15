@@ -20,12 +20,16 @@ declare namespace __MarklessTypeService {
 	type IdrefValue = AttributeValue | globalThis.Element;
 	type StyleValue = string | number | undefined;
 	/**
-	 * The object form of `style`: camelCase CSS property names and `--custom`
-	 * properties. Property names stay open because the compiler lowers any camelCase
-	 * key, while values stay primitive so arrays and nested objects remain errors.
+	 * Named CSS properties from csstype (camelCase and hyphenated spellings) plus
+	 * open `--custom` properties. Unknown property names are errors; escape via the
+	 * string form `style="..."`. Values stay primitive so arrays and nested objects
+	 * remain errors. Length properties accept bare numbers because the compiler
+	 * appends `px` for unitful names.
 	 */
-	type StyleObject = {
-		[property: string]: StyleValue;
+	type CssProperties = import('csstype').Properties<string | number> &
+		import('csstype').PropertiesHyphen<string | number>;
+	type StyleObject = CssProperties & {
+		[property: `--${string}`]: StyleValue;
 	};
 	type Cleanup = () => void;
 	type NativeElementBehavior<E extends globalThis.Element> = (

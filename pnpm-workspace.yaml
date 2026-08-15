@@ -22,6 +22,7 @@ catalogs:
         '@vscode/vsce': ^3.9.1
         adm-zip: ^0.5.16
         acorn: ^8.15.0
+        csstype: ^3.2.3
         esrap: ^2.2.8
         hast-util-to-html: ^9.0.5
         is-reference: ^3.0.3

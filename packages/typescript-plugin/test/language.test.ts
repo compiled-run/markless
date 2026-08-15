@@ -304,6 +304,26 @@ test.each([
 		markup: `<div style={{ '--panel-offset': x, opacity: undefined }}>ok</div>`,
 		typechecks: true,
 	},
+	{
+		name: 'a hyphenated object style key',
+		markup: `<div style={{ 'padding-top': 6 }}>ok</div>`,
+		typechecks: true,
+	},
+	{
+		name: 'a vendor-prefixed object style key',
+		markup: `<div style={{ WebkitTransform: 'none', msGridRows: 'none' }}>ok</div>`,
+		typechecks: true,
+	},
+	{
+		name: 'a bare number length in an object style',
+		markup: `<div style={{ top: 0, width: 100 }}>ok</div>`,
+		typechecks: true,
+	},
+	{
+		name: 'a plain-object spread into an object style',
+		markup: `const base = { color: 'red', marginTop: 4 };\n\t<div style={{ ...base, color: 'blue' }}>ok</div>`,
+		typechecks: true,
+	},
 	{ name: 'a css text string', markup: `<div style="position: absolute">ok</div>`, typechecks: true },
 	{
 		name: 'an interpolated css text string',
@@ -323,6 +343,16 @@ test.each([
 	{
 		name: 'a nested object value',
 		markup: `<div style={{ nested: { x: 1 } }}>ok</div>`,
+		typechecks: false,
+	},
+	{
+		name: 'an unknown object style property',
+		markup: `<div style={{ pozition: 'absolute' }}>ok</div>`,
+		typechecks: false,
+	},
+	{
+		name: 'a bad keyword value in an object style',
+		markup: `<div style={{ position: 'relatve' }}>ok</div>`,
 		typechecks: false,
 	},
 ])('type-checks $name on the style attribute', ({ name, markup, typechecks }) => {
