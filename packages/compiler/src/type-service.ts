@@ -89,7 +89,6 @@ export function compileTsrxForTypeService(
 		code: generated.code,
 		mappings: generated.mappings,
 		cssMappings: collectCssMappings(sourceAst, source),
-		scriptMappings: [],
 		errors,
 		sourceAst,
 	};
