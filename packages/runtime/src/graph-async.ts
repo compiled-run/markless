@@ -4,6 +4,7 @@ import type {
 	RuntimeGraphRead,
 } from './graph.ts';
 import { readPath } from './graph-core.ts';
+import { diffDerivedValue, isDiffableContainer } from './graph-reconcile.ts';
 import type { RuntimeComputedNode } from './graph-computed.ts';
 
 export type RuntimeAsyncComputedNode = RuntimeGraphAsyncComputed & {
@@ -221,7 +222,71 @@ function publish(
 	},
 	snapshot: RuntimeGraphAsyncSnapshot,
 ): void {
+	const previous = input.node.snapshot;
 	input.node.snapshot = snapshot;
-	input.markDirtyPath(input.node.graphNodeId, []);
+	for (const path of asyncCommitPaths(input.node, previous, snapshot)) {
+		input.markDirtyPath(input.node.graphNodeId, path);
+	}
 	input.scheduleFlush();
+}
+
+/**
+ * The graph paths a snapshot commit changed. Snapshot metadata is addressed as
+ * `status`/`version`/`key`/`error`; the fulfilled value is addressed both as
+ * `value.<path>` and, for compiled reads, as the bare `<path>` (see
+ * `readAsyncComputedNode`), so a changed value path is reported in both
+ * coordinate systems.
+ *
+ * A value commit compares structurally only. Unlike a sync computed, an async
+ * snapshot can land long after the flush that wrote the state it embeds, so the
+ * write-touched record is already cleared; a runner that returns live state
+ * objects is covered by the identical-root rule below, which reports the whole
+ * node.
+ */
+function asyncCommitPaths(
+	node: RuntimeAsyncComputedNode,
+	previous: RuntimeGraphAsyncSnapshot,
+	next: RuntimeGraphAsyncSnapshot,
+): ReadonlyArray<ReadonlyArray<string>> {
+	const paths: ReadonlyArray<string>[] = [];
+	if (previous.status !== next.status) paths.push(['status']);
+	if (previous.version !== next.version) paths.push(['version']);
+	if (!Object.is(snapshotField(previous, 'key'), snapshotField(next, 'key'))) paths.push(['key']);
+	if (!Object.is(snapshotField(previous, 'error'), snapshotField(next, 'error'))) {
+		paths.push(['error']);
+	}
+
+	// A pending re-run carries the prior settled value forward, so value cells
+	// never re-check on a pending flip.
+	if (next.status === 'pending') return paths;
+
+	const previousValue = snapshotField(previous, 'value');
+	const nextValue = snapshotField(next, 'value');
+	if (
+		!Object.is(previousValue, nextValue) &&
+		isDiffableContainer(previousValue) &&
+		isDiffableContainer(nextValue)
+	) {
+		const changed = diffDerivedValue({
+			previous: previousValue,
+			next: nextValue,
+			keyed: node.reconcile?.keyed,
+		});
+		if (changed.every((path) => path.length > 0)) {
+			for (const path of changed) {
+				paths.push(['value', ...path]);
+				if (!ASYNC_SNAPSHOT_META_KEYS.has(path[0])) paths.push([...path]);
+			}
+			return paths;
+		}
+	}
+
+	// The value root was replaced by something structurally incomparable, or is
+	// the identical reference the runner was handed: nothing narrower is sound.
+	paths.push([]);
+	return paths;
+}
+
+function snapshotField(snapshot: RuntimeGraphAsyncSnapshot, field: string): unknown {
+	return (snapshot as Record<string, unknown>)[field];
 }

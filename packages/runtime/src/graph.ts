@@ -23,10 +23,23 @@ import {
 	markDirtyComputedDependencies,
 	readComputedNode,
 } from './graph-computed.ts';
+import {
+	diffDerivedValue,
+	samePath,
+	type RuntimeGraphReconcileOptions,
+} from './graph-reconcile.ts';
 import { appendJournalResult, scheduleMicrotask, type DirtyPath } from './graph-scheduler.ts';
 import { createSharedGraphPlane } from './graph-shared.ts';
 
 declare const __MARKLESS_DEBUG_ENABLED__: boolean;
+
+export type {
+	DiffDerivedValueInput,
+	RuntimeGraphReconcileKey,
+	RuntimeGraphReconcileOptions,
+	WriteTouchedRecord,
+} from './graph-reconcile.ts';
+export { diffDerivedValue } from './graph-reconcile.ts';
 
 export type RuntimeGraphCell = {
 	readonly graphNodeId: string;
@@ -45,6 +58,8 @@ export type RuntimeGraphComputed = {
 	readonly graphNodeId: string;
 	readonly dependencies: ReadonlyArray<RuntimeGraphComputedDependency>;
 	readonly compute: (read: RuntimeGraphRead) => unknown;
+	/** How re-derived values reconcile against the node's previous value. */
+	readonly reconcile?: RuntimeGraphReconcileOptions;
 };
 
 export type RuntimeGraphComputedDependencyNode = Omit<RuntimeGraphComputed, 'compute'> & {
@@ -83,6 +98,8 @@ export type RuntimeGraphAsyncComputed = {
 	readonly dependencies: ReadonlyArray<RuntimeGraphComputedDependency>;
 	readonly initialSnapshot?: RuntimeGraphAsyncSnapshot;
 	readonly key: (read: RuntimeGraphRead) => unknown;
+	/** How a fulfilled value reconciles against the previously published one. */
+	readonly reconcile?: RuntimeGraphReconcileOptions;
 	readonly run: (input: {
 		readonly key: unknown;
 		readonly signal: AbortSignal;
@@ -220,6 +237,13 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const subscriptions: RuntimeGraphSubscription[] = [];
 	const journalListeners: DomJournalListener[] = [];
 	const dirtyPaths: DirtyPath[] = [];
+	// Computed nodes a dependency write invalidated but whose changed paths are
+	// not known yet; the flush recomputes the subscribed ones (pull rule).
+	const dirtyComputedIds = new Set<string>();
+	// Objects a state write mutated in place during this flush, mapped to the
+	// paths written beneath them. Reconciliation needs it because a derived
+	// value may hold the very object a write went through.
+	const writeTouched = new Map<object, ReadonlyArray<string>[]>();
 	const journal: DomJournalEntry[] = [];
 	let flushScheduled = false;
 	let flushing = false;
@@ -230,10 +254,12 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		if (cell.readInitializer) readInitializers.set(cell.graphNodeId, cell.readInitializer);
 	}
 
+	const reconcileContext = { dirtyPaths, touched: writeTouched };
+
 	const readGraph: RuntimeGraphRead = (graphNodeId, path = []) => {
 		const computed = computedNodes.get(graphNodeId);
 		if (computed?.compute) {
-			return readComputedNode(computed, readGraph, path);
+			return readComputedNode(computed, readGraph, path, reconcileContext);
 		}
 
 		const asyncComputed = asyncComputedNodes.get(graphNodeId);
@@ -260,14 +286,39 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		return readPath(cells.get(graphNodeId), path);
 	};
 
+	// State writes mutate objects in place, so a derived value that still holds
+	// one of those objects did change even though its reference did not. Record
+	// every object container along the written path together with the part of
+	// the path left below it; reconciliation reports those remainders wherever
+	// it meets the object again.
+	const recordWriteTouched = (graphNodeId: string, path: ReadonlyArray<string>): void => {
+		if (computedNodes.has(graphNodeId)) return;
+
+		let container: unknown = cells.get(graphNodeId);
+		for (let depth = 0; depth <= path.length; depth++) {
+			if (typeof container === 'object' && container !== null) {
+				const remainders = writeTouched.get(container) ?? [];
+				const remaining = path.slice(depth);
+				if (!remainders.some((entry) => samePath(entry, remaining))) {
+					remainders.push(remaining);
+					writeTouched.set(container, remainders);
+				}
+			}
+			if (depth === path.length) break;
+			container = readPath(container, [path[depth]]);
+		}
+	};
+
 	const markDirtyPath = (graphNodeId: string, path: ReadonlyArray<string>): void => {
 		dirtyPaths.push({ graphNodeId, path });
+		recordWriteTouched(graphNodeId, path);
 		markDirtyComputedDependencies({
 			graphNodeId,
 			path,
 			computedNodes,
 			asyncComputedNodes,
 			dirtyPaths,
+			dirtyComputedIds,
 			invalidateAsyncComputed,
 		});
 	};
@@ -310,6 +361,39 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		return activeFlush;
 	};
 
+	// A dirty compute node reports its changed paths only once it recomputes,
+	// and it recomputes on demand: at flush start for the nodes something is
+	// subscribed to, lazily on read for every other node (spec 03 "no effects").
+	const recomputeSubscribedComputeds = (): void => {
+		// Snapshot: the loop deletes settled ids and a recompute may add more.
+		for (const graphNodeId of Array.from(dirtyComputedIds)) {
+			const computed = computedNodes.get(graphNodeId);
+			if (!computed?.dirty) {
+				dirtyComputedIds.delete(graphNodeId);
+				continue;
+			}
+			if (!subscriptions.some((subscription) => subscription.graphNodeId === graphNodeId)) {
+				continue;
+			}
+
+			dirtyComputedIds.delete(graphNodeId);
+			// Recompute, reconcile and swap before any subscription of this pass
+			// runs, so every subscriber of the pass reads the committed value.
+			readGraph(graphNodeId);
+		}
+	};
+
+	// Nodes still dirty when the flush ends never saw the write-touched record,
+	// so their next reconciliation cannot trust reference identity.
+	const settleReconcileBaselines = (): void => {
+		for (const graphNodeId of dirtyComputedIds) {
+			const computed = computedNodes.get(graphNodeId);
+			if (computed?.dirty) computed.baselineStale = true;
+		}
+		dirtyComputedIds.clear();
+		writeTouched.clear();
+	};
+
 	const runFlush = async (): Promise<void> => {
 		flushScheduled = false;
 		flushing = true;
@@ -317,6 +401,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		try {
 			try {
 				while (dirtyPaths.length > 0) {
+					recomputeSubscribedComputeds();
 					const pending = dirtyPaths.splice(0);
 					const ranSubscriptions = new Set<string>();
 
@@ -337,6 +422,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 					}
 				}
 			} finally {
+				settleReconcileBaselines();
 				flushing = false;
 			}
 
@@ -376,6 +462,26 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		write(write) {
 			const path = write.path ?? [];
 			const current = cells.get(write.graphNodeId);
+			const computed = computedNodes.get(write.graphNodeId);
+			if (computed && path.length === 0) {
+				// Committing a derived value: a cell-backed computed is written
+				// whole by whatever derives it, so the commit reconciles instead
+				// of comparing the root by identity.
+				const changed = diffDerivedValue({
+					previous: current,
+					next: write.value,
+					keyed: computed.reconcile?.keyed,
+					touched: writeTouched,
+					baselineStale: computed.baselineStale,
+				});
+				cells.set(write.graphNodeId, write.value);
+				computed.baselineStale = false;
+				if (changed.length === 0) return;
+
+				for (const changedPath of changed) markDirtyPath(write.graphNodeId, changedPath);
+				scheduleFlush();
+				return;
+			}
 			if (Object.is(readPath(current, path), write.value)) return;
 			cells.set(write.graphNodeId, writePath(current, path, write.value));
 			markDirtyPath(write.graphNodeId, dirtyPathForGraphWrite(current, path));
