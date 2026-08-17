@@ -31,6 +31,12 @@ export type RuntimeComputedNode = Omit<RuntimeGraphComputed, 'compute'> & {
 export type ComputedReconcileContext = {
 	readonly dirtyPaths: DirtyPath[];
 	readonly touched: WriteTouchedRecord;
+	/**
+	 * Asks the graph to flush the paths a reconciled recompute reported. A lazy
+	 * read outside a flush has no write behind it to schedule one, so without
+	 * this the subscriber of a changed path waits for the next unrelated write.
+	 */
+	readonly scheduleFlush: () => void;
 };
 
 export function createRuntimeComputedNodes(
@@ -80,8 +86,13 @@ export function readComputedNode(
 		computed.baselineStale = false;
 		// Pushed straight onto the dirty list: dependents were already flagged
 		// when the dependency write invalidated this node.
-		for (const changedPath of changed) {
-			reconcile?.dirtyPaths.push({ graphNodeId: computed.graphNodeId, path: changedPath });
+		if (reconcile && changed.length > 0) {
+			for (const changedPath of changed) {
+				reconcile.dirtyPaths.push({ graphNodeId: computed.graphNodeId, path: changedPath });
+			}
+			// Inside a flush the loop picks these up on its own; outside one only
+			// this call gets them to the subscribers. Scheduling is idempotent.
+			reconcile.scheduleFlush();
 		}
 	}
 
@@ -92,7 +103,6 @@ export function markComputedDirty(input: {
 	readonly graphNodeId: string;
 	readonly computedNodes: ReadonlyMap<string, RuntimeComputedNode>;
 	readonly asyncComputedNodes: ReadonlyMap<string, RuntimeAsyncComputedNode>;
-	readonly dirtyPaths: DirtyPath[];
 	readonly dirtyComputedIds: Set<string>;
 	readonly invalidateAsyncComputed: (node: RuntimeAsyncComputedNode) => void;
 	readonly visited: Set<string>;
@@ -134,7 +144,6 @@ export function markDirtyComputedDependencies(input: {
 	readonly path: ReadonlyArray<string>;
 	readonly computedNodes: ReadonlyMap<string, RuntimeComputedNode>;
 	readonly asyncComputedNodes: ReadonlyMap<string, RuntimeAsyncComputedNode>;
-	readonly dirtyPaths: DirtyPath[];
 	readonly dirtyComputedIds: Set<string>;
 	readonly invalidateAsyncComputed: (node: RuntimeAsyncComputedNode) => void;
 }): void {

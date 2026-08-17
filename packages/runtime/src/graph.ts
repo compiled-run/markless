@@ -22,6 +22,7 @@ import {
 	createRuntimeComputedNodes,
 	markDirtyComputedDependencies,
 	readComputedNode,
+	type ComputedReconcileContext,
 } from './graph-computed.ts';
 import {
 	diffDerivedValue,
@@ -254,7 +255,15 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		if (cell.readInitializer) readInitializers.set(cell.graphNodeId, cell.readInitializer);
 	}
 
-	const reconcileContext = { dirtyPaths, touched: writeTouched };
+	// `scheduleFlush` is declared below, so the context forwards to it instead of
+	// capturing it: the forward only runs once a read reconciles something.
+	const reconcileContext: ComputedReconcileContext = {
+		dirtyPaths,
+		touched: writeTouched,
+		scheduleFlush: () => {
+			scheduleFlush();
+		},
+	};
 
 	const readGraph: RuntimeGraphRead = (graphNodeId, path = []) => {
 		const computed = computedNodes.get(graphNodeId);
@@ -317,7 +326,6 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			path,
 			computedNodes,
 			asyncComputedNodes,
-			dirtyPaths,
 			dirtyComputedIds,
 			invalidateAsyncComputed,
 		});
@@ -463,10 +471,12 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			const path = write.path ?? [];
 			const current = cells.get(write.graphNodeId);
 			const computed = computedNodes.get(write.graphNodeId);
-			if (computed && path.length === 0) {
+			if (computed && !computed.compute && path.length === 0) {
 				// Committing a derived value: a cell-backed computed is written
 				// whole by whatever derives it, so the commit reconciles instead
-				// of comparing the root by identity.
+				// of comparing the root by identity. A compute-carrying node reads
+				// through its compute and never through the cell, so it is not a
+				// commit target and takes the plain write path below.
 				const changed = diffDerivedValue({
 					previous: current,
 					next: write.value,

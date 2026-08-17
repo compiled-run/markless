@@ -629,6 +629,82 @@ test('an unsubscribed compute node stays lazy until it is read', async () => {
 	expect(computeRuns).toBe(1);
 });
 
+/** Lets the graph's own scheduled flush run without calling `graph.flush()`. */
+function scheduledFlushSettled(): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+test('a lazy recompute outside a flush schedules the flush its changed paths need', async () => {
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: STATE, value: { first: 'a' } }],
+		computed: [
+			{
+				graphNodeId: DERIVED,
+				dependencies: [{ graphNodeId: STATE, path: [] }],
+				compute: (read) => ({ first: String(read(STATE, ['first'])).toUpperCase() }),
+			},
+		],
+	});
+	const first = subscriptionRecorder();
+
+	// The dependency write lands while nothing is subscribed, so the flush
+	// leaves the node dirty (pull rule) and consumes the flush it scheduled.
+	graph.write({ graphNodeId: STATE, path: ['first'], value: 'b' });
+	await graph.flush();
+
+	// A scope mounts afterwards and reads the node lazily, outside any flush.
+	graph.subscribe({
+		id: 'view-dom-update:first',
+		graphNodeId: DERIVED,
+		path: ['first'],
+		run: first.run,
+	});
+	expect(graph.read(DERIVED, ['first'])).toBe('B');
+
+	// The recompute reported changed paths, so it has to ask for a flush of its
+	// own: no further write is coming to carry them.
+	await scheduledFlushSettled();
+	expect(first.runs).toBe(1);
+	expect(first.values.at(-1)).toBe('B');
+});
+
+test('a root write onto a compute-carrying node leaves the computed value in charge', async () => {
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: STATE, value: { first: 'a' } }],
+		computed: [
+			{
+				graphNodeId: DERIVED,
+				dependencies: [{ graphNodeId: STATE, path: [] }],
+				compute: (read) => ({ first: String(read(STATE, ['first'])).toUpperCase() }),
+			},
+		],
+	});
+	const first = subscriptionRecorder();
+	graph.subscribe({
+		id: 'view-dom-update:first',
+		graphNodeId: DERIVED,
+		path: ['first'],
+		run: first.run,
+	});
+
+	graph.write({ graphNodeId: STATE, path: ['first'], value: 'b' });
+	await graph.flush();
+	expect(first.values.at(-1)).toBe('B');
+
+	// A compute-carrying node reads through its compute, never through the cell,
+	// so a root write must not take over the node.
+	graph.write({ graphNodeId: DERIVED, path: [], value: { first: 'hijacked' } });
+	await graph.flush();
+	expect(graph.read(DERIVED, ['first'])).toBe('B');
+	expect(graph.read(DERIVED)).toEqual({ first: 'B' });
+
+	// The node still tracks its dependency afterwards.
+	graph.write({ graphNodeId: STATE, path: ['first'], value: 'c' });
+	await graph.flush();
+	expect(graph.read(DERIVED, ['first'])).toBe('C');
+	expect(first.values.at(-1)).toBe('C');
+});
+
 test('a dependent computed reports nothing when the upstream change is outside its read', async () => {
 	const upstream = 'computed:upstream';
 	const graph = createRuntimeGraph({
