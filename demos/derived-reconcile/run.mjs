@@ -8,10 +8,15 @@ import { createFailedResult } from '../benchmarks/lib/results.mjs';
 // This benchmark counts DOM-expression re-checks, never milliseconds. One
 // re-check is one run of a `view-dom-update:*` graph subscription, which is
 // exactly what `packages/web/src/resume-runtime.ts` registers per DOM update
-// record. A single-field change to a derived collection must re-check a
-// constant number of DOM expressions; today a recomputed derived node dirties
-// its whole root path, so the count grows with N. That is the red the gates
-// below record.
+// record.
+//
+// Every case writes one field of the state source — a path write such as
+// `state.todos[i].completed`, the write a `@for` row's checkbox handler makes —
+// re-derives the whole collection from it, and counts how many DOM expressions
+// the derived node re-checked. The gate is the scaling law: one field change
+// must re-check the same number of DOM expressions at N=100 as at N=1000.
+// Before derived reconciliation a recomputed derived node dirtied its whole
+// root path, so the count grew with N.
 
 const STATE_NODE_ID = 'state-source';
 const DERIVED_NODE_ID = 'derived-view';
@@ -219,8 +224,12 @@ export function validateDerivedReconcileResultSchema(result) {
 /**
  * Rows `{ id, title, completed }` behind a derived list. Every row owns two
  * DOM-expression subscriptions (`title` and `completed`), a collection
- * subscription sits on the derived root, and exactly one row's `completed`
- * field changes.
+ * subscription sits on the derived root, and the measured change is a single
+ * state-path write to one row's `completed` field.
+ *
+ * The derive rebuilds the row that write touched and returns every other row
+ * unchanged, so exactly one derived element is a fresh object and the rest keep
+ * their identity — what a mapped `@for` collection produces.
  *
  * `computeNode: false` mirrors the production cell-backed computed: the derive
  * runs inside a demand subscription on the dependency and commits through
@@ -234,8 +243,7 @@ async function measureListCase({ size, keyed, computeNode }) {
 	}));
 	const changedIndex = Math.floor(size / 2);
 	let toggledId;
-	const derive = (todos) =>
-		todos.map((todo) => (todo.id === toggledId ? { ...todo, completed: !todo.completed } : todo));
+	const derive = (todos) => todos.map((todo) => (todo.id === toggledId ? { ...todo } : todo));
 
 	const counters = createCounters();
 	const graph = createRuntimeGraph({
@@ -245,10 +253,8 @@ async function measureListCase({ size, keyed, computeNode }) {
 				graphNodeId: DERIVED_NODE_ID,
 				dependencies: [{ graphNodeId: STATE_NODE_ID, path: [] }],
 				...(computeNode ? { compute: (read) => derive(read(STATE_NODE_ID)) } : {}),
-				// The keyed-reconcile option the runtime does not implement yet.
-				// It is carried as data so the shape is fixed before the runtime
-				// grows the behaviour; today it changes nothing, which is part of
-				// why this benchmark is red.
+				// Declares the derived root as a keyed array so reconciliation
+				// matches rows by `id` instead of by element identity.
 				...(keyed ? { reconcile: { keyed: [{ path: [], keyPath: ['id'] }] } } : {}),
 			},
 		],
@@ -268,8 +274,13 @@ async function measureListCase({ size, keyed, computeNode }) {
 
 	await warmMount(graph, rows);
 	counters.start();
+	// The derive must rebuild exactly the row the write is about to change, so
+	// the toggled id is set before the write, not inside it.
 	toggledId = rows[changedIndex].id;
-	const changeFlushMs = await changeFlush(graph, () => [...graph.read(STATE_NODE_ID)]);
+	const changeFlushMs = await changeFlush(graph, () => true, [
+		String(changedIndex),
+		'completed',
+	]);
 
 	const committed = graph.read(DERIVED_NODE_ID, [String(changedIndex), 'completed']);
 	if (committed !== true) {

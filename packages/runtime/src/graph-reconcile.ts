@@ -1,5 +1,7 @@
 import { readPath } from './graph-core.ts';
 
+declare const __MARKLESS_DEBUG_ENABLED__: boolean;
+
 /**
  * One array inside a derived value that reconciles by key instead of by
  * element identity. `path` names the array (`[]` is the derived value itself)
@@ -40,11 +42,16 @@ const WHOLE_NODE: ReadonlyArray<ReadonlyArray<string>> = Object.freeze([Object.f
  *
  * Rules (specs/framework/03-state-graph.md "Derived reconciliation"):
  * - identical references are unchanged, unless a write touched that object in
- *   this flush, in which case the touched remainders are reported;
+ *   this flush, in which case the touched remainders are reported; the same
+ *   holds when only the previous value held the written object, because an
+ *   in-place write left that baseline already carrying the new field;
  * - primitives, functions, `Map`, `Set`, `Date` and class instances are leaves;
  * - plain objects reconcile field by field;
  * - arrays reconcile by declared key, otherwise by element identity, and a
  *   length or structural mismatch reports the array's own path;
+ * - a declared key that is missing or duplicated on either side falls back to
+ *   structural reconciliation for that array, which reports the array's own
+ *   path: keys are never matched partially and an index is never identity;
  * - a missing baseline (first value, or a value whose write-touched record was
  *   already cleared) reports the whole node.
  */
@@ -61,7 +68,12 @@ export function diffDerivedValue(input: DiffDerivedValueInput): ReadonlyArray<Re
 		if (!input.touched || typeof value !== 'object' || value === null) return;
 		const remainders = input.touched.get(value);
 		if (!remainders) return;
-		for (const remaining of remainders) changed.push([...path, ...remaining]);
+		for (const remaining of remainders) {
+			const touchedPath = [...path, ...remaining];
+			// The structural comparison may have reported the same path already.
+			if (changed.some((entry) => samePath(entry, touchedPath))) continue;
+			changed.push(touchedPath);
+		}
 	}
 
 	function keyedFor(path: ReadonlyArray<string>): RuntimeGraphReconcileKey | undefined {
@@ -73,12 +85,34 @@ export function diffDerivedValue(input: DiffDerivedValueInput): ReadonlyArray<Re
 		next: ReadonlyArray<unknown>,
 		path: ReadonlyArray<string>,
 	): void {
-		if (previous.length !== next.length) {
+		// Everything this array reports lives above this mark, so a structural
+		// fallback discovered mid-walk can drop the slots it already reported:
+		// the array's own path subsumes them.
+		const mark = changed.length;
+		const fallBackToStructural = (): void => {
+			changed.length = mark;
 			changed.push(path);
+		};
+
+		if (previous.length !== next.length) {
+			fallBackToStructural();
 			return;
 		}
 
 		const keyed = keyedFor(path);
+		if (keyed) {
+			// Keyed matching is only sound when every element on both sides has
+			// a key and no key repeats. A violation on either side falls back to
+			// structural reconciliation for the whole array rather than matching
+			// the well-formed part by key and the rest by index.
+			const fault = keyFault(previous, keyed) ?? keyFault(next, keyed);
+			if (fault) {
+				reportKeyFault(path, keyed, fault);
+				fallBackToStructural();
+				return;
+			}
+		}
+
 		for (let index = 0; index < next.length; index++) {
 			const previousItem = previous[index];
 			const nextItem = next[index];
@@ -94,7 +128,7 @@ export function diffDerivedValue(input: DiffDerivedValueInput): ReadonlyArray<Re
 				// Different keys at the same slot are a structural change: the
 				// runtime never claims two elements are the same element.
 				if (!Object.is(previousKey, nextKey)) {
-					changed.push(path);
+					fallBackToStructural();
 					return;
 				}
 				walk(previousItem, nextItem, itemPath);
@@ -153,10 +187,68 @@ export function diffDerivedValue(input: DiffDerivedValueInput): ReadonlyArray<Re
 		} finally {
 			active.delete(next);
 		}
+
+		// The previous value is the baseline the node last published. A write
+		// that went through this object mutated it in place after it was
+		// published, so the comparison above compared the new value against an
+		// already-updated baseline and saw nothing: report the written
+		// remainders here (the write-touched rule, previous side).
+		emitTouched(previous, path);
 	}
 
 	walk(input.previous, input.next, []);
 	return changed;
+}
+
+/** Why an array declared keyed cannot be reconciled by key this time. */
+type KeyFault = {
+	readonly reason: 'missing' | 'duplicate';
+	readonly index: number;
+	readonly key: unknown;
+};
+
+/**
+ * Reads the declared key of every element and reports the first element that
+ * has no key or repeats one already used in the same array. Reads only; it
+ * never touches the elements it inspects.
+ */
+function keyFault(items: ReadonlyArray<unknown>, keyed: RuntimeGraphReconcileKey): KeyFault | undefined {
+	const seen = new Set<unknown>();
+	for (let index = 0; index < items.length; index++) {
+		const key = readPath(items[index], keyed.keyPath);
+		if (key === undefined) return { reason: 'missing', index, key };
+		if (seen.has(key)) return { reason: 'duplicate', index, key };
+		seen.add(key);
+	}
+
+	return undefined;
+}
+
+/**
+ * Names the array and the offending key in debug-enabled builds. Keyed
+ * reconciliation degrading to structural reconciliation is silent in
+ * production — the result is still correct, only coarser.
+ */
+function reportKeyFault(
+	path: ReadonlyArray<string>,
+	keyed: RuntimeGraphReconcileKey,
+	fault: KeyFault,
+): void {
+	if (typeof __MARKLESS_DEBUG_ENABLED__ === 'undefined' || !__MARKLESS_DEBUG_ENABLED__) return;
+
+	const array = path.length === 0 ? 'the derived value' : `derived path ${path.join('.')}`;
+	const keyPath = keyed.keyPath.length === 0 ? 'the element itself' : keyed.keyPath.join('.');
+	const cause =
+		fault.reason === 'missing'
+			? `element ${fault.index} has no key at ${keyPath}`
+			: `key ${describeKey(fault.key)} at ${keyPath} is used by more than one element (element ${fault.index})`;
+	console.warn(
+		`markless: reconciling ${array} by key is not possible because ${cause}; falling back to structural reconciliation for that array.`,
+	);
+}
+
+function describeKey(key: unknown): string {
+	return typeof key === 'string' ? JSON.stringify(key) : String(key);
 }
 
 /** Plain objects and arrays are the only values reconciliation walks into. */

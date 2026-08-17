@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { createRuntimeGraph, diffDerivedValue } from '../src/index.ts';
 
 // Derived reconciliation (specs/framework/03-state-graph.md "Derived
@@ -124,6 +124,110 @@ test('a keyed slot whose key changed is structural, not a field diff', () => {
 	expect(diffDerivedValue({ previous, next, keyed: [{ path: [], keyPath: ['id'] }] })).toEqual([
 		[],
 	]);
+	// The changed key is reported as the array path even when the element it
+	// displaced also changed a field: a keyed array is matched slot by slot.
+	const alsoChanged = deepFreeze([
+		{ ...previous[0]!, completed: true },
+		{ id: 'row-9', title: 'title-1', completed: false },
+	]);
+	expect(
+		diffDerivedValue({ previous, next: alsoChanged, keyed: [{ path: [], keyPath: ['id'] }] }),
+	).toEqual([[]]);
+});
+
+test('duplicate keys disqualify the whole array from keyed reconciliation', () => {
+	const previous = deepFreeze(rows(3));
+	const keyed = [{ path: [], keyPath: ['id'] }];
+
+	// Two elements of the new value claim `row-0`. Every other element still
+	// matches by key, and one of them changed a single field — but a partially
+	// keyed array is never matched partially, so only the array path is
+	// reported.
+	const duplicatedNext = deepFreeze([
+		previous[0]!,
+		{ ...previous[1]!, id: 'row-0' },
+		{ ...previous[2]!, completed: true },
+	]);
+	expect(diffDerivedValue({ previous, next: duplicatedNext, keyed })).toEqual([[]]);
+
+	// A duplicate on the previous side alone disqualifies the array too.
+	const duplicatedPrevious = deepFreeze([
+		previous[0]!,
+		{ ...previous[1]!, id: 'row-0' },
+		previous[2]!,
+	]);
+	const changedField = deepFreeze(
+		duplicatedPrevious.map((row, index) => (index === 2 ? { ...row, completed: true } : row)),
+	);
+	expect(diffDerivedValue({ previous: duplicatedPrevious, next: changedField, keyed })).toEqual([
+		[],
+	]);
+});
+
+test('an element without a key disqualifies the whole array from keyed reconciliation', () => {
+	const previous: ReadonlyArray<unknown> = deepFreeze(rows(3) as ReadonlyArray<unknown>);
+	const keyed = [{ path: [], keyPath: ['id'] }];
+
+	// The middle element carries no `id`, so its identity is unknowable.
+	const missingKey: ReadonlyArray<unknown> = deepFreeze([
+		(previous as ReadonlyArray<Row>)[0]!,
+		{ title: 'title-1', completed: false },
+		{ ...(previous as ReadonlyArray<Row>)[2]!, completed: true },
+	] as ReadonlyArray<unknown>);
+	expect(diffDerivedValue({ previous, next: missingKey, keyed })).toEqual([[]]);
+	expect(diffDerivedValue({ previous: missingKey, next: previous, keyed })).toEqual([[]]);
+
+	// A nested keyed array reports its own path, not the root.
+	expect(
+		diffDerivedValue({
+			previous: deepFreeze({ label: 'list', rows: previous }),
+			next: deepFreeze({ label: 'list', rows: missingKey }),
+			keyed: [{ path: ['rows'], keyPath: ['id'] }],
+		}),
+	).toEqual([['rows']]);
+});
+
+test('unique present keys still reconcile field by field', () => {
+	const previous = deepFreeze(rows(3));
+	const next = deepFreeze(
+		previous.map((row, index) => (index === 2 ? { ...row, completed: true } : row)),
+	);
+
+	expect(diffDerivedValue({ previous, next, keyed: [{ path: [], keyPath: ['id'] }] })).toEqual([
+		['2', 'completed'],
+	]);
+});
+
+test('a debug-enabled build names the array path and the offending key', () => {
+	const warnings: string[] = [];
+	const warn = vi.spyOn(console, 'warn').mockImplementation((message: unknown) => {
+		warnings.push(String(message));
+	});
+	const source = rows(2);
+	const previous = deepFreeze({ rows: source });
+	const duplicated = deepFreeze({ rows: [source[0]!, { ...source[1]!, id: 'row-0' }] });
+	const missing = deepFreeze({ rows: [source[0]!, { title: 'title-1', completed: false }] });
+	const keyed = [{ path: ['rows'], keyPath: ['id'] }];
+
+	try {
+		// Production builds degrade silently: the coarser result is still right.
+		diffDerivedValue({ previous, next: duplicated, keyed });
+		expect(warnings).toEqual([]);
+
+		(globalThis as any).__MARKLESS_DEBUG_ENABLED__ = true;
+		diffDerivedValue({ previous, next: duplicated, keyed });
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain('derived path rows');
+		expect(warnings[0]).toContain('"row-0"');
+
+		diffDerivedValue({ previous, next: missing as never, keyed });
+		expect(warnings).toHaveLength(2);
+		expect(warnings[1]).toContain('derived path rows');
+		expect(warnings[1]).toContain('element 1 has no key at id');
+	} finally {
+		delete (globalThis as any).__MARKLESS_DEBUG_ENABLED__;
+		warn.mockRestore();
+	}
 });
 
 test('missing and added keys report their own path', () => {
@@ -392,6 +496,55 @@ test('an in-place write into a row the derived value shares still re-runs that r
 	expect(first.values.at(-1)).toBe(true);
 	expect(second.runs).toBe(1);
 	expect(graph.read(DERIVED, ['0'])).toBe(source[0]);
+});
+
+test('an in-place write into a row the derive function then rebuilds still re-runs that cell', async () => {
+	// The shape `demos/derived-reconcile` measures: state writes mutate the row
+	// in place, and the derive returns a fresh copy of exactly that row. The
+	// previous derived value holds the mutated row, so a field comparison sees
+	// two equal objects; the write-touched record is what keeps the cell honest.
+	const source = rows(2);
+	let rebuilt: string | undefined;
+	const graph = graphWithDemandCommittedComputed(
+		source,
+		(todos: readonly Row[]) => todos.map((todo) => (todo.id === rebuilt ? { ...todo } : todo)),
+		{ keyed: [{ path: [], keyPath: ['id'] }] },
+	);
+	const first = subscriptionRecorder();
+	const firstTitle = subscriptionRecorder();
+	const second = subscriptionRecorder();
+	graph.subscribe({
+		id: 'view-dom-update:row-0-completed',
+		graphNodeId: DERIVED,
+		path: ['0', 'completed'],
+		run: first.run,
+	});
+	graph.subscribe({
+		id: 'view-dom-update:row-0-title',
+		graphNodeId: DERIVED,
+		path: ['0', 'title'],
+		run: firstTitle.run,
+	});
+	graph.subscribe({
+		id: 'view-dom-update:row-1-completed',
+		graphNodeId: DERIVED,
+		path: ['1', 'completed'],
+		run: second.run,
+	});
+
+	graph.write({ graphNodeId: STATE, path: [], value: [...source] });
+	await graph.flush();
+	expect([first.runs, firstTitle.runs, second.runs]).toEqual([1, 1, 1]);
+
+	rebuilt = source[0]!.id;
+	graph.write({ graphNodeId: STATE, path: ['0', 'completed'], value: true });
+	await graph.flush();
+	expect(first.runs).toBe(2);
+	expect(first.values.at(-1)).toBe(true);
+	// Only the written field re-checks: the rebuilt row is not a whole-slot change.
+	expect(firstTitle.runs).toBe(1);
+	expect(second.runs).toBe(1);
+	expect(graph.read(DERIVED, ['1'])).toBe(source[1]);
 });
 
 // --- compute-carrying nodes (flush-time recompute) ------------------------

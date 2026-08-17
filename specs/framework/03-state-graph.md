@@ -134,19 +134,40 @@ previous value and invalidates only the paths that changed.
   each element. Without a declared key, arrays reconcile by element identity.
   Index is never identity on its own: two different elements at the same
   position are never reported as the same element.
+- Keys must be well formed for keyed matching to apply. In a declared-keyed
+  array, every element on both the previous and the next side must have a key
+  (reading `keyPath` must not produce `undefined`), and keys must be unique
+  within each side. If either side breaks that rule, the array falls back to
+  structural reconciliation and the array's own path is reported: the runtime
+  never matches the well-formed part by key and the rest by index, and never
+  matches by index. Falling back is silent in production because the result is
+  still correct, only coarser; a debug-enabled build reports a diagnostic naming
+  the array path and the offending key. A key that changes for the element at
+  the same slot is not a malformed array — it is an ordinary keyed mismatch,
+  which is structural and likewise reports the array's own path.
 - Reconciliation never mutates a value. It compares, replaces the node's value,
   and reports the changed paths. `computed()` stays read-only; there is no
   draft, patch, or other mutation API.
 - Object identity produced by the derive function is preserved. An element the
   derive function returned unchanged is still the same object after
   reconciliation, which is what keyed rows and element handles rely on.
-- Cost is proportional to the part of the new value that is not identical to
-  the previous one, not to the size of the value.
+- Invalidation fan-out is proportional to the changed paths: the work that
+  follows reconciliation — dirty paths, woken subscriptions, DOM updates — is
+  sized by what changed, not by the size of the value. Comparison itself is not.
+  Reconciliation still visits the containers it compares, so each array or
+  object level costs O(length) to compare, and the saving is that a subtree
+  whose reference is `Object.is`-identical to the previous one short-circuits
+  without being walked. Reconciliation makes no sublinear-comparison claim: that
+  would need change metadata from the derive function, which the compiler does
+  not supply today.
 - A derived value may share objects with the state it derives from, so in-place
   writes into those objects are detected within the same flush: the write
   records the touched object together with the path written beneath it, and
-  reconciliation reports that path even where the derived value still holds the
-  same object reference (the write-touched rule).
+  reconciliation reports that path (the write-touched rule). The rule applies
+  both where the new derived value still holds the same object reference and
+  where only the previous value held it — an in-place write leaves that previous
+  value already carrying the new field, so comparing a rebuilt copy against it
+  would otherwise see two equal objects and report nothing.
 - Async computeds reconcile the fulfilled value the same way and expose
   `status`, `version`, `key`, and `error` as separate paths, so a pending
   re-run carrying the prior value invalidates only those paths.
