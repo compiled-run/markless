@@ -818,13 +818,38 @@ test('M10 cold-start: the intrinsic contract is present at the very first reques
 		const diagnostics = await coldServer.semanticDiagnosticsSync(fixture.file);
 
 		expect(
-			diagnostics.filter((diagnostic) => [7016, 7026].includes(diagnostic.code)),
-			'M10 cold-start missing capability: the first semantic request must see the Markless JSX intrinsic contract.',
+			diagnostics.filter((diagnostic) => [7016, 7026, 2307].includes(diagnostic.code)),
+			'M10 cold-start missing capability: the first semantic request must see the Markless JSX intrinsic contract, including a resolvable csstype module for style objects.',
 		).toEqual([]);
 	} finally {
 		await coldServer.close();
 		removeFixtureProject(coldProject);
 	}
+}, 20_000);
+
+test('M10 style object completes CSS property names and keyword values', async () => {
+	const fixture = openFixture('style-completions.tsrx');
+	const propertyNames = completionNames(
+		await server.completionInfo(
+			fixture.file,
+			positionAfterMarker(fixture.marked, '/*M10_STYLE_PROP*/'),
+		),
+	);
+	const valueNames = completionNames(
+		await server.completionInfo(
+			fixture.file,
+			positionAfterMarker(fixture.marked, '/*M10_STYLE_VALUE*/'),
+		),
+	);
+
+	expect(
+		propertyNames,
+		'M10 missing capability: style object keys must complete named CSS properties.',
+	).toEqual(expect.arrayContaining(['position', 'marginTop']));
+	expect(
+		valueNames,
+		'M10 missing capability: style object values must complete CSS keyword unions.',
+	).toEqual(expect.arrayContaining(['absolute']));
 }, 20_000);
 
 test('M10 intrinsic contract accepts Markless spellings, native events, element bindings, and tag-specific attributes', async () => {

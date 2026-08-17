@@ -951,6 +951,48 @@ const n = state(base);`,
 	);
 });
 
+// A `<` in markup text opens a tag only when the next character can start one: a letter,
+// `{`, `/`, or `>`. Anything else is literal text, so `<3` and `<=` are what they look
+// like rather than a parse error. Both shapes throw `Unexpected token` before this rule.
+test('a less-than that cannot open a tag stays literal text and escapes in SSR html', async () => {
+	for (const [name, text, expected] of [
+		['digit', '<3', '&lt;3'],
+		['operator', '<= arrow', '&lt;= arrow'],
+	] as const) {
+		const result = await compileTsrxModule({
+			filename: `src/LessThan-${name}.tsrx`,
+			source: `export function App() @{\n\t<span>${text}</span>\n}\n`,
+			symbols: [],
+		});
+
+		expect(result.semanticGraph.diagnostics, name).toEqual([]);
+		expect(result.publicRenderPlan.diagnostics, name).toEqual([]);
+		expect((await renderTestSsr(result)).html, name).toBe(`<span>${expected}</span>`);
+	}
+});
+
+// An element written inside a `{ … }` expression container has its children read by a
+// different tokenizer path than bare markup text, so the rule has to hold there too.
+// Markless itself has no construct for an element inside a container and rejects the
+// shape in its own pass, but the literal `<` must reach that pass as text instead of
+// killing the file with a parse error.
+test('a less-than inside an expression container is text, not a parse error', async () => {
+	const compileContainer = async (text: string) =>
+		await compileTsrxModule({
+			filename: 'src/LessThanContainer.tsrx',
+			source: `export function App() @{\n\t<div>{<span>${text}</span>}</div>\n}\n`,
+			symbols: [],
+		});
+
+	const literal = await compileContainer('<3');
+	const plain = await compileContainer('ok');
+
+	expect(literal.semanticGraph.diagnostics).toEqual([]);
+	expect(literal.publicRenderPlan.diagnostics.map((diagnostic) => diagnostic.code)).toEqual(
+		plain.publicRenderPlan.diagnostics.map((diagnostic) => diagnostic.code),
+	);
+});
+
 test('B910 sync computed over state renders the derived value in SSR html', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/SyncComputed.tsrx',

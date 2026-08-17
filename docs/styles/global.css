@@ -1,0 +1,138 @@
+:root {
+	/* colors */
+	--ink: oklch(28% 0.015 90);
+	--yellow: oklch(88.6% 0.14 101);
+	--pink: oklch(76% 0.15 0);
+	--purple: oklch(75.4% 0.165 310);
+	--green-soft: oklch(84% 0.1 140);
+	--green-star: oklch(80% 0.155 148);
+	--paper: oklch(91.4% 0.033 79);
+
+	/* text shadow: an offset silhouette peeking out left of the glyphs, dilated
+	   past the glyph edges (text-shadow has no spread). Everything derives from
+	   this one base offset and growth radius; elements pick a color by setting
+	   --shadow-color (see the heading rule below). */
+	--shadow-x: -0.09em;
+	--shadow-y: -0.01em;
+	--shadow-grow: 0.03em;
+	--shadow-color: transparent;
+
+	/* typography */
+	/* @link https://utopia.fyi/type/calculator?c=360,18,1.2,1240,20,1.25,5,2,&s=0.75|0.5|0.25,1.5|2|3|4|6,s-l&g=s,l,xl,12 */
+	--step--2: clamp(0.7813rem, 0.7736rem + 0.0341vw, 0.8rem);
+	--step--1: clamp(0.9375rem, 0.9119rem + 0.1136vw, 1rem);
+	--step-0: clamp(1.125rem, 1.0739rem + 0.2273vw, 1.25rem);
+	--step-1: clamp(1.35rem, 1.2631rem + 0.3864vw, 1.5625rem);
+	--step-2: clamp(1.62rem, 1.4837rem + 0.6057vw, 1.9531rem);
+	--step-3: clamp(1.944rem, 1.7405rem + 0.9044vw, 2.4414rem);
+	--step-4: clamp(2.3328rem, 2.0387rem + 1.3072vw, 3.0518rem);
+	--step-5: clamp(2.7994rem, 2.384rem + 1.8461vw, 3.8147rem);
+
+	/* spacing */
+	/* @link https://utopia.fyi/space/calculator?c=360,18,1.2,1240,20,1.25,5,2,&s=0.75,1.5|2|3|4|6,s-l|m-2xl&g=s,l,xl,12 */
+	--space-xs: clamp(0.875rem, 0.8494rem + 0.1136vw, 0.9375rem);
+	--space-s: clamp(1.125rem, 1.0739rem + 0.2273vw, 1.25rem);
+	--space-m: clamp(1.6875rem, 1.6108rem + 0.3409vw, 1.875rem);
+	--space-l: clamp(2.25rem, 2.1477rem + 0.4545vw, 2.5rem);
+	--space-xl: clamp(3.375rem, 3.2216rem + 0.6818vw, 3.75rem);
+	--space-2xl: clamp(4.5rem, 4.2955rem + 0.9091vw, 5rem);
+	--space-3xl: clamp(6.75rem, 6.4432rem + 1.3636vw, 7.5rem);
+
+	/* One-up pairs */
+	--space-xs-s: clamp(0.875rem, 0.7216rem + 0.6818vw, 1.25rem);
+	--space-s-m: clamp(1.125rem, 0.8182rem + 1.3636vw, 1.875rem);
+	--space-m-l: clamp(1.6875rem, 1.3551rem + 1.4773vw, 2.5rem);
+	--space-l-xl: clamp(2.25rem, 1.6364rem + 2.7273vw, 3.75rem);
+	--space-xl-2xl: clamp(3.375rem, 2.7102rem + 2.9545vw, 5rem);
+	--space-2xl-3xl: clamp(4.5rem, 3.2727rem + 5.4545vw, 7.5rem);
+
+	/* Custom pairs */
+	--space-s-l: clamp(1.125rem, 0.5625rem + 2.5vw, 2.5rem);
+	--space-m-2xl: clamp(1.6875rem, 0.3324rem + 6.0227vw, 5rem);
+}
+
+/* Joy Elia — self-hosted under a TypeBerka Font Studio Basic License. */
+@font-face {
+	font-family: 'Joy Elia';
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src:
+		url('/fonts/JoyElia-Regular.woff2') format('woff2'),
+		url('/fonts/JoyElia-Regular.woff') format('woff');
+}
+
+@font-face {
+	font-family: 'Joy Elia';
+	font-style: normal;
+	font-weight: 700;
+	font-display: swap;
+	src:
+		url('/fonts/JoyElia-Bold.woff2') format('woff2'),
+		url('/fonts/JoyElia-Bold.woff') format('woff');
+}
+
+* {
+	font-family: 'Joy Elia';
+}
+
+body {
+	background: var(--paper);
+	color: var(--ink);
+	font-size: var(--step-0);
+	max-width: 65ch;
+	margin-inline: auto;
+	padding-inline: var(--space-s-l);
+	line-height: 145%;
+}
+
+/* The base offset plus its four corners at --shadow-grow: a solid silhouette
+   grown outward on every side. Invisible until an element sets --shadow-color. */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+	text-shadow:
+		var(--shadow-x) var(--shadow-y) 0 var(--shadow-color),
+		calc(var(--shadow-x) - var(--shadow-grow)) calc(var(--shadow-y) - var(--shadow-grow)) 0
+			var(--shadow-color),
+		calc(var(--shadow-x) - var(--shadow-grow)) calc(var(--shadow-y) + var(--shadow-grow)) 0
+			var(--shadow-color),
+		calc(var(--shadow-x) + var(--shadow-grow)) calc(var(--shadow-y) - var(--shadow-grow)) 0
+			var(--shadow-color),
+		calc(var(--shadow-x) + var(--shadow-grow)) calc(var(--shadow-y) + var(--shadow-grow)) 0
+			var(--shadow-color);
+}
+
+h1 {
+	font-size: var(--step-5);
+	--shadow-color: var(--pink);
+	line-height: 120%;
+}
+
+/* Paper grain over the whole viewport */
+body::before,
+body::after {
+	content: '';
+	position: fixed;
+	inset: 0;
+	z-index: 999999999;
+	pointer-events: none;
+}
+
+/* Fiber layer: continuous tooth pressed into everything via overlay. */
+body::before {
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.3' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0 0 0 0 1'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='1.5' intercept='-0.25'/%3E%3CfeFuncG type='linear' slope='1.5' intercept='-0.25'/%3E%3CfeFuncB type='linear' slope='1.5' intercept='-0.25'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23grain)'/%3E%3C/svg%3E");
+	mix-blend-mode: overlay;
+	opacity: 0.55;
+}
+
+/* Speck layer: hard-light keys off the noise itself, so its bright flecks
+   punch through dark ink the way paper tooth shows through print. */
+body::after {
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.3' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0 0 0 0 1'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='2.6' intercept='-0.8'/%3E%3CfeFuncG type='linear' slope='2.6' intercept='-0.8'/%3E%3CfeFuncB type='linear' slope='2.6' intercept='-0.8'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23grain)'/%3E%3C/svg%3E");
+	mix-blend-mode: hard-light;
+	opacity: 0.22;
+}

@@ -91,7 +91,11 @@ nav h1 {
 	color: var(--text-primary);
 	min-height: 2.5rem;
 	padding: 0.5rem;
+	/* Opening the library shifts the nav left by the sheet width, which can slide
+	   this button under the fixed mini video shell. Stay above both overlays. */
+	position: relative;
 	transition: all 0.3s ease;
+	z-index: 40;
 }
 
 .library-button:hover {
@@ -494,11 +498,6 @@ input[type='range']::-moz-range-thumb {
 @media screen and (max-width: 768px) {
 	.App.library-active {
 		margin-right: 0;
-	}
-
-	.library-button {
-		position: relative;
-		z-index: 40;
 	}
 
 	.mini-video-shell {

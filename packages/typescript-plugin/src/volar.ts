@@ -36,6 +36,7 @@ export function compileToVolarMappings(
 		result = recovered;
 	}
 	addImportClauseInteriorMappings(result, source);
+	escapeMarkupTextLessThan(result);
 	return {
 		...result,
 		cssMappings: result.cssMappings.map((mapping, index) => ({
@@ -246,6 +247,73 @@ function authoredCssMappings(
 			data: { ...data, customData: { ...data.customData, content } },
 		};
 	});
+}
+
+/**
+ * A `<` that cannot open a tag is literal text in TSRX markup, but TSX has no such
+ * rule and reads it as a malformed tag, so the emitted document would not parse.
+ * Rewrite each one to the `&lt;` entity and move the mappings that follow along by
+ * the three characters it adds - the same generated-code edit `restoreTypedDot`
+ * makes for a dot.
+ */
+function escapeMarkupTextLessThan(compiled: MarklessTsrxTypeServiceResult): void {
+	const textSpans = markupTextSpans(compiled.sourceAst);
+	if (textSpans.length === 0) return;
+
+	const positions = new Set<number>();
+	for (const mapping of compiled.mappings) {
+		const sourceStart = mapping.sourceOffsets[0];
+		const inText = textSpans.some((span) => sourceStart >= span.start && sourceStart < span.end);
+		if (!inText) continue;
+		const generatedStart = mapping.generatedOffsets[0];
+		const generated = compiled.code.slice(
+			generatedStart,
+			generatedStart + mapping.generatedLengths[0],
+		);
+		let index = generated.indexOf('<');
+		while (index !== -1) {
+			positions.add(generatedStart + index);
+			index = generated.indexOf('<', index + 1);
+		}
+	}
+
+	for (const position of [...positions].sort((left, right) => right - left)) {
+		compiled.code = `${compiled.code.slice(0, position)}&lt;${compiled.code.slice(position + 1)}`;
+		for (const mapping of compiled.mappings) {
+			const generatedStart = mapping.generatedOffsets[0];
+			if (generatedStart > position) mapping.generatedOffsets[0] += 3;
+			else if (generatedStart + mapping.generatedLengths[0] > position) {
+				mapping.generatedLengths[0] += 3;
+			}
+		}
+	}
+}
+
+function markupTextSpans(sourceAst: unknown): Array<{ start: number; end: number }> {
+	const spans: Array<{ start: number; end: number }> = [];
+	const seen = new Set<unknown>();
+	const visit = (node: unknown): void => {
+		if (!node || typeof node !== 'object' || seen.has(node)) return;
+		seen.add(node);
+		if (Array.isArray(node)) {
+			for (const entry of node) visit(entry);
+			return;
+		}
+		const candidate = node as { type?: unknown; start?: unknown; end?: unknown };
+		if (
+			candidate.type === 'JSXText' &&
+			typeof candidate.start === 'number' &&
+			typeof candidate.end === 'number'
+		) {
+			spans.push({ start: candidate.start, end: candidate.end });
+		}
+		for (const [key, value] of Object.entries(node)) {
+			if (key === 'loc' || key === 'metadata') continue;
+			visit(value);
+		}
+	};
+	visit(sourceAst);
+	return spans;
 }
 
 type RecoveryEdit = { readonly offset: number; readonly replacement: string };
