@@ -31,6 +31,14 @@ export type DiffDerivedValueInput = {
 	readonly keyed?: ReadonlyArray<RuntimeGraphReconcileKey>;
 	readonly touched?: WriteTouchedRecord;
 	readonly baselineStale?: boolean;
+	/**
+	 * What an `Object.is`-identical plain object or array below the root means.
+	 * `'unchanged'` (the default) trusts identity, which is sound for a caller
+	 * that also supplies the write-touched record of the same flush.
+	 * `'unknown'` is for a caller with no such record — the async commit — and
+	 * reports every identical container at its own path instead.
+	 */
+	readonly identicalContainers?: 'unchanged' | 'unknown';
 };
 
 const WHOLE_NODE: ReadonlyArray<ReadonlyArray<string>> = Object.freeze([Object.freeze([])]);
@@ -54,6 +62,15 @@ const WHOLE_NODE: ReadonlyArray<ReadonlyArray<string>> = Object.freeze([Object.f
  *   path: keys are never matched partially and an index is never identity;
  * - a missing baseline (first value, or a value whose write-touched record was
  *   already cleared) reports the whole node.
+ *
+ * `identicalContainers: 'unknown'` is for a caller that has no write-touched
+ * record for the flush that produced the new value, so identity below the root
+ * proves nothing: every `Object.is`-identical plain object or array met below
+ * the root is reported at its own path and is not walked into. An identical
+ * root still reports nothing — nothing narrower is known about it, and the
+ * caller decides what a wholly identical value means — and identical
+ * primitives and other leaves stay unchanged. The default, `'unchanged'`,
+ * trusts identity as above.
  */
 export function diffDerivedValue(input: DiffDerivedValueInput): ReadonlyArray<ReadonlyArray<string>> {
 	if (input.baselineStale) return WHOLE_NODE;
@@ -74,6 +91,25 @@ export function diffDerivedValue(input: DiffDerivedValueInput): ReadonlyArray<Re
 			if (changed.some((entry) => samePath(entry, touchedPath))) continue;
 			changed.push(touchedPath);
 		}
+	}
+
+	/**
+	 * What an identical reference met at `path` reports. With a write-touched
+	 * record identity means unchanged apart from the recorded remainders; in
+	 * `'unknown'` mode there is no such record, so an identical container below
+	 * the root is reported whole rather than trusted or walked into.
+	 */
+	function reportIdentical(value: unknown, path: ReadonlyArray<string>): void {
+		if (
+			input.identicalContainers === 'unknown' &&
+			path.length > 0 &&
+			isDiffableContainer(value)
+		) {
+			changed.push(path);
+			return;
+		}
+
+		emitTouched(value, path);
 	}
 
 	function keyedFor(path: ReadonlyArray<string>): RuntimeGraphReconcileKey | undefined {
@@ -118,7 +154,7 @@ export function diffDerivedValue(input: DiffDerivedValueInput): ReadonlyArray<Re
 			const nextItem = next[index];
 			const itemPath = [...path, String(index)];
 			if (Object.is(previousItem, nextItem)) {
-				emitTouched(nextItem, itemPath);
+				reportIdentical(nextItem, itemPath);
 				continue;
 			}
 
@@ -161,7 +197,7 @@ export function diffDerivedValue(input: DiffDerivedValueInput): ReadonlyArray<Re
 
 	function walk(previous: unknown, next: unknown, path: ReadonlyArray<string>): void {
 		if (Object.is(previous, next)) {
-			emitTouched(next, path);
+			reportIdentical(next, path);
 			return;
 		}
 

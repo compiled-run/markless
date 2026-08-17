@@ -170,7 +170,12 @@ previous value and invalidates only the paths that changed.
   would otherwise see two equal objects and report nothing.
 - Async computeds reconcile the fulfilled value the same way and expose
   `status`, `version`, `key`, and `error` as separate paths, so a pending
-  re-run carrying the prior value invalidates only those paths.
+  re-run carrying the prior value invalidates only those paths. A fulfilled
+  value is compared structurally: an async result can land long after the flush
+  that wrote the state it embeds, so identical nested references are not
+  evidence that nothing changed there and each is reported at its own path,
+  while a fulfilled value identical to the previous one at the root reports the
+  whole node.
 
 ### Async derivation and TSRX boundaries
 

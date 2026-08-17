@@ -239,9 +239,14 @@ function publish(
  *
  * A value commit compares structurally only. Unlike a sync computed, an async
  * snapshot can land long after the flush that wrote the state it embeds, so the
- * write-touched record is already cleared; a runner that returns live state
- * objects is covered by the identical-root rule below, which reports the whole
- * node.
+ * per-flush write-touched record is already cleared by the time it publishes.
+ * Identity below the root therefore proves nothing here: a runner that returns
+ * live state objects publishes the very rows a later write mutated in place,
+ * and treating them as unchanged would silently withhold that write from the
+ * subscribers of those paths. The diff runs in `identicalContainers: 'unknown'`
+ * mode, which reports each identical nested container at its path; a value
+ * rebuilt from fresh objects still reconciles field by field, and an identical
+ * root is handled by the whole-node rule below.
  */
 function asyncCommitPaths(
 	node: RuntimeAsyncComputedNode,
@@ -271,6 +276,7 @@ function asyncCommitPaths(
 			previous: previousValue,
 			next: nextValue,
 			keyed: node.reconcile?.keyed,
+			identicalContainers: 'unknown',
 		});
 		if (changed.every((path) => path.length > 0)) {
 			for (const path of changed) {

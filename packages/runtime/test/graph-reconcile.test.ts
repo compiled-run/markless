@@ -790,3 +790,152 @@ test('a rejected async commit reports the error path', async () => {
 	expect(graph.read(ASYNC, ['status'])).toBe('rejected');
 	expect((failure.values.at(-1) as Error).message).toBe('boom');
 });
+
+test('a fulfilled async value that aliases in-place-written state re-checks the written path', async () => {
+	// The runner hands back a fresh root array whose elements are the live state
+	// rows. A write mutates row 0 in place, the key changes, the runner re-runs
+	// and publishes a new fulfilled value whose row 0 is the same object as
+	// before — identity below the root is not evidence of "unchanged" here,
+	// because the settle happens long after the flush that wrote the row.
+	const runs = deferredRuns();
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: STATE, value: rows(2) }],
+		asyncComputed: [
+			{
+				graphNodeId: ASYNC,
+				dependencies: [{ graphNodeId: STATE, path: [] }],
+				key: (read) => JSON.stringify(read(STATE)),
+				run: runs.run,
+			},
+		],
+	});
+	const aliasingValue = (): Row[] => (graph.read(STATE) as Row[]).filter(() => true);
+	const completed = subscriptionRecorder();
+	const status = subscriptionRecorder();
+	graph.subscribe({
+		id: 'view-dom-update:row-0-completed',
+		graphNodeId: ASYNC,
+		path: ['0', 'completed'],
+		run: completed.run,
+	});
+	graph.subscribe({
+		id: 'view-dom-update:status',
+		graphNodeId: ASYNC,
+		path: ['status'],
+		run: status.run,
+	});
+
+	graph.read(ASYNC, ['status']);
+	runs.resolvers[0]!(aliasingValue());
+	await settle();
+	await graph.flush();
+	const mounted = { completed: completed.runs, status: status.runs };
+	expect(completed.values.at(-1)).toBe(false);
+
+	graph.write({ graphNodeId: STATE, path: ['0', 'completed'], value: true });
+	await graph.flush();
+	// The re-run is pending: it carries the prior value forward, so only
+	// snapshot metadata is reported and no value cell re-checks yet.
+	expect(graph.read(ASYNC, ['status'])).toBe('pending');
+	expect(status.runs).toBe(mounted.status + 1);
+	expect(completed.runs).toBe(mounted.completed);
+
+	runs.resolvers[1]!(aliasingValue());
+	await settle();
+	await graph.flush();
+
+	expect(graph.read(ASYNC, ['0', 'completed'])).toBe(true);
+	expect(completed.values.at(-1)).toBe(true);
+});
+
+test('a fulfilled async value rebuilt from fresh rows stays path granular', async () => {
+	// The complement of the aliasing test: when the runner returns brand new row
+	// objects, the structural walk still reports only the field that changed.
+	let toggled = false;
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: TICK, value: 0 }],
+		asyncComputed: [
+			{
+				graphNodeId: ASYNC,
+				dependencies: [{ graphNodeId: TICK, path: [] }],
+				key: (read) => read(TICK),
+				reconcile: { keyed: [{ path: [], keyPath: ['id'] }] },
+				run: () =>
+					Promise.resolve(
+						rows(2).map((row) => (row.id === 'row-1' ? { ...row, completed: toggled } : { ...row })),
+					),
+			},
+		],
+	});
+	const first = subscriptionRecorder();
+	const second = subscriptionRecorder();
+	graph.subscribe({
+		id: 'view-dom-update:row-0',
+		graphNodeId: ASYNC,
+		path: ['0', 'completed'],
+		run: first.run,
+	});
+	graph.subscribe({
+		id: 'view-dom-update:row-1',
+		graphNodeId: ASYNC,
+		path: ['1', 'completed'],
+		run: second.run,
+	});
+
+	graph.read(ASYNC, ['status']);
+	await settle();
+	await graph.flush();
+	const mounted = { first: first.runs, second: second.runs };
+
+	toggled = true;
+	graph.write({ graphNodeId: TICK, value: 1 });
+	await graph.flush();
+	await settle();
+	await graph.flush();
+
+	expect(second.runs).toBe(mounted.second + 1);
+	expect(second.values.at(-1)).toBe(true);
+	// Row 0 is a new object with the same fields: reconciled by key, unchanged.
+	expect(first.runs).toBe(mounted.first);
+});
+
+test("'unknown' identical containers are reported at their path, below the root only", () => {
+	const row = { id: 'row-0', completed: false };
+	const list = [row];
+	const previous = { rows: list, label: 'one left' };
+
+	// The identical array is reported at its own path and is not walked into.
+	expect(diffDerivedValue({ previous, next: { rows: list, label: 'one left' } })).toEqual([]);
+	expect(
+		diffDerivedValue({
+			previous,
+			next: { rows: list, label: 'one left' },
+			identicalContainers: 'unknown',
+		}),
+	).toEqual([['rows']]);
+
+	// A fresh array holding the identical row reports the row, not the array.
+	expect(
+		diffDerivedValue({
+			previous,
+			next: { rows: [row], label: 'one left' },
+			identicalContainers: 'unknown',
+		}),
+	).toEqual([['rows', '0']]);
+
+	// An identical root reports nothing: the caller decides what a wholly
+	// identical value means.
+	expect(diffDerivedValue({ previous, next: previous, identicalContainers: 'unknown' })).toEqual(
+		[],
+	);
+
+	// Identical primitives and non-walkable leaves stay unchanged.
+	const stamp = new Date(0);
+	expect(
+		diffDerivedValue({
+			previous: { label: 'one left', at: stamp, count: 2 },
+			next: { label: 'one left', at: stamp, count: 2 },
+			identicalContainers: 'unknown',
+		}),
+	).toEqual([]);
+});
