@@ -1034,3 +1034,46 @@ test("'unknown' identical containers are reported at their path, below the root 
 		}),
 	).toEqual([]);
 });
+
+// Reconciliation bookkeeping is pay-per-use: the write-touched record exists
+// only so a derived value can be compared against a baseline a write mutated
+// in place, so a graph with no computed nodes must not walk written paths for
+// it. The walk is observable through a counting accessor on the written
+// container.
+test('a write in a graph with no computed nodes does not walk the path for reconciliation', () => {
+	const walkedWithoutComputed = countContainerReads([]);
+	const walkedWithComputed = countContainerReads([
+		{
+			graphNodeId: DERIVED,
+			dependencies: [{ graphNodeId: STATE }],
+			compute: (read) => read(STATE, ['rows']),
+		},
+	]);
+
+	expect(walkedWithoutComputed).toBeLessThan(walkedWithComputed);
+});
+
+/** Counts how many times a write reads the container the written path goes through. */
+function countContainerReads(
+	computed: Parameters<typeof createRuntimeGraph>[0]['computed'],
+): number {
+	let reads = 0;
+	const list = rows(1);
+	const graph = createRuntimeGraph({
+		cells: [
+			{
+				graphNodeId: STATE,
+				value: {
+					get rows() {
+						reads++;
+						return list;
+					},
+				},
+			},
+		],
+		computed,
+	});
+
+	graph.write({ graphNodeId: STATE, path: ['rows', '0', 'title'], value: 'next' });
+	return reads;
+}

@@ -301,7 +301,9 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	// the path left below it; reconciliation reports those remainders wherever
 	// it meets the object again.
 	const recordWriteTouched = (graphNodeId: string, path: ReadonlyArray<string>): void => {
-		if (computedNodes.has(graphNodeId)) return;
+		// Only reconciliation reads this record, and only a computed node
+		// reconciles: a graph with none pays nothing per write.
+		if (computedNodes.size === 0 || computedNodes.has(graphNodeId)) return;
 
 		let container: unknown = cells.get(graphNodeId);
 		for (let depth = 0; depth <= path.length; depth++) {
