@@ -25,6 +25,30 @@ Write user-facing explanations in clear, concise language without reducing techn
 
 Owner-facing decision menus must be skimmable in seconds and written for a reader with none of the goal's context loaded. Lead with one sentence: what is being asked and what you recommend. Surface only the items where the owner's choice genuinely changes the outcome or carries real risk, as a short list — one everyday-language item each stating the choice, the recommendation, and the reason it is right ("because ..."), each item its own paragraph separated by blank lines (no `-`/`*` list markers: markdown renderers collapse list spacing), never a single prose block; batch the rest as "researched defaults" behind a pointer to the note. The full summary must live inside whatever the owner actually sees at decision time: text emitted before an interactive prompt is not displayed, and prompt boxes render literally, so no markdown markup — structure with blank lines and a `Name:` prefix per bullet. When styled text matters more than an interactive menu, deliver the summary as a normal final message (markdown renders there: bold decision names, plain gray prose) and take the choice as a typed reply. No internal shorthand — task IDs, metric nicknames, codes like A1/D2 — without saying what it means in plain words, and no parenthetical asides carrying essential meaning. Generic process words count as jargon too ("baseline", "matrix", "artifact", "cut cards"): say what physically happens instead. If the owner wants depth, they will open the note or ask.
 
+<!-- guessless-integration:begin -->
+## Structural claims about JavaScript/TypeScript
+
+Do not assert that you have found *all* call sites, *every* reference, or that a symbol is safe to
+delete, unless you can show a guessless receipt for that exact claim. `grep` cannot see re-exports,
+aliased imports, `export * from`, or property access through a namespace object, so "all" derived
+from a text search is a guess.
+
+To price a completeness claim:
+
+    node /Users/jacksm5pro/dev/open-source/guessless/packages/cli/dist/cli.js query envelope.json
+
+where `envelope.json` is `{"inputs": [{"path": "...", "source": "..."}], "request": {...}}`. The
+answer is a receipt whose `state` is one of:
+
+- `complete` — the result set is exhaustive. This is the only state that licenses the word "all".
+- `partial` — plus a named `unresolved` site for every place the engine could not classify. Say the
+  answer is partial and name the gaps.
+- `refused` — the question was not answered. It supports no claim at all.
+
+If you have no receipt, say which sites you checked instead of saying "all". A qualified answer is
+always acceptable; an unpriced "all" is not.
+<!-- guessless-integration:end -->
+
 
 
 <!-- Source: .ruler/claude.md -->
@@ -33,3 +57,27 @@ Owner-facing decision menus must be skimmable in seconds and written for a reade
 
 Use the `markless-implementation` skill for implementation work and `markless-spec-maintenance` for spec work; their folders carry the full workflow doctrine.
 Command policy is enforced mechanically in `.claude/settings.json`.
+
+<!-- guessless-integration:begin -->
+## Structural claims about JavaScript/TypeScript
+
+Do not assert that you have found *all* call sites, *every* reference, or that a symbol is safe to
+delete, unless you can show a guessless receipt for that exact claim. `grep` cannot see re-exports,
+aliased imports, `export * from`, or property access through a namespace object, so "all" derived
+from a text search is a guess.
+
+To price a completeness claim:
+
+    node /Users/jacksm5pro/dev/open-source/guessless/packages/cli/dist/cli.js query envelope.json
+
+where `envelope.json` is `{"inputs": [{"path": "...", "source": "..."}], "request": {...}}`. The
+answer is a receipt whose `state` is one of:
+
+- `complete` — the result set is exhaustive. This is the only state that licenses the word "all".
+- `partial` — plus a named `unresolved` site for every place the engine could not classify. Say the
+  answer is partial and name the gaps.
+- `refused` — the question was not answered. It supports no claim at all.
+
+If you have no receipt, say which sites you checked instead of saying "all". A qualified answer is
+always acceptable; an unpriced "all" is not.
+<!-- guessless-integration:end -->

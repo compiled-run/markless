@@ -5,14 +5,18 @@ export default function Home() @{
 	let count = state(0);
 
 	<main>
-		<h1>Markless Router</h1>
-		<button onClick={() => count++}>Count {count}</button>
+		<div>
+			<h1>
+				<span>Your code</span>,
+				<span>compiled to whatever comes next.</span>
+			</h1>
+		</div>
 
-		<Counter count={10} />
+		<p class="subtitle">An open source organization building compiler software. Frameworks change. Platforms multiply. The tools stay useful.</p>
 
 		<style>
-			button {
-				background: yellow;
+			.subtitle {
+				font-size: var(--step-1);
 			}
 		</style>
 	</main>
