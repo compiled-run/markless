@@ -36,7 +36,8 @@ export function Counter() @{
   collections compile to field/path-granular reactive data. There is no separate
   `store()` primitive.
 - `computed(fn)` — lazy derived value. Read as a plain variable. Sync computeds
-  re-derive from their dependencies when read. Async computeds are compiler-known
+  re-derive from their dependencies when read; re-derivation reconciles into the
+  same node so only changed paths invalidate. Async computeds are compiler-known
   async graph nodes with pending/error/value state, cancellation, and dependency
   keys. Computeds are not writable (no optimistic-write semantics in v1; revisit
   if real apps demand it).
@@ -106,6 +107,10 @@ The classic uses of effects each have a better home:
 
 - _Derive state from state_ → `computed()`.
 - _Fetch data from state_ → `computed(async ...)` plus a TSRX async boundary.
+- _Streams, sockets, async iterators_ → event sources that write into state at
+  the site that owns the source (a handler or an `attach` behavior); derived
+  values never mutate. A token append is a state write, and a derived transcript
+  reconciles so only the changed message re-checks.
 - _"When X changes, update Y"_ → an antipattern in every fine-grained system;
   with no render loop, every mutation originates at an identifiable site (an
   event handler), so co-locate the side work there as a plain function.
@@ -115,6 +120,36 @@ The classic uses of effects each have a better home:
 - _React to state you don't own_ → deliberately unsupported.
 - _Eager browser setup_ (third-party widgets, canvas init, observers) →
   host element behavior through `attach`.
+
+### Derived reconciliation
+
+A computed keeps one persistent graph node. Each re-derivation produces a new
+value; the runtime structurally reconciles that value against the node's
+previous value and invalidates only the paths that changed.
+
+- Objects reconcile by field. A field that did not change invalidates nothing.
+- Arrays reconcile by key when a key is declared for that array through the
+  runtime option `reconcile.keyed[{ path, keyPath }]` on the computed node,
+  where `path` names an array inside the derived value and `keyPath` is read on
+  each element. Without a declared key, arrays reconcile by element identity.
+  Index is never identity on its own: two different elements at the same
+  position are never reported as the same element.
+- Reconciliation never mutates a value. It compares, replaces the node's value,
+  and reports the changed paths. `computed()` stays read-only; there is no
+  draft, patch, or other mutation API.
+- Object identity produced by the derive function is preserved. An element the
+  derive function returned unchanged is still the same object after
+  reconciliation, which is what keyed rows and element handles rely on.
+- Cost is proportional to the part of the new value that is not identical to
+  the previous one, not to the size of the value.
+- A derived value may share objects with the state it derives from, so in-place
+  writes into those objects are detected within the same flush: the write
+  records the touched object together with the path written beneath it, and
+  reconciliation reports that path even where the derived value still holds the
+  same object reference (the write-touched rule).
+- Async computeds reconcile the fulfilled value the same way and expose
+  `status`, `version`, `key`, and `error` as separate paths, so a pending
+  re-run carrying the prior value invalidates only those paths.
 
 ### Async derivation and TSRX boundaries
 

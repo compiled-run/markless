@@ -235,6 +235,8 @@ importers:
         specifier: 0.1.20
         version: 0.1.20(@types/node@24.12.2)(jiti@2.7.0)(typescript@5.9.3)(vite@8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0))(yaml@2.9.0)
 
+  demos/derived-reconcile: {}
+
   demos/executed-at-load:
     dependencies:
       '@markless/compiler':
