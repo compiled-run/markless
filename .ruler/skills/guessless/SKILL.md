@@ -42,7 +42,7 @@ anchors are fingerprinted, so hand-editing one invalidates it.
 ## 2. Run it
 
 ```bash
-node /Users/jacksm5pro/dev/open-source/guessless/packages/cli/dist/cli.js query envelope.json > answer.receipt.json
+npx guessless query envelope.json > answer.receipt.json
 ```
 
 ## 3. Read the receipt honestly
@@ -62,7 +62,7 @@ answer.receipt.json         the receipt
 answer.reproduction.json    {"inputs": [...same inputs...], "receipt": {...that receipt...}}
 ```
 
-Then `node /Users/jacksm5pro/dev/open-source/guessless/scripts/reproduce-check.mjs <dir>` re-runs it and fails if a single byte of
+Then `npx guessless reproduce answer.reproduction.json` re-runs it and fails if a single byte of
 the receipt was altered.
 
 ## Boundaries

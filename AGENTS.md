@@ -36,7 +36,7 @@ from a text search is a guess.
 
 To price a completeness claim:
 
-    node /Users/jacksm5pro/dev/open-source/guessless/packages/cli/dist/cli.js query envelope.json
+    npx guessless query envelope.json
 
 where `envelope.json` is `{"inputs": [{"path": "...", "source": "..."}], "request": {...}}`. The
 answer is a receipt whose `state` is one of:
@@ -69,7 +69,7 @@ from a text search is a guess.
 
 To price a completeness claim:
 
-    node /Users/jacksm5pro/dev/open-source/guessless/packages/cli/dist/cli.js query envelope.json
+    npx guessless query envelope.json
 
 where `envelope.json` is `{"inputs": [{"path": "...", "source": "..."}], "request": {...}}`. The
 answer is a receipt whose `state` is one of:
