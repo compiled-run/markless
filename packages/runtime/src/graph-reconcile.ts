@@ -79,7 +79,11 @@ export function diffDerivedValue(input: DiffDerivedValueInput): ReadonlyArray<Re
 	const changed: ReadonlyArray<string>[] = [];
 	// Cycles are legal graph values, so guard the active recursion stack rather
 	// than every visited object: a value repeated in two branches still diffs.
-	const active = new Set<unknown>();
+	// The stack holds (previous, next) pairs, not next alone — the two sides may
+	// close their cycles at different depths, and meeting an active next against
+	// a previous it has not been compared with is a comparison still owed.
+	// Pairs are finite, so the walk still terminates.
+	const active = new Map<object, Set<object>>();
 
 	function emitTouched(value: unknown, path: ReadonlyArray<string>): void {
 		if (!input.touched || typeof value !== 'object' || value === null) return;
@@ -212,8 +216,13 @@ export function diffDerivedValue(input: DiffDerivedValueInput): ReadonlyArray<Re
 			return;
 		}
 
-		if (active.has(next)) return;
-		active.add(next);
+		let pairedWithPrevious = active.get(previous);
+		if (pairedWithPrevious?.has(next)) return;
+		if (!pairedWithPrevious) {
+			pairedWithPrevious = new Set();
+			active.set(previous, pairedWithPrevious);
+		}
+		pairedWithPrevious.add(next);
 		try {
 			if (previousIsArray) {
 				walkArray(previous as ReadonlyArray<unknown>, next as ReadonlyArray<unknown>, path);
@@ -221,7 +230,8 @@ export function diffDerivedValue(input: DiffDerivedValueInput): ReadonlyArray<Re
 				walkObject(previous as Record<string, unknown>, next as Record<string, unknown>, path);
 			}
 		} finally {
-			active.delete(next);
+			pairedWithPrevious.delete(next);
+			if (pairedWithPrevious.size === 0) active.delete(previous);
 		}
 
 		// The previous value is the baseline the node last published. A write

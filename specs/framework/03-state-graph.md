@@ -133,7 +133,12 @@ previous value and invalidates only the paths that changed.
   where `path` names an array inside the derived value and `keyPath` is read on
   each element. Without a declared key, arrays reconcile by element identity.
   Index is never identity on its own: two different elements at the same
-  position are never reported as the same element.
+  position are never reported as the same element. Keyed matching applies to the
+  element at the same slot, so a reorder reports the array's own path instead of
+  following elements to their new positions: graph paths address elements by
+  index, every index past a move names a different element, and the subscribers
+  reading those indexes must re-check — moving rows by key is the DOM layer's
+  job.
 - Keys must be well formed for keyed matching to apply. In a declared-keyed
   array, every element on both the previous and the next side must have a key
   (reading `keyPath` must not produce `undefined`), and keys must be unique

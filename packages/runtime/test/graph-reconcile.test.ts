@@ -199,6 +199,9 @@ test('unique present keys still reconcile field by field', () => {
 });
 
 test('a debug-enabled build names the array path and the offending key', () => {
+	// The flag is a global the whole suite shares, so restore exactly the state
+	// found here rather than assuming it was absent.
+	const debugFlag = Object.getOwnPropertyDescriptor(globalThis, '__MARKLESS_DEBUG_ENABLED__');
 	const warnings: string[] = [];
 	const warn = vi.spyOn(console, 'warn').mockImplementation((message: unknown) => {
 		warnings.push(String(message));
@@ -225,7 +228,8 @@ test('a debug-enabled build names the array path and the offending key', () => {
 		expect(warnings[1]).toContain('derived path rows');
 		expect(warnings[1]).toContain('element 1 has no key at id');
 	} finally {
-		delete (globalThis as any).__MARKLESS_DEBUG_ENABLED__;
+		if (debugFlag) Object.defineProperty(globalThis, '__MARKLESS_DEBUG_ENABLED__', debugFlag);
+		else delete (globalThis as any).__MARKLESS_DEBUG_ENABLED__;
 		warn.mockRestore();
 	}
 });
@@ -291,6 +295,21 @@ test('reconciliation never mutates its inputs and walks cycles once', () => {
 	expect(() => diffDerivedValue({ previous: frozenPrevious, next: frozenNext })).not.toThrow();
 	expect(frozenPrevious.rows[0]!.completed).toBe(false);
 	expect(frozenNext.rows[0]!.completed).toBe(true);
+});
+
+test('a cycle the two sides close differently is still compared', () => {
+	// `next.self` points back at its own root, while the previous side holds a
+	// plain object there. The pair (previous.self, next) has never been compared,
+	// so meeting the active ancestor `next` again must not end the walk: guarding
+	// the next side alone would report nothing for two differing objects.
+	const previous = deepFreeze({ self: { x: 1 } });
+	const next: Record<string, unknown> = {};
+	next.self = next;
+
+	expect(diffDerivedValue({ previous, next })).toEqual([
+		['self', 'x'],
+		['self', 'self'],
+	]);
 });
 
 // --- cell-backed computeds (the production commit path) -------------------
