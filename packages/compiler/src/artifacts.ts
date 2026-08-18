@@ -349,6 +349,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_REPEAT_KEY_REQUIRED'
 		| 'MARKLESS_REPEAT_KEY_IS_INDEX'
 		| 'MARKLESS_REPEAT_KEY_UNSTABLE'
+		| 'MARKLESS_REPEAT_COLLECTION_UNREADABLE'
 		| 'MARKLESS_TEMPLATE_AS_VALUE'
 		| 'MARKLESS_SUBMODULE_UNSUPPORTED'
 		| 'MARKLESS_ALLOW_ERROR_UNSUPPRESSIBLE'
@@ -718,6 +719,9 @@ export type RenderDataRepeat = {
 	readonly rowHostNodeId?: string;
 	readonly itemName: string;
 	readonly collectionGraphNodeId?: string;
+	// The authored collection expression, carried only when the collection is
+	// not a graph read: the renderer has no graph node to read the rows from.
+	readonly collectionSource?: string;
 	readonly collectionPath: ReadonlyArray<string>;
 	readonly keyPath: ReadonlyArray<string>;
 	readonly rowChunkId: string;

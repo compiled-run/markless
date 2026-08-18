@@ -32,4 +32,4 @@ Both flags do nothing when no enclosing workspace was found. Without
 that already matches a member declaration is left alone entirely: no question,
 no config change, and a normal workspace install.
 
-See the repository for documentation: https://github.com/markless-dev/markless
+See the repository for documentation: https://github.com/compiled-run/markless

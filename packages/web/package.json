@@ -1,11 +1,11 @@
 {
 	"name": "@markless/web",
-	"version": "0.2.2",
+	"version": "0.3.2",
 	"description": "Markless unified render/resume runtime for the web.",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/markless-dev/markless.git",
+		"url": "git+https://github.com/compiled-run/markless.git",
 		"directory": "packages/web"
 	},
 	"files": [

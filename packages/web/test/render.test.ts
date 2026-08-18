@@ -1339,6 +1339,44 @@ export default function MusicPlayer() @{
 	);
 });
 
+test('compiled expression-tested class binding renders and then moves after dispatch', async () => {
+	const source = `
+import { state } from '@markless/core';
+
+export default function Explorer() @{
+	let picked = state('body');
+	<section>
+		<button type="button" onClick={() => picked = 'markup'}>Markup</button>
+		<span class={picked === 'body' ? 'file-line is-lit' : 'file-line'}>body</span>
+		<span class={picked === 'markup' ? 'file-line is-lit' : 'file-line'}>markup</span>
+	</section>
+}
+`;
+	await withCompiledCaptureDispatch(
+		'src/Explorer.tsrx',
+		source,
+		async ({ output, runtime }) => {
+			const classUpdates = output.view.domUpdates.filter(
+				(candidate) => candidate.target.kind === 'class',
+			);
+			expect(classUpdates).toHaveLength(2);
+			const button = descendants(output.root, 'BUTTON')[0]!;
+			const [bodyLine, markupLine] = descendants(output.root, 'SPAN') as Array<
+				FakeElement & { getAttribute(name: string): string | null }
+			>;
+
+			expect(bodyLine!.getAttribute('class')).toBe('file-line is-lit');
+			expect(markupLine!.getAttribute('class')).toBe('file-line');
+
+			await runtime.runtime.dispatch(event('click', button) as never);
+
+			expect(bodyLine!.getAttribute('class')).toBe('file-line');
+			expect(markupLine!.getAttribute('class')).toBe('file-line is-lit');
+		},
+		{ expectResolver: false },
+	);
+});
+
 test('compiled parent state updates a composed child direct-value attribute after dispatch', async () => {
 	const source = `
 import { state } from '@markless/core';
@@ -4014,4 +4052,36 @@ test('render self-wakes pending CSR async boundaries only after the render settl
 	expect(
 		root.childNodes.map((child) => (child.nodeType === 8 ? '#comment' : child.tagName)),
 	).toEqual(['#comment', 'SPAN', '#comment']);
+});
+
+test('SSR renders module-const repeat rows beside a state-driven list', async () => {
+	const filename = 'src/static-nav.tsrx';
+	const source = `
+import { state } from '@markless/core';
+
+const nav = [{ href: '/docs', title: 'Docs' }, { href: '/blog', title: 'Blog' }];
+
+export function StaticNav() @{
+	let rows = state([{ id: 'a', label: 'Alpha' }]);
+	<main>
+		<ul>@for (const entry of nav; key entry.href) { <li>{entry.title}</li> }</ul>
+		<ol>@for (const row of rows; key row.id) { <li>{row.label}</li> }</ol>
+		<button onClick={() => rows = [...rows, { id: 'b', label: 'Beta' }]}>Add</button>
+	</main>
+}
+`;
+	const serverUrl = await captureDispatchModuleUrl(filename, source, [], 'server');
+	const global = globalThis as { document?: unknown };
+	const previousDocument = global.document;
+	global.document = captureDispatchDocument();
+	try {
+		const serverModule = (await import(serverUrl)) as {
+			readonly default: { readonly renderSsr: () => Promise<{ readonly html: string }> };
+		};
+		const serverOutput = await serverModule.default.renderSsr();
+		const root = parseCaptureDispatchHtml(serverOutput.html)[0]!;
+		expect(descendants(root, 'LI').map(renderedText)).toEqual(['Docs', 'Blog', 'Alpha']);
+	} finally {
+		global.document = previousDocument;
+	}
 });

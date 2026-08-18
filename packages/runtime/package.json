@@ -1,11 +1,11 @@
 {
 	"name": "@markless/runtime",
-	"version": "0.2.2",
+	"version": "0.3.2",
 	"description": "Markless state graph runtime: reads, writes, computed invalidation, flush journal.",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/markless-dev/markless.git",
+		"url": "git+https://github.com/compiled-run/markless.git",
 		"directory": "packages/runtime"
 	},
 	"publishConfig": {

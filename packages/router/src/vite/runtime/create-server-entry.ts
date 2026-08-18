@@ -511,7 +511,26 @@ async function renderDocumentModule(
 	props: PageComponentProps & { readonly children: string },
 ): Promise<string | undefined> {
 	const output = await documentModule?.default?.renderSsr?.(props);
+	assertDocumentStorageFree(output);
 	return output?.html;
+}
+
+// The shell takes the document's html and nothing else: its state payload is
+// never served, so a storage() cell there resumes on no page. Fail loudly
+// instead of serving a control that silently does nothing.
+function assertDocumentStorageFree(output: RenderOutput | undefined): void {
+	const storage = documentStorageRecords(output?.state);
+	if (storage.length === 0) return;
+	const keys = storage.map((record) => record.key).join(', ');
+	throw new Error(
+		`MARKLESS_ROUTER_DOCUMENT_STORAGE_UNSUPPORTED: the document declares storage cells (${keys}), but the router serves only the document's HTML, so their state payload never reaches the browser and they can never resume. Declare storage() at module scope in a component the page renders instead.`,
+	);
+}
+
+function documentStorageRecords(state: unknown): ReadonlyArray<{ readonly key: string }> {
+	if (!state || typeof state !== 'object') return [];
+	const storage = (state as { readonly storage?: unknown }).storage;
+	return Array.isArray(storage) ? (storage as ReadonlyArray<{ readonly key: string }>) : [];
 }
 
 function insertHeadHtml(documentHtml: string, headHtml: string): string {

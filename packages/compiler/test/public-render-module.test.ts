@@ -217,3 +217,67 @@ export function Dashboard() @{
 		}),
 	]);
 });
+
+test('SSR repeat rows come from the authored collection when it is not a graph read', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/StaticNav.tsrx',
+		source: `
+import { navLinks } from './nav-links.ts';
+const extras = [{ href: '/help', title: 'Help' }];
+export function App() @{
+	<nav>
+		<ul>@for (const entry of navLinks; key entry.href) { <li>{entry.title}</li> }</ul>
+		<ul>@for (const extra of extras; key extra.href) { <li>{extra.title}</li> }</ul>
+	</nav>
+}
+`,
+		symbols: [],
+	});
+
+	const source = result.publicRenderModule.ssrModuleSource;
+	expect(source).toContain('repeatItems:(marklessSsrDataSlot,marklessSsrDataContext)=>{');
+	expect(source).toContain('case "repeat:0":return (navLinks);');
+	expect(source).toContain('case "repeat:1":return (extras);');
+	expect(source).toContain(
+		"default:throw new Error('MARKLESS_SSR_DATA_REPEAT_MISSING: '+marklessSsrDataSlot.repeatId);",
+	);
+	expect(source).toContain('import { navLinks } from "./nav-links.ts";');
+	expect(source).toContain("const extras = [{ href: '/help', title: 'Help' }];");
+});
+
+test('SSR repeat items keep graph-backed collections on their graph read', async () => {
+	const mixed = await compileTsrxModule({
+		filename: 'src/MixedRepeats.tsrx',
+		source: `
+import { state } from '@markless/core';
+const tags = ['new', 'hot'];
+export function App() @{
+	let rows = state([{ id: 'a', label: 'A' }]);
+	<main>
+		<ul>@for (const row of rows; key row.id) { <li>{row.label}</li> }</ul>
+		<ul>@for (const tag of tags; key tag) { <li>{tag}</li> }</ul>
+	</main>
+}
+`,
+		symbols: [],
+	});
+	const graphOnly = await compileTsrxModule({
+		filename: 'src/StateRepeat.tsrx',
+		source: `
+import { state } from '@markless/core';
+export function App() @{
+	let rows = state([{ id: 'a', label: 'A' }]);
+	<ul>@for (const row of rows; key row.id) { <li>{row.label}</li> }</ul>
+}
+`,
+		symbols: [],
+	});
+
+	expect(mixed.publicRenderModule.ssrModuleSource).toContain(
+		'case "repeat:0":return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get("state:rows"),[]);',
+	);
+	expect(mixed.publicRenderModule.ssrModuleSource).toContain('case "repeat:1":return (tags);');
+	// A module whose repeats all read the graph keeps the renderer on its graph
+	// path, so no callback is emitted for it.
+	expect(graphOnly.publicRenderModule.ssrModuleSource).not.toContain('repeatItems:');
+});

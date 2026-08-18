@@ -1,6 +1,6 @@
 {
 	"name": "@markless/markless-workspace",
-	"version": "0.2.2",
+	"version": "0.3.2",
 	"private": true,
 	"type": "module",
 	"scripts": {
@@ -16,7 +16,9 @@
 		"receipts:generate": "vitest run --config packages/web/vitest.analyzer-debug-channel-contract.config.ts && vitest run packages/web/test/analyzer-debug-channel-contract.test.ts packages/analyzer/test/receipt-set.test.ts packages/web/test/debug-channel-registration.test.ts",
 		"test:compiler": "vp test packages/compiler/test/*.test.ts",
 		"publish": "pnpm --filter '@markless/*' --filter create-markless publish --access public --no-git-checks",
-		"release": "node scripts/release/run-release.mjs",
+		"release": "bumpp package.json --no-commit --no-tag --no-push && node scripts/release/sync-version.mjs",
+		"release:check": "node scripts/release/sync-version.mjs --check",
+		"release:notes": "node scripts/release/release-notes.mjs",
 		"release:trust": "sh scripts/release/trust-publishers.sh",
 		"state": "node scripts/state-ledger.mjs",
 		"rules": "npx -y @intellectronica/ruler apply",
@@ -27,6 +29,7 @@
 		"@markless/typescript-plugin": "workspace:*",
 		"@types/node": "24.12.2",
 		"bumpp": "^10.4.1",
+		"changelogen": "^0.6.2",
 		"create-markless": "workspace:*",
 		"rolldown": "1.0.3",
 		"typescript": "5.9.3",

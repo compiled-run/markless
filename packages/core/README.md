@@ -11,4 +11,4 @@ authoring APIs (`state`, `computed`, `element`, `shared`), rendering
 (`render`, `renderToString`, resume helpers), and the build plugins via
 `@markless/core/vite` and `@markless/core/rolldown`.
 
-See the repository for documentation: https://github.com/markless-dev/markless
+See the repository for documentation: https://github.com/compiled-run/markless

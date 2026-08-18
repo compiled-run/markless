@@ -678,6 +678,60 @@ describe('server entry rendering', () => {
 		expect(html).toContain('Wind sensor failed');
 	});
 
+	// The shell keeps the document's html and drops its payload, so a storage()
+	// cell declared there used to serve a control that silently did nothing.
+	it('refuses a document that declares storage cells the shell cannot serve', async () => {
+		const entry = createServerEntry({
+			dev: true,
+			documentModuleLoader: async () => ({
+				default: {
+					renderSsr: () => ({
+						html: '<head></head><body>__markless_router_document_children__</body>',
+						state: {
+							version: 2,
+							cells: [{ graphNodeId: 'storage:document.tsrx#theme', name: 'theme' }],
+							computed: [],
+							storage: [{ graphNodeId: 'storage:document.tsrx#theme', key: 'theme' }],
+						},
+					}),
+				},
+			}),
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => ({ default: page('<main>Home</main>') }),
+			},
+			routeFileIds: ['/pages/index.tsrx'],
+		});
+
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
+		const html = await response.text();
+
+		expect(response.status).toBe(500);
+		expect(html).toContain('MARKLESS_ROUTER_DOCUMENT_STORAGE_UNSUPPORTED');
+		expect(html).toContain('theme');
+	});
+
+	it('serves a document whose render output carries no storage records', async () => {
+		const entry = createServerEntry({
+			documentModuleLoader: async () => ({
+				default: {
+					renderSsr: () => ({
+						html: '<head></head><body>__markless_router_document_children__</body>',
+						state: { version: 1, cells: [], computed: [] },
+					}),
+				},
+			}),
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => ({ default: page('<main>Home</main>') }),
+			},
+			routeFileIds: ['/pages/index.tsrx'],
+		});
+
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
+
+		expect(response.status).toBe(200);
+		expect(await response.text()).toContain('<main>Home</main>');
+	});
+
 	it('renders the configured production error route with status 500', async () => {
 		const entry = createServerEntry({
 			dev: false,

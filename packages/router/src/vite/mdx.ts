@@ -45,6 +45,7 @@ export async function transformMdxRoute(source: string, id: string) {
 			'const marklessMdxRenderData = createMdxRenderDataSurface(marklessMdxParts, []);',
 			'const marklessMdxPage = {',
 			'  renderData: marklessMdxRenderData,',
+		'  storageSeeds: marklessMdxStorageSeeds,',
 			'  renderSsr() {',
 			`    return { html: ${JSON.stringify(html)} };`,
 			'  }',
@@ -102,9 +103,11 @@ function emitComposedMdxRoute(route: MdxRoute, id: string): string {
 		`const marklessMdxParts = ${JSON.stringify(route.parts)};`,
 		`const marklessMdxSymbolLoaders = ${renderSymbolLoaders(route.components)};`,
 		`const marklessMdxRenderData = ${renderMdxRenderDataLoader(route.components, id)};`,
+		`const marklessMdxStorageSeeds = ${renderStorageSeeds(route.components)};`,
 		'',
 		'const marklessMdxPage = {',
 		'  renderData: marklessMdxRenderData,',
+		'  storageSeeds: marklessMdxStorageSeeds,',
 		'  loadSymbol: marklessMdxLoadSymbol,',
 		'  async renderSsr(props = {}) {',
 		'    const marklessMdxChildren = [];',
@@ -528,6 +531,15 @@ function hastElementTags(nodes: readonly HastNode[]): string[] {
 		}
 	}
 	return tags;
+}
+
+// A compiled .tsrx child carries its own storage seeds; the MDX page is the
+// artifact the host reads them off, so it has to gather its children's.
+function renderStorageSeeds(components: ReadonlyArray<MdxComponent>): string {
+	const localNames = [...new Set(components.map((component) => component.localName))];
+	return localNames.length === 0
+		? '[]'
+		: `[${localNames.map((localName) => `...(${localName}.storageSeeds ?? [])`).join(', ')}]`;
 }
 
 function renderSymbolLoaders(components: ReadonlyArray<MdxComponent>): string {

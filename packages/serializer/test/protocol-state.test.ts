@@ -1,9 +1,12 @@
 import { expect, test } from 'vitest';
 import {
+	ASYNC_PROTOCOL_VERSION,
 	createProtocolStatePayload,
 	deserializeGraphValue,
 	ProtocolStateSerializationError,
+	protocolStateVersion,
 	serializeRuntimeStateCells,
+	STORAGE_PROTOCOL_VERSION,
 } from '../src/index.ts';
 
 test('createProtocolStatePayload serializes async computed snapshot values', () => {
@@ -69,6 +72,17 @@ test('storage protocol state emits version 2 records beside fallback cells', () 
 		},
 	]);
 	expect(deserializeGraphValue(payload.cells[0]?.value as never)).toBe('light');
+});
+
+// Other payload composers (the router's MDX route) stamp the version themselves;
+// a stamp that disagreed with the records shipped a payload the client refuses.
+test('protocolStateVersion is the one rule createProtocolStatePayload stamps with', () => {
+	expect(protocolStateVersion(undefined)).toBe(ASYNC_PROTOCOL_VERSION);
+	expect(protocolStateVersion([])).toBe(ASYNC_PROTOCOL_VERSION);
+	expect(protocolStateVersion([{ graphNodeId: 'storage:a#k', key: 'k' }])).toBe(
+		STORAGE_PROTOCOL_VERSION,
+	);
+	expect(createProtocolStatePayload({ cells: [] }).version).toBe(protocolStateVersion([]));
 });
 
 test('createProtocolStatePayload preserves structured serialization diagnostics when a state cell fails', () => {

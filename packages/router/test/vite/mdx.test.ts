@@ -79,6 +79,28 @@ This page is static markdown.
 		expect(code).not.toContain('modules[0].marklessRenderData');
 	});
 
+	// The host reads storage seeds off the page artifact, which for an MDX route is
+	// the composed module, not the .tsrx child that declared the cell.
+	it('gathers each TSRX child storage seed onto the MDX page artifact', async () => {
+		const code = await transformMdxRoute(
+			`import ThemeToggle from '../../components/ThemeToggle.tsrx';
+import Density from '../../components/Density.tsrx';
+
+<ThemeToggle />
+
+<ThemeToggle />
+
+<Density />
+`,
+			'/project/pages/docs/[...slug].mdx',
+		);
+
+		expect(code).toContain(
+			'const marklessMdxStorageSeeds = [...(ThemeToggle.storageSeeds ?? []), ...(Density.storageSeeds ?? [])];',
+		);
+		expect(code).toContain('storageSeeds: marklessMdxStorageSeeds');
+	});
+
 	it('reads TSRX imports and component placeholders from the MDX AST', async () => {
 		const code = await transformMdxRoute(
 			`import InteractiveCounter
