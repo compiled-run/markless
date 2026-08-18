@@ -495,6 +495,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					needsFullResume: prerenderClosureNeedsWake,
 					prerenderRecords: input.prerenderRecords,
 					directCsr: input.directCsr,
+					hasComputedState: compiled.payloadScripts.state.computed.length > 0,
 					resumeModuleUrl: input.resumeModuleUrl,
 					prerenderWakeModuleUrl: input.prerenderWakeModuleUrl,
 					publicRenderModuleSource: compiled.publicRenderModule.moduleSource,

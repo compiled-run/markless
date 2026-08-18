@@ -677,3 +677,58 @@ test('records-only wake uses generic staged resume without payload documents', (
 	expect(wakeCode).not.toContain('resumeScalarRowEventFromPayloadDocument');
 	expect(wakeCode).not.toContain('@markless/web/event-only-lean/');
 });
+
+test('resume module installs the reconcile plane only when the payload carries computeds', () => {
+	const withComputed = emitResumeModule({
+		...baseInput,
+		needsFullResume: true,
+		payloadState: {
+			cells: [{ graphNodeId: 'state:list' }],
+			computed: [{ graphNodeId: 'computed:rows', dependencies: [] }],
+		},
+	});
+	expect(withComputed).toContain(
+		"import { installMarklessDerivedReconcile } from '@markless/web/fns/reconcile-plane';",
+	);
+	// Called at module top level, before any resume entry runs: the plane must be
+	// installed before the graph is built, and a bare side-effect import would be
+	// dropped because @markless/web declares `sideEffects: false`.
+	expect(withComputed).toContain('installMarklessDerivedReconcile();');
+
+	const withoutComputed = emitResumeModule({
+		...baseInput,
+		needsFullResume: true,
+		payloadState: { cells: [{ graphNodeId: 'state:count' }], computed: [] },
+	});
+	expect(withoutComputed).not.toContain('reconcile-plane');
+	expect(withoutComputed).not.toContain('installMarklessDerivedReconcile');
+
+	const noState = emitResumeModule({ ...baseInput, needsFullResume: true });
+	expect(noState).not.toContain('reconcile-plane');
+});
+
+test('a CSR mount installs the reconcile plane only when the payload carries computeds', () => {
+	// A CSR mount has no resume module: it builds its graph from the client
+	// source module, so that is where a computed-using CSR app installs.
+	const withComputed = emitSourceModule({
+		...baseInput,
+		directCsr: true,
+		hasComputedState: true,
+	});
+	expect(withComputed).toContain(
+		"import { installMarklessDerivedReconcile } from '@markless/web/fns/reconcile-plane';",
+	);
+	expect(withComputed).toContain('installMarklessDerivedReconcile();');
+
+	expect(
+		emitSourceModule({ ...baseInput, directCsr: true, hasComputedState: false }),
+	).not.toContain('reconcile-plane');
+	// A server-rendered app installs in its resume module instead, so its client
+	// source module must not drag the plane into the eager container chunk.
+	expect(emitSourceModule({ ...baseInput, hasComputedState: true })).not.toContain(
+		'reconcile-plane',
+	);
+	expect(
+		emitSourceModule({ ...baseInput, environment: 'server', hasComputedState: true }),
+	).not.toContain('reconcile-plane');
+});
