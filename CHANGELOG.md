@@ -45,6 +45,14 @@ Runtime bytes grew with this change (about 1.4 kB gzip in the shipped client);
 that cost is tracked and a follow-up moves the reconcile machinery out of the
 path of apps that never use `computed()`.
 
+### Static `.mdx` pages load again
+
+0.3.1 made MDX pages emit the no-flash `storage()` seed script, but the code
+path for a page with no islands referenced the seed list without declaring it,
+so every plain markdown route failed at load with
+`marklessMdxStorageSeeds is not defined`. Static pages now declare an empty seed
+list; pages with islands were unaffected.
+
 ### `class` bindings tested by an expression update again
 
 `class={picked === 'x' ? 'a' : 'b'}` produced no DOM update record: the

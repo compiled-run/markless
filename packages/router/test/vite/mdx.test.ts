@@ -18,6 +18,18 @@ This page is static markdown.
 		expect(code).toContain('export default marklessMdxPage');
 	});
 
+	it('static markdown routes declare every identifier the page object references', async () => {
+		const code = await transformMdxRoute('# Docs\n', '/project/pages/docs.mdx');
+		// 0.3.1 emitted `storageSeeds: marklessMdxStorageSeeds` here without declaring it,
+		// so every static .mdx page threw ReferenceError at load.
+		expect(code).toContain('storageSeeds: []');
+		expect(code).not.toContain('marklessMdxStorageSeeds');
+		// The emitted module must evaluate.
+		const { default: page } = await import(`data:text/javascript;base64,${Buffer.from(code.replace(/^import .*$/m, 'const createMdxRenderDataSurface = () => ({});')).toString('base64')}`);
+		expect(page.storageSeeds).toEqual([]);
+		expect(page.renderSsr().html).toContain('<h1>Docs</h1>');
+	});
+
 	it('renders markdown route content through a real markdown AST', async () => {
 		const code = await transformMdxRoute(
 			`# Docs

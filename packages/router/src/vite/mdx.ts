@@ -45,7 +45,7 @@ export async function transformMdxRoute(source: string, id: string) {
 			'const marklessMdxRenderData = createMdxRenderDataSurface(marklessMdxParts, []);',
 			'const marklessMdxPage = {',
 			'  renderData: marklessMdxRenderData,',
-		'  storageSeeds: marklessMdxStorageSeeds,',
+			'  storageSeeds: [],',
 			'  renderSsr() {',
 			`    return { html: ${JSON.stringify(html)} };`,
 			'  }',
