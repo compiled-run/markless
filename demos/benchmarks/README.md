@@ -124,6 +124,20 @@ This benchmark measures compiler output for a fixed 14-file TSRX corpus covering
 
 For every file and mode, the result records source raw/gzip bytes and compiled raw/minified/gzip bytes after one Oxc minification pass. Aggregate values are sums of the per-file values. Every corpus filename and SHA-256 hash is embedded in both mode results; a corpus mismatch, compiler diagnostic, empty output, invalid byte count, or aggregate mismatch fails validation.
 
+## Derived reconcile
+
+Status: RED. It records the O(N) re-check behaviour that derived reconciliation is meant to remove.
+
+```sh
+pnpm --dir demos/benchmarks bench -- derived-reconcile
+```
+
+This benchmark counts DOM-expression re-checks, never milliseconds. It builds a production-shaped runtime graph in Node — state cells plus a derived node — and registers one `view-dom-update:*` subscription per DOM expression, exactly as the resume runtime does for a DOM update record. One re-check is one run of such a subscription, so the count is the oracle; time would only hide the growth.
+
+Four modes run at N = 100 and N = 1,000: `list-keyed` (rows `{ id, title, completed }` with a declared `id` key), `list-identity` (the same rows with no declared key), `object-fields` (a derived record `k0..kN` built from a state array), and `list-keyed-compute` (the keyed list behind a `compute`-carrying node instead of a demand subscription that commits through `graph.write`). Each case takes a warm mount flush, makes exactly one single-field change, and flushes once.
+
+The gates are that every case delivers the changed value to its own subscription, and that `reChecks` at N = 100 equals `reChecks` at N = 1,000 for each mode. Expected absolute counts once reconciliation lands — one for keyed lists, two for identity lists (both fields of the replaced row), one for record fields — are recorded as metrics, not gates, so they cannot be quietly retuned. Today a recomputed derived node dirties its whole root path, so each list mode re-checks 200 expressions at N = 100 and 2,000 at N = 1,000, and each record mode 100 against 1,000; the run reports `failed` and exits 1.
+
 ## Effectful list status
 
 An effect-lifecycle benchmark is SKIPPED by owner adjudication (2026-07-13), the same reasoning
