@@ -652,3 +652,47 @@ test('planPayloadArena records shared definition state planning metadata', async
 		]),
 	);
 });
+
+test('planPayloadArena keeps a conditional class whose test is an expression on state', async () => {
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/ExpressionClass.tsrx',
+		source: `import { state } from '@markless/core';
+export function App() @{
+	let picked = state('body');
+	<section>
+		<button class={picked === 'body' ? 'pick is-picked' : 'pick'} onClick={() => picked = 'body'}>Body</button>
+		<span class={picked === 'markup' ? 'line is-lit' : 'line'}>{'markup'}</span>
+	</section>
+}`,
+	});
+	const stateLowering = lowerStateAccess({ semanticGraph });
+
+	const payload = planPayloadArena({ semanticGraph, stateLowering });
+
+	expect(semanticGraph.diagnostics).toEqual([]);
+	const classUpdates = payload.view.domUpdates.filter(
+		(update) => update.target?.kind === 'class',
+	);
+	expect(classUpdates).toEqual([
+		expect.objectContaining({
+			source: "picked === 'body'",
+			graphNodeId: 'computed:templateExpression:0',
+			path: [],
+			target: { kind: 'class', trueValue: 'pick is-picked', falseValue: 'pick' },
+		}),
+		expect.objectContaining({
+			source: "picked === 'markup'",
+			graphNodeId: 'computed:templateExpression:1',
+			path: [],
+			target: { kind: 'class', trueValue: 'line is-lit', falseValue: 'line' },
+		}),
+	]);
+	expect(payload.state.computed).toEqual(
+		expect.arrayContaining([
+			expect.objectContaining({
+				graphNodeId: 'computed:templateExpression:0',
+				dependencies: [expect.objectContaining({ graphNodeId: 'state:picked' })],
+			}),
+		]),
+	);
+});

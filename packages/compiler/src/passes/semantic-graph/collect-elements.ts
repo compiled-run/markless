@@ -680,12 +680,16 @@ function collectAttribute(
 
 	const conditionalClass = conditionalClassTarget(attributeName, expressionValue);
 	if (conditionalClass) {
+		// A test that is not a plain graph read resolves to no graph node later, so
+		// without this computed the whole record is dropped and the class never moves.
+		const composite = collectCompositeTemplateExpression(conditionalClass.test, state);
 		state.graph.templateReads.push({
 			hostNodeId,
 			source: expressionSource(conditionalClass.test, state.source),
 			sourceSpan: sourceSpan(conditionalClass.test, state.filename),
 			target: conditionalClass.target,
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
+			computedGraphNodeId: composite?.graphNodeId,
 		});
 		walk(expressionValue, state);
 		return;

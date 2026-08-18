@@ -1339,6 +1339,44 @@ export default function MusicPlayer() @{
 	);
 });
 
+test('compiled expression-tested class binding renders and then moves after dispatch', async () => {
+	const source = `
+import { state } from '@markless/core';
+
+export default function Explorer() @{
+	let picked = state('body');
+	<section>
+		<button type="button" onClick={() => picked = 'markup'}>Markup</button>
+		<span class={picked === 'body' ? 'file-line is-lit' : 'file-line'}>body</span>
+		<span class={picked === 'markup' ? 'file-line is-lit' : 'file-line'}>markup</span>
+	</section>
+}
+`;
+	await withCompiledCaptureDispatch(
+		'src/Explorer.tsrx',
+		source,
+		async ({ output, runtime }) => {
+			const classUpdates = output.view.domUpdates.filter(
+				(candidate) => candidate.target.kind === 'class',
+			);
+			expect(classUpdates).toHaveLength(2);
+			const button = descendants(output.root, 'BUTTON')[0]!;
+			const [bodyLine, markupLine] = descendants(output.root, 'SPAN') as Array<
+				FakeElement & { getAttribute(name: string): string | null }
+			>;
+
+			expect(bodyLine!.getAttribute('class')).toBe('file-line is-lit');
+			expect(markupLine!.getAttribute('class')).toBe('file-line');
+
+			await runtime.runtime.dispatch(event('click', button) as never);
+
+			expect(bodyLine!.getAttribute('class')).toBe('file-line');
+			expect(markupLine!.getAttribute('class')).toBe('file-line is-lit');
+		},
+		{ expectResolver: false },
+	);
+});
+
 test('compiled parent state updates a composed child direct-value attribute after dispatch', async () => {
 	const source = `
 import { state } from '@markless/core';
