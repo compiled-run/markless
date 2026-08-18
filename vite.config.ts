@@ -115,6 +115,7 @@ const buildOrder: PackUserConfig[] = [
 		entry: {
 			index: './src/index.ts',
 			graph: './src/graph.ts',
+			'graph-reconcile': './src/graph-reconcile.ts',
 		},
 	}),
 	marklessPack({
