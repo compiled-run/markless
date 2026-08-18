@@ -1,3 +1,5 @@
+import { protocolStateVersion } from '../../../../serializer/src/protocol-constants.ts';
+
 export type MdxRoutePart =
 	| {
 			readonly kind: 'html';
@@ -178,11 +180,17 @@ type MdxComputedRecord = {
 	readonly [key: string]: unknown;
 };
 
+type MdxStorageRecord = {
+	readonly graphNodeId: string;
+	readonly key: string;
+};
+
 type MdxStatePayload = {
 	readonly version: unknown;
 	readonly cells?: readonly unknown[];
 	readonly computed?: readonly MdxComputedRecord[];
 	readonly sharedDefinitions?: readonly unknown[];
+	readonly storage?: readonly MdxStorageRecord[];
 };
 
 type MdxLocator = {
@@ -237,8 +245,12 @@ export function composeMdxState(children: readonly MdxChild[]): MdxStatePayload 
 		return undefined;
 	}
 
+	// Verbatim, like cells: the client matches each record to a cell by graphNodeId.
+	// Inheriting the first child's version stamped 2 with no storage array, which the
+	// client refuses — every island on the page died.
+	const storage = childStates.flatMap(({ state }) => state.storage ?? []);
 	return {
-		version: childStates[0]!.state.version,
+		version: protocolStateVersion(storage),
 		cells: childStates.flatMap(({ state }) => state.cells ?? []),
 		computed: childStates.flatMap(({ child, state }) =>
 			(state.computed ?? []).map((record) => prefixMdxComputedRecord(record, child)),
@@ -250,6 +262,7 @@ export function composeMdxState(children: readonly MdxChild[]): MdxStatePayload 
 					),
 				}
 			: {}),
+		...(storage.length > 0 ? { storage } : {}),
 	};
 }
 

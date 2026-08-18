@@ -1,7 +1,16 @@
 import { ASYNC_BOUNDARY_ARM } from './async-boundary-arm.ts';
-import { ASYNC_PROTOCOL_VERSION, STORAGE_PROTOCOL_VERSION } from './protocol-constants.ts';
+import {
+	ASYNC_PROTOCOL_VERSION,
+	protocolStateVersion,
+	STORAGE_PROTOCOL_VERSION,
+} from './protocol-constants.ts';
 
-export { ASYNC_BOUNDARY_ARM, ASYNC_PROTOCOL_VERSION, STORAGE_PROTOCOL_VERSION };
+export {
+	ASYNC_BOUNDARY_ARM,
+	ASYNC_PROTOCOL_VERSION,
+	protocolStateVersion,
+	STORAGE_PROTOCOL_VERSION,
+};
 
 export type ProtocolAsyncBoundaryArm = (typeof ASYNC_BOUNDARY_ARM)[keyof typeof ASYNC_BOUNDARY_ARM];
 

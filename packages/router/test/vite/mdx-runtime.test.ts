@@ -6,6 +6,11 @@ import {
 	type MdxChild,
 	renderMdxChild,
 } from '../../src/vite/runtime/mdx-route.ts';
+import {
+	ASYNC_PROTOCOL_VERSION,
+	protocolStateVersion,
+	STORAGE_PROTOCOL_VERSION,
+} from '../../../serializer/src/protocol-constants.ts';
 
 describe('Markless Router MDX route runtime helpers', () => {
 	it('composes child state payloads for one MDX route container', () => {
@@ -289,5 +294,83 @@ describe('composeMdxState symbol namespacing', () => {
 				],
 			),
 		).toBe('static:c0:symbol:5');
+	});
+});
+
+describe('composeMdxState storage records', () => {
+	const storageChild = (index: number, key: string): MdxChild => ({
+		componentIndex: index,
+		hostPrefix: `m${index}:`,
+		symbolPrefix: `m${index}:`,
+		output: {
+			state: {
+				version: STORAGE_PROTOCOL_VERSION,
+				cells: [{ graphNodeId: `storage:demo.tsrx#${key}`, name: key }],
+				computed: [],
+				storage: [{ graphNodeId: `storage:demo.tsrx#${key}`, key }],
+			},
+		},
+	});
+
+	// The composed payload kept the child's version-2 stamp while dropping the
+	// storage array; the client validator refuses that shape, and refusing it took
+	// every island on the page down with it.
+	it('carries child storage records into a version 2 composed payload', () => {
+		const state = composeMdxState([storageChild(0, 'theme')]);
+
+		expect(state?.version).toBe(STORAGE_PROTOCOL_VERSION);
+		expect(state?.storage).toEqual([{ graphNodeId: 'storage:demo.tsrx#theme', key: 'theme' }]);
+	});
+
+	it('concatenates storage across children and leaves graph node ids unprefixed', () => {
+		const state = composeMdxState([storageChild(0, 'theme'), storageChild(1, 'density')]);
+
+		expect(state?.storage).toEqual([
+			{ graphNodeId: 'storage:demo.tsrx#theme', key: 'theme' },
+			{ graphNodeId: 'storage:demo.tsrx#density', key: 'density' },
+		]);
+		// The client validator matches every storage record to a state cell by id.
+		expect(state?.storage?.map((record) => record.graphNodeId)).toEqual(
+			state?.cells?.map((cell) => (cell as { readonly graphNodeId: string }).graphNodeId),
+		);
+	});
+
+	it('stamps version 1 and omits the field when no child declares storage', () => {
+		const state = composeMdxState([
+			{
+				componentIndex: 0,
+				hostPrefix: 'm0:',
+				symbolPrefix: 'm0:',
+				output: {
+					state: {
+						version: ASYNC_PROTOCOL_VERSION,
+						cells: [{ graphNodeId: 'count', name: 'count' }],
+						computed: [],
+					},
+				},
+			},
+		]);
+
+		expect(state?.version).toBe(ASYNC_PROTOCOL_VERSION);
+		expect(state).not.toHaveProperty('storage');
+	});
+
+	// Reading the first child's stamp also went wrong the other way: a
+	// storage-declaring child behind a storage-free one shipped version 1.
+	it('recomputes the version instead of inheriting the first child stamp', () => {
+		const state = composeMdxState([
+			{
+				componentIndex: 0,
+				hostPrefix: 'm0:',
+				symbolPrefix: 'm0:',
+				output: {
+					state: { version: ASYNC_PROTOCOL_VERSION, cells: [], computed: [] },
+				},
+			},
+			storageChild(1, 'theme'),
+		]);
+
+		expect(state?.version).toBe(protocolStateVersion(state?.storage));
+		expect(state?.version).toBe(STORAGE_PROTOCOL_VERSION);
 	});
 });

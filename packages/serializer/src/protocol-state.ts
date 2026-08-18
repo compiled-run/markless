@@ -1,8 +1,5 @@
-import {
-	ASYNC_PROTOCOL_VERSION,
-	STORAGE_PROTOCOL_VERSION,
-	type ProtocolStatePayload,
-} from './protocol.ts';
+import { protocolStateVersion } from './protocol-constants.ts';
+import type { ProtocolStatePayload } from './protocol.ts';
 import {
 	serializeGraphValue,
 	type SerializedGraphPayload,
@@ -91,7 +88,7 @@ export class ProtocolStateSerializationError
 export function createProtocolStatePayload(input: ProtocolStatePayloadInput): ProtocolStatePayload {
 	const storage = input.storage ?? [];
 	return {
-		version: storage.length > 0 ? STORAGE_PROTOCOL_VERSION : ASYNC_PROTOCOL_VERSION,
+		version: protocolStateVersion(storage),
 		cells: input.cells.map((cell) => {
 			const result = serializeGraphValue(cell.value);
 			if (!result.ok) {
