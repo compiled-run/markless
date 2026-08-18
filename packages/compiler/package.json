@@ -1,6 +1,6 @@
 {
 	"name": "@markless/compiler",
-	"version": "0.3.2",
+	"version": "0.3.3",
 	"description": "Markless TSRX compiler: semantic graph, state lowering, payload planning, emit.",
 	"license": "MIT",
 	"repository": {

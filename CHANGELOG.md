@@ -10,6 +10,32 @@ version of everything else.
 
 This file starts at 0.2.0. Earlier versions have no changelog entries.
 
+## 0.3.3
+
+A patch release that takes back most of the bytes 0.3.2 added. No behavior
+changes for apps that use `computed()`; apps that do not now ship none of the
+reconcile machinery.
+
+### Derived reconciliation is installed only where it is used
+
+0.3.2 shipped derived-result reconciliation inside the runtime graph, so every
+app paid for it (about 1.4 kB gzip) whether or not it had a `computed()`.
+Reconciliation is now an installable plane: `@markless/runtime` exports it as
+`@markless/runtime/graph-reconcile`, and the build installs it into an app only
+when that app's state payload has computed nodes. Everything else about it is
+unchanged: same keyed and identity matching, same object-field reconciliation,
+same behavior for async computeds.
+
+For an app with no computed nodes the runtime behaves as it did before 0.3.2:
+nothing is recorded on writes, and the reconcile module and its installer are
+absent from the built output. The music-player-ssr demo drops from 64,363 to
+63,109 gzip bytes of shipped JavaScript.
+
+If you construct a runtime graph yourself (outside a Markless build), pass the
+plane to `createRuntimeGraph({ reconcile: createDerivedReconcilePlane })` to keep
+path-granular invalidation; without it, a recomputed value invalidates its whole
+node.
+
 ## 0.3.2
 
 A patch release with one runtime change you will feel on pages that derive lists

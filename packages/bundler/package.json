@@ -1,6 +1,6 @@
 {
 	"name": "@markless/bundler",
-	"version": "0.3.2",
+	"version": "0.3.3",
 	"description": "Markless build plugins for Rolldown and Vite.",
 	"license": "MIT",
 	"repository": {
