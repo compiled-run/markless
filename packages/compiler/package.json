@@ -5,7 +5,7 @@
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/markless-dev/markless.git",
+		"url": "git+https://github.com/compiled-run/markless.git",
 		"directory": "packages/compiler"
 	},
 	"publishConfig": {

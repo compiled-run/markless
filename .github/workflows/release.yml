@@ -61,7 +61,7 @@ jobs:
     release:
         # Forks and clones must not be able to dispatch a publish that claims to
         # be this repository.
-        if: github.repository == 'markless-dev/markless'
+        if: github.repository == 'compiled-run/markless'
         runs-on: ubuntu-latest
         timeout-minutes: 45
         permissions:
