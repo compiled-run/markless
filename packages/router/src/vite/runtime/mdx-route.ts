@@ -86,7 +86,8 @@ export function createMdxRenderDataSurface(
 			continue;
 		}
 		const child = childrenByIndex.get(part.componentIndex);
-		if (!child) throw new Error(`MARKLESS_MDX_RENDER_DATA_CHILD_MISSING: ${part.componentIndex}`);
+		if (!child)
+			throw new Error(`MARKLESS_MDX_RENDER_DATA_CHILD_MISSING: ${part.componentIndex}`);
 		const childComponentName = child.surface.rootComponentName;
 		if (!childComponentName) {
 			throw new Error(`MARKLESS_MDX_RENDER_DATA_ROOT_MISSING: ${part.componentIndex}`);
@@ -172,10 +173,15 @@ export function createMdxRenderDataSurface(
 	};
 }
 
+type MdxComputedRecord = {
+	readonly deriveSymbolId?: string;
+	readonly [key: string]: unknown;
+};
+
 type MdxStatePayload = {
 	readonly version: unknown;
 	readonly cells?: readonly unknown[];
-	readonly computed?: readonly unknown[];
+	readonly computed?: readonly MdxComputedRecord[];
 	readonly sharedDefinitions?: readonly unknown[];
 };
 
@@ -222,19 +228,25 @@ export async function renderMdxChild(
 }
 
 export function composeMdxState(children: readonly MdxChild[]): MdxStatePayload | undefined {
-	const childStates = children.map((child) => child.output?.state).filter(isDefined);
+	const childStates = children
+		.map((child) => ({ child, state: child.output?.state }))
+		.filter((entry): entry is { readonly child: MdxChild; readonly state: MdxStatePayload } =>
+			isDefined(entry.state),
+		);
 	if (childStates.length === 0) {
 		return undefined;
 	}
 
 	return {
-		version: childStates[0]!.version,
-		cells: childStates.flatMap((state) => state.cells ?? []),
-		computed: childStates.flatMap((state) => state.computed ?? []),
-		...(childStates.some((state) => state.sharedDefinitions?.length)
+		version: childStates[0]!.state.version,
+		cells: childStates.flatMap(({ state }) => state.cells ?? []),
+		computed: childStates.flatMap(({ child, state }) =>
+			(state.computed ?? []).map((record) => prefixMdxComputedRecord(record, child)),
+		),
+		...(childStates.some(({ state }) => state.sharedDefinitions?.length)
 			? {
 					sharedDefinitions: childStates.flatMap(
-						(state) => state.sharedDefinitions ?? [],
+						({ state }) => state.sharedDefinitions ?? [],
 					),
 				}
 			: {}),
@@ -356,6 +368,17 @@ function appendMdxChildView(context: {
 			hostNodeId: context.child.hostPrefix + handle.hostNodeId,
 		});
 	}
+}
+
+// deriveSymbolId is the only state field loadMdxSymbol resolves; graph node ids stay
+// unprefixed because the view records that read them are unprefixed too.
+function prefixMdxComputedRecord(record: MdxComputedRecord, child: MdxChild): MdxComputedRecord {
+	return {
+		...record,
+		...(record.deriveSymbolId
+			? { deriveSymbolId: child.symbolPrefix + record.deriveSymbolId }
+			: {}),
+	};
 }
 
 function prefixMdxSymbolRecord(record: MdxSymbolRecord, child: MdxChild): MdxSymbolRecord {
