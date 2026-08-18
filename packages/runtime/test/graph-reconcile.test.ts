@@ -1,5 +1,11 @@
 import { expect, test, vi } from 'vitest';
-import { createRuntimeGraph, diffDerivedValue } from '../src/index.ts';
+import { createRuntimeGraph as createGraph, type RuntimeGraphInput } from '../src/index.ts';
+import { createDerivedReconcilePlane, diffDerivedValue } from '../src/graph-reconcile.ts';
+
+// Reconciliation is a plug-in plane: every graph below installs it, and the
+// last test in the file pins what a graph without it does instead.
+const createRuntimeGraph = (input: RuntimeGraphInput) =>
+	createGraph({ ...input, reconcile: createDerivedReconcilePlane });
 
 // Derived reconciliation (specs/framework/03-state-graph.md "Derived
 // reconciliation", specs/framework/06-runtime-resumer.md flush bullet): a
@@ -1033,4 +1039,176 @@ test("'unknown' identical containers are reported at their path, below the root 
 			identicalContainers: 'unknown',
 		}),
 	).toEqual([]);
+});
+
+// Reconciliation bookkeeping is pay-per-use: the write-touched record exists
+// only so a derived value can be compared against a baseline a write mutated
+// in place, so a graph with no computed nodes must not walk written paths for
+// it. The walk is observable through a counting accessor on the written
+// container.
+test('a write in a graph with no computed nodes does not walk the path for reconciliation', () => {
+	const walkedWithoutComputed = countContainerReads([]);
+	const walkedWithComputed = countContainerReads([
+		{
+			graphNodeId: DERIVED,
+			dependencies: [{ graphNodeId: STATE }],
+			compute: (read) => read(STATE, ['rows']),
+		},
+	]);
+
+	expect(walkedWithoutComputed).toBeLessThan(walkedWithComputed);
+});
+
+/** Counts how many times a write reads the container the written path goes through. */
+function countContainerReads(
+	computed: Parameters<typeof createRuntimeGraph>[0]['computed'],
+): number {
+	let reads = 0;
+	const list = rows(1);
+	const graph = createRuntimeGraph({
+		cells: [
+			{
+				graphNodeId: STATE,
+				value: {
+					get rows() {
+						reads++;
+						return list;
+					},
+				},
+			},
+		],
+		computed,
+	});
+
+	graph.write({ graphNodeId: STATE, path: ['rows', '0', 'title'], value: 'next' });
+	return reads;
+}
+
+// --- the graph without the plane ------------------------------------------
+
+// Reconciliation is opt-in. A graph built without the plane behaves the way the
+// runtime did before reconciliation existed: a computed invalidation dirties
+// the whole node, so every subscriber of that node re-checks even when the part
+// it reads did not move.
+test('a computed invalidation dirties the whole node when no plane is installed', async () => {
+	const build = (reconcile?: RuntimeGraphInput['reconcile']) => {
+		const recorder = subscriptionRecorder();
+		const graph = createGraph({
+			reconcile,
+			cells: [{ graphNodeId: STATE, value: rows(2) }],
+			computed: [
+				{
+					graphNodeId: DERIVED,
+					dependencies: [{ graphNodeId: STATE }],
+					compute: (read) => {
+						const list = read(STATE) as ReadonlyArray<Row>;
+						return { total: list.length, done: list.filter((row) => row.completed).length };
+					},
+				},
+			],
+		});
+		graph.subscribe({ id: 'total', graphNodeId: DERIVED, path: ['total'], run: recorder.run });
+		// A first read publishes the baseline the next recompute is compared with.
+		graph.read(DERIVED);
+		return { graph, recorder };
+	};
+
+	const plain = build();
+	plain.graph.write({ graphNodeId: STATE, path: ['0', 'completed'], value: true });
+	await plain.graph.flush();
+	// `total` did not move, but the whole node was dirtied, so it re-checked.
+	expect(plain.recorder.runs).toBe(1);
+
+	const reconciled = build(createDerivedReconcilePlane);
+	reconciled.graph.write({ graphNodeId: STATE, path: ['0', 'completed'], value: true });
+	await reconciled.graph.flush();
+	expect(reconciled.recorder.runs).toBe(0);
+});
+
+// The write-touched record is the plane's, so a graph without one records
+// nothing extra per write: it never walks the written path to collect the
+// containers a reconciliation would have needed.
+test('a write records no write-touched containers when no plane is installed', () => {
+	expect(containerReads(undefined)).toBeLessThan(containerReads(createDerivedReconcilePlane));
+});
+
+/** Counts how many times a write reads the container the written path goes through. */
+function containerReads(reconcile: RuntimeGraphInput['reconcile']): number {
+	let reads = 0;
+	const list = rows(1);
+	const graph = createGraph({
+		reconcile,
+		cells: [
+			{
+				graphNodeId: STATE,
+				value: {
+					get rows() {
+						reads++;
+						return list;
+					},
+				},
+			},
+		],
+		computed: [
+			{
+				graphNodeId: DERIVED,
+				dependencies: [{ graphNodeId: STATE }],
+				compute: (read) => read(STATE, ['rows']),
+			},
+		],
+	});
+
+	graph.write({ graphNodeId: STATE, path: ['rows', '0', 'title'], value: 'next' });
+	return reads;
+}
+
+// The async half is the plane's too: without one a snapshot commit dirties the
+// whole node, so a cell reading a value field that did not move re-checks.
+test('an async publish dirties the whole node when no plane is installed', async () => {
+	const build = (reconcile?: RuntimeGraphInput['reconcile']) => {
+		const runs = deferredRuns();
+		const y = subscriptionRecorder();
+		const graph = createGraph({
+			reconcile,
+			cells: [{ graphNodeId: TICK, value: 0 }],
+			asyncComputed: [
+				{
+					graphNodeId: ASYNC,
+					dependencies: [{ graphNodeId: TICK, path: [] }],
+					key: (read) => read(TICK),
+					run: runs.run,
+				},
+			],
+		});
+		graph.subscribe({ id: 'view-dom-update:y', graphNodeId: ASYNC, path: ['y'], run: y.run });
+		graph.read(ASYNC, ['status']);
+		return { graph, runs, y };
+	};
+
+	const settleFirst = async (built: ReturnType<typeof build>) => {
+		built.runs.resolvers[0]!({ x: 1, y: 2 });
+		await settle();
+		await built.graph.flush();
+		return built.y.runs;
+	};
+
+	const plain = build();
+	const plainMounted = await settleFirst(plain);
+	// Only `x` moves, but both the pending flip and the fulfilled commit dirty
+	// the whole node, so `y` re-checked twice.
+	plain.graph.write({ graphNodeId: TICK, value: 1 });
+	await plain.graph.flush();
+	plain.runs.resolvers[1]!({ x: 9, y: 2 });
+	await settle();
+	await plain.graph.flush();
+	expect(plain.y.runs).toBe(plainMounted + 2);
+
+	const reconciled = build(createDerivedReconcilePlane);
+	const reconciledMounted = await settleFirst(reconciled);
+	reconciled.graph.write({ graphNodeId: TICK, value: 1 });
+	await reconciled.graph.flush();
+	reconciled.runs.resolvers[1]!({ x: 9, y: 2 });
+	await settle();
+	await reconciled.graph.flush();
+	expect(reconciled.y.runs).toBe(reconciledMounted);
 });

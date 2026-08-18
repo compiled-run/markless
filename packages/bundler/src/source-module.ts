@@ -211,6 +211,8 @@ export function emitSourceModule(input: {
 	readonly hasBoundSymbols?: boolean;
 	readonly prerenderRecords?: boolean;
 	readonly directCsr?: boolean;
+	/** Whether the app's serialized state defines computed nodes. */
+	readonly hasComputedState?: boolean;
 }) {
 	if (input.directCsr && input.prerenderRecords) input = { ...input, prerenderRecords: false };
 	const symbolsOnly = input.environment === 'client' && input.clientOutput === 'symbols-only';
@@ -239,6 +241,17 @@ export function emitSourceModule(input: {
 		symbolsOnly
 			? ''
 			: `import { state as payloadState, view as payloadView, runtimeDemandMap as payloadRuntimeDemandMap } from '${input.payloadId}';`,
+		// A CSR mount builds its graph from this module, never from a resume
+		// module, so a computed-using CSR app installs the plane here instead.
+		// Server-rendered apps install it in their resume module: putting it here
+		// too would drag the plane into the eager container chunk of a page that
+		// may never resume.
+		input.environment === 'client' && input.directCsr === true && input.hasComputedState === true
+			? [
+					"import { installMarklessDerivedReconcile } from '@markless/web/fns/reconcile-plane';",
+					'installMarklessDerivedReconcile();',
+				].join('\n')
+			: null,
 		'',
 		emitLoadSymbol(input),
 		input.behaviorSymbols?.length
@@ -305,6 +318,17 @@ export function emitSourceModule(input: {
 	]
 		.filter((line): line is string => line !== null)
 		.join('\n');
+}
+
+/**
+ * Whether this app's serialized state defines any computed node. Computed
+ * definitions are what `createRuntimeGraph` turns into derived graph nodes on
+ * resume, so they are exactly the apps derived reconciliation can act on.
+ */
+function payloadHasComputed(payloadState: unknown): boolean {
+	const computed = (payloadState as { readonly computed?: ReadonlyArray<unknown> } | undefined)
+		?.computed;
+	return Array.isArray(computed) && computed.length > 0;
 }
 
 export function emitResumeModule(input: {
@@ -378,6 +402,17 @@ export function emitResumeModule(input: {
 			? `async function marklessLoadPrerenderData() { const module = await import('${input.prerenderDataId}'); return module.marklessPrerenderData; }`
 			: null,
 		`import { runtimeDemandMap as payloadRuntimeDemandMap } from '${input.payloadId}';`,
+		// Derived reconciliation is pay-per-use. Only a payload that carries
+		// computed nodes emits the plane module, and it installs at module
+		// evaluation so the plane is in place before any resume entry builds the
+		// graph. The call is explicit because `@markless/web` declares
+		// `sideEffects: false`, which would drop a bare side-effect import.
+		payloadHasComputed(input.payloadState)
+			? [
+					"import { installMarklessDerivedReconcile } from '@markless/web/fns/reconcile-plane';",
+					'installMarklessDerivedReconcile();',
+				].join('\n')
+			: null,
 		scalarSpecializations.length > 0
 			? [
 					"import { marklessDecodeScalarCell, marklessReadScalarCell, marklessScalarSpecializedError } from '@markless/web/fns/scalar-specialized';",

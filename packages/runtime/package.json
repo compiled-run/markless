@@ -19,6 +19,10 @@
 			"./graph": {
 				"types": "./dist/graph.d.ts",
 				"default": "./dist/graph.js"
+			},
+			"./graph-reconcile": {
+				"types": "./dist/graph-reconcile.d.ts",
+				"default": "./dist/graph-reconcile.js"
 			}
 		}
 	},
@@ -26,7 +30,8 @@
 	"sideEffects": false,
 	"exports": {
 		".": "./src/index.ts",
-		"./graph": "./src/graph.ts"
+		"./graph": "./src/graph.ts",
+		"./graph-reconcile": "./src/graph-reconcile.ts"
 	},
 	"dependencies": {
 		"@markless/serializer": "workspace:*"

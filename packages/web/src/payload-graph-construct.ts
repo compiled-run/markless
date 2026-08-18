@@ -1,5 +1,6 @@
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer/protocol';
 import type { SerializedGraphPayload } from '../../serializer/src/value-decode-client.ts';
+import { derivedReconcilePlane } from './reconcile-plane-slot.ts';
 import type { ResumeDomElement, ResumeRuntimeInput } from './resume.ts';
 
 type RuntimeModule = typeof import('@markless/runtime');
@@ -43,6 +44,7 @@ export async function createRuntimeGraphFromResumePayload(
 		})),
 		sharedDefinitions: input.state.sharedDefinitions,
 		asyncComputed,
+		reconcile: derivedReconcilePlane(),
 	});
 	return graph;
 }

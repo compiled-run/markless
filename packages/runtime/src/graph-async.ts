@@ -4,7 +4,6 @@ import type {
 	RuntimeGraphRead,
 } from './graph.ts';
 import { readPath } from './graph-core.ts';
-import { diffDerivedValue, isDiffableContainer } from './graph-reconcile.ts';
 import type { RuntimeComputedNode } from './graph-computed.ts';
 
 export type RuntimeAsyncComputedNode = RuntimeGraphAsyncComputed & {
@@ -14,7 +13,20 @@ export type RuntimeAsyncComputedNode = RuntimeGraphAsyncComputed & {
 	version: number;
 };
 
-const ASYNC_SNAPSHOT_META_KEYS = new Set(['status', 'version', 'key', 'error', 'value']);
+export const ASYNC_SNAPSHOT_META_KEYS = new Set(['status', 'version', 'key', 'error', 'value']);
+
+/**
+ * The async half of the derived-reconcile plane, when one is installed. Without
+ * it a snapshot commit dirties the whole node.
+ */
+type AsyncReconcile = {
+	readonly reconcile?: {
+		readonly publishAsync: (
+			node: RuntimeAsyncComputedNode,
+			previous: RuntimeGraphAsyncSnapshot,
+		) => void;
+	};
+};
 
 export function createRuntimeAsyncComputedNodes(
 	asyncComputedInput: ReadonlyArray<RuntimeGraphAsyncComputed> | undefined,
@@ -48,7 +60,7 @@ export function readAsyncComputedNode(
 	return readPath((node.snapshot as { readonly value?: unknown }).value, path);
 }
 
-export function demandAsyncComputed(input: {
+export function demandAsyncComputed(input: AsyncReconcile & {
 	readonly node: RuntimeAsyncComputedNode;
 	readonly computedNodes: ReadonlyMap<string, RuntimeComputedNode>;
 	readonly asyncComputedNodes: ReadonlyMap<string, RuntimeAsyncComputedNode>;
@@ -65,7 +77,7 @@ export function demandAsyncComputed(input: {
 	advanceAsyncComputed(input);
 }
 
-export function invalidateAsyncComputed(input: {
+export function invalidateAsyncComputed(input: AsyncReconcile & {
 	readonly node: RuntimeAsyncComputedNode;
 	readonly computedNodes: ReadonlyMap<string, RuntimeComputedNode>;
 	readonly asyncComputedNodes: ReadonlyMap<string, RuntimeAsyncComputedNode>;
@@ -79,7 +91,7 @@ export function invalidateAsyncComputed(input: {
 	advanceAsyncComputed(input);
 }
 
-function advanceAsyncComputed(input: {
+function advanceAsyncComputed(input: AsyncReconcile & {
 	readonly node: RuntimeAsyncComputedNode;
 	readonly computedNodes: ReadonlyMap<string, RuntimeComputedNode>;
 	readonly asyncComputedNodes: ReadonlyMap<string, RuntimeAsyncComputedNode>;
@@ -129,7 +141,7 @@ function advanceAsyncComputed(input: {
 }
 
 function commitDependencyBlock(
-	input: {
+	input: AsyncReconcile & {
 		readonly node: RuntimeAsyncComputedNode;
 		readonly markDirtyPath: (graphNodeId: string, path: ReadonlyArray<string>) => void;
 		readonly scheduleFlush: () => void;
@@ -169,7 +181,7 @@ function commitDependencyBlock(
 	);
 }
 
-function startAsyncComputed(input: {
+function startAsyncComputed(input: AsyncReconcile & {
 	readonly node: RuntimeAsyncComputedNode;
 	readonly key: unknown;
 	readonly readGraph: RuntimeGraphRead;
@@ -215,7 +227,7 @@ function startAsyncComputed(input: {
 }
 
 function publish(
-	input: {
+	input: AsyncReconcile & {
 		readonly node: RuntimeAsyncComputedNode;
 		readonly markDirtyPath: (graphNodeId: string, path: ReadonlyArray<string>) => void;
 		readonly scheduleFlush: () => void;
@@ -224,75 +236,7 @@ function publish(
 ): void {
 	const previous = input.node.snapshot;
 	input.node.snapshot = snapshot;
-	for (const path of asyncCommitPaths(input.node, previous, snapshot)) {
-		input.markDirtyPath(input.node.graphNodeId, path);
-	}
+	if (input.reconcile) input.reconcile.publishAsync(input.node, previous);
+	else input.markDirtyPath(input.node.graphNodeId, []);
 	input.scheduleFlush();
-}
-
-/**
- * The graph paths a snapshot commit changed. Snapshot metadata is addressed as
- * `status`/`version`/`key`/`error`; the fulfilled value is addressed both as
- * `value.<path>` and, for compiled reads, as the bare `<path>` (see
- * `readAsyncComputedNode`), so a changed value path is reported in both
- * coordinate systems.
- *
- * A value commit compares structurally only. Unlike a sync computed, an async
- * snapshot can land long after the flush that wrote the state it embeds, so the
- * per-flush write-touched record is already cleared by the time it publishes.
- * Identity below the root therefore proves nothing here: a runner that returns
- * live state objects publishes the very rows a later write mutated in place,
- * and treating them as unchanged would silently withhold that write from the
- * subscribers of those paths. The diff runs in `identicalContainers: 'unknown'`
- * mode, which reports each identical nested container at its path; a value
- * rebuilt from fresh objects still reconciles field by field, and an identical
- * root is handled by the whole-node rule below.
- */
-function asyncCommitPaths(
-	node: RuntimeAsyncComputedNode,
-	previous: RuntimeGraphAsyncSnapshot,
-	next: RuntimeGraphAsyncSnapshot,
-): ReadonlyArray<ReadonlyArray<string>> {
-	const paths: ReadonlyArray<string>[] = [];
-	if (previous.status !== next.status) paths.push(['status']);
-	if (previous.version !== next.version) paths.push(['version']);
-	if (!Object.is(snapshotField(previous, 'key'), snapshotField(next, 'key'))) paths.push(['key']);
-	if (!Object.is(snapshotField(previous, 'error'), snapshotField(next, 'error'))) {
-		paths.push(['error']);
-	}
-
-	// A pending re-run carries the prior settled value forward, so value cells
-	// never re-check on a pending flip.
-	if (next.status === 'pending') return paths;
-
-	const previousValue = snapshotField(previous, 'value');
-	const nextValue = snapshotField(next, 'value');
-	if (
-		!Object.is(previousValue, nextValue) &&
-		isDiffableContainer(previousValue) &&
-		isDiffableContainer(nextValue)
-	) {
-		const changed = diffDerivedValue({
-			previous: previousValue,
-			next: nextValue,
-			keyed: node.reconcile?.keyed,
-			identicalContainers: 'unknown',
-		});
-		if (changed.every((path) => path.length > 0)) {
-			for (const path of changed) {
-				paths.push(['value', ...path]);
-				if (!ASYNC_SNAPSHOT_META_KEYS.has(path[0])) paths.push([...path]);
-			}
-			return paths;
-		}
-	}
-
-	// The value root was replaced by something structurally incomparable, or is
-	// the identical reference the runner was handed: nothing narrower is sound.
-	paths.push([]);
-	return paths;
-}
-
-function snapshotField(snapshot: RuntimeGraphAsyncSnapshot, field: string): unknown {
-	return (snapshot as Record<string, unknown>)[field];
 }
