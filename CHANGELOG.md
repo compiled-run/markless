@@ -10,6 +10,50 @@ version of everything else.
 
 This file starts at 0.2.0. Earlier versions have no changelog entries.
 
+## 0.3.2
+
+A patch release with one runtime change you will feel on pages that derive lists
+or objects, and one compiler fix.
+
+### A recomputed `computed()` only wakes what actually changed
+
+Before this release, when a `computed()` re-ran, the runtime treated its whole
+result as new: every expression on the page that read any part of it re-checked.
+For a derived list of N rows that meant N re-checks after a change to one field
+of one row.
+
+Now the runtime keeps one persistent node per computed and reconciles each new
+result against the previous one:
+
+- Objects reconcile field by field. A field that did not change wakes nothing.
+- Arrays reconcile by element identity, or by a key you declare on the computed
+  node with the runtime option `reconcile.keyed[{ path, keyPath }]`. Position
+  alone is never treated as identity, so two different elements at the same
+  index are never confused for one another. Malformed keys (missing or
+  duplicated on either side) fall back to structural comparison, silently in
+  production and with a diagnostic in a debug build.
+- Reconciliation never mutates your values and `computed()` stays read-only.
+  Objects your derive function returned unchanged keep their identity, which is
+  what keyed rows and `element()` handles rely on.
+
+The work that follows a recompute (dirty paths, woken subscriptions, DOM
+updates) is now proportional to what changed rather than to the size of the
+value. Comparison itself still visits each compared container level. Async
+computeds get the same treatment when they publish a fulfilled value.
+
+Runtime bytes grew with this change (about 1.4 kB gzip in the shipped client);
+that cost is tracked and a follow-up moves the reconcile machinery out of the
+path of apps that never use `computed()`.
+
+### `class` bindings tested by an expression update again
+
+`class={picked === 'x' ? 'a' : 'b'}` produced no DOM update record: the
+conditional-class branch of the compiler never created the template-expression
+node that text bindings get, so the read could not be resolved and the update
+was dropped silently. It now goes through the same composite-expression path as
+text bindings. Bare-identifier tests such as `class={active ? 'a' : 'b'}` were
+already fine and are unchanged.
+
 ## 0.3.1
 
 A patch release with three fixes found while building the Markless docs site as

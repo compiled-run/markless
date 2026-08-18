@@ -1,6 +1,6 @@
 {
 	"name": "@markless/runtime",
-	"version": "0.3.1",
+	"version": "0.3.2",
 	"description": "Markless state graph runtime: reads, writes, computed invalidation, flush journal.",
 	"license": "MIT",
 	"repository": {
