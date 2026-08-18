@@ -2,6 +2,7 @@ import os from 'node:os';
 import { performance } from 'node:perf_hooks';
 
 import { createRuntimeGraph } from '../../packages/runtime/src/graph.ts';
+import { createDerivedReconcilePlane } from '../../packages/runtime/src/graph-reconcile.ts';
 
 import { createFailedResult } from '../benchmarks/lib/results.mjs';
 
@@ -247,6 +248,7 @@ async function measureListCase({ size, keyed, computeNode }) {
 
 	const counters = createCounters();
 	const graph = createRuntimeGraph({
+		reconcile: createDerivedReconcilePlane,
 		cells: [{ graphNodeId: STATE_NODE_ID, value: rows }],
 		computed: [
 			{
@@ -306,6 +308,7 @@ async function measureObjectCase({ size }) {
 
 	const counters = createCounters();
 	const graph = createRuntimeGraph({
+		reconcile: createDerivedReconcilePlane,
 		cells: [{ graphNodeId: STATE_NODE_ID, value: values }],
 		computed: [
 			{
