@@ -18,6 +18,7 @@ import { runTodoMvc } from '../todomvc/run.mjs';
 import { runChatStream } from '../chat-stream/run.mjs';
 import { runBundleSize } from '../bundle-size/run.mjs';
 import { runCodegenSize } from '../codegen-size/run.mjs';
+import { derivedReconcileProtocol, runDerivedReconcile } from '../derived-reconcile/run.mjs';
 
 process.env.NODE_ENV = 'production';
 
@@ -37,12 +38,13 @@ const benchmarkDefinitions = {
 	'chat-stream': { run: runChatStream, protocol: interactionProtocol },
 	'bundle-size': { run: runBundleSize, protocol: sizeProtocol },
 	'codegen-size': { run: runCodegenSize, protocol: sizeProtocol },
+	'derived-reconcile': { run: runDerivedReconcile, protocol: derivedReconcileProtocol },
 };
 const benchmarkDefinition = benchmarkDefinitions[benchmark];
 
 if (!benchmarkDefinition) {
 	console.error(
-		'usage: node bench.mjs <ssr-throughput|streaming-ssr|news|async-waterfall|computed-chain|memo-wall|dbmon|todomvc|chat-stream|bundle-size|codegen-size> [--smoke] [--record] [--build-only] [--ssr-only] [--gen-check]',
+		'usage: node bench.mjs <ssr-throughput|streaming-ssr|news|async-waterfall|computed-chain|memo-wall|dbmon|todomvc|chat-stream|bundle-size|codegen-size|derived-reconcile> [--smoke] [--record] [--build-only] [--ssr-only] [--gen-check]',
 	);
 	process.exit(2);
 }
@@ -56,8 +58,11 @@ if (benchmark === 'computed-chain' && flags.has('--gen-check')) {
 }
 
 const fixtureRoot = path.resolve(root, '..', benchmark, 'fixture');
-const nodeOnlySizeBenchmark = benchmark === 'bundle-size' || benchmark === 'codegen-size';
-if (!nodeOnlySizeBenchmark) {
+// Node-only benchmarks own their whole measurement: no Vite fixture build, no
+// browser, no Playwright.
+const nodeOnlyBenchmarks = new Set(['bundle-size', 'codegen-size', 'derived-reconcile']);
+const nodeOnlyBenchmark = nodeOnlyBenchmarks.has(benchmark);
+if (!nodeOnlyBenchmark) {
 	await buildFixture(fixtureRoot);
 	if (flags.has('--build-only')) {
 		console.log(`built ${benchmark} production fixture`);
@@ -70,7 +75,7 @@ const protocol = benchmarkDefinition.protocol(smoke);
 const environment = collectEnvironment();
 let fixture;
 const csrBrowserBenchmarks = ['computed-chain', 'memo-wall', 'dbmon', 'todomvc', 'chat-stream'].includes(benchmark);
-if (!nodeOnlySizeBenchmark && !csrBrowserBenchmarks) {
+if (!nodeOnlyBenchmark && !csrBrowserBenchmarks) {
 	const entryPath = path.join(
 		fixtureRoot,
 		'dist',
@@ -355,6 +360,15 @@ function printSummary(result, resultPath) {
 				`${benchmarkCase.name.padEnd(10)} ${String(bytes.source.gzip).padStart(11)} ${String(bytes.compiled.raw).padStart(14)} ${String(bytes.compiled.minified).padStart(14)} ${String(bytes.compiled.gzip).padStart(15)}`,
 			);
 		}
+	} else if (result.benchmark === 'derived-reconcile') {
+		console.log('case                          N   re-checks   reconciled   collection runs');
+		for (const benchmarkCase of result.cases) {
+			const metrics = benchmarkCase.metrics;
+			console.log(
+				`${benchmarkCase.name.padEnd(25)} ${String(metrics.size).padStart(6)} ${String(metrics.reChecks).padStart(11)} ${String(metrics.expectedReChecks).padStart(12)} ${String(metrics.collectionRuns).padStart(17)}`,
+			);
+		}
+		console.log('re-checks are `view-dom-update:*` subscription runs; milliseconds are never a gate here');
 	} else if (result.benchmark === 'streaming-ssr') {
 		console.log(
 			'scenario       shell p50 ms   total p50 ms   chunks   total bytes   renders/sec',

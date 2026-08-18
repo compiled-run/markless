@@ -153,13 +153,28 @@ export function withMarklessBaselineResults(baseline, marklessResults) {
 	if (!isObject(marklessResults))
 		throw new Error('Expected Markless baseline results to be a JSON object.');
 
+	// Fresh same-machine results replace the committed Markless CPU rows so
+	// runner noise is measured against itself. Size rows are different: the
+	// committed baseline carries owner-ratified size, and a same-machine build
+	// of the base commit must not silently retract that ratification (a PR that
+	// grows the runtime by an accepted amount would otherwise fail against a
+	// base that never carried it). Each size row uses the larger of the two.
+	const ratified = baseline.frameworks?.markless?.results;
+	const results = { ...marklessResults };
+	for (const key of baseline.benchmarks?.size ?? []) {
+		const fresh = readNumber(marklessResults[key]);
+		const accepted = readNumber(ratified?.[key]);
+		if (fresh === undefined || accepted === undefined) continue;
+		results[key] = Math.max(fresh, accepted);
+	}
+
 	return {
 		...baseline,
 		frameworks: {
 			...baseline.frameworks,
 			markless: {
 				...baseline.frameworks?.markless,
-				results: marklessResults,
+				results,
 			},
 		},
 	};

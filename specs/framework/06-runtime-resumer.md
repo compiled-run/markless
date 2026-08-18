@@ -40,6 +40,11 @@ patch located real DOM nodes in place. `markless/view` records and graph DOM upd
 records may describe how to find/update existing DOM, but they are not an
 alternate UI tree to diff.
 
+Derived nodes do reconcile _data_: a recomputed value is compared structurally
+with the node's previous value, and only the graph paths that changed
+invalidate. That comparison runs on graph values, never on element trees or
+render output.
+
 ### Scheduler and flush semantics
 
 The scheduler is a graph scheduler with a DOM mutation journal. A journal is
@@ -58,8 +63,9 @@ The v1 scheduler contract is:
 - The default flush point is a microtask scheduled by the first graph write in
   an otherwise idle turn. The runtime may also force an internal flush before it
   must observe updated DOM or finish an initial render/resume operation.
-- A flush drains graph work until stable: recompute dirty sync computed nodes,
-  discover newly dirty DOM updates, enqueue demanded DOM update symbols, and repeat
+- A flush drains graph work until stable: recompute dirty sync computed nodes
+  that have subscribers, reconcile their results into changed paths, discover
+  newly dirty DOM updates, enqueue demanded DOM update symbols, and repeat
   until no synchronous graph work remains.
 - DOM work produced during the flush is appended to a DOM mutation journal and
   applied after graph work settles for that flush.
