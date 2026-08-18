@@ -10,6 +10,40 @@ version of everything else.
 
 This file starts at 0.2.0. Earlier versions have no changelog entries.
 
+## 0.3.1
+
+A patch release with three fixes found while building the Markless docs site as
+a Markless app on the published packages.
+
+### MDX islands that derive a value now resume
+
+An MDX page is stitched from several `.tsrx` islands, and each island gets its
+own symbol prefix. The view side already applied that prefix; the composed state
+payload did not, so an island whose update re-derived a `computed()` looked up a
+symbol the loader table did not know and failed with `Unknown Markless MDX
+symbol`. `composeMdxState` now prefixes `deriveSymbolId` the same way the view
+side prefixes host and event symbol ids.
+
+### `storage()` works in router apps
+
+A module-scope `storage()` used from a page or MDX island served a state payload
+stamped as the storage version with no storage records, and the client refused
+the whole payload, taking every island on the page down with it. Storage records
+now travel through MDX composition, the payload version is computed from what the
+payload carries, and MDX pages emit the no-flash storage seed script. A
+`storage()` declared in `document.tsrx` used to be dropped silently; it now fails
+the build with `MARKLESS_ROUTER_DOCUMENT_STORAGE_UNSUPPORTED`, which tells you to
+move it into a component the page renders.
+
+### `@for` over a plain array renders its rows
+
+`@for` over a collection that is not reactive state, such as an inline array, a
+module constant, or an imported constant, rendered zero rows on the server with no
+diagnostic. The compiler now carries the authored collection expression on the
+repeat record and the server-render module evaluates it in the module's own
+scope, so those loops render. A repeat with no readable collection is a build
+error, `MARKLESS_REPEAT_COLLECTION_UNREADABLE`, instead of an empty list.
+
 ## 0.3.0
 
 The headline is what a page runs before you touch it. On 0.2.2, loading a
