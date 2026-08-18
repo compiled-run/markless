@@ -252,7 +252,7 @@ test('buildSemanticGraph reports module-scope graph state creation', async () =>
 	const stateStart = moduleScopeSource.indexOf('state(0)');
 	const computedStart = moduleScopeSource.indexOf('computed(() => leaked * 2)');
 
-	expect(graph.components).toEqual([{ name: 'App' }]);
+	expect(graph.components).toEqual([{ name: 'App', exportName: 'App' }]);
 	expect(graph.graphBindings).toEqual([]);
 	expect(graph.diagnostics).toEqual([
 		expect.objectContaining({

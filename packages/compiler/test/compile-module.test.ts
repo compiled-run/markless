@@ -811,7 +811,7 @@ test('compileTsrxModule orchestrates source to payload scripts and resolver modu
 		],
 	});
 
-	expect(result.semanticGraph.components).toEqual([{ name: 'App' }]);
+	expect(result.semanticGraph.components).toEqual([{ name: 'App', exportName: 'App' }]);
 	expect(result.stateLowering.diagnostics).toEqual([]);
 	expect(result.captureAnalysis.extractedSymbols).toEqual(
 		expect.arrayContaining([
@@ -1093,7 +1093,7 @@ test('compileTsrxModule treats a default exported TSRX function as the public re
 		symbols: [],
 	});
 
-	expect(result.semanticGraph.components).toEqual([{ name: 'Home' }]);
+	expect(result.semanticGraph.components).toEqual([{ name: 'Home', exportName: 'default' }]);
 	expect(result.protocolView.locators).toEqual(
 		expect.arrayContaining([
 			expect.objectContaining({ hostNodeId: 'h0', tagName: 'main' }),
@@ -1121,7 +1121,7 @@ export function Dashboard() @{
 		symbols: [],
 	});
 
-	expect(result.semanticGraph.components).toEqual([{ name: 'Dashboard' }]);
+	expect(result.semanticGraph.components).toEqual([{ name: 'Dashboard', exportName: 'Dashboard' }]);
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
 	expect(result.publicRenderModule.ssrModuleSource).toContain('function marklessRenderSsr');
 });
@@ -1865,7 +1865,7 @@ export const App = () => @{
 		symbols: [],
 	});
 
-	expect(result.semanticGraph.components).toEqual([{ name: 'App' }]);
+	expect(result.semanticGraph.components).toEqual([{ name: 'App', exportName: 'App' }]);
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
 	const output = await (ssrModule.marklessRenderSsr as () => { readonly html: string })();

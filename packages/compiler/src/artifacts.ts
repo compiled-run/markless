@@ -28,6 +28,8 @@ export type ArtifactChildMaterialization = {
 
 export type SemanticComponent = {
 	readonly name: string;
+	/** How this module exports the component: `default`, the export name, or absent. */
+	readonly exportName?: string;
 };
 
 // An authored prop binding is identified by its declaration span, not by the
@@ -138,14 +140,38 @@ export type ModuleGraphInterfaceExport =
 			readonly bindingKind: 'state' | 'computed';
 	  };
 
+/** `export { default as root } from './x.tsrx'` as the module authored it. */
+export type ModuleGraphInterfaceReexport = {
+	readonly exportName: string;
+	readonly source: string;
+	/** `default`, a named export, or `*` for `export * as ns from`. */
+	readonly importedName: string;
+};
+
+/**
+ * A component a barrel module re-exports, with the specifier already rebased to
+ * the module that imports the barrel. Linkers produce this; compiling a module
+ * alone cannot, because only the linker resolves specifiers.
+ */
+export type ModuleGraphInterfaceLinkedComponent = {
+	readonly exportPath: ReadonlyArray<string>;
+	readonly source: string;
+	readonly importKind: SemanticModuleImport['kind'];
+	readonly importedName?: string;
+	readonly componentName: string;
+};
+
 export type ModuleGraphInterfaceArtifact = {
 	readonly passId: 'module-graph-interface';
 	readonly filename: string;
 	readonly exports: ReadonlyArray<ModuleGraphInterfaceExport>;
+	readonly reexports?: ReadonlyArray<ModuleGraphInterfaceReexport>;
+	readonly linkedComponents?: ReadonlyArray<ModuleGraphInterfaceLinkedComponent>;
 	readonly render: {
 		readonly version: 1;
 		readonly components: ReadonlyArray<{
 			readonly componentName: string;
+			readonly exportName?: string;
 			readonly rootChunkId: string;
 			readonly childChunks: ReadonlyArray<{
 				readonly id: string;
@@ -352,6 +378,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_REPEAT_COLLECTION_UNREADABLE'
 		| 'MARKLESS_TEMPLATE_AS_VALUE'
 		| 'MARKLESS_SUBMODULE_UNSUPPORTED'
+		| 'MARKLESS_COMPONENT_TAG_UNRESOLVED'
 		| 'MARKLESS_ALLOW_ERROR_UNSUPPRESSIBLE'
 		| 'MARKLESS_ALLOW_REASON_REQUIRED'
 		| 'MARKLESS_ALLOW_STALE';

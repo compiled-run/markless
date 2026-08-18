@@ -37,9 +37,11 @@ export function emitPublicSsrRenderModule(
 	);
 	const asyncRunnerDefinitions = collectSsrAsyncRunnerDefinitions(input);
 	const hasAsyncDependencyRegistry = asyncRunnerDefinitions.size > 0;
+	const moduleScope = moduleScopeLines(input.source.source, input.source.filename);
 	const valueImports = publicRenderValueImports(
 		input.semanticGraph.moduleImports,
 		input.semanticGraph.componentEdges,
+		moduleScope.join('\n'),
 	);
 	const hostLocators = staticHostLocators(input);
 	const propEvents = collectSsrPropEvents(
@@ -175,7 +177,7 @@ export function emitPublicSsrRenderModule(
 				names: ['marklessSsrRepeatRows', 'marklessSsrComponentRepeatRows'],
 			},
 		]),
-		...moduleScopeLines(input.source.source, input.source.filename),
+		...moduleScope,
 		...sameModuleComponents,
 		bodySource,
 	]

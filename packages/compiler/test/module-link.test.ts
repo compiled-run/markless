@@ -2,10 +2,12 @@ import { expect, test } from 'vitest';
 import type {
 	CaptureAnalysisArtifact,
 	LinkedModuleChildResolution,
+	ModuleGraphInterfaceArtifact,
 	ModuleLinkArtifact,
 } from '../src/artifacts.ts';
 import { linkCompilerPasses } from '../src/pass-registry.ts';
 import {
+	linkBarrelComponents,
 	linkImportedModules,
 	linkedImportedClaimsMissing,
 	linkedImportedSymbolInputs,
@@ -317,4 +319,167 @@ test('a child with no component edge never blocks the imported-claims seal', () 
 	expect(symbolInputs([child('edge-1')])).toHaveLength(1);
 	expect(missing([child('edge-1')], [])).toBe(true);
 	expect(missing([child('edge-1')], symbolInputs([child('edge-1')]))).toBe(false);
+});
+
+
+// The barrel walk is a pass step: it resolves nothing and reads no file. Every
+// specifier it reaches comes back as a pending request the driver fills, so the
+// walk below runs the same fixpoint the driver runs.
+const barrelInterface = (
+	filename: string,
+	reexports: ReadonlyArray<{ exportName: string; source: string; importedName: string }>,
+): ModuleGraphInterfaceArtifact => ({
+	passId: 'module-graph-interface',
+	filename,
+	exports: [],
+	reexports,
+	render: { version: 1, components: [] },
+});
+
+const componentInterface = (
+	filename: string,
+	componentName: string,
+	exportName: string,
+): ModuleGraphInterfaceArtifact => ({
+	passId: 'module-graph-interface',
+	filename,
+	exports: [],
+	render: {
+		version: 1,
+		components: [{ componentName, exportName, rootChunkId: 'chunk:0', childChunks: [] }],
+	},
+});
+
+// Stands in for the bundler's resolver: joins the specifier onto the importer's
+// directory, and answers nothing for a file the fixture does not declare.
+const declaredFiles = new Set<string>();
+const joinResolve = (specifier: string, importer: string): string | null => {
+	const base = importer.slice(0, importer.lastIndexOf('/'));
+	const joined = `${base}/${specifier.replace(/^\.\//, '')}`;
+	return declaredFiles.has(joined) ? joined : null;
+};
+
+function walkBarrels(input: {
+	readonly parent: string;
+	readonly moduleImports: ReadonlyArray<{ readonly source: string }>;
+	readonly resolve: (specifier: string, importer: string) => string | null;
+	readonly interfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
+}) {
+	declaredFiles.clear();
+	for (const filename of Object.keys(input.interfaces)) declaredFiles.add(filename);
+	const resolution: Record<string, string | null> = {};
+	const read = new Map<string, ModuleGraphInterfaceArtifact | null>();
+	const call = () =>
+		linkBarrelComponents({
+			parent: input.parent,
+			moduleImports: input.moduleImports,
+			resolution,
+			moduleInterface: (filename) => read.get(filename),
+			rebase: (target) => `./${target.slice('/app/'.length)}`,
+		});
+	let artifact = call();
+	for (let round = 0; artifact.pendingResolutions.length + artifact.pendingInterfaces.length; ) {
+		expect(round).toBeLessThan(8);
+		round += 1;
+		for (const request of artifact.pendingResolutions) {
+			resolution[moduleLinkResolutionKey(request.specifier, request.parent)] = input.resolve(
+				request.specifier,
+				request.parent,
+			);
+		}
+		for (const filename of artifact.pendingInterfaces) {
+			read.set(filename, input.interfaces[filename] ?? null);
+		}
+		artifact = call();
+	}
+	return artifact;
+}
+
+test('linkBarrelComponents follows an export * as chain to the .tsrx components behind it', () => {
+	const artifact = walkBarrels({
+		parent: '/app/App.tsrx',
+		moduleImports: [{ source: './ui.ts' }, { source: 'rolldown' }, { source: './Other.tsrx' }],
+		resolve: joinResolve,
+		interfaces: {
+			'/app/ui.ts': barrelInterface('/app/ui.ts', [
+				{ exportName: 'checkbox', source: './checkbox/index.ts', importedName: '*' },
+			]),
+			'/app/checkbox/index.ts': barrelInterface('/app/checkbox/index.ts', [
+				{ exportName: 'root', source: './checkbox-root.tsrx', importedName: 'CheckboxRoot' },
+				{
+					exportName: 'trigger',
+					source: './checkbox-trigger.tsrx',
+					importedName: 'CheckboxTrigger',
+				},
+			]),
+			'/app/checkbox/checkbox-root.tsrx': componentInterface(
+				'/app/checkbox/checkbox-root.tsrx',
+				'CheckboxRoot',
+				'CheckboxRoot',
+			),
+			'/app/checkbox/checkbox-trigger.tsrx': componentInterface(
+				'/app/checkbox/checkbox-trigger.tsrx',
+				'CheckboxTrigger',
+				'CheckboxTrigger',
+			),
+		},
+	});
+
+	expect(artifact.diagnostics).toEqual([]);
+	expect(artifact.children).toEqual([
+		{
+			parent: '/app/App.tsrx',
+			specifier: './checkbox/checkbox-root.tsrx',
+			source: '/app/checkbox/checkbox-root.tsrx',
+			externalized: false,
+		},
+		{
+			parent: '/app/App.tsrx',
+			specifier: './checkbox/checkbox-trigger.tsrx',
+			source: '/app/checkbox/checkbox-trigger.tsrx',
+			externalized: false,
+		},
+	]);
+	// The rebased `.tsrx` specifiers carry the real interfaces; the barrel
+	// specifier carries only the synthetic `linkedComponents` entry.
+	expect(Object.keys(artifact.interfaces).sort()).toEqual([
+		'./checkbox/checkbox-root.tsrx',
+		'./checkbox/checkbox-trigger.tsrx',
+		'./ui.ts',
+	]);
+	expect(artifact.interfaces['./ui.ts']?.linkedComponents).toEqual([
+		{
+			exportPath: ['checkbox', 'root'],
+			source: './checkbox/checkbox-root.tsrx',
+			importKind: 'named',
+			importedName: 'CheckboxRoot',
+			componentName: 'CheckboxRoot',
+		},
+		{
+			exportPath: ['checkbox', 'trigger'],
+			source: './checkbox/checkbox-trigger.tsrx',
+			importKind: 'named',
+			importedName: 'CheckboxTrigger',
+			componentName: 'CheckboxTrigger',
+		},
+	]);
+});
+
+test('linkBarrelComponents reports a re-export that resolves to no module', () => {
+	const artifact = walkBarrels({
+		parent: '/app/App.tsrx',
+		moduleImports: [{ source: './broken.ts' }],
+		resolve: joinResolve,
+		interfaces: {
+			'/app/broken.ts': barrelInterface('/app/broken.ts', [
+				{ exportName: 'part', source: './missing-part.tsrx', importedName: 'Part' },
+			]),
+		},
+	});
+
+	expect(artifact.children).toEqual([]);
+	expect(artifact.diagnostics).toHaveLength(1);
+	expect(artifact.diagnostics[0]?.code).toBe('MARKLESS_COMPONENT_BARREL_UNRESOLVED');
+	expect(artifact.diagnostics[0]?.passId).toBe('module-link');
+	expect(artifact.diagnostics[0]?.message).toMatch(/missing-part\.tsrx/);
 });

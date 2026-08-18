@@ -4,6 +4,7 @@ import type {
 	ModuleGraphInterfaceArtifact,
 	ModuleGraphInterfaceExport,
 	ModuleGraphInterfaceHelperReturn,
+	ModuleGraphInterfaceReexport,
 	SemanticGraphBinding,
 	SemanticLocalBinding,
 	SemanticModuleImport,
@@ -369,12 +370,45 @@ export function collectModuleGraphInterface(input: {
 		});
 	}
 
+	const reexports = collectModuleReexports(input.statements);
 	return {
 		passId: 'module-graph-interface',
 		filename: input.state.filename,
 		exports: exportedHelpers,
+		...(reexports.length > 0 ? { reexports } : {}),
 		render: { version: 1, components: [] },
 	};
+}
+
+// `export { default as root } from './x.tsrx'` and `export * as ns from './y.ts'`.
+// A linker follows these to reach the module that declares the component.
+function collectModuleReexports(
+	statements: ReadonlyArray<AnyNode>,
+): ReadonlyArray<ModuleGraphInterfaceReexport> {
+	const reexports: ModuleGraphInterfaceReexport[] = [];
+	for (const statement of statements) {
+		const source = (statement.source as { readonly value?: unknown } | undefined)?.value;
+		if (typeof source !== 'string') continue;
+		if (statement.type === 'ExportAllDeclaration') {
+			const exportName = exportSpecifierName(statement.exported as AnyNode | undefined);
+			if (exportName) reexports.push({ exportName, source, importedName: '*' });
+			continue;
+		}
+		if (statement.type !== 'ExportNamedDeclaration') continue;
+		for (const specifier of asNodes(statement.specifiers)) {
+			const exportName = exportSpecifierName(specifier.exported as AnyNode | undefined);
+			const importedName = exportSpecifierName(specifier.local as AnyNode | undefined);
+			if (exportName && importedName) reexports.push({ exportName, source, importedName });
+		}
+	}
+	return reexports;
+}
+
+function exportSpecifierName(node: AnyNode | undefined): string | null {
+	if (!node) return null;
+	return typeof node.value === 'string'
+		? node.value
+		: (getIdentifierName(node) ?? (node.name === 'default' ? 'default' : null));
 }
 
 function reportImportedModuleScopeGraphBindings(state: WalkState): void {

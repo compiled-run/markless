@@ -311,13 +311,15 @@ function emitNode(
 			emitNodes(projected, [0], projection, context, repeat);
 			context.chunks.push(finishChunk(projection));
 		}
+		// The edge already resolved a member tag to the component it names.
+		const childComponentName = edge?.childComponentName ?? tagName;
 		addAnchorSlot(
 			builder,
 			{
 				kind: 'child-component',
 				componentEdgeId: edge?.id ?? `component-edge:${tagName}:${span?.start ?? 0}`,
-				childComponentName: tagName,
-				childTemplateId: `template:${tagName}`,
+				childComponentName,
+				childTemplateId: `template:${childComponentName}`,
 				...(projectionChunkId ? { projectionChunkId } : {}),
 			},
 			path,

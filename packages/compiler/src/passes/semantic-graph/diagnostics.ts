@@ -160,6 +160,23 @@ export function callbackPropArityUnsupportedDiagnostic(input: {
 	});
 }
 
+export function memberTagUnresolvedDiagnostic(input: {
+	readonly tagName: string;
+	readonly rootName: string;
+	readonly node: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_COMPONENT_TAG_UNRESOLVED',
+		title: 'Member component tag must come from an import',
+		message: `Cannot resolve \`<${input.tagName} />\` because \`${input.rootName}\` is not imported in this file.`,
+		why: 'The compiler links a child component to the module it comes from at build time. Without an import it cannot find the component to render, and dropping the tag silently would delete the subtree.',
+		span: sourceSpan(input.node, input.filename),
+		suggestion: `Import the object that holds the component, for example \`import * as ${input.rootName} from './${input.rootName}.tsrx';\` or \`import { ${input.rootName} } from './${input.rootName}.ts';\`.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_COMPONENT_TAG_UNRESOLVED',
+	});
+}
+
 export function computedDependencyGraphCycleDiagnostic(input: {
 	readonly cycle: ReadonlyArray<string>;
 }): SemanticGraphDiagnostic {

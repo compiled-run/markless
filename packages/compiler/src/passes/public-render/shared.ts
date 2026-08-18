@@ -8,6 +8,9 @@ import {
 	getDynamicTagExpression,
 	getElementTagName,
 	isHostTagName,
+	isMemberTagName,
+	memberTagPropertyPath,
+	memberTagRootName,
 } from '../../ast/tsrx.ts';
 import type { ComponentEdge } from './types.ts';
 
@@ -256,10 +259,23 @@ export function hasComponentImportSource(
 export function emitComponentImport(
 	imported: ComponentReference & { readonly importSource: string },
 ): string {
-	if (imported.importKind === 'named' && !isTsrxComponentImport(imported.importSource)) {
-		return `import { ${imported.importedName ?? imported.componentName} as ${imported.localName} } from ${JSON.stringify(imported.importSource)};`;
+	const source = JSON.stringify(imported.importSource);
+	if (isMemberTagName(imported.componentName)) {
+		// Bind the imported object; the local name reads the authored path off it.
+		const holder = `${imported.localName}Holder`;
+		const property = memberTagPropertyPath(imported.componentName).join('.');
+		const binding =
+			imported.importKind === 'namespace'
+				? `import * as ${holder} from ${source};`
+				: imported.importKind === 'named'
+					? `import { ${imported.importedName ?? memberTagRootName(imported.componentName)} as ${holder} } from ${source};`
+					: `import ${holder} from ${source};`;
+		return `${binding}\nconst ${imported.localName} = ${holder}.${property};`;
 	}
-	return `import ${imported.localName} from ${JSON.stringify(imported.importSource)};`;
+	if (imported.importKind === 'named' && !isTsrxComponentImport(imported.importSource)) {
+		return `import { ${imported.importedName ?? imported.componentName} as ${imported.localName} } from ${source};`;
+	}
+	return `import ${imported.localName} from ${source};`;
 }
 
 export function sameModuleComponentMap(ast: AnyNode): ReadonlyMap<string, AnyNode> {
@@ -325,9 +341,20 @@ function isTsrxComponentImport(importSource: string): boolean {
 export function publicRenderValueImports(
 	moduleImports: ReadonlyArray<SemanticModuleImport>,
 	componentEdges: PublicRenderModuleInput['semanticGraph']['componentEdges'],
+	// Surviving module scope may still name a component import (a parts object).
+	moduleScopeSource = '',
 ): ReadonlyArray<SemanticModuleImport> {
 	const componentLocalNames = new Set(componentEdges.map((edge) => edge.childComponentName));
-	return moduleImports.filter((moduleImport) => !componentLocalNames.has(moduleImport.localName));
+	return moduleImports.filter(
+		(moduleImport) =>
+			!componentLocalNames.has(moduleImport.localName) ||
+			referencesIdentifier(moduleScopeSource, moduleImport.localName),
+	);
+}
+
+export function referencesIdentifier(text: string, name: string): boolean {
+	if (!/^[A-Za-z_$][\w$]*$/.test(name)) return false;
+	return new RegExp(`(^|[^\\w$.])${name}([^\\w$]|$)`).test(text);
 }
 
 export function emitValueImport(moduleImport: SemanticModuleImport): string {

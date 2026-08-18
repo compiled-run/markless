@@ -3,7 +3,7 @@
 // delegate's compiled JavaScript, then calls the passes. Nothing here decides
 // what a child is or what it contributes; those verdicts belong to
 // `@markless/compiler`, whose passes have no resolve, no load and no import.
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
@@ -17,12 +17,15 @@ import {
 	type LinkedModuleChildResolution,
 	type LinkedClaimsArtifact,
 	type LinkedModuleGraphArtifact,
+	type ModuleGraphInterfaceArtifact,
 	type ModuleLinkRequest,
 	type ModuleLinkResolutionTable,
+	compileTsrxModuleLinkArtifact,
 	computeLinkedInterfaces,
 	delegateChildRenderPlan,
 	delegateChildRendering,
 	delegateChildResolutionRequests,
+	linkBarrelComponents,
 	linkClaimManifests,
 	linkDelegateChildren,
 	linkImportedModules,
@@ -36,7 +39,7 @@ import {
 	planLinkedModuleChildren,
 	uniqueLinkedModuleChildren,
 } from '@markless/compiler';
-import { dirname, resolve } from 'pathe';
+import { dirname, relative, resolve } from 'pathe';
 import { withQuery } from 'ufo';
 import type { ModuleMetadataRegistry } from './module-metadata-registry.ts';
 import { MARKLESS_VIRTUAL_PREFIX } from './transform.ts';
@@ -169,6 +172,86 @@ export async function resolveImportedModuleInterfaces(
 		requests,
 		await resolveModuleLinkRequests(context, requests, fallbackSource),
 	);
+}
+
+// The walk in `module-link` asks; this performs the I/O it may not: resolves
+// each specifier the walk reached, and reads the module-graph interface of each
+// file it reached, compiling one this build has not linked yet. The pass is
+// called again after every round until it asks for nothing more.
+const BARREL_WALK_ROUNDS = 32;
+
+export async function linkBarrelComponentInterfaces(
+	context: LinkResolveContext,
+	parent: string,
+	moduleImports: ReadonlyArray<{ readonly source: string }>,
+	artifacts: ReadonlyMap<string, MarklessModuleLinkArtifact>,
+	buildId: string | undefined,
+): Promise<{
+	readonly interfaces: Record<string, ModuleGraphInterfaceArtifact>;
+	readonly children: ReadonlyArray<LinkedModuleChildResolution>;
+}> {
+	const resolution: Record<string, string | null> = {};
+	const interfacesByFile = new Map<string, ModuleGraphInterfaceArtifact | null>();
+	const passInput = () => ({
+		parent,
+		moduleImports,
+		resolution,
+		moduleInterface: (filename: string) => interfacesByFile.get(filename),
+		rebase: (target: string) => {
+			const specifier = relative(dirname(parent), target);
+			return specifier.startsWith('.') ? specifier : `./${specifier}`;
+		},
+	});
+
+	let artifact = linkBarrelComponents(passInput());
+	for (
+		let round = 0;
+		artifact.pendingResolutions.length + artifact.pendingInterfaces.length > 0;
+		round += 1
+	) {
+		if (round === BARREL_WALK_ROUNDS) {
+			throw new Error(
+				`MARKLESS_COMPONENT_BARREL_UNRESOLVED: Module ${JSON.stringify(parent)} re-exports through more than ${BARREL_WALK_ROUNDS} chained barrels.`,
+			);
+		}
+		await Promise.all(
+			artifact.pendingResolutions.map(async (request) => {
+				const resolved = await context.resolve(request.specifier, request.parent, {
+					skipSelf: true,
+				});
+				const id = typeof resolved === 'string' ? resolved : resolved?.id;
+				resolution[moduleLinkResolutionKey(request.specifier, request.parent)] = id
+					? pathname(String(id))
+					: null;
+			}),
+		);
+		await Promise.all(
+			artifact.pendingInterfaces.map(async (filename) => {
+				interfacesByFile.set(filename, await barrelModuleInterface(filename, artifacts, buildId));
+			}),
+		);
+		artifact = linkBarrelComponents(passInput());
+	}
+	// The pass decides; a barrel it could not follow stays fail-closed.
+	const [diagnostic] = artifact.diagnostics;
+	if (diagnostic) throw new Error(diagnostic.message);
+	return { interfaces: artifact.interfaces, children: artifact.children };
+}
+
+async function barrelModuleInterface(
+	filename: string,
+	artifacts: ReadonlyMap<string, MarklessModuleLinkArtifact>,
+	buildId: string | undefined,
+): Promise<ModuleGraphInterfaceArtifact | null> {
+	const known = artifacts.get(filename)?.moduleGraphInterface;
+	if (known) return known;
+	if (!existsSync(filename) || !statSync(filename).isFile()) return null;
+	const linked = await compileTsrxModuleLinkArtifact({
+		filename,
+		source: readFileSync(filename, 'utf8'),
+		buildId,
+	});
+	return linked.moduleGraphInterface;
 }
 
 export async function resolveImportedChildren(
