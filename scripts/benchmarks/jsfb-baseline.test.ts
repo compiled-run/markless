@@ -399,6 +399,57 @@ describe('js-framework-benchmark baseline guard', () => {
 		expect(sameMachineResult.ok).toBe(true);
 	});
 
+	test('same-machine baseline results keep owner-ratified size rows', async () => {
+		const { compareBenchmarkResults, withMarklessBaselineResults } = await loadBenchmarkGuard();
+		const baseline = {
+			thresholds: { gzipSizeRegressionKb: 0.15, rawSizeRegressionKb: 0.5 },
+			benchmarks: {
+				cpu: [],
+				size: ['41_size-uncompressed', '42_size-compressed'],
+				warnOnly: [],
+			},
+			frameworks: {
+				markless: {
+					// Ratified size (owner-accepted growth) is larger than what a
+					// same-machine build of the base commit measures.
+					results: { '41_size-uncompressed': 12, '42_size-compressed': 4.6 },
+				},
+			},
+		};
+		const merged = withMarklessBaselineResults(baseline, {
+			'41_size-uncompressed': 10.6,
+			'42_size-compressed': 4.2,
+		});
+
+		expect(merged.frameworks.markless.results).toEqual({
+			'41_size-uncompressed': 12,
+			'42_size-compressed': 4.6,
+		});
+		expect(
+			compareBenchmarkResults(merged, {
+				'41_size-uncompressed': 12.4,
+				'42_size-compressed': 4.7,
+			}).ok,
+		).toBe(true);
+		expect(
+			compareBenchmarkResults(merged, {
+				'41_size-uncompressed': 12.6,
+				'42_size-compressed': 4.7,
+			}).failures,
+		).toEqual([expect.stringContaining('raw size regressed')]);
+
+		// A same-machine base that is larger than the ratified value still wins:
+		// the guard never loosens below what the base commit actually ships.
+		const larger = withMarklessBaselineResults(baseline, {
+			'41_size-uncompressed': 13,
+			'42_size-compressed': 5,
+		});
+		expect(larger.frameworks.markless.results).toEqual({
+			'41_size-uncompressed': 13,
+			'42_size-compressed': 5,
+		});
+	});
+
 	test('warns for individual CPU row noise when same-runner geomean improves', async () => {
 		const { compareBenchmarkResults } = await loadBenchmarkGuard();
 		const baseline = {
