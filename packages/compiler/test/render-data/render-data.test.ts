@@ -251,3 +251,77 @@ test('moduleGraphInterface publishes child chunk summaries and component inputs'
 		],
 	});
 });
+
+test('renderData carries the authored collection for repeats that are not graph reads', async () => {
+	const inline = await compileTsrxModule({
+		filename: 'src/InlineNav.tsrx',
+		source: `
+export function App() @{
+	<ul>@for (const entry of [{ href: '/a', title: 'Alpha' }]; key entry.href) { <li>{entry.title}</li> }</ul>
+}
+`,
+		symbols: [],
+	});
+	const moduleConst = await compileTsrxModule({
+		filename: 'src/ModuleNav.tsrx',
+		source: `
+const nav = [{ href: '/a', title: 'Alpha' }, { href: '/b', title: 'Beta' }];
+export function App() @{
+	<ul>@for (const entry of nav; key entry.href) { <li>{entry.title}</li> }</ul>
+}
+`,
+		symbols: [],
+	});
+	const imported = await compileTsrxModule({
+		filename: 'src/ImportedNav.tsrx',
+		source: `
+import { nav } from './nav.ts';
+export function App() @{
+	<ul>@for (const entry of nav; key entry.href) { <li>{entry.title}</li> }</ul>
+}
+`,
+		symbols: [],
+	});
+
+	for (const [result, collectionSource] of [
+		[inline, "[{ href: '/a', title: 'Alpha' }]"],
+		[moduleConst, 'nav'],
+		[imported, 'nav'],
+	] as const) {
+		expect(result.semanticGraph.keyedRepeats).toEqual([
+			expect.objectContaining({ collectionSource }),
+		]);
+		expect(result.semanticGraph.keyedRepeats[0]?.collectionGraphNodeId).toBeUndefined();
+		expect(result.renderData.repeats).toEqual([
+			expect.objectContaining({
+				repeatId: 'repeat:0',
+				collectionSource,
+				directSupported: false,
+			}),
+		]);
+		expect(result.renderData.repeats[0]?.collectionGraphNodeId).toBeUndefined();
+	}
+});
+
+test('renderData leaves graph-backed repeat collections on the graph read', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/StateRows.tsrx',
+		source: `
+import { state } from '@markless/core';
+export function App() @{
+	let rows = state([{ id: 'a', label: 'A' }]);
+	<ul>@for (const row of rows; key row.id) { <li>{row.label}</li> }</ul>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.renderData.repeats).toEqual([
+		expect.objectContaining({
+			repeatId: 'repeat:0',
+			collectionGraphNodeId: 'state:rows',
+			directSupported: true,
+		}),
+	]);
+	expect(result.renderData.repeats[0]).not.toHaveProperty('collectionSource');
+});

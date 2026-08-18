@@ -4015,3 +4015,35 @@ test('render self-wakes pending CSR async boundaries only after the render settl
 		root.childNodes.map((child) => (child.nodeType === 8 ? '#comment' : child.tagName)),
 	).toEqual(['#comment', 'SPAN', '#comment']);
 });
+
+test('SSR renders module-const repeat rows beside a state-driven list', async () => {
+	const filename = 'src/static-nav.tsrx';
+	const source = `
+import { state } from '@markless/core';
+
+const nav = [{ href: '/docs', title: 'Docs' }, { href: '/blog', title: 'Blog' }];
+
+export function StaticNav() @{
+	let rows = state([{ id: 'a', label: 'Alpha' }]);
+	<main>
+		<ul>@for (const entry of nav; key entry.href) { <li>{entry.title}</li> }</ul>
+		<ol>@for (const row of rows; key row.id) { <li>{row.label}</li> }</ol>
+		<button onClick={() => rows = [...rows, { id: 'b', label: 'Beta' }]}>Add</button>
+	</main>
+}
+`;
+	const serverUrl = await captureDispatchModuleUrl(filename, source, [], 'server');
+	const global = globalThis as { document?: unknown };
+	const previousDocument = global.document;
+	global.document = captureDispatchDocument();
+	try {
+		const serverModule = (await import(serverUrl)) as {
+			readonly default: { readonly renderSsr: () => Promise<{ readonly html: string }> };
+		};
+		const serverOutput = await serverModule.default.renderSsr();
+		const root = parseCaptureDispatchHtml(serverOutput.html)[0]!;
+		expect(descendants(root, 'LI').map(renderedText)).toEqual(['Docs', 'Blog', 'Alpha']);
+	} finally {
+		global.document = previousDocument;
+	}
+});

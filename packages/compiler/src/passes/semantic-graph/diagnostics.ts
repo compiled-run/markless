@@ -870,6 +870,30 @@ export function repeatKeyRequiredDiagnostic(input: {
 	} as SemanticGraphDiagnostic;
 }
 
+export function repeatCollectionUnreadableDiagnostic(input: {
+	readonly node: AnyNode;
+	readonly itemName: string;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_REPEAT_COLLECTION_UNREADABLE',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'This @for collection cannot be read',
+		message: `@for (const ${input.itemName} of ...) has a collection the compiler could not read back as an expression, so the repeat has neither a state graph node nor an authored expression to take its rows from. It would render no rows at all.`,
+		why: 'Rows come either from a reactive graph read or from the authored collection expression evaluated in module scope; a repeat with neither has no source of rows on the server or in the browser.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [
+			{
+				message: `Loop over a named collection, such as \`@for (const ${input.itemName} of items; key ${input.itemName}.id)\` where \`items\` is state, a module constant, or an import.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_COLLECTION_UNREADABLE',
+	} as SemanticGraphDiagnostic;
+}
+
 export function repeatKeyIsIndexDiagnostic(input: {
 	readonly node: AnyNode;
 	readonly itemName: string;

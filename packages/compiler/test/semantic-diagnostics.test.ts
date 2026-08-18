@@ -1,5 +1,11 @@
 import { expect, test } from 'vitest';
 import { buildSemanticGraph } from '../src/index.ts';
+import type { AnyNode } from '../src/ast/nodes.ts';
+import { collectKeyedRepeat } from '../src/passes/semantic-graph/collect-repeat.ts';
+import {
+	createMutableSemanticGraphArtifact,
+	createWalkState,
+} from '../src/passes/semantic-graph/types.ts';
 
 const moduleScopeSource = `
 import { state, computed } from '@markless/core';
@@ -1406,6 +1412,47 @@ export function App() @{
 			code: 'MARKLESS_ROW_ELEMENT_HANDLE_UNSUPPORTED',
 			message:
 				'Cannot bind el={row.current} inside a keyed repeat. Stage-one row ownership supports only a direct element() handle identifier such as el={row}. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package',
+		}),
+	]);
+});
+
+test('a repeat with neither a graph node nor a readable collection expression fails closed', () => {
+	const filename = 'src/UnreadableCollection.tsrx';
+	const source = `export function App() @{
+	<ul>@for (const entry of nav; key entry.href) { <li>{entry.title}</li> }</ul>
+}`;
+	const graph = createMutableSemanticGraphArtifact(filename);
+	const state = createWalkState({
+		filename,
+		source,
+		graph,
+		frameworkApiImports: new Map(),
+	});
+	state.currentHostNodeId = 'h0';
+	// A collection node without a source range: the walk can neither resolve a
+	// graph path from it nor read its authored text back.
+	const node = {
+		type: 'ForOfStatement',
+		start: source.indexOf('@for'),
+		end: source.lastIndexOf('}'),
+		left: { type: 'Identifier', name: 'entry' },
+		right: { type: 'Identifier', name: 'nav' },
+		key: {
+			type: 'MemberExpression',
+			start: source.indexOf('entry.href'),
+			end: source.indexOf('entry.href') + 'entry.href'.length,
+		},
+		body: { type: 'BlockStatement', body: [] },
+	} as unknown as AnyNode;
+
+	expect(collectKeyedRepeat(node, state)).toBeNull();
+	expect(graph.keyedRepeats).toEqual([]);
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_REPEAT_COLLECTION_UNREADABLE',
+			severity: 'error',
+			passId: 'tsrx-semantic-graph',
+			primarySpan: expect.objectContaining({ filename }),
 		}),
 	]);
 });

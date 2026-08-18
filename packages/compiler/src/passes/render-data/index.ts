@@ -248,7 +248,7 @@ function repeatRecord(
 		itemName: repeat.itemName,
 		...(repeat.collectionGraphNodeId
 			? { collectionGraphNodeId: repeat.collectionGraphNodeId }
-			: {}),
+			: { collectionSource: repeat.collectionSource }),
 		collectionPath: repeat.collectionPath,
 		keyPath: repeat.keyPath,
 		rowChunkId,

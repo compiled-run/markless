@@ -7,6 +7,7 @@ import {
 	splitStaticGraphPath,
 } from '../../artifact-helpers/graph-paths.ts';
 import {
+	repeatCollectionUnreadableDiagnostic,
 	repeatKeyIsIndexDiagnostic,
 	repeatKeyRequiredDiagnostic,
 	repeatKeyUnstableDiagnostic,
@@ -22,7 +23,18 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 	if (!itemName || !collectionNode) return null;
 
 	const collectionSource = expressionSource(collectionNode, state.source);
-	if (!collectionSource) return null;
+	// No readable source means no graph path can resolve from it either, so the
+	// repeat would carry neither a graph node nor an authored expression.
+	if (!collectionSource) {
+		state.graph.diagnostics.push(
+			repeatCollectionUnreadableDiagnostic({
+				node,
+				itemName,
+				filename: state.filename,
+			}),
+		);
+		return null;
+	}
 	if (!keyNode) {
 		state.graph.diagnostics.push(
 			repeatKeyRequiredDiagnostic({
