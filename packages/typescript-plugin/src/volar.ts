@@ -366,6 +366,12 @@ function wrapMultiSiblingRenderRuns(
 	return withRecoveryEdits(candidate, originalSource, insertions);
 }
 
+// The attribute region of a tag, up to but not including the tag's own `>`. A
+// quoted value is consumed whole, so a `>` written inside one is attribute text
+// rather than the end of the tag; outside quotes the region still stops at `<`
+// and `>` so an unterminated tag cannot swallow the rest of the body.
+const TAG_ATTRIBUTES = String.raw`(?:\s(?:"[^"]*"|'[^']*'|[^<>'"])*?)?`;
+
 function inferImmediatelyTerminatedClosingTag(
 	candidate: RecoveryCandidate,
 	originalSource: string,
@@ -375,7 +381,9 @@ function inferImmediatelyTerminatedClosingTag(
 		const body = candidate.source.slice(component.start, component.end);
 		const authoredEnd = body.trimEnd().length;
 		const authored = body.slice(0, authoredEnd);
-		const opening = authored.match(/<([A-Za-z][\w.-]*)(?:\s[^<>]*?)?>$/u);
+		const opening = authored.match(
+			new RegExp(String.raw`<([A-Za-z][\w.-]*)${TAG_ATTRIBUTES}>$`, 'u'),
+		);
 		if (!opening || opening[0].endsWith('/>')) continue;
 		const tag = opening[1];
 		const escapedTag = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -384,9 +392,11 @@ function inferImmediatelyTerminatedClosingTag(
 		// reports whether a `/` preceded it: a lookahead-terminated match only ever
 		// captures `<Foo`, which can never end in `/>`, so filtering on the matched
 		// text would silently keep counting self-closing tags as openings and skip
-		// the recovery for every body that contains one.
+		// the recovery for every body that contains one. Attribute values are
+		// skipped whole (see TAG_ATTRIBUTES) so a quoted `>` cannot end the scan
+		// early and turn `<Foo title=">" />` back into an opening.
 		const openingCount = [
-			...authored.matchAll(new RegExp(`<${escapedTag}(?:\\s[^<>]*?)?\\s*(/?)>`, 'gu')),
+			...authored.matchAll(new RegExp(`<${escapedTag}${TAG_ATTRIBUTES}\\s*(/?)>`, 'gu')),
 		].filter((match) => match[1] !== '/').length;
 		const closingCount = [...authored.matchAll(new RegExp(`</${escapedTag}\\s*>`, 'gu'))]
 			.length;

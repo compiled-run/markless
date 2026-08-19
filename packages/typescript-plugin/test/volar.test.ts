@@ -432,6 +432,26 @@ export default function Shell() @{
 	expect(baseline.code).toContain('return <Foo>;');
 });
 
+// A `>` inside a quoted attribute value is text, not the end of the tag. Ending
+// the scan there reads `<Foo title=">` as a complete opening tag, so the
+// self-closing sibling counts as an opening again and the recovery is skipped.
+test('a quoted > in a self-closing tag does not defeat the inferred closing tag', () => {
+	const withQuotedAngleBracket = `import { Foo } from './Foo.tsrx';
+
+export default function Shell() @{
+	const icon = <Foo title=">" />;
+	<Foo>
+}`;
+
+	const recovered = compileToVolarMappings(withQuotedAngleBracket, 'Shell.tsrx', {
+		loose: true,
+	});
+
+	expect(recovered.code).toContain('const icon = <Foo title=">" />;');
+	expect(recovered.code).toContain('return <Foo>;');
+	expect(recovered.code).not.toContain('</Foo>');
+});
+
 test('an import clause maps its interior, not only its specifier tokens', () => {
 	const source = `import { Nav } from './Nav.tsrx';
 

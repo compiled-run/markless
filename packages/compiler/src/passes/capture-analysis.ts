@@ -21,6 +21,18 @@ import {
 	type SymbolSourceSemanticsReader,
 } from './capture-semantics.ts';
 
+// Capture analysis owns these diagnostic contract values. Tests and any other
+// reader import them from here rather than restating the strings, so the
+// contract has one source of truth.
+export const CAPTURE_ANALYSIS_PASS_ID = 'capture-analysis' as const;
+export const CAPTURE_ANALYSIS_PHASE = 'capture-analysis' as const;
+export const CAPTURE_OPAQUE_PROP_CODE = 'MARKLESS_CAPTURE_OPAQUE_PROP' as const;
+export const CAPTURE_UNSUPPORTED_VALUE_CODE = 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE' as const;
+export const BEHAVIOR_SYMBOL_EMIT_UNSUPPORTED_CODE =
+	'MARKLESS_BEHAVIOR_SYMBOL_EMIT_UNSUPPORTED' as const;
+export const EVENT_HANDLER_EMIT_UNSUPPORTED_CODE =
+	'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED' as const;
+
 export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArtifact {
 	const semantics = createSymbolSourceSemanticsReader();
 	const localSymbols = input.symbolResolver.symbols.map((symbol) => {
@@ -51,14 +63,17 @@ export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArt
 		...extractedSymbols.flatMap((symbol) => {
 			const { freeNames, analysisFailed } = semantics.read(symbol.source);
 			// A source the analyzer could not read proves nothing about what it
-			// closes over, so it cannot clear a component-local binding either. The
-			// refusal is the existing unsupported-capture diagnostic rather than a
-			// new code: the author's problem is the same one, and staying silent
-			// here would emit a lazy symbol whose captures were never checked.
+			// closes over, so it cannot clear anything. The refusal does not depend
+			// on the component having local bindings to name: with none, the
+			// unknown captures are exactly as unknown, and reporting per binding
+			// would stay silent in every component without one. One diagnostic per
+			// failed symbol, using the existing unsupported-capture code because the
+			// author's problem is the same one. `freeNames` is empty on failure, so
+			// returning here also cannot drop a name-based diagnostic.
+			if (analysisFailed) return [unsupportedCaptureDiagnostic(symbol, undefined)];
+
 			return input.semanticGraph.localBindings.flatMap((binding) =>
-				analysisFailed || freeNames.has(binding.name)
-					? [unsupportedCaptureDiagnostic(symbol, binding)]
-					: [],
+				freeNames.has(binding.name) ? [unsupportedCaptureDiagnostic(symbol, binding)] : [],
 			);
 		}),
 	];
@@ -587,14 +602,14 @@ function opaqueSlotDiagnostics(symbol: {
 			reportedRoutes.add(routeKey);
 			return [
 				{
-					code: 'MARKLESS_CAPTURE_OPAQUE_PROP' as const,
+					code: CAPTURE_OPAQUE_PROP_CODE,
 					severity: 'error' as const,
-					phase: 'capture-analysis' as const,
+					phase: CAPTURE_ANALYSIS_PHASE,
 					title: 'Lazy handler prop capture is not resumable',
 					message: `Cannot bind lazy symbol "${symbol.symbolId}" on component edge "${route.componentEdgeId}" because prop "${propName}" for "${componentName}" is the runtime expression "${route.expression}".`,
 					why: 'A demanded capture slot must route to a graph node, a compiler-known constant, or a callback symbol. This opaque runtime value cannot be reduced without adding a serialized capture protocol.',
 					...(route.sourceSpan ? { primarySpan: route.sourceSpan } : {}),
-					passId: 'capture-analysis' as const,
+					passId: CAPTURE_ANALYSIS_PASS_ID,
 					artifactKeys: ['semanticGraph', 'symbolResolver', 'captureAnalysis'],
 					symbolId: symbol.symbolId,
 					componentEdgeId: route.componentEdgeId,
@@ -614,78 +629,77 @@ function opaqueSlotDiagnostics(symbol: {
 	);
 }
 
+// `binding` is the component-local the symbol was proven to read. It is absent
+// when the source itself could not be analyzed: there is no name to blame, but
+// the captures are unknown, which refuses for the same reason.
 function unsupportedCaptureDiagnostic(
 	symbol: {
 		readonly symbolId: string;
 		readonly kind: PlannedSymbol['kind'];
 		readonly source: string;
 	},
-	binding: SemanticLocalBinding,
+	binding: SemanticLocalBinding | undefined,
 ): CaptureAnalysisDiagnostic {
+	const span = binding ? { primarySpan: binding.sourceSpan } : {};
+	const suggestions = [
+		{ message: binding ? suggestionForBinding(binding.kind) : UNREADABLE_SOURCE_SUGGESTION },
+	];
+	const shared = {
+		severity: 'error' as const,
+		phase: CAPTURE_ANALYSIS_PHASE,
+		...span,
+		passId: CAPTURE_ANALYSIS_PASS_ID,
+		artifactKeys: ['semanticGraph', 'symbolResolver', 'captureAnalysis'],
+		symbolId: symbol.symbolId,
+		source: symbol.source,
+		suggestions,
+	};
+
 	if (symbol.kind === 'event-handler' || symbol.kind === 'callback-prop') {
 		return {
-			code: 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED',
-			severity: 'error',
-			phase: 'capture-analysis',
+			...shared,
+			code: EVENT_HANDLER_EMIT_UNSUPPORTED_CODE,
 			title: 'This event handler cannot run in the browser yet',
-			message: `Cannot emit lazy ${symbol.kind} symbol "${symbol.symbolId}" because it reads component-local "${binding.name}", a local ${bindingKindLabel(binding.kind)} value that cannot cross a resume boundary.`,
+			message: binding
+				? `Cannot emit lazy ${symbol.kind} symbol "${symbol.symbolId}" because it reads component-local "${binding.name}", a local ${bindingKindLabel(binding.kind)} value that cannot cross a resume boundary.`
+				: `Cannot emit lazy ${symbol.kind} symbol "${symbol.symbolId}" because ${UNREADABLE_SOURCE_REASON}`,
 			why: 'Lazy handler symbols run after browser resume. Handler bodies may use graph references, element handles, props/shared values, module imports, or serializable capture-plane inputs; unsupported body locals would otherwise become silent no-op code.',
-			primarySpan: binding.sourceSpan,
-			passId: 'capture-analysis',
-			artifactKeys: ['semanticGraph', 'symbolResolver', 'captureAnalysis'],
-			symbolId: symbol.symbolId,
-			source: symbol.source,
-			suggestions: [
-				{
-					message: suggestionForBinding(binding.kind),
-				},
-			],
 			docsUrl: 'https://markless.dev/errors/MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED',
 		};
 	}
 
 	if (symbol.kind === 'behavior') {
 		return {
-			code: 'MARKLESS_BEHAVIOR_SYMBOL_EMIT_UNSUPPORTED',
-			severity: 'error',
-			phase: 'capture-analysis',
+			...shared,
+			code: BEHAVIOR_SYMBOL_EMIT_UNSUPPORTED_CODE,
 			title: 'This element behavior cannot run in the browser yet',
-			message: `Cannot emit lazy behavior symbol "${symbol.symbolId}" because it reads component-local "${binding.name}", a local ${bindingKindLabel(binding.kind)} value that cannot cross a resume boundary.`,
+			message: binding
+				? `Cannot emit lazy behavior symbol "${symbol.symbolId}" because it reads component-local "${binding.name}", a local ${bindingKindLabel(binding.kind)} value that cannot cross a resume boundary.`
+				: `Cannot emit lazy behavior symbol "${symbol.symbolId}" because ${UNREADABLE_SOURCE_REASON}`,
 			why: 'Element behavior symbols run after browser resume. Behavior factories may use module functions, graph inputs, element handles, props/shared values, or serializable capture-plane inputs; unsupported body locals would otherwise become missing behavior code.',
-			primarySpan: binding.sourceSpan,
-			passId: 'capture-analysis',
-			artifactKeys: ['semanticGraph', 'symbolResolver', 'captureAnalysis'],
-			symbolId: symbol.symbolId,
-			source: symbol.source,
-			suggestions: [
-				{
-					message: suggestionForBinding(binding.kind),
-				},
-			],
 			docsUrl: 'https://markless.dev/errors/MARKLESS_BEHAVIOR_SYMBOL_EMIT_UNSUPPORTED',
 		};
 	}
 
 	return {
-		code: 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
-		severity: 'error',
-		phase: 'capture-analysis',
-		title: `Cannot capture local ${bindingKindLabel(binding.kind)} in lazy symbol`,
-		message: `Cannot capture "${binding.name}" in lazy ${symbol.kind} symbol "${symbol.symbolId}" because local ${bindingKindLabel(binding.kind)} values cannot cross a resume boundary.`,
+		...shared,
+		code: CAPTURE_UNSUPPORTED_VALUE_CODE,
+		title: binding
+			? `Cannot capture local ${bindingKindLabel(binding.kind)} in lazy symbol`
+			: 'Cannot check the captures of this lazy symbol',
+		message: binding
+			? `Cannot capture "${binding.name}" in lazy ${symbol.kind} symbol "${symbol.symbolId}" because local ${bindingKindLabel(binding.kind)} values cannot cross a resume boundary.`
+			: `Cannot emit lazy ${symbol.kind} symbol "${symbol.symbolId}" because ${UNREADABLE_SOURCE_REASON}`,
 		why: 'Lazy symbols run after browser resume. Captures must be graph references, element handles, props/shared values, module imports, or serializable constants.',
-		primarySpan: binding.sourceSpan,
-		passId: 'capture-analysis',
-		artifactKeys: ['semanticGraph', 'symbolResolver', 'captureAnalysis'],
-		symbolId: symbol.symbolId,
-		source: symbol.source,
-		suggestions: [
-			{
-				message: suggestionForBinding(binding.kind),
-			},
-		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 	};
 }
+
+const UNREADABLE_SOURCE_REASON =
+	'the compiler could not read its source, so the values it captures across the resume boundary are unknown.';
+
+const UNREADABLE_SOURCE_SUGGESTION =
+	'Simplify the body until the compiler can read it: move helpers to module scope and keep the body to graph references, element handles, props/shared values, and serializable values.';
 
 function bindingKindLabel(kind: SemanticLocalBinding['kind']): string {
 	if (kind === 'class-instance') return 'class instance';

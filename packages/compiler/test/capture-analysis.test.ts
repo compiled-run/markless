@@ -5,7 +5,12 @@ import {
 	planPayloadArena,
 	planSymbolResolver,
 } from '../src/index.ts';
-import { analyzeCaptures } from '../src/passes/capture-analysis.ts';
+import {
+	analyzeCaptures,
+	CAPTURE_ANALYSIS_PASS_ID,
+	CAPTURE_ANALYSIS_PHASE,
+	EVENT_HANDLER_EMIT_UNSUPPORTED_CODE,
+} from '../src/passes/capture-analysis.ts';
 
 const source = `
 import { state } from '@markless/core';
@@ -956,12 +961,56 @@ export function App() @{
 
 	expect(analyzeCaptures({ semanticGraph, symbolResolver: unanalyzable }).diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED',
+			code: EVENT_HANDLER_EMIT_UNSUPPORTED_CODE,
 			severity: 'error',
-			phase: 'capture-analysis',
-			passId: 'capture-analysis',
+			phase: CAPTURE_ANALYSIS_PHASE,
+			passId: CAPTURE_ANALYSIS_PASS_ID,
 			symbolId: 'symbol:0',
 			source: '() => format(',
+		}),
+	]);
+});
+
+// The refusal cannot be spelled through component-local bindings: a component
+// with no locals at all still has a source the analyzer could not read, and its
+// captures are just as unknown. Reporting only when a local exists would let the
+// same unreadable source pass silently in every component without one.
+test('analyzeCaptures refuses an unanalyzable source in a component with no locals', async () => {
+	const analyzableSource = `
+import { state } from '@markless/core';
+
+export function App() @{
+	let count = state(0);
+
+	<button onClick={() => count++}>{count}</button>
+}
+`;
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/NoLocals.tsrx',
+		source: analyzableSource,
+	});
+	const stateLowering = lowerStateAccess({ semanticGraph });
+	const payloadArena = planPayloadArena({ semanticGraph, stateLowering });
+	const symbolResolver = planSymbolResolver({ semanticGraph, payloadArena });
+
+	expect(semanticGraph.localBindings).toEqual([]);
+	expect(analyzeCaptures({ semanticGraph, symbolResolver }).diagnostics).toEqual([]);
+
+	const unanalyzable = {
+		...symbolResolver,
+		symbols: symbolResolver.symbols.map((symbol) =>
+			symbol.id === 'symbol:0' ? { ...symbol, source: '() => count++ (' } : symbol,
+		),
+	};
+
+	expect(analyzeCaptures({ semanticGraph, symbolResolver: unanalyzable }).diagnostics).toEqual([
+		expect.objectContaining({
+			code: EVENT_HANDLER_EMIT_UNSUPPORTED_CODE,
+			severity: 'error',
+			phase: CAPTURE_ANALYSIS_PHASE,
+			passId: CAPTURE_ANALYSIS_PASS_ID,
+			symbolId: 'symbol:0',
+			source: '() => count++ (',
 		}),
 	]);
 });
