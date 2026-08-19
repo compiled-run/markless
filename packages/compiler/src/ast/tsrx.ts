@@ -72,10 +72,32 @@ export function isPlainHostTemplateNode(node: AnyNode): boolean {
 }
 
 export function getElementTagName(node: AnyNode): string | null {
-	return (
-		getIdentifierName(node.id as AnyNode | undefined) ??
-		getIdentifierName((node.openingElement as AnyNode | undefined)?.name as AnyNode | undefined)
-	);
+	const name = (node.id ?? (node.openingElement as AnyNode | undefined)?.name) as
+		| AnyNode
+		| undefined;
+	return getIdentifierName(name) ?? memberTagName(name);
+}
+
+// <checkbox.root />: the authored dotted path is the component's name.
+function memberTagName(node: AnyNode | undefined): string | null {
+	if (node?.type !== 'JSXMemberExpression' && node?.type !== 'MemberExpression') return null;
+	const object = node.object as AnyNode | undefined;
+	const objectName = getIdentifierName(object) ?? memberTagName(object);
+	const propertyName = getIdentifierName(node.property as AnyNode | undefined);
+	return objectName && propertyName ? `${objectName}.${propertyName}` : null;
+}
+
+export function isMemberTagName(name: string): boolean {
+	return name.includes('.');
+}
+
+// `checkbox` in `checkbox.root`: the binding that must resolve.
+export function memberTagRootName(name: string): string {
+	return name.split('.')[0] ?? name;
+}
+
+export function memberTagPropertyPath(name: string): ReadonlyArray<string> {
+	return name.split('.').slice(1);
 }
 
 export function getElementAttributes(node: AnyNode): AnyNode[] {
@@ -94,6 +116,8 @@ export function unwrapExpressionContainer(node: AnyNode | undefined): AnyNode | 
 }
 
 export function isHostTagName(name: string): boolean {
+	// Dotted tags are components at any case.
+	if (isMemberTagName(name)) return false;
 	return name.length > 0 && name[0] === name[0].toLowerCase();
 }
 

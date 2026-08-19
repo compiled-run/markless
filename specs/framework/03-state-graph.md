@@ -348,6 +348,42 @@ normal JavaScript/TypeScript AST and scope information:
   concrete value returned by an opaque function, network request, or
   third-party library.
 
+#### Graph node identity
+
+Every graph node has one compiler-minted id. The id families are `state:<name>`,
+`computed:<name>`, `element:<name>`, `prop:props`, and
+`<sharedDefinitionId>/state:<name>` for nodes owned by a `shared()` definition.
+Ids are per module, so two modules may mint the same string for unrelated nodes.
+
+Composition is what makes those ids page-unique. When a page composes a
+component from another module, the composing layer qualifies each of that
+child's node ids with an **instance path**: one `c<componentEdgeIndex>:` segment
+per component edge it was composed through, outermost segment first. A child two
+edges deep reads `c0:c3:state:steps` in the page graph. The segment indexes the
+compiler's component edge, not render order, so inserting a sibling above a
+component does not renumber the edges after it and does not reset its state on
+reload. The grammar is protocol, owned by one serializer constant, and the same
+path qualifies the child's symbol ids and host node ids — that shared string is
+how resume recovers the instance a symbol belongs to from the id it loaded.
+
+Normative rules:
+
+- A node that belongs to the composed component instance (`state:`, `computed:`,
+  `element:`, `prop:`) takes the instance path. A `shared()` definition node
+  never does: its id is already cross-module and one instance of a definition is
+  one graph node by design.
+- Every field that names a graph node must be qualified with the same path in
+  the same change set: cells, computed nodes and their dependencies, DOM
+  updates, keyed-repeat collections, branch test reads, behavior input reads,
+  event sync-policy reads, async boundary reads and runner nodes. A partly
+  qualified graph reads the wrong value with no diagnostic, so a child node id
+  that composition cannot classify is a compose-time refusal, not a node merged
+  unqualified.
+- A component declared in the same module as its parent has no instance path:
+  its symbols are the same symbols for every instance, so no id can tell the
+  instances apart. Composing two same-module components that declare the same
+  `state()`/`computed()` name is refused with an author-facing diagnostic.
+
 #### State lvalue meta-contract
 
 The spec does not try to pre-enumerate every valid JavaScript lvalue shape.
@@ -532,8 +568,12 @@ function Header() @{
 ```
 
 `session()` does not mean "run a hook." It means: resolve this named dataflow
-instance for the current graph context. For app data, that graph context is
-usually request/container/page. The instance is created during initial render,
+instance for the current graph context. A definition declares which context that
+is: `request`, `container`, `page`, or `widget`. For app data the context is
+usually request/container/page — one instance per request, per container, or per
+page. `widget` scope is the component-library case: one instance per rendered
+widget, resolved by the outermost component instance that calls the definition,
+so a second `<SelectRoot>` on the page resolves a second instance. The instance is created during initial render,
 serialized into the graph payload, resumed lazily in the browser, and
 synchronized by serialized patch events only when it crosses container/runtime
 boundaries.
@@ -557,8 +597,12 @@ Semantics:
   request/container/page instance. For headless UI and design-system components,
   the active instance is the compiler-owned UI graph instance serialized for
   that widget. Multiple widgets get distinct graph instances through normal
-  component, key, and projection identity; event/resume symbols carry the graph
-  instance ID they were rendered with.
+  component, key, and projection identity: the widget instance is the instance
+  path (see "Graph node identity") of the outermost component that resolves the
+  definition, and event/resume symbols carry that same path in their symbol ids.
+  A `widget`-scoped definition's instance id is its definition id qualified by
+  that path, so two rendered widgets of one family never share a node while the
+  root/trigger/item pieces of one widget always do.
 - **Boundaries are dataflow, not components.** The framework tracks who reads,
   who writes, which runtime owns the instance, and where the state must
   serialize or sync. Authors do not place provider components to define those
@@ -729,11 +773,14 @@ export function SelectItem({ value, children }) @{
 ```
 
 All three components read and write the same select graph instance for that
-rendered widget. A second `<SelectRoot>` gets a different graph instance. No
-provider component, context ID, wrapper hook, or tree-shaped public API is
-introduced; the compiler/runtime records graph instance identity in the same
-render/resume metadata used for events, projection, keyed loops, and DOM
-updates.
+rendered widget. A second `<SelectRoot>` gets a different graph instance: with
+`widget` scope, the instance id is the definition id qualified by the instance
+path of the outermost resolving component, and the trigger and item pieces
+resolve through the same path. No provider component, context ID, wrapper hook,
+or tree-shaped public API is introduced; the compiler/runtime records graph
+instance identity in the same render/resume metadata used for events,
+projection, keyed loops, and DOM updates — the instance path defined in "Graph
+node identity".
 
 **Self-contained local widget state**
 

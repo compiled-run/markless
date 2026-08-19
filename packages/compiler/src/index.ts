@@ -40,8 +40,18 @@ export {
 	moduleInterfaceHash,
 	prerenderInterfacesComplete,
 } from './passes/link/interface-link.ts';
+export type { ComponentEdgeSymbolRoute } from './component-edge-instance.ts';
+export {
+	componentEdgeSymbolRoutes,
+	importedSymbolRoutes,
+} from './component-edge-instance.ts';
+export type {
+	BarrelComponentLinkArtifact,
+	BarrelComponentLinkInput,
+} from './passes/link/module-link.ts';
 export {
 	MODULE_LINK_PASS_ID,
+	linkBarrelComponents,
 	linkImportedModules,
 	linkedChildrenHaveBrowserTriggers,
 	linkedImportedClaimsMissing,

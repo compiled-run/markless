@@ -15,7 +15,9 @@ import {
 import {
 	fallbackImportedSource,
 	forceImportedModules,
+	linkBarrelComponentInterfaces,
 	linkModuleGraph,
+	linkedInterfaces,
 	materializeDelegateChildren,
 	mergeLinkedModuleChildren,
 	moduleIsEntry,
@@ -114,6 +116,37 @@ export async function linkTransformChildren(
 		transformed.moduleImports,
 		fallbackImportedSource,
 	);
+	const barrelComponents = await linkBarrelComponentInterfaces(
+		pluginContext,
+		manifestSource,
+		transformed.moduleImports,
+		moduleLinkArtifacts,
+		internalOptions.buildId,
+	);
+	// The interfaces this module links: the barrel's synthetic entry first, so a
+	// real compiled interface for the same specifier always wins.
+	const barrelLinkedInterfaces = () => ({
+		...barrelComponents.interfaces,
+		...linkedInterfaces(barrelComponents.children, moduleLinkArtifacts).interfaces,
+	});
+	// A barrel names the parts module, not the components; the symbol routes
+	// below must already point at the `.tsrx` files, so the link runs before
+	// children are resolved from the manifest.
+	if (!reusedLinkedTransform && barrelComponents.children.length > 0) {
+		await forceImportedModules(
+			pluginContext,
+			mergeLinkedModuleChildren(barrelComponents.children),
+			moduleLinkArtifacts,
+			moduleMetadata,
+			internalOptions,
+			currentEnvironment,
+		);
+		linkedTransformInput = {
+			...linkedTransformInput,
+			importedModuleInterfaces: barrelLinkedInterfaces(),
+		};
+		transformed = await transformTsrxModuleWithPrerenderWakeClosure(linkedTransformInput, false);
+	}
 	const resolvedChildren = await resolveImportedChildren(
 		pluginContext,
 		manifestSource,
@@ -126,7 +159,11 @@ export async function linkTransformChildren(
 	}
 	await forceImportedModules(
 		pluginContext,
-		mergeLinkedModuleChildren(resolvedInterfaceImports, resolvedChildren),
+		mergeLinkedModuleChildren(
+			resolvedInterfaceImports,
+			barrelComponents.children,
+			resolvedChildren,
+		),
 		moduleLinkArtifacts,
 		moduleMetadata,
 		internalOptions,
@@ -145,7 +182,9 @@ export async function linkTransformChildren(
 	});
 	if (
 		!reusedLinkedTransform &&
-		(resolvedChildren.length > 0 || resolvedInterfaceImports.length > 0)
+		(resolvedChildren.length > 0 ||
+			resolvedInterfaceImports.length > 0 ||
+			barrelComponents.children.length > 0)
 	) {
 		const symbols = linkedImportedSymbolInputs({
 			children: resolvedChildren,
@@ -169,7 +208,7 @@ export async function linkTransformChildren(
 		linkedTransformInput = {
 			...linkedTransformInput,
 			symbols,
-			importedModuleInterfaces: linkedGraph.interfaces,
+			importedModuleInterfaces: { ...barrelLinkedInterfaces(), ...linkedGraph.interfaces },
 			...(renderDataImportSources ? { renderDataImportSources } : {}),
 		};
 		transformed = await transformTsrxModuleWithPrerenderWakeClosure(

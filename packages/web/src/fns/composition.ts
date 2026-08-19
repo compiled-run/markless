@@ -1,4 +1,10 @@
 import { marklessBoundSymbolId, marklessLiveBoundGraphRoute } from './bound-symbol.ts';
+import {
+	marklessComposedGraphNodeId,
+	marklessInstancePath,
+	marklessInstanceScopedGraph,
+	marklessMarkComposedSymbol,
+} from './instance-scope.ts';
 import type { ResumeSymbol, ResumeSymbolContext } from '../resume-types.ts';
 
 // Composition works on the DRAFT payload the compiled render modules build:
@@ -48,8 +54,9 @@ export type ComposeLoadSymbol = (symbolId: string) => ResumeSymbol | Promise<Res
 export type ComposeChildOutput = {
 	state?: ComposeStateDraft;
 	loadSymbol?: ComposeLoadSymbol;
-	// `m` remaps the child's own graph output against the parent's prop routes.
-	readonly m?: (graphProps: ComposeGraphProps) => void;
+	// `m` remaps the child's own graph output against the parent's prop routes
+	// and qualifies its remaining graph node ids with the instance path.
+	readonly m?: (graphProps: ComposeGraphProps, instancePath?: string) => void;
 	readonly [key: string]: unknown;
 };
 export type ComposeChild = {
@@ -61,6 +68,42 @@ export type ComposeChild = {
 	readonly [key: string]: unknown;
 };
 
+// One instance path qualifies a composed child's symbol ids AND its graph node
+// ids. Keeping them the same string is what lets browser resume recover the
+// instance a symbol belongs to from the symbol id it was loaded with; a child
+// whose symbols do not carry the path cannot be graph-qualified either.
+export function marklessComposedInstancePath(child: {
+	readonly symbolPrefix?: string;
+}): string {
+	return marklessInstancePath(child.symbolPrefix);
+}
+
+export { marklessComposedGraphNodeId };
+
+// Rewrites a child state draft from child-local ids into page-space ids: prop
+// reads with a live parent route become that route, everything else takes the
+// instance path.
+export function marklessQualifyChildState(
+	state: ComposeStateDraft,
+	graphProps: ComposeGraphProps,
+	instancePath: string,
+) {
+	state.cells = (state.cells ?? []).map((cell) => ({
+		...cell,
+		graphNodeId: marklessComposedGraphNodeId(cell.graphNodeId, instancePath),
+	}));
+	state.computed = (state.computed ?? []).map((computed) => ({
+		...computed,
+		graphNodeId: marklessComposedGraphNodeId(computed.graphNodeId, instancePath),
+		...(computed.dependencies && {
+			dependencies: computed.dependencies.map(
+				(dependency) =>
+					marklessCsrRemapChildGraph(dependency, graphProps, instancePath) ?? dependency,
+			),
+		}),
+	}));
+}
+
 export function marklessComposeState<T extends ComposeStateDraft>(
 	state: T,
 	children: ReadonlyArray<ComposeChild>,
@@ -69,8 +112,13 @@ export function marklessComposeState<T extends ComposeStateDraft>(
 		.map((child) => child.output?.state)
 		.filter((childState): childState is ComposeStateDraft => Boolean(childState));
 	if (!childStates.length) return state;
-	marklessAssertComposableStateNames(state, childStates);
-	for (const child of children) child.output?.m?.(child.graphProps);
+	for (const child of children) {
+		const output = child.output;
+		if (!output?.state) continue;
+		const instancePath = marklessComposedInstancePath(child);
+		if (output.m) output.m(child.graphProps, instancePath);
+		else marklessQualifyChildState(output.state, child.graphProps, instancePath);
+	}
 	const sharedDefinitions = [
 		...(state.sharedDefinitions ?? []),
 		...childStates.flatMap((childState) => childState.sharedDefinitions ?? []),
@@ -101,11 +149,14 @@ export function marklessCsrRemapGraphOutput(
 		state: ComposeStateDraft & { readonly cells: ReadonlyArray<ComposeStateNode> };
 	},
 	graphProps: ComposeGraphProps,
+	instancePath = '',
 ) {
+	marklessQualifyChildState(output.state, graphProps, instancePath);
 	// A composed prop is the source node's committed mount value. Seed that
 	// node before the page graph is built so a downstream-first write can read it.
-	const props = output.state.cells.find((cell) => cell.graphNodeId.startsWith('prop:'))
-		?.directValue as Readonly<Record<string, unknown>> | undefined;
+	const props = output.state.cells.find((cell) =>
+		cell.graphNodeId.startsWith(instancePath + 'prop:'),
+	)?.directValue as Readonly<Record<string, unknown>> | undefined;
 	if (props)
 		for (const prop of graphProps ?? []) {
 			const route = marklessLiveBoundGraphRoute(prop);
@@ -116,87 +167,55 @@ export function marklessCsrRemapGraphOutput(
 					directValue: props[prop.name],
 				});
 		}
-	output.state.computed = (output.state.computed ?? []).map((computed) => ({
-		...computed,
-		...(computed.dependencies && {
-			dependencies: computed.dependencies.map(
-				(dependency) => marklessCsrRemapChildGraph(dependency, graphProps) ?? dependency,
-			),
-		}),
-	}));
 	const loadSymbol = output.loadSymbol;
-	if (!loadSymbol || !graphProps?.length) return;
+	if (!loadSymbol || !(graphProps?.length || instancePath)) return;
 	output.loadSymbol = (symbolId: string) =>
-		Promise.resolve(loadSymbol(symbolId)).then(
-			(symbol) => (context: ResumeSymbolContext) =>
-				symbol({
-					...context,
-					graph: {
-						...context.graph,
-						read(graphNodeId: string, path: ReadonlyArray<string> = []) {
-							const mapped = marklessCsrRemapChildGraph(
-								{ graphNodeId, path },
-								graphProps,
-							);
-							return context.graph.read(
-								mapped?.graphNodeId ?? graphNodeId,
-								mapped?.path ?? path,
-							);
-						},
-					},
-				}),
+		Promise.resolve(loadSymbol(symbolId)).then((symbol) =>
+			marklessComposedSymbol(symbol, graphProps, instancePath),
 		);
 }
 
-// Graph node ids are NAME-based per module and compose merges child state
-// into ONE page graph unprefixed: same-named state()/computed() in a page
-// and a composed component would silently share one value (and one streaming
-// runner). Refuse loudly until graph ids are instance-scoped; shared
-// definitions keep their cross-module ids on purpose.
-export function marklessAssertComposableStateNames(
-	state: ComposeStateDraft,
-	childStates: ReadonlyArray<ComposeStateDraft>,
-) {
-	const seen = new Set(
-		[...(state.cells ?? []), ...(state.computed ?? [])].map((node) => node.graphNodeId),
-	);
-	for (const childState of childStates) {
-		for (const node of [...(childState.cells ?? []), ...(childState.computed ?? [])]) {
-			const id = node.graphNodeId;
-			// Only author-renamable state()/computed() names are diagnosable.
-			// Live directValue cells seed mapped prop sources and are not declarations.
-			// Shared definitions and props compose by design; compiler-synthesized
-			// names carry extra ':' segments and are not author collisions.
-			if (
-				node.directValue !== undefined ||
-				id.startsWith('shared:') ||
-				id.startsWith('prop:') ||
-				id.slice(id.indexOf(':') + 1).includes(':')
-			)
-				continue;
-			if (seen.has(id)) {
-				throw Object.assign(
-					new Error(
-						`MARKLESS_COMPOSED_STATE_COLLISION: Two components on this page both declare state() or computed() named "${id.slice(id.indexOf(':') + 1)}". Composed components share one state graph, so they would read and write the same value. Rename one of them.`,
-					),
-					{
-						code: 'MARKLESS_COMPOSED_STATE_COLLISION',
-						graphNodeId: id,
-						docsUrl: 'https://markless.dev/errors/MARKLESS_COMPOSED_STATE_COLLISION',
-					},
-				);
-			}
-			seen.add(id);
-		}
-	}
+function marklessComposedSymbol(
+	symbol: ResumeSymbol,
+	graphProps: ComposeGraphProps,
+	instancePath: string,
+): ResumeSymbol {
+	const composed = (context: ResumeSymbolContext) => {
+		// One route for both read channels: `context.read` is the same child-local
+		// id space `graph.read` is, so an unmapped one would read the page graph raw.
+		const read = (graphNodeId: string, path: ReadonlyArray<string> = []) => {
+			const mapped = marklessCsrRemapChildGraph(
+				{ graphNodeId, path },
+				graphProps,
+				instancePath,
+			);
+			return context.graph.read(mapped?.graphNodeId ?? graphNodeId, mapped?.path ?? path);
+		};
+		return symbol({
+			...context,
+			graph: {
+				...marklessInstanceScopedGraph(context.graph, instancePath),
+				read,
+			},
+			...(context.read ? { read } : {}),
+		});
+	};
+	return marklessMarkComposedSymbol(composed);
 }
 
 export function marklessCsrRemapChildGraph(
 	record: ComposeGraphRead,
 	graphProps: ComposeGraphProps,
+	instancePath = '',
 ): ComposeGraphRead | null {
 	const propName = marklessCompositionPropName(record.graphNodeId, record.path);
-	if (propName === null) return record;
+	if (propName === null)
+		return instancePath
+			? {
+					...record,
+					graphNodeId: marklessComposedGraphNodeId(record.graphNodeId, instancePath),
+				}
+			: record;
 	const binding = marklessCompositionGraphProp(graphProps, propName);
 	const liveRoute = marklessLiveBoundGraphRoute(binding);
 	return liveRoute
@@ -210,11 +229,49 @@ export function marklessCsrRemapChildGraph(
 		: null;
 }
 
+// Sync policy conditions read the graph by id, so a composed child's policy
+// travels the same route its other reads do.
+export function marklessComposedSyncPolicy<T>(
+	policy: T,
+	graphProps: ComposeGraphProps,
+	instancePath: string,
+): T {
+	if (!policy || typeof policy !== 'object' || !(instancePath || graphProps?.length))
+		return policy;
+	const condition = policy as { readonly type?: string; readonly graphNodeId?: unknown };
+	if (condition.type === 'graph-truthy' && typeof condition.graphNodeId === 'string') {
+		const mapped = marklessCsrRemapChildGraph(
+			{
+				graphNodeId: condition.graphNodeId,
+				path: (condition as { readonly path?: ReadonlyArray<string> }).path ?? [],
+			},
+			graphProps,
+			instancePath,
+		);
+		return mapped
+			? ({ ...condition, graphNodeId: mapped.graphNodeId, path: mapped.path } as T)
+			: policy;
+	}
+	if (Array.isArray(policy))
+		return policy.map((item) =>
+			marklessComposedSyncPolicy(item, graphProps, instancePath),
+		) as unknown as T;
+	return Object.fromEntries(
+		Object.entries(policy as Record<string, unknown>).map(([key, value]) => [
+			key,
+			marklessComposedSyncPolicy(value, graphProps, instancePath),
+		]),
+	) as T;
+}
+
 export function marklessCsrChildReadIsStatic(record: ComposeGraphRead, graphProps: ComposeGraphProps) {
 	const propName = marklessCompositionPropName(record.graphNodeId, record.path);
 	if (propName === null) return false;
 	const binding = (graphProps ?? []).find((prop) => prop.name === propName);
-	return !!binding && binding.kind !== undefined && binding.kind !== 'graph-reference';
+	// A name the route table never lists was never passed, so the child read a
+	// static undefined and rendered its final answer with it.
+	if (!binding) return true;
+	return binding.kind !== undefined && binding.kind !== 'graph-reference';
 }
 
 function marklessCompositionPropName(
@@ -224,7 +281,7 @@ function marklessCompositionPropName(
 	return graphNodeId === 'prop:props'
 		? path[0]
 		: graphNodeId.startsWith('prop:')
-			? graphNodeId.slice(5)
+			? graphNodeId.slice('prop:'.length)
 			: null;
 }
 
@@ -237,16 +294,22 @@ export function marklessCsrRemapChildKeyedRepeat(
 	repeat: ComposeKeyedRepeat,
 	graphProps: ComposeGraphProps,
 	hostPrefix = '',
+	instancePath = '',
 ): ComposeGraphRead | null {
 	const graphNodeId = repeat.collectionGraphNodeId;
 	if (!graphNodeId) return null;
 	const propName = marklessCompositionPropName(graphNodeId, repeat.collectionPath);
-	if (propName === null) return { graphNodeId, path: repeat.collectionPath };
+	if (propName === null)
+		return {
+			graphNodeId: marklessComposedGraphNodeId(graphNodeId, instancePath),
+			path: repeat.collectionPath,
+		};
 	const binding = marklessCompositionGraphProp(graphProps, propName);
 	if (binding === null) return null;
 	const mapped = marklessCsrRemapChildGraph(
 		{ graphNodeId, path: repeat.collectionPath },
 		graphProps,
+		instancePath,
 	);
 	if (mapped) return mapped;
 	throw new Error('MARKLESS_COMPOSED_READ_UNMAPPED: ' + hostPrefix + repeat.id);
@@ -256,14 +319,23 @@ export function marklessCsrRemapChildDomUpdate(
 	update: ComposeDomUpdate,
 	graphProps: ComposeGraphProps,
 	hostPrefix = '',
+	instancePath = '',
 ): ComposeGraphRead | null {
 	const propName = marklessCompositionPropName(update.graphNodeId, update.path);
-	if (propName === null) return update;
+	if (propName === null)
+		return instancePath
+			? {
+					...update,
+					graphNodeId: marklessComposedGraphNodeId(update.graphNodeId, instancePath),
+				}
+			: update;
 	const binding = marklessCompositionGraphProp(graphProps, propName);
 	if (binding === null) return null;
-	// Projected children are rendered by the parent's chunk slots. A wrapper
-	// component's synthetic `children` text record has no live graph route.
-	if (!binding && propName === 'children') return null;
+	// The route table lists every prop written at the invocation site, so a name
+	// missing from it was never passed (or came through a static spread): the
+	// child already rendered its final value and there is nothing live to wire.
+	// Projected children reach the same conclusion by a different road.
+	if (!binding) return null;
 	const mapped = marklessCsrRemapChildGraph(update, graphProps);
 	if (mapped) return mapped;
 

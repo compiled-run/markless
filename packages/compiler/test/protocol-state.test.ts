@@ -146,3 +146,40 @@ export function App() @{
 		},
 	]);
 });
+
+// Composition qualifies a composed child's ids by concatenating its instance
+// path, with no classifier at runtime. These two cases were a runtime refusal in
+// packages/web; the refusal now happens once, here, where the payload is minted.
+for (const family of ['cells', 'computed'] as const) {
+	test(`payload emission refuses an unclassifiable ${family} graph node id`, async () => {
+		const semanticGraph = await buildSemanticGraph({
+			filename: 'src/mystery.tsrx',
+			source: `
+import { state, computed } from '@markless/core';
+
+export function Page() @{
+	let count = state(2);
+	const doubled = computed(() => count * 2);
+
+	<p>{doubled}</p>
+}
+`,
+		});
+		const stateLowering = lowerStateAccess({ semanticGraph });
+		const payloadArena = planPayloadArena({ semanticGraph, stateLowering });
+		const arena = {
+			...payloadArena,
+			state: {
+				...payloadArena.state,
+				[family]: payloadArena.state[family].map((node) => ({
+					...node,
+					graphNodeId: 'mystery:report',
+				})),
+			},
+		};
+
+		expect(() =>
+			createProtocolStatePayloadFromArena({ semanticGraph, payloadArena: arena }),
+		).toThrowError(/MARKLESS_COMPOSED_GRAPH_NODE_UNCLASSIFIED: .*"mystery:report"/);
+	});
+}

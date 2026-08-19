@@ -7,6 +7,7 @@ import type { decodePayloadScripts } from '../../serializer/src/protocol-client.
 import type { DecodedPayloadScripts } from '../../serializer/src/protocol-client-storage.ts';
 import { createRuntimeGraphFromResumePayload } from './payload-graph-construct.ts';
 import { getAlreadyResumedPayload, setResumedPayload } from './payload-resume-registry.ts';
+import { marklessInstanceScopedLoadSymbol } from './fns/instance-scope.ts';
 
 // Streamed settles (T107) leave records + snapshot patches in the document.
 // Only pages that actually streamed pay for the adoption module: the check
@@ -72,11 +73,13 @@ async function startDecodedResume(
 	input: Omit<ResumePayloadScriptsInput, 'stateScript' | 'viewScript'>,
 	decoded: DecodedPayloadScripts,
 ): Promise<ResumePayloadScriptsResult> {
+	// Composed children's symbols answer on their own instance's graph nodes.
+	const loadSymbol = marklessInstanceScopedLoadSymbol(input.loadSymbol);
 	const graph = await createRuntimeGraphFromResumePayload({
 		state: decoded.state,
 		view: decoded.view,
 		root: input.root,
-		loadSymbol: input.loadSymbol,
+		loadSymbol,
 	});
 	delete input.root.__marklessEventOnlyGraph;
 	let runtime: ResumeRuntime | undefined;
@@ -105,7 +108,7 @@ async function startDecodedResume(
 		graph,
 		state: decoded.state,
 		view: decoded.view,
-		loadSymbol: input.loadSymbol,
+		loadSymbol,
 		createVisibilityObserver: input.createVisibilityObserver,
 		createRemovalObserver: input.createRemovalObserver,
 		applyDomJournal,

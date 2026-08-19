@@ -12,11 +12,21 @@
 		"target": "ES2022",
 		"types": ["node", "vitest"]
 	},
-	"exclude": ["dist", "node_modules", "poc", "packages/*/test", "packages/bundler/fixtures"],
+	"exclude": [
+		"dist",
+		"node_modules",
+		"poc",
+		"packages/*/test",
+		"packages/headless/*/test",
+		"packages/bundler/fixtures"
+	],
 	"include": [
 		"packages/*/src/**/*.d.ts",
 		"packages/*/src/**/*.ts",
 		"packages/*/src/**/*.tsrx",
+		"packages/headless/*/src/**/*.d.ts",
+		"packages/headless/*/src/**/*.ts",
+		"packages/headless/*/src/**/*.tsrx",
 		"vite.config.ts"
 	]
 }

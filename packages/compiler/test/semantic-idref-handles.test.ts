@@ -215,7 +215,8 @@ export function App() @{
 	expect(graph.templateReads.map((read) => [read.source, read.target])).toEqual([
 		['labelId', { kind: 'attribute', name: 'aria-labelledby' }],
 	]);
-	expect(statics(graph)).toContain('aria-labelledby="');
+	// The name now travels with the slot, so the statics keep only the element.
+	expect(statics(graph)).toContain('<div>Body</div>');
 });
 
 test('aria-activedescendant is not an IDREF position in this slice', async () => {

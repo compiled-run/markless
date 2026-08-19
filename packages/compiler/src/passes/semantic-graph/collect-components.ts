@@ -6,6 +6,9 @@ import {
 	getElementTagName,
 	isHostTagName,
 	isIgnorableJsxTextNode,
+	isMemberTagName,
+	memberTagPropertyPath,
+	memberTagRootName,
 	unwrapExpressionContainer,
 } from '../../ast/tsrx.ts';
 import {
@@ -15,7 +18,10 @@ import {
 } from '../../artifact-helpers/graph-paths.ts';
 import { collectExpressionReads } from './collect-expressions.ts';
 import { collectObjectPatternAliases } from './collect-aliases.ts';
-import { callbackPropArityUnsupportedDiagnostic } from './diagnostics.ts';
+import {
+	callbackPropArityUnsupportedDiagnostic,
+	memberTagUnresolvedDiagnostic,
+} from './diagnostics.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
 
 export function collectComponentProps(component: AnyNode, state: WalkState): void {
@@ -78,9 +84,25 @@ export function collectComponentEdge(
 	state: WalkState,
 	walk: SemanticGraphWalk,
 ): boolean {
-	const childComponentName = getElementTagName(node);
-	if (!childComponentName || isHostTagName(childComponentName)) return false;
+	const tagName = getElementTagName(node);
+	if (!tagName || isHostTagName(tagName)) return false;
 	if (!state.currentComponentName) return false;
+
+	// A member tag off a local object names that object's component directly.
+	const localTarget = state.memberTagTargets.get(tagName) ?? tagName;
+	const link = resolveImportedChildComponent(localTarget, state);
+	const childComponentName = link.childComponentName;
+	const importSource = link.importSource;
+	if (isMemberTagName(childComponentName) && !importSource.importSource) {
+		state.graph.diagnostics.push(
+			memberTagUnresolvedDiagnostic({
+				tagName,
+				rootName: memberTagRootName(tagName),
+				node,
+				filename: state.filename,
+			}),
+		);
+	}
 
 	const props = componentPropBindings(node, state);
 	state.graph.componentEdges.push({
@@ -88,7 +110,7 @@ export function collectComponentEdge(
 		parentComponentName: state.currentComponentName,
 		childComponentName,
 		...(state.currentAsyncBoundaryId ? { asyncBoundaryId: state.currentAsyncBoundaryId } : {}),
-		...componentImportSource(childComponentName, state),
+		...importSource,
 		sourceSpan: sourceSpan(node, state.filename),
 		props,
 		children: {
@@ -208,9 +230,9 @@ function componentImportSource(
 	childComponentName: string,
 	state: WalkState,
 ): Pick<SemanticComponentEdge, 'importSource' | 'importKind' | 'importedName'> {
-	const imported = state.graph.moduleImports.find(
-		(item) => item.localName === childComponentName,
-	);
+	// Member tags resolve through their root identifier (`checkbox` in `checkbox.root`).
+	const localName = memberTagRootName(childComponentName);
+	const imported = state.graph.moduleImports.find((item) => item.localName === localName);
 	return imported
 		? {
 				importSource: imported.source,
@@ -218,6 +240,57 @@ function componentImportSource(
 				importedName: imported.importedName,
 			}
 		: {};
+}
+
+// Maps a tag's local name (aliased import or barrel member path) to the component its module declares.
+function resolveImportedChildComponent(
+	localTarget: string,
+	state: WalkState,
+): {
+	readonly childComponentName: string;
+	readonly importSource: Pick<
+		SemanticComponentEdge,
+		'importSource' | 'importKind' | 'importedName'
+	>;
+} {
+	const importSource = componentImportSource(localTarget, state);
+	const unresolved = { childComponentName: localTarget, importSource };
+	if (!importSource.importSource) return unresolved;
+	const moduleInterface = state.importedModuleInterfaces[importSource.importSource];
+	if (!moduleInterface) return unresolved;
+
+	const exportPath = [
+		...(importSource.importKind === 'namespace'
+			? []
+			: importSource.importKind === 'default'
+				? ['default']
+				: [importSource.importedName ?? memberTagRootName(localTarget)]),
+		...memberTagPropertyPath(localTarget),
+	];
+
+	const linked = moduleInterface.linkedComponents?.find(
+		(candidate) =>
+			candidate.exportPath.length === exportPath.length &&
+			candidate.exportPath.every((part, index) => part === exportPath[index]),
+	);
+	if (linked) {
+		return {
+			childComponentName: linked.componentName,
+			importSource: {
+				importSource: linked.source,
+				importKind: linked.importKind,
+				...(linked.importedName ? { importedName: linked.importedName } : {}),
+			},
+		};
+	}
+
+	if (exportPath.length !== 1) return unresolved;
+	const declared = moduleInterface.render.components.find(
+		(candidate) => candidate.exportName === exportPath[0],
+	);
+	return declared
+		? { childComponentName: declared.componentName, importSource }
+		: unresolved;
 }
 
 function componentChildCount(node: AnyNode): number {

@@ -15,6 +15,9 @@ import type {
 	LinkedModuleGraphInput,
 	LinkedModuleClaimPlan,
 	LinkedSymbolClaimManifest,
+	ModuleGraphInterfaceArtifact,
+	ModuleGraphInterfaceLinkedComponent,
+	ModuleGraphInterfaceReexport,
 	ModuleLinkRequest,
 	ModuleLinkResolutionTable,
 	RenderDataReachRecord,
@@ -342,4 +345,169 @@ export function linkedManifestHasBrowserTriggers(manifest: LinkedSymbolClaimMani
 	return manifest.symbols.some(
 		(symbol) => symbol.kind === 'event-handler' || symbol.kind === 'behavior',
 	);
+}
+
+/**
+ * Component parts are shipped as a barrel: `checkbox/index.ts` re-exports the
+ * `.tsrx` files, and an app may read it through another `export * as checkbox`.
+ * A plain `.ts` module has no render data of its own, so the chain is followed
+ * to the `.tsrx` modules that do, and every reached component is reported with
+ * its specifier rebased to the module that imports the barrel.
+ *
+ * Resolution and reading are inputs, never work this pass does. A specifier the
+ * driver has not resolved yet, or a file whose interface it has not read yet,
+ * comes back as `pendingResolutions` / `pendingInterfaces`; the driver fills
+ * them and calls again until both are empty.
+ */
+export type BarrelComponentLinkInput = {
+	readonly parent: string;
+	readonly moduleImports: ReadonlyArray<{ readonly source: string }>;
+	/**
+	 * `specifier@importer` (see `moduleLinkResolutionKey`) to the module id it
+	 * resolves to, or `null` when the resolver answered with nothing. An absent
+	 * key has not been asked yet.
+	 */
+	readonly resolution: Readonly<Record<string, string | null>>;
+	/**
+	 * The module-graph interface of a file the driver has already read: `null`
+	 * when that file has none, `undefined` when it has not been read yet.
+	 */
+	readonly moduleInterface: (filename: string) => ModuleGraphInterfaceArtifact | null | undefined;
+	/** The specifier `parent` must use to import `target`. Path math is the driver's. */
+	readonly rebase: (target: string) => string;
+};
+
+export type BarrelComponentLinkArtifact = {
+	readonly passId: typeof MODULE_LINK_PASS_ID;
+	readonly interfaces: Record<string, ModuleGraphInterfaceArtifact>;
+	readonly children: LinkedModuleChildResolution[];
+	readonly diagnostics: CompilerDiagnostic[];
+	readonly pendingResolutions: ModuleLinkRequest[];
+	readonly pendingInterfaces: string[];
+};
+
+export function linkBarrelComponents(
+	input: BarrelComponentLinkInput,
+): BarrelComponentLinkArtifact {
+	const interfaces: Record<string, ModuleGraphInterfaceArtifact> = {};
+	const children: LinkedModuleChildResolution[] = [];
+	const diagnostics: CompilerDiagnostic[] = [];
+	const pendingResolutions: ModuleLinkRequest[] = [];
+	const pendingInterfaces: string[] = [];
+
+	// `undefined` means "ask the driver"; `null` means "the driver asked and got nothing".
+	const resolveId = (specifier: string, importer: string): string | null | undefined => {
+		const key = moduleLinkResolutionKey(specifier, importer);
+		if (!Object.hasOwn(input.resolution, key)) {
+			pendingResolutions.push({ parent: importer, specifier });
+			return undefined;
+		}
+		return input.resolution[key] ?? null;
+	};
+	const readInterface = (filename: string): ModuleGraphInterfaceArtifact | null | undefined => {
+		const known = input.moduleInterface(filename);
+		if (known === undefined) pendingInterfaces.push(filename);
+		return known;
+	};
+
+	const walkBarrel = (
+		filename: string,
+		prefix: ReadonlyArray<string>,
+		seen: ReadonlySet<string>,
+	): ModuleGraphInterfaceLinkedComponent[] => {
+		if (seen.has(filename)) return [];
+		const reexports = readInterface(filename)?.reexports ?? [];
+		const linked: ModuleGraphInterfaceLinkedComponent[] = [];
+		for (const reexport of reexports) {
+			const target = resolveId(reexport.source, filename);
+			if (target === undefined) continue;
+			if (target === null) {
+				diagnostics.push(barrelUnresolvedDiagnostic(filename, reexport));
+				continue;
+			}
+			const exportPath = [...prefix, reexport.exportName];
+			if (!TSRX_SOURCE_FILE.test(target)) {
+				linked.push(
+					...walkBarrel(
+						target,
+						reexport.importedName === '*' ? exportPath : prefix,
+						new Set([...seen, filename]),
+					),
+				);
+				continue;
+			}
+			const targetInterface = readInterface(target);
+			const component = targetInterface?.render.components.find(
+				(candidate) => candidate.exportName === reexport.importedName,
+			);
+			if (!targetInterface || !component) continue;
+			const specifier = input.rebase(target);
+			interfaces[specifier] = targetInterface;
+			children.push({
+				parent: input.parent,
+				specifier,
+				source: target,
+				externalized: false,
+			});
+			linked.push({
+				exportPath,
+				source: specifier,
+				importKind: reexport.importedName === 'default' ? 'default' : 'named',
+				...(reexport.importedName === 'default'
+					? {}
+					: { importedName: reexport.importedName }),
+				componentName: component.componentName,
+			});
+		}
+		return linked;
+	};
+
+	for (const moduleImport of input.moduleImports) {
+		if (TSRX_SOURCE_FILE.test(moduleImport.source)) continue;
+		if (!moduleImport.source.startsWith('.')) continue;
+		const barrel = resolveId(moduleImport.source, input.parent);
+		// An import that names no module in this build is not a barrel to follow.
+		if (barrel === undefined || barrel === null) continue;
+		const linkedComponents = walkBarrel(barrel, [], new Set());
+		if (linkedComponents.length === 0) continue;
+		interfaces[moduleImport.source] = {
+			passId: 'module-graph-interface',
+			filename: barrel,
+			exports: [],
+			linkedComponents,
+			render: { version: 1, components: [] },
+		};
+	}
+
+	return {
+		passId: MODULE_LINK_PASS_ID,
+		interfaces,
+		children,
+		diagnostics,
+		pendingResolutions,
+		pendingInterfaces,
+	};
+}
+
+function barrelUnresolvedDiagnostic(
+	filename: string,
+	reexport: ModuleGraphInterfaceReexport,
+): CompilerDiagnostic {
+	return {
+		code: 'MARKLESS_COMPONENT_BARREL_UNRESOLVED',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'Component barrel re-export does not resolve',
+		message: `MARKLESS_COMPONENT_BARREL_UNRESOLVED: ${JSON.stringify(filename)} re-exports ${JSON.stringify(reexport.exportName)} from ${JSON.stringify(reexport.source)}, which does not resolve to a module.`,
+		why: 'A barrel names the parts module rather than the components, so a re-export that resolves to nothing would silently drop every component behind it.',
+		passId: MODULE_LINK_PASS_ID,
+		artifactKeys: ['linkedModuleGraph'],
+		source: filename,
+		suggestions: [
+			{
+				message: `Check that ${JSON.stringify(reexport.source)} exists next to ${JSON.stringify(filename)} and is reachable by this build's resolver.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_COMPONENT_BARREL_UNRESOLVED',
+	};
 }

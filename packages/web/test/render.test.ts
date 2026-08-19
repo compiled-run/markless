@@ -1205,7 +1205,13 @@ export default function CaptureSlotSiblings() @{
 			);
 			const records = output.view.events.filter((record) => record.eventName === 'click');
 
-			expect(childHandler.captureSlots.length).toBeGreaterThanOrEqual(3);
+			// The child's handler captures exactly what it reads: the callback prop
+			// and the label prop. The page's own `count` state is a different
+			// component's binding and is not a capture of this child.
+			expect(childHandler.captureSlots.map((slot) => slot.source)).toEqual([
+				'onTrace',
+				'label',
+			]);
 			expect(rows).toHaveLength(2);
 			expect(rows.map((row) => row.componentEdgePath)).toEqual([
 				['component-edge:0'],

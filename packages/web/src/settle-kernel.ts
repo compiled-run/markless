@@ -10,6 +10,7 @@
 //     markup-parsing sink, because feed values are server-controlled strings;
 //   - anything it cannot express exactly throws SettleKernelUnsupportedError so
 //     the caller falls back to the full evaluation. Never half-render.
+import { marklessAttributeValue } from './dom-attribute.ts';
 import type { SsrDataChunk, SsrDataResidue, SsrDataSlot } from './ssr-data/renderer.ts';
 
 export const SETTLE_KERNEL_UNSUPPORTED = 'MARKLESS_SETTLE_KERNEL_UNSUPPORTED';
@@ -316,7 +317,12 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 			if (slot.raw) throw new SettleKernelUnsupportedError('raw text slot');
 			return escapeHtml(readResidue(slot.residue, item));
 		}
-		if (slot.kind === 'attribute') return escapeHtml(readResidue(slot.residue, item));
+		if (slot.kind === 'attribute') {
+			const value = readResidue(slot.residue, item);
+			if (slot.alwaysPresent) return escapeHtml(value);
+			const text = marklessAttributeValue(slot.name, value);
+			return text === null ? '' : ` ${slot.name}="${escapeHtml(text)}"`;
+		}
 		if (slot.kind === 'repeat') {
 			const record = (surface.renderData.repeats ?? []).find(
 				(candidate) => candidate.repeatId === slot.repeatId,

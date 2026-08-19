@@ -180,3 +180,24 @@ function elementsAndAnchorOffset(
 	// Missing anchor: past-the-end offset makes locator lookups fail loud.
 	return { elements, offset: offset === -1 ? elements.length : offset };
 }
+
+// A composed child's arm records are minted in the child module's own id space,
+// so the settle commit has to re-spell them in page space before registration.
+// Only a page with component edges can hold such a boundary, so the table that
+// does the re-spelling lives in fns/composition.ts and the bundler emits its
+// install call for those pages alone; a non-composing page leaves this slot
+// empty and its settle path registers arm records untouched.
+export type ComposedArmRecordQualifier = (
+	boundaryId: string,
+	set: ResumeArmRecordSet,
+) => ResumeArmRecordSet;
+
+let installedQualifier: ComposedArmRecordQualifier | undefined;
+
+export function installComposedArmRecordQualifier(qualifier: ComposedArmRecordQualifier): void {
+	installedQualifier = qualifier;
+}
+
+export function composedArmRecordQualifier(): ComposedArmRecordQualifier | undefined {
+	return installedQualifier;
+}

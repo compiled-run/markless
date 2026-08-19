@@ -296,7 +296,8 @@ function materializeBranchArmRecords(
 		input.storeHostSubscription(
 			host.hostNodeId,
 			input.graph.subscribe({
-				id: `arm-dom-update:${host.hostNodeId}:${update.graphNodeId}:${update.path.join('.')}`,
+				// Target in the id: one graph node can drive two attributes on a host.
+				id: `arm-dom-update:${host.hostNodeId}:${update.target?.kind ?? ''}:${update.target && 'name' in update.target ? update.target.name : ''}:${update.graphNodeId}:${update.path.join('.')}`,
 				graphNodeId: update.graphNodeId,
 				path: update.path,
 				async run(value: unknown) {

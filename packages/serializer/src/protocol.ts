@@ -11,6 +11,15 @@ export {
 	protocolStateVersion,
 	STORAGE_PROTOCOL_VERSION,
 };
+export {
+	PROTOCOL_PROP_GRAPH_NODE_PREFIX,
+	PROTOCOL_PROPS_GRAPH_NODE_ID,
+	protocolInstancePath,
+	PROTOCOL_PAGE_SPACE_ID_PREFIXES,
+	protocolInstanceQualifies,
+	protocolInstanceSegment,
+	protocolProjectionSegment,
+} from './protocol-constants.ts';
 
 export type ProtocolAsyncBoundaryArm = (typeof ASYNC_BOUNDARY_ARM)[keyof typeof ASYNC_BOUNDARY_ARM];
 

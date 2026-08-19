@@ -3,7 +3,9 @@ import {
 	artifactChildCandidates,
 	collectTsrxModuleDiagnostics,
 	compileTsrxModule,
+	componentEdgeSymbolRoutes,
 	emitSymbolResolverModule,
+	importedSymbolRoutes,
 	linkedRenderDataBoundarySymbols,
 	moduleInterfaceHash,
 	prerenderInterfacesComplete,
@@ -183,11 +185,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		}),
 		importedBoundRows.some((row) => row.loaderSymbolId !== undefined),
 	);
-	const symbolRoutes = compiled.semanticGraph.componentEdges.flatMap((edge, index) =>
-		edge.importSource && !input.artifactChildMaterializations?.[edge.id]
-			? [{ prefix: `c${index}:`, importSource: edge.importSource, componentEdgeId: edge.id }]
-			: [],
-	);
+	const symbolRoutes = componentEdgeSymbolRoutes(compiled, input.artifactChildMaterializations);
 	const executionLogModuleHookMode =
 		input.executionLogModuleHooks === false ? 'never' : input.executionLog;
 	const symbolManifestEntries = [
@@ -244,7 +242,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	const manifest: MarklessTransformManifest = {
 		source: input.filename,
 		captureMetadata: compiled.captureAnalysis,
-		symbolRoutes,
+		symbolRoutes: importedSymbolRoutes(symbolRoutes),
 		payload: { virtualModuleId: payloadId },
 		resolver: {
 			virtualModuleId: emitsPrerenderWakeFacade ? prerenderWakeId : resolverId,
@@ -406,7 +404,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					group,
 					symbols: uniqueSymbolsById([...(input.symbols ?? []), ...symbolRows]),
 					boundRows: importedBoundRows,
-					symbolRoutes,
+					symbolRoutes: importedSymbolRoutes(symbolRoutes),
 					armRendererModuleId:
 						group.id === 'self-wake' ? selfWakeArmRendererId : undefined,
 				}),

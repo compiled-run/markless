@@ -88,6 +88,7 @@ export async function compileTsrxModule(
 		boundSymbolResolver: {
 			passId: 'bound-symbol-resolver',
 			rows: artifacts.captureAnalysis.boundResolverRows ?? [],
+			componentEdgeInstancePaths: artifacts.captureAnalysis.componentEdgeInstancePaths ?? [],
 		},
 		captureAnalysis: artifacts.captureAnalysis,
 		protocolState: artifacts.protocolState,
@@ -177,13 +178,12 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 						symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
 						symbols: inputs.symbols as CompileTsrxModuleInput['symbols'],
 					});
+					const bound = planBoundSymbolResolver({ semanticGraph, captureAnalysis });
 					return {
 						captureAnalysis: {
 							...captureAnalysis,
-							boundResolverRows: planBoundSymbolResolver({
-								semanticGraph,
-								captureAnalysis,
-							}).rows,
+							boundResolverRows: bound.rows,
+							componentEdgeInstancePaths: bound.componentEdgeInstancePaths,
 						},
 					};
 				},

@@ -28,6 +28,8 @@ export type ArtifactChildMaterialization = {
 
 export type SemanticComponent = {
 	readonly name: string;
+	/** How this module exports the component: `default`, the export name, or absent. */
+	readonly exportName?: string;
 };
 
 // An authored prop binding is identified by its declaration span, not by the
@@ -138,14 +140,38 @@ export type ModuleGraphInterfaceExport =
 			readonly bindingKind: 'state' | 'computed';
 	  };
 
+/** `export { default as root } from './x.tsrx'` as the module authored it. */
+export type ModuleGraphInterfaceReexport = {
+	readonly exportName: string;
+	readonly source: string;
+	/** `default`, a named export, or `*` for `export * as ns from`. */
+	readonly importedName: string;
+};
+
+/**
+ * A component a barrel module re-exports, with the specifier already rebased to
+ * the module that imports the barrel. Linkers produce this; compiling a module
+ * alone cannot, because only the linker resolves specifiers.
+ */
+export type ModuleGraphInterfaceLinkedComponent = {
+	readonly exportPath: ReadonlyArray<string>;
+	readonly source: string;
+	readonly importKind: SemanticModuleImport['kind'];
+	readonly importedName?: string;
+	readonly componentName: string;
+};
+
 export type ModuleGraphInterfaceArtifact = {
 	readonly passId: 'module-graph-interface';
 	readonly filename: string;
 	readonly exports: ReadonlyArray<ModuleGraphInterfaceExport>;
+	readonly reexports?: ReadonlyArray<ModuleGraphInterfaceReexport>;
+	readonly linkedComponents?: ReadonlyArray<ModuleGraphInterfaceLinkedComponent>;
 	readonly render: {
 		readonly version: 1;
 		readonly components: ReadonlyArray<{
 			readonly componentName: string;
+			readonly exportName?: string;
 			readonly rootChunkId: string;
 			readonly childChunks: ReadonlyArray<{
 				readonly id: string;
@@ -352,6 +378,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_REPEAT_COLLECTION_UNREADABLE'
 		| 'MARKLESS_TEMPLATE_AS_VALUE'
 		| 'MARKLESS_SUBMODULE_UNSUPPORTED'
+		| 'MARKLESS_COMPONENT_TAG_UNRESOLVED'
 		| 'MARKLESS_ALLOW_ERROR_UNSUPPRESSIBLE'
 		| 'MARKLESS_ALLOW_REASON_REQUIRED'
 		| 'MARKLESS_ALLOW_STALE';
@@ -570,6 +597,9 @@ export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 				readonly kind: 'attribute';
 				readonly name: string;
 				readonly residue: SemanticMarkupResidue;
+				// The name and quotes are already in the statics: this value can
+				// never be absent, so the slot renders the value alone.
+				readonly alwaysPresent?: true;
 				readonly directClassMatch?: {
 					readonly stateGraphNodeId: string;
 					readonly statePath: ReadonlyArray<string>;
@@ -1093,6 +1123,9 @@ export type BoundSymbolResolverRow = {
 	// Imported symbols keep their child-local base ID for view composition, while
 	// the parent resolver loads the edge-scoped symbol route registered by the bundler.
 	readonly loaderSymbolId?: string;
+	// The rendered instance the base symbol's own graph nodes were composed
+	// under: one segment per imported component edge in the ancestry.
+	readonly instancePath?: string;
 	readonly componentEdgePath: ReadonlyArray<string>;
 	readonly ancestry: ReadonlyArray<{
 		readonly componentEdgeId: string;
@@ -1113,6 +1146,13 @@ export type BoundSymbolResolverRow = {
 export type BoundSymbolResolverArtifact = {
 	readonly passId: 'bound-symbol-resolver';
 	readonly rows: ReadonlyArray<BoundSymbolResolverRow>;
+	// The instance path this module's render emission spells for each of its
+	// composed component edges. The bundler registers one symbol route per entry
+	// instead of restating the instance grammar.
+	readonly componentEdgeInstancePaths?: ReadonlyArray<{
+		readonly componentEdgeId: string;
+		readonly instancePath: string;
+	}>;
 };
 
 export type BoundSymbolResolverInput = {
@@ -1178,6 +1218,9 @@ export type CaptureSlotRoute =
 			readonly componentEdgePath?: ReadonlyArray<string>;
 			readonly expression: string;
 			readonly sourceSpan?: SourceSpan;
+			// The consumer passed no such prop, so the diagnostic names the missing
+			// prop instead of an authored runtime expression.
+			readonly absentProp?: true;
 	  };
 
 // A slot belongs to one authored binding in one component and may have one
@@ -1213,6 +1256,7 @@ export type ExtractedCaptureSymbol = {
 export type CaptureAnalysisArtifact = {
 	readonly passId: 'capture-analysis';
 	readonly boundResolverRows?: ReadonlyArray<BoundSymbolResolverRow>;
+	readonly componentEdgeInstancePaths?: BoundSymbolResolverArtifact['componentEdgeInstancePaths'];
 	readonly extractedSymbols: ReadonlyArray<ExtractedCaptureSymbol>;
 	readonly diagnostics: ReadonlyArray<CaptureAnalysisDiagnostic>;
 };
@@ -1811,7 +1855,12 @@ export type LinkedInterfaceCompleteness = Pick<
 export type LinkedBoundarySymbolsInput = {
 	readonly compiled: Pick<
 		CompileTsrxModuleResult,
-		'protocolView' | 'publicRenderModule' | 'semanticGraph' | 'symbolModules' | 'symbolResolver'
+		| 'boundSymbolResolver'
+		| 'protocolView'
+		| 'publicRenderModule'
+		| 'semanticGraph'
+		| 'symbolModules'
+		| 'symbolResolver'
 	>;
 	readonly link: LinkedInterfaceCompleteness;
 	// The linker owns the client-environment gate and virtual module naming, so

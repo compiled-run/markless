@@ -238,6 +238,16 @@ and production output should not require per-node event attributes. The
 or other private locator data, then the resumer builds internal side tables such
 as `WeakMap<Element, EventRecord>`.
 
+An event record reaches the graph through the instance its symbols were
+rendered with. A composed child's symbol IDs carry that instance path (see
+`03-state-graph.md`, "Graph node identity"), so resume recovers the instance
+from the ID it loaded and answers the symbol's graph reads and writes on that
+instance's nodes; no separate instance field is added to the record. A bound
+callback symbol names the component edge it was bound through instead of
+carrying the path in its own ID, so its instance is recovered from that edge —
+and only the child symbol is re-scoped, because the parent's capture routes are
+already page-space graph references.
+
 The compiler and bundler own event discovery, locator assignment, symbol IDs,
 chunk/export tables, and compact resolver rows. The browser resumer does not
 scan QRL-like attributes, infer event names from markup, discover chunks, or

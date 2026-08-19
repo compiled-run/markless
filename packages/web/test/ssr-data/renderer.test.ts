@@ -17,7 +17,7 @@ describe('renderSsrData', () => {
 						id: 'template:Card',
 						kind: 'template',
 						componentName: 'Card',
-						statics: ['<article title="', '"><!--markless-slot:1-->', '</article>'],
+						statics: ['<article', '><!--markless-slot:1-->', '</article>'],
 						hosts: [
 							{
 								hostNodeId: 'h0',

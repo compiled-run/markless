@@ -4,8 +4,10 @@ import type { AnyNode } from '../../ast/nodes.ts';
 import { firstComponentRoot } from './plan.ts';
 import { renderBodyLines } from './render-body.ts';
 import {
+	componentOwnedStateNodes,
 	componentPropNames,
 	destructureProps,
+	stateEntries,
 	hasPropDependentComputed,
 	sameModuleComponentMap,
 	type ComponentReference,
@@ -32,12 +34,19 @@ export function emitSameModuleSsrComponents(
 			propNames: componentPropNames(component),
 		};
 		const functionName = `marklessRenderSsr${reference.componentName}`;
+		const owned = componentOwnedStateNodes(input, reference.componentName, rootComponentName);
+		const valuesName = `marklessSsrStateValues${reference.componentName}`;
 		return [
+			`const ${valuesName} = new Map([`,
+			stateEntries(input, owned.cellIndexes).join(',\n'),
+			']);',
 			`const ${reference.localName} = { renderSsr: ${functionName} };`,
 			`async function ${functionName}(props = {}, marklessSsrRenderContext) {`,
 			destructureProps(rootInfo.propNames, rootInfo.component),
-			'	const marklessSsrPayloadState = { ...marklessCloneState(payloadState), cells: [], computed: [] };',
-			'	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);',
+			`	const marklessSsrPayloadState = marklessSelectStateNodes(marklessCloneState(payloadState), ${JSON.stringify(
+				owned.cellIndexes,
+			)}, ${JSON.stringify(owned.computedIndexes)});`,
+			`	const marklessSsrRenderStateValues = new Map(${valuesName});`,
 			...renderBodyLines(
 				input,
 				rootInfo,
@@ -54,7 +63,7 @@ export function emitSameModuleSsrComponents(
 			'	const html = marklessSsrRendered.html;',
 			'	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, marklessViewWithoutAnchors(payloadView), marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);',
 			'	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);',
-			`	return { html, state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots), view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) }, elementCount: marklessSsrComposition.elementCount, propEvents: [], externalSymbolIds: marklessSsrComposition.externalSymbolIds, structure: marklessSsrRendered.structure, structureTokens: marklessSsrRendered.structureTokens${remapsGraphProps ? ', m(graphProps) { marklessSsrRemapGraphOutput(this, graphProps); }' : ''} };`,
+			`	return { html, state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots), view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) }, elementCount: marklessSsrComposition.elementCount, propEvents: [], externalSymbolIds: marklessSsrComposition.externalSymbolIds, structure: marklessSsrRendered.structure, structureTokens: marklessSsrRendered.structureTokens${remapsGraphProps ? ', m(graphProps, instancePath) { marklessSsrRemapGraphOutput(this, graphProps, instancePath); }' : ''} };`,
 			'}',
 		].filter((line): line is string => line !== null);
 	});

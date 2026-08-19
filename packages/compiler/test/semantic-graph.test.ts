@@ -181,7 +181,7 @@ test('buildSemanticGraph creates the first production compiler artifact', async 
 	});
 
 	expect(graph.passId).toBe('tsrx-semantic-graph');
-	expect(graph.components).toEqual([{ name: 'App' }]);
+	expect(graph.components).toEqual([{ name: 'App', exportName: 'App' }]);
 	expect(graph.moduleImports).toEqual([
 		{
 			localName: 'makeChart',
@@ -764,7 +764,7 @@ export const App = () => @{
 `,
 	});
 
-	expect(graph.components).toEqual([{ name: 'App' }]);
+	expect(graph.components).toEqual([{ name: 'App', exportName: 'App' }]);
 	expect(graph.diagnostics).toEqual([]);
 	expect(graph.graphBindings).toEqual(
 		expect.arrayContaining([expect.objectContaining({ id: 'state:count', name: 'count' })]),

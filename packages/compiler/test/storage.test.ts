@@ -220,7 +220,7 @@ test('public render lowering removes executable storage calls', async () => {
 		symbols: [],
 	});
 
-	expect(result.semanticGraph.components).toEqual([{ name: 'App' }]);
+	expect(result.semanticGraph.components).toEqual([{ name: 'App', exportName: 'App' }]);
 	expect(result.semanticGraph.diagnostics).toEqual([]);
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
 	expect(result.protocolView.domUpdates).toEqual([

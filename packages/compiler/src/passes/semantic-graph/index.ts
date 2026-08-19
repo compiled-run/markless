@@ -66,6 +66,7 @@ export async function buildSemanticGraph(
 		importedModuleInterfaces: input.importedModuleInterfaces,
 	});
 	state.walk = walk;
+	collectMemberTagTargets(statements, state);
 	for (const statement of statements) {
 		const declaration =
 			statement.type === 'ExportNamedDeclaration'
@@ -90,7 +91,11 @@ export async function buildSemanticGraph(
 		const componentFunction = getComponentFunction(statement);
 		if (!componentFunction) continue;
 
-		graph.components.push({ name: componentFunction.name });
+		const exportName = componentExportName(statement, componentFunction.name);
+		graph.components.push({
+			name: componentFunction.name,
+			...(exportName ? { exportName } : {}),
+		});
 		const previousComponentName = state.currentComponentName;
 		const previousComponentId = state.currentComponentId;
 		const componentSpan = sourceSpan(componentFunction.node, input.filename);
@@ -134,6 +139,7 @@ export async function buildSemanticGraph(
 				if (!root) return [];
 				return [{
 					componentName: component.name,
+					...(component.exportName ? { exportName: component.exportName } : {}),
 					rootChunkId: root.id,
 					childChunks: chunks
 						.filter((chunk) => chunk.id !== root.id)
@@ -517,6 +523,40 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 
 	for (const child of childNodes(node)) {
 		walk(child, state);
+	}
+}
+
+// How the module exports a component, so an importer can match its own local
+// name (or a barrel export name) back to the declared component.
+function componentExportName(statement: AnyNode, componentName: string): string | null {
+	if (statement.type === 'ExportDefaultDeclaration') return 'default';
+	return statement.type === 'ExportNamedDeclaration' ? componentName : null;
+}
+
+// `const checkbox = { root: CheckboxRoot }` lets <checkbox.root /> collapse to CheckboxRoot.
+function collectMemberTagTargets(
+	statements: ReadonlyArray<AnyNode>,
+	state: WalkState,
+): void {
+	for (const statement of statements) {
+		const declaration =
+			statement.type === 'ExportNamedDeclaration'
+				? ((statement.declaration as AnyNode | undefined) ?? statement)
+				: statement;
+		if (declaration.type !== 'VariableDeclaration') continue;
+
+		for (const declarator of asNodes(declaration.declarations)) {
+			const objectName = getIdentifierName(declarator.id as AnyNode | undefined);
+			const init = declarator.init as AnyNode | undefined;
+			if (!objectName || init?.type !== 'ObjectExpression') continue;
+
+			for (const property of asNodes(init.properties)) {
+				if (property.type !== 'Property' && property.type !== 'ObjectProperty') continue;
+				const key = getIdentifierName(property.key as AnyNode | undefined);
+				const target = getIdentifierName(property.value as AnyNode | undefined);
+				if (key && target) state.memberTagTargets.set(`${objectName}.${key}`, target);
+			}
+		}
 	}
 }
 

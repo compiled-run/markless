@@ -311,13 +311,15 @@ function emitNode(
 			emitNodes(projected, [0], projection, context, repeat);
 			context.chunks.push(finishChunk(projection));
 		}
+		// The edge already resolved a member tag to the component it names.
+		const childComponentName = edge?.childComponentName ?? tagName;
 		addAnchorSlot(
 			builder,
 			{
 				kind: 'child-component',
 				componentEdgeId: edge?.id ?? `component-edge:${tagName}:${span?.start ?? 0}`,
-				childComponentName: tagName,
-				childTemplateId: `template:${tagName}`,
+				childComponentName,
+				childTemplateId: `template:${childComponentName}`,
 				...(projectionChunkId ? { projectionChunkId } : {}),
 			},
 			path,
@@ -377,22 +379,28 @@ function emitNode(
 			continue;
 		}
 		const literal = staticAttributeValue(value, expression);
-		if (literal !== null) {
-			append(builder, ` ${name}="${escapeAttribute(name === 'class' && context.styleScopeClass ? `${literal} ${context.styleScopeClass}` : literal)}"`);
+		if (literal) {
+			const text = staticAttributeText(name, literal.value);
+			if (text !== null)
+				append(builder, ` ${name}="${escapeAttribute(name === 'class' && context.styleScopeClass ? `${text} ${context.styleScopeClass}` : text)}"`);
 			continue;
 		}
 		if (!expression) continue;
-		append(builder, ` ${name}="`);
+		// A value that cannot be absent keeps its name in the statics; otherwise
+		// the slot emits the whole attribute so the runtime decides presence.
+		const alwaysPresent = isAlwaysPresentValue(expression);
+		if (alwaysPresent) append(builder, ` ${name}="`);
 		addSlot(builder, {
 			kind: 'attribute',
 			name,
 			coordinate: { kind: 'child-index', path },
 			residue: expressionResidue(expression, context, repeat),
+			...(alwaysPresent ? { alwaysPresent: true } : {}),
 			...(name === 'class' && repeat
 				? { directClassMatch: directClassMatch(expression, context, repeat) }
 				: {}),
 		});
-		append(builder, '"');
+		if (alwaysPresent) append(builder, '"');
 	}
 	if (context.styleScopeClass && !classSeen)
 		append(builder, ` class="${context.styleScopeClass}"`);
@@ -498,8 +506,9 @@ function emitDynamicHost(
 			continue;
 		}
 		const literal = staticAttributeValue(value, expression);
-		if (literal !== null) {
-			staticAttributes[name] = literal;
+		if (literal) {
+			const text = staticAttributeText(name, literal.value);
+			if (text !== null) staticAttributes[name] = text;
 			continue;
 		}
 		if (expression) {
@@ -775,14 +784,34 @@ function markupStyleConstResolver(context: CollectionContext): StyleConstResolve
 	return context.styleConstResolver;
 }
 
+// A bare attribute is already the present-with-no-value form, so it reports the
+// empty string rather than the boolean a `{true}` value would.
 function staticAttributeValue(
 	value: AnyNode | undefined,
 	expression: AnyNode | undefined,
-): string | null {
-	if (!value) return '';
-	if (value.type === 'Literal' && typeof value.value !== 'object') return String(value.value);
+): { readonly value: unknown } | null {
+	if (!value) return { value: '' };
+	if (value.type === 'Literal' && typeof value.value !== 'object') return { value: value.value };
 	if (expression?.type === 'Literal' && typeof expression.value !== 'object') {
-		return String(expression.value);
+		return { value: expression.value };
 	}
 	return null;
+}
+
+// Both arms of a literal conditional are strings, so the attribute is present
+// whichever one wins and its name can stay in the statics.
+function isAlwaysPresentValue(expression: AnyNode): boolean {
+	if (expression.type !== 'ConditionalExpression') return false;
+	return [expression.consequent, expression.alternate].every((arm) => {
+		const node = arm as AnyNode | undefined;
+		return node?.type === 'Literal' && (typeof node.value === 'string' || typeof node.value === 'number');
+	});
+}
+
+// The compile-time half of the presence rule marklessAttributeValue owns for
+// values only the runtime sees; both halves must agree.
+function staticAttributeText(name: string, value: unknown): string | null {
+	if (value === null || value === undefined || value === false) return null;
+	if (value === true) return name.startsWith('aria-') || name.startsWith('data-') ? 'true' : '';
+	return String(value);
 }

@@ -99,6 +99,12 @@ the HTML:
    serializes the behavior result, DOM-backed class instance, observer, editor,
    map, chart, canvas context, or cleanup function.
 
+Graph node IDs in these arenas are protocol, not an internal convention. A
+composed child's IDs carry the instance path defined in `03-state-graph.md`
+("Graph node identity"); the grammar is owned by one serializer constant module
+so the compiler, the composing layer, and resume all spell it the same way, and
+an ID is byte-identical across SSR, payload, and the browser graph.
+
 State and shared snapshots use an identity table, not naive JSON tree cloning.
 Every serializable object, array, collection, or restorable class instance gets a
 payload ID. Repeated references encode that ID, and cyclic graphs allocate shells

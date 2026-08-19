@@ -5,6 +5,7 @@ import { emitCatalogHelperImports, stateRuntimeImports } from './runtime-helpers
 import { emitSameModuleSsrComponents } from './same-module.ts';
 import {
 	callbackSymbolIds,
+	componentEdgeInstanceSegment,
 	componentEdgesFor,
 	componentReferences,
 	destructureProps,
@@ -15,6 +16,7 @@ import {
 	isComponentRoot,
 	publicRenderValueImports,
 	composedGraphProps,
+	componentOwnedStateNodes,
 	stateEntries,
 	staticHostLocators,
 	moduleScopeLines,
@@ -37,9 +39,11 @@ export function emitPublicSsrRenderModule(
 	);
 	const asyncRunnerDefinitions = collectSsrAsyncRunnerDefinitions(input);
 	const hasAsyncDependencyRegistry = asyncRunnerDefinitions.size > 0;
+	const moduleScope = moduleScopeLines(input.source.source, input.source.filename);
 	const valueImports = publicRenderValueImports(
 		input.semanticGraph.moduleImports,
 		input.semanticGraph.componentEdges,
+		moduleScope.join('\n'),
 	);
 	const hostLocators = staticHostLocators(input);
 	const propEvents = collectSsrPropEvents(
@@ -63,18 +67,30 @@ export function emitPublicSsrRenderModule(
 		rootInfo.componentName,
 		(componentName) => emitSsrDataRenderLines(input, componentName, references),
 	);
+	// Each component seeds only the payload nodes it declares; a module with no
+	// same-module child owns every node, so it emits no selection at all.
+	const ownedNodes =
+		sameModuleComponents.length === 0
+			? undefined
+			: componentOwnedStateNodes(input, rootInfo.componentName, rootInfo.componentName);
 	const body = [
 		'',
 		`const marklessSsrPropEvents = ${JSON.stringify(propEvents)};`,
 		'const marklessSsrStateValues = new Map([',
-		stateEntries(input).join(',\n'),
+		stateEntries(input, ownedNodes?.cellIndexes).join(',\n'),
 		']);',
 		// The optional render context is the per-request streaming channel
 		// (T107): renderToStream threads it through child renders and async
 		// runners. Omitted = exact blocking behavior.
 		'async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {',
 		destructureProps(rootInfo.propNames, rootInfo.component),
-		'	const marklessSsrPayloadState = marklessCloneState(payloadState);',
+		// A module that composes no same-module child owns every payload node, so
+		// it keeps the whole clone and emits no selection list.
+		ownedNodes === undefined
+			? '	const marklessSsrPayloadState = marklessCloneState(payloadState);'
+			: `	const marklessSsrPayloadState = marklessSelectStateNodes(marklessCloneState(payloadState), ${JSON.stringify(
+					ownedNodes.cellIndexes,
+				)}, ${JSON.stringify(ownedNodes.computedIndexes)});`,
 		'	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);',
 		...renderBodyLines(
 			input,
@@ -111,7 +127,7 @@ export function emitPublicSsrRenderModule(
 		'		view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) },',
 		'		elementCount: marklessSsrComposition.elementCount,',
 		...(remapsGraphProps
-			? ['		m(graphProps) { marklessSsrRemapGraphOutput(this, graphProps); },']
+			? ['		m(graphProps, instancePath) { marklessSsrRemapGraphOutput(this, graphProps, instancePath); },']
 			: []),
 		'		propEvents: marklessSsrPropEvents,',
 		'		externalSymbolIds: marklessSsrComposition.externalSymbolIds,',
@@ -175,7 +191,7 @@ export function emitPublicSsrRenderModule(
 				names: ['marklessSsrRepeatRows', 'marklessSsrComponentRepeatRows'],
 			},
 		]),
-		...moduleScopeLines(input.source.source, input.source.filename),
+		...moduleScope,
 		...sameModuleComponents,
 		bodySource,
 	]
@@ -309,7 +325,7 @@ function emitSsrDataRenderLines(
 			props.push(`__marklessSsrCallbacks:marklessSsrCallbacks({${callbackEntries.join(',')}})`);
 		const child = {
 			hostPrefix: `c${index}:`,
-			symbolPrefix: edge.importSource ? `c${index}:` : '',
+			symbolPrefix: componentEdgeInstanceSegment(edge, input.semanticGraph.componentEdges),
 			graphProps: componentEdgeGraphRoutes(edge, hasProjection),
 			boundSymbols: boundSymbolsForEdge(edge, callbacks),
 		};
