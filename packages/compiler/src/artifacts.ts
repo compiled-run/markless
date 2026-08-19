@@ -1256,6 +1256,7 @@ export type ExtractedCaptureSymbol = {
 export type CaptureAnalysisArtifact = {
 	readonly passId: 'capture-analysis';
 	readonly boundResolverRows?: ReadonlyArray<BoundSymbolResolverRow>;
+	readonly componentEdgeInstancePaths?: BoundSymbolResolverArtifact['componentEdgeInstancePaths'];
 	readonly extractedSymbols: ReadonlyArray<ExtractedCaptureSymbol>;
 	readonly diagnostics: ReadonlyArray<CaptureAnalysisDiagnostic>;
 };

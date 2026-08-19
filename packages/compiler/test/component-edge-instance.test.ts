@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import type { SemanticComponentEdge } from '../src/artifacts.ts';
+import { compileTsrxModule } from '../src/index.ts';
 import {
 	componentEdgeInstancePaths,
 	componentEdgeInstanceSegment,
@@ -49,4 +50,29 @@ test('nested projection keeps one projected segment per enclosing component', ()
 	const paths = componentEdgeInstancePaths(edges);
 
 	expect(paths.get('component-edge:2')).toBe('c0:p1:p2:');
+});
+
+// The instance path is only useful if it survives to the compiled result: the
+// bundler builds one symbol route per composed edge from this artifact, and a
+// missing entry silently falls back to the positional prefix, which sends a
+// projected child's symbols to the component it was projected into.
+test('a compiled module publishes the instance path of every composed edge', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Page.tsrx',
+		source: `import Root from './root.tsrx';
+import Trigger from './trigger.tsrx';
+export default function Page() @{
+	<section>
+		<Root>
+			<Trigger />
+		</Root>
+	</section>
+}`,
+		symbols: [],
+	});
+
+	expect(result.boundSymbolResolver.componentEdgeInstancePaths).toEqual([
+		{ componentEdgeId: 'component-edge:0', instancePath: 'c0:' },
+		{ componentEdgeId: 'component-edge:1', instancePath: 'c0:p1:' },
+	]);
 });

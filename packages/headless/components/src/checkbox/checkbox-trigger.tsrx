@@ -1,11 +1,20 @@
-import type { Children, PropsOf } from '@markless/core';
+import { state, type Children, type PropsOf } from '@markless/core';
 
 type CheckboxTriggerProps = {
 	readonly disabled?: PropsOf<'button'>['disabled'];
 	readonly children?: Children;
 };
 
-// Entry-gate placeholder: the checkbox family lands in the next unit.
+// Minimal own-state toggle: the family's shared checked state (root-owned,
+// controlled/uncontrolled, aria wiring) lands with the checkbox behaviour unit.
 export default function CheckboxTrigger({ disabled, children }: CheckboxTriggerProps) @{
-	<button type="button" disabled={disabled} ui-disabled={disabled}>{children}</button>
+	let checked = state(false);
+
+	<button
+		type="button"
+		disabled={disabled}
+		ui-disabled={disabled}
+		ui-checked={checked}
+		onClick={() => { checked = !checked; }}
+	>{children}</button>
 }
