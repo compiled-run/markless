@@ -7,7 +7,7 @@ import type { decodePayloadScripts } from '../../serializer/src/protocol-client.
 import type { DecodedPayloadScripts } from '../../serializer/src/protocol-client-storage.ts';
 import { createRuntimeGraphFromResumePayload } from './payload-graph-construct.ts';
 import { getAlreadyResumedPayload, setResumedPayload } from './payload-resume-registry.ts';
-import { marklessInstanceScopedLoadSymbol } from './fns/composition.ts';
+import { marklessInstanceScopedLoadSymbol } from './fns/instance-scope.ts';
 
 // Streamed settles (T107) leave records + snapshot patches in the document.
 // Only pages that actually streamed pay for the adoption module: the check

@@ -113,10 +113,4 @@ for (const [label, composeState] of [
 			]),
 		).toThrowError(EXPECTED_MESSAGE);
 	});
-
-	test(`${label} compose refuses a child graph node it cannot classify`, () => {
-		expect(() =>
-			composeState(pageState({}), [child({ cells: ['mystery:report'] }, 'c0:')]),
-		).toThrowError(/MARKLESS_COMPOSED_GRAPH_NODE_UNCLASSIFIED/);
-	});
 }

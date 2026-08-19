@@ -1,0 +1,44 @@
+import { expect, test } from 'vitest';
+import {
+	PROTOCOL_PAGE_SPACE_ID_PREFIXES,
+	protocolInstancePath,
+	protocolInstanceSegment,
+} from '../../serializer/src/protocol.ts';
+import { marklessComposedGraphNodeId } from '../src/fns/composition.ts';
+import { marklessInstanceScopedLoadSymbol } from '../src/fns/instance-scope.ts';
+
+// The browser copy of composition restates the page-space families and the
+// instance-path grammar as literals so the resume bundle never imports the
+// protocol module. These tests are the seam that fails when the protocol moves.
+test('composition leaves every protocol page-space id family unqualified', () => {
+	for (const prefix of PROTOCOL_PAGE_SPACE_ID_PREFIXES) {
+		const graphNodeId = `${prefix}src/lib.tsrx#thing`;
+		expect(marklessComposedGraphNodeId(graphNodeId, 'c0:')).toBe(graphNodeId);
+	}
+});
+
+test('a nested compose leaves an already-composed page-space id alone', () => {
+	for (const prefix of PROTOCOL_PAGE_SPACE_ID_PREFIXES) {
+		const graphNodeId = `${protocolInstanceSegment(0)}${prefix}src/lib.tsrx#thing`;
+		expect(marklessComposedGraphNodeId(graphNodeId, 'c1:')).toBe(graphNodeId);
+	}
+});
+
+test('composition qualifies a component-owned id with its instance path', () => {
+	expect(marklessComposedGraphNodeId('state:count', 'c0:')).toBe('c0:state:count');
+});
+
+test('the loader reads back exactly the instance path the protocol spells', () => {
+	const path = protocolInstanceSegment(0) + protocolInstanceSegment(12);
+	expect(protocolInstancePath(`${path}symbol:3`)).toBe(path);
+	let seen = '';
+	const load = marklessInstanceScopedLoadSymbol(() => (context) => {
+		seen = String(context.graph.read('state:count'));
+		return null;
+	});
+	const symbol = load(`${path}symbol:3`) as (context: {
+		readonly graph: { readonly read: (graphNodeId: string) => unknown };
+	}) => unknown;
+	symbol({ graph: { read: (graphNodeId: string) => graphNodeId } });
+	expect(seen).toBe(`${path}state:count`);
+});

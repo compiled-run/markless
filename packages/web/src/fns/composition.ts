@@ -1,11 +1,5 @@
-import {
-	PROTOCOL_PROP_GRAPH_NODE_PREFIX,
-	PROTOCOL_PROPS_GRAPH_NODE_ID,
-	protocolInstancePath,
-	protocolInstanceQualifies,
-} from '@markless/serializer/protocol';
 import { marklessBoundSymbolId, marklessLiveBoundGraphRoute } from './bound-symbol.ts';
-import type { RuntimeGraph } from '@markless/runtime';
+import { marklessInstanceScopedGraph, marklessMarkComposedSymbol } from './instance-scope.ts';
 import type { ResumeSymbol, ResumeSymbolContext } from '../resume-types.ts';
 
 // Composition works on the DRAFT payload the compiled render modules build:
@@ -79,17 +73,17 @@ export function marklessComposedInstancePath(child: {
 	return child.symbolPrefix ?? '';
 }
 
+// Mirrors PROTOCOL_PAGE_SPACE_ID_PREFIXES, past any instance path a nested
+// compose already applied; composed-page-space.test.ts keeps the two in step so
+// the browser never imports the serializer's protocol module.
+const PAGE_SPACE_ID = /^(?:c\d+:)*(?:shared|storage):/;
+
+// Every id family a component owns is instance-local; a shared() graph and a
+// persisted storage slot are page-space on purpose. The compiler refuses at
+// build time to emit an id belonging to neither, so this stays a concatenation.
 export function marklessComposedGraphNodeId(graphNodeId: string, instancePath: string): string {
-	if (!instancePath) return graphNodeId;
-	const qualifies = protocolInstanceQualifies(graphNodeId);
-	if (qualifies === undefined)
-		throw Object.assign(
-			new Error(
-				`MARKLESS_COMPOSED_GRAPH_NODE_UNCLASSIFIED: composition cannot tell whether graph node "${graphNodeId}" belongs to the composed component instance, so it refuses to merge it into the page graph.`,
-			),
-			{ code: 'MARKLESS_COMPOSED_GRAPH_NODE_UNCLASSIFIED', graphNodeId },
-		);
-	return qualifies ? instancePath + graphNodeId : graphNodeId;
+	if (!instancePath || PAGE_SPACE_ID.test(graphNodeId)) return graphNodeId;
+	return instancePath + graphNodeId;
 }
 
 // Rewrites a child state draft from child-local ids into page-space ids: prop
@@ -168,7 +162,7 @@ export function marklessCsrRemapGraphOutput(
 	// A composed prop is the source node's committed mount value. Seed that
 	// node before the page graph is built so a downstream-first write can read it.
 	const props = output.state.cells.find((cell) =>
-		cell.graphNodeId.startsWith(instancePath + PROTOCOL_PROP_GRAPH_NODE_PREFIX),
+		cell.graphNodeId.startsWith(instancePath + 'prop:'),
 	)?.directValue as Readonly<Record<string, unknown>> | undefined;
 	if (props)
 		for (const prop of graphProps ?? []) {
@@ -187,10 +181,6 @@ export function marklessCsrRemapGraphOutput(
 			marklessComposedSymbol(symbol, graphProps, instancePath),
 		);
 }
-
-// A symbol loaded through the child's own composed loader already answers in
-// page space, so resume must not scope it a second time.
-const marklessComposedSymbols = new WeakSet<object>();
 
 function marklessComposedSymbol(
 	symbol: ResumeSymbol,
@@ -215,8 +205,7 @@ function marklessComposedSymbol(
 				},
 			},
 		});
-	marklessComposedSymbols.add(composed);
-	return composed;
+	return marklessMarkComposedSymbol(composed);
 }
 
 // Composed children whose symbols carry an instance path have already been
@@ -283,7 +272,7 @@ export function marklessCsrRemapChildGraph(
 				graphNodeId: liveRoute.graphNodeId,
 				path: [
 					...liveRoute.path,
-					...record.path.slice(+(record.graphNodeId === PROTOCOL_PROPS_GRAPH_NODE_ID)),
+					...record.path.slice(+(record.graphNodeId === 'prop:props')),
 				],
 			}
 		: null;
@@ -335,10 +324,10 @@ function marklessCompositionPropName(
 	graphNodeId: string,
 	path: ReadonlyArray<string>,
 ): string | null {
-	return graphNodeId === PROTOCOL_PROPS_GRAPH_NODE_ID
+	return graphNodeId === 'prop:props'
 		? path[0]
-		: graphNodeId.startsWith(PROTOCOL_PROP_GRAPH_NODE_PREFIX)
-			? graphNodeId.slice(PROTOCOL_PROP_GRAPH_NODE_PREFIX.length)
+		: graphNodeId.startsWith('prop:')
+			? graphNodeId.slice('prop:'.length)
 			: null;
 }
 
@@ -404,62 +393,4 @@ export function marklessCsrRemapChildDomUpdate(
 		),
 		{ code: 'MARKLESS_COMPOSED_DOM_UPDATE_UNMAPPED', recordId, hostNodeId, symbolId, propName },
 	);
-}
-
-
-// A composed child's compiled symbols carry the child module's own graph node
-// ids, but composition merged that child's nodes into the page graph under its
-// instance path. The symbol id carries the same path, so resume recovers the
-// instance from the id it loaded and answers the symbol's reads and writes on
-// the instance's nodes.
-export function marklessInstanceScopedLoadSymbol(loadSymbol: ComposeLoadSymbol): ComposeLoadSymbol {
-	return (symbolId: string) => {
-		const instancePath = protocolInstancePath(symbolId);
-		if (!instancePath) return loadSymbol(symbolId);
-		const loaded = loadSymbol(symbolId);
-		return isPromise(loaded)
-			? loaded.then((symbol) => scopeSymbol(symbol, instancePath))
-			: scopeSymbol(loaded, instancePath);
-	};
-}
-
-function isPromise(value: ResumeSymbol | Promise<ResumeSymbol>): value is Promise<ResumeSymbol> {
-	return typeof (value as Promise<ResumeSymbol>)?.then === 'function';
-}
-
-function scopeSymbol(symbol: ResumeSymbol, instancePath: string): ResumeSymbol {
-	if (marklessComposedSymbols.has(symbol)) return symbol;
-	return (context: ResumeSymbolContext) =>
-		symbol({
-			...context,
-			graph: marklessInstanceScopedGraph(context.graph, instancePath),
-			...(context.read
-				? { read: (graphNodeId, path) => context.graph.read(instancePath + graphNodeId, path) }
-				: {}),
-		});
-}
-
-// Only ids the symbol itself spells are child-local. Shared definitions and the
-// graph's own bookkeeping (journal, flush, subscriptions by record id) stay in
-// page space.
-export function marklessInstanceScopedGraph(
-	graph: RuntimeGraph,
-	instancePath: string,
-): RuntimeGraph {
-	if (!instancePath) return graph;
-	const qualify = (graphNodeId: string) => instancePath + graphNodeId;
-	return {
-		...graph,
-		read: (graphNodeId, path) => graph.read(qualify(graphNodeId), path),
-		write: (write) => graph.write({ ...write, graphNodeId: qualify(write.graphNodeId) }),
-		update: (update) => graph.update({ ...update, graphNodeId: qualify(update.graphNodeId) }),
-		call: (call) => graph.call({ ...call, graphNodeId: qualify(call.graphNodeId) }),
-		delete: (deletion) =>
-			graph.delete({ ...deletion, graphNodeId: qualify(deletion.graphNodeId) }),
-		subscribe: (subscription) =>
-			graph.subscribe({
-				...subscription,
-				graphNodeId: qualify(subscription.graphNodeId),
-			}),
-	};
 }

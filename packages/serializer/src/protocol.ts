@@ -15,6 +15,7 @@ export {
 	PROTOCOL_PROP_GRAPH_NODE_PREFIX,
 	PROTOCOL_PROPS_GRAPH_NODE_ID,
 	protocolInstancePath,
+	PROTOCOL_PAGE_SPACE_ID_PREFIXES,
 	protocolInstanceQualifies,
 	protocolInstanceSegment,
 } from './protocol-constants.ts';

@@ -38,9 +38,14 @@ export const PROTOCOL_PROP_GRAPH_NODE_PREFIX = 'prop:';
 // caller refuses instead of merging a silently unqualified node.
 const PROTOCOL_INSTANCE_QUALIFIABLE = ['prop:', 'state:', 'computed:', 'element:'];
 
+// Families whose ids already name one module-qualified definition (a shared()
+// graph, a persisted storage slot). Every instance of a component means the
+// same node, so composition must leave these ids alone.
+export const PROTOCOL_PAGE_SPACE_ID_PREFIXES = ['shared:', 'storage:'];
+
 export function protocolInstanceQualifies(graphNodeId: string): boolean | undefined {
 	const local = graphNodeId.slice(protocolInstancePath(graphNodeId).length);
-	if (local.startsWith('shared:')) return false;
+	if (PROTOCOL_PAGE_SPACE_ID_PREFIXES.some((prefix) => local.startsWith(prefix))) return false;
 	return PROTOCOL_INSTANCE_QUALIFIABLE.some((prefix) => local.startsWith(prefix))
 		? true
 		: undefined;

@@ -1,4 +1,4 @@
-import { createProtocolStatePayload } from '@markless/serializer';
+import { createProtocolStatePayload, protocolInstanceQualifies } from '@markless/serializer';
 import type { ProtocolStatePayload } from '@markless/serializer';
 import type { ProtocolStatePayloadInput, SemanticSharedReturnProperty } from '../artifacts.ts';
 import { planSymbolResolver } from './symbol-resolver.ts';
@@ -56,7 +56,7 @@ export function createProtocolStatePayloadFromArena(
 		storage: input.payloadArena.state.storage,
 	});
 
-	return {
+	const state: ProtocolStatePayload = {
 		...payload,
 		cells: input.payloadArena.state.cells.map((cell) => {
 			const binding = input.semanticGraph.graphBindings.find(
@@ -77,6 +77,22 @@ export function createProtocolStatePayloadFromArena(
 			}).cells[0]!;
 		}),
 	};
+	for (const node of [...state.cells, ...state.computed]) assertClassifiable(node.graphNodeId);
+	return state;
+}
+
+// Composition qualifies a composed child's ids with its instance path by plain
+// concatenation, so nothing at runtime asks which family an id belongs to. That
+// is only sound while every id a module emits is classifiable, which is decided
+// here, at the one place the served state payload is minted from the arena.
+function assertClassifiable(graphNodeId: string): void {
+	if (protocolInstanceQualifies(graphNodeId) !== undefined) return;
+	throw Object.assign(
+		new Error(
+			`MARKLESS_COMPOSED_GRAPH_NODE_UNCLASSIFIED: the compiler cannot tell whether graph node "${graphNodeId}" belongs to a composed component instance or to the page, so it refuses to emit it into the state payload.`,
+		),
+		{ code: 'MARKLESS_COMPOSED_GRAPH_NODE_UNCLASSIFIED', graphNodeId },
+	);
 }
 
 function syncDeriveSymbolIds(input: ProtocolStatePayloadInput): ReadonlyMap<string, string> {
