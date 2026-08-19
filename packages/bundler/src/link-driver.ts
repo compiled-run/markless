@@ -9,6 +9,7 @@ import { pathToFileURL } from 'node:url';
 import {
 	type ArtifactChildMaterialization,
 	type CaptureAnalysisArtifact,
+	type CompilerDiagnostic,
 	type DelegateImportFailure,
 	type LinkedArtifactChild,
 	type LinkedInterfaceClaim,
@@ -284,11 +285,30 @@ export function moduleIsEntry(
 }
 
 // What the linker materialized, plus every delegate whose `import()` rejected:
-// the failure keeps the source and the original error the pass cannot observe.
+// the failure keeps the source and the original error the pass cannot observe,
+// and the pass's own diagnostics travel with them so a caller can report them.
 export type DelegateChildMaterializationResult = {
 	readonly materializations: Readonly<Record<string, ArtifactChildMaterialization>>;
 	readonly importFailures: ReadonlyArray<DelegateImportFailure>;
+	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };
+
+export type DelegateWarnContext = { warn?: (message: string) => void };
+
+// Reports the delegates whose `import()` rejected as build warnings. The pass
+// owns the message; the module still skips, so this never fails the build.
+export function warnDelegateImportFailures(
+	pluginContext: DelegateWarnContext,
+	result: Pick<DelegateChildMaterializationResult, 'diagnostics' | 'importFailures'>,
+): void {
+	if (typeof pluginContext.warn !== 'function' || result.importFailures.length === 0) return;
+	const failed = new Set(result.importFailures.map((failure) => failure.source));
+	for (const diagnostic of result.diagnostics) {
+		if (diagnostic.source !== undefined && failed.has(diagnostic.source)) {
+			pluginContext.warn(diagnostic.message);
+		}
+	}
+}
 
 // Performs the I/O the `delegate-children` pass may not: resolves each edge,
 // imports the dependency's compiled JavaScript, and calls its `renderSsr`. The
@@ -357,10 +377,11 @@ export async function materializeDelegateChildren(
 		edgeIds: [...failure.edgeIds],
 		message: failure.message,
 	}));
+	const linked = linkDelegateChildren({ children, renderings, importFailures });
 	return {
-		materializations: linkDelegateChildren({ children, renderings, importFailures })
-			.materializations,
+		materializations: linked.materializations,
 		importFailures,
+		diagnostics: linked.diagnostics,
 	};
 }
 

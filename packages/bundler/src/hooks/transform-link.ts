@@ -2,6 +2,7 @@
 // its delegates, forces and links its imports through a second pass, and seals
 // the wake aggregate the resolver ships.
 import {
+	type ArtifactChildMaterialization,
 	type LinkedModuleChildResolution,
 	delegateMaterializationScope,
 	linkedChildrenHaveBrowserTriggers,
@@ -22,6 +23,7 @@ import {
 	resolveImportedModuleInterfaces,
 	sourceSymbolManifest,
 	throwLinkedModuleChildDiagnostics,
+	warnDelegateImportFailures,
 } from '../link-driver.ts';
 import { transformTsrxModuleWithPrerenderWakeClosure } from '../transform.ts';
 import type { TransformTsrxModuleInput, TransformTsrxModuleResult } from '../types.ts';
@@ -47,28 +49,14 @@ export async function materializeOwnDelegateChildren(
 	readonly transformed: TransformTsrxModuleResult;
 	readonly input: TransformTsrxModuleInput;
 }> {
-	const { ctx, pluginContext, id, source, currentEnvironment, materializedRenderDataReach } =
-		request;
+	const { ctx, source, currentEnvironment } = request;
 	const { clientRouteArtifactMaterializations } = ctx.state;
 	let transformed = result;
 	let linkedTransformInput = input;
 	const artifactChildMaterializations =
 		currentEnvironment === 'client' && clientRouteArtifactMaterializations.has(source)
 			? clientRouteArtifactMaterializations.get(source)!
-			: delegateMaterializationScope({
-						clientEnvironment: currentEnvironment === 'client',
-						symbolOnlyRequest: isSymbolOnlySourceRequest(id),
-						moduleEntry: moduleIsEntry(pluginContext, id),
-						renderDataReached: materializedRenderDataReach !== undefined,
-				  })
-				? (
-						await materializeDelegateChildren(
-							pluginContext,
-							source,
-							transformed.artifactChildren,
-						)
-					).materializations
-				: {};
+			: await scopedDelegateMaterializations(request, transformed);
 	if (Object.keys(artifactChildMaterializations).length > 0) {
 		linkedTransformInput = {
 			...linkedTransformInput,
@@ -80,6 +68,31 @@ export async function materializeOwnDelegateChildren(
 		);
 	}
 	return { transformed, input: linkedTransformInput };
+}
+
+async function scopedDelegateMaterializations(
+	request: TransformRequest,
+	transformed: TransformTsrxModuleResult,
+): Promise<Readonly<Record<string, ArtifactChildMaterialization>>> {
+	const { pluginContext, id, source, currentEnvironment, materializedRenderDataReach } = request;
+	if (
+		!delegateMaterializationScope({
+			clientEnvironment: currentEnvironment === 'client',
+			symbolOnlyRequest: isSymbolOnlySourceRequest(id),
+			moduleEntry: moduleIsEntry(pluginContext, id),
+			renderDataReached: materializedRenderDataReach !== undefined,
+		})
+	) {
+		return {};
+	}
+	const delegates = await materializeDelegateChildren(
+		pluginContext,
+		source,
+		transformed.artifactChildren,
+	);
+	// A delegate whose import rejected is reported, not swallowed; the edge still skips.
+	warnDelegateImportFailures(pluginContext, delegates);
+	return delegates.materializations;
 }
 
 export async function linkTransformChildren(

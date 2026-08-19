@@ -43,12 +43,24 @@ test('a delegate this runtime cannot import fails open instead of crashing the l
 	expect(failure?.edgeIds).toEqual(['edge-1', 'edge-2']);
 	expect(failure?.message).toBeTruthy();
 
-	// The pass names that cause in the diagnostic it emits for the edge.
+	// The pass names that cause in the diagnostic it emits for the edge, and the
+	// driver hands those diagnostics back so a caller can report them.
+	expect(result.diagnostics).toHaveLength(2);
+	for (const diagnostic of result.diagnostics) {
+		expect(diagnostic.code).toBe('MARKLESS_DELEGATE_ARTIFACT_MISSING');
+		expect(diagnostic.source).toBe(source);
+		expect(diagnostic.message).toContain(`Importing ${JSON.stringify(source)} failed:`);
+		expect(diagnostic.message).toContain(failure!.message);
+	}
+
+	// Same diagnostics the pass produces on its own: the driver adds no message.
 	const { diagnostics } = linkDelegateChildren({
-		children: planDelegateChildren([child('edge-1')], { 'edge-1': source }),
+		children: planDelegateChildren([child('edge-1'), child('edge-2')], {
+			'edge-1': source,
+			'edge-2': source,
+		}),
 		renderings: {},
 		importFailures: result.importFailures,
 	});
-	expect(diagnostics[0]?.code).toBe('MARKLESS_DELEGATE_ARTIFACT_MISSING');
-	expect(diagnostics[0]?.message).toContain(failure!.message);
+	expect(result.diagnostics).toEqual(diagnostics);
 });
