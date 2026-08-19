@@ -809,6 +809,9 @@ importers:
       postcss-selector-parser:
         specifier: 7.1.5
         version: 7.1.5
+      yuku-analyzer:
+        specifier: 0.9.0
+        version: 0.9.0
       yuku-tsrx:
         specifier: file:../../vendor/yuku-tsrx
         version: file:vendor/yuku-tsrx
@@ -2071,6 +2074,75 @@ packages:
   '@volar/typescript@2.4.28':
     resolution: {integrity: sha512-Ja6yvWrbis2QtN4ClAKreeUZPVYMARDYZl9LMEv1iQ1QdepB6wn0jTRxA9MftYmYa4DQ4k/DaSZpFPUfxl8giw==}
 
+  '@yuku-analyzer/binding-android-arm64@0.9.0':
+    resolution: {integrity: sha512-iM3jCKoVDpcPbEAZTJXWKwQCp7Ju5imr7PnntvnKj7fU7itNW6N29CJwXwln1wYyodof1gTImHesGjAJNfc8vA==}
+    cpu: [arm64]
+    os: [android]
+
+  '@yuku-analyzer/binding-darwin-arm64@0.9.0':
+    resolution: {integrity: sha512-0HJMELovYgH7meSQ0SO5MoEpJAFSMKMBYh5AoQNrXiCnzysHbMwut3zH5emljC2GTCzrBdSO2ewWAjwrwUw+8A==}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@yuku-analyzer/binding-darwin-x64@0.9.0':
+    resolution: {integrity: sha512-pqm7nEaL3dOUDDExCZCw3sko1NWk/Wucalw5RdzZdxHhA7OFijLaRo6OTAozSkJ8HqEqNfu7N3ob7uCKrrEF1A==}
+    cpu: [x64]
+    os: [darwin]
+
+  '@yuku-analyzer/binding-freebsd-x64@0.9.0':
+    resolution: {integrity: sha512-WeK+555J5Jek01DycU0DCQF66+A+HACjOCKzyX3Z145PeUsZzV5WIc0xkWHvUxP58SAs9iruJCRMci38Y5mi6g==}
+    cpu: [x64]
+    os: [freebsd]
+
+  '@yuku-analyzer/binding-linux-arm-gnu@0.9.0':
+    resolution: {integrity: sha512-AjbvxS67HNtid/P8GOgRMNSK5QgFY8CvAOKElTnxTn6cnfSKDEnMiLSKKjfyknm3O7pBzTy2Z2qr5oWjJEsV6w==}
+    cpu: [arm]
+    os: [linux]
+    libc: [glibc]
+
+  '@yuku-analyzer/binding-linux-arm-musl@0.9.0':
+    resolution: {integrity: sha512-8e6/1nWSfmzzcE/WybjbyqnQKJdXw+Dh+0oHRPH7ASzebImOFaOv6IT/cOw1ExlCH6TvumucrFnwhCiSUVnq3Q==}
+    cpu: [arm]
+    os: [linux]
+    libc: [musl]
+
+  '@yuku-analyzer/binding-linux-arm64-gnu@0.9.0':
+    resolution: {integrity: sha512-Yg/xuq1LiplWBQ3E9jgBY+MJiAQwXOkxgr5HZVfICktSdxLtyNnkD4GFrRkE1CDSgGsKa9IOkzjjEvzu1QA+6w==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@yuku-analyzer/binding-linux-arm64-musl@0.9.0':
+    resolution: {integrity: sha512-JIH1nU9dAVn6GhvlpVSNxmDPY88P7LrRCeY0q5o/EGfOsGOKJuvcgk1wSGb9k5FGasfQYb1YDre245clKsQ/Hg==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
+  '@yuku-analyzer/binding-linux-x64-gnu@0.9.0':
+    resolution: {integrity: sha512-LP4Ebhwu9rCCzmNWjcD6aMRtdfd3hsYO79goePvGKNfV5uhAuDS+q4UkYbt+IDNRp4GAw0Xj7Q/9qJmnUJaw1w==}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@yuku-analyzer/binding-linux-x64-musl@0.9.0':
+    resolution: {integrity: sha512-9Oe3GRWYVnshSIZa+ixEmIc/fLRtm4JdtPlUpM/cpcQc7Be5Tf9H1shBGKsbFxjoPggO9d00dL+P31oTKNBv5g==}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
+  '@yuku-analyzer/binding-win32-arm64@0.9.0':
+    resolution: {integrity: sha512-i+oa5wQJZ4041MUfIrtR4rSXm/AN2E37L2Ct6FL5pwrGuW/4Jn0a1uGLRIy8IaJi9p7dU8Pu7Gioe6YqwsX11g==}
+    cpu: [arm64]
+    os: [win32]
+
+  '@yuku-analyzer/binding-win32-x64@0.9.0':
+    resolution: {integrity: sha512-YD/9so2BcKuIBSWsFJRdaHPkQY4ehB8idBlVemEM+oQ3c6BrtdspoIe7WKv0t6YCDVPEz7KO2tM9WOx12jDzLw==}
+    cpu: [x64]
+    os: [win32]
+
+  '@yuku-toolchain/types@0.9.0':
+    resolution: {integrity: sha512-ta11OgDlY5ESPaO4mer9on6BMYtbQc5itQB+JYxQ7DWVZBgxgJmQkMTUlSDddBg0ueYOpxBrp9vLjkZlhQfClA==}
+
   agent-base@7.1.4:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
@@ -3136,6 +3208,12 @@ packages:
     engines: {node: '>= 14.6'}
     hasBin: true
 
+  yuku-analyzer@0.9.0:
+    resolution: {integrity: sha512-+cz5HPc4DbyEx2yfd9HN3IEDPfZj4XI+xBTdPbx4vDBOtqcDMdQQXdXjzDZr85edZJGo4i6GGsm30N81/IA+2Q==}
+
+  yuku-ast@0.9.0:
+    resolution: {integrity: sha512-+cfaDdcTQuOH5EnfxPvcB3ju4fzWYxZVpbYjKUJ/LMkrfBnuajiY9OcZBwfugKtk+mOTsTLIX87+Vth1zm7r/w==}
+
   yuku-tsrx@file:vendor/yuku-tsrx:
     resolution: {directory: vendor/yuku-tsrx, type: directory}
 
@@ -4160,6 +4238,44 @@ snapshots:
       path-browserify: 1.0.1
       vscode-uri: 3.1.0
 
+  '@yuku-analyzer/binding-android-arm64@0.9.0':
+    optional: true
+
+  '@yuku-analyzer/binding-darwin-arm64@0.9.0':
+    optional: true
+
+  '@yuku-analyzer/binding-darwin-x64@0.9.0':
+    optional: true
+
+  '@yuku-analyzer/binding-freebsd-x64@0.9.0':
+    optional: true
+
+  '@yuku-analyzer/binding-linux-arm-gnu@0.9.0':
+    optional: true
+
+  '@yuku-analyzer/binding-linux-arm-musl@0.9.0':
+    optional: true
+
+  '@yuku-analyzer/binding-linux-arm64-gnu@0.9.0':
+    optional: true
+
+  '@yuku-analyzer/binding-linux-arm64-musl@0.9.0':
+    optional: true
+
+  '@yuku-analyzer/binding-linux-x64-gnu@0.9.0':
+    optional: true
+
+  '@yuku-analyzer/binding-linux-x64-musl@0.9.0':
+    optional: true
+
+  '@yuku-analyzer/binding-win32-arm64@0.9.0':
+    optional: true
+
+  '@yuku-analyzer/binding-win32-x64@0.9.0':
+    optional: true
+
+  '@yuku-toolchain/types@0.9.0': {}
+
   agent-base@7.1.4:
     optional: true
 
@@ -5091,6 +5207,28 @@ snapshots:
   yallist@3.1.1: {}
 
   yaml@2.9.0: {}
+
+  yuku-analyzer@0.9.0:
+    dependencies:
+      '@yuku-toolchain/types': 0.9.0
+      yuku-ast: 0.9.0
+    optionalDependencies:
+      '@yuku-analyzer/binding-android-arm64': 0.9.0
+      '@yuku-analyzer/binding-darwin-arm64': 0.9.0
+      '@yuku-analyzer/binding-darwin-x64': 0.9.0
+      '@yuku-analyzer/binding-freebsd-x64': 0.9.0
+      '@yuku-analyzer/binding-linux-arm-gnu': 0.9.0
+      '@yuku-analyzer/binding-linux-arm-musl': 0.9.0
+      '@yuku-analyzer/binding-linux-arm64-gnu': 0.9.0
+      '@yuku-analyzer/binding-linux-arm64-musl': 0.9.0
+      '@yuku-analyzer/binding-linux-x64-gnu': 0.9.0
+      '@yuku-analyzer/binding-linux-x64-musl': 0.9.0
+      '@yuku-analyzer/binding-win32-arm64': 0.9.0
+      '@yuku-analyzer/binding-win32-x64': 0.9.0
+
+  yuku-ast@0.9.0:
+    dependencies:
+      '@yuku-toolchain/types': 0.9.0
 
   yuku-tsrx@file:vendor/yuku-tsrx: {}
 

@@ -38,6 +38,7 @@
 		"@markless/serializer": "workspace:*",
 		"postcss": "8.5.15",
 		"postcss-selector-parser": "7.1.5",
+		"yuku-analyzer": "0.9.0",
 		"yuku-tsrx": "file:../../vendor/yuku-tsrx"
 	}
 }

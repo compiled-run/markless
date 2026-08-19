@@ -843,3 +843,75 @@ export function App() @{
 		}),
 	]);
 });
+
+// The capture substrate must answer "does this lazy symbol read the component
+// local?" the way JavaScript scoping does. A handler that declares its own
+// binding of the same name reads its own binding, so nothing crosses the
+// resume boundary and no diagnostic is owed.
+test('analyzeCaptures does not report a component local that the lazy symbol shadows', async () => {
+	const shadowingSource = `
+import { state } from '@markless/core';
+
+export function App() @{
+	let count = state(0);
+	const format = (value) => value + 1;
+
+	<section>
+		<button onClick={(format) => format(count)}>{count}</button>
+		<button onClick={() => { const format = (value) => value; format(count); }}>{count}</button>
+	</section>
+}
+`;
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/Shadowed.tsrx',
+		source: shadowingSource,
+	});
+	const stateLowering = lowerStateAccess({ semanticGraph });
+	const payloadArena = planPayloadArena({ semanticGraph, stateLowering });
+	const symbolResolver = planSymbolResolver({ semanticGraph, payloadArena });
+
+	expect(semanticGraph.localBindings).toEqual(
+		expect.arrayContaining([expect.objectContaining({ name: 'format', kind: 'function' })]),
+	);
+
+	const captureAnalysis = analyzeCaptures({
+		semanticGraph,
+		symbolResolver,
+	});
+
+	expect(captureAnalysis.diagnostics).toEqual([]);
+});
+
+// Only real reference positions count. A component local's name appearing as
+// string text, an object literal key, or a member property is not a read of
+// that binding and must not produce a capture diagnostic.
+test('analyzeCaptures ignores component local names that are not reference positions', async () => {
+	const mentionSource = `
+import { state } from '@markless/core';
+
+export function App() @{
+	let count = state(0);
+	const format = (value) => value + 1;
+
+	<button onClick={() => console.log('format', { format: 1 }, count.format, count)}>{count}</button>
+}
+`;
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/Mentions.tsrx',
+		source: mentionSource,
+	});
+	const stateLowering = lowerStateAccess({ semanticGraph });
+	const payloadArena = planPayloadArena({ semanticGraph, stateLowering });
+	const symbolResolver = planSymbolResolver({ semanticGraph, payloadArena });
+
+	expect(semanticGraph.localBindings).toEqual([
+		expect.objectContaining({ name: 'format', kind: 'function' }),
+	]);
+
+	const captureAnalysis = analyzeCaptures({
+		semanticGraph,
+		symbolResolver,
+	});
+
+	expect(captureAnalysis.diagnostics).toEqual([]);
+});
