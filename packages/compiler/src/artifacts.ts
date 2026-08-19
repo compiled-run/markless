@@ -1859,3 +1859,87 @@ export type LinkedArtifactChild = {
 		readonly elementCount: number;
 	};
 };
+
+// Linked module graph (`module-link` link pass): the imported-child table a
+// linker holds once every specifier has been resolved. A child's kind is a
+// typed field decided from its resolution and its compiled artifact, so a
+// filename can never stand in for a fact about a module, and an externalized
+// dependency can never be mistaken for something the linker may load.
+// `children`/`diagnostics` are per-build; `interfaces` is serializable.
+export type LinkedModuleChildKind =
+	| 'compiled-tsrx'
+	| 'external-delegate'
+	| 'plain-ts'
+	| 'unresolved';
+
+// Filled by the caller that owns `resolve`: `id` is the resolved module id with
+// its query stripped, `external` is the resolver's own verdict, and `kind`
+// records whether the id came from the resolver or from the caller's fallback.
+export type ModuleLinkResolution = {
+	readonly id: string;
+	readonly external: boolean;
+	readonly kind: 'resolved' | 'fallback';
+};
+
+export type ModuleLinkResolutionTable = Readonly<Record<string, ModuleLinkResolution>>;
+
+export type ModuleLinkRequest = {
+	readonly parent: string;
+	readonly specifier: string;
+	readonly componentEdgeId?: string;
+};
+
+export type LinkedModuleChildResolution = {
+	readonly parent: string;
+	readonly specifier: string;
+	readonly source: string;
+	readonly componentEdgeId?: string;
+	readonly externalized: boolean;
+};
+
+export type LinkedModuleChild = LinkedModuleChildResolution & {
+	readonly kind: LinkedModuleChildKind;
+};
+
+// The claim manifest half the linker publishes per source. Only the symbol rows
+// matter here; naming the virtual module they live in stays with the caller.
+export type LinkedSymbolClaimManifest = {
+	readonly symbols: ReadonlyArray<{
+		readonly symbolId: string;
+		readonly exportName: string;
+		readonly kind: string;
+		readonly virtualModuleId: string;
+	}>;
+};
+
+export type LinkedModuleGraphInput = {
+	readonly children: ReadonlyArray<LinkedModuleChildResolution>;
+	readonly moduleArtifacts: ReadonlyMap<string, ModuleLinkArtifact>;
+	readonly captureMetadataForSource: (source: string) => CaptureAnalysisArtifact | undefined;
+	// A parent mid-transform is not in the registry yet, so the caller decides
+	// which capture metadata answers for it.
+	readonly parentCaptureMetadataForSource: (
+		parent: string,
+	) => CaptureAnalysisArtifact | undefined;
+	// Virtual module naming is the caller's: the pass asks for the symbol-route
+	// module of a source rather than spelling the query itself.
+	readonly symbolRouteSource: (source: string) => string;
+};
+
+export type LinkedModuleGraphArtifact = {
+	readonly passId: 'module-link';
+	readonly children: ReadonlyArray<LinkedModuleChild>;
+	readonly interfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
+	readonly routeArtifacts: Readonly<Record<string, string>>;
+	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+};
+
+// What a linker must publish and wait for before a child's claims can be read.
+// The pass decides the plan; performing it is the caller's I/O. The load source
+// is decided separately because the caller must load the child before its
+// capture metadata exists to plan against.
+export type LinkedModuleClaimPlan = {
+	readonly claimSources: ReadonlyArray<string>;
+	readonly expectClaims: boolean;
+	readonly seal: boolean;
+};

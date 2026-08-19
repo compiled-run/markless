@@ -20,6 +20,23 @@ export {
 	moduleInterfaceHash,
 	prerenderInterfacesComplete,
 } from './passes/link/interface-link.ts';
+export {
+	MODULE_LINK_PASS_ID,
+	linkImportedModules,
+	linkedChildrenHaveBrowserTriggers,
+	linkedImportedClaimsMissing,
+	linkedImportedSymbolInputs,
+	linkedManifestHasBrowserTriggers,
+	linkedModuleChildDiagnostics,
+	linkedModuleChildKey,
+	linkedModuleImportRequests,
+	linkedModuleClaimPlan,
+	linkedModuleLoadSource,
+	linkedSymbolRouteRequests,
+	moduleLinkResolutionKey,
+	planLinkedModuleChildren,
+	uniqueLinkedModuleChildren,
+} from './passes/link/module-link.ts';
 export { planPayloadArena } from './passes/payload-arena.ts';
 export { renderPayloadScriptArtifact } from './passes/payload-scripts.ts';
 export { emitPublicRenderModule } from './passes/public-render/module.ts';

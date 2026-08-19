@@ -27,8 +27,8 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Environment-less invalidation falls back to the already resolved client environment.',
 	"packages/bundler/src/rolldown.ts :: if (currentEnvironment !== 'client') {":
 		'Rolldown entry signatures are adjusted only for its resolved client build.',
-	"packages/bundler/src/rolldown.ts :: if (environment !== 'client') {":
-		'Imported symbol facades are materialized only for the resolved client build.',
+	"packages/bundler/src/link-driver.ts :: clientEnvironment: environment === 'client',":
+		'The link driver reports the already resolved build environment to the module-link pass.',
 	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'client' &&":
 		'Rolldown transform hooks project the resolved environment into client-only build behavior.',
 	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'client' && !renderDataRequest && !clientRouteArtifact;":
