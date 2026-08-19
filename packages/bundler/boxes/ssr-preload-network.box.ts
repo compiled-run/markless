@@ -5,6 +5,7 @@ import {
 	measureI5WithV8,
 	requirePassingAnalyzerResults,
 } from './analyzer-gate.ts';
+import { clickCausedRequests, preClickInstantMs } from './network-phase.ts';
 import {
 	invalidateBundlerAnalyzerReceipt,
 	writeBundlerAnalyzerReceipt,
@@ -59,7 +60,11 @@ export default box(
 		await page.click(COUNTER, WAIT);
 		await expect.page.text(page, COUNTER, '1', WAIT);
 		const afterClick = await page.networkRequests();
-		const interactionModules = jsBuildRequests(afterClick.slice(beforeClick.length));
+		// Phase by start time, not array position: witness records a request only
+		// when it finishes, so slicing at beforeClick.length counts a page-parse
+		// modulepreload that was still in flight at click time as click-caused.
+		const actionStartTimeMs = preClickInstantMs(beforeClick);
+		const interactionModules = jsBuildRequests(clickCausedRequests(beforeClick, afterClick));
 		receipt.note(`SSR preload post-click JS: ${formatRequests(interactionModules)}`);
 		if (interactionModules.length > 0) {
 			throw new Error(
@@ -78,7 +83,7 @@ export default box(
 			fixture: 'vite-ssr-preloader',
 			pageUrl: page.url,
 			declaredPreloads: expectedPreloadHrefs,
-			actionStartIndex: beforeClick.length,
+			actionStartTimeMs,
 			requests: afterClick,
 		});
 		// Merge-blocking: a failed analyzer result fails the box (never advisory).
