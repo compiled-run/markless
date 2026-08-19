@@ -5,7 +5,11 @@ import {
 	protocolInstanceSegment,
 	protocolProjectionSegment,
 } from '../../serializer/src/protocol.ts';
-import { marklessComposedGraphNodeId } from '../src/fns/composition.ts';
+import {
+	marklessComposedGraphNodeId,
+	marklessComposedInstancePath,
+	marklessComposeState,
+} from '../src/fns/composition.ts';
 import { marklessInstanceScopedLoadSymbol } from '../src/fns/instance-scope.ts';
 
 // The browser copy of composition restates the page-space families and the
@@ -60,4 +64,38 @@ test('the loader reads back exactly the instance path the protocol spells', () =
 	}) => unknown;
 	symbol({ graph: { read: (graphNodeId: string) => graphNodeId } });
 	expect(seen).toBe(`${path}state:count`);
+});
+
+// The regression that took the router's MDX routes down: composition read the
+// child's whole symbol prefix as its instance path and qualified the child's
+// cells with `m0:`, while the symbol side — which recovers the path from the
+// symbol id by the protocol grammar — kept reading and writing unqualified.
+// The click reached the handler and wrote to a node no dom update watched.
+test('the state a child composes into is the state its symbols read', () => {
+	for (const symbolPrefix of [protocolInstanceSegment(0), 'm0:']) {
+		const composed = marklessComposeState({ cells: [], computed: [] }, [
+			{
+				hostPrefix: symbolPrefix,
+				symbolPrefix,
+				output: { state: { cells: [{ graphNodeId: 'state:count' }], computed: [] } },
+			},
+		]);
+		let read = '';
+		const load = marklessInstanceScopedLoadSymbol(() => (context) => {
+			read = String(context.graph.read('state:count'));
+			return null;
+		});
+		const symbol = load(`${symbolPrefix}symbol:0`) as (context: {
+			readonly graph: { readonly read: (graphNodeId: string) => unknown };
+		}) => unknown;
+		symbol({ graph: { read: (graphNodeId: string) => graphNodeId } });
+		expect(read).toBe(composed.cells[0]!.graphNodeId);
+	}
+});
+
+test('a prefix the protocol grammar does not spell is no instance path', () => {
+	expect(marklessComposedInstancePath({ symbolPrefix: 'm0:' })).toBe('');
+	expect(marklessComposedInstancePath({ symbolPrefix: protocolInstanceSegment(3) })).toBe(
+		protocolInstanceSegment(3),
+	);
 });

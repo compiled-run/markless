@@ -10,6 +10,11 @@ import type { ResumeArmRecordSet, ResumeSymbol, ResumeSymbolContext } from '../r
 // serializer's grammar; composed-page-space.test.ts keeps the two in step.
 const INSTANCE_PATH = /^(?:[cp]\d+:)+/;
 
+// The one reading of a prefix as an instance path; host-minted prefixes (router `m<n>:`) are not one.
+export function marklessInstancePath(prefix: string | undefined): string {
+	return (prefix && INSTANCE_PATH.exec(prefix)?.[0]) || '';
+}
+
 // A symbol loaded through the child's own composed loader already answers in
 // page space, so resume must not scope it a second time.
 const composedSymbols = new WeakSet<object>();
@@ -110,18 +115,20 @@ function composedBoundaryArmRecords(
 	void exhaustive;
 	const prefix = boundaryId.slice(0, boundaryId.lastIndexOf('boundary:'));
 	if (!prefix) return set;
+	// Host/symbol ids take the whole prefix; graph ids only its instance-path part.
+	const instancePath = marklessInstancePath(prefix);
 	const prefixHost = <T extends { readonly hostNodeId: string }>(record: T): T => ({
 		...record,
 		hostNodeId: prefix + record.hostNodeId,
 	});
 	const qualifyRead = <T extends { readonly graphNodeId: string }>(read: T): T => ({
 		...read,
-		graphNodeId: marklessComposedGraphNodeId(read.graphNodeId, prefix),
+		graphNodeId: marklessComposedGraphNodeId(read.graphNodeId, instancePath),
 	});
 	// Arm-scoped branch records ride the protocol's untyped record bag.
 	const qualifyLooseRead = (record: Record<string, unknown>): Record<string, unknown> =>
 		typeof record.graphNodeId === 'string'
-			? { ...record, graphNodeId: marklessComposedGraphNodeId(record.graphNodeId, prefix) }
+			? { ...record, graphNodeId: marklessComposedGraphNodeId(record.graphNodeId, instancePath) }
 			: record;
 	return {
 		locators: set.locators.map(prefixHost),
@@ -149,7 +156,7 @@ function composedBoundaryArmRecords(
 				? {
 						collectionGraphNodeId: marklessComposedGraphNodeId(
 							repeat.collectionGraphNodeId,
-							prefix,
+							instancePath,
 						),
 					}
 				: {}),

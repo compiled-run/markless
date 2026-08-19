@@ -8,9 +8,11 @@ import {
 } from '../../src/vite/runtime/mdx-route.ts';
 import {
 	ASYNC_PROTOCOL_VERSION,
+	protocolInstancePath,
 	protocolStateVersion,
 	STORAGE_PROTOCOL_VERSION,
 } from '../../../serializer/src/protocol-constants.ts';
+import { transformMdxRoute } from '../../src/vite/mdx.ts';
 
 describe('Markless Router MDX route runtime helpers', () => {
 	it('composes child state payloads for one MDX route container', () => {
@@ -372,5 +374,50 @@ describe('composeMdxState storage records', () => {
 
 		expect(state?.version).toBe(protocolStateVersion(state?.storage));
 		expect(state?.version).toBe(STORAGE_PROTOCOL_VERSION);
+	});
+});
+
+describe('MDX slot prefixes against the composition instance-path grammar', () => {
+	// An MDX route composes its children's records VERBATIM: cells and the view
+	// records that read them stay in the child's own graph-node namespace. A slot
+	// prefix that read as an instance path made client-side composition qualify
+	// the child's cells while its symbols kept writing unqualified ids, and every
+	// composed .tsrx child on a navigated MDX route went dead on click.
+	it('mints slot prefixes the protocol does not read as an instance path', async () => {
+		const code = await transformMdxRoute(
+			"import Counter from '../components/Counter.tsrx';\n\n# Docs\n\n<Counter />\n",
+			'/project/pages/docs.mdx',
+		);
+		const prefixes = [...code.matchAll(/symbolPrefix: "([^"]*)"/g)].map((match) => match[1]!);
+		expect(prefixes.length).toBeGreaterThan(0);
+		for (const prefix of prefixes) expect(protocolInstancePath(prefix)).toBe('');
+	});
+
+	it('composes child records without qualifying their graph node ids', () => {
+		const child: MdxChild = {
+			componentIndex: 0,
+			hostPrefix: 'm0:',
+			symbolPrefix: 'm0:',
+			output: {
+				state: { version: 1, cells: [{ graphNodeId: 'state:count' }], computed: [] },
+				view: {
+					version: 1,
+					locators: [],
+					events: [],
+					domUpdates: [
+						{ hostNodeId: 'h1', graphNodeId: 'state:count', symbolId: 'symbol:3' },
+					],
+					behaviors: [],
+					elementHandles: [],
+					asyncBoundaries: [],
+				},
+			},
+		};
+		const state = composeMdxState([child]);
+		const view = composeMdxView([{ kind: 'component', componentIndex: 0 }], [child], 0);
+		expect(state?.cells).toEqual([{ graphNodeId: 'state:count' }]);
+		expect(view?.domUpdates).toEqual([
+			{ hostNodeId: 'm0:h1', graphNodeId: 'state:count', symbolId: 'm0:symbol:3' },
+		]);
 	});
 });

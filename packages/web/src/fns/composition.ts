@@ -1,6 +1,7 @@
 import { marklessBoundSymbolId, marklessLiveBoundGraphRoute } from './bound-symbol.ts';
 import {
 	marklessComposedGraphNodeId,
+	marklessInstancePath,
 	marklessInstanceScopedGraph,
 	marklessMarkComposedSymbol,
 } from './instance-scope.ts';
@@ -74,7 +75,7 @@ export type ComposeChild = {
 export function marklessComposedInstancePath(child: {
 	readonly symbolPrefix?: string;
 }): string {
-	return child.symbolPrefix ?? '';
+	return marklessInstancePath(child.symbolPrefix);
 }
 
 export { marklessComposedGraphNodeId };
