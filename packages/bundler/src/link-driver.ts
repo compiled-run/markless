@@ -10,17 +10,21 @@ import {
 	type ArtifactChildMaterialization,
 	type CaptureAnalysisArtifact,
 	type LinkedArtifactChild,
+	type LinkedInterfaceClaim,
+	type LinkedInterfaceImport,
 	type LinkedModuleChildResolution,
 	type LinkedClaimsArtifact,
 	type LinkedModuleGraphArtifact,
 	type ModuleLinkRequest,
 	type ModuleLinkResolutionTable,
+	computeLinkedInterfaces,
 	delegateChildRenderPlan,
 	delegateChildRendering,
 	delegateChildResolutionRequests,
 	linkClaimManifests,
 	linkDelegateChildren,
 	linkImportedModules,
+	linkedModuleChildDiagnostics,
 	linkedModuleImportRequests,
 	linkedModuleClaimPlan,
 	linkedModuleLoadSource,
@@ -30,6 +34,7 @@ import {
 	planLinkedModuleChildren,
 	uniqueLinkedModuleChildren,
 } from '@markless/compiler';
+import { dirname, resolve } from 'pathe';
 import { withQuery } from 'ufo';
 import type { ModuleMetadataRegistry } from './module-metadata-registry.ts';
 import { MARKLESS_VIRTUAL_PREFIX } from './transform.ts';
@@ -39,7 +44,7 @@ import type {
 	MarklessRolldownOptions,
 	MarklessTransformManifest,
 } from './types.ts';
-import { pathname } from './virtual-ids.ts';
+import { isRelativeImport, pathname } from './virtual-ids.ts';
 
 type ResolvedImport = { readonly id: string; readonly external?: unknown } | string | null;
 
@@ -325,4 +330,53 @@ export async function materializeDelegateChildren(
 		renderings[child.edgeId] = rendering.rendering;
 	}
 	return linkDelegateChildren({ children, renderings }).materializations;
+}
+
+// Resolution and path math stay with the bundler by the ruling's own list of
+// bundler concepts; the `module-link` pass reads the resulting table.
+export function fallbackImportedSource(parent: string, specifier: string): string {
+	const source = specifier.split('?')[0]!;
+	return isRelativeImport(source) ? resolve(dirname(parent), source) : source;
+}
+
+export function linkedInterfaces(
+	imports: ReadonlyArray<LinkedModuleChildResolution>,
+	artifacts: ReadonlyMap<string, MarklessModuleLinkArtifact>,
+	claims: ReadonlyArray<LinkedInterfaceClaim> = [],
+) {
+	return computeLinkedInterfaces({
+		imports: imports.map(
+			(imported): LinkedInterfaceImport => ({
+				specifier: imported.specifier,
+				source: imported.source,
+				interfaceHash: artifacts.get(imported.source)?.interfaceHash,
+				moduleInterface: artifacts.get(imported.source)?.moduleGraphInterface,
+			}),
+		),
+		claims,
+	});
+}
+
+export function linkedInterfaceClaims(
+	imports: ReadonlyArray<LinkedModuleChildResolution>,
+	metadata: ModuleMetadataRegistry,
+): LinkedInterfaceClaim[] {
+	return imports.map((imported) => ({
+		source: imported.source,
+		symbols: sourceSymbolManifest(metadata, imported.source)?.symbols ?? [],
+	}));
+}
+
+// The pass decides; composing a child it could not classify stays fail-closed.
+export function throwLinkedModuleChildDiagnostics(
+	metadata: ModuleMetadataRegistry,
+	children: ReadonlyArray<LinkedModuleChildResolution>,
+	parentManifest?: Pick<MarklessTransformManifest, 'captureMetadata'>,
+) {
+	const [diagnostic] = linkedModuleChildDiagnostics(children, {
+		captureMetadataForSource: (source) => metadata.captureMetadataForSource(source),
+		parentCaptureMetadataForSource: (parent) =>
+			parentManifest?.captureMetadata ?? metadata.captureMetadataForSource(pathname(parent)),
+	});
+	if (diagnostic) throw new Error(diagnostic.message);
 }
