@@ -1128,6 +1128,16 @@ export function marklessSsrPrefixBoundaryArmRecords(
 					? symbolId
 					: marklessBoundSymbolId(child, symbolId),
 			),
+			// An arm event's policy reads the graph by id like any other child event.
+			...(event.syncPolicy
+				? {
+						syncPolicy: marklessComposedSyncPolicy(
+							event.syncPolicy,
+							child.graphProps,
+							instancePath,
+						),
+					}
+				: {}),
 		})),
 		domUpdates: (set.domUpdates ?? []).flatMap((update) => {
 			const mapped = marklessCsrRemapChildDomUpdate(
@@ -1195,6 +1205,15 @@ export function marklessSsrPrefixBoundaryArmRecords(
 								symbolIds: event.symbolIds.map((symbolId) =>
 									marklessBoundSymbolId(child, symbolId),
 								),
+								...(event.syncPolicy
+									? {
+											syncPolicy: marklessComposedSyncPolicy(
+												event.syncPolicy,
+												child.graphProps,
+												instancePath,
+											),
+										}
+									: {}),
 							})),
 						},
 					]
@@ -1257,6 +1276,15 @@ export function marklessSsrPrefixArmRecord(arm: SsrArmRecordSet, child: SsrPrefi
 		events: (arm.events ?? []).map((event) => ({
 			...event,
 			symbolIds: event.symbolIds.map((symbolId) => marklessBoundSymbolId(child, symbolId)),
+			...(event.syncPolicy
+				? {
+						syncPolicy: marklessComposedSyncPolicy(
+							event.syncPolicy,
+							child.graphProps,
+							instancePath,
+						),
+					}
+				: {}),
 		})),
 		domUpdates: (arm.domUpdates ?? []).flatMap((update) => {
 			const mapped = marklessCsrRemapChildDomUpdate(

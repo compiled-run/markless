@@ -781,6 +781,8 @@ test('a branch testing a prop the parent never passed settles as a static read',
 
 	// The name is absent from the route table, so the child read a static
 	// undefined and its rendered arm is final: no live branch record survives.
+	// The arm is asserted too, or an omitted child branch would also pass.
+	expect(rendered.html).toContain('<i>Idle</i>');
 	expect(rendered.armRecords.branches).toEqual([]);
 });
 

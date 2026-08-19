@@ -212,3 +212,57 @@ export default function ForwardApp() @{
 	]);
 	expect(app.captureAnalysis.diagnostics).toEqual([]);
 });
+
+const guardedChild = (name: string, body: string) => `
+function Child({ onChange }) @{
+	<button onClick={() => { ${body} }}>go</button>
+}
+
+export function App() @{
+	<Child />
+}
+`;
+
+// A presence guard must be false when the prop is absent. A comparison that
+// stays true for `undefined`, and a fallback whose right side runs precisely
+// because the prop is absent, prove nothing: those call sites stay fail-closed.
+const unsafeGuards: ReadonlyArray<readonly [name: string, body: string]> = [
+	['NullComparison', `if (onChange !== null) { onChange('next'); }`],
+	['ArbitraryComparison', `if (onChange !== 'none') { onChange('next'); }`],
+	['TypeofUndefinedConsequent', `if (typeof onChange === 'undefined') { onChange('next'); }`],
+	['NullishFallbackCall', `onChange ?? onChange('next')`],
+	['OrFallbackCall', `onChange || onChange('next')`],
+];
+
+for (const [name, body] of unsafeGuards)
+	test(`an absent callback prop tested by ${name} stays fail-closed`, async () => {
+		const result = await compile(`src/${name}.tsrx`, guardedChild(name, body));
+		const slot = handlerSlots(result).find((candidate) => candidate.propName === 'onChange');
+
+		expect(slot?.routes).toEqual([
+			expect.objectContaining({ kind: 'unsupported-opaque', expression: 'onChange' }),
+		]);
+		expect(result.captureAnalysis.diagnostics.map((item) => item.code)).toContain(
+			'MARKLESS_CAPTURE_OPAQUE_PROP',
+		);
+	});
+
+const safeGuards: ReadonlyArray<readonly [name: string, body: string]> = [
+	['UndefinedComparison', `if (onChange !== undefined) { onChange('next'); }`],
+	['TypeofDefined', `if (typeof onChange !== 'undefined') { onChange('next'); }`],
+	['TypeofUndefinedAlternate', `typeof onChange === 'undefined' ? null : onChange('next')`],
+	['NullishGuardAlternate', `onChange == null ? null : onChange('next')`],
+	['NegatedGuardAlternate', `if (!onChange) { } else { onChange('next'); }`],
+	['AndGuard', `onChange && onChange('next')`],
+];
+
+for (const [name, body] of safeGuards)
+	test(`an absent callback prop proven absent-safe by ${name} folds to undefined`, async () => {
+		const result = await compile(`src/${name}.tsrx`, guardedChild(name, body));
+		const slot = handlerSlots(result).find((candidate) => candidate.propName === 'onChange');
+
+		expect(slot?.routes).toEqual([
+			expect.objectContaining({ kind: 'compiler-known-constant', value: undefined }),
+		]);
+		expect(result.captureAnalysis.diagnostics).toEqual([]);
+	});

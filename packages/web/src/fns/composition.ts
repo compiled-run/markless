@@ -180,24 +180,26 @@ function marklessComposedSymbol(
 	graphProps: ComposeGraphProps,
 	instancePath: string,
 ): ResumeSymbol {
-	const composed = (context: ResumeSymbolContext) =>
-		symbol({
+	const composed = (context: ResumeSymbolContext) => {
+		// One route for both read channels: `context.read` is the same child-local
+		// id space `graph.read` is, so an unmapped one would read the page graph raw.
+		const read = (graphNodeId: string, path: ReadonlyArray<string> = []) => {
+			const mapped = marklessCsrRemapChildGraph(
+				{ graphNodeId, path },
+				graphProps,
+				instancePath,
+			);
+			return context.graph.read(mapped?.graphNodeId ?? graphNodeId, mapped?.path ?? path);
+		};
+		return symbol({
 			...context,
 			graph: {
 				...marklessInstanceScopedGraph(context.graph, instancePath),
-				read(graphNodeId: string, path: ReadonlyArray<string> = []) {
-					const mapped = marklessCsrRemapChildGraph(
-						{ graphNodeId, path },
-						graphProps,
-						instancePath,
-					);
-					return context.graph.read(
-						mapped?.graphNodeId ?? graphNodeId,
-						mapped?.path ?? path,
-					);
-				},
+				read,
 			},
+			...(context.read ? { read } : {}),
 		});
+	};
 	return marklessMarkComposedSymbol(composed);
 }
 

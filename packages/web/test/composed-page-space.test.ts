@@ -9,8 +9,12 @@ import {
 	marklessComposedGraphNodeId,
 	marklessComposedInstancePath,
 	marklessComposeState,
+	marklessCsrRemapGraphOutput,
 } from '../src/fns/composition.ts';
-import { marklessInstanceScopedLoadSymbol } from '../src/fns/instance-scope.ts';
+import {
+	marklessInstanceScopedGraph,
+	marklessInstanceScopedLoadSymbol,
+} from '../src/fns/instance-scope.ts';
 
 // The browser copy of composition restates the page-space families and the
 // instance-path grammar as literals so the resume bundle never imports the
@@ -98,4 +102,92 @@ test('a prefix the protocol grammar does not spell is no instance path', () => {
 	expect(marklessComposedInstancePath({ symbolPrefix: protocolInstanceSegment(3) })).toBe(
 		protocolInstanceSegment(3),
 	);
+});
+
+// Every id a scoped adapter touches — reads, writes, subscriptions, and the
+// second `context.read` channel — obeys the same page-space exemption the
+// state qualifier does, or a composed child writes to `c0:shared:...`.
+test('the instance-scoped graph exempts page-space ids in every record it rewrites', () => {
+	const seen: string[] = [];
+	const record = (graphNodeId: string) => {
+		seen.push(graphNodeId);
+		return undefined as never;
+	};
+	const graph = {
+		read: (graphNodeId: string) => graphNodeId,
+		write: (entry: { readonly graphNodeId: string }) => record(entry.graphNodeId),
+		update: (entry: { readonly graphNodeId: string }) => record(entry.graphNodeId),
+		call: (entry: { readonly graphNodeId: string }) => record(entry.graphNodeId),
+		delete: (entry: { readonly graphNodeId: string }) => record(entry.graphNodeId),
+		subscribe: (entry: { readonly graphNodeId: string }) => record(entry.graphNodeId),
+	};
+	const scoped = marklessInstanceScopedGraph(
+		graph as never,
+		protocolInstanceSegment(0),
+	) as unknown as typeof graph;
+
+	for (const prefix of PROTOCOL_PAGE_SPACE_ID_PREFIXES) {
+		const graphNodeId = `${prefix}src/lib.tsrx#thing`;
+		expect(scoped.read(graphNodeId)).toBe(graphNodeId);
+		seen.length = 0;
+		scoped.write({ graphNodeId });
+		scoped.update({ graphNodeId });
+		scoped.call({ graphNodeId });
+		scoped.delete({ graphNodeId });
+		scoped.subscribe({ graphNodeId });
+		expect(seen).toEqual([graphNodeId, graphNodeId, graphNodeId, graphNodeId, graphNodeId]);
+	}
+
+	expect(scoped.read('state:count')).toBe(`${protocolInstanceSegment(0)}state:count`);
+	seen.length = 0;
+	scoped.write({ graphNodeId: 'state:count' });
+	expect(seen).toEqual([`${protocolInstanceSegment(0)}state:count`]);
+});
+
+test('a scoped symbol reads page space through context.read as well as through the graph', () => {
+	const path = protocolInstanceSegment(0);
+	const reads: string[] = [];
+	const load = marklessInstanceScopedLoadSymbol(() => (context) => {
+		reads.push(String(context.read?.('state:count')));
+		reads.push(String(context.read?.(`${PROTOCOL_PAGE_SPACE_ID_PREFIXES[0]}lib#thing`)));
+		return null;
+	});
+	const symbol = load(`${path}symbol:0`) as (context: {
+		readonly graph: { readonly read: (graphNodeId: string) => unknown };
+		readonly read: (graphNodeId: string) => unknown;
+	}) => unknown;
+	const read = (graphNodeId: string) => graphNodeId;
+	symbol({ graph: { read }, read });
+
+	expect(reads).toEqual([
+		`${path}state:count`,
+		`${PROTOCOL_PAGE_SPACE_ID_PREFIXES[0]}lib#thing`,
+	]);
+});
+
+// A composed child's own loader marks its symbols composed, so the scoped
+// loader above skips them: the composed wrapper owns both read channels.
+test('a composed symbol remaps context.read through the same child route as its graph', async () => {
+	const instancePath = protocolInstanceSegment(0);
+	const reads: string[] = [];
+	const output = {
+		state: { cells: [], computed: [] },
+		loadSymbol: () => (context: {
+			readonly graph: { readonly read: (graphNodeId: string) => unknown };
+			readonly read?: (graphNodeId: string) => unknown;
+		}) => {
+			reads.push(String(context.graph.read('state:count')));
+			reads.push(String(context.read?.('state:count')));
+			return null;
+		},
+	};
+	marklessCsrRemapGraphOutput(output as never, [], instancePath);
+
+	const symbol = (await (output as unknown as {
+		loadSymbol: (symbolId: string) => Promise<(context: unknown) => unknown>;
+	}).loadSymbol(`${instancePath}symbol:0`)) as (context: unknown) => unknown;
+	const read = (graphNodeId: string) => graphNodeId;
+	symbol({ graph: { read }, read });
+
+	expect(reads).toEqual([`${instancePath}state:count`, `${instancePath}state:count`]);
 });

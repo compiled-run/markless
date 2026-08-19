@@ -46,7 +46,10 @@ function scopeSymbol(symbol: ResumeSymbol, instancePath: string): ResumeSymbol {
 			...(context.read
 				? {
 						read: (graphNodeId: string, path?: ReadonlyArray<string>) =>
-							context.graph.read(instancePath + graphNodeId, path),
+							context.graph.read(
+								marklessComposedGraphNodeId(graphNodeId, instancePath),
+								path,
+							),
 					}
 				: {}),
 		});
@@ -60,7 +63,8 @@ export function marklessInstanceScopedGraph(
 	instancePath: string,
 ): RuntimeGraph {
 	if (!instancePath) return graph;
-	const qualify = (graphNodeId: string) => instancePath + graphNodeId;
+	// Page-space families (shared, storage) keep their page ids through every adapter.
+	const qualify = (graphNodeId: string) => marklessComposedGraphNodeId(graphNodeId, instancePath);
 	return {
 		...graph,
 		read: (graphNodeId, path) => graph.read(qualify(graphNodeId), path),

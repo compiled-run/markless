@@ -625,24 +625,76 @@ function referenceInvocationIsAbsentSafe(source: string, reference: string): boo
 		typeof node.start === 'number' &&
 		typeof node.end === 'number' &&
 		moduleSource.slice(node.start, node.end) === reference;
-	const guardsReference = (node: AnyNode | undefined): boolean => {
-		if (!node) return false;
-		if (isReference(node)) return true;
-		if (node.type === 'ChainExpression') return guardsReference(asNode(node.expression));
-		if (node.type !== 'BinaryExpression') return false;
+	const isUndefinedLiteral = (node: AnyNode | undefined): boolean =>
+		node?.type === 'Identifier' && node.name === 'undefined';
+	const isNullLiteral = (node: AnyNode | undefined): boolean =>
+		node?.type === 'Literal' && node.value === null && node.raw === 'null';
+	const isTypeofReference = (node: AnyNode | undefined): boolean =>
+		node?.type === 'UnaryExpression' &&
+		node.operator === 'typeof' &&
+		isReference(asNode(node.argument));
+	const isUndefinedString = (node: AnyNode | undefined): boolean =>
+		node?.type === 'Literal' && node.value === 'undefined';
+	// A comparison pairs the reference (or `typeof reference`) with the value the
+	// side names: `onChange !== null` names null, which an absent prop is not.
+	const comparesWith = (
+		node: AnyNode,
+		operand: (side: AnyNode | undefined) => boolean,
+		value: (side: AnyNode | undefined) => boolean,
+	): boolean => {
 		const left = asNode(node.left);
 		const right = asNode(node.right);
-		if (node.operator === '!==' || node.operator === '!=') {
-			return isReference(left) || isReference(right);
-		}
-		if (node.operator === '===' || node.operator === '==') {
-			return [left, right].some(
-				(side) =>
-					side?.type === 'UnaryExpression' &&
-					side.operator === 'typeof' &&
-					isReference(asNode(side.argument)),
+		return (operand(left) && value(right)) || (operand(right) && value(left));
+	};
+	// True when the test cannot be truthy while `reference` is absent, so its
+	// consequent never runs on an absent prop.
+	const provesPresent = (node: AnyNode | undefined): boolean => {
+		if (!node) return false;
+		if (isReference(node)) return true;
+		if (node.type === 'ChainExpression') return provesPresent(asNode(node.expression));
+		if (node.type === 'UnaryExpression' && node.operator === '!')
+			return provesAbsent(asNode(node.argument));
+		if (node.type === 'LogicalExpression' && node.operator === '&&')
+			return provesPresent(asNode(node.left)) || provesPresent(asNode(node.right));
+		if (node.type !== 'BinaryExpression') return false;
+		if (node.operator === '!==')
+			return (
+				comparesWith(node, isReference, isUndefinedLiteral) ||
+				comparesWith(node, isTypeofReference, isUndefinedString)
 			);
-		}
+		if (node.operator === '!=')
+			return (
+				comparesWith(
+					node,
+					isReference,
+					(side) => isUndefinedLiteral(side) || isNullLiteral(side),
+				) || comparesWith(node, isTypeofReference, isUndefinedString)
+			);
+		return false;
+	};
+	// The mirror: the test cannot be falsy while `reference` is absent, so its
+	// alternate never runs on an absent prop.
+	const provesAbsent = (node: AnyNode | undefined): boolean => {
+		if (!node) return false;
+		if (node.type === 'ChainExpression') return provesAbsent(asNode(node.expression));
+		if (node.type === 'UnaryExpression' && node.operator === '!')
+			return provesPresent(asNode(node.argument));
+		if (node.type === 'LogicalExpression' && node.operator === '||')
+			return provesAbsent(asNode(node.left)) || provesAbsent(asNode(node.right));
+		if (node.type !== 'BinaryExpression') return false;
+		if (node.operator === '===')
+			return (
+				comparesWith(node, isReference, isUndefinedLiteral) ||
+				comparesWith(node, isTypeofReference, isUndefinedString)
+			);
+		if (node.operator === '==')
+			return (
+				comparesWith(
+					node,
+					isReference,
+					(side) => isUndefinedLiteral(side) || isNullLiteral(side),
+				) || comparesWith(node, isTypeofReference, isUndefinedString)
+			);
 		return false;
 	};
 
@@ -657,16 +709,30 @@ function referenceInvocationIsAbsentSafe(source: string, reference: string): boo
 			const test = asNode(node.test);
 			visit(test ?? node, guarded);
 			const consequent = asNode(node.consequent);
-			if (consequent) visit(consequent, guarded || guardsReference(test));
+			if (consequent) visit(consequent, guarded || provesPresent(test));
 			const alternate = asNode(node.alternate);
-			if (alternate) visit(alternate, guarded);
+			if (alternate) visit(alternate, guarded || provesAbsent(test));
 			return;
 		}
-		if (node.type === 'LogicalExpression' && (node.operator === '&&' || node.operator === '??')) {
+		// `??` and `||` run their right side when the left is absent/falsy, so the
+		// left proves nothing about presence there; only `&&` carries a guard.
+		if (
+			node.type === 'LogicalExpression' &&
+			(node.operator === '&&' || node.operator === '||' || node.operator === '??')
+		) {
 			const left = asNode(node.left);
 			if (left) visit(left, guarded);
 			const right = asNode(node.right);
-			if (right) visit(right, guarded || guardsReference(left));
+			if (right)
+				visit(
+					right,
+					guarded ||
+						(node.operator === '&&'
+							? provesPresent(left)
+							: node.operator === '||'
+								? provesAbsent(left)
+								: false),
+				);
 			return;
 		}
 		for (const child of childNodes(node)) visit(child, guarded);
