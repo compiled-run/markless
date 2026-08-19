@@ -915,3 +915,53 @@ export function App() @{
 
 	expect(captureAnalysis.diagnostics).toEqual([]);
 });
+
+// A non-empty source the analyzer cannot read yields no free names - the same
+// empty answer a source that genuinely captures nothing yields. Reading that
+// silence as "no captures" would emit a lazy symbol whose captures were never
+// checked, so a failed reading has to refuse instead of proceed.
+test('analyzeCaptures refuses a symbol whose non-empty source could not be analyzed', async () => {
+	const analyzableSource = `
+import { state } from '@markless/core';
+
+export function App() @{
+	let count = state(0);
+	const format = () => count + 1;
+
+	<button onClick={() => count++}>{count}</button>
+}
+`;
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/Unanalyzable.tsrx',
+		source: analyzableSource,
+	});
+	const stateLowering = lowerStateAccess({ semanticGraph });
+	const payloadArena = planPayloadArena({ semanticGraph, stateLowering });
+	const symbolResolver = planSymbolResolver({ semanticGraph, payloadArena });
+
+	expect(semanticGraph.localBindings).toEqual([
+		expect.objectContaining({ name: 'format', kind: 'function' }),
+	]);
+	// As authored the handler reads no component local, so it is clean.
+	expect(analyzeCaptures({ semanticGraph, symbolResolver }).diagnostics).toEqual([]);
+
+	// Same graph and same component local, but the symbol now carries a
+	// non-empty source the analyzer cannot parse.
+	const unanalyzable = {
+		...symbolResolver,
+		symbols: symbolResolver.symbols.map((symbol) =>
+			symbol.id === 'symbol:0' ? { ...symbol, source: '() => format(' } : symbol,
+		),
+	};
+
+	expect(analyzeCaptures({ semanticGraph, symbolResolver: unanalyzable }).diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED',
+			severity: 'error',
+			phase: 'capture-analysis',
+			passId: 'capture-analysis',
+			symbolId: 'symbol:0',
+			source: '() => format(',
+		}),
+	]);
+});

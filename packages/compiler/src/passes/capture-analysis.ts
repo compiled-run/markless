@@ -49,9 +49,16 @@ export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArt
 	const diagnostics = [
 		...extractedSymbols.flatMap((symbol) => opaqueSlotDiagnostics(symbol)),
 		...extractedSymbols.flatMap((symbol) => {
-			const { freeNames } = semantics.read(symbol.source);
+			const { freeNames, analysisFailed } = semantics.read(symbol.source);
+			// A source the analyzer could not read proves nothing about what it
+			// closes over, so it cannot clear a component-local binding either. The
+			// refusal is the existing unsupported-capture diagnostic rather than a
+			// new code: the author's problem is the same one, and staying silent
+			// here would emit a lazy symbol whose captures were never checked.
 			return input.semanticGraph.localBindings.flatMap((binding) =>
-				freeNames.has(binding.name) ? [unsupportedCaptureDiagnostic(symbol, binding)] : [],
+				analysisFailed || freeNames.has(binding.name)
+					? [unsupportedCaptureDiagnostic(symbol, binding)]
+					: [],
 			);
 		}),
 	];

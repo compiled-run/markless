@@ -379,9 +379,15 @@ function inferImmediatelyTerminatedClosingTag(
 		if (!opening || opening[0].endsWith('/>')) continue;
 		const tag = opening[1];
 		const escapedTag = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+		// A self-closing `<Foo />` opens nothing, so it must not count toward the
+		// unclosed-tag balance. The pattern therefore runs to the tag's own `>` and
+		// reports whether a `/` preceded it: a lookahead-terminated match only ever
+		// captures `<Foo`, which can never end in `/>`, so filtering on the matched
+		// text would silently keep counting self-closing tags as openings and skip
+		// the recovery for every body that contains one.
 		const openingCount = [
-			...authored.matchAll(new RegExp(`<${escapedTag}(?=\\s|>)`, 'gu')),
-		].filter((match) => !match[0].endsWith('/>')).length;
+			...authored.matchAll(new RegExp(`<${escapedTag}(?:\\s[^<>]*?)?\\s*(/?)>`, 'gu')),
+		].filter((match) => match[1] !== '/').length;
 		const closingCount = [...authored.matchAll(new RegExp(`</${escapedTag}\\s*>`, 'gu'))]
 			.length;
 		if (openingCount !== closingCount + 1) continue;

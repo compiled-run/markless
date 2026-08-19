@@ -24,6 +24,16 @@ export type SymbolSourceSemantics = {
 	 */
 	readonly freeNames: ReadonlySet<string>;
 	/**
+	 * True when the source carried code the analyzer could not read, so
+	 * `freeNames` is empty for lack of an answer rather than because the source
+	 * closes over nothing. Callers must treat this as "captures unknown" and stay
+	 * fail-closed; an empty `freeNames` alone cannot tell the two apart, and
+	 * reading it as "no captures" silently drops every capture diagnostic the
+	 * source deserved. A symbol kind that carries no source at all is not a
+	 * failure: there is nothing to analyze and nothing to capture.
+	 */
+	readonly analysisFailed: boolean;
+	/**
 	 * True when `expression` appears in callee position anywhere in the source,
 	 * including inside nested functions. Compared by source text so a member
 	 * expression such as `props.onSelect` matches the read it came from.
@@ -59,13 +69,27 @@ export function createSymbolSourceSemanticsReader(): SymbolSourceSemanticsReader
 
 // A source the analyzer cannot parse carries no queryable semantics. Reporting
 // nothing keeps an unparsable source from inventing captures or invocations,
-// which is what the pass did before it had a semantic substrate.
+// which is what the pass did before it had a semantic substrate - but the empty
+// answer is flagged as a failure so callers refuse rather than read it as proof
+// that the source captures nothing.
 const UNANALYZABLE_SOURCE: SymbolSourceSemantics = {
 	freeNames: new Set(),
+	analysisFailed: true,
+	invokes: () => false,
+};
+
+// Several symbol kinds (`async-boundary-update`, `branch-update`) carry no
+// source text at all. There is nothing to analyze and nothing to capture, so an
+// empty answer here is the true answer, not a failed reading of one.
+const SOURCELESS_SYMBOL: SymbolSourceSemantics = {
+	freeNames: new Set(),
+	analysisFailed: false,
 	invokes: () => false,
 };
 
 function symbolSourceSemantics(source: string): SymbolSourceSemantics {
+	if (source.trim() === '') return SOURCELESS_SYMBOL;
+
 	const module = analyzeSymbolSource(source);
 	if (!module) return UNANALYZABLE_SOURCE;
 
@@ -73,6 +97,7 @@ function symbolSourceSemantics(source: string): SymbolSourceSemantics {
 
 	return {
 		freeNames: freeValueNames(module),
+		analysisFailed: false,
 		invokes: (expression) => calleeSources.has(expression),
 	};
 }

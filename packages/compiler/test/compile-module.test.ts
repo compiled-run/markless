@@ -2161,6 +2161,40 @@ export function App() @{
 	expect(output.html).not.toContain('<style');
 });
 
+// A <style> block that cannot be scope-compiled is dropped from the build, so
+// the drop has to be explained. `collectStyleScopes` reports it and the public
+// render plan is the single pass that carries those diagnostics to the author;
+// the semantic-graph markup collector calls the same helper only for the scope
+// class, which is why re-reporting there would duplicate this one diagnostic.
+test('compileTsrxModule reports a <style> block whose CSS cannot be scope-compiled', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/BrokenStyle.tsrx',
+		source: `
+export function App() @{
+	<section class="card">
+		<style>
+			.card { color: red;
+		</style>
+		<footer>Done</footer>
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.styleScopes).toEqual([]);
+	expect(result.publicRenderPlan.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
+			phase: 'public-render',
+			passId: 'public-render-plan',
+			title: expect.stringContaining('<style>'),
+			message: expect.stringContaining('could not be scope-compiled'),
+			primarySpan: expect.objectContaining({ filename: 'src/BrokenStyle.tsrx' }),
+		}),
+	]);
+});
+
 test('compileTsrxModule renders fragment-rooted components in SSR html', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/FragmentCard.tsrx',

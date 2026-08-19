@@ -401,6 +401,37 @@ test('an unusable file without a style element still throws as fatal', () => {
 	expect(fatal).toMatchObject({ type: 'fatal' });
 });
 
+// A self-closing `<Foo />` opens nothing. Counting it as an opening leaves the
+// unclosed-tag balance one too high, so the closing tag is never inferred and
+// the whole file goes dark while the author is still typing the wrapper.
+test('a self-closing tag does not defeat the inferred closing tag for the same name', () => {
+	const withSelfClosingSibling = `import { Foo } from './Foo.tsrx';
+
+export default function Shell() @{
+	const icon = <Foo />;
+	<Foo>
+}`;
+	const withoutSelfClosingSibling = `import { Foo } from './Foo.tsrx';
+
+export default function Shell() @{
+	<Foo>
+}`;
+
+	const recovered = compileToVolarMappings(withSelfClosingSibling, 'Shell.tsrx', {
+		loose: true,
+	});
+	const baseline = compileToVolarMappings(withoutSelfClosingSibling, 'Shell.tsrx', {
+		loose: true,
+	});
+
+	// Both recover; the inferred `</Foo>` is stripped from the generated text, so
+	// the authored (still unclosed) opening is what remains visible in both.
+	expect(recovered.code).toContain('const icon = <Foo />;');
+	expect(recovered.code).toContain('return <Foo>;');
+	expect(recovered.code).not.toContain('</Foo>');
+	expect(baseline.code).toContain('return <Foo>;');
+});
+
 test('an import clause maps its interior, not only its specifier tokens', () => {
 	const source = `import { Nav } from './Nav.tsrx';
 
