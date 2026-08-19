@@ -103,6 +103,31 @@ export async function invalidateEditedGeneratedModules(
 		return invalidateAllGeneratedModules(ctx, parent, currentEnvironment);
 	}
 
+	// The registries below are keyed by the edited source, not by the cache entry.
+	// With no current environment every cached environment of one source is
+	// refreshed here, so writing them inside the loop let the last entry answer
+	// for all of them: a capture manifest that carries no metadata erased one
+	// that did, and an environment with no browser triggers erased the capability
+	// an environment with triggers had just recorded. Fold first, write once.
+	const linkEntry = nextEntries[nextEntries.length - 1]!;
+	const captureEntry =
+		nextEntries.findLast(([, , , next]) => next.manifest.captureMetadata !== undefined) ??
+		linkEntry;
+	moduleLinkArtifacts.set(changedSource, {
+		moduleGraphInterface: linkEntry[3].moduleGraphInterface,
+		interfaceHash: linkEntry[3].interfaceHash,
+		moduleImports: linkEntry[3].moduleImports,
+	});
+	moduleMetadata.recordCaptureMetadata(changedSource, captureEntry[3].manifest);
+	prerenderWakeCapabilities.set(
+		changedSource,
+		nextEntries.some(
+			([, cached, , next]) =>
+				linkedManifestHasBrowserTriggers(next.manifest) ||
+				cached.linkedChildHasBrowserTriggers,
+		),
+	);
+
 	const renderDataIds = new Set<string>();
 	for (const [key, cached, nextInput, next] of nextEntries) {
 		linkedTransformCache.set(key, {
@@ -111,12 +136,6 @@ export async function invalidateEditedGeneratedModules(
 			input: nextInput,
 			result: next,
 		});
-		moduleLinkArtifacts.set(changedSource, {
-			moduleGraphInterface: next.moduleGraphInterface,
-			interfaceHash: next.interfaceHash,
-			moduleImports: next.moduleImports,
-		});
-		moduleMetadata.recordCaptureMetadata(changedSource, next.manifest);
 		recordEmittedClaimOwnership(state, {
 			source: changedSource,
 			emittedModule: cached.manifestSource,
@@ -131,10 +150,6 @@ export async function invalidateEditedGeneratedModules(
 					}
 				: {}),
 		});
-		prerenderWakeCapabilities.set(
-			changedSource,
-			linkedManifestHasBrowserTriggers(next.manifest) || cached.linkedChildHasBrowserTriggers,
-		);
 		for (const module of next.virtualModules) {
 			if (module.type !== 'render-data') continue;
 			virtualModules.set(module.id, module);
