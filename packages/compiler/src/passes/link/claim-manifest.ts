@@ -15,6 +15,7 @@ import type {
 	LinkedResolverClaimVerdict,
 	LinkedRouteArtifactRegistration,
 	LinkedSourceClaimMerge,
+	LinkedSymbolClaimManifest,
 } from '../../artifacts.ts';
 
 export const CLAIM_MANIFEST_PASS_ID = 'claim-manifest';
@@ -57,7 +58,7 @@ export function mergeLinkedSourceClaims<Manifest extends LinkedClaimManifest>(
 				symbols.set(symbol.symbolId, { owner: candidate.source, symbol });
 				continue;
 			}
-			if (JSON.stringify(existing.symbol) !== JSON.stringify(symbol)) {
+			if (claimedSymbolsDiverge(existing.symbol, symbol)) {
 				diagnostics.push(
 					divergedClaimsDiagnostic(input.source, existing.owner, candidate.source),
 				);
@@ -68,6 +69,20 @@ export function mergeLinkedSourceClaims<Manifest extends LinkedClaimManifest>(
 		manifest: { ...selected, symbols: [...symbols.values()].map(({ symbol }) => symbol) },
 		diagnostics,
 	};
+}
+
+// The row shape `LinkedSymbolClaimManifest` fixes, compared field by field:
+// serialized text also disagrees on key order and on absent optional fields,
+// which is a build failure over a difference that is not a contradiction.
+function claimedSymbolsDiverge(
+	left: LinkedSymbolClaimManifest['symbols'][number],
+	right: LinkedSymbolClaimManifest['symbols'][number],
+): boolean {
+	return (
+		left.exportName !== right.exportName ||
+		left.kind !== right.kind ||
+		left.virtualModuleId !== right.virtualModuleId
+	);
 }
 
 function divergedClaimsDiagnostic(
