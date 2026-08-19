@@ -126,4 +126,10 @@ export const linkCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 		consumes: ['moduleManifests', 'childTable'],
 		produces: ['executionAttribution'],
 	},
+	{
+		passId: 'interface-link',
+		description: 'Link imported module interfaces into the linked interface map and its keys.',
+		consumes: ['moduleArtifacts', 'linkedModuleGraph'],
+		produces: ['linkedInterfaces'],
+	},
 ];

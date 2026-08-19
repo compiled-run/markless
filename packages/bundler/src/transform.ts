@@ -1,8 +1,12 @@
 import { dirname, isAbsolute, resolve } from 'pathe';
 import {
+	artifactChildCandidates,
 	collectTsrxModuleDiagnostics,
 	compileTsrxModule,
 	emitSymbolResolverModule,
+	linkedRenderDataBoundarySymbols,
+	moduleInterfaceHash,
+	prerenderInterfacesComplete,
 	type BoundSymbolResolverRow,
 	type CompilerDiagnostic,
 	type CompileTsrxModuleResult,
@@ -145,9 +149,13 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	}));
 	const linkedBoundarySymbols = linkedRenderDataBoundarySymbols({
 		compiled,
-		input,
+		link: input,
+		clientLink: input.environment === 'client',
 		renderDataId,
 		resolverId,
+		symbolModuleId: (symbolId) => symbolVirtualModuleId(input.filename, symbolId),
+		boundaryExportName: (index) =>
+			scopedSymbolExportName(input.filename, `marklessLinkedBoundaryUpdate${index}`),
 	});
 	const symbolRows = [
 		...compilerSymbolRows,
@@ -519,161 +527,6 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	};
 }
 
-function linkedRenderDataBoundarySymbols(input: {
-	readonly compiled: CompileTsrxModuleResult;
-	readonly input: TransformTsrxModuleInput;
-	readonly renderDataId: string;
-	readonly resolverId: string;
-}): ReadonlyArray<{
-	readonly row: { readonly id: string; readonly chunk: string; readonly exportName: string };
-	readonly manifest: {
-		readonly symbolId: string;
-		readonly kind: 'async-boundary-update';
-		readonly exportName: string;
-		readonly virtualModuleId: string;
-	};
-	readonly module: MarklessVirtualModule;
-}> {
-	if (
-		input.input.environment !== 'client' ||
-		!input.compiled.publicRenderModule.renderDataModuleSource ||
-		!prerenderInterfacesComplete(input.compiled, input.input)
-	)
-		return [];
-
-	const emittedSymbolIds = new Set(
-		input.compiled.symbolModules.modules.map((module) => module.symbolId),
-	);
-	const plannedSymbols = new Map(
-		input.compiled.symbolResolver.symbols.map((symbol) => [symbol.id, symbol]),
-	);
-	const routes = input.compiled.semanticGraph.componentEdges.flatMap((edge, index) =>
-		edge.importSource && !input.input.artifactChildMaterializations?.[edge.id]
-			? [{ prefix: `c${index}:`, importSource: edge.importSource }]
-			: [],
-	);
-
-	return input.compiled.protocolView.asyncBoundaries.flatMap((boundary, index) => {
-		const symbolId = boundary.updateSymbolId;
-		if (!symbolId || emittedSymbolIds.has(symbolId)) return [];
-		const planned = plannedSymbols.get(symbolId);
-		if (planned?.kind !== 'async-boundary-update') return [];
-
-		const virtualModuleId = symbolVirtualModuleId(input.input.filename, symbolId);
-		const exportName = scopedSymbolExportName(
-			input.input.filename,
-			`marklessLinkedBoundaryUpdate${index}`,
-		);
-		const row = { id: symbolId, chunk: virtualModuleId, exportName };
-		return [
-			{
-				row,
-				manifest: {
-					symbolId,
-					kind: 'async-boundary-update' as const,
-					exportName,
-					virtualModuleId,
-				},
-				module: {
-					id: virtualModuleId,
-					type: 'symbol' as const,
-					symbolId,
-					exportName,
-					source: linkedRenderDataBoundarySymbolSource({
-						boundaryId: boundary.id,
-						exportName,
-						renderDataId: input.renderDataId,
-						resolverId: input.resolverId,
-						routes,
-					}),
-				},
-			},
-		];
-	});
-}
-
-function linkedRenderDataBoundarySymbolSource(input: {
-	readonly boundaryId: string;
-	readonly exportName: string;
-	readonly renderDataId: string;
-	readonly resolverId: string;
-	readonly routes: ReadonlyArray<{ readonly prefix: string; readonly importSource: string }>;
-}): string {
-	return [
-		`import { marklessPrerenderData } from ${JSON.stringify(input.renderDataId)};`,
-		`import { loadSymbol as marklessLoadLocalSymbol } from ${JSON.stringify(input.resolverId)};`,
-		"import { renderPrerenderBoundary } from '@markless/web/fns/prerender-resume';",
-		'function marklessLoadLinkedSymbol(symbolId) {',
-		...input.routes.flatMap((route) => [
-			`\tif (symbolId.startsWith(${JSON.stringify(route.prefix)})) {`,
-			`\t\treturn import(${JSON.stringify(linkedRenderDataSymbolRouteSource(route.importSource))}).then((module) => module.loadSymbol(symbolId.slice(${route.prefix.length})));`,
-			'\t}',
-		]),
-		'\treturn marklessLoadLocalSymbol(symbolId);',
-		'}',
-		`export async function ${input.exportName}(context) {`,
-		`\tconst rendered = await renderPrerenderBoundary(marklessPrerenderData, ${JSON.stringify(input.boundaryId)}, context.status, context.graph, marklessLoadLinkedSymbol);`,
-		'\treturn { ...rendered, arm: context.status === "rejected" ? 2 : 0 };',
-		'}',
-	].join('\n');
-}
-
-function linkedRenderDataSymbolRouteSource(importSource: string): string {
-	return importSource.includes('?')
-		? `${importSource}&markless-symbols`
-		: `${importSource}?markless-symbols`;
-}
-
-function prerenderInterfacesComplete(
-	compiled: CompileTsrxModuleResult,
-	input: Pick<
-		TransformTsrxModuleInput,
-		'artifactChildMaterializations' | 'importedModuleInterfaces'
-	>,
-): boolean {
-	return compiled.semanticGraph.componentEdges.every(
-		(edge) =>
-			!edge.importSource ||
-			input.artifactChildMaterializations?.[edge.id] !== undefined ||
-			input.importedModuleInterfaces?.[edge.importSource] !== undefined,
-	);
-}
-
-function artifactChildCandidates(
-	compiled: CompileTsrxModuleResult,
-): TransformTsrxModuleResult['artifactChildren'] {
-	const definitions = compiled.publicRenderModule.componentDefinitions as ReadonlyArray<{
-		readonly edges?: ReadonlyArray<{
-			readonly id: string;
-			readonly props: TransformTsrxModuleResult['artifactChildren'][number]['props'];
-			readonly projection?: TransformTsrxModuleResult['artifactChildren'][number]['projection'];
-		}>;
-	}>;
-	const definitionsByEdge = new Map(
-		definitions.flatMap((definition) =>
-			(definition.edges ?? []).map((edge) => [edge.id, edge] as const),
-		),
-	);
-	return compiled.semanticGraph.componentEdges.flatMap((edge) => {
-		if (!edge.importSource || !edge.importKind) return [];
-		const definition = definitionsByEdge.get(edge.id);
-		return definition
-			? [
-					{
-						edgeId: edge.id,
-						componentName: edge.childComponentName,
-						importSource: edge.importSource,
-						importKind: edge.importKind,
-						...(edge.importedName ? { importedName: edge.importedName } : {}),
-						hasChildren: edge.children.childCount > 0,
-						props: definition.props,
-						...(definition.projection ? { projection: definition.projection } : {}),
-					},
-				]
-			: [];
-	});
-}
-
 // A relative specifier in the render-data virtual module would resolve against
 // the virtual id, not the authored file that wrote it, so it is rebound here.
 function resolveAuthoredSpecifier(specifier: string, sourceFilename: string): string {
@@ -764,39 +617,6 @@ function prerenderDataModuleSource(
 		`\timports: {${[...importedComponents].map(([name, entry]) => `${JSON.stringify(name)}:${entry.local}`).join(',')}},`,
 		'};',
 	].join('\n');
-}
-
-export async function compileTsrxModuleLinkArtifact(
-	input: Pick<TransformTsrxModuleInput, 'filename' | 'source' | 'buildId'>,
-): Promise<
-	Pick<CompileTsrxModuleResult, 'moduleGraphInterface'> & {
-		readonly interfaceHash: string;
-		readonly moduleImports: CompileTsrxModuleResult['semanticGraph']['moduleImports'];
-	}
-> {
-	const compiled = await compileTsrxModule({
-		filename: input.filename,
-		source: input.source,
-		buildId: input.buildId,
-		symbols: [],
-	});
-	return {
-		moduleGraphInterface: compiled.moduleGraphInterface,
-		interfaceHash: moduleInterfaceHash(compiled.moduleGraphInterface),
-		moduleImports: compiled.semanticGraph.moduleImports,
-	};
-}
-
-function moduleInterfaceHash(
-	value: CompileTsrxModuleResult['moduleGraphInterface'] | undefined,
-): string {
-	let hash = 0x811c9dc5;
-	const source = JSON.stringify(value ?? null);
-	for (let index = 0; index < source.length; index++) {
-		hash ^= source.charCodeAt(index);
-		hash = Math.imul(hash, 0x01000193);
-	}
-	return `mgi1-${(hash >>> 0).toString(36)}`;
 }
 
 export async function preflightTsrxModuleDiagnostics(

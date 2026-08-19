@@ -1769,3 +1769,93 @@ export type ExecutionAttributionArtifact = {
 	readonly roots: ReadonlyArray<string>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };
+
+// Linked interfaces (`interface-link` link pass). Serializable: the signature
+// is the invalidation key a published package carries so a consumer can tell a
+// stale dependency artifact from a current one.
+export type ModuleLinkArtifact = {
+	readonly moduleGraphInterface: ModuleGraphInterfaceArtifact;
+	readonly interfaceHash: string;
+	readonly moduleImports: SemanticGraphArtifact['moduleImports'];
+};
+
+export type LinkedInterfaceImport = {
+	readonly specifier: string;
+	readonly source: string;
+	readonly interfaceHash?: string;
+	readonly moduleInterface?: ModuleGraphInterfaceArtifact;
+};
+
+export type LinkedInterfaceClaim = {
+	readonly source: string;
+	readonly symbols: ReadonlyArray<unknown>;
+};
+
+export type LinkedInterfacesInput = {
+	readonly imports: ReadonlyArray<LinkedInterfaceImport>;
+	readonly claims: ReadonlyArray<LinkedInterfaceClaim>;
+};
+
+export type LinkedInterfacesArtifact = {
+	readonly passId: 'interface-link';
+	readonly interfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
+	readonly signature: string;
+	readonly claimSignature: string;
+};
+
+export type LinkedInterfaceCompleteness = Pick<
+	SemanticGraphInput,
+	'artifactChildMaterializations' | 'importedModuleInterfaces'
+>;
+
+export type LinkedBoundarySymbolsInput = {
+	readonly compiled: Pick<
+		CompileTsrxModuleResult,
+		'protocolView' | 'publicRenderModule' | 'semanticGraph' | 'symbolModules' | 'symbolResolver'
+	>;
+	readonly link: LinkedInterfaceCompleteness;
+	// The linker owns the client-environment gate and virtual module naming, so
+	// both arrive as inputs rather than being derived here.
+	readonly clientLink: boolean;
+	readonly renderDataId: string;
+	readonly resolverId: string;
+	readonly symbolModuleId: (symbolId: string) => string;
+	readonly boundaryExportName: (index: number) => string;
+};
+
+export type LinkedBoundarySymbol = {
+	readonly row: { readonly id: string; readonly chunk: string; readonly exportName: string };
+	readonly manifest: {
+		readonly symbolId: string;
+		readonly kind: 'async-boundary-update';
+		readonly exportName: string;
+		readonly virtualModuleId: string;
+	};
+	readonly module: {
+		readonly id: string;
+		readonly type: 'symbol';
+		readonly symbolId: string;
+		readonly exportName: string;
+		readonly source: string;
+	};
+};
+
+export type LinkedArtifactChild = {
+	readonly edgeId: string;
+	readonly componentName: string;
+	readonly importSource: string;
+	readonly importKind: NonNullable<SemanticComponentEdge['importKind']>;
+	readonly importedName?: string;
+	readonly hasChildren: boolean;
+	readonly props: ReadonlyArray<{
+		readonly name: string;
+		readonly kind: string;
+		readonly value?: unknown;
+		readonly source?: string;
+	}>;
+	readonly projection?: {
+		readonly kind: 'static-markup';
+		readonly markup: string;
+		readonly elementCount: number;
+	};
+};

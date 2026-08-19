@@ -10,14 +10,12 @@ const resolveSpecifier = (parent: string, specifier: string) =>
 const encodeSource = (source: string) => encodeURIComponent(source);
 
 test('execution-attribution is registered as a link pass with its artifact boundary', () => {
-	expect(linkCompilerPasses).toEqual([
-		{
-			passId: 'execution-attribution',
-			description: expect.stringContaining('execution scope tables'),
-			consumes: ['moduleManifests', 'childTable'],
-			produces: ['executionAttribution'],
-		},
-	]);
+	expect(linkCompilerPasses).toContainEqual({
+		passId: 'execution-attribution',
+		description: expect.stringContaining('execution scope tables'),
+		consumes: ['moduleManifests', 'childTable'],
+		produces: ['executionAttribution'],
+	});
 });
 
 test('two module manifests and a child table produce the fixture route keys and scopes', () => {

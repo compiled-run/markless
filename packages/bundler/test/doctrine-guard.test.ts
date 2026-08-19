@@ -107,8 +107,8 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Build-time source emission recursively links ordinary client render-data modules while prerender records use their separately resolved shape.',
 	"packages/bundler/src/transform.ts :: input.environment === 'server' ? await compilePrerenderInlineResumerSources() : undefined;":
 		'Prerender boot scripts are compiled once for the resolved server compilation that inlines them into the document.',
-	"packages/bundler/src/transform.ts :: input.input.environment !== 'client' ||":
-		'Linked render-data boundary symbols are emitted only for the resolved client compilation that can demand them.',
+	"packages/bundler/src/transform.ts :: clientLink: input.environment === 'client',":
+		'Linked render-data boundary symbols are requested from the compiler pass only for the resolved client compilation that can demand them.',
 	"packages/bundler/src/vite/environment.ts :: if (environment === 'client') {":
 		'This file is the Vite environment-name resolver for client posture.',
 	"packages/bundler/src/vite/environment.ts :: if (environment === 'server') {":

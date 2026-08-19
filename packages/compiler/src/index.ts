@@ -12,6 +12,14 @@ export { defaultCompilerPasses } from './pass-registry.ts';
 
 export { analyzeCaptures } from './passes/capture-analysis.ts';
 export { computeExecutionAttribution } from './passes/link/attribution.ts';
+export {
+	artifactChildCandidates,
+	compileTsrxModuleLinkArtifact,
+	computeLinkedInterfaces,
+	linkedRenderDataBoundarySymbols,
+	moduleInterfaceHash,
+	prerenderInterfacesComplete,
+} from './passes/link/interface-link.ts';
 export { planPayloadArena } from './passes/payload-arena.ts';
 export { renderPayloadScriptArtifact } from './passes/payload-scripts.ts';
 export { emitPublicRenderModule } from './passes/public-render/module.ts';

@@ -1,5 +1,11 @@
 import type { InputOptions, Plugin } from 'rolldown';
-import { computeExecutionAttribution } from '@markless/compiler';
+import {
+	compileTsrxModuleLinkArtifact,
+	computeExecutionAttribution,
+	computeLinkedInterfaces,
+	type LinkedInterfaceClaim,
+	type LinkedInterfaceImport,
+} from '@markless/compiler';
 import { existsSync, statSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { dirname, isAbsolute, relative, resolve } from 'pathe';
@@ -26,7 +32,6 @@ import type { ModuleMetadataRegistry } from './module-metadata-registry.ts';
 import { type ImportedChild, createPluginState } from './plugin-state.ts';
 import {
 	MARKLESS_VIRTUAL_PREFIX,
-	compileTsrxModuleLinkArtifact,
 	marklessVirtualModuleSourceFile,
 	resumeVirtualModuleId,
 	transformTsrxModule,
@@ -697,11 +702,14 @@ export function createMarklessRolldownPlugin(input: {
 					internalOptions,
 					currentEnvironment,
 				);
+				const cachedLink = linkedInterfaces(
+					cachedImports,
+					moduleLinkArtifacts,
+					linkedInterfaceClaims(cachedImports, moduleMetadata),
+				);
 				if (
-					cached.importedInterfaceHashes ===
-						importedInterfaceHashSignature(cachedImports, moduleLinkArtifacts) &&
-					cached.importedSymbolClaims ===
-						importedSymbolClaimSignature(cachedImports, moduleMetadata)
+					cached.importedInterfaceHashes === cachedLink.signature &&
+					cached.importedSymbolClaims === cachedLink.claimSignature
 				) {
 					linkedTransformResult = cached.result;
 					linkedTransformInput = cached.input;
@@ -983,14 +991,16 @@ export function createMarklessRolldownPlugin(input: {
 				source,
 				manifestSource,
 				code,
-				importedInterfaceHashes: importedInterfaceHashSignature(
+				importedInterfaceHashes: linkedInterfaces(resolvedInterfaceImports, moduleLinkArtifacts)
+					.signature,
+				importedSymbolClaims: linkedInterfaces(
 					resolvedInterfaceImports,
 					moduleLinkArtifacts,
-				),
-				importedSymbolClaims: importedSymbolClaimSignature(
-					uniqueImportedModules([...resolvedInterfaceImports, ...resolvedChildren]),
-					moduleMetadata,
-				),
+					linkedInterfaceClaims(
+						uniqueImportedModules([...resolvedInterfaceImports, ...resolvedChildren]),
+						moduleMetadata,
+					),
+				).claimSignature,
 				input: linkedTransformInput,
 				result: transformed,
 				linkedChildHasBrowserTriggers,
@@ -1347,12 +1357,35 @@ function importedModuleInterfaces(
 	imports: ReadonlyArray<ImportedChild>,
 	artifacts: ReadonlyMap<string, MarklessModuleLinkArtifact>,
 ): NonNullable<import('./types.ts').TransformTsrxModuleInput['importedModuleInterfaces']> {
-	return Object.fromEntries(
-		imports.flatMap((imported) => {
-			const artifact = artifacts.get(imported.source);
-			return artifact ? [[imported.specifier, artifact.moduleGraphInterface] as const] : [];
-		}),
-	);
+	return linkedInterfaces(imports, artifacts).interfaces;
+}
+
+function linkedInterfaces(
+	imports: ReadonlyArray<ImportedChild>,
+	artifacts: ReadonlyMap<string, MarklessModuleLinkArtifact>,
+	claims: ReadonlyArray<LinkedInterfaceClaim> = [],
+) {
+	return computeLinkedInterfaces({
+		imports: imports.map(
+			(imported): LinkedInterfaceImport => ({
+				specifier: imported.specifier,
+				source: imported.source,
+				interfaceHash: artifacts.get(imported.source)?.interfaceHash,
+				moduleInterface: artifacts.get(imported.source)?.moduleGraphInterface,
+			}),
+		),
+		claims,
+	});
+}
+
+function linkedInterfaceClaims(
+	imports: ReadonlyArray<ImportedChild>,
+	metadata: ModuleMetadataRegistry,
+): LinkedInterfaceClaim[] {
+	return imports.map((imported) => ({
+		source: imported.source,
+		symbols: sourceSymbolManifest(metadata, imported.source)?.symbols ?? [],
+	}));
 }
 
 function uniqueImportedModules(imports: ReadonlyArray<ImportedChild>): ImportedChild[] {
@@ -1685,36 +1718,6 @@ function renderDataHash(source: string): string {
 		hash = Math.imul(hash, 0x01000193);
 	}
 	return `mrd1-${(hash >>> 0).toString(36)}`;
-}
-
-function importedInterfaceHashSignature(
-	imports: ReadonlyArray<ImportedChild>,
-	artifacts: ReadonlyMap<string, MarklessModuleLinkArtifact>,
-): string {
-	return imports
-		.map((imported) =>
-			[
-				imported.specifier,
-				imported.source,
-				artifacts.get(imported.source)?.interfaceHash ?? 'missing',
-			]
-				.map(encodeURIComponent)
-				.join(':'),
-		)
-		.sort()
-		.join('|');
-}
-
-function importedSymbolClaimSignature(
-	imports: ReadonlyArray<ImportedChild>,
-	metadata: ModuleMetadataRegistry,
-): string {
-	return [...new Set(imports.map((imported) => imported.source))]
-		.sort()
-		.map((source) =>
-			JSON.stringify([source, sourceSymbolManifest(metadata, source)?.symbols ?? []]),
-		)
-		.join('|');
 }
 
 function isRenderDataOnlyTransformChange(
