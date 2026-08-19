@@ -170,6 +170,10 @@ jobs:
             - name: Run browser tests
               run: pnpm exec vp test --project browser --shard=${{ matrix.shard }}
 
+            - name: Run the @markless/ui browser project
+              if: matrix.shard == '1/2'
+              run: pnpm exec vp test --project ui
+
     # Packaged editor completion matrix: builds the CJS plugin bundles, so it
     # owns a runner instead of serializing behind the test suites.
     completion-matrix:
