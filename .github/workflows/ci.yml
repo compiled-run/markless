@@ -71,10 +71,21 @@ jobs:
             - name: Lint
               run: pnpm exec vp check --no-fmt
 
-    test:
+    # The steps that used to run back-to-back inside one 30-minute `test` job
+    # now run as the parallel lanes below. Nothing was dropped: every step of
+    # the old job appears in exactly one lane, and the `test` job at the end of
+    # this file fails unless every lane succeeded, so the required status check
+    # keeps its name and its meaning.
+
+    # Node vitest project, split by test file across three runners (~200 files).
+    unit:
         needs: typecheck
         runs-on: ubuntu-latest
-        timeout-minutes: 30
+        timeout-minutes: 20
+        strategy:
+            fail-fast: false
+            matrix:
+                shard: ['1/3', '2/3', '3/3']
         env:
             NPM_CONFIG_AUDIT: 'false'
             NPM_CONFIG_FUND: 'false'
@@ -98,23 +109,269 @@ jobs:
             - name: Install Markless dependencies
               run: pnpm install --frozen-lockfile
 
+            - name: Run unit and integration tests
+              run: pnpm exec vp test --project node --shard=${{ matrix.shard }}
+
+    # Real-Chromium vitest project, split by test file across two runners.
+    browser:
+        needs: typecheck
+        runs-on: ubuntu-latest
+        timeout-minutes: 25
+        strategy:
+            fail-fast: false
+            matrix:
+                shard: ['1/2', '2/2']
+        env:
+            NPM_CONFIG_AUDIT: 'false'
+            NPM_CONFIG_FUND: 'false'
+            NPM_CONFIG_PREFER_OFFLINE: 'true'
+            PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+            PUPPETEER_SKIP_DOWNLOAD: '1'
+            CHROMEDRIVER_SKIP_DOWNLOAD: 'true'
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - name: Install Markless dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Resolve the pinned Playwright version
+              id: playwright
+              run: |
+                  version="$(sed -nE 's/^  playwright@([0-9]+\.[0-9]+\.[0-9]+):$/\1/p' pnpm-lock.yaml | head -1)"
+                  if [ -z "$version" ]; then
+                      echo "::error::Could not read the pinned playwright version from pnpm-lock.yaml"
+                      exit 1
+                  fi
+                  echo "version=$version" >> "$GITHUB_OUTPUT"
+
+            # The Chromium download is what hung a runner for 28 minutes; cache
+            # it by the pinned version and cap the step so a bad network fails
+            # in minutes instead of eating the whole budget.
+            - name: Cache Playwright browsers
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
             - name: Install Playwright browsers for the vitest browser project
+              timeout-minutes: 10
               run: pnpm --dir packages/vitest-browser exec playwright install --with-deps chromium
+
+            - name: Run browser tests
+              run: pnpm exec vp test --project browser --shard=${{ matrix.shard }}
+
+    # Packaged editor completion matrix: builds the CJS plugin bundles, so it
+    # owns a runner instead of serializing behind the test suites.
+    completion-matrix:
+        needs: typecheck
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        env:
+            NPM_CONFIG_AUDIT: 'false'
+            NPM_CONFIG_FUND: 'false'
+            NPM_CONFIG_PREFER_OFFLINE: 'true'
+            PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+            PUPPETEER_SKIP_DOWNLOAD: '1'
+            CHROMEDRIVER_SKIP_DOWNLOAD: 'true'
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - name: Install Markless dependencies
+              run: pnpm install --frozen-lockfile
 
             - name: Run packaged editor completion matrix
               run: pnpm --dir packages/typescript-plugin test:completion-matrix
 
-            - name: Run unit and integration tests
-              run: pnpm exec vp test
+    # Bundler pipeline boxes. Boxes drive a real browser through @async/witness,
+    # so every box lane installs the cached Chromium too. The receipts this lane
+    # writes are the only copy of that evidence, so they leave as an artifact for
+    # the `receipts` job to validate.
+    boxes-bundler:
+        needs: typecheck
+        runs-on: ubuntu-latest
+        timeout-minutes: 25
+        env:
+            NPM_CONFIG_AUDIT: 'false'
+            NPM_CONFIG_FUND: 'false'
+            NPM_CONFIG_PREFER_OFFLINE: 'true'
+            PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+            PUPPETEER_SKIP_DOWNLOAD: '1'
+            CHROMEDRIVER_SKIP_DOWNLOAD: 'true'
 
-            - name: Generate analyzer unit-contract receipts
-              run: pnpm receipts:generate
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - name: Install Markless dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Resolve the pinned Playwright version
+              id: playwright
+              run: |
+                  version="$(sed -nE 's/^  playwright@([0-9]+\.[0-9]+\.[0-9]+):$/\1/p' pnpm-lock.yaml | head -1)"
+                  if [ -z "$version" ]; then
+                      echo "::error::Could not read the pinned playwright version from pnpm-lock.yaml"
+                      exit 1
+                  fi
+                  echo "version=$version" >> "$GITHUB_OUTPUT"
+
+            - name: Cache Playwright browsers
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+            - name: Install Playwright browsers for the pipeline boxes
+              timeout-minutes: 10
+              run: pnpm --dir packages/vitest-browser exec playwright install --with-deps chromium
 
             - name: Run bundler pipeline boxes
               run: pnpm --dir packages/bundler test:boxes
 
+            - name: Upload bundler analyzer receipts
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: receipts-bundler
+                  path: packages/bundler/.witness/receipts/*.json
+                  include-hidden-files: true
+                  if-no-files-found: error
+
+    # Router pipeline boxes.
+    boxes-router:
+        needs: typecheck
+        runs-on: ubuntu-latest
+        timeout-minutes: 25
+        env:
+            NPM_CONFIG_AUDIT: 'false'
+            NPM_CONFIG_FUND: 'false'
+            NPM_CONFIG_PREFER_OFFLINE: 'true'
+            PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+            PUPPETEER_SKIP_DOWNLOAD: '1'
+            CHROMEDRIVER_SKIP_DOWNLOAD: 'true'
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - name: Install Markless dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Resolve the pinned Playwright version
+              id: playwright
+              run: |
+                  version="$(sed -nE 's/^  playwright@([0-9]+\.[0-9]+\.[0-9]+):$/\1/p' pnpm-lock.yaml | head -1)"
+                  if [ -z "$version" ]; then
+                      echo "::error::Could not read the pinned playwright version from pnpm-lock.yaml"
+                      exit 1
+                  fi
+                  echo "version=$version" >> "$GITHUB_OUTPUT"
+
+            - name: Cache Playwright browsers
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+            - name: Install Playwright browsers for the pipeline boxes
+              timeout-minutes: 10
+              run: pnpm --dir packages/vitest-browser exec playwright install --with-deps chromium
+
             - name: Run router pipeline boxes
               run: pnpm --dir packages/router test:boxes
+
+            - name: Upload router analyzer receipts
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: receipts-router
+                  path: packages/router/.witness/receipts/*.json
+                  include-hidden-files: true
+                  if-no-files-found: error
+
+    # music-player demo: analyzer gate tests then boxes, same order as before.
+    boxes-music-player:
+        needs: typecheck
+        runs-on: ubuntu-latest
+        timeout-minutes: 25
+        env:
+            NPM_CONFIG_AUDIT: 'false'
+            NPM_CONFIG_FUND: 'false'
+            NPM_CONFIG_PREFER_OFFLINE: 'true'
+            PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+            PUPPETEER_SKIP_DOWNLOAD: '1'
+            CHROMEDRIVER_SKIP_DOWNLOAD: 'true'
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - name: Install Markless dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Resolve the pinned Playwright version
+              id: playwright
+              run: |
+                  version="$(sed -nE 's/^  playwright@([0-9]+\.[0-9]+\.[0-9]+):$/\1/p' pnpm-lock.yaml | head -1)"
+                  if [ -z "$version" ]; then
+                      echo "::error::Could not read the pinned playwright version from pnpm-lock.yaml"
+                      exit 1
+                  fi
+                  echo "version=$version" >> "$GITHUB_OUTPUT"
+
+            - name: Cache Playwright browsers
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+            - name: Install Playwright browsers for the pipeline boxes
+              timeout-minutes: 10
+              run: pnpm --dir packages/vitest-browser exec playwright install --with-deps chromium
 
             - name: Run music-player demo analyzer gate tests
               run: pnpm --dir demos/music-player test:analyzer
@@ -122,11 +379,140 @@ jobs:
             - name: Run music-player demo boxes
               run: pnpm --dir demos/music-player test:boxes
 
+            - name: Upload music-player analyzer receipts
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: receipts-music-player
+                  path: demos/music-player/.witness/receipts/*.json
+                  include-hidden-files: true
+                  if-no-files-found: error
+
+    # music-player-ssr demo: analyzer gate tests then boxes.
+    boxes-music-player-ssr:
+        needs: typecheck
+        runs-on: ubuntu-latest
+        timeout-minutes: 25
+        env:
+            NPM_CONFIG_AUDIT: 'false'
+            NPM_CONFIG_FUND: 'false'
+            NPM_CONFIG_PREFER_OFFLINE: 'true'
+            PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+            PUPPETEER_SKIP_DOWNLOAD: '1'
+            CHROMEDRIVER_SKIP_DOWNLOAD: 'true'
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - name: Install Markless dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Resolve the pinned Playwright version
+              id: playwright
+              run: |
+                  version="$(sed -nE 's/^  playwright@([0-9]+\.[0-9]+\.[0-9]+):$/\1/p' pnpm-lock.yaml | head -1)"
+                  if [ -z "$version" ]; then
+                      echo "::error::Could not read the pinned playwright version from pnpm-lock.yaml"
+                      exit 1
+                  fi
+                  echo "version=$version" >> "$GITHUB_OUTPUT"
+
+            - name: Cache Playwright browsers
+              uses: actions/cache@v4
+              with:
+                  path: ~/.cache/ms-playwright
+                  key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+            - name: Install Playwright browsers for the pipeline boxes
+              timeout-minutes: 10
+              run: pnpm --dir packages/vitest-browser exec playwright install --with-deps chromium
+
             - name: Run music-player-ssr demo analyzer gate tests
               run: pnpm --dir demos/music-player-ssr test:analyzer
 
             - name: Run music-player-ssr demo boxes
               run: pnpm --dir demos/music-player-ssr test:boxes
+
+            - name: Upload music-player-ssr analyzer receipts
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: receipts-music-player-ssr
+                  path: demos/music-player-ssr/.witness/receipts/*.json
+                  include-hidden-files: true
+                  if-no-files-found: error
+
+    # Reassembles the receipt tree the split box lanes wrote on four different
+    # runners, adds the @markless/web receipt that receipts:generate writes
+    # here, and runs the same receipts:check that used to run at the end of the
+    # serial job. Every receipt records `git rev-parse HEAD` and a source-file
+    # hash, and all lanes check out the same run SHA, so receipts written
+    # elsewhere still match here.
+    receipts:
+        needs: [boxes-bundler, boxes-router, boxes-music-player, boxes-music-player-ssr]
+        runs-on: ubuntu-latest
+        timeout-minutes: 20
+        env:
+            NPM_CONFIG_AUDIT: 'false'
+            NPM_CONFIG_FUND: 'false'
+            NPM_CONFIG_PREFER_OFFLINE: 'true'
+            PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+            PUPPETEER_SKIP_DOWNLOAD: '1'
+            CHROMEDRIVER_SKIP_DOWNLOAD: 'true'
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - name: Install Markless dependencies
+              run: pnpm install --frozen-lockfile
+
+            # One download per artifact with an explicit destination: a merged
+            # download would flatten each artifact to its own root and lose the
+            # package prefix the manifest checks.
+            - name: Download bundler analyzer receipts
+              uses: actions/download-artifact@v4
+              with:
+                  name: receipts-bundler
+                  path: packages/bundler/.witness/receipts
+
+            - name: Download router analyzer receipts
+              uses: actions/download-artifact@v4
+              with:
+                  name: receipts-router
+                  path: packages/router/.witness/receipts
+
+            - name: Download music-player analyzer receipts
+              uses: actions/download-artifact@v4
+              with:
+                  name: receipts-music-player
+                  path: demos/music-player/.witness/receipts
+
+            - name: Download music-player-ssr analyzer receipts
+              uses: actions/download-artifact@v4
+              with:
+                  name: receipts-music-player-ssr
+                  path: demos/music-player-ssr/.witness/receipts
+
+            - name: Generate analyzer unit-contract receipts
+              run: pnpm receipts:generate
 
             - name: Validate required analyzer consumer receipts
               run: pnpm receipts:check
@@ -145,6 +531,40 @@ jobs:
                   # evidence, not missing receipts).
                   include-hidden-files: true
                   if-no-files-found: error
+
+    # The required status check. It holds the name branch protection already
+    # points at, and it is red unless every lane above went green, so splitting
+    # the work did not weaken the gate.
+    test:
+        needs:
+            [
+                unit,
+                browser,
+                completion-matrix,
+                boxes-bundler,
+                boxes-router,
+                boxes-music-player,
+                boxes-music-player-ssr,
+                receipts,
+            ]
+        if: always()
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        steps:
+            - name: Fail unless every test lane succeeded
+              run: |
+                  results="${{ join(needs.*.result, ',') }}"
+                  echo "lane results: $results"
+                  failed=0
+                  for result in $(printf '%s' "$results" | tr ',' ' '); do
+                      if [ "$result" != "success" ]; then
+                          failed=1
+                      fi
+                  done
+                  if [ "$failed" = "1" ]; then
+                      echo "::error::A test lane did not succeed: $results"
+                      exit 1
+                  fi
 
     # Separate from `test` on purpose. The CLI workspace matrix needs npm, pnpm,
     # yarn (via corepack), bun and deno all on PATH and runs real installs, so it
