@@ -10,12 +10,19 @@ concurrency:
     group: ci-${{ github.ref }}
     cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# No job here pushes, comments, or publishes, so the token every job gets is
+# read-only. A job that ever needs more has to ask for it by name.
+permissions:
+    contents: read
+
 jobs:
     agent-files:
         runs-on: ubuntu-latest
         timeout-minutes: 5
         steps:
             - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
 
             - uses: pnpm/action-setup@v4
               with:
@@ -52,6 +59,8 @@ jobs:
 
         steps:
             - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
 
             - uses: pnpm/action-setup@v4
               with:
@@ -65,6 +74,14 @@ jobs:
             - name: Install Markless dependencies
               run: pnpm install --frozen-lockfile
 
+            # First check after the install, and it takes about a second: a
+            # lane missing from the `test` gate, or a typo in a `needs:` name,
+            # turns the gate green while the work never ran, and no test in
+            # this repo would catch that. It parses the workflow with the
+            # `yaml` package, so it runs after the install, never before.
+            - name: Validate the CI workflow structure
+              run: node scripts/ci/check-workflow.mjs .github/workflows/ci.yml
+
             - name: Typecheck
               run: pnpm exec tsc --noEmit -p tsconfig.json
 
@@ -75,8 +92,10 @@ jobs:
     # into a cache key and probed read-only; a lane whose key already has a
     # green marker saved against it is skipped instead of re-run. `.github/**`
     # and `scripts/ci/**` are deliberately outside the base key, so CI-only
-    # edits do not invalidate every lane. Nothing installs in this job, so the
-    # globs below see a clean checkout with no node_modules or dist to hash.
+    # edits do not invalidate every lane; the unit lane hashes this workflow
+    # anyway, because one of its tests reads it. Nothing installs in this job,
+    # so the globs below see a clean checkout with no node_modules or dist to
+    # hash.
     lanes:
         runs-on: ubuntu-latest
         timeout-minutes: 10
@@ -105,9 +124,15 @@ jobs:
 
         steps:
             - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
 
             # Shared inputs every lane depends on. Its evaluated key is written
             # to a file so the per-lane keys below layer on top of it.
+            # The per-package manifests are in here because they decide package
+            # resolution and the exports every lane imports through: the
+            # lockfile pins versions, but it does not see a changed `exports`
+            # map in `packages/core/package.json`.
             - name: Probe the shared input hash
               id: base
               uses: actions/cache/restore@v4
@@ -116,12 +141,24 @@ jobs:
                   path: ci-base-key.txt
                   key:
                       markless-base-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml',
-                      'package.json', 'tsconfig.json', 'vite.config.ts', 'packages/*/src/**/*',
-                      'scripts/**/*', '!scripts/ci/**') }}
+                      'package.json', 'tsconfig.json', 'vite.config.ts',
+                      'packages/*/package.json', 'packages/*/*/package.json',
+                      'packages/*/tsconfig*.json', 'packages/*/src/**/*', 'scripts/**/*',
+                      '!scripts/ci/**') }}
 
             - name: Record the shared input hash
               run: echo '${{ steps.base.outputs.cache-primary-key }}' > ci-base-key.txt
 
+            # The node project is `packages/*/test/**/*.test.ts` plus
+            # `scripts/**/*.test.ts`, and those files read more than their own
+            # directory: the bundler, router and vitest-browser suites build
+            # `packages/*/fixtures`, `packages/cli/test/create.test.ts`
+            # scaffolds from `packages/cli/templates`, several bundler and web
+            # suites measure `demos/**` sources, and
+            # `scripts/benchmarks/ci-workflow.test.ts` asserts on this workflow
+            # file. Every one of those is an input: leave it out of the key and
+            # editing it skips the lane that would have caught the break, which
+            # the gate then reads as a content-hash hit.
             - name: Probe the unit lane
               id: unit
               uses: actions/cache/restore@v4
@@ -130,7 +167,10 @@ jobs:
                   path: unit-completed.txt
                   key:
                       unit-${{ hashFiles('ci-base-key.txt', 'packages/*/test/**/*',
-                      'packages/*/test-support/**/*') }}
+                      'packages/*/test-support/**/*', 'packages/*/fixtures/**/*',
+                      'packages/cli/templates/**/*', 'demos/**/*',
+                      '.github/workflows/ci.yml', 'scripts/ci/**/*', '!**/node_modules/**',
+                      '!**/dist/**', '!**/.witness/**') }}
 
             - name: Probe the browser lane
               id: browser
@@ -246,6 +286,8 @@ jobs:
 
         steps:
             - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
 
             - uses: pnpm/action-setup@v4
               with:
@@ -305,6 +347,8 @@ jobs:
 
         steps:
             - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
 
             - uses: pnpm/action-setup@v4
               with:
@@ -342,6 +386,8 @@ jobs:
 
         steps:
             - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
 
             - uses: pnpm/action-setup@v4
               with:
@@ -397,6 +443,8 @@ jobs:
 
         steps:
             - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
 
             - uses: pnpm/action-setup@v4
               with:
@@ -444,6 +492,8 @@ jobs:
 
         steps:
             - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
 
             - uses: pnpm/action-setup@v4
               with:
@@ -515,6 +565,8 @@ jobs:
 
         steps:
             - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
 
             - uses: pnpm/action-setup@v4
               with:
@@ -583,6 +635,8 @@ jobs:
 
         steps:
             - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
 
             - uses: pnpm/action-setup@v4
               with:
@@ -654,6 +708,8 @@ jobs:
 
         steps:
             - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
 
             - uses: pnpm/action-setup@v4
               with:
@@ -747,6 +803,8 @@ jobs:
               run: exit 1
 
             - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
 
             - uses: pnpm/action-setup@v4
               with:
@@ -953,6 +1011,8 @@ jobs:
 
         steps:
             - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
 
             - uses: pnpm/action-setup@v4
               with:
@@ -984,6 +1044,7 @@ jobs:
         steps:
             - uses: actions/checkout@v4
               with:
+                  persist-credentials: false
                   fetch-depth: 0
 
             - name: Decide whether benchmarks can be affected
@@ -1044,6 +1105,7 @@ jobs:
         steps:
             - uses: actions/checkout@v4
               with:
+                  persist-credentials: false
                   fetch-depth: 0
 
             - uses: pnpm/action-setup@v4
@@ -1179,6 +1241,8 @@ jobs:
             MARKLESS_JSFB_RESULTS: ${{ github.workspace }}/.jsfb-merged/markless-jsfb/results-markless-ci
         steps:
             - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
 
             - uses: actions/setup-node@v4
               with:

@@ -2,18 +2,47 @@
 // Structural check for .github/workflows/ci.yml. The workflow is the merge
 // gate, and a typo in a `needs:` name or a lane missing from the `test` gate
 // turns the gate green while the work never ran, which no test in this repo
-// would catch. Runs with zero dependencies: it parses the YAML through python3
-// when pyyaml is available and falls back to a line-level scan otherwise.
+// would catch. The workflow is parsed, never pattern-matched: a text scan has
+// its own idea of the shape, so it can pass a workflow the parser would reject
+// and disagree with itself about what a job's `if:` even says.
 
-import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { createRequire } from 'node:module';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const workflowPath = resolve(process.argv[2] ?? '.github/workflows/ci.yml');
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const workflowPath = resolve(process.argv[2] ?? resolve(repoRoot, '.github/workflows/ci.yml'));
 const source = readFileSync(workflowPath, 'utf8');
 
+// `yaml` is a workspace dependency of @markless/cli. pnpm's isolated layout
+// keeps it out of the root node_modules, so the package that declares it is
+// the second resolution base.
+const loadYaml = () => {
+	for (const base of ['package.json', 'packages/cli/package.json']) {
+		try {
+			return createRequire(resolve(repoRoot, base))('yaml');
+		} catch {
+			continue;
+		}
+	}
+	return null;
+};
+
+const yaml = loadYaml();
+if (yaml === null) {
+	console.error(
+		`Cannot resolve the \`yaml\` package from ${repoRoot}. Run \`pnpm install\` and try again: this check parses the workflow and has no pattern-matching fallback to degrade to.`,
+	);
+	process.exit(1);
+}
+
 // Jobs that existed before the `test` job was split and are deliberately not
-// part of the test gate.
+// part of the test gate. `package-manager-matrix` and `benchmark-guard` are
+// blocking on their own: they are separate required status checks in branch
+// protection, not gate members, because neither ran inside the serial `test`
+// job either and folding a 30-minute benchmark into the gate would make every
+// merge wait on it.
 const NON_TEST_JOBS = new Set([
 	'agent-files',
 	'typecheck',
@@ -46,85 +75,28 @@ const wordEnd = '(?![A-Za-z0-9_])';
 const problems = [];
 const fail = (message) => problems.push(message);
 
-/** @returns {{ jobs: Record<string, any>, concurrency: unknown } | null} */
-function parseWithPython() {
-	const script = 'import json,sys,yaml;json.dump(yaml.safe_load(open(sys.argv[1])),sys.stdout)';
-	const result = spawnSync('python3', ['-c', script, workflowPath], { encoding: 'utf8' });
-	if (result.status !== 0 || typeof result.stdout !== 'string' || result.stdout.length === 0)
-		return null;
-	try {
-		const document = JSON.parse(result.stdout);
-		if (typeof document !== 'object' || document === null) return null;
-		if (typeof document.jobs !== 'object' || document.jobs === null) return null;
-		return { jobs: document.jobs, concurrency: document.concurrency };
-	} catch {
-		return null;
-	}
-}
-
 const asList = (value) => {
 	if (value === undefined || value === null) return [];
 	if (Array.isArray(value)) return value.map(String);
 	return [String(value)];
 };
 
-// Line-level fallback: top-level job keys sit at exactly four spaces under
-// `jobs:`, so the shape is readable without a YAML parser.
-function parseWithScan() {
-	const lines = source.split('\n');
-	const jobs = {};
-	let current = null;
-	let inJobs = false;
-	for (let index = 0; index < lines.length; index += 1) {
-		const line = lines[index];
-		if (/^jobs:\s*$/.test(line)) {
-			inJobs = true;
-			continue;
-		}
-		if (!inJobs) continue;
-		if (/^\S/.test(line) && line.trim() !== '') {
-			inJobs = false;
-			continue;
-		}
-		const jobMatch = /^ {4}([A-Za-z0-9_.-]+):\s*$/.exec(line);
-		if (jobMatch) {
-			current = jobMatch[1];
-			jobs[current] = { needs: [], body: [], raw: line };
-			continue;
-		}
-		if (current === null) continue;
-		jobs[current].body.push(line);
-		const needsMatch = /^ {8}needs:\s*(.*)$/.exec(line);
-		if (!needsMatch) continue;
-		let text = needsMatch[1].trim();
-		if (text === '' || text.startsWith('[')) {
-			// Flow sequence, possibly spread over several lines.
-			let cursor = index;
-			while (!text.includes(']') && cursor + 1 < lines.length) {
-				cursor += 1;
-				const next = lines[cursor];
-				if (/^ {8}\S/.test(next) && !next.trim().startsWith('-')) break;
-				text += next.trim();
-				jobs[current].body.push(next);
-			}
-			index = cursor;
-		}
-		jobs[current].needs = text
-			.replace(/[[\]]/g, ' ')
-			.split(/[,\s]+/)
-			.map((name) => name.replace(/^['"]|['"]$/g, ''))
-			.filter((name) => name.length > 0);
-	}
-	return {
-		jobs,
-		concurrency: /^concurrency:\s*$/m.test(source) ? {} : undefined,
-		scanned: true,
-	};
+let document;
+try {
+	document = yaml.parse(source);
+} catch (error) {
+	console.error(`${workflowPath} is not valid YAML: ${error.message}`);
+	process.exit(1);
+}
+if (typeof document !== 'object' || document === null) {
+	console.error(`${workflowPath} does not parse to a workflow document.`);
+	process.exit(1);
+}
+if (typeof document.jobs !== 'object' || document.jobs === null) {
+	console.error(`${workflowPath} declares no \`jobs:\` mapping.`);
+	process.exit(1);
 }
 
-const parsed = parseWithPython();
-const usingScan = parsed === null;
-const document = parsed ?? parseWithScan();
 const jobs = document.jobs;
 const jobNames = Object.keys(jobs);
 
@@ -132,30 +104,30 @@ if (jobNames.length === 0) fail('The workflow declares no jobs.');
 if (document.concurrency === undefined)
 	fail('The workflow has no top-level `concurrency` block, so pushes pile up on one ref.');
 
-const needsOf = (name) =>
-	usingScan ? jobs[name].needs : asList(jobs[name] && jobs[name].needs);
+const needsOf = (name) => asList(jobs[name] && jobs[name].needs);
 
-const jobText = (name) => {
-	if (usingScan) return jobs[name].body.join('\n');
-	return JSON.stringify(jobs[name]);
+// The whole job as text, for the checks that ask whether an expression or a
+// command appears anywhere inside it.
+const jobText = (name) => JSON.stringify(jobs[name]);
+
+const outputsOf = (name) => Object.keys((jobs[name] && jobs[name].outputs) || {});
+
+const stepsOf = (name) => {
+	const steps = jobs[name] && jobs[name].steps;
+	return Array.isArray(steps) ? steps : [];
 };
 
-// Declared `outputs:` names. Under the line scan the block sits at eight
-// spaces with its entries at twelve.
-const outputsOf = (name) => {
-	if (!usingScan) return Object.keys((jobs[name] && jobs[name].outputs) || {});
-	const block = /^ {8}outputs:\s*$([\s\S]*?)(?=^ {8}\S|$(?![\s\S]))/m.exec(jobText(name));
-	if (block === null) return [];
-	return [...block[1].matchAll(/^ {12}([A-Za-z0-9_.-]+):/gm)].map((match) => match[1]);
-};
+const usesAction = (step, action) =>
+	typeof step === 'object' &&
+	step !== null &&
+	typeof step.uses === 'string' &&
+	step.uses.startsWith(action);
 
-// The job-level `if:` expression. The line scan cannot separate a block scalar
-// from the rest of the job, so it falls back to the whole job body: a superset,
-// which only ever makes the checks below more permissive, never less honest.
-const ifOf = (name) => {
-	if (!usingScan) return String((jobs[name] && jobs[name].if) ?? '');
-	return jobText(name);
-};
+const withOf = (step) => (typeof step.with === 'object' && step.with !== null ? step.with : {});
+
+// The job-level `if:` expression, and only that: a step's `if:` answers a
+// different question and must never satisfy a check about the job.
+const ifOf = (name) => String((jobs[name] && jobs[name].if) ?? '');
 
 // 1. Every `needs:` name has to be a real job, or the run silently skips work.
 for (const name of jobNames) {
@@ -183,15 +155,20 @@ for (const name of jobNames) walk(name, []);
 
 // 3. Every job needs a wall-clock cap; the 28-minute Playwright hang is why.
 for (const name of jobNames) {
-	const hasTimeout = usingScan
-		? /^ {8}timeout-minutes:/m.test(jobs[name].body.join('\n'))
-		: jobs[name] && jobs[name]['timeout-minutes'] !== undefined;
-	if (!hasTimeout) fail(`Job \`${name}\` has no \`timeout-minutes\`.`);
+	if (jobs[name] === null || jobs[name]['timeout-minutes'] === undefined)
+		fail(`Job \`${name}\` has no \`timeout-minutes\`.`);
 }
 
-// 4. Nothing may be advisory: the suite is the merge gate.
-if (/continue-on-error/.test(source))
-	fail('`continue-on-error` appears in the workflow; no check in this suite may be advisory.');
+// 4. Nothing may be advisory: the suite is the merge gate. Comment lines drop
+// out first, so the ban can be written down next to the rule it protects, and
+// only a truthy value fails: `continue-on-error: false` restates the default
+// and weakens nothing.
+const uncommented = source
+	.split('\n')
+	.filter((line) => !/^\s*#/.test(line))
+	.join('\n');
+if (/^\s*continue-on-error:\s*(?!false\s*$)\S/m.test(uncommented))
+	fail('`continue-on-error` is set in the workflow; no check in this suite may be advisory.');
 
 // 5. The gate job keeps the required-status-check name and must depend on
 // every test lane, with `if: always()` so a failed lane still reaches it.
@@ -204,10 +181,9 @@ if (!jobNames.includes(GATE_JOB)) {
 		if (!gateNeeds.has(lane))
 			fail(`Job \`${GATE_JOB}\` does not need lane \`${lane}\`, so that lane cannot block a merge.`);
 	}
-	const gateIf = usingScan
-		? /^ {8}if:\s*always\(\)\s*$/m.test(jobs[GATE_JOB].body.join('\n'))
-		: String(jobs[GATE_JOB].if ?? '').includes('always()');
-	if (!gateIf)
+	// The parsed job-level value, so `${{ always() }}` and the bare `always()`
+	// both pass and a step's `if:` cannot stand in for the job's.
+	if (!ifOf(GATE_JOB).includes('always()'))
 		fail(`Job \`${GATE_JOB}\` must set \`if: always()\` or a failed lane skips the gate instead of failing it.`);
 	if (!/needs\.\*\.result/.test(jobText(GATE_JOB)))
 		fail(`Job \`${GATE_JOB}\` does not inspect \`needs.*.result\`, so \`if: always()\` would make it pass regardless.`);
@@ -252,8 +228,18 @@ if (!jobNames.includes('receipts')) {
 		if (!new RegExp(`needs\\.lanes\\.outputs\\.key_${slug}${wordEnd}`).test(receiptsText))
 			fail(`Job \`receipts\` never restores \`${boxJob}\` receipts from \`needs.lanes.outputs.key_${slug}\`, so a skipped box lane would leave the receipt set short.`);
 	}
-	if (!/fail-on-cache-miss/.test(receiptsText))
-		fail('Job `receipts` restores cached receipts without `fail-on-cache-miss`, so a missing cache entry would pass as an empty receipt set.');
+	// `fail-on-cache-miss` has to be set to true, not merely mentioned: the
+	// key's default is false, and false is exactly the value that would turn a
+	// missing receipt set into a silent pass.
+	const receiptRestores = stepsOf('receipts').filter((step) =>
+		usesAction(step, 'actions/cache/restore'),
+	);
+	if (receiptRestores.length < boxJobs.length)
+		fail(`Job \`receipts\` has ${receiptRestores.length} cache restore step(s) for ${boxJobs.length} box lane(s); a skipped lane would leave the receipt set short.`);
+	for (const step of receiptRestores) {
+		if (withOf(step)['fail-on-cache-miss'] !== true)
+			fail(`Job \`receipts\` restores \`${step.name ?? 'a cache entry'}\` without \`fail-on-cache-miss: true\`, so a missing cache entry would pass as an empty receipt set.`);
+	}
 }
 
 // 7. Content-hash lanes. A lane may only skip because its key already carries a
@@ -296,12 +282,22 @@ if (jobNames.includes(GATE_JOB) && !jobNames.includes(LANES_JOB)) {
 	// Every probe reads: a restore without `lookup-only` would unpack a marker
 	// into the workspace, and one that ever wrote would mark work green that
 	// never ran.
-	const restores = (lanesText.match(/actions\/cache\/restore/g) ?? []).length;
-	const probes = (lanesText.match(/lookup-only/g) ?? []).length;
-	if (restores < hashedLanes.length)
-		fail(`Job \`${LANES_JOB}\` has ${restores} cache probe(s) for ${hashedLanes.length} lane(s).`);
-	if (probes !== restores)
-		fail(`Job \`${LANES_JOB}\` has ${probes} \`lookup-only\` flag(s) for ${restores} cache probe(s); every probe must be read-only.`);
+	{
+		const restoreSteps = stepsOf(LANES_JOB).filter((step) =>
+			usesAction(step, 'actions/cache/restore'),
+		);
+		if (restoreSteps.length < hashedLanes.length)
+			fail(`Job \`${LANES_JOB}\` has ${restoreSteps.length} cache probe(s) for ${hashedLanes.length} lane(s).`);
+		for (const step of restoreSteps) {
+			if (withOf(step)['lookup-only'] !== true)
+				fail(`Probe \`${step.name ?? step.id ?? 'unnamed'}\` in \`${LANES_JOB}\` does not set \`lookup-only: true\`, so it unpacks a marker instead of only reading whether one exists.`);
+		}
+	}
+	// Every lane key layers on the shared input hash. A lane key that stopped
+	// reading `ci-base-key.txt` would skip on a tree whose sources changed.
+	const layered = (lanesText.match(/hashFiles\('ci-base-key\.txt'/g) ?? []).length;
+	if (layered < hashedLanes.length)
+		fail(`Job \`${LANES_JOB}\` layers ${layered} lane key(s) on \`ci-base-key.txt\` for ${hashedLanes.length} lane(s); a lane key that drops the shared hash skips on changed sources.`);
 	if (/actions\/cache\/save/.test(lanesText) || /actions\/cache@/.test(lanesText))
 		fail(`Job \`${LANES_JOB}\` writes a cache; a lane's key may only be marked green by the lane that ran.`);
 }
@@ -332,8 +328,25 @@ if (!jobNames.includes(PLAYWRIGHT_JOB)) {
 	}
 }
 
+// 10. Token posture. Nothing in this workflow pushes, comments or publishes,
+// so the default token stays read-only and no checkout leaves credentials in
+// `.git/config` for a later step to pick up.
+if (document.permissions === undefined)
+	fail('The workflow has no top-level `permissions:` block, so every job runs with the default token scope.');
+for (const name of jobNames) {
+	for (const step of stepsOf(name)) {
+		if (!usesAction(step, 'actions/checkout')) continue;
+		if (withOf(step)['persist-credentials'] !== false)
+			fail(`Job \`${name}\` checks out without \`persist-credentials: false\`, so the token stays in \`.git/config\` for every later step.`);
+	}
+}
+
+// 11. This checker only protects the workflow if the workflow runs it.
+if (!/scripts\/ci\/check-workflow\.mjs/.test(source))
+	fail('No job runs `scripts/ci/check-workflow.mjs`, so none of these invariants are enforced in CI.');
+
 console.log(`Workflow: ${workflowPath}`);
-console.log(`Parsed with: ${usingScan ? 'line scan (python3/pyyaml unavailable)' : 'python3 + pyyaml'}`);
+console.log('Parsed with: the `yaml` package');
 console.log('');
 const width = Math.max(...jobNames.map((name) => name.length), 4);
 for (const name of jobNames) {
