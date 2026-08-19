@@ -125,3 +125,19 @@ test('the claim signature is stable across claim order and repeated sources', ()
 	);
 	expect(claimSignature([widgetClaim])).not.toBe(claimSignature([widgetClaim, panelClaim]));
 });
+
+test('a second claim for one source moves the claim signature', () => {
+	const widgetClaim = { source: '/app/widget.tsrx', symbols: [{ symbolId: 's0' }] };
+	const divergingClaim = { source: '/app/widget.tsrx', symbols: [{ symbolId: 's1' }] };
+	const claimSignature = (claims: ReadonlyArray<typeof widgetClaim>) =>
+		computeLinkedInterfaces({ imports: [], claims }).claimSignature;
+	// Keeping only the first claim left the key unchanged, so the link the key
+	// guards was reused against symbols the second claim contradicts.
+	expect(claimSignature([widgetClaim, divergingClaim])).not.toBe(claimSignature([widgetClaim]));
+	expect(claimSignature([widgetClaim, divergingClaim])).not.toBe(
+		claimSignature([divergingClaim]),
+	);
+	expect(claimSignature([widgetClaim, divergingClaim])).toBe(
+		claimSignature([divergingClaim, widgetClaim]),
+	);
+});
