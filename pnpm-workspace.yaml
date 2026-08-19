@@ -1,6 +1,7 @@
 packages:
     - packages/*
     - packages/*/fixtures/*
+    - packages/headless/*
     - demos/*
     - docs
     # Do not add ../native-tsrx here. @tsrx/core is an external dependency

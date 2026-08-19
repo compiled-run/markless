@@ -822,6 +822,34 @@ importers:
         specifier: workspace:*
         version: link:../web
 
+  packages/headless/base:
+    dependencies:
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../../core
+
+  packages/headless/components:
+    dependencies:
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@markless/headless-base':
+        specifier: workspace:*
+        version: link:../base
+      vite:
+        specifier: ^8.0.16
+        version: 8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0)
+      vitest:
+        specifier: ^4.1.5
+        version: 4.1.5(@types/node@24.12.2)(vite@8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0))
+    devDependencies:
+      '@markless/vitest-browser':
+        specifier: workspace:*
+        version: link:../../vitest-browser
+      playwright:
+        specifier: 1.58.2
+        version: 1.58.2
+
   packages/router:
     dependencies:
       '@markless/bundler':
