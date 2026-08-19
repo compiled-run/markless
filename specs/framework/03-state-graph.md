@@ -626,6 +626,46 @@ model deletes for root/request state instead of pushing into userland. Zustand's
 define-then-bare-call shape appears in ~60k files, with its ~21k selector call
 sites being pure re-render tax that a fine-grained graph deletes.
 
+#### What the compiler lowers today
+
+The model above is implemented for a `shared()` definition and its readers
+inside one `.tsrx` module:
+
+- **The definition never reaches emitted code.** `shared(() => ...)` is graph
+  data, not module code. The factory's `state()` and `computed()` declarations
+  become payload nodes under `shared:<file>#<exportName>/state:<name>` and
+  `shared:<file>#<exportName>/computed:<name>`; neither the `shared(...)` call
+  nor the `session()` instance call survives into the browser or SSR module.
+- **Every reader resolves to the same node.** `const s = session()` leaves no
+  local behind. `s.status` in any component of that module lowers to a read of
+  the definition's own graph node, so two components reading one definition
+  repaint from one write. Server rendering seeds that node's value into every
+  component that reads it, and a `computed()` declared in the factory is derived
+  from those seeded nodes instead of from a render-body local.
+- **Methods lower to graph writes.** A returned method that takes no parameters
+  is inlined at its call site, so `onClick={() => s.login()}` becomes the graph
+  writes the method body performs. A method that takes parameters is not
+  inlined: binding call-site arguments the graph cannot see is outside this
+  lowering.
+- **Page scope is the default.** Omitting `scope` resolves the definition to one
+  instance for the page. `'request'`, `'container'`, and `'page'` are accepted
+  and recorded on the definition; any other value fails the compile closed with
+  `MARKLESS_SHARED_SCOPE_INVALID`, so the `widget` scope described above is a
+  design target that is not accepted yet.
+
+Two follow-ups are named here rather than implied by the lowering:
+
+- **Cross-container patches are not wired.** "Cross-runtime writes are event
+  patches" above describes the intended contract, not current behavior. A write
+  updates the writing container's graph only; the `writeShared` routing that
+  would emit the versioned `CustomEvent` for a `container`-scoped instance is a
+  separate change and needs a ruling on the patch contract before it lands.
+- **Cross-file definitions fail closed.** Importing a definition from another
+  `.tsrx` module reports `MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED`, because the
+  module graph interface carries no shared definitions for the importing module
+  to read the factory's nodes from. That is deliberate: an instance resolved
+  without its nodes would render blank and never update.
+
 #### Shared examples
 
 **Request session**

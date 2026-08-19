@@ -18,6 +18,7 @@ import {
 	splitStaticGraphPath,
 	uniqueBy,
 } from '../artifact-helpers/graph-paths.ts';
+import { resolveSharedInstanceGraphPath } from './semantic-graph/collect-shared.ts';
 
 export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifact {
 	const reads: LoweredStateRead[] = [];
@@ -297,44 +298,6 @@ function resolveStateGraphPath(
 	if (sharedDefinitionId) return null;
 
 	return resolveSharedInstanceGraphPath(source, input.semanticGraph);
-}
-
-function resolveSharedInstanceGraphPath(
-	source: string,
-	graph: SemanticGraphArtifact,
-): ResolvedStateGraphPath | null {
-	const segments = splitStaticGraphPath(source);
-	if (segments.length < 2) return null;
-
-	const [localName, propertyName, ...propertyPath] = segments;
-	const instance = findLast(graph.sharedInstances, (item) => item.localName === localName);
-	if (!instance) return null;
-
-	const definition = graph.sharedDefinitions.find((item) => item.id === instance.definitionId);
-	if (!definition) return null;
-
-	const property = findLast(
-		definition.returnProperties ?? [],
-		(item) => item.name === propertyName,
-	);
-	if (property?.kind !== 'graph') return null;
-
-	const binding = graph.graphBindings.find((item) => item.id === property.graphNodeId);
-	if (!binding) return null;
-
-	return {
-		binding,
-		path: [...property.path, ...propertyPath],
-	};
-}
-
-function findLast<T>(values: ReadonlyArray<T>, predicate: (value: T) => boolean): T | undefined {
-	for (let index = values.length - 1; index >= 0; index--) {
-		const value = values[index];
-		if (value !== undefined && predicate(value)) return value;
-	}
-
-	return undefined;
 }
 
 function templateExpressionStaticDiagnostic({

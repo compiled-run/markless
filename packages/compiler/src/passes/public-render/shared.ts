@@ -50,7 +50,8 @@ export function moduleScopeDeclarations(
 	filename: string,
 ): ReadonlyArray<{ readonly names: ReadonlyArray<string>; readonly source: string }> {
 	const ast = parseModule(source, filename) as unknown as AnyNode;
-	const storageImports = storageImportNames(ast);
+	const storageImports = frameworkApiImportNames(ast, 'storage');
+	const sharedImports = frameworkApiImportNames(ast, 'shared');
 	return asNodes(ast.body).flatMap((statement) => {
 		if (statement.type === 'ImportDeclaration' || getComponentFunction(statement)) return [];
 		const declaration =
@@ -64,6 +65,9 @@ export function moduleScopeDeclarations(
 			declaration.type !== 'ClassDeclaration'
 		)
 			return [];
+		// A shared() definition is graph data, not module code: its factory ships
+		// as payload nodes, so the authored call never reaches emitted source.
+		if (isSharedDefinitionDeclaration(declaration, sharedImports)) return [];
 		const sourceText = lowerModuleStorageDeclaration(declaration, source, storageImports);
 		return sourceText ? [{ names: declaredNames(declaration), source: sourceText }] : [];
 	});
@@ -80,7 +84,7 @@ function declaredNames(declaration: AnyNode): ReadonlyArray<string> {
 	return name ? [name] : [];
 }
 
-function storageImportNames(ast: AnyNode): ReadonlySet<string> {
+function frameworkApiImportNames(ast: AnyNode, apiName: string): ReadonlySet<string> {
 	const names = new Set<string>();
 	for (const statement of asNodes(ast.body)) {
 		if (statement.type !== 'ImportDeclaration') continue;
@@ -88,13 +92,27 @@ function storageImportNames(ast: AnyNode): ReadonlySet<string> {
 		if (importSource !== '@markless/core') continue;
 		for (const specifier of asNodes(statement.specifiers)) {
 			if (specifier.type !== 'ImportSpecifier') continue;
-			if (getIdentifierName(specifier.imported as AnyNode | undefined) !== 'storage')
-				continue;
+			if (getIdentifierName(specifier.imported as AnyNode | undefined) !== apiName) continue;
 			const localName = getIdentifierName(specifier.local as AnyNode | undefined);
 			if (localName) names.add(localName);
 		}
 	}
 	return names;
+}
+
+function isSharedDefinitionDeclaration(
+	declaration: AnyNode,
+	sharedImports: ReadonlySet<string>,
+): boolean {
+	if (declaration.type !== 'VariableDeclaration' || sharedImports.size === 0) return false;
+	const declarators = asNodes(declaration.declarations);
+	if (declarators.length === 0) return false;
+	return declarators.every((declarator) => {
+		const init = declarator.init as AnyNode | undefined;
+		if (init?.type !== 'CallExpression') return false;
+		const callName = getIdentifierName(init.callee as AnyNode | undefined);
+		return !!callName && sharedImports.has(callName);
+	});
 }
 
 function lowerModuleStorageDeclaration(
@@ -488,14 +506,32 @@ export function componentOwnedStateNodes(
 	input: PublicRenderModuleInput,
 	componentName: string,
 	rootComponentName: string,
-): { readonly cellIndexes: ReadonlyArray<number>; readonly computedIndexes: ReadonlyArray<number> } {
+): {
+	readonly cellIndexes: ReadonlyArray<number>;
+	readonly computedIndexes: ReadonlyArray<number>;
+	readonly seedCellIndexes: ReadonlyArray<number>;
+} {
 	const owner = payloadNodeOwners(input, rootComponentName);
-	return {
-		cellIndexes: input.protocolState.cells.flatMap((_cell, index) =>
-			owner.cells[index] === componentName ? [index] : [],
+	const cellIndexes = input.protocolState.cells.flatMap((_cell, index) =>
+		owner.cells[index] === componentName ? [index] : [],
+	);
+	// A page-space node the component only reads stays owned by the page, but its
+	// value must still seed this component's render.
+	const readGraphNodeIds = new Set(
+		chunkGraphNodeIds(
+			input.renderData.chunks.filter((chunk) => chunk.componentName === componentName),
 		),
+	);
+	return {
+		cellIndexes,
 		computedIndexes: input.protocolState.computed.flatMap((_computed, index) =>
 			owner.computed[index] === componentName ? [index] : [],
+		),
+		seedCellIndexes: input.protocolState.cells.flatMap((cell, index) =>
+			cellIndexes.includes(index) ||
+			(isPageSpaceGraphNodeId(cell.graphNodeId) && readGraphNodeIds.has(cell.graphNodeId))
+				? [index]
+				: [],
 		),
 	};
 }

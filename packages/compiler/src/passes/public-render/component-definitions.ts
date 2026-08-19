@@ -126,7 +126,12 @@ export function collectPublicRenderComponentDefinitions(
 		const stateGraphNodeIds = input.semanticGraph.graphBindings.flatMap((binding) =>
 			binding.componentName === componentName ||
 			usedGraphNodeIds.has(binding.id) ||
+			// A shared() node belongs to the page, so the root keeps it even when
+			// only a child component reads it.
+			(binding.sharedDefinitionId !== undefined &&
+				componentName === rootInfo.componentName) ||
 			(!binding.componentName &&
+				binding.sharedDefinitionId === undefined &&
 				componentName === rootInfo.componentName &&
 				!childGraphNodeIds.has(binding.id))
 				? [binding.id]

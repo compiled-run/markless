@@ -28,6 +28,7 @@ export function renderBodyLines(
 			binding.kind === 'computed' ? [[binding.name, binding]] : [],
 		),
 	);
+	const sharedInstanceNames = sharedInstanceLocalNames(input.semanticGraph);
 	const lines: string[] = [];
 	let emittedRoot = false;
 	for (const statement of childNodes(body)) {
@@ -55,6 +56,7 @@ export function renderBodyLines(
 			continue;
 		}
 		if (isLoweredFrameworkDeclaration(statement)) continue;
+		if (isSharedInstanceDeclaration(statement, sharedInstanceNames)) continue;
 
 		const source = expressionSource(statement, input.source.source);
 		if (source) lines.push(source);
@@ -118,6 +120,28 @@ function stateDeclarationLine(
 	return `let ${binding.name} = ${stateValueFunctionName}(${args.join(', ')});`;
 }
 
+// `const shell = session()` names a shared instance. Every read and write
+// through that name is already a graph node id, so the emitted body keeps no
+// local for it.
+export function sharedInstanceLocalNames(
+	semanticGraph: Pick<PublicRenderModuleInput['semanticGraph'], 'sharedInstances'>,
+): ReadonlySet<string> {
+	return new Set((semanticGraph.sharedInstances ?? []).map((instance) => instance.localName));
+}
+
+export function isSharedInstanceDeclaration(
+	statement: AnyNode,
+	sharedInstanceNames: ReadonlySet<string>,
+): boolean {
+	if (statement.type !== 'VariableDeclaration' || sharedInstanceNames.size === 0) return false;
+	const declarators = asNodes(statement.declarations);
+	if (declarators.length === 0) return false;
+	return declarators.every((declarator) => {
+		const name = getIdentifierName(declarator.id as AnyNode | undefined);
+		return !!name && sharedInstanceNames.has(name);
+	});
+}
+
 function isStateDeclaration(statement: AnyNode): boolean {
 	return (
 		statement.type === 'VariableDeclaration' &&
@@ -160,6 +184,7 @@ export function hasExecutableBodyStatements(
 	component: AnyNode,
 	root: AnyNode,
 	source: string,
+	sharedInstanceNames: ReadonlySet<string> = new Set(),
 ): boolean {
 	const body = component.body as AnyNode | undefined;
 	if (!body) return false;
@@ -167,6 +192,7 @@ export function hasExecutableBodyStatements(
 		if (isIgnorableTextNode(statement)) continue;
 		if (statement === root || returnArgument(statement) === root) continue;
 		if (isStateDeclaration(statement) || isLoweredFrameworkDeclaration(statement)) continue;
+		if (isSharedInstanceDeclaration(statement, sharedInstanceNames)) continue;
 		if (expressionSource(statement, source)) return true;
 	}
 	return false;
@@ -193,6 +219,7 @@ export function renderValuePreludeLines(
 			binding.kind === 'computed' ? [[binding.name, binding] as const] : [],
 		),
 	);
+	const sharedInstanceNames = sharedInstanceLocalNames(input.semanticGraph);
 	const statements = childNodes(body).filter((statement) => {
 		if (isIgnorableTextNode(statement)) return false;
 		return statement !== rootInfo.root && returnArgument(statement) !== rootInfo.root;
@@ -239,6 +266,7 @@ export function renderValuePreludeLines(
 				}
 			}
 			if (isLoweredFrameworkDeclaration(statement)) continue;
+			if (isSharedInstanceDeclaration(statement, sharedInstanceNames)) continue;
 		}
 		const source = expressionSource(statement, input.source.source);
 		if (

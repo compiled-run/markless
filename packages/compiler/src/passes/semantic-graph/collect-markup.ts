@@ -26,6 +26,7 @@ import type {
 	SemanticMarkupResidue,
 	SemanticMarkupSlot,
 } from '../../artifacts.ts';
+import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import { isIdrefAttribute } from './idref-attributes.ts';
 import {
 	createStyleConstResolver,
@@ -595,11 +596,11 @@ function expressionResidue(
 		}
 	}
 	const resolved = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(source)
-		? resolveGraphPath(
+		? (resolveGraphPath(
 				source,
 				graphBindingMap(context.graph),
 				semanticAliasMap(context.graph),
-			)
+			) ?? resolveSharedInstanceGraphPath(source, context.graph))
 		: null;
 	if (resolved) {
 		return { kind: 'graph-read', graphNodeId: resolved.binding.id, path: resolved.path };

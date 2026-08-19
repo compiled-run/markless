@@ -79,3 +79,24 @@ function ssrAsyncRunnerSource(
 	if (declarations.length === 0) return symbol.source;
 	return `({key,signal,read})=>{${declarations.join('')}const run=${symbol.source};return run({key,signal,read})}`;
 }
+
+// A shared() computed lives in the factory, so SSR has no render-body local to
+// re-read: it derives the value from the factory's seeded state nodes instead.
+export function collectSsrSharedComputedSources(
+	input: PublicRenderModuleInput,
+): ReadonlyMap<string, string> {
+	const sharedGraphNodeIds = new Set(
+		input.semanticGraph.graphBindings.flatMap((binding) =>
+			binding.sharedDefinitionId !== undefined ? [binding.id] : [],
+		),
+	);
+	if (sharedGraphNodeIds.size === 0) return new Map();
+
+	return new Map(
+		input.symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'sync-computed-derive' && sharedGraphNodeIds.has(symbol.graphNodeId)
+				? ([[symbol.graphNodeId, ssrAsyncRunnerSource(symbol, sharedGraphNodeIds)]] as const)
+				: [],
+		),
+	);
+}

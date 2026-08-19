@@ -5,7 +5,7 @@ import { collectPublicRenderComponentDefinitions } from './component-definitions
 import { emitDirectPublicRenderModule } from './direct-module.ts';
 import { emitPublicSsrRenderModule } from './ssr-module.ts';
 import { firstComponentRoot, selectPublicRenderRoot } from './plan.ts';
-import { hasExecutableBodyStatements } from './render-body.ts';
+import { hasExecutableBodyStatements, sharedInstanceLocalNames } from './render-body.ts';
 import { componentPropNames, isFragmentNode } from './shared.ts';
 
 export { firstComponentRoot, planPublicRender, selectPublicRenderRoot } from './plan.ts';
@@ -52,7 +52,12 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 	const canUseDirectCsrModule =
 		!!root &&
 		!isFragmentRoot &&
-		!hasExecutableBodyStatements(root.component, root.root, input.source.source) &&
+		!hasExecutableBodyStatements(
+			root.component,
+			root.root,
+			input.source.source,
+			sharedInstanceLocalNames(input.semanticGraph),
+		) &&
 		root.propNames.length === 0 &&
 		input.semanticGraph.componentEdges.length === 0 &&
 		input.publicRenderPlan.styleScopes.length === 0 &&

@@ -15,6 +15,7 @@ import {
 	uniqueBy,
 } from '../artifact-helpers/graph-paths.ts';
 import { createRenderData } from './render-data/index.ts';
+import { resolveSharedInstanceGraphPath } from './semantic-graph/collect-shared.ts';
 
 export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact {
 	const renderData =
@@ -158,7 +159,9 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			];
 		}
 
-		const resolved = resolveGraphPath(read.source, bindings, aliases);
+		const resolved =
+			resolveGraphPath(read.source, bindings, aliases) ??
+			resolveSharedInstanceGraphPath(read.source, input.semanticGraph);
 		if (!resolved) return [];
 
 		return [

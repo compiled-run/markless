@@ -4,6 +4,7 @@ import type {
 	SemanticGraphBinding,
 	SemanticSharedDefinition,
 	SemanticSharedDependency,
+	SemanticSharedInstance,
 	SemanticSharedReturnProperty,
 	SemanticSharedScope,
 } from '../../artifacts.ts';
@@ -11,6 +12,8 @@ import {
 	graphBindingMap,
 	resolveGraphPath,
 	semanticAliasMap,
+	splitStaticGraphPath,
+	type ResolvedGraphPath,
 } from '../../artifact-helpers/graph-paths.ts';
 import { invalidSharedScopeDiagnostic, sharedDefinitionCycleDiagnostic } from './diagnostics.ts';
 import { getCallName, getFrameworkApiForCall } from './imports.ts';
@@ -153,6 +156,66 @@ export function collectSharedFactoryGraph(
 
 export function sharedDefinitionId(filename: string, exportedName: string): string {
 	return `shared:${filename}#${exportedName}`;
+}
+
+// What the semantic graph knows about `const s = session()`: the local name, the
+// definition it came from, and the graph nodes the factory declared. Every
+// consumer that turns `s.status` into a graph node id reads it through here.
+export type SharedInstanceGraph = {
+	readonly graphBindings: ReadonlyArray<SemanticGraphBinding>;
+	readonly sharedDefinitions: ReadonlyArray<SemanticSharedDefinition>;
+	readonly sharedInstances: ReadonlyArray<SemanticSharedInstance>;
+};
+
+export function findSharedInstance(
+	localName: string,
+	graph: Pick<SharedInstanceGraph, 'sharedDefinitions' | 'sharedInstances'>,
+): { readonly instance: SemanticSharedInstance; readonly definition: SemanticSharedDefinition } | null {
+	const instance = findLast(graph.sharedInstances, (item) => item.localName === localName);
+	if (!instance) return null;
+
+	const definition = graph.sharedDefinitions.find((item) => item.id === instance.definitionId);
+	return definition ? { instance, definition } : null;
+}
+
+// `s.status` and `s.status.deep` resolve through the definition's returned
+// property to the factory's own graph node; a method property resolves to
+// nothing here because a call is not a value path.
+export function resolveSharedInstanceGraphPath(
+	source: string,
+	graph: SharedInstanceGraph,
+): ResolvedGraphPath | null {
+	const segments = splitStaticGraphPath(source);
+	if (segments.length < 2) return null;
+
+	const [localName, propertyName, ...propertyPath] = segments;
+	if (!localName || !propertyName) return null;
+
+	const resolved = findSharedInstance(localName, graph);
+	if (!resolved) return null;
+
+	const property = findLast(
+		resolved.definition.returnProperties ?? [],
+		(item) => item.name === propertyName,
+	);
+	if (property?.kind !== 'graph') return null;
+
+	const binding = graph.graphBindings.find((item) => item.id === property.graphNodeId);
+	if (!binding) return null;
+
+	return { binding, path: [...property.path, ...propertyPath] };
+}
+
+export function findLast<T>(
+	values: ReadonlyArray<T>,
+	predicate: (value: T) => boolean,
+): T | undefined {
+	for (let index = values.length - 1; index >= 0; index--) {
+		const value = values[index];
+		if (value !== undefined && predicate(value)) return value;
+	}
+
+	return undefined;
 }
 
 function isTsrxModuleImport(source: string): boolean {

@@ -38,7 +38,7 @@ export function emitSameModuleSsrComponents(
 		const valuesName = `marklessSsrStateValues${reference.componentName}`;
 		return [
 			`const ${valuesName} = new Map([`,
-			stateEntries(input, owned.cellIndexes).join(',\n'),
+			stateEntries(input, owned.seedCellIndexes).join(',\n'),
 			']);',
 			`const ${reference.localName} = { renderSsr: ${functionName} };`,
 			`async function ${functionName}(props = {}, marklessSsrRenderContext) {`,

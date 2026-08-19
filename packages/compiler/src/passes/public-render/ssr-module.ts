@@ -1,5 +1,9 @@
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
-import { collectSsrAsyncRunnerDefinitions, collectSsrAsyncRunners } from './html.ts';
+import {
+	collectSsrAsyncRunnerDefinitions,
+	collectSsrAsyncRunners,
+	collectSsrSharedComputedSources,
+} from './html.ts';
 import { renderBodyLines } from './render-body.ts';
 import { emitCatalogHelperImports, stateRuntimeImports } from './runtime-helpers.ts';
 import { emitSameModuleSsrComponents } from './same-module.ts';
@@ -77,7 +81,7 @@ export function emitPublicSsrRenderModule(
 		'',
 		`const marklessSsrPropEvents = ${JSON.stringify(propEvents)};`,
 		'const marklessSsrStateValues = new Map([',
-		stateEntries(input, ownedNodes?.cellIndexes).join(',\n'),
+		stateEntries(input, ownedNodes?.seedCellIndexes).join(',\n'),
 		']);',
 		// The optional render context is the per-request streaming channel
 		// (T107): renderToStream threads it through child renders and async
@@ -334,11 +338,24 @@ function emitSsrDataRenderLines(
 		];
 	});
 	const bindingLines = input.semanticGraph.graphBindings.flatMap((binding) =>
+		// A shared() node has no render-body local to re-read: its seed value is
+		// already in the state map the factory payload built.
+		binding.sharedDefinitionId === undefined &&
 		(binding.componentName === componentName || (!binding.componentName && componentName === input.renderData.root?.componentName)) &&
 		(binding.kind !== 'computed' || binding.async !== true)
 			? [`if(typeof ${binding.name}!=='undefined')marklessSsrRenderStateValues.set(${JSON.stringify(binding.id)},${binding.name});`]
 			: [],
 	);
+	// Derived after the static seed map, so the factory's state nodes are already
+	// readable when the derive runs.
+	const sharedComputedSources = collectSsrSharedComputedSources(input);
+	const sharedComputedLines = input.protocolState.computed.flatMap((computed) => {
+		const source = sharedComputedSources.get(computed.graphNodeId);
+		if (!source || !componentGraphNodeIds.has(computed.graphNodeId)) return [];
+		return [
+			`marklessSsrRenderStateValues.set(${JSON.stringify(computed.graphNodeId)},(${source})({read:(marklessSsrSharedId,marklessSsrSharedPath)=>marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(marklessSsrSharedId),marklessSsrSharedPath)}));`,
+		];
+	});
 	const templateComputedLines = input.renderData.initialValues.flatMap((initial) => {
 		// Held in a const so the discriminated narrowing survives into the callback.
 		const value = initial.value;
@@ -360,6 +377,7 @@ function emitSsrDataRenderLines(
 	return [
 		"marklessSsrRenderStateValues.set('prop:props',props);",
 		...bindingLines,
+		...sharedComputedLines,
 		...templateComputedLines,
 		"const marklessSsrIdPrefix=marklessSsrRenderContext?.idPrefix??'';",
 		`const marklessSsrReadData=(residue,marklessSsrDataContext)=>{if(residue.kind==='graph-read')return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(residue.graphNodeId),residue.path);if(residue.kind==='repeat-item')return marklessSsrReadPublicPath(marklessSsrDataContext.repeatItem,residue.path);${localLines.join('')}switch(residue.source){${readCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_RESIDUE_MISSING: '+residue.source);}};`,
