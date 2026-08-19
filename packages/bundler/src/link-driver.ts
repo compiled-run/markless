@@ -301,15 +301,28 @@ export async function materializeDelegateChildren(
 	const children = planDelegateChildren(candidates, resolution);
 	const byEdge = new Map(candidates.map((candidate) => [candidate.edgeId, candidate]));
 	const loaded = new Map<string, Record<string, unknown>>();
+	const unloadable = new Set<string>();
 	const renderings: Record<string, ArtifactChildMaterialization> = {};
 	for (const child of children) {
 		const candidate = byEdge.get(child.edgeId);
 		const source = child.source;
 		if (!child.loadable || !candidate || source === undefined) continue;
 		if (!isAbsolute(source) || !existsSync(source) || !statSync(source).isFile()) continue;
+		if (unloadable.has(source)) continue;
 		let module = loaded.get(source);
 		if (!module) {
-			module = (await import(pathToFileURL(source).href)) as Record<string, unknown>;
+			// Fail open. `planDelegateChildren` classifies a delegate from what its
+			// specifier resolved to, and the workspace states no Node engine
+			// requirement, so a resolved TypeScript source is importable only where
+			// type stripping happens to be available. A delegate this runtime cannot
+			// import is a child that did not materialize, which `linkDelegateChildren`
+			// reports as MARKLESS_DELEGATE_ARTIFACT_MISSING; it is never a crash.
+			try {
+				module = (await import(pathToFileURL(source).href)) as Record<string, unknown>;
+			} catch {
+				unloadable.add(source);
+				continue;
+			}
 			loaded.set(source, module);
 		}
 		const component =
