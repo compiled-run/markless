@@ -273,6 +273,9 @@ The compiler/bundler pipeline must preserve, compose, and offset child artifacts
 
 - host locators from children must resolve inside the final rendered DOM
 - child event records must point at the composed host locators
+- child graph node ids must be offset by the child's instance path, so two
+  instances of one component own separate state, computed, element, and prop
+  nodes (see `03-state-graph.md`, "Graph node identity")
 - child DOM update records must subscribe to the correct graph references
 - prop-backed child reads must connect to parent graph values or serialized prop
   cells without inventing a component rerender path

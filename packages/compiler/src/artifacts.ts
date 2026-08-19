@@ -1120,6 +1120,9 @@ export type BoundSymbolResolverRow = {
 	// Imported symbols keep their child-local base ID for view composition, while
 	// the parent resolver loads the edge-scoped symbol route registered by the bundler.
 	readonly loaderSymbolId?: string;
+	// The rendered instance the base symbol's own graph nodes were composed
+	// under: one segment per imported component edge in the ancestry.
+	readonly instancePath?: string;
 	readonly componentEdgePath: ReadonlyArray<string>;
 	readonly ancestry: ReadonlyArray<{
 		readonly componentEdgeId: string;
@@ -1205,6 +1208,9 @@ export type CaptureSlotRoute =
 			readonly componentEdgePath?: ReadonlyArray<string>;
 			readonly expression: string;
 			readonly sourceSpan?: SourceSpan;
+			// The consumer passed no such prop, so the diagnostic names the missing
+			// prop instead of an authored runtime expression.
+			readonly absentProp?: true;
 	  };
 
 // A slot belongs to one authored binding in one component and may have one

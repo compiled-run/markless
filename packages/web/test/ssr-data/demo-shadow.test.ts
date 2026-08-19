@@ -179,7 +179,7 @@ test('live-feed settled prerender arm records match its settled render twin', as
 		expect.arrayContaining([
 			expect.objectContaining({
 				hostNodeId: 'c0:h0',
-				graphNodeId: 'computed:weightedCount',
+				graphNodeId: 'c0:computed:weightedCount',
 				symbolId: expect.any(String),
 			}),
 		]),

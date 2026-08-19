@@ -19,7 +19,7 @@ type ComposedChild = {
 	readonly output: {
 		state: ProtocolStatePayload;
 		loadSymbol?: (symbolId: string) => (context: never) => unknown;
-		m?: (graphProps: ComposedChild['graphProps']) => void;
+		m?: (graphProps: ComposedChild['graphProps'], instancePath?: string) => void;
 	};
 };
 
@@ -102,7 +102,7 @@ function child(
 	loadSymbol?: ComposedChild['output']['loadSymbol'],
 ): ComposedChild {
 	const output: ComposedChild['output'] = { state, loadSymbol };
-	output.m = (props) => marklessCsrRemapGraphOutput(output, props);
+	output.m = (props, instancePath) => marklessCsrRemapGraphOutput(output, props, instancePath);
 	return { symbolPrefix, graphProps, output };
 }
 
@@ -150,7 +150,7 @@ test('composed CSR sync computed resolves its derive symbol through the child-pr
 	const childLoaderCalls: string[] = [];
 	const container = await mountAndWrite({
 		state,
-		cellId: 'state:childInput',
+		cellId: 'c0:state:childInput',
 		value: 4,
 		loadSymbol(symbolId) {
 			rootLoaderCalls.push(symbolId);
@@ -166,7 +166,7 @@ test('composed CSR sync computed resolves its derive symbol through the child-pr
 
 	expect(rootLoaderCalls).toEqual(['c0:symbol:21']);
 	expect(childLoaderCalls).toEqual(['symbol:21']);
-	expect(container.graph.read('computed:childOutput')).toBe(8);
+	expect(container.graph.read('c0:computed:childOutput')).toBe(8);
 });
 
 test('compiled same-module CSR re-derives a child computed fed by a parent computed prop', async () => {
@@ -297,7 +297,7 @@ test('composed CSR re-derives a child computed fed directly by parent state', as
 	});
 
 	expect(childEvaluations.count).toBe(2);
-	expect(container.graph.read('computed:stateChildValue')).toBe(4);
+	expect(container.graph.read('c0:computed:stateChildValue')).toBe(4);
 });
 
 test('nested composed CSR propagates a parent computed prop through a two-hop computed chain', async () => {
@@ -373,7 +373,7 @@ test('nested composed CSR propagates a parent computed prop through a two-hop co
 	});
 
 	expect(evaluations).toEqual({ parent: 2, child: 2, grandchild: 2 });
-	expect(container.graph.read('computed:grandchildValue')).toBe(3);
+	expect(container.graph.read('c0:c1:computed:grandchildValue')).toBe(3);
 });
 
 test('nested composed CSR sync computed accumulates each child route prefix exactly once', async () => {
@@ -387,7 +387,7 @@ test('nested composed CSR sync computed accumulates each child route prefix exac
 	const loaderCalls: string[] = [];
 	const container = await mountAndWrite({
 		state: rootState,
-		cellId: 'state:leafInput',
+		cellId: 'c0:c1:state:leafInput',
 		value: 5,
 		loadSymbol(symbolId) {
 			loaderCalls.push(symbolId);
@@ -399,7 +399,7 @@ test('nested composed CSR sync computed accumulates each child route prefix exac
 	});
 
 	expect(loaderCalls).toEqual(['c0:c1:symbol:21']);
-	expect(container.graph.read('computed:leafOutput')).toBe(6);
+	expect(container.graph.read('c0:c1:computed:leafOutput')).toBe(6);
 });
 
 test('three same-module hops preserve one imported-child route for derive and DOM symbols', async () => {
@@ -426,7 +426,7 @@ test('three same-module hops preserve one imported-child route for derive and DO
 			{
 				hostNodeId: 'routed-leaf',
 				source: 'routedLeafOutput',
-				graphNodeId: 'computed:routedLeafOutput',
+				graphNodeId: 'c0:computed:routedLeafOutput',
 				path: [],
 				target: { kind: 'text' },
 				symbolId: 'c0:symbol:leaf-dom',
@@ -458,7 +458,7 @@ test('three same-module hops preserve one imported-child route for derive and DO
 	);
 	await container.runtime.start?.();
 
-	container.graph.write({ graphNodeId: 'state:routedLeafInput', value: 6 });
+	container.graph.write({ graphNodeId: 'c0:state:routedLeafInput', value: 6 });
 	await container.graph.flush();
 
 	expect(loaderCalls).toEqual(['c0:symbol:leaf-derive', 'c0:symbol:leaf-dom']);
@@ -479,7 +479,7 @@ test('composed SSR sync computed preserves its child-owned symbol route for resu
 	const loaderCalls: string[] = [];
 	const container = await mountAndWrite({
 		state,
-		cellId: 'state:ssrChildInput',
+		cellId: 'c2:state:ssrChildInput',
 		value: 6,
 		loadSymbol(symbolId) {
 			loaderCalls.push(symbolId);
@@ -489,7 +489,7 @@ test('composed SSR sync computed preserves its child-owned symbol route for resu
 	});
 
 	expect(loaderCalls).toEqual(['c2:symbol:7']);
-	expect(container.graph.read('computed:ssrChildOutput')).toBe(5);
+	expect(container.graph.read('c2:computed:ssrChildOutput')).toBe(5);
 });
 
 test('root-owned sync computed keeps routing to the root loader after child composition', async () => {

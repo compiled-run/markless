@@ -9,6 +9,7 @@ import {
 import type { DomJournalEntry } from '@markless/runtime';
 import type { RuntimeGraph } from '@markless/runtime';
 import type { CsrRenderContainer, CsrRenderOptions, CsrRenderOutput } from './render.ts';
+import { marklessInstanceScopedLoadSymbol } from './fns/composition.ts';
 import { registerServedArmEventRecords } from './resume-arm-records.ts';
 import type { ResumeAsyncBoundaryPayload, ResumeDomElement } from './resume-types.ts';
 import type { ResumeRuntime, ResumeRuntimeInput, ResumeSymbol } from './resume.ts';
@@ -41,7 +42,9 @@ export async function renderCsrRuntime(input: {
 	const state = output.state ?? emptyStatePayload();
 	const view = output.view ?? emptyViewPayload();
 	const loadSymbol = withCsrCallbackSymbols(
-		output.loadSymbol ?? options.loadSymbol ?? missingLoadSymbol,
+		marklessInstanceScopedLoadSymbol(
+			output.loadSymbol ?? options.loadSymbol ?? missingLoadSymbol,
+		),
 		view,
 	);
 

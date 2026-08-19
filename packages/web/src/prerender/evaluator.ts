@@ -590,8 +590,8 @@ async function evaluatePrerenderDataComponent(input: {
 		elementCount: composition.elementCount,
 		propEvents: [],
 		externalSymbolIds: composition.externalSymbolIds,
-		m(graphProps: ComposeGraphProps) {
-			marklessSsrRemapGraphOutput(output, graphProps);
+		m(graphProps: ComposeGraphProps, instancePath?: string) {
+			marklessSsrRemapGraphOutput(output, graphProps, instancePath);
 		},
 	};
 	return output;

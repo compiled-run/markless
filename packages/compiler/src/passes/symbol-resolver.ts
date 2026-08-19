@@ -15,6 +15,7 @@ import {
 	resolveGraphPath,
 	semanticAliasMap,
 } from '../artifact-helpers/graph-paths.ts';
+import { componentEdgeInstancePath } from '../component-edge-instance.ts';
 import { getIdentifierName, walkNode, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
 import { resolveBoundaryRunners } from './public-render/boundary-runner.ts';
@@ -260,6 +261,7 @@ export function planBoundSymbolResolver(
 					branchScopeIds: edge.branchScopeIds,
 					keyedRepeatScopeIds: edge.keyedRepeatScopeIds,
 				}));
+				const instancePath = componentEdgeInstancePath(path);
 				rows.push({
 					id: boundSymbolId(symbol.symbolId, ancestry),
 					// Imported symbols keep the child-local ID in the bound record ID,
@@ -268,6 +270,7 @@ export function planBoundSymbolResolver(
 					// an unrelated parent-owned `symbol:0` record.
 					baseSymbolId: symbol.loaderSymbolId ?? symbol.symbolId,
 					...(symbol.loaderSymbolId ? { loaderSymbolId: symbol.loaderSymbolId } : {}),
+					...(instancePath ? { instancePath } : {}),
 					componentEdgePath,
 					ancestry,
 					captureSlots,

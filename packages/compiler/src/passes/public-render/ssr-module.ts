@@ -5,6 +5,7 @@ import { emitCatalogHelperImports, stateRuntimeImports } from './runtime-helpers
 import { emitSameModuleSsrComponents } from './same-module.ts';
 import {
 	callbackSymbolIds,
+	componentEdgeInstanceSegment,
 	componentEdgesFor,
 	componentReferences,
 	destructureProps,
@@ -113,7 +114,7 @@ export function emitPublicSsrRenderModule(
 		'		view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) },',
 		'		elementCount: marklessSsrComposition.elementCount,',
 		...(remapsGraphProps
-			? ['		m(graphProps) { marklessSsrRemapGraphOutput(this, graphProps); },']
+			? ['		m(graphProps, instancePath) { marklessSsrRemapGraphOutput(this, graphProps, instancePath); },']
 			: []),
 		'		propEvents: marklessSsrPropEvents,',
 		'		externalSymbolIds: marklessSsrComposition.externalSymbolIds,',
@@ -311,7 +312,7 @@ function emitSsrDataRenderLines(
 			props.push(`__marklessSsrCallbacks:marklessSsrCallbacks({${callbackEntries.join(',')}})`);
 		const child = {
 			hostPrefix: `c${index}:`,
-			symbolPrefix: edge.importSource ? `c${index}:` : '',
+			symbolPrefix: componentEdgeInstanceSegment(edge),
 			graphProps: componentEdgeGraphRoutes(edge, hasProjection),
 			boundSymbols: boundSymbolsForEdge(edge, callbacks),
 		};

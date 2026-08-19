@@ -7,6 +7,7 @@ import {
 	callbackSymbolIds,
 	componentPropNames,
 	componentPropCellId,
+	componentEdgeInstanceSegment,
 	componentEdgesFor,
 	sameModuleComponentMap,
 } from './shared.ts';
@@ -53,7 +54,7 @@ export function collectPublicRenderComponentDefinitions(
 				childComponentName: edge.childComponentName,
 				...(edge.asyncBoundaryId ? { asyncBoundaryId: edge.asyncBoundaryId } : {}),
 				hostPrefix: `c${index}:`,
-				symbolPrefix: edge.importSource ? `c${index}:` : '',
+				symbolPrefix: componentEdgeInstanceSegment(edge),
 				boundSymbols: Object.fromEntries(
 					[...callbacks].flatMap(([key, value]) => {
 						const prefix = `bound:${edge.id}:`;

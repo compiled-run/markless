@@ -1,5 +1,7 @@
 import {
 	marklessAssertComposableStateNames,
+	marklessComposedInstancePath,
+	marklessComposedSyncPolicy,
 	marklessComposeState,
 	marklessCsrChildReadIsStatic,
 	marklessCsrRemapChildGraph,
@@ -891,10 +893,12 @@ export function marklessSsrAppendChildView(context: {
 			for (const symbolId of event.symbolIds)
 				callbackSymbolIds.set(symbolId, callbackSymbolId);
 	}
+	const childInstancePath = marklessComposedInstancePath(context.child);
 	for (const [graphNodeId, symbolId] of Object.entries<string>(childView.asyncRunners ?? {})) {
 		const mapped = marklessSsrRemapChildGraph(
 			{ graphNodeId, path: [] },
 			context.child.graphProps,
+			childInstancePath,
 		);
 		context.asyncRunners[mapped?.graphNodeId ?? graphNodeId] = marklessBoundSymbolId(
 			context.child,
@@ -926,6 +930,15 @@ export function marklessSsrAppendChildView(context: {
 			...event,
 			hostNodeId: context.child.hostPrefix + event.hostNodeId,
 			symbolIds,
+			...(event.syncPolicy
+				? {
+						syncPolicy: marklessComposedSyncPolicy(
+							event.syncPolicy,
+							context.child.graphProps,
+							childInstancePath,
+						),
+					}
+				: {}),
 		});
 	}
 	for (const update of childView.domUpdates) {
@@ -933,6 +946,7 @@ export function marklessSsrAppendChildView(context: {
 			update,
 			context.child.graphProps,
 			context.child.hostPrefix,
+			childInstancePath,
 		);
 		if (!mapped) continue;
 		context.domUpdates.push({
@@ -950,10 +964,20 @@ export function marklessSsrAppendChildView(context: {
 			repeat,
 			context.child.graphProps,
 			context.child.hostPrefix,
+			childInstancePath,
 		);
 		if (!mapped) continue;
 		const rowEvents = repeat.rowEvents.map((event) => ({
 			...event,
+			...(event.syncPolicy
+				? {
+						syncPolicy: marklessComposedSyncPolicy(
+							event.syncPolicy,
+							context.child.graphProps,
+							childInstancePath,
+						),
+					}
+				: {}),
 			symbolIds: event.symbolIds.map((symbolId) => {
 				const callbackSymbolId = callbackSymbolIds.get(symbolId);
 				if (callbackSymbolId) {
@@ -982,6 +1006,7 @@ export function marklessSsrAppendChildView(context: {
 							const mapped = marklessSsrRemapChildGraph(
 								read,
 								context.child.graphProps,
+								childInstancePath,
 							);
 							return mapped
 								? { ...read, graphNodeId: mapped.graphNodeId, path: mapped.path }
@@ -1012,6 +1037,7 @@ export function marklessSsrAppendChildView(context: {
 				liveTestReads,
 				context.child.graphProps,
 				context.child.hostPrefix + branch.id,
+				childInstancePath,
 			),
 			...(branch.symbolId
 				? { symbolId: marklessBoundSymbolId(context.child, branch.symbolId) }
@@ -1036,10 +1062,21 @@ export function marklessSsrAppendChildView(context: {
 		context.asyncBoundaries.push({
 			...boundary,
 			id: context.child.hostPrefix + boundary.id,
+			...(boundary.runnerGraphNodeId
+				? {
+						runnerGraphNodeId:
+							marklessSsrRemapChildGraph(
+								{ graphNodeId: boundary.runnerGraphNodeId, path: [] },
+								context.child.graphProps,
+								childInstancePath,
+							)?.graphNodeId ?? boundary.runnerGraphNodeId,
+					}
+				: {}),
 			asyncReads: marklessSsrRemapChildReads(
 				boundary.asyncReads,
 				context.child.graphProps,
 				context.child.hostPrefix + boundary.id,
+				childInstancePath,
 			).map((read) => ({
 				...read,
 				...(read.runnerSymbolId
@@ -1068,6 +1105,7 @@ export function marklessSsrPrefixBoundaryArmRecords(
 	set: SsrArmRecordSet,
 	child: SsrPrefixChild,
 ) {
+	const instancePath = marklessComposedInstancePath(child);
 	const exhaustive = {
 		locators: true,
 		events: true,
@@ -1097,6 +1135,7 @@ export function marklessSsrPrefixBoundaryArmRecords(
 				update,
 				child.graphProps,
 				child.hostPrefix,
+				instancePath,
 			);
 			return mapped
 				? [
@@ -1118,7 +1157,11 @@ export function marklessSsrPrefixBoundaryArmRecords(
 			...(behavior.inputGraphReads
 				? {
 						inputGraphReads: behavior.inputGraphReads.map((read) => {
-							const mapped = marklessSsrRemapChildGraph(read, child.graphProps);
+							const mapped = marklessSsrRemapChildGraph(
+								read,
+								child.graphProps,
+								instancePath,
+							);
 							return mapped
 								? { ...read, graphNodeId: mapped.graphNodeId, path: mapped.path }
 								: read;
@@ -1138,6 +1181,7 @@ export function marklessSsrPrefixBoundaryArmRecords(
 				repeat,
 				child.graphProps,
 				child.hostPrefix,
+				instancePath,
 			);
 			return mapped
 				? [
@@ -1168,6 +1212,7 @@ export function marklessSsrPrefixBoundaryArmRecords(
 							branch.testReads,
 							child.graphProps,
 							child.hostPrefix + branch.id,
+							instancePath,
 						),
 						...(branch.symbolId
 							? { symbolId: marklessBoundSymbolId(child, branch.symbolId) }
@@ -1188,14 +1233,16 @@ export function marklessSsrRemapChildReads<T extends ComposeGraphRead>(
 	reads: ReadonlyArray<T> | undefined,
 	graphProps: ComposeGraphProps,
 	recordId: string,
+	instancePath = '',
 ): T[] {
 	return (reads ?? []).map((read) => {
-		const mapped = marklessSsrRemapChildGraph(read, graphProps);
+		const mapped = marklessSsrRemapChildGraph(read, graphProps, instancePath);
 		if (!mapped) throw new Error('MARKLESS_COMPOSED_READ_UNMAPPED: ' + recordId);
 		return { ...read, graphNodeId: mapped.graphNodeId, path: mapped.path };
 	});
 }
 export function marklessSsrPrefixArmRecord(arm: SsrArmRecordSet, child: SsrPrefixChild) {
+	const instancePath = marklessComposedInstancePath(child);
 	return {
 		...arm,
 		events: (arm.events ?? []).map((event) => ({
@@ -1207,6 +1254,7 @@ export function marklessSsrPrefixArmRecord(arm: SsrArmRecordSet, child: SsrPrefi
 				update,
 				child.graphProps,
 				child.hostPrefix,
+				instancePath,
 			);
 			return mapped
 				? [

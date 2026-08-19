@@ -890,14 +890,14 @@ test('linked boundary evaluation carries a composed child computed into settled 
 	);
 	expect(rendered.computed).toEqual(
 		expect.arrayContaining([
-			expect.objectContaining({ graphNodeId: 'computed:weightedCount' }),
+			expect.objectContaining({ graphNodeId: 'c0:computed:weightedCount' }),
 		]),
 	);
 	expect(rendered.armRecords.domUpdates).toEqual(
 		expect.arrayContaining([
 			expect.objectContaining({
 				hostNodeId: 'c0:h0',
-				graphNodeId: 'computed:weightedCount',
+				graphNodeId: 'c0:computed:weightedCount',
 			}),
 		]),
 	);

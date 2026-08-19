@@ -4460,7 +4460,7 @@ export function App() @{
 			readonly view: ProtocolViewPayload;
 		}
 	)();
-	const countCell = output.state.cells.find((cell) => cell.graphNodeId === 'state:count');
+	const countCell = output.state.cells.find((cell) => cell.graphNodeId === 'c0:state:count');
 	const button = new PublicRenderTestElement('button');
 	button.textContent = 'BUTTON 0';
 	const root = new PublicRenderTestElement('section');
@@ -4493,7 +4493,7 @@ export function App() @{
 
 	await runtime.dispatch({ type: 'click', target: button as never });
 
-	expect(graph.read('state:count')).toBe(1);
+	expect(graph.read('c0:state:count')).toBe(1);
 	expect(button.textContent).toBe('BUTTON 1');
 });
 

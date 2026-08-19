@@ -35,6 +35,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 			? emitSmallSymbolResolverModule(input)
 			: emitTableSymbolResolverModule(manifest);
 	}
+	const scopesInstances = (input.boundSymbols ?? []).some((row) => row.instancePath);
 	return [
 		'export const symbolManifest = ',
 		JSON.stringify(manifest),
@@ -59,10 +60,14 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'}',
 		'',
 		'async function loadBoundSymbol(bound) {',
-		'	const base = await loadSymbol(bound.baseSymbolId);',
+		scopesInstances
+			? '	const base = instanceScopedBase(await loadSymbol(bound.baseSymbolId), bound);'
+			: '	const base = await loadSymbol(bound.baseSymbolId);',
+		// The bundler's imported-capture adapter rewrites the next line verbatim.
 		'	return (context) => base({ ...context, capture: createCaptureContext(context, bound) });',
 		'}',
 		'',
+		...(scopesInstances ? instanceScopeLines() : []),
 		'function createCaptureContext(context, bound) {',
 		'	const slots = {};',
 		'	for (const slot of bound.captureSlots) slots[slot.slotId] = slot;',
@@ -76,6 +81,8 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'		},',
 		'		invoke(slotId, args) {',
 		'			const route = requiredCaptureSlot(slots, slotId).route;',
+		// This edge passed no callback for an optional/guarded call site, so the call no-ops like `?.()`.
+		'			if (route.kind === "compiler-known-constant" && route.value === undefined) return undefined;',
 		'			if (route.kind !== callbackRoute) throw new Error(`Capture slot ${slotId} is not a callback route`);',
 		'			if (typeof context.invokeSymbol !== "function") throw new Error("Bound callback invocation is unavailable");',
 		'			return context.invokeSymbol(route.callbackSymbolId, { ...context, event: context.event, args });',
@@ -107,6 +114,35 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'}',
 		'',
 	].join('\n');
+}
+
+// A composed child's graph nodes were merged into the page graph under the
+// instance path of the edges it was composed through, but its own symbol still
+// spells child-local ids. The parent's capture routes and the prop reads the
+// capture adapter intercepts stay in page space.
+function instanceScopeLines(): string[] {
+	return [
+		'function instanceScopedBase(base, bound) {',
+		'	const path = bound.instancePath;',
+		'	if (!path) return base;',
+		'	const pageSpace = new Set(bound.captureSlots.flatMap((slot) => slot.legacyGraphRead ? [slot.legacyGraphRead.graphNodeId] : []));',
+		'	const scoped = (graphNodeId) => pageSpace.has(graphNodeId) ? graphNodeId : path + graphNodeId;',
+		'	const scopeGraph = (graph) => {',
+		'		const wrapped = { ...graph, read: (graphNodeId, readPath) => graph.read(scoped(graphNodeId), readPath) };',
+		'		for (const name of ["write", "update", "call", "delete", "subscribe"]) {',
+		'			const method = graph[name];',
+		'			if (typeof method === "function") wrapped[name] = (record) => method.call(graph, { ...record, graphNodeId: scoped(record.graphNodeId) });',
+		'		}',
+		'		return wrapped;',
+		'	};',
+		'	return (context) => base({',
+		'		...context,',
+		'		graph: scopeGraph(context.graph),',
+		'		...(context.read ? { read: (graphNodeId, readPath) => context.graph.read(scoped(graphNodeId), readPath) } : {}),',
+		'	});',
+		'}',
+		'',
+	];
 }
 
 const OMITTED_EMPTY_BOUND_ROW_FIELDS = new Set([

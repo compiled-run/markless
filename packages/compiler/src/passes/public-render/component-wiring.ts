@@ -10,7 +10,7 @@ import {
 	unwrapExpressionContainer,
 } from '../../ast/tsrx.ts';
 import { emitHtmlChildren } from './html.ts';
-import { objectPropertyName } from './shared.ts';
+import { componentEdgeInstanceSegment, objectPropertyName } from './shared.ts';
 import type { ComponentEdge, CsrRenderContext, SsrRenderContext } from './types.ts';
 
 export function emitSsrComponent(
@@ -25,7 +25,7 @@ export function emitSsrComponent(
 	const props = ssrComponentPropsSource(node, context, edge, context.callbackSymbols);
 	const placement = {
 		hostPrefix: `c${childIndex}:`,
-		symbolPrefix: edge?.importSource ? `c${childIndex}:` : '',
+		symbolPrefix: componentEdgeInstanceSegment(edge),
 		graphProps: componentEdgeGraphRoutes(edge, hasChildrenProjection(node)),
 		boundSymbols: boundSymbolsForEdge(edge, context.callbackSymbols),
 	};
@@ -82,33 +82,6 @@ export function emitCsrProjectedComponent(
 	return `marklessCsrProjectedChild(${localName}, { ${props.join(', ')} }, ${JSON.stringify(componentName)})`;
 }
 
-export function emitCsrComponent(
-	node: AnyNode,
-	componentName: string,
-	context: CsrRenderContext,
-): string {
-	const localName = context.componentImports.get(componentName);
-	if (!localName) return '""';
-	// Arm-render modules number children page-aligned (symbol routes key on
-	// the component-edge index); the page module keeps its own numbering.
-	const index =
-		context.nextChildIndex !== undefined
-			? context.nextChildIndex++
-			: context.childReplacements.length;
-	const edge = context.componentEdges[context.nextComponentEdgeIndex++];
-	const props = componentPropsSource(node, context, edge, context.callbackSymbols);
-	const graphProps = componentEdgeGraphRoutes(edge, hasChildrenProjection(node));
-	const childName = `marklessCsrChild${index}`;
-	context.childReplacements.push(
-		`	const ${childName} = marklessCsrRenderChild(${localName}, { ${props.join(', ')} });`,
-		node === context.componentRoot
-			? `	root = marklessCsrReplaceChild(root, ${index}, ${childName}?.root);`
-			: `	marklessCsrReplaceChild(root, ${index}, ${childName}?.root);`,
-		`	marklessCsrChildren.push({ hostPrefix: ${JSON.stringify(`c${index}:`)}, symbolPrefix: ${JSON.stringify(edge?.importSource ? `c${index}:` : '')}, output: ${childName}, graphProps: ${JSON.stringify(graphProps)}, boundSymbols: ${JSON.stringify(boundSymbolsForEdge(edge, context.callbackSymbols))} });`,
-	);
-	return JSON.stringify(`<span data-markless-csr-child="${index}"></span>`);
-}
-
 function componentPropsSource(
 	node: AnyNode,
 	context: CsrRenderContext,
@@ -135,7 +108,6 @@ function componentPropsSource(
 	const childrenContext: CsrRenderContext = {
 		mode: 'csr',
 		source,
-		childReplacements: [],
 		componentEdges: context.componentEdges,
 		componentImports: context.componentImports,
 		callbackSymbols: context.callbackSymbols,

@@ -14,6 +14,8 @@ import {
 } from '../../ast/tsrx.ts';
 import type { ComponentEdge } from './types.ts';
 
+export { componentEdgeInstanceSegment } from '../../component-edge-instance.ts';
+
 export function isComponentRoot(root: AnyNode): boolean {
 	const tagName = getElementTagName(root);
 	return !!tagName && !isHostTagName(tagName);
