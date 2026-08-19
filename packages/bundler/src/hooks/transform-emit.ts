@@ -31,7 +31,7 @@ export async function emitClientRouteArtifact(
 ) {
 	const { ctx, pluginContext, source } = request;
 	const { clientRouteArtifactMaterializations } = ctx.state;
-	const artifactChildMaterializations = await materializeDelegateChildren(
+	const { materializations: artifactChildMaterializations } = await materializeDelegateChildren(
 		pluginContext,
 		source,
 		transformed.artifactChildren,

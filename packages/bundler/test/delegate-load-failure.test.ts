@@ -2,7 +2,11 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
-import type { LinkedArtifactChild } from '@markless/compiler';
+import {
+	type LinkedArtifactChild,
+	linkDelegateChildren,
+	planDelegateChildren,
+} from '@markless/compiler';
 import { materializeDelegateChildren } from '../src/link-driver.ts';
 
 const directory = mkdtempSync(join(tmpdir(), 'markless-delegate-'));
@@ -24,11 +28,27 @@ test('a delegate this runtime cannot import fails open instead of crashing the l
 	const source = join(directory, 'frame.mjs');
 	writeFileSync(source, 'this is not valid JavaScript (\n', 'utf8');
 
-	await expect(
-		materializeDelegateChildren(
-			{ resolve: async () => source },
-			'/workspace/app/src/App.tsrx',
-			[child('edge-1'), child('edge-2')],
-		),
-	).resolves.toEqual({});
+	const result = await materializeDelegateChildren(
+		{ resolve: async () => source },
+		'/workspace/app/src/App.tsrx',
+		[child('edge-1'), child('edge-2')],
+	);
+
+	expect(result.materializations).toEqual({});
+	// The import error is the only account of why these edges rendered nothing,
+	// so it travels with the source and every edge it left unrendered.
+	expect(result.importFailures).toHaveLength(1);
+	const [failure] = result.importFailures;
+	expect(failure?.source).toBe(source);
+	expect(failure?.edgeIds).toEqual(['edge-1', 'edge-2']);
+	expect(failure?.message).toBeTruthy();
+
+	// The pass names that cause in the diagnostic it emits for the edge.
+	const { diagnostics } = linkDelegateChildren({
+		children: planDelegateChildren([child('edge-1')], { 'edge-1': source }),
+		renderings: {},
+		importFailures: result.importFailures,
+	});
+	expect(diagnostics[0]?.code).toBe('MARKLESS_DELEGATE_ARTIFACT_MISSING');
+	expect(diagnostics[0]?.message).toContain(failure!.message);
 });

@@ -11,6 +11,7 @@ import type {
 	DelegateChildRenderPlan,
 	DelegateChildRenderingResult,
 	DelegateChildrenInput,
+	DelegateImportFailure,
 	DelegateRenderings,
 	LinkedArtifactChild,
 	LinkedDelegateChild,
@@ -84,7 +85,14 @@ export function linkDelegateChildren(
 		if (delegateChildMaterializable(child, input.renderings)) {
 			materializations[child.edgeId] = input.renderings[child.edgeId]!;
 		} else if (child.kind === 'external-delegate') {
-			diagnostics.push(delegateArtifactMissingDiagnostic(child));
+			diagnostics.push(
+				delegateArtifactMissingDiagnostic(
+					child,
+					input.importFailures?.find((failure) =>
+						failure.edgeIds.includes(child.edgeId),
+					),
+				),
+			);
 		}
 	}
 	return {
@@ -166,13 +174,20 @@ export function delegateChildRendering(
 
 // Reported, not thrown: a dependency that exports no build-time renderer is an
 // ordinary import, so the linker decides whether this is worth failing on.
-function delegateArtifactMissingDiagnostic(child: LinkedDelegateChild): CompilerDiagnostic {
+function delegateArtifactMissingDiagnostic(
+	child: LinkedDelegateChild,
+	importFailure?: DelegateImportFailure,
+): CompilerDiagnostic {
+	// A failed import is the specific reason this edge handed back nothing.
+	const cause = importFailure
+		? ` Importing ${JSON.stringify(importFailure.source)} failed: ${importFailure.message}`
+		: '';
 	return {
 		code: 'MARKLESS_DELEGATE_ARTIFACT_MISSING',
 		severity: 'info',
 		phase: 'public-render',
 		title: 'Delegate child produced no build-time rendering',
-		message: `MARKLESS_DELEGATE_ARTIFACT_MISSING: <${child.componentName}> resolves to ${JSON.stringify(child.source ?? child.specifier)}, which this build did not compile and which handed back no build-time rendering, so the edge stays a runtime import.`,
+		message: `MARKLESS_DELEGATE_ARTIFACT_MISSING: <${child.componentName}> resolves to ${JSON.stringify(child.source ?? child.specifier)}, which this build did not compile and which handed back no build-time rendering, so the edge stays a runtime import.${cause}`,
 		why: 'A delegate is materialized from the rendering its own compiled module produced; without one there is nothing to inline.',
 		passId: DELEGATE_CHILDREN_PASS_ID,
 		artifactKeys: ['delegateChildren'],

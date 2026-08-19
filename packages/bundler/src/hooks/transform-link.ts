@@ -61,11 +61,13 @@ export async function materializeOwnDelegateChildren(
 						moduleEntry: moduleIsEntry(pluginContext, id),
 						renderDataReached: materializedRenderDataReach !== undefined,
 				  })
-				? await materializeDelegateChildren(
-						pluginContext,
-						source,
-						transformed.artifactChildren,
-					)
+				? (
+						await materializeDelegateChildren(
+							pluginContext,
+							source,
+							transformed.artifactChildren,
+						)
+					).materializations
 				: {};
 	if (Object.keys(artifactChildMaterializations).length > 0) {
 		linkedTransformInput = {

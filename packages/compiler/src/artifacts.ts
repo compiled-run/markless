@@ -1975,9 +1975,18 @@ export type LinkedDelegateChild = {
 // that owns `import()`; the pass only ever reads it.
 export type DelegateRenderings = Readonly<Record<string, ArtifactChildMaterialization>>;
 
+// A delegate whose compiled JavaScript the linker could not import, named by
+// the edges it left unrendered so the pass can report the real cause.
+export type DelegateImportFailure = {
+	readonly source: string;
+	readonly edgeIds: ReadonlyArray<string>;
+	readonly message: string;
+};
+
 export type DelegateChildrenInput = {
 	readonly children: ReadonlyArray<LinkedDelegateChild>;
 	readonly renderings: DelegateRenderings;
+	readonly importFailures?: ReadonlyArray<DelegateImportFailure>;
 };
 
 export type LinkedDelegateChildrenArtifact = {
