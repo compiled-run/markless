@@ -352,6 +352,9 @@ function componentPropNames(component: AnyNode): string[] {
 	return param.type === 'ObjectPattern'
 		? asNodes(param.properties).flatMap((property) => {
 				const prop = property as AnyNode;
+				// `...rest` binds the remaining props under its own name.
+				if (prop.type === 'RestElement')
+					return bindingNames(prop.argument as AnyNode | undefined);
 				return bindingNames(
 					(prop.value as AnyNode | undefined) ?? (prop.key as AnyNode | undefined),
 				);

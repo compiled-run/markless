@@ -160,6 +160,10 @@ export function destructureProps(
 	}
 
 	const bindings = asNodes(param.properties).flatMap((property) => {
+		if (property.type === 'RestElement') {
+			const restName = getIdentifierName(property.argument as AnyNode | undefined);
+			return restName ? [`...${restName}`] : [];
+		}
 		const key = property.key as AnyNode | undefined;
 		const value = property.value as AnyNode | undefined;
 		const fallback = getIdentifierName(value) ?? getIdentifierName(key);
@@ -429,7 +433,11 @@ export function componentPropNames(component: AnyNode | undefined): string[] {
 	return asNodes(param.properties).flatMap((property) => {
 		const value = property.value as AnyNode | undefined;
 		const key = property.key as AnyNode | undefined;
-		const name = getIdentifierName(value) ?? getIdentifierName(key);
+		// A rest binding names the remaining props, so it is a render-scope name too.
+		const name =
+			property.type === 'RestElement'
+				? getIdentifierName(property.argument as AnyNode | undefined)
+				: (getIdentifierName(value) ?? getIdentifierName(key));
 		return name ? [name] : [];
 	});
 }

@@ -377,9 +377,11 @@ export function marklessCsrRemapChildDomUpdate(
 			: update;
 	const binding = marklessCompositionGraphProp(graphProps, propName);
 	if (binding === null) return null;
-	// Projected children are rendered by the parent's chunk slots. A wrapper
-	// component's synthetic `children` text record has no live graph route.
-	if (!binding && propName === 'children') return null;
+	// The route table lists every prop written at the invocation site, so a name
+	// missing from it was never passed (or came through a static spread): the
+	// child already rendered its final value and there is nothing live to wire.
+	// Projected children reach the same conclusion by a different road.
+	if (!binding) return null;
 	const mapped = marklessCsrRemapChildGraph(update, graphProps);
 	if (mapped) return mapped;
 

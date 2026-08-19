@@ -416,7 +416,11 @@ async function flushDomUpdates(input: {
 		);
 		if (!dirty) continue;
 
-		const key = `${domUpdate.hostNodeId}\n${domUpdate.graphNodeId}\n${domUpdate.path.join('.')}`;
+		// The target belongs in the key: two attributes on one element can read
+		// the same graph node (`disabled` and `ui-disabled` off one prop).
+		const target = domUpdate.target;
+		const targetKey = `${target?.kind ?? ''}:${target && 'name' in target ? target.name : ''}`;
+		const key = `${domUpdate.hostNodeId}\n${targetKey}\n${domUpdate.graphNodeId}\n${domUpdate.path.join('.')}`;
 		if (ranDomUpdates.has(key)) continue;
 		ranDomUpdates.add(key);
 
