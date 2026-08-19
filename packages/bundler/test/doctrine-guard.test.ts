@@ -21,47 +21,47 @@ const EMITTED_DOM_ORDER_WALK_ALLOWLIST: Readonly<Record<string, string>> = {
 const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 	"packages/bundler/src/build/chunking.ts :: if (environment === 'server') {":
 		'Build output naming is selected once from the resolved bundler environment.',
-	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'client' ||":
+	"packages/bundler/src/dev-invalidation.ts :: currentEnvironment === 'client' ||":
 		'Invalidation projects the Rolldown environment into the client development graph.',
-	"packages/bundler/src/rolldown.ts :: (currentEnvironment === undefined && environment === 'client');":
+	"packages/bundler/src/dev-invalidation.ts :: (currentEnvironment === undefined && environment === 'client');":
 		'Environment-less invalidation falls back to the already resolved client environment.',
 	"packages/bundler/src/rolldown.ts :: if (currentEnvironment !== 'client') {":
 		'Rolldown entry signatures are adjusted only for its resolved client build.',
-	"packages/bundler/src/rolldown.ts :: if (environment !== 'client') {":
-		'Imported symbol facades are materialized only for the resolved client build.',
-	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'client' &&":
+	"packages/bundler/src/link-driver.ts :: clientEnvironment: environment === 'client',":
+		'The link driver reports the already resolved build environment to the module-link pass.',
+	"packages/bundler/src/hooks/transform-link.ts :: clientEnvironment: currentEnvironment === 'client',":
+		'The transform hook reports the already resolved build environment to the delegate-children pass.',
+	"packages/bundler/src/hooks/transform-hook.ts :: currentEnvironment === 'client' &&":
 		'Rolldown transform hooks project the resolved environment into client-only build behavior.',
-	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'client' && !renderDataRequest && !clientRouteArtifact;":
-		'Only claim-bearing client transforms participate in source publication readiness.',
-	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'client' && renderDataRequest":
+	"packages/bundler/src/hooks/transform-link.ts :: currentEnvironment === 'client' && clientRouteArtifactMaterializations.has(source)":
+		'Rolldown transform hooks project the resolved environment into client-only build behavior.',
+	"packages/bundler/src/hooks/transform-request.ts :: currentEnvironment === 'client' &&":
+		'Rolldown transform hooks project the resolved environment into client-only build behavior.',
+	"packages/bundler/src/hooks/transform-request.ts :: currentEnvironment === 'client' && renderDataRequest":
 		'Reached-from lookup is limited to client render-data requests before materialized-route propagation is selected.',
-	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'client'":
+	"packages/bundler/src/hooks/transform-request.ts :: currentEnvironment === 'client' ? ctx.prerenderRecordsBySource?.get(source) : undefined,":
 		'Prerender records are supplied only to the resolved client compilation that emits staged wake modules.',
-	"packages/bundler/src/rolldown.ts :: (currentEnvironment === 'client' && clientRouteArtifactSources.has(source)),":
-		'Client route artifacts opt their primary source into development-shaped diagnostics.',
-	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'client' && !isClientPrimarySourceRequest(id) ? id : source;":
-		'Client query facades retain their meaning-bearing manifest identity.',
-	"packages/bundler/src/rolldown.ts :: if (currentEnvironment === 'client' && clientRouteArtifact) {":
+	"packages/bundler/src/hooks/transform-hook.ts :: if (currentEnvironment === 'client' && clientRouteArtifact) {":
 		'Only client route-artifact requests run package-child materialization.',
-	"packages/bundler/src/rolldown.ts :: if (currentEnvironment === 'client' && isClientPrimarySourceRequest(id)) {":
+	"packages/bundler/src/hooks/transform-emit.ts :: if (currentEnvironment === 'client' && isClientPrimarySourceRequest(id)) {":
 		'Primary-source tracking is scoped to the resolved client graph.',
-	"packages/bundler/src/rolldown.ts :: if (currentEnvironment === 'client' && renderDataRequest) {":
+	"packages/bundler/src/hooks/transform-emit.ts :: if (currentEnvironment === 'client' && renderDataRequest) {":
 		'Client render-data requests are answered with the client-shaped module from the resolved build environment.',
-	"packages/bundler/src/rolldown.ts :: internalOptions.dev === true && currentEnvironment === 'server'":
+	"packages/bundler/src/hooks/transform-request.ts :: internalOptions.dev === true && currentEnvironment === 'server'":
 		'Development resume URLs are emitted by the resolved server compilation.',
-	"packages/bundler/src/rolldown.ts :: : currentEnvironment === 'server'":
+	"packages/bundler/src/hooks/transform-request.ts :: : currentEnvironment === 'server'":
 		'Production resume URLs are selected by the resolved server compilation.',
-	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'server'":
+	"packages/bundler/src/hooks/transform-request.ts :: currentEnvironment === 'server'":
 		'Production prerender-wake URLs are selected by the resolved server compilation.',
-	"packages/bundler/src/rolldown.ts :: if (currentEnvironment === 'client' && prerenderWakeRequest) {":
+	"packages/bundler/src/hooks/transform-request.ts :: if (currentEnvironment === 'client' && prerenderWakeRequest) {":
 		'Prerender-wake source requests are answered only in the resolved client compilation.',
-	"packages/bundler/src/rolldown.ts :: devResumeReexport: internalOptions.dev === true && currentEnvironment === 'client',":
-		'Development resume re-exports keep source modules in the resolved client graph.',
-	"packages/bundler/src/rolldown.ts :: if (currentEnvironment === 'client' && isResumeSourceRequest(id)) {":
+	"packages/bundler/src/hooks/transform-emit.ts :: if (currentEnvironment === 'client' && prerenderWakeRequest) {":
+		'Prerender-wake source requests are answered only in the resolved client compilation.',
+	"packages/bundler/src/hooks/transform-emit.ts :: if (currentEnvironment === 'client' && isResumeSourceRequest(id)) {":
 		'Resume virtual modules are returned only to their resolved client request.',
-	"packages/bundler/src/rolldown.ts :: if (currentEnvironment === 'client' && !internalOptions.dev) {":
+	"packages/bundler/src/hooks/transform-emit.ts :: if (currentEnvironment === 'client' && !internalOptions.dev) {":
 		'Production client virtual modules are registered from the resolved build environment.',
-	"packages/bundler/src/rolldown.ts :: const isClientSymbol = input.environment === 'client' && module.type === 'symbol';":
+	"packages/bundler/src/plugin-state.ts :: const isClientSymbol = input.environment === 'client' && module.type === 'symbol';":
 		'Virtual-module storage qualifies symbols using the transform input environment.',
 	"packages/bundler/src/source-module.ts :: const symbolsOnly = input.environment === 'client' && input.clientOutput === 'symbols-only';":
 		'Source emission derives its symbols-only module shape from compiler input.',
@@ -107,8 +107,8 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Build-time source emission recursively links ordinary client render-data modules while prerender records use their separately resolved shape.',
 	"packages/bundler/src/transform.ts :: input.environment === 'server' ? await compilePrerenderInlineResumerSources() : undefined;":
 		'Prerender boot scripts are compiled once for the resolved server compilation that inlines them into the document.',
-	"packages/bundler/src/transform.ts :: input.input.environment !== 'client' ||":
-		'Linked render-data boundary symbols are emitted only for the resolved client compilation that can demand them.',
+	"packages/bundler/src/transform.ts :: clientLink: input.environment === 'client',":
+		'Linked render-data boundary symbols are requested from the compiler pass only for the resolved client compilation that can demand them.',
 	"packages/bundler/src/vite/environment.ts :: if (environment === 'client') {":
 		'This file is the Vite environment-name resolver for client posture.',
 	"packages/bundler/src/vite/environment.ts :: if (environment === 'server') {":

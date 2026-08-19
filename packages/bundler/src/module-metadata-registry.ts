@@ -134,45 +134,18 @@ export class ModuleMetadataRegistry {
 		return this.#symbolClaimsByEmittedModule;
 	}
 
-	/** Combine sibling emitted-module claims by symbol identity; contradictions stay fail-closed. */
-	sourceSymbolClaims(source: string, resolverId: string): MarklessTransformManifest | undefined {
+	/**
+	 * The publication barrier: claims may only be read once every emitted sibling
+	 * of the source has finished publishing. Merging those claims is the
+	 * `claim-manifest` compiler pass, not this registry.
+	 */
+	assertSourceClaimsSealed(source: string): void {
 		const publication = this.#sourceClaimPublications.get(source);
 		if (publication && (publication.active > 0 || publication.pending.size > 0)) {
 			throw new Error(
 				`MARKLESS_SOURCE_SYMBOL_CLAIMS_UNSEALED: Source ${JSON.stringify(source)} claims were consumed before final publication completed.`,
 			);
 		}
-		const candidates = [...this.#symbolClaimsByEmittedModule.values()]
-			.filter(
-				(manifest) =>
-					manifest.resolver.virtualModuleId === resolverId && manifest.symbols.length > 0,
-			)
-			.sort((left, right) => left.source.localeCompare(right.source));
-		const selected = candidates[0];
-		if (!selected) return undefined;
-
-		const symbols = new Map<
-			string,
-			{
-				readonly owner: string;
-				readonly symbol: MarklessTransformManifest['symbols'][number];
-			}
-		>();
-		for (const candidate of candidates) {
-			for (const symbol of candidate.symbols) {
-				const existing = symbols.get(symbol.symbolId);
-				if (!existing) {
-					symbols.set(symbol.symbolId, { owner: candidate.source, symbol });
-					continue;
-				}
-				if (JSON.stringify(existing.symbol) !== JSON.stringify(symbol)) {
-					throw new Error(
-						`MARKLESS_SOURCE_SYMBOL_CLAIMS_DIVERGED: Source ${JSON.stringify(source)} has incompatible emitted symbol claims in ${JSON.stringify(existing.owner)} and ${JSON.stringify(candidate.source)}.`,
-					);
-				}
-			}
-		}
-		return { ...selected, symbols: [...symbols.values()].map(({ symbol }) => symbol) };
 	}
 
 	emittedSymbolClaimMap(

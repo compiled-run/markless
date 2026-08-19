@@ -1733,3 +1733,448 @@ export type CompileTsrxModuleResult = {
 	readonly symbolResolverModule: string;
 	readonly symbolResolverModuleManifest: SymbolResolverModuleManifest;
 };
+
+// Execution attribution (`execution-attribution` link pass): route key -> scope
+// prefix -> encoded module source. Build output, never serialized into a
+// published package.
+export type ExecutionAttributionTables = Readonly<Record<string, Readonly<Record<string, string>>>>;
+
+export type ExecutionAttributionModuleManifest = {
+	readonly source: string;
+	readonly symbolRoutes?: ReadonlyArray<{
+		readonly prefix: string;
+		readonly importSource: string;
+	}>;
+};
+
+export type ExecutionAttributionChild = {
+	readonly parent: string;
+	readonly specifier: string;
+	readonly source: string;
+};
+
+export type ExecutionAttributionInput = {
+	readonly moduleManifests: Iterable<ExecutionAttributionModuleManifest>;
+	readonly childTable: Iterable<ExecutionAttributionChild>;
+	readonly root?: string;
+	// The linker owns specifier resolution and source encoding; the pass reads
+	// them as inputs so it never needs a bundler resolve/load context.
+	readonly resolveSpecifier: (parent: string, specifier: string) => string;
+	readonly encodeSource: (source: string) => string;
+};
+
+export type ExecutionAttributionArtifact = {
+	readonly passId: 'execution-attribution';
+	readonly tables: ExecutionAttributionTables;
+	readonly roots: ReadonlyArray<string>;
+	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+};
+
+// Linked interfaces (`interface-link` link pass). Serializable: the signature
+// is the invalidation key a published package carries so a consumer can tell a
+// stale dependency artifact from a current one.
+export type ModuleLinkArtifact = {
+	readonly moduleGraphInterface: ModuleGraphInterfaceArtifact;
+	readonly interfaceHash: string;
+	readonly moduleImports: SemanticGraphArtifact['moduleImports'];
+};
+
+export type LinkedInterfaceImport = {
+	readonly specifier: string;
+	readonly source: string;
+	readonly interfaceHash?: string;
+	readonly moduleInterface?: ModuleGraphInterfaceArtifact;
+};
+
+export type LinkedInterfaceClaim = {
+	readonly source: string;
+	readonly symbols: ReadonlyArray<unknown>;
+};
+
+export type LinkedInterfacesInput = {
+	readonly imports: ReadonlyArray<LinkedInterfaceImport>;
+	readonly claims: ReadonlyArray<LinkedInterfaceClaim>;
+};
+
+export type LinkedInterfacesArtifact = {
+	readonly passId: 'interface-link';
+	readonly interfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
+	readonly signature: string;
+	readonly claimSignature: string;
+};
+
+export type LinkedInterfaceCompleteness = Pick<
+	SemanticGraphInput,
+	'artifactChildMaterializations' | 'importedModuleInterfaces'
+>;
+
+export type LinkedBoundarySymbolsInput = {
+	readonly compiled: Pick<
+		CompileTsrxModuleResult,
+		'protocolView' | 'publicRenderModule' | 'semanticGraph' | 'symbolModules' | 'symbolResolver'
+	>;
+	readonly link: LinkedInterfaceCompleteness;
+	// The linker owns the client-environment gate and virtual module naming, so
+	// both arrive as inputs rather than being derived here.
+	readonly clientLink: boolean;
+	readonly renderDataId: string;
+	readonly resolverId: string;
+	readonly symbolModuleId: (symbolId: string) => string;
+	readonly boundaryExportName: (index: number) => string;
+};
+
+export type LinkedBoundarySymbol = {
+	readonly row: { readonly id: string; readonly chunk: string; readonly exportName: string };
+	readonly manifest: {
+		readonly symbolId: string;
+		readonly kind: 'async-boundary-update';
+		readonly exportName: string;
+		readonly virtualModuleId: string;
+	};
+	readonly module: {
+		readonly id: string;
+		readonly type: 'symbol';
+		readonly symbolId: string;
+		readonly exportName: string;
+		readonly source: string;
+	};
+};
+
+export type LinkedArtifactChild = {
+	readonly edgeId: string;
+	readonly componentName: string;
+	readonly importSource: string;
+	readonly importKind: NonNullable<SemanticComponentEdge['importKind']>;
+	readonly importedName?: string;
+	readonly hasChildren: boolean;
+	readonly props: ReadonlyArray<{
+		readonly name: string;
+		readonly kind: string;
+		readonly value?: unknown;
+		readonly source?: string;
+	}>;
+	readonly projection?: {
+		readonly kind: 'static-markup';
+		readonly markup: string;
+		readonly elementCount: number;
+	};
+};
+
+// Linked module graph (`module-link` link pass): the imported-child table a
+// linker holds once every specifier has been resolved. A child's kind is a
+// typed field decided from its resolution and its compiled artifact, so a
+// filename can never stand in for a fact about a module, and an externalized
+// dependency can never be mistaken for something the linker may load.
+// `children`/`diagnostics` are per-build; `interfaces` is serializable.
+export type LinkedModuleChildKind =
+	| 'compiled-tsrx'
+	| 'external-delegate'
+	| 'plain-ts'
+	| 'unresolved';
+
+// Filled by the caller that owns `resolve`: `id` is the resolved module id with
+// its query stripped, `external` is the resolver's own verdict, and `kind`
+// records whether the id came from the resolver or from the caller's fallback.
+export type ModuleLinkResolution = {
+	readonly id: string;
+	readonly external: boolean;
+	readonly kind: 'resolved' | 'fallback';
+};
+
+export type ModuleLinkResolutionTable = Readonly<Record<string, ModuleLinkResolution>>;
+
+export type ModuleLinkRequest = {
+	readonly parent: string;
+	readonly specifier: string;
+	readonly componentEdgeId?: string;
+};
+
+export type LinkedModuleChildResolution = {
+	readonly parent: string;
+	readonly specifier: string;
+	readonly source: string;
+	readonly componentEdgeId?: string;
+	readonly externalized: boolean;
+};
+
+export type LinkedModuleChild = LinkedModuleChildResolution & {
+	readonly kind: LinkedModuleChildKind;
+};
+
+// The claim manifest half the linker publishes per source. Only the symbol rows
+// matter here; naming the virtual module they live in stays with the caller.
+export type LinkedSymbolClaimManifest = {
+	readonly symbols: ReadonlyArray<{
+		readonly symbolId: string;
+		readonly exportName: string;
+		readonly kind: string;
+		readonly virtualModuleId: string;
+	}>;
+};
+
+export type LinkedModuleGraphInput = {
+	readonly children: ReadonlyArray<LinkedModuleChildResolution>;
+	readonly moduleArtifacts: ReadonlyMap<string, ModuleLinkArtifact>;
+	readonly captureMetadataForSource: (source: string) => CaptureAnalysisArtifact | undefined;
+	// A parent mid-transform is not in the registry yet, so the caller decides
+	// which capture metadata answers for it.
+	readonly parentCaptureMetadataForSource: (
+		parent: string,
+	) => CaptureAnalysisArtifact | undefined;
+	// Virtual module naming is the caller's: the pass asks for the symbol-route
+	// module of a source rather than spelling the query itself.
+	readonly symbolRouteSource: (source: string) => string;
+	// Set only while linking render data that a materialized route root reached:
+	// the root every child's render data below is reached from. Absent means the
+	// question was never asked, and the pass records no reach at all.
+	readonly renderDataReachRoot?: string;
+	// Naming stays the caller's here too: the pass asks for the module source a
+	// parent imports to reach a child's render data from one route root, and the
+	// `?markless-render-data` / `markless-reached-from` id that carries it across
+	// the bundler boundary is the caller's transport.
+	readonly reachedRenderDataSource?: (source: string, root: string) => string;
+};
+
+// One `(root, source)` reach: a child's render data qualified by the route root
+// it was reached from, plus the module source a parent imports for it. The pair
+// is the linked fact; the id string that transports it is not.
+export type RenderDataReachRecord = {
+	readonly root: string;
+	readonly source: string;
+	readonly specifiers: ReadonlyArray<string>;
+	readonly moduleSource: string;
+};
+
+export type LinkedModuleGraphArtifact = {
+	readonly passId: 'module-link';
+	readonly children: ReadonlyArray<LinkedModuleChild>;
+	readonly interfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
+	readonly routeArtifacts: Readonly<Record<string, string>>;
+	// Keyed by `(root, source)`; empty unless the caller asked for a reach root.
+	readonly reachedRenderData: Readonly<Record<string, RenderDataReachRecord>>;
+	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+};
+
+// Delegate children (`delegate-children` link pass): the artifact-child edges a
+// module composes, each one classified by what the linker resolved it to rather
+// than by where the file sits on disk. `external-delegate` is the only kind a
+// linker may load and render at build time; `compiled-tsrx` is this build's own
+// work and is never a delegate. The rendering itself is an input, because a
+// compiler pass never imports user code.
+export type LinkedDelegateChild = {
+	readonly edgeId: string;
+	readonly componentName: string;
+	readonly specifier: string;
+	readonly source?: string;
+	readonly kind: LinkedModuleChildKind;
+	// Whether the linker should load this source and ask it to render.
+	readonly loadable: boolean;
+};
+
+// One delegate's build-time rendering, keyed by edge id. Produced by the caller
+// that owns `import()`; the pass only ever reads it.
+export type DelegateRenderings = Readonly<Record<string, ArtifactChildMaterialization>>;
+
+export type DelegateChildrenInput = {
+	readonly children: ReadonlyArray<LinkedDelegateChild>;
+	readonly renderings: DelegateRenderings;
+};
+
+export type LinkedDelegateChildrenArtifact = {
+	readonly passId: 'delegate-children';
+	readonly children: ReadonlyArray<LinkedDelegateChild>;
+	readonly materializations: Readonly<Record<string, ArtifactChildMaterialization>>;
+	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+};
+
+// Either the build-known props a delegate may be rendered with, or the
+// diagnostic that says why it may not be. The caller decides whether a
+// diagnostic is fatal; the pass never throws.
+export type DelegateChildRenderPlan =
+	| { readonly ok: true; readonly props: Readonly<Record<string, unknown>> }
+	| { readonly ok: false; readonly diagnostic: CompilerDiagnostic };
+
+export type DelegateChildRenderingResult =
+	| { readonly ok: true; readonly rendering: ArtifactChildMaterialization }
+	| { readonly ok: false; readonly diagnostic: CompilerDiagnostic };
+
+// The compiled outputs a link-stage cache key compares. Structural on purpose:
+// the caller's richer transform result flows through unchanged, and the pass
+// only ever reads these fields.
+export type LinkedCompiledOutputs = {
+	readonly interfaceHash: string;
+	readonly code: string;
+	readonly moduleImports: unknown;
+	readonly manifest: unknown;
+	readonly virtualModules: ReadonlyArray<{ readonly type: string }>;
+};
+
+// The `renderDataModule` artifact (`render-data-module` pass): what one emitted
+// render-data module carries as a linkable unit. `contentHash` and
+// `styleModules` are serializable on purpose — they are what a published
+// component must ship so a consuming app can link its CSS and tell a stale
+// render-data module from a fresh one. `claimManifest` always carries an empty
+// `symbols`: a data-only facade owns no symbol claims.
+export type RenderDataModuleArtifact<
+	Manifest extends LinkedClaimManifest = LinkedClaimManifest,
+> = {
+	readonly passId: 'render-data-module';
+	readonly source: string;
+	readonly emittedModule: string;
+	readonly contentHash: string;
+	readonly styleModules: ReadonlyArray<string>;
+	readonly claimManifest: Manifest;
+	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+};
+
+// What a linker must publish and wait for before a child's claims can be read.
+// The pass decides the plan; performing it is the caller's I/O. The load source
+// is decided separately because the caller must load the child before its
+// capture metadata exists to plan against.
+export type LinkedModuleClaimPlan = {
+	readonly claimSources: ReadonlyArray<string>;
+	readonly expectClaims: boolean;
+	readonly seal: boolean;
+};
+
+// Linked claims (`claim-manifest` link pass): who owns a source's emitted
+// symbol claims, and the merged manifest a consumer of that source reads. The
+// manifest shape is structural on purpose — the caller's richer transform
+// manifest flows through unchanged, and the pass only ever rewrites `source`,
+// `symbols` and `resolver`.
+export type LinkedClaimManifest = LinkedSymbolClaimManifest & {
+	readonly source: string;
+	readonly resolver: { readonly virtualModuleId: string };
+};
+
+// Per-build, never serialized: `bySource` is the merged manifest each source
+// answers with, `byEmittedModule` the exact owners it was merged from.
+export type LinkedClaimsArtifact<Manifest extends LinkedClaimManifest = LinkedClaimManifest> = {
+	readonly passId: 'claim-manifest';
+	readonly bySource: Readonly<Record<string, Manifest>>;
+	readonly byEmittedModule: Readonly<Record<string, Manifest>>;
+	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+};
+
+export type LinkedClaimsInput<Manifest extends LinkedClaimManifest = LinkedClaimManifest> = {
+	readonly source: string;
+	// Virtual module naming is the caller's, so the resolver a source's siblings
+	// must share arrives as an id rather than being spelled here.
+	readonly resolverId: string;
+	readonly claims: ReadonlyArray<Manifest>;
+};
+
+export type LinkedSourceClaimMerge<Manifest extends LinkedClaimManifest = LinkedClaimManifest> = {
+	readonly manifest: Manifest | undefined;
+	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+};
+
+// Emitted-id vocabulary the claim rules need. The pass asks these questions
+// rather than parsing ids, because how a variant is spelled is the bundler's.
+export type LinkedClaimIdNaming = {
+	readonly sourcePathOf: (id: string) => string;
+	readonly isResumeRequest: (id: string) => boolean;
+	readonly isWakeRequest: (id: string) => boolean;
+};
+
+export type EmittedClaimOwnershipInput<
+	Manifest extends LinkedClaimManifest = LinkedClaimManifest,
+> = {
+	readonly source: string;
+	readonly emittedModule: string;
+	readonly manifest: Manifest;
+	// The generated resolver among the modules this transform emitted, when it
+	// emitted one.
+	readonly resolverModuleId: string | undefined;
+	// Whether the resolver this manifest names already holds claims, which is how
+	// an ordinary sibling knows a wake variant took its routes.
+	readonly wakeOwnsRoutes: boolean;
+	// Every emitted module currently holding claims, for displacement.
+	readonly claimOwners: ReadonlyArray<string>;
+	readonly naming: LinkedClaimIdNaming;
+};
+
+export type EmittedClaimOwnership<Manifest extends LinkedClaimManifest = LinkedClaimManifest> = {
+	readonly owner: string;
+	readonly manifest: Manifest;
+	readonly displacedOwners: ReadonlyArray<string>;
+	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+};
+
+export type LinkedResolverClaimVerdict =
+	| { readonly action: 'keep-current' | 'replace' }
+	| { readonly action: 'diverged'; readonly diagnostic: CompilerDiagnostic };
+
+export type LinkedRouteArtifactRegistration = {
+	readonly action: 'already-registered' | 'register' | 'reinvalidate' | 'late';
+	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+};
+
+// What one transform request is asking the compiler for. `route-artifact` is a
+// client request for the build-time rendering of a route rather than for a
+// module a browser loads, which is why it is a kind of its own.
+export type TransformRequestKind =
+	| 'source'
+	| 'resume'
+	| 'prerender-wake'
+	| 'render-data'
+	| 'route-artifact';
+
+// Every field is a plain value the caller already holds. Ids are parsed by the
+// caller and arrive here as answered questions, because how a variant is
+// spelled in a module id is the bundler's vocabulary, not the compiler's.
+export type TransformPlanInput = {
+	// Undefined where the host has not resolved an environment for this request;
+	// it is neither client nor server, and every client-only decision is off.
+	readonly environment: string | undefined;
+	// The file this request is about, and the exact id it was requested as.
+	readonly source: string;
+	readonly requestId: string;
+	readonly request: {
+		readonly resume: boolean;
+		readonly prerenderWake: boolean;
+		readonly renderData: boolean;
+		readonly routeArtifact: boolean;
+		// Whether this id is the source's own primary request rather than one of
+		// its query-addressed siblings.
+		readonly clientPrimary: boolean;
+	};
+	readonly options: {
+		readonly dev: boolean;
+		readonly prerender: boolean;
+		readonly prerenderWakeChannel: boolean;
+	};
+	// Whether this build has already seen a wake-variant entry request.
+	readonly hasWakeSources: boolean;
+	// Whether a materialized route root reaches this request's render data.
+	readonly renderDataReached: boolean;
+	// Whether this source is itself a registered client route artifact.
+	readonly routeArtifactSource: boolean;
+	readonly clientOutput: 'symbols-only' | undefined;
+	// Whether the caller can read module-graph facts at all; without them the
+	// wake aggregate cannot know which sibling modules exist.
+	readonly getModuleInfoAvailable: boolean;
+};
+
+export type TransformPlanArtifact = {
+	readonly passId: 'transform-plan';
+	readonly requestKind: TransformRequestKind;
+	// The module identity the claims and artifacts of this request are filed
+	// under: a query facade speaks for itself, a primary request for its file.
+	readonly manifestSource: string;
+	readonly publishesClientClaims: boolean;
+	readonly ssrPrerenderArtifacts: boolean;
+	readonly prerenderRecords: boolean;
+	readonly dev: boolean;
+	readonly devResumeReexport: boolean;
+	// Opaque: one source requested four different ways compiles four different
+	// module shapes, so each shape caches under its own key.
+	readonly cacheKey: string;
+	// Whether this request must recompile an aggregate variant to own the wake
+	// channel's symbol routes.
+	readonly aggregateEligible: boolean;
+	readonly wakeCapability: (
+		manifestHasBrowserTriggers: boolean,
+		childHasBrowserTriggers: boolean,
+	) => boolean;
+};
