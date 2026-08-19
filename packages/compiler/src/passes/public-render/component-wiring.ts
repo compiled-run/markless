@@ -25,7 +25,7 @@ export function emitSsrComponent(
 	const props = ssrComponentPropsSource(node, context, edge, context.callbackSymbols);
 	const placement = {
 		hostPrefix: `c${childIndex}:`,
-		symbolPrefix: componentEdgeInstanceSegment(edge),
+		symbolPrefix: componentEdgeInstanceSegment(edge, context.componentEdges),
 		graphProps: componentEdgeGraphRoutes(edge, hasChildrenProjection(node)),
 		boundSymbols: boundSymbolsForEdge(edge, context.callbackSymbols),
 	};

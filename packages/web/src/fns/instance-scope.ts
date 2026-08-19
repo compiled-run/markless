@@ -7,7 +7,7 @@ import type { ResumeSymbol, ResumeSymbolContext } from '../resume-types.ts';
 // bundler's symbol route, the dev harness, a test's own loadSymbol — recovers
 // the instance from the id it was asked for. INSTANCE_PATH restates the
 // serializer's grammar; composed-page-space.test.ts keeps the two in step.
-const INSTANCE_PATH = /^(?:c\d+:)+/;
+const INSTANCE_PATH = /^(?:[cp]\d+:)+/;
 
 // A symbol loaded through the child's own composed loader already answers in
 // page space, so resume must not scope it a second time.

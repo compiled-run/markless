@@ -15,7 +15,10 @@ import {
 	resolveGraphPath,
 	semanticAliasMap,
 } from '../artifact-helpers/graph-paths.ts';
-import { componentEdgeInstancePath } from '../component-edge-instance.ts';
+import {
+	componentEdgeInstancePath,
+	componentEdgeInstanceSegment,
+} from '../component-edge-instance.ts';
 import { getIdentifierName, walkNode, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
 import { resolveBoundaryRunners } from './public-render/boundary-runner.ts';
@@ -261,7 +264,7 @@ export function planBoundSymbolResolver(
 					branchScopeIds: edge.branchScopeIds,
 					keyedRepeatScopeIds: edge.keyedRepeatScopeIds,
 				}));
-				const instancePath = componentEdgeInstancePath(path);
+				const instancePath = componentEdgeInstancePath(path, input.semanticGraph.componentEdges);
 				rows.push({
 					id: boundSymbolId(symbol.symbolId, ancestry),
 					// Imported symbols keep the child-local ID in the bound record ID,
@@ -279,7 +282,12 @@ export function planBoundSymbolResolver(
 		}
 	}
 
-	return { passId: 'bound-symbol-resolver', rows };
+	const edges = input.semanticGraph.componentEdges;
+	const componentEdgeInstancePaths = edges.flatMap((edge) => {
+		const instancePath = componentEdgeInstanceSegment(edge, edges);
+		return instancePath ? [{ componentEdgeId: edge.id, instancePath }] : [];
+	});
+	return { passId: 'bound-symbol-resolver', rows, componentEdgeInstancePaths };
 }
 
 function componentEdgePaths(edges: SymbolResolverInput['semanticGraph']['componentEdges']) {

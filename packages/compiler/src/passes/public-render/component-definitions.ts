@@ -54,7 +54,7 @@ export function collectPublicRenderComponentDefinitions(
 				childComponentName: edge.childComponentName,
 				...(edge.asyncBoundaryId ? { asyncBoundaryId: edge.asyncBoundaryId } : {}),
 				hostPrefix: `c${index}:`,
-				symbolPrefix: componentEdgeInstanceSegment(edge),
+				symbolPrefix: componentEdgeInstanceSegment(edge, input.semanticGraph.componentEdges),
 				boundSymbols: Object.fromEntries(
 					[...callbacks].flatMap(([key, value]) => {
 						const prefix = `bound:${edge.id}:`;

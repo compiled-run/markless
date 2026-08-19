@@ -3,6 +3,7 @@ import {
 	PROTOCOL_PAGE_SPACE_ID_PREFIXES,
 	protocolInstancePath,
 	protocolInstanceSegment,
+	protocolProjectionSegment,
 } from '../../serializer/src/protocol.ts';
 import { marklessComposedGraphNodeId } from '../src/fns/composition.ts';
 import { marklessInstanceScopedLoadSymbol } from '../src/fns/instance-scope.ts';
@@ -28,8 +29,26 @@ test('composition qualifies a component-owned id with its instance path', () => 
 	expect(marklessComposedGraphNodeId('state:count', 'c0:')).toBe('c0:state:count');
 });
 
+test('a projected segment is page-space transparent and instance-qualifying alike', () => {
+	for (const prefix of PROTOCOL_PAGE_SPACE_ID_PREFIXES) {
+		const graphNodeId = `${protocolInstanceSegment(0)}${protocolProjectionSegment(1)}${prefix}src/lib.tsrx#thing`;
+		expect(marklessComposedGraphNodeId(graphNodeId, 'c2:')).toBe(graphNodeId);
+	}
+	expect(marklessComposedGraphNodeId('state:open', protocolProjectionSegment(1))).toBe(
+		'p1:state:open',
+	);
+});
+
+test('a projected child and its host component edge never share a path', () => {
+	const projected = protocolInstanceSegment(0) + protocolProjectionSegment(1);
+	const own = protocolInstanceSegment(0) + protocolInstanceSegment(1);
+	expect(projected).not.toBe(own);
+	expect(protocolInstancePath(`${projected}symbol:0`)).toBe(projected);
+	expect(protocolInstancePath(`${own}symbol:0`)).toBe(own);
+});
+
 test('the loader reads back exactly the instance path the protocol spells', () => {
-	const path = protocolInstanceSegment(0) + protocolInstanceSegment(12);
+	const path = protocolInstanceSegment(0) + protocolProjectionSegment(12);
 	expect(protocolInstancePath(`${path}symbol:3`)).toBe(path);
 	let seen = '';
 	const load = marklessInstanceScopedLoadSymbol(() => (context) => {

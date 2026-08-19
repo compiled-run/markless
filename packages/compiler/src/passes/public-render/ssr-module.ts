@@ -312,7 +312,7 @@ function emitSsrDataRenderLines(
 			props.push(`__marklessSsrCallbacks:marklessSsrCallbacks({${callbackEntries.join(',')}})`);
 		const child = {
 			hostPrefix: `c${index}:`,
-			symbolPrefix: componentEdgeInstanceSegment(edge),
+			symbolPrefix: componentEdgeInstanceSegment(edge, input.semanticGraph.componentEdges),
 			graphProps: componentEdgeGraphRoutes(edge, hasProjection),
 			boundSymbols: boundSymbolsForEdge(edge, callbacks),
 		};

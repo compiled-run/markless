@@ -76,7 +76,7 @@ export function marklessComposedInstancePath(child: {
 // Mirrors PROTOCOL_PAGE_SPACE_ID_PREFIXES, past any instance path a nested
 // compose already applied; composed-page-space.test.ts keeps the two in step so
 // the browser never imports the serializer's protocol module.
-const PAGE_SPACE_ID = /^(?:c\d+:)*(?:shared|storage):/;
+const PAGE_SPACE_ID = /^(?:[cp]\d+:)*(?:shared|storage):/;
 
 // Every id family a component owns is instance-local; a shared() graph and a
 // persisted storage slot are page-space on purpose. The compiler refuses at

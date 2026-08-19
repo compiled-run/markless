@@ -1146,6 +1146,13 @@ export type BoundSymbolResolverRow = {
 export type BoundSymbolResolverArtifact = {
 	readonly passId: 'bound-symbol-resolver';
 	readonly rows: ReadonlyArray<BoundSymbolResolverRow>;
+	// The instance path this module's render emission spells for each of its
+	// composed component edges. The bundler registers one symbol route per entry
+	// instead of restating the instance grammar.
+	readonly componentEdgeInstancePaths?: ReadonlyArray<{
+		readonly componentEdgeId: string;
+		readonly instancePath: string;
+	}>;
 };
 
 export type BoundSymbolResolverInput = {
@@ -1847,7 +1854,12 @@ export type LinkedInterfaceCompleteness = Pick<
 export type LinkedBoundarySymbolsInput = {
 	readonly compiled: Pick<
 		CompileTsrxModuleResult,
-		'protocolView' | 'publicRenderModule' | 'semanticGraph' | 'symbolModules' | 'symbolResolver'
+		| 'boundSymbolResolver'
+		| 'protocolView'
+		| 'publicRenderModule'
+		| 'semanticGraph'
+		| 'symbolModules'
+		| 'symbolResolver'
 	>;
 	readonly link: LinkedInterfaceCompleteness;
 	// The linker owns the client-environment gate and virtual module naming, so

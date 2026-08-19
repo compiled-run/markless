@@ -4,6 +4,7 @@
 // known. Resolution is an input: the pass never resolves or loads a specifier,
 // and virtual module naming stays with the caller that owns the module ids.
 import { compileTsrxModule } from '../../compile-module.ts';
+import { componentEdgeSymbolRoutes } from '../../component-edge-instance.ts';
 import type {
 	CompileTsrxModuleResult,
 	LinkedArtifactChild,
@@ -148,10 +149,9 @@ export function linkedRenderDataBoundarySymbols(
 	const plannedSymbols = new Map(
 		input.compiled.symbolResolver.symbols.map((symbol) => [symbol.id, symbol]),
 	);
-	const routes = input.compiled.semanticGraph.componentEdges.flatMap((edge, index) =>
-		edge.importSource && !input.link.artifactChildMaterializations?.[edge.id]
-			? [{ prefix: `c${index}:`, importSource: edge.importSource }]
-			: [],
+	const routes = componentEdgeSymbolRoutes(
+		input.compiled,
+		input.link.artifactChildMaterializations,
 	);
 
 	return input.compiled.protocolView.asyncBoundaries.flatMap((boundary, index) => {

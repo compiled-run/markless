@@ -18,6 +18,7 @@ export {
 	PROTOCOL_PAGE_SPACE_ID_PREFIXES,
 	protocolInstanceQualifies,
 	protocolInstanceSegment,
+	protocolProjectionSegment,
 } from './protocol-constants.ts';
 
 export type ProtocolAsyncBoundaryArm = (typeof ASYNC_BOUNDARY_ARM)[keyof typeof ASYNC_BOUNDARY_ARM];

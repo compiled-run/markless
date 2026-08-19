@@ -15,14 +15,19 @@ export const ASYNC_BOUNDARY_ARM_PENDING = 1;
 export const ASYNC_BOUNDARY_ARM_MAX = 2;
 
 // Instance identity grammar: composition qualifies a composed child's graph
-// node, symbol, and host node ids with one `c<componentEdgeIndex>:` segment per
-// component edge it was composed through, outermost first. The segment indexes
-// the compiler's component edge, not render order, so inserting a sibling above
-// a component does not renumber the edges after it.
-const PROTOCOL_INSTANCE_PATH = /^(?:c\d+:)+/;
+// node, symbol, and host node ids with one segment per component edge it was
+// composed through, outermost first. `c<n>:` is a module's own edge, `p<n>:` a
+// child the template projected into a component: `<Root><Trigger/></Root>` mints
+// `c0:` and `c0:p1:`, disjoint from Root's own `c0:c1:`. Both index the
+// compiler's edge, not render order, so a sibling above renumbers nothing.
+const PROTOCOL_INSTANCE_PATH = /^(?:[cp]\d+:)+/;
 
 export function protocolInstanceSegment(edgeIndex: number): string {
 	return `c${edgeIndex}:`;
+}
+
+export function protocolProjectionSegment(edgeIndex: number): string {
+	return `p${edgeIndex}:`;
 }
 
 /** The leading instance path of a composed id, or '' when the id is page-local. */

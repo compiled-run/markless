@@ -3,6 +3,7 @@ import {
 	artifactChildCandidates,
 	collectTsrxModuleDiagnostics,
 	compileTsrxModule,
+	componentEdgeSymbolRoutes,
 	emitSymbolResolverModule,
 	linkedRenderDataBoundarySymbols,
 	moduleInterfaceHash,
@@ -183,11 +184,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		}),
 		importedBoundRows.some((row) => row.loaderSymbolId !== undefined),
 	);
-	const symbolRoutes = compiled.semanticGraph.componentEdges.flatMap((edge, index) =>
-		edge.importSource && !input.artifactChildMaterializations?.[edge.id]
-			? [{ prefix: `c${index}:`, importSource: edge.importSource, componentEdgeId: edge.id }]
-			: [],
-	);
+	const symbolRoutes = componentEdgeSymbolRoutes(compiled, input.artifactChildMaterializations);
 	const executionLogModuleHookMode =
 		input.executionLogModuleHooks === false ? 'never' : input.executionLog;
 	const symbolManifestEntries = [

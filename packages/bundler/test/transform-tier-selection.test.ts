@@ -27,6 +27,7 @@ vi.mock('@markless/compiler', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('@markless/compiler')>();
 	return {
 		artifactChildCandidates: actual.artifactChildCandidates,
+		componentEdgeSymbolRoutes: actual.componentEdgeSymbolRoutes,
 		linkedRenderDataBoundarySymbols: actual.linkedRenderDataBoundarySymbols,
 		moduleInterfaceHash: actual.moduleInterfaceHash,
 		prerenderInterfacesComplete: actual.prerenderInterfacesComplete,

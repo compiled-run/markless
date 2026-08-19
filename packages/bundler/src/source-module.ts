@@ -498,9 +498,12 @@ function emitLazySymbolRouteFunction(
 	fallbackName = 'loadSymbol',
 ): string {
 	if (routes.length === 0) return '';
+	// A projected child's path nests under the component it was projected into,
+	// so the longer literal prefix must be tested first.
+	const ordered = [...routes].sort((left, right) => right.prefix.length - left.prefix.length);
 	return [
 		`function ${functionName}(symbolId) {`,
-		...routes.flatMap((route) => [
+		...ordered.flatMap((route) => [
 			`	if (symbolId.startsWith(${JSON.stringify(route.prefix)})) {`,
 			`		return import(${JSON.stringify(symbolRouteImportSource(route.importSource))}).then((mod) => mod.loadSymbol ? mod.loadSymbol(symbolId.slice(${route.prefix.length})) : Promise.reject(new Error(\`Unknown child async symbol \${symbolId}\`)));`,
 			'	}',
