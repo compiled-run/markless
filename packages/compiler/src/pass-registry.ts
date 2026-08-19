@@ -116,3 +116,14 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 		produces: ['symbolResolverModule', 'symbolResolverModuleManifest'],
 	},
 ];
+
+// Link passes run across modules once the bundler has a module graph, so they
+// are not part of the per-module `defaultCompilerPasses` pipeline.
+export const linkCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
+	{
+		passId: 'execution-attribution',
+		description: 'Flatten linked module manifests into per-route execution scope tables.',
+		consumes: ['moduleManifests', 'childTable'],
+		produces: ['executionAttribution'],
+	},
+];

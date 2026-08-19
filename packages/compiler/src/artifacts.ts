@@ -1733,3 +1733,39 @@ export type CompileTsrxModuleResult = {
 	readonly symbolResolverModule: string;
 	readonly symbolResolverModuleManifest: SymbolResolverModuleManifest;
 };
+
+// Execution attribution (`execution-attribution` link pass): route key -> scope
+// prefix -> encoded module source. Build output, never serialized into a
+// published package.
+export type ExecutionAttributionTables = Readonly<Record<string, Readonly<Record<string, string>>>>;
+
+export type ExecutionAttributionModuleManifest = {
+	readonly source: string;
+	readonly symbolRoutes?: ReadonlyArray<{
+		readonly prefix: string;
+		readonly importSource: string;
+	}>;
+};
+
+export type ExecutionAttributionChild = {
+	readonly parent: string;
+	readonly specifier: string;
+	readonly source: string;
+};
+
+export type ExecutionAttributionInput = {
+	readonly moduleManifests: Iterable<ExecutionAttributionModuleManifest>;
+	readonly childTable: Iterable<ExecutionAttributionChild>;
+	readonly root?: string;
+	// The linker owns specifier resolution and source encoding; the pass reads
+	// them as inputs so it never needs a bundler resolve/load context.
+	readonly resolveSpecifier: (parent: string, specifier: string) => string;
+	readonly encodeSource: (source: string) => string;
+};
+
+export type ExecutionAttributionArtifact = {
+	readonly passId: 'execution-attribution';
+	readonly tables: ExecutionAttributionTables;
+	readonly roots: ReadonlyArray<string>;
+	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+};

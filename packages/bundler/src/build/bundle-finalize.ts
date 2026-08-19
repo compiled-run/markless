@@ -11,7 +11,10 @@ import {
 	rewriteGeneratedSymbolInitExports,
 } from './symbol-facade-cleanup.ts';
 import { rewriteGeneratedSymbolTableUrls, verifyGeneratedSymbolTableRoutes } from './symbol-table.ts';
-import { executionLogActivationInjection } from '../execution-log.ts';
+import {
+	type ExecutionAttributionTables,
+	executionLogActivationInjection,
+} from '../execution-log.ts';
 import type { ModuleMetadataRegistry } from '../module-metadata-registry.ts';
 import type { MarklessRolldownOptions, MarklessTransformManifest } from '../types.ts';
 import {
@@ -53,7 +56,7 @@ export async function finalizeBundle(
 		readonly executionLogEmittedIds: ReadonlyMap<string, string>;
 		readonly executionAttributionTables: (
 			manifests: Iterable<MarklessTransformManifest>,
-		) => Record<string, Record<string, string>>;
+		) => ExecutionAttributionTables;
 	},
 ): Promise<void> {
 	const { options, moduleMetadata } = input;

@@ -1,4 +1,5 @@
 import type { InputOptions, Plugin } from 'rolldown';
+import { computeExecutionAttribution } from '@markless/compiler';
 import { existsSync, statSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { dirname, isAbsolute, relative, resolve } from 'pathe';
@@ -159,6 +160,18 @@ export function createMarklessRolldownPlugin(input: {
 
 	function getRoot() {
 		return root ?? internalOptions.rootDir;
+	}
+
+	// `resolveSpecifier`/`encodeSource` are the bundler's; the compiler pass owns
+	// only the graph flattening.
+	function attributionTables(manifests: Iterable<MarklessTransformManifest>) {
+		return computeExecutionAttribution({
+			moduleManifests: manifests,
+			childTable: importedChildren.values(),
+			root: getRoot(),
+			resolveSpecifier: fallbackImportedSource,
+			encodeSource: encodedSymbolSource,
+		}).tables;
 	}
 
 	function invalidateAllGeneratedModules(
@@ -436,11 +449,7 @@ export function createMarklessRolldownPlugin(input: {
 				return executionLogVirtualModuleSource({
 					moduleSizes: embedsDevSizes ? executionLogEstimatedSizes : undefined,
 					attribution: embedsDevSizes
-						? executionAttributionTables(
-								moduleMetadata.symbolClaimMap().values(),
-								getRoot(),
-								importedChildren.values(),
-							)
+						? attributionTables(moduleMetadata.symbolClaimMap().values())
 						: undefined,
 					sizesUrl:
 						internalOptions.dev === true
@@ -1091,12 +1100,7 @@ export function createMarklessRolldownPlugin(input: {
 					moduleMetadata,
 					root: getRoot(),
 					executionLogEmittedIds,
-					executionAttributionTables: (manifests) =>
-						executionAttributionTables(
-							manifests,
-							getRoot(),
-							importedChildren.values(),
-						),
+					executionAttributionTables: attributionTables,
 				});
 			},
 		},
@@ -1472,134 +1476,6 @@ function validateImportedChild(
 
 function isPlainTypeScriptSource(source: string): boolean {
 	return /\.[cm]?tsx?$/.test(source);
-}
-
-type ExecutionAttributionNode = {
-	readonly source: string;
-	readonly symbolRoutes: ReadonlyArray<{ readonly prefix: string; readonly importSource: string }>;
-};
-
-// The consumer looks these tables up by the bare path the document names (the
-// route file, or the single root of a routeless build). A transform variant's
-// query — `?markless-symbols`, `?markless-resume`, `?markless-prerender-wake` —
-// is a build-side name for the same source file, so the variants of one source
-// merge into one node. Without this, a component reached as a child under its
-// bare path and as a root under its queried path is both, and no key the
-// consumer can produce ever matches.
-function canonicalExecutionAttributionSource(source: string): string {
-	return source.split('?')[0]!.split('#')[0]!;
-}
-
-function canonicalExecutionAttributionNodes(
-	manifests: Iterable<MarklessTransformManifest>,
-): ReadonlyMap<string, ExecutionAttributionNode> {
-	const routesBySource = new Map<string, Map<string, string>>();
-	// Sorted so a prefix claimed by two variants resolves the same way on every
-	// build; the emitted map is a permanent artifact, not a per-run reading.
-	const sorted = [...manifests].sort((left, right) => left.source.localeCompare(right.source));
-	for (const manifest of sorted) {
-		const source = canonicalExecutionAttributionSource(manifest.source);
-		const routes = routesBySource.get(source) ?? new Map<string, string>();
-		for (const route of manifest.symbolRoutes ?? [])
-			if (!routes.has(route.prefix)) routes.set(route.prefix, route.importSource);
-		routesBySource.set(source, routes);
-	}
-	return new Map(
-		[...routesBySource].map(([source, routes]) => [
-			source,
-			{
-				source,
-				symbolRoutes: [...routes].map(([prefix, importSource]) => ({ prefix, importSource })),
-			},
-		]),
-	);
-}
-
-function executionAttributionRoots(
-	nodes: ReadonlyMap<string, ExecutionAttributionNode>,
-	childrenByRoute: ReadonlyMap<string, string>,
-): string[] {
-	const children = new Set<string>();
-	for (const node of nodes.values()) {
-		for (const route of node.symbolRoutes) {
-			const child = resolvedRouteSource(node.source, route.importSource, childrenByRoute);
-			if (nodes.has(child)) children.add(child);
-		}
-	}
-	return [...nodes.keys()].filter((source) => !children.has(source));
-}
-
-function executionAttributionTables(
-	manifests: Iterable<MarklessTransformManifest>,
-	root: string | undefined,
-	children: Iterable<ImportedChild>,
-): Record<string, Record<string, string>> {
-	const nodes = canonicalExecutionAttributionNodes(manifests);
-	const childrenByRoute = new Map(
-		[...children]
-			.map(
-				(child) =>
-					[
-						routeKey(
-							canonicalExecutionAttributionSource(child.parent),
-							child.specifier,
-						),
-						canonicalExecutionAttributionSource(child.source),
-					] as const,
-			)
-			.sort((left, right) => left[0].localeCompare(right[0]) || left[1].localeCompare(right[1])),
-	);
-	return Object.fromEntries(
-		executionAttributionRoots(nodes, childrenByRoute)
-			.sort()
-			.map((source) => [
-				executionAttributionRouteKey(source, root),
-				flattenExecutionAttributionScopes(source, nodes, childrenByRoute),
-			]),
-	);
-}
-
-function executionAttributionRouteKey(source: string, root: string | undefined): string {
-	const prefix = root ? `${root.replace(/[/\\]+$/, '')}/` : '';
-	return (prefix && source.startsWith(prefix) ? source.slice(prefix.length) : source).replace(
-		/^[/\\]+/,
-		'',
-	);
-}
-
-function flattenExecutionAttributionScopes(
-	root: string,
-	nodes: ReadonlyMap<string, ExecutionAttributionNode>,
-	childrenByRoute: ReadonlyMap<string, string>,
-): Record<string, string> {
-	const scopes: Record<string, string> = {};
-	const visit = (source: string, scope: string, seen: ReadonlySet<string>) => {
-		if (seen.has(source)) return;
-		scopes[scope] = encodedSymbolSource(source);
-		const manifest = nodes.get(source);
-		for (const route of manifest?.symbolRoutes ?? []) {
-			const child = resolvedRouteSource(source, route.importSource, childrenByRoute);
-			if (!nodes.has(child)) continue;
-			visit(child, scope + route.prefix, new Set([...seen, source]));
-		}
-	};
-	visit(root, '', new Set());
-	return scopes;
-}
-
-function resolvedRouteSource(
-	parent: string,
-	specifier: string,
-	childrenByRoute: ReadonlyMap<string, string>,
-): string {
-	return (
-		childrenByRoute.get(routeKey(parent, specifier)) ??
-		fallbackImportedSource(parent, specifier)
-	);
-}
-
-function routeKey(parent: string, specifier: string): string {
-	return `${parent}\0${specifier}`;
 }
 
 function pluginName(environment: Environment) {
