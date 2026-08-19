@@ -1,7 +1,7 @@
 # Markless
 
 <p align="center">
-  <img src="./assets/markless-logo.png" alt="Markless logo" width="180" height="180" />
+  <img src="./assets/markless-logo.png" alt="Markless logo" width="200" />
 </p>
 
 Markless is a UI framework for building web and native apps from one web-like
