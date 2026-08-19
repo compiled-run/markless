@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import {
+	analyzeModule,
 	isEventAttribute,
 	normalizeEventName,
 	parseModule,
@@ -180,4 +181,104 @@ test('blanks exact markless-allow JSX text without changing spans or ordinary te
 		const ordinary = parseText(text);
 		expect(ordinary.node.value).toBe(ordinary.sourceText);
 	}
+});
+
+const ids = (count: number): number[] => Array.from({ length: count }, (_, id) => id);
+
+test('resolves TSRX identifiers to their bindings, with the node and span of each use', () => {
+	const source = [
+		'import { state } from "@markless/core";',
+		'',
+		'export function Counter() @{',
+		'	let total = state(0);',
+		'	const bump = () => { total = total + 1; };',
+		'	<button onClick={bump}>{total}</button>',
+		'}',
+		'',
+	].join('\n');
+
+	const semantic = analyzeModule(source, 'counter.tsrx');
+
+	// Every binding the module declares is present, imported one included.
+	const symbolNames = ids(semantic.symbol.count).map((id) => semantic.symbol.name(id));
+	expect(symbolNames).toEqual(expect.arrayContaining(['state', 'Counter', 'total', 'bump']));
+
+	// The point of the view: a use of `total` resolves to the declaration of
+	// `total`, rather than the walk having to match on the name itself.
+	const totalSymbol = symbolNames.indexOf('total');
+	const totalUses = ids(semantic.reference.count).filter(
+		(id) => semantic.reference.symbolId(id) === totalSymbol,
+	);
+	// The assignment target, the addend it reads, and the interpolation.
+	expect(totalUses).toHaveLength(3);
+	for (const id of totalUses) {
+		expect(semantic.reference.name(id)).toBe('total');
+		expect(semantic.reference.node(id).type).toBe('Identifier');
+		// The span is a real authored span, not a placeholder.
+		expect(source.slice(semantic.reference.start(id), semantic.reference.end(id))).toBe('total');
+	}
+	// Only the assignment target is a write.
+	expect(totalUses.filter((id) => semantic.reference.isWrite(id))).toHaveLength(1);
+
+	// The declaration site is reachable from the symbol.
+	const declaration = semantic.symbol.declNode(totalSymbol, 0);
+	expect(semantic.symbol.declCount(totalSymbol)).toBe(1);
+	expect(source.slice(declaration.start, declaration.end)).toBe('total');
+
+	// `total` belongs to the component body, not to module scope.
+	const totalScope = semantic.symbol.scopeId(totalSymbol);
+	expect(semantic.scope.kind(totalScope)).toBe('block');
+	expect(semantic.scope.parentId(totalScope)).not.toBeNull();
+
+	// Module edges carry their specifiers, so an import can be attributed to the
+	// package it came from without re-reading the import statement.
+	expect(
+		ids(semantic.import.count).map((id) => ({
+			name: semantic.import.name(id),
+			specifier: semantic.import.specifier(id),
+		})),
+	).toContainEqual({ name: 'state', specifier: '@markless/core' });
+	expect(ids(semantic.export.count).map((id) => semantic.export.name(id))).toContain('Counter');
+});
+
+test('analyzes a module whose names and shape differ from the counter fixture', () => {
+	const source = [
+		'import { computed, state } from "@markless/core";',
+		'',
+		'export function Panel() @{',
+		'	let label = state("");',
+		'	const upper = computed(() => label.toUpperCase());',
+		'	<section>',
+		'		<input value={label} onInput={(event) => { label = event.target.value; }} />',
+		'		<span>{upper}</span>',
+		'	</section>',
+		'}',
+		'',
+	].join('\n');
+
+	const semantic = analyzeModule(source, 'panel.tsrx');
+	const symbolNames = ids(semantic.symbol.count).map((id) => semantic.symbol.name(id));
+	expect(symbolNames).toEqual(
+		expect.arrayContaining(['computed', 'state', 'Panel', 'label', 'upper', 'event']),
+	);
+
+	// Resolution follows the binding, not the name: the handler parameter and
+	// the component local are different symbols even though both are read here.
+	const labelSymbol = symbolNames.indexOf('label');
+	const labelUses = ids(semantic.reference.count).filter(
+		(id) => semantic.reference.symbolId(id) === labelSymbol,
+	);
+	expect(labelUses).toHaveLength(3);
+	for (const id of labelUses) {
+		expect(source.slice(semantic.reference.start(id), semantic.reference.end(id))).toBe('label');
+	}
+	// Only the assignment inside the event handler writes.
+	expect(labelUses.filter((id) => semantic.reference.isWrite(id))).toHaveLength(1);
+
+	// Both named imports resolve to the same specifier.
+	expect(ids(semantic.import.count).map((id) => semantic.import.specifier(id))).toEqual([
+		'@markless/core',
+		'@markless/core',
+	]);
+	expect(ids(semantic.export.count).map((id) => semantic.export.name(id))).toContain('Panel');
 });

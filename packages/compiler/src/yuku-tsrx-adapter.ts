@@ -1,4 +1,5 @@
 import {
+	analyze as analyzeYukuSource,
 	isEventAttribute,
 	normalizeEventName,
 	parseModule as parseYukuModule,
@@ -6,10 +7,11 @@ import {
 	type Diagnostic,
 	type ParseModuleOptions,
 	type Program,
+	type SemanticView,
 } from 'yuku-tsrx';
 
 export { isEventAttribute, normalizeEventName };
-export type { Program };
+export type { Program, SemanticView };
 
 export type MarklessSourcePosition = {
 	readonly line: number;
@@ -118,6 +120,44 @@ export function parseModule(
 		if (fatal) throw fatal;
 	}
 	return decorateProgram(program);
+}
+
+/**
+ * The parser dialect yuku infers from a filename. `parseModule` does this for
+ * us, but `analyze` takes options only, so the adapter has to say which dialect
+ * a Markless file is written in. `.tsrx` is the authoring extension.
+ */
+function parserLangFor(filename: string): 'tsx' | 'jsx' | 'dts' | 'ts' | 'js' {
+	const path = filename.split(/[?#]/, 1)[0]?.toLowerCase() ?? '';
+	if (path.endsWith('.tsrx') || path.endsWith('.tsx')) return 'tsx';
+	if (path.endsWith('.jsx')) return 'jsx';
+	if (path.endsWith('.d.ts')) return 'dts';
+	if (path.endsWith('.ts')) return 'ts';
+	return 'js';
+}
+
+/**
+ * Runs yuku's semantic analysis over a module and returns its tables: the
+ * scopes, the bindings each scope declares, and every identifier use resolved
+ * to the binding it refers to.
+ *
+ * This is a second pass over the source, not a by-product of `parseModule`, so
+ * it roughly doubles parse cost for a file. Callers should read it only when
+ * they need resolution that names alone cannot give them.
+ */
+export function analyzeModule(
+	source: string,
+	filename = 'module.tsrx',
+	options: Omit<MarklessParseOptions, 'errors' | 'comments' | 'collect'> = {},
+): SemanticView {
+	const { loose = false, ...parserOptions } = options;
+	const result = analyzeYukuSource(source, {
+		...parserOptions,
+		lang: parserOptions.lang ?? parserLangFor(filename),
+		sourceType: 'module',
+		loose,
+	});
+	return result.semantic;
 }
 
 type AstRecord = Record<string, unknown> & { readonly type?: unknown };
