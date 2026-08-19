@@ -71,9 +71,7 @@ export function mergeLinkedSourceClaims<Manifest extends LinkedClaimManifest>(
 	};
 }
 
-// The row shape `LinkedSymbolClaimManifest` fixes, compared field by field:
-// serialized text also disagrees on key order and on absent optional fields,
-// which is a build failure over a difference that is not a contradiction.
+// Field-wise: serialized text also differs on key order and absent optionals.
 function claimedSymbolsDiverge(
 	left: LinkedSymbolClaimManifest['symbols'][number],
 	right: LinkedSymbolClaimManifest['symbols'][number],

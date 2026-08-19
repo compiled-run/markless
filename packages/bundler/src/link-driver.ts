@@ -311,12 +311,7 @@ export async function materializeDelegateChildren(
 		if (unloadable.has(source)) continue;
 		let module = loaded.get(source);
 		if (!module) {
-			// Fail open. `planDelegateChildren` classifies a delegate from what its
-			// specifier resolved to, and the workspace states no Node engine
-			// requirement, so a resolved TypeScript source is importable only where
-			// type stripping happens to be available. A delegate this runtime cannot
-			// import is a child that did not materialize, which `linkDelegateChildren`
-			// reports as MARKLESS_DELEGATE_ARTIFACT_MISSING; it is never a crash.
+			// Unimportable here (e.g. raw .ts without type stripping): not materialized, never a crash.
 			try {
 				module = (await import(pathToFileURL(source).href)) as Record<string, unknown>;
 			} catch {

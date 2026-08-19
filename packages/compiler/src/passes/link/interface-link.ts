@@ -78,10 +78,7 @@ function interfaceHashSignature(imports: ReadonlyArray<LinkedInterfaceImport>): 
 		.join('|');
 }
 
-// Every claim a source published, not the first one: this is a cache key, so a
-// second claim that disagrees with the first has to move it or the link it
-// guards is reused stale. A row is opaque here, so rows are merged and ordered
-// by their serialized text, which also collapses a repeated identical claim.
+// Cache key: every claim per source, merged and ordered, so a diverging later claim moves it.
 function symbolClaimSignature(claims: ReadonlyArray<LinkedInterfaceClaim>): string {
 	const rowsBySource = new Map<string, Set<string>>();
 	for (const claim of claims) {

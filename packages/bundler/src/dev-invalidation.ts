@@ -103,12 +103,7 @@ export async function invalidateEditedGeneratedModules(
 		return invalidateAllGeneratedModules(ctx, parent, currentEnvironment);
 	}
 
-	// The registries below are keyed by the edited source, not by the cache entry.
-	// With no current environment every cached environment of one source is
-	// refreshed here, so writing them inside the loop let the last entry answer
-	// for all of them: a capture manifest that carries no metadata erased one
-	// that did, and an environment with no browser triggers erased the capability
-	// an environment with triggers had just recorded. Fold first, write once.
+	// Source-keyed registries: fold across every cached environment, write once.
 	const linkEntry = nextEntries[nextEntries.length - 1]!;
 	const captureEntry =
 		nextEntries.findLast(([, , , next]) => next.manifest.captureMetadata !== undefined) ??

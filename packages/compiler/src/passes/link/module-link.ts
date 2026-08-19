@@ -255,8 +255,7 @@ export function linkedModuleClaimPlan(input: {
 	readonly resumeSource: (source: string) => string;
 	readonly wakeSource: (source: string) => string;
 }): LinkedModuleClaimPlan {
-	if (!input.clientEnvironment)
-		return { claimSources: [], expectClaims: false, seal: false };
+	if (!input.clientEnvironment) return { claimSources: [], expectClaims: false, seal: false };
 	if (!input.captureMetadata?.extractedSymbols.length)
 		return { claimSources: [], expectClaims: false, seal: true };
 	const source = input.child.source;
@@ -311,8 +310,7 @@ export function linkedImportedClaimsMissing(input: {
 	readonly captureMetadataForSource: (source: string) => CaptureAnalysisArtifact | undefined;
 }): boolean {
 	return input.children.some((child) => {
-		// A child with no component edge is never a row in `linkedImportedSymbolInputs`,
-		// so waiting on one would be waiting on a row that can never arrive.
+		// Edgeless children never get a symbol-input row; do not wait on one.
 		if (!child.componentEdgeId) return false;
 		const expectsClaims = input
 			.captureMetadataForSource(child.source)
