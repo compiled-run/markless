@@ -282,3 +282,53 @@ test('analyzes a module whose names and shape differ from the counter fixture', 
 	]);
 	expect(ids(semantic.export.count).map((id) => semantic.export.name(id))).toContain('Panel');
 });
+
+test('analyzes short modules, whose size once decided whether the analyzer ran at all', () => {
+	// Each of these aborted the process instead of returning a view. The native
+	// semantic transfer asked for a scratch buffer with byte alignment and then
+	// wrote 32-bit-wide sections through it, so whether analysis worked came
+	// down to which size class the allocator picked for that particular source
+	// -- which is to say, to the length and shape of the module. Longer sources
+	// such as the counter fixture above happened to land on a usable address and
+	// masked the defect.
+	const cases = [
+		{ source: 'a', filename: 'src/App.ts', symbols: [], references: ['a'] },
+		{ source: 'const a = 1;\n', filename: 'src/App.ts', symbols: ['a'], references: [] },
+		{ source: 'a\n', filename: 'bare.js', symbols: [], references: ['a'] },
+		{ source: 'let x=1', filename: 'terse.ts', symbols: ['x'], references: [] },
+		{ source: 'export const y = 2;\n', filename: 'exported.jsx', symbols: ['y'], references: [] },
+		{ source: 'const el = <p>hi</p>;\n', filename: 'markup.tsx', symbols: ['el'], references: [] },
+		{
+			source: 'export function App() @{ <p>hi</p> }\n',
+			filename: 'App.tsrx',
+			symbols: ['App'],
+			references: [],
+		},
+	];
+
+	for (const { source, filename, symbols, references } of cases) {
+		const semantic = analyzeModule(source, filename);
+
+		// A view over this module rather than an empty placeholder: the module
+		// scope exists, and the tables hold exactly the module's own names.
+		expect({ source, scopes: semantic.scope.count > 0 }).toEqual({ source, scopes: true });
+		expect({ source, names: ids(semantic.symbol.count).map((id) => semantic.symbol.name(id)) }) //
+			.toEqual({ source, names: symbols });
+		expect({
+			source,
+			names: ids(semantic.reference.count).map((id) => semantic.reference.name(id)),
+		}).toEqual({ source, names: references });
+
+		// Spans point into this source, so the tables were not read through a
+		// misaligned pointer and quietly filled with neighbouring bytes.
+		for (const id of ids(semantic.symbol.count)) {
+			const declaration = semantic.symbol.declNode(id, 0);
+			expect(source.slice(declaration.start, declaration.end)).toBe(semantic.symbol.name(id));
+		}
+		for (const id of ids(semantic.reference.count)) {
+			expect(source.slice(semantic.reference.start(id), semantic.reference.end(id))).toBe(
+				semantic.reference.name(id),
+			);
+		}
+	}
+});
