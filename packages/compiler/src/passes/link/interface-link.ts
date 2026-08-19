@@ -4,7 +4,10 @@
 // known. Resolution is an input: the pass never resolves or loads a specifier,
 // and virtual module naming stays with the caller that owns the module ids.
 import { compileTsrxModule } from '../../compile-module.ts';
-import { componentEdgeSymbolRoutes } from '../../component-edge-instance.ts';
+import {
+	componentEdgeSymbolRoutes,
+	type ComponentEdgeSymbolRoute,
+} from '../../component-edge-instance.ts';
 import type {
 	CompileTsrxModuleResult,
 	LinkedArtifactChild,
@@ -195,7 +198,7 @@ function linkedRenderDataBoundarySymbolSource(input: {
 	readonly exportName: string;
 	readonly renderDataId: string;
 	readonly resolverId: string;
-	readonly routes: ReadonlyArray<{ readonly prefix: string; readonly importSource: string }>;
+	readonly routes: ReadonlyArray<ComponentEdgeSymbolRoute>;
 }): string {
 	return [
 		`import { marklessPrerenderData } from ${JSON.stringify(input.renderDataId)};`,
@@ -204,7 +207,9 @@ function linkedRenderDataBoundarySymbolSource(input: {
 		'function marklessLoadLinkedSymbol(symbolId) {',
 		...input.routes.flatMap((route) => [
 			`\tif (symbolId.startsWith(${JSON.stringify(route.prefix)})) {`,
-			`\t\treturn import(${JSON.stringify(linkedRenderDataSymbolRouteSource(route.importSource))}).then((module) => module.loadSymbol(symbolId.slice(${route.prefix.length})));`,
+			'importSource' in route
+				? `\t\treturn import(${JSON.stringify(linkedRenderDataSymbolRouteSource(route.importSource))}).then((module) => module.loadSymbol(symbolId.slice(${route.prefix.length})));`
+				: `\t\treturn marklessLoadLocalSymbol(symbolId.slice(${route.prefix.length}));`,
 			'\t}',
 		]),
 		'\treturn marklessLoadLocalSymbol(symbolId);',

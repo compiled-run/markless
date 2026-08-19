@@ -9,6 +9,7 @@ import {
 	componentPropCellId,
 	componentEdgeInstanceSegment,
 	componentEdgesFor,
+	componentOwnedStateNodes,
 	sameModuleComponentMap,
 } from './shared.ts';
 import type { PublicRenderRoot } from './types.ts';
@@ -146,10 +147,22 @@ export function collectPublicRenderComponentDefinitions(
 			...chunk,
 			nativeTemplateId: `markless-render-data:${encodeURIComponent(input.source.filename)}:${encodeURIComponent(componentName)}:template:${encodeURIComponent(chunk.id)}`,
 		}));
+		// Positions resolve a state name two components of one module both
+		// declare; a single-component module needs no partition at all.
+		const ownedNodes =
+			componentNames.size > 1
+				? componentOwnedStateNodes(input, componentName, rootInfo.componentName)
+				: undefined;
 		return [
 			{
 				name: componentName,
 				state: input.protocolState,
+				...(ownedNodes
+					? {
+							stateCellIndexes: ownedNodes.cellIndexes,
+							stateComputedIndexes: ownedNodes.computedIndexes,
+						}
+					: {}),
 				view: input.protocolView,
 				rootChunkId: rootChunk.id,
 				chunks: nativeChunks,

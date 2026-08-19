@@ -60,6 +60,10 @@ type PrerenderDataDefinition = {
 	readonly rootChunkId: string;
 	readonly hostNodeIds?: ReadonlyArray<string>;
 	readonly stateGraphNodeIds?: ReadonlyArray<string>;
+	// Positions into `state`, emitted when one module declares several
+	// components: two of them may spell one graph node id.
+	readonly stateCellIndexes?: ReadonlyArray<number>;
+	readonly stateComputedIndexes?: ReadonlyArray<number>;
 	readonly initialValues?: PrerenderRenderData['initialValues'];
 	readonly initialValueKinds?: Readonly<Record<string, string>>;
 	readonly branches?: PrerenderRenderData['branches'];
@@ -398,17 +402,29 @@ async function evaluatePrerenderDataComponent(input: {
 	);
 
 	const owned = new Set(definition.stateGraphNodeIds ?? []);
+	const cellIndexes = definition.stateCellIndexes;
+	const computedIndexes = definition.stateComputedIndexes;
+	const ownedCells = cellIndexes
+		? cellIndexes.flatMap((index) =>
+				definition.state.cells[index] ? [definition.state.cells[index]!] : [],
+			)
+		: definition.state.cells.filter((cell) => owned.size === 0 || owned.has(cell.graphNodeId));
+	const ownedComputed = computedIndexes
+		? computedIndexes.flatMap((index) =>
+				definition.state.computed[index] ? [definition.state.computed[index]!] : [],
+			)
+		: definition.state.computed.filter(
+				(computed) => owned.size === 0 || owned.has(computed.graphNodeId),
+			);
 	const state: ProtocolStatePayload = {
 		...structuredClone(definition.state),
-		cells: definition.state.cells
-			.filter((cell) => owned.size === 0 || owned.has(cell.graphNodeId))
+		cells: ownedCells
 			.map((cell) =>
 				values.has(cell.graphNodeId)
 					? { ...cell, value: undefined, directValue: values.get(cell.graphNodeId) }
 					: { ...cell },
 			),
-		computed: definition.state.computed
-			.filter((computed) => owned.size === 0 || owned.has(computed.graphNodeId))
+		computed: ownedComputed
 			.map((computed) =>
 				computed.async
 					? {

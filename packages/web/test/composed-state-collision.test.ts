@@ -2,11 +2,12 @@ import { expect, test } from 'vitest';
 import { marklessComposeState as csrComposeState } from '../src/fns/composition.ts';
 import { marklessComposeState as ssrComposeState } from '../src/fns/ssr.ts';
 
-// Composition qualifies an imported child's graph node ids with the instance
-// path its symbols already carry, so two instances of one component (and a page
-// and a child sharing a name) own separate nodes. A child declared in the SAME
-// module has no instance path — its symbols are indistinguishable at resume —
-// so its ids still merge unqualified and compose must refuse loudly.
+// Composition qualifies a composed child's graph node ids with the instance
+// path its symbols carry, so two instances of one component (and a page and a
+// child sharing a name) own separate nodes. A child declared in the SAME module
+// carries that path too — its symbols route back to the composing module's own
+// resolver once the prefix is stripped — so a same-named state() no longer
+// collides and there is nothing left to refuse.
 
 function pageState(nodes: { cells?: string[]; computed?: string[] }) {
 	return {
@@ -27,9 +28,6 @@ function graphNodeIds(composed: unknown): string[] {
 	};
 	return [...state.cells, ...state.computed].map((node) => node.graphNodeId);
 }
-
-const EXPECTED_MESSAGE =
-	'MARKLESS_COMPOSED_STATE_COLLISION: Two components declared in the same module both declare state() or computed() named "report". Components declared in the same module as the page share one state graph, so they would read and write the same value. Move one into its own module or rename it.';
 
 for (const [label, composeState] of [
 	['SSR', ssrComposeState],
@@ -100,17 +98,21 @@ for (const [label, composeState] of [
 		]);
 	});
 
-	test(`${label} compose refuses loudly when a same-module component collides on a name`, () => {
-		expect(() =>
-			composeState(pageState({ computed: ['computed:report'] }), [
-				child({ computed: ['computed:report'] }),
-			]),
-		).toThrowError(EXPECTED_MESSAGE);
-		expect(() =>
-			composeState(pageState({ cells: ['state:page'] }), [
-				child({ cells: ['state:report'] }),
-				child({ cells: ['state:report'] }),
-			]),
-		).toThrowError(EXPECTED_MESSAGE);
+	test(`${label} compose separates same-module components that share a state name`, () => {
+		expect(
+			graphNodeIds(
+				composeState(pageState({ computed: ['computed:report'] }), [
+					child({ computed: ['computed:report'] }, 'c0:'),
+				]),
+			),
+		).toEqual(['computed:report', 'c0:computed:report']);
+		expect(
+			graphNodeIds(
+				composeState(pageState({ cells: ['state:page'] }), [
+					child({ cells: ['state:report'] }, 'c0:'),
+					child({ cells: ['state:report'] }, 'c1:'),
+				]),
+			),
+		).toEqual(['state:page', 'c0:state:report', 'c1:state:report']);
 	});
 }

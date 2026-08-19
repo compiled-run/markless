@@ -39,9 +39,12 @@ test('a projected child never collides with the host component own edges', () =>
 	expect(projected).not.toBe('c0:c1:');
 });
 
-test('a child declared in the same module carries no instance path', () => {
+// A same-module child owns its own cells and symbols exactly like an imported
+// one; its symbols route back to this module's resolver once the prefix is
+// stripped, so it carries the same instance path.
+test('a child declared in the same module carries an instance path', () => {
 	const edges = [edge(0, [0, 40])];
-	expect(componentEdgeInstanceSegment(edges[0], edges)).toBe('');
+	expect(componentEdgeInstanceSegment(edges[0], edges)).toBe('c0:');
 });
 
 test('nested projection keeps one projected segment per enclosing component', () => {

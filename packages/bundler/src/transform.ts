@@ -5,6 +5,7 @@ import {
 	compileTsrxModule,
 	componentEdgeSymbolRoutes,
 	emitSymbolResolverModule,
+	importedSymbolRoutes,
 	linkedRenderDataBoundarySymbols,
 	moduleInterfaceHash,
 	prerenderInterfacesComplete,
@@ -241,7 +242,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	const manifest: MarklessTransformManifest = {
 		source: input.filename,
 		captureMetadata: compiled.captureAnalysis,
-		symbolRoutes,
+		symbolRoutes: importedSymbolRoutes(symbolRoutes),
 		payload: { virtualModuleId: payloadId },
 		resolver: {
 			virtualModuleId: emitsPrerenderWakeFacade ? prerenderWakeId : resolverId,
@@ -403,7 +404,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					group,
 					symbols: uniqueSymbolsById([...(input.symbols ?? []), ...symbolRows]),
 					boundRows: importedBoundRows,
-					symbolRoutes,
+					symbolRoutes: importedSymbolRoutes(symbolRoutes),
 					armRendererModuleId:
 						group.id === 'self-wake' ? selfWakeArmRendererId : undefined,
 				}),

@@ -1,5 +1,4 @@
 import {
-	marklessAssertComposableStateNames,
 	marklessComposedInstancePath,
 	marklessComposedSyncPolicy,
 	marklessComposeState,
@@ -193,7 +192,7 @@ export type MarklessSsrHostLocators = Array<MarklessSsrHostLocator> & {
 	marklessSsrExtraElements?: number;
 };
 
-export { marklessAssertComposableStateNames, marklessComposeState };
+export { marklessComposeState };
 export const marklessSsrRemapChildGraph = marklessCsrRemapChildGraph;
 export const marklessSsrRemapGraphOutput = marklessCsrRemapGraphOutput;
 

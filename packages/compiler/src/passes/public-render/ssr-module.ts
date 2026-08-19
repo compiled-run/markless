@@ -16,6 +16,7 @@ import {
 	isComponentRoot,
 	publicRenderValueImports,
 	composedGraphProps,
+	componentOwnedStateNodes,
 	stateEntries,
 	staticHostLocators,
 	moduleScopeLines,
@@ -66,18 +67,30 @@ export function emitPublicSsrRenderModule(
 		rootInfo.componentName,
 		(componentName) => emitSsrDataRenderLines(input, componentName, references),
 	);
+	// Each component seeds only the payload nodes it declares; a module with no
+	// same-module child owns every node, so it emits no selection at all.
+	const ownedNodes =
+		sameModuleComponents.length === 0
+			? undefined
+			: componentOwnedStateNodes(input, rootInfo.componentName, rootInfo.componentName);
 	const body = [
 		'',
 		`const marklessSsrPropEvents = ${JSON.stringify(propEvents)};`,
 		'const marklessSsrStateValues = new Map([',
-		stateEntries(input).join(',\n'),
+		stateEntries(input, ownedNodes?.cellIndexes).join(',\n'),
 		']);',
 		// The optional render context is the per-request streaming channel
 		// (T107): renderToStream threads it through child renders and async
 		// runners. Omitted = exact blocking behavior.
 		'async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {',
 		destructureProps(rootInfo.propNames, rootInfo.component),
-		'	const marklessSsrPayloadState = marklessCloneState(payloadState);',
+		// A module that composes no same-module child owns every payload node, so
+		// it keeps the whole clone and emits no selection list.
+		ownedNodes === undefined
+			? '	const marklessSsrPayloadState = marklessCloneState(payloadState);'
+			: `	const marklessSsrPayloadState = marklessSelectStateNodes(marklessCloneState(payloadState), ${JSON.stringify(
+					ownedNodes.cellIndexes,
+				)}, ${JSON.stringify(ownedNodes.computedIndexes)});`,
 		'	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);',
 		...renderBodyLines(
 			input,

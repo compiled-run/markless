@@ -4,8 +4,10 @@ import type { AnyNode } from '../../ast/nodes.ts';
 import { firstComponentRoot } from './plan.ts';
 import { renderBodyLines } from './render-body.ts';
 import {
+	componentOwnedStateNodes,
 	componentPropNames,
 	destructureProps,
+	stateEntries,
 	hasPropDependentComputed,
 	sameModuleComponentMap,
 	type ComponentReference,
@@ -32,12 +34,19 @@ export function emitSameModuleSsrComponents(
 			propNames: componentPropNames(component),
 		};
 		const functionName = `marklessRenderSsr${reference.componentName}`;
+		const owned = componentOwnedStateNodes(input, reference.componentName, rootComponentName);
+		const valuesName = `marklessSsrStateValues${reference.componentName}`;
 		return [
+			`const ${valuesName} = new Map([`,
+			stateEntries(input, owned.cellIndexes).join(',\n'),
+			']);',
 			`const ${reference.localName} = { renderSsr: ${functionName} };`,
 			`async function ${functionName}(props = {}, marklessSsrRenderContext) {`,
 			destructureProps(rootInfo.propNames, rootInfo.component),
-			'	const marklessSsrPayloadState = { ...marklessCloneState(payloadState), cells: [], computed: [] };',
-			'	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);',
+			`	const marklessSsrPayloadState = marklessSelectStateNodes(marklessCloneState(payloadState), ${JSON.stringify(
+				owned.cellIndexes,
+			)}, ${JSON.stringify(owned.computedIndexes)});`,
+			`	const marklessSsrRenderStateValues = new Map(${valuesName});`,
 			...renderBodyLines(
 				input,
 				rootInfo,

@@ -403,9 +403,13 @@ export function assignSsrHostIds(
 	return hostIdByNode;
 }
 
-export function stateEntries(input: PublicRenderModuleInput): string[] {
-	return input.protocolState.cells.flatMap((cell) => {
+export function stateEntries(
+	input: PublicRenderModuleInput,
+	cellIndexes?: ReadonlyArray<number>,
+): string[] {
+	return input.protocolState.cells.flatMap((cell, index) => {
 		if (cell.value === undefined) return [];
+		if (cellIndexes && !cellIndexes.includes(index)) return [];
 		const value = deserializeGraphValue(cell.value as SerializedGraphPayload);
 		return `	[${JSON.stringify(cell.graphNodeId)}, ${JSON.stringify(value)}]`;
 	});
@@ -444,4 +448,93 @@ export function componentPropNames(component: AnyNode | undefined): string[] {
 
 export function isFragmentNode(node: AnyNode | undefined): boolean {
 	return node?.type === 'Fragment' || node?.type === 'JSXFragment';
+}
+
+// A shared() graph and a persisted storage slot are page-space by design: they
+// belong to the page, never to one composed component instance.
+function isPageSpaceGraphNodeId(graphNodeId: string): boolean {
+	return graphNodeId.startsWith('shared:') || graphNodeId.startsWith('storage:');
+}
+
+function chunkGraphNodeIds(
+	chunks: PublicRenderModuleInput['renderData']['chunks'],
+): ReadonlyArray<string> {
+	return chunks.flatMap((chunk) =>
+		chunk.slots.flatMap((slot) => {
+			const residueIds =
+				'residue' in slot && slot.residue.kind === 'graph-read'
+					? [slot.residue.graphNodeId]
+					: [];
+			return slot.kind === 'dynamic-host'
+				? [
+						...residueIds,
+						...slot.attributeSlots.flatMap((attribute) =>
+							attribute.residue.kind === 'graph-read'
+								? [attribute.residue.graphNodeId]
+								: [],
+						),
+					]
+				: residueIds;
+		}),
+	);
+}
+
+// Every payload node one component declares: its own state()/computed()
+// bindings, the props cell it destructures, and the template expressions its
+// own chunks read. The page root additionally keeps page-space nodes and any
+// node no same-module component claimed, so nothing is dropped. Positions, not
+// ids: two components of one module may each declare the same state name.
+export function componentOwnedStateNodes(
+	input: PublicRenderModuleInput,
+	componentName: string,
+	rootComponentName: string,
+): { readonly cellIndexes: ReadonlyArray<number>; readonly computedIndexes: ReadonlyArray<number> } {
+	const owner = payloadNodeOwners(input, rootComponentName);
+	return {
+		cellIndexes: input.protocolState.cells.flatMap((_cell, index) =>
+			owner.cells[index] === componentName ? [index] : [],
+		),
+		computedIndexes: input.protocolState.computed.flatMap((_computed, index) =>
+			owner.computed[index] === componentName ? [index] : [],
+		),
+	};
+}
+
+// The declaring component of every payload node, aligned with the payload's own
+// cell and computed order. A duplicated id is resolved positionally: the Nth
+// binding spelling that id owns the Nth node spelling it.
+function payloadNodeOwners(
+	input: PublicRenderModuleInput,
+	rootComponentName: string,
+): { readonly cells: ReadonlyArray<string>; readonly computed: ReadonlyArray<string> } {
+	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
+	const componentMap = sameModuleComponentMap(ast);
+	const chunkOwner = new Map<string, string>();
+	for (const component of input.semanticGraph.components) {
+		const propCell = componentMap.get(component.name);
+		const propCellId = propCell ? componentPropCellId(propCell) : null;
+		if (propCellId && !chunkOwner.has(propCellId)) chunkOwner.set(propCellId, component.name);
+		for (const graphNodeId of chunkGraphNodeIds(
+			input.renderData.chunks.filter((chunk) => chunk.componentName === component.name),
+		)) {
+			if (!chunkOwner.has(graphNodeId)) chunkOwner.set(graphNodeId, component.name);
+		}
+	}
+	const pending = new Map<string, string[]>();
+	for (const binding of input.semanticGraph.graphBindings) {
+		if (!binding.componentName) continue;
+		const queue = pending.get(binding.id);
+		if (queue) queue.push(binding.componentName);
+		else pending.set(binding.id, [binding.componentName]);
+	}
+	const ownerOf = (graphNodeId: string): string => {
+		if (isPageSpaceGraphNodeId(graphNodeId)) return rootComponentName;
+		const queue = pending.get(graphNodeId);
+		const declared = queue && queue.length > 1 ? queue.shift() : queue?.[0];
+		return declared ?? chunkOwner.get(graphNodeId) ?? rootComponentName;
+	};
+	return {
+		cells: input.protocolState.cells.map((cell) => ownerOf(cell.graphNodeId)),
+		computed: input.protocolState.computed.map((computed) => ownerOf(computed.graphNodeId)),
+	};
 }

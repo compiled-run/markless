@@ -56,12 +56,21 @@ export function createProtocolStatePayloadFromArena(
 		storage: input.payloadArena.state.storage,
 	});
 
+	// Two components of one module may each declare a state() of the same name,
+	// so one id can spell two cells. Consume the bindings for an id in order:
+	// the Nth cell takes the Nth binding's initial value.
+	const pendingBindings = new Map<string, StateBindingWithInitializer[]>();
+	for (const candidate of input.semanticGraph.graphBindings) {
+		const queue = pendingBindings.get(candidate.id);
+		if (queue) queue.push(candidate as StateBindingWithInitializer);
+		else pendingBindings.set(candidate.id, [candidate as StateBindingWithInitializer]);
+	}
 	const state: ProtocolStatePayload = {
 		...payload,
 		cells: input.payloadArena.state.cells.map((cell) => {
-			const binding = input.semanticGraph.graphBindings.find(
-				(candidate) => candidate.id === cell.graphNodeId,
-			) as StateBindingWithInitializer | undefined;
+			const queue = pendingBindings.get(cell.graphNodeId);
+			const binding =
+				queue && queue.length > 1 ? queue.shift() : queue?.[0];
 			const valueKind = cell.valueKind ?? 'unknown';
 			if (!binding?.initialValueKnown) {
 				return {

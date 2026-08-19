@@ -225,6 +225,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 				id: graphBindingId('state', name, state),
 				name: graphBindingName(name, state),
 				kind: 'state',
+				...declaringComponent(state),
 				...sharedScope(state),
 				declarationKind: state.currentHelperCall ? 'let' : declarationKind,
 				writable: true,
@@ -292,6 +293,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 				id: graphBindingId('computed', name, state),
 				name: graphBindingName(name, state),
 				kind: 'computed',
+				...declaringComponent(state),
 				...sharedScope(state),
 				declarationKind,
 				writable: false,
@@ -315,6 +317,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 				id: graphBindingId('element', name, state),
 				name,
 				kind: 'element',
+				...declaringComponent(state),
 				...sharedScope(state),
 				declarationKind,
 				writable: false,
@@ -746,6 +749,20 @@ function graphBindingName(name: string, state: WalkState): string {
 	if (!state.currentHelperCall) return name;
 	const call = state.currentHelperCall;
 	return `${call.componentName}_${call.localName}_${call.helperName}_${name}`;
+}
+
+// Which component declared this node. A same-module child's cells are seeded
+// and instance-qualified by that component alone, so the payload partition and
+// the SSR seeding lines both read this.
+function declaringComponent(
+	state: WalkState,
+): { readonly componentId?: string; readonly componentName?: string } {
+	return state.currentComponentName
+		? {
+				...(state.currentComponentId ? { componentId: state.currentComponentId } : {}),
+				componentName: state.currentComponentName,
+			}
+		: {};
 }
 
 function sharedScope(state: WalkState): { readonly sharedDefinitionId?: string } {

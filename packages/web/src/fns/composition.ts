@@ -125,7 +125,6 @@ export function marklessComposeState<T extends ComposeStateDraft>(
 		if (output.m) output.m(child.graphProps, instancePath);
 		else marklessQualifyChildState(output.state, child.graphProps, instancePath);
 	}
-	marklessAssertComposableStateNames(state, childStates);
 	const sharedDefinitions = [
 		...(state.sharedDefinitions ?? []),
 		...childStates.flatMap((childState) => childState.sharedDefinitions ?? []),
@@ -206,50 +205,6 @@ function marklessComposedSymbol(
 			},
 		});
 	return marklessMarkComposedSymbol(composed);
-}
-
-// Composed children whose symbols carry an instance path have already been
-// qualified above, so their ids cannot collide. A child declared in the SAME
-// module has no instance path (its symbols are indistinguishable at resume),
-// so its ids still merge unqualified and a same-named state()/computed() would
-// silently share one value. Refuse loudly for that case; shared definitions
-// keep their cross-module ids on purpose.
-export function marklessAssertComposableStateNames(
-	state: ComposeStateDraft,
-	childStates: ReadonlyArray<ComposeStateDraft>,
-) {
-	const seen = new Set(
-		[...(state.cells ?? []), ...(state.computed ?? [])].map((node) => node.graphNodeId),
-	);
-	for (const childState of childStates) {
-		for (const node of [...(childState.cells ?? []), ...(childState.computed ?? [])]) {
-			const id = node.graphNodeId;
-			// Only author-renamable state()/computed() names are diagnosable.
-			// Live directValue cells seed mapped prop sources and are not declarations.
-			// Shared definitions and props compose by design; compiler-synthesized
-			// names carry extra ':' segments and are not author collisions.
-			if (
-				node.directValue !== undefined ||
-				id.startsWith('shared:') ||
-				id.startsWith('prop:') ||
-				id.slice(id.indexOf(':') + 1).includes(':')
-			)
-				continue;
-			if (seen.has(id)) {
-				throw Object.assign(
-					new Error(
-						`MARKLESS_COMPOSED_STATE_COLLISION: Two components declared in the same module both declare state() or computed() named "${id.slice(id.indexOf(':') + 1)}". Components declared in the same module as the page share one state graph, so they would read and write the same value. Move one into its own module or rename it.`,
-					),
-					{
-						code: 'MARKLESS_COMPOSED_STATE_COLLISION',
-						graphNodeId: id,
-						docsUrl: 'https://markless.dev/errors/MARKLESS_COMPOSED_STATE_COLLISION',
-					},
-				);
-			}
-			seen.add(id);
-		}
-	}
 }
 
 export function marklessCsrRemapChildGraph(
