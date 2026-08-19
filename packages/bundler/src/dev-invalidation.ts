@@ -9,7 +9,7 @@ import { MARKLESS_EXECUTION_LOG_MODULE_ID, normalizeExecutionLogMode } from './e
 import type { MarklessHookContext } from './hooks/hook-context.ts';
 import { recordEmittedClaimOwnership } from './plugin-state.ts';
 import { transformTsrxModuleWithPrerenderWakeClosure } from './transform.ts';
-import type { MarklessEnvironment } from './types.ts';
+import type { MarklessEnvironment, TransformTsrxModuleResult } from './types.ts';
 import { isRenderDataSourceRequest, pathname, resolveVirtualId } from './virtual-ids.ts';
 
 export function invalidateAllGeneratedModules(
@@ -103,22 +103,35 @@ export async function invalidateEditedGeneratedModules(
 		return invalidateAllGeneratedModules(ctx, parent, currentEnvironment);
 	}
 
-	// Source-keyed registries: fold across every cached environment, write once.
-	const linkEntry = nextEntries[nextEntries.length - 1]!;
-	const captureEntry =
-		nextEntries.findLast(([, , , next]) => next.manifest.captureMetadata !== undefined) ??
-		linkEntry;
+	// Source-keyed registries: fold across every cached entry for this source,
+	// refreshed results substituted in, so a one-environment refresh cannot
+	// narrow a registry the retained entries also feed.
+	const refreshed = new Map(nextEntries.map(([key, , , next]) => [key, next]));
+	const foldEntries = [...linkedTransformCache].flatMap(([key, cached]) =>
+		cached.source === changedSource
+			? [{ cached, result: refreshed.get(key) ?? cached.result }]
+			: [],
+	);
+	// The link artifact must come from the edited source, so only a refreshed entry can supply it.
+	const linkResult = nextEntries[nextEntries.length - 1]![3];
+	// A refreshed manifest wins; a retained one only fills a gap the refresh left.
+	const captured = (result: TransformTsrxModuleResult) =>
+		(result.manifest.captureMetadata?.extractedSymbols.length ?? 0) > 0;
+	const captureManifest =
+		nextEntries.findLast(([, , , next]) => captured(next))?.[3].manifest ??
+		foldEntries.findLast(({ result }) => captured(result))?.result.manifest ??
+		linkResult.manifest;
 	moduleLinkArtifacts.set(changedSource, {
-		moduleGraphInterface: linkEntry[3].moduleGraphInterface,
-		interfaceHash: linkEntry[3].interfaceHash,
-		moduleImports: linkEntry[3].moduleImports,
+		moduleGraphInterface: linkResult.moduleGraphInterface,
+		interfaceHash: linkResult.interfaceHash,
+		moduleImports: linkResult.moduleImports,
 	});
-	moduleMetadata.recordCaptureMetadata(changedSource, captureEntry[3].manifest);
+	moduleMetadata.recordCaptureMetadata(changedSource, captureManifest);
 	prerenderWakeCapabilities.set(
 		changedSource,
-		nextEntries.some(
-			([, cached, , next]) =>
-				linkedManifestHasBrowserTriggers(next.manifest) ||
+		foldEntries.some(
+			({ cached, result }) =>
+				linkedManifestHasBrowserTriggers(result.manifest) ||
 				cached.linkedChildHasBrowserTriggers,
 		),
 	);
