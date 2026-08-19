@@ -92,14 +92,16 @@ test('compiles TSRX source into type-checkable TSX for TypeScript', () => {
 });
 
 // The document shell is authored against framework components like the router's
-// Html, which are plain .ts functions returning their children as `unknown`.
+// Html, which are plain .ts functions that pass their children through.
 test('document-shell markup type-checks: meta attributes and children-passthrough components', () => {
 	const source = `
-		function Shell(props: { readonly children?: unknown }): unknown {
+		import type { Children } from '@markless/core';
+
+		function Shell(props: { readonly children?: Children }): unknown {
 			return props.children;
 		}
 
-		export default function Document({ children }: { readonly children?: unknown }) @{
+		export default function Document({ children }: { readonly children?: Children }) @{
 			<Shell>
 				<head>
 					<meta charset="utf-8" />
@@ -113,13 +115,11 @@ test('document-shell markup type-checks: meta attributes and children-passthroug
 	const fileName = join(process.cwd(), 'packages/core/src/Document.tsrx');
 	const virtualCode = new MarklessTsrxVirtualCode(fileName, ts.ScriptSnapshot.fromString(source));
 
-	// Known gap, not user-visible today: interpolating `unknown`-typed children
-	// fails the strict Child contract. Closing it needs a public children type
-	// for component authors, which is an API decision - see the M10 object-child
-	// rejection this strictness exists for.
+	// The public Children type from @markless/core is the contract's own child
+	// shape, so a passthrough shell interpolates its children with no diagnostic.
 	expect(
 		formatDiagnostics(typeCheckVirtualSource(fileName, virtualCode.generatedCode)),
-	).toEqual(["Type 'unknown' is not assignable to type 'Child'."]);
+	).toEqual([]);
 });
 
 test('populates virtual code from the Markless compiler type-service artifact', () => {

@@ -1,8 +1,10 @@
+import type { Children } from '@markless/core';
+
 type CheckboxRootProps = {
-	readonly children?: unknown;
+	readonly children?: Children;
 };
 
 // Entry-gate placeholder: the checkbox family lands in the next unit.
 export default function CheckboxRoot({ children }: CheckboxRootProps) @{
-	<div data-checkbox-root>{children}</div>
+	<div>{children}</div>
 }

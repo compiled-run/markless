@@ -6,12 +6,16 @@ import App from './fixtures/entry-gate.tsrx';
 // barrel must render inside @markless/ui, not only in the compiler fixtures.
 afterEach(() => cleanup());
 
+// Library parts carry no data-* hooks, so the parts are located through the
+// element the fixture owns and then by the tag and text each part renders.
 function expectPartsMounted(container: ParentNode) {
-	const root = container.querySelector('[data-checkbox-root]');
+	const host = container.querySelector('[data-testid="entry-gate"]');
+	expect(host).not.toBeNull();
+	const root = host?.querySelector('div');
 	expect(root).not.toBeNull();
-	const trigger = root?.querySelector<HTMLButtonElement>('[data-checkbox-trigger]');
+	const trigger = root?.querySelector<HTMLButtonElement>('button');
 	expect(trigger).not.toBeNull();
-	expect(trigger?.tagName).toBe('BUTTON');
+	expect(trigger?.getAttribute('type')).toBe('button');
 	expect(trigger?.textContent).toBe('x');
 }
 

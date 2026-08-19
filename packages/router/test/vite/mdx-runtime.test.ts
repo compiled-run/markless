@@ -135,9 +135,9 @@ describe('renderMdxChild with async compiled artifacts', () => {
 		// work. The unawaited Promise passed the truthy guard while .html read
 		// undefined — the MDX child (counter AND home Link) silently dropped,
 		// which broke both router-dev-routes and router-preload-strategy.
-		const children: unknown[] = [];
+		const children: MdxChild[] = [];
 		const html = await renderMdxChild(
-			children as never,
+			children,
 			{
 				renderSsr: async () => ({
 					html: '<div data-mdx-counter>MDX Count 0</div>',

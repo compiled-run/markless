@@ -15,6 +15,7 @@ export type {
 	SharedOptions,
 	SharedScope,
 } from './framework-api.ts';
+export type { Children, PropsOf } from './jsx-types.ts';
 export { render } from './render.ts';
 export type {
 	CsrRenderArtifact,

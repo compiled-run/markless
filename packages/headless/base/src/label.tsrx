@@ -1,6 +1,8 @@
+import type { Children, PropsOf } from '@markless/core';
+
 type LabelProps = {
-	readonly for?: string;
-	readonly children?: unknown;
+	readonly for?: PropsOf<'label'>['for'];
+	readonly children?: Children;
 };
 
 // QDS also suppresses text selection on a second click. That needs a synchronous

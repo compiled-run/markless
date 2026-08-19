@@ -65,7 +65,8 @@ export interface LinkNavigationProps {
 
 export type DefaultLinkProps = {
 	readonly href?: string;
-	readonly children?: unknown;
+	// The JSX contract's child shape, reached ambiently: core depends on router, not the reverse.
+	readonly children?: __MarklessTypeService.Child;
 	readonly class?: string;
 	readonly id?: string;
 	readonly target?: string;
@@ -127,11 +128,11 @@ export function __marklessCreateHttpContext<
 }
 
 export const Html = Object.assign(
-	function Html(props: { readonly children?: unknown }): unknown {
+	function Html(props: { readonly children?: __MarklessTypeService.Child }): unknown {
 		return props.children;
 	},
 	{
-		renderSsr(props: { readonly children?: unknown } = {}) {
+		renderSsr(props: { readonly children?: __MarklessTypeService.Child } = {}) {
 			return { html: props.children == null ? '' : String(props.children), elementCount: 0 };
 		},
 	},

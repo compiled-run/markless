@@ -774,7 +774,7 @@ test('M11 real tsserver hovers and defines component tags in authored TSRX sourc
 	const importedSource = realpathSync(fixturePath(project, 'Nav.tsrx'));
 
 	expect(displayText(info)).toMatch(
-		/Nav\([\s\S]*label: string;[\s\S]*active\?: boolean;[\s\S]*children\?: unknown/,
+		/Nav\([\s\S]*label: string;[\s\S]*active\?: boolean;[\s\S]*children\?: Children/,
 	);
 	for (const definition of [openingDefinition, closingDefinition]) {
 		expect(definition?.definitions?.map((item: any) => realpathSync(item.file))).toContain(
@@ -877,6 +877,39 @@ test('M10 intrinsic contract rejects className, bogus and tag-wrong attributes, 
 	expectDiagnosticSpan(fixture.source, diagnosticMatching(diagnostics, /src/), 'src');
 	expectDiagnosticSpan(fixture.source, diagnosticMatching(diagnostics, /invalid/), 'invalid');
 	expect(diagnostics).toHaveLength(4);
+}, 20_000);
+
+test('M16 PropsOf and Children from @markless/core type a component and its children in .tsrx', async () => {
+	const fixture = openFixture('authoring-types.tsrx');
+	const syntactic = await server.syntacticDiagnosticsSync(fixture.file);
+	const semantic = await server.semanticDiagnosticsSync(fixture.file);
+
+	expect(syntactic).toEqual([]);
+	expect(
+		semantic,
+		'M16 missing capability: PropsOf<\'button\'> must accept the intrinsic button attributes and native handlers on a component, and Children must accept an element, text, and an absent child.',
+	).toEqual([]);
+}, 20_000);
+
+test('M16 PropsOf rejects an attribute the wrapped tag does not have', async () => {
+	const fixture = openFixture('authoring-types-errors.tsrx');
+	const diagnostics = await server.semanticDiagnosticsSync(fixture.file);
+
+	expectDiagnosticSpan(fixture.source, diagnosticMatching(diagnostics, /href/), 'href');
+	expect(
+		diagnostics,
+		'M16 missing capability: href is an anchor attribute, so it must be the only diagnostic on a PropsOf<\'button\'> component.',
+	).toHaveLength(1);
+}, 20_000);
+
+test('M16 PropsOf and Children import into a plain .ts file and PropsOf is exactly the intrinsic props', async () => {
+	const fixture = openFixture('authoring-types.ts');
+	const diagnostics = await server.semanticDiagnosticsSync(fixture.file);
+
+	expect(
+		diagnostics,
+		'M16 missing capability: the authoring types must resolve from @markless/core in .ts, and PropsOf<Tag> must stay mutually assignable with JSX.IntrinsicElements[Tag].',
+	).toEqual([]);
 }, 20_000);
 
 test('M10 plugin does not add the Markless declaration to a project without TSRX', async () => {

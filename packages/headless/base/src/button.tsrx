@@ -1,6 +1,8 @@
+import type { Children, PropsOf } from '@markless/core';
+
 type ButtonProps = {
-	readonly disabled?: boolean;
-	readonly children?: unknown;
+	readonly disabled?: PropsOf<'button'>['disabled'];
+	readonly children?: Children;
 };
 
 // QDS also has a toggle mode (pressed + onChange + aria-pressed/ui-pressed). Calling an
