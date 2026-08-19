@@ -60,6 +60,36 @@ describe('claim-manifest link pass', () => {
 		expect(Object.keys(artifact.byEmittedModule)).toEqual([source, symbolsSource]);
 	});
 
+	test('one symbol row written in a different key order is not a divergence', () => {
+		const event = symbol('symbol:event');
+		// The same four fields, spelled in the reverse order: serialized text
+		// disagrees, the claim does not.
+		const reordered = {
+			virtualModuleId: event.virtualModuleId,
+			kind: event.kind,
+			exportName: event.exportName,
+			symbolId: event.symbolId,
+		};
+		expect(
+			mergeLinkedSourceClaims({
+				source,
+				resolverId,
+				claims: [manifest(source, [event]), manifest(symbolsSource, [reordered])],
+			}).diagnostics,
+		).toEqual([]);
+
+		const diverged = mergeLinkedSourceClaims({
+			source,
+			resolverId,
+			claims: [
+				manifest(source, [event]),
+				manifest(symbolsSource, [{ ...reordered, exportName: 'conflict' }]),
+			],
+		}).diagnostics;
+		expect(diverged).toHaveLength(1);
+		expect(diverged[0]?.code).toBe('MARKLESS_SOURCE_SYMBOL_CLAIMS_DIVERGED');
+	});
+
 	test('a source with no claiming sibling merges to nothing rather than failing', () => {
 		const merged = mergeLinkedSourceClaims({
 			source,

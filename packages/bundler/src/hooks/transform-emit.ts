@@ -12,6 +12,7 @@ import {
 	linkedInterfaces,
 	materializeDelegateChildren,
 	mergeLinkedModuleChildren,
+	warnDelegateImportFailures,
 } from '../link-driver.ts';
 import { registerRenderDataStyles, registerTransformArtifacts } from '../plugin-state.ts';
 import type { TransformTsrxModuleInput, TransformTsrxModuleResult } from '../types.ts';
@@ -31,11 +32,13 @@ export async function emitClientRouteArtifact(
 ) {
 	const { ctx, pluginContext, source } = request;
 	const { clientRouteArtifactMaterializations } = ctx.state;
-	const artifactChildMaterializations = await materializeDelegateChildren(
+	const delegates = await materializeDelegateChildren(
 		pluginContext,
 		source,
 		transformed.artifactChildren,
 	);
+	warnDelegateImportFailures(pluginContext, delegates);
+	const artifactChildMaterializations = delegates.materializations;
 	if (Object.keys(artifactChildMaterializations).length > 0) {
 		clientRouteArtifactMaterializations.set(source, artifactChildMaterializations);
 	}

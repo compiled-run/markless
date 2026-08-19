@@ -9,6 +9,8 @@ import { pathToFileURL } from 'node:url';
 import {
 	type ArtifactChildMaterialization,
 	type CaptureAnalysisArtifact,
+	type CompilerDiagnostic,
+	type DelegateImportFailure,
 	type LinkedArtifactChild,
 	type LinkedInterfaceClaim,
 	type LinkedInterfaceImport,
@@ -282,6 +284,32 @@ export function moduleIsEntry(
 	}
 }
 
+// What the linker materialized, plus every delegate whose `import()` rejected:
+// the failure keeps the source and the original error the pass cannot observe,
+// and the pass's own diagnostics travel with them so a caller can report them.
+export type DelegateChildMaterializationResult = {
+	readonly materializations: Readonly<Record<string, ArtifactChildMaterialization>>;
+	readonly importFailures: ReadonlyArray<DelegateImportFailure>;
+	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+};
+
+export type DelegateWarnContext = { warn?: (message: string) => void };
+
+// Reports the delegates whose `import()` rejected as build warnings. The pass
+// owns the message; the module still skips, so this never fails the build.
+export function warnDelegateImportFailures(
+	pluginContext: DelegateWarnContext,
+	result: Pick<DelegateChildMaterializationResult, 'diagnostics' | 'importFailures'>,
+): void {
+	if (typeof pluginContext.warn !== 'function' || result.importFailures.length === 0) return;
+	const failed = new Set(result.importFailures.map((failure) => failure.source));
+	for (const diagnostic of result.diagnostics) {
+		if (diagnostic.source !== undefined && failed.has(diagnostic.source)) {
+			pluginContext.warn(diagnostic.message);
+		}
+	}
+}
+
 // Performs the I/O the `delegate-children` pass may not: resolves each edge,
 // imports the dependency's compiled JavaScript, and calls its `renderSsr`. The
 // build-time `import()` of a dependency's dist is pre-existing; it is the one
@@ -291,7 +319,7 @@ export async function materializeDelegateChildren(
 	context: LinkResolveContext,
 	parent: string,
 	candidates: ReadonlyArray<LinkedArtifactChild>,
-): Promise<Record<string, ArtifactChildMaterialization>> {
+): Promise<DelegateChildMaterializationResult> {
 	const resolution: Record<string, string> = {};
 	for (const candidate of delegateChildResolutionRequests(candidates)) {
 		const resolved = await context.resolve(candidate.importSource, parent, { skipSelf: true });
@@ -301,15 +329,30 @@ export async function materializeDelegateChildren(
 	const children = planDelegateChildren(candidates, resolution);
 	const byEdge = new Map(candidates.map((candidate) => [candidate.edgeId, candidate]));
 	const loaded = new Map<string, Record<string, unknown>>();
+	const unloadable = new Map<string, { readonly message: string; readonly edgeIds: string[] }>();
 	const renderings: Record<string, ArtifactChildMaterialization> = {};
 	for (const child of children) {
 		const candidate = byEdge.get(child.edgeId);
 		const source = child.source;
 		if (!child.loadable || !candidate || source === undefined) continue;
 		if (!isAbsolute(source) || !existsSync(source) || !statSync(source).isFile()) continue;
+		const failed = unloadable.get(source);
+		if (failed) {
+			failed.edgeIds.push(child.edgeId);
+			continue;
+		}
 		let module = loaded.get(source);
 		if (!module) {
-			module = (await import(pathToFileURL(source).href)) as Record<string, unknown>;
+			// Unimportable here (e.g. raw .ts without type stripping): not materialized, never a crash.
+			try {
+				module = (await import(pathToFileURL(source).href)) as Record<string, unknown>;
+			} catch (error) {
+				unloadable.set(source, {
+					message: error instanceof Error ? error.message : String(error),
+					edgeIds: [child.edgeId],
+				});
+				continue;
+			}
 			loaded.set(source, module);
 		}
 		const component =
@@ -329,7 +372,17 @@ export async function materializeDelegateChildren(
 		if (!rendering.ok) throw new Error(rendering.diagnostic.message);
 		renderings[child.edgeId] = rendering.rendering;
 	}
-	return linkDelegateChildren({ children, renderings }).materializations;
+	const importFailures = [...unloadable].map(([source, failure]) => ({
+		source,
+		edgeIds: [...failure.edgeIds],
+		message: failure.message,
+	}));
+	const linked = linkDelegateChildren({ children, renderings, importFailures });
+	return {
+		materializations: linked.materializations,
+		importFailures,
+		diagnostics: linked.diagnostics,
+	};
 }
 
 // Resolution and path math stay with the bundler by the ruling's own list of

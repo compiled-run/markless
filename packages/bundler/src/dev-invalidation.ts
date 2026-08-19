@@ -9,7 +9,7 @@ import { MARKLESS_EXECUTION_LOG_MODULE_ID, normalizeExecutionLogMode } from './e
 import type { MarklessHookContext } from './hooks/hook-context.ts';
 import { recordEmittedClaimOwnership } from './plugin-state.ts';
 import { transformTsrxModuleWithPrerenderWakeClosure } from './transform.ts';
-import type { MarklessEnvironment } from './types.ts';
+import type { MarklessEnvironment, TransformTsrxModuleResult } from './types.ts';
 import { isRenderDataSourceRequest, pathname, resolveVirtualId } from './virtual-ids.ts';
 
 export function invalidateAllGeneratedModules(
@@ -103,6 +103,37 @@ export async function invalidateEditedGeneratedModules(
 		return invalidateAllGeneratedModules(ctx, parent, currentEnvironment);
 	}
 
+	// Fold across every cached entry for this source (refreshed substituted in), never one environment.
+	const refreshed = new Map(nextEntries.map(([key, , , next]) => [key, next]));
+	const foldEntries = [...linkedTransformCache].flatMap(([key, cached]) =>
+		cached.source === changedSource
+			? [{ cached, result: refreshed.get(key) ?? cached.result }]
+			: [],
+	);
+	// The link artifact must come from the edited source, so only a refreshed entry can supply it.
+	const linkResult = nextEntries[nextEntries.length - 1]![3];
+	// A refreshed manifest wins; a retained one only fills a gap the refresh left.
+	const captured = (result: TransformTsrxModuleResult) =>
+		(result.manifest.captureMetadata?.extractedSymbols.length ?? 0) > 0;
+	const captureManifest =
+		nextEntries.findLast(([, , , next]) => captured(next))?.[3].manifest ??
+		foldEntries.findLast(({ result }) => captured(result))?.result.manifest ??
+		linkResult.manifest;
+	moduleLinkArtifacts.set(changedSource, {
+		moduleGraphInterface: linkResult.moduleGraphInterface,
+		interfaceHash: linkResult.interfaceHash,
+		moduleImports: linkResult.moduleImports,
+	});
+	moduleMetadata.recordCaptureMetadata(changedSource, captureManifest);
+	prerenderWakeCapabilities.set(
+		changedSource,
+		foldEntries.some(
+			({ cached, result }) =>
+				linkedManifestHasBrowserTriggers(result.manifest) ||
+				cached.linkedChildHasBrowserTriggers,
+		),
+	);
+
 	const renderDataIds = new Set<string>();
 	for (const [key, cached, nextInput, next] of nextEntries) {
 		linkedTransformCache.set(key, {
@@ -111,12 +142,6 @@ export async function invalidateEditedGeneratedModules(
 			input: nextInput,
 			result: next,
 		});
-		moduleLinkArtifacts.set(changedSource, {
-			moduleGraphInterface: next.moduleGraphInterface,
-			interfaceHash: next.interfaceHash,
-			moduleImports: next.moduleImports,
-		});
-		moduleMetadata.recordCaptureMetadata(changedSource, next.manifest);
 		recordEmittedClaimOwnership(state, {
 			source: changedSource,
 			emittedModule: cached.manifestSource,
@@ -131,10 +156,6 @@ export async function invalidateEditedGeneratedModules(
 					}
 				: {}),
 		});
-		prerenderWakeCapabilities.set(
-			changedSource,
-			linkedManifestHasBrowserTriggers(next.manifest) || cached.linkedChildHasBrowserTriggers,
-		);
 		for (const module of next.virtualModules) {
 			if (module.type !== 'render-data') continue;
 			virtualModules.set(module.id, module);

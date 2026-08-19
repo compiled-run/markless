@@ -78,13 +78,17 @@ function interfaceHashSignature(imports: ReadonlyArray<LinkedInterfaceImport>): 
 		.join('|');
 }
 
+// Cache key: every claim per source, merged and ordered, so a diverging later claim moves it.
 function symbolClaimSignature(claims: ReadonlyArray<LinkedInterfaceClaim>): string {
-	const symbolsBySource = new Map<string, ReadonlyArray<unknown>>();
-	for (const claim of claims)
-		if (!symbolsBySource.has(claim.source)) symbolsBySource.set(claim.source, claim.symbols);
-	return [...symbolsBySource.keys()]
+	const rowsBySource = new Map<string, Set<string>>();
+	for (const claim of claims) {
+		const rows = rowsBySource.get(claim.source) ?? new Set<string>();
+		for (const symbol of claim.symbols) rows.add(JSON.stringify(symbol));
+		rowsBySource.set(claim.source, rows);
+	}
+	return [...rowsBySource.keys()]
 		.sort()
-		.map((source) => JSON.stringify([source, symbolsBySource.get(source)]))
+		.map((source) => JSON.stringify([source, [...(rowsBySource.get(source) ?? [])].sort()]))
 		.join('|');
 }
 
