@@ -236,7 +236,9 @@ export default defineConfig({
 		// No lint.options.typeCheck: tsgolint disagrees with the tsc gate of
 		// record (1253 vs 0) because it applies strict-family defaults and lints
 		// outside this tsconfig's include/exclude. Raw tsc is the type gate.
-		ignorePatterns: ['dist/**', 'node_modules/**', '.claude/**'],
+		// vendor/ holds generated build output from sibling toolchains (yuku-tsrx);
+		// lint findings there belong to the producing build, not this repo.
+		ignorePatterns: ['dist/**', 'node_modules/**', '.claude/**', 'vendor/**'],
 	},
 	fmt: {
 		useTabs: true,
@@ -244,6 +246,6 @@ export default defineConfig({
 		printWidth: 100,
 		endOfLine: 'lf',
 		singleQuote: true,
-		ignorePatterns: ['dist/**', 'node_modules/**', '.claude/**'],
+		ignorePatterns: ['dist/**', 'node_modules/**', '.claude/**', 'vendor/**'],
 	},
 });

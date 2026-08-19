@@ -2,8 +2,8 @@
 
 Read `implementation.md` first. This file is the compiler overlay.
 
-- The compiler implementation is JS/TS on `@tsrx/core`; OXC/native work is deferred until framework behavior and artifact contracts are proven.
-- Treat `@tsrx/core` as an external dependency boundary. Never inspect, edit, run commands in, or depend on changes to `../native-tsrx`.
+- The compiler implementation is JS/TS on the generated self-contained `yuku-tsrx` host; OXC/native work is deferred until framework behavior and artifact contracts are proven.
+- Treat `yuku-tsrx` as the parser boundary. Markless owns compiler diagnostics, source locations, and Volar mapping adapters; the host owns parser channels and event names.
 - Add expected pass artifacts one pass at a time through failing tests; do not hand-write large final artifact JSON before the owning pass exists.
 - If a required parser artifact is unavailable, keep Markless tests at the compiler artifact boundary, record the caveat, or ask before dependency work.
 - Organize compiler behavior as pass-owned modules with typed, human-readable input and output artifacts. An orchestrator may validate and run the pass graph; an entry file may re-export; neither owns pass semantics.

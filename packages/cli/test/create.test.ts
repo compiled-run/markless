@@ -711,8 +711,7 @@ const lane = (flavor: ManagerFlavor) => MANAGER_LANES.find((entry) => entry.flav
 const JOIN_CASES = [
 	{
 		after: [
-			'# Do not add ../native-tsrx here. @tsrx/core is an external dependency',
-			'# boundary for this repo.',
+			'# yuku-tsrx is consumed through the generated self-contained local host.',
 			'packages:',
 			"    - 'packages/*'",
 			"    - 'nested/newapp'",
@@ -723,8 +722,7 @@ const JOIN_CASES = [
 			'',
 		].join('\n'),
 		before: [
-			'# Do not add ../native-tsrx here. @tsrx/core is an external dependency',
-			'# boundary for this repo.',
+			'# yuku-tsrx is consumed through the generated self-contained local host.',
 			'packages:',
 			"    - 'packages/*'",
 			'',

@@ -1,4 +1,4 @@
-import { parseModule } from '@tsrx/core';
+import { parseModule } from '../../yuku-tsrx-adapter.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import type {
@@ -21,7 +21,11 @@ import {
 	getFrameworkApiForCall,
 } from './imports.ts';
 import { collectComponentProps } from './collect-components.ts';
-import { getComponentFunction, getElementAttributes, unwrapExpressionContainer } from '../../ast/tsrx.ts';
+import {
+	getComponentFunction,
+	getElementAttributes,
+	unwrapExpressionContainer,
+} from '../../ast/tsrx.ts';
 import {
 	collectConditionalBranchText,
 	collectElement,
@@ -132,16 +136,25 @@ export async function buildSemanticGraph(
 				);
 				const root = chunks.find((chunk) => chunk.id === `template:${component.name}`);
 				if (!root) return [];
-				return [{
-					componentName: component.name,
-					rootChunkId: root.id,
-					childChunks: chunks
-						.filter((chunk) => chunk.id !== root.id)
-						.map((chunk) => ({ id: chunk.id, kind: chunk.kind, slotCount: chunk.slots.length })),
-					inputs: graph.componentPropBindings
-						.filter((binding) => binding.componentName === component.name)
-						.map((binding) => ({ localName: binding.localName, path: binding.propPath })),
-				}];
+				return [
+					{
+						componentName: component.name,
+						rootChunkId: root.id,
+						childChunks: chunks
+							.filter((chunk) => chunk.id !== root.id)
+							.map((chunk) => ({
+								id: chunk.id,
+								kind: chunk.kind,
+								slotCount: chunk.slots.length,
+							})),
+						inputs: graph.componentPropBindings
+							.filter((binding) => binding.componentName === component.name)
+							.map((binding) => ({
+								localName: binding.localName,
+								path: binding.propPath,
+							})),
+					},
+				];
 			}),
 		},
 	};
@@ -159,12 +172,8 @@ export async function buildSemanticGraph(
 	};
 }
 
-type ComponentLocalBinding = WalkState['componentLocalBindings'] extends Map<
-	string,
-	infer Binding
->
-	? Binding
-	: never;
+type ComponentLocalBinding =
+	WalkState['componentLocalBindings'] extends Map<string, infer Binding> ? Binding : never;
 
 function prepareComponentLocalBindings(body: AnyNode, state: WalkState): void {
 	state.componentLocalBindings = new Map();
@@ -190,7 +199,9 @@ function prepareComponentLocalBindings(body: AnyNode, state: WalkState): void {
 					bindingId: `binding:${declarationSpan.start}:${declarationSpan.end}`,
 					lexicalScopeId,
 					declarationKind:
-						statement.kind === 'let' || statement.kind === 'var' ? statement.kind : 'const',
+						statement.kind === 'let' || statement.kind === 'var'
+							? statement.kind
+							: 'const',
 					declarationSpan,
 					writeCount: initializerNode ? 1 : 0,
 					...(initializer ? { initializer } : {}),
@@ -293,7 +304,11 @@ function resolveComponentLocalReferences(
 		if (bindingId) {
 			state.resolvedComponentLocalBindingIds.set(node, bindingId);
 			const span = sourceSpan(node, state.filename);
-			if (span) state.resolvedComponentLocalBindingsBySpan.set(`${span.start}:${span.end}`, bindingId);
+			if (span)
+				state.resolvedComponentLocalBindingsBySpan.set(
+					`${span.start}:${span.end}`,
+					bindingId,
+				);
 		}
 		return;
 	}
@@ -377,7 +392,8 @@ function directScopeBindingNames(node: AnyNode | undefined): ReadonlyArray<strin
 
 function bindingPatternNames(node: AnyNode | undefined): ReadonlyArray<string> {
 	if (!node) return [];
-	if (node.type === 'Identifier') return getIdentifierName(node) ? [getIdentifierName(node)!] : [];
+	if (node.type === 'Identifier')
+		return getIdentifierName(node) ? [getIdentifierName(node)!] : [];
 	if (node.type === 'AssignmentPattern') {
 		return bindingPatternNames(node.left as AnyNode | undefined);
 	}

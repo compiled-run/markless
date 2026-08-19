@@ -195,7 +195,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 				...pass,
 				run({ inputs }) {
 					return {
-					renderData: createRenderData({
+						renderData: createRenderData({
 							semanticGraph: inputs.semanticGraph as SemanticGraphArtifact,
 							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
 							payloadArena: inputs.payloadArena as PayloadArenaArtifact,
@@ -327,8 +327,10 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 						symbolModules: inputs.symbolModules as SymbolModulesArtifact,
 						publicRenderModule:
 							inputs.publicRenderModule as CompileTsrxModuleResult['publicRenderModule'],
-						protocolView: inputs.protocolView as CompileTsrxModuleResult['protocolView'],
-						protocolState: inputs.protocolState as CompileTsrxModuleResult['protocolState'],
+						protocolView:
+							inputs.protocolView as CompileTsrxModuleResult['protocolView'],
+						protocolState:
+							inputs.protocolState as CompileTsrxModuleResult['protocolState'],
 					};
 					const runtimeDemandMaps = {
 						'plain-ssr': createRuntimeDemandMap(demandInput, 'plain-ssr'),
@@ -349,8 +351,10 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 					return {
 						triggerGroups: createTriggerGroups({
 							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
-							protocolState: inputs.protocolState as CompileTsrxModuleResult['protocolState'],
-							protocolView: inputs.protocolView as CompileTsrxModuleResult['protocolView'],
+							protocolState:
+								inputs.protocolState as CompileTsrxModuleResult['protocolState'],
+							protocolView:
+								inputs.protocolView as CompileTsrxModuleResult['protocolView'],
 							runtimeDemandMap: inputs.runtimeDemandMap as RuntimeDemandMapArtifact,
 						}),
 					};
@@ -405,8 +409,8 @@ function parseErrorDiagnostic(
 		severity: 'error',
 		phase: 'parse',
 		title: 'TSRX parser rejected this source',
-		message: `@tsrx/core reported: ${message}`,
-		why: 'The source could not enter the Markless compiler because the TSRX parser failed at phase parse (external @tsrx/core). Markless treats @tsrx/core as an external dependency boundary, so the original parser message is preserved here instead of changing the parser.',
+		message: `yuku-tsrx reported: ${message}`,
+		why: 'The source could not enter the Markless compiler because the yuku-tsrx parser failed at phase parse. Markless preserves the parser message and adapts its source location into the compiler diagnostic.',
 		primarySpan: parserErrorSpan(error, source),
 		passId: 'tsrx-semantic-graph',
 		artifactKeys: ['semanticGraph'],

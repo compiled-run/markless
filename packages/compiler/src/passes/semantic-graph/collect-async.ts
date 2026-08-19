@@ -49,7 +49,7 @@ export function collectAsyncBoundary(
 	});
 	state.currentAsyncBoundaryId = boundaryId;
 
-	for (const child of childNodes(node)) {
+	for (const child of asNodes([node.block, node.handler, node.pending])) {
 		state.currentAsyncBoundaryArm = armByNode.get(child) ?? previousArm;
 		walk(child, state);
 	}
@@ -257,7 +257,12 @@ export function collectAsyncComputedPostAwaitReads(
 	const firstAwaitEnd = findFirstAwaitEnd(body);
 	if (firstAwaitEnd === null) return;
 
-	for (const read of postAwaitGraphReads(body, firstAwaitEnd, state, declaredBindingNamesDeep(body))) {
+	for (const read of postAwaitGraphReads(
+		body,
+		firstAwaitEnd,
+		state,
+		declaredBindingNamesDeep(body),
+	)) {
 		state.graph.diagnostics.push(asyncPostAwaitReadDiagnostic(computedName, read));
 	}
 }
