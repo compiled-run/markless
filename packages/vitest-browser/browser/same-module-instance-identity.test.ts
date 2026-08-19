@@ -48,10 +48,23 @@ test('same-module siblings: SSR resume qualifies each instance in the payload', 
 	expect(b.textContent).toBe('0');
 });
 
-// CSR for two same-module components that declare ONE state name is still
-// open: the browser evaluator reads initial values through the module-wide
-// payload, so the duplicated id resolves to the first cell. SSR below proves
-// the payload partition; the CSR read path is named in this unit's receipt.
+test('same-module components with one state name keep separate CSR state', async () => {
+	const screen = await render(SameNamePage);
+	const container = screen.container as HTMLElement;
+	const left = button(container, '[data-left]');
+	const right = button(container, '[data-right]');
+	expect(left.textContent).toBe('0');
+	expect(right.textContent).toBe('10');
+
+	left.click();
+	await expect.poll(() => left.textContent).toBe('1');
+	expect(right.textContent).toBe('10');
+
+	right.click();
+	await expect.poll(() => right.textContent).toBe('12');
+	expect(left.textContent).toBe('1');
+});
+
 test('same-module components with one state name keep distinct SSR payload ids', async () => {
 	const screen = await renderSSR(SameNamePage);
 	const reportIds = statePayloadIds(screen.container).filter((id) =>

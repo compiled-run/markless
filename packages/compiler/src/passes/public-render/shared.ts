@@ -497,6 +497,36 @@ function chunkGraphNodeIds(
 	);
 }
 
+// The initial values one component seeds its render from. An id only one
+// binding spells stays available to every component of the module; an id two
+// same-module components both spell resolves positionally, so each component
+// seeds the initial value it actually declared.
+export function componentOwnedInitialValues(
+	input: PublicRenderModuleInput,
+	componentName: string,
+	rootComponentName: string,
+): PublicRenderModuleInput['renderData']['initialValues'] {
+	const declaringOwners = new Map<string, string[]>();
+	for (const binding of input.semanticGraph.graphBindings) {
+		if (!binding.componentName) continue;
+		const owners = declaringOwners.get(binding.id);
+		if (owners) owners.push(binding.componentName);
+		else declaringOwners.set(binding.id, [binding.componentName]);
+	}
+	const spellings = new Map<string, number>();
+	for (const initial of input.renderData.initialValues) {
+		spellings.set(initial.graphNodeId, (spellings.get(initial.graphNodeId) ?? 0) + 1);
+	}
+	const position = new Map<string, number>();
+	return input.renderData.initialValues.filter((initial) => {
+		const index = position.get(initial.graphNodeId) ?? 0;
+		position.set(initial.graphNodeId, index + 1);
+		if ((spellings.get(initial.graphNodeId) ?? 0) < 2) return true;
+		const owners = declaringOwners.get(initial.graphNodeId);
+		return (owners?.[index] ?? rootComponentName) === componentName;
+	});
+}
+
 // Every payload node one component declares: its own state()/computed()
 // bindings, the props cell it destructures, and the template expressions its
 // own chunks read. The page root additionally keeps page-space nodes and any

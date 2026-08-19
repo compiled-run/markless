@@ -9,6 +9,7 @@ import {
 	componentPropCellId,
 	componentEdgeInstanceSegment,
 	componentEdgesFor,
+	componentOwnedInitialValues,
 	componentOwnedStateNodes,
 	sameModuleComponentMap,
 } from './shared.ts';
@@ -137,8 +138,12 @@ export function collectPublicRenderComponentDefinitions(
 				? [binding.id]
 				: [],
 		);
+		const initialValues =
+			componentNames.size > 1
+				? componentOwnedInitialValues(input, componentName, rootInfo.componentName)
+				: input.renderData.initialValues;
 		const initialValueKinds = Object.fromEntries(
-			input.renderData.initialValues.flatMap((initial) => {
+			initialValues.flatMap((initial) => {
 				// Held in a const so the discriminated narrowing survives into the callback.
 				const value = initial.value;
 				if (value.kind !== 'symbol-function') return [];
@@ -175,7 +180,7 @@ export function collectPublicRenderComponentDefinitions(
 				branchIds: [...branchIds],
 				boundaryIds: [...boundaryIds],
 				repeatIds: [...repeatIds],
-				initialValues: input.renderData.initialValues,
+				initialValues,
 				initialValueKinds,
 				stateGraphNodeIds,
 				branches: input.renderData.branches.filter((branch) =>
