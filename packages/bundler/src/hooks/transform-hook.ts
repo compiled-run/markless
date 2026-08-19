@@ -198,7 +198,14 @@ async function runFirstPassTransform(
 		} catch (error) {
 			// Imported graph helpers can diagnose before their interface is linked.
 			// Publish only this compiler-owned link artifact so cycles never wait.
-			const provisional = await compileTsrxModuleLinkArtifact(transformInput);
+			// The provisional compile is a recovery attempt, so its own failure is
+			// never the diagnostic the author needs: report the transform error.
+			let provisional: Awaited<ReturnType<typeof compileTsrxModuleLinkArtifact>>;
+			try {
+				provisional = await compileTsrxModuleLinkArtifact(transformInput);
+			} catch {
+				throw error;
+			}
 			moduleLinkArtifacts.set(source, provisional);
 			const provisionalImports = await resolveImportedModuleInterfaces(
 				pluginContext,
