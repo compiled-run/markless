@@ -103,9 +103,7 @@ export async function invalidateEditedGeneratedModules(
 		return invalidateAllGeneratedModules(ctx, parent, currentEnvironment);
 	}
 
-	// Source-keyed registries: fold across every cached entry for this source,
-	// refreshed results substituted in, so a one-environment refresh cannot
-	// narrow a registry the retained entries also feed.
+	// Fold across every cached entry for this source (refreshed substituted in), never one environment.
 	const refreshed = new Map(nextEntries.map(([key, , , next]) => [key, next]));
 	const foldEntries = [...linkedTransformCache].flatMap(([key, cached]) =>
 		cached.source === changedSource

@@ -2024,9 +2024,7 @@ export type LinkedCompiledOutputs = {
 // component must ship so a consuming app can link its CSS and tell a stale
 // render-data module from a fresh one. `claimManifest` always carries an empty
 // `symbols`: a data-only facade owns no symbol claims.
-export type RenderDataModuleArtifact<
-	Manifest extends LinkedClaimManifest = LinkedClaimManifest,
-> = {
+export type RenderDataModuleArtifact<Manifest extends LinkedClaimManifest = LinkedClaimManifest> = {
 	readonly passId: 'render-data-module';
 	readonly source: string;
 	readonly emittedModule: string;
@@ -2086,22 +2084,21 @@ export type LinkedClaimIdNaming = {
 	readonly isWakeRequest: (id: string) => boolean;
 };
 
-export type EmittedClaimOwnershipInput<
-	Manifest extends LinkedClaimManifest = LinkedClaimManifest,
-> = {
-	readonly source: string;
-	readonly emittedModule: string;
-	readonly manifest: Manifest;
-	// The generated resolver among the modules this transform emitted, when it
-	// emitted one.
-	readonly resolverModuleId: string | undefined;
-	// Whether the resolver this manifest names already holds claims, which is how
-	// an ordinary sibling knows a wake variant took its routes.
-	readonly wakeOwnsRoutes: boolean;
-	// Every emitted module currently holding claims, for displacement.
-	readonly claimOwners: ReadonlyArray<string>;
-	readonly naming: LinkedClaimIdNaming;
-};
+export type EmittedClaimOwnershipInput<Manifest extends LinkedClaimManifest = LinkedClaimManifest> =
+	{
+		readonly source: string;
+		readonly emittedModule: string;
+		readonly manifest: Manifest;
+		// The generated resolver among the modules this transform emitted, when it
+		// emitted one.
+		readonly resolverModuleId: string | undefined;
+		// Whether the resolver this manifest names already holds claims, which is how
+		// an ordinary sibling knows a wake variant took its routes.
+		readonly wakeOwnsRoutes: boolean;
+		// Every emitted module currently holding claims, for displacement.
+		readonly claimOwners: ReadonlyArray<string>;
+		readonly naming: LinkedClaimIdNaming;
+	};
 
 export type EmittedClaimOwnership<Manifest extends LinkedClaimManifest = LinkedClaimManifest> = {
 	readonly owner: string;
