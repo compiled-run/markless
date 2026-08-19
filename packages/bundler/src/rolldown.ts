@@ -7,13 +7,17 @@ import {
 	type LinkedInterfaceImport,
 	type LinkedModuleChildResolution,
 	linkedChildrenHaveBrowserTriggers,
-	linkedClaimManifestForSource,
 	linkedImportedClaimsMissing,
 	linkedImportedSymbolInputs,
 	linkedManifestHasBrowserTriggers,
 	linkedModuleChildDiagnostics,
 	linkedModuleChildKey,
+	linkedRenderDataOnlyChange,
+	linkedRenderDataReachRoot,
 	linkedRouteArtifactRegistration,
+	planRenderDataModule,
+	renderDataClaimManifest,
+	renderDataReachImportSources,
 } from '@markless/compiler';
 import { existsSync, statSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -48,6 +52,7 @@ import {
 	type ImportedChild,
 	createPluginState,
 	recordEmittedClaimOwnership,
+	registerRenderDataStyles,
 	registerTransformArtifacts,
 } from './plugin-state.ts';
 import {
@@ -73,9 +78,9 @@ import {
 	isResumeSourceRequest,
 	isSymbolOnlySourceRequest,
 	materializedReachedRenderDataSource,
-	materializedRenderDataReachRoot,
 	normalizeVirtualId,
 	pathname,
+	renderDataReachedFromQuery,
 	resolveVirtualId,
 	resolverVirtualModuleSourceFile,
 	sourceForPrerenderWakeVirtualImporter,
@@ -159,8 +164,6 @@ export function createMarklessRolldownPlugin(input: {
 		importedChildren,
 		importedChildSources,
 		emittedClientResolverSources,
-		transformVirtualModules,
-		virtualModuleOwners,
 		clientSymbolEntrySources,
 		prerenderWakeSources,
 		clientRouteArtifactSources,
@@ -270,7 +273,7 @@ export function createMarklessRolldownPlugin(input: {
 		);
 		if (
 			nextEntries.some(
-				([, cached, , next]) => !isRenderDataOnlyTransformChange(cached.result, next),
+				([, cached, , next]) => !linkedRenderDataOnlyChange(cached.result, next),
 			)
 		) {
 			return invalidateAllGeneratedModules(parent, currentEnvironment);
@@ -576,11 +579,11 @@ export function createMarklessRolldownPlugin(input: {
 			const clientRouteArtifact = MARKLESS_ROUTE_SOURCE_QUERY_RE.test(id);
 			const materializedRenderDataReach =
 				currentEnvironment === 'client' && renderDataRequest
-					? materializedRenderDataReachRoot(
-							id,
+					? linkedRenderDataReachRoot({
 							source,
-							clientRouteArtifactMaterializations,
-						)
+							materializedSources: clientRouteArtifactMaterializations,
+							reachedFrom: renderDataReachedFromQuery(id),
+						})
 					: undefined;
 			if (currentEnvironment === 'client' && prerenderWakeRequest) {
 				clientSymbolEntrySources.add(source);
@@ -906,25 +909,24 @@ export function createMarklessRolldownPlugin(input: {
 						moduleMetadata.captureMetadataForSource(source),
 					symbolClaimsForSource: (source) => sourceSymbolManifest(moduleMetadata, source),
 				});
+				const linkedGraph = linkModuleGraph(resolvedInterfaceImports, {
+					moduleArtifacts: moduleLinkArtifacts,
+					metadata: moduleMetadata,
+					parentManifest: transformed.manifest,
+					...(materializedRenderDataReach
+						? {
+								renderDataReachRoot: materializedRenderDataReach,
+								reachedRenderDataSource: materializedReachedRenderDataSource,
+							}
+						: {}),
+				});
 				const renderDataImportSources = materializedRenderDataReach
-					? Object.fromEntries(
-							resolvedInterfaceImports.map((imported) => [
-								imported.specifier,
-								materializedReachedRenderDataSource(
-									imported.source,
-									materializedRenderDataReach,
-								),
-							]),
-						)
+					? renderDataReachImportSources(linkedGraph)
 					: undefined;
 				linkedTransformInput = {
 					...linkedTransformInput,
 					symbols,
-					importedModuleInterfaces: linkModuleGraph(resolvedInterfaceImports, {
-						moduleArtifacts: moduleLinkArtifacts,
-						metadata: moduleMetadata,
-						parentManifest: transformed.manifest,
-					}).interfaces,
+					importedModuleInterfaces: linkedGraph.interfaces,
 					...(renderDataImportSources ? { renderDataImportSources } : {}),
 				};
 				transformed = await transformTsrxModuleWithPrerenderWakeClosure(
@@ -1063,18 +1065,26 @@ export function createMarklessRolldownPlugin(input: {
 					const styleModules = transformed.virtualModules.filter(
 						(module) => module.type === 'style',
 					);
-					registerRenderDataStyles({
+					registerRenderDataStyles(state, {
 						owner: cacheKey,
 						source,
 						modules: styleModules,
-						virtualModules,
-						transformVirtualModules,
-						virtualModuleOwners,
 						dev,
 					});
+					const renderData = planRenderDataModule({
+						source,
+						emittedModule: manifestSource,
+						moduleSource: renderDataModule.source,
+						styleModules: styleModules.map((module) => module.id),
+						manifest: transformed.manifest,
+						linkedModules: virtualModules.keys(),
+					});
+					throwIfRenderDataUnlinked(renderData);
 					return {
 						code: [
-							...styleModules.map((module) => `import ${JSON.stringify(module.id)};`),
+							...renderData.styleModules.map(
+								(styleModule) => `import ${JSON.stringify(styleModule)};`,
+							),
 							renderDataModule.source,
 						].join('\n'),
 						map: null,
@@ -1326,52 +1336,14 @@ function pluginName(environment: Environment) {
 	return `markless:rolldown:${environment}`;
 }
 
-function registerRenderDataStyles(input: {
-	owner: string;
-	source: string;
-	modules: ReadonlyArray<MarklessVirtualModule>;
-	virtualModules: Map<string, MarklessVirtualModule>;
-	transformVirtualModules: Map<string, Set<string>>;
-	virtualModuleOwners: Map<string, Set<string>>;
-	dev: ReturnType<typeof createMarklessDevGraph>;
+// A render-data module that links a scoped style this build never registered
+// would ship markup with no CSS behind it, so the pass diagnostic fails the
+// load rather than serving the silent version.
+function throwIfRenderDataUnlinked(renderData: {
+	readonly diagnostics: ReadonlyArray<{ readonly message: string }>;
 }) {
-	if (input.modules.length === 0) return;
-	const ids = new Set(input.transformVirtualModules.get(input.owner) ?? []);
-	for (const module of input.modules) {
-		input.virtualModules.set(module.id, module);
-		ids.add(module.id);
-		const owners = input.virtualModuleOwners.get(module.id) ?? new Set<string>();
-		owners.add(input.owner);
-		input.virtualModuleOwners.set(module.id, owners);
-	}
-	input.transformVirtualModules.set(input.owner, ids);
-	input.dev.record(
-		input.source,
-		input.modules.map((module) => module.id),
-		'client',
-	);
-}
-
-function renderDataClaimManifest(
-	manifest: MarklessTransformManifest,
-	source: string,
-): MarklessTransformManifest {
-	// Data-only facades keep demand records but own no symbol claims.
-	return { ...linkedClaimManifestForSource(manifest, source), symbols: [] };
-}
-
-function isRenderDataOnlyTransformChange(
-	previous: TransformTsrxModuleResult,
-	next: TransformTsrxModuleResult,
-): boolean {
-	if (previous.interfaceHash !== next.interfaceHash || previous.code !== next.code) return false;
-	if (JSON.stringify(previous.moduleImports) !== JSON.stringify(next.moduleImports)) return false;
-	const withoutRenderData = (result: TransformTsrxModuleResult) =>
-		result.virtualModules.filter((module) => module.type !== 'render-data');
-	if (JSON.stringify(withoutRenderData(previous)) !== JSON.stringify(withoutRenderData(next))) {
-		return false;
-	}
-	return JSON.stringify(previous.manifest) === JSON.stringify(next.manifest);
+	const unlinked = renderData.diagnostics[0];
+	if (unlinked) throw new Error(unlinked.message);
 }
 
 

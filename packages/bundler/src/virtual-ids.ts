@@ -6,7 +6,7 @@ import { MARKLESS_BUILD_PREFIX } from './build/chunking.ts';
 import { symbolVirtualModuleSourceFile } from './source-module.ts';
 import { MARKLESS_VIRTUAL_PREFIX } from './transform.ts';
 import { triggerGroupVirtualModuleSourceFile } from './trigger-groups.ts';
-import type { MarklessVirtualModule, TransformTsrxModuleInput } from './types.ts';
+import type { MarklessVirtualModule } from './types.ts';
 
 export const TSRX_SOURCE_FILE = /\.tsrx(?:[?#].*)?$/;
 const MARKLESS_SYMBOL_SOURCE_QUERY_RE = /[?&]markless-symbols(?:[&#]|$)/;
@@ -103,15 +103,10 @@ export function isRenderDataSourceRequest(id: string): boolean {
 	return MARKLESS_RENDER_DATA_SOURCE_QUERY_RE.test(id);
 }
 
-export function materializedRenderDataReachRoot(
-	id: string,
-	source: string,
-	materializations: ReadonlyMap<
-		string,
-		NonNullable<TransformTsrxModuleInput['artifactChildMaterializations']>
-	>,
-): string | undefined {
-	if (materializations.has(source)) return source;
+// Transport only: reads the route root a render-data request says it was
+// reached from. Whether that qualifies the link is the `module-link` pass's
+// call (`linkedRenderDataReachRoot`), not this id's.
+export function renderDataReachedFromQuery(id: string): string | undefined {
 	return (
 		new URLSearchParams(parsePath(id).search).get(MARKLESS_REACHED_FROM_SOURCE_QUERY) ??
 		undefined

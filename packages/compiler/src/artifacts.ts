@@ -1924,6 +1924,25 @@ export type LinkedModuleGraphInput = {
 	// Virtual module naming is the caller's: the pass asks for the symbol-route
 	// module of a source rather than spelling the query itself.
 	readonly symbolRouteSource: (source: string) => string;
+	// Set only while linking render data that a materialized route root reached:
+	// the root every child's render data below is reached from. Absent means the
+	// question was never asked, and the pass records no reach at all.
+	readonly renderDataReachRoot?: string;
+	// Naming stays the caller's here too: the pass asks for the module source a
+	// parent imports to reach a child's render data from one route root, and the
+	// `?markless-render-data` / `markless-reached-from` id that carries it across
+	// the bundler boundary is the caller's transport.
+	readonly reachedRenderDataSource?: (source: string, root: string) => string;
+};
+
+// One `(root, source)` reach: a child's render data qualified by the route root
+// it was reached from, plus the module source a parent imports for it. The pair
+// is the linked fact; the id string that transports it is not.
+export type RenderDataReachRecord = {
+	readonly root: string;
+	readonly source: string;
+	readonly specifiers: ReadonlyArray<string>;
+	readonly moduleSource: string;
 };
 
 export type LinkedModuleGraphArtifact = {
@@ -1931,6 +1950,37 @@ export type LinkedModuleGraphArtifact = {
 	readonly children: ReadonlyArray<LinkedModuleChild>;
 	readonly interfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 	readonly routeArtifacts: Readonly<Record<string, string>>;
+	// Keyed by `(root, source)`; empty unless the caller asked for a reach root.
+	readonly reachedRenderData: Readonly<Record<string, RenderDataReachRecord>>;
+	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+};
+
+// The compiled outputs a link-stage cache key compares. Structural on purpose:
+// the caller's richer transform result flows through unchanged, and the pass
+// only ever reads these fields.
+export type LinkedCompiledOutputs = {
+	readonly interfaceHash: string;
+	readonly code: string;
+	readonly moduleImports: unknown;
+	readonly manifest: unknown;
+	readonly virtualModules: ReadonlyArray<{ readonly type: string }>;
+};
+
+// The `renderDataModule` artifact (`render-data-module` pass): what one emitted
+// render-data module carries as a linkable unit. `contentHash` and
+// `styleModules` are serializable on purpose — they are what a published
+// component must ship so a consuming app can link its CSS and tell a stale
+// render-data module from a fresh one. `claimManifest` always carries an empty
+// `symbols`: a data-only facade owns no symbol claims.
+export type RenderDataModuleArtifact<
+	Manifest extends LinkedClaimManifest = LinkedClaimManifest,
+> = {
+	readonly passId: 'render-data-module';
+	readonly source: string;
+	readonly emittedModule: string;
+	readonly contentHash: string;
+	readonly styleModules: ReadonlyArray<string>;
+	readonly claimManifest: Manifest;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };
 

@@ -26,6 +26,7 @@ export {
 	compileTsrxModuleLinkArtifact,
 	computeLinkedInterfaces,
 	linkedRenderDataBoundarySymbols,
+	linkedRenderDataOnlyChange,
 	moduleInterfaceHash,
 	prerenderInterfacesComplete,
 } from './passes/link/interface-link.ts';
@@ -41,9 +42,12 @@ export {
 	linkedModuleImportRequests,
 	linkedModuleClaimPlan,
 	linkedModuleLoadSource,
+	linkedRenderDataReachRoot,
 	linkedSymbolRouteRequests,
 	moduleLinkResolutionKey,
 	planLinkedModuleChildren,
+	renderDataReachImportSources,
+	renderDataReachKey,
 	uniqueLinkedModuleChildren,
 } from './passes/link/module-link.ts';
 export { planPayloadArena } from './passes/payload-arena.ts';
@@ -53,6 +57,12 @@ export { planPublicRender } from './passes/public-render/plan.ts';
 export { createProtocolStatePayloadFromArena } from './passes/protocol-state.ts';
 export { createProtocolViewPayload } from './passes/protocol-view.ts';
 export { createRenderData } from './passes/render-data/index.ts';
+export {
+	RENDER_DATA_MODULE_PASS_ID,
+	planRenderDataModule,
+	renderDataClaimManifest,
+	renderDataContentHash,
+} from './passes/render-data/manifest.ts';
 export { createRuntimeDemandMap } from './passes/runtime-demand-map.ts';
 export { createTriggerGroups } from './passes/trigger-groups.ts';
 export { buildSemanticGraph } from './passes/semantic-graph/index.ts';

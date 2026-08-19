@@ -1,7 +1,11 @@
 // Holds one build's mutable bookkeeping: virtual modules, owners, per-transform id sets,
 // execution-log sizes. Registration applies the `claim-manifest` pass verdicts here;
 // which module owns a claim is decided by the pass, not by this table.
-import { linkedResolverClaimVerdict, planEmittedClaimOwnership } from '@markless/compiler';
+import {
+	linkedResolverClaimVerdict,
+	planEmittedClaimOwnership,
+	planRenderDataModule,
+} from '@markless/compiler';
 import type { createMarklessDevGraph } from './dev.ts';
 import { hasExecutionLogModuleHook, requalifyExecutionLogModuleHook } from './execution-log.ts';
 import { ModuleMetadataRegistry } from './module-metadata-registry.ts';
@@ -173,7 +177,18 @@ export function registerTransformArtifacts(
 		owners.add(input.owner);
 		state.virtualModuleOwners.set(module.id, owners);
 		if (module.type === 'render-data') {
-			renderDataHashes.set(resolveVirtualId(module.id), renderDataHash(module.source));
+			// The hash is the `render-data-module` pass's field, not a local one:
+			// the dev prerender feed and a published component read the same value.
+			const renderData = planRenderDataModule({
+				source: input.source,
+				emittedModule: input.manifestSource,
+				moduleSource: module.source,
+				styleModules: input.result.virtualModules.flatMap((candidate) =>
+					candidate.type === 'style' ? [candidate.id] : [],
+				),
+				manifest: input.result.manifest,
+			});
+			renderDataHashes.set(resolveVirtualId(module.id), renderData.contentHash);
 		}
 		if (isClientSymbol) {
 			state.executionLogEstimatedSizes.set(module.id, stored.source.length);
@@ -251,11 +266,32 @@ export function recordEmittedClaimOwnership(
 	);
 }
 
-function renderDataHash(source: string): string {
-	let hash = 0x811c9dc5;
-	for (let index = 0; index < source.length; index += 1) {
-		hash ^= source.charCodeAt(index);
-		hash = Math.imul(hash, 0x01000193);
+// Id bookkeeping for the scoped-style modules a render-data module links: they
+// are registered under the same owner so a rebuild retires them with it, and
+// recorded against their source for the development graph. Which styles a
+// render-data module links is the `render-data-module` pass's answer.
+export function registerRenderDataStyles(
+	state: MarklessPluginState,
+	input: {
+		readonly owner: string;
+		readonly source: string;
+		readonly modules: ReadonlyArray<MarklessVirtualModule>;
+		readonly dev: ReturnType<typeof createMarklessDevGraph>;
+	},
+) {
+	if (input.modules.length === 0) return;
+	const ids = new Set(state.transformVirtualModules.get(input.owner) ?? []);
+	for (const module of input.modules) {
+		state.virtualModules.set(module.id, module);
+		ids.add(module.id);
+		const owners = state.virtualModuleOwners.get(module.id) ?? new Set<string>();
+		owners.add(input.owner);
+		state.virtualModuleOwners.set(module.id, owners);
 	}
-	return `mrd1-${(hash >>> 0).toString(36)}`;
+	state.transformVirtualModules.set(input.owner, ids);
+	input.dev.record(
+		input.source,
+		input.modules.map((module) => module.id),
+		'client',
+	);
 }

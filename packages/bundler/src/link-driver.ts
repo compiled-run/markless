@@ -56,6 +56,11 @@ export type LinkGraphReaders = {
 	// A parent mid-transform is not in the registry yet, so its own manifest
 	// answers for it.
 	readonly parentManifest?: Pick<MarklessTransformManifest, 'captureMetadata'>;
+	// Set only while linking render data reached from a materialized route root.
+	// The pass records the `(root, source)` reach; the id that transports it is
+	// still minted here.
+	readonly renderDataReachRoot?: string;
+	readonly reachedRenderDataSource?: (source: string, root: string) => string;
 };
 
 // The symbols-only route of a source: the module id a parent's resolver reaches
@@ -228,6 +233,12 @@ export function linkModuleGraph(
 		captureMetadataForSource: (source) => readers.metadata.captureMetadataForSource(source),
 		parentCaptureMetadataForSource: (parent) => parentCaptureMetadata(parent, readers),
 		symbolRouteSource,
+		...(readers.renderDataReachRoot !== undefined && readers.reachedRenderDataSource
+			? {
+					renderDataReachRoot: readers.renderDataReachRoot,
+					reachedRenderDataSource: readers.reachedRenderDataSource,
+				}
+			: {}),
 	});
 }
 

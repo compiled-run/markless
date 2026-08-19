@@ -14,11 +14,30 @@ import type {
 	LinkedInterfaceImport,
 	LinkedInterfacesArtifact,
 	LinkedInterfacesInput,
+	LinkedCompiledOutputs,
 	ModuleGraphInterfaceArtifact,
 	ModuleLinkArtifact,
 } from '../../artifacts.ts';
 
 export const INTERFACE_LINK_PASS_ID = 'interface-link';
+
+// A cache-key decision over two compilations of one module: everything a
+// consumer links against is unchanged and only the emitted render data moved.
+// The caller keeps its cached link and republishes the render data instead of
+// invalidating every module the link generated.
+export function linkedRenderDataOnlyChange(
+	previous: LinkedCompiledOutputs,
+	next: LinkedCompiledOutputs,
+): boolean {
+	if (previous.interfaceHash !== next.interfaceHash || previous.code !== next.code) return false;
+	if (JSON.stringify(previous.moduleImports) !== JSON.stringify(next.moduleImports)) return false;
+	const withoutRenderData = (result: LinkedCompiledOutputs) =>
+		result.virtualModules.filter((module) => module.type !== 'render-data');
+	if (JSON.stringify(withoutRenderData(previous)) !== JSON.stringify(withoutRenderData(next))) {
+		return false;
+	}
+	return JSON.stringify(previous.manifest) === JSON.stringify(next.manifest);
+}
 
 export function computeLinkedInterfaces(input: LinkedInterfacesInput): LinkedInterfacesArtifact {
 	return {

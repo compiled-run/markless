@@ -140,6 +140,13 @@ export const linkCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 		produces: ['linkedInterfaces'],
 	},
 	{
+		passId: 'render-data-module',
+		description:
+			'Describe an emitted render-data module as a linkable unit: its content hash, the scoped-style modules it links, and the claims a data-only facade publishes.',
+		consumes: ['moduleManifests', 'publicRenderModule'],
+		produces: ['renderDataModule'],
+	},
+	{
 		passId: 'claim-manifest',
 		description:
 			'Decide which emitted module owns the symbol claims of a source and merge sibling claims into one manifest per source.',
