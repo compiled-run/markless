@@ -7,6 +7,8 @@ import type {
 import { linkCompilerPasses } from '../src/pass-registry.ts';
 import {
 	linkImportedModules,
+	linkedImportedClaimsMissing,
+	linkedImportedSymbolInputs,
 	linkedModuleChildDiagnostics,
 	linkedModuleClaimPlan,
 	linkedModuleImportRequests,
@@ -266,4 +268,53 @@ test('the claim plan names the symbol route only for a client child with symbols
 		'/app/pages/widget.tsrx?markless-prerender-wake',
 		'/app/pages/widget.tsrx?markless-symbols',
 	]);
+});
+
+test('a child with no component edge never blocks the imported-claims seal', () => {
+	const propBound = {
+		passId: 'capture-analysis',
+		extractedSymbols: [{ symbolId: 's0', captureSlots: [{ propName: 'onSelect' }] }],
+		diagnostics: [],
+	} as unknown as CaptureAnalysisArtifact;
+	const claims = {
+		symbols: [
+			{
+				symbolId: 's0',
+				exportName: 's0_export',
+				kind: 'event-handler',
+				virtualModuleId: 'virtual:markless:symbol:s0',
+			},
+		],
+	};
+	const child = (componentEdgeId?: string): LinkedModuleChildResolution => ({
+		parent: '/app/pages/index.tsrx',
+		specifier: './widget.tsrx',
+		source: '/app/pages/widget.tsrx',
+		externalized: false,
+		...(componentEdgeId === undefined ? {} : { componentEdgeId }),
+	});
+	const symbolInputs = (children: ReadonlyArray<LinkedModuleChildResolution>) =>
+		linkedImportedSymbolInputs({
+			children,
+			captureMetadataForSource: () => propBound,
+			symbolClaimsForSource: () => claims,
+		});
+	const missing = (
+		children: ReadonlyArray<LinkedModuleChildResolution>,
+		symbols: ReturnType<typeof symbolInputs>,
+	) =>
+		linkedImportedClaimsMissing({
+			children,
+			symbols,
+			captureMetadataForSource: () => propBound,
+		});
+
+	// The premise: an edgeless child is never a row, so waiting on its row waits forever.
+	expect(symbolInputs([child()])).toEqual([]);
+	expect(missing([child()], symbolInputs([child()]))).toBe(false);
+
+	// A child that does carry an edge still waits until its row arrives.
+	expect(symbolInputs([child('edge-1')])).toHaveLength(1);
+	expect(missing([child('edge-1')], [])).toBe(true);
+	expect(missing([child('edge-1')], symbolInputs([child('edge-1')]))).toBe(false);
 });

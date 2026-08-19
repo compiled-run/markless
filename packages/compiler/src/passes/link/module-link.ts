@@ -311,6 +311,9 @@ export function linkedImportedClaimsMissing(input: {
 	readonly captureMetadataForSource: (source: string) => CaptureAnalysisArtifact | undefined;
 }): boolean {
 	return input.children.some((child) => {
+		// A child with no component edge is never a row in `linkedImportedSymbolInputs`,
+		// so waiting on one would be waiting on a row that can never arrive.
+		if (!child.componentEdgeId) return false;
 		const expectsClaims = input
 			.captureMetadataForSource(child.source)
 			?.extractedSymbols.some((symbol: ExtractedCaptureSymbol) =>
