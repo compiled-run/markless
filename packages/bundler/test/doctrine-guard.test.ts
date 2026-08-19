@@ -33,16 +33,10 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'The transform hook reports the already resolved build environment to the delegate-children pass.',
 	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'client' &&":
 		'Rolldown transform hooks project the resolved environment into client-only build behavior.',
-	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'client' && !renderDataRequest && !clientRouteArtifact;":
-		'Only claim-bearing client transforms participate in source publication readiness.',
 	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'client' && renderDataRequest":
 		'Reached-from lookup is limited to client render-data requests before materialized-route propagation is selected.',
 	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'client'":
 		'Prerender records are supplied only to the resolved client compilation that emits staged wake modules.',
-	"packages/bundler/src/rolldown.ts :: (currentEnvironment === 'client' && clientRouteArtifactSources.has(source)),":
-		'Client route artifacts opt their primary source into development-shaped diagnostics.',
-	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'client' && !isClientPrimarySourceRequest(id) ? id : source;":
-		'Client query facades retain their meaning-bearing manifest identity.',
 	"packages/bundler/src/rolldown.ts :: if (currentEnvironment === 'client' && clientRouteArtifact) {":
 		'Only client route-artifact requests run package-child materialization.',
 	"packages/bundler/src/rolldown.ts :: if (currentEnvironment === 'client' && isClientPrimarySourceRequest(id)) {":
@@ -57,8 +51,6 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Production prerender-wake URLs are selected by the resolved server compilation.',
 	"packages/bundler/src/rolldown.ts :: if (currentEnvironment === 'client' && prerenderWakeRequest) {":
 		'Prerender-wake source requests are answered only in the resolved client compilation.',
-	"packages/bundler/src/rolldown.ts :: devResumeReexport: internalOptions.dev === true && currentEnvironment === 'client',":
-		'Development resume re-exports keep source modules in the resolved client graph.',
 	"packages/bundler/src/rolldown.ts :: if (currentEnvironment === 'client' && isResumeSourceRequest(id)) {":
 		'Resume virtual modules are returned only to their resolved client request.',
 	"packages/bundler/src/rolldown.ts :: if (currentEnvironment === 'client' && !internalOptions.dev) {":

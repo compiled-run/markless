@@ -154,6 +154,13 @@ export const linkCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 		produces: ['renderDataModule'],
 	},
 	{
+		passId: 'transform-plan',
+		description:
+			'Decide what one transform request asks for: its request kind, manifest identity, claim publication, prerender shaping, and cache slot.',
+		consumes: ['source'],
+		produces: ['transformPlan'],
+	},
+	{
 		passId: 'claim-manifest',
 		description:
 			'Decide which emitted module owns the symbol claims of a source and merge sibling claims into one manifest per source.',

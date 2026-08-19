@@ -60,6 +60,12 @@ export {
 	renderDataReachKey,
 	uniqueLinkedModuleChildren,
 } from './passes/link/module-link.ts';
+export {
+	TRANSFORM_PLAN_PASS_ID,
+	planTransformRequest,
+	transformRequestKind,
+	transformWakeCapability,
+} from './passes/link/transform-plan.ts';
 export { planPayloadArena } from './passes/payload-arena.ts';
 export { renderPayloadScriptArtifact } from './passes/payload-scripts.ts';
 export { emitPublicRenderModule } from './passes/public-render/module.ts';

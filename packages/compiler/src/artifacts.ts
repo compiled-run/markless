@@ -2109,3 +2109,72 @@ export type LinkedRouteArtifactRegistration = {
 	readonly action: 'already-registered' | 'register' | 'reinvalidate' | 'late';
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };
+
+// What one transform request is asking the compiler for. `route-artifact` is a
+// client request for the build-time rendering of a route rather than for a
+// module a browser loads, which is why it is a kind of its own.
+export type TransformRequestKind =
+	| 'source'
+	| 'resume'
+	| 'prerender-wake'
+	| 'render-data'
+	| 'route-artifact';
+
+// Every field is a plain value the caller already holds. Ids are parsed by the
+// caller and arrive here as answered questions, because how a variant is
+// spelled in a module id is the bundler's vocabulary, not the compiler's.
+export type TransformPlanInput = {
+	// Undefined where the host has not resolved an environment for this request;
+	// it is neither client nor server, and every client-only decision is off.
+	readonly environment: string | undefined;
+	// The file this request is about, and the exact id it was requested as.
+	readonly source: string;
+	readonly requestId: string;
+	readonly request: {
+		readonly resume: boolean;
+		readonly prerenderWake: boolean;
+		readonly renderData: boolean;
+		readonly routeArtifact: boolean;
+		// Whether this id is the source's own primary request rather than one of
+		// its query-addressed siblings.
+		readonly clientPrimary: boolean;
+	};
+	readonly options: {
+		readonly dev: boolean;
+		readonly prerender: boolean;
+		readonly prerenderWakeChannel: boolean;
+	};
+	// Whether this build has already seen a wake-variant entry request.
+	readonly hasWakeSources: boolean;
+	// Whether a materialized route root reaches this request's render data.
+	readonly renderDataReached: boolean;
+	// Whether this source is itself a registered client route artifact.
+	readonly routeArtifactSource: boolean;
+	readonly clientOutput: 'symbols-only' | undefined;
+	// Whether the caller can read module-graph facts at all; without them the
+	// wake aggregate cannot know which sibling modules exist.
+	readonly getModuleInfoAvailable: boolean;
+};
+
+export type TransformPlanArtifact = {
+	readonly passId: 'transform-plan';
+	readonly requestKind: TransformRequestKind;
+	// The module identity the claims and artifacts of this request are filed
+	// under: a query facade speaks for itself, a primary request for its file.
+	readonly manifestSource: string;
+	readonly publishesClientClaims: boolean;
+	readonly ssrPrerenderArtifacts: boolean;
+	readonly prerenderRecords: boolean;
+	readonly dev: boolean;
+	readonly devResumeReexport: boolean;
+	// Opaque: one source requested four different ways compiles four different
+	// module shapes, so each shape caches under its own key.
+	readonly cacheKey: string;
+	// Whether this request must recompile an aggregate variant to own the wake
+	// channel's symbol routes.
+	readonly aggregateEligible: boolean;
+	readonly wakeCapability: (
+		manifestHasBrowserTriggers: boolean,
+		childHasBrowserTriggers: boolean,
+	) => boolean;
+};

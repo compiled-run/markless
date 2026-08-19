@@ -17,6 +17,7 @@ import {
 	linkedRenderDataReachRoot,
 	linkedRouteArtifactRegistration,
 	planRenderDataModule,
+	planTransformRequest,
 	renderDataClaimManifest,
 	renderDataReachImportSources,
 } from '@markless/compiler';
@@ -589,35 +590,43 @@ export function createMarklessRolldownPlugin(input: {
 				clientSymbolEntrySources.add(source);
 				prerenderWakeSources.add(source);
 			}
-			// Children reshape only when this build actually has wake-variant
-			// entries; router apps have none until their entry channel exists,
-			// and reshaping their children alone ships dead bytes into walls.
-			// Router apps signal wake eligibility through per-page wake requests
-			// rather than the SSR symbol input, so either signal opens the gate.
-			// With the router wake channel, every client transform is prerender
-			// shaped (same order-independent semantics as MARKLESS_PRERENDER=1):
-			// wake requests arrive after package children are already cached.
-			// The wake channel (env-captured at plugin construction, or the
-			// router's late per-page wake requests) is the ONLY trigger: bare
-			// emitResumeModules must not reshape ordinary SSR apps — their
-			// symbol-route pages would inherit prerenderDataId and the no-op
-			// container-event stub, silently swallowing clicks.
-			const ssrPrerenderArtifacts =
+			const clientOutput =
 				currentEnvironment === 'client' &&
-				(internalOptions.prerenderWakeChannel === true || prerenderWakeSources.size > 0);
-			const prerenderRecords =
-				currentEnvironment === 'client' &&
-				(internalOptions.prerender === true ||
-					internalOptions.prerenderWakeChannel === true ||
-					materializedRenderDataReach !== undefined ||
-					prerenderWakeRequest ||
-					ssrPrerenderArtifacts);
+				((clientSymbolEntrySources.has(source) &&
+					internalOptions.prerender !== true &&
+					!clientRouteArtifactSources.has(source) &&
+					isClientPrimarySourceRequest(id) &&
+					moduleIsEntry(this, id)) ||
+					isSymbolOnlySourceRequest(id))
+					? ('symbols-only' as const)
+					: undefined;
+			const plan = planTransformRequest({
+				environment: currentEnvironment,
+				source,
+				requestId: id,
+				request: {
+					resume: isResumeSourceRequest(id),
+					prerenderWake: prerenderWakeRequest,
+					renderData: renderDataRequest,
+					routeArtifact: clientRouteArtifact,
+					clientPrimary: isClientPrimarySourceRequest(id),
+				},
+				options: {
+					dev: internalOptions.dev === true,
+					prerender: internalOptions.prerender === true,
+					prerenderWakeChannel: internalOptions.prerenderWakeChannel === true,
+				},
+				hasWakeSources: prerenderWakeSources.size > 0,
+				renderDataReached: materializedRenderDataReach !== undefined,
+				routeArtifactSource: clientRouteArtifactSources.has(source),
+				clientOutput,
+				getModuleInfoAvailable: typeof this.getModuleInfo === 'function',
+			});
+			const { cacheKey, manifestSource, prerenderRecords, publishesClientClaims } = plan;
 			const transformInput: TransformTsrxModuleInput = {
 				filename: source,
 				source: code,
-				dev:
-					internalOptions.dev === true ||
-					(currentEnvironment === 'client' && clientRouteArtifactSources.has(source)),
+				dev: plan.dev,
 				buildId: internalOptions.buildId,
 				executionLog: normalizeExecutionLogMode(internalOptions.executionLog),
 				executionLogModuleHooks:
@@ -644,22 +653,13 @@ export function createMarklessRolldownPlugin(input: {
 				prerenderWakeVariant:
 					internalOptions.prerenderWakeChannel === true &&
 					(prerenderWakeRequest ||
-						(ssrPrerenderArtifacts && clientSymbolEntrySources.has(source))),
+						(plan.ssrPrerenderArtifacts && clientSymbolEntrySources.has(source))),
 				prerenderWakeFacade: prerenderWakeRequest,
 				preserveWakeSiblingClaims:
 					currentEnvironment === 'client' &&
 					(isResumeSourceRequest(id) || isSymbolOnlySourceRequest(id)),
 				environment: currentEnvironment,
-				clientOutput:
-					currentEnvironment === 'client' &&
-					((clientSymbolEntrySources.has(source) &&
-						internalOptions.prerender !== true &&
-						!clientRouteArtifactSources.has(source) &&
-						isClientPrimarySourceRequest(id) &&
-						moduleIsEntry(this, id)) ||
-						isSymbolOnlySourceRequest(id))
-						? 'symbols-only'
-						: undefined,
+				clientOutput,
 				// Dev resume URL points at the SOURCE module (not the virtual resume
 				// module): loading the .tsrx keeps it in the client module graph, which
 				// is what lets Vite's own no-accepting-boundary full-reload fire on
@@ -697,34 +697,15 @@ export function createMarklessRolldownPlugin(input: {
 					internalOptions.dev === true && currentEnvironment === 'server'
 						? internalOptions.devInjections
 						: undefined,
-				devResumeReexport: internalOptions.dev === true && currentEnvironment === 'client',
+				devResumeReexport: plan.devResumeReexport,
 				prerenderRecordData:
 					currentEnvironment === 'client'
 						? input.prerenderRecordsBySource?.get(source)
 						: undefined,
 			};
-			const manifestSource =
-				currentEnvironment === 'client' && !isClientPrimarySourceRequest(id) ? id : source;
-			const publishesClientClaims =
-				currentEnvironment === 'client' && !renderDataRequest && !clientRouteArtifact;
 			if (publishesClientClaims) {
 				moduleMetadata.beginSourceSymbolClaims(source, manifestSource);
 			}
-			// One source can be requested as a full environment entry, a symbols-only
-			// interaction entry, or a dev resume entry. Their linked interfaces are the
-			// same, but their emitted module shapes are deliberately different.
-			const cacheKey = [
-				currentEnvironment,
-				manifestSource,
-				transformInput.clientOutput ?? 'full',
-				isResumeSourceRequest(id)
-					? 'resume'
-					: prerenderWakeRequest
-						? 'prerender-wake'
-						: renderDataRequest
-							? 'render-data'
-							: 'source',
-			].join('\0');
 			const cached = linkedTransformCache.get(cacheKey);
 			let linkedTransformResult: TransformTsrxModuleResult | undefined;
 			let linkedTransformInput = transformInput;
@@ -934,14 +915,12 @@ export function createMarklessRolldownPlugin(input: {
 			}
 			prerenderWakeCapabilities.set(
 				source,
-				linkedManifestHasBrowserTriggers(transformed.manifest) || linkedChildHasBrowserTriggers,
+				plan.wakeCapability(
+					linkedManifestHasBrowserTriggers(transformed.manifest),
+					linkedChildHasBrowserTriggers,
+				),
 			);
-			if (
-				publishesClientClaims &&
-				!isClientPrimarySourceRequest(id) &&
-				internalOptions.prerenderWakeChannel === true &&
-				typeof this.getModuleInfo === 'function'
-			) {
+			if (plan.aggregateEligible) {
 				const aggregateInput = {
 					...linkedTransformInput,
 					clientOutput: undefined,
