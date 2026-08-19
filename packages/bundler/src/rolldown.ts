@@ -3,24 +3,13 @@ import { existsSync, statSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { dirname, isAbsolute, relative, resolve } from 'pathe';
 import { withQuery } from 'ufo';
-import { type MarklessBuildMetadataBundle, createBuildMetadata } from './build/build-metadata.ts';
+import { createBuildMetadata } from './build/build-metadata.ts';
 import { MARKLESS_BUILD_PREFIX, MARKLESS_BUNDLE_GRAPH, outputDefaults } from './build/chunking.ts';
-import { MARKLESS_EXECUTION_SIZES, createExecutionSizesAsset } from './build/execution-sizes.ts';
-import { collectModulePreloadInjections, injectHeadLinks } from './build/head-links.ts';
-import { stripEmptyVitePreloadWrappers } from './build/preload-cleanup.ts';
-import {
-	compactGeneratedDirectSymbolLoaders,
-	rewriteGeneratedSymbolFacadeImports,
-	rewriteGeneratedSymbolInitExports,
-} from './build/symbol-facade-cleanup.ts';
-import {
-	rewriteGeneratedSymbolTableUrls,
-	verifyGeneratedSymbolTableRoutes,
-} from './build/symbol-table.ts';
+import { MARKLESS_EXECUTION_SIZES } from './build/execution-sizes.ts';
+import { finalizeBundle } from './build/bundle-finalize.ts';
 import { createMarklessDevGraph } from './dev.ts';
 import {
 	MARKLESS_EXECUTION_LOG_MODULE_ID,
-	executionLogActivationInjection,
 	executionLogVirtualModuleSource,
 	hasExecutionLogModuleHook,
 	injectExecutionLogModuleHook,
@@ -49,7 +38,6 @@ import {
 	clientSymbolEntries,
 	devBrowserSourceModuleUrl,
 	devBrowserVirtualModuleUrl,
-	emittedBundleModuleIds,
 	executionLogRuntimeModuleId,
 	isClientPrimarySourceRequest,
 	isMarklessRuntimeModule,
@@ -66,10 +54,8 @@ import {
 	resolverVirtualModuleSourceFile,
 	sourceForPrerenderWakeVirtualImporter,
 	sourceForResumeVirtualImporter,
-	sourceForSettleVirtualImporter,
 	sourceForSymbolVirtualImporter,
 	sourceForTriggerGroupVirtualImporter,
-	stripBuildPrefix,
 	virtualModuleSourceForLoad,
 } from './virtual-ids.ts';
 import type {
@@ -1100,132 +1086,17 @@ export function createMarklessRolldownPlugin(input: {
 					validateImportedChild(child, moduleMetadata);
 				}
 				if (getEnvironment(this) !== 'client') return;
-
-				recordProductionResumeModuleUrls(
-					bundle,
-					internalOptions.productionResumeModuleUrls,
-					internalOptions.publicPath,
-				);
-				if (internalOptions.prerenderWakeChannel === true) {
-					recordProductionPrerenderWakeModuleUrls(
-						bundle,
-						internalOptions.productionPrerenderWakeModuleUrls,
-						internalOptions.publicPath,
-					);
-					recordProductionSettleModuleUrls(
-						bundle,
-						(internalOptions.productionSettleModuleUrls ??= new Map()),
-						internalOptions.publicPath,
-					);
-				}
-				stripEmptyPreloadWrappersFromChunks(bundle);
-				const removedSymbolFacades = rewriteGeneratedSymbolFacadeImports(bundle);
-				rewriteGeneratedSymbolInitExports(bundle);
-				compactGeneratedDirectSymbolLoaders(bundle);
-				const manifestBundle = bundleWithoutRemovedChunks(bundle, removedSymbolFacades);
-				const tableRewrite = rewriteGeneratedSymbolTableUrls(manifestBundle);
-				if (tableRewrite.unresolved.length > 0) {
-					this.error(
-						`Markless symbol resolver table contains unresolved generated symbol chunks: ${tableRewrite.unresolved.join(', ')}. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`,
-					);
-				}
-				// The strip can erase a resolver together with every route it owned.
-				// Final symbol claims therefore follow exact emitted module identities.
-				const emittedSymbolClaims = moduleMetadata.emittedSymbolClaimMap(
-					emittedBundleModuleIds(manifestBundle),
-				);
-				const attributionClaims = [...moduleMetadata.symbolClaimManifests()];
-				const tableIntegrity = verifyGeneratedSymbolTableRoutes(
-					manifestBundle,
-					emittedSymbolClaims.values(),
-				);
-				if (tableIntegrity.errors.length > 0) {
-					this.error(
-						`Markless symbol resolver table integrity check failed:\n${tableIntegrity.errors
-							.map(
-								(error) =>
-									`- ${error.symbolId} -> ${error.claimedChunk}: ${error.reason}`,
-							)
-							.join('\n')}`,
-					);
-				}
-
-				const clientManifest = createBuildMetadata(
-					manifestBundle,
-					emittedSymbolClaims.values(),
-					getRoot(),
-					{
-						bundleGraphAsset: MARKLESS_BUNDLE_GRAPH,
-						bundleGraphAdders: internalOptions.bundleGraphAdders,
-						canonPath: stripBuildPrefix,
-						publicPath: internalOptions.publicPath,
-						injections: internalOptions.devInjections,
-					},
-				);
-
-				const executionLogInjection = executionLogActivationInjection(
-					internalOptions.executionLog,
-				);
-				if (executionLogInjection) injectHeadLinks(bundle, [executionLogInjection]);
-				injectHeadLinks(
-					bundle,
-					collectModulePreloadInjections(clientManifest, {
-						publicPath: internalOptions.publicPath,
-						wakeChunks:
-							internalOptions.prerender ||
-							internalOptions.prerenderWakeChannel === true
-								? productionWakeModuleChunks(bundle)
-								: undefined,
-						entryChunks: Object.values(bundle)
-							.filter(
-								(output) =>
-									!!output &&
-									typeof output === 'object' &&
-									(output as { type?: string }).type === 'chunk' &&
-									(output as { isEntry?: boolean }).isEntry === true,
-							)
-							.map((chunk) =>
-								stripBuildPrefix((chunk as { fileName: string }).fileName),
-							),
-					}),
-				);
-
-				this.emitFile({
-					type: 'asset',
-					fileName: MARKLESS_BUNDLE_GRAPH,
-					source: JSON.stringify(clientManifest.bundleGraph),
-				});
-				this.emitFile(
-					await createExecutionSizesAsset(
-						manifestBundle,
-						clientManifest,
-						stripBuildPrefix,
-						executionLogInjection
-							? executionAttributionTables(
-									attributionClaims,
-									getRoot(),
-									importedChildren.values(),
-								)
-							: undefined,
-						{
-							executionLogActive: executionLogInjection !== null,
-							hookedIds: executionLogEmittedIds,
-						},
-					),
-				);
-				// The demand map lives in payload-module exports (tree-shaken from built
-				// pages by design); ship it as a build asset so witness boxes and tooling
-				// can derive allowed execution sets against real builds.
-				this.emitFile({
-					type: 'asset',
-					fileName: `${MARKLESS_BUILD_PREFIX}execution-demand.json`,
-					source: JSON.stringify(
-						Object.fromEntries(
-							clientManifest.modules
-								.filter((module) => module.runtimeDemandMap)
-								.map((module) => [module.source, module.runtimeDemandMap]),
+				await finalizeBundle(this, bundle, {
+					options: internalOptions,
+					moduleMetadata,
+					root: getRoot(),
+					executionLogEmittedIds,
+					executionAttributionTables: (manifests) =>
+						executionAttributionTables(
+							manifests,
+							getRoot(),
+							importedChildren.values(),
 						),
-					),
 				});
 			},
 		},
@@ -1731,55 +1602,6 @@ function routeKey(parent: string, specifier: string): string {
 	return `${parent}\0${specifier}`;
 }
 
-function bundleWithoutRemovedChunks(
-	bundle: MarklessBuildMetadataBundle,
-	removedFileNames: ReadonlySet<string>,
-) {
-	if (removedFileNames.size === 0) return bundle;
-
-	const next: MarklessBuildMetadataBundle = {};
-	for (const [key, output] of Object.entries(bundle)) {
-		if (isChunkFile(output) && removedFileNames.has(output.fileName)) continue;
-		next[key] = output;
-	}
-	return next;
-}
-
-function stripEmptyPreloadWrappersFromChunks(bundle: Record<string, unknown>) {
-	for (const output of Object.values(bundle)) {
-		if (!isChunkWithCode(output)) continue;
-
-		const nextCode = stripEmptyVitePreloadWrappers(output.code);
-		if (nextCode !== output.code) {
-			output.code = nextCode;
-		}
-	}
-}
-
-function isChunkFile(output: unknown): output is {
-	readonly type: 'chunk';
-	readonly fileName: string;
-} {
-	if (!output || typeof output !== 'object') return false;
-	const chunk = output as {
-		readonly type?: unknown;
-		readonly fileName?: unknown;
-	};
-	return chunk.type === 'chunk' && typeof chunk.fileName === 'string';
-}
-
-function isChunkWithCode(output: unknown): output is {
-	readonly type: 'chunk';
-	code: string;
-} {
-	if (!output || typeof output !== 'object') return false;
-	const chunk = output as {
-		readonly type?: unknown;
-		readonly code?: unknown;
-	};
-	return chunk.type === 'chunk' && typeof chunk.code === 'string';
-}
-
 function pluginName(environment: Environment) {
 	if (typeof environment === 'function') {
 		return 'markless:rolldown';
@@ -2034,98 +1856,6 @@ function isRenderDataOnlyTransformChange(
 }
 
 
-function recordProductionSettleModuleUrls(
-	bundle: Record<string, unknown>,
-	urls: Map<string, string>,
-	publicPath: ((fileName: string) => string) | undefined,
-): void {
-	for (const output of Object.values(bundle)) {
-		if (!output || typeof output !== 'object') continue;
-		const chunk = output as {
-			readonly type?: unknown;
-			readonly facadeModuleId?: unknown;
-			readonly fileName?: unknown;
-		};
-		if (
-			chunk.type !== 'chunk' ||
-			typeof chunk.facadeModuleId !== 'string' ||
-			typeof chunk.fileName !== 'string'
-		)
-			continue;
-		const source = sourceForSettleVirtualImporter(chunk.facadeModuleId);
-		if (source) urls.set(source, publicPath?.(chunk.fileName) ?? `/${chunk.fileName}`);
-	}
-}
-
-function recordProductionResumeModuleUrls(
-	bundle: Record<string, unknown>,
-	urls: Map<string, string> | undefined,
-	publicPath: ((fileName: string) => string) | undefined,
-): void {
-	if (!urls) return;
-	for (const output of Object.values(bundle)) {
-		if (!output || typeof output !== 'object') continue;
-		const chunk = output as {
-			readonly type?: unknown;
-			readonly facadeModuleId?: unknown;
-			readonly fileName?: unknown;
-		};
-		if (
-			chunk.type !== 'chunk' ||
-			typeof chunk.facadeModuleId !== 'string' ||
-			typeof chunk.fileName !== 'string'
-		)
-			continue;
-		const source = sourceForResumeVirtualImporter(chunk.facadeModuleId);
-		if (source) urls.set(source, publicPath?.(chunk.fileName) ?? `/${chunk.fileName}`);
-	}
-}
-
-function recordProductionPrerenderWakeModuleUrls(
-	bundle: Record<string, unknown>,
-	urls: Map<string, string> | undefined,
-	publicPath: ((fileName: string) => string) | undefined,
-): void {
-	if (!urls) return;
-	for (const output of Object.values(bundle)) {
-		if (!output || typeof output !== 'object') continue;
-		const chunk = output as {
-			readonly type?: unknown;
-			readonly facadeModuleId?: unknown;
-			readonly fileName?: unknown;
-		};
-		if (
-			chunk.type !== 'chunk' ||
-			typeof chunk.facadeModuleId !== 'string' ||
-			typeof chunk.fileName !== 'string'
-		)
-			continue;
-		const source = sourceForPrerenderWakeVirtualImporter(chunk.facadeModuleId);
-		if (source) urls.set(source, publicPath?.(chunk.fileName) ?? `/${chunk.fileName}`);
-	}
-}
-
-function productionWakeModuleChunks(bundle: Record<string, unknown>): string[] {
-	const chunks: string[] = [];
-	for (const output of Object.values(bundle)) {
-		if (!output || typeof output !== 'object') continue;
-		const chunk = output as {
-			readonly type?: unknown;
-			readonly facadeModuleId?: unknown;
-			readonly fileName?: unknown;
-		};
-		if (
-			chunk.type === 'chunk' &&
-			typeof chunk.facadeModuleId === 'string' &&
-			typeof chunk.fileName === 'string' &&
-			(sourceForResumeVirtualImporter(chunk.facadeModuleId) ||
-				sourceForPrerenderWakeVirtualImporter(chunk.facadeModuleId))
-		) {
-			chunks.push(stripBuildPrefix(chunk.fileName));
-		}
-	}
-	return chunks;
-}
 
 
 export { MARKLESS_BUNDLE_GRAPH, MARKLESS_BUILD_PREFIX, outputDefaults } from './build/chunking.ts';
