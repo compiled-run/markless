@@ -1,5 +1,9 @@
 import { marklessBoundSymbolId, marklessLiveBoundGraphRoute } from './bound-symbol.ts';
-import { marklessInstanceScopedGraph, marklessMarkComposedSymbol } from './instance-scope.ts';
+import {
+	marklessComposedGraphNodeId,
+	marklessInstanceScopedGraph,
+	marklessMarkComposedSymbol,
+} from './instance-scope.ts';
 import type { ResumeSymbol, ResumeSymbolContext } from '../resume-types.ts';
 
 // Composition works on the DRAFT payload the compiled render modules build:
@@ -73,18 +77,7 @@ export function marklessComposedInstancePath(child: {
 	return child.symbolPrefix ?? '';
 }
 
-// Mirrors PROTOCOL_PAGE_SPACE_ID_PREFIXES, past any instance path a nested
-// compose already applied; composed-page-space.test.ts keeps the two in step so
-// the browser never imports the serializer's protocol module.
-const PAGE_SPACE_ID = /^(?:[cp]\d+:)*(?:shared|storage):/;
-
-// Every id family a component owns is instance-local; a shared() graph and a
-// persisted storage slot are page-space on purpose. The compiler refuses at
-// build time to emit an id belonging to neither, so this stays a concatenation.
-export function marklessComposedGraphNodeId(graphNodeId: string, instancePath: string): string {
-	if (!instancePath || PAGE_SPACE_ID.test(graphNodeId)) return graphNodeId;
-	return instancePath + graphNodeId;
-}
+export { marklessComposedGraphNodeId };
 
 // Rewrites a child state draft from child-local ids into page-space ids: prop
 // reads with a live parent route become that route, everything else takes the

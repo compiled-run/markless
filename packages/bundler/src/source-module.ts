@@ -305,6 +305,9 @@ export function emitSourceModule(input: {
 					'marklessLoadLocalSymbol',
 				)
 			: '',
+		routeSymbols && !symbolsOnly && input.directCsr === true
+			? emitComposedArmRecordsInstall()
+			: null,
 		symbolsOnly && routeSymbols ? 'export { marklessSsrLoadSymbolRoute as loadSymbol };' : '',
 		symbolsOnly
 			? ''
@@ -449,6 +452,7 @@ export function emitResumeModule(input: {
 				)
 			: '',
 		routeSymbols ? 'export { marklessSsrLoadSymbolRoute as loadSymbol };' : '',
+		routeSymbols ? emitComposedArmRecordsInstall() : null,
 		stagedPrerender ? emitPrerenderTriggerGroupLoader(input.prerenderTriggerGroups ?? []) : '',
 		resumeContainerEvent,
 		'',
@@ -499,6 +503,18 @@ export function emitQueuedResumeContainerEvent(source: string): string {
 		'\t}',
 		'\treturn root.__marklessDispatch(input);',
 		'}',
+	].join('\n');
+}
+
+// Composed arm-record qualification is pay-per-use: only a page with component
+// edges can hold a child-owned async boundary whose records were minted in the
+// child's own id space, so the gate that emits its symbol routes also emits
+// this install. The call is explicit because `@markless/web` declares
+// `sideEffects: false`, which would drop a bare side-effect import.
+function emitComposedArmRecordsInstall(): string {
+	return [
+		"import { installMarklessComposedArmRecords } from '@markless/web/fns/instance-scope';",
+		'installMarklessComposedArmRecords();',
 	].join('\n');
 }
 
