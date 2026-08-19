@@ -7,11 +7,13 @@ import {
 	type LinkedInterfaceImport,
 	type LinkedModuleChildResolution,
 	linkedChildrenHaveBrowserTriggers,
+	linkedClaimManifestForSource,
 	linkedImportedClaimsMissing,
 	linkedImportedSymbolInputs,
 	linkedManifestHasBrowserTriggers,
 	linkedModuleChildDiagnostics,
 	linkedModuleChildKey,
+	linkedRouteArtifactRegistration,
 } from '@markless/compiler';
 import { existsSync, statSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -33,10 +35,8 @@ import {
 import {
 	MARKLESS_EXECUTION_LOG_MODULE_ID,
 	executionLogVirtualModuleSource,
-	hasExecutionLogModuleHook,
 	injectExecutionLogModuleHook,
 	normalizeExecutionLogMode,
-	requalifyExecutionLogModuleHook,
 } from './execution-log.ts';
 import {
 	encodedSymbolSource,
@@ -44,7 +44,12 @@ import {
 	symbolVirtualModuleSourceFile,
 } from './source-module.ts';
 import type { ModuleMetadataRegistry } from './module-metadata-registry.ts';
-import { type ImportedChild, createPluginState } from './plugin-state.ts';
+import {
+	type ImportedChild,
+	createPluginState,
+	recordEmittedClaimOwnership,
+	registerTransformArtifacts,
+} from './plugin-state.ts';
 import {
 	MARKLESS_VIRTUAL_PREFIX,
 	marklessVirtualModuleSourceFile,
@@ -285,19 +290,20 @@ export function createMarklessRolldownPlugin(input: {
 				moduleImports: next.moduleImports,
 			});
 			moduleMetadata.recordCaptureMetadata(changedSource, next.manifest);
-			const symbolClaim = emittedSymbolClaim(
-				moduleMetadata,
-				changedSource,
-				cached.manifestSource,
-				next.manifest,
-				next.virtualModules,
-			);
-			moduleMetadata.recordSymbolClaims(
-				symbolClaim.owner,
-				isRenderDataSourceRequest(cached.manifestSource)
-					? renderDataClaimManifest(next.manifest, cached.manifestSource)
-					: symbolClaim.manifest,
-			);
+			recordEmittedClaimOwnership(state, {
+				source: changedSource,
+				emittedModule: cached.manifestSource,
+				manifest: next.manifest,
+				virtualModules: next.virtualModules,
+				...(isRenderDataSourceRequest(cached.manifestSource)
+					? {
+							overrideManifest: renderDataClaimManifest(
+								next.manifest,
+								cached.manifestSource,
+							),
+						}
+					: {}),
+			});
 			prerenderWakeCapabilities.set(
 				changedSource,
 				linkedManifestHasBrowserTriggers(next.manifest) || cached.linkedChildHasBrowserTriggers,
@@ -832,18 +838,11 @@ export function createMarklessRolldownPlugin(input: {
 			// Register the first-pass artifact before loading children so the existing
 			// cross-module registry can validate both sides of the composition edge.
 			if (!renderDataRequest) {
-				registerTransformArtifacts({
+				registerTransformArtifacts(state, {
 					owner: cacheKey,
 					source,
 					manifestSource,
 					result: transformed,
-					virtualModules,
-					moduleMetadata,
-					moduleLinkArtifacts,
-					transformVirtualModules,
-					virtualModuleOwners,
-					executionLogEstimatedSizes,
-					executionLogEmittedIds,
 					dev,
 					environment: currentEnvironment,
 					finalPublication: false,
@@ -1016,18 +1015,11 @@ export function createMarklessRolldownPlugin(input: {
 				}
 			}
 			if (!renderDataRequest)
-				registerTransformArtifacts({
+				registerTransformArtifacts(state, {
 					owner: cacheKey,
 					source,
 					manifestSource,
 					result: transformed,
-					virtualModules,
-					moduleMetadata,
-					moduleLinkArtifacts,
-					transformVirtualModules,
-					virtualModuleOwners,
-					executionLogEstimatedSizes,
-					executionLogEmittedIds,
 					dev,
 					environment: currentEnvironment,
 					finalPublication: true,
@@ -1169,14 +1161,18 @@ export function createMarklessRolldownPlugin(input: {
 		},
 	} satisfies Plugin & { api: MarklessRolldownPluginApi };
 
+	// Applies the `claim-manifest` route-artifact verdict: the pass decides whether
+	// a source may still take ownership, the plugin performs the invalidation.
 	function registerClientRouteArtifactSource(source: string) {
-		if (clientRouteArtifactSources.has(source)) return;
-		if (transformedClientPrimarySources.has(source)) {
-			if (internalOptions.dev !== true) {
-				throw new Error(
-					`MARKLESS_ROUTE_ARTIFACT_REGISTERED_LATE: Client route artifact ${JSON.stringify(source)} was registered after its primary module transformed. Register every production route artifact before transformation begins.`,
-				);
-			}
+		const registration = linkedRouteArtifactRegistration({
+			source,
+			registered: clientRouteArtifactSources.has(source),
+			primaryTransformed: transformedClientPrimarySources.has(source),
+			dev: internalOptions.dev === true,
+		});
+		if (registration.action === 'already-registered') return;
+		if (registration.action === 'late') throw new Error(registration.diagnostics[0]!.message);
+		if (registration.action === 'reinvalidate') {
 			invalidateAllGeneratedModules(source, 'client');
 			transformedClientPrimarySources.delete(source);
 			internalOptions.devServer?.invalidateModule?.(source, 'client');
@@ -1330,157 +1326,6 @@ function pluginName(environment: Environment) {
 	return `markless:rolldown:${environment}`;
 }
 
-function registerTransformArtifacts(input: {
-	owner: string;
-	source: string;
-	manifestSource: string;
-	result: TransformTsrxModuleResult;
-	virtualModules: Map<string, MarklessVirtualModule>;
-	moduleMetadata: ModuleMetadataRegistry;
-	moduleLinkArtifacts: Map<string, MarklessModuleLinkArtifact>;
-	transformVirtualModules: Map<string, Set<string>>;
-	virtualModuleOwners: Map<string, Set<string>>;
-	executionLogEstimatedSizes: Map<string, number>;
-	executionLogEmittedIds: Map<string, string>;
-	dev: ReturnType<typeof createMarklessDevGraph>;
-	environment: MarklessEnvironment;
-	finalPublication?: boolean;
-	tracksSourceClaimPublication?: boolean;
-	replaceOwnedArtifacts?: boolean;
-	updateDevPrerenderHashes?: (hashes: ReadonlyMap<string, string>) => void;
-}) {
-	const ids = new Set<string>();
-	const renderDataHashes = new Map<string, string>();
-	for (const module of input.result.virtualModules) {
-		if (input.finalPublication === false && module.type === 'resolver') continue;
-		const isClientSymbol = input.environment === 'client' && module.type === 'symbol';
-		// The symbol virtual module id embeds the source filename, so it is the
-		// collision-free execution-log id: re-key the injected hook (dev builds)
-		// and the size estimate to that same id so the join always resolves.
-		const stored = isClientSymbol
-			? { ...module, source: requalifyExecutionLogModuleHook(module.source, module.id) }
-			: module;
-		const current = input.virtualModules.get(module.id);
-		if (module.type === 'resolver' && current?.type === 'resolver') {
-			const currentClaims = new Set(current.symbolClaims ?? []);
-			const nextClaims = new Set(module.symbolClaims ?? []);
-			const currentContainsNext = [...nextClaims].every((claim) => currentClaims.has(claim));
-			const nextContainsCurrent = [...currentClaims].every((claim) => nextClaims.has(claim));
-			if (currentContainsNext && !nextContainsCurrent) continue;
-			if (!currentContainsNext && !nextContainsCurrent) {
-				throw new Error(
-					`MARKLESS_RESOLVER_CLAIMS_DIVERGED: Resolver ${JSON.stringify(module.id)} has incompatible final claim sets.`,
-				);
-			}
-		}
-		// Parallel sibling transforms share this id: canonical render data must not be replaced.
-		if (
-			module.type !== 'render-data' ||
-			current?.type !== 'render-data' ||
-			current.canonicalRenderData !== true ||
-			module.canonicalRenderData === true
-		) {
-			input.virtualModules.set(module.id, stored);
-		}
-		ids.add(module.id);
-		const owners = input.virtualModuleOwners.get(module.id) ?? new Set<string>();
-		owners.add(input.owner);
-		input.virtualModuleOwners.set(module.id, owners);
-		if (module.type === 'render-data') {
-			renderDataHashes.set(resolveVirtualId(module.id), renderDataHash(module.source));
-		}
-		if (isClientSymbol) {
-			input.executionLogEstimatedSizes.set(module.id, stored.source.length);
-			if (hasExecutionLogModuleHook(stored.source))
-				input.executionLogEmittedIds.set(module.id, module.id);
-		}
-	}
-	input.moduleMetadata.recordCaptureMetadata(input.source, input.result.manifest);
-	if (input.finalPublication !== false) {
-		const symbolClaim = emittedSymbolClaim(
-			input.moduleMetadata,
-			input.source,
-			input.manifestSource,
-			input.result.manifest,
-			input.result.virtualModules,
-		);
-		input.moduleMetadata.recordSymbolClaims(symbolClaim.owner, symbolClaim.manifest);
-		if (input.tracksSourceClaimPublication === true) {
-			input.moduleMetadata.finishSourceSymbolClaims(input.source, input.manifestSource);
-		}
-	}
-	input.moduleLinkArtifacts.set(input.source, {
-		moduleGraphInterface: input.result.moduleGraphInterface,
-		interfaceHash: input.result.interfaceHash,
-		moduleImports: input.result.moduleImports,
-	});
-	const previouslyOwned = input.transformVirtualModules.get(input.owner) ?? new Set<string>();
-	if (input.replaceOwnedArtifacts === true) {
-		for (const staleId of previouslyOwned) {
-			if (ids.has(staleId)) continue;
-			const owners = input.virtualModuleOwners.get(staleId);
-			owners?.delete(input.owner);
-			if (!owners || owners.size === 0) {
-				input.virtualModuleOwners.delete(staleId);
-				input.virtualModules.delete(staleId);
-			}
-		}
-		input.transformVirtualModules.set(input.owner, ids);
-	} else {
-		input.transformVirtualModules.set(input.owner, new Set([...previouslyOwned, ...ids]));
-	}
-	input.dev.record(input.source, ids, input.environment);
-	if (renderDataHashes.size > 0) input.updateDevPrerenderHashes?.(renderDataHashes);
-}
-
-function replaceClaimsWithPrerenderWakeOwner(
-	metadata: ModuleMetadataRegistry,
-	source: string,
-): void {
-	for (const emittedModule of metadata.symbolClaimMap().keys()) {
-		if (
-			pathname(emittedModule) === source &&
-			(emittedModule === source || isResumeSourceRequest(emittedModule))
-		) {
-			metadata.deleteSymbolClaims(emittedModule);
-		}
-	}
-}
-
-function emittedSymbolClaim(
-	metadata: ModuleMetadataRegistry,
-	source: string,
-	emittedModule: string,
-	manifest: MarklessTransformManifest,
-	virtualModules: ReadonlyArray<MarklessVirtualModule>,
-): { readonly owner: string; readonly manifest: MarklessTransformManifest } {
-	const claim = manifestForSource(manifest, emittedModule);
-	if (isPrerenderWakeSourceRequest(emittedModule) && manifest.symbols.length > 0) {
-		// The generated resolver owns wake-wrapper symbol routes when it survives
-		// the final strip; final claim selection drops this owner if it does not.
-		replaceClaimsWithPrerenderWakeOwner(metadata, source);
-		const resolver = virtualModules.find((module) => module.type === 'resolver');
-		if (!resolver) throw new Error('MARKLESS_PRERENDER_WAKE_RESOLVER_MISSING');
-		return {
-			owner: resolver.id,
-			manifest: {
-				...manifestForSource(manifest, source),
-				resolver: { virtualModuleId: resolver.id },
-			},
-		};
-	}
-	// An ineligible wake request emits no facade and therefore cannot displace
-	// the ordinary source or symbols sibling that still owns these claims.
-	const wakeOwnsRoutes = metadata.hasSymbolClaims(manifest.resolver.virtualModuleId);
-	return {
-		owner: emittedModule,
-		manifest:
-			wakeOwnsRoutes && (emittedModule === source || isResumeSourceRequest(emittedModule))
-				? { ...claim, symbols: [] }
-				: claim,
-	};
-}
-
 function registerRenderDataStyles(input: {
 	owner: string;
 	source: string;
@@ -1507,28 +1352,12 @@ function registerRenderDataStyles(input: {
 	);
 }
 
-function manifestForSource(
-	manifest: MarklessTransformManifest,
-	source: string,
-): MarklessTransformManifest {
-	return manifest.source === source ? manifest : { ...manifest, source };
-}
-
 function renderDataClaimManifest(
 	manifest: MarklessTransformManifest,
 	source: string,
 ): MarklessTransformManifest {
 	// Data-only facades keep demand records but own no symbol claims.
-	return { ...manifestForSource(manifest, source), symbols: [] };
-}
-
-function renderDataHash(source: string): string {
-	let hash = 0x811c9dc5;
-	for (let index = 0; index < source.length; index += 1) {
-		hash ^= source.charCodeAt(index);
-		hash = Math.imul(hash, 0x01000193);
-	}
-	return `mrd1-${(hash >>> 0).toString(36)}`;
+	return { ...linkedClaimManifestForSource(manifest, source), symbols: [] };
 }
 
 function isRenderDataOnlyTransformChange(

@@ -61,7 +61,7 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Resume virtual modules are returned only to their resolved client request.',
 	"packages/bundler/src/rolldown.ts :: if (currentEnvironment === 'client' && !internalOptions.dev) {":
 		'Production client virtual modules are registered from the resolved build environment.',
-	"packages/bundler/src/rolldown.ts :: const isClientSymbol = input.environment === 'client' && module.type === 'symbol';":
+	"packages/bundler/src/plugin-state.ts :: const isClientSymbol = input.environment === 'client' && module.type === 'symbol';":
 		'Virtual-module storage qualifies symbols using the transform input environment.',
 	"packages/bundler/src/source-module.ts :: const symbolsOnly = input.environment === 'client' && input.clientOutput === 'symbols-only';":
 		'Source emission derives its symbols-only module shape from compiler input.',

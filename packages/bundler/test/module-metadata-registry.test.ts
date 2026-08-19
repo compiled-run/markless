@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { sourceSymbolManifest } from '../src/link-driver.ts';
 import { ModuleMetadataRegistry } from '../src/module-metadata-registry.ts';
 import type { MarklessTransformManifest } from '../src/types.ts';
 
@@ -60,7 +61,7 @@ describe('module metadata identity registry', () => {
 			manifest(`${source}?markless-symbols`, resolver, [event, boundaryUpdate]),
 		);
 
-		expect(registry.sourceSymbolClaims(source, resolver)?.symbols).toEqual([
+		expect(sourceSymbolManifest(registry, source)?.symbols).toEqual([
 			event,
 			boundaryUpdate,
 		]);
@@ -100,7 +101,7 @@ describe('module metadata identity registry', () => {
 		registry.finishSourceSymbolClaims(source, source);
 		await sealing;
 
-		expect(registry.sourceSymbolClaims(source, resolver)?.symbols).toContainEqual(imported);
+		expect(sourceSymbolManifest(registry, source)?.symbols).toContainEqual(imported);
 	});
 
 	test('refuses incompatible claims for the same source symbol', () => {
@@ -118,7 +119,7 @@ describe('module metadata identity registry', () => {
 			]),
 		);
 
-		expect(() => registry.sourceSymbolClaims(source, resolver)).toThrow(
+		expect(() => sourceSymbolManifest(registry, source)).toThrow(
 			'MARKLESS_SOURCE_SYMBOL_CLAIMS_DIVERGED',
 		);
 	});

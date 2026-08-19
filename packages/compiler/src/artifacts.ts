@@ -1943,3 +1943,76 @@ export type LinkedModuleClaimPlan = {
 	readonly expectClaims: boolean;
 	readonly seal: boolean;
 };
+
+// Linked claims (`claim-manifest` link pass): who owns a source's emitted
+// symbol claims, and the merged manifest a consumer of that source reads. The
+// manifest shape is structural on purpose — the caller's richer transform
+// manifest flows through unchanged, and the pass only ever rewrites `source`,
+// `symbols` and `resolver`.
+export type LinkedClaimManifest = LinkedSymbolClaimManifest & {
+	readonly source: string;
+	readonly resolver: { readonly virtualModuleId: string };
+};
+
+// Per-build, never serialized: `bySource` is the merged manifest each source
+// answers with, `byEmittedModule` the exact owners it was merged from.
+export type LinkedClaimsArtifact<Manifest extends LinkedClaimManifest = LinkedClaimManifest> = {
+	readonly passId: 'claim-manifest';
+	readonly bySource: Readonly<Record<string, Manifest>>;
+	readonly byEmittedModule: Readonly<Record<string, Manifest>>;
+	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+};
+
+export type LinkedClaimsInput<Manifest extends LinkedClaimManifest = LinkedClaimManifest> = {
+	readonly source: string;
+	// Virtual module naming is the caller's, so the resolver a source's siblings
+	// must share arrives as an id rather than being spelled here.
+	readonly resolverId: string;
+	readonly claims: ReadonlyArray<Manifest>;
+};
+
+export type LinkedSourceClaimMerge<Manifest extends LinkedClaimManifest = LinkedClaimManifest> = {
+	readonly manifest: Manifest | undefined;
+	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+};
+
+// Emitted-id vocabulary the claim rules need. The pass asks these questions
+// rather than parsing ids, because how a variant is spelled is the bundler's.
+export type LinkedClaimIdNaming = {
+	readonly sourcePathOf: (id: string) => string;
+	readonly isResumeRequest: (id: string) => boolean;
+	readonly isWakeRequest: (id: string) => boolean;
+};
+
+export type EmittedClaimOwnershipInput<
+	Manifest extends LinkedClaimManifest = LinkedClaimManifest,
+> = {
+	readonly source: string;
+	readonly emittedModule: string;
+	readonly manifest: Manifest;
+	// The generated resolver among the modules this transform emitted, when it
+	// emitted one.
+	readonly resolverModuleId: string | undefined;
+	// Whether the resolver this manifest names already holds claims, which is how
+	// an ordinary sibling knows a wake variant took its routes.
+	readonly wakeOwnsRoutes: boolean;
+	// Every emitted module currently holding claims, for displacement.
+	readonly claimOwners: ReadonlyArray<string>;
+	readonly naming: LinkedClaimIdNaming;
+};
+
+export type EmittedClaimOwnership<Manifest extends LinkedClaimManifest = LinkedClaimManifest> = {
+	readonly owner: string;
+	readonly manifest: Manifest;
+	readonly displacedOwners: ReadonlyArray<string>;
+	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+};
+
+export type LinkedResolverClaimVerdict =
+	| { readonly action: 'keep-current' | 'replace' }
+	| { readonly action: 'diverged'; readonly diagnostic: CompilerDiagnostic };
+
+export type LinkedRouteArtifactRegistration = {
+	readonly action: 'already-registered' | 'register' | 'reinvalidate' | 'late';
+	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+};

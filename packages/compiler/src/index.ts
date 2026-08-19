@@ -13,6 +13,15 @@ export { defaultCompilerPasses } from './pass-registry.ts';
 export { analyzeCaptures } from './passes/capture-analysis.ts';
 export { computeExecutionAttribution } from './passes/link/attribution.ts';
 export {
+	CLAIM_MANIFEST_PASS_ID,
+	linkClaimManifests,
+	linkedClaimManifestForSource,
+	linkedResolverClaimVerdict,
+	linkedRouteArtifactRegistration,
+	mergeLinkedSourceClaims,
+	planEmittedClaimOwnership,
+} from './passes/link/claim-manifest.ts';
+export {
 	artifactChildCandidates,
 	compileTsrxModuleLinkArtifact,
 	computeLinkedInterfaces,

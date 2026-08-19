@@ -5,9 +5,11 @@
 import {
 	type CaptureAnalysisArtifact,
 	type LinkedModuleChildResolution,
+	type LinkedClaimsArtifact,
 	type LinkedModuleGraphArtifact,
 	type ModuleLinkRequest,
 	type ModuleLinkResolutionTable,
+	linkClaimManifests,
 	linkImportedModules,
 	linkedModuleImportRequests,
 	linkedModuleClaimPlan,
@@ -62,12 +64,37 @@ export function symbolRouteSource(source: string): string {
 	return withQuery(source, { 'markless-symbols': null });
 }
 
+// The resolver every emitted sibling of a source must share. Virtual module
+// naming is the bundler's, so the id is spelled here and handed to the pass.
+function resolverVirtualModuleId(source: string): string {
+	return `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodeURIComponent(source)}`;
+}
+
+// Runs the `claim-manifest` pass over the registry once the barrier says every
+// requested source has finished publishing. Waiting is the driver's; deciding
+// who owns what is the pass's.
+export function linkedClaims(
+	metadata: ModuleMetadataRegistry,
+	sources: ReadonlyArray<string>,
+): LinkedClaimsArtifact<MarklessTransformManifest> {
+	for (const source of sources) metadata.assertSourceClaimsSealed(source);
+	return linkClaimManifests({
+		byEmittedModule: metadata.symbolClaimMap(),
+		sources: sources.map((source) => ({
+			source,
+			resolverId: resolverVirtualModuleId(source),
+		})),
+	});
+}
+
 export function sourceSymbolManifest(
 	metadata: ModuleMetadataRegistry,
 	source: string,
 ): MarklessTransformManifest | undefined {
-	const resolverId = `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodeURIComponent(source)}`;
-	return metadata.sourceSymbolClaims(source, resolverId);
+	const artifact = linkedClaims(metadata, [source]);
+	const contradiction = artifact.diagnostics[0];
+	if (contradiction) throw new Error(contradiction.message);
+	return artifact.bySource[source];
 }
 
 async function resolveModuleLinkRequests(

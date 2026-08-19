@@ -139,4 +139,11 @@ export const linkCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 		consumes: ['moduleArtifacts', 'linkedModuleGraph'],
 		produces: ['linkedInterfaces'],
 	},
+	{
+		passId: 'claim-manifest',
+		description:
+			'Decide which emitted module owns the symbol claims of a source and merge sibling claims into one manifest per source.',
+		consumes: ['moduleManifests'],
+		produces: ['linkedClaims'],
+	},
 ];
