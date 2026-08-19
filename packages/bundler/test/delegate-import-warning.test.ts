@@ -33,9 +33,9 @@ export default function Page() @{ <main><BrokenFrame /></main> }`,
 			},
 		)) as { code: string };
 
-		// Fail-open: the build still produced a module, with the edge left as a
-		// runtime import rather than inlined markup.
-		expect(page.code).toBeTruthy();
+		// Fail-open: the edge stays a runtime import instead of inlined markup.
+		expect(page.code).toContain('@fixtures/broken-frame');
+		expect(page.code).not.toContain('BROKEN_DELEGATE_MODULE');
 
 		const messages = warn.mock.calls
 			.map(([message]) => String(message))
