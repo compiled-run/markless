@@ -10,6 +10,7 @@ import {
 	stateWriteInTemplateDiagnostic,
 	templateAsValueDiagnostic,
 } from './diagnostics.ts';
+import type { SemanticView } from '../../yuku-tsrx-adapter.ts';
 import type { DeferredComputedWrite, WalkState } from './types.ts';
 
 export function collectAssignment(node: AnyNode, state: WalkState): void {
@@ -129,7 +130,33 @@ export function collectDelete(node: AnyNode, state: WalkState): void {
 	});
 }
 
+/**
+ * The source range of the expression a single collection is walking. A name
+ * declared inside it is that expression's own binding, so a use of it refers to
+ * the local rather than to graph state - whatever the two are called.
+ */
+type ReadRegion = {
+	readonly start: number;
+	readonly end: number;
+};
+
 export function collectExpressionReads(node: AnyNode | undefined, state: WalkState): void {
+	if (!node) return;
+
+	collectReadsIn(node, state, readRegion(node));
+}
+
+function readRegion(node: AnyNode): ReadRegion | null {
+	return typeof node.start === 'number' && typeof node.end === 'number'
+		? { start: node.start, end: node.end }
+		: null;
+}
+
+function collectReadsIn(
+	node: AnyNode | undefined,
+	state: WalkState,
+	region: ReadRegion | null,
+): void {
 	if (!node) return;
 
 	if (
@@ -137,72 +164,41 @@ export function collectExpressionReads(node: AnyNode | undefined, state: WalkSta
 		node.type === 'FunctionExpression' ||
 		node.type === 'FunctionDeclaration'
 	) {
-		const previousShadowedBindings = state.shadowedBindingNames;
-		state.shadowedBindingNames = new Set(previousShadowedBindings);
-		for (const name of bindingNames(node.id as AnyNode | undefined)) {
-			state.shadowedBindingNames.add(name);
-		}
-		for (const parameter of asNodes(node.params)) {
-			for (const name of bindingNames(parameter)) state.shadowedBindingNames.add(name);
-		}
-		for (const name of functionScopedBindingNames(node.body as AnyNode | undefined)) {
-			state.shadowedBindingNames.add(name);
-		}
-		collectExpressionReads(node.body as AnyNode | undefined, state);
-		state.shadowedBindingNames = previousShadowedBindings;
-		return;
-	}
-
-	if (node.type === 'BlockStatement' || node.type === 'SwitchStatement') {
-		withShadowedBindings(state, blockScopedBindingNames(node), () => {
-			for (const child of childNodes(node)) collectExpressionReads(child, state);
-		});
-		return;
-	}
-
-	if (
-		node.type === 'ForStatement' ||
-		node.type === 'ForInStatement' ||
-		node.type === 'ForOfStatement'
-	) {
-		withShadowedBindings(state, forHeadBindingNames(node), () => {
-			for (const child of childNodes(node)) collectExpressionReads(child, state);
-		});
+		// Parameters and the function's own name are declarations, not reads.
+		collectReadsIn(node.body as AnyNode | undefined, state, region);
 		return;
 	}
 
 	if (node.type === 'CatchClause') {
-		withShadowedBindings(state, bindingNames(node.param as AnyNode | undefined), () => {
-			collectExpressionReads(node.body as AnyNode | undefined, state);
-		});
+		// The caught binding is a declaration, not a read.
+		collectReadsIn(node.body as AnyNode | undefined, state, region);
 		return;
 	}
 
 	if (node.type === 'VariableDeclaration') {
-		withShadowedBindings(state, declarationBindingNames(node), () => {
-			for (const declaration of asNodes(node.declarations)) {
-				collectExpressionReads(declaration.init as AnyNode | undefined, state);
-			}
-		});
+		// Only the initializers read; the declared patterns bind.
+		for (const declaration of asNodes(node.declarations)) {
+			collectReadsIn(declaration.init as AnyNode | undefined, state, region);
+		}
 		return;
 	}
 
 	if (node.type === 'AssignmentExpression') {
 		const operator = typeof node.operator === 'string' ? node.operator : '=';
 		if (operator !== '=') {
-			collectExpressionReads(node.left as AnyNode | undefined, state);
+			collectReadsIn(node.left as AnyNode | undefined, state, region);
 		}
-		collectExpressionReads(node.right as AnyNode | undefined, state);
+		collectReadsIn(node.right as AnyNode | undefined, state, region);
 		return;
 	}
 
 	if (node.type === 'UpdateExpression') {
-		collectExpressionReads(node.argument as AnyNode | undefined, state);
+		collectReadsIn(node.argument as AnyNode | undefined, state, region);
 		return;
 	}
 
 	if (node.type === 'UnaryExpression' && node.operator === 'delete') {
-		collectDeleteComputedPropertyReads(node.argument as AnyNode | undefined, state);
+		collectDeleteComputedPropertyReads(node.argument as AnyNode | undefined, state, region);
 		return;
 	}
 
@@ -211,9 +207,9 @@ export function collectExpressionReads(node: AnyNode | undefined, state: WalkSta
 		if (callee?.type === 'MemberExpression') {
 			const method = getStaticMemberPropertyName(callee);
 			if (method && isMutatingCollectionMethod(method)) {
-				collectExpressionReads(callee.object as AnyNode | undefined, state);
+				collectReadsIn(callee.object as AnyNode | undefined, state, region);
 				for (const argument of asNodes(node.arguments)) {
-					collectExpressionReads(argument, state);
+					collectReadsIn(argument, state, region);
 				}
 				return;
 			}
@@ -221,35 +217,51 @@ export function collectExpressionReads(node: AnyNode | undefined, state: WalkSta
 	}
 
 	if (node.type === 'ChainExpression') {
-		collectExpressionReads(node.expression as AnyNode | undefined, state);
+		collectReadsIn(node.expression as AnyNode | undefined, state, region);
+		return;
+	}
+
+	if (node.type === 'Property') {
+		// A static key names a field; it reads nothing. A computed one evaluates
+		// an expression, exactly as `a[b]` does. Shorthand `{ count }` parses to a
+		// key and a value node over the same identifier, so visiting only the value
+		// records the single read the source actually writes.
+		if (node.computed === true) {
+			collectReadsIn(node.key as AnyNode | undefined, state, region);
+		}
+		collectReadsIn(node.value as AnyNode | undefined, state, region);
 		return;
 	}
 
 	if (node.type === 'MemberExpression') {
-		addStateRead(node, state);
+		addStateRead(node, state, region);
 
 		if (node.computed === true) {
-			collectExpressionReads(node.property as AnyNode | undefined, state);
+			collectReadsIn(node.property as AnyNode | undefined, state, region);
 		}
 		return;
 	}
 
 	if (node.type === 'Identifier') {
-		addStateRead(node, state);
+		addStateRead(node, state, region);
 		return;
 	}
 
 	for (const child of childNodes(node)) {
-		collectExpressionReads(child, state);
+		collectReadsIn(child, state, region);
 	}
 }
 
-function collectDeleteComputedPropertyReads(node: AnyNode | undefined, state: WalkState): void {
+function collectDeleteComputedPropertyReads(
+	node: AnyNode | undefined,
+	state: WalkState,
+	region: ReadRegion | null,
+): void {
 	node = unwrapChainExpression(node);
 	if (node?.type !== 'MemberExpression') return;
 	if (node.computed !== true) return;
 
-	collectExpressionReads(node.property as AnyNode | undefined, state);
+	collectReadsIn(node.property as AnyNode | undefined, state, region);
 }
 
 function diagnoseBannedWriteSite(node: AnyNode, target: AnyNode, state: WalkState): boolean {
@@ -366,11 +378,10 @@ function isChainExpression(node: unknown): boolean {
 	return isNode(node) && node.type === 'ChainExpression';
 }
 
-function addStateRead(node: AnyNode, state: WalkState): void {
+function addStateRead(node: AnyNode, state: WalkState, region: ReadRegion | null): void {
 	const source = expressionSource(node, state.source);
 	if (!source) return;
-	const rootName = /^[$A-Z_a-z][$\w]*/.exec(source)?.[0];
-	if (rootName && state.shadowedBindingNames.has(rootName)) return;
+	if (rootBindsInsideRegion(node, state, region)) return;
 
 	const resolved = resolveGraphPath(
 		source,
@@ -389,6 +400,72 @@ function addStateRead(node: AnyNode, state: WalkState): void {
 				: {}),
 		sourceSpan: sourceSpan(node, state.filename),
 	});
+}
+
+/**
+ * Whether the leftmost identifier of a read - the root of `items[i].label`, of
+ * `session.user`, or of a bare `count` - refers to a binding the collected
+ * expression declares itself.
+ *
+ * The question is asked of yuku's resolved references rather than of a set of
+ * names, because only resolution can tell a use of the graph cell from a use of
+ * a local that happens to share its name: `var` hoisting past the declaration
+ * site, a sibling block whose binding is out of scope here, a parameter that
+ * shadows for the whole body. A binding declared inside the collected
+ * expression is one the expression owns, so a use of it is not a graph read.
+ */
+function rootBindsInsideRegion(
+	node: AnyNode,
+	state: WalkState,
+	region: ReadRegion | null,
+): boolean {
+	if (!region) return false;
+
+	const offset = rootIdentifierOffset(node, state.source);
+	if (offset === null) return false;
+
+	const semantic = state.semantic();
+	const symbolId = resolvedSymbolAt(semantic, offset);
+	if (symbolId === null) return false;
+
+	const scopeId = semantic.symbol.scopeId(symbolId);
+	return semantic.scope.start(scopeId) >= region.start && semantic.scope.end(scopeId) <= region.end;
+}
+
+/**
+ * Source offset of the identifier a read starts with, or `null` when it starts
+ * with something else - `this`, a parenthesis, a literal - and so has no
+ * binding to resolve.
+ */
+function rootIdentifierOffset(node: AnyNode, source: string): number | null {
+	if (typeof node.start !== 'number' || typeof node.end !== 'number') return null;
+
+	const raw = source.slice(node.start, node.end);
+	return node.start + (raw.length - raw.trimStart().length);
+}
+
+/**
+ * Identifier uses indexed by where they start, built once per analyzed module.
+ * Type-position uses are skipped: they never contribute a runtime read, and
+ * indexing them would let a type annotation answer for the value beside it.
+ */
+const valueReferenceSymbolsByOffset = new WeakMap<SemanticView, Map<number, number>>();
+
+function resolvedSymbolAt(semantic: SemanticView, offset: number): number | null {
+	let symbolsByOffset = valueReferenceSymbolsByOffset.get(semantic);
+	if (!symbolsByOffset) {
+		symbolsByOffset = new Map<number, number>();
+		for (let referenceId = 0; referenceId < semantic.reference.count; referenceId += 1) {
+			if (semantic.reference.inTypePosition(referenceId)) continue;
+			const symbolId = semantic.reference.symbolId(referenceId);
+			if (symbolId === null) continue;
+			const start = semantic.reference.start(referenceId);
+			if (!symbolsByOffset.has(start)) symbolsByOffset.set(start, symbolId);
+		}
+		valueReferenceSymbolsByOffset.set(semantic, symbolsByOffset);
+	}
+
+	return symbolsByOffset.get(offset) ?? null;
 }
 
 function bindingNames(node: AnyNode | undefined): string[] {
@@ -415,63 +492,6 @@ function declarationBindingNames(node: AnyNode | undefined): string[] {
 	return asNodes(node.declarations).flatMap((declaration) =>
 		bindingNames(declaration.id as AnyNode | undefined),
 	);
-}
-
-function blockScopedBindingNames(node: AnyNode): string[] {
-	const statements =
-		node.type === 'SwitchStatement'
-			? asNodes(node.cases).flatMap((switchCase) => asNodes(switchCase.consequent))
-			: asNodes(node.body);
-	return statements.flatMap((statement) => {
-		if (
-			statement.type === 'VariableDeclaration' &&
-			(statement.kind === 'const' || statement.kind === 'let')
-		) {
-			return declarationBindingNames(statement);
-		}
-		if (statement.type === 'FunctionDeclaration' || statement.type === 'ClassDeclaration') {
-			return bindingNames(statement.id as AnyNode | undefined);
-		}
-		return [];
-	});
-}
-
-function functionScopedBindingNames(node: AnyNode | undefined): string[] {
-	if (!node) return [];
-	if (
-		node.type === 'ArrowFunctionExpression' ||
-		node.type === 'FunctionExpression' ||
-		node.type === 'FunctionDeclaration'
-	) {
-		return [];
-	}
-	const own =
-		node.type === 'VariableDeclaration' && node.kind === 'var'
-			? declarationBindingNames(node)
-			: [];
-	return [...own, ...childNodes(node).flatMap(functionScopedBindingNames)];
-}
-
-function forHeadBindingNames(node: AnyNode): string[] {
-	return [node.init, node.left].flatMap((head) =>
-		declarationBindingNames(head as AnyNode | undefined),
-	);
-}
-
-function withShadowedBindings(
-	state: WalkState,
-	names: ReadonlyArray<string>,
-	visit: () => void,
-): void {
-	if (names.length === 0) {
-		visit();
-		return;
-	}
-	const previousShadowedBindings = state.shadowedBindingNames;
-	state.shadowedBindingNames = new Set(previousShadowedBindings);
-	for (const name of names) state.shadowedBindingNames.add(name);
-	visit();
-	state.shadowedBindingNames = previousShadowedBindings;
 }
 
 function sharedScope(state: WalkState): { readonly sharedDefinitionId?: string } {

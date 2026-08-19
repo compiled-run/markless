@@ -99,7 +99,6 @@ export type WalkState = {
 	readonly hostIds: WeakMap<object, string>;
 	currentComponentName: string | null;
 	currentComponentId: string | null;
-	shadowedBindingNames: Set<string>;
 	currentBranchScopeIds: string[];
 	currentKeyedRepeatScopeIds: string[];
 	currentHostNodeId: string | null;
@@ -220,7 +219,6 @@ export function createWalkState(input: {
 		hostIds: new WeakMap<object, string>(),
 		currentComponentName: null,
 		currentComponentId: null,
-		shadowedBindingNames: new Set(),
 		currentBranchScopeIds: [],
 		currentKeyedRepeatScopeIds: [],
 		currentHostNodeId: null,
