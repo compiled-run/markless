@@ -21,10 +21,27 @@ const NON_TEST_JOBS = new Set([
 	'changes',
 	'benchmark',
 	'benchmark-guard',
+	// Writes the green markers for the sharded lanes. A cache write is not a
+	// check, so a merge must not hang on it.
+	'save-lane-markers',
 ]);
 
 const GATE_JOB = 'test';
 const BOX_JOB_PREFIX = 'boxes-';
+const LANES_JOB = 'lanes';
+const PLAYWRIGHT_JOB = 'prepare-playwright';
+
+// Jobs the gate depends on that are wiring rather than a content-hashed lane.
+const GATE_INFRASTRUCTURE = new Set([LANES_JOB, PLAYWRIGHT_JOB]);
+
+// Jobs whose failure skips a lane. The gate reads `skipped` as a content-hash
+// hit, so each of these has to reach the gate under its own name.
+const SKIP_CAUSING_JOBS = ['typecheck', LANES_JOB, PLAYWRIGHT_JOB];
+
+// `boxes-music-player` -> `boxes_music_player`: GitHub expressions read `-` as
+// subtraction, so lane outputs and probe step ids use underscores.
+const slugOf = (jobName) => jobName.replace(/-/g, '_');
+const wordEnd = '(?![A-Za-z0-9_])';
 
 const problems = [];
 const fail = (message) => problems.push(message);
@@ -123,6 +140,23 @@ const jobText = (name) => {
 	return JSON.stringify(jobs[name]);
 };
 
+// Declared `outputs:` names. Under the line scan the block sits at eight
+// spaces with its entries at twelve.
+const outputsOf = (name) => {
+	if (!usingScan) return Object.keys((jobs[name] && jobs[name].outputs) || {});
+	const block = /^ {8}outputs:\s*$([\s\S]*?)(?=^ {8}\S|$(?![\s\S]))/m.exec(jobText(name));
+	if (block === null) return [];
+	return [...block[1].matchAll(/^ {12}([A-Za-z0-9_.-]+):/gm)].map((match) => match[1]);
+};
+
+// The job-level `if:` expression. The line scan cannot separate a block scalar
+// from the rest of the job, so it falls back to the whole job body: a superset,
+// which only ever makes the checks below more permissive, never less honest.
+const ifOf = (name) => {
+	if (!usingScan) return String((jobs[name] && jobs[name].if) ?? '');
+	return jobText(name);
+};
+
 // 1. Every `needs:` name has to be a real job, or the run silently skips work.
 for (const name of jobNames) {
 	for (const dependency of needsOf(name)) {
@@ -177,6 +211,15 @@ if (!jobNames.includes(GATE_JOB)) {
 		fail(`Job \`${GATE_JOB}\` must set \`if: always()\` or a failed lane skips the gate instead of failing it.`);
 	if (!/needs\.\*\.result/.test(jobText(GATE_JOB)))
 		fail(`Job \`${GATE_JOB}\` does not inspect \`needs.*.result\`, so \`if: always()\` would make it pass regardless.`);
+	// The gate reads `skipped` as "this lane's content hash already went green",
+	// so every job whose failure would skip a lane has to reach the gate under
+	// its own name, where it lands as `failure` instead.
+	if (!/skipped/.test(jobText(GATE_JOB)))
+		fail(`Job \`${GATE_JOB}\` never mentions \`skipped\`, so a lane that hit its content hash would read as a failure.`);
+	for (const guard of SKIP_CAUSING_JOBS) {
+		if (jobNames.includes(guard) && !gateNeeds.has(guard))
+			fail(`Job \`${GATE_JOB}\` does not need \`${guard}\`, whose failure skips lanes the gate would then read as content-hash hits.`);
+	}
 }
 
 // 6. Receipt aggregation: every box lane must upload, and the receipts job must
@@ -201,6 +244,92 @@ if (!jobNames.includes('receipts')) {
 		fail('Job `receipts` never runs `receipts:check`.');
 	if (!/analyzer-contract-receipts/.test(receiptsText))
 		fail('Job `receipts` never uploads the `analyzer-contract-receipts` artifact.');
+	// A skipped box lane uploads nothing, so its receipts have to come back out
+	// of the cache entry its last green run saved under the very key whose hit
+	// is the reason the lane skipped.
+	for (const boxJob of boxJobs) {
+		const slug = slugOf(boxJob);
+		if (!new RegExp(`needs\\.lanes\\.outputs\\.key_${slug}${wordEnd}`).test(receiptsText))
+			fail(`Job \`receipts\` never restores \`${boxJob}\` receipts from \`needs.lanes.outputs.key_${slug}\`, so a skipped box lane would leave the receipt set short.`);
+	}
+	if (!/fail-on-cache-miss/.test(receiptsText))
+		fail('Job `receipts` restores cached receipts without `fail-on-cache-miss`, so a missing cache entry would pass as an empty receipt set.');
+}
+
+// 7. Content-hash lanes. A lane may only skip because its key already carries a
+// green marker, so each one needs a read-only probe in `lanes`, an `if:` on
+// that probe's verdict, and a marker saved under the same key when it wins.
+if (jobNames.includes(GATE_JOB) && !jobNames.includes(LANES_JOB)) {
+	fail(`There is no \`${LANES_JOB}\` job, so nothing decides which lanes a run can skip.`);
+} else if (jobNames.includes(GATE_JOB)) {
+	const laneOutputs = new Set(outputsOf(LANES_JOB));
+	const lanesText = jobText(LANES_JOB);
+	const hashedLanes = needsOf(GATE_JOB).filter(
+		(name) =>
+			jobNames.includes(name) &&
+			name !== GATE_JOB &&
+			!GATE_INFRASTRUCTURE.has(name) &&
+			!NON_TEST_JOBS.has(name),
+	);
+	if (hashedLanes.length === 0) fail('The gate depends on no content-hashed lane.');
+	for (const lane of hashedLanes) {
+		const slug = slugOf(lane);
+		if (!laneOutputs.has(`run_${slug}`))
+			fail(`Job \`${LANES_JOB}\` has no \`run_${slug}\` output, so lane \`${lane}\` has no content hash to skip on.`);
+		if (!laneOutputs.has(`key_${slug}`))
+			fail(`Job \`${LANES_JOB}\` has no \`key_${slug}\` output, so lane \`${lane}\` has no key to save a marker under.`);
+		if (
+			!new RegExp(`steps\\.${slug}\\.outputs\\.cache-hit`).test(lanesText) ||
+			!new RegExp(`steps\\.${slug}\\.outputs\\.cache-primary-key`).test(lanesText)
+		)
+			fail(`Job \`${LANES_JOB}\` has no cache probe with id \`${slug}\` behind the \`${lane}\` outputs.`);
+		if (!new RegExp(`needs\\.lanes\\.outputs\\.run_${slug}${wordEnd}`).test(ifOf(lane)))
+			fail(`Lane \`${lane}\` does not gate on \`needs.lanes.outputs.run_${slug}\`, so its content hash decides nothing.`);
+		const saver = jobNames.find(
+			(name) =>
+				/actions\/cache\/save/.test(jobText(name)) &&
+				new RegExp(`needs\\.lanes\\.outputs\\.key_${slug}${wordEnd}`).test(jobText(name)),
+		);
+		if (saver === undefined)
+			fail(`No job saves a marker under \`needs.lanes.outputs.key_${slug}\`, so lane \`${lane}\` re-runs forever on an unchanged tree.`);
+	}
+	// Every probe reads: a restore without `lookup-only` would unpack a marker
+	// into the workspace, and one that ever wrote would mark work green that
+	// never ran.
+	const restores = (lanesText.match(/actions\/cache\/restore/g) ?? []).length;
+	const probes = (lanesText.match(/lookup-only/g) ?? []).length;
+	if (restores < hashedLanes.length)
+		fail(`Job \`${LANES_JOB}\` has ${restores} cache probe(s) for ${hashedLanes.length} lane(s).`);
+	if (probes !== restores)
+		fail(`Job \`${LANES_JOB}\` has ${probes} \`lookup-only\` flag(s) for ${restores} cache probe(s); every probe must be read-only.`);
+	if (/actions\/cache\/save/.test(lanesText) || /actions\/cache@/.test(lanesText))
+		fail(`Job \`${LANES_JOB}\` writes a cache; a lane's key may only be marked green by the lane that ran.`);
+}
+
+// 8. A sharded lane must not save its own marker: one green shard next to a red
+// one would let the whole lane skip on the next identical tree.
+for (const name of jobNames) {
+	const text = jobText(name);
+	const sharded = /strategy/.test(text) && /matrix/.test(text) && /shard/.test(text);
+	if (sharded && /actions\/cache\/save/.test(text))
+		fail(`Sharded lane \`${name}\` saves a cache marker from inside its own matrix, so one green shard could mark a red lane complete.`);
+}
+
+// 9. One Chromium download per run: only the prepare job installs a browser
+// unconditionally, and anything that installs one shares its cache path.
+if (!jobNames.includes(PLAYWRIGHT_JOB)) {
+	fail(`There is no \`${PLAYWRIGHT_JOB}\` job; every browser lane would download its own Chromium.`);
+} else {
+	if (!/PLAYWRIGHT_BROWSERS_PATH/.test(jobText(PLAYWRIGHT_JOB)))
+		fail(`Job \`${PLAYWRIGHT_JOB}\` does not set \`PLAYWRIGHT_BROWSERS_PATH\`, so the cache it saves is not the one the lanes read.`);
+	for (const name of jobNames) {
+		// `install-deps` is per-runner system libraries, not the browser.
+		if (!/playwright install(?!-deps)/.test(jobText(name))) continue;
+		if (!/PLAYWRIGHT_BROWSERS_PATH/.test(jobText(name)))
+			fail(`Job \`${name}\` installs a Playwright browser without \`PLAYWRIGHT_BROWSERS_PATH\`, so it cannot share the prepared cache.`);
+		if (name !== PLAYWRIGHT_JOB && !needsOf(name).includes(PLAYWRIGHT_JOB))
+			fail(`Job \`${name}\` installs a Playwright browser but does not need \`${PLAYWRIGHT_JOB}\`.`);
+	}
 }
 
 console.log(`Workflow: ${workflowPath}`);
