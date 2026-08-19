@@ -61,7 +61,18 @@
       "Bash(node /Users/jacksm5pro/.claude/skills/goal-prep/scripts/check-update.mjs)",
       "Bash(node /Users/jacksm5pro/.claude/skills/goal-prep/scripts/check-update.mjs *)",
       "Bash(pnpm typecheck)",
-      "mcp__claude-in-chrome__tabs_context_mcp"
+      "mcp__claude-in-chrome__tabs_context_mcp",
+      "Bash(pnpm exec tsc --noEmit)",
+      "Bash(pnpm run check)",
+      "Bash(pnpm run check *)",
+      "Bash(pnpm run test)",
+      "Bash(pnpm run test *)",
+      "Bash(pnpm exec vitest run)",
+      "Bash(pnpm typecheck *)",
+      "Bash(pnpm test:react)",
+      "Bash(pnpm test:react *)",
+      "Bash(npx witness run)",
+      "Bash(npx witness run *)"
     ],
     "ask": [
       "Bash(pnpm add:*)",

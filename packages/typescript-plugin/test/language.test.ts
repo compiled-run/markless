@@ -63,7 +63,8 @@ test('configures Zed to highlight .tsrx as TSX and load the workspace plugin', (
 	]);
 });
 
-test('compiles TSRX source into type-checkable TSX for TypeScript', () => {
+// First test to touch the TS program pays its creation; CI runner load has blown the 5s default.
+test('compiles TSRX source into type-checkable TSX for TypeScript', { timeout: 20_000 }, () => {
 	const source = `
 		import { state } from '@markless/core';
 
