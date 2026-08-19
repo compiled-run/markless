@@ -24,8 +24,11 @@ export function compileToVolarMappings(
 ): MarklessTsrxTypeServiceResult {
 	const selection = compileEditorSource(source, filename, options);
 	const result = selection.result;
-	addImportClauseInteriorMappings(result, source);
-	escapeMarkupTextLessThan(result);
+	// `result.sourceAst` indexes the recovered source a ladder rung produced, while the
+	// mappings were translated back to the authored source. Everything below reasons about
+	// authored offsets, so AST positions cross over here and nowhere else.
+	addImportClauseInteriorMappings(result, source, selection.toAuthoredOffset);
+	escapeMarkupTextLessThan(result, selection.toAuthoredOffset);
 	return {
 		...result,
 		cssMappings: result.cssMappings.map((mapping, index) => ({
@@ -56,6 +59,12 @@ export type EditorSourceSelection = {
 	readonly result: MarklessTsrxTypeServiceResult;
 	readonly source: string;
 	readonly translateOffset: (offset: number) => number;
+	/**
+	 * The inverse of `translateOffset`: a `source`/`result.sourceAst` offset back to the
+	 * authored source. `result.mappings` and `result.cssMappings` are already authored-space,
+	 * so anything correlating an AST position with a mapping has to come through here.
+	 */
+	readonly toAuthoredOffset: (offset: number) => number;
 };
 
 /**
@@ -121,6 +130,7 @@ function selectedSource(
 		result,
 		source,
 		translateOffset: (offset) => originalOffsetToSelected(offset, edits),
+		toAuthoredOffset: (offset) => selectedOffsetToOriginal(offset, edits),
 	};
 }
 
@@ -141,6 +151,7 @@ type AstNode = {
 function addImportClauseInteriorMappings(
 	compiled: MarklessTsrxTypeServiceResult,
 	source: string,
+	toAuthoredOffset: (offset: number) => number,
 ): void {
 	const program = compiled.sourceAst as AstNode | undefined;
 	if (program?.type !== 'Program') return;
@@ -155,17 +166,29 @@ function addImportClauseInteriorMappings(
 		const namedSpecifiers = specifiers.filter(
 			(specifier) => specifier.type === 'ImportSpecifier',
 		);
-		const first = namedSpecifiers[0];
-		const last = namedSpecifiers.at(-1);
-		if (first?.start === undefined || first.end === undefined || last?.end === undefined)
+		const rawFirst = namedSpecifiers[0];
+		const rawLast = namedSpecifiers.at(-1);
+		if (rawFirst?.start === undefined || rawFirst.end === undefined || rawLast?.end === undefined)
 			continue;
 
+		// The clause is scanned in `source`, so every AST offset used here crosses into
+		// authored space first; a recovery rung that edited earlier text shifts them all.
+		const first = {
+			start: toAuthoredOffset(rawFirst.start),
+			end: toAuthoredOffset(rawFirst.end),
+		};
+		const last = { end: toAuthoredOffset(rawLast.end) };
+		const declarationStart =
+			declaration.start === undefined ? 0 : toAuthoredOffset(declaration.start);
+		const declarationEnd =
+			declaration.end === undefined ? source.length : toAuthoredOffset(declaration.end);
+
 		let openBrace = first.start - 1;
-		while (openBrace >= (declaration.start ?? 0) && /\s/.test(source[openBrace] ?? '')) {
+		while (openBrace >= declarationStart && /\s/.test(source[openBrace] ?? '')) {
 			openBrace -= 1;
 		}
 		let closeBrace = last.end;
-		while (closeBrace < (declaration.end ?? source.length)) {
+		while (closeBrace < declarationEnd) {
 			const character = source[closeBrace];
 			if (character === '}') break;
 			if (character !== ',' && !/\s/.test(character ?? '')) break;
@@ -176,7 +199,7 @@ function addImportClauseInteriorMappings(
 		const tokenMapping = compiled.mappings.find((mapping) => {
 			const mappingStart = mapping.sourceOffsets[0];
 			const mappingEnd = mappingStart + mapping.lengths[0];
-			return mappingStart < first.end! && mappingEnd > first.start!;
+			return mappingStart < first.end && mappingEnd > first.start;
 		});
 		if (!tokenMapping) continue;
 
@@ -205,8 +228,17 @@ function addImportClauseInteriorMappings(
  * the three characters it adds - the same generated-code edit `restoreTypedDot`
  * makes for a dot.
  */
-function escapeMarkupTextLessThan(compiled: MarklessTsrxTypeServiceResult): void {
-	const textSpans = markupTextSpans(compiled.sourceAst);
+function escapeMarkupTextLessThan(
+	compiled: MarklessTsrxTypeServiceResult,
+	toAuthoredOffset: (offset: number) => number,
+): void {
+	// Compared against authored-space mapping offsets below, so the AST spans are moved
+	// out of the recovered source's coordinates first. A run of real tags sitting at the
+	// shifted position of a text node would otherwise be escaped into literal text.
+	const textSpans = markupTextSpans(compiled.sourceAst).map((span) => ({
+		start: toAuthoredOffset(span.start),
+		end: toAuthoredOffset(span.end),
+	}));
 	if (textSpans.length === 0) return;
 
 	const positions = new Set<number>();
