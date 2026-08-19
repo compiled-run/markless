@@ -597,6 +597,9 @@ export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 				readonly kind: 'attribute';
 				readonly name: string;
 				readonly residue: SemanticMarkupResidue;
+				// The name and quotes are already in the statics: this value can
+				// never be absent, so the slot renders the value alone.
+				readonly alwaysPresent?: true;
 				readonly directClassMatch?: {
 					readonly stateGraphNodeId: string;
 					readonly statePath: ReadonlyArray<string>;

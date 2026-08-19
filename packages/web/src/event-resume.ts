@@ -3,6 +3,7 @@ import {
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
 } from '@markless/serializer/protocol';
+import { marklessAttributeValue } from './dom-attribute.ts';
 import type {
 	DomJournalEntry,
 	DomJournalResult,
@@ -479,11 +480,12 @@ function applyDomJournalEntry(
 		return;
 	}
 	if (entry.type === 'setAttr') {
-		if (entry.value == null || entry.value === false) {
+		const text = marklessAttributeValue(entry.name, entry.value);
+		if (text === null) {
 			target.removeAttribute?.(entry.name);
 			return;
 		}
-		target.setAttribute?.(entry.name, stringifyDomValue(entry.value));
+		target.setAttribute?.(entry.name, text);
 		return;
 	}
 	if (entry.type === 'setProp') {

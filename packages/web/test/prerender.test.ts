@@ -770,16 +770,34 @@ test('client linked-data evaluation envelopes its initial pending snapshot', asy
 	});
 });
 
-test('linked boundary evaluation stays fail-loud for a genuinely unmapped composed branch read', async () => {
+test('a branch testing a prop the parent never passed settles as a static read', async () => {
+	const rendered = await renderPrerenderBoundary(
+		linkedBoundaryWithComposedBranch([]) as never,
+		'boundary:0',
+		'fulfilled',
+		fulfilledStatusGraph() as never,
+		async () => undefined,
+	);
+
+	// The name is absent from the route table, so the child read a static
+	// undefined and its rendered arm is final: no live branch record survives.
+	expect(rendered.armRecords.branches).toEqual([]);
+});
+
+test('linked boundary evaluation stays fail-loud for a prop shape it cannot derive', async () => {
+	// The route table names the prop but describes no value composition can
+	// reach, which is a defect rather than an omission.
 	await expect(
 		renderPrerenderBoundary(
-			linkedBoundaryWithComposedBranch([]) as never,
+			linkedBoundaryWithComposedBranch([
+				{ name: 'active', kind: 'graph-reference' },
+			] as never) as never,
 			'boundary:0',
 			'fulfilled',
 			fulfilledStatusGraph() as never,
 			async () => undefined,
 		),
-	).rejects.toThrow('MARKLESS_COMPOSED_READ_UNMAPPED: c0:branch-site:0-class');
+	).rejects.toThrow('MARKLESS_PRERENDER_PROP_UNDERIVABLE: active');
 });
 
 test('linked boundary evaluation carries a composed child computed into settled HTML and records', async () => {

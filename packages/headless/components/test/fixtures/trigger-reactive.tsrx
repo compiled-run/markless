@@ -5,7 +5,7 @@ export function App() @{
 	let blocked = state(false);
 
 	<section data-testid="trigger-reactive">
-		<button type="button" data-flip onClick={() => blocked = true}>flip</button>
+		<button type="button" data-flip onClick={() => blocked = !blocked}>flip</button>
 		<checkbox.root>
 			<checkbox.trigger disabled={blocked}>x</checkbox.trigger>
 		</checkbox.root>

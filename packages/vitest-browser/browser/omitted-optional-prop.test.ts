@@ -8,14 +8,11 @@ import BarrelApp from './fixtures/optional-prop-barrel.tsrx';
 // has nothing live to wire — reached directly or through a barrel.
 afterEach(() => cleanup());
 
-// A dynamic attribute keeps its name in the static html, so an undefined value
-// still renders an empty attribute; that is a separate open defect. What this
-// covers is that composition maps the child's records instead of refusing.
 function expectOmittedPropRendered(container: ParentNode) {
 	const part = container.querySelector<HTMLButtonElement>('[data-optional-part]');
 	expect(part).not.toBeNull();
 	expect(part?.textContent).toBe('x');
-	expect(part?.getAttribute('disabled')).toBe('');
+	expect(part?.hasAttribute('disabled')).toBe(false);
 }
 
 test('CSR: a directly imported child renders with an omitted optional prop', async () => {

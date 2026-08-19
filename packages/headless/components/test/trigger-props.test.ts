@@ -16,19 +16,24 @@ function trigger(container: ParentNode, testid: string) {
 function expectStaticDisabled(container: ParentNode) {
 	const button = trigger(container, 'trigger-props');
 	expect(button).not.toBeNull();
-	expect(button?.hasAttribute('disabled')).toBe(true);
-	expect(button?.getAttribute('ui-disabled')).toBe('true');
+	expect(button?.getAttribute('disabled')).toBe('');
+	expect(button?.getAttribute('ui-disabled')).toBe('');
 }
 
 async function expectFlipsDisabled(container: ParentNode) {
 	const button = trigger(container, 'trigger-reactive');
-	expect(button?.getAttribute('disabled')).toBe('false');
-	expect(button?.getAttribute('ui-disabled')).toBe('false');
+	expect(button?.hasAttribute('disabled')).toBe(false);
+	expect(button?.hasAttribute('ui-disabled')).toBe(false);
 
 	container.querySelector<HTMLButtonElement>('[data-flip]')?.click();
 
-	await expect.poll(() => trigger(container, 'trigger-reactive')?.getAttribute('disabled')).toBe('true');
-	expect(trigger(container, 'trigger-reactive')?.getAttribute('ui-disabled')).toBe('true');
+	await expect.poll(() => trigger(container, 'trigger-reactive')?.hasAttribute('disabled')).toBe(true);
+	expect(trigger(container, 'trigger-reactive')?.getAttribute('ui-disabled')).toBe('');
+
+	container.querySelector<HTMLButtonElement>('[data-flip]')?.click();
+
+	await expect.poll(() => trigger(container, 'trigger-reactive')?.hasAttribute('disabled')).toBe(false);
+	expect(trigger(container, 'trigger-reactive')?.hasAttribute('ui-disabled')).toBe(false);
 }
 
 test('CSR: a barrel-reached part forwards a static prop onto its host element', async () => {

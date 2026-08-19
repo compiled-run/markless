@@ -1205,26 +1205,36 @@ export function marklessSsrPrefixBoundaryArmRecords(
 		// position, not text); ids/symbols/test reads take the child prefixes.
 		...(set.branches
 			? {
-					branches: set.branches.map((branch) => ({
-						...branch,
-						id: child.hostPrefix + branch.id,
-						testReads: marklessSsrRemapChildReads(
-							branch.testReads,
-							child.graphProps,
-							child.hostPrefix + branch.id,
-							instancePath,
-						),
-						...(branch.symbolId
-							? { symbolId: marklessBoundSymbolId(child, branch.symbolId) }
-							: {}),
-						...(branch.armRecords
-							? {
-									armRecords: branch.armRecords.map((arm) =>
-										marklessSsrPrefixArmRecord(arm, child),
-									),
-								}
-							: {}),
-					})),
+					// A branch decided only by a constant or never-passed prop has no
+					// live route to wire; it rendered its final arm with the child.
+					branches: set.branches.flatMap((branch) => {
+						const liveTestReads = (branch.testReads ?? []).filter(
+							(read) => !marklessCsrChildReadIsStatic(read, child.graphProps),
+						);
+						if ((branch.testReads ?? []).length > 0 && liveTestReads.length === 0) return [];
+						return [
+							{
+								...branch,
+								id: child.hostPrefix + branch.id,
+								testReads: marklessSsrRemapChildReads(
+									liveTestReads,
+									child.graphProps,
+									child.hostPrefix + branch.id,
+									instancePath,
+								),
+								...(branch.symbolId
+									? { symbolId: marklessBoundSymbolId(child, branch.symbolId) }
+									: {}),
+								...(branch.armRecords
+									? {
+											armRecords: branch.armRecords.map((arm) =>
+												marklessSsrPrefixArmRecord(arm, child),
+											),
+										}
+									: {}),
+							},
+						];
+					}),
 				}
 			: {}),
 	};

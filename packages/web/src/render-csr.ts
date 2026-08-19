@@ -8,6 +8,7 @@ import {
 } from '@markless/serializer/protocol';
 import type { DomJournalEntry } from '@markless/runtime';
 import type { RuntimeGraph } from '@markless/runtime';
+import { marklessAttributeValue } from './dom-attribute.ts';
 import type { CsrRenderContainer, CsrRenderOptions, CsrRenderOutput } from './render.ts';
 import { marklessInstanceScopedLoadSymbol } from './fns/instance-scope.ts';
 import { registerServedArmEventRecords } from './resume-arm-records.ts';
@@ -343,10 +344,11 @@ async function applyDefaultCsrDomJournal(
 				| CsrDomJournalTarget
 				| undefined;
 			if (!target) continue;
-			if (entry.value == null || entry.value === false) {
+			const text = marklessAttributeValue(entry.name, entry.value);
+			if (text === null) {
 				target.removeAttribute?.(entry.name);
 			} else {
-				target.setAttribute?.(entry.name, stringifyDomValue(entry.value));
+				target.setAttribute?.(entry.name, text);
 			}
 			continue;
 		}

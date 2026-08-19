@@ -23,7 +23,8 @@ const clientBuild = resolve(demo, '.output/public/build');
 // 63,090 -> 63,109 (2026-08-18): CI (Linux) actual for the per-app reconcile plane; local macOS measured 63,074. Wall tracks CI actuals.
 // 63,109 -> 63,112 (interim 2026-08-18, de-minimis gzip variance): local macOS measured 63,110 on main da8ce0a0 with no member-tag code in this demo's build; +3 B run variance, no cost class.
 // 63,112 -> 63,812 (re-anchor 2026-08-18, instance identity for composed children): +696, measured 63,808 by this test across 78 chunks (same chunk count as before). All of it is code, not payload: the served ids only gain their `c<n>:` prefix characters, which gzip absorbs. The code is the composition seam qualifying a composed child's cells/computed/dependencies and every graphNodeId-bearing view record with the child's instance path, plus the loader wrapper that answers a composed symbol's reads and writes on that instance's nodes. It cannot move to build time: composition runs on the child render module's runtime output, and one child module serves every edge that composes it, so per-edge qualified emission would mean one specialized copy of the child module per parent edge. What did move to build time is the classifier (packages/compiler/src/passes/protocol-state.ts), which is why the two fixture walls did not move. The wall keeps ~4 B for gzip run variance. Repayment owed by the bundler-diet goal.
-const MAX_SHIPPED_JS_GZIP_BYTES = 63_812;
+// 63,812 -> 64,001 (re-anchor 2026-08-19, attribute presence, owner-accepted): +185, measured 63,997; dynamic attributes emit name+value from the slot so falsy values render no attribute; mostly compiler emission (name no longer duplicated in statics). Repayment owed by bundler-diet.
+const MAX_SHIPPED_JS_GZIP_BYTES = 64_001;
 
 test('music-player-ssr production build stays within its shipped JS budget', async () => {
 	await rm(resolve(demo, '.output'), { force: true, recursive: true });

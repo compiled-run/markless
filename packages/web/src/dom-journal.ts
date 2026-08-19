@@ -1,4 +1,5 @@
 import type { DomJournalEntry } from '@markless/runtime';
+import { marklessAttributeValue } from './dom-attribute.ts';
 
 type InsertRangeEntry = Extract<DomJournalEntry, { readonly type: 'insertRange' }>;
 type RemoveRangeEntry = Extract<DomJournalEntry, { readonly type: 'removeRange' }>;
@@ -191,12 +192,13 @@ function setText(target: unknown, value: unknown): void {
 
 function setAttr(target: unknown, name: string, value: unknown): void {
 	const element = target as DomJournalApplyTarget;
-	if (value == null || value === false) {
+	const text = marklessAttributeValue(name, value);
+	if (text === null) {
 		element.removeAttribute?.(name);
 		return;
 	}
 
-	element.setAttribute?.(name, stringifyDomValue(value));
+	element.setAttribute?.(name, text);
 }
 
 function setProp(target: unknown, name: string, value: unknown): void {

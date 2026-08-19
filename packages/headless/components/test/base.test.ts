@@ -14,6 +14,8 @@ test('CSR: base one-offs render their single elements', async () => {
 	expect(button?.getAttribute('type')).toBe('button');
 	expect(button?.textContent).toBe('Press');
 	expect(button?.hasAttribute('aria-pressed')).toBe(false);
+	// disabled is optional and this call omits it: no attribute, not an empty one.
+	expect(button?.hasAttribute('disabled')).toBe(false);
 
 	const label = container.querySelector('label');
 	expect(label?.getAttribute('for')).toBe('field-id');

@@ -1,3 +1,4 @@
+import { marklessAttributeValue } from '../dom-attribute.ts';
 import {
 	ASYNC_BOUNDARY_ARM,
 	renderPayloadScripts,
@@ -22,7 +23,12 @@ type LocatedSlot = { readonly staticIndex: number; readonly coordinate: SsrDataC
 export type SsrDataSlot = LocatedSlot &
 	(
 		| { readonly kind: 'text'; readonly residue: SsrDataResidue; readonly raw?: boolean }
-		| { readonly kind: 'attribute'; readonly name: string; readonly residue: SsrDataResidue }
+		| {
+				readonly kind: 'attribute';
+				readonly name: string;
+				readonly residue: SsrDataResidue;
+				readonly alwaysPresent?: true;
+		  }
 		| {
 				readonly kind: 'spread-attributes';
 				readonly residue: SsrDataResidue;
@@ -280,8 +286,13 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 				const value = await input.read(slot.residue, context);
 				return { html: slot.raw ? String(value ?? '') : escapeHtml(value), tokens: [] };
 			}
-			case 'attribute':
-				return { html: escapeHtml(await input.read(slot.residue, context)), tokens: [] };
+			case 'attribute': {
+				const value = await input.read(slot.residue, context);
+				return {
+					html: slot.alwaysPresent ? escapeHtml(value) : renderAttribute(slot.name, value),
+					tokens: [],
+				};
+			}
 			case 'spread-attributes':
 				return { html: renderSpreadAttributes(await input.read(slot.residue, context), slot.excludeNames), tokens: [] };
 			case 'child-component': {
@@ -524,7 +535,8 @@ function dynamicTag(value: unknown): string | null {
 }
 
 function renderAttribute(name: string, value: unknown): string {
-	return ` ${name}="${escapeHtml(value)}"`;
+	const text = marklessAttributeValue(name, value);
+	return text === null ? '' : ` ${name}="${escapeHtml(text)}"`;
 }
 
 function renderSpreadAttributes(value: unknown, excludeNames: ReadonlyArray<string> = []): string {
@@ -533,8 +545,7 @@ function renderSpreadAttributes(value: unknown, excludeNames: ReadonlyArray<stri
 	for (const [name, attribute] of Object.entries(value)) {
 		if (excludeNames.includes(name)) continue;
 		if (!/^[A-Za-z_][\w.:-]*$/.test(name) || /^on[A-Z]/.test(name) || name === 'attach' || name === 'el' || name === 'children') continue;
-		if (attribute === null || attribute === undefined || attribute === false) continue;
-		html += attribute === true ? ` ${name}=""` : renderAttribute(name, attribute);
+		html += renderAttribute(name, attribute);
 	}
 	return html;
 }

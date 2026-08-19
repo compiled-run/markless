@@ -317,7 +317,10 @@ export function marklessCsrChildReadIsStatic(record: ComposeGraphRead, graphProp
 	const propName = marklessCompositionPropName(record.graphNodeId, record.path);
 	if (propName === null) return false;
 	const binding = (graphProps ?? []).find((prop) => prop.name === propName);
-	return !!binding && binding.kind !== undefined && binding.kind !== 'graph-reference';
+	// A name the route table never lists was never passed, so the child read a
+	// static undefined and rendered its final answer with it.
+	if (!binding) return true;
+	return binding.kind !== undefined && binding.kind !== 'graph-reference';
 }
 
 function marklessCompositionPropName(
