@@ -22,6 +22,16 @@ export {
 	planEmittedClaimOwnership,
 } from './passes/link/claim-manifest.ts';
 export {
+	DELEGATE_CHILDREN_PASS_ID,
+	delegateChildMaterializable,
+	delegateChildRenderPlan,
+	delegateChildRendering,
+	delegateChildResolutionRequests,
+	delegateMaterializationScope,
+	linkDelegateChildren,
+	planDelegateChildren,
+} from './passes/link/delegate-children.ts';
+export {
 	artifactChildCandidates,
 	compileTsrxModuleLinkArtifact,
 	computeLinkedInterfaces,

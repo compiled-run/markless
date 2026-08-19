@@ -1,21 +1,32 @@
-// Performs the I/O the `module-link` compiler pass may not: resolves
-// specifiers, forces child loads, awaits sealing, then calls the pass. Nothing
-// here decides what a child is or what it contributes; those verdicts belong to
-// `@markless/compiler`'s `module-link` pass, which has no resolve and no load.
+// Performs the I/O the `module-link` and `delegate-children` compiler passes
+// may not: resolves specifiers, forces child loads, awaits sealing, imports a
+// delegate's compiled JavaScript, then calls the passes. Nothing here decides
+// what a child is or what it contributes; those verdicts belong to
+// `@markless/compiler`, whose passes have no resolve, no load and no import.
+import { existsSync, statSync } from 'node:fs';
+import { isAbsolute } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
+	type ArtifactChildMaterialization,
 	type CaptureAnalysisArtifact,
+	type LinkedArtifactChild,
 	type LinkedModuleChildResolution,
 	type LinkedClaimsArtifact,
 	type LinkedModuleGraphArtifact,
 	type ModuleLinkRequest,
 	type ModuleLinkResolutionTable,
+	delegateChildRenderPlan,
+	delegateChildRendering,
+	delegateChildResolutionRequests,
 	linkClaimManifests,
+	linkDelegateChildren,
 	linkImportedModules,
 	linkedModuleImportRequests,
 	linkedModuleClaimPlan,
 	linkedModuleLoadSource,
 	linkedSymbolRouteRequests,
 	moduleLinkResolutionKey,
+	planDelegateChildren,
 	planLinkedModuleChildren,
 	uniqueLinkedModuleChildren,
 } from '@markless/compiler';
@@ -250,4 +261,68 @@ function parentCaptureMetadata(
 		readers.parentManifest?.captureMetadata ??
 		readers.metadata.captureMetadataForSource(pathname(parent))
 	);
+}
+
+// Whether the bundler considers this id an entry module. Reading a plugin
+// context is bundler I/O; what an entry may compose is the pass's verdict.
+export function moduleIsEntry(
+	context: { getModuleInfo?(id: string): { readonly isEntry?: boolean } | null },
+	id: string,
+): boolean {
+	try {
+		return context.getModuleInfo?.(id)?.isEntry === true;
+	} catch {
+		// Unknown entry posture cannot authorize page-root materialization.
+		return false;
+	}
+}
+
+// Performs the I/O the `delegate-children` pass may not: resolves each edge,
+// imports the dependency's compiled JavaScript, and calls its `renderSsr`. The
+// build-time `import()` of a dependency's dist is pre-existing; it is the one
+// place a linker executes code the compiler did not produce, which is exactly
+// why it lives here and not in the pass.
+export async function materializeDelegateChildren(
+	context: LinkResolveContext,
+	parent: string,
+	candidates: ReadonlyArray<LinkedArtifactChild>,
+): Promise<Record<string, ArtifactChildMaterialization>> {
+	const resolution: Record<string, string> = {};
+	for (const candidate of delegateChildResolutionRequests(candidates)) {
+		const resolved = await context.resolve(candidate.importSource, parent, { skipSelf: true });
+		const id = typeof resolved === 'string' ? resolved : resolved?.id;
+		if (id) resolution[candidate.edgeId] = pathname(id);
+	}
+	const children = planDelegateChildren(candidates, resolution);
+	const byEdge = new Map(candidates.map((candidate) => [candidate.edgeId, candidate]));
+	const loaded = new Map<string, Record<string, unknown>>();
+	const renderings: Record<string, ArtifactChildMaterialization> = {};
+	for (const child of children) {
+		const candidate = byEdge.get(child.edgeId);
+		const source = child.source;
+		if (!child.loadable || !candidate || source === undefined) continue;
+		if (!isAbsolute(source) || !existsSync(source) || !statSync(source).isFile()) continue;
+		let module = loaded.get(source);
+		if (!module) {
+			module = (await import(pathToFileURL(source).href)) as Record<string, unknown>;
+			loaded.set(source, module);
+		}
+		const component =
+			candidate.importKind === 'default'
+				? module.default
+				: candidate.importKind === 'namespace'
+					? module
+					: module[candidate.importedName ?? candidate.componentName];
+		const renderSsr = (component as { readonly renderSsr?: unknown } | undefined)?.renderSsr;
+		if (typeof renderSsr !== 'function') continue;
+		const plan = delegateChildRenderPlan(candidate);
+		if (!plan.ok) throw new Error(plan.diagnostic.message);
+		const rendering = delegateChildRendering(
+			candidate,
+			await renderSsr.call(component, plan.props),
+		);
+		if (!rendering.ok) throw new Error(rendering.diagnostic.message);
+		renderings[child.edgeId] = rendering.rendering;
+	}
+	return linkDelegateChildren({ children, renderings }).materializations;
 }

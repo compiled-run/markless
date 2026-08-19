@@ -134,6 +134,13 @@ export const linkCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 		produces: ['linkedModuleGraph'],
 	},
 	{
+		passId: 'delegate-children',
+		description:
+			'Decide which artifact-child edges are delegates a linker may render at build time, and turn the renderings it handed back into materializations.',
+		consumes: ['linkedModuleGraph', 'delegateRenderings'],
+		produces: ['delegateChildren'],
+	},
+	{
 		passId: 'interface-link',
 		description: 'Link imported module interfaces into the linked interface map and its keys.',
 		consumes: ['moduleArtifacts', 'linkedModuleGraph'],

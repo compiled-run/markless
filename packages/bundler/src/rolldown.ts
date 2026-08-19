@@ -3,6 +3,7 @@ import {
 	compileTsrxModuleLinkArtifact,
 	computeExecutionAttribution,
 	computeLinkedInterfaces,
+	delegateMaterializationScope,
 	type LinkedInterfaceClaim,
 	type LinkedInterfaceImport,
 	type LinkedModuleChildResolution,
@@ -19,9 +20,7 @@ import {
 	renderDataClaimManifest,
 	renderDataReachImportSources,
 } from '@markless/compiler';
-import { existsSync, statSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
-import { dirname, isAbsolute, relative, resolve } from 'pathe';
+import { dirname, resolve } from 'pathe';
 import { withQuery } from 'ufo';
 import { createBuildMetadata } from './build/build-metadata.ts';
 import { MARKLESS_BUILD_PREFIX, MARKLESS_BUNDLE_GRAPH, outputDefaults } from './build/chunking.ts';
@@ -31,7 +30,9 @@ import { createMarklessDevGraph } from './dev.ts';
 import {
 	forceImportedModules,
 	linkModuleGraph,
+	materializeDelegateChildren,
 	mergeLinkedModuleChildren,
+	moduleIsEntry,
 	resolveImportedChildren,
 	resolveImportedModuleInterfaces,
 	sourceSymbolManifest,
@@ -98,7 +99,6 @@ import type {
 	MarklessVirtualModule,
 	TransformTsrxModuleInput,
 	TransformTsrxModuleResult,
-	ArtifactChildCandidate,
 } from './types.ts';
 import type { BuiltPrerenderRecords } from './build/prerender.ts';
 
@@ -656,7 +656,7 @@ export function createMarklessRolldownPlugin(input: {
 						internalOptions.prerender !== true &&
 						!clientRouteArtifactSources.has(source) &&
 						isClientPrimarySourceRequest(id) &&
-						isModuleEntry(this, id)) ||
+						moduleIsEntry(this, id)) ||
 						isSymbolOnlySourceRequest(id))
 						? 'symbols-only'
 						: undefined,
@@ -794,10 +794,9 @@ export function createMarklessRolldownPlugin(input: {
 			}
 			let transformed: TransformTsrxModuleResult = linkedTransformResult;
 			if (currentEnvironment === 'client' && clientRouteArtifact) {
-				const artifactChildMaterializations = await materializeArtifactChildren.call(
+				const artifactChildMaterializations = await materializeDelegateChildren(
 					this,
 					source,
-					getRoot(),
 					transformed.artifactChildren,
 				);
 				if (Object.keys(artifactChildMaterializations).length > 0) {
@@ -810,20 +809,19 @@ export function createMarklessRolldownPlugin(input: {
 				};
 			}
 			if (!reusedLinkedTransform) {
-				// Only client page composition materializes artifact children.
-				const pageRoot =
-					currentEnvironment === 'client' &&
-					!isSymbolOnlySourceRequest(id) &&
-					isModuleEntry(this, id);
 				const artifactChildMaterializations =
 					currentEnvironment === 'client' &&
 					clientRouteArtifactMaterializations.has(source)
 						? clientRouteArtifactMaterializations.get(source)!
-						: pageRoot || materializedRenderDataReach !== undefined
-							? await materializeArtifactChildren.call(
+						: delegateMaterializationScope({
+									clientEnvironment: currentEnvironment === 'client',
+									symbolOnlyRequest: isSymbolOnlySourceRequest(id),
+									moduleEntry: moduleIsEntry(this, id),
+									renderDataReached: materializedRenderDataReach !== undefined,
+								})
+							? await materializeDelegateChildren(
 									this,
 									source,
-									getRoot(),
 									transformed.artifactChildren,
 								)
 							: {};
@@ -1191,106 +1189,6 @@ export function createMarklessRolldownPlugin(input: {
 	}
 
 	return plugin;
-}
-
-async function materializeArtifactChildren(
-	this: {
-		resolve(
-			source: string,
-			importer?: string,
-			options?: { readonly skipSelf?: boolean },
-		): Promise<{ readonly id: string } | string | null>;
-	},
-	parent: string,
-	appRoot: string | undefined,
-	candidates: ReadonlyArray<ArtifactChildCandidate>,
-): Promise<NonNullable<TransformTsrxModuleInput['artifactChildMaterializations']>> {
-	const materialized: Record<
-		string,
-		NonNullable<TransformTsrxModuleInput['artifactChildMaterializations']>[string]
-	> = {};
-	const loaded = new Map<string, Record<string, unknown>>();
-	for (const candidate of candidates) {
-		if (TSRX_SOURCE_FILE.test(candidate.importSource)) continue;
-		const resolved = await this.resolve(candidate.importSource, parent, { skipSelf: true });
-		const id = typeof resolved === 'string' ? resolved : resolved?.id;
-		if (!id) continue;
-		const source = pathname(id);
-		if (
-			!appRoot ||
-			!isAbsolute(source) ||
-			!existsSync(source) ||
-			!statSync(source).isFile() ||
-			isInsideRoot(source, appRoot)
-		)
-			continue;
-		let module = loaded.get(source);
-		if (!module) {
-			module = (await import(pathToFileURL(source).href)) as Record<string, unknown>;
-			loaded.set(source, module);
-		}
-		const component =
-			candidate.importKind === 'default'
-				? module.default
-				: candidate.importKind === 'namespace'
-					? module
-					: module[candidate.importedName ?? candidate.componentName];
-		const renderSsr = (component as { readonly renderSsr?: unknown } | undefined)?.renderSsr;
-		if (typeof renderSsr !== 'function') continue;
-		const underivable = candidate.props.find((prop) => prop.kind !== 'serializable');
-		if (underivable || (candidate.hasChildren && !candidate.projection)) {
-			const prop = underivable?.name ?? 'children';
-			throw new Error(
-				`MARKLESS_ARTIFACT_CHILD_PROP_NOT_BUILD_KNOWN: <${candidate.componentName}> prop ${JSON.stringify(prop)} must be a build-known static value. Runtime component execution is not a fallback.`,
-			);
-		}
-		const props = Object.fromEntries(
-			candidate.props.map((prop) => [prop.name, prop.value]),
-		) as Record<string, unknown>;
-		if (candidate.projection) props.children = candidate.projection.markup;
-		const output = await renderSsr.call(component, props);
-		if (
-			!output ||
-			typeof output !== 'object' ||
-			typeof (output as { readonly html?: unknown }).html !== 'string'
-		) {
-			throw new Error(
-				`MARKLESS_ARTIFACT_CHILD_RENDER_INVALID: <${candidate.componentName}> renderSsr must return static HTML.`,
-			);
-		}
-		const result = output as Record<string, unknown>;
-		materialized[candidate.edgeId] = {
-			html: result.html as string,
-			elementCount: typeof result.elementCount === 'number' ? result.elementCount : 0,
-			...(result.state ? { state: result.state as never } : {}),
-			...(result.view ? { view: result.view as never } : {}),
-			...(result.coordinates ? { coordinates: result.coordinates as never } : {}),
-			...(result.structure ? { structure: result.structure as never } : {}),
-			...(Array.isArray(result.structureTokens)
-				? { structureTokens: result.structureTokens as never }
-				: {}),
-		};
-	}
-	return materialized;
-}
-
-function isInsideRoot(source: string, root: string): boolean {
-	const path = relative(root, source);
-	return path === '' || (!isAbsolute(path) && path !== '..' && !path.startsWith('../'));
-}
-
-function isModuleEntry(
-	context: {
-		getModuleInfo?(id: string): { readonly isEntry?: boolean } | null;
-	},
-	id: string,
-): boolean {
-	try {
-		return context.getModuleInfo?.(id)?.isEntry === true;
-	} catch {
-		// Unknown entry posture cannot authorize page-root materialization.
-		return false;
-	}
 }
 
 // Resolution and path math stay with the bundler by the ruling's own list of

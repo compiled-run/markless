@@ -1955,6 +1955,49 @@ export type LinkedModuleGraphArtifact = {
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };
 
+// Delegate children (`delegate-children` link pass): the artifact-child edges a
+// module composes, each one classified by what the linker resolved it to rather
+// than by where the file sits on disk. `external-delegate` is the only kind a
+// linker may load and render at build time; `compiled-tsrx` is this build's own
+// work and is never a delegate. The rendering itself is an input, because a
+// compiler pass never imports user code.
+export type LinkedDelegateChild = {
+	readonly edgeId: string;
+	readonly componentName: string;
+	readonly specifier: string;
+	readonly source?: string;
+	readonly kind: LinkedModuleChildKind;
+	// Whether the linker should load this source and ask it to render.
+	readonly loadable: boolean;
+};
+
+// One delegate's build-time rendering, keyed by edge id. Produced by the caller
+// that owns `import()`; the pass only ever reads it.
+export type DelegateRenderings = Readonly<Record<string, ArtifactChildMaterialization>>;
+
+export type DelegateChildrenInput = {
+	readonly children: ReadonlyArray<LinkedDelegateChild>;
+	readonly renderings: DelegateRenderings;
+};
+
+export type LinkedDelegateChildrenArtifact = {
+	readonly passId: 'delegate-children';
+	readonly children: ReadonlyArray<LinkedDelegateChild>;
+	readonly materializations: Readonly<Record<string, ArtifactChildMaterialization>>;
+	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+};
+
+// Either the build-known props a delegate may be rendered with, or the
+// diagnostic that says why it may not be. The caller decides whether a
+// diagnostic is fatal; the pass never throws.
+export type DelegateChildRenderPlan =
+	| { readonly ok: true; readonly props: Readonly<Record<string, unknown>> }
+	| { readonly ok: false; readonly diagnostic: CompilerDiagnostic };
+
+export type DelegateChildRenderingResult =
+	| { readonly ok: true; readonly rendering: ArtifactChildMaterialization }
+	| { readonly ok: false; readonly diagnostic: CompilerDiagnostic };
+
 // The compiled outputs a link-stage cache key compares. Structural on purpose:
 // the caller's richer transform result flows through unchanged, and the pass
 // only ever reads these fields.

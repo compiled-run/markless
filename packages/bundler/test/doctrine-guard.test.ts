@@ -29,6 +29,8 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Rolldown entry signatures are adjusted only for its resolved client build.',
 	"packages/bundler/src/link-driver.ts :: clientEnvironment: environment === 'client',":
 		'The link driver reports the already resolved build environment to the module-link pass.',
+	"packages/bundler/src/rolldown.ts :: clientEnvironment: currentEnvironment === 'client',":
+		'The transform hook reports the already resolved build environment to the delegate-children pass.',
 	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'client' &&":
 		'Rolldown transform hooks project the resolved environment into client-only build behavior.',
 	"packages/bundler/src/rolldown.ts :: currentEnvironment === 'client' && !renderDataRequest && !clientRouteArtifact;":
