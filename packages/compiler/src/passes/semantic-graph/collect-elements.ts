@@ -1,9 +1,4 @@
-import {
-	isEventAttribute,
-	normalizeEventName,
-	parseModule,
-	type SemanticView,
-} from '../../yuku-tsrx-adapter.ts';
+import { isEventAttribute, normalizeEventName, parseModule } from '../../yuku-tsrx-adapter.ts';
 import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
@@ -33,7 +28,7 @@ import {
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
 import { collectComponentEdge } from './collect-components.ts';
-import { collectExpressionReads } from './collect-expressions.ts';
+import { collectExpressionReads, resolvedSymbolAt } from './collect-expressions.ts';
 import {
 	extractSyncPolicyFromHandlers,
 	firstDetachedSyncPolicyReference,
@@ -1179,30 +1174,6 @@ function isDomPropertyBindingName(attributeName: string): boolean {
 }
 
 /**
- * Identifier uses indexed by where they start, built once per analyzed module.
- * Type-position uses are skipped: they never name a runtime value, so a type
- * annotation must not answer for the value beside it.
- */
-const valueReferenceSymbolsByOffset = new WeakMap<SemanticView, Map<number, number>>();
-
-function resolvedValueSymbolAt(semantic: SemanticView, offset: number): number | null {
-	let symbolsByOffset = valueReferenceSymbolsByOffset.get(semantic);
-	if (!symbolsByOffset) {
-		symbolsByOffset = new Map<number, number>();
-		for (let referenceId = 0; referenceId < semantic.reference.count; referenceId += 1) {
-			if (semantic.reference.inTypePosition(referenceId)) continue;
-			const symbolId = semantic.reference.symbolId(referenceId);
-			if (symbolId === null) continue;
-			const start = semantic.reference.start(referenceId);
-			if (!symbolsByOffset.has(start)) symbolsByOffset.set(start, symbolId);
-		}
-		valueReferenceSymbolsByOffset.set(semantic, symbolsByOffset);
-	}
-
-	return symbolsByOffset.get(offset) ?? null;
-}
-
-/**
  * Source offset of the declaration an identifier use actually refers to.
  *
  * The question is asked of yuku's resolved references rather than of a name,
@@ -1215,7 +1186,7 @@ function resolvedDeclarationStart(node: AnyNode | undefined, state: WalkState): 
 	if (!node || typeof node.start !== 'number' || !getIdentifierName(node)) return null;
 
 	const semantic = state.semantic();
-	const symbolId = resolvedValueSymbolAt(semantic, node.start);
+	const symbolId = resolvedSymbolAt(semantic, node.start);
 	if (symbolId === null || semantic.symbol.declCount(symbolId) === 0) return null;
 
 	const declaration = semantic.symbol.declNode(symbolId, 0);
