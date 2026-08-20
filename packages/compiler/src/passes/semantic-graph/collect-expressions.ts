@@ -428,7 +428,7 @@ export function rootBindsInsideRegion(
  * with something else - `this`, a parenthesis, a literal - and so has no
  * binding to resolve.
  */
-function rootIdentifierOffset(node: AnyNode, source: string): number | null {
+export function rootIdentifierOffset(node: AnyNode, source: string): number | null {
 	if (typeof node.start !== 'number' || typeof node.end !== 'number') return null;
 
 	const raw = source.slice(node.start, node.end);
@@ -442,7 +442,8 @@ function rootIdentifierOffset(node: AnyNode, source: string): number | null {
  */
 const valueReferenceSymbolsByOffset = new WeakMap<SemanticView, Map<number, number>>();
 
-function resolvedSymbolAt(semantic: SemanticView, offset: number): number | null {
+/** The binding an identifier use at `offset` resolves to, if it resolves. */
+export function resolvedSymbolAt(semantic: SemanticView, offset: number): number | null {
 	let symbolsByOffset = valueReferenceSymbolsByOffset.get(semantic);
 	if (!symbolsByOffset) {
 		symbolsByOffset = new Map<number, number>();

@@ -21,6 +21,7 @@ import {
 	collectExpressionReads,
 	findTemplateValue,
 	markTemplateValueHandled,
+	resolvedSymbolAt,
 } from './collect-expressions.ts';
 import {
 	computedDependencyCycleDiagnostic,
@@ -788,17 +789,6 @@ function readsOwnBinding(body: AnyNode | undefined, id: AnyNode, state: WalkStat
 	}
 
 	return false;
-}
-
-/** The binding an identifier use at `offset` resolves to, if it resolves. */
-function resolvedSymbolAt(semantic: SemanticView, offset: number): number | null {
-	for (let reference = 0; reference < semantic.reference.count; reference += 1) {
-		if (semantic.reference.start(reference) !== offset) continue;
-		if (semantic.reference.inTypePosition(reference)) continue;
-		return semantic.reference.symbolId(reference);
-	}
-
-	return null;
 }
 
 /** The binding a declaration site introduces, found by where its name starts. */

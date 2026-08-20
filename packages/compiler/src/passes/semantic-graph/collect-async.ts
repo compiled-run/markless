@@ -12,7 +12,13 @@ import {
 	semanticAliasMap,
 	uniqueBy,
 } from '../../artifact-helpers/graph-paths.ts';
-import { readRegion, rootBindsInsideRegion, type ReadRegion } from './collect-expressions.ts';
+import {
+	readRegion,
+	resolvedSymbolAt,
+	rootBindsInsideRegion,
+	rootIdentifierOffset,
+	type ReadRegion,
+} from './collect-expressions.ts';
 import {
 	asyncBoundaryRequiredDiagnostic,
 	asyncPostAwaitReadDiagnostic,
@@ -186,6 +192,7 @@ export function collectGraphDependencies(
 	const dependencies: SemanticGraphDependency[] = [];
 	const bindings = graphBindingMap(state.graph, currentGraphScope(state));
 	const aliases = semanticAliasMap(state.graph, currentGraphScope(state));
+	const bodyRegion = readRegion(node);
 
 	const visit = (candidate: AnyNode | undefined): void => {
 		if (!candidate) return;
@@ -217,7 +224,7 @@ export function collectGraphDependencies(
 		}
 
 		if (candidate.type === 'MemberExpression') {
-			const dependency = graphDependency(candidate, state, bindings, aliases);
+			const dependency = graphDependency(candidate, state, bindings, aliases, bodyRegion);
 			if (dependency) {
 				dependencies.push(dependency);
 				return;
@@ -230,7 +237,7 @@ export function collectGraphDependencies(
 		}
 
 		if (candidate.type === 'Identifier') {
-			const dependency = graphDependency(candidate, state, bindings, aliases);
+			const dependency = graphDependency(candidate, state, bindings, aliases, bodyRegion);
 			if (dependency) dependencies.push(dependency);
 			return;
 		}
@@ -267,7 +274,10 @@ function graphDependency(
 	state: WalkState,
 	bindings: ReadonlyMap<string, SemanticGraphBinding>,
 	aliases: ReadonlyMap<string, SemanticGraphAlias>,
+	bodyRegion: ReadRegion | null,
 ): SemanticGraphDependency | null {
+	if (!namesGraphBinding(node, state, bodyRegion)) return null;
+
 	const source = expressionSource(node, state.source);
 	const resolved = resolveGraphPath(source, bindings, aliases);
 	if (!resolved) return null;
@@ -277,6 +287,31 @@ function graphDependency(
 		graphNodeId: resolved.binding.id,
 		path: resolved.path,
 	};
+}
+
+/**
+ * Whether the leftmost identifier of a candidate dependency really names a
+ * graph binding, rather than something else the derive body spells the same
+ * way. The question is asked of yuku's resolved references, because a name is
+ * not an identity: the `total` in `const total = rate * 3` is a declaration and
+ * refers to nothing, and the `total` that follows it refers to that local, not
+ * to the derive named `total`. Matching by name records the derive as its own
+ * dependency and the graph then reports a legal derive as a cycle on itself.
+ */
+function namesGraphBinding(
+	node: AnyNode,
+	state: WalkState,
+	bodyRegion: ReadRegion | null,
+): boolean {
+	const offset = rootIdentifierOffset(node, state.source);
+	if (offset === null) return false;
+
+	// A declaration site has no reference row at all, so it reads nothing.
+	if (resolvedSymbolAt(state.semantic(), offset) === null) return false;
+
+	// A binding the derive body declares itself - a `const`, a callback
+	// parameter - shadows any graph binding of the same name.
+	return !rootBindsInsideRegion(node, state, bodyRegion);
 }
 
 function findFirstAwaitEnd(node: AnyNode | undefined): number | null {
