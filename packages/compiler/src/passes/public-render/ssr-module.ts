@@ -34,6 +34,7 @@ import {
 	staticHostLocators,
 	moduleScopeLines,
 	objectPropertyName,
+	ssrComposeStateExpression,
 } from './shared.ts';
 import {
 	authoredResidueReadCases,
@@ -146,7 +147,7 @@ export function emitPublicSsrRenderModule(
 		),
 		'	const html = marklessSsrRendered.html;',
 		'	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, payloadView, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);',
-		'	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);',
+		`	const marklessSsrState = ${ssrComposeStateExpression(input, rootInfo.component, rootInfo.componentName)};`,
 		remapsInternalGraphProps ? '	const marklessSsrOutput = {' : '	return {',
 		'		html,',
 		'		state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots),',
@@ -201,7 +202,7 @@ export function emitPublicSsrRenderModule(
 					// Keep the emitted SSR helper distinct from authored bindings.
 					'marklessComposeState as marklessSsrComposeState',
 					'marklessSsrRemapGraphOutput',
-					'marklessViewWithoutAnchors',
+					'marklessSsrSeedPropCells',
 					'marklessSsrComposeView',
 					'marklessSsrPrefixAnchorHtml',
 				],

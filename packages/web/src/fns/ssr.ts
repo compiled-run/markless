@@ -21,6 +21,7 @@ import {
 	marklessBoundSymbolId,
 	marklessDomUpdateSymbolId,
 } from './bound-symbol.ts';
+import { marklessSerializeGraphValue } from './state-serialize.ts';
 import type { SsrDataStructure } from '../ssr-data/renderer.ts';
 import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
 
@@ -584,8 +585,40 @@ export function marklessSsrCallbackSymbol(
 		value = (value as Readonly<Record<string, unknown>> | null | undefined)?.[key];
 	return typeof value === 'string' ? value : undefined;
 }
-export function marklessViewWithoutAnchors(view: SsrViewDraft) {
-	return { ...view, branches: [], asyncBoundaries: [] };
+// An arm rebuild reads its props back out of the graph, which a CSR mount seeds
+// and a served page must carry; `keys` narrows the bag, null means a lone prop.
+export function marklessSsrSeedPropCells(
+	state: ComposeStateDraft,
+	props: Readonly<Record<string, unknown>> | undefined,
+	cells: ReadonlyArray<{
+		readonly graphNodeId: string;
+		readonly keys: ReadonlyArray<string> | null;
+	}>,
+) {
+	const seeded = cells.flatMap((cell) => {
+		const name = cell.graphNodeId.slice('prop:'.length);
+		const present = (cell.keys ?? []).filter((key) => props?.[key] !== undefined);
+		if (cell.keys ? present.length === 0 : props?.[name] === undefined) return [];
+		const value = cell.keys
+			? Object.fromEntries(present.map((key) => [key, props?.[key]]))
+			: props?.[name];
+		return [
+			{
+				graphNodeId: cell.graphNodeId,
+				name,
+				valueKind: marklessSsrValueKind(value),
+				value: marklessSerializeGraphValue(value),
+			},
+		];
+	});
+	if (seeded.length === 0) return state;
+	return { ...state, cells: [...(state.cells ?? []), ...seeded] };
+}
+
+function marklessSsrValueKind(value: unknown) {
+	if (Array.isArray(value)) return 'array' as const;
+	if (value !== null && typeof value === 'object') return 'object' as const;
+	return 'scalar' as const;
 }
 
 function marklessSsrUnbindLocalSymbolId(symbolId: string) {

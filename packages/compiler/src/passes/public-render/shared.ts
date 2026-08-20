@@ -226,6 +226,49 @@ export function componentPropCellId(component: AnyNode): string | null {
 	return param.type === 'ObjectPattern' ? 'prop:props' : null;
 }
 
+// The prop cells a browser flip reads to rebuild this component's arms — an arm
+// showing projected `children` is the common one. `keys` names the properties
+// the bag cell must hold; `null` marks a cell that IS one destructured prop.
+export function armRebuildPropCells(
+	input: PublicRenderModuleInput,
+	component: AnyNode | undefined,
+	componentName: string,
+): ReadonlyArray<{ readonly graphNodeId: string; readonly keys: ReadonlyArray<string> | null }> {
+	const bagCellId = component ? componentPropCellId(component) : null;
+	const keysByCell = new Map<string, Set<string> | null>();
+	for (const chunk of input.renderData.chunks) {
+		if (chunk.componentName !== componentName) continue;
+		if (chunk.kind !== 'branch-arm' && chunk.kind !== 'async-arm') continue;
+		for (const slot of chunk.slots) {
+			if (slot.kind !== 'text' || slot.residue.kind !== 'graph-read') continue;
+			const { graphNodeId, path } = slot.residue;
+			if (!graphNodeId.startsWith('prop:')) continue;
+			if (graphNodeId === 'prop:props' || graphNodeId === bagCellId) {
+				const keys = keysByCell.get(graphNodeId) ?? new Set<string>();
+				if (path[0]) keys.add(path[0]);
+				keysByCell.set(graphNodeId, keys);
+			} else keysByCell.set(graphNodeId, null);
+		}
+	}
+	return [...keysByCell].flatMap(([graphNodeId, keys]) =>
+		keys && keys.size === 0 ? [] : [{ graphNodeId, keys: keys ? [...keys] : null }],
+	);
+}
+
+// The composed state a server-rendered component returns, plus the prop cells
+// its own arm flips read back.
+export function ssrComposeStateExpression(
+	input: PublicRenderModuleInput,
+	component: AnyNode | undefined,
+	componentName: string,
+): string {
+	const composed = 'marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren)';
+	const cells = armRebuildPropCells(input, component, componentName);
+	return cells.length === 0
+		? composed
+		: `marklessSsrSeedPropCells(${composed}, props, ${JSON.stringify(cells)})`;
+}
+
 export function hasPropDependentComputed(input: PublicRenderModuleInput): boolean {
 	return input.protocolState.computed.some((computed) =>
 		computed.dependencies?.some((dependency) => dependency.graphNodeId.startsWith('prop:')),

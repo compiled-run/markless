@@ -281,3 +281,57 @@ export function App() @{
 	// path, so no callback is emitted for it.
 	expect(graphOnly.publicRenderModule.ssrModuleSource).not.toContain('repeatItems:');
 });
+
+test('SSR seeds only the prop cells an arm rebuild reads back', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Lantern.tsrx',
+		source: `
+import { state } from '@markless/core';
+export function Lantern() @{
+	let hot = state(false);
+	<section><button onClick={() => hot = !hot}>t</button><Shade>glow</Shade>@if (hot) { <em>hot</em> }</section>
+}
+export function Shade({ children }) @{
+	let lit = state(false);
+	<div><button onClick={() => lit = !lit}>t</button>@if (lit) { <>{children}</> }</div>
+}
+`,
+		symbols: [],
+	});
+
+	const source = result.publicRenderModule.ssrModuleSource;
+	const shadeStart = source.indexOf('async function marklessRenderSsrShade');
+	expect(shadeStart).toBeGreaterThanOrEqual(0);
+	// The arm that shows projected children needs them back at flip time.
+	expect(source.slice(shadeStart)).toContain(
+		'marklessSsrSeedPropCells(marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren), props, [{"graphNodeId":"prop:props","keys":["children"]}])',
+	);
+	// The root's arm owns its markup and reads no prop, so it seeds nothing:
+	// exactly one component in the module pays for a prop cell.
+	expect(source.match(/marklessSsrSeedPropCells\(/g)?.length).toBe(1);
+});
+
+test('SSR composition keeps the branch records a same-module component anchored', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Beacon.tsrx',
+		source: `
+import { state } from '@markless/core';
+export function Lamp() @{
+	let on = state(false);
+	<span><button onClick={() => on = !on}>t</button>@if (on) { <b>on</b> }</span>
+}
+export function Beacon() @{
+	<div><Lamp /></div>
+}
+`,
+		symbols: [],
+	});
+
+	// Every SSR entry composes the view it just rendered; blanking the anchored
+	// records left a non-root component's branch unwired after resume.
+	const source = result.publicRenderModule.ssrModuleSource;
+	expect(source).not.toContain('WithoutAnchors');
+	expect(
+		source.match(/marklessSsrComposeView\(marklessSsrRendered\.structure, payloadView,/g)?.length,
+	).toBe(2);
+});

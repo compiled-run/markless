@@ -8,8 +8,8 @@ import StatesApp from './fixtures/checkbox-states.tsrx';
 // Witnesses for the compiler defects the checkbox family ran into. A defect
 // still live is marked `test.fails`, so the day it is fixed THIS file turns red
 // and tells whoever fixed it to unmark the test and un-block the parity rows in
-// goals/headless-components/notes/parity-table.md. U-D and U-E are fixed and
-// their witnesses are plain green tests now; U-F and U-G are still red.
+// goals/headless-components/notes/parity-table.md. U-D, U-E and U-F are fixed
+// and their witnesses are plain green tests now; U-G is still red.
 afterEach(() => cleanup());
 
 // U-D (fixed). A ternary over a shared field, and a computed() built in the
@@ -17,9 +17,7 @@ afterEach(() => cleanup());
 // `ui-checked` and `ui-mixed` could not follow a toggle. Each recombined
 // expression now stands behind a synthetic computed subscribed to the cells it
 // reads.
-test('a composite expression over a shared read follows the write', async () => {
-	const screen = await render(CompositeApp);
-	const container = screen.container as HTMLElement;
+async function expectCompositeFollowsWrite(container: ParentNode) {
 	const trigger = container.querySelector('[data-repro-trigger]') as HTMLButtonElement;
 
 	expect(trigger.getAttribute('data-attr')).toBe('false');
@@ -31,36 +29,57 @@ test('a composite expression over a shared read follows the write', async () => 
 		text: container.querySelector('[data-repro-text]')?.textContent,
 		rawText: container.querySelector('[data-repro-raw]')?.textContent,
 	}).toEqual({ attr: 'true', derived: 'true', text: 'true', rawText: 'true' });
+}
+
+test('CSR: a composite expression over a shared read follows the write', async () => {
+	const screen = await render(CompositeApp);
+	await expectCompositeFollowsWrite(screen.container as HTMLElement);
+});
+
+test('SSR: a composite expression over a shared read follows the write after resume', async () => {
+	const screen = await renderSSR(CompositeApp);
+	await expectCompositeFollowsWrite(screen.container);
 });
 
 // U-E (fixed). A computed() declared in a component body that reads a shared
 // instance used to throw `ReferenceError: <factory local> is not defined` out of
 // the prerender evaluator, because its dependency never resolved and its derive
 // kept the authored read.
-test('a component-local computed over a shared read renders', async () => {
+test('CSR: a component-local computed over a shared read renders', async () => {
 	const screen = await render(LocalComputedApp);
 	expect((screen.container as HTMLElement).querySelector('[data-local-computed]')?.textContent).toBe(
 		'false',
 	);
 });
 
-// U-F. After an SSR resume the write lands — `data-raw` follows it — but a
-// branch whose condition reads the same shared field never re-renders. The same
-// fixture flips correctly under CSR, which is what makes this resume-only.
-test('CSR: a branch over a shared read re-renders after the write', async () => {
-	const screen = await render(BranchApp);
-	const container = screen.container as HTMLElement;
-	container.querySelector<HTMLButtonElement>('[data-gate-trigger]')?.click();
-	await expect.poll(() => container.querySelector('[data-gate-arm]')?.textContent).toBe('open');
+test('SSR: a component-local computed over a shared read renders', async () => {
+	const screen = await renderSSR(LocalComputedApp);
+	expect(screen.container.querySelector('[data-local-computed]')?.textContent).toBe('false');
 });
 
-test.fails('SSR: a branch over a shared read re-renders after resume', async () => {
-	const screen = await renderSSR(BranchApp);
-	const container = screen.container;
+// U-F (fixed). The branch lives in a PROJECTED part, and its arm holds the
+// children the page projected into it. Two things used to stop it after a
+// resume: a same-module component's SSR render dropped every branch record it
+// had just anchored, so the flip was never wired; and the arm rebuild reads the
+// projected children back out of the component's own prop cell, which only a
+// CSR mount seeded. The write always landed — `data-raw` followed it — which is
+// what made this a render defect rather than a state one.
+async function expectGateOpens(container: ParentNode) {
 	container.querySelector<HTMLButtonElement>('[data-gate-trigger]')?.click();
-	// The write itself arrives, which is what makes this a render defect.
-	await expect.poll(() => container.querySelector('[data-gate-trigger]')?.getAttribute('data-raw')).toBe('true');
+	await expect
+		.poll(() => container.querySelector('[data-gate-trigger]')?.getAttribute('data-raw'))
+		.toBe('true');
 	await expect.poll(() => container.querySelector('[data-gate-arm]')?.textContent).toBe('open');
+}
+
+test('CSR: a branch over a shared read re-renders after the write', async () => {
+	const screen = await render(BranchApp);
+	await expectGateOpens(screen.container as HTMLElement);
+});
+
+test('SSR: a branch over a shared read re-renders after resume', async () => {
+	const screen = await renderSSR(BranchApp);
+	await expectGateOpens(screen.container);
 });
 
 // U-G. Two unmatched-dispatch errors escape as unhandled rejections during an

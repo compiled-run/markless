@@ -16,6 +16,7 @@ import {
 	stateEntries,
 	hasPropDependentComputed,
 	sameModuleComponentMap,
+	ssrComposeStateExpression,
 	type ComponentReference,
 } from './shared.ts';
 
@@ -95,8 +96,8 @@ export function emitSameModuleSsrComponents(
 				],
 			),
 			'	const html = marklessSsrRendered.html;',
-			'	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, marklessViewWithoutAnchors(payloadView), marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);',
-			'	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);',
+			'	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, payloadView, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);',
+			`	const marklessSsrState = ${ssrComposeStateExpression(input, rootInfo.component, componentName)};`,
 			`	return { html, state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots), view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) }, elementCount: marklessSsrComposition.elementCount, propEvents: [], externalSymbolIds: marklessSsrComposition.externalSymbolIds, structure: marklessSsrRendered.structure, structureTokens: marklessSsrRendered.structureTokens${remapsGraphProps ? ', m(graphProps, instancePath) { marklessSsrRemapGraphOutput(this, graphProps, instancePath); }' : ''} };`,
 			'}',
 			sharedSeedMarkerLine(componentSharedSeeds(input, componentName), functionName),
