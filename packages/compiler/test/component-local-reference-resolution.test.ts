@@ -123,7 +123,7 @@ test('a block-scoped declaration that shadows a component-local absorbs its writ
 	expect(propKindOf(graph, 'onSelect')).toBe('callback');
 });
 
-test('a shadowed identifier in a prop position does not resolve to the component-local', async () => {
+test('a parameter shadowing a component-local adds no references to the local', async () => {
 	const graph = await graphFor(
 		[
 			'\tconst pick = (song) => console.log(song);',

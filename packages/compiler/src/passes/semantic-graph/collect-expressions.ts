@@ -350,7 +350,9 @@ function enclosingFunctionRegion(node: AnyNode, state: WalkState): ReadRegion | 
 	for (let scopeId = 0; scopeId < semantic.scope.count; scopeId += 1) {
 		if (semantic.scope.kind(scopeId) !== 'function') continue;
 		const start = semantic.scope.start(scopeId);
-		if (start > node.start || semantic.scope.end(scopeId) < node.start) continue;
+		// yuku scope ranges use an exclusive end, so a scope ending exactly at
+		// the node's start does not contain it.
+		if (start > node.start || semantic.scope.end(scopeId) <= node.start) continue;
 		if (!innermost || start > innermost.start) {
 			innermost = { start, end: semantic.scope.end(scopeId) };
 		}
