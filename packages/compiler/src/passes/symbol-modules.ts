@@ -12,8 +12,26 @@ import type {
 	SymbolModulesArtifact,
 	SymbolModulesInput,
 } from '../artifacts.ts';
-import { childNodes, type AnyNode } from '../ast/nodes.ts';
+import { asNodes, childNodes, isNode, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
+import {
+	callNode,
+	constDeclarationNode,
+	type EmissionNode,
+	type EmissionPrintInput,
+	type EmissionSite,
+	exportNamedDeclarationNode,
+	functionDeclarationNode,
+	literalNode,
+	memberChainNode,
+	moduleImportNode,
+	moduleProgramNode,
+	parseEmissionSource,
+	printEmittedModule,
+	returnStatementNode,
+	stringArrayNode,
+	type EmittedModule,
+} from './emit-codegen.ts';
 import { moduleScopeLines } from './public-render/shared.ts';
 
 export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtifact {
@@ -1423,6 +1441,357 @@ function moduleDeclarationNames(declaration: string): string[] {
 	return [...variables.matchAll(/(?:^|,)\s*([A-Za-z_$][\w$]*)\s*=/g)].map(
 		(match) => match[1]!,
 	);
+}
+
+// ---------------------------------------------------------------------------
+// State-initializer emission through the AST printer.
+//
+// `specs/framework/14-emission-codegen-migration.md`, stage 1, sketch item 2.
+// This band builds nodes and prints them through `emit-codegen.ts`. It reaches
+// into nothing in the string-scanner band (lines "topLevelBinaryOperators
+// through sourceReferencesIdentifier"), which invariant 5 keeps alive until the
+// stage's final unit but which a migrated site may not call.
+//
+// It is not yet the wired path. `test/emit-state-initializer.test.ts` runs both
+// paths over the same inputs and records exactly where the printed bytes differ
+// from the spliced ones; the printer normalizes, so the two are behaviorally
+// equal and not byte-equal, and invariant 2 makes the swap an owner-approved
+// step rather than a side effect of this unit.
+// ---------------------------------------------------------------------------
+
+/** A component prop the initializer reads, before it becomes a graph read. */
+export type StateInitializerPropRead = {
+	readonly localName: string;
+	readonly graphNodeId: string;
+	readonly path: ReadonlyArray<string>;
+};
+
+export type StateInitializerEmissionInput = {
+	readonly symbol: Extract<PlannedSymbol, { readonly kind: 'state-initializer' }>;
+	readonly moduleDeclarations: readonly string[];
+	readonly moduleImports: readonly SemanticModuleImport[];
+	readonly propReads: ReadonlyArray<StateInitializerPropRead>;
+	readonly omitAuthoredSource: boolean;
+	/** The authored file the initializer was extracted from; names the map. */
+	readonly sourceFileName: string;
+};
+
+/**
+ * Build the print input for a state-initializer module.
+ *
+ * Split from the print so a test can run the determinism helper (invariant 7)
+ * over the same tree the emitter would print, without emission paying for three
+ * prints and two reparses per symbol in a real build.
+ */
+export function buildStateInitializerEmission(
+	input: StateInitializerEmissionInput,
+): EmissionPrintInput {
+	const exportName = symbolExportName(input.symbol.id);
+	const site: EmissionSite = {
+		phase: 'payload',
+		passId: 'symbol-modules',
+		sourceFileName: input.sourceFileName,
+		symbolId: input.symbol.id,
+	};
+
+	const declarations = referencedModuleDeclarationSources(
+		input.symbol.source,
+		input.moduleDeclarations,
+		input.sourceFileName,
+	);
+	const projection = stateInitializerProjection(
+		declarations,
+		input.symbol.source,
+		input.sourceFileName,
+	);
+	const referencedNames = referencedIdentifierNames(projection.program as unknown as AnyNode);
+	const imports = dedupeModuleImports([
+		...(input.symbol.moduleImports ?? []),
+		...input.moduleImports.filter((moduleImport) => referencedNames.has(moduleImport.localName)),
+	]);
+
+	const body: EmissionNode[] = [
+		...imports.map((moduleImport) =>
+			moduleImportNode({
+				kind: moduleImport.kind,
+				localName: moduleImport.localName,
+				importedName: moduleImport.importedName,
+				source: moduleImport.source,
+			}),
+		),
+		...projection.declarationStatements,
+		...(input.omitAuthoredSource
+			? []
+			: [
+					exportNamedDeclarationNode(
+						constDeclarationNode('authoredSource', literalNode(input.symbol.source)),
+					),
+				]),
+		exportNamedDeclarationNode(
+			functionDeclarationNode(
+				exportName,
+				input.propReads.length > 0 ? ['context'] : [],
+				[
+					...input.propReads.map(stateInitializerPropReadStatement),
+					returnStatementNode(projection.initializerExpression),
+				],
+			),
+		),
+	];
+
+	return {
+		program: moduleProgramNode(body),
+		source: projection.source,
+		outputFileName: `${exportName}.js`,
+		site,
+	};
+}
+
+/** The printed state-initializer module, with its source map (invariant 3). */
+export function emitStateInitializerModuleNodes(
+	input: StateInitializerEmissionInput,
+): EmittedModule {
+	return printEmittedModule(buildStateInitializerEmission(input));
+}
+
+type StateInitializerProjection = {
+	/** The one text every printed node carries an offset into. */
+	readonly source: string;
+	readonly program: unknown;
+	readonly declarationStatements: ReadonlyArray<EmissionNode>;
+	readonly initializerExpression: EmissionNode;
+};
+
+/**
+ * Parse the selected module-scope declarations and the initializer expression
+ * together, once.
+ *
+ * One parse matters for the source map: a node's `start`/`end` index the text it
+ * was parsed from, so declarations parsed separately from the initializer would
+ * carry offsets into two different strings and the map would attribute one of
+ * them to positions in the other. The initializer is parenthesized so it parses
+ * as an expression statement in every authored form (an object literal at
+ * statement start would otherwise be a block); `preserveParens: false` then
+ * drops the wrapper, and the printer re-derives whatever parentheses the
+ * expression actually needs.
+ */
+function stateInitializerProjection(
+	declarations: readonly string[],
+	initializerSource: string,
+	filename: string,
+): StateInitializerProjection {
+	const source = [...declarations, `(${initializerSource});`].join('\n');
+	const { program, errors } = parseEmissionSource(source, filename, 'ts');
+	if (errors.length > 0) {
+		throw new Error(
+			`symbol-modules: state-initializer emission could not parse its projected source (${errors
+				.map((error) => error.message)
+				.join('; ')})`,
+		);
+	}
+
+	const statements = asNodes((program as unknown as AnyNode).body);
+	const last = statements.at(-1);
+	if (!last || last.type !== 'ExpressionStatement' || !isNode(last.expression)) {
+		throw new Error(
+			'symbol-modules: state-initializer emission expected its projected source to end in an expression statement',
+		);
+	}
+
+	return {
+		source,
+		program,
+		declarationStatements: statements.slice(0, -1) as unknown as ReadonlyArray<EmissionNode>,
+		initializerExpression: last.expression as unknown as EmissionNode,
+	};
+}
+
+/**
+ * `const <local> = context.graph.read("<id>", [...])`.
+ *
+ * Built directly rather than through the foundation's `graphReadCall`, which
+ * omits the path argument on an empty path. The text this replaces always
+ * passes the array, so passing it keeps the call shape unchanged.
+ */
+function stateInitializerPropReadStatement(propRead: StateInitializerPropRead): EmissionNode {
+	return constDeclarationNode(
+		propRead.localName,
+		callNode(memberChainNode('context.graph.read'), [
+			literalNode(propRead.graphNodeId),
+			stringArrayNode(propRead.path),
+		]),
+	);
+}
+
+/**
+ * The prop reads a state initializer needs, as data.
+ *
+ * The structured twin of `stateInitializerPropDeclarations`. It decides which
+ * props the initializer mentions from the parsed tree rather than from a text
+ * scan, because the scan lives in the band a migrated site may not call.
+ */
+export function stateInitializerPropReads(
+	symbol: Extract<PlannedSymbol, { readonly kind: 'state-initializer' }>,
+	semanticGraph: SymbolModulesInput['semanticGraph'],
+	renderData: SymbolModulesInput['renderData'],
+	sourceFileName: string,
+): StateInitializerPropRead[] {
+	if (!semanticGraph) return [];
+	const componentName =
+		semanticGraph.localDeclarations.find(
+			(declaration) =>
+				declaration.scope === 'component' && declaration.name === symbol.name,
+		)?.componentName ?? renderData?.root?.componentName;
+	if (!componentName) return [];
+
+	const propBinding = semanticGraph.graphBindings.find(
+		(binding) => binding.kind === 'prop' && binding.componentName === componentName,
+	);
+	if (!propBinding) return [];
+
+	const referenced = initializerReferencedNames(symbol.source, sourceFileName);
+	if (propBinding.id !== 'prop:props') {
+		return referenced.has(propBinding.name)
+			? [{ localName: propBinding.name, graphNodeId: propBinding.id, path: [] }]
+			: [];
+	}
+
+	return semanticGraph.componentPropBindings.flatMap((binding) =>
+		binding.componentName === componentName && referenced.has(binding.localName)
+			? [
+					{
+						localName: binding.localName,
+						graphNodeId: 'prop:props',
+						path: binding.propPath,
+					},
+				]
+			: [],
+	);
+}
+
+/**
+ * The module-scope declarations the initializer transitively needs, in the same
+ * order the text path selects them.
+ *
+ * The AST twin of `referencedModuleDeclarations`: a declaration is pulled in
+ * when the accumulated reference set mentions one of the names it declares, and
+ * pulling it in adds its own identifiers to that set, until nothing new is
+ * reached.
+ */
+function referencedModuleDeclarationSources(
+	initializerSource: string,
+	declarations: readonly string[],
+	filename: string,
+): string[] {
+	const remaining = declarations.map((declaration) => {
+		const parsed = parseEmissionSource(declaration, filename, 'ts').program as unknown as AnyNode;
+		return {
+			declaration,
+			names: declaredStatementNames(parsed),
+			references: referencedIdentifierNames(parsed),
+		};
+	});
+
+	const references = initializerReferencedNames(initializerSource, filename);
+	const selected: string[] = [];
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (let index = 0; index < remaining.length; index += 1) {
+			const candidate = remaining[index]!;
+			if (!candidate.names.some((name) => references.has(name))) continue;
+			selected.push(candidate.declaration);
+			for (const name of candidate.references) references.add(name);
+			remaining.splice(index, 1);
+			index -= 1;
+			changed = true;
+		}
+	}
+	return selected;
+}
+
+function initializerReferencedNames(initializerSource: string, filename: string): Set<string> {
+	const parsed = parseEmissionSource(`(${initializerSource});`, filename, 'ts')
+		.program as unknown as AnyNode;
+	return referencedIdentifierNames(parsed);
+}
+
+/** The names a parsed module's top-level declarations bind. */
+function declaredStatementNames(program: AnyNode): string[] {
+	return asNodes(program.body).flatMap((statement) => {
+		if (statement.type === 'VariableDeclaration') {
+			return asNodes(statement.declarations).flatMap((declarator) => {
+				const id = declarator.id;
+				return isNode(id) && id.type === 'Identifier' && typeof id.name === 'string'
+					? [id.name]
+					: [];
+			});
+		}
+		const id = statement.id;
+		return isNode(id) && id.type === 'Identifier' && typeof id.name === 'string' ? [id.name] : [];
+	});
+}
+
+/**
+ * Every identifier the tree mentions, excluding a non-computed member's
+ * property name.
+ *
+ * That one exclusion is what `sourceReferencesIdentifier` approximates by
+ * refusing a match preceded by a lone `.`; the tree states it exactly. Binding
+ * positions are deliberately included, matching the text path, which appends a
+ * selected declaration's whole source to the haystack.
+ */
+function referencedIdentifierNames(root: AnyNode): Set<string> {
+	const names = new Set<string>();
+	const seen = new Set<object>();
+	const stack: AnyNode[] = [root];
+
+	while (stack.length > 0) {
+		const node = stack.pop()!;
+		if (seen.has(node)) continue;
+		seen.add(node);
+
+		if (node.type === 'Identifier' && typeof node.name === 'string') names.add(node.name);
+
+		const skipProperty = node.type === 'MemberExpression' && node.computed !== true;
+		for (const [key, value] of Object.entries(node)) {
+			if (key === 'parent' || key === 'loc' || key === 'range') continue;
+			if (skipProperty && key === 'property') continue;
+			if (Array.isArray(value)) {
+				for (const item of value) if (isNode(item)) stack.push(item);
+				continue;
+			}
+			if (isNode(value)) stack.push(value);
+		}
+	}
+
+	return names;
+}
+
+/**
+ * The AST path's import dedupe. Same key as `uniqueModuleImports`, which sits
+ * inside the scanner band a migrated site may not call.
+ */
+function dedupeModuleImports(
+	moduleImports: ReadonlyArray<SemanticModuleImport>,
+): ReadonlyArray<SemanticModuleImport> {
+	const seen = new Set<string>();
+	const unique: SemanticModuleImport[] = [];
+
+	for (const moduleImport of moduleImports) {
+		const key = [
+			moduleImport.kind,
+			moduleImport.localName,
+			moduleImport.importedName ?? '',
+			moduleImport.source,
+		].join('\0');
+		if (seen.has(key)) continue;
+
+		seen.add(key);
+		unique.push(moduleImport);
+	}
+
+	return unique;
 }
 
 function emitSyncComputedDeriveModule(

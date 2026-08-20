@@ -337,13 +337,26 @@ export function printEmissionExpression(node: EmissionNode): string {
 	return result.code.slice(EXPRESSION_WRAPPER_PREFIX.length, -1);
 }
 
-/** Parse source that is destined for the printer, under the owned options. */
+/**
+ * Parse source that is destined for the printer, under the owned options.
+ *
+ * `lang` is explicit because language inference from a path is unreliable —
+ * `specs/framework/14-...` records the analyzer inferring `lang: "js"` from a
+ * `.tsrx` path. A stage-1 emitter reuses an authored `.tsrx` filename for the
+ * source map while the text it parses is already plain TypeScript, so it passes
+ * `lang: 'ts'` rather than letting the extension decide.
+ */
 export function parseEmissionSource(
 	source: string,
 	filename: string,
+	lang?: 'js' | 'ts' | 'tsx',
 ): { readonly program: Program; readonly errors: ReadonlyArray<MarklessCompileError> } {
 	const errors: MarklessCompileError[] = [];
-	const program = parseModule(source, filename, { ...EMISSION_PARSE_OPTIONS, errors });
+	const program = parseModule(source, filename, {
+		...EMISSION_PARSE_OPTIONS,
+		...(lang ? { lang } : {}),
+		errors,
+	});
 	return { program, errors };
 }
 
@@ -497,6 +510,80 @@ export function objectNode(properties: ReadonlyArray<EmissionNode>): EmissionNod
 
 export function returnStatementNode(argument: EmissionNode): EmissionNode {
 	return { type: 'ReturnStatement', argument };
+}
+
+/** `const <name> = <init>;` — the only declaration kind stage-1 emission builds. */
+export function constDeclarationNode(name: string, init: EmissionNode): EmissionNode {
+	return {
+		type: 'VariableDeclaration',
+		kind: 'const',
+		declarations: [
+			{ type: 'VariableDeclarator', id: identifierNode(name), init },
+		],
+	};
+}
+
+/** `function <name>(<params>) { <body> }`, as a declaration statement. */
+export function functionDeclarationNode(
+	name: string,
+	parameterNames: ReadonlyArray<string>,
+	body: ReadonlyArray<EmissionNode>,
+): EmissionNode {
+	return {
+		type: 'FunctionDeclaration',
+		id: identifierNode(name),
+		async: false,
+		generator: false,
+		params: parameterNames.map((parameterName) => identifierNode(parameterName)),
+		body: { type: 'BlockStatement', body: [...body] },
+	};
+}
+
+/** `export <declaration>` — the named-export form with no specifier list. */
+export function exportNamedDeclarationNode(declaration: EmissionNode): EmissionNode {
+	return { type: 'ExportNamedDeclaration', specifiers: [], source: null, declaration };
+}
+
+export type ModuleImportShape =
+	| { readonly kind: 'default'; readonly localName: string; readonly source: string }
+	| { readonly kind: 'namespace'; readonly localName: string; readonly source: string }
+	| {
+			readonly kind: 'named';
+			readonly localName: string;
+			readonly importedName?: string;
+			readonly source: string;
+	  };
+
+/**
+ * `import x from "m"` / `import * as x from "m"` / `import { a as b } from "m"`
+ * — the three shapes `symbol-modules.ts` builds as text in `emitModuleImport`.
+ *
+ * The module specifier is a synthesized literal with no `raw`, so it prints
+ * double-quoted, matching the `JSON.stringify` the text path used.
+ */
+export function moduleImportNode(moduleImport: ModuleImportShape): EmissionNode {
+	const local = identifierNode(moduleImport.localName);
+	const specifier: EmissionNode =
+		moduleImport.kind === 'default'
+			? { type: 'ImportDefaultSpecifier', local }
+			: moduleImport.kind === 'namespace'
+				? { type: 'ImportNamespaceSpecifier', local }
+				: {
+						type: 'ImportSpecifier',
+						imported: identifierNode(moduleImport.importedName ?? moduleImport.localName),
+						local,
+					};
+
+	return {
+		type: 'ImportDeclaration',
+		specifiers: [specifier],
+		source: literalNode(moduleImport.source),
+	};
+}
+
+/** A `Program` wrapper for a printed module. */
+export function moduleProgramNode(body: ReadonlyArray<EmissionNode>): EmissionNode {
+	return { type: 'Program', sourceType: 'module', body: [...body] };
 }
 
 export type GraphReadCallInput = {
