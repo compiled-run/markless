@@ -14,7 +14,7 @@ import type {
 // method below, because a direct assignment from a handler is not a graph write.
 export const checkboxState = shared(
 	() => {
-		const c = state({
+		const checkbox = state({
 			checked: false,
 			disabled: false,
 			required: false,
@@ -24,15 +24,15 @@ export const checkboxState = shared(
 			instanceId: 'chk',
 		});
 
-		const isChecked = computed(() => c.checked === true);
+		const isChecked = computed(() => checkbox.checked === true);
 
 		return {
-			...c,
+			...checkbox,
 			isChecked,
-			ariaChecked: computed(() => (c.checked === true ? 'true' : 'false')),
+			ariaChecked: computed(() => (checkbox.checked === true ? 'true' : 'false')),
 			// One statement only: a local const here breaks the emitted reader (B2).
 			toggle() {
-				c.checked = c.checked !== true;
+				checkbox.checked = checkbox.checked !== true;
 			},
 		};
 	},
@@ -48,31 +48,31 @@ export function CheckboxRoot({
 	children,
 	...rest
 }: CheckboxRootProps) @{
-	const c = checkboxState();
-	c.checked = checked ?? false;
-	c.disabled = disabled ?? false;
-	c.required = required ?? false;
-	c.name = name ?? '';
-	c.value = value ?? '';
+	const checkbox = checkboxState();
+	checkbox.checked = checked ?? false;
+	checkbox.disabled = disabled ?? false;
+	checkbox.required = required ?? false;
+	checkbox.name = name ?? '';
+	checkbox.value = value ?? '';
 
 	<div
 		{...rest}
-		ui-checked={c.isChecked}
-		ui-disabled={c.disabled}
+		ui-checked={checkbox.isChecked}
+		ui-disabled={checkbox.disabled}
 	>{children}</div>
 }
 
 export function CheckboxTrigger({ children, ...rest }: CheckboxTriggerProps) @{
-	const c = checkboxState();
+	const checkbox = checkboxState();
 
 	<button
 		{...rest}
 		type="button"
 		role="checkbox"
-		id={c.instanceId}
-		aria-checked={c.ariaChecked}
-		disabled={c.disabled}
-		onClick={() => c.toggle()}
+		id={checkbox.instanceId}
+		aria-checked={checkbox.ariaChecked}
+		disabled={checkbox.disabled}
+		onClick={() => checkbox.toggle()}
 		onKeyDown={(event) => {
 			if (event.key === 'Enter') {
 				event.preventDefault();
