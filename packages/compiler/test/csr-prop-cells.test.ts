@@ -76,7 +76,7 @@ export default function Page() @{
 		'"name":"input","kind":"graph-reference","graphNodeId":"computed:parentValue","path":[]',
 	);
 	expect(result.publicRenderModule.ssrModuleSource).toContain(
-		'm(graphProps) { marklessSsrRemapGraphOutput(this, graphProps); }',
+		'm(graphProps, instancePath) { marklessSsrRemapGraphOutput(this, graphProps, instancePath); }',
 	);
 	expect(result.publicRenderModule.ssrModuleSource).toContain(
 		'marklessSsrRemapGraphOutput(marklessSsrOutput, [{"name":"input","graphNodeId":"computed:parentValue","path":[]}]);',

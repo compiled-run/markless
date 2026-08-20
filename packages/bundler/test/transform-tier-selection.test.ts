@@ -21,38 +21,49 @@ const runtimeDemandMap = (replaced: boolean) => ({
 	unknownRecordModuleIds: [],
 });
 
-vi.mock('@markless/compiler', () => ({
-	collectTsrxModuleDiagnostics: vi.fn(() => []),
-	compileTsrxModule: vi.fn(async () => ({
-		semanticGraph: { componentEdges: compiler.componentEdges },
-		protocolState: compiler.protocolState,
-		protocolView: compiler.protocolView,
-		// The real compiler always returns payloadArena (non-optional on
-		// CompileTsrxModuleResult); transform.ts reads payloadArena.state.storage
-		// unguarded. Empty storage keeps this test focused on tier selection.
-		payloadArena: { state: { storage: [] } },
-		// runtimeDemandMap is likewise a required compiler artifact. This fixture
-		// predates that contract; an empty map represents its no-demand module.
-		runtimeDemandMap: runtimeDemandMap(false),
-		runtimeDemandMaps: {
-			'plain-ssr': runtimeDemandMap(true),
-			prerender: runtimeDemandMap(false),
-		},
-		symbolModules: { modules: [] },
-		boundSymbolResolver: { rows: [] },
-		publicRenderPlan: { styleScopes: [] },
-		payloadScripts: { state: compiler.protocolState, view: compiler.protocolView },
-		publicRenderModule: {
-			renderDataModuleSource: '',
-			moduleSource: '',
-			rootExportName: null,
-			ssrModuleSource: '',
-			ssrExportName: null,
-			componentDefinitions: [],
-		},
-	})),
-	emitSymbolResolverModule: vi.fn(() => 'export function loadSymbol() {}'),
-}));
+vi.mock('@markless/compiler', async (importOriginal) => {
+	// The link helpers below used to be local to transform.ts; keep the real ones so
+	// tier selection is still judged by the same predicates.
+	const actual = await importOriginal<typeof import('@markless/compiler')>();
+	return {
+		artifactChildCandidates: actual.artifactChildCandidates,
+		componentEdgeSymbolRoutes: actual.componentEdgeSymbolRoutes,
+		importedSymbolRoutes: actual.importedSymbolRoutes,
+		linkedRenderDataBoundarySymbols: actual.linkedRenderDataBoundarySymbols,
+		moduleInterfaceHash: actual.moduleInterfaceHash,
+		prerenderInterfacesComplete: actual.prerenderInterfacesComplete,
+		collectTsrxModuleDiagnostics: vi.fn(() => []),
+		compileTsrxModule: vi.fn(async () => ({
+			semanticGraph: { componentEdges: compiler.componentEdges },
+			protocolState: compiler.protocolState,
+			protocolView: compiler.protocolView,
+			// The real compiler always returns payloadArena (non-optional on
+			// CompileTsrxModuleResult); transform.ts reads payloadArena.state.storage
+			// unguarded. Empty storage keeps this test focused on tier selection.
+			payloadArena: { state: { storage: [] } },
+			// runtimeDemandMap is likewise a required compiler artifact. This fixture
+			// predates that contract; an empty map represents its no-demand module.
+			runtimeDemandMap: runtimeDemandMap(false),
+			runtimeDemandMaps: {
+				'plain-ssr': runtimeDemandMap(true),
+				prerender: runtimeDemandMap(false),
+			},
+			symbolModules: { modules: [] },
+			boundSymbolResolver: { rows: [] },
+			publicRenderPlan: { styleScopes: [] },
+			payloadScripts: { state: compiler.protocolState, view: compiler.protocolView },
+			publicRenderModule: {
+				renderDataModuleSource: '',
+				moduleSource: '',
+				rootExportName: null,
+				ssrModuleSource: '',
+				ssrExportName: null,
+				componentDefinitions: [],
+			},
+		})),
+		emitSymbolResolverModule: vi.fn(() => 'export function loadSymbol() {}'),
+	};
+});
 
 test('transform selects the explicit demand map for each build class', async () => {
 	const { transformTsrxModule } = await import('../src/transform.ts');

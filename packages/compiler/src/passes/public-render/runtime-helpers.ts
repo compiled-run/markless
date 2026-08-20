@@ -23,5 +23,5 @@ function referencesIdentifier(source: string, name: string): boolean {
 
 export const stateRuntimeImports = {
 	module: 'state',
-	names: ['marklessCloneState', 'marklessStateValue'],
+	names: ['marklessCloneState', 'marklessSelectStateNodes', 'marklessStateValue'],
 } as const satisfies CatalogHelperImport;

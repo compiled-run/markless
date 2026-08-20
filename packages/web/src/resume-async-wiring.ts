@@ -1,9 +1,8 @@
 import type { DomJournalEntry, DomJournalResult } from '@markless/runtime';
 import { ASYNC_BOUNDARY_ARM } from '@markless/serializer/async-boundary-arm';
-import { boundaryArmRecordSet } from './resume-arm-records.ts';
+import { boundaryArmRecordSet, composedArmRecordQualifier } from './resume-arm-records.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import type {
-	ResumeArmRecordSet,
 	ResumeAsyncBoundaryRecord,
 	ResumePreparedCore,
 	ResumeRuntimeInput,
@@ -225,6 +224,9 @@ export async function settleAsyncBoundaryRange(
 			return;
 	}
 	const source = resolveBoundarySettleSource(input, boundary);
+	// A composed child's arm records are minted in the child's own id space; the
+	// qualifier that re-spells them in page space is installed only by pages the
+	// bundler gave component edges (fns/composed-arm-records).
 	if (source === 'renderAsyncBoundary') {
 		const rendered = await input.renderAsyncBoundary!(boundary.id, status, input.graph);
 		const armRecords = boundaryArmRecordSet(rendered.armRecords);
@@ -232,7 +234,7 @@ export async function settleAsyncBoundaryRange(
 		await input.commitArm!(boundary, {
 			...rendered,
 			html: rendered.html,
-			armRecords: composedBoundaryArmRecords(boundary.id, armRecords),
+			armRecords: (composedArmRecordQualifier()?.(boundary.id, armRecords) ?? armRecords),
 		});
 		input.settleTracker?.markSettled(boundary.id);
 		return;
@@ -259,7 +261,7 @@ export async function settleAsyncBoundaryRange(
 		if (armRecords) {
 			await input.commitArm(boundary, {
 				html: update.html,
-				armRecords: composedBoundaryArmRecords(boundary.id, armRecords),
+				armRecords: (composedArmRecordQualifier()?.(boundary.id, armRecords) ?? armRecords),
 			});
 			input.settleTracker?.markSettled(boundary.id);
 			return;
@@ -306,88 +308,6 @@ function boundaryRangeJournal(boundaryId: string, fragment: unknown): DomJournal
 		{ type: 'removeRange', locator: `async-boundary:${boundaryId}` },
 		{ type: 'insertRange', locator: `async-boundary:${boundaryId}:start`, fragment },
 	] as DomJournalEntry[];
-}
-
-// Composed child-owned boundaries load their update symbol through the
-// instance prefix riding boundary.id (c0:boundary:1 → prefix "c0:"). The
-// arm-render module mints records in the child module's own id space, so
-// committed host, symbol, and arm-branch ids take the same prefix before
-// registration — host ids join the page-wide host map and symbol ids resolve
-// through the same prefix routes the update symbol itself resolved through.
-// Graph node ids stay untouched: composed pages share one name-based graph.
-function composedBoundaryArmRecords(
-	boundaryId: string,
-	set: ResumeArmRecordSet,
-): ResumeArmRecordSet {
-	const exhaustive = {
-		locators: true,
-		events: true,
-		domUpdates: true,
-		behaviors: true,
-		elementHandles: true,
-		keyedRepeats: true,
-		branches: true,
-	} satisfies Record<keyof ResumeArmRecordSet, true>;
-	void exhaustive;
-	const prefix = boundaryId.slice(0, boundaryId.lastIndexOf('boundary:'));
-	if (!prefix) return set;
-	const prefixHost = <T extends { readonly hostNodeId: string }>(record: T): T => ({
-		...record,
-		hostNodeId: prefix + record.hostNodeId,
-	});
-	return {
-		locators: set.locators.map(prefixHost),
-		events: set.events.map((event) => ({
-			...prefixHost(event),
-			symbolIds: event.symbolIds.map((symbolId) => prefix + symbolId),
-		})),
-		domUpdates: set.domUpdates?.map((update) => ({
-			...prefixHost(update),
-			...(update.symbolId ? { symbolId: prefix + update.symbolId } : {}),
-		})),
-		behaviors: set.behaviors.map((behavior) => ({
-			...prefixHost(behavior),
-			...(behavior.symbolId ? { symbolId: prefix + behavior.symbolId } : {}),
-		})),
-		elementHandles: set.elementHandles.map(prefixHost),
-		keyedRepeats: set.keyedRepeats?.map((repeat) => ({
-			...repeat,
-			id: prefix + repeat.id,
-			parentHostNodeId: prefix + repeat.parentHostNodeId,
-			rowEvents: repeat.rowEvents.map((event) => ({
-				...event,
-				symbolIds: event.symbolIds.map((symbolId) => prefix + symbolId),
-			})),
-		})),
-		...(set.branches
-			? {
-					branches: set.branches.map((branch) => ({
-						...branch,
-						id: prefix + branch.id,
-						...(branch.symbolId ? { symbolId: prefix + branch.symbolId } : {}),
-						...(branch.armRecords
-							? {
-									armRecords: branch.armRecords.map((arm) => ({
-										...arm,
-										events: (arm.events ?? []).map((event) => ({
-											...event,
-											symbolIds: (event.symbolIds ?? []).map(
-												(symbolId) => prefix + symbolId,
-											),
-										})),
-										domUpdates: (arm.domUpdates ?? []).map((update) => ({
-											...update,
-											...(update.symbolId
-												? { symbolId: prefix + update.symbolId }
-												: {}),
-										})),
-									})),
-								}
-							: {}),
-					})),
-				}
-			: {}),
-	};
 }
 
 function isResumeBranchUpdate(

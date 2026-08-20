@@ -47,7 +47,7 @@ export function App() @{
 
 	expect(graph.markup.root).toEqual({ componentName: 'App', templateId: 'template:App' });
 	const root = graph.markup.chunks.find((chunk) => chunk.id === 'template:App');
-	expect(root?.statics.join('')).toContain('<main data-title=""><header><h1>');
+	expect(root?.statics.join('')).toContain('<main><header><h1>');
 	expect(root?.slots).toEqual(
 		expect.arrayContaining([
 			expect.objectContaining({

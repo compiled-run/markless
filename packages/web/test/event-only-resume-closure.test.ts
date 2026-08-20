@@ -94,7 +94,9 @@ test('every arm-record fold and prefix is compile-time exhaustive', () => {
 	for (const file of [
 		'resume-arm-records.ts',
 		'resume-commit-arm.ts',
-		'resume-async-wiring.ts',
+		// The composed prefix fold is pay-per-use: it lives in the instance-scope
+		// module only composing pages load, not in the shared settle path.
+		'fns/instance-scope.ts',
 		'fns/ssr.ts',
 	]) {
 		const source = readFileSync(join(repoRoot, 'packages/web/src', file), 'utf8');

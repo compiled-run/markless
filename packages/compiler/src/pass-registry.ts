@@ -116,3 +116,55 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 		produces: ['symbolResolverModule', 'symbolResolverModuleManifest'],
 	},
 ];
+
+// Link passes run across modules once the bundler has a module graph, so they
+// are not part of the per-module `defaultCompilerPasses` pipeline.
+export const linkCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
+	{
+		passId: 'execution-attribution',
+		description: 'Flatten linked module manifests into per-route execution scope tables.',
+		consumes: ['moduleManifests', 'childTable'],
+		produces: ['executionAttribution'],
+	},
+	{
+		passId: 'module-link',
+		description:
+			'Link resolved imported children into the typed module graph, kinds decided from artifacts.',
+		consumes: ['moduleArtifacts', 'resolution'],
+		produces: ['linkedModuleGraph'],
+	},
+	{
+		passId: 'delegate-children',
+		description:
+			'Decide which artifact-child edges are delegates a linker may render at build time, and turn the renderings it handed back into materializations.',
+		consumes: ['linkedModuleGraph', 'delegateRenderings'],
+		produces: ['delegateChildren'],
+	},
+	{
+		passId: 'interface-link',
+		description: 'Link imported module interfaces into the linked interface map and its keys.',
+		consumes: ['moduleArtifacts', 'linkedModuleGraph'],
+		produces: ['linkedInterfaces'],
+	},
+	{
+		passId: 'render-data-module',
+		description:
+			'Describe an emitted render-data module as a linkable unit: its content hash, the scoped-style modules it links, and the claims a data-only facade publishes.',
+		consumes: ['moduleManifests', 'publicRenderModule'],
+		produces: ['renderDataModule'],
+	},
+	{
+		passId: 'transform-plan',
+		description:
+			'Decide what one transform request asks for: its request kind, manifest identity, claim publication, prerender shaping, and cache slot.',
+		consumes: ['source'],
+		produces: ['transformPlan'],
+	},
+	{
+		passId: 'claim-manifest',
+		description:
+			'Decide which emitted module owns the symbol claims of a source and merge sibling claims into one manifest per source.',
+		consumes: ['moduleManifests'],
+		produces: ['linkedClaims'],
+	},
+];

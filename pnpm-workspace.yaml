@@ -1,6 +1,7 @@
 packages:
     - packages/*
     - packages/*/fixtures/*
+    - packages/headless/*
     - demos/*
     - docs
     # yuku-tsrx is consumed through the generated self-contained local host.

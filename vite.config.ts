@@ -230,6 +230,7 @@ export default defineConfig({
 				},
 			},
 			'packages/vitest-browser/vitest.config.ts',
+			'packages/headless/components/vitest.config.ts',
 		],
 	},
 	lint: {

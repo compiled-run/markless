@@ -11,6 +11,15 @@ import type {
 } from '../../artifacts.ts';
 import { resolveBoundaryRunners } from '../public-render/boundary-runner.ts';
 
+// The link-stage half of this pass: what an emitted render-data module carries
+// once it exists as a module a consuming app can link.
+export {
+	RENDER_DATA_MODULE_PASS_ID,
+	planRenderDataModule,
+	renderDataClaimManifest,
+	renderDataContentHash,
+} from './manifest.ts';
+
 export function createRenderData(input: {
 	readonly semanticGraph: SemanticGraphArtifact;
 	readonly symbolResolver: SymbolResolverPlan;

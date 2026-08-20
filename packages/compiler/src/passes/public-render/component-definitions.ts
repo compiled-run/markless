@@ -7,7 +7,9 @@ import {
 	callbackSymbolIds,
 	componentPropNames,
 	componentPropCellId,
+	componentEdgeInstanceSegment,
 	componentEdgesFor,
+	componentOwnedStateNodes,
 	sameModuleComponentMap,
 } from './shared.ts';
 import type { PublicRenderRoot } from './types.ts';
@@ -55,7 +57,7 @@ export function collectPublicRenderComponentDefinitions(
 				childComponentName: edge.childComponentName,
 				...(edge.asyncBoundaryId ? { asyncBoundaryId: edge.asyncBoundaryId } : {}),
 				hostPrefix: `c${index}:`,
-				symbolPrefix: edge.importSource ? `c${index}:` : '',
+				symbolPrefix: componentEdgeInstanceSegment(edge, input.semanticGraph.componentEdges),
 				boundSymbols: Object.fromEntries(
 					[...callbacks].flatMap(([key, value]) => {
 						const prefix = `bound:${edge.id}:`;
@@ -141,10 +143,22 @@ export function collectPublicRenderComponentDefinitions(
 			...chunk,
 			nativeTemplateId: `markless-render-data:${encodeURIComponent(input.source.filename)}:${encodeURIComponent(componentName)}:template:${encodeURIComponent(chunk.id)}`,
 		}));
+		// Positions resolve a state name two components of one module both
+		// declare; a single-component module needs no partition at all.
+		const ownedNodes =
+			componentNames.size > 1
+				? componentOwnedStateNodes(input, componentName, rootInfo.componentName)
+				: undefined;
 		return [
 			{
 				name: componentName,
 				state: input.protocolState,
+				...(ownedNodes
+					? {
+							stateCellIndexes: ownedNodes.cellIndexes,
+							stateComputedIndexes: ownedNodes.computedIndexes,
+						}
+					: {}),
 				view: input.protocolView,
 				rootChunkId: rootChunk.id,
 				chunks: nativeChunks,

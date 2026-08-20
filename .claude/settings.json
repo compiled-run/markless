@@ -52,7 +52,16 @@
       "Bash(npm run test:site:static)",
       "Bash(npm run test:site:static *)",
       "mcp__chrome-devtools__take_snapshot",
-      "mcp__chrome-devtools__list_console_messages"
+      "mcp__chrome-devtools__list_console_messages",
+      "Bash(node /Users/jacksm5pro/.claude/skills/goal-prep/scripts/check-goal-state.mjs)",
+      "Bash(node /Users/jacksm5pro/.claude/skills/goal-prep/scripts/check-goal-state.mjs *)",
+      "Bash(node /Users/jacksm5pro/dev/open-source/fable-opus/scripts/status.mjs)",
+      "Bash(node /Users/jacksm5pro/dev/open-source/fable-opus/scripts/status.mjs *)",
+      "Bash(pnpm exec tsc --noEmit *)",
+      "Bash(node /Users/jacksm5pro/.claude/skills/goal-prep/scripts/check-update.mjs)",
+      "Bash(node /Users/jacksm5pro/.claude/skills/goal-prep/scripts/check-update.mjs *)",
+      "Bash(pnpm typecheck)",
+      "mcp__claude-in-chrome__tabs_context_mcp"
     ],
     "ask": [
       "Bash(pnpm add:*)",

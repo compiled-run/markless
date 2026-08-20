@@ -818,7 +818,7 @@ test('compileTsrxModule orchestrates source to payload scripts and resolver modu
 		],
 	});
 
-	expect(result.semanticGraph.components).toEqual([{ name: 'App' }]);
+	expect(result.semanticGraph.components).toEqual([{ name: 'App', exportName: 'App' }]);
 	expect(result.stateLowering.diagnostics).toEqual([]);
 	expect(result.captureAnalysis.extractedSymbols).toEqual(
 		expect.arrayContaining([
@@ -1100,7 +1100,7 @@ test('compileTsrxModule treats a default exported TSRX function as the public re
 		symbols: [],
 	});
 
-	expect(result.semanticGraph.components).toEqual([{ name: 'Home' }]);
+	expect(result.semanticGraph.components).toEqual([{ name: 'Home', exportName: 'default' }]);
 	expect(result.protocolView.locators).toEqual(
 		expect.arrayContaining([
 			expect.objectContaining({ hostNodeId: 'h0', tagName: 'main' }),
@@ -1128,7 +1128,7 @@ export function Dashboard() @{
 		symbols: [],
 	});
 
-	expect(result.semanticGraph.components).toEqual([{ name: 'Dashboard' }]);
+	expect(result.semanticGraph.components).toEqual([{ name: 'Dashboard', exportName: 'Dashboard' }]);
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
 	expect(result.publicRenderModule.ssrModuleSource).toContain('function marklessRenderSsr');
 });
@@ -1872,7 +1872,7 @@ export const App = () => @{
 		symbols: [],
 	});
 
-	expect(result.semanticGraph.components).toEqual([{ name: 'App' }]);
+	expect(result.semanticGraph.components).toEqual([{ name: 'App', exportName: 'App' }]);
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
 	const output = await (ssrModule.marklessRenderSsr as () => { readonly html: string })();
@@ -4523,7 +4523,7 @@ export function App() @{
 			readonly view: ProtocolViewPayload;
 		}
 	)();
-	const countCell = output.state.cells.find((cell) => cell.graphNodeId === 'state:count');
+	const countCell = output.state.cells.find((cell) => cell.graphNodeId === 'c0:state:count');
 	const button = new PublicRenderTestElement('button');
 	button.textContent = 'BUTTON 0';
 	const root = new PublicRenderTestElement('section');
@@ -4556,7 +4556,7 @@ export function App() @{
 
 	await runtime.dispatch({ type: 'click', target: button as never });
 
-	expect(graph.read('state:count')).toBe(1);
+	expect(graph.read('c0:state:count')).toBe(1);
 	expect(button.textContent).toBe('BUTTON 1');
 });
 

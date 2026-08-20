@@ -16,6 +16,8 @@ import {
 	resolveGraphPath,
 	semanticAliasMap,
 } from '../artifact-helpers/graph-paths.ts';
+import { childNodes, type AnyNode } from '../ast/nodes.ts';
+import { parseJavaScriptModule } from '../js-ast.ts';
 import {
 	createSymbolSourceSemanticsReader,
 	type SymbolSourceSemanticsReader,
@@ -94,9 +96,12 @@ function importedCaptureSymbols(
 			(candidate) => candidate.id === symbol.componentEdgeId,
 		);
 		if (!edge) return [];
-		const absentPropIsUndefined =
-			symbol.captureSymbol.kind !== 'event-handler' &&
-			symbol.captureSymbol.kind !== 'callback-prop';
+		const captureSymbol = symbol.captureSymbol;
+		// Absent callback props fold to undefined only at optional/guarded call sites.
+		const absentPropIsUndefined = (slot: CaptureSlot) =>
+			captureSymbol.kind !== 'event-handler' && captureSymbol.kind !== 'callback-prop'
+				? true
+				: referenceInvocationIsAbsentSafe(captureSymbol.source, slot.source);
 		return [
 			{
 				...symbol.captureSymbol,
@@ -113,7 +118,7 @@ function importedCaptureSymbols(
 													route.propName,
 													[...route.path, ...slot.path],
 													input,
-													absentPropIsUndefined,
+													absentPropIsUndefined(slot),
 												),
 											]
 										: [],
@@ -125,7 +130,7 @@ function importedCaptureSymbols(
 											slot.propName,
 											slot.path,
 											input,
-											absentPropIsUndefined,
+											absentPropIsUndefined(slot),
 										),
 									]
 								: slot.routes.map((route) =>
@@ -349,8 +354,12 @@ function captureSlot(
 	const componentName = declaration?.componentName ?? read.componentName;
 	const propName = read.graphNodeId.startsWith('prop:') ? read.path[0] : undefined;
 	const routePath = propName ? read.path.slice(1) : read.path;
+	// Absent callback props fold to undefined only at optional/guarded call sites.
+	const absentPropIsUndefined =
+		(symbol.kind === 'event-handler' || symbol.kind === 'callback-prop') &&
+		referenceInvocationIsAbsentSafe(symbolSource(symbol), read.source);
 	let routes = propName
-		? propCaptureRoutes(componentName, propName, routePath, input)
+		? propCaptureRoutes(componentName, propName, routePath, input, absentPropIsUndefined)
 		: [
 				{
 					kind: 'graph-reference' as const,
@@ -401,6 +410,7 @@ function propCaptureRoutes(
 	propName: string,
 	readPath: ReadonlyArray<string>,
 	input: CaptureAnalysisInput,
+	absentPropIsUndefined = false,
 ): ReadonlyArray<CaptureSlotRoute> {
 	const edges = componentName
 		? input.semanticGraph.componentEdges.filter(
@@ -415,7 +425,7 @@ function propCaptureRoutes(
 
 	return edges.flatMap((edge) =>
 		componentEdgePathsEndingAt(edge, input.semanticGraph.componentEdges).map((path) =>
-			propCaptureRoute(path, propName, readPath, input),
+			propCaptureRoute(path, propName, readPath, input, absentPropIsUndefined),
 		),
 	);
 }
@@ -466,6 +476,7 @@ function resolvePropCaptureRoute(
 			componentEdgeId: terminalEdgeId,
 			componentEdgePath: edgePathIds,
 			expression: propName,
+			absentProp: true,
 		};
 	}
 	if (prop.kind === 'graph-reference') {
@@ -587,6 +598,143 @@ function valueAtPath(value: unknown, path: ReadonlyArray<string>): unknown {
 	}, value);
 }
 
+// True when every call of `reference` in source already no-ops on a missing value (?.(), if/&&/?: guards).
+function referenceInvocationIsAbsentSafe(source: string, reference: string): boolean {
+	const moduleSource = `const __marklessCaptureSource = ${source};`;
+	let ast: AnyNode;
+	try {
+		ast = parseJavaScriptModule(moduleSource);
+	} catch {
+		return false;
+	}
+	const isReference = (node: AnyNode | undefined): boolean =>
+		node !== undefined &&
+		typeof node.start === 'number' &&
+		typeof node.end === 'number' &&
+		moduleSource.slice(node.start, node.end) === reference;
+	const isUndefinedLiteral = (node: AnyNode | undefined): boolean =>
+		node?.type === 'Identifier' && node.name === 'undefined';
+	const isNullLiteral = (node: AnyNode | undefined): boolean =>
+		node?.type === 'Literal' && node.value === null && node.raw === 'null';
+	const isTypeofReference = (node: AnyNode | undefined): boolean =>
+		node?.type === 'UnaryExpression' &&
+		node.operator === 'typeof' &&
+		isReference(asNode(node.argument));
+	const isUndefinedString = (node: AnyNode | undefined): boolean =>
+		node?.type === 'Literal' && node.value === 'undefined';
+	// A comparison pairs the reference (or `typeof reference`) with the value the
+	// side names: `onChange !== null` names null, which an absent prop is not.
+	const comparesWith = (
+		node: AnyNode,
+		operand: (side: AnyNode | undefined) => boolean,
+		value: (side: AnyNode | undefined) => boolean,
+	): boolean => {
+		const left = asNode(node.left);
+		const right = asNode(node.right);
+		return (operand(left) && value(right)) || (operand(right) && value(left));
+	};
+	// True when the test cannot be truthy while `reference` is absent, so its
+	// consequent never runs on an absent prop.
+	const provesPresent = (node: AnyNode | undefined): boolean => {
+		if (!node) return false;
+		if (isReference(node)) return true;
+		if (node.type === 'ChainExpression') return provesPresent(asNode(node.expression));
+		if (node.type === 'UnaryExpression' && node.operator === '!')
+			return provesAbsent(asNode(node.argument));
+		if (node.type === 'LogicalExpression' && node.operator === '&&')
+			return provesPresent(asNode(node.left)) || provesPresent(asNode(node.right));
+		if (node.type !== 'BinaryExpression') return false;
+		if (node.operator === '!==')
+			return (
+				comparesWith(node, isReference, isUndefinedLiteral) ||
+				comparesWith(node, isTypeofReference, isUndefinedString)
+			);
+		if (node.operator === '!=')
+			return (
+				comparesWith(
+					node,
+					isReference,
+					(side) => isUndefinedLiteral(side) || isNullLiteral(side),
+				) || comparesWith(node, isTypeofReference, isUndefinedString)
+			);
+		return false;
+	};
+	// The mirror: the test cannot be falsy while `reference` is absent, so its
+	// alternate never runs on an absent prop.
+	const provesAbsent = (node: AnyNode | undefined): boolean => {
+		if (!node) return false;
+		if (node.type === 'ChainExpression') return provesAbsent(asNode(node.expression));
+		if (node.type === 'UnaryExpression' && node.operator === '!')
+			return provesPresent(asNode(node.argument));
+		if (node.type === 'LogicalExpression' && node.operator === '||')
+			return provesAbsent(asNode(node.left)) || provesAbsent(asNode(node.right));
+		if (node.type !== 'BinaryExpression') return false;
+		if (node.operator === '===')
+			return (
+				comparesWith(node, isReference, isUndefinedLiteral) ||
+				comparesWith(node, isTypeofReference, isUndefinedString)
+			);
+		if (node.operator === '==')
+			return (
+				comparesWith(
+					node,
+					isReference,
+					(side) => isUndefinedLiteral(side) || isNullLiteral(side),
+				) || comparesWith(node, isTypeofReference, isUndefinedString)
+			);
+		return false;
+	};
+
+	let invoked = false;
+	let unguarded = false;
+	const visit = (node: AnyNode, guarded: boolean): void => {
+		if (node.type === 'CallExpression' && isReference(asNode(node.callee))) {
+			invoked = true;
+			if (node.optional !== true && !guarded) unguarded = true;
+		}
+		if (node.type === 'IfStatement' || node.type === 'ConditionalExpression') {
+			const test = asNode(node.test);
+			visit(test ?? node, guarded);
+			const consequent = asNode(node.consequent);
+			if (consequent) visit(consequent, guarded || provesPresent(test));
+			const alternate = asNode(node.alternate);
+			if (alternate) visit(alternate, guarded || provesAbsent(test));
+			return;
+		}
+		// `??` and `||` run their right side when the left is absent/falsy, so the
+		// left proves nothing about presence there; only `&&` carries a guard.
+		if (
+			node.type === 'LogicalExpression' &&
+			(node.operator === '&&' || node.operator === '||' || node.operator === '??')
+		) {
+			const left = asNode(node.left);
+			if (left) visit(left, guarded);
+			const right = asNode(node.right);
+			if (right)
+				visit(
+					right,
+					guarded ||
+						(node.operator === '&&'
+							? provesPresent(left)
+							: node.operator === '||'
+								? provesAbsent(left)
+								: false),
+				);
+			return;
+		}
+		for (const child of childNodes(node)) visit(child, guarded);
+	};
+	visit(ast, false);
+
+	return invoked && !unguarded;
+}
+
+function asNode(value: unknown): AnyNode | undefined {
+	return typeof value === 'object' && value !== null && typeof (value as AnyNode).type === 'string'
+		? (value as AnyNode)
+		: undefined;
+}
+
 function opaqueSlotDiagnostics(symbol: {
 	readonly symbolId: string;
 	readonly captureSlots: ReadonlyArray<CaptureSlot>;
@@ -606,8 +754,12 @@ function opaqueSlotDiagnostics(symbol: {
 					severity: 'error' as const,
 					phase: CAPTURE_ANALYSIS_PHASE,
 					title: 'Lazy handler prop capture is not resumable',
-					message: `Cannot bind lazy symbol "${symbol.symbolId}" on component edge "${route.componentEdgeId}" because prop "${propName}" for "${componentName}" is the runtime expression "${route.expression}".`,
-					why: 'A demanded capture slot must route to a graph node, a compiler-known constant, or a callback symbol. This opaque runtime value cannot be reduced without adding a serialized capture protocol.',
+					message: route.absentProp
+						? `Cannot bind lazy symbol "${symbol.symbolId}" on component edge "${route.componentEdgeId}" because prop "${propName}" is not passed by the parent that renders "${componentName}", and this call site invokes it unconditionally.`
+						: `Cannot bind lazy symbol "${symbol.symbolId}" on component edge "${route.componentEdgeId}" because prop "${propName}" for "${componentName}" is the runtime expression "${route.expression}".`,
+					why: route.absentProp
+						? 'An absent prop has no value to route at this component edge. An optional or guarded call folds to undefined; an unconditional call would throw after resume, so it stays a build error.'
+						: 'A demanded capture slot must route to a graph node, a compiler-known constant, or a callback symbol. This opaque runtime value cannot be reduced without adding a serialized capture protocol.',
 					...(route.sourceSpan ? { primarySpan: route.sourceSpan } : {}),
 					passId: CAPTURE_ANALYSIS_PASS_ID,
 					artifactKeys: ['semanticGraph', 'symbolResolver', 'captureAnalysis'],
@@ -618,8 +770,9 @@ function opaqueSlotDiagnostics(symbol: {
 					source: route.expression,
 					suggestions: [
 						{
-							message:
-								'Pass state()/computed() data, a literal value, or a callback prop to the lazy handler instead.',
+							message: route.absentProp
+								? `Call it optionally as ${propName}?.(…), guard it with if (${propName}), or pass ${propName} where "${componentName}" is rendered.`
+								: 'Pass state()/computed() data, a literal value, or a callback prop to the lazy handler instead.',
 						},
 					],
 					docsUrl: 'https://markless.dev/errors/MARKLESS_CAPTURE_OPAQUE_PROP',

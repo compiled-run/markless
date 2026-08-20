@@ -1,3 +1,4 @@
+import type { ExecutionAttributionTables } from '@markless/compiler';
 import type { MarklessExecutionLogMode } from './types.ts';
 import type { GlobalInjections } from './types.ts';
 
@@ -28,7 +29,7 @@ export const EXECUTION_LOG_GESTURE_EVENTS = [
 export const EXECUTION_LOG_FRAMEWORK_ID_PATTERN =
 	'/^(?:web|runtime|serializer|router|core|analyzer):/';
 
-export type ExecutionAttributionTables = Readonly<Record<string, Readonly<Record<string, string>>>>;
+export type { ExecutionAttributionTables };
 
 export function normalizeExecutionLogMode(
 	mode: MarklessExecutionLogMode | undefined,

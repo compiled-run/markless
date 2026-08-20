@@ -3,6 +3,7 @@ import {
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
 } from '@markless/serializer/protocol';
+import { marklessAttributeValue } from './dom-attribute.ts';
 import type {
 	DomJournalEntry,
 	DomJournalResult,
@@ -416,7 +417,11 @@ async function flushDomUpdates(input: {
 		);
 		if (!dirty) continue;
 
-		const key = `${domUpdate.hostNodeId}\n${domUpdate.graphNodeId}\n${domUpdate.path.join('.')}`;
+		// The target belongs in the key: two attributes on one element can read
+		// the same graph node (`disabled` and `ui-disabled` off one prop).
+		const target = domUpdate.target;
+		const targetKey = `${target?.kind ?? ''}:${target && 'name' in target ? target.name : ''}`;
+		const key = `${domUpdate.hostNodeId}\n${targetKey}\n${domUpdate.graphNodeId}\n${domUpdate.path.join('.')}`;
 		if (ranDomUpdates.has(key)) continue;
 		ranDomUpdates.add(key);
 
@@ -475,11 +480,12 @@ function applyDomJournalEntry(
 		return;
 	}
 	if (entry.type === 'setAttr') {
-		if (entry.value == null || entry.value === false) {
+		const text = marklessAttributeValue(entry.name, entry.value);
+		if (text === null) {
 			target.removeAttribute?.(entry.name);
 			return;
 		}
-		target.setAttribute?.(entry.name, stringifyDomValue(entry.value));
+		target.setAttribute?.(entry.name, text);
 		return;
 	}
 	if (entry.type === 'setProp') {

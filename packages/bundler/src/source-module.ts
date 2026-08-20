@@ -23,6 +23,16 @@ export type SourceSymbolRoute = {
 	readonly importSource: string;
 };
 
+// A child declared in the SAME module carries an instance path like any other
+// composed child, but its symbols live in this module's own resolver: strip the
+// path and answer locally instead of importing a child module.
+export type SourceSelfSymbolRoute = {
+	readonly prefix: string;
+	readonly self: true;
+};
+
+export type SourceLazySymbolRoute = SourceSymbolRoute | SourceSelfSymbolRoute;
+
 /**
  * What a settle path needs to call ONE bound symbol without the generic
  * resolver: the base symbol the loader resolves, and the legacy prop reads the
@@ -207,7 +217,7 @@ export function emitSourceModule(input: {
 	readonly canonicalRenderData?: boolean;
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
 	readonly behaviorSymbols?: ReadonlyArray<SourceSymbolRow>;
-	readonly symbolRoutes: ReadonlyArray<SourceSymbolRoute>;
+	readonly symbolRoutes: ReadonlyArray<SourceLazySymbolRoute>;
 	readonly hasBoundSymbols?: boolean;
 	readonly prerenderRecords?: boolean;
 	readonly directCsr?: boolean;
@@ -295,6 +305,9 @@ export function emitSourceModule(input: {
 					'marklessLoadLocalSymbol',
 				)
 			: '',
+		routeSymbols && !symbolsOnly && input.directCsr === true
+			? emitComposedArmRecordsInstall()
+			: null,
 		symbolsOnly && routeSymbols ? 'export { marklessSsrLoadSymbolRoute as loadSymbol };' : '',
 		symbolsOnly
 			? ''
@@ -339,7 +352,7 @@ export function emitResumeModule(input: {
 	readonly runtimeDemandMap?: unknown;
 	readonly needsFullResume?: boolean;
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
-	readonly symbolRoutes: ReadonlyArray<SourceSymbolRoute>;
+	readonly symbolRoutes: ReadonlyArray<SourceLazySymbolRoute>;
 	readonly executionLog?: MarklessExecutionLogMode;
 	readonly hasBoundSymbols?: boolean;
 	// Boundary-sized bound-symbol facts for the narrow settle path. Data only:
@@ -439,6 +452,7 @@ export function emitResumeModule(input: {
 				)
 			: '',
 		routeSymbols ? 'export { marklessSsrLoadSymbolRoute as loadSymbol };' : '',
+		routeSymbols ? emitComposedArmRecordsInstall() : null,
 		stagedPrerender ? emitPrerenderTriggerGroupLoader(input.prerenderTriggerGroups ?? []) : '',
 		resumeContainerEvent,
 		'',
@@ -492,17 +506,34 @@ export function emitQueuedResumeContainerEvent(source: string): string {
 	].join('\n');
 }
 
+// Composed arm-record qualification is pay-per-use: only a page with component
+// edges can hold a child-owned async boundary whose records were minted in the
+// child's own id space, so the gate that emits its symbol routes also emits
+// this install. The call is explicit because `@markless/web` declares
+// `sideEffects: false`, which would drop a bare side-effect import.
+function emitComposedArmRecordsInstall(): string {
+	return [
+		"import { installMarklessComposedArmRecords } from '@markless/web/fns/instance-scope';",
+		'installMarklessComposedArmRecords();',
+	].join('\n');
+}
+
 function emitLazySymbolRouteFunction(
-	routes: ReadonlyArray<SourceSymbolRoute>,
+	routes: ReadonlyArray<SourceLazySymbolRoute>,
 	functionName: string,
 	fallbackName = 'loadSymbol',
 ): string {
 	if (routes.length === 0) return '';
+	// A projected child's path nests under the component it was projected into,
+	// so the longer literal prefix must be tested first.
+	const ordered = [...routes].sort((left, right) => right.prefix.length - left.prefix.length);
 	return [
 		`function ${functionName}(symbolId) {`,
-		...routes.flatMap((route) => [
+		...ordered.flatMap((route) => [
 			`	if (symbolId.startsWith(${JSON.stringify(route.prefix)})) {`,
-			`		return import(${JSON.stringify(symbolRouteImportSource(route.importSource))}).then((mod) => mod.loadSymbol ? mod.loadSymbol(symbolId.slice(${route.prefix.length})) : Promise.reject(new Error(\`Unknown child async symbol \${symbolId}\`)));`,
+			'importSource' in route
+				? `		return import(${JSON.stringify(symbolRouteImportSource(route.importSource))}).then((mod) => mod.loadSymbol ? mod.loadSymbol(symbolId.slice(${route.prefix.length})) : Promise.reject(new Error(\`Unknown child async symbol \${symbolId}\`)));`
+				: `		return ${fallbackName}(symbolId.slice(${route.prefix.length}));`,
 			'	}',
 		]),
 		`	return ${fallbackName}(symbolId);`,
@@ -859,7 +890,7 @@ function scalarDispatcherSpecializations(input: {
 	readonly payloadState?: unknown;
 	readonly payloadView?: unknown;
 	readonly runtimeDemandMap?: unknown;
-	readonly symbolRoutes?: ReadonlyArray<SourceSymbolRoute>;
+	readonly symbolRoutes?: ReadonlyArray<SourceLazySymbolRoute>;
 }): ReadonlyArray<ScalarSpecialization> {
 	const state = input.payloadState as
 		| { readonly cells?: ReadonlyArray<{ readonly graphNodeId?: unknown }> }
@@ -947,7 +978,7 @@ function scalarDispatcherSpecializations(input: {
 function scalarActionSymbolId(
 	plannedSymbolId: unknown,
 	event: { readonly symbolIds?: unknown } | undefined,
-	routes: ReadonlyArray<SourceSymbolRoute>,
+	routes: ReadonlyArray<SourceLazySymbolRoute>,
 ): string | null {
 	if (typeof plannedSymbolId !== 'string') return null;
 	const eventSymbolIds = Array.isArray(event?.symbolIds)

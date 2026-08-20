@@ -1,7 +1,8 @@
+import type { Children } from '@markless/core';
 import { Html } from '@markless/router';
 import stylesheetHref from './src/styles.css?url';
 
-export default function Document({ children }: { readonly children?: unknown }) @{
+export default function Document({ children }: { readonly children?: Children }) @{
 	<Html>
 		<head>
 			<meta charset="utf-8" />

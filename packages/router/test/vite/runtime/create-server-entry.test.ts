@@ -491,7 +491,7 @@ describe('server entry rendering', () => {
 				}),
 				default: {
 					renderSsr(props: {
-						readonly children?: unknown;
+						readonly children?: __MarklessTypeService.Child;
 						readonly url: { pathname: string };
 					}) {
 						return {
@@ -526,7 +526,7 @@ describe('server entry rendering', () => {
 		const entry = createServerEntry({
 			documentModuleLoader: async () => ({
 				default: {
-					renderSsr(props: { readonly children?: unknown }) {
+					renderSsr(props: { readonly children?: __MarklessTypeService.Child }) {
 						return {
 							html: `<head><title>Compiled</title></head><body>${escapeTestHtml(String(props.children ?? ''))}</body>`,
 						};
