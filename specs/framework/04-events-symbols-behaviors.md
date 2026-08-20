@@ -40,6 +40,39 @@ DOM access. It also keeps two jobs separate:
 data. Passing element handles through component context, arrays, and helpers is
 valid when the values remain inside `.tsrx` compiler-owned code.
 
+#### Element handles in IDREF positions
+
+An `element()` handle is also valid where the platform expects an id string
+naming another element: `aria-labelledby`, `aria-controls`, `aria-describedby`,
+`popovertarget`, and `for`. There is no `useId`. The author names the
+relationship - `el={trigger}` on the element, `for={trigger}` on the label - and
+the compiler mints the id, writing it onto the bound element and onto every
+position that named the handle. Both sides render from one record, so they can
+never be spelled differently, and no id string appears in authored source.
+
+The minted id is emitted per module that has such a record; a module with none
+carries no minting code at all. What the id is derived from depends on where the
+handle is declared. A handle declared in a component is one element per rendered
+component, so the id carries that render's own instance prefix. A handle
+declared in a `shared()` factory with `{ scope: 'widget' }` is one element per
+rendered widget, so the id carries the token the widget root registers - from
+static edge data, before any HTML is written - into the seed map it hands the
+parts placed inside it. Two widgets on one page therefore mint different ids for
+their triggers, and each label resolves to its own.
+
+These shapes are refused rather than resolved, because each would need identity
+this lowering cannot recover:
+
+- A handle named by an IDREF inside a keyed list. One authored handle would name
+  one element per row.
+- An IDREF read from inside the widget root itself, or from a `shared()` factory
+  that is not `{ scope: 'widget' }`. The widget token does not exist yet in the
+  first case and names nothing per-widget in the second.
+- An authored `id` on the element an IDREF names. Two id attributes would leave
+  the relationship pointing at whichever one the parser kept.
+- A handle that no `el=` ever bound, a composite expression, or a multi-value
+  IDREF.
+
 ### Element behaviors
 
 DOM-backed libraries are not durable state. Chart.js, Monaco, Mapbox, tooltips,
@@ -190,6 +223,13 @@ This extraction uses the TSRX semantic graph: `onKeyDown={...}` is an event
 attribute, its value is a normal function AST, the guard is an `IfStatement`,
 and graph-state reads/writes are resolved through the same binding map used by
 state lowering. No inline DOM closure is required for the authored handler.
+
+A handler that calls a parameterless method returned by a `shared()` factory
+carries that method's body instead of the call, because the browser has no
+factory instance to call it on. Everything the body reads and writes is rewritten
+to its graph node, including reads inside the body's own locals, so a body of
+several statements lowers with no factory local surviving into the handler
+module.
 
 ```tsrx
 let menuOpen = state(false);

@@ -42,6 +42,8 @@ export type SemanticComponentPropDeclaration = {
 	readonly bindingId: string;
 	readonly localName: string;
 	readonly propPath: ReadonlyArray<string>;
+	// The authored destructuring default, applied only when the prop is undefined.
+	readonly defaultSource?: string;
 	readonly sourceSpan: SourceSpan;
 };
 
@@ -186,7 +188,7 @@ export type ModuleGraphInterfaceArtifact = {
 	};
 };
 
-export type SemanticSharedScope = 'request' | 'container' | 'page';
+export type SemanticSharedScope = 'request' | 'container' | 'page' | 'widget';
 
 export type SemanticSharedDependency = {
 	readonly definitionId: string;
@@ -226,6 +228,9 @@ export type SemanticSharedInstance = {
 	readonly definitionId: string;
 	readonly definitionName: string;
 	readonly localName: string;
+	// The component whose body resolved the definition; widget scope needs it to
+	// decide which composed instances belong to one rendered widget.
+	readonly componentName?: string;
 	readonly source: string;
 	readonly sourceSpan?: SourceSpan;
 };
@@ -351,6 +356,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_STATE_WRITE_IN_COMPUTED'
 		| 'MARKLESS_SHARED_DEFINITION_CYCLE'
 		| 'MARKLESS_SHARED_SCOPE_INVALID'
+		| 'MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT'
 		| 'MARKLESS_ELEMENT_HANDLE_REQUIRED'
 		| 'MARKLESS_ELEMENT_HANDLE_DUPLICATE'
 		| 'MARKLESS_ROW_ELEMENT_HANDLE_UNSUPPORTED'
@@ -361,6 +367,8 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_ELEMENT_HANDLE_IDREF_UNBOUND'
 		| 'MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE'
 		| 'MARKLESS_ELEMENT_HANDLE_IDREF_ROW_OWNED'
+		| 'MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT'
+		| 'MARKLESS_ELEMENT_HANDLE_IDREF_ID_CONFLICT'
 		| 'MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED'
 		| 'MARKLESS_OVERLAY_VALUE_UNSUPPORTED'
 		| 'MARKLESS_OVERLAY_HOST_ELEMENT_REQUIRED'
@@ -396,6 +404,7 @@ export type SemanticStateWrite = {
 	readonly operation: 'assign' | 'update' | 'call' | 'delete';
 	readonly assignmentOperator?: string;
 	readonly valueSource?: string;
+	readonly valueSpan?: SourceSpan;
 	readonly optional?: boolean;
 	readonly prefix?: boolean;
 	readonly updateOperator?: '++' | '--';
@@ -445,6 +454,7 @@ export type SemanticGraphAlias = {
 	readonly propPath?: ReadonlyArray<string>;
 	readonly sharedDefinitionId?: string;
 	readonly excludedPaths?: ReadonlyArray<ReadonlyArray<string>>;
+	readonly defaultSource?: string;
 	readonly declarationKind?: SemanticGraphBinding['declarationKind'];
 	readonly sourceSpan?: SourceSpan;
 };
@@ -494,6 +504,8 @@ export type SemanticElementHandleIdref = {
 	readonly attributeName: string;
 	/** The resolved element() handle binding name. */
 	readonly handleName: string;
+	/** The graph node the handle declares; what the minted id is derived from. */
+	readonly handleGraphNodeId: string;
 	/** The authored expression, which differs from handleName through an alias. */
 	readonly source: string;
 	/** The host element bound with `el={handle}`; the element that needs the id. */
@@ -582,7 +594,11 @@ export type SemanticMarkupResidue =
 			readonly repeatId: string;
 			readonly path: ReadonlyArray<string>;
 	  }
-	| { readonly kind: 'authored-expression'; readonly source: string };
+	| { readonly kind: 'authored-expression'; readonly source: string }
+	// The id minted for one element() handle: written on the element `el=` bound
+	// it and on every IDREF position that named it, so both sides spell one
+	// string the author never sees.
+	| { readonly kind: 'element-handle-id'; readonly handleGraphNodeId: string };
 
 type SemanticMarkupLocatedSlot = {
 	readonly coordinate: SemanticMarkupSlotCoordinate;
@@ -825,6 +841,10 @@ export type StateLoweringDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_STATE_STALE_LOCAL_WRITE'
 		| 'MARKLESS_STATE_MODULE_ESCAPE'
 		| 'MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE'
+		| 'MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED'
+		| 'MARKLESS_SHARED_SEED_UNSUPPORTED'
+		| 'MARKLESS_SHARED_SEED_UNKNOWN_FIELD'
+		| 'MARKLESS_SHARED_MEMBER_UNKNOWN'
 		| 'MARKLESS_TEMPLATE_EXPRESSION_STATIC';
 	readonly phase: 'state-lowering';
 	readonly passId: 'state-lowering';
@@ -1062,6 +1082,20 @@ export type PlannedSymbol =
 			readonly moduleImports?: ReadonlyArray<SemanticModuleImport>;
 	  }
 	| {
+			// A component body assigning into its shared instance
+			// (`s.disabled = props.disabled`). The function returns the whole node
+			// value with the assigned property merged in, so it can replace the
+			// factory initial for that component's instance alone.
+			readonly id: string;
+			readonly kind: 'shared-seed';
+			readonly graphNodeId: string;
+			readonly path: ReadonlyArray<string>;
+			readonly componentName: string;
+			readonly name: string;
+			readonly source: string;
+			readonly moduleImports?: ReadonlyArray<SemanticModuleImport>;
+	  }
+	| {
 			readonly id: string;
 			readonly kind: 'async-computed-runner';
 			readonly graphNodeId: string;
@@ -1280,10 +1314,17 @@ export type GeneratedSymbolModule = {
 	readonly source: string;
 };
 
+// A branch flip whose module this pass refuses to emit, rather than let the payload name it.
+export type SymbolModulesDiagnostic = CompilerDiagnostic & {
+	readonly code: 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED';
+	readonly phase: 'public-render';
+	readonly passId: 'symbol-modules';
+};
+
 export type SymbolModulesArtifact = {
 	readonly passId: 'symbol-modules';
 	readonly modules: ReadonlyArray<GeneratedSymbolModule>;
-	readonly diagnostics: ReadonlyArray<CaptureAnalysisDiagnostic>;
+	readonly diagnostics: ReadonlyArray<CaptureAnalysisDiagnostic | SymbolModulesDiagnostic>;
 };
 
 export type RuntimeDemandMapRecordKind =
@@ -1697,6 +1738,11 @@ export type PublicRenderModuleArtifact = {
 	readonly rootExportName: string | null;
 	readonly ssrModuleSource: string;
 	readonly ssrExportName: string | null;
+	/** SSR entry per exported component, for a module that serves more than one. */
+	readonly ssrComponentExports?: ReadonlyArray<{
+		readonly exportName: string;
+		readonly ssrFunctionName: string;
+	}>;
 	readonly componentDefinitions: ReadonlyArray<Readonly<Record<string, unknown>>>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };

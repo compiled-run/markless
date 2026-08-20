@@ -621,6 +621,26 @@ export function withLeadingBlockComment(node: EmissionNode, value: string): Emis
 	};
 }
 
+/**
+ * `<object>?.[<property>]` — the computed twin of `optionalMemberNode`, for a
+ * key that is not identifier-shaped.
+ */
+export function optionalComputedMemberNode(
+	object: EmissionNode,
+	property: EmissionNode,
+): EmissionNode {
+	return {
+		type: 'ChainExpression',
+		expression: {
+			type: 'MemberExpression',
+			object,
+			property,
+			computed: true,
+			optional: true,
+		},
+	};
+}
+
 export function propertyNode(key: string, value: EmissionNode): EmissionNode {
 	return {
 		type: 'Property',

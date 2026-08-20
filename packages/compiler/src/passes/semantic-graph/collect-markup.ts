@@ -26,6 +26,8 @@ import type {
 	SemanticMarkupResidue,
 	SemanticMarkupSlot,
 } from '../../artifacts.ts';
+import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
+import { idrefElementHandleIdConflictDiagnostic } from './diagnostics.ts';
 import { isIdrefAttribute } from './idref-attributes.ts';
 import {
 	createStyleConstResolver,
@@ -340,6 +342,21 @@ function emitNode(
 	append(builder, `<${tagName}`);
 	let classSeen = false;
 	const elementAttributes = getElementAttributes(node);
+	// The element an IDREF names carries the minted id. It is written before the
+	// authored attributes so the pair is emitted from one record, never from an
+	// author-visible string.
+	const mintedIdHandle = mintedElementIdHandle(context, node, elementAttributes);
+	if (mintedIdHandle) {
+		append(builder, ' id="');
+		addSlot(builder, {
+			kind: 'attribute',
+			name: 'id',
+			coordinate: { kind: 'child-index', path },
+			residue: { kind: 'element-handle-id', handleGraphNodeId: mintedIdHandle },
+			alwaysPresent: true,
+		});
+		append(builder, '"');
+	}
 	const declaredAttributeNames = elementAttributes.flatMap((candidate) => {
 		if (isSpreadAttribute(candidate)) return [];
 		const name = getIdentifierName(candidate.name as AnyNode | undefined);
@@ -368,10 +385,22 @@ function emitNode(
 			isEventAttribute(name) ||
 			name === 'attach' ||
 			name === 'el' ||
-			name === 'overlay' ||
-			isElementHandleIdref(context, node, name)
+			name === 'overlay'
 		)
 			continue;
+		const idrefHandle = elementHandleIdrefTarget(context, node, name);
+		if (idrefHandle) {
+			append(builder, ` ${name}="`);
+			addSlot(builder, {
+				kind: 'attribute',
+				name,
+				coordinate: { kind: 'child-index', path },
+				residue: { kind: 'element-handle-id', handleGraphNodeId: idrefHandle },
+				alwaysPresent: true,
+			});
+			append(builder, '"');
+			continue;
+		}
 		if (name === 'class') classSeen = true;
 		const value = attribute.value as AnyNode | undefined;
 		const expression = unwrapExpressionContainer(value);
@@ -417,18 +446,55 @@ function emitNode(
 
 /**
  * An IDREF attribute whose value resolved to an element() handle is a recorded
- * relationship, not a value binding, so it must not reach the statics at all.
- * Emitting the slot anyway would ship `aria-labelledby=""` - an id reference
- * pointing at nothing, which is worse than an absent attribute. The consuming
- * emitter writes both sides of the relationship from the record.
+ * relationship, not a value binding: its value is the id minted for the handle,
+ * so the slot renders from the record rather than from the authored expression.
+ * Returns the handle's graph node, or undefined when this attribute is an
+ * ordinary value binding.
  */
-function isElementHandleIdref(context: CollectionContext, node: AnyNode, name: string): boolean {
-	if (!isIdrefAttribute(name)) return false;
+function elementHandleIdrefTarget(
+	context: CollectionContext,
+	node: AnyNode,
+	name: string,
+): string | undefined {
+	if (!isIdrefAttribute(name)) return undefined;
 	const hostNodeId = context.hostIds.get(node);
-	if (!hostNodeId) return false;
-	return context.graph.elementHandleIdrefs.some(
+	if (!hostNodeId) return undefined;
+	return context.graph.elementHandleIdrefs.find(
 		(idref) => idref.hostNodeId === hostNodeId && idref.attributeName === name,
+	)?.handleGraphNodeId;
+}
+
+/**
+ * The handle whose minted id this element must carry, because at least one
+ * IDREF position named it. An authored id on the same element would emit two id
+ * attributes, so that is refused rather than silently resolved.
+ */
+function mintedElementIdHandle(
+	context: CollectionContext,
+	node: AnyNode,
+	attributes: ReadonlyArray<AnyNode>,
+): string | undefined {
+	const hostNodeId = context.hostIds.get(node);
+	if (!hostNodeId) return undefined;
+	const idref = context.graph.elementHandleIdrefs.find(
+		(candidate) => candidate.boundHostNodeId === hostNodeId,
 	);
+	if (!idref) return undefined;
+	const authoredId = attributes.find(
+		(attribute) =>
+			!isSpreadAttribute(attribute) &&
+			getIdentifierName(attribute.name as AnyNode | undefined) === 'id',
+	);
+	if (authoredId) {
+		context.graph.diagnostics.push(
+			idrefElementHandleIdConflictDiagnostic({
+				handleName: idref.handleName,
+				span: sourceSpan(authoredId, context.filename),
+			}),
+		);
+		return undefined;
+	}
+	return idref.handleGraphNodeId;
 }
 
 function directClassMatch(
@@ -482,7 +548,8 @@ function emitDynamicHost(
 		  }
 		| { readonly kind: 'spread'; readonly residue: SemanticMarkupResidue }
 	> = [];
-	for (const attribute of getElementAttributes(node)) {
+	const elementAttributes = getElementAttributes(node);
+	for (const attribute of elementAttributes) {
 		if (isSpreadAttribute(attribute)) {
 			const expression = unwrapExpressionContainer(
 				(attribute.argument ?? attribute.value) as AnyNode | undefined,
@@ -504,10 +571,18 @@ function emitDynamicHost(
 			isEventAttribute(name) ||
 			name === 'attach' ||
 			name === 'el' ||
-			name === 'overlay' ||
-			isElementHandleIdref(context, node, name)
+			name === 'overlay'
 		)
 			continue;
+		const idrefHandle = elementHandleIdrefTarget(context, node, name);
+		if (idrefHandle) {
+			attributeSlots.push({
+				kind: 'attribute',
+				name,
+				residue: { kind: 'element-handle-id', handleGraphNodeId: idrefHandle },
+			});
+			continue;
+		}
 		const value = attribute.value as AnyNode | undefined;
 		const expression = unwrapExpressionContainer(value);
 		const styleCss = staticStyleObjectCss(name, expression, context);
@@ -528,6 +603,14 @@ function emitDynamicHost(
 				residue: expressionResidue(expression, context, repeat),
 			});
 		}
+	}
+	const mintedIdHandle = mintedElementIdHandle(context, node, elementAttributes);
+	if (mintedIdHandle) {
+		attributeSlots.push({
+			kind: 'attribute',
+			name: 'id',
+			residue: { kind: 'element-handle-id', handleGraphNodeId: mintedIdHandle },
+		});
 	}
 	if (context.styleScopeClass) {
 		staticAttributes.class = staticAttributes.class
@@ -605,7 +688,13 @@ function expressionResidue(
 		}
 	}
 	const resolved = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(source)
-		? resolveGraphPath(source, graphBindingMap(context.graph), semanticAliasMap(context.graph))
+		? // Component scope only: a factory local and a component's shared-instance
+			// local routinely share a name, and the instance is what markup names.
+			(resolveGraphPath(
+				source,
+				graphBindingMap(context.graph, null),
+				semanticAliasMap(context.graph, null),
+			) ?? resolveSharedInstanceGraphPath(source, context.graph))
 		: null;
 	if (resolved) {
 		return { kind: 'graph-read', graphNodeId: resolved.binding.id, path: resolved.path };

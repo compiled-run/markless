@@ -53,9 +53,11 @@ import {
 	unboundElementHandleDiagnostic,
 	compositeIdrefElementHandleDiagnostic,
 	rowOwnedIdrefElementHandleDiagnostic,
+	widgetRootIdrefElementHandleDiagnostic,
 	unboundIdrefElementHandleDiagnostic,
 } from './diagnostics.ts';
 import { isIdrefAttribute } from './idref-attributes.ts';
+import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
 	createStyleConstResolver,
 	lowerStyleObject,
@@ -177,6 +179,7 @@ function isStaticTextPart(node: AnyNode): boolean {
 function collectCompositeTemplateExpression(
 	node: AnyNode,
 	state: WalkState,
+	options: { readonly requireWritableRead?: boolean } = {},
 ): { readonly graphNodeId: string } | null {
 	if (!isCompositeTemplateExpression(node)) return null;
 
@@ -187,6 +190,7 @@ function collectCompositeTemplateExpression(
 		`() => ${expressionSource(node, state.source)}`,
 		readSources,
 		state,
+		options.requireWritableRead === true,
 	);
 }
 
@@ -198,12 +202,17 @@ function mintTemplateExpressionComputed(
 	functionSource: string,
 	readSources: ReadonlyArray<string>,
 	state: WalkState,
+	requireWritableRead = false,
 ): { readonly graphNodeId: string } | null {
 	const bindings = graphBindingMap(state.graph, state.currentSharedDefinitionId);
 	const aliases = semanticAliasMap(state.graph, state.currentSharedDefinitionId);
 	const dependencies: SemanticGraphDependency[] = [];
+	let readsGraphCell = false;
 	for (const source of readSources) {
-		const resolved = resolveGraphPath(source, bindings, aliases);
+		// Component scope first: a factory local and the instance local routinely collide.
+		const resolved =
+			resolveGraphPath(source, bindings, aliases) ??
+			resolveSharedInstanceGraphPath(source, state.graph);
 		if (!resolved) return null;
 		if (
 			resolved.binding.kind !== 'state' &&
@@ -212,9 +221,12 @@ function mintTemplateExpressionComputed(
 		) {
 			return null;
 		}
+		if (resolved.binding.kind !== 'prop') readsGraphCell = true;
 		dependencies.push({ source, graphNodeId: resolved.binding.id, path: resolved.path });
 	}
 	if (dependencies.length === 0) return null;
+	// No write can move a prop after the render that read it, so props-only owes no record.
+	if (requireWritableRead && !readsGraphCell) return null;
 
 	const index = state.graph.graphBindings.filter((binding) =>
 		binding.id.startsWith('computed:templateExpression:'),
@@ -366,7 +378,13 @@ export function collectElementHandleDiagnostics(
 	);
 
 	for (const [bindingIndex, binding] of graph.elementHandleBindings.entries()) {
-		const resolved = resolveGraphPath(binding.handleName, bindings, aliases);
+		// `el={checkbox.triggerEl}` names a handle the shared factory declared. The
+		// component-scope lookup answers first with the factory's state cell (the
+		// instance local shares its name), so the shared route wins whenever it is
+		// the one that lands on an element node.
+		const resolved =
+			elementHandlePath(resolveSharedInstanceGraphPath(binding.handleName, graph)) ??
+			resolveGraphPath(binding.handleName, bindings, aliases);
 		const graphBinding = resolved?.binding;
 		if (moduleElementNames.has(binding.handleName)) continue;
 		if (binding.keyedRepeatScopeIds.length > 0) {
@@ -408,7 +426,13 @@ export function collectElementHandleDiagnostics(
 			graph.diagnostics.push(elementHandleRequiredDiagnostic(binding, graphBinding));
 			continue;
 		}
-		validElementHandleBindings.push(binding);
+		// A handle reached through a shared instance is keyed by the factory's own
+		// name, so every component of the family names one relationship.
+		validElementHandleBindings.push(
+			binding.handleName === graphBinding.name
+				? binding
+				: { ...binding, handleName: graphBinding.name },
+		);
 	}
 
 	const firstBindingByHandle = new Map<string, SemanticElementHandleBinding>();
@@ -473,12 +497,51 @@ function resolveElementHandleIdrefs(
 			graph.diagnostics.push(rowOwnedIdrefElementHandleDiagnostic(reference));
 			continue;
 		}
+		const handleBinding = graph.graphBindings.find(
+			(binding) => binding.kind === 'element' && binding.name === bound.handleName,
+		);
+		if (!handleBinding) {
+			graph.diagnostics.push(unboundIdrefElementHandleDiagnostic(reference));
+			continue;
+		}
+		if (handleBinding.sharedDefinitionId !== undefined) {
+			// A widget's own root resolves the factory before any part of it
+			// renders, so the token naming the widget instance is not readable
+			// from inside the root itself; only the parts it seeds carry it.
+			const widgetRoot = widgetRootComponentName(graph, handleBinding.sharedDefinitionId);
+			if (
+				widgetRoot === undefined ||
+				widgetRoot === reference.componentName ||
+				widgetRoot === bound.componentName
+			) {
+				graph.diagnostics.push(widgetRootIdrefElementHandleDiagnostic(reference));
+				continue;
+			}
+		}
 		graph.elementHandleIdrefs.push({
 			...reference,
+			handleGraphNodeId: handleBinding.id,
 			boundHostNodeId: bound.hostNodeId,
 			order: graph.elementHandleIdrefs.length,
 		});
 	}
+}
+
+/**
+ * The component that resolves a widget-scoped factory first owns its nodes, so
+ * its rendered instance is the widget root every other part is seeded from.
+ */
+function widgetRootComponentName(
+	graph: MutableSemanticGraphArtifact,
+	sharedDefinitionId: string,
+): string | undefined {
+	const definition = graph.sharedDefinitions.find(
+		(candidate) => candidate.id === sharedDefinitionId,
+	);
+	if (definition?.scope !== 'widget') return undefined;
+	return graph.sharedInstances.find(
+		(instance) => instance.definitionId === sharedDefinitionId && instance.componentName,
+	)?.componentName;
 }
 
 function moduleScopeElementName(message: string): string | null {
@@ -737,12 +800,17 @@ function collectAttribute(
 			walk(expressionValue, state);
 			return;
 		}
+		// A recombined value resolves to no graph node, so without this nothing subscribes it.
+		const composite = collectCompositeTemplateExpression(expressionValue, state, {
+			requireWritableRead: true,
+		});
 		state.graph.templateReads.push({
 			hostNodeId,
 			source: expressionSource(expressionValue, state.source),
 			sourceSpan: sourceSpan(expressionValue, state.filename),
 			target: bindingTargetForAttribute(attributeName),
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
+			computedGraphNodeId: composite?.graphNodeId,
 		});
 		walk(expressionValue, state);
 	}
@@ -1008,17 +1076,29 @@ function classifyIdrefValue(
 	return mentionsElementHandle(expression, state) ? { kind: 'composite' } : null;
 }
 
+// A resolution is an element() handle only when it lands on an element node
+// with nothing left of the path; anything else is a value read.
+function elementHandlePath(
+	resolved: ReturnType<typeof resolveGraphPath>,
+): ReturnType<typeof resolveGraphPath> {
+	if (!resolved || resolved.binding.kind !== 'element' || resolved.path.length > 0) return null;
+	return resolved;
+}
+
 function resolvedElementHandleName(expression: AnyNode, state: WalkState): string | null {
 	const source = expressionSource(expression, state.source);
 	if (!source) return null;
-	const resolved = resolveGraphPath(
-		source,
-		graphBindingMap(state.graph),
-		semanticAliasMap(state.graph),
-	);
-	// A member path such as `label.id` is a render-time DOM read, not identity;
-	// it keeps falling through to MARKLESS_ELEMENT_HANDLE_RENDER_READ.
-	if (!resolved || resolved.binding.kind !== 'element' || resolved.path.length > 0) return null;
+	// `checkbox.triggerEl` names a handle the shared factory declared; the same
+	// two-route lookup the el= path uses, so one form does not silently become a
+	// value read while the other records a relationship.
+	const resolved =
+		elementHandlePath(resolveSharedInstanceGraphPath(source, state.graph)) ??
+		// A member path such as `label.id` is a render-time DOM read, not identity;
+		// it keeps falling through to MARKLESS_ELEMENT_HANDLE_RENDER_READ.
+		elementHandlePath(
+			resolveGraphPath(source, graphBindingMap(state.graph), semanticAliasMap(state.graph)),
+		);
+	if (!resolved) return null;
 	return resolved.binding.name;
 }
 

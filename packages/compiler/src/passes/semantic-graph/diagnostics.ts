@@ -634,7 +634,7 @@ export function invalidSharedScopeDiagnostic(input: {
 	readonly valueSource?: string;
 	readonly valueSpan?: SourceSpan;
 }): SemanticGraphDiagnostic {
-	const valid = '"request", "container", and "page"';
+	const valid = '"request", "container", "page", and "widget"';
 	const literal = input.valueSource?.startsWith("'") || input.valueSource?.startsWith('"');
 	const valueText = literal ? `"${input.valueSource?.slice(1, -1)}"` : input.valueSource;
 	return semanticGraphDiagnostic({
@@ -643,12 +643,45 @@ export function invalidSharedScopeDiagnostic(input: {
 		message: literal
 			? `Unknown shared() scope ${valueText}. Valid scopes are ${valid}.`
 			: `shared() scope must be a string literal. Valid scopes are ${valid}.`,
-		why: 'shared() scope controls graph lifetime. Silently dropping an unknown scope changes whether data is request, container, or page owned.',
+		why: 'shared() scope controls graph lifetime. Silently dropping an unknown scope changes whether data is request, container, page, or widget owned.',
 		span: input.valueSpan,
 		suggestion:
-			'Use `shared(factory, { scope: "request" })`, `shared(factory, { scope: "container" })`, or `shared(factory, { scope: "page" })`.',
+			'Use `shared(factory, { scope: "request" })`, `shared(factory, { scope: "container" })`, `shared(factory, { scope: "page" })`, or `shared(factory, { scope: "widget" })`.',
 		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_SCOPE_INVALID',
 	});
+}
+
+// A shared() definition that several components of its own module resolve is a
+// widget family shape. Left without a scope it is page-scoped, so two of those
+// widgets on one page silently share one graph. The warning makes the scope a
+// choice instead of an omission; either spelling silences it.
+export function implicitFamilyScopeDiagnostic(input: {
+	readonly definitionName: string;
+	readonly componentNames: ReadonlyArray<string>;
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	const components = input.componentNames.join(', ');
+	return {
+		code: 'MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT',
+		severity: 'warning',
+		phase: 'semantic-graph',
+		title: 'shared() family has no declared scope',
+		message: `${input.componentNames.length} components in this module resolve shared() "${input.definitionName}" (${components}), which is the shape of a widget family, but no scope is declared so it is page-scoped.`,
+		why: 'A page-scoped family gives every widget of that family on one page the same graph, so two of them move together. That is a real choice, but silence makes it a surprise.',
+		primarySpan: input.span,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		source: input.definitionName,
+		suggestions: [
+			{
+				message: `Add { scope: 'widget' } to give each rendered widget its own graph.`,
+			},
+			{
+				message: `Write { scope: 'page' } explicitly to keep one graph shared across the page.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT',
+	};
 }
 
 export function elementHandleRequiredDiagnostic(
@@ -789,6 +822,47 @@ export function rowOwnedIdrefElementHandleDiagnostic(
 		span: reference.sourceSpan,
 		suggestion: 'Bind a separate element() handle outside the repeat for the element this attribute names, or move the relationship inside the row so each row names its own element.',
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_ROW_OWNED',
+	});
+}
+
+/**
+ * The widget root is the component that resolves the factory, and it renders
+ * BEFORE the token naming its own instance exists: that token is written into
+ * the seed map the root hands its parts. A part reads it; the root cannot. The
+ * same holds for a factory whose scope is not `widget`, where one handle would
+ * name one element per page rather than one per rendered widget.
+ */
+export function widgetRootIdrefElementHandleDiagnostic(
+	reference: PendingElementHandleIdref,
+): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT',
+		title: 'This shared() element() handle cannot be named by an IDREF here',
+		message: `Cannot resolve ${reference.attributeName}={${reference.source}} because "${reference.handleName}" is declared in a shared() factory that this component roots, or in a factory that is not { scope: 'widget' }.`,
+		why: 'A widget-scoped factory is one graph per rendered widget, so the minted id has to carry which widget it belongs to. That token is written when the widget root seeds the parts placed inside it, which happens after the root itself has started rendering and never happens at all for a page-wide factory.',
+		span: reference.sourceSpan,
+		suggestion: "Move the element() handle and both ends of the relationship into parts placed inside the widget root, and give the factory { scope: 'widget' }.",
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT',
+	});
+}
+
+/**
+ * The element an IDREF names receives a minted id, so an authored id on the
+ * same element would produce two id attributes and the relationship would
+ * silently follow whichever one the parser kept.
+ */
+export function idrefElementHandleIdConflictDiagnostic(input: {
+	readonly handleName: string;
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_ELEMENT_HANDLE_IDREF_ID_CONFLICT',
+		title: 'An element named by an IDREF cannot also declare an id',
+		message: `Cannot mint the id for el={${input.handleName}} because this element already declares an id attribute.`,
+		why: 'An IDREF position is written from the id the compiler mints for the bound element. A second, authored id on the same element would emit two id attributes and leave the relationship pointing at whichever one the HTML parser kept.',
+		span: input.span,
+		suggestion: 'Remove the authored id from this element, or drop the element() handle and write the IDREF attribute with your own id string.',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_ID_CONFLICT',
 	});
 }
 

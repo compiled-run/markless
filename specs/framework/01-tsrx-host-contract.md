@@ -165,6 +165,11 @@ graph, event, element, async, and projection metadata, and the resumer wakes onl
 from serialized locators when an event, visibility trigger, async continuation,
 or state write demands it.
 
+Projected content renders AFTER the component it is projected into has run its
+body. A widget root that seeds its shared instance from its own props has already
+written that seed when the parts projected into it render, so a part reads the
+seeded configuration rather than the factory's initial value.
+
 Projection does not make the graph a tree. The DOM placement is tree-shaped, but
 state and async graph nodes keep the scopes where they were created. A parent
 that renders `{children}` owns only the projection site, not the child graph. If

@@ -198,3 +198,108 @@ export function App() @{
 	expect(record?.startAnchor).toBeUndefined();
 	expect(result.protocolView.asyncBoundaries[0]?.updateSymbolId).toBeDefined();
 });
+
+// U-K: at page level there is no @try to escalate to, so a component inside an
+// @if either rebuilds from compiled markup or the build refuses. What it must
+// never do is ship a record naming a flip module the build never wrote.
+const pageLevelComponentSource = `
+import { state } from '@markless/core';
+
+function Badge() @{
+	<em class="badge">Armed</em>
+}
+
+export function App() @{
+	let armed = state(false);
+
+	<main>
+		<button type="button" onClick={() => armed = !armed}>Arm</button>
+		@if (armed) { <Badge /> }
+	</main>
+}
+`;
+
+test('a page-level @if that shows a markup-only component rebuilds it without running it', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/PageBadge.tsrx',
+		source: pageLevelComponentSource,
+		symbols: [],
+	});
+	const record = result.protocolView.branches?.[0];
+	expect(record?.symbolId).toBeDefined();
+
+	const module = result.symbolModules.modules.find(
+		(candidate) => candidate.symbolId === record?.symbolId,
+	);
+	expect(module?.kind).toBe('branch-update');
+	expect(module?.source).toContain('badge');
+	expect(module?.source).toContain('Armed</em>');
+	expect(module?.source).not.toContain('import ');
+	expect(result.symbolModules.diagnostics).toEqual([]);
+});
+
+test('a page-level @if whose component has to run refuses at build time, in author words', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/PagePanel.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+function Panel({ label }) @{
+	<em class="panel">{label}</em>
+}
+
+export function App() @{
+	let armed = state(false);
+
+	<main>
+		<button type="button" onClick={() => armed = !armed}>Arm</button>
+		@if (armed) { <Panel label="ready" /> }
+	</main>
+}
+`,
+		symbols: [],
+	});
+	const record = result.protocolView.branches?.[0];
+	const diagnostic = result.symbolModules.diagnostics.find(
+		(candidate) => candidate.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
+	);
+	expect(diagnostic?.severity).toBe('error');
+	expect(diagnostic?.message).toBe(
+		'this @if (armed) cannot be rebuilt when armed changes because <Panel> has to run to produce its content.',
+	);
+	expect(diagnostic?.symbolId).toBe(record?.symbolId);
+	// D4: the message names the author's @if, test, and component — never a
+	// compiler word ("armed" below is the author's own state name).
+	for (const banned of ['tier', 'anchor', 'boundary', 'symbol'])
+		expect(diagnostic?.message.toLowerCase()).not.toContain(banned);
+
+	// The build refuses; it does not ship a record pointing at a module nobody wrote.
+	expect(
+		result.symbolModules.modules.some((candidate) => candidate.symbolId === record?.symbolId),
+	).toBe(false);
+});
+
+test('a prop-decided @if with the same content warns instead of blocking the build', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/PropPanel.tsrx',
+		source: `
+function Panel({ label }) @{
+	<em class="panel">{label}</em>
+}
+
+export function Frame({ info }) @{
+	<div>
+		@if (info) { <Panel label={info.label} /> } @else { <em class="none">none</em> }
+	</div>
+}
+`,
+		symbols: [],
+	});
+	const diagnostic = result.symbolModules.diagnostics.find(
+		(candidate) => candidate.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
+	);
+	// The caller decides whether `info` ever changes, so a caller that passes a
+	// fixed value ships correctly; blocking every such file would be a false red.
+	expect(diagnostic?.severity).toBe('warning');
+});
+

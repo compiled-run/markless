@@ -1,6 +1,7 @@
 import { afterEach, expect, test, onTestFinished } from 'vitest';
 import { cleanup, renderSSR } from '../src/index.ts';
 import ArmEvents from './fixtures/arm-events.tsrx';
+import BranchComponent from './fixtures/branch-component.tsrx';
 import ArmTryEvents from './fixtures/arm-try-events.tsrx';
 import AsyncDetails from './fixtures/async-details.tsrx';
 import AttachBehavior from './fixtures/attach-behavior.tsrx';
@@ -335,4 +336,34 @@ test('SSR: a child component @if driven by a parent prop resumes and flips', asy
 
 	(button as HTMLButtonElement).click();
 	await expect.poll(() => container.querySelector('em.live')?.textContent).toBe('Live');
+});
+
+test('SSR: an @if that shows a component resumes, flips both ways, and keeps its siblings live', async () => {
+	const screen = await renderSSR(BranchComponent);
+	const container = screen.container;
+	const button = requireElement<HTMLButtonElement>(container, 'button[data-arm]');
+	const clicks = requireElement<HTMLOutputElement>(container, 'output[data-clicks]');
+
+	expect(container.querySelector('em.badge')).toBeNull();
+
+	button.click();
+	await expect.poll(() => container.querySelector('em.badge')?.textContent).toBe('Armed');
+	expect(clicks.textContent).toBe('1');
+
+	button.click();
+	await expect.poll(() => container.querySelector('em.badge')).toBeNull();
+	expect(clicks.textContent).toBe('2');
+
+	// The other direction: content the first render already showed goes away and
+	// comes back, with the counter proving the sibling handler still dispatches.
+	const dim = requireElement<HTMLButtonElement>(container, 'button[data-dim]');
+	expect(container.querySelector('em.lamp')?.textContent).toBe('Lit');
+
+	dim.click();
+	await expect.poll(() => container.querySelector('em.lamp')).toBeNull();
+	expect(clicks.textContent).toBe('3');
+
+	dim.click();
+	await expect.poll(() => container.querySelector('em.lamp')?.textContent).toBe('Lit');
+	expect(clicks.textContent).toBe('4');
 });

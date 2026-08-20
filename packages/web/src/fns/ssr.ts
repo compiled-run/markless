@@ -2,6 +2,7 @@ import {
 	marklessComposedInstancePath,
 	marklessComposedSyncPolicy,
 	marklessComposeState,
+	marklessRegisterComposedWidgets,
 	marklessCsrChildReadIsStatic,
 	marklessCsrRemapChildGraph,
 	marklessCsrRemapChildDomUpdate,
@@ -108,10 +109,15 @@ type SsrChildOutput = ComposeChildOutput & {
 	readonly propEvents?: ReadonlyArray<SsrPropEvent>;
 };
 type SsrChildComponent = {
-	readonly renderSsr?: (
+	readonly renderSsr?: ((
 		props?: unknown,
 		renderContext?: unknown,
-	) => SsrChildOutput | undefined | Promise<SsrChildOutput | undefined>;
+	) => SsrChildOutput | undefined | Promise<SsrChildOutput | undefined>) & {
+		/** Set by the compiler on a component whose body seeds a shared instance. */
+		readonly marklessSeedsShared?: boolean;
+	};
+	/** SSR entry per exported component, for a module that serves more than one. */
+	readonly renderSsrComponents?: Readonly<Record<string, SsrChildComponent>>;
 };
 type SsrChildProps = Readonly<Record<string, unknown>> & {
 	readonly __marklessSsrCallbacks?: Readonly<Record<string, string>>;
@@ -195,6 +201,34 @@ export type MarklessSsrHostLocators = Array<MarklessSsrHostLocator> & {
 export { marklessComposeState };
 export const marklessSsrRemapChildGraph = marklessCsrRemapChildGraph;
 export const marklessSsrRemapGraphOutput = marklessCsrRemapGraphOutput;
+
+// The compiled module a composed child was imported from may serve several
+// components. The child names the one it declared, so its own SSR entry
+// answers; a module with a single entry has no map and answers as itself.
+export function marklessSsrComponentPart(
+	component: SsrChildComponent | undefined,
+	componentName: string,
+): SsrChildComponent | undefined {
+	return component?.renderSsrComponents?.[componentName] ?? component;
+}
+
+// Asks a projecting child for the shared-instance seeds its body writes. Only a
+// child the compiler marked as seeding is asked, so every other child renders once.
+export async function marklessSsrSeedChild(
+	component: SsrChildComponent | undefined,
+	componentName: string | undefined,
+	props: SsrChildProps | undefined,
+	renderContext: unknown,
+	sharedSeeds: Map<string, unknown>,
+): Promise<void> {
+	const part = componentName ? marklessSsrComponentPart(component, componentName) : component;
+	const render = part?.renderSsr;
+	if (!render?.marklessSeedsShared) return;
+	await render(props, {
+		...(renderContext as Record<string, unknown> | undefined),
+		marklessSharedSeeds: sharedSeeds,
+	});
+}
 
 export async function marklessSsrRenderChild(
 	children: SsrComposedChild[],
@@ -608,6 +642,10 @@ export function marklessSsrComposeView(
 	asyncSnapshots: ReadonlyArray<SsrAsyncSnapshotEntry>,
 	idPrefix = '',
 ) {
+	// View composition qualifies child dom updates before state composition runs,
+	// so the widget roots must be known by here or a widget's reads land on the
+	// first widget of its family.
+	marklessRegisterComposedWidgets(children);
 	const renderedHostIds = new Set(structure.locators.map((locator) => locator.hostNodeId));
 	const plannedArmHostIds = new Set(
 		(view.asyncBoundaries ?? []).flatMap((boundary) => {

@@ -361,6 +361,28 @@ export function App() @{
 	<Child label="Save" onTrace={(payload) => console.log(payload.value)} />
 }`,
 	},
+	{
+		// A component body seeding its shared instance from its own props: the
+		// shared-seed kind, whose module reads a prop and merges one field over
+		// the factory initial.
+		name: 'shared-seed',
+		filename: '/workspace/app/src/Seed.tsrx',
+		source: `
+import { shared, state } from '@markless/core';
+
+export const box = shared(() => {
+	const s = state({ open: false });
+	return { ...s };
+}, { scope: 'widget' });
+
+export function Panel({ open }: { open?: boolean }) @{
+	const s = box();
+	s.open = open ?? false;
+
+	<section data-open={s.open} />
+}
+`,
+	},
 ];
 
 type DispatchedSymbol = {
@@ -490,6 +512,7 @@ test('the dispatcher declines exactly the kinds with no AST path, and names thei
 		'callback-prop',
 		'dom-update',
 		'event-handler',
+		'shared-seed',
 		'state-initializer',
 	]);
 	expect([...declined].sort()).toEqual([

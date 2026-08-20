@@ -5,7 +5,8 @@ import { collectPublicRenderComponentDefinitions } from './component-definitions
 import { emitDirectPublicRenderModule } from './direct-module.ts';
 import { emitPublicSsrRenderModule } from './ssr-module.ts';
 import { firstComponentRoot, selectPublicRenderRoot } from './plan.ts';
-import { hasExecutableBodyStatements } from './render-body.ts';
+import { hasExecutableBodyStatements, sharedInstanceLocalNames } from './render-body.ts';
+import { sameModuleSsrComponentNames, ssrComponentFunctionName } from './same-module.ts';
 import { componentPropNames, isFragmentNode } from './shared.ts';
 
 export { firstComponentRoot, planPublicRender, selectPublicRenderRoot } from './plan.ts';
@@ -29,6 +30,7 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 			rootExportName: null,
 			ssrModuleSource: '',
 			ssrExportName: null,
+			ssrComponentExports: [],
 			componentDefinitions: [],
 			diagnostics: input.publicRenderPlan.diagnostics,
 		};
@@ -52,7 +54,12 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 	const canUseDirectCsrModule =
 		!!root &&
 		!isFragmentRoot &&
-		!hasExecutableBodyStatements(root.component, root.root, input.source.source) &&
+		!hasExecutableBodyStatements(
+			root.component,
+			root.root,
+			input.source.source,
+			sharedInstanceLocalNames(input.semanticGraph),
+		) &&
 		root.propNames.length === 0 &&
 		input.semanticGraph.componentEdges.length === 0 &&
 		input.publicRenderPlan.styleScopes.length === 0 &&
@@ -72,6 +79,29 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 		: '';
 	const ssrModuleSource = root ? emitPublicSsrRenderModule(input, root) : '';
 	const componentDefinitions = root ? collectPublicRenderComponentDefinitions(input, root) : [];
+	// Only a module that server-renders more than its root publishes the per
+	// component surface; a single-component module keeps `renderSsr` alone.
+	const sameModuleSsrComponents =
+		root && ssrModuleSource ? sameModuleSsrComponentNames(input, ast, root.componentName) : [];
+	const ssrComponentExports =
+		root && sameModuleSsrComponents.length > 0
+			? input.semanticGraph.components.flatMap((component) =>
+					component.exportName &&
+					component.exportName !== 'default' &&
+					(component.name === root.componentName ||
+						sameModuleSsrComponents.includes(component.name))
+						? [
+								{
+									exportName: component.exportName,
+									ssrFunctionName:
+										component.name === root.componentName
+											? 'marklessRenderSsr'
+											: ssrComponentFunctionName(component.name),
+								},
+							]
+						: [],
+				)
+			: [];
 	return {
 		passId: 'public-render-module',
 		renderDataModuleSource: root
@@ -81,6 +111,7 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 		rootExportName: moduleSource ? (rootComponentName ?? null) : null,
 		ssrModuleSource,
 		ssrExportName: ssrModuleSource ? 'marklessRenderSsr' : null,
+		ssrComponentExports,
 		componentDefinitions,
 		diagnostics: input.publicRenderPlan.diagnostics,
 	};

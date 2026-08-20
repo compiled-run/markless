@@ -25,6 +25,7 @@ import {
 	createSymbolSourceSemanticsReader,
 	type SymbolSourceSemanticsReader,
 } from './capture-semantics.ts';
+import { componentSharedSeedWrite } from './semantic-graph/collect-shared.ts';
 import { resolveBoundaryRunners } from './public-render/boundary-runner.ts';
 
 export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPlan {
@@ -36,8 +37,14 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 
 	for (const event of input.payloadArena.view.events) {
 		for (let order = 0; order < event.handlerCount; order++) {
-			const source = event.handlerSources[order] ?? '';
+			const authoredSource = event.handlerSources[order] ?? '';
 			const sourceSpan = event.handlerSpans[order];
+			const inlined = inlineSharedMethodCalls(
+				authoredSource,
+				input.semanticGraph,
+				semanticsReader,
+			);
+			const source = inlined.source;
 			const moduleImports = referencedModuleImports(
 				input.semanticGraph.moduleImports,
 				source,
@@ -53,8 +60,16 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				parameters: event.handlerParameters[order] ?? [],
 				...(moduleImports.length > 0 ? { moduleImports } : {}),
 				order,
-				reads: eventReads(input.stateLowering?.reads, sourceSpan, source, semanticsReader),
-				writes: eventWrites(source, input.stateLowering?.writes, sourceSpan),
+				reads: eventReads(
+					input.stateLowering?.reads,
+					[sourceSpan, ...inlined.spans],
+					source,
+					semanticsReader,
+				),
+				writes: eventWrites(source, input.stateLowering?.writes, [
+					sourceSpan,
+					...inlined.spans,
+				]),
 				elementHandleCalls: collectElementHandleCalls(
 					source,
 					input.payloadArena.view.elementHandles,
@@ -81,11 +96,11 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				...(moduleImports.length > 0 ? { moduleImports } : {}),
 				reads: eventReads(
 					input.stateLowering?.reads,
-					prop.sourceSpan,
+					[prop.sourceSpan],
 					prop.source,
 					semanticsReader,
 				),
-				writes: eventWrites(prop.source, input.stateLowering?.writes, prop.sourceSpan),
+				writes: eventWrites(prop.source, input.stateLowering?.writes, [prop.sourceSpan]),
 			});
 		}
 	}
@@ -150,6 +165,23 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			graphNodeId: binding.id,
 			name: binding.name,
 			source: binding.initializerSource,
+			...(moduleImports.length > 0 ? { moduleImports } : {}),
+		});
+	}
+
+	for (const write of input.semanticGraph.stateWrites) {
+		const seed = componentSharedSeedWrite(write, input.semanticGraph);
+		if (!seed) continue;
+		const source = write.valueSource ?? '';
+		const moduleImports = referencedModuleImports(input.semanticGraph.moduleImports, source);
+		symbols.push({
+			id: `symbol:${nextSymbolId++}`,
+			kind: 'shared-seed',
+			graphNodeId: seed.resolved.binding.id,
+			path: seed.resolved.path,
+			componentName: seed.componentName,
+			name: write.target,
+			source,
 			...(moduleImports.length > 0 ? { moduleImports } : {}),
 		});
 	}
@@ -331,32 +363,104 @@ function boundSymbolId(baseSymbolId: string, ancestry: BoundSymbolResolverRow['a
 		.join('/')}`;
 }
 
+// A shared() definition returns methods that close over its factory graph. A
+// handler that calls one carries no runtime instance, so the call is replaced
+// by the method's own body; the method's declaration span travels with it so
+// the writes inside it are attributed to this handler.
+function inlineSharedMethodCalls(
+	source: string,
+	semanticGraph: SymbolResolverInput['semanticGraph'],
+	semanticsReader: SymbolSourceSemanticsReader,
+): { readonly source: string; readonly spans: ReadonlyArray<SourceSpan> } {
+	if (!source || semanticGraph.sharedInstances.length === 0) return { source, spans: [] };
+
+	const spans: SourceSpan[] = [];
+	let emitted = source;
+	for (const instance of semanticGraph.sharedInstances) {
+		const definition = semanticGraph.sharedDefinitions.find(
+			(item) => item.id === instance.definitionId,
+		);
+		if (!definition) continue;
+		for (const property of definition.returnProperties ?? []) {
+			if (property.kind !== 'method' || !property.source) continue;
+			const callee = `${instance.localName}.${property.name}`;
+			if (!invokesMethod(emitted, callee, semanticsReader)) continue;
+			const body = sharedMethodBodySource(property.source);
+			if (body === null) continue;
+			emitted = emitted.split(`${callee}()`).join(`(() => {${body}})()`);
+			if (property.sourceSpan) spans.push(property.sourceSpan);
+		}
+	}
+
+	return { source: emitted, spans };
+}
+
+/**
+ * Whether the handler really calls the shared method, asked of the analyzer's
+ * callee table rather than of the source text - the same name inside a string
+ * literal or a comment is not a call.
+ *
+ * A source the analyzer could not read falls back to the text test, which is
+ * what an unparsable handler already got before this pass had a semantic
+ * substrate.
+ */
+function invokesMethod(
+	source: string,
+	callee: string,
+	semanticsReader: SymbolSourceSemanticsReader,
+): boolean {
+	const semantics = semanticsReader.read(source);
+	return semantics.analysisFailed ? source.includes(`${callee}()`) : semantics.invokes(callee);
+}
+
+// The statements between the method's own braces, from the authored property
+// text (`login() { ... }`). A parameterised method is not inlined: the call
+// site would have to bind arguments the graph cannot see.
+function sharedMethodBodySource(propertySource: string): string | null {
+	const open = propertySource.indexOf('(');
+	const close = propertySource.indexOf(')', open + 1);
+	if (open === -1 || close === -1) return null;
+	if (propertySource.slice(open + 1, close).trim() !== '') return null;
+
+	const bodyStart = propertySource.indexOf('{', close);
+	const bodyEnd = propertySource.lastIndexOf('}');
+	if (bodyStart === -1 || bodyEnd <= bodyStart) return null;
+
+	return propertySource.slice(bodyStart + 1, bodyEnd);
+}
+
 function eventWrites(
 	handlerSource: string,
 	writes: ReadonlyArray<LoweredStateWrite> | undefined,
-	handlerSpan: SourceSpan | undefined,
+	handlerSpans: ReadonlyArray<SourceSpan | undefined>,
 ): ReadonlyArray<LoweredStateWrite> {
 	if (!handlerSource || !writes?.length) return [];
 
+	const spans = handlerSpans.filter((span): span is SourceSpan => span !== undefined);
 	return writes.filter((write) => {
-		if (handlerSpan && write.sourceSpan) return spanContains(handlerSpan, write.sourceSpan);
+		if (spans.length > 0 && write.sourceSpan) {
+			const containing = spans.some((span) => spanContains(span, write.sourceSpan!));
+			if (containing) return true;
+			if (handlerSpans[0]) return false;
+		}
 		return handlerContainsWrite(handlerSource, write);
 	});
 }
 
 function eventReads(
 	reads: ReadonlyArray<LoweredStateRead> | undefined,
-	handlerSpan: SourceSpan | undefined,
+	handlerSpans: ReadonlyArray<SourceSpan | undefined>,
 	handlerSource: string,
 	semanticsReader: SymbolSourceSemanticsReader,
 ): ReadonlyArray<LoweredStateRead> {
-	if (!handlerSpan || !reads?.length) return [];
+	const spans = handlerSpans.filter((span): span is SourceSpan => span !== undefined);
+	if (spans.length === 0 || !reads?.length) return [];
 
 	const bindsOwnName = handlerBoundName(handlerSource, semanticsReader);
 	const contained = reads.filter(
 		(read) =>
 			read.sourceSpan !== undefined &&
-			spanContains(handlerSpan, read.sourceSpan) &&
+			spans.some((span) => spanContains(span, read.sourceSpan!)) &&
 			!bindsOwnName(rootIdentifierName(read.source)),
 	);
 	const seen = new Set<string>();

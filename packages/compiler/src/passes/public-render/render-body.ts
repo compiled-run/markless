@@ -2,6 +2,8 @@ import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
 import { isIgnorableJsxTextNode as isIgnorableTextNode } from '../../ast/tsrx.ts';
+import { resolveSharedInstanceGraphPath } from '../semantic-graph/collect-shared.ts';
+import { sharedInstancePreludeLines } from './residue-reader.ts';
 import type { PublicRenderRoot } from './types.ts';
 
 type GraphBinding = PublicRenderModuleInput['semanticGraph']['graphBindings'][number];
@@ -28,6 +30,7 @@ export function renderBodyLines(
 			binding.kind === 'computed' ? [[binding.name, binding]] : [],
 		),
 	);
+	const sharedInstanceNames = sharedInstanceLocalNames(input.semanticGraph);
 	const lines: string[] = [];
 	let emittedRoot = false;
 	for (const statement of childNodes(body)) {
@@ -49,12 +52,32 @@ export function renderBodyLines(
 			lines.push(stateLine);
 			continue;
 		}
-		const computedLine = computedDeclarationLine(statement, computedBindings);
+		const computedLine = computedDeclarationLine(
+			statement,
+			computedBindings,
+			input,
+			stateValuesName,
+		);
 		if (computedLine) {
 			lines.push(computedLine);
 			continue;
 		}
 		if (isLoweredFrameworkDeclaration(statement)) continue;
+		if (isSharedInstanceDeclaration(statement, sharedInstanceNames)) continue;
+
+		const seedLine = sharedStateSeedLine(
+			statement,
+			input,
+			stateValueFunctionName,
+			stateValuesName,
+			statePayloadName,
+		);
+		if (seedLine) {
+			lines.push(seedLine);
+			continue;
+		}
+		// The instance local is gone here; state-lowering already failed the compile.
+		if (isSharedInstanceAssignment(statement, input, sharedInstanceNames)) continue;
 
 		const source = expressionSource(statement, input.source.source);
 		if (source) lines.push(source);
@@ -63,9 +86,69 @@ export function renderBodyLines(
 	return indentLines(lines);
 }
 
+// `s.disabled = disabled` in a component body seeds the widget's shared
+// instance: the assigned value replaces the factory initial for this render, so
+// the emitted body sets the graph node instead of an absent local.
+function sharedStateSeedLine(
+	statement: AnyNode,
+	input: PublicRenderModuleInput,
+	stateValueFunctionName: string,
+	stateValuesName: string,
+	statePayloadName: string,
+): string | null {
+	if (statement.type !== 'ExpressionStatement') return null;
+	const assignment = statement.expression as AnyNode | undefined;
+	if (assignment?.type !== 'AssignmentExpression' || assignment.operator !== '=') return null;
+
+	const target = expressionSource(assignment.left as AnyNode, input.source.source);
+	const resolved = resolveSharedInstanceGraphPath(target, input.semanticGraph);
+	if (!resolved) return null;
+
+	const value = expressionSource(assignment.right as AnyNode, input.source.source);
+	const read = `${stateValuesName}.get(${JSON.stringify(resolved.binding.id)})`;
+	// The seed writes the served payload too: resume never re-runs the body, so a
+	// payload left holding the factory initial resumes a value nobody rendered.
+	// An assignment always assigns: an omitted prop with no destructuring default
+	// writes undefined, exactly as the same statement would in plain JavaScript.
+	return `{ const marklessSharedSeed = (${value}); ${stateValueFunctionName}(${stateValuesName}, ${statePayloadName}, ${JSON.stringify(
+		resolved.binding.id,
+	)}, ${seedValueSource(read, resolved.path, 'marklessSharedSeed')}); }`;
+}
+
+function isSharedInstanceAssignment(
+	statement: AnyNode,
+	input: PublicRenderModuleInput,
+	sharedInstanceNames: ReadonlySet<string>,
+): boolean {
+	if (statement.type !== 'ExpressionStatement' || sharedInstanceNames.size === 0) return false;
+	const assignment = statement.expression as AnyNode | undefined;
+	if (assignment?.type !== 'AssignmentExpression') return false;
+
+	const target = expressionSource(assignment.left as AnyNode, input.source.source);
+	const root = /^\s*([$A-Z_a-z][$\w]*)\s*[.[]/.exec(target ?? '')?.[1];
+	return !!root && sharedInstanceNames.has(root);
+}
+
+function seedValueSource(
+	readSource: string,
+	path: ReadonlyArray<string>,
+	valueSource: string,
+): string {
+	const [head, ...rest] = path;
+	if (head === undefined) return valueSource;
+	const nested = seedValueSource(
+		`${readSource}?.[${JSON.stringify(head)}]`,
+		rest,
+		valueSource,
+	);
+	return `{ ...${readSource}, [${JSON.stringify(head)}]: ${nested} }`;
+}
+
 function computedDeclarationLine(
 	statement: AnyNode,
 	computedBindings: ReadonlyMap<string, GraphBinding>,
+	input: PublicRenderModuleInput,
+	stateValuesName: string,
 ): string | null {
 	if (statement.type !== 'VariableDeclaration') return null;
 	const declarations = asNodes(statement.declarations);
@@ -84,7 +167,19 @@ function computedDeclarationLine(
 	}
 
 	const declarationKind = binding.declarationKind ?? 'const';
-	return `${declarationKind} ${binding.name} = (${binding.functionSource})();`;
+	// No instance local exists here; rebuild it from the graph, as the residue readers do.
+	const prelude = sharedInstancePreludeLines(
+		input.semanticGraph,
+		binding.functionSource,
+		new Set(),
+		(graphNodeId, path) =>
+			`marklessSsrReadPublicPath(${stateValuesName}.get(${JSON.stringify(graphNodeId)}), ${JSON.stringify(path)})`,
+	);
+	if (prelude.length === 0) {
+		return `${declarationKind} ${binding.name} = (${binding.functionSource})();`;
+	}
+
+	return `${declarationKind} ${binding.name} = (() => { ${prelude.join(' ')} return (${binding.functionSource})(); })();`;
 }
 
 function stateDeclarationLine(
@@ -116,6 +211,28 @@ function stateDeclarationLine(
 		initializerSource,
 	].filter((arg): arg is string => arg !== undefined);
 	return `let ${binding.name} = ${stateValueFunctionName}(${args.join(', ')});`;
+}
+
+// `const shell = session()` names a shared instance. Every read and write
+// through that name is already a graph node id, so the emitted body keeps no
+// local for it.
+export function sharedInstanceLocalNames(
+	semanticGraph: Pick<PublicRenderModuleInput['semanticGraph'], 'sharedInstances'>,
+): ReadonlySet<string> {
+	return new Set((semanticGraph.sharedInstances ?? []).map((instance) => instance.localName));
+}
+
+export function isSharedInstanceDeclaration(
+	statement: AnyNode,
+	sharedInstanceNames: ReadonlySet<string>,
+): boolean {
+	if (statement.type !== 'VariableDeclaration' || sharedInstanceNames.size === 0) return false;
+	const declarators = asNodes(statement.declarations);
+	if (declarators.length === 0) return false;
+	return declarators.every((declarator) => {
+		const name = getIdentifierName(declarator.id as AnyNode | undefined);
+		return !!name && sharedInstanceNames.has(name);
+	});
 }
 
 function isStateDeclaration(statement: AnyNode): boolean {
@@ -160,6 +277,7 @@ export function hasExecutableBodyStatements(
 	component: AnyNode,
 	root: AnyNode,
 	source: string,
+	sharedInstanceNames: ReadonlySet<string> = new Set(),
 ): boolean {
 	const body = component.body as AnyNode | undefined;
 	if (!body) return false;
@@ -167,6 +285,7 @@ export function hasExecutableBodyStatements(
 		if (isIgnorableTextNode(statement)) continue;
 		if (statement === root || returnArgument(statement) === root) continue;
 		if (isStateDeclaration(statement) || isLoweredFrameworkDeclaration(statement)) continue;
+		if (isSharedInstanceDeclaration(statement, sharedInstanceNames)) continue;
 		if (expressionSource(statement, source)) return true;
 	}
 	return false;
@@ -193,6 +312,7 @@ export function renderValuePreludeLines(
 			binding.kind === 'computed' ? [[binding.name, binding] as const] : [],
 		),
 	);
+	const sharedInstanceNames = sharedInstanceLocalNames(input.semanticGraph);
 	const statements = childNodes(body).filter((statement) => {
 		if (isIgnorableTextNode(statement)) return false;
 		return statement !== rootInfo.root && returnArgument(statement) !== rootInfo.root;
@@ -239,6 +359,7 @@ export function renderValuePreludeLines(
 				}
 			}
 			if (isLoweredFrameworkDeclaration(statement)) continue;
+			if (isSharedInstanceDeclaration(statement, sharedInstanceNames)) continue;
 		}
 		const source = expressionSource(statement, input.source.source);
 		if (

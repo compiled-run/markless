@@ -508,6 +508,8 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					publicRenderRootExportName: compiled.publicRenderModule.rootExportName,
 					publicSsrModuleSource: compiled.publicRenderModule.ssrModuleSource,
 					publicRenderSsrExportName: compiled.publicRenderModule.ssrExportName,
+					publicRenderSsrComponentExports:
+						compiled.publicRenderModule.ssrComponentExports,
 					canonicalRenderData: prerenderInterfacesComplete(compiled, input),
 					hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
 					symbols: symbolRows,
@@ -600,7 +602,21 @@ function prerenderDataModuleSource(
 		}`;
 	});
 	const preludes = [...readerImports.values(), ...readerDeclarations];
+	// Pay-per-use gate: this module's render data is loaded by exactly the pages
+	// that compose it, so a build with no shared-seed symbol never loads the pass.
+	const seedsShared = compiled.publicRenderModule.componentDefinitions.some((definition) =>
+		Object.values(
+			(definition as { readonly initialValueKinds?: Readonly<Record<string, string>> })
+				.initialValueKinds ?? {},
+		).includes('shared-seed'),
+	);
 	return [
+		...(seedsShared
+			? [
+					"import { installMarklessSharedSeedPass } from '@markless/web/fns/shared-seed';",
+					'installMarklessSharedSeedPass();',
+				]
+			: []),
 		...[...importedComponents.values()].map(
 			(entry) =>
 				`import { marklessPrerenderData as ${entry.local} } from ${JSON.stringify(entry.source)};`,

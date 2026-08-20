@@ -26,6 +26,7 @@ import type { ComposeGraphProps } from '../fns/composition.ts';
 import { marklessCsrRemapChildGraph } from '../fns/composition.ts';
 import { marklessBoundSymbolId } from '../fns/bound-symbol.ts';
 import { registerPrerenderStagedComputeds } from './staged-graph.ts';
+import { sharedSeedPass } from './shared-seed-slot.ts';
 
 // This evaluator is the seam where a SERIALIZED protocol payload meets the
 // mutable draft the SSR composer works on. They describe the same records; the
@@ -53,7 +54,7 @@ type PrerenderRenderData = SsrRenderData & {
 	}>;
 };
 
-type PrerenderDataDefinition = {
+export type PrerenderDataDefinition = {
 	readonly name: string;
 	readonly state: ProtocolStatePayload;
 	readonly view: import('@markless/serializer').ProtocolViewPayload;
@@ -95,12 +96,19 @@ type PrerenderDataDefinition = {
 	// Compiled by the same producer as the server module's reader; the browser
 	// never parses or evaluates authored source itself.
 	readonly readResidue?: (
-		residue: Extract<SsrDataResidue, { readonly kind: 'authored-expression' }>,
+		residue: Extract<
+			SsrDataResidue,
+			{ readonly kind: 'authored-expression' | 'element-handle-id' }
+		>,
 		context: {
 			readonly repeatItem?: unknown;
 			readonly repeatIndex?: number;
 			readonly asyncError?: unknown;
 			readonly read: (graphNodeId: string, path?: ReadonlyArray<string>) => unknown;
+			// What a minted element() id is derived from. The token naming the
+			// widget a part belongs to arrives through the seed map, so `read`
+			// already answers it.
+			readonly idPrefix?: string;
 		},
 	) => unknown;
 };
@@ -127,7 +135,10 @@ export type PrerenderPageClosure = {
 		readonly evaluate: (context: PrerenderEvaluationContext) => Awaitable<unknown>;
 	}>;
 	readonly readAuthored?: (
-		residue: Extract<SsrDataResidue, { readonly kind: 'authored-expression' }>,
+		residue: Extract<
+			SsrDataResidue,
+			{ readonly kind: 'authored-expression' | 'element-handle-id' }
+		>,
 		context: SsrDataReadContext,
 		evaluation: PrerenderEvaluationContext,
 	) => Awaitable<unknown>;
@@ -181,7 +192,7 @@ export async function evaluatePrerenderClosure(
 			if (residue.kind === 'repeat-item') return readPath(context.repeatItem, residue.path);
 			if (residue.kind === 'graph-read') return read(residue.graphNodeId, residue.path);
 			if (closure.readAuthored) return closure.readAuthored(residue, context, evaluation);
-			throw new Error(`MARKLESS_PRERENDER_RESIDUE_MISSING: ${residue.source}`);
+			throw new Error('MARKLESS_PRERENDER_RESIDUE_MISSING');
 		},
 		selectBranchArm: closure.selectBranchArm
 			? (slot, context) => closure.selectBranchArm!(slot, context, evaluation)
@@ -314,6 +325,9 @@ async function evaluatePrerenderDataComponent(input: {
 	readonly loadSymbol: PrerenderLoadSymbol;
 	readonly graph: RuntimeGraph | undefined;
 	readonly requireHtml: boolean;
+	// What the component this one is projected into seeded into its widget's
+	// shared instance, written before this render started.
+	readonly sharedSeeds?: ReadonlyMap<string, unknown>;
 }): Promise<
 	SsrRenderOutput & {
 		// The render-data path emits the full ssr-data structure, not just anchors.
@@ -334,6 +348,7 @@ async function evaluatePrerenderDataComponent(input: {
 			values.set(initial.graphNodeId, structuredClone(initial.value.value));
 		}
 	}
+	for (const [graphNodeId, seeded] of input.sharedSeeds ?? []) values.set(graphNodeId, seeded);
 	// Authored state cells belong to the live graph once one exists: an
 	// escalated arm re-settle renders what the interaction wrote, not the
 	// compile-time initial value seeded into `values`.
@@ -484,8 +499,9 @@ async function evaluatePrerenderDataComponent(input: {
 					repeatIndex: context.repeatIndex,
 					asyncError: context.asyncError,
 					read,
+					idPrefix: input.idPrefix,
 				});
-			throw new Error(`MARKLESS_PRERENDER_RESIDUE_MISSING: ${residue.source}`);
+			throw new Error('MARKLESS_PRERENDER_RESIDUE_MISSING');
 		},
 		selectBranchArm: (slot) => {
 			const branch = (definition.branches ?? []).find(
@@ -514,6 +530,8 @@ async function evaluatePrerenderDataComponent(input: {
 				: undefined;
 			return snapshot?.status === 'fulfilled' ? 0 : snapshot?.status === 'rejected' ? 2 : 1;
 		},
+		seedChild: (slot, context) =>
+			sharedSeedPass()?.(input, definition, slot.componentEdgeId, read, context.sharedSeeds),
 		renderChild: async (slot, context) => {
 			const edge = (definition.edges ?? []).find(
 				(candidate) => candidate.id === slot.componentEdgeId,
@@ -574,6 +592,7 @@ async function evaluatePrerenderDataComponent(input: {
 				loadSymbol: input.loadSymbol,
 				graph: input.graph,
 				requireHtml: input.requireHtml,
+				sharedSeeds: context.sharedSeeds,
 			});
 			children.push({
 				output: output as SsrComposableChildOutput,

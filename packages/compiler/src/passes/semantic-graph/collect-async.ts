@@ -12,6 +12,7 @@ import {
 	semanticAliasMap,
 	uniqueBy,
 } from '../../artifact-helpers/graph-paths.ts';
+import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
 	readRegion,
 	resolvedSymbolAt,
@@ -279,7 +280,10 @@ function graphDependency(
 	if (!namesGraphBinding(node, state, bodyRegion)) return null;
 
 	const source = expressionSource(node, state.source);
-	const resolved = resolveGraphPath(source, bindings, aliases);
+	// Own scope first: a factory local and the instance local naming it routinely collide.
+	const resolved =
+		resolveGraphPath(source, bindings, aliases) ??
+		resolveSharedInstanceGraphPath(source, state.graph);
 	if (!resolved) return null;
 
 	return {

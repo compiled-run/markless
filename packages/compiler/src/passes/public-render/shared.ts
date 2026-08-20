@@ -50,7 +50,8 @@ export function moduleScopeDeclarations(
 	filename: string,
 ): ReadonlyArray<{ readonly names: ReadonlyArray<string>; readonly source: string }> {
 	const ast = parseModule(source, filename) as unknown as AnyNode;
-	const storageImports = storageImportNames(ast);
+	const storageImports = frameworkApiImportNames(ast, 'storage');
+	const sharedImports = frameworkApiImportNames(ast, 'shared');
 	return asNodes(ast.body).flatMap((statement) => {
 		if (statement.type === 'ImportDeclaration' || getComponentFunction(statement)) return [];
 		const declaration =
@@ -64,6 +65,9 @@ export function moduleScopeDeclarations(
 			declaration.type !== 'ClassDeclaration'
 		)
 			return [];
+		// A shared() definition is graph data, not module code: its factory ships
+		// as payload nodes, so the authored call never reaches emitted source.
+		if (isSharedDefinitionDeclaration(declaration, sharedImports)) return [];
 		const sourceText = lowerModuleStorageDeclaration(declaration, source, storageImports);
 		return sourceText ? [{ names: declaredNames(declaration), source: sourceText }] : [];
 	});
@@ -80,7 +84,7 @@ function declaredNames(declaration: AnyNode): ReadonlyArray<string> {
 	return name ? [name] : [];
 }
 
-function storageImportNames(ast: AnyNode): ReadonlySet<string> {
+function frameworkApiImportNames(ast: AnyNode, apiName: string): ReadonlySet<string> {
 	const names = new Set<string>();
 	for (const statement of asNodes(ast.body)) {
 		if (statement.type !== 'ImportDeclaration') continue;
@@ -88,13 +92,27 @@ function storageImportNames(ast: AnyNode): ReadonlySet<string> {
 		if (importSource !== '@markless/core') continue;
 		for (const specifier of asNodes(statement.specifiers)) {
 			if (specifier.type !== 'ImportSpecifier') continue;
-			if (getIdentifierName(specifier.imported as AnyNode | undefined) !== 'storage')
-				continue;
+			if (getIdentifierName(specifier.imported as AnyNode | undefined) !== apiName) continue;
 			const localName = getIdentifierName(specifier.local as AnyNode | undefined);
 			if (localName) names.add(localName);
 		}
 	}
 	return names;
+}
+
+function isSharedDefinitionDeclaration(
+	declaration: AnyNode,
+	sharedImports: ReadonlySet<string>,
+): boolean {
+	if (declaration.type !== 'VariableDeclaration' || sharedImports.size === 0) return false;
+	const declarators = asNodes(declaration.declarations);
+	if (declarators.length === 0) return false;
+	return declarators.every((declarator) => {
+		const init = declarator.init as AnyNode | undefined;
+		if (init?.type !== 'CallExpression') return false;
+		const callName = getIdentifierName(init.callee as AnyNode | undefined);
+		return !!callName && sharedImports.has(callName);
+	});
 }
 
 function lowerModuleStorageDeclaration(
@@ -151,7 +169,8 @@ function lowerModuleStorageDeclaration(
 
 export function destructureProps(
 	propNames: ReadonlyArray<string>,
-	component?: AnyNode,
+	component: AnyNode | undefined,
+	source: string,
 ): string | null {
 	if (propNames.length === 0) return null;
 	const param = component ? asNodes(component.params)[0] : undefined;
@@ -166,21 +185,28 @@ export function destructureProps(
 		}
 		const key = property.key as AnyNode | undefined;
 		const value = property.value as AnyNode | undefined;
-		const fallback = getIdentifierName(value) ?? getIdentifierName(key);
+		// The authored default is re-emitted here, so the body local means what
+		// JavaScript says it means for an omitted or explicitly undefined prop.
+		const pattern = value?.type === 'AssignmentPattern' ? value : undefined;
+		const local = pattern ? (pattern.left as AnyNode | undefined) : value;
+		const fallback = getIdentifierName(local) ?? getIdentifierName(key);
 		if (!fallback) return [];
+		const defaultSource = pattern?.right
+			? ` = ${expressionSource(pattern.right as AnyNode, source)}`
+			: '';
 		if (
 			property.type === 'Property' &&
 			!property.computed &&
 			key?.type === 'Identifier' &&
-			value?.type === 'Identifier'
+			local?.type === 'Identifier'
 		) {
 			const authoredName = getIdentifierName(key);
-			const localName = getIdentifierName(value);
+			const localName = getIdentifierName(local);
 			if (authoredName && localName && authoredName !== localName) {
-				return [`${authoredName}: ${localName}`];
+				return [`${authoredName}: ${localName}${defaultSource}`];
 			}
 		}
-		return [fallback];
+		return [`${fallback}${defaultSource}`];
 	});
 	return `	const { ${bindings.join(', ')} } = props ?? {};`;
 }
@@ -339,7 +365,7 @@ function componentEdgeWithCaptureRouteHandoff(
 	};
 }
 
-function isTsrxComponentImport(importSource: string): boolean {
+export function isTsrxComponentImport(importSource: string): boolean {
 	return /\.tsrx(?:[?#].*)?$/.test(importSource);
 }
 
@@ -478,6 +504,36 @@ function chunkGraphNodeIds(
 	);
 }
 
+// The initial values one component seeds its render from. An id only one
+// binding spells stays available to every component of the module; an id two
+// same-module components both spell resolves positionally, so each component
+// seeds the initial value it actually declared.
+export function componentOwnedInitialValues(
+	input: PublicRenderModuleInput,
+	componentName: string,
+	rootComponentName: string,
+): PublicRenderModuleInput['renderData']['initialValues'] {
+	const declaringOwners = new Map<string, string[]>();
+	for (const binding of input.semanticGraph.graphBindings) {
+		if (!binding.componentName) continue;
+		const owners = declaringOwners.get(binding.id);
+		if (owners) owners.push(binding.componentName);
+		else declaringOwners.set(binding.id, [binding.componentName]);
+	}
+	const spellings = new Map<string, number>();
+	for (const initial of input.renderData.initialValues) {
+		spellings.set(initial.graphNodeId, (spellings.get(initial.graphNodeId) ?? 0) + 1);
+	}
+	const position = new Map<string, number>();
+	return input.renderData.initialValues.filter((initial) => {
+		const index = position.get(initial.graphNodeId) ?? 0;
+		position.set(initial.graphNodeId, index + 1);
+		if ((spellings.get(initial.graphNodeId) ?? 0) < 2) return true;
+		const owners = declaringOwners.get(initial.graphNodeId);
+		return (owners?.[index] ?? rootComponentName) === componentName;
+	});
+}
+
 // Every payload node one component declares: its own state()/computed()
 // bindings, the props cell it destructures, and the template expressions its
 // own chunks read. The page root additionally keeps page-space nodes and any
@@ -487,16 +543,55 @@ export function componentOwnedStateNodes(
 	input: PublicRenderModuleInput,
 	componentName: string,
 	rootComponentName: string,
-): { readonly cellIndexes: ReadonlyArray<number>; readonly computedIndexes: ReadonlyArray<number> } {
+): {
+	readonly cellIndexes: ReadonlyArray<number>;
+	readonly computedIndexes: ReadonlyArray<number>;
+	readonly seedCellIndexes: ReadonlyArray<number>;
+} {
 	const owner = payloadNodeOwners(input, rootComponentName);
-	return {
-		cellIndexes: input.protocolState.cells.flatMap((_cell, index) =>
-			owner.cells[index] === componentName ? [index] : [],
+	const cellIndexes = input.protocolState.cells.flatMap((_cell, index) =>
+		owner.cells[index] === componentName ? [index] : [],
+	);
+	// A page-space node the component only reads stays owned by the page, but its
+	// value must still seed this component's render — including a node it reaches
+	// only through a shared computed it derives.
+	const readGraphNodeIds = graphReadClosure(
+		chunkGraphNodeIds(
+			input.renderData.chunks.filter((chunk) => chunk.componentName === componentName),
 		),
+		input.semanticGraph,
+	);
+	return {
+		cellIndexes,
 		computedIndexes: input.protocolState.computed.flatMap((_computed, index) =>
 			owner.computed[index] === componentName ? [index] : [],
 		),
+		seedCellIndexes: input.protocolState.cells.flatMap((cell, index) =>
+			cellIndexes.includes(index) ||
+			(isPageSpaceGraphNodeId(cell.graphNodeId) && readGraphNodeIds.has(cell.graphNodeId))
+				? [index]
+				: [],
+		),
 	};
+}
+
+// Every graph node a set of reads reaches, following each computed to what it
+// derives from. A component that renders a computed must seed the cells that
+// computed reads, even when its own markup never names them.
+function graphReadClosure(
+	graphNodeIds: ReadonlyArray<string>,
+	semanticGraph: PublicRenderModuleInput['semanticGraph'],
+): ReadonlySet<string> {
+	const reached = new Set<string>();
+	const queue = [...graphNodeIds];
+	while (queue.length > 0) {
+		const graphNodeId = queue.pop();
+		if (graphNodeId === undefined || reached.has(graphNodeId)) continue;
+		reached.add(graphNodeId);
+		const binding = semanticGraph.graphBindings.find((candidate) => candidate.id === graphNodeId);
+		for (const dependency of binding?.dependencies ?? []) queue.push(dependency.graphNodeId);
+	}
+	return reached;
 }
 
 // The declaring component of every payload node, aligned with the payload's own
@@ -526,8 +621,34 @@ function payloadNodeOwners(
 		if (queue) queue.push(binding.componentName);
 		else pending.set(binding.id, [binding.componentName]);
 	}
+	// A widget-scoped shared() graph is one instance per rendered widget, so its
+	// nodes belong to the widget root, not the module root: that component's
+	// composed instance path is the widget root. The root is the component that
+	// seeds the definition — its seed has to land in the payload it serves, so a
+	// part declared above it must not take the cells and make that write a no-op —
+	// or, with no seed, the first component that resolves the definition.
+	const seedingComponent = new Map<string, string>();
+	for (const symbol of input.symbolResolver.symbols) {
+		if (symbol.kind !== 'shared-seed' || !symbol.componentName) continue;
+		const definitionId = symbol.graphNodeId.slice(0, symbol.graphNodeId.lastIndexOf('/'));
+		if (!seedingComponent.has(definitionId))
+			seedingComponent.set(definitionId, symbol.componentName);
+	}
+	const widgetOwner = new Map<string, string>();
+	for (const definition of input.semanticGraph.sharedDefinitions) {
+		if (definition.scope !== 'widget') continue;
+		const resolver = input.semanticGraph.sharedInstances.find(
+			(instance) => instance.definitionId === definition.id && instance.componentName,
+		);
+		const owner = seedingComponent.get(definition.id) ?? resolver?.componentName;
+		if (owner) widgetOwner.set(definition.id, owner);
+	}
 	const ownerOf = (graphNodeId: string): string => {
-		if (isPageSpaceGraphNodeId(graphNodeId)) return rootComponentName;
+		if (isPageSpaceGraphNodeId(graphNodeId))
+			return (
+				widgetOwner.get(graphNodeId.slice(0, graphNodeId.lastIndexOf('/'))) ??
+				rootComponentName
+			);
 		const queue = pending.get(graphNodeId);
 		const declared = queue && queue.length > 1 ? queue.shift() : queue?.[0];
 		return declared ?? chunkOwner.get(graphNodeId) ?? rootComponentName;

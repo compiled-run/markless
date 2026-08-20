@@ -4,6 +4,7 @@ import type {
 	SemanticGraphBinding,
 	SemanticSharedDefinition,
 	SemanticSharedDependency,
+	SemanticSharedInstance,
 	SemanticSharedReturnProperty,
 	SemanticSharedScope,
 } from '../../artifacts.ts';
@@ -11,8 +12,16 @@ import {
 	graphBindingMap,
 	resolveGraphPath,
 	semanticAliasMap,
+	splitStaticGraphPath,
+	type ResolvedGraphPath,
 } from '../../artifact-helpers/graph-paths.ts';
-import { invalidSharedScopeDiagnostic, sharedDefinitionCycleDiagnostic } from './diagnostics.ts';
+import {
+	implicitFamilyScopeDiagnostic,
+	invalidSharedScopeDiagnostic,
+	sharedDefinitionCycleDiagnostic,
+} from './diagnostics.ts';
+import { collectComputedBinding } from './collect-state.ts';
+import { collectExpressionReads } from './collect-expressions.ts';
 import { getCallName, getFrameworkApiForCall } from './imports.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
 
@@ -51,6 +60,9 @@ export function collectSharedInstance(input: {
 		definitionId: definition.id,
 		definitionName: definition.name,
 		localName: input.localName,
+		...(input.state.currentComponentName
+			? { componentName: input.state.currentComponentName }
+			: {}),
 		source: expressionSource(input.init, input.state.source),
 		sourceSpan: sourceSpan(input.init, input.state.filename),
 	});
@@ -132,13 +144,14 @@ export function collectSharedFactoryGraph(
 		const previousSharedDefinitionId = state.currentSharedDefinitionId;
 		state.currentSharedDefinitionId = definition.id;
 		walk(body, state);
-		state.currentSharedDefinitionId = previousSharedDefinitionId;
-
+		// An inline `computed()` in the returned literal declares a factory-scoped
+		// node, so the definition stays current through return collection too.
 		const returnProperties = collectSharedReturnProperties({
 			factory: declaration.factory,
 			definitionId: definition.id,
 			state,
 		});
+		state.currentSharedDefinitionId = previousSharedDefinitionId;
 		if (returnProperties.length === 0) continue;
 
 		const index = state.graph.sharedDefinitions.findIndex((item) => item.id === definition.id);
@@ -151,8 +164,121 @@ export function collectSharedFactoryGraph(
 	}
 }
 
+// B6: a definition this module declares AND several of this module's components
+// resolve is a family shape. Only an omitted scope warns; either explicit
+// spelling is a decision, and an imported definition is another module's call.
+export function collectImplicitFamilyScopeDiagnostics(state: WalkState): void {
+	for (const definition of state.graph.sharedDefinitions) {
+		if (definition.scope !== undefined) continue;
+		if (definition.id !== sharedDefinitionId(state.filename, definition.exportedName)) continue;
+
+		const componentNames = [
+			...new Set(
+				state.graph.sharedInstances.flatMap((instance) =>
+					instance.definitionId === definition.id && instance.componentName
+						? [instance.componentName]
+						: [],
+				),
+			),
+		];
+		if (componentNames.length < 2) continue;
+
+		state.graph.diagnostics.push(
+			implicitFamilyScopeDiagnostic({
+				definitionName: definition.name,
+				componentNames,
+				span: definition.sourceSpan,
+			}),
+		);
+	}
+}
+
 export function sharedDefinitionId(filename: string, exportedName: string): string {
 	return `shared:${filename}#${exportedName}`;
+}
+
+// What the semantic graph knows about `const s = session()`: the local name, the
+// definition it came from, and the graph nodes the factory declared. Every
+// consumer that turns `s.status` into a graph node id reads it through here.
+export type SharedInstanceGraph = {
+	readonly graphBindings: ReadonlyArray<SemanticGraphBinding>;
+	readonly sharedDefinitions: ReadonlyArray<SemanticSharedDefinition>;
+	readonly sharedInstances: ReadonlyArray<SemanticSharedInstance>;
+};
+
+export function findSharedInstance(
+	localName: string,
+	graph: Pick<SharedInstanceGraph, 'sharedDefinitions' | 'sharedInstances'>,
+): { readonly instance: SemanticSharedInstance; readonly definition: SemanticSharedDefinition } | null {
+	const instance = findLast(graph.sharedInstances, (item) => item.localName === localName);
+	if (!instance) return null;
+
+	const definition = graph.sharedDefinitions.find((item) => item.id === instance.definitionId);
+	return definition ? { instance, definition } : null;
+}
+
+// `s.status` and `s.status.deep` resolve through the definition's returned
+// property to the factory's own graph node; a method property resolves to
+// nothing here because a call is not a value path.
+export function resolveSharedInstanceGraphPath(
+	source: string,
+	graph: SharedInstanceGraph,
+): ResolvedGraphPath | null {
+	const segments = splitStaticGraphPath(source);
+	if (segments.length < 2) return null;
+
+	const [localName, propertyName, ...propertyPath] = segments;
+	if (!localName || !propertyName) return null;
+
+	const resolved = findSharedInstance(localName, graph);
+	if (!resolved) return null;
+
+	const property = findLast(
+		resolved.definition.returnProperties ?? [],
+		(item) => item.name === propertyName,
+	);
+	if (property?.kind !== 'graph') return null;
+
+	const binding = graph.graphBindings.find((item) => item.id === property.graphNodeId);
+	if (!binding) return null;
+
+	return { binding, path: [...property.path, ...propertyPath] };
+}
+
+// `s.disabled = props.disabled ?? false` in a component body: a plain assignment
+// into the component's shared instance. It is not a runtime write — the shared
+// graph does not exist yet — but the per-instance initial value for that node.
+export function componentSharedSeedWrite(
+	write: {
+		readonly target: string;
+		readonly writeScope?: string;
+		readonly operation: string;
+		readonly assignmentOperator?: string;
+		readonly componentName?: string;
+		readonly valueSource?: string;
+	},
+	graph: SharedInstanceGraph,
+): { readonly resolved: ResolvedGraphPath; readonly componentName: string } | null {
+	if (write.writeScope !== 'component') return null;
+	if (write.operation !== 'assign' || write.assignmentOperator !== undefined) return null;
+	if (!write.componentName || write.valueSource === undefined) return null;
+
+	const resolved = resolveSharedInstanceGraphPath(write.target, graph);
+	if (!resolved || resolved.binding.sharedDefinitionId === undefined) return null;
+
+	return { resolved, componentName: write.componentName };
+}
+
+export function findLast<T>(
+	values: ReadonlyArray<T>,
+	predicate: (value: T) => boolean,
+): T | undefined {
+	for (let index = values.length - 1; index >= 0; index--) {
+		const value = values[index];
+		if (value !== undefined && predicate(value)) return value;
+	}
+
+	return undefined;
 }
 
 function isTsrxModuleImport(source: string): boolean {
@@ -263,6 +389,11 @@ function collectReturnedObjectProperties(input: {
 		const propertySource = expressionSource(property, input.state.source);
 
 		if (property.method === true || isFunctionValue(value)) {
+			// A method is inlined into every handler that calls it, so every read
+			// in its body must resolve to a graph node. The generic walk only
+			// records reads at assignment sites, which leaves a method local
+			// (`const next = s.checked !== true`) closing over the factory local.
+			collectExpressionReads(value.body as AnyNode | undefined, input.state);
 			properties.push({
 				kind: 'method',
 				name,
@@ -273,6 +404,29 @@ function collectReturnedObjectProperties(input: {
 		}
 
 		const valueSource = expressionSource(value, input.state.source);
+
+		// `isChecked: computed(() => ...)` names its node by the property key, the
+		// same node the named-const form declares.
+		if (getFrameworkApiForCall(value, input.state.frameworkApiImports) === 'computed') {
+			const binding = collectComputedBinding({
+				name,
+				init: value,
+				declarationKind: 'const',
+				state: input.state,
+			});
+			if (binding) {
+				properties.push({
+					kind: 'graph',
+					name,
+					source: valueSource,
+					graphNodeId: binding.id,
+					path: [],
+					sourceSpan: sourceSpan(value, input.state.filename),
+				});
+			}
+			continue;
+		}
+
 		const resolved = resolveGraphPath(valueSource, bindings, aliases);
 		if (!resolved) continue;
 
@@ -510,7 +664,12 @@ function sharedScopeFromOptions(
 			);
 			return undefined;
 		}
-		if (value.value === 'request' || value.value === 'container' || value.value === 'page') {
+		if (
+			value.value === 'request' ||
+			value.value === 'container' ||
+			value.value === 'page' ||
+			value.value === 'widget'
+		) {
 			return value.value;
 		}
 		state.graph.diagnostics.push(

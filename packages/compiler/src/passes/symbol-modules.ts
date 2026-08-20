@@ -7,11 +7,17 @@ import type {
 	LoweredStateWrite,
 	PlannedSymbol,
 	RenderDataArtifact,
+	RenderDataBranch,
+	SemanticGraphArtifact,
+	SemanticMarkupSlot,
 	SemanticGraphDependency,
 	SemanticModuleImport,
 	SymbolModulesArtifact,
+	SymbolModulesDiagnostic,
 	SymbolModulesInput,
+	SymbolResolverPlan,
 } from '../artifacts.ts';
+import type { SourceSpan } from '../diagnostics.ts';
 import { asNodes, isNode, type AnyNode } from '../ast/nodes.ts';
 import {
 	arrayNode,
@@ -45,6 +51,7 @@ import {
 	moduleProgramNode,
 	newNode,
 	objectNode,
+	optionalComputedMemberNode,
 	optionalMemberNode,
 	parseEmissionSource,
 	postfixUpdateNode,
@@ -54,6 +61,7 @@ import {
 	shorthandPropertyNode,
 	spreadNode,
 	stringArrayNode,
+	stringKeyPropertyNode,
 	unaryNode,
 	withLeadingBlockComment,
 	type EmittedModule,
@@ -97,7 +105,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 	);
 
 	const asyncComputedNodeIds = asyncComputedGraphNodeIds(input.semanticGraph);
-	const branchArmsBySite = renderBranchArms(input.renderData, asyncComputedNodeIds);
+	const branchArms = renderBranchArms(input, asyncComputedNodeIds);
 	const boundaryArmsById = renderBoundaryArms(input.renderData, asyncComputedNodeIds);
 	const sourceFileName = input.source?.filename ?? 'markless-module.tsrx';
 	const authoredSource = input.source?.source ?? '';
@@ -106,7 +114,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 		modules: input.symbolResolver.symbols.flatMap((symbol) => {
 			if (unsupportedCaptureSymbolIds.has(symbol.id)) return [];
 			if (symbol.kind === 'branch-update') {
-				const arms = branchArmsBySite.get(symbol.branchSiteId);
+				const arms = branchArms.armsBySite.get(symbol.branchSiteId);
 				if (!arms) return [];
 				return [
 					{
@@ -148,7 +156,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 				sourceFileName,
 			);
 		}),
-		diagnostics: input.captureAnalysis.diagnostics,
+		diagnostics: [...input.captureAnalysis.diagnostics, ...branchArms.diagnostics],
 	};
 }
 
@@ -183,25 +191,102 @@ function armPartReadPath(
 	return path.length === 0 && asyncComputedNodeIds.has(graphNodeId) ? ['value'] : path;
 }
 
+// The first refusal recorded for a branch is the one its diagnostic reports.
+type ArmRefusal = {
+	readonly detail: string;
+	readonly span?: SourceSpan;
+};
+
+type ArmPartsContext = {
+	readonly renderData: RenderDataArtifact;
+	readonly asyncComputedNodeIds: ReadonlySet<string>;
+	// Branch flips only: boundary arms re-render through a module that can run components.
+	readonly inline?: {
+		readonly semanticGraph: SemanticGraphArtifact;
+		readonly symbolResolver: SymbolResolverPlan;
+	};
+	readonly refusals?: ArmRefusal[];
+};
+
 function renderBranchArms(
-	renderData: RenderDataArtifact | undefined,
+	input: SymbolModulesInput,
 	asyncComputedNodeIds: ReadonlySet<string>,
-): ReadonlyMap<string, PublicRenderPlanBranchArms> {
-	if (!renderData) return new Map();
-	return new Map((renderData.branches ?? []).flatMap((branch) => {
-		if (branch.update === 'boundary') return [];
-		const arms = branch.armChunkIds.map((chunkId) =>
-			renderChunkParts(renderData, chunkId, asyncComputedNodeIds),
-		);
-		if (arms.some((arm) => arm === null)) return [];
-		return [[branch.branchSiteId, {
+): {
+	readonly armsBySite: ReadonlyMap<string, PublicRenderPlanBranchArms>;
+	readonly diagnostics: ReadonlyArray<SymbolModulesDiagnostic>;
+} {
+	const renderData = input.renderData;
+	if (!renderData) return { armsBySite: new Map(), diagnostics: [] };
+	const armsBySite = new Map<string, PublicRenderPlanBranchArms>();
+	const diagnostics: SymbolModulesDiagnostic[] = [];
+	for (const branch of renderData.branches ?? []) {
+		if (branch.update === 'boundary') continue;
+		const refusals: ArmRefusal[] = [];
+		const context: ArmPartsContext = {
+			renderData,
+			asyncComputedNodeIds,
+			...(input.semanticGraph
+				? {
+						inline: {
+							semanticGraph: input.semanticGraph,
+							symbolResolver: input.symbolResolver,
+						},
+					}
+				: {}),
+			refusals,
+		};
+		const arms = branch.armChunkIds.map((chunkId) => renderChunkParts(context, chunkId));
+		if (arms.some((arm) => arm === null)) {
+			// A branch nobody asks to flip ships no symbol, so it needs no diagnostic.
+			const symbol = input.symbolResolver.symbols.find(
+				(candidate) =>
+					candidate.kind === 'branch-update' &&
+					candidate.branchSiteId === branch.branchSiteId,
+			);
+			if (symbol)
+				diagnostics.push(branchArmUnsupportedDiagnostic(branch, refusals[0], symbol.id));
+			continue;
+		}
+		armsBySite.set(branch.branchSiteId, {
 			branchSiteId: branch.branchSiteId,
 			testRead: branch.testReads[0] ?? null,
 			arms: arms as PublicRenderPlanBranchArms['arms'],
 			...(branch.armTests ? { armTests: branch.armTests } : {}),
 			...(branch.declaredEmptyArms ? { declaredEmptyArms: branch.declaredEmptyArms } : {}),
-		}] as const];
-	}));
+		});
+	}
+	return { armsBySite, diagnostics };
+}
+
+function branchArmUnsupportedDiagnostic(
+	branch: RenderDataBranch,
+	refusal: ArmRefusal | undefined,
+	symbolId: string,
+): SymbolModulesDiagnostic {
+	const label = branch.kind === 'switch' ? '@switch' : '@if';
+	const detail = refusal?.detail ?? 'it holds content that has no compiled markup';
+	// A prop is the caller's to change, and a caller that never changes it ships
+	// correctly today, so only a test this file can write blocks the build.
+	const decidedByProp = branch.testReads.every((read) => read.graphNodeId.startsWith('prop:'));
+	return {
+		code: 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
+		severity: decidedByProp ? 'warning' : 'error',
+		phase: 'public-render',
+		title: `Changing this ${label} cannot rebuild what it shows`,
+		message: `this ${label} (${branch.testSource}) cannot be rebuilt when ${branch.testSource} changes because ${detail}.`,
+		why: 'Showing or hiding this content replaces it wholesale from compiled markup plus value reads. Content that has to run to produce itself has no compiled markup to replace it with, so the browser would ask for code the build never wrote — and that failure stops every other update in the same component.',
+		...(refusal?.span ? { primarySpan: refusal.span } : {}),
+		passId: 'symbol-modules',
+		artifactKeys: ['renderData', 'symbolResolver', 'symbolModules'],
+		symbolId,
+		source: branch.testSource,
+		suggestions: [
+			{
+				message: `Move the component outside the ${label} and hide it with an attribute, or keep the ${label} content to plain elements, text, and state reads.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
+	};
 }
 
 function renderBoundaryArms(
@@ -214,7 +299,7 @@ function renderBoundaryArms(
 			(candidate): candidate is string => candidate !== undefined,
 		);
 		const arms = chunkIds.map((chunkId) =>
-			renderChunkParts(renderData, chunkId, asyncComputedNodeIds),
+			renderChunkParts({ renderData, asyncComputedNodeIds }, chunkId),
 		);
 		if (arms.some((arm) => arm === null)) return [];
 		return [[boundary.boundaryId, {
@@ -225,12 +310,16 @@ function renderBoundaryArms(
 }
 
 function renderChunkParts(
-	renderData: RenderDataArtifact,
+	context: ArmPartsContext,
 	chunkId: string,
-	asyncComputedNodeIds: ReadonlySet<string>,
 ): PublicRenderPlanBranchArms['arms'][number] | null {
+	const { renderData, asyncComputedNodeIds } = context;
+	const refuse = (detail: string, span?: SourceSpan) => {
+		context.refusals?.push({ detail, ...(span ? { span } : {}) });
+		return null;
+	};
 	const chunk = renderData.chunks.find((candidate) => candidate.id === chunkId);
-	if (!chunk) return null;
+	if (!chunk) return refuse('its content has no compiled markup');
 	const parts: Array<PublicRenderPlanBranchArms['arms'][number][number]> = [];
 	const pushText = (text: string) => {
 		const clean = text.replace(/<!--markless-slot:\d+-->/g, '');
@@ -253,19 +342,31 @@ function renderChunkParts(
 				} });
 				continue;
 			}
+			if (slot.kind === 'child-component') {
+				const markup = staticChildComponentMarkup(context, slot);
+				if (markup === null)
+					return refuse(
+						`<${slot.childComponentName}> has to run to produce its content`,
+						componentEdgeSpan(context, slot.componentEdgeId),
+					);
+				pushText(markup);
+				continue;
+			}
 			if (slot.kind === 'repeat') {
 				const repeat = renderData.repeats.find((candidate) => candidate.repeatId === slot.repeatId);
 				const row = repeat ? renderData.chunks.find((candidate) => candidate.id === repeat.rowChunkId) : undefined;
-				if (!repeat?.collectionGraphNodeId || !row) return null;
+				if (!repeat?.collectionGraphNodeId || !row)
+					return refuse('it repeats over a collection with no compiled row');
 				const rowParts: Array<{ text: string } | { read: { graphNodeId: string; path: ReadonlyArray<string> } } | { itemPath: ReadonlyArray<string> }> = [];
 				for (let rowIndex = 0; rowIndex < row.statics.length; rowIndex++) {
 					const text = (row.statics[rowIndex] ?? '').replace(/<!--markless-slot:\d+-->/g, '');
 					if (text) rowParts.push({ text });
 					for (const rowSlot of row.slots.filter((candidate) => candidate.staticIndex === rowIndex)) {
-						if (rowSlot.kind !== 'text') return null;
+						if (rowSlot.kind !== 'text')
+							return refuse(`a repeated row inside it holds a ${rowSlot.kind} binding`);
 						if (rowSlot.residue.kind === 'repeat-item') rowParts.push({ itemPath: rowSlot.residue.path });
 						else if (rowSlot.residue.kind === 'graph-read') rowParts.push({ read: { graphNodeId: rowSlot.residue.graphNodeId, path: armPartReadPath(rowSlot.residue.graphNodeId, rowSlot.residue.path, asyncComputedNodeIds) } });
-						else return null;
+						else return refuse('a repeated row inside it reads a value that cannot be recomputed');
 					}
 				}
 				parts.push({ repeat: {
@@ -274,10 +375,57 @@ function renderChunkParts(
 				} });
 				continue;
 			}
-			return null;
+			return refuse(`it holds a ${slot.kind} binding`);
 		}
 	}
 	return parts;
+}
+
+// A child a flip can rebuild without running it: one constant string, wired to nothing.
+function staticChildComponentMarkup(
+	context: ArmPartsContext,
+	slot: Extract<SemanticMarkupSlot, { readonly kind: 'child-component' }>,
+): string | null {
+	const semanticGraph = context.inline?.semanticGraph;
+	if (!semanticGraph || slot.projectionChunkId) return null;
+	const edge = semanticGraph.componentEdges.find(
+		(candidate) => candidate.id === slot.componentEdgeId,
+	);
+	if (!edge || edge.importSource || edge.props.length > 0 || edge.children.childCount > 0)
+		return null;
+	if (
+		semanticGraph.graphBindings.some(
+			(binding) => binding.componentName === edge.childComponentName,
+		)
+	)
+		return null;
+	const chunk = context.renderData.chunks.find(
+		(candidate) => candidate.id === slot.childTemplateId,
+	);
+	if (!chunk || chunk.slots.length > 0) return null;
+	const hostNodeIds = new Set(chunk.hosts.map((host) => host.hostNodeId));
+	const wired = [
+		...semanticGraph.events,
+		...semanticGraph.behaviors,
+		...semanticGraph.overlays,
+		...semanticGraph.elementHandleBindings,
+		...context.inline.symbolResolver.symbols,
+	].some(
+		(record) =>
+			'hostNodeId' in record &&
+			typeof record.hostNodeId === 'string' &&
+			hostNodeIds.has(record.hostNodeId),
+	);
+	return wired ? null : chunk.statics.join('');
+}
+
+function componentEdgeSpan(
+	context: ArmPartsContext,
+	componentEdgeId: string,
+): SourceSpan | undefined {
+	return context.inline?.semanticGraph.componentEdges.find(
+		(candidate) => candidate.id === componentEdgeId,
+	)?.sourceSpan;
 }
 
 const emptyLocalNames = new Set<string>();
@@ -862,6 +1010,8 @@ export type StateInitializerPropRead = {
 	readonly localName: string;
 	readonly graphNodeId: string;
 	readonly path: ReadonlyArray<string>;
+	/** The authored expression a destructuring default supplies, when it has one. */
+	readonly defaultSource?: string;
 };
 
 export type StateInitializerEmissionInput = {
@@ -930,7 +1080,9 @@ export function buildStateInitializerEmission(
 				exportName,
 				input.propReads.length > 0 ? ['context'] : [],
 				[
-					...input.propReads.map(stateInitializerPropReadStatement),
+					...input.propReads.flatMap((propRead) =>
+						stateInitializerPropReadStatements(propRead, input.sourceFileName),
+					),
 					returnStatementNode(projection.initializerExpression),
 				],
 			),
@@ -950,6 +1102,98 @@ export function emitStateInitializerModuleNodes(
 	input: StateInitializerEmissionInput,
 ): EmittedModule {
 	return printEmittedModule(buildStateInitializerEmission(input));
+}
+
+// ---------------------------------------------------------------------------
+// Shared-seed emission through the AST printer.
+//
+// A component body assigning into its shared instance (`s.disabled =
+// props.disabled`) seeds that component's own instance. The seed replaces the
+// node's whole value, so a property assignment returns the current value with
+// that property merged in: the factory initial survives every field the body did
+// not assign and is overwritten by every field it did.
+// ---------------------------------------------------------------------------
+
+export type SharedSeedEmissionInput = {
+	readonly symbol: Extract<PlannedSymbol, { readonly kind: 'shared-seed' }>;
+	readonly propReads: ReadonlyArray<StateInitializerPropRead>;
+	/** The authored file the seed was extracted from; names the map. */
+	readonly sourceFileName: string;
+};
+
+export function buildSharedSeedEmission(input: SharedSeedEmissionInput): EmissionPrintInput {
+	const exportName = symbolExportName(input.symbol.id);
+	const site: EmissionSite = {
+		phase: 'payload',
+		passId: 'symbol-modules',
+		sourceFileName: input.sourceFileName,
+		symbolId: input.symbol.id,
+	};
+
+	const imports = dedupeModuleImports(input.symbol.moduleImports ?? []);
+	const seedLocal = 'marklessSharedSeed';
+	const body: EmissionNode[] = [
+		...imports.map((moduleImport) =>
+			moduleImportNode({
+				kind: moduleImport.kind,
+				localName: moduleImport.localName,
+				importedName: moduleImport.importedName,
+				source: moduleImport.source,
+			}),
+		),
+		exportNamedDeclarationNode(
+			functionDeclarationNode(exportName, ['context'], [
+				...input.propReads.flatMap((propRead) =>
+					stateInitializerPropReadStatements(propRead, input.sourceFileName),
+				),
+				constDeclarationNode(
+					seedLocal,
+					expressionFromSource(input.symbol.source, input.sourceFileName),
+				),
+				returnStatementNode(
+					sharedSeedValueNode(
+						() =>
+							callNode(memberChainNode('context.graph.read'), [
+								literalNode(input.symbol.graphNodeId),
+								stringArrayNode([]),
+							]),
+						input.symbol.path,
+						identifierNode(seedLocal),
+					),
+				),
+			]),
+		),
+	];
+
+	return {
+		program: moduleProgramNode(body),
+		source: input.symbol.source,
+		outputFileName: `${exportName}.js`,
+		site,
+	};
+}
+
+// `read` is a factory because the same read appears twice per level - once
+// spread, once as the object the next level reads through - and a node is not
+// shared between two tree positions.
+function sharedSeedValueNode(
+	read: () => EmissionNode,
+	path: ReadonlyArray<string>,
+	value: EmissionNode,
+): EmissionNode {
+	const [head, ...rest] = path;
+	if (head === undefined) return value;
+	const nested = sharedSeedValueNode(
+		() => optionalComputedMemberNode(read(), literalNode(head)),
+		rest,
+		value,
+	);
+	return objectNode([spreadNode(read()), stringKeyPropertyNode(head, nested)]);
+}
+
+/** The printed shared-seed module, with its source map (invariant 3). */
+export function emitSharedSeedModuleNodes(input: SharedSeedEmissionInput): EmittedModule {
+	return printEmittedModule(buildSharedSeedEmission(input));
 }
 
 type StateInitializerProjection = {
@@ -1011,14 +1255,58 @@ function stateInitializerProjection(
  * omits the path argument on an empty path. The text this replaces always
  * passes the array, so passing it keeps the call shape unchanged.
  */
-function stateInitializerPropReadStatement(propRead: StateInitializerPropRead): EmissionNode {
-	return constDeclarationNode(
-		propRead.localName,
-		callNode(memberChainNode('context.graph.read'), [
-			literalNode(propRead.graphNodeId),
-			stringArrayNode(propRead.path),
-		]),
-	);
+function stateInitializerPropReadStatements(
+	propRead: StateInitializerPropRead,
+	sourceFileName: string,
+): EmissionNode[] {
+	const read = callNode(memberChainNode('context.graph.read'), [
+		literalNode(propRead.graphNodeId),
+		stringArrayNode(propRead.path),
+	]);
+	if (propRead.defaultSource === undefined) {
+		return [constDeclarationNode(propRead.localName, read)];
+	}
+
+	// A destructuring default runs only for an undefined prop, so the read is
+	// compared, not coalesced.
+	const passed = `marklessProp_${propRead.localName}`;
+	return [
+		constDeclarationNode(passed, read),
+		constDeclarationNode(
+			propRead.localName,
+			conditionalNode(
+				binaryNode('===', identifierNode(passed), identifierNode('undefined')),
+				expressionFromSource(propRead.defaultSource, sourceFileName),
+				identifierNode(passed),
+			),
+		),
+	];
+}
+
+/**
+ * One authored expression, parsed as a node the printer can place.
+ *
+ * Parenthesized so every authored form parses as an expression statement, the
+ * same reason `behaviorProjection` wraps its factory; `preserveParens: false`
+ * drops the wrapper and the printer re-derives whatever parentheses the
+ * position actually needs.
+ */
+function expressionFromSource(source: string, filename: string): EmissionNode {
+	const { program, errors } = parseEmissionSource(`(${source});`, filename, 'ts');
+	const statements = asNodes((program as unknown as AnyNode).body);
+	const last = statements.at(-1);
+	if (
+		errors.length > 0 ||
+		statements.length !== 1 ||
+		!last ||
+		last.type !== 'ExpressionStatement' ||
+		!isNode(last.expression)
+	) {
+		throw new Error(
+			`symbol-modules: emission expected a single expression, got ${JSON.stringify(source)}`,
+		);
+	}
+	return last.expression as unknown as EmissionNode;
 }
 
 /**
@@ -1042,12 +1330,26 @@ export function stateInitializerPropReads(
 		)?.componentName ?? renderData?.root?.componentName;
 	if (!componentName) return [];
 
+	return componentPropReads(componentName, symbol.source, semanticGraph, sourceFileName);
+}
+
+/**
+ * The prop locals one component's authored expression names, each as the graph
+ * read the rendering instance answers with its own props.
+ */
+export function componentPropReads(
+	componentName: string,
+	source: string,
+	semanticGraph: SymbolModulesInput['semanticGraph'],
+	sourceFileName: string,
+): StateInitializerPropRead[] {
+	if (!semanticGraph) return [];
 	const propBinding = semanticGraph.graphBindings.find(
 		(binding) => binding.kind === 'prop' && binding.componentName === componentName,
 	);
 	if (!propBinding) return [];
 
-	const referenced = initializerReferencedNames(symbol.source, sourceFileName);
+	const referenced = initializerReferencedNames(source, sourceFileName);
 	if (propBinding.id !== 'prop:props') {
 		return referenced.has(propBinding.name)
 			? [{ localName: propBinding.name, graphNodeId: propBinding.id, path: [] }]
@@ -1061,6 +1363,9 @@ export function stateInitializerPropReads(
 						localName: binding.localName,
 						graphNodeId: 'prop:props',
 						path: binding.propPath,
+						...(binding.defaultSource === undefined
+							? {}
+							: { defaultSource: binding.defaultSource }),
 					},
 				]
 			: [],
@@ -4032,6 +4337,7 @@ export type SymbolModuleEmissionInput = {
 /** The symbol kinds `buildSymbolModuleEmission` can print from nodes today. */
 export const SYMBOL_MODULE_AST_KINDS: ReadonlySet<PlannedSymbol['kind']> = new Set([
 	'state-initializer',
+	'shared-seed',
 	'behavior',
 	'async-computed-runner',
 	'dom-update',
@@ -4077,6 +4383,19 @@ export function buildSymbolModuleEmission(
 				input.sourceFileName,
 			),
 			omitAuthoredSource: input.omitAuthoredSource,
+			sourceFileName: input.sourceFileName,
+		});
+	}
+
+	if (symbol.kind === 'shared-seed') {
+		return buildSharedSeedEmission({
+			symbol,
+			propReads: componentPropReads(
+				symbol.componentName,
+				symbol.source,
+				input.semanticGraph,
+				input.sourceFileName,
+			),
 			sourceFileName: input.sourceFileName,
 		});
 	}

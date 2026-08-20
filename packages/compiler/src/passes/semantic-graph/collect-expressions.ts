@@ -28,6 +28,7 @@ export function collectAssignment(node: AnyNode, state: WalkState): void {
 		operation: 'assign',
 		assignmentOperator: operator === '=' ? undefined : operator,
 		valueSource: value ? expressionSource(value, state.source) : undefined,
+		valueSpan: value ? sourceSpan(value, state.filename) : undefined,
 	});
 }
 

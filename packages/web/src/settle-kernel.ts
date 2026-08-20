@@ -373,7 +373,7 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 			return readPath(item.value, residue.path);
 		}
 		if (residue.kind === 'graph-read') return read(residue.graphNodeId, residue.path);
-		throw new SettleKernelUnsupportedError('authored-expression residue');
+		throw new SettleKernelUnsupportedError(`${residue.kind} residue`);
 	}
 }
 

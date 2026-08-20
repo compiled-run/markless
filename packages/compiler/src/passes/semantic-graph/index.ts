@@ -40,6 +40,7 @@ import { collectModuleScopeGraphCreation } from './collect-module-scope.ts';
 import { submoduleUnsupportedDiagnostic } from './diagnostics.ts';
 import {
 	collectSharedDefinitionDependencies,
+	collectImplicitFamilyScopeDiagnostics,
 	collectSharedFactoryGraph,
 } from './collect-shared.ts';
 import { attachKeyedRepeatRowHost, collectKeyedRepeat } from './collect-repeat.ts';
@@ -113,6 +114,7 @@ export async function buildSemanticGraph(
 		state.currentComponentId = previousComponentId;
 	}
 
+	collectImplicitFamilyScopeDiagnostics(state);
 	collectComputedWriteDiagnostics(state);
 	finalizeComputedDependencies(state);
 	propagateAsyncComputedCapability(graph);

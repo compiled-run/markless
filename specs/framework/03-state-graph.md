@@ -626,6 +626,141 @@ model deletes for root/request state instead of pushing into userland. Zustand's
 define-then-bare-call shape appears in ~60k files, with its ~21k selector call
 sites being pure re-render tax that a fine-grained graph deletes.
 
+#### What the compiler lowers today
+
+The model above is implemented for a `shared()` definition and its readers
+inside one `.tsrx` module:
+
+- **The definition never reaches emitted code.** `shared(() => ...)` is graph
+  data, not module code. The factory's `state()` and `computed()` declarations
+  become payload nodes under `shared:<file>#<exportName>/state:<name>` and
+  `shared:<file>#<exportName>/computed:<name>`; neither the `shared(...)` call
+  nor the `session()` instance call survives into the browser or SSR module.
+- **Every reader resolves to the same node.** `const s = session()` leaves no
+  local behind. `s.status` in any component of that module lowers to a read of
+  the definition's own graph node, so two components reading one definition
+  repaint from one write. Server rendering seeds that node's value into every
+  component that reads it, and a `computed()` declared in the factory is derived
+  from those seeded nodes instead of from a render-body local.
+- **A returned `computed()` is named by its property.** The factory may declare
+  the computed as a const and return it by name, or write `computed(...)` inline
+  in the returned object literal. Both spell the same node,
+  `shared:<file>#<exportName>/computed:<propertyName>`.
+- **A component body may seed a shared field once.** `s.disabled = props.disabled`
+  in a component body is not a runtime write — the shared graph does not exist
+  yet — but the initial value for that component's instance of the node: the
+  assigned property replaces the factory's initial and the rest of it survives.
+  The value must come from that component's own props or from constants, or the
+  compile fails closed with `MARKLESS_SHARED_SEED_UNSUPPORTED`. A widget's parts
+  are projected into its root, and projected content renders AFTER the component
+  it is projected into has run its body, so a part reads the seeded value rather
+  than the factory initial.
+- **A seed of an undeclared field fails closed.** `s.onChange = onChange` where
+  the definition declares no `onChange` graph field has nothing to seed, and the
+  authored line cannot run on the server because the emitted body keeps no local
+  for the instance. The compile fails with `MARKLESS_SHARED_SEED_UNKNOWN_FIELD`
+  naming the field, and the line never reaches emitted source. Instance callback
+  fields are not supported yet; pass the callback as a component prop instead.
+- **A read of an undeclared member fails closed.** `s.onChange?.(next)` inside a
+  factory method resolves onto the definition's own state node with a path that
+  node never declared, so it would read undefined on every render and after
+  resume. The compile fails with `MARKLESS_SHARED_MEMBER_UNKNOWN` naming the
+  member and the definition. Dynamic property names (`s[key]`) keep their own
+  `MARKLESS_STATE_DYNAMIC_PATH_READ`/`_WRITE` diagnostics.
+- **An assignment always assigns; defaults live at the part signature.** A seed
+  writes whatever its expression evaluated to, `undefined` included, exactly as
+  the same statement would in plain JavaScript. What an omitted prop means is
+  stated once, as a destructuring default on the part's own signature:
+  `function Root({ checked = false }) @{ ... s.checked = checked }` seeds `false`
+  for a consumer who omits `checked` and for one who passes `checked={undefined}`,
+  because that is what a destructuring default does. The factory's initial value
+  is a placeholder for a field no body seeds, not the family's default. All three
+  seed paths agree — the server render body, the seed pass a projecting component
+  answers for its parts, and the browser seed symbol — and each applies the
+  signature default before the seed expression runs. A defaulted prop local read
+  anywhere other than a component-body assignment reads the raw prop instead of
+  the default, so that read fails closed with
+  `MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED`.
+- **A type assertion in the factory is transparent.** `state({ checked: false as
+  boolean | 'mixed' })` declares the same known initial value as
+  `state({ checked: false })`. `as`, `satisfies`, and `!` are unwrapped before
+  the initial value is read, so the union spelling a widget family needs does
+  not degrade the node into an unknown initializer.
+- **A composite template expression over a shared instance resolves its reads,
+  and follows a write.** `ui-checked={checkbox.checked === true}` on a part is
+  not a plain path read, so it stands behind one synthetic computed whose
+  dependencies are the graph nodes it reads — a shared instance read resolves
+  through the definition's returned graph properties, exactly as a plain path
+  read does. That computed carries the position's DOM-update record, in an
+  attribute position as much as a text one, so a write to the cell repaints
+  every derived position that reads it, in the browser and after an SSR resume.
+  Presence semantics are unchanged: a falsy value renders no attribute. An
+  expression that reads only props plans no record, because no write can move a
+  prop after the render that read it. A `computed()` declared in a component
+  body resolves a shared instance read the same way; the server render body
+  rebuilds the instance from the factory's graph nodes before the derive runs,
+  so nothing closes over the factory's own local.
+- **Methods lower to graph writes.** A returned method that takes no parameters
+  is inlined at its call site, so `onClick={() => s.login()}` becomes the graph
+  writes the method body performs. A method that takes parameters is not
+  inlined: binding call-site arguments the graph cannot see is outside this
+  lowering.
+- **A method body may hold locals and several statements.** Every read in the
+  body is rewritten to its graph node, not only the read on the right of an
+  assignment, so `toggle() { const next = s.checked !== true; s.checked = next; }`
+  and any longer body lower with no factory local surviving into the browser.
+- **A returned `element()` handle is a handle through the instance.** A factory
+  may declare `const triggerEl = element()` and return it; `el={s.triggerEl}` on
+  a part binds that element node. The IDREF positions (`for`,
+  `aria-labelledby`, `aria-describedby`, `aria-controls`, `popovertarget`) still
+  refuse a handle reached through an instance, because nothing mints or emits the
+  id yet; the refusal is deliberate, since a recorded relationship that renders
+  no attribute would be invisible.
+- **Page scope is the default.** Omitting `scope` resolves the definition to one
+  instance for the page. `'request'`, `'container'`, `'page'`, and `'widget'`
+  are accepted and recorded on the definition; any other value fails the compile
+  closed with `MARKLESS_SHARED_SCOPE_INVALID`.
+- **A family shape with no declared scope warns.** When two or more components of
+  the module that declares a definition resolve it, that is the shape of a widget
+  family. Left without a scope it is page-scoped, so two of those widgets on one
+  page share one graph and move together. The compiler emits the warning
+  `MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT`, naming the components and both fixes:
+  add `{ scope: 'widget' }` for a graph per rendered widget, or write
+  `{ scope: 'page' }` to keep the sharing on purpose. It is a warning, not an
+  error, so existing page-scoped families keep compiling; either explicit
+  spelling silences it.
+- **Widget scope is per rendered widget.** A `widget`-scoped definition's graph
+  nodes belong to the first component of the module that resolves it, not to the
+  module root. Composition reads that ownership back: the widget root is the
+  outermost composed instance that carries the definition's cells, and every
+  other piece of the widget — trigger, content, item — finds that root as the
+  longest registered widget-root prefix of its own instance path. The instance id
+  is the definition id qualified by the widget-root path
+  (`c0:shared:select.tsrx#select/state:s`), so a widget-scoped `shared:` id is
+  the one page-space family composition does qualify. A widget nested inside
+  another widget's content owns its own root path; two widgets of one family
+  nested inside one another resolve to the outermost of the two, which is what
+  "the outermost component that resolves the definition" means above.
+- **No compile diagnostic is owed for widget scope.** Spec 03's normative refusal
+  is compose-time — "a child node id that composition cannot classify is a
+  compose-time refusal" — and a widget-scoped id is always classifiable: it is
+  either qualified by a registered widget root or, when the resolving component
+  is the page itself and has no instance path, page-wide, which is the same
+  answer page scope gives.
+
+Two follow-ups are named here rather than implied by the lowering:
+
+- **Cross-container patches are not wired.** "Cross-runtime writes are event
+  patches" above describes the intended contract, not current behavior. A write
+  updates the writing container's graph only; the `writeShared` routing that
+  would emit the versioned `CustomEvent` for a `container`-scoped instance is a
+  separate change and needs a ruling on the patch contract before it lands.
+- **Cross-file definitions fail closed.** Importing a definition from another
+  `.tsrx` module reports `MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED`, because the
+  module graph interface carries no shared definitions for the importing module
+  to read the factory's nodes from. That is deliberate: an instance resolved
+  without its nodes would render blank and never update.
+
 #### Shared examples
 
 **Request session**

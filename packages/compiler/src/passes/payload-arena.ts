@@ -8,6 +8,7 @@ import type {
 	SemanticGraphBinding,
 } from '../artifacts.ts';
 import {
+	graphBindingMap,
 	resolveGraphPath,
 	runtimeGraphDependencyPath,
 	runtimeGraphReadPath,
@@ -15,6 +16,7 @@ import {
 	uniqueBy,
 } from '../artifact-helpers/graph-paths.ts';
 import { createRenderData } from './render-data/index.ts';
+import { resolveSharedInstanceGraphPath } from './semantic-graph/collect-shared.ts';
 
 export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact {
 	const renderData =
@@ -32,6 +34,8 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 	const bindings = new Map<string, SemanticGraphBinding>();
 	const bindingsById = new Map<string, SemanticGraphBinding>();
 	const aliases = semanticAliasMap(input.semanticGraph);
+	const componentBindings = graphBindingMap(input.semanticGraph, null);
+	const componentAliases = semanticAliasMap(input.semanticGraph, null);
 
 	for (const binding of input.semanticGraph.graphBindings) {
 		bindings.set(binding.name, binding);
@@ -158,7 +162,10 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			];
 		}
 
-		const resolved = resolveGraphPath(read.source, bindings, aliases);
+		// Component scope only: a factory local and the instance local markup names routinely collide.
+		const resolved =
+			resolveGraphPath(read.source, componentBindings, componentAliases) ??
+			resolveSharedInstanceGraphPath(read.source, input.semanticGraph);
 		if (!resolved) return [];
 
 		return [
@@ -292,6 +299,9 @@ function resolveElementHandleBinding(
 	bindings: ReadonlyMap<string, SemanticGraphBinding>,
 	aliases: ReturnType<typeof semanticAliasMap>,
 ): SemanticGraphBinding | undefined {
+	const shared = resolveSharedInstanceGraphPath(binding.handleName, input.semanticGraph);
+	if (shared?.binding.kind === 'element' && shared.path.length === 0) return shared.binding;
+
 	const direct = resolveGraphPath(binding.handleName, bindings, aliases);
 	if (!direct) return undefined;
 	if (direct.binding.kind === 'element' && direct.path.length === 0) return direct.binding;

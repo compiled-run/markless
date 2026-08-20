@@ -2,7 +2,7 @@ export type AsyncComputedValue<T> = T extends Promise<infer Value> ? Awaited<Val
 
 export type ElementHandle<T extends Element = Element> = T | undefined;
 
-export type SharedScope = 'request' | 'container' | 'page';
+export type SharedScope = 'request' | 'container' | 'page' | 'widget';
 
 export type SharedOptions = {
 	readonly scope: SharedScope;

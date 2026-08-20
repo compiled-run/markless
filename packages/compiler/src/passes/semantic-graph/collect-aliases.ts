@@ -106,7 +106,13 @@ export function collectObjectPatternAliases(
 		const target = `${targetBase}.${key}`;
 		const value = property.value as AnyNode | undefined;
 		if (value?.type === 'AssignmentPattern') {
-			diagnoseDefaultAlias(value, target, state);
+			const owned = propOwner && {
+				...propOwner,
+				propPath: [...propOwner.propPath, key],
+			};
+			if (!owned || !recordDefaultedPropAlias(value, target, owned, state)) {
+				diagnoseDefaultAlias(value, target, state);
+			}
 			continue;
 		}
 
@@ -251,6 +257,48 @@ type PropAliasOwner = {
 
 function sourceBindingId(span: { readonly start: number; readonly end: number }): string {
 	return `binding:${span.start}:${span.end}`;
+}
+
+// A component signature's destructuring default is the one place a part states
+// what an omitted prop means, so the prop local records the default expression
+// and every emitter that materializes the local applies it.
+function recordDefaultedPropAlias(
+	pattern: AnyNode,
+	target: string,
+	owner: PropAliasOwner,
+	state: WalkState,
+): boolean {
+	const local = pattern.left as AnyNode | undefined;
+	const fallback = pattern.right as AnyNode | undefined;
+	if (local?.type !== 'Identifier' || typeof local.name !== 'string' || !fallback) return false;
+
+	const span = sourceSpan(local, state.filename);
+	if (!span) return false;
+
+	const bindingId = sourceBindingId(span);
+	const defaultSource = expressionSource(fallback, state.source);
+	state.graph.aliases.push({
+		name: local.name,
+		target,
+		bindingId,
+		componentId: owner.componentId,
+		componentName: owner.componentName,
+		propPath: owner.propPath,
+		defaultSource,
+		...sharedScope(state),
+		declarationKind: 'const',
+		sourceSpan: span,
+	});
+	state.graph.componentPropBindings.push({
+		componentId: owner.componentId,
+		componentName: owner.componentName,
+		bindingId,
+		localName: local.name,
+		propPath: owner.propPath,
+		defaultSource,
+		sourceSpan: span,
+	});
+	return true;
 }
 
 function recordComponentPropBinding(
