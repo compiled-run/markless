@@ -169,7 +169,8 @@ function lowerModuleStorageDeclaration(
 
 export function destructureProps(
 	propNames: ReadonlyArray<string>,
-	component?: AnyNode,
+	component: AnyNode | undefined,
+	source: string,
 ): string | null {
 	if (propNames.length === 0) return null;
 	const param = component ? asNodes(component.params)[0] : undefined;
@@ -184,21 +185,28 @@ export function destructureProps(
 		}
 		const key = property.key as AnyNode | undefined;
 		const value = property.value as AnyNode | undefined;
-		const fallback = getIdentifierName(value) ?? getIdentifierName(key);
+		// The authored default is re-emitted here, so the body local means what
+		// JavaScript says it means for an omitted or explicitly undefined prop.
+		const pattern = value?.type === 'AssignmentPattern' ? value : undefined;
+		const local = pattern ? (pattern.left as AnyNode | undefined) : value;
+		const fallback = getIdentifierName(local) ?? getIdentifierName(key);
 		if (!fallback) return [];
+		const defaultSource = pattern?.right
+			? ` = ${expressionSource(pattern.right as AnyNode, source)}`
+			: '';
 		if (
 			property.type === 'Property' &&
 			!property.computed &&
 			key?.type === 'Identifier' &&
-			value?.type === 'Identifier'
+			local?.type === 'Identifier'
 		) {
 			const authoredName = getIdentifierName(key);
-			const localName = getIdentifierName(value);
+			const localName = getIdentifierName(local);
 			if (authoredName && localName && authoredName !== localName) {
-				return [`${authoredName}: ${localName}`];
+				return [`${authoredName}: ${localName}${defaultSource}`];
 			}
 		}
-		return [fallback];
+		return [`${fallback}${defaultSource}`];
 	});
 	return `	const { ${bindings.join(', ')} } = props ?? {};`;
 }

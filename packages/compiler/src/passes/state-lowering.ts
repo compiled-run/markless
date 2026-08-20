@@ -261,6 +261,8 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 		});
 	}
 
+	diagnostics.push(...escapedDefaultedPropDiagnostics(input));
+
 	return {
 		passId: 'state-lowering',
 		reads: uniqueBy(
@@ -556,6 +558,92 @@ function isUnloweredSharedSeed(
 	return [...(write.valueSource ?? '').matchAll(/(\.\s*)?\b[$A-Z_a-z][$\w]*\b/g)].some(
 		(match) => match[1] === undefined && !allowed.has(match[0].trim()),
 	);
+}
+
+// A destructuring default on a component signature is applied where the body
+// materializes the local: the render body, and the symbol modules that seed
+// state from a component-body assignment. Every other reader — a template
+// position, an event handler, a computed — takes the raw prop, so it fails
+// closed instead of quietly rendering undefined where a default was authored.
+function escapedDefaultedPropDiagnostics(
+	input: StateLoweringInput,
+): StateLoweringDiagnostic[] {
+	return input.semanticGraph.componentPropBindings.flatMap((binding) => {
+		if (binding.defaultSource === undefined) return [];
+
+		const seedValueSpans = input.semanticGraph.stateWrites.flatMap((write) =>
+			write.writeScope === 'component' &&
+			write.componentName === binding.componentName &&
+			write.operation === 'assign' &&
+			write.valueSpan
+				? [write.valueSpan]
+				: [],
+		);
+		const componentRange = /^component:(\d+):(\d+)$/.exec(binding.componentId) ?? undefined;
+		const escaped = [
+			...input.semanticGraph.stateReads.filter(
+				(read) =>
+					read.bindingId === binding.bindingId &&
+					!seedValueSpans.some(
+						(span) =>
+							read.sourceSpan !== undefined &&
+							span.start <= read.sourceSpan.start &&
+							span.end >= read.sourceSpan.end,
+					),
+			),
+			...input.semanticGraph.templateReads.filter(
+				(read) =>
+					componentRange !== undefined &&
+					read.sourceSpan !== undefined &&
+					Number(componentRange[1]) <= read.sourceSpan.start &&
+					Number(componentRange[2]) >= read.sourceSpan.end &&
+					referencesIdentifier(read.source, binding.localName),
+			),
+		];
+		const first = escaped[0];
+		return first
+			? [
+					escapedDefaultedPropDiagnostic(
+						binding.localName,
+						first.source,
+						first.sourceSpan,
+						input.semanticGraph.filename,
+					),
+				]
+			: [];
+	});
+}
+
+function referencesIdentifier(source: string, name: string): boolean {
+	return new RegExp(`(^|[^$\\w.])${name}($|[^$\\w])`).test(source);
+}
+
+function escapedDefaultedPropDiagnostic(
+	localName: string,
+	source: string,
+	sourceSpan: SourceSpan | undefined,
+	filename: string,
+): StateLoweringDiagnostic {
+	return {
+		code: 'MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
+		severity: 'error',
+		phase: 'state-lowering',
+		title: 'This prop default is only supported where the body assigns it',
+		message: `Cannot read "${source}" because the prop "${localName}" has a destructuring default, and this position reads the prop the consumer passed instead of the default.`,
+		why: 'A destructuring default runs only when the prop is undefined. The component body materializes the defaulted local, so a component-body assignment sees it; a template position, an event handler and a computed read the raw prop cell and would silently render undefined where a default was authored.',
+		primarySpan: sourceSpan ?? fallbackSpan(filename),
+		passId: 'state-lowering',
+		artifactKeys: ['semanticGraph', 'stateLowering'],
+		statePath: localName,
+		source,
+		suggestions: [
+			{
+				message:
+					'Assign the defaulted local to state in the component body and read that state here, or drop the default and write the fallback at the read site.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
+	};
 }
 
 function sharedSeedUnsupportedDiagnostic(

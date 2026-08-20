@@ -42,6 +42,8 @@ export type SemanticComponentPropDeclaration = {
 	readonly bindingId: string;
 	readonly localName: string;
 	readonly propPath: ReadonlyArray<string>;
+	// The authored destructuring default, applied only when the prop is undefined.
+	readonly defaultSource?: string;
 	readonly sourceSpan: SourceSpan;
 };
 
@@ -402,6 +404,7 @@ export type SemanticStateWrite = {
 	readonly operation: 'assign' | 'update' | 'call' | 'delete';
 	readonly assignmentOperator?: string;
 	readonly valueSource?: string;
+	readonly valueSpan?: SourceSpan;
 	readonly optional?: boolean;
 	readonly prefix?: boolean;
 	readonly updateOperator?: '++' | '--';
@@ -451,6 +454,7 @@ export type SemanticGraphAlias = {
 	readonly propPath?: ReadonlyArray<string>;
 	readonly sharedDefinitionId?: string;
 	readonly excludedPaths?: ReadonlyArray<ReadonlyArray<string>>;
+	readonly defaultSource?: string;
 	readonly declarationKind?: SemanticGraphBinding['declarationKind'];
 	readonly sourceSpan?: SourceSpan;
 };
@@ -837,6 +841,7 @@ export type StateLoweringDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_STATE_STALE_LOCAL_WRITE'
 		| 'MARKLESS_STATE_MODULE_ESCAPE'
 		| 'MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE'
+		| 'MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED'
 		| 'MARKLESS_SHARED_SEED_UNSUPPORTED'
 		| 'MARKLESS_SHARED_SEED_UNKNOWN_FIELD'
 		| 'MARKLESS_SHARED_MEMBER_UNKNOWN'

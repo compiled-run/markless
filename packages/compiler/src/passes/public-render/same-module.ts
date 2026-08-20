@@ -74,7 +74,7 @@ export function emitSameModuleSsrComponents(
 			']);',
 			localName ? `const ${localName} = { renderSsr: ${functionName} };` : null,
 			`async function ${functionName}(props = {}, marklessSsrRenderContext) {`,
-			destructureProps(rootInfo.propNames, rootInfo.component),
+			destructureProps(rootInfo.propNames, rootInfo.component, input.source.source),
 			...sharedSeedPassLines(componentSharedSeeds(input, componentName), valuesName),
 			`	const marklessSsrPayloadState = marklessSelectStateNodes(marklessCloneState(payloadState), ${JSON.stringify(
 				owned.cellIndexes,

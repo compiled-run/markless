@@ -1408,19 +1408,26 @@ function componentPropReadDeclarations(
 			: [];
 	}
 
-	return semanticGraph.componentPropBindings.flatMap((binding) =>
-		binding.componentName === componentName &&
-		sourceReferencesIdentifier(source, binding.localName)
-			? [
-					`\tconst ${binding.localName} = context.graph.read("prop:props", ${JSON.stringify(binding.propPath)});`,
-				]
-			: [],
-	);
+	return semanticGraph.componentPropBindings.flatMap((binding) => {
+		if (binding.componentName !== componentName) return [];
+		if (!sourceReferencesIdentifier(source, binding.localName)) return [];
+
+		const read = `context.graph.read("prop:props", ${JSON.stringify(binding.propPath)})`;
+		if (binding.defaultSource === undefined) return [`\tconst ${binding.localName} = ${read};`];
+
+		// A destructuring default runs only for an undefined prop, so the read is
+		// compared, not coalesced.
+		const passed = `marklessProp_${binding.localName}`;
+		return [
+			`\tconst ${passed} = ${read};`,
+			`\tconst ${binding.localName} = ${passed} === undefined ? (${binding.defaultSource}) : ${passed};`,
+		];
+	});
 }
 
 // The seed replaces the node's whole value, so a property assignment returns the
-// current value with that property merged in. Reading the node here is what lets
-// the factory initial survive everything the body did not assign.
+// current value with that property merged in: the factory initial survives every
+// field the body did not assign, and is overwritten by every field it did.
 function emitSharedSeedModule(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'shared-seed' }>,
 	propDeclarations: readonly string[],
@@ -1433,11 +1440,6 @@ function emitSharedSeedModule(
 		`export function ${exportName}(context) {`,
 		...propDeclarations,
 		`\tconst marklessSharedSeed = (${symbol.source});`,
-		// An omitted prop is undefined here; returning the node untouched is what
-		// leaves the factory's own initial standing.
-		`\tif (marklessSharedSeed === undefined) return context.graph.read(${JSON.stringify(
-			symbol.graphNodeId,
-		)}, []);`,
 		`\treturn ${sharedSeedValueSource(
 			`context.graph.read(${JSON.stringify(symbol.graphNodeId)}, [])`,
 			symbol.path,

@@ -4,7 +4,7 @@ import type { Children, PropsOf } from '@markless/core';
 export type CheckboxChecked = boolean | 'mixed';
 
 export type CheckboxRootProps = PropsOf<'div'> & {
-	/** The value the checkbox shows. Omit it and the family keeps the value itself. */
+	/** The value the checkbox shows. Omit it and the checkbox starts off. */
 	readonly checked?: CheckboxChecked;
 	readonly disabled?: boolean;
 	readonly required?: boolean;

@@ -667,12 +667,20 @@ inside one `.tsrx` module:
   resume. The compile fails with `MARKLESS_SHARED_MEMBER_UNKNOWN` naming the
   member and the definition. Dynamic property names (`s[key]`) keep their own
   `MARKLESS_STATE_DYNAMIC_PATH_READ`/`_WRITE` diagnostics.
-- **A seed whose value is undefined is a no-write.** An omitted prop reaches the
-  body as `undefined`. Seeding it would erase the factory's own initial, so the
-  seed is skipped and the factory value stands. That is what lets defaults live
-  in the factory alone: `s.checked = checked` needs no `?? false` chain. The
-  rule holds on all three seed paths — the server render body, the seed pass a
-  projecting component answers for its parts, and the browser seed symbol.
+- **An assignment always assigns; defaults live at the part signature.** A seed
+  writes whatever its expression evaluated to, `undefined` included, exactly as
+  the same statement would in plain JavaScript. What an omitted prop means is
+  stated once, as a destructuring default on the part's own signature:
+  `function Root({ checked = false }) @{ ... s.checked = checked }` seeds `false`
+  for a consumer who omits `checked` and for one who passes `checked={undefined}`,
+  because that is what a destructuring default does. The factory's initial value
+  is a placeholder for a field no body seeds, not the family's default. All three
+  seed paths agree — the server render body, the seed pass a projecting component
+  answers for its parts, and the browser seed symbol — and each applies the
+  signature default before the seed expression runs. A defaulted prop local read
+  anywhere other than a component-body assignment reads the raw prop instead of
+  the default, so that read fails closed with
+  `MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED`.
 - **A type assertion in the factory is transparent.** `state({ checked: false as
   boolean | 'mixed' })` declares the same known initial value as
   `state({ checked: false })`. `as`, `satisfies`, and `!` are unwrapped before

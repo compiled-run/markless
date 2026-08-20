@@ -74,9 +74,9 @@ export function renderBodyLines(
 	return indentLines(lines);
 }
 
-// `s.disabled = props.disabled ?? false` in a component body seeds the widget's
-// shared instance: the assigned value replaces the factory initial for this
-// render, so the emitted body sets the graph node instead of an absent local.
+// `s.disabled = disabled` in a component body seeds the widget's shared
+// instance: the assigned value replaces the factory initial for this render, so
+// the emitted body sets the graph node instead of an absent local.
 function sharedStateSeedLine(
 	statement: AnyNode,
 	input: PublicRenderModuleInput,
@@ -92,9 +92,9 @@ function sharedStateSeedLine(
 
 	const value = expressionSource(assignment.right as AnyNode, input.source.source);
 	const read = `${stateValuesName}.get(${JSON.stringify(resolved.binding.id)})`;
-	// An omitted prop reaches the body as undefined; seeding it would erase the
-	// factory's own initial, so the write only happens when a value arrived.
-	return `{ const marklessSharedSeed = (${value}); if (marklessSharedSeed !== undefined) ${stateValuesName}.set(${JSON.stringify(
+	// An assignment always assigns: an omitted prop with no destructuring default
+	// writes undefined, exactly as the same statement would in plain JavaScript.
+	return `{ const marklessSharedSeed = (${value}); ${stateValuesName}.set(${JSON.stringify(
 		resolved.binding.id,
 	)}, ${seedValueSource(read, resolved.path, 'marklessSharedSeed')}); }`;
 }

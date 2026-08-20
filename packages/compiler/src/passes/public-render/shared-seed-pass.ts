@@ -44,11 +44,11 @@ export function sharedSeedPassLines(
 			const id = JSON.stringify(graphNodeId);
 			return `		if (!marklessSsrSeeds.has(${id})) marklessSsrSeeds.set(${id}, ${staticValuesName}.get(${id}));`;
 		}),
-		// An omitted prop is undefined here; seeding it would erase the factory's
-		// own initial, so the write only happens when a value arrived.
+		// An assignment always assigns, so an omitted prop with no destructuring
+		// default seeds undefined the way plain JavaScript would.
 		...seeds.map((seed) => {
 			const id = JSON.stringify(seed.graphNodeId);
-			return `		{ const marklessSharedSeed = (${seed.source}); if (marklessSharedSeed !== undefined) marklessSsrSeeds.set(${id}, ${sharedSeedValueSource(
+			return `		{ const marklessSharedSeed = (${seed.source}); marklessSsrSeeds.set(${id}, ${sharedSeedValueSource(
 				`marklessSsrSeeds.get(${id})`,
 				seed.path,
 				'marklessSharedSeed',

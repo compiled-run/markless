@@ -10,9 +10,10 @@ import type {
 } from './checkbox-types.ts';
 
 // One instance per rendered `<checkbox.root>`: every part reads and writes this
-// object, so a part is placeable anywhere inside the root. Every default lives
-// here and nowhere else — a consumer who omits a prop writes nothing, so the
-// value below stands and the parts need no `??` chain.
+// object, so a part is placeable anywhere inside the root. The values below are
+// placeholders, not defaults: `<checkbox.root>` seeds every one of them on every
+// render, and what an omitted prop means is stated once, as a destructuring
+// default on the root's signature.
 export const checkboxState = shared(
 	() => {
 		const checkbox = state({
@@ -22,8 +23,7 @@ export const checkboxState = shared(
 			// A string, not a boolean, so `aria-invalid` is a plain path read.
 			invalid: 'false',
 			name: '',
-			// What a browser submits for a checkbox with no value of its own.
-			value: 'on',
+			value: '',
 		});
 		// The relationship, not a string: the compiler mints this widget's id and
 		// writes it on the trigger and on every position that names the handle.
@@ -43,11 +43,12 @@ export const checkboxState = shared(
 );
 
 export function CheckboxRoot({
-	checked,
-	disabled,
-	required,
-	name,
-	value,
+	checked = false,
+	disabled = false,
+	required = false,
+	name = '',
+	// What a browser submits for a checkbox with no value of its own.
+	value = 'on',
 	onChange,
 	children,
 	...rest

@@ -291,7 +291,9 @@ export function Panel() @{
 	expect(errors(compiled)).toEqual([]);
 });
 
-// B5 (owner ruling) — an omitted prop seeds nothing, so the factory initial stands.
+// B5 (owner ruling, 2026-08-20) — an assignment always assigns. A part with no
+// destructuring default writes whatever the expression evaluated to, undefined
+// included, exactly as the same statement would in plain JavaScript.
 const omittedSeedSource = `
 import { shared, state } from '@markless/core';
 
@@ -308,17 +310,26 @@ export function Root({ checked, children }) @{
 }
 `;
 
-test('an omitted-prop seed leaves the factory initial in place during SSR', async () => {
+// The same family, authored the ruled way: the default lives at the part
+// signature, so an omitted prop seeds the default instead of undefined.
+const defaultedSeedSource = omittedSeedSource.replace(
+	'Root({ checked, children })',
+	"Root({ checked = false, children })",
+);
+
+test('a seed with no destructuring default writes unconditionally during SSR', async () => {
 	const compiled = await compile('src/spike.tsrx', omittedSeedSource);
 
-	// The seed writes only when the consumer actually passed a value.
-	expect(compiled.publicRenderModule.ssrModuleSource).toContain('!== undefined');
 	expect(compiled.publicRenderModule.ssrModuleSource).toContain(
-		'marklessSsrRenderStateValues.set("shared:src/spike.tsrx#spike/state:s"',
+		'{ const marklessSharedSeed = (checked); ' +
+			'marklessSsrRenderStateValues.set("shared:src/spike.tsrx#spike/state:s", ' +
+			'{ ...marklessSsrRenderStateValues.get("shared:src/spike.tsrx#spike/state:s"), ' +
+			'["checked"]: marklessSharedSeed }); }',
 	);
+	expect(errors(compiled)).toEqual([]);
 });
 
-test('the CSR seed symbol returns the untouched node when the prop is omitted', async () => {
+test('the CSR seed symbol writes the evaluated value with no undefined guard', async () => {
 	const compiled = await compile('src/spike.tsrx', omittedSeedSource);
 	const seed = compiled.symbolResolver.symbols.find(
 		(candidate) => candidate.kind === 'shared-seed',
@@ -327,11 +338,85 @@ test('the CSR seed symbol returns the untouched node when the prop is omitted', 
 		(candidate) => candidate.symbolId === seed?.id,
 	);
 
-	expect(module?.source).toContain('=== undefined');
+	expect(module?.source).not.toContain('undefined');
 	expect(module?.source).toContain(
-		'return context.graph.read("shared:src/spike.tsrx#spike/state:s", []);',
+		'return { ...context.graph.read("shared:src/spike.tsrx#spike/state:s", []), ' +
+			'["checked"]: marklessSharedSeed };',
 	);
 	expect(errors(compiled)).toEqual([]);
+});
+
+test('a destructuring default reaches the SSR body local the seed reads', async () => {
+	const compiled = await compile('src/spike.tsrx', defaultedSeedSource);
+
+	expect(compiled.publicRenderModule.ssrModuleSource).toContain(
+		'const { checked = false, children } = props ?? {};',
+	);
+	expect(errors(compiled)).toEqual([]);
+});
+
+test('the CSR seed symbol applies the destructuring default to the prop it reads', async () => {
+	const compiled = await compile('src/spike.tsrx', defaultedSeedSource);
+	const seed = compiled.symbolResolver.symbols.find(
+		(candidate) => candidate.kind === 'shared-seed',
+	);
+	const module = compiled.symbolModules.modules.find(
+		(candidate) => candidate.symbolId === seed?.id,
+	);
+
+	// `=== undefined` here is the destructuring default's own rule, not a skipped
+	// write: an explicit `checked={undefined}` takes the default too.
+	expect(module?.source).toContain(
+		'const marklessProp_checked = context.graph.read("prop:props", ["checked"]);',
+	);
+	expect(module?.source).toContain(
+		'const checked = marklessProp_checked === undefined ? (false) : marklessProp_checked;',
+	);
+	expect(errors(compiled)).toEqual([]);
+});
+
+test('the projected-child seed pass writes the seed unconditionally too', async () => {
+	const compiled = await compile('src/spike.tsrx', defaultedSeedSource);
+	const seedPass = (compiled.publicRenderModule.ssrModuleSource ?? '').split(
+		'marklessSharedSeeds',
+	)[2];
+
+	expect(seedPass).toContain(
+		'{ const marklessSharedSeed = (checked); marklessSsrSeeds.set(',
+	);
+});
+
+test('a defaulted prop read outside a body assignment fails closed', async () => {
+	const compiled = await compile(
+		'src/spike.tsrx',
+		`
+import { shared, state } from '@markless/core';
+
+export const spike = shared(() => {
+	const s = state({ checked: true });
+	return { ...s, toggle() { s.checked = false; } };
+}, { scope: 'widget' });
+
+export function Root({ checked = false, children }) @{
+	const s = spike();
+	s.checked = checked;
+
+	<div data-root ui-checked={s.checked} data-raw={checked}>{children}</div>
+}
+`,
+	);
+
+	expect(
+		compiled.stateLowering.diagnostics.filter(
+			(diagnostic) => diagnostic.severity === 'error',
+		),
+	).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED',
+			severity: 'error',
+			phase: 'state-lowering',
+		}),
+	]);
 });
 
 // B6 (owner ruling) — a family shape that is page-scoped only by omission.
