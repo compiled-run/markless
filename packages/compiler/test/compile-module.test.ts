@@ -4476,7 +4476,7 @@ export function App() @{
 	expect(module?.kind).toBe('behavior');
 	expect(module?.source).toContain('function installChart(options) {');
 	expect(module?.source).toContain('canvas.dataset.points = String(options.points);');
-	expect(module?.source).toContain('const behavior = (function installChart(options)');
+	expect(module?.source).toContain('const behavior = function installChart(options)');
 });
 
 test('compileTsrxModule composes imported child BUTTON counters for SSR resume', async () => {

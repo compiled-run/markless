@@ -264,14 +264,6 @@ function countMapSegments(mappings: string): number {
 		.flatMap((line) => line.split(',').filter((segment) => segment.length > 0)).length;
 }
 
-/** Leading whitespace only. Tokens, blank lines, and line breaks stay put. */
-function normalizeIndentation(code: string): string {
-	return code
-		.split('\n')
-		.map((line) => line.replace(/^[\t ]+/, ''))
-		.join('\n');
-}
-
 /**
  * Reprint a module through the same printer.
  *
@@ -362,41 +354,14 @@ test('both paths take the bare-context.read branch identically', async () => {
 	).resolves.toEqual(fixture.expectedValue);
 });
 
-test('the printed module is not byte-equal, and the difference is exactly the printer normalizing', async () => {
-	const summary: Record<string, ReadonlyArray<string>> = {};
-
+test('the swapped production path is byte-equal to the printed module', async () => {
+	// The swap wired the async-runner build through `emitSymbolModuleNodes`, so
+	// the module the compiler ships and the module this suite prints are one path.
 	for (const fixture of FIXTURES) {
 		const paths = await bothPaths(fixture);
-		summary[fixture.name] = differenceClasses(paths.spliced, paths.printed);
-	}
-
-	// Every class here is a printer normalization the spec already records as a
-	// known upstream behavior; none of them changes what the module does, and
-	// `token-divergence-beyond-layout` appears nowhere. This is the diff the
-	// owner's re-baseline decision is made against.
-	const layoutOnly = [
-		'blank-lines-dropped',
-		'indentation-tabs-to-spaces',
-		'trailing-newline-dropped',
-	];
-	expect(summary).toEqual({
-		'single-dependency': layoutOnly,
-		'member-path-dependency': layoutOnly,
-		'chained-runner': layoutOnly,
-		'chained-runner-upstream': layoutOnly,
-		'signal-consuming-runner': layoutOnly,
-	});
-});
-
-test('normalizing indentation alone does not make the two paths equal', async () => {
-	for (const fixture of FIXTURES) {
-		const paths = await bothPaths(fixture);
-
-		expect(paths.printed).not.toBe(paths.spliced);
-		// Stated as a fact, not as a wish: indentation is one of three differences,
-		// so an indentation-only normalizer cannot close the gap and the swap needs
-		// the owner's approval on the rest.
-		expect(normalizeIndentation(paths.printed)).not.toBe(normalizeIndentation(paths.spliced));
+		expect(paths.spliced, `${fixture.name}: production diverged from the printed module`).toBe(
+			paths.printed,
+		);
 	}
 });
 

@@ -95,18 +95,41 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 	const asyncComputedNodeIds = asyncComputedGraphNodeIds(input.semanticGraph);
 	const branchArmsBySite = renderBranchArms(input.renderData, asyncComputedNodeIds);
 	const boundaryArmsById = renderBoundaryArms(input.renderData, asyncComputedNodeIds);
+	const sourceFileName = input.source?.filename ?? 'markless-module.tsrx';
+	const authoredSource = input.source?.source ?? '';
 	return {
 		passId: 'symbol-modules',
 		modules: input.symbolResolver.symbols.flatMap((symbol) => {
 			if (unsupportedCaptureSymbolIds.has(symbol.id)) return [];
 			if (symbol.kind === 'branch-update') {
 				const arms = branchArmsBySite.get(symbol.branchSiteId);
-				return arms ? [emitBranchUpdateModule(symbol, arms)] : [];
+				if (!arms) return [];
+				return [
+					{
+						symbolId: symbol.id,
+						kind: symbol.kind,
+						exportName: symbolExportName(symbol.id),
+						source: emitBranchUpdateModuleNodes({ symbol, arms, sourceFileName, authoredSource })
+							.code,
+					},
+				];
 			}
 			if (symbol.kind === 'async-boundary-update') {
 				const arms = boundaryArmsById.get(symbol.boundaryId);
-				if (arms) return [emitAsyncBoundaryUpdateModule(symbol, arms)];
-				return [];
+				if (!arms) return [];
+				return [
+					{
+						symbolId: symbol.id,
+						kind: symbol.kind,
+						exportName: symbolExportName(symbol.id),
+						source: emitAsyncBoundaryUpdateModuleNodes({
+							symbol,
+							arms,
+							sourceFileName,
+							authoredSource,
+						}).code,
+					},
+				];
 			}
 			return emitSymbolModule(
 				symbol,
@@ -118,6 +141,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 				input.semanticGraph,
 				input.renderData,
 				input.omitAuthoredSource === true,
+				sourceFileName,
 			);
 		}),
 		diagnostics: input.captureAnalysis.diagnostics,
@@ -252,52 +276,6 @@ function renderChunkParts(
 	return parts;
 }
 
-// A branch flip module: evaluate the compiled test through graph reads, pick
-// the arm, and rebuild that arm's HTML from static parts plus graph-read
-// slots. Whole-range replacement only — no diffing, no component execution.
-function emitBranchUpdateModule(
-	symbol: Extract<PlannedSymbol, { kind: 'branch-update' }>,
-	arms: PublicRenderPlanBranchArms,
-): GeneratedSymbolModule {
-	const exportName = symbolExportName(symbol.id);
-	const testExpression = arms.testRead
-		? `context.graph.read(${JSON.stringify(arms.testRead.graphNodeId)}${arms.testRead.path.length > 0 ? `, ${JSON.stringify(arms.testRead.path)}` : ''})`
-		: 'undefined';
-	const armSelector = arms.armTests
-		? `marklessSelectSwitchArm(${testExpression}, ${JSON.stringify(arms.armTests)})`
-		: `(${testExpression}) ? 0 : 1`;
-	const selectorHelper = arms.armTests
-		? 'function marklessSelectSwitchArm(value, tests) { for (let index = 0; index < tests.length; index++) { if (tests[index] !== null && value === tests[index]) return index; } return tests.indexOf(null); }'
-		: null;
-	// Arm-scoped flips may carry repeat parts: rows rebuild from a live graph
-	// read of the collection at flip time (still no component execution).
-	const hasRepeatParts = arms.arms.some((arm) => arm.some((part) => 'repeat' in part));
-	const partExpression = hasRepeatParts
-		? 'parts.map((part) => part.text !== undefined ? part.text : part.repeat !== undefined ? marklessBranchRows(part.repeat, context.graph) : marklessBranchText(context.graph.read(part.read.graphNodeId, part.read.path))).join("")'
-		: 'parts.map((part) => part.text !== undefined ? part.text : marklessBranchText(context.graph.read(part.read.graphNodeId, part.read.path))).join("")';
-	const rowsHelper = hasRepeatParts
-		? 'function marklessBranchRows(repeat, graph) { const items = graph.read(repeat.read.graphNodeId, repeat.read.path); if (!Array.isArray(items)) return ""; return items.map((item) => repeat.rowParts.map((row) => row.text !== undefined ? row.text : row.itemPath !== undefined ? marklessBranchText(row.itemPath.reduce((value, key) => value == null ? value : value[key], item)) : marklessBranchText(graph.read(row.read.graphNodeId, row.read.path))).join("")).join(""); }'
-		: null;
-	const source = [
-		`const marklessBranchArms = ${JSON.stringify(arms.arms)};`,
-		...(selectorHelper ? [selectorHelper] : []),
-		`export function ${exportName}(context) {`,
-		`	const arm = context.arm ?? (${armSelector});`,
-		'	const parts = marklessBranchArms[arm] ?? [];',
-		`	const html = ${partExpression};`,
-		'	return { arm, html };',
-		'}',
-		'function marklessBranchText(value) { return String(value == null ? "" : value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }',
-		...(rowsHelper ? [rowsHelper] : []),
-	].join('\n');
-	return {
-		symbolId: symbol.id,
-		kind: symbol.kind,
-		exportName,
-		source,
-	};
-}
-
 const emptyLocalNames = new Set<string>();
 
 function rowLocalNamesBySymbol(
@@ -369,6 +347,7 @@ function emitSymbolModule(
 	semanticGraph: SymbolModulesInput['semanticGraph'],
 	renderData: SymbolModulesInput['renderData'],
 	omitAuthoredSource: boolean,
+	sourceFileName: string,
 ): GeneratedSymbolModule[] {
 	if (symbol.kind === 'event-handler' || symbol.kind === 'callback-prop') {
 		return [
@@ -377,45 +356,6 @@ function emitSymbolModule(
 				kind: symbol.kind,
 				exportName: symbolExportName(symbol.id),
 				source: emitEventHandlerModule(symbol, localNames, captureSlots, usesArgumentVector),
-			},
-		];
-	}
-
-	if (symbol.kind === 'behavior' && canEmitBehaviorModule(symbol)) {
-		return [
-			{
-				symbolId: symbol.id,
-				kind: symbol.kind,
-				exportName: symbolExportName(symbol.id),
-				source: emitBehaviorModule(symbol, omitAuthoredSource),
-			},
-		];
-	}
-
-	if (symbol.kind === 'async-computed-runner') {
-		return [
-			{
-				symbolId: symbol.id,
-				kind: symbol.kind,
-				exportName: symbolExportName(symbol.id),
-				source: emitAsyncComputedRunnerModule(symbol, captureSlots, omitAuthoredSource),
-			},
-		];
-	}
-
-	if (symbol.kind === 'state-initializer') {
-		return [
-			{
-				symbolId: symbol.id,
-				kind: symbol.kind,
-				exportName: symbolExportName(symbol.id),
-				source: emitStateInitializerModule(
-					symbol,
-					moduleDeclarations,
-					moduleImports,
-					stateInitializerPropDeclarations(symbol, semanticGraph, renderData),
-					omitAuthoredSource,
-				),
 			},
 		];
 	}
@@ -431,14 +371,24 @@ function emitSymbolModule(
 		];
 	}
 
-	if (symbol.kind !== 'dom-update') return [];
+	const emitted = emitSymbolModuleNodes({
+		symbol,
+		moduleDeclarations,
+		moduleImports,
+		captureSlots,
+		semanticGraph,
+		renderData,
+		omitAuthoredSource,
+		sourceFileName,
+	});
+	if (!emitted) return [];
 
 	return [
 		{
 			symbolId: symbol.id,
 			kind: symbol.kind,
 			exportName: symbolExportName(symbol.id),
-			source: emitDomBindingModule(symbol),
+			source: emitted.code,
 		},
 	];
 }
@@ -1398,149 +1348,10 @@ function textDomUpdateValueNode(target: DomTextTarget): EmissionNode {
 	);
 }
 
-function emitDomBindingModule(
-	symbol: Extract<PlannedSymbol, { readonly kind: 'dom-update' }>,
-): string {
-	const exportName = symbolExportName(symbol.id);
-	if (
-		symbol.target.kind === 'text' &&
-		symbol.target.prefix === undefined &&
-		symbol.target.suffix === undefined &&
-		symbol.target.trueValue === undefined &&
-		symbol.target.falseValue === undefined
-	) {
-		return [
-			"import { marklessUpdateText } from '@markless/web/fns/update-text';",
-			'',
-			'/* text update leaf marker: type: "setText" */',
-			`export function ${exportName}(context) {`,
-			`	return marklessUpdateText(context, ${JSON.stringify(symbol.hostNodeId)});`,
-			'}',
-			'',
-		].join('\n');
-	}
-	const entryProperties = domJournalEntryProperties(symbol);
-
-	return [
-		`export function ${exportName}(context) {`,
-		'	return {',
-		...entryProperties,
-		'	};',
-		'}',
-		'',
-	].join('\n');
-}
-
-function domJournalEntryProperties(
-	symbol: Extract<PlannedSymbol, { readonly kind: 'dom-update' }>,
-): string[] {
-	const locator = `context.domUpdate?.hostNodeId ?? ${JSON.stringify(symbol.hostNodeId)}`;
-	const value = 'context.value';
-
-	if (symbol.target.kind === 'text') {
-		return [
-			`		type: ${JSON.stringify('setText')},`,
-			`		locator: ${locator},`,
-			`		value: ${textDomUpdateValueSource(symbol.target, value)},`,
-		];
-	}
-
-	if (symbol.target.kind === 'property') {
-		return [
-			`		type: ${JSON.stringify('setProp')},`,
-			`		locator: ${locator},`,
-			`		name: ${JSON.stringify(symbol.target.name)},`,
-			`		value: ${value},`,
-		];
-	}
-
-	if (symbol.target.kind === 'class') {
-		return [
-			`		type: ${JSON.stringify('setAttr')},`,
-			`		locator: ${locator},`,
-			`		name: ${JSON.stringify('class')},`,
-			symbol.target.trueValue !== undefined && symbol.target.falseValue !== undefined
-				? `		value: ${value} ? ${JSON.stringify(symbol.target.trueValue)} : ${JSON.stringify(symbol.target.falseValue)},`
-				: `		value: ${value},`,
-		];
-	}
-
-	if (symbol.target.kind === 'style') {
-		return [
-			`		type: ${JSON.stringify('setAttr')},`,
-			`		locator: ${locator},`,
-			`		name: ${JSON.stringify('style')},`,
-			`		value: ${value},`,
-		];
-	}
-
-	return [
-		`		type: ${JSON.stringify('setAttr')},`,
-		`		locator: ${locator},`,
-		`		name: ${JSON.stringify(symbol.target.name)},`,
-		`		value: ${value},`,
-	];
-}
-
-function textDomUpdateValueSource(
-	target: Extract<
-		Extract<PlannedSymbol, { readonly kind: 'dom-update' }>['target'],
-		{ readonly kind: 'text' }
-	>,
-	value: string,
-): string {
-	const conditional =
-		target.trueValue !== undefined && target.falseValue !== undefined
-			? `${value} ? ${JSON.stringify(target.trueValue)} : ${JSON.stringify(target.falseValue)}`
-			: null;
-	if (target.prefix === undefined && target.suffix === undefined) return conditional ?? value;
-
-	const base = conditional ? `(${conditional})` : value;
-	return `${JSON.stringify(target.prefix ?? '')} + (${base} == null ? "" : String(${base})) + ${JSON.stringify(target.suffix ?? '')}`;
-}
-
 // Nothing reads this export at runtime; consumer builds drop it rather than
 // ship one authored-source string per symbol chunk.
 function authoredSourceLines(source: string, omit: boolean): string[] {
 	return omit ? [] : [`export const authoredSource = ${JSON.stringify(source)};`];
-}
-
-function emitBehaviorModule(
-	symbol: Extract<PlannedSymbol, { readonly kind: 'behavior' }>,
-	omitAuthoredSource: boolean,
-): string {
-	const exportName = symbolExportName(symbol.id);
-	const inputCount = symbol.inputSources.length;
-	const imports = symbol.moduleImport ? [emitModuleImport(symbol.moduleImport), ''] : [];
-	const functionSource =
-		inputCount > 0 ? callableBehaviorFunctionSource(symbol) : symbol.functionSource;
-
-	return [
-		...imports,
-		...authoredSourceLines(symbol.source, omitAuthoredSource),
-		`export const behaviorFunctionSource = ${JSON.stringify(symbol.functionSource)};`,
-		`export const behaviorInputSources = ${JSON.stringify(symbol.inputSources)};`,
-		'',
-		`export function ${exportName}(context) {`,
-		inputCount > 0
-			? `	const inputs = context.behaviorInputs ?? new Array(${inputCount}).fill(undefined);`
-			: '	const inputs = [];',
-		inputCount > 0
-			? `	const behavior = ${functionSource}(...inputs);`
-			: `	const behavior = ${functionSource};`,
-		'	return behavior(context.element);',
-		'}',
-		'',
-	].join('\n');
-}
-
-function callableBehaviorFunctionSource(
-	symbol: Extract<PlannedSymbol, { readonly kind: 'behavior' }>,
-): string {
-	if (symbol.moduleImport) return symbol.functionSource;
-	if (!isInlineFunctionSource(symbol.functionSource)) return symbol.functionSource;
-
-	return `(${symbol.functionSource})`;
 }
 
 export function canEmitBehaviorModule(
@@ -1726,135 +1537,6 @@ function behaviorProjection(functionSource: string, filename: string): BehaviorP
 	}
 
 	return { source, functionExpression: last.expression as unknown as EmissionNode };
-}
-
-function emitAsyncComputedRunnerModule(
-	symbol: Extract<PlannedSymbol, { readonly kind: 'async-computed-runner' }>,
-	captureSlots: ReadonlyArray<CaptureSlot>,
-	omitAuthoredSource: boolean,
-): string {
-	const exportName = symbolExportName(symbol.id);
-	const imports = uniqueModuleImports(symbol.moduleImports ?? []);
-	const dependencyDeclarations = asyncRunnerDependencyDeclarations(
-		symbol.dependencies ?? [],
-		captureSlots,
-	);
-
-	return [
-		...imports.map(emitModuleImport),
-		...(imports.length > 0 ? [''] : []),
-		...authoredSourceLines(symbol.source, omitAuthoredSource),
-		'',
-		`export function ${exportName}(context) {`,
-		'	const read = context.graph?.read ? context.graph.read.bind(context.graph) : context.read;',
-		...dependencyDeclarations,
-		`	const run = ${symbol.source};`,
-		'	return run({ key: context.key, signal: context.signal, read });',
-		'}',
-		'',
-	].join('\n');
-}
-
-function emitStateInitializerModule(
-	symbol: Extract<PlannedSymbol, { readonly kind: 'state-initializer' }>,
-	moduleDeclarations: readonly string[],
-	moduleImports: readonly SemanticModuleImport[],
-	propDeclarations: readonly string[],
-	omitAuthoredSource: boolean,
-): string {
-	const exportName = symbolExportName(symbol.id);
-	const declarations = referencedModuleDeclarations(symbol.source, moduleDeclarations);
-	const body = [symbol.source, ...declarations].join('\n');
-	const imports = uniqueModuleImports([
-		...(symbol.moduleImports ?? []),
-		...moduleImports.filter((moduleImport) =>
-			sourceReferencesIdentifier(body, moduleImport.localName),
-		),
-	]);
-	return [
-		...imports.map(emitModuleImport),
-		...(imports.length > 0 ? [''] : []),
-		...declarations,
-		...(declarations.length > 0 ? [''] : []),
-		...authoredSourceLines(symbol.source, omitAuthoredSource),
-		'',
-		`export function ${exportName}(${propDeclarations.length > 0 ? 'context' : ''}) {`,
-		...propDeclarations,
-		`\treturn (${symbol.source});`,
-		'}',
-		'',
-	].join('\n');
-}
-
-function stateInitializerPropDeclarations(
-	symbol: Extract<PlannedSymbol, { readonly kind: 'state-initializer' }>,
-	semanticGraph: SymbolModulesInput['semanticGraph'],
-	renderData: SymbolModulesInput['renderData'],
-): string[] {
-	if (!semanticGraph) return [];
-	const componentName =
-		semanticGraph.localDeclarations.find(
-			(declaration) =>
-				declaration.scope === 'component' && declaration.name === symbol.name,
-		)?.componentName ?? renderData?.root?.componentName;
-	if (!componentName) return [];
-
-	const propBinding = semanticGraph.graphBindings.find(
-		(binding) => binding.kind === 'prop' && binding.componentName === componentName,
-	);
-	if (!propBinding) return [];
-	if (propBinding.id !== 'prop:props') {
-		return sourceReferencesIdentifier(symbol.source, propBinding.name)
-			? [
-					`\tconst ${propBinding.name} = context.graph.read(${JSON.stringify(propBinding.id)}, []);`,
-				]
-			: [];
-	}
-
-	return semanticGraph.componentPropBindings.flatMap((binding) =>
-		binding.componentName === componentName &&
-		sourceReferencesIdentifier(symbol.source, binding.localName)
-			? [
-					`\tconst ${binding.localName} = context.graph.read("prop:props", ${JSON.stringify(binding.propPath)});`,
-				]
-			: [],
-	);
-}
-
-function referencedModuleDeclarations(
-	source: string,
-	declarations: readonly string[],
-): string[] {
-	const remaining = declarations.map((declaration) => ({
-		declaration,
-		names: moduleDeclarationNames(declaration),
-	}));
-	const selected: string[] = [];
-	let references = source;
-	let changed = true;
-	while (changed) {
-		changed = false;
-		for (let index = 0; index < remaining.length; index += 1) {
-			const candidate = remaining[index]!;
-			if (!candidate.names.some((name) => sourceReferencesIdentifier(references, name))) continue;
-			selected.push(candidate.declaration);
-			references += `\n${candidate.declaration}`;
-			remaining.splice(index, 1);
-			index -= 1;
-			changed = true;
-		}
-	}
-	return selected;
-}
-
-function moduleDeclarationNames(declaration: string): string[] {
-	const direct = declaration.match(/^(?:async\s+)?(?:function|class)\s+([A-Za-z_$][\w$]*)/);
-	if (direct?.[1]) return [direct[1]];
-	const variables = declaration.match(/^(?:const|let|var)\s+(.+?)(?:;|$)/s)?.[1];
-	if (!variables) return [];
-	return [...variables.matchAll(/(?:^|,)\s*([A-Za-z_$][\w$]*)\s*=/g)].map(
-		(match) => match[1]!,
-	);
 }
 
 // ---------------------------------------------------------------------------
@@ -2208,16 +1890,105 @@ function dedupeModuleImports(
 	return unique;
 }
 
+// ---------------------------------------------------------------------------
+// Sync computed derive emission — migrated to AST construction plus the printer
+// per `specs/framework/14-emission-codegen-migration.md` stage 1, sketch item 2.
+//
+// The authored derive function is parsed once, its dependency reads are
+// rewritten by *node identity* (invariant 6) rather than by span arithmetic over
+// the authored text, and the exported wrapper is printed through
+// `emit-codegen.ts` — which applies the TSRX-node assertion (invariant 4) and
+// the non-null source-map guard (invariant 3) at this site.
+//
+// The module frame around the printed function (imports, the `authoredSource`
+// export, the blank-line layout) is still assembled from lines. That is
+// deliberate: those pieces are produced by helpers shared with emitters this
+// unit does not own, and printing the whole module as one program would drop the
+// authored blank lines the printer does not preserve — a byte change beyond the
+// indentation difference this migration is scoped to.
+// ---------------------------------------------------------------------------
+
+/**
+ * The authored derive source is a function *expression* (`() => ...`,
+ * `function () { ... }`), which is not a module on its own — an anonymous
+ * `function () {}` at statement position is a syntax error. Wrapping it in a
+ * declarator makes it parseable without changing the text of the function
+ * itself, so a dependency's authored `source` still matches the wrapped text
+ * exactly.
+ */
+const DERIVE_SOURCE_PREFIX = 'const __marklessSyncComputedDerive = (\n';
+const DERIVE_SOURCE_SUFFIX = '\n);';
+const DERIVE_SOURCE_FILENAME = 'markless-sync-computed-derive.ts';
+
+/**
+ * The print input for one derive module's exported function.
+ *
+ * Exported so the site's focused test can run the foundation's determinism
+ * helper (invariant 7: print twice, then reparse and reprint) against the exact
+ * tree production builds.
+ */
+export function syncComputedDeriveEmissionInput(
+	symbol: Extract<PlannedSymbol, { readonly kind: 'sync-computed-derive' }>,
+	captureSlots: ReadonlyArray<CaptureSlot>,
+): EmissionPrintInput {
+	return syncComputedDeriveEmission(symbol, captureSlots).input;
+}
+
+function syncComputedDeriveEmission(
+	symbol: Extract<PlannedSymbol, { readonly kind: 'sync-computed-derive' }>,
+	captureSlots: ReadonlyArray<CaptureSlot>,
+): { readonly input: EmissionPrintInput; readonly statements: ReadonlyArray<EmissionNode> } {
+	const exportName = symbolExportName(symbol.id);
+	const wrappedSource = `${DERIVE_SOURCE_PREFIX}${symbol.source}${DERIVE_SOURCE_SUFFIX}`;
+	const statements = syncComputedDeriveStatements(symbol, captureSlots, wrappedSource);
+
+	const input: EmissionPrintInput = {
+		program: {
+			type: 'Program',
+			sourceType: 'module',
+			body: [
+				{
+					type: 'ExportNamedDeclaration',
+					specifiers: [],
+					source: null,
+					declaration: {
+						type: 'FunctionDeclaration',
+						id: identifierNode(exportName),
+						async: false,
+						generator: false,
+						params: [identifierNode('context')],
+						body: { type: 'BlockStatement', body: statements },
+					},
+				},
+			],
+		},
+		// The tree's offsets are offsets into the wrapped text, so the map is
+		// built against that text. Naming the *authored* file at every print site
+		// is the separate source-map wiring unit in the campaign sketch.
+		source: wrappedSource,
+		outputFileName: `${exportName}.js`,
+		site: {
+			phase: 'payload',
+			passId: 'symbol-modules',
+			sourceFileName: DERIVE_SOURCE_FILENAME,
+			symbolId: symbol.id,
+		},
+	};
+
+	return { input, statements };
+}
+
 function emitSyncComputedDeriveModule(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'sync-computed-derive' }>,
 	captureSlots: ReadonlyArray<CaptureSlot>,
 	omitAuthoredSource: boolean,
 ): string {
-	const exportName = symbolExportName(symbol.id);
-	const body = syncComputedDeriveBody(symbol, captureSlots);
+	const emission = syncComputedDeriveEmission(symbol, captureSlots);
+	const printed = printEmittedModule(emission.input);
+	const referenced = deriveReferencedIdentifierNames(emission.statements);
 	const imports = uniqueModuleImports(
 		(symbol.moduleImports ?? []).filter((moduleImport) =>
-			sourceReferencesIdentifier(body, moduleImport.localName),
+			referenced.has(moduleImport.localName),
 		),
 	);
 
@@ -2226,96 +1997,252 @@ function emitSyncComputedDeriveModule(
 		...(imports.length > 0 ? [''] : []),
 		...authoredSourceLines(symbol.source, omitAuthoredSource),
 		'',
-		`export function ${exportName}(context) {`,
-		...indentBody(body),
-		'}',
+		printed.code,
 		'',
 	].join('\n');
 }
 
-function syncComputedDeriveBody(
+/**
+ * The names the emitted body actually refers to, used to decide which module
+ * imports the emitted module still needs.
+ *
+ * This replaces a call into the string-scanner band (`sourceReferencesIdentifier`
+ * scans the emitted text), which is why it is here rather than reusing it: the
+ * campaign requires a migrated site to reach no scanner. Reading the tree is
+ * also more accurate — a name that appears only inside a string literal is not a
+ * reference, and the text scan counted it as one.
+ *
+ * Non-computed member properties and non-computed object keys are excluded: they
+ * are names of properties, not references to bindings.
+ */
+function deriveReferencedIdentifierNames(root: unknown): ReadonlySet<string> {
+	const names = new Set<string>();
+	const seen = new Set<object>();
+	const stack: unknown[] = [root];
+
+	while (stack.length > 0) {
+		const value = stack.pop();
+		if (!value || typeof value !== 'object') continue;
+		if (seen.has(value)) continue;
+		seen.add(value);
+
+		if (Array.isArray(value)) {
+			for (const item of value) stack.push(item);
+			continue;
+		}
+
+		const node = value as AnyNode;
+		if (node.type === 'Identifier' && typeof node.name === 'string') {
+			names.add(node.name);
+			continue;
+		}
+
+		for (const [key, child] of Object.entries(node)) {
+			if (REFERENCE_WALK_IGNORED_KEYS.has(key)) continue;
+			if (node.computed !== true && key === 'property' && node.type === 'MemberExpression') {
+				continue;
+			}
+			if (node.computed !== true && key === 'key' && node.type === 'Property') continue;
+			stack.push(child);
+		}
+	}
+
+	return names;
+}
+
+/** Side tables and back-pointers, which are not tree structure. */
+const REFERENCE_WALK_IGNORED_KEYS: ReadonlySet<string> = new Set([
+	'parent',
+	'loc',
+	'range',
+	'leadingComments',
+	'trailingComments',
+	'comments',
+]);
+
+function syncComputedDeriveStatements(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'sync-computed-derive' }>,
 	captureSlots: ReadonlyArray<CaptureSlot>,
-): string {
-	const body = eventHandlerBodySource(symbol.source);
-	if (!body) return 'return undefined;';
+	wrappedSource: string,
+): EmissionNode[] {
+	const derive = parseDeriveFunction(wrappedSource);
+	const body = derive?.body as AnyNode | undefined;
+	if (!body) return [returnUndefinedStatement()];
 
-	let emitted = body.source;
-	const replacements = (symbol.dependencies ?? [])
-		.flatMap((dependency) =>
-			readBodySpans(body.source, dependency).map((span) => {
-				const slot = captureSlots.find((candidate) =>
-					captureSlotMatchesRead(candidate, dependency),
-				);
-				return {
-					...span,
-					replacement: slot
-						? `context.capture.read(${JSON.stringify(slot.id)})`
-						: graphReadCallSource(
-								'context.graph.read',
-								dependency.graphNodeId,
-								dependency.path,
-							),
-				};
-			}),
-		)
-		.sort((left, right) => right.start - left.start || right.end - left.end);
+	const statements =
+		body.type === 'BlockStatement'
+			? asNodes(body.body)
+			: [{ type: 'ReturnStatement', argument: body } as AnyNode];
 
-	for (const replacement of replacements) {
-		emitted =
-			emitted.slice(0, replacement.start) +
-			replacement.replacement +
-			emitted.slice(replacement.end);
-	}
+	rewriteDeriveReads(statements, symbol.dependencies ?? [], captureSlots, wrappedSource);
 
-	return emitted.trim() || 'return undefined;';
+	if (statements.length === 0) return [returnUndefinedStatement()];
+	return statements as unknown as EmissionNode[];
 }
 
-function asyncRunnerDependencyDeclarations(
+function returnUndefinedStatement(): EmissionNode {
+	return { type: 'ReturnStatement', argument: identifierNode('undefined') };
+}
+
+function parseDeriveFunction(wrappedSource: string): AnyNode | null {
+	let program: AnyNode;
+	try {
+		const parsed = parseEmissionSource(wrappedSource, DERIVE_SOURCE_FILENAME);
+		if (parsed.errors.length > 0) return null;
+		program = parsed.program as unknown as AnyNode;
+	} catch {
+		// A derive whose authored source does not parse has no tree to rewrite.
+		// The caller emits `return undefined;` rather than shipping text that
+		// cannot be printed.
+		return null;
+	}
+
+	const declaration = asNodes(program.body)[0];
+	if (declaration?.type !== 'VariableDeclaration') return null;
+
+	const init = asNodes(declaration.declarations)[0]?.init;
+	if (!isNode(init)) return null;
+	if (init.type !== 'ArrowFunctionExpression' && init.type !== 'FunctionExpression') return null;
+
+	return init;
+}
+
+/**
+ * Keys the read walk does not descend into.
+ *
+ * This mirrors the ignore set `ast/nodes.ts#childNodes` uses, deliberately:
+ * the string path this replaced detected reads by walking with `childNodes`, so
+ * matching its blind spots — `id` above all, which keeps a declared function's
+ * own name from being rewritten into a graph read — is what makes the migrated
+ * emitter select the same reads as the emitter it replaces.
+ */
+const DERIVE_WALK_IGNORED_KEYS: ReadonlySet<string> = new Set([
+	'closingElement',
+	'comments',
+	'id',
+	'leadingComments',
+	'loc',
+	'metadata',
+	'openingElement',
+	'parent',
+	'range',
+	'trailingComments',
+]);
+
+/**
+ * Rewrite every dependency read in the derive body to a graph or capture read,
+ * in place, keyed on the node that carries the read.
+ *
+ * The outermost matching node wins: once a read is replaced the walk does not
+ * descend into it, so a dependency on `user.profile` and a dependency on `user`
+ * cannot both rewrite the same text. The string path had no such rule and
+ * corrupted the second splice when the spans nested.
+ */
+function rewriteDeriveReads(
+	statements: ReadonlyArray<AnyNode>,
 	dependencies: ReadonlyArray<SemanticGraphDependency>,
 	captureSlots: ReadonlyArray<CaptureSlot>,
-): string[] {
-	const declarations: string[] = [];
-	const seenNames = new Set<string>();
+	wrappedSource: string,
+): void {
+	if (dependencies.length === 0) return;
 
-	for (const dependency of dependencies) {
-		const declaration = asyncRunnerDependencyDeclaration(dependency);
-		if (!declaration || seenNames.has(declaration.name)) continue;
+	const visit = (
+		node: AnyNode,
+		parent: AnyNode | undefined,
+		replace: ((next: EmissionNode) => void) | null,
+	): void => {
+		const dependency = matchingDependency(node, parent, dependencies, wrappedSource);
+		if (dependency && replace) {
+			replace(deriveReadNode(dependency, captureSlots));
+			return;
+		}
 
-		seenNames.add(declaration.name);
-		const slot = captureSlots.find((candidate) =>
-			captureSlotMatchesRead(candidate, dependency),
-		);
-		declarations.push(
-			`	const ${declaration.name} = ${
-				slot
-					? `context.capture.read(${JSON.stringify(slot.id)})`
-					: graphReadCallSource('read', declaration.graphNodeId, declaration.path)
-			};`,
-		);
-	}
+		if (node.type === 'Property') {
+			visitPropertyChildren(node, visit);
+			return;
+		}
 
-	return declarations;
+		for (const [key, value] of Object.entries(node)) {
+			if (DERIVE_WALK_IGNORED_KEYS.has(key)) continue;
+
+			if (Array.isArray(value)) {
+				value.forEach((item, index) => {
+					if (!isNode(item)) return;
+					visit(item, node, (next) => {
+						value[index] = next;
+					});
+				});
+				continue;
+			}
+
+			if (!isNode(value)) continue;
+			visit(value, node, (next) => {
+				(node as Record<string, unknown>)[key] = next;
+			});
+		}
+	};
+
+	for (const statement of statements) visit(statement, undefined, null);
 }
 
-function asyncRunnerDependencyDeclaration(dependency: SemanticGraphDependency): {
-	readonly name: string;
-	readonly graphNodeId: string;
-	readonly path: ReadonlyArray<string>;
-} | null {
-	const sourcePath = staticSourcePath(dependency.source);
-	if (!sourcePath) return null;
+/**
+ * A shorthand property's key and value cover the same text, so a generic walk
+ * would match both. Only the value is a read; replacing it also has to drop the
+ * shorthand flag, or the printer would render the property as its key alone and
+ * silently discard the rewritten read.
+ */
+function visitPropertyChildren(
+	property: AnyNode,
+	visit: (
+		node: AnyNode,
+		parent: AnyNode | undefined,
+		replace: ((next: EmissionNode) => void) | null,
+	) => void,
+): void {
+	const key = property.key;
+	if (property.computed === true && isNode(key)) {
+		visit(key, property, (next) => {
+			(property as Record<string, unknown>).key = next;
+		});
+	}
 
-	const [name, ...memberPath] = sourcePath;
-	if (!name) return null;
+	const value = property.value;
+	if (!isNode(value)) return;
 
-	const path = dependency.path.slice(0, Math.max(0, dependency.path.length - memberPath.length));
+	visit(value, property, (next) => {
+		(property as Record<string, unknown>).value = next;
+		(property as Record<string, unknown>).shorthand = false;
+	});
+}
 
-	return {
-		name,
+function matchingDependency(
+	node: AnyNode,
+	parent: AnyNode | undefined,
+	dependencies: ReadonlyArray<SemanticGraphDependency>,
+	wrappedSource: string,
+): SemanticGraphDependency | null {
+	if (!isGraphReadExpression(node)) return null;
+	if (!isValuePositionGraphRead(node, parent)) return null;
+	if (typeof node.start !== 'number' || typeof node.end !== 'number') return null;
+
+	const text = wrappedSource.slice(node.start, node.end);
+	return dependencies.find((dependency) => dependency.source === text) ?? null;
+}
+
+function deriveReadNode(
+	dependency: SemanticGraphDependency,
+	captureSlots: ReadonlyArray<CaptureSlot>,
+): EmissionNode {
+	const slot = captureSlots.find((candidate) => captureSlotMatchesRead(candidate, dependency));
+	if (slot) {
+		return callNode(memberChainNode('context.capture.read'), [literalNode(slot.id)]);
+	}
+
+	return graphReadCall({
+		callee: 'context.graph.read',
 		graphNodeId: dependency.graphNodeId,
-		path,
-	};
+		path: dependency.path,
+	});
 }
 
 function staticSourcePath(source: string): ReadonlyArray<string> | null {
@@ -3777,27 +3704,6 @@ function emitElementHandleCall(
 	return [
 		`\tcontext.getElementHandle(${JSON.stringify(call.handleName)})?.${call.method}(${call.argumentSources.join(', ')});`,
 	];
-}
-
-// A boundary settle module: the runtime passes the settled status; the module
-// picks the @try or @catch arm and rebuilds its HTML from static parts plus
-// graph reads (the settled value already lives in the graph).
-function emitAsyncBoundaryUpdateModule(
-	symbol: Extract<PlannedSymbol, { kind: 'async-boundary-update' }>,
-	arms: PublicRenderPlanAsyncBoundaryArms,
-): GeneratedSymbolModule {
-	const exportName = symbolExportName(symbol.id);
-	const source = [
-		`const marklessBoundaryArms = ${JSON.stringify(arms.arms)};`,
-		`export function ${exportName}(context) {`,
-		'	const arm = context.status === "rejected" ? 1 : 0;',
-		'	const parts = marklessBoundaryArms[arm] ?? [];',
-		'	const html = parts.map((part) => part.text !== undefined ? part.text : marklessBoundaryText(context.graph.read(part.read.graphNodeId, part.read.path))).join("");',
-		'	return { arm, html };',
-		'}',
-		'function marklessBoundaryText(value) { return String(value == null ? "" : value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }',
-	].join('\n');
-	return { symbolId: symbol.id, kind: symbol.kind, exportName, source };
 }
 
 // ---------------------------------------------------------------------------

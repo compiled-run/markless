@@ -16,8 +16,8 @@ export function App() @{ let weight = state(initialWeight()); <main>{weight}</ma
 		(module) => module.kind === 'state-initializer',
 	);
 
-	expect(initializer?.source).toContain('function initialWeight() { return 2; }');
-	expect(initializer?.source).toContain('return (initialWeight());');
+	expect(initializer?.source).toContain('function initialWeight() {\n  return 2;\n}');
+	expect(initializer?.source).toContain('return initialWeight();');
 });
 
 const AUTHORED_SOURCE_APP = `
@@ -93,13 +93,11 @@ test('omitAuthoredSource keeps the behavior module runnable', () => {
 	expect(emitSymbolModules({ ...input, omitAuthoredSource: true }).modules[0]!.source)
 		.toBe(`export const behaviorFunctionSource = "(element) => element.focus()";
 export const behaviorInputSources = [];
-
 export function symbol_autofocus(context) {
-	const inputs = [];
-	const behavior = (element) => element.focus();
-	return behavior(context.element);
-}
-`);
+  const inputs = [];
+  const behavior = (element) => element.focus();
+  return behavior(context.element);
+}`);
 });
 
 test('emitSymbolModules emits event, callback, and DOM update modules', () => {
@@ -234,7 +232,7 @@ test('emitSymbolModules imports scalar write and text update leaves for scalar c
 	);
 	expect(artifact.modules[0].source).toContain('return marklessWriteScalar(context, {');
 	expect(artifact.modules[1].source).toContain(
-		"import { marklessUpdateText } from '@markless/web/fns/update-text';",
+		'import { marklessUpdateText } from "@markless/web/fns/update-text";',
 	);
 	expect(artifact.modules[1].source).toContain('return marklessUpdateText(context, "h1");');
 });
@@ -419,7 +417,7 @@ test('emitSymbolModules emits concrete DOM journal entries for each binding targ
 		expect(artifact.modules[0].source).not.toContain('createDomUpdateEntry');
 		if (targetCase.id === 'text') {
 			expect(artifact.modules[0].source).toContain(
-				"import { marklessUpdateText } from '@markless/web/fns/update-text';",
+				'import { marklessUpdateText } from "@markless/web/fns/update-text";',
 			);
 		} else {
 			for (const expected of targetCase.expected) {
@@ -463,17 +461,14 @@ test('emitSymbolModules emits imported behavior modules with deferred input valu
 
 	expect(artifact.modules).toHaveLength(1);
 	expect(artifact.modules[0].source).toBe(`import { chart } from "./behaviors";
-
 export const authoredSource = "chart(config)";
 export const behaviorFunctionSource = "chart";
 export const behaviorInputSources = ["config"];
-
 export function symbol_chart(context) {
-	const inputs = context.behaviorInputs ?? new Array(1).fill(undefined);
-	const behavior = chart(...inputs);
-	return behavior(context.element);
-}
-`);
+  const inputs = context.behaviorInputs ?? new Array(1).fill(undefined);
+  const behavior = chart(...inputs);
+  return behavior(context.element);
+}`);
 	expect(artifact.modules[0]).toMatchObject({
 		symbolId: 'symbol:chart',
 		kind: 'behavior',
@@ -517,13 +512,11 @@ test('emitSymbolModules emits inline behavior function modules without imports',
 		.toBe(`export const authoredSource = "(element) => element.focus()";
 export const behaviorFunctionSource = "(element) => element.focus()";
 export const behaviorInputSources = [];
-
 export function symbol_autofocus(context) {
-	const inputs = [];
-	const behavior = (element) => element.focus();
-	return behavior(context.element);
-}
-`);
+  const inputs = [];
+  const behavior = (element) => element.focus();
+  return behavior(context.element);
+}`);
 	expect(artifact.modules[0]).toMatchObject({
 		symbolId: 'symbol:autofocus',
 		kind: 'behavior',
@@ -3068,8 +3061,10 @@ export function App() @{
 	expect(branchModule).toBeDefined();
 	// A bare read of an async computed must be lowered to the snapshot's value
 	// path, matching what the view-record producer emits for the same host.
-	expect(branchModule!.source).toContain('{"graphNodeId":"computed:beacon","path":["value"]}');
-	expect(branchModule!.source).not.toContain('{"graphNodeId":"computed:beacon","path":[]}');
+	expect(branchModule!.source).toContain(
+		'{ "graphNodeId": "computed:beacon", "path": ["value"] }',
+	);
+	expect(branchModule!.source).not.toContain('{ "graphNodeId": "computed:beacon", "path": [] }');
 
 	const imported = (await import(
 		`data:text/javascript;charset=utf-8,${encodeURIComponent(branchModule!.source)}`

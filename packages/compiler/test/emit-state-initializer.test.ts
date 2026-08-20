@@ -158,14 +158,6 @@ async function bothPaths(fixture: Fixture, omitAuthoredSource = false): Promise<
 	};
 }
 
-/** Leading whitespace only. Tokens, blank lines, and line breaks stay put. */
-function normalizeIndentation(code: string): string {
-	return code
-		.split('\n')
-		.map((line) => line.replace(/^[\t ]+/, ''))
-		.join('\n');
-}
-
 /**
  * Reprint a module through the same printer.
  *
@@ -226,80 +218,16 @@ test('the printed and spliced modules evaluate to the same initial value', async
 	}
 });
 
-test('the printed module is not byte-equal, and the difference is exactly the printer normalizing', async () => {
-	const summary: Record<string, ReadonlyArray<string>> = {};
-
+test('the swapped production path is byte-equal to the printed module', async () => {
+	// The swap wired `emitStateInitializerModuleNodes` into production, so the
+	// module the compiler ships and the module this suite prints are one path.
 	for (const fixture of FIXTURES) {
 		const paths = await bothPaths(fixture);
-		summary[fixture.name] = differenceClasses(paths.spliced, paths.printed);
-	}
-
-	// Every class here is a printer normalization the spec already records as a
-	// known upstream behavior; none of them changes what the module does.
-	expect(summary).toEqual({
-		'same-module-helper': [
-			'blank-lines-dropped',
-			'declaration-reflowed',
-			'indentation-tabs-to-spaces',
-			'return-parentheses-dropped',
-			'trailing-newline-dropped',
-		],
-		'transitive-helper': [
-			'blank-lines-dropped',
-			'declaration-reflowed',
-			'indentation-tabs-to-spaces',
-			'return-parentheses-dropped',
-			'trailing-newline-dropped',
-		],
-		'object-literal-initializer': [
-			'blank-lines-dropped',
-			'declaration-reflowed',
-			'indentation-tabs-to-spaces',
-			'return-parentheses-dropped',
-			'trailing-newline-dropped',
-		],
-		'module-import-initializer': [
-			'blank-lines-dropped',
-			'indentation-tabs-to-spaces',
-			'return-parentheses-dropped',
-			'trailing-newline-dropped',
-		],
-		'prop-read-initializer': [
-			'blank-lines-dropped',
-			'indentation-tabs-to-spaces',
-			'return-parentheses-dropped',
-			'trailing-newline-dropped',
-		],
-	});
-});
-
-test('normalizing indentation alone does not make the two paths equal', async () => {
-	for (const fixture of FIXTURES) {
-		const paths = await bothPaths(fixture);
-
-		expect(paths.printed).not.toBe(paths.spliced);
-		// Stated as a fact, not as a wish: indentation is the smallest of the
-		// five differences, so an indentation-only normalizer cannot close the
-		// gap, and the swap needs the owner's approval on the rest.
-		expect(normalizeIndentation(paths.printed)).not.toBe(normalizeIndentation(paths.spliced));
+		expect(paths.spliced, `${fixture.name}: production diverged from the printed module`).toBe(
+			paths.printed,
+		);
 	}
 });
-
-/** The named normalizations that separate the two paths, sorted for stability. */
-function differenceClasses(spliced: string, printed: string): string[] {
-	const classes = new Set<string>();
-
-	if (spliced.includes('\n\n') && !printed.includes('\n\n')) classes.add('blank-lines-dropped');
-	if (spliced.endsWith('\n') && !printed.endsWith('\n')) classes.add('trailing-newline-dropped');
-	if (spliced.includes('\treturn (') && printed.includes('  return '))
-		classes.add('return-parentheses-dropped');
-	if (/^\t/m.test(spliced) && !/^\t/m.test(printed) && /^ {2}/m.test(printed))
-		classes.add('indentation-tabs-to-spaces');
-	if (/^(?:function|const|class|let|var).*\{.+\}$/m.test(spliced))
-		classes.add('declaration-reflowed');
-
-	return [...classes].sort();
-}
 
 test('omitting the authored source removes only that export from the printed module', async () => {
 	const fixture = FIXTURES[0]!;
