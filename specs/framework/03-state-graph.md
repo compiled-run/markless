@@ -642,6 +642,20 @@ inside one `.tsrx` module:
   repaint from one write. Server rendering seeds that node's value into every
   component that reads it, and a `computed()` declared in the factory is derived
   from those seeded nodes instead of from a render-body local.
+- **A returned `computed()` is named by its property.** The factory may declare
+  the computed as a const and return it by name, or write `computed(...)` inline
+  in the returned object literal. Both spell the same node,
+  `shared:<file>#<exportName>/computed:<propertyName>`.
+- **A component body may seed a shared field once.** `s.disabled = props.disabled`
+  in a component body is not a runtime write — the shared graph does not exist
+  yet — but the initial value for that component's instance of the node: the
+  assigned property replaces the factory's initial and the rest of it survives.
+  The value must come from that component's own props or from constants, or the
+  compile fails closed with `MARKLESS_SHARED_SEED_UNSUPPORTED`. A widget's parts
+  are projected into its root and therefore render BEFORE the root body seeds, so
+  a part reading a seeded field fails the compile closed with
+  `MARKLESS_SHARED_SEED_PART_READ_UNSUPPORTED` rather than rendering the factory
+  initial.
 - **Methods lower to graph writes.** A returned method that takes no parameters
   is inlined at its call site, so `onClick={() => s.login()}` becomes the graph
   writes the method body performs. A method that takes parameters is not

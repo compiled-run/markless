@@ -546,11 +546,13 @@ export function componentOwnedStateNodes(
 		owner.cells[index] === componentName ? [index] : [],
 	);
 	// A page-space node the component only reads stays owned by the page, but its
-	// value must still seed this component's render.
-	const readGraphNodeIds = new Set(
+	// value must still seed this component's render — including a node it reaches
+	// only through a shared computed it derives.
+	const readGraphNodeIds = graphReadClosure(
 		chunkGraphNodeIds(
 			input.renderData.chunks.filter((chunk) => chunk.componentName === componentName),
 		),
+		input.semanticGraph,
 	);
 	return {
 		cellIndexes,
@@ -564,6 +566,25 @@ export function componentOwnedStateNodes(
 				: [],
 		),
 	};
+}
+
+// Every graph node a set of reads reaches, following each computed to what it
+// derives from. A component that renders a computed must seed the cells that
+// computed reads, even when its own markup never names them.
+function graphReadClosure(
+	graphNodeIds: ReadonlyArray<string>,
+	semanticGraph: PublicRenderModuleInput['semanticGraph'],
+): ReadonlySet<string> {
+	const reached = new Set<string>();
+	const queue = [...graphNodeIds];
+	while (queue.length > 0) {
+		const graphNodeId = queue.pop();
+		if (graphNodeId === undefined || reached.has(graphNodeId)) continue;
+		reached.add(graphNodeId);
+		const binding = semanticGraph.graphBindings.find((candidate) => candidate.id === graphNodeId);
+		for (const dependency of binding?.dependencies ?? []) queue.push(dependency.graphNodeId);
+	}
+	return reached;
 }
 
 // The declaring component of every payload node, aligned with the payload's own

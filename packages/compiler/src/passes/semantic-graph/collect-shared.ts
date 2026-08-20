@@ -16,6 +16,7 @@ import {
 	type ResolvedGraphPath,
 } from '../../artifact-helpers/graph-paths.ts';
 import { invalidSharedScopeDiagnostic, sharedDefinitionCycleDiagnostic } from './diagnostics.ts';
+import { collectComputedBinding } from './collect-state.ts';
 import { getCallName, getFrameworkApiForCall } from './imports.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
 
@@ -138,13 +139,14 @@ export function collectSharedFactoryGraph(
 		const previousSharedDefinitionId = state.currentSharedDefinitionId;
 		state.currentSharedDefinitionId = definition.id;
 		walk(body, state);
-		state.currentSharedDefinitionId = previousSharedDefinitionId;
-
+		// An inline `computed()` in the returned literal declares a factory-scoped
+		// node, so the definition stays current through return collection too.
 		const returnProperties = collectSharedReturnProperties({
 			factory: declaration.factory,
 			definitionId: definition.id,
 			state,
 		});
+		state.currentSharedDefinitionId = previousSharedDefinitionId;
 		if (returnProperties.length === 0) continue;
 
 		const index = state.graph.sharedDefinitions.findIndex((item) => item.id === definition.id);
@@ -207,6 +209,30 @@ export function resolveSharedInstanceGraphPath(
 	if (!binding) return null;
 
 	return { binding, path: [...property.path, ...propertyPath] };
+}
+
+// `s.disabled = props.disabled ?? false` in a component body: a plain assignment
+// into the component's shared instance. It is not a runtime write — the shared
+// graph does not exist yet — but the per-instance initial value for that node.
+export function componentSharedSeedWrite(
+	write: {
+		readonly target: string;
+		readonly writeScope?: string;
+		readonly operation: string;
+		readonly assignmentOperator?: string;
+		readonly componentName?: string;
+		readonly valueSource?: string;
+	},
+	graph: SharedInstanceGraph,
+): { readonly resolved: ResolvedGraphPath; readonly componentName: string } | null {
+	if (write.writeScope !== 'component') return null;
+	if (write.operation !== 'assign' || write.assignmentOperator !== undefined) return null;
+	if (!write.componentName || write.valueSource === undefined) return null;
+
+	const resolved = resolveSharedInstanceGraphPath(write.target, graph);
+	if (!resolved || resolved.binding.sharedDefinitionId === undefined) return null;
+
+	return { resolved, componentName: write.componentName };
 }
 
 export function findLast<T>(
@@ -339,6 +365,29 @@ function collectReturnedObjectProperties(input: {
 		}
 
 		const valueSource = expressionSource(value, input.state.source);
+
+		// `isChecked: computed(() => ...)` names its node by the property key, the
+		// same node the named-const form declares.
+		if (getFrameworkApiForCall(value, input.state.frameworkApiImports) === 'computed') {
+			const binding = collectComputedBinding({
+				name,
+				init: value,
+				declarationKind: 'const',
+				state: input.state,
+			});
+			if (binding) {
+				properties.push({
+					kind: 'graph',
+					name,
+					source: valueSource,
+					graphNodeId: binding.id,
+					path: [],
+					sourceSpan: sourceSpan(value, input.state.filename),
+				});
+			}
+			continue;
+		}
+
 		const resolved = resolveGraphPath(valueSource, bindings, aliases);
 		if (!resolved) continue;
 

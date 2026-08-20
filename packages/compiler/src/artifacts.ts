@@ -828,6 +828,8 @@ export type StateLoweringDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_STATE_STALE_LOCAL_WRITE'
 		| 'MARKLESS_STATE_MODULE_ESCAPE'
 		| 'MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE'
+		| 'MARKLESS_SHARED_SEED_UNSUPPORTED'
+		| 'MARKLESS_SHARED_SEED_PART_READ_UNSUPPORTED'
 		| 'MARKLESS_TEMPLATE_EXPRESSION_STATIC';
 	readonly phase: 'state-lowering';
 	readonly passId: 'state-lowering';
@@ -1060,6 +1062,20 @@ export type PlannedSymbol =
 			readonly id: string;
 			readonly kind: 'state-initializer';
 			readonly graphNodeId: string;
+			readonly name: string;
+			readonly source: string;
+			readonly moduleImports?: ReadonlyArray<SemanticModuleImport>;
+	  }
+	| {
+			// A component body assigning into its shared instance
+			// (`s.disabled = props.disabled`). The function returns the whole node
+			// value with the assigned property merged in, so it can replace the
+			// factory initial for that component's instance alone.
+			readonly id: string;
+			readonly kind: 'shared-seed';
+			readonly graphNodeId: string;
+			readonly path: ReadonlyArray<string>;
+			readonly componentName: string;
 			readonly name: string;
 			readonly source: string;
 			readonly moduleImports?: ReadonlyArray<SemanticModuleImport>;

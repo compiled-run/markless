@@ -18,7 +18,10 @@ import {
 	splitStaticGraphPath,
 	uniqueBy,
 } from '../artifact-helpers/graph-paths.ts';
-import { resolveSharedInstanceGraphPath } from './semantic-graph/collect-shared.ts';
+import {
+	componentSharedSeedWrite,
+	resolveSharedInstanceGraphPath,
+} from './semantic-graph/collect-shared.ts';
 
 export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifact {
 	const reads: LoweredStateRead[] = [];
@@ -190,6 +193,21 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 
 		if (!resolved.binding.writable) {
 			diagnostics.push(readOnlyWriteDiagnostic(write, resolved.binding));
+			continue;
+		}
+
+		if (isUnloweredSharedSeed(write, resolved.binding, input)) {
+			diagnostics.push(
+				sharedSeedUnsupportedDiagnostic(write, input.semanticGraph.filename),
+			);
+			continue;
+		}
+
+		const seedReader = sharedSeedPartReader(write, input);
+		if (seedReader) {
+			diagnostics.push(
+				sharedSeedPartReadDiagnostic(write, seedReader, input.semanticGraph.filename),
+			);
 			continue;
 		}
 
@@ -493,6 +511,142 @@ function dynamicGraphPathReadDiagnostic(
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_DYNAMIC_PATH_READ',
+	};
+}
+
+// A component body seeds its widget's shared instance by assignment, and the
+// seed is only representable when its value comes from this component's props
+// or from constants. Anything else has no render-time source to read.
+function isUnloweredSharedSeed(
+	write: SemanticStateWrite,
+	binding: SemanticGraphBinding,
+	input: StateLoweringInput,
+): boolean {
+	if (write.writeScope !== 'component') return false;
+	if (binding.sharedDefinitionId === undefined) return false;
+	if (write.operation !== 'assign' || write.assignmentOperator !== undefined) return true;
+
+	const allowed = new Set<string>(['true', 'false', 'null', 'undefined', 'NaN', 'Infinity']);
+	for (const propBinding of input.semanticGraph.componentPropBindings) {
+		if (propBinding.componentName === write.componentName) allowed.add(propBinding.localName);
+	}
+	for (const graphBinding of input.semanticGraph.graphBindings) {
+		if (graphBinding.kind === 'prop' && graphBinding.componentName === write.componentName)
+			allowed.add(graphBinding.name);
+	}
+
+	return [...(write.valueSource ?? '').matchAll(/(\.\s*)?\b[$A-Z_a-z][$\w]*\b/g)].some(
+		(match) => match[1] === undefined && !allowed.has(match[0].trim()),
+	);
+}
+
+// A widget's parts are projected into its root, so they render BEFORE the root
+// body runs its seed. A part that reads a seeded field would render the factory
+// initial instead of the seeded value, so the compiler refuses the pair.
+function sharedSeedPartReader(
+	write: SemanticStateWrite,
+	input: StateLoweringInput,
+): string | null {
+	const seed = componentSharedSeedWrite(write, input.semanticGraph);
+	if (!seed) return null;
+
+	for (const chunk of input.semanticGraph.markup.chunks) {
+		if (chunk.componentName === write.componentName) continue;
+		for (const read of chunkGraphReads(chunk, input.semanticGraph)) {
+			if (read.graphNodeId !== seed.resolved.binding.id) continue;
+			if (sharedPathsOverlap(read.path, seed.resolved.path)) return chunk.componentName;
+		}
+	}
+	return null;
+}
+
+// Every graph node a chunk's markup reads, following each computed through to
+// what it derives from: a part reading a computed still reads its inputs.
+function chunkGraphReads(
+	chunk: SemanticGraphArtifact['markup']['chunks'][number],
+	semanticGraph: SemanticGraphArtifact,
+): ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }> {
+	const reads: Array<{ graphNodeId: string; path: ReadonlyArray<string> }> = [];
+	const queue = chunk.slots.flatMap((slot) =>
+		'residue' in slot && slot.residue.kind === 'graph-read'
+			? [{ graphNodeId: slot.residue.graphNodeId, path: slot.residue.path }]
+			: [],
+	);
+	const seen = new Set<string>();
+	while (queue.length > 0) {
+		const read = queue.pop();
+		if (!read) continue;
+		const key = `${read.graphNodeId}#${read.path.join('.')}`;
+		if (seen.has(key)) continue;
+		seen.add(key);
+		reads.push(read);
+		const binding = semanticGraph.graphBindings.find(
+			(candidate) => candidate.id === read.graphNodeId,
+		);
+		for (const dependency of binding?.dependencies ?? [])
+			queue.push({ graphNodeId: dependency.graphNodeId, path: dependency.path ?? [] });
+	}
+	return reads;
+}
+
+function sharedPathsOverlap(
+	left: ReadonlyArray<string>,
+	right: ReadonlyArray<string>,
+): boolean {
+	const shared = Math.min(left.length, right.length);
+	for (let index = 0; index < shared; index++) if (left[index] !== right[index]) return false;
+	return true;
+}
+
+function sharedSeedPartReadDiagnostic(
+	write: SemanticStateWrite,
+	readerComponentName: string,
+	filename: string,
+): StateLoweringDiagnostic {
+	return {
+		code: 'MARKLESS_SHARED_SEED_PART_READ_UNSUPPORTED',
+		severity: 'error',
+		phase: 'state-lowering',
+		title: 'A widget part cannot read a field the widget root seeds',
+		message: `"${readerComponentName}" reads "${write.target}", which "${write.componentName}" seeds in its component body. A part renders before the root body runs, so it would render the factory's initial value instead of the seeded one.`,
+		why: 'A widget part is projected into the widget root, so the part renders first. Its markup is written before the root body assigns the seeded value, and nothing re-renders it afterwards.',
+		primarySpan: write.targetSpan ?? fallbackSpan(filename),
+		passId: 'state-lowering',
+		artifactKeys: ['semanticGraph', 'stateLowering'],
+		statePath: write.target,
+		source: write.target,
+		suggestions: [
+			{
+				message: `Pass the value to "${readerComponentName}" as its own prop, or read it only from the component that seeds it.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_SEED_PART_READ_UNSUPPORTED',
+	};
+}
+
+function sharedSeedUnsupportedDiagnostic(
+	write: SemanticStateWrite,
+	filename: string,
+): StateLoweringDiagnostic {
+	return {
+		code: 'MARKLESS_SHARED_SEED_UNSUPPORTED',
+		severity: 'error',
+		phase: 'state-lowering',
+		title: 'Cannot seed shared state from this expression',
+		message: `Cannot seed "${write.target}" from "${write.valueSource ?? write.target}" because a component body seeds a shared instance only from its own props or from constants.`,
+		why: 'A component body runs once during initial render. The compiler turns a shared-state assignment there into a per-instance initial value, which it can only build from values the render already has: this component\'s props and constants.',
+		primarySpan: write.targetSpan ?? fallbackSpan(filename),
+		passId: 'state-lowering',
+		artifactKeys: ['semanticGraph', 'stateLowering'],
+		statePath: write.target,
+		source: write.target,
+		suggestions: [
+			{
+				message:
+					'Assign a prop or a constant, or move the write into an event handler where the shared instance is already live.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_SEED_UNSUPPORTED',
 	};
 }
 

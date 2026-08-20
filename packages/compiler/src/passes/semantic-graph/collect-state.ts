@@ -240,76 +240,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 		}
 
 		if (frameworkApi === 'computed') {
-			if (state.currentCreationSite) {
-				reportUnstableCreationSite(
-					name,
-					'computed',
-					init,
-					state.currentCreationSite,
-					state,
-				);
-				continue;
-			}
-			const body = firstArgument(init);
-			const nestedApi = findNestedFrameworkApiCall(body, state);
-			if (nestedApi) {
-				state.graph.diagnostics.push(
-					nestedStateCreationDiagnostic({
-						outerApi: 'computed',
-						nestedApi,
-						name,
-						init,
-						filename: state.filename,
-						source: state.source,
-					}),
-				);
-				continue;
-			}
-			if (readsIdentifier(body, name)) {
-				state.graph.diagnostics.push(
-					computedDependencyCycleDiagnostic({
-						name,
-						init,
-						filename: state.filename,
-						source: state.source,
-					}),
-				);
-				continue;
-			}
-			const templateValue = findComputedTemplateValue(body);
-			if (templateValue) {
-				reportTemplateAsValue(
-					state,
-					templateValue,
-					expressionSource(init, state.source),
-					name,
-				);
-				markTemplateValueHandled(templateValue);
-				continue;
-			}
-			const isAsync = body?.async === true;
-			const dependencies = collectGraphDependencies(body, state);
-			const binding: SemanticGraphBinding = {
-				id: graphBindingId('computed', name, state),
-				name: graphBindingName(name, state),
-				kind: 'computed',
-				...declaringComponent(state),
-				...sharedScope(state),
-				declarationKind,
-				writable: false,
-				async: isAsync,
-				asyncCapable: isAsync,
-				dependencies,
-				functionSource: body ? expressionSource(body, state.source) : undefined,
-			};
-			state.graph.graphBindings.push(binding);
-			state.pendingComputedDependencies.push({
-				graphNodeId: binding.id,
-				body,
-				sharedDefinitionId: state.currentSharedDefinitionId,
-			});
-			collectExpressionReads(body, state);
-			if (isAsync) collectAsyncComputedPostAwaitReads(name, body, state);
+			collectComputedBinding({ name, init, declarationKind, state });
 		}
 
 		if (frameworkApi === 'element') {
@@ -324,6 +255,79 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 			});
 		}
 	}
+}
+
+// One `computed(...)` call becomes one graph node. `name` is whatever names the
+// node in source: a declared local, or the property key when a shared() factory
+// returns the call inline. Returns the node it declared, or null when a
+// diagnostic was reported instead.
+export function collectComputedBinding(input: {
+	readonly name: string;
+	readonly init: AnyNode;
+	readonly declarationKind: SemanticGraphBinding['declarationKind'];
+	readonly state: WalkState;
+}): SemanticGraphBinding | null {
+	const { name, init, declarationKind, state } = input;
+	if (state.currentCreationSite) {
+		reportUnstableCreationSite(name, 'computed', init, state.currentCreationSite, state);
+		return null;
+	}
+	const body = firstArgument(init);
+	const nestedApi = findNestedFrameworkApiCall(body, state);
+	if (nestedApi) {
+		state.graph.diagnostics.push(
+			nestedStateCreationDiagnostic({
+				outerApi: 'computed',
+				nestedApi,
+				name,
+				init,
+				filename: state.filename,
+				source: state.source,
+			}),
+		);
+		return null;
+	}
+	if (readsIdentifier(body, name)) {
+		state.graph.diagnostics.push(
+			computedDependencyCycleDiagnostic({
+				name,
+				init,
+				filename: state.filename,
+				source: state.source,
+			}),
+		);
+		return null;
+	}
+	const templateValue = findComputedTemplateValue(body);
+	if (templateValue) {
+		reportTemplateAsValue(state, templateValue, expressionSource(init, state.source), name);
+		markTemplateValueHandled(templateValue);
+		return null;
+	}
+	const isAsync = body?.async === true;
+	const dependencies = collectGraphDependencies(body, state);
+	const binding: SemanticGraphBinding = {
+		id: graphBindingId('computed', name, state),
+		name: graphBindingName(name, state),
+		kind: 'computed',
+		...declaringComponent(state),
+		...sharedScope(state),
+		declarationKind,
+		writable: false,
+		async: isAsync,
+		asyncCapable: isAsync,
+		dependencies,
+		functionSource: body ? expressionSource(body, state.source) : undefined,
+	};
+	state.graph.graphBindings.push(binding);
+	state.pendingComputedDependencies.push({
+		graphNodeId: binding.id,
+		body,
+		sharedDefinitionId: state.currentSharedDefinitionId,
+	});
+	collectExpressionReads(body, state);
+	if (isAsync) collectAsyncComputedPostAwaitReads(name, body, state);
+	return binding;
 }
 
 export function collectModuleGraphInterface(input: {

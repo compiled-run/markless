@@ -391,6 +391,24 @@ function emitSymbolModule(
 		];
 	}
 
+	if (symbol.kind === 'shared-seed') {
+		return [
+			{
+				symbolId: symbol.id,
+				kind: symbol.kind,
+				exportName: symbolExportName(symbol.id),
+				source: emitSharedSeedModule(
+					symbol,
+					componentPropReadDeclarations(
+						symbol.componentName,
+						symbol.source,
+						semanticGraph,
+					),
+				),
+			},
+		];
+	}
+
 	if (symbol.kind !== 'dom-update') return [];
 
 	return [
@@ -1367,12 +1385,23 @@ function stateInitializerPropDeclarations(
 		)?.componentName ?? renderData?.root?.componentName;
 	if (!componentName) return [];
 
+	return componentPropReadDeclarations(componentName, symbol.source, semanticGraph);
+}
+
+// The prop locals one component's authored expression names, each declared from
+// the graph read the rendering instance answers with its own props.
+function componentPropReadDeclarations(
+	componentName: string,
+	source: string,
+	semanticGraph: SymbolModulesInput['semanticGraph'],
+): string[] {
+	if (!semanticGraph) return [];
 	const propBinding = semanticGraph.graphBindings.find(
 		(binding) => binding.kind === 'prop' && binding.componentName === componentName,
 	);
 	if (!propBinding) return [];
 	if (propBinding.id !== 'prop:props') {
-		return sourceReferencesIdentifier(symbol.source, propBinding.name)
+		return sourceReferencesIdentifier(source, propBinding.name)
 			? [
 					`\tconst ${propBinding.name} = context.graph.read(${JSON.stringify(propBinding.id)}, []);`,
 				]
@@ -1381,12 +1410,51 @@ function stateInitializerPropDeclarations(
 
 	return semanticGraph.componentPropBindings.flatMap((binding) =>
 		binding.componentName === componentName &&
-		sourceReferencesIdentifier(symbol.source, binding.localName)
+		sourceReferencesIdentifier(source, binding.localName)
 			? [
 					`\tconst ${binding.localName} = context.graph.read("prop:props", ${JSON.stringify(binding.propPath)});`,
 				]
 			: [],
 	);
+}
+
+// The seed replaces the node's whole value, so a property assignment returns the
+// current value with that property merged in. Reading the node here is what lets
+// the factory initial survive everything the body did not assign.
+function emitSharedSeedModule(
+	symbol: Extract<PlannedSymbol, { readonly kind: 'shared-seed' }>,
+	propDeclarations: readonly string[],
+): string {
+	const exportName = symbolExportName(symbol.id);
+	const imports = uniqueModuleImports(symbol.moduleImports ?? []);
+	return [
+		...imports.map(emitModuleImport),
+		...(imports.length > 0 ? [''] : []),
+		`export function ${exportName}(context) {`,
+		...propDeclarations,
+		`\treturn ${sharedSeedValueSource(
+			`context.graph.read(${JSON.stringify(symbol.graphNodeId)}, [])`,
+			symbol.path,
+			`(${symbol.source})`,
+		)};`,
+		'}',
+		'',
+	].join('\n');
+}
+
+function sharedSeedValueSource(
+	readSource: string,
+	path: ReadonlyArray<string>,
+	valueSource: string,
+): string {
+	const [head, ...rest] = path;
+	if (head === undefined) return valueSource;
+	const nested = sharedSeedValueSource(
+		`${readSource}?.[${JSON.stringify(head)}]`,
+		rest,
+		valueSource,
+	);
+	return `{ ...${readSource}, [${JSON.stringify(head)}]: ${nested} }`;
 }
 
 function referencedModuleDeclarations(

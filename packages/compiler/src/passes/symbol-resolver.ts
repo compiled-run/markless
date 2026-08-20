@@ -21,6 +21,7 @@ import {
 } from '../component-edge-instance.ts';
 import { getIdentifierName, walkNode, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
+import { componentSharedSeedWrite } from './semantic-graph/collect-shared.ts';
 import { resolveBoundaryRunners } from './public-render/boundary-runner.ts';
 
 export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPlan {
@@ -151,6 +152,23 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			graphNodeId: binding.id,
 			name: binding.name,
 			source: binding.initializerSource,
+			...(moduleImports.length > 0 ? { moduleImports } : {}),
+		});
+	}
+
+	for (const write of input.semanticGraph.stateWrites) {
+		const seed = componentSharedSeedWrite(write, input.semanticGraph);
+		if (!seed) continue;
+		const source = write.valueSource ?? '';
+		const moduleImports = referencedModuleImports(input.semanticGraph.moduleImports, source);
+		symbols.push({
+			id: `symbol:${nextSymbolId++}`,
+			kind: 'shared-seed',
+			graphNodeId: seed.resolved.binding.id,
+			path: seed.resolved.path,
+			componentName: seed.componentName,
+			name: write.target,
+			source,
 			...(moduleImports.length > 0 ? { moduleImports } : {}),
 		});
 	}

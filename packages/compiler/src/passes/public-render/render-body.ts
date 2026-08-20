@@ -2,6 +2,7 @@ import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
 import { isIgnorableJsxTextNode as isIgnorableTextNode } from '../../ast/tsrx.ts';
+import { resolveSharedInstanceGraphPath } from '../semantic-graph/collect-shared.ts';
 import type { PublicRenderRoot } from './types.ts';
 
 type GraphBinding = PublicRenderModuleInput['semanticGraph']['graphBindings'][number];
@@ -58,11 +59,57 @@ export function renderBodyLines(
 		if (isLoweredFrameworkDeclaration(statement)) continue;
 		if (isSharedInstanceDeclaration(statement, sharedInstanceNames)) continue;
 
+		const seedLine = sharedStateSeedLine(statement, input, stateValuesName);
+		if (seedLine) {
+			lines.push(seedLine);
+			continue;
+		}
+
 		const source = expressionSource(statement, input.source.source);
 		if (source) lines.push(source);
 	}
 	if (!emittedRoot) lines.push(...rootLines);
 	return indentLines(lines);
+}
+
+// `s.disabled = props.disabled ?? false` in a component body seeds the widget's
+// shared instance: the assigned value replaces the factory initial for this
+// render, so the emitted body sets the graph node instead of an absent local.
+function sharedStateSeedLine(
+	statement: AnyNode,
+	input: PublicRenderModuleInput,
+	stateValuesName: string,
+): string | null {
+	if (statement.type !== 'ExpressionStatement') return null;
+	const assignment = statement.expression as AnyNode | undefined;
+	if (assignment?.type !== 'AssignmentExpression' || assignment.operator !== '=') return null;
+
+	const target = expressionSource(assignment.left as AnyNode, input.source.source);
+	const resolved = resolveSharedInstanceGraphPath(target, input.semanticGraph);
+	if (!resolved) return null;
+
+	const value = expressionSource(assignment.right as AnyNode, input.source.source);
+	const read = `${stateValuesName}.get(${JSON.stringify(resolved.binding.id)})`;
+	return `${stateValuesName}.set(${JSON.stringify(resolved.binding.id)}, ${seedValueSource(
+		read,
+		resolved.path,
+		`(${value})`,
+	)});`;
+}
+
+function seedValueSource(
+	readSource: string,
+	path: ReadonlyArray<string>,
+	valueSource: string,
+): string {
+	const [head, ...rest] = path;
+	if (head === undefined) return valueSource;
+	const nested = seedValueSource(
+		`${readSource}?.[${JSON.stringify(head)}]`,
+		rest,
+		valueSource,
+	);
+	return `{ ...${readSource}, [${JSON.stringify(head)}]: ${nested} }`;
 }
 
 function computedDeclarationLine(

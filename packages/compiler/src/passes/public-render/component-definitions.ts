@@ -154,10 +154,13 @@ export function collectPublicRenderComponentDefinitions(
 				? [binding.id]
 				: [],
 		);
-		const initialValues =
+		const initialValues = withComponentSharedSeeds(
 			componentNames.size > 1
 				? componentOwnedInitialValues(input, componentName, rootInfo.componentName)
-				: input.renderData.initialValues;
+				: input.renderData.initialValues,
+			input,
+			componentName,
+		);
 		const initialValueKinds = Object.fromEntries(
 			initialValues.flatMap((initial) => {
 				// Held in a const so the discriminated narrowing survives into the callback.
@@ -237,6 +240,43 @@ export function collectPublicRenderComponentDefinitions(
 			};
 		}
 	});
+}
+
+// A component body's shared seed is a per-instance initial value, so it rides
+// this component's definition alone. It is spliced in before the first sync
+// computed derive: a derive that reads the seeded node must see the seeded value.
+function withComponentSharedSeeds(
+	initialValues: PublicRenderModuleInput['renderData']['initialValues'],
+	input: PublicRenderModuleInput,
+	componentName: string,
+): PublicRenderModuleInput['renderData']['initialValues'] {
+	const seeds = input.symbolResolver.symbols.flatMap((symbol) =>
+		symbol.kind === 'shared-seed' && symbol.componentName === componentName
+			? [
+					{
+						graphNodeId: symbol.graphNodeId,
+						value: { kind: 'symbol-function' as const, symbolId: symbol.id },
+					},
+				]
+			: [],
+	);
+	if (seeds.length === 0) return initialValues;
+
+	const deriveIds = new Set(
+		input.symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'sync-computed-derive' ? [symbol.id] : [],
+		),
+	);
+	const firstDerive = initialValues.findIndex(
+		(initial) => initial.value.kind === 'symbol-function' && deriveIds.has(initial.value.symbolId),
+	);
+	return firstDerive === -1
+		? [...initialValues, ...seeds]
+		: [
+				...initialValues.slice(0, firstDerive),
+				...seeds,
+				...initialValues.slice(firstDerive),
+			];
 }
 
 function childComponentInputs(
