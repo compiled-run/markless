@@ -15,21 +15,29 @@ import type {
 import { asNodes, childNodes, isNode, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
 import {
+	binaryNode,
 	callNode,
+	conditionalNode,
 	constDeclarationNode,
 	type EmissionNode,
 	type EmissionPrintInput,
 	type EmissionSite,
 	exportNamedDeclarationNode,
 	functionDeclarationNode,
+	identifierNode,
 	literalNode,
+	logicalNode,
 	memberChainNode,
 	moduleImportNode,
 	moduleProgramNode,
+	objectNode,
+	optionalMemberNode,
 	parseEmissionSource,
 	printEmittedModule,
+	propertyNode,
 	returnStatementNode,
 	stringArrayNode,
+	withLeadingBlockComment,
 	type EmittedModule,
 } from './emit-codegen.ts';
 import { moduleScopeLines } from './public-render/shared.ts';
@@ -1152,6 +1160,228 @@ function eventHandlerBodyAllowsScalarLeaf(
 	}
 	remainder = remainder.replace(/\breturn\b/g, '');
 	return remainder.replace(/[;\s]/g, '') === '';
+}
+
+// ---------------------------------------------------------------------------
+// DOM-binding emission through the AST printer.
+//
+// `specs/framework/14-emission-codegen-migration.md`, stage 1, sketch item 2 —
+// the last of the low-risk emitters. This band builds nodes and prints them
+// through `emit-codegen.ts`; it calls nothing in the string-scanner band that
+// invariant 5 keeps alive until the stage's final unit.
+//
+// It is not the wired path. `emitDomBindingModule` below still emits the
+// spliced string the compiler ships, and `test/emit-dom-binding.test.ts` runs
+// both over the same symbols and records exactly where the printed bytes differ
+// from the spliced ones. The printer normalizes rather than preserves, so the
+// two are behaviorally equal and not byte-equal, and invariant 2 makes the swap
+// an owner-approved step rather than a side effect of this unit.
+//
+// This site synthesizes its whole module from render data — no authored text is
+// spliced into it — so the emitted source map is non-null and names the authored
+// file (invariant 3) but carries no segments. There is no honest mapping to
+// carry: the emitted `context.value` is not the authored expression's text.
+// ---------------------------------------------------------------------------
+
+export type DomBindingEmissionInput = {
+	readonly symbol: Extract<PlannedSymbol, { readonly kind: 'dom-update' }>;
+	/** The authored file the binding was extracted from; names the map. */
+	readonly sourceFileName: string;
+};
+
+type DomUpdateTarget = Extract<PlannedSymbol, { readonly kind: 'dom-update' }>['target'];
+type DomTextTarget = Extract<DomUpdateTarget, { readonly kind: 'text' }>;
+
+/**
+ * Build the print input for a DOM-binding module.
+ *
+ * Split from the print so a test can run the determinism helper (invariant 7)
+ * over the same tree the emitter would print, without emission paying for three
+ * prints and two reparses per symbol in a real build.
+ */
+export function buildDomBindingEmission(input: DomBindingEmissionInput): EmissionPrintInput {
+	const exportName = symbolExportName(input.symbol.id);
+	const site: EmissionSite = {
+		phase: 'payload',
+		passId: 'symbol-modules',
+		sourceFileName: input.sourceFileName,
+		symbolId: input.symbol.id,
+	};
+
+	const body = isPlainTextUpdateLeaf(input.symbol.target)
+		? domTextLeafBody(exportName, input.symbol.hostNodeId)
+		: [
+				exportNamedDeclarationNode(
+					functionDeclarationNode(
+						exportName,
+						['context'],
+						[returnStatementNode(domJournalEntryNode(input.symbol))],
+					),
+				),
+			];
+
+	return {
+		program: moduleProgramNode(body),
+		source: input.symbol.source,
+		outputFileName: `${exportName}.js`,
+		site,
+	};
+}
+
+/** The printed DOM-binding module, with its source map (invariant 3). */
+export function emitDomBindingModuleNodes(input: DomBindingEmissionInput): EmittedModule {
+	return printEmittedModule(buildDomBindingEmission(input));
+}
+
+/**
+ * The one target shape that emits a runtime call instead of a journal entry.
+ *
+ * Stated separately from `emitDomBindingModule`'s inline condition rather than
+ * extracted out of it: the string path stays byte-for-byte as it is until the
+ * swap, so the two conditions are duplicated on purpose while parity is still
+ * accumulating. `test/emit-dom-binding.test.ts` covers both branches on the
+ * same fixtures, so a divergence between them fails a test rather than hiding.
+ */
+function isPlainTextUpdateLeaf(target: DomUpdateTarget): boolean {
+	return (
+		target.kind === 'text' &&
+		target.prefix === undefined &&
+		target.suffix === undefined &&
+		target.trueValue === undefined &&
+		target.falseValue === undefined
+	);
+}
+
+function domTextLeafBody(exportName: string, hostNodeId: string): EmissionNode[] {
+	return [
+		moduleImportNode({
+			kind: 'named',
+			localName: 'marklessUpdateText',
+			source: '@markless/web/fns/update-text',
+		}),
+		withLeadingBlockComment(
+			exportNamedDeclarationNode(
+				functionDeclarationNode(
+					exportName,
+					['context'],
+					[
+						returnStatementNode(
+							callNode(identifierNode('marklessUpdateText'), [
+								identifierNode('context'),
+								literalNode(hostNodeId),
+							]),
+						),
+					],
+				),
+			),
+			' text update leaf marker: type: "setText" ',
+		),
+	];
+}
+
+/** The AST twin of `domJournalEntryProperties`, property for property. */
+function domJournalEntryNode(
+	symbol: Extract<PlannedSymbol, { readonly kind: 'dom-update' }>,
+): EmissionNode {
+	const locator = domLocatorNode(symbol.hostNodeId);
+	const target = symbol.target;
+
+	if (target.kind === 'text') {
+		return objectNode([
+			propertyNode('type', literalNode('setText')),
+			propertyNode('locator', locator),
+			propertyNode('value', textDomUpdateValueNode(target)),
+		]);
+	}
+
+	if (target.kind === 'property') {
+		return objectNode([
+			propertyNode('type', literalNode('setProp')),
+			propertyNode('locator', locator),
+			propertyNode('name', literalNode(target.name)),
+			propertyNode('value', domUpdateValueNode()),
+		]);
+	}
+
+	if (target.kind === 'class') {
+		return objectNode([
+			propertyNode('type', literalNode('setAttr')),
+			propertyNode('locator', locator),
+			propertyNode('name', literalNode('class')),
+			propertyNode(
+				'value',
+				target.trueValue !== undefined && target.falseValue !== undefined
+					? conditionalNode(
+							domUpdateValueNode(),
+							literalNode(target.trueValue),
+							literalNode(target.falseValue),
+						)
+					: domUpdateValueNode(),
+			),
+		]);
+	}
+
+	return objectNode([
+		propertyNode('type', literalNode('setAttr')),
+		propertyNode('locator', locator),
+		propertyNode('name', literalNode(target.kind === 'style' ? 'style' : target.name)),
+		propertyNode('value', domUpdateValueNode()),
+	]);
+}
+
+/** `context.domUpdate?.hostNodeId ?? "<hostNodeId>"`. */
+function domLocatorNode(hostNodeId: string): EmissionNode {
+	return logicalNode(
+		'??',
+		optionalMemberNode(memberChainNode('context.domUpdate'), 'hostNodeId'),
+		literalNode(hostNodeId),
+	);
+}
+
+/**
+ * `context.value`, built fresh per use.
+ *
+ * A shared node object would appear at two places in one tree, which prints the
+ * same but makes the tree a graph rather than a tree — every walker over it
+ * (the TSRX assertion included) would then have to decide whether a second
+ * visit is a cycle.
+ */
+function domUpdateValueNode(): EmissionNode {
+	return memberChainNode('context.value');
+}
+
+/** The AST twin of `textDomUpdateValueSource`. */
+function textDomUpdateValueNode(target: DomTextTarget): EmissionNode {
+	const conditional = (): EmissionNode | null =>
+		target.trueValue !== undefined && target.falseValue !== undefined
+			? conditionalNode(
+					domUpdateValueNode(),
+					literalNode(target.trueValue),
+					literalNode(target.falseValue),
+				)
+			: null;
+
+	if (target.prefix === undefined && target.suffix === undefined) {
+		return conditional() ?? domUpdateValueNode();
+	}
+
+	// The text path parenthesizes the conditional before reusing it twice; the
+	// printer derives the parentheses the grammar needs, so none are built here.
+	const base = (): EmissionNode => conditional() ?? domUpdateValueNode();
+
+	return binaryNode(
+		'+',
+		binaryNode(
+			'+',
+			literalNode(target.prefix ?? ''),
+			conditionalNode(
+				binaryNode('==', base(), literalNode(null)),
+				literalNode(''),
+				callNode(identifierNode('String'), [base()]),
+			),
+		),
+		literalNode(target.suffix ?? ''),
+	);
 }
 
 function emitDomBindingModule(

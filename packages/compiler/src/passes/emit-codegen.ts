@@ -468,6 +468,75 @@ export function callNode(
 	};
 }
 
+/** `<test> ? <consequent> : <alternate>`. */
+export function conditionalNode(
+	test: EmissionNode,
+	consequent: EmissionNode,
+	alternate: EmissionNode,
+): EmissionNode {
+	return { type: 'ConditionalExpression', test, consequent, alternate };
+}
+
+/**
+ * `<left> <operator> <right>` for a non-short-circuiting operator.
+ *
+ * No parentheses are built here and none are needed: `preserveParens: false`
+ * means the printer derives them from precedence, which is the capability that
+ * retires the hand-maintained precedence table.
+ */
+export function binaryNode(
+	operator: string,
+	left: EmissionNode,
+	right: EmissionNode,
+): EmissionNode {
+	return { type: 'BinaryExpression', operator, left, right };
+}
+
+/** `<left> ?? <right>` and the other short-circuiting operators. */
+export function logicalNode(
+	operator: '??' | '&&' | '||',
+	left: EmissionNode,
+	right: EmissionNode,
+): EmissionNode {
+	return { type: 'LogicalExpression', operator, left, right };
+}
+
+/**
+ * `<object>?.<property>`, wrapped in the `ChainExpression` ESTree requires
+ * around an optional member access. The wrapper is the whole chain, so this
+ * builds the outermost link; a longer chain nests its non-optional links inside
+ * `object` with `memberChainNode`.
+ */
+export function optionalMemberNode(object: EmissionNode, property: string): EmissionNode {
+	return {
+		type: 'ChainExpression',
+		expression: {
+			type: 'MemberExpression',
+			object,
+			property: identifierNode(property),
+			computed: false,
+			optional: true,
+		},
+	};
+}
+
+/**
+ * Attach a leading block comment to a statement.
+ *
+ * The printer takes comments from a node's own `comments` array, in the shape
+ * the parser attaches — `leadingComments` is ignored, which was checked against
+ * the installed `yuku-codegen@0.9.0` while writing this. `value` is the text
+ * between the delimiters and excludes them: passing `" marker "` prints a block
+ * comment whose body is `" marker "`, with the printer supplying `slash-star`
+ * and `star-slash` itself.
+ */
+export function withLeadingBlockComment(node: EmissionNode, value: string): EmissionNode {
+	return {
+		...node,
+		comments: [{ type: 'Block', position: 'before', sameLine: false, value }],
+	};
+}
+
 export function propertyNode(key: string, value: EmissionNode): EmissionNode {
 	return {
 		type: 'Property',
