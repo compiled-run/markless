@@ -308,34 +308,32 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	};
 }",
     "symbolModules": "symbol:0
-import { marklessUpdateText } from '@markless/web/fns/update-text';
-
+import { marklessUpdateText } from "@markless/web/fns/update-text";
 /* text update leaf marker: type: "setText" */
 export function symbol_0(context) {
-	return marklessUpdateText(context, "h1");
+  return marklessUpdateText(context, "h1");
 }
-
 
 symbol:1
 export const authoredSource = "async () => ({ title: query })";
-
 export function symbol_1(context) {
-	const read = context.graph?.read ? context.graph.read.bind(context.graph) : context.read;
-	const query = read("state:query");
-	const run = async () => ({ title: query });
-	return run({ key: context.key, signal: context.signal, read });
+  const read = context.graph?.read ? context.graph.read.bind(context.graph) : context.read;
+  const query = read("state:query");
+  const run = async () => ({ title: query });
+  return run({ key: context.key, signal: context.signal, read });
 }
-
 
 symbol:2
-const marklessBoundaryArms = [[{"text":"<p>"},{"read":{"graphNodeId":"computed:details","path":["title"]}},{"text":"</p>"}],[{"text":"<p>Broken</p>"}]];
+const marklessBoundaryArms = [[{ "text": "<p>" }, { "read": { "graphNodeId": "computed:details", "path": ["title"] } }, { "text": "</p>" }], [{ "text": "<p>Broken</p>" }]];
 export function symbol_2(context) {
-	const arm = context.status === "rejected" ? 1 : 0;
-	const parts = marklessBoundaryArms[arm] ?? [];
-	const html = parts.map((part) => part.text !== undefined ? part.text : marklessBoundaryText(context.graph.read(part.read.graphNodeId, part.read.path))).join("");
-	return { arm, html };
+  const arm = context.status === "rejected" ? 1 : 0;
+  const parts = marklessBoundaryArms[arm] ?? [];
+  const html = parts.map((part) => part.text !== undefined ? part.text : marklessBoundaryText(context.graph.read(part.read.graphNodeId, part.read.path))).join("");
+  return { arm, html };
 }
-function marklessBoundaryText(value) { return String(value == null ? "" : value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }",
+function marklessBoundaryText(value) {
+  return String(value == null ? "" : value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+}",
     "symbolResolverModule": "export const symbolManifest = 
 [1,null,null,[],[],{}]
 ;
@@ -566,13 +564,11 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	};
 }",
     "symbolModules": "symbol:0
-import { marklessUpdateText } from '@markless/web/fns/update-text';
-
+import { marklessUpdateText } from "@markless/web/fns/update-text";
 /* text update leaf marker: type: "setText" */
 export function symbol_0(context) {
-	return marklessUpdateText(context, "h0");
-}
-",
+  return marklessUpdateText(context, "h0");
+}",
     "symbolResolverModule": "export const symbolManifest = 
 [1,null,null,[],[],{}]
 ;
@@ -858,33 +854,25 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 }",
     "symbolModules": "symbol:0
 export function symbol_0(context) {
-	return {
-		type: "setText",
-		locator: context.domUpdate?.hostNodeId ?? "h1",
-		value: context.value ? "Shown" : "Hidden",
-	};
+  return { type: "setText", locator: context.domUpdate?.hostNodeId ?? "h1", value: context.value ? "Shown" : "Hidden" };
 }
-
 
 symbol:1
 export function symbol_1(context) {
-	return {
-		type: "setText",
-		locator: context.domUpdate?.hostNodeId ?? "h2",
-		value: context.value ? "Shown" : "Hidden",
-	};
+  return { type: "setText", locator: context.domUpdate?.hostNodeId ?? "h2", value: context.value ? "Shown" : "Hidden" };
 }
-
 
 symbol:2
-const marklessBranchArms = [[{"text":"<p>Shown</p>"}],[{"text":"<p>Hidden</p>"}]];
+const marklessBranchArms = [[{ "text": "<p>Shown</p>" }], [{ "text": "<p>Hidden</p>" }]];
 export function symbol_2(context) {
-	const arm = context.arm ?? ((context.graph.read("state:open")) ? 0 : 1);
-	const parts = marklessBranchArms[arm] ?? [];
-	const html = parts.map((part) => part.text !== undefined ? part.text : marklessBranchText(context.graph.read(part.read.graphNodeId, part.read.path))).join("");
-	return { arm, html };
+  const arm = context.arm ?? (context.graph.read("state:open") ? 0 : 1);
+  const parts = marklessBranchArms[arm] ?? [];
+  const html = parts.map((part) => part.text !== undefined ? part.text : marklessBranchText(context.graph.read(part.read.graphNodeId, part.read.path))).join("");
+  return { arm, html };
 }
-function marklessBranchText(value) { return String(value == null ? "" : value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }",
+function marklessBranchText(value) {
+  return String(value == null ? "" : value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+}",
     "symbolResolverModule": "export const symbolManifest = 
 [1,null,null,[],[],{}]
 ;
@@ -1076,25 +1064,18 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 }",
     "symbolModules": "symbol:0
 export function symbol_0(context) {
-	if (context.graph.read("state:count") > 2) return; context.graph.update({
-		graphNodeId: "state:count",
-		path: [],
-		returnValue: "next",
-		update(value) {
-			return Number(value) + 1;
-		},
-	});
+  if (context.graph.read("state:count") > 2) return;
+  context.graph.update({ graphNodeId: "state:count", path: [], returnValue: "next", update(value) {
+    return Number(value) + 1;
+  } });
 }
-
 
 symbol:1
-import { marklessUpdateText } from '@markless/web/fns/update-text';
-
+import { marklessUpdateText } from "@markless/web/fns/update-text";
 /* text update leaf marker: type: "setText" */
 export function symbol_1(context) {
-	return marklessUpdateText(context, "h0");
-}
-",
+  return marklessUpdateText(context, "h0");
+}",
     "symbolResolverModule": "export const symbolManifest = 
 [1,null,null,[],[],{}]
 ;
@@ -1286,28 +1267,20 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	};
 }",
     "symbolModules": "symbol:0
-import { marklessWriteScalar } from '@markless/web/fns/write-scalar';
-
+import { marklessWriteScalar } from "@markless/web/fns/write-scalar";
 /* scalar leaf marker: context.graph.update({ */
 export function symbol_0(context) {
-	return marklessWriteScalar(context, {
-		graphNodeId: "state:App.count.createCount.count",
-		returnValue: "next",
-		update(value) {
-			return Number(value) + 1;
-		},
-	});
+  return marklessWriteScalar(context, { graphNodeId: "state:App.count.createCount.count", returnValue: "next", update(value) {
+    return Number(value) + 1;
+  } });
 }
-
 
 symbol:1
-import { marklessUpdateText } from '@markless/web/fns/update-text';
-
+import { marklessUpdateText } from "@markless/web/fns/update-text";
 /* text update leaf marker: type: "setText" */
 export function symbol_1(context) {
-	return marklessUpdateText(context, "h0");
-}
-",
+  return marklessUpdateText(context, "h0");
+}",
     "symbolResolverModule": "export const symbolManifest = 
 [1,null,null,[],[],{}]
 ;
@@ -1735,33 +1708,25 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 }",
     "symbolModules": "symbol:0
 export function symbol_0(context) {
-	return {
-		type: "setText",
-		locator: context.domUpdate?.hostNodeId ?? "h1",
-		value: context.value ? "Live" : "Idle",
-	};
+  return { type: "setText", locator: context.domUpdate?.hostNodeId ?? "h1", value: context.value ? "Live" : "Idle" };
 }
-
 
 symbol:1
 export function symbol_1(context) {
-	return {
-		type: "setText",
-		locator: context.domUpdate?.hostNodeId ?? "h2",
-		value: context.value ? "Live" : "Idle",
-	};
+  return { type: "setText", locator: context.domUpdate?.hostNodeId ?? "h2", value: context.value ? "Live" : "Idle" };
 }
-
 
 symbol:2
-const marklessBranchArms = [[{"text":"<em>Live</em>"}],[{"text":"<em>Idle</em>"}]];
+const marklessBranchArms = [[{ "text": "<em>Live</em>" }], [{ "text": "<em>Idle</em>" }]];
 export function symbol_2(context) {
-	const arm = context.arm ?? ((context.graph.read("prop:props", ["active"])) ? 0 : 1);
-	const parts = marklessBranchArms[arm] ?? [];
-	const html = parts.map((part) => part.text !== undefined ? part.text : marklessBranchText(context.graph.read(part.read.graphNodeId, part.read.path))).join("");
-	return { arm, html };
+  const arm = context.arm ?? (context.graph.read("prop:props", ["active"]) ? 0 : 1);
+  const parts = marklessBranchArms[arm] ?? [];
+  const html = parts.map((part) => part.text !== undefined ? part.text : marklessBranchText(context.graph.read(part.read.graphNodeId, part.read.path))).join("");
+  return { arm, html };
 }
-function marklessBranchText(value) { return String(value == null ? "" : value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }",
+function marklessBranchText(value) {
+  return String(value == null ? "" : value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+}",
     "symbolResolverModule": "export const symbolManifest = 
 [1,null,null,[],[],{}]
 ;
@@ -2099,16 +2064,11 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	};
 }",
     "symbolModules": "symbol:0
-import { marklessWriteScalar } from '@markless/web/fns/write-scalar';
-
+import { marklessWriteScalar } from "@markless/web/fns/write-scalar";
 /* scalar leaf marker: context.graph.update({ */
 export function symbol_0(context) {
-	return marklessWriteScalar(context, {
-		graphNodeId: "state:chosen",
-		value: context.locals?.entry?.code,
-	});
-}
-",
+  return marklessWriteScalar(context, { graphNodeId: "state:chosen", value: context.locals?.entry?.code });
+}",
     "symbolResolverModule": "export const symbolManifest = 
 [1,null,null,[],[],{}]
 ;
@@ -2774,33 +2734,25 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 }",
     "symbolModules": "symbol:0
 export function symbol_0(context) {
-	return {
-		type: "setText",
-		locator: context.domUpdate?.hostNodeId ?? "h1",
-		value: context.value ? "Live" : "Idle",
-	};
+  return { type: "setText", locator: context.domUpdate?.hostNodeId ?? "h1", value: context.value ? "Live" : "Idle" };
 }
-
 
 symbol:1
 export function symbol_1(context) {
-	return {
-		type: "setText",
-		locator: context.domUpdate?.hostNodeId ?? "h2",
-		value: context.value ? "Live" : "Idle",
-	};
+  return { type: "setText", locator: context.domUpdate?.hostNodeId ?? "h2", value: context.value ? "Live" : "Idle" };
 }
-
 
 symbol:2
-const marklessBranchArms = [[{"text":"<em>Live</em>"}],[{"text":"<em>Idle</em>"}]];
+const marklessBranchArms = [[{ "text": "<em>Live</em>" }], [{ "text": "<em>Idle</em>" }]];
 export function symbol_2(context) {
-	const arm = context.arm ?? ((context.graph.read("prop:props", ["active"])) ? 0 : 1);
-	const parts = marklessBranchArms[arm] ?? [];
-	const html = parts.map((part) => part.text !== undefined ? part.text : marklessBranchText(context.graph.read(part.read.graphNodeId, part.read.path))).join("");
-	return { arm, html };
+  const arm = context.arm ?? (context.graph.read("prop:props", ["active"]) ? 0 : 1);
+  const parts = marklessBranchArms[arm] ?? [];
+  const html = parts.map((part) => part.text !== undefined ? part.text : marklessBranchText(context.graph.read(part.read.graphNodeId, part.read.path))).join("");
+  return { arm, html };
 }
-function marklessBranchText(value) { return String(value == null ? "" : value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }",
+function marklessBranchText(value) {
+  return String(value == null ? "" : value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+}",
     "symbolResolverModule": "export const symbolManifest = 
 [1,null,null,[],[],{}]
 ;
@@ -3137,28 +3089,20 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	};
 }",
     "symbolModules": "symbol:0
-import { marklessWriteScalar } from '@markless/web/fns/write-scalar';
-
+import { marklessWriteScalar } from "@markless/web/fns/write-scalar";
 /* scalar leaf marker: context.graph.update({ */
 export function symbol_0(context) {
-	return marklessWriteScalar(context, {
-		graphNodeId: "state:count",
-		returnValue: "next",
-		update(value) {
-			return Number(value) + 1;
-		},
-	});
+  return marklessWriteScalar(context, { graphNodeId: "state:count", returnValue: "next", update(value) {
+    return Number(value) + 1;
+  } });
 }
-
 
 symbol:1
-import { marklessUpdateText } from '@markless/web/fns/update-text';
-
+import { marklessUpdateText } from "@markless/web/fns/update-text";
 /* text update leaf marker: type: "setText" */
 export function symbol_1(context) {
-	return marklessUpdateText(context, "h0");
-}
-",
+  return marklessUpdateText(context, "h0");
+}",
     "symbolResolverModule": "export const symbolManifest = 
 [1,null,null,[],[],{}]
 ;
@@ -3361,19 +3305,17 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	};
 }",
     "symbolModules": "symbol:0
-import { marklessUpdateText } from '@markless/web/fns/update-text';
-
+import { marklessUpdateText } from "@markless/web/fns/update-text";
 /* text update leaf marker: type: "setText" */
 export function symbol_0(context) {
-	return marklessUpdateText(context, "h0");
+  return marklessUpdateText(context, "h0");
 }
-
 
 symbol:1
 export const authoredSource = "() => count * 2";
 
 export function symbol_1(context) {
-	return context.graph.read("state:count") * 2;
+  return context.graph.read("state:count") * 2;
 }
 ",
     "symbolResolverModule": "export const symbolManifest = 

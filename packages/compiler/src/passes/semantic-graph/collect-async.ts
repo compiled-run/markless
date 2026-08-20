@@ -12,7 +12,13 @@ import {
 	semanticAliasMap,
 	uniqueBy,
 } from '../../artifact-helpers/graph-paths.ts';
-import { declaredBindingNamesDeep, graphPathRootName } from './collect-expressions.ts';
+import {
+	readRegion,
+	resolvedSymbolAt,
+	rootBindsInsideRegion,
+	rootIdentifierOffset,
+	type ReadRegion,
+} from './collect-expressions.ts';
 import {
 	asyncBoundaryRequiredDiagnostic,
 	asyncPostAwaitReadDiagnostic,
@@ -49,7 +55,7 @@ export function collectAsyncBoundary(
 	});
 	state.currentAsyncBoundaryId = boundaryId;
 
-	for (const child of childNodes(node)) {
+	for (const child of asNodes([node.block, node.handler, node.pending])) {
 		state.currentAsyncBoundaryArm = armByNode.get(child) ?? previousArm;
 		walk(child, state);
 	}
@@ -186,6 +192,7 @@ export function collectGraphDependencies(
 	const dependencies: SemanticGraphDependency[] = [];
 	const bindings = graphBindingMap(state.graph, currentGraphScope(state));
 	const aliases = semanticAliasMap(state.graph, currentGraphScope(state));
+	const bodyRegion = readRegion(node);
 
 	const visit = (candidate: AnyNode | undefined): void => {
 		if (!candidate) return;
@@ -217,7 +224,7 @@ export function collectGraphDependencies(
 		}
 
 		if (candidate.type === 'MemberExpression') {
-			const dependency = graphDependency(candidate, state, bindings, aliases);
+			const dependency = graphDependency(candidate, state, bindings, aliases, bodyRegion);
 			if (dependency) {
 				dependencies.push(dependency);
 				return;
@@ -230,7 +237,7 @@ export function collectGraphDependencies(
 		}
 
 		if (candidate.type === 'Identifier') {
-			const dependency = graphDependency(candidate, state, bindings, aliases);
+			const dependency = graphDependency(candidate, state, bindings, aliases, bodyRegion);
 			if (dependency) dependencies.push(dependency);
 			return;
 		}
@@ -257,7 +264,7 @@ export function collectAsyncComputedPostAwaitReads(
 	const firstAwaitEnd = findFirstAwaitEnd(body);
 	if (firstAwaitEnd === null) return;
 
-	for (const read of postAwaitGraphReads(body, firstAwaitEnd, state, declaredBindingNamesDeep(body))) {
+	for (const read of postAwaitGraphReads(body, firstAwaitEnd, state)) {
 		state.graph.diagnostics.push(asyncPostAwaitReadDiagnostic(computedName, read));
 	}
 }
@@ -267,7 +274,10 @@ function graphDependency(
 	state: WalkState,
 	bindings: ReadonlyMap<string, SemanticGraphBinding>,
 	aliases: ReadonlyMap<string, SemanticGraphAlias>,
+	bodyRegion: ReadRegion | null,
 ): SemanticGraphDependency | null {
+	if (!namesGraphBinding(node, state, bodyRegion)) return null;
+
 	const source = expressionSource(node, state.source);
 	const resolved = resolveGraphPath(source, bindings, aliases);
 	if (!resolved) return null;
@@ -277,6 +287,31 @@ function graphDependency(
 		graphNodeId: resolved.binding.id,
 		path: resolved.path,
 	};
+}
+
+/**
+ * Whether the leftmost identifier of a candidate dependency really names a
+ * graph binding, rather than something else the derive body spells the same
+ * way. The question is asked of yuku's resolved references, because a name is
+ * not an identity: the `total` in `const total = rate * 3` is a declaration and
+ * refers to nothing, and the `total` that follows it refers to that local, not
+ * to the derive named `total`. Matching by name records the derive as its own
+ * dependency and the graph then reports a legal derive as a cycle on itself.
+ */
+function namesGraphBinding(
+	node: AnyNode,
+	state: WalkState,
+	bodyRegion: ReadRegion | null,
+): boolean {
+	const offset = rootIdentifierOffset(node, state.source);
+	if (offset === null) return false;
+
+	// A declaration site has no reference row at all, so it reads nothing.
+	if (resolvedSymbolAt(state.semantic(), offset) === null) return false;
+
+	// A binding the derive body declares itself - a `const`, a callback
+	// parameter - shadows any graph binding of the same name.
+	return !rootBindsInsideRegion(node, state, bodyRegion);
 }
 
 function findFirstAwaitEnd(node: AnyNode | undefined): number | null {
@@ -299,24 +334,17 @@ function postAwaitGraphReads(
 	node: AnyNode | undefined,
 	firstAwaitEnd: number,
 	state: WalkState,
-	bodyLocalNames: ReadonlySet<string>,
 ): SemanticStateRead[] {
 	const reads: SemanticStateRead[] = [];
 	const bindings = graphBindingMap(state.graph, currentGraphScope(state));
 	const aliases = semanticAliasMap(state.graph, currentGraphScope(state));
+	const bodyRegion = readRegion(node);
 
 	const visit = (candidate: AnyNode | undefined): void => {
 		if (!candidate) return;
 
 		if (candidate.type === 'MemberExpression') {
-			const read = postAwaitRead(
-				candidate,
-				firstAwaitEnd,
-				state,
-				bindings,
-				aliases,
-				bodyLocalNames,
-			);
+			const read = postAwaitRead(candidate, firstAwaitEnd, state, bindings, aliases, bodyRegion);
 			if (read) {
 				reads.push(read);
 				return;
@@ -329,14 +357,7 @@ function postAwaitGraphReads(
 		}
 
 		if (candidate.type === 'Identifier') {
-			const read = postAwaitRead(
-				candidate,
-				firstAwaitEnd,
-				state,
-				bindings,
-				aliases,
-				bodyLocalNames,
-			);
+			const read = postAwaitRead(candidate, firstAwaitEnd, state, bindings, aliases, bodyRegion);
 			if (read) reads.push(read);
 			return;
 		}
@@ -357,18 +378,19 @@ function postAwaitRead(
 	state: WalkState,
 	bindings: ReadonlyMap<string, SemanticGraphBinding>,
 	aliases: ReadonlyMap<string, SemanticGraphAlias>,
-	bodyLocalNames: ReadonlySet<string>,
+	bodyRegion: ReadRegion | null,
 ): SemanticStateRead | null {
 	const span = sourceSpan(node, state.filename);
 	if (!span || span.start <= firstAwaitEnd) return null;
 
+	// A binding the derive body declares itself is a local value, not graph
+	// state, even when an identically named alias exists elsewhere in the
+	// module. Snapshotting into such a local before the first await is the
+	// prescribed fix for this diagnostic; the graph read that fed it is checked
+	// on its own.
+	if (rootBindsInsideRegion(node, state, bodyRegion)) return null;
+
 	const source = expressionSource(node, state.source);
-	// A name the derive body binds itself is a local value, not graph state,
-	// even when an identically named alias exists elsewhere in the module.
-	// Snapshotting into such a local before the first await is the prescribed
-	// fix for this diagnostic; the graph read that fed it is checked on its own.
-	const rootName = graphPathRootName(source);
-	if (rootName && bodyLocalNames.has(rootName)) return null;
 	if (!resolveGraphPath(source, bindings, aliases)) return null;
 
 	return {

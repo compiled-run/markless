@@ -1,4 +1,4 @@
-import { parseModule } from '@tsrx/core';
+import { parseModule } from '../../js-ast.ts';
 import type { PublicRenderModuleArtifact, PublicRenderModuleInput } from '../../artifacts.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
 import { collectPublicRenderComponentDefinitions } from './component-definitions.ts';
@@ -71,9 +71,7 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 			})
 		: '';
 	const ssrModuleSource = root ? emitPublicSsrRenderModule(input, root) : '';
-	const componentDefinitions = root
-		? collectPublicRenderComponentDefinitions(input, root)
-		: [];
+	const componentDefinitions = root ? collectPublicRenderComponentDefinitions(input, root) : [];
 	return {
 		passId: 'public-render-module',
 		renderDataModuleSource: root

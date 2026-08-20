@@ -14,6 +14,7 @@ import {
 	type BundlerAnalyzerBudget,
 	type BundlerAnalyzerNetworkRule,
 } from './analyzer/policy.ts';
+import { requestPhase, startedAfterAction } from './network-phase.ts';
 
 type I5Fixture = 'vite-csr-preloader' | 'vite-ssr-preloader';
 type I5Measurement = { readonly bootstrap: number; readonly action: number };
@@ -199,10 +200,18 @@ export function evaluatePreloaderEvidence(input: {
 	readonly fixture: 'vite-csr-preloader' | 'vite-ssr-preloader';
 	readonly pageUrl: string;
 	readonly declaredPreloads: readonly string[];
-	readonly actionStartIndex: number;
+	/**
+	 * Latest instant, in the CDP monotonic timebase, that provably precedes the
+	 * click (see `preClickInstantMs`). Phase is decided by request start time, not
+	 * by array position: witness records requests in completion order, so an index
+	 * split counts a still-in-flight page-parse preload as click-caused.
+	 */
+	readonly actionStartTimeMs: number;
 	readonly requests: readonly {
 		readonly method: string;
 		readonly url: string;
+		readonly startTimeMs: number;
+		readonly endTimeMs: number | null;
 		readonly status: number | null;
 		readonly failedReason?: string | null;
 		readonly resourceType?: string | null;
@@ -213,9 +222,11 @@ export function evaluatePreloaderEvidence(input: {
 		baseUrl: input.pageUrl,
 		actionKind: 'interaction',
 		declaredPreloads: input.declaredPreloads,
-		observedRequests: input.requests.map((request, index) => ({
-			phase: index < input.actionStartIndex ? 'bootstrap' : 'action',
-			...(index < input.actionStartIndex ? {} : { actionId: 'counter-click' }),
+		observedRequests: input.requests.map((request) => ({
+			phase: requestPhase(request, input.actionStartTimeMs),
+			...(startedAfterAction(request, input.actionStartTimeMs)
+				? { actionId: 'counter-click' }
+				: {}),
 			url: request.url,
 			...(request.resourceType === null || request.resourceType === undefined
 				? {}

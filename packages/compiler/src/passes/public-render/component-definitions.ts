@@ -1,4 +1,4 @@
-import { parseModule } from '@tsrx/core';
+import { parseModule } from '../../js-ast.ts';
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import { asNodes, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { firstComponentRoot } from './plan.ts';
@@ -24,7 +24,9 @@ export function collectPublicRenderComponentDefinitions(
 	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
 	const componentMap = sameModuleComponentMap(ast);
 	const materializations = input.source.artifactChildMaterializations ?? {};
-	const componentNames = new Set(input.semanticGraph.components.map((component) => component.name));
+	const componentNames = new Set(
+		input.semanticGraph.components.map((component) => component.name),
+	);
 	const callbacks = callbackSymbolIds(input);
 	const componentInvocations = new Map<number, AnyNode>();
 	walkNode(ast, (node) => {
@@ -79,9 +81,7 @@ export function collectPublicRenderComponentDefinitions(
 						passedInputs.has(name) ? [] : [{ name, kind: 'absent' }],
 					),
 				],
-				...(materializations[edge.id]
-					? { materialized: materializations[edge.id] }
-					: {}),
+				...(materializations[edge.id] ? { materialized: materializations[edge.id] } : {}),
 			};
 		});
 		const hostNodeIds = new Set(
@@ -89,16 +89,12 @@ export function collectPublicRenderComponentDefinitions(
 		);
 		const branchIds = new Set(
 			chunks.flatMap((chunk) =>
-				chunk.slots.flatMap((slot) =>
-					slot.kind === 'branch' ? [slot.branchSiteId] : [],
-				),
+				chunk.slots.flatMap((slot) => (slot.kind === 'branch' ? [slot.branchSiteId] : [])),
 			),
 		);
 		const boundaryIds = new Set(
 			chunks.flatMap((chunk) =>
-				chunk.slots.flatMap((slot) =>
-					slot.kind === 'async' ? [slot.boundaryId] : [],
-				),
+				chunk.slots.flatMap((slot) => (slot.kind === 'async' ? [slot.boundaryId] : [])),
 			),
 		);
 		const repeatIds = new Set(
@@ -176,7 +172,9 @@ export function collectPublicRenderComponentDefinitions(
 				branches: input.renderData.branches.filter((branch) =>
 					branchIds.has(branch.branchSiteId),
 				),
-				repeats: input.renderData.repeats.filter((repeat) => repeatIds.has(repeat.repeatId)),
+				repeats: input.renderData.repeats.filter((repeat) =>
+					repeatIds.has(repeat.repeatId),
+				),
 				boundaries: input.renderData.boundaries.filter((boundary) =>
 					boundaryIds.has(boundary.boundaryId),
 				),
@@ -184,7 +182,9 @@ export function collectPublicRenderComponentDefinitions(
 				propCellId:
 					input.semanticGraph.components.find(
 						(component) => component.name === componentName,
-					) && componentNode && componentRoot
+					) &&
+					componentNode &&
+					componentRoot
 						? componentPropCellId(componentNode)
 						: null,
 				ownsModuleData: componentName === rootInfo.componentName,
@@ -248,7 +248,9 @@ function projectionProp(source: string, node: AnyNode | undefined): Record<strin
 	const start = children[0]?.start;
 	const end = children.at(-1)?.end;
 	if (dynamic || typeof start !== 'number' || typeof end !== 'number') return {};
-	return { projection: { kind: 'static-markup', markup: source.slice(start, end), elementCount } };
+	return {
+		projection: { kind: 'static-markup', markup: source.slice(start, end), elementCount },
+	};
 }
 
 function chunkGraphNodeIds(chunks: PublicRenderModuleInput['renderData']['chunks']): string[] {
@@ -259,9 +261,7 @@ function chunkGraphNodeIds(chunks: PublicRenderModuleInput['renderData']['chunks
 			}
 			if (slot.kind === 'dynamic-host') {
 				return slot.attributeSlots.flatMap((attribute) =>
-					attribute.residue.kind === 'graph-read'
-						? [attribute.residue.graphNodeId]
-						: [],
+					attribute.residue.kind === 'graph-read' ? [attribute.residue.graphNodeId] : [],
 				);
 			}
 			return [];

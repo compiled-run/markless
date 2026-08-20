@@ -1,14 +1,49 @@
-import { parseModule } from '@tsrx/core';
-import type {
-	CodeMapping,
-	CompileError,
-	MappingData,
-	ParseOptions,
-	VolarMappingsResult,
-} from '@tsrx/core/types';
-import type * as AST from '@tsrx/core/types/estree';
+import type { Program } from 'yuku-tsrx';
+import {
+	parseModule,
+	type MarklessCompileError,
+	type MarklessParseOptions,
+	type MarklessParserComment,
+} from './js-ast.ts';
 
-export type TsrxTypeServiceOptions = ParseOptions & {
+export interface MarklessMappingData {
+	verification: boolean;
+	completion: boolean;
+	semantic: boolean;
+	navigation: boolean;
+	structure: boolean;
+	format: boolean;
+	customData: {
+		embeddedId?: string;
+		content?: string;
+		readonly [key: string]: unknown;
+	};
+	readonly [key: string]: unknown;
+}
+
+export interface MarklessCodeMapping {
+	sourceOffsets: number[];
+	generatedOffsets: number[];
+	lengths: number[];
+	generatedLengths: number[];
+	data: MarklessMappingData;
+}
+
+export interface MarklessVolarMappingsResult {
+	code: string;
+	mappings: MarklessCodeMapping[];
+	cssMappings: MarklessCodeMapping[];
+	/**
+	 * Reserved for mappings of `<script>` regions. The yuku parser does not surface them
+	 * yet, so the type service emits an empty array to keep the result shape stable for
+	 * editor hosts that already read this field.
+	 */
+	scriptMappings: MarklessCodeMapping[];
+	errors: MarklessCompileError[];
+	sourceAst: Program;
+}
+
+export type TsrxTypeServiceOptions = MarklessParseOptions & {
 	readonly [key: string]: unknown;
 };
 
@@ -24,11 +59,11 @@ type SourceTextSpan = {
 	readonly text: string;
 };
 
-export type TsrxCodeMapping = CodeMapping;
+export type TsrxCodeMapping = MarklessCodeMapping;
 
-export type MarklessTsrxTypeServiceResult = VolarMappingsResult;
+export type MarklessTsrxTypeServiceResult = MarklessVolarMappingsResult;
 
-const fullMappingData: MappingData = {
+const fullMappingData: MarklessMappingData = {
 	verification: true,
 	completion: true,
 	semantic: true,
@@ -37,17 +72,17 @@ const fullMappingData: MappingData = {
 	format: false,
 	customData: {},
 };
-const valueMappingData: MappingData = {
+const valueMappingData: MarklessMappingData = {
 	...fullMappingData,
 	structure: false,
 };
-const gapMappingData: MappingData = {
+const gapMappingData: MarklessMappingData = {
 	...fullMappingData,
 	verification: false,
 	semantic: false,
 	navigation: false,
 };
-const structureMappingData: MappingData = {
+const structureMappingData: MarklessMappingData = {
 	verification: false,
 	completion: false,
 	semantic: false,
@@ -57,7 +92,7 @@ const structureMappingData: MappingData = {
 	customData: {},
 };
 type MappingProfile = 'full' | 'value' | 'gap' | 'structure';
-const mappingProfiles: Record<MappingProfile, MappingData> = {
+const mappingProfiles: Record<MappingProfile, MarklessMappingData> = {
 	full: fullMappingData,
 	value: valueMappingData,
 	gap: gapMappingData,
@@ -72,15 +107,15 @@ export function compileTsrxForTypeService(
 	filename = 'module.tsrx',
 	options: TsrxTypeServiceOptions = {},
 ): MarklessTsrxTypeServiceResult {
-	const errors: CompileError[] = [];
-	const comments: AST.CommentWithLocation[] = [];
+	const errors: MarklessCompileError[] = [];
+	const comments: MarklessParserComment[] = [];
 	const sourceAst = parseModule(source, filename, {
 		...options,
 		collect: true,
 		loose: !!options?.loose,
 		errors,
 		comments,
-	}) as AST.Program;
+	}) as Program;
 	const emittedCode = emitProgramForTypeService(sourceAst, source);
 	const generated = finalizeSourceMapMarkers(emittedCode);
 	addImportInsertionMappings(sourceAst, source, generated.mappings);
@@ -97,7 +132,7 @@ export function compileTsrxForTypeService(
 
 export const compile_to_volar_mappings = compileTsrxForTypeService;
 
-function emitProgramForTypeService(program: AST.Program, source: string): string {
+function emitProgramForTypeService(program: Program, source: string): string {
 	const statements = asNodes(program.body);
 	const body = statements
 		.map((statement) => emitTopLevelStatement(statement, source))
@@ -249,16 +284,29 @@ function emitAttribute(attribute: TsrxAstNode, source: string): string {
 	if (!name) return source.slice(span.start, span.end);
 	let output = markNodeText(name, source, 'full');
 	if (!isNode(attribute.value)) return output;
-	output += markSourceText(name.end ?? span.start, source.slice(name.end ?? span.start, attribute.value.start), 'gap');
+	output += markSourceText(
+		name.end ?? span.start,
+		source.slice(name.end ?? span.start, attribute.value.start),
+		'gap',
+	);
 	if (attribute.value.type === 'Literal') {
 		const raw = source.slice(attribute.value.start ?? 0, attribute.value.end ?? 0);
 		output += markNodeText(attribute.value, source, 'value');
 		if ((raw.startsWith('"') || raw.startsWith("'")) && raw.length >= 2) {
-			output += markOverlay((attribute.value.start ?? 0) + 1, raw.length - 2, raw.length - 1, raw.length - 2, 'value');
+			output += markOverlay(
+				(attribute.value.start ?? 0) + 1,
+				raw.length - 2,
+				raw.length - 1,
+				raw.length - 2,
+				'value',
+			);
 		}
 		return output;
 	}
-	if (attribute.value.type === 'JSXExpressionContainer' || attribute.value.type === 'TSRXExpression') {
+	if (
+		attribute.value.type === 'JSXExpressionContainer' ||
+		attribute.value.type === 'TSRXExpression'
+	) {
 		output += emitExpressionContainer(attribute.value, source);
 		return output;
 	}
@@ -309,10 +357,21 @@ function emitDynamicElement(
 		cursor = attributeSpan.end;
 	}
 	const openingSpan = sourceSpan(opening);
-	if (openingSpan) attributes += markSourceText(cursor, source.slice(cursor, openingSpan.end), 'gap');
+	if (openingSpan)
+		attributes += markSourceText(cursor, source.slice(cursor, openingSpan.end), 'gap');
 	const children = emitTemplateChildren(node.children, source);
-	const tagUse = sourceSliceRange(expression, source, expression.start ?? 0, expression.end ?? 0, 'value');
-	return `{((__Tag) => <__Tag${attributes}${opening.selfClosing ? '' : `${children}</__Tag>`})(` + tagUse + ')}';
+	const tagUse = sourceSliceRange(
+		expression,
+		source,
+		expression.start ?? 0,
+		expression.end ?? 0,
+		'value',
+	);
+	return (
+		`{((__Tag) => <__Tag${attributes}${opening.selfClosing ? '' : `${children}</__Tag>`})(` +
+		tagUse +
+		')}'
+	);
 }
 
 function emitChildCodeBlock(node: TsrxAstNode, source: string): string {
@@ -367,11 +426,7 @@ function emitIfChain(node: TsrxAstNode, source: string): string {
 	return output;
 }
 
-function emitIfChainWithKeyword(
-	node: TsrxAstNode,
-	source: string,
-	ifKeyword: string,
-): string {
+function emitIfChainWithKeyword(node: TsrxAstNode, source: string, ifKeyword: string): string {
 	let output = `${ifKeyword} (${emitValue(node.test, source)}) ${emitConditionalReturningArm(node.consequent, source)}`;
 	if (!isNode(node.alternate)) return `${output}\nreturn null;`;
 	const elseOffset = findKeywordBefore('@else', node.alternate.start, node.consequent, source);
@@ -392,9 +447,10 @@ function emitForExpression(node: TsrxAstNode, source: string): string {
 	const index = isNode(node.index) ? node.index : undefined;
 	const key = isNode(node.key) ? node.key : undefined;
 	const body = emitArmParts(node.body, source);
-	const left = isNode(node.left) && node.left.type === 'VariableDeclaration'
-		? emitValue(node.left, source)
-		: `const ${emitValue(node.left, source)}`;
+	const left =
+		isNode(node.left) && node.left.type === 'VariableDeclaration'
+			? emitValue(node.left, source)
+			: `const ${emitValue(node.left, source)}`;
 	const setup = index ? `\nlet ${emitValue(index, source)} = 0;` : '';
 	const keyCheck = key ? `\nvoid (${emitValue(key, source)});` : '';
 	const increment = index ? `\n${rawSourceSlice(index, source)} += 1;` : '';
@@ -499,7 +555,8 @@ function emitKeywordAt(
 	generatedKeyword: string,
 	source: string,
 ): string {
-	return typeof offset === 'number' && source.slice(offset, offset + sourceKeyword.length) === sourceKeyword
+	return typeof offset === 'number' &&
+		source.slice(offset, offset + sourceKeyword.length) === sourceKeyword
 		? markSourceReplacement(offset, sourceKeyword.length, generatedKeyword, 'structure')
 		: generatedKeyword;
 }
@@ -592,7 +649,7 @@ function collectCssMappings(ast: unknown, source: string): TsrxCodeMapping[] {
 }
 
 function addImportInsertionMappings(
-	program: AST.Program,
+	program: Program,
 	source: string,
 	mappings: TsrxCodeMapping[],
 ): void {
@@ -610,8 +667,7 @@ function addImportInsertionMappings(
 			return span.start <= mappingStart && mappingStart < span.end;
 		});
 		if (!authoredMapping) continue;
-		const offsetDelta =
-			authoredMapping.generatedOffsets[0] - authoredMapping.sourceOffsets[0];
+		const offsetDelta = authoredMapping.generatedOffsets[0] - authoredMapping.sourceOffsets[0];
 		mappings.push(
 			createMapping(span.end - 1, 1, span.end - 1 + offsetDelta, 1, gapMappingData),
 		);
@@ -637,9 +693,14 @@ function finalizeSourceMapMarkers(codeWithMarkers: string): {
 			continue;
 		}
 
-		const [sourceOffsetText, sourceLengthText, profileText, markerKind, backText, generatedLengthText] = codeWithMarkers
-			.slice(index + mapStart.length, headerEnd)
-			.split(':');
+		const [
+			sourceOffsetText,
+			sourceLengthText,
+			profileText,
+			markerKind,
+			backText,
+			generatedLengthText,
+		] = codeWithMarkers.slice(index + mapStart.length, headerEnd).split(':');
 		const text = codeWithMarkers.slice(headerEnd + mapSeparator.length, contentEnd);
 		const sourceOffset = Number(sourceOffsetText);
 		const sourceLength = Number(sourceLengthText);
@@ -759,7 +820,7 @@ function createMapping(
 	sourceLength: number,
 	generatedOffset: number,
 	generatedLength: number,
-	data: MappingData = fullMappingData,
+	data: MarklessMappingData = fullMappingData,
 ): TsrxCodeMapping {
 	return {
 		sourceOffsets: [sourceOffset],
@@ -811,11 +872,7 @@ function markOverlay(
 	return `${mapStart}${sourceOffset}:${sourceLength}:${profile}:overlay:${generatedBack}:${generatedLength}${mapSeparator}${mapEnd}`;
 }
 
-function markNodeText(
-	node: TsrxAstNode,
-	source: string,
-	profile: MappingProfile,
-): string {
+function markNodeText(node: TsrxAstNode, source: string, profile: MappingProfile): string {
 	const span = sourceSpan(node);
 	return span ? markSourceText(span.start, source.slice(span.start, span.end), profile) : '';
 }

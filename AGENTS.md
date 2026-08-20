@@ -20,6 +20,10 @@ Merging or pushing to main, pushing any shared branch, or closing a goal require
 The progress ledger is CLI-managed: use `pnpm state append|status|tail|project`.
 Never read `specs/state-archive.md` or bulk history; use the CLI.
 
+## Pull request feedback
+
+Opening a PR is not the end of the work. Before calling any PR done, fetch every reviewer finding — human and bot (CodeRabbit) — and adjudicate each one: fix what is valid, reply on the PR with the reason when a finding is stale or wrong, and carry upstream-owned findings into the ledger. A PR with unanswered review feedback is not finished.
+
 Production package folders: `packages/analyzer`, `packages/bundler`, `packages/cli`, `packages/compiler`, `packages/core`, `packages/router`, `packages/runtime`, `packages/serializer`, `packages/typescript-plugin`, `packages/vitest-browser`, and `packages/web`.
 
 Write user-facing explanations in clear, concise language without reducing technical precision. Prefer concrete wording over unexplained jargon. Use established domain terminology when it is the most precise choice, and briefly define it when the intended audience may not know it. Preserve material evidence, constraints, tradeoffs, caveats, and uncertainty. Do not rewrite code, identifiers, commands, quoted text, or prescribed formats merely to satisfy this style rule.

@@ -1205,12 +1205,45 @@ export default function CaptureSlotSiblings() @{
 			);
 			const records = output.view.events.filter((record) => record.eventName === 'click');
 
-			// The child's handler captures exactly what it reads: the callback prop
-			// and the label prop. The page's own `count` state is a different
-			// component's binding and is not a capture of this child.
-			expect(childHandler.captureSlots.map((slot) => slot.source)).toEqual([
+			// The child handler captures exactly the two props it closes over, and each
+			// slot carries one route per sibling instance edge. Pin what each slot IS so
+			// a phantom slot, or a collapse of the two instance routes into one, fails here.
+			expect(childHandler.captureSlots.map((slot) => slot.propName)).toEqual([
 				'onTrace',
 				'label',
+			]);
+			const [callbackSlot, labelSlot] = childHandler.captureSlots;
+			expect(callbackSlot!.routes).toEqual([
+				expect.objectContaining({
+					kind: 'callback-route',
+					componentEdgeId: 'component-edge:0',
+					componentEdgePath: ['component-edge:0'],
+				}),
+				expect.objectContaining({
+					kind: 'callback-route',
+					componentEdgeId: 'component-edge:1',
+					componentEdgePath: ['component-edge:1'],
+				}),
+			]);
+			expect(
+				callbackSlot!.routes.map((route) =>
+					route.kind === 'callback-route' ? route.callbackSymbolId : route.kind,
+				),
+			).toEqual(['symbol:1', 'symbol:2']);
+			expect(labelSlot!.routes).toEqual([
+				expect.objectContaining({
+					kind: 'graph-reference',
+					componentEdgeId: 'component-edge:0',
+					componentEdgePath: ['component-edge:0'],
+					graphNodeId: 'state:graphLabel',
+					path: [],
+				}),
+				expect.objectContaining({
+					kind: 'compiler-known-constant',
+					componentEdgeId: 'component-edge:1',
+					componentEdgePath: ['component-edge:1'],
+					value: 'Literal coral',
+				}),
 			]);
 			expect(rows).toHaveLength(2);
 			expect(rows.map((row) => row.componentEdgePath)).toEqual([

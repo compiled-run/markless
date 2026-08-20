@@ -2,6 +2,14 @@ import type { AnyNode } from '../../ast/nodes.ts';
 import { sourceSpan } from '../../ast/source.ts';
 import type { CompilerDiagnostic } from '../../diagnostics.ts';
 
+// The public render plan pass owns these diagnostic contract values. Tests and
+// any other reader import them from here rather than restating the strings, so
+// the contract has one source of truth.
+export const PUBLIC_RENDER_PLAN_PASS_ID = 'public-render-plan' as const;
+export const PUBLIC_RENDER_PHASE = 'public-render' as const;
+export const PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT_CODE =
+	'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT' as const;
+
 export function gatePlanDisagreementDiagnostic(input: {
 	readonly label: '@try' | '@if' | '@switch' | '@for';
 	readonly message: string;
@@ -36,17 +44,17 @@ export function unsupportedRenderConstructDiagnostic(input: {
 	readonly severity?: 'warning' | 'error';
 }): CompilerDiagnostic {
 	return {
-		code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
+		code: PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT_CODE,
 		severity: input.severity ?? 'warning',
-		phase: 'public-render',
+		phase: PUBLIC_RENDER_PHASE,
 		title: `${input.label} is not rendered by the public render path yet`,
 		message: `${input.message} markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`,
 		why: 'The public render module only emits compiler-proven output. Content inside an unsupported construct would silently disappear from rendered HTML, so the compiler reports it instead.',
 		primarySpan: sourceSpan(input.node, input.filename),
-		passId: 'public-render-plan',
+		passId: PUBLIC_RENDER_PLAN_PASS_ID,
 		artifactKeys: ['publicRenderPlan'],
 		suggestions: [{ message: input.suggestion }],
-		docsUrl: 'https://markless.dev/errors/MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
+		docsUrl: `https://markless.dev/errors/${PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT_CODE}`,
 	};
 }
 

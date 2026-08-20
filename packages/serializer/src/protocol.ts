@@ -89,15 +89,10 @@ export function protocolEventActionKind(
 	return record.action?.kind ?? PROTOCOL_EVENT_ACTION_KIND.event;
 }
 
-const PROTOCOL_EVENT_ACTION_DISPATCHES_MARKLESS = {
-	[PROTOCOL_EVENT_ACTION_KIND.event]: true,
-	[PROTOCOL_EVENT_ACTION_KIND.externalDelegate]: false,
-} as const satisfies Record<ProtocolEventActionKind, boolean>;
-
 export function protocolEventDispatchesMarkless(
 	record: Pick<ProtocolEventRecord, 'action'>,
 ): boolean {
-	return PROTOCOL_EVENT_ACTION_DISPATCHES_MARKLESS[protocolEventActionKind(record)];
+	return protocolEventActionKind(record) === PROTOCOL_EVENT_ACTION_KIND.event;
 }
 
 export type ProtocolStatePayload = {

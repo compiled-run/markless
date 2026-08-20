@@ -89,7 +89,9 @@ test('compiles TSRX source into type-checkable TSX for TypeScript', () => {
 			}),
 		),
 	).toEqual([]);
-});
+	// The first type-check in a worker builds the TypeScript program cold, which
+	// crossed the default 5s on a slow CI runner while passing everywhere else.
+}, 15000);
 
 // The document shell is authored against framework components like the router's
 // Html, which are plain .ts functions that pass their children through.

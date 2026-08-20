@@ -32,7 +32,6 @@
 	},
 	"publishConfig": {
 		"access": "public",
-		"provenance": true,
 		"exports": {
 			".": {
 				"types": "./dist/index.d.ts",
@@ -63,7 +62,8 @@
 				"require": "./dist/typescript-plugin.cjs",
 				"default": "./dist/typescript-plugin.js"
 			}
-		}
+		},
+		"provenance": true
 	},
 	"scripts": {
 		"build:cjs": "vp pack src/typescript-plugin/index.ts --no-config --format cjs --platform node --out-dir dist --clean=false --no-dts --no-report && node -e \"require('node:fs').renameSync('dist/index.cjs','dist/typescript-plugin.cjs')\"",
@@ -74,13 +74,13 @@
 	"dependencies": {
 		"@markless/bundler": "workspace:*",
 		"@markless/web": "workspace:*",
-		"@tsrx/core": "catalog:",
 		"@virtualstate/navigation": "1.0.1-alpha.212",
 		"hast-util-to-html": "catalog:",
 		"nitro": "catalog:",
 		"pathe": "catalog:",
 		"satteri": "catalog:",
-		"ufo": "catalog:"
+		"ufo": "catalog:",
+		"yuku-tsrx": "0.1.2"
 	},
 	"devDependencies": {
 		"@markless/analyzer": "workspace:*"
