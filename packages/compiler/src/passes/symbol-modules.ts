@@ -15,6 +15,7 @@ import type {
 import { asNodes, childNodes, isNode, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
 import {
+	arrayNode,
 	binaryNode,
 	callNode,
 	conditionalNode,
@@ -28,14 +29,17 @@ import {
 	literalNode,
 	logicalNode,
 	memberChainNode,
+	memberNode,
 	moduleImportNode,
 	moduleProgramNode,
+	newNode,
 	objectNode,
 	optionalMemberNode,
 	parseEmissionSource,
 	printEmittedModule,
 	propertyNode,
 	returnStatementNode,
+	spreadNode,
 	stringArrayNode,
 	withLeadingBlockComment,
 	type EmittedModule,
@@ -1529,7 +1533,7 @@ function callableBehaviorFunctionSource(
 	return `(${symbol.functionSource})`;
 }
 
-function canEmitBehaviorModule(
+export function canEmitBehaviorModule(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'behavior' }>,
 ): boolean {
 	if (symbol.moduleImport) return true;
@@ -1542,6 +1546,176 @@ function isInlineFunctionSource(source: string): boolean {
 	if (trimmed.startsWith('function') || trimmed.startsWith('async function')) return true;
 
 	return trimmed.includes('=>');
+}
+
+// ---------------------------------------------------------------------------
+// Behavior emission through the AST printer.
+//
+// `specs/framework/14-emission-codegen-migration.md`, stage 1, sketch item 2.
+// This band builds nodes and prints them through `emit-codegen.ts`. It calls
+// nothing in the string-scanner band (`topLevelBinaryOperators` through
+// `sourceReferencesIdentifier`), which invariant 5 keeps alive until the
+// stage's final unit but which a migrated site may not call. The behavior
+// emitter never reached that band in the first place: its only authored input
+// is `functionSource`, which the text path splices whole.
+//
+// It is not yet the wired path. `emitBehaviorModule` above still produces the
+// bytes the compiler ships; `test/emit-behavior.test.ts` runs both paths over
+// the same inputs and records where the printed bytes differ from the spliced
+// ones. The printer normalizes rather than preserves, so the two are
+// behaviorally equal and not byte-equal, and invariant 2 makes the swap an
+// owner-approved step rather than a side effect of this unit.
+// ---------------------------------------------------------------------------
+
+export type BehaviorEmissionInput = {
+	readonly symbol: Extract<PlannedSymbol, { readonly kind: 'behavior' }>;
+	readonly omitAuthoredSource: boolean;
+	/** The authored file the behavior was extracted from; names the map. */
+	readonly sourceFileName: string;
+};
+
+/**
+ * Build the print input for a behavior module.
+ *
+ * Split from the print so a test can run the determinism helper (invariant 7)
+ * over the same tree the emitter would print, without emission paying for three
+ * prints and two reparses per symbol in a real build.
+ */
+export function buildBehaviorEmission(input: BehaviorEmissionInput): EmissionPrintInput {
+	const exportName = symbolExportName(input.symbol.id);
+	const site: EmissionSite = {
+		phase: 'payload',
+		passId: 'symbol-modules',
+		sourceFileName: input.sourceFileName,
+		symbolId: input.symbol.id,
+	};
+
+	const inputCount = input.symbol.inputSources.length;
+	const projection = behaviorProjection(input.symbol.functionSource, input.sourceFileName);
+
+	const body: EmissionNode[] = [
+		...(input.symbol.moduleImport
+			? [
+					moduleImportNode({
+						kind: input.symbol.moduleImport.kind,
+						localName: input.symbol.moduleImport.localName,
+						importedName: input.symbol.moduleImport.importedName,
+						source: input.symbol.moduleImport.source,
+					}),
+				]
+			: []),
+		...(input.omitAuthoredSource
+			? []
+			: [
+					exportNamedDeclarationNode(
+						constDeclarationNode('authoredSource', literalNode(input.symbol.source)),
+					),
+				]),
+		exportNamedDeclarationNode(
+			constDeclarationNode(
+				'behaviorFunctionSource',
+				literalNode(input.symbol.functionSource),
+			),
+		),
+		exportNamedDeclarationNode(
+			constDeclarationNode(
+				'behaviorInputSources',
+				stringArrayNode(input.symbol.inputSources),
+			),
+		),
+		exportNamedDeclarationNode(
+			functionDeclarationNode(exportName, ['context'], [
+				constDeclarationNode('inputs', behaviorInputsExpression(inputCount)),
+				constDeclarationNode(
+					'behavior',
+					inputCount > 0
+						? callNode(projection.functionExpression, [
+								spreadNode(identifierNode('inputs')),
+							])
+						: projection.functionExpression,
+				),
+				returnStatementNode(
+					callNode(identifierNode('behavior'), [memberChainNode('context.element')]),
+				),
+			]),
+		),
+	];
+
+	return {
+		program: moduleProgramNode(body),
+		source: projection.source,
+		outputFileName: `${exportName}.js`,
+		site,
+	};
+}
+
+/** The printed behavior module, with its source map (invariant 3). */
+export function emitBehaviorModuleNodes(input: BehaviorEmissionInput): EmittedModule {
+	return printEmittedModule(buildBehaviorEmission(input));
+}
+
+/**
+ * `context.behaviorInputs ?? new Array(n).fill(undefined)`, or `[]` when the
+ * behavior takes no inputs — the two forms the text path writes today.
+ *
+ * The zero-input form is a separate branch rather than `new Array(0).fill(...)`
+ * because the text path emits a literal `[]` there, and this band's job is to
+ * reproduce that behavior, not to improve on it.
+ */
+function behaviorInputsExpression(inputCount: number): EmissionNode {
+	if (inputCount === 0) return arrayNode([]);
+
+	return logicalNode(
+		'??',
+		memberChainNode('context.behaviorInputs'),
+		callNode(
+			memberNode(newNode(identifierNode('Array'), [literalNode(inputCount)]), 'fill'),
+			[identifierNode('undefined')],
+		),
+	);
+}
+
+type BehaviorProjection = {
+	/** The one text every printed node carries an offset into. */
+	readonly source: string;
+	readonly functionExpression: EmissionNode;
+};
+
+/**
+ * Parse the authored behavior factory once, as an expression.
+ *
+ * The factory is parenthesized so it parses as an expression statement in every
+ * authored form — a `function` at statement start would otherwise be a
+ * declaration, and the text path wraps it in parentheses for the same reason
+ * (`callableBehaviorFunctionSource`). `preserveParens: false` then drops the
+ * wrapper, and the printer re-derives whatever parentheses calling the factory
+ * actually needs.
+ */
+function behaviorProjection(functionSource: string, filename: string): BehaviorProjection {
+	const source = `(${functionSource});`;
+	const { program, errors } = parseEmissionSource(source, filename, 'ts');
+	if (errors.length > 0) {
+		throw new Error(
+			`symbol-modules: behavior emission could not parse its factory source (${errors
+				.map((error) => error.message)
+				.join('; ')})`,
+		);
+	}
+
+	const statements = asNodes((program as unknown as AnyNode).body);
+	const last = statements.at(-1);
+	if (
+		statements.length !== 1 ||
+		!last ||
+		last.type !== 'ExpressionStatement' ||
+		!isNode(last.expression)
+	) {
+		throw new Error(
+			'symbol-modules: behavior emission expected its factory source to be a single expression',
+		);
+	}
+
+	return { source, functionExpression: last.expression as unknown as EmissionNode };
 }
 
 function emitAsyncComputedRunnerModule(

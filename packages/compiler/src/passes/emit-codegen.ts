@@ -456,6 +456,51 @@ export function memberChainNode(dottedName: string): EmissionNode {
 	return node;
 }
 
+/**
+ * `<object>.<property>` where the object is already a node.
+ *
+ * `memberChainNode` starts from a name, so it cannot reach a property of a call
+ * or a `new` expression. The behavior emitter needs exactly that, for
+ * `new Array(n).fill(undefined)`.
+ */
+export function memberNode(object: EmissionNode, property: string): EmissionNode {
+	return {
+		type: 'MemberExpression',
+		object,
+		property: identifierNode(property),
+		computed: false,
+		optional: false,
+	};
+}
+
+/** `new <callee>(<args>)`. */
+export function newNode(
+	callee: EmissionNode,
+	callArguments: ReadonlyArray<EmissionNode>,
+): EmissionNode {
+	return { type: 'NewExpression', callee, arguments: [...callArguments] };
+}
+
+/**
+ * `<left> <operator> <right>` for the short-circuiting operators.
+ *
+ * The behavior emitter builds `??`; the printer derives the parentheses that
+ * mixing `??` with `&&`/`||` requires, which is the capability that retires the
+ * hand-maintained precedence table.
+ */
+export function logicalNode(
+	operator: '??' | '&&' | '||',
+	left: EmissionNode,
+	right: EmissionNode,
+): EmissionNode {
+	return { type: 'LogicalExpression', operator, left, right };
+}
+
+/** `...<argument>`, in a call-argument or array-element position. */
+export function spreadNode(argument: EmissionNode): EmissionNode {
+	return { type: 'SpreadElement', argument };
+}
+
 export function callNode(
 	callee: EmissionNode,
 	callArguments: ReadonlyArray<EmissionNode>,
@@ -490,15 +535,6 @@ export function binaryNode(
 	right: EmissionNode,
 ): EmissionNode {
 	return { type: 'BinaryExpression', operator, left, right };
-}
-
-/** `<left> ?? <right>` and the other short-circuiting operators. */
-export function logicalNode(
-	operator: '??' | '&&' | '||',
-	left: EmissionNode,
-	right: EmissionNode,
-): EmissionNode {
-	return { type: 'LogicalExpression', operator, left, right };
 }
 
 /**
