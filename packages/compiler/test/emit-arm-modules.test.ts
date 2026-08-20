@@ -3,13 +3,14 @@
  * arm emitters — stage 1, sketch item 3 of
  * `specs/framework/14-emission-codegen-migration.md`.
  *
- * Both paths run here on the same arms: the assembled string the compiler emits
- * today, and the tree the additive emitters build and print through
- * `emit-codegen.ts`. The spec's per-site acceptance asks for byte equality where
- * bytes are pinned and behavior equality elsewhere; this file measures which of
- * the two these sites get, records the exact difference, and runs both emitted
- * modules against the same stub graph so the behavior claim is executed rather
- * than asserted.
+ * The swap has landed: production emission at both arm sites now runs through
+ * the tree the additive emitters build and print via `emit-codegen.ts`, so the
+ * module the compiler ships and the module this suite prints are one path and
+ * are byte-equal at every fixture — which `the swapped production path is
+ * byte-equal to the printed module` asserts. Both emitted modules are still run
+ * against the same stub graph so the behavior claim stays executed rather than
+ * asserted, and the structural reprint, determinism, and source-map tests stay
+ * as permanent gates on the swapped path.
  *
  * These two sites are assembled, not extracted: not one character of their
  * output comes from authored text. So unlike every emitter migrated before them
@@ -635,12 +636,20 @@ function bothPaths(fixture: Fixture): Paths {
 	};
 }
 
-/** Leading whitespace only. Tokens, blank lines, and line breaks stay put. */
-function normalizeIndentation(code: string): string {
-	return code
-		.split('\n')
-		.map((line) => line.replace(/^[\t ]+/, ''))
-		.join('\n');
+/**
+ * `JSON.stringify` with the printer's object-literal spacing: `{ "text": "x" }`
+ * where `JSON.stringify` writes `{"text":"x"}`. Keys stay quoted and arrays stay
+ * on one line, because the arm tables reach the module through `jsonValueNode`,
+ * which builds string-literal keys and prints each array inline.
+ */
+function spacedJson(value: unknown): string {
+	if (value === null || typeof value !== 'object') return JSON.stringify(value);
+	if (Array.isArray(value)) return `[${value.map((item) => spacedJson(item)).join(', ')}]`;
+
+	const entries = Object.entries(value).map(
+		([key, child]) => `${JSON.stringify(key)}: ${spacedJson(child)}`,
+	);
+	return entries.length === 0 ? '{}' : `{ ${entries.join(', ')} }`;
 }
 
 /**
@@ -677,12 +686,12 @@ function runModule(code: string, exportName: string, context: Record<string, unk
 test('the fixtures’ arm tables are the ones the pass derives from their render data', () => {
 	// The additive path is fed `expectedArms` directly, so if those drifted from
 	// what `renderBranchArms`/`renderBoundaryArms` compute the two paths would
-	// agree on the wrong table. The assembled module embeds the arms as
-	// `JSON.stringify` wrote them, which is the pass's own answer.
+	// agree on the wrong table. The assembled module embeds the arms as the
+	// printer wrote them, which is the pass's own answer.
 	for (const fixture of FIXTURES) {
 		const paths = bothPaths(fixture);
 		expect(paths.assembled, `${fixture.name}: arm table drifted from the pass`).toContain(
-			JSON.stringify(fixture.expectedArms.arms),
+			spacedJson(fixture.expectedArms.arms),
 		);
 	}
 });
@@ -712,32 +721,14 @@ test('both paths return the same arm and the same HTML for every case', () => {
 	}
 });
 
-test('the printed module is not byte-equal, and the difference is exactly the printer normalizing', () => {
-	const summary: Record<string, ReadonlyArray<string>> = {};
-
+test('the swapped production path is byte-equal to the printed module', () => {
+	// The swap wired both arm builds through the printer, so the module the
+	// compiler ships and the module this suite prints are one path.
 	for (const fixture of FIXTURES) {
 		const paths = bothPaths(fixture);
-		expect(paths.printed, `${fixture.name}: unexpectedly byte-equal`).not.toBe(paths.assembled);
-		summary[fixture.name] = differenceClasses(paths.assembled, paths.printed);
-	}
-
-	// Every class here is a printer normalization or a stated option consequence.
-	// None of them changes what the module does, which the behavior test above
-	// executes rather than assumes.
-	expect(summary).toEqual(ARM_DIFFERENCE_CLASSES);
-});
-
-test('normalizing indentation alone does not make the two paths equal', () => {
-	for (const fixture of FIXTURES) {
-		const paths = bothPaths(fixture);
-
-		// Stated as a fact, not as a wish. Indentation is the smallest of the
-		// differences at these sites, so an indentation-only normalizer cannot close
-		// the gap and the swap needs the owner's approval on the rest (invariant 2).
-		expect(
-			normalizeIndentation(paths.printed),
-			`${fixture.name}: indentation alone closed the gap`,
-		).not.toBe(normalizeIndentation(paths.assembled));
+		expect(paths.assembled, `${fixture.name}: production diverged from the printed module`).toBe(
+			paths.printed,
+		);
 	}
 });
 
@@ -833,77 +824,3 @@ test('the switch selector and the row rebuilder are emitted only where the site 
 	expect(withRepeat.assembled).toContain('function marklessBranchRows(');
 	expect(withoutTests.assembled).not.toContain('marklessBranchRows');
 });
-
-/**
- * Parentheses the text path places by hand around the arm selector: `?? ((test)
- * ? 0 : 1)` and `?? (marklessSelectSwitchArm(...))`. The printer keeps only the
- * pair the grammar requires — `??` over a conditional — and drops the rest.
- */
-const HAND_PLACED_SELECTOR_PARENS = /\?\? \((?:\(|markless)/;
-
-/** The named normalizations that separate the two paths, sorted for stability. */
-function differenceClasses(assembled: string, printed: string): string[] {
-	const classes = new Set<string>();
-
-	if (/^\t/m.test(assembled) && !/^\t/m.test(printed) && /^ {2}/m.test(printed))
-		classes.add('indentation-tabs-to-spaces');
-	// `JSON.stringify` writes `{"text":"x"}`; the printer writes `{ "text": "x" }`.
-	if (assembled.includes('{"') && !printed.includes('{"')) classes.add('data-table-spaced');
-	// The helpers are written as one-line function declarations and print expanded.
-	if (assembled.includes('; }') && !printed.includes('; }')) classes.add('helper-body-expanded');
-	if (HAND_PLACED_SELECTOR_PARENS.test(assembled) && !HAND_PLACED_SELECTOR_PARENS.test(printed))
-		classes.add('redundant-parentheses-dropped');
-
-	return [...classes].sort();
-}
-
-/**
- * The measured divergence, per fixture. Four classes account for all of it, and
- * only one of them is indentation — so an indentation-normalized comparison does
- * not close the gap at these sites and the swap needs the owner's approval on
- * the other three (invariant 2).
- *
- * Object keys are not on this list on purpose: the emitted data tables keep
- * `JSON.stringify`'s quoted keys, because `jsonValueNode` builds string-literal
- * keys rather than deciding per key whether a name is identifier-shaped.
- */
-const ARM_DIFFERENCE_CLASSES: Record<string, ReadonlyArray<string>> = {
-	'if-branch': [
-		'data-table-spaced',
-		'helper-body-expanded',
-		'indentation-tabs-to-spaces',
-		'redundant-parentheses-dropped',
-	],
-	'if-branch-with-read': [
-		'data-table-spaced',
-		'helper-body-expanded',
-		'indentation-tabs-to-spaces',
-		'redundant-parentheses-dropped',
-	],
-	'switch-branch': [
-		'data-table-spaced',
-		'helper-body-expanded',
-		'indentation-tabs-to-spaces',
-		'redundant-parentheses-dropped',
-	],
-	'branch-without-test-read': [
-		'data-table-spaced',
-		'helper-body-expanded',
-		'indentation-tabs-to-spaces',
-		'redundant-parentheses-dropped',
-	],
-	'branch-with-repeat': [
-		'data-table-spaced',
-		'helper-body-expanded',
-		'indentation-tabs-to-spaces',
-		'redundant-parentheses-dropped',
-	],
-	// The boundary emitter selects its arm with a plain conditional rather than
-	// `??` over one, so it has no hand-placed parentheses to drop.
-	boundary: ['data-table-spaced', 'helper-body-expanded', 'indentation-tabs-to-spaces'],
-	'boundary-try-only': [
-		'data-table-spaced',
-		'helper-body-expanded',
-		'indentation-tabs-to-spaces',
-	],
-};

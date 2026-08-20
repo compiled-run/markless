@@ -2,24 +2,17 @@
  * Parity for `emitBehaviorModule`, one of the low-risk emitters in stage 1 of
  * `specs/framework/14-emission-codegen-migration.md`.
  *
- * Both paths run here: the spliced string the compiler emits today, and the
- * tree the additive emitter builds and prints through `emit-codegen.ts`. The
- * spec's per-site acceptance asks for byte equality where bytes are pinned and
- * behavior equality elsewhere; this file measures which of the two this site
- * gets and records the exact difference, so the owner's re-baseline decision
- * (invariant 2) rests on evidence rather than on a claim.
+ * The swap has landed: `emitBehaviorModuleNodes` is the wired path, so the
+ * module the compiler ships ("spliced" below) and the module this suite prints
+ * are one path, and the re-baseline the owner approved is what these fixtures
+ * now pin. `the swapped production path is byte-equal to the printed module`
+ * asserts that directly, fixture by fixture — the pre-swap tests that measured
+ * and classified the gap between the two paths have no gap left to describe.
  *
- * Nothing here swaps the wired path. `emitBehaviorModule` still produces the
- * bytes the compiler ships; `buildBehaviorEmission` produces the bytes it would
- * ship after an approved re-baseline.
- *
- * The answer these fixtures give: the printed module is never byte-equal to the
- * spliced one. Indentation is the smallest part of the gap, so the divergence
- * summary below is computed on indentation-normalized text and reports only
- * what survives that normalization — blank lines, the trailing newline, the
- * parentheses the text path puts around an immediately-invoked factory, and the
- * factory body being reflowed. None of the four changes what the module does,
- * which the reprint and evaluation tests prove independently.
+ * The rest of the file is the permanent gate around the printed path: it still
+ * reprints structurally identical, still does the same thing to the host
+ * element, still prints deterministically to a reparse fixpoint, still carries
+ * a source map naming the authored file, and still refuses a TSRX-only node.
  */
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/compile-module.ts';
@@ -170,14 +163,6 @@ async function bothPaths(fixture: Fixture, omitAuthoredSource = false): Promise<
 	};
 }
 
-/** Leading whitespace only. Tokens, blank lines, and line breaks stay put. */
-function normalizeIndentation(code: string): string {
-	return code
-		.split('\n')
-		.map((line) => line.replace(/^[\t ]+/, ''))
-		.join('\n');
-}
-
 /**
  * Reprint a module through the same printer.
  *
@@ -256,88 +241,16 @@ test('the printed and spliced behaviors do the same thing to the host element', 
 	}
 });
 
-test('what separates the two paths, after indentation is normalized away', async () => {
-	const summary: Record<string, ReadonlyArray<string>> = {};
-
+test('the swapped production path is byte-equal to the printed module', async () => {
+	// The swap wired `emitBehaviorModuleNodes` into production, so the module the
+	// compiler ships and the module this suite prints are one path.
 	for (const fixture of FIXTURES) {
 		const paths = await bothPaths(fixture);
-		summary[fixture.name] = divergenceClasses(paths.spliced, paths.printed);
-	}
-
-	// Every class here is a printer normalization the spec already records as a
-	// known upstream behavior; none of them changes what the module does. They
-	// are the site's parity-beyond-indentation divergences, carried to the
-	// re-baseline decision rather than papered over here.
-	expect(summary).toEqual({
-		'inline-arrow-no-inputs': [
-			'blank-lines-dropped',
-			'factory-body-expanded',
-			'trailing-newline-dropped',
-		],
-		'same-file-factory': [
-			'blank-lines-dropped',
-			'factory-parentheses-dropped',
-			'trailing-newline-dropped',
-		],
-		'imported-factory': ['blank-lines-dropped', 'trailing-newline-dropped'],
-		'default-import-factory': ['blank-lines-dropped', 'trailing-newline-dropped'],
-	});
-});
-
-test('indentation and blank lines alone close the gap only where nothing was reflowed', async () => {
-	const closed: Record<string, boolean> = {};
-
-	for (const fixture of FIXTURES) {
-		const paths = await bothPaths(fixture);
-
-		expect(paths.printed, `${fixture.name}: printed unexpectedly byte-equal`).not.toBe(
-			paths.spliced,
+		expect(paths.spliced, `${fixture.name}: production diverged from the printed module`).toBe(
+			paths.printed,
 		);
-		closed[fixture.name] =
-			meaningfulLines(paths.printed).join('\n') === meaningfulLines(paths.spliced).join('\n');
 	}
-
-	// Stated as a fact, not as a wish. The two import fixtures splice nothing the
-	// printer reflows, so for them the whole remaining gap is whitespace; the
-	// other two need the owner's approval on more than whitespace.
-	expect(closed).toEqual({
-		'inline-arrow-no-inputs': false,
-		'same-file-factory': false,
-		'imported-factory': true,
-		'default-import-factory': true,
-	});
 });
-
-/** Non-blank lines, with leading whitespace removed. */
-function meaningfulLines(code: string): string[] {
-	return normalizeIndentation(code)
-		.split('\n')
-		.filter((line) => line.trim() !== '');
-}
-
-/**
- * The named divergences that separate the two paths once indentation is
- * normalized away, sorted for stability.
- */
-function divergenceClasses(spliced: string, printed: string): string[] {
-	const classes = new Set<string>();
-
-	if (spliced.includes('\n\n') && !printed.includes('\n\n')) classes.add('blank-lines-dropped');
-	if (spliced.endsWith('\n') && !printed.endsWith('\n')) classes.add('trailing-newline-dropped');
-	// The text path wraps an inline factory in parentheses before invoking it;
-	// in an initializer position the grammar does not require them, so the
-	// printer omits them.
-	if (/=\s*\(function\b/.test(spliced) && /=\s*function\b/.test(printed)) {
-		classes.add('factory-parentheses-dropped');
-	}
-
-	const splicedLines = meaningfulLines(spliced).length;
-	const printedLines = meaningfulLines(printed).length;
-	if (printedLines > splicedLines) classes.add('factory-body-expanded');
-	if (printedLines < splicedLines) classes.add('factory-body-collapsed');
-
-	return [...classes].sort();
-}
 
 test('omitting the authored source removes only that export from the printed module', async () => {
 	const fixture = FIXTURES[0]!;

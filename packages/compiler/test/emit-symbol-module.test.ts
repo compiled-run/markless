@@ -17,9 +17,12 @@
  * planned symbol whose kind has an AST path, printed and compared against the
  * module the compiler ships today.
  *
- * Neither path is wired. The string emitters still produce the shipped bytes;
- * invariant 2 makes the swap an owner-approved step, so this file records the
- * divergence rather than closing it.
+ * The dispatcher swap has landed: `emitSymbolModule` now routes every kind in
+ * `SYMBOL_MODULE_AST_KINDS` through `emitSymbolModuleNodes`, so the shipped
+ * module and the printed one are the same bytes, and that is what the dispatcher
+ * tests below assert. The value-source cluster is a different story — the
+ * event-handler emitter still splices strings, so the `*ForParity` seams stay
+ * and the value tests still measure two paths against each other.
  */
 import { expect, test } from 'vitest';
 import type { LoweredStateRead, SemanticModuleImport } from '../src/artifacts.ts';
@@ -578,34 +581,12 @@ async function dispatchedSymbols(fixture: DispatcherFixture): Promise<Dispatched
 	});
 }
 
-/** Reprint a whole module, the parity claim the sibling site tests use. */
-function reprintModule(code: string, filename: string): string {
-	const { program, errors } = parseEmissionSource(code, filename, 'ts');
-	expect(errors, `reprinting a module produced parse errors:\n${code}`).toEqual([]);
-	return printEmittedModule({
-		program,
-		source: code,
-		outputFileName: 'reprint.js',
-		site: { phase: 'payload', passId: 'symbol-modules', sourceFileName: filename },
-	}).code;
-}
-
-/**
- * Rewrite single-quoted string literals with no escapes to double quotes.
- *
- * `quotes: 'preserve'` keeps whatever quote a literal was parsed with, and
- * synthesized literals carry no `raw` and print double-quoted. A module the
- * string path wrote with `'...'` therefore reprints with `'...'` while the same
- * module built from nodes reprints with `"..."`. That is a quote-style
- * difference and nothing else, so parity is measured with it normalized and the
- * cases where it happens are recorded separately.
- */
-function normalizeQuoteStyle(code: string): string {
-	return code.replaceAll(/'([^'\\\n"]*)'/g, '"$1"');
-}
-
-test('the dispatcher prints every migrated kind structurally identically to the spliced module', async () => {
-	const quoteStyleOnly: string[] = [];
+test('the swapped production path is byte-equal to the printed module for every migrated kind', async () => {
+	// The swap wired `emitSymbolModule` through `emitSymbolModuleNodes`, so the
+	// module the compiler ships and the module this suite prints are one path.
+	// Byte equality is therefore the claim available here — no reprint, no quote
+	// normalization, no recorded residual difference.
+	const migratedKinds = new Set<string>();
 	let compared = 0;
 
 	for (const fixture of DISPATCHER_FIXTURES) {
@@ -619,14 +600,11 @@ test('the dispatcher prints every migrated kind structurally identically to the 
 				continue;
 			}
 
-			const printed = reprintModule(emitted.code, dispatched.input.sourceFileName);
-			const spliced = reprintModule(dispatched.spliced, dispatched.input.sourceFileName);
-			if (printed !== spliced) quoteStyleOnly.push(dispatched.kind);
-
 			expect(
-				normalizeQuoteStyle(printed),
-				`${dispatched.fixture}/${dispatched.symbolId} (${dispatched.kind}): printed and spliced modules reprint differently`,
-			).toBe(normalizeQuoteStyle(spliced));
+				dispatched.spliced,
+				`${dispatched.fixture}/${dispatched.symbolId} (${dispatched.kind}): production diverged from the printed module`,
+			).toBe(emitted.code);
+			migratedKinds.add(dispatched.kind);
 			compared++;
 		}
 	}
@@ -635,9 +613,9 @@ test('the dispatcher prints every migrated kind structurally identically to the 
 	// vacuously true.
 	expect(compared).toBeGreaterThanOrEqual(4);
 
-	// Recorded: the only kind whose reprints are not already equal, and the
-	// reason is the module-specifier quote style in its emitted `import`.
-	expect([...new Set(quoteStyleOnly)].sort()).toEqual(['dom-update']);
+	// And they must reach every migrated kind, so byte equality is claimed for the
+	// whole AST band rather than for whichever kinds the fixtures happened to hit.
+	expect([...migratedKinds].sort()).toEqual([...SYMBOL_MODULE_AST_KINDS].sort());
 });
 
 test('the dispatcher declines exactly the kinds with no AST path, and names their unit', async () => {

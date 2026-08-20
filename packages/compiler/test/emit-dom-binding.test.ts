@@ -2,18 +2,14 @@
  * Parity for `emitDomBindingModule`, the last of the low-risk emitters in
  * stage 1 of `specs/framework/14-emission-codegen-migration.md`.
  *
- * Both paths run here on the same symbols: the spliced string the compiler
- * emits today, and the tree the additive emitter builds and prints through
- * `emit-codegen.ts`. The spec's per-site acceptance asks for byte equality
- * where bytes are pinned and behavior equality elsewhere; this file measures
- * which of the two this site gets and records the exact difference, so the
- * owner's re-baseline decision (invariant 2) rests on evidence.
- *
- * The answer these fixtures give: the printed module is never byte-equal to the
- * spliced one, and the difference is never semantic. Six normalizations account
- * for all of it — see `differenceClasses` below. Only one of them, the import's
- * quote style, survives a reprint of both paths through the same printer; the
- * other five are layout the printer re-derives.
+ * The swap has landed: production emission at this site runs through the AST
+ * printer, so the module the compiler ships and the module this suite prints
+ * are one path. The pre-swap difference classes — dropped blank lines, tabs
+ * becoming spaces, the collapsed object literal, the dropped trailing newline,
+ * the redundant parentheses, and the import's quote style — no longer exist to
+ * be measured, so this file pins the printed path alone: byte equality between
+ * the two paths, plus the behavioral, determinism, source-map, and TSRX-node
+ * gates that outlive the migration.
  *
  * This emitter synthesizes its whole module from render data, so unlike the
  * state-initializer site there is no authored text to splice and no authored
@@ -208,14 +204,6 @@ function bothPaths(fixture: Fixture): Paths {
 	};
 }
 
-/** Leading whitespace only. Tokens, blank lines, and line breaks stay put. */
-function normalizeIndentation(code: string): string {
-	return code
-		.split('\n')
-		.map((line) => line.replace(/^[\t ]+/, ''))
-		.join('\n');
-}
-
 /**
  * Reprint a module through the same printer.
  *
@@ -225,12 +213,12 @@ function normalizeIndentation(code: string): string {
  * rather than preserving.
  *
  * `normalizeQuotes` additionally drops every literal's `raw`, which is what the
- * `quotes: 'preserve'` option reads. The two paths quote the one module
- * specifier they emit differently — the text path hard-codes single quotes, the
- * printed path emits a synthesized literal — so the option preserves a
- * difference that is not structural. Dropping `raw` makes the comparison see
- * past it, and the difference itself is pinned as a named class below rather
- * than normalized out of sight.
+ * `quotes: 'preserve'` option reads, so the comparison sees a literal's value
+ * rather than the quote characters an author or emitter happened to type. Since
+ * the swap both paths are one path and quote alike, so it changes no result
+ * here; it stays because the structural claim it makes — same tree, whatever
+ * the quoting — is the one this test means, and byte equality is pinned
+ * separately by its own test.
  */
 function reprint(code: string, normalizeQuotes = false): string {
 	const { program, errors } = parseEmissionSource(code, SOURCE_FILE_NAME, 'ts');
@@ -298,24 +286,15 @@ test('the printed dom-binding module is structurally identical to the spliced on
 	}
 });
 
-test('quote style is the only difference a reprint of both paths does not erase', () => {
-	const differing = FIXTURES.filter(
-		(fixture) => {
-			const paths = bothPaths(fixture);
-			return reprint(paths.printed) !== reprint(paths.spliced);
-		},
-	).map((fixture) => fixture.name);
-
-	// Only the text leaf emits an import, and the module specifier is the only
-	// string literal whose quoting the two paths disagree about.
-	expect(differing).toEqual(['text-leaf']);
-
-	const leaf = bothPaths(FIXTURES[0]!);
-	expect(reprint(leaf.spliced)).toContain("from '@markless/web/fns/update-text'");
-	expect(reprint(leaf.printed)).toContain('from "@markless/web/fns/update-text"');
-	expect(reprint(leaf.printed).replace('"@markless/web/fns/update-text"', "'@markless/web/fns/update-text'")).toBe(
-		reprint(leaf.spliced),
-	);
+test('the swapped production path is byte-equal to the printed module', () => {
+	// The swap wired the dom-binding build through the printer, so the module the
+	// compiler ships and the module this suite prints are one path.
+	for (const fixture of FIXTURES) {
+		const paths = bothPaths(fixture);
+		expect(paths.spliced, `${fixture.name}: production diverged from the printed module`).toBe(
+			paths.printed,
+		);
+	}
 });
 
 test('the printed and spliced journal entries are equal, and are the expected entry', () => {
@@ -353,101 +332,6 @@ test('the text leaf calls the update-text runtime the same way on both paths', (
 	// the printed path has to carry it across into a synthesized program.
 	expect(paths.printed).toContain('/* text update leaf marker: type: "setText" */');
 });
-
-test('the printed module is not byte-equal, and the difference is exactly the printer normalizing', () => {
-	const summary: Record<string, ReadonlyArray<string>> = {};
-
-	for (const fixture of FIXTURES) {
-		const paths = bothPaths(fixture);
-		summary[fixture.name] = differenceClasses(paths.spliced, paths.printed);
-	}
-
-	// Every class here is a printer normalization the spec already records as a
-	// known upstream behavior, or a quoting choice the emission foundation states
-	// once. None of them changes what the module does.
-	expect(summary).toEqual({
-		'text-leaf': [
-			'blank-lines-dropped',
-			'indentation-tabs-to-spaces',
-			'module-specifier-double-quoted',
-			'trailing-newline-dropped',
-		],
-		'text-prefix-suffix': [
-			'indentation-tabs-to-spaces',
-			'object-literal-collapsed',
-			'trailing-newline-dropped',
-		],
-		'text-conditional': [
-			'indentation-tabs-to-spaces',
-			'object-literal-collapsed',
-			'trailing-newline-dropped',
-		],
-		'text-conditional-affixed': [
-			'indentation-tabs-to-spaces',
-			'object-literal-collapsed',
-			'redundant-parentheses-dropped',
-			'trailing-newline-dropped',
-		],
-		property: [
-			'indentation-tabs-to-spaces',
-			'object-literal-collapsed',
-			'trailing-newline-dropped',
-		],
-		'class-conditional': [
-			'indentation-tabs-to-spaces',
-			'object-literal-collapsed',
-			'trailing-newline-dropped',
-		],
-		'class-plain': [
-			'indentation-tabs-to-spaces',
-			'object-literal-collapsed',
-			'trailing-newline-dropped',
-		],
-		style: [
-			'indentation-tabs-to-spaces',
-			'object-literal-collapsed',
-			'trailing-newline-dropped',
-		],
-		attribute: [
-			'indentation-tabs-to-spaces',
-			'object-literal-collapsed',
-			'trailing-newline-dropped',
-		],
-	});
-});
-
-test('normalizing indentation alone does not make the two paths equal', () => {
-	for (const fixture of FIXTURES) {
-		const paths = bothPaths(fixture);
-
-		expect(paths.printed).not.toBe(paths.spliced);
-		// Stated as a fact, not as a wish: indentation is the smallest of the
-		// differences at this site, so an indentation-only normalizer cannot close
-		// the gap and the swap needs the owner's approval on the rest.
-		expect(
-			normalizeIndentation(paths.printed),
-			`${fixture.name}: indentation alone closed the gap`,
-		).not.toBe(normalizeIndentation(paths.spliced));
-	}
-});
-
-/** The named normalizations that separate the two paths, sorted for stability. */
-function differenceClasses(spliced: string, printed: string): string[] {
-	const classes = new Set<string>();
-
-	if (spliced.includes('\n\n') && !printed.includes('\n\n')) classes.add('blank-lines-dropped');
-	if (spliced.endsWith('\n') && !printed.endsWith('\n')) classes.add('trailing-newline-dropped');
-	if (/^\t/m.test(spliced) && !/^\t/m.test(printed) && /^ {2}/m.test(printed))
-		classes.add('indentation-tabs-to-spaces');
-	if (spliced.includes("from '") && printed.includes('from "'))
-		classes.add('module-specifier-double-quoted');
-	if (spliced.includes('return {\n') && printed.includes('return { '))
-		classes.add('object-literal-collapsed');
-	if (spliced.includes('String((') && !printed.includes('String(('))
-		classes.add('redundant-parentheses-dropped');
-
-	return [...classes].sort();
-}
 
 test('emission is deterministic and reaches a reparse fixpoint at this site', () => {
 	for (const fixture of FIXTURES) {
