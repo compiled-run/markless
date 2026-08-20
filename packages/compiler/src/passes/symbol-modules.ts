@@ -25,6 +25,7 @@ import {
 	type EmissionSite,
 	exportNamedDeclarationNode,
 	functionDeclarationNode,
+	graphReadCall,
 	identifierNode,
 	literalNode,
 	logicalNode,
@@ -39,6 +40,7 @@ import {
 	printEmittedModule,
 	propertyNode,
 	returnStatementNode,
+	shorthandPropertyNode,
 	spreadNode,
 	stringArrayNode,
 	withLeadingBlockComment,
@@ -2314,6 +2316,236 @@ function staticSourcePath(source: string): ReadonlyArray<string> | null {
 	if (parts.some((part) => !isIdentifierObjectKey(part))) return null;
 
 	return parts;
+}
+
+// ---------------------------------------------------------------------------
+// Async-computed-runner emission through the AST printer.
+//
+// `specs/framework/14-emission-codegen-migration.md`, stage 1, sketch item 2,
+// third emitter. Built the same way the state-initializer band above is built:
+// nodes go to `emit-codegen.ts` and come back printed, with a source map.
+//
+// This band calls nothing in the scanner band (`topLevelBinaryOperators`
+// through `sourceReferencesIdentifier`), which invariant 5 keeps alive until
+// stage 1's final unit but which a migrated site may not reach. Two string-path
+// helpers are therefore re-expressed here rather than shared:
+// `graphReadCallSource` and `uniqueModuleImports` are inside the band, and
+// `staticSourcePath` reaches it through `isIdentifierObjectKey`. The foundation's
+// `graphReadCall` and the band-free `dedupeModuleImports` and
+// `asyncRunnerDependencyBinding` below stand in for them, with the same
+// behavior.
+//
+// It is not yet the wired path. `emitAsyncComputedRunnerModule` stays the active
+// emitter; `test/emit-async-runner.test.ts` runs both over the same inputs and
+// records where the printed bytes differ from the spliced ones. Invariant 2
+// makes the swap an owner-approved step, not a side effect of this unit.
+// ---------------------------------------------------------------------------
+
+export type AsyncComputedRunnerEmissionInput = {
+	readonly symbol: Extract<PlannedSymbol, { readonly kind: 'async-computed-runner' }>;
+	readonly captureSlots: ReadonlyArray<CaptureSlot>;
+	readonly omitAuthoredSource: boolean;
+	/** The authored file the runner was extracted from; names the map. */
+	readonly sourceFileName: string;
+};
+
+/**
+ * Build the print input for an async-computed-runner module.
+ *
+ * Split from the print so a test can run the determinism helper (invariant 7)
+ * over the same tree the emitter would print, without emission paying for three
+ * prints and two reparses per symbol in a real build.
+ */
+export function buildAsyncComputedRunnerEmission(
+	input: AsyncComputedRunnerEmissionInput,
+): EmissionPrintInput {
+	const exportName = symbolExportName(input.symbol.id);
+	const site: EmissionSite = {
+		phase: 'payload',
+		passId: 'symbol-modules',
+		sourceFileName: input.sourceFileName,
+		symbolId: input.symbol.id,
+	};
+
+	const projection = asyncRunnerProjection(input.symbol.source, input.sourceFileName);
+	const imports = dedupeModuleImports(input.symbol.moduleImports ?? []);
+
+	const body: EmissionNode[] = [
+		...imports.map((moduleImport) =>
+			moduleImportNode({
+				kind: moduleImport.kind,
+				localName: moduleImport.localName,
+				importedName: moduleImport.importedName,
+				source: moduleImport.source,
+			}),
+		),
+		...(input.omitAuthoredSource
+			? []
+			: [
+					exportNamedDeclarationNode(
+						constDeclarationNode('authoredSource', literalNode(input.symbol.source)),
+					),
+				]),
+		exportNamedDeclarationNode(
+			functionDeclarationNode(
+				exportName,
+				['context'],
+				[
+					asyncRunnerReadBindingStatement(),
+					...asyncRunnerDependencyStatements(
+						input.symbol.dependencies ?? [],
+						input.captureSlots,
+					),
+					constDeclarationNode('run', projection.runnerExpression),
+					returnStatementNode(
+						callNode(identifierNode('run'), [
+							objectNode([
+								propertyNode('key', memberChainNode('context.key')),
+								propertyNode('signal', memberChainNode('context.signal')),
+								shorthandPropertyNode('read'),
+							]),
+						]),
+					),
+				],
+			),
+		),
+	];
+
+	return {
+		program: moduleProgramNode(body),
+		source: projection.source,
+		outputFileName: `${exportName}.js`,
+		site,
+	};
+}
+
+/** The printed async-computed-runner module, with its source map (invariant 3). */
+export function emitAsyncComputedRunnerModuleNodes(
+	input: AsyncComputedRunnerEmissionInput,
+): EmittedModule {
+	return printEmittedModule(buildAsyncComputedRunnerEmission(input));
+}
+
+/**
+ * `const read = context.graph?.read ? context.graph.read.bind(context.graph) : context.read;`
+ *
+ * The runner is handed a `read` that works against either shape of context: the
+ * compiled graph exposes `context.graph.read`, which has to stay bound to the
+ * graph, while a bare async context exposes `context.read` directly.
+ */
+function asyncRunnerReadBindingStatement(): EmissionNode {
+	return constDeclarationNode(
+		'read',
+		conditionalNode(
+			optionalMemberNode(memberChainNode('context.graph'), 'read'),
+			callNode(memberChainNode('context.graph.read.bind'), [memberChainNode('context.graph')]),
+			memberChainNode('context.read'),
+		),
+	);
+}
+
+/**
+ * One `const <name> = ...;` per dependency the runner closes over, in dependency
+ * order, first binding wins.
+ *
+ * The AST twin of `asyncRunnerDependencyDeclarations`. A dependency covered by a
+ * capture slot reads through the capture table; every other one reads through
+ * the bound `read` above.
+ */
+function asyncRunnerDependencyStatements(
+	dependencies: ReadonlyArray<SemanticGraphDependency>,
+	captureSlots: ReadonlyArray<CaptureSlot>,
+): EmissionNode[] {
+	const statements: EmissionNode[] = [];
+	const seenNames = new Set<string>();
+
+	for (const dependency of dependencies) {
+		const binding = asyncRunnerDependencyBinding(dependency);
+		if (!binding || seenNames.has(binding.name)) continue;
+
+		seenNames.add(binding.name);
+		const slot = captureSlots.find((candidate) => captureSlotMatchesRead(candidate, dependency));
+		statements.push(
+			constDeclarationNode(
+				binding.name,
+				slot
+					? callNode(memberChainNode('context.capture.read'), [literalNode(slot.id)])
+					: graphReadCall({
+							callee: 'read',
+							graphNodeId: binding.graphNodeId,
+							path: binding.path,
+						}),
+			),
+		);
+	}
+
+	return statements;
+}
+
+/** Matches `isIdentifierObjectKey`, which sits inside the scanner band. */
+const ASYNC_RUNNER_IDENTIFIER = /^[$A-Z_a-z][$0-9A-Z_a-z]*$/;
+
+/**
+ * The local name a dependency binds and the graph path it reads, or `null` when
+ * the dependency source is not a plain dotted name.
+ *
+ * The band-free twin of `asyncRunnerDependencyDeclaration`: same trailing-member
+ * arithmetic, with the identifier test inlined so this site reaches no scanner.
+ */
+function asyncRunnerDependencyBinding(dependency: SemanticGraphDependency): {
+	readonly name: string;
+	readonly graphNodeId: string;
+	readonly path: ReadonlyArray<string>;
+} | null {
+	const parts = dependency.source.split('.');
+	if (parts.some((part) => !ASYNC_RUNNER_IDENTIFIER.test(part))) return null;
+
+	const [name, ...memberPath] = parts;
+	if (!name) return null;
+
+	return {
+		name,
+		graphNodeId: dependency.graphNodeId,
+		path: dependency.path.slice(0, Math.max(0, dependency.path.length - memberPath.length)),
+	};
+}
+
+type AsyncRunnerProjection = {
+	/** The one text every printed node carries an offset into. */
+	readonly source: string;
+	readonly runnerExpression: EmissionNode;
+};
+
+/**
+ * Parse the runner expression, once.
+ *
+ * Only the runner carries authored spans — the imports, the `read` binding, the
+ * dependency reads, and the call are all synthesized — so this is the whole of
+ * the source the map points into. The runner is parenthesized so it parses as an
+ * expression statement whatever its authored form; `preserveParens: false` drops
+ * the wrapper and the printer re-derives whatever parentheses the expression
+ * actually needs in initializer position.
+ */
+function asyncRunnerProjection(runnerSource: string, filename: string): AsyncRunnerProjection {
+	const source = `(${runnerSource});`;
+	const { program, errors } = parseEmissionSource(source, filename, 'ts');
+	if (errors.length > 0) {
+		throw new Error(
+			`symbol-modules: async-computed-runner emission could not parse its projected source (${errors
+				.map((error) => error.message)
+				.join('; ')})`,
+		);
+	}
+
+	const statements = asNodes((program as unknown as AnyNode).body);
+	const last = statements.at(-1);
+	if (!last || last.type !== 'ExpressionStatement' || !isNode(last.expression)) {
+		throw new Error(
+			'symbol-modules: async-computed-runner emission expected its projected source to be an expression statement',
+		);
+	}
+
+	return { source, runnerExpression: last.expression as unknown as EmissionNode };
 }
 
 function symbolExportName(symbolId: string): string {

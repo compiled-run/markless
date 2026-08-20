@@ -585,6 +585,26 @@ export function propertyNode(key: string, value: EmissionNode): EmissionNode {
 	};
 }
 
+/**
+ * A shorthand property: `{ read }` rather than `{ read: read }`.
+ *
+ * `shorthand: true` with `key` and `value` both naming the same identifier is
+ * the shape the parser produces for authored shorthand, so the printer renders
+ * it the same way whether the node was parsed or synthesized.
+ */
+export function shorthandPropertyNode(name: string): EmissionNode {
+	return {
+		type: 'Property',
+		kind: 'init',
+		method: false,
+		shorthand: true,
+		computed: false,
+		key: identifierNode(name),
+		value: identifierNode(name),
+	};
+}
+
+
 /** A method-shorthand property: `update(value) { ... }`. */
 export function methodPropertyNode(
 	key: string,
