@@ -3,7 +3,7 @@ import { Indicator, Root, Trigger } from './chk.tsrx';
 export default function ChkPage() @{
 	<section data-chk-page>
 		<div data-widget="a">
-			<Root disabled={true}>
+			<Root disabled={true} name="alpha">
 				<Trigger />
 				<Indicator />
 			</Root>

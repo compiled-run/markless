@@ -4,6 +4,12 @@ import type { AnyNode } from '../../ast/nodes.ts';
 import { firstComponentRoot } from './plan.ts';
 import { renderBodyLines } from './render-body.ts';
 import {
+	componentSharedSeeds,
+	sharedSeedConsumeLine,
+	sharedSeedMarkerLine,
+	sharedSeedPassLines,
+} from './shared-seed-pass.ts';
+import {
 	componentOwnedStateNodes,
 	componentPropNames,
 	destructureProps,
@@ -69,10 +75,12 @@ export function emitSameModuleSsrComponents(
 			localName ? `const ${localName} = { renderSsr: ${functionName} };` : null,
 			`async function ${functionName}(props = {}, marklessSsrRenderContext) {`,
 			destructureProps(rootInfo.propNames, rootInfo.component),
+			...sharedSeedPassLines(componentSharedSeeds(input, componentName), valuesName),
 			`	const marklessSsrPayloadState = marklessSelectStateNodes(marklessCloneState(payloadState), ${JSON.stringify(
 				owned.cellIndexes,
 			)}, ${JSON.stringify(owned.computedIndexes)});`,
 			`	const marklessSsrRenderStateValues = new Map(${valuesName});`,
+			sharedSeedConsumeLine(input, componentName, 'marklessSsrRenderStateValues'),
 			...renderBodyLines(
 				input,
 				rootInfo,
@@ -91,6 +99,7 @@ export function emitSameModuleSsrComponents(
 			'	const marklessSsrState = marklessSsrComposeState(marklessSsrPayloadState, marklessSsrChildren);',
 			`	return { html, state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots), view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) }, elementCount: marklessSsrComposition.elementCount, propEvents: [], externalSymbolIds: marklessSsrComposition.externalSymbolIds, structure: marklessSsrRendered.structure, structureTokens: marklessSsrRendered.structureTokens${remapsGraphProps ? ', m(graphProps, instancePath) { marklessSsrRemapGraphOutput(this, graphProps, instancePath); }' : ''} };`,
 			'}',
+			sharedSeedMarkerLine(componentSharedSeeds(input, componentName), functionName),
 		].filter((line): line is string => line !== null);
 	});
 }

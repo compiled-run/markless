@@ -5,6 +5,12 @@ import {
 	collectSsrSharedComputedSources,
 } from './html.ts';
 import { renderBodyLines } from './render-body.ts';
+import {
+	componentSharedSeeds,
+	sharedSeedConsumeLine,
+	sharedSeedMarkerLine,
+	sharedSeedPassLines,
+} from './shared-seed-pass.ts';
 import { emitCatalogHelperImports, stateRuntimeImports } from './runtime-helpers.ts';
 import { emitSameModuleSsrComponents } from './same-module.ts';
 import {
@@ -89,6 +95,10 @@ export function emitPublicSsrRenderModule(
 		// runners. Omitted = exact blocking behavior.
 		'async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {',
 		destructureProps(rootInfo.propNames, rootInfo.component),
+		...sharedSeedPassLines(
+			componentSharedSeeds(input, rootInfo.componentName),
+			'marklessSsrStateValues',
+		),
 		// A module that composes no same-module child owns every payload node, so
 		// it keeps the whole clone and emits no selection list.
 		ownedNodes === undefined
@@ -97,6 +107,7 @@ export function emitPublicSsrRenderModule(
 					ownedNodes.cellIndexes,
 				)}, ${JSON.stringify(ownedNodes.computedIndexes)});`,
 		'	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);',
+		sharedSeedConsumeLine(input, rootInfo.componentName, 'marklessSsrRenderStateValues'),
 		...renderBodyLines(
 			input,
 			rootInfo,
@@ -144,6 +155,10 @@ export function emitPublicSsrRenderModule(
 			: null,
 		remapsInternalGraphProps ? '	return marklessSsrOutput;' : null,
 		'}',
+		sharedSeedMarkerLine(
+			componentSharedSeeds(input, rootInfo.componentName),
+			'marklessRenderSsr',
+		),
 		'',
 	];
 	const bodySource = body
@@ -172,6 +187,7 @@ export function emitPublicSsrRenderModule(
 					'marklessSsrHost',
 					'marklessSsrCallbacks',
 					'marklessSsrCallbackSymbol',
+					'marklessSsrSeedChild',
 					// Keep the emitted SSR helper distinct from authored bindings.
 					'marklessComposeState as marklessSsrComposeState',
 					'marklessSsrRemapGraphOutput',
@@ -296,6 +312,24 @@ function emitSsrDataRenderLines(
 	const edges = componentEdgesFor(input, componentName);
 	const referenceByName = new Map(references.map((reference) => [reference.componentName, reference.localName]));
 	const callbacks = callbackSymbolIds(input);
+	// An edge whose slot sits inside another edge's projection chunk is PROJECTED
+	// into that component: it renders from what that component's body seeded.
+	const projectedEdgeIds = new Set(
+		chunks.flatMap((chunk) =>
+			chunk.slots.flatMap((slot) =>
+				slot.kind === 'child-component' && slot.projectionChunkId
+					? (
+							input.renderData.chunks.find(
+								(candidate) => candidate.id === slot.projectionChunkId,
+							)?.slots ?? []
+						).flatMap((projected) =>
+							projected.kind === 'child-component' ? [projected.componentEdgeId] : [],
+						)
+					: [],
+			),
+		),
+	);
+	const seedCases: string[] = [];
 	const childCases = edges.flatMap((edge, index) => {
 		const component = referenceByName.get(edge.childComponentName);
 		if (!component) return [];
@@ -311,6 +345,9 @@ function emitSsrDataRenderLines(
 					slot.componentEdgeId === edge.id && !!slot.projectionChunkId,
 			),
 		);
+		// The seed pass runs before the projected children exist, so it asks for the
+		// same props without the projection.
+		const seedProps = [...props];
 		if (hasProjection && !edge.props.some((prop) => prop.name === 'children'))
 			props.push('children:marklessSsrDataContext.projectionHtml');
 		const callbackEntries = edge.props.flatMap((prop) => {
@@ -345,8 +382,21 @@ function emitSsrDataRenderLines(
 		const childSurface = declaredName
 			? `marklessSsrComponentPart(${component},${JSON.stringify(declaredName)})`
 			: component;
+		// A same-module child answers at compile time; an imported one is asked
+		// through the marker the compiler stamped on its render function.
+		if (hasProjection) {
+			const seedCall = edge.importSource
+				? `await marklessSsrSeedChild(${component},${declaredName ? JSON.stringify(declaredName) : 'undefined'},childProps,marklessSsrRenderContext,marklessSsrSeeds);`
+				: componentSharedSeeds(input, edge.childComponentName).length > 0
+					? `await ${childSurface}?.renderSsr?.(childProps,{...marklessSsrRenderContext,marklessSharedSeeds:marklessSsrSeeds});`
+					: '';
+			if (seedCall)
+				seedCases.push(
+					`case ${JSON.stringify(edge.id)}:{const childProps={${seedProps.join(',')}};${seedCall}return marklessSsrSeeds;}`,
+				);
+		}
 		return [
-			`case ${JSON.stringify(edge.id)}:{const child=${JSON.stringify(child)};const childProps={${props.join(',')}};const output=await ${childSurface}?.renderSsr?.(childProps,{...marklessSsrRenderContext,idPrefix:marklessSsrIdPrefix+child.hostPrefix});if(!output)throw new Error('MARKLESS_SSR_DATA_CHILD_RENDER_MISSING: ${edge.id}');if(marklessSsrDataContext.repeatItem!==undefined){marklessAssertPresentationalRowChild(output,${JSON.stringify(edge.childComponentName)});return output;}marklessSsrChildren.push({...child,output,callbackProps:childProps.__marklessSsrCallbacks??{}});return output;}`,
+			`case ${JSON.stringify(edge.id)}:{const child=${JSON.stringify(child)};const childProps={${props.join(',')}};const output=await ${childSurface}?.renderSsr?.(childProps,{...marklessSsrRenderContext,idPrefix:marklessSsrIdPrefix+child.hostPrefix${projectedEdgeIds.has(edge.id) ? ',sharedSeeds:marklessSsrDataContext.sharedSeeds' : ''}});if(!output)throw new Error('MARKLESS_SSR_DATA_CHILD_RENDER_MISSING: ${edge.id}');if(marklessSsrDataContext.repeatItem!==undefined){marklessAssertPresentationalRowChild(output,${JSON.stringify(edge.childComponentName)});return output;}marklessSsrChildren.push({...child,output,callbackProps:childProps.__marklessSsrCallbacks??{}});return output;}`,
 		];
 	});
 	const bindingLines = input.semanticGraph.graphBindings.flatMap((binding) =>
@@ -397,6 +447,10 @@ function emitSsrDataRenderLines(
 			repeatCases.length > 0
 				? `repeatItems:(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.repeatId){${repeatCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_REPEAT_MISSING: '+marklessSsrDataSlot.repeatId);}},`
 				: ''
-		}selectAsyncArm:async(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.boundaryId){${boundaryCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_BOUNDARY_MISSING: '+marklessSsrDataSlot.boundaryId);}},renderChild:async(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.componentEdgeId){${childCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_CHILD_MISSING: '+marklessSsrDataSlot.componentEdgeId);}}});`,
+		}selectAsyncArm:async(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.boundaryId){${boundaryCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_BOUNDARY_MISSING: '+marklessSsrDataSlot.boundaryId);}},${
+			seedCases.length > 0
+				? `seedChild:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const marklessSsrSeeds=new Map(marklessSsrDataContext.sharedSeeds??[]);${localLines.join('')}switch(marklessSsrDataSlot.componentEdgeId){${seedCases.join('')}}return marklessSsrSeeds;},`
+				: ''
+		}renderChild:async(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.componentEdgeId){${childCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_CHILD_MISSING: '+marklessSsrDataSlot.componentEdgeId);}}});`,
 	];
 }

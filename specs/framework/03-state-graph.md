@@ -652,10 +652,9 @@ inside one `.tsrx` module:
   assigned property replaces the factory's initial and the rest of it survives.
   The value must come from that component's own props or from constants, or the
   compile fails closed with `MARKLESS_SHARED_SEED_UNSUPPORTED`. A widget's parts
-  are projected into its root and therefore render BEFORE the root body seeds, so
-  a part reading a seeded field fails the compile closed with
-  `MARKLESS_SHARED_SEED_PART_READ_UNSUPPORTED` rather than rendering the factory
-  initial.
+  are projected into its root, and projected content renders AFTER the component
+  it is projected into has run its body, so a part reads the seeded value rather
+  than the factory initial.
 - **Methods lower to graph writes.** A returned method that takes no parameters
   is inlined at its call site, so `onClick={() => s.login()}` becomes the graph
   writes the method body performs. A method that takes parameters is not

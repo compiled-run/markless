@@ -271,10 +271,10 @@ test('a sibling component of the same widget carries no seed of its own', async 
 	).toBe(false);
 });
 
-// A widget's parts are projected into its root, so they render BEFORE the root
-// body seeds. A part reading a seeded field would render the factory initial, so
-// the compiler refuses the pair instead of dropping the mismatch silently.
-test('a part reading a field the widget root seeds fails the compile closed', async () => {
+// A widget's parts are projected into its root, and the render order now runs
+// the root's body — and its seed — before the projected parts render, so a part
+// may read a field the root seeds.
+test('a part reading a field the widget root seeds compiles', async () => {
 	const compiled = await compile(
 		'src/gate.tsrx',
 		`
@@ -299,14 +299,28 @@ export function Handle() @{
 }
 `,
 	);
+	const seed = compiled.symbolResolver.symbols.find(
+		(candidate) => candidate.kind === 'shared-seed',
+	);
+	const handle = compiled.renderData.chunks.find((chunk) => chunk.id === 'template:Handle');
+	const slot = handle?.slots.find(
+		(candidate) => candidate.kind === 'attribute' && candidate.name === 'ui-locked',
+	);
 
 	expect(
 		compiled.stateLowering.diagnostics.filter(
 			(diagnostic) => diagnostic.severity === 'error',
 		),
-	).toEqual([
-		expect.objectContaining({ code: 'MARKLESS_SHARED_SEED_PART_READ_UNSUPPORTED' }),
-	]);
+	).toEqual([]);
+	// The part reads exactly the node the root seeds.
+	expect(seed && 'graphNodeId' in seed ? seed.graphNodeId : null).toBe(
+		'shared:src/gate.tsrx#gate/state:cell',
+	);
+	expect(slot && 'residue' in slot ? slot.residue : null).toEqual({
+		kind: 'graph-read',
+		graphNodeId: 'shared:src/gate.tsrx#gate/state:cell',
+		path: ['locked'],
+	});
 });
 
 test('a part reading a field the root does NOT seed compiles', async () => {

@@ -109,10 +109,13 @@ type SsrChildOutput = ComposeChildOutput & {
 	readonly propEvents?: ReadonlyArray<SsrPropEvent>;
 };
 type SsrChildComponent = {
-	readonly renderSsr?: (
+	readonly renderSsr?: ((
 		props?: unknown,
 		renderContext?: unknown,
-	) => SsrChildOutput | undefined | Promise<SsrChildOutput | undefined>;
+	) => SsrChildOutput | undefined | Promise<SsrChildOutput | undefined>) & {
+		/** Set by the compiler on a component whose body seeds a shared instance. */
+		readonly marklessSeedsShared?: boolean;
+	};
 	/** SSR entry per exported component, for a module that serves more than one. */
 	readonly renderSsrComponents?: Readonly<Record<string, SsrChildComponent>>;
 };
@@ -207,6 +210,24 @@ export function marklessSsrComponentPart(
 	componentName: string,
 ): SsrChildComponent | undefined {
 	return component?.renderSsrComponents?.[componentName] ?? component;
+}
+
+// Asks a projecting child for the shared-instance seeds its body writes. Only a
+// child the compiler marked as seeding is asked, so every other child renders once.
+export async function marklessSsrSeedChild(
+	component: SsrChildComponent | undefined,
+	componentName: string | undefined,
+	props: SsrChildProps | undefined,
+	renderContext: unknown,
+	sharedSeeds: Map<string, unknown>,
+): Promise<void> {
+	const part = componentName ? marklessSsrComponentPart(component, componentName) : component;
+	const render = part?.renderSsr;
+	if (!render?.marklessSeedsShared) return;
+	await render(props, {
+		...(renderContext as Record<string, unknown> | undefined),
+		marklessSharedSeeds: sharedSeeds,
+	});
 }
 
 export async function marklessSsrRenderChild(

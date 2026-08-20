@@ -118,6 +118,7 @@ export type SsrDataReadContext = {
 	readonly repeatIndex?: number;
 	readonly asyncError?: unknown;
 	readonly projectionHtml?: string;
+	readonly sharedSeeds?: ReadonlyMap<string, unknown>;
 };
 
 export type SsrDataStructure = {
@@ -167,6 +168,11 @@ export type RenderSsrDataInput = {
 		readonly structureTokens?: ReadonlyArray<StructureToken>;
 		readonly elementCount?: number;
 	}>;
+	// Runs the projecting component's body before its projected children render.
+	readonly seedChild?: (
+		slot: Extract<SsrDataSlot, { readonly kind: 'child-component' }>,
+		context: SsrDataReadContext,
+	) => Awaitable<ReadonlyMap<string, unknown> | undefined>;
 	readonly selectBranchArm?: (
 		slot: Extract<SsrDataSlot, { readonly kind: 'branch' }>,
 		context: SsrDataReadContext,
@@ -260,6 +266,7 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 					chunkId,
 					...(repeat.item !== undefined ? { repeatItem: repeat.item } : {}),
 					...(repeat.index !== undefined ? { repeatIndex: repeat.index } : {}),
+					...(repeat.sharedSeeds ? { sharedSeeds: repeat.sharedSeeds } : {}),
 				};
 				const renderedSlot = await renderSlot(slot, context);
 				renderedSlots.set(slot, renderedSlot);
@@ -297,8 +304,11 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 				return { html: renderSpreadAttributes(await input.read(slot.residue, context), slot.excludeNames), tokens: [] };
 			case 'child-component': {
 				anchors.push(anchorRecord(idPrefix, context.chunkId, slot, slot.componentEdgeId));
+				const sharedSeeds = slot.projectionChunkId
+					? await input.seedChild?.(slot, context)
+					: undefined;
 				const projection = slot.projectionChunkId
-					? await renderChunk(slot.projectionChunkId, {})
+					? await renderChunk(slot.projectionChunkId, sharedSeeds ? { sharedSeeds } : {})
 					: undefined;
 				if (!input.renderChild)
 					throw new Error(`MARKLESS_SSR_DATA_CHILD_RENDERER_MISSING: ${slot.componentEdgeId}`);
