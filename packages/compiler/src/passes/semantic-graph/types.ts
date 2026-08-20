@@ -1,6 +1,6 @@
 import type { AnyNode } from '../../ast/nodes.ts';
 import type { SourceSpan } from '../../diagnostics.ts';
-import { analyzeModule, type SemanticView } from '../../yuku-tsrx-adapter.ts';
+import { analyze, type SemanticView } from 'yuku-tsrx';
 import type {
 	SemanticComponent,
 	SemanticComponentPropDeclaration,
@@ -207,7 +207,8 @@ export function createWalkState(input: {
 	/** Overridable so a test can observe when analysis is requested. */
 	readonly analyzeSemantics?: (source: string, filename: string) => SemanticView;
 }): WalkState {
-	const analyzeSemantics = input.analyzeSemantics ?? analyzeModule;
+	const analyzeSemantics =
+		input.analyzeSemantics ?? ((source, filename) => analyze(source, filename).semantic);
 	let semanticView: SemanticView | undefined;
 	return {
 		filename: input.filename,

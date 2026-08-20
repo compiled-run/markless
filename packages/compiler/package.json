@@ -40,6 +40,6 @@
 		"postcss-selector-parser": "7.1.5",
 		"yuku-analyzer": "0.9.0",
 		"yuku-codegen": "0.9.0",
-		"yuku-tsrx": "0.1.1"
+		"yuku-tsrx": "0.1.2"
 	}
 }

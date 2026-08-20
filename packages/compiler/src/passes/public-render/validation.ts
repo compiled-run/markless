@@ -1,4 +1,4 @@
-import { analyzeModule, isEventAttribute } from '../../yuku-tsrx-adapter.ts';
+import { analyze, isEventAttribute } from 'yuku-tsrx';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
 import {
@@ -325,7 +325,7 @@ function unresolvedValueReferences(
 	source: string,
 	filename: string,
 ): Array<{ readonly name: string; readonly start: number; readonly end: number }> {
-	const view = analyzeModule(source, filename);
+	const view = analyze(source, filename).semantic;
 	const references: Array<{ readonly name: string; readonly start: number; readonly end: number }> =
 		[];
 	for (let id = 0; id < view.reference.count; id++) {

@@ -31,7 +31,8 @@
  */
 import { generate, type GenerateOptions, type SourceMap } from 'yuku-codegen';
 import type { CompilerDiagnostic } from '../diagnostics.ts';
-import { parseModule, type MarklessCompileError, type Program } from '../yuku-tsrx-adapter.ts';
+import type { Program } from 'yuku-tsrx';
+import { parseModule, type MarklessCompileError } from '../js-ast.ts';
 
 /**
  * `yuku-codegen` types its input against `@yuku-toolchain/types`, which models
