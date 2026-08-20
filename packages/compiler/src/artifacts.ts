@@ -211,7 +211,38 @@ export type SemanticSharedReturnProperty =
 			readonly name: string;
 			readonly source: string;
 			readonly sourceSpan?: SourceSpan;
+	  }
+	| {
+			// A function-typed placeholder on the returned object: a slot the widget
+			// root fills with its own callback prop. It never becomes a graph node,
+			// so it has no initial value and never reaches the payload.
+			readonly kind: 'callback-slot';
+			readonly name: string;
+			readonly source: string;
+			readonly sourceSpan?: SourceSpan;
 	  };
+
+// `checkbox.onChange?.(next)` inside a factory method: the call site that a
+// dispatching handler routes to the enclosing widget root's callback prop.
+export type SemanticSharedCallbackInvocation = {
+	readonly definitionId: string;
+	readonly slotName: string;
+	// The authored callee text (`checkbox.onChange`), which the inlined method
+	// body still spells inside the handler symbol that calls the method.
+	readonly calleeSource: string;
+	readonly sourceSpan?: SourceSpan;
+};
+
+// `checkbox.onChange = onChange` in the widget root: the compile-time routing
+// fact that this component's callback prop fills that slot. Comptime only —
+// it emits no runtime seed.
+export type SemanticSharedCallbackBinding = {
+	readonly definitionId: string;
+	readonly slotName: string;
+	readonly componentName: string;
+	readonly propName: string;
+	readonly sourceSpan?: SourceSpan;
+};
 
 export type SemanticSharedDefinition = {
 	readonly id: string;
@@ -374,6 +405,8 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_OVERLAY_HOST_ELEMENT_REQUIRED'
 		| 'MARKLESS_EVENT_HANDLER_NOT_A_FUNCTION'
 		| 'MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED'
+		| 'MARKLESS_CALLBACK_SLOT_SOURCE_UNSUPPORTED'
+		| 'MARKLESS_CALLBACK_SLOT_UNBOUND'
 		| 'MARKLESS_EVENT_SPREAD_UNSUPPORTED'
 		| 'MARKLESS_SPREAD_STATIC_SNAPSHOT'
 		| 'MARKLESS_ATTRIBUTE_OBJECT_VALUE'
@@ -710,6 +743,8 @@ export type SemanticGraphArtifact = {
 	readonly graphBindings: ReadonlyArray<SemanticGraphBinding>;
 	readonly sharedDefinitions: ReadonlyArray<SemanticSharedDefinition>;
 	readonly sharedInstances: ReadonlyArray<SemanticSharedInstance>;
+	readonly sharedCallbackInvocations: ReadonlyArray<SemanticSharedCallbackInvocation>;
+	readonly sharedCallbackBindings: ReadonlyArray<SemanticSharedCallbackBinding>;
 	readonly hostNodes: ReadonlyArray<SemanticHostNode>;
 	readonly keyedRepeats: ReadonlyArray<SemanticKeyedRepeat>;
 	readonly events: ReadonlyArray<SemanticEvent>;
@@ -1236,6 +1271,20 @@ export type CaptureSlotRoute =
 			readonly callbackSymbolId: string;
 	  }
 	| {
+			// A widget part invokes a callback slot on its shared instance. The family
+			// module cannot name the consumer's handler, so a composing module resolves
+			// this against the enclosing widget root's edge and replaces it with the
+			// ordinary callback route that edge proves.
+			readonly kind: 'widget-callback-route';
+			readonly componentEdgeId?: string;
+			readonly componentEdgePath?: ReadonlyArray<string>;
+			readonly sharedDefinitionId: string;
+			readonly slotName: string;
+			// The widget root's own prop name, which need not match the slot name.
+			readonly rootPropName: string;
+			readonly rootComponentName: string;
+	  }
+	| {
 			// An imported descendant reads a prop owned by this forwarding component.
 			// A consuming module replaces this compiler-only route when it composes the
 			// forwarding component through a concrete instance edge.
@@ -1418,6 +1467,9 @@ export type SymbolResolverModuleInput = {
 		readonly chunk: string;
 		readonly exportName: string;
 		readonly componentEdgeId?: string;
+		// Why the parent has to bind this row; a widget-callback claim binds the
+		// callback slot alone and leaves the child's own captures to the child.
+		readonly claimKind?: 'prop-bound' | 'widget-callback';
 		readonly captureSymbol?: ExtractedCaptureSymbol;
 	}>;
 	readonly boundSymbols?: ReadonlyArray<BoundSymbolResolverRow>;

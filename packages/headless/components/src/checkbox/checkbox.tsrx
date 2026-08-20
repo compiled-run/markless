@@ -31,10 +31,14 @@ export const checkboxState = shared(
 		return {
 			...checkbox,
 			triggerEl,
+			// The slot `<checkbox.root>` fills with its own onChange prop; a part
+			// invoking it dispatches straight to the consumer's handler.
+			onChange: undefined as ((checked: boolean | 'mixed') => void) | undefined,
 			toggle() {
 				// Mixed resolves to checked, the way a native indeterminate box does.
 				const next = checkbox.checked === true ? false : true;
 				checkbox.checked = next;
+				checkbox.onChange?.(next);
 			},
 		};
 	},
@@ -53,8 +57,7 @@ export function CheckboxRoot({
 	...rest
 }: CheckboxRootProps) @{
 	const checkbox = checkboxState();
-	// `onChange` is destructured so it never lands on the div below, but it is
-	// inert: a consumer callback cannot be reached from the factory's toggle yet.
+	checkbox.onChange = onChange;
 	checkbox.checked = checked;
 	checkbox.disabled = disabled;
 	checkbox.required = required;

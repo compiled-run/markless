@@ -1,6 +1,7 @@
 import { cleanup, render, renderSSR } from '@markless/vitest-browser';
 import { userEvent } from 'vite-plus/test/browser';
 import { afterEach, beforeEach, expect, test } from 'vitest';
+import ChangeApp from './fixtures/checkbox-change.tsrx';
 import FormApp from './fixtures/checkbox-form.tsrx';
 import MessagesApp from './fixtures/checkbox-messages.tsrx';
 import StatesApp from './fixtures/checkbox-states.tsrx';
@@ -414,4 +415,86 @@ test('CSR: the description renders and a mounted error marks the trigger invalid
 test('SSR: the description renders and a mounted error marks the trigger invalid', async () => {
 	const screen = await renderSSR(MessagesApp);
 	expectMessages(screen.container);
+});
+
+// --- consumer callbacks (U-B) ---------------------------------------------
+//
+// `onChange` is a callback slot on the shared instance: the root fills it with
+// its own prop at build time, and `toggle()` dispatches through that route. The
+// slot never becomes a graph node, so these assertions are about a call that
+// reaches the consumer, not about a value the payload carried.
+
+function changeTrigger(container: ParentNode, name: string) {
+	const host = container.querySelector(`[data-case="${name}"]`);
+	if (!host) throw new Error(`Expected the "${name}" checkbox.`);
+	return host.querySelector('button') as HTMLButtonElement;
+}
+
+function reported(container: ParentNode, name: string) {
+	return container.querySelector(`[data-testid="${name}"]`)?.textContent ?? null;
+}
+
+async function expectConsumerCallbackFires(container: ParentNode) {
+	// Nothing fired on mount, first render or resume.
+	expect(reported(container, 'calls')).toBe('0');
+	expect(reported(container, 'first-value')).toBe('');
+
+	changeTrigger(container, 'first').click();
+	await expect.poll(() => reported(container, 'first-value')).toBe('true');
+	// Called once, with the next value, and the state moved with it.
+	await expect.poll(() => reported(container, 'calls')).toBe('1');
+	expect(changeTrigger(container, 'first').getAttribute('aria-checked')).toBe('true');
+	// The sibling's handler did not run.
+	expect(reported(container, 'second-value')).toBe('');
+}
+
+async function expectEachInstanceReachesItsOwnHandler(container: ParentNode) {
+	changeTrigger(container, 'second').click();
+	await expect.poll(() => reported(container, 'second-value')).toBe('false');
+	await expect.poll(() => reported(container, 'calls')).toBe('1');
+	expect(reported(container, 'first-value')).toBe('');
+
+	changeTrigger(container, 'first').click();
+	await expect.poll(() => reported(container, 'first-value')).toBe('true');
+	await expect.poll(() => reported(container, 'calls')).toBe('2');
+	// Each click reached only its own consumer handler.
+	expect(reported(container, 'second-value')).toBe('false');
+}
+
+async function expectOmittedCallbackStillToggles(container: ParentNode) {
+	const trigger = changeTrigger(container, 'silent');
+	trigger.click();
+	// The trigger's own click record survives with no consumer handler in play.
+	await expect.poll(() => trigger.getAttribute('aria-checked')).toBe('true');
+	expect(reported(container, 'calls')).toBe('0');
+}
+
+test('CSR: a click calls the consumer onChange once with the next value', async () => {
+	const screen = await render(ChangeApp);
+	await expectConsumerCallbackFires(screen.container as HTMLElement);
+});
+
+test('SSR: a click after resume calls the consumer onChange once with the next value', async () => {
+	const screen = await renderSSR(ChangeApp);
+	await expectConsumerCallbackFires(screen.container);
+});
+
+test('CSR: two sibling checkboxes each reach only their own handler', async () => {
+	const screen = await render(ChangeApp);
+	await expectEachInstanceReachesItsOwnHandler(screen.container as HTMLElement);
+});
+
+test('SSR: two sibling checkboxes each reach only their own handler', async () => {
+	const screen = await renderSSR(ChangeApp);
+	await expectEachInstanceReachesItsOwnHandler(screen.container);
+});
+
+test('CSR: an omitted onChange toggles without a dispatch', async () => {
+	const screen = await render(ChangeApp);
+	await expectOmittedCallbackStillToggles(screen.container as HTMLElement);
+});
+
+test('SSR: an omitted onChange toggles without a dispatch', async () => {
+	const screen = await renderSSR(ChangeApp);
+	await expectOmittedCallbackStillToggles(screen.container);
 });

@@ -41,6 +41,8 @@ import { submoduleUnsupportedDiagnostic } from './diagnostics.ts';
 import {
 	collectSharedDefinitionDependencies,
 	collectImplicitFamilyScopeDiagnostics,
+	collectSharedCallbackBindings,
+	collectSharedCallbackInvocations,
 	collectSharedFactoryGraph,
 } from './collect-shared.ts';
 import { attachKeyedRepeatRowHost, collectKeyedRepeat } from './collect-repeat.ts';
@@ -86,6 +88,7 @@ export async function buildSemanticGraph(
 
 	collectSharedDefinitionDependencies(statements, state);
 	collectSharedFactoryGraph(statements, state, walk);
+	collectSharedCallbackInvocations(statements, state);
 
 	for (const statement of statements) {
 		const componentFunction = getComponentFunction(statement);
@@ -114,6 +117,7 @@ export async function buildSemanticGraph(
 		state.currentComponentId = previousComponentId;
 	}
 
+	collectSharedCallbackBindings(state);
 	collectImplicitFamilyScopeDiagnostics(state);
 	collectComputedWriteDiagnostics(state);
 	finalizeComputedDependencies(state);

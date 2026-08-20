@@ -274,9 +274,33 @@ export function linkedModuleClaimPlan(input: {
 	};
 }
 
+/**
+ * The two reasons a composed child's symbol needs the parent to bind it.
+ *
+ * `prop-bound` is the original one: the child's symbol captures a prop, and only
+ * the parent's edge knows what that prop is. `widget-callback` is the second: the
+ * child's symbol dispatches to a callback slot on its own widget graph, and only
+ * the parent's edge knows which consumer handler answers it. They are separate
+ * claims because a prop-bound row rebinds the symbol's *other* capture slots
+ * against the parent edge too, which a widget-callback row must not do — the
+ * child's own graph reads and its trigger record stay the child's.
+ */
+export type LinkedImportedClaimKind = 'prop-bound' | 'widget-callback';
+
+export function linkedImportedClaimKind(
+	captureSymbol: ExtractedCaptureSymbol,
+): LinkedImportedClaimKind | undefined {
+	if (captureSymbol.captureSlots.some((slot) => slot.propName !== undefined)) return 'prop-bound';
+	return captureSymbol.captureSlots.some((slot) =>
+		slot.routes.some((route) => route.kind === 'widget-callback-route'),
+	)
+		? 'widget-callback'
+		: undefined;
+}
+
 // The parent-bound symbol rows a composed child contributes. A child only
 // contributes rows once its claims and its capture metadata agree on a symbol
-// that is actually bound through a prop.
+// the parent has to bind — through a prop, or through a widget callback slot.
 export function linkedImportedSymbolInputs(input: {
 	readonly children: ReadonlyArray<LinkedModuleChildResolution>;
 	readonly captureMetadataForSource: (source: string) => CaptureAnalysisArtifact | undefined;
@@ -290,17 +314,18 @@ export function linkedImportedSymbolInputs(input: {
 			const captureSymbol = captureMetadata.extractedSymbols.find(
 				(candidate: ExtractedCaptureSymbol) => candidate.symbolId === symbol.symbolId,
 			);
-			return captureSymbol?.captureSlots.some((slot) => slot.propName !== undefined)
-				? [
-						{
-							id: `imported:${encodeURIComponent(child.source)}:${symbol.symbolId}`,
-							chunk: symbol.virtualModuleId,
-							exportName: symbol.exportName,
-							componentEdgeId: child.componentEdgeId,
-							captureSymbol,
-						},
-					]
-				: [];
+			const claimKind = captureSymbol ? linkedImportedClaimKind(captureSymbol) : undefined;
+			if (!captureSymbol || !claimKind) return [];
+			return [
+				{
+					id: `imported:${encodeURIComponent(child.source)}:${symbol.symbolId}`,
+					chunk: symbol.virtualModuleId,
+					exportName: symbol.exportName,
+					componentEdgeId: child.componentEdgeId,
+					claimKind,
+					captureSymbol,
+				},
+			];
 		});
 	});
 }
@@ -317,8 +342,9 @@ export function linkedImportedClaimsMissing(input: {
 		if (!child.componentEdgeId) return false;
 		const expectsClaims = input
 			.captureMetadataForSource(child.source)
-			?.extractedSymbols.some((symbol: ExtractedCaptureSymbol) =>
-				symbol.captureSlots.some((slot) => slot.propName !== undefined),
+			?.extractedSymbols.some(
+				(symbol: ExtractedCaptureSymbol) =>
+					linkedImportedClaimKind(symbol) !== undefined,
 			);
 		return (
 			expectsClaims === true &&

@@ -16,9 +16,11 @@ import {
 	type ResolvedGraphPath,
 } from '../../artifact-helpers/graph-paths.ts';
 import {
+	callbackSlotSourceDiagnostic,
 	implicitFamilyScopeDiagnostic,
 	invalidSharedScopeDiagnostic,
 	sharedDefinitionCycleDiagnostic,
+	unboundCallbackSlotDiagnostic,
 } from './diagnostics.ts';
 import { collectComputedBinding } from './collect-state.ts';
 import { collectExpressionReads } from './collect-expressions.ts';
@@ -161,6 +163,128 @@ export function collectSharedFactoryGraph(
 			...state.graph.sharedDefinitions[index],
 			returnProperties,
 		};
+	}
+}
+
+export function sharedCallbackSlotNames(
+	definition: SemanticSharedDefinition,
+): ReadonlyArray<string> {
+	return (definition.returnProperties ?? []).flatMap((property) =>
+		property.kind === 'callback-slot' ? [property.name] : [],
+	);
+}
+
+/**
+ * The call sites a widget part routes to its consumer: `checkbox.onChange?.(next)`
+ * inside a factory method. A method is inlined into every handler that calls it,
+ * so the callee text collected here is the text that handler's symbol still
+ * spells when capture analysis binds the slot.
+ */
+export function collectSharedCallbackInvocations(
+	statements: ReadonlyArray<AnyNode>,
+	state: WalkState,
+): void {
+	for (const declaration of sharedDefinitionDeclarations(statements, state)) {
+		const definition = state.graph.sharedDefinitions.find(
+			(item) => item.name === declaration.name,
+		);
+		const body = declaration.factory?.body as AnyNode | undefined;
+		if (!definition || !body) continue;
+
+		const slotNames = new Set(sharedCallbackSlotNames(definition));
+		if (slotNames.size === 0) continue;
+
+		const seen = new Set<string>();
+		walkSubtree(body, (node) => {
+			if (node.type !== 'CallExpression') return;
+
+			const callee = node.callee as AnyNode | undefined;
+			if (callee?.type !== 'MemberExpression' || callee.computed === true) return;
+
+			const slotName = getIdentifierName(callee.property as AnyNode | undefined);
+			if (!slotName || !slotNames.has(slotName)) return;
+
+			const calleeSource = expressionSource(callee, state.source);
+			if (seen.has(calleeSource)) return;
+
+			seen.add(calleeSource);
+			state.graph.sharedCallbackInvocations.push({
+				definitionId: definition.id,
+				slotName,
+				calleeSource,
+				sourceSpan: sourceSpan(node, state.filename),
+			});
+		});
+	}
+}
+
+/**
+ * The compile-time routing fact `checkbox.onChange = onChange` states: this
+ * component's own callback prop fills that slot. It emits no runtime seed —
+ * the slot is not a graph node, so there is nothing to seed.
+ */
+export function collectSharedCallbackBindings(state: WalkState): void {
+	const definitionsById = new Map(
+		state.graph.sharedDefinitions.map((definition) => [definition.id, definition]),
+	);
+
+	for (const write of state.graph.stateWrites) {
+		if (write.writeScope !== 'component' || !write.componentName) continue;
+
+		const [localName, slotName, ...rest] = splitStaticGraphPath(write.target);
+		if (!localName || !slotName || rest.length > 0) continue;
+
+		const resolved = findSharedInstance(localName, state.graph);
+		if (!resolved) continue;
+
+		const definition = definitionsById.get(resolved.definition.id);
+		if (!definition || !sharedCallbackSlotNames(definition).includes(slotName)) continue;
+
+		const valueSource = write.valueSource ?? '';
+		const propBinding = state.graph.componentPropBindings.find(
+			(binding) =>
+				binding.componentName === write.componentName &&
+				binding.localName === valueSource &&
+				binding.propPath.length === 1,
+		);
+		if (!propBinding?.propPath[0]) {
+			state.graph.diagnostics.push(
+				callbackSlotSourceDiagnostic({
+					slotName,
+					componentName: write.componentName,
+					definitionName: definition.name,
+					valueSource,
+					span: write.targetSpan,
+				}),
+			);
+			continue;
+		}
+
+		state.graph.sharedCallbackBindings.push({
+			definitionId: definition.id,
+			slotName,
+			componentName: write.componentName,
+			propName: propBinding.propPath[0],
+			...(write.targetSpan ? { sourceSpan: write.targetSpan } : {}),
+		});
+	}
+
+	for (const invocation of state.graph.sharedCallbackInvocations) {
+		const bound = state.graph.sharedCallbackBindings.some(
+			(binding) =>
+				binding.definitionId === invocation.definitionId &&
+				binding.slotName === invocation.slotName,
+		);
+		const definition = definitionsById.get(invocation.definitionId);
+		if (bound || !definition) continue;
+
+		state.graph.diagnostics.push(
+			unboundCallbackSlotDiagnostic({
+				slotName: invocation.slotName,
+				definitionName: definition.name,
+				span: invocation.sourceSpan,
+			}),
+		);
 	}
 }
 
@@ -403,6 +527,16 @@ function collectReturnedObjectProperties(input: {
 			continue;
 		}
 
+		if (isCallbackSlotDeclaration(value)) {
+			properties.push({
+				kind: 'callback-slot',
+				name,
+				source: propertySource,
+				sourceSpan: sourceSpan(property, input.state.filename),
+			});
+			continue;
+		}
+
 		const valueSource = expressionSource(value, input.state.source);
 
 		// `isChecked: computed(() => ...)` names its node by the property key, the
@@ -489,6 +623,31 @@ function objectPropertyKey(node: AnyNode | undefined): string | null {
 function isFunctionValue(node: AnyNode | undefined): boolean {
 	if (!node) return false;
 	return node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression';
+}
+
+// `undefined as ((next: boolean) => void) | undefined` — the declaration form
+// for a callback slot: a placeholder value with a function-bearing type.
+function isCallbackSlotDeclaration(value: AnyNode): boolean {
+	if (value.type !== 'TSAsExpression') return false;
+	if (getIdentifierName(value.expression as AnyNode | undefined) !== 'undefined') return false;
+
+	return containsFunctionType(value.typeAnnotation as AnyNode | undefined);
+}
+
+function containsFunctionType(node: AnyNode | undefined): boolean {
+	if (!node || typeof node !== 'object') return false;
+	if (node.type === 'TSFunctionType') return true;
+
+	return childNodes(node).some((child) => containsFunctionType(child));
+}
+
+// The factory-body twin of `walkFactoryBody` that keeps descending into nested
+// functions, because a slot invocation lives inside a returned method.
+function walkSubtree(node: AnyNode | undefined, visit: (node: AnyNode) => void): void {
+	if (!node || typeof node !== 'object') return;
+
+	visit(node);
+	for (const child of childNodes(node)) walkSubtree(child, visit);
 }
 
 function walkFactoryBody(node: AnyNode | undefined, visit: (node: AnyNode) => void): void {

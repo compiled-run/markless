@@ -387,7 +387,16 @@ function inlineSharedMethodCalls(
 			if (!invokesMethod(emitted, callee, semanticsReader)) continue;
 			const body = sharedMethodBodySource(property.source);
 			if (body === null) continue;
-			emitted = emitted.split(`${callee}()`).join(`(() => {${body}})()`);
+			// A method that dispatches to a consumer callback awaits that dispatch,
+			// so the inlined body has to be an async context.
+			const dispatches = semanticGraph.sharedCallbackInvocations.some(
+				(invocation) =>
+					invocation.definitionId === definition.id &&
+					body.includes(invocation.calleeSource),
+			);
+			emitted = emitted
+				.split(`${callee}()`)
+				.join(dispatches ? `(async () => {${body}})()` : `(() => {${body}})()`);
 			if (property.sourceSpan) spans.push(property.sourceSpan);
 		}
 	}

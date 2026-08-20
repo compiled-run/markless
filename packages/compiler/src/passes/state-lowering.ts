@@ -109,7 +109,11 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 			continue;
 		}
 
-		const unknownMember = unknownSharedStateMember(resolved);
+		// A callback slot is a compile-time route, not graph data: it must not
+		// become a read, or the handler would subscribe to a cell that has no value.
+		if (readsDeclaredCallbackSlot(resolved, input.semanticGraph)) continue;
+
+		const unknownMember = unknownSharedStateMember(resolved, input.semanticGraph);
 		if (unknownMember) {
 			diagnostics.push(
 				unknownSharedMemberDiagnostic({
@@ -177,6 +181,9 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 				);
 				continue;
 			}
+
+			// Filling a callback slot records a route; there is nothing to lower.
+			if (writesDeclaredCallbackSlot(write, input.semanticGraph)) continue;
 
 			const unknownField = unknownSharedInstanceField(write, input.semanticGraph);
 			if (unknownField) {
@@ -1059,14 +1066,66 @@ function unknownSharedSeedFieldDiagnostic(
 	};
 }
 
+function isDeclaredCallbackSlot(
+	graph: SemanticGraphArtifact,
+	definitionId: string,
+	name: string,
+): boolean {
+	return (
+		graph.sharedDefinitions
+			.find((definition) => definition.id === definitionId)
+			?.returnProperties?.some(
+				(property) => property.kind === 'callback-slot' && property.name === name,
+			) === true
+	);
+}
+
+// `checkbox.onChange = onChange` fills a callback slot: a compile-time route,
+// not a seed, so there is no graph field to miss.
+function writesDeclaredCallbackSlot(
+	write: SemanticStateWrite,
+	graph: SemanticGraphArtifact,
+): boolean {
+	const [localName, field, ...rest] = write.target.split('.');
+	if (!localName || !field || rest.length > 0) return false;
+
+	const instance = findLast(
+		graph.sharedInstances,
+		(item) =>
+			item.localName === localName &&
+			(write.componentName === undefined ||
+				item.componentName === undefined ||
+				item.componentName === write.componentName),
+	);
+
+	return instance ? isDeclaredCallbackSlot(graph, instance.definitionId, field) : false;
+}
+
+function readsDeclaredCallbackSlot(
+	resolved: ResolvedStateGraphPath,
+	graph: SemanticGraphArtifact,
+): boolean {
+	const member = resolved.path[0];
+	const definitionId = resolved.binding.sharedDefinitionId;
+	if (member === undefined || resolved.path.length !== 1 || definitionId === undefined)
+		return false;
+
+	return isDeclaredCallbackSlot(graph, definitionId, member);
+}
+
 // A path that resolves onto the definition's own state node but names a key the
 // node never declared: undefined on every render, so the caller silently no-ops.
-function unknownSharedStateMember(resolved: ResolvedStateGraphPath): string | null {
+function unknownSharedStateMember(
+	resolved: ResolvedStateGraphPath,
+	graph: SemanticGraphArtifact,
+): string | null {
 	const member = resolved.path[0];
 	if (member === undefined) return null;
 
 	const binding = resolved.binding;
 	if (binding.kind !== 'state' || binding.sharedDefinitionId === undefined) return null;
+	// A callback slot is declared on the returned object, not in the state node.
+	if (isDeclaredCallbackSlot(graph, binding.sharedDefinitionId, member)) return null;
 	if (binding.initialValueKnown !== true) return null;
 
 	const initial = binding.initialValue;

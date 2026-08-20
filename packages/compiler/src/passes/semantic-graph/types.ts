@@ -15,6 +15,8 @@ import type {
 	ModuleGraphInterfaceArtifact,
 	SemanticModuleImport,
 	SemanticSharedDefinition,
+	SemanticSharedCallbackBinding,
+	SemanticSharedCallbackInvocation,
 	SemanticSharedInstance,
 	SemanticSyncPolicyConstant,
 	SemanticHostNode,
@@ -42,6 +44,8 @@ export type MutableSemanticGraphArtifact = {
 	graphBindings: SemanticGraphBinding[];
 	sharedDefinitions: SemanticSharedDefinition[];
 	sharedInstances: SemanticSharedInstance[];
+	sharedCallbackInvocations: SemanticSharedCallbackInvocation[];
+	sharedCallbackBindings: SemanticSharedCallbackBinding[];
 	hostNodes: SemanticHostNode[];
 	keyedRepeats: SemanticKeyedRepeat[];
 	events: SemanticEvent[];
@@ -171,6 +175,8 @@ export function createMutableSemanticGraphArtifact(filename: string): MutableSem
 		graphBindings: [],
 		sharedDefinitions: [],
 		sharedInstances: [],
+		sharedCallbackInvocations: [],
+		sharedCallbackBindings: [],
 		hostNodes: [],
 		keyedRepeats: [],
 		events: [],

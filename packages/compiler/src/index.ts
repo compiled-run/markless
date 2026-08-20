@@ -54,6 +54,7 @@ export {
 	linkBarrelComponents,
 	linkImportedModules,
 	linkedChildrenHaveBrowserTriggers,
+	linkedImportedClaimKind,
 	linkedImportedClaimsMissing,
 	linkedImportedSymbolInputs,
 	linkedManifestHasBrowserTriggers,

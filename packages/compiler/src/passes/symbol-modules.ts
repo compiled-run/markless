@@ -79,7 +79,12 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 						[
 							symbol.symbolId,
 							symbol.captureSlots.filter((slot) =>
-								slot.routes.some((route) => route.componentEdgeId !== undefined),
+								slot.routes.some(
+									(route) =>
+										route.componentEdgeId !== undefined ||
+										// A composing module supplies this slot's edge.
+										route.kind === 'widget-callback-route',
+								),
 							),
 						] as const,
 					],
@@ -537,7 +542,9 @@ function emitSymbolModule(
 }
 
 function callbackCaptureSlot(slot: CaptureSlot): boolean {
-	return slot.routes.some((route) => route.kind === 'callback-route');
+	return slot.routes.some(
+		(route) => route.kind === 'callback-route' || route.kind === 'widget-callback-route',
+	);
 }
 
 function captureSlotMatchesRead(slot: CaptureSlot, read: LoweredStateRead): boolean {
@@ -3601,7 +3608,11 @@ function eventHandlerAuthoredStatements(
 		return [
 			returnStatementNode(
 				eventAwaitNode(
-					captureInvokeNode(directCallbackSlot.id, [memberChainNode('context.event')]),
+					captureInvokeNode(
+						directCallbackSlot.id,
+						[memberChainNode('context.event')],
+						widgetCallbackCaptureSlot(directCallbackSlot),
+					),
 				),
 			),
 		];
@@ -3810,17 +3821,29 @@ function captureInvocationNode(
 		isNode(argument) ? [rewriteCaptureArgumentNode(argument, undefined, rewrite)] : [],
 	);
 
-	return eventAwaitNode(captureInvokeNode(slot.id, args));
+	return eventAwaitNode(captureInvokeNode(slot.id, args, widgetCallbackCaptureSlot(slot)));
+}
+
+// A widget callback slot is dropped when no consumer filled it, so the part's
+// own symbol may run with no capture context at all; that call must no-op.
+function widgetCallbackCaptureSlot(slot: CaptureSlot): boolean {
+	return slot.routes.some((route) => route.kind === 'widget-callback-route');
 }
 
 function captureInvokeNode(
 	slotId: string,
 	args: ReadonlyArray<EmissionNode>,
+	optional = false,
 ): EmissionNode {
-	return callNode(memberChainNode('context.capture.invoke'), [
-		literalNode(slotId),
-		arrayNode(args),
-	]);
+	const invocationArguments = [literalNode(slotId), arrayNode(args)];
+	const invocation = callNode(memberChainNode('context.capture.invoke'), invocationArguments);
+	if (!optional) return invocation;
+
+	return conditionalNode(
+		memberChainNode('context.capture'),
+		invocation,
+		identifierNode('undefined'),
+	);
 }
 
 function eventAwaitNode(argument: EmissionNode): EmissionNode {

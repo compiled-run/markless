@@ -36,7 +36,18 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 			: emitTableSymbolResolverModule(manifest);
 	}
 	const scopesInstances = (input.boundSymbols ?? []).some((row) => row.instancePath);
+	// A widget callback row binds a symbol whose whole graph is its widget's, and
+	// which widget an id belongs to is a runtime reading, not a prefix. Only such a
+	// resolver imports that rule; every other bound resolver stays self-contained.
+	const scopesWidgetGraphs =
+		scopesInstances && input.symbols.some((symbol) => symbol.claimKind === 'widget-callback');
 	return [
+		...(scopesWidgetGraphs
+			? [
+					"import { marklessComposedGraphNodeId } from '@markless/web/fns/instance-scope';",
+					'',
+				]
+			: []),
 		'export const symbolManifest = ',
 		JSON.stringify(manifest),
 		';',
@@ -67,7 +78,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'	return (context) => base({ ...context, capture: createCaptureContext(context, bound) });',
 		'}',
 		'',
-		...(scopesInstances ? instanceScopeLines() : []),
+		...(scopesInstances ? instanceScopeLines(scopesWidgetGraphs) : []),
 		'function createCaptureContext(context, bound) {',
 		'	const slots = {};',
 		'	for (const slot of bound.captureSlots) slots[slot.slotId] = slot;',
@@ -120,13 +131,19 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 // instance path of the edges it was composed through, but its own symbol still
 // spells child-local ids. The parent's capture routes and the prop reads the
 // capture adapter intercepts stay in page space.
-function instanceScopeLines(): string[] {
+function instanceScopeLines(widgetAware: boolean): string[] {
 	return [
 		'function instanceScopedBase(base, bound) {',
 		'	const path = bound.instancePath;',
 		'	if (!path) return base;',
 		'	const pageSpace = new Set(bound.captureSlots.flatMap((slot) => slot.legacyGraphRead ? [slot.legacyGraphRead.graphNodeId] : []));',
-		'	const scoped = (graphNodeId) => pageSpace.has(graphNodeId) ? graphNodeId : path + graphNodeId;',
+		// A `shared:`/`storage:` id belongs to the page, and a widget-scoped one to
+		// its widget root, not to the edge this row was bound through. The runtime
+		// owns that reading; restating it here would put the write on a graph the
+		// part's own records never read.
+		widgetAware
+			? '	const scoped = (graphNodeId) => pageSpace.has(graphNodeId) ? graphNodeId : marklessComposedGraphNodeId(graphNodeId, path);'
+			: '	const scoped = (graphNodeId) => pageSpace.has(graphNodeId) ? graphNodeId : path + graphNodeId;',
 		'	const scopeGraph = (graph) => {',
 		'		const wrapped = { ...graph, read: (graphNodeId, readPath) => graph.read(scoped(graphNodeId), readPath) };',
 		'		for (const name of ["write", "update", "call", "delete", "subscribe"]) {',

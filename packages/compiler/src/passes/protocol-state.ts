@@ -43,9 +43,11 @@ export function createProtocolStatePayloadFromArena(
 					})),
 				}
 			: {}),
-		...(definition.returnProperties && definition.returnProperties.length > 0
+		...(payloadReturnProperties(definition.returnProperties).length > 0
 			? {
-					returnProperties: definition.returnProperties.map(protocolReturnProperty),
+					returnProperties: payloadReturnProperties(definition.returnProperties).map(
+						protocolReturnProperty,
+					),
 				}
 			: {}),
 	}));
@@ -121,8 +123,18 @@ function syncDeriveSymbolIds(input: ProtocolStatePayloadInput): ReadonlyMap<stri
 	);
 }
 
+// A callback slot is a compile-time route with no value, so it never reaches
+// the payload: a page that uses one pays no bytes for it.
+function payloadReturnProperties(
+	properties: ReadonlyArray<SemanticSharedReturnProperty> | undefined,
+): ReadonlyArray<Exclude<SemanticSharedReturnProperty, { readonly kind: 'callback-slot' }>> {
+	return (properties ?? []).flatMap((property) =>
+		property.kind === 'callback-slot' ? [] : [property],
+	);
+}
+
 function protocolReturnProperty(
-	property: SemanticSharedReturnProperty,
+	property: Exclude<SemanticSharedReturnProperty, { readonly kind: 'callback-slot' }>,
 ): NonNullable<
 	NonNullable<ProtocolStatePayload['sharedDefinitions']>[number]['returnProperties']
 >[number] {

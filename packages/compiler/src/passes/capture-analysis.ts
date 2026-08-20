@@ -102,6 +102,31 @@ function importedCaptureSymbols(
 			captureSymbol.kind !== 'event-handler' && captureSymbol.kind !== 'callback-prop'
 				? true
 				: referenceInvocationIsAbsentSafe(captureSymbol.source, slot.source);
+		// A widget-callback claim binds one thing: the slot the enclosing root
+		// answers. The child's own graph reads keep resolving in the child's
+		// module, so rebinding them here would take the part's records with them.
+		if (symbol.claimKind === 'widget-callback') {
+			return [
+				{
+					...captureSymbol,
+					loaderSymbolId: symbol.id,
+					captureSlots: captureSymbol.captureSlots.flatMap((slot) =>
+						slot.routes.some((route) => route.kind === 'widget-callback-route')
+							? [
+									{
+										...slot,
+										routes: slot.routes.map((route) =>
+											route.kind === 'widget-callback-route'
+												? resolveWidgetCallbackRoute(route, edge, input)
+												: route,
+										),
+									},
+								]
+							: [],
+					),
+				},
+			];
+		}
 		return [
 			{
 				...symbol.captureSymbol,
@@ -109,7 +134,13 @@ function importedCaptureSymbols(
 				captureSlots: symbol.captureSymbol.captureSlots
 					.map((slot) => ({
 						...slot,
-						routes: slot.routes.some((route) => route.kind === 'passthrough-route')
+						routes: slot.routes.some((route) => route.kind === 'widget-callback-route')
+							? slot.routes.map((route) =>
+									route.kind === 'widget-callback-route'
+										? resolveWidgetCallbackRoute(route, edge, input)
+										: route,
+								)
+							: slot.routes.some((route) => route.kind === 'passthrough-route')
 							? slot.routes.flatMap((route) =>
 									route.kind === 'passthrough-route'
 										? [
@@ -169,7 +200,8 @@ function symbolCaptureSlots(
 ): ReadonlyArray<CaptureSlot> {
 	const reads = lazySymbolReads(symbol, input);
 	const slots = reads.map((read) => captureSlot(read, symbol, input, semantics));
-	if (symbol.kind === 'event-handler' || symbol.kind === 'callback-prop') return slots;
+	if (symbol.kind === 'event-handler' || symbol.kind === 'callback-prop')
+		return [...slots, ...widgetCallbackSlots(symbol, input, semantics)];
 
 	// A non-callback lazy symbol does not need an opaque presentation value at
 	// resume time: it rendered once, and the value has no live graph route that
@@ -179,6 +211,102 @@ function symbolCaptureSlots(
 		const routes = slot.routes.filter((route) => route.kind !== 'unsupported-opaque');
 		return routes.length > 0 ? [{ ...slot, routes }] : [];
 	});
+}
+
+/**
+ * A handler that invokes a widget callback slot — directly or through a factory
+ * method inlined into it — captures that slot instead of reading it. The slot
+ * has no graph node and no seed: the family module records which widget root
+ * prop answers it, and a composing module turns that into the ordinary callback
+ * route the root's own edge proves.
+ */
+function widgetCallbackSlots(
+	symbol: PlannedSymbol,
+	input: CaptureAnalysisInput,
+	semantics: SymbolSourceSemanticsReader,
+): ReadonlyArray<CaptureSlot> {
+	const invocations = input.semanticGraph.sharedCallbackInvocations ?? [];
+	if (invocations.length === 0) return [];
+
+	const invoked = semantics.read(symbolSource(symbol));
+	return invocations.flatMap((invocation) => {
+		if (!invoked.invokes(invocation.calleeSource)) return [];
+
+		const binding = (input.semanticGraph.sharedCallbackBindings ?? []).find(
+			(candidate) =>
+				candidate.definitionId === invocation.definitionId &&
+				candidate.slotName === invocation.slotName,
+		);
+		if (!binding) return [];
+
+		return [
+			{
+				id: `capture-slot:widget-callback:${invocation.definitionId}:${invocation.slotName}:${symbol.id}`,
+				bindingId: `widget-callback:${invocation.definitionId}:${invocation.slotName}`,
+				source: invocation.calleeSource,
+				...(invocation.sourceSpan ? { sourceSpan: invocation.sourceSpan } : {}),
+				owner: {},
+				path: [],
+				routes: [
+					{
+						kind: 'widget-callback-route' as const,
+						sharedDefinitionId: invocation.definitionId,
+						slotName: invocation.slotName,
+						rootPropName: binding.propName,
+						rootComponentName: binding.componentName,
+					},
+				],
+			},
+		];
+	});
+}
+
+/**
+ * The widget root this composed part belongs to: the innermost enclosing
+ * component edge into the same family module. Nesting is the relationship the
+ * author already wrote, so no id, prop, or name has to be spelled twice.
+ */
+function enclosingWidgetRootEdge(
+	edge: SemanticComponentEdge,
+	edges: ReadonlyArray<SemanticComponentEdge>,
+): SemanticComponentEdge | undefined {
+	const span = edge.sourceSpan;
+	if (!span) return undefined;
+
+	return edges
+		.filter(
+			(candidate) =>
+				candidate.id !== edge.id &&
+				candidate.importSource === edge.importSource &&
+				candidate.sourceSpan !== undefined &&
+				candidate.sourceSpan.filename === span.filename &&
+				candidate.sourceSpan.start <= span.start &&
+				candidate.sourceSpan.end >= span.end,
+		)
+		.sort(
+			(left, right) =>
+				(right.sourceSpan?.start ?? 0) - (left.sourceSpan?.start ?? 0) ||
+				(left.sourceSpan?.end ?? 0) - (right.sourceSpan?.end ?? 0),
+		)[0];
+}
+
+/**
+ * The consumer handler a widget part's slot invocation reaches: the callback
+ * prop on the widget root that encloses this part. The resolved route is keyed
+ * back onto the part's own edge, because that is the instance whose dispatch
+ * runs it. No enclosing root, or a root the consumer gave no such prop, folds to
+ * undefined and the invocation no-ops.
+ */
+function resolveWidgetCallbackRoute(
+	route: Extract<CaptureSlotRoute, { readonly kind: 'widget-callback-route' }>,
+	edge: SemanticComponentEdge,
+	input: CaptureAnalysisInput,
+): CaptureSlotRoute {
+	const rootEdge = enclosingWidgetRootEdge(edge, input.semanticGraph.componentEdges);
+	const resolved = rootEdge
+		? propCaptureRoute([rootEdge], route.rootPropName, [], input, true)
+		: createCompilerKnownConstantCaptureRoute(edge.id, [edge.id], undefined);
+	return { ...resolved, componentEdgeId: edge.id, componentEdgePath: [edge.id] };
 }
 
 // Handlers already carry their lowered reads. Other lazy symbols are planned

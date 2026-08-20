@@ -684,6 +684,62 @@ export function implicitFamilyScopeDiagnostic(input: {
 	};
 }
 
+export function callbackSlotSourceDiagnostic(input: {
+	readonly slotName: string;
+	readonly componentName: string;
+	readonly definitionName: string;
+	readonly valueSource: string;
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_CALLBACK_SLOT_SOURCE_UNSUPPORTED',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'A callback slot can only be filled by the widget root’s own callback prop',
+		message: `"${input.componentName}" assigns ${input.valueSource} into the "${input.slotName}" callback slot of shared() "${input.definitionName}", and ${input.valueSource} is not one of this component's callback props.`,
+		why: 'A callback slot is a compile-time route, not a stored value: the build records that this widget root’s callback prop answers the slot, and a part invoking the slot dispatches straight to the consumer’s handler. A local function has no consumer to route to, so nothing could be recorded and the call would silently do nothing.',
+		...(input.span ? { primarySpan: input.span } : {}),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		source: input.valueSource,
+		suggestions: [
+			{
+				message: `Declare the handler as a prop of ${input.componentName} and assign that prop: ${input.slotName} = <thatProp>.`,
+			},
+			{
+				message:
+					'To run widget-local logic on the same gesture, call it from the factory method that invokes the slot.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_CALLBACK_SLOT_SOURCE_UNSUPPORTED',
+	};
+}
+
+export function unboundCallbackSlotDiagnostic(input: {
+	readonly slotName: string;
+	readonly definitionName: string;
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_CALLBACK_SLOT_UNBOUND',
+		severity: 'warning',
+		phase: 'semantic-graph',
+		title: 'A callback slot is invoked but no component fills it',
+		message: `shared() "${input.definitionName}" invokes its "${input.slotName}" callback slot, but no component in this module assigns a callback prop into it.`,
+		why: 'Without an assignment there is no widget root to route the call to, so the invocation can never reach a consumer and does nothing at runtime.',
+		...(input.span ? { primarySpan: input.span } : {}),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		source: input.slotName,
+		suggestions: [
+			{
+				message: `Assign the widget root's callback prop into the slot: <instance>.${input.slotName} = <thatProp>.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_CALLBACK_SLOT_UNBOUND',
+	};
+}
+
 export function elementHandleRequiredDiagnostic(
 	binding: SemanticElementHandleBinding,
 	graphBinding: SemanticGraphBinding | undefined,
