@@ -46,6 +46,7 @@ export function CheckboxRoot({
 	name,
 	value,
 	children,
+	...rest
 }: CheckboxRootProps) @{
 	const c = checkboxState();
 	c.checked = checked ?? false;
@@ -55,15 +56,17 @@ export function CheckboxRoot({
 	c.value = value ?? '';
 
 	<div
+		{...rest}
 		ui-checked={c.isChecked}
 		ui-disabled={c.disabled}
 	>{children}</div>
 }
 
-export function CheckboxTrigger({ disabled, children }: CheckboxTriggerProps) @{
+export function CheckboxTrigger({ children, ...rest }: CheckboxTriggerProps) @{
 	const c = checkboxState();
 
 	<button
+		{...rest}
 		type="button"
 		role="checkbox"
 		id={c.instanceId}
@@ -78,22 +81,22 @@ export function CheckboxTrigger({ disabled, children }: CheckboxTriggerProps) @{
 	>{children}</button>
 }
 
-export function CheckboxIndicator({ children }: CheckboxIndicatorProps) @{
-	<span aria-hidden="true">{children}</span>
+export function CheckboxIndicator({ children, ...rest }: CheckboxIndicatorProps) @{
+	<span {...rest} aria-hidden="true">{children}</span>
 }
 
-export function CheckboxLabel({ children }: CheckboxLabelProps) @{
-	<label>{children}</label>
+export function CheckboxLabel({ children, ...rest }: CheckboxLabelProps) @{
+	<label {...rest}>{children}</label>
 }
 
-export function CheckboxDescription({ children }: CheckboxDescriptionProps) @{
-	<div>{children}</div>
+export function CheckboxDescription({ children, ...rest }: CheckboxDescriptionProps) @{
+	<div {...rest}>{children}</div>
 }
 
-export function CheckboxError({ children }: CheckboxErrorProps) @{
-	<div>{children}</div>
+export function CheckboxError({ children, ...rest }: CheckboxErrorProps) @{
+	<div {...rest}>{children}</div>
 }
 
-export function CheckboxField({ name, value, required }: CheckboxFieldProps) @{
-	<input type="checkbox" name={name} value={value} required={required} />
+export function CheckboxField({ name, value, required, ...rest }: CheckboxFieldProps) @{
+	<input {...rest} type="checkbox" name={name} value={value} required={required} />
 }
