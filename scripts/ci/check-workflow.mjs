@@ -39,10 +39,11 @@ if (yaml === null) {
 
 // Jobs that existed before the `test` job was split and are deliberately not
 // part of the test gate. `package-manager-matrix` and `benchmark-guard` are
-// blocking on their own: they are separate required status checks in branch
-// protection, not gate members, because neither ran inside the serial `test`
-// job either and folding a 30-minute benchmark into the gate would make every
-// merge wait on it.
+// intended to block on their own as separate status checks - making them
+// required is a pending repository-settings action, since `main` has no branch
+// protection today. They are not gate members because neither ran inside the
+// serial `test` job either, and folding a 30-minute benchmark into the gate
+// would make every merge wait on it.
 const NON_TEST_JOBS = new Set([
 	'agent-files',
 	'typecheck',
@@ -331,8 +332,20 @@ if (!jobNames.includes(PLAYWRIGHT_JOB)) {
 // 10. Token posture. Nothing in this workflow pushes, comments or publishes,
 // so the default token stays read-only and no checkout leaves credentials in
 // `.git/config` for a later step to pick up.
-if (document.permissions === undefined)
+if (document.permissions === undefined) {
 	fail('The workflow has no top-level `permissions:` block, so every job runs with the default token scope.');
+} else if (document.permissions === 'read-all') {
+	// The string form grants read on every scope; nothing here needs more.
+} else if (typeof document.permissions !== 'object' || document.permissions === null) {
+	fail('The top-level `permissions:` value is neither a scope map nor `read-all`, so its effective grants cannot be validated.');
+} else {
+	if (document.permissions.contents !== 'read')
+		fail('Top-level `permissions.contents` must be `read`: nothing in this workflow pushes, and a wider grant would survive every later edit unnoticed.');
+	for (const [scope, level] of Object.entries(document.permissions)) {
+		if (level === 'write')
+			fail(`Top-level \`permissions.${scope}: write\` hands a write-capable token to every job; nothing in this workflow needs one.`);
+	}
+}
 for (const name of jobNames) {
 	for (const step of stepsOf(name)) {
 		if (!usesAction(step, 'actions/checkout')) continue;
@@ -341,9 +354,24 @@ for (const name of jobNames) {
 	}
 }
 
-// 11. This checker only protects the workflow if the workflow runs it.
-if (!/scripts\/ci\/check-workflow\.mjs/.test(source))
-	fail('No job runs `scripts/ci/check-workflow.mjs`, so none of these invariants are enforced in CI.');
+// 11. This checker only protects the workflow if the workflow runs it - as a
+// parsed `run` step in `typecheck`, after the install that provides the `yaml`
+// package it parses with. A source-text scan would stay green on a comment.
+{
+	const typecheckSteps = stepsOf('typecheck');
+	const runLine = (step) =>
+		typeof step === 'object' && step !== null && typeof step.run === 'string' ? step.run : '';
+	const checkerIndex = typecheckSteps.findIndex((step) =>
+		runLine(step).includes('node scripts/ci/check-workflow.mjs .github/workflows/ci.yml'),
+	);
+	const installIndex = typecheckSteps.findIndex((step) =>
+		runLine(step).includes('pnpm install --frozen-lockfile'),
+	);
+	if (checkerIndex === -1)
+		fail('The `typecheck` job has no `run` step invoking `node scripts/ci/check-workflow.mjs .github/workflows/ci.yml`, so none of these invariants are enforced in CI.');
+	else if (installIndex === -1 || checkerIndex < installIndex)
+		fail('The checker step in `typecheck` must come after `pnpm install --frozen-lockfile`: it resolves the `yaml` package from node_modules.');
+}
 
 console.log(`Workflow: ${workflowPath}`);
 console.log('Parsed with: the `yaml` package');

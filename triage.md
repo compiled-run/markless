@@ -6,7 +6,7 @@ repository setting. Verified with `node scripts/ci/check-workflow.mjs`, 17 mutat
 
 | id | path | verdict | reason |
 | --- | --- | --- | --- |
-| 3817073530 | .github/workflows/ci.yml:333 | answered | The serial `test` job never ran the benchmark guard either, so this predates the PR; `benchmark-guard` blocks as its own required check, and folding a 30-minute bimodal benchmark into the gate would make every non-docs merge wait on it. |
+| 3817073530 | .github/workflows/ci.yml:333 | answered | The serial `test` job never ran the benchmark guard either, so this predates the PR; `benchmark-guard` is intended to block as its own status check (making it required is a pending repository-settings action; `main` has no branch protection today), and folding a 30-minute bimodal benchmark into the gate would make every non-docs merge wait on it. |
 | 3817073534 | .github/workflows/ci.yml:307 | fixed | Added top-level `permissions: contents: read` and `persist-credentials: false` on all 16 checkouts, with a checker invariant so a future checkout cannot quietly keep the token. |
 | 3817073548 | scripts/ci/check-workflow.mjs:13 | fixed | The `typecheck` job now runs the checker, and the checker fails if the workflow ever stops running it. Per owner directive it now parses with the `yaml` package instead of shelling out to python3, with no regex fallback. |
 | 3817073551 | scripts/ci/check-workflow.mjs:116 | fixed | The fallback scanner that mangled block-sequence `needs:` is gone; a block-sequence gate is now a passing mutation case against the real parser. |
@@ -32,9 +32,10 @@ Two reasons not to fold it in:
 - The guard is known to be bimodal on hosted runners (`07_create10k`), so gate membership would
   convert runner noise into a merge block.
 
-Deferred to repository settings, not workflow text: branch protection on `main` must list
-`test`, `package-manager-matrix`, `benchmark-guard` and `agent-files` as required status checks. If
-it lists only `test`, the guard is advisory in practice and that is the thing to fix — in settings.
+Deferred to repository settings, not workflow text: `main` currently has no branch protection at
+all, so every check here is advisory in practice. The pending settings action is to enable branch
+protection listing `test`, `package-manager-matrix`, `benchmark-guard` and `agent-files` as
+required status checks; until that happens, none of these jobs block a merge.
 The rationale is now recorded next to `NON_TEST_JOBS` in the checker so the exclusion is a stated
 decision rather than an oversight.
 
