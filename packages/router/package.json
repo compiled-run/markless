@@ -80,7 +80,7 @@
 		"pathe": "catalog:",
 		"satteri": "catalog:",
 		"ufo": "catalog:",
-		"yuku-tsrx": "0.1.2"
+		"yuku-tsrx": "0.1.3"
 	},
 	"devDependencies": {
 		"@markless/analyzer": "workspace:*"
