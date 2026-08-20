@@ -1700,6 +1700,11 @@ export type PublicRenderModuleArtifact = {
 	readonly rootExportName: string | null;
 	readonly ssrModuleSource: string;
 	readonly ssrExportName: string | null;
+	/** SSR entry per exported component, for a module that serves more than one. */
+	readonly ssrComponentExports?: ReadonlyArray<{
+		readonly exportName: string;
+		readonly ssrFunctionName: string;
+	}>;
 	readonly componentDefinitions: ReadonlyArray<Readonly<Record<string, unknown>>>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };

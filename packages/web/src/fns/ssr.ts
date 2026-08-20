@@ -113,6 +113,8 @@ type SsrChildComponent = {
 		props?: unknown,
 		renderContext?: unknown,
 	) => SsrChildOutput | undefined | Promise<SsrChildOutput | undefined>;
+	/** SSR entry per exported component, for a module that serves more than one. */
+	readonly renderSsrComponents?: Readonly<Record<string, SsrChildComponent>>;
 };
 type SsrChildProps = Readonly<Record<string, unknown>> & {
 	readonly __marklessSsrCallbacks?: Readonly<Record<string, string>>;
@@ -196,6 +198,16 @@ export type MarklessSsrHostLocators = Array<MarklessSsrHostLocator> & {
 export { marklessComposeState };
 export const marklessSsrRemapChildGraph = marklessCsrRemapChildGraph;
 export const marklessSsrRemapGraphOutput = marklessCsrRemapGraphOutput;
+
+// The compiled module a composed child was imported from may serve several
+// components. The child names the one it declared, so its own SSR entry
+// answers; a module with a single entry has no map and answers as itself.
+export function marklessSsrComponentPart(
+	component: SsrChildComponent | undefined,
+	componentName: string,
+): SsrChildComponent | undefined {
+	return component?.renderSsrComponents?.[componentName] ?? component;
+}
 
 export async function marklessSsrRenderChild(
 	children: SsrComposedChild[],

@@ -18,6 +18,7 @@ import {
 	hasComponentImportSource,
 	hasPropDependentComputed,
 	isComponentRoot,
+	isTsrxComponentImport,
 	publicRenderValueImports,
 	composedGraphProps,
 	componentOwnedStateNodes,
@@ -159,6 +160,7 @@ export function emitPublicSsrRenderModule(
 				module: 'ssr',
 				names: [
 					'marklessSsrRenderChild',
+					'marklessSsrComponentPart',
 					'marklessSsrRowChild',
 					'marklessAssertPresentationalRowChild',
 					'marklessSsrBranchArm',
@@ -333,8 +335,18 @@ function emitSsrDataRenderLines(
 			graphProps: componentEdgeGraphRoutes(edge, hasProjection),
 			boundSymbols: boundSymbolsForEdge(edge, callbacks),
 		};
+		// A .tsrx child is imported as its whole module surface, so a named import
+		// (a barrel alias resolves to one too) says WHICH of the components that
+		// module serves composes here.
+		const declaredName =
+			edge.importKind === 'named' && edge.importSource && isTsrxComponentImport(edge.importSource)
+				? (edge.importedName ?? edge.childComponentName)
+				: undefined;
+		const childSurface = declaredName
+			? `marklessSsrComponentPart(${component},${JSON.stringify(declaredName)})`
+			: component;
 		return [
-			`case ${JSON.stringify(edge.id)}:{const child=${JSON.stringify(child)};const childProps={${props.join(',')}};const output=await ${component}?.renderSsr?.(childProps,{...marklessSsrRenderContext,idPrefix:marklessSsrIdPrefix+child.hostPrefix});if(!output)throw new Error('MARKLESS_SSR_DATA_CHILD_RENDER_MISSING: ${edge.id}');if(marklessSsrDataContext.repeatItem!==undefined){marklessAssertPresentationalRowChild(output,${JSON.stringify(edge.childComponentName)});return output;}marklessSsrChildren.push({...child,output,callbackProps:childProps.__marklessSsrCallbacks??{}});return output;}`,
+			`case ${JSON.stringify(edge.id)}:{const child=${JSON.stringify(child)};const childProps={${props.join(',')}};const output=await ${childSurface}?.renderSsr?.(childProps,{...marklessSsrRenderContext,idPrefix:marklessSsrIdPrefix+child.hostPrefix});if(!output)throw new Error('MARKLESS_SSR_DATA_CHILD_RENDER_MISSING: ${edge.id}');if(marklessSsrDataContext.repeatItem!==undefined){marklessAssertPresentationalRowChild(output,${JSON.stringify(edge.childComponentName)});return output;}marklessSsrChildren.push({...child,output,callbackProps:childProps.__marklessSsrCallbacks??{}});return output;}`,
 		];
 	});
 	const bindingLines = input.semanticGraph.graphBindings.flatMap((binding) =>

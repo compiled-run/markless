@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from 'vitest';
-import { cleanup, render } from '../src/index.ts';
+import { cleanup, render, renderSSR } from '../src/index.ts';
+import BarrelPage from './fixtures/sel-barrel-page.tsrx';
 import NestedPage from './fixtures/sel-nested-page.tsrx';
 import Page from './fixtures/sel-page.tsrx';
 
@@ -7,12 +8,23 @@ import Page from './fixtures/sel-page.tsrx';
 // root/trigger/content pieces of one widget resolve the same instance; a second
 // widget of the same family on the same page resolves a different one.
 //
-// No SSR case here: a compound family authored in ONE .tsrx module has one SSR
-// entry for the whole module (source-module.ts binds `renderSsr` to the module
-// root), so server-rendering <Trigger/> renders <Root/> instead. That gap is
-// independent of widget scope; the composed ids this scope mints are covered at
-// the composition boundary in packages/web/test/widget-shared.test.ts.
+// The family is authored in ONE .tsrx module, so the SSR cases below also prove
+// the module surface serves each exported component its own SSR entry: composing
+// <Trigger/> used to server-render <Root/>, because the module bound `renderSsr`
+// to its root alone.
 afterEach(() => cleanup());
+
+type StatePayload = {
+	readonly cells: ReadonlyArray<{ readonly graphNodeId: string }>;
+	readonly computed: ReadonlyArray<{ readonly graphNodeId: string }>;
+};
+
+function statePayloadIds(container: HTMLElement): string[] {
+	const script = container.querySelector<HTMLScriptElement>('script[type="markless/state"]');
+	if (!script) throw new Error('Expected markless/state payload script.');
+	const payload = JSON.parse(script.textContent ?? 'null') as StatePayload;
+	return [...payload.cells, ...payload.computed].map((node) => node.graphNodeId);
+}
 
 function widget(container: ParentNode, name: string) {
 	const host = container.querySelector(`[data-widget="${name}"]`);
@@ -70,4 +82,36 @@ async function expectNestedIsolated(container: ParentNode) {
 test('CSR: a widget projected into another widget content resolves its own instance', async () => {
 	const screen = await render(NestedPage);
 	await expectNestedIsolated(screen.container as HTMLElement);
+});
+
+// Server-rendered markup must carry each part's OWN element, and the payload
+// must hold one widget-scoped state node per widget, qualified by the instance
+// path composition minted. Both widgets resume, and a trigger still opens only
+// its own widget.
+function expectServerRenderedParts(container: HTMLElement) {
+	for (const name of ['a', 'b']) {
+		const parts = widget(container, name);
+		expect(parts.root, `widget ${name} root`).not.toBeNull();
+		expect(parts.trigger, `widget ${name} trigger`).not.toBeNull();
+		expect(parts.content, `widget ${name} content`).not.toBeNull();
+	}
+	const openIds = statePayloadIds(container).filter((id) => id.endsWith('/state:s'));
+	expect(new Set(openIds).size).toBe(2);
+}
+
+test('SSR: two widgets server-render their own parts and resume independently', async () => {
+	const screen = await renderSSR(Page);
+	expectServerRenderedParts(screen.container);
+	await expectWidgetsIsolated(screen.container);
+});
+
+test('SSR: a parts barrel reaches each component of the family through member tags', async () => {
+	const screen = await renderSSR(BarrelPage);
+	expectServerRenderedParts(screen.container);
+	await expectWidgetsIsolated(screen.container);
+});
+
+test('CSR: a parts barrel mounts each component of the family', async () => {
+	const screen = await render(BarrelPage);
+	await expectWidgetsIsolated(screen.container as HTMLElement);
 });

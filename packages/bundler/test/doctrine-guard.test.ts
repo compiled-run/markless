@@ -83,8 +83,8 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Compiled app metadata includes a direct render entry outside server-only output.',
 	"packages/bundler/src/source-module.ts :: input.environment !== 'server' && input.rootExportName === null":
 		'Non-server linked artifacts retain their emitted symbol loader when no direct render body exists.',
-	"packages/bundler/src/source-module.ts :: (input.environment !== 'client' || input.prerenderRecords || input.dev)":
-		'Compiled app metadata exposes canonical SSR rendering on servers, prerender builds, and development client mounts.',
+	"packages/bundler/src/source-module.ts :: (input.environment !== 'client' || input.prerenderRecords || input.dev);":
+		'Compiled app metadata exposes canonical SSR rendering on servers, prerender builds, and development client mounts, for the root and for every component the module exports.',
 	"packages/bundler/src/source-module.ts :: input.resumeModuleUrl && input.environment !== 'client'":
 		'Compiled app metadata exposes resume URLs only from non-client output.',
 	"packages/bundler/src/source-module.ts :: input.prerenderWakeModuleUrl && input.environment !== 'client'":

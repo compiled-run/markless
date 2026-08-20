@@ -13,6 +13,27 @@ import {
 	type ComponentReference,
 } from './shared.ts';
 
+export function ssrComponentFunctionName(componentName: string): string {
+	return `marklessRenderSsr${componentName}`;
+}
+
+// Every component this module can server-render on its own: each same-module
+// component other than the root that declares markup of its own. A composing
+// page reaches one of these by the name it is exported under, so they emit
+// whether or not this module composes them itself.
+export function sameModuleSsrComponentNames(
+	input: PublicRenderModuleInput,
+	ast: AnyNode,
+	rootComponentName: string,
+): ReadonlyArray<string> {
+	const componentMap = sameModuleComponentMap(ast);
+	return input.semanticGraph.components.flatMap((component) => {
+		if (component.name === rootComponentName) return [];
+		const node = componentMap.get(component.name);
+		return node && firstComponentRoot(node) ? [component.name] : [];
+	});
+}
+
 export function emitSameModuleSsrComponents(
 	input: PublicRenderModuleInput,
 	references: ReadonlyArray<ComponentReference>,
@@ -22,25 +43,30 @@ export function emitSameModuleSsrComponents(
 	const remapsGraphProps = hasPropDependentComputed(input);
 	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
 	const componentMap = sameModuleComponentMap(ast);
-	return references.flatMap((reference) => {
-		if (reference.importSource || reference.componentName === rootComponentName) return [];
-		const component = componentMap.get(reference.componentName);
+	const localNames = new Map(
+		references.flatMap((reference) =>
+			reference.importSource ? [] : [[reference.componentName, reference.localName] as const],
+		),
+	);
+	return sameModuleSsrComponentNames(input, ast, rootComponentName).flatMap((componentName) => {
+		const component = componentMap.get(componentName);
 		const root = firstComponentRoot(component);
 		if (!component || !root) return [];
 		const rootInfo = {
 			component,
-			componentName: reference.componentName,
+			componentName,
 			root,
 			propNames: componentPropNames(component),
 		};
-		const functionName = `marklessRenderSsr${reference.componentName}`;
-		const owned = componentOwnedStateNodes(input, reference.componentName, rootComponentName);
-		const valuesName = `marklessSsrStateValues${reference.componentName}`;
+		const functionName = ssrComponentFunctionName(componentName);
+		const owned = componentOwnedStateNodes(input, componentName, rootComponentName);
+		const valuesName = `marklessSsrStateValues${componentName}`;
+		const localName = localNames.get(componentName);
 		return [
 			`const ${valuesName} = new Map([`,
 			stateEntries(input, owned.seedCellIndexes).join(',\n'),
 			']);',
-			`const ${reference.localName} = { renderSsr: ${functionName} };`,
+			localName ? `const ${localName} = { renderSsr: ${functionName} };` : null,
 			`async function ${functionName}(props = {}, marklessSsrRenderContext) {`,
 			destructureProps(rootInfo.propNames, rootInfo.component),
 			`	const marklessSsrPayloadState = marklessSelectStateNodes(marklessCloneState(payloadState), ${JSON.stringify(
@@ -57,7 +83,7 @@ export function emitSameModuleSsrComponents(
 					'const marklessSsrChildren = [];',
 					'const marklessSsrBranches = [];',
 					'const marklessSsrAsyncSnapshots = [];',
-					...renderDataLines(reference.componentName),
+					...renderDataLines(componentName),
 				],
 			),
 			'	const html = marklessSsrRendered.html;',

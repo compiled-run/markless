@@ -358,7 +358,7 @@ function componentEdgeWithCaptureRouteHandoff(
 	};
 }
 
-function isTsrxComponentImport(importSource: string): boolean {
+export function isTsrxComponentImport(importSource: string): boolean {
 	return /\.tsrx(?:[?#].*)?$/.test(importSource);
 }
 

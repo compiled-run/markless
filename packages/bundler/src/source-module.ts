@@ -213,6 +213,11 @@ export function emitSourceModule(input: {
 	readonly publicRenderRootExportName: string | null;
 	readonly publicSsrModuleSource: string;
 	readonly publicRenderSsrExportName: string | null;
+	/** SSR entry per exported component, for a module that serves more than one. */
+	readonly publicRenderSsrComponentExports?: ReadonlyArray<{
+		readonly exportName: string;
+		readonly ssrFunctionName: string;
+	}>;
 	readonly renderDataId?: string;
 	readonly canonicalRenderData?: boolean;
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
@@ -323,6 +328,7 @@ export function emitSourceModule(input: {
 					rootExportName: input.publicRenderRootExportName,
 					symbolLoaderName: routeSymbols ? 'marklessSsrLoadSymbolRoute' : 'loadSymbol',
 					ssrExportName: input.publicRenderSsrExportName,
+					ssrComponents: input.publicRenderSsrComponentExports ?? [],
 					canonicalRenderData,
 					prerenderRecords: input.prerenderRecords,
 					dev: input.dev,
@@ -564,6 +570,10 @@ function emitCompiledAppDefault(input: {
 	readonly rootExportName: string | null;
 	readonly symbolLoaderName: string;
 	readonly ssrExportName: string | null;
+	readonly ssrComponents: ReadonlyArray<{
+		readonly exportName: string;
+		readonly ssrFunctionName: string;
+	}>;
 	readonly canonicalRenderData: boolean;
 	readonly prerenderRecords?: boolean;
 	readonly dev?: boolean;
@@ -583,13 +593,27 @@ function emitCompiledAppDefault(input: {
 		: [];
 	// The optional render context is the per-request streaming channel (T107):
 	// dropping it here would silently force every page back to blocking SSR.
-	const renderSsrEntry =
-		input.ssrExportName &&
-		(input.environment !== 'client' || input.prerenderRecords || input.dev)
+	const servesSsr =
+		!!input.ssrExportName &&
+		(input.environment !== 'client' || input.prerenderRecords || input.dev);
+	const renderSsrEntry = servesSsr
+		? [
+				'	renderSsr(props, marklessRenderContext) {',
+				`		return ${input.ssrExportName}(props, marklessRenderContext);`,
+				'	},',
+			]
+		: [];
+	// A composing page names the component it imported, so a module serving more
+	// than one publishes each entry under the name it exports it as.
+	const renderSsrComponentsEntry =
+		servesSsr && input.ssrComponents.length > 0
 			? [
-					'	renderSsr(props, marklessRenderContext) {',
-					`		return ${input.ssrExportName}(props, marklessRenderContext);`,
-					'	},',
+					`	renderSsrComponents: { ${input.ssrComponents
+						.map(
+							(component) =>
+								`${JSON.stringify(component.exportName)}: { renderSsr: ${component.ssrFunctionName} }`,
+						)
+						.join(', ')} },`,
 				]
 			: [];
 	const resumeModuleEntry =
@@ -645,6 +669,7 @@ function emitCompiledAppDefault(input: {
 		...renderDataEntry,
 		...symbolLoaderEntry,
 		...renderSsrEntry,
+		...renderSsrComponentsEntry,
 		...metadataEntries,
 		'};',
 		'export default marklessCompiledApp;',

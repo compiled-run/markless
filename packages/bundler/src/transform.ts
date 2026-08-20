@@ -508,6 +508,8 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					publicRenderRootExportName: compiled.publicRenderModule.rootExportName,
 					publicSsrModuleSource: compiled.publicRenderModule.ssrModuleSource,
 					publicRenderSsrExportName: compiled.publicRenderModule.ssrExportName,
+					publicRenderSsrComponentExports:
+						compiled.publicRenderModule.ssrComponentExports,
 					canonicalRenderData: prerenderInterfacesComplete(compiled, input),
 					hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
 					symbols: symbolRows,
