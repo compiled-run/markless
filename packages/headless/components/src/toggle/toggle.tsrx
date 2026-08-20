@@ -52,7 +52,7 @@ export function ToggleRoot({
 	...rest
 }: ToggleRootProps) @{
 	const toggle = toggleState();
-	// `onChange` is destructured so it never lands on the div below; it is inert (U-B).
+	// Destructured so it never lands on the div below; the shared instance carries it.
 	toggle.checked = checked;
 	toggle.disabled = disabled;
 	toggle.required = required;
@@ -65,7 +65,7 @@ export function ToggleRoot({
 // role="switch" is a checkbox with two states and no mixed value, so the button
 // needs no keyboard rule of its own: a native button activates on both Space and
 // Enter, which is exactly what a switch must do.
-export function ToggleTrigger({ children, ...rest }: ToggleTriggerProps) @{
+export function ToggleTrigger({ children, onClick, ...rest }: ToggleTriggerProps) @{
 	const toggle = toggleState();
 
 	<button
@@ -79,7 +79,10 @@ export function ToggleTrigger({ children, ...rest }: ToggleTriggerProps) @{
 		ui-checked={toggle.checked}
 		ui-disabled={toggle.disabled}
 		disabled={toggle.disabled}
-		onClick={() => toggle.flip()}
+		onClick={(event) => {
+			toggle.flip();
+			onClick?.(event);
+		}}
 	>{children}</button>
 }
 

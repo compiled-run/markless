@@ -16,6 +16,7 @@ import {
 	resolveGraphPath,
 	semanticAliasMap,
 } from '../artifact-helpers/graph-paths.ts';
+import { protocolInstanceQualifies } from '@markless/serializer';
 import { childNodes, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
 import {
@@ -56,6 +57,9 @@ export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArt
 						},
 					}
 				: {}),
+			...(symbolTouchesPageSpaceGraph(symbol, captureSlots)
+				? { touchesPageSpaceGraph: true as const }
+				: {}),
 			captureSlots,
 		};
 	});
@@ -85,6 +89,35 @@ export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArt
 		extractedSymbols,
 		diagnostics,
 	};
+}
+
+/**
+ * Whether this symbol's own graph traffic reaches a page-space id. A shared()
+ * graph or a storage slot names one definition for every instance of a
+ * component, so a composing module cannot scope it by prefixing an instance
+ * path; the runtime rule decides. Reads and writes are the symbol's direct
+ * traffic, capture slots its routed traffic — both can name such an id.
+ */
+function symbolTouchesPageSpaceGraph(
+	symbol: PlannedSymbol,
+	captureSlots: ReadonlyArray<CaptureSlot>,
+): boolean {
+	const pageSpace = (graphNodeId: string | undefined) =>
+		graphNodeId !== undefined && protocolInstanceQualifies(graphNodeId) === false;
+	const traffic = [
+		...('reads' in symbol ? (symbol.reads ?? []) : []),
+		...('writes' in symbol ? (symbol.writes ?? []) : []),
+	];
+	return (
+		traffic.some((entry) => pageSpace(entry.graphNodeId)) ||
+		captureSlots.some((slot) =>
+			slot.routes.some(
+				(route) =>
+					route.kind === 'widget-callback-route' ||
+					(route.kind === 'graph-reference' && pageSpace(route.graphNodeId)),
+			),
+		)
+	);
 }
 
 function importedCaptureSymbols(

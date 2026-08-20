@@ -408,6 +408,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_CALLBACK_SLOT_SOURCE_UNSUPPORTED'
 		| 'MARKLESS_CALLBACK_SLOT_UNBOUND'
 		| 'MARKLESS_EVENT_SPREAD_UNSUPPORTED'
+		| 'MARKLESS_EVENT_SPREAD_SHADOWED'
 		| 'MARKLESS_SPREAD_STATIC_SNAPSHOT'
 		| 'MARKLESS_ATTRIBUTE_OBJECT_VALUE'
 		| 'MARKLESS_ATTRIBUTE_DUPLICATE'
@@ -1333,6 +1334,10 @@ export type ExtractedCaptureSymbol = {
 		readonly componentId?: string;
 		readonly componentName?: string;
 	};
+	// This symbol reads or writes a page-space graph id (a shared() graph, a
+	// storage slot). A composing module that instance-scopes it must ask the
+	// runtime which space an id belongs to instead of prefixing the path.
+	readonly touchesPageSpaceGraph?: true;
 	readonly captureSlots: ReadonlyArray<CaptureSlot>;
 };
 

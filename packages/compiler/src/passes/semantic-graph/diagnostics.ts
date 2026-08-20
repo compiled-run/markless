@@ -35,6 +35,26 @@ export function storageKeyStaticDiagnostic(input: {
 	});
 }
 
+export function spreadEventShadowDiagnostic(input: {
+	readonly componentName: string;
+	readonly eventPropName: string;
+	readonly restName: string;
+	readonly tagName: string;
+	readonly span?: SourceSpan;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	const { componentName, eventPropName, restName, tagName } = input;
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_EVENT_SPREAD_SHADOWED',
+		title: 'A spread event prop would be shadowed',
+		message: `\`<${tagName}>\` in \`${componentName}\` spreads \`{...${restName}}\` and also writes its own \`${eventPropName}\`. Whoever renders \`${componentName}\` can pass \`${eventPropName}\`, it arrives inside \`${restName}\`, and this element's own \`${eventPropName}\` stands in its place — their handler never runs.`,
+		why: 'Two handlers for one event on one element have no order the compiler may invent, and picking one silently drops the other. Which handler runs, and in what order, is the component author\'s decision to write down.',
+		span: input.span,
+		suggestion: `Take \`${eventPropName}\` out of the spread and call it yourself — before: \`function ${componentName}({ ...${restName} })\` with \`${eventPropName}={(event) => { ownWork(); }}\`; after: \`function ${componentName}({ ${eventPropName}, ...${restName} })\` with \`${eventPropName}={(event) => { ownWork(); ${eventPropName}?.(event); }}\`. Call it first to let the caller act before your work, or leave it out entirely to make the event yours.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_EVENT_SPREAD_SHADOWED',
+	});
+}
+
 export function frameworkImportRequiredDiagnostic(
 	apiName: FrameworkApiName,
 	call: AnyNode,

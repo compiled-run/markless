@@ -1,4 +1,4 @@
-import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
+import { ASYNC_PROTOCOL_VERSION, protocolInstanceQualifies } from '@markless/serializer';
 import type { SymbolResolverModuleInput, SymbolResolverModuleManifest } from '../artifacts.ts';
 
 const SMALL_SYMBOL_SWITCH_LIMIT = 3;
@@ -36,11 +36,20 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 			: emitTableSymbolResolverModule(manifest);
 	}
 	const scopesInstances = (input.boundSymbols ?? []).some((row) => row.instancePath);
-	// A widget callback row binds a symbol whose whole graph is its widget's, and
-	// which widget an id belongs to is a runtime reading, not a prefix. Only such a
-	// resolver imports that rule; every other bound resolver stays self-contained.
+	// Which space an id belongs to is a runtime reading, not a prefix: a shared id
+	// belongs to its widget root, a storage id to the page. Only a resolver that
+	// binds a symbol reaching such an id imports that rule; the rest stay
+	// self-contained on the plain instance prefix.
 	const scopesWidgetGraphs =
-		scopesInstances && input.symbols.some((symbol) => symbol.claimKind === 'widget-callback');
+		scopesInstances &&
+		(input.symbols.some((symbol) => symbol.captureSymbol?.touchesPageSpaceGraph) ||
+			(input.boundSymbols ?? []).some((row) =>
+				row.captureSlots.some(
+					(slot) =>
+						slot.route.kind === 'graph-reference' &&
+						protocolInstanceQualifies(slot.route.graphNodeId) === false,
+				),
+			));
 	return [
 		...(scopesWidgetGraphs
 			? [

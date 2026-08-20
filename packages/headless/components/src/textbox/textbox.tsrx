@@ -47,7 +47,7 @@ export function TextboxRoot({
 	...rest
 }: TextboxRootProps) @{
 	const textbox = textboxState();
-	// `onChange` is destructured so it never lands on the div below; it is inert (U-B).
+	// Destructured so it never lands on the div below; the shared instance carries it.
 	textbox.value = value;
 	textbox.disabled = disabled;
 	textbox.required = required;
@@ -65,7 +65,13 @@ export function TextboxRoot({
 
 // A restriction set on this part is added to whatever the root set: `||`, never a
 // replacement, so a part can make the control stricter and never looser.
-export function TextboxTrigger({ disabled, required, readonly, ...rest }: TextboxTriggerProps) @{
+export function TextboxTrigger({
+	disabled,
+	required,
+	readonly,
+	onInput,
+	...rest
+}: TextboxTriggerProps) @{
 	const textbox = textboxState();
 
 	<input
@@ -80,6 +86,7 @@ export function TextboxTrigger({ disabled, required, readonly, ...rest }: Textbo
 		readonly={textbox.readonly || readonly === true}
 		onInput={(event) => {
 			textbox.value = event.target.value;
+			onInput?.(event);
 		}}
 	/>
 }
@@ -88,6 +95,7 @@ export function TextboxMultilineTrigger({
 	disabled,
 	required,
 	readonly,
+	onInput,
 	...rest
 }: TextboxMultilineTriggerProps) @{
 	const textbox = textboxState();
@@ -104,6 +112,7 @@ export function TextboxMultilineTrigger({
 		readonly={textbox.readonly || readonly === true}
 		onInput={(event) => {
 			textbox.value = event.target.value;
+			onInput?.(event);
 		}}
 	/>
 }

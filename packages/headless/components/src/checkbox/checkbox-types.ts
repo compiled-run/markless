@@ -14,8 +14,7 @@ export type CheckboxRootProps = PropsOf<'div'> & {
 	readonly value?: string;
 	/**
 	 * Intended to be called with the new value when a person toggles the checkbox.
-	 * Inert today: a consumer callback cannot be reached from the shared instance
-	 * yet (U-B in the goal's parity table), so it is accepted and never invoked.
+	 * Omit it and the toggle still works; the call site simply does nothing.
 	 */
 	readonly onChange?: (checked: CheckboxChecked) => void;
 	readonly children?: Children;

@@ -72,7 +72,7 @@ export function CheckboxRoot({
 	>{children}</div>
 }
 
-export function CheckboxTrigger({ children, ...rest }: CheckboxTriggerProps) @{
+export function CheckboxTrigger({ children, onClick, onKeyDown, ...rest }: CheckboxTriggerProps) @{
 	const checkbox = checkboxState();
 
 	<button
@@ -88,13 +88,17 @@ export function CheckboxTrigger({ children, ...rest }: CheckboxTriggerProps) @{
 		ui-mixed={checkbox.checked === 'mixed'}
 		ui-disabled={checkbox.disabled}
 		disabled={checkbox.disabled}
-		onClick={() => checkbox.toggle()}
+		onClick={(event) => {
+			checkbox.toggle();
+			onClick?.(event);
+		}}
 		onKeyDown={(event) => {
 			// A native button activates on Enter; a checkbox must not. The request
 			// lands after dispatch returns, so today it only sometimes wins (U-M).
 			if (event.key === 'Enter') {
 				event.preventDefault();
 			}
+			onKeyDown?.(event);
 		}}
 	>{children}</button>
 }

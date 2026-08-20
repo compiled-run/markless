@@ -9,9 +9,8 @@ export type TextboxRootProps = PropsOf<'div'> & {
 	/** Submitted under this name by whichever trigger the family renders. */
 	readonly name?: string;
 	/**
-	 * Intended to be called with the new text as a person types. Inert today: a
-	 * consumer callback cannot be reached from the shared instance yet (U-B in the
-	 * goal's parity table), so it is accepted and never invoked.
+	 * Called with the new text as a person types. Omit it and the box still works;
+	 * the call site simply does nothing.
 	 */
 	readonly onChange?: (value: string) => void;
 	readonly children?: Children;
