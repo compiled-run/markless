@@ -83,13 +83,11 @@ test('SSR: a seeded config renders across every part', async () => {
 
 // --- gestures -------------------------------------------------------------
 //
-// After a write to the shared instance only a PLAIN path read of a shared field
-// follows the value; every composite form (a ternary, a comparison, a factory
-// computed) keeps whatever it rendered first. So these assert the parts that
-// are plain reads — the indicator's arm and the `ui-disabled` flag — and the
-// `aria-checked` / `ui-checked` / `ui-mixed` half of each QDS test is a blocked
-// row in notes/parity-table.md. The single red witness is
-// shared-composite-refresh.test.ts.
+// Every derived position follows a write now: the tri-state `aria-checked`, the
+// root's `ui-checked` / `ui-mixed` flags and the hidden field's `checked` /
+// `indeterminate` are all comparisons over the shared instance, and each one
+// moves with the plain read beside it. The parts that observe the write are in
+// different components from the part that made it.
 
 async function expectClickShowsIndicator(container: ParentNode) {
 	const plain = widget(container, 'plain');
@@ -97,12 +95,21 @@ async function expectClickShowsIndicator(container: ParentNode) {
 
 	plain.trigger.click();
 	await expect.poll(() => plain.indicator.textContent).toBe('Checked');
+	// The trigger's tri-state and the root's flag are comparisons over the same
+	// cell the click wrote, and they moved with it.
+	await expect.poll(() => plain.trigger.getAttribute('aria-checked')).toBe('true');
+	expect(plain.root.getAttribute('ui-checked')).toBe('');
 	// The click landed in one family only: the neighbour kept its own value.
 	expect(neighbour.indicator.textContent).toBe('Checked');
+	expect(neighbour.trigger.getAttribute('aria-checked')).toBe('true');
 	expect(widget(container, 'mixed').indicator.textContent).toBe('Checked');
+	expect(widget(container, 'mixed').trigger.getAttribute('aria-checked')).toBe('mixed');
 
 	plain.trigger.click();
 	await expect.poll(() => plain.indicator.textContent).toBe('');
+	// A false comparison removes the attribute rather than writing "false".
+	await expect.poll(() => plain.trigger.getAttribute('aria-checked')).toBe('false');
+	expect(plain.root.hasAttribute('ui-checked')).toBe(false);
 	expect(neighbour.indicator.textContent).toBe('Checked');
 }
 
@@ -110,17 +117,26 @@ async function expectCheckedHidesIndicator(container: ParentNode) {
 	const checked = widget(container, 'checked');
 	checked.trigger.click();
 	await expect.poll(() => checked.indicator.textContent).toBe('');
+	await expect.poll(() => checked.trigger.getAttribute('aria-checked')).toBe('false');
+	expect(checked.root.hasAttribute('ui-checked')).toBe(false);
 	// The neighbour that started unchecked is still unchecked.
 	expect(widget(container, 'plain').indicator.textContent).toBe('');
+	expect(widget(container, 'plain').trigger.getAttribute('aria-checked')).toBe('false');
 }
 
 async function expectMixedTransitions(container: ParentNode) {
 	const mixed = widget(container, 'mixed');
+	expect(mixed.trigger.getAttribute('aria-checked')).toBe('mixed');
 	// mixed -> checked keeps the indicator up, checked -> unchecked takes it down.
 	mixed.trigger.click();
 	await expect.poll(() => mixed.indicator.textContent).toBe('Checked');
+	await expect.poll(() => mixed.trigger.getAttribute('aria-checked')).toBe('true');
+	expect(mixed.root.getAttribute('ui-checked')).toBe('');
+	expect(mixed.root.hasAttribute('ui-mixed')).toBe(false);
 	mixed.trigger.click();
 	await expect.poll(() => mixed.indicator.textContent).toBe('');
+	await expect.poll(() => mixed.trigger.getAttribute('aria-checked')).toBe('false');
+	expect(mixed.root.hasAttribute('ui-checked')).toBe(false);
 }
 
 async function expectLabelToggles(container: ParentNode) {
@@ -166,6 +182,32 @@ test('CSR: clicking the label toggles the checkbox it names', async () => {
 	await expectLabelToggles(screen.container as HTMLElement);
 });
 
+
+// The indicator's arm is a branch in a projected part, which does not re-render
+// after an SSR resume (U-F in notes/parity-table.md). The derived ATTRIBUTES do,
+// so this is the resume half of the tri-state rows without the blocked arm.
+async function expectTriStateFollowsAfterResume(container: ParentNode) {
+	const plain = widget(container, 'plain');
+	const mixed = widget(container, 'mixed');
+
+	plain.trigger.click();
+	await expect.poll(() => plain.trigger.getAttribute('aria-checked')).toBe('true');
+	expect(plain.root.getAttribute('ui-checked')).toBe('');
+	expect(mixed.trigger.getAttribute('aria-checked')).toBe('mixed');
+
+	plain.trigger.click();
+	await expect.poll(() => plain.trigger.getAttribute('aria-checked')).toBe('false');
+	expect(plain.root.hasAttribute('ui-checked')).toBe(false);
+
+	mixed.trigger.click();
+	await expect.poll(() => mixed.trigger.getAttribute('aria-checked')).toBe('true');
+	expect(mixed.root.hasAttribute('ui-mixed')).toBe(false);
+}
+
+test('SSR: the tri-state attributes follow a click after resume', async () => {
+	const screen = await renderSSR(StatesApp);
+	await expectTriStateFollowsAfterResume(screen.container);
+});
 
 test('CSR: a disabled trigger does not toggle', async () => {
 	const screen = await render(StatesApp);
@@ -264,6 +306,36 @@ async function expectSubmissions(container: ParentNode) {
 	await expect.poll(() => submit('mixed').textContent).toBe('{}');
 }
 
+async function expectFieldFollowsTheTrigger(container: ParentNode) {
+	const plain = form(container, 'plain');
+	const trigger = plain.host.querySelector('button[type="button"]') as HTMLButtonElement;
+
+	trigger.click();
+	// `checked` and `indeterminate` on the field are comparisons over the cell
+	// the trigger wrote, in a different part from the one that wrote it. A live
+	// `checked` lands on the property, which is what a submission reads.
+	await expect.poll(() => plain.field.checked).toBe(true);
+	await expect.poll(() => submitted(plain).textContent).toBe('{"terms":"on"}');
+
+	trigger.click();
+	await expect.poll(() => plain.field.checked).toBe(false);
+	await expect.poll(() => submitted(plain).textContent).toBe('{}');
+
+	// A mixed box resolves to checked on the first click, the way a native
+	// indeterminate box does, and stops being indeterminate.
+	const mixed = form(container, 'mixed');
+	expect(mixed.field.hasAttribute('indeterminate')).toBe(true);
+	(mixed.host.querySelector('button[type="button"]') as HTMLButtonElement).click();
+	await expect.poll(() => mixed.field.hasAttribute('indeterminate')).toBe(false);
+	expect(mixed.field.checked).toBe(true);
+}
+
+// A real submit would navigate the test iframe, so the event is dispatched.
+function submitted(entry: ReturnType<typeof form>) {
+	entry.host.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+	return entry.submitted;
+}
+
 test('CSR: the field renders the config a form needs', async () => {
 	const screen = await render(FormApp);
 	expectFieldRendered(screen.container as HTMLElement);
@@ -282,6 +354,16 @@ test('CSR: submitting carries the checkbox into the FormData', async () => {
 test('SSR: submitting carries the checkbox into the FormData', async () => {
 	const screen = await renderSSR(FormApp);
 	await expectSubmissions(screen.container);
+});
+
+test('CSR: clicking the trigger syncs the hidden field and what the form submits', async () => {
+	const screen = await render(FormApp);
+	await expectFieldFollowsTheTrigger(screen.container as HTMLElement);
+});
+
+test('SSR: clicking the trigger syncs the hidden field and what the form submits', async () => {
+	const screen = await renderSSR(FormApp);
+	await expectFieldFollowsTheTrigger(screen.container);
 });
 
 // --- label, description and error -----------------------------------------

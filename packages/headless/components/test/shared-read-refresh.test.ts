@@ -5,19 +5,19 @@ import CompositeApp from './fixtures/shared-composite-refresh.tsrx';
 import LocalComputedApp from './fixtures/shared-local-computed.tsrx';
 import StatesApp from './fixtures/checkbox-states.tsrx';
 
-// Three red witnesses for the compiler defects the checkbox family ran into.
-// Each is marked `test.fails`, so the day the defect is fixed THIS file turns
-// red and tells whoever fixed it to unmark the test and un-block the parity
-// rows in goals/headless-components/notes/parity-table.md. The pattern follows
-// packages/vitest-browser/browser/constructs-csr.test.ts, which carried a
-// test.fails until T006 made it pass.
+// Witnesses for the compiler defects the checkbox family ran into. A defect
+// still live is marked `test.fails`, so the day it is fixed THIS file turns red
+// and tells whoever fixed it to unmark the test and un-block the parity rows in
+// goals/headless-components/notes/parity-table.md. U-D and U-E are fixed and
+// their witnesses are plain green tests now; U-F and U-G are still red.
 afterEach(() => cleanup());
 
-// U-D. Only a plain path read of a shared field follows a write. A ternary over
-// the same field, and a computed() built in the shared factory, both keep the
-// value they first rendered — so `aria-checked`, `ui-checked` and `ui-mixed`
-// cannot follow a toggle.
-test.fails('a composite expression over a shared read follows the write', async () => {
+// U-D (fixed). A ternary over a shared field, and a computed() built in the
+// shared factory, used to keep the value they first rendered, so `aria-checked`,
+// `ui-checked` and `ui-mixed` could not follow a toggle. Each recombined
+// expression now stands behind a synthetic computed subscribed to the cells it
+// reads.
+test('a composite expression over a shared read follows the write', async () => {
 	const screen = await render(CompositeApp);
 	const container = screen.container as HTMLElement;
 	const trigger = container.querySelector('[data-repro-trigger]') as HTMLButtonElement;
@@ -33,10 +33,11 @@ test.fails('a composite expression over a shared read follows the write', async 
 	}).toEqual({ attr: 'true', derived: 'true', text: 'true', rawText: 'true' });
 });
 
-// U-E. A computed() declared in a component body that reads a shared instance
-// throws `ReferenceError: <factory local> is not defined` out of the prerender
-// evaluator: the emitted residue reader closes over the factory's own local.
-test.fails('a component-local computed over a shared read renders', async () => {
+// U-E (fixed). A computed() declared in a component body that reads a shared
+// instance used to throw `ReferenceError: <factory local> is not defined` out of
+// the prerender evaluator, because its dependency never resolved and its derive
+// kept the authored read.
+test('a component-local computed over a shared read renders', async () => {
 	const screen = await render(LocalComputedApp);
 	expect((screen.container as HTMLElement).querySelector('[data-local-computed]')?.textContent).toBe(
 		'false',

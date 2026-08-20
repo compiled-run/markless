@@ -179,6 +179,7 @@ function isStaticTextPart(node: AnyNode): boolean {
 function collectCompositeTemplateExpression(
 	node: AnyNode,
 	state: WalkState,
+	options: { readonly requireWritableRead?: boolean } = {},
 ): { readonly graphNodeId: string } | null {
 	if (!isCompositeTemplateExpression(node)) return null;
 
@@ -189,6 +190,7 @@ function collectCompositeTemplateExpression(
 		`() => ${expressionSource(node, state.source)}`,
 		readSources,
 		state,
+		options.requireWritableRead === true,
 	);
 }
 
@@ -200,12 +202,17 @@ function mintTemplateExpressionComputed(
 	functionSource: string,
 	readSources: ReadonlyArray<string>,
 	state: WalkState,
+	requireWritableRead = false,
 ): { readonly graphNodeId: string } | null {
 	const bindings = graphBindingMap(state.graph, state.currentSharedDefinitionId);
 	const aliases = semanticAliasMap(state.graph, state.currentSharedDefinitionId);
 	const dependencies: SemanticGraphDependency[] = [];
+	let readsGraphCell = false;
 	for (const source of readSources) {
-		const resolved = resolveGraphPath(source, bindings, aliases);
+		// Component scope first: a factory local and the instance local routinely collide.
+		const resolved =
+			resolveGraphPath(source, bindings, aliases) ??
+			resolveSharedInstanceGraphPath(source, state.graph);
 		if (!resolved) return null;
 		if (
 			resolved.binding.kind !== 'state' &&
@@ -214,9 +221,12 @@ function mintTemplateExpressionComputed(
 		) {
 			return null;
 		}
+		if (resolved.binding.kind !== 'prop') readsGraphCell = true;
 		dependencies.push({ source, graphNodeId: resolved.binding.id, path: resolved.path });
 	}
 	if (dependencies.length === 0) return null;
+	// No write can move a prop after the render that read it, so props-only owes no record.
+	if (requireWritableRead && !readsGraphCell) return null;
 
 	const index = state.graph.graphBindings.filter((binding) =>
 		binding.id.startsWith('computed:templateExpression:'),
@@ -790,12 +800,17 @@ function collectAttribute(
 			walk(expressionValue, state);
 			return;
 		}
+		// A recombined value resolves to no graph node, so without this nothing subscribes it.
+		const composite = collectCompositeTemplateExpression(expressionValue, state, {
+			requireWritableRead: true,
+		});
 		state.graph.templateReads.push({
 			hostNodeId,
 			source: expressionSource(expressionValue, state.source),
 			sourceSpan: sourceSpan(expressionValue, state.filename),
 			target: bindingTargetForAttribute(attributeName),
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
+			computedGraphNodeId: composite?.graphNodeId,
 		});
 		walk(expressionValue, state);
 	}

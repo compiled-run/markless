@@ -3,6 +3,8 @@ import {
 	collectSsrAsyncRunnerDefinitions,
 	collectSsrAsyncRunners,
 	collectSsrSharedComputedSources,
+	collectSsrTemplateComputedSources,
+	TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX,
 } from './html.ts';
 import { renderBodyLines } from './render-body.ts';
 import {
@@ -458,15 +460,22 @@ function emitSsrDataRenderLines(
 			`marklessSsrRenderStateValues.set(${JSON.stringify(computed.graphNodeId)},(${source})({read:(marklessSsrSharedId,marklessSsrSharedPath)=>marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(marklessSsrSharedId),marklessSsrSharedPath)}));`,
 		];
 	});
+	const templateComputedSharedSources = collectSsrTemplateComputedSources(input);
 	const templateComputedLines = input.renderData.initialValues.flatMap((initial) => {
 		// Held in a const so the discriminated narrowing survives into the callback.
 		const value = initial.value;
 		if (
 			!componentGraphNodeIds.has(initial.graphNodeId) ||
-			!initial.graphNodeId.startsWith('computed:templateExpression:') ||
+			!initial.graphNodeId.startsWith(TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX) ||
 			value.kind !== 'symbol-function'
 		)
 			return [];
+		const sharedSource = templateComputedSharedSources.get(initial.graphNodeId);
+		if (sharedSource) {
+			return [
+				`marklessSsrRenderStateValues.set(${JSON.stringify(initial.graphNodeId)},(${sharedSource})({read:(marklessSsrSharedId,marklessSsrSharedPath)=>marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(marklessSsrSharedId),marklessSsrSharedPath)}));`,
+			];
+		}
 		const symbol = input.symbolResolver.symbols.find(
 			(candidate) => candidate.id === value.symbolId,
 		);

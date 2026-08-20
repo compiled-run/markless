@@ -8,6 +8,7 @@ import type {
 	SemanticGraphBinding,
 } from '../artifacts.ts';
 import {
+	graphBindingMap,
 	resolveGraphPath,
 	runtimeGraphDependencyPath,
 	runtimeGraphReadPath,
@@ -33,6 +34,8 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 	const bindings = new Map<string, SemanticGraphBinding>();
 	const bindingsById = new Map<string, SemanticGraphBinding>();
 	const aliases = semanticAliasMap(input.semanticGraph);
+	const componentBindings = graphBindingMap(input.semanticGraph, null);
+	const componentAliases = semanticAliasMap(input.semanticGraph, null);
 
 	for (const binding of input.semanticGraph.graphBindings) {
 		bindings.set(binding.name, binding);
@@ -159,8 +162,9 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			];
 		}
 
+		// Component scope only: a factory local and the instance local markup names routinely collide.
 		const resolved =
-			resolveGraphPath(read.source, bindings, aliases) ??
+			resolveGraphPath(read.source, componentBindings, componentAliases) ??
 			resolveSharedInstanceGraphPath(read.source, input.semanticGraph);
 		if (!resolved) return [];
 

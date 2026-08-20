@@ -100,3 +100,34 @@ export function collectSsrSharedComputedSources(
 		),
 	);
 }
+
+export const TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX = 'computed:templateExpression:';
+
+/**
+ * A recombined template expression that reads a shared() instance has no
+ * render-body local either: the instance is not a binding, so SSR derives the
+ * value from the factory's seeded state nodes exactly as a shared computed does.
+ */
+export function collectSsrTemplateComputedSources(
+	input: PublicRenderModuleInput,
+): ReadonlyMap<string, string> {
+	const sharedGraphNodeIds = new Set(
+		input.semanticGraph.graphBindings.flatMap((binding) =>
+			binding.sharedDefinitionId !== undefined ? [binding.id] : [],
+		),
+	);
+	if (sharedGraphNodeIds.size === 0) return new Map();
+
+	return new Map(
+		input.symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'sync-computed-derive' &&
+			symbol.graphNodeId.startsWith(TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX) &&
+			(symbol.dependencies ?? []).some((dependency) =>
+				sharedGraphNodeIds.has(dependency.graphNodeId),
+			)
+				? ([[symbol.graphNodeId, ssrAsyncRunnerSource(symbol, sharedGraphNodeIds)]] as const)
+				: [],
+		),
+	);
+}
+

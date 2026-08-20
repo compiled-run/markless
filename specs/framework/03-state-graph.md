@@ -686,13 +686,20 @@ inside one `.tsrx` module:
   `state({ checked: false })`. `as`, `satisfies`, and `!` are unwrapped before
   the initial value is read, so the union spelling a widget family needs does
   not degrade the node into an unknown initializer.
-- **A composite template expression over a shared instance resolves its reads.**
-  `ui-checked={checkbox.checked === true}` on a part is not a plain path read, so
-  it travels as an authored expression. Both readers — the server module's and
-  the browser's — rebuild the instance local from the definition's returned
-  graph properties before evaluating it, so the expression never closes over the
-  factory's own local. Like every composite attribute expression, it renders from
-  the value the graph holds; it plans no DOM-update record of its own.
+- **A composite template expression over a shared instance resolves its reads,
+  and follows a write.** `ui-checked={checkbox.checked === true}` on a part is
+  not a plain path read, so it stands behind one synthetic computed whose
+  dependencies are the graph nodes it reads — a shared instance read resolves
+  through the definition's returned graph properties, exactly as a plain path
+  read does. That computed carries the position's DOM-update record, in an
+  attribute position as much as a text one, so a write to the cell repaints
+  every derived position that reads it, in the browser and after an SSR resume.
+  Presence semantics are unchanged: a falsy value renders no attribute. An
+  expression that reads only props plans no record, because no write can move a
+  prop after the render that read it. A `computed()` declared in a component
+  body resolves a shared instance read the same way; the server render body
+  rebuilds the instance from the factory's graph nodes before the derive runs,
+  so nothing closes over the factory's own local.
 - **Methods lower to graph writes.** A returned method that takes no parameters
   is inlined at its call site, so `onClick={() => s.login()}` becomes the graph
   writes the method body performs. A method that takes parameters is not

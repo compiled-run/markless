@@ -221,11 +221,14 @@ test('a composite over a shared read binds the instance in the client residue re
 test('a composite over a shared read reads the graph in the SSR module', async () => {
 	const compiled = await compile('src/spike.tsrx', compositeSource);
 
-	// The reader's prelude rebuilds the instance from graph nodes, so the
-	// authored expression evaluates without the factory's local.
+	// Each recombined expression stands behind its own synthetic computed, whose
+	// SSR derive binds the instance from the factory's graph node: the authored
+	// expression evaluates without the factory's local, which does not exist here.
 	expect(compiled.publicRenderModule.ssrModuleSource).toContain(
-		'const s = {"checked": marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(' +
-			'"shared:src/spike.tsrx#spike/state:s"), ["checked"])',
+		'const s=read("shared:src/spike.tsrx#spike/state:s",[])',
+	);
+	expect(compiled.publicRenderModule.ssrModuleSource).toMatch(
+		/marklessSsrRenderStateValues\.set\("computed:templateExpression:\d+"/,
 	);
 });
 

@@ -3,6 +3,7 @@ import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/
 import { expressionSource } from '../../ast/source.ts';
 import { isIgnorableJsxTextNode as isIgnorableTextNode } from '../../ast/tsrx.ts';
 import { resolveSharedInstanceGraphPath } from '../semantic-graph/collect-shared.ts';
+import { sharedInstancePreludeLines } from './residue-reader.ts';
 import type { PublicRenderRoot } from './types.ts';
 
 type GraphBinding = PublicRenderModuleInput['semanticGraph']['graphBindings'][number];
@@ -51,7 +52,12 @@ export function renderBodyLines(
 			lines.push(stateLine);
 			continue;
 		}
-		const computedLine = computedDeclarationLine(statement, computedBindings);
+		const computedLine = computedDeclarationLine(
+			statement,
+			computedBindings,
+			input,
+			stateValuesName,
+		);
 		if (computedLine) {
 			lines.push(computedLine);
 			continue;
@@ -131,6 +137,8 @@ function seedValueSource(
 function computedDeclarationLine(
 	statement: AnyNode,
 	computedBindings: ReadonlyMap<string, GraphBinding>,
+	input: PublicRenderModuleInput,
+	stateValuesName: string,
 ): string | null {
 	if (statement.type !== 'VariableDeclaration') return null;
 	const declarations = asNodes(statement.declarations);
@@ -149,7 +157,19 @@ function computedDeclarationLine(
 	}
 
 	const declarationKind = binding.declarationKind ?? 'const';
-	return `${declarationKind} ${binding.name} = (${binding.functionSource})();`;
+	// No instance local exists here; rebuild it from the graph, as the residue readers do.
+	const prelude = sharedInstancePreludeLines(
+		input.semanticGraph,
+		binding.functionSource,
+		new Set(),
+		(graphNodeId, path) =>
+			`marklessSsrReadPublicPath(${stateValuesName}.get(${JSON.stringify(graphNodeId)}), ${JSON.stringify(path)})`,
+	);
+	if (prelude.length === 0) {
+		return `${declarationKind} ${binding.name} = (${binding.functionSource})();`;
+	}
+
+	return `${declarationKind} ${binding.name} = (() => { ${prelude.join(' ')} return (${binding.functionSource})(); })();`;
 }
 
 function stateDeclarationLine(
