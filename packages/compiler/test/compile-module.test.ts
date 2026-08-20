@@ -1,6 +1,11 @@
 import { expect, test, vi } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
 import {
+	PUBLIC_RENDER_PHASE,
+	PUBLIC_RENDER_PLAN_PASS_ID,
+	PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT_CODE,
+} from '../src/passes/public-render/diagnostics.ts';
+import {
 	ASYNC_BOUNDARY_ARM,
 	deserializeGraphValue,
 	renderPayloadScripts,
@@ -2185,9 +2190,9 @@ export function App() @{
 	expect(result.publicRenderPlan.styleScopes).toEqual([]);
 	expect(result.publicRenderPlan.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
-			phase: 'public-render',
-			passId: 'public-render-plan',
+			code: PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT_CODE,
+			phase: PUBLIC_RENDER_PHASE,
+			passId: PUBLIC_RENDER_PLAN_PASS_ID,
 			title: expect.stringContaining('<style>'),
 			message: expect.stringContaining('could not be scope-compiled'),
 			primarySpan: expect.objectContaining({ filename: 'src/BrokenStyle.tsrx' }),
