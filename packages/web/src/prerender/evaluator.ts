@@ -26,6 +26,7 @@ import type { ComposeGraphProps } from '../fns/composition.ts';
 import { marklessCsrRemapChildGraph } from '../fns/composition.ts';
 import { marklessBoundSymbolId } from '../fns/bound-symbol.ts';
 import { registerPrerenderStagedComputeds } from './staged-graph.ts';
+import { sharedSeedPass } from './shared-seed-slot.ts';
 
 // This evaluator is the seam where a SERIALIZED protocol payload meets the
 // mutable draft the SSR composer works on. They describe the same records; the
@@ -53,7 +54,7 @@ type PrerenderRenderData = SsrRenderData & {
 	}>;
 };
 
-type PrerenderDataDefinition = {
+export type PrerenderDataDefinition = {
 	readonly name: string;
 	readonly state: ProtocolStatePayload;
 	readonly view: import('@markless/serializer').ProtocolViewPayload;
@@ -471,77 +472,6 @@ async function evaluatePrerenderDataComponent(input: {
 		branches: definition.branches ?? [],
 		boundaries: definition.boundaries ?? [],
 	};
-	type ChildEdge = NonNullable<PrerenderDataDefinition['edges']>[number];
-	// The props one composed child edge passes, and the callback symbols that ride
-	// beside them. Both the seed pass and the render pass ask the same question.
-	function edgeChildProps(edge: ChildEdge) {
-		const childProps: Record<string, unknown> = {};
-		const callbacks: Record<string, string> = {};
-		for (const prop of edge.props) {
-			if (prop.kind === 'graph-reference' && prop.graphNodeId) {
-				childProps[prop.name] = read(prop.graphNodeId, prop.path ?? []);
-			} else if (prop.kind === 'absent') {
-				childProps[prop.name] = undefined;
-			} else if (prop.kind === 'serializable' && 'value' in prop) {
-				childProps[prop.name] = prop.value;
-			} else if (prop.kind === 'callback') {
-				const symbolId = edge.boundSymbols?.[prop.name] ?? prop.symbolId;
-				if (symbolId) callbacks[prop.name] = input.symbolPrefix + symbolId;
-			} else {
-				throw new Error(`MARKLESS_PRERENDER_PROP_UNDERIVABLE: ${prop.name}`);
-			}
-		}
-		return { childProps, callbacks };
-	}
-
-	// A seed is a per-instance initial value built from the child's own props, so
-	// running it needs those props and the factory initial, not the child's markup.
-	async function seedProjectingChild(
-		edge: ChildEdge,
-		inherited: ReadonlyMap<string, unknown> | undefined,
-	): Promise<ReadonlyMap<string, unknown> | undefined> {
-		const child = (
-			input.surface.components[edge.childComponentName]
-				? input.surface
-				: input.surface.imports[edge.childComponentName]
-		)?.components[edge.childComponentName];
-		const initials = child?.initialValues ?? [];
-		const seeds = initials.filter(
-			(initial) => child?.initialValueKinds?.[initial.graphNodeId] === 'shared-seed',
-		);
-		if (!child || seeds.length === 0) return inherited;
-
-		const { childProps } = edgeChildProps(edge);
-		const seeded = new Map(inherited ?? []);
-		const readSeed: PrerenderRead = (graphNodeId, path = []) =>
-			readPath(
-				graphNodeId === child.propCellId || graphNodeId === 'prop:props'
-					? childProps
-					: graphNodeId.startsWith('prop:')
-						? childProps[graphNodeId.slice(5)]
-						: seeded.get(graphNodeId),
-				path,
-			);
-		for (const initial of seeds) {
-			if (initial.value.kind !== 'symbol-function') continue;
-			const factory = initials.find(
-				(candidate) =>
-					candidate.graphNodeId === initial.graphNodeId &&
-					candidate.value.kind === 'constant',
-			)?.value;
-			if (!seeded.has(initial.graphNodeId) && factory?.kind === 'constant')
-				seeded.set(initial.graphNodeId, structuredClone(factory.value));
-			const loaded = await input.loadSymbol(
-				edge.boundSymbols?.[initial.value.symbolId] ??
-					input.symbolPrefix + edge.symbolPrefix + initial.value.symbolId,
-			);
-			if (typeof loaded !== 'function')
-				throw new Error(`MARKLESS_PRERENDER_DATA_SYMBOL_MISSING: ${initial.value.symbolId}`);
-			seeded.set(initial.graphNodeId, await loaded({ graph: { read: readSeed }, read: readSeed }));
-		}
-		return seeded;
-	}
-
 	const rendered = await renderSsrData({
 		renderData,
 		idPrefix: input.idPrefix,
@@ -589,13 +519,8 @@ async function evaluatePrerenderDataComponent(input: {
 				: undefined;
 			return snapshot?.status === 'fulfilled' ? 0 : snapshot?.status === 'rejected' ? 2 : 1;
 		},
-		seedChild: async (slot, context) => {
-			const edge = (definition.edges ?? []).find(
-				(candidate) => candidate.id === slot.componentEdgeId,
-			);
-			if (!edge || edge.materialized) return context.sharedSeeds;
-			return seedProjectingChild(edge, context.sharedSeeds);
-		},
+		seedChild: (slot, context) =>
+			sharedSeedPass()?.(input, definition, slot.componentEdgeId, read, context.sharedSeeds),
 		renderChild: async (slot, context) => {
 			const edge = (definition.edges ?? []).find(
 				(candidate) => candidate.id === slot.componentEdgeId,
@@ -617,7 +542,22 @@ async function evaluatePrerenderDataComponent(input: {
 				});
 				return materialized;
 			}
-			const { childProps, callbacks } = edgeChildProps(edge);
+			const childProps: Record<string, unknown> = {};
+			const callbacks: Record<string, string> = {};
+			for (const prop of edge.props) {
+				if (prop.kind === 'graph-reference' && prop.graphNodeId) {
+					childProps[prop.name] = read(prop.graphNodeId, prop.path ?? []);
+				} else if (prop.kind === 'absent') {
+					childProps[prop.name] = undefined;
+				} else if (prop.kind === 'serializable' && 'value' in prop) {
+					childProps[prop.name] = prop.value;
+				} else if (prop.kind === 'callback') {
+					const symbolId = edge.boundSymbols?.[prop.name] ?? prop.symbolId;
+					if (symbolId) callbacks[prop.name] = input.symbolPrefix + symbolId;
+				} else {
+					throw new Error(`MARKLESS_PRERENDER_PROP_UNDERIVABLE: ${prop.name}`);
+				}
+			}
 			if (context.projectionHtml !== undefined) {
 				childProps.children = context.projectionHtml;
 			}
@@ -641,7 +581,7 @@ async function evaluatePrerenderDataComponent(input: {
 				loadSymbol: input.loadSymbol,
 				graph: input.graph,
 				requireHtml: input.requireHtml,
-				...(context.sharedSeeds ? { sharedSeeds: context.sharedSeeds } : {}),
+				sharedSeeds: context.sharedSeeds,
 			});
 			children.push({
 				output: output as SsrComposableChildOutput,
