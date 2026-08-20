@@ -20,9 +20,7 @@ export const checkboxState = shared(
 			required: false,
 			name: '',
 			value: '',
-			// A minted id would need a call in the factory initializer; see notes/parity-table.md B1.
-			instanceId: 'chk',
-		});
+					});
 
 		const isChecked = computed(() => checkbox.checked === true);
 
@@ -69,7 +67,6 @@ export function CheckboxTrigger({ children, ...rest }: CheckboxTriggerProps) @{
 		{...rest}
 		type="button"
 		role="checkbox"
-		id={checkbox.instanceId}
 		aria-checked={checkbox.ariaChecked}
 		disabled={checkbox.disabled}
 		onClick={() => checkbox.toggle()}
