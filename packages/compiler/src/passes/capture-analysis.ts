@@ -640,7 +640,7 @@ function unsupportedCaptureDiagnostic(
 	},
 	binding: SemanticLocalBinding | undefined,
 ): CaptureAnalysisDiagnostic {
-	const span = binding ? { primarySpan: binding.sourceSpan } : {};
+	const span = binding?.sourceSpan ? { primarySpan: binding.sourceSpan } : {};
 	const suggestions = [
 		{ message: binding ? suggestionForBinding(binding.kind) : UNREADABLE_SOURCE_SUGGESTION },
 	];
