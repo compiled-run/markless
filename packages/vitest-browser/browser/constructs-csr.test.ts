@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render } from '../src/index.ts';
 import ArmEvents from './fixtures/arm-events.tsrx';
+import BranchComponent from './fixtures/branch-component.tsrx';
 import AsyncDetails from './fixtures/async-details.tsrx';
 import AttachBehavior from './fixtures/attach-behavior.tsrx';
 import DynamicTag from './fixtures/dynamic-tag.tsrx';
@@ -282,4 +283,37 @@ test('CSR: a child component @if driven by a parent prop flips on click', async 
 
 	(button as HTMLButtonElement).click();
 	await expect.poll(() => container.querySelector('em.live')?.textContent).toBe('Live');
+});
+
+test('CSR: an @if that shows a component flips both ways and leaves its siblings live', async () => {
+	// U-K: the component in the branch used to drop the whole flip module, so the
+	// first click asked the loader for a symbol nobody emitted and that failure
+	// stopped every other handler in the page.
+	const screen = await render(BranchComponent);
+	const container = queryContainer(screen.container);
+	const button = requireElement<HTMLButtonElement>(container, 'button[data-arm]');
+	const clicks = requireElement<HTMLOutputElement>(container, 'output[data-clicks]');
+
+	expect(container.querySelector('em.badge')).toBeNull();
+
+	button.click();
+	await expect.poll(() => container.querySelector('em.badge')?.textContent).toBe('Armed');
+	expect(clicks.textContent).toBe('1');
+
+	button.click();
+	await expect.poll(() => container.querySelector('em.badge')).toBeNull();
+	expect(clicks.textContent).toBe('2');
+
+	// The other direction: content the first render already showed goes away and
+	// comes back, with the counter proving the sibling handler still dispatches.
+	const dim = requireElement<HTMLButtonElement>(container, 'button[data-dim]');
+	expect(container.querySelector('em.lamp')?.textContent).toBe('Lit');
+
+	dim.click();
+	await expect.poll(() => container.querySelector('em.lamp')).toBeNull();
+	expect(clicks.textContent).toBe('3');
+
+	dim.click();
+	await expect.poll(() => container.querySelector('em.lamp')?.textContent).toBe('Lit');
+	expect(clicks.textContent).toBe('4');
 });

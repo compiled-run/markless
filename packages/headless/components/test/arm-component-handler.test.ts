@@ -36,6 +36,7 @@ function pane(container: ParentNode, name: string) {
 	const host = container.querySelector(`[data-case="${name}"]`) as HTMLElement;
 	if (!host) throw new Error(`Expected the "${name}" pane.`);
 	return {
+		host,
 		button: host.querySelector('button') as HTMLButtonElement,
 		clicks: host.querySelector('output') as HTMLOutputElement,
 	};
@@ -43,18 +44,19 @@ function pane(container: ParentNode, name: string) {
 
 test('CSR: a click handler runs beside a branch whose arm holds an element', async () => {
 	const screen = await render(App);
-	const { button, clicks } = pane(screen.container as HTMLElement, 'element-arm');
+	const { host, button, clicks } = pane(screen.container as HTMLElement, 'element-arm');
 	button.click();
 	await expect.poll(() => clicks.textContent).toBe('1');
+	await expect.poll(() => host.querySelector('em')?.textContent).toBe('armed');
 });
 
-// U-K: swapping the arm's plain element for a component reference silences every
-// handler in the component that owns the branch. Same markup, same handler, same
-// gesture as the test above — only the arm's content differs. This file turns red
-// the day the compiler stops dropping those handlers.
-test.fails('CSR: a click handler runs beside a branch whose arm holds a component', async () => {
+// U-K: swapping the branch content's plain element for a component reference used
+// to silence every handler in the component that owns the branch. Same markup,
+// same handler, same gesture as the test above — only the content differs.
+test('CSR: a click handler runs beside a branch whose arm holds a component', async () => {
 	const screen = await render(App);
-	const { button, clicks } = pane(screen.container as HTMLElement, 'component-arm');
+	const { host, button, clicks } = pane(screen.container as HTMLElement, 'component-arm');
 	button.click();
 	await expect.poll(() => clicks.textContent).toBe('1');
+	await expect.poll(() => host.querySelector('em')?.textContent).toBe('armed');
 });

@@ -7,11 +7,17 @@ import type {
 	LoweredStateWrite,
 	PlannedSymbol,
 	RenderDataArtifact,
+	RenderDataBranch,
+	SemanticGraphArtifact,
+	SemanticMarkupSlot,
 	SemanticGraphDependency,
 	SemanticModuleImport,
 	SymbolModulesArtifact,
+	SymbolModulesDiagnostic,
 	SymbolModulesInput,
+	SymbolResolverPlan,
 } from '../artifacts.ts';
+import type { SourceSpan } from '../diagnostics.ts';
 import { childNodes, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
 import { moduleScopeLines } from './public-render/shared.ts';
@@ -53,14 +59,14 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 	);
 
 	const asyncComputedNodeIds = asyncComputedGraphNodeIds(input.semanticGraph);
-	const branchArmsBySite = renderBranchArms(input.renderData, asyncComputedNodeIds);
+	const branchArms = renderBranchArms(input, asyncComputedNodeIds);
 	const boundaryArmsById = renderBoundaryArms(input.renderData, asyncComputedNodeIds);
 	return {
 		passId: 'symbol-modules',
 		modules: input.symbolResolver.symbols.flatMap((symbol) => {
 			if (unsupportedCaptureSymbolIds.has(symbol.id)) return [];
 			if (symbol.kind === 'branch-update') {
-				const arms = branchArmsBySite.get(symbol.branchSiteId);
+				const arms = branchArms.armsBySite.get(symbol.branchSiteId);
 				return arms ? [emitBranchUpdateModule(symbol, arms)] : [];
 			}
 			if (symbol.kind === 'async-boundary-update') {
@@ -80,7 +86,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 				input.omitAuthoredSource === true,
 			);
 		}),
-		diagnostics: input.captureAnalysis.diagnostics,
+		diagnostics: [...input.captureAnalysis.diagnostics, ...branchArms.diagnostics],
 	};
 }
 
@@ -115,25 +121,96 @@ function armPartReadPath(
 	return path.length === 0 && asyncComputedNodeIds.has(graphNodeId) ? ['value'] : path;
 }
 
+// The first refusal recorded for a branch is the one its diagnostic reports.
+type ArmRefusal = {
+	readonly detail: string;
+	readonly span?: SourceSpan;
+};
+
+type ArmPartsContext = {
+	readonly renderData: RenderDataArtifact;
+	readonly asyncComputedNodeIds: ReadonlySet<string>;
+	// Branch flips only: boundary arms re-render through a module that can run components.
+	readonly inline?: {
+		readonly semanticGraph: SemanticGraphArtifact;
+		readonly symbolResolver: SymbolResolverPlan;
+	};
+	readonly refusals?: ArmRefusal[];
+};
+
 function renderBranchArms(
-	renderData: RenderDataArtifact | undefined,
+	input: SymbolModulesInput,
 	asyncComputedNodeIds: ReadonlySet<string>,
-): ReadonlyMap<string, PublicRenderPlanBranchArms> {
-	if (!renderData) return new Map();
-	return new Map((renderData.branches ?? []).flatMap((branch) => {
-		if (branch.update === 'boundary') return [];
-		const arms = branch.armChunkIds.map((chunkId) =>
-			renderChunkParts(renderData, chunkId, asyncComputedNodeIds),
-		);
-		if (arms.some((arm) => arm === null)) return [];
-		return [[branch.branchSiteId, {
+): {
+	readonly armsBySite: ReadonlyMap<string, PublicRenderPlanBranchArms>;
+	readonly diagnostics: ReadonlyArray<SymbolModulesDiagnostic>;
+} {
+	const renderData = input.renderData;
+	if (!renderData) return { armsBySite: new Map(), diagnostics: [] };
+	const armsBySite = new Map<string, PublicRenderPlanBranchArms>();
+	const diagnostics: SymbolModulesDiagnostic[] = [];
+	for (const branch of renderData.branches ?? []) {
+		if (branch.update === 'boundary') continue;
+		const refusals: ArmRefusal[] = [];
+		const context: ArmPartsContext = {
+			renderData,
+			asyncComputedNodeIds,
+			...(input.semanticGraph
+				? { inline: { semanticGraph: input.semanticGraph, symbolResolver: input.symbolResolver } }
+				: {}),
+			refusals,
+		};
+		const arms = branch.armChunkIds.map((chunkId) => renderChunkParts(context, chunkId));
+		if (arms.some((arm) => arm === null)) {
+			// A branch nobody asks to flip ships no symbol, so it needs no diagnostic.
+			const symbol = input.symbolResolver.symbols.find(
+				(candidate) =>
+					candidate.kind === 'branch-update' &&
+					candidate.branchSiteId === branch.branchSiteId,
+			);
+			if (symbol) diagnostics.push(branchArmUnsupportedDiagnostic(branch, refusals[0], symbol.id));
+			continue;
+		}
+		armsBySite.set(branch.branchSiteId, {
 			branchSiteId: branch.branchSiteId,
 			testRead: branch.testReads[0] ?? null,
 			arms: arms as PublicRenderPlanBranchArms['arms'],
 			...(branch.armTests ? { armTests: branch.armTests } : {}),
 			...(branch.declaredEmptyArms ? { declaredEmptyArms: branch.declaredEmptyArms } : {}),
-		}] as const];
-	}));
+		});
+	}
+	return { armsBySite, diagnostics };
+}
+
+function branchArmUnsupportedDiagnostic(
+	branch: RenderDataBranch,
+	refusal: ArmRefusal | undefined,
+	symbolId: string,
+): SymbolModulesDiagnostic {
+	const label = branch.kind === 'switch' ? '@switch' : '@if';
+	const detail = refusal?.detail ?? 'it holds content that has no compiled markup';
+	// A prop is the caller's to change, and a caller that never changes it ships
+	// correctly today, so only a test this file can write blocks the build.
+	const decidedByProp = branch.testReads.every((read) => read.graphNodeId.startsWith('prop:'));
+	return {
+		code: 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
+		severity: decidedByProp ? 'warning' : 'error',
+		phase: 'public-render',
+		title: `Changing this ${label} cannot rebuild what it shows`,
+		message: `this ${label} (${branch.testSource}) cannot be rebuilt when ${branch.testSource} changes because ${detail}.`,
+		why: 'Showing or hiding this content replaces it wholesale from compiled markup plus value reads. Content that has to run to produce itself has no compiled markup to replace it with, so the browser would ask for code the build never wrote — and that failure stops every other update in the same component.',
+		...(refusal?.span ? { primarySpan: refusal.span } : {}),
+		passId: 'symbol-modules',
+		artifactKeys: ['renderData', 'symbolResolver', 'symbolModules'],
+		symbolId,
+		source: branch.testSource,
+		suggestions: [
+			{
+				message: `Move the component outside the ${label} and hide it with an attribute, or keep the ${label} content to plain elements, text, and state reads.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
+	};
 }
 
 function renderBoundaryArms(
@@ -146,7 +223,7 @@ function renderBoundaryArms(
 			(candidate): candidate is string => candidate !== undefined,
 		);
 		const arms = chunkIds.map((chunkId) =>
-			renderChunkParts(renderData, chunkId, asyncComputedNodeIds),
+			renderChunkParts({ renderData, asyncComputedNodeIds }, chunkId),
 		);
 		if (arms.some((arm) => arm === null)) return [];
 		return [[boundary.boundaryId, {
@@ -157,12 +234,16 @@ function renderBoundaryArms(
 }
 
 function renderChunkParts(
-	renderData: RenderDataArtifact,
+	context: ArmPartsContext,
 	chunkId: string,
-	asyncComputedNodeIds: ReadonlySet<string>,
 ): PublicRenderPlanBranchArms['arms'][number] | null {
+	const { renderData, asyncComputedNodeIds } = context;
+	const refuse = (detail: string, span?: SourceSpan) => {
+		context.refusals?.push({ detail, ...(span ? { span } : {}) });
+		return null;
+	};
 	const chunk = renderData.chunks.find((candidate) => candidate.id === chunkId);
-	if (!chunk) return null;
+	if (!chunk) return refuse('its content has no compiled markup');
 	const parts: Array<PublicRenderPlanBranchArms['arms'][number][number]> = [];
 	const pushText = (text: string) => {
 		const clean = text.replace(/<!--markless-slot:\d+-->/g, '');
@@ -185,19 +266,31 @@ function renderChunkParts(
 				} });
 				continue;
 			}
+			if (slot.kind === 'child-component') {
+				const markup = staticChildComponentMarkup(context, slot);
+				if (markup === null)
+					return refuse(
+						`<${slot.childComponentName}> has to run to produce its content`,
+						componentEdgeSpan(context, slot.componentEdgeId),
+					);
+				pushText(markup);
+				continue;
+			}
 			if (slot.kind === 'repeat') {
 				const repeat = renderData.repeats.find((candidate) => candidate.repeatId === slot.repeatId);
 				const row = repeat ? renderData.chunks.find((candidate) => candidate.id === repeat.rowChunkId) : undefined;
-				if (!repeat?.collectionGraphNodeId || !row) return null;
+				if (!repeat?.collectionGraphNodeId || !row)
+					return refuse('it repeats over a collection with no compiled row');
 				const rowParts: Array<{ text: string } | { read: { graphNodeId: string; path: ReadonlyArray<string> } } | { itemPath: ReadonlyArray<string> }> = [];
 				for (let rowIndex = 0; rowIndex < row.statics.length; rowIndex++) {
 					const text = (row.statics[rowIndex] ?? '').replace(/<!--markless-slot:\d+-->/g, '');
 					if (text) rowParts.push({ text });
 					for (const rowSlot of row.slots.filter((candidate) => candidate.staticIndex === rowIndex)) {
-						if (rowSlot.kind !== 'text') return null;
+						if (rowSlot.kind !== 'text')
+							return refuse(`a repeated row inside it holds a ${rowSlot.kind} binding`);
 						if (rowSlot.residue.kind === 'repeat-item') rowParts.push({ itemPath: rowSlot.residue.path });
 						else if (rowSlot.residue.kind === 'graph-read') rowParts.push({ read: { graphNodeId: rowSlot.residue.graphNodeId, path: armPartReadPath(rowSlot.residue.graphNodeId, rowSlot.residue.path, asyncComputedNodeIds) } });
-						else return null;
+						else return refuse('a repeated row inside it reads a value that cannot be recomputed');
 					}
 				}
 				parts.push({ repeat: {
@@ -206,10 +299,57 @@ function renderChunkParts(
 				} });
 				continue;
 			}
-			return null;
+			return refuse(`it holds a ${slot.kind} binding`);
 		}
 	}
 	return parts;
+}
+
+// A child a flip can rebuild without running it: one constant string, wired to nothing.
+function staticChildComponentMarkup(
+	context: ArmPartsContext,
+	slot: Extract<SemanticMarkupSlot, { readonly kind: 'child-component' }>,
+): string | null {
+	const semanticGraph = context.inline?.semanticGraph;
+	if (!semanticGraph || slot.projectionChunkId) return null;
+	const edge = semanticGraph.componentEdges.find(
+		(candidate) => candidate.id === slot.componentEdgeId,
+	);
+	if (!edge || edge.importSource || edge.props.length > 0 || edge.children.childCount > 0)
+		return null;
+	if (
+		semanticGraph.graphBindings.some(
+			(binding) => binding.componentName === edge.childComponentName,
+		)
+	)
+		return null;
+	const chunk = context.renderData.chunks.find(
+		(candidate) => candidate.id === slot.childTemplateId,
+	);
+	if (!chunk || chunk.slots.length > 0) return null;
+	const hostNodeIds = new Set(chunk.hosts.map((host) => host.hostNodeId));
+	const wired = [
+		...semanticGraph.events,
+		...semanticGraph.behaviors,
+		...semanticGraph.overlays,
+		...semanticGraph.elementHandleBindings,
+		...context.inline.symbolResolver.symbols,
+	].some(
+		(record) =>
+			'hostNodeId' in record &&
+			typeof record.hostNodeId === 'string' &&
+			hostNodeIds.has(record.hostNodeId),
+	);
+	return wired ? null : chunk.statics.join('');
+}
+
+function componentEdgeSpan(
+	context: ArmPartsContext,
+	componentEdgeId: string,
+): SourceSpan | undefined {
+	return context.inline?.semanticGraph.componentEdges.find(
+		(candidate) => candidate.id === componentEdgeId,
+	)?.sourceSpan;
 }
 
 // A branch flip module: evaluate the compiled test through graph reads, pick

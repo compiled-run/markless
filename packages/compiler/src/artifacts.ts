@@ -1314,10 +1314,17 @@ export type GeneratedSymbolModule = {
 	readonly source: string;
 };
 
+// A branch flip whose module this pass refuses to emit, rather than let the payload name it.
+export type SymbolModulesDiagnostic = CompilerDiagnostic & {
+	readonly code: 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED';
+	readonly phase: 'public-render';
+	readonly passId: 'symbol-modules';
+};
+
 export type SymbolModulesArtifact = {
 	readonly passId: 'symbol-modules';
 	readonly modules: ReadonlyArray<GeneratedSymbolModule>;
-	readonly diagnostics: ReadonlyArray<CaptureAnalysisDiagnostic>;
+	readonly diagnostics: ReadonlyArray<CaptureAnalysisDiagnostic | SymbolModulesDiagnostic>;
 };
 
 export type RuntimeDemandMapRecordKind =
