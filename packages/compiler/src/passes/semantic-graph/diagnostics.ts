@@ -825,6 +825,47 @@ export function rowOwnedIdrefElementHandleDiagnostic(
 	});
 }
 
+/**
+ * The widget root is the component that resolves the factory, and it renders
+ * BEFORE the token naming its own instance exists: that token is written into
+ * the seed map the root hands its parts. A part reads it; the root cannot. The
+ * same holds for a factory whose scope is not `widget`, where one handle would
+ * name one element per page rather than one per rendered widget.
+ */
+export function widgetRootIdrefElementHandleDiagnostic(
+	reference: PendingElementHandleIdref,
+): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT',
+		title: 'This shared() element() handle cannot be named by an IDREF here',
+		message: `Cannot resolve ${reference.attributeName}={${reference.source}} because "${reference.handleName}" is declared in a shared() factory that this component roots, or in a factory that is not { scope: 'widget' }.`,
+		why: 'A widget-scoped factory is one graph per rendered widget, so the minted id has to carry which widget it belongs to. That token is written when the widget root seeds the parts placed inside it, which happens after the root itself has started rendering and never happens at all for a page-wide factory.',
+		span: reference.sourceSpan,
+		suggestion: "Move the element() handle and both ends of the relationship into parts placed inside the widget root, and give the factory { scope: 'widget' }.",
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT',
+	});
+}
+
+/**
+ * The element an IDREF names receives a minted id, so an authored id on the
+ * same element would produce two id attributes and the relationship would
+ * silently follow whichever one the parser kept.
+ */
+export function idrefElementHandleIdConflictDiagnostic(input: {
+	readonly handleName: string;
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_ELEMENT_HANDLE_IDREF_ID_CONFLICT',
+		title: 'An element named by an IDREF cannot also declare an id',
+		message: `Cannot mint the id for el={${input.handleName}} because this element already declares an id attribute.`,
+		why: 'An IDREF position is written from the id the compiler mints for the bound element. A second, authored id on the same element would emit two id attributes and leave the relationship pointing at whichever one the HTML parser kept.',
+		span: input.span,
+		suggestion: 'Remove the authored id from this element, or drop the element() handle and write the IDREF attribute with your own id string.',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_ID_CONFLICT',
+	});
+}
+
 export function elementHandleRenderReadDiagnostic(input: {
 	readonly handleName: string;
 	readonly source: string;

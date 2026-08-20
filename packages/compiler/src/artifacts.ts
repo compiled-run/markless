@@ -365,6 +365,8 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_ELEMENT_HANDLE_IDREF_UNBOUND'
 		| 'MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE'
 		| 'MARKLESS_ELEMENT_HANDLE_IDREF_ROW_OWNED'
+		| 'MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT'
+		| 'MARKLESS_ELEMENT_HANDLE_IDREF_ID_CONFLICT'
 		| 'MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED'
 		| 'MARKLESS_OVERLAY_VALUE_UNSUPPORTED'
 		| 'MARKLESS_OVERLAY_HOST_ELEMENT_REQUIRED'
@@ -498,6 +500,8 @@ export type SemanticElementHandleIdref = {
 	readonly attributeName: string;
 	/** The resolved element() handle binding name. */
 	readonly handleName: string;
+	/** The graph node the handle declares; what the minted id is derived from. */
+	readonly handleGraphNodeId: string;
 	/** The authored expression, which differs from handleName through an alias. */
 	readonly source: string;
 	/** The host element bound with `el={handle}`; the element that needs the id. */
@@ -586,7 +590,11 @@ export type SemanticMarkupResidue =
 			readonly repeatId: string;
 			readonly path: ReadonlyArray<string>;
 	  }
-	| { readonly kind: 'authored-expression'; readonly source: string };
+	| { readonly kind: 'authored-expression'; readonly source: string }
+	// The id minted for one element() handle: written on the element `el=` bound
+	// it and on every IDREF position that named it, so both sides spell one
+	// string the author never sees.
+	| { readonly kind: 'element-handle-id'; readonly handleGraphNodeId: string };
 
 type SemanticMarkupLocatedSlot = {
 	readonly coordinate: SemanticMarkupSlotCoordinate;

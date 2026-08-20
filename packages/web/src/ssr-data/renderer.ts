@@ -12,7 +12,8 @@ type Awaitable<T> = T | Promise<T>;
 export type SsrDataResidue =
 	| { readonly kind: 'graph-read'; readonly graphNodeId: string; readonly path: ReadonlyArray<string> }
 	| { readonly kind: 'repeat-item'; readonly repeatId: string; readonly path: ReadonlyArray<string> }
-	| { readonly kind: 'authored-expression'; readonly source: string };
+	| { readonly kind: 'authored-expression'; readonly source: string }
+	| { readonly kind: 'element-handle-id'; readonly handleGraphNodeId: string };
 
 export type SsrDataCoordinate =
 	| { readonly kind: 'child-index'; readonly path: ReadonlyArray<number> }

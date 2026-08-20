@@ -1,4 +1,8 @@
-import { installSharedSeedPass, type SharedSeedPass } from '../prerender/shared-seed-slot.ts';
+import {
+	installSharedSeedPass,
+	MARKLESS_WIDGET_INSTANCE_KEY,
+	type SharedSeedPass,
+} from '../prerender/shared-seed-slot.ts';
 
 // A seed is a per-instance initial value built from the child's own props, so
 // running it needs those props and the factory initial, not the child's markup.
@@ -11,6 +15,13 @@ const seedProjectingChild: SharedSeedPass = async (
 ) => {
 	const edge = (definition.edges ?? []).find((candidate) => candidate.id === componentEdgeId);
 	if (!edge || edge.materialized) return inherited;
+	// Static registration before descent: the projecting child's own instance
+	// names the widget its parts belong to, so a part's minted element() id can
+	// carry which rendered widget it is part of.
+	const widget = new Map(inherited ?? []).set(
+		MARKLESS_WIDGET_INSTANCE_KEY,
+		context.idPrefix + edge.symbolPrefix,
+	);
 	const surface = context.surface;
 	const child = (
 		surface.components[edge.childComponentName]
@@ -21,7 +32,7 @@ const seedProjectingChild: SharedSeedPass = async (
 	const seeds = initials.filter(
 		(initial) => child?.initialValueKinds?.[initial.graphNodeId] === 'shared-seed',
 	);
-	if (!child || seeds.length === 0) return inherited;
+	if (!child || seeds.length === 0) return widget;
 
 	const childProps: Record<string, unknown> = {};
 	for (const prop of edge.props) {
@@ -31,7 +42,7 @@ const seedProjectingChild: SharedSeedPass = async (
 			childProps[prop.name] = prop.value;
 		}
 	}
-	const seeded = new Map(inherited ?? []);
+	const seeded = new Map(widget);
 	const readSeed: PrerenderReadSeed = (graphNodeId, path = []) =>
 		readPath(
 			graphNodeId === child.propCellId || graphNodeId === 'prop:props'

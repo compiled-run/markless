@@ -18,6 +18,16 @@ const statics = (graph: Awaited<ReturnType<typeof buildSemanticGraph>>) =>
 const codes = (graph: Awaited<ReturnType<typeof buildSemanticGraph>>) =>
 	graph.diagnostics.map((diagnostic) => diagnostic.code);
 
+// Every attribute slot rendered from a minted element() id, in emitted order.
+const idSlots = (graph: Awaited<ReturnType<typeof buildSemanticGraph>>) =>
+	graph.markup.chunks.flatMap((chunk) =>
+		chunk.slots.flatMap((slot) =>
+			slot.kind === 'attribute' && slot.residue.kind === 'element-handle-id'
+				? [[slot.name, slot.residue.handleGraphNodeId]]
+				: [],
+		),
+	);
+
 test('the IDREF positions are one named constant', () => {
 	// One constant so the set can grow. aria-activedescendant is deliberately
 	// absent: it points at one row of a live collection, which needs per-row
@@ -49,6 +59,7 @@ export function App() @{
 			hostNodeId: 'h2',
 			attributeName: 'aria-labelledby',
 			handleName: 'label',
+			handleGraphNodeId: 'element:label',
 			source: 'label',
 			boundHostNodeId: 'h1',
 			componentName: 'App',
@@ -60,10 +71,16 @@ export function App() @{
 			},
 		},
 	]);
-	// The read is no longer an ordinary attribute binding: nothing may lower it
-	// as a value write, and no empty aria-labelledby="" may reach the statics.
+	// The read is no longer an ordinary attribute binding: nothing lowers it as a
+	// value write. Both sides of the relationship render from the same record -
+	// the bound element takes the minted id, the reference takes the same string.
 	expect(graph.templateReads).toEqual([]);
-	expect(statics(graph)).not.toContain('aria-labelledby');
+	expect(idSlots(graph)).toEqual([
+		['id', 'element:label'],
+		['aria-labelledby', 'element:label'],
+	]);
+	expect(statics(graph)).toContain('<span id="');
+	expect(statics(graph)).toContain('aria-labelledby="');
 });
 
 test('every IDREF position resolves its handle', async () => {
@@ -297,7 +314,10 @@ export function App() @{
 		graph.elementHandleIdrefs.map((idref) => [idref.hostNodeId, idref.boundHostNodeId]),
 	).toEqual([['h1', 'h2']]);
 	expect(statics(graph)).not.toContain('overlay');
-	expect(statics(graph)).not.toContain('aria-labelledby');
+	expect(idSlots(graph)).toEqual([
+		['aria-labelledby', 'element:heading'],
+		['id', 'element:heading'],
+	]);
 });
 
 test('a multi-value IDREF is refused rather than silently joined', async () => {
@@ -436,5 +456,174 @@ export function App() @{
 	).toEqual([
 		['aria-labelledby', 'h2', 'h1', 0],
 		['aria-describedby', 'h3', 'h1', 1],
+	]);
+});
+
+test('both sides of the relationship render from one minted id', async () => {
+	const graph = await graphOf(
+		'MintedPair',
+		`import { element } from '@markless/core';
+export function App() @{
+	const trigger = element<HTMLButtonElement>();
+	<div>
+		<label for={trigger}>Name</label>
+		<button type="button" el={trigger}>go</button>
+	</div>
+}`,
+	);
+
+	expect(graph.diagnostics).toEqual([]);
+	// The element bound by el= and the IDREF position read the same residue, so
+	// no emitter can spell one of them differently from the other.
+	expect(idSlots(graph)).toEqual([
+		['for', 'element:trigger'],
+		['id', 'element:trigger'],
+	]);
+	// Neither side is a value binding any more.
+	expect(graph.templateReads).toEqual([]);
+	expect(statics(graph)).toContain('<label for="');
+	expect(statics(graph)).toContain('<button id="');
+});
+
+test('a widget part mints its shared() handle id; the widget root cannot', async () => {
+	// Before the resolution fix `for={s.triggerEl}` fell through to an ordinary
+	// graph read, so it rendered the element node's value: absent, and silently.
+	const graph = await graphOf(
+		'SharedIdref',
+		`import { element, shared, state } from '@markless/core';
+export const wid = shared(() => {
+	const w = state({ open: false });
+	const triggerEl = element<HTMLButtonElement>();
+	return { ...w, triggerEl };
+}, { scope: 'widget' });
+export function Root({ children }: { children?: unknown }) @{
+	const s = wid();
+	<div>{children}</div>
+}
+export function Trigger() @{
+	const s = wid();
+	<button type="button" el={s.triggerEl}>go</button>
+}
+export function Lab() @{
+	const s = wid();
+	<label for={s.triggerEl}>Name</label>
+}`,
+	);
+
+	expect(graph.diagnostics).toEqual([]);
+	// Both parts render from the factory's own graph node, so the widget token
+	// registered before they rendered is the only thing that separates one
+	// rendered widget's id from another's.
+	expect(idSlots(graph)).toEqual([
+		['id', 'shared:src/SharedIdref.tsrx#wid/element:triggerEl'],
+		['for', 'shared:src/SharedIdref.tsrx#wid/element:triggerEl'],
+	]);
+	// Neither side is a value binding: the root's {children} is the only read.
+	expect(graph.templateReads.map((read) => read.source)).toEqual(['children']);
+});
+
+test('the widget root itself cannot be named by an IDREF', async () => {
+	const graph = await graphOf(
+		'WidgetRootIdref',
+		`import { element, shared, state } from '@markless/core';
+export const wid = shared(() => {
+	const w = state({ open: false });
+	const triggerEl = element<HTMLButtonElement>();
+	return { ...w, triggerEl };
+}, { scope: 'widget' });
+export function Root({ children }: { children?: unknown }) @{
+	const s = wid();
+	<div aria-controls={s.triggerEl}>{children}</div>
+}
+export function Trigger() @{
+	const s = wid();
+	<button type="button" el={s.triggerEl}>go</button>
+}`,
+	);
+
+	expect(codes(graph)).toEqual(['MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT']);
+	expect(
+		graph.diagnostics.find(
+			(diagnostic) => diagnostic.code === 'MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT',
+		),
+	).toEqual(
+		expect.objectContaining({
+			severity: 'error',
+			title: 'This shared() element() handle cannot be named by an IDREF here',
+			docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT',
+		}),
+	);
+	// Refused, not lowered: no record, no slot, and the attribute never reaches
+	// the statics as an empty one.
+	expect(graph.elementHandleIdrefs).toEqual([]);
+	expect(idSlots(graph)).toEqual([]);
+	expect(statics(graph)).not.toContain('aria-controls');
+});
+
+test('a page-wide shared() handle is refused: one element per page is not one per widget', async () => {
+	const graph = await graphOf(
+		'PageSharedIdref',
+		`import { element, shared, state } from '@markless/core';
+export const wid = shared(() => {
+	const w = state({ open: false });
+	const triggerEl = element<HTMLButtonElement>();
+	return { ...w, triggerEl };
+});
+export function Trigger() @{
+	const s = wid();
+	<button type="button" el={s.triggerEl}>go</button>
+}
+export function Lab() @{
+	const s = wid();
+	<label for={s.triggerEl}>Name</label>
+}`,
+	);
+
+	expect(codes(graph)).toContain('MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT');
+	expect(graph.elementHandleIdrefs).toEqual([]);
+	expect(idSlots(graph)).toEqual([]);
+});
+
+test('an authored id on the element an IDREF names is refused', async () => {
+	const graph = await graphOf(
+		'IdConflict',
+		`import { element } from '@markless/core';
+export function App() @{
+	const trigger = element<HTMLButtonElement>();
+	<div>
+		<label for={trigger}>Name</label>
+		<button id="mine" el={trigger}>go</button>
+	</div>
+}`,
+	);
+
+	expect(codes(graph)).toEqual(['MARKLESS_ELEMENT_HANDLE_IDREF_ID_CONFLICT']);
+	expect(
+		graph.diagnostics.find(
+			(diagnostic) => diagnostic.code === 'MARKLESS_ELEMENT_HANDLE_IDREF_ID_CONFLICT',
+		)?.severity,
+	).toBe('error');
+	// The authored id stands; the minted one is not written beside it.
+	expect(statics(graph)).toContain('id="mine"');
+	expect(idSlots(graph).map(([name]) => name)).toEqual(['for']);
+});
+
+test('an alternate-shaped family mints from its own handle, not from a fixture name', async () => {
+	const graph = await graphOf(
+		'AlternateShape',
+		`import { element } from '@markless/core';
+export default function Panel() @{
+	const sheetSurface = element<HTMLElement>();
+	<section>
+		<button popovertarget={sheetSurface}>Open</button>
+		<aside el={sheetSurface} popover="auto">Sheet</aside>
+	</section>
+}`,
+	);
+
+	expect(graph.diagnostics).toEqual([]);
+	expect(idSlots(graph)).toEqual([
+		['popovertarget', 'element:sheetSurface'],
+		['id', 'element:sheetSurface'],
 	]);
 });

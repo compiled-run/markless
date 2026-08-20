@@ -75,7 +75,7 @@ export type MutableSemanticGraphArtifact = {
  */
 export type PendingElementHandleIdref = Omit<
 	SemanticElementHandleIdref,
-	'boundHostNodeId' | 'order'
+	'boundHostNodeId' | 'handleGraphNodeId' | 'order'
 >;
 
 export type WalkState = {

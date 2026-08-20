@@ -36,6 +36,10 @@ import {
 import {
 	authoredResidueReadCases,
 	authoredResidueSources,
+	elementHandleIdReadCase,
+	elementHandleIdSources,
+	hasSharedElementHandle,
+	MARKLESS_WIDGET_INSTANCE_KEY,
 	sharedInstancePreludeLines,
 } from './residue-reader.ts';
 import { collectSsrPropEvents } from './component-wiring.ts';
@@ -272,6 +276,18 @@ function emitSsrDataRenderLines(
 		),
 	];
 	const readCases = authoredResidueReadCases(residueSources);
+	// Pay-per-use: a module with no IDREF record emits no mint at all, so the
+	// shared renderer never carries one for the pages that never ask for an id.
+	const handleIds = elementHandleIdSources(chunks);
+	const mintCase =
+		handleIds.length > 0
+			? elementHandleIdReadCase({
+					idPrefixSource: 'marklessSsrIdPrefix',
+					widgetInstanceSource: hasSharedElementHandle(handleIds)
+						? `marklessSsrRenderStateValues.get(${JSON.stringify(MARKLESS_WIDGET_INSTANCE_KEY)})`
+						: null,
+				})
+			: '';
 	const branchIds = new Set(chunks.flatMap((chunk) =>
 		chunk.slots.flatMap((slot) => slot.kind === 'branch' ? [slot.branchSiteId] : []),
 	));
@@ -407,9 +423,16 @@ function emitSsrDataRenderLines(
 				: componentSharedSeeds(input, edge.childComponentName).length > 0
 					? `await ${childSurface}?.renderSsr?.(childProps,{...marklessSsrRenderContext,marklessSharedSeeds:marklessSsrSeeds});`
 					: '';
+			// Static registration before descent: the widget root's instance token
+			// is written into the seed map the parts placed inside it read, so a
+			// part mints an id that names WHICH rendered widget it belongs to.
 			if (seedCall)
 				seedCases.push(
-					`case ${JSON.stringify(edge.id)}:{const childProps={${seedProps.join(',')}};${seedCall}return marklessSsrSeeds;}`,
+					`case ${JSON.stringify(edge.id)}:{marklessSsrSeeds.set(${JSON.stringify(
+						MARKLESS_WIDGET_INSTANCE_KEY,
+					)},marklessSsrIdPrefix+${JSON.stringify(
+						child.symbolPrefix,
+					)});const childProps={${seedProps.join(',')}};${seedCall}return marklessSsrSeeds;}`,
 				);
 		}
 		return [
@@ -459,7 +482,7 @@ function emitSsrDataRenderLines(
 		...sharedComputedLines,
 		...templateComputedLines,
 		"const marklessSsrIdPrefix=marklessSsrRenderContext?.idPrefix??'';",
-		`const marklessSsrReadData=(residue,marklessSsrDataContext)=>{if(residue.kind==='graph-read')return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(residue.graphNodeId),residue.path);if(residue.kind==='repeat-item')return marklessSsrReadPublicPath(marklessSsrDataContext.repeatItem,residue.path);${localLines.join('')}switch(residue.source){${readCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_RESIDUE_MISSING: '+residue.source);}};`,
+		`const marklessSsrReadData=(residue,marklessSsrDataContext)=>{${mintCase}if(residue.kind==='graph-read')return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(residue.graphNodeId),residue.path);if(residue.kind==='repeat-item')return marklessSsrReadPublicPath(marklessSsrDataContext.repeatItem,residue.path);${localLines.join('')}switch(residue.source){${readCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_RESIDUE_MISSING: '+residue.source);}};`,
 		`const marklessSsrRendered=await renderSsrData({renderData:{...marklessRenderData,root:{componentName:${JSON.stringify(componentName)},templateId:${JSON.stringify(`template:${componentName}`)}}},idPrefix:marklessSsrIdPrefix,read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.branchSiteId){${branchCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},${
 			repeatCases.length > 0
 				? `repeatItems:(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.repeatId){${repeatCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_REPEAT_MISSING: '+marklessSsrDataSlot.repeatId);}},`

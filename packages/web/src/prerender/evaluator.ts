@@ -96,12 +96,19 @@ export type PrerenderDataDefinition = {
 	// Compiled by the same producer as the server module's reader; the browser
 	// never parses or evaluates authored source itself.
 	readonly readResidue?: (
-		residue: Extract<SsrDataResidue, { readonly kind: 'authored-expression' }>,
+		residue: Extract<
+			SsrDataResidue,
+			{ readonly kind: 'authored-expression' | 'element-handle-id' }
+		>,
 		context: {
 			readonly repeatItem?: unknown;
 			readonly repeatIndex?: number;
 			readonly asyncError?: unknown;
 			readonly read: (graphNodeId: string, path?: ReadonlyArray<string>) => unknown;
+			// What a minted element() id is derived from. The token naming the
+			// widget a part belongs to arrives through the seed map, so `read`
+			// already answers it.
+			readonly idPrefix?: string;
 		},
 	) => unknown;
 };
@@ -128,7 +135,10 @@ export type PrerenderPageClosure = {
 		readonly evaluate: (context: PrerenderEvaluationContext) => Awaitable<unknown>;
 	}>;
 	readonly readAuthored?: (
-		residue: Extract<SsrDataResidue, { readonly kind: 'authored-expression' }>,
+		residue: Extract<
+			SsrDataResidue,
+			{ readonly kind: 'authored-expression' | 'element-handle-id' }
+		>,
 		context: SsrDataReadContext,
 		evaluation: PrerenderEvaluationContext,
 	) => Awaitable<unknown>;
@@ -182,7 +192,7 @@ export async function evaluatePrerenderClosure(
 			if (residue.kind === 'repeat-item') return readPath(context.repeatItem, residue.path);
 			if (residue.kind === 'graph-read') return read(residue.graphNodeId, residue.path);
 			if (closure.readAuthored) return closure.readAuthored(residue, context, evaluation);
-			throw new Error(`MARKLESS_PRERENDER_RESIDUE_MISSING: ${residue.source}`);
+			throw new Error('MARKLESS_PRERENDER_RESIDUE_MISSING');
 		},
 		selectBranchArm: closure.selectBranchArm
 			? (slot, context) => closure.selectBranchArm!(slot, context, evaluation)
@@ -489,8 +499,9 @@ async function evaluatePrerenderDataComponent(input: {
 					repeatIndex: context.repeatIndex,
 					asyncError: context.asyncError,
 					read,
+					idPrefix: input.idPrefix,
 				});
-			throw new Error(`MARKLESS_PRERENDER_RESIDUE_MISSING: ${residue.source}`);
+			throw new Error('MARKLESS_PRERENDER_RESIDUE_MISSING');
 		},
 		selectBranchArm: (slot) => {
 			const branch = (definition.branches ?? []).find(

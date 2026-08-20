@@ -5,6 +5,17 @@ import type {
 } from './evaluator.ts';
 
 /**
+ * The seed-map key a widget root's instance token travels under, restating
+ * MARKLESS_WIDGET_INSTANCE_KEY in @markless/compiler (public-render's
+ * residue-reader) so the browser never imports the compiler. It is not a graph
+ * node id: it names WHICH rendered widget the parts seeded from this map belong
+ * to, which is what a shared() element() handle's minted id has to carry.
+ * shared-seed-widget.test.ts pins this spelling; element-handle-idref.test.ts
+ * proves the two sides agree end to end.
+ */
+export const MARKLESS_WIDGET_INSTANCE_KEY = 'markless:widget-instance';
+
+/**
  * A projecting component's shared-instance seeds, which the components
  * projected into it must read before they render. Answering means running the
  * projected-into child's seed symbols from its props, so the answer is
@@ -16,6 +27,7 @@ export type SharedSeedPass = (
 	context: {
 		readonly surface: PrerenderDataSurface;
 		readonly symbolPrefix: string;
+		readonly idPrefix: string;
 		readonly loadSymbol: (symbolId: string) => unknown | Promise<unknown>;
 	},
 	definition: PrerenderDataDefinition,

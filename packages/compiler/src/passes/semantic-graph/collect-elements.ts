@@ -53,6 +53,7 @@ import {
 	unboundElementHandleDiagnostic,
 	compositeIdrefElementHandleDiagnostic,
 	rowOwnedIdrefElementHandleDiagnostic,
+	widgetRootIdrefElementHandleDiagnostic,
 	unboundIdrefElementHandleDiagnostic,
 } from './diagnostics.ts';
 import { isIdrefAttribute } from './idref-attributes.ts';
@@ -486,12 +487,51 @@ function resolveElementHandleIdrefs(
 			graph.diagnostics.push(rowOwnedIdrefElementHandleDiagnostic(reference));
 			continue;
 		}
+		const handleBinding = graph.graphBindings.find(
+			(binding) => binding.kind === 'element' && binding.name === bound.handleName,
+		);
+		if (!handleBinding) {
+			graph.diagnostics.push(unboundIdrefElementHandleDiagnostic(reference));
+			continue;
+		}
+		if (handleBinding.sharedDefinitionId !== undefined) {
+			// A widget's own root resolves the factory before any part of it
+			// renders, so the token naming the widget instance is not readable
+			// from inside the root itself; only the parts it seeds carry it.
+			const widgetRoot = widgetRootComponentName(graph, handleBinding.sharedDefinitionId);
+			if (
+				widgetRoot === undefined ||
+				widgetRoot === reference.componentName ||
+				widgetRoot === bound.componentName
+			) {
+				graph.diagnostics.push(widgetRootIdrefElementHandleDiagnostic(reference));
+				continue;
+			}
+		}
 		graph.elementHandleIdrefs.push({
 			...reference,
+			handleGraphNodeId: handleBinding.id,
 			boundHostNodeId: bound.hostNodeId,
 			order: graph.elementHandleIdrefs.length,
 		});
 	}
+}
+
+/**
+ * The component that resolves a widget-scoped factory first owns its nodes, so
+ * its rendered instance is the widget root every other part is seeded from.
+ */
+function widgetRootComponentName(
+	graph: MutableSemanticGraphArtifact,
+	sharedDefinitionId: string,
+): string | undefined {
+	const definition = graph.sharedDefinitions.find(
+		(candidate) => candidate.id === sharedDefinitionId,
+	);
+	if (definition?.scope !== 'widget') return undefined;
+	return graph.sharedInstances.find(
+		(instance) => instance.definitionId === sharedDefinitionId && instance.componentName,
+	)?.componentName;
 }
 
 function moduleScopeElementName(message: string): string | null {
@@ -1033,14 +1073,17 @@ function elementHandlePath(
 function resolvedElementHandleName(expression: AnyNode, state: WalkState): string | null {
 	const source = expressionSource(expression, state.source);
 	if (!source) return null;
-	const resolved = resolveGraphPath(
-		source,
-		graphBindingMap(state.graph),
-		semanticAliasMap(state.graph),
-	);
-	// A member path such as `label.id` is a render-time DOM read, not identity;
-	// it keeps falling through to MARKLESS_ELEMENT_HANDLE_RENDER_READ.
-	if (!resolved || resolved.binding.kind !== 'element' || resolved.path.length > 0) return null;
+	// `checkbox.triggerEl` names a handle the shared factory declared; the same
+	// two-route lookup the el= path uses, so one form does not silently become a
+	// value read while the other records a relationship.
+	const resolved =
+		elementHandlePath(resolveSharedInstanceGraphPath(source, state.graph)) ??
+		// A member path such as `label.id` is a render-time DOM read, not identity;
+		// it keeps falling through to MARKLESS_ELEMENT_HANDLE_RENDER_READ.
+		elementHandlePath(
+			resolveGraphPath(source, graphBindingMap(state.graph), semanticAliasMap(state.graph)),
+		);
+	if (!resolved) return null;
 	return resolved.binding.name;
 }
 

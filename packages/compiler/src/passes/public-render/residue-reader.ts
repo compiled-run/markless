@@ -36,6 +36,62 @@ export function authoredResidueReadCases(sources: ReadonlyArray<string>): string
 	return sources.map((source) => `case ${JSON.stringify(source)}:return (${source});`);
 }
 
+/**
+ * The seed-map key a widget root's instance token travels under. It is not a
+ * graph node id: it names WHICH rendered widget the parts seeded from this map
+ * belong to, which is what a shared() handle's minted id has to carry.
+ */
+export const MARKLESS_WIDGET_INSTANCE_KEY = 'markless:widget-instance';
+
+/** Every element() handle whose minted id one chunk set has to spell. */
+export function elementHandleIdSources(chunks: RenderChunks): ReadonlyArray<string> {
+	const handles = new Set<string>();
+	for (const chunk of chunks) {
+		for (const slot of chunk.slots) {
+			if ('residue' in slot && slot.residue.kind === 'element-handle-id')
+				handles.add(slot.residue.handleGraphNodeId);
+			if (slot.kind !== 'dynamic-host') continue;
+			for (const attribute of slot.attributeSlots)
+				if (attribute.residue.kind === 'element-handle-id')
+					handles.add(attribute.residue.handleGraphNodeId);
+		}
+	}
+	return [...handles];
+}
+
+/**
+ * The one spelling of a minted element() id, compiled into the server module's
+ * reader and the client one from this single description: the element that
+ * carries the id and every IDREF that names it read the same residue, so the
+ * two sides of the relationship cannot be spelled differently.
+ *
+ * A component-local handle is one element per rendered component, so the
+ * render's own id prefix names it. A shared() factory handle is one element per
+ * rendered WIDGET, so it takes the token the widget root registered before the
+ * parts placed inside it rendered. A missing token means the part rendered
+ * outside any widget root: it throws instead of minting an id that a second
+ * widget on the page would also mint.
+ */
+export function elementHandleIdReadCase(input: {
+	readonly idPrefixSource: string;
+	readonly widgetInstanceSource: string | null;
+}): string {
+	const prefix = input.widgetInstanceSource
+		? `(residue.handleGraphNodeId.startsWith('shared:')?(${input.widgetInstanceSource}??${MISSING_WIDGET_INSTANCE}):${input.idPrefixSource})`
+		: input.idPrefixSource;
+	return `if(residue.kind==='element-handle-id')return 'mx-'+(${prefix}+residue.handleGraphNodeId).replace(/\\W+/g,'-');`;
+}
+
+// A part rendered outside every widget root has no token; refusing loudly is
+// the only alternative to minting an id a second widget would mint too.
+const MISSING_WIDGET_INSTANCE =
+	"(()=>{throw new Error('MARKLESS_ELEMENT_HANDLE_WIDGET_INSTANCE_MISSING: '+residue.handleGraphNodeId)})()";
+
+/** Whether any of these handles is declared by a shared() factory. */
+export function hasSharedElementHandle(handles: ReadonlyArray<string>): boolean {
+	return handles.some((handle) => handle.startsWith('shared:'));
+}
+
 // A component's shared-instance local (`const checkbox = checkboxState()`) is
 // not a graph binding: it names a factory whose returned properties each stand
 // for one graph node. A composite residue over that local (`checkbox.checked
@@ -85,10 +141,12 @@ export function emitClientResidueReader(
 	rootComponentName: string | undefined,
 	componentAst: AnyNode | undefined,
 ): string | null {
-	const sources = authoredResidueSources(
-		input.renderData.chunks.filter((chunk) => chunk.componentName === componentName),
+	const componentChunks = input.renderData.chunks.filter(
+		(chunk) => chunk.componentName === componentName,
 	);
-	if (sources.length === 0) return null;
+	const sources = authoredResidueSources(componentChunks);
+	const handles = elementHandleIdSources(componentChunks);
+	if (sources.length === 0 && handles.length === 0) return null;
 	const text = sources.join('\n');
 	const bound = new Set<string>();
 	const lines: string[] = [];
@@ -128,8 +186,18 @@ export function emitClientResidueReader(
 				`${CONTEXT}.read(${JSON.stringify(graphNodeId)}, ${JSON.stringify(path)})`,
 		),
 	);
+	const mintCase =
+		handles.length > 0
+			? elementHandleIdReadCase({
+					idPrefixSource: `(${CONTEXT}.idPrefix??'')`,
+					widgetInstanceSource: hasSharedElementHandle(handles)
+						? `${CONTEXT}.read(${JSON.stringify(MARKLESS_WIDGET_INSTANCE_KEY)})`
+						: null,
+				})
+			: '';
 	return [
 		`(residue,${CONTEXT})=>{`,
+		mintCase,
 		lines.join(''),
 		`switch(residue.source){`,
 		authoredResidueReadCases(sources).join(''),
