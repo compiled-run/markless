@@ -2,6 +2,7 @@ import {
 	marklessComposedInstancePath,
 	marklessComposedSyncPolicy,
 	marklessComposeState,
+	marklessRegisterComposedWidgets,
 	marklessCsrChildReadIsStatic,
 	marklessCsrRemapChildGraph,
 	marklessCsrRemapChildDomUpdate,
@@ -608,6 +609,10 @@ export function marklessSsrComposeView(
 	asyncSnapshots: ReadonlyArray<SsrAsyncSnapshotEntry>,
 	idPrefix = '',
 ) {
+	// View composition qualifies child dom updates before state composition runs,
+	// so the widget roots must be known by here or a widget's reads land on the
+	// first widget of its family.
+	marklessRegisterComposedWidgets(children);
 	const renderedHostIds = new Set(structure.locators.map((locator) => locator.hostNodeId));
 	const plannedArmHostIds = new Set(
 		(view.asyncBoundaries ?? []).flatMap((boundary) => {

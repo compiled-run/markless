@@ -54,6 +54,9 @@ export function collectSharedInstance(input: {
 		definitionId: definition.id,
 		definitionName: definition.name,
 		localName: input.localName,
+		...(input.state.currentComponentName
+			? { componentName: input.state.currentComponentName }
+			: {}),
 		source: expressionSource(input.init, input.state.source),
 		sourceSpan: sourceSpan(input.init, input.state.filename),
 	});
@@ -573,7 +576,12 @@ function sharedScopeFromOptions(
 			);
 			return undefined;
 		}
-		if (value.value === 'request' || value.value === 'container' || value.value === 'page') {
+		if (
+			value.value === 'request' ||
+			value.value === 'container' ||
+			value.value === 'page' ||
+			value.value === 'widget'
+		) {
 			return value.value;
 		}
 		state.graph.diagnostics.push(

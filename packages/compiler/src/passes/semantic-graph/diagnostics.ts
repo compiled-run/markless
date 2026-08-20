@@ -634,7 +634,7 @@ export function invalidSharedScopeDiagnostic(input: {
 	readonly valueSource?: string;
 	readonly valueSpan?: SourceSpan;
 }): SemanticGraphDiagnostic {
-	const valid = '"request", "container", and "page"';
+	const valid = '"request", "container", "page", and "widget"';
 	const literal = input.valueSource?.startsWith("'") || input.valueSource?.startsWith('"');
 	const valueText = literal ? `"${input.valueSource?.slice(1, -1)}"` : input.valueSource;
 	return semanticGraphDiagnostic({
@@ -643,10 +643,10 @@ export function invalidSharedScopeDiagnostic(input: {
 		message: literal
 			? `Unknown shared() scope ${valueText}. Valid scopes are ${valid}.`
 			: `shared() scope must be a string literal. Valid scopes are ${valid}.`,
-		why: 'shared() scope controls graph lifetime. Silently dropping an unknown scope changes whether data is request, container, or page owned.',
+		why: 'shared() scope controls graph lifetime. Silently dropping an unknown scope changes whether data is request, container, page, or widget owned.',
 		span: input.valueSpan,
 		suggestion:
-			'Use `shared(factory, { scope: "request" })`, `shared(factory, { scope: "container" })`, or `shared(factory, { scope: "page" })`.',
+			'Use `shared(factory, { scope: "request" })`, `shared(factory, { scope: "container" })`, `shared(factory, { scope: "page" })`, or `shared(factory, { scope: "widget" })`.',
 		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_SCOPE_INVALID',
 	});
 }

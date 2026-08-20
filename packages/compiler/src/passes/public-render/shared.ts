@@ -593,8 +593,23 @@ function payloadNodeOwners(
 		if (queue) queue.push(binding.componentName);
 		else pending.set(binding.id, [binding.componentName]);
 	}
+	// A widget-scoped shared() graph is one instance per rendered widget, so its
+	// nodes belong to the first component that resolves the definition, not to the
+	// module root: that component's composed instance path is the widget root.
+	const widgetOwner = new Map<string, string>();
+	for (const definition of input.semanticGraph.sharedDefinitions) {
+		if (definition.scope !== 'widget') continue;
+		const resolver = input.semanticGraph.sharedInstances.find(
+			(instance) => instance.definitionId === definition.id && instance.componentName,
+		);
+		if (resolver?.componentName) widgetOwner.set(definition.id, resolver.componentName);
+	}
 	const ownerOf = (graphNodeId: string): string => {
-		if (isPageSpaceGraphNodeId(graphNodeId)) return rootComponentName;
+		if (isPageSpaceGraphNodeId(graphNodeId))
+			return (
+				widgetOwner.get(graphNodeId.slice(0, graphNodeId.lastIndexOf('/'))) ??
+				rootComponentName
+			);
 		const queue = pending.get(graphNodeId);
 		const declared = queue && queue.length > 1 ? queue.shift() : queue?.[0];
 		return declared ?? chunkOwner.get(graphNodeId) ?? rootComponentName;

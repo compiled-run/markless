@@ -142,7 +142,7 @@ import { shared, state } from '@markless/core';
 export const session = shared(() => {
 	const data = state({ status: 'anonymous' });
 	return { ...data };
-}, { scope: 'widget' });
+}, { scope: 'session' });
 
 export function App() @{
 	const currentSession = session();

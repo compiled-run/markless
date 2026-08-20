@@ -186,7 +186,7 @@ export type ModuleGraphInterfaceArtifact = {
 	};
 };
 
-export type SemanticSharedScope = 'request' | 'container' | 'page';
+export type SemanticSharedScope = 'request' | 'container' | 'page' | 'widget';
 
 export type SemanticSharedDependency = {
 	readonly definitionId: string;
@@ -226,6 +226,9 @@ export type SemanticSharedInstance = {
 	readonly definitionId: string;
 	readonly definitionName: string;
 	readonly localName: string;
+	// The component whose body resolved the definition; widget scope needs it to
+	// decide which composed instances belong to one rendered widget.
+	readonly componentName?: string;
 	readonly source: string;
 	readonly sourceSpan?: SourceSpan;
 };

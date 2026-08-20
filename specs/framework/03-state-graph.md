@@ -648,10 +648,27 @@ inside one `.tsrx` module:
   inlined: binding call-site arguments the graph cannot see is outside this
   lowering.
 - **Page scope is the default.** Omitting `scope` resolves the definition to one
-  instance for the page. `'request'`, `'container'`, and `'page'` are accepted
-  and recorded on the definition; any other value fails the compile closed with
-  `MARKLESS_SHARED_SCOPE_INVALID`, so the `widget` scope described above is a
-  design target that is not accepted yet.
+  instance for the page. `'request'`, `'container'`, `'page'`, and `'widget'`
+  are accepted and recorded on the definition; any other value fails the compile
+  closed with `MARKLESS_SHARED_SCOPE_INVALID`.
+- **Widget scope is per rendered widget.** A `widget`-scoped definition's graph
+  nodes belong to the first component of the module that resolves it, not to the
+  module root. Composition reads that ownership back: the widget root is the
+  outermost composed instance that carries the definition's cells, and every
+  other piece of the widget — trigger, content, item — finds that root as the
+  longest registered widget-root prefix of its own instance path. The instance id
+  is the definition id qualified by the widget-root path
+  (`c0:shared:select.tsrx#select/state:s`), so a widget-scoped `shared:` id is
+  the one page-space family composition does qualify. A widget nested inside
+  another widget's content owns its own root path; two widgets of one family
+  nested inside one another resolve to the outermost of the two, which is what
+  "the outermost component that resolves the definition" means above.
+- **No compile diagnostic is owed for widget scope.** Spec 03's normative refusal
+  is compose-time — "a child node id that composition cannot classify is a
+  compose-time refusal" — and a widget-scoped id is always classifiable: it is
+  either qualified by a registered widget root or, when the resolving component
+  is the page itself and has no instance path, page-wide, which is the same
+  answer page scope gives.
 
 Two follow-ups are named here rather than implied by the lowering:
 

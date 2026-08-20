@@ -435,7 +435,7 @@ test('B919 reports unknown shared scope strings', async () => {
 		expect.objectContaining({
 			code: 'MARKLESS_SHARED_SCOPE_INVALID',
 			message:
-				'Unknown shared() scope "session". Valid scopes are "request", "container", and "page".',
+				'Unknown shared() scope "session". Valid scopes are "request", "container", "page", and "widget".',
 			primarySpan: {
 				filename: 'src/session.tsrx',
 				start: scopeStart,
@@ -457,7 +457,7 @@ test('B919 reports non-literal shared scope values', async () => {
 		expect.objectContaining({
 			code: 'MARKLESS_SHARED_SCOPE_INVALID',
 			message:
-				'shared() scope must be a string literal. Valid scopes are "request", "container", and "page".',
+				'shared() scope must be a string literal. Valid scopes are "request", "container", "page", and "widget".',
 			primarySpan: {
 				filename: 'src/session.tsrx',
 				start: scopeStart,

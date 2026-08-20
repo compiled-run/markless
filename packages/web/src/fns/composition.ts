@@ -4,6 +4,7 @@ import {
 	marklessInstancePath,
 	marklessInstanceScopedGraph,
 	marklessMarkComposedSymbol,
+	marklessRegisterWidgetInstanceIds,
 } from './instance-scope.ts';
 import type { ResumeSymbol, ResumeSymbolContext } from '../resume-types.ts';
 
@@ -44,10 +45,21 @@ export type ComposeStateComputed = ComposeStateNode & {
 	readonly deriveSymbolId?: string;
 	readonly dependencies?: ReadonlyArray<ComposeGraphRead>;
 };
+export type ComposeSharedDefinition = {
+	readonly id: string;
+	readonly scope?: string;
+	readonly graphNodeIds?: ReadonlyArray<string>;
+	readonly returnProperties?: ReadonlyArray<{
+		readonly kind: string;
+		readonly graphNodeId?: string;
+		readonly [key: string]: unknown;
+	}>;
+	readonly [key: string]: unknown;
+};
 export type ComposeStateDraft = {
 	cells?: ReadonlyArray<ComposeStateNode>;
 	computed?: ReadonlyArray<ComposeStateComputed>;
-	sharedDefinitions?: ReadonlyArray<unknown>;
+	sharedDefinitions?: ReadonlyArray<ComposeSharedDefinition>;
 	readonly [key: string]: unknown;
 };
 export type ComposeLoadSymbol = (symbolId: string) => ResumeSymbol | Promise<ResumeSymbol>;
@@ -104,6 +116,69 @@ export function marklessQualifyChildState(
 	}));
 }
 
+// A `widget`-scoped definition is one graph per rendered widget. The widget root
+// is the OUTERMOST composed instance that owns the definition's cells — the
+// compiler gives those cells to the first component that resolves it, so a
+// root/trigger/content family contributes exactly one owner per widget, and a
+// widget nested in another widget's content contributes its own. Every other
+// piece of the widget finds that root by instance-path prefix.
+export function marklessRegisterComposedWidgets(children: ReadonlyArray<ComposeChild>): void {
+	const owners = new Map<string, string[]>();
+	for (const child of children) {
+		const instancePath = marklessComposedInstancePath(child);
+		if (!instancePath) continue;
+		for (const definition of child.output?.state?.sharedDefinitions ?? []) {
+			if (definition.scope !== 'widget') continue;
+			if (
+				!(child.output?.state?.cells ?? []).some((cell) =>
+					cell.graphNodeId.startsWith(definition.id + '/'),
+				)
+			)
+				continue;
+			owners.set(definition.id, [...(owners.get(definition.id) ?? []), instancePath]);
+		}
+	}
+	const roots: string[] = [];
+	for (const [definitionId, paths] of owners)
+		for (const path of paths)
+			if (!paths.some((other) => other !== path && path.startsWith(other)))
+				roots.push(path + definitionId);
+	marklessRegisterWidgetInstanceIds(roots);
+}
+
+function marklessComposedSharedDefinition(
+	definition: ComposeSharedDefinition,
+	instancePath: string,
+): ComposeSharedDefinition {
+	if (definition.scope !== 'widget' || !instancePath) return definition;
+	return {
+		...definition,
+		id: marklessComposedGraphNodeId(definition.id, instancePath),
+		...(definition.graphNodeIds
+			? {
+					graphNodeIds: definition.graphNodeIds.map((graphNodeId) =>
+						marklessComposedGraphNodeId(graphNodeId, instancePath),
+					),
+				}
+			: {}),
+		...(definition.returnProperties
+			? {
+					returnProperties: definition.returnProperties.map((property) =>
+						typeof property.graphNodeId === 'string'
+							? {
+									...property,
+									graphNodeId: marklessComposedGraphNodeId(
+										property.graphNodeId,
+										instancePath,
+									),
+								}
+							: property,
+					),
+				}
+			: {}),
+	};
+}
+
 export function marklessComposeState<T extends ComposeStateDraft>(
 	state: T,
 	children: ReadonlyArray<ComposeChild>,
@@ -112,6 +187,7 @@ export function marklessComposeState<T extends ComposeStateDraft>(
 		.map((child) => child.output?.state)
 		.filter((childState): childState is ComposeStateDraft => Boolean(childState));
 	if (!childStates.length) return state;
+	marklessRegisterComposedWidgets(children);
 	for (const child of children) {
 		const output = child.output;
 		if (!output?.state) continue;
@@ -121,8 +197,18 @@ export function marklessComposeState<T extends ComposeStateDraft>(
 	}
 	const sharedDefinitions = [
 		...(state.sharedDefinitions ?? []),
-		...childStates.flatMap((childState) => childState.sharedDefinitions ?? []),
-	];
+		...children.flatMap((child) =>
+			(child.output?.state?.sharedDefinitions ?? []).map((definition) =>
+				marklessComposedSharedDefinition(
+					definition,
+					marklessComposedInstancePath(child),
+				),
+			),
+		),
+	].filter(
+		(definition, index, all) =>
+			all.findIndex((other) => other.id === definition.id) === index,
+	);
 	return {
 		...state,
 		cells: [

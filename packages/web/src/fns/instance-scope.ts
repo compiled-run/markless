@@ -63,6 +63,10 @@ export function marklessInstanceScopedGraph(
 	instancePath: string,
 ): RuntimeGraph {
 	if (!instancePath) return graph;
+	// Resume loads a widget piece's symbol by its instance path alone; the widget
+	// roots it must map onto are the qualified definition ids the payload carries.
+	for (const definition of graph.listSharedDefinitions?.() ?? [])
+		if (definition.scope === 'widget') widgetInstanceIds.add(definition.id);
 	// Page-space families (shared, storage) keep their page ids through every adapter.
 	const qualify = (graphNodeId: string) => marklessComposedGraphNodeId(graphNodeId, instancePath);
 	return {
@@ -86,11 +90,49 @@ export function marklessInstanceScopedGraph(
 // the browser never imports the serializer's protocol module.
 const PAGE_SPACE_ID = /^(?:[cp]\d+:)*(?:shared|storage):/;
 
-// Every id family a component owns is instance-local; a shared() graph and a
-// persisted storage slot are page-space on purpose. The compiler refuses at
-// build time to emit an id belonging to neither, so this stays a concatenation.
+// Widget-scoped shared() definitions are the one page-space family that is NOT
+// page-wide: one graph per rendered widget, keyed by the instance path of the
+// outermost component that resolves the definition. Composition registers those
+// widget-root ids as it merges children; browser resume registers them from the
+// definitions the payload already carries. A page with no widget-scoped
+// definition never fills this set and never pays for the lookup.
+const widgetInstanceIds = new Set<string>();
+
+export function marklessRegisterWidgetInstanceIds(ids: Iterable<string>): void {
+	for (const id of ids) widgetInstanceIds.add(id);
+}
+
+// The widget this child-local `shared:` id belongs to: the longest prefix of the
+// child's instance path registered as a widget root for that definition.
+function marklessWidgetRootPath(graphNodeId: string, instancePath: string): string {
+	if (widgetInstanceIds.size === 0) return '';
+	// The id is either a definition id (`shared:<file>#<export>`) or one of its
+	// nodes (`<definitionId>/<kind>:<name>`). The definition id carries the module
+	// path, which has separators of its own, so ask the registry both ways instead
+	// of guessing which separator splits them.
+	const slash = graphNodeId.lastIndexOf('/');
+	for (let end = instancePath.length; end > 0; end--) {
+		if (instancePath[end - 1] !== ':') continue;
+		const prefix = instancePath.slice(0, end);
+		if (
+			widgetInstanceIds.has(prefix + graphNodeId) ||
+			(slash > 0 && widgetInstanceIds.has(prefix + graphNodeId.slice(0, slash)))
+		)
+			return prefix;
+	}
+	return '';
+}
+
+// Every id family a component owns is instance-local; a page-scoped shared()
+// graph and a persisted storage slot are page-space on purpose. The compiler
+// refuses at build time to emit an id belonging to neither, so this stays a
+// concatenation.
 export function marklessComposedGraphNodeId(graphNodeId: string, instancePath: string): string {
-	if (!instancePath || PAGE_SPACE_ID.test(graphNodeId)) return graphNodeId;
+	if (!instancePath) return graphNodeId;
+	if (PAGE_SPACE_ID.test(graphNodeId))
+		return graphNodeId.startsWith('shared:')
+			? marklessWidgetRootPath(graphNodeId, instancePath) + graphNodeId
+			: graphNodeId;
 	return instancePath + graphNodeId;
 }
 

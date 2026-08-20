@@ -904,6 +904,7 @@ test('buildSemanticGraph records shared definitions and instance calls', async (
 			definitionId: 'shared:src/session.tsrx#session',
 			definitionName: 'session',
 			localName: 'currentSession',
+			componentName: 'Header',
 			source: 'session()',
 			sourceSpan: {
 				filename: 'src/session.tsrx',
@@ -945,6 +946,7 @@ export function Header() @{
 			definitionId: 'shared:./session.tsrx#session',
 			definitionName: 'session',
 			localName: 'currentSession',
+			componentName: 'Header',
 			source: 'useSession()',
 			sourceSpan: {
 				filename: 'src/Header.tsrx',
@@ -990,6 +992,7 @@ test('buildSemanticGraph records same-module shared definition dependencies', as
 			definitionId: 'shared:src/cart.tsrx#cart',
 			definitionName: 'cart',
 			localName: 'activeCart',
+			componentName: 'CartButton',
 			source: 'cart()',
 			sourceSpan: {
 				filename: 'src/cart.tsrx',

@@ -124,12 +124,28 @@ export function collectPublicRenderComponentDefinitions(
 				),
 			),
 		);
+		// A widget-scoped shared() graph is one instance per rendered widget, so its
+		// nodes travel with the components that resolve it, not with the module root.
+		const widgetScoped = new Set(
+			input.semanticGraph.sharedDefinitions.flatMap((definition) =>
+				definition.scope === 'widget' ? [definition.id] : [],
+			),
+		);
+		const resolvedDefinitionIds = new Set(
+			input.semanticGraph.sharedInstances.flatMap((instance) =>
+				instance.componentName === componentName ? [instance.definitionId] : [],
+			),
+		);
 		const stateGraphNodeIds = input.semanticGraph.graphBindings.flatMap((binding) =>
 			binding.componentName === componentName ||
 			usedGraphNodeIds.has(binding.id) ||
+			(binding.sharedDefinitionId !== undefined &&
+				widgetScoped.has(binding.sharedDefinitionId) &&
+				resolvedDefinitionIds.has(binding.sharedDefinitionId)) ||
 			// A shared() node belongs to the page, so the root keeps it even when
 			// only a child component reads it.
 			(binding.sharedDefinitionId !== undefined &&
+				!widgetScoped.has(binding.sharedDefinitionId) &&
 				componentName === rootInfo.componentName) ||
 			(!binding.componentName &&
 				binding.sharedDefinitionId === undefined &&
