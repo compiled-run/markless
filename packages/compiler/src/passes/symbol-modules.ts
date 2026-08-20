@@ -4196,3 +4196,764 @@ function branchRowsFunctionNode(): EmissionNode {
 		),
 	]);
 }
+
+// ---------------------------------------------------------------------------
+// Value-expression emission through the AST printer.
+//
+// `specs/framework/14-emission-codegen-migration.md`, stage 1, sketch item 4 —
+// `emitSymbolModule`, the general path, together with the value-source cluster
+// it reaches: `supportedValueSource` through `binaryValueOperatorPrecedence`
+// (the spec measures that cluster at lines 1552-2107 of the 2,789-line
+// baseline; it sits at `supportedValueSource` .. `binaryValueOperatorPrecedence`
+// in this file today).
+//
+// The cluster's whole job is to re-derive, from characters, facts a parser
+// already knows: where a top-level operator is, which colon separates an object
+// key from its value, which comma is a real separator and which one is inside a
+// nested literal or a string. This band asks the parser instead. One parse of
+// the authored value source, one recursive walk that keeps the same support
+// envelope, and the printer supplies precedence, parentheses, and quoting.
+//
+// It is not the wired path. `supportedValueSource` and `eventWriteValueSource`
+// above still produce the bytes the compiler ships;
+// `test/emit-symbol-module.test.ts` runs both over the same value sources and
+// records exactly where the printed text differs from the spliced text.
+// Invariant 5 keeps the scanners alive until stage 1's final unit, and this band
+// calls none of them: the four predicates it needs (`isIdentifierObjectKey`'s
+// regex, `isSupportedObjectLiteralKey`'s three regexes,
+// `isSupportedStaticCallCallee`'s dotted-path regex, and the
+// `knownGlobalStaticCallRoots` set) are re-expressed inside the band rather
+// than shared, exactly as the async-runner band re-expresses its two.
+// ---------------------------------------------------------------------------
+
+/** `foo` — the identifier shape `isIdentifierObjectKey` tests for. */
+const VALUE_IDENTIFIER_PATTERN = /^[$A-Z_a-z][$0-9A-Z_a-z]*$/;
+
+/** `a.b.c` — the callee shape `isSupportedStaticCallCallee` tests for. */
+const VALUE_STATIC_CALLEE_PATTERN = /^[$A-Z_a-z][$0-9A-Z_a-z]*(?:\.[$A-Z_a-z][$0-9A-Z_a-z]*)*$/;
+
+/** The band-local twin of `knownGlobalStaticCallRoots`. */
+const VALUE_GLOBAL_CALL_ROOTS: ReadonlySet<string> = new Set([
+	'Array',
+	'Boolean',
+	'Date',
+	'JSON',
+	'Math',
+	'Number',
+	'Object',
+	'String',
+]);
+
+/**
+ * The operators `binaryValueOperators` lists, as a set.
+ *
+ * Membership is the whole of what the AST path needs from that table: the
+ * precedence half (`binaryValueOperatorPrecedence`, `splitOperator`) exists only
+ * to find the split point in a flat string, which a parse already gives, and the
+ * re-parenthesization half is the printer's job under `preserveParens: false`.
+ */
+const VALUE_BINARY_OPERATORS: ReadonlySet<string> = new Set([
+	'===',
+	'!==',
+	'>>>',
+	'<<',
+	'>>',
+	'>=',
+	'<=',
+	'&&',
+	'||',
+	'??',
+	'**',
+	'==',
+	'!=',
+	'>',
+	'<',
+	'+',
+	'-',
+	'*',
+	'/',
+	'%',
+	'&',
+	'|',
+	'^',
+]);
+
+/** The prefix operators `unaryValueOperator` accepts. */
+const VALUE_UNARY_OPERATORS: ReadonlySet<string> = new Set(['!', '+', '-', '~']);
+
+export type ValueExpressionEmissionInput = {
+	/** The authored expression text, as the lowering recorded it. */
+	readonly valueSource: string | undefined;
+	readonly eventParameters: ReadonlyArray<string>;
+	readonly graphReads: ReadonlyArray<LoweredStateRead>;
+	readonly moduleImports: ReadonlyArray<SemanticModuleImport>;
+	readonly localNames: ReadonlySet<string>;
+	/** The authored file the value came from; names the map at the print site. */
+	readonly sourceFileName: string;
+};
+
+export type ValueExpressionEmission = {
+	readonly node: EmissionNode;
+	/**
+	 * The projected text every node in `node` carries an offset into.
+	 *
+	 * A print site has to hand this to `printEmittedModule` as its `source`, or
+	 * the map attributes the value's positions to a different string.
+	 */
+	readonly source: string;
+};
+
+/**
+ * The AST twin of `supportedValueSource`.
+ *
+ * Same envelope, decided from a tree instead of from characters: `null` for any
+ * shape the string path also refuses, so a caller's supported/unsupported
+ * branch does not move when the swap lands.
+ */
+export function buildValueExpressionEmission(
+	input: ValueExpressionEmissionInput,
+): ValueExpressionEmission | null {
+	const projection = valueExpressionProjection(input.valueSource, input.sourceFileName);
+	if (!projection) return null;
+
+	const node = valueExpressionNode(projection.expression, projection.source, input);
+	return node ? { node, source: projection.source } : null;
+}
+
+/**
+ * The AST twin of `eventWriteValueSource`: the supported envelope first, then
+ * the identifier-rewrite fallback for everything else.
+ *
+ * The fallback is where the text path is least defensible. `replaceIdentifierPath`
+ * matches on characters with only identifier-boundary guards, so it rewrites a
+ * graph-read name that happens to appear inside a string literal, and it turns
+ * an authored shorthand property `{ count }` into the syntactically invalid
+ * `{ context.locals?.count }`. Rewriting by node identity (invariant 6) cannot do
+ * either: a string literal is not an identifier node, and a shorthand property
+ * is expanded to `count: <rewritten>` because that is what the tree says it is.
+ * Both divergences are recorded in the parity test rather than hidden here.
+ */
+export function buildEventWriteValueEmission(
+	input: ValueExpressionEmissionInput,
+): ValueExpressionEmission | null {
+	const supported = buildValueExpressionEmission(input);
+	if (supported) return supported;
+
+	const projection = valueExpressionProjection(input.valueSource, input.sourceFileName);
+	if (!projection) return null;
+
+	return {
+		node: rewriteGraphReadsAndLocals(projection.expression, projection.source, input),
+		source: projection.source,
+	};
+}
+
+type ValueExpressionProjection = {
+	/** The one text every node parsed here carries an offset into. */
+	readonly source: string;
+	readonly expression: AnyNode;
+};
+
+/**
+ * Parse one authored value expression, once.
+ *
+ * The expression is parenthesized so it parses as an expression statement in
+ * every authored form — an object literal at statement start would otherwise be
+ * a block, and a string literal would be a directive. `preserveParens: false`
+ * then drops the wrapper, and the printer re-derives whatever parentheses the
+ * expression actually needs in the position it lands in.
+ */
+function valueExpressionProjection(
+	valueSource: string | undefined,
+	filename: string,
+): ValueExpressionProjection | null {
+	const trimmed = valueSource?.trim();
+	if (!trimmed) return null;
+
+	const source = `(${trimmed});`;
+	const { program, errors } = parseEmissionSource(source, filename, 'ts');
+	if (errors.length > 0) return null;
+
+	const statements = asNodes((program as unknown as AnyNode).body);
+	if (statements.length !== 1) return null;
+
+	const only = statements[0];
+	if (!only || only.type !== 'ExpressionStatement' || !isNode(only.expression)) return null;
+
+	return { source, expression: only.expression };
+}
+
+/** The authored text a node spans, trimmed — the string the scanners compared. */
+function valueNodeText(node: AnyNode, source: string): string {
+	const { start, end } = node;
+	if (typeof start !== 'number' || typeof end !== 'number') return '';
+
+	return source.slice(start, end).trim();
+}
+
+/**
+ * One node of `supportedValueSource`, in the same order it tries its cases.
+ *
+ * The four leaf cases run first and on the node's own authored text, because
+ * that is what the string path matches on: a graph read is recognized by its
+ * recorded `source` string, not by its shape. Only when all four miss does the
+ * walk descend into the node's structure.
+ */
+function valueExpressionNode(
+	node: AnyNode,
+	source: string,
+	input: ValueExpressionEmissionInput,
+): EmissionNode | null {
+	const text = valueNodeText(node, source);
+	if (!text) return null;
+
+	const leaf =
+		literalValueNode(node, text) ??
+		eventFieldValueNode(text, input.eventParameters) ??
+		graphReadValueNode(text, input.graphReads) ??
+		localValueNode(text, input.localNames);
+	if (leaf) return leaf;
+
+	if (node.type === 'ArrayExpression') return arrayLiteralValueNode(node, source, input);
+	if (node.type === 'ObjectExpression') return objectLiteralValueNode(node, source, input);
+	if (node.type === 'CallExpression') return staticCallValueNode(node, source, input);
+	if (node.type === 'UnaryExpression') return unaryValueNode(node, source, input);
+	if (node.type === 'ConditionalExpression') return conditionalValueNode(node, source, input);
+	if (node.type === 'BinaryExpression' || node.type === 'LogicalExpression') {
+		return binaryValueNode(node, source, input);
+	}
+
+	return null;
+}
+
+/**
+ * `literalValueSource`, node-shaped.
+ *
+ * The parsed node is returned as it stands rather than rebuilt: it carries its
+ * authored `raw`, so the quote the author wrote survives under
+ * `quotes: 'preserve'`, and it carries its span, so the map points at the
+ * literal the author typed. `-1` is a unary node here and a matched literal in
+ * the string path; returning the node verbatim keeps both readings the same
+ * bytes.
+ */
+function literalValueNode(node: AnyNode, text: string): EmissionNode | null {
+	if (/^(?:true|false|null|undefined)$/.test(text)) return node as unknown as EmissionNode;
+	if (/^[+-]?(?:\d+|\d*\.\d+)(?:e[+-]?\d+)?$/i.test(text)) return node as unknown as EmissionNode;
+	if (/^(['"])(?:\\.|(?!\1).)*\1$/.test(text)) return node as unknown as EmissionNode;
+
+	return null;
+}
+
+/** `eventFieldAssignmentSource`, node-shaped. */
+function eventFieldValueNode(
+	text: string,
+	eventParameters: ReadonlyArray<string>,
+): EmissionNode | null {
+	const eventParameter = eventParameters[0];
+	if (!eventParameter) return null;
+	if (text === eventParameter) return memberChainNode('context.event');
+	if (!text.startsWith(`${eventParameter}.`)) return null;
+
+	const fields = text
+		.slice(eventParameter.length + 1)
+		.split('.')
+		.filter(Boolean);
+	if (fields.length === 0) return null;
+	if (fields.some((field) => !VALUE_IDENTIFIER_PATTERN.test(field))) return null;
+
+	if (fields[0] === 'currentTarget') {
+		const currentTargetFields = fields.slice(1);
+		return currentTargetFields.length === 0
+			? memberChainNode('context.element')
+			: optionalPathNode(memberChainNode('context.element'), currentTargetFields);
+	}
+
+	return optionalPathNode(memberChainNode('context.event'), fields);
+}
+
+/** `graphReadSource`, node-shaped. */
+function graphReadValueNode(
+	text: string,
+	graphReads: ReadonlyArray<LoweredStateRead>,
+): EmissionNode | null {
+	const graphRead = graphReads.find((read) => read.source === text);
+	if (!graphRead) return null;
+
+	return graphReadCall({
+		callee: 'context.graph.read',
+		graphNodeId: graphRead.graphNodeId,
+		path: graphRead.path,
+	});
+}
+
+/** `localValueSource`, node-shaped. */
+function localValueNode(text: string, localNames: ReadonlySet<string>): EmissionNode | null {
+	const path = staticDottedPath(text);
+	if (!path || path.length < 2) return null;
+	if (!localNames.has(path[0] ?? '')) return null;
+
+	return optionalPathNode(memberChainNode('context.locals'), path);
+}
+
+/** The band-local twin of `staticSourcePath`, which reaches the scanner band. */
+function staticDottedPath(text: string): ReadonlyArray<string> | null {
+	const parts = text.split('.');
+	if (parts.length === 0) return null;
+	if (parts.some((part) => !VALUE_IDENTIFIER_PATTERN.test(part))) return null;
+
+	return parts;
+}
+
+/**
+ * `<base>?.<a>?.<b>` as one `ChainExpression`.
+ *
+ * ESTree puts a single `ChainExpression` around the whole optional chain rather
+ * than one per link, so the links nest inside and only the outermost is wrapped.
+ * `optionalMemberNode` in the foundation builds a one-link chain, which cannot
+ * express the multi-field paths this band emits for `context.event?.a?.b`.
+ */
+function optionalPathNode(base: EmissionNode, path: ReadonlyArray<string>): EmissionNode {
+	let expression = base;
+	for (const part of path) {
+		expression = {
+			type: 'MemberExpression',
+			object: expression,
+			property: identifierNode(part),
+			computed: false,
+			optional: true,
+		};
+	}
+
+	return { type: 'ChainExpression', expression };
+}
+
+/**
+ * `arrayLiteralValueSource`, node-shaped.
+ *
+ * `splitTopLevelArrayElementSources` and `formatArrayLiteralElements` exist to
+ * keep holes and a trailing comma straight while splitting characters; the
+ * parser reports a hole as a `null` element, which is the same fact without the
+ * bookkeeping.
+ */
+function arrayLiteralValueNode(
+	node: AnyNode,
+	source: string,
+	input: ValueExpressionEmissionInput,
+): EmissionNode | null {
+	const elements: (EmissionNode | null)[] = [];
+
+	for (const element of Array.isArray(node.elements) ? node.elements : []) {
+		if (element === null || element === undefined) {
+			elements.push(null);
+			continue;
+		}
+		if (!isNode(element)) return null;
+
+		if (element.type === 'SpreadElement') {
+			if (!isNode(element.argument)) return null;
+			const spread = valueExpressionNode(element.argument, source, input);
+			if (!spread) return null;
+			elements.push(spreadNode(spread));
+			continue;
+		}
+
+		const value = valueExpressionNode(element, source, input);
+		if (!value) return null;
+		elements.push(value);
+	}
+
+	return { type: 'ArrayExpression', elements };
+}
+
+/** `objectLiteralValueSource` and `objectLiteralPropertySource`, node-shaped. */
+function objectLiteralValueNode(
+	node: AnyNode,
+	source: string,
+	input: ValueExpressionEmissionInput,
+): EmissionNode | null {
+	const properties: EmissionNode[] = [];
+
+	for (const property of asNodes(node.properties)) {
+		if (property.type === 'SpreadElement') {
+			if (!isNode(property.argument)) return null;
+			const spread = valueExpressionNode(property.argument, source, input);
+			if (!spread) return null;
+			properties.push(spreadNode(spread));
+			continue;
+		}
+
+		if (property.type !== 'Property') return null;
+		if (property.kind !== 'init' || property.method === true) return null;
+		if (!isNode(property.key) || !isNode(property.value)) return null;
+
+		const value = valueExpressionNode(property.value, source, input);
+		if (!value) return null;
+
+		const key = objectLiteralKeyNode(property, source, input);
+		if (!key) return null;
+
+		properties.push({
+			type: 'Property',
+			kind: 'init',
+			method: false,
+			shorthand: false,
+			computed: property.computed === true,
+			key,
+			value,
+		});
+	}
+
+	return { type: 'ObjectExpression', properties };
+}
+
+/**
+ * `objectLiteralKeySource`, node-shaped.
+ *
+ * A computed key is a value in its own right and goes back through the walk. A
+ * plain key is returned verbatim, and gated on the same three shapes
+ * `isSupportedObjectLiteralKey` accepts, so a key form the string path refuses
+ * (`1e3:`, `0x10:`) is still refused here.
+ */
+function objectLiteralKeyNode(
+	property: AnyNode,
+	source: string,
+	input: ValueExpressionEmissionInput,
+): EmissionNode | null {
+	const key = property.key;
+	if (!isNode(key)) return null;
+
+	if (property.computed === true) return valueExpressionNode(key, source, input);
+
+	const text = valueNodeText(key, source);
+	if (!isSupportedObjectLiteralKeyText(text)) return null;
+
+	return key as unknown as EmissionNode;
+}
+
+/** The band-local twin of `isSupportedObjectLiteralKey`. */
+function isSupportedObjectLiteralKeyText(text: string): boolean {
+	return (
+		VALUE_IDENTIFIER_PATTERN.test(text) ||
+		/^(['"])(?:\\.|(?!\1).)*\1$/.test(text) ||
+		/^(?:\d+|\d*\.\d+)$/.test(text)
+	);
+}
+
+/** `staticCallValueSource`, node-shaped. */
+function staticCallValueNode(
+	node: AnyNode,
+	source: string,
+	input: ValueExpressionEmissionInput,
+): EmissionNode | null {
+	if (node.optional === true) return null;
+	if (!isNode(node.callee)) return null;
+
+	const calleeText = valueNodeText(node.callee, source);
+	if (!VALUE_STATIC_CALLEE_PATTERN.test(calleeText)) return null;
+	if (!canEmitStaticCalleeText(calleeText, input.moduleImports)) return null;
+
+	const args: EmissionNode[] = [];
+	for (const argument of Array.isArray(node.arguments) ? node.arguments : []) {
+		if (!isNode(argument)) return null;
+		// The string path splits arguments on top-level commas and hands each one
+		// to `supportedValueSource`, which refuses a leading `...`. A spread
+		// argument is therefore unsupported on both paths.
+		if (argument.type === 'SpreadElement') return null;
+
+		const value = valueExpressionNode(argument, source, input);
+		if (!value) return null;
+		args.push(value);
+	}
+
+	return callNode(node.callee as unknown as EmissionNode, args);
+}
+
+/** The band-local twin of `canEmitStaticCallCallee`. */
+function canEmitStaticCalleeText(
+	callee: string,
+	moduleImports: ReadonlyArray<SemanticModuleImport>,
+): boolean {
+	const [rootName] = callee.split('.');
+	if (!rootName) return false;
+	if (moduleImports.some((moduleImport) => moduleImport.localName === rootName)) return true;
+	if (callee.includes('.')) return VALUE_GLOBAL_CALL_ROOTS.has(rootName);
+
+	return false;
+}
+
+/** `unaryValueSource`, node-shaped. */
+function unaryValueNode(
+	node: AnyNode,
+	source: string,
+	input: ValueExpressionEmissionInput,
+): EmissionNode | null {
+	const operator = typeof node.operator === 'string' ? node.operator : '';
+	if (node.prefix !== true || !VALUE_UNARY_OPERATORS.has(operator)) return null;
+	if (!isNode(node.argument)) return null;
+
+	const argument = valueExpressionNode(node.argument, source, input);
+	if (!argument) return null;
+
+	return { type: 'UnaryExpression', operator, prefix: true, argument };
+}
+
+/** `conditionalValueSource`, node-shaped. */
+function conditionalValueNode(
+	node: AnyNode,
+	source: string,
+	input: ValueExpressionEmissionInput,
+): EmissionNode | null {
+	if (!isNode(node.test) || !isNode(node.consequent) || !isNode(node.alternate)) return null;
+
+	const test = valueExpressionNode(node.test, source, input);
+	const consequent = valueExpressionNode(node.consequent, source, input);
+	const alternate = valueExpressionNode(node.alternate, source, input);
+	if (!test || !consequent || !alternate) return null;
+
+	return conditionalNode(test, consequent, alternate);
+}
+
+/** `binaryValueSource`, node-shaped, for both the binary and logical forms. */
+function binaryValueNode(
+	node: AnyNode,
+	source: string,
+	input: ValueExpressionEmissionInput,
+): EmissionNode | null {
+	const operator = typeof node.operator === 'string' ? node.operator : '';
+	if (!VALUE_BINARY_OPERATORS.has(operator)) return null;
+	if (!isNode(node.left) || !isNode(node.right)) return null;
+
+	const left = valueExpressionNode(node.left, source, input);
+	const right = valueExpressionNode(node.right, source, input);
+	if (!left || !right) return null;
+
+	if (operator === '&&' || operator === '||' || operator === '??') {
+		return logicalNode(operator, left, right);
+	}
+
+	return binaryNode(operator, left, right);
+}
+
+/**
+ * The AST twin of `spliceGraphReadsAndLocals` — rewriting by node identity
+ * rather than by character search (invariant 6).
+ *
+ * A node is rewritten when its own authored text is a recorded graph read's
+ * source, outermost first, which is what the string path's longest-source-first
+ * sort approximates. A bare identifier that names a row local becomes
+ * `context.locals?.<name>`. Everything else is cloned through unchanged.
+ *
+ * Two positions are never rewritten, because they are not value positions: the
+ * property of a non-computed member access, and the key of a non-computed
+ * property. A shorthand property is expanded to `key: <rewritten>` rather than
+ * left shorthand, since a rewritten value can no longer be spelled by its key.
+ */
+function rewriteGraphReadsAndLocals(
+	node: AnyNode,
+	source: string,
+	input: ValueExpressionEmissionInput,
+): EmissionNode {
+	// A property is checked before its own text is, because a shorthand
+	// property's text is its key's text: matching there would replace the whole
+	// property with a bare expression, which is what the string path does and
+	// what makes its output unparseable.
+	if (node.type === 'Property') {
+		const key = isNode(node.key) ? node.key : null;
+		const value = isNode(node.value) ? node.value : null;
+		if (!key || !value) return node as unknown as EmissionNode;
+
+		return {
+			...(node as unknown as EmissionNode),
+			shorthand: false,
+			key:
+				node.computed === true
+					? rewriteGraphReadsAndLocals(key, source, input)
+					: (key as unknown as EmissionNode),
+			value: rewriteGraphReadsAndLocals(value, source, input),
+		};
+	}
+
+	const text = valueNodeText(node, source);
+	const graphRead = text
+		? input.graphReads.find((read) => read.source === text)
+		: undefined;
+	if (graphRead) {
+		return graphReadCall({
+			callee: 'context.graph.read',
+			graphNodeId: graphRead.graphNodeId,
+			path: graphRead.path,
+		});
+	}
+
+	if (node.type === 'Identifier' && typeof node.name === 'string' && input.localNames.has(node.name)) {
+		return optionalPathNode(memberChainNode('context.locals'), [node.name]);
+	}
+
+	if (node.type === 'MemberExpression' && node.computed !== true && isNode(node.object)) {
+		return {
+			...(node as unknown as EmissionNode),
+			object: rewriteGraphReadsAndLocals(node.object, source, input),
+		};
+	}
+
+	const rewritten: Record<string, unknown> = { ...(node as Record<string, unknown>) };
+	for (const [key, child] of Object.entries(node)) {
+		if (key === 'parent' || key === 'loc' || key === 'range') continue;
+
+		if (Array.isArray(child)) {
+			rewritten[key] = child.map((item) =>
+				isNode(item) ? rewriteGraphReadsAndLocals(item, source, input) : item,
+			);
+			continue;
+		}
+		if (isNode(child)) {
+			rewritten[key] = rewriteGraphReadsAndLocals(child, source, input);
+		}
+	}
+
+	return rewritten as unknown as EmissionNode;
+}
+
+// ---------------------------------------------------------------------------
+// The general symbol-module path through the AST printer.
+//
+// `emitSymbolModule` is a dispatcher: it reads a planned symbol's kind and hands
+// the symbol to the emitter that owns it. Its AST twin is the same dispatch over
+// the sibling builders this file already carries, so a caller can ask for one
+// symbol's printed module without knowing which band answers.
+//
+// Two kinds have no AST path to dispatch to yet, and this band says so by name
+// rather than by silently emitting nothing: `SYMBOL_MODULE_UNMIGRATED_KINDS`
+// records which unit owns each. The branch-update and async-boundary-update
+// kinds never reach `emitSymbolModule` at all — `emitSymbolModules` routes them
+// before this dispatcher would see them — so they are listed there too.
+// ---------------------------------------------------------------------------
+
+export type SymbolModuleEmissionInput = {
+	readonly symbol: PlannedSymbol;
+	readonly moduleDeclarations: readonly string[];
+	readonly moduleImports: readonly SemanticModuleImport[];
+	readonly captureSlots: ReadonlyArray<CaptureSlot>;
+	readonly semanticGraph: SymbolModulesInput['semanticGraph'];
+	readonly renderData: SymbolModulesInput['renderData'];
+	readonly omitAuthoredSource: boolean;
+	/** The authored file the symbol was extracted from; names the map. */
+	readonly sourceFileName: string;
+};
+
+/** The symbol kinds `buildSymbolModuleEmission` can print from nodes today. */
+export const SYMBOL_MODULE_AST_KINDS: ReadonlySet<PlannedSymbol['kind']> = new Set([
+	'state-initializer',
+	'behavior',
+	'async-computed-runner',
+	'dom-update',
+]);
+
+/** The kinds with no AST path yet, and the unit that owes each one. */
+export const SYMBOL_MODULE_UNMIGRATED_KINDS: ReadonlyMap<PlannedSymbol['kind'], string> = new Map([
+	['event-handler', 'sketch item 5 - emitEventHandlerModule'],
+	['callback-prop', 'sketch item 5 - emitEventHandlerModule'],
+	['sync-computed-derive', 'sketch item 2 - the last unmigrated low-risk emitter'],
+	['branch-update', 'sketch item 3 - routed by emitSymbolModules, never by emitSymbolModule'],
+	[
+		'async-boundary-update',
+		'sketch item 3 - routed by emitSymbolModules, never by emitSymbolModule',
+	],
+]);
+
+/**
+ * Build the print input for one planned symbol, whichever kind it is.
+ *
+ * `null` means one of two things, and they are distinguished by
+ * `SYMBOL_MODULE_AST_KINDS`: either the symbol produces no module at all (a
+ * behavior whose function source is not callable, which the string path also
+ * drops), or its kind's emitter has not been migrated yet.
+ */
+export function buildSymbolModuleEmission(
+	input: SymbolModuleEmissionInput,
+): EmissionPrintInput | null {
+	const { symbol } = input;
+
+	if (symbol.kind === 'state-initializer') {
+		return buildStateInitializerEmission({
+			symbol,
+			moduleDeclarations: input.moduleDeclarations,
+			moduleImports: input.moduleImports,
+			propReads: stateInitializerPropReads(
+				symbol,
+				input.semanticGraph,
+				input.renderData,
+				input.sourceFileName,
+			),
+			omitAuthoredSource: input.omitAuthoredSource,
+			sourceFileName: input.sourceFileName,
+		});
+	}
+
+	if (symbol.kind === 'behavior') {
+		if (!canEmitBehaviorModule(symbol)) return null;
+
+		return buildBehaviorEmission({
+			symbol,
+			omitAuthoredSource: input.omitAuthoredSource,
+			sourceFileName: input.sourceFileName,
+		});
+	}
+
+	if (symbol.kind === 'async-computed-runner') {
+		return buildAsyncComputedRunnerEmission({
+			symbol,
+			captureSlots: input.captureSlots,
+			omitAuthoredSource: input.omitAuthoredSource,
+			sourceFileName: input.sourceFileName,
+		});
+	}
+
+	if (symbol.kind === 'dom-update') {
+		return buildDomBindingEmission({ symbol, sourceFileName: input.sourceFileName });
+	}
+
+	return null;
+}
+
+/** The printed module for one planned symbol, with its source map (invariant 3). */
+export function emitSymbolModuleNodes(input: SymbolModuleEmissionInput): EmittedModule | null {
+	const emission = buildSymbolModuleEmission(input);
+	return emission ? printEmittedModule(emission) : null;
+}
+
+// ---------------------------------------------------------------------------
+// Test seams.
+//
+// The string path's value emitters are module-private, and the parity test has
+// to run them against the AST path on the same inputs. Exporting them through
+// thin wrappers rather than by widening their declarations keeps the swap unit's
+// deletion mechanical: these two functions go when the cluster goes, and no
+// existing declaration was edited to add them.
+// ---------------------------------------------------------------------------
+
+/** The string path's `supportedValueSource`, for parity measurement only. */
+export function supportedValueSourceForParity(
+	input: Omit<ValueExpressionEmissionInput, 'sourceFileName'>,
+): string | null {
+	return supportedValueSource(
+		input.valueSource,
+		input.eventParameters,
+		input.graphReads,
+		input.moduleImports,
+		input.localNames,
+	);
+}
+
+/** The string path's `eventWriteValueSource`, for parity measurement only. */
+export function eventWriteValueSourceForParity(
+	input: Omit<ValueExpressionEmissionInput, 'sourceFileName'>,
+): string | null {
+	return eventWriteValueSource(
+		input.valueSource,
+		input.eventParameters,
+		input.graphReads,
+		input.moduleImports,
+		input.localNames,
+	);
+}
