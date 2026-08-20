@@ -295,6 +295,9 @@ function resolveElementHandleBinding(
 	bindings: ReadonlyMap<string, SemanticGraphBinding>,
 	aliases: ReturnType<typeof semanticAliasMap>,
 ): SemanticGraphBinding | undefined {
+	const shared = resolveSharedInstanceGraphPath(binding.handleName, input.semanticGraph);
+	if (shared?.binding.kind === 'element' && shared.path.length === 0) return shared.binding;
+
 	const direct = resolveGraphPath(binding.handleName, bindings, aliases);
 	if (!direct) return undefined;
 	if (direct.binding.kind === 'element' && direct.path.length === 0) return direct.binding;

@@ -651,6 +651,39 @@ export function invalidSharedScopeDiagnostic(input: {
 	});
 }
 
+// A shared() definition that several components of its own module resolve is a
+// widget family shape. Left without a scope it is page-scoped, so two of those
+// widgets on one page silently share one graph. The warning makes the scope a
+// choice instead of an omission; either spelling silences it.
+export function implicitFamilyScopeDiagnostic(input: {
+	readonly definitionName: string;
+	readonly componentNames: ReadonlyArray<string>;
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	const components = input.componentNames.join(', ');
+	return {
+		code: 'MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT',
+		severity: 'warning',
+		phase: 'semantic-graph',
+		title: 'shared() family has no declared scope',
+		message: `${input.componentNames.length} components in this module resolve shared() "${input.definitionName}" (${components}), which is the shape of a widget family, but no scope is declared so it is page-scoped.`,
+		why: 'A page-scoped family gives every widget of that family on one page the same graph, so two of them move together. That is a real choice, but silence makes it a surprise.',
+		primarySpan: input.span,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		source: input.definitionName,
+		suggestions: [
+			{
+				message: `Add { scope: 'widget' } to give each rendered widget its own graph.`,
+			},
+			{
+				message: `Write { scope: 'page' } explicitly to keep one graph shared across the page.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT',
+	};
+}
+
 export function elementHandleRequiredDiagnostic(
 	binding: SemanticElementHandleBinding,
 	graphBinding: SemanticGraphBinding | undefined,

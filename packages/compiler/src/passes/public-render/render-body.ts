@@ -90,11 +90,11 @@ function sharedStateSeedLine(
 
 	const value = expressionSource(assignment.right as AnyNode, input.source.source);
 	const read = `${stateValuesName}.get(${JSON.stringify(resolved.binding.id)})`;
-	return `${stateValuesName}.set(${JSON.stringify(resolved.binding.id)}, ${seedValueSource(
-		read,
-		resolved.path,
-		`(${value})`,
-	)});`;
+	// An omitted prop reaches the body as undefined; seeding it would erase the
+	// factory's own initial, so the write only happens when a value arrived.
+	return `{ const marklessSharedSeed = (${value}); if (marklessSharedSeed !== undefined) ${stateValuesName}.set(${JSON.stringify(
+		resolved.binding.id,
+	)}, ${seedValueSource(read, resolved.path, 'marklessSharedSeed')}); }`;
 }
 
 function seedValueSource(

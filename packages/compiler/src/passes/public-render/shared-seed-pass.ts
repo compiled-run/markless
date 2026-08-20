@@ -44,13 +44,15 @@ export function sharedSeedPassLines(
 			const id = JSON.stringify(graphNodeId);
 			return `		if (!marklessSsrSeeds.has(${id})) marklessSsrSeeds.set(${id}, ${staticValuesName}.get(${id}));`;
 		}),
+		// An omitted prop is undefined here; seeding it would erase the factory's
+		// own initial, so the write only happens when a value arrived.
 		...seeds.map((seed) => {
 			const id = JSON.stringify(seed.graphNodeId);
-			return `		marklessSsrSeeds.set(${id}, ${sharedSeedValueSource(
+			return `		{ const marklessSharedSeed = (${seed.source}); if (marklessSharedSeed !== undefined) marklessSsrSeeds.set(${id}, ${sharedSeedValueSource(
 				`marklessSsrSeeds.get(${id})`,
 				seed.path,
-				`(${seed.source})`,
-			)});`;
+				'marklessSharedSeed',
+			)}); }`;
 		}),
 		'		return;',
 		'	}',

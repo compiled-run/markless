@@ -655,15 +655,53 @@ inside one `.tsrx` module:
   are projected into its root, and projected content renders AFTER the component
   it is projected into has run its body, so a part reads the seeded value rather
   than the factory initial.
+- **A seed whose value is undefined is a no-write.** An omitted prop reaches the
+  body as `undefined`. Seeding it would erase the factory's own initial, so the
+  seed is skipped and the factory value stands. That is what lets defaults live
+  in the factory alone: `s.checked = checked` needs no `?? false` chain. The
+  rule holds on all three seed paths — the server render body, the seed pass a
+  projecting component answers for its parts, and the browser seed symbol.
+- **A type assertion in the factory is transparent.** `state({ checked: false as
+  boolean | 'mixed' })` declares the same known initial value as
+  `state({ checked: false })`. `as`, `satisfies`, and `!` are unwrapped before
+  the initial value is read, so the union spelling a widget family needs does
+  not degrade the node into an unknown initializer.
+- **A composite template expression over a shared instance resolves its reads.**
+  `ui-checked={checkbox.checked === true}` on a part is not a plain path read, so
+  it travels as an authored expression. Both readers — the server module's and
+  the browser's — rebuild the instance local from the definition's returned
+  graph properties before evaluating it, so the expression never closes over the
+  factory's own local. Like every composite attribute expression, it renders from
+  the value the graph holds; it plans no DOM-update record of its own.
 - **Methods lower to graph writes.** A returned method that takes no parameters
   is inlined at its call site, so `onClick={() => s.login()}` becomes the graph
   writes the method body performs. A method that takes parameters is not
   inlined: binding call-site arguments the graph cannot see is outside this
   lowering.
+- **A method body may hold locals and several statements.** Every read in the
+  body is rewritten to its graph node, not only the read on the right of an
+  assignment, so `toggle() { const next = s.checked !== true; s.checked = next; }`
+  and any longer body lower with no factory local surviving into the browser.
+- **A returned `element()` handle is a handle through the instance.** A factory
+  may declare `const triggerEl = element()` and return it; `el={s.triggerEl}` on
+  a part binds that element node. The IDREF positions (`for`,
+  `aria-labelledby`, `aria-describedby`, `aria-controls`, `popovertarget`) still
+  refuse a handle reached through an instance, because nothing mints or emits the
+  id yet; the refusal is deliberate, since a recorded relationship that renders
+  no attribute would be invisible.
 - **Page scope is the default.** Omitting `scope` resolves the definition to one
   instance for the page. `'request'`, `'container'`, `'page'`, and `'widget'`
   are accepted and recorded on the definition; any other value fails the compile
   closed with `MARKLESS_SHARED_SCOPE_INVALID`.
+- **A family shape with no declared scope warns.** When two or more components of
+  the module that declares a definition resolve it, that is the shape of a widget
+  family. Left without a scope it is page-scoped, so two of those widgets on one
+  page share one graph and move together. The compiler emits the warning
+  `MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT`, naming the components and both fixes:
+  add `{ scope: 'widget' }` for a graph per rendered widget, or write
+  `{ scope: 'page' }` to keep the sharing on purpose. It is a warning, not an
+  error, so existing page-scoped families keep compiling; either explicit
+  spelling silences it.
 - **Widget scope is per rendered widget.** A `widget`-scoped definition's graph
   nodes belong to the first component of the module that resolves it, not to the
   module root. Composition reads that ownership back: the widget root is the

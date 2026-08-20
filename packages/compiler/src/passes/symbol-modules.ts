@@ -1432,10 +1432,16 @@ function emitSharedSeedModule(
 		...(imports.length > 0 ? [''] : []),
 		`export function ${exportName}(context) {`,
 		...propDeclarations,
+		`\tconst marklessSharedSeed = (${symbol.source});`,
+		// An omitted prop is undefined here; returning the node untouched is what
+		// leaves the factory's own initial standing.
+		`\tif (marklessSharedSeed === undefined) return context.graph.read(${JSON.stringify(
+			symbol.graphNodeId,
+		)}, []);`,
 		`\treturn ${sharedSeedValueSource(
 			`context.graph.read(${JSON.stringify(symbol.graphNodeId)}, [])`,
 			symbol.path,
-			`(${symbol.source})`,
+			'marklessSharedSeed',
 		)};`,
 		'}',
 		'',

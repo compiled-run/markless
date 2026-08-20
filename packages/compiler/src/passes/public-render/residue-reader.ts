@@ -36,6 +36,44 @@ export function authoredResidueReadCases(sources: ReadonlyArray<string>): string
 	return sources.map((source) => `case ${JSON.stringify(source)}:return (${source});`);
 }
 
+// A component's shared-instance local (`const checkbox = checkboxState()`) is
+// not a graph binding: it names a factory whose returned properties each stand
+// for one graph node. A composite residue over that local (`checkbox.checked
+// === true`) can only run once the local is rebuilt from those nodes, so both
+// readers declare it from the same description.
+export function sharedInstancePreludeLines(
+	semanticGraph: PublicRenderModuleInput['semanticGraph'],
+	text: string,
+	bound: ReadonlySet<string>,
+	readSource: (graphNodeId: string, path: ReadonlyArray<string>) => string,
+): string[] {
+	const lines: string[] = [];
+	const declared = new Set<string>();
+	for (const instance of semanticGraph.sharedInstances ?? []) {
+		if (declared.has(instance.localName) || bound.has(instance.localName)) continue;
+		if (!references(text, instance.localName)) continue;
+
+		const definition = semanticGraph.sharedDefinitions.find(
+			(candidate) => candidate.id === instance.definitionId,
+		);
+		const members = (definition?.returnProperties ?? []).flatMap((property) =>
+			property.kind === 'graph'
+				? [
+						`${JSON.stringify(property.name)}: ${readSource(
+							property.graphNodeId,
+							property.path,
+						)}`,
+					]
+				: [],
+		);
+		if (members.length === 0) continue;
+
+		declared.add(instance.localName);
+		lines.push(`const ${instance.localName} = {${members.join(', ')}};`);
+	}
+	return lines;
+}
+
 const CONTEXT = 'marklessResidueContext';
 
 // The client reader is the same compiled switch the server module emits; only
@@ -81,6 +119,15 @@ export function emitClientResidueReader(
 		bound.add(propName);
 		lines.push(`const ${propName}=${CONTEXT}.read(${JSON.stringify(`prop:${propName}`)});`);
 	}
+	lines.push(
+		...sharedInstancePreludeLines(
+			input.semanticGraph,
+			text,
+			bound,
+			(graphNodeId, path) =>
+				`${CONTEXT}.read(${JSON.stringify(graphNodeId)}, ${JSON.stringify(path)})`,
+		),
+	);
 	return [
 		`(residue,${CONTEXT})=>{`,
 		lines.join(''),

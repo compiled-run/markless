@@ -104,10 +104,14 @@ export function Panel(config) @{
 		graphNodeId: 'shared:src/gate.tsrx#gate/computed:isOpen',
 		path: [],
 	});
+	// The seed is guarded: an omitted prop is undefined and leaves the factory
+	// initial alone (B5 ruling).
 	expect(compiled.publicRenderModule.ssrModuleSource).toContain(
-		'marklessSsrRenderStateValues.set("shared:src/gate.tsrx#gate/state:cell", ' +
+		'const marklessSharedSeed = (config.locked ?? true); ' +
+			'if (marklessSharedSeed !== undefined) ' +
+			'marklessSsrRenderStateValues.set("shared:src/gate.tsrx#gate/state:cell", ' +
 			'{ ...marklessSsrRenderStateValues.get("shared:src/gate.tsrx#gate/state:cell"), ' +
-			'["locked"]: (config.locked ?? true) });',
+			'["locked"]: marklessSharedSeed });',
 	);
 });
 
@@ -142,9 +146,11 @@ test('a component-body seed of shared state overrides the factory initial for th
 	const compiled = await compile('src/spike.tsrx', familySource);
 
 	expect(compiled.publicRenderModule.ssrModuleSource).toContain(
-		'marklessSsrRenderStateValues.set("shared:src/spike.tsrx#spike/state:s", ' +
+		'const marklessSharedSeed = (props.disabled ?? false); ' +
+			'if (marklessSharedSeed !== undefined) ' +
+			'marklessSsrRenderStateValues.set("shared:src/spike.tsrx#spike/state:s", ' +
 			'{ ...marklessSsrRenderStateValues.get("shared:src/spike.tsrx#spike/state:s"), ' +
-			'["disabled"]: (props.disabled ?? false) });',
+			'["disabled"]: marklessSharedSeed });',
 	);
 });
 
@@ -241,9 +247,14 @@ test('the seed symbol module merges the assigned property over the factory initi
 	);
 
 	expect(module?.source).toContain('const props = context.graph.read("prop:props", []);');
+	expect(module?.source).toContain('const marklessSharedSeed = (props.disabled ?? false);');
+	expect(module?.source).toContain(
+		'if (marklessSharedSeed === undefined) ' +
+			'return context.graph.read("shared:src/spike.tsrx#spike/state:s", []);',
+	);
 	expect(module?.source).toContain(
 		'return { ...context.graph.read("shared:src/spike.tsrx#spike/state:s", []), ' +
-			'["disabled"]: (props.disabled ?? false) };',
+			'["disabled"]: marklessSharedSeed };',
 	);
 });
 

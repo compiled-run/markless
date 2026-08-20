@@ -33,7 +33,11 @@ import {
 	moduleScopeLines,
 	objectPropertyName,
 } from './shared.ts';
-import { authoredResidueReadCases, authoredResidueSources } from './residue-reader.ts';
+import {
+	authoredResidueReadCases,
+	authoredResidueSources,
+	sharedInstancePreludeLines,
+} from './residue-reader.ts';
 import { collectSsrPropEvents } from './component-wiring.ts';
 import { boundSymbolsForEdge, componentEdgeGraphRoutes } from './component-wiring.ts';
 import type { PublicRenderRoot } from './types.ts';
@@ -253,6 +257,19 @@ function emitSsrDataRenderLines(
 		...repeats.map((repeat) => `const ${repeat.itemName}=marklessSsrDataContext.repeatItem;`),
 		...repeats.flatMap((repeat) => repeat.indexName ? [`const ${repeat.indexName}=marklessSsrDataContext.repeatIndex;`] : []),
 		'const error=marklessSsrDataContext.asyncError;',
+		...sharedInstancePreludeLines(
+			input.semanticGraph,
+			authoredResidueSources(chunks).join('\n'),
+			new Set([
+				...repeats.map((repeat) => repeat.itemName),
+				...repeats.flatMap((repeat) => (repeat.indexName ? [repeat.indexName] : [])),
+				'error',
+			]),
+			(graphNodeId, path) =>
+				`marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(${JSON.stringify(
+					graphNodeId,
+				)}), ${JSON.stringify(path)})`,
+		),
 	];
 	const readCases = authoredResidueReadCases(residueSources);
 	const branchIds = new Set(chunks.flatMap((chunk) =>

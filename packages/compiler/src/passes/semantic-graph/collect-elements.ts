@@ -56,6 +56,7 @@ import {
 	unboundIdrefElementHandleDiagnostic,
 } from './diagnostics.ts';
 import { isIdrefAttribute } from './idref-attributes.ts';
+import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
 	createStyleConstResolver,
 	lowerStyleObject,
@@ -366,7 +367,13 @@ export function collectElementHandleDiagnostics(
 	);
 
 	for (const [bindingIndex, binding] of graph.elementHandleBindings.entries()) {
-		const resolved = resolveGraphPath(binding.handleName, bindings, aliases);
+		// `el={checkbox.triggerEl}` names a handle the shared factory declared. The
+		// component-scope lookup answers first with the factory's state cell (the
+		// instance local shares its name), so the shared route wins whenever it is
+		// the one that lands on an element node.
+		const resolved =
+			elementHandlePath(resolveSharedInstanceGraphPath(binding.handleName, graph)) ??
+			resolveGraphPath(binding.handleName, bindings, aliases);
 		const graphBinding = resolved?.binding;
 		if (moduleElementNames.has(binding.handleName)) continue;
 		if (binding.keyedRepeatScopeIds.length > 0) {
@@ -408,7 +415,13 @@ export function collectElementHandleDiagnostics(
 			graph.diagnostics.push(elementHandleRequiredDiagnostic(binding, graphBinding));
 			continue;
 		}
-		validElementHandleBindings.push(binding);
+		// A handle reached through a shared instance is keyed by the factory's own
+		// name, so every component of the family names one relationship.
+		validElementHandleBindings.push(
+			binding.handleName === graphBinding.name
+				? binding
+				: { ...binding, handleName: graphBinding.name },
+		);
 	}
 
 	const firstBindingByHandle = new Map<string, SemanticElementHandleBinding>();
@@ -1006,6 +1019,15 @@ function classifyIdrefValue(
 	const handleName = resolvedElementHandleName(expression, state);
 	if (handleName) return { kind: 'handle', handleName };
 	return mentionsElementHandle(expression, state) ? { kind: 'composite' } : null;
+}
+
+// A resolution is an element() handle only when it lands on an element node
+// with nothing left of the path; anything else is a value read.
+function elementHandlePath(
+	resolved: ReturnType<typeof resolveGraphPath>,
+): ReturnType<typeof resolveGraphPath> {
+	if (!resolved || resolved.binding.kind !== 'element' || resolved.path.length > 0) return null;
+	return resolved;
 }
 
 function resolvedElementHandleName(expression: AnyNode, state: WalkState): string | null {

@@ -15,8 +15,13 @@ import {
 	splitStaticGraphPath,
 	type ResolvedGraphPath,
 } from '../../artifact-helpers/graph-paths.ts';
-import { invalidSharedScopeDiagnostic, sharedDefinitionCycleDiagnostic } from './diagnostics.ts';
+import {
+	implicitFamilyScopeDiagnostic,
+	invalidSharedScopeDiagnostic,
+	sharedDefinitionCycleDiagnostic,
+} from './diagnostics.ts';
 import { collectComputedBinding } from './collect-state.ts';
+import { collectExpressionReads } from './collect-expressions.ts';
 import { getCallName, getFrameworkApiForCall } from './imports.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
 
@@ -156,6 +161,35 @@ export function collectSharedFactoryGraph(
 			...state.graph.sharedDefinitions[index],
 			returnProperties,
 		};
+	}
+}
+
+// B6: a definition this module declares AND several of this module's components
+// resolve is a family shape. Only an omitted scope warns; either explicit
+// spelling is a decision, and an imported definition is another module's call.
+export function collectImplicitFamilyScopeDiagnostics(state: WalkState): void {
+	for (const definition of state.graph.sharedDefinitions) {
+		if (definition.scope !== undefined) continue;
+		if (definition.id !== sharedDefinitionId(state.filename, definition.exportedName)) continue;
+
+		const componentNames = [
+			...new Set(
+				state.graph.sharedInstances.flatMap((instance) =>
+					instance.definitionId === definition.id && instance.componentName
+						? [instance.componentName]
+						: [],
+				),
+			),
+		];
+		if (componentNames.length < 2) continue;
+
+		state.graph.diagnostics.push(
+			implicitFamilyScopeDiagnostic({
+				definitionName: definition.name,
+				componentNames,
+				span: definition.sourceSpan,
+			}),
+		);
 	}
 }
 
@@ -355,6 +389,11 @@ function collectReturnedObjectProperties(input: {
 		const propertySource = expressionSource(property, input.state.source);
 
 		if (property.method === true || isFunctionValue(value)) {
+			// A method is inlined into every handler that calls it, so every read
+			// in its body must resolve to a graph node. The generic walk only
+			// records reads at assignment sites, which leaves a method local
+			// (`const next = s.checked !== true`) closing over the factory local.
+			collectExpressionReads(value.body as AnyNode | undefined, input.state);
 			properties.push({
 				kind: 'method',
 				name,

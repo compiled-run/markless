@@ -59,3 +59,22 @@ export function isNode(value: unknown): value is AnyNode {
 export function getIdentifierName(node: AnyNode | undefined | null): string | null {
 	return typeof node?.name === 'string' ? node.name : null;
 }
+
+const typeAssertionTypes = new Set([
+	'TSAsExpression',
+	'TSSatisfiesExpression',
+	'TSNonNullExpression',
+	'TSTypeAssertion',
+	'TSInstantiationExpression',
+]);
+
+// `false as boolean | 'mixed'` is the value `false` wearing a type. Every pass
+// that reads a value out of the AST must see through the assertion, or the
+// value looks unknowable and its lowering silently degrades.
+export function unwrapTypeAssertion(node: AnyNode | undefined): AnyNode | undefined {
+	let current = node;
+	while (current && typeAssertionTypes.has(current.type ?? '')) {
+		current = current.expression as AnyNode | undefined;
+	}
+	return current;
+}

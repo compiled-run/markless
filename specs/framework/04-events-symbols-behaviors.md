@@ -191,6 +191,13 @@ attribute, its value is a normal function AST, the guard is an `IfStatement`,
 and graph-state reads/writes are resolved through the same binding map used by
 state lowering. No inline DOM closure is required for the authored handler.
 
+A handler that calls a parameterless method returned by a `shared()` factory
+carries that method's body instead of the call, because the browser has no
+factory instance to call it on. Everything the body reads and writes is rewritten
+to its graph node, including reads inside the body's own locals, so a body of
+several statements lowers with no factory local surviving into the handler
+module.
+
 ```tsrx
 let menuOpen = state(false);
 

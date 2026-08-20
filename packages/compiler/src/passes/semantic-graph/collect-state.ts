@@ -1,4 +1,10 @@
-import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
+import {
+	asNodes,
+	childNodes,
+	getIdentifierName,
+	unwrapTypeAssertion,
+	type AnyNode,
+} from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import type {
 	ModuleGraphInterfaceArtifact,
@@ -1243,7 +1249,8 @@ function findReturnTemplateValue(node: AnyNode | undefined): AnyNode | null {
 	return null;
 }
 
-function initialValueKind(node: AnyNode | undefined): SemanticGraphBinding['valueKind'] {
+function initialValueKind(rawNode: AnyNode | undefined): SemanticGraphBinding['valueKind'] {
+	const node = unwrapTypeAssertion(rawNode);
 	if (!node) return 'unknown';
 
 	if (node.type === 'ObjectExpression') return 'object';
@@ -1255,8 +1262,9 @@ function initialValueKind(node: AnyNode | undefined): SemanticGraphBinding['valu
 }
 
 function evaluateInitialStateValue(
-	node: AnyNode | undefined,
+	rawNode: AnyNode | undefined,
 ): { readonly ok: true; readonly value: unknown } | { readonly ok: false } {
+	const node = unwrapTypeAssertion(rawNode);
 	if (!node) return { ok: false };
 
 	if (node.type === 'Literal') return { ok: true, value: node.value };
