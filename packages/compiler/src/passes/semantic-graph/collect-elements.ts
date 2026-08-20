@@ -1,4 +1,9 @@
-import { isEventAttribute, normalizeEventName, parseModule } from '../../yuku-tsrx-adapter.ts';
+import {
+	isEventAttribute,
+	normalizeEventName,
+	parseModule,
+	type SemanticView,
+} from '../../yuku-tsrx-adapter.ts';
 import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
@@ -1173,17 +1178,61 @@ function isDomPropertyBindingName(attributeName: string): boolean {
 	return attributeName === 'value' || attributeName === 'checked' || attributeName === 'selected';
 }
 
+/**
+ * Identifier uses indexed by where they start, built once per analyzed module.
+ * Type-position uses are skipped: they never name a runtime value, so a type
+ * annotation must not answer for the value beside it.
+ */
+const valueReferenceSymbolsByOffset = new WeakMap<SemanticView, Map<number, number>>();
+
+function resolvedValueSymbolAt(semantic: SemanticView, offset: number): number | null {
+	let symbolsByOffset = valueReferenceSymbolsByOffset.get(semantic);
+	if (!symbolsByOffset) {
+		symbolsByOffset = new Map<number, number>();
+		for (let referenceId = 0; referenceId < semantic.reference.count; referenceId += 1) {
+			if (semantic.reference.inTypePosition(referenceId)) continue;
+			const symbolId = semantic.reference.symbolId(referenceId);
+			if (symbolId === null) continue;
+			const start = semantic.reference.start(referenceId);
+			if (!symbolsByOffset.has(start)) symbolsByOffset.set(start, symbolId);
+		}
+		valueReferenceSymbolsByOffset.set(semantic, symbolsByOffset);
+	}
+
+	return symbolsByOffset.get(offset) ?? null;
+}
+
+/**
+ * Source offset of the declaration an identifier use actually refers to.
+ *
+ * The question is asked of yuku's resolved references rather than of a name,
+ * because two components can each declare `attrs`, and a nested block can
+ * shadow one written above it. A search for the first declarator carrying the
+ * name answers with whichever one the file happens to write first, which is the
+ * right answer only by luck.
+ */
+function resolvedDeclarationStart(node: AnyNode | undefined, state: WalkState): number | null {
+	if (!node || typeof node.start !== 'number' || !getIdentifierName(node)) return null;
+
+	const semantic = state.semantic();
+	const symbolId = resolvedValueSymbolAt(semantic, node.start);
+	if (symbolId === null || semantic.symbol.declCount(symbolId) === 0) return null;
+
+	const declaration = semantic.symbol.declNode(symbolId, 0);
+	return typeof declaration.start === 'number' ? declaration.start : null;
+}
+
 function resolveStaticObjectExpression(node: AnyNode, state: WalkState): AnyNode | null {
 	if (node.type === 'ObjectExpression') return node;
-	const name = getIdentifierName(node);
-	if (!name) return null;
+	const declarationStart = resolvedDeclarationStart(node, state);
+	if (declarationStart === null) return null;
 	let found: AnyNode | null = null;
 	const ast = parseModule(state.source, state.filename) as unknown as AnyNode;
 	walkNode(ast, (candidate) => {
 		if (found || candidate.type !== 'VariableDeclarator') return;
 		const id = candidate.id as AnyNode | undefined;
 		const init = candidate.init as AnyNode | undefined;
-		if (getIdentifierName(id) === name && init?.type === 'ObjectExpression') found = init;
+		if (id?.start === declarationStart && init?.type === 'ObjectExpression') found = init;
 	});
 	return found;
 }
@@ -1326,7 +1375,7 @@ function localFunctionDeclarationSource(
 	const declaration = state.helperFunctions.get(name);
 	if (declaration) return expressionSource(declaration, state.source);
 
-	return localFunctionValueSource(name, state)?.source ?? null;
+	return localFunctionValueSource(node, state)?.source ?? null;
 }
 
 function eventHandlerExpressions(
@@ -1337,7 +1386,7 @@ function eventHandlerExpressions(
 	const expressions = node.type === 'ArrayExpression' ? asNodes(node.elements) : [node];
 
 	return expressions.map((expression) => {
-		const resolved = localFunctionValueSource(getIdentifierName(expression), state);
+		const resolved = localFunctionValueSource(expression, state);
 		if (!resolved) {
 			return {
 				node: expression,
@@ -1415,31 +1464,35 @@ function firstInvalidEventHandlerExpression(node: AnyNode | undefined): AnyNode 
 	return node;
 }
 
+/**
+ * The function value a handler identifier names, when it names a local one.
+ *
+ * The local binding is looked up by the declaration site the reference resolves
+ * to, not by name: `onClick={handler}` in one component must not pick up the
+ * `handler` another component declares above it.
+ */
 function localFunctionValueSource(
-	name: string | null,
+	node: AnyNode | undefined,
 	state: WalkState,
 ): { readonly node: AnyNode; readonly source: string; readonly span?: SourceSpan } | null {
-	if (!name) return null;
+	const declarationStart = resolvedDeclarationStart(node, state);
+	if (declarationStart === null) return null;
 	const binding = state.graph.localBindings.find(
-		(item) => item.name === name && item.kind === 'function',
+		(item) => item.sourceSpan?.start === declarationStart && item.kind === 'function',
 	);
-	if (!binding?.sourceSpan) return null;
+	if (!binding) return null;
 
-	const node = localFunctionValueNode(name, binding.sourceSpan, state);
-	if (!node) return null;
+	const valueNode = localFunctionValueNode(declarationStart, state);
+	if (!valueNode) return null;
 
 	return {
-		node,
-		source: expressionSource(node, state.source),
-		span: sourceSpan(node, state.filename),
+		node: valueNode,
+		source: expressionSource(valueNode, state.source),
+		span: sourceSpan(valueNode, state.filename),
 	};
 }
 
-function localFunctionValueNode(
-	name: string,
-	nameSpan: SourceSpan,
-	state: WalkState,
-): AnyNode | null {
+function localFunctionValueNode(declarationStart: number, state: WalkState): AnyNode | null {
 	const ast = parseModule(state.source, state.filename) as unknown as AnyNode;
 	let found: AnyNode | null = null;
 
@@ -1448,8 +1501,7 @@ function localFunctionValueNode(
 		const id = node.id as AnyNode | undefined;
 		const init = node.init as AnyNode | undefined;
 		if (
-			getIdentifierName(id) === name &&
-			id?.start === nameSpan.start &&
+			id?.start === declarationStart &&
 			(init?.type === 'ArrowFunctionExpression' || init?.type === 'FunctionExpression')
 		) {
 			found = init;
