@@ -37,8 +37,9 @@ export type CheckboxErrorProps = PropsOf<'div'> & {
 	readonly children?: Children;
 };
 
-export type CheckboxFieldProps = PropsOf<'input'> & {
-	readonly name?: string;
-	readonly value?: string;
-	readonly required?: boolean;
-};
+/**
+ * The visually hidden native input that carries the checkbox into a form. It
+ * takes no configuration of its own: `name`, `value` and `required` come from
+ * `checkbox.root`, so one place decides what a form receives.
+ */
+export type CheckboxFieldProps = PropsOf<'input'>;

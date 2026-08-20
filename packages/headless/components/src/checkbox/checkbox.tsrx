@@ -1,4 +1,4 @@
-import { computed, shared, state } from '@markless/core';
+import { element, shared, state } from '@markless/core';
 import type {
 	CheckboxDescriptionProps,
 	CheckboxErrorProps,
@@ -9,28 +9,33 @@ import type {
 	CheckboxTriggerProps,
 } from './checkbox-types.ts';
 
-// One instance per `<checkbox.root>`: every part reads and writes this object, so
-// parts are placeable anywhere inside the root. Handlers change it through the
-// method below, because a direct assignment from a handler is not a graph write.
+// One instance per rendered `<checkbox.root>`: every part reads and writes this
+// object, so a part is placeable anywhere inside the root. Every default lives
+// here and nowhere else — a consumer who omits a prop writes nothing, so the
+// value below stands and the parts need no `??` chain.
 export const checkboxState = shared(
 	() => {
 		const checkbox = state({
-			checked: false,
+			checked: false as boolean | 'mixed',
 			disabled: false,
 			required: false,
+			// A string, not a boolean, so `aria-invalid` is a plain path read.
+			invalid: 'false',
 			name: '',
-			value: '',
-					});
-
-		const isChecked = computed(() => checkbox.checked === true);
+			// What a browser submits for a checkbox with no value of its own.
+			value: 'on',
+		});
+		// The relationship, not a string: the compiler mints this widget's id and
+		// writes it on the trigger and on every position that names the handle.
+		const triggerEl = element<HTMLButtonElement>();
 
 		return {
 			...checkbox,
-			isChecked,
-			ariaChecked: computed(() => (checkbox.checked === true ? 'true' : 'false')),
-			// One statement only: a local const here breaks the emitted reader (B2).
+			triggerEl,
 			toggle() {
-				checkbox.checked = checkbox.checked !== true;
+				// Mixed resolves to checked, the way a native indeterminate box does.
+				const next = checkbox.checked === true ? false : true;
+				checkbox.checked = next;
 			},
 		};
 	},
@@ -43,19 +48,23 @@ export function CheckboxRoot({
 	required,
 	name,
 	value,
+	onChange,
 	children,
 	...rest
 }: CheckboxRootProps) @{
 	const checkbox = checkboxState();
-	checkbox.checked = checked ?? false;
-	checkbox.disabled = disabled ?? false;
-	checkbox.required = required ?? false;
-	checkbox.name = name ?? '';
-	checkbox.value = value ?? '';
+	// `onChange` is destructured so it never lands on the div below, but it is
+	// inert: a consumer callback cannot be reached from the factory's toggle yet.
+	checkbox.checked = checked;
+	checkbox.disabled = disabled;
+	checkbox.required = required;
+	checkbox.name = name;
+	checkbox.value = value;
 
 	<div
 		{...rest}
-		ui-checked={checkbox.isChecked}
+		ui-checked={checkbox.checked === true}
+		ui-mixed={checkbox.checked === 'mixed'}
 		ui-disabled={checkbox.disabled}
 	>{children}</div>
 }
@@ -65,12 +74,21 @@ export function CheckboxTrigger({ children, ...rest }: CheckboxTriggerProps) @{
 
 	<button
 		{...rest}
+		el={checkbox.triggerEl}
 		type="button"
 		role="checkbox"
-		aria-checked={checkbox.ariaChecked}
+		aria-checked={
+			checkbox.checked === 'mixed' ? 'mixed' : checkbox.checked === true ? 'true' : 'false'
+		}
+		aria-invalid={checkbox.invalid}
+		ui-checked={checkbox.checked === true}
+		ui-mixed={checkbox.checked === 'mixed'}
+		ui-disabled={checkbox.disabled}
 		disabled={checkbox.disabled}
 		onClick={() => checkbox.toggle()}
 		onKeyDown={(event) => {
+			// A native button activates on Enter; a checkbox must not. Space still
+			// activates, because a button's Space activation happens on keyup.
 			if (event.key === 'Enter') {
 				event.preventDefault();
 			}
@@ -79,11 +97,17 @@ export function CheckboxTrigger({ children, ...rest }: CheckboxTriggerProps) @{
 }
 
 export function CheckboxIndicator({ children, ...rest }: CheckboxIndicatorProps) @{
-	<span {...rest} aria-hidden="true">{children}</span>
+	const checkbox = checkboxState();
+
+	<span {...rest} aria-hidden="true">
+		@if (checkbox.checked) { <>{children}</> }
+	</span>
 }
 
 export function CheckboxLabel({ children, ...rest }: CheckboxLabelProps) @{
-	<label {...rest}>{children}</label>
+	const checkbox = checkboxState();
+
+	<label {...rest} for={checkbox.triggerEl}>{children}</label>
 }
 
 export function CheckboxDescription({ children, ...rest }: CheckboxDescriptionProps) @{
@@ -91,9 +115,32 @@ export function CheckboxDescription({ children, ...rest }: CheckboxDescriptionPr
 }
 
 export function CheckboxError({ children, ...rest }: CheckboxErrorProps) @{
+	const checkbox = checkboxState();
+	// Mounting the error part is what makes the trigger invalid; nothing else says so.
+	checkbox.invalid = 'true';
+
 	<div {...rest}>{children}</div>
 }
 
-export function CheckboxField({ name, value, required, ...rest }: CheckboxFieldProps) @{
-	<input {...rest} type="checkbox" name={name} value={value} required={required} />
+// No change handler of its own: the input is clipped, aria-hidden and out of the
+// tab order, so nothing but the family ever changes it.
+export function CheckboxField({ ...rest }: CheckboxFieldProps) @{
+	const checkbox = checkboxState();
+
+	<span
+		class="visually-hidden"
+		style="clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px;"
+	>
+		<input
+			{...rest}
+			type="checkbox"
+			tabindex="-1"
+			aria-hidden="true"
+			name={checkbox.name}
+			value={checkbox.value}
+			required={checkbox.required}
+			checked={checkbox.checked === true}
+			indeterminate={checkbox.checked === 'mixed'}
+		/>
+	</span>
 }
