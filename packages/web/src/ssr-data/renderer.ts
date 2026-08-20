@@ -34,7 +34,6 @@ export type SsrDataSlot = LocatedSlot &
 				readonly kind: 'spread-attributes';
 				readonly residue: SsrDataResidue;
 				readonly excludeNames: ReadonlyArray<string>;
-				readonly destructuredNames?: ReadonlyArray<string>;
 		  }
 		| {
 				readonly kind: 'child-component';
@@ -200,19 +199,6 @@ export type RenderSsrDataOutput = {
 	readonly structure: SsrDataStructure;
 	/** Internal composition stream; child renderers return it without reparsing HTML. */
 	readonly structureTokens: ReadonlyArray<StructureToken>;
-	/** Rendered elements carrying a props spread; absent when this render has none. */
-	readonly spreadHosts?: ReadonlyArray<SsrDataSpreadHost>;
-};
-
-/**
- * One rendered element that spreads its component's props. The names say what
- * the spread can never carry: what the element already writes itself, and what
- * the component signature took out of the rest binding.
- */
-export type SsrDataSpreadHost = {
-	readonly hostNodeId: string;
-	readonly excludeNames: ReadonlyArray<string>;
-	readonly destructuredNames: ReadonlyArray<string>;
 };
 
 export type StructureToken =
@@ -232,7 +218,6 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 	const chunks = new Map(input.renderData.chunks.map((chunk) => [chunk.id, chunk]));
 	const locators: Array<SsrDataCoordinates['locators'][number]> = [];
 	const anchors: Array<SsrDataCoordinates['anchors'][number]> = [];
-	const spreadHosts: SsrDataSpreadHost[] = [];
 	const rootId = input.renderData.root?.templateId;
 	const rendered = rootId ? await renderChunk(rootId, {}) : { html: '', tokens: [] };
 	const html = rendered.html;
@@ -249,7 +234,6 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 		coordinates: { locators, anchors },
 		structure,
 		structureTokens: rendered.tokens,
-		...(spreadHosts.length > 0 ? { spreadHosts } : {}),
 	};
 
 	async function renderChunk(
@@ -271,17 +255,6 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 			const group = slotsByStatic.get(slot.staticIndex) ?? [];
 			group.push(slot);
 			slotsByStatic.set(slot.staticIndex, group);
-			if (slot.kind !== 'spread-attributes') continue;
-			// Child-local id: composition prefixes it the way it prefixes events.
-			const host = chunk.hosts.find(
-				(candidate) => comparePath(candidate.coordinate.path, slot.coordinate.path) === 0,
-			);
-			if (host)
-				spreadHosts.push({
-					hostNodeId: host.hostNodeId,
-					excludeNames: slot.excludeNames,
-					destructuredNames: slot.destructuredNames ?? [],
-				});
 		}
 
 		let html = '';

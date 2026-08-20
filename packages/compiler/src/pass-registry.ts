@@ -52,7 +52,14 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 	{
 		passId: 'protocol-view',
 		description: 'Create the protocol view payload with symbol IDs wired to view records.',
-		consumes: ['payloadArena', 'symbolResolver', 'renderData', 'captureAnalysis'],
+		consumes: [
+			'source',
+			'semanticGraph',
+			'payloadArena',
+			'symbolResolver',
+			'renderData',
+			'captureAnalysis',
+		],
 		produces: ['protocolView'],
 	},
 	{

@@ -275,6 +275,8 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
 							renderData: inputs.renderData as RenderDataArtifact,
 							captureAnalysis: inputs.captureAnalysis as CaptureAnalysisArtifact,
+							semanticGraph: inputs.semanticGraph as SemanticGraphArtifact,
+							source: inputs.source as CompileTsrxModuleInput,
 						}),
 					};
 				},

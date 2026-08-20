@@ -6,6 +6,7 @@ import type {
 	ProtocolViewPayloadWithArmRecords,
 	RenderDataArtifact,
 } from '../artifacts.ts';
+import { forwardedSpreadViewRecords } from './spread-forwarding.ts';
 
 function renderDataOf(input: ProtocolViewPayloadInput): RenderDataArtifact {
 	if (!input.renderData) {
@@ -55,20 +56,29 @@ export function createProtocolViewPayload(
 	// since page-absolute locators cannot name elements a flip or an async
 	// settle replaces (D3).
 	const excludedHostIds = new Set([...armHostIds(input), ...boundaryArmHostIds(input)]);
+	// The consumer function props a composed child's `{...rest}` carries onto its
+	// own elements. Joined here, at build time, they are ordinary view records.
+	const forwarded = forwardedSpreadViewRecords(input);
 	return {
 		version: ASYNC_PROTOCOL_VERSION,
 		...optionalAsyncRunnerRegistry(input, asyncRunnerSymbols),
-		locators: input.payloadArena.view.locators.filter(
-			(locator) => !excludedHostIds.has(locator.hostNodeId),
-		),
-		events: input.payloadArena.view.events
-			.filter((event) => !excludedHostIds.has(event.hostNodeId))
-			.map((event) => ({
-				hostNodeId: event.hostNodeId,
-				eventName: event.eventName,
-				syncPolicy: event.syncPolicy,
-				symbolIds: eventSymbols.get(`${event.hostNodeId}:${event.eventName}`) ?? [],
-			})),
+		locators: [
+			...input.payloadArena.view.locators.filter(
+				(locator) => !excludedHostIds.has(locator.hostNodeId),
+			),
+			...forwarded.locators,
+		],
+		events: [
+			...input.payloadArena.view.events
+				.filter((event) => !excludedHostIds.has(event.hostNodeId))
+				.map((event) => ({
+					hostNodeId: event.hostNodeId,
+					eventName: event.eventName,
+					syncPolicy: event.syncPolicy,
+					symbolIds: eventSymbols.get(`${event.hostNodeId}:${event.eventName}`) ?? [],
+				})),
+			...forwarded.events,
+		],
 		domUpdates: input.payloadArena.view.domUpdates
 			.filter((domUpdate) => !armHostIds(input).has(domUpdate.hostNodeId))
 			.map((domUpdate) => ({
@@ -83,9 +93,12 @@ export function createProtocolViewPayload(
 				...behavior,
 				symbolId: behaviorSymbols.get(behavior.hostNodeId)?.[index],
 			})),
-		elementHandles: input.payloadArena.view.elementHandles.filter(
-			(handle) => !excludedHostIds.has(handle.hostNodeId),
-		),
+		elementHandles: [
+			...input.payloadArena.view.elementHandles.filter(
+				(handle) => !excludedHostIds.has(handle.hostNodeId),
+			),
+			...forwarded.elementHandles,
+		],
 		// Only gate-supported boundaries have SSR-emitted anchors; shipping
 		// records for ungated boundaries would make resume throw
 		// missingCommentAnchorError. Re-index contiguously over the emitted set.

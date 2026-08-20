@@ -184,8 +184,23 @@ export type ModuleGraphInterfaceArtifact = {
 				readonly localName: string;
 				readonly path: ReadonlyArray<string>;
 			}>;
+			readonly spreadHosts?: ReadonlyArray<ModuleGraphInterfaceSpreadHost>;
 		}>;
 	};
+};
+
+/**
+ * One element of a component's markup that spreads the component's own props.
+ * A parent reads this off the child's interface to decide, at build time, which
+ * of the function props it passes reach that element: the name lists say what
+ * the spread can never carry — what the element already writes itself
+ * (`excludeNames`) and what the signature took out of the rest binding
+ * (`destructuredNames`).
+ */
+export type ModuleGraphInterfaceSpreadHost = {
+	readonly hostNodeId: string;
+	readonly excludeNames: ReadonlyArray<string>;
+	readonly destructuredNames: ReadonlyArray<string>;
 };
 
 export type SemanticSharedScope = 'request' | 'container' | 'page' | 'widget';
@@ -1503,6 +1518,8 @@ export type ProtocolViewPayloadInput = {
 	readonly symbolResolver: SymbolResolverPlan;
 	readonly renderData?: RenderDataArtifact;
 	readonly captureAnalysis?: CaptureAnalysisArtifact;
+	readonly semanticGraph?: SemanticGraphArtifact;
+	readonly source?: Pick<CompileTsrxModuleInput, 'importedModuleInterfaces'>;
 };
 
 // Wire shape of a boundary arm record set: the payload arena plan with lazy

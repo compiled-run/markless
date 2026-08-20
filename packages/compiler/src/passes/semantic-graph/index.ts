@@ -22,6 +22,7 @@ import {
 } from './imports.ts';
 import { collectComponentProps } from './collect-components.ts';
 import { collectSpreadEventShadowDiagnostics } from './spread-event-guard.ts';
+import { spreadHostsField } from './spread-hosts.ts';
 import { getComponentFunction } from '../../ast/tsrx.ts';
 import {
 	collectConditionalBranchText,
@@ -168,6 +169,7 @@ export async function buildSemanticGraph(
 								localName: binding.localName,
 								path: binding.propPath,
 							})),
+						...spreadHostsField(chunks),
 					},
 				];
 			}),

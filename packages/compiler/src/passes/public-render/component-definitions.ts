@@ -1,4 +1,4 @@
-import { isEventAttribute, normalizeEventName, parseModule } from '../../yuku-tsrx-adapter.ts';
+import { parseModule } from '../../yuku-tsrx-adapter.ts';
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import { asNodes, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { firstComponentRoot } from './plan.ts';
@@ -72,17 +72,9 @@ export function collectPublicRenderComponentDefinitions(
 						...('graphNodeId' in prop
 							? { graphNodeId: prop.graphNodeId, path: prop.path }
 							: {}),
-						...(prop.kind === 'graph-reference' && prop.graphBindingKind === 'element'
-							? { handleName: prop.source }
-							: {}),
 						...('value' in prop ? { value: prop.value } : {}),
 						...(prop.kind === 'callback'
 							? { symbolId: callbacks.get(`${edge.id}:${prop.name}`) }
-							: {}),
-						// The DOM event this prop names, so a child spreading its
-						// props can forward it without owning the naming rule.
-						...(prop.kind === 'callback' && isEventAttribute(prop.name)
-							? { eventName: normalizeEventName(prop.name) }
 							: {}),
 						...(prop.kind === 'callback' ? {} : { source: prop.source }),
 					})),
