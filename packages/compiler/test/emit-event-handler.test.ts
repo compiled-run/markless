@@ -485,127 +485,15 @@ test('the printed and spliced handlers do the same thing to the runtime', async 
 	}
 });
 
-/**
- * The named byte differences that separate the two paths, sorted for stability.
- *
- * Post-swap these become the re-baseline list: every one of them is a printer
- * normalization or a splice artifact the printer does not reproduce, and none of
- * them changes what the module does — which the reprint and runtime tests above
- * prove independently.
- */
-function divergenceClasses(spliced: string, printed: string): string[] {
-	const classes = new Set<string>();
-
-	if (spliced.includes('\t') && !printed.includes('\t')) classes.add('tabs-to-spaces');
-	if (spliced.includes('\n\n') && !printed.includes('\n\n')) classes.add('blank-lines-dropped');
-	if (spliced.endsWith('\n') && !printed.endsWith('\n')) classes.add('trailing-newline-dropped');
-	// The text path writes the scalar-leaf import as a single-quoted literal; the
-	// printer has one rule for a synthesized literal, which is double quotes.
-	if (/from '/.test(spliced) && !/from '/.test(printed)) {
-		classes.add('import-quotes-normalized');
-	}
-	// The text path writes each graph call's option object one property per line;
-	// the printer has no wrapping control, so it emits the object on one line.
-	if (/\{\n\s*graphNodeId/.test(spliced) && !/\{\n\s*graphNodeId/.test(printed)) {
-		classes.add('call-object-inlined');
-	}
-	// The spliced body is assembled from an indented template and a body whose
-	// own indentation came from the authored file, so a spliced replacement can
-	// land under a deeper indent than the line it replaced. The printer re-indents
-	// from the tree, so the irregularity does not survive.
-	if (hasSpliceIndentationArtifact(spliced) && !hasSpliceIndentationArtifact(printed)) {
-		classes.add('splice-indentation-repaired');
-	}
-
-	const splicedLines = meaningfulLines(spliced).length;
-	const printedLines = meaningfulLines(printed).length;
-	if (printedLines > splicedLines) classes.add('body-expanded');
-	if (printedLines < splicedLines) classes.add('body-collapsed');
-
-	return [...classes].sort();
-}
-
-/**
- * A line indented deeper than the line above it, where the line above opened
- * nothing — layout no tree-derived printer produces, and the signature of a
- * replacement spliced in at the template's indentation rather than the authored
- * body's.
- */
-function hasSpliceIndentationArtifact(code: string): boolean {
-	const lines = code.split('\n').filter((line) => line.trim() !== '');
-
-	for (let index = 1; index < lines.length; index++) {
-		const previous = lines[index - 1] ?? '';
-		const current = lines[index] ?? '';
-		const previousIndent = (/^[\t ]*/.exec(previous) ?? [''])[0].length;
-		const currentIndent = (/^[\t ]*/.exec(current) ?? [''])[0].length;
-		if (currentIndent > previousIndent && !/(?:[{([,]|=>)$/.test(previous.trim())) return true;
-	}
-
-	return false;
-}
-
-test('what separates the two paths, byte class by byte class', async () => {
-	const summary: Record<string, ReadonlyArray<string>> = {};
-
+test('the swapped production path is byte-equal to the printed module', async () => {
+	// The swap wired the event-handler build through `emitSymbolModuleNodes`, so
+	// the module the compiler ships and the module this suite prints are one path.
 	for (const fixture of FIXTURES) {
 		const paths = await bothPaths(fixture);
-		expect(paths.printed, `${fixture.name}: printed unexpectedly byte-equal`).not.toBe(
-			paths.spliced,
+		expect(paths.spliced, `${fixture.name}: production diverged from the printed module`).toBe(
+			paths.printed,
 		);
-		summary[fixture.name] = divergenceClasses(paths.spliced, paths.printed);
 	}
-
-	expect(summary).toEqual({
-		'scalar-leaf-step': [
-			'blank-lines-dropped',
-			'body-collapsed',
-			'call-object-inlined',
-			'import-quotes-normalized',
-			'tabs-to-spaces',
-			'trailing-newline-dropped',
-		],
-		'scalar-leaf-local': [
-			'blank-lines-dropped',
-			'body-collapsed',
-			'call-object-inlined',
-			'import-quotes-normalized',
-			'tabs-to-spaces',
-			'trailing-newline-dropped',
-		],
-		'guarded-scalar-leaf': [
-			'blank-lines-dropped',
-			'body-collapsed',
-			'call-object-inlined',
-			'import-quotes-normalized',
-			'tabs-to-spaces',
-			'trailing-newline-dropped',
-		],
-		'imported-reference': ['blank-lines-dropped', 'tabs-to-spaces', 'trailing-newline-dropped'],
-		'authored-body-writes': [
-			'body-collapsed',
-			'call-object-inlined',
-			'splice-indentation-repaired',
-			'tabs-to-spaces',
-			'trailing-newline-dropped',
-		],
-		'method-call-write': [
-			'body-collapsed',
-			'call-object-inlined',
-			'tabs-to-spaces',
-			'trailing-newline-dropped',
-		],
-		'commented-body': [
-			'body-collapsed',
-			'call-object-inlined',
-			'splice-indentation-repaired',
-			'tabs-to-spaces',
-			'trailing-newline-dropped',
-		],
-		'capture-child-handler': ['tabs-to-spaces', 'trailing-newline-dropped'],
-		'capture-callback-prop': ['tabs-to-spaces', 'trailing-newline-dropped'],
-		'empty-body': ['tabs-to-spaces', 'trailing-newline-dropped'],
-	});
 });
 
 test('comment classes survive the move into a synthesized module', async () => {
@@ -781,12 +669,12 @@ test('an imported callback reference with several parameters calls through the a
 		sourceFileName: '/workspace/app/src/Forward.tsrx',
 	})!.code;
 
-	expect(spliced).toContain('return trace(...(context.args ?? []));');
+	// A spread argument is an assignment expression, so `...context.args ?? []`
+	// is the same tree as the parenthesized form the string path used to write.
+	expect(spliced).toContain('return trace(...context.args ?? []);');
 	expect(printed).toContain('import { trace } from "./api.ts";');
-	// The printer drops the parentheses the text path writes: a spread argument is
-	// an assignment expression, so `...context.args ?? []` is the same tree.
-	expect(printed).toMatch(/return trace\(\.\.\.\(?context\.args \?\? \[\]\)?\);/);
-	expect(reprint(printed, 'forward.ts')).toBe(reprint(spliced, 'forward.ts'));
+	expect(printed).toContain('return trace(...context.args ?? []);');
+	expect(spliced).toBe(printed);
 });
 
 // ---------------------------------------------------------------------------

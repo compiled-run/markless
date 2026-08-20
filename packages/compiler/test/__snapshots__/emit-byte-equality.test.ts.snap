@@ -1064,16 +1064,11 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 }",
     "symbolModules": "symbol:0
 export function symbol_0(context) {
-	if (context.graph.read("state:count") > 2) return; context.graph.update({
-		graphNodeId: "state:count",
-		path: [],
-		returnValue: "next",
-		update(value) {
-			return Number(value) + 1;
-		},
-	});
+  if (context.graph.read("state:count") > 2) return;
+  context.graph.update({ graphNodeId: "state:count", path: [], returnValue: "next", update(value) {
+    return Number(value) + 1;
+  } });
 }
-
 
 symbol:1
 import { marklessUpdateText } from "@markless/web/fns/update-text";
@@ -1272,19 +1267,13 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	};
 }",
     "symbolModules": "symbol:0
-import { marklessWriteScalar } from '@markless/web/fns/write-scalar';
-
+import { marklessWriteScalar } from "@markless/web/fns/write-scalar";
 /* scalar leaf marker: context.graph.update({ */
 export function symbol_0(context) {
-	return marklessWriteScalar(context, {
-		graphNodeId: "state:App.count.createCount.count",
-		returnValue: "next",
-		update(value) {
-			return Number(value) + 1;
-		},
-	});
+  return marklessWriteScalar(context, { graphNodeId: "state:App.count.createCount.count", returnValue: "next", update(value) {
+    return Number(value) + 1;
+  } });
 }
-
 
 symbol:1
 import { marklessUpdateText } from "@markless/web/fns/update-text";
@@ -2075,16 +2064,11 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	};
 }",
     "symbolModules": "symbol:0
-import { marklessWriteScalar } from '@markless/web/fns/write-scalar';
-
+import { marklessWriteScalar } from "@markless/web/fns/write-scalar";
 /* scalar leaf marker: context.graph.update({ */
 export function symbol_0(context) {
-	return marklessWriteScalar(context, {
-		graphNodeId: "state:chosen",
-		value: context.locals?.entry?.code,
-	});
-}
-",
+  return marklessWriteScalar(context, { graphNodeId: "state:chosen", value: context.locals?.entry?.code });
+}",
     "symbolResolverModule": "export const symbolManifest = 
 [1,null,null,[],[],{}]
 ;
@@ -3103,19 +3087,13 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 	};
 }",
     "symbolModules": "symbol:0
-import { marklessWriteScalar } from '@markless/web/fns/write-scalar';
-
+import { marklessWriteScalar } from "@markless/web/fns/write-scalar";
 /* scalar leaf marker: context.graph.update({ */
 export function symbol_0(context) {
-	return marklessWriteScalar(context, {
-		graphNodeId: "state:count",
-		returnValue: "next",
-		update(value) {
-			return Number(value) + 1;
-		},
-	});
+  return marklessWriteScalar(context, { graphNodeId: "state:count", returnValue: "next", update(value) {
+    return Number(value) + 1;
+  } });
 }
-
 
 symbol:1
 import { marklessUpdateText } from "@markless/web/fns/update-text";

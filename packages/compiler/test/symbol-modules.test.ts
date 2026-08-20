@@ -228,7 +228,7 @@ test('emitSymbolModules imports scalar write and text update leaves for scalar c
 	});
 
 	expect(artifact.modules[0].source).toContain(
-		"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
+		'import { marklessWriteScalar } from "@markless/web/fns/write-scalar";',
 	);
 	expect(artifact.modules[0].source).toContain('return marklessWriteScalar(context, {');
 	expect(artifact.modules[1].source).toContain(
@@ -307,7 +307,7 @@ test('emitSymbolModules emits repeat-local assignment values through context loc
 	const artifact = emitSelectAssignmentSymbol('entry.code', repeatLocalRenderData());
 
 	expect(artifact.modules[0].source).toContain(
-		"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
+		'import { marklessWriteScalar } from "@markless/web/fns/write-scalar";',
 	);
 	expect(artifact.modules[0].source).toContain('return marklessWriteScalar(context, {');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:selected"');
@@ -2107,7 +2107,7 @@ test('B908 preserves simple count++ handler semantics as a spliced graph write',
 	});
 
 	expect(source).toContain(
-		"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
+		'import { marklessWriteScalar } from "@markless/web/fns/write-scalar";',
 	);
 	expect(source).toContain('return marklessWriteScalar(context, {');
 	expect(source).toContain('graphNodeId: "state:count"');

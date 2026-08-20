@@ -12,8 +12,7 @@ import type {
 	SymbolModulesArtifact,
 	SymbolModulesInput,
 } from '../artifacts.ts';
-import { asNodes, childNodes, isNode, type AnyNode } from '../ast/nodes.ts';
-import { parseJavaScriptModule } from '../js-ast.ts';
+import { asNodes, isNode, type AnyNode } from '../ast/nodes.ts';
 import {
 	arrayNode,
 	arrowFunctionNode,
@@ -354,17 +353,6 @@ function emitSymbolModule(
 	omitAuthoredSource: boolean,
 	sourceFileName: string,
 ): GeneratedSymbolModule[] {
-	if (symbol.kind === 'event-handler' || symbol.kind === 'callback-prop') {
-		return [
-			{
-				symbolId: symbol.id,
-				kind: symbol.kind,
-				exportName: symbolExportName(symbol.id),
-				source: emitEventHandlerModule(symbol, localNames, captureSlots, usesArgumentVector),
-			},
-		];
-	}
-
 	if (symbol.kind === 'sync-computed-derive') {
 		return [
 			{
@@ -385,6 +373,8 @@ function emitSymbolModule(
 		renderData,
 		omitAuthoredSource,
 		sourceFileName,
+		localNames,
+		usesArgumentVector,
 	});
 	if (!emitted) return [];
 
@@ -396,197 +386,6 @@ function emitSymbolModule(
 			source: emitted.code,
 		},
 	];
-}
-
-function emitEventHandlerModule(
-	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' | 'callback-prop' }>,
-	localNames: ReadonlySet<string>,
-	captureSlots: ReadonlyArray<CaptureSlot>,
-	usesArgumentVector: boolean,
-): string {
-	const exportName = symbolExportName(symbol.id);
-	const scalarWriteLeaf = captureSlots.length === 0 ? scalarWriteLeafSource(symbol, localNames) : null;
-	if (scalarWriteLeaf) {
-		return [
-			"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
-			'',
-			'/* scalar leaf marker: context.graph.update({ */',
-			`export function ${exportName}(context) {`,
-			...indentBody(scalarWriteLeaf),
-			'}',
-			'',
-		].join('\n');
-	}
-	const parameters = symbol.parameters ?? [];
-	const importedReference = importedHandlerReference(symbol);
-	const body = importedReference
-		? symbol.kind === 'callback-prop' && (usesArgumentVector || parameters.length > 1)
-			? `return ${symbol.source.trim()}(...(context.args ?? []));`
-			: `return ${symbol.source.trim()}(context.event);`
-		: eventHandlerAuthoredBody(symbol, localNames, captureSlots);
-	const imports = eventModuleImports(symbol, body);
-	const asyncKeyword =
-		!importedReference &&
-		(eventHandlerIsAsync(symbol.source) || captureSlots.some(callbackCaptureSlot))
-			? 'async '
-			: '';
-	const parameterDeclarations =
-		!importedReference && parameters.length > 0
-			? parameters.flatMap((parameter, index) => {
-					if (symbol.kind !== 'callback-prop' || (!usesArgumentVector && parameters.length <= 1)) {
-						return [`	const ${parameter} = context.event;`];
-					}
-					return [
-						`	const ${parameter} = context.args?.[${index}];`,
-						`	/* legacy callback binding was: const ${parameter} = context.event; */`,
-					];
-				})
-			: [];
-
-	return [
-		...imports.map(emitModuleImport),
-		...(imports.length > 0 ? [''] : []),
-		`export ${asyncKeyword}function ${exportName}(context) {`,
-		...parameterDeclarations,
-		...indentBody(body),
-		'}',
-		'',
-	].join('\n');
-}
-
-function eventModuleImports(
-	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' | 'callback-prop' }>,
-	emittedSource: string,
-): ReadonlyArray<SemanticModuleImport> {
-	if (!emittedSource) return [];
-
-	return uniqueModuleImports(
-		(symbol.moduleImports ?? []).filter((moduleImport) =>
-			sourceReferencesIdentifier(emittedSource, moduleImport.localName),
-		),
-	);
-}
-
-function importedHandlerReference(
-	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' | 'callback-prop' }>,
-): SemanticModuleImport | null {
-	const source = symbol.source.trim();
-	if (!source) return null;
-
-	const firstName = source.split('.')[0] ?? '';
-	if (!isIdentifierObjectKey(firstName)) return null;
-
-	return (
-		(symbol.moduleImports ?? []).find((moduleImport) => moduleImport.localName === firstName) ??
-		null
-	);
-}
-
-function eventHandlerAuthoredBody(
-	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' | 'callback-prop' }>,
-	localNames: ReadonlySet<string>,
-	captureSlots: ReadonlyArray<CaptureSlot>,
-): string {
-	const directCallbackSlot = captureSlots.find(
-		(slot) => callbackCaptureSlot(slot) && slot.source.trim() === symbol.source.trim(),
-	);
-	if (directCallbackSlot) {
-		return `return await context.capture.invoke(${JSON.stringify(directCallbackSlot.id)}, [context.event]);`;
-	}
-	const directReferenceRead = (symbol.reads ?? []).find(
-		(read) => read.source.trim() === symbol.source.trim(),
-	);
-	if (directReferenceRead && isIdentifierObjectKey(symbol.source.trim())) {
-		return `return ${graphReadCallSource(
-			'context.graph.read',
-			directReferenceRead.graphNodeId,
-			directReferenceRead.path,
-		)}(context.event);`;
-	}
-	const body = eventHandlerBodySource(symbol.source);
-	if (!body) return 'void context;';
-
-	return spliceEventHandlerBody(
-		body.source,
-		body.sourceStart,
-		symbol,
-		symbol.parameters ?? [],
-		localNames,
-		captureSlots,
-	);
-}
-
-function eventHandlerBodySource(
-	source: string,
-): { readonly source: string; readonly sourceStart: number } | null {
-	const arrowIndex = source.indexOf('=>');
-	if (arrowIndex === -1) return declaredFunctionBodySource(source);
-
-	const bodyStart = arrowIndex + 2 + leadingWhitespaceLength(source.slice(arrowIndex + 2));
-	if (bodyStart >= source.length) return null;
-
-	if (source[bodyStart] === '{') {
-		const bodyEnd = source.lastIndexOf('}');
-		if (bodyEnd === -1) return null;
-		const inner = source.slice(bodyStart + 1, bodyEnd);
-
-		return {
-			source: inner.trim(),
-			sourceStart: bodyStart + 1 + leadingWhitespaceLength(inner),
-		};
-	}
-
-	return {
-		source: `return ${source.slice(bodyStart).trim()};`,
-		sourceStart: bodyStart,
-	};
-}
-
-function declaredFunctionBodySource(
-	source: string,
-): { readonly source: string; readonly sourceStart: number } | null {
-	if (!/^\s*(?:async\s+)?function\b/.test(source)) return null;
-	let parameterDepth = 0;
-	let sawParameters = false;
-	let quote: string | null = null;
-	let escaped = false;
-
-	for (let index = 0; index < source.length; index++) {
-		const char = source[index] ?? '';
-		if (quote) {
-			if (escaped) escaped = false;
-			else if (char === '\\') escaped = true;
-			else if (char === quote) quote = null;
-			continue;
-		}
-		if (char === '"' || char === "'" || char === '`') {
-			quote = char;
-			continue;
-		}
-		if (char === '(') {
-			parameterDepth++;
-			sawParameters = true;
-			continue;
-		}
-		if (char === ')') {
-			parameterDepth = Math.max(0, parameterDepth - 1);
-			continue;
-		}
-		if (char !== '{' || !sawParameters || parameterDepth !== 0) continue;
-		const bodyEnd = source.lastIndexOf('}');
-		if (bodyEnd <= index) return null;
-		const inner = source.slice(index + 1, bodyEnd);
-		return {
-			source: inner.trim(),
-			sourceStart: index + 1 + leadingWhitespaceLength(inner),
-		};
-	}
-
-	return null;
-}
-
-function eventHandlerIsAsync(source: string): boolean {
-	return source.trimStart().startsWith('async ');
 }
 
 function callbackCaptureSlot(slot: CaptureSlot): boolean {
@@ -605,264 +404,6 @@ function captureSlotMatchesRead(slot: CaptureSlot, read: LoweredStateRead): bool
 	return slot.source === read.source;
 }
 
-function callbackInvocationSpans(
-	source: string,
-	callee: string,
-): ReadonlyArray<{ start: number; end: number; arguments: ReadonlyArray<string> }> {
-	const prefix = 'async function* __marklessCallbackBody() {\n';
-	const moduleSource = `${prefix}${source}\n}`;
-	const calls: Array<{ start: number; end: number; arguments: ReadonlyArray<string> }> = [];
-	let ast: AnyNode;
-	try {
-		ast = parseJavaScriptModule(moduleSource);
-	} catch {
-		return [];
-	}
-	const visit = (node: AnyNode): void => {
-		if (
-			node.type === 'CallExpression' &&
-			typeof node.start === 'number' &&
-			typeof node.end === 'number'
-		) {
-			const called = node.callee as AnyNode | undefined;
-			const argumentNodes = Array.isArray(node.arguments) ? (node.arguments as AnyNode[]) : [];
-			if (
-				called &&
-				typeof called.start === 'number' &&
-				typeof called.end === 'number' &&
-				moduleSource.slice(called.start, called.end) === callee &&
-				argumentNodes.every(
-					(argument) => typeof argument.start === 'number' && typeof argument.end === 'number',
-				)
-			) {
-				calls.push({
-					start: node.start - prefix.length,
-					end: node.end - prefix.length,
-					arguments: argumentNodes.map((argument) =>
-						moduleSource.slice(argument.start as number, argument.end as number),
-					),
-				});
-			}
-		}
-		for (const child of childNodes(node)) visit(child);
-	};
-	visit(ast);
-	return calls;
-}
-
-function captureArgumentSource(
-	argument: string,
-	valueSlots: ReadonlyArray<CaptureSlot>,
-	eventParameters: ReadonlyArray<string>,
-	reads: ReadonlyArray<LoweredStateRead>,
-): string {
-	const replacements = [
-		...reads.flatMap((read) =>
-			argumentReadBodySpans(argument, read).map((span) => {
-				const slot = valueSlots.find((candidate) => captureSlotMatchesRead(candidate, read));
-				const graphRead = slot
-					? `context.capture.read(${JSON.stringify(slot.id)})`
-					: graphReadCallSource('context.graph.read', read.graphNodeId, read.path);
-				return {
-					start: span.start,
-					end: span.end,
-					replacement: span.shorthandKey
-						? `${span.shorthandKey}: ${graphRead}`
-						: graphRead,
-				};
-			}),
-		),
-		...valueSlots.flatMap((slot) => {
-			if (reads.some((read) => captureSlotMatchesRead(slot, read))) return [];
-			return argumentReadBodySpans(argument, slot).map((span) => {
-				const captureRead = `context.capture.read(${JSON.stringify(slot.id)})`;
-				return {
-					start: span.start,
-					end: span.end,
-					replacement: span.shorthandKey
-						? `${span.shorthandKey}: ${captureRead}`
-						: captureRead,
-				};
-			});
-		}),
-	]
-		.sort((left, right) => right.start - left.start || right.end - left.end)
-		.filter(
-			(item, index, items) =>
-				!items.some(
-					(other, otherIndex) =>
-						otherIndex !== index &&
-						item.start >= other.start &&
-						item.end <= other.end &&
-						other.end - other.start > item.end - item.start,
-				),
-		);
-
-	let emitted = argument;
-	for (const replacement of replacements) {
-		emitted =
-			emitted.slice(0, replacement.start) +
-			replacement.replacement +
-			emitted.slice(replacement.end);
-	}
-	for (const parameter of eventParameters) {
-		const pattern = new RegExp(`\\b${escapeRegExp(parameter)}(?:\\.[$A-Z_a-z][$0-9A-Z_a-z]*)*`, 'g');
-		emitted = emitted.replace(pattern, (source) => eventFieldAssignmentSource(source, [parameter]) ?? source);
-	}
-	return emitted;
-}
-
-function argumentReadBodySpans(
-	argument: string,
-	read: Pick<LoweredStateRead, 'source'>,
-): ReturnType<typeof readBodySpans> {
-	return readBodySpans(`(${argument})`, read).flatMap((span) =>
-		span.start > 0 && span.end <= argument.length + 1
-			? [{ ...span, start: span.start - 1, end: span.end - 1 }]
-			: [],
-	);
-}
-
-function escapeRegExp(source: string): string {
-	return source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function spliceEventHandlerBody(
-	bodySource: string,
-	bodyStartInHandlerSource: number,
-	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' | 'callback-prop' }>,
-	eventParameters: ReadonlyArray<string>,
-	localNames: ReadonlySet<string>,
-	captureSlots: ReadonlyArray<CaptureSlot>,
-): string {
-	const callbackSlots = captureSlots.filter(callbackCaptureSlot);
-	const valueSlots = captureSlots.filter((slot) => !callbackCaptureSlot(slot));
-	const replacements = [
-		...callbackSlots.flatMap((slot) =>
-			callbackInvocationSpans(bodySource, slot.source).map((call) => ({
-				start: call.start,
-				end: call.end,
-				replacement: `await context.capture.invoke(${JSON.stringify(slot.id)}, [${call.arguments
-					.map((argument) =>
-						captureArgumentSource(argument, valueSlots, eventParameters, symbol.reads ?? []),
-					)
-					.join(', ')}])`,
-			})),
-		),
-		...(symbol.reads ?? []).flatMap((read) =>
-			readBodySpans(bodySource, read).map((span) => {
-				const slot = valueSlots.find((candidate) => captureSlotMatchesRead(candidate, read));
-				const graphRead = slot
-					? `context.capture.read(${JSON.stringify(slot.id)})`
-					: graphReadCallSource('context.graph.read', read.graphNodeId, read.path);
-				return {
-					start: span.start,
-					end: span.end,
-					replacement: span.shorthandKey
-						? `${span.shorthandKey}: ${graphRead}`
-						: graphRead,
-				};
-			}),
-		),
-		...(symbol.writes ?? []).flatMap((write) => {
-			const replacement = emitEventWriteExpression(
-				write,
-				symbol.kind === 'callback-prop' ? [] : eventParameters,
-				symbol.reads ?? [],
-				symbol.moduleImports ?? [],
-				localNames,
-			);
-			if (!replacement) return [];
-
-			const span = handlerBodyWriteSpan(bodySource, bodyStartInHandlerSource, symbol, write);
-			return span ? [{ ...span, replacement }] : [];
-		}),
-		...(symbol.kind === 'event-handler' ? (symbol.elementHandleCalls ?? []) : []).flatMap(
-			(call) => {
-				const replacement = emitElementHandleCall(call, eventParameters)
-					.map((line) => line.replace(/^\t/, ''))
-					.join('\n')
-					.replace(/;$/, '');
-				let start = call.offset - bodyStartInHandlerSource;
-				if (start < 0 || start >= bodySource.length) return [];
-
-				let end = call.endOffset - bodyStartInHandlerSource;
-				if (end <= start || end > bodySource.length) return [];
-				if (bodySource.slice(start, end) !== call.source) {
-					start = bodySource.indexOf(call.source);
-					end = start + call.source.length;
-				}
-				if (start < 0 || end <= start || end > bodySource.length) return [];
-				return [{ start, end, replacement }];
-			},
-		),
-	]
-		.sort((left, right) => right.start - left.start || right.end - left.end)
-		.filter(
-			(item, index, items) =>
-				!items.some(
-					(other, otherIndex) =>
-						otherIndex !== index &&
-						item.start >= other.start &&
-						item.end <= other.end &&
-						other.end - other.start > item.end - item.start,
-				),
-		);
-
-	let emitted = bodySource;
-	for (const replacement of replacements) {
-		emitted =
-			emitted.slice(0, replacement.start) +
-			replacement.replacement +
-			emitted.slice(replacement.end);
-	}
-
-	return emitted.trim() || 'void context;';
-}
-
-function readBodySpans(
-	bodySource: string,
-	read: Pick<LoweredStateRead, 'source'>,
-): ReadonlyArray<{
-	readonly start: number;
-	readonly end: number;
-	readonly shorthandKey?: string;
-}> {
-	const prefix = 'async function* __marklessBody() {\n';
-	const source = `${prefix}${bodySource}\n}`;
-	let ast: AnyNode;
-	try {
-		ast = parseJavaScriptModule(source);
-	} catch {
-		return [];
-	}
-
-	const spans = new Map<
-		number,
-		{ readonly start: number; readonly end: number; readonly shorthandKey?: string }
-	>();
-	const walkWithParent = (node: AnyNode, parent?: AnyNode): void => {
-		if (
-			isGraphReadExpression(node) &&
-			isValuePositionGraphRead(node, parent) &&
-			typeof node.start === 'number' &&
-			typeof node.end === 'number' &&
-			source.slice(node.start, node.end) === read.source
-		) {
-			const start = node.start - prefix.length;
-			const end = node.end - prefix.length;
-			if (start >= 0 && end <= bodySource.length) {
-				const shorthandKey = objectShorthandKeySource(parent, node, source);
-				spans.set(start, { start, end, ...(shorthandKey ? { shorthandKey } : {}) });
-			}
-		}
-
-		for (const child of childNodes(node)) walkWithParent(child, node);
-	};
-	walkWithParent(ast);
-	return [...spans.values()];
-}
-
 function isValuePositionGraphRead(node: AnyNode, parent: AnyNode | undefined): boolean {
 	if (node.type !== 'Identifier' || !parent) return true;
 
@@ -879,256 +420,12 @@ function isValuePositionGraphRead(node: AnyNode, parent: AnyNode | undefined): b
 	return true;
 }
 
-function objectShorthandKeySource(
-	parent: AnyNode | undefined,
-	read: AnyNode,
-	source: string,
-): string | null {
-	if (parent?.type !== 'Property' || parent.shorthand !== true) return null;
-	const key = parent.key as AnyNode | undefined;
-	const value = parent.value as AnyNode | undefined;
-	if (
-		key?.type !== 'Identifier' ||
-		typeof key.start !== 'number' ||
-		typeof key.end !== 'number' ||
-		typeof value?.start !== 'number' ||
-		typeof value.end !== 'number' ||
-		read.start !== value.start ||
-		read.end !== value.end
-	) {
-		return null;
-	}
-
-	return source.slice(key.start, key.end);
-}
-
 function isGraphReadExpression(node: AnyNode): boolean {
 	return (
 		node.type === 'Identifier' ||
 		node.type === 'MemberExpression' ||
 		node.type === 'ChainExpression'
 	);
-}
-
-function handlerBodyWriteSpan(
-	bodySource: string,
-	bodyStartInHandlerSource: number,
-	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' | 'callback-prop' }>,
-	write: LoweredStateWrite,
-): { readonly start: number; readonly end: number } | null {
-	if (symbol.sourceSpan && write.sourceSpan) {
-		const start = write.sourceSpan.start - symbol.sourceSpan.start - bodyStartInHandlerSource;
-		const end = write.sourceSpan.end - symbol.sourceSpan.start - bodyStartInHandlerSource;
-		if (start >= 0 && end > start && end <= bodySource.length) {
-			const spanSource = bodySource.slice(start, end);
-			const expectedSource = authoredWriteSource(write);
-			if (!expectedSource || spanSource === expectedSource) return { start, end };
-		}
-	}
-
-	const authoredWrite = authoredWriteSource(write);
-	if (!authoredWrite) return null;
-
-	const start = bodySource.indexOf(authoredWrite);
-	if (start === -1) return null;
-
-	return {
-		start,
-		end: start + authoredWrite.length,
-	};
-}
-
-function authoredWriteSource(write: LoweredStateWrite): string | null {
-	if (write.operation === 'assign') {
-		const operator = write.assignmentOperator ?? '=';
-		if (!write.valueSource) return null;
-		return `${write.source} ${operator} ${write.valueSource}`;
-	}
-
-	if (write.operation === 'update' && write.updateOperator) {
-		return write.prefix
-			? `${write.updateOperator}${write.source}`
-			: `${write.source}${write.updateOperator}`;
-	}
-
-	if (write.operation === 'delete') return `delete ${write.source}`;
-
-	if (write.operation === 'call' && write.method) {
-		return `${write.source}.${write.method}(${(write.argumentSources ?? []).join(', ')})`;
-	}
-
-	return null;
-}
-
-function emitEventWriteExpression(
-	write: LoweredStateWrite,
-	eventParameters: ReadonlyArray<string>,
-	graphReads: ReadonlyArray<LoweredStateRead>,
-	moduleImports: ReadonlyArray<SemanticModuleImport>,
-	localNames: ReadonlySet<string>,
-): string | null {
-	const lines = emitEventWrite(write, eventParameters, graphReads, moduleImports, localNames);
-	if (lines.length === 0) return null;
-
-	const source = lines.map((line) => line.replace(/^\t/, '')).join('\n');
-	return source.endsWith(';') ? source.slice(0, -1) : source;
-}
-
-function indentBody(source: string): string[] {
-	return source.split('\n').map((line) => (line.length > 0 ? `	${line}` : line));
-}
-
-function leadingWhitespaceLength(source: string): number {
-	const match = /^\s*/.exec(source);
-	return match ? match[0].length : 0;
-}
-
-function emitEventWrite(
-	write: LoweredStateWrite,
-	eventParameters: ReadonlyArray<string>,
-	graphReads: ReadonlyArray<LoweredStateRead>,
-	moduleImports: ReadonlyArray<SemanticModuleImport>,
-	localNames: ReadonlySet<string>,
-): string[] {
-	if (write.operation === 'assign' && !write.assignmentOperator) {
-		const valueSource = eventWriteValueSource(
-			write.valueSource,
-			eventParameters,
-			graphReads,
-			moduleImports,
-			localNames,
-		);
-		if (valueSource) {
-			return [
-				'	context.graph.write({',
-				`		graphNodeId: ${JSON.stringify(write.graphNodeId)},`,
-				`		path: ${JSON.stringify(write.path)},`,
-				`		value: ${valueSource},`,
-				'	});',
-			];
-		}
-	}
-
-	if (write.operation === 'assign' && write.assignmentOperator) {
-		const operator = compoundAssignmentOperator(write.assignmentOperator);
-		const valueSource = eventWriteValueSource(
-			write.valueSource,
-			eventParameters,
-			graphReads,
-			moduleImports,
-			localNames,
-		);
-		if (operator && valueSource) {
-			return [
-				'	context.graph.update({',
-				`		graphNodeId: ${JSON.stringify(write.graphNodeId)},`,
-				`		path: ${JSON.stringify(write.path)},`,
-				'		returnValue: "next",',
-				'		update(value) {',
-				`			return value ${operator} ${valueSource};`,
-				'		},',
-				'	});',
-			];
-		}
-	}
-
-	if (write.operation === 'update' && write.updateOperator) {
-		const operator = write.updateOperator;
-		return [
-			'	context.graph.update({',
-			`		graphNodeId: ${JSON.stringify(write.graphNodeId)},`,
-			`		path: ${JSON.stringify(write.path)},`,
-			'		returnValue: "next",',
-			'		update(value) {',
-			`			return Number(value) ${operator === '++' ? '+' : '-'} 1;`,
-			'		},',
-			'	});',
-		];
-	}
-
-	if (write.operation === 'delete') {
-		return [
-			'	context.graph.delete({',
-			`		graphNodeId: ${JSON.stringify(write.graphNodeId)},`,
-			`		path: ${JSON.stringify(write.path)},`,
-			'	});',
-		];
-	}
-
-	if (write.operation === 'call' && write.method) {
-		const argumentSources = supportedArgumentSources(
-			write.argumentSources ?? [],
-			eventParameters,
-			graphReads,
-			moduleImports,
-			localNames,
-		);
-		if (!argumentSources) return [];
-
-		return [
-			'	context.graph.call({',
-			`		graphNodeId: ${JSON.stringify(write.graphNodeId)},`,
-			`		path: ${JSON.stringify(write.path)},`,
-			`		method: ${JSON.stringify(write.method)},`,
-			`		args: [${argumentSources.join(', ')}],`,
-			'	});',
-		];
-	}
-
-	return [];
-}
-
-function scalarWriteLeafSource(
-	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' | 'callback-prop' }>,
-	localNames: ReadonlySet<string>,
-): string | null {
-	if (symbol.kind !== 'event-handler') return null;
-	if ((symbol.writes ?? []).length !== 1) return null;
-	if ((symbol.moduleImports ?? []).length > 0 || (symbol.elementHandleCalls ?? []).length > 0) {
-		return null;
-	}
-	const write = symbol.writes?.[0];
-	if (!write || write.path.length !== 0) return null;
-	if (!eventHandlerBodyAllowsScalarLeaf(symbol, write)) return null;
-
-	if (write.operation === 'update' && write.updateOperator) {
-		return [
-			'return marklessWriteScalar(context, {',
-			`	graphNodeId: ${JSON.stringify(write.graphNodeId)},`,
-			'	returnValue: "next",',
-			'	update(value) {',
-			`		return Number(value) ${write.updateOperator === '++' ? '+' : '-'} 1;`,
-			'	},',
-			'});',
-		].join('\n');
-	}
-
-	if (write.operation !== 'assign' || write.assignmentOperator) return null;
-	const valueSource =
-		literalValueSource(write.valueSource) ?? localValueSource(write.valueSource, localNames);
-	if (!valueSource) return null;
-	return [
-		'return marklessWriteScalar(context, {',
-		`	graphNodeId: ${JSON.stringify(write.graphNodeId)},`,
-		`	value: ${valueSource},`,
-		'});',
-	].join('\n');
-}
-
-function eventHandlerBodyAllowsScalarLeaf(
-	symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' | 'callback-prop' }>,
-	write: LoweredStateWrite,
-): boolean {
-	const body = eventHandlerBodySource(symbol.source);
-	const authoredWrite = authoredWriteSource(write);
-	if (!body || !authoredWrite) return false;
-	let remainder = body.source.replace(authoredWrite, '');
-	for (const parameter of symbol.parameters ?? []) {
-		remainder = remainder.replaceAll(`${parameter}.preventDefault();`, '');
-		remainder = remainder.replaceAll(`${parameter}.stopPropagation();`, '');
-	}
-	remainder = remainder.replace(/\breturn\b/g, '');
-	return remainder.replace(/[;\s]/g, '') === '';
 }
 
 // ---------------------------------------------------------------------------
@@ -3547,56 +2844,6 @@ function eventFieldAssignmentSource(
 	return `context.event?.${fields.join('?.')}`;
 }
 
-function supportedArgumentSources(
-	argumentSources: ReadonlyArray<string>,
-	eventParameters: ReadonlyArray<string>,
-	graphReads: ReadonlyArray<LoweredStateRead>,
-	moduleImports: ReadonlyArray<SemanticModuleImport>,
-	localNames: ReadonlySet<string>,
-): ReadonlyArray<string> | null {
-	const supported = argumentSources.map((source) =>
-		supportedArgumentSource(source, eventParameters, graphReads, moduleImports, localNames),
-	);
-	if (supported.some((source) => source === null)) return null;
-
-	return supported as string[];
-}
-
-function supportedArgumentSource(
-	source: string,
-	eventParameters: ReadonlyArray<string>,
-	graphReads: ReadonlyArray<LoweredStateRead>,
-	moduleImports: ReadonlyArray<SemanticModuleImport>,
-	localNames: ReadonlySet<string>,
-): string | null {
-	const trimmedSource = source.trim();
-	if (trimmedSource.startsWith('...')) {
-		const spreadValue = supportedValueSource(
-			trimmedSource.slice(3).trim(),
-			eventParameters,
-			graphReads,
-			moduleImports,
-			localNames,
-		);
-		if (!spreadValue) return null;
-
-		return `...${spreadValue}`;
-	}
-
-	return supportedValueSource(source, eventParameters, graphReads, moduleImports, localNames);
-}
-
-function compoundAssignmentOperator(assignmentOperator: string): string | null {
-	if (assignmentOperator === '**=') return '**';
-	if (assignmentOperator === '&&=') return '&&';
-	if (assignmentOperator === '||=') return '||';
-	if (assignmentOperator === '??=') return '??';
-	if (/^(?:[+\-*/%&|^]|<<|>>|>>>)=$/.test(assignmentOperator)) {
-		return assignmentOperator.slice(0, -1);
-	}
-	return null;
-}
-
 function graphReadSource(
 	valueSource: string | undefined,
 	graphReads: ReadonlyArray<LoweredStateRead>,
@@ -3653,24 +2900,6 @@ function uniqueModuleImports(
 	return unique;
 }
 
-function sourceReferencesIdentifier(source: string, name: string): boolean {
-	for (
-		let index = source.indexOf(name);
-		index !== -1;
-		index = source.indexOf(name, index + name.length)
-	) {
-		const before = source[index - 1] ?? '';
-		const after = source[index + name.length] ?? '';
-		if (isIdentifierChar(before)) continue;
-		if (before === '.' && source.slice(index - 3, index) !== '...') continue;
-		if (isIdentifierChar(after)) continue;
-
-		return true;
-	}
-
-	return false;
-}
-
 function isIdentifierChar(char: string): boolean {
 	return /[$0-9A-Z_a-z]/.test(char);
 }
@@ -3687,28 +2916,6 @@ function emitModuleImport(moduleImport: SemanticModuleImport): string {
 		return `import { ${moduleImport.localName} } from ${source};`;
 	}
 	return `import { ${moduleImport.importedName} as ${moduleImport.localName} } from ${source};`;
-}
-
-// Element-handle method calls run against the runtime-resolved host element.
-// Arguments stay restricted to literals and event parameters; anything richer
-// keeps the current unsupported behavior until capture analysis owns it.
-function emitElementHandleCall(
-	call: {
-		readonly handleName: string;
-		readonly method: string;
-		readonly argumentSources: ReadonlyArray<string>;
-	},
-	parameters: ReadonlyArray<string>,
-): string[] {
-	const literalPattern =
-		/^(?:'[^']*'|"[^"]*"|`[^`]*`|-?\d+(?:\.\d+)?|true|false|null|undefined)$/;
-	const supported = call.argumentSources.every(
-		(argument) => literalPattern.test(argument) || parameters.includes(argument),
-	);
-	if (!supported) return [];
-	return [
-		`\tcontext.getElementHandle(${JSON.stringify(call.handleName)})?.${call.method}(${call.argumentSources.join(', ')});`,
-	];
 }
 
 // ---------------------------------------------------------------------------
@@ -5915,6 +5122,10 @@ export type SymbolModuleEmissionInput = {
 	readonly omitAuthoredSource: boolean;
 	/** The authored file the symbol was extracted from; names the map. */
 	readonly sourceFileName: string;
+	/** Row-local names in scope; only the event-handler kinds read them. */
+	readonly localNames?: ReadonlySet<string>;
+	/** Whether some other symbol binds this one as a callback route. */
+	readonly usesArgumentVector?: boolean;
 };
 
 /** The symbol kinds `buildSymbolModuleEmission` can print from nodes today. */
@@ -5923,13 +5134,16 @@ export const SYMBOL_MODULE_AST_KINDS: ReadonlySet<PlannedSymbol['kind']> = new S
 	'behavior',
 	'async-computed-runner',
 	'dom-update',
+	'event-handler',
+	'callback-prop',
 ]);
 
-/** The kinds with no AST path yet, and the unit that owes each one. */
+/** The kinds this dispatcher never sees, and where each is emitted instead. */
 export const SYMBOL_MODULE_UNMIGRATED_KINDS: ReadonlyMap<PlannedSymbol['kind'], string> = new Map([
-	['event-handler', 'sketch item 5 - emitEventHandlerModule'],
-	['callback-prop', 'sketch item 5 - emitEventHandlerModule'],
-	['sync-computed-derive', 'sketch item 2 - the last unmigrated low-risk emitter'],
+	[
+		'sync-computed-derive',
+		'emitted by emitSyncComputedDeriveModule, which prints through the derive band',
+	],
 	['branch-update', 'sketch item 3 - routed by emitSymbolModules, never by emitSymbolModule'],
 	[
 		'async-boundary-update',
@@ -5987,6 +5201,16 @@ export function buildSymbolModuleEmission(
 
 	if (symbol.kind === 'dom-update') {
 		return buildDomBindingEmission({ symbol, sourceFileName: input.sourceFileName });
+	}
+
+	if (symbol.kind === 'event-handler' || symbol.kind === 'callback-prop') {
+		return buildEventHandlerEmission({
+			symbol,
+			localNames: input.localNames ?? emptyLocalNames,
+			captureSlots: input.captureSlots,
+			usesArgumentVector: input.usesArgumentVector === true,
+			sourceFileName: input.sourceFileName,
+		});
 	}
 
 	return null;

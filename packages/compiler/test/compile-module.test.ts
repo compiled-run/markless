@@ -675,8 +675,8 @@ async function importPublicRenderTestModule(
 
 	try {
 		const testSource = source.replace(
-			/from '@markless\/web\/fns\/([^']+)'/g,
-			(_match, helperModule: string) =>
+			/from (['"])@markless\/web\/fns\/([^'"]+)\1/g,
+			(_match, _quote: string, helperModule: string) =>
 				`from '${new URL(`../../web/src/fns/${helperModule}.ts`, import.meta.url).href}'`,
 		);
 		return (await import(
@@ -4889,7 +4889,7 @@ test('compileTsrxModule emits handler writes through whole-binding aliases', asy
 	]);
 	expect(result.stateLowering.diagnostics).toEqual([]);
 	expect(module?.source).toContain(
-		"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
+		'import { marklessWriteScalar } from "@markless/web/fns/write-scalar";',
 	);
 	expect(module?.source).toContain('return marklessWriteScalar(context, {');
 	expect(module?.source).toContain('graphNodeId: "state:origin"');

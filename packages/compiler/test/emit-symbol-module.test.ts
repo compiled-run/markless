@@ -20,9 +20,9 @@
  * The dispatcher swap has landed: `emitSymbolModule` now routes every kind in
  * `SYMBOL_MODULE_AST_KINDS` through `emitSymbolModuleNodes`, so the shipped
  * module and the printed one are the same bytes, and that is what the dispatcher
- * tests below assert. The value-source cluster is a different story — the
- * event-handler emitter still splices strings, so the `*ForParity` seams stay
- * and the value tests still measure two paths against each other.
+ * tests below assert. The string value cluster is gone with the rest of the
+ * scanner band, so the value tests that remain gate the node path alone:
+ * support decisions, determinism, and the TSRX-node assertion.
  */
 import { expect, test } from 'vitest';
 import type { LoweredStateRead, SemanticModuleImport } from '../src/artifacts.ts';
@@ -35,23 +35,18 @@ import {
 	exportNamedDeclarationNode,
 	findTsrxOnlyNodeType,
 	moduleProgramNode,
-	parseEmissionSource,
-	printEmissionExpression,
 	printEmittedModule,
 	type EmissionNode,
 	type EmissionPrintInput,
 } from '../src/passes/emit-codegen.ts';
 import { moduleScopeLines } from '../src/passes/public-render/shared.ts';
 import {
-	buildEventWriteValueEmission,
 	buildSymbolModuleEmission,
 	buildValueExpressionEmission,
 	emitSymbolModuleNodes,
-	eventWriteValueSourceForParity,
-	supportedValueSourceForParity,
+	eventHandlerRowLocalNames,
 	SYMBOL_MODULE_AST_KINDS,
 	SYMBOL_MODULE_UNMIGRATED_KINDS,
-	supportedValueSourceForParity as textValue,
 	type SymbolModuleEmissionInput,
 	type ValueExpressionEmission,
 } from '../src/passes/symbol-modules.ts';
@@ -218,26 +213,6 @@ function valueInput(valueSource: string) {
 	};
 }
 
-/**
- * Reprint an expression through the printer that emission uses.
- *
- * Two expressions that reprint to the same bytes differ only in what the printer
- * normalizes away — spacing and parentheses the grammar does not require. That is
- * the parity claim available when one side is spliced text and the other is a
- * printed tree.
- */
-function reprintExpression(code: string): string {
-	const source = `(${code});`;
-	const { program, errors } = parseEmissionSource(source, VALUE_FILE, 'ts');
-	expect(errors, `reprinting ${code} produced parse errors`).toEqual([]);
-	return printEmittedModule({
-		program,
-		source,
-		outputFileName: 'reprint.js',
-		site: { phase: 'payload', passId: 'symbol-modules', sourceFileName: VALUE_FILE },
-	}).code;
-}
-
 /** Wrap a value node in a module, so the site gates can run over it. */
 function valueModule(emission: ValueExpressionEmission): EmissionPrintInput {
 	return {
@@ -250,172 +225,7 @@ function valueModule(emission: ValueExpressionEmission): EmissionPrintInput {
 	};
 }
 
-test('both value paths agree on which authored shapes are supported', () => {
-	const disagreements: string[] = [];
-
-	for (const valueCase of VALUE_CASES) {
-		const text = supportedValueSourceForParity(valueInput(valueCase.valueSource));
-		const ast = buildValueExpressionEmission({
-			...valueInput(valueCase.valueSource),
-			sourceFileName: VALUE_FILE,
-		});
-
-		if ((text !== null) !== (ast !== null)) {
-			disagreements.push(
-				`${valueCase.name}: text=${text === null ? 'unsupported' : 'supported'} ast=${ast === null ? 'unsupported' : 'supported'}`,
-			);
-			continue;
-		}
-		if ((text !== null) !== valueCase.supported) {
-			disagreements.push(
-				`${valueCase.name}: expected ${valueCase.supported ? 'supported' : 'unsupported'}, both paths said otherwise`,
-			);
-		}
-	}
-
-	expect(disagreements).toEqual([]);
-});
-
-test('every supported value emits the same expression once the printer normalizes both', () => {
-	const divergences: Record<string, { readonly text: string; readonly printed: string }> = {};
-
-	for (const valueCase of VALUE_CASES) {
-		if (!valueCase.supported) continue;
-
-		const text = supportedValueSourceForParity(valueInput(valueCase.valueSource));
-		const ast = buildValueExpressionEmission({
-			...valueInput(valueCase.valueSource),
-			sourceFileName: VALUE_FILE,
-		});
-		if (text === null || ast === null) continue;
-
-		const printed = printEmissionExpression(ast.node);
-		if (reprintExpression(text) !== reprintExpression(printed)) {
-			divergences[valueCase.name] = { text, printed };
-		}
-	}
-
-	// Empty is the claim: the AST path emits the same expression the cluster
-	// emits, for every shape the cluster supports.
-	expect(divergences).toEqual({});
-});
-
-test('the printed value is not always byte-identical, and every difference is the printer normalizing', () => {
-	const classes: Record<string, string> = {};
-
-	for (const valueCase of VALUE_CASES) {
-		if (!valueCase.supported) continue;
-
-		const text = supportedValueSourceForParity(valueInput(valueCase.valueSource));
-		const ast = buildValueExpressionEmission({
-			...valueInput(valueCase.valueSource),
-			sourceFileName: VALUE_FILE,
-		});
-		if (text === null || ast === null) continue;
-
-		const printed = printEmissionExpression(ast.node);
-		if (printed === text) continue;
-
-		classes[valueCase.name] = valueDifferenceClass(text, printed);
-	}
-
-	// Recorded, not asserted-away: these are the exact byte differences the
-	// owner's re-baseline decision rests on. `other` must not appear.
-	//
-	// All three are the same normalization. The string path keeps whatever
-	// parentheses the author wrote, because `parenthesizedValueSource` re-emits
-	// them and `conditionalValueSource` cannot tell a needed pair from a
-	// redundant one. The printer derives parentheses from precedence under
-	// `preserveParens: false`, so it drops the redundant pairs and keeps the
-	// load-bearing ones — `(count + 1) * 2` is byte-identical on both paths.
-	expect(classes).toEqual({
-		'parenthesized-graph-read': 'redundant-parentheses-dropped',
-		'parenthesized-binary': 'redundant-parentheses-dropped',
-		'nested-conditional': 'redundant-parentheses-dropped',
-	});
-});
-
 /** The named normalizations that separate the two value paths. */
-function valueDifferenceClass(text: string, printed: string): string {
-	if (printed.replaceAll(' ', '') === text.replaceAll(' ', '')) return 'spacing-only';
-
-	const withoutParentheses = (source: string) => source.replaceAll('(', '').replaceAll(')', '');
-	if (withoutParentheses(text) === withoutParentheses(printed)) {
-		return 'redundant-parentheses-dropped';
-	}
-
-	return 'other';
-}
-
-test('the value path rewrites by node identity, not by character search', () => {
-	// The string fallback replaces `count` wherever the characters appear with
-	// only identifier-boundary guards, so it reaches inside a string literal.
-	// Rewriting by node identity cannot: a string literal is not an identifier.
-	const insideAString = "'count is high'";
-	const spliced = eventWriteValueSourceForParity(valueInput(insideAString));
-	const printed = buildEventWriteValueEmission({
-		...valueInput(insideAString),
-		sourceFileName: VALUE_FILE,
-	});
-
-	expect(printed).not.toBeNull();
-	// Supported as a literal on both paths, so neither rewrites here.
-	expect(spliced).toBe(insideAString);
-	expect(printEmissionExpression(printed!.node)).toBe(insideAString);
-
-	// The unsupported shape that reaches the fallback: a template literal whose
-	// interpolation names a graph read and a row local.
-	const unsupported = '`${count}-${row}`';
-	const splicedFallback = eventWriteValueSourceForParity(valueInput(unsupported));
-	const printedFallback = buildEventWriteValueEmission({
-		...valueInput(unsupported),
-		sourceFileName: VALUE_FILE,
-	});
-
-	expect(printedFallback).not.toBeNull();
-	expect(splicedFallback).toBe('`${context.graph.read("state:count")}-${context.locals?.row}`');
-	expect(printEmissionExpression(printedFallback!.node)).toBe(
-		'`${context.graph.read("state:count")}-${context.locals?.row}`',
-	);
-});
-
-test('the string fallback corrupts a shorthand property and the node rewrite does not', () => {
-	// `{ count }` is supported on both paths, so force the fallback with a shape
-	// neither supports that still contains a shorthand property.
-	const source = '{ ...mystery, count }';
-	const spliced = eventWriteValueSourceForParity(valueInput(source));
-	const printed = buildEventWriteValueEmission({
-		...valueInput(source),
-		sourceFileName: VALUE_FILE,
-	});
-
-	expect(printed).not.toBeNull();
-
-	// The recorded defect, stated as a fact so the swap unit knows it is a fix
-	// and not a regression: the spliced text does not parse.
-	expect(spliced).toBe('{ ...mystery, context.graph.read("state:count") }');
-	expect(parsesAsExpression(spliced!)).toBe(false);
-
-	// The node rewrite expands the shorthand instead, which does parse.
-	const printedSource = printEmissionExpression(printed!.node);
-	expect(printedSource).toBe('{ ...mystery, count: context.graph.read("state:count") }');
-	expect(parsesAsExpression(printedSource)).toBe(true);
-});
-
-/**
- * Whether emitted text is a parseable expression.
- *
- * The adapter reports some parse failures through its `errors` array and throws
- * on others, so both have to be caught to answer the question honestly.
- */
-function parsesAsExpression(code: string): boolean {
-	try {
-		return parseEmissionSource(`(${code});`, VALUE_FILE, 'ts').errors.length === 0;
-	} catch {
-		return false;
-	}
-}
-
 test('value emission is deterministic and reaches a reparse fixpoint', () => {
 	for (const valueCase of VALUE_CASES) {
 		if (!valueCase.supported) continue;
@@ -522,8 +332,9 @@ export function App() @{
 `,
 	},
 	{
-		// An event handler and a sync computed derive: the two kinds the
-		// dispatcher must decline rather than mis-emit.
+		// An event handler and a sync computed derive: the handler dispatches
+		// through the event-handler band, the derive is the one kind this
+		// dispatcher declines (its band is called by `emitSyncComputedDeriveModule`).
 		name: 'unmigrated-kinds',
 		filename: '/workspace/app/src/Handler.tsrx',
 		source: `
@@ -536,6 +347,19 @@ export function App() @{
 	<button onClick={() => { count = count + 1; }}>{doubled}</button>
 }
 `,
+	},
+	{
+		// A child handler that reads a captured prop and invokes a captured
+		// callback: one fixture yielding both event-handler and callback-prop, the
+		// two kinds the event-handler band added to the dispatcher.
+		name: 'capture-callbacks',
+		filename: '/workspace/app/src/Captures.tsrx',
+		source: `function Child({ label, onTrace }: { label: string; onTrace: (payload: { value: number }, reason: string) => void }) @{
+	<button onClick={(event) => onTrace({ value: label.length }, event.type)}>{label}</button>
+}
+export function App() @{
+	<Child label="Save" onTrace={(payload) => console.log(payload.value)} />
+}`,
 	},
 ];
 
@@ -560,6 +384,22 @@ async function dispatchedSymbols(fixture: DispatcherFixture): Promise<Dispatched
 		);
 		if (!spliced) return [];
 
+		// The same capture-slot and argument-vector selection `emitSymbolModules`
+		// makes before it dispatches, so both paths see identical input.
+		const extracted = result.captureAnalysis.extractedSymbols.find(
+			(candidate) => !candidate.loaderSymbolId && candidate.symbolId === symbol.id,
+		);
+		const captureSlots = (extracted?.captureSlots ?? []).filter((slot) =>
+			slot.routes.some((route) => route.componentEdgeId !== undefined),
+		);
+		const usesArgumentVector = result.captureAnalysis.extractedSymbols.some((candidate) =>
+			candidate.captureSlots.some((slot) =>
+				slot.routes.some(
+					(route) => route.kind === 'callback-route' && route.callbackSymbolId === symbol.id,
+				),
+			),
+		);
+
 		return [
 			{
 				fixture: fixture.name,
@@ -570,11 +410,13 @@ async function dispatchedSymbols(fixture: DispatcherFixture): Promise<Dispatched
 					symbol,
 					moduleDeclarations: moduleScopeLines(fixture.source, fixture.filename),
 					moduleImports: result.semanticGraph.moduleImports,
-					captureSlots: [],
+					captureSlots,
 					semanticGraph: result.semanticGraph,
 					renderData: result.renderData,
 					omitAuthoredSource: false,
 					sourceFileName: fixture.filename,
+					localNames: eventHandlerRowLocalNames(result.renderData, symbol.id),
+					usesArgumentVector,
 				},
 			},
 		];
@@ -645,14 +487,16 @@ test('the dispatcher declines exactly the kinds with no AST path, and names thei
 	expect([...built].sort()).toEqual([
 		'async-computed-runner',
 		'behavior',
+		'callback-prop',
 		'dom-update',
+		'event-handler',
 		'state-initializer',
 	]);
 	expect([...declined].sort()).toEqual([
-		// Routed by `emitSymbolModules` before `emitSymbolModule` would see it,
-		// so its own AST band (sketch item 3) is not this dispatcher's to call.
+		// The boundary is routed by `emitSymbolModules` before `emitSymbolModule`
+		// would see it, and the derive is emitted by `emitSyncComputedDeriveModule`,
+		// whose own band prints it — neither is this dispatcher's to call.
 		'async-boundary-update',
-		'event-handler',
 		'sync-computed-derive',
 	]);
 });
@@ -680,11 +524,4 @@ test('dispatched emission is deterministic and reaches a reparse fixpoint', asyn
 			expect(emitted.code).toBe(emitSymbolModuleNodes(dispatched.input)?.code);
 		}
 	}
-});
-
-test('the parity seam and the string path are the same function', () => {
-	// Guards the seam itself: a wrapper that drifted from the function it wraps
-	// would make every parity claim above meaningless.
-	expect(textValue(valueInput('count'))).toBe('context.graph.read("state:count")');
-	expect(textValue(valueInput('mystery'))).toBeNull();
 });
