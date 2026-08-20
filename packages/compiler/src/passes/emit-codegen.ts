@@ -501,6 +501,54 @@ export function spreadNode(argument: EmissionNode): EmissionNode {
 	return { type: 'SpreadElement', argument };
 }
 
+/**
+ * `<operator><argument>` — the prefix operators emission builds, which today is
+ * only `!` in front of a call.
+ */
+export function unaryNode(operator: '!' | '-' | 'typeof', argument: EmissionNode): EmissionNode {
+	return { type: 'UnaryExpression', operator, prefix: true, argument };
+}
+
+/**
+ * `<object>[<property>]`, where the property is an expression rather than a
+ * name.
+ *
+ * `memberNode` and `memberChainNode` both build the non-computed form, which
+ * cannot index by a variable. The arm emitters need exactly that, for
+ * `marklessBranchArms[arm]` and `value[key]`.
+ */
+export function computedMemberNode(object: EmissionNode, property: EmissionNode): EmissionNode {
+	return {
+		type: 'MemberExpression',
+		object,
+		property,
+		computed: true,
+		optional: false,
+	};
+}
+
+/**
+ * `(<params>) => <expression>` — the concise-body arrow.
+ *
+ * Only the expression body is built here. Emission has no arrow with a block
+ * body: a site that needs statements builds a `FunctionExpression` through
+ * `methodPropertyNode` instead.
+ */
+export function arrowFunctionNode(
+	parameterNames: ReadonlyArray<string>,
+	body: EmissionNode,
+): EmissionNode {
+	return {
+		type: 'ArrowFunctionExpression',
+		id: null,
+		async: false,
+		generator: false,
+		expression: true,
+		params: parameterNames.map((name) => identifierNode(name)),
+		body,
+	};
+}
+
 export function callNode(
 	callee: EmissionNode,
 	callArguments: ReadonlyArray<EmissionNode>,
@@ -586,6 +634,63 @@ export function propertyNode(key: string, value: EmissionNode): EmissionNode {
 }
 
 /**
+ * `"key": <value>` — a property whose key is a string literal rather than a
+ * bare identifier.
+ *
+ * `propertyNode` builds the identifier form, which is only legal for
+ * identifier-shaped names. Data tables emitted from `JSON.stringify` quote every
+ * key, so `jsonValueNode` builds this form and never has to decide per key
+ * whether a name is identifier-shaped.
+ */
+export function stringKeyPropertyNode(key: string, value: EmissionNode): EmissionNode {
+	return {
+		type: 'Property',
+		kind: 'init',
+		method: false,
+		shorthand: false,
+		computed: false,
+		key: literalNode(key),
+		value,
+	};
+}
+
+type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+
+/**
+ * A JSON-shaped data table as nodes: what `JSON.stringify` would have written,
+ * built for the printer instead.
+ *
+ * The value is round-tripped through `JSON.stringify` and `JSON.parse` before
+ * any node is built, so the tree reproduces `JSON.stringify`'s own coercions —
+ * `undefined` object properties dropped, `undefined` array elements as `null`,
+ * `NaN` and `Infinity` as `null` — rather than a second, subtly different set.
+ * The arm emitters' text path writes these tables with `JSON.stringify`, so
+ * matching its semantics exactly is what makes the two paths comparable.
+ *
+ * Strings are built without `raw`, so the printer's `quotes` option governs
+ * them, which under `EMISSION_PRINT_OPTIONS` means double quotes — the quoting
+ * `JSON.stringify` also produces.
+ */
+export function jsonValueNode(value: unknown): EmissionNode {
+	const text = JSON.stringify(value);
+	if (text === undefined) {
+		throw new Error('emission: jsonValueNode requires a JSON-serializable value');
+	}
+	return jsonNode(JSON.parse(text) as JsonValue);
+}
+
+function jsonNode(value: JsonValue): EmissionNode {
+	if (value === null) return literalNode(null);
+	if (Array.isArray(value)) return arrayNode(value.map((item) => jsonNode(item)));
+	if (typeof value === 'object') {
+		return objectNode(
+			Object.entries(value).map(([key, child]) => stringKeyPropertyNode(key, jsonNode(child))),
+		);
+	}
+	return literalNode(value);
+}
+
+/**
  * A shorthand property: `{ read }` rather than `{ read: read }`.
  *
  * `shorthand: true` with `key` and `value` both naming the same identifier is
@@ -637,7 +742,7 @@ export function returnStatementNode(argument: EmissionNode): EmissionNode {
 	return { type: 'ReturnStatement', argument };
 }
 
-/** `const <name> = <init>;` — the only declaration kind stage-1 emission builds. */
+/** `const <name> = <init>;` — the declaration kind most stage-1 emission builds. */
 export function constDeclarationNode(name: string, init: EmissionNode): EmissionNode {
 	return {
 		type: 'VariableDeclaration',
@@ -646,6 +751,51 @@ export function constDeclarationNode(name: string, init: EmissionNode): Emission
 			{ type: 'VariableDeclarator', id: identifierNode(name), init },
 		],
 	};
+}
+
+/**
+ * `let <name> = <init>` — built only as a `for` initializer, where the loop
+ * counter has to be reassignable.
+ */
+export function letDeclarationNode(name: string, init: EmissionNode): EmissionNode {
+	return {
+		type: 'VariableDeclaration',
+		kind: 'let',
+		declarations: [
+			{ type: 'VariableDeclarator', id: identifierNode(name), init },
+		],
+	};
+}
+
+/** `<argument>++` / `<argument>--`, in the postfix position. */
+export function postfixUpdateNode(operator: '++' | '--', argument: EmissionNode): EmissionNode {
+	return { type: 'UpdateExpression', operator, prefix: false, argument };
+}
+
+/** `{ <body> }` — a statement block. */
+export function blockStatementNode(body: ReadonlyArray<EmissionNode>): EmissionNode {
+	return { type: 'BlockStatement', body: [...body] };
+}
+
+/**
+ * `if (<test>) <consequent>` — no `else` arm.
+ *
+ * The consequent is a statement, not a list, because the emitted guards this
+ * builds are single unbraced statements (`if (...) return index;`) and wrapping
+ * them in a block would change the emitted bytes for no reason.
+ */
+export function ifStatementNode(test: EmissionNode, consequent: EmissionNode): EmissionNode {
+	return { type: 'IfStatement', test, consequent, alternate: null };
+}
+
+/** `for (<init>; <test>; <update>) { <body> }` — the C-style counted loop. */
+export function forStatementNode(
+	init: EmissionNode,
+	test: EmissionNode,
+	update: EmissionNode,
+	body: ReadonlyArray<EmissionNode>,
+): EmissionNode {
+	return { type: 'ForStatement', init, test, update, body: blockStatementNode(body) };
 }
 
 /** `function <name>(<params>) { <body> }`, as a declaration statement. */

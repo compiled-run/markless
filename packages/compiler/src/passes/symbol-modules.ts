@@ -16,17 +16,23 @@ import { asNodes, childNodes, isNode, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
 import {
 	arrayNode,
+	arrowFunctionNode,
 	binaryNode,
 	callNode,
+	computedMemberNode,
 	conditionalNode,
 	constDeclarationNode,
 	type EmissionNode,
 	type EmissionPrintInput,
 	type EmissionSite,
 	exportNamedDeclarationNode,
+	forStatementNode,
 	functionDeclarationNode,
 	graphReadCall,
 	identifierNode,
+	ifStatementNode,
+	jsonValueNode,
+	letDeclarationNode,
 	literalNode,
 	logicalNode,
 	memberChainNode,
@@ -37,12 +43,14 @@ import {
 	objectNode,
 	optionalMemberNode,
 	parseEmissionSource,
+	postfixUpdateNode,
 	printEmittedModule,
 	propertyNode,
 	returnStatementNode,
 	shorthandPropertyNode,
 	spreadNode,
 	stringArrayNode,
+	unaryNode,
 	withLeadingBlockComment,
 	type EmittedModule,
 } from './emit-codegen.ts';
@@ -3790,4 +3798,401 @@ function emitAsyncBoundaryUpdateModule(
 		'function marklessBoundaryText(value) { return String(value == null ? "" : value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }',
 	].join('\n');
 	return { symbolId: symbol.id, kind: symbol.kind, exportName, source };
+}
+
+// ---------------------------------------------------------------------------
+// Arm emission through the AST printer.
+//
+// `specs/framework/14-emission-codegen-migration.md`, stage 1, sketch item 3 —
+// the two arm emitters, taken together because they emit the same module shape
+// over different arm data. This band builds nodes and prints them through
+// `emit-codegen.ts`; it calls nothing in the string-scanner band
+// (`topLevelBinaryOperators` through `sourceReferencesIdentifier`), which
+// invariant 5 keeps alive until the stage's final unit but which a migrated site
+// may not reach. Neither arm emitter reached that band on the text path either:
+// their only inputs are render data and `JSON.stringify`.
+//
+// It is not yet the wired path. `emitBranchUpdateModule` and
+// `emitAsyncBoundaryUpdateModule` above still produce the bytes the compiler
+// ships; `test/emit-arm-modules.test.ts` runs both paths over the same arms and
+// records where the printed bytes differ from the assembled ones. Invariant 2
+// makes the swap an owner-approved step, not a side effect of this unit.
+//
+// These two sites are assembled, not extracted: unlike every emitter migrated
+// before them, not one character of their output comes from authored text. The
+// arm HTML is render data, the selector and escaper helpers are the emitter's
+// own fixed code, and the graph reads are built from ids. Two consequences the
+// spec's map invariant does not anticipate, recorded here rather than papered
+// over:
+//
+//   - No printed node carries a span, so the emitted map has no segments. The
+//     DOM-binding band above reached the same state for the same reason; here it
+//     is total rather than near-total, since there is no authored expression
+//     behind the module at all.
+//   - `source` is therefore not recoverable from the symbol. `branch-update`
+//     carries `testSource`, but that text is not what the module emits — the
+//     emitted test is rebuilt from `testRead` ids — and `async-boundary-update`
+//     carries no source field whatsoever. Rather than pass a misleading
+//     substitute, both inputs take `authoredSource` explicitly: the authored
+//     module's own text, which is what `sourceFileName` already names and what
+//     the map's `sourcesContent` should therefore hold.
+//
+// The non-null-map guard (invariant 3) still runs, and still passes, but at
+// these two sites it proves less than it reads as: `yuku-codegen@0.9.0` returns
+// a non-null map for an empty `source` too, so the guard cannot distinguish a
+// module whose source was threaded through from one whose source is absent. The
+// guard is kept because invariant 3 requires it and because it does catch a
+// print site that forgot `sourceMap` entirely.
+// ---------------------------------------------------------------------------
+
+export type BranchUpdateEmissionInput = {
+	readonly symbol: Extract<PlannedSymbol, { readonly kind: 'branch-update' }>;
+	readonly arms: PublicRenderPlanBranchArms;
+	/** The authored file the branch site was compiled from; names the map. */
+	readonly sourceFileName: string;
+	/**
+	 * The authored module's text, for the map's `sourcesContent`.
+	 *
+	 * Passed rather than derived: this site assembles its whole module, so no
+	 * field on the symbol holds text the emitted module is made of.
+	 */
+	readonly authoredSource: string;
+};
+
+/**
+ * Build the print input for a branch-update module.
+ *
+ * Split from the print so a test can run the determinism helper (invariant 7)
+ * over the same tree the emitter would print, without emission paying for three
+ * prints and two reparses per symbol in a real build.
+ */
+export function buildBranchUpdateEmission(input: BranchUpdateEmissionInput): EmissionPrintInput {
+	const exportName = symbolExportName(input.symbol.id);
+	const site: EmissionSite = {
+		phase: 'payload',
+		passId: 'symbol-modules',
+		sourceFileName: input.sourceFileName,
+		symbolId: input.symbol.id,
+	};
+
+	const arms = input.arms;
+	const testExpression = arms.testRead
+		? graphReadCall({
+				callee: 'context.graph.read',
+				graphNodeId: arms.testRead.graphNodeId,
+				path: arms.testRead.path,
+			})
+		: identifierNode('undefined');
+
+	// Switch sites select by case value; if-sites select by truthiness. The text
+	// path parenthesizes the truthiness test by hand; the printer derives the
+	// parentheses `??` over a conditional actually needs.
+	const armSelector = arms.armTests
+		? callNode(identifierNode('marklessSelectSwitchArm'), [
+				testExpression,
+				jsonValueNode(arms.armTests),
+			])
+		: conditionalNode(testExpression, literalNode(0), literalNode(1));
+
+	// Arm-scoped flips may carry repeat parts: rows rebuild from a live graph
+	// read of the collection at flip time (still no component execution).
+	const hasRepeatParts = arms.arms.some((arm) => arm.some((part) => 'repeat' in part));
+
+	const body: EmissionNode[] = [
+		constDeclarationNode('marklessBranchArms', jsonValueNode(arms.arms)),
+		...(arms.armTests ? [switchArmSelectorFunctionNode()] : []),
+		exportNamedDeclarationNode(
+			functionDeclarationNode(exportName, ['context'], [
+				constDeclarationNode(
+					'arm',
+					logicalNode('??', memberChainNode('context.arm'), armSelector),
+				),
+				constDeclarationNode(
+					'parts',
+					logicalNode(
+						'??',
+						computedMemberNode(identifierNode('marklessBranchArms'), identifierNode('arm')),
+						arrayNode([]),
+					),
+				),
+				constDeclarationNode(
+					'html',
+					armPartsHtmlExpression('marklessBranchText', hasRepeatParts),
+				),
+				returnStatementNode(
+					objectNode([shorthandPropertyNode('arm'), shorthandPropertyNode('html')]),
+				),
+			]),
+		),
+		armTextEscaperFunctionNode('marklessBranchText'),
+		...(hasRepeatParts ? [branchRowsFunctionNode()] : []),
+	];
+
+	return {
+		program: moduleProgramNode(body),
+		source: input.authoredSource,
+		outputFileName: `${exportName}.js`,
+		site,
+	};
+}
+
+/** The printed branch-update module, with its source map (invariant 3). */
+export function emitBranchUpdateModuleNodes(input: BranchUpdateEmissionInput): EmittedModule {
+	return printEmittedModule(buildBranchUpdateEmission(input));
+}
+
+export type AsyncBoundaryUpdateEmissionInput = {
+	readonly symbol: Extract<PlannedSymbol, { readonly kind: 'async-boundary-update' }>;
+	readonly arms: PublicRenderPlanAsyncBoundaryArms;
+	/** The authored file the boundary was compiled from; names the map. */
+	readonly sourceFileName: string;
+	/** The authored module's text, for the map's `sourcesContent`. */
+	readonly authoredSource: string;
+};
+
+/**
+ * Build the print input for an async-boundary-update module.
+ *
+ * Split from the print for the same reason `buildBranchUpdateEmission` is: the
+ * determinism helper (invariant 7) needs the tree, and a real build must not pay
+ * for three prints and two reparses per symbol.
+ */
+export function buildAsyncBoundaryUpdateEmission(
+	input: AsyncBoundaryUpdateEmissionInput,
+): EmissionPrintInput {
+	const exportName = symbolExportName(input.symbol.id);
+	const site: EmissionSite = {
+		phase: 'payload',
+		passId: 'symbol-modules',
+		sourceFileName: input.sourceFileName,
+		symbolId: input.symbol.id,
+	};
+
+	const body: EmissionNode[] = [
+		constDeclarationNode('marklessBoundaryArms', jsonValueNode(input.arms.arms)),
+		exportNamedDeclarationNode(
+			functionDeclarationNode(exportName, ['context'], [
+				// The runtime passes the settled status; arm 1 is @catch, arm 0 is @try.
+				constDeclarationNode(
+					'arm',
+					conditionalNode(
+						binaryNode('===', memberChainNode('context.status'), literalNode('rejected')),
+						literalNode(1),
+						literalNode(0),
+					),
+				),
+				constDeclarationNode(
+					'parts',
+					logicalNode(
+						'??',
+						computedMemberNode(identifierNode('marklessBoundaryArms'), identifierNode('arm')),
+						arrayNode([]),
+					),
+				),
+				constDeclarationNode('html', armPartsHtmlExpression('marklessBoundaryText', false)),
+				returnStatementNode(
+					objectNode([shorthandPropertyNode('arm'), shorthandPropertyNode('html')]),
+				),
+			]),
+		),
+		armTextEscaperFunctionNode('marklessBoundaryText'),
+	];
+
+	return {
+		program: moduleProgramNode(body),
+		source: input.authoredSource,
+		outputFileName: `${exportName}.js`,
+		site,
+	};
+}
+
+/** The printed async-boundary-update module, with its source map (invariant 3). */
+export function emitAsyncBoundaryUpdateModuleNodes(
+	input: AsyncBoundaryUpdateEmissionInput,
+): EmittedModule {
+	return printEmittedModule(buildAsyncBoundaryUpdateEmission(input));
+}
+
+/**
+ * `parts.map((part) => ...).join("")` — the arm-to-HTML expression both arm
+ * emitters build, differing only in which escaper they call and whether they
+ * handle repeat parts.
+ *
+ * Shared between the two bands rather than written twice because the two text
+ * paths are already character-identical apart from the escaper name; a shared
+ * builder means a future change cannot drift them apart silently.
+ */
+function armPartsHtmlExpression(escaperName: string, hasRepeatParts: boolean): EmissionNode {
+	const escapedRead = callNode(identifierNode(escaperName), [
+		callNode(memberChainNode('context.graph.read'), [
+			memberChainNode('part.read.graphNodeId'),
+			memberChainNode('part.read.path'),
+		]),
+	]);
+
+	const nonTextPart = hasRepeatParts
+		? conditionalNode(
+				binaryNode('!==', memberChainNode('part.repeat'), identifierNode('undefined')),
+				callNode(identifierNode('marklessBranchRows'), [
+					memberChainNode('part.repeat'),
+					memberChainNode('context.graph'),
+				]),
+				escapedRead,
+			)
+		: escapedRead;
+
+	return callNode(
+		memberNode(
+			callNode(memberChainNode('parts.map'), [
+				arrowFunctionNode(
+					['part'],
+					conditionalNode(
+						binaryNode('!==', memberChainNode('part.text'), identifierNode('undefined')),
+						memberChainNode('part.text'),
+						nonTextPart,
+					),
+				),
+			]),
+			'join',
+		),
+		[literalNode('')],
+	);
+}
+
+/**
+ * The three HTML replacements the arm escapers apply, in the order the text path
+ * chains them. Order is emitted bytes, so it is data rather than three literal
+ * call sites.
+ */
+const ARM_TEXT_ESCAPES: ReadonlyArray<readonly [string, string]> = [
+	['&', '&amp;'],
+	['<', '&lt;'],
+	['>', '&gt;'],
+];
+
+/**
+ * `function <name>(value) { return String(value == null ? "" : value).replaceAll(...)...; }`
+ *
+ * The two emitters give this function two different names —
+ * `marklessBranchText` and `marklessBoundaryText` — with identical bodies, so
+ * the name is a parameter and the body is built once.
+ */
+function armTextEscaperFunctionNode(name: string): EmissionNode {
+	const coerced: EmissionNode = callNode(identifierNode('String'), [
+		conditionalNode(
+			binaryNode('==', identifierNode('value'), literalNode(null)),
+			literalNode(''),
+			identifierNode('value'),
+		),
+	]);
+	const escaped = ARM_TEXT_ESCAPES.reduce<EmissionNode>(
+		(node, [from, to]) =>
+			callNode(memberNode(node, 'replaceAll'), [literalNode(from), literalNode(to)]),
+		coerced,
+	);
+
+	return functionDeclarationNode(name, ['value'], [returnStatementNode(escaped)]);
+}
+
+/**
+ * `function marklessSelectSwitchArm(value, tests) { ... }` — the switch-site arm
+ * picker, emitted only when the site carries `armTests`.
+ *
+ * `tests[index]` is built twice rather than once and shared: a node reused at
+ * two positions is one object in two places in the tree, which the printer
+ * happens to tolerate but which makes any later per-node bookkeeping (spans,
+ * comments, map segments) ambiguous.
+ */
+function switchArmSelectorFunctionNode(): EmissionNode {
+	const testAtIndex = (): EmissionNode =>
+		computedMemberNode(identifierNode('tests'), identifierNode('index'));
+
+	return functionDeclarationNode('marklessSelectSwitchArm', ['value', 'tests'], [
+		forStatementNode(
+			letDeclarationNode('index', literalNode(0)),
+			binaryNode('<', identifierNode('index'), memberChainNode('tests.length')),
+			postfixUpdateNode('++', identifierNode('index')),
+			[
+				ifStatementNode(
+					logicalNode(
+						'&&',
+						binaryNode('!==', testAtIndex(), literalNode(null)),
+						binaryNode('===', identifierNode('value'), testAtIndex()),
+					),
+					returnStatementNode(identifierNode('index')),
+				),
+			],
+		),
+		returnStatementNode(callNode(memberChainNode('tests.indexOf'), [literalNode(null)])),
+	]);
+}
+
+/**
+ * `function marklessBranchRows(repeat, graph) { ... }` — the row rebuilder,
+ * emitted only when an arm carries repeat parts.
+ *
+ * A row part is one of three shapes: static text, an item-relative path walked
+ * against the row's own item, or a graph read. The walk is a `reduce` that
+ * short-circuits on a nullish intermediate, exactly as the text path writes it.
+ */
+function branchRowsFunctionNode(): EmissionNode {
+	const rowExpression = conditionalNode(
+		binaryNode('!==', memberChainNode('row.text'), identifierNode('undefined')),
+		memberChainNode('row.text'),
+		conditionalNode(
+			binaryNode('!==', memberChainNode('row.itemPath'), identifierNode('undefined')),
+			callNode(identifierNode('marklessBranchText'), [
+				callNode(memberChainNode('row.itemPath.reduce'), [
+					arrowFunctionNode(
+						['value', 'key'],
+						conditionalNode(
+							binaryNode('==', identifierNode('value'), literalNode(null)),
+							identifierNode('value'),
+							computedMemberNode(identifierNode('value'), identifierNode('key')),
+						),
+					),
+					identifierNode('item'),
+				]),
+			]),
+			callNode(identifierNode('marklessBranchText'), [
+				callNode(memberChainNode('graph.read'), [
+					memberChainNode('row.read.graphNodeId'),
+					memberChainNode('row.read.path'),
+				]),
+			]),
+		),
+	);
+
+	const rowHtml = callNode(
+		memberNode(
+			callNode(memberChainNode('repeat.rowParts.map'), [
+				arrowFunctionNode(['row'], rowExpression),
+			]),
+			'join',
+		),
+		[literalNode('')],
+	);
+
+	return functionDeclarationNode('marklessBranchRows', ['repeat', 'graph'], [
+		constDeclarationNode(
+			'items',
+			callNode(memberChainNode('graph.read'), [
+				memberChainNode('repeat.read.graphNodeId'),
+				memberChainNode('repeat.read.path'),
+			]),
+		),
+		ifStatementNode(
+			unaryNode('!', callNode(memberChainNode('Array.isArray'), [identifierNode('items')])),
+			returnStatementNode(literalNode('')),
+		),
+		returnStatementNode(
+			callNode(
+				memberNode(
+					callNode(memberChainNode('items.map'), [arrowFunctionNode(['item'], rowHtml)]),
+					'join',
+				),
+				[literalNode('')],
+			),
+		),
+	]);
 }
