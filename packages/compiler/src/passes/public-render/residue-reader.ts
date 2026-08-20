@@ -1,4 +1,4 @@
-import { parseModule } from '@tsrx/core';
+import { parseModule } from '../../yuku-tsrx-adapter.ts';
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
 import {
@@ -59,7 +59,11 @@ export function emitClientResidueReader(
 			bound.add(repeat.itemName);
 			lines.push(`const ${repeat.itemName}=${CONTEXT}.repeatItem;`);
 		}
-		if (repeat.indexName && references(text, repeat.indexName) && !bound.has(repeat.indexName)) {
+		if (
+			repeat.indexName &&
+			references(text, repeat.indexName) &&
+			!bound.has(repeat.indexName)
+		) {
 			bound.add(repeat.indexName);
 			lines.push(`const ${repeat.indexName}=${CONTEXT}.repeatIndex;`);
 		}

@@ -120,7 +120,7 @@ export function GlassArchive() @{
 	);
 	if (!syncDerive) throw new Error('Expected the sync-hop derive module.');
 	expect(syncDerive.source).toContain(
-		'context.graph.read("computed:furnaceReading", ["value","tone"])',
+		'context.graph.read("computed:furnaceReading", ["value", "tone"])',
 	);
 	expect(syncDerive.source).not.toContain('return ({ caption: furnaceReading.tone })');
 	expect(result.protocolState.computed).toContainEqual({

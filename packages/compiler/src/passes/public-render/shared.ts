@@ -1,4 +1,4 @@
-import { parseModule } from '@tsrx/core';
+import { parseModule } from '../../yuku-tsrx-adapter.ts';
 import { deserializeGraphValue, type SerializedGraphPayload } from '@markless/serializer';
 import type { PublicRenderModuleInput, SemanticModuleImport } from '../../artifacts.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
@@ -222,9 +222,8 @@ export function staticHostLocators(input: PublicRenderModuleInput) {
 	return (rootChunk?.hosts ?? []).map((host) => ({
 		hostNodeId: host.hostNodeId,
 		tagName: host.tagName,
-		hostPath: host.coordinate.path[0] === 0
-			? host.coordinate.path.slice(1)
-			: host.coordinate.path,
+		hostPath:
+			host.coordinate.path[0] === 0 ? host.coordinate.path.slice(1) : host.coordinate.path,
 	}));
 }
 

@@ -1,6 +1,11 @@
 import { expect, test, vi } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
 import {
+	PUBLIC_RENDER_PHASE,
+	PUBLIC_RENDER_PLAN_PASS_ID,
+	PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT_CODE,
+} from '../src/passes/public-render/diagnostics.ts';
+import {
 	ASYNC_BOUNDARY_ARM,
 	deserializeGraphValue,
 	renderPayloadScripts,
@@ -181,7 +186,7 @@ export default function Home() @{
 }
 `;
 
-test('compileTsrxModule wraps @tsrx/core parse SyntaxErrors as structured diagnostics', async () => {
+test('compileTsrxModule wraps yuku-tsrx parse SyntaxErrors as structured diagnostics', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/DynamicTagCall.tsrx',
 		source: `
@@ -208,9 +213,11 @@ export function App() @{
 		}),
 	]);
 	expect(result.semanticGraph.diagnostics[0]?.message).toContain(
-		'Dynamic element names must be an identifier, member expression, static string, or runtime expression; calls, spreads, string concatenation, string interpolation, and static null, undefined, boolean, number, object, and array literals are not valid tag names.',
+		'TSRX dynamic tag expression must resolve to an element name',
 	);
-	expect(result.semanticGraph.diagnostics[0]?.why).toContain('phase parse (external @tsrx/core)');
+	expect(result.semanticGraph.diagnostics[0]?.why).toContain(
+		'yuku-tsrx parser failed at phase parse',
+	);
 	expect(result.semanticGraph.diagnostics[0]?.suggestions[0]?.message).toContain(
 		'https://tsrx.dev/specification',
 	);
@@ -668,8 +675,8 @@ async function importPublicRenderTestModule(
 
 	try {
 		const testSource = source.replace(
-			/from '@markless\/web\/fns\/([^']+)'/g,
-			(_match, helperModule: string) =>
+			/from (['"])@markless\/web\/fns\/([^'"]+)\1/g,
+			(_match, _quote: string, helperModule: string) =>
 				`from '${new URL(`../../web/src/fns/${helperModule}.ts`, import.meta.url).href}'`,
 		);
 		return (await import(
@@ -1141,7 +1148,9 @@ export function Dashboard() @{
 		symbols: [],
 	});
 
-	expect(result.renderData.chunks.find((chunk) => chunk.id === 'template:Dashboard')?.statics).toEqual(['<main>Chosen root</main>']);
+	expect(
+		result.renderData.chunks.find((chunk) => chunk.id === 'template:Dashboard')?.statics,
+	).toEqual(['<main>Chosen root</main>']);
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
 	const output = await (ssrModule.marklessRenderSsr as () => { readonly html: string })();
 
@@ -1820,9 +1829,7 @@ export function App() @{
 		symbols: [],
 	});
 
-	expect(result.renderData.repeats).toEqual([
-		expect.objectContaining({ repeatId: 'repeat:0' }),
-	]);
+	expect(result.renderData.repeats).toEqual([expect.objectContaining({ repeatId: 'repeat:0' })]);
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
 	const output = await (
 		ssrModule.marklessRenderSsr as () => {
@@ -1926,7 +1933,9 @@ export function App() @{
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
 	// Index-reading rows stay off the direct-DOM runtime, which cannot rewrite
 	// index text on reorder yet.
-	expect(result.renderData.repeats[0]).toEqual(expect.objectContaining({ directSupported: false }));
+	expect(result.renderData.repeats[0]).toEqual(
+		expect.objectContaining({ directSupported: false }),
+	);
 
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
 	const output = await (
@@ -1975,7 +1984,9 @@ export function App() @{
 			suppressionReason: 'static list, order never changes',
 		}),
 	]);
-	expect(result.renderData.repeats[0]).toEqual(expect.objectContaining({ directSupported: false }));
+	expect(result.renderData.repeats[0]).toEqual(
+		expect.objectContaining({ directSupported: false }),
+	);
 
 	const ssrOutput = await renderTestSsr(result);
 
@@ -2005,9 +2016,7 @@ export function App() @{
 	});
 
 	expect(result.semanticGraph.diagnostics).toEqual([]);
-	expect(result.renderData.repeats).toEqual([
-		expect.objectContaining({ repeatId: 'repeat:0' }),
-	]);
+	expect(result.renderData.repeats).toEqual([expect.objectContaining({ repeatId: 'repeat:0' })]);
 	const ssrOutput = await renderTestSsr(result);
 
 	expect(ssrOutput.html).toBe('<section><p>One</p><p>Two</p></section>');
@@ -2114,6 +2123,9 @@ export function App() @{
 		<style>
 			.card { color: red; }
 			.card h2, .title { font-size: 2rem; }
+			.card:hover::before { content: 'hover'; }
+			@media (min-width: 40rem) { .card > h2:first-child { font-weight: 700; } }
+			@KEYFRAMES pulse { from { opacity: 0; } 50% { opacity: .5; } to { opacity: 1; } }
 		</style>
 		<h2 class="title">{label}</h2>
 		<footer>Done</footer>
@@ -2134,6 +2146,15 @@ export function App() @{
 	expect(styleScope!.cssText).toContain(
 		`.card h2.${scope}, .title.${scope} { font-size: 2rem; }`,
 	);
+	expect(styleScope!.cssText).toContain(`.card.${scope}:hover::before { content: 'hover'; }`);
+	expect(styleScope!.cssText).toContain(
+		`@media (min-width: 40rem) { .card > h2.${scope}:first-child { font-weight: 700; } }`,
+	);
+	expect(styleScope!.cssText).toContain(
+		`@KEYFRAMES pulse { from { opacity: 0; } 50% { opacity: .5; } to { opacity: 1; } }`,
+	);
+	expect(styleScope!.cssText).not.toContain(`from.${scope}`);
+	expect(styleScope!.cssText).not.toContain(`50%.${scope}`);
 
 	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
 	const output = await (ssrModule.marklessRenderSsr as () => { readonly html: string })();
@@ -2143,6 +2164,40 @@ export function App() @{
 		`<section class="card ${scope}"><h2 class="title ${scope}">Hi</h2><footer class="${scope}">Done</footer></section>`,
 	);
 	expect(output.html).not.toContain('<style');
+});
+
+// A <style> block that cannot be scope-compiled is dropped from the build, so
+// the drop has to be explained. `collectStyleScopes` reports it and the public
+// render plan is the single pass that carries those diagnostics to the author;
+// the semantic-graph markup collector calls the same helper only for the scope
+// class, which is why re-reporting there would duplicate this one diagnostic.
+test('compileTsrxModule reports a <style> block whose CSS cannot be scope-compiled', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/BrokenStyle.tsrx',
+		source: `
+export function App() @{
+	<section class="card">
+		<style>
+			.card { color: red;
+		</style>
+		<footer>Done</footer>
+	</section>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.styleScopes).toEqual([]);
+	expect(result.publicRenderPlan.diagnostics).toEqual([
+		expect.objectContaining({
+			code: PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT_CODE,
+			phase: PUBLIC_RENDER_PHASE,
+			passId: PUBLIC_RENDER_PLAN_PASS_ID,
+			title: expect.stringContaining('<style>'),
+			message: expect.stringContaining('could not be scope-compiled'),
+			primarySpan: expect.objectContaining({ filename: 'src/BrokenStyle.tsrx' }),
+		}),
+	]);
 });
 
 test('compileTsrxModule renders fragment-rooted components in SSR html', async () => {
@@ -2571,7 +2626,9 @@ export function App() @{
 	// Boundary 0 contains boundary 1 (both unsupported: nested); boundary 2 is
 	// inside <article> at the top level of its parent... it is conditional-free
 	// and non-nested, so it gates supported.
-	expect(result.renderData.boundaries.filter((boundary) => boundary.protocolSupported)).toHaveLength(1);
+	expect(
+		result.renderData.boundaries.filter((boundary) => boundary.protocolSupported),
+	).toHaveLength(1);
 
 	// The runtime payload must ship ONLY anchors that the SSR emitter actually
 	// emits, re-indexed contiguously — otherwise resume throws
@@ -3225,18 +3282,22 @@ export function App() @{
 	expect(addSymbol).toBeDefined();
 	expect(deleteDraftSymbol).toBeDefined();
 	const bootstrap = result.publicRenderModule.moduleSource;
-	expect(bootstrap).toContain(JSON.stringify({
-		eventName: 'click',
-		hostNodeId: addSymbol!.hostNodeId,
-		hostPath: [0],
-		symbolIds: [addSymbol!.id],
-	}).slice(1, -1));
-	expect(bootstrap).toContain(JSON.stringify({
-		eventName: 'click',
-		hostNodeId: deleteDraftSymbol!.hostNodeId,
-		hostPath: [1],
-		symbolIds: [deleteDraftSymbol!.id],
-	}).slice(1, -1));
+	expect(bootstrap).toContain(
+		JSON.stringify({
+			eventName: 'click',
+			hostNodeId: addSymbol!.hostNodeId,
+			hostPath: [0],
+			symbolIds: [addSymbol!.id],
+		}).slice(1, -1),
+	);
+	expect(bootstrap).toContain(
+		JSON.stringify({
+			eventName: 'click',
+			hostNodeId: deleteDraftSymbol!.hostNodeId,
+			hostPath: [1],
+			symbolIds: [deleteDraftSymbol!.id],
+		}).slice(1, -1),
+	);
 	/* retired plan projection previously duplicated these records:
 	expect([]).toEqual([
 		{
@@ -4011,7 +4072,9 @@ export function Scoreboard() @{
 
 	expect(incrementSymbol).toBeDefined();
 	expect(incrementModule).toBeDefined();
-	expect(result.renderData.chunks.find((chunk) => chunk.id === 'template:Scoreboard')?.slots).toContainEqual(
+	expect(
+		result.renderData.chunks.find((chunk) => chunk.id === 'template:Scoreboard')?.slots,
+	).toContainEqual(
 		expect.objectContaining({
 			kind: 'text',
 			residue: { kind: 'graph-read', graphNodeId: 'state:score', path: ['total'] },
@@ -4413,7 +4476,7 @@ export function App() @{
 	expect(module?.kind).toBe('behavior');
 	expect(module?.source).toContain('function installChart(options) {');
 	expect(module?.source).toContain('canvas.dataset.points = String(options.points);');
-	expect(module?.source).toContain('const behavior = (function installChart(options)');
+	expect(module?.source).toContain('const behavior = function installChart(options)');
 });
 
 test('compileTsrxModule composes imported child BUTTON counters for SSR resume', async () => {
@@ -4628,9 +4691,7 @@ let entries = state([]);
 		symbols: [],
 	});
 
-	expect(result.renderData.repeats).toEqual([
-		expect.objectContaining({ repeatId: 'repeat:0' }),
-	]);
+	expect(result.renderData.repeats).toEqual([expect.objectContaining({ repeatId: 'repeat:0' })]);
 	expect(result.publicRenderModule.moduleSource).toBe('');
 });
 
@@ -4828,7 +4889,7 @@ test('compileTsrxModule emits handler writes through whole-binding aliases', asy
 	]);
 	expect(result.stateLowering.diagnostics).toEqual([]);
 	expect(module?.source).toContain(
-		"import { marklessWriteScalar } from '@markless/web/fns/write-scalar';",
+		'import { marklessWriteScalar } from "@markless/web/fns/write-scalar";',
 	);
 	expect(module?.source).toContain('return marklessWriteScalar(context, {');
 	expect(module?.source).toContain('graphNodeId: "state:origin"');
@@ -5448,9 +5509,7 @@ export function App() @{
 	});
 
 	expect(result.semanticGraph.diagnostics).toEqual([]);
-	expect(result.renderData.repeats).toEqual([
-		expect.objectContaining({ repeatId: 'repeat:0' }),
-	]);
+	expect(result.renderData.repeats).toEqual([expect.objectContaining({ repeatId: 'repeat:0' })]);
 	expect(result.publicRenderModule.rootExportName).toBe('App');
 	expect(result.publicRenderModule.moduleSource).toContain(
 		'"rowBehaviors":[{"hostPath":[],"symbolId":"symbol:5"',

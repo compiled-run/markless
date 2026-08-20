@@ -1,5 +1,6 @@
 import type { AnyNode } from '../../ast/nodes.ts';
 import type { SourceSpan } from '../../diagnostics.ts';
+import { analyzeModule, type SemanticView } from '../../yuku-tsrx-adapter.ts';
 import type {
 	SemanticComponent,
 	SemanticComponentPropDeclaration,
@@ -81,13 +82,23 @@ export type PendingElementHandleIdref = Omit<
 export type WalkState = {
 	readonly filename: string;
 	readonly source: string;
+	/**
+	 * yuku's semantic tables for this file: the scopes, the bindings each scope
+	 * declares, and every identifier use resolved to the binding it refers to.
+	 * A collector that needs to know whether two identifiers are the same
+	 * binding should ask this instead of comparing names, which cannot tell a
+	 * shadowed local from the graph state it shadows.
+	 *
+	 * Analysis is a second pass over the source, so it is deferred: a walk that
+	 * never asks never pays for it, and a walk that asks twice pays once.
+	 */
+	readonly semantic: () => SemanticView;
 	readonly graph: MutableSemanticGraphArtifact;
 	readonly frameworkApiImports: ReadonlyMap<string, FrameworkApiName>;
 	readonly importedModuleInterfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 	readonly hostIds: WeakMap<object, string>;
 	currentComponentName: string | null;
 	currentComponentId: string | null;
-	shadowedBindingNames: Set<string>;
 	currentBranchScopeIds: string[];
 	currentKeyedRepeatScopeIds: string[];
 	currentHostNodeId: string | null;
@@ -98,9 +109,6 @@ export type WalkState = {
 	currentSharedDefinitionId: string | null;
 	currentCreationSite: 'computed' | 'handler' | 'helper' | 'branch' | 'loop' | null;
 	currentFunctionSite: 'computed' | 'handler' | 'helper' | null;
-	// Names bound by the computed body currently being walked. They shadow any
-	// graph binding of the same name, so a write to one is never a graph write.
-	computedBodyLocalNames: ReadonlySet<string> | null;
 	deferredComputedWrites: DeferredComputedWrite[];
 	pendingElementHandleIdrefs: PendingElementHandleIdref[];
 	currentHelperCall: HelperStateCallSite | null;
@@ -123,7 +131,7 @@ export type WalkState = {
 			readonly initializerNode?: AnyNode;
 		}
 	>;
-	resolvedComponentLocalBindingIds: WeakMap<object, string>;
+	/** Component-local binding id per `start:end` of the use that resolves to it. */
 	resolvedComponentLocalBindingsBySpan: Map<string, string>;
 	walk: SemanticGraphWalk | null;
 	nextComponentEdgeId: number;
@@ -196,17 +204,21 @@ export function createWalkState(input: {
 	readonly graph: MutableSemanticGraphArtifact;
 	readonly frameworkApiImports: ReadonlyMap<string, FrameworkApiName>;
 	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
+	/** Overridable so a test can observe when analysis is requested. */
+	readonly analyzeSemantics?: (source: string, filename: string) => SemanticView;
 }): WalkState {
+	const analyzeSemantics = input.analyzeSemantics ?? analyzeModule;
+	let semanticView: SemanticView | undefined;
 	return {
 		filename: input.filename,
 		source: input.source,
+		semantic: () => (semanticView ??= analyzeSemantics(input.source, input.filename)),
 		graph: input.graph,
 		frameworkApiImports: input.frameworkApiImports,
 		importedModuleInterfaces: input.importedModuleInterfaces ?? {},
 		hostIds: new WeakMap<object, string>(),
 		currentComponentName: null,
 		currentComponentId: null,
-		shadowedBindingNames: new Set(),
 		currentBranchScopeIds: [],
 		currentKeyedRepeatScopeIds: [],
 		currentHostNodeId: null,
@@ -216,7 +228,6 @@ export function createWalkState(input: {
 		currentSharedDefinitionId: null,
 		currentCreationSite: null,
 		currentFunctionSite: null,
-		computedBodyLocalNames: null,
 		deferredComputedWrites: [],
 		pendingElementHandleIdrefs: [],
 		currentHelperCall: null,
@@ -225,7 +236,6 @@ export function createWalkState(input: {
 		styleConstResolver: null,
 		pendingComputedDependencies: [],
 		componentLocalBindings: new Map(),
-		resolvedComponentLocalBindingIds: new WeakMap<object, string>(),
 		resolvedComponentLocalBindingsBySpan: new Map(),
 		walk: null,
 		nextComponentEdgeId: 0,

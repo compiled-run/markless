@@ -348,6 +348,46 @@ test('an unclosed CSS rule keeps the file compiling with its authored style text
 	).toMatchObject(expectedFeatureData);
 });
 
+// A `<style>` next to another root element makes the component multi-sibling, so the
+// fragment-wrapping recovery rung compiles a source whose offsets no longer line up with
+// the authored file. The markup text spans come off that recovered AST while the mappings
+// were translated back to authored offsets, and correlating the two spaces directly used
+// to land the text spans on the `<section>` tags - escaping them into `&lt;` and emitting
+// a document TypeScript could not parse.
+test('a style element beside sibling markup leaves the sibling tags unescaped', () => {
+	const source = `export function App() @{
+	<style>.counter { color: red; }</style>
+	<section>hello</section>
+}`;
+	const result = compileToVolarMappings(source, 'Style.tsrx', { loose: true });
+
+	expect(result.code).toContain('<section>hello</section>');
+	expect(result.code).not.toContain('&lt;');
+	expect(
+		exactMappingAt(result, source, source.indexOf('section'), 'section'.length)?.data,
+	).toMatchObject(expectedFeatureData);
+});
+
+test('a half-typed CSS declaration beside sibling markup keeps both usable', () => {
+	const source = `export function App() @{
+	<style>.counter { colo</style>
+	<section>hello</section>
+}`;
+	const result = compileToVolarMappings(source, 'Half.tsrx', { loose: true });
+	const styleStart = source.indexOf('<style>') + '<style>'.length;
+	const styleEnd = source.indexOf('</style>');
+
+	expect(result.code).toContain('<section>hello</section>');
+	expect(result.code).not.toContain('&lt;');
+	expect(result.cssMappings).toHaveLength(1);
+	expect(result.cssMappings[0]?.data.customData.content).toBe(source.slice(styleStart, styleEnd));
+	expect(result.cssMappings[0]?.sourceOffsets).toEqual([styleStart]);
+	expect(result.cssMappings[0]?.lengths).toEqual([styleEnd - styleStart]);
+	expect(
+		exactMappingAt(result, source, source.indexOf('section'), 'section'.length)?.data,
+	).toMatchObject(expectedFeatureData);
+});
+
 test('an unusable file without a style element still throws as fatal', () => {
 	let fatal: unknown;
 	try {
@@ -359,6 +399,57 @@ test('an unusable file without a style element still throws as fatal', () => {
 	}
 
 	expect(fatal).toMatchObject({ type: 'fatal' });
+});
+
+// A self-closing `<Foo />` opens nothing. Counting it as an opening leaves the
+// unclosed-tag balance one too high, so the closing tag is never inferred and
+// the whole file goes dark while the author is still typing the wrapper.
+test('a self-closing tag does not defeat the inferred closing tag for the same name', () => {
+	const withSelfClosingSibling = `import { Foo } from './Foo.tsrx';
+
+export default function Shell() @{
+	const icon = <Foo />;
+	<Foo>
+}`;
+	const withoutSelfClosingSibling = `import { Foo } from './Foo.tsrx';
+
+export default function Shell() @{
+	<Foo>
+}`;
+
+	const recovered = compileToVolarMappings(withSelfClosingSibling, 'Shell.tsrx', {
+		loose: true,
+	});
+	const baseline = compileToVolarMappings(withoutSelfClosingSibling, 'Shell.tsrx', {
+		loose: true,
+	});
+
+	// Both recover; the inferred `</Foo>` is stripped from the generated text, so
+	// the authored (still unclosed) opening is what remains visible in both.
+	expect(recovered.code).toContain('const icon = <Foo />;');
+	expect(recovered.code).toContain('return <Foo>;');
+	expect(recovered.code).not.toContain('</Foo>');
+	expect(baseline.code).toContain('return <Foo>;');
+});
+
+// A `>` inside a quoted attribute value is text, not the end of the tag. Ending
+// the scan there reads `<Foo title=">` as a complete opening tag, so the
+// self-closing sibling counts as an opening again and the recovery is skipped.
+test('a quoted > in a self-closing tag does not defeat the inferred closing tag', () => {
+	const withQuotedAngleBracket = `import { Foo } from './Foo.tsrx';
+
+export default function Shell() @{
+	const icon = <Foo title=">" />;
+	<Foo>
+}`;
+
+	const recovered = compileToVolarMappings(withQuotedAngleBracket, 'Shell.tsrx', {
+		loose: true,
+	});
+
+	expect(recovered.code).toContain('const icon = <Foo title=">" />;');
+	expect(recovered.code).toContain('return <Foo>;');
+	expect(recovered.code).not.toContain('</Foo>');
 });
 
 test('an import clause maps its interior, not only its specifier tokens', () => {

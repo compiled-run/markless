@@ -21,11 +21,18 @@ import {
 } from '../component-edge-instance.ts';
 import { getIdentifierName, walkNode, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
+import {
+	createSymbolSourceSemanticsReader,
+	type SymbolSourceSemanticsReader,
+} from './capture-semantics.ts';
 import { resolveBoundaryRunners } from './public-render/boundary-runner.ts';
 
 export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPlan {
 	const symbols: PlannedSymbol[] = [];
 	let nextSymbolId = 0;
+	// One reader per plan run, so a source shared by several symbols is analyzed
+	// once and nothing is retained between compilations.
+	const semanticsReader = createSymbolSourceSemanticsReader();
 
 	for (const event of input.payloadArena.view.events) {
 		for (let order = 0; order < event.handlerCount; order++) {
@@ -46,11 +53,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				parameters: event.handlerParameters[order] ?? [],
 				...(moduleImports.length > 0 ? { moduleImports } : {}),
 				order,
-				reads: eventReads(
-					input.stateLowering?.reads,
-					sourceSpan,
-					functionParameterBindingNames(source),
-				),
+				reads: eventReads(input.stateLowering?.reads, sourceSpan, source, semanticsReader),
 				writes: eventWrites(source, input.stateLowering?.writes, sourceSpan),
 				elementHandleCalls: collectElementHandleCalls(
 					source,
@@ -79,7 +82,8 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				reads: eventReads(
 					input.stateLowering?.reads,
 					prop.sourceSpan,
-					functionParameterBindingNames(prop.source),
+					prop.source,
+					semanticsReader,
 				),
 				writes: eventWrites(prop.source, input.stateLowering?.writes, prop.sourceSpan),
 			});
@@ -343,15 +347,17 @@ function eventWrites(
 function eventReads(
 	reads: ReadonlyArray<LoweredStateRead> | undefined,
 	handlerSpan: SourceSpan | undefined,
-	parameterBindingNames: ReadonlySet<string>,
+	handlerSource: string,
+	semanticsReader: SymbolSourceSemanticsReader,
 ): ReadonlyArray<LoweredStateRead> {
 	if (!handlerSpan || !reads?.length) return [];
 
+	const bindsOwnName = handlerBoundName(handlerSource, semanticsReader);
 	const contained = reads.filter(
 		(read) =>
 			read.sourceSpan !== undefined &&
 			spanContains(handlerSpan, read.sourceSpan) &&
-			!parameterBindingNames.has(rootIdentifierName(read.source)),
+			!bindsOwnName(rootIdentifierName(read.source)),
 	);
 	const seen = new Set<string>();
 	return contained.filter((read) => {
@@ -362,57 +368,26 @@ function eventReads(
 	});
 }
 
-function functionParameterBindingNames(source: string): ReadonlySet<string> {
-	const prefix = 'const __marklessHandler = ';
-	let ast: AnyNode;
-	try {
-		ast = parseJavaScriptModule(`${prefix}${source};`);
-	} catch {
-		return new Set();
-	}
+// A lowered read can sit inside the handler span yet not read component state at
+// all: the handler may bind that name itself. Whether a name is bound by the
+// source is a scope question, and the analyzer already answers it - a name the
+// source binds is not free in it - so the handler's own bindings are read off
+// `freeNames` rather than recovered by walking its parameter patterns by hand.
+function handlerBoundName(
+	handlerSource: string,
+	semanticsReader: SymbolSourceSemanticsReader,
+): (name: string) => boolean {
+	// A source with no text carries no bindings, and a source the analyzer could
+	// not read reports no names for lack of an answer rather than because it binds
+	// none. Both stay fail-open, keeping every contained read exactly as an
+	// unparsable handler did before.
+	if (handlerSource.trim() === '') return () => false;
+	const semantics = semanticsReader.read(handlerSource);
+	if (semantics.analysisFailed) return () => false;
 
-	const names = new Set<string>();
-	let foundFunction = false;
-	walkNode(ast, (node) => {
-		if (
-			foundFunction ||
-			(node.type !== 'ArrowFunctionExpression' &&
-				node.type !== 'FunctionExpression' &&
-				node.type !== 'FunctionDeclaration')
-		) {
-			return;
-		}
-		foundFunction = true;
-		for (const parameter of asNodeArray(node.params)) {
-			for (const name of bindingPatternNames(parameter)) names.add(name);
-		}
-	});
-	return names;
-}
-
-function bindingPatternNames(node: AnyNode | undefined): ReadonlyArray<string> {
-	if (!node) return [];
-	if (node.type === 'Identifier') {
-		const name = getIdentifierName(node);
-		return name ? [name] : [];
-	}
-	if (node.type === 'AssignmentPattern') {
-		return bindingPatternNames(node.left as AnyNode | undefined);
-	}
-	if (node.type === 'RestElement') {
-		return bindingPatternNames(node.argument as AnyNode | undefined);
-	}
-	if (node.type === 'ObjectPattern') {
-		return asNodeArray(node.properties).flatMap((property) =>
-			property.type === 'Property'
-				? bindingPatternNames(property.value as AnyNode | undefined)
-				: bindingPatternNames(property.argument as AnyNode | undefined),
-		);
-	}
-	if (node.type === 'ArrayPattern') {
-		return asNodeArray(node.elements).flatMap((element) => bindingPatternNames(element));
-	}
-	return [];
+	// A read whose source does not start with an identifier has no root name to
+	// attribute, so it is never treated as handler-bound.
+	return (name) => name !== '' && !semantics.freeNames.has(name);
 }
 
 function rootIdentifierName(source: string): string {

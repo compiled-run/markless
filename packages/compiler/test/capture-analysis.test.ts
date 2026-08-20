@@ -5,7 +5,12 @@ import {
 	planPayloadArena,
 	planSymbolResolver,
 } from '../src/index.ts';
-import { analyzeCaptures } from '../src/passes/capture-analysis.ts';
+import {
+	analyzeCaptures,
+	CAPTURE_ANALYSIS_PASS_ID,
+	CAPTURE_ANALYSIS_PHASE,
+	EVENT_HANDLER_EMIT_UNSUPPORTED_CODE,
+} from '../src/passes/capture-analysis.ts';
 
 const source = `
 import { state } from '@markless/core';
@@ -840,6 +845,172 @@ export function App() @{
 			symbolId: 'symbol:0',
 			source: 'installLabel()',
 			message: expect.stringContaining('installLabel'),
+		}),
+	]);
+});
+
+// The capture substrate must answer "does this lazy symbol read the component
+// local?" the way JavaScript scoping does. A handler that declares its own
+// binding of the same name reads its own binding, so nothing crosses the
+// resume boundary and no diagnostic is owed.
+test('analyzeCaptures does not report a component local that the lazy symbol shadows', async () => {
+	const shadowingSource = `
+import { state } from '@markless/core';
+
+export function App() @{
+	let count = state(0);
+	const format = (value) => value + 1;
+
+	<section>
+		<button onClick={(format) => format(count)}>{count}</button>
+		<button onClick={() => { const format = (value) => value; format(count); }}>{count}</button>
+	</section>
+}
+`;
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/Shadowed.tsrx',
+		source: shadowingSource,
+	});
+	const stateLowering = lowerStateAccess({ semanticGraph });
+	const payloadArena = planPayloadArena({ semanticGraph, stateLowering });
+	const symbolResolver = planSymbolResolver({ semanticGraph, payloadArena });
+
+	expect(semanticGraph.localBindings).toEqual(
+		expect.arrayContaining([expect.objectContaining({ name: 'format', kind: 'function' })]),
+	);
+
+	const captureAnalysis = analyzeCaptures({
+		semanticGraph,
+		symbolResolver,
+	});
+
+	expect(captureAnalysis.diagnostics).toEqual([]);
+});
+
+// Only real reference positions count. A component local's name appearing as
+// string text, an object literal key, or a member property is not a read of
+// that binding and must not produce a capture diagnostic.
+test('analyzeCaptures ignores component local names that are not reference positions', async () => {
+	const mentionSource = `
+import { state } from '@markless/core';
+
+export function App() @{
+	let count = state(0);
+	const format = (value) => value + 1;
+
+	<button onClick={() => console.log('format', { format: 1 }, count.format, count)}>{count}</button>
+}
+`;
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/Mentions.tsrx',
+		source: mentionSource,
+	});
+	const stateLowering = lowerStateAccess({ semanticGraph });
+	const payloadArena = planPayloadArena({ semanticGraph, stateLowering });
+	const symbolResolver = planSymbolResolver({ semanticGraph, payloadArena });
+
+	expect(semanticGraph.localBindings).toEqual([
+		expect.objectContaining({ name: 'format', kind: 'function' }),
+	]);
+
+	const captureAnalysis = analyzeCaptures({
+		semanticGraph,
+		symbolResolver,
+	});
+
+	expect(captureAnalysis.diagnostics).toEqual([]);
+});
+
+// A non-empty source the analyzer cannot read yields no free names - the same
+// empty answer a source that genuinely captures nothing yields. Reading that
+// silence as "no captures" would emit a lazy symbol whose captures were never
+// checked, so a failed reading has to refuse instead of proceed.
+test('analyzeCaptures refuses a symbol whose non-empty source could not be analyzed', async () => {
+	const analyzableSource = `
+import { state } from '@markless/core';
+
+export function App() @{
+	let count = state(0);
+	const format = () => count + 1;
+
+	<button onClick={() => count++}>{count}</button>
+}
+`;
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/Unanalyzable.tsrx',
+		source: analyzableSource,
+	});
+	const stateLowering = lowerStateAccess({ semanticGraph });
+	const payloadArena = planPayloadArena({ semanticGraph, stateLowering });
+	const symbolResolver = planSymbolResolver({ semanticGraph, payloadArena });
+
+	expect(semanticGraph.localBindings).toEqual([
+		expect.objectContaining({ name: 'format', kind: 'function' }),
+	]);
+	// As authored the handler reads no component local, so it is clean.
+	expect(analyzeCaptures({ semanticGraph, symbolResolver }).diagnostics).toEqual([]);
+
+	// Same graph and same component local, but the symbol now carries a
+	// non-empty source the analyzer cannot parse.
+	const unanalyzable = {
+		...symbolResolver,
+		symbols: symbolResolver.symbols.map((symbol) =>
+			symbol.id === 'symbol:0' ? { ...symbol, source: '() => format(' } : symbol,
+		),
+	};
+
+	expect(analyzeCaptures({ semanticGraph, symbolResolver: unanalyzable }).diagnostics).toEqual([
+		expect.objectContaining({
+			code: EVENT_HANDLER_EMIT_UNSUPPORTED_CODE,
+			severity: 'error',
+			phase: CAPTURE_ANALYSIS_PHASE,
+			passId: CAPTURE_ANALYSIS_PASS_ID,
+			symbolId: 'symbol:0',
+			source: '() => format(',
+		}),
+	]);
+});
+
+// The refusal cannot be spelled through component-local bindings: a component
+// with no locals at all still has a source the analyzer could not read, and its
+// captures are just as unknown. Reporting only when a local exists would let the
+// same unreadable source pass silently in every component without one.
+test('analyzeCaptures refuses an unanalyzable source in a component with no locals', async () => {
+	const analyzableSource = `
+import { state } from '@markless/core';
+
+export function App() @{
+	let count = state(0);
+
+	<button onClick={() => count++}>{count}</button>
+}
+`;
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/NoLocals.tsrx',
+		source: analyzableSource,
+	});
+	const stateLowering = lowerStateAccess({ semanticGraph });
+	const payloadArena = planPayloadArena({ semanticGraph, stateLowering });
+	const symbolResolver = planSymbolResolver({ semanticGraph, payloadArena });
+
+	expect(semanticGraph.localBindings).toEqual([]);
+	expect(analyzeCaptures({ semanticGraph, symbolResolver }).diagnostics).toEqual([]);
+
+	const unanalyzable = {
+		...symbolResolver,
+		symbols: symbolResolver.symbols.map((symbol) =>
+			symbol.id === 'symbol:0' ? { ...symbol, source: '() => count++ (' } : symbol,
+		),
+	};
+
+	expect(analyzeCaptures({ semanticGraph, symbolResolver: unanalyzable }).diagnostics).toEqual([
+		expect.objectContaining({
+			code: EVENT_HANDLER_EMIT_UNSUPPORTED_CODE,
+			severity: 'error',
+			phase: CAPTURE_ANALYSIS_PHASE,
+			passId: CAPTURE_ANALYSIS_PASS_ID,
+			symbolId: 'symbol:0',
+			source: '() => count++ (',
 		}),
 	]);
 });

@@ -156,13 +156,10 @@ function componentPropBindings(
 				? sourceSpan(value, state.filename)
 				: sourceSpan(attribute, state.filename);
 		const expressionSpan = expression ? sourceSpan(expression, state.filename) : undefined;
-		const localBindingId = expression
-			? state.resolvedComponentLocalBindingIds.get(expression) ??
-				(expressionSpan
-					? state.resolvedComponentLocalBindingsBySpan.get(
-							`${expressionSpan.start}:${expressionSpan.end}`,
-						)
-					: undefined)
+		const localBindingId = expressionSpan
+			? state.resolvedComponentLocalBindingsBySpan.get(
+					`${expressionSpan.start}:${expressionSpan.end}`,
+				)
 			: undefined;
 		const localBinding = localBindingId
 			? state.componentLocalBindings.get(localBindingId)

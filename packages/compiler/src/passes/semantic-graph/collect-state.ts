@@ -22,6 +22,7 @@ import {
 	collectExpressionReads,
 	findTemplateValue,
 	markTemplateValueHandled,
+	resolvedSymbolAt,
 } from './collect-expressions.ts';
 import {
 	computedDependencyCycleDiagnostic,
@@ -36,6 +37,7 @@ import {
 	templateAsValueDiagnostic,
 	unstableStateCreationSiteDiagnostic,
 } from './diagnostics.ts';
+import type { SemanticView } from '../../yuku-tsrx-adapter.ts';
 import type { WalkState } from './types.ts';
 import { collectSharedInstance } from './collect-shared.ts';
 
@@ -73,7 +75,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 					callName,
 					init,
 					state.filename,
-					isLocalFrameworkApiShadow(callName, state),
+					isLocalFrameworkApiShadow(init, state),
 					state.source,
 				),
 			);
@@ -265,7 +267,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 				);
 				continue;
 			}
-			if (readsIdentifier(body, name)) {
+			if (readsOwnBinding(body, id, state)) {
 				state.graph.diagnostics.push(
 					computedDependencyCycleDiagnostic({
 						name,
@@ -780,13 +782,18 @@ function frameworkApiValueReference(node: AnyNode, state: WalkState): FrameworkA
 	return name ? (state.frameworkApiImports.get(name) ?? null) : null;
 }
 
-function isLocalFrameworkApiShadow(name: FrameworkApiName, state: WalkState): boolean {
-	if (state.helperFunctions.has(name)) return true;
-	return state.graph.localDeclarations.some(
-		(declaration) =>
-			declaration.name === name &&
-			(declaration.scope === 'component' || declaration.scope === 'function'),
-	);
+/**
+ * Whether a bare `state()`/`computed()`/... call really calls a binding this
+ * file declares, rather than a framework API nobody imported. A callee that
+ * resolves to a binding is that binding; one that resolves to nothing is the
+ * missing import. Comparing names cannot separate the two, because it also
+ * matches a same-named binding declared in some other scope of the file.
+ */
+function isLocalFrameworkApiShadow(call: AnyNode, state: WalkState): boolean {
+	const callee = call.callee as AnyNode | undefined;
+	if (typeof callee?.start !== 'number') return false;
+
+	return resolvedSymbolAt(state.semantic(), callee.start) !== null;
 }
 
 function findNestedFrameworkApiCall(
@@ -810,33 +817,40 @@ function findNestedFrameworkApiCall(
 	return found;
 }
 
-function readsIdentifier(node: AnyNode | undefined, name: string): boolean {
-	let found = false;
+/**
+ * Whether a computed body reads the very binding the computed is defining.
+ * Only resolution can tell that use apart from a use of something else spelled
+ * the same - a `const` the body declares, a callback parameter, the static
+ * property name in `view.repos` - and a false match rejects a legal computed
+ * as a dependency cycle.
+ */
+function readsOwnBinding(body: AnyNode | undefined, id: AnyNode, state: WalkState): boolean {
+	if (typeof body?.start !== 'number' || typeof body.end !== 'number') return false;
+	if (typeof id.start !== 'number') return false;
 
-	const visit = (candidate: AnyNode | undefined): void => {
-		if (!candidate || found) return;
-		if (candidate.type === 'Identifier' && getIdentifierName(candidate) === name) {
-			found = true;
-			return;
-		}
-		if (candidate.type === 'Property') {
-			if (candidate.computed === true) visit(candidate.key as AnyNode | undefined);
-			visit(candidate.value as AnyNode | undefined);
-			return;
-		}
-		if (candidate.type === 'MemberExpression' && candidate.computed !== true) {
-			// `view.repos` reads `view`, not `repos`: static property names are
-			// not identifier reads (a computed named after a field it projects is
-			// not a self-dependency).
-			visit(candidate.object as AnyNode | undefined);
-			return;
-		}
+	const semantic = state.semantic();
+	const symbolId = declaredSymbolAt(semantic, id.start);
+	if (symbolId === null) return false;
 
-		for (const child of childNodes(candidate)) visit(child);
-	};
+	for (let reference = 0; reference < semantic.reference.count; reference += 1) {
+		if (semantic.reference.symbolId(reference) !== symbolId) continue;
+		if (semantic.reference.inTypePosition(reference)) continue;
+		const start = semantic.reference.start(reference);
+		if (start >= body.start && start < body.end) return true;
+	}
 
-	visit(node);
-	return found;
+	return false;
+}
+
+/** The binding a declaration site introduces, found by where its name starts. */
+function declaredSymbolAt(semantic: SemanticView, offset: number): number | null {
+	for (let symbolId = 0; symbolId < semantic.symbol.count; symbolId += 1) {
+		for (let declIndex = 0; declIndex < semantic.symbol.declCount(symbolId); declIndex += 1) {
+			if (semantic.symbol.declNode(symbolId, declIndex).start === offset) return symbolId;
+		}
+	}
+
+	return null;
 }
 
 function moduleAliasTarget(init: AnyNode, state: WalkState): string | undefined {
@@ -1286,6 +1300,9 @@ export function evaluateSyncPolicyConstant(
 	if (!node) return { ok: false };
 
 	if (node.type === 'Literal') return { ok: true, value: node.value };
+	if (node.type === 'ParenthesizedExpression') {
+		return evaluateSyncPolicyConstant(node.expression as AnyNode | undefined);
+	}
 	if (node.type === 'ObjectExpression') return evaluateSyncPolicyConstantObjectExpression(node);
 	if (node.type === 'ArrayExpression') return evaluateSyncPolicyConstantArrayExpression(node);
 	if (node.type === 'UnaryExpression') {

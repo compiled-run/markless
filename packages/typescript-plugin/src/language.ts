@@ -154,7 +154,15 @@ export function updateMarklessTsrxParseFailure(
 ): MarklessTsrxTypeServiceResult | undefined {
 	try {
 		const compiled = compileToVolarMappings(source, fileName, { loose: true });
-		parseFailures.delete(canonicalParseFailureFileName(fileName));
+		const firstError = compiled.errors[0];
+		if (firstError) {
+			parseFailures.set(
+				canonicalParseFailureFileName(fileName),
+				parserFailureDetails(firstError),
+			);
+		} else {
+			parseFailures.delete(canonicalParseFailureFileName(fileName));
+		}
 		return compiled;
 	} catch (error) {
 		parseFailures.set(canonicalParseFailureFileName(fileName), parserFailureDetails(error));

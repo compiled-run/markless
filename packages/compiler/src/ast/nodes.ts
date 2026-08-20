@@ -7,6 +7,7 @@ export type AnyNode = {
 
 const ignoredWalkKeys = new Set([
 	'closingElement',
+	'comments',
 	'id',
 	'leadingComments',
 	'loc',

@@ -1,4 +1,4 @@
-import { isEventAttribute, normalizeEventName } from '@tsrx/core';
+import { isEventAttribute, normalizeEventName } from '../../yuku-tsrx-adapter.ts';
 import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
 import {
@@ -181,10 +181,7 @@ function ssrComponentPropsSource(
 	return props;
 }
 
-export function componentEdgeGraphRoutes(
-	edge: ComponentEdge | undefined,
-	hasProjection = false,
-) {
+export function componentEdgeGraphRoutes(edge: ComponentEdge | undefined, hasProjection = false) {
 	const routes = (edge?.props ?? []).map((prop) =>
 		prop.kind === 'graph-reference'
 			? { name: prop.name, graphNodeId: prop.graphNodeId, path: prop.path }
@@ -250,9 +247,7 @@ export function collectSsrPropEvents(
 	const propNameSet = new Set(propNames);
 	for (const event of semanticEvents) {
 		for (const handlerSource of event.handlerSources) {
-			const invokedProps = [
-				...handlerSource.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g),
-			]
+			const invokedProps = [...handlerSource.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)]
 				.map((match) => match[1]!)
 				.filter((name) => propNameSet.has(name));
 			if (invokedProps.length !== 1) continue;

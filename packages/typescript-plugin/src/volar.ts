@@ -22,21 +22,13 @@ export function compileToVolarMappings(
 	filename: string,
 	options: TsrxTypeServiceOptions = {},
 ): MarklessTsrxTypeServiceResult {
-	let result: MarklessTsrxTypeServiceResult;
-	try {
-		result = compileTsrxForTypeService(source, filename, options);
-	} catch (error) {
-		const recovered = compileRecoverableSource(source, filename, options);
-		if (!recovered) {
-			if (error && typeof error === 'object') {
-				(error as { type?: 'fatal' }).type = 'fatal';
-			}
-			throw error;
-		}
-		result = recovered;
-	}
-	addImportClauseInteriorMappings(result, source);
-	escapeMarkupTextLessThan(result);
+	const selection = compileEditorSource(source, filename, options);
+	const result = selection.result;
+	// `result.sourceAst` indexes the recovered source a ladder rung produced, while the
+	// mappings were translated back to the authored source. Everything below reasons about
+	// authored offsets, so AST positions cross over here and nowhere else.
+	addImportClauseInteriorMappings(result, source, selection.toAuthoredOffset);
+	escapeMarkupTextLessThan(result, selection.toAuthoredOffset);
 	return {
 		...result,
 		cssMappings: result.cssMappings.map((mapping, index) => ({
@@ -63,6 +55,85 @@ function fnv1a(text: string): string {
 	return hash.toString(16).padStart(8, '0');
 }
 
+export type EditorSourceSelection = {
+	readonly result: MarklessTsrxTypeServiceResult;
+	readonly source: string;
+	readonly translateOffset: (offset: number) => number;
+	/**
+	 * The inverse of `translateOffset`: a `source`/`result.sourceAst` offset back to the
+	 * authored source. `result.mappings` and `result.cssMappings` are already authored-space,
+	 * so anything correlating an AST position with a mapping has to come through here.
+	 */
+	readonly toAuthoredOffset: (offset: number) => number;
+};
+
+/**
+ * Compile authored or classifier TSRX without admitting a truncated loose parse.
+ * Candidates are cumulative, and only the first candidate without parser diagnostics
+ * may replace the original result.
+ */
+export function compileEditorSource(
+	source: string,
+	fileName: string,
+	options: TsrxTypeServiceOptions = {},
+): EditorSourceSelection {
+	let original: MarklessTsrxTypeServiceResult | undefined;
+	let originalError: unknown;
+	try {
+		original = compileTsrxForTypeService(source, fileName, options);
+		if (original.errors.length === 0) return selectedSource(original, source, []);
+		const fatal = original.errors.find((error) => error.type === 'fatal');
+		if (!fatal) return selectedSource(original, source, []);
+		originalError = fatal;
+	} catch (error) {
+		originalError = error;
+	}
+
+	let candidate: RecoveryCandidate = { source, edits: [] };
+	const attemptedSources = new Set([source]);
+	const transformations = [
+		removeDanglingMemberDots,
+		replaceIncompleteConstructs,
+		wrapMultiSiblingRenderRuns,
+		inferImmediatelyTerminatedClosingTag,
+	] as const;
+	for (const transform of transformations) {
+		candidate = transform(candidate, source);
+		if (attemptedSources.has(candidate.source)) continue;
+		attemptedSources.add(candidate.source);
+		try {
+			const compiled = compileTsrxForTypeService(candidate.source, fileName, options);
+			if (compiled.errors.length !== 0) continue;
+			removeInferredClosingTagsFromGenerated(compiled, candidate.edits);
+			repairSelectedSourceMappings(compiled, candidate.edits);
+			for (const edit of candidate.edits) {
+				if (edit.deletedText === '.') restoreTypedDot(compiled, edit.offset, source);
+			}
+			return selectedSource(compiled, candidate.source, candidate.edits);
+		} catch {
+			// Continue to the next cumulative, source-preserving recovery shape.
+		}
+	}
+
+	if (originalError && typeof originalError === 'object') {
+		(originalError as { type?: 'fatal' }).type = 'fatal';
+	}
+	throw originalError;
+}
+
+function selectedSource(
+	result: MarklessTsrxTypeServiceResult,
+	source: string,
+	edits: readonly RecoveryEdit[],
+): EditorSourceSelection {
+	return {
+		result,
+		source,
+		translateOffset: (offset) => originalOffsetToSelected(offset, edits),
+		toAuthoredOffset: (offset) => selectedOffsetToOriginal(offset, edits),
+	};
+}
+
 type AstNode = {
 	readonly type: string;
 	readonly start?: number;
@@ -80,6 +151,7 @@ type AstNode = {
 function addImportClauseInteriorMappings(
 	compiled: MarklessTsrxTypeServiceResult,
 	source: string,
+	toAuthoredOffset: (offset: number) => number,
 ): void {
 	const program = compiled.sourceAst as AstNode | undefined;
 	if (program?.type !== 'Program') return;
@@ -94,17 +166,29 @@ function addImportClauseInteriorMappings(
 		const namedSpecifiers = specifiers.filter(
 			(specifier) => specifier.type === 'ImportSpecifier',
 		);
-		const first = namedSpecifiers[0];
-		const last = namedSpecifiers.at(-1);
-		if (first?.start === undefined || first.end === undefined || last?.end === undefined)
+		const rawFirst = namedSpecifiers[0];
+		const rawLast = namedSpecifiers.at(-1);
+		if (rawFirst?.start === undefined || rawFirst.end === undefined || rawLast?.end === undefined)
 			continue;
 
+		// The clause is scanned in `source`, so every AST offset used here crosses into
+		// authored space first; a recovery rung that edited earlier text shifts them all.
+		const first = {
+			start: toAuthoredOffset(rawFirst.start),
+			end: toAuthoredOffset(rawFirst.end),
+		};
+		const last = { end: toAuthoredOffset(rawLast.end) };
+		const declarationStart =
+			declaration.start === undefined ? 0 : toAuthoredOffset(declaration.start);
+		const declarationEnd =
+			declaration.end === undefined ? source.length : toAuthoredOffset(declaration.end);
+
 		let openBrace = first.start - 1;
-		while (openBrace >= (declaration.start ?? 0) && /\s/.test(source[openBrace] ?? '')) {
+		while (openBrace >= declarationStart && /\s/.test(source[openBrace] ?? '')) {
 			openBrace -= 1;
 		}
 		let closeBrace = last.end;
-		while (closeBrace < (declaration.end ?? source.length)) {
+		while (closeBrace < declarationEnd) {
 			const character = source[closeBrace];
 			if (character === '}') break;
 			if (character !== ',' && !/\s/.test(character ?? '')) break;
@@ -115,7 +199,7 @@ function addImportClauseInteriorMappings(
 		const tokenMapping = compiled.mappings.find((mapping) => {
 			const mappingStart = mapping.sourceOffsets[0];
 			const mappingEnd = mappingStart + mapping.lengths[0];
-			return mappingStart < first.end! && mappingEnd > first.start!;
+			return mappingStart < first.end && mappingEnd > first.start;
 		});
 		if (!tokenMapping) continue;
 
@@ -138,126 +222,23 @@ function addImportClauseInteriorMappings(
 }
 
 /**
- * Recover the TSX for a file the compiler cannot parse yet, so an in-progress edit keeps
- * its unrelated TypeScript features instead of blanking the whole document. Returns
- * undefined when the file stays unusable.
- */
-function compileRecoverableSource(
-	source: string,
-	fileName: string,
-	options: TsrxTypeServiceOptions,
-): MarklessTsrxTypeServiceResult | undefined {
-	const recovered = compileWithTypeScriptRecovery(source, fileName, options);
-	if (recovered) return recovered;
-
-	// A half-typed CSS rule fails the whole file; blanking keeps every other offset valid.
-	const regions = styleInteriorRegions(source);
-	if (regions.length === 0) return undefined;
-	const blanked = compileWithTypeScriptRecovery(
-		blankStyleInteriors(source, regions),
-		fileName,
-		options,
-	);
-	if (!blanked) return undefined;
-	blanked.cssMappings = authoredCssMappings(blanked, source, regions);
-	return blanked;
-}
-
-function compileWithTypeScriptRecovery(
-	source: string,
-	fileName: string,
-	options: TsrxTypeServiceOptions,
-): MarklessTsrxTypeServiceResult | undefined {
-	const dotPositions = danglingMemberDotPositions(source);
-	let recoverableSource = removeCharactersAt(source, dotPositions);
-
-	try {
-		const compiled = compileTsrxForTypeService(recoverableSource, fileName, options);
-		for (const dotPosition of dotPositions) restoreTypedDot(compiled, dotPosition, source);
-		return compiled;
-	} catch {
-		// A bare @ is a common intermediate editor state. Replacing only those
-		// incomplete tokens with a same-width expression lets unrelated mapped
-		// TypeScript features remain available while the directive is unfinished.
-		const recovery = replaceIncompleteConstructs(recoverableSource);
-		recoverableSource = recovery.source;
-		try {
-			const compiled = compileTsrxForTypeService(recoverableSource, fileName, options);
-			repairRecoveryEditMappings(compiled, recovery.edits);
-			for (const dotPosition of dotPositions) restoreTypedDot(compiled, dotPosition, source);
-			return compiled;
-		} catch {
-			return undefined;
-		}
-	}
-}
-
-type StyleRegion = { readonly start: number; readonly end: number };
-
-function styleInteriorRegions(source: string): StyleRegion[] {
-	const regions: StyleRegion[] = [];
-	for (const match of source.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi)) {
-		const start = match.index + match[0].indexOf('>') + 1;
-		regions.push({ start, end: start + match[1].length });
-	}
-	return regions;
-}
-
-function blankStyleInteriors(source: string, regions: readonly StyleRegion[]): string {
-	let blanked = source;
-	for (const region of regions) {
-		const blank = source.slice(region.start, region.end).replace(/[^\n]/g, ' ');
-		blanked = `${blanked.slice(0, region.start)}${blank}${blanked.slice(region.end)}`;
-	}
-	return blanked;
-}
-
-const styleMappingData: TsrxCodeMapping['data'] = {
-	verification: true,
-	completion: true,
-	semantic: true,
-	navigation: true,
-	structure: true,
-	format: false,
-	customData: {},
-};
-
-/**
- * Put the authored CSS back on mappings compiled from blanked style interiors, so the
- * embedded CSS document still serves the text being typed. A region the parser dropped
- * gets a mapping synthesized in the shape a style element normally compiles to.
- */
-function authoredCssMappings(
-	compiled: MarklessTsrxTypeServiceResult,
-	source: string,
-	regions: readonly StyleRegion[],
-): TsrxCodeMapping[] {
-	return regions.map((region) => {
-		const content = source.slice(region.start, region.end);
-		const data =
-			compiled.cssMappings.find(
-				(mapping) =>
-					mapping.sourceOffsets[0] >= region.start && mapping.sourceOffsets[0] <= region.end,
-			)?.data ?? styleMappingData;
-		return {
-			sourceOffsets: [region.start],
-			generatedOffsets: [0],
-			lengths: [content.length],
-			generatedLengths: [content.length],
-			data: { ...data, customData: { ...data.customData, content } },
-		};
-	});
-}
-
-/**
  * A `<` that cannot open a tag is literal text in TSRX markup, but TSX has no such
  * rule and reads it as a malformed tag, so the emitted document would not parse.
  * Rewrite each one to the `&lt;` entity and move the mappings that follow along by
  * the three characters it adds - the same generated-code edit `restoreTypedDot`
  * makes for a dot.
  */
-function escapeMarkupTextLessThan(compiled: MarklessTsrxTypeServiceResult): void {
-	const textSpans = markupTextSpans(compiled.sourceAst);
+function escapeMarkupTextLessThan(
+	compiled: MarklessTsrxTypeServiceResult,
+	toAuthoredOffset: (offset: number) => number,
+): void {
+	// Compared against authored-space mapping offsets below, so the AST spans are moved
+	// out of the recovered source's coordinates first. A run of real tags sitting at the
+	// shifted position of a text node would otherwise be escaped into literal text.
+	const textSpans = markupTextSpans(compiled.sourceAst).map((span) => ({
+		start: toAuthoredOffset(span.start),
+		end: toAuthoredOffset(span.end),
+	}));
 	if (textSpans.length === 0) return;
 
 	const positions = new Set<number>();
@@ -316,77 +297,314 @@ function markupTextSpans(sourceAst: unknown): Array<{ start: number; end: number
 	return spans;
 }
 
-type RecoveryEdit = { readonly offset: number; readonly replacement: string };
+type RecoveryEdit = {
+	readonly offset: number;
+	readonly deletedText: string;
+	readonly replacement: string;
+};
 
-function replaceIncompleteConstructs(source: string): {
+type RecoveryCandidate = {
 	readonly source: string;
 	readonly edits: readonly RecoveryEdit[];
-} {
+};
+
+function removeDanglingMemberDots(
+	candidate: RecoveryCandidate,
+	originalSource: string,
+): RecoveryCandidate {
+	const edits = danglingMemberDotPositions(candidate.source).map((offset) => ({
+		offset: selectedOffsetToOriginal(offset, candidate.edits),
+		deletedText: '.',
+		replacement: '',
+	}));
+	return withRecoveryEdits(candidate, originalSource, edits);
+}
+
+function replaceIncompleteConstructs(
+	candidate: RecoveryCandidate,
+	originalSource: string,
+): RecoveryCandidate {
 	const edits: RecoveryEdit[] = [];
-	for (const match of source.matchAll(/@(?![\w{])/g)) {
+	for (const match of candidate.source.matchAll(/@(?![\w{])/g)) {
 		const offset = match.index;
-		const lineStart = source.lastIndexOf('\n', offset - 1) + 1;
-		const lineBefore = source.slice(lineStart, offset);
-		const trimmedBefore = source.slice(Math.max(0, offset - 96), offset).trimEnd();
+		const lineStart = candidate.source.lastIndexOf('\n', offset - 1) + 1;
+		const lineBefore = candidate.source.slice(lineStart, offset);
+		const trimmedBefore = candidate.source.slice(Math.max(0, offset - 96), offset).trimEnd();
 		let replacement = '@{}';
 		if (lineStart === offset) replacement = '0';
 		else if ('=+-*/%?:,('.includes(trimmedBefore.at(-1) ?? '')) replacement = '0';
 		else if (/@try\b/.test(lineBefore)) replacement = '@pending {}';
 		else if (/@switch\b/.test(lineBefore)) replacement = '@default: {}';
-		edits.push({ offset, replacement });
+		edits.push({
+			offset: selectedOffsetToOriginal(offset, candidate.edits),
+			deletedText: '@',
+			replacement,
+		});
 	}
-	let recovered = source;
+	return withRecoveryEdits(candidate, originalSource, edits);
+}
+
+function wrapMultiSiblingRenderRuns(
+	candidate: RecoveryCandidate,
+	originalSource: string,
+): RecoveryCandidate {
+	const insertions: RecoveryEdit[] = [];
+	for (const run of multiSiblingRenderRuns(candidate.source)) {
+		insertions.push(
+			{
+				offset: selectedOffsetToOriginal(run.start, candidate.edits),
+				deletedText: '',
+				replacement: '<>',
+			},
+			{
+				offset: selectedOffsetToOriginal(run.end, candidate.edits),
+				deletedText: '',
+				replacement: '</>',
+			},
+		);
+	}
+	return withRecoveryEdits(candidate, originalSource, insertions);
+}
+
+// The attribute region of a tag, up to but not including the tag's own `>`. A
+// quoted value is consumed whole, so a `>` written inside one is attribute text
+// rather than the end of the tag; outside quotes the region still stops at `<`
+// and `>` so an unterminated tag cannot swallow the rest of the body.
+const TAG_ATTRIBUTES = String.raw`(?:\s(?:"[^"]*"|'[^']*'|[^<>'"])*?)?`;
+
+function inferImmediatelyTerminatedClosingTag(
+	candidate: RecoveryCandidate,
+	originalSource: string,
+): RecoveryCandidate {
+	const edits: RecoveryEdit[] = [];
+	for (const component of componentBodies(candidate.source)) {
+		const body = candidate.source.slice(component.start, component.end);
+		const authoredEnd = body.trimEnd().length;
+		const authored = body.slice(0, authoredEnd);
+		const opening = authored.match(
+			new RegExp(String.raw`<([A-Za-z][\w.-]*)${TAG_ATTRIBUTES}>$`, 'u'),
+		);
+		if (!opening || opening[0].endsWith('/>')) continue;
+		const tag = opening[1];
+		const escapedTag = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+		// A self-closing `<Foo />` opens nothing, so it must not count toward the
+		// unclosed-tag balance. The pattern therefore runs to the tag's own `>` and
+		// reports whether a `/` preceded it: a lookahead-terminated match only ever
+		// captures `<Foo`, which can never end in `/>`, so filtering on the matched
+		// text would silently keep counting self-closing tags as openings and skip
+		// the recovery for every body that contains one. Attribute values are
+		// skipped whole (see TAG_ATTRIBUTES) so a quoted `>` cannot end the scan
+		// early and turn `<Foo title=">" />` back into an opening.
+		const openingCount = [
+			...authored.matchAll(new RegExp(`<${escapedTag}${TAG_ATTRIBUTES}\\s*(/?)>`, 'gu')),
+		].filter((match) => match[1] !== '/').length;
+		const closingCount = [...authored.matchAll(new RegExp(`</${escapedTag}\\s*>`, 'gu'))]
+			.length;
+		if (openingCount !== closingCount + 1) continue;
+		const selectedOffset = component.start + authoredEnd;
+		edits.push({
+			offset: selectedOffsetToOriginal(selectedOffset, candidate.edits),
+			deletedText: '',
+			replacement: `</${tag}>`,
+		});
+	}
+	return withRecoveryEdits(candidate, originalSource, edits);
+}
+
+function withRecoveryEdits(
+	candidate: RecoveryCandidate,
+	originalSource: string,
+	additional: readonly RecoveryEdit[],
+): RecoveryCandidate {
+	if (additional.length === 0) return candidate;
+	const edits = [...candidate.edits, ...additional].sort(
+		(left, right) =>
+			left.offset - right.offset || left.deletedText.length - right.deletedText.length,
+	);
+	let recovered = originalSource;
 	for (const edit of edits.toReversed()) {
-		recovered = `${recovered.slice(0, edit.offset)}${edit.replacement}${recovered.slice(edit.offset + 1)}`;
+		recovered = `${recovered.slice(0, edit.offset)}${edit.replacement}${recovered.slice(
+			edit.offset + edit.deletedText.length,
+		)}`;
 	}
 	return { source: recovered, edits };
 }
 
-function repairRecoveryEditMappings(
+function componentBodies(source: string): Array<{ readonly start: number; readonly end: number }> {
+	const bodies: Array<{ start: number; end: number }> = [];
+	for (const match of source.matchAll(/@\{/g)) {
+		const lineStart = source.lastIndexOf('\n', match.index - 1) + 1;
+		const indentation = source.slice(lineStart, match.index).match(/^\s*/)?.[0] ?? '';
+		const closing = new RegExp(`^${indentation.replace(/\t/g, '\\t')}\\}`, 'gmu');
+		closing.lastIndex = match.index + 2;
+		const close = closing.exec(source);
+		if (!close) continue;
+		bodies.push({ start: match.index + 2, end: close.index });
+	}
+	return bodies;
+}
+
+function multiSiblingRenderRuns(
+	source: string,
+): Array<{ readonly start: number; readonly end: number }> {
+	const runs: Array<{ start: number; end: number }> = [];
+	for (const component of componentBodies(source)) {
+		const body = source.slice(component.start, component.end);
+		const tagLines = [...body.matchAll(/^([ \t]+)<(?!\/)/gmu)];
+		if (tagLines.length < 2) continue;
+		const rootIndentLength = Math.min(...tagLines.map((match) => match[1].length));
+		const roots = tagLines.filter((match) => match[1].length === rootIndentLength);
+		if (roots.length < 2) continue;
+		const first = roots[0];
+		const runStart = component.start + first.index + first[1].length;
+		const runEnd = component.start + body.trimEnd().length;
+		const run = source.slice(runStart, runEnd);
+		const crossesAuthoredStatement = [...run.matchAll(/^([ \t]*)(\S.*)$/gmu)].some(
+			(line) =>
+				line[1].length <= rootIndentLength && !line[2].startsWith('<') && line[2] !== '>',
+		);
+		if (!crossesAuthoredStatement) runs.push({ start: runStart, end: runEnd });
+	}
+	return runs;
+}
+
+function removeInferredClosingTagsFromGenerated(
 	compiled: MarklessTsrxTypeServiceResult,
 	edits: readonly RecoveryEdit[],
 ): void {
-	for (const edit of edits) {
-		const expandedOffset =
-			edit.offset +
-			edits
-				.filter((candidate) => candidate.offset < edit.offset)
-				.reduce((total, candidate) => total + candidate.replacement.length - 1, 0);
-		const containing = compiled.mappings.find(
-			(mapping) =>
-				mapping.sourceOffsets[0] <= expandedOffset &&
-				mapping.sourceOffsets[0] + mapping.lengths[0] >= expandedOffset,
+	for (const edit of edits.toReversed()) {
+		if (edit.deletedText !== '' || !/^<\/[A-Za-z][\w.-]*>$/u.test(edit.replacement)) {
+			continue;
+		}
+		const selectedStart = originalOffsetToSelected(edit.offset, edits);
+		const selectedEnd = selectedStart + edit.replacement.length;
+		const syntheticMappings = compiled.mappings.filter((mapping) => {
+			const mappingStart = mapping.sourceOffsets[0];
+			const mappingEnd = mappingStart + mapping.lengths[0];
+			return mappingStart >= selectedStart && mappingEnd <= selectedEnd;
+		});
+		if (syntheticMappings.length === 0) continue;
+		const generatedStart = Math.min(
+			...syntheticMappings.map((mapping) => mapping.generatedOffsets[0]),
 		);
-		if (containing) {
-			compiled.mappings.push({
-				sourceOffsets: [edit.offset],
-				generatedOffsets: [
-					containing.generatedOffsets[0] +
-						Math.min(
-							expandedOffset - containing.sourceOffsets[0],
-							containing.generatedLengths[0],
-						),
-				],
-				lengths: [1],
-				generatedLengths: [1],
-				data: { ...containing.data },
+		const generatedEnd = Math.max(
+			...syntheticMappings.map(
+				(mapping) => mapping.generatedOffsets[0] + mapping.generatedLengths[0],
+			),
+		);
+		compiled.code = `${compiled.code.slice(0, generatedStart)}${compiled.code.slice(
+			generatedEnd,
+		)}`;
+		for (const mapping of [...compiled.mappings, ...compiled.cssMappings]) {
+			if (mapping.generatedOffsets[0] >= generatedEnd) {
+				mapping.generatedOffsets[0] -= generatedEnd - generatedStart;
+			}
+		}
+	}
+}
+
+function repairSelectedSourceMappings(
+	compiled: MarklessTsrxTypeServiceResult,
+	edits: readonly RecoveryEdit[],
+): void {
+	const authoredSegments = selectedAuthoredSegments(edits);
+	compiled.mappings = translateMappings(compiled.mappings, authoredSegments);
+	compiled.cssMappings = translateMappings(compiled.cssMappings, authoredSegments);
+}
+
+type AuthoredSegment = {
+	readonly selectedStart: number;
+	readonly selectedEnd: number;
+	readonly originalStart: number;
+};
+
+function selectedAuthoredSegments(edits: readonly RecoveryEdit[]): AuthoredSegment[] {
+	const segments: AuthoredSegment[] = [];
+	let originalCursor = 0;
+	let selectedCursor = 0;
+	for (const edit of edits) {
+		if (edit.offset > originalCursor) {
+			const length = edit.offset - originalCursor;
+			segments.push({
+				selectedStart: selectedCursor,
+				selectedEnd: selectedCursor + length,
+				originalStart: originalCursor,
+			});
+			selectedCursor += length;
+		}
+		const authoredReplacementLength = Math.min(
+			edit.deletedText.length,
+			edit.replacement.length,
+		);
+		if (authoredReplacementLength > 0) {
+			segments.push({
+				selectedStart: selectedCursor,
+				selectedEnd: selectedCursor + authoredReplacementLength,
+				originalStart: edit.offset,
+			});
+		}
+		selectedCursor += edit.replacement.length;
+		originalCursor = edit.offset + edit.deletedText.length;
+	}
+	segments.push({
+		selectedStart: selectedCursor,
+		selectedEnd: Number.POSITIVE_INFINITY,
+		originalStart: originalCursor,
+	});
+	return segments;
+}
+
+function translateMappings(
+	mappings: readonly TsrxCodeMapping[],
+	segments: readonly AuthoredSegment[],
+): TsrxCodeMapping[] {
+	const translated: TsrxCodeMapping[] = [];
+	for (const mapping of mappings) {
+		const sourceStart = mapping.sourceOffsets[0];
+		const sourceEnd = sourceStart + mapping.lengths[0];
+		for (const segment of segments) {
+			const start = Math.max(sourceStart, segment.selectedStart);
+			const end = Math.min(sourceEnd, segment.selectedEnd);
+			if (end <= start) continue;
+			const relativeStart = start - sourceStart;
+			const relativeEnd = end - sourceStart;
+			const generatedStart =
+				mapping.generatedOffsets[0] + Math.min(relativeStart, mapping.generatedLengths[0]);
+			const generatedEnd =
+				mapping.generatedOffsets[0] + Math.min(relativeEnd, mapping.generatedLengths[0]);
+			translated.push({
+				sourceOffsets: [segment.originalStart + start - segment.selectedStart],
+				generatedOffsets: [generatedStart],
+				lengths: [end - start],
+				generatedLengths: [Math.max(0, generatedEnd - generatedStart)],
+				data: { ...mapping.data },
 			});
 		}
 	}
-	for (const mapping of compiled.mappings) {
-		const expandedOffset = mapping.sourceOffsets[0];
-		const shift = edits.reduce((total, edit) => {
-			const editExpandedOffset =
-				edit.offset +
-				edits
-					.filter((candidate) => candidate.offset < edit.offset)
-					.reduce((sum, candidate) => sum + candidate.replacement.length - 1, 0);
-			return editExpandedOffset < expandedOffset
-				? total + edit.replacement.length - 1
-				: total;
-		}, 0);
-		mapping.sourceOffsets[0] -= shift;
+	return translated;
+}
+
+function originalOffsetToSelected(offset: number, edits: readonly RecoveryEdit[]): number {
+	let translated = offset;
+	for (const edit of edits) {
+		if (edit.offset >= offset) break;
+		translated += edit.replacement.length - edit.deletedText.length;
 	}
+	return translated;
+}
+
+function selectedOffsetToOriginal(offset: number, edits: readonly RecoveryEdit[]): number {
+	let shift = 0;
+	for (const edit of edits) {
+		const selectedStart = edit.offset + shift;
+		const selectedEnd = selectedStart + edit.replacement.length;
+		if (offset < selectedStart) break;
+		if (offset <= selectedEnd) {
+			return edit.offset + Math.min(offset - selectedStart, edit.deletedText.length);
+		}
+		shift += edit.replacement.length - edit.deletedText.length;
+	}
+	return offset - shift;
 }
 
 function danglingMemberDotPositions(source: string): number[] {
@@ -394,13 +612,6 @@ function danglingMemberDotPositions(source: string): number[] {
 	const pattern = /[$#_\u200C\u200D\p{ID_Continue})\]}]\.(?=\s*(?:;|\n|$))/gu;
 	for (const match of source.matchAll(pattern)) positions.push(match.index + match[0].length - 1);
 	return positions;
-}
-
-function removeCharactersAt(source: string, positions: readonly number[]): string {
-	const removed = new Set(positions);
-	return Array.from(source)
-		.filter((_character, index) => !removed.has(index))
-		.join('');
 }
 
 function restoreTypedDot(
@@ -435,6 +646,5 @@ function restoreTypedDot(
 	for (const mapping of compiled.mappings) {
 		if (mapping === dotMapping || mapping === insertedMapping) continue;
 		if (mapping.generatedOffsets[0] >= generatedPosition) mapping.generatedOffsets[0] += 1;
-		if (mapping.sourceOffsets[0] >= dotPosition) mapping.sourceOffsets[0] += 1;
 	}
 }
