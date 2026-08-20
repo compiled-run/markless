@@ -12,7 +12,11 @@ export type CheckboxRootProps = PropsOf<'div'> & {
 	readonly name?: string;
 	/** Submitted instead of the browser default `"on"`. */
 	readonly value?: string;
-	/** Called with the new value when a person toggles the checkbox; never on mount. */
+	/**
+	 * Intended to be called with the new value when a person toggles the checkbox.
+	 * Inert today: a consumer callback cannot be reached from the shared instance
+	 * yet (U-B in the goal's parity table), so it is accepted and never invoked.
+	 */
 	readonly onChange?: (checked: CheckboxChecked) => void;
 	readonly children?: Children;
 };

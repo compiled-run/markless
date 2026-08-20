@@ -16,7 +16,10 @@
 	"exports": {
 		".": "./src/index.ts",
 		"./base": "./src/base/index.ts",
-		"./checkbox": "./src/checkbox/index.ts"
+		"./checkbox": "./src/checkbox/index.ts",
+		"./progress": "./src/progress/index.ts",
+		"./textbox": "./src/textbox/index.ts",
+		"./toggle": "./src/toggle/index.ts"
 	},
 	"dependencies": {
 		"@markless/core": "workspace:*"

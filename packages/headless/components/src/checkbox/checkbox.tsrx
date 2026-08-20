@@ -20,8 +20,7 @@ export const checkboxState = shared(
 			checked: false as boolean | 'mixed',
 			disabled: false,
 			required: false,
-			// A string, not a boolean, so `aria-invalid` is a plain path read.
-			invalid: 'false',
+			invalid: false,
 			name: '',
 			value: '',
 		});
@@ -81,15 +80,15 @@ export function CheckboxTrigger({ children, ...rest }: CheckboxTriggerProps) @{
 		aria-checked={
 			checkbox.checked === 'mixed' ? 'mixed' : checkbox.checked === true ? 'true' : 'false'
 		}
-		aria-invalid={checkbox.invalid}
+		aria-invalid={checkbox.invalid ? 'true' : 'false'}
 		ui-checked={checkbox.checked === true}
 		ui-mixed={checkbox.checked === 'mixed'}
 		ui-disabled={checkbox.disabled}
 		disabled={checkbox.disabled}
 		onClick={() => checkbox.toggle()}
 		onKeyDown={(event) => {
-			// A native button activates on Enter; a checkbox must not. Space still
-			// activates, because a button's Space activation happens on keyup.
+			// A native button activates on Enter; a checkbox must not. The request
+			// lands after dispatch returns, so today it only sometimes wins (U-M).
 			if (event.key === 'Enter') {
 				event.preventDefault();
 			}
@@ -117,8 +116,9 @@ export function CheckboxDescription({ children, ...rest }: CheckboxDescriptionPr
 
 export function CheckboxError({ children, ...rest }: CheckboxErrorProps) @{
 	const checkbox = checkboxState();
-	// Mounting the error part is what makes the trigger invalid; nothing else says so.
-	checkbox.invalid = 'true';
+	// Intent: mounting the error part marks the trigger invalid. A seed a part writes
+	// does not reach its siblings yet (U-H), so the trigger still reads valid.
+	checkbox.invalid = true;
 
 	<div {...rest}>{children}</div>
 }
@@ -129,7 +129,6 @@ export function CheckboxField({ ...rest }: CheckboxFieldProps) @{
 	const checkbox = checkboxState();
 
 	<span
-		class="visually-hidden"
 		style="clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px;"
 	>
 		<input
