@@ -64,6 +64,8 @@ export function renderBodyLines(
 			lines.push(seedLine);
 			continue;
 		}
+		// The instance local is gone here; state-lowering already failed the compile.
+		if (isSharedInstanceAssignment(statement, input, sharedInstanceNames)) continue;
 
 		const source = expressionSource(statement, input.source.source);
 		if (source) lines.push(source);
@@ -95,6 +97,20 @@ function sharedStateSeedLine(
 	return `{ const marklessSharedSeed = (${value}); if (marklessSharedSeed !== undefined) ${stateValuesName}.set(${JSON.stringify(
 		resolved.binding.id,
 	)}, ${seedValueSource(read, resolved.path, 'marklessSharedSeed')}); }`;
+}
+
+function isSharedInstanceAssignment(
+	statement: AnyNode,
+	input: PublicRenderModuleInput,
+	sharedInstanceNames: ReadonlySet<string>,
+): boolean {
+	if (statement.type !== 'ExpressionStatement' || sharedInstanceNames.size === 0) return false;
+	const assignment = statement.expression as AnyNode | undefined;
+	if (assignment?.type !== 'AssignmentExpression') return false;
+
+	const target = expressionSource(assignment.left as AnyNode, input.source.source);
+	const root = /^\s*([$A-Z_a-z][$\w]*)\s*[.[]/.exec(target ?? '')?.[1];
+	return !!root && sharedInstanceNames.has(root);
 }
 
 function seedValueSource(

@@ -655,6 +655,18 @@ inside one `.tsrx` module:
   are projected into its root, and projected content renders AFTER the component
   it is projected into has run its body, so a part reads the seeded value rather
   than the factory initial.
+- **A seed of an undeclared field fails closed.** `s.onChange = onChange` where
+  the definition declares no `onChange` graph field has nothing to seed, and the
+  authored line cannot run on the server because the emitted body keeps no local
+  for the instance. The compile fails with `MARKLESS_SHARED_SEED_UNKNOWN_FIELD`
+  naming the field, and the line never reaches emitted source. Instance callback
+  fields are not supported yet; pass the callback as a component prop instead.
+- **A read of an undeclared member fails closed.** `s.onChange?.(next)` inside a
+  factory method resolves onto the definition's own state node with a path that
+  node never declared, so it would read undefined on every render and after
+  resume. The compile fails with `MARKLESS_SHARED_MEMBER_UNKNOWN` naming the
+  member and the definition. Dynamic property names (`s[key]`) keep their own
+  `MARKLESS_STATE_DYNAMIC_PATH_READ`/`_WRITE` diagnostics.
 - **A seed whose value is undefined is a no-write.** An omitted prop reaches the
   body as `undefined`. Seeding it would erase the factory's own initial, so the
   seed is skipped and the factory value stands. That is what lets defaults live

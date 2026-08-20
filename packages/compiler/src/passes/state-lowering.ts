@@ -18,7 +18,7 @@ import {
 	splitStaticGraphPath,
 	uniqueBy,
 } from '../artifact-helpers/graph-paths.ts';
-import { resolveSharedInstanceGraphPath } from './semantic-graph/collect-shared.ts';
+import { findLast, resolveSharedInstanceGraphPath } from './semantic-graph/collect-shared.ts';
 
 export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifact {
 	const reads: LoweredStateRead[] = [];
@@ -109,6 +109,23 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 			continue;
 		}
 
+		const unknownMember = unknownSharedStateMember(resolved);
+		if (unknownMember) {
+			diagnostics.push(
+				unknownSharedMemberDiagnostic({
+					source: read.source,
+					sourceSpan: read.sourceSpan,
+					member: unknownMember,
+					definitionName: sharedDefinitionName(
+						input.semanticGraph,
+						resolved.binding.sharedDefinitionId,
+					),
+					filename: input.semanticGraph.filename,
+				}),
+			);
+			continue;
+		}
+
 		reads.push({
 			source: read.source,
 			...(read.sourceSpan ? { sourceSpan: read.sourceSpan } : {}),
@@ -157,6 +174,18 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 			) {
 				diagnostics.push(
 					dynamicGraphPathWriteDiagnostic(write, input.semanticGraph.filename),
+				);
+				continue;
+			}
+
+			const unknownField = unknownSharedInstanceField(write, input.semanticGraph);
+			if (unknownField) {
+				diagnostics.push(
+					unknownSharedSeedFieldDiagnostic(
+						write,
+						unknownField,
+						input.semanticGraph.filename,
+					),
 				);
 				continue;
 			}
@@ -887,6 +916,115 @@ function constBindingReassignmentDiagnostic(write: SemanticStateWrite): StateLow
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_STATE_CONST_REASSIGNMENT',
+	};
+}
+
+// `s.onChange = onChange` where the definition declares no such graph field:
+// nothing to seed, and the emitted server body keeps no local for the instance.
+function unknownSharedInstanceField(
+	write: SemanticStateWrite,
+	graph: SemanticGraphArtifact,
+): { readonly field: string; readonly definitionName: string } | null {
+	if (write.sharedDefinitionId !== undefined) return null;
+
+	const segments = splitStaticGraphPath(write.target);
+	const localName = segments[0];
+	const field = segments[1];
+	if (segments.length < 2 || !localName || !field) return null;
+
+	const instance = findLast(
+		graph.sharedInstances,
+		(item) =>
+			item.localName === localName &&
+			(write.componentName === undefined ||
+				item.componentName === undefined ||
+				item.componentName === write.componentName),
+	);
+	if (!instance) return null;
+
+	return { field, definitionName: instance.definitionName };
+}
+
+function unknownSharedSeedFieldDiagnostic(
+	write: SemanticStateWrite,
+	unknown: { readonly field: string; readonly definitionName: string },
+	filename: string,
+): StateLoweringDiagnostic {
+	return {
+		code: 'MARKLESS_SHARED_SEED_UNKNOWN_FIELD',
+		severity: 'error',
+		phase: 'state-lowering',
+		title: 'Shared instance has no such field to seed',
+		message: `Cannot write to "${write.target}" because "${unknown.definitionName}()" declares no graph field named "${unknown.field}". Instance callback fields such as "${unknown.field}" are not supported yet (tracked).`,
+		why: 'A component body seed is lowered into an initial value for a graph node the shared definition declared. With no matching node there is nothing to seed, and the authored assignment cannot run on the server because the emitted body keeps no local for the shared instance.',
+		primarySpan: write.targetSpan ?? fallbackSpan(filename),
+		passId: 'state-lowering',
+		artifactKeys: ['semanticGraph', 'stateLowering'],
+		statePath: write.target,
+		source: write.target,
+		suggestions: [
+			{
+				message: `Return "${unknown.field}" from the ${unknown.definitionName}() factory as state() or computed() graph data, or pass the callback to the component as a prop and call it from an event handler.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_SEED_UNKNOWN_FIELD',
+	};
+}
+
+// A path that resolves onto the definition's own state node but names a key the
+// node never declared: undefined on every render, so the caller silently no-ops.
+function unknownSharedStateMember(resolved: ResolvedStateGraphPath): string | null {
+	const member = resolved.path[0];
+	if (member === undefined) return null;
+
+	const binding = resolved.binding;
+	if (binding.kind !== 'state' || binding.sharedDefinitionId === undefined) return null;
+	if (binding.initialValueKnown !== true) return null;
+
+	const initial = binding.initialValue;
+	if (typeof initial !== 'object' || initial === null || Array.isArray(initial)) return null;
+
+	return Object.hasOwn(initial, member) ? null : member;
+}
+
+function sharedDefinitionName(graph: SemanticGraphArtifact, definitionId?: string): string {
+	return (
+		graph.sharedDefinitions.find((definition) => definition.id === definitionId)?.name ??
+		(definitionId ?? 'the shared definition')
+	);
+}
+
+function unknownSharedMemberDiagnostic({
+	source,
+	sourceSpan,
+	member,
+	definitionName,
+	filename,
+}: {
+	readonly source: string;
+	readonly sourceSpan?: SourceSpan;
+	readonly member: string;
+	readonly definitionName: string;
+	readonly filename: string;
+}): StateLoweringDiagnostic {
+	return {
+		code: 'MARKLESS_SHARED_MEMBER_UNKNOWN',
+		severity: 'error',
+		phase: 'state-lowering',
+		title: 'Shared state has no such member',
+		message: `Cannot read "${source}" because the ${definitionName}() shared state declares no member named "${member}".`,
+		why: 'A member read is lowered into a path subscription on a declared graph node. A path the node never declares reads undefined on every render and after resume, so the code that depends on it silently does nothing.',
+		primarySpan: sourceSpan ?? fallbackSpan(filename),
+		passId: 'state-lowering',
+		artifactKeys: ['semanticGraph', 'stateLowering'],
+		statePath: source,
+		source,
+		suggestions: [
+			{
+				message: `Declare "${member}" in the state() initial value of ${definitionName}(), or read a member the definition already declares.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_MEMBER_UNKNOWN',
 	};
 }
 

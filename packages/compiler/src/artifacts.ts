@@ -838,6 +838,8 @@ export type StateLoweringDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_STATE_MODULE_ESCAPE'
 		| 'MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE'
 		| 'MARKLESS_SHARED_SEED_UNSUPPORTED'
+		| 'MARKLESS_SHARED_SEED_UNKNOWN_FIELD'
+		| 'MARKLESS_SHARED_MEMBER_UNKNOWN'
 		| 'MARKLESS_TEMPLATE_EXPRESSION_STATIC';
 	readonly phase: 'state-lowering';
 	readonly passId: 'state-lowering';
