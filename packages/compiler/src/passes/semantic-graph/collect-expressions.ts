@@ -135,7 +135,7 @@ export function collectDelete(node: AnyNode, state: WalkState): void {
  * declared inside it is that expression's own binding, so a use of it refers to
  * the local rather than to graph state - whatever the two are called.
  */
-type ReadRegion = {
+export type ReadRegion = {
 	readonly start: number;
 	readonly end: number;
 };
@@ -146,7 +146,8 @@ export function collectExpressionReads(node: AnyNode | undefined, state: WalkSta
 	collectReadsIn(node, state, readRegion(node));
 }
 
-function readRegion(node: AnyNode): ReadRegion | null {
+export function readRegion(node: AnyNode | undefined): ReadRegion | null {
+	if (!node) return null;
 	return typeof node.start === 'number' && typeof node.end === 'number'
 		? { start: node.start, end: node.end }
 		: null;
@@ -297,10 +298,9 @@ function deferComputedWrite(
 	state: WalkState,
 ): void {
 	const targetSource = expressionSource(target, state.source);
-	const rootName = graphPathRootName(targetSource);
-	// A name declared inside the derive shadows any graph binding of the same
+	// A binding declared inside the derive shadows any graph binding of the same
 	// name, so it can never be the graph cell.
-	if (!rootName || state.computedBodyLocalNames?.has(rootName)) return;
+	if (rootBindsInsideRegion(target, state, enclosingFunctionRegion(target, state))) return;
 
 	state.deferredComputedWrites.push({
 		writeIndex: state.graph.stateWrites.length,
@@ -336,38 +336,27 @@ export function collectComputedWriteDiagnostics(state: WalkState): void {
 	state.graph.stateWrites.push(...kept);
 }
 
-export function graphPathRootName(source: string): string | null {
-	if (!source) return null;
-	return /^[$A-Z_a-z][$\w]*/.exec(source)?.[0] ?? null;
-}
+/**
+ * Source range of the function a node sits directly inside, from yuku's scope
+ * table. A write reaches the deferred path only while the walk is inside a
+ * derive body and outside any function nested in it, so the innermost function
+ * scope containing the write is exactly that derive body.
+ */
+function enclosingFunctionRegion(node: AnyNode, state: WalkState): ReadRegion | null {
+	if (typeof node.start !== 'number') return null;
 
-// Every name a derive body binds itself: its own parameters, and any
-// declaration at any depth inside it. Collected conservatively — an extra name
-// only means one fewer diagnostic, never a wrong one.
-export function declaredBindingNamesDeep(node: AnyNode | undefined): Set<string> {
-	const names = new Set<string>();
-	const visit = (current: AnyNode | undefined): void => {
-		if (!current) return;
-		if (
-			current.type === 'ArrowFunctionExpression' ||
-			current.type === 'FunctionExpression' ||
-			current.type === 'FunctionDeclaration'
-		) {
-			for (const name of bindingNames(current.id as AnyNode | undefined)) names.add(name);
-			for (const parameter of asNodes(current.params)) {
-				for (const name of bindingNames(parameter)) names.add(name);
-			}
-		} else if (current.type === 'VariableDeclaration') {
-			for (const name of declarationBindingNames(current)) names.add(name);
-		} else if (current.type === 'ClassDeclaration' || current.type === 'ClassExpression') {
-			for (const name of bindingNames(current.id as AnyNode | undefined)) names.add(name);
-		} else if (current.type === 'CatchClause') {
-			for (const name of bindingNames(current.param as AnyNode | undefined)) names.add(name);
+	const semantic = state.semantic();
+	let innermost: ReadRegion | null = null;
+	for (let scopeId = 0; scopeId < semantic.scope.count; scopeId += 1) {
+		if (semantic.scope.kind(scopeId) !== 'function') continue;
+		const start = semantic.scope.start(scopeId);
+		if (start > node.start || semantic.scope.end(scopeId) < node.start) continue;
+		if (!innermost || start > innermost.start) {
+			innermost = { start, end: semantic.scope.end(scopeId) };
 		}
-		for (const child of childNodes(current)) visit(child);
-	};
-	visit(node);
-	return names;
+	}
+
+	return innermost;
 }
 
 function unwrapChainExpression(node: AnyNode | undefined): AnyNode | undefined {
@@ -414,7 +403,7 @@ function addStateRead(node: AnyNode, state: WalkState, region: ReadRegion | null
  * shadows for the whole body. A binding declared inside the collected
  * expression is one the expression owns, so a use of it is not a graph read.
  */
-function rootBindsInsideRegion(
+export function rootBindsInsideRegion(
 	node: AnyNode,
 	state: WalkState,
 	region: ReadRegion | null,
@@ -466,32 +455,6 @@ function resolvedSymbolAt(semantic: SemanticView, offset: number): number | null
 	}
 
 	return symbolsByOffset.get(offset) ?? null;
-}
-
-function bindingNames(node: AnyNode | undefined): string[] {
-	if (!node) return [];
-	if (node.type === 'Identifier') return [String(node.name ?? '')].filter(Boolean);
-	if (node.type === 'AssignmentPattern') return bindingNames(node.left as AnyNode | undefined);
-	if (node.type === 'RestElement') return bindingNames(node.argument as AnyNode | undefined);
-	if (node.type === 'ObjectPattern') {
-		return asNodes(node.properties).flatMap((property) =>
-			property.type === 'Property'
-				? bindingNames(property.value as AnyNode | undefined)
-				: bindingNames(property.argument as AnyNode | undefined),
-		);
-	}
-	if (node.type === 'ArrayPattern') {
-		return asNodes(node.elements).flatMap((element) => bindingNames(element));
-	}
-
-	return [];
-}
-
-function declarationBindingNames(node: AnyNode | undefined): string[] {
-	if (node?.type !== 'VariableDeclaration') return [];
-	return asNodes(node.declarations).flatMap((declaration) =>
-		bindingNames(declaration.id as AnyNode | undefined),
-	);
 }
 
 function sharedScope(state: WalkState): { readonly sharedDefinitionId?: string } {

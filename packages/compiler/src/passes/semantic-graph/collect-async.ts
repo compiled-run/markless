@@ -12,7 +12,7 @@ import {
 	semanticAliasMap,
 	uniqueBy,
 } from '../../artifact-helpers/graph-paths.ts';
-import { declaredBindingNamesDeep, graphPathRootName } from './collect-expressions.ts';
+import { readRegion, rootBindsInsideRegion, type ReadRegion } from './collect-expressions.ts';
 import {
 	asyncBoundaryRequiredDiagnostic,
 	asyncPostAwaitReadDiagnostic,
@@ -257,12 +257,7 @@ export function collectAsyncComputedPostAwaitReads(
 	const firstAwaitEnd = findFirstAwaitEnd(body);
 	if (firstAwaitEnd === null) return;
 
-	for (const read of postAwaitGraphReads(
-		body,
-		firstAwaitEnd,
-		state,
-		declaredBindingNamesDeep(body),
-	)) {
+	for (const read of postAwaitGraphReads(body, firstAwaitEnd, state)) {
 		state.graph.diagnostics.push(asyncPostAwaitReadDiagnostic(computedName, read));
 	}
 }
@@ -304,24 +299,17 @@ function postAwaitGraphReads(
 	node: AnyNode | undefined,
 	firstAwaitEnd: number,
 	state: WalkState,
-	bodyLocalNames: ReadonlySet<string>,
 ): SemanticStateRead[] {
 	const reads: SemanticStateRead[] = [];
 	const bindings = graphBindingMap(state.graph, currentGraphScope(state));
 	const aliases = semanticAliasMap(state.graph, currentGraphScope(state));
+	const bodyRegion = readRegion(node);
 
 	const visit = (candidate: AnyNode | undefined): void => {
 		if (!candidate) return;
 
 		if (candidate.type === 'MemberExpression') {
-			const read = postAwaitRead(
-				candidate,
-				firstAwaitEnd,
-				state,
-				bindings,
-				aliases,
-				bodyLocalNames,
-			);
+			const read = postAwaitRead(candidate, firstAwaitEnd, state, bindings, aliases, bodyRegion);
 			if (read) {
 				reads.push(read);
 				return;
@@ -334,14 +322,7 @@ function postAwaitGraphReads(
 		}
 
 		if (candidate.type === 'Identifier') {
-			const read = postAwaitRead(
-				candidate,
-				firstAwaitEnd,
-				state,
-				bindings,
-				aliases,
-				bodyLocalNames,
-			);
+			const read = postAwaitRead(candidate, firstAwaitEnd, state, bindings, aliases, bodyRegion);
 			if (read) reads.push(read);
 			return;
 		}
@@ -362,18 +343,19 @@ function postAwaitRead(
 	state: WalkState,
 	bindings: ReadonlyMap<string, SemanticGraphBinding>,
 	aliases: ReadonlyMap<string, SemanticGraphAlias>,
-	bodyLocalNames: ReadonlySet<string>,
+	bodyRegion: ReadRegion | null,
 ): SemanticStateRead | null {
 	const span = sourceSpan(node, state.filename);
 	if (!span || span.start <= firstAwaitEnd) return null;
 
+	// A binding the derive body declares itself is a local value, not graph
+	// state, even when an identically named alias exists elsewhere in the
+	// module. Snapshotting into such a local before the first await is the
+	// prescribed fix for this diagnostic; the graph read that fed it is checked
+	// on its own.
+	if (rootBindsInsideRegion(node, state, bodyRegion)) return null;
+
 	const source = expressionSource(node, state.source);
-	// A name the derive body binds itself is a local value, not graph state,
-	// even when an identically named alias exists elsewhere in the module.
-	// Snapshotting into such a local before the first await is the prescribed
-	// fix for this diagnostic; the graph read that fed it is checked on its own.
-	const rootName = graphPathRootName(source);
-	if (rootName && bodyLocalNames.has(rootName)) return null;
 	if (!resolveGraphPath(source, bindings, aliases)) return null;
 
 	return {

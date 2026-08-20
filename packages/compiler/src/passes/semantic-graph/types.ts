@@ -109,9 +109,6 @@ export type WalkState = {
 	currentSharedDefinitionId: string | null;
 	currentCreationSite: 'computed' | 'handler' | 'helper' | 'branch' | 'loop' | null;
 	currentFunctionSite: 'computed' | 'handler' | 'helper' | null;
-	// Names bound by the computed body currently being walked. They shadow any
-	// graph binding of the same name, so a write to one is never a graph write.
-	computedBodyLocalNames: ReadonlySet<string> | null;
 	deferredComputedWrites: DeferredComputedWrite[];
 	pendingElementHandleIdrefs: PendingElementHandleIdref[];
 	currentHelperCall: HelperStateCallSite | null;
@@ -228,7 +225,6 @@ export function createWalkState(input: {
 		currentSharedDefinitionId: null,
 		currentCreationSite: null,
 		currentFunctionSite: null,
-		computedBodyLocalNames: null,
 		deferredComputedWrites: [],
 		pendingElementHandleIdrefs: [],
 		currentHelperCall: null,
