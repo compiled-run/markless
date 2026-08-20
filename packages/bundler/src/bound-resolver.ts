@@ -17,14 +17,22 @@ export function adaptImportedCaptureResolver(source: string, hasImportedRows: bo
 	const helper = [
 		'function createBoundGraph(context, bound, capture, pendingCallbacks) {',
 		'\tconst legacySlots = new Map(bound.captureSlots.flatMap((slot) => slot.legacyGraphRead ? [[JSON.stringify([slot.legacyGraphRead.graphNodeId, slot.legacyGraphRead.path ?? []]), slot]] : []));',
+		// A legacy child handler calls its callbacks without awaiting them (the
+		// emitted code is not even async), so ordering between two invocations is
+		// this dispatcher's to provide: each invocation starts only after the
+		// previous one settles, which is the contract the capture path gives via
+		// `await context.capture.invoke`. Without the chain, a synchronous second
+		// callback races the first's async continuation and reads stale state.
+		'\tlet lastCallback = Promise.resolve();',
 		'\treturn {',
 		'\t\t...context.graph,',
 		'\t\tread(graphNodeId, path = []) {',
 		'\t\t\tconst slot = legacySlots.get(JSON.stringify([graphNodeId, path]));',
 		'\t\t\tif (!slot) return context.graph.read(graphNodeId, path);',
 		'\t\t\tif (slot.route.kind === callbackRoute) return (...args) => {',
-		'\t\t\t\tconst pending = context.invokeSymbol(slot.route.callbackSymbolId, { ...context, event: context.event, args });',
-		'\t\t\t\tpendingCallbacks.push(Promise.resolve(pending));',
+		'\t\t\t\tconst pending = lastCallback.then(() => context.invokeSymbol(slot.route.callbackSymbolId, { ...context, event: context.event, args }));',
+		'\t\t\t\tlastCallback = pending.catch(() => {});',
+		'\t\t\t\tpendingCallbacks.push(pending);',
 		'\t\t\t\treturn pending;',
 		'\t\t\t};',
 		'\t\t\treturn capture.read(slot.slotId);',
