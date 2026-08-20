@@ -822,20 +822,11 @@ importers:
         specifier: workspace:*
         version: link:../web
 
-  packages/headless/base:
-    dependencies:
-      '@markless/core':
-        specifier: workspace:*
-        version: link:../../core
-
   packages/headless/components:
     dependencies:
       '@markless/core':
         specifier: workspace:*
         version: link:../../core
-      '@markless/headless-base':
-        specifier: workspace:*
-        version: link:../base
       vite:
         specifier: ^8.0.16
         version: 8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0)
