@@ -28,7 +28,12 @@ import {
 	exportNamedDeclarationNode,
 	forStatementNode,
 	functionDeclarationNode,
+	graphDeleteCall,
+	graphMethodCall,
 	graphReadCall,
+	graphScalarWriteCall,
+	graphUpdateCall,
+	graphWriteCall,
 	identifierNode,
 	ifStatementNode,
 	jsonValueNode,
@@ -4718,6 +4723,1171 @@ function rewriteGraphReadsAndLocals(
 	}
 
 	return rewritten as unknown as EmissionNode;
+}
+
+// ---------------------------------------------------------------------------
+// Event-handler emission through the AST printer.
+//
+// `specs/framework/14-emission-codegen-migration.md`, stage 1, sketch item 5:
+// "`emitEventHandlerModule`, the largest and riskiest: the span-splicing band at
+// lines 490-900, capture-slot substitution, and write lowering. This is the unit
+// that must also settle comment migration across a move."
+//
+// **Comment migration across a move is settled, and the answer is yes.** The
+// spec lists it as an open question because probe `p5c` has no recorded output
+// and the acceptance case printed without `attachComments`. Re-probed against
+// the installed `yuku-codegen@0.9.0` while writing this band, and asserted in
+// `test/emit-event-handler.test.ts`: with `EMISSION_PARSE_OPTIONS`'
+// `attachComments: true`, the parser hangs each comment off the *node* it
+// belongs to, in that node's own `comments` array. Moving the node into a
+// synthesized `Program` moves the array with it, and `comments: 'all'` prints it
+// back in place. Three classes were checked — a leading line comment, a leading
+// block comment, and a trailing same-line comment — and all three survive the
+// move. The band relies on that: a node this walk *replaces* has its `comments`
+// carried onto the replacement (`carryEventHandlerComments`), because a
+// replacement is the one operation that would otherwise drop them.
+//
+// The emitter also *writes* two comments of its own, and both are built rather
+// than carried:
+//
+// - `/* scalar leaf marker: context.graph.update({ */` above a scalar-leaf
+//   export, through the foundation's `withLeadingBlockComment`. It is not
+//   decoration: `packages/bundler/test/rolldown.test.ts` asserts that a
+//   scalar-leaf symbol module still contains the text `context.graph.update({`,
+//   which after the leaf rewrite exists only inside this comment.
+// - `/* legacy callback binding was: const <p> = context.event; */` under each
+//   argument-vector parameter binding, through the band-local
+//   `withTrailingBlockComment`. The foundation owns only the leading form; the
+//   trailing form is `position: 'after'`, which the same printer accepts.
+//
+// Everything else here is the span-splicing band rebuilt as a tree walk. The
+// authored handler is parsed once, and reads, writes, capture-slot invocations,
+// and element-handle calls are rewritten by *node identity* (invariant 6) rather
+// than by the offset arithmetic `spliceEventHandlerBody` does over the authored
+// text. Outermost wins by construction: a rewritten node is not descended into,
+// which is what the string path's "drop every strictly nested span" filter
+// approximates.
+//
+// It is not the wired path. `emitEventHandlerModule` above still produces the
+// bytes the compiler ships, and `SYMBOL_MODULE_AST_KINDS` does not list these
+// two kinds; `test/emit-event-handler.test.ts` runs both paths over the same
+// symbols and names every class of byte difference between them. Invariant 2
+// makes the swap an owner-approved step rather than a side effect of this unit.
+//
+// The band calls nothing in the scanner band (`topLevelBinaryOperators` through
+// `sourceReferencesIdentifier`), which invariant 5 keeps alive until stage 1's
+// final unit. Three of that band's helpers are re-expressed here rather than
+// shared, exactly as the value band re-expresses its four: `isIdentifierObjectKey`
+// (as the value band's `VALUE_IDENTIFIER_PATTERN`, reused because a fourth copy
+// of one regex buys nothing), `compoundAssignmentOperator` (as
+// `EVENT_COMPOUND_ASSIGNMENT_OPERATORS`), and `sourceReferencesIdentifier` (as
+// `deriveReferencedIdentifierNames`, which reads the tree instead of scanning
+// emitted text and so does not count a name that appears only inside a string).
+// ---------------------------------------------------------------------------
+
+export type EventHandlerEmissionInput = {
+	readonly symbol: Extract<PlannedSymbol, { readonly kind: 'event-handler' | 'callback-prop' }>;
+	/** Row-local names in scope, as `emitSymbolModules` selects them. */
+	readonly localNames: ReadonlySet<string>;
+	/** The component-routed capture slots, as `emitSymbolModules` filters them. */
+	readonly captureSlots: ReadonlyArray<CaptureSlot>;
+	/** Whether some other symbol binds this one as a callback route. */
+	readonly usesArgumentVector: boolean;
+	/** The authored file the handler was extracted from; names the map. */
+	readonly sourceFileName: string;
+};
+
+/** The body of the `/* scalar leaf marker: ... *\/` comment, delimiters excluded. */
+const EVENT_SCALAR_LEAF_MARKER = ' scalar leaf marker: context.graph.update({ ';
+
+/** The one import a scalar-leaf module carries. */
+const EVENT_SCALAR_WRITE_IMPORT: SemanticModuleImport = {
+	kind: 'named',
+	localName: 'marklessWriteScalar',
+	importedName: 'marklessWriteScalar',
+	source: '@markless/web/fns/write-scalar',
+};
+
+/** The band-local twin of `compoundAssignmentOperator`. */
+const EVENT_COMPOUND_ASSIGNMENT_OPERATORS: ReadonlyMap<string, string> = new Map([
+	['**=', '**'],
+	['&&=', '&&'],
+	['||=', '||'],
+	['??=', '??'],
+	['+=', '+'],
+	['-=', '-'],
+	['*=', '*'],
+	['/=', '/'],
+	['%=', '%'],
+	['&=', '&'],
+	['|=', '|'],
+	['^=', '^'],
+	['<<=', '<<'],
+	['>>=', '>>'],
+	['>>>=', '>>>'],
+]);
+
+/** The literal shapes `emitElementHandleCall` accepts as an argument. */
+const EVENT_HANDLE_ARGUMENT_LITERAL =
+	/^(?:'[^']*'|"[^"]*"|`[^`]*`|-?\d+(?:\.\d+)?|true|false|null|undefined)$/;
+
+/**
+ * Keys the handler walk does not descend into.
+ *
+ * The same set `DERIVE_WALK_IGNORED_KEYS` uses, for the same reason: the string
+ * path detected reads by walking with `childNodes`, so matching its blind spots
+ * is what makes this emitter select the same nodes. `comments` matters twice
+ * over here — a parsed comment object has a `type` field, so `isNode` accepts
+ * it, and a walk that did not skip the key would try to rewrite comments as
+ * expressions.
+ */
+const EVENT_WALK_IGNORED_KEYS: ReadonlySet<string> = DERIVE_WALK_IGNORED_KEYS;
+
+type EventHandlerSymbol = EventHandlerEmissionInput['symbol'];
+
+type EventElementHandleCall = NonNullable<
+	Extract<PlannedSymbol, { readonly kind: 'event-handler' }>['elementHandleCalls']
+>[number];
+
+/**
+ * Build the print input for one event-handler or callback-prop module.
+ *
+ * Split from the print so the site's focused test can run the foundation's
+ * determinism helper (invariant 7) over the exact tree the emitter would print.
+ * `null` is never returned today — both kinds always produce a module, as the
+ * string path does — but the signature matches its sibling
+ * `buildSymbolModuleEmission`, whose `null` means "no module for this symbol".
+ */
+export function buildEventHandlerEmission(
+	input: EventHandlerEmissionInput,
+): EmissionPrintInput | null {
+	const { symbol } = input;
+	const exportName = symbolExportName(symbol.id);
+	const site: EmissionSite = {
+		phase: 'payload',
+		passId: 'symbol-modules',
+		sourceFileName: input.sourceFileName,
+		symbolId: symbol.id,
+	};
+	const projection = eventHandlerProjection(symbol.source, input.sourceFileName);
+	// Every node with a span carries an offset into this one text, so it is what
+	// the print site hands the printer as its `source` (invariant 3).
+	const source = projection?.source ?? symbol.source;
+
+	const scalarLeaf =
+		input.captureSlots.length === 0 ? eventHandlerScalarLeafStatements(input, projection) : null;
+	if (scalarLeaf) {
+		return {
+			program: moduleProgramNode([
+				moduleImportNode({
+					kind: EVENT_SCALAR_WRITE_IMPORT.kind,
+					localName: EVENT_SCALAR_WRITE_IMPORT.localName,
+					importedName: EVENT_SCALAR_WRITE_IMPORT.importedName,
+					source: EVENT_SCALAR_WRITE_IMPORT.source,
+				}),
+				withLeadingBlockComment(
+					exportNamedDeclarationNode(
+						eventHandlerFunctionNode(exportName, false, scalarLeaf),
+					),
+					EVENT_SCALAR_LEAF_MARKER,
+				),
+			]),
+			source,
+			outputFileName: `${exportName}.js`,
+			site,
+		};
+	}
+
+	const importedReference = eventHandlerImportedReference(symbol);
+	const bodyStatements = importedReference
+		? [importedHandlerCallStatement(input, projection)]
+		: eventHandlerAuthoredStatements(input, projection, source);
+
+	// The string path decides which imports survive by scanning the emitted
+	// *body* text only, so this reads the same statements and no others.
+	const referenced = deriveReferencedIdentifierNames(bodyStatements);
+	const imports = uniqueModuleImports(
+		(symbol.moduleImports ?? []).filter((moduleImport) =>
+			referenced.has(moduleImport.localName),
+		),
+	);
+
+	const isAsync =
+		!importedReference &&
+		(symbol.source.trimStart().startsWith('async ') ||
+			input.captureSlots.some(callbackCaptureSlot));
+
+	return {
+		program: moduleProgramNode([
+			...imports.map((moduleImport) =>
+				moduleImportNode({
+					kind: moduleImport.kind,
+					localName: moduleImport.localName,
+					importedName: moduleImport.importedName,
+					source: moduleImport.source,
+				}),
+			),
+			exportNamedDeclarationNode(
+				eventHandlerFunctionNode(exportName, isAsync, [
+					...(importedReference ? [] : eventHandlerParameterStatements(input)),
+					...bodyStatements,
+				]),
+			),
+		]),
+		source,
+		outputFileName: `${exportName}.js`,
+		site,
+	};
+}
+
+/** The printed handler module, with its source map (invariant 3). */
+export function emitEventHandlerModuleNodes(
+	input: EventHandlerEmissionInput,
+): EmittedModule | null {
+	const emission = buildEventHandlerEmission(input);
+	return emission ? printEmittedModule(emission) : null;
+}
+
+/**
+ * The row-local names `emitSymbolModules` puts in scope for one symbol.
+ *
+ * Exported so the site's parity test can feed both paths the identical local-name
+ * set the dispatcher would. The selection is recursive over render chunks, so
+ * restating it in the test would be restating a rule rather than testing one.
+ */
+export function eventHandlerRowLocalNames(
+	renderData: SymbolModulesInput['renderData'],
+	symbolId: string,
+): ReadonlySet<string> {
+	return rowLocalNamesBySymbol(renderData).get(symbolId) ?? emptyLocalNames;
+}
+
+/**
+ * `export [async ]function <name>(context) { ... }` — the declaration both
+ * module shapes export.
+ *
+ * The foundation's `functionDeclarationNode` builds only the synchronous form,
+ * and a handler that awaits a capture invocation has to be `async`.
+ */
+function eventHandlerFunctionNode(
+	name: string,
+	isAsync: boolean,
+	statements: ReadonlyArray<EmissionNode>,
+): EmissionNode {
+	return {
+		type: 'FunctionDeclaration',
+		id: identifierNode(name),
+		async: isAsync,
+		generator: false,
+		params: [identifierNode('context')],
+		body: { type: 'BlockStatement', body: [...statements] },
+	};
+}
+
+/**
+ * Attach a trailing block comment to a statement.
+ *
+ * The mirror of the foundation's `withLeadingBlockComment`, which owns only
+ * `position: 'before'`. `sameLine: false` puts the comment on its own line after
+ * the statement, which is the layout the string path writes for the legacy
+ * callback binding note.
+ */
+function withTrailingBlockComment(node: EmissionNode, value: string): EmissionNode {
+	return {
+		...node,
+		comments: [{ type: 'Block', position: 'after', sameLine: false, value }],
+	};
+}
+
+/**
+ * Carry a replaced node's comments onto its replacement.
+ *
+ * Rewriting is the one operation that can drop an authored comment: a cloned
+ * node keeps its `comments` array through the spread, but a node swapped out for
+ * a synthesized graph call would leave its comments behind with the node that no
+ * longer exists.
+ */
+function carryEventHandlerComments(from: AnyNode, to: EmissionNode): EmissionNode {
+	const comments = from.comments;
+	if (!Array.isArray(comments) || comments.length === 0) return to;
+	if (Array.isArray((to as { readonly comments?: unknown }).comments)) return to;
+
+	return { ...to, comments };
+}
+
+type EventHandlerProjection = {
+	/** The one text every node parsed here carries an offset into. */
+	readonly source: string;
+	readonly expression: AnyNode;
+};
+
+/**
+ * Parse the authored handler once, as an expression.
+ *
+ * The handler is parenthesized for the same reason the behavior and value bands
+ * parenthesize theirs: an anonymous `function () {}` at statement position is a
+ * syntax error, and `preserveParens: false` drops the wrapper again before
+ * anything is printed. The one-character offset the wrapper introduces is why
+ * every text comparison in this band goes through `valueNodeText`, which reads
+ * the node's own span, rather than through arithmetic on the authored source.
+ */
+function eventHandlerProjection(
+	handlerSource: string,
+	filename: string,
+): EventHandlerProjection | null {
+	const trimmed = handlerSource.trim();
+	if (!trimmed) return null;
+
+	const source = `(${trimmed});`;
+	let parsed: ReturnType<typeof parseEmissionSource>;
+	try {
+		parsed = parseEmissionSource(source, filename, 'ts');
+	} catch {
+		// A handler whose authored source does not parse has no tree to rewrite.
+		// The caller emits `void context;`, which is what the string path's own
+		// body-locator failure produces.
+		return null;
+	}
+	if (parsed.errors.length > 0) return null;
+
+	const statements = asNodes((parsed.program as unknown as AnyNode).body);
+	const only = statements[0];
+	if (statements.length !== 1 || !only || only.type !== 'ExpressionStatement') return null;
+	if (!isNode(only.expression)) return null;
+
+	return { source, expression: only.expression };
+}
+
+/** The parsed handler when it is a function; `null` for every other shape. */
+function eventHandlerFunctionExpression(
+	projection: EventHandlerProjection | null,
+): AnyNode | null {
+	const expression = projection?.expression;
+	if (!expression) return null;
+	if (expression.type !== 'ArrowFunctionExpression' && expression.type !== 'FunctionExpression') {
+		return null;
+	}
+
+	return expression;
+}
+
+/**
+ * The handler body as statements: a block's own statements, or the concise
+ * arrow's expression wrapped in a `return`, which is the `return <expr>;` the
+ * string path's `eventHandlerBodySource` synthesizes for the same shape.
+ */
+function eventHandlerBodyNodes(fn: AnyNode): AnyNode[] {
+	const body = fn.body;
+	if (!isNode(body)) return [];
+	if (body.type === 'BlockStatement') return asNodes(body.body);
+
+	return [{ type: 'ReturnStatement', argument: body } as AnyNode];
+}
+
+/** `void context;`, the body the string path emits when it finds none. */
+function voidContextStatement(): EmissionNode {
+	return {
+		type: 'ExpressionStatement',
+		expression: {
+			type: 'UnaryExpression',
+			operator: 'void',
+			prefix: true,
+			argument: identifierNode('context'),
+		},
+	};
+}
+
+/** The band-local twin of `importedHandlerReference`. */
+function eventHandlerImportedReference(symbol: EventHandlerSymbol): SemanticModuleImport | null {
+	const source = symbol.source.trim();
+	if (!source) return null;
+
+	const firstName = source.split('.')[0] ?? '';
+	if (!VALUE_IDENTIFIER_PATTERN.test(firstName)) return null;
+
+	return (
+		(symbol.moduleImports ?? []).find((moduleImport) => moduleImport.localName === firstName) ??
+		null
+	);
+}
+
+/**
+ * `return <imported>(context.event);`, or the argument-vector form
+ * `return <imported>(...(context.args ?? []));` for a callback prop that some
+ * other symbol binds, or that takes more than one parameter.
+ *
+ * The callee is the parsed reference node when there is one, so it carries its
+ * authored span into the source map; a handler whose source did not parse falls
+ * back to a synthesized member chain over the same dotted name.
+ */
+function importedHandlerCallStatement(
+	input: EventHandlerEmissionInput,
+	projection: EventHandlerProjection | null,
+): EmissionNode {
+	const { symbol } = input;
+	const parameters = symbol.parameters ?? [];
+	const callee = projection
+		? (projection.expression as unknown as EmissionNode)
+		: memberChainNode(symbol.source.trim());
+	const usesArguments =
+		symbol.kind === 'callback-prop' && (input.usesArgumentVector || parameters.length > 1);
+
+	return returnStatementNode(
+		callNode(
+			callee,
+			usesArguments
+				? [spreadNode(logicalNode('??', memberChainNode('context.args'), arrayNode([])))]
+				: [memberChainNode('context.event')],
+		),
+	);
+}
+
+/**
+ * `const <p> = context.event;` per parameter, or the argument-vector form with
+ * its legacy-binding note underneath.
+ */
+function eventHandlerParameterStatements(input: EventHandlerEmissionInput): EmissionNode[] {
+	const { symbol } = input;
+	const parameters = symbol.parameters ?? [];
+	if (parameters.length === 0) return [];
+
+	return parameters.map((parameter, index) => {
+		if (symbol.kind !== 'callback-prop' || (!input.usesArgumentVector && parameters.length <= 1)) {
+			return constDeclarationNode(parameter, memberChainNode('context.event'));
+		}
+
+		return withTrailingBlockComment(
+			constDeclarationNode(parameter, {
+				type: 'ChainExpression',
+				expression: {
+					type: 'MemberExpression',
+					object: memberChainNode('context.args'),
+					property: literalNode(index),
+					computed: true,
+					optional: true,
+				},
+			}),
+			` legacy callback binding was: const ${parameter} = context.event; `,
+		);
+	});
+}
+
+/** The band-local twin of `eventHandlerAuthoredBody`. */
+function eventHandlerAuthoredStatements(
+	input: EventHandlerEmissionInput,
+	projection: EventHandlerProjection | null,
+	source: string,
+): EmissionNode[] {
+	const { symbol } = input;
+	const trimmed = symbol.source.trim();
+
+	const directCallbackSlot = input.captureSlots.find(
+		(slot) => callbackCaptureSlot(slot) && slot.source.trim() === trimmed,
+	);
+	if (directCallbackSlot) {
+		return [
+			returnStatementNode(
+				eventAwaitNode(
+					captureInvokeNode(directCallbackSlot.id, [memberChainNode('context.event')]),
+				),
+			),
+		];
+	}
+
+	const directReferenceRead = (symbol.reads ?? []).find(
+		(read) => read.source.trim() === trimmed,
+	);
+	if (directReferenceRead && VALUE_IDENTIFIER_PATTERN.test(trimmed)) {
+		return [
+			returnStatementNode(
+				callNode(
+					graphReadCall({
+						callee: 'context.graph.read',
+						graphNodeId: directReferenceRead.graphNodeId,
+						path: directReferenceRead.path,
+					}),
+					[memberChainNode('context.event')],
+				),
+			),
+		];
+	}
+
+	const fn = eventHandlerFunctionExpression(projection);
+	if (!fn) return [voidContextStatement()];
+
+	const statements = eventHandlerBodyNodes(fn);
+	if (statements.length === 0) return [voidContextStatement()];
+
+	const rewrite = eventHandlerRewrite(input, source);
+	return statements.map((statement) => rewriteEventHandlerNode(statement, undefined, rewrite));
+}
+
+type EventHandlerRewrite = {
+	readonly source: string;
+	readonly symbol: EventHandlerSymbol;
+	readonly reads: ReadonlyArray<LoweredStateRead>;
+	readonly valueSlots: ReadonlyArray<CaptureSlot>;
+	readonly callbackSlots: ReadonlyArray<CaptureSlot>;
+	/** The handler's own parameters, as capture arguments still see them. */
+	readonly eventParameters: ReadonlyArray<string>;
+	/** The parameters write lowering sees, which a callback prop blanks. */
+	readonly writeValueInput: ValueExpressionEmissionInput;
+	readonly elementHandleCalls: ReadonlyArray<EventElementHandleCall>;
+	readonly claimedWrites: Set<LoweredStateWrite>;
+	readonly claimedHandleCalls: Set<EventElementHandleCall>;
+};
+
+function eventHandlerRewrite(
+	input: EventHandlerEmissionInput,
+	source: string,
+): EventHandlerRewrite {
+	const { symbol } = input;
+	const parameters = symbol.parameters ?? [];
+
+	return {
+		source,
+		symbol,
+		reads: symbol.reads ?? [],
+		valueSlots: input.captureSlots.filter((slot) => !callbackCaptureSlot(slot)),
+		callbackSlots: input.captureSlots.filter(callbackCaptureSlot),
+		eventParameters: parameters,
+		writeValueInput: {
+			valueSource: undefined,
+			// `spliceEventHandlerBody` blanks the parameters for a callback prop's
+			// writes, because a callback prop has no DOM event to read fields off.
+			eventParameters: symbol.kind === 'callback-prop' ? [] : parameters,
+			graphReads: symbol.reads ?? [],
+			moduleImports: symbol.moduleImports ?? [],
+			localNames: input.localNames,
+			sourceFileName: input.sourceFileName,
+		},
+		elementHandleCalls:
+			symbol.kind === 'event-handler' ? (symbol.elementHandleCalls ?? []) : [],
+		claimedWrites: new Set(),
+		claimedHandleCalls: new Set(),
+	};
+}
+
+/**
+ * One node of the handler body, rewritten.
+ *
+ * The four rewrites are tried outermost-first and a match stops the descent,
+ * which is how this walk reproduces the string path's "drop every strictly
+ * nested span" filter without sorting spans. Order matters between them exactly
+ * once: a capture-slot invocation and an element-handle call are both
+ * `CallExpression`s, and a write can enclose a read, so the enclosing form is
+ * always asked first.
+ */
+function rewriteEventHandlerNode(
+	node: AnyNode,
+	parent: AnyNode | undefined,
+	rewrite: EventHandlerRewrite,
+): EmissionNode {
+	if (node.type === 'Property') {
+		return rewriteEventHandlerProperty(node, (child, childParent) =>
+			rewriteEventHandlerNode(child, childParent, rewrite),
+		);
+	}
+
+	const text = valueNodeText(node, rewrite.source);
+
+	const invocation = captureInvocationNode(node, rewrite);
+	if (invocation) return carryEventHandlerComments(node, invocation);
+
+	const write = eventWriteNode(node, rewrite);
+	if (write) return carryEventHandlerComments(node, write);
+
+	const handleCall = elementHandleCallNode(node, text, rewrite);
+	if (handleCall) return carryEventHandlerComments(node, handleCall);
+
+	const read = eventReadNode(node, parent, text, rewrite);
+	if (read) return carryEventHandlerComments(node, read);
+
+	if (node.type === 'ChainExpression' && isNode(node.expression)) {
+		return chainExpressionNode(node, rewriteEventHandlerNode(node.expression, node, rewrite));
+	}
+
+	// A non-computed member's property is a property name, not a reference, so
+	// only the object is walked — the same rule `rewriteGraphReadsAndLocals`
+	// applies in the value band.
+	if (node.type === 'MemberExpression' && node.computed !== true && isNode(node.object)) {
+		return {
+			...(node as unknown as EmissionNode),
+			object: rewriteEventHandlerNode(node.object, node, rewrite),
+		};
+	}
+
+	return rewriteEventHandlerChildren(node, (child) =>
+		rewriteEventHandlerNode(child, node, rewrite),
+	);
+}
+
+/**
+ * Re-wrap an optional chain around its rewritten interior, or drop the wrapper
+ * when there is no longer a chain to describe.
+ *
+ * A guarded callback — `onChange?.('next')` — parses as a `ChainExpression`
+ * around the call. When the captured prop routes to a value the call survives
+ * and the wrapper still belongs; when it routes to a callback symbol the whole
+ * call becomes `await context.capture.invoke(...)`, and ESTree has no
+ * `ChainExpression` around an `AwaitExpression`. The printer tolerates the
+ * malformed shape today, which is exactly why it is not worth depending on.
+ */
+function chainExpressionNode(chain: AnyNode, expression: EmissionNode): EmissionNode {
+	const type = (expression as { readonly type?: string }).type;
+	if (type !== 'MemberExpression' && type !== 'CallExpression') return expression;
+
+	return { ...(chain as unknown as EmissionNode), expression };
+}
+
+/**
+ * A shorthand property's key and value cover the same text, so a generic walk
+ * would match both. Only the value is a read, and replacing it has to drop the
+ * shorthand flag or the printer renders the property as its key alone and
+ * silently discards the rewrite.
+ */
+function rewriteEventHandlerProperty(
+	property: AnyNode,
+	visit: (node: AnyNode, parent: AnyNode) => EmissionNode,
+): EmissionNode {
+	const key = isNode(property.key) ? property.key : null;
+	const value = isNode(property.value) ? property.value : null;
+	if (!key || !value) return property as unknown as EmissionNode;
+
+	return {
+		...(property as unknown as EmissionNode),
+		shorthand: false,
+		key: property.computed === true ? visit(key, property) : (key as unknown as EmissionNode),
+		value: visit(value, property),
+	};
+}
+
+/** Clone a node, rewriting every child node and leaving everything else alone. */
+function rewriteEventHandlerChildren(
+	node: AnyNode,
+	visit: (child: AnyNode) => EmissionNode,
+): EmissionNode {
+	const rewritten: Record<string, unknown> = { ...(node as Record<string, unknown>) };
+
+	for (const [key, child] of Object.entries(node)) {
+		if (EVENT_WALK_IGNORED_KEYS.has(key)) continue;
+
+		if (Array.isArray(child)) {
+			rewritten[key] = child.map((item) => (isNode(item) ? visit(item) : item));
+			continue;
+		}
+		if (isNode(child)) rewritten[key] = visit(child);
+	}
+
+	return rewritten as unknown as EmissionNode;
+}
+
+/** `await context.capture.invoke("slot", [ ... ])`. */
+function captureInvocationNode(
+	node: AnyNode,
+	rewrite: EventHandlerRewrite,
+): EmissionNode | null {
+	if (node.type !== 'CallExpression' || !isNode(node.callee)) return null;
+
+	const calleeText = valueNodeText(node.callee, rewrite.source);
+	const slot = rewrite.callbackSlots.find((candidate) => candidate.source === calleeText);
+	if (!slot) return null;
+
+	const args = (Array.isArray(node.arguments) ? node.arguments : []).flatMap((argument) =>
+		isNode(argument) ? [rewriteCaptureArgumentNode(argument, undefined, rewrite)] : [],
+	);
+
+	return eventAwaitNode(captureInvokeNode(slot.id, args));
+}
+
+function captureInvokeNode(
+	slotId: string,
+	args: ReadonlyArray<EmissionNode>,
+): EmissionNode {
+	return callNode(memberChainNode('context.capture.invoke'), [
+		literalNode(slotId),
+		arrayNode(args),
+	]);
+}
+
+function eventAwaitNode(argument: EmissionNode): EmissionNode {
+	return { type: 'AwaitExpression', argument };
+}
+
+/**
+ * The band-local twin of `captureArgumentSource`: reads become capture or graph
+ * reads, and a reference to the handler's own event parameter becomes the
+ * `context.event` field path the runtime supplies instead.
+ *
+ * The string path runs those two as separate passes over text, the second a
+ * regular expression over the output of the first. Here they are one walk, which
+ * is why a parameter name inside a string literal — which the regular expression
+ * rewrites — is left alone.
+ */
+function rewriteCaptureArgumentNode(
+	node: AnyNode,
+	parent: AnyNode | undefined,
+	rewrite: EventHandlerRewrite,
+): EmissionNode {
+	if (node.type === 'Property') {
+		return rewriteEventHandlerProperty(node, (child, childParent) =>
+			rewriteCaptureArgumentNode(child, childParent, rewrite),
+		);
+	}
+
+	const text = valueNodeText(node, rewrite.source);
+
+	const read = eventReadNode(node, parent, text, rewrite);
+	if (read) return carryEventHandlerComments(node, read);
+
+	if (isGraphReadExpression(node)) {
+		const eventField = eventFieldValueNode(text, rewrite.eventParameters);
+		if (eventField) return carryEventHandlerComments(node, eventField);
+	}
+
+	if (node.type === 'ChainExpression' && isNode(node.expression)) {
+		return chainExpressionNode(node, rewriteCaptureArgumentNode(node.expression, node, rewrite));
+	}
+
+	if (node.type === 'MemberExpression' && node.computed !== true && isNode(node.object)) {
+		return {
+			...(node as unknown as EmissionNode),
+			object: rewriteCaptureArgumentNode(node.object, node, rewrite),
+		};
+	}
+
+	return rewriteEventHandlerChildren(node, (child) =>
+		rewriteCaptureArgumentNode(child, node, rewrite),
+	);
+}
+
+/** `context.capture.read("slot")` or `context.graph.read("id", ["path"])`. */
+function eventReadNode(
+	node: AnyNode,
+	parent: AnyNode | undefined,
+	text: string,
+	rewrite: EventHandlerRewrite,
+): EmissionNode | null {
+	if (!text) return null;
+	if (!isGraphReadExpression(node)) return null;
+	if (!isValuePositionGraphRead(node, parent)) return null;
+
+	const read = rewrite.reads.find((candidate) => candidate.source === text);
+	if (!read) return null;
+
+	const slot = rewrite.valueSlots.find((candidate) => captureSlotMatchesRead(candidate, read));
+	if (slot) return callNode(memberChainNode('context.capture.read'), [literalNode(slot.id)]);
+
+	return graphReadCall({
+		callee: 'context.graph.read',
+		graphNodeId: read.graphNodeId,
+		path: read.path,
+	});
+}
+
+/**
+ * The lowered graph call for a write whose authored node this is.
+ *
+ * A write the lowering cannot express is left as the author wrote it, which is
+ * what the string path does when `emitEventWriteExpression` returns `null`: the
+ * span is dropped from the replacement list and the authored text survives.
+ */
+function eventWriteNode(node: AnyNode, rewrite: EventHandlerRewrite): EmissionNode | null {
+	for (const write of rewrite.symbol.writes ?? []) {
+		if (rewrite.claimedWrites.has(write)) continue;
+		if (!eventWriteNodeMatches(node, write, rewrite.source)) continue;
+
+		const lowered = loweredEventWriteNode(node, write, rewrite);
+		if (!lowered) continue;
+
+		rewrite.claimedWrites.add(write);
+		return lowered;
+	}
+
+	return null;
+}
+
+/**
+ * Whether this node is the authored form of that write.
+ *
+ * Matched on shape and on the target's own authored text, never on an offset:
+ * the string path's `handlerBodyWriteSpan` reconstructs a span by subtracting
+ * the symbol's start from the write's, then falls back to `indexOf` on a
+ * re-assembled source string when that lands wrong.
+ */
+function eventWriteNodeMatches(node: AnyNode, write: LoweredStateWrite, source: string): boolean {
+	if (write.operation === 'assign') {
+		if (node.type !== 'AssignmentExpression') return false;
+		if (node.operator !== (write.assignmentOperator ?? '=')) return false;
+
+		return isNode(node.left) && valueNodeText(node.left, source) === write.source;
+	}
+
+	if (write.operation === 'update') {
+		if (node.type !== 'UpdateExpression') return false;
+		if (write.updateOperator && node.operator !== write.updateOperator) return false;
+		if (write.prefix !== undefined && node.prefix !== write.prefix) return false;
+
+		return isNode(node.argument) && valueNodeText(node.argument, source) === write.source;
+	}
+
+	if (write.operation === 'delete') {
+		if (node.type !== 'UnaryExpression' || node.operator !== 'delete') return false;
+
+		return isNode(node.argument) && valueNodeText(node.argument, source) === write.source;
+	}
+
+	if (write.operation === 'call') {
+		if (node.type !== 'CallExpression' || !isNode(node.callee)) return false;
+
+		const callee = node.callee;
+		if (callee.type !== 'MemberExpression' || callee.computed === true) return false;
+		if (!isNode(callee.object) || !isNode(callee.property)) return false;
+		if (callee.property.type !== 'Identifier' || callee.property.name !== write.method) {
+			return false;
+		}
+
+		return valueNodeText(callee.object, source) === write.source;
+	}
+
+	return false;
+}
+
+/** The band-local twin of `emitEventWrite`, built from the authored node. */
+function loweredEventWriteNode(
+	node: AnyNode,
+	write: LoweredStateWrite,
+	rewrite: EventHandlerRewrite,
+): EmissionNode | null {
+	if (write.operation === 'assign') {
+		const value = isNode(node.right) ? eventWriteValueNode(node.right, rewrite) : null;
+		if (!value) return null;
+
+		if (!write.assignmentOperator) {
+			return graphWriteCall({ graphNodeId: write.graphNodeId, path: write.path, value });
+		}
+
+		const operator = EVENT_COMPOUND_ASSIGNMENT_OPERATORS.get(write.assignmentOperator);
+		if (!operator) return null;
+
+		return graphUpdateCall({
+			graphNodeId: write.graphNodeId,
+			path: write.path,
+			returnValue: 'next',
+			updateExpression:
+				operator === '&&' || operator === '||' || operator === '??'
+					? logicalNode(operator, identifierNode('value'), value)
+					: binaryNode(operator, identifierNode('value'), value),
+		});
+	}
+
+	if (write.operation === 'update' && write.updateOperator) {
+		return graphUpdateCall({
+			graphNodeId: write.graphNodeId,
+			path: write.path,
+			returnValue: 'next',
+			updateExpression: numberStepNode(write.updateOperator),
+		});
+	}
+
+	if (write.operation === 'delete') {
+		return graphDeleteCall({ graphNodeId: write.graphNodeId, path: write.path });
+	}
+
+	if (write.operation === 'call' && write.method) {
+		const args = eventWriteArgumentNodes(node, rewrite);
+		if (!args) return null;
+
+		return graphMethodCall({
+			graphNodeId: write.graphNodeId,
+			path: write.path,
+			method: write.method,
+			args,
+		});
+	}
+
+	return null;
+}
+
+/** `Number(value) + 1` / `Number(value) - 1`, the updater both step forms emit. */
+function numberStepNode(updateOperator: string): EmissionNode {
+	return binaryNode(
+		updateOperator === '++' ? '+' : '-',
+		callNode(identifierNode('Number'), [identifierNode('value')]),
+		literalNode(1),
+	);
+}
+
+/** The band-local twin of `supportedArgumentSources`, node-shaped. */
+function eventWriteArgumentNodes(
+	node: AnyNode,
+	rewrite: EventHandlerRewrite,
+): EmissionNode[] | null {
+	const args: EmissionNode[] = [];
+
+	for (const argument of Array.isArray(node.arguments) ? node.arguments : []) {
+		if (!isNode(argument)) return null;
+
+		if (argument.type === 'SpreadElement') {
+			if (!isNode(argument.argument)) return null;
+
+			const spread = valueExpressionNode(
+				argument.argument,
+				rewrite.source,
+				rewrite.writeValueInput,
+			);
+			if (!spread) return null;
+
+			args.push(spreadNode(spread));
+			continue;
+		}
+
+		const value = valueExpressionNode(argument, rewrite.source, rewrite.writeValueInput);
+		if (!value) return null;
+
+		args.push(value);
+	}
+
+	return args;
+}
+
+/** The band-local twin of `eventWriteValueSource`, from an authored node. */
+function eventWriteValueNode(node: AnyNode, rewrite: EventHandlerRewrite): EmissionNode {
+	return (
+		valueExpressionNode(node, rewrite.source, rewrite.writeValueInput) ??
+		rewriteGraphReadsAndLocals(node, rewrite.source, rewrite.writeValueInput)
+	);
+}
+
+/** `context.getElementHandle("chart")?.setData(1)`. */
+function elementHandleCallNode(
+	node: AnyNode,
+	text: string,
+	rewrite: EventHandlerRewrite,
+): EmissionNode | null {
+	if (node.type !== 'CallExpression' || !text) return null;
+
+	for (const call of rewrite.elementHandleCalls) {
+		if (rewrite.claimedHandleCalls.has(call)) continue;
+		if (text !== call.source) continue;
+
+		const args = elementHandleArgumentNodes(node, call, rewrite);
+		if (!args) return null;
+
+		rewrite.claimedHandleCalls.add(call);
+		return {
+			type: 'ChainExpression',
+			expression: {
+				type: 'CallExpression',
+				callee: {
+					type: 'MemberExpression',
+					object: callNode(memberChainNode('context.getElementHandle'), [
+						literalNode(call.handleName),
+					]),
+					property: identifierNode(call.method),
+					computed: false,
+					optional: true,
+				},
+				arguments: args,
+				optional: false,
+			},
+		};
+	}
+
+	return null;
+}
+
+/**
+ * The authored argument nodes, when `emitElementHandleCall` would accept them.
+ *
+ * The nodes are reused rather than rebuilt, so a string argument keeps the quote
+ * the author wrote under `quotes: 'preserve'`, matching what splicing did. `null`
+ * means the call is unsupported on both paths — the string path then emits no
+ * replacement lines at all, and this band leaves the authored call standing
+ * rather than silently deleting it.
+ */
+function elementHandleArgumentNodes(
+	node: AnyNode,
+	call: EventElementHandleCall,
+	rewrite: EventHandlerRewrite,
+): EmissionNode[] | null {
+	const supported = call.argumentSources.every(
+		(argument) =>
+			EVENT_HANDLE_ARGUMENT_LITERAL.test(argument) ||
+			rewrite.eventParameters.includes(argument),
+	);
+	if (!supported) return null;
+
+	const args = Array.isArray(node.arguments) ? node.arguments : [];
+	if (args.length !== call.argumentSources.length) return null;
+	if (!args.every((argument) => isNode(argument))) return null;
+
+	return args as unknown as EmissionNode[];
+}
+
+/**
+ * The scalar-leaf body, when this handler is one: a single path-free write and
+ * nothing else but event guards.
+ *
+ * The string path decides this over text — it deletes the authored write and the
+ * guard calls from the body string and asks whether anything but semicolons is
+ * left. Decided here from the parsed statements instead, which is why a guard
+ * written `e.preventDefault()` without its semicolon, or across two lines, lands
+ * on the same answer as the canonical spelling.
+ */
+function eventHandlerScalarLeafStatements(
+	input: EventHandlerEmissionInput,
+	projection: EventHandlerProjection | null,
+): EmissionNode[] | null {
+	const { symbol } = input;
+	if (symbol.kind !== 'event-handler') return null;
+
+	const writes = symbol.writes ?? [];
+	if (writes.length !== 1) return null;
+	if ((symbol.moduleImports ?? []).length > 0 || (symbol.elementHandleCalls ?? []).length > 0) {
+		return null;
+	}
+
+	const write = writes[0];
+	if (!write || write.path.length !== 0) return null;
+	if (!projection) return null;
+
+	const fn = eventHandlerFunctionExpression(projection);
+	if (!fn) return null;
+
+	const writeNode = scalarLeafWriteNode(
+		eventHandlerBodyNodes(fn),
+		write,
+		projection.source,
+		symbol.parameters ?? [],
+	);
+	if (!writeNode) return null;
+
+	if (write.operation === 'update' && write.updateOperator) {
+		return [
+			returnStatementNode(
+				graphScalarWriteCall({
+					graphNodeId: write.graphNodeId,
+					returnValue: 'next',
+					updateExpression: numberStepNode(write.updateOperator),
+				}),
+			),
+		];
+	}
+
+	if (write.operation !== 'assign' || write.assignmentOperator) return null;
+
+	const right = isNode(writeNode.right) ? writeNode.right : null;
+	if (!right) return null;
+
+	const text = valueNodeText(right, projection.source);
+	const value = literalValueNode(right, text) ?? localValueNode(text, input.localNames);
+	if (!value) return null;
+
+	return [
+		returnStatementNode(
+			graphScalarWriteCall({ graphNodeId: write.graphNodeId, value }),
+		),
+	];
+}
+
+/**
+ * The write's own node, when the body holds nothing else that has to run.
+ *
+ * `null` for a body that does more, which sends the caller back to the general
+ * path — the same fallthrough `scalarWriteLeafSource` returning `null` produces.
+ *
+ * A body carrying *any* comment is refused, which looks arbitrary until you read
+ * what the string path does: `eventHandlerBodyAllowsScalarLeaf` deletes the
+ * authored write and the guard calls from the body *text* and asks whether
+ * anything but semicolons and whitespace is left, and a comment is left. So the
+ * string path already refuses a commented body, and matching it here keeps the
+ * two paths choosing the same module shape. Matching also happens to be the only
+ * comment-preserving answer available: the leaf shape replaces the whole body
+ * with one synthesized call, so taking it would delete the author's comment,
+ * which `EMISSION_PRINT_OPTIONS`' `comments: 'all'` exists to prevent.
+ */
+function scalarLeafWriteNode(
+	statements: ReadonlyArray<AnyNode>,
+	write: LoweredStateWrite,
+	source: string,
+	parameters: ReadonlyArray<string>,
+): AnyNode | null {
+	if (statements.some((statement) => carriesComment(statement))) return null;
+
+	let found: AnyNode | null = null;
+
+	for (const statement of statements) {
+		if (statement.type === 'EmptyStatement') continue;
+
+		let expression: AnyNode | null;
+		if (statement.type === 'ExpressionStatement' && isNode(statement.expression)) {
+			expression = statement.expression;
+		} else if (statement.type === 'ReturnStatement') {
+			expression = isNode(statement.argument) ? statement.argument : null;
+		} else {
+			return null;
+		}
+
+		if (!expression) continue;
+		if (isEventGuardCall(expression, parameters, source)) continue;
+		if (!found && eventWriteNodeMatches(expression, write, source)) {
+			found = expression;
+			continue;
+		}
+
+		return null;
+	}
+
+	return found;
+}
+
+/** Whether any node in this subtree carries an attached comment. */
+function carriesComment(root: AnyNode): boolean {
+	const seen = new Set<object>();
+	const stack: unknown[] = [root];
+
+	while (stack.length > 0) {
+		const value = stack.pop();
+		if (!value || typeof value !== 'object') continue;
+		if (seen.has(value)) continue;
+		seen.add(value);
+
+		if (Array.isArray(value)) {
+			for (const item of value) stack.push(item);
+			continue;
+		}
+
+		const node = value as AnyNode;
+		if (Array.isArray(node.comments) && node.comments.length > 0) return true;
+
+		for (const [key, child] of Object.entries(node)) {
+			if (EVENT_WALK_IGNORED_KEYS.has(key)) continue;
+			stack.push(child);
+		}
+	}
+
+	return false;
+}
+
+/** `<parameter>.preventDefault()` / `<parameter>.stopPropagation()`. */
+function isEventGuardCall(
+	node: AnyNode,
+	parameters: ReadonlyArray<string>,
+	source: string,
+): boolean {
+	if (node.type !== 'CallExpression' || !isNode(node.callee)) return false;
+	if ((Array.isArray(node.arguments) ? node.arguments : []).length !== 0) return false;
+
+	const callee = node.callee;
+	if (callee.type !== 'MemberExpression' || callee.computed === true) return false;
+	if (!isNode(callee.object) || !isNode(callee.property)) return false;
+	if (callee.property.type !== 'Identifier') return false;
+	if (callee.property.name !== 'preventDefault' && callee.property.name !== 'stopPropagation') {
+		return false;
+	}
+
+	return parameters.includes(valueNodeText(callee.object, source));
 }
 
 // ---------------------------------------------------------------------------
