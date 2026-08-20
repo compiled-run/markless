@@ -3,7 +3,11 @@ import type {
 	ResumeRuntimeErrorContext,
 	ResumeRuntimeInput,
 } from './resume-types.ts';
-import { enrichRuntimeErrorForReporting } from './runtime-error-reporting.ts';
+import {
+	enrichRuntimeErrorForReporting,
+	markRuntimeErrorReported,
+	reportRuntimeErrorToHost,
+} from './runtime-error-reporting.ts';
 
 export const SHARED_PATCH_EVENT_TYPE = 'async:shared-patch';
 
@@ -35,9 +39,10 @@ export function createResumeRuntimeShared(input: ResumeRuntimeInput) {
 	const reportRuntimeError = async (error: unknown, context: ResumeRuntimeErrorContext) => {
 		const reportable = enrichRuntimeErrorForReporting(error, context);
 		if (!input.onError) {
-			reportGlobalRuntimeError(reportable);
+			reportRuntimeErrorToHost(reportable, context);
 			return;
 		}
+		markRuntimeErrorReported(reportable);
 		try {
 			const result = input.onError(reportable, context);
 			if (isPromiseLike(result)) await result;
@@ -60,25 +65,6 @@ export function createResumeRuntimeShared(input: ResumeRuntimeInput) {
 	};
 
 	return { flushRuntimeGraph, receiveSharedPatch, reportRuntimeError };
-}
-
-function reportGlobalRuntimeError(error: unknown): void {
-	const host = globalThis as {
-		readonly reportError?: (error: unknown) => void;
-		readonly dispatchEvent?: (event: Event) => boolean;
-		readonly ErrorEvent?: new (
-			type: string,
-			init: { readonly error: unknown; readonly message: string },
-		) => Event;
-	};
-	if (host.reportError) return host.reportError(error);
-	if (host.dispatchEvent && host.ErrorEvent)
-		host.dispatchEvent(
-			new host.ErrorEvent('error', {
-				error,
-				message: error instanceof Error ? error.message : String(error),
-			}),
-		);
 }
 
 function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {

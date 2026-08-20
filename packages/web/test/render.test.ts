@@ -1992,52 +1992,95 @@ test('render dispatch throws a tagged error when no event record matches', async
 	});
 });
 
-test('CSR external delegation no-ops on its recorded element and keeps unmatched clicks fail-loud', async () => {
+// The container listener is installed because ONE element carries a record, so
+// it also sees every event of that type fired on elements that carry none. Only
+// a record the runtime cannot route is a defect; a record-free element is not.
+function delegatedTriggerView(action: Readonly<Record<string, unknown>>) {
+	return {
+		...staticView(),
+		locators: [{ hostNodeId: 'router:link', strategy: 'dom-order', index: 1, tagName: 'a' }],
+		events: [{ hostNodeId: 'router:link', eventName: 'click', symbolIds: [], action }],
+	};
+}
+
+function captureReportedRuntimeErrors(): {
+	readonly reported: unknown[];
+	readonly restore: () => void;
+} {
+	const host = globalThis as { reportError?: (error: unknown) => void };
+	const previous = host.reportError;
+	const reported: unknown[] = [];
+	host.reportError = (error) => void reported.push(error);
+	return { reported, restore: () => void (host.reportError = previous) };
+}
+
+test('CSR external delegation no-ops on its recorded element and lets record-free siblings through', async () => {
 	const link = element('A');
 	const unowned = element('BUTTON');
 	const root = element('MAIN', [link, unowned]);
-	const container = await renderCsrRuntime({
-		output: {
-			root,
-			liveHostNodes: new Map([['router:link', link]]),
-			state: createProtocolStatePayload({ cells: [] }),
-			view: {
-				...staticView(),
-				locators: [
-					{
-						hostNodeId: 'router:link',
-						strategy: 'dom-order',
-						index: 1,
-						tagName: 'a',
-					},
-				],
-				events: [
-					{
-						hostNodeId: 'router:link',
-						eventName: 'click',
-						symbolIds: [],
-						action: {
-							kind: PROTOCOL_EVENT_ACTION_KIND.externalDelegate,
-							owner: 'router',
-						},
-					},
-				],
+	const surface = captureReportedRuntimeErrors();
+	try {
+		const container = await renderCsrRuntime({
+			output: {
+				root,
+				liveHostNodes: new Map([['router:link', link]]),
+				state: createProtocolStatePayload({ cells: [] }),
+				view: delegatedTriggerView({
+					kind: PROTOCOL_EVENT_ACTION_KIND.externalDelegate,
+					owner: 'router',
+				}),
+				loadSymbol() {
+					throw new Error('external delegation must not load a Markless symbol');
+				},
 			},
-			loadSymbol() {
-				throw new Error('external delegation must not load a Markless symbol');
+			options: {},
+		} as never);
+		const clickListener = root.listeners.find((entry) => entry.type === 'click')?.listener;
+		expect(clickListener).toBeDefined();
+
+		await expect(clickListener!(event('click', link))).resolves.toBeUndefined();
+		expect(() => container.graph).toThrow('MARKLESS_CSR_GRAPH_NOT_DEMANDED');
+
+		await expect(clickListener!(event('click', unowned))).resolves.toBeUndefined();
+		expect(surface.reported).toEqual([]);
+	} finally {
+		surface.restore();
+	}
+});
+
+test('CSR delegated triggers report a record whose action kind names no route', async () => {
+	const link = element('A');
+	const root = element('MAIN', [link]);
+	const surface = captureReportedRuntimeErrors();
+	try {
+		await renderCsrRuntime({
+			output: {
+				root,
+				liveHostNodes: new Map([['router:link', link]]),
+				state: createProtocolStatePayload({ cells: [] }),
+				view: delegatedTriggerView({ kind: 'nonexistent-route', owner: 'router' }),
+				loadSymbol() {
+					throw new Error('an unrouted record must not load a Markless symbol');
+				},
 			},
-		},
-		options: {},
-	} as never);
-	const clickListener = root.listeners.find((entry) => entry.type === 'click')?.listener;
-	expect(clickListener).toBeDefined();
+			options: {},
+		} as never);
+		const clickListener = root.listeners.find((entry) => entry.type === 'click')?.listener;
 
-	await expect(clickListener!(event('click', link))).resolves.toBeUndefined();
-	expect(() => container.graph).toThrow('MARKLESS_CSR_GRAPH_NOT_DEMANDED');
-
-	await expect(clickListener!(event('click', unowned))).rejects.toThrow(
-		'MARKLESS_CSR_DELEGATED_TRIGGER_UNMATCHED: click',
-	);
+		await expect(clickListener!(event('click', link))).resolves.toBeUndefined();
+		expect(surface.reported).toMatchObject([
+			{
+				code: 'MARKLESS_CSR_DELEGATED_TRIGGER_UNMATCHED',
+				phase: 'event',
+				eventName: 'click',
+				selector: 'a',
+				severity: 'error',
+			},
+		]);
+		expect(String((surface.reported[0] as Error).message)).toContain('nonexistent-route');
+	} finally {
+		surface.restore();
+	}
 });
 
 test('CSR delegated clicks dispatch once whether full runtime demand starts before or during the click', async () => {

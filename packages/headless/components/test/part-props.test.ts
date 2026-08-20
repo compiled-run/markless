@@ -80,6 +80,32 @@ test('CSR: a part given no consumer function props gains no records', async () =
 	await expect.poll(() => hovers.textContent).toBe('0');
 });
 
+// One spread-forwarded onMouseEnter puts a container-level mouseenter listener
+// on the page, so it also sees the bare trigger that has no mouseenter record.
+// That miss is the container's own delegation reaching wider than the record,
+// not a broken route, so it must stay silent on every surface a consumer sees.
+test('CSR: a mouseenter on the element without the record raises nothing', async () => {
+	const screen = await render(App);
+	const container = screen.container as HTMLElement;
+	const bare = container.querySelector('[data-case="bare"] button') as HTMLButtonElement;
+	const raised: string[] = [];
+	const onRejection = (event: PromiseRejectionEvent) => {
+		event.preventDefault();
+		raised.push(String(event.reason));
+	};
+	const onError = (event: ErrorEvent) => void raised.push(String(event.error ?? event.message));
+	window.addEventListener('unhandledrejection', onRejection);
+	window.addEventListener('error', onError);
+	try {
+		bare.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
+		await new Promise((resolve) => setTimeout(resolve, 150));
+		expect(raised).toEqual([]);
+	} finally {
+		window.removeEventListener('unhandledrejection', onRejection);
+		window.removeEventListener('error', onError);
+	}
+});
+
 async function expectConsumerHandleToReachTheElement(container: ParentNode) {
 	const trigger = container.querySelector('[data-case="handle"] button') as HTMLButtonElement;
 	const probe = container.querySelector('[data-probe-handle]') as HTMLButtonElement;

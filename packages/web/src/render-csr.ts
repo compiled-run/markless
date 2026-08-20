@@ -14,6 +14,7 @@ import { marklessInstanceScopedLoadSymbol } from './fns/instance-scope.ts';
 import { registerServedArmEventRecords } from './resume-arm-records.ts';
 import type { ResumeAsyncBoundaryPayload, ResumeDomElement } from './resume-types.ts';
 import type { ResumeRuntime, ResumeRuntimeInput, ResumeSymbol } from './resume.ts';
+import { reportRuntimeErrorToHost } from './runtime-error-reporting.ts';
 
 declare const __MARKLESS_DEV_ENABLED__: boolean;
 
@@ -259,17 +260,15 @@ function installDelegatedTriggers(
 	);
 	const releases: Array<() => void> = [];
 	const installedEventNames = new Set<string>();
-	const actions = {
+	type DelegatedEvent = NonNullable<Parameters<ResumeRuntime['dispatch']>[0]>;
+	const routes: Partial<Record<string, (event: DelegatedEvent) => Promise<void>>> = {
 		[PROTOCOL_EVENT_ACTION_KIND.event]: dispatch,
 		[PROTOCOL_EVENT_ACTION_KIND.externalDelegate]: async () => {},
-	} satisfies Record<
-		ProtocolEventActionKind,
-		(event: NonNullable<Parameters<ResumeRuntime['dispatch']>[0]>) => Promise<void>
-	>;
+	} satisfies Record<ProtocolEventActionKind, (event: DelegatedEvent) => Promise<void>>;
 	const installEventListener = (eventName: string) => {
 		if (eventName === 'visible' || installedEventNames.has(eventName)) return;
 		installedEventNames.add(eventName);
-		const listener = async (event: NonNullable<Parameters<ResumeRuntime['dispatch']>[0]>) => {
+		const route = async (event: DelegatedEvent) => {
 			let actionKind: ProtocolEventActionKind | undefined = rowEventNames.has(event.type)
 				? PROTOCOL_EVENT_ACTION_KIND.event
 				: undefined;
@@ -281,13 +280,29 @@ function installDelegatedTriggers(
 				const record = recordsByElement.get(element)?.get(event.type);
 				if (record) actionKind = protocolEventActionKind(record);
 			}
-			if (!actionKind) {
+			// This container listener exists for whichever element registered the
+			// record; a sibling with no record of its own is simply not ours.
+			if (!actionKind) return;
+			const action = routes[actionKind];
+			// Fail-closed on a record this runtime cannot route, on the same dev
+			// gate this guard has always carried.
+			if (!action) {
 				if (typeof __MARKLESS_DEV_ENABLED__ === 'undefined' || __MARKLESS_DEV_ENABLED__)
-					throw new Error(`MARKLESS_CSR_DELEGATED_TRIGGER_UNMATCHED: ${event.type}`);
+					throw unroutedDelegatedTriggerError(actionKind);
 				return;
 			}
-			await actions[actionKind](event);
+			await action(event);
 		};
+		// addEventListener drops the returned promise, so a rejection would escape
+		// the flush unhandled: contain it here and report it instead.
+		const listener = (event: DelegatedEvent) =>
+			route(event).catch((error) =>
+				reportRuntimeErrorToHost(error, {
+					phase: 'event',
+					eventName: event.type,
+					selector: delegatedTargetTag(event.target),
+				}),
+			);
 		output.root.addEventListener?.(eventName, listener, { capture: true });
 		releases.push(() =>
 			output.root.removeEventListener?.(eventName, listener, { capture: true }),
@@ -317,6 +332,23 @@ function installDelegatedTriggers(
 			for (const release of releases.splice(0)) release();
 		},
 	};
+}
+
+// A record matched the element but its action kind names no route: the payload
+// and this runtime disagree, which is a defect rather than a stray event.
+function unroutedDelegatedTriggerError(actionKind: string): Error {
+	const code = 'MARKLESS_CSR_DELEGATED_TRIGGER_UNMATCHED';
+	const error = new Error(`${code}: event record names no ${actionKind} route`) as Error &
+		Record<string, unknown>;
+	error.name = 'RuntimeResumeError';
+	error.code = code;
+	error.phase = 'event';
+	error.dispatchModuleId = 'web:render-csr';
+	return error;
+}
+
+function delegatedTargetTag(target: { readonly tagName?: unknown } | null | undefined): string {
+	return typeof target?.tagName === 'string' ? target.tagName.toLowerCase() : 'element';
 }
 
 type CsrDomJournalTarget = {

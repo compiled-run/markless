@@ -8,8 +8,8 @@ import StatesApp from './fixtures/checkbox-states.tsrx';
 // Witnesses for the compiler defects the checkbox family ran into. A defect
 // still live is marked `test.fails`, so the day it is fixed THIS file turns red
 // and tells whoever fixed it to unmark the test and un-block the parity rows in
-// goals/headless-components/notes/parity-table.md. U-D, U-E and U-F are fixed
-// and their witnesses are plain green tests now; U-G is still red.
+// goals/headless-components/notes/parity-table.md. U-D, U-E, U-F and U-G are all
+// fixed and their witnesses are plain green tests now.
 afterEach(() => cleanup());
 
 // U-D (fixed). A ternary over a shared field, and a computed() built in the
@@ -82,18 +82,22 @@ test('SSR: a branch over a shared read re-renders after resume', async () => {
 	await expectGateOpens(screen.container);
 });
 
-// U-G. Two unmatched-dispatch errors escape as unhandled rejections during an
-// ordinary interaction sequence: a click on a <label> that only names a trigger
-// has no record of its own, and a container from an earlier SSR render still
-// answers document-level events after cleanup(). Neither breaks a behaviour —
-// the label still toggles the checkbox — but a consumer cannot silence either.
-test.fails('an ordinary interaction sequence raises no unmatched-dispatch rejection', async () => {
+// U-G (fixed). Unmatched-dispatch errors used to escape as unhandled rejections
+// during an ordinary interaction sequence: a click on a <label> that only names
+// a trigger has no record of its own, and a container from an earlier SSR render
+// still answered document-level events after cleanup(). Neither broke a
+// behaviour — the label still toggles the checkbox — and neither could be
+// silenced. A container listener now passes a record-free element through, and
+// whatever it does catch reports instead of rejecting into the void.
+test('an ordinary interaction sequence raises no unmatched-dispatch rejection', async () => {
 	const seen: string[] = [];
 	const onRejection = (event: PromiseRejectionEvent) => {
 		event.preventDefault();
 		seen.push(String(event.reason));
 	};
+	const onError = (event: ErrorEvent) => void seen.push(String(event.error ?? event.message));
 	window.addEventListener('unhandledrejection', onRejection);
+	window.addEventListener('error', onError);
 	try {
 		// An SSR container first, cleaned up before the next render.
 		await renderSSR(StatesApp);
@@ -107,5 +111,6 @@ test.fails('an ordinary interaction sequence raises no unmatched-dispatch reject
 		expect(seen).toEqual([]);
 	} finally {
 		window.removeEventListener('unhandledrejection', onRejection);
+		window.removeEventListener('error', onError);
 	}
 });
