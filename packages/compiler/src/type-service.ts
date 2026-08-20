@@ -1,13 +1,47 @@
+import type { Program } from 'yuku-tsrx';
 import {
 	parseModule,
-	type MarklessCodeMapping,
 	type MarklessCompileError,
-	type MarklessMappingData,
 	type MarklessParseOptions,
 	type MarklessParserComment,
-	type MarklessVolarMappingsResult,
-	type Program,
-} from './yuku-tsrx-adapter.ts';
+} from './js-ast.ts';
+
+export interface MarklessMappingData {
+	verification: boolean;
+	completion: boolean;
+	semantic: boolean;
+	navigation: boolean;
+	structure: boolean;
+	format: boolean;
+	customData: {
+		embeddedId?: string;
+		content?: string;
+		readonly [key: string]: unknown;
+	};
+	readonly [key: string]: unknown;
+}
+
+export interface MarklessCodeMapping {
+	sourceOffsets: number[];
+	generatedOffsets: number[];
+	lengths: number[];
+	generatedLengths: number[];
+	data: MarklessMappingData;
+}
+
+export interface MarklessVolarMappingsResult {
+	code: string;
+	mappings: MarklessCodeMapping[];
+	cssMappings: MarklessCodeMapping[];
+	/**
+	 * Reserved for mappings of `<script>` regions. The yuku parser does not surface them
+	 * yet, so the type service emits an empty array to keep the result shape stable for
+	 * editor hosts that already read this field.
+	 */
+	scriptMappings: MarklessCodeMapping[];
+	errors: MarklessCompileError[];
+	sourceAst: Program;
+}
 
 export type TsrxTypeServiceOptions = MarklessParseOptions & {
 	readonly [key: string]: unknown;

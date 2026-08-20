@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { parseModule } from '../src/yuku-tsrx-adapter.ts';
+import { parseModule } from '../src/js-ast.ts';
 import { selectPublicRenderRoot } from '../src/passes/public-render/plan.ts';
 import { collectUndeclaredTemplateReadDiagnostics } from '../src/passes/public-render/validation.ts';
 import type { AnyNode } from '../src/ast/nodes.ts';

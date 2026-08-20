@@ -32,7 +32,7 @@ import {
 	type EmissionNode,
 	type EmissionSite,
 } from '../src/passes/emit-codegen.ts';
-import { parseModule } from '../src/yuku-tsrx-adapter.ts';
+import { parseModule } from '../src/js-ast.ts';
 
 const site: EmissionSite = {
 	phase: 'payload',
