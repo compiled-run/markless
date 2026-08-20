@@ -325,9 +325,35 @@ test('a seed with no destructuring default writes unconditionally during SSR', a
 
 	expect(compiled.publicRenderModule.ssrModuleSource).toContain(
 		'{ const marklessSharedSeed = (checked); ' +
-			'marklessSsrRenderStateValues.set("shared:src/spike.tsrx#spike/state:s", ' +
+			'marklessStateValue(marklessSsrRenderStateValues, marklessSsrPayloadState, ' +
+			'"shared:src/spike.tsrx#spike/state:s", ' +
 			'{ ...marklessSsrRenderStateValues.get("shared:src/spike.tsrx#spike/state:s"), ' +
 			'["checked"]: marklessSharedSeed }); }',
+	);
+	expect(errors(compiled)).toEqual([]);
+});
+
+// U-L: browser resume never re-runs a component body, so a seed that only
+// reached this render's value map left the served payload holding the factory
+// initial and the widget resumed from a value the server never rendered.
+test('an SSR seed writes the served payload, not just this render values', async () => {
+	const compiled = await compile('src/spike.tsrx', defaultedSeedSource);
+	const source = compiled.publicRenderModule.ssrModuleSource ?? '';
+	const seedWrite = source.slice(source.lastIndexOf('const marklessSharedSeed'));
+
+	// The payload draft is the second argument, so the cell the page serves
+	// carries the seeded value.
+	expect(seedWrite).toContain(
+		'marklessStateValue(marklessSsrRenderStateValues, marklessSsrPayloadState, ' +
+			'"shared:src/spike.tsrx#spike/state:s",',
+	);
+	// The draft is cloned before the seed writes it and composed after, so the
+	// served payload is the one carrying the seed.
+	expect(source.indexOf('const marklessSsrPayloadState =')).toBeLessThan(
+		source.lastIndexOf('const marklessSharedSeed'),
+	);
+	expect(source.lastIndexOf('const marklessSharedSeed')).toBeLessThan(
+		source.indexOf('marklessSsrComposeState(marklessSsrPayloadState'),
 	);
 	expect(errors(compiled)).toEqual([]);
 });
@@ -516,4 +542,49 @@ export default function Cart() @{
 			(diagnostic) => diagnostic.code === 'MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT',
 		),
 	).toEqual([]);
+});
+
+// Alternate shape for the same structural rule: the family is authored with the
+// part above the root, different names, different field. The seeded cell has to
+// follow the SEEDING component, not the first one in the file, or the payload
+// write would silently no-op and resume would fall back to the placeholder.
+const partFirstSeedSource = `
+import { shared, state } from '@markless/core';
+
+export const gate = shared(() => {
+	const cell = state({ locked: false });
+	return { ...cell, release() { cell.locked = false; } };
+}, { scope: 'widget' });
+
+export function Latch() @{
+	const cell = gate();
+
+	<button type="button" data-latch onClick={() => cell.release()}>x</button>
+}
+
+export function Panel({ locked = false, children }) @{
+	const cell = gate();
+	cell.locked = locked;
+
+	<div data-panel ui-locked={cell.locked}>{children}</div>
+}
+`;
+
+test('a widget-scoped cell is owned by the component that seeds it, not the first one', async () => {
+	const compiled = await compile('src/gate.tsrx', partFirstSeedSource);
+	const source = compiled.publicRenderModule.ssrModuleSource ?? '';
+	const seeding = source.slice(source.indexOf('async function marklessRenderSsrPanel'));
+	const part = source.slice(
+		source.indexOf('async function marklessRenderSsr('),
+	);
+
+	expect(seeding).toContain(
+		'marklessSelectStateNodes(marklessCloneState(payloadState), [0], [])',
+	);
+	expect(part).toContain('marklessSelectStateNodes(marklessCloneState(payloadState), [], [])');
+	expect(seeding).toContain(
+		'marklessStateValue(marklessSsrRenderStateValues, marklessSsrPayloadState, ' +
+			'"shared:src/gate.tsrx#gate/state:cell",',
+	);
+	expect(errors(compiled)).toEqual([]);
 });

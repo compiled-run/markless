@@ -107,7 +107,8 @@ export function Panel(config) @{
 	// The seed is unguarded: the assignment always assigns.
 	expect(compiled.publicRenderModule.ssrModuleSource).toContain(
 		'const marklessSharedSeed = (config.locked ?? true); ' +
-			'marklessSsrRenderStateValues.set("shared:src/gate.tsrx#gate/state:cell", ' +
+			'marklessStateValue(marklessSsrRenderStateValues, marklessSsrPayloadState, ' +
+			'"shared:src/gate.tsrx#gate/state:cell", ' +
 			'{ ...marklessSsrRenderStateValues.get("shared:src/gate.tsrx#gate/state:cell"), ' +
 			'["locked"]: marklessSharedSeed });',
 	);
@@ -145,7 +146,8 @@ test('a component-body seed of shared state overrides the factory initial for th
 
 	expect(compiled.publicRenderModule.ssrModuleSource).toContain(
 		'const marklessSharedSeed = (props.disabled ?? false); ' +
-			'marklessSsrRenderStateValues.set("shared:src/spike.tsrx#spike/state:s", ' +
+			'marklessStateValue(marklessSsrRenderStateValues, marklessSsrPayloadState, ' +
+			'"shared:src/spike.tsrx#spike/state:s", ' +
 			'{ ...marklessSsrRenderStateValues.get("shared:src/spike.tsrx#spike/state:s"), ' +
 			'["disabled"]: marklessSharedSeed });',
 	);

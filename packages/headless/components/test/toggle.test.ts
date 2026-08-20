@@ -110,8 +110,6 @@ test('CSR: clicking the trigger flips one switch and leaves its neighbours alone
 	await expectClickFlips(screen.container as HTMLElement);
 });
 
-// The seeds this page starts from are all `false` for the switch it clicks, which
-// is also the factory's placeholder, so this half is unaffected by U-L below.
 test('SSR: clicking the trigger flips one switch and leaves its neighbours alone', async () => {
 	const screen = await renderSSR(StatesApp);
 	await expectClickFlips(screen.container);
@@ -122,13 +120,10 @@ test('CSR: a checked switch flips off on click', async () => {
 	await expectCheckedFlipsOff(screen.container as HTMLElement);
 });
 
-// U-L: after an SSR resume the shared instance holds the factory's placeholder,
-// not what `<toggle.root checked>` seeded, so the first click on a switch that
-// rendered as on flips the instance from false to true and the markup does not
-// move. The same page flips correctly under CSR (the test above this one), and a
-// second click here does reach 'false'. This turns green the day resume restores
-// the seeds, and the same defect sits under every seeded family.
-test.fails('SSR: a checked switch flips off on click', async () => {
+// The switch this clicks rendered as on because `<toggle.root checked>` seeded
+// it, and the server carries that seed in the payload, so the resumed instance
+// holds `true` and the first click reaches 'false' (U-L, fixed).
+test('SSR: a checked switch flips off on click', async () => {
 	const screen = await renderSSR(StatesApp);
 	await expectCheckedFlipsOff(screen.container);
 });

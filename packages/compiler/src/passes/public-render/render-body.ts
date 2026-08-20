@@ -65,7 +65,13 @@ export function renderBodyLines(
 		if (isLoweredFrameworkDeclaration(statement)) continue;
 		if (isSharedInstanceDeclaration(statement, sharedInstanceNames)) continue;
 
-		const seedLine = sharedStateSeedLine(statement, input, stateValuesName);
+		const seedLine = sharedStateSeedLine(
+			statement,
+			input,
+			stateValueFunctionName,
+			stateValuesName,
+			statePayloadName,
+		);
 		if (seedLine) {
 			lines.push(seedLine);
 			continue;
@@ -86,7 +92,9 @@ export function renderBodyLines(
 function sharedStateSeedLine(
 	statement: AnyNode,
 	input: PublicRenderModuleInput,
+	stateValueFunctionName: string,
 	stateValuesName: string,
+	statePayloadName: string,
 ): string | null {
 	if (statement.type !== 'ExpressionStatement') return null;
 	const assignment = statement.expression as AnyNode | undefined;
@@ -98,9 +106,11 @@ function sharedStateSeedLine(
 
 	const value = expressionSource(assignment.right as AnyNode, input.source.source);
 	const read = `${stateValuesName}.get(${JSON.stringify(resolved.binding.id)})`;
+	// The seed writes the served payload too: resume never re-runs the body, so a
+	// payload left holding the factory initial resumes a value nobody rendered.
 	// An assignment always assigns: an omitted prop with no destructuring default
 	// writes undefined, exactly as the same statement would in plain JavaScript.
-	return `{ const marklessSharedSeed = (${value}); ${stateValuesName}.set(${JSON.stringify(
+	return `{ const marklessSharedSeed = (${value}); ${stateValueFunctionName}(${stateValuesName}, ${statePayloadName}, ${JSON.stringify(
 		resolved.binding.id,
 	)}, ${seedValueSource(read, resolved.path, 'marklessSharedSeed')}); }`;
 }
