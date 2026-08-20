@@ -22,12 +22,12 @@ import { spreadEventShadowDiagnostic } from './diagnostics.ts';
  * name is what an element spreads, and the named properties are what the author
  * already took out of it.
  */
-type PropsRestSignature = {
+export type PropsRestSignature = {
 	readonly restName: string;
 	readonly destructuredNames: ReadonlySet<string>;
 };
 
-function propsRestSignature(component: AnyNode): PropsRestSignature | undefined {
+export function propsRestSignature(component: AnyNode): PropsRestSignature | undefined {
 	const firstParam = asNodes(component.params)[0];
 	if (!firstParam || firstParam.type !== 'ObjectPattern') return undefined;
 

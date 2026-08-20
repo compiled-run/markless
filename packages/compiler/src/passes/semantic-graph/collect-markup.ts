@@ -35,6 +35,7 @@ import {
 	type StyleConstResolver,
 } from './style-object.ts';
 import { collectStyleScopes } from '../public-render/style-scopes.ts';
+import { propsRestSignature } from './spread-event-guard.ts';
 import type { MutableSemanticGraphArtifact } from './types.ts';
 
 type CollectionContext = {
@@ -48,6 +49,9 @@ type CollectionContext = {
 	boundaryIndex: number;
 	styleScopeClass: string | null;
 	styleConstResolver: StyleConstResolver | null;
+	// Names the component being emitted destructured out of its props, so a
+	// spread of the rest binding can say what it can never carry.
+	destructuredNames: ReadonlyArray<string>;
 };
 
 type ChunkBuilder = {
@@ -86,9 +90,11 @@ export function collectSemanticMarkup(input: {
 		boundaryIndex: 0,
 		styleScopeClass: null,
 		styleConstResolver: null,
+		destructuredNames: [],
 	};
 	const components: Array<{
 		readonly name: string;
+		readonly node: AnyNode;
 		readonly root: AnyNode;
 		readonly exported: boolean;
 		readonly rootEligible: boolean;
@@ -101,6 +107,7 @@ export function collectSemanticMarkup(input: {
 		if (!root) continue;
 		components.push({
 			name: component.name,
+			node: component.node,
 			root,
 			rootEligible: isPublicRoot(root) && isPublicComponentBody(component.node, root),
 			exported:
@@ -112,6 +119,9 @@ export function collectSemanticMarkup(input: {
 	for (const component of components) {
 		context.styleScopeClass =
 			collectStyleScopes(component.root, input.filename).styleScopes[0]?.scopeId ?? null;
+		context.destructuredNames = [
+			...(propsRestSignature(component.node)?.destructuredNames ?? []),
+		];
 		const builder = createChunk(`template:${component.name}`, 'template', component.name);
 		emitNode(component.root, [0], builder, context, null);
 		chunks.push(finishChunk(builder));
@@ -373,6 +383,9 @@ function emitNode(
 					coordinate: { kind: 'child-index', path },
 					residue: expressionResidue(expression, context, repeat),
 					excludeNames: declaredAttributeNames,
+					...(context.destructuredNames.length > 0
+						? { destructuredNames: context.destructuredNames }
+						: {}),
 				});
 			continue;
 		}

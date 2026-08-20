@@ -84,6 +84,8 @@ export type PrerenderDataDefinition = {
 			readonly value?: unknown;
 			readonly symbolId?: string;
 			readonly source?: string;
+			/** DOM event an event-shaped callback prop names, minted by the compiler. */
+			readonly eventName?: string;
 		}>;
 		readonly materialized?: SsrRenderOutput & {
 			// Render-data children carry the full ssr-data structure, not just anchors.
@@ -334,6 +336,7 @@ async function evaluatePrerenderDataComponent(input: {
 		readonly structure?: SsrDataStructure;
 		readonly elementCount: number;
 		readonly propEvents: ReadonlyArray<unknown>;
+		readonly propSpreads?: ReadonlyArray<unknown>;
 		readonly externalSymbolIds: ReadonlyArray<string>;
 		m?: (graphProps: ComposeGraphProps) => void;
 	}
@@ -555,6 +558,7 @@ async function evaluatePrerenderDataComponent(input: {
 			}
 			const childProps: Record<string, unknown> = {};
 			const callbacks: Record<string, string> = {};
+			const callbackEvents: Record<string, string> = {};
 			for (const prop of edge.props) {
 				if (prop.kind === 'graph-reference' && prop.graphNodeId) {
 					childProps[prop.name] = read(prop.graphNodeId, prop.path ?? []);
@@ -565,6 +569,7 @@ async function evaluatePrerenderDataComponent(input: {
 				} else if (prop.kind === 'callback') {
 					const symbolId = edge.boundSymbols?.[prop.name] ?? prop.symbolId;
 					if (symbolId) callbacks[prop.name] = input.symbolPrefix + symbolId;
+					if (prop.eventName) callbackEvents[prop.name] = prop.eventName;
 				} else {
 					throw new Error(`MARKLESS_PRERENDER_PROP_UNDERIVABLE: ${prop.name}`);
 				}
@@ -602,6 +607,7 @@ async function evaluatePrerenderDataComponent(input: {
 				asyncBoundaryId: edge.asyncBoundaryId,
 				boundSymbols: edge.boundSymbols ?? {},
 				callbackProps: callbacks,
+				...(Object.keys(callbackEvents).length > 0 ? { callbackEvents } : {}),
 			});
 			return output;
 		},
@@ -624,6 +630,7 @@ async function evaluatePrerenderDataComponent(input: {
 		structureTokens: rendered.structureTokens,
 		elementCount: composition.elementCount,
 		propEvents: [],
+		propSpreads: rendered.spreadHosts,
 		externalSymbolIds: composition.externalSymbolIds,
 		m(graphProps: ComposeGraphProps, instancePath?: string) {
 			marklessSsrRemapGraphOutput(output, graphProps, instancePath);

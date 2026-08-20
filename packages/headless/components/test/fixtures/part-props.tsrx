@@ -6,7 +6,6 @@ import { checkbox } from '../../src/index.ts';
 export function App() @{
 	let clicks = state(0);
 	let hovers = state(0);
-	let consumerTag = state('none');
 	const consumerEl = element<HTMLButtonElement>();
 
 	<section data-testid="part-props">
@@ -38,9 +37,8 @@ export function App() @{
 				</checkbox.trigger>
 			</checkbox.root>
 		</div>
-		<button type="button" data-probe-handle onClick={() => { consumerTag = consumerEl ? consumerEl.tagName : 'none'; }}>Read handle</button>
+		<button type="button" data-probe-handle onClick={() => { consumerEl.focus(); }}>Focus handle</button>
 		<output data-probe="clicks">{clicks}</output>
 		<output data-probe="hovers">{hovers}</output>
-		<output data-probe="consumer-tag">{consumerTag}</output>
 	</section>
 }

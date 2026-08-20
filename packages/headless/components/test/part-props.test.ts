@@ -47,26 +47,45 @@ test('SSR: an omitted consumer handler leaves the part working after resume', as
 	await expectBarePartStillToggles(screen.container);
 });
 
-// U-O remainder: `{...rest}` renders attributes only. A consumer event the part
-// declares no handler for is dropped at the spread, and a consumer `el` handle
-// never binds. Both are marked failing so the day forwarding lands, this file
-// turns red and the expectation is read again.
-test.fails('CSR: a consumer event the part has no handler for rides the spread', async () => {
-	const screen = await render(App);
-	const container = screen.container as HTMLElement;
+// U-O: `{...rest}` forwards the consumer's function props. An event the part
+// declares no handler for reaches the element it spreads onto, and an `el`
+// handle fills alongside the part's own.
+async function expectSpreadEventToFire(container: ParentNode) {
 	const trigger = container.querySelector('[data-case="spread"] button') as HTMLButtonElement;
 	const hovers = container.querySelector('[data-probe="hovers"]') as HTMLElement;
 
 	trigger.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
 	await expect.poll(() => hovers.textContent).toBe('1');
+}
+
+test('CSR: a consumer event the part has no handler for rides the spread', async () => {
+	const screen = await render(App);
+	await expectSpreadEventToFire(screen.container as HTMLElement);
 });
 
-test.fails('CSR: a consumer el handle on a part fills alongside the part own handle', async () => {
+test('SSR: a consumer event the part has no handler for rides the spread after resume', async () => {
+	const screen = await renderSSR(App);
+	await expectSpreadEventToFire(screen.container);
+});
+
+// A part whose consumer passed nothing must gain nothing: the bare trigger is
+// still the part's own two handlers, never a forwarded third.
+test('CSR: a part given no consumer function props gains no records', async () => {
 	const screen = await render(App);
 	const container = screen.container as HTMLElement;
-	const tag = container.querySelector('[data-probe="consumer-tag"]') as HTMLElement;
+	const bare = container.querySelector('[data-case="bare"] button') as HTMLButtonElement;
+	const hovers = container.querySelector('[data-probe="hovers"]') as HTMLElement;
+
+	bare.dispatchEvent(new MouseEvent('mouseenter', { bubbles: false }));
+	await expect.poll(() => hovers.textContent).toBe('0');
+});
+
+test('CSR: a consumer el handle on a part fills alongside the part own handle', async () => {
+	const screen = await render(App);
+	const container = screen.container as HTMLElement;
+	const trigger = container.querySelector('[data-case="handle"] button') as HTMLButtonElement;
 	const probe = container.querySelector('[data-probe-handle]') as HTMLButtonElement;
 
 	probe.click();
-	await expect.poll(() => tag.textContent).toBe('BUTTON');
+	await expect.poll(() => document.activeElement === trigger).toBe(true);
 });

@@ -34,6 +34,18 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 	// One reader per plan run, so a source shared by several symbols is analyzed
 	// once and nothing is retained between compilations.
 	const semanticsReader = createSymbolSourceSemanticsReader();
+	// A handle this module hands to a child part through `el=` is still a handle
+	// here, even though no element of this module's own markup binds it.
+	const reachableElementHandles = [
+		...input.payloadArena.view.elementHandles,
+		...input.semanticGraph.componentEdges.flatMap((edge) =>
+			edge.props.flatMap((prop) =>
+				prop.kind === 'graph-reference' && prop.graphBindingKind === 'element'
+					? [{ name: prop.source }]
+					: [],
+			),
+		),
+	];
 
 	for (const event of input.payloadArena.view.events) {
 		for (let order = 0; order < event.handlerCount; order++) {
@@ -70,10 +82,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 					sourceSpan,
 					...inlined.spans,
 				]),
-				elementHandleCalls: collectElementHandleCalls(
-					source,
-					input.payloadArena.view.elementHandles,
-				),
+				elementHandleCalls: collectElementHandleCalls(source, reachableElementHandles),
 			});
 		}
 	}

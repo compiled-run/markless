@@ -662,6 +662,9 @@ export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 				readonly kind: 'spread-attributes';
 				readonly residue: SemanticMarkupResidue;
 				readonly excludeNames: ReadonlyArray<string>;
+				// Prop names the component signature already took out of the rest
+				// binding, so they never reach this spread at all.
+				readonly destructuredNames?: ReadonlyArray<string>;
 		  }
 		| {
 				readonly kind: 'child-component';

@@ -28,9 +28,14 @@ export function emitSsrComponent(
 		symbolPrefix: componentEdgeInstanceSegment(edge, context.componentEdges),
 		graphProps: componentEdgeGraphRoutes(edge, hasChildrenProjection(node)),
 		boundSymbols: boundSymbolsForEdge(edge, context.callbackSymbols),
+		callbackEvents: callbackEventNames(edge),
 	};
+	const callbackEventsSource =
+		Object.keys(placement.callbackEvents).length > 0
+			? `, callbackEvents: ${JSON.stringify(placement.callbackEvents)}`
+			: '';
 
-	return `(await marklessSsrRenderChild(marklessSsrChildren, ${localName}, { ${props.join(', ')} }, { hostPrefix: ${JSON.stringify(placement.hostPrefix)}, symbolPrefix: ${JSON.stringify(placement.symbolPrefix)}, localIndex: marklessSsrHostLocators.length, graphProps: ${JSON.stringify(placement.graphProps)}, boundSymbols: ${JSON.stringify(placement.boundSymbols)} }, marklessSsrRenderContext))`;
+	return `(await marklessSsrRenderChild(marklessSsrChildren, ${localName}, { ${props.join(', ')} }, { hostPrefix: ${JSON.stringify(placement.hostPrefix)}, symbolPrefix: ${JSON.stringify(placement.symbolPrefix)}, localIndex: marklessSsrHostLocators.length, graphProps: ${JSON.stringify(placement.graphProps)}, boundSymbols: ${JSON.stringify(placement.boundSymbols)}${callbackEventsSource} }, marklessSsrRenderContext))`;
 }
 
 // Component invocation inside a keyed repeat row (SSR): the row mapper
@@ -132,6 +137,21 @@ function componentPropsSource(
 	return props;
 }
 
+// The DOM event each event-shaped callback prop names. A child that spreads its
+// props reads this to forward a handler it declares nothing for; the naming rule
+// stays here, where the parser host owns it.
+export function callbackEventNames(
+	edge: ComponentEdge | undefined,
+): Readonly<Record<string, string>> {
+	return Object.fromEntries(
+		(edge?.props ?? []).flatMap((prop) =>
+			prop.kind === 'callback' && isEventAttribute(prop.name)
+				? [[prop.name, normalizeEventName(prop.name)] as const]
+				: [],
+		),
+	);
+}
+
 export function boundSymbolsForEdge(
 	edge: ComponentEdge | undefined,
 	symbols: ReadonlyMap<string, string>,
@@ -184,7 +204,14 @@ function ssrComponentPropsSource(
 export function componentEdgeGraphRoutes(edge: ComponentEdge | undefined, hasProjection = false) {
 	const routes = (edge?.props ?? []).map((prop) =>
 		prop.kind === 'graph-reference'
-			? { name: prop.name, graphNodeId: prop.graphNodeId, path: prop.path }
+			? {
+					name: prop.name,
+					graphNodeId: prop.graphNodeId,
+					path: prop.path,
+					// The name the parent's own handle registry answers to, so a
+					// forwarded handle registers under it and not under an id.
+					...(prop.graphBindingKind === 'element' ? { handleName: prop.source } : {}),
+				}
 			: {
 					name: prop.name,
 					kind: prop.kind === 'serializable' ? 'compiler-known-constant' : prop.kind,

@@ -103,11 +103,20 @@ type SsrPropEvent = {
 	readonly eventName: string;
 	readonly propName: string;
 };
+// One rendered element of the child that spreads the child's own props. The
+// name lists say what that spread can never carry, so composition knows which
+// consumer props it may forward onto the element.
+type SsrPropSpread = {
+	readonly hostNodeId: string;
+	readonly excludeNames: ReadonlyArray<string>;
+	readonly destructuredNames: ReadonlyArray<string>;
+};
 type SsrChildOutput = ComposeChildOutput & {
 	readonly html?: string;
 	readonly view?: SsrViewDraft;
 	readonly externalSymbolIds?: ReadonlyArray<string>;
 	readonly propEvents?: ReadonlyArray<SsrPropEvent>;
+	readonly propSpreads?: ReadonlyArray<SsrPropSpread>;
 };
 type SsrChildComponent = {
 	readonly renderSsr?: ((
@@ -126,6 +135,8 @@ type SsrChildProps = Readonly<Record<string, unknown>> & {
 export type MarklessSsrComposedChild = ComposeChild & {
 	readonly asyncBoundaryId?: string;
 	readonly callbackProps?: Readonly<Record<string, string>>;
+	/** DOM event name per event-shaped callback prop, minted by the parent compiler. */
+	readonly callbackEvents?: Readonly<Record<string, string>>;
 	readonly output?: SsrChildOutput;
 };
 type SsrComposedChild = MarklessSsrComposedChild;
@@ -1093,6 +1104,7 @@ export function marklessSsrAppendChildView(context: {
 			...handle,
 			hostNodeId: context.child.hostPrefix + handle.hostNodeId,
 		});
+	marklessSsrForwardSpreadProps(context, childView);
 	for (const branch of childView.branches ?? []) {
 		const liveTestReads = (branch.testReads ?? []).filter(
 			(read) => !marklessCsrChildReadIsStatic(read, context.child.graphProps),
@@ -1167,6 +1179,62 @@ export function marklessSsrAppendChildView(context: {
 					}
 				: {}),
 		});
+}
+
+/**
+ * Forwards the consumer's function props through a part's `{...rest}`.
+ *
+ * A part that spreads its props onto a host element carries whatever the
+ * consumer passed and the part itself never claimed: an `onMouseEnter` the part
+ * declares no handler for becomes an event record on that element, and an `el`
+ * handle fills alongside the part's own. Nothing is synthesized for a part whose
+ * consumer passed no function props, so an unused part costs no records.
+ */
+function marklessSsrForwardSpreadProps(
+	context: {
+		readonly child: SsrChildData;
+		readonly events: SsrEventRecord[];
+		readonly elementHandles: SsrHostedRecord[];
+		readonly externalSymbolIds: Set<string>;
+	},
+	childView: SsrViewDraft,
+) {
+	const spreads = context.child.output?.propSpreads ?? [];
+	const callbackEvents = context.child.callbackEvents ?? {};
+	const handles = (context.child.graphProps ?? []).filter(
+		(route) => route.name === 'el' && typeof route.graphNodeId === 'string',
+	);
+	if (spreads.length === 0) return;
+
+	for (const spread of spreads) {
+		const hostNodeId = context.child.hostPrefix + spread.hostNodeId;
+		const carries = (name: string) => !spread.destructuredNames.includes(name);
+		for (const [propName, eventName] of Object.entries(callbackEvents)) {
+			const symbolId = context.child.callbackProps?.[propName];
+			if (!symbolId || !carries(propName) || spread.excludeNames.includes(propName))
+				continue;
+			// The part's own handler wins its event; the shadow guard is what makes
+			// that a build error rather than a silent merge.
+			if (
+				childView.events.some(
+					(event) =>
+						event.hostNodeId === spread.hostNodeId && event.eventName === eventName,
+				)
+			)
+				continue;
+			context.externalSymbolIds.add(symbolId);
+			context.events.push({ hostNodeId, eventName, symbolIds: [symbolId] });
+		}
+		for (const route of handles) {
+			const handleId = route.graphNodeId as string;
+			if (carries(route.name))
+				context.elementHandles.push({
+					hostNodeId,
+					handleId,
+					name: typeof route.handleName === 'string' ? route.handleName : handleId,
+				});
+		}
+	}
 }
 // A child boundary's armized record set keeps its arm-relative coordinates
 // through composition (the anchor is located live at resume); only host ids,

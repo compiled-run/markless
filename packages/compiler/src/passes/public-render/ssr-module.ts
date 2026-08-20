@@ -46,7 +46,11 @@ import {
 	sharedInstancePreludeLines,
 } from './residue-reader.ts';
 import { collectSsrPropEvents } from './component-wiring.ts';
-import { boundSymbolsForEdge, componentEdgeGraphRoutes } from './component-wiring.ts';
+import {
+	boundSymbolsForEdge,
+	callbackEventNames,
+	componentEdgeGraphRoutes,
+} from './component-wiring.ts';
 import type { PublicRenderRoot } from './types.ts';
 
 export function emitPublicSsrRenderModule(
@@ -157,6 +161,7 @@ export function emitPublicSsrRenderModule(
 			? ['		m(graphProps, instancePath) { marklessSsrRemapGraphOutput(this, graphProps, instancePath); },']
 			: []),
 		'		propEvents: marklessSsrPropEvents,',
+		'		propSpreads: marklessSsrRendered.spreadHosts,',
 		'		externalSymbolIds: marklessSsrComposition.externalSymbolIds,',
 		'		structure: marklessSsrRendered.structure,',
 		'		structureTokens: marklessSsrRendered.structureTokens,',
@@ -402,11 +407,15 @@ function emitSsrDataRenderLines(
 		});
 		if (callbackEntries.length)
 			props.push(`__marklessSsrCallbacks:marklessSsrCallbacks({${callbackEntries.join(',')}})`);
+		const edgeCallbackEvents = callbackEventNames(edge);
 		const child = {
 			hostPrefix: `c${index}:`,
 			symbolPrefix: componentEdgeInstanceSegment(edge, input.semanticGraph.componentEdges),
 			graphProps: componentEdgeGraphRoutes(edge, hasProjection),
 			boundSymbols: boundSymbolsForEdge(edge, callbacks),
+			...(Object.keys(edgeCallbackEvents).length > 0
+				? { callbackEvents: edgeCallbackEvents }
+				: {}),
 		};
 		// A .tsrx child is imported as its whole module surface, so a named import
 		// (a barrel alias resolves to one too) says WHICH of the components that
