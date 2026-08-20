@@ -6,7 +6,7 @@ import type {
 	SemanticGraphInput,
 	SemanticLocalDeclaration,
 } from '../../artifacts.ts';
-import { applyMarklessAllowDirectives } from '../../diagnostics.ts';
+import { applyMarklessAllowDirectives, type SourceSpan } from '../../diagnostics.ts';
 import {
 	collectAsyncBoundary,
 	collectAsyncBoundaryDiagnostics,
@@ -21,11 +21,7 @@ import {
 	getFrameworkApiForCall,
 } from './imports.ts';
 import { collectComponentProps } from './collect-components.ts';
-import {
-	getComponentFunction,
-	getElementAttributes,
-	unwrapExpressionContainer,
-} from '../../ast/tsrx.ts';
+import { getComponentFunction } from '../../ast/tsrx.ts';
 import {
 	collectConditionalBranchText,
 	collectElement,
@@ -172,16 +168,12 @@ export async function buildSemanticGraph(
 	};
 }
 
-type ComponentLocalBinding =
-	WalkState['componentLocalBindings'] extends Map<string, infer Binding> ? Binding : never;
-
 function prepareComponentLocalBindings(body: AnyNode, state: WalkState): void {
 	state.componentLocalBindings = new Map();
 	state.resolvedComponentLocalBindingsBySpan = new Map();
 	const bodySpan = sourceSpan(body, state.filename);
 	if (!bodySpan || !state.currentComponentName) return;
 	const lexicalScopeId = `scope:${bodySpan.start}:${bodySpan.end}`;
-	const bindingsByName = new Map<string, ComponentLocalBinding>();
 
 	for (const statement of asNodes(body.body)) {
 		if (statement.type === 'VariableDeclaration') {
@@ -210,7 +202,6 @@ function prepareComponentLocalBindings(body: AnyNode, state: WalkState): void {
 					declaration,
 					...(initializer ? { initializerNode } : {}),
 				};
-				bindingsByName.set(name, binding);
 				state.componentLocalBindings.set(declaration.bindingId!, binding);
 			}
 			continue;
@@ -234,12 +225,11 @@ function prepareComponentLocalBindings(body: AnyNode, state: WalkState): void {
 				initializer,
 			};
 			const binding = { declaration, initializerNode: statement };
-			bindingsByName.set(name, binding);
 			state.componentLocalBindings.set(declaration.bindingId!, binding);
 		}
 	}
 
-	resolveComponentLocalReferences(body, bindingsByName, state, true, new Set());
+	resolveComponentLocalReferences(state, bodySpan);
 }
 
 function callbackInitializer(
@@ -273,144 +263,45 @@ function callbackInitializer(
 	};
 }
 
-function resolveComponentLocalReferences(
-	node: AnyNode | undefined,
-	bindings: ReadonlyMap<string, ComponentLocalBinding>,
-	state: WalkState,
-	isRootScope: boolean,
-	shadowed: ReadonlySet<string>,
-): void {
-	if (!node) return;
-	if (node.type === 'Element' || node.type === 'JSXElement') {
-		for (const attribute of getElementAttributes(node)) {
-			resolveComponentLocalReferences(
-				unwrapExpressionContainer(attribute.value as AnyNode | undefined),
-				bindings,
-				state,
-				false,
-				shadowed,
-			);
-		}
-		for (const child of asNodes(node.children)) {
-			resolveComponentLocalReferences(child, bindings, state, false, shadowed);
-		}
-		return;
-	}
+/**
+ * Point every identifier use inside the component body at the component-local
+ * declaration it refers to, and count the writes aimed at each declaration.
+ *
+ * The question is asked of yuku's resolved references rather than of a set of
+ * names, because only resolution can tell a use of the component-local from a
+ * use of a parameter, a block-scoped declaration, or a nested function's own
+ * binding that shadows it. A reference belongs to a component-local exactly
+ * when its symbol's first declaration site is the identifier the binding id was
+ * minted from, so the two agree by construction rather than by name matching.
+ */
+function resolveComponentLocalReferences(state: WalkState, bodySpan: SourceSpan): void {
+	const semantic = state.semantic();
 
-	if (node.type === 'Identifier') {
-		const name = getIdentifierName(node);
-		const binding = name && !shadowed.has(name) ? bindings.get(name) : undefined;
-		const bindingId = binding?.declaration.bindingId;
-		if (bindingId) {
-			state.resolvedComponentLocalBindingIds.set(node, bindingId);
-			const span = sourceSpan(node, state.filename);
-			if (span)
-				state.resolvedComponentLocalBindingsBySpan.set(
-					`${span.start}:${span.end}`,
-					bindingId,
-				);
-		}
-		return;
-	}
+	for (let referenceId = 0; referenceId < semantic.reference.count; referenceId += 1) {
+		const start = semantic.reference.start(referenceId);
+		const end = semantic.reference.end(referenceId);
+		if (start < bodySpan.start || end > bodySpan.end) continue;
+		// A type-position use never reads or writes the value beside it.
+		if (semantic.reference.inTypePosition(referenceId)) continue;
 
-	if (node.type === 'AssignmentExpression' || node.type === 'UpdateExpression') {
-		const target = (node.type === 'AssignmentExpression' ? node.left : node.argument) as
-			| AnyNode
-			| undefined;
-		incrementComponentLocalWrites(target, bindings, shadowed);
-	}
-
-	if (
-		node.type === 'ArrowFunctionExpression' ||
-		node.type === 'FunctionExpression' ||
-		node.type === 'FunctionDeclaration'
-	) {
-		const functionShadowed = new Set(shadowed);
-		for (const parameter of asNodes(node.params)) {
-			for (const name of bindingPatternNames(parameter)) functionShadowed.add(name);
-		}
-		const functionBody = node.body as AnyNode | undefined;
-		for (const name of directScopeBindingNames(functionBody)) functionShadowed.add(name);
-		for (const child of childNodes(node)) {
-			resolveComponentLocalReferences(child, bindings, state, false, functionShadowed);
-		}
-		return;
-	}
-
-	let nestedShadowed = shadowed;
-	if (!isRootScope && isLexicalScopeNode(node)) {
-		const nextShadowed = new Set(shadowed);
-		for (const name of directScopeBindingNames(node)) nextShadowed.add(name);
-		nestedShadowed = nextShadowed;
-	}
-	for (const child of childNodes(node)) {
-		resolveComponentLocalReferences(child, bindings, state, false, nestedShadowed);
-	}
-}
-
-function incrementComponentLocalWrites(
-	target: AnyNode | undefined,
-	bindings: ReadonlyMap<string, ComponentLocalBinding>,
-	shadowed: ReadonlySet<string>,
-): void {
-	for (const name of bindingPatternNames(target)) {
-		if (shadowed.has(name)) continue;
-		const binding = bindings.get(name);
-		if (!binding) continue;
-		const writeCount = (binding.declaration.writeCount ?? 0) + 1;
-		Object.assign(binding.declaration, { writeCount });
-	}
-}
-
-function isLexicalScopeNode(node: AnyNode): boolean {
-	return (
-		node.type === 'BlockStatement' ||
-		node.type === 'JSXCodeBlock' ||
-		node.type === 'SwitchStatement' ||
-		node.type === 'CatchClause' ||
-		node.type === 'ForStatement' ||
-		node.type === 'ForInStatement' ||
-		node.type === 'ForOfStatement'
-	);
-}
-
-function directScopeBindingNames(node: AnyNode | undefined): ReadonlyArray<string> {
-	if (!node) return [];
-	const statements = asNodes(node.body);
-	return statements.flatMap((statement) => {
-		if (statement.type === 'VariableDeclaration') {
-			return asNodes(statement.declarations).flatMap((declaration) =>
-				bindingPatternNames(declaration.id as AnyNode | undefined),
-			);
-		}
-		if (statement.type === 'FunctionDeclaration' || statement.type === 'ClassDeclaration') {
-			return bindingPatternNames(statement.id as AnyNode | undefined);
-		}
-		return [];
-	});
-}
-
-function bindingPatternNames(node: AnyNode | undefined): ReadonlyArray<string> {
-	if (!node) return [];
-	if (node.type === 'Identifier')
-		return getIdentifierName(node) ? [getIdentifierName(node)!] : [];
-	if (node.type === 'AssignmentPattern') {
-		return bindingPatternNames(node.left as AnyNode | undefined);
-	}
-	if (node.type === 'RestElement') {
-		return bindingPatternNames(node.argument as AnyNode | undefined);
-	}
-	if (node.type === 'ObjectPattern') {
-		return asNodes(node.properties).flatMap((property) =>
-			bindingPatternNames(
-				(property.type === 'Property' ? property.value : property.argument) as
-					| AnyNode
-					| undefined,
-			),
+		const symbolId = semantic.reference.symbolId(referenceId);
+		if (symbolId === null) continue;
+		const declaration = semantic.symbol.declNode(symbolId, 0);
+		const binding = state.componentLocalBindings.get(
+			`binding:${declaration.start}:${declaration.end}`,
 		);
+		if (!binding) continue;
+
+		state.resolvedComponentLocalBindingsBySpan.set(
+			`${start}:${end}`,
+			binding.declaration.bindingId!,
+		);
+		if (semantic.reference.isWrite(referenceId)) {
+			Object.assign(binding.declaration, {
+				writeCount: (binding.declaration.writeCount ?? 0) + 1,
+			});
+		}
 	}
-	if (node.type === 'ArrayPattern') return asNodes(node.elements).flatMap(bindingPatternNames);
-	return [];
 }
 
 function mergeComponentLocalDeclarations(state: WalkState): void {

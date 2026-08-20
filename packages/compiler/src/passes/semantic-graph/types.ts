@@ -131,7 +131,7 @@ export type WalkState = {
 			readonly initializerNode?: AnyNode;
 		}
 	>;
-	resolvedComponentLocalBindingIds: WeakMap<object, string>;
+	/** Component-local binding id per `start:end` of the use that resolves to it. */
 	resolvedComponentLocalBindingsBySpan: Map<string, string>;
 	walk: SemanticGraphWalk | null;
 	nextComponentEdgeId: number;
@@ -236,7 +236,6 @@ export function createWalkState(input: {
 		styleConstResolver: null,
 		pendingComputedDependencies: [],
 		componentLocalBindings: new Map(),
-		resolvedComponentLocalBindingIds: new WeakMap<object, string>(),
 		resolvedComponentLocalBindingsBySpan: new Map(),
 		walk: null,
 		nextComponentEdgeId: 0,
