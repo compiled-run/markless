@@ -1,4 +1,4 @@
-import { isEventAttribute } from '../../yuku-tsrx-adapter.ts';
+import { analyzeModule, isEventAttribute } from '../../yuku-tsrx-adapter.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
 import {
@@ -285,89 +285,72 @@ export function collectUndeclaredTemplateReadDiagnostics(input: {
 	readonly root: AnyNode;
 	readonly source: string;
 }) {
-	const scope = new Set([
-		...knownRenderGlobals,
-		...input.moduleImports,
-		...input.repeatLocals,
-		...declarations(
-			asNodes(input.ast.body).filter((statement) => !getComponentFunction(statement)),
-		),
-		...componentPropNames(input.component),
-		...declarations(
-			input.component.body ? childNodes(input.component.body as AnyNode) : [],
-		),
-		...catchNames(input.root),
-	]);
+	// Which names in a template read are not declared anywhere is a resolution
+	// question, and the semantic view already answers it: every identifier use
+	// it could not bind is a row with no symbol. Analyze the module once here —
+	// this pass runs outside WalkState, and re-analyzing per read span would pay
+	// the second parse over and over.
+	const unresolved = unresolvedValueReferences(input.source, input.filename);
+	if (unresolved.length === 0) return [];
+	// Render policy rather than scope mechanics: these names are in scope when
+	// the render module runs without any declaration the analyzer can see.
+	const inRenderScope = new Set([...knownRenderGlobals, ...input.repeatLocals]);
 	for (const read of emittedTemplateReads(input.root, input.source)) {
-		const name = [...identifiersFromSource(read.source)].find(
-			(identifier) => !scope.has(identifier),
+		const found = unresolved.find(
+			(reference) =>
+				reference.start >= read.start &&
+				reference.end <= read.end &&
+				!inRenderScope.has(reference.name),
 		);
-		if (!name) continue;
+		if (!found) continue;
 		return [
-			undeclaredTemplateReadDiagnostic({ name, node: read.node, filename: input.filename }),
+			undeclaredTemplateReadDiagnostic({
+				name: found.name,
+				node: read.node,
+				filename: input.filename,
+			}),
 		];
 	}
 	return [];
 }
 
-function declarations(nodes: ReadonlyArray<AnyNode>): string[] {
-	return nodes.flatMap((node) => {
-		node =
-			node.type === 'ExportNamedDeclaration'
-				? ((node.declaration as AnyNode | undefined) ?? node)
-				: node;
-		if (node.type === 'VariableDeclaration')
-			return asNodes(node.declarations).flatMap((declaration) =>
-				bindingNames(declaration.id as AnyNode | undefined),
-			);
-		if (node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration')
-			return bindingNames(node.id as AnyNode | undefined);
-		return [];
-	});
-}
-
-function bindingNames(node: AnyNode | undefined): string[] {
-	if (node?.type === 'AssignmentPattern') return bindingNames(node.left as AnyNode | undefined);
-	const name = getIdentifierName(node);
-	return name ? [name] : [];
-}
-
-function catchNames(root: AnyNode): string[] {
-	const names: string[] = [];
-	const visit = (node: AnyNode | null | undefined): void => {
-		if (!node || typeof node !== 'object') return;
-		if (node.type === 'CatchClause')
-			names.push(...bindingNames(node.param as AnyNode | undefined));
-		for (const child of childNodes(node)) visit(child);
-	};
-	visit(root);
-	return names;
-}
-
-function componentPropNames(component: AnyNode): string[] {
-	const param = asNodes(component.params)[0];
-	if (!param) return [];
-	const name = getIdentifierName(param);
-	if (name) return [name];
-	return param.type === 'ObjectPattern'
-		? asNodes(param.properties).flatMap((property) => {
-				const prop = property as AnyNode;
-				return bindingNames(
-					(prop.value as AnyNode | undefined) ?? (prop.key as AnyNode | undefined),
-				);
-			})
-		: [];
+/**
+ * Identifier uses the analyzer could not resolve to a binding, in source order.
+ *
+ * Type-position names are left out: annotations are erased before the render
+ * module runs, so an unresolved one cannot produce the ReferenceError this
+ * diagnostic reports.
+ */
+function unresolvedValueReferences(
+	source: string,
+	filename: string,
+): Array<{ readonly name: string; readonly start: number; readonly end: number }> {
+	const view = analyzeModule(source, filename);
+	const references: Array<{ readonly name: string; readonly start: number; readonly end: number }> =
+		[];
+	for (let id = 0; id < view.reference.count; id++) {
+		if (view.reference.symbolId(id) !== null) continue;
+		if (view.reference.inTypePosition(id)) continue;
+		references.push({
+			name: view.reference.name(id),
+			start: view.reference.start(id),
+			end: view.reference.end(id),
+		});
+	}
+	return references.sort((left, right) => left.start - right.start);
 }
 
 function emittedTemplateReads(
 	root: AnyNode,
 	fileSource: string,
-): Array<{ readonly source: string; readonly node: AnyNode }> {
-	const reads: Array<{ readonly source: string; readonly node: AnyNode }> = [];
+): Array<{ readonly start: number; readonly end: number; readonly node: AnyNode }> {
+	const reads: Array<{ readonly start: number; readonly end: number; readonly node: AnyNode }> = [];
 	const add = (node: AnyNode | undefined) => {
 		if (!node) return;
-		const source = expressionSource(node, fileSource);
-		if (source) reads.push({ source, node });
+		// A read whose authored source cannot be recovered is not emitted, so it
+		// is not a read this diagnostic can speak about.
+		if (!expressionSource(node, fileSource)) return;
+		reads.push({ start: node.start ?? 0, end: node.end ?? 0, node });
 	};
 	const visitTemplate = (node: AnyNode | null | undefined): void => {
 		if (!node || typeof node !== 'object') return;
@@ -405,20 +388,6 @@ function emittedTemplateReads(
 	};
 	visitTemplate(root);
 	return reads;
-}
-
-function identifiersFromSource(source: string): Set<string> {
-	const stripped = source.replaceAll(/(['"`])(?:\\.|(?!\1)[\s\S])*\1/g, '');
-	const names = new Set<string>();
-	for (const match of stripped.matchAll(/\b[A-Za-z_$][\w$]*\b/g)) {
-		const index = match.index ?? 0;
-		const name = match[0]!;
-		const before = stripped[index - 1];
-		const after = stripped.slice(index + name.length).trimStart()[0];
-		if (before === '.' || after === ':') continue;
-		names.add(name);
-	}
-	return names;
 }
 
 const knownRenderGlobals = new Set(
