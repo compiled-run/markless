@@ -13,6 +13,7 @@ import {
 	renderDataReachImportSources,
 } from '@markless/compiler';
 import {
+	awaitChildClaimPublications,
 	fallbackImportedSource,
 	forceImportedModules,
 	linkBarrelComponentInterfaces,
@@ -175,6 +176,9 @@ export async function linkTransformChildren(
 			throwLinkedModuleChildDiagnostics(moduleMetadata, [child], transformed.manifest);
 		}
 	}
+	// Last await before the claim reads below; a sibling must not start compiling
+	// between the barrier and the read.
+	await awaitChildClaimPublications(moduleMetadata, resolvedChildren);
 	const linkedChildHasBrowserTriggers = linkedChildrenHaveBrowserTriggers({
 		children: resolvedChildren,
 		symbolClaimsForSource: (source) => sourceSymbolManifest(moduleMetadata, source),

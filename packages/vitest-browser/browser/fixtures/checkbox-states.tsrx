@@ -1,4 +1,4 @@
-import * as checkbox from '../../src/checkbox/index.ts';
+import * as checkbox from '../../../headless/components/src/checkbox/index.ts';
 
 // Five independently configured families on one page. Each one is seeded once by
 // its own props, so this page pins what a config renders before any gesture.
