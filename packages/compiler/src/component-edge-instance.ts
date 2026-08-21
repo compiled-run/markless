@@ -109,7 +109,42 @@ export function componentEdgeInstancePath(
 export type ComponentEdgeSymbolRoute = {
 	readonly prefix: string;
 	readonly componentEdgeId: string;
-} & ({ readonly importSource: string } | { readonly self: true });
+} & (
+	| { readonly importSource: string; readonly selfRecursive?: true }
+	| { readonly self: true }
+);
+
+// Whether a same-module edge sits on a cycle: the component it places reaches
+// the component that placed it again through same-module edges. Rendering walks
+// that cycle once per level, so ids under such an edge carry one segment per
+// LEVEL and the count is a render-time answer.
+function onSameModuleCycle(
+	edge: SemanticComponentEdge,
+	edges: ReadonlyArray<SemanticComponentEdge>,
+): boolean {
+	const target = edge.parentComponentName;
+	if (target === undefined) return false;
+	const seen = new Set<string>();
+	const pending = [edge.childComponentName];
+	while (pending.length > 0) {
+		const componentName = pending.pop()!;
+		if (componentName === target) return true;
+		if (seen.has(componentName)) continue;
+		seen.add(componentName);
+		for (const candidate of edges)
+			if (!candidate.importSource && candidate.parentComponentName === componentName)
+				pending.push(candidate.childComponentName);
+	}
+	return false;
+}
+
+// The specifier a module names itself by, so a route emitted into it can re-enter
+// its own symbol surface.
+function selfImportSource(edge: SemanticComponentEdge): string | undefined {
+	const filename = edge.sourceSpan?.filename;
+	const base = filename?.split(/[\\/]/).pop();
+	return base ? `./${base}` : undefined;
+}
 
 // One symbol route per composed component edge, keyed by the FULL instance path
 // the compiler spelled for that edge. A projected child nests under the
@@ -141,22 +176,38 @@ export function componentEdgeSymbolRoutes(
 			// route strips the instance path and answers from the page's own
 			// resolver. It never names an import, so it never reaches the
 			// manifest's import resolution.
+			if (edge.importSource)
+				return [{ prefix, importSource: edge.importSource, componentEdgeId: edge.id }];
+			// A cyclic same-module edge is entered once per rendered level, so what
+			// is left after one strip may carry more of the same segments. Naming
+			// this module itself re-enters this route table instead of dropping to
+			// the local resolver after exactly one strip.
+			const selfSource = onSameModuleCycle(edge, compiled.semanticGraph.componentEdges)
+				? selfImportSource(edge)
+				: undefined;
 			return [
-				edge.importSource
-					? { prefix, importSource: edge.importSource, componentEdgeId: edge.id }
+				selfSource
+					? {
+							prefix,
+							importSource: selfSource,
+							selfRecursive: true,
+							componentEdgeId: edge.id,
+						}
 					: { prefix, self: true, componentEdgeId: edge.id },
 			];
 		})
 		.sort((left, right) => right.prefix.length - left.prefix.length);
 }
 
-// Only routes that name a child module belong in the manifest: the manifest's
-// consumers resolve every entry to an import source.
+// Only routes that name a CHILD module belong in the manifest: the manifest's
+// consumers resolve every entry to an import source, and a self-recursive route
+// names the module that already owns the manifest.
 export function importedSymbolRoutes(
 	routes: ReadonlyArray<{
 		readonly prefix: string;
 		readonly componentEdgeId?: string;
 		readonly importSource?: string;
+		readonly selfRecursive?: true;
 	}>,
 ): Array<{
 	readonly prefix: string;
@@ -164,7 +215,7 @@ export function importedSymbolRoutes(
 	readonly componentEdgeId?: string;
 }> {
 	return routes.flatMap((route) =>
-		'importSource' in route && route.importSource !== undefined
+		'importSource' in route && route.importSource !== undefined && !route.selfRecursive
 			? [{ ...route, importSource: route.importSource }]
 			: [],
 	);

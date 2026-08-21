@@ -18,7 +18,7 @@ import {
 	widgetRootMarkerLine,
 } from './shared-seed-pass.ts';
 import { emitCatalogHelperImports, stateRuntimeImports } from './runtime-helpers.ts';
-import { emitSameModuleSsrComponents } from './same-module.ts';
+import { emitSameModuleSsrComponents, selfComposedSsrBindingLines } from './same-module.ts';
 import {
 	callbackSymbolIds,
 	componentEdgeInstanceSegment,
@@ -180,6 +180,11 @@ export function emitPublicSsrRenderModule(
 		),
 		'',
 	];
+	const selfBindings = selfComposedSsrBindingLines(
+		references,
+		rootInfo.componentName,
+		'marklessRenderSsr',
+	);
 	const bodySource = body
 		.filter((part): part is string => part !== null && part !== '')
 		.join('\n')
@@ -236,6 +241,7 @@ export function emitPublicSsrRenderModule(
 		]),
 		...moduleScope,
 		...sameModuleComponents,
+		...selfBindings,
 		bodySource,
 	]
 		.filter((part): part is string => part !== null && part !== '')

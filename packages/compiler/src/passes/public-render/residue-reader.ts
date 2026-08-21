@@ -2,6 +2,7 @@ import { parseModule } from '../../yuku-tsrx-adapter.ts';
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
 import {
+	componentEdgesFor,
 	componentPropNames,
 	emitValueImport,
 	moduleScopeDeclarations,
@@ -34,6 +35,33 @@ export function authoredResidueSources(chunks: RenderChunks): ReadonlyArray<stri
 // render data carries as the residue's identity.
 export function authoredResidueReadCases(sources: ReadonlyArray<string>): string[] {
 	return sources.map((source) => `case ${JSON.stringify(source)}:return (${source});`);
+}
+
+/**
+ * The authored expressions a component still owes the RENDERER's decisions,
+ * rather than its markup: an arm test the compiler could not reduce to a single
+ * graph read, and a child prop whose value is an expression. The server render
+ * body evaluates both from component scope; the browser has no body, so its
+ * reader answers them through the same compiled switch as markup residue.
+ */
+export function renderDecisionSources(
+	input: PublicRenderModuleInput,
+	componentName: string,
+): ReadonlyArray<string> {
+	const chunks = input.renderData.chunks.filter((chunk) => chunk.componentName === componentName);
+	const branchIds = new Set(
+		chunks.flatMap((chunk) =>
+			chunk.slots.flatMap((slot) => (slot.kind === 'branch' ? [slot.branchSiteId] : [])),
+		),
+	);
+	const sources = new Set<string>();
+	for (const branch of input.renderData.branches)
+		if (branchIds.has(branch.branchSiteId) && branch.testReads.length !== 1 && branch.testSource)
+			sources.add(branch.testSource);
+	for (const edge of componentEdgesFor(input, componentName))
+		for (const prop of edge.props)
+			if (prop.kind === 'opaque' && prop.source) sources.add(prop.source);
+	return [...sources];
 }
 
 /**
@@ -144,7 +172,12 @@ export function emitClientResidueReader(
 	const componentChunks = input.renderData.chunks.filter(
 		(chunk) => chunk.componentName === componentName,
 	);
-	const sources = authoredResidueSources(componentChunks);
+	const sources = [
+		...new Set([
+			...authoredResidueSources(componentChunks),
+			...renderDecisionSources(input, componentName),
+		]),
+	];
 	const handles = elementHandleIdSources(componentChunks);
 	if (sources.length === 0 && handles.length === 0) return null;
 	const text = sources.join('\n');
@@ -223,6 +256,7 @@ export function emitClientResidueReaderPrelude(
 		...authoredResidueSources(
 			input.renderData.chunks.filter((chunk) => chunk.componentName === componentName),
 		),
+		...renderDecisionSources(input, componentName),
 	]);
 	if (sources.length === 0) return { imports: [], declarations: [] };
 	const declarations = moduleScopeDeclarations(input.source.source, input.source.filename);

@@ -109,6 +109,9 @@ export type SsrRenderData = {
 			readonly graphNodeId: string;
 			readonly path: ReadonlyArray<string>;
 		}>;
+		// The authored test, for an arm the compiler could not reduce to one graph
+		// read: the browser answers it through the component's compiled reader.
+		readonly testSource?: string;
 		readonly armTests?: ReadonlyArray<unknown>;
 	}>;
 };

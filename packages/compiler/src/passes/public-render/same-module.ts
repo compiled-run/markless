@@ -43,6 +43,21 @@ export function sameModuleSsrComponentNames(
 	});
 }
 
+// A same-module edge that names this module's own root composes the root as its
+// own child. The child surface is the root's own render function, so how deep it
+// unrolls is decided by the render call that re-enters it, never at build time.
+export function selfComposedSsrBindingLines(
+	references: ReadonlyArray<ComponentReference>,
+	rootComponentName: string,
+	rootFunctionName: string,
+): string[] {
+	return references.flatMap((reference) =>
+		!reference.importSource && reference.componentName === rootComponentName
+			? [`const ${reference.localName} = { renderSsr: ${rootFunctionName} };`]
+			: [],
+	);
+}
+
 export function emitSameModuleSsrComponents(
 	input: PublicRenderModuleInput,
 	references: ReadonlyArray<ComponentReference>,

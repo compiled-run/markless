@@ -466,6 +466,15 @@ async function evaluatePrerenderDataComponent(input: {
 				directValue: input.props,
 			});
 	}
+	// An arm test or child prop the compiler could not reduce to a graph read is
+	// an authored expression, answered by the same compiled reader as markup
+	// residue. It decides what renders, so it runs even when the HTML is dropped.
+	const readDecision = (source?: string) =>
+		source &&
+		definition.readResidue?.(
+			{ kind: 'authored-expression', source },
+			{ read, idPrefix: input.idPrefix },
+		);
 	const children: Array<MarklessSsrComposedChild> = [];
 	const branches: Array<{ readonly id: string; readonly takenArm: number }> = [];
 	const asyncSnapshots = state.computed.flatMap((computed) =>
@@ -507,8 +516,10 @@ async function evaluatePrerenderDataComponent(input: {
 			const branch = (definition.branches ?? []).find(
 				(candidate) => candidate.branchSiteId === slot.branchSiteId,
 			);
-			const testRead = branch?.testReads?.[0];
-			const value = testRead ? read(testRead.graphNodeId, testRead.path) : undefined;
+			const testRead = branch?.testReads?.length === 1 ? branch.testReads[0] : undefined;
+			const value = testRead
+				? read(testRead.graphNodeId, testRead.path)
+				: readDecision(branch?.testSource);
 			let arm = value ? 0 : 1;
 			if (branch?.armTests) {
 				const match = branch.armTests.findIndex(
@@ -565,6 +576,8 @@ async function evaluatePrerenderDataComponent(input: {
 				} else if (prop.kind === 'callback') {
 					const symbolId = edge.boundSymbols?.[prop.name] ?? prop.symbolId;
 					if (symbolId) callbacks[prop.name] = input.symbolPrefix + symbolId;
+				} else if (prop.source !== undefined && definition.readResidue) {
+					childProps[prop.name] = readDecision(prop.source);
 				} else {
 					throw new Error(`MARKLESS_PRERENDER_PROP_UNDERIVABLE: ${prop.name}`);
 				}

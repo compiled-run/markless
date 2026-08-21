@@ -1,14 +1,16 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
+import {
+	componentEdgeSymbolRoutes,
+	importedSymbolRoutes,
+} from '../src/component-edge-instance.ts';
 import { sameModuleSsrComponentNames } from '../src/passes/public-render/same-module.ts';
 
-// T053-B: a PLAIN component (no shared(), no widget) that composes ITSELF behind
-// a PROP-decided arm. The chunk graph has a cycle; how far it unrolls is a
-// render-time answer. The semantic-graph pass plans it, and no pass refuses it.
-// The public-render pass then emits a child case that renders through a local it
-// never declares, because a module's own root component is never emitted as one
-// of that module's same-module children. Nothing names the gap: there is no
-// diagnostic, so a self-composing component renders exactly one level.
+// T055: a PLAIN component (no shared(), no widget) that composes ITSELF behind a
+// PROP-decided arm. The chunk graph has a cycle, and how far it unrolls is a
+// render-time answer: the emitted module reaches its own render function through
+// the same child call any imported child takes, so each level is one more
+// component edge with its own `c<n>:` node identity, state, and symbol route.
 // recursive-self-composition.test.ts in packages/vitest-browser pins the
 // rendered consequence.
 
@@ -27,9 +29,44 @@ export default function TreeNode({ depth }) @{
 }
 `;
 
-async function compile(source: string) {
+// The same shape with every authored name, element, attribute, and prop changed:
+// nothing may be selected by the fixture's own spelling.
+const alternateSelfComposing = `
+import { state } from '@markless/core';
+
+export default function Crumb({ left }) @{
+	let hits = state(0);
+
+	<section data-crumb data-left={left}>
+		<a href="#" data-crumb-hit onClick={() => hits++}>{hits}</a>
+		@if (left > 0) {
+			<Crumb left={left - 1} />
+		}
+	</section>
+}
+`;
+
+// Two components of ONE module composing each other: the cycle runs through the
+// module's own root, which is the same edge shape as direct self-composition.
+const mutualSameModule = `
+export default function Outer({ depth }) @{
+	<div data-outer data-depth={depth}>
+		@if (depth > 0) {
+			<Inner depth={depth} />
+		}
+	</div>
+}
+
+export function Inner({ depth }) @{
+	<span data-inner>
+		<Outer depth={depth - 1} />
+	</span>
+}
+`;
+
+async function compile(source: string, filename = 'src/tree-node.tsrx') {
 	return compileTsrxModule({
-		filename: 'src/tree-node.tsrx',
+		filename,
 		source,
 		buildId: 'b',
 		resolverId: 'r',
@@ -61,31 +98,94 @@ test('the semantic graph plans the self edge, and no pass refuses the cycle', as
 	expect(armChunk?.id).toBe('branch:branch-site:0:arm:0');
 });
 
-test('public render emits the self edge against a child surface it never declares', async () => {
-	const compiled = await compile(selfComposing);
-	const source = compiled.publicRenderModule.ssrModuleSource ?? '';
+test.each([
+	['tree', selfComposing],
+	['alternate', alternateSelfComposing],
+])('public render binds the root as its own child surface (%s)', async (_name, source) => {
+	const compiled = await compile(source);
+	const emitted = compiled.publicRenderModule.ssrModuleSource ?? '';
 
-	// The child case IS emitted, and it renders through `__marklessSsrComponent0`.
-	expect(source).toContain('case "component-edge:0"');
-	expect(source).toContain('await __marklessSsrComponent0?.renderSsr?.(');
-	// That local is never bound: a same-module child is declared by
-	// emitSameModuleSsrComponents, which excludes the module's own root, and an
-	// imported one by an import, which a same-module edge never gets. The one
-	// mention in the module is the read above.
-	expect(source.split('__marklessSsrComponent0').length - 1).toBe(1);
-	expect(source).not.toContain('const __marklessSsrComponent0');
-	expect(source).not.toContain('import __marklessSsrComponent0');
+	// The child case renders through the same local an imported child would use,
+	// and that local now names the module's own render function.
+	expect(emitted).toContain('case "component-edge:0"');
+	expect(emitted).toContain('await __marklessSsrComponent0?.renderSsr?.(');
+	expect(emitted).toContain('const __marklessSsrComponent0 = { renderSsr: marklessRenderSsr };');
+	// Depth is render-time: exactly one render function is emitted for the
+	// component, re-entered per level, never one copy per level.
+	expect(emitted.split('async function marklessRenderSsr(').length - 1).toBe(1);
+	// The root is still not one of the module's same-module CHILD components: it
+	// is reached as itself, not emitted a second time under a child name.
+	expect(
+		sameModuleSsrComponentNames(compiled as never, { type: 'Program' } as never, 'TreeNode'),
+	).toEqual([]);
 });
 
-test('the same-module child list is where the self edge is lost', async () => {
+test('each level renders under its own instance path, so its nodes and state are its own', async () => {
 	const compiled = await compile(selfComposing);
-	const ast = { type: 'Program' } as never;
+	const emitted = compiled.publicRenderModule.ssrModuleSource ?? '';
 
-	// Every same-module child of this module, as the SSR emitter enumerates them:
-	// the root component is excluded by name, and the root component is the only
-	// component this module declares.
-	expect(sameModuleSsrComponentNames(compiled as never, ast, 'TreeNode')).toEqual([]);
-	expect(compiled.semanticGraph.components.map((component) => component.name)).toEqual([
-		'TreeNode',
+	// The self edge carries the ordinary composed-child identity: the child's
+	// hosts are minted under `c0:` and its symbols are routed under `c0:`, which
+	// is what makes level 2's counter a different cell from level 1's.
+	expect(emitted).toContain('"hostPrefix":"c0:"');
+	expect(emitted).toContain('"symbolPrefix":"c0:"');
+	expect(emitted).toContain('idPrefix:marklessSsrIdPrefix+child.hostPrefix');
+	// Each level clones the payload state for itself rather than sharing one map.
+	expect(emitted).toContain('const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);');
+});
+
+test('a cyclic same-module route re-enters this module rather than stripping once', async () => {
+	const compiled = await compile(selfComposing);
+	const routes = componentEdgeSymbolRoutes(compiled, undefined);
+
+	// One rendered level per segment, so `c0:c0:symbol:0` must strip twice. A
+	// route back into this module's own symbol surface strips one segment per
+	// pass; the old self route dropped straight to the local resolver and
+	// rejected everything below the first level.
+	expect(routes).toEqual([
+		{
+			prefix: 'c0:',
+			importSource: './tree-node.tsrx',
+			selfRecursive: true,
+			componentEdgeId: 'component-edge:0',
+		},
+	]);
+	// It names this module, so it is not a child to link: the manifest stays a
+	// list of other modules.
+	expect(importedSymbolRoutes(routes)).toEqual([]);
+});
+
+test('a same-module cycle through two components routes recursively too', async () => {
+	const compiled = await compile(mutualSameModule, 'src/outer.tsrx');
+
+	expect(compiled.diagnostics ?? []).toEqual([]);
+	expect(
+		componentEdgeSymbolRoutes(compiled, undefined).map((route) => ({
+			prefix: route.prefix,
+			recursive: 'selfRecursive' in route && route.selfRecursive === true,
+		})),
+	).toEqual([
+		{ prefix: 'c0:', recursive: true },
+		{ prefix: 'c1:', recursive: true },
+	]);
+});
+
+test('a same-module child that closes no cycle keeps its plain local route', async () => {
+	const compiled = await compile(
+		`export default function Page() @{
+	<main><Panel /></main>
+}
+
+export function Panel() @{
+	<aside data-panel>panel</aside>
+}
+`,
+		'src/page.tsrx',
+	);
+
+	// Nothing re-enters: one strip reaches this module's own resolver, so the
+	// route stays the cheap local one and imports nothing.
+	expect(componentEdgeSymbolRoutes(compiled, undefined)).toEqual([
+		{ prefix: 'c0:', self: true, componentEdgeId: 'component-edge:0' },
 	]);
 });
