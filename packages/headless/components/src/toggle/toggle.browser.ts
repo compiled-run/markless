@@ -1,14 +1,14 @@
 import { cleanup, render, renderSSR } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { afterEach, beforeEach, expect, test } from 'vitest';
-import Basic from './scenarios/toggle-basic.tsrx';
-import ErrorBeforeTrigger from './scenarios/toggle-error-first.tsrx';
-import InvalidToggle from './scenarios/toggle-invalid.tsrx';
-import NotificationsForm from './scenarios/toggle-notifications-form.tsrx';
-import SavedSettingsForm from './scenarios/toggle-saved-settings-form.tsrx';
-import SettingsList from './scenarios/toggle-settings-list.tsrx';
-import UnavailableOptions from './scenarios/toggle-unavailable-options.tsrx';
-import ToggleWithHelp from './scenarios/toggle-with-help.tsrx';
+import Basic from './scenarios/basic.tsrx';
+import ErrorBeforeTrigger from './scenarios/error-first.tsrx';
+import Invalid from './scenarios/invalid.tsrx';
+import NotificationsForm from './scenarios/notifications-form.tsrx';
+import SavedSettingsForm from './scenarios/saved-settings-form.tsrx';
+import SettingsList from './scenarios/settings-list.tsrx';
+import UnavailableOptions from './scenarios/unavailable-options.tsrx';
+import WithHelp from './scenarios/with-help.tsrx';
 
 // Colocated browser suite for the toggle family. Each test renders a realistic
 // consumer scenario, and the locators name the part anatomy: root, trigger,
@@ -227,14 +227,14 @@ for (const mode of MODES) {
 	});
 
 	test(`${mode}: help text renders and leaves the trigger valid`, async () => {
-		if (mode === 'CSR') await render(ToggleWithHelp);
-		else await renderSSR(ToggleWithHelp);
+		if (mode === 'CSR') await render(WithHelp);
+		else await renderSSR(WithHelp);
 		expectHelpRendered();
 	});
 
 	test(`${mode}: a mounted error carries its message and marks the trigger invalid`, async () => {
-		if (mode === 'CSR') await render(InvalidToggle);
-		else await renderSSR(InvalidToggle);
+		if (mode === 'CSR') await render(Invalid);
+		else await renderSSR(Invalid);
 		expectInvalidRendered();
 	});
 

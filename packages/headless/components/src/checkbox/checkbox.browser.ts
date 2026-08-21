@@ -1,16 +1,16 @@
 import { cleanup, render, renderSSR } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { afterEach, beforeEach, expect, test } from 'vitest';
-import Basic from './scenarios/checkbox-basic.tsrx';
-import ControlledCheckboxes from './scenarios/checkbox-controlled.tsrx';
-import TermsForm from './scenarios/checkbox-form.tsrx';
-import InvalidCheckbox from './scenarios/checkbox-invalid.tsrx';
-import PartialSelection from './scenarios/checkbox-partial-selection.tsrx';
-import PrefilledForm from './scenarios/checkbox-prefilled-form.tsrx';
-import SettingsList from './scenarios/checkbox-settings-list.tsrx';
-import UnavailableOptions from './scenarios/checkbox-unavailable-options.tsrx';
-import Uncontrolled from './scenarios/checkbox-uncontrolled.tsrx';
-import CheckboxWithHelp from './scenarios/checkbox-with-help.tsrx';
+import Basic from './scenarios/basic.tsrx';
+import Controlled from './scenarios/controlled.tsrx';
+import TermsForm from './scenarios/form.tsrx';
+import Invalid from './scenarios/invalid.tsrx';
+import PartialSelection from './scenarios/partial-selection.tsrx';
+import PrefilledForm from './scenarios/prefilled-form.tsrx';
+import SettingsList from './scenarios/settings-list.tsrx';
+import UnavailableOptions from './scenarios/unavailable-options.tsrx';
+import Uncontrolled from './scenarios/uncontrolled.tsrx';
+import WithHelp from './scenarios/with-help.tsrx';
 
 // Colocated browser suite for the checkbox family. Each test renders a realistic
 // consumer scenario, and the locators name the part anatomy: root, trigger,
@@ -318,26 +318,26 @@ for (const mode of MODES) {
 	});
 
 	test(`${mode}: help text renders and leaves the trigger valid`, async () => {
-		if (mode === 'CSR') await render(CheckboxWithHelp);
-		else await renderSSR(CheckboxWithHelp);
+		if (mode === 'CSR') await render(WithHelp);
+		else await renderSSR(WithHelp);
 		expectHelpRendered();
 	});
 
 	test(`${mode}: a mounted error marks the trigger invalid, written after it or before it`, async () => {
-		if (mode === 'CSR') await render(InvalidCheckbox);
-		else await renderSSR(InvalidCheckbox);
+		if (mode === 'CSR') await render(Invalid);
+		else await renderSSR(Invalid);
 		expectInvalidRendered();
 	});
 
 	test(`${mode}: a click calls the consumer onChange once with the next value`, async () => {
-		if (mode === 'CSR') await render(ControlledCheckboxes);
-		else await renderSSR(ControlledCheckboxes);
+		if (mode === 'CSR') await render(Controlled);
+		else await renderSSR(Controlled);
 		await expectConsumerCallbackFires();
 	});
 
 	test(`${mode}: two sibling checkboxes each reach only their own handler`, async () => {
-		if (mode === 'CSR') await render(ControlledCheckboxes);
-		else await renderSSR(ControlledCheckboxes);
+		if (mode === 'CSR') await render(Controlled);
+		else await renderSSR(Controlled);
 		await expectEachInstanceReachesItsOwnHandler();
 	});
 

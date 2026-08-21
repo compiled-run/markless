@@ -4,7 +4,7 @@ import { checkbox } from '../../index.ts';
 // what marks the trigger invalid — and it works whether the consumer writes the
 // error after the trigger or before it, because seeding is a phase that
 // completes before any part renders.
-export default function InvalidCheckbox() @{
+export default function Invalid() @{
 	<section>
 		<checkbox.root required data-testid="after-root">
 			<checkbox.label data-testid="after-label">Accept Terms</checkbox.label>

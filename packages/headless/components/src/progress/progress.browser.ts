@@ -1,11 +1,11 @@
 import { cleanup, render, renderSSR } from '@markless/vitest-browser';
 import { page } from 'vite-plus/test/browser';
 import { afterEach, expect, test } from 'vitest';
-import Basic from './scenarios/progress-basic.tsrx';
-import CompleteProgress from './scenarios/progress-complete.tsrx';
-import CustomRange from './scenarios/progress-custom-range.tsrx';
-import IndeterminateProgress from './scenarios/progress-indeterminate.tsrx';
-import LiveProgress from './scenarios/progress-live.tsrx';
+import Basic from './scenarios/basic.tsrx';
+import Complete from './scenarios/complete.tsrx';
+import CustomRange from './scenarios/custom-range.tsrx';
+import Indeterminate from './scenarios/indeterminate.tsrx';
+import Live from './scenarios/live.tsrx';
 
 // Colocated browser suite for the progress family. Each test renders a realistic
 // consumer scenario, and the locators name the part anatomy: root, label, track,
@@ -89,14 +89,14 @@ for (const mode of MODES) {
 	});
 
 	test(`${mode}: an unknown amount announces no current value`, async () => {
-		if (mode === 'CSR') await render(IndeterminateProgress);
-		else await renderSSR(IndeterminateProgress);
+		if (mode === 'CSR') await render(Indeterminate);
+		else await renderSSR(Indeterminate);
 		expectIndeterminateRendered();
 	});
 
 	test(`${mode}: a finished job renders complete`, async () => {
-		if (mode === 'CSR') await render(CompleteProgress);
-		else await renderSSR(CompleteProgress);
+		if (mode === 'CSR') await render(Complete);
+		else await renderSSR(Complete);
 		expectCompleteRendered();
 	});
 
@@ -113,7 +113,7 @@ for (const mode of MODES) {
 // move, which is what the `amount` probe below proves — the write landed, the
 // family just never heard about it. Turns green the day a seed re-runs.
 test.fails('CSR: the bar follows an amount the consumer changes from outside', async () => {
-	await render(LiveProgress);
+	await render(Live);
 	expect(el(Root).getAttribute('aria-valuetext')).toBe('30%');
 
 	el<HTMLButtonElement>(Advance).click();

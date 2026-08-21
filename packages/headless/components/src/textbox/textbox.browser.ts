@@ -1,14 +1,14 @@
 import { cleanup, render, renderSSR } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { afterEach, beforeEach, expect, test } from 'vitest';
-import Basic from './scenarios/textbox-basic.tsrx';
-import FieldWithHelpAndError from './scenarios/textbox-help-and-error.tsrx';
-import InvalidField from './scenarios/textbox-invalid.tsrx';
-import LockedField from './scenarios/textbox-locked.tsrx';
-import PartRestrictions from './scenarios/textbox-part-restrictions.tsrx';
-import PrefilledField from './scenarios/textbox-prefilled.tsrx';
-import SignupForm from './scenarios/textbox-signup-form.tsrx';
-import FieldWithHelp from './scenarios/textbox-with-help.tsrx';
+import Basic from './scenarios/basic.tsrx';
+import FieldWithHelpAndError from './scenarios/help-and-error.tsrx';
+import InvalidField from './scenarios/invalid.tsrx';
+import LockedField from './scenarios/locked.tsrx';
+import PartRestrictions from './scenarios/part-restrictions.tsrx';
+import PrefilledField from './scenarios/prefilled.tsrx';
+import SignupForm from './scenarios/signup-form.tsrx';
+import FieldWithHelp from './scenarios/with-help.tsrx';
 
 // Colocated browser suite for the textbox family. Each test renders a realistic
 // consumer scenario, and the locators name the part anatomy: root, input,
