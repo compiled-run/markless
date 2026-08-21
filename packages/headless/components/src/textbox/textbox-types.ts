@@ -1,6 +1,7 @@
 import type { Children, PropsOf } from '@markless/core';
+import type { SingleHandler } from '../handler-props.ts';
 
-export type TextboxRootProps = PropsOf<'div'> & {
+export type TextboxRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/** The text the box shows. Omit it and the box starts empty. */
 	readonly value?: string;
 	readonly disabled?: boolean;
@@ -13,7 +14,6 @@ export type TextboxRootProps = PropsOf<'div'> & {
 	 * the call site simply does nothing.
 	 */
 	readonly onChange?: (value: string) => void;
-	readonly children?: Children;
 };
 
 /**
@@ -21,19 +21,18 @@ export type TextboxRootProps = PropsOf<'div'> & {
  * set here as well as on the root, and a restriction set in either place stands:
  * a part can add a restriction, never remove one.
  */
-export type TextboxInputProps = PropsOf<'input'>;
+export type TextboxInputProps = Omit<PropsOf<'input'>, 'onInput'> & {
+	/** Called after the box's own text has moved with the person's keystroke. */
+	readonly onInput?: SingleHandler<PropsOf<'input'>['onInput']>;
+};
 
 /** The same control over more than one line. */
-export type TextboxTextareaProps = PropsOf<'textarea'>;
-
-export type TextboxLabelProps = PropsOf<'label'> & {
-	readonly children?: Children;
+export type TextboxTextareaProps = Omit<PropsOf<'textarea'>, 'onInput'> & {
+	readonly onInput?: SingleHandler<PropsOf<'textarea'>['onInput']>;
 };
 
-export type TextboxDescriptionProps = PropsOf<'div'> & {
-	readonly children?: Children;
-};
+export type TextboxLabelProps = PropsOf<'label'>;
 
-export type TextboxErrorProps = PropsOf<'div'> & {
-	readonly children?: Children;
-};
+export type TextboxDescriptionProps = PropsOf<'div'>;
+
+export type TextboxErrorProps = PropsOf<'div'>;

@@ -1,6 +1,9 @@
 import type { Children, PropsOf } from '@markless/core';
+import type { SingleHandler } from '../handler-props.ts';
 
-export type ToggleRootProps = PropsOf<'div'> & {
+type TriggerProps = PropsOf<'button'>;
+
+export type ToggleRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/** Whether the switch reads as on. Omit it and the switch starts off. */
 	readonly checked?: boolean;
 	readonly disabled?: boolean;
@@ -14,29 +17,21 @@ export type ToggleRootProps = PropsOf<'div'> & {
 	 * Omit it and the switch still works; the call site simply does nothing.
 	 */
 	readonly onChange?: (checked: boolean) => void;
-	readonly children?: Children;
 };
 
-export type ToggleTriggerProps = PropsOf<'button'> & {
-	readonly children?: Children;
+export type ToggleTriggerProps = Omit<TriggerProps, 'onClick'> & {
+	/** Called after the switch has flipped. */
+	readonly onClick?: SingleHandler<TriggerProps['onClick']>;
 };
 
 /** The moving piece inside the trigger. It renders an element and nothing else. */
-export type ToggleThumbProps = PropsOf<'span'> & {
-	readonly children?: Children;
-};
+export type ToggleThumbProps = PropsOf<'span'>;
 
-export type ToggleLabelProps = PropsOf<'label'> & {
-	readonly children?: Children;
-};
+export type ToggleLabelProps = PropsOf<'label'>;
 
-export type ToggleDescriptionProps = PropsOf<'div'> & {
-	readonly children?: Children;
-};
+export type ToggleDescriptionProps = PropsOf<'div'>;
 
-export type ToggleErrorProps = PropsOf<'div'> & {
-	readonly children?: Children;
-};
+export type ToggleErrorProps = PropsOf<'div'>;
 
 /**
  * The visually hidden native input that carries the switch into a form. It takes

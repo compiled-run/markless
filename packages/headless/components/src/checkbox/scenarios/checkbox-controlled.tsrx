@@ -10,7 +10,7 @@ export default function ControlledCheckboxes() @{
 	<section>
 		<checkbox.root
 			data-testid="first-root"
-			onChange={(next) => {
+			onChange={(next: boolean | 'mixed') => {
 				log.first = String(next);
 				log.calls = log.calls + 1;
 			}}
@@ -20,7 +20,7 @@ export default function ControlledCheckboxes() @{
 		<checkbox.root
 			checked
 			data-testid="second-root"
-			onChange={(next) => {
+			onChange={(next: boolean | 'mixed') => {
 				log.second = String(next);
 				log.calls = log.calls + 1;
 			}}

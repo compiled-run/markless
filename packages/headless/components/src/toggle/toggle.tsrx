@@ -1,4 +1,5 @@
 import { element, shared, state } from '@markless/core';
+import VisuallyHidden from '../base/visually-hidden.tsrx';
 import type {
 	ToggleDescriptionProps,
 	ToggleErrorProps,
@@ -113,13 +114,11 @@ export function ToggleError({ children, ...rest }: ToggleErrorProps) @{
 export function ToggleField({ ...rest }: ToggleFieldProps) @{
 	const toggle = toggleState();
 
-	<span
-		style="clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px;"
-	>
+	<VisuallyHidden>
 		<input
 			{...rest}
 			type="checkbox"
-			tabindex="-1"
+			tabindex={-1}
 			aria-hidden="true"
 			name={toggle.name}
 			value={toggle.value}
@@ -127,5 +126,5 @@ export function ToggleField({ ...rest }: ToggleFieldProps) @{
 			disabled={toggle.disabled}
 			checked={toggle.checked}
 		/>
-	</span>
+	</VisuallyHidden>
 }

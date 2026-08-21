@@ -11,7 +11,7 @@ export default function PrefilledForm() @{
 		data-testid="form"
 		onSubmit={(event) => {
 			event.preventDefault();
-			submitted = JSON.stringify(Object.fromEntries(new FormData(event.target)));
+			submitted = JSON.stringify(Object.fromEntries(new FormData(event.target as HTMLFormElement)));
 		}}
 	>
 		<checkbox.root name="terms" value="checked" checked required data-testid="root">

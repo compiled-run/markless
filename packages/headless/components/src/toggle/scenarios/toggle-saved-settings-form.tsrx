@@ -10,7 +10,7 @@ export default function SavedSettingsForm() @{
 		data-testid="form"
 		onSubmit={(event) => {
 			event.preventDefault();
-			submitted = JSON.stringify(Object.fromEntries(new FormData(event.target)));
+			submitted = JSON.stringify(Object.fromEntries(new FormData(event.target as HTMLFormElement)));
 		}}
 	>
 		<toggle.root name="notifications" value="enabled" checked required data-testid="root">

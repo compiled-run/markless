@@ -11,7 +11,7 @@ export default function TermsForm() @{
 		data-testid="form"
 		onSubmit={(event) => {
 			event.preventDefault();
-			submitted = JSON.stringify(Object.fromEntries(new FormData(event.target)));
+			submitted = JSON.stringify(Object.fromEntries(new FormData(event.target as HTMLFormElement)));
 		}}
 	>
 		<checkbox.root name="terms" data-testid="root">

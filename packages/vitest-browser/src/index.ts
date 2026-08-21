@@ -47,12 +47,19 @@ type MountedContainer = {
 
 const mountedContainers = new Map<BrowserRenderElement, MountedContainer>();
 
+/**
+ * A compiled component's own type is what the type service derives for its
+ * signature, not the runtime's CsrRenderable contract; the harness mounts
+ * either, so both are accepted and narrowed at the runtime boundary.
+ */
+export type BrowserRenderComponent = CsrRenderable | (() => unknown);
+
 export async function render(
-	component: CsrRenderable,
+	component: BrowserRenderComponent,
 	options: BrowserRenderOptions = {},
 ): Promise<BrowserRenderResult> {
 	const setup = setupContainer(options);
-	const runtime = await renderCsrContainer(component, {
+	const runtime = await renderCsrContainer(component as CsrRenderable, {
 		target: setup.container,
 		loadSymbol: options.loadSymbol,
 		createVisibilityObserver: options.createVisibilityObserver,

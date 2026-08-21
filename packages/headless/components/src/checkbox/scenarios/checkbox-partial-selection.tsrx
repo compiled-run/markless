@@ -11,7 +11,7 @@ export default function PartialSelection() @{
 		data-testid="form"
 		onSubmit={(event) => {
 			event.preventDefault();
-			submitted = JSON.stringify(Object.fromEntries(new FormData(event.target)));
+			submitted = JSON.stringify(Object.fromEntries(new FormData(event.target as HTMLFormElement)));
 		}}
 	>
 		<checkbox.root name="terms" checked="mixed" data-testid="root">

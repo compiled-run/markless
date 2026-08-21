@@ -22,7 +22,29 @@ export function compileToVolarMappings(
 	filename: string,
 	options: TsrxTypeServiceOptions = {},
 ): MarklessTsrxTypeServiceResult {
-	const selection = compileEditorSource(source, filename, options);
+	return marklessTsxFor(compileEditorSource(source, filename, options), source, filename);
+}
+
+/**
+ * The same TSX the editor gets, minus the half-typed-file recovery.
+ *
+ * A checker must not accept what a recovery rung invented: inferring `</Foo>` for an
+ * unclosed tag turns a real syntax error into a clean compile, so `markless-tsc` compiles
+ * the authored source once and lets the failure stand.
+ */
+export function compileToVolarMappingsWithoutRecovery(
+	source: string,
+	filename: string,
+	options: TsrxTypeServiceOptions = {},
+): MarklessTsrxTypeServiceResult {
+	return marklessTsxFor(compileEditorSource(source, filename, options, false), source, filename);
+}
+
+function marklessTsxFor(
+	selection: EditorSourceSelection,
+	source: string,
+	filename: string,
+): MarklessTsrxTypeServiceResult {
 	const result = selection.result;
 	// `result.sourceAst` indexes the recovered source a ladder rung produced, while the
 	// mappings were translated back to the authored source. Everything below reasons about
@@ -76,6 +98,7 @@ export function compileEditorSource(
 	source: string,
 	fileName: string,
 	options: TsrxTypeServiceOptions = {},
+	recoverPartialSource = true,
 ): EditorSourceSelection {
 	let original: MarklessTsrxTypeServiceResult | undefined;
 	let originalError: unknown;
@@ -88,6 +111,7 @@ export function compileEditorSource(
 	} catch (error) {
 		originalError = error;
 	}
+	if (!recoverPartialSource) throw asFatal(originalError);
 
 	let candidate: RecoveryCandidate = { source, edits: [] };
 	const attemptedSources = new Set([source]);
@@ -115,10 +139,12 @@ export function compileEditorSource(
 		}
 	}
 
-	if (originalError && typeof originalError === 'object') {
-		(originalError as { type?: 'fatal' }).type = 'fatal';
-	}
-	throw originalError;
+	throw asFatal(originalError);
+}
+
+function asFatal(error: unknown): unknown {
+	if (error && typeof error === 'object') (error as { type?: 'fatal' }).type = 'fatal';
+	return error;
 }
 
 function selectedSource(

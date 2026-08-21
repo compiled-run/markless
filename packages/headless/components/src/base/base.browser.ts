@@ -31,7 +31,8 @@ test('CSR: base one-offs render their single elements', async () => {
 	expect(label?.getAttribute('for')).toBe('field-id');
 	expect(label?.textContent).toBe('Name');
 
-	const hidden = el(Hidden).querySelector('span.visually-hidden');
+	// No class ships (consumer stylesheets must have nothing to collide with); the span is the only child.
+	const hidden = el(Hidden).querySelector('span');
 	expect(hidden?.textContent).toBe('Hidden');
 	expect(getComputedStyle(hidden as Element).position).toBe('absolute');
 });

@@ -7,18 +7,11 @@ export type ProgressRootProps = PropsOf<'div'> & {
 	readonly min?: number;
 	/** The top of the range. Omit it and the range ends at 100. */
 	readonly max?: number;
-	readonly children?: Children;
 };
 
-export type ProgressLabelProps = PropsOf<'span'> & {
-	readonly children?: Children;
-};
+export type ProgressLabelProps = PropsOf<'span'>;
 
 /** The full length of the range; the indicator sits inside it. */
-export type ProgressTrackProps = PropsOf<'div'> & {
-	readonly children?: Children;
-};
+export type ProgressTrackProps = PropsOf<'div'>;
 
-export type ProgressIndicatorProps = PropsOf<'div'> & {
-	readonly children?: Children;
-};
+export type ProgressIndicatorProps = PropsOf<'div'>;

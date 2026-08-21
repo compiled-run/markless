@@ -12,12 +12,12 @@ fi
 
 # Block commits that introduce TypeScript errors. This is the type gate of
 # record: it matches the editor's tsserver semantics. ~2s warm.
-pnpm exec tsc --noEmit -p tsconfig.json
+pnpm typecheck
 status=$?
 if [ $status -ne 0 ]; then
 	echo ""
-	echo "pre-commit: tsc found type errors (see above)."
-	echo "Re-run with: pnpm exec tsc --noEmit -p tsconfig.json"
+	echo "pre-commit: markless-tsc found type errors (see above)."
+	echo "Re-run with: pnpm typecheck"
 	exit $status
 fi
 
