@@ -1,16 +1,16 @@
 export {
 	TextboxDescription as description,
 	TextboxError as error,
+	TextboxInput as input,
 	TextboxLabel as label,
-	TextboxMultilineTrigger as multilinetrigger,
 	TextboxRoot as root,
-	TextboxTrigger as trigger,
+	TextboxTextarea as textarea,
 } from './textbox.tsrx';
 export type {
 	TextboxDescriptionProps,
 	TextboxErrorProps,
+	TextboxInputProps,
 	TextboxLabelProps,
-	TextboxMultilineTriggerProps,
 	TextboxRootProps,
-	TextboxTriggerProps,
+	TextboxTextareaProps,
 } from './textbox-types.ts';

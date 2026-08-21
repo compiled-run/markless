@@ -3,9 +3,9 @@ import type {
 	TextboxDescriptionProps,
 	TextboxErrorProps,
 	TextboxLabelProps,
-	TextboxMultilineTriggerProps,
+	TextboxTextareaProps,
 	TextboxRootProps,
-	TextboxTriggerProps,
+	TextboxInputProps,
 } from './textbox-types.ts';
 
 // One instance per rendered `<textbox.root>`: every part reads and writes this
@@ -27,11 +27,11 @@ export const textboxState = shared(
 		// writes them on the parts that name each other. A handle binds one live
 		// element, so the two controls carry one each and the label names the
 		// single-line one; both controls point back at the label for their name.
-		const triggerEl = element<HTMLInputElement>();
-		const multilineTriggerEl = element<HTMLTextAreaElement>();
+		const inputEl = element<HTMLInputElement>();
+		const textareaEl = element<HTMLTextAreaElement>();
 		const labelEl = element<HTMLLabelElement>();
 
-		return { ...textbox, triggerEl, multilineTriggerEl, labelEl };
+		return { ...textbox, inputEl, textareaEl, labelEl };
 	},
 	{ scope: 'widget' },
 );
@@ -65,18 +65,18 @@ export function TextboxRoot({
 
 // A restriction set on this part is added to whatever the root set: `||`, never a
 // replacement, so a part can make the control stricter and never looser.
-export function TextboxTrigger({
+export function TextboxInput({
 	disabled,
 	required,
 	readonly,
 	onInput,
 	...rest
-}: TextboxTriggerProps) @{
+}: TextboxInputProps) @{
 	const textbox = textboxState();
 
 	<input
 		{...rest}
-		el={textbox.triggerEl}
+		el={textbox.inputEl}
 		aria-labelledby={textbox.labelEl}
 		name={textbox.name}
 		value={textbox.value}
@@ -91,18 +91,18 @@ export function TextboxTrigger({
 	/>
 }
 
-export function TextboxMultilineTrigger({
+export function TextboxTextarea({
 	disabled,
 	required,
 	readonly,
 	onInput,
 	...rest
-}: TextboxMultilineTriggerProps) @{
+}: TextboxTextareaProps) @{
 	const textbox = textboxState();
 
 	<textarea
 		{...rest}
-		el={textbox.multilineTriggerEl}
+		el={textbox.textareaEl}
 		aria-labelledby={textbox.labelEl}
 		name={textbox.name}
 		value={textbox.value}
@@ -120,7 +120,7 @@ export function TextboxMultilineTrigger({
 export function TextboxLabel({ children, ...rest }: TextboxLabelProps) @{
 	const textbox = textboxState();
 
-	<label {...rest} el={textbox.labelEl} for={textbox.triggerEl}>{children}</label>
+	<label {...rest} el={textbox.labelEl} for={textbox.inputEl}>{children}</label>
 }
 
 export function TextboxDescription({ children, ...rest }: TextboxDescriptionProps) @{

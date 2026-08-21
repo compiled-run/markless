@@ -4,14 +4,14 @@ import type {
 	TextboxDescriptionProps,
 	TextboxErrorProps,
 	TextboxLabelProps,
-	TextboxMultilineTriggerProps,
+	TextboxTextareaProps,
 	TextboxRootProps,
-	TextboxTriggerProps,
+	TextboxInputProps,
 } from './textbox-types.ts';
 
 export declare function TextboxRoot(props: TextboxRootProps): unknown;
-export declare function TextboxTrigger(props: TextboxTriggerProps): unknown;
-export declare function TextboxMultilineTrigger(props: TextboxMultilineTriggerProps): unknown;
+export declare function TextboxInput(props: TextboxInputProps): unknown;
+export declare function TextboxTextarea(props: TextboxTextareaProps): unknown;
 export declare function TextboxLabel(props: TextboxLabelProps): unknown;
 export declare function TextboxDescription(props: TextboxDescriptionProps): unknown;
 export declare function TextboxError(props: TextboxErrorProps): unknown;

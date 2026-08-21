@@ -6,7 +6,7 @@ export type TextboxRootProps = PropsOf<'div'> & {
 	readonly disabled?: boolean;
 	readonly required?: boolean;
 	readonly readonly?: boolean;
-	/** Submitted under this name by whichever trigger the family renders. */
+	/** Submitted under this name by whichever control the family renders. */
 	readonly name?: string;
 	/**
 	 * Called with the new text as a person types. Omit it and the box still works;
@@ -21,10 +21,10 @@ export type TextboxRootProps = PropsOf<'div'> & {
  * set here as well as on the root, and a restriction set in either place stands:
  * a part can add a restriction, never remove one.
  */
-export type TextboxTriggerProps = PropsOf<'input'>;
+export type TextboxInputProps = PropsOf<'input'>;
 
 /** The same control over more than one line. */
-export type TextboxMultilineTriggerProps = PropsOf<'textarea'>;
+export type TextboxTextareaProps = PropsOf<'textarea'>;
 
 export type TextboxLabelProps = PropsOf<'label'> & {
 	readonly children?: Children;

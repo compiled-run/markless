@@ -1,10 +1,10 @@
 import { state } from '@markless/core';
 import { checkbox } from '../index.ts';
 
-// The accept-the-terms form every signup has. It writes what the browser
-// actually put in the FormData, so the assertions read a submission rather than
-// an attribute.
-export default function TermsForm() @{
+// The same form reopened on a saved record: already accepted, still required,
+// and submitting its own value rather than the browser default "on". A real
+// prefilled form carries checked, required and value together.
+export default function PrefilledForm() @{
 	let submitted = state('');
 
 	<form
@@ -14,7 +14,7 @@ export default function TermsForm() @{
 			submitted = JSON.stringify(Object.fromEntries(new FormData(event.target)));
 		}}
 	>
-		<checkbox.root name="terms" data-testid="root">
+		<checkbox.root name="terms" value="checked" checked required data-testid="root">
 			<checkbox.field data-testid="field" />
 			<checkbox.trigger data-testid="trigger"><checkbox.indicator data-testid="indicator">Checked</checkbox.indicator></checkbox.trigger>
 			<checkbox.label data-testid="label">I accept the Terms and Conditions</checkbox.label>
