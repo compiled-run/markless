@@ -1,4 +1,4 @@
-import * as checkbox from '../../src/checkbox/index.ts';
+import * as checkbox from '../../../headless/components/src/checkbox/index.ts';
 
 export function App() @{
 	<section data-testid="entry-gate">

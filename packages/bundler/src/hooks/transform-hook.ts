@@ -41,7 +41,7 @@ import {
 	materializeOwnDelegateChildren,
 	sealWakeAggregate,
 } from './transform-link.ts';
-import { planTransformHookRequest } from './transform-request.ts';
+import { type TransformRequest, planTransformHookRequest } from './transform-request.ts';
 
 export async function transformHook(
 	ctx: MarklessHookContext,
@@ -58,11 +58,22 @@ export async function transformHook(
 		return null;
 	}
 	const request = planTransformHookRequest(ctx, pluginContext, code, id, currentEnvironment);
-	const { clientRouteArtifact, plan, source } = request;
+	const { plan, source } = request;
 	const { manifestSource, publishesClientClaims } = plan;
 	if (publishesClientClaims) {
 		ctx.state.moduleMetadata.beginSourceSymbolClaims(source, manifestSource);
 	}
+	try {
+		return await runTransformSteps(request);
+	} catch (error) {
+		// A compile that threw publishes nothing; release it so readers stop waiting.
+		ctx.state.moduleMetadata.releaseSourceSymbolClaims(source, manifestSource);
+		throw error;
+	}
+}
+
+async function runTransformSteps(request: TransformRequest) {
+	const { clientRouteArtifact, currentEnvironment } = request;
 	const firstPass = await runFirstPassTransform(request);
 	let transformed = firstPass.result;
 	let linkedTransformInput = firstPass.input;

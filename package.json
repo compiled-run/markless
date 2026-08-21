@@ -17,6 +17,7 @@
 		"receipts:check": "node packages/analyzer/test-support/check-receipts.ts packages/analyzer/expected-receipts.json .",
 		"receipts:generate": "vitest run --config packages/web/vitest.analyzer-debug-channel-contract.config.ts && vitest run packages/web/test/analyzer-debug-channel-contract.test.ts packages/analyzer/test/receipt-set.test.ts packages/web/test/debug-channel-registration.test.ts",
 		"test:compiler": "vp test packages/compiler/test/*.test.ts",
+		"test:headless": "vp test --project ui",
 		"publish": "pnpm --filter '@markless/*' --filter create-markless publish --access public --no-git-checks",
 		"release": "bumpp package.json --no-commit --no-tag --no-push && node scripts/release/sync-version.mjs",
 		"release:check": "node scripts/release/sync-version.mjs --check",

@@ -34,7 +34,7 @@ export type PropsOf<Tag extends __MarklessTypeService.IntrinsicTagName> =
  * `onClick?.(event)` - and cannot invoke a list. This strips the list form, so
  * passing one is a type error at the prop instead of a crash inside the component.
  */
-export type CallableHandler<Handler> = Exclude<Handler, readonly unknown[]>;
+export type Handler<Handler> = Exclude<Handler, readonly unknown[]>;
 
 /**
  * The instance fields a widget root seeds from its props: the same fields the

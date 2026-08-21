@@ -1,4 +1,4 @@
-import type { CallableHandler, PropsOf, Seeded } from '@markless/core';
+import type { Handler, PropsOf, Seeded } from '@markless/core';
 
 
 type TriggerProps = PropsOf<'button'>;
@@ -24,8 +24,8 @@ export type CheckboxRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 
 export type CheckboxTriggerProps = Omit<TriggerProps, 'onClick' | 'onKeydown'> & {
 	/** Called after the checkbox has toggled. */
-	readonly onClick?: CallableHandler<TriggerProps['onClick']>;
-	readonly onKeydown?: CallableHandler<TriggerProps['onKeydown']>;
+	readonly onClick?: Handler<TriggerProps['onClick']>;
+	readonly onKeydown?: Handler<TriggerProps['onKeydown']>;
 };
 
 /**

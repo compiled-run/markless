@@ -1,5 +1,5 @@
 import { element, state } from '@markless/core';
-import * as checkbox from '../../src/checkbox/index.ts';
+import * as checkbox from '../../../headless/components/src/checkbox/index.ts';
 
 // A consumer hangs their own handler, their own extra event, and their own
 // element handle on a library part. This pins what actually reaches the DOM.

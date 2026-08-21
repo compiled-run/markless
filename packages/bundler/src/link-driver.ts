@@ -314,6 +314,21 @@ export async function forceImportedModules(
 		}
 		if (plan.seal) await metadata.sealSourceSymbolClaims(child.source);
 	}
+	await awaitChildClaimPublications(metadata, children);
+}
+
+/**
+ * Re-enters the publication barrier immediately before claims are read. A server
+ * transform publishes no client claims, so it has no seal of its own, and any
+ * await between forcing a child and reading it reopens the window a sibling can
+ * start compiling in. Callers must invoke this with no further await before the
+ * read: the registry state it settles is the state the read sees.
+ */
+export async function awaitChildClaimPublications(
+	metadata: ModuleMetadataRegistry,
+	children: ReadonlyArray<LinkedModuleChildResolution>,
+): Promise<void> {
+	for (const child of children) await metadata.awaitSourceClaimsPublished(child.source);
 }
 
 export function mergeLinkedModuleChildren(

@@ -104,6 +104,126 @@ describe('module metadata identity registry', () => {
 		expect(sourceSymbolManifest(registry, source)?.symbols).toContainEqual(imported);
 	});
 
+	test('a reader outside the publishing environment waits for the variant in flight', async () => {
+		const source = '/workspace/app/components/Checkbox.tsrx';
+		const symbols = `${source}?markless-symbols`;
+		const resolver = `virtual:markless:resolver:${encodeURIComponent(source)}`;
+		const registry = new ModuleMetadataRegistry();
+		const imported = symbol(source, 'symbol:1', 'event-handler');
+
+		// The client publishes the plain module, then starts the symbols sibling.
+		registry.beginSourceSymbolClaims(source, source);
+		registry.recordSymbolClaims(source, manifest(source, resolver, []));
+		registry.finishSourceSymbolClaims(source, source);
+		registry.expectSourceSymbolClaims(source, [symbols]);
+		registry.beginSourceSymbolClaims(source, symbols);
+
+		// The server reader has no seal of its own; it waits on the publication.
+		const waiting = registry.awaitSourceClaimsPublished(source);
+		let resolved = false;
+		void waiting.then(() => {
+			resolved = true;
+		});
+		await Promise.resolve();
+		expect(resolved).toBe(false);
+
+		registry.recordSymbolClaims(symbols, manifest(symbols, resolver, [imported]));
+		registry.finishSourceSymbolClaims(source, symbols);
+		await waiting;
+
+		expect(sourceSymbolManifest(registry, source)?.symbols).toContainEqual(imported);
+	});
+
+	test('a republication of an already published variant does not fail a concurrent read', () => {
+		const source = '/workspace/app/components/Checkbox.tsrx';
+		const symbols = `${source}?markless-symbols`;
+		const resolver = `virtual:markless:resolver:${encodeURIComponent(source)}`;
+		const registry = new ModuleMetadataRegistry();
+		const imported = symbol(source, 'symbol:1', 'event-handler');
+
+		for (const emitted of [source, symbols]) {
+			registry.beginSourceSymbolClaims(source, emitted);
+			registry.recordSymbolClaims(
+				emitted,
+				manifest(emitted, resolver, emitted === symbols ? [imported] : []),
+			);
+			registry.finishSourceSymbolClaims(source, emitted);
+		}
+		// A second importer forces the symbols sibling again while this read runs.
+		registry.expectSourceSymbolClaims(source, [symbols]);
+		registry.beginSourceSymbolClaims(source, symbols);
+
+		expect(sourceSymbolManifest(registry, source)?.symbols).toContainEqual(imported);
+	});
+
+	test('a variant compiling for the first time still fails closed', () => {
+		const source = '/workspace/app/components/Checkbox.tsrx';
+		const symbols = `${source}?markless-symbols`;
+		const resolver = `virtual:markless:resolver:${encodeURIComponent(source)}`;
+		const registry = new ModuleMetadataRegistry();
+
+		registry.beginSourceSymbolClaims(source, source);
+		registry.recordSymbolClaims(source, manifest(source, resolver, []));
+		registry.finishSourceSymbolClaims(source, source);
+		registry.beginSourceSymbolClaims(source, symbols);
+
+		expect(() => sourceSymbolManifest(registry, source)).toThrow(
+			'MARKLESS_SOURCE_SYMBOL_CLAIMS_UNSEALED',
+		);
+	});
+
+	test('one importer expectation list does not gate another reader', () => {
+		const source = '/workspace/app/components/Checkbox.tsrx';
+		const symbols = `${source}?markless-symbols`;
+		const resolver = `virtual:markless:resolver:${encodeURIComponent(source)}`;
+		const registry = new ModuleMetadataRegistry();
+		const imported = symbol(source, 'symbol:1', 'event-handler');
+
+		registry.beginSourceSymbolClaims(source, source);
+		registry.recordSymbolClaims(source, manifest(source, resolver, [imported]));
+		registry.finishSourceSymbolClaims(source, source);
+		// A client importer names the routes it is about to force; that is its own
+		// seal's wait list, and a reader in another environment must not inherit it.
+		registry.expectSourceSymbolClaims(source, [symbols]);
+
+		expect(sourceSymbolManifest(registry, source)?.symbols).toContainEqual(imported);
+	});
+
+	test('an invalidated variant recompiling is a first publication again', () => {
+		const source = '/workspace/app/components/Checkbox.tsrx';
+		const resolver = `virtual:markless:resolver:${encodeURIComponent(source)}`;
+		const registry = new ModuleMetadataRegistry();
+
+		registry.beginSourceSymbolClaims(source, source);
+		registry.recordSymbolClaims(source, manifest(source, resolver, []));
+		registry.finishSourceSymbolClaims(source, source);
+		// The edit drops the claims, so remembering the publication would wave a
+		// reader past a variant whose claims are no longer in the registry.
+		registry.invalidateSourceSymbolClaims(source, source);
+		expect(() => sourceSymbolManifest(registry, source)).not.toThrow();
+
+		registry.beginSourceSymbolClaims(source, source);
+		expect(() => sourceSymbolManifest(registry, source)).toThrow(
+			'MARKLESS_SOURCE_SYMBOL_CLAIMS_UNSEALED',
+		);
+	});
+
+	test('a transform that fails releases its publication and the read stays fail-closed', async () => {
+		const source = '/workspace/app/components/Checkbox.tsrx';
+		const symbols = `${source}?markless-symbols`;
+		const registry = new ModuleMetadataRegistry();
+
+		registry.expectSourceSymbolClaims(source, [symbols]);
+		registry.beginSourceSymbolClaims(source, symbols);
+		const waiting = registry.awaitSourceClaimsPublished(source);
+		registry.releaseSourceSymbolClaims(source, symbols);
+		await waiting;
+
+		expect(() => sourceSymbolManifest(registry, source)).toThrow(
+			'MARKLESS_SOURCE_SYMBOL_CLAIMS_UNSEALED',
+		);
+	});
+
 	test('refuses incompatible claims for the same source symbol', () => {
 		const source = '/workspace/app/components/WeatherPanel.tsrx';
 		const resolver = `virtual:markless:resolver:${encodeURIComponent(source)}`;

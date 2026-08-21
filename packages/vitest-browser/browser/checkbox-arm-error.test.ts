@@ -26,10 +26,7 @@ function widget(container: ParentNode, name: string) {
 	};
 }
 
-// Skipped, not pinned: MARKLESS_SOURCE_SYMBOL_CLAIMS_UNSEALED is ORDER-DEPENDENT (fires only
-// under some suite orderings), so neither test() nor test.fails() is stable. T061 fixes the
-// link defect and un-skips this row as its acceptance.
-test.skip('SSR: an error part inside a taken @if arm marks the trigger invalid', async () => {
+test('SSR: an error part inside a taken @if arm marks the trigger invalid', async () => {
 	const screen = await renderSSR(ArmErrorApp);
 	const container = screen.container;
 

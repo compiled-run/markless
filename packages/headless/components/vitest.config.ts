@@ -11,11 +11,9 @@ export default defineProject({
 	plugins: [testSSR(), markless()],
 	test: {
 		name: 'ui',
-		// Family suites are colocated beside their components. test/ holds only the
-		// framework-machinery witnesses that exercise that machinery through this
-		// package's families, so they cannot live in the framework's own browser
-		// project without dragging this package into its module graph.
-		include: ['src/**/*.browser.ts', 'test/**/*.test.ts'],
+		// Family suites are colocated beside their components; the framework-
+		// machinery witnesses live in the framework's own browser project.
+		include: ['src/**/*.browser.ts'],
 		browser: {
 			enabled: true,
 			headless: true,

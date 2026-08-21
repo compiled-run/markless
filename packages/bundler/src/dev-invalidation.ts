@@ -29,12 +29,12 @@ export function invalidateAllGeneratedModules(
 	const changedSource = pathname(parent);
 	moduleLinkArtifacts.delete(changedSource);
 	moduleMetadata.deleteCaptureMetadata(changedSource);
-	moduleMetadata.deleteSymbolClaims(changedSource);
+	moduleMetadata.invalidateSourceSymbolClaims(changedSource, changedSource);
 	prerenderWakeCapabilities.delete(changedSource);
 	prerenderWakeSources.delete(changedSource);
 	for (const [key, cached] of linkedTransformCache) {
 		if (cached.source !== changedSource) continue;
-		moduleMetadata.deleteSymbolClaims(cached.manifestSource);
+		moduleMetadata.invalidateSourceSymbolClaims(changedSource, cached.manifestSource);
 		linkedTransformCache.delete(key);
 	}
 	const ids = dev.clear(parent, currentEnvironment);
