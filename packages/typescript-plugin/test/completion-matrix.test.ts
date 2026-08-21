@@ -933,7 +933,7 @@ test('M10 plugin does not add the Markless declaration to a project without TSRX
 		plainServer.open(file, source);
 		const diagnostics = await plainServer.semanticDiagnosticsSync(file);
 		expect(diagnostics.map((diagnostic) => diagnostic.code)).toContain(7026);
-		expect(plainServer.readLog()).not.toContain('markless-jsx.d.ts');
+		expect(plainServer.readLog()).not.toContain('markless-tsrx.d.ts');
 	} finally {
 		await plainServer.close();
 		rmSync(plainProject, { recursive: true, force: true });

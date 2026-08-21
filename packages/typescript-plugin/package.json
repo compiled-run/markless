@@ -24,10 +24,10 @@
 			"require": "./dist/volar.cjs"
 		},
 		"./jsx-runtime": {
-			"types": "./src/markless-jsx.d.ts"
+			"types": "./src/markless-tsrx.d.ts"
 		},
 		"./jsx-dev-runtime": {
-			"types": "./src/markless-jsx.d.ts"
+			"types": "./src/markless-tsrx.d.ts"
 		}
 	},
 	"publishConfig": {
@@ -50,15 +50,15 @@
 				"default": "./dist/volar.cjs"
 			},
 			"./jsx-runtime": {
-				"types": "./dist/markless-jsx.d.ts"
+				"types": "./dist/markless-tsrx.d.ts"
 			},
 			"./jsx-dev-runtime": {
-				"types": "./dist/markless-jsx.d.ts"
+				"types": "./dist/markless-tsrx.d.ts"
 			}
 		}
 	},
 	"scripts": {
-		"build:cjs": "vp pack src/index.ts --no-config --format cjs --platform node --out-dir dist --clean --dts --no-report && vp pack src/language.ts src/volar.ts --no-config --format cjs --platform node --out-dir dist --no-clean --dts --no-report && cp src/markless-jsx.d.ts dist/markless-jsx.d.ts",
+		"build:cjs": "vp pack src/index.ts --no-config --format cjs --platform node --out-dir dist --clean --dts --no-report && vp pack src/language.ts src/volar.ts --no-config --format cjs --platform node --out-dir dist --no-clean --dts --no-report && cp src/markless-tsrx.d.ts dist/markless-tsrx.d.ts",
 		"prepublishOnly": "pnpm run build:cjs && node ../../scripts/release/verify-publish-ready.mjs",
 		"test:completion-matrix": "MARKLESS_COMPLETION_MATRIX_STARTED_AT=$(node -p 'Date.now()') pnpm run test:completion-matrix:run",
 		"test:completion-matrix:run": "pnpm run build:cjs && pnpm --dir ../router run build:cjs && pnpm -w exec vitest run --config packages/typescript-plugin/vitest.completion-matrix.config.ts"

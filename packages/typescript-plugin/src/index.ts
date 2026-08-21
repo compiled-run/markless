@@ -46,7 +46,7 @@ const plugin = (modules: TsserverPluginModules) => {
 		getExternalFiles(project: any, updateLevel: any) {
 			const externalFiles = getUpstreamExternalFiles?.(project, updateLevel) ?? [];
 			if (!projectContainsTsrx(project)) return externalFiles;
-			const contract = join(__dirname, 'markless-jsx.d.ts');
+			const contract = join(__dirname, 'markless-tsrx.d.ts');
 			return externalFiles.includes(contract) ? externalFiles : [...externalFiles, contract];
 		},
 		create(info: any) {

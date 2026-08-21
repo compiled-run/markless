@@ -230,9 +230,9 @@ test('package CommonJS entry is generated into dist instead of maintained in src
 	expect(packageJson.exports['.'].require).toBe('./dist/index.cjs');
 	expect(packageJson.scripts?.['build:cjs']).toContain('vp pack src/index.ts');
 	expect(packageJson.publishConfig.exports['./jsx-runtime'].types).toBe(
-		'./dist/markless-jsx.d.ts',
+		'./dist/markless-tsrx.d.ts',
 	);
-	expect(existsSync('packages/typescript-plugin/dist/markless-jsx.d.ts')).toBe(true);
+	expect(existsSync('packages/typescript-plugin/dist/markless-tsrx.d.ts')).toBe(true);
 	expect(existsSync('packages/typescript-plugin/src/index.cjs')).toBe(false);
 });
 
@@ -561,7 +561,7 @@ export function App() @{
 		const log = server.readLog();
 		return {
 			loadedPlugin: log.includes('@markless/typescript-plugin'),
-			loadedContract: log.includes('markless-jsx.d.ts'),
+			loadedContract: log.includes('markless-tsrx.d.ts'),
 			results,
 		};
 	} finally {

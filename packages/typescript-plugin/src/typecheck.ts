@@ -20,7 +20,7 @@ import { compileToVolarMappingsWithoutRecovery } from './volar.ts';
  * program itself and a project keeps its tsconfig free of a path into node_modules.
  */
 export const MARKLESS_JSX_CONTRACT_FILE = fileURLToPath(
-	new URL('./markless-jsx.d.ts', import.meta.url),
+	new URL('./markless-tsrx.d.ts', import.meta.url),
 );
 
 /**
