@@ -18,6 +18,7 @@ import type {
 	SymbolResolverPlan,
 } from '../artifacts.ts';
 import type { SourceSpan } from '../diagnostics.ts';
+import { armChildDescent, type ArmChildProp } from './arm-child-content.ts';
 import { asNodes, isNode, type AnyNode } from '../ast/nodes.ts';
 import {
 	arrayNode,
@@ -279,7 +280,7 @@ function branchArmUnsupportedDiagnostic(
 		phase: 'public-render',
 		title: `Changing this ${label} cannot rebuild what it shows`,
 		message: `this ${label} (${branch.testSource}) cannot be rebuilt when ${branch.testSource} changes because ${detail}.`,
-		why: 'Showing or hiding this content replaces it wholesale from compiled markup plus value reads. Content that has to run to produce itself has no compiled markup to replace it with, so the browser would ask for code the build never wrote — and that failure stops every other update in the same component.',
+		why: 'Showing or hiding this content replaces it wholesale from compiled markup plus value reads. A component written in this file is rebuilt from its own compiled markup, but one that brings state of its own, takes a function, or comes from another file has nothing compiled here to replace it with — so the browser would ask for code the build never wrote, and that failure stops every other update in the same component.',
 		...(refusal?.span ? { primarySpan: refusal.span } : {}),
 		passId: 'symbol-modules',
 		artifactKeys: ['renderData', 'symbolResolver', 'symbolModules'],
@@ -287,7 +288,7 @@ function branchArmUnsupportedDiagnostic(
 		source: branch.testSource,
 		suggestions: [
 			{
-				message: `Move the component outside the ${label} and hide it with an attribute, or keep the ${label} content to plain elements, text, and state reads.`,
+				message: `Move the component outside the ${label} and hide it with an attribute, lift its state up to the component that owns the ${label}, or keep the ${label} content to plain elements, text, and state reads.`,
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
@@ -317,6 +318,7 @@ function renderBoundaryArms(
 function renderChunkParts(
 	context: ArmPartsContext,
 	chunkId: string,
+	scope?: ArmPropScope,
 ): PublicRenderPlanBranchArms['arms'][number] | null {
 	const { renderData, asyncComputedNodeIds } = context;
 	const refuse = (detail: string, span?: SourceSpan) => {
@@ -337,6 +339,14 @@ function renderChunkParts(
 		pushText(chunk.statics[staticIndex] ?? '');
 		for (const slot of chunk.slots.filter((candidate) => candidate.staticIndex === staticIndex)) {
 			if (slot.kind === 'text' && slot.residue.kind === 'graph-read') {
+				const scoped = scopedPropPart(scope, slot.residue.graphNodeId, slot.residue.path);
+				if (scoped === 'unsupported')
+					return refuse('a value it shows comes from a prop the flip cannot recompute');
+				if (scoped) {
+					if ('text' in scoped) pushText(scoped.text);
+					else parts.push(scoped);
+					continue;
+				}
 				parts.push({ read: {
 					graphNodeId: slot.residue.graphNodeId,
 					path: armPartReadPath(
@@ -348,13 +358,16 @@ function renderChunkParts(
 				continue;
 			}
 			if (slot.kind === 'child-component') {
-				const markup = staticChildComponentMarkup(context, slot);
-				if (markup === null)
+				const childParts = childComponentParts(context, slot);
+				if (childParts === null)
 					return refuse(
 						`<${slot.childComponentName}> has to run to produce its content`,
 						componentEdgeSpan(context, slot.componentEdgeId),
 					);
-				pushText(markup);
+				for (const part of childParts) {
+					if ('text' in part) pushText(part.text);
+					else parts.push(part);
+				}
 				continue;
 			}
 			if (slot.kind === 'repeat') {
@@ -384,6 +397,67 @@ function renderChunkParts(
 		}
 	}
 	return parts;
+}
+
+// One prop name to the value a flip rebuilds the child's markup with.
+type ArmPropScope = ReadonlyMap<string, ArmChildProp>;
+
+/**
+ * The part a scoped prop read contributes, `null` when the read is not a prop
+ * (the caller keeps its own graph read), `'unsupported'` when the flip cannot
+ * answer it.
+ */
+function scopedPropPart(
+	scope: ArmPropScope | undefined,
+	graphNodeId: string,
+	path: ReadonlyArray<string>,
+): { readonly text: string } | { readonly read: { graphNodeId: string; path: ReadonlyArray<string> } } | 'unsupported' | null {
+	if (!scope) return null;
+	const name = graphNodeId === 'prop:props' ? path[0] : graphNodeId.slice('prop:'.length);
+	const rest = graphNodeId === 'prop:props' ? path.slice(1) : path;
+	if (!graphNodeId.startsWith('prop:') || name === undefined) return null;
+	const prop = scope.get(name);
+	// A name the caller never passed is a static undefined, which renders empty.
+	if (!prop) return { text: '' };
+	if (prop.kind === 'unreadable') return 'unsupported';
+	if (prop.kind === 'read')
+		return { read: { graphNodeId: prop.graphNodeId, path: [...prop.path, ...rest] } };
+	let value: unknown = prop.value;
+	for (const segment of rest) {
+		if (value === null || value === undefined) return { text: '' };
+		if (typeof value !== 'object') return 'unsupported';
+		value = (value as Record<string, unknown>)[segment];
+	}
+	if (value !== null && typeof value === 'object') return 'unsupported';
+	return { text: armTextEscape(value) };
+}
+
+function armTextEscape(value: unknown): string {
+	return ARM_TEXT_ESCAPES.reduce(
+		(text, [from, to]) => text.replaceAll(from, to),
+		value === null || value === undefined ? '' : String(value),
+	);
+}
+
+/**
+ * The parts a child component contributes to the arm its parent rebuilds.
+ *
+ * The child's markup is render data like any other chunk, so a flip rebuilds it
+ * from the child's own statics and reads with the caller's props substituted in.
+ * Falls back to the older constant-string admission so a child this descent
+ * cannot express keeps compiling exactly as it did.
+ */
+function childComponentParts(
+	context: ArmPartsContext,
+	slot: Extract<SemanticMarkupSlot, { readonly kind: 'child-component' }>,
+): PublicRenderPlanBranchArms['arms'][number] | null {
+	const descent = armChildDescent(context.renderData, context.inline?.semanticGraph, slot);
+	if (descent) {
+		const parts = renderChunkParts(context, descent.chunkId, descent.props);
+		if (parts) return parts;
+	}
+	const markup = staticChildComponentMarkup(context, slot);
+	return markup === null ? null : [{ text: markup }];
 }
 
 // A child a flip can rebuild without running it: one constant string, wired to nothing.

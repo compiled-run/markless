@@ -238,6 +238,44 @@ test('a page-level @if that shows a markup-only component rebuilds it without ru
 	expect(result.symbolModules.diagnostics).toEqual([]);
 });
 
+// T054: a component whose markup is this module's render data is rebuilt from
+// that render data, so the flip no longer refuses it. The child's own hosts
+// leave the page-absolute streams and ride the arm's records instead.
+test('a page-level @if rebuilds a component whose markup the module already carries', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/LiftedPanel.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+function Panel({ label }) @{
+	<em class="panel">{label}</em>
+}
+
+export function App() @{
+	let armed = state(false);
+
+	<main>
+		<button type="button" onClick={() => armed = !armed}>Arm</button>
+		@if (armed) { <Panel label="ready" /> }
+	</main>
+}
+`,
+		symbols: [],
+	});
+	expect(result.symbolModules.diagnostics).toEqual([]);
+	const record = result.protocolView.branches?.[0];
+	const module = result.symbolModules.modules.find(
+		(candidate) => candidate.symbolId === record?.symbolId,
+	);
+	expect(module?.kind).toBe('branch-update');
+	// The caller's constant prop is substituted into the child's own statics.
+	expect(module?.source).toContain('<em class=\\"panel\\">ready</em>');
+	// The child's element is addressed inside the arm, never on the page.
+	const armHostPaths = record?.armRecords?.[0]?.domUpdates.map((update) => update.hostPath);
+	expect(armHostPaths).toEqual([[0]]);
+	expect(result.protocolView.locators.map((locator) => locator.tagName)).not.toContain('em');
+});
+
 test('a page-level @if whose component has to run refuses at build time, in author words', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/PagePanel.tsrx',
@@ -245,7 +283,8 @@ test('a page-level @if whose component has to run refuses at build time, in auth
 import { state } from '@markless/core';
 
 function Panel({ label }) @{
-	<em class="panel">{label}</em>
+	let hits = state(0);
+	<em class="panel" onClick={() => hits = hits + 1}>{label}{hits}</em>
 }
 
 export function App() @{
@@ -283,8 +322,11 @@ test('a prop-decided @if with the same content warns instead of blocking the bui
 	const result = await compileTsrxModule({
 		filename: 'src/PropPanel.tsrx',
 		source: `
+import { state } from '@markless/core';
+
 function Panel({ label }) @{
-	<em class="panel">{label}</em>
+	let hits = state(0);
+	<em class="panel" onClick={() => hits = hits + 1}>{label}{hits}</em>
 }
 
 export function Frame({ info }) @{

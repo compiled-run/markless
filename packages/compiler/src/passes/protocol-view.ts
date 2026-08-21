@@ -6,6 +6,7 @@ import type {
 	ProtocolViewPayloadWithArmRecords,
 	RenderDataArtifact,
 } from '../artifacts.ts';
+import { armChildRead, armHostPaths, type ArmHostPlacement } from './arm-child-content.ts';
 import { forwardedSpreadViewRecords } from './spread-forwarding.ts';
 
 function renderDataOf(input: ProtocolViewPayloadInput): RenderDataArtifact {
@@ -398,11 +399,18 @@ function wiredArmRecordSet(
 function armHostIds(input: ProtocolViewPayloadInput): ReadonlySet<string> {
 	return new Set(
 		renderDataOf(input).branches.flatMap((branch) =>
-			branch.armChunkIds.flatMap((chunkId) => [
-				...hostPathsForChunk(input, chunkId).keys(),
-			]),
+			branch.armChunkIds.flatMap((chunkId) => [...branchArmHostPaths(input, chunkId).keys()]),
 		),
 	);
+}
+
+// Arm records address the child components a flip rebuilds too: their hosts
+// exist only while the arm is taken, so no page-absolute locator can name them.
+function branchArmHostPaths(
+	input: ProtocolViewPayloadInput,
+	chunkId: string,
+): ReadonlyMap<string, ArmHostPlacement> {
+	return armHostPaths(renderDataOf(input), input.semanticGraph, chunkId);
 }
 
 function hostPathsForChunk(
@@ -541,37 +549,46 @@ function branchArmRecords(input: ProtocolViewPayloadInput, branchSiteId: string)
 		}
 	}
 	return branch.armChunkIds.map((chunkId) => {
-		const hostIds = hostPathsForChunk(input, chunkId);
+		const hostIds = branchArmHostPaths(input, chunkId);
 		return {
 			events: input.payloadArena.view.events
 				.filter((event) => hostIds.has(event.hostNodeId))
 				.map((event) => ({
-					hostPath: hostIds.get(event.hostNodeId)!,
+					hostPath: hostIds.get(event.hostNodeId)!.path,
 					eventName: event.eventName,
 					syncPolicy: event.syncPolicy,
 					symbolIds: eventSymbols.get(`${event.hostNodeId}:${event.eventName}`) ?? [],
 				})),
 			domUpdates: input.payloadArena.view.domUpdates
 				.filter((domUpdate) => hostIds.has(domUpdate.hostNodeId))
-				.map((domUpdate) => ({
-					...domUpdate,
-					hostPath: hostIds.get(domUpdate.hostNodeId)!,
-					symbolId: domUpdateSymbols.get(
-						`${domUpdate.hostNodeId}:${domUpdateTargetKey(domUpdate.target)}:${domUpdate.graphNodeId}:${domUpdate.source}`,
-					),
-				})),
+				.map((domUpdate) => {
+					const placement = hostIds.get(domUpdate.hostNodeId)!;
+					const live = armChildRead(
+						placement.props,
+						domUpdate.graphNodeId,
+						domUpdate.path ?? [],
+					);
+					return {
+						...domUpdate,
+						...(live ? live : {}),
+						hostPath: placement.path,
+						symbolId: domUpdateSymbols.get(
+							`${domUpdate.hostNodeId}:${domUpdateTargetKey(domUpdate.target)}:${domUpdate.graphNodeId}:${domUpdate.source}`,
+						),
+					};
+				}),
 			behaviors: input.payloadArena.view.behaviors
 				.filter((behavior) => hostIds.has(behavior.hostNodeId))
 				.map((behavior, index) => ({
 					...behavior,
-					hostPath: hostIds.get(behavior.hostNodeId)!,
+					hostPath: hostIds.get(behavior.hostNodeId)!.path,
 					symbolId: behaviorSymbolsForArms(input).get(behavior.hostNodeId)?.[index],
 				})),
 			elementHandles: input.payloadArena.view.elementHandles
 				.filter((handle) => hostIds.has(handle.hostNodeId))
 				.map((handle) => ({
 					...handle,
-					hostPath: hostIds.get(handle.hostNodeId)!,
+					hostPath: hostIds.get(handle.hostNodeId)!.path,
 				})),
 		};
 	});

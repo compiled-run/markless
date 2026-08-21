@@ -306,7 +306,9 @@ function materializeBranchArmRecords(
 						graph: input.graph,
 						element: host.element,
 						getElementHandle: input.elementHandles.get,
-						domUpdate: update,
+						// The arm claimed this element under its own id; the page id
+						// the record carries names nothing while the arm is live.
+						domUpdate: { ...update, hostNodeId: host.hostNodeId },
 						value,
 					})) as DomJournalResult | void;
 				},
