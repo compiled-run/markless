@@ -460,3 +460,121 @@ export function Frame({ info }) @{
 	expect(diagnostic?.severity).toBe('warning');
 });
 
+// T057 wall 3: a function the caller hands the child is not markup — it wires
+// the child's records. The capture pass mints the bound symbol for that edge
+// whether or not the arm is open, so the flip rebuilds the child and the
+// rewired event still carries the caller's capture.
+test('a page-level @if rebuilds a component handed a function prop, capture intact', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/HandlerPanel.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+function Panel({ label, onPick }) @{
+	<em class="panel" onClick={() => onPick()}>{label}</em>
+}
+
+export function App() @{
+	let armed = state(false);
+	let picks = state(0);
+
+	<main>
+		<button type="button" onClick={() => armed = !armed}>Arm</button>
+		<output>{picks}</output>
+		@if (armed) { <Panel label="ready" onPick={() => picks = picks + 1} /> }
+	</main>
+}
+`,
+		symbols: [],
+	});
+	expect(result.symbolModules.diagnostics).toEqual([]);
+	const record = result.protocolView.branches?.[0];
+	const module = result.symbolModules.modules.find(
+		(candidate) => candidate.symbolId === record?.symbolId,
+	);
+	expect(module?.kind).toBe('branch-update');
+	expect(module?.source).toContain('<em class=\\"panel\\">ready</em>');
+
+	// The child's wired element rides the arm's own records, and its click
+	// symbol is the edge-bound one, so the caller's capture travels with it.
+	const armEvents = record?.armRecords?.[0]?.events;
+	expect(armEvents).toHaveLength(1);
+	expect(armEvents?.[0]?.hostPath).toEqual([0]);
+	expect(armEvents?.[0]?.eventName).toBe('click');
+	const boundSymbolId = armEvents?.[0]?.symbolIds[0];
+	expect(boundSymbolId).toMatch(/^bound:/);
+	const boundRow = result.boundSymbolResolver.rows.find((row) => row.id === boundSymbolId);
+	expect(boundRow?.captureSlots[0]?.route.kind).toBe('callback-route');
+	// The child's element left the page-absolute locator stream with its markup.
+	expect(result.protocolView.locators.map((locator) => locator.tagName)).not.toContain('em');
+});
+
+// The function itself is not something markup can print, so a child that tries
+// to SHOW it keeps refusing: the lift is about wiring, not about rendering.
+test('a page-level @if still refuses a component that shows the function it was handed', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ShownHandler.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+function Panel({ onPick }) @{
+	<em class="panel">{onPick}</em>
+}
+
+export function App() @{
+	let armed = state(false);
+	let picks = state(0);
+
+	<main>
+		<button type="button" onClick={() => armed = !armed}>Arm</button>
+		<output>{picks}</output>
+		@if (armed) { <Panel onPick={() => picks = picks + 1} /> }
+	</main>
+}
+`,
+		symbols: [],
+	});
+	const diagnostic = result.symbolModules.diagnostics[0];
+	expect(diagnostic?.code).toBe('MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED');
+	expect(diagnostic?.severity).toBe('error');
+	expect(diagnostic?.message).toContain(
+		'a value it shows comes from a prop the flip cannot recompute',
+	);
+	// No record pointing at a flip module the build refused to write.
+	expect(
+		result.symbolModules.modules.some(
+			(candidate) => candidate.symbolId === result.protocolView.branches?.[0]?.symbolId,
+		),
+	).toBe(false);
+});
+
+// T057 wall 2 is NOT lifted: a cell the child declares joins the page graph
+// only when the child renders, so a component with state() of its own still has
+// nothing this file can rebuild, and the refusal stays fail-closed.
+test('a page-level @if whose component brings state of its own still refuses', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/OwnStatePanel.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+function Panel({ label }) @{
+	let hits = state(0);
+	<em class="panel" onClick={() => hits = hits + 1}>{label}{hits}</em>
+}
+
+export function App() @{
+	let armed = state(false);
+
+	<main>
+		<button type="button" onClick={() => armed = !armed}>Arm</button>
+		@if (armed) { <Panel label="ready" /> }
+	</main>
+}
+`,
+		symbols: [],
+	});
+	const diagnostic = result.symbolModules.diagnostics[0];
+	expect(diagnostic?.code).toBe('MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED');
+	expect(diagnostic?.message).toContain('<Panel> has to run to produce its content');
+});
+

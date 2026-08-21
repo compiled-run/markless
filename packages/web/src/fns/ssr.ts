@@ -681,8 +681,9 @@ function marklessSsrUnbindLocalView(view: SsrViewDraft, localHostIds: ReadonlySe
 				symbolIds: event.symbolIds.map(marklessSsrUnbindLocalSymbolId),
 			})),
 		}));
-	for (const branch of view.branches ?? [])
-		for (const arm of branch.armRecords ?? []) marklessSsrUnbindLocalRecordSet(arm);
+	// A branch arm's records address a child component this module rebuilds from
+	// compiled markup, so a bound id here is the capture route THIS module minted
+	// for its own edge; unbinding it would drop the caller's captured values.
 	for (const boundary of view.asyncBoundaries ?? []) {
 		const sets = Array.isArray(boundary.armRecords)
 			? boundary.armRecords

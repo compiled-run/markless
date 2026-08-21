@@ -289,7 +289,7 @@ function branchArmUnsupportedDiagnostic(
 		phase: 'public-render',
 		title: `Changing this ${label} cannot rebuild what it shows`,
 		message: `this ${label} (${branch.testSource}) cannot be rebuilt when ${branch.testSource} changes because ${detail}.`,
-		why: 'Showing or hiding this content replaces it wholesale from compiled markup plus value reads. A component is rebuilt from the markup its own file compiled, so one that brings state of its own, takes a function, or — when it comes from another file — shows a value that keeps changing while it is shown has nothing left to be rebuilt from, and the browser would ask for code the build never wrote. That failure stops every other update in the same component.',
+		why: 'Showing or hiding this content replaces it wholesale from compiled markup plus value reads. A component is rebuilt from the markup its own file compiled, so one that brings state of its own, shows a function it was handed, or — when it comes from another file — shows a value that keeps changing while it is shown has nothing left to be rebuilt from, and the browser would ask for code the build never wrote. That failure stops every other update in the same component.',
 		...(refusal?.span ? { primarySpan: refusal.span } : {}),
 		passId: 'symbol-modules',
 		artifactKeys: ['renderData', 'symbolResolver', 'symbolModules'],

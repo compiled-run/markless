@@ -82,8 +82,13 @@ export function armChildDescent(
 			props.set(prop.name, { kind: 'constant', value: prop.value });
 			continue;
 		}
-		// A function prop wires the child's records through a bound symbol the
-		// capture pass mints only for a child that rendered, so a flip cannot.
+		// A function the caller passed wires the child's records through a bound
+		// symbol minted for this edge whether or not the arm is open; markup that
+		// tries to SHOW it refuses instead (see scopedPropPart).
+		if (prop.kind === 'callback') {
+			props.set(prop.name, { kind: 'unreadable' });
+			continue;
+		}
 		return null;
 	}
 	if (!singleRootChunk(material.chunks, material.chunkId)) return null;
