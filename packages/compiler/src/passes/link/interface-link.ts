@@ -116,12 +116,29 @@ export async function compileTsrxModuleLinkArtifact(input: {
 
 export function moduleInterfaceHash(value: ModuleGraphInterfaceArtifact | undefined): string {
 	let hash = 0x811c9dc5;
-	const source = JSON.stringify(value ?? null);
+	const source = JSON.stringify(hashedInterface(value));
 	for (let index = 0; index < source.length; index++) {
 		hash ^= source.charCodeAt(index);
 		hash = Math.imul(hash, 0x01000193);
 	}
 	return `mgi1-${(hash >>> 0).toString(36)}`;
+}
+
+/**
+ * The interface as the hash reads it: the component's published arm markup is
+ * left out, so an edit inside a child's own markup keeps reusing the parent the
+ * way it always has. A parent that inlined that markup into an `@if` flip picks
+ * the new markup up when it next compiles.
+ */
+function hashedInterface(value: ModuleGraphInterfaceArtifact | undefined): unknown {
+	if (!value) return null;
+	return {
+		...value,
+		render: {
+			...value.render,
+			components: value.render.components.map(({ armMaterial: _armMaterial, ...rest }) => rest),
+		},
+	};
 }
 
 export function prerenderInterfacesComplete(

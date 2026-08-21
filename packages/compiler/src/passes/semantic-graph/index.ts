@@ -23,6 +23,7 @@ import {
 import { collectComponentProps } from './collect-components.ts';
 import { collectSpreadEventShadowDiagnostics } from './spread-event-guard.ts';
 import { spreadHostsField } from './spread-hosts.ts';
+import { armMaterialField } from './arm-material.ts';
 import { getComponentFunction } from '../../ast/tsrx.ts';
 import {
 	collectConditionalBranchText,
@@ -170,6 +171,7 @@ export async function buildSemanticGraph(
 								path: binding.propPath,
 							})),
 						...spreadHostsField(chunks),
+						...armMaterialField(graph, component.name, chunks),
 					},
 				];
 			}),

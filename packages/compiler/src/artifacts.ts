@@ -185,8 +185,20 @@ export type ModuleGraphInterfaceArtifact = {
 				readonly path: ReadonlyArray<string>;
 			}>;
 			readonly spreadHosts?: ReadonlyArray<ModuleGraphInterfaceSpreadHost>;
+			readonly armMaterial?: ModuleGraphInterfaceArmMaterial;
 		}>;
 	};
+};
+
+/**
+ * The compiled markup an importing module can rebuild this component from
+ * without running it: its own chunks, published only when the component's body
+ * is markup and prop reads. A caller that shows the component inside a
+ * flippable `@if` arm replaces the arm wholesale from these chunks, the way it
+ * already does for a component written in its own file.
+ */
+export type ModuleGraphInterfaceArmMaterial = {
+	readonly chunks: ReadonlyArray<SemanticMarkupChunk>;
 };
 
 /**

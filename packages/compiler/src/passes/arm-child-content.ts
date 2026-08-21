@@ -1,10 +1,16 @@
 import type {
+	ModuleGraphInterfaceArtifact,
 	RenderDataArtifact,
+	SemanticComponentEdge,
 	SemanticGraphArtifact,
+	SemanticMarkupChunk,
 	SemanticMarkupSlot,
 } from '../artifacts.ts';
 
 type ChildComponentSlot = Extract<SemanticMarkupSlot, { readonly kind: 'child-component' }>;
+
+/** The interfaces of the modules this one imports, keyed by import specifier. */
+export type ArmImportedInterfaces = Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 
 /** How a flip answers one prop the child's markup reads. */
 export type ArmChildProp =
@@ -21,6 +27,17 @@ export type ArmChildProp =
 export type ArmChildDescent = {
 	readonly chunkId: string;
 	readonly props: ReadonlyMap<string, ArmChildProp>;
+	/**
+	 * Where the child's markup lives: this module's own render data for a child
+	 * written here, the imported module's published arm material for one that
+	 * comes from another file.
+	 */
+	readonly chunks: ReadonlyArray<SemanticMarkupChunk>;
+	/**
+	 * An imported child's host ids are its own module's, so they name nothing in
+	 * this module's records and are never addressed from this module's arms.
+	 */
+	readonly imported: boolean;
 };
 
 /**
@@ -37,21 +54,24 @@ export function armChildDescent(
 	renderData: RenderDataArtifact,
 	semanticGraph: SemanticGraphArtifact | undefined,
 	slot: ChildComponentSlot,
+	interfaces?: ArmImportedInterfaces,
 ): ArmChildDescent | null {
 	if (!semanticGraph || slot.projectionChunkId) return null;
 	const edge = semanticGraph.componentEdges.find(
 		(candidate) => candidate.id === slot.componentEdgeId,
 	);
-	if (!edge || edge.importSource || edge.children.childCount > 0) return null;
-	// A cell a child declares joins the page graph only when the child renders,
-	// so an arm that was closed at first render has nothing for the flip to read.
-	if (
-		semanticGraph.graphBindings.some(
-			(binding) =>
-				binding.componentName === edge.childComponentName && binding.kind !== 'prop',
-		)
-	)
-		return null;
+	if (!edge || edge.children.childCount > 0) return null;
+	const material = edge.importSource
+		? importedArmMaterial(interfaces, edge)
+		: // A cell a child declares joins the page graph only when the child renders,
+			// so an arm that was closed at first render has nothing for the flip to read.
+			semanticGraph.graphBindings.some(
+					(binding) =>
+						binding.componentName === edge.childComponentName && binding.kind !== 'prop',
+				)
+			? null
+			: { chunkId: slot.childTemplateId, chunks: renderData.chunks };
+	if (!material) return null;
 	const props = new Map<string, ArmChildProp>();
 	for (const prop of edge.props) {
 		if (prop.kind === 'graph-reference') {
@@ -66,12 +86,40 @@ export function armChildDescent(
 		// capture pass mints only for a child that rendered, so a flip cannot.
 		return null;
 	}
-	if (!singleRootChunk(renderData, slot.childTemplateId)) return null;
-	return { chunkId: slot.childTemplateId, props };
+	if (!singleRootChunk(material.chunks, material.chunkId)) return null;
+	return {
+		chunkId: material.chunkId,
+		props,
+		chunks: material.chunks,
+		imported: edge.importSource !== undefined,
+	};
 }
 
-function singleRootChunk(renderData: RenderDataArtifact, chunkId: string): boolean {
-	const chunk = renderData.chunks.find((candidate) => candidate.id === chunkId);
+/**
+ * The chunks an imported child's own module published for it, or null when that
+ * module published none: a component that has to run to produce its content has
+ * no arm material, and the caller refuses the flip in author words.
+ */
+function importedArmMaterial(
+	interfaces: ArmImportedInterfaces | undefined,
+	edge: SemanticComponentEdge,
+): { readonly chunkId: string; readonly chunks: ReadonlyArray<SemanticMarkupChunk> } | null {
+	const moduleInterface = edge.importSource ? interfaces?.[edge.importSource] : undefined;
+	const component = moduleInterface?.render.components.find(
+		(candidate) =>
+			candidate.componentName === edge.childComponentName ||
+			(edge.importedName !== undefined && candidate.exportName === edge.importedName),
+	);
+	return component?.armMaterial
+		? { chunkId: component.rootChunkId, chunks: component.armMaterial.chunks }
+		: null;
+}
+
+function singleRootChunk(
+	chunks: ReadonlyArray<SemanticMarkupChunk>,
+	chunkId: string,
+): boolean {
+	const chunk = chunks.find((candidate) => candidate.id === chunkId);
 	if (!chunk || chunk.hosts.length === 0) return false;
 	return (
 		chunk.hosts.every((host) => host.coordinate.path[0] === 0) &&
@@ -95,6 +143,7 @@ export function armHostPaths(
 	renderData: RenderDataArtifact,
 	semanticGraph: SemanticGraphArtifact | undefined,
 	chunkId: string,
+	interfaces?: ArmImportedInterfaces,
 ): ReadonlyMap<string, ArmHostPlacement> {
 	const paths = new Map<string, ArmHostPlacement>();
 	const noProps: ReadonlyMap<string, ArmChildProp> = new Map();
@@ -115,8 +164,10 @@ export function armHostPaths(
 			paths.set(host.hostNodeId, { path: compose(offset, host.coordinate.path), props });
 		for (const slot of chunk.slots) {
 			if (slot.kind !== 'child-component') continue;
-			const descent = armChildDescent(renderData, semanticGraph, slot);
-			if (!descent) continue;
+			const descent = armChildDescent(renderData, semanticGraph, slot, interfaces);
+			// An imported child brings no record of this module's to address: its
+			// module publishes arm material only for markup nothing here wired.
+			if (!descent || descent.imported) continue;
 			collect(descent.chunkId, compose(offset, slot.coordinate.path), descent.props, seen);
 		}
 	}

@@ -276,6 +276,121 @@ export function App() @{
 	expect(result.protocolView.locators.map((locator) => locator.tagName)).not.toContain('em');
 });
 
+// T056: the child comes from another file, so its markup is not in this module's
+// render data at all. Its own module publishes that markup on its interface, and
+// the flip rebuilds the arm from it with the caller's props substituted in.
+test('a page-level @if rebuilds a component imported from another file', async () => {
+	const child = await compileTsrxModule({
+		filename: 'src/Panel.tsrx',
+		source: `export function Panel({ label }) @{ <em class="panel">{label}</em> }`,
+		symbols: [],
+	});
+	const result = await compileTsrxModule({
+		filename: 'src/ImportedPanel.tsrx',
+		source: `
+import { state } from '@markless/core';
+import { Panel } from './Panel.tsrx';
+
+export function App() @{
+	let armed = state(false);
+
+	<main>
+		<button type="button" onClick={() => armed = !armed}>Arm</button>
+		@if (armed) { <Panel label="ready" /> }
+	</main>
+}
+`,
+		symbols: [],
+		importedModuleInterfaces: { './Panel.tsrx': child.moduleGraphInterface },
+	});
+	expect(result.symbolModules.diagnostics).toEqual([]);
+	const record = result.protocolView.branches?.[0];
+	const module = result.symbolModules.modules.find(
+		(candidate) => candidate.symbolId === record?.symbolId,
+	);
+	expect(module?.kind).toBe('branch-update');
+	// The imported child's own statics, with the caller's prop substituted in.
+	expect(module?.source).toContain('<em class=\\"panel\\">ready</em>');
+	// The child never runs: the flip module imports nothing.
+	expect(module?.source).not.toContain('import ');
+	// The child's host ids are its module's, so this module addresses none of them.
+	expect(record?.armRecords?.[0]?.domUpdates).toEqual([]);
+});
+
+// The refresh records of an imported child belong to ITS module, and this one
+// cannot address them, so a value that changes after the child is shown is
+// refused rather than shown once and left stale.
+test('a page-level @if refuses an imported component showing a value that changes', async () => {
+	const child = await compileTsrxModule({
+		filename: 'src/Panel.tsrx',
+		source: `export function Panel({ label }) @{ <em class="panel">{label}</em> }`,
+		symbols: [],
+	});
+	const result = await compileTsrxModule({
+		filename: 'src/LivePanel.tsrx',
+		source: `
+import { state } from '@markless/core';
+import { Panel } from './Panel.tsrx';
+
+export function App() @{
+	let armed = state(false);
+	let label = state('ready');
+
+	<main>
+		<button type="button" onClick={() => armed = !armed}>Arm</button>
+		@if (armed) { <Panel label={label} /> }
+	</main>
+}
+`,
+		symbols: [],
+		importedModuleInterfaces: { './Panel.tsrx': child.moduleGraphInterface },
+	});
+	const diagnostic = result.symbolModules.diagnostics[0];
+	expect(diagnostic?.code).toBe('MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED');
+	expect(diagnostic?.message).toContain(
+		'<Panel> shows a value that changes after it is shown',
+	);
+});
+
+// A component that has to run has no arm material to publish, so the caller
+// still refuses - the same refusal it gave before any of this existed.
+test('a page-level @if whose imported component has to run still refuses', async () => {
+	const child = await compileTsrxModule({
+		filename: 'src/Counter.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function Counter({ label }) @{
+	let hits = state(0);
+	<em class="panel" onClick={() => hits = hits + 1}>{label}{hits}</em>
+}
+`,
+		symbols: [],
+	});
+	expect(child.moduleGraphInterface.render.components[0]?.armMaterial).toBeUndefined();
+	const result = await compileTsrxModule({
+		filename: 'src/ImportedCounter.tsrx',
+		source: `
+import { state } from '@markless/core';
+import { Counter } from './Counter.tsrx';
+
+export function App() @{
+	let armed = state(false);
+
+	<main>
+		<button type="button" onClick={() => armed = !armed}>Arm</button>
+		@if (armed) { <Counter label="ready" /> }
+	</main>
+}
+`,
+		symbols: [],
+		importedModuleInterfaces: { './Counter.tsrx': child.moduleGraphInterface },
+	});
+	const diagnostic = result.symbolModules.diagnostics[0];
+	expect(diagnostic?.code).toBe('MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED');
+	expect(diagnostic?.message).toContain('<Counter> has to run to produce its content');
+});
+
 test('a page-level @if whose component has to run refuses at build time, in author words', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/PagePanel.tsrx',

@@ -9,6 +9,7 @@ import type {
 	RenderDataArtifact,
 	RenderDataBranch,
 	SemanticGraphArtifact,
+	SemanticMarkupChunk,
 	SemanticMarkupSlot,
 	SemanticGraphDependency,
 	SemanticModuleImport,
@@ -18,7 +19,11 @@ import type {
 	SymbolResolverPlan,
 } from '../artifacts.ts';
 import type { SourceSpan } from '../diagnostics.ts';
-import { armChildDescent, type ArmChildProp } from './arm-child-content.ts';
+import {
+	armChildDescent,
+	type ArmChildProp,
+	type ArmImportedInterfaces,
+} from './arm-child-content.ts';
 import { asNodes, isNode, type AnyNode } from '../ast/nodes.ts';
 import {
 	arrayNode,
@@ -210,6 +215,7 @@ type ArmPartsContext = {
 	readonly inline?: {
 		readonly semanticGraph: SemanticGraphArtifact;
 		readonly symbolResolver: SymbolResolverPlan;
+		readonly importedInterfaces?: ArmImportedInterfaces;
 	};
 	readonly refusals?: ArmRefusal[];
 };
@@ -236,6 +242,9 @@ function renderBranchArms(
 						inline: {
 							semanticGraph: input.semanticGraph,
 							symbolResolver: input.symbolResolver,
+							...(input.source?.importedModuleInterfaces
+								? { importedInterfaces: input.source.importedModuleInterfaces }
+								: {}),
 						},
 					}
 				: {}),
@@ -280,7 +289,7 @@ function branchArmUnsupportedDiagnostic(
 		phase: 'public-render',
 		title: `Changing this ${label} cannot rebuild what it shows`,
 		message: `this ${label} (${branch.testSource}) cannot be rebuilt when ${branch.testSource} changes because ${detail}.`,
-		why: 'Showing or hiding this content replaces it wholesale from compiled markup plus value reads. A component written in this file is rebuilt from its own compiled markup, but one that brings state of its own, takes a function, or comes from another file has nothing compiled here to replace it with — so the browser would ask for code the build never wrote, and that failure stops every other update in the same component.',
+		why: 'Showing or hiding this content replaces it wholesale from compiled markup plus value reads. A component is rebuilt from the markup its own file compiled, so one that brings state of its own, takes a function, or — when it comes from another file — shows a value that keeps changing while it is shown has nothing left to be rebuilt from, and the browser would ask for code the build never wrote. That failure stops every other update in the same component.',
 		...(refusal?.span ? { primarySpan: refusal.span } : {}),
 		passId: 'symbol-modules',
 		artifactKeys: ['renderData', 'symbolResolver', 'symbolModules'],
@@ -319,13 +328,15 @@ function renderChunkParts(
 	context: ArmPartsContext,
 	chunkId: string,
 	scope?: ArmPropScope,
+	// Set while rendering the markup of a child component spliced into the arm.
+	child?: ArmChildScope,
 ): PublicRenderPlanBranchArms['arms'][number] | null {
 	const { renderData, asyncComputedNodeIds } = context;
 	const refuse = (detail: string, span?: SourceSpan) => {
 		context.refusals?.push({ detail, ...(span ? { span } : {}) });
 		return null;
 	};
-	const chunk = renderData.chunks.find((candidate) => candidate.id === chunkId);
+	const chunk = (child?.chunks ?? renderData.chunks).find((candidate) => candidate.id === chunkId);
 	if (!chunk) return refuse('its content has no compiled markup');
 	const parts: Array<PublicRenderPlanBranchArms['arms'][number][number]> = [];
 	const pushText = (text: string) => {
@@ -342,6 +353,13 @@ function renderChunkParts(
 				const scoped = scopedPropPart(scope, slot.residue.graphNodeId, slot.residue.path);
 				if (scoped === 'unsupported')
 					return refuse('a value it shows comes from a prop the flip cannot recompute');
+				// A value inside an imported child refreshes through records that
+				// module owns, and this module cannot address them, so only a value
+				// that is already decided may be shown there.
+				if (child?.imported && (!scoped || 'read' in scoped))
+					return refuse(
+						`<${child.componentName}> shows a value that changes after it is shown`,
+					);
 				if (scoped) {
 					if ('text' in scoped) pushText(scoped.text);
 					else parts.push(scoped);
@@ -358,6 +376,8 @@ function renderChunkParts(
 				continue;
 			}
 			if (slot.kind === 'child-component') {
+				if (child?.imported)
+					return refuse(`<${child.componentName}> shows a component of its own`);
 				const childParts = childComponentParts(context, slot);
 				if (childParts === null)
 					return refuse(
@@ -401,6 +421,13 @@ function renderChunkParts(
 
 // One prop name to the value a flip rebuilds the child's markup with.
 type ArmPropScope = ReadonlyMap<string, ArmChildProp>;
+
+// The child component whose own markup is being spliced into the arm.
+type ArmChildScope = {
+	readonly chunks: ReadonlyArray<SemanticMarkupChunk>;
+	readonly imported: boolean;
+	readonly componentName: string;
+};
 
 /**
  * The part a scoped prop read contributes, `null` when the read is not a prop
@@ -451,9 +478,18 @@ function childComponentParts(
 	context: ArmPartsContext,
 	slot: Extract<SemanticMarkupSlot, { readonly kind: 'child-component' }>,
 ): PublicRenderPlanBranchArms['arms'][number] | null {
-	const descent = armChildDescent(context.renderData, context.inline?.semanticGraph, slot);
+	const descent = armChildDescent(
+		context.renderData,
+		context.inline?.semanticGraph,
+		slot,
+		context.inline?.importedInterfaces,
+	);
 	if (descent) {
-		const parts = renderChunkParts(context, descent.chunkId, descent.props);
+		const parts = renderChunkParts(context, descent.chunkId, descent.props, {
+			chunks: descent.chunks,
+			imported: descent.imported,
+			componentName: slot.childComponentName,
+		});
 		if (parts) return parts;
 	}
 	const markup = staticChildComponentMarkup(context, slot);
