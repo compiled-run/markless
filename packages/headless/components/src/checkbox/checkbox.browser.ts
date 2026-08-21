@@ -2,14 +2,14 @@ import { cleanup, render, renderSSR } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { afterEach, beforeEach, expect, test } from 'vitest';
 import Basic from './scenarios/basic.tsrx';
-import Controlled from './scenarios/controlled.tsrx';
+import WithOnChange from './scenarios/with-onchange.tsrx';
 import TermsForm from './scenarios/form.tsrx';
 import Invalid from './scenarios/invalid.tsrx';
 import PartialSelection from './scenarios/partial-selection.tsrx';
 import PrefilledForm from './scenarios/prefilled-form.tsrx';
 import SettingsList from './scenarios/settings-list.tsrx';
 import UnavailableOptions from './scenarios/unavailable-options.tsrx';
-import Uncontrolled from './scenarios/uncontrolled.tsrx';
+import WithoutOnChange from './scenarios/without-onchange.tsrx';
 import WithHelp from './scenarios/with-help.tsrx';
 
 // Colocated browser suite for the checkbox family. Each test renders a realistic
@@ -316,20 +316,20 @@ for (const mode of MODES) {
 	});
 
 	test(`${mode}: a click calls the consumer onChange once with the next value`, async () => {
-		if (mode === 'CSR') await render(Controlled);
-		else await renderSSR(Controlled);
+		if (mode === 'CSR') await render(WithOnChange);
+		else await renderSSR(WithOnChange);
 		await expectConsumerCallbackFires();
 	});
 
 	test(`${mode}: two sibling checkboxes each reach only their own handler`, async () => {
-		if (mode === 'CSR') await render(Controlled);
-		else await renderSSR(Controlled);
+		if (mode === 'CSR') await render(WithOnChange);
+		else await renderSSR(WithOnChange);
 		await expectEachInstanceReachesItsOwnHandler();
 	});
 
 	test(`${mode}: an omitted onChange toggles without a dispatch`, async () => {
-		if (mode === 'CSR') await render(Uncontrolled);
-		else await renderSSR(Uncontrolled);
+		if (mode === 'CSR') await render(WithoutOnChange);
+		else await renderSSR(WithoutOnChange);
 		await expectOmittedCallbackStillToggles();
 	});
 }

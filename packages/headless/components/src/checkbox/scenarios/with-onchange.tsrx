@@ -4,7 +4,7 @@ import { checkbox } from '../../index.ts';
 // Two checkboxes with their own consumer handlers. Each handler writes into page
 // state the page renders, so what the DOM shows is what the consumer's callback
 // was actually called with, and how often.
-export default function Controlled() @{
+export default function WithOnChange() @{
 	const log = state({ first: '', second: '', calls: 0 });
 
 	<section>

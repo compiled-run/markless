@@ -3,7 +3,7 @@ import { checkbox } from '../../index.ts';
 
 // A consumer who wants the checkbox to just work and never hears about changes:
 // no onChange at all. The toggle still works and nothing is dispatched.
-export default function Uncontrolled() @{
+export default function WithoutOnChange() @{
 	const log = state({ calls: 0 });
 
 	<section>

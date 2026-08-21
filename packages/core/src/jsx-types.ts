@@ -44,3 +44,10 @@ export type CallableHandler<Handler> = Exclude<Handler, readonly unknown[]>;
 export type Seeded<Props, Keys extends keyof Props> = {
 	-readonly [Field in Keys]-?: Props[Field];
 };
+
+/**
+ * A compiled TSRX component, as a value: what a `.tsrx` module's default export
+ * is, what test harnesses mount, and what composition renders. The runtime's
+ * internal contract stays internal; this is the name consumers see.
+ */
+export type Component = import('./render.ts').CsrRenderable;

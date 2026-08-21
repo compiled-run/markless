@@ -6,6 +6,6 @@
 // a mountable renderable. Deletable the day the editor plugin resolves .tsrx
 // imports itself.
 declare module '*.tsrx' {
-	const component: import('@markless/core').CsrRenderable;
+	const component: import('@markless/core').Component;
 	export default component;
 }

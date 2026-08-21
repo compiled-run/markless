@@ -1,15 +1,14 @@
-import { cleanup, render } from '@markless/vitest-browser';
+import { render } from '@markless/vitest-browser';
 import { page } from 'vite-plus/test/browser';
-import { afterEach, expect, test } from 'vitest';
+import { expect, test } from 'vitest';
 import Basic from './scenarios/basic.tsrx';
 
 // The base namespace is reached the same way a consumer reaches it: through
 // the @markless/ui barrel, which re-exports the internal base package.
-const Button = page.getByTestId('button');
-const Label = page.getByTestId('label');
-const Hidden = page.getByTestId('hidden');
-
-afterEach(() => cleanup());
+// Parts are located the way a person finds them: by role and by text.
+const Button = page.getByRole('button', { name: 'Press' });
+const Label = page.getByText('Name');
+const Hidden = page.getByText('Hidden');
 
 function el<T extends Element = HTMLElement>(locator: { element(): Element | null }) {
 	const found = locator.element();
@@ -20,19 +19,18 @@ function el<T extends Element = HTMLElement>(locator: { element(): Element | nul
 test('CSR: base one-offs render their single elements', async () => {
 	await render(Basic);
 
-	const button = el(Button).querySelector('button');
-	expect(button?.getAttribute('type')).toBe('button');
-	expect(button?.textContent).toBe('Press');
-	expect(button?.hasAttribute('aria-pressed')).toBe(false);
+	await expect.element(Button).toBeInTheDocument();
+	expect(el(Button).getAttribute('type')).toBe('button');
+	expect(el(Button).hasAttribute('aria-pressed')).toBe(false);
 	// disabled is optional and this call omits it: no attribute, not an empty one.
-	expect(button?.hasAttribute('disabled')).toBe(false);
+	expect(el(Button).hasAttribute('disabled')).toBe(false);
 
-	const label = el(Label).querySelector('label');
-	expect(label?.getAttribute('for')).toBe('field-id');
-	expect(label?.textContent).toBe('Name');
+	expect(el(Label).tagName).toBe('LABEL');
+	expect(el(Label).getAttribute('for')).toBe('field-id');
 
-	// No class ships (consumer stylesheets must have nothing to collide with); the span is the only child.
-	const hidden = el(Hidden).querySelector('span');
-	expect(hidden?.textContent).toBe('Hidden');
-	expect(getComputedStyle(hidden as Element).position).toBe('absolute');
+	// Hidden from sight, still in the accessibility tree: findable by its text,
+	// clipped by inline style, and shipping no class a stylesheet could target.
+	expect(el(Hidden).tagName).toBe('SPAN');
+	expect(getComputedStyle(el(Hidden)).position).toBe('absolute');
+	expect(el(Hidden).hasAttribute('class')).toBe(false);
 });
