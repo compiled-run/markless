@@ -102,8 +102,7 @@ export function ToggleDescription({ children, ...rest }: ToggleDescriptionProps)
 
 export function ToggleError({ children, ...rest }: ToggleErrorProps) @{
 	const toggle = toggleState();
-	// Intent: mounting the error part marks the trigger invalid. A seed a part writes
-	// does not reach its siblings yet (U-H), so the trigger still reads valid.
+	// Mounting the error part is what marks the trigger invalid.
 	toggle.invalid = true;
 
 	<div {...rest}>{children}</div>

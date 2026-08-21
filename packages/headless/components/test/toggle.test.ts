@@ -300,10 +300,15 @@ function expectMessages(container: ParentNode) {
 
 	const errored = messages(container, 'errored');
 	expect(errored.message?.textContent).toBe('This field is required');
-	// The trigger's aria-invalid stays 'false' while the error is mounted: a seed
-	// written by a part only reaches parts rendered from the root's own seeds, so
-	// the error part cannot mark the trigger. Blocked row (U-H).
-	expect(errored.trigger.getAttribute('aria-invalid')).toBe('false');
+	// Every part of one widget instance seeds before any part renders, so the
+	// error part's `toggle.invalid = true` is what the trigger reads.
+	expect(errored.trigger.getAttribute('aria-invalid')).toBe('true');
+
+	// The same error written BEFORE the trigger: seeding completes before any
+	// part renders, so document order does not decide what a part reads.
+	const first = messages(container, 'error-first');
+	expect(first.message?.textContent).toBe('This field is required');
+	expect(first.trigger.getAttribute('aria-invalid')).toBe('true');
 }
 
 test('CSR: the description renders and the error part carries its message', async () => {

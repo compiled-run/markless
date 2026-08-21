@@ -401,10 +401,16 @@ function expectMessages(container: ParentNode) {
 		'Read our terms and conditions before accepting',
 	);
 	expect(errored.error?.textContent).toBe('Please accept the terms and conditions');
-	// The trigger's aria-invalid stays 'false' while the error is mounted: a seed
-	// written by a part only reaches parts rendered from the root's own seeds, so
-	// the error part cannot mark the trigger. Blocked row in notes/parity-table.md.
-	expect(errored.trigger.getAttribute('aria-invalid')).toBe('false');
+	// Every part of one widget instance seeds before any part renders, so the
+	// error part's `checkbox.invalid = true` is what the trigger reads.
+	expect(errored.trigger.getAttribute('aria-invalid')).toBe('true');
+
+	// The same error, written before the trigger instead of after it: seeding is
+	// a phase that completes before any part renders, so document order does not
+	// decide what a part reads. Here the error is the first div after the root.
+	const first = messages(container, 'error-first');
+	expect(first.description?.textContent).toBe('Please accept the terms and conditions');
+	expect(first.trigger.getAttribute('aria-invalid')).toBe('true');
 }
 
 test('CSR: the description renders and a mounted error marks the trigger invalid', async () => {

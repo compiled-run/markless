@@ -123,8 +123,7 @@ export function CheckboxDescription({ children, ...rest }: CheckboxDescriptionPr
 
 export function CheckboxError({ children, ...rest }: CheckboxErrorProps) @{
 	const checkbox = checkboxState();
-	// Intent: mounting the error part marks the trigger invalid. A seed a part writes
-	// does not reach its siblings yet (U-H), so the trigger still reads valid.
+	// Mounting the error part is what marks the trigger invalid.
 	checkbox.invalid = true;
 
 	<div {...rest}>{children}</div>

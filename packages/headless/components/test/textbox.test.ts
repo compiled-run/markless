@@ -186,10 +186,15 @@ function expectMessages(container: ParentNode) {
 
 	const errored = messages(container, 'errored');
 	expect(errored.first?.textContent).toBe('Password is required');
-	// The control's aria-invalid stays 'false' while the error is mounted: a seed
-	// written by a part only reaches parts rendered from the root's own seeds, so
-	// the error part cannot mark the control. Blocked row (U-H).
-	expect(errored.control.getAttribute('aria-invalid')).toBe('false');
+	// Every part of one widget instance seeds before any part renders, so the
+	// error part's `textbox.invalid = true` is what the control reads.
+	expect(errored.control.getAttribute('aria-invalid')).toBe('true');
+
+	// The same error written BEFORE the control: seeding completes before any
+	// part renders, so document order does not decide what a part reads.
+	const first = messages(container, 'error-first');
+	expect(first.first?.textContent).toBe('Password is required');
+	expect(first.control.getAttribute('aria-invalid')).toBe('true');
 
 	const both = messages(container, 'both');
 	expect(both.first?.textContent).toBe('Enter a valid email address');

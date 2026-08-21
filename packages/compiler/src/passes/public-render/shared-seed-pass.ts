@@ -7,6 +7,34 @@ type SharedSeedSymbol = {
 	readonly source: string;
 };
 
+/**
+ * The component edges placed inside one projecting child, outermost first: its
+ * projection chunk's own child components, then the ones projected into those.
+ * These are the parts of the widget that child roots, and they seed the same
+ * shared instance it does, so its seed pass must run theirs before any of them
+ * renders. Chunks reached through a repeat, branch, or async arm are not walked:
+ * which of those renders is a render-time answer, not a build-time one.
+ */
+export function projectedEdgeIdsUnder(
+	chunks: PublicRenderModuleInput['renderData']['chunks'],
+	projectionChunkId: string,
+): string[] {
+	const byId = new Map(chunks.map((chunk) => [chunk.id, chunk]));
+	const edgeIds: string[] = [];
+	const walked = new Set<string>();
+	const walk = (chunkId: string) => {
+		if (walked.has(chunkId)) return;
+		walked.add(chunkId);
+		for (const slot of byId.get(chunkId)?.slots ?? []) {
+			if (slot.kind !== 'child-component') continue;
+			edgeIds.push(slot.componentEdgeId);
+			if (slot.projectionChunkId) walk(slot.projectionChunkId);
+		}
+	};
+	walk(projectionChunkId);
+	return edgeIds;
+}
+
 /** The shared-instance seeds one component's body writes from its own props. */
 export function componentSharedSeeds(
 	input: PublicRenderModuleInput,

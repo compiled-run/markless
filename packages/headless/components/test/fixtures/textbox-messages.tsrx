@@ -25,5 +25,12 @@ export function App() @{
 				<textbox.error>Email format is invalid</textbox.error>
 			</textbox.root>
 		</div>
+		<div data-case="error-first">
+			<textbox.root>
+				<textbox.error>Password is required</textbox.error>
+				<textbox.label>Password</textbox.label>
+				<textbox.trigger />
+			</textbox.root>
+		</div>
 	</section>
 }

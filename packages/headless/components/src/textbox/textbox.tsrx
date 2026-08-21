@@ -129,8 +129,7 @@ export function TextboxDescription({ children, ...rest }: TextboxDescriptionProp
 
 export function TextboxError({ children, ...rest }: TextboxErrorProps) @{
 	const textbox = textboxState();
-	// Intent: mounting the error part marks the control invalid. A seed a part
-	// writes does not reach its siblings yet (U-H), so the control still reads valid.
+	// Mounting the error part is what marks the control invalid.
 	textbox.invalid = true;
 
 	<div {...rest}>{children}</div>

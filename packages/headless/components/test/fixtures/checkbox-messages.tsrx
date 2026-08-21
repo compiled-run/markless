@@ -19,5 +19,12 @@ export function App() @{
 				<checkbox.error>Please accept the terms and conditions</checkbox.error>
 			</checkbox.root>
 		</div>
+		<div data-case="error-first">
+			<checkbox.root required>
+				<checkbox.error>Please accept the terms and conditions</checkbox.error>
+				<checkbox.label>Accept Terms</checkbox.label>
+				<checkbox.trigger><checkbox.indicator>Checked</checkbox.indicator></checkbox.trigger>
+			</checkbox.root>
+		</div>
 	</section>
 }

@@ -9,6 +9,7 @@ import {
 import { renderBodyLines } from './render-body.ts';
 import {
 	componentSharedSeeds,
+	projectedEdgeIdsUnder,
 	sharedSeedConsumeLine,
 	sharedSeedMarkerLine,
 	sharedSeedPassLines,
@@ -365,7 +366,11 @@ function emitSsrDataRenderLines(
 			),
 		),
 	);
-	const seedCases: string[] = [];
+	// One seed block per edge, keyed by edge id, so the widget root's case can run
+	// its parts' seeds too. An edge nobody projects never reaches an emitted case.
+	const seedBlockByEdgeId = new Map<string, string>();
+	const projectionChunkByEdgeId = new Map<string, string>();
+	const widgetInstanceLineByEdgeId = new Map<string, string>();
 	const childCases = edges.flatMap((edge, index) => {
 		const component = referenceByName.get(edge.childComponentName);
 		if (!component) return [];
@@ -375,12 +380,16 @@ function emitSsrDataRenderLines(
 				return [`${objectPropertyName(prop.name)}:marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(${JSON.stringify(prop.graphNodeId)}),${JSON.stringify(prop.path)})`];
 			return prop.source ? [`${objectPropertyName(prop.name)}:(${prop.source})`] : [];
 		});
-		const hasProjection = chunks.some((chunk) =>
-			chunk.slots.some(
-				(slot) => slot.kind === 'child-component' &&
-					slot.componentEdgeId === edge.id && !!slot.projectionChunkId,
+		const projectionChunkId = chunks.flatMap((chunk) =>
+			chunk.slots.flatMap((slot) =>
+				slot.kind === 'child-component' &&
+				slot.componentEdgeId === edge.id &&
+				slot.projectionChunkId
+					? [slot.projectionChunkId]
+					: [],
 			),
-		);
+		)[0];
+		const hasProjection = projectionChunkId !== undefined;
 		// The seed pass runs before the projected children exist, so it asks for the
 		// same props without the projection.
 		const seedProps = [...props];
@@ -420,26 +429,46 @@ function emitSsrDataRenderLines(
 			: component;
 		// A same-module child answers at compile time; an imported one is asked
 		// through the marker the compiler stamped on its render function.
-		if (hasProjection) {
-			const seedCall = edge.importSource
-				? `await marklessSsrSeedChild(${component},${declaredName ? JSON.stringify(declaredName) : 'undefined'},childProps,marklessSsrRenderContext,marklessSsrSeeds);`
-				: componentSharedSeeds(input, edge.childComponentName).length > 0
-					? `await ${childSurface}?.renderSsr?.(childProps,{...marklessSsrRenderContext,marklessSharedSeeds:marklessSsrSeeds});`
-					: '';
-			// Static registration before descent: the widget root's instance token
-			// is written into the seed map the parts placed inside it read, so a
-			// part mints an id that names WHICH rendered widget it belongs to.
+		const seedCall = edge.importSource
+			? `await marklessSsrSeedChild(${component},${declaredName ? JSON.stringify(declaredName) : 'undefined'},childProps,marklessSsrRenderContext,marklessSsrSeeds);`
+			: componentSharedSeeds(input, edge.childComponentName).length > 0
+				? `await ${childSurface}?.renderSsr?.(childProps,{...marklessSsrRenderContext,marklessSharedSeeds:marklessSsrSeeds});`
+				: '';
+		if (seedCall)
+			seedBlockByEdgeId.set(
+				edge.id,
+				`{const childProps={${seedProps.join(',')}};${seedCall}}`,
+			);
+		// Static registration before descent: the widget root's instance token
+		// is written into the seed map the parts placed inside it read, so a
+		// part mints an id that names WHICH rendered widget it belongs to.
+		if (projectionChunkId !== undefined) {
+			projectionChunkByEdgeId.set(edge.id, projectionChunkId);
 			if (seedCall)
-				seedCases.push(
-					`case ${JSON.stringify(edge.id)}:{marklessSsrSeeds.set(${JSON.stringify(
+				widgetInstanceLineByEdgeId.set(
+					edge.id,
+					`marklessSsrSeeds.set(${JSON.stringify(
 						MARKLESS_WIDGET_INSTANCE_KEY,
-					)},marklessSsrIdPrefix+${JSON.stringify(
-						child.symbolPrefix,
-					)});const childProps={${seedProps.join(',')}};${seedCall}return marklessSsrSeeds;}`,
+					)},marklessSsrIdPrefix+${JSON.stringify(child.symbolPrefix)});`,
 				);
 		}
 		return [
 			`case ${JSON.stringify(edge.id)}:{const child=${JSON.stringify(child)};const childProps={${props.join(',')}};const output=await ${childSurface}?.renderSsr?.(childProps,{...marklessSsrRenderContext,idPrefix:marklessSsrIdPrefix+child.hostPrefix${projectedEdgeIds.has(edge.id) ? ',sharedSeeds:marklessSsrDataContext.sharedSeeds' : ''}});if(!output)throw new Error('MARKLESS_SSR_DATA_CHILD_RENDER_MISSING: ${edge.id}');if(marklessSsrDataContext.repeatItem!==undefined){marklessAssertPresentationalRowChild(output,${JSON.stringify(edge.childComponentName)});return output;}marklessSsrChildren.push({...child,output,callbackProps:childProps.__marklessSsrCallbacks??{}});return output;}`,
+		];
+	});
+	// U-H: every part of one widget instance seeds before any part renders, so a
+	// seed written by a part is what its siblings read whatever the document order.
+	const seedCases = [...projectionChunkByEdgeId].flatMap(([edgeId, projectionChunkId]) => {
+		const blocks = [
+			edgeId,
+			...projectedEdgeIdsUnder(input.renderData.chunks, projectionChunkId),
+		].flatMap((partEdgeId) => {
+			const block = seedBlockByEdgeId.get(partEdgeId);
+			return block ? [block] : [];
+		});
+		if (blocks.length === 0) return [];
+		return [
+			`case ${JSON.stringify(edgeId)}:{${widgetInstanceLineByEdgeId.get(edgeId) ?? ''}${blocks.join('')}return marklessSsrSeeds;}`,
 		];
 	});
 	const bindingLines = input.semanticGraph.graphBindings.flatMap((binding) =>

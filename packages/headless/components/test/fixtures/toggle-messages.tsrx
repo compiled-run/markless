@@ -18,5 +18,12 @@ export function App() @{
 				<toggle.error>This field is required</toggle.error>
 			</toggle.root>
 		</div>
+		<div data-case="error-first">
+			<toggle.root required>
+				<toggle.error>This field is required</toggle.error>
+				<toggle.label>Enable notifications</toggle.label>
+				<toggle.trigger><toggle.thumb /></toggle.trigger>
+			</toggle.root>
+		</div>
 	</section>
 }
