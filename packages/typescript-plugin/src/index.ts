@@ -9,6 +9,7 @@ import {
 	mapMarklessSourcePositionToGenerated,
 	updateMarklessTsrxParseFailure,
 } from './language.ts';
+import { installMarklessTsrxModuleResolution } from './resolution.ts';
 
 type TsserverPluginModules = { readonly typescript: any };
 type TsserverPlugin = {
@@ -70,6 +71,8 @@ const plugin = (modules: TsserverPluginModules) => {
 			// host was already decorated, so the result is treated as an opaque service rather
 			// than as a guaranteed Volar proxy.
 			const languageService = upstream.create(info) ?? info.languageService;
+			// After upstream decorates the host, so a .tsrx specifier is answered here first.
+			installMarklessTsrxModuleResolution(modules.typescript, info.languageServiceHost);
 			const enhancedLanguageService = Object.create(null);
 			for (const key of Object.keys(languageService)) {
 				const value = languageService[key as keyof typeof languageService];
