@@ -1,14 +1,14 @@
 import { cleanup, render, renderSSR } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { afterEach, beforeEach, expect, test } from 'vitest';
-import Basic from './toggle-basic.tsrx';
-import ErrorBeforeTrigger from './toggle-error-first.tsrx';
-import InvalidToggle from './toggle-invalid.tsrx';
-import NotificationsForm from './toggle-notifications-form.tsrx';
-import SavedSettingsForm from './toggle-saved-settings-form.tsrx';
-import SettingsList from './toggle-settings-list.tsrx';
-import UnavailableOptions from './toggle-unavailable-options.tsrx';
-import ToggleWithHelp from './toggle-with-help.tsrx';
+import Basic from './examples/toggle-basic.tsrx';
+import ErrorBeforeTrigger from './examples/toggle-error-first.tsrx';
+import InvalidToggle from './examples/toggle-invalid.tsrx';
+import NotificationsForm from './examples/toggle-notifications-form.tsrx';
+import SavedSettingsForm from './examples/toggle-saved-settings-form.tsrx';
+import SettingsList from './examples/toggle-settings-list.tsrx';
+import UnavailableOptions from './examples/toggle-unavailable-options.tsrx';
+import ToggleWithHelp from './examples/toggle-with-help.tsrx';
 
 // Colocated browser suite for the toggle family. Each test renders a realistic
 // consumer scenario, and the locators name the part anatomy: root, trigger,

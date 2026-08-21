@@ -1,16 +1,16 @@
 import { cleanup, render, renderSSR } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { afterEach, beforeEach, expect, test } from 'vitest';
-import Basic from './checkbox-basic.tsrx';
-import ControlledCheckboxes from './checkbox-controlled.tsrx';
-import TermsForm from './checkbox-form.tsrx';
-import InvalidCheckbox from './checkbox-invalid.tsrx';
-import PartialSelection from './checkbox-partial-selection.tsrx';
-import PrefilledForm from './checkbox-prefilled-form.tsrx';
-import SettingsList from './checkbox-settings-list.tsrx';
-import UnavailableOptions from './checkbox-unavailable-options.tsrx';
-import Uncontrolled from './checkbox-uncontrolled.tsrx';
-import CheckboxWithHelp from './checkbox-with-help.tsrx';
+import Basic from './examples/checkbox-basic.tsrx';
+import ControlledCheckboxes from './examples/checkbox-controlled.tsrx';
+import TermsForm from './examples/checkbox-form.tsrx';
+import InvalidCheckbox from './examples/checkbox-invalid.tsrx';
+import PartialSelection from './examples/checkbox-partial-selection.tsrx';
+import PrefilledForm from './examples/checkbox-prefilled-form.tsrx';
+import SettingsList from './examples/checkbox-settings-list.tsrx';
+import UnavailableOptions from './examples/checkbox-unavailable-options.tsrx';
+import Uncontrolled from './examples/checkbox-uncontrolled.tsrx';
+import CheckboxWithHelp from './examples/checkbox-with-help.tsrx';
 
 // Colocated browser suite for the checkbox family. Each test renders a realistic
 // consumer scenario, and the locators name the part anatomy: root, trigger,

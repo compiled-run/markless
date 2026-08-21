@@ -1,11 +1,11 @@
 import { cleanup, render, renderSSR } from '@markless/vitest-browser';
 import { page } from 'vite-plus/test/browser';
 import { afterEach, expect, test } from 'vitest';
-import Basic from './progress-basic.tsrx';
-import CompleteProgress from './progress-complete.tsrx';
-import CustomRange from './progress-custom-range.tsrx';
-import IndeterminateProgress from './progress-indeterminate.tsrx';
-import LiveProgress from './progress-live.tsrx';
+import Basic from './examples/progress-basic.tsrx';
+import CompleteProgress from './examples/progress-complete.tsrx';
+import CustomRange from './examples/progress-custom-range.tsrx';
+import IndeterminateProgress from './examples/progress-indeterminate.tsrx';
+import LiveProgress from './examples/progress-live.tsrx';
 
 // Colocated browser suite for the progress family. Each test renders a realistic
 // consumer scenario, and the locators name the part anatomy: root, label, track,

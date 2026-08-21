@@ -1,7 +1,7 @@
 import { cleanup, render } from '@markless/vitest-browser';
 import { page } from 'vite-plus/test/browser';
 import { afterEach, expect, test } from 'vitest';
-import Basic from './base-basic.tsrx';
+import Basic from './examples/base-basic.tsrx';
 
 // The base namespace is reached the same way a consumer reaches it: through
 // the @markless/ui barrel, which re-exports the internal base package.
