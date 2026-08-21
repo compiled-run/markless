@@ -8,6 +8,19 @@ type SharedSeedSymbol = {
 };
 
 /**
+ * A part the widget renders only when one of its `@if`/`@switch` arms is the
+ * taken one. `armGuards` names every arm the part sits inside, outermost first;
+ * the part seeds exactly when all of them are taken.
+ */
+export type ArmScopedSeedRef = {
+	readonly edgeId: string;
+	readonly armGuards: ReadonlyArray<{
+		readonly branchSiteId: string;
+		readonly armIndex: number;
+	}>;
+};
+
+/**
  * The component edges placed inside one projecting child, outermost first: its
  * projection chunk's own child components, then the ones projected into those.
  * These are the parts of the widget that child roots, and they seed the same
@@ -33,6 +46,39 @@ export function projectedEdgeIdsUnder(
 	};
 	walk(projectionChunkId);
 	return edgeIds;
+}
+
+/**
+ * The parts of one widget that a branch arm holds, each with the arms it sits
+ * inside. The compiler knows the seed and which arm chunk holds the part; only
+ * WHICH arm renders is a render-time answer, so the emitted seed pass carries
+ * the arm test and asks it at render time. A repeat row or an async arm is
+ * still not walked: those have their own render-time cardinality and lifecycle.
+ */
+export function armScopedSeedRefsUnder(
+	chunks: PublicRenderModuleInput['renderData']['chunks'],
+	projectionChunkId: string,
+): ArmScopedSeedRef[] {
+	const byId = new Map(chunks.map((chunk) => [chunk.id, chunk]));
+	const refs: ArmScopedSeedRef[] = [];
+	const walked = new Set<string>();
+	const walk = (chunkId: string, armGuards: ArmScopedSeedRef['armGuards']) => {
+		if (walked.has(chunkId)) return;
+		walked.add(chunkId);
+		for (const slot of byId.get(chunkId)?.slots ?? []) {
+			if (slot.kind === 'branch') {
+				slot.armTemplateIds.forEach((armChunkId, armIndex) =>
+					walk(armChunkId, [...armGuards, { branchSiteId: slot.branchSiteId, armIndex }]),
+				);
+				continue;
+			}
+			if (slot.kind !== 'child-component') continue;
+			if (armGuards.length > 0) refs.push({ edgeId: slot.componentEdgeId, armGuards });
+			if (slot.projectionChunkId) walk(slot.projectionChunkId, armGuards);
+		}
+	};
+	walk(projectionChunkId, []);
+	return refs;
 }
 
 /** The shared-instance seeds one component's body writes from its own props. */

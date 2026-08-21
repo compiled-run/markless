@@ -8,6 +8,7 @@ import {
 } from './html.ts';
 import { renderBodyLines } from './render-body.ts';
 import {
+	armScopedSeedRefsUnder,
 	componentSharedSeeds,
 	projectedEdgeIdsUnder,
 	sharedSeedConsumeLine,
@@ -295,18 +296,31 @@ function emitSsrDataRenderLines(
 	const branchIds = new Set(chunks.flatMap((chunk) =>
 		chunk.slots.flatMap((slot) => slot.kind === 'branch' ? [slot.branchSiteId] : []),
 	));
-	const branchCases = input.renderData.branches
-		.filter((branch) => branchIds.has(branch.branchSiteId))
-		.map((branch) => {
+	const branchArmSources = new Map(
+		input.renderData.branches.map((branch) => {
 			const testRead = branch.testReads.length === 1 ? branch.testReads[0] : undefined;
 			const testSource = testRead
 				? `marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(${JSON.stringify(testRead.graphNodeId)}),${JSON.stringify(testRead.path)})`
 				: branch.testSource;
-			const armSource = branch.kind === 'switch' && branch.armTests
-				? `(()=>{const value=(${testSource});const tests=${JSON.stringify(branch.armTests)};const match=tests.findIndex((test)=>test!==null&&Object.is(test,value));return match===-1?Math.max(0,tests.indexOf(null)):match;})()`
-				: `((${testSource})?0:1)`;
-			return `case ${JSON.stringify(branch.branchSiteId)}:{const arm=${armSource};marklessSsrBranches.push({id:marklessSsrDataSlot.branchSiteId,takenArm:arm});return arm;}`;
-		});
+			return [
+				branch.branchSiteId,
+				{
+					source: branch.kind === 'switch' && branch.armTests
+						? `(()=>{const value=(${testSource});const tests=${JSON.stringify(branch.armTests)};const match=tests.findIndex((test)=>test!==null&&Object.is(test,value));return match===-1?Math.max(0,tests.indexOf(null)):match;})()`
+						: `((${testSource})?0:1)`,
+					// A test the emitted seed pass can also ask: it reads the same state
+					// map, where an authored local the render body declares is not in scope.
+					readable: testRead !== undefined,
+				},
+			] as const;
+		}),
+	);
+	const branchCases = input.renderData.branches
+		.filter((branch) => branchIds.has(branch.branchSiteId))
+		.map(
+			(branch) =>
+				`case ${JSON.stringify(branch.branchSiteId)}:{const arm=${branchArmSources.get(branch.branchSiteId)?.source ?? '1'};marklessSsrBranches.push({id:marklessSsrDataSlot.branchSiteId,takenArm:arm});return arm;}`,
+		);
 	const repeatIds = new Set(chunks.flatMap((chunk) =>
 		chunk.slots.flatMap((slot) => slot.kind === 'repeat' ? [slot.repeatId] : []),
 	));
@@ -350,18 +364,25 @@ function emitSsrDataRenderLines(
 	const referenceByName = new Map(references.map((reference) => [reference.componentName, reference.localName]));
 	const callbacks = callbackSymbolIds(input);
 	// An edge whose slot sits inside another edge's projection chunk is PROJECTED
-	// into that component: it renders from what that component's body seeded.
+	// into that component: it renders from what that component's body seeded. A
+	// part an arm holds is projected the same way — the arm only decides whether
+	// it renders, not which widget it belongs to.
 	const projectedEdgeIds = new Set(
 		chunks.flatMap((chunk) =>
 			chunk.slots.flatMap((slot) =>
 				slot.kind === 'child-component' && slot.projectionChunkId
-					? (
-							input.renderData.chunks.find(
-								(candidate) => candidate.id === slot.projectionChunkId,
-							)?.slots ?? []
-						).flatMap((projected) =>
-							projected.kind === 'child-component' ? [projected.componentEdgeId] : [],
-						)
+					? [
+							...(
+								input.renderData.chunks.find(
+									(candidate) => candidate.id === slot.projectionChunkId,
+								)?.slots ?? []
+							).flatMap((projected) =>
+								projected.kind === 'child-component' ? [projected.componentEdgeId] : [],
+							),
+							...armScopedSeedRefsUnder(input.renderData.chunks, slot.projectionChunkId).map(
+								(ref) => ref.edgeId,
+							),
+						]
 					: [],
 			),
 		),
@@ -460,12 +481,25 @@ function emitSsrDataRenderLines(
 	// seed written by a part is what its siblings read whatever the document order.
 	const seedCases = [...projectionChunkByEdgeId].flatMap(([edgeId, projectionChunkId]) => {
 		const blocks = [
-			edgeId,
-			...projectedEdgeIdsUnder(input.renderData.chunks, projectionChunkId),
-		].flatMap((partEdgeId) => {
-			const block = seedBlockByEdgeId.get(partEdgeId);
-			return block ? [block] : [];
-		});
+			...[edgeId, ...projectedEdgeIdsUnder(input.renderData.chunks, projectionChunkId)].flatMap(
+				(partEdgeId) => {
+					const block = seedBlockByEdgeId.get(partEdgeId);
+					return block ? [block] : [];
+				},
+			),
+			// T052: a part an arm holds seeds when its arm is the taken one, so the
+			// widget's post-seed value is what every part renders from.
+			...armScopedSeedRefsUnder(input.renderData.chunks, projectionChunkId).flatMap((ref) => {
+				const block = seedBlockByEdgeId.get(ref.edgeId);
+				const guards = ref.armGuards.flatMap((guard) => {
+					const arm = branchArmSources.get(guard.branchSiteId);
+					return arm?.readable ? [`(${arm.source})===${String(guard.armIndex)}`] : [];
+				});
+				return block && guards.length === ref.armGuards.length
+					? [`if(${guards.join('&&')}){${block}}`]
+					: [];
+			}),
+		];
 		if (blocks.length === 0) return [];
 		return [
 			`case ${JSON.stringify(edgeId)}:{${widgetInstanceLineByEdgeId.get(edgeId) ?? ''}${blocks.join('')}return marklessSsrSeeds;}`,

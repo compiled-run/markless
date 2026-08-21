@@ -31,19 +31,25 @@ const seedProjectingChild: SharedSeedPass = async (
 	// U-H: every part of this widget instance contributes before any part
 	// renders, so a seed a part writes is what its siblings read whatever the
 	// document order.
-	for (const edge of [rootEdge, ...projectedEdges(context.surface, definition, componentEdgeId)])
+	for (const edge of [
+		rootEdge,
+		...projectedEdges(context.surface, definition, componentEdgeId, read),
+	])
 		await applySharedSeeds(context, edge, read, seeded);
 	return seeded;
 };
 
-// The component edges placed inside the projecting child, outermost first:
-// its projection chunk's own child components, then the ones projected into
-// those. A repeat, branch, or async arm is not walked - which of those renders
-// is a render-time answer.
+// The component edges placed inside the projecting child, outermost first: its
+// projection chunk's own child components, then the ones projected into those.
+// A branch arm IS walked, but only into the arm this render takes - the arm
+// decides whether the part renders, never which widget it belongs to. A repeat
+// row or an async arm is not walked: those have their own cardinality and
+// lifecycle.
 function projectedEdges(
 	surface: PrerenderDataSurface,
 	definition: PrerenderDataDefinition,
 	componentEdgeId: string,
+	read: PrerenderReadSeed,
 ): SeedEdge[] {
 	const chunks = surface.renderData.chunks.filter(
 		(chunk) => chunk.componentName === definition.name,
@@ -65,6 +71,11 @@ function projectedEdges(
 		if (walked.has(chunkId)) return;
 		walked.add(chunkId);
 		for (const slot of byId.get(chunkId)?.slots ?? []) {
+			if (slot.kind === 'branch') {
+				const armChunkId = slot.armTemplateIds[takenArm(definition, slot.branchSiteId, read)];
+				if (armChunkId) walk(armChunkId);
+				continue;
+			}
 			if (slot.kind !== 'child-component') continue;
 			edgeIds.push(slot.componentEdgeId);
 			if (slot.projectionChunkId) walk(slot.projectionChunkId);
@@ -76,6 +87,26 @@ function projectedEdges(
 		const edge = edges.find((candidate) => candidate.id === edgeId);
 		return edge && !edge.materialized ? [edge] : [];
 	});
+}
+
+// The same arm the renderer will take, asked before the arm renders. A branch
+// with no recorded test read has no arm this pass can name, so nothing under it
+// seeds and the render behaves as it did before arms carried seeds.
+function takenArm(
+	definition: PrerenderDataDefinition,
+	branchSiteId: string,
+	read: PrerenderReadSeed,
+): number {
+	const branch = (definition.branches ?? []).find(
+		(candidate) => candidate.branchSiteId === branchSiteId,
+	);
+	const testRead = branch?.testReads?.[0];
+	if (!testRead) return -1;
+	const value = read(testRead.graphNodeId, testRead.path);
+	const armTests = branch?.armTests;
+	if (!armTests) return value ? 0 : 1;
+	const match = armTests.findIndex((candidate) => candidate !== null && Object.is(candidate, value));
+	return match >= 0 ? match : armTests.indexOf(null);
 }
 
 async function applySharedSeeds(
