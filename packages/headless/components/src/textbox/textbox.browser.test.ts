@@ -119,7 +119,7 @@ test.fails('CSR: a label beside a multiline trigger names an element that exists
 	const multiline = widget(screen.container as HTMLElement, 'multiline');
 	const named = multiline.label.getAttribute('for');
 	expect(named).not.toBeNull();
-	expect(screen.container.querySelector(`#${named}`)).not.toBeNull();
+	expect((screen.container as HTMLElement).querySelector(`#${named}`)).not.toBeNull();
 });
 
 // --- typing ---------------------------------------------------------------

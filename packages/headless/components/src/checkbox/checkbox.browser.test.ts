@@ -1,10 +1,44 @@
 import { cleanup, render, renderSSR } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { afterEach, beforeEach, expect, test } from 'vitest';
-import ChangeApp from './checkbox-change.test-app.tsrx';
-import FormApp from './checkbox-form.test-app.tsrx';
-import MessagesApp from './checkbox-messages.test-app.tsrx';
-import StatesApp from './checkbox-states.test-app.tsrx';
+import BasicCheckbox from './checkbox-basic.tsrx';
+import CheckedDisabledCheckbox from './checkbox-checked-disabled.tsrx';
+import CheckedCheckbox from './checkbox-checked.tsrx';
+import ControlledCheckboxes from './checkbox-controlled.tsrx';
+import DescribedCheckbox from './checkbox-described.tsrx';
+import DisabledCheckbox from './checkbox-disabled.tsrx';
+import ErrorFirstCheckbox from './checkbox-error-first.tsrx';
+import ErroredCheckbox from './checkbox-errored.tsrx';
+import CheckedFormCheckbox from './checkbox-form-checked.tsrx';
+import MixedFormCheckbox from './checkbox-form-mixed.tsrx';
+import ValuedFormCheckbox from './checkbox-form-valued.tsrx';
+import FormCheckbox from './checkbox-form.tsrx';
+import MixedCheckbox from './checkbox-mixed.tsrx';
+import SilentCheckbox from './checkbox-silent.tsrx';
+import TwoCheckboxes from './checkbox-two.tsrx';
+
+// Colocated browser suite for the checkbox family, in the QDS shape: locators
+// name the part anatomy, and each test renders a real example component a
+// consumer could copy. The harness mounts a zero-argument component, so a state
+// is a thin example wrapper rather than a prop passed to render().
+const Root = page.getByTestId('root');
+const Trigger = page.getByTestId('trigger');
+const Indicator = page.getByTestId('indicator');
+const Label = page.getByTestId('label');
+const Description = page.getByTestId('description');
+const CheckboxError = page.getByTestId('error');
+const HiddenInput = page.getByTestId('field');
+const SubmitButton = page.getByTestId('submit');
+const Submitted = page.getByTestId('submitted');
+const Calls = page.getByTestId('calls');
+const FirstTrigger = page.getByTestId('first-trigger');
+const FirstIndicator = page.getByTestId('first-indicator');
+const FirstValue = page.getByTestId('first-value');
+const SecondTrigger = page.getByTestId('second-trigger');
+const SecondIndicator = page.getByTestId('second-indicator');
+const SecondValue = page.getByTestId('second-value');
+const ThirdTrigger = page.getByTestId('third-trigger');
+const ThirdIndicator = page.getByTestId('third-indicator');
 
 // Two runtime errors escape as unhandled rejections while this suite runs, and
 // neither is a defect in the family or in these assertions:
@@ -29,78 +63,88 @@ afterEach(async () => {
 	window.removeEventListener('unhandledrejection', onUnmatchedRejection);
 });
 
-// Colocated browser suite for the checkbox family, in the QDS shape: top-level
-// testid locators naming each case, and one test app module per case beside it.
-const Plain = page.getByTestId('plain');
-const Checked = page.getByTestId('checked');
-const Mixed = page.getByTestId('mixed');
-const Disabled = page.getByTestId('disabled');
-const Both = page.getByTestId('both');
-const Valued = page.getByTestId('valued');
-const Described = page.getByTestId('described');
-const Errored = page.getByTestId('errored');
-const ErrorFirst = page.getByTestId('error-first');
-const First = page.getByTestId('first');
-const Second = page.getByTestId('second');
-const Silent = page.getByTestId('silent');
-
-// Every case the top-level locators name reached the page under test.
-function expectCasesOnPage(...locators: Array<{ element(): Element | null }>) {
-	for (const locator of locators) expect(locator.element()).toBeTruthy();
+function el(locator: { element(): Element | null }) {
+	const found = locator.element();
+	if (!found) throw new Error('Expected the part to be on the page.');
+	return found as HTMLElement;
 }
 
-function widget(container: ParentNode, name: string) {
-	const host = container.querySelector(`[data-testid="${name}"]`);
-	if (!host) throw new Error(`Expected the "${name}" checkbox.`);
-	return {
-		root: host.querySelector('div') as HTMLElement,
-		trigger: host.querySelector('button') as HTMLButtonElement,
-		indicator: host.querySelector('span') as HTMLElement,
-		label: host.querySelector('label') as HTMLLabelElement,
-	};
-}
+// --- seeded configuration -------------------------------------------------
 
-function expectStates(container: ParentNode) {
-	expectCasesOnPage(Plain, Checked, Mixed, Disabled, Both);
-	const plain = widget(container, 'plain');
-	expect(plain.trigger.getAttribute('role')).toBe('checkbox');
-	expect(plain.trigger.getAttribute('aria-checked')).toBe('false');
-	expect(plain.root.hasAttribute('ui-checked')).toBe(false);
-	expect(plain.indicator.textContent).toBe('');
-
-	const checked = widget(container, 'checked');
-	expect(checked.trigger.getAttribute('aria-checked')).toBe('true');
-	expect(checked.root.getAttribute('ui-checked')).toBe('');
-	expect(checked.indicator.textContent).toBe('Checked');
-
-	const mixed = widget(container, 'mixed');
-	expect(mixed.trigger.getAttribute('aria-checked')).toBe('mixed');
-	expect(mixed.root.getAttribute('ui-mixed')).toBe('');
-	expect(mixed.root.hasAttribute('ui-checked')).toBe(false);
-	expect(mixed.indicator.textContent).toBe('Checked');
-
-	const disabled = widget(container, 'disabled');
-	expect(disabled.trigger.getAttribute('disabled')).toBe('');
-	expect(disabled.root.getAttribute('ui-disabled')).toBe('');
-
-	const both = widget(container, 'both');
-	expect(both.root.getAttribute('ui-checked')).toBe('');
-	expect(both.root.getAttribute('ui-disabled')).toBe('');
-
+function expectPlainRendered() {
+	expect(el(Trigger).getAttribute('role')).toBe('checkbox');
+	expect(el(Trigger).getAttribute('aria-checked')).toBe('false');
+	expect(el(Root).hasAttribute('ui-checked')).toBe(false);
+	expect(el(Indicator).textContent).toBe('');
 	// The label points at its own trigger, by a minted id nobody spelled.
-	expect(plain.label.getAttribute('for')).toBe(plain.trigger.getAttribute('id'));
-	expect(plain.trigger.id).toBeTruthy();
-	expect(plain.label.getAttribute('for')).not.toBe(checked.label.getAttribute('for'));
+	expect(el(Label).getAttribute('for')).toBe(el(Trigger).getAttribute('id'));
+	expect(el(Trigger).id).toBeTruthy();
+}
+
+function expectCheckedRendered() {
+	expect(el(Trigger).getAttribute('aria-checked')).toBe('true');
+	expect(el(Root).getAttribute('ui-checked')).toBe('');
+	expect(el(Indicator).textContent).toBe('Checked');
+}
+
+function expectMixedRendered() {
+	expect(el(Trigger).getAttribute('aria-checked')).toBe('mixed');
+	expect(el(Root).getAttribute('ui-mixed')).toBe('');
+	expect(el(Root).hasAttribute('ui-checked')).toBe(false);
+	expect(el(Indicator).textContent).toBe('Checked');
+}
+
+function expectDisabledRendered() {
+	expect(el(Trigger).getAttribute('disabled')).toBe('');
+	expect(el(Root).getAttribute('ui-disabled')).toBe('');
+}
+
+function expectCheckedDisabledRendered() {
+	expect(el(Root).getAttribute('ui-checked')).toBe('');
+	expect(el(Root).getAttribute('ui-disabled')).toBe('');
 }
 
 test('CSR: a seeded config renders across every part', async () => {
-	const screen = await render(StatesApp);
-	expectStates(screen.container as HTMLElement);
+	await render(BasicCheckbox);
+	expectPlainRendered();
+	await cleanup();
+	await render(CheckedCheckbox);
+	expectCheckedRendered();
+	await cleanup();
+	await render(MixedCheckbox);
+	expectMixedRendered();
+	await cleanup();
+	await render(DisabledCheckbox);
+	expectDisabledRendered();
+	await cleanup();
+	await render(CheckedDisabledCheckbox);
+	expectCheckedDisabledRendered();
 });
 
 test('SSR: a seeded config renders across every part', async () => {
-	const screen = await renderSSR(StatesApp);
-	expectStates(screen.container);
+	await renderSSR(BasicCheckbox);
+	expectPlainRendered();
+	await cleanup();
+	await renderSSR(CheckedCheckbox);
+	expectCheckedRendered();
+	await cleanup();
+	await renderSSR(MixedCheckbox);
+	expectMixedRendered();
+	await cleanup();
+	await renderSSR(DisabledCheckbox);
+	expectDisabledRendered();
+	await cleanup();
+	await renderSSR(CheckedDisabledCheckbox);
+	expectCheckedDisabledRendered();
+});
+
+// Two labels on one page mint different ids, so a label names exactly one trigger.
+test('CSR: each instance mints its own trigger id', async () => {
+	await render(TwoCheckboxes);
+	const first = el(page.getByTestId('first-label')).getAttribute('for');
+	const second = el(page.getByTestId('second-label')).getAttribute('for');
+	expect(first).toBe(el(FirstTrigger).getAttribute('id'));
+	expect(first).not.toBe(second);
 });
 
 // --- gestures -------------------------------------------------------------
@@ -111,147 +155,130 @@ test('SSR: a seeded config renders across every part', async () => {
 // moves with the plain read beside it. The parts that observe the write are in
 // different components from the part that made it.
 
-async function expectClickShowsIndicator(container: ParentNode) {
-	const plain = widget(container, 'plain');
-	const neighbour = widget(container, 'checked');
-
-	plain.trigger.click();
-	await expect.poll(() => plain.indicator.textContent).toBe('Checked');
+async function expectClickShowsIndicator() {
+	el(FirstTrigger).click();
+	await expect.poll(() => el(FirstIndicator).textContent).toBe('Checked');
 	// The trigger's tri-state and the root's flag are comparisons over the same
 	// cell the click wrote, and they moved with it.
-	await expect.poll(() => plain.trigger.getAttribute('aria-checked')).toBe('true');
-	expect(plain.root.getAttribute('ui-checked')).toBe('');
+	await expect.poll(() => el(FirstTrigger).getAttribute('aria-checked')).toBe('true');
+	expect(el(page.getByTestId('first-root')).getAttribute('ui-checked')).toBe('');
 	// The click landed in one family only: the neighbour kept its own value.
-	expect(neighbour.indicator.textContent).toBe('Checked');
-	expect(neighbour.trigger.getAttribute('aria-checked')).toBe('true');
-	expect(widget(container, 'mixed').indicator.textContent).toBe('Checked');
-	expect(widget(container, 'mixed').trigger.getAttribute('aria-checked')).toBe('mixed');
+	expect(el(SecondIndicator).textContent).toBe('Checked');
+	expect(el(SecondTrigger).getAttribute('aria-checked')).toBe('true');
+	expect(el(ThirdIndicator).textContent).toBe('Checked');
+	expect(el(ThirdTrigger).getAttribute('aria-checked')).toBe('mixed');
 
-	plain.trigger.click();
-	await expect.poll(() => plain.indicator.textContent).toBe('');
+	el(FirstTrigger).click();
+	await expect.poll(() => el(FirstIndicator).textContent).toBe('');
 	// A false comparison removes the attribute rather than writing "false".
-	await expect.poll(() => plain.trigger.getAttribute('aria-checked')).toBe('false');
-	expect(plain.root.hasAttribute('ui-checked')).toBe(false);
-	expect(neighbour.indicator.textContent).toBe('Checked');
+	await expect.poll(() => el(FirstTrigger).getAttribute('aria-checked')).toBe('false');
+	expect(el(page.getByTestId('first-root')).hasAttribute('ui-checked')).toBe(false);
+	expect(el(SecondIndicator).textContent).toBe('Checked');
 }
 
-async function expectCheckedHidesIndicator(container: ParentNode) {
-	const checked = widget(container, 'checked');
-	checked.trigger.click();
-	await expect.poll(() => checked.indicator.textContent).toBe('');
-	await expect.poll(() => checked.trigger.getAttribute('aria-checked')).toBe('false');
-	expect(checked.root.hasAttribute('ui-checked')).toBe(false);
+async function expectCheckedHidesIndicator() {
+	el(SecondTrigger).click();
+	await expect.poll(() => el(SecondIndicator).textContent).toBe('');
+	await expect.poll(() => el(SecondTrigger).getAttribute('aria-checked')).toBe('false');
+	expect(el(page.getByTestId('second-root')).hasAttribute('ui-checked')).toBe(false);
 	// The neighbour that started unchecked is still unchecked.
-	expect(widget(container, 'plain').indicator.textContent).toBe('');
-	expect(widget(container, 'plain').trigger.getAttribute('aria-checked')).toBe('false');
+	expect(el(FirstIndicator).textContent).toBe('');
+	expect(el(FirstTrigger).getAttribute('aria-checked')).toBe('false');
 }
 
-async function expectMixedTransitions(container: ParentNode) {
-	const mixed = widget(container, 'mixed');
-	expect(mixed.trigger.getAttribute('aria-checked')).toBe('mixed');
+async function expectMixedTransitions() {
+	expect(el(ThirdTrigger).getAttribute('aria-checked')).toBe('mixed');
 	// mixed -> checked keeps the indicator up, checked -> unchecked takes it down.
-	mixed.trigger.click();
-	await expect.poll(() => mixed.indicator.textContent).toBe('Checked');
-	await expect.poll(() => mixed.trigger.getAttribute('aria-checked')).toBe('true');
-	expect(mixed.root.getAttribute('ui-checked')).toBe('');
-	expect(mixed.root.hasAttribute('ui-mixed')).toBe(false);
-	mixed.trigger.click();
-	await expect.poll(() => mixed.indicator.textContent).toBe('');
-	await expect.poll(() => mixed.trigger.getAttribute('aria-checked')).toBe('false');
-	expect(mixed.root.hasAttribute('ui-checked')).toBe(false);
+	el(ThirdTrigger).click();
+	await expect.poll(() => el(ThirdIndicator).textContent).toBe('Checked');
+	await expect.poll(() => el(ThirdTrigger).getAttribute('aria-checked')).toBe('true');
+	expect(el(page.getByTestId('third-root')).getAttribute('ui-checked')).toBe('');
+	expect(el(page.getByTestId('third-root')).hasAttribute('ui-mixed')).toBe(false);
+	el(ThirdTrigger).click();
+	await expect.poll(() => el(ThirdIndicator).textContent).toBe('');
+	await expect.poll(() => el(ThirdTrigger).getAttribute('aria-checked')).toBe('false');
+	expect(el(page.getByTestId('third-root')).hasAttribute('ui-checked')).toBe(false);
 }
 
-async function expectLabelToggles(container: ParentNode) {
-	const plain = widget(container, 'plain');
-	const checked = widget(container, 'checked');
-
+async function expectLabelToggles() {
 	// The label names the trigger through a minted id, so a click on it is a
 	// click on the checkbox — the label part has no handler of its own.
-	plain.label.click();
-	await expect.poll(() => plain.indicator.textContent).toBe('Checked');
+	el(page.getByTestId('first-label')).click();
+	await expect.poll(() => el(FirstIndicator).textContent).toBe('Checked');
 
-	checked.label.click();
-	await expect.poll(() => checked.indicator.textContent).toBe('');
+	el(page.getByTestId('second-label')).click();
+	await expect.poll(() => el(SecondIndicator).textContent).toBe('');
 }
 
-function expectDisabledBlocks(container: ParentNode) {
-	const disabled = widget(container, 'disabled');
-	disabled.trigger.click();
-	expect(disabled.indicator.textContent).toBe('');
-	expect(disabled.trigger.getAttribute('ui-disabled')).toBe('');
+function expectDisabledBlocks() {
+	el(Trigger).click();
+	expect(el(Indicator).textContent).toBe('');
+	expect(el(Trigger).getAttribute('ui-disabled')).toBe('');
 }
 
 test('CSR: clicking the trigger checks one family and leaves its neighbours alone', async () => {
-	const screen = await render(StatesApp);
-	await expectClickShowsIndicator(screen.container as HTMLElement);
+	await render(TwoCheckboxes);
+	await expectClickShowsIndicator();
 });
-
 
 test('CSR: a checked family unchecks on click', async () => {
-	const screen = await render(StatesApp);
-	await expectCheckedHidesIndicator(screen.container as HTMLElement);
+	await render(TwoCheckboxes);
+	await expectCheckedHidesIndicator();
 });
-
 
 test('CSR: mixed goes to checked, then to unchecked', async () => {
-	const screen = await render(StatesApp);
-	await expectMixedTransitions(screen.container as HTMLElement);
+	await render(TwoCheckboxes);
+	await expectMixedTransitions();
 });
-
 
 test('CSR: clicking the label toggles the checkbox it names', async () => {
-	const screen = await render(StatesApp);
-	await expectLabelToggles(screen.container as HTMLElement);
+	await render(TwoCheckboxes);
+	await expectLabelToggles();
 });
-
 
 // The indicator's arm is a branch in a projected part, which does not re-render
 // after an SSR resume (U-F in notes/parity-table.md). The derived ATTRIBUTES do,
 // so this is the resume half of the tri-state rows without the blocked arm.
-async function expectTriStateFollowsAfterResume(container: ParentNode) {
-	const plain = widget(container, 'plain');
-	const mixed = widget(container, 'mixed');
+async function expectTriStateFollowsAfterResume() {
+	el(FirstTrigger).click();
+	await expect.poll(() => el(FirstTrigger).getAttribute('aria-checked')).toBe('true');
+	expect(el(page.getByTestId('first-root')).getAttribute('ui-checked')).toBe('');
+	expect(el(ThirdTrigger).getAttribute('aria-checked')).toBe('mixed');
 
-	plain.trigger.click();
-	await expect.poll(() => plain.trigger.getAttribute('aria-checked')).toBe('true');
-	expect(plain.root.getAttribute('ui-checked')).toBe('');
-	expect(mixed.trigger.getAttribute('aria-checked')).toBe('mixed');
+	el(FirstTrigger).click();
+	await expect.poll(() => el(FirstTrigger).getAttribute('aria-checked')).toBe('false');
+	expect(el(page.getByTestId('first-root')).hasAttribute('ui-checked')).toBe(false);
 
-	plain.trigger.click();
-	await expect.poll(() => plain.trigger.getAttribute('aria-checked')).toBe('false');
-	expect(plain.root.hasAttribute('ui-checked')).toBe(false);
-
-	mixed.trigger.click();
-	await expect.poll(() => mixed.trigger.getAttribute('aria-checked')).toBe('true');
-	expect(mixed.root.hasAttribute('ui-mixed')).toBe(false);
+	el(ThirdTrigger).click();
+	await expect.poll(() => el(ThirdTrigger).getAttribute('aria-checked')).toBe('true');
+	expect(el(page.getByTestId('third-root')).hasAttribute('ui-mixed')).toBe(false);
 }
 
 test('SSR: the tri-state attributes follow a click after resume', async () => {
-	const screen = await renderSSR(StatesApp);
-	await expectTriStateFollowsAfterResume(screen.container);
+	await renderSSR(TwoCheckboxes);
+	await expectTriStateFollowsAfterResume();
 });
 
 test('CSR: a disabled trigger does not toggle', async () => {
-	const screen = await render(StatesApp);
-	expectDisabledBlocks(screen.container as HTMLElement);
+	await render(DisabledCheckbox);
+	expectDisabledBlocks();
 });
 
 test('SSR: a disabled trigger does not toggle', async () => {
-	const screen = await renderSSR(StatesApp);
-	expectDisabledBlocks(screen.container);
+	await renderSSR(DisabledCheckbox);
+	expectDisabledBlocks();
 });
 
 // --- keyboard -------------------------------------------------------------
 
-async function expectSpaceToggles(container: ParentNode) {
-	const plain = widget(container, 'plain');
-	plain.trigger.focus();
-	expect(document.activeElement).toBe(plain.trigger);
+async function expectSpaceToggles() {
+	el(Trigger).focus();
+	expect(document.activeElement).toBe(el(Trigger));
 
 	// Space activates a native button on keyup, so the trigger needs no rule of
 	// its own for it; the family only has to not get in the way.
 	await userEvent.keyboard(' ');
-	await expect.poll(() => plain.indicator.textContent).toBe('Checked');
+	await expect.poll(() => el(Indicator).textContent).toBe('Checked');
 }
 
 // U-M: a Markless handler runs after dispatch returns, so the trigger's
@@ -260,190 +287,216 @@ async function expectSpaceToggles(container: ParentNode) {
 // — `defaultPrevented` is true a tick later — but nothing enforces it, so whether
 // Enter toggles is a race. This asserts the race rather than one side of it; the
 // behavioural row is blocked in notes/parity-table.md.
-async function expectEnterPreventionIsLate(container: ParentNode) {
-	const plain = widget(container, 'plain');
-	plain.trigger.focus();
+async function expectEnterPreventionIsLate() {
+	el(Trigger).focus();
 
 	const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
-	plain.trigger.dispatchEvent(enter);
+	el(Trigger).dispatchEvent(enter);
 	expect(enter.defaultPrevented).toBe(false);
 	await expect.poll(() => enter.defaultPrevented).toBe(true);
 }
 
 test('CSR: Space on the focused trigger toggles the checkbox', async () => {
-	const screen = await render(StatesApp);
-	await expectSpaceToggles(screen.container as HTMLElement);
+	await render(BasicCheckbox);
+	await expectSpaceToggles();
 });
 
 test('CSR: the trigger asks to prevent Enter, and the request lands too late', async () => {
-	const screen = await render(StatesApp);
-	await expectEnterPreventionIsLate(screen.container as HTMLElement);
+	await render(BasicCheckbox);
+	await expectEnterPreventionIsLate();
 });
 
 // --- form participation ---------------------------------------------------
 
-function form(container: ParentNode, name: string) {
-	const host = container.querySelector(`[data-testid="${name}"]`) as HTMLFormElement;
-	if (!host) throw new Error(`Expected the "${name}" form.`);
-	return {
-		host,
-		field: host.querySelector('input[type="checkbox"]') as HTMLInputElement,
-		submitted: host.querySelector('output') as HTMLOutputElement,
-	};
-}
-
-function expectFieldRendered(container: ParentNode) {
-	expectCasesOnPage(Plain, Checked, Valued, Mixed);
-	const plain = form(container, 'plain');
-	expect(plain.field).not.toBeNull();
-	expect(plain.field.getAttribute('name')).toBe('terms');
+function expectPlainFieldRendered() {
+	expect(el(HiddenInput)).not.toBeNull();
+	expect(el(HiddenInput).getAttribute('name')).toBe('terms');
 	// The default a browser submits for a checkbox that carries no value.
-	expect(plain.field.getAttribute('value')).toBe('on');
-	expect(plain.field.hasAttribute('checked')).toBe(false);
-	expect(plain.field.hasAttribute('required')).toBe(false);
+	expect(el(HiddenInput).getAttribute('value')).toBe('on');
+	expect(el(HiddenInput).hasAttribute('checked')).toBe(false);
+	expect(el(HiddenInput).hasAttribute('required')).toBe(false);
 	// Present for a form and for assistive tech, absent from sight.
-	expect(getComputedStyle(plain.field.parentElement as Element).position).toBe('absolute');
+	expect(getComputedStyle(el(HiddenInput).parentElement as Element).position).toBe('absolute');
+}
 
-	const checked = form(container, 'checked');
-	expect(checked.field.getAttribute('checked')).toBe('');
-	expect(checked.field.checked).toBe(true);
+function expectCheckedFieldRendered() {
+	expect(el(HiddenInput).getAttribute('checked')).toBe('');
+	expect((el(HiddenInput) as HTMLInputElement).checked).toBe(true);
+}
 
-	const valued = form(container, 'valued');
-	expect(valued.field.getAttribute('value')).toBe('checked');
-	expect(valued.field.getAttribute('required')).toBe('');
+function expectValuedFieldRendered() {
+	expect(el(HiddenInput).getAttribute('value')).toBe('checked');
+	expect(el(HiddenInput).getAttribute('required')).toBe('');
+}
 
+function expectMixedFieldRendered() {
 	// QDS asserts the attribute here too, not the IDL property.
-	const mixed = form(container, 'mixed');
-	expect(mixed.field.getAttribute('indeterminate')).toBe('');
-	expect(mixed.field.hasAttribute('checked')).toBe(false);
-}
-
-async function expectSubmissions(container: ParentNode) {
-	// The submit event is dispatched rather than clicked: a real submit would
-	// navigate the test iframe. What is proven is what the browser itself put in
-	// the FormData for this form, which is the whole point of the field part.
-	function submit(name: string) {
-		const { host, submitted } = form(container, name);
-		host.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-		return submitted;
-	}
-
-	await expect.poll(() => submit('plain').textContent).toBe('{}');
-	await expect.poll(() => submit('checked').textContent).toBe('{"terms":"on"}');
-	await expect.poll(() => submit('valued').textContent).toBe('{"terms":"checked"}');
-	// Indeterminate is not checked: a mixed box submits nothing.
-	await expect.poll(() => submit('mixed').textContent).toBe('{}');
-}
-
-async function expectFieldFollowsTheTrigger(container: ParentNode) {
-	const plain = form(container, 'plain');
-	const trigger = plain.host.querySelector('button[type="button"]') as HTMLButtonElement;
-
-	trigger.click();
-	// `checked` and `indeterminate` on the field are comparisons over the cell
-	// the trigger wrote, in a different part from the one that wrote it. A live
-	// `checked` lands on the property, which is what a submission reads.
-	await expect.poll(() => plain.field.checked).toBe(true);
-	await expect.poll(() => submitted(plain).textContent).toBe('{"terms":"on"}');
-
-	trigger.click();
-	await expect.poll(() => plain.field.checked).toBe(false);
-	await expect.poll(() => submitted(plain).textContent).toBe('{}');
-
-	// A mixed box resolves to checked on the first click, the way a native
-	// indeterminate box does, and stops being indeterminate.
-	const mixed = form(container, 'mixed');
-	expect(mixed.field.hasAttribute('indeterminate')).toBe(true);
-	(mixed.host.querySelector('button[type="button"]') as HTMLButtonElement).click();
-	await expect.poll(() => mixed.field.hasAttribute('indeterminate')).toBe(false);
-	expect(mixed.field.checked).toBe(true);
+	expect(el(HiddenInput).getAttribute('indeterminate')).toBe('');
+	expect(el(HiddenInput).hasAttribute('checked')).toBe(false);
 }
 
 // A real submit would navigate the test iframe, so the event is dispatched.
-function submitted(entry: ReturnType<typeof form>) {
-	entry.host.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-	return entry.submitted;
+// What is proven is what the browser itself put in the FormData for this form,
+// which is the whole point of the field part.
+function submit() {
+	el(page.getByTestId('form')).dispatchEvent(
+		new Event('submit', { bubbles: true, cancelable: true }),
+	);
+	return el(Submitted);
+}
+
+async function expectFieldFollowsTheTrigger() {
+	el(Trigger).click();
+	// `checked` and `indeterminate` on the field are comparisons over the cell
+	// the trigger wrote, in a different part from the one that wrote it. A live
+	// `checked` lands on the property, which is what a submission reads.
+	await expect.poll(() => (el(HiddenInput) as HTMLInputElement).checked).toBe(true);
+	await expect.poll(() => submit().textContent).toBe('{"terms":"on"}');
+
+	el(Trigger).click();
+	await expect.poll(() => (el(HiddenInput) as HTMLInputElement).checked).toBe(false);
+	await expect.poll(() => submit().textContent).toBe('{}');
+}
+
+async function expectMixedResolvesOnFirstClick() {
+	// A mixed box resolves to checked on the first click, the way a native
+	// indeterminate box does, and stops being indeterminate.
+	expect(el(HiddenInput).hasAttribute('indeterminate')).toBe(true);
+	el(Trigger).click();
+	await expect.poll(() => el(HiddenInput).hasAttribute('indeterminate')).toBe(false);
+	expect((el(HiddenInput) as HTMLInputElement).checked).toBe(true);
 }
 
 test('CSR: the field renders the config a form needs', async () => {
-	const screen = await render(FormApp);
-	expectFieldRendered(screen.container as HTMLElement);
+	await render(FormCheckbox);
+	expectPlainFieldRendered();
+	await cleanup();
+	await render(CheckedFormCheckbox);
+	expectCheckedFieldRendered();
+	await cleanup();
+	await render(ValuedFormCheckbox);
+	expectValuedFieldRendered();
+	await cleanup();
+	await render(MixedFormCheckbox);
+	expectMixedFieldRendered();
 });
 
 test('SSR: the field renders the config a form needs', async () => {
-	const screen = await renderSSR(FormApp);
-	expectFieldRendered(screen.container);
+	await renderSSR(FormCheckbox);
+	expectPlainFieldRendered();
+	await cleanup();
+	await renderSSR(CheckedFormCheckbox);
+	expectCheckedFieldRendered();
+	await cleanup();
+	await renderSSR(ValuedFormCheckbox);
+	expectValuedFieldRendered();
+	await cleanup();
+	await renderSSR(MixedFormCheckbox);
+	expectMixedFieldRendered();
 });
 
 test('CSR: submitting carries the checkbox into the FormData', async () => {
-	const screen = await render(FormApp);
-	await expectSubmissions(screen.container as HTMLElement);
+	await render(FormCheckbox);
+	await expect.poll(() => submit().textContent).toBe('{}');
+	await cleanup();
+	await render(CheckedFormCheckbox);
+	await expect.poll(() => submit().textContent).toBe('{"terms":"on"}');
+	await cleanup();
+	await render(ValuedFormCheckbox);
+	await expect.poll(() => submit().textContent).toBe('{"terms":"checked"}');
+	await cleanup();
+	// Indeterminate is not checked: a mixed box submits nothing.
+	await render(MixedFormCheckbox);
+	await expect.poll(() => submit().textContent).toBe('{}');
 });
 
 test('SSR: submitting carries the checkbox into the FormData', async () => {
-	const screen = await renderSSR(FormApp);
-	await expectSubmissions(screen.container);
+	await renderSSR(FormCheckbox);
+	await expect.poll(() => submit().textContent).toBe('{}');
+	await cleanup();
+	await renderSSR(CheckedFormCheckbox);
+	await expect.poll(() => submit().textContent).toBe('{"terms":"on"}');
+	await cleanup();
+	await renderSSR(ValuedFormCheckbox);
+	await expect.poll(() => submit().textContent).toBe('{"terms":"checked"}');
+	await cleanup();
+	await renderSSR(MixedFormCheckbox);
+	await expect.poll(() => submit().textContent).toBe('{}');
 });
 
 test('CSR: clicking the trigger syncs the hidden field and what the form submits', async () => {
-	const screen = await render(FormApp);
-	await expectFieldFollowsTheTrigger(screen.container as HTMLElement);
+	await render(FormCheckbox);
+	await expectFieldFollowsTheTrigger();
 });
 
 test('SSR: clicking the trigger syncs the hidden field and what the form submits', async () => {
-	const screen = await renderSSR(FormApp);
-	await expectFieldFollowsTheTrigger(screen.container);
+	await renderSSR(FormCheckbox);
+	await expectFieldFollowsTheTrigger();
+});
+
+test('CSR: a mixed box resolves to checked on the first click', async () => {
+	await render(MixedFormCheckbox);
+	await expectMixedResolvesOnFirstClick();
+});
+
+test('SSR: a mixed box resolves to checked on the first click', async () => {
+	await renderSSR(MixedFormCheckbox);
+	await expectMixedResolvesOnFirstClick();
+});
+
+// The submit button is a real part of the form example, not decoration.
+test('CSR: the form example renders a submit button', async () => {
+	await render(FormCheckbox);
+	expect(el(SubmitButton).getAttribute('type')).toBe('submit');
 });
 
 // --- label, description and error -----------------------------------------
 
-function messages(container: ParentNode, name: string) {
-	const host = container.querySelector(`[data-testid="${name}"]`) as HTMLElement;
-	if (!host) throw new Error(`Expected the "${name}" checkbox.`);
-	const divs = [...host.querySelectorAll('div')];
-	return {
-		trigger: host.querySelector('button') as HTMLButtonElement,
-		label: host.querySelector('label') as HTMLLabelElement,
-		// [0] is the root; the description and the error are the parts after it.
-		description: divs[1] ?? null,
-		error: divs[2] ?? null,
-	};
+function expectDescribed() {
+	expect(el(Label).textContent).toBe('Subscribe to newsletter');
+	expect(el(Label).getAttribute('for')).toBe(el(Trigger).id);
+	expect(el(Description).textContent).toBe("We'll send you updates about new features");
+	expect(el(Trigger).getAttribute('aria-invalid')).toBe('false');
+	// No error part is mounted, so nothing marks the trigger invalid.
+	expect(CheckboxError.query()).toBeNull();
 }
 
-function expectMessages(container: ParentNode) {
-	expectCasesOnPage(Described, Errored, ErrorFirst);
-	const described = messages(container, 'described');
-	expect(described.label.textContent).toBe('Subscribe to newsletter');
-	expect(described.label.getAttribute('for')).toBe(described.trigger.id);
-	expect(described.description?.textContent).toBe("We'll send you updates about new features");
-	expect(described.trigger.getAttribute('aria-invalid')).toBe('false');
-	expect(described.error).toBeNull();
-
-	const errored = messages(container, 'errored');
-	expect(errored.description?.textContent).toBe(
-		'Read our terms and conditions before accepting',
-	);
-	expect(errored.error?.textContent).toBe('Please accept the terms and conditions');
+function expectErrored() {
+	expect(el(Description).textContent).toBe('Read our terms and conditions before accepting');
+	expect(el(CheckboxError).textContent).toBe('Please accept the terms and conditions');
 	// Every part of one widget instance seeds before any part renders, so the
 	// error part's `checkbox.invalid = true` is what the trigger reads.
-	expect(errored.trigger.getAttribute('aria-invalid')).toBe('true');
+	expect(el(Trigger).getAttribute('aria-invalid')).toBe('true');
+}
 
+function expectErrorFirst() {
 	// The same error, written before the trigger instead of after it: seeding is
 	// a phase that completes before any part renders, so document order does not
-	// decide what a part reads. Here the error is the first div after the root.
-	const first = messages(container, 'error-first');
-	expect(first.description?.textContent).toBe('Please accept the terms and conditions');
-	expect(first.trigger.getAttribute('aria-invalid')).toBe('true');
+	// decide what a part reads.
+	expect(el(CheckboxError).textContent).toBe('Please accept the terms and conditions');
+	expect(el(Trigger).getAttribute('aria-invalid')).toBe('true');
 }
 
 test('CSR: the description renders and a mounted error marks the trigger invalid', async () => {
-	const screen = await render(MessagesApp);
-	expectMessages(screen.container as HTMLElement);
+	await render(DescribedCheckbox);
+	expectDescribed();
+	await cleanup();
+	await render(ErroredCheckbox);
+	expectErrored();
+	await cleanup();
+	await render(ErrorFirstCheckbox);
+	expectErrorFirst();
 });
 
 test('SSR: the description renders and a mounted error marks the trigger invalid', async () => {
-	const screen = await renderSSR(MessagesApp);
-	expectMessages(screen.container);
+	await renderSSR(DescribedCheckbox);
+	expectDescribed();
+	await cleanup();
+	await renderSSR(ErroredCheckbox);
+	expectErrored();
+	await cleanup();
+	await renderSSR(ErrorFirstCheckbox);
+	expectErrorFirst();
 });
 
 // --- consumer callbacks (U-B) ---------------------------------------------
@@ -453,78 +506,66 @@ test('SSR: the description renders and a mounted error marks the trigger invalid
 // slot never becomes a graph node, so these assertions are about a call that
 // reaches the consumer, not about a value the payload carried.
 
-function changeTrigger(container: ParentNode, name: string) {
-	const host = container.querySelector(`[data-testid="${name}"]`);
-	if (!host) throw new Error(`Expected the "${name}" checkbox.`);
-	return host.querySelector('button') as HTMLButtonElement;
-}
-
-function reported(container: ParentNode, name: string) {
-	return container.querySelector(`[data-testid="${name}"]`)?.textContent ?? null;
-}
-
-async function expectConsumerCallbackFires(container: ParentNode) {
-	expectCasesOnPage(First, Second, Silent);
+async function expectConsumerCallbackFires() {
 	// Nothing fired on mount, first render or resume.
-	expect(reported(container, 'calls')).toBe('0');
-	expect(reported(container, 'first-value')).toBe('');
+	expect(el(Calls).textContent).toBe('0');
+	expect(el(FirstValue).textContent).toBe('');
 
-	changeTrigger(container, 'first').click();
-	await expect.poll(() => reported(container, 'first-value')).toBe('true');
+	el(FirstTrigger).click();
+	await expect.poll(() => el(FirstValue).textContent).toBe('true');
 	// Called once, with the next value, and the state moved with it.
-	await expect.poll(() => reported(container, 'calls')).toBe('1');
-	expect(changeTrigger(container, 'first').getAttribute('aria-checked')).toBe('true');
+	await expect.poll(() => el(Calls).textContent).toBe('1');
+	expect(el(FirstTrigger).getAttribute('aria-checked')).toBe('true');
 	// The sibling's handler did not run.
-	expect(reported(container, 'second-value')).toBe('');
+	expect(el(SecondValue).textContent).toBe('');
 }
 
-async function expectEachInstanceReachesItsOwnHandler(container: ParentNode) {
-	changeTrigger(container, 'second').click();
-	await expect.poll(() => reported(container, 'second-value')).toBe('false');
-	await expect.poll(() => reported(container, 'calls')).toBe('1');
-	expect(reported(container, 'first-value')).toBe('');
+async function expectEachInstanceReachesItsOwnHandler() {
+	el(SecondTrigger).click();
+	await expect.poll(() => el(SecondValue).textContent).toBe('false');
+	await expect.poll(() => el(Calls).textContent).toBe('1');
+	expect(el(FirstValue).textContent).toBe('');
 
-	changeTrigger(container, 'first').click();
-	await expect.poll(() => reported(container, 'first-value')).toBe('true');
-	await expect.poll(() => reported(container, 'calls')).toBe('2');
+	el(FirstTrigger).click();
+	await expect.poll(() => el(FirstValue).textContent).toBe('true');
+	await expect.poll(() => el(Calls).textContent).toBe('2');
 	// Each click reached only its own consumer handler.
-	expect(reported(container, 'second-value')).toBe('false');
+	expect(el(SecondValue).textContent).toBe('false');
 }
 
-async function expectOmittedCallbackStillToggles(container: ParentNode) {
-	const trigger = changeTrigger(container, 'silent');
-	trigger.click();
+async function expectOmittedCallbackStillToggles() {
 	// The trigger's own click record survives with no consumer handler in play.
-	await expect.poll(() => trigger.getAttribute('aria-checked')).toBe('true');
-	expect(reported(container, 'calls')).toBe('0');
+	el(Trigger).click();
+	await expect.poll(() => el(Trigger).getAttribute('aria-checked')).toBe('true');
+	expect(el(Calls).textContent).toBe('0');
 }
 
 test('CSR: a click calls the consumer onChange once with the next value', async () => {
-	const screen = await render(ChangeApp);
-	await expectConsumerCallbackFires(screen.container as HTMLElement);
+	await render(ControlledCheckboxes);
+	await expectConsumerCallbackFires();
 });
 
 test('SSR: a click after resume calls the consumer onChange once with the next value', async () => {
-	const screen = await renderSSR(ChangeApp);
-	await expectConsumerCallbackFires(screen.container);
+	await renderSSR(ControlledCheckboxes);
+	await expectConsumerCallbackFires();
 });
 
 test('CSR: two sibling checkboxes each reach only their own handler', async () => {
-	const screen = await render(ChangeApp);
-	await expectEachInstanceReachesItsOwnHandler(screen.container as HTMLElement);
+	await render(ControlledCheckboxes);
+	await expectEachInstanceReachesItsOwnHandler();
 });
 
 test('SSR: two sibling checkboxes each reach only their own handler', async () => {
-	const screen = await renderSSR(ChangeApp);
-	await expectEachInstanceReachesItsOwnHandler(screen.container);
+	await renderSSR(ControlledCheckboxes);
+	await expectEachInstanceReachesItsOwnHandler();
 });
 
 test('CSR: an omitted onChange toggles without a dispatch', async () => {
-	const screen = await render(ChangeApp);
-	await expectOmittedCallbackStillToggles(screen.container as HTMLElement);
+	await render(SilentCheckbox);
+	await expectOmittedCallbackStillToggles();
 });
 
 test('SSR: an omitted onChange toggles without a dispatch', async () => {
-	const screen = await renderSSR(ChangeApp);
-	await expectOmittedCallbackStillToggles(screen.container);
+	await renderSSR(SilentCheckbox);
+	await expectOmittedCallbackStillToggles();
 });
