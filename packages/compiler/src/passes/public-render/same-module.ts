@@ -8,6 +8,8 @@ import {
 	sharedSeedConsumeLine,
 	sharedSeedMarkerLine,
 	sharedSeedPassLines,
+	widgetRootDefinitionIds,
+	widgetRootMarkerLine,
 } from './shared-seed-pass.ts';
 import {
 	componentOwnedStateNodes,
@@ -101,6 +103,7 @@ export function emitSameModuleSsrComponents(
 			`	return { html, state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots), view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) }, elementCount: marklessSsrComposition.elementCount, propEvents: [], externalSymbolIds: marklessSsrComposition.externalSymbolIds, structure: marklessSsrRendered.structure, structureTokens: marklessSsrRendered.structureTokens${remapsGraphProps ? ', m(graphProps, instancePath) { marklessSsrRemapGraphOutput(this, graphProps, instancePath); }' : ''} };`,
 			'}',
 			sharedSeedMarkerLine(componentSharedSeeds(input, componentName), functionName),
+			widgetRootMarkerLine(widgetRootDefinitionIds(input, componentName), functionName),
 		].filter((line): line is string => line !== null);
 	});
 }

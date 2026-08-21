@@ -13,6 +13,7 @@ import {
 	memberTagRootName,
 } from '../../ast/tsrx.ts';
 import type { ComponentEdge } from './types.ts';
+import { widgetRootComponents } from './shared-seed-pass.ts';
 
 export { componentEdgeInstanceSegment } from '../../component-edge-instance.ts';
 
@@ -666,26 +667,8 @@ function payloadNodeOwners(
 	}
 	// A widget-scoped shared() graph is one instance per rendered widget, so its
 	// nodes belong to the widget root, not the module root: that component's
-	// composed instance path is the widget root. The root is the component that
-	// seeds the definition — its seed has to land in the payload it serves, so a
-	// part declared above it must not take the cells and make that write a no-op —
-	// or, with no seed, the first component that resolves the definition.
-	const seedingComponent = new Map<string, string>();
-	for (const symbol of input.symbolResolver.symbols) {
-		if (symbol.kind !== 'shared-seed' || !symbol.componentName) continue;
-		const definitionId = symbol.graphNodeId.slice(0, symbol.graphNodeId.lastIndexOf('/'));
-		if (!seedingComponent.has(definitionId))
-			seedingComponent.set(definitionId, symbol.componentName);
-	}
-	const widgetOwner = new Map<string, string>();
-	for (const definition of input.semanticGraph.sharedDefinitions) {
-		if (definition.scope !== 'widget') continue;
-		const resolver = input.semanticGraph.sharedInstances.find(
-			(instance) => instance.definitionId === definition.id && instance.componentName,
-		);
-		const owner = seedingComponent.get(definition.id) ?? resolver?.componentName;
-		if (owner) widgetOwner.set(definition.id, owner);
-	}
+	// composed instance path is the widget root.
+	const widgetOwner = widgetRootComponents(input);
 	const ownerOf = (graphNodeId: string): string => {
 		if (isPageSpaceGraphNodeId(graphNodeId))
 			return (

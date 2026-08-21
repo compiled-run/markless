@@ -39,12 +39,46 @@ const seedProjectingChild: SharedSeedPass = async (
 	return seeded;
 };
 
+/**
+ * The widget-scoped families a placed child ROOTS: the definitions whose cells
+ * its own payload owns, so every rendered instance of it starts a widget
+ * instance of its own. A part reads the innermost root that encloses it, which
+ * is why a root nested in another root's projection ends the outer seed phase.
+ */
+function widgetRootsOf(surface: PrerenderDataSurface, componentName: string): string[] {
+	const child = (surface.components[componentName] ? surface : surface.imports[componentName])
+		?.components[componentName];
+	const state = child?.state;
+	if (!state) return [];
+	// A module serving several components publishes one payload for all of them
+	// and names each component's own nodes by position, so ownership is the
+	// selection, never the whole payload.
+	const owned = new Set(ownedCellIds(child));
+	return (state.sharedDefinitions ?? []).flatMap((definition) =>
+		definition.scope === 'widget' &&
+		[...owned].some((graphNodeId) => graphNodeId.startsWith(definition.id + '/'))
+			? [definition.id]
+			: [],
+	);
+}
+
+function ownedCellIds(definition: PrerenderDataDefinition): string[] {
+	const cells = definition.state.cells ?? [];
+	const indexes = definition.stateCellIndexes;
+	const owned = definition.stateGraphNodeIds;
+	if (indexes) return indexes.flatMap((index) => (cells[index] ? [cells[index]!.graphNodeId] : []));
+	return cells.flatMap((cell) =>
+		!owned || owned.length === 0 || owned.includes(cell.graphNodeId) ? [cell.graphNodeId] : [],
+	);
+}
+
 // The component edges placed inside the projecting child, outermost first: its
 // projection chunk's own child components, then the ones projected into those.
 // A branch arm IS walked, but only into the arm this render takes - the arm
 // decides whether the part renders, never which widget it belongs to. A repeat
 // row or an async arm is not walked: those have their own cardinality and
-// lifecycle.
+// lifecycle. A child that ROOTS one of this root's families is where the walk
+// stops: it starts its own instance and runs its own seed phase.
 function projectedEdges(
 	surface: PrerenderDataSurface,
 	definition: PrerenderDataDefinition,
@@ -55,6 +89,8 @@ function projectedEdges(
 		(chunk) => chunk.componentName === definition.name,
 	);
 	const byId = new Map(chunks.map((chunk) => [chunk.id, chunk]));
+	const edges = definition.edges ?? [];
+	const rootEdge = edges.find((candidate) => candidate.id === componentEdgeId);
 	const rootProjectionChunkId = chunks.flatMap((chunk) =>
 		chunk.slots.flatMap((slot) =>
 			slot.kind === 'child-component' &&
@@ -64,7 +100,18 @@ function projectedEdges(
 				: [],
 		),
 	)[0];
-	if (rootProjectionChunkId === undefined) return [];
+	if (rootProjectionChunkId === undefined || !rootEdge) return [];
+	const families = widgetRootsOf(surface, rootEdge.childComponentName);
+	const startsOwnInstance = (edgeId: string): boolean => {
+		if (families.length === 0) return false;
+		const edge = edges.find((candidate) => candidate.id === edgeId);
+		return (
+			edge !== undefined &&
+			widgetRootsOf(surface, edge.childComponentName).some((definitionId) =>
+				families.includes(definitionId),
+			)
+		);
+	};
 	const edgeIds: string[] = [];
 	const walked = new Set<string>();
 	const walk = (chunkId: string) => {
@@ -77,12 +124,12 @@ function projectedEdges(
 				continue;
 			}
 			if (slot.kind !== 'child-component') continue;
+			if (startsOwnInstance(slot.componentEdgeId)) continue;
 			edgeIds.push(slot.componentEdgeId);
 			if (slot.projectionChunkId) walk(slot.projectionChunkId);
 		}
 	};
 	walk(rootProjectionChunkId);
-	const edges = definition.edges ?? [];
 	return edgeIds.flatMap((edgeId) => {
 		const edge = edges.find((candidate) => candidate.id === edgeId);
 		return edge && !edge.materialized ? [edge] : [];

@@ -10,10 +10,12 @@ import { renderBodyLines } from './render-body.ts';
 import {
 	armScopedSeedRefsUnder,
 	componentSharedSeeds,
-	projectedEdgeIdsUnder,
+	projectedSeedPartsUnder,
 	sharedSeedConsumeLine,
 	sharedSeedMarkerLine,
 	sharedSeedPassLines,
+	widgetRootDefinitionIds,
+	widgetRootMarkerLine,
 } from './shared-seed-pass.ts';
 import { emitCatalogHelperImports, stateRuntimeImports } from './runtime-helpers.ts';
 import { emitSameModuleSsrComponents } from './same-module.ts';
@@ -172,6 +174,10 @@ export function emitPublicSsrRenderModule(
 			componentSharedSeeds(input, rootInfo.componentName),
 			'marklessRenderSsr',
 		),
+		widgetRootMarkerLine(
+			widgetRootDefinitionIds(input, rootInfo.componentName),
+			'marklessRenderSsr',
+		),
 		'',
 	];
 	const bodySource = body
@@ -201,6 +207,8 @@ export function emitPublicSsrRenderModule(
 					'marklessSsrCallbacks',
 					'marklessSsrCallbackSymbol',
 					'marklessSsrSeedChild',
+					'marklessSsrWidgetRoots',
+					'marklessSsrWidgetBoundary',
 					// Keep the emitted SSR helper distinct from authored bindings.
 					'marklessComposeState as marklessSsrComposeState',
 					'marklessSsrRemapGraphOutput',
@@ -392,6 +400,10 @@ function emitSsrDataRenderLines(
 	const seedBlockByEdgeId = new Map<string, string>();
 	const projectionChunkByEdgeId = new Map<string, string>();
 	const widgetInstanceLineByEdgeId = new Map<string, string>();
+	// What the emitted seed pass hands the boundary check to ask a placed child
+	// whether it roots a widget: the child's module surface and the name it
+	// declared, exactly as the render and seed calls spell them.
+	const childSurfaceArgsByEdgeId = new Map<string, string>();
 	const childCases = edges.flatMap((edge, index) => {
 		const component = referenceByName.get(edge.childComponentName);
 		if (!component) return [];
@@ -448,6 +460,10 @@ function emitSsrDataRenderLines(
 		const childSurface = declaredName
 			? `marklessSsrComponentPart(${component},${JSON.stringify(declaredName)})`
 			: component;
+		childSurfaceArgsByEdgeId.set(
+			edge.id,
+			`${component},${declaredName ? JSON.stringify(declaredName) : 'undefined'}`,
+		);
 		// A same-module child answers at compile time; an imported one is asked
 		// through the marker the compiler stamped on its render function.
 		const seedCall = edge.importSource
@@ -479,30 +495,61 @@ function emitSsrDataRenderLines(
 	});
 	// U-H: every part of one widget instance seeds before any part renders, so a
 	// seed written by a part is what its siblings read whatever the document order.
+	// T053: a placed child that ROOTS a widget of the family this root started is
+	// an instance boundary — it and everything under it seed their own instance,
+	// so this pass skips them. Which child roots a widget is answered where that
+	// child was compiled, so the chain is asked at render time.
 	const seedCases = [...projectionChunkByEdgeId].flatMap(([edgeId, projectionChunkId]) => {
+		const rootSurfaceArgs = childSurfaceArgsByEdgeId.get(edgeId);
+		// Every link from the root's projection down to the part, the part itself
+		// last: any of them rooting one of this root's families ends the walk.
+		const boundaryGuard = (part: {
+			readonly edgeId: string;
+			readonly projectingAncestorEdgeIds: ReadonlyArray<string>;
+		}): string[] => {
+			if (!rootSurfaceArgs) return [];
+			const chain = [...part.projectingAncestorEdgeIds, part.edgeId].map((linkEdgeId) =>
+				childSurfaceArgsByEdgeId.get(linkEdgeId),
+			);
+			return chain.flatMap((args) =>
+				args ? [`!marklessSsrWidgetBoundary(marklessSsrWidgetFamilies,${args})`] : [],
+			);
+		};
+		const guarded = (guards: ReadonlyArray<string>, block: string) =>
+			guards.length > 0 ? `if(${guards.join('&&')}){${block}}` : block;
+		const rootBlock = seedBlockByEdgeId.get(edgeId);
+		const parts = projectedSeedPartsUnder(input.renderData.chunks, projectionChunkId);
+		const armRefs = armScopedSeedRefsUnder(input.renderData.chunks, projectionChunkId);
 		const blocks = [
-			...[edgeId, ...projectedEdgeIdsUnder(input.renderData.chunks, projectionChunkId)].flatMap(
-				(partEdgeId) => {
-					const block = seedBlockByEdgeId.get(partEdgeId);
-					return block ? [block] : [];
-				},
-			),
+			...(rootBlock ? [rootBlock] : []),
+			...parts.flatMap((part) => {
+				const block = seedBlockByEdgeId.get(part.edgeId);
+				return block ? [guarded(boundaryGuard(part), block)] : [];
+			}),
 			// T052: a part an arm holds seeds when its arm is the taken one, so the
 			// widget's post-seed value is what every part renders from.
-			...armScopedSeedRefsUnder(input.renderData.chunks, projectionChunkId).flatMap((ref) => {
+			...armRefs.flatMap((ref) => {
 				const block = seedBlockByEdgeId.get(ref.edgeId);
 				const guards = ref.armGuards.flatMap((guard) => {
 					const arm = branchArmSources.get(guard.branchSiteId);
 					return arm?.readable ? [`(${arm.source})===${String(guard.armIndex)}`] : [];
 				});
 				return block && guards.length === ref.armGuards.length
-					? [`if(${guards.join('&&')}){${block}}`]
+					? [guarded([...guards, ...boundaryGuard(ref)], block)]
 					: [];
 			}),
 		];
 		if (blocks.length === 0) return [];
+		// Pay-per-use: the family lookup is emitted only where a projected part can
+		// actually sit under another root — a widget with no nested projection
+		// emits exactly the seed pass it emitted before boundaries existed.
+		const needsFamilies = blocks.some((block) => block.includes('marklessSsrWidgetBoundary'));
 		return [
-			`case ${JSON.stringify(edgeId)}:{${widgetInstanceLineByEdgeId.get(edgeId) ?? ''}${blocks.join('')}return marklessSsrSeeds;}`,
+			`case ${JSON.stringify(edgeId)}:{${widgetInstanceLineByEdgeId.get(edgeId) ?? ''}${
+				needsFamilies
+					? `const marklessSsrWidgetFamilies=marklessSsrWidgetRoots(${rootSurfaceArgs});`
+					: ''
+			}${blocks.join('')}return marklessSsrSeeds;}`,
 		];
 	});
 	const bindingLines = input.semanticGraph.graphBindings.flatMap((binding) =>

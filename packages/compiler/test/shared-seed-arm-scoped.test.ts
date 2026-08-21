@@ -96,10 +96,12 @@ test("the widget root's seed case runs an arm-held part's seed under the arm's o
 	// read the branch selector asks, compared against the arm that holds it.
 	expect(rootCase).toContain('__marklessSsrComponent2?.renderSsr?.');
 	expect(rootCase).toContain('marklessSsrRenderStateValues.get("state:shown")');
-	expect(rootCase).toContain(')===0){');
+	// T053 places the instance-boundary check alongside the arm test, so the arm
+	// test opens the guard rather than closing it.
+	expect(rootCase).toContain(')===0&&');
 	// The root's own seed still runs first and unguarded.
 	expect(rootCase.indexOf('__marklessSsrComponent0?.renderSsr?.')).toBeLessThan(
-		rootCase.indexOf(')===0){'),
+		rootCase.indexOf(')===0&&'),
 	);
 });
 
@@ -107,7 +109,7 @@ test('an unconditional part seeds with no arm test at all', async () => {
 	const seedChild = seedChildSource(await compile(errorUnconditional));
 
 	expect(seedChild).toContain('__marklessSsrComponent2?.renderSsr?.');
-	expect(seedChild).not.toContain(')===0){');
+	expect(seedChild).not.toContain(')===0');
 });
 
 test('pay-per-use: an arm holding no seeding part emits no arm test', async () => {
@@ -116,7 +118,7 @@ test('pay-per-use: an arm holding no seeding part emits no arm test', async () =
 	// One seed call, the root's own. An arm whose content seeds nothing costs
 	// nothing: no guard, no extra seed body.
 	expect(seedChild.split('marklessSharedSeeds:marklessSsrSeeds').length - 1).toBe(1);
-	expect(seedChild).not.toContain('===0){');
+	expect(seedChild).not.toContain(')===0');
 });
 
 test('the arm walk names the parts an arm holds, with the arms they sit inside', () => {
@@ -157,11 +159,24 @@ test('the arm walk names the parts an arm holds, with the arms they sit inside',
 	] as unknown as Parameters<typeof armScopedSeedRefsUnder>[0];
 
 	// Only the arm-held parts, each carrying the arm that decides it. A part
-	// projected into an arm-held part inherits that arm's guard.
+	// projected into an arm-held part inherits that arm's guard, and names the
+	// edge it was projected into so T053's instance-boundary check can ask it.
 	expect(armScopedSeedRefsUnder(chunks, 'projection:component-edge:0')).toEqual([
-		{ edgeId: 'component-edge:2', armGuards: [{ branchSiteId: 'branch-site:0', armIndex: 0 }] },
-		{ edgeId: 'component-edge:4', armGuards: [{ branchSiteId: 'branch-site:0', armIndex: 0 }] },
-		{ edgeId: 'component-edge:3', armGuards: [{ branchSiteId: 'branch-site:0', armIndex: 1 }] },
+		{
+			edgeId: 'component-edge:2',
+			armGuards: [{ branchSiteId: 'branch-site:0', armIndex: 0 }],
+			projectingAncestorEdgeIds: [],
+		},
+		{
+			edgeId: 'component-edge:4',
+			armGuards: [{ branchSiteId: 'branch-site:0', armIndex: 0 }],
+			projectingAncestorEdgeIds: ['component-edge:2'],
+		},
+		{
+			edgeId: 'component-edge:3',
+			armGuards: [{ branchSiteId: 'branch-site:0', armIndex: 1 }],
+			projectingAncestorEdgeIds: [],
+		},
 	]);
 	// The unconditional part is not one of them: it is already in the seed list.
 	expect(

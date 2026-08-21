@@ -116,6 +116,12 @@ type SsrChildComponent = {
 	) => SsrChildOutput | undefined | Promise<SsrChildOutput | undefined>) & {
 		/** Set by the compiler on a component whose body seeds a shared instance. */
 		readonly marklessSeedsShared?: boolean;
+		/**
+		 * The widget-scoped shared definitions this component ROOTS, set by the
+		 * compiler on a component whose payload owns their cells. Every rendered
+		 * instance of it starts a widget instance of its own.
+		 */
+		readonly marklessWidgetRoots?: ReadonlyArray<string>;
 	};
 	/** SSR entry per exported component, for a module that serves more than one. */
 	readonly renderSsrComponents?: Readonly<Record<string, SsrChildComponent>>;
@@ -229,6 +235,30 @@ export async function marklessSsrSeedChild(
 		...(renderContext as Record<string, unknown> | undefined),
 		marklessSharedSeeds: sharedSeeds,
 	});
+}
+
+/** The widget families a placed child roots; a child that roots none costs an undefined read. */
+export function marklessSsrWidgetRoots(
+	component: SsrChildComponent | undefined,
+	componentName: string | undefined,
+): ReadonlyArray<string> {
+	const part = componentName ? marklessSsrComponentPart(component, componentName) : component;
+	return part?.renderSsr?.marklessWidgetRoots ?? [];
+}
+
+/**
+ * Whether a placed child ends this widget's seed phase: it roots a family this
+ * root started, so it and everything under it belong to their own instance.
+ */
+export function marklessSsrWidgetBoundary(
+	families: ReadonlyArray<string>,
+	component: SsrChildComponent | undefined,
+	componentName: string | undefined,
+): boolean {
+	if (families.length === 0) return false;
+	return marklessSsrWidgetRoots(component, componentName).some((definitionId) =>
+		families.includes(definitionId),
+	);
 }
 
 export async function marklessSsrRenderChild(

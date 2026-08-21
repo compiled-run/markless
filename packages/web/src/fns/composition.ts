@@ -116,14 +116,15 @@ export function marklessQualifyChildState(
 	}));
 }
 
-// A `widget`-scoped definition is one graph per rendered widget. The widget root
-// is the OUTERMOST composed instance that owns the definition's cells — the
-// compiler gives those cells to the first component that resolves it, so a
-// root/trigger/content family contributes exactly one owner per widget, and a
-// widget nested in another widget's content contributes its own. Every other
-// piece of the widget finds that root by instance-path prefix.
+// A `widget`-scoped definition is one graph per rendered widget. EVERY composed
+// instance that owns the definition's cells is a widget root — the compiler
+// gives those cells to the component that roots the family, so a
+// root/trigger/content family contributes one owner per rendered widget, and a
+// root nested in another root's projection contributes its own. Every other
+// piece of the widget finds its root by INNERMOST instance-path prefix, which is
+// what makes a nested root's parts read the nested root.
 export function marklessRegisterComposedWidgets(children: ReadonlyArray<ComposeChild>): void {
-	const owners = new Map<string, string[]>();
+	const roots: string[] = [];
 	for (const child of children) {
 		const instancePath = marklessComposedInstancePath(child);
 		if (!instancePath) continue;
@@ -135,14 +136,9 @@ export function marklessRegisterComposedWidgets(children: ReadonlyArray<ComposeC
 				)
 			)
 				continue;
-			owners.set(definition.id, [...(owners.get(definition.id) ?? []), instancePath]);
+			roots.push(instancePath + definition.id);
 		}
 	}
-	const roots: string[] = [];
-	for (const [definitionId, paths] of owners)
-		for (const path of paths)
-			if (!paths.some((other) => other !== path && path.startsWith(other)))
-				roots.push(path + definitionId);
 	marklessRegisterWidgetInstanceIds(roots);
 }
 

@@ -18,6 +18,21 @@ export type ArmScopedSeedRef = {
 		readonly branchSiteId: string;
 		readonly armIndex: number;
 	}>;
+	readonly projectingAncestorEdgeIds: ReadonlyArray<string>;
+};
+
+/**
+ * One component edge placed inside a widget root's projection, with the edges
+ * whose projections it sits inside, outermost first. A projecting ancestor that
+ * turns out to root a widget of the same family is an instance boundary: the
+ * part belongs to THAT root, not to the outer one, so the outer root's seed
+ * phase must not run it. Which ancestor roots a widget is answered where the
+ * component is compiled, so the walk names the chain and the emitted seed pass
+ * asks each link.
+ */
+export type ProjectedSeedPart = {
+	readonly edgeId: string;
+	readonly projectingAncestorEdgeIds: ReadonlyArray<string>;
 };
 
 /**
@@ -28,24 +43,33 @@ export type ArmScopedSeedRef = {
  * renders. Chunks reached through a repeat, branch, or async arm are not walked:
  * which of those renders is a render-time answer, not a build-time one.
  */
-export function projectedEdgeIdsUnder(
+export function projectedSeedPartsUnder(
 	chunks: PublicRenderModuleInput['renderData']['chunks'],
 	projectionChunkId: string,
-): string[] {
+): ProjectedSeedPart[] {
 	const byId = new Map(chunks.map((chunk) => [chunk.id, chunk]));
-	const edgeIds: string[] = [];
+	const parts: ProjectedSeedPart[] = [];
 	const walked = new Set<string>();
-	const walk = (chunkId: string) => {
+	const walk = (chunkId: string, projectingAncestorEdgeIds: ReadonlyArray<string>) => {
 		if (walked.has(chunkId)) return;
 		walked.add(chunkId);
 		for (const slot of byId.get(chunkId)?.slots ?? []) {
 			if (slot.kind !== 'child-component') continue;
-			edgeIds.push(slot.componentEdgeId);
-			if (slot.projectionChunkId) walk(slot.projectionChunkId);
+			parts.push({ edgeId: slot.componentEdgeId, projectingAncestorEdgeIds });
+			if (slot.projectionChunkId)
+				walk(slot.projectionChunkId, [...projectingAncestorEdgeIds, slot.componentEdgeId]);
 		}
 	};
-	walk(projectionChunkId);
-	return edgeIds;
+	walk(projectionChunkId, []);
+	return parts;
+}
+
+/** The projected part edge ids alone, for callers that place no boundary guard. */
+export function projectedEdgeIdsUnder(
+	chunks: PublicRenderModuleInput['renderData']['chunks'],
+	projectionChunkId: string,
+): string[] {
+	return projectedSeedPartsUnder(chunks, projectionChunkId).map((part) => part.edgeId);
 }
 
 /**
@@ -62,23 +86,88 @@ export function armScopedSeedRefsUnder(
 	const byId = new Map(chunks.map((chunk) => [chunk.id, chunk]));
 	const refs: ArmScopedSeedRef[] = [];
 	const walked = new Set<string>();
-	const walk = (chunkId: string, armGuards: ArmScopedSeedRef['armGuards']) => {
+	const walk = (
+		chunkId: string,
+		armGuards: ArmScopedSeedRef['armGuards'],
+		projectingAncestorEdgeIds: ReadonlyArray<string>,
+	) => {
 		if (walked.has(chunkId)) return;
 		walked.add(chunkId);
 		for (const slot of byId.get(chunkId)?.slots ?? []) {
 			if (slot.kind === 'branch') {
 				slot.armTemplateIds.forEach((armChunkId, armIndex) =>
-					walk(armChunkId, [...armGuards, { branchSiteId: slot.branchSiteId, armIndex }]),
+					walk(
+						armChunkId,
+						[...armGuards, { branchSiteId: slot.branchSiteId, armIndex }],
+						projectingAncestorEdgeIds,
+					),
 				);
 				continue;
 			}
 			if (slot.kind !== 'child-component') continue;
-			if (armGuards.length > 0) refs.push({ edgeId: slot.componentEdgeId, armGuards });
-			if (slot.projectionChunkId) walk(slot.projectionChunkId, armGuards);
+			if (armGuards.length > 0)
+				refs.push({ edgeId: slot.componentEdgeId, armGuards, projectingAncestorEdgeIds });
+			if (slot.projectionChunkId)
+				walk(slot.projectionChunkId, armGuards, [
+					...projectingAncestorEdgeIds,
+					slot.componentEdgeId,
+				]);
 		}
 	};
-	walk(projectionChunkId, []);
+	walk(projectionChunkId, [], []);
 	return refs;
+}
+
+/**
+ * The component that ROOTS each widget-scoped shared definition of this module:
+ * the one whose payload owns the definition's cells, so every rendered instance
+ * of it starts a widget instance of its own. The seeding component roots it —
+ * its seed has to land in the payload it serves — and with no seed, the first
+ * component that resolves the definition does.
+ */
+export function widgetRootComponents(input: PublicRenderModuleInput): Map<string, string> {
+	const seedingComponent = new Map<string, string>();
+	for (const symbol of input.symbolResolver.symbols) {
+		if (symbol.kind !== 'shared-seed' || !symbol.componentName) continue;
+		const definitionId = symbol.graphNodeId.slice(0, symbol.graphNodeId.lastIndexOf('/'));
+		if (!seedingComponent.has(definitionId))
+			seedingComponent.set(definitionId, symbol.componentName);
+	}
+	const roots = new Map<string, string>();
+	for (const definition of input.semanticGraph.sharedDefinitions) {
+		if (definition.scope !== 'widget') continue;
+		const resolver = input.semanticGraph.sharedInstances.find(
+			(instance) => instance.definitionId === definition.id && instance.componentName,
+		);
+		const owner = seedingComponent.get(definition.id) ?? resolver?.componentName;
+		if (owner) roots.set(definition.id, owner);
+	}
+	return roots;
+}
+
+/** The widget-scoped definitions one component roots, spelled as the payload spells them. */
+export function widgetRootDefinitionIds(
+	input: PublicRenderModuleInput,
+	componentName: string,
+): string[] {
+	return [...widgetRootComponents(input)].flatMap(([definitionId, owner]) =>
+		owner === componentName ? [definitionId] : [],
+	);
+}
+
+/**
+ * How a composing module learns that a child it places is a widget ROOT: the
+ * marker names the families that child starts, so a root nested inside another
+ * root's projection is recognised as an instance boundary at render time, in
+ * the module that placed it, without that module importing the child's graph.
+ */
+export function widgetRootMarkerLine(
+	definitionIds: ReadonlyArray<string>,
+	functionName: string,
+): string | null {
+	return definitionIds.length > 0
+		? `${functionName}.marklessWidgetRoots = ${JSON.stringify(definitionIds)};`
+		: null;
 }
 
 /** The shared-instance seeds one component's body writes from its own props. */
