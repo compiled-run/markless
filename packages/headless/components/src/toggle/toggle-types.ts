@@ -1,5 +1,5 @@
-import type { Children, PropsOf } from '@markless/core';
-import type { CallableHandler } from '../handler-props.ts';
+import type { CallableHandler, Children, PropsOf } from '@markless/core';
+
 
 type TriggerProps = PropsOf<'button'>;
 

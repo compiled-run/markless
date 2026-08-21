@@ -27,3 +27,20 @@ type VoidTagName =
 export type PropsOf<Tag extends __MarklessTypeService.IntrinsicTagName> =
 	__MarklessTypeService.IntrinsicElementFor<Tag> &
 		(Tag extends VoidTagName ? unknown : { readonly children?: Children });
+
+/**
+ * A handler the component itself calls. Element attributes accept one handler or a
+ * list, but a component that forwards a consumer's handler invokes it -
+ * `onClick?.(event)` - and cannot invoke a list. This strips the list form, so
+ * passing one is a type error at the prop instead of a crash inside the component.
+ */
+export type CallableHandler<Handler> = Exclude<Handler, readonly unknown[]>;
+
+/**
+ * The instance fields a widget root seeds from its props: the same fields the
+ * consumer knows, made required and mutable, because a prop is optional to the
+ * consumer while the root assigns every one of them on every render.
+ */
+export type Seeded<Props, Keys extends keyof Props> = {
+	-readonly [Field in Keys]-?: Props[Field];
+};

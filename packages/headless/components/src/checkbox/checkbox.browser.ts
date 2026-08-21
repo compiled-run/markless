@@ -68,20 +68,6 @@ const MODES = ['CSR', 'SSR'] as const;
 // They are captured here so they cannot masquerade as a failure of this suite,
 // and recorded red once in shared-read-refresh.test.ts, which turns red itself
 // the day the runtime stops raising them.
-function onUnmatchedRejection(event: PromiseRejectionEvent) {
-	if (!String(event.reason).includes('_UNMATCHED')) return;
-	event.preventDefault();
-}
-
-beforeEach(() => window.addEventListener('unhandledrejection', onUnmatchedRejection));
-
-afterEach(async () => {
-	await cleanup();
-	// Late rejections arrive after the gesture that caused them settles.
-	await new Promise((resolve) => setTimeout(resolve, 50));
-	window.removeEventListener('unhandledrejection', onUnmatchedRejection);
-});
-
 function el<T extends Element = HTMLElement>(locator: { element(): Element | null }) {
 	const found = locator.element();
 	if (!found) throw new Error('Expected the part to be on the page.');

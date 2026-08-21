@@ -42,22 +42,6 @@ const BeforeError = page.getByTestId('before-error');
 // sites literal, which is why this idiom rather than a `mount` parameter.
 const MODES = ['CSR', 'SSR'] as const;
 
-// Same two runtime errors the checkbox suite captures (U-G in
-// goals/headless-components/notes/parity-table.md), recorded red once in
-// shared-read-refresh.test.ts.
-function onUnmatchedRejection(event: PromiseRejectionEvent) {
-	if (!String(event.reason).includes('_UNMATCHED')) return;
-	event.preventDefault();
-}
-
-beforeEach(() => window.addEventListener('unhandledrejection', onUnmatchedRejection));
-
-afterEach(async () => {
-	await cleanup();
-	await new Promise((resolve) => setTimeout(resolve, 50));
-	window.removeEventListener('unhandledrejection', onUnmatchedRejection);
-});
-
 function el<T extends Element = HTMLElement>(locator: { element(): Element | null }) {
 	const found = locator.element();
 	if (!found) throw new Error('Expected the part to be on the page.');

@@ -1,5 +1,5 @@
-import type { Children, PropsOf } from '@markless/core';
-import type { CallableHandler } from '../handler-props.ts';
+import type { CallableHandler, Children, PropsOf } from '@markless/core';
+
 
 export type TextboxRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/** The text the box shows. Omit it and the box starts empty. */

@@ -47,6 +47,14 @@ type MountedContainer = {
 
 const mountedContainers = new Map<BrowserRenderElement, MountedContainer>();
 
+// The harness owns cleanup the way every vitest-browser framework wrapper does:
+// each test starts from an empty document without suites registering afterEach
+// themselves. Manual cleanup() stays exported for tests that need it mid-test.
+if (typeof (globalThis as { __vitest_browser__?: unknown }).__vitest_browser__ !== 'undefined') {
+	const { afterEach } = await import('vitest');
+	afterEach(() => cleanup());
+}
+
 /**
  * A compiled component's own type is what the type service derives for its
  * signature, not the runtime's CsrRenderable contract; the harness mounts
