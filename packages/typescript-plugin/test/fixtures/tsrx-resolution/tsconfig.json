@@ -1,0 +1,18 @@
+{
+	"tsrx": {
+		"compiler": "@markless/typescript-plugin/volar"
+	},
+	"compilerOptions": {
+		"allowImportingTsExtensions": true,
+		"lib": ["ES2022", "DOM"],
+		"jsx": "preserve",
+		"module": "ESNext",
+		"moduleResolution": "Bundler",
+		"noEmit": true,
+		"plugins": [{ "name": "@markless/typescript-plugin" }],
+		"skipLibCheck": true,
+		"strict": true,
+		"target": "ES2022"
+	},
+	"include": ["**/*.ts", "**/*.tsx", "**/*.tsrx"]
+}
