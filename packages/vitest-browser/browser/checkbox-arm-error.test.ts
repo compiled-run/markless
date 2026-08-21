@@ -1,4 +1,4 @@
-import { cleanup, renderSSR } from '@markless/vitest-browser';
+import { cleanup, renderSSR } from '../src/index.ts';
 import { afterEach, beforeEach, expect, test } from 'vitest';
 import ArmErrorApp from './fixtures/checkbox-arm-error.tsrx';
 import BaselineApp from './fixtures/arm-seed-baseline.tsrx';

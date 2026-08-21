@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import { checkbox } from '../../src/index.ts';
+import { checkbox } from '../index.ts';
 
 // Four real forms. Each one submits its own hidden field and writes what the
 // browser actually put in the FormData, so the assertions read a submission
@@ -11,7 +11,7 @@ export function App() @{
 	let mixed = state('');
 
 	<section data-testid="form">
-		<form data-case="plain" onSubmit={(event) => {
+		<form data-testid="plain" onSubmit={(event) => {
 			event.preventDefault();
 			plain = JSON.stringify(Object.fromEntries(new FormData(event.target)));
 		}}>
@@ -24,7 +24,7 @@ export function App() @{
 			<output>{plain}</output>
 		</form>
 
-		<form data-case="checked" onSubmit={(event) => {
+		<form data-testid="checked" onSubmit={(event) => {
 			event.preventDefault();
 			checked = JSON.stringify(Object.fromEntries(new FormData(event.target)));
 		}}>
@@ -36,7 +36,7 @@ export function App() @{
 			<output>{checked}</output>
 		</form>
 
-		<form data-case="valued" onSubmit={(event) => {
+		<form data-testid="valued" onSubmit={(event) => {
 			event.preventDefault();
 			valued = JSON.stringify(Object.fromEntries(new FormData(event.target)));
 		}}>
@@ -48,7 +48,7 @@ export function App() @{
 			<output>{valued}</output>
 		</form>
 
-		<form data-case="mixed" onSubmit={(event) => {
+		<form data-testid="mixed" onSubmit={(event) => {
 			event.preventDefault();
 			mixed = JSON.stringify(Object.fromEntries(new FormData(event.target)));
 		}}>

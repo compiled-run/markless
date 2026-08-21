@@ -1,9 +1,25 @@
 import { cleanup, render, renderSSR } from '@markless/vitest-browser';
-import { userEvent } from 'vite-plus/test/browser';
+import { page, userEvent } from 'vite-plus/test/browser';
 import { afterEach, beforeEach, expect, test } from 'vitest';
-import FormApp from './fixtures/toggle-form.tsrx';
-import MessagesApp from './fixtures/toggle-messages.tsrx';
-import StatesApp from './fixtures/toggle-states.tsrx';
+import FormApp from './toggle-form.test-app.tsrx';
+import MessagesApp from './toggle-messages.test-app.tsrx';
+import StatesApp from './toggle-states.test-app.tsrx';
+
+// Colocated browser suite for the toggle family, in the QDS shape: top-level
+// testid locators naming each case, and one test app module per case beside it.
+const Plain = page.getByTestId('plain');
+const Checked = page.getByTestId('checked');
+const Disabled = page.getByTestId('disabled');
+const Both = page.getByTestId('both');
+const Valued = page.getByTestId('valued');
+const Described = page.getByTestId('described');
+const Errored = page.getByTestId('errored');
+const ErrorFirst = page.getByTestId('error-first');
+
+// Every case the top-level locators name reached the page under test.
+function expectCasesOnPage(...locators: Array<{ element(): Element | null }>) {
+	for (const locator of locators) expect(locator.element()).toBeTruthy();
+}
 
 // Same two runtime errors the checkbox suite captures (U-G in
 // goals/headless-components/notes/parity-table.md): a click on a <label> reaches
@@ -24,7 +40,7 @@ afterEach(async () => {
 });
 
 function widget(container: ParentNode, name: string) {
-	const host = container.querySelector(`[data-case="${name}"]`);
+	const host = container.querySelector(`[data-testid="${name}"]`);
 	if (!host) throw new Error(`Expected the "${name}" switch.`);
 	return {
 		root: host.querySelector('div') as HTMLElement,
@@ -35,6 +51,7 @@ function widget(container: ParentNode, name: string) {
 }
 
 function expectStates(container: ParentNode) {
+	expectCasesOnPage(Plain, Checked, Disabled, Both);
 	const plain = widget(container, 'plain');
 	expect(plain.trigger.getAttribute('role')).toBe('switch');
 	expect(plain.trigger.getAttribute('aria-checked')).toBe('false');
@@ -195,7 +212,7 @@ test('CSR: a disabled trigger ignores Space and Enter', async () => {
 // --- form participation ---------------------------------------------------
 
 function form(container: ParentNode, name: string) {
-	const host = container.querySelector(`[data-case="${name}"]`) as HTMLFormElement;
+	const host = container.querySelector(`[data-testid="${name}"]`) as HTMLFormElement;
 	if (!host) throw new Error(`Expected the "${name}" form.`);
 	return {
 		host,
@@ -205,6 +222,7 @@ function form(container: ParentNode, name: string) {
 }
 
 function expectFieldRendered(container: ParentNode) {
+	expectCasesOnPage(Plain, Checked, Valued);
 	const plain = form(container, 'plain');
 	expect(plain.field).not.toBeNull();
 	expect(plain.field.getAttribute('name')).toBe('notifications');
@@ -280,7 +298,7 @@ test('CSR: clicking the trigger syncs the hidden field and what the form submits
 // --- description and error ------------------------------------------------
 
 function messages(container: ParentNode, name: string) {
-	const host = container.querySelector(`[data-case="${name}"]`) as HTMLElement;
+	const host = container.querySelector(`[data-testid="${name}"]`) as HTMLElement;
 	if (!host) throw new Error(`Expected the "${name}" switch.`);
 	const divs = [...host.querySelectorAll('div')];
 	return {
@@ -292,6 +310,7 @@ function messages(container: ParentNode, name: string) {
 }
 
 function expectMessages(container: ParentNode) {
+	expectCasesOnPage(Described, Errored, ErrorFirst);
 	const described = messages(container, 'described');
 	expect(described.message?.textContent).toBe(
 		'(Receive notifications about important updates)',

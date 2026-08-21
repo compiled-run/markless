@@ -1,4 +1,4 @@
-import { checkbox } from '../../src/index.ts';
+import { checkbox } from '../../../headless/components/src/index.ts';
 
 // The error part sits inside an @if arm. Mounting the arm is what marks the
 // trigger invalid, and the trigger renders after the arm decided.

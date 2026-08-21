@@ -1,10 +1,10 @@
 import { cleanup, render, renderSSR } from '@markless/vitest-browser';
-import { userEvent } from 'vite-plus/test/browser';
+import { page, userEvent } from 'vite-plus/test/browser';
 import { afterEach, beforeEach, expect, test } from 'vitest';
-import ChangeApp from './fixtures/checkbox-change.tsrx';
-import FormApp from './fixtures/checkbox-form.tsrx';
-import MessagesApp from './fixtures/checkbox-messages.tsrx';
-import StatesApp from './fixtures/checkbox-states.tsrx';
+import ChangeApp from './checkbox-change.test-app.tsrx';
+import FormApp from './checkbox-form.test-app.tsrx';
+import MessagesApp from './checkbox-messages.test-app.tsrx';
+import StatesApp from './checkbox-states.test-app.tsrx';
 
 // Two runtime errors escape as unhandled rejections while this suite runs, and
 // neither is a defect in the family or in these assertions:
@@ -29,8 +29,28 @@ afterEach(async () => {
 	window.removeEventListener('unhandledrejection', onUnmatchedRejection);
 });
 
+// Colocated browser suite for the checkbox family, in the QDS shape: top-level
+// testid locators naming each case, and one test app module per case beside it.
+const Plain = page.getByTestId('plain');
+const Checked = page.getByTestId('checked');
+const Mixed = page.getByTestId('mixed');
+const Disabled = page.getByTestId('disabled');
+const Both = page.getByTestId('both');
+const Valued = page.getByTestId('valued');
+const Described = page.getByTestId('described');
+const Errored = page.getByTestId('errored');
+const ErrorFirst = page.getByTestId('error-first');
+const First = page.getByTestId('first');
+const Second = page.getByTestId('second');
+const Silent = page.getByTestId('silent');
+
+// Every case the top-level locators name reached the page under test.
+function expectCasesOnPage(...locators: Array<{ element(): Element | null }>) {
+	for (const locator of locators) expect(locator.element()).toBeTruthy();
+}
+
 function widget(container: ParentNode, name: string) {
-	const host = container.querySelector(`[data-case="${name}"]`);
+	const host = container.querySelector(`[data-testid="${name}"]`);
 	if (!host) throw new Error(`Expected the "${name}" checkbox.`);
 	return {
 		root: host.querySelector('div') as HTMLElement,
@@ -41,6 +61,7 @@ function widget(container: ParentNode, name: string) {
 }
 
 function expectStates(container: ParentNode) {
+	expectCasesOnPage(Plain, Checked, Mixed, Disabled, Both);
 	const plain = widget(container, 'plain');
 	expect(plain.trigger.getAttribute('role')).toBe('checkbox');
 	expect(plain.trigger.getAttribute('aria-checked')).toBe('false');
@@ -262,7 +283,7 @@ test('CSR: the trigger asks to prevent Enter, and the request lands too late', a
 // --- form participation ---------------------------------------------------
 
 function form(container: ParentNode, name: string) {
-	const host = container.querySelector(`[data-case="${name}"]`) as HTMLFormElement;
+	const host = container.querySelector(`[data-testid="${name}"]`) as HTMLFormElement;
 	if (!host) throw new Error(`Expected the "${name}" form.`);
 	return {
 		host,
@@ -272,6 +293,7 @@ function form(container: ParentNode, name: string) {
 }
 
 function expectFieldRendered(container: ParentNode) {
+	expectCasesOnPage(Plain, Checked, Valued, Mixed);
 	const plain = form(container, 'plain');
 	expect(plain.field).not.toBeNull();
 	expect(plain.field.getAttribute('name')).toBe('terms');
@@ -376,7 +398,7 @@ test('SSR: clicking the trigger syncs the hidden field and what the form submits
 // --- label, description and error -----------------------------------------
 
 function messages(container: ParentNode, name: string) {
-	const host = container.querySelector(`[data-case="${name}"]`) as HTMLElement;
+	const host = container.querySelector(`[data-testid="${name}"]`) as HTMLElement;
 	if (!host) throw new Error(`Expected the "${name}" checkbox.`);
 	const divs = [...host.querySelectorAll('div')];
 	return {
@@ -389,6 +411,7 @@ function messages(container: ParentNode, name: string) {
 }
 
 function expectMessages(container: ParentNode) {
+	expectCasesOnPage(Described, Errored, ErrorFirst);
 	const described = messages(container, 'described');
 	expect(described.label.textContent).toBe('Subscribe to newsletter');
 	expect(described.label.getAttribute('for')).toBe(described.trigger.id);
@@ -431,7 +454,7 @@ test('SSR: the description renders and a mounted error marks the trigger invalid
 // reaches the consumer, not about a value the payload carried.
 
 function changeTrigger(container: ParentNode, name: string) {
-	const host = container.querySelector(`[data-case="${name}"]`);
+	const host = container.querySelector(`[data-testid="${name}"]`);
 	if (!host) throw new Error(`Expected the "${name}" checkbox.`);
 	return host.querySelector('button') as HTMLButtonElement;
 }
@@ -441,6 +464,7 @@ function reported(container: ParentNode, name: string) {
 }
 
 async function expectConsumerCallbackFires(container: ParentNode) {
+	expectCasesOnPage(First, Second, Silent);
 	// Nothing fired on mount, first render or resume.
 	expect(reported(container, 'calls')).toBe('0');
 	expect(reported(container, 'first-value')).toBe('');

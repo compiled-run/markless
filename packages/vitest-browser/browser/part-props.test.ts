@@ -1,4 +1,4 @@
-import { cleanup, render, renderSSR } from '@markless/vitest-browser';
+import { cleanup, render, renderSSR } from '../src/index.ts';
 import { afterEach, expect, test } from 'vitest';
 import App from './fixtures/part-props.tsrx';
 

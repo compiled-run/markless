@@ -1,8 +1,21 @@
 import { cleanup, render, renderSSR } from '@markless/vitest-browser';
-import { userEvent } from 'vite-plus/test/browser';
+import { page, userEvent } from 'vite-plus/test/browser';
 import { afterEach, beforeEach, expect, test } from 'vitest';
-import MessagesApp from './fixtures/textbox-messages.tsrx';
-import StatesApp from './fixtures/textbox-states.tsrx';
+import MessagesApp from './textbox-messages.test-app.tsrx';
+import StatesApp from './textbox-states.test-app.tsrx';
+
+// Colocated browser suite for the textbox family, in the QDS shape: top-level
+// testid locators naming each case, and one test app module per case beside it.
+const Plain = page.getByTestId('plain');
+const Multiline = page.getByTestId('multiline');
+const Filled = page.getByTestId('filled');
+const Restricted = page.getByTestId('restricted');
+const Strict = page.getByTestId('strict');
+const Loose = page.getByTestId('loose');
+const Described = page.getByTestId('described');
+const Errored = page.getByTestId('errored');
+const Both = page.getByTestId('both');
+const ErrorFirst = page.getByTestId('error-first');
 
 // Same two runtime errors the checkbox suite captures (U-G in
 // goals/headless-components/notes/parity-table.md), recorded red once in
@@ -21,7 +34,7 @@ afterEach(async () => {
 });
 
 function widget(container: ParentNode, name: string) {
-	const host = container.querySelector(`[data-case="${name}"]`);
+	const host = container.querySelector(`[data-testid="${name}"]`);
 	if (!host) throw new Error(`Expected the "${name}" text box.`);
 	return {
 		root: host.querySelector('div') as HTMLElement,
@@ -30,7 +43,13 @@ function widget(container: ParentNode, name: string) {
 	};
 }
 
+// Every case the top-level locators name reached the page under test.
+function expectCasesOnPage(...locators: Array<{ element(): Element | null }>) {
+	for (const locator of locators) expect(locator.element()).toBeTruthy();
+}
+
 function expectStates(container: ParentNode) {
+	expectCasesOnPage(Plain, Multiline, Filled, Restricted, Strict, Loose);
 	const plain = widget(container, 'plain');
 	expect(plain.control.tagName).toBe('INPUT');
 	expect(plain.control.getAttribute('name')).toBe('username');
@@ -168,7 +187,7 @@ test('CSR: a disabled trigger takes no typing', async () => {
 // --- description and error ------------------------------------------------
 
 function messages(container: ParentNode, name: string) {
-	const host = container.querySelector(`[data-case="${name}"]`) as HTMLElement;
+	const host = container.querySelector(`[data-testid="${name}"]`) as HTMLElement;
 	if (!host) throw new Error(`Expected the "${name}" text box.`);
 	const divs = [...host.querySelectorAll('div')];
 	return {
@@ -180,6 +199,7 @@ function messages(container: ParentNode, name: string) {
 }
 
 function expectMessages(container: ParentNode) {
+	expectCasesOnPage(Described, Errored, Both, ErrorFirst);
 	const described = messages(container, 'described');
 	expect(described.first?.textContent).toBe("We'll never share your email");
 	expect(described.control.getAttribute('aria-invalid')).toBe('false');

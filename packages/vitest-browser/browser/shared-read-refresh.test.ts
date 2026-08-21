@@ -1,4 +1,4 @@
-import { cleanup, render, renderSSR } from '@markless/vitest-browser';
+import { cleanup, render, renderSSR } from '../src/index.ts';
 import { afterEach, expect, test } from 'vitest';
 import BranchApp from './fixtures/shared-branch-resume-page.tsrx';
 import CompositeApp from './fixtures/shared-composite-refresh.tsrx';

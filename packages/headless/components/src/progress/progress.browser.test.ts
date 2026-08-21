@@ -1,14 +1,29 @@
 import { cleanup, render, renderSSR } from '@markless/vitest-browser';
+import { page } from 'vite-plus/test/browser';
 import { afterEach, expect, test } from 'vitest';
-import ReactiveApp from './fixtures/progress-reactive.tsrx';
-import StatesApp from './fixtures/progress-states.tsrx';
+import ReactiveApp from './progress-reactive.test-app.tsrx';
+import StatesApp from './progress-states.test-app.tsrx';
+
+// Colocated browser suite for the progress family, in the QDS shape: one test
+// file per family beside the component, top-level testid locators, and a test
+// app per case. The apps sit in their own .tsrx modules rather than inline
+// because the SSR harness resolves a component through a separate .tsrx module,
+// and a .tsrx module carries one renderable root.
+const Loading = page.getByTestId('loading');
+const Indeterminate = page.getByTestId('indeterminate');
+const Complete = page.getByTestId('complete');
+const CustomMax = page.getByTestId('custom-max');
+const CustomRange = page.getByTestId('custom-range');
+const ReactiveCase = page.getByTestId('reactive-case');
+const ChangeButton = page.getByTestId('change');
+const Amount = page.getByTestId('amount');
 
 afterEach(async () => {
 	await cleanup();
 });
 
 function widget(container: ParentNode, name: string) {
-	const host = container.querySelector(`[data-case="${name}"]`);
+	const host = container.querySelector(`[data-testid="${name}"]`);
 	if (!host) throw new Error(`Expected the "${name}" progress bar.`);
 	const divs = [...host.querySelectorAll('div')];
 	return {
@@ -64,6 +79,12 @@ function expectStates(container: ParentNode) {
 
 test('CSR: a seeded range renders across every part', async () => {
 	const screen = await render(StatesApp);
+	// Every seeded case reached the page the locators name.
+	await expect.element(Loading).toBeInTheDocument();
+	await expect.element(Indeterminate).toBeInTheDocument();
+	await expect.element(Complete).toBeInTheDocument();
+	await expect.element(CustomMax).toBeInTheDocument();
+	await expect.element(CustomRange).toBeInTheDocument();
 	expectStates(screen.container as HTMLElement);
 });
 
@@ -78,13 +99,12 @@ test('SSR: a seeded range renders across every part', async () => {
 // move, which is what the `amount` probe below proves — the write landed, the
 // family just never heard about it. Turns green the day a seed re-runs.
 test.fails('CSR: the bar follows an amount the consumer changes from outside', async () => {
-	const screen = await render(ReactiveApp);
-	const container = screen.container as HTMLElement;
-	const root = container.querySelector('[data-case="reactive"] div') as HTMLElement;
-	const probe = container.querySelector('[data-probe="amount"]') as HTMLElement;
+	await render(ReactiveApp);
+	const root = (ReactiveCase.element() as HTMLElement).querySelector('div') as HTMLElement;
+	const probe = Amount.element() as HTMLElement;
 	expect(root.getAttribute('aria-valuetext')).toBe('30%');
 
-	(container.querySelector('[data-action="change"]') as HTMLButtonElement).click();
+	(ChangeButton.element() as HTMLButtonElement).click();
 	await expect.poll(() => probe.textContent).toBe('70');
 	await expect.poll(() => root.getAttribute('aria-valuetext')).toBe('70%');
 });
