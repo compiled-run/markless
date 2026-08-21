@@ -159,6 +159,9 @@ declare namespace __MarklessTypeService {
 		dirname?: string;
 		disabled?: boolean;
 		height?: number;
+		// The third checkbox state. It is an IDL property rather than a content
+		// attribute, so no HTML attribute list carries it.
+		indeterminate?: boolean;
 		list?: string;
 		max?: string | number;
 		maxlength?: number;

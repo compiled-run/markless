@@ -85,7 +85,7 @@ export function TextboxTrigger({
 		required={textbox.required || required === true}
 		readonly={textbox.readonly || readonly === true}
 		onInput={(event) => {
-			textbox.value = event.target.value;
+			textbox.value = event.currentTarget.value;
 			onInput?.(event);
 		}}
 	/>
@@ -111,7 +111,7 @@ export function TextboxMultilineTrigger({
 		required={textbox.required || required === true}
 		readonly={textbox.readonly || readonly === true}
 		onInput={(event) => {
-			textbox.value = event.target.value;
+			textbox.value = event.currentTarget.value;
 			onInput?.(event);
 		}}
 	/>

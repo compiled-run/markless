@@ -1,4 +1,7 @@
 import type { Children, PropsOf } from '@markless/core';
+import type { SingleHandler } from '../handler-props.ts';
+
+type TriggerProps = PropsOf<'button'>;
 
 export type ToggleRootProps = PropsOf<'div'> & {
 	/** Whether the switch reads as on. Omit it and the switch starts off. */
@@ -17,7 +20,9 @@ export type ToggleRootProps = PropsOf<'div'> & {
 	readonly children?: Children;
 };
 
-export type ToggleTriggerProps = PropsOf<'button'> & {
+export type ToggleTriggerProps = Omit<TriggerProps, 'onClick'> & {
+	/** Called after the switch has flipped. */
+	readonly onClick?: SingleHandler<TriggerProps['onClick']>;
 	readonly children?: Children;
 };
 

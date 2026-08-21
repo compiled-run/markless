@@ -65,6 +65,8 @@
 	},
 	"dependencies": {
 		"@markless/compiler": "workspace:*",
+		"@volar/language-core": "~2.4.28",
+		"@volar/typescript": "~2.4.28",
 		"@markless/router": "workspace:*",
 		"@tsrx/typescript-plugin": "0.3.112",
 		"csstype": "catalog:"

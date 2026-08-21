@@ -119,7 +119,7 @@ export function ToggleField({ ...rest }: ToggleFieldProps) @{
 		<input
 			{...rest}
 			type="checkbox"
-			tabindex="-1"
+			tabindex={-1}
 			aria-hidden="true"
 			name={toggle.name}
 			value={toggle.value}

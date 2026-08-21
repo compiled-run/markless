@@ -985,6 +985,12 @@ importers:
       '@tsrx/typescript-plugin':
         specifier: 0.3.112
         version: 0.3.112(typescript@5.9.3)
+      '@volar/language-core':
+        specifier: ~2.4.28
+        version: 2.4.28
+      '@volar/typescript':
+        specifier: ~2.4.28
+        version: 2.4.28
       csstype:
         specifier: 'catalog:'
         version: 3.2.3

@@ -1,4 +1,7 @@
 import type { Children, PropsOf } from '@markless/core';
+import type { SingleHandler } from '../handler-props.ts';
+
+type TriggerProps = PropsOf<'button'>;
 
 /** A checkbox is on, off, or mixed — the third value is what `indeterminate` means to a form. */
 export type CheckboxChecked = boolean | 'mixed';
@@ -20,8 +23,28 @@ export type CheckboxRootProps = PropsOf<'div'> & {
 	readonly children?: Children;
 };
 
-export type CheckboxTriggerProps = PropsOf<'button'> & {
+export type CheckboxTriggerProps = Omit<TriggerProps, 'onClick' | 'onKeydown'> & {
+	/** Called after the checkbox has toggled. */
+	readonly onClick?: SingleHandler<TriggerProps['onClick']>;
+	readonly onKeydown?: SingleHandler<TriggerProps['onKeydown']>;
 	readonly children?: Children;
+};
+
+/**
+ * The shared instance every checkbox part reads and writes, named here because the parts
+ * and `checkboxState()` itself both need it: `toggle()` reaches the consumer slot the root
+ * filled, which the state object's own inferred type does not carry.
+ */
+export type CheckboxInstanceState = {
+	-readonly [Field in keyof Pick<
+		CheckboxRootProps,
+		'checked' | 'disabled' | 'required' | 'name' | 'value'
+	>]-?: CheckboxRootProps[Field];
+} & {
+	/** Set by `checkbox.error` when it mounts. */
+	invalid: boolean;
+	/** Filled by `checkbox.root` with the consumer's own onChange prop. */
+	onChange?: CheckboxRootProps['onChange'];
 };
 
 export type CheckboxIndicatorProps = PropsOf<'span'> & {

@@ -4,6 +4,7 @@ import type {
 	CheckboxErrorProps,
 	CheckboxFieldProps,
 	CheckboxIndicatorProps,
+	CheckboxInstanceState,
 	CheckboxLabelProps,
 	CheckboxRootProps,
 	CheckboxTriggerProps,
@@ -16,7 +17,9 @@ import type {
 // default on the root's signature.
 export const checkboxState = shared(
 	() => {
-		const checkbox = state({
+		// Annotated, not cast: the compiler reads member accesses on this binding, and an
+		// `as` expression at a use site hides them from its capture analysis.
+		const checkbox: CheckboxInstanceState = state({
 			checked: false as boolean | 'mixed',
 			disabled: false,
 			required: false,
@@ -32,7 +35,8 @@ export const checkboxState = shared(
 			...checkbox,
 			triggerEl,
 			// The slot `<checkbox.root>` fills with its own onChange prop; a part
-			// invoking it dispatches straight to the consumer's handler.
+			// invoking it dispatches straight to the consumer's handler. It stays off
+			// state() on purpose - the slot must not become a graph node.
 			onChange: undefined as ((checked: boolean | 'mixed') => void) | undefined,
 			toggle() {
 				// Mixed resolves to checked, the way a native indeterminate box does.
@@ -72,7 +76,7 @@ export function CheckboxRoot({
 	>{children}</div>
 }
 
-export function CheckboxTrigger({ children, onClick, onKeyDown, ...rest }: CheckboxTriggerProps) @{
+export function CheckboxTrigger({ children, onClick, onKeydown, ...rest }: CheckboxTriggerProps) @{
 	const checkbox = checkboxState();
 
 	<button
@@ -92,13 +96,13 @@ export function CheckboxTrigger({ children, onClick, onKeyDown, ...rest }: Check
 			checkbox.toggle();
 			onClick?.(event);
 		}}
-		onKeyDown={(event) => {
+		onKeydown={(event) => {
 			// A native button activates on Enter; a checkbox must not. The request
 			// lands after dispatch returns, so today it only sometimes wins (U-M).
 			if (event.key === 'Enter') {
 				event.preventDefault();
 			}
-			onKeyDown?.(event);
+			onKeydown?.(event);
 		}}
 	>{children}</button>
 }
@@ -140,7 +144,7 @@ export function CheckboxField({ ...rest }: CheckboxFieldProps) @{
 		<input
 			{...rest}
 			type="checkbox"
-			tabindex="-1"
+			tabindex={-1}
 			aria-hidden="true"
 			name={checkbox.name}
 			value={checkbox.value}
