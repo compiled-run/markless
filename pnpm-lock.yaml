@@ -816,8 +816,8 @@ importers:
         specifier: 0.9.0
         version: 0.9.0
       yuku-tsrx:
-        specifier: 0.1.2
-        version: 0.1.2
+        specifier: 0.1.3
+        version: 0.1.3
 
   packages/core:
     dependencies:
@@ -889,8 +889,8 @@ importers:
         specifier: 8.0.16
         version: 8.0.16(@types/node@24.12.2)(jiti@2.7.0)(yaml@2.9.0)
       yuku-tsrx:
-        specifier: 0.1.2
-        version: 0.1.2
+        specifier: 0.1.3
+        version: 0.1.3
     devDependencies:
       '@markless/analyzer':
         specifier: workspace:*
@@ -2240,14 +2240,14 @@ packages:
   '@yuku-toolchain/types@0.9.0':
     resolution: {integrity: sha512-ta11OgDlY5ESPaO4mer9on6BMYtbQc5itQB+JYxQ7DWVZBgxgJmQkMTUlSDddBg0ueYOpxBrp9vLjkZlhQfClA==}
 
-  '@yuku-tsrx/binding-darwin-arm64@0.1.2':
-    resolution: {integrity: sha512-PRdGbdgTJmHIX6XcqmUqVDXMeqK0+Y2QBBqBwIzOes+O1W5lR0xbaLCElo51A8urAeL57dMtKSdXZAj5gJXEbg==}
+  '@yuku-tsrx/binding-darwin-arm64@0.1.3':
+    resolution: {integrity: sha512-4SrfOSx/KXZWaAoN1V7vsWU7nux1rnnYDoz1jaW6PcLOf4wvnO3y9Gg/+6eZJEibQFFnS4Wm5wYDvIryFgx5/A==}
     engines: {node: '>=22'}
     cpu: [arm64]
     os: [darwin]
 
-  '@yuku-tsrx/binding-linux-x64-gnu@0.1.2':
-    resolution: {integrity: sha512-W4ek16C0ibGJeiOnNl/QQ6MWBqwIntb6ItyqztoMPM3vVYQ5ESj0i7P0B5OFq85I1jL2v+468ukNJxpzuauN0w==}
+  '@yuku-tsrx/binding-linux-x64-gnu@0.1.3':
+    resolution: {integrity: sha512-oV6TFgUaGRx40aXMDZEnv5LhuUcCEVOBqV+bIL3V6ab268W8GsgByeykxBJXds4bD8A9LxOeveVeII0bfYlplQ==}
     engines: {node: '>=22'}
     cpu: [x64]
     os: [linux]
@@ -3327,8 +3327,8 @@ packages:
   yuku-codegen@0.9.0:
     resolution: {integrity: sha512-U2mUYP/Wes46CYMS94EJdBnmEiMs+ykgc5NT9Rh0iQimF4BDkcMEz+yXy+1xiljEIrg2wbLYF2JZLh1EBXXksw==}
 
-  yuku-tsrx@0.1.2:
-    resolution: {integrity: sha512-FMsxPbDNgJugHpozkrmTUZqbP+dfzh6jPzzUijFHJa8B/5wkVbptG8dVIKpSJQ+2MrresH5DzdSSbbM1e5wuHw==}
+  yuku-tsrx@0.1.3:
+    resolution: {integrity: sha512-Q9nxULCIoEyAB7LAEs8/RdUqfjklieSqvNwnvEMYPp+l5ooKRLVJP9nsolI4yhTmbHV178N3XlqKu2SEX0FK+A==}
     engines: {node: '>=22'}
 
   zod@4.4.3:
@@ -4426,10 +4426,10 @@ snapshots:
 
   '@yuku-toolchain/types@0.9.0': {}
 
-  '@yuku-tsrx/binding-darwin-arm64@0.1.2':
+  '@yuku-tsrx/binding-darwin-arm64@0.1.3':
     optional: true
 
-  '@yuku-tsrx/binding-linux-x64-gnu@0.1.2':
+  '@yuku-tsrx/binding-linux-x64-gnu@0.1.3':
     optional: true
 
   agent-base@7.1.4:
@@ -5403,10 +5403,10 @@ snapshots:
       '@yuku-codegen/binding-win32-arm64': 0.9.0
       '@yuku-codegen/binding-win32-x64': 0.9.0
 
-  yuku-tsrx@0.1.2:
+  yuku-tsrx@0.1.3:
     optionalDependencies:
-      '@yuku-tsrx/binding-darwin-arm64': 0.1.2
-      '@yuku-tsrx/binding-linux-x64-gnu': 0.1.2
+      '@yuku-tsrx/binding-darwin-arm64': 0.1.3
+      '@yuku-tsrx/binding-linux-x64-gnu': 0.1.3
 
   zod@4.4.3: {}
 
