@@ -1,5 +1,5 @@
 import type { Children, PropsOf } from '@markless/core';
-import type { SingleHandler } from '../handler-props.ts';
+import type { CallableHandler } from '../handler-props.ts';
 
 export type TextboxRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/** The text the box shows. Omit it and the box starts empty. */
@@ -23,12 +23,12 @@ export type TextboxRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
  */
 export type TextboxInputProps = Omit<PropsOf<'input'>, 'onInput'> & {
 	/** Called after the box's own text has moved with the person's keystroke. */
-	readonly onInput?: SingleHandler<PropsOf<'input'>['onInput']>;
+	readonly onInput?: CallableHandler<PropsOf<'input'>['onInput']>;
 };
 
 /** The same control over more than one line. */
 export type TextboxTextareaProps = Omit<PropsOf<'textarea'>, 'onInput'> & {
-	readonly onInput?: SingleHandler<PropsOf<'textarea'>['onInput']>;
+	readonly onInput?: CallableHandler<PropsOf<'textarea'>['onInput']>;
 };
 
 export type TextboxLabelProps = PropsOf<'label'>;

@@ -1,5 +1,5 @@
 import type { Children, PropsOf } from '@markless/core';
-import type { SingleHandler } from '../handler-props.ts';
+import type { CallableHandler, Seeded } from '../handler-props.ts';
 
 type TriggerProps = PropsOf<'button'>;
 
@@ -24,24 +24,20 @@ export type CheckboxRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 
 export type CheckboxTriggerProps = Omit<TriggerProps, 'onClick' | 'onKeydown'> & {
 	/** Called after the checkbox has toggled. */
-	readonly onClick?: SingleHandler<TriggerProps['onClick']>;
-	readonly onKeydown?: SingleHandler<TriggerProps['onKeydown']>;
+	readonly onClick?: CallableHandler<TriggerProps['onClick']>;
+	readonly onKeydown?: CallableHandler<TriggerProps['onKeydown']>;
 };
 
 /**
- * The shared instance every checkbox part reads and writes, named here because the parts
- * and `checkboxState()` itself both need it: `toggle()` reaches the consumer slot the root
- * filled, which the state object's own inferred type does not carry.
+ * The shared instance every checkbox part reads and writes: the root's seeded
+ * fields, plus what no prop carries - `invalid`, set by a mounted error part,
+ * and the consumer's `onChange`, stored by the root for `toggle()` to call.
  */
-export type CheckboxInstanceState = {
-	-readonly [Field in keyof Pick<
-		CheckboxRootProps,
-		'checked' | 'disabled' | 'required' | 'name' | 'value'
-	>]-?: CheckboxRootProps[Field];
-} & {
-	/** Set by `checkbox.error` when it mounts. */
+export type CheckboxInstanceState = Seeded<
+	CheckboxRootProps,
+	'checked' | 'disabled' | 'required' | 'name' | 'value'
+> & {
 	invalid: boolean;
-	/** Filled by `checkbox.root` with the consumer's own onChange prop. */
 	onChange?: CheckboxRootProps['onChange'];
 };
 
