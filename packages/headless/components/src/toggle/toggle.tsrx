@@ -10,11 +10,6 @@ import type {
 	ToggleTriggerProps,
 } from './toggle-types.ts';
 
-// One instance per rendered `<toggle.root>`: every part reads and writes this
-// object, so a part is placeable anywhere inside the root. The values below are
-// placeholders, not defaults: `<toggle.root>` seeds every one of them on every
-// render, and what an omitted prop means is stated once, as a destructuring
-// default on the root's signature.
 export const toggleState = shared(
 	() => {
 		const toggle = state({
@@ -25,8 +20,6 @@ export const toggleState = shared(
 			name: '',
 			value: '',
 		});
-		// The relationship, not a string: the compiler mints this widget's id and
-		// writes it on the trigger and on every position that names the handle.
 		const triggerEl = element<HTMLButtonElement>();
 
 		return {
@@ -46,14 +39,12 @@ export function ToggleRoot({
 	disabled = false,
 	required = false,
 	name = '',
-	// What a browser submits for a checkbox-shaped control with no value of its own.
 	value = 'on',
 	onChange,
 	children,
 	...rest
 }: ToggleRootProps) @{
 	const toggle = toggleState();
-	// Destructured so it never lands on the div below; the shared instance carries it.
 	toggle.checked = checked;
 	toggle.disabled = disabled;
 	toggle.required = required;
@@ -63,9 +54,6 @@ export function ToggleRoot({
 	<div {...rest} ui-checked={toggle.checked} ui-disabled={toggle.disabled}>{children}</div>
 }
 
-// role="switch" is a checkbox with two states and no mixed value, so the button
-// needs no keyboard rule of its own: a native button activates on both Space and
-// Enter, which is exactly what a switch must do.
 export function ToggleTrigger({ children, onClick, ...rest }: ToggleTriggerProps) @{
 	const toggle = toggleState();
 
@@ -103,7 +91,6 @@ export function ToggleDescription({ children, ...rest }: ToggleDescriptionProps)
 
 export function ToggleError({ children, ...rest }: ToggleErrorProps) @{
 	const toggle = toggleState();
-	// Mounting the error part is what marks the trigger invalid.
 	toggle.invalid = true;
 
 	<div {...rest}>{children}</div>

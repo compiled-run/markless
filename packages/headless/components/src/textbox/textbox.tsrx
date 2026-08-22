@@ -8,11 +8,6 @@ import type {
 	TextboxInputProps,
 } from './textbox-types.ts';
 
-// One instance per rendered `<textbox.root>`: every part reads and writes this
-// object, so a part is placeable anywhere inside the root. The values below are
-// placeholders, not defaults: `<textbox.root>` seeds every one of them on every
-// render, and what an omitted prop means is stated once, as a destructuring
-// default on the root's signature.
 export const textboxState = shared(
 	() => {
 		const textbox = state({
@@ -23,10 +18,6 @@ export const textboxState = shared(
 			invalid: false,
 			name: '',
 		});
-		// The relationships, not strings: the compiler mints this widget's ids and
-		// writes them on the parts that name each other. A handle binds one live
-		// element, so the two controls carry one each and the label names the
-		// single-line one; both controls point back at the label for their name.
 		const inputEl = element<HTMLInputElement>();
 		const textareaEl = element<HTMLTextAreaElement>();
 		const labelEl = element<HTMLLabelElement>();
@@ -47,7 +38,6 @@ export function TextboxRoot({
 	...rest
 }: TextboxRootProps) @{
 	const textbox = textboxState();
-	// Destructured so it never lands on the div below; the shared instance carries it.
 	textbox.value = value;
 	textbox.disabled = disabled;
 	textbox.required = required;

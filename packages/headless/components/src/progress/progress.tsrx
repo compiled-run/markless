@@ -6,10 +6,6 @@ import type {
 	ProgressTrackProps,
 } from './progress-types.ts';
 
-// One instance per rendered `<progress.root>`. The three numbers are the whole
-// state; everything a part renders is derived from them once, here, so no part
-// repeats the arithmetic. The values below are placeholders, not defaults:
-// `<progress.root>` seeds every one of them on every render.
 export const progressState = shared(
 	() => {
 		const progress = state({
@@ -25,15 +21,11 @@ export const progressState = shared(
 				const covered = (progress.value - progress.min) / (progress.max - progress.min);
 				return covered >= 1 ? 'complete' : 'loading';
 			}),
-			// What a screen reader announces: the share of the range covered. An
-			// unknown amount reads as the bottom of the range.
 			valueText: computed(() => {
 				const value = progress.value === null ? progress.min : progress.value;
 				const covered = (value - progress.min) / (progress.max - progress.min);
 				return `${Math.round(covered * 100)}%`;
 			}),
-			// The indicator is the full length of the track, slid back by whatever
-			// share of the range is still to go.
 			indicatorStyle: computed(() => {
 				const value = progress.value === null ? progress.min : progress.value;
 				const covered = (value - progress.min) / (progress.max - progress.min);

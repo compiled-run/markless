@@ -11,15 +11,8 @@ import type {
 	CheckboxTriggerProps,
 } from './checkbox-types.ts';
 
-// One instance per rendered `<checkbox.root>`: every part reads and writes this
-// object, so a part is placeable anywhere inside the root. The values below are
-// placeholders, not defaults: `<checkbox.root>` seeds every one of them on every
-// render, and what an omitted prop means is stated once, as a destructuring
-// default on the root's signature.
 export const checkboxState = shared(
 	() => {
-		// Annotated, not cast: the compiler reads member accesses on this binding, and an
-		// `as` expression at a use site hides them from its capture analysis.
 		const checkbox: CheckboxInstanceState = state({
 			checked: false as boolean | 'mixed',
 			disabled: false,
@@ -28,22 +21,16 @@ export const checkboxState = shared(
 			name: '',
 			value: '',
 		});
-		// The relationship, not a string: the compiler mints this widget's id and
-		// writes it on the trigger and on every position that names the handle.
 		const triggerEl = element<HTMLButtonElement>();
 
 		return {
 			...checkbox,
 			triggerEl,
-			// The slot `<checkbox.root>` fills with its own onChange prop; a part
-			// invoking it dispatches straight to the consumer's handler. It stays off
-			// state() on purpose - the slot must not become a graph node.
 			onChange: undefined as ((checked: boolean | 'mixed') => void) | undefined,
 			toggle() {
-				// Mixed resolves to checked, the way a native indeterminate box does.
-				const next = checkbox.checked === true ? false : true;
-				checkbox.checked = next;
-				checkbox.onChange?.(next);
+				// mixed resolves to checked, like a native indeterminate box
+				checkbox.checked = checkbox.checked !== true;
+				checkbox.onChange?.(checkbox.checked);
 			},
 		};
 	},
@@ -55,7 +42,6 @@ export function CheckboxRoot({
 	disabled = false,
 	required = false,
 	name = '',
-	// What a browser submits for a checkbox with no value of its own.
 	value = 'on',
 	onChange,
 	children,
