@@ -72,7 +72,12 @@ const clientBuild = resolve(demo, '.output/public/build');
 // measured and kept (65,501 -> 65,458 -> 65,441): collapsing the dependency rewrite onto the
 // existing remap result, and dropping a per-node freshness check seeds cannot use anyway (one node
 // carries a seed per property, which its id cannot tell apart). Repayment owed by bundler-diet.
-const MAX_SHIPPED_JS_GZIP_BYTES = 65_441;
+// 65,441 -> 65,444 (re-anchor 2026-08-22, main merge at 8f9db739): +3 measured on the merge
+// commit itself, before the T075h seed-phase change (which added 0 on top). The merge brought
+// main's yuku-tsrx 0.1.2 adapter dissolution into the compiler; emission-side churn of that
+// size is codegen noise, not a new payload class. De-minimis interim per the proportionality
+// order; repayment stays with bundler-diet.
+const MAX_SHIPPED_JS_GZIP_BYTES = 65_444;
 
 test('music-player-ssr production build stays within its shipped JS budget', async () => {
 	await rm(resolve(demo, '.output'), { force: true, recursive: true });
