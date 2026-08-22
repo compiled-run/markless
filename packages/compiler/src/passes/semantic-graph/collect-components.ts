@@ -7,6 +7,7 @@ import {
 	isHostTagName,
 	isIgnorableJsxTextNode,
 	isMemberTagName,
+	isSpreadAttribute,
 	memberTagPropertyPath,
 	memberTagRootName,
 	unwrapExpressionContainer,
@@ -28,6 +29,7 @@ import {
 import {
 	callbackPropArityUnsupportedDiagnostic,
 	componentPropExpressionUnsupportedDiagnostic,
+	componentSpreadUnsupportedDiagnostic,
 	memberTagUnresolvedDiagnostic,
 } from './diagnostics.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
@@ -162,6 +164,11 @@ function componentPropBindings(
 	const props: SemanticComponentPropBinding[] = [];
 
 	for (const attribute of getElementAttributes(node)) {
+		if (isSpreadAttribute(attribute)) {
+			const spread = spreadPropBinding(attribute, state, scope, childComponentName);
+			if (spread) props.push(spread);
+			continue;
+		}
 		const name = getIdentifierName(attribute.name as AnyNode | undefined);
 		if (!name) continue;
 
@@ -239,9 +246,14 @@ function componentPropBindings(
 
 		// A recombined expression at the edge - `list.value.includes(item.value)` -
 		// resolves to no single node, so without a computed of its own the child is
-		// seeded once and never hears about the group again.
+		// seeded once and never hears about the group again. A props-only expression
+		// (`depth - 1`) is settled by the render that read it, so it owes no computed.
 		const composite = expression
-			? collectCompositeTemplateExpression(expression, state, { scope, methodCalls: true })
+			? collectCompositeTemplateExpression(expression, state, {
+					scope,
+					methodCalls: true,
+					requireWritableRead: true,
+				})
 			: null;
 		if (composite) {
 			props.push({
@@ -277,6 +289,53 @@ function componentPropBindings(
 	}
 
 	return props;
+}
+
+/**
+ * `{...rest}` written on a child COMPONENT tag. What crosses the edge is the
+ * props object this component was handed, minus the names its own signature
+ * destructured out of the rest binding - a build-time fact of the signature, not
+ * of what any consumer passes. Anything else spread onto a component tag is
+ * refused rather than dropped: the child would render without it and nothing
+ * would say so.
+ */
+function spreadPropBinding(
+	attribute: AnyNode,
+	state: WalkState,
+	scope: GraphReadScope,
+	childComponentName: string,
+): SemanticComponentPropBinding | null {
+	const expression = unwrapExpressionContainer(
+		(attribute.argument ?? attribute.value) as AnyNode | undefined,
+	);
+	if (!expression) return null;
+	const source = expressionSource(expression, state.source);
+	const span = sourceSpan(expression, state.filename);
+	const resolved = resolveGraphPath(source, scope.bindings, scope.aliases);
+	if (!resolved || resolved.binding.kind !== 'prop') {
+		state.graph.diagnostics.push(
+			componentSpreadUnsupportedDiagnostic({
+				source,
+				childComponentName,
+				node: expression,
+				filename: state.filename,
+			}),
+		);
+		return null;
+	}
+	return {
+		name: `...${source}`,
+		source,
+		kind: 'spread',
+		graphNodeId: resolved.binding.id,
+		path: resolved.path,
+		// A rest binding excludes whole names, so only the one-segment paths name
+		// something a spread could have carried.
+		excludeNames: (scope.aliases.get(source)?.excludedPaths ?? []).flatMap((excluded) =>
+			excluded.length === 1 && excluded[0] !== undefined ? [excluded[0]] : [],
+		),
+		...(span ? { sourceSpan: span } : {}),
+	};
 }
 
 /**

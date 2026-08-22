@@ -66,21 +66,24 @@ export function collectPublicRenderComponentDefinitions(
 					}),
 				),
 				props: [
+					// Ahead of the written props: a name the tag spreads must not be
+					// undone by the absence of a tag attribute for it.
+					...declaredInputs.flatMap((name) =>
+						passedInputs.has(name) ? [] : [{ name, kind: 'absent' }],
+					),
 					...edge.props.map((prop) => ({
 						name: prop.name,
 						kind: prop.kind,
 						...('graphNodeId' in prop
 							? { graphNodeId: prop.graphNodeId, path: prop.path }
 							: {}),
+						...('excludeNames' in prop ? { excludeNames: prop.excludeNames } : {}),
 						...('value' in prop ? { value: prop.value } : {}),
 						...(prop.kind === 'callback'
 							? { symbolId: callbacks.get(`${edge.id}:${prop.name}`) }
 							: {}),
 						...(prop.kind === 'callback' ? {} : { source: prop.source }),
 					})),
-					...declaredInputs.flatMap((name) =>
-						passedInputs.has(name) ? [] : [{ name, kind: 'absent' }],
-					),
 				],
 				...(materializations[edge.id] ? { materialized: materializations[edge.id] } : {}),
 			};

@@ -64,6 +64,18 @@ export type SemanticComponentPropBinding =
 			readonly parameters?: ReadonlyArray<string>;
 			readonly value?: unknown;
 			readonly sourceSpan?: SourceSpan;
+	  }
+	// `{...rest}` written on a CHILD COMPONENT tag. It carries no single name: the
+	// whole props object the parent was handed crosses the edge, minus what the
+	// parent's signature took out of the rest binding.
+	| {
+			readonly name: string;
+			readonly source: string;
+			readonly kind: 'spread';
+			readonly graphNodeId: string;
+			readonly path: ReadonlyArray<string>;
+			readonly excludeNames: ReadonlyArray<string>;
+			readonly sourceSpan?: SourceSpan;
 	  };
 
 export type SemanticComponentEdge = {
@@ -434,6 +446,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_EVENT_HANDLER_ARRAY_UNSUPPORTED'
 		| 'MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED'
 		| 'MARKLESS_COMPONENT_PROP_EXPRESSION_UNSUPPORTED'
+		| 'MARKLESS_COMPONENT_SPREAD_UNSUPPORTED'
 		| 'MARKLESS_CALLBACK_SLOT_SOURCE_UNSUPPORTED'
 		| 'MARKLESS_CALLBACK_SLOT_UNBOUND'
 		| 'MARKLESS_EVENT_SPREAD_UNSUPPORTED'

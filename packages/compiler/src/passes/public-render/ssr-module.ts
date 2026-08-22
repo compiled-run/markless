@@ -230,6 +230,7 @@ export function emitPublicSsrRenderModule(
 					'marklessSsrHost',
 					'marklessSsrCallbacks',
 					'marklessSsrCallbackSymbol',
+					'marklessSsrSpreadProps',
 					'marklessSsrSeedChild',
 					'marklessSsrWidgetRoots',
 					'marklessSsrChildrenWidgetRoot',
@@ -503,6 +504,8 @@ function emitSsrDataRenderLines(
 		if (!component) return [];
 		const props = edge.props.flatMap((prop) => {
 			if (prop.kind === 'callback') return [];
+			if (prop.kind === 'spread')
+				return [`...marklessSsrSpreadProps(marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(${JSON.stringify(prop.graphNodeId)}),${JSON.stringify(prop.path)}),${JSON.stringify(prop.excludeNames)})`];
 			if (prop.kind === 'graph-reference')
 				return [`${objectPropertyName(prop.name)}:marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(${JSON.stringify(prop.graphNodeId)}),${JSON.stringify(prop.path)})`];
 			return prop.source ? [`${objectPropertyName(prop.name)}:(${prop.source})`] : [];

@@ -134,6 +134,107 @@ test('an opaque call that reads no state stays an opaque prop', async () => {
 	).toEqual([]);
 });
 
+// The other side of the widening: nothing a later write can move is inside the
+// expression, so no computed is minted for it. A self-composing component's
+// `depth={depth - 1}` is exactly that shape, and minting a computed for it sent
+// the child edge through a capture read the render evaluator never supplies.
+test('an edge expression over props alone stays opaque and mints no computed', async () => {
+	const results = await compileTsrxModulesWithInterfaces([
+		{
+			filename: 'src/tree-node.tsrx',
+			source: `
+import { state } from '@markless/core';
+
+export default function TreeNode({ depth }) @{
+	let count = state(0);
+
+	<div data-tree-node data-depth={depth}>
+		<button type="button" data-tree-bump onClick={() => count++}>{count}</button>
+		@if (depth > 0) {
+			<TreeNode depth={depth - 1} />
+		}
+	</div>
+}
+`,
+		},
+	]);
+	const tree = results[results.length - 1]!;
+	const depth = tree.semanticGraph.componentEdges[0]?.props.find((prop) => prop.name === 'depth');
+
+	expect(depth?.kind).toBe('opaque');
+	expect(
+		tree.semanticGraph.graphBindings.filter((binding) =>
+			binding.id.startsWith('computed:templateExpression:'),
+		),
+	).toEqual([]);
+	expect(
+		tree.semanticGraph.diagnostics.filter(
+			(candidate) => candidate.code === 'MARKLESS_COMPONENT_PROP_EXPRESSION_UNSUPPORTED',
+		),
+	).toEqual([]);
+});
+
+// `{...rest}` on a CHILD COMPONENT tag. What crosses is the props object this
+// component was handed, minus the names its signature took out of the rest
+// binding — a build-time fact of the signature, so the consumer's `data-testid`
+// reaches the element the composed child spreads onto.
+test('a rest spread on a component tag crosses the edge as one prop binding', async () => {
+	const results = await compileTsrxModulesWithInterfaces([
+		{ filename: 'src/child.tsrx', source: CHILD, importSource: './child.tsrx' },
+		{
+			filename: 'src/parent.tsrx',
+			source: `
+import { BoxRoot } from './child.tsrx';
+
+export function Wrapper({ disabled, children, ...rest }) @{
+	<BoxRoot {...rest} disabled={disabled}>{children}</BoxRoot>
+}
+`,
+		},
+	]);
+	const wrapper = results[results.length - 1]!;
+	const props = wrapper.semanticGraph.componentEdges[0]?.props ?? [];
+	const spread = props[0];
+
+	expect(spread?.kind).toBe('spread');
+	expect(spread && 'graphNodeId' in spread ? spread.graphNodeId : '').toBe('prop:props');
+	expect(spread && 'excludeNames' in spread ? [...spread.excludeNames].sort() : []).toEqual([
+		'children',
+		'disabled',
+	]);
+	// Written first on the tag, so the props the tag names itself still win.
+	expect(props.map((prop) => prop.name)).toEqual(['...rest', 'disabled']);
+	expect(wrapper.semanticGraph.diagnostics).toEqual([]);
+});
+
+// Fail closed, never drop: an object assembled anywhere but the signature has no
+// build-time contents, so the child would silently render without them.
+test('a spread of anything but the props rest binding is refused', async () => {
+	const results = await compileTsrxModulesWithInterfaces([
+		{ filename: 'src/child.tsrx', source: CHILD, importSource: './child.tsrx' },
+		{
+			filename: 'src/parent.tsrx',
+			source: `
+import { BoxRoot } from './child.tsrx';
+
+export function Wrapper({ children }) @{
+	const extra = { 'data-kind': 'card' };
+
+	<BoxRoot {...extra}>{children}</BoxRoot>
+}
+`,
+		},
+	]);
+	const wrapper = results[results.length - 1]!;
+	const diagnostic = wrapper.semanticGraph.diagnostics.find(
+		(candidate) => candidate.code === 'MARKLESS_COMPONENT_SPREAD_UNSUPPORTED',
+	);
+
+	expect(diagnostic?.severity).toBe('error');
+	expect(diagnostic?.message).toContain('extra');
+	expect(wrapper.semanticGraph.componentEdges[0]?.props).toEqual([]);
+});
+
 // Hardcoding resistance: the same structure with every name, element, member and
 // method changed still mints the computed and still names both reads.
 test('the edge computed is selected from structure, not from names', async () => {

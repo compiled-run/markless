@@ -263,6 +263,32 @@ export function marklessSsrChildrenWidgetRoot(
 }
 
 /**
+ * What `{...rest}` on a child COMPONENT tag hands the child: the props object
+ * this component was handed, minus the names its signature destructured out of
+ * the rest binding. Function props do not travel this way - a consumer handler
+ * crosses the edge as a view record, written where the composition seam knows
+ * the host it lands on - so the callback channel never rides along.
+ */
+export function marklessSsrSpreadProps(
+	value: unknown,
+	excludeNames: ReadonlyArray<string> = [],
+): Record<string, unknown> {
+	const carried: Record<string, unknown> = {};
+	if (!value || typeof value !== 'object') return carried;
+	for (const [name, entry] of Object.entries(value as Record<string, unknown>))
+		// `__markless` is the framework's own reserved prefix for the channels a
+		// parent render arranges with a child; none of them is a prop anyone wrote.
+		if (
+			typeof entry !== 'function' &&
+			name !== 'children' &&
+			!name.startsWith('__markless') &&
+			!excludeNames.includes(name)
+		)
+			carried[name] = entry;
+	return carried;
+}
+
+/**
  * Whether a placed child ends this widget's seed phase: it roots a family this
  * root started, so it and everything under it belong to their own instance.
  */

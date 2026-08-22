@@ -68,8 +68,11 @@ test('CSR: a part projected into a composed family root resolves to that root', 
 // COMPOSES a family root (GroupRoot -> PwrRoot) is not asked for seeds, because
 // the seed pass stops at the child the consumer wrote and does not descend the
 // children-projection chain it now declares. Identity resolves; the seeded value
-// does not travel. Un-pin when the seed pass follows the same chain the widget
-// token does.
+// does not travel. Descending the chain also needs a reader for the composing
+// component's own computeds — `<CheckboxRoot checked={checklist.allChecked}>` is
+// the same shape one link in — which the seed pass does not have today. Un-pin
+// when the seed pass follows the same chain the widget token does AND can read a
+// computed of the component whose edge it is descending.
 test.skip('CSR: each composed root seeds only the parts projected into it', async () => {
 	const screen = await render(Page);
 	expectSeedsPerWidget(screen.container as HTMLElement);
