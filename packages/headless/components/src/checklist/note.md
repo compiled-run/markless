@@ -11,7 +11,7 @@ QDS pass-through wrappers (`itemtrigger`, `itemindicator`, `itemlabel`,
 `itemdescription`, `selectallindicator`, `hiddeninput`) are deleted — a consumer
 writes `checkbox.*` directly inside `checklist.item` and `checklist.selectall`,
 because each of those roots a real checkbox instance and a checkbox part resolves
-the innermost enclosing root of *its own* family.
+the innermost enclosing root of _its own_ family.
 
 The group is a `<fieldset>` named by a `<legend>`, which is what aria-at's own
 tri-state reference implementation does. No id is minted for the group name and no
@@ -26,27 +26,35 @@ disagree, and no item registration or construction-order index is required.
 Each of these was measured on `feat/headless-ui-pilot` @ `34968931` while building
 this family. They are the reason `checklist.browser.ts` carries pinned rows.
 
-1. **A spread onto a component tag is silently dropped.**
-   `packages/compiler/src/passes/semantic-graph/collect-components.ts` builds a
-   component edge's props by iterating attributes and skipping anything with no
-   identifier name; a `JSXSpreadAttribute` has none, so `{...rest}` written on
-   `<CheckboxRoot>` contributes nothing and raises no diagnostic. This is why
-   `checklist.selectall` and `checklist.item` render an element of their own that
-   carries `{...rest}`, with the checkbox root as its child, rather than being the
-   checkbox root. Cost: one extra element per item, and the checkbox family's
-   `ui-*` flags sit on the inner element while the checklist's sit on the outer.
+1. **A spread onto a component tag was dropped on the CSR side.** _(fixed)_
+   The SSR emitter already forwarded it; the CSR emitter
+   (`componentPropsSource` in `passes/public-render/component-wiring.ts`) skipped
+   any attribute with no identifier name, and a `JSXSpreadAttribute` has none.
+   Both emitters now forward the spread. What is NOT yet done: the semantic graph
+   still records no prop binding for a spread, so a spread-forwarded event or
+   `el` handle across a component edge has no view record. The wrapper elements
+   `checklist.selectall` and `checklist.item` render are still here for that
+   reason and for gap 2 below.
 
 2. **A composed family's root cannot be seeded from the enclosing family's
-   instance.** `<CheckboxRoot checked={checklist.value.includes(item.value)}>`
-   seeds `false` at first render even when the group says the item is ticked. The
-   identical expression in a plain template position on the same component —
-   `ui-checked={checklist.value.includes(item.value)}` on the wrapper element —
-   renders correctly, so the expression is right and the component-edge seed is
-   what is stale. Moving the answer into a component-local `state()` cell first
-   makes it worse: a component-body read of the enclosing family's instance sees
-   the placeholder too, because part bodies run in the order-independent seed
-   phase. There is no route today that carries a group's answer into a child
-   family's root at first render.
+   instance.** _(partly fixed)_ Two separate faults were behind this.
+    - `splitStaticGraphPath` split `checklist.value.includes(item.value)` on `.`
+      with no check that a segment is a property name, so the edge prop was
+      recorded as a graph reference down the path
+      `["value", "includes(item", "value)"]` — a path no object answers, which
+      read as `undefined` and seeded `false`. The split now fails closed when a
+      segment is not an identifier or index, so the prop is honestly `opaque` and
+      SSR evaluates the authored expression against the instance-qualified local.
+    - `componentPropBindings` resolved edge props against an UNSCOPED binding map,
+      so `checklist` in a part body resolved to the shared factory's own local of
+      the same name. It is now scoped the way every other collector scopes a
+      component body, with the shared instance's own return map as the fallback —
+      which is what makes `checked={checklist.allChecked}` reach
+      `computed:allChecked` instead of a non-existent `state:checklist.allChecked`.
+      What is still open: the item's membership seed. `checked={...includes(...)}`
+      is `opaque` at the edge, so it has an SSR value but no reactive route, and the
+      CSR seed still renders the placeholder. Every row still pinned turns on that
+      one seed.
 
 3. **Sibling composed checkbox instances are not isolated after a gesture.** With
    three items rendered, a click on one item's trigger moved the select-all's and a
@@ -69,7 +77,7 @@ this family. They are the reason `checklist.browser.ts` carries pinned rows.
 6. **`aria-controls` on the select-all is not expressible.**
    `MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE` refuses an IDREF list. The family ships
    without it, exactly where QDS is, with a pinned row in the suite that turns red
-   the day an IDREF *set* lands.
+   the day an IDREF _set_ lands.
 
 7. **A construct cannot open directly inside a component tag's children.** `@for`
    written as a direct child of `<checklist.root>` is a parse error; it has to be
@@ -77,12 +85,17 @@ this family. They are the reason `checklist.browser.ts` carries pinned rows.
    `<div>` for that reason.
 
 8. **A part that renders a composed family's root has no instance during the
-   server render.** Every SSR row throws "Cannot read properties of undefined
-   (reading 'allChecked')" from `checklist.selectall`. This is why the whole SSR
-   half of the suite is pinned rather than a few rows of it.
+   server render.** _(fixed)_ Every SSR row threw "Cannot read properties of
+   undefined (reading 'allChecked')" from `checklist.selectall`. The synthetic
+   computed that stands behind a recombined template expression declares one
+   local per read root (`passes/public-render/html.ts`, `ssrAsyncRunnerSource`),
+   and it assumed the resolved graph node WAS that root. When the node sits below
+   the root — a shared instance's `allChecked` resolves to the computed itself —
+   it bound `const checklist = <the boolean>` and the authored
+   `checklist.allChecked` then read a member of a boolean. A node below the root
+   now contributes a member of the local instead of replacing it. Four SSR rows
+   are green as a result; the rest wait on gap 2.
 
 9. **`<fieldset>` does not declare `disabled`** in the type service's intrinsic
-   attribute map, so the native "a disabled fieldset disables every control inside
-   it" cascade is unavailable. `checklist.root` writes `ui-disabled` and each part
-   carries its own restriction instead. Worth adding to the type service, since it
-   is a plain HTML attribute the family's design assumed.
+   attribute map. _(fixed)_ `fieldset` now declares `disabled`, `form` and `name`
+   in `packages/typescript-plugin/src/markless-tsrx.d.ts`.

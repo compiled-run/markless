@@ -251,75 +251,90 @@ declare namespace __MarklessTypeService {
 						}
 					: Tag extends 'canvas'
 						? { height?: number; width?: number }
-						: Tag extends 'form'
-							? {
-									action?: string;
-									autocomplete?: string;
-									enctype?: string;
-									method?: string;
-									name?: string;
-									novalidate?: boolean;
-									target?: string;
-								}
-							: Tag extends 'iframe'
+						: Tag extends 'fieldset'
+							? // `disabled` is what the native "disable every control inside" cascade reads.
+								{ disabled?: boolean; form?: string; name?: string }
+							: Tag extends 'form'
 								? {
-										allow?: string;
-										allowfullscreen?: boolean;
-										height?: string | number;
-										loading?: 'eager' | 'lazy';
+										action?: string;
+										autocomplete?: string;
+										enctype?: string;
+										method?: string;
 										name?: string;
-										referrerpolicy?: ReferrerPolicy;
-										sandbox?: string;
-										src?: string;
-										srcdoc?: string;
-										width?: string | number;
+										novalidate?: boolean;
+										target?: string;
 									}
-								: Tag extends 'img'
-									? ImageAttributes
-									: Tag extends 'input'
-										? InputAttributes
-										: Tag extends 'label'
-											? { for?: IdrefValue }
-											: Tag extends 'link'
-												? AnchorAttributes & { as?: string; disabled?: boolean; sizes?: string }
-												: Tag extends 'meta'
-													? {
-															charset?: string;
-															content?: string;
-															'http-equiv'?: string;
-															media?: string;
-															name?: string;
+								: Tag extends 'iframe'
+									? {
+											allow?: string;
+											allowfullscreen?: boolean;
+											height?: string | number;
+											loading?: 'eager' | 'lazy';
+											name?: string;
+											referrerpolicy?: ReferrerPolicy;
+											sandbox?: string;
+											src?: string;
+											srcdoc?: string;
+											width?: string | number;
+										}
+									: Tag extends 'img'
+										? ImageAttributes
+										: Tag extends 'input'
+											? InputAttributes
+											: Tag extends 'label'
+												? { for?: IdrefValue }
+												: Tag extends 'link'
+													? AnchorAttributes & {
+															as?: string;
+															disabled?: boolean;
+															sizes?: string;
 														}
-													: Tag extends 'source'
-														? { media?: string; sizes?: string; src?: string; srcset?: string; type?: string }
-														: Tag extends 'select'
-															? FormAttributes & {
-																	disabled?: boolean;
-																	multiple?: boolean;
-																	required?: boolean;
-																	size?: number;
-																	value?: string | readonly string[];
+													: Tag extends 'meta'
+														? {
+																charset?: string;
+																content?: string;
+																'http-equiv'?: string;
+																media?: string;
+																name?: string;
+															}
+														: Tag extends 'source'
+															? {
+																	media?: string;
+																	sizes?: string;
+																	src?: string;
+																	srcset?: string;
+																	type?: string;
 																}
-															: Tag extends 'textarea'
+															: Tag extends 'select'
 																? FormAttributes & {
-																		cols?: number;
 																		disabled?: boolean;
-																		placeholder?: string;
-																		readonly?: boolean;
+																		multiple?: boolean;
 																		required?: boolean;
-																		rows?: number;
-																		value?: string;
+																		size?: number;
+																		value?:
+																			| string
+																			| readonly string[];
 																	}
-																: Tag extends 'video'
-																	? MediaAttributes & {
-																			height?: number;
-																			playsinline?: boolean;
-																			poster?: string;
-																			width?: number;
+																: Tag extends 'textarea'
+																	? FormAttributes & {
+																			cols?: number;
+																			disabled?: boolean;
+																			placeholder?: string;
+																			readonly?: boolean;
+																			required?: boolean;
+																			rows?: number;
+																			value?: string;
 																		}
-																	: Tag extends keyof SVGElementTagNameMap
-																		? SvgAttributes
-																		: {};
+																	: Tag extends 'video'
+																		? MediaAttributes & {
+																				height?: number;
+																				playsinline?: boolean;
+																				poster?: string;
+																				width?: number;
+																			}
+																		: Tag extends keyof SVGElementTagNameMap
+																			? SvgAttributes
+																			: {};
 
 	type IntrinsicElementFor<Tag extends PropertyKey> = Tag extends keyof HTMLElementTagNameMap
 		? Attributes<HTMLElementTagNameMap[Tag]> & TagNameSpecificAttributes<Tag>

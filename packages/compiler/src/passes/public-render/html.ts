@@ -11,68 +11,123 @@ export function emitHtmlChildren(..._retiredInputs: ReadonlyArray<unknown>): str
 // renderData chunks in ssr-module.ts.
 export function collectSsrAsyncRunners(
 	input: PublicRenderModuleInput,
-): ReadonlyMap<string, { readonly graphNodeId: string; readonly name: string; readonly source: string }> {
+): ReadonlyMap<
+	string,
+	{ readonly graphNodeId: string; readonly name: string; readonly source: string }
+> {
 	const definitions = collectSsrAsyncRunnerDefinitions(input);
 	const runnersByGraphNode = new Map(
 		input.symbolResolver.symbols.flatMap((symbol) => {
-			if (symbol.kind !== 'async-computed-runner' && symbol.kind !== 'sync-computed-derive') return [];
+			if (symbol.kind !== 'async-computed-runner' && symbol.kind !== 'sync-computed-derive')
+				return [];
 			const definition = definitions.get(symbol.graphNodeId);
-			return definition ? [[symbol.graphNodeId, { name: symbol.name, source: definition.source }] as const] : [];
+			return definition
+				? [[symbol.graphNodeId, { name: symbol.name, source: definition.source }] as const]
+				: [];
 		}),
 	);
-	const byBoundary = new Map<string, { readonly graphNodeId: string; readonly name: string; readonly source: string }>();
+	const byBoundary = new Map<
+		string,
+		{ readonly graphNodeId: string; readonly name: string; readonly source: string }
+	>();
 	const boundaryRunners = resolveBoundaryRunners(input.semanticGraph);
 	for (const boundary of input.protocolView.asyncBoundaries) {
 		const read = boundaryRunners.get(boundary.id)?.authored;
 		const runner = read ? runnersByGraphNode.get(read.graphNodeId) : undefined;
-		if (read && runner) byBoundary.set(boundary.id, { graphNodeId: read.graphNodeId, ...runner });
+		if (read && runner)
+			byBoundary.set(boundary.id, { graphNodeId: read.graphNodeId, ...runner });
 	}
 	return byBoundary;
 }
 
-export function collectSsrAsyncRunnerDefinitions(input: PublicRenderModuleInput): ReadonlyMap<
+export function collectSsrAsyncRunnerDefinitions(
+	input: PublicRenderModuleInput,
+): ReadonlyMap<
 	string,
-	{ readonly source: string; readonly dependencies: ReadonlyArray<string>; readonly async: boolean }
+	{
+		readonly source: string;
+		readonly dependencies: ReadonlyArray<string>;
+		readonly async: boolean;
+	}
 > {
-	const asyncCapableSyncIds = new Set(input.semanticGraph.graphBindings.flatMap((binding) =>
-		binding.kind === 'computed' && binding.async !== true && binding.asyncCapable === true ? [binding.id] : [],
-	));
-	const registeredGraphNodeIds = new Set(input.symbolResolver.symbols.flatMap((symbol) =>
-		symbol.kind === 'async-computed-runner' ||
-		(symbol.kind === 'sync-computed-derive' && asyncCapableSyncIds.has(symbol.graphNodeId))
-			? [symbol.graphNodeId]
-			: [],
-	));
-	const computedByGraphNode = new Map(input.protocolState.computed.map((computed) => [computed.graphNodeId, computed]));
-	return new Map(input.symbolResolver.symbols.flatMap((symbol) =>
-		symbol.kind === 'async-computed-runner' ||
-		(symbol.kind === 'sync-computed-derive' && asyncCapableSyncIds.has(symbol.graphNodeId))
-			? [[symbol.graphNodeId, {
-				source: ssrAsyncRunnerSource(symbol, registeredGraphNodeIds),
-				dependencies: (computedByGraphNode.get(symbol.graphNodeId)?.dependencies ?? [])
-					.map((dependency) => dependency.graphNodeId)
-					.filter((graphNodeId) => registeredGraphNodeIds.has(graphNodeId)),
-				async: symbol.kind === 'async-computed-runner',
-			}] as const]
-			: [],
-	));
+	const asyncCapableSyncIds = new Set(
+		input.semanticGraph.graphBindings.flatMap((binding) =>
+			binding.kind === 'computed' && binding.async !== true && binding.asyncCapable === true
+				? [binding.id]
+				: [],
+		),
+	);
+	const registeredGraphNodeIds = new Set(
+		input.symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'async-computed-runner' ||
+			(symbol.kind === 'sync-computed-derive' && asyncCapableSyncIds.has(symbol.graphNodeId))
+				? [symbol.graphNodeId]
+				: [],
+		),
+	);
+	const computedByGraphNode = new Map(
+		input.protocolState.computed.map((computed) => [computed.graphNodeId, computed]),
+	);
+	return new Map(
+		input.symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'async-computed-runner' ||
+			(symbol.kind === 'sync-computed-derive' && asyncCapableSyncIds.has(symbol.graphNodeId))
+				? [
+						[
+							symbol.graphNodeId,
+							{
+								source: ssrAsyncRunnerSource(symbol, registeredGraphNodeIds),
+								dependencies: (
+									computedByGraphNode.get(symbol.graphNodeId)?.dependencies ?? []
+								)
+									.map((dependency) => dependency.graphNodeId)
+									.filter((graphNodeId) =>
+										registeredGraphNodeIds.has(graphNodeId),
+									),
+								async: symbol.kind === 'async-computed-runner',
+							},
+						] as const,
+					]
+				: [],
+		),
+	);
 }
 
 function ssrAsyncRunnerSource(
-	symbol: Extract<PublicRenderModuleInput['symbolResolver']['symbols'][number], { readonly kind: 'async-computed-runner' | 'sync-computed-derive' }>,
+	symbol: Extract<
+		PublicRenderModuleInput['symbolResolver']['symbols'][number],
+		{ readonly kind: 'async-computed-runner' | 'sync-computed-derive' }
+	>,
 	registeredGraphNodeIds: ReadonlySet<string>,
 ): string {
-	const declarations: string[] = [];
-	const names = new Set<string>();
+	// One local per read root. A dependency whose node sits BELOW that root (a
+	// shared instance's `allChecked` resolves to the computed itself) contributes
+	// a member of the local instead of replacing it.
+	const roots = new Map<string, { root: string | null; members: Map<string, string> }>();
 	for (const dependency of symbol.dependencies ?? []) {
 		if (!registeredGraphNodeIds.has(dependency.graphNodeId)) continue;
 		const sourcePath = dependency.source.split('.');
 		const name = sourcePath[0];
-		if (!name || names.has(name) || sourcePath.some((part) => !/^[$A-Z_a-z][$\w]*$/.test(part))) continue;
-		names.add(name);
-		const path = dependency.path.slice(0, dependency.path.length - sourcePath.length + 1);
-		declarations.push(`const ${name}=read(${JSON.stringify(dependency.graphNodeId)},${JSON.stringify(path)});`);
+		if (!name || sourcePath.some((part) => !/^[$A-Z_a-z][$\w]*$/.test(part))) continue;
+		const entry = roots.get(name) ?? { root: null, members: new Map<string, string>() };
+		roots.set(name, entry);
+		const read = (path: ReadonlyArray<string>) =>
+			`read(${JSON.stringify(dependency.graphNodeId)},${JSON.stringify(path)})`;
+		const rootPathLength = dependency.path.length - sourcePath.length + 1;
+		if (rootPathLength >= 0) {
+			entry.root ??= read(dependency.path.slice(0, rootPathLength));
+			continue;
+		}
+		const member = sourcePath[1];
+		if (!member || entry.members.has(member)) continue;
+		entry.members.set(member, read(dependency.path));
 	}
+	const declarations = [...roots].flatMap(([name, entry]) => {
+		const members = [...entry.members].map(([key, read]) => `${JSON.stringify(key)}:${read}`);
+		if (members.length === 0) return entry.root ? [`const ${name}=${entry.root};`] : [];
+		const spread = entry.root ? [`...${entry.root}`] : [];
+		return [`const ${name}={${[...spread, ...members].join(',')}};`];
+	});
 	if (symbol.kind === 'sync-computed-derive') {
 		return `({read})=>{${declarations.join('')}const derive=${symbol.source};return derive()}`;
 	}
@@ -95,7 +150,9 @@ export function collectSsrSharedComputedSources(
 	return new Map(
 		input.symbolResolver.symbols.flatMap((symbol) =>
 			symbol.kind === 'sync-computed-derive' && sharedGraphNodeIds.has(symbol.graphNodeId)
-				? ([[symbol.graphNodeId, ssrAsyncRunnerSource(symbol, sharedGraphNodeIds)]] as const)
+				? ([
+						[symbol.graphNodeId, ssrAsyncRunnerSource(symbol, sharedGraphNodeIds)],
+					] as const)
 				: [],
 		),
 	);
@@ -125,9 +182,10 @@ export function collectSsrTemplateComputedSources(
 			(symbol.dependencies ?? []).some((dependency) =>
 				sharedGraphNodeIds.has(dependency.graphNodeId),
 			)
-				? ([[symbol.graphNodeId, ssrAsyncRunnerSource(symbol, sharedGraphNodeIds)]] as const)
+				? ([
+						[symbol.graphNodeId, ssrAsyncRunnerSource(symbol, sharedGraphNodeIds)],
+					] as const)
 				: [],
 		),
 	);
 }
-

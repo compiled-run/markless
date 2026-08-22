@@ -18,6 +18,7 @@ import {
 } from '../../artifact-helpers/graph-paths.ts';
 import { collectExpressionReads } from './collect-expressions.ts';
 import { collectObjectPatternAliases } from './collect-aliases.ts';
+import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
 	callbackPropArityUnsupportedDiagnostic,
 	memberTagUnresolvedDiagnostic,
@@ -135,10 +136,18 @@ function componentPropBindings(
 	node: AnyNode,
 	state: WalkState,
 ): ReadonlyArray<SemanticComponentPropBinding> {
-	// Keep the legacy edge projection stable until bound-symbol emission consumes
-	// the scoped capture routes introduced by this package.
-	const bindings = graphBindingMap(state.graph);
-	const aliases = semanticAliasMap(state.graph);
+	// Component-body scope: an unscoped map resolves `checklist` to the shared
+	// factory's own local of the same name, which is a different node.
+	const bindings = graphBindingMap(
+		state.graph,
+		state.currentSharedDefinitionId ?? null,
+		state.currentComponentName,
+	);
+	const aliases = semanticAliasMap(
+		state.graph,
+		state.currentSharedDefinitionId ?? null,
+		state.currentComponentName,
+	);
 	const props: SemanticComponentPropBinding[] = [];
 
 	for (const attribute of getElementAttributes(node)) {
@@ -168,7 +177,8 @@ function componentPropBindings(
 		// is callable here. Identifier aliases do not inherit callback identity.
 		const namedCallback =
 			localBinding?.declaration.writeCount === 1 ? localBinding.initializerNode : undefined;
-		const callback = expression && isCallbackExpression(expression) ? expression : namedCallback;
+		const callback =
+			expression && isCallbackExpression(expression) ? expression : namedCallback;
 
 		if (callback && isCallbackExpression(callback)) {
 			const parameterNodes = asNodes(callback.params);
@@ -198,7 +208,11 @@ function componentPropBindings(
 			continue;
 		}
 
-		const graph = resolveGraphPath(source, bindings, aliases);
+		// The enclosing family's instance answers through its own return map, so
+		// `checklist.allChecked` reaches the computed rather than a state member.
+		const graph =
+			resolveGraphPath(source, bindings, aliases) ??
+			resolveSharedInstanceGraphPath(source, state.graph);
 		if (graph) {
 			props.push({
 				name,
@@ -285,9 +299,7 @@ function resolveImportedChildComponent(
 	const declared = moduleInterface.render.components.find(
 		(candidate) => candidate.exportName === exportPath[0],
 	);
-	return declared
-		? { childComponentName: declared.componentName, importSource }
-		: unresolved;
+	return declared ? { childComponentName: declared.componentName, importSource } : unresolved;
 }
 
 function componentChildCount(node: AnyNode): number {
