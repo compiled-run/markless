@@ -5,6 +5,7 @@ import {
 	marklessInstanceScopedGraph,
 	marklessMarkComposedSymbol,
 	marklessRegisterWidgetInstanceIds,
+	marklessRegisterWidgetProjections,
 } from './instance-scope.ts';
 import type { ResumeSymbol, ResumeSymbolContext } from '../resume-types.ts';
 
@@ -49,6 +50,7 @@ export type ComposeSharedDefinition = {
 	readonly id: string;
 	readonly scope?: string;
 	readonly graphNodeIds?: ReadonlyArray<string>;
+	readonly projectionIds?: ReadonlyArray<string>;
 	readonly returnProperties?: ReadonlyArray<{
 		readonly kind: string;
 		readonly graphNodeId?: string;
@@ -77,6 +79,8 @@ export type ComposeChild = {
 	readonly boundSymbols?: Readonly<Record<string, string>>;
 	readonly graphProps?: ComposeGraphProps;
 	readonly output?: ComposeChildOutput;
+	/** Build-time: the child-relative path of the composed widget root its children land in. */
+	readonly childrenWidgetRoot?: string;
 	readonly [key: string]: unknown;
 };
 
@@ -125,6 +129,7 @@ export function marklessQualifyChildState(
 // what makes a nested root's parts read the nested root.
 export function marklessRegisterComposedWidgets(children: ReadonlyArray<ComposeChild>): void {
 	const roots: string[] = [];
+	const projections: Array<readonly [string, string]> = [];
 	for (const child of children) {
 		const instancePath = marklessComposedInstancePath(child);
 		if (!instancePath) continue;
@@ -137,19 +142,44 @@ export function marklessRegisterComposedWidgets(children: ReadonlyArray<ComposeC
 			)
 				continue;
 			roots.push(instancePath + definition.id);
+			// The same widget, registered again under the projection site a part sits at.
+			const rootPath = instancePath + marklessInstancePath(definition.id);
+			for (const projectionId of marklessProjectionIds(definition, child.childrenWidgetRoot))
+				projections.push([instancePath + projectionId, rootPath]);
 		}
 	}
 	marklessRegisterWidgetInstanceIds(roots);
+	marklessRegisterWidgetProjections(projections);
+}
+
+// The child-local ids a projected part spells this definition under: what deeper
+// composes recorded, plus this compose's own when the child declared the chain.
+function marklessProjectionIds(
+	definition: ComposeSharedDefinition,
+	childrenWidgetRoot: string | undefined,
+): string[] {
+	return [
+		...(definition.projectionIds ?? []),
+		...(childrenWidgetRoot && definition.id.startsWith(childrenWidgetRoot)
+			? [definition.id.slice(childrenWidgetRoot.length)]
+			: []),
+	];
 }
 
 function marklessComposedSharedDefinition(
 	definition: ComposeSharedDefinition,
 	instancePath: string,
+	childrenWidgetRoot: string | undefined,
 ): ComposeSharedDefinition {
 	if (definition.scope !== 'widget' || !instancePath) return definition;
+	const projectionIds = marklessProjectionIds(definition, childrenWidgetRoot).map(
+		(projectionId) => instancePath + projectionId,
+	);
 	return {
 		...definition,
 		id: marklessComposedGraphNodeId(definition.id, instancePath),
+		// Resume registers these; a part loaded by its path alone has no other road.
+		...(projectionIds.length ? { projectionIds } : {}),
 		...(definition.graphNodeIds
 			? {
 					graphNodeIds: definition.graphNodeIds.map((graphNodeId) =>
@@ -198,6 +228,7 @@ export function marklessComposeState<T extends ComposeStateDraft>(
 				marklessComposedSharedDefinition(
 					definition,
 					marklessComposedInstancePath(child),
+					child.childrenWidgetRoot,
 				),
 			),
 		),

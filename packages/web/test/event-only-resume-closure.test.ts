@@ -28,7 +28,15 @@ const resumeOnDemandEntries = [
 // reverting the change: 28,892 raw with it out, 29,047 with it in (~26 gzip at the
 // observed 6.02 ratio, so the 4,800 gzip wall still holds). Repayment owed by the
 // bundler-diet goal.
-const sourceByteLimit = 29047;
+// INTERIM 2026-08-22 (T074), 29,047 -> 29,097: +50 raw bytes for one optional
+// TYPE member on the protocol's shared definition (`projectionIds`, the ids a
+// part composition placed beside a widget root spells it under, which browser
+// resume registers from the payload). It is a type-literal field: it erases at
+// build, so the shipped closure gains nothing and this proxy is measuring source
+// text alone. The field is documented at its writer in web's composition seam,
+// which this closure does not reach. De-minimis auto-interim per proportionality
+// order 2026-08-04.
+const sourceByteLimit = 29097;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

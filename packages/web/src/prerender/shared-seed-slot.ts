@@ -23,7 +23,15 @@ export const MARKLESS_WIDGET_INSTANCE_KEY = 'markless:widget-instance';
  * .tsrx whose compiler planned a shared-seed symbol, and a page with no widget
  * seeds leaves this slot empty and never loads the module that fills it.
  */
-export type SharedSeedPass = (
+export type SharedSeedPass = {
+	/**
+	 * Where a placed child's own composition puts the children written into it,
+	 * read off the same declared chain the seed pass descends. It rides the seed
+	 * pass because it answers for the same widget the seed pass is seeding, and
+	 * because that keeps a page with no widget seeds from loading either.
+	 */
+	childrenWidgetRoot?: (surface: PrerenderDataSurface, componentName: string) => string;
+} & ((
 	context: {
 		readonly surface: PrerenderDataSurface;
 		readonly symbolPrefix: string;
@@ -38,7 +46,7 @@ export type SharedSeedPass = (
 	componentEdgeId: string,
 	read: PrerenderRead,
 	inherited: ReadonlyMap<string, unknown> | undefined,
-) => Promise<ReadonlyMap<string, unknown> | undefined>;
+) => Promise<ReadonlyMap<string, unknown> | undefined>);
 
 let installedPass: SharedSeedPass | undefined;
 

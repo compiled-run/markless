@@ -634,6 +634,7 @@ function assertOptionalSharedDefinitions(record: Record<string, unknown>): void 
 		assertOptionalSharedScope(definition, context);
 		assertNonNegativeIntegerField(definition, 'version', context);
 		assertStringArrayField(definition, 'graphNodeIds', context);
+		assertOptionalStringArrayField(definition, 'projectionIds', context);
 		assertOptionalSharedDependencies(definition, context);
 		assertOptionalSharedReturnProperties(definition, context);
 	}

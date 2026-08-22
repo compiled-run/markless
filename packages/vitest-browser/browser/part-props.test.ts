@@ -106,6 +106,26 @@ test('CSR: a mouseenter on the element without the record raises nothing', async
 	}
 });
 
+// T074 spread hygiene: `__markless` is the framework's reserved prefix for the
+// channels a parent arranges with a child. One of them riding `{...rest}` onto
+// an element rendered `__marklessSsrCallbacks="[object Object]"` into the page.
+function expectNoFrameworkChannelInTheDom(container: ParentNode) {
+	for (const element of container.querySelectorAll('*'))
+		expect(
+			element.getAttributeNames().filter((name) => name.startsWith('__markless')),
+		).toEqual([]);
+}
+
+test('CSR: a framework channel never reaches the DOM through a spread', async () => {
+	const screen = await render(App);
+	expectNoFrameworkChannelInTheDom(screen.container as HTMLElement);
+});
+
+test('SSR: a framework channel never reaches the served markup through a spread', async () => {
+	const screen = await renderSSR(App);
+	expectNoFrameworkChannelInTheDom(screen.container);
+});
+
 async function expectConsumerHandleToReachTheElement(container: ParentNode) {
 	const trigger = container.querySelector('[data-case="handle"] button') as HTMLButtonElement;
 	const probe = container.querySelector('[data-probe-handle]') as HTMLButtonElement;

@@ -84,23 +84,17 @@ test('SSR resume: minted ids and gestures agree with CSR', async () => {
 	await expectGesturesStayPerWidget(screen.container);
 });
 
-// A keyed row composes a widget of its own, so the row segment has to reach the
-// minted handle as well as the row's state.
-// Pinned on a NEW named defect, measured on this branch: A PART IS A SIBLING OF
-// THE WIDGET ROOT ITS COMPOSITION PLACED IT IN. The row's parts sit at
-// `r:alpha:c0:p1:` while the root the row's child composed sits at
-// `r:alpha:c0:c0:`, and `marklessWidgetRootPath` only walks PREFIXES of the
-// part's own path, so no prefix names that root and every row's parts fall back
-// to the unprefixed shared id — one instance for both rows. Two halves are
-// needed and both were measured here: a widget id that already names its root
-// has to keep taking the instance path when it is composed again (otherwise
-// both rows' roots collapse onto `c0:shared:...` regardless), and the projecting
-// child's declared chain has to be registered as the answer for its siblings.
-// Landing only the CSR half turns `SSR resume: minted ids and gestures agree
-// with CSR` red, because the SSR emitted seed pass registers no such answer:
-// the two sides then disagree about which node a part reads. Un-pin when the
-// compiler's SSR seed pass declares the same chain the CSR pass does.
-test.skip('CSR: a keyed row composes a widget of its own', async () => {
+// T074: a part is a SIBLING of the widget root its composition placed it in. A
+// row's parts sit at `r:alpha:c0:p1:` while the root the row's child composed
+// sits at `r:alpha:c0:c0:`, so no prefix of the part's own path names that root.
+// Both halves landed together: a widget id that already names its root keeps
+// taking the instance path when it is composed AGAIN, so each row roots its own
+// widget; and the composing child's declared children-projection chain is
+// registered a second time under the projection site's path, so the part's own
+// prefix walk answers that root. The compiler's SSR module declares the same
+// chain into the same composition seam, and the payload carries the projection
+// ids so browser resume registers them from data rather than from a live render.
+test('CSR: a keyed row composes a widget of its own', async () => {
 	const screen = await render(RowsPage);
 	const container = screen.container as HTMLElement;
 	const { triggers, labels } = widgets(container);

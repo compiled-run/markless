@@ -592,13 +592,22 @@ function emitSsrDataRenderLines(
 					}${JSON.stringify(child.symbolPrefix)}+marklessSsrChildrenWidgetRoot(${childSurfaceArgsByEdgeId.get(edge.id) ?? `${component},undefined`}));`,
 				);
 		}
+		// The composed child declares where ITS composition puts the children written
+		// into it, so composition registers the same widget for the projection site
+		// the CSR seed pass registers it for. Both sides read the same declaration.
+		const childLiteral =
+			projectionChunkId === undefined
+				? JSON.stringify(child)
+				: `{...${JSON.stringify(child)},childrenWidgetRoot:marklessSsrChildrenWidgetRoot(${
+						childSurfaceArgsByEdgeId.get(edge.id) ?? `${component},undefined`
+					})}`;
 		// A row-scoped edge takes its row's runtime segment ahead of its own
 		// prefixes, so each row composes an instance of its own. An UNKEYED row has
 		// no identity to carry, so its interactive output still refuses.
 		const rowScoped = rowScopedEdges.has(edge.id);
 		const placement = rowScoped
-			? `marklessSsrRowPlacement(${JSON.stringify(child)},marklessSsrDataContext.repeatKey)`
-			: JSON.stringify(child);
+			? `marklessSsrRowPlacement(${childLiteral},marklessSsrDataContext.repeatKey)`
+			: childLiteral;
 		const refusal = rowScoped
 			? `if(marklessSsrDataContext.repeatKey===undefined){marklessAssertPresentationalRowChild(output,${JSON.stringify(edge.childComponentName)});return output;}`
 			: `if(marklessSsrDataContext.repeatItem!==undefined){marklessAssertPresentationalRowChild(output,${JSON.stringify(edge.childComponentName)});return output;}`;

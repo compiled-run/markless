@@ -650,6 +650,12 @@ async function evaluatePrerenderDataComponent(input: {
 				asyncBoundaryId: edge.asyncBoundaryId,
 				boundSymbols: edge.boundSymbols ?? {},
 				callbackProps: callbacks,
+				// Where this child's own composition puts the children written into it,
+				// so composition can register the widget a projected part sits beside.
+				childrenWidgetRoot: sharedSeedPass()?.childrenWidgetRoot?.(
+					childSurface,
+					edge.childComponentName,
+				),
 			});
 			return output;
 		},

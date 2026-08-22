@@ -26,10 +26,20 @@ test('composition leaves every protocol page-space id family unqualified', () =>
 	}
 });
 
-test('a nested compose leaves an already-composed page-space id alone', () => {
+// A `storage:` slot is page-wide however deeply it is composed. A `shared:` id
+// that already carries a path is the one exception: only a widget lookup ever
+// writes that prefix, so composing it again is another RENDERED widget and it
+// takes the new instance path. Without this, two placements of the same
+// composing component collapse onto one widget's cells.
+test('a nested compose re-qualifies a composed widget id and leaves page space alone', () => {
 	for (const prefix of PROTOCOL_PAGE_SPACE_ID_PREFIXES) {
-		const graphNodeId = `${protocolInstanceSegment(0)}${prefix}src/lib.tsrx#thing`;
-		expect(marklessComposedGraphNodeId(graphNodeId, 'c1:')).toBe(graphNodeId);
+		const composed = `${protocolInstanceSegment(0)}${prefix}src/lib.tsrx#thing`;
+		expect(marklessComposedGraphNodeId(composed, 'c1:')).toBe(
+			prefix === 'shared:' ? `c1:${composed}` : composed,
+		);
+		expect(marklessComposedGraphNodeId(`${prefix}src/lib.tsrx#thing`, 'c1:')).toBe(
+			`${prefix}src/lib.tsrx#thing`,
+		);
 	}
 });
 
@@ -40,7 +50,9 @@ test('composition qualifies a component-owned id with its instance path', () => 
 test('a projected segment is page-space transparent and instance-qualifying alike', () => {
 	for (const prefix of PROTOCOL_PAGE_SPACE_ID_PREFIXES) {
 		const graphNodeId = `${protocolInstanceSegment(0)}${protocolProjectionSegment(1)}${prefix}src/lib.tsrx#thing`;
-		expect(marklessComposedGraphNodeId(graphNodeId, 'c2:')).toBe(graphNodeId);
+		expect(marklessComposedGraphNodeId(graphNodeId, 'c2:')).toBe(
+			prefix === 'shared:' ? `c2:${graphNodeId}` : graphNodeId,
+		);
 	}
 	expect(marklessComposedGraphNodeId('state:open', protocolProjectionSegment(1))).toBe(
 		'p1:state:open',
