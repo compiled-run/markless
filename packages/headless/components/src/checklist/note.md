@@ -204,6 +204,12 @@ walked. That is a new claim/route kind plus a new compose-time registration seam
 across CSR, SSR and the resume payload, with its own byte measure — a change of
 T074's size, not a patch to `resolveWidgetCallbackRoute`.
 
+(Read the T075c section below before acting on this paragraph. A registration
+seam of composition's own is the wrong half: the invoking side cannot ask it,
+because it never sees the instance path the registration is keyed by. The
+identity resolves through the GRAPH, so the answer has to BE a graph node, and
+the declaration belongs to the family module rather than to composition.)
+
 Every remaining pinned row of this suite is still pinned on this.
 
 ### What T075b priced about that design
@@ -237,6 +243,57 @@ The registration therefore has to be gated the way the T074 CSR walk is (riding
 the shared-seed pass, so a page with no widget seeds loads neither), and the
 invoke-side route handling has to live in the symbol-resolver module, which the
 compiler already emits per-page and can gate on the route being present.
+
+### What T075c measured, and why the registration moves
+
+**A registry keyed by qualified instance path cannot be ASKED from the invoking
+side.** This is the fact that decides the design, and it was measured on the
+running witness rather than reasoned about. The part's dispatch runs inside the
+capture context the emitted symbol-resolver builds
+(`packages/compiler/src/passes/symbol-resolver-module.ts`,
+`createCaptureContext`), and everything that context knows about instances is
+`bound.instancePath` — the part's edge path inside its OWN module. On
+`wcb-page.tsrx` the second group's trigger dispatched with
+`bound.instancePath = "c1:"` while the widget it belongs to is rooted at
+`c5:c0:`, because the bundler's per-edge symbol route already consumed the outer
+path: `emitLazySymbolRouteFunction` (`packages/bundler/src/source-module.ts`)
+hands the child module `symbolId.slice(prefix.length)`, and the woken symbol was
+`c5:p7:bound:symbol%3A0:component-edge%3A1`. Composition's registrations are
+absolute (`c5:shared:…#wcb -> c5:c0:`, logged at
+`marklessRegisterWidgetProjections`), so a lookup made with `c1:` matches
+nothing, and a lookup made with a RELATIVE key cannot be made to work either:
+two placements of one composing component register the same relative key, which
+is exactly the sibling collapse T074 removed.
+
+**The one channel that still knows the absolute path is the GRAPH.** The part's
+own `s.on` read resolves correctly today only because
+`marklessInstanceScopedGraph` qualifies it with the stripped prefix before the
+graph sees it, and `marklessComposedGraphNodeId` runs the widget-root lookup
+there. So the answer has to be readable as a graph node of the widget's own
+definition — `<definitionId>/slot:<slotName>` — and the invoke side becomes
+`context.graph.read(...)` of that id, which lands on the right rendered widget by
+the same rule the part's other reads land by. Nothing new is sensed and no path
+arithmetic is added.
+
+**Where that node's value comes from, and why it keeps the wall unmoved.** The
+answering symbol id is already handed to the widget root as a prop:
+`__marklessSsrCallbacks[propName]` on its own props object, on both the
+prerender-evaluator path and the emitted SSR path. The declaration therefore
+belongs to the FAMILY module (`wcb.tsrx`, `checkbox.tsrx`) — the module that
+declares the slot — as one more `shared-seed`-shaped value for the node, planned
+from `semanticGraph.sharedCallbackBindings` (which already says: definition D,
+slot S, root component C, prop P). A module with no callback slot emits none, so
+`music-player-ssr` is byte-identical by construction, and the value rides the
+seed map, the compose seam and the payload that already exist — CSR, SSR and
+resume agree because there is one node, not three transports. The remaining work
+is four sites: the protocol-state cell plus `graphNodeIds` entry
+(`packages/compiler/src/passes/protocol-state.ts`, which today drops
+`kind: 'callback-slot'` return properties), the planned seed symbol
+(`packages/compiler/src/passes/symbol-resolver.ts`), the route kind replacing the
+`compiler-known-constant undefined` fold in `resolveWidgetCallbackRoute`, and the
+`invoke` branch in the emitted resolver. `edgeChildProps` in
+`packages/web/src/fns/shared-seed.ts` also has to carry the callbacks map, which
+it does not build today.
 
 **A third defect, newly measured and pinned:** the children-projection chain is
 walked to any depth, but the seed pass's symbol prefix is not.
