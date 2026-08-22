@@ -1,11 +1,20 @@
-// Pinned at suite level, on a DIFFERENT fault than before. T071 landed widget
-// resolution through composition: the anatomy now renders, every part resolves
-// to the checkbox root `checklist.root` composed, and each item's trigger and
-// label agree on one minted id. What still stops every row is that a spread onto
-// a COMPONENT tag contributes no edge prop, so `{...rest}` never crosses
-// `<checklist.root>` -> `<CheckboxRoot>` and no consumer attribute (starting with
-// every `data-testid` these locators name) reaches the DOM. Two further gaps are
-// pinned row-level in projection-into-composed-root.test.ts. See note.md.
+// No longer pinned at suite level. T072 landed component-tag spread forwarding:
+// `{...rest}` on `<CheckboxRoot>` is an edge prop now, so every consumer
+// attribute — `data-testid` first among them — crosses `<checklist.root>` into
+// the DOM and these locators resolve. The starter row below runs.
+//
+// The rows still pinned share ONE named defect: COMPOSED-ROOT SEED DOES NOT
+// EVALUATE THE COMPOSING COMPONENT'S COMPUTEDS. A part written inside
+// `<checklist.root>` renders during the CONSUMER's render, before ChecklistRoot
+// runs, so the checkbox instance it reads has to be seeded from the consumer's
+// own seed pass. That pass descends to the child the consumer wrote and runs its
+// seeds, but the seeds of the root that child COMPOSES take `checked=
+// {checklist.allChecked}` and `checked={checklist.value.includes(item.value)}` —
+// values of a computed, which the seed pass has no evaluator for. So every part
+// reads `checked === undefined` and reports `false`: the select-all never reads
+// mixed, membership never shows, and the field never carries its name or value.
+// Two further gaps are pinned row-level in projection-into-composed-root.test.ts.
+// See note.md.
 import { render, renderSSR } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
@@ -297,7 +306,7 @@ async function expectOmittedCallbackStillTicks() {
 }
 
 for (const mode of MODES) {
-	test.skip(`${mode}: the starter renders a named group, a select-all and three items`, async () => {
+	test(`${mode}: the starter renders a named group, a select-all and three items`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 		expectBasicRendered();

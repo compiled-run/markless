@@ -20,6 +20,7 @@ import {
 	marklessSsrComposeView,
 	marklessSsrMergeBranches,
 	marklessSsrRemapGraphOutput,
+	marklessSsrSpreadProps,
 	type MarklessSsrComposedChild,
 } from '../fns/ssr.ts';
 import type { ComposeGraphProps } from '../fns/composition.ts';
@@ -85,6 +86,7 @@ export type PrerenderDataDefinition = {
 			readonly value?: unknown;
 			readonly symbolId?: string;
 			readonly source?: string;
+			readonly excludeNames?: ReadonlyArray<string>;
 		}>;
 		readonly materialized?: SsrRenderOutput & {
 			// Render-data children carry the full ssr-data structure, not just anchors.
@@ -595,7 +597,12 @@ async function evaluatePrerenderDataComponent(input: {
 			const childProps: Record<string, unknown> = {};
 			const callbacks: Record<string, string> = {};
 			for (const prop of edge.props) {
-				if (prop.kind === 'graph-reference' && prop.graphNodeId) {
+				if (prop.kind === 'spread' && prop.graphNodeId) {
+					Object.assign(
+						childProps,
+						marklessSsrSpreadProps(read(prop.graphNodeId, prop.path ?? []), prop.excludeNames),
+					);
+				} else if (prop.kind === 'graph-reference' && prop.graphNodeId) {
 					childProps[prop.name] = read(prop.graphNodeId, prop.path ?? []);
 				} else if (prop.kind === 'absent') {
 					childProps[prop.name] = undefined;

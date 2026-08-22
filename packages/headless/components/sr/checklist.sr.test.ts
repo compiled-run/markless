@@ -1,4 +1,9 @@
-// Suite-level pin: family blocked on the projection-identity ruling (see checklist/note.md).
+// No longer pinned at suite level: T072's component-tag spread forwarding puts the
+// consumer's attributes on the parts, and the item rows below run. The four rows
+// still pinned are the SELECT-ALL rows, on one named defect: COMPOSED-ROOT SEED
+// DOES NOT EVALUATE THE COMPOSING COMPONENT'S COMPUTEDS, so the select-all's
+// checkbox instance is seeded with `checked === undefined` and the reader is never
+// offered the control the group's label names. See checklist.browser.ts and note.md.
 import { render } from '@markless/vitest-browser';
 import { afterEach, expect, test } from 'vitest';
 import { missingFacts, readUntil, type Conveys } from './driver.ts';
@@ -72,7 +77,7 @@ test.skip('reading an untouched select-all conveys the checkbox role, its name a
 // Sequence F, from the sibling dual-state plan: every item is its own tab stop,
 // with no position-in-set fact, because a checkbox group is not a set the way a
 // radio group is. That is the audible difference between the two families.
-test.skip('each item conveys the checkbox role, its own name and that it is not checked', async () => {
+test('each item conveys the checkbox role, its own name and that it is not checked', async () => {
 	await open(Basic);
 	for (const name of ['Lettuce', 'Tomato', 'Mustard']) {
 		expectConveys(await readUntil(sr, { role: 'checkbox', name }), {
@@ -103,7 +108,7 @@ test.skip('pressing space on an untouched select-all announces it as checked, ne
 });
 
 // Sequence F's second step, on an item rather than on the parent.
-test.skip('pressing space on an item announces that item as checked', async () => {
+test('pressing space on an item announces that item as checked', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'checkbox', name: 'Lettuce' });
 	await sr.press(sr.keys.space);
@@ -119,7 +124,7 @@ test.skip('pressing space on an item announces that item as checked', async () =
 // `aria-controls` on the parent matters - it gives a reader a way to REACH the
 // controlled set. It must not be solved with aria-live on the select-all, which
 // would announce on every single item toggle.
-test.skip('checking one item announces that item only, and says nothing about the select-all', async () => {
+test('checking one item announces that item only, and says nothing about the select-all', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'checkbox', name: 'Lettuce' });
 	await sr.press(sr.keys.space);

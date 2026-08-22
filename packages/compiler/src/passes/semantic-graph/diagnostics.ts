@@ -199,6 +199,24 @@ export function componentPropExpressionUnsupportedDiagnostic(input: {
 	});
 }
 
+export function componentSpreadUnsupportedDiagnostic(input: {
+	readonly source: string;
+	readonly childComponentName: string;
+	readonly node: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_COMPONENT_SPREAD_UNSUPPORTED',
+		title: 'Only the props rest binding can be spread onto a component',
+		message: `\`{...${input.source}}\` on \`<${input.childComponentName}>\` cannot be forwarded, because \`${input.source}\` is not this component's props rest binding.`,
+		why: 'What a spread carries onto a child component is decided at build time, from the signature that produced it. An object assembled anywhere else has no build-time contents, so the child would render without the entries and nothing would say so.',
+		span: sourceSpan(input.node, input.filename),
+		suggestion:
+			'Spread the rest binding of this component\'s own props (`function Part({ known, ...rest })` then `<Child {...rest} />`), or write the props you mean out by name on the tag.',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_COMPONENT_SPREAD_UNSUPPORTED',
+	});
+}
+
 export function memberTagUnresolvedDiagnostic(input: {
 	readonly tagName: string;
 	readonly rootName: string;

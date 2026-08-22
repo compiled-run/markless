@@ -4,6 +4,7 @@ import {
 	type SharedSeedPass,
 } from '../prerender/shared-seed-slot.ts';
 import type { PrerenderDataDefinition, PrerenderDataSurface } from '../prerender/evaluator.ts';
+import { marklessSsrSpreadProps } from './ssr.ts';
 
 type SeedEdge = NonNullable<PrerenderDataDefinition['edges']>[number];
 type SeedContext = Parameters<SharedSeedPass>[0];
@@ -221,7 +222,12 @@ async function applySharedSeeds(
 
 	const childProps: Record<string, unknown> = {};
 	for (const prop of edge.props) {
-		if (prop.kind === 'graph-reference' && prop.graphNodeId) {
+		if (prop.kind === 'spread' && prop.graphNodeId) {
+			Object.assign(
+				childProps,
+				marklessSsrSpreadProps(read(prop.graphNodeId, prop.path ?? []), prop.excludeNames),
+			);
+		} else if (prop.kind === 'graph-reference' && prop.graphNodeId) {
 			childProps[prop.name] = read(prop.graphNodeId, prop.path ?? []);
 		} else if (prop.kind === 'serializable' && 'value' in prop) {
 			childProps[prop.name] = prop.value;
