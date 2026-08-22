@@ -6,10 +6,7 @@ import App from './fixtures/array-handler-probe.tsrx';
 // handler array is now a closure, and it still runs every call in order.
 afterEach(() => cleanup());
 
-async function probe(container: ParentNode) {
-	container.querySelector<HTMLButtonElement>('[data-probe]')?.click();
-	container.querySelector<HTMLButtonElement>('[data-solo]')?.click();
-	await new Promise((resolve) => setTimeout(resolve, 50));
+function readProbe(container: ParentNode) {
 	return {
 		first: container.querySelector('[data-first]')?.textContent,
 		second: container.querySelector('[data-second]')?.textContent,
@@ -18,24 +15,24 @@ async function probe(container: ParentNode) {
 	};
 }
 
+// A click wakes the handler's module before its writes can commit, so the reads
+// poll instead of sampling once at a fixed delay.
+async function probe(container: ParentNode, expected: ReturnType<typeof readProbe>) {
+	container.querySelector<HTMLButtonElement>('[data-probe]')?.click();
+	container.querySelector<HTMLButtonElement>('[data-solo]')?.click();
+	await expect.poll(() => readProbe(container)).toEqual(expected);
+}
+
+const composed = { first: '1', second: '1', order: 'AB', solo: '1' };
+
 test('CSR: a composed closure runs every call it makes, in order', async () => {
 	const screen = await render(App);
-	expect(await probe(screen.container as HTMLElement)).toEqual({
-		first: '1',
-		second: '1',
-		order: 'AB',
-		solo: '1',
-	});
+	await probe(screen.container as HTMLElement, composed);
 });
 
 test('SSR: a composed closure runs every call it makes, in order', async () => {
 	const screen = await renderSSR(App);
-	expect(await probe(screen.container)).toEqual({
-		first: '1',
-		second: '1',
-		order: 'AB',
-		solo: '1',
-	});
+	await probe(screen.container, composed);
 });
 
 // The module never loads because the compiler blocks it; the browser sees only a
