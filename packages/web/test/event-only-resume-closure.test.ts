@@ -36,7 +36,28 @@ const resumeOnDemandEntries = [
 // text alone. The field is documented at its writer in web's composition seam,
 // which this closure does not reach. De-minimis auto-interim per proportionality
 // order 2026-08-04.
-const sourceByteLimit = 29097;
+// INTERIM 2026-08-22 (T075g), 29,097 -> 29,943: +876 raw chars of growth, less a
+// -30 trim, for a +846 net. Attributed by revert-measurement, not assumption: the
+// binding closure is `payload.ts`, and of its 8 files the only one T075g touched is
+// the serializer's protocol.ts. Reverting protocol.ts to its pre-T075g content (the
+// change adds no import line, so closure membership is unchanged) puts the closure
+// back at exactly 29,097 -- the ratified anchor -- so the whole delta is that one
+// file. What it added is `sharedSeeds`, one optional TYPE member on
+// ProtocolStatePayload: the shared nodes a component seeds from its own props, plus
+// the prop reads each seed follows so a composing parent's write re-runs it. Like
+// the T074 field above it is type-literal and erases at build, so the shipped
+// closure gains nothing and this proxy is measuring source text alone.
+// Compile-time-impossible: a return-leg seed is decided when a parent composes a
+// child, which is a runtime composition, so the payload has to carry the route.
+// Repayment owed and NOT paid here: 12,015 of the closure's 29,943 chars are
+// protocol.ts, and the only runtime value web pulls from it is
+// PROTOCOL_EVENT_ACTION_KIND. Moving that one constant into protocol-constants.ts
+// (already in the closure) drops protocol.ts from the closure entirely and buys
+// back ~12,000 chars. That trim is serializer-side, outside this unit's contract.
+// The -30 trim taken here is web-side: payload.ts named the same seven symbols
+// twice, once to import and once to re-export, and the re-export now sources them
+// directly. Measured 29,973 before the trim, 29,943 after.
+const sourceByteLimit = 29943;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

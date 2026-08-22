@@ -1,12 +1,9 @@
 import {
-	RuntimePayloadError,
 	decodePayloadScripts,
 	payloadInvalidError,
 	payloadScriptSelector,
 	type DecodedPayloadScripts,
 	type EncodedPayloadScripts,
-	type RuntimePayloadDiagnostic,
-	type RuntimePayloadErrorCode,
 	type RuntimePayloadType,
 } from '../../serializer/src/protocol-client-storage.ts';
 import type {
@@ -23,7 +20,7 @@ export {
 	type RuntimePayloadDiagnostic,
 	type RuntimePayloadErrorCode,
 	type RuntimePayloadType,
-};
+} from '../../serializer/src/protocol-client-storage.ts';
 
 export type PayloadScriptElement = {
 	readonly textContent?: string | null;
