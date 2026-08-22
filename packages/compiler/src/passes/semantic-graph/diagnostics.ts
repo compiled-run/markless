@@ -180,6 +180,25 @@ export function callbackPropArityUnsupportedDiagnostic(input: {
 	});
 }
 
+export function componentPropExpressionUnsupportedDiagnostic(input: {
+	readonly propName: string;
+	readonly source: string;
+	readonly childComponentName: string;
+	readonly node: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_COMPONENT_PROP_EXPRESSION_UNSUPPORTED',
+		title: 'A prop expression that reads state needs a route the child can follow',
+		message: `Prop \`${input.propName}\` on \`<${input.childComponentName}>\` is written as \`${input.source}\`, which reads state but is not an expression this compiler can route.`,
+		why: 'A child reads a prop through the graph node the parent named. An expression with no node behind it can only be seeded once, from whatever the value happened to be at render - so the child would show a stale value forever and nothing would say so.',
+		span: sourceSpan(input.node, input.filename),
+		suggestion:
+			'Pass a value the compiler can follow: a plain read (`group.value`), or an expression built only from reads, operators and method calls on those reads (`group.value.includes(item.value)`). If the value needs a function of your own, put that function inside a `computed()` and pass the computed.',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_COMPONENT_PROP_EXPRESSION_UNSUPPORTED',
+	});
+}
+
 export function memberTagUnresolvedDiagnostic(input: {
 	readonly tagName: string;
 	readonly rootName: string;

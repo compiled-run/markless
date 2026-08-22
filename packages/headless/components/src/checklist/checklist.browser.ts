@@ -11,16 +11,16 @@ import WithError from './scenarios/with-error.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
 
 // Colocated browser suite for the checklist family. Each test renders a
-// realistic consumer scenario, and the locators name the part anatomy: root,
-// label, selectall, item, error, plus the composed checkbox roles per instance.
+// realistic consumer scenario, and the locators name the QDS part anatomy: root,
+// label, error, field, selectall, selectallindicator, item, itemtrigger,
+// itemlabel, itemdescription, itemindicator.
 const Root = page.getByTestId('root');
 const Label = page.getByTestId('label');
-const SelectAll = page.getByTestId('selectall');
 const SelectAllTrigger = page.getByTestId('selectall-trigger');
 const SelectAllIndicator = page.getByTestId('selectall-indicator');
-const SelectAllLabel = page.getByTestId('selectall-label');
 const SelectAllField = page.getByTestId('selectall-field');
 // One condiment per part role, the way a consumer names their own options.
+const Lettuce = page.getByTestId('lettuce');
 const LettuceTrigger = page.getByTestId('lettuce-trigger');
 const LettuceIndicator = page.getByTestId('lettuce-indicator');
 const LettuceLabel = page.getByTestId('lettuce-label');
@@ -33,13 +33,14 @@ const MustardTrigger = page.getByTestId('mustard-trigger');
 const CaviarTrigger = page.getByTestId('caviar-trigger');
 const CaviarIndicator = page.getByTestId('caviar-indicator');
 const LockedRoot = page.getByTestId('locked-root');
+const LockedSelectAllTrigger = page.getByTestId('locked-selectall-trigger');
 const LockedMustardTrigger = page.getByTestId('locked-mustard-trigger');
 const LockedMustardIndicator = page.getByTestId('locked-mustard-indicator');
 // The group error, written after the items and before them.
-const AfterRoot = page.getByTestId('after-root');
 const AfterError = page.getByTestId('after-error');
-const BeforeRoot = page.getByTestId('before-root');
+const AfterSelectAllTrigger = page.getByTestId('after-selectall-trigger');
 const BeforeError = page.getByTestId('before-error');
+const BeforeSelectAllTrigger = page.getByTestId('before-selectall-trigger');
 // Two lists on one page.
 const LeftSelectAllTrigger = page.getByTestId('left-selectall-trigger');
 const LeftLettuceIndicator = page.getByTestId('left-lettuce-indicator');
@@ -57,44 +58,6 @@ const Submitted = page.getByTestId('submitted');
 // by reference or wrapped in a helper — the branch below keeps both call sites
 // literal, which is why this idiom rather than a `mount` parameter.
 const MODES = ['CSR', 'SSR'] as const;
-
-// Every row below is written in full and asserts what the family is specified to
-// do. Two groups of them are pinned with `test.fails`, because the composition
-// this family needs is not expressible today; both are measured and described in
-// note.md, and whoever lands the capability deletes the pin.
-//
-//   * The SSR rows named in SSR_PINNED. The server render itself now works —
-//     a part that renders a composed family's root reaches the enclosing
-//     instance — but every row whose assertion depends on a per-item membership
-//     seed still reads the placeholder (note.md gap 2).
-//   * The CSR rows named below. A prop expression that reads the enclosing
-//     family's instance seeds the composed checkbox against placeholder values,
-//     so a group that starts with anything ticked, disabled or invalid renders as
-//     if it were empty, and a write that has to reach the composed instance does
-//     not land (note.md gaps 2 and 3).
-const CSR_PINNED = new Set([
-	'some ticked renders the select-all mixed and each item by membership',
-	'a mixed select-all splits aria-checked and indeterminate across two elements',
-	'unavailable options and a locked group render their flags',
-	'a mounted error marks the group invalid, written after the items or before them',
-	"the form carries a name and a value onto every item's field",
-	'only ticked items appear in what the form submits',
-	'a mixed select-all ticks everything rather than cycling',
-	'ticking one item moves the select-all to mixed',
-	'ticking every item checks the select-all, and unticking one returns it to mixed',
-	'the consumer onChange is called once with the whole new ticked set',
-	'an omitted onChange still ticks',
-]);
-
-// The SSR rows still pinned: every one of them turns on a per-item membership
-// seed. The four SSR rows NOT listed here are green — the server render reaches
-// the enclosing instance now, so a group that starts empty renders and both
-// select-all gestures land, in one list and in two.
-const SSR_PINNED = new Set([...CSR_PINNED, 'unavailable options and a locked group do not toggle']);
-
-function row(mode: (typeof MODES)[number], name: string) {
-	return (mode === 'SSR' ? SSR_PINNED : CSR_PINNED).has(name) ? test.fails : test;
-}
 
 function el<T extends Element = HTMLElement>(locator: { element(): Element | null }) {
 	const found = locator.element();
@@ -116,16 +79,16 @@ function submit() {
 }
 
 function expectBasicRendered() {
-	// The group is a fieldset named by its legend, which is what aria-at's own
-	// tri-state reference does: a group name with no id and no IDREF.
-	expect(el(Root).tagName).toBe('FIELDSET');
-	expect(el(Label).tagName).toBe('LEGEND');
+	// The group and the select-all's checkbox root are one element, which is what
+	// lets `checklist.label` name the group by naming the select-all trigger.
+	expect(el(Root).getAttribute('role')).toBe('group');
+	expect(el(Label).tagName).toBe('LABEL');
 	expect(el(Label).textContent).toBe('Sandwich Condiments');
 
 	// Nothing ticked: the select-all is off, not mixed.
 	expect(el(SelectAllTrigger).getAttribute('role')).toBe('checkbox');
 	expect(el(SelectAllTrigger).getAttribute('aria-checked')).toBe('false');
-	expect(el(SelectAll).hasAttribute('ui-mixed')).toBe(false);
+	expect(el(Root).hasAttribute('ui-mixed')).toBe(false);
 	expect(el(SelectAllIndicator).textContent).toBe('');
 
 	for (const trigger of [LettuceTrigger, TomatoTrigger, MustardTrigger]) {
@@ -133,16 +96,27 @@ function expectBasicRendered() {
 		expect(el(trigger).getAttribute('aria-checked')).toBe('false');
 	}
 	// Every instance mints its own trigger id, so each label names exactly one.
-	expect(el(SelectAllLabel).getAttribute('for')).toBe(el(SelectAllTrigger).getAttribute('id'));
+	expect(el(Label).getAttribute('for')).toBe(el(SelectAllTrigger).getAttribute('id'));
 	expect(el(LettuceLabel).getAttribute('for')).toBe(el(LettuceTrigger).getAttribute('id'));
-	expect(el(LettuceLabel).getAttribute('for')).not.toBe(el(SelectAllLabel).getAttribute('for'));
+	expect(el(LettuceLabel).getAttribute('for')).not.toBe(el(Label).getAttribute('for'));
+}
+
+// One element per part: every part this family ships renders exactly one piece of
+// markup, so a consumer's stylesheet and a screen reader see the tree they wrote.
+function expectOneElementPerPart() {
+	expect(el(Lettuce).getAttribute('ui-checked')).not.toBe(null);
+	expect(el(Lettuce).children.length).toBe(2);
+	expect(el(Lettuce).children[0]).toBe(el(LettuceTrigger));
+	expect(el(LettuceTrigger).children.length).toBe(1);
+	expect(el(LettuceTrigger).children[0]).toBe(el(LettuceIndicator));
+	expect(el(Lettuce).children[1]).toBe(el(LettuceLabel));
 }
 
 function expectPartialRendered() {
 	// Some but not all: the select-all reports the third state.
 	expect(el(SelectAllTrigger).getAttribute('aria-checked')).toBe('mixed');
-	expect(el(SelectAll).getAttribute('ui-mixed')).toBe('');
-	expect(el(SelectAll).hasAttribute('ui-checked')).toBe(false);
+	expect(el(Root).getAttribute('ui-mixed')).toBe('');
+	expect(el(Root).hasAttribute('ui-checked')).toBe(false);
 
 	// Membership decides each item, and only the ticked one is on.
 	expect(el(TomatoTrigger).getAttribute('aria-checked')).toBe('true');
@@ -166,8 +140,10 @@ function expectDisabledRendered() {
 	expect(el(CaviarTrigger).getAttribute('disabled')).toBe('');
 	expect(el(TomatoTrigger).hasAttribute('disabled')).toBe(false);
 
-	// A whole locked group: the root carries the flag, and so does every trigger.
+	// A whole locked group: the root carries the flag, and so does every trigger,
+	// including the select-all's.
 	expect(el(LockedRoot).getAttribute('ui-disabled')).toBe('');
+	expect(el(LockedSelectAllTrigger).getAttribute('disabled')).toBe('');
 	expect(el(LockedMustardTrigger).getAttribute('disabled')).toBe('');
 }
 
@@ -183,11 +159,11 @@ async function expectDisabledBlocks() {
 function expectGroupErrorRendered() {
 	expect(el(AfterError).textContent).toBe('Pick at least one condiment');
 	// Every part of one instance seeds before any part renders, so an error part
-	// written after the items still marks the group invalid.
-	expect(el(AfterRoot).getAttribute('ui-invalid')).toBe('');
+	// written after the items still marks the group's own trigger invalid.
+	expect(el(AfterSelectAllTrigger).getAttribute('aria-invalid')).toBe('true');
 	// The same error written BEFORE the items: document order does not decide.
 	expect(el(BeforeError).textContent).toBe('Pick at least one condiment');
-	expect(el(BeforeRoot).getAttribute('ui-invalid')).toBe('');
+	expect(el(BeforeSelectAllTrigger).getAttribute('aria-invalid')).toBe('true');
 }
 
 function expectFormConfigRendered() {
@@ -217,7 +193,7 @@ async function expectSelectAllTicksEverything() {
 	await expect.poll(() => el(LettuceTrigger).getAttribute('aria-checked')).toBe('true');
 	expect(el(TomatoTrigger).getAttribute('aria-checked')).toBe('true');
 	expect(el(MustardTrigger).getAttribute('aria-checked')).toBe('true');
-	expect(el(SelectAll).hasAttribute('ui-mixed')).toBe(false);
+	expect(el(Root).hasAttribute('ui-mixed')).toBe(false);
 }
 
 async function expectSelectAllUnticksEverything() {
@@ -276,6 +252,16 @@ async function expectInstancesStayIsolated() {
 	expect(el(RightSelectAllTrigger).getAttribute('aria-checked')).toBe('false');
 }
 
+// Sibling items inside ONE list: a gesture on one item may not move another's
+// composed checkbox instance, and it may not move the select-all past mixed.
+async function expectSiblingItemsStayIsolated() {
+	el(LettuceTrigger).click();
+	await expect.poll(() => el(LettuceIndicator).textContent).toBe('Checked');
+	expect(el(TomatoIndicator).textContent).toBe('');
+	expect(el(TomatoTrigger).getAttribute('aria-checked')).toBe('false');
+	expect(el(MustardTrigger).getAttribute('aria-checked')).toBe('false');
+}
+
 // `onChange` is a callback slot on the shared instance: the root fills it with
 // its own prop at build time, and the writers dispatch through that route.
 async function expectConsumerCallbackCarriesTheWholeSet() {
@@ -303,149 +289,113 @@ async function expectOmittedCallbackStillTicks() {
 }
 
 for (const mode of MODES) {
-	row(mode, 'the starter renders a named group, a select-all and three items')(
-		`${mode}: the starter renders a named group, a select-all and three items`,
-		async () => {
-			if (mode === 'CSR') await render(Basic);
-			else await renderSSR(Basic);
-			expectBasicRendered();
-		},
-	);
+	test(`${mode}: the starter renders a named group, a select-all and three items`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+		expectBasicRendered();
+	});
 
-	row(mode, 'some ticked renders the select-all mixed and each item by membership')(
-		`${mode}: some ticked renders the select-all mixed and each item by membership`,
-		async () => {
-			if (mode === 'CSR') await render(Partial);
-			else await renderSSR(Partial);
-			expectPartialRendered();
-		},
-	);
+	test(`${mode}: every part renders exactly one element`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+		expectOneElementPerPart();
+	});
 
-	row(mode, 'a mixed select-all splits aria-checked and indeterminate across two elements')(
-		`${mode}: a mixed select-all splits aria-checked and indeterminate across two elements`,
-		async () => {
-			if (mode === 'CSR') await render(Partial);
-			else await renderSSR(Partial);
-			expectMixedSplitAcrossTriggerAndField();
-		},
-	);
+	test(`${mode}: some ticked renders the select-all mixed and each item by membership`, async () => {
+		if (mode === 'CSR') await render(Partial);
+		else await renderSSR(Partial);
+		expectPartialRendered();
+	});
 
-	row(mode, 'unavailable options and a locked group render their flags')(
-		`${mode}: unavailable options and a locked group render their flags`,
-		async () => {
-			if (mode === 'CSR') await render(UnavailableOptions);
-			else await renderSSR(UnavailableOptions);
-			expectDisabledRendered();
-		},
-	);
+	test(`${mode}: a mixed select-all splits aria-checked and indeterminate across two elements`, async () => {
+		if (mode === 'CSR') await render(Partial);
+		else await renderSSR(Partial);
+		expectMixedSplitAcrossTriggerAndField();
+	});
 
-	row(mode, 'unavailable options and a locked group do not toggle')(
-		`${mode}: unavailable options and a locked group do not toggle`,
-		async () => {
-			if (mode === 'CSR') await render(UnavailableOptions);
-			else await renderSSR(UnavailableOptions);
-			await expectDisabledBlocks();
-		},
-	);
+	test(`${mode}: unavailable options and a locked group render their flags`, async () => {
+		if (mode === 'CSR') await render(UnavailableOptions);
+		else await renderSSR(UnavailableOptions);
+		expectDisabledRendered();
+	});
 
-	row(mode, 'a mounted error marks the group invalid, written after the items or before them')(
-		`${mode}: a mounted error marks the group invalid, written after the items or before them`,
-		async () => {
-			if (mode === 'CSR') await render(WithError);
-			else await renderSSR(WithError);
-			expectGroupErrorRendered();
-		},
-	);
+	test(`${mode}: unavailable options and a locked group do not toggle`, async () => {
+		if (mode === 'CSR') await render(UnavailableOptions);
+		else await renderSSR(UnavailableOptions);
+		await expectDisabledBlocks();
+	});
 
-	row(mode, "the form carries a name and a value onto every item's field")(
-		`${mode}: the form carries a name and a value onto every item's field`,
-		async () => {
-			if (mode === 'CSR') await render(CondimentsForm);
-			else await renderSSR(CondimentsForm);
-			expectFormConfigRendered();
-		},
-	);
+	test(`${mode}: a mounted error marks the group invalid, written after the items or before them`, async () => {
+		if (mode === 'CSR') await render(WithError);
+		else await renderSSR(WithError);
+		expectGroupErrorRendered();
+	});
 
-	row(mode, 'only ticked items appear in what the form submits')(
-		`${mode}: only ticked items appear in what the form submits`,
-		async () => {
-			if (mode === 'CSR') await render(CondimentsForm);
-			else await renderSSR(CondimentsForm);
-			await expectTickedItemsSubmit();
-		},
-	);
+	test(`${mode}: the form carries a name and a value onto every item's field`, async () => {
+		if (mode === 'CSR') await render(CondimentsForm);
+		else await renderSSR(CondimentsForm);
+		expectFormConfigRendered();
+	});
 
-	row(mode, 'the select-all ticks every item')(
-		`${mode}: the select-all ticks every item`,
-		async () => {
-			if (mode === 'CSR') await render(Basic);
-			else await renderSSR(Basic);
-			await expectSelectAllTicksEverything();
-		},
-	);
+	test(`${mode}: only ticked items appear in what the form submits`, async () => {
+		if (mode === 'CSR') await render(CondimentsForm);
+		else await renderSSR(CondimentsForm);
+		await expectTickedItemsSubmit();
+	});
 
-	row(mode, 'the select-all unticks every item')(
-		`${mode}: the select-all unticks every item`,
-		async () => {
-			if (mode === 'CSR') await render(Basic);
-			else await renderSSR(Basic);
-			await expectSelectAllUnticksEverything();
-		},
-	);
+	test(`${mode}: the select-all ticks every item`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+		await expectSelectAllTicksEverything();
+	});
 
-	row(mode, 'a mixed select-all ticks everything rather than cycling')(
-		`${mode}: a mixed select-all ticks everything rather than cycling`,
-		async () => {
-			if (mode === 'CSR') await render(Partial);
-			else await renderSSR(Partial);
-			await expectMixedSelectAllTicksEverything();
-		},
-	);
+	test(`${mode}: the select-all unticks every item`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+		await expectSelectAllUnticksEverything();
+	});
 
-	row(mode, 'ticking one item moves the select-all to mixed')(
-		`${mode}: ticking one item moves the select-all to mixed`,
-		async () => {
-			if (mode === 'CSR') await render(Basic);
-			else await renderSSR(Basic);
-			await expectOneItemMovesTheSelectAllToMixed();
-		},
-	);
+	test(`${mode}: a mixed select-all ticks everything rather than cycling`, async () => {
+		if (mode === 'CSR') await render(Partial);
+		else await renderSSR(Partial);
+		await expectMixedSelectAllTicksEverything();
+	});
 
-	row(mode, 'ticking every item checks the select-all, and unticking one returns it to mixed')(
-		`${mode}: ticking every item checks the select-all, and unticking one returns it to mixed`,
-		async () => {
-			if (mode === 'CSR') await render(Basic);
-			else await renderSSR(Basic);
-			await expectTickingEveryItemChecksTheSelectAll();
-		},
-	);
+	test(`${mode}: ticking one item moves the select-all to mixed`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+		await expectOneItemMovesTheSelectAllToMixed();
+	});
 
-	row(mode, 'a select-all in one list leaves the other list alone')(
-		`${mode}: a select-all in one list leaves the other list alone`,
-		async () => {
-			if (mode === 'CSR') await render(TwoLists);
-			else await renderSSR(TwoLists);
-			await expectInstancesStayIsolated();
-		},
-	);
+	test(`${mode}: ticking every item checks the select-all, and unticking one returns it to mixed`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+		await expectTickingEveryItemChecksTheSelectAll();
+	});
 
-	row(mode, 'the consumer onChange is called once with the whole new ticked set')(
-		`${mode}: the consumer onChange is called once with the whole new ticked set`,
-		async () => {
-			if (mode === 'CSR') await render(WithOnChange);
-			else await renderSSR(WithOnChange);
-			await expectConsumerCallbackCarriesTheWholeSet();
-		},
-	);
+	test(`${mode}: a select-all in one list leaves the other list alone`, async () => {
+		if (mode === 'CSR') await render(TwoLists);
+		else await renderSSR(TwoLists);
+		await expectInstancesStayIsolated();
+	});
 
-	row(mode, 'an omitted onChange still ticks')(
-		`${mode}: an omitted onChange still ticks`,
-		async () => {
-			if (mode === 'CSR') await render(Basic);
-			else await renderSSR(Basic);
-			await expectOmittedCallbackStillTicks();
-		},
-	);
+	test(`${mode}: ticking one item leaves its siblings alone`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+		await expectSiblingItemsStayIsolated();
+	});
+
+	test(`${mode}: the consumer onChange is called once with the whole new ticked set`, async () => {
+		if (mode === 'CSR') await render(WithOnChange);
+		else await renderSSR(WithOnChange);
+		await expectConsumerCallbackCarriesTheWholeSet();
+	});
+
+	test(`${mode}: an omitted onChange still ticks`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+		await expectOmittedCallbackStillTicks();
+	});
 }
 
 // --- keyboard -------------------------------------------------------------
@@ -464,16 +414,42 @@ test('CSR: Space on the focused select-all ticks every item', async () => {
 	await expect.poll(() => el(LettuceTrigger).getAttribute('aria-checked')).toBe('true');
 });
 
-// Pinned for the same reason as the CSR rows above: a write on an item's own
-// checkbox has to reach the group through the composed instance, and it does not
-// (note.md gaps 2 and 3). Space itself is fine — the indicator does move.
-test.fails('CSR: Space on a focused item moves the select-all to mixed', async () => {
+test('CSR: Space on a focused item moves the select-all to mixed', async () => {
 	await render(Basic);
 	el(LettuceTrigger).focus();
 
 	await userEvent.keyboard(' ');
 	await expect.poll(() => el(LettuceIndicator).textContent).toBe('Checked');
 	await expect.poll(() => el(SelectAllTrigger).getAttribute('aria-checked')).toBe('mixed');
+});
+
+// --- repeats ---------------------------------------------------------------
+//
+// Items authored with a keyed `@for` — the shape a real list has, since a
+// checklist over a literal list of options is a toy.
+
+test('CSR: items from a keyed loop each get their own instance', async () => {
+	await render(ItemsFromData);
+	const triggers = all('row-trigger');
+	expect(triggers.length).toBe(3);
+	// Three rows, three minted ids: the rows did not share one instance.
+	expect(new Set(triggers.map((trigger) => trigger.id)).size).toBe(3);
+
+	(triggers[1] as HTMLElement).click();
+	await expect.poll(() => triggers[1]?.getAttribute('aria-checked')).toBe('true');
+	// The click landed in one row only.
+	expect(triggers[0]?.getAttribute('aria-checked')).toBe('false');
+	expect(triggers[2]?.getAttribute('aria-checked')).toBe('false');
+	await expect.poll(() => el(SelectAllTrigger).getAttribute('aria-checked')).toBe('mixed');
+});
+
+test('CSR: the select-all ticks every row of a looped list', async () => {
+	await render(ItemsFromData);
+	el(SelectAllTrigger).click();
+	await expect.poll(() => el(SelectAllTrigger).getAttribute('aria-checked')).toBe('true');
+	for (const trigger of all('row-trigger')) {
+		await expect.poll(() => trigger.getAttribute('aria-checked')).toBe('true');
+	}
 });
 
 // --- gaps -----------------------------------------------------------------
@@ -492,33 +468,4 @@ test.fails('the select-all names the boxes it controls', async () => {
 		el(TomatoTrigger).id,
 		el(MustardTrigger).id,
 	]);
-});
-
-// Items authored with a keyed `@for` — the shape a real list has, since a
-// checklist over a literal list of options is a toy. The loop itself compiles and
-// renders three rows; these two rows are pinned for the composition reason above,
-// not for anything to do with the repeat, so they are worth re-running first when
-// that lands.
-test.fails('CSR: items from a keyed loop each get their own instance', async () => {
-	await render(ItemsFromData);
-	const triggers = all('row-trigger');
-	expect(triggers.length).toBe(3);
-	// Three rows, three minted ids: the rows did not share one instance.
-	expect(new Set(triggers.map((trigger) => trigger.id)).size).toBe(3);
-
-	(triggers[1] as HTMLElement).click();
-	await expect.poll(() => triggers[1]?.getAttribute('aria-checked')).toBe('true');
-	// The click landed in one row only.
-	expect(triggers[0]?.getAttribute('aria-checked')).toBe('false');
-	expect(triggers[2]?.getAttribute('aria-checked')).toBe('false');
-	await expect.poll(() => el(SelectAllTrigger).getAttribute('aria-checked')).toBe('mixed');
-});
-
-test.fails('CSR: the select-all ticks every row of a looped list', async () => {
-	await render(ItemsFromData);
-	el(SelectAllTrigger).click();
-	await expect.poll(() => el(SelectAllTrigger).getAttribute('aria-checked')).toBe('true');
-	for (const trigger of all('row-trigger')) {
-		await expect.poll(() => trigger.getAttribute('aria-checked')).toBe('true');
-	}
 });

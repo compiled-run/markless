@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import { checkbox, checklist } from '../../index.ts';
+import { checklist } from '../../index.ts';
 
 // The realistic one: a checklist inside a real form, one `name` per item, and the
 // assertions read what the browser itself put in the FormData rather than an
@@ -16,25 +16,22 @@ export default function CondimentsForm() @{
 	>
 		<checklist.root values={['lettuce', 'tomato']} data-testid="root">
 			<checklist.label data-testid="label">Sandwich Condiments</checklist.label>
-			<checklist.selectall data-testid="selectall">
-				<checkbox.trigger data-testid="selectall-trigger">
-					<checkbox.indicator data-testid="selectall-indicator">Checked</checkbox.indicator>
-				</checkbox.trigger>
-				<checkbox.label data-testid="selectall-label">All condiments</checkbox.label>
+			<checklist.selectall data-testid="selectall-trigger">
+				<checklist.selectallindicator data-testid="selectall-indicator">Checked</checklist.selectallindicator>
 			</checklist.selectall>
 			<checklist.item value="lettuce" name="lettuce" data-testid="lettuce">
-				<checkbox.field data-testid="lettuce-field" />
-				<checkbox.trigger data-testid="lettuce-trigger">
-					<checkbox.indicator data-testid="lettuce-indicator">Checked</checkbox.indicator>
-				</checkbox.trigger>
-				<checkbox.label data-testid="lettuce-label">Lettuce</checkbox.label>
+				<checklist.field data-testid="lettuce-field" />
+				<checklist.itemtrigger data-testid="lettuce-trigger">
+					<checklist.itemindicator data-testid="lettuce-indicator">Checked</checklist.itemindicator>
+				</checklist.itemtrigger>
+				<checklist.itemlabel data-testid="lettuce-label">Lettuce</checklist.itemlabel>
 			</checklist.item>
 			<checklist.item value="tomato" name="tomato" data-testid="tomato">
-				<checkbox.field data-testid="tomato-field" />
-				<checkbox.trigger data-testid="tomato-trigger">
-					<checkbox.indicator data-testid="tomato-indicator">Checked</checkbox.indicator>
-				</checkbox.trigger>
-				<checkbox.label data-testid="tomato-label">Tomato</checkbox.label>
+				<checklist.field data-testid="tomato-field" />
+				<checklist.itemtrigger data-testid="tomato-trigger">
+					<checklist.itemindicator data-testid="tomato-indicator">Checked</checklist.itemindicator>
+				</checklist.itemtrigger>
+				<checklist.itemlabel data-testid="tomato-label">Tomato</checklist.itemlabel>
 			</checklist.item>
 		</checklist.root>
 		<button type="submit" data-testid="submit">Submit</button>

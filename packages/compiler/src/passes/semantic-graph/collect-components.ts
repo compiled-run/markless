@@ -1,4 +1,4 @@
-import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
+import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, expressionSourceOrFallback, sourceSpan } from '../../ast/source.ts';
 import type { SemanticComponentEdge, SemanticComponentPropBinding } from '../../artifacts.ts';
 import {
@@ -20,7 +20,14 @@ import { collectExpressionReads } from './collect-expressions.ts';
 import { collectObjectPatternAliases } from './collect-aliases.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
+	type GraphReadScope,
+	collectCompositeTemplateExpression,
+	pureCompositeReadSources,
+	readsWritableGraphCell,
+} from './composite-reads.ts';
+import {
 	callbackPropArityUnsupportedDiagnostic,
+	componentPropExpressionUnsupportedDiagnostic,
 	memberTagUnresolvedDiagnostic,
 } from './diagnostics.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
@@ -105,7 +112,7 @@ export function collectComponentEdge(
 		);
 	}
 
-	const props = componentPropBindings(node, state);
+	const props = componentPropBindings(node, state, tagName);
 	state.graph.componentEdges.push({
 		id: `component-edge:${state.nextComponentEdgeId++}`,
 		parentComponentName: state.currentComponentName,
@@ -135,19 +142,23 @@ export function collectComponentEdge(
 function componentPropBindings(
 	node: AnyNode,
 	state: WalkState,
+	childComponentName: string,
 ): ReadonlyArray<SemanticComponentPropBinding> {
 	// Component-body scope: an unscoped map resolves `checklist` to the shared
 	// factory's own local of the same name, which is a different node.
-	const bindings = graphBindingMap(
-		state.graph,
-		state.currentSharedDefinitionId ?? null,
-		state.currentComponentName,
-	);
-	const aliases = semanticAliasMap(
-		state.graph,
-		state.currentSharedDefinitionId ?? null,
-		state.currentComponentName,
-	);
+	const scope: GraphReadScope = {
+		bindings: graphBindingMap(
+			state.graph,
+			state.currentSharedDefinitionId ?? null,
+			state.currentComponentName,
+		),
+		aliases: semanticAliasMap(
+			state.graph,
+			state.currentSharedDefinitionId ?? null,
+			state.currentComponentName,
+		),
+	};
+	const { bindings, aliases } = scope;
 	const props: SemanticComponentPropBinding[] = [];
 
 	for (const attribute of getElementAttributes(node)) {
@@ -226,7 +237,38 @@ function componentPropBindings(
 			continue;
 		}
 
+		// A recombined expression at the edge - `list.value.includes(item.value)` -
+		// resolves to no single node, so without a computed of its own the child is
+		// seeded once and never hears about the group again.
+		const composite = expression
+			? collectCompositeTemplateExpression(expression, state, { scope, methodCalls: true })
+			: null;
+		if (composite) {
+			props.push({
+				name,
+				source,
+				kind: 'graph-reference',
+				graphNodeId: composite.graphNodeId,
+				graphBindingKind: 'computed',
+				path: [],
+				sourceSpan: span,
+			});
+			continue;
+		}
+
 		const literal = serializableLiteralValue(expression ?? value);
+		if (!literal.known && expression && readsUnroutedGraphCell(expression, state, scope)) {
+			state.graph.diagnostics.push(
+				componentPropExpressionUnsupportedDiagnostic({
+					propName: name,
+					source,
+					childComponentName,
+					node: expression,
+					filename: state.filename,
+				}),
+			);
+			continue;
+		}
 		props.push(
 			literal.known
 				? { name, source, kind: 'serializable', value: literal.value, sourceSpan: span }
@@ -235,6 +277,30 @@ function componentPropBindings(
 	}
 
 	return props;
+}
+
+/**
+ * True when a prop expression reads a state cell or a computed value but this
+ * pass could not build a reactive route for it. Seeding the child from a value
+ * like that renders the placeholder the shared factory was declared with and
+ * never moves again, so the compiler refuses instead of shipping it.
+ */
+function readsUnroutedGraphCell(
+	expression: AnyNode,
+	state: WalkState,
+	scope: GraphReadScope,
+): boolean {
+	const readSources = pureCompositeReadSources(expression, state, { methodCalls: true });
+	if (readSources) return readsWritableGraphCell(readSources, state, scope);
+	// An expression this pass cannot decompose still fails closed when any member
+	// path inside it names a graph cell.
+	const sources: string[] = [];
+	walkNode(expression, (inner) => {
+		if (inner.type === 'MemberExpression' && inner.computed !== true) {
+			sources.push(expressionSource(inner, state.source));
+		}
+	});
+	return readsWritableGraphCell(sources, state, scope);
 }
 
 function componentImportSource(
