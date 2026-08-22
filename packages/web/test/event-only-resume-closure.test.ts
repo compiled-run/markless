@@ -57,7 +57,19 @@ const resumeOnDemandEntries = [
 // The -30 trim taken here is web-side: payload.ts named the same seven symbols
 // twice, once to import and once to re-export, and the re-export now sources them
 // directly. Measured 29,973 before the trim, 29,943 after.
-const sourceByteLimit = 29943;
+// REPAYMENT 2026-08-22 (U106), 29,943 -> 20,996: the debt the T075g interim
+// directly above owed is paid. PROTOCOL_EVENT_ACTION_KIND was the only runtime
+// value this closure pulled out of the serializer's protocol.ts; its definition
+// now lives in protocol-constants.ts, which the closure already reached.
+// protocol.ts re-exports it, so every other consumer's path is unchanged, and
+// protocol-client.ts's remaining protocol.ts bindings are types, which this
+// walk erases. Cause of the drop: protocol.ts (11,959 chars) left the closure
+// via that constant move, and async-boundary-arm.ts (271) left with it, taking
+// the payload closure from 29,943 to 18,071. The new anchor is not payload.ts
+// though: the largest closure this wall governs is now resume-runtime.ts at
+// 20,996, a single-file closure this change does not touch. This is a measured
+// value, not an estimate -- every governed entry was re-measured here.
+const sourceByteLimit = 20996;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

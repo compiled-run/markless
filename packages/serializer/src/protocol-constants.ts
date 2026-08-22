@@ -10,6 +10,13 @@ export function protocolStateVersion(
 	return (storage?.length ?? 0) > 0 ? STORAGE_PROTOCOL_VERSION : ASYNC_PROTOCOL_VERSION;
 }
 
+// Lives here, not beside its record types in protocol.ts, because the browser
+// payload closure needs this value and nothing else protocol.ts defines.
+export const PROTOCOL_EVENT_ACTION_KIND = {
+	event: 'event',
+	externalDelegate: 'external-delegate',
+} as const;
+
 export const ASYNC_BOUNDARY_ARM_MIN = 0;
 export const ASYNC_BOUNDARY_ARM_PENDING = 1;
 export const ASYNC_BOUNDARY_ARM_MAX = 2;
