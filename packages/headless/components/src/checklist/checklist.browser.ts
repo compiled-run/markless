@@ -7,9 +7,14 @@
 // the select-all reads mixed, membership shows, and the field carries its name
 // and value. Eighteen rows flipped with it.
 //
-// Three rows stay pinned on ONE new named defect: A PART IS A SIBLING OF THE
-// WIDGET ROOT ITS COMPOSITION PLACED IT IN. Each pinned row carries the measured
-// detail. See note.md.
+// T074 landed the sibling fix: a part written into a composing component now
+// resolves to the widget root that component composed, and a keyed row roots a
+// widget of its own. Six more rows flipped, and the rows that were green only
+// because every instance had collapsed into one are now honestly red.
+//
+// What is left is ONE new named defect, measured here: A WIDGET CALLBACK SLOT'S
+// DISPATCH NEVER LEAVES THE WIDGET, so no gesture on one part moves the group.
+// The `for (const mode of MODES)` block below carries the measurement. See note.md.
 import { render, renderSSR } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
@@ -301,6 +306,19 @@ async function expectOmittedCallbackStillTicks() {
 	await expect.poll(() => el(SelectAllTrigger).getAttribute('aria-checked')).toBe('mixed');
 }
 
+// Every row still pinned below is pinned on ONE named defect, measured on this
+// branch after T074 gave each rendered widget its own instance: A WIDGET
+// CALLBACK SLOT'S DISPATCH NEVER LEAVES THE WIDGET. `checkbox.toggle()` calls
+// `checkbox.onChange?.(next)`, which the consumer edge answers with
+// `checklist.setAll` — and on a gesture no checklist symbol runs at all. The
+// browser's own dispatch trace for `Space on the focused select-all` is
+// character-identical before and after T074: `symbol:0 (checkbox.tsrx)` and its
+// dom updates wake, and nothing from checklist.tsrx ever does. Before T074 the
+// rows that touched this passed anyway, because the select-all and all three
+// items resolved to ONE collapsed checkbox instance (the items' parts fell back
+// to the root's `c0:shared:checkbox...`), so the root's own toggle moved every
+// trigger. Separating the instances is correct and removes that accident.
+// Un-pin when a part's slot invocation reaches the root edge's callback.
 for (const mode of MODES) {
 	test(`${mode}: the starter renders a named group, a select-all and three items`, async () => {
 		if (mode === 'CSR') await render(Basic);
@@ -308,7 +326,7 @@ for (const mode of MODES) {
 		expectBasicRendered();
 	});
 
-	test.skip(`${mode}: every part renders exactly one element`, async () => {
+	test(`${mode}: every part renders exactly one element`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 		expectOneElementPerPart();
@@ -362,7 +380,7 @@ for (const mode of MODES) {
 		await expectSelectAllTicksEverything();
 	});
 
-	test.skip(`${mode}: the select-all unticks every item`, async () => {
+	test(`${mode}: the select-all unticks every item`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 		await expectSelectAllUnticksEverything();
@@ -392,7 +410,7 @@ for (const mode of MODES) {
 		await expectInstancesStayIsolated();
 	});
 
-	test.skip(`${mode}: ticking one item leaves its siblings alone`, async () => {
+	test(`${mode}: ticking one item leaves its siblings alone`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 		await expectSiblingItemsStayIsolated();
@@ -417,7 +435,14 @@ for (const mode of MODES) {
 // its own tab stop and Space is the only activation key, so the family adds no
 // keyboard rule of its own beyond what the composed checkbox already has.
 
-test('CSR: Space on the focused select-all ticks every item', async () => {
+// Newly pinned on the dispatch defect named above. This row was green before
+// T074 for the wrong reason: the select-all and the three items were one
+// collapsed checkbox instance, so the select-all's own toggle wrote the value
+// every item trigger read. With each widget separated, ticking the select-all
+// has to travel `checkbox.onChange` -> `checklist.setAll` -> the group's value,
+// and that dispatch never runs. The keyboard path is not the gap: the same
+// gesture through a click is pinned the same way.
+test.skip('CSR: Space on the focused select-all ticks every item', async () => {
 	await render(Basic);
 	el(SelectAllTrigger).focus();
 	expect(document.activeElement).toBe(el(SelectAllTrigger));
@@ -427,9 +452,8 @@ test('CSR: Space on the focused select-all ticks every item', async () => {
 	await expect.poll(() => el(LettuceTrigger).getAttribute('aria-checked')).toBe('true');
 });
 
-// Pinned on the same NEW named defect as the looped rows below: A PART IS A
-// SIBLING OF THE WIDGET ROOT ITS COMPOSITION PLACED IT IN, so the item's gesture
-// and the select-all's computed do not meet on one instance.
+// Pinned on the dispatch defect named above: the item's gesture reaches its own
+// checkbox and stops there, so the group's computed never sees it.
 test.skip('CSR: Space on a focused item moves the select-all to mixed', async () => {
 	await render(Basic);
 	el(LettuceTrigger).focus();
@@ -444,13 +468,13 @@ test.skip('CSR: Space on a focused item moves the select-all to mixed', async ()
 // Items authored with a keyed `@for` — the shape a real list has, since a
 // checklist over a literal list of options is a toy.
 
-// Pinned on a NEW named defect, measured on this branch: A PART IS A SIBLING OF
-// THE WIDGET ROOT ITS COMPOSITION PLACED IT IN. Inside a keyed `@for`, the row's
-// parts sit at `r:<key>:c0:p1:` while the checkbox root `checklist.item`
-// composed sits at `r:<key>:c0:c0:`, and the widget lookup only walks PREFIXES of
-// the part's own path, so every row falls back to one unprefixed shared id and
-// the rows share an instance. Witness and the two halves the fix needs are in
-// packages/vitest-browser/browser/projection-into-composed-root.test.ts.
+// The sibling defect this row named is FIXED at the framework level (witness:
+// packages/vitest-browser/browser/projection-into-composed-root.test.ts, whose
+// keyed-row row is green on CSR and whose SSR resume agrees). This row stays
+// pinned on the dispatch defect named above plus a second one measured here:
+// inside `items-from-data.tsrx` the three row triggers still mint ONE id, so the
+// row segment reaches the graph path but not the element() handle's token, which
+// the seed pass builds from the HOST id prefix rather than the instance path.
 test.skip('CSR: items from a keyed loop each get their own instance', async () => {
 	await render(ItemsFromData);
 	const triggers = all('row-trigger');
@@ -466,13 +490,8 @@ test.skip('CSR: items from a keyed loop each get their own instance', async () =
 	await expect.poll(() => el(SelectAllTrigger).getAttribute('aria-checked')).toBe('mixed');
 });
 
-// Pinned on a NEW named defect, measured on this branch: A PART IS A SIBLING OF
-// THE WIDGET ROOT ITS COMPOSITION PLACED IT IN. Inside a keyed `@for`, the row's
-// parts sit at `r:<key>:c0:p1:` while the checkbox root `checklist.item`
-// composed sits at `r:<key>:c0:c0:`, and the widget lookup only walks PREFIXES of
-// the part's own path, so every row falls back to one unprefixed shared id and
-// the rows share an instance. Witness and the two halves the fix needs are in
-// packages/vitest-browser/browser/projection-into-composed-root.test.ts.
+// Pinned on the dispatch defect named above: the select-all's gesture never
+// reaches `checklist.setAll`, so no row of the loop can follow it.
 test.skip('CSR: the select-all ticks every row of a looped list', async () => {
 	await render(ItemsFromData);
 	el(SelectAllTrigger).click();

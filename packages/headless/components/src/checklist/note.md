@@ -74,19 +74,60 @@ derive over them reads seeded values, not the factory placeholder: acyclic.
 
 Eighteen rows of this suite and two screen-reader rows flipped with it.
 
-One gap is still pinned row-level, on a NEW named defect measured here: **a part
-is a SIBLING of the widget root its composition placed it in.** Inside a keyed
-`@for`, a row's parts sit at `r:<key>:c0:p1:` while the checkbox root the row's
-child composed sits at `r:<key>:c0:c0:`, and the widget lookup only walks
-PREFIXES of the part's own path, so every row falls back to one unprefixed shared
-id. Two halves are needed and both were measured on this branch: a widget id that
-already names its root has to keep taking the instance path when it is composed
-again (otherwise both rows' roots collapse onto `c0:shared:...` whatever the
-lookup answers), and the projecting child's declared chain has to be registered as
-the answer for its siblings. Landing only the CSR half turns the SSR-resume row
-red, because the compiler's emitted SSR seed pass registers no such answer and the
-two sides then disagree about which node a part reads. The witness and both halves
-are written up in `packages/vitest-browser/browser/projection-into-composed-root.test.ts`.
+## What T074 changed
+
+The sibling defect is fixed, both halves at once, because neither works alone
+(measured: shipping either one on its own turns the select-all's own render red).
+
+A part is a SIBLING of the widget root its composition placed it in — inside a
+keyed `@for` a row's parts sit at `r:<key>:c0:p1:` while the checkbox root the
+row's child composed sits at `r:<key>:c0:c0:` — so no prefix of the part's own
+path can ever name that root. The two halves:
+
+1. A `shared:` id that already carries an instance path is one only a widget
+   lookup can have written, so composing it AGAIN starts another rendered widget
+   and it takes the new path. Without this, two placements of one composing
+   component (and every row of a `@for`) collapse onto one widget's cells.
+2. The registry that answers "which rendered widget holds this id" is now a map,
+   and composition registers each widget a second time under the projection site
+   its parts sit at. The answer comes from the same declared children-projection
+   chain T071 introduced: the compiler's `marklessChildrenWidgetRoot` marker on
+   the SSR side, the same chunk walk on the CSR side, both handed to one
+   registration function. Nothing is sensed and no lookup rule changed.
+
+The SSR side declares it into the same seam rather than a parallel one: the
+emitted module puts `childrenWidgetRoot` on the composed child it already builds,
+so CSR and SSR reach the same registration code with the same value. Browser
+resume has no composition to watch, so the payload carries it: a widget-scoped
+shared definition now has `projectionIds`, and resume registers those the way it
+already registers the definition's own id.
+
+Six more rows of this suite flipped, and
+`packages/vitest-browser/browser/projection-into-composed-root.test.ts` is green
+on every row including the keyed one and SSR resume.
+
+Three rows that used to pass went honestly red. They passed because every
+instance had collapsed into one: the items' parts fell back to the root's
+`c0:shared:checkbox...`, so the select-all's own toggle moved every item trigger
+without anything travelling through the group. Separating the instances removed
+that accident and exposed the defect below.
+
+## The one named defect left
+
+**A widget callback slot's dispatch never leaves the widget.**
+`checkbox.toggle()` calls `checkbox.onChange?.(next)`, which the consumer edge
+answers with `checklist.setAll` — and on a gesture no checklist symbol runs at
+all. The browser's own dispatch trace for `Space on the focused select-all` is
+character-identical before and after T074: `symbol:0 (checkbox.tsrx)` and its dom
+updates wake, and nothing from checklist.tsrx ever does. Every remaining pinned
+row of this suite is pinned on it. It is not a seeding or an identity problem —
+both sides now agree on which node each part reads — so it belongs to the
+widget-callback route, not to this family.
+
+The looped rows carry a second measured detail: inside `items-from-data.tsrx` the
+three row triggers still mint ONE element id. The row segment reaches the graph
+path but not the minted handle, because the seed pass builds that token from the
+HOST id prefix rather than from the instance path.
 
 ## Framework limits this family ran into
 

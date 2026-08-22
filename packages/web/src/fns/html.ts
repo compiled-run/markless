@@ -26,6 +26,8 @@ export function marklessCsrSpreadAttributes(values: MarklessAttributeValues, sco
 		if (
 			!/^[A-Za-z_][\w.:-]*$/.test(key) ||
 			/^on[A-Z]/.test(key) ||
+			// The framework's own reserved prefix for parent-to-child channels.
+			key.startsWith('__markless') ||
 			key === 'attach' ||
 			key === 'el' ||
 			key === 'children'
@@ -76,6 +78,8 @@ export function marklessSsrSpreadAttributes(values: MarklessAttributeValues, sco
 		if (
 			!/^[A-Za-z_][\w.:-]*$/.test(key) ||
 			/^on[A-Z]/.test(key) ||
+			// The framework's own reserved prefix for parent-to-child channels.
+			key.startsWith('__markless') ||
 			key === 'attach' ||
 			key === 'el' ||
 			key === 'children'

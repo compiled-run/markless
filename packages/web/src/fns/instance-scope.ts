@@ -79,9 +79,15 @@ export function marklessInstanceScopedGraph(
 ): RuntimeGraph {
 	if (!instancePath) return graph;
 	// Resume loads a widget piece's symbol by its instance path alone; the widget
-	// roots it must map onto are the qualified definition ids the payload carries.
+	// roots it must map onto are the qualified definition ids the payload carries,
+	// along with the projection sites composition registered them under.
 	for (const definition of graph.listSharedDefinitions?.() ?? [])
-		if (definition.scope === 'widget') widgetInstanceIds.add(definition.id);
+		if (definition.scope === 'widget') {
+			const rootPath = marklessInstancePath(definition.id);
+			widgetRootPaths.set(definition.id, rootPath);
+			for (const projectionId of definition.projectionIds ?? [])
+				widgetRootPaths.set(projectionId, rootPath);
+		}
 	// Page-space families (shared, storage) keep their page ids through every adapter.
 	const qualify = (graphNodeId: string) => marklessComposedGraphNodeId(graphNodeId, instancePath);
 	return {
@@ -103,24 +109,32 @@ export function marklessInstanceScopedGraph(
 // Mirrors PROTOCOL_PAGE_SPACE_ID_PREFIXES, past any instance path a nested
 // compose already applied; composed-page-space.test.ts keeps the two in step so
 // the browser never imports the serializer's protocol module.
-const PAGE_SPACE_ID = /^(?:[cp]\d+:|r:[^:]*:)*(?:shared|storage):/;
+const PAGE_SPACE_ID = /^((?:[cp]\d+:|r:[^:]*:)*)(shared|storage):/;
 
 // Widget-scoped shared() definitions are the one page-space family that is NOT
-// page-wide: one graph per rendered widget, keyed by the instance path of the
-// outermost component that resolves the definition. Composition registers those
-// widget-root ids as it merges children; browser resume registers them from the
-// definitions the payload already carries. A page with no widget-scoped
-// definition never fills this set and never pays for the lookup.
-const widgetInstanceIds = new Set<string>();
+// page-wide: one graph per rendered widget. This answers, for an id a part
+// spells, WHICH rendered widget's instance path holds its nodes. Composition
+// registers as it merges children; resume registers from the payload. A page
+// with no widget-scoped definition never fills it and never pays for the lookup.
+const widgetRootPaths = new Map<string, string>();
 
 export function marklessRegisterWidgetInstanceIds(ids: Iterable<string>): void {
-	for (const id of ids) widgetInstanceIds.add(id);
+	for (const id of ids) widgetRootPaths.set(id, marklessInstancePath(id));
 }
 
-// The widget this child-local `shared:` id belongs to: the longest prefix of the
-// child's instance path registered as a widget root for that definition.
+// A part is a SIBLING of the root composition placed it in (`c0:p1:` beside
+// `c0:c0:`), so the walk below cannot reach that root from the part's own path;
+// the composing child declared where its children land and this is that answer.
+export function marklessRegisterWidgetProjections(
+	entries: Iterable<readonly [string, string]>,
+): void {
+	for (const [id, rootPath] of entries) widgetRootPaths.set(id, rootPath);
+}
+
+// The widget this child-local `shared:` id belongs to: the answer registered for
+// the longest prefix of the reading instance's path.
 function marklessWidgetRootPath(graphNodeId: string, instancePath: string): string {
-	if (widgetInstanceIds.size === 0) return '';
+	if (widgetRootPaths.size === 0) return '';
 	// The id is either a definition id (`shared:<file>#<export>`) or one of its
 	// nodes (`<definitionId>/<kind>:<name>`). The definition id carries the module
 	// path, which has separators of its own, so ask the registry both ways instead
@@ -129,11 +143,10 @@ function marklessWidgetRootPath(graphNodeId: string, instancePath: string): stri
 	for (let end = instancePath.length; end > 0; end--) {
 		if (instancePath[end - 1] !== ':') continue;
 		const prefix = instancePath.slice(0, end);
-		if (
-			widgetInstanceIds.has(prefix + graphNodeId) ||
-			(slash > 0 && widgetInstanceIds.has(prefix + graphNodeId.slice(0, slash)))
-		)
-			return prefix;
+		const rootPath =
+			widgetRootPaths.get(prefix + graphNodeId) ??
+			(slash > 0 ? widgetRootPaths.get(prefix + graphNodeId.slice(0, slash)) : undefined);
+		if (rootPath !== undefined) return rootPath;
 	}
 	return '';
 }
@@ -144,11 +157,14 @@ function marklessWidgetRootPath(graphNodeId: string, instancePath: string): stri
 // concatenation.
 export function marklessComposedGraphNodeId(graphNodeId: string, instancePath: string): string {
 	if (!instancePath) return graphNodeId;
-	if (PAGE_SPACE_ID.test(graphNodeId))
-		return graphNodeId.startsWith('shared:')
-			? marklessWidgetRootPath(graphNodeId, instancePath) + graphNodeId
-			: graphNodeId;
-	return instancePath + graphNodeId;
+	const pageSpace = PAGE_SPACE_ID.exec(graphNodeId);
+	if (!pageSpace) return instancePath + graphNodeId;
+	if (pageSpace[2] === 'storage') return graphNodeId;
+	// Only a widget lookup writes a prefix onto a `shared:` id, so a prefixed one
+	// names a widget root: composing it AGAIN is another rendered widget.
+	return pageSpace[1]
+		? instancePath + graphNodeId
+		: marklessWidgetRootPath(graphNodeId, instancePath) + graphNodeId;
 }
 
 // Composed child-owned boundaries load their update symbol through the

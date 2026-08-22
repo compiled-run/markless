@@ -149,6 +149,7 @@ export type ProtocolStatePayload = {
 		readonly scope?: 'request' | 'container' | 'page' | 'widget';
 		readonly version: number;
 		readonly graphNodeIds: ReadonlyArray<string>;
+		readonly projectionIds?: ReadonlyArray<string>;
 		readonly dependencies?: ReadonlyArray<{
 			readonly definitionId: string;
 			readonly definitionName: string;

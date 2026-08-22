@@ -588,7 +588,9 @@ function renderSpreadAttributes(value: unknown, excludeNames: ReadonlyArray<stri
 	let html = '';
 	for (const [name, attribute] of Object.entries(value)) {
 		if (excludeNames.includes(name)) continue;
-		if (!/^[A-Za-z_][\w.:-]*$/.test(name) || /^on[A-Z]/.test(name) || name === 'attach' || name === 'el' || name === 'children') continue;
+		// `__markless` is the framework's own reserved prefix for the channels a
+		// parent arranges with a child; none of them is an attribute anyone wrote.
+		if (!/^[A-Za-z_][\w.:-]*$/.test(name) || /^on[A-Z]/.test(name) || name.startsWith('__markless') || name === 'attach' || name === 'el' || name === 'children') continue;
 		html += renderAttribute(name, attribute);
 	}
 	return html;
