@@ -1,9 +1,8 @@
 // No longer pinned at suite level: T072's component-tag spread forwarding puts the
-// consumer's attributes on the parts, and the item rows below run. The four rows
-// still pinned are the SELECT-ALL rows, on one named defect: COMPOSED-ROOT SEED
-// DOES NOT EVALUATE THE COMPOSING COMPONENT'S COMPUTEDS, so the select-all's
-// checkbox instance is seeded with `checked === undefined` and the reader is never
-// offered the control the group's label names. See checklist.browser.ts and note.md.
+// consumer's attributes on the parts, and T073's seed-time computed reader makes
+// the item rows announce their real state. The four rows still pinned are the
+// SELECT-ALL rows, on one named defect: THE SELECT-ALL AND THE GROUP SHARE ONE
+// ACCESSIBLE NAME, which is note.md limit 8, not a seed. See note.md.
 import { render } from '@markless/vitest-browser';
 import { afterEach, expect, test } from 'vitest';
 import { missingFacts, readUntil, type Conveys } from './driver.ts';
@@ -55,6 +54,12 @@ async function settle() {
 
 // Sequence A, entering the group: aria-at asserts the group's name and its role
 // before the control's own facts, both at priority 2.
+// Pinned on a NEW named defect, measured on this branch: THE SELECT-ALL AND THE
+// GROUP SHARE ONE ACCESSIBLE NAME. `checklist.root` is both the group and the
+// select-all's checkbox root, so `checklist.label` names both and the reader
+// announces the select-all as the group's own name. Naming them apart needs the
+// `aria-labelledby` half of note.md limit 8, not a seed. The seed reader this
+// unit landed is no longer the cause: the item rows below now run.
 test.skip('entering the list conveys the group and its name before the select-all', async () => {
 	await open(Basic);
 	expectConveys(await readUntil(sr, { role: 'group' }), {
@@ -65,6 +70,12 @@ test.skip('entering the list conveys the group and its name before the select-al
 
 // Sequence C, the unchecked half: reading the select-all conveys its role, its
 // name and that it is not checked.
+// Pinned on a NEW named defect, measured on this branch: THE SELECT-ALL AND THE
+// GROUP SHARE ONE ACCESSIBLE NAME. `checklist.root` is both the group and the
+// select-all's checkbox root, so `checklist.label` names both and the reader
+// announces the select-all as the group's own name. Naming them apart needs the
+// `aria-labelledby` half of note.md limit 8, not a seed. The seed reader this
+// unit landed is no longer the cause: the item rows below now run.
 test.skip('reading an untouched select-all conveys the checkbox role, its name and that it is not checked', async () => {
 	await open(Basic);
 	expectConveys(await readUntil(sr, { role: 'checkbox', name: 'All condiments' }), {
@@ -93,6 +104,12 @@ test('each item conveys the checkbox role, its own name and that it is not check
 // select-all never cycles into mixed, because its mixed state is computed from
 // the items and is not a value a person can choose. Recorded here so nobody
 // later "fixes" this family to match the plan.
+// Pinned on a NEW named defect, measured on this branch: THE SELECT-ALL AND THE
+// GROUP SHARE ONE ACCESSIBLE NAME. `checklist.root` is both the group and the
+// select-all's checkbox root, so `checklist.label` names both and the reader
+// announces the select-all as the group's own name. Naming them apart needs the
+// `aria-labelledby` half of note.md limit 8, not a seed. The seed reader this
+// unit landed is no longer the cause: the item rows below now run.
 test.skip('pressing space on an untouched select-all announces it as checked, never as partially checked', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'checkbox', name: 'All condiments' });
@@ -136,7 +153,7 @@ test('checking one item announces that item only, and says nothing about the sel
 // Pinned: `disabled` on an item crosses the same composed-family edge as
 // `checked`, so the reader is told the box is available when the group says it is
 // not. Measured in src/checklist/note.md.
-test.fails('an item nobody may change conveys that it is disabled and space leaves it alone', async () => {
+test('an item nobody may change conveys that it is disabled and space leaves it alone', async () => {
 	await open(UnavailableOptions);
 	const name = 'Not available on your plan';
 	expectConveys(await readUntil(sr, { role: 'checkbox', name }), {
@@ -177,6 +194,12 @@ test.fails('reading a partly ticked select-all conveys it as partially checked',
 // it agrees with our design even though the APG example's cycle does not. Green
 // today for the wrong reason - the select-all in this scenario renders unticked
 // rather than partly ticked - and green for the right one once the row above is.
+// Pinned on a NEW named defect, measured on this branch: THE SELECT-ALL AND THE
+// GROUP SHARE ONE ACCESSIBLE NAME. `checklist.root` is both the group and the
+// select-all's checkbox root, so `checklist.label` names both and the reader
+// announces the select-all as the group's own name. Naming them apart needs the
+// `aria-labelledby` half of note.md limit 8, not a seed. The seed reader this
+// unit landed is no longer the cause: the item rows below now run.
 test.skip('pressing space on a partly ticked select-all announces it as checked', async () => {
 	await open(Partial);
 	await readUntil(sr, { role: 'checkbox', name: 'All condiments' });
@@ -190,7 +213,7 @@ test.skip('pressing space on a partly ticked select-all announces it as checked'
 
 // Sequence C, the checked half: an item the group starts with ticked has to be
 // conveyed as checked.
-test.fails('an item the group starts with ticked is conveyed as checked', async () => {
+test('an item the group starts with ticked is conveyed as checked', async () => {
 	await open(Partial);
 	expectConveys(await readUntil(sr, { role: 'checkbox', name: 'Tomato' }), {
 		role: 'checkbox',

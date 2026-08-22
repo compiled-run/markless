@@ -64,16 +64,11 @@ test('CSR: a part projected into a composed family root resolves to that root', 
 	expectPartsResolveToTheComposedRoot(screen.container as HTMLElement);
 });
 
-// Pinned: the composed root's OWN seed never runs. A consumer that only
-// COMPOSES a family root (GroupRoot -> PwrRoot) is not asked for seeds, because
-// the seed pass stops at the child the consumer wrote and does not descend the
-// children-projection chain it now declares. Identity resolves; the seeded value
-// does not travel. Descending the chain also needs a reader for the composing
-// component's own computeds — `<CheckboxRoot checked={checklist.allChecked}>` is
-// the same shape one link in — which the seed pass does not have today. Un-pin
-// when the seed pass follows the same chain the widget token does AND can read a
-// computed of the component whose edge it is descending.
-test.skip('CSR: each composed root seeds only the parts projected into it', async () => {
+// T073: the composed root's own seed runs. The seed pass descends the
+// children-projection chain the composing child declares and runs each link's
+// seeds in THAT link owner's scope, so a value written by the root composition
+// placed inside reaches every part projected into it.
+test('CSR: each composed root seeds only the parts projected into it', async () => {
 	const screen = await render(Page);
 	expectSeedsPerWidget(screen.container as HTMLElement);
 });
@@ -91,10 +86,20 @@ test('SSR resume: minted ids and gestures agree with CSR', async () => {
 
 // A keyed row composes a widget of its own, so the row segment has to reach the
 // minted handle as well as the row's state.
-// Pinned: a keyed row's composed widget is not row-scoped. The row segment
-// reaches the row's own child, but the widget the row's child COMPOSES resolves
-// without it, so both rows share one instance and one gesture flips both. The
-// ids below already differ; only the state is shared.
+// Pinned on a NEW named defect, measured on this branch: A PART IS A SIBLING OF
+// THE WIDGET ROOT ITS COMPOSITION PLACED IT IN. The row's parts sit at
+// `r:alpha:c0:p1:` while the root the row's child composed sits at
+// `r:alpha:c0:c0:`, and `marklessWidgetRootPath` only walks PREFIXES of the
+// part's own path, so no prefix names that root and every row's parts fall back
+// to the unprefixed shared id — one instance for both rows. Two halves are
+// needed and both were measured here: a widget id that already names its root
+// has to keep taking the instance path when it is composed again (otherwise
+// both rows' roots collapse onto `c0:shared:...` regardless), and the projecting
+// child's declared chain has to be registered as the answer for its siblings.
+// Landing only the CSR half turns `SSR resume: minted ids and gestures agree
+// with CSR` red, because the SSR emitted seed pass registers no such answer:
+// the two sides then disagree about which node a part reads. Un-pin when the
+// compiler's SSR seed pass declares the same chain the CSR pass does.
 test.skip('CSR: a keyed row composes a widget of its own', async () => {
 	const screen = await render(RowsPage);
 	const container = screen.container as HTMLElement;

@@ -3,18 +3,13 @@
 // attribute — `data-testid` first among them — crosses `<checklist.root>` into
 // the DOM and these locators resolve. The starter row below runs.
 //
-// The rows still pinned share ONE named defect: COMPOSED-ROOT SEED DOES NOT
-// EVALUATE THE COMPOSING COMPONENT'S COMPUTEDS. A part written inside
-// `<checklist.root>` renders during the CONSUMER's render, before ChecklistRoot
-// runs, so the checkbox instance it reads has to be seeded from the consumer's
-// own seed pass. That pass descends to the child the consumer wrote and runs its
-// seeds, but the seeds of the root that child COMPOSES take `checked=
-// {checklist.allChecked}` and `checked={checklist.value.includes(item.value)}` —
-// values of a computed, which the seed pass has no evaluator for. So every part
-// reads `checked === undefined` and reports `false`: the select-all never reads
-// mixed, membership never shows, and the field never carries its name or value.
-// Two further gaps are pinned row-level in projection-into-composed-root.test.ts.
-// See note.md.
+// T073 landed the seed-time reader for the composing component's computeds, so
+// the select-all reads mixed, membership shows, and the field carries its name
+// and value. Eighteen rows flipped with it.
+//
+// Three rows stay pinned on ONE new named defect: A PART IS A SIBLING OF THE
+// WIDGET ROOT ITS COMPOSITION PLACED IT IN. Each pinned row carries the measured
+// detail. See note.md.
 import { render, renderSSR } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
@@ -422,7 +417,7 @@ for (const mode of MODES) {
 // its own tab stop and Space is the only activation key, so the family adds no
 // keyboard rule of its own beyond what the composed checkbox already has.
 
-test.skip('CSR: Space on the focused select-all ticks every item', async () => {
+test('CSR: Space on the focused select-all ticks every item', async () => {
 	await render(Basic);
 	el(SelectAllTrigger).focus();
 	expect(document.activeElement).toBe(el(SelectAllTrigger));
@@ -432,6 +427,9 @@ test.skip('CSR: Space on the focused select-all ticks every item', async () => {
 	await expect.poll(() => el(LettuceTrigger).getAttribute('aria-checked')).toBe('true');
 });
 
+// Pinned on the same NEW named defect as the looped rows below: A PART IS A
+// SIBLING OF THE WIDGET ROOT ITS COMPOSITION PLACED IT IN, so the item's gesture
+// and the select-all's computed do not meet on one instance.
 test.skip('CSR: Space on a focused item moves the select-all to mixed', async () => {
 	await render(Basic);
 	el(LettuceTrigger).focus();
@@ -446,6 +444,13 @@ test.skip('CSR: Space on a focused item moves the select-all to mixed', async ()
 // Items authored with a keyed `@for` — the shape a real list has, since a
 // checklist over a literal list of options is a toy.
 
+// Pinned on a NEW named defect, measured on this branch: A PART IS A SIBLING OF
+// THE WIDGET ROOT ITS COMPOSITION PLACED IT IN. Inside a keyed `@for`, the row's
+// parts sit at `r:<key>:c0:p1:` while the checkbox root `checklist.item`
+// composed sits at `r:<key>:c0:c0:`, and the widget lookup only walks PREFIXES of
+// the part's own path, so every row falls back to one unprefixed shared id and
+// the rows share an instance. Witness and the two halves the fix needs are in
+// packages/vitest-browser/browser/projection-into-composed-root.test.ts.
 test.skip('CSR: items from a keyed loop each get their own instance', async () => {
 	await render(ItemsFromData);
 	const triggers = all('row-trigger');
@@ -461,6 +466,13 @@ test.skip('CSR: items from a keyed loop each get their own instance', async () =
 	await expect.poll(() => el(SelectAllTrigger).getAttribute('aria-checked')).toBe('mixed');
 });
 
+// Pinned on a NEW named defect, measured on this branch: A PART IS A SIBLING OF
+// THE WIDGET ROOT ITS COMPOSITION PLACED IT IN. Inside a keyed `@for`, the row's
+// parts sit at `r:<key>:c0:p1:` while the checkbox root `checklist.item`
+// composed sits at `r:<key>:c0:c0:`, and the widget lookup only walks PREFIXES of
+// the part's own path, so every row falls back to one unprefixed shared id and
+// the rows share an instance. Witness and the two halves the fix needs are in
+// packages/vitest-browser/browser/projection-into-composed-root.test.ts.
 test.skip('CSR: the select-all ticks every row of a looped list', async () => {
 	await render(ItemsFromData);
 	el(SelectAllTrigger).click();
