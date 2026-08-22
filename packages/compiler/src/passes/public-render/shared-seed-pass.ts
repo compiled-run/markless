@@ -119,6 +119,85 @@ export function armScopedSeedRefsUnder(
 }
 
 /**
+ * The component edges whose projections enclose a component's own `children`,
+ * outermost first, each with the instance path it contributes. Composition —
+ * not the consumer — placed those children inside that composed child, so a
+ * part written into this component belongs to the innermost of these edges that
+ * roots a widget. The chain is a build-time fact of THIS module; which of its
+ * links roots a widget is answered where that link's component was compiled.
+ */
+export function childrenProjectionChain(
+	chunks: PublicRenderModuleInput['renderData']['chunks'],
+	componentName: string,
+	instanceSegment: (componentEdgeId: string) => string,
+): Array<{ readonly componentEdgeId: string; readonly instancePath: string }> {
+	const byId = new Map(chunks.map((chunk) => [chunk.id, chunk]));
+	const found: Array<{ componentEdgeId: string; instancePath: string }> = [];
+	// A self-composing component's projection chunks reach themselves; how deep it
+	// unrolls is a render-time answer, so the build-time walk visits each once.
+	const walked = new Set<string>();
+	const walk = (
+		chunkId: string,
+		chain: ReadonlyArray<{ componentEdgeId: string; instancePath: string }>,
+	): boolean => {
+		if (walked.has(chunkId)) return false;
+		walked.add(chunkId);
+		for (const slot of byId.get(chunkId)?.slots ?? []) {
+			if (slot.kind === 'text' && isOwnChildrenResidue(slot.residue)) {
+				found.push(...chain);
+				return true;
+			}
+			if (slot.kind !== 'child-component' || !slot.projectionChunkId) continue;
+			const instancePath =
+				(chain[chain.length - 1]?.instancePath ?? '') + instanceSegment(slot.componentEdgeId);
+			if (walk(slot.projectionChunkId, [...chain, { componentEdgeId: slot.componentEdgeId, instancePath }]))
+				return true;
+		}
+		return false;
+	};
+	for (const chunk of chunks)
+		if (chunk.componentName === componentName && chunk.kind === 'template' && walk(chunk.id, []))
+			break;
+	return found;
+}
+
+// The one slot that renders a component's own `children` prop, raw.
+function isOwnChildrenResidue(residue: { readonly kind: string }): boolean {
+	const read = residue as { kind: string; graphNodeId?: string; path?: ReadonlyArray<string> };
+	return (
+		read.kind === 'graph-read' &&
+		read.graphNodeId === 'prop:props' &&
+		read.path?.length === 1 &&
+		read.path[0] === 'children'
+	);
+}
+
+/**
+ * How a composing module learns where a placed child's own composition puts the
+ * children written into it: the marker answers the instance path of the widget
+ * root that encloses them, or the empty string when no composed root does. The
+ * families each link roots are asked at module load, once, from the same marker
+ * the boundary check reads — so nothing is sensed at render time.
+ */
+export function childrenWidgetRootMarkerLine(
+	chain: ReadonlyArray<{
+		readonly instancePath: string;
+		readonly surfaceArgs: string | undefined;
+	}>,
+	functionName: string,
+): string | null {
+	const links = chain.flatMap((link) =>
+		link.surfaceArgs
+			? [`marklessSsrWidgetRoots(${link.surfaceArgs}).length?${JSON.stringify(link.instancePath)}:`]
+			: [],
+	);
+	// Innermost first: the nearest composed root is the one that owns the parts.
+	return links.length > 0
+		? `${functionName}.marklessChildrenWidgetRoot = ${[...links].reverse().join('')}'';`
+		: null;
+}
+
+/**
  * The component that ROOTS each widget-scoped shared definition of this module:
  * the one whose payload owns the definition's cells, so every rendered instance
  * of it starts a widget instance of its own. The seeding component roots it —

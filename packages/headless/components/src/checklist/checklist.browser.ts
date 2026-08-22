@@ -1,8 +1,11 @@
-// Pinned at suite level: the QDS one-element anatomy does not run yet -
-// MARKLESS_ELEMENT_HANDLE_WIDGET_INSTANCE_MISSING: projected children keep the
-// consumer-site instance path, so a part-composed family root (c0:c0:) is not a
-// prefix of the projected trigger's path (c0:p1:c0:). Un-skipped when the
-// projection-identity ruling lands. See note.md.
+// Pinned at suite level, on a DIFFERENT fault than before. T071 landed widget
+// resolution through composition: the anatomy now renders, every part resolves
+// to the checkbox root `checklist.root` composed, and each item's trigger and
+// label agree on one minted id. What still stops every row is that a spread onto
+// a COMPONENT tag contributes no edge prop, so `{...rest}` never crosses
+// `<checklist.root>` -> `<CheckboxRoot>` and no consumer attribute (starting with
+// every `data-testid` these locators name) reaches the DOM. Two further gaps are
+// pinned row-level in projection-into-composed-root.test.ts. See note.md.
 import { render, renderSSR } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';

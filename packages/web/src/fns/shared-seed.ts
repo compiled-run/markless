@@ -24,9 +24,10 @@ const seedProjectingChild: SharedSeedPass = async (
 	// Static registration before descent: the projecting child's own instance
 	// names the widget its parts belong to, so a part's minted element() id can
 	// carry which rendered widget it is part of.
+	const base = context.idPrefix + (context.rowSegment ?? '') + rootEdge.symbolPrefix;
 	const seeded = new Map(inherited ?? []).set(
 		MARKLESS_WIDGET_INSTANCE_KEY,
-		context.idPrefix + (context.rowSegment ?? '') + rootEdge.symbolPrefix,
+		base + childrenWidgetRootPath(context.surface, rootEdge.childComponentName),
 	);
 	// U-H: every part of this widget instance contributes before any part
 	// renders, so a seed a part writes is what its siblings read whatever the
@@ -59,6 +60,52 @@ function widgetRootsOf(surface: PrerenderDataSurface, componentName: string): st
 		[...owned].some((graphNodeId) => graphNodeId.startsWith(definition.id + '/'))
 			? [definition.id]
 			: [],
+	);
+}
+
+// Where a component's own `children` land inside ITS composition: the instance
+// path of the innermost composed child that both encloses the projection and
+// roots a widget. Composition placed those children there, so the parts written
+// into them belong to that root, not to the component the consumer wrote.
+function childrenWidgetRootPath(surface: PrerenderDataSurface, componentName: string): string {
+	const own = surface.components[componentName] ? surface : surface.imports[componentName];
+	const definition = own?.components[componentName];
+	if (!own || !definition) return '';
+	const chunks = own.renderData.chunks.filter((chunk) => chunk.componentName === componentName);
+	const byId = new Map(chunks.map((chunk) => [chunk.id, chunk]));
+	const edges = definition.edges ?? [];
+	let path = '';
+	let found = '';
+	const walk = (chunkId: string): boolean => {
+		const chunk = byId.get(chunkId);
+		if (!chunk) return false;
+		for (const slot of chunk.slots) {
+			if (slot.kind === 'text' && isOwnChildrenResidue(slot.residue)) return true;
+			if (slot.kind !== 'child-component' || !slot.projectionChunkId) continue;
+			const edge = edges.find((candidate) => candidate.id === slot.componentEdgeId);
+			if (!edge) continue;
+			const before = path;
+			path += edge.symbolPrefix;
+			if (walk(slot.projectionChunkId)) {
+				if (widgetRootsOf(own, edge.childComponentName).length > 0) found = path;
+				return true;
+			}
+			path = before;
+		}
+		return false;
+	};
+	for (const chunk of chunks) if (chunk.kind === 'template' && walk(chunk.id)) break;
+	return found;
+}
+
+// The one slot that renders the component's own `children` prop, raw.
+function isOwnChildrenResidue(residue: { readonly kind: string; readonly [key: string]: unknown }) {
+	return (
+		residue.kind === 'graph-read' &&
+		residue.graphNodeId === 'prop:props' &&
+		Array.isArray(residue.path) &&
+		residue.path.length === 1 &&
+		residue.path[0] === 'children'
 	);
 }
 
