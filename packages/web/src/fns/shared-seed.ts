@@ -26,20 +26,111 @@ const seedProjectingChild: SharedSeedPass = async (
 	// names the widget its parts belong to, so a part's minted element() id can
 	// carry which rendered widget it is part of.
 	const base = context.idPrefix + (context.rowSegment ?? '') + rootEdge.symbolPrefix;
-	const seeded = new Map(inherited ?? []).set(
-		MARKLESS_WIDGET_INSTANCE_KEY,
-		base + childrenWidgetRootPath(context.surface, rootEdge.childComponentName),
+	const chain = childrenProjectionChain(context.surface, rootEdge.childComponentName);
+	const composedRoot = chain.map((link) => link.edge.symbolPrefix).join('');
+	const seeded = new Map(inherited ?? []).set(MARKLESS_WIDGET_INSTANCE_KEY, base + composedRoot);
+	await applySharedSeeds(context, context.surface, context.symbolPrefix, rootEdge, read, seeded);
+	// The composed roots the child's own composition put this widget's parts
+	// inside seed the same instance, so they run before any part does.
+	await applyComposedChainSeeds(
+		context,
+		chain,
+		rootEdge,
+		context.symbolPrefix + rootEdge.symbolPrefix,
+		edgeChildProps(context, rootEdge, read),
+		seeded,
 	);
 	// U-H: every part of this widget instance contributes before any part
 	// renders, so a seed a part writes is what its siblings read whatever the
 	// document order.
-	for (const edge of [
-		rootEdge,
-		...projectedEdges(context.surface, definition, componentEdgeId, read),
-	])
-		await applySharedSeeds(context, edge, read, seeded);
+	for (const edge of projectedEdges(context.surface, definition, componentEdgeId, read))
+		await applySharedSeeds(context, context.surface, context.symbolPrefix, edge, read, seeded);
 	return seeded;
 };
+
+/**
+ * The composed roots between a placed child's own template and the slot that
+ * renders its `children`, innermost last. Each link's seeds belong to the widget
+ * instance the parts read, so they run in the LINK OWNER's scope: its props, and
+ * the derives its module already emitted. A prop like `checked={group.allChecked}`
+ * is a computed read, so the scope evaluates the same staged reads the render
+ * would — no seed-time derive of its own.
+ */
+async function applyComposedChainSeeds(
+	context: SeedContext,
+	chain: ReadonlyArray<ChainLink>,
+	rootEdge: SeedEdge,
+	symbolPrefix: string,
+	props: Record<string, unknown>,
+	seeded: Map<string, unknown>,
+): Promise<void> {
+	let ownerProps = props;
+	let ownerPrefix = symbolPrefix;
+	let ownerEdge = rootEdge;
+	for (const link of chain) {
+		const read = await composedScopeRead(
+			context,
+			link.definition,
+			ownerEdge,
+			ownerPrefix,
+			ownerProps,
+			seeded,
+		);
+		await applySharedSeeds(context, link.surface, ownerPrefix, link.edge, read, seeded);
+		ownerProps = edgeChildProps(context, link.edge, read);
+		ownerPrefix += link.edge.symbolPrefix;
+		ownerEdge = link.edge;
+	}
+}
+
+/**
+ * One composing component's own scope at seed time: its props answer directly,
+ * and every value its module emitted an initial for is evaluated here, in the
+ * order the module emitted them, exactly as the render evaluates them. A shared
+ * instance the composing body already seeded answers from the seed map, so a
+ * derive over it reads the seeded value rather than the factory placeholder.
+ */
+async function composedScopeRead(
+	context: SeedContext,
+	definition: PrerenderDataDefinition,
+	edge: SeedEdge,
+	symbolPrefix: string,
+	props: Record<string, unknown>,
+	seeded: ReadonlyMap<string, unknown>,
+): Promise<PrerenderReadSeed> {
+	const values = new Map<string, unknown>();
+	const read: PrerenderReadSeed = (graphNodeId, path = []) =>
+		readPath(
+			graphNodeId === definition.propCellId || graphNodeId === 'prop:props'
+				? props
+				: graphNodeId.startsWith('prop:')
+					? props[graphNodeId.slice(5)]
+					: seeded.has(graphNodeId)
+						? seeded.get(graphNodeId)
+						: values.get(graphNodeId),
+			path,
+		);
+	for (const initial of definition.initialValues ?? []) {
+		// A shared seed is this widget's own value, already written by the seed pass.
+		if (definition.initialValueKinds?.[initial.graphNodeId] === 'shared-seed') continue;
+		if (initial.value.kind === 'constant') {
+			values.set(initial.graphNodeId, structuredClone(initial.value.value));
+			continue;
+		}
+		if (initial.value.kind !== 'symbol-function') continue;
+		const loaded = await context.loadSymbol(
+			edge.boundSymbols?.[initial.value.symbolId] ?? symbolPrefix + initial.value.symbolId,
+		);
+		// A derive this build did not publish leaves the node unseeded rather than
+		// failing the render: the composed root still gets every prop that resolved.
+		if (typeof loaded !== 'function') continue;
+		values.set(
+			initial.graphNodeId,
+			loaded.length > 0 ? await loaded({ graph: { read }, read }) : await loaded(),
+		);
+	}
+	return read;
+}
 
 /**
  * The widget-scoped families a placed child ROOTS: the definitions whose cells
@@ -64,19 +155,35 @@ function widgetRootsOf(surface: PrerenderDataSurface, componentName: string): st
 	);
 }
 
-// Where a component's own `children` land inside ITS composition: the instance
-// path of the innermost composed child that both encloses the projection and
-// roots a widget. Composition placed those children there, so the parts written
-// into them belong to that root, not to the component the consumer wrote.
-function childrenWidgetRootPath(surface: PrerenderDataSurface, componentName: string): string {
+/**
+ * One composed edge on the way from a component's own template down to the slot
+ * that renders its `children`, with the surface and definition that DECLARED it
+ * — the scope its props are written in.
+ */
+type ChainLink = {
+	readonly edge: SeedEdge;
+	readonly surface: PrerenderDataSurface;
+	readonly definition: PrerenderDataDefinition;
+	readonly rootsWidget: boolean;
+};
+
+// Where a component's own `children` land inside ITS composition: the composed
+// children that enclose the projection, outermost first, truncated at the
+// innermost one that roots a widget. Composition placed those children there, so
+// the parts written into them belong to that root, not to the component the
+// consumer wrote, and every link's seeds are that instance's own.
+function childrenProjectionChain(
+	surface: PrerenderDataSurface,
+	componentName: string,
+): ChainLink[] {
 	const own = surface.components[componentName] ? surface : surface.imports[componentName];
 	const definition = own?.components[componentName];
-	if (!own || !definition) return '';
+	if (!own || !definition) return [];
 	const chunks = own.renderData.chunks.filter((chunk) => chunk.componentName === componentName);
 	const byId = new Map(chunks.map((chunk) => [chunk.id, chunk]));
 	const edges = definition.edges ?? [];
-	let path = '';
-	let found = '';
+	const chain: ChainLink[] = [];
+	let found: ChainLink[] = [];
 	const walk = (chunkId: string): boolean => {
 		const chunk = byId.get(chunkId);
 		if (!chunk) return false;
@@ -84,19 +191,41 @@ function childrenWidgetRootPath(surface: PrerenderDataSurface, componentName: st
 			if (slot.kind === 'text' && isOwnChildrenResidue(slot.residue)) return true;
 			if (slot.kind !== 'child-component' || !slot.projectionChunkId) continue;
 			const edge = edges.find((candidate) => candidate.id === slot.componentEdgeId);
-			if (!edge) continue;
-			const before = path;
-			path += edge.symbolPrefix;
+			if (!edge || edge.materialized) continue;
+			const owner = chain[chain.length - 1];
+			const ownerSurface = owner
+				? childSurfaceOf(owner.surface, owner.edge.childComponentName)
+				: own;
+			const ownerDefinition = owner
+				? ownerSurface?.components[owner.edge.childComponentName]
+				: definition;
+			if (!ownerSurface || !ownerDefinition) continue;
+			chain.push({
+				edge,
+				surface: ownerSurface,
+				definition: ownerDefinition,
+				rootsWidget: widgetRootsOf(ownerSurface, edge.childComponentName).length > 0,
+			});
 			if (walk(slot.projectionChunkId)) {
-				if (widgetRootsOf(own, edge.childComponentName).length > 0) found = path;
+				const rooted = chain.map((link) => link.rootsWidget).lastIndexOf(true);
+				if (rooted >= 0) found = chain.slice(0, rooted + 1);
 				return true;
 			}
-			path = before;
+			chain.pop();
 		}
 		return false;
 	};
 	for (const chunk of chunks) if (chunk.kind === 'template' && walk(chunk.id)) break;
 	return found;
+}
+
+// The surface that publishes a placed child: its own module when the child is
+// declared there, otherwise the module it was imported from.
+function childSurfaceOf(
+	surface: PrerenderDataSurface,
+	componentName: string,
+): PrerenderDataSurface | undefined {
+	return surface.components[componentName] ? surface : surface.imports[componentName];
 }
 
 // The one slot that renders the component's own `children` prop, raw.
@@ -204,22 +333,12 @@ function takenArm(
 	return match >= 0 ? match : armTests.indexOf(null);
 }
 
-async function applySharedSeeds(
+// What one component edge hands its child, read in the scope that declared it.
+function edgeChildProps(
 	context: SeedContext,
 	edge: SeedEdge,
-	read: Parameters<SharedSeedPass>[3],
-	seeded: Map<string, unknown>,
-): Promise<void> {
-	const surface = context.surface;
-	const child = (
-		surface.components[edge.childComponentName] ? surface : surface.imports[edge.childComponentName]
-	)?.components[edge.childComponentName];
-	const initials = child?.initialValues ?? [];
-	const seeds = initials.filter(
-		(initial) => child?.initialValueKinds?.[initial.graphNodeId] === 'shared-seed',
-	);
-	if (!child || seeds.length === 0) return;
-
+	read: PrerenderReadSeed,
+): Record<string, unknown> {
 	const childProps: Record<string, unknown> = {};
 	for (const prop of edge.props) {
 		if (prop.kind === 'spread' && prop.graphNodeId) {
@@ -235,6 +354,27 @@ async function applySharedSeeds(
 			childProps[prop.name] = context.readEdgeProp(prop);
 		}
 	}
+	return childProps;
+}
+
+async function applySharedSeeds(
+	context: SeedContext,
+	surface: PrerenderDataSurface,
+	symbolPrefix: string,
+	edge: SeedEdge,
+	read: PrerenderReadSeed,
+	seeded: Map<string, unknown>,
+): Promise<void> {
+	const child = childSurfaceOf(surface, edge.childComponentName)?.components[
+		edge.childComponentName
+	];
+	const initials = child?.initialValues ?? [];
+	const seeds = initials.filter(
+		(initial) => child?.initialValueKinds?.[initial.graphNodeId] === 'shared-seed',
+	);
+	if (!child || seeds.length === 0) return;
+
+	const childProps = edgeChildProps(context, edge, read);
 	const readSeed: PrerenderReadSeed = (graphNodeId, path = []) =>
 		readPath(
 			graphNodeId === child.propCellId || graphNodeId === 'prop:props'
@@ -256,7 +396,7 @@ async function applySharedSeeds(
 		// identity, never its symbol id, which routes match as a compile-time literal.
 		const loaded = await context.loadSymbol(
 			edge.boundSymbols?.[initial.value.symbolId] ??
-				context.symbolPrefix + edge.symbolPrefix + initial.value.symbolId,
+				symbolPrefix + edge.symbolPrefix + initial.value.symbolId,
 		);
 		if (typeof loaded !== 'function')
 			throw new Error(`MARKLESS_PRERENDER_DATA_SYMBOL_MISSING: ${initial.value.symbolId}`);

@@ -60,13 +60,33 @@ wrote, so the suite stays pinned at suite level until the spread reaches the
 edge. This is the same gap as limit 1 below, now measured as blocking the whole
 anatomy rather than only forwarded events and handles.
 
-Two adjacent gaps are pinned row-level in the framework witness, both of them
-about what the chain does NOT yet carry:
+## What T073 changed
 
-  * a composed root's own seed never runs, because the seed pass stops at the
-    child the consumer wrote instead of descending the chain it now declares;
-  * a keyed row's composed widget is not row-scoped, so two rows share one
-    instance even though their minted ids differ.
+The composed root's own seed now runs. The CSR seed pass descends the same
+children-projection chain the widget token follows, and runs each link's seeds in
+THAT link owner's scope: its props, plus every value its module already emitted an
+initial for, evaluated in the emitted order exactly as the render evaluates them.
+That is the computed reader this family was waiting for — `checked=
+{checklist.allChecked}` and `checked={checklist.value.includes(item.value)}` both
+resolve, with no seed-time derive of their own and no new emission kind. The
+group's shared cells are seeded by `<checklist.root>`'s own seeds first, so the
+derive over them reads seeded values, not the factory placeholder: acyclic.
+
+Eighteen rows of this suite and two screen-reader rows flipped with it.
+
+One gap is still pinned row-level, on a NEW named defect measured here: **a part
+is a SIBLING of the widget root its composition placed it in.** Inside a keyed
+`@for`, a row's parts sit at `r:<key>:c0:p1:` while the checkbox root the row's
+child composed sits at `r:<key>:c0:c0:`, and the widget lookup only walks
+PREFIXES of the part's own path, so every row falls back to one unprefixed shared
+id. Two halves are needed and both were measured on this branch: a widget id that
+already names its root has to keep taking the instance path when it is composed
+again (otherwise both rows' roots collapse onto `c0:shared:...` whatever the
+lookup answers), and the projecting child's declared chain has to be registered as
+the answer for its siblings. Landing only the CSR half turns the SSR-resume row
+red, because the compiler's emitted SSR seed pass registers no such answer and the
+two sides then disagree about which node a part reads. The witness and both halves
+are written up in `packages/vitest-browser/browser/projection-into-composed-root.test.ts`.
 
 ## Framework limits this family ran into
 
