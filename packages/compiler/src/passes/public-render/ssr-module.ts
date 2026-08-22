@@ -96,12 +96,13 @@ export function emitPublicSsrRenderModule(
 	const remapsGraphProps = hasPropDependentComputed(input);
 	const internalGraphProps = composedGraphProps(input);
 	const remapsInternalGraphProps = remapsGraphProps && internalGraphProps.length > 0;
-	const dataRenderLines = emitSsrDataRenderLines(input, rootInfo.componentName, references);
+	const rootDataLines = emitSsrDataLines(input, rootInfo.componentName, references);
+	const dataRenderLines = rootDataLines.render;
 	const sameModuleComponents = emitSameModuleSsrComponents(
 		input,
 		references,
 		rootInfo.componentName,
-		(componentName) => emitSsrDataRenderLines(input, componentName, references),
+		(componentName) => emitSsrDataLines(input, componentName, references),
 	);
 	// Each component seeds only the payload nodes it declares; a module with no
 	// same-module child owns every node, so it emits no selection at all.
@@ -123,6 +124,15 @@ export function emitPublicSsrRenderModule(
 		...sharedSeedPassLines(
 			componentSharedSeeds(input, rootInfo.componentName),
 			'marklessSsrStateValues',
+			ssrSeedForwardBlockLines(
+				input,
+				rootInfo,
+				'marklessSsrStateValues',
+				ownedNodes === undefined
+					? 'marklessCloneState(payloadState)'
+					: `marklessSelectStateNodes(marklessCloneState(payloadState), ${JSON.stringify(ownedNodes.cellIndexes)}, ${JSON.stringify(ownedNodes.computedIndexes)})`,
+				rootDataLines.seedForward,
+			),
 		),
 		// A module that composes no same-module child owns every payload node, so
 		// it keeps the whole clone and emits no selection list.
@@ -183,10 +193,12 @@ export function emitPublicSsrRenderModule(
 		sharedSeedMarkerLine(
 			componentSharedSeeds(input, rootInfo.componentName),
 			'marklessRenderSsr',
+			rootDataLines.seedForward,
 		),
 		widgetRootMarkerLine(
 			widgetRootDefinitionIds(input, rootInfo.componentName),
 			'marklessRenderSsr',
+			rootDataLines.composedRootSurfaceArgs,
 		),
 		...childrenWidgetRootMarkerLines(input, references, [
 			[rootInfo.componentName, 'marklessRenderSsr'],
@@ -338,15 +350,58 @@ function rowScopedEdgeIds(
 	return edgeIds;
 }
 
-function emitSsrDataRenderLines(
+/**
+ * What one component contributes to the emitted SSR function: the render lines
+ * and, for a component whose own children sit inside a composed widget root,
+ * the lines its seed phase runs so that root is seeded before those children
+ * render.
+ */
+export type SsrDataLines = {
+	readonly render: string[];
+	readonly seedForward: string[];
+	/** The composed children-root child surfaces, for this component's widget-root marker. */
+	readonly composedRootSurfaceArgs: string[];
+};
+
+/**
+ * The seed-phase body for a component whose own children sit inside a widget
+ * root it composes. It runs the component body the render runs - the state
+ * declarations and shared seeds the derives read - and ends by handing that
+ * root the same props the render hands it, so the parts the consumer already
+ * placed read a seeded instance rather than the factory placeholder.
+ */
+export function ssrSeedForwardBlockLines(
+	input: PublicRenderModuleInput,
+	rootInfo: PublicRenderRoot,
+	valuesName: string,
+	payloadStateExpression: string,
+	seedForward: ReadonlyArray<string>,
+): string[] {
+	if (seedForward.length === 0) return [];
+	return [
+		`		const marklessSsrPayloadState = ${payloadStateExpression};`,
+		`		const marklessSsrRenderStateValues = new Map(${valuesName});`,
+		'		for (const [marklessSeedId, marklessSeedValue] of marklessSsrSeeds) marklessSsrRenderStateValues.set(marklessSeedId, marklessSeedValue);',
+		...renderBodyLines(
+			input,
+			rootInfo,
+			'marklessStateValue',
+			'marklessSsrRenderStateValues',
+			'marklessSsrPayloadState',
+			seedForward,
+		),
+	];
+}
+
+function emitSsrDataLines(
 	input: PublicRenderModuleInput,
 	componentName: string,
 	references: ReadonlyArray<{ readonly componentName: string; readonly localName: string }>,
-): string[] {
+): SsrDataLines {
 	const rowScopedEdges = rowScopedEdgeIds(input.renderData.chunks);
 	const chunks = input.renderData.chunks.filter((chunk) => chunk.componentName === componentName);
-	const componentGraphNodeIds = new Set(
-		chunks.flatMap((chunk) =>
+	const componentGraphNodeIds = new Set([
+		...chunks.flatMap((chunk) =>
 			chunk.slots.flatMap((slot) => {
 				const residueIds =
 					'residue' in slot && slot.residue.kind === 'graph-read'
@@ -364,7 +419,20 @@ function emitSsrDataRenderLines(
 					: residueIds;
 			}),
 		),
-	);
+		// A node this component reads ONLY to hand to the child it composes is
+		// still read by this render: without it the child is composed from the
+		// factory placeholder rather than from what this body just seeded. Row
+		// -scoped edges stay out - their props read locals only the row has.
+		...componentEdgesFor(input, componentName).flatMap((edge) =>
+			rowScopedEdges.has(edge.id)
+				? []
+				: edge.props.flatMap((prop) =>
+						prop.kind === 'graph-reference' || prop.kind === 'spread'
+							? [prop.graphNodeId]
+							: [],
+					),
+		),
+	]);
 	const residueSources = authoredResidueSources(chunks);
 	const repeats = input.semanticGraph.keyedRepeats;
 	const localLines = [
@@ -723,7 +791,42 @@ function emitSsrDataRenderLines(
 			? [`marklessSsrRenderStateValues.set(${JSON.stringify(initial.graphNodeId)},(${source})());`]
 			: [];
 	});
-	return [
+	// The composed child that encloses this component's own children roots the
+	// widget those children resolve. It is composed during THIS component's
+	// render, which happens after the consumer already rendered them, so the
+	// seed phase forwards the same props to it before any part renders.
+	const childrenRootEdgeIds = childrenProjectionChain(
+		input.renderData.chunks,
+		componentName,
+		(edgeId) =>
+			componentEdgeInstanceSegment(
+				input.semanticGraph.componentEdges.find((edge) => edge.id === edgeId),
+				input.semanticGraph.componentEdges,
+			),
+	).map((link) => link.componentEdgeId);
+	const composedRootEdgeIds = childrenRootEdgeIds.filter((edgeId) => !rowScopedEdges.has(edgeId));
+	const seedForward = composedRootEdgeIds.flatMap((edgeId) => {
+		const block = seedBlockByEdgeId.get(edgeId);
+		return block ? [block] : [];
+	});
+	const composedRootSurfaceArgs = composedRootEdgeIds.flatMap((edgeId) => {
+		const args = childSurfaceArgsByEdgeId.get(edgeId);
+		return args ? [args] : [];
+	});
+	const seedForwardLines =
+		seedForward.length === 0
+			? []
+			: [
+					"marklessSsrRenderStateValues.set('prop:props',props);",
+					...bindingLines,
+					...sharedComputedLines,
+					...templateComputedLines,
+					...seedForward,
+				];
+	return {
+		seedForward: seedForwardLines,
+		composedRootSurfaceArgs,
+		render: [
 		"marklessSsrRenderStateValues.set('prop:props',props);",
 		...bindingLines,
 		...sharedComputedLines,
@@ -739,5 +842,6 @@ function emitSsrDataRenderLines(
 				? `seedChild:async(marklessSsrDataSlot,marklessSsrDataContext)=>{const marklessSsrSeeds=new Map(marklessSsrDataContext.sharedSeeds??[]);${localLines.join('')}switch(marklessSsrDataSlot.componentEdgeId){${seedCases.join('')}}return marklessSsrSeeds;},`
 				: ''
 		}renderChild:async(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.componentEdgeId){${childCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_CHILD_MISSING: '+marklessSsrDataSlot.componentEdgeId);}}});`,
-	];
+		],
+	};
 }
