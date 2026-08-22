@@ -29,6 +29,10 @@ export type SharedSeedPass = (
 		readonly symbolPrefix: string;
 		readonly idPrefix: string;
 		readonly loadSymbol: (symbolId: string) => unknown | Promise<unknown>;
+		// The keyed `@for` row this phase seeds for; empty outside a repeat.
+		readonly rowSegment?: string;
+		// Answers a root prop left as an authored expression, with this row in scope.
+		readonly readEdgeProp?: (prop: { readonly source?: string }) => unknown;
 	},
 	definition: PrerenderDataDefinition,
 	componentEdgeId: string,

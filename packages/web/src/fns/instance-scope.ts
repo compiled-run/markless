@@ -8,11 +8,25 @@ import type { ResumeArmRecordSet, ResumeSymbol, ResumeSymbolContext } from '../r
 // bundler's symbol route, the dev harness, a test's own loadSymbol — recovers
 // the instance from the id it was asked for. INSTANCE_PATH restates the
 // serializer's grammar; composed-page-space.test.ts keeps the two in step.
-const INSTANCE_PATH = /^(?:[cp]\d+:)+/;
+const INSTANCE_PATH = /^(?:[cp]\d+:|r:[^:]*:)+/;
 
 // The one reading of a prefix as an instance path; host-minted prefixes (router `m<n>:`) are not one.
 export function marklessInstancePath(prefix: string | undefined): string {
 	return (prefix && INSTANCE_PATH.exec(prefix)?.[0]) || '';
+}
+
+const ROW_SEGMENT = /r:[^:]*:/g;
+
+// Restates protocolRowSegment for the reason INSTANCE_PATH restates the grammar.
+export function marklessRowSegment(key: unknown): string {
+	return `r:${encodeURIComponent(String(key))}:`;
+}
+
+// Row segments are runtime identity, so no route literal or symbol table holds one.
+export function marklessRowFreeSymbolId(symbolId: string, instancePath?: string): string {
+	const path = instancePath ?? INSTANCE_PATH.exec(symbolId)?.[0] ?? '';
+	if (!path.includes('r:')) return symbolId;
+	return path.replace(ROW_SEGMENT, '') + symbolId.slice(path.length);
 }
 
 // A symbol loaded through the child's own composed loader already answers in
@@ -30,7 +44,8 @@ export function marklessInstanceScopedLoadSymbol(
 	return (symbolId: string) => {
 		const instancePath = INSTANCE_PATH.exec(symbolId)?.[0];
 		if (!instancePath) return loadSymbol(symbolId);
-		const loaded = loadSymbol(symbolId);
+		// The row is consumed here and re-applied below as graph scope.
+		const loaded = loadSymbol(marklessRowFreeSymbolId(symbolId, instancePath));
 		return typeof (loaded as Promise<ResumeSymbol>)?.then === 'function'
 			? (loaded as Promise<ResumeSymbol>).then((symbol) => scopeSymbol(symbol, instancePath))
 			: scopeSymbol(loaded as ResumeSymbol, instancePath);
@@ -88,7 +103,7 @@ export function marklessInstanceScopedGraph(
 // Mirrors PROTOCOL_PAGE_SPACE_ID_PREFIXES, past any instance path a nested
 // compose already applied; composed-page-space.test.ts keeps the two in step so
 // the browser never imports the serializer's protocol module.
-const PAGE_SPACE_ID = /^(?:[cp]\d+:)*(?:shared|storage):/;
+const PAGE_SPACE_ID = /^(?:[cp]\d+:|r:[^:]*:)*(?:shared|storage):/;
 
 // Widget-scoped shared() definitions are the one page-space family that is NOT
 // page-wide: one graph per rendered widget, keyed by the instance path of the

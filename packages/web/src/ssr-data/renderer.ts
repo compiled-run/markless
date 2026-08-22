@@ -93,6 +93,7 @@ export type SsrRenderData = {
 		readonly repeatId: string;
 		readonly collectionGraphNodeId?: string;
 		readonly collectionPath?: ReadonlyArray<string>;
+		readonly keyPath?: ReadonlyArray<string>;
 		readonly rowChunkId: string;
 		readonly emptyChunkId?: string;
 	}>;
@@ -120,6 +121,8 @@ export type SsrDataReadContext = {
 	readonly chunkId: string;
 	readonly repeatItem?: unknown;
 	readonly repeatIndex?: number;
+	// The row's authored key, so a child composed inside it takes its own identity.
+	readonly repeatKey?: unknown;
 	readonly asyncError?: unknown;
 	readonly projectionHtml?: string;
 	readonly sharedSeeds?: ReadonlyMap<string, unknown>;
@@ -243,7 +246,7 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 		chunkId: string,
 		// The async-arm path forwards the caller's read context; only item/index
 		// are read here.
-		repeat: { readonly item?: unknown; readonly index?: number } & Partial<SsrDataReadContext>,
+		repeat: { readonly item?: unknown; readonly index?: number; readonly key?: unknown } & Partial<SsrDataReadContext>,
 	): Promise<RenderedPart> {
 		const chunk = chunks.get(chunkId);
 		if (!chunk) throw new Error(`MARKLESS_SSR_DATA_CHUNK_MISSING: ${chunkId}`);
@@ -270,6 +273,7 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 					chunkId,
 					...(repeat.item !== undefined ? { repeatItem: repeat.item } : {}),
 					...(repeat.index !== undefined ? { repeatIndex: repeat.index } : {}),
+					...(repeat.key !== undefined ? { repeatKey: repeat.key } : {}),
 					sharedSeeds: repeat.sharedSeeds,
 				};
 				const renderedSlot = await renderSlot(slot, context);
@@ -308,8 +312,12 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 				return { html: renderSpreadAttributes(await input.read(slot.residue, context), slot.excludeNames), tokens: [] };
 			case 'child-component': {
 				anchors.push(anchorRecord(idPrefix, context.chunkId, slot, slot.componentEdgeId));
+				// A projection renders inside the row that placed it, so the row travels with it.
 				const projection = slot.projectionChunkId
 					? await renderChunk(slot.projectionChunkId, {
+							item: context.repeatItem,
+							index: context.repeatIndex,
+							key: context.repeatKey,
 							sharedSeeds: await input.seedChild?.(slot, context),
 						})
 					: undefined;
@@ -379,7 +387,16 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 						: [];
 				if (!Array.isArray(items) || items.length === 0)
 					return slot.emptyTemplateId ? renderChunk(slot.emptyTemplateId, {}) : { html: '', tokens: [] };
-				const rows = await Promise.all(items.map((item, index) => renderChunk(slot.rowTemplateId, { item, index })));
+				const keyPath = record?.keyPath;
+				const rows = await Promise.all(
+					items.map((item, index) =>
+						renderChunk(slot.rowTemplateId, {
+							item,
+							index,
+							...(keyPath?.length ? { key: readValuePath(item, keyPath) } : {}),
+						}),
+					),
+				);
 				return { html: rows.map((row) => row.html).join(''), tokens: rows.flatMap((row) => row.tokens) };
 			}
 			case 'async': {
@@ -447,6 +464,15 @@ function commentToken(
 	anchorHtml?: string,
 ): StructureToken {
 	return { kind: 'comment', anchorKind, anchorId, edge, ...(anchorHtml === undefined ? {} : { anchorHtml }) };
+}
+
+function readValuePath(value: unknown, path: ReadonlyArray<string>): unknown {
+	let current = value;
+	for (const segment of path) {
+		if (current === null || current === undefined) return undefined;
+		current = (current as Record<string, unknown>)[segment];
+	}
+	return current;
 }
 
 function comparePath(left: ReadonlyArray<number>, right: ReadonlyArray<number>): number {
