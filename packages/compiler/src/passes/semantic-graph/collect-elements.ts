@@ -18,7 +18,6 @@ import type {
 	SemanticElementHandleBinding,
 	SemanticGraphDiagnostic,
 	SemanticGraphBinding,
-	SemanticGraphDependency,
 	SemanticTemplateBindingTarget,
 	SourceSpan,
 } from '../../artifacts.ts';
@@ -28,6 +27,12 @@ import {
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
 import { collectComponentEdge } from './collect-components.ts';
+import {
+	collectCompositeTemplateExpression,
+	joinReadSources,
+	mintTemplateExpressionComputed,
+	pureCompositeReadSources,
+} from './composite-reads.ts';
 import { collectExpressionReads, resolvedSymbolAt } from './collect-expressions.ts';
 import {
 	extractSyncPolicy,
@@ -173,165 +178,6 @@ function textExpressionTarget(
 
 function isStaticTextPart(node: AnyNode): boolean {
 	return node.type === 'JSXText' || node.type === 'Literal';
-}
-
-function collectCompositeTemplateExpression(
-	node: AnyNode,
-	state: WalkState,
-	options: { readonly requireWritableRead?: boolean } = {},
-): { readonly graphNodeId: string } | null {
-	if (!isCompositeTemplateExpression(node)) return null;
-
-	const readSources = pureCompositeReadSources(node, state);
-	if (!readSources) return null;
-
-	return mintTemplateExpressionComputed(
-		`() => ${expressionSource(node, state.source)}`,
-		readSources,
-		state,
-		options.requireWritableRead === true,
-	);
-}
-
-/**
- * Mints the synthetic computed that stands behind one recombined expression, so
- * every graph read inside it wakes a single DOM update instead of none.
- */
-function mintTemplateExpressionComputed(
-	functionSource: string,
-	readSources: ReadonlyArray<string>,
-	state: WalkState,
-	requireWritableRead = false,
-): { readonly graphNodeId: string } | null {
-	const bindings = graphBindingMap(state.graph, state.currentSharedDefinitionId);
-	const aliases = semanticAliasMap(state.graph, state.currentSharedDefinitionId);
-	const dependencies: SemanticGraphDependency[] = [];
-	let readsGraphCell = false;
-	for (const source of readSources) {
-		// Component scope first: a factory local and the instance local routinely collide.
-		const resolved =
-			resolveGraphPath(source, bindings, aliases) ??
-			resolveSharedInstanceGraphPath(source, state.graph);
-		if (!resolved) return null;
-		if (
-			resolved.binding.kind !== 'state' &&
-			resolved.binding.kind !== 'computed' &&
-			resolved.binding.kind !== 'prop'
-		) {
-			return null;
-		}
-		if (resolved.binding.kind !== 'prop') readsGraphCell = true;
-		dependencies.push({ source, graphNodeId: resolved.binding.id, path: resolved.path });
-	}
-	if (dependencies.length === 0) return null;
-	// No write can move a prop after the render that read it, so props-only owes no record.
-	if (requireWritableRead && !readsGraphCell) return null;
-
-	const index = state.graph.graphBindings.filter((binding) =>
-		binding.id.startsWith('computed:templateExpression:'),
-	).length;
-	const graphNodeId = `computed:templateExpression:${index}`;
-	state.graph.graphBindings.push({
-		id: graphNodeId,
-		name: `marklessTemplateExpression${index}`,
-		kind: 'computed',
-		writable: false,
-		async: false,
-		asyncCapable: false,
-		functionSource,
-		dependencies: uniqueDependencies(dependencies),
-	});
-	return { graphNodeId };
-}
-
-function isCompositeTemplateExpression(node: AnyNode): boolean {
-	return (
-		node.type === 'ConditionalExpression' ||
-		node.type === 'BinaryExpression' ||
-		node.type === 'LogicalExpression' ||
-		node.type === 'TemplateLiteral'
-	);
-}
-
-function pureCompositeReadSources(
-	node: AnyNode | undefined,
-	state: WalkState,
-): ReadonlyArray<string> | null {
-	if (!node) return [];
-	if (node.type === 'ChainExpression') {
-		return pureCompositeReadSources(node.expression as AnyNode | undefined, state);
-	}
-	if (isLiteralExpression(node)) return [];
-	if (node.type === 'Identifier') return [expressionSource(node, state.source)];
-	if (node.type === 'MemberExpression') return memberReadSources(node, state);
-	if (node.type === 'ConditionalExpression') {
-		return joinReadSources([
-			pureCompositeReadSources(node.test as AnyNode | undefined, state),
-			pureCompositeReadSources(node.consequent as AnyNode | undefined, state),
-			pureCompositeReadSources(node.alternate as AnyNode | undefined, state),
-		]);
-	}
-	if (node.type === 'BinaryExpression' || node.type === 'LogicalExpression') {
-		return joinReadSources([
-			pureCompositeReadSources(node.left as AnyNode | undefined, state),
-			pureCompositeReadSources(node.right as AnyNode | undefined, state),
-		]);
-	}
-	if (node.type === 'UnaryExpression') {
-		if (node.operator === 'delete') return null;
-		return pureCompositeReadSources(node.argument as AnyNode | undefined, state);
-	}
-	if (node.type === 'TemplateLiteral') {
-		return joinReadSources(
-			asNodes(node.expressions).map((part) => pureCompositeReadSources(part, state)),
-		);
-	}
-	return null;
-}
-
-function memberReadSources(node: AnyNode, state: WalkState): ReadonlyArray<string> | null {
-	if (node.computed === true && !isLiteralExpression(node.property as AnyNode | undefined)) {
-		return null;
-	}
-	const object = node.object as AnyNode | undefined;
-	if (object?.type === 'CallExpression' || object?.type === 'NewExpression') return null;
-	const source = expressionSource(node, state.source);
-	return source ? [source] : null;
-}
-
-function joinReadSources(
-	parts: ReadonlyArray<ReadonlyArray<string> | null>,
-): ReadonlyArray<string> | null {
-	const joined: string[] = [];
-	for (const part of parts) {
-		if (!part) return null;
-		joined.push(...part);
-	}
-	return [...new Set(joined)];
-}
-
-function isLiteralExpression(node: AnyNode | undefined): boolean {
-	return (
-		node?.type === 'Literal' ||
-		node?.type === 'StringLiteral' ||
-		node?.type === 'NumericLiteral' ||
-		node?.type === 'BooleanLiteral' ||
-		node?.type === 'NullLiteral'
-	);
-}
-
-function uniqueDependencies(
-	dependencies: ReadonlyArray<SemanticGraphDependency>,
-): ReadonlyArray<SemanticGraphDependency> {
-	const seen = new Set<string>();
-	const unique: SemanticGraphDependency[] = [];
-	for (const dependency of dependencies) {
-		const key = `${dependency.graphNodeId}:${dependency.path.join('.')}:${dependency.source}`;
-		if (seen.has(key)) continue;
-		seen.add(key);
-		unique.push(dependency);
-	}
-	return unique;
 }
 
 export function collectConditionalBranchText(node: AnyNode, state: WalkState): void {

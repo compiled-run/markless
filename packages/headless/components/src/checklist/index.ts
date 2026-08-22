@@ -1,15 +1,27 @@
 export {
 	ChecklistError as error,
+	ChecklistField as field,
 	ChecklistItem as item,
+	ChecklistItemDescription as itemdescription,
+	ChecklistItemIndicator as itemindicator,
+	ChecklistItemLabel as itemlabel,
+	ChecklistItemTrigger as itemtrigger,
 	ChecklistLabel as label,
 	ChecklistRoot as root,
 	ChecklistSelectAll as selectall,
+	ChecklistSelectAllIndicator as selectallindicator,
 } from './checklist.tsrx';
 export type {
 	ChecklistChecked,
 	ChecklistErrorProps,
+	ChecklistFieldProps,
+	ChecklistItemDescriptionProps,
+	ChecklistItemIndicatorProps,
+	ChecklistItemLabelProps,
 	ChecklistItemProps,
+	ChecklistItemTriggerProps,
 	ChecklistLabelProps,
 	ChecklistRootProps,
+	ChecklistSelectAllIndicatorProps,
 	ChecklistSelectAllProps,
 } from './checklist-types.ts';
