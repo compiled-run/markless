@@ -44,8 +44,9 @@ async function expectDispatchReachesTheEnclosingGroup(container: ParentNode) {
 // composes the part, and that module cannot know which of ITS roots encloses the
 // part — only the consumer's nesting says. Measured: the route folds to
 // `compiler-known-constant undefined` in wcb-group.tsrx and the dispatch no-ops
-// on both CSR and SSR resume. The design memo is in
-// packages/headless/components/src/checklist/note.md.
+// on both CSR and SSR resume. T075c measured WHERE the answer has to live (a
+// registry keyed by instance path cannot be asked from a capture slot); the
+// design memo is in packages/headless/components/src/checklist/note.md.
 test.skip('CSR: a composed part dispatches to the enclosing family root that placed it', async () => {
 	const screen = await render(Page);
 	await expectDispatchReachesTheEnclosingGroup(screen.container as HTMLElement);
