@@ -15,6 +15,7 @@ export const virtualDriver: ScreenReaderDriver = {
 	// not from its docs. NVDA and VoiceOver drivers fill the same six slots.
 	vocabulary: {
 		checkbox: 'checkbox',
+		group: 'group',
 		checked: 'checked',
 		notChecked: 'not checked',
 		partiallyChecked: 'partially checked',

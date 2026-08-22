@@ -13,6 +13,8 @@
 /** What one reader calls the facts a checkbox announcement has to convey. */
 export type Vocabulary = {
 	readonly checkbox: string;
+	/** What a reader calls the element a set of checkboxes is presented in. */
+	readonly group: string;
 	readonly checked: string;
 	readonly notChecked: string;
 	readonly partiallyChecked: string;
