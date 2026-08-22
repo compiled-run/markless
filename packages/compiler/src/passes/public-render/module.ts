@@ -106,6 +106,23 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 						: [],
 				)
 			: [];
+	// Plain ESM has to reach these components too: a `.ts` barrel re-exporting
+	// `CheckboxRoot` from this module, or an app importing `{ Gallery }` from it,
+	// is a named read the bundler resolves at link time, and a compiled module
+	// that published its components only on the default export's map answered
+	// none of them (MISSING_EXPORT, or "does not provide an export named" in the
+	// browser). Each name is bound to the SAME per-component surface
+	// `marklessSsrComponentPart` hands a composed child, so a named import and a
+	// member tag reach one object shape. The direct-CSR module already exports
+	// the root under its own name; both sources land in one module, so that name
+	// is left to it rather than declared twice.
+	const namedComponentExports = ssrComponentExports.flatMap((component) =>
+		moduleSource && component.exportName === rootComponentName
+			? []
+			: [
+					`export const ${component.exportName} = { renderSsr: ${component.ssrFunctionName} };`,
+				],
+	);
 	return {
 		passId: 'public-render-module',
 		renderDataModuleSource: root
@@ -113,7 +130,9 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 			: '',
 		moduleSource,
 		rootExportName: moduleSource ? (rootComponentName ?? null) : null,
-		ssrModuleSource,
+		ssrModuleSource: ssrModuleSource
+			? [ssrModuleSource, ...namedComponentExports].join('\n')
+			: ssrModuleSource,
 		ssrExportName: ssrModuleSource ? 'marklessRenderSsr' : null,
 		ssrComponentExports,
 		componentDefinitions,
