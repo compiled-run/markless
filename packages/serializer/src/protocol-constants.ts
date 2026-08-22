@@ -20,7 +20,9 @@ export const ASYNC_BOUNDARY_ARM_MAX = 2;
 // child the template projected into a component: `<Root><Trigger/></Root>` mints
 // `c0:` and `c0:p1:`, disjoint from Root's own `c0:c1:`. Both index the
 // compiler's edge, not render order, so a sibling above renumbers nothing.
-const PROTOCOL_INSTANCE_PATH = /^(?:[cp]\d+:)+/;
+// `r:<key>:` is a third, RUNTIME segment kind: one keyed `@for` row, so each
+// iteration of a compile-time edge is its own instance. Encoding escapes `:`.
+const PROTOCOL_INSTANCE_PATH = /^(?:[cp]\d+:|r:[^:]*:)+/;
 
 export function protocolInstanceSegment(edgeIndex: number): string {
 	return `c${edgeIndex}:`;
@@ -28,6 +30,11 @@ export function protocolInstanceSegment(edgeIndex: number): string {
 
 export function protocolProjectionSegment(edgeIndex: number): string {
 	return `p${edgeIndex}:`;
+}
+
+/** One keyed `@for` row's identity segment. The key is identity, never the index. */
+export function protocolRowSegment(key: unknown): string {
+	return `r:${encodeURIComponent(String(key))}:`;
 }
 
 /** The leading instance path of a composed id, or '' when the id is page-local. */

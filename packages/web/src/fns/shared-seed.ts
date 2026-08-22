@@ -26,7 +26,7 @@ const seedProjectingChild: SharedSeedPass = async (
 	// carry which rendered widget it is part of.
 	const seeded = new Map(inherited ?? []).set(
 		MARKLESS_WIDGET_INSTANCE_KEY,
-		context.idPrefix + rootEdge.symbolPrefix,
+		context.idPrefix + (context.rowSegment ?? '') + rootEdge.symbolPrefix,
 	);
 	// U-H: every part of this widget instance contributes before any part
 	// renders, so a seed a part writes is what its siblings read whatever the
@@ -178,6 +178,8 @@ async function applySharedSeeds(
 			childProps[prop.name] = read(prop.graphNodeId, prop.path ?? []);
 		} else if (prop.kind === 'serializable' && 'value' in prop) {
 			childProps[prop.name] = prop.value;
+		} else if (prop.source !== undefined && context.readEdgeProp) {
+			childProps[prop.name] = context.readEdgeProp(prop);
 		}
 	}
 	const readSeed: PrerenderReadSeed = (graphNodeId, path = []) =>
@@ -197,6 +199,8 @@ async function applySharedSeeds(
 		)?.value;
 		if (!seeded.has(initial.graphNodeId) && factory?.kind === 'constant')
 			seeded.set(initial.graphNodeId, structuredClone(factory.value));
+		// The caller hands in a row-free symbolPrefix: the row rides the seed's
+		// identity, never its symbol id, which routes match as a compile-time literal.
 		const loaded = await context.loadSymbol(
 			edge.boundSymbols?.[initial.value.symbolId] ??
 				context.symbolPrefix + edge.symbolPrefix + initial.value.symbolId,

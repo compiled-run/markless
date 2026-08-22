@@ -25,6 +25,7 @@ import {
 import type { ComposeGraphProps } from '../fns/composition.ts';
 import { marklessCsrRemapChildGraph } from '../fns/composition.ts';
 import { marklessBoundSymbolId } from '../fns/bound-symbol.ts';
+import { marklessRowFreeSymbolId, marklessRowSegment } from '../fns/instance-scope.ts';
 import { registerPrerenderStagedComputeds } from './staged-graph.ts';
 import { sharedSeedPass } from './shared-seed-slot.ts';
 
@@ -384,8 +385,10 @@ async function evaluatePrerenderDataComponent(input: {
 	for (const initial of definition.initialValues ?? []) {
 		if (initial.value.kind !== 'symbol-function') continue;
 		const symbolId = initial.value.symbolId;
+		// This component's reads are already the row's, so the loader answers row-free.
 		const loaded = await input.loadSymbol(
-			input.boundSymbols?.[symbolId] ?? input.symbolPrefix + symbolId,
+			input.boundSymbols?.[symbolId] ??
+				marklessRowFreeSymbolId(input.symbolPrefix + symbolId, input.symbolPrefix),
 		);
 		if (typeof loaded !== 'function') {
 			throw new Error(`MARKLESS_PRERENDER_DATA_SYMBOL_MISSING: ${symbolId}`);
@@ -549,21 +552,38 @@ async function evaluatePrerenderDataComponent(input: {
 			return snapshot?.status === 'fulfilled' ? 0 : snapshot?.status === 'rejected' ? 2 : 1;
 		},
 		seedChild: (slot, context) =>
-			sharedSeedPass()?.(input, definition, slot.componentEdgeId, read, context.sharedSeeds),
+			sharedSeedPass()?.(
+				{
+					...input,
+					// Seeds load by compile-time symbol id; the row reaches them as identity.
+					symbolPrefix: marklessRowFreeSymbolId(input.symbolPrefix, input.symbolPrefix),
+					rowSegment:
+						context.repeatKey === undefined ? '' : marklessRowSegment(context.repeatKey),
+					readEdgeProp: (prop) => readDecision(prop.source, context),
+				},
+				definition,
+				slot.componentEdgeId,
+				read,
+				context.sharedSeeds,
+			),
 		renderChild: async (slot, context) => {
 			const edge = (definition.edges ?? []).find(
 				(candidate) => candidate.id === slot.componentEdgeId,
 			);
 			if (!edge) throw new Error(`MARKLESS_PRERENDER_CHILD_MISSING: ${slot.componentEdgeId}`);
+			// One compile-time edge inside a keyed `@for` is many instances at render time.
+			const rowSegment = context.repeatKey === undefined ? '' : marklessRowSegment(context.repeatKey);
+			const hostPrefix = rowSegment + edge.hostPrefix;
+			const symbolPrefix = rowSegment + edge.symbolPrefix;
 			if (edge.materialized) {
 				const materialized = placeMaterializedChild(
 					edge.materialized,
-					input.idPrefix + edge.hostPrefix,
+					input.idPrefix + hostPrefix,
 				);
 				children.push({
 					output: materialized as SsrComposableChildOutput,
-					hostPrefix: edge.hostPrefix,
-					symbolPrefix: edge.symbolPrefix,
+					hostPrefix,
+					symbolPrefix,
 					graphProps: edge.props,
 					asyncBoundaryId: edge.asyncBoundaryId,
 					boundSymbols: edge.boundSymbols ?? {},
@@ -605,8 +625,8 @@ async function evaluatePrerenderDataComponent(input: {
 				surface: childSurface,
 				componentName: edge.childComponentName,
 				props: childProps,
-				idPrefix: input.idPrefix + edge.hostPrefix,
-				symbolPrefix: input.symbolPrefix + edge.symbolPrefix,
+				idPrefix: input.idPrefix + hostPrefix,
+				symbolPrefix: input.symbolPrefix + symbolPrefix,
 				boundSymbols: edge.boundSymbols,
 				graphProps: edge.props,
 				loadSymbol: input.loadSymbol,
@@ -616,8 +636,8 @@ async function evaluatePrerenderDataComponent(input: {
 			});
 			children.push({
 				output: output as SsrComposableChildOutput,
-				hostPrefix: edge.hostPrefix,
-				symbolPrefix: edge.symbolPrefix,
+				hostPrefix,
+				symbolPrefix,
 				graphProps: edge.props,
 				asyncBoundaryId: edge.asyncBoundaryId,
 				boundSymbols: edge.boundSymbols ?? {},

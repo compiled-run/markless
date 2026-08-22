@@ -21,7 +21,14 @@ const resumeOnDemandEntries = [
 // Ratio re-observed 2026-08-02 after sanctioned prerender and one-core
 // convergence work: the largest closure was 18,961 raw bytes and its esbuild
 // bundle+minify output was 3,150 gzip bytes. The 4,800-byte gzip wall is unchanged.
-const sourceByteLimit = 28892;
+// INTERIM 2026-08-21 (T067b), 28,892 -> 29,047: +155 raw bytes, the compile-time-
+// impossible identity cost class. Per-iteration widget identity needs a keyed-row
+// segment in the instance-path grammar, and the grammar lives in the serializer's
+// protocol-constants, which the payload closure statically reaches. Measured by
+// reverting the change: 28,892 raw with it out, 29,047 with it in (~26 gzip at the
+// observed 6.02 ratio, so the 4,800 gzip wall still holds). Repayment owed by the
+// bundler-diet goal.
+const sourceByteLimit = 29047;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',
