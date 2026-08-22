@@ -428,6 +428,73 @@ the derive path lowers the same shape as a member call
 did not surface as a red row in this suite, but it is a real difference between
 the event-handler and derive read rewriters.
 
+## What T075g changed
+
+**The return leg is closed, and the missing half was not the record — it was the
+read.** The record itself went in as priced: `sharedSeeds` on the state payload
+(one entry per shared node a component seeds from its own props, carrying the
+seed's own symbol id and the prop reads it makes), the compose-side remap beside
+the one `marklessQualifyChildState` already performs for `computed[].dependencies`,
+and the subscription in `resume-sync-demand.ts` that writes the node from the
+derive symbol. A seed whose prop the parent did not pass as a graph reference is
+dropped at compose: the child already rendered its final value, so it follows
+nothing.
+
+What the priced design did not account for is measured on the running witness.
+Re-running the seed symbol on resume is not enough, because the symbol reads
+`prop:props` and the loader hands it an INSTANCE-SCOPED graph
+(`marklessInstanceScopedGraph`), so that read lands on the child's own props
+cell — the props the child was rendered with once, which no later write moves.
+The first attempt refreshed on every group write and re-derived `false` each
+time. So each dependency carries two halves: the ROUTE (where the live value is
+now, which is what the subscription watches) and the READ it answers (the child's
+own qualified `prop:props` path, which is what the symbol will ask for). The
+refresh hands the symbol a graph whose `read` answers that one declared read from
+the route. Nothing is sensed, no path arithmetic is added, and the child's own
+toggle still writes the same cell: last write wins.
+
+Witness: `packages/vitest-browser/browser/widget-seed-follows-props.test.ts`
+(CSR and SSR resume, both channels, two sibling groups) with
+`fixtures/wsf-group.tsrx` and `wsf-page.tsrx`; the artifact fact is pinned at
+`packages/compiler/test/shared-seed-follows-props.test.ts`.
+
+**What flipped, and what did not.** Seven rows of this suite flipped on CSR. Two
+of them were pinned on this defect (`ticking one item moves the select-all to
+mixed`, `an omitted onChange still ticks`); the other five were pinned
+pessimistically and were already green on the pre-T075g tip once unskipped —
+recorded here so the next reader does not credit them to this change.
+
+Their SSR halves stay pinned, on a defect measured as SEPARATE: red on the
+pre-T075g tip too, alone as well as beside this file's other SSR rows. The
+server-rendered select-all trigger comes back `aria-checked="false"` while the
+group's own root element already carries `ui-mixed`, so the composed checkbox's
+seed reaches the root's own attributes but not a sibling part's render. That is a
+render-time seed defect, not a resume one, and it is why the rows run through
+`csrOnly(mode)` rather than unskipped outright.
+
+No screen-reader row flipped. The four pinned there name the labelling design
+(limit 8), and the one `test.fails` row names the same render-time seed gap
+above; neither is what this unit removed.
+
+Five rows stay pinned on the older dispatch-side causes, re-measured here: with
+them live the browser throws `next.join is not a function` and
+`Array.prototype.filter called on null or undefined` out of `setAll`/`setItem`,
+because the group's `values` never reaches the browser graph as an array. The
+group's own `value`/`values` come from a literal list at the consumer edge, which
+is a static prop, so this change deliberately declares nothing for them.
+
+**Byte wall.** The wall moved 65,210 -> 65,441, revert-measured at 65,204 with
+the whole change set reverted on this worktree. The measurement and the two trims
+that were kept are written out in
+`packages/bundler/test/music-player-ssr-budget.test.ts`; the payload record
+itself costs nothing here, since a page with no prop-seeded shared node emits
+none.
+
+**Open, and not attempted.** An arm-delivered widget's seeds are not registered:
+`resume-commit-arm.ts` carries its own record set and this unit did not extend
+it, so a family composed inside a `@pending` arm follows its parent only after
+the page's own registration ran.
+
 ## Framework limits this family ran into
 
 1. **A spread onto a component tag was dropped on the CSR side.** _(fixed)_

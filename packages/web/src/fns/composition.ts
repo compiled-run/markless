@@ -46,6 +46,15 @@ export type ComposeStateComputed = ComposeStateNode & {
 	readonly deriveSymbolId?: string;
 	readonly dependencies?: ReadonlyArray<ComposeGraphRead>;
 };
+// "This shared node follows these prop reads": the child module's own seed, so a
+// write on the composing instance re-runs it.
+export type ComposeSharedSeed = {
+	readonly graphNodeId: string;
+	readonly deriveSymbolId: string;
+	readonly dependencies: ReadonlyArray<
+		ComposeGraphRead & { readonly reads: ComposeGraphRead }
+	>;
+};
 export type ComposeSharedDefinition = {
 	readonly id: string;
 	readonly scope?: string;
@@ -61,6 +70,7 @@ export type ComposeSharedDefinition = {
 export type ComposeStateDraft = {
 	cells?: ReadonlyArray<ComposeStateNode>;
 	computed?: ReadonlyArray<ComposeStateComputed>;
+	sharedSeeds?: ReadonlyArray<ComposeSharedSeed>;
 	sharedDefinitions?: ReadonlyArray<ComposeSharedDefinition>;
 	readonly [key: string]: unknown;
 };
@@ -118,6 +128,33 @@ export function marklessQualifyChildState(
 			),
 		}),
 	}));
+	if (state.sharedSeeds)
+		state.sharedSeeds = state.sharedSeeds.flatMap((seed) => {
+			// A prop with no live route was never passed live, so the child already
+			// rendered its final value and this seed has nothing to follow.
+			const dependencies = seed.dependencies.flatMap((dependency) => {
+				const mapped = marklessCsrRemapChildGraph(dependency, graphProps, instancePath);
+				// The route moved onto the parent's node; the read the seed's own
+				// symbol makes only takes this instance path.
+				const reads = {
+					...dependency.reads,
+					graphNodeId: marklessComposedGraphNodeId(
+						dependency.reads.graphNodeId,
+						instancePath,
+					),
+				};
+				return mapped ? [{ ...mapped, reads }] : [];
+			});
+			return dependencies.length
+				? [
+						{
+							...seed,
+							graphNodeId: marklessComposedGraphNodeId(seed.graphNodeId, instancePath),
+							dependencies,
+						},
+					]
+				: [];
+		});
 }
 
 // A `widget`-scoped definition is one graph per rendered widget. EVERY composed
@@ -236,6 +273,15 @@ export function marklessComposeState<T extends ComposeStateDraft>(
 		(definition, index, all) =>
 			all.findIndex((other) => other.id === definition.id) === index,
 	);
+	const sharedSeeds = [
+		...(state.sharedSeeds ?? []),
+		...children.flatMap((child) =>
+			(child.output?.state?.sharedSeeds ?? []).map((seed) => ({
+				...seed,
+				deriveSymbolId: marklessBoundSymbolId(child, seed.deriveSymbolId),
+			})),
+		),
+	];
 	return {
 		...state,
 		cells: [
@@ -254,6 +300,7 @@ export function marklessComposeState<T extends ComposeStateDraft>(
 			),
 		],
 		...(sharedDefinitions.length ? { sharedDefinitions } : {}),
+		...(sharedSeeds.length ? { sharedSeeds } : {}),
 	};
 }
 
