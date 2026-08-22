@@ -338,12 +338,42 @@ export function hasComponentImportSource(
 	return !!reference.importSource;
 }
 
+// Where a member tag's part sits relative to the module SURFACE (a compiled
+// .tsrx module's default export). A namespace or default import already names
+// that surface, so only the authored dots remain; a named import spends its
+// first segment on the imported name.
+function memberTagSurfacePath(
+	componentName: string,
+	importKind: string | undefined,
+	importedName: string | undefined,
+): ReadonlyArray<string> {
+	const property = memberTagPropertyPath(componentName);
+	return importKind === 'named'
+		? [importedName ?? memberTagRootName(componentName), ...property]
+		: property;
+}
+
 export function emitComponentImport(
 	imported: ComponentReference & { readonly importSource: string },
 ): string {
 	const source = JSON.stringify(imported.importSource);
 	if (isMemberTagName(imported.componentName)) {
-		// Bind the imported object; the local name reads the authored path off it.
+		// A compiled .tsrx module publishes no ES named exports: its components
+		// hang off the default export, so reading the authored path off a
+		// namespace or named binding resolves to nothing (MISSING_EXPORT for the
+		// named shape). Import the surface and let the edge's declared part name
+		// take the last segment through the same lookup the linked case uses.
+		if (isTsrxComponentImport(imported.importSource)) {
+			const enclosing = memberTagSurfacePath(
+				imported.componentName,
+				imported.importKind,
+				imported.importedName,
+			).slice(0, -1);
+			if (enclosing.length === 0) return `import ${imported.localName} from ${source};`;
+			const holder = `${imported.localName}Holder`;
+			return `import ${holder} from ${source};\nconst ${imported.localName} = ${holder}.${enclosing.join('.')};`;
+		}
+		// A plain module really does publish the object the tag reads off.
 		const holder = `${imported.localName}Holder`;
 		const property = memberTagPropertyPath(imported.componentName).join('.');
 		const binding =
@@ -425,8 +455,11 @@ export function isTsrxComponentImport(importSource: string): boolean {
 // the same question with different spelling, and the linker already answered it
 // by resolving the dotted tag to a concrete component — without this the edge
 // falls back to the module's root, so <parts.Badge /> silently renders <Card />.
-// A tag still spelled dotted was never linked, so its import binding already
-// reads the part off the module object and naming it again would resolve twice.
+// A tag still spelled dotted was never linked, so nothing resolved it for us -
+// but the surface it composes is still a compiled .tsrx module, whose parts live
+// on the default export's component map rather than on ES named exports. Naming
+// its last segment here is what turns the deferred tag into the same lookup the
+// linked case makes; the import binding takes only the segments enclosing it.
 // Undefined means "this module's own root", which is what a default import composes.
 export function edgeDeclaredComponentName(edge: {
 	readonly childComponentName: string;
@@ -435,8 +468,15 @@ export function edgeDeclaredComponentName(edge: {
 	readonly importedName?: string;
 }): string | undefined {
 	if (!edge.importSource || !isTsrxComponentImport(edge.importSource)) return undefined;
+	if (isMemberTagName(edge.childComponentName))
+		return (
+			memberTagSurfacePath(
+				edge.childComponentName,
+				edge.importKind,
+				edge.importedName,
+			).at(-1) ?? undefined
+		);
 	if (edge.importKind !== 'named' && edge.importKind !== 'namespace') return undefined;
-	if (isMemberTagName(edge.childComponentName)) return undefined;
 	return edge.importedName ?? edge.childComponentName;
 }
 
