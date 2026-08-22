@@ -121,7 +121,8 @@ function expectBasicRendered() {
 // One element per part: every part this family ships renders exactly one piece of
 // markup, so a consumer's stylesheet and a screen reader see the tree they wrote.
 function expectOneElementPerPart() {
-	expect(el(Lettuce).getAttribute('ui-checked')).not.toBe(null);
+	// Presence-only convention: an unchecked item carries no ui-checked attribute.
+	expect(el(Lettuce).hasAttribute('ui-checked')).toBe(false);
 	expect(el(Lettuce).children.length).toBe(2);
 	expect(el(Lettuce).children[0]).toBe(el(LettuceTrigger));
 	expect(el(LettuceTrigger).children.length).toBe(1);
