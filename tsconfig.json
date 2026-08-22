@@ -30,7 +30,8 @@
 		"poc",
 		"packages/*/test",
 		"packages/headless/*/test",
-		"packages/bundler/fixtures"
+		"packages/bundler/fixtures",
+		"packages/headless/*/sr/vitest.config.ts"
 	],
 	"include": [
 		"packages/*/src/**/*.d.ts",
@@ -39,6 +40,7 @@
 		"packages/headless/*/src/**/*.d.ts",
 		"packages/headless/*/src/**/*.ts",
 		"packages/headless/*/src/**/*.tsrx",
+		"packages/headless/*/sr/**/*.ts",
 		"vite.config.ts"
 	],
 	"tsrx": {
