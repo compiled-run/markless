@@ -707,6 +707,8 @@ export function App() @{
 			collectionPath: [],
 			keySource: 'slot',
 			keyPath: [],
+			// An empty key path alone would read the same as `key record`.
+			indexKey: true,
 		},
 	]);
 	expect(graph.diagnostics).toEqual([

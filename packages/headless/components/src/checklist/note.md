@@ -125,9 +125,130 @@ both sides now agree on which node each part reads — so it belongs to the
 widget-callback route, not to this family.
 
 The looped rows carry a second measured detail: inside `items-from-data.tsrx` the
-three row triggers still mint ONE element id. The row segment reaches the graph
-path but not the minted handle, because the seed pass builds that token from the
-HOST id prefix rather than from the instance path.
+three row triggers still mint ONE element id.
+
+## What T075 changed
+
+**The looped rows are fixed, and the cause was not the host prefix.** `key row`
+and `key i` both lower to an EMPTY key path (`itemKeyPath` returns `[]` when the
+key IS the item, and `null` for an index key, which `collect-repeat` then spells
+as `[]` too). Two readers took an empty path for "this repeat has no key":
+`protocol-view`'s `resumableKeyedRepeats` dropped the keyed-repeat view record
+outright, and the SSR-data renderer passed no `key` down, so every row got the
+same empty row segment and the whole loop collapsed onto one widget instance and
+one minted id. A list of option values is exactly this shape.
+
+The artifact now says which one it is: `indexKey` is set only for a position key,
+and an empty key path means the item itself is the identity — which
+`readValuePath(item, [])` already answered correctly. The two readers ask
+`indexKey` instead of the path length. Witnesses:
+`packages/vitest-browser/browser/widget-token-scalar-rows.test.ts` (the T074 row
+shape keyed by the scalar item) and `widget-token-row-scoping.test.ts` (that loop
+written inside an enclosing root's projected children, the checklist anatomy);
+`packages/compiler/test/keyed-repeat-item-key.test.ts` pins the artifact fact.
+
+**T075b moved where that fact is spelled, because the first spelling shipped it.**
+`indexKey` on the emitted render-data artifact cost bytes on every page with a
+position-keyed `@for` — the whole render-data artifact is `JSON.stringify`d into
+the shipped module — and `music-player-ssr` has one, which put the byte wall over
+and changed the checked-in emit snapshot. The position key is now a semantic-graph
+fact only: `protocol-view` reads `semanticGraph.keyedRepeats[].indexKey`, and the
+render-data artifact carries the opposite, rarer marker instead — `itemKey`, set
+only for `key row`. No fixture in `emit-byte-equality` and nothing in
+`music-player-ssr` writes `key row`, so both are byte-identical to the pre-T075
+tree: the emit snapshot passes unchanged and the wall measures exactly 65,162.
+
+## The defect that is still open, and why it is a redesign
+
+**A widget callback slot's dispatch still never leaves the widget**, and the
+reason is structural rather than a missing case. The minimal shape is witnessed
+at `packages/vitest-browser/browser/widget-callback-escape.test.ts` (pinned) with
+`fixtures/wcb.tsrx`, `wcb-group.tsrx`, `wcb-page.tsrx`, and measured at the
+artifact boundary in `packages/compiler/test/widget-callback-composed-root.test.ts`.
+
+What happens today: `resolveWidgetCallbackRoute` resolves a claim against
+`enclosingWidgetRootEdge` — the innermost edge into the SAME family module that
+textually encloses the part's own edge. In `checklist.tsrx`, `ChecklistSelectAll`
+composes `<CheckboxTrigger>` and no `<CheckboxRoot>` encloses it: the enclosing
+root was placed by a SIBLING part (`ChecklistRoot`), and only the consumer's
+nesting says which sibling. The route therefore folds to
+`compiler-known-constant undefined` and the dispatch no-ops silently.
+
+A second resolution target inside the composing module is not enough, and this is
+the conflict:
+
+1. `checklist.tsrx` has TWO composed roots of the same family — `ChecklistRoot`'s
+   `<CheckboxRoot onChange={setAll}>` and `ChecklistItem`'s
+   `<CheckboxRoot onChange={setItem}>`. Which one encloses `ChecklistSelectAll`
+   versus `ChecklistItemTrigger` is a fact about the CONSUMER's markup. The
+   module that binds the claim cannot choose, and choosing wrong is worse than
+   no-oping.
+2. Handing the choice to the consumer means re-publishing the claim one level up.
+   A claim row needs a manifest entry (`virtualModuleId` + `exportName`), and a
+   module's manifest carries only the symbol modules it compiled itself; the
+   re-exported claim has none. Worse, the composing module ALREADY binds that
+   same base symbol (for the part's own graph reads, at its own instance path), so
+   a second binding at the consumer would give one symbol two bound rows with two
+   different instance paths.
+
+The shape that does work is the one T074 already used for widget identity:
+resolve at COMPOSE time, not at bind time. The composing module declares, on the
+composed child it already builds, "the widget rooted here answers slot
+`<definitionId>#onChange` with symbol `<local id>`", exactly beside the
+`childrenWidgetRoot` it already declares; composition registers it under the same
+qualified instance path it registers `projectionIds` under; the payload carries
+it for browser resume the same way; and the slot invocation becomes a new route
+kind that asks that registry using the part's own widget instance — the identity
+it already resolves its graph reads through. Nothing is sensed and no tree is
+walked. That is a new claim/route kind plus a new compose-time registration seam
+across CSR, SSR and the resume payload, with its own byte measure — a change of
+T074's size, not a patch to `resolveWidgetCallbackRoute`.
+
+Every remaining pinned row of this suite is still pinned on this.
+
+### What T075b priced about that design
+
+Three facts measured on this base, so the next attempt starts from them.
+
+**The answer is already at the compose seam; only the KEY is missing.** A compose
+child already carries `callbackProps` — `{propName: page-space symbol id}`, built
+by `packages/web/src/prerender/evaluator.ts` (`input.symbolPrefix + symbolId`) and
+by the emitted SSR module (`childProps.__marklessSsrCallbacks`). The same loop in
+`marklessRegisterComposedWidgets` that pushes a widget root already knows the
+qualified widget id that answer belongs to. So the registration reads
+`[instancePath + definition.id, child.callbackProps]` and needs NO new compiler
+artifact field, no new emitted data, and no new SSR/CSR declaration — only the
+registry, the payload field for resume, and the new route kind.
+
+**Deriving the answer instead of registering it does not work, and the reason is
+worth writing down.** The widget's root instance path minus its last instance
+segment IS the composing instance's path, so `rootPath` plus the composing
+module's local callback symbol id would reach the handler with no registry, no
+payload field, and no bytes in `composition.ts`. It fails on the same conflict
+that killed bind-time resolution: `checklist.tsrx` has two `<CheckboxRoot
+onChange=...>` edges with two different local symbol ids, and the stripped path
+does not say which edge composed this root. Compose-time registration is the only
+shape that answers that, which is what the ruling says.
+
+**The byte wall decides the shape.** `music-player-ssr` sits at exactly 65,162,
+its cap. `packages/web/src/fns/composition.ts` loads on every composing page, so
+even two unconditional lines in `marklessRegisterComposedWidgets` move the wall.
+The registration therefore has to be gated the way the T074 CSR walk is (riding
+the shared-seed pass, so a page with no widget seeds loads neither), and the
+invoke-side route handling has to live in the symbol-resolver module, which the
+compiler already emits per-page and can gate on the route being present.
+
+**A third defect, newly measured and pinned:** the children-projection chain is
+walked to any depth, but the seed pass's symbol prefix is not.
+`applyComposedChainSeeds` advances `ownerPrefix` by each link's own edge segment
+while `applySharedSeeds` appends that segment again, so a composer that wraps its
+children in a SECOND pure composer before the family root asks the first link's
+module for a symbol only the second one owns (`Unknown async symbol c0:symbol:7`).
+One link deep the double-count is invisible. Witness:
+`packages/vitest-browser/browser/projection-chain-depth.test.ts` (pinned), with
+`fixtures/pwr-deep-group.tsrx` and `pwr-deep-page.tsrx`. The fix is prefix
+arithmetic in `packages/web/src/fns/shared-seed.ts`, not a change to the declared
+chain.
 
 ## Framework limits this family ran into
 
