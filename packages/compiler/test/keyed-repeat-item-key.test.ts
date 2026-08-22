@@ -29,7 +29,7 @@ test('the item itself as the key is an empty key path that is not an index key',
 	expect(repeat.keySource).toBe('row');
 	expect(repeat.keyPath).toEqual([]);
 	expect(repeat.indexKey).toBeUndefined();
-	expect(compiled.renderData?.repeats[0]?.indexKey).toBeUndefined();
+	expect(compiled.renderData?.repeats[0]?.itemKey).toBe(true);
 });
 
 test('a position key carries the marker that separates it from an item key', async () => {
@@ -38,7 +38,8 @@ test('a position key carries the marker that separates it from an item key', asy
 
 	expect(repeat.keyPath).toEqual([]);
 	expect(repeat.indexKey).toBe(true);
-	expect(compiled.renderData?.repeats[0]?.indexKey).toBe(true);
+	// The position key stays a semantic-graph fact: nothing reaches the shipped artifact.
+	expect(compiled.renderData?.repeats[0]?.itemKey).toBeUndefined();
 });
 
 test('a field key keeps the path it always had', async () => {

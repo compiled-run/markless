@@ -147,6 +147,17 @@ shape keyed by the scalar item) and `widget-token-row-scoping.test.ts` (that loo
 written inside an enclosing root's projected children, the checklist anatomy);
 `packages/compiler/test/keyed-repeat-item-key.test.ts` pins the artifact fact.
 
+**T075b moved where that fact is spelled, because the first spelling shipped it.**
+`indexKey` on the emitted render-data artifact cost bytes on every page with a
+position-keyed `@for` — the whole render-data artifact is `JSON.stringify`d into
+the shipped module — and `music-player-ssr` has one, which put the byte wall over
+and changed the checked-in emit snapshot. The position key is now a semantic-graph
+fact only: `protocol-view` reads `semanticGraph.keyedRepeats[].indexKey`, and the
+render-data artifact carries the opposite, rarer marker instead — `itemKey`, set
+only for `key row`. No fixture in `emit-byte-equality` and nothing in
+`music-player-ssr` writes `key row`, so both are byte-identical to the pre-T075
+tree: the emit snapshot passes unchanged and the wall measures exactly 65,162.
+
 ## The defect that is still open, and why it is a redesign
 
 **A widget callback slot's dispatch still never leaves the widget**, and the
@@ -194,6 +205,38 @@ across CSR, SSR and the resume payload, with its own byte measure — a change o
 T074's size, not a patch to `resolveWidgetCallbackRoute`.
 
 Every remaining pinned row of this suite is still pinned on this.
+
+### What T075b priced about that design
+
+Three facts measured on this base, so the next attempt starts from them.
+
+**The answer is already at the compose seam; only the KEY is missing.** A compose
+child already carries `callbackProps` — `{propName: page-space symbol id}`, built
+by `packages/web/src/prerender/evaluator.ts` (`input.symbolPrefix + symbolId`) and
+by the emitted SSR module (`childProps.__marklessSsrCallbacks`). The same loop in
+`marklessRegisterComposedWidgets` that pushes a widget root already knows the
+qualified widget id that answer belongs to. So the registration reads
+`[instancePath + definition.id, child.callbackProps]` and needs NO new compiler
+artifact field, no new emitted data, and no new SSR/CSR declaration — only the
+registry, the payload field for resume, and the new route kind.
+
+**Deriving the answer instead of registering it does not work, and the reason is
+worth writing down.** The widget's root instance path minus its last instance
+segment IS the composing instance's path, so `rootPath` plus the composing
+module's local callback symbol id would reach the handler with no registry, no
+payload field, and no bytes in `composition.ts`. It fails on the same conflict
+that killed bind-time resolution: `checklist.tsrx` has two `<CheckboxRoot
+onChange=...>` edges with two different local symbol ids, and the stripped path
+does not say which edge composed this root. Compose-time registration is the only
+shape that answers that, which is what the ruling says.
+
+**The byte wall decides the shape.** `music-player-ssr` sits at exactly 65,162,
+its cap. `packages/web/src/fns/composition.ts` loads on every composing page, so
+even two unconditional lines in `marklessRegisterComposedWidgets` move the wall.
+The registration therefore has to be gated the way the T074 CSR walk is (riding
+the shared-seed pass, so a page with no widget seeds loads neither), and the
+invoke-side route handling has to live in the symbol-resolver module, which the
+compiler already emits per-page and can gate on the route being present.
 
 **A third defect, newly measured and pinned:** the children-projection chain is
 walked to any depth, but the seed pass's symbol prefix is not.

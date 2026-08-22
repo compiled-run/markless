@@ -94,8 +94,8 @@ export type SsrRenderData = {
 		readonly collectionGraphNodeId?: string;
 		readonly collectionPath?: ReadonlyArray<string>;
 		readonly keyPath?: ReadonlyArray<string>;
-		// Empty keyPath means the item itself is the key; this means position is.
-		readonly indexKey?: true;
+		// Set only for `key row`: read the item itself as the key.
+		readonly itemKey?: true;
 		readonly rowChunkId: string;
 		readonly emptyChunkId?: string;
 	}>;
@@ -396,13 +396,13 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 					return slot.emptyTemplateId ? renderChunk(slot.emptyTemplateId, {}) : { html: '', tokens: [] };
 				const keyPath = record?.keyPath;
 				// `key row` reads the item itself, so an empty path is still a key.
-				const keyed = keyPath !== undefined && record?.indexKey !== true;
+				const keyed = record?.itemKey === true || (keyPath?.length ?? 0) > 0;
 				const rows = await Promise.all(
 					items.map((item, index) =>
 						renderChunk(slot.rowTemplateId, {
 							item,
 							index,
-							...(keyed ? { key: readValuePath(item, keyPath) } : {}),
+							...(keyed ? { key: readValuePath(item, keyPath ?? []) } : {}),
 						}),
 					),
 				);

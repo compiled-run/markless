@@ -853,9 +853,10 @@ export type RenderDataRepeat = {
 	// not a graph read: the renderer has no graph node to read the rows from.
 	readonly collectionSource?: string;
 	readonly collectionPath: ReadonlyArray<string>;
-	// Empty means the item itself is the key; `indexKey` means position is.
 	readonly keyPath: ReadonlyArray<string>;
-	readonly indexKey?: true;
+	// Set only for `key row`: the empty path means read the item itself, not that
+	// the row is unkeyed. A position key stays a semantic-graph fact.
+	readonly itemKey?: true;
 	readonly rowChunkId: string;
 	readonly emptyChunkId?: string;
 	readonly rowElementCount: number;
