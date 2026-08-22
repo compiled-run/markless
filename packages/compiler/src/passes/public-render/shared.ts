@@ -420,6 +420,26 @@ export function isTsrxComponentImport(importSource: string): boolean {
 	return /\.tsrx(?:[?#].*)?$/.test(importSource);
 }
 
+// WHICH component of an imported .tsrx module's surface composes at this edge.
+// A named import says it outright. A namespace member tag (<parts.Card />) asks
+// the same question with different spelling, and the linker already answered it
+// by resolving the dotted tag to a concrete component — without this the edge
+// falls back to the module's root, so <parts.Badge /> silently renders <Card />.
+// A tag still spelled dotted was never linked, so its import binding already
+// reads the part off the module object and naming it again would resolve twice.
+// Undefined means "this module's own root", which is what a default import composes.
+export function edgeDeclaredComponentName(edge: {
+	readonly childComponentName: string;
+	readonly importKind?: string;
+	readonly importSource?: string;
+	readonly importedName?: string;
+}): string | undefined {
+	if (!edge.importSource || !isTsrxComponentImport(edge.importSource)) return undefined;
+	if (edge.importKind !== 'named' && edge.importKind !== 'namespace') return undefined;
+	if (isMemberTagName(edge.childComponentName)) return undefined;
+	return edge.importedName ?? edge.childComponentName;
+}
+
 export function publicRenderValueImports(
 	moduleImports: ReadonlyArray<SemanticModuleImport>,
 	componentEdges: PublicRenderModuleInput['semanticGraph']['componentEdges'],

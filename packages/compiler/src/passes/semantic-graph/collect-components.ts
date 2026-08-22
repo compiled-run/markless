@@ -30,6 +30,7 @@ import {
 	callbackPropArityUnsupportedDiagnostic,
 	componentPropExpressionUnsupportedDiagnostic,
 	componentSpreadUnsupportedDiagnostic,
+	memberTagPartMissingDiagnostic,
 	memberTagUnresolvedDiagnostic,
 } from './diagnostics.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
@@ -108,6 +109,17 @@ export function collectComponentEdge(
 			memberTagUnresolvedDiagnostic({
 				tagName,
 				rootName: memberTagRootName(tagName),
+				node,
+				filename: state.filename,
+			}),
+		);
+	} else if (isMemberTagName(tagName) && link.missingPart) {
+		state.graph.diagnostics.push(
+			memberTagPartMissingDiagnostic({
+				tagName,
+				partName: link.missingPart.partName,
+				importSource: link.missingPart.importSource,
+				served: link.missingPart.served,
 				node,
 				filename: state.filename,
 			}),
@@ -388,6 +400,11 @@ function resolveImportedChildComponent(
 		SemanticComponentEdge,
 		'importSource' | 'importKind' | 'importedName'
 	>;
+	readonly missingPart?: {
+		readonly partName: string;
+		readonly importSource: string;
+		readonly served: ReadonlyArray<string>;
+	};
 } {
 	const importSource = componentImportSource(localTarget, state);
 	const unresolved = { childComponentName: localTarget, importSource };
@@ -424,7 +441,19 @@ function resolveImportedChildComponent(
 	const declared = moduleInterface.render.components.find(
 		(candidate) => candidate.exportName === exportPath[0],
 	);
-	return declared ? { childComponentName: declared.componentName, importSource } : unresolved;
+	if (declared) return { childComponentName: declared.componentName, importSource };
+	// The module answered and does not serve this name, so the miss is a fact
+	// rather than a link that has not happened yet.
+	return {
+		...unresolved,
+		missingPart: {
+			partName: exportPath[0]!,
+			importSource: importSource.importSource,
+			served: moduleInterface.render.components.flatMap((candidate) =>
+				candidate.exportName ? [candidate.exportName] : [],
+			),
+		},
+	};
 }
 
 function componentChildCount(node: AnyNode): number {
