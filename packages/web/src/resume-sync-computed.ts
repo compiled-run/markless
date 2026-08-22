@@ -1,4 +1,3 @@
-import type { ProtocolStatePayload } from '@markless/serializer';
 import type { RuntimeGraph } from '@markless/runtime';
 import type {
 	ElementHandleRegistry,
@@ -6,8 +5,21 @@ import type {
 	ResumeRuntimeInput,
 } from './resume-types.ts';
 
-type ResumeSyncComputedRecord = ProtocolStatePayload['computed'][number] & {
+// The node to write and the symbol that derives it: all a refresh needs, and the
+// shape both a sync computed and a shared seed's follow record have. A seed also
+// says which read each of its routes answers, because its symbol reads the props
+// its component was rendered with and the live value moved to the parent's node.
+type ResumeSyncComputedRecord = {
+	readonly graphNodeId: string;
 	readonly deriveSymbolId: string;
+	readonly dependencies?: ReadonlyArray<{
+		readonly graphNodeId: string;
+		readonly path: ReadonlyArray<string>;
+		readonly reads?: {
+			readonly graphNodeId: string;
+			readonly path: ReadonlyArray<string>;
+		};
+	}>;
 };
 
 export async function refreshSyncComputed(input: {
@@ -17,9 +29,10 @@ export async function refreshSyncComputed(input: {
 	readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
 	readonly elementHandles: ElementHandleRegistry;
 }): Promise<void> {
+	const graph = seedSourceGraph(input.graph, input.computed);
 	const result = (await input.loadSymbol(input.computed.deriveSymbolId))({
-		graph: input.graph,
-		read: input.graph.read,
+		graph,
+		read: graph.read,
 		element: input.root,
 		getElementHandle: input.elementHandles.get,
 	});
@@ -27,4 +40,22 @@ export async function refreshSyncComputed(input: {
 		graphNodeId: input.computed.graphNodeId,
 		value: await result,
 	});
+}
+
+// A shared seed re-runs its own authored expression, so its prop reads have to
+// reach the value the enclosing instance now holds rather than the props its
+// component was rendered with once. The symbol runs instance-scoped, so the ids
+// reaching here are already qualified and the record's read matches exactly.
+function seedSourceGraph(graph: RuntimeGraph, record: ResumeSyncComputedRecord): RuntimeGraph {
+	const routes = record.dependencies;
+	if (!routes?.some((route) => route.reads)) return graph;
+	const read: RuntimeGraph['read'] = (graphNodeId, path = []) => {
+		const route = routes.find(
+			(candidate) =>
+				candidate.reads?.graphNodeId === graphNodeId &&
+				candidate.reads.path.join(' ') === path.join(' '),
+		);
+		return route ? graph.read(route.graphNodeId, route.path) : graph.read(graphNodeId, path);
+	};
+	return { ...graph, read };
 }

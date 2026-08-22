@@ -57,7 +57,22 @@ const clientBuild = resolve(demo, '.output/public/build');
 //     branch in `edgeChildProps` (fns/shared-seed.ts). Both are inside one shared module, so
 //     making them pay-per-use means splitting that chunk, not adding a gate - bundler-diet's
 //     shape, not this task's. Floor documented rather than claimed recovered.
-const MAX_SHIPPED_JS_GZIP_BYTES = 65_210;
+// 65,210 -> 65,441 (re-anchor 2026-08-22, T075g composed-seed return leg): +237 over a baseline
+// re-measured on this worktree at 65,204 by reverting the whole change set; 78 chunks either way.
+// Attributed by revert-measurement wholly to packages/web/src (with only the compiler and
+// serializer halves applied the build passes the old wall), so none of it is payload: the new
+// record is emitted only for a component that seeds a shared node from its own props, and this
+// demo has none. Composition cost class. The bytes are three runtime seams: the compose-side
+// remap that moves each declared prop read onto the parent's node and drops the reads the parent
+// never passed live, the subscription that wires those routes on resume, and the read adapter that
+// lets a re-run seed symbol reach the value the enclosing instance now holds instead of the props
+// its component was rendered with once. Compile-time impossible for the same reason the +404
+// widget-scope and +189 sibling re-anchors were: which node a composed child's prop reads is the
+// CONSUMER's fact, and one child module serves every edge that composes it. Two trims were
+// measured and kept (65,501 -> 65,458 -> 65,441): collapsing the dependency rewrite onto the
+// existing remap result, and dropping a per-node freshness check seeds cannot use anyway (one node
+// carries a seed per property, which its id cannot tell apart). Repayment owed by bundler-diet.
+const MAX_SHIPPED_JS_GZIP_BYTES = 65_441;
 
 test('music-player-ssr production build stays within its shipped JS budget', async () => {
 	await rm(resolve(demo, '.output'), { force: true, recursive: true });

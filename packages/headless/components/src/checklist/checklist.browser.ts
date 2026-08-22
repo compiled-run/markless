@@ -319,6 +319,17 @@ async function expectOmittedCallbackStillTicks() {
 // to the root's `c0:shared:checkbox...`), so the root's own toggle moved every
 // trigger. Separating the instances is correct and removes that accident.
 // Un-pin when a part's slot invocation reaches the root edge's callback.
+
+// T075g landed the return leg: a composed CheckboxRoot's `checked` follows the
+// group's write, so the rows using it run on CSR. Their SSR halves stay pinned on
+// a SEPARATE, older defect, measured on this base and on the pre-T075g tip, alone
+// as well as beside this file's other SSR rows: the server-rendered select-all
+// trigger comes back aria-checked="false" while the group's own root element
+// already carries ui-mixed, so the composed checkbox's seed reaches the root's
+// own attributes but not a sibling part's render. A render-time seed defect, not
+// a resume one.
+const csrOnly = (mode: (typeof MODES)[number]) => (mode === 'CSR' ? test : test.skip);
+
 for (const mode of MODES) {
 	test(`${mode}: the starter renders a named group, a select-all and three items`, async () => {
 		if (mode === 'CSR') await render(Basic);
@@ -332,25 +343,25 @@ for (const mode of MODES) {
 		expectOneElementPerPart();
 	});
 
-	test.skip(`${mode}: some ticked renders the select-all mixed and each item by membership`, async () => {
+	csrOnly(mode)(`${mode}: some ticked renders the select-all mixed and each item by membership`, async () => {
 		if (mode === 'CSR') await render(Partial);
 		else await renderSSR(Partial);
 		expectPartialRendered();
 	});
 
-	test.skip(`${mode}: a mixed select-all splits aria-checked and indeterminate across two elements`, async () => {
+	csrOnly(mode)(`${mode}: a mixed select-all splits aria-checked and indeterminate across two elements`, async () => {
 		if (mode === 'CSR') await render(Partial);
 		else await renderSSR(Partial);
 		expectMixedSplitAcrossTriggerAndField();
 	});
 
-	test.skip(`${mode}: unavailable options and a locked group render their flags`, async () => {
+	csrOnly(mode)(`${mode}: unavailable options and a locked group render their flags`, async () => {
 		if (mode === 'CSR') await render(UnavailableOptions);
 		else await renderSSR(UnavailableOptions);
 		expectDisabledRendered();
 	});
 
-	test.skip(`${mode}: unavailable options and a locked group do not toggle`, async () => {
+	csrOnly(mode)(`${mode}: unavailable options and a locked group do not toggle`, async () => {
 		if (mode === 'CSR') await render(UnavailableOptions);
 		else await renderSSR(UnavailableOptions);
 		await expectDisabledBlocks();
@@ -362,7 +373,7 @@ for (const mode of MODES) {
 		expectGroupErrorRendered();
 	});
 
-	test.skip(`${mode}: the form carries a name and a value onto every item's field`, async () => {
+	csrOnly(mode)(`${mode}: the form carries a name and a value onto every item's field`, async () => {
 		if (mode === 'CSR') await render(CondimentsForm);
 		else await renderSSR(CondimentsForm);
 		expectFormConfigRendered();
@@ -392,7 +403,7 @@ for (const mode of MODES) {
 		await expectMixedSelectAllTicksEverything();
 	});
 
-	test.skip(`${mode}: ticking one item moves the select-all to mixed`, async () => {
+	csrOnly(mode)(`${mode}: ticking one item moves the select-all to mixed`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 		await expectOneItemMovesTheSelectAllToMixed();
@@ -422,7 +433,7 @@ for (const mode of MODES) {
 		await expectConsumerCallbackCarriesTheWholeSet();
 	});
 
-	test.skip(`${mode}: an omitted onChange still ticks`, async () => {
+	csrOnly(mode)(`${mode}: an omitted onChange still ticks`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 		await expectOmittedCallbackStillTicks();

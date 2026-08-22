@@ -41,6 +41,7 @@ export type ProtocolStatePayloadInput = {
 			readonly snapshot?: ProtocolAsyncComputedSnapshotInput;
 		}
 	>;
+	readonly sharedSeeds?: ProtocolStatePayload['sharedSeeds'];
 	readonly sharedDefinitions?: ProtocolStatePayload['sharedDefinitions'];
 	readonly storage?: ProtocolStatePayload['storage'];
 };
@@ -103,6 +104,7 @@ export function createProtocolStatePayload(input: ProtocolStatePayloadInput): Pr
 			};
 		}),
 		computed: (input.computed ?? []).map(serializeComputedSnapshot),
+		...(input.sharedSeeds?.length ? { sharedSeeds: input.sharedSeeds } : {}),
 		sharedDefinitions: input.sharedDefinitions,
 		...(storage.length > 0 ? { storage } : {}),
 	};

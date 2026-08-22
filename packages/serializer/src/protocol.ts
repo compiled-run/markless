@@ -142,6 +142,25 @@ export type ProtocolStatePayload = {
 					readonly error: unknown;
 			  };
 	}>;
+	// A shared node a component seeds from its own props. The node keeps its own
+	// value (a part's write stands until the next prop moves), and these say which
+	// prop reads the seed follows so a composing parent's write re-runs it.
+	readonly sharedSeeds?: ReadonlyArray<{
+		readonly graphNodeId: string;
+		readonly deriveSymbolId: string;
+		readonly dependencies: ReadonlyArray<{
+			// Where the live value is: the node to watch, and the value to re-seed from.
+			readonly graphNodeId: string;
+			readonly path: ReadonlyArray<string>;
+			// The read the seed's own symbol makes, which this route answers. Before
+			// composition the two are the same read; composition moves the route onto
+			// the parent's node and leaves this one on the child's own props.
+			readonly reads: {
+				readonly graphNodeId: string;
+				readonly path: ReadonlyArray<string>;
+			};
+		}>;
+	}>;
 	readonly sharedDefinitions?: ReadonlyArray<{
 		readonly id: string;
 		readonly name: string;

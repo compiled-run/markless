@@ -2,6 +2,7 @@ import { createProtocolStatePayload, protocolInstanceQualifies } from '@markless
 import type { ProtocolStatePayload } from '@markless/serializer';
 import type { ProtocolStatePayloadInput, SemanticSharedReturnProperty } from '../artifacts.ts';
 import { sharedCallbackSlotGraphNodeId } from './semantic-graph/collect-shared.ts';
+import { componentPropReads } from './symbol-modules.ts';
 import { planSymbolResolver } from './symbol-resolver.ts';
 
 type StateBindingWithInitializer =
@@ -12,7 +13,13 @@ type StateBindingWithInitializer =
 export function createProtocolStatePayloadFromArena(
 	input: ProtocolStatePayloadInput,
 ): ProtocolStatePayload {
-	const deriveSymbolIds = syncDeriveSymbolIds(input);
+	const symbolResolver =
+		input.symbolResolver ??
+		planSymbolResolver({
+			semanticGraph: input.semanticGraph,
+			payloadArena: input.payloadArena,
+		});
+	const deriveSymbolIds = syncDeriveSymbolIds(symbolResolver);
 	const computed = input.payloadArena.state.computed.map((computed) => ({
 		graphNodeId: computed.graphNodeId,
 		name: computed.name,
@@ -61,6 +68,7 @@ export function createProtocolStatePayloadFromArena(
 	const payload = createProtocolStatePayload({
 		cells: [],
 		computed,
+		sharedSeeds: sharedSeedFollows(input, symbolResolver),
 		sharedDefinitions,
 		storage: input.payloadArena.state.storage,
 	});
@@ -121,14 +129,9 @@ function assertClassifiable(graphNodeId: string): void {
 	);
 }
 
-function syncDeriveSymbolIds(input: ProtocolStatePayloadInput): ReadonlyMap<string, string> {
-	const symbolResolver =
-		input.symbolResolver ??
-		planSymbolResolver({
-			semanticGraph: input.semanticGraph,
-			payloadArena: input.payloadArena,
-		});
-
+function syncDeriveSymbolIds(
+	symbolResolver: NonNullable<ProtocolStatePayloadInput['symbolResolver']>,
+): ReadonlyMap<string, string> {
 	return new Map(
 		symbolResolver.symbols.flatMap((symbol) =>
 			symbol.kind === 'sync-computed-derive'
@@ -136,6 +139,47 @@ function syncDeriveSymbolIds(input: ProtocolStatePayloadInput): ReadonlyMap<stri
 				: [],
 		),
 	);
+}
+
+/**
+ * The shared nodes this module seeds from a component's own props, each with the
+ * prop reads its seed expression makes.
+ *
+ * A composed family renders its instance from the props its edge was given, and
+ * an enclosing family's write moves one of those props. The record says which
+ * reads the node follows, so browser resume can re-run the seed's own symbol when
+ * one of them moves; the node still holds its own value, so a part's write to it
+ * stands until the next prop change overwrites it. A seed reading no prop (a
+ * constant, or a value only this component can move) declares nothing.
+ */
+function sharedSeedFollows(
+	input: ProtocolStatePayloadInput,
+	symbolResolver: NonNullable<ProtocolStatePayloadInput['symbolResolver']>,
+): NonNullable<ProtocolStatePayload['sharedSeeds']> {
+	return symbolResolver.symbols.flatMap((symbol) => {
+		// A callback slot's seed is answered by the composing edge itself, not by a
+		// prop the enclosing family can write, so it follows nothing.
+		if (
+			symbol.kind !== 'shared-seed' ||
+			symbol.callbackSlotPropName !== undefined ||
+			!symbol.componentName
+		)
+			return [];
+		const dependencies = componentPropReads(
+			symbol.componentName,
+			symbol.source,
+			input.semanticGraph,
+			input.semanticGraph.filename,
+		).map((read) => ({
+			graphNodeId: read.graphNodeId,
+			path: read.path,
+			reads: { graphNodeId: read.graphNodeId, path: read.path },
+		}));
+		if (dependencies.length === 0) return [];
+		return [
+			{ graphNodeId: symbol.graphNodeId, deriveSymbolId: symbol.id, dependencies },
+		];
+	});
 }
 
 /**

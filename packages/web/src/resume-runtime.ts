@@ -94,14 +94,19 @@ export function createResumeRuntime(
 			release();
 		else containerSubscriptionReleases.push(release);
 	};
-	const registerComputedRefreshes = async (records: ProtocolStatePayload['computed']) => {
+	const registerComputedRefreshes = async (
+		records: ProtocolStatePayload['computed'],
+		sharedSeeds?: ProtocolStatePayload['sharedSeeds'],
+	) => {
 		const fresh = records.filter(
 			(record) =>
 				record.async === false &&
 				typeof record.deriveSymbolId === 'string' &&
 				!registeredComputedRefreshIds.has(record.graphNodeId),
 		);
-		if (fresh.length === 0) return;
+		// Seeds arrive once, with the page's own state, so they need no fresh check:
+		// one node carries a seed per property, which the node id cannot tell apart.
+		if (fresh.length === 0 && !sharedSeeds?.length) return;
 		for (const record of fresh) {
 			registeredComputedRefreshIds.add(record.graphNodeId);
 			graphNodeIds?.add(record.graphNodeId);
@@ -111,6 +116,7 @@ export function createResumeRuntime(
 		).wireSyncComputedDemandRecordsWithoutLoadingCapability({
 			graph: input.graph,
 			computed: fresh,
+			sharedSeeds,
 			root: input.root,
 			loadSymbol: input.loadSymbol,
 			elementHandles,
@@ -393,7 +399,7 @@ export function createResumeRuntime(
 				graph: input.graph,
 				state: input.state,
 			});
-		await registerComputedRefreshes(input.state?.computed ?? []);
+		await registerComputedRefreshes(input.state?.computed ?? [], input.state?.sharedSeeds);
 		await registerServedBoundaryArms();
 		settleTracker = await (
 			await import('./resume-runtime-start.ts')
