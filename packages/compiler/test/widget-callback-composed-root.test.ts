@@ -170,32 +170,51 @@ test('a part with no enclosing root in its own module routes the slot through th
 	expect(linkedImportedClaimKind(bound)).toBeUndefined();
 });
 
-// T075e. Inlining a shared method into an EVENT handler is what makes its writes
-// reachable, and T075d extended that to callback props. A method that dispatches
-// through its own family's slot must stay a call there: inlined, the callback
-// prop grows a widget-callback claim of its own, which pushes every claim this
-// module publishes up to the consumer and leaves the composed part's gesture
-// running nothing at all. Measured on the checklist: the select-all's own
-// `checked` stopped moving and `onChange` was never called.
-test('a dispatching shared method is not inlined into a callback prop', async () => {
+// T075f. A shared method is inlined into a callback prop for the same reason it
+// is inlined into an event handler: the prop carries no runtime instance to call
+// it on, so leaving the call standing emits a free `g` and the symbol throws
+// `ReferenceError` the moment a slot route invokes it. What T075e was really
+// protecting against is the CLAIM: a widget-callback route published from a
+// callback prop travels to the consumer, and the part's own gesture then binds
+// the wrong symbol. A callback prop is invoked by whatever composed its edge, so
+// no consumer edge can ever answer its slot — the slot's own graph node does,
+// and the route is resolved here rather than published.
+test('a dispatching shared method inlined into a callback prop routes through its own slot node', async () => {
 	const module = await compileTsrxModule({
 		filename: 'src/wcb-group.tsrx',
 		source: DISPATCHING_MIDDLE_SOURCE,
 		symbols: [],
 	});
+	const definitionId = module.semanticGraph.sharedDefinitions[0]!.id;
 	const callbackProp = module.symbolResolver.symbols.find(
 		(symbol) => symbol.kind === 'callback-prop' && symbol.propName === 'onChange',
 	)!;
 
-	expect(callbackProp.source).toContain('g.record(next)');
-	expect(callbackProp.source).not.toContain('g.onChange?.');
-	// The dispatching body is still inlined where a handler owns the whole route.
-	const eventHandler = module.captureAnalysis.extractedSymbols.find(
-		(symbol) => symbol.kind === 'callback-prop',
-	);
+	// The body is inlined, so no free shared-instance reference survives.
+	expect(callbackProp.source).not.toContain('g.record(');
+	expect(callbackProp.source).toContain('g.count = g.count + 1');
+
+	const extracted = module.captureAnalysis.extractedSymbols.find(
+		(symbol) => symbol.symbolId === callbackProp.id,
+	)!;
 	expect(
-		eventHandler?.captureSlots.some((slot) =>
+		extracted.captureSlots.some((slot) =>
 			slot.routes.some((route) => route.kind === 'widget-callback-route'),
-		) ?? false,
+		),
 	).toBe(false);
+	expect(
+		extracted.captureSlots.flatMap((slot) =>
+			slot.routes.filter((route) => route.kind === 'callback-slot-route'),
+		)[0],
+	).toMatchObject({ graphNodeId: `${definitionId}/slot:onChange` });
+	// Nothing about this symbol asks a consumer to bind it.
+	expect(linkedImportedClaimKind(extracted)).toBeUndefined();
+
+	// The emitted module dispatches through the graph node rather than through a
+	// capture context a locally invoked symbol never receives.
+	const emitted = module.symbolModules.modules.find(
+		(candidate) => candidate.symbolId === callbackProp.id,
+	)!;
+	expect(emitted.source).toContain('marklessInvokeCallbackSlot(context, ');
+	expect(emitted.source).toContain(`${definitionId}/slot:onChange`);
 });

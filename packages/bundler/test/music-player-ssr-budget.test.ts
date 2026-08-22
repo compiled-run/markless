@@ -38,6 +38,25 @@ const clientBuild = resolve(demo, '.output/public/build');
 // checkout; T075d claimed slot-free modules emit nothing, but part of the escape emission rides
 // unconditionally - attribution to the exact site owed by the T075f recovery item, which should
 // gate it and walk this number back. Composition cost class; repayment owed by bundler-diet.
+// 65,210 held (T075f, 2026-08-22). The wall constant does not move: this tree measures 65,193
+// across 78 chunks, under it either way. Two facts were revert-measured in one worktree, so both
+// numbers are comparable to each other rather than to the root checkout (a worktree build embeds
+// its longer absolute path and reads a few bytes high, per the 64,514 entry's follow-up note).
+//   - T075f itself costs +9: baseline 65,184 with the whole change set reverted, 65,193 with it
+//     applied, 78 chunks both ways. All of it is the containment on the invoke path in
+//     resume-events.ts (a symbol reached through a callback slot runs in a body no caller awaits,
+//     so its failure is reported instead of escaping as an unhandled rejection). Runtime cost
+//     class by nature, the same "last resort" case the +129 U-G containment entry was.
+//   - The T075d +48 was NOT recovered, and the site named in the recovery charter is not where it
+//     is. The two candidates were checked: the invoke branch in the emitted symbol-resolver module
+//     is already gated (`routesCallbackSlots`, from the bound rows), and the protocol-state cell
+//     machinery is gated on `semanticGraph.sharedCallbackBindings`, which this demo has none of -
+//     it emits neither cell nor graphNodeIds entry. What is left rides the shared composition and
+//     seed chunk every composing page loads: the two identity fields on the scoped graph
+//     (`marklessPageGraph`, `marklessInstancePath` in fns/instance-scope.ts) and the callback
+//     branch in `edgeChildProps` (fns/shared-seed.ts). Both are inside one shared module, so
+//     making them pay-per-use means splitting that chunk, not adding a gate - bundler-diet's
+//     shape, not this task's. Floor documented rather than claimed recovered.
 const MAX_SHIPPED_JS_GZIP_BYTES = 65_210;
 
 test('music-player-ssr production build stays within its shipped JS budget', async () => {

@@ -282,13 +282,27 @@ function widgetCallbackSlots(
 				owner: {},
 				path: [],
 				routes: [
-					{
-						kind: 'widget-callback-route' as const,
-						sharedDefinitionId: invocation.definitionId,
-						slotName: invocation.slotName,
-						rootPropName: binding.propName,
-						rootComponentName: binding.componentName,
-					},
+					// A callback prop is invoked by whatever composed its edge, so no
+					// consumer ever binds it and no consumer edge can answer its slot;
+					// the slot's own graph node is the answer, as it is for a part with
+					// no enclosing root.
+					symbol.kind === 'callback-prop'
+						? {
+								kind: 'callback-slot-route' as const,
+								graphNodeId: sharedCallbackSlotGraphNodeId(
+									invocation.definitionId,
+									invocation.slotName,
+								),
+								rootPropName: binding.propName,
+								rootComponentName: binding.componentName,
+							}
+						: {
+								kind: 'widget-callback-route' as const,
+								sharedDefinitionId: invocation.definitionId,
+								slotName: invocation.slotName,
+								rootPropName: binding.propName,
+								rootComponentName: binding.componentName,
+							},
 				],
 			},
 		];

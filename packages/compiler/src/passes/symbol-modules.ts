@@ -1,5 +1,6 @@
 import type {
 	CaptureSlot,
+	CaptureSlotRoute,
 	GeneratedSymbolModule,
 	PublicRenderPlanAsyncBoundaryArms,
 	PublicRenderPlanBranchArms,
@@ -90,7 +91,9 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 									(route) =>
 										route.componentEdgeId !== undefined ||
 										// A composing module supplies this slot's edge.
-										route.kind === 'widget-callback-route',
+										route.kind === 'widget-callback-route' ||
+										// This module already resolved the slot itself.
+										route.kind === 'callback-slot-route',
 								),
 							),
 						] as const,
@@ -681,8 +684,20 @@ function emitSymbolModule(
 
 function callbackCaptureSlot(slot: CaptureSlot): boolean {
 	return slot.routes.some(
-		(route) => route.kind === 'callback-route' || route.kind === 'widget-callback-route',
+		(route) =>
+			route.kind === 'callback-route' ||
+			route.kind === 'widget-callback-route' ||
+			route.kind === 'callback-slot-route',
 	);
+}
+
+// A slot this module already resolved to its own definition's node: the symbol
+// dispatches through the graph itself rather than through a capture context it
+// never receives.
+function resolvedCallbackSlotRoute(
+	slot: CaptureSlot,
+): Extract<CaptureSlotRoute, { readonly kind: 'callback-slot-route' }> | undefined {
+	return slot.routes.find((route) => route.kind === 'callback-slot-route');
 }
 
 function captureSlotMatchesRead(slot: CaptureSlot, read: LoweredStateRead): boolean {
@@ -3501,6 +3516,17 @@ export function buildEventHandlerEmission(
 
 	return {
 		program: moduleProgramNode([
+			// Only a symbol that dispatches through a slot its own module resolved
+			// carries this import, so no other page pays for it.
+			...(referenced.has(CALLBACK_SLOT_FN)
+				? [
+						moduleImportNode({
+							kind: 'named' as const,
+							localName: CALLBACK_SLOT_FN,
+							source: '@markless/web/fns/callback-slot',
+						}),
+					]
+				: []),
 			...imports.map((moduleImport) =>
 				moduleImportNode({
 					kind: moduleImport.kind,
@@ -3770,11 +3796,7 @@ function eventHandlerAuthoredStatements(
 		return [
 			returnStatementNode(
 				eventAwaitNode(
-					captureInvokeNode(
-						directCallbackSlot.id,
-						[memberChainNode('context.event')],
-						widgetCallbackCaptureSlot(directCallbackSlot),
-					),
+					callbackSlotInvokeNode(directCallbackSlot, [memberChainNode('context.event')]),
 				),
 			),
 		];
@@ -3983,7 +4005,25 @@ function captureInvocationNode(
 		isNode(argument) ? [rewriteCaptureArgumentNode(argument, undefined, rewrite)] : [],
 	);
 
-	return eventAwaitNode(captureInvokeNode(slot.id, args, widgetCallbackCaptureSlot(slot)));
+	return eventAwaitNode(callbackSlotInvokeNode(slot, args));
+}
+
+const CALLBACK_SLOT_FN = 'marklessInvokeCallbackSlot';
+
+// A slot this module resolved itself dispatches straight through the graph node
+// the widget root wrote its answering symbol id into; every other one still goes
+// through the capture context a composing module built.
+function callbackSlotInvokeNode(
+	slot: CaptureSlot,
+	args: ReadonlyArray<EmissionNode>,
+): EmissionNode {
+	const resolved = resolvedCallbackSlotRoute(slot);
+	if (!resolved) return captureInvokeNode(slot.id, args, widgetCallbackCaptureSlot(slot));
+	return callNode(identifierNode(CALLBACK_SLOT_FN), [
+		identifierNode('context'),
+		literalNode(resolved.graphNodeId),
+		arrayNode(args),
+	]);
 }
 
 // A widget callback slot is dropped when no consumer filled it, so the part's
