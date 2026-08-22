@@ -11,7 +11,7 @@ import {
 	type ChildrenProjectionLink,
 	widgetRootsOf,
 } from '../prerender/children-projection.ts';
-import { marklessSsrSpreadProps } from './ssr.ts';
+import { MARKLESS_SSR_CALLBACKS_PROP, marklessSsrSpreadProps } from './ssr.ts';
 
 type SeedEdge = NonNullable<PrerenderDataDefinition['edges']>[number];
 type SeedContext = Parameters<SharedSeedPass>[0];
@@ -230,6 +230,7 @@ function edgeChildProps(
 	read: PrerenderReadSeed,
 ): Record<string, unknown> {
 	const childProps: Record<string, unknown> = {};
+	const callbacks: Record<string, string> = {};
 	for (const prop of edge.props) {
 		if (prop.kind === 'spread' && prop.graphNodeId) {
 			Object.assign(
@@ -240,10 +241,16 @@ function edgeChildProps(
 			childProps[prop.name] = read(prop.graphNodeId, prop.path ?? []);
 		} else if (prop.kind === 'serializable' && 'value' in prop) {
 			childProps[prop.name] = prop.value;
+		} else if (prop.kind === 'callback') {
+			const symbolId = edge.boundSymbols?.[prop.name] ?? prop.symbolId;
+			if (symbolId) callbacks[prop.name] = symbolId;
 		} else if (prop.source !== undefined && context.readEdgeProp) {
 			childProps[prop.name] = context.readEdgeProp(prop);
 		}
 	}
+	// A widget root's callback-slot seed reads its answer from here, so the seed
+	// pass hands the child the same map the render path hands it.
+	if (Object.keys(callbacks).length > 0) childProps[MARKLESS_SSR_CALLBACKS_PROP] = callbacks;
 	return childProps;
 }
 

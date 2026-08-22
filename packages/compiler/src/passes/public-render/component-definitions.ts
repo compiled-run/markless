@@ -2,6 +2,7 @@ import { parseModule } from '../../yuku-tsrx-adapter.ts';
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import { asNodes, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { firstComponentRoot } from './plan.ts';
+import { sharedCallbackSlotGraphNodeId } from '../semantic-graph/collect-shared.ts';
 import { emitClientResidueReader, emitClientResidueReaderPrelude } from './residue-reader.ts';
 import {
 	callbackSymbolIds,
@@ -153,6 +154,14 @@ export function collectPublicRenderComponentDefinitions(
 				? [binding.id]
 				: [],
 		);
+		// A callback slot has no graph binding to travel with, so the root that
+		// fills it carries its node the way it carries the rest of its widget's.
+		const slotGraphNodeIds = (input.semanticGraph.sharedCallbackBindings ?? []).flatMap(
+			(binding) =>
+				binding.componentName === componentName
+					? [sharedCallbackSlotGraphNodeId(binding.definitionId, binding.slotName)]
+					: [],
+		);
 		const initialValues = withComponentSharedSeeds(
 			componentNames.size > 1
 				? componentOwnedInitialValues(input, componentName, rootInfo.componentName)
@@ -200,7 +209,7 @@ export function collectPublicRenderComponentDefinitions(
 				repeatIds: [...repeatIds],
 				initialValues,
 				initialValueKinds,
-				stateGraphNodeIds,
+				stateGraphNodeIds: [...stateGraphNodeIds, ...slotGraphNodeIds],
 				branches: input.renderData.branches.filter((branch) =>
 					branchIds.has(branch.branchSiteId),
 				),

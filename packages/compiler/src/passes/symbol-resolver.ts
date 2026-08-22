@@ -25,7 +25,10 @@ import {
 	createSymbolSourceSemanticsReader,
 	type SymbolSourceSemanticsReader,
 } from './capture-semantics.ts';
-import { componentSharedSeedWrite } from './semantic-graph/collect-shared.ts';
+import {
+	componentSharedSeedWrite,
+	sharedCallbackSlotGraphNodeId,
+} from './semantic-graph/collect-shared.ts';
 import { resolveBoundaryRunners } from './public-render/boundary-runner.ts';
 
 export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPlan {
@@ -86,26 +89,35 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 	for (const edge of input.semanticGraph.componentEdges) {
 		for (const prop of edge.props) {
 			if (prop.kind !== 'callback') continue;
-			const moduleImports = referencedModuleImports(
-				input.semanticGraph.moduleImports,
+			// A callback prop carries no runtime shared instance either, so a method
+			// it calls is inlined the way an event handler's is.
+			const inlined = inlineSharedMethodCalls(
 				prop.source,
+				input.semanticGraph,
+				semanticsReader,
+				true,
 			);
+			const source = inlined.source;
+			const moduleImports = referencedModuleImports(input.semanticGraph.moduleImports, source);
 			symbols.push({
 				id: `symbol:${nextSymbolId++}`,
 				kind: 'callback-prop',
 				componentEdgeId: edge.id,
 				propName: prop.name,
-				source: prop.source,
+				source,
 				sourceSpan: prop.sourceSpan,
 				parameters: prop.parameters ?? [],
 				...(moduleImports.length > 0 ? { moduleImports } : {}),
 				reads: eventReads(
 					input.stateLowering?.reads,
-					[prop.sourceSpan],
-					prop.source,
+					[prop.sourceSpan, ...inlined.spans],
+					source,
 					semanticsReader,
 				),
-				writes: eventWrites(prop.source, input.stateLowering?.writes, [prop.sourceSpan]),
+				writes: eventWrites(source, input.stateLowering?.writes, [
+					prop.sourceSpan,
+					...inlined.spans,
+				]),
 			});
 		}
 	}
@@ -188,6 +200,27 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			name: write.target,
 			source,
 			...(moduleImports.length > 0 ? { moduleImports } : {}),
+		});
+	}
+
+	// A widget root filling a callback slot seeds that slot's node with the id of
+	// the symbol its own prop was compiled into, so a part invoking the slot
+	// reaches the consumer's handler through the graph rather than through an
+	// enclosure its own module cannot see.
+	const seededSlots = new Set<string>();
+	for (const binding of input.semanticGraph.sharedCallbackBindings ?? []) {
+		const graphNodeId = sharedCallbackSlotGraphNodeId(binding.definitionId, binding.slotName);
+		if (seededSlots.has(graphNodeId)) continue;
+		seededSlots.add(graphNodeId);
+		symbols.push({
+			id: `symbol:${nextSymbolId++}`,
+			kind: 'shared-seed',
+			graphNodeId,
+			path: [],
+			componentName: binding.componentName,
+			name: binding.slotName,
+			source: binding.propName,
+			callbackSlotPropName: binding.propName,
 		});
 	}
 
@@ -376,6 +409,10 @@ function inlineSharedMethodCalls(
 	source: string,
 	semanticGraph: SymbolResolverInput['semanticGraph'],
 	semanticsReader: SymbolSourceSemanticsReader,
+	// A dispatching body inlined here would carry a slot claim of its own, and a
+	// callback prop has no route to answer one: the whole family's claims then
+	// travel to the consumer and the part's own gesture runs nothing.
+	skipDispatchingMethods = false,
 ): { readonly source: string; readonly spans: ReadonlyArray<SourceSpan> } {
 	if (!source || semanticGraph.sharedInstances.length === 0) return { source, spans: [] };
 
@@ -390,18 +427,20 @@ function inlineSharedMethodCalls(
 			if (property.kind !== 'method' || !property.source) continue;
 			const callee = `${instance.localName}.${property.name}`;
 			if (!invokesMethod(emitted, callee, semanticsReader)) continue;
-			const body = sharedMethodBodySource(property.source);
-			if (body === null) continue;
+			const method = sharedMethodSource(property.source);
+			if (method === null) continue;
 			// A method that dispatches to a consumer callback awaits that dispatch,
 			// so the inlined body has to be an async context.
 			const dispatches = semanticGraph.sharedCallbackInvocations.some(
 				(invocation) =>
 					invocation.definitionId === definition.id &&
-					body.includes(invocation.calleeSource),
+					method.body.includes(invocation.calleeSource),
 			);
-			emitted = emitted
-				.split(`${callee}()`)
-				.join(dispatches ? `(async () => {${body}})()` : `(() => {${body}})()`);
+			if (dispatches && skipDispatchingMethods) continue;
+			const arrow = `(${dispatches ? 'async ' : ''}(${method.parameters}) => {${method.body}})`;
+			const replaced = replaceMethodCalls(emitted, callee, (args) => `${arrow}(${args})`);
+			if (replaced === emitted) continue;
+			emitted = replaced;
 			if (property.sourceSpan) spans.push(property.sourceSpan);
 		}
 	}
@@ -428,19 +467,82 @@ function invokesMethod(
 }
 
 // The statements between the method's own braces, from the authored property
-// text (`login() { ... }`). A parameterised method is not inlined: the call
-// site would have to bind arguments the graph cannot see.
-function sharedMethodBodySource(propertySource: string): string | null {
+// text (`login() { ... }`, `setAll(on: boolean) { ... }`). The parameter list
+// travels with the body: the inlined arrow binds it to the call's own arguments,
+// which is the same scoping the call had.
+function sharedMethodSource(
+	propertySource: string,
+): { readonly parameters: string; readonly body: string } | null {
 	const open = propertySource.indexOf('(');
 	const close = propertySource.indexOf(')', open + 1);
 	if (open === -1 || close === -1) return null;
-	if (propertySource.slice(open + 1, close).trim() !== '') return null;
 
 	const bodyStart = propertySource.indexOf('{', close);
 	const bodyEnd = propertySource.lastIndexOf('}');
 	if (bodyStart === -1 || bodyEnd <= bodyStart) return null;
 
-	return propertySource.slice(bodyStart + 1, bodyEnd);
+	return {
+		parameters: propertySource.slice(open + 1, close),
+		body: propertySource.slice(bodyStart + 1, bodyEnd),
+	};
+}
+
+/**
+ * Every call of `callee` in this source, replaced by what `build` makes of its
+ * own argument text. The calls are found in the parsed expression rather than in
+ * the text, so the same spelling inside a string or a comment is left alone, and
+ * an argument list containing parentheses or commas keeps its own boundaries. A
+ * source the parser cannot read is returned unchanged: it inlines nothing rather
+ * than splicing text it did not understand.
+ */
+function replaceMethodCalls(
+	source: string,
+	callee: string,
+	build: (argumentSource: string) => string,
+): string {
+	const moduleSource = `const __marklessInlineSource = ${source};`;
+	let ast: AnyNode;
+	try {
+		// Authored handler sources keep their TypeScript annotations, so the parse
+		// has to be told it is reading TypeScript.
+		ast = parseJavaScriptModule(moduleSource, 'generated.ts');
+	} catch {
+		return source;
+	}
+	const offset = moduleSource.indexOf(source);
+	const edits: Array<{ start: number; end: number; text: string }> = [];
+	walkNode(ast, (node) => {
+		if (node.type !== 'CallExpression') return;
+		const target = node.callee as AnyNode | undefined;
+		if (
+			typeof node.start !== 'number' ||
+			typeof node.end !== 'number' ||
+			typeof target?.start !== 'number' ||
+			typeof target?.end !== 'number' ||
+			moduleSource.slice(target.start, target.end) !== callee
+		)
+			return;
+		const args = (node.arguments as AnyNode[] | undefined) ?? [];
+		const argumentSource = args
+			.map((argument) =>
+				typeof argument.start === 'number' && typeof argument.end === 'number'
+					? moduleSource.slice(argument.start, argument.end)
+					: '',
+			)
+			.join(', ');
+		edits.push({ start: node.start, end: node.end, text: build(argumentSource) });
+	});
+	if (edits.length === 0) return source;
+
+	// Outermost first, then apply from the end so earlier offsets stay valid; a
+	// call nested inside one already replaced travelled with that replacement.
+	const ordered = [...edits].sort((left, right) => left.start - right.start);
+	const applied: typeof ordered = [];
+	for (const edit of ordered) if (!applied.some((held) => held.end >= edit.end)) applied.push(edit);
+	let emitted = moduleSource;
+	for (const edit of [...applied].reverse())
+		emitted = emitted.slice(0, edit.start) + edit.text + emitted.slice(edit.end);
+	return emitted.slice(offset, emitted.length - 1);
 }
 
 function eventWrites(

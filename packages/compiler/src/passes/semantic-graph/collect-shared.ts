@@ -166,6 +166,16 @@ export function collectSharedFactoryGraph(
 	}
 }
 
+/**
+ * The graph node a callback slot occupies on its definition, spelled the way
+ * `graphBindingId` spells every other node of a shared factory
+ * (`<definitionId>/<kind>:<name>`). Its value is the page-space id of the symbol
+ * the widget root's own prop answers with, written by the root's seed.
+ */
+export function sharedCallbackSlotGraphNodeId(definitionId: string, slotName: string): string {
+	return `${definitionId}/slot:${slotName}`;
+}
+
 export function sharedCallbackSlotNames(
 	definition: SemanticSharedDefinition,
 ): ReadonlyArray<string> {

@@ -60,6 +60,36 @@ export function GrpCount() @{
 	<output>{g.count}</output>
 }`;
 
+// The checklist's own shape: the composing family declares a callback slot of
+// its OWN and its method dispatches through it, so the method body carries a
+// widget-callback claim wherever it is inlined.
+const DISPATCHING_MIDDLE_SOURCE = `import { shared, state } from '@markless/core';
+import { WcbRoot, WcbTrigger } from './wcb.tsrx';
+export const grp = shared(
+	() => {
+		const g = state({ name: '', count: 0 });
+		return {
+			...g,
+			onChange: undefined as ((count: number) => void) | undefined,
+			record(next: boolean) {
+				g.count = g.count + 1;
+				g.onChange?.(g.count);
+			},
+		};
+	},
+	{ scope: 'widget' },
+);
+export function GrpRoot({ name, onChange, children }) @{
+	const g = grp();
+	g.onChange = onChange;
+	g.name = name;
+
+	<WcbRoot label={g.name} onChange={(next: boolean) => { g.record(next); }}>{children}</WcbRoot>
+}
+export function GrpTrigger() @{
+	<WcbTrigger />
+}`;
+
 async function compileFamily() {
 	return compileTsrxModule({ filename: 'src/wcb.tsrx', source: FAMILY_SOURCE, symbols: [] });
 }
@@ -122,19 +152,50 @@ test('the composing module owns the callback the slot should reach', async () =>
 	).toBe(true);
 });
 
-// The defect, pinned as a fact rather than as a behaviour: no edge in the
-// composing module textually encloses the part, so `enclosingWidgetRootEdge`
-// finds none and the slot folds to a compiler-known undefined. The dispatch then
-// no-ops instead of reaching the handler above.
-test('a part with no enclosing root in its own module loses the slot', async () => {
-	const { middle } = await bindInMiddleModule();
+// T075d: no edge in the composing module textually encloses the part, and only
+// the consumer's nesting says which of this module's roots does. The route
+// therefore names the slot's own graph node: the part's instance resolves that
+// node onto the widget it belongs to, exactly as it resolves its other reads.
+test('a part with no enclosing root in its own module routes the slot through the graph', async () => {
+	const { family, middle } = await bindInMiddleModule();
+	const definitionId = family.semanticGraph.sharedDefinitions[0]!.id;
 	const bound = middle.captureAnalysis.extractedSymbols.find((symbol) => symbol.loaderSymbolId)!;
 
 	expect(bound.captureSlots).toHaveLength(1);
 	expect(bound.captureSlots[0]?.routes[0]).toMatchObject({
-		kind: 'compiler-known-constant',
-		value: undefined,
+		kind: 'callback-slot-route',
+		graphNodeId: `${definitionId}/slot:onChange`,
 	});
 	// Nothing is left for a consumer to resolve: the claim was consumed here.
 	expect(linkedImportedClaimKind(bound)).toBeUndefined();
+});
+
+// T075e. Inlining a shared method into an EVENT handler is what makes its writes
+// reachable, and T075d extended that to callback props. A method that dispatches
+// through its own family's slot must stay a call there: inlined, the callback
+// prop grows a widget-callback claim of its own, which pushes every claim this
+// module publishes up to the consumer and leaves the composed part's gesture
+// running nothing at all. Measured on the checklist: the select-all's own
+// `checked` stopped moving and `onChange` was never called.
+test('a dispatching shared method is not inlined into a callback prop', async () => {
+	const module = await compileTsrxModule({
+		filename: 'src/wcb-group.tsrx',
+		source: DISPATCHING_MIDDLE_SOURCE,
+		symbols: [],
+	});
+	const callbackProp = module.symbolResolver.symbols.find(
+		(symbol) => symbol.kind === 'callback-prop' && symbol.propName === 'onChange',
+	)!;
+
+	expect(callbackProp.source).toContain('g.record(next)');
+	expect(callbackProp.source).not.toContain('g.onChange?.');
+	// The dispatching body is still inlined where a handler owns the whole route.
+	const eventHandler = module.captureAnalysis.extractedSymbols.find(
+		(symbol) => symbol.kind === 'callback-prop',
+	);
+	expect(
+		eventHandler?.captureSlots.some((slot) =>
+			slot.routes.some((route) => route.kind === 'widget-callback-route'),
+		) ?? false,
+	).toBe(false);
 });

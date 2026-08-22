@@ -43,6 +43,7 @@ import {
 	publicRenderValueImports,
 	composedGraphProps,
 	componentOwnedStateNodes,
+	SSR_CALLBACKS_PROP_NAME,
 	stateEntries,
 	staticHostLocators,
 	moduleScopeLines,
@@ -230,6 +231,7 @@ export function emitPublicSsrRenderModule(
 					'marklessSsrHost',
 					'marklessSsrCallbacks',
 					'marklessSsrCallbackSymbol',
+					'marklessSsrCallbackSlot',
 					'marklessSsrSpreadProps',
 					'marklessSsrSeedChild',
 					'marklessSsrWidgetRoots',
@@ -520,11 +522,6 @@ function emitSsrDataRenderLines(
 			),
 		)[0];
 		const hasProjection = projectionChunkId !== undefined;
-		// The seed pass runs before the projected children exist, so it asks for the
-		// same props without the projection.
-		const seedProps = [...props];
-		if (hasProjection && !edge.props.some((prop) => prop.name === 'children'))
-			props.push('children:marklessSsrDataContext.projectionHtml');
 		const callbackEntries = edge.props.flatMap((prop) => {
 			const symbolId = callbacks.get(`${edge.id}:${prop.name}`);
 			if (symbolId) return [`${JSON.stringify(prop.name)}:${JSON.stringify(symbolId)}`];
@@ -540,7 +537,15 @@ function emitSsrDataRenderLines(
 			return [];
 		});
 		if (callbackEntries.length)
-			props.push(`__marklessSsrCallbacks:marklessSsrCallbacks({${callbackEntries.join(',')}})`);
+			props.push(
+				`${SSR_CALLBACKS_PROP_NAME}:marklessSsrCallbacks({${callbackEntries.join(',')}})`,
+			);
+		// The seed pass runs before the projected children exist, so it asks for the
+		// same props without the projection. It keeps the callbacks map: a widget
+		// root's callback-slot seed is exactly the answer that map carries.
+		const seedProps = [...props];
+		if (hasProjection && !edge.props.some((prop) => prop.name === 'children'))
+			props.push('children:marklessSsrDataContext.projectionHtml');
 		const child = {
 			hostPrefix: `c${index}:`,
 			symbolPrefix: componentEdgeInstanceSegment(edge, input.semanticGraph.componentEdges),

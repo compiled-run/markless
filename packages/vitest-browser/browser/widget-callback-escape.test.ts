@@ -40,19 +40,16 @@ async function expectDispatchReachesTheEnclosingGroup(container: ParentNode) {
 		.toEqual(['1', '2']);
 }
 
-// Pinned on the open defect (T075): the claim is resolved in the module that
-// composes the part, and that module cannot know which of ITS roots encloses the
-// part — only the consumer's nesting says. Measured: the route folds to
-// `compiler-known-constant undefined` in wcb-group.tsrx and the dispatch no-ops
-// on both CSR and SSR resume. T075c measured WHERE the answer has to live (a
-// registry keyed by instance path cannot be asked from a capture slot); the
-// design memo is in packages/headless/components/src/checklist/note.md.
-test.skip('CSR: a composed part dispatches to the enclosing family root that placed it', async () => {
+// T075d: the slot is a graph node of the widget's own definition, valued at
+// compose from the callbacks map the composing edge already hands the root, and
+// read at invoke time through the instance-qualified graph. Both halves of the
+// same node, so CSR and SSR resume answer alike.
+test('CSR: a composed part dispatches to the enclosing family root that placed it', async () => {
 	const screen = await render(Page);
 	await expectDispatchReachesTheEnclosingGroup(screen.container as HTMLElement);
 });
 
-test.skip('SSR resume: the same dispatch reaches the same enclosing group', async () => {
+test('SSR resume: the same dispatch reaches the same enclosing group', async () => {
 	const screen = await renderSSR(Page);
 	await expectDispatchReachesTheEnclosingGroup(screen.container);
 });
