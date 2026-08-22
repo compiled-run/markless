@@ -91,7 +91,9 @@ function componentPropsSource(
 	const source = context.source;
 	const props = getElementAttributes(node).flatMap((attribute) => {
 		const name = getIdentifierName(attribute.name as AnyNode | undefined);
-		if (!name) return [];
+		// A spread carries the part's own rest props across the edge, the way SSR
+		// already emits it; dropping it here lost every forwarded attribute.
+		if (!name) return componentAttributePropSource(attribute, source);
 		const callbackSymbolId = edge ? callbackSymbols.get(`${edge.id}:${name}`) : undefined;
 		if (callbackSymbolId) {
 			return `${objectPropertyName(name)}: marklessCsrCallback(${JSON.stringify(callbackSymbolId)})`;

@@ -63,10 +63,10 @@ const MODES = ['CSR', 'SSR'] as const;
 // this family needs is not expressible today; both are measured and described in
 // note.md, and whoever lands the capability deletes the pin.
 //
-//   * EVERY SSR row. `checklist.selectall` and `checklist.item` throw
-//     "Cannot read properties of undefined (reading 'allChecked')" during the
-//     server render: the checklist instance is not available to a part that
-//     renders a composed family's root (note.md gap 8).
+//   * The SSR rows named in SSR_PINNED. The server render itself now works —
+//     a part that renders a composed family's root reaches the enclosing
+//     instance — but every row whose assertion depends on a per-item membership
+//     seed still reads the placeholder (note.md gap 2).
 //   * The CSR rows named below. A prop expression that reads the enclosing
 //     family's instance seeds the composed checkbox against placeholder values,
 //     so a group that starts with anything ticked, disabled or invalid renders as
@@ -86,8 +86,14 @@ const CSR_PINNED = new Set([
 	'an omitted onChange still ticks',
 ]);
 
+// The SSR rows still pinned: every one of them turns on a per-item membership
+// seed. The four SSR rows NOT listed here are green — the server render reaches
+// the enclosing instance now, so a group that starts empty renders and both
+// select-all gestures land, in one list and in two.
+const SSR_PINNED = new Set([...CSR_PINNED, 'unavailable options and a locked group do not toggle']);
+
 function row(mode: (typeof MODES)[number], name: string) {
-	return mode === 'SSR' || CSR_PINNED.has(name) ? test.fails : test;
+	return (mode === 'SSR' ? SSR_PINNED : CSR_PINNED).has(name) ? test.fails : test;
 }
 
 function el<T extends Element = HTMLElement>(locator: { element(): Element | null }) {
@@ -297,101 +303,149 @@ async function expectOmittedCallbackStillTicks() {
 }
 
 for (const mode of MODES) {
-	row(mode, 'the starter renders a named group, a select-all and three items')(`${mode}: the starter renders a named group, a select-all and three items`, async () => {
-		if (mode === 'CSR') await render(Basic);
-		else await renderSSR(Basic);
-		expectBasicRendered();
-	});
+	row(mode, 'the starter renders a named group, a select-all and three items')(
+		`${mode}: the starter renders a named group, a select-all and three items`,
+		async () => {
+			if (mode === 'CSR') await render(Basic);
+			else await renderSSR(Basic);
+			expectBasicRendered();
+		},
+	);
 
-	row(mode, 'some ticked renders the select-all mixed and each item by membership')(`${mode}: some ticked renders the select-all mixed and each item by membership`, async () => {
-		if (mode === 'CSR') await render(Partial);
-		else await renderSSR(Partial);
-		expectPartialRendered();
-	});
+	row(mode, 'some ticked renders the select-all mixed and each item by membership')(
+		`${mode}: some ticked renders the select-all mixed and each item by membership`,
+		async () => {
+			if (mode === 'CSR') await render(Partial);
+			else await renderSSR(Partial);
+			expectPartialRendered();
+		},
+	);
 
-	row(mode, 'a mixed select-all splits aria-checked and indeterminate across two elements')(`${mode}: a mixed select-all splits aria-checked and indeterminate across two elements`, async () => {
-		if (mode === 'CSR') await render(Partial);
-		else await renderSSR(Partial);
-		expectMixedSplitAcrossTriggerAndField();
-	});
+	row(mode, 'a mixed select-all splits aria-checked and indeterminate across two elements')(
+		`${mode}: a mixed select-all splits aria-checked and indeterminate across two elements`,
+		async () => {
+			if (mode === 'CSR') await render(Partial);
+			else await renderSSR(Partial);
+			expectMixedSplitAcrossTriggerAndField();
+		},
+	);
 
-	row(mode, 'unavailable options and a locked group render their flags')(`${mode}: unavailable options and a locked group render their flags`, async () => {
-		if (mode === 'CSR') await render(UnavailableOptions);
-		else await renderSSR(UnavailableOptions);
-		expectDisabledRendered();
-	});
+	row(mode, 'unavailable options and a locked group render their flags')(
+		`${mode}: unavailable options and a locked group render their flags`,
+		async () => {
+			if (mode === 'CSR') await render(UnavailableOptions);
+			else await renderSSR(UnavailableOptions);
+			expectDisabledRendered();
+		},
+	);
 
-	row(mode, 'unavailable options and a locked group do not toggle')(`${mode}: unavailable options and a locked group do not toggle`, async () => {
-		if (mode === 'CSR') await render(UnavailableOptions);
-		else await renderSSR(UnavailableOptions);
-		await expectDisabledBlocks();
-	});
+	row(mode, 'unavailable options and a locked group do not toggle')(
+		`${mode}: unavailable options and a locked group do not toggle`,
+		async () => {
+			if (mode === 'CSR') await render(UnavailableOptions);
+			else await renderSSR(UnavailableOptions);
+			await expectDisabledBlocks();
+		},
+	);
 
-	row(mode, 'a mounted error marks the group invalid, written after the items or before them')(`${mode}: a mounted error marks the group invalid, written after the items or before them`, async () => {
-		if (mode === 'CSR') await render(WithError);
-		else await renderSSR(WithError);
-		expectGroupErrorRendered();
-	});
+	row(mode, 'a mounted error marks the group invalid, written after the items or before them')(
+		`${mode}: a mounted error marks the group invalid, written after the items or before them`,
+		async () => {
+			if (mode === 'CSR') await render(WithError);
+			else await renderSSR(WithError);
+			expectGroupErrorRendered();
+		},
+	);
 
-	row(mode, 'the form carries a name and a value onto every item\'s field')(`${mode}: the form carries a name and a value onto every item's field`, async () => {
-		if (mode === 'CSR') await render(CondimentsForm);
-		else await renderSSR(CondimentsForm);
-		expectFormConfigRendered();
-	});
+	row(mode, "the form carries a name and a value onto every item's field")(
+		`${mode}: the form carries a name and a value onto every item's field`,
+		async () => {
+			if (mode === 'CSR') await render(CondimentsForm);
+			else await renderSSR(CondimentsForm);
+			expectFormConfigRendered();
+		},
+	);
 
-	row(mode, 'only ticked items appear in what the form submits')(`${mode}: only ticked items appear in what the form submits`, async () => {
-		if (mode === 'CSR') await render(CondimentsForm);
-		else await renderSSR(CondimentsForm);
-		await expectTickedItemsSubmit();
-	});
+	row(mode, 'only ticked items appear in what the form submits')(
+		`${mode}: only ticked items appear in what the form submits`,
+		async () => {
+			if (mode === 'CSR') await render(CondimentsForm);
+			else await renderSSR(CondimentsForm);
+			await expectTickedItemsSubmit();
+		},
+	);
 
-	row(mode, 'the select-all ticks every item')(`${mode}: the select-all ticks every item`, async () => {
-		if (mode === 'CSR') await render(Basic);
-		else await renderSSR(Basic);
-		await expectSelectAllTicksEverything();
-	});
+	row(mode, 'the select-all ticks every item')(
+		`${mode}: the select-all ticks every item`,
+		async () => {
+			if (mode === 'CSR') await render(Basic);
+			else await renderSSR(Basic);
+			await expectSelectAllTicksEverything();
+		},
+	);
 
-	row(mode, 'the select-all unticks every item')(`${mode}: the select-all unticks every item`, async () => {
-		if (mode === 'CSR') await render(Basic);
-		else await renderSSR(Basic);
-		await expectSelectAllUnticksEverything();
-	});
+	row(mode, 'the select-all unticks every item')(
+		`${mode}: the select-all unticks every item`,
+		async () => {
+			if (mode === 'CSR') await render(Basic);
+			else await renderSSR(Basic);
+			await expectSelectAllUnticksEverything();
+		},
+	);
 
-	row(mode, 'a mixed select-all ticks everything rather than cycling')(`${mode}: a mixed select-all ticks everything rather than cycling`, async () => {
-		if (mode === 'CSR') await render(Partial);
-		else await renderSSR(Partial);
-		await expectMixedSelectAllTicksEverything();
-	});
+	row(mode, 'a mixed select-all ticks everything rather than cycling')(
+		`${mode}: a mixed select-all ticks everything rather than cycling`,
+		async () => {
+			if (mode === 'CSR') await render(Partial);
+			else await renderSSR(Partial);
+			await expectMixedSelectAllTicksEverything();
+		},
+	);
 
-	row(mode, 'ticking one item moves the select-all to mixed')(`${mode}: ticking one item moves the select-all to mixed`, async () => {
-		if (mode === 'CSR') await render(Basic);
-		else await renderSSR(Basic);
-		await expectOneItemMovesTheSelectAllToMixed();
-	});
+	row(mode, 'ticking one item moves the select-all to mixed')(
+		`${mode}: ticking one item moves the select-all to mixed`,
+		async () => {
+			if (mode === 'CSR') await render(Basic);
+			else await renderSSR(Basic);
+			await expectOneItemMovesTheSelectAllToMixed();
+		},
+	);
 
-	row(mode, 'ticking every item checks the select-all, and unticking one returns it to mixed')(`${mode}: ticking every item checks the select-all, and unticking one returns it to mixed`, async () => {
-		if (mode === 'CSR') await render(Basic);
-		else await renderSSR(Basic);
-		await expectTickingEveryItemChecksTheSelectAll();
-	});
+	row(mode, 'ticking every item checks the select-all, and unticking one returns it to mixed')(
+		`${mode}: ticking every item checks the select-all, and unticking one returns it to mixed`,
+		async () => {
+			if (mode === 'CSR') await render(Basic);
+			else await renderSSR(Basic);
+			await expectTickingEveryItemChecksTheSelectAll();
+		},
+	);
 
-	row(mode, 'a select-all in one list leaves the other list alone')(`${mode}: a select-all in one list leaves the other list alone`, async () => {
-		if (mode === 'CSR') await render(TwoLists);
-		else await renderSSR(TwoLists);
-		await expectInstancesStayIsolated();
-	});
+	row(mode, 'a select-all in one list leaves the other list alone')(
+		`${mode}: a select-all in one list leaves the other list alone`,
+		async () => {
+			if (mode === 'CSR') await render(TwoLists);
+			else await renderSSR(TwoLists);
+			await expectInstancesStayIsolated();
+		},
+	);
 
-	row(mode, 'the consumer onChange is called once with the whole new ticked set')(`${mode}: the consumer onChange is called once with the whole new ticked set`, async () => {
-		if (mode === 'CSR') await render(WithOnChange);
-		else await renderSSR(WithOnChange);
-		await expectConsumerCallbackCarriesTheWholeSet();
-	});
+	row(mode, 'the consumer onChange is called once with the whole new ticked set')(
+		`${mode}: the consumer onChange is called once with the whole new ticked set`,
+		async () => {
+			if (mode === 'CSR') await render(WithOnChange);
+			else await renderSSR(WithOnChange);
+			await expectConsumerCallbackCarriesTheWholeSet();
+		},
+	);
 
-	row(mode, 'an omitted onChange still ticks')(`${mode}: an omitted onChange still ticks`, async () => {
-		if (mode === 'CSR') await render(Basic);
-		else await renderSSR(Basic);
-		await expectOmittedCallbackStillTicks();
-	});
+	row(mode, 'an omitted onChange still ticks')(
+		`${mode}: an omitted onChange still ticks`,
+		async () => {
+			if (mode === 'CSR') await render(Basic);
+			else await renderSSR(Basic);
+			await expectOmittedCallbackStillTicks();
+		},
+	);
 }
 
 // --- keyboard -------------------------------------------------------------

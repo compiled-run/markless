@@ -176,12 +176,19 @@ function aliasExcludesPath(alias: SemanticGraphAlias, path: ReadonlyArray<string
 	});
 }
 
+// A member path segment: a plain property name or an array index. Anything else
+// (a call, an operator, a space) means the source was never a static path.
+const STATIC_GRAPH_PATH_SEGMENT = /^(?:[A-Za-z_$][A-Za-z0-9_$]*|\d+)$/;
+
 // Graph/member path parsing for compiler artifacts, not filesystem or URL path handling.
 export function splitStaticGraphPath(source: string): string[] {
-	return source
+	const segments = source
 		.replace(/\[['"]([^'"]+)['"]\]/g, '.$1')
 		.replace(/\[(\d+)\]/g, '.$1')
 		.split('.')
 		.map((segment) => segment.trim())
 		.filter(Boolean);
+	// Fail closed: a split that produced `includes(item` would otherwise become a
+	// path no runtime object can answer, and the read silently returns undefined.
+	return segments.every((segment) => STATIC_GRAPH_PATH_SEGMENT.test(segment)) ? segments : [];
 }
