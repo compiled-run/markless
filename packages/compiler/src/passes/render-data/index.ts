@@ -260,6 +260,7 @@ function repeatRecord(
 			: { collectionSource: repeat.collectionSource }),
 		collectionPath: repeat.collectionPath,
 		keyPath: repeat.keyPath,
+		...(repeat.indexKey ? { indexKey: true as const } : {}),
 		rowChunkId,
 		...(slot?.emptyTemplateId ? { emptyChunkId: slot.emptyTemplateId } : {}),
 		rowElementCount: chunks.find((chunk) => chunk.id === rowChunkId)?.hosts.length ?? 0,

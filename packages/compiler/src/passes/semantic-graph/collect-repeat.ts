@@ -101,6 +101,7 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 				}),
 		keySource,
 		keyPath: keyPath ?? [],
+		...(isIndexKey ? { indexKey: true as const } : {}),
 	});
 	return repeatIndex;
 }

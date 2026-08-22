@@ -8,6 +8,12 @@ export function GroupRoot({ label, children }) @{
 	<PwrRoot label={label}>{children}</PwrRoot>
 }
 
+// A second root part: a row of the group composes a pwr root of its OWN, so a
+// part written inside it belongs to that row's widget, not to the group's.
+export function GroupItem({ label, children }) @{
+	<PwrRoot label={label}>{children}</PwrRoot>
+}
+
 export function GroupTrigger() @{
 	<PwrTrigger />
 }

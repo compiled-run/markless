@@ -334,7 +334,10 @@ export type SemanticKeyedRepeat = {
 	readonly collectionGraphNodeId?: string;
 	readonly collectionPath: ReadonlyArray<string>;
 	readonly keySource: string;
+	// Empty means the item ITSELF is the key (`key row`), which a list of scalars
+	// is; `indexKey` is what says a row has no data identity at all.
 	readonly keyPath: ReadonlyArray<string>;
+	readonly indexKey?: true;
 };
 
 // A reactive branch site (@if or @switch) sharing the unified document-order
@@ -850,7 +853,9 @@ export type RenderDataRepeat = {
 	// not a graph read: the renderer has no graph node to read the rows from.
 	readonly collectionSource?: string;
 	readonly collectionPath: ReadonlyArray<string>;
+	// Empty means the item itself is the key; `indexKey` means position is.
 	readonly keyPath: ReadonlyArray<string>;
+	readonly indexKey?: true;
 	readonly rowChunkId: string;
 	readonly emptyChunkId?: string;
 	readonly rowElementCount: number;

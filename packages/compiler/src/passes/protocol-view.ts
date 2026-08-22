@@ -302,7 +302,9 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 	);
 	return (input.payloadArena.view.keyedRepeats ?? []).flatMap((repeat) => {
 		const render = renderEntries.get(repeat.id);
-		if (!render || render.keyPath.length === 0 || render.rowElementCount === 0) return [];
+		// An empty key path is `key row`: the item IS the identity. Only a position
+		// key leaves a row with no data identity to resume against.
+		if (!render || render.indexKey === true || render.rowElementCount === 0) return [];
 		const rowHostPaths = hostPathsForChunk(input, render.rowChunkId, true);
 		return [
 			{
