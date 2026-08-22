@@ -10,19 +10,29 @@ name: Screen reader
 #   nvda     - the real NVDA screen reader on Windows. Required green.
 #   voiceover- the real VoiceOver screen reader on macOS. Advisory, see below.
 #
-# The matrix key is the component family. Only checkbox exists today; a new
-# family adds its name to each matrix and nothing else changes.
+# The matrix key is the component family. A new family adds its name to each
+# matrix and nothing else changes.
+#
+# The two real-reader lanes read a served page: apps/sr-gallery renders every
+# family's Basic scenario, and packages/headless/components/sr-real drives NVDA
+# or VoiceOver over it with the same transcript expectations the virtual lane
+# uses. The gallery is built and booted first, in its own step, because a page
+# that never rendered and a reader that never spoke look identical downstream.
+# If that step fails the lane falls back to the drivability smoke, which is the
+# proof no developer machine can reproduce and the one worth keeping either way.
 
 on:
     pull_request:
         paths:
             - 'packages/headless/**'
+            - 'apps/sr-gallery/**'
             - '.github/workflows/screen-reader.yml'
     push:
         branches:
             - main
         paths:
             - 'packages/headless/**'
+            - 'apps/sr-gallery/**'
             - '.github/workflows/screen-reader.yml'
     workflow_dispatch:
 
@@ -65,8 +75,11 @@ jobs:
             - name: Install Playwright browsers for the vitest browser project
               run: pnpm --dir packages/vitest-browser exec playwright install --with-deps chromium
 
-            - name: Typecheck the screen-reader lane
+            - name: Typecheck the screen-reader lanes
               run: pnpm typecheck:sr
+
+            - name: Typecheck the real-reader lane
+              run: pnpm typecheck:sr-real
 
             - name: Read the ${{ matrix.family }} family with the virtual screen reader
               run: pnpm test:sr -- sr/${{ matrix.family }}.sr.test.ts
@@ -79,7 +92,10 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                family: [checkbox, checklist]
+                # Only families with a spec under sr-real/. A family joins this
+                # list when its <family>.nvda.spec.ts exists, not before: a name
+                # with no spec file makes the run find no tests.
+                family: [checkbox]
 
         steps:
             - uses: actions/checkout@v4
@@ -99,7 +115,25 @@ jobs:
             - name: Install NVDA and its automation dependencies
               uses: guidepup/setup-action@v3
 
+            - name: Install the browser the reader reads through
+              run: pnpm exec playwright install --with-deps chromium
+
+            # Its own step, and allowed to fail: this is the gate that decides
+            # whether the reader gets a page to read. It serves the gallery,
+            # loads it, and checks every family rendered.
+            - name: Serve and render the screen-reader gallery
+              id: gallery
+              continue-on-error: true
+              run: node apps/sr-gallery/scripts/boot-check.ts
+
+            - name: Read the ${{ matrix.family }} family with NVDA
+              if: steps.gallery.outcome == 'success'
+              run: pnpm test:sr-real -- --project=nvda ${{ matrix.family }}.nvda.spec.ts
+
+            # Fallback, not a pass: the gallery did not render, so this proves
+            # only that the runner can drive the reader at all.
             - name: Prove the runner can drive NVDA
+              if: steps.gallery.outcome != 'success'
               run: node scripts/ci/screen-reader-smoke.mjs nvda
 
     # Real VoiceOver on macOS. Advisory on purpose, and this is the whole
@@ -119,7 +153,8 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                family: [checkbox, checklist]
+                # See the nvda job: only families with a spec under sr-real/.
+                family: [checkbox]
 
         steps:
             - uses: actions/checkout@v4
@@ -139,5 +174,18 @@ jobs:
             - name: Grant VoiceOver automation permission
               uses: guidepup/setup-action@v3
 
+            - name: Install the browser the reader reads through
+              run: pnpm exec playwright install --with-deps chromium
+
+            - name: Serve and render the screen-reader gallery
+              id: gallery
+              continue-on-error: true
+              run: node apps/sr-gallery/scripts/boot-check.ts
+
+            - name: Read the ${{ matrix.family }} family with VoiceOver
+              if: steps.gallery.outcome == 'success'
+              run: pnpm test:sr-real -- --project=voiceover ${{ matrix.family }}.voiceover.spec.ts
+
             - name: Prove the runner can drive VoiceOver
+              if: steps.gallery.outcome != 'success'
               run: node scripts/ci/screen-reader-smoke.mjs voiceover
