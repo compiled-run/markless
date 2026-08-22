@@ -50,10 +50,17 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 						protocolInstanceQualifies(slot.route.graphNodeId) === false,
 				),
 			));
+	// A slot route reads its answering symbol id out of the graph, so only a page
+	// whose parts actually escape a widget callback carries the extra branch.
+	const routesCallbackSlots = (input.boundSymbols ?? []).some((row) =>
+		row.captureSlots.some((slot) => slot.route.kind === 'callback-slot-route'),
+	);
 	return [
-		...(scopesWidgetGraphs
+		...(scopesWidgetGraphs || routesCallbackSlots
 			? [
-					"import { marklessComposedGraphNodeId } from '@markless/web/fns/instance-scope';",
+					`import { marklessComposedGraphNodeId${
+						routesCallbackSlots ? ', marklessInstancePath' : ''
+					} } from '@markless/web/fns/instance-scope';`,
 					'',
 				]
 			: []),
@@ -103,6 +110,27 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'			const route = requiredCaptureSlot(slots, slotId).route;',
 		// This edge passed no callback for an optional/guarded call site, so the call no-ops like `?.()`.
 		'			if (route.kind === "compiler-known-constant" && route.value === undefined) return undefined;',
+		// The widget root wrote the answering symbol id into the slot's node, and the
+		// part's own instance resolves that node the way it resolves its other reads.
+		...(routesCallbackSlots
+			? [
+					'			if (route.kind === "callback-slot-route") {',
+					'				const slotSymbolId = context.graph.read(route.graphNodeId, []);',
+					'				if (typeof slotSymbolId !== "string") return undefined;',
+					'				if (typeof context.invokeSymbol !== "function") throw new Error("Bound callback invocation is unavailable");',
+					// The answering symbol belongs to the instance that COMPOSED this
+					// widget root, which is the root's own resolved path less the segment
+					// that composed it. A value already carrying a path was written by a
+					// render that knew its own place and is used as it stands. Either way
+					// the page graph goes with it: that instance's path rides its symbol
+					// id, so this part's scope would qualify it a second time.
+					'				const slotPath = marklessComposedGraphNodeId(route.graphNodeId, context.graph.marklessInstancePath ?? "");',
+					'				const rootPath = slotPath.slice(0, slotPath.length - route.graphNodeId.length);',
+					'				const composerPath = marklessInstancePath(slotSymbolId) ? "" : rootPath.slice(0, rootPath.lastIndexOf(":", rootPath.length - 2) + 1);',
+					'				return context.invokeSymbol(composerPath + slotSymbolId, { ...context, graph: context.graph.marklessPageGraph ?? context.graph, event: context.event, args });',
+					'			}',
+				]
+			: []),
 		'			if (route.kind !== callbackRoute) throw new Error(`Capture slot ${slotId} is not a callback route`);',
 		'			if (typeof context.invokeSymbol !== "function") throw new Error("Bound callback invocation is unavailable");',
 		'			return context.invokeSymbol(route.callbackSymbolId, { ...context, event: context.event, args });',

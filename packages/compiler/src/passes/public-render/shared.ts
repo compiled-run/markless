@@ -17,6 +17,13 @@ import { widgetRootComponents } from './shared-seed-pass.ts';
 
 export { componentEdgeInstanceSegment } from '../../component-edge-instance.ts';
 
+/**
+ * The prop a component edge hands its child the ids of the symbols its callback
+ * props were compiled into. `marklessSsrCallbackSymbol` in `@markless/web` reads
+ * it back; every emitter that writes or reads it spells it from here.
+ */
+export const SSR_CALLBACKS_PROP_NAME = '__marklessSsrCallbacks';
+
 export function isComponentRoot(root: AnyNode): boolean {
 	const tagName = getElementTagName(root);
 	return !!tagName && !isHostTagName(tagName);

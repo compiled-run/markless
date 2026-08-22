@@ -1,6 +1,7 @@
 import { createProtocolStatePayload, protocolInstanceQualifies } from '@markless/serializer';
 import type { ProtocolStatePayload } from '@markless/serializer';
 import type { ProtocolStatePayloadInput, SemanticSharedReturnProperty } from '../artifacts.ts';
+import { sharedCallbackSlotGraphNodeId } from './semantic-graph/collect-shared.ts';
 import { planSymbolResolver } from './symbol-resolver.ts';
 
 type StateBindingWithInitializer =
@@ -28,13 +29,19 @@ export function createProtocolStatePayloadFromArena(
 				}
 			: {}),
 	}));
+	const callbackSlots = callbackSlotNodes(input);
 	const sharedDefinitions = input.payloadArena.state.sharedDefinitions.map((definition) => ({
 		id: definition.id,
 		name: definition.name,
 		exportedName: definition.exportedName,
 		...(definition.scope ? { scope: definition.scope } : {}),
 		version: 0,
-		graphNodeIds: definition.graphNodeIds,
+		graphNodeIds: [
+			...definition.graphNodeIds,
+			...callbackSlots.flatMap((slot) =>
+				slot.definitionId === definition.id ? [slot.graphNodeId] : [],
+			),
+		],
 		...(definition.dependencies && definition.dependencies.length > 0
 			? {
 					dependencies: definition.dependencies.map((dependency) => ({
@@ -57,6 +64,14 @@ export function createProtocolStatePayloadFromArena(
 		sharedDefinitions,
 		storage: input.payloadArena.state.storage,
 	});
+	// The slot's cell holds the answering symbol id, written by the widget root's
+	// own seed; it has no factory initial, so it starts unvalued like any cell
+	// whose initial the compiler could not read.
+	const slotCells = callbackSlots.map((slot) => ({
+		graphNodeId: slot.graphNodeId,
+		name: slot.slotName,
+		valueKind: 'unknown' as const,
+	}));
 
 	// Two components of one module may each declare a state() of the same name,
 	// so one id can spell two cells. Consume the bindings for an id in order:
@@ -69,7 +84,7 @@ export function createProtocolStatePayloadFromArena(
 	}
 	const state: ProtocolStatePayload = {
 		...payload,
-		cells: input.payloadArena.state.cells.map((cell) => {
+		cells: [...input.payloadArena.state.cells, ...slotCells].map((cell) => {
 			const queue = pendingBindings.get(cell.graphNodeId);
 			const binding =
 				queue && queue.length > 1 ? queue.shift() : queue?.[0];
@@ -123,8 +138,30 @@ function syncDeriveSymbolIds(input: ProtocolStatePayloadInput): ReadonlyMap<stri
 	);
 }
 
-// A callback slot is a compile-time route with no value, so it never reaches
-// the payload: a page that uses one pays no bytes for it.
+/**
+ * The callback slots a widget root of this module answers, as graph nodes of the
+ * definition that declares them. A slot is a node so the part's dispatch can
+ * reach the consumer's handler through the same instance-qualified graph its
+ * other reads resolve by; a module whose components fill no slot declares none.
+ */
+function callbackSlotNodes(
+	input: ProtocolStatePayloadInput,
+): ReadonlyArray<{
+	readonly definitionId: string;
+	readonly slotName: string;
+	readonly graphNodeId: string;
+}> {
+	const seen = new Set<string>();
+	return (input.semanticGraph.sharedCallbackBindings ?? []).flatMap((binding) => {
+		const graphNodeId = sharedCallbackSlotGraphNodeId(binding.definitionId, binding.slotName);
+		if (seen.has(graphNodeId)) return [];
+		seen.add(graphNodeId);
+		return [{ definitionId: binding.definitionId, slotName: binding.slotName, graphNodeId }];
+	});
+}
+
+// The slot's own return property is a compile-time route with no value, so it
+// never reaches the payload: the node above carries everything runtime needs.
 function payloadReturnProperties(
 	properties: ReadonlyArray<SemanticSharedReturnProperty> | undefined,
 ): ReadonlyArray<Exclude<SemanticSharedReturnProperty, { readonly kind: 'callback-slot' }>> {

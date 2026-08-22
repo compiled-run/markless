@@ -128,6 +128,8 @@ type SsrChildComponent = {
 	/** SSR entry per exported component, for a module that serves more than one. */
 	readonly renderSsrComponents?: Readonly<Record<string, SsrChildComponent>>;
 };
+/** The prop a component edge hands its child the ids of its callback symbols under. */
+export const MARKLESS_SSR_CALLBACKS_PROP = '__marklessSsrCallbacks';
 type SsrChildProps = Readonly<Record<string, unknown>> & {
 	readonly __marklessSsrCallbacks?: Readonly<Record<string, string>>;
 };
@@ -670,6 +672,21 @@ export function marklessSsrCallbacks(callbacks: Readonly<Record<string, string |
 		if (callback) result[key] = callback;
 	}
 	return result;
+}
+/**
+ * A callback slot's answer: the id of the symbol the composing module's own prop
+ * was compiled into. It stays a live value rather than a serialized one so
+ * composition can lift it into that composer's instance space; the serving
+ * boundary serializes it with every other live cell.
+ */
+export function marklessSsrCallbackSlot(
+	state: ComposeStateDraft,
+	graphNodeId: string,
+	symbolId: string | undefined,
+) {
+	const cell = state.cells?.find((candidate) => candidate.graphNodeId === graphNodeId);
+	if (cell && symbolId !== undefined)
+		Object.assign(cell, { value: undefined, directValue: symbolId });
 }
 export function marklessSsrCallbackSymbol(
 	props: SsrChildProps | undefined,

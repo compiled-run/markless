@@ -2,7 +2,11 @@ import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
 import { isIgnorableJsxTextNode as isIgnorableTextNode } from '../../ast/tsrx.ts';
-import { resolveSharedInstanceGraphPath } from '../semantic-graph/collect-shared.ts';
+import {
+	findSharedInstance,
+	resolveSharedInstanceGraphPath,
+	sharedCallbackSlotGraphNodeId,
+} from '../semantic-graph/collect-shared.ts';
 import { sharedInstancePreludeLines } from './residue-reader.ts';
 import type { PublicRenderRoot } from './types.ts';
 
@@ -102,7 +106,15 @@ function sharedStateSeedLine(
 
 	const target = expressionSource(assignment.left as AnyNode, input.source.source);
 	const resolved = resolveSharedInstanceGraphPath(target, input.semanticGraph);
-	if (!resolved) return null;
+	if (!resolved) {
+		return callbackSlotSeedLine(
+			target,
+			input,
+			stateValueFunctionName,
+			stateValuesName,
+			statePayloadName,
+		);
+	}
 
 	const value = expressionSource(assignment.right as AnyNode, input.source.source);
 	const read = `${stateValuesName}.get(${JSON.stringify(resolved.binding.id)})`;
@@ -113,6 +125,38 @@ function sharedStateSeedLine(
 	return `{ const marklessSharedSeed = (${value}); ${stateValueFunctionName}(${stateValuesName}, ${statePayloadName}, ${JSON.stringify(
 		resolved.binding.id,
 	)}, ${seedValueSource(read, resolved.path, 'marklessSharedSeed')}); }`;
+}
+
+/**
+ * `checkbox.onChange = onChange` fills a callback slot. The value that reaches
+ * the browser is not the closure but the id of the symbol this prop was compiled
+ * into, which the composing edge already hands this root; writing it into the
+ * slot's node is what lets a part's dispatch find the consumer's handler.
+ */
+function callbackSlotSeedLine(
+	target: string,
+	input: PublicRenderModuleInput,
+	stateValueFunctionName: string,
+	stateValuesName: string,
+	statePayloadName: string,
+): string | null {
+	void stateValueFunctionName;
+	void stateValuesName;
+	const [localName, slotName, ...rest] = target.split('.');
+	if (!localName || !slotName || rest.length > 0) return null;
+
+	const instance = findSharedInstance(localName, input.semanticGraph);
+	if (!instance) return null;
+
+	const binding = (input.semanticGraph.sharedCallbackBindings ?? []).find(
+		(candidate) =>
+			candidate.definitionId === instance.definition.id && candidate.slotName === slotName,
+	);
+	if (!binding) return null;
+
+	return `marklessSsrCallbackSlot(${statePayloadName}, ${JSON.stringify(
+		sharedCallbackSlotGraphNodeId(binding.definitionId, binding.slotName),
+	)}, marklessSsrCallbackSymbol(props, ${JSON.stringify([binding.propName])}));`;
 }
 
 function isSharedInstanceAssignment(

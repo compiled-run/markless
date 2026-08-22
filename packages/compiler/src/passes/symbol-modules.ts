@@ -18,6 +18,7 @@ import type {
 	SymbolModulesInput,
 	SymbolResolverPlan,
 } from '../artifacts.ts';
+import { PROTOCOL_PROPS_GRAPH_NODE_ID } from '@markless/serializer';
 import type { SourceSpan } from '../diagnostics.ts';
 import {
 	armChildDescent,
@@ -72,7 +73,7 @@ import {
 	withLeadingBlockComment,
 	type EmittedModule,
 } from './emit-codegen.ts';
-import { moduleScopeLines } from './public-render/shared.ts';
+import { moduleScopeLines, SSR_CALLBACKS_PROP_NAME } from './public-render/shared.ts';
 
 export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtifact {
 	const moduleDeclarations = sourceModuleScopeLines(input.source);
@@ -96,15 +97,42 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 					],
 		),
 	);
-	const boundCallbackSymbolIds = new Set(
-		input.captureAnalysis.extractedSymbols.flatMap((symbol) =>
+	// A callback prop a widget answers a slot with is invoked with the dispatched
+	// arguments, exactly like a directly bound callback route — the difference is
+	// only that the runtime, not the compiler, names which symbol answers.
+	const slotAnsweringEdges = input.captureAnalysis.extractedSymbols.flatMap((symbol) =>
+		symbol.captureSlots.flatMap((slot) =>
+			slot.routes.flatMap((route) =>
+				route.kind === 'callback-slot-route'
+					? [{ componentName: route.rootComponentName, propName: route.rootPropName }]
+					: [],
+			),
+		),
+	);
+	const boundCallbackSymbolIds = new Set([
+		...input.captureAnalysis.extractedSymbols.flatMap((symbol) =>
 			symbol.captureSlots.flatMap((slot) =>
 				slot.routes.flatMap((route) =>
 					route.kind === 'callback-route' ? [route.callbackSymbolId] : [],
 				),
 			),
 		),
-	);
+		...(slotAnsweringEdges.length === 0
+			? []
+			: (input.symbolResolver?.symbols ?? []).flatMap((symbol) => {
+					if (symbol.kind !== 'callback-prop') return [];
+					const edge = (input.semanticGraph?.componentEdges ?? []).find(
+						(candidate) => candidate.id === symbol.componentEdgeId,
+					);
+					return slotAnsweringEdges.some(
+						(answered) =>
+							answered.propName === symbol.propName &&
+							answered.componentName === edge?.childComponentName,
+					)
+						? [symbol.id]
+						: [];
+				})),
+	]);
 	const unsupportedCaptureSymbolIds = new Set(
 		input.captureAnalysis.extractedSymbols.flatMap((symbol) =>
 			!symbol.loaderSymbolId && symbol.captureSlots.some((slot) =>
@@ -1249,6 +1277,30 @@ export function buildSharedSeedEmission(input: SharedSeedEmissionInput): Emissio
 
 	const imports = dedupeModuleImports(input.symbol.moduleImports ?? []);
 	const seedLocal = 'marklessSharedSeed';
+	// A callback slot's value is the composing edge's own answer, handed to this
+	// root among its props; there is no authored expression to read.
+	if (input.symbol.callbackSlotPropName !== undefined) {
+		return {
+			program: moduleProgramNode([
+				exportNamedDeclarationNode(
+					functionDeclarationNode(exportName, ['context'], [
+						returnStatementNode(
+							callNode(memberChainNode('context.graph.read'), [
+								literalNode(PROTOCOL_PROPS_GRAPH_NODE_ID),
+								stringArrayNode([
+									SSR_CALLBACKS_PROP_NAME,
+									input.symbol.callbackSlotPropName,
+								]),
+							]),
+						),
+					]),
+				),
+			]),
+			source: input.symbol.source,
+			outputFileName: `${exportName}.js`,
+			site,
+		};
+	}
 	const body: EmissionNode[] = [
 		...imports.map((moduleImport) =>
 			moduleImportNode({

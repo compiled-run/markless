@@ -23,6 +23,7 @@ import {
 	createSymbolSourceSemanticsReader,
 	type SymbolSourceSemanticsReader,
 } from './capture-semantics.ts';
+import { sharedCallbackSlotGraphNodeId } from './semantic-graph/collect-shared.ts';
 
 // Capture analysis owns these diagnostic contract values. Tests and any other
 // reader import them from here rather than restating the strings, so the
@@ -327,8 +328,10 @@ function enclosingWidgetRootEdge(
  * The consumer handler a widget part's slot invocation reaches: the callback
  * prop on the widget root that encloses this part. The resolved route is keyed
  * back onto the part's own edge, because that is the instance whose dispatch
- * runs it. No enclosing root, or a root the consumer gave no such prop, folds to
- * undefined and the invocation no-ops.
+ * runs it. When nothing in this module encloses the part — its root was placed
+ * by a SIBLING part, which only the consumer's nesting relates it to — the route
+ * asks the graph instead: the slot is a node of the widget's own definition, so
+ * the part's own instance resolves it exactly as it resolves its other reads.
  */
 function resolveWidgetCallbackRoute(
 	route: Extract<CaptureSlotRoute, { readonly kind: 'widget-callback-route' }>,
@@ -336,9 +339,14 @@ function resolveWidgetCallbackRoute(
 	input: CaptureAnalysisInput,
 ): CaptureSlotRoute {
 	const rootEdge = enclosingWidgetRootEdge(edge, input.semanticGraph.componentEdges);
-	const resolved = rootEdge
+	const resolved: CaptureSlotRoute = rootEdge
 		? propCaptureRoute([rootEdge], route.rootPropName, [], input, true)
-		: createCompilerKnownConstantCaptureRoute(edge.id, [edge.id], undefined);
+		: {
+				kind: 'callback-slot-route',
+				graphNodeId: sharedCallbackSlotGraphNodeId(route.sharedDefinitionId, route.slotName),
+				rootPropName: route.rootPropName,
+				rootComponentName: route.rootComponentName,
+			};
 	return { ...resolved, componentEdgeId: edge.id, componentEdgePath: [edge.id] };
 }
 

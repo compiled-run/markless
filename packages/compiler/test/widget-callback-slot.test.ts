@@ -39,14 +39,15 @@ async function compileFamily(source = FAMILY_SOURCE) {
 	return compileTsrxModule({ filename: 'src/box.tsrx', source, symbols: [] });
 }
 
-test('a function-typed placeholder on the returned object is a callback slot, not a graph node', async () => {
+test('a function-typed placeholder on the returned object is a callback slot, not a value property', async () => {
 	const family = await compileFamily();
 	const definition = family.semanticGraph.sharedDefinitions[0]!;
 
 	expect(
 		definition.returnProperties?.find((property) => property.name === 'onChange'),
 	).toMatchObject({ kind: 'callback-slot', name: 'onChange' });
-	// No graph node, no seed, no payload row.
+	// It is not an authored state()/computed() binding, and the runtime instance
+	// still exposes no such property: nothing reads the slot as a value.
 	expect(family.semanticGraph.graphBindings.some((binding) => binding.id.endsWith('onChange'))).toBe(
 		false,
 	);
@@ -55,7 +56,42 @@ test('a function-typed placeholder on the returned object is a callback slot, no
 			(property) => property.name === 'onChange',
 		) ?? false,
 	).toBe(false);
-	expect(JSON.stringify(family.protocolState)).not.toContain('onChange');
+});
+
+// T075d: the slot IS a node of its definition, valued by the root that fills it,
+// so a part's dispatch can reach the consumer's handler through the graph.
+test('the slot is a graph node of the definition, declared unvalued', async () => {
+	const family = await compileFamily();
+	const definitionId = family.semanticGraph.sharedDefinitions[0]!.id;
+	const slotGraphNodeId = `${definitionId}/slot:onChange`;
+
+	expect(family.protocolState.sharedDefinitions?.[0]?.graphNodeIds).toContain(slotGraphNodeId);
+	expect(family.protocolState.cells).toContainEqual({
+		graphNodeId: slotGraphNodeId,
+		name: 'onChange',
+		valueKind: 'unknown',
+	});
+	// The value is planned as the root's own seed, read off the composing edge's
+	// callbacks map rather than from any authored expression.
+	expect(
+		family.symbolResolver.symbols.find(
+			(symbol) => symbol.kind === 'shared-seed' && symbol.graphNodeId === slotGraphNodeId,
+		),
+	).toMatchObject({ componentName: 'BoxRoot', callbackSlotPropName: 'onChange', path: [] });
+});
+
+// A module that declares a slot no component fills declares no node: nothing
+// could value it, and an unbound slot is already its own refusal.
+test('a definition whose root fills no slot declares no slot node', async () => {
+	const family = await compileFamily(
+		FAMILY_SOURCE.replace('\tbox.onChange = onChange;\n', '').replace(
+			'box.onChange?.(next);',
+			'',
+		),
+	);
+
+	expect(family.semanticGraph.sharedCallbackBindings).toEqual([]);
+	expect(JSON.stringify(family.protocolState)).not.toContain('slot:onChange');
 });
 
 test('the root binding and the factory invocation are collected as routing facts', async () => {

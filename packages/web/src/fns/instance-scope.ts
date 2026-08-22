@@ -73,10 +73,21 @@ function scopeSymbol(symbol: ResumeSymbol, instancePath: string): ResumeSymbol {
 // Only ids the symbol itself spells are child-local. Shared definitions and the
 // graph's own bookkeeping (journal, flush, subscriptions by record id) stay in
 // page space.
+/**
+ * The scope adapter's own reading of where the symbol it wraps is running.
+ * A symbol that dispatches to ANOTHER instance's symbol needs both: the
+ * unscoped page graph to hand it (its own path already rides its symbol id),
+ * and this path to say which rendered widget it dispatched from.
+ */
+export type MarklessScopedGraph = RuntimeGraph & {
+	readonly marklessPageGraph?: RuntimeGraph;
+	readonly marklessInstancePath?: string;
+};
+
 export function marklessInstanceScopedGraph(
 	graph: RuntimeGraph,
 	instancePath: string,
-): RuntimeGraph {
+): MarklessScopedGraph {
 	if (!instancePath) return graph;
 	// Resume loads a widget piece's symbol by its instance path alone; the widget
 	// roots it must map onto are the qualified definition ids the payload carries,
@@ -92,6 +103,8 @@ export function marklessInstanceScopedGraph(
 	const qualify = (graphNodeId: string) => marklessComposedGraphNodeId(graphNodeId, instancePath);
 	return {
 		...graph,
+		marklessPageGraph: (graph as MarklessScopedGraph).marklessPageGraph ?? graph,
+		marklessInstancePath: instancePath,
 		read: (graphNodeId, path) => graph.read(qualify(graphNodeId), path),
 		write: (write) => graph.write({ ...write, graphNodeId: qualify(write.graphNodeId) }),
 		update: (update) => graph.update({ ...update, graphNodeId: qualify(update.graphNodeId) }),

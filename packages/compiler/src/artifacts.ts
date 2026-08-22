@@ -1181,6 +1181,10 @@ export type PlannedSymbol =
 			readonly name: string;
 			readonly source: string;
 			readonly moduleImports?: ReadonlyArray<SemanticModuleImport>;
+			// A callback-slot seed reads no authored expression: its value is the id
+			// of the symbol this component's own callback prop was compiled into,
+			// which the composing edge already hands the root among its props.
+			readonly callbackSlotPropName?: string;
 	  }
 	| {
 			readonly id: string;
@@ -1333,6 +1337,19 @@ export type CaptureSlotRoute =
 			readonly sharedDefinitionId: string;
 			readonly slotName: string;
 			// The widget root's own prop name, which need not match the slot name.
+			readonly rootPropName: string;
+			readonly rootComponentName: string;
+	  }
+	| {
+			// The resolved widget-callback escape: the answering symbol id is a graph
+			// node of the widget's own definition, so the part's dispatch reaches it
+			// through the same instance-qualified graph its other reads resolve by.
+			readonly kind: 'callback-slot-route';
+			readonly componentEdgeId?: string;
+			readonly componentEdgePath?: ReadonlyArray<string>;
+			readonly graphNodeId: string;
+			// Which of this module's own callback props answers the slot, so the
+			// emitted symbol for it binds the dispatched arguments rather than the event.
 			readonly rootPropName: string;
 			readonly rootComponentName: string;
 	  }

@@ -5,6 +5,7 @@ type SharedSeedSymbol = {
 	readonly path: ReadonlyArray<string>;
 	readonly componentName?: string;
 	readonly source: string;
+	readonly callbackSlotPropName?: string;
 };
 
 /**
@@ -262,6 +263,9 @@ export function componentSharedSeeds(
 						path: symbol.path ?? [],
 						componentName: symbol.componentName,
 						source: symbol.source,
+						...(symbol.callbackSlotPropName !== undefined
+							? { callbackSlotPropName: symbol.callbackSlotPropName }
+							: {}),
 					},
 				]
 			: [],
@@ -290,7 +294,7 @@ export function sharedSeedPassLines(
 		// default seeds undefined the way plain JavaScript would.
 		...seeds.map((seed) => {
 			const id = JSON.stringify(seed.graphNodeId);
-			return `		{ const marklessSharedSeed = (${seed.source}); marklessSsrSeeds.set(${id}, ${sharedSeedValueSource(
+			return `		{ const marklessSharedSeed = (${sharedSeedSource(seed)}); marklessSsrSeeds.set(${id}, ${sharedSeedValueSource(
 				`marklessSsrSeeds.get(${id})`,
 				seed.path,
 				'marklessSharedSeed',
@@ -331,6 +335,14 @@ export function sharedSeedConsumeLine(
 	return readsWidgetInstance
 		? `	for (const [marklessSeedId, marklessSeedValue] of marklessSsrRenderContext?.sharedSeeds ?? []) ${valuesName}.set(marklessSeedId, marklessSeedValue);`
 		: null;
+}
+
+// A callback slot seeds the id of the symbol this root's own prop was compiled
+// into, which the composing edge handed it among its props.
+function sharedSeedSource(seed: SharedSeedSymbol): string {
+	return seed.callbackSlotPropName === undefined
+		? seed.source
+		: `marklessSsrCallbackSymbol(props, ${JSON.stringify([seed.callbackSlotPropName])})`;
 }
 
 // The seed replaces the node's whole value, so a property assignment returns the

@@ -122,18 +122,19 @@ test('the composing module owns the callback the slot should reach', async () =>
 	).toBe(true);
 });
 
-// The defect, pinned as a fact rather than as a behaviour: no edge in the
-// composing module textually encloses the part, so `enclosingWidgetRootEdge`
-// finds none and the slot folds to a compiler-known undefined. The dispatch then
-// no-ops instead of reaching the handler above.
-test('a part with no enclosing root in its own module loses the slot', async () => {
-	const { middle } = await bindInMiddleModule();
+// T075d: no edge in the composing module textually encloses the part, and only
+// the consumer's nesting says which of this module's roots does. The route
+// therefore names the slot's own graph node: the part's instance resolves that
+// node onto the widget it belongs to, exactly as it resolves its other reads.
+test('a part with no enclosing root in its own module routes the slot through the graph', async () => {
+	const { family, middle } = await bindInMiddleModule();
+	const definitionId = family.semanticGraph.sharedDefinitions[0]!.id;
 	const bound = middle.captureAnalysis.extractedSymbols.find((symbol) => symbol.loaderSymbolId)!;
 
 	expect(bound.captureSlots).toHaveLength(1);
 	expect(bound.captureSlots[0]?.routes[0]).toMatchObject({
-		kind: 'compiler-known-constant',
-		value: undefined,
+		kind: 'callback-slot-route',
+		graphNodeId: `${definitionId}/slot:onChange`,
 	});
 	// Nothing is left for a consumer to resolve: the claim was consumed here.
 	expect(linkedImportedClaimKind(bound)).toBeUndefined();
