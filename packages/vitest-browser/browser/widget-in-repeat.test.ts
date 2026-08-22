@@ -1,8 +1,10 @@
 import { afterEach, expect, test } from 'vitest';
-import { cleanup, render, renderSSRPhased } from '../src/index.ts';
+import { cleanup, render, renderSSR, renderSSRPhased } from '../src/index.ts';
 import Control from './fixtures/rpt-control.tsrx';
+import IndexKeyedPage from './fixtures/rpt-index-page.tsrx';
 import PlainChild from './fixtures/rpt-plain-child.tsrx';
 import Page from './fixtures/rpt-page.tsrx';
+import ReorderPage from './fixtures/rpt-reorder-page.tsrx';
 import StaticPage from './fixtures/rpt-static-page.tsrx';
 import UiPage from './fixtures/rpt-ui-page.tsrx';
 import UiStaticPage from './fixtures/rpt-ui-static-page.tsrx';
@@ -21,7 +23,9 @@ import UiStaticPage from './fixtures/rpt-ui-static-page.tsrx';
 // boundary (marklessRowFreeSymbolId) so routes and symbol tables still see the
 // path they were emitted with, while the FULL path — row included — is what
 // qualifies graph nodes, widget instances, host ids, and minted element() ids.
-// SSR stays refused: finding 2 below is the next unit.
+// T068 closed finding 2: the server mints the same row segment, so a keyed row
+// composes a child record of its own and its gestures resume into their own row.
+// The one shape left refused is a row keyed by INDEX, which carries no row value.
 afterEach(() => cleanup());
 
 const SSR_REFUSAL = 'MARKLESS_ROW_COMPONENT_INTERACTIVE';
@@ -80,35 +84,99 @@ test("CSR: each row's label comes from its own row", async () => {
 });
 
 // ---------------------------------------------------------------------------
-// Finding 2. SSR refuses a widget root in a row, by design and by name. The
-// refusal fires on the SERVER render, before any HTML exists, so there is no
-// resume to witness. It fires with literal root props too: it is the widget's
-// own state and events that trip it, not the row-derived props of finding 1.
-// These stay pinned: lifting the refusal is the SSR unit that follows T067, and
-// it cannot land before finding 3 gives each row an instance of its own.
+// Finding 2, closed by T068. SSR used to refuse a widget root in a row by name
+// (MARKLESS_ROW_COMPONENT_INTERACTIVE), because a repeating row could not own a
+// composed child record. It can now: the same `r:<key>:` runtime segment CSR
+// mints is minted on the server too, so each row composes a child of its own —
+// its own payload entry, its own seeds, its own minted ids, its own event
+// routes. The guard stays for the shapes that still cannot resume (below).
 // ---------------------------------------------------------------------------
 
-test('SSR: a widget root inside a @for refuses with the row-component diagnostic', async () => {
-	await expect(renderSSRPhased(Page)).rejects.toThrow(SSR_REFUSAL);
+test('SSR: a widget root inside a @for renders one seeded root per row', async () => {
+	const phased = await renderSSRPhased(Page);
+	expect((phased.html.match(/data-rpt-root/g) ?? []).length).toBe(3);
+	expect(displays(phased.mount().container)).toEqual(['true', 'false', 'false']);
 });
 
-test('SSR: it refuses with literal root props as well', async () => {
-	await expect(renderSSRPhased(StaticPage)).rejects.toThrow(SSR_REFUSAL);
+test("SSR: each row's label comes from its own row", async () => {
+	const phased = await renderSSRPhased(Page);
+	const labels = [...phased.mount().container.querySelectorAll('[data-rpt-label]')];
+	expect(labels.map((node) => node.textContent)).toEqual(['alpha', 'beta', 'gamma']);
 });
 
-test('SSR: the real @markless/ui checkbox refuses the same way', async () => {
-	await expect(renderSSRPhased(UiStaticPage)).rejects.toThrow(SSR_REFUSAL);
+test('SSR: it renders with literal root props as well', async () => {
+	const phased = await renderSSRPhased(StaticPage);
+	expect((phased.html.match(/data-rpt-trigger/g) ?? []).length).toBe(3);
+	expect(displays(phased.mount().container)).toEqual(['false', 'false', 'false']);
+});
+
+test('SSR: the real @markless/ui checkbox renders per row too', async () => {
+	const phased = await renderSSRPhased(UiStaticPage);
+	expect((phased.html.match(/data-ui-trigger/g) ?? []).length).toBe(3);
+});
+
+test('SSR: each row mints its own element() id', async () => {
+	const phased = await renderSSRPhased(StaticPage);
+	const ids = [...phased.mount().container.querySelectorAll('[data-rpt-trigger]')].map((node) =>
+		node.getAttribute('id'),
+	);
+	expect(ids.every(Boolean)).toBe(true);
+	expect(new Set(ids).size).toBe(3);
+});
+
+test('SSR: each row label points at its OWN row trigger', async () => {
+	const phased = await renderSSRPhased(StaticPage);
+	const rows = [...phased.mount().container.querySelectorAll('[data-row]')];
+	expect(rows.length).toBe(3);
+	for (const row of rows) {
+		const label = row.querySelector<HTMLLabelElement>('[data-rpt-label]');
+		expect(label?.control).toBe(row.querySelector('[data-rpt-trigger]'));
+	}
+});
+
+test('SSR resume: clicking one row trigger flips that row alone', async () => {
+	const screen = await renderSSR(StaticPage);
+	const triggers = [...screen.container.querySelectorAll<HTMLButtonElement>('[data-rpt-trigger]')];
+	expect(triggers.length).toBe(3);
+
+	triggers[1]?.click();
+	await expect.poll(() => displays(screen.container)).toEqual(['false', 'true', 'false']);
+});
+
+test('SSR resume: a second row keeps its own seed after the first row is flipped', async () => {
+	const screen = await renderSSR(Page);
+	const triggers = [...screen.container.querySelectorAll<HTMLButtonElement>('[data-rpt-trigger]')];
+
+	triggers[2]?.click();
+	await expect.poll(() => displays(screen.container)).toEqual(['true', 'false', 'true']);
+});
+
+// Keys are identity, not positions: the same three rows rendered in a different
+// order resolve the same three instances, so each row's seed travels with its key.
+// What the narrowed guard still covers. A @for with no key at all is already a
+// build-time error, so the shape left is `key i`: identity by position carries
+// no row value, so there is nothing to mint a per-row instance from and the
+// server refuses rather than resuming every gesture into row 0.
+test('SSR: a widget root in an INDEX-keyed row still refuses', async () => {
+	await expect(renderSSRPhased(IndexKeyedPage)).rejects.toThrow(SSR_REFUSAL);
+});
+
+test('SSR: a differently-ordered second render keeps each key with its own seed', async () => {
+	const phased = await renderSSRPhased(ReorderPage);
+	const container = phased.mount().container;
+	const rows = [...container.querySelectorAll('[data-row]')];
+	expect(rows.map((row) => row.getAttribute('data-row'))).toEqual(['r3', 'r1', 'r2']);
+	expect(
+		rows.map((row) => row.querySelector('[data-rpt-display]')?.textContent),
+	).toEqual(['false', 'true', 'false']);
 });
 
 // ---------------------------------------------------------------------------
-// Finding 3, still open after T067. With literal root props the CSR path
-// renders one root per row, so the markup is there - but every row shares one
-// build-time host and symbol prefix. Two consequences: the minted element() id
-// repeats, and no row's gesture dispatches at all. The blocker is named at the
-// top of this file: the symbol-route matcher takes a compile-time literal, and
-// a row key is not one. The compiler now REFUSES this shape at build time
-// (MARKLESS_WIDGET_ROOT_IN_REPEAT), so nothing reaches a user silently while
-// these rows stay red.
+// Finding 3, closed by T067b. It used to be that with literal root props the
+// CSR path rendered one root per row, so the markup was there - but every row
+// shared one build-time host and symbol prefix, so the minted element() id
+// repeated and no row's gesture dispatched at all. The blocker is named at the
+// top of this file, and the row segment resolves it.
 // ---------------------------------------------------------------------------
 
 test('CSR: a widget root with literal props renders once per row', async () => {

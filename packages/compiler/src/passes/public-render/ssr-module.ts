@@ -201,6 +201,8 @@ export function emitPublicSsrRenderModule(
 					'marklessSsrRenderChild',
 					'marklessSsrComponentPart',
 					'marklessSsrRowChild',
+					'marklessSsrRowPlacement',
+					'marklessSsrRowSegment',
 					'marklessAssertPresentationalRowChild',
 					'marklessSsrBranchArm',
 					'marklessSsrRunAsyncComputed',
@@ -248,11 +250,37 @@ export function emitPublicSsrRenderModule(
 		.join('\n');
 }
 
+// The component edges whose slot renders inside a `@for` row, so one compile-time
+// edge is many instances at render time. The walk follows only the chunks the row
+// renderer hands its row context to: a row template, and a projection, which
+// travels with the row that placed it. A branch arm, an async arm, an empty list,
+// and a dynamic host's children are all rendered without the row context.
+function rowScopedEdgeIds(
+	chunks: PublicRenderModuleInput['renderData']['chunks'],
+): ReadonlySet<string> {
+	const byId = new Map(chunks.map((chunk) => [chunk.id, chunk]));
+	const edgeIds = new Set<string>();
+	const walked = new Set<string>();
+	const walk = (chunkId: string) => {
+		if (walked.has(chunkId)) return;
+		walked.add(chunkId);
+		for (const slot of byId.get(chunkId)?.slots ?? []) {
+			if (slot.kind === 'child-component') {
+				edgeIds.add(slot.componentEdgeId);
+				if (slot.projectionChunkId) walk(slot.projectionChunkId);
+			} else if (slot.kind === 'repeat') walk(slot.rowTemplateId);
+		}
+	};
+	for (const chunk of chunks) if (chunk.kind === 'repeat-row') walk(chunk.id);
+	return edgeIds;
+}
+
 function emitSsrDataRenderLines(
 	input: PublicRenderModuleInput,
 	componentName: string,
 	references: ReadonlyArray<{ readonly componentName: string; readonly localName: string }>,
 ): string[] {
+	const rowScopedEdges = rowScopedEdgeIds(input.renderData.chunks);
 	const chunks = input.renderData.chunks.filter((chunk) => chunk.componentName === componentName);
 	const componentGraphNodeIds = new Set(
 		chunks.flatMap((chunk) =>
@@ -492,11 +520,27 @@ function emitSsrDataRenderLines(
 					edge.id,
 					`marklessSsrSeeds.set(${JSON.stringify(
 						MARKLESS_WIDGET_INSTANCE_KEY,
-					)},marklessSsrIdPrefix+${JSON.stringify(child.symbolPrefix)});`,
+					)},marklessSsrIdPrefix+${
+						// A widget rooted per row is one instance per row, so the token its
+						// parts mint ids from names the row as well as the edge.
+						rowScopedEdges.has(edge.id)
+							? 'marklessSsrRowSegment(marklessSsrDataContext.repeatKey)+'
+							: ''
+					}${JSON.stringify(child.symbolPrefix)});`,
 				);
 		}
+		// A row-scoped edge takes its row's runtime segment ahead of its own
+		// prefixes, so each row composes an instance of its own. An UNKEYED row has
+		// no identity to carry, so its interactive output still refuses.
+		const rowScoped = rowScopedEdges.has(edge.id);
+		const placement = rowScoped
+			? `marklessSsrRowPlacement(${JSON.stringify(child)},marklessSsrDataContext.repeatKey)`
+			: JSON.stringify(child);
+		const refusal = rowScoped
+			? `if(marklessSsrDataContext.repeatKey===undefined){marklessAssertPresentationalRowChild(output,${JSON.stringify(edge.childComponentName)});return output;}`
+			: `if(marklessSsrDataContext.repeatItem!==undefined){marklessAssertPresentationalRowChild(output,${JSON.stringify(edge.childComponentName)});return output;}`;
 		return [
-			`case ${JSON.stringify(edge.id)}:{const child=${JSON.stringify(child)};const childProps={${props.join(',')}};const output=await ${childSurface}?.renderSsr?.(childProps,{...marklessSsrRenderContext,idPrefix:marklessSsrIdPrefix+child.hostPrefix${projectedEdgeIds.has(edge.id) ? ',sharedSeeds:marklessSsrDataContext.sharedSeeds' : ''}});if(!output)throw new Error('MARKLESS_SSR_DATA_CHILD_RENDER_MISSING: ${edge.id}');if(marklessSsrDataContext.repeatItem!==undefined){marklessAssertPresentationalRowChild(output,${JSON.stringify(edge.childComponentName)});return output;}marklessSsrChildren.push({...child,output,callbackProps:childProps.__marklessSsrCallbacks??{}});return output;}`,
+			`case ${JSON.stringify(edge.id)}:{const child=${placement};const childProps={${props.join(',')}};const output=await ${childSurface}?.renderSsr?.(childProps,{...marklessSsrRenderContext,idPrefix:marklessSsrIdPrefix+child.hostPrefix${projectedEdgeIds.has(edge.id) ? ',sharedSeeds:marklessSsrDataContext.sharedSeeds' : ''}});if(!output)throw new Error('MARKLESS_SSR_DATA_CHILD_RENDER_MISSING: ${edge.id}');${refusal}marklessSsrChildren.push({...child,output,callbackProps:childProps.__marklessSsrCallbacks??{}});return output;}`,
 		];
 	});
 	// U-H: every part of one widget instance seeds before any part renders, so a
