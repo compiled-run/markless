@@ -3,6 +3,7 @@ import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
 import { firstComponentRoot } from './plan.ts';
 import { renderBodyLines } from './render-body.ts';
+import { ssrSeedForwardBlockLines, type SsrDataLines } from './ssr-module.ts';
 import {
 	componentSharedSeeds,
 	sharedSeedConsumeLine,
@@ -62,7 +63,7 @@ export function emitSameModuleSsrComponents(
 	input: PublicRenderModuleInput,
 	references: ReadonlyArray<ComponentReference>,
 	rootComponentName: string,
-	renderDataLines: (componentName: string) => ReadonlyArray<string>,
+	componentDataLines: (componentName: string) => SsrDataLines,
 ): string[] {
 	const remapsGraphProps = hasPropDependentComputed(input);
 	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
@@ -86,6 +87,10 @@ export function emitSameModuleSsrComponents(
 		const owned = componentOwnedStateNodes(input, componentName, rootComponentName);
 		const valuesName = `marklessSsrStateValues${componentName}`;
 		const localName = localNames.get(componentName);
+		const dataLines = componentDataLines(componentName);
+		const payloadStateExpression = `marklessSelectStateNodes(marklessCloneState(payloadState), ${JSON.stringify(
+			owned.cellIndexes,
+		)}, ${JSON.stringify(owned.computedIndexes)})`;
 		return [
 			`const ${valuesName} = new Map([`,
 			stateEntries(input, owned.seedCellIndexes).join(',\n'),
@@ -93,10 +98,18 @@ export function emitSameModuleSsrComponents(
 			localName ? `const ${localName} = { renderSsr: ${functionName} };` : null,
 			`async function ${functionName}(props = {}, marklessSsrRenderContext) {`,
 			destructureProps(rootInfo.propNames, rootInfo.component, input.source.source),
-			...sharedSeedPassLines(componentSharedSeeds(input, componentName), valuesName),
-			`	const marklessSsrPayloadState = marklessSelectStateNodes(marklessCloneState(payloadState), ${JSON.stringify(
-				owned.cellIndexes,
-			)}, ${JSON.stringify(owned.computedIndexes)});`,
+			...sharedSeedPassLines(
+				componentSharedSeeds(input, componentName),
+				valuesName,
+				ssrSeedForwardBlockLines(
+					input,
+					rootInfo,
+					valuesName,
+					payloadStateExpression,
+					dataLines.seedForward,
+				),
+			),
+			`	const marklessSsrPayloadState = ${payloadStateExpression};`,
 			`	const marklessSsrRenderStateValues = new Map(${valuesName});`,
 			sharedSeedConsumeLine(input, componentName, 'marklessSsrRenderStateValues'),
 			...renderBodyLines(
@@ -109,7 +122,7 @@ export function emitSameModuleSsrComponents(
 					'const marklessSsrChildren = [];',
 					'const marklessSsrBranches = [];',
 					'const marklessSsrAsyncSnapshots = [];',
-					...renderDataLines(componentName),
+					...dataLines.render,
 				],
 			),
 			'	const html = marklessSsrRendered.html;',
@@ -117,8 +130,16 @@ export function emitSameModuleSsrComponents(
 			`	const marklessSsrState = ${ssrComposeStateExpression(input, rootInfo.component, componentName)};`,
 			`	return { html, state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots), view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) }, elementCount: marklessSsrComposition.elementCount, propEvents: [], externalSymbolIds: marklessSsrComposition.externalSymbolIds, structure: marklessSsrRendered.structure, structureTokens: marklessSsrRendered.structureTokens${remapsGraphProps ? ', m(graphProps, instancePath) { marklessSsrRemapGraphOutput(this, graphProps, instancePath); }' : ''} };`,
 			'}',
-			sharedSeedMarkerLine(componentSharedSeeds(input, componentName), functionName),
-			widgetRootMarkerLine(widgetRootDefinitionIds(input, componentName), functionName),
+			sharedSeedMarkerLine(
+				componentSharedSeeds(input, componentName),
+				functionName,
+				dataLines.seedForward,
+			),
+			widgetRootMarkerLine(
+				widgetRootDefinitionIds(input, componentName),
+				functionName,
+				dataLines.composedRootSurfaceArgs,
+			),
 		].filter((line): line is string => line !== null);
 	});
 }

@@ -321,14 +321,28 @@ async function expectOmittedCallbackStillTicks() {
 // Un-pin when a part's slot invocation reaches the root edge's callback.
 
 // T075g landed the return leg: a composed CheckboxRoot's `checked` follows the
-// group's write, so the rows using it run on CSR. Their SSR halves stay pinned on
-// a SEPARATE, older defect, measured on this base and on the pre-T075g tip, alone
-// as well as beside this file's other SSR rows: the server-rendered select-all
-// trigger comes back aria-checked="false" while the group's own root element
-// already carries ui-mixed, so the composed checkbox's seed reaches the root's
-// own attributes but not a sibling part's render. A render-time seed defect, not
-// a resume one.
-const csrOnly = (mode: (typeof MODES)[number]) => (mode === 'CSR' ? test : test.skip);
+// group's write, so the rows using it run on CSR.
+//
+// T075h landed their SSR halves. The server render is two phases — seed, then
+// render — and the parts a consumer writes inside `<checklist.root>` render in
+// the FIRST phase, before the root composes its `<CheckboxRoot>` at all. The
+// seed phase now composes that root too: it runs the same body, derives the same
+// values, and hands the composed root the same props the render hands it, so a
+// part reads a seeded checkbox instance rather than the factory placeholder. It
+// also declares the families that composed root starts, so a sibling item that
+// composes a checkbox of its own is an instance boundary rather than the last
+// writer of one shared seed.
+//
+// Four of the seven flipped. The three below are pinned on a NEW named defect,
+// measured on this branch: A SEEDED SELECT-ALL DOES NOT MOVE ON THE FIRST
+// GESTURE AFTER RESUME. Before the seed phase composed the root, the served
+// payload carried no value at all for the select-all's `checkbox.checked`, and
+// the first click wrote one. With a value served, the first click no longer
+// changes what the trigger renders — the gesture reaches the checkbox and the
+// group's own derive still answers from the served set, because the group write
+// (`checklist.setAll`) is the dispatch that never leaves the widget. Un-pin with
+// that dispatch, or with a resume that lets a seeded widget's own write win.
+const gestureLeg = (mode: (typeof MODES)[number]) => (mode === 'CSR' ? test : test.skip);
 
 for (const mode of MODES) {
 	test(`${mode}: the starter renders a named group, a select-all and three items`, async () => {
@@ -343,25 +357,25 @@ for (const mode of MODES) {
 		expectOneElementPerPart();
 	});
 
-	csrOnly(mode)(`${mode}: some ticked renders the select-all mixed and each item by membership`, async () => {
+	test(`${mode}: some ticked renders the select-all mixed and each item by membership`, async () => {
 		if (mode === 'CSR') await render(Partial);
 		else await renderSSR(Partial);
 		expectPartialRendered();
 	});
 
-	csrOnly(mode)(`${mode}: a mixed select-all splits aria-checked and indeterminate across two elements`, async () => {
+	test(`${mode}: a mixed select-all splits aria-checked and indeterminate across two elements`, async () => {
 		if (mode === 'CSR') await render(Partial);
 		else await renderSSR(Partial);
 		expectMixedSplitAcrossTriggerAndField();
 	});
 
-	csrOnly(mode)(`${mode}: unavailable options and a locked group render their flags`, async () => {
+	test(`${mode}: unavailable options and a locked group render their flags`, async () => {
 		if (mode === 'CSR') await render(UnavailableOptions);
 		else await renderSSR(UnavailableOptions);
 		expectDisabledRendered();
 	});
 
-	csrOnly(mode)(`${mode}: unavailable options and a locked group do not toggle`, async () => {
+	test(`${mode}: unavailable options and a locked group do not toggle`, async () => {
 		if (mode === 'CSR') await render(UnavailableOptions);
 		else await renderSSR(UnavailableOptions);
 		await expectDisabledBlocks();
@@ -373,7 +387,7 @@ for (const mode of MODES) {
 		expectGroupErrorRendered();
 	});
 
-	csrOnly(mode)(`${mode}: the form carries a name and a value onto every item's field`, async () => {
+	test(`${mode}: the form carries a name and a value onto every item's field`, async () => {
 		if (mode === 'CSR') await render(CondimentsForm);
 		else await renderSSR(CondimentsForm);
 		expectFormConfigRendered();
@@ -391,7 +405,7 @@ for (const mode of MODES) {
 		await expectSelectAllTicksEverything();
 	});
 
-	test(`${mode}: the select-all unticks every item`, async () => {
+	gestureLeg(mode)(`${mode}: the select-all unticks every item`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 		await expectSelectAllUnticksEverything();
@@ -403,7 +417,7 @@ for (const mode of MODES) {
 		await expectMixedSelectAllTicksEverything();
 	});
 
-	csrOnly(mode)(`${mode}: ticking one item moves the select-all to mixed`, async () => {
+	gestureLeg(mode)(`${mode}: ticking one item moves the select-all to mixed`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 		await expectOneItemMovesTheSelectAllToMixed();
@@ -433,7 +447,7 @@ for (const mode of MODES) {
 		await expectConsumerCallbackCarriesTheWholeSet();
 	});
 
-	csrOnly(mode)(`${mode}: an omitted onChange still ticks`, async () => {
+	gestureLeg(mode)(`${mode}: an omitted onChange still ticks`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 		await expectOmittedCallbackStillTicks();

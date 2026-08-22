@@ -244,10 +244,17 @@ export function widgetRootDefinitionIds(
 export function widgetRootMarkerLine(
 	definitionIds: ReadonlyArray<string>,
 	functionName: string,
+	// The child this component composes around its own children roots its own
+	// families, and a rendered instance of this component starts them too - so a
+	// sibling that composes the same family is an instance boundary. Which
+	// families that child roots is answered where it was compiled, so the marker
+	// asks it at module load.
+	composedRootSurfaceArgs: ReadonlyArray<string> = [],
 ): string | null {
-	return definitionIds.length > 0
-		? `${functionName}.marklessWidgetRoots = ${JSON.stringify(definitionIds)};`
-		: null;
+	const composed = composedRootSurfaceArgs.map((args) => `...marklessSsrWidgetRoots(${args})`);
+	if (definitionIds.length === 0 && composed.length === 0) return null;
+	const entries = [...definitionIds.map((id) => JSON.stringify(id)), ...composed];
+	return `${functionName}.marklessWidgetRoots = [${entries.join(',')}];`;
 }
 
 /** The shared-instance seeds one component's body writes from its own props. */
@@ -280,8 +287,12 @@ export function componentSharedSeeds(
 export function sharedSeedPassLines(
 	seeds: ReadonlyArray<SharedSeedSymbol>,
 	staticValuesName: string,
+	// Lines that seed the widget root this component composes around its own
+	// children: that root is composed during this component's render, which is
+	// after the consumer rendered those children, so the seed phase runs it.
+	forwardLines: ReadonlyArray<string> = [],
 ): string[] {
-	if (seeds.length === 0) return [];
+	if (seeds.length === 0 && forwardLines.length === 0) return [];
 	const nodeIds = [...new Set(seeds.map((seed) => seed.graphNodeId))];
 	return [
 		'	if (marklessSsrRenderContext?.marklessSharedSeeds) {',
@@ -300,6 +311,7 @@ export function sharedSeedPassLines(
 				'marklessSharedSeed',
 			)}); }`;
 		}),
+		...forwardLines,
 		'		return;',
 		'	}',
 	];
@@ -313,8 +325,11 @@ export function sharedSeedPassLines(
 export function sharedSeedMarkerLine(
 	seeds: ReadonlyArray<SharedSeedSymbol>,
 	functionName: string,
+	forwardLines: ReadonlyArray<string> = [],
 ): string | null {
-	return seeds.length > 0 ? `${functionName}.marklessSeedsShared = true;` : null;
+	return seeds.length > 0 || forwardLines.length > 0
+		? `${functionName}.marklessSeedsShared = true;`
+		: null;
 }
 
 /** A component that reads a widget-scoped shared instance renders from the seeds its widget root wrote. */
