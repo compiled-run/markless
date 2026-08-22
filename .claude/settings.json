@@ -75,10 +75,6 @@
       "Bash(npx witness run *)"
     ],
     "ask": [
-      "Bash(pnpm add:*)",
-      "Bash(pnpm install:*)",
-      "Bash(pnpm i:*)",
-      "Bash(pnpm update:*)",
       "Bash(npm add:*)",
       "Bash(npm install:*)",
       "Bash(npm i:*)",

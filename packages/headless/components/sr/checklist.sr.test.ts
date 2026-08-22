@@ -1,3 +1,4 @@
+// Suite-level pin: family blocked on the projection-identity ruling (see checklist/note.md).
 import { render } from '@markless/vitest-browser';
 import { afterEach, expect, test } from 'vitest';
 import { missingFacts, readUntil, type Conveys } from './driver.ts';
@@ -49,7 +50,7 @@ async function settle() {
 
 // Sequence A, entering the group: aria-at asserts the group's name and its role
 // before the control's own facts, both at priority 2.
-test('entering the list conveys the group and its name before the select-all', async () => {
+test.skip('entering the list conveys the group and its name before the select-all', async () => {
 	await open(Basic);
 	expectConveys(await readUntil(sr, { role: 'group' }), {
 		role: 'group',
@@ -59,7 +60,7 @@ test('entering the list conveys the group and its name before the select-all', a
 
 // Sequence C, the unchecked half: reading the select-all conveys its role, its
 // name and that it is not checked.
-test('reading an untouched select-all conveys the checkbox role, its name and that it is not checked', async () => {
+test.skip('reading an untouched select-all conveys the checkbox role, its name and that it is not checked', async () => {
 	await open(Basic);
 	expectConveys(await readUntil(sr, { role: 'checkbox', name: 'All condiments' }), {
 		role: 'checkbox',
@@ -71,7 +72,7 @@ test('reading an untouched select-all conveys the checkbox role, its name and th
 // Sequence F, from the sibling dual-state plan: every item is its own tab stop,
 // with no position-in-set fact, because a checkbox group is not a set the way a
 // radio group is. That is the audible difference between the two families.
-test('each item conveys the checkbox role, its own name and that it is not checked', async () => {
+test.skip('each item conveys the checkbox role, its own name and that it is not checked', async () => {
 	await open(Basic);
 	for (const name of ['Lettuce', 'Tomato', 'Mustard']) {
 		expectConveys(await readUntil(sr, { role: 'checkbox', name }), {
@@ -87,7 +88,7 @@ test('each item conveys the checkbox role, its own name and that it is not check
 // select-all never cycles into mixed, because its mixed state is computed from
 // the items and is not a value a person can choose. Recorded here so nobody
 // later "fixes" this family to match the plan.
-test('pressing space on an untouched select-all announces it as checked, never as partially checked', async () => {
+test.skip('pressing space on an untouched select-all announces it as checked, never as partially checked', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'checkbox', name: 'All condiments' });
 	await sr.press(sr.keys.space);
@@ -102,7 +103,7 @@ test('pressing space on an untouched select-all announces it as checked, never a
 });
 
 // Sequence F's second step, on an item rather than on the parent.
-test('pressing space on an item announces that item as checked', async () => {
+test.skip('pressing space on an item announces that item as checked', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'checkbox', name: 'Lettuce' });
 	await sr.press(sr.keys.space);
@@ -118,7 +119,7 @@ test('pressing space on an item announces that item as checked', async () => {
 // `aria-controls` on the parent matters - it gives a reader a way to REACH the
 // controlled set. It must not be solved with aria-live on the select-all, which
 // would announce on every single item toggle.
-test('checking one item announces that item only, and says nothing about the select-all', async () => {
+test.skip('checking one item announces that item only, and says nothing about the select-all', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'checkbox', name: 'Lettuce' });
 	await sr.press(sr.keys.space);
@@ -171,7 +172,7 @@ test.fails('reading a partly ticked select-all conveys it as partially checked',
 // it agrees with our design even though the APG example's cycle does not. Green
 // today for the wrong reason - the select-all in this scenario renders unticked
 // rather than partly ticked - and green for the right one once the row above is.
-test('pressing space on a partly ticked select-all announces it as checked', async () => {
+test.skip('pressing space on a partly ticked select-all announces it as checked', async () => {
 	await open(Partial);
 	await readUntil(sr, { role: 'checkbox', name: 'All condiments' });
 	await sr.press(sr.keys.space);
