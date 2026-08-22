@@ -125,3 +125,38 @@ export function Gallery() @{
 		expect.objectContaining({ childComponentName: 'parts.Card', importKind: 'namespace' }),
 	]);
 });
+
+const GALLERY = `import * as parts from './parts.tsrx';
+export function Gallery() @{
+	<section><parts.Badge text="New" /></section>
+}`;
+
+test('a member tag compiled before its module answered still reaches the part, not a named export', async () => {
+	// Transform order decides only WHEN the module answers, never WHAT the
+	// emitted module reads. A compiled .tsrx publishes no ES named exports - its
+	// components hang off the default export - so binding the namespace and
+	// reading `.Badge` off it resolves to undefined, and the named spelling of
+	// the same read is the MISSING_EXPORT the bundler rejects.
+	const [unlinked] = await compileTsrxModulesWithInterfaces([
+		{ filename: 'src/Gallery.tsrx', source: GALLERY },
+	]);
+	const unlinkedSsr = unlinked!.publicRenderModule.ssrModuleSource;
+
+	// Deferred at the graph: the tag is still spelled dotted.
+	expect(unlinked!.semanticGraph.componentEdges).toEqual([
+		expect.objectContaining({ childComponentName: 'parts.Badge', importKind: 'namespace' }),
+	]);
+
+	// Resolved at the emission: the module surface, then the part it names.
+	expect(unlinkedSsr).toMatch(/import (\w+) from "\.\/parts\.tsrx";/);
+	expect(namedPartsOf(unlinkedSsr)).toEqual(['Badge']);
+	// No component binding reads a part off a namespace or named import of it.
+	expect(unlinkedSsr).not.toMatch(/import \* as \w+ from "\.\/parts\.tsrx";\nconst \w+ =/);
+	expect(unlinkedSsr).not.toMatch(/import \{ [^}]* as \w+ \} from "\.\/parts\.tsrx";/);
+
+	// And the part it composes is the one the linked compile composes.
+	const { gallery: linked } = await compileGallery(GALLERY);
+	expect(namedPartsOf(unlinkedSsr)).toEqual(
+		namedPartsOf(linked.publicRenderModule.ssrModuleSource),
+	);
+});

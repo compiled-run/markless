@@ -73,9 +73,13 @@ export function App() @{
 		}),
 	]);
 
-	// The SSR module binds the namespace and reads the authored path off it.
+	// A compiled .tsrx module publishes no ES named exports, so the SSR module
+	// imports its surface and asks that surface for the part the tag named.
 	expect(result.publicRenderModule.ssrModuleSource).toMatch(
-		/import \* as (\w+)Holder from "\.\/checkbox\.tsrx";\nconst \1 = \1Holder\.root;/,
+		/import (\w+) from "\.\/checkbox\.tsrx";/,
+	);
+	expect(result.publicRenderModule.ssrModuleSource).toMatch(
+		/marklessSsrComponentPart\(\w+,"root"\)/,
 	);
 });
 
@@ -140,8 +144,13 @@ export function App() @{
 	expect(result.semanticGraph.componentEdges[0]?.props).toEqual([
 		expect.objectContaining({ name: 'label', kind: 'serializable', value: 'Name' }),
 	]);
+	// Same surface rule one level deeper: the enclosing segment is read off the
+	// module's default export, and the last segment is the part it names.
 	expect(result.publicRenderModule.ssrModuleSource).toMatch(
-		/import \* as (\w+)Holder from "\.\/ui\.tsrx";\nconst \1 = \1Holder\.forms\.field;/,
+		/import (\w+)Holder from "\.\/ui\.tsrx";\nconst \1 = \1Holder\.forms;/,
+	);
+	expect(result.publicRenderModule.ssrModuleSource).toMatch(
+		/marklessSsrComponentPart\(\w+,"field"\)/,
 	);
 });
 
