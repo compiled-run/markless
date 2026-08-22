@@ -5173,17 +5173,11 @@ test('keyed repeat rows render component invocations from item-scope props', asy
 	).toBe(true);
 });
 
-test('interactive components in repeat rows refuse loudly at row render', async () => {
-	const page = await compileTsrxModule({
-		filename: 'src/Catalog.tsrx',
-		// Variant of componentRowsPageSource: the data-URL module loader caches
-		// identical emitted sources, so this compile must differ byte-wise.
-		source: componentRowsPageSource.replace("state('none')", "state('unset')"),
-		symbols: [],
-	});
-	const interactiveChild = {
+function interactiveRowChild() {
+	return {
 		renderSsr: () => ({
 			html: '<em class="tag">x</em>',
+			elementCount: 1,
 			view: {
 				locators: [{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'em' }],
 				events: [{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:0'] }],
@@ -5193,13 +5187,68 @@ test('interactive components in repeat rows refuse loudly at row render', async 
 			},
 		}),
 	};
+}
+
+// T068: a KEYED row is an identity, so an interactive child composes once per
+// row — its records hang off the row's runtime `r:<key>:` segment rather than
+// collapsing onto one shared build-time prefix.
+test('interactive components in KEYED repeat rows compose one instance per row', async () => {
+	const page = await compileTsrxModule({
+		filename: 'src/Catalog.tsrx',
+		// Variant of componentRowsPageSource: the data-URL module loader caches
+		// identical emitted sources, so this compile must differ byte-wise.
+		source: componentRowsPageSource.replace("state('none')", "state('unset')"),
+		symbols: [],
+	});
 
 	const pageSsrModule = await importPublicRenderTestModule(
 		ssrRenderTestModuleSource(page, { replaceChildImport: true }),
-		{ childComponent: interactiveChild },
+		{ childComponent: interactiveRowChild() },
+	);
+	const output = await (
+		pageSsrModule.marklessRenderSsr as () => Promise<{
+			readonly view: {
+				readonly events: ReadonlyArray<{
+					readonly hostNodeId: string;
+					readonly symbolIds: ReadonlyArray<string>;
+				}>;
+			};
+		}>
+	)();
+	const rowEventHostIds = output.view.events
+		.map((event) => event.hostNodeId)
+		.filter((hostNodeId) => hostNodeId.startsWith('r:'));
+	expect(rowEventHostIds).toEqual(['r:g1:c0:h0', 'r:g2:c0:h0']);
+	// Each row's handler routes through its own row segment, so a gesture on one
+	// row cannot dispatch into the other.
+	const rowSymbolIds = output.view.events.flatMap((event) =>
+		event.hostNodeId.startsWith('r:') ? event.symbolIds : [],
+	);
+	expect(new Set(rowSymbolIds).size).toBe(2);
+	expect(rowSymbolIds.every((symbolId) => symbolId.startsWith('r:'))).toBe(true);
+});
+
+// The narrowed guard, and the ONE shape it still covers. A @for with no key at
+// all never gets here: it is already a build-time error
+// (MARKLESS_REPEAT_KEY_REQUIRED) and produces no repeat. What is left is `key i`
+// — identity by position — which carries no row value the render walk can mint a
+// runtime instance segment from, so a composed instance would have nothing to
+// hang off and its gestures would resume into whichever row rendered first.
+test('interactive components in INDEX-KEYED repeat rows refuse loudly at row render', async () => {
+	const page = await compileTsrxModule({
+		filename: 'src/Catalog.tsrx',
+		source: componentRowsPageSource
+			.replace("state('none')", "state('by position')")
+			.replace('const good of goods; key good.sku', 'const good of goods; index i; key i'),
+		symbols: [],
+	});
+
+	const pageSsrModule = await importPublicRenderTestModule(
+		ssrRenderTestModuleSource(page, { replaceChildImport: true }),
+		{ childComponent: interactiveRowChild() },
 	);
 	await expect((pageSsrModule.marklessRenderSsr as () => Promise<unknown>)()).rejects.toThrow(
-		'MARKLESS_ROW_COMPONENT_INTERACTIVE: <TagBadge> inside a @for row has its own state, events, or async content, so its interactions cannot resume. Keep components in @for rows presentational (markup from item props, like <Link>), or move the interactive content out of the row.',
+		'MARKLESS_ROW_COMPONENT_INTERACTIVE: <TagBadge> inside a @for row keyed by position has its own state, events, or async content, so its interactions cannot resume: an index key carries no row value to route them to. Key the @for by a stable field of the item, or keep components in index-keyed rows presentational (markup from item props, like <Link>).',
 	);
 });
 

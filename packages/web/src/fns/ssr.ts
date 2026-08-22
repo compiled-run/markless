@@ -21,6 +21,7 @@ import {
 	marklessBoundSymbolId,
 	marklessDomUpdateSymbolId,
 } from './bound-symbol.ts';
+import { marklessRowSegment } from './instance-scope.ts';
 import { marklessSerializeGraphValue } from './state-serialize.ts';
 import type { SsrDataStructure } from '../ssr-data/renderer.ts';
 import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
@@ -278,6 +279,29 @@ export async function marklessSsrRenderChild(
 	children.push(entry);
 	return output.html ?? '';
 }
+/**
+ * The runtime instance segment one `@for` row contributes. A KEYED row has an
+ * identity of its own, so everything composed inside it — payload entries,
+ * seeds, minted ids, event routes — hangs off `r:<key>:`. An unkeyed row has no
+ * identity to carry and contributes nothing.
+ */
+export function marklessSsrRowSegment(repeatKey: unknown): string {
+	return repeatKey === undefined ? '' : marklessRowSegment(repeatKey);
+}
+
+/** Places a composed child inside its row: the row segment leads the edge's own prefixes. */
+export function marklessSsrRowPlacement<
+	T extends { readonly hostPrefix: string; readonly symbolPrefix: string },
+>(child: T, repeatKey: unknown): T {
+	const segment = marklessSsrRowSegment(repeatKey);
+	if (!segment) return child;
+	return {
+		...child,
+		hostPrefix: segment + child.hostPrefix,
+		symbolPrefix: segment + child.symbolPrefix,
+	};
+}
+
 // Component invocation inside a keyed repeat row: rows repeat, so no composed
 // child record can exist — the child contributes MARKUP ONLY. Interactive
 // child output (own state, events, async content) would silently die after
@@ -312,7 +336,7 @@ export function marklessAssertPresentationalRowChild(
 		(state?.computed?.length ?? 0) > 0 ||
 		(output.propEvents?.length ?? 0) > 0;
 	if (!interactive) return;
-	const message = `MARKLESS_ROW_COMPONENT_INTERACTIVE: <${componentName}> inside a @for row has its own state, events, or async content, so its interactions cannot resume. Keep components in @for rows presentational (markup from item props, like <Link>), or move the interactive content out of the row.`;
+	const message = `MARKLESS_ROW_COMPONENT_INTERACTIVE: <${componentName}> inside a @for row keyed by position has its own state, events, or async content, so its interactions cannot resume: an index key carries no row value to route them to. Key the @for by a stable field of the item, or keep components in index-keyed rows presentational (markup from item props, like <Link>).`;
 	const error = new Error(message) as Error & Record<string, unknown>;
 	error.code = 'MARKLESS_ROW_COMPONENT_INTERACTIVE';
 	error.severity = 'error';
