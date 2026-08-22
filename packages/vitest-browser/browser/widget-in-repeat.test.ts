@@ -8,13 +8,23 @@ import UiPage from './fixtures/rpt-ui-page.tsrx';
 import UiStaticPage from './fixtures/rpt-ui-static-page.tsrx';
 
 // Spike T065: can a widget family root be authored inside a keyed `@for`?
-// Answer: no, on either render path, and for three separate reasons. Each row
-// below pins ONE of them so a fix can be measured piece by piece. Rows marked
-// `test.fails` describe the behaviour the item-shaped families (tabs,
+// Each row below pins ONE finding so a fix can be measured piece by piece. Rows
+// marked `test.fails` describe the behaviour the item-shaped families (tabs,
 // radio-group, checklist) need; the day one turns green, unmark it.
+//
+// T067 closed finding 1: a child component's props and arm tests are now
+// evaluated with the `@for` row in scope on the CSR path, so a row-derived prop
+// reaches the child instead of crashing the render. What is still open is
+// finding 3, per-iteration INSTANCE identity, and it is open for a named
+// reason: a symbol route is matched with `symbolId.startsWith(<literal instance
+// path the compiler emitted>)` and stripped by that literal's length
+// (packages/bundler/src/source-module.ts). A row segment is a runtime value, so
+// it cannot be in that literal: ahead of the edge path the route stops
+// matching, behind it the child module is handed an id its own resolver cannot
+// answer. Until that matcher learns the row segment, every row of one edge
+// shares one widget instance.
 afterEach(() => cleanup());
 
-const CSR_ROW_BINDING_CRASH = /Cannot read properties of undefined/;
 const SSR_REFUSAL = 'MARKLESS_ROW_COMPONENT_INTERACTIVE';
 
 function displays(container: ParentNode) {
@@ -30,8 +40,13 @@ function displays(container: ParentNode) {
 // evaluator answers it with no repeat item in scope.
 // ---------------------------------------------------------------------------
 
-test('CSR: a presentational child prop over the row binding crashes the render', async () => {
-	await expect(render(PlainChild)).rejects.toThrow(CSR_ROW_BINDING_CRASH);
+test('CSR: a presentational child renders its row values', async () => {
+	const screen = await render(PlainChild);
+	const container = screen.container as HTMLElement;
+	expect([...container.querySelectorAll('[data-tag]')].map((node) => node.textContent)).toEqual([
+		'alpha',
+		'beta',
+	]);
 });
 
 test('SSR: the same presentational child renders its row values', async () => {
@@ -40,12 +55,29 @@ test('SSR: the same presentational child renders its row values', async () => {
 	expect(phased.html).toContain('<em data-tag="">beta</em>');
 });
 
-test('CSR: a widget root seeded from the row binding crashes the render', async () => {
-	await expect(render(Page)).rejects.toThrow(CSR_ROW_BINDING_CRASH);
+test('CSR: a widget root seeded from the row binding renders one root per row', async () => {
+	const screen = await render(Page);
+	const container = screen.container as HTMLElement;
+	expect(container.querySelectorAll('[data-rpt-root]').length).toBe(3);
+	expect(container.querySelectorAll('[data-rpt-trigger]').length).toBe(3);
 });
 
-test('CSR: the real @markless/ui checkbox seeded from the row binding crashes too', async () => {
-	await expect(render(UiPage)).rejects.toThrow(CSR_ROW_BINDING_CRASH);
+test('CSR: the real @markless/ui checkbox seeded from the row binding renders too', async () => {
+	const screen = await render(UiPage);
+	expect((screen.container as HTMLElement).querySelectorAll('[data-ui-trigger]').length).toBe(3);
+});
+
+// The row values reach the child now; what they do NOT reach is a widget
+// instance of the row's own, so all three roots read one shared seed.
+test.fails("CSR: each row's widget is seeded from its own row", async () => {
+	const screen = await render(Page);
+	expect(displays(screen.container as HTMLElement)).toEqual(['true', 'false', 'false']);
+});
+
+test.fails("CSR: each row's label comes from its own row", async () => {
+	const screen = await render(Page);
+	const labels = [...(screen.container as HTMLElement).querySelectorAll('[data-rpt-label]')];
+	expect(labels.map((node) => node.textContent)).toEqual(['alpha', 'beta', 'gamma']);
 });
 
 // ---------------------------------------------------------------------------
@@ -53,6 +85,8 @@ test('CSR: the real @markless/ui checkbox seeded from the row binding crashes to
 // refusal fires on the SERVER render, before any HTML exists, so there is no
 // resume to witness. It fires with literal root props too: it is the widget's
 // own state and events that trip it, not the row-derived props of finding 1.
+// These stay pinned: lifting the refusal is the SSR unit that follows T067, and
+// it cannot land before finding 3 gives each row an instance of its own.
 // ---------------------------------------------------------------------------
 
 test('SSR: a widget root inside a @for refuses with the row-component diagnostic', async () => {
@@ -68,10 +102,14 @@ test('SSR: the real @markless/ui checkbox refuses the same way', async () => {
 });
 
 // ---------------------------------------------------------------------------
-// Finding 3. With literal root props the CSR path renders one root per row, so
-// the markup is there - but every row shares one build-time host and symbol
-// prefix. Two consequences: the minted element() id repeats, and no row's
-// gesture dispatches at all.
+// Finding 3, still open after T067. With literal root props the CSR path
+// renders one root per row, so the markup is there - but every row shares one
+// build-time host and symbol prefix. Two consequences: the minted element() id
+// repeats, and no row's gesture dispatches at all. The blocker is named at the
+// top of this file: the symbol-route matcher takes a compile-time literal, and
+// a row key is not one. The compiler now REFUSES this shape at build time
+// (MARKLESS_WIDGET_ROOT_IN_REPEAT), so nothing reaches a user silently while
+// these rows stay red.
 // ---------------------------------------------------------------------------
 
 test('CSR: a widget root with literal props renders once per row', async () => {
