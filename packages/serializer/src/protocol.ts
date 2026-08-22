@@ -1,6 +1,7 @@
 import { ASYNC_BOUNDARY_ARM } from './async-boundary-arm.ts';
 import {
 	ASYNC_PROTOCOL_VERSION,
+	PROTOCOL_EVENT_ACTION_KIND,
 	protocolStateVersion,
 	STORAGE_PROTOCOL_VERSION,
 } from './protocol-constants.ts';
@@ -8,6 +9,7 @@ import {
 export {
 	ASYNC_BOUNDARY_ARM,
 	ASYNC_PROTOCOL_VERSION,
+	PROTOCOL_EVENT_ACTION_KIND,
 	protocolStateVersion,
 	STORAGE_PROTOCOL_VERSION,
 };
@@ -62,11 +64,6 @@ export type ProtocolSyncPolicy =
 	| {
 			readonly branches: ReadonlyArray<ProtocolSyncPolicyBranch>;
 	  };
-
-export const PROTOCOL_EVENT_ACTION_KIND = {
-	event: 'event',
-	externalDelegate: 'external-delegate',
-} as const;
 
 export type ProtocolEventActionKind =
 	(typeof PROTOCOL_EVENT_ACTION_KIND)[keyof typeof PROTOCOL_EVENT_ACTION_KIND];
