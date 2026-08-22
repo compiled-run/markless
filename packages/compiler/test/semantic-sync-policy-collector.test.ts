@@ -2,7 +2,6 @@ import { expect, test } from 'vitest';
 import type { AnyNode } from '../src/ast/nodes.ts';
 import {
 	extractSyncPolicy,
-	getHandlerCount,
 	hasSyncEventPolicyCandidate,
 } from '../src/passes/semantic-graph/collect-sync-policy.ts';
 import { createMutableSemanticGraphArtifact } from '../src/passes/semantic-graph/types.ts';
@@ -92,7 +91,6 @@ test('sync-policy collector extracts graph and event-field guard policy', () => 
 		writable: true,
 	});
 
-	expect(getHandlerCount(handler)).toBe(1);
 	expect(hasSyncEventPolicyCandidate(handler)).toBe(true);
 	expect(extractSyncPolicy(handler, { graph, source })).toEqual({
 		when: {

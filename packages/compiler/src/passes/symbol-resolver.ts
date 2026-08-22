@@ -48,43 +48,39 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 	];
 
 	for (const event of input.payloadArena.view.events) {
-		for (let order = 0; order < event.handlerCount; order++) {
-			const authoredSource = event.handlerSources[order] ?? '';
-			const sourceSpan = event.handlerSpans[order];
-			const inlined = inlineSharedMethodCalls(
-				authoredSource,
-				input.semanticGraph,
-				semanticsReader,
-			);
-			const source = inlined.source;
-			const moduleImports = referencedModuleImports(
-				input.semanticGraph.moduleImports,
-				source,
-			);
+		if (event.handlerSource === undefined) continue;
 
-			symbols.push({
-				id: `symbol:${nextSymbolId++}`,
-				kind: 'event-handler',
-				hostNodeId: event.hostNodeId,
-				eventName: event.eventName,
+		const sourceSpan = event.handlerSpan;
+		const inlined = inlineSharedMethodCalls(
+			event.handlerSource,
+			input.semanticGraph,
+			semanticsReader,
+		);
+		const source = inlined.source;
+		const moduleImports = referencedModuleImports(input.semanticGraph.moduleImports, source);
+
+		symbols.push({
+			id: `symbol:${nextSymbolId++}`,
+			kind: 'event-handler',
+			hostNodeId: event.hostNodeId,
+			eventName: event.eventName,
+			source,
+			sourceSpan,
+			parameters: event.handlerParameters,
+			...(moduleImports.length > 0 ? { moduleImports } : {}),
+			order: 0,
+			reads: eventReads(
+				input.stateLowering?.reads,
+				[sourceSpan, ...inlined.spans],
 				source,
+				semanticsReader,
+			),
+			writes: eventWrites(source, input.stateLowering?.writes, [
 				sourceSpan,
-				parameters: event.handlerParameters[order] ?? [],
-				...(moduleImports.length > 0 ? { moduleImports } : {}),
-				order,
-				reads: eventReads(
-					input.stateLowering?.reads,
-					[sourceSpan, ...inlined.spans],
-					source,
-					semanticsReader,
-				),
-				writes: eventWrites(source, input.stateLowering?.writes, [
-					sourceSpan,
-					...inlined.spans,
-				]),
-				elementHandleCalls: collectElementHandleCalls(source, reachableElementHandles),
-			});
-		}
+				...inlined.spans,
+			]),
+			elementHandleCalls: collectElementHandleCalls(source, reachableElementHandles),
+		});
 	}
 
 	for (const edge of input.semanticGraph.componentEdges) {

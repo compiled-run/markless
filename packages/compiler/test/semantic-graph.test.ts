@@ -289,14 +289,12 @@ test('buildSemanticGraph creates the first production compiler artifact', async 
 		expect.arrayContaining([
 			expect.objectContaining({
 				eventName: 'keydown',
-				handlerCount: 1,
-				handlerParameters: [['event']],
+				handlerParameters: ['event'],
 				hasSyncPolicyCandidate: true,
 			}),
 			expect.objectContaining({
 				eventName: 'click',
-				handlerCount: 1,
-				handlerParameters: [[]],
+				handlerParameters: [],
 				hasSyncPolicyCandidate: false,
 			}),
 		]),

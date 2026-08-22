@@ -110,25 +110,21 @@ export function Menu() @{
 }
 `;
 
-const handlerArraySyncPolicySource = `
+const composedHandlerSyncPolicySource = `
 import { state } from '@markless/core';
 
 export function Menu() @{
 	const menu = state({ open: true, locked: true });
 
 	<input
-		onKeyDown={[
-			(event) => {
-				if (menu.open && event.key === 'Escape') {
-					event.preventDefault();
-				}
-			},
-			(event) => {
-				if (menu.locked && event.key === 'Enter') {
-					event.stopPropagation();
-				}
-			},
-		]}
+		onKeyDown={(event) => {
+			if (menu.open && event.key === 'Escape') {
+				event.preventDefault();
+			}
+			if (menu.locked && event.key === 'Enter') {
+				event.stopPropagation();
+			}
+		}}
 	/>
 }
 `;
@@ -204,7 +200,7 @@ test('B914 extracts unconditional and aliased onSubmit policies', async () => {
 		expect(semanticGraph.events[0]).toEqual(
 			expect.objectContaining({
 				eventName: 'submit',
-				handlerSources: ['(event) => { event.preventDefault(); count++; }'],
+				handlerSource: '(event) => { event.preventDefault(); count++; }',
 				hasSyncPolicyCandidate: true,
 				syncPolicy,
 			}),
@@ -279,43 +275,28 @@ test('B914 folds module constant equality in sync event policy guards', async ()
 	expect(semanticGraph.diagnostics).toEqual([]);
 });
 
-test('compiler preserves sync policy branches for handler arrays', async () => {
+test('compiler extracts the sync policy a composed handler declares first', async () => {
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/Menu.tsrx',
-		source: handlerArraySyncPolicySource,
+		source: composedHandlerSyncPolicySource,
 	});
 	const stateLowering = lowerStateAccess({ semanticGraph });
 	const payload = planPayloadArena({ semanticGraph, stateLowering });
 
 	const syncPolicy = {
-		branches: [
-			{
-				when: {
-					type: 'and',
-					conditions: [
-						{ type: 'graph-truthy', graphNodeId: 'state:menu', path: ['open'] },
-						{ type: 'event-equals', field: 'key', value: 'Escape' },
-					],
-				},
-				actions: ['preventDefault'],
-			},
-			{
-				when: {
-					type: 'and',
-					conditions: [
-						{ type: 'graph-truthy', graphNodeId: 'state:menu', path: ['locked'] },
-						{ type: 'event-equals', field: 'key', value: 'Enter' },
-					],
-				},
-				actions: ['stopPropagation'],
-			},
-		],
+		when: {
+			type: 'and',
+			conditions: [
+				{ type: 'graph-truthy', graphNodeId: 'state:menu', path: ['open'] },
+				{ type: 'event-equals', field: 'key', value: 'Escape' },
+			],
+		},
+		actions: ['preventDefault'],
 	};
 
 	expect(semanticGraph.events).toEqual([
 		expect.objectContaining({
 			eventName: 'keydown',
-			handlerCount: 2,
 			hasSyncPolicyCandidate: true,
 			syncPolicy,
 		}),

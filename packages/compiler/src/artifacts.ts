@@ -386,10 +386,10 @@ export type SemanticEvent = {
 	readonly id: string;
 	readonly hostNodeId: string;
 	readonly eventName: string;
-	readonly handlerCount: number;
-	readonly handlerSources: ReadonlyArray<string>;
-	readonly handlerSpans: ReadonlyArray<SourceSpan | undefined>;
-	readonly handlerParameters: ReadonlyArray<ReadonlyArray<string>>;
+	// One handler per event attribute; absent when the attribute carries no value.
+	readonly handlerSource?: string;
+	readonly handlerSpan?: SourceSpan;
+	readonly handlerParameters: ReadonlyArray<string>;
 	readonly hasSyncPolicyCandidate: boolean;
 	readonly syncPolicy?: SemanticSyncPolicy;
 };
@@ -431,6 +431,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_OVERLAY_VALUE_UNSUPPORTED'
 		| 'MARKLESS_OVERLAY_HOST_ELEMENT_REQUIRED'
 		| 'MARKLESS_EVENT_HANDLER_NOT_A_FUNCTION'
+		| 'MARKLESS_EVENT_HANDLER_ARRAY_UNSUPPORTED'
 		| 'MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED'
 		| 'MARKLESS_CALLBACK_SLOT_SOURCE_UNSUPPORTED'
 		| 'MARKLESS_CALLBACK_SLOT_UNBOUND'

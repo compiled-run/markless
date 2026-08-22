@@ -2,8 +2,8 @@ import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../src/index.ts';
 import App from './fixtures/array-handler-probe.tsrx';
 
-// Records what an array of event handlers does today; the owner has not yet
-// ruled whether the array form stays.
+// One handler per event attribute: the composition an author used to spell as a
+// handler array is now a closure, and it still runs every call in order.
 afterEach(() => cleanup());
 
 async function probe(container: ParentNode) {
@@ -18,7 +18,7 @@ async function probe(container: ParentNode) {
 	};
 }
 
-test('CSR: every handler in an array fires, in authored order', async () => {
+test('CSR: a composed closure runs every call it makes, in order', async () => {
 	const screen = await render(App);
 	expect(await probe(screen.container as HTMLElement)).toEqual({
 		first: '1',
@@ -28,7 +28,7 @@ test('CSR: every handler in an array fires, in authored order', async () => {
 	});
 });
 
-test('SSR: every handler in an array fires, in authored order', async () => {
+test('SSR: a composed closure runs every call it makes, in order', async () => {
 	const screen = await renderSSR(App);
 	expect(await probe(screen.container)).toEqual({
 		first: '1',
@@ -36,4 +36,10 @@ test('SSR: every handler in an array fires, in authored order', async () => {
 		order: 'AB',
 		solo: '1',
 	});
+});
+
+// The module never loads because the compiler blocks it; the browser sees only a
+// failed fetch, so the diagnostic text itself is asserted in the compiler suite.
+test('an array of handlers fails the build instead of rendering', async () => {
+	await expect(import('./fixtures/array-handler-rejected.tsrx')).rejects.toThrow();
 });

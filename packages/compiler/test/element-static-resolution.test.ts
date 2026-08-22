@@ -96,7 +96,7 @@ test('each component`s event handler resolves to its own function', async () => 
 		'}',
 	]);
 
-	expect(graph.events.flatMap((event) => event.handlerSources)).toEqual([
+	expect(graph.events.map((event) => event.handlerSource)).toEqual([
 		'() => { console.log("alpha"); }',
 		'() => { console.log("beta"); }',
 	]);
@@ -112,11 +112,11 @@ test('a component-local handler shadows a module-level function of the same name
 		'}',
 	]);
 
-	expect(graph.events.flatMap((event) => event.handlerSources)).toEqual([
+	expect(graph.events.map((event) => event.handlerSource)).toEqual([
 		'(event) => { console.log("local", event); }',
 	]);
 	// The parameter list is read off the resolved function, so it moves with it.
-	expect(graph.events.flatMap((event) => event.handlerParameters)).toEqual([['event']]);
+	expect(graph.events.map((event) => event.handlerParameters)).toEqual([['event']]);
 });
 
 test('a module-level handler keeps recording the identifier, as it did before', async () => {
@@ -134,5 +134,5 @@ test('a module-level handler keeps recording the identifier, as it did before', 
 		'}',
 	]);
 
-	expect(graph.events.flatMap((event) => event.handlerSources)).toEqual(['handler']);
+	expect(graph.events.map((event) => event.handlerSource)).toEqual(['handler']);
 });

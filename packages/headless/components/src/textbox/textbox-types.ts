@@ -1,5 +1,4 @@
-import type { Handler, Children, PropsOf } from '@markless/core';
-
+import type { PropsOf } from '@markless/core';
 
 export type TextboxRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/** The text the box shows. Omit it and the box starts empty. */
@@ -21,15 +20,10 @@ export type TextboxRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
  * set here as well as on the root, and a restriction set in either place stands:
  * a part can add a restriction, never remove one.
  */
-export type TextboxInputProps = Omit<PropsOf<'input'>, 'onInput'> & {
-	/** Called after the box's own text has moved with the person's keystroke. */
-	readonly onInput?: Handler<PropsOf<'input'>['onInput']>;
-};
+export type TextboxInputProps = PropsOf<'input'>;
 
 /** The same control over more than one line. */
-export type TextboxTextareaProps = Omit<PropsOf<'textarea'>, 'onInput'> & {
-	readonly onInput?: Handler<PropsOf<'textarea'>['onInput']>;
-};
+export type TextboxTextareaProps = PropsOf<'textarea'>;
 
 export type TextboxLabelProps = PropsOf<'label'>;
 

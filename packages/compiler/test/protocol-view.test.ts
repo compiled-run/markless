@@ -135,7 +135,8 @@ export function App() @{
 				}
 			}}
 		/>
-		<button onClick={[() => count++, () => menu.open = true]}>{count}</button>
+		<button onClick={() => count++}>{count}</button>
+		<button onClick={() => menu.open = true}>open</button>
 		<canvas attach={[chart(menu), resizeCanvas]} />
 	</section>
 }
@@ -192,7 +193,12 @@ test('createProtocolViewPayload links payload arena records to lazy symbol IDs',
 			expect.objectContaining({
 				hostNodeId: 'h2',
 				eventName: 'click',
-				symbolIds: ['symbol:1', 'symbol:2'],
+				symbolIds: ['symbol:1'],
+			}),
+			expect.objectContaining({
+				hostNodeId: 'h3',
+				eventName: 'click',
+				symbolIds: ['symbol:2'],
 			}),
 		]),
 	);
@@ -210,7 +216,7 @@ test('createProtocolViewPayload links payload arena records to lazy symbol IDs',
 	]);
 	expect(view.behaviors).toEqual([
 		{
-			hostNodeId: 'h3',
+			hostNodeId: 'h4',
 			source: 'chart(menu)',
 			functionSource: 'chart',
 			inputSources: ['menu'],
@@ -226,7 +232,7 @@ test('createProtocolViewPayload links payload arena records to lazy symbol IDs',
 			symbolId: 'symbol:4',
 		},
 		{
-			hostNodeId: 'h3',
+			hostNodeId: 'h4',
 			source: 'resizeCanvas',
 			functionSource: 'resizeCanvas',
 			inputSources: [],

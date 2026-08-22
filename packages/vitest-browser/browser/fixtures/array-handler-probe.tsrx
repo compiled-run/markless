@@ -6,11 +6,6 @@ export function App() @{
 	let order = state('');
 	let solo = state(0);
 
-	const bumpSecond = () => {
-		second++;
-		order = order + 'B';
-	};
-
 	const bumpSolo = () => {
 		solo++;
 	};
@@ -19,13 +14,12 @@ export function App() @{
 		<button
 			type="button"
 			data-probe
-			onClick={[
-				() => {
-					first++;
-					order = order + 'A';
-				},
-				bumpSecond,
-			]}
+			onClick={() => {
+				first++;
+				order = order + 'A';
+				second++;
+				order = order + 'B';
+			}}
 		>
 			click
 		</button>

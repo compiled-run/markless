@@ -1,7 +1,4 @@
-import type { Handler, PropsOf, Seeded } from '@markless/core';
-
-
-type TriggerProps = PropsOf<'button'>;
+import type { PropsOf, Seeded } from '@markless/core';
 
 /** A checkbox is on, off, or mixed — the third value is what `indeterminate` means to a form. */
 export type CheckboxChecked = boolean | 'mixed';
@@ -22,11 +19,8 @@ export type CheckboxRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	readonly onChange?: (checked: CheckboxChecked) => void;
 };
 
-export type CheckboxTriggerProps = Omit<TriggerProps, 'onClick' | 'onKeydown'> & {
-	/** Called after the checkbox has toggled. */
-	readonly onClick?: Handler<TriggerProps['onClick']>;
-	readonly onKeydown?: Handler<TriggerProps['onKeydown']>;
-};
+/** A consumer's `onClick` and `onKeydown` run after the checkbox has toggled. */
+export type CheckboxTriggerProps = PropsOf<'button'>;
 
 /**
  * The shared instance every checkbox part reads and writes: the root's seeded
