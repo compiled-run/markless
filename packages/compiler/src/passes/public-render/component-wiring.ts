@@ -232,7 +232,7 @@ export function collectSsrPropEvents(
 	semanticEvents: ReadonlyArray<{
 		readonly hostNodeId: string;
 		readonly eventName: string;
-		readonly handlerSources: ReadonlyArray<string>;
+		readonly handlerSource?: string;
 	}> = [],
 ) {
 	const hostNodeIdByPath = new Map(
@@ -246,26 +246,26 @@ export function collectSsrPropEvents(
 	});
 	const propNameSet = new Set(propNames);
 	for (const event of semanticEvents) {
-		for (const handlerSource of event.handlerSources) {
-			const invokedProps = [...handlerSource.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)]
-				.map((match) => match[1]!)
-				.filter((name) => propNameSet.has(name));
-			if (invokedProps.length !== 1) continue;
-			const propName = invokedProps[0]!;
-			if (
-				!events.some(
-					(candidate) =>
-						candidate.hostNodeId === event.hostNodeId &&
-						candidate.eventName === event.eventName &&
-						candidate.propName === propName,
-				)
+		const handlerSource = event.handlerSource;
+		if (handlerSource === undefined) continue;
+		const invokedProps = [...handlerSource.matchAll(/\b([A-Za-z_$][\w$]*)\s*\(/g)]
+			.map((match) => match[1]!)
+			.filter((name) => propNameSet.has(name));
+		if (invokedProps.length !== 1) continue;
+		const propName = invokedProps[0]!;
+		if (
+			!events.some(
+				(candidate) =>
+					candidate.hostNodeId === event.hostNodeId &&
+					candidate.eventName === event.eventName &&
+					candidate.propName === propName,
 			)
-				events.push({
-					hostNodeId: event.hostNodeId,
-					eventName: event.eventName,
-					propName,
-				});
-		}
+		)
+			events.push({
+				hostNodeId: event.hostNodeId,
+				eventName: event.eventName,
+				propName,
+			});
 	}
 	return events;
 }

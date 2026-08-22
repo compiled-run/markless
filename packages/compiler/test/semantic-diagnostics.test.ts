@@ -849,9 +849,61 @@ test('B914 reports non-function event prop expressions', async () => {
 			title: 'Event props need a function',
 			message:
 				'`onClick={count++}` passes the result of `count++`, not a function. The expression would run once while rendering, and the click would receive a number.',
-			why: 'An event prop compiles to a lazy handler symbol that runs on the browser event; only a function or an array of functions can be that handler.',
+			why: 'An event prop compiles to a lazy handler symbol that runs on the browser event; only a function can be that handler.',
 			primarySpan: expect.objectContaining({ start: expressionStart }),
 		}),
+	]);
+});
+
+test('an array of handlers in an event attribute fails the build and teaches the closure form', async () => {
+	const source = `
+import { state } from '@markless/core';
+
+export function Toggle() @{
+	let count = state(0);
+	const track = () => count++;
+
+	<button onClick={[track, (event) => event.currentTarget.blur()]}>Go</button>
+}
+`;
+	const graph = await buildSemanticGraph({ filename: 'src/Toggle.tsrx', source });
+
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_EVENT_HANDLER_ARRAY_UNSUPPORTED',
+			severity: 'error',
+			phase: 'semantic-graph',
+			title: 'One handler per event attribute',
+			message:
+				'`onClick` takes one handler, not a list. Compose the calls yourself in a single function.',
+			primarySpan: expect.objectContaining({ start: source.indexOf('[track') }),
+			suggestions: [
+				{
+					message:
+						'Write one function that calls both: onClick={(event) => { track(event); /* ... */ }}.',
+				},
+				{ message: 'The list-shaped attribute is `attach`, which still takes an array.' },
+			],
+		}),
+	]);
+	// Fail closed: no handler symbol is minted from the rejected array.
+	expect(graph.events).toEqual([]);
+});
+
+test('an array in attach stays legal while an array in an event attribute does not', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/Attach.tsrx',
+		source: `
+export function Panel() @{
+	<canvas attach={[chart(), resizeCanvas]} onClick={(event) => event.currentTarget.blur()} />
+}
+`,
+	});
+
+	expect(graph.diagnostics).toEqual([]);
+	expect(graph.behaviors.map((behavior) => behavior.source)).toEqual([
+		'chart()',
+		'resizeCanvas',
 	]);
 });
 

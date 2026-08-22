@@ -14,39 +14,16 @@ import type {
 } from '../../artifacts.ts';
 import type { WalkState } from './types.ts';
 
-export function getHandlerCount(node: AnyNode | undefined): number {
-	if (!node) return 0;
-	if (node.type === 'ArrayExpression') return asNodes(node.elements).length;
-	return 1;
-}
-
+// One handler per event attribute, so a policy is one branch: the multi-branch
+// protocol shape has no compiler producer left.
 export function extractSyncPolicy(
 	node: AnyNode | undefined,
 	state: Pick<WalkState, 'graph' | 'source'>,
 ): SemanticSyncPolicy | undefined {
-	return extractSyncPolicyFromHandlers(handlerExpressions(node), state);
-}
+	if (!node) return undefined;
 
-export function extractSyncPolicyFromHandlers(
-	handlers: ReadonlyArray<AnyNode>,
-	state: Pick<WalkState, 'graph' | 'source'>,
-): SemanticSyncPolicy | undefined {
-	const branches: SemanticSyncPolicyBranch[] = [];
-
-	for (const handler of handlers) {
-		const eventParam = getIdentifierName(asNodes(handler.params)[0]) ?? 'event';
-		const policy = extractSyncPolicyFromBody(
-			handler.body as AnyNode | undefined,
-			eventParam,
-			state,
-		);
-		if (policy) branches.push(policy);
-	}
-
-	if (branches.length === 0) return undefined;
-	if (branches.length === 1) return branches[0];
-
-	return { branches };
+	const eventParam = getIdentifierName(asNodes(node.params)[0]) ?? 'event';
+	return extractSyncPolicyFromBody(node.body as AnyNode | undefined, eventParam, state);
 }
 
 export function hasSyncEventPolicyCandidate(node: AnyNode | undefined): boolean {
@@ -143,12 +120,6 @@ export function firstDetachedSyncPolicyReference(node: AnyNode | undefined): {
 	});
 
 	return detached;
-}
-
-function handlerExpressions(node: AnyNode | undefined): AnyNode[] {
-	if (!node) return [];
-	if (node.type === 'ArrayExpression') return asNodes(node.elements);
-	return [node];
 }
 
 function extractSyncPolicyFromBody(

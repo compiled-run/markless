@@ -50,10 +50,15 @@ declare namespace __MarklessTypeService {
 		(E extends HTMLMediaElement ? HTMLMediaElementEventMap : {}) &
 		(E extends HTMLVideoElement ? HTMLVideoElementEventMap : {});
 
+	/**
+	 * One handler per event attribute. Compose several calls in your own closure:
+	 * `onClick={(event) => { toggle(); onClick?.(event); }}`. `attach` is the
+	 * list-shaped attribute, and it keeps its array form.
+	 */
 	type NativeEventAttributes<E extends globalThis.Element> = {
 		[Name in keyof ElementEventMap<E> as Name extends string
 			? `on${Capitalize<Name>}`
-			: never]?: OneOrMany<EventHandler<ElementEventMap<E>[Name], E>>;
+			: never]?: EventHandler<ElementEventMap<E>[Name], E>;
 	};
 
 	type MarklessAttributes<E extends globalThis.Element> = {

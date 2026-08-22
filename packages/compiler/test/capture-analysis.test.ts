@@ -20,7 +20,8 @@ export function App() @{
 	const menu = state({ open: true });
 
 	<section>
-		<button onClick={[() => count++, () => menu.open = false]}>{count}</button>
+		<button onClick={() => count++}>{count}</button>
+		<button onClick={() => menu.open = false}>close</button>
 		<canvas attach={chart(menu)} />
 	</section>
 }

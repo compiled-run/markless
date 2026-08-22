@@ -1,7 +1,4 @@
-import type { Handler, Children, PropsOf } from '@markless/core';
-
-
-type TriggerProps = PropsOf<'button'>;
+import type { PropsOf } from '@markless/core';
 
 export type ToggleRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/** Whether the switch reads as on. Omit it and the switch starts off. */
@@ -19,10 +16,8 @@ export type ToggleRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	readonly onChange?: (checked: boolean) => void;
 };
 
-export type ToggleTriggerProps = Omit<TriggerProps, 'onClick'> & {
-	/** Called after the switch has flipped. */
-	readonly onClick?: Handler<TriggerProps['onClick']>;
-};
+/** A consumer's `onClick` runs after the switch has flipped. */
+export type ToggleTriggerProps = PropsOf<'button'>;
 
 /** The moving piece inside the trigger. It renders an element and nothing else. */
 export type ToggleThumbProps = PropsOf<'span'>;

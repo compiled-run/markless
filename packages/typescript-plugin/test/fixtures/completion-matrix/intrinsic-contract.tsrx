@@ -28,5 +28,7 @@ export function IntrinsicContract() @{
 	>
 		Press
 	</button>
-	<button attach={[installButton]} onClick={[(event) => event.currentTarget.focus()]}>Array forms</button>
+	<button attach={[installButton]} onClick={(event) => event.currentTarget.focus()}>
+		Array attach, single handler
+	</button>
 }

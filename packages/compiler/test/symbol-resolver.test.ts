@@ -28,7 +28,13 @@ export function App() @{
 				}
 			}}
 		/>
-		<button onClick={[() => count++, () => query = 'clicked', () => count = clamp(count, 10)]}>
+		<button
+			onClick={() => {
+				count++;
+				query = 'clicked';
+				count = clamp(count, 10);
+			}}
+		>
 			{count} {result.title}
 		</button>
 		<canvas attach={[chart(result), resizeCanvas]} />
@@ -71,35 +77,17 @@ test('planSymbolResolver assigns lazy symbols while resolver owns import boundar
 			}),
 			expect.objectContaining({ kind: 'event-handler', eventName: 'keydown' }),
 			expect.objectContaining({
-				kind: 'event-handler',
-				eventName: 'click',
-				order: 0,
-				source: '() => count++',
-				writes: [
-					expect.objectContaining({
-						graphNodeId: 'state:count',
-						operation: 'update',
-						updateOperator: '++',
-					}),
-				],
-			}),
-			expect.objectContaining({
 				kind: 'callback-prop',
 				propName: 'onPick',
 				source: '() => count++',
 				writes: [expect.objectContaining({ graphNodeId: 'state:count' })],
 			}),
+			// One composed closure per event attribute, so every write it makes
+			// belongs to the single order-0 symbol.
 			expect.objectContaining({
 				kind: 'event-handler',
 				eventName: 'click',
-				order: 1,
-				source: "() => query = 'clicked'",
-			}),
-			expect.objectContaining({
-				kind: 'event-handler',
-				eventName: 'click',
-				order: 2,
-				source: '() => count = clamp(count, 10)',
+				order: 0,
 				moduleImports: [
 					{
 						localName: 'clamp',
@@ -109,6 +97,15 @@ test('planSymbolResolver assigns lazy symbols while resolver owns import boundar
 					},
 				],
 				writes: [
+					expect.objectContaining({
+						graphNodeId: 'state:count',
+						operation: 'update',
+						updateOperator: '++',
+					}),
+					expect.objectContaining({
+						graphNodeId: 'state:query',
+						operation: 'assign',
+					}),
 					expect.objectContaining({
 						graphNodeId: 'state:count',
 						operation: 'assign',

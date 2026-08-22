@@ -30,10 +30,9 @@ import {
 import { collectComponentEdge } from './collect-components.ts';
 import { collectExpressionReads, resolvedSymbolAt } from './collect-expressions.ts';
 import {
-	extractSyncPolicyFromHandlers,
+	extractSyncPolicy,
 	firstDetachedSyncPolicyReference,
 	firstSyncPolicyActionCall,
-	getHandlerCount,
 	hasSyncEventPolicyCandidate,
 } from './collect-sync-policy.ts';
 import {
@@ -599,6 +598,15 @@ function collectAttribute(
 	if (!hostNodeId) return;
 
 	if (isEventAttribute(attributeName)) {
+		if (expressionValue?.type === 'ArrayExpression') {
+			state.graph.diagnostics.push(
+				eventHandlerArrayDiagnostic(attributeName, expressionValue, state),
+			);
+			collectExpressionReads(expressionValue, state);
+			walk(expressionValue, state);
+			return;
+		}
+
 		const invalidHandler = invalidEventHandlerExpression(attributeName, expressionValue, state);
 		if (invalidHandler) {
 			state.graph.diagnostics.push(invalidHandler);
@@ -607,28 +615,28 @@ function collectAttribute(
 			return;
 		}
 
-		const handlers = eventHandlerExpressions(expressionValue, state);
-		const handlerNodes = handlers.map((handler) => handler.node);
-		const handlerSources = handlers.map((handler) => handler.source);
-		const handlerSpans = handlers.map((handler) => handler.span);
-		const handlerParameters = handlerNodes.map(handlerParameterNames);
-		const syncPolicy = extractSyncPolicyFromHandlers(handlerNodes, state);
-		const hasSyncPolicyCandidate =
-			handlerNodes.some((handler) => hasSyncEventPolicyCandidate(handler)) ||
-			handlers.some((handler) => firstDetachedSyncPolicyReference(handler.node));
+		const handler = eventHandlerExpression(expressionValue, state);
+		const syncPolicy = extractSyncPolicy(handler?.node, state);
+		const hasSyncPolicyCandidate = handler
+			? hasSyncEventPolicyCandidate(handler.node) ||
+				Boolean(firstDetachedSyncPolicyReference(handler.node))
+			: false;
 		if (hasSyncPolicyCandidate && !syncPolicy) {
 			state.graph.diagnostics.push(
-				unextractableSyncPolicyDiagnostic(attributeName, value, handlerNodes, state),
+				unextractableSyncPolicyDiagnostic(
+					attributeName,
+					value,
+					handler ? [handler.node] : [],
+					state,
+				),
 			);
 		}
 		state.graph.events.push({
 			id: `event:${state.nextEventId++}`,
 			hostNodeId,
 			eventName: normalizeEventName(attributeName),
-			handlerCount: getHandlerCount(expressionValue),
-			handlerSources,
-			handlerSpans,
-			handlerParameters,
+			...(handler ? { handlerSource: handler.source, handlerSpan: handler.span } : {}),
+			handlerParameters: handler ? handlerParameterNames(handler.node) : [],
 			hasSyncPolicyCandidate,
 			syncPolicy,
 		});
@@ -1429,25 +1437,22 @@ function localFunctionDeclarationSource(
 	return localFunctionValueSource(node, state)?.source ?? null;
 }
 
-function eventHandlerExpressions(
+function eventHandlerExpression(
 	node: AnyNode | undefined,
 	state: WalkState,
-): EventHandlerExpression[] {
-	if (!node) return [];
-	const expressions = node.type === 'ArrayExpression' ? asNodes(node.elements) : [node];
+): EventHandlerExpression | null {
+	if (!node) return null;
 
-	return expressions.map((expression) => {
-		const resolved = localFunctionValueSource(expression, state);
-		if (!resolved) {
-			return {
-				node: expression,
-				source: expressionSource(expression, state.source),
-				span: sourceSpan(expression, state.filename),
-			};
-		}
+	const resolved = localFunctionValueSource(node, state);
+	if (!resolved) {
+		return {
+			node,
+			source: expressionSource(node, state.source),
+			span: sourceSpan(node, state.filename),
+		};
+	}
 
-		return { node: resolved.node, source: resolved.source, span: resolved.span };
-	});
+	return { node: resolved.node, source: resolved.source, span: resolved.span };
 }
 
 function handlerParameterNames(node: AnyNode): string[] {
@@ -1463,6 +1468,35 @@ function handlerParameterNames(node: AnyNode): string[] {
 		const name = getIdentifierName(parameter);
 		return name ? [name] : [];
 	});
+}
+
+function eventHandlerArrayDiagnostic(
+	attributeName: string,
+	node: AnyNode,
+	state: WalkState,
+): SemanticGraphDiagnostic {
+	const calls = asNodes(node.elements).map((element) => {
+		const name = getIdentifierName(element);
+		return name ? `${name}(event)` : '/* ... */';
+	});
+	const body = calls.length > 0 ? calls.join('; ') : '/* ... */';
+
+	return {
+		code: 'MARKLESS_EVENT_HANDLER_ARRAY_UNSUPPORTED',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'One handler per event attribute',
+		primarySpan: sourceSpan(node, state.filename),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		message: `\`${attributeName}\` takes one handler, not a list. Compose the calls yourself in a single function.`,
+		why: 'An event attribute compiles to one lazy handler symbol. A closure you write keeps the call order, early returns, and conditions visible in your own code instead of hiding them in a framework rule.',
+		suggestions: [
+			{ message: `Write one function that calls both: ${attributeName}={(event) => { ${body} }}.` },
+			{ message: 'The list-shaped attribute is `attach`, which still takes an array.' },
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_EVENT_HANDLER_ARRAY_UNSUPPORTED',
+	};
 }
 
 function invalidEventHandlerExpression(
@@ -1483,7 +1517,7 @@ function invalidEventHandlerExpression(
 		passId: 'tsrx-semantic-graph',
 		artifactKeys: ['semanticGraph'],
 		message: `\`${attributeName}={${source}}\` passes the result of \`${source}\`, not a function. The expression would run once while rendering, and the click would receive a number.`,
-		why: 'An event prop compiles to a lazy handler symbol that runs on the browser event; only a function or an array of functions can be that handler.',
+		why: 'An event prop compiles to a lazy handler symbol that runs on the browser event; only a function can be that handler.',
 		suggestions: [
 			{ message: `Wrap it in a function, for example ${attributeName}={() => ${source}}.` },
 		],
@@ -1493,13 +1527,6 @@ function invalidEventHandlerExpression(
 
 function firstInvalidEventHandlerExpression(node: AnyNode | undefined): AnyNode | null {
 	if (!node) return null;
-	if (node.type === 'ArrayExpression') {
-		for (const item of asNodes(node.elements)) {
-			const invalid = firstInvalidEventHandlerExpression(item);
-			if (invalid) return invalid;
-		}
-		return null;
-	}
 
 	if (
 		node.type === 'ArrowFunctionExpression' ||
