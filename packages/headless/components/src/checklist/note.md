@@ -307,6 +307,53 @@ One link deep the double-count is invisible. Witness:
 arithmetic in `packages/web/src/fns/shared-seed.ts`, not a change to the declared
 chain.
 
+## What T075e measured, and the one line it changed
+
+**The return leg was not what the red rows were pinned on.** T075d landed the
+callback-slot graph node and its minimal witness
+(`packages/vitest-browser/browser/widget-callback-escape.test.ts`) is green, but
+five rows of this family that were green before it went red. Measured on the
+running page rather than reasoned about: clicking the select-all produced NO
+writes at all. Its own `checkbox.checked` never moved, `checklist.setAll` never
+ran, and on `with-onchange.tsrx` the consumer handler's call counter stayed at
+`0`. The dispatch trace named the difference exactly — before T075d the click
+woke `symbol:0 (checkbox.tsrx)` plus six of its dom-update symbols through
+`c0:p2:bound:symbol:0:component-edge:4`; after it, no checkbox symbol woke at
+all and the bound symbol had lost its instance prefix.
+
+**The cause is where a dispatching method gets inlined.** A `shared()` method is
+inlined into a handler because the handler carries no runtime instance to call it
+on. T075d extended that inlining from event handlers to callback props, and fixed
+parameterised methods, which is what `checklist.setAll(next === true)` needs. But
+`setAll` and `setItem` both end in `checklist.onChange?.(next)`, so the inlined
+body carries a widget-callback claim of the CHECKLIST's own slot — a claim a
+callback prop has no route to answer. Every claim this module publishes then
+travelled to the consumer page, the part's own gesture bound to the wrong symbol,
+and it ran nothing. One line closes it: a method that dispatches through its own
+family's slot stays a CALL inside a callback prop, and is still inlined into event
+handlers, where the whole route is owned. Parameterised inlining is untouched, so
+the escape witness stays green.
+
+Pinned at `packages/compiler/test/widget-callback-composed-root.test.ts` ("a
+dispatching shared method is not inlined into a callback prop") with a middle
+module that declares a slot of its own — this family's exact shape.
+
+**The return leg itself is still open, and it is still the next thing.** With the
+dispatch restored, the rows below the ones that flipped back stay pinned on it:
+when the group writes `checklist.value`, the synthetic computed a composed edge
+minted (`checked={checklist.value.includes(item.value)}`,
+`checked={checklist.allChecked}`) re-derives, but nothing writes that value
+through to the composed `CheckboxRoot`'s seeded cell, so the item's rendered
+state does not follow. The channel is priced and needs no new transport: the
+child's shared-seed symbol is already a derive `(context) => value` reading
+`prop:props`, and `resume-sync-demand.ts` already subscribes a record's
+dependencies and writes its node from a `deriveSymbolId`. What is missing is the
+record — the child module declaring "this shared node follows these prop reads"
+— plus the compose-side remap, which `marklessQualifyChildState` already performs
+for `computed[].dependencies`. A payload `computed` entry carrying no `compute`
+is read from the cell, so the child's own toggle keeps writing it: last write
+wins between the two channels.
+
 ## Framework limits this family ran into
 
 1. **A spread onto a component tag was dropped on the CSR side.** _(fixed)_
