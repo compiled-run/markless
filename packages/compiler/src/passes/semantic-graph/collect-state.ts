@@ -43,7 +43,7 @@ import {
 	templateAsValueDiagnostic,
 	unstableStateCreationSiteDiagnostic,
 } from './diagnostics.ts';
-import type { SemanticView } from '../../yuku-tsrx-adapter.ts';
+import type { SemanticView } from 'yuku-tsrx';
 import type { WalkState } from './types.ts';
 import { collectSharedInstance } from './collect-shared.ts';
 

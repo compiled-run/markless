@@ -1,4 +1,4 @@
-import { parseModule } from '../../yuku-tsrx-adapter.ts';
+import { parseModule } from '../../js-ast.ts';
 import { childNodes, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { getElementTagName, isHostTagName } from '../../ast/tsrx.ts';
 import { parseJavaScriptModule } from '../../js-ast.ts';

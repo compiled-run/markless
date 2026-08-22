@@ -1,4 +1,4 @@
-import { parseModule } from '../../yuku-tsrx-adapter.ts';
+import { parseModule } from '../../js-ast.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import type {

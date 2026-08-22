@@ -1,4 +1,4 @@
-import { parseModule } from '../../yuku-tsrx-adapter.ts';
+import { parseModule } from '../../js-ast.ts';
 import type { PublicRenderModuleArtifact, PublicRenderModuleInput } from '../../artifacts.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
 import { collectPublicRenderComponentDefinitions } from './component-definitions.ts';

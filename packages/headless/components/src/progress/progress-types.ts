@@ -1,4 +1,4 @@
-import type { Children, PropsOf } from '@markless/core';
+import type { PropsOf } from '@markless/core';
 
 export type ProgressRootProps = PropsOf<'div'> & {
 	/** How far along the task is. Omit it, or pass `null`, for an unknown amount. */

@@ -1,6 +1,6 @@
-import { cleanup, render, renderSSR } from '@markless/vitest-browser';
+import { render, renderSSR } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
-import { afterEach, beforeEach, expect, test } from 'vitest';
+import { expect, test } from 'vitest';
 import Basic from './scenarios/basic.tsrx';
 import FieldWithHelpAndError from './scenarios/help-and-error.tsrx';
 import InvalidField from './scenarios/invalid.tsrx';

@@ -12,7 +12,7 @@ import {
 	isHostTagName,
 	isSpreadAttribute,
 } from '../../ast/tsrx.ts';
-import { isEventAttribute } from '../../yuku-tsrx-adapter.ts';
+import { isEventAttribute } from 'yuku-tsrx';
 import type { SemanticGraphDiagnostic } from '../../artifacts.ts';
 import { spreadEventShadowDiagnostic } from './diagnostics.ts';
 

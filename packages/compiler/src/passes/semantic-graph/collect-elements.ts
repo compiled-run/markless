@@ -1,4 +1,5 @@
-import { isEventAttribute, normalizeEventName, parseModule } from '../../yuku-tsrx-adapter.ts';
+import { isEventAttribute, normalizeEventName } from 'yuku-tsrx';
+import { parseModule } from '../../js-ast.ts';
 import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {

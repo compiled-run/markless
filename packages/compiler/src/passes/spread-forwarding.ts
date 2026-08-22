@@ -1,5 +1,5 @@
 import type { ProtocolViewPayload } from '@markless/serializer';
-import { isEventAttribute, normalizeEventName } from '../yuku-tsrx-adapter.ts';
+import { isEventAttribute, normalizeEventName } from 'yuku-tsrx';
 import type {
 	ModuleGraphInterfaceSpreadHost,
 	ProtocolViewPayloadInput,

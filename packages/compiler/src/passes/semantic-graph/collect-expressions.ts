@@ -10,7 +10,7 @@ import {
 	stateWriteInTemplateDiagnostic,
 	templateAsValueDiagnostic,
 } from './diagnostics.ts';
-import type { SemanticView } from '../../yuku-tsrx-adapter.ts';
+import type { SemanticView } from 'yuku-tsrx';
 import type { DeferredComputedWrite, WalkState } from './types.ts';
 
 export function collectAssignment(node: AnyNode, state: WalkState): void {
