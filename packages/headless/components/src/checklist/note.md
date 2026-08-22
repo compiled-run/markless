@@ -354,6 +354,80 @@ for `computed[].dependencies`. A payload `computed` entry carrying no `compute`
 is read from the cell, so the child's own toggle keeps writing it: last write
 wins between the two channels.
 
+## What T075f changed
+
+**T075e's one line was the wrong half of a true diagnosis, and it shipped a red
+tip.** Leaving `checklist.setAll(...)` standing as a call inside the callback prop
+emitted a free `checklist` into the symbol module, so the moment the checkbox's
+slot route invoked it the symbol threw `ReferenceError: checklist is not defined`
+— six unhandled rejections, `pnpm test:headless` exiting 1 on 108 passing rows. A
+callback prop carries no runtime shared instance, for exactly the reason an event
+handler does not, so the method has to be inlined there too.
+
+What T075e was really protecting against is the CLAIM, not the inlining. An
+inlined dispatching body grows a widget-callback capture slot, and a
+widget-callback ROUTE is what publishes a claim to the consumer
+(`linkedImportedClaimKind`); once the callback prop published one, every claim
+this module makes travelled up and the part's own gesture bound the wrong symbol.
+
+The fix separates the two. A callback prop is invoked by whatever composed its
+edge — it is never a part a consumer binds — so no consumer edge can ever answer
+its slot, and the route is resolved where it is minted instead of published: the
+`callback-slot-route` on the slot's own graph node that T075d already built for a
+part with no enclosing root. The symbol therefore dispatches through the graph,
+which is the one channel that knows the absolute instance path (the T075c
+finding), and publishes nothing.
+
+The emitted module says it plainly:
+
+```js
+export async function symbol_0(context) {
+  const next = context.event;
+  (async (on) => {
+    const next = on ? [...context.graph.read(".../state:checklist", ["values"])] : [];
+    context.graph.write({ graphNodeId: ".../state:checklist", path: ["value"], value: next });
+    await marklessInvokeCallbackSlot(context, ".../slot:onChange", [next]);
+  })(next === true);
+}
+```
+
+`marklessInvokeCallbackSlot` is `packages/web/src/fns/callback-slot.ts`, and it is
+the same function the emitted symbol-resolver module's own `callback-slot-route`
+branch now calls — one reading of the composer-path arithmetic instead of two, and
+the import is carried only by a module that actually dispatches through a slot.
+Pinned at `packages/compiler/test/widget-callback-composed-root.test.ts` ("a
+dispatching shared method inlined into a callback prop routes through its own slot
+node"), which asserts the inlining, the resolved route, the absent claim, and the
+emitted call.
+
+**Containment, and where the rejection was really escaping.** An inlined
+dispatching body becomes `(async () => { ... })()` — a promise no caller awaits,
+because the authored `checkbox.toggle()` was not awaited either. Every failure
+inside it therefore bypassed the dispatch try/catch entirely, which is why the
+T050 outer-listener containment never saw these. `resume-events.ts` now separates
+the two invocation paths: the top-level loop runs symbols directly, so a failure
+there still reaches the dispatch catch and rethrows, while the `invokeSymbol`
+threaded into symbol contexts — the one a slot route calls — reports through
+`reportRuntimeError` and returns, contained and reported once instead of
+surfacing as an unhandled rejection. The row-event path was threading neither
+`invokeSymbol` nor `invokeCallback` into its context at all; it now builds the
+same channel, with the row's item locals travelling on it, so a slot dispatch from
+inside a keyed `@for` row reaches a handler rather than throwing "Bound callback
+invocation is unavailable".
+
+**The return leg is still open**, unchanged from the T075e description below it:
+the group's write re-derives the synthetic computed a composed edge minted, but
+nothing writes it through to the composed `CheckboxRoot`'s seeded cell. The design
+is priced in that section and was not attempted here.
+
+**One thing measured in passing, not fixed.** `setItem`'s inlined body lowers
+`checklist.value.filter(...)` to `context.graph.read(node, ["value", "filter"])(...)`
+— the array method read off the path and called detached from its receiver, where
+the derive path lowers the same shape as a member call
+(`read(node, ["value"]).includes(...)`, symbol:3). The two lowerings disagree. It
+did not surface as a red row in this suite, but it is a real difference between
+the event-handler and derive read rewriters.
+
 ## Framework limits this family ran into
 
 1. **A spread onto a component tag was dropped on the CSR side.** _(fixed)_

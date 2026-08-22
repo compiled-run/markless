@@ -95,7 +95,6 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				prop.source,
 				input.semanticGraph,
 				semanticsReader,
-				true,
 			);
 			const source = inlined.source;
 			const moduleImports = referencedModuleImports(input.semanticGraph.moduleImports, source);
@@ -409,10 +408,6 @@ function inlineSharedMethodCalls(
 	source: string,
 	semanticGraph: SymbolResolverInput['semanticGraph'],
 	semanticsReader: SymbolSourceSemanticsReader,
-	// A dispatching body inlined here would carry a slot claim of its own, and a
-	// callback prop has no route to answer one: the whole family's claims then
-	// travel to the consumer and the part's own gesture runs nothing.
-	skipDispatchingMethods = false,
 ): { readonly source: string; readonly spans: ReadonlyArray<SourceSpan> } {
 	if (!source || semanticGraph.sharedInstances.length === 0) return { source, spans: [] };
 
@@ -436,7 +431,6 @@ function inlineSharedMethodCalls(
 					invocation.definitionId === definition.id &&
 					method.body.includes(invocation.calleeSource),
 			);
-			if (dispatches && skipDispatchingMethods) continue;
 			const arrow = `(${dispatches ? 'async ' : ''}(${method.parameters}) => {${method.body}})`;
 			const replaced = replaceMethodCalls(emitted, callee, (args) => `${arrow}(${args})`);
 			if (replaced === emitted) continue;

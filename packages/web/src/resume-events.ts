@@ -167,8 +167,26 @@ export function createEventWiring(input: {
 			}
 			const activation = input.activateBehaviorsFromTrigger(eventRecord.hostNodeId);
 			if (activation) await activation;
-			const invokeSymbol = async (symbolId: string, context: ResumeSymbolContext) =>
+			const runSymbol = async (symbolId: string, context: ResumeSymbolContext) =>
 				(await input.loadSymbol(symbolId))({ ...context, invokeCallback, invokeSymbol });
+			// A symbol reached through a callback slot runs inside a dispatching
+			// body no caller awaits, so its failure is reported here rather than
+			// escaping the dispatch as an unhandled rejection.
+			const invokeSymbol = async (symbolId: string, context: ResumeSymbolContext) => {
+				try {
+					return await runSymbol(symbolId, context);
+				} catch (error) {
+					await input.reportRuntimeError(error, {
+						phase: 'event',
+						hostNodeId: eventRecord.hostNodeId,
+						eventName: eventRecord.eventName,
+						symbolId,
+						event,
+						element,
+					});
+					return undefined;
+				}
+			};
 			const baseContext = {
 				graph: input.graph,
 				event,
@@ -179,7 +197,7 @@ export function createEventWiring(input: {
 				invokeSymbol(symbolId, { ...baseContext, args, invokeCallback, invokeSymbol });
 			for (const symbolId of eventRecord.symbolIds) {
 				activeSymbolId = symbolId;
-				await invokeSymbol(symbolId, baseContext);
+				await runSymbol(symbolId, baseContext);
 			}
 		} catch (error) {
 			await input.reportRuntimeError(error, {
@@ -226,17 +244,37 @@ export function createEventWiring(input: {
 					rowKey,
 				),
 			};
+			// A row's symbol dispatches through the same callback channel a view
+			// event's does; the row's own item locals travel with it.
+			const runSymbol = async (symbolId: string, context: ResumeSymbolContext) =>
+				(await input.loadSymbol(symbolId))({ ...context, invokeCallback, invokeSymbol });
+			const invokeSymbol = async (symbolId: string, context: ResumeSymbolContext) => {
+				try {
+					return await runSymbol(symbolId, context);
+				} catch (error) {
+					await input.reportRuntimeError(error, {
+						phase: 'event',
+						hostNodeId: repeat.parentHostNodeId,
+						eventName: rowEvent.eventName,
+						symbolId,
+						event,
+						element,
+					});
+					return undefined;
+				}
+			};
+			const baseContext = {
+				graph: input.graph,
+				event,
+				element,
+				getElementHandle: input.elementHandles.get,
+				locals,
+			} as ResumeSymbolContext;
+			const invokeCallback = (symbolId: string, args: ReadonlyArray<unknown>) =>
+				invokeSymbol(symbolId, { ...baseContext, args, invokeCallback, invokeSymbol });
 			for (const symbolId of rowEvent.symbolIds) {
 				activeSymbolId = symbolId;
-				const symbol = await input.loadSymbol(symbolId);
-				const result = symbol({
-					graph: input.graph,
-					event,
-					element,
-					getElementHandle: input.elementHandles.get,
-					locals,
-				});
-				if (isPromiseLike(result)) await result;
+				await runSymbol(symbolId, baseContext);
 			}
 		} catch (error) {
 			await input.reportRuntimeError(error, {
@@ -360,11 +398,4 @@ function unmatchedDispatchError(event: ResumeDomEvent, selector: string | undefi
 	error.dispatchModuleId = 'web:resume-events';
 	error.docsUrl = `https://markless.dev/errors/${code}`;
 	return error;
-}
-function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
-	return (
-		value !== null &&
-		(typeof value === 'object' || typeof value === 'function') &&
-		typeof (value as { readonly then?: unknown }).then === 'function'
-	);
 }
