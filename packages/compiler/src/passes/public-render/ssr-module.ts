@@ -1,4 +1,6 @@
+import { parseModule } from '../../yuku-tsrx-adapter.ts';
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
+import type { AnyNode } from '../../ast/nodes.ts';
 import {
 	collectSsrAsyncRunnerDefinitions,
 	collectSsrAsyncRunners,
@@ -10,6 +12,8 @@ import { renderBodyLines } from './render-body.ts';
 import {
 	armScopedSeedRefsUnder,
 	componentSharedSeeds,
+	childrenProjectionChain,
+	childrenWidgetRootMarkerLine,
 	projectedSeedPartsUnder,
 	sharedSeedConsumeLine,
 	sharedSeedMarkerLine,
@@ -18,7 +22,12 @@ import {
 	widgetRootMarkerLine,
 } from './shared-seed-pass.ts';
 import { emitCatalogHelperImports, stateRuntimeImports } from './runtime-helpers.ts';
-import { emitSameModuleSsrComponents, selfComposedSsrBindingLines } from './same-module.ts';
+import {
+	emitSameModuleSsrComponents,
+	sameModuleSsrComponentNames,
+	selfComposedSsrBindingLines,
+	ssrComponentFunctionName,
+} from './same-module.ts';
 import {
 	callbackSymbolIds,
 	componentEdgeInstanceSegment,
@@ -178,6 +187,14 @@ export function emitPublicSsrRenderModule(
 			widgetRootDefinitionIds(input, rootInfo.componentName),
 			'marklessRenderSsr',
 		),
+		...childrenWidgetRootMarkerLines(input, references, [
+			[rootInfo.componentName, 'marklessRenderSsr'],
+			...sameModuleSsrComponentNames(
+				input,
+				parseModule(input.source.source, input.source.filename) as unknown as AnyNode,
+				rootInfo.componentName,
+			).map((name) => [name, ssrComponentFunctionName(name)] as [string, string]),
+		]),
 		'',
 	];
 	const selfBindings = selfComposedSsrBindingLines(
@@ -215,6 +232,7 @@ export function emitPublicSsrRenderModule(
 					'marklessSsrCallbackSymbol',
 					'marklessSsrSeedChild',
 					'marklessSsrWidgetRoots',
+					'marklessSsrChildrenWidgetRoot',
 					'marklessSsrWidgetBoundary',
 					// Keep the emitted SSR helper distinct from authored bindings.
 					'marklessComposeState as marklessSsrComposeState',
@@ -255,6 +273,48 @@ export function emitPublicSsrRenderModule(
 // renderer hands its row context to: a row template, and a projection, which
 // travels with the row that placed it. A branch arm, an async arm, an empty list,
 // and a dynamic host's children are all rendered without the row context.
+// The child surface a marker or a boundary check names, spelled exactly as the
+// render and seed calls spell it: the module reference, and the component name
+// when a named import says WHICH component of that module's surface composes.
+function childSurfaceArgs(
+	edge: { readonly childComponentName: string; readonly importKind?: string; readonly importSource?: string; readonly importedName?: string },
+	referenceByName: ReadonlyMap<string, string>,
+): string | undefined {
+	const reference = referenceByName.get(edge.childComponentName);
+	if (!reference) return undefined;
+	const declaredName =
+		edge.importKind === 'named' && edge.importSource && isTsrxComponentImport(edge.importSource)
+			? (edge.importedName ?? edge.childComponentName)
+			: undefined;
+	return `${reference},${declaredName ? JSON.stringify(declaredName) : 'undefined'}`;
+}
+
+// One marker per component whose own `children` land inside its composition.
+function childrenWidgetRootMarkerLines(
+	input: PublicRenderModuleInput,
+	references: ReadonlyArray<{ readonly componentName: string; readonly localName: string }>,
+	components: ReadonlyArray<readonly [string, string]>,
+): string[] {
+	const referenceByName = new Map(references.map((entry) => [entry.componentName, entry.localName]));
+	const edgeById = new Map(input.semanticGraph.componentEdges.map((edge) => [edge.id, edge]));
+	return components.flatMap(([componentName, functionName]) => {
+		const chain = childrenProjectionChain(input.renderData.chunks, componentName, (edgeId) =>
+			componentEdgeInstanceSegment(edgeById.get(edgeId), input.semanticGraph.componentEdges),
+		);
+		const line = childrenWidgetRootMarkerLine(
+			chain.map((link) => ({
+				instancePath: link.instancePath,
+				surfaceArgs: (() => {
+					const edge = edgeById.get(link.componentEdgeId);
+					return edge ? childSurfaceArgs(edge, referenceByName) : undefined;
+				})(),
+			})),
+			functionName,
+		);
+		return line ? [line] : [];
+	});
+}
+
 function rowScopedEdgeIds(
 	chunks: PublicRenderModuleInput['renderData']['chunks'],
 ): ReadonlySet<string> {
@@ -526,7 +586,7 @@ function emitSsrDataRenderLines(
 						rowScopedEdges.has(edge.id)
 							? 'marklessSsrRowSegment(marklessSsrDataContext.repeatKey)+'
 							: ''
-					}${JSON.stringify(child.symbolPrefix)});`,
+					}${JSON.stringify(child.symbolPrefix)}+marklessSsrChildrenWidgetRoot(${childSurfaceArgsByEdgeId.get(edge.id) ?? `${component},undefined`}));`,
 				);
 		}
 		// A row-scoped edge takes its row's runtime segment ahead of its own

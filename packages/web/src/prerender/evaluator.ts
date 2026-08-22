@@ -504,6 +504,7 @@ async function evaluatePrerenderDataComponent(input: {
 	const rendered = await renderSsrData({
 		renderData,
 		idPrefix: input.idPrefix,
+		sharedSeeds: input.sharedSeeds,
 		read: (residue, context) => {
 			if (residue.kind === 'repeat-item') return readPath(context.repeatItem, residue.path);
 			if (residue.kind === 'graph-read') return read(residue.graphNodeId, residue.path);

@@ -123,6 +123,7 @@ type SsrChildComponent = {
 		 * instance of it starts a widget instance of its own.
 		 */
 		readonly marklessWidgetRoots?: ReadonlyArray<string>;
+		readonly marklessChildrenWidgetRoot?: string;
 	};
 	/** SSR entry per exported component, for a module that serves more than one. */
 	readonly renderSsrComponents?: Readonly<Record<string, SsrChildComponent>>;
@@ -245,6 +246,20 @@ export function marklessSsrWidgetRoots(
 ): ReadonlyArray<string> {
 	const part = componentName ? marklessSsrComponentPart(component, componentName) : component;
 	return part?.renderSsr?.marklessWidgetRoots ?? [];
+}
+
+/**
+ * Where a placed child's own composition puts the children written into it: the
+ * instance path of the composed widget root that encloses them, empty when no
+ * composed root does. The child declared it at build time, so the parts written
+ * into that child resolve to the root COMPOSITION placed them in.
+ */
+export function marklessSsrChildrenWidgetRoot(
+	component: SsrChildComponent | undefined,
+	componentName: string | undefined,
+): string {
+	const part = componentName ? marklessSsrComponentPart(component, componentName) : component;
+	return part?.renderSsr?.marklessChildrenWidgetRoot ?? '';
 }
 
 /**

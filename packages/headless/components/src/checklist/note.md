@@ -22,39 +22,51 @@ Select-all state is a pure function of `value` × `values` (the Base UI `allValu
 shape). There is no second state cell, so the select-all and the items cannot
 disagree, and no item registration or construction-order index is required.
 
-## THE BLOCKER: this anatomy does not run on this base
+## The blocker, and what T071 changed
 
-Measured on `feat/headless-ui-pilot` @ `560eebd5` plus the component-edge computed
-landed beside this note. Every row of `checklist.browser.ts` except the recorded
-IDREF gap is red, and they are all one fault:
+The original diagnosis in this note was wrong about the mechanism. Measured on
+this base: the fault was never `marklessWidgetRootPath`'s longest-prefix lookup.
+It was the widget-instance TOKEN a part mints its `element()` id from
+(`markless:widget-instance`, set by the seed pass in
+`packages/web/src/fns/shared-seed.ts`). The token named the nearest projecting
+component edge, and it never crossed a composed edge at all, so
+`CheckboxTrigger` composed by `checklist.selectall` read no token and threw
+`MARKLESS_ELEMENT_HANDLE_WIDGET_INSTANCE_MISSING`.
 
-    MARKLESS_ELEMENT_HANDLE_WIDGET_INSTANCE_MISSING:
-    shared:.../checkbox.tsrx#checkboxState/element:triggerEl
+T071 landed the owner's ruling as compose-time data. A component whose own
+`children` are rendered inside its composition declares that fact at build time:
+`childrenProjectionChain` reads it off the render chunks (the one slot that
+renders `prop:props.children` raw), and the emitted module carries the answer as
+`Fn.marklessChildrenWidgetRoot`, resolved once at module load from the same
+`marklessWidgetRoots` marker the T053 boundary check already reads. The seeding
+parent appends it to the token, so a part written inside `<checklist.root>`
+resolves to the `CheckboxRoot` that root COMPOSED (`c0:c0:`), not to the
+consumer-site path. Nothing is sensed: no tree walk, no DOM ancestry, no child
+announcing itself. Seeds also now cross a composed edge on the CSR path, the way
+the SSR render context already carried them.
 
-A widget-scoped shared() instance is found by **longest registered prefix of the
-reader's instance path** (`marklessWidgetRootPath`, `packages/web/src/fns/
-instance-scope.ts`). Instance paths for projected children are computed from where
-the consumer WROTE the tag (`componentEdgeInstancePaths`), not from where the part
-forwards `children` to.
+The anatomy renders. Every part resolves to one instance, `checklist.label`'s
+`for` equals the select-all trigger's minted `id`, and each item mints its own
+(`c0:p4:c6:`, `c0:p8:c6:`, ...). The framework witnesses are
+`packages/vitest-browser/browser/projection-into-composed-root.test.ts`.
 
-So for `<checklist.root><checklist.selectall/></checklist.root>`:
+**What still stops every row of this suite:** a spread onto a COMPONENT tag
+contributes no edge prop. `componentPropBindings`
+(`packages/compiler/src/passes/semantic-graph/collect-components.ts`) skips an
+attribute with no name, so `<CheckboxRoot {...rest} ...>` forwards nothing, and
+no consumer attribute survives `<checklist.root>` -> `<CheckboxRoot>` -> `<div>`.
+Every locator in `checklist.browser.ts` names a `data-testid` the consumer
+wrote, so the suite stays pinned at suite level until the spread reaches the
+edge. This is the same gap as limit 1 below, now measured as blocking the whole
+anatomy rather than only forwarded events and handles.
 
-  * `checklist.root`'s own composed `CheckboxRoot` registers the checkbox widget
-    at `c0:c0:`.
-  * `checklist.selectall` is a projected child of `checklist.root` at `c0:p1:`,
-    and its own `CheckboxTrigger` lands at `c0:p1:c0:`.
-  * `c0:c0:` is not a prefix of `c0:p1:c0:`, so the trigger finds no widget root.
+Two adjacent gaps are pinned row-level in the framework witness, both of them
+about what the chain does NOT yet carry:
 
-The five-part shape this family shipped before worked around it by giving
-`checklist.selectall` a wrapper `<div>` whose child was the `CheckboxRoot`: the
-consumer's `<checkbox.trigger>` was then projected THROUGH that root
-(`c0:p1:c0:pN:`), and projection composes. That is exactly the wrapper element the
-QDS anatomy forbids.
-
-**What has to land before this anatomy runs:** children projected into a part must
-inherit the instance path of any family root that part composes them into. Until
-then the QDS part list is expressible but not executable, and the choice is a
-wrapper element per composing part or a change to how projection paths are built.
+  * a composed root's own seed never runs, because the seed pass stops at the
+    child the consumer wrote instead of descending the chain it now declares;
+  * a keyed row's composed widget is not row-scoped, so two rows share one
+    instance even though their minted ids differ.
 
 ## Framework limits this family ran into
 

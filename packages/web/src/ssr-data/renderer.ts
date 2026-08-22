@@ -164,6 +164,9 @@ export type SsrDataCoordinates = {
 export type RenderSsrDataInput = {
 	readonly renderData: SsrRenderData;
 	readonly idPrefix?: string;
+	// What the component that placed this one seeded: it travels the composed
+	// edge as well as the projection, because a part may sit behind either.
+	readonly sharedSeeds?: ReadonlyMap<string, unknown>;
 	readonly read: (residue: SsrDataResidue, context: SsrDataReadContext) => Awaitable<unknown>;
 	readonly renderChild?: (
 		slot: Extract<SsrDataSlot, { readonly kind: 'child-component' }>,
@@ -225,7 +228,9 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 	const locators: Array<SsrDataCoordinates['locators'][number]> = [];
 	const anchors: Array<SsrDataCoordinates['anchors'][number]> = [];
 	const rootId = input.renderData.root?.templateId;
-	const rendered = rootId ? await renderChunk(rootId, {}) : { html: '', tokens: [] };
+	const rendered = rootId
+		? await renderChunk(rootId, { sharedSeeds: input.sharedSeeds })
+		: { html: '', tokens: [] };
 	const html = rendered.html;
 	const structure = materializeStructure(rendered.tokens);
 	const payloadScripts = input.state && input.view
