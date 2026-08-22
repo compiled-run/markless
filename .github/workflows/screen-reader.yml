@@ -1,0 +1,143 @@
+name: Screen reader
+
+# Announcement-level accessibility proof for @markless/ui. Separate from ci.yml
+# on purpose: two of these jobs need Windows and macOS runners with an assistive
+# technology installed, which is a different cost class from the Linux CI matrix.
+#
+# Three lanes, cheapest first:
+#   virtual  - a screen reader written in JavaScript, no assistive technology
+#              needed. Runs on every touched PR, required green.
+#   nvda     - the real NVDA screen reader on Windows. Required green.
+#   voiceover- the real VoiceOver screen reader on macOS. Advisory, see below.
+#
+# The matrix key is the component family. Only checkbox exists today; a new
+# family adds its name to each matrix and nothing else changes.
+
+on:
+    pull_request:
+        paths:
+            - 'packages/headless/**'
+            - '.github/workflows/screen-reader.yml'
+    push:
+        branches:
+            - main
+        paths:
+            - 'packages/headless/**'
+            - '.github/workflows/screen-reader.yml'
+    workflow_dispatch:
+
+concurrency:
+    group: screen-reader-${{ github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+    NPM_CONFIG_AUDIT: 'false'
+    NPM_CONFIG_FUND: 'false'
+    NPM_CONFIG_PREFER_OFFLINE: 'true'
+
+jobs:
+    # The always-on lane. Same transcript expectations the real readers will
+    # run, driven by @guidepup/virtual-screen-reader inside the existing
+    # Chromium browser project, so it needs nothing a Linux runner lacks.
+    virtual:
+        runs-on: ubuntu-latest
+        timeout-minutes: 15
+        strategy:
+            fail-fast: false
+            matrix:
+                family: [checkbox]
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - name: Install Markless dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Install Playwright browsers for the vitest browser project
+              run: pnpm --dir packages/vitest-browser exec playwright install --with-deps chromium
+
+            - name: Typecheck the screen-reader lane
+              run: pnpm typecheck:sr
+
+            - name: Read the ${{ matrix.family }} family with the virtual screen reader
+              run: pnpm test:sr -- sr/${{ matrix.family }}.sr.test.ts
+
+    # Real NVDA on a real Windows desktop session. guidepup/setup-action
+    # installs NVDA and the keyboard automation it needs.
+    nvda:
+        runs-on: windows-latest
+        timeout-minutes: 25
+        strategy:
+            fail-fast: false
+            matrix:
+                family: [checkbox]
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - name: Install Markless dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Install NVDA and its automation dependencies
+              uses: guidepup/setup-action@v3
+
+            - name: Prove the runner can drive NVDA
+              run: node scripts/ci/screen-reader-smoke.mjs nvda
+
+    # Real VoiceOver on macOS. Advisory on purpose, and this is the whole
+    # reason: guidepup/setup-action grants VoiceOver automation by writing the
+    # runner's TCC permission database directly, and every macOS runner image
+    # update can break that write. A broken image would otherwise block every
+    # unrelated pull request that touches packages/headless.
+    #
+    # continue-on-error is not permission to ignore this job, and removing the
+    # job is not a fix. A red VoiceOver lane is triaged like any other red: if
+    # the failure is a real announcement regression it blocks the change, and if
+    # it is the setup step it goes in the ledger with the runner image version.
+    voiceover:
+        runs-on: macos-latest
+        timeout-minutes: 25
+        continue-on-error: true
+        strategy:
+            fail-fast: false
+            matrix:
+                family: [checkbox]
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - name: Install Markless dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Grant VoiceOver automation permission
+              uses: guidepup/setup-action@v3
+
+            - name: Prove the runner can drive VoiceOver
+              run: node scripts/ci/screen-reader-smoke.mjs voiceover
