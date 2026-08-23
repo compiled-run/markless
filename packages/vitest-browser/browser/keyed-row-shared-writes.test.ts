@@ -29,9 +29,8 @@ import Page from './fixtures/krs-page.tsrx';
  * packages/compiler/test/keyed-row-shared-seeds.test.ts - and cannot show until
  * the row context carries a seed map for it to forward.
  *
- * The pins are `test.fails` rather than skips because the read is deterministic:
- * each turns red the day a row inherits its widget's seeds, which is the signal
- * to unpin it.
+ * The three seed rows were `test.fails` pins while seat B was open; the repeat
+ * row context now carries sharedSeeds, so they assert directly.
  */
 afterEach(() => cleanup());
 
@@ -86,12 +85,12 @@ test('SSR resume: a part beside the loop reads what the declaring part wrote', a
 
 // Defect 56 itself. Three shapes, each measured on its own so the receipt says
 // which of them a fix moved.
-test.fails('CSR: a keyed row reads the field a sibling part declared', async () => {
+test('CSR: a keyed row reads the field a sibling part declared', async () => {
 	const screen = await render(Page);
 	await expect.poll(() => rowNames(screen.container as HTMLElement)).toEqual(rows.map(() => 'plan'));
 });
 
-test.fails('CSR: a keyed row reads the field through a computed() cell', async () => {
+test('CSR: a keyed row reads the field through a computed() cell', async () => {
 	const screen = await render(Page);
 	await expect
 		.poll(() => computedRowNames(screen.container as HTMLElement))
@@ -114,7 +113,7 @@ test('CSR: a write landing after the rows exist reaches every row', async () => 
 	await expect.poll(() => rowNames(container)).toEqual(rows.map(() => 'late'));
 });
 
-test.fails('SSR resume: a keyed row reads the field a sibling part declared', async () => {
+test('SSR resume: a keyed row reads the field a sibling part declared', async () => {
 	const screen = await renderSSR(Page);
 	await expect.poll(() => rowNames(screen.container)).toEqual(rows.map(() => 'plan'));
 });

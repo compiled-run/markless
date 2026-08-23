@@ -514,22 +514,18 @@ test('CSR: options from a keyed loop each get their own instance', async () => {
 	expect(page.getByTestId('row-indicator').elements()[2]?.textContent).toBe('');
 });
 
-// Pinned on a framework wall, measured on this tip (2026-08-23). What a part
-// writes to the group instance does not reach parts built inside a keyed `@for`
-// row: the rows read the instance as the root left it, so options from a loop
-// carry name="" however the field is authored. Measured three ways in this
-// scenario - field before the loop, field after it, and the read taken through a
-// computed cell on the instance rather than a bare field read - all three give
-// ["","",""], and a 2s poll never resolves, so it is not a late refresh.
-// Flat options are unaffected (the form rows above are green), and the same
-// scenario's own choose/arrow rows pass, so this is only about what a part
-// declares for a row, not about the rows themselves. Naming it here rather than
-// keeping the name on the root: the root is not where QDS declares it, and a
-// second surface for one value is the thing the family is not allowed to invent.
-test.skip('CSR: every option from a loop submits under the name the field declares', async () => {
+// The seed a part writes before the rows are built reaches keyed rows (the
+// framework's keyed-row-shared-writes witness owns that proof); this row keeps
+// the family-level fact: looped options submit under the declared name.
+test('CSR: every option from a loop submits under the name the field declares', async () => {
 	await render(OptionsFromData);
-	const fields = page.getByTestId('row-field').elements() as HTMLInputElement[];
-	expect(fields.map((row) => row.getAttribute('name'))).toEqual(['plan', 'plan', 'plan']);
+	await expect
+		.poll(() =>
+			(page.getByTestId('row-field').elements() as HTMLInputElement[]).map((row) =>
+				row.getAttribute('name'),
+			),
+		)
+		.toEqual(['plan', 'plan', 'plan']);
 });
 
 test('CSR: an arrow key walks a looped group', async () => {

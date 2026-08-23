@@ -429,6 +429,9 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 						renderChunk(slot.rowTemplateId, {
 							item,
 							index,
+							// Rows mint fresh item/index but must not drop the seed map the
+							// way branch and async keep it: a part's pre-row write rides here.
+							sharedSeeds: context.sharedSeeds,
 							...(keyed ? { key: readValuePath(item, keyPath ?? []) } : {}),
 						}),
 					),
