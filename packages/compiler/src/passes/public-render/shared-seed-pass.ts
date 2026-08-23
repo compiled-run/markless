@@ -1,4 +1,5 @@
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
+import { sharedDefinitionId } from '../semantic-graph/collect-shared.ts';
 
 type SharedSeedSymbol = {
 	readonly graphNodeId: string;
@@ -199,11 +200,16 @@ export function childrenWidgetRootMarkerLine(
 }
 
 /**
- * The component that ROOTS each widget-scoped shared definition of this module:
- * the one whose payload owns the definition's cells, so every rendered instance
- * of it starts a widget instance of its own. The seeding component roots it —
- * its seed has to land in the payload it serves — and with no seed, the first
- * component that resolves the definition does.
+ * The component that ROOTS each widget-scoped shared definition THIS MODULE
+ * DECLARES: the one whose payload owns the definition's cells, so every rendered
+ * instance of it starts a widget instance of its own. The seeding component
+ * roots it — its seed has to land in the payload it serves — and with no seed,
+ * the first component that resolves the definition does.
+ *
+ * A definition this module merely adopted from an import is the declaring
+ * module's to root: a consumer component that reads one is a part of somebody
+ * else's widget, not the start of a widget of its own, and rooting it here would
+ * spawn a second instance beside the one it meant to read.
  */
 export function widgetRootComponents(input: PublicRenderModuleInput): Map<string, string> {
 	const seedingComponent = new Map<string, string>();
@@ -216,6 +222,11 @@ export function widgetRootComponents(input: PublicRenderModuleInput): Map<string
 	const roots = new Map<string, string>();
 	for (const definition of input.semanticGraph.sharedDefinitions) {
 		if (definition.scope !== 'widget') continue;
+		// The id carries the declaring module's filename, so it answers ownership.
+		if (
+			definition.id !== sharedDefinitionId(input.semanticGraph.filename, definition.exportedName)
+		)
+			continue;
 		const resolver = input.semanticGraph.sharedInstances.find(
 			(instance) => instance.definitionId === definition.id && instance.componentName,
 		);
