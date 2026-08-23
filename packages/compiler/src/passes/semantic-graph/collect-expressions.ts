@@ -10,6 +10,7 @@ import {
 	stateWriteInTemplateDiagnostic,
 	templateAsValueDiagnostic,
 } from './diagnostics.ts';
+import { repeatRowBindsName } from './collect-repeat.ts';
 import type { SemanticView } from 'yuku-tsrx';
 import type { DeferredComputedWrite, WalkState } from './types.ts';
 
@@ -412,6 +413,9 @@ function addStateRead(node: AnyNode, state: WalkState, region: ReadRegion | null
 	const source = expressionSource(node, state.source);
 	if (!source) return;
 	if (rootBindsInsideRegion(node, state, region)) return;
+	// An enclosing @for owns this name for the row, so no component-level or
+	// module-level node answers for it however the two happen to be spelled.
+	if (repeatRowBindsName(source, state)) return;
 
 	const resolved = resolveGraphPath(
 		source,
