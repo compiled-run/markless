@@ -58,7 +58,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 	return [
 		...(scopesWidgetGraphs
 			? [
-					`import { marklessComposedGraphNodeId } from '@markless/web/fns/instance-scope';`,
+					`import { marklessComposedGraphNodeId, marklessGraphWidgetRegistry } from '@markless/web/fns/instance-scope';`,
 					'',
 				]
 			: []),
@@ -175,6 +175,13 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 // spells child-local ids. The parent's capture routes and the prop reads the
 // capture adapter intercepts stay in page space.
 function instanceScopeLines(widgetAware: boolean): string[] {
+	// Which registry answers "does a widget own this id" is a property of the graph
+	// being dispatched on, so the emitted closure hands its own graph over rather
+	// than letting the runtime fall back to the per-dispatch `active` pointer. That
+	// pointer is re-aimed per entry, so two containers whose async symbol bodies
+	// interleave would otherwise read each other's rendered widgets.
+	const scoped = (graphNodeId: string, registry: string) =>
+		widgetAware ? `scoped(${graphNodeId}, ${registry})` : `scoped(${graphNodeId})`;
 	return [
 		'function instanceScopedBase(base, bound) {',
 		'	const path = bound.instancePath;',
@@ -185,20 +192,23 @@ function instanceScopeLines(widgetAware: boolean): string[] {
 		// owns that reading; restating it here would put the write on a graph the
 		// part's own records never read.
 		widgetAware
-			? '	const scoped = (graphNodeId) => pageSpace.has(graphNodeId) ? graphNodeId : marklessComposedGraphNodeId(graphNodeId, path);'
+			? '	const scoped = (graphNodeId, registry) => pageSpace.has(graphNodeId) ? graphNodeId : marklessComposedGraphNodeId(graphNodeId, path, registry);'
 			: '	const scoped = (graphNodeId) => pageSpace.has(graphNodeId) ? graphNodeId : path + graphNodeId;',
 		'	const scopeGraph = (graph) => {',
-		'		const wrapped = { ...graph, read: (graphNodeId, readPath) => graph.read(scoped(graphNodeId), readPath) };',
+		// A graph-less context still has an answer: the runtime hands back the
+		// `active` pointer, which is what an older payload's resolver read anyway.
+		...(widgetAware ? ['		const registry = marklessGraphWidgetRegistry(graph);'] : []),
+		`		const wrapped = { ...graph, read: (graphNodeId, readPath) => graph.read(${scoped('graphNodeId', 'registry')}, readPath) };`,
 		'		for (const name of ["write", "update", "call", "delete", "subscribe"]) {',
 		'			const method = graph[name];',
-		'			if (typeof method === "function") wrapped[name] = (record) => method.call(graph, { ...record, graphNodeId: scoped(record.graphNodeId) });',
+		`			if (typeof method === "function") wrapped[name] = (record) => method.call(graph, { ...record, graphNodeId: ${scoped('record.graphNodeId', 'registry')} });`,
 		'		}',
 		'		return wrapped;',
 		'	};',
 		'	return (context) => base({',
 		'		...context,',
 		'		graph: scopeGraph(context.graph),',
-		'		...(context.read ? { read: (graphNodeId, readPath) => context.graph.read(scoped(graphNodeId), readPath) } : {}),',
+		`		...(context.read ? { read: (graphNodeId, readPath) => context.graph.read(${scoped('graphNodeId', 'marklessGraphWidgetRegistry(context.graph)')}, readPath) } : {}),`,
 		'	});',
 		'}',
 		'',
