@@ -129,7 +129,12 @@ const clientBuild = resolve(demo, '.output/public/build');
 // Repayment owed by bundler-diet - and the fixture walls carry the priced version of that debt: the
 // same three layers cost a row-free, widget-free app 1,087 B, all of it retained capability code it
 // never runs. That is the trim to take, and it is measured, not estimated.
-const MAX_SHIPPED_JS_GZIP_BYTES = 65_995;
+// 65,995 -> 66,085 (bridge 2026-08-23): +85 from the four merges landed after the
+// attribution unit measured (claimed-root callback binding, unary lift on component
+// edges, layer-7 keep-path, per-edge claim prep) — same capability cost classes the
+// attribution priced; measured 66,080 on this tip, 5 B margin. Repayment: bundler-diet
+// owns the measured 1,087 B pay-per-use ceiling from the attribution entry above.
+const MAX_SHIPPED_JS_GZIP_BYTES = 66_085;
 
 test('music-player-ssr production build stays within its shipped JS budget', async () => {
 	await rm(resolve(demo, '.output'), { force: true, recursive: true });
