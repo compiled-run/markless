@@ -324,17 +324,26 @@ function widgetCallbackSlots(
 
 /**
  * The widget root this composed part belongs to: the innermost enclosing
- * component edge into the same family module. Nesting is the relationship the
- * author already wrote, so no id, prop, or name has to be spelled twice.
+ * component edge into the same family module that IS the root the claim named.
+ * Nesting is the relationship the author already wrote, so no id, prop, or name
+ * has to be spelled twice — but nesting alone is not enough. Every part of a
+ * family shares the root's `importSource`, so a same-family intermediate
+ * (`<WcbLabel>`, a pagination `item`) textually encloses the dispatching part
+ * exactly the way the root does. Selecting on enclosure alone hands the root's
+ * claim to that intermediate, which carries no such prop, and the consumer's
+ * callback then reaches nobody. Genuinely nested roots still resolve to the
+ * innermost one: the ordering is innermost-first and only the matching
+ * candidates are considered.
  */
 function enclosingWidgetRootEdge(
 	edge: SemanticComponentEdge,
 	edges: ReadonlyArray<SemanticComponentEdge>,
+	route: Extract<CaptureSlotRoute, { readonly kind: 'widget-callback-route' }>,
 ): SemanticComponentEdge | undefined {
 	const span = edge.sourceSpan;
 	if (!span) return undefined;
 
-	return edges
+	const enclosing = edges
 		.filter(
 			(candidate) =>
 				candidate.id !== edge.id &&
@@ -348,7 +357,33 @@ function enclosingWidgetRootEdge(
 			(left, right) =>
 				(right.sourceSpan?.start ?? 0) - (left.sourceSpan?.start ?? 0) ||
 				(left.sourceSpan?.end ?? 0) - (right.sourceSpan?.end ?? 0),
-		)[0];
+		);
+
+	// The name the family module declared is the authoritative test. The prop the
+	// claim named is the fallback for a shape whose authored name cannot be
+	// recovered — a member tag off a barrel this build did not compile — where an
+	// enclosing same-family edge that actually passes the claimed prop is the root
+	// by the only evidence available.
+	return (
+		enclosing.find((candidate) => edgeRendersComponent(candidate, route.rootComponentName)) ??
+		enclosing.find((candidate) =>
+			candidate.props.some((prop) => prop.name === route.rootPropName),
+		)
+	);
+}
+
+/**
+ * Whether this edge renders the component the family module declared under this
+ * name. The consumer may have aliased the import (`importedName` holds the
+ * authored export) or written it as a member tag off a barrel object
+ * (`<Pagination.Root>`), so the last segment answers too.
+ */
+function edgeRendersComponent(edge: SemanticComponentEdge, componentName: string): boolean {
+	return [edge.importedName, edge.childComponentName].some(
+		(name) =>
+			name !== undefined &&
+			(name === componentName || name.split('.').at(-1) === componentName),
+	);
 }
 
 /**
@@ -365,9 +400,9 @@ function resolveWidgetCallbackRoute(
 	edge: SemanticComponentEdge,
 	input: CaptureAnalysisInput,
 ): CaptureSlotRoute {
-	const rootEdge = enclosingWidgetRootEdge(edge, input.semanticGraph.componentEdges);
+	const rootEdge = enclosingWidgetRootEdge(edge, input.semanticGraph.componentEdges, route);
 	const resolved: CaptureSlotRoute = rootEdge
-		? propCaptureRoute([rootEdge], route.rootPropName, [], input, true)
+		? widgetRootPropCaptureRoute(rootEdge, route, input)
 		: {
 				kind: 'callback-slot-route',
 				graphNodeId: sharedCallbackSlotGraphNodeId(route.sharedDefinitionId, route.slotName),
@@ -375,6 +410,25 @@ function resolveWidgetCallbackRoute(
 				rootComponentName: route.rootComponentName,
 			};
 	return { ...resolved, componentEdgeId: edge.id, componentEdgePath: [edge.id] };
+}
+
+/**
+ * The claimed prop as this root edge passes it. A valueless compiler-known
+ * constant is the answer to exactly one question — did the root the claim named
+ * pass the callback at all — so it is produced only from that root's own prop
+ * list, never as the generic "prop is absent somewhere on the path" fold. Every
+ * other way the prop fails to reduce stays `unsupported-opaque`, which
+ * `opaqueSlotDiagnostics` already reports as a build error: an unbindable claim
+ * refuses the build instead of shipping a callback that silently reaches nobody.
+ */
+function widgetRootPropCaptureRoute(
+	rootEdge: SemanticComponentEdge,
+	route: Extract<CaptureSlotRoute, { readonly kind: 'widget-callback-route' }>,
+	input: CaptureAnalysisInput,
+): CaptureSlotRoute {
+	return rootEdge.props.some((prop) => prop.name === route.rootPropName)
+		? propCaptureRoute([rootEdge], route.rootPropName, [], input, false)
+		: createCompilerKnownConstantCaptureRoute(rootEdge.id, [rootEdge.id], undefined);
 }
 
 // Handlers already carry their lowered reads. Other lazy symbols are planned

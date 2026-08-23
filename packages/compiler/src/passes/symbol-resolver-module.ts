@@ -112,8 +112,17 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'		},',
 		'		invoke(slotId, args) {',
 		'			const route = requiredCaptureSlot(slots, slotId).route;',
-		// This edge passed no callback for an optional/guarded call site, so the call no-ops like `?.()`.
-		'			if (route.kind === "compiler-known-constant" && route.value === undefined) return undefined;',
+		// Two different things reach this fold, and only one of them is legitimate.
+		// A valueless constant means the edge genuinely passed no callback for an
+		// optional/guarded call site, so the call no-ops like `?.()`. A constant
+		// that carries a VALUE means the claim never bound to a callback at all —
+		// capture analysis refuses that build (`MARKLESS_CAPTURE_OPAQUE_PROP`), so
+		// reaching it here proves the gate was bypassed and silently no-oping would
+		// hide it. Assert instead of folding.
+		'			if (route.kind === "compiler-known-constant") {',
+		'				if (route.value === undefined) return undefined;',
+		'				throw createUnbindableCaptureSlotError(slotId, route);',
+		'			}',
 		// The widget root wrote the answering symbol id into the slot's node, and the
 		// part's own instance resolves that node the way it resolves its other reads.
 		...(routesCallbackSlots
@@ -132,6 +141,13 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'	const slot = slots[slotId];',
 		'	if (!slot) throw new Error(`Unknown capture slot ${slotId}`);',
 		'	return slot;',
+		'}',
+		'',
+		'function createUnbindableCaptureSlotError(slotId, route) {',
+		'	return Object.assign(',
+		'		new Error(`Capture slot ${slotId} invokes a value that is not a callback, so the build gate that refuses unbindable capture claims was bypassed.`),',
+		'		{ code: "MARKLESS_CAPTURE_SLOT_UNBINDABLE", phase: "resume", slotId: String(slotId), value: route.value },',
+		'	);',
 		'}',
 		'',
 		'function runGeneratedSymbolChunkInitializers(mod) {',
