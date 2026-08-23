@@ -77,7 +77,12 @@ const clientBuild = resolve(demo, '.output/public/build');
 // main's yuku-tsrx 0.1.2 adapter dissolution into the compiler; emission-side churn of that
 // size is codegen noise, not a new payload class. De-minimis interim per the proportionality
 // order; repayment stays with bundler-diet.
-const MAX_SHIPPED_JS_GZIP_BYTES = 65_444;
+// 65,444 -> 65,452 (re-anchor 2026-08-22, U112/U116 merge window): +8 across two candidate
+// classes, not individually revert-measured (de-minimis): compiled modules now publish real
+// ES named exports per served component (plain-ESM consumers link — the sr-gallery gate), and
+// handler symbol modules carry same-file module-scope declarations they name. Both are
+// consumer-capability payload, not waste. Repayment stays with bundler-diet.
+const MAX_SHIPPED_JS_GZIP_BYTES = 65_452;
 
 test('music-player-ssr production build stays within its shipped JS budget', async () => {
 	await rm(resolve(demo, '.output'), { force: true, recursive: true });

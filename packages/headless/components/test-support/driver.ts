@@ -2,7 +2,7 @@
  * The seam between a family's transcript expectations and whichever screen
  * reader is speaking.
  *
- * A suite under this folder never names a product's wording. It says which
+ * A suite written against this seam never names a product's wording. It says which
  * facts an announcement has to convey — role, accessible name, state — in the
  * style the w3c/aria-at test plans use, and the driver supplies both the
  * commands and that reader's own vocabulary for those facts. The same file can

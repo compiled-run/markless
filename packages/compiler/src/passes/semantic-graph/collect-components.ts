@@ -30,6 +30,8 @@ import {
 	callbackPropArityUnsupportedDiagnostic,
 	componentPropExpressionUnsupportedDiagnostic,
 	componentSpreadUnsupportedDiagnostic,
+	memberTagNestedPartDiagnostic,
+	memberTagPartMissingDiagnostic,
 	memberTagUnresolvedDiagnostic,
 } from './diagnostics.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
@@ -108,6 +110,28 @@ export function collectComponentEdge(
 			memberTagUnresolvedDiagnostic({
 				tagName,
 				rootName: memberTagRootName(tagName),
+				node,
+				filename: state.filename,
+			}),
+		);
+	} else if (isMemberTagName(tagName) && link.missingPart) {
+		state.graph.diagnostics.push(
+			memberTagPartMissingDiagnostic({
+				tagName,
+				partName: link.missingPart.partName,
+				importSource: link.missingPart.importSource,
+				served: link.missingPart.served,
+				node,
+				filename: state.filename,
+			}),
+		);
+	} else if (isMemberTagName(tagName) && link.nestedPart) {
+		state.graph.diagnostics.push(
+			memberTagNestedPartDiagnostic({
+				tagName,
+				surfacePath: link.nestedPart.surfacePath,
+				importSource: link.nestedPart.importSource,
+				served: link.nestedPart.served,
 				node,
 				filename: state.filename,
 			}),
@@ -388,6 +412,16 @@ function resolveImportedChildComponent(
 		SemanticComponentEdge,
 		'importSource' | 'importKind' | 'importedName'
 	>;
+	readonly missingPart?: {
+		readonly partName: string;
+		readonly importSource: string;
+		readonly served: ReadonlyArray<string>;
+	};
+	readonly nestedPart?: {
+		readonly surfacePath: ReadonlyArray<string>;
+		readonly importSource: string;
+		readonly served: ReadonlyArray<string>;
+	};
 } {
 	const importSource = componentImportSource(localTarget, state);
 	const unresolved = { childComponentName: localTarget, importSource };
@@ -420,11 +454,47 @@ function resolveImportedChildComponent(
 		};
 	}
 
-	if (exportPath.length !== 1) return unresolved;
+	if (exportPath.length !== 1) {
+		// The module surface IS the default export, so a default import spends its
+		// first segment reaching the surface rather than walking into it.
+		const surfacePath = exportPath[0] === 'default' ? exportPath.slice(1) : exportPath;
+		// A module that serves components of its own is a compiled .tsrx surface,
+		// and that surface is flat. A plain barrel serves none, so a path it has
+		// not linked yet stays deferred instead of failing for compile order.
+		if (surfacePath.length > 1 && moduleInterface.render.components.length > 0) {
+			return {
+				...unresolved,
+				nestedPart: {
+					surfacePath,
+					importSource: importSource.importSource,
+					served: servedComponentNames(moduleInterface),
+				},
+			};
+		}
+		return unresolved;
+	}
 	const declared = moduleInterface.render.components.find(
 		(candidate) => candidate.exportName === exportPath[0],
 	);
-	return declared ? { childComponentName: declared.componentName, importSource } : unresolved;
+	if (declared) return { childComponentName: declared.componentName, importSource };
+	// The module answered and does not serve this name, so the miss is a fact
+	// rather than a link that has not happened yet.
+	return {
+		...unresolved,
+		missingPart: {
+			partName: exportPath[0]!,
+			importSource: importSource.importSource,
+			served: servedComponentNames(moduleInterface),
+		},
+	};
+}
+
+function servedComponentNames(
+	moduleInterface: WalkState['importedModuleInterfaces'][string],
+): ReadonlyArray<string> {
+	return moduleInterface.render.components.flatMap((candidate) =>
+		candidate.exportName ? [candidate.exportName] : [],
+	);
 }
 
 function componentChildCount(node: AnyNode): number {

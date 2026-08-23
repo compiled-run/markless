@@ -536,10 +536,17 @@ test('emitSourceModule wraps direct render summaries only in logging builds', ()
 		publicRenderRootExportName: 'Fixture',
 	});
 
+	// The direct render body is module-local either way: the emitted module binds
+	// `Fixture` once, as the published surface.
 	expect(enabled).toContain('logMarklessRenderSummary()');
-	expect(enabled).toContain('export function Fixture()');
-	expect(disabled).toContain(publicRenderModuleSource);
+	expect(enabled).toContain('function marklessCsrFixture()');
+	expect(enabled).toContain('function marklessRenderFixture()');
+	expect(disabled).toContain('function marklessCsrFixture() { return { root: {} }; }');
 	expect(disabled).not.toContain('logMarklessRenderSummary()');
+	for (const emitted of [enabled, disabled]) {
+		expect(emitted).not.toContain('export function Fixture()');
+		expect(emitted).toContain('renderCsr: marklessCsrFixture,');
+	}
 });
 
 test('emitSourceModule emits the CSR execution log loader only when logging is enabled', () => {

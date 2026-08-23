@@ -1052,7 +1052,7 @@ function isFunctionValue(node: AnyNode): boolean {
 	return node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression';
 }
 
-function isClassInstanceValue(node: AnyNode): boolean {
+export function isClassInstanceValue(node: AnyNode): boolean {
 	const constructorName = getNewConstructorName(node);
 	if (constructorName) return !isSerializableBuiltInConstructorName(constructorName);
 

@@ -39,7 +39,7 @@ import {
 	hasComponentImportSource,
 	hasPropDependentComputed,
 	isComponentRoot,
-	isTsrxComponentImport,
+	edgeDeclaredComponentName,
 	publicRenderValueImports,
 	composedGraphProps,
 	componentOwnedStateNodes,
@@ -297,10 +297,7 @@ function childSurfaceArgs(
 ): string | undefined {
 	const reference = referenceByName.get(edge.childComponentName);
 	if (!reference) return undefined;
-	const declaredName =
-		edge.importKind === 'named' && edge.importSource && isTsrxComponentImport(edge.importSource)
-			? (edge.importedName ?? edge.childComponentName)
-			: undefined;
+	const declaredName = edgeDeclaredComponentName(edge);
 	return `${reference},${declaredName ? JSON.stringify(declaredName) : 'undefined'}`;
 }
 
@@ -620,13 +617,7 @@ function emitSsrDataLines(
 			graphProps: componentEdgeGraphRoutes(edge, hasProjection),
 			boundSymbols: boundSymbolsForEdge(edge, callbacks),
 		};
-		// A .tsrx child is imported as its whole module surface, so a named import
-		// (a barrel alias resolves to one too) says WHICH of the components that
-		// module serves composes here.
-		const declaredName =
-			edge.importKind === 'named' && edge.importSource && isTsrxComponentImport(edge.importSource)
-				? (edge.importedName ?? edge.childComponentName)
-				: undefined;
+		const declaredName = edgeDeclaredComponentName(edge);
 		const childSurface = declaredName
 			? `marklessSsrComponentPart(${component},${JSON.stringify(declaredName)})`
 			: component;

@@ -79,12 +79,16 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 		: '';
 	const ssrModuleSource = root ? emitPublicSsrRenderModule(input, root) : '';
 	const componentDefinitions = root ? collectPublicRenderComponentDefinitions(input, root) : [];
-	// Only a module that server-renders more than its root publishes the per
-	// component surface; a single-component module keeps `renderSsr` alone.
+	// Every component this module server-renders is published under the name it
+	// is exported as, its root included. A composing page names the component it
+	// imported — a namespace member tag (<gallery.Gallery />) names it as surely
+	// as a named import does — so a single-component module that withheld its
+	// entry left that name unanswerable and the composed child fell through to
+	// whatever the module's default happened to be.
 	const sameModuleSsrComponents =
 		root && ssrModuleSource ? sameModuleSsrComponentNames(input, ast, root.componentName) : [];
 	const ssrComponentExports =
-		root && sameModuleSsrComponents.length > 0
+		root && ssrModuleSource
 			? input.semanticGraph.components.flatMap((component) =>
 					component.exportName &&
 					component.exportName !== 'default' &&

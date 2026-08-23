@@ -2,13 +2,15 @@ import {
 	ASYNC_BOUNDARY_ARM_MAX,
 	ASYNC_BOUNDARY_ARM_MIN,
 	ASYNC_PROTOCOL_VERSION,
+	PROTOCOL_EVENT_ACTION_KIND,
 	STORAGE_PROTOCOL_VERSION,
 } from './protocol-constants.ts';
-import {
-	PROTOCOL_EVENT_ACTION_KIND,
-	type ProtocolEventActionKind,
-	type ProtocolStatePayload,
-	type ProtocolViewPayload,
+// Type-only on purpose: taking a runtime value from protocol.ts here drags it
+// back into the browser payload closure the event-only-resume wall measures.
+import type {
+	ProtocolEventActionKind,
+	ProtocolStatePayload,
+	ProtocolViewPayload,
 } from './protocol.ts';
 export type EncodedPayloadScripts = { readonly stateScript: string; readonly viewScript: string };
 export type DecodedPayloadScripts = {

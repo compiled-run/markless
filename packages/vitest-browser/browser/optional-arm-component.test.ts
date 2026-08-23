@@ -44,15 +44,16 @@ test('client mount settles when an optional-prop component sits in the falsy @if
 
 	// The settled arm must commit: rows render, the @else context row shows,
 	// and the pending arm is gone — the pre-fix crash left pending forever.
-	const deadline = performance.now() + 5000;
-	while (performance.now() < deadline) {
-		if (routeDocument.querySelector('[data-optional-row]')) break;
-		await new Promise((resolve) => setTimeout(resolve, 16));
-	}
-	expect(routeDocument.querySelectorAll('[data-optional-row]')).toHaveLength(2);
-	expect(routeDocument.querySelector('[data-optional-anonymous]')?.textContent).toBe(
-		'no context',
-	);
+	// Polling the settled shape, not the first row to appear: one row in the DOM
+	// does not mean the flush finished writing the rest.
+	await expect
+		.poll(() => routeDocument.querySelectorAll('[data-optional-row]').length, { timeout: 5000 })
+		.toBe(2);
+	await expect
+		.poll(() => routeDocument.querySelector('[data-optional-anonymous]')?.textContent, {
+			timeout: 5000,
+		})
+		.toBe('no context');
 	expect(routeDocument.querySelector('[data-optional-owner]')).toBeNull();
 	expect(routeDocument.querySelector('[data-optional-pending]')).toBeNull();
 	expect(pageErrors).toEqual([]);

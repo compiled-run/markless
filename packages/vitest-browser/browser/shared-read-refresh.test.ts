@@ -105,8 +105,15 @@ test('an ordinary interaction sequence raises no unmatched-dispatch rejection', 
 
 		const screen = await render(StatesApp);
 		const host = (screen.container as HTMLElement).querySelector('[data-case="plain"]');
+		const trigger = host?.querySelector('button') as HTMLButtonElement;
+		// Each click is confirmed by the write it commits, so the sequence this
+		// test exists to witness has demonstrably run before the log is read.
 		host?.querySelector('label')?.click();
-		host?.querySelector('button')?.click();
+		await expect.poll(() => trigger.getAttribute('aria-checked')).toBe('true');
+		trigger.click();
+		await expect.poll(() => trigger.getAttribute('aria-checked')).toBe('false');
+		// A quiet window on top: a rejection escapes on a later task than the
+		// write that preceded it, so the log needs time to fill before it counts.
 		await new Promise((resolve) => setTimeout(resolve, 150));
 		expect(seen).toEqual([]);
 	} finally {

@@ -242,6 +242,34 @@ function marklessComposedSharedDefinition(
 	};
 }
 
+// A projected part and the child that ROOTS the widget derive the same composed
+// definition id, and only the rooting child carries the projection sites resume
+// needs. Keeping whichever record came first therefore drops the projection
+// bridge whenever a part is placed first, so records that collapse are merged:
+// the sites union, and the rooting record supplies every other field.
+function marklessMergedSharedDefinitions(
+	definitions: ReadonlyArray<ComposeSharedDefinition>,
+): ComposeSharedDefinition[] {
+	const byId = new Map<string, ComposeSharedDefinition>();
+	const sitesById = new Map<string, Set<string>>();
+	for (const definition of definitions) {
+		const held = byId.get(definition.id);
+		// Records that all root describe the same composed widget, so they agree
+		// on everything the projection sites are not.
+		if (!held || (!held.projectionIds?.length && definition.projectionIds?.length))
+			byId.set(definition.id, definition);
+		const sites = sitesById.get(definition.id) ?? new Set<string>();
+		for (const projectionId of definition.projectionIds ?? []) sites.add(projectionId);
+		sitesById.set(definition.id, sites);
+	}
+	return [...byId].map(([id, definition]) => {
+		const sites = sitesById.get(id);
+		// Sorted so the served definition never depends on child order; every
+		// reader registers these against a widget root rather than walking them.
+		return sites?.size ? { ...definition, projectionIds: [...sites].sort() } : definition;
+	});
+}
+
 export function marklessComposeState<T extends ComposeStateDraft>(
 	state: T,
 	children: ReadonlyArray<ComposeChild>,
@@ -258,7 +286,7 @@ export function marklessComposeState<T extends ComposeStateDraft>(
 		if (output.m) output.m(child.graphProps, instancePath);
 		else marklessQualifyChildState(output.state, child.graphProps, instancePath);
 	}
-	const sharedDefinitions = [
+	const sharedDefinitions = marklessMergedSharedDefinitions([
 		...(state.sharedDefinitions ?? []),
 		...children.flatMap((child) =>
 			(child.output?.state?.sharedDefinitions ?? []).map((definition) =>
@@ -269,10 +297,7 @@ export function marklessComposeState<T extends ComposeStateDraft>(
 				),
 			),
 		),
-	].filter(
-		(definition, index, all) =>
-			all.findIndex((other) => other.id === definition.id) === index,
-	);
+	]);
 	const sharedSeeds = [
 		...(state.sharedSeeds ?? []),
 		...children.flatMap((child) =>

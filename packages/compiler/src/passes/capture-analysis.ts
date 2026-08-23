@@ -7,7 +7,9 @@ import type {
 	LoweredStateRead,
 	PlannedSymbol,
 	SemanticComponentEdge,
+	SemanticGraphBinding,
 	SemanticLocalBinding,
+	SemanticSharedDefinition,
 	SemanticStateRead,
 	SemanticTemplateRead,
 } from '../artifacts.ts';
@@ -17,8 +19,9 @@ import {
 	semanticAliasMap,
 } from '../artifact-helpers/graph-paths.ts';
 import { protocolInstanceQualifies } from '@markless/serializer';
-import { childNodes, type AnyNode } from '../ast/nodes.ts';
+import { asNodes, childNodes, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
+import { isClassInstanceValue } from './semantic-graph/collect-state.ts';
 import {
 	createSymbolSourceSemanticsReader,
 	type SymbolSourceSemanticsReader,
@@ -36,6 +39,10 @@ export const BEHAVIOR_SYMBOL_EMIT_UNSUPPORTED_CODE =
 	'MARKLESS_BEHAVIOR_SYMBOL_EMIT_UNSUPPORTED' as const;
 export const EVENT_HANDLER_EMIT_UNSUPPORTED_CODE =
 	'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED' as const;
+export const SHARED_FACTORY_CLASS_INSTANCE_CODE =
+	'MARKLESS_SHARED_FACTORY_CLASS_INSTANCE' as const;
+export const STATE_PROPERTY_CLASS_INSTANCE_CODE =
+	'MARKLESS_STATE_PROPERTY_CLASS_INSTANCE' as const;
 
 export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArtifact {
 	const semantics = createSymbolSourceSemanticsReader();
@@ -83,6 +90,7 @@ export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArt
 				freeNames.has(binding.name) ? [unsupportedCaptureDiagnostic(symbol, binding)] : [],
 			);
 		}),
+		...classInstanceValueDiagnostics(input.semanticGraph),
 	];
 
 	return {
@@ -1029,6 +1037,236 @@ function unsupportedCaptureDiagnostic(
 		why: 'Lazy symbols run after browser resume. Captures must be graph references, element handles, props/shared values, module imports, or serializable constants.',
 		docsUrl: 'https://markless.dev/errors/MARKLESS_CAPTURE_UNSUPPORTED_VALUE',
 	};
+}
+
+// ---------------------------------------------------------------------------
+// Class instances in the values the payload carries.
+//
+// A shared() factory and a state() initializer both declare the graph fields the
+// payload carries and the SSR module rebuilds. A class instance declares none:
+// the server renders reads against a value that was never built, and the browser
+// gets either an unbound name or a method call with no receiver. Both shapes
+// compiled clean before this and crashed at render or at click, so both refuse
+// here. Only these two shapes refuse; nothing else about class usage changes.
+// ---------------------------------------------------------------------------
+
+type ClassInstanceProperty = {
+	readonly path: string;
+	readonly constructorName: string;
+};
+
+function classInstanceValueDiagnostics(
+	semanticGraph: CaptureAnalysisInput['semanticGraph'],
+): ReadonlyArray<CaptureAnalysisDiagnostic> {
+	const diagnostics: CaptureAnalysisDiagnostic[] = [];
+
+	for (const definition of semanticGraph.sharedDefinitions ?? []) {
+		for (const returned of factoryReturnExpressions(definition.factorySource)) {
+			if (isClassInstanceValue(returned)) {
+				diagnostics.push(
+					sharedFactoryClassInstanceDiagnostic(definition, constructorDisplayName(returned)),
+				);
+				continue;
+			}
+			for (const property of classInstanceProperties(returned)) {
+				diagnostics.push(sharedFactoryPropertyDiagnostic(definition, property));
+			}
+		}
+	}
+
+	for (const binding of semanticGraph.graphBindings ?? []) {
+		if (binding.kind !== 'state' || binding.initializerSource === undefined) continue;
+		const initializer = parsedExpression(binding.initializerSource);
+		if (!initializer) continue;
+		for (const property of classInstanceProperties(initializer)) {
+			diagnostics.push(stateInitializerPropertyDiagnostic(binding, property));
+		}
+	}
+
+	return diagnostics;
+}
+
+function sharedFactoryClassInstanceDiagnostic(
+	definition: SemanticSharedDefinition,
+	constructorName: string,
+): CaptureAnalysisDiagnostic {
+	return {
+		code: SHARED_FACTORY_CLASS_INSTANCE_CODE,
+		severity: 'error',
+		phase: CAPTURE_ANALYSIS_PHASE,
+		passId: CAPTURE_ANALYSIS_PASS_ID,
+		artifactKeys: ['semanticGraph', 'captureAnalysis'],
+		...(definition.sourceSpan ? { primarySpan: definition.sourceSpan } : {}),
+		source: definition.factorySource,
+		title: 'A shared() factory cannot return a class instance',
+		message: `shared() definition "${definition.name}" returns ${constructorName}, so the definition declares no fields at all: the payload carries nothing for it, and both the server render and the browser handler name a value that was never built.`,
+		why: 'A shared() factory declares the graph fields the payload carries and the server render rebuilds. A class instance declares none, so every read of it is a reference to a binding that does not exist in the module doing the reading.',
+		suggestions: [
+			{
+				message: `Return a plain object instead: the durable data becomes fields, and the behaviour becomes methods on the same object (\`shared(() => ({ index: 0, next() { ... } }))\`).`,
+			},
+			{
+				message: `Keep a real ${constructorName} browser-side by declaring it in its own module and importing it. An imported binding is carried into the handler module that uses it, so the instance is built there — after resume, on first interaction — and never has to cross the boundary.`,
+			},
+		],
+		docsUrl: `https://markless.dev/errors/${SHARED_FACTORY_CLASS_INSTANCE_CODE}`,
+	};
+}
+
+function sharedFactoryPropertyDiagnostic(
+	definition: SemanticSharedDefinition,
+	property: ClassInstanceProperty,
+): CaptureAnalysisDiagnostic {
+	return {
+		...classInstancePropertyShared(property),
+		...(definition.sourceSpan ? { primarySpan: definition.sourceSpan } : {}),
+		source: definition.factorySource,
+		message: `shared() definition "${definition.name}" puts ${property.constructorName} on "${property.path}". The server render rebuilds this object from its declared graph fields only, so "${property.path}" is missing during render and reading through it throws.`,
+	};
+}
+
+function stateInitializerPropertyDiagnostic(
+	binding: SemanticGraphBinding,
+	property: ClassInstanceProperty,
+): CaptureAnalysisDiagnostic {
+	return {
+		...classInstancePropertyShared(property),
+		...(binding.sourceSpan ? { primarySpan: binding.sourceSpan } : {}),
+		source: binding.initializerSource ?? '',
+		message: `state "${binding.name}" initializes "${property.path}" with ${property.constructorName}. The payload carries no value for that field, and a method reached through it is read off the graph as a plain property, so it runs with no receiver and \`this\` is undefined.`,
+	};
+}
+
+function classInstancePropertyShared(
+	property: ClassInstanceProperty,
+): Omit<CaptureAnalysisDiagnostic, 'message' | 'source'> {
+	return {
+		code: STATE_PROPERTY_CLASS_INSTANCE_CODE,
+		severity: 'error',
+		phase: CAPTURE_ANALYSIS_PHASE,
+		passId: CAPTURE_ANALYSIS_PASS_ID,
+		artifactKeys: ['semanticGraph', 'captureAnalysis'],
+		title: 'A class instance cannot be a field of a shared() or state() value',
+		why: 'Only declared graph fields cross the boundary. A class instance is not one, so the rebuilt object has a hole where the field was, and any method reached through the graph arrives unbound.',
+		suggestions: [
+			{
+				message: `Make the durable data plain fields on the same object, and put the behaviour beside them as methods (\`{ index: 0, next() { ... } }\`).`,
+			},
+			{
+				message: `Keep a real ${property.constructorName} browser-side by declaring it in its own module and importing it, so it is built inside the handler module that uses it rather than crossing the boundary.`,
+			},
+		],
+		docsUrl: `https://markless.dev/errors/${STATE_PROPERTY_CLASS_INSTANCE_CODE}`,
+	};
+}
+
+/**
+ * The expressions a factory returns: the body of an expression-bodied arrow, or
+ * every `return` argument the function's own body spells. Nested functions are
+ * not descended into — their returns belong to them, not to the factory.
+ */
+function factoryReturnExpressions(factorySource: string): ReadonlyArray<AnyNode> {
+	const factory = parsedExpression(factorySource);
+	if (
+		factory?.type !== 'ArrowFunctionExpression' &&
+		factory?.type !== 'FunctionExpression' &&
+		factory?.type !== 'FunctionDeclaration'
+	) {
+		return [];
+	}
+	const body = asNode(factory.body);
+	if (!body) return [];
+	if (body.type !== 'BlockStatement') return [unwrapParens(body)];
+
+	const found: AnyNode[] = [];
+	const visit = (node: AnyNode): void => {
+		if (isFunctionLikeNode(node)) return;
+		if (node.type === 'ReturnStatement') {
+			const argument = asNode(node.argument);
+			if (argument) found.push(unwrapParens(argument));
+			return;
+		}
+		for (const child of childNodes(node)) visit(child);
+	};
+	for (const child of childNodes(body)) visit(child);
+
+	return found;
+}
+
+/**
+ * Class-instance fields of an object literal, addressed by the path the author
+ * reads them at. Nested object literals count — a rebuilt `{ a: { nav } }` has
+ * the same hole one level down — but arrays and function bodies do not, because
+ * neither is a field the graph declares.
+ */
+function classInstanceProperties(
+	node: AnyNode,
+	prefix = '',
+): ReadonlyArray<ClassInstanceProperty> {
+	const expression = unwrapParens(node);
+	if (expression.type !== 'ObjectExpression') return [];
+
+	return asNodes(expression.properties).flatMap((property) => {
+		if (property.type !== 'Property' && property.type !== 'ObjectProperty') return [];
+		const key = propertyKeyName(property);
+		if (key === undefined) return [];
+		const value = asNode(property.value);
+		if (!value) return [];
+		const path = prefix ? `${prefix}.${key}` : key;
+		const unwrapped = unwrapParens(value);
+		if (isClassInstanceValue(unwrapped)) {
+			return [{ path, constructorName: constructorDisplayName(unwrapped) }];
+		}
+
+		return classInstanceProperties(unwrapped, path);
+	});
+}
+
+function propertyKeyName(property: AnyNode): string | undefined {
+	if (property.computed === true) return undefined;
+	const key = asNode(property.key);
+	if (key?.type === 'Identifier' && typeof key.name === 'string') return key.name;
+	if (key?.type === 'Literal' && typeof key.value === 'string') return key.value;
+
+	return undefined;
+}
+
+/** How the message names the constructor. Display only — the classification is `isClassInstanceValue`. */
+function constructorDisplayName(node: AnyNode): string {
+	const callee = asNode(node.callee);
+	const name = callee?.type === 'Identifier' && typeof callee.name === 'string' ? callee.name : '';
+	if (name.startsWith('new ')) return `a \`${name.slice('new '.length)}\` instance`;
+
+	return name ? `a \`new ${name}()\`` : 'a class instance';
+}
+
+function isFunctionLikeNode(node: AnyNode): boolean {
+	return (
+		node.type === 'ArrowFunctionExpression' ||
+		node.type === 'FunctionExpression' ||
+		node.type === 'FunctionDeclaration' ||
+		node.type === 'ClassDeclaration' ||
+		node.type === 'ClassExpression'
+	);
+}
+
+function unwrapParens(node: AnyNode): AnyNode {
+	return node.type === 'ParenthesizedExpression' ? (asNode(node.expression) ?? node) : node;
+}
+
+/** The single expression a source spells, or `undefined` when it does not parse as one. */
+function parsedExpression(source: string): AnyNode | undefined {
+	let ast: AnyNode;
+	try {
+		ast = parseJavaScriptModule(`(${source});`);
+	} catch {
+		return undefined;
+	}
+	const statement = asNodes(ast.body)[0];
+	if (statement?.type !== 'ExpressionStatement') return undefined;
+	const expression = asNode(statement.expression);
+
+	return expression ? unwrapParens(expression) : undefined;
 }
 
 const UNREADABLE_SOURCE_REASON =
