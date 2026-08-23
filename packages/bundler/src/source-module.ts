@@ -616,7 +616,10 @@ function emitLazySymbolRouteFunction(
 			`	if (symbolId.startsWith(${JSON.stringify(route.prefix)})) {`,
 			'importSource' in route
 				? `		return import(${JSON.stringify(symbolRouteImportSource(route.importSource))}).then((mod) => mod.loadSymbol ? mod.loadSymbol(symbolId.slice(${route.prefix.length})) : Promise.reject(new Error(\`Unknown child async symbol \${symbolId}\`)));`
-				: `		return ${fallbackName}(symbolId.slice(${route.prefix.length}));`,
+				: // Re-enter the table: what is left after one strip can itself carry
+					// another composed child's path. Each hop is strictly shorter, and an
+					// unmatched tail still reaches the closing fallback.
+					`		return ${route.prefix.length > 0 ? functionName : fallbackName}(symbolId.slice(${route.prefix.length}));`,
 			'	}',
 		]),
 		`	return ${fallbackName}(symbolId);`,

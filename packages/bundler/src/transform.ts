@@ -404,7 +404,10 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					group,
 					symbols: uniqueSymbolsById([...(input.symbols ?? []), ...symbolRows]),
 					boundRows: importedBoundRows,
-					symbolRoutes: importedSymbolRoutes(symbolRoutes),
+					// Every route, not just the ones naming a child module: a
+					// prerendered page owns same-module children the same way a CSR one
+					// does. Only the MANIFEST is import-source-only.
+					symbolRoutes,
 					armRendererModuleId:
 						group.id === 'self-wake' ? selfWakeArmRendererId : undefined,
 				}),

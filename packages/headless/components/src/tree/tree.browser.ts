@@ -334,23 +334,11 @@ for (const mode of MODES) {
 		expect(el(IndexItem).getAttribute('aria-level')).toBe('2');
 	});
 
-	// The spike research-tree.md §6c.2 named, and the answer is split by mode.
-	//
-	// SSR renders it: four levels of ONE component composing itself, each level
-	// rooting its own widget instance of the same family, all served correctly.
-	// That is the capability question answered yes on the server.
-	//
-	// CSR is pinned, with the measured cause: the same scenario throws
-	// `Error: Unknown async symbol c0:p4:p5:c0:p1:symbol:2` out of the client
-	// resolver before anything renders. The landed recursion receipts cover a
-	// PLAIN self-composing component - no shared(), no widget - so this is the
-	// widget-rooting half of that capability, and it is red on the client only.
-	// Hand-written nesting to the same depth works in both modes: `nested.tsrx`
-	// and `nested-open.tsrx` are the witnesses.
-	// CSR side throws an UNHANDLED Unknown-async-symbol (defect 51), which
-	// test.fails cannot contain — skipped there, asserted under SSR.
-	const unrolls = mode === 'CSR' ? test.skip : test;
-	unrolls(`${mode}: a self-composing node unrolls to the depth its prop names`, async () => {
+	// The spike research-tree.md §6c.2 named: four levels of ONE component
+	// composing itself, each level rooting its own widget instance of the same
+	// family. Green in both modes since the page's symbol route table re-enters
+	// itself instead of stopping after one strip (defect 51).
+	test(`${mode}: a self-composing node unrolls to the depth its prop names`, async () => {
 		if (mode === 'CSR') await render(Deep);
 		else await renderSSR(Deep);
 		expectDeepRendered();
@@ -396,8 +384,7 @@ for (const mode of MODES) {
 
 // --- recursion ------------------------------------------------------------
 
-// Pinned on the same wall as the rows above: the scenario never renders.
-test.skip('CSR: each unrolled level owns its own open state', async () => {
+test('CSR: each unrolled level owns its own open state', async () => {
 	await render(Deep);
 
 	el(Depth4Trigger).click();
@@ -677,10 +664,8 @@ test('SSR: a node opened after resume stays open, and its children are reachable
 	expect(el(SrcContent).hasAttribute('hidden')).toBe(false);
 });
 
-// Pinned on the same wall as the rows above: the scenario never renders.
-// Post-resume interaction reaches the CSR dispatch path and throws the same
-// unhandled Unknown-async-symbol (defect 51) — skipped with its CSR twin.
-test.skip('SSR: each unrolled level resumes with its own open state', async () => {
+// The resume twin: post-resume interaction reaches the same client route table.
+test('SSR: each unrolled level resumes with its own open state', async () => {
 	await renderSSR(Deep);
 	expectDeepRendered();
 
