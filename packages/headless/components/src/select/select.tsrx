@@ -137,32 +137,37 @@ export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectT
 			}
 
 			const key = event.key;
-			const opensAtStart = key === 'ArrowDown' || key === 'Home';
-			const opensAtEnd = key === 'ArrowUp' || key === 'End';
+			const isOpenAtFirstKey = key === 'ArrowDown' || key === 'Home';
+			const isOpenAtLastKey = key === 'ArrowUp' || key === 'End';
 			// Enter and Space are the button's own activation. preventDefault()
 			// from a lazily loaded handler runs after the native dispatch, so a
 			// key rule that also opened would toggle straight back shut: the
 			// click opens the popup and this handler only lands the focus.
-			const activates = key === 'Enter' || key === ' ';
-			const typed = key.length === 1 && key !== ' ';
+			const isActivationKey = key === 'Enter' || key === ' ';
+			const isTypeaheadChar = key.length === 1 && key !== ' ';
 
-			if (!select.disabled && (opensAtStart || opensAtEnd || activates || typed)) {
+			if (
+				!select.disabled &&
+				(isOpenAtFirstKey || isOpenAtLastKey || isActivationKey || isTypeaheadChar)
+			) {
 				const now = Date.now();
-				const expired = now - select.searchAt > TYPEAHEAD_WINDOW;
-				const search = typed ? (expired ? '' : select.search) + key.toLowerCase() : '';
+				const isSearchStale = now - select.searchAt > TYPEAHEAD_WINDOW;
+				const search = isTypeaheadChar
+					? (isSearchStale ? '' : select.search) + key.toLowerCase()
+					: '';
 				// Two cell assignments rather than one method taking both: a
 				// shared method of arity two aborts the handler. See note.md.
-				if (typed) {
+				if (isTypeaheadChar) {
 					select.search = search;
 					select.searchAt = now;
 				}
-				if (!activates) select.setOpen(true);
+				if (!isActivationKey) select.setOpen(true);
 
 				// Alt+ArrowDown opens the popup and leaves focus on the combobox.
 				// `target`, not `currentTarget`: a lazy handler symbol runs after
 				// the native dispatch, and `currentTarget` is null by then.
 				if (!event.altKey) {
-					focusOpeningOption(event.target as HTMLElement, search, opensAtEnd);
+					focusOpeningOption(event.target as HTMLElement, search, isOpenAtLastKey);
 				}
 			}
 			onKeydown?.(event);
@@ -201,22 +206,23 @@ export function SelectContent({ children, onKeydown, ...rest }: SelectContentPro
 			// `target`, not `currentTarget`: a lazy handler symbol runs after the
 			// native dispatch has finished, and `currentTarget` is null by then.
 			const here = event.target as HTMLElement;
-			const typed = key.length === 1 && key !== ' ';
-			const moves = key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End';
-			const commits = key === 'Enter' || key === ' ' || key === 'Tab';
+			const isTypeaheadChar = key.length === 1 && key !== ' ';
+			const isNavigationKey =
+				key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End';
+			const isSelectionKey = key === 'Enter' || key === ' ' || key === 'Tab';
 
-			if (typed) {
+			if (isTypeaheadChar) {
 				const now = Date.now();
-				const expired = now - select.searchAt > TYPEAHEAD_WINDOW;
-				const search = (expired ? '' : select.search) + key.toLowerCase();
+				const isSearchStale = now - select.searchAt > TYPEAHEAD_WINDOW;
+				const search = (isSearchStale ? '' : select.search) + key.toLowerCase();
 				select.search = search;
 				select.searchAt = now;
 				focusMatchingOption(here, search);
-			} else if (moves) {
+			} else if (isNavigationKey) {
 				// Moving is not choosing. A reader that says "selected" after an
 				// arrow is this family's most common bug, so the walk is focus only.
 				focusNeighbourOption(here, key);
-			} else if (commits) {
+			} else if (isSelectionKey) {
 				// Through the option's own click rule, so one place in this family
 				// reads a value. Tab keeps its native move; the other two hand
 				// focus back.
@@ -247,19 +253,19 @@ export function SelectItem({
 	item.disabled = disabled;
 	// One graph cell, read in every position: a comparison written inline in an
 	// attribute renders once and then goes stale.
-	const chosen = computed(() => select.value === item.value);
-	const locked = computed(() => item.disabled || select.disabled);
+	const isChosen = computed(() => select.value === item.value);
+	const isLocked = computed(() => item.disabled || select.disabled);
 
 	<div
 		{...rest}
 		role="option"
-		aria-selected={chosen ? 'true' : 'false'}
-		aria-disabled={locked ? 'true' : 'false'}
+		aria-selected={isChosen ? 'true' : 'false'}
+		aria-disabled={isLocked ? 'true' : 'false'}
 		tabindex={-1}
-		ui-selected={chosen}
-		ui-disabled={locked}
+		ui-selected={isChosen}
+		ui-disabled={isLocked}
 		onClick={(event) => {
-			// The two cells, not the `locked` computed: a computed() read from a
+			// The two cells, not the `isLocked` computed: a computed() read from a
 			// handler body does not guard. See note.md.
 			if (item.disabled !== true && select.disabled !== true) {
 				select.choose(item.value);
@@ -277,9 +283,9 @@ export function SelectItemLabel({ children, ...rest }: SelectItemLabelProps) @{
 export function SelectItemIndicator({ children, ...rest }: SelectItemIndicatorProps) @{
 	const select = selectState();
 	const item = selectItemState();
-	const chosen = computed(() => select.value === item.value);
+	const isChosen = computed(() => select.value === item.value);
 
-	<span {...rest} aria-hidden="true" ui-hidden={chosen !== true}>{children}</span>
+	<span {...rest} aria-hidden="true" ui-hidden={isChosen !== true}>{children}</span>
 }
 
 // A `<select>` holding exactly the choice that was made. A single-option

@@ -5,13 +5,13 @@ import * as otp from '../index.ts';
 // arm is a different thing and the compiler refuses it today
 // (MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED, recorded in otp.browser.ts), so the
 // choice here is a module constant.
-const backup = false;
+const isBackupCode = false;
 
 export default function ArmedLength() @{
 	<otp.root length={6} data-testid="root">
 		<otp.field data-testid="field" aria-label="Verification code" />
 		<div data-testid="boxes">
-			@if (backup) {
+			@if (isBackupCode) {
 				<div data-testid="backup-boxes">
 					<otp.item index={0} data-testid="backup-item-0" />
 					<otp.item index={1} data-testid="backup-item-1" />

@@ -217,19 +217,19 @@ export function TreeItem({
 	item.level = level;
 	// One graph cell per attribute: an inline comparison in an attribute renders
 	// once and then goes stale.
-	const closed = computed(() => item.leaf !== true && item.open !== true);
-	const showing = computed(() => item.leaf !== true && item.open === true);
+	const isClosed = computed(() => item.leaf !== true && item.open !== true);
+	const isShowing = computed(() => item.leaf !== true && item.open === true);
 
 	// aria-expanded the way WAI-ARIA asks: a closed parent reports "false", a leaf
 	// reports nothing, or a reader cannot tell the two apart.
 	<div
 		{...rest}
 		role="treeitem"
-		aria-expanded={showing ? 'true' : closed ? 'false' : undefined}
+		aria-expanded={isShowing ? 'true' : isClosed ? 'false' : undefined}
 		aria-level={item.level}
 		tabindex={-1}
-		ui-open={showing}
-		ui-closed={closed}
+		ui-open={isShowing}
+		ui-closed={isClosed}
 		ui-leaf={item.leaf}
 	>{children}</div>
 }
@@ -261,7 +261,7 @@ export function TreeItemContent({ children, ...rest }: TreeItemContentProps) @{
 	const item = treeItemState();
 	// One graph cell, read in every position: this part renders children that root
 	// instances of the same family, and an inline comparison does not survive that.
-	const showing = computed(() => item.open === true);
+	const isShowing = computed(() => item.open === true);
 
 	// Closed hides the group, it never detaches it: a widget root inside an arm that
 	// flips at runtime is MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED, and every node in
@@ -269,9 +269,9 @@ export function TreeItemContent({ children, ...rest }: TreeItemContentProps) @{
 	<div
 		{...rest}
 		role="group"
-		hidden={showing !== true}
-		ui-open={showing}
-		ui-closed={showing !== true}
+		hidden={isShowing !== true}
+		ui-open={isShowing}
+		ui-closed={isShowing !== true}
 	>{children}</div>
 }
 
