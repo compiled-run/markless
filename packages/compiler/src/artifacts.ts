@@ -1296,7 +1296,9 @@ export type CaptureAnalysisDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_CAPTURE_UNSUPPORTED_VALUE'
 		| 'MARKLESS_CAPTURE_OPAQUE_PROP'
 		| 'MARKLESS_BEHAVIOR_SYMBOL_EMIT_UNSUPPORTED'
-		| 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED';
+		| 'MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED'
+		| 'MARKLESS_SHARED_FACTORY_CLASS_INSTANCE'
+		| 'MARKLESS_STATE_PROPERTY_CLASS_INSTANCE';
 	readonly phase: 'capture-analysis';
 	readonly passId: 'capture-analysis';
 	readonly symbolId?: string;
@@ -1438,7 +1440,9 @@ export type GeneratedSymbolModule = {
 
 // A branch flip whose module this pass refuses to emit, rather than let the payload name it.
 export type SymbolModulesDiagnostic = CompilerDiagnostic & {
-	readonly code: 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED';
+	readonly code:
+		| 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED'
+		| 'MARKLESS_MODULE_INSTANCE_DIVERGENT_HANDLERS';
 	readonly phase: 'public-render';
 	readonly passId: 'symbol-modules';
 };

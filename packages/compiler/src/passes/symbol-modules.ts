@@ -27,6 +27,8 @@ import {
 	type ArmImportedInterfaces,
 } from './arm-child-content.ts';
 import { asNodes, isNode, type AnyNode } from '../ast/nodes.ts';
+import { parseJavaScriptModule } from '../js-ast.ts';
+import { isClassInstanceValue } from './semantic-graph/collect-state.ts';
 import {
 	arrayNode,
 	arrowFunctionNode,
@@ -151,9 +153,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 	const boundaryArmsById = renderBoundaryArms(input.renderData, asyncComputedNodeIds);
 	const sourceFileName = input.source?.filename ?? 'markless-module.tsrx';
 	const authoredSource = input.source?.source ?? '';
-	return {
-		passId: 'symbol-modules',
-		modules: input.symbolResolver.symbols.flatMap((symbol) => {
+	const modules: GeneratedSymbolModule[] = input.symbolResolver.symbols.flatMap((symbol) => {
 			if (unsupportedCaptureSymbolIds.has(symbol.id)) return [];
 			if (symbol.kind === 'branch-update') {
 				const arms = branchArms.armsBySite.get(symbol.branchSiteId);
@@ -197,8 +197,108 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 				input.omitAuthoredSource === true,
 				sourceFileName,
 			);
-		}),
-		diagnostics: [...input.captureAnalysis.diagnostics, ...branchArms.diagnostics],
+	});
+
+	return {
+		passId: 'symbol-modules',
+		modules,
+		diagnostics: [
+			...input.captureAnalysis.diagnostics,
+			...branchArms.diagnostics,
+			...divergentModuleInstanceCarries(modules).map(divergentModuleInstanceDiagnostic),
+		],
+	};
+}
+
+// ---------------------------------------------------------------------------
+// One authored instance, one instance per handler module.
+//
+// A handler symbol module is fetched and evaluated on its own, so a same-file
+// module-scope declaration the handler still names is copied into every handler
+// module that names it. With one handler that is exactly the intent — the
+// instance is built browser-side, inside the module that uses it. With two it
+// stops being one instance: each module runs its own `new`, and whatever the
+// methods accumulate diverges with nothing to say so.
+//
+// The carry is read back off the modules that were actually emitted rather than
+// recorded during emission, so what this reports is what shipped. The fact and
+// the refusal are deliberately separate: `divergentModuleInstanceCarries` is the
+// measurement, `divergentModuleInstanceDiagnostic` is the current policy on it.
+// Relaxing refusal to recording is swapping the second, not rewriting the first.
+// ---------------------------------------------------------------------------
+
+// This pass owns the code; readers import it rather than restating the string.
+export const MODULE_INSTANCE_DIVERGENT_HANDLERS_CODE =
+	'MARKLESS_MODULE_INSTANCE_DIVERGENT_HANDLERS' as const;
+
+type DivergentModuleInstance = {
+	readonly name: string;
+	readonly symbolIds: ReadonlyArray<string>;
+};
+
+function divergentModuleInstanceCarries(
+	modules: ReadonlyArray<GeneratedSymbolModule>,
+): ReadonlyArray<DivergentModuleInstance> {
+	const symbolIdsByName = new Map<string, string[]>();
+	for (const emitted of modules) {
+		if (emitted.kind !== 'event-handler' && emitted.kind !== 'callback-prop') continue;
+		for (const name of moduleScopeInstanceNames(emitted.source)) {
+			const seen = symbolIdsByName.get(name);
+			if (seen) seen.push(emitted.symbolId);
+			else symbolIdsByName.set(name, [emitted.symbolId]);
+		}
+	}
+
+	return [...symbolIdsByName]
+		.filter(([, symbolIds]) => symbolIds.length > 1)
+		.map(([name, symbolIds]) => ({ name, symbolIds }));
+}
+
+/** Module-scope bindings this emitted module initializes with a class instance. */
+function moduleScopeInstanceNames(source: string): ReadonlyArray<string> {
+	let ast: AnyNode;
+	try {
+		ast = parseJavaScriptModule(source);
+	} catch {
+		// A module the compiler just printed and cannot reparse is a different
+		// defect; it is not evidence that this one is absent, so claim nothing.
+		return [];
+	}
+
+	return asNodes(ast.body).flatMap((statement) => {
+		if (statement.type !== 'VariableDeclaration') return [];
+		return asNodes(statement.declarations).flatMap((declarator) => {
+			const init = declarator.init;
+			if (!isNode(init) || !isClassInstanceValue(init)) return [];
+			const id = declarator.id;
+			return isNode(id) && id.type === 'Identifier' && typeof id.name === 'string'
+				? [id.name]
+				: [];
+		});
+	});
+}
+
+function divergentModuleInstanceDiagnostic(
+	carry: DivergentModuleInstance,
+): SymbolModulesDiagnostic {
+	return {
+		code: MODULE_INSTANCE_DIVERGENT_HANDLERS_CODE,
+		severity: 'error',
+		phase: 'public-render',
+		passId: 'symbol-modules',
+		artifactKeys: ['symbolModules'],
+		title: 'This module-scope instance would become one instance per handler',
+		message: `Module-scope instance "${carry.name}" is carried into ${carry.symbolIds.length} handler modules (${carry.symbolIds.join(', ')}). Each of those modules runs its own constructor, so they hold ${carry.symbolIds.length} separate instances and anything one of them records is invisible to the others.`,
+		why: 'Every handler symbol module is loaded on its own when its handler first fires, so a declaration in the authoring file has to be copied into each one that names it. One handler gets the intended browser-side instance. Two or more get a copy each, and nothing at runtime reveals that they have drifted apart.',
+		suggestions: [
+			{
+				message: `Move "${carry.name}" and its class into their own module and import it. An import resolves to one module instance that every handler module shares, so the handlers agree.`,
+			},
+			{
+				message: `Or hold the data in shared() or state() instead, so the graph owns it and the payload carries it. Use this when the value has to survive resume or be read during the server render; the imported-module route keeps it browser-only.`,
+			},
+		],
+		docsUrl: `https://markless.dev/errors/${MODULE_INSTANCE_DIVERGENT_HANDLERS_CODE}`,
 	};
 }
 
