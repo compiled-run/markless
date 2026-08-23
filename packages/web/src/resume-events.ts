@@ -2,6 +2,7 @@ import type { RuntimeGraph } from '@markless/runtime';
 import { protocolEventDispatchesMarkless } from '@markless/serializer/protocol';
 import {
 	marklessInstancePath,
+	marklessInstanceScopedElementHandle,
 	marklessRecordRowScope,
 	marklessRowScopedGraph,
 } from './fns/instance-scope.ts';
@@ -177,11 +178,26 @@ export function createEventWiring(input: {
 			// spell the same node as the handler for row A - the write lands
 			// nowhere, or worse, on the wrong row.
 			const rowScope = marklessRecordRowScope(eventRecord.hostNodeId);
+			// The same question for the element handles, which the row scope cannot
+			// answer: a widget-scoped handle is one element per rendered widget and
+			// the compiled symbol spells the module-level id, so without an instance
+			// path the read lands on the flat key every instance filed and the
+			// registry refuses it. The registrations on this record's own host are
+			// what name the widget it is dispatching from.
+			const recordInstancePath =
+				input.elementHandles.widgetRootPath?.(eventRecord.hostNodeId) ??
+				marklessInstancePath(eventRecord.hostNodeId);
 			const runSymbol = async (symbolId: string, context: ResumeSymbolContext) =>
 				(await input.loadSymbol(symbolId))({
 					...context,
 					...(rowScope && isBoundSymbolId(symbolId)
-						? { graph: marklessRowScopedGraph(context.graph, rowScope) }
+						? {
+								graph: marklessRowScopedGraph(context.graph, rowScope),
+								getElementHandle: marklessInstanceScopedElementHandle(
+									context.getElementHandle,
+									recordInstancePath,
+								),
+							}
 						: {}),
 					invokeCallback,
 					invokeSymbol,

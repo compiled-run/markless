@@ -5,7 +5,6 @@ import {
 	focusMatchingOption,
 	focusNeighbourOption,
 	focusOpeningOption,
-	returnFocusToTrigger,
 } from './element-reach.ts';
 import type {
 	SelectContentProps,
@@ -36,11 +35,13 @@ export const selectState = shared(
 		});
 		const labelEl = element<HTMLLabelElement>();
 		const contentEl = element<HTMLDivElement>();
+		const triggerEl = element<HTMLButtonElement>();
 
 		return {
 			...select,
 			labelEl,
 			contentEl,
+			triggerEl,
 			// literal function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
 			onOpenChange: undefined as ((open: boolean) => void) | undefined,
@@ -111,6 +112,7 @@ export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectT
 
 	<button
 		{...rest}
+		el={select.triggerEl}
 		type="button"
 		role="combobox"
 		aria-haspopup="listbox"
@@ -164,10 +166,8 @@ export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectT
 				if (!isActivationKey) select.setOpen(true);
 
 				// Alt+ArrowDown opens the popup and leaves focus on the combobox.
-				// `target`, not `currentTarget`: a lazy handler symbol runs after
-				// the native dispatch, and `currentTarget` is null by then.
 				if (!event.altKey) {
-					focusOpeningOption(event.target as HTMLElement, search, isOpenAtLastKey);
+					focusOpeningOption(select.contentEl, search, isOpenAtLastKey);
 				}
 			}
 			onKeydown?.(event);
@@ -218,21 +218,21 @@ export function SelectContent({ children, onKeydown, ...rest }: SelectContentPro
 				const search = (isSearchStale ? '' : select.search) + key.toLowerCase();
 				select.search = search;
 				select.searchAt = now;
-				focusMatchingOption(here, search);
+				focusMatchingOption(select.contentEl, search);
 			} else if (isNavigationKey) {
 				// Moving is not choosing. A reader that says "selected" after an
 				// arrow is this family's most common bug, so the walk is focus only.
-				focusNeighbourOption(here, key);
+				focusNeighbourOption(select.contentEl, here, key);
 			} else if (isSelectionKey) {
 				// Through the option's own click rule, so one place in this family
 				// reads a value. Tab keeps its native move; the other two hand
 				// focus back.
 				commitFocusedOption(here);
-				if (key !== 'Tab') returnFocusToTrigger(here);
+				if (key !== 'Tab') select.triggerEl?.focus();
 			} else if (key === 'Escape') {
 				// Closing leaves the value untouched: the highlight never committed.
 				select.setOpen(false);
-				returnFocusToTrigger(here);
+				select.triggerEl?.focus();
 			}
 			onKeydown?.(event);
 		}}

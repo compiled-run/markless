@@ -29,11 +29,12 @@ a `shared()` factory. `search` plus `searchAt` replaces the timer, and every
 navigation question is answered by a DOM walk from `event.target`, so there is
 no item registry in this family at all.
 
-**Every DOM query the family makes lives in `element-reach.ts`.** No handler in
-`select.tsrx` holds a DOM reference: each one hands `event.target` to a named
-function that does one job. Two framework walls, both measured below, are why
-that module exists at all; the section "What a handler cannot reach" states them
-and what would close them.
+**Every DOM query the family still makes lives in `element-reach.ts`.** No
+handler in `select.tsrx` holds a DOM reference of its own: the listbox and the
+trigger are read as `element()` handles off the handler's own widget instance,
+and only the walk over the options is asked of the document. One framework wall
+is why that module still exists; the section "What a handler cannot reach"
+states it, and records the wall that closed on 2026-08-23.
 
 ## Deviations from QDS, and the constraint that forced each
 
@@ -141,17 +142,19 @@ Everything below was measured by running the suite, not assumed.
 ## What a handler cannot reach — measured on this tip
 
 The owner's order is that no part of the library selects DOM nodes: references
-and id lifetimes go through markless primitives. Select cannot meet it yet, and
-the reason is two walls rather than a shortcut anyone took. Both were measured
+and id lifetimes go through markless primitives. Select nearly meets it now: one
+wall is left, and it is the walk over the options. Everything below was measured
 here by writing the primitive-based shape and running the suite.
 
 **1. A handle read in a handler answers for one widget on the page, not for the
-handler's own widget.**
+handler's own widget. — CLOSED 2026-08-23.**
 
-*The read-as-undefined half of this wall is fixed. The instance half was
-re-measured 2026-08-23 against the landed per-instance fix, and it is what still
-holds the family to `element-reach.ts` — it now fails loudly rather than
-silently.*
+*Both halves are fixed and the four-site conversion is landed: `select.contentEl`
+and `select.triggerEl` are read straight from the handler that needs them, the
+family's suite is 54/54 with two selects on one page, and
+`packages/vitest-browser/browser/handle-instance.test.ts` stays 9/9. The history
+below is kept because the last cause was not where two rounds of measurement
+expected it.*
 
 The original wall was that an `element()` handle resolved in `el=` and in an
 IDREF attribute but read as `undefined` from a handler body, silently, with no
@@ -167,7 +170,8 @@ and shared-instance members are included: `focusOpeningOption(select.contentEl,
 search, isFromEnd)` and `select.triggerEl?.focus()` both compile with no
 diagnostic and emit `context.getElementHandle("shared:…/element:contentEl")`.
 
-What the read does not do is answer per widget instance.
+What the read did not do, before the per-instance keying landed, is answer per
+widget instance.
 `ProtocolViewPayload['elementHandles']` records `{hostNodeId, handleId, name}`,
 and the `handleId` of a widget-scoped handle is one module-level string shared by
 every instance of that widget. `materializeElementHandles`
@@ -218,35 +222,61 @@ What was ruled out, each by its own run:
   `symbol:2`, the content's handler. A handler on the very element that binds the
   handle names no instance either.
 
-So the per-instance keying holds for the shape its fixture pins (a widget root
-component whose two children are a binding part and a reading part, both direct
-children) and does not reach this family's. The next question is which of the two
-halves loses the path: the registration qualifying under one instance path, or
-the reading symbol resolving under another. Both live in
-`packages/web/src/fns/instance-scope.ts`, outside this folder. Until one of them
-answers, `element-reach.ts` stays exactly as it is — the conversion above is
-written out in full so it is re-appliable in one sitting.
+**The cause, found 2026-08-23 by logging both halves of the key on the same
+run.** Neither half was losing the path. The registration was already right:
+instrumenting `materializeElementHandles` on the two-select page shows six
+records filed under exactly the keys the design wants —
+`c0:shared:…/element:contentEl` for the first select and
+`c13:shared:…/element:contentEl` for the second, each beside the module-level id
+and the handle's name. The reading half never ran at all: not one call reached
+`marklessInstanceScopedElementHandle`.
 
-The older half of the wall still stands beside it: `attach={(host) => ...}` is
-the only primitive handed a live element, and it cannot pass one on. Writing it
-to a plain instance field is `MARKLESS_SHARED_SEED_UNKNOWN_FIELD` ("declares no
-graph field named 'triggerNode'"). Declaring that field with `state()` instead
+The reason is the kind of symbol select's handlers compile to. The passing
+fixture's trigger handler is loaded as `c0:p2:symbol:0` — its id carries the
+instance path, so `marklessInstanceScopedLoadSymbol` scopes its handle reads
+before the body runs. Select's trigger handler is loaded as
+`bound:symbol%3A1:component-edge%3A2`: a BOUND symbol, minted per component edge
+because the part forwards a consumer callback (`onKeydown?.(event)`), and a bound
+symbol's id names only that edge — it carries no instance path for anything to
+read. `resume-events.ts` already knew this for the graph and answered it with
+`marklessRecordRowScope` plus `marklessRowScopedGraph`; the element handles were
+simply not given the same treatment, so the read fell through to the flat
+module-level key that both selects had filed, and the registry refused it.
+
+That is why the three eliminations above all threw identically: none of them
+changed whether the handler's symbol was bound. The barrel was never the
+divergence either — the passing fixture imports its parts cross-module too.
+
+**What landed** (`packages/web/src/resume-locators.ts`,
+`packages/web/src/resume-events.ts`, `packages/web/src/resume-types.ts`): the
+handle registry now also answers "which rendered widget does this host sit in",
+by reading the widget-root path off the qualified handles that host itself
+registered, and the bound-symbol dispatch path scopes `getElementHandle` with
+that answer the same way it already scopes the graph. One host cannot sit in two
+instances of the same widget, so the answer is exact rather than a guess; a host
+two roots somehow claimed answers nothing, and a handler on a part that binds no
+handle of its own still falls through to the loud refusal. Fail-closed is intact:
+`MARKLESS_ELEMENT_HANDLE_INSTANCE_AMBIGUOUS` still throws for a read no instance
+can name.
+
+The other half of the older wall still stands beside it: `attach={(host) => ...}`
+is the only primitive handed a live element, and it cannot pass one on. Writing
+it to a plain instance field is `MARKLESS_SHARED_SEED_UNKNOWN_FIELD` ("declares
+no graph field named 'triggerNode'"). Declaring that field with `state()` instead
 clears that diagnostic and hits
 `MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE`: the emitted behavior module
 still names the shared binding, because a behavior is compiled into a module of
 its own and no graph write is lowered into it. So a behavior can touch its own
-host element and nothing else.
+host element and nothing else. Nothing in this family needs it now.
 
-So the trigger still reaches its listbox through the id markless minted for it
-(`aria-controls` → `getElementById`) and the listbox still reaches its trigger
-back through the same id. The id lifetime is the framework's; only the lookup is
-not.
-
-What would close it: a handle read that carries the reading handler's widget
-instance, so `getElementHandle` answers per instance instead of per module. With
-that, the conversion above removes four of this family's six queries, and the
-same four in radio group, tree and navbar. The two that walk the options stay
-either way — they are wall 2.
+The conversion this bought, all four sites: the trigger's key rule hands
+`select.contentEl` to `focusOpeningOption`, the listbox's key rule hands the same
+handle to `focusMatchingOption` and `focusNeighbourOption`, and `Escape`, `Enter`
+and `Space` hand focus back with `select.triggerEl?.focus()` instead of finding
+the combobox by its `aria-controls` id. `select.triggerEl` is a new handle on the
+shared factory, bound with `el=` on the trigger — the anchor-positioning work
+wants it anyway. The same four sites are waiting in radio group, tree and navbar.
+The two that walk the options stay either way — they are wall 2.
 
 **2. Nothing yields the rows of a repeated part in order.**
 
