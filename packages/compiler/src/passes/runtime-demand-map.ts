@@ -298,7 +298,12 @@ function isScalarWriteOnlyEventSymbol(
 	localNames: ReadonlySet<string> = new Set(),
 ): boolean {
 	if ((symbol.writes ?? []).length !== 1) return false;
-	if ((symbol.moduleImports ?? []).length > 0 || (symbol.elementHandleCalls ?? []).length > 0)
+	if (
+		(symbol.moduleImports ?? []).length > 0 ||
+		(symbol.elementHandleCalls ?? []).length > 0 ||
+		// A handle read needs the resume registry, so this is no scalar leaf.
+		(symbol.elementHandleReads ?? []).length > 0
+	)
 		return false;
 	const write = symbol.writes?.[0];
 	if (!write || write.path.length !== 0) return false;
