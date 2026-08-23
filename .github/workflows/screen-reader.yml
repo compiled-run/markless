@@ -66,6 +66,7 @@ jobs:
                         checkbox,
                         checklist,
                         collapsible,
+                        modal,
                         otp,
                         pagination,
                         progress,
