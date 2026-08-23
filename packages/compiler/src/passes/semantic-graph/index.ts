@@ -134,7 +134,11 @@ export async function buildSemanticGraph(
 	finalizeComputedDependencies(state);
 	propagateAsyncComputedCapability(graph);
 	collectComputedDependencyCycleDiagnostics(graph);
-	collectElementHandleDiagnostics(graph, state.pendingElementHandleIdrefs);
+	collectElementHandleDiagnostics(
+		graph,
+		state.pendingElementHandleIdrefs,
+		state.pendingElementHandleAnchors,
+	);
 	collectAsyncBoundaryDiagnostics(graph);
 	graph.markup = collectSemanticMarkup({
 		ast,

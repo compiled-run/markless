@@ -55,6 +55,7 @@ import {
 	authoredResidueSources,
 	elementHandleIdReadCase,
 	elementHandleIdSources,
+	elementHandleResidueKinds,
 	hasSharedElementHandle,
 	MARKLESS_WIDGET_INSTANCE_KEY,
 	renderDecisionSources,
@@ -516,6 +517,7 @@ function emitSsrDataLines(
 	// Pay-per-use: a module with no IDREF record emits no mint at all, so the
 	// shared renderer never carries one for the pages that never ask for an id.
 	const handleIds = elementHandleIdSources(chunks);
+	const handleKinds = elementHandleResidueKinds(chunks);
 	const mintCase =
 		handleIds.length > 0
 			? elementHandleIdReadCase({
@@ -523,6 +525,7 @@ function emitSsrDataLines(
 					widgetInstanceSource: hasSharedElementHandle(handleIds)
 						? `marklessSsrRenderStateValues.get(${JSON.stringify(MARKLESS_WIDGET_INSTANCE_KEY)})`
 						: null,
+					kinds: handleKinds,
 				})
 			: '';
 	const branchIds = new Set(chunks.flatMap((chunk) =>

@@ -101,7 +101,12 @@ export type PrerenderDataDefinition = {
 	readonly readResidue?: (
 		residue: Extract<
 			SsrDataResidue,
-			{ readonly kind: 'authored-expression' | 'element-handle-id' }
+			{
+				readonly kind:
+					| 'authored-expression'
+					| 'element-handle-id'
+					| 'element-handle-anchor-style';
+			}
 		>,
 		context: {
 			readonly repeatItem?: unknown;
@@ -140,7 +145,12 @@ export type PrerenderPageClosure = {
 	readonly readAuthored?: (
 		residue: Extract<
 			SsrDataResidue,
-			{ readonly kind: 'authored-expression' | 'element-handle-id' }
+			{
+				readonly kind:
+					| 'authored-expression'
+					| 'element-handle-id'
+					| 'element-handle-anchor-style';
+			}
 		>,
 		context: SsrDataReadContext,
 		evaluation: PrerenderEvaluationContext,

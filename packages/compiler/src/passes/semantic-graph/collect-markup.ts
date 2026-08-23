@@ -27,8 +27,11 @@ import type {
 	SemanticMarkupSlot,
 } from '../../artifacts.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
-import { idrefElementHandleIdConflictDiagnostic } from './diagnostics.ts';
-import { isIdrefAttribute } from './idref-attributes.ts';
+import {
+	anchorElementHandleDynamicStyleDiagnostic,
+	idrefElementHandleIdConflictDiagnostic,
+} from './diagnostics.ts';
+import { anchorStyleProperty, isIdrefAttribute } from './idref-attributes.ts';
 import {
 	createStyleConstResolver,
 	lowerStyleObject,
@@ -371,6 +374,10 @@ function emitNode(
 		});
 		append(builder, '"');
 	}
+	// One residue for the whole style attribute when a CSS anchor position named
+	// a handle here: the consumer's style rides inside it rather than in a second
+	// style attribute the parser would drop.
+	const anchorStyle = anchorStyleResidue(context, node, elementAttributes);
 	const declaredAttributeNames = elementAttributes.flatMap((candidate) => {
 		if (isSpreadAttribute(candidate)) return [];
 		const name = getIdentifierName(candidate.name as AnyNode | undefined);
@@ -410,7 +417,11 @@ function emitNode(
 			isEventAttribute(name) ||
 			name === 'attach' ||
 			name === 'el' ||
-			name === 'overlay'
+			name === 'overlay' ||
+			// A CSS anchor position is not a DOM attribute: it lowers to the one
+			// style slot below, so writing it here would leak `anchorname="..."`.
+			anchorStyleProperty(name) !== undefined ||
+			(name === 'style' && anchorStyle !== null)
 		)
 			continue;
 		const idrefHandle = elementHandleIdrefTarget(context, node, name);
@@ -468,12 +479,92 @@ function emitNode(
 		});
 		if (alwaysPresent) append(builder, '"');
 	}
+	if (anchorStyle) {
+		append(builder, ' style="');
+		addSlot(builder, {
+			kind: 'attribute',
+			name: 'style',
+			coordinate: { kind: 'child-index', path },
+			residue: anchorStyle,
+			alwaysPresent: true,
+		});
+		append(builder, '"');
+	}
 	if (context.styleScopeClass && !classSeen)
 		append(builder, ` class="${context.styleScopeClass}"`);
 	append(builder, '>');
 	emitNodes(asNodes(node.children), [...path, 0], builder, context, repeat);
 	append(builder, `</${tagName}>`);
 	return 1;
+}
+
+/**
+ * The one inline style value for an element whose CSS anchor positions named
+ * element() handles, consumer declarations included.
+ *
+ * One residue rather than one per declaration, because an element carries
+ * exactly one style attribute: two would leave the browser keeping the first
+ * and dropping the rest without saying so, and the dynamic-host path writes
+ * attributes by name, where a second `style` really would clobber. Composing
+ * here also fixes the precedence: the consumer's declarations come first, so
+ * the anchor names - which are plumbing, not design - win the cascade.
+ *
+ * Returns null when this element declares no anchor, and also when it declares
+ * one alongside a style the compiler cannot read at compile time, which is
+ * refused rather than merged in the browser.
+ */
+function anchorStyleResidue(
+	context: CollectionContext,
+	node: AnyNode,
+	attributes: ReadonlyArray<AnyNode>,
+): SemanticMarkupResidue | null {
+	const hostNodeId = context.hostIds.get(node);
+	if (!hostNodeId) return null;
+	const anchors = context.graph.elementHandleAnchors
+		.filter((anchor) => anchor.hostNodeId === hostNodeId)
+		.slice()
+		.sort((left, right) => left.order - right.order);
+	if (anchors.length === 0) return null;
+	const declarations = anchors.flatMap((anchor) => {
+		const property = anchorStyleProperty(anchor.attributeName);
+		return property ? [{ property, handleGraphNodeId: anchor.handleGraphNodeId }] : [];
+	});
+	if (declarations.length === 0) return null;
+
+	const styleAttribute = attributes.find(
+		(candidate) =>
+			!isSpreadAttribute(candidate) &&
+			getIdentifierName(candidate.name as AnyNode | undefined) === 'style',
+	);
+	let staticStyle = '';
+	if (styleAttribute) {
+		const value = styleAttribute.value as AnyNode | undefined;
+		const expression = unwrapExpressionContainer(value);
+		const objectCss = staticStyleObjectCss('style', expression, context);
+		if (objectCss !== null) staticStyle = objectCss;
+		else {
+			const literal = staticAttributeValue(value, expression);
+			const text = literal ? staticAttributeText('style', literal.value) : null;
+			if (text === null) {
+				context.graph.diagnostics.push(
+					anchorElementHandleDynamicStyleDiagnostic({
+						attributeName: anchors[0]!.attributeName,
+						span: sourceSpan(styleAttribute, context.filename),
+					}),
+				);
+				return null;
+			}
+			staticStyle = text;
+		}
+	}
+	// The lowered style object ends in `;`; the composed value supplies its own
+	// separators, so a trailing one would emit an empty declaration.
+	const consumerStyle = staticStyle.replace(/;\s*$/, '');
+	return {
+		kind: 'element-handle-anchor-style',
+		declarations,
+		...(consumerStyle ? { staticStyle: consumerStyle } : {}),
+	};
 }
 
 /**
@@ -582,6 +673,7 @@ function emitDynamicHost(
 		| { readonly kind: 'spread'; readonly residue: SemanticMarkupResidue }
 	> = [];
 	const elementAttributes = getElementAttributes(node);
+	const anchorStyle = anchorStyleResidue(context, node, elementAttributes);
 	for (const attribute of elementAttributes) {
 		if (isSpreadAttribute(attribute)) {
 			const expression = unwrapExpressionContainer(
@@ -604,7 +696,9 @@ function emitDynamicHost(
 			isEventAttribute(name) ||
 			name === 'attach' ||
 			name === 'el' ||
-			name === 'overlay'
+			name === 'overlay' ||
+			anchorStyleProperty(name) !== undefined ||
+			(name === 'style' && anchorStyle !== null)
 		)
 			continue;
 		const idrefHandle = elementHandleIdrefTarget(context, node, name);
@@ -645,6 +739,9 @@ function emitDynamicHost(
 			residue: { kind: 'element-handle-id', handleGraphNodeId: mintedIdHandle },
 		});
 	}
+	// The composed value carries the consumer's static style too, so it replaces
+	// the static entry rather than adding a second style attribute after it.
+	if (anchorStyle) attributeSlots.push({ kind: 'attribute', name: 'style', residue: anchorStyle });
 	if (context.styleScopeClass) {
 		staticAttributes.class = staticAttributes.class
 			? `${staticAttributes.class} ${context.styleScopeClass}`

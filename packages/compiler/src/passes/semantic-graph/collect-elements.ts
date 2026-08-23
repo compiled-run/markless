@@ -61,8 +61,13 @@ import {
 	rowOwnedIdrefElementHandleDiagnostic,
 	widgetRootIdrefElementHandleDiagnostic,
 	unboundIdrefElementHandleDiagnostic,
+	anchorElementHandleValueDiagnostic,
+	anchorElementHandleHostRequiredDiagnostic,
+	unboundAnchorElementHandleDiagnostic,
+	rowOwnedAnchorElementHandleDiagnostic,
+	widgetRootAnchorElementHandleDiagnostic,
 } from './diagnostics.ts';
-import { isIdrefAttribute } from './idref-attributes.ts';
+import { anchorStyleProperty, isIdrefAttribute } from './idref-attributes.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
 	createStyleConstResolver,
@@ -72,6 +77,7 @@ import {
 } from './style-object.ts';
 import type {
 	MutableSemanticGraphArtifact,
+	PendingElementHandleAnchor,
 	PendingElementHandleIdref,
 	SemanticGraphWalk,
 	WalkState,
@@ -232,6 +238,7 @@ export function collectConditionalBranchText(node: AnyNode, state: WalkState): v
 export function collectElementHandleDiagnostics(
 	graph: MutableSemanticGraphArtifact,
 	pendingIdrefs: ReadonlyArray<PendingElementHandleIdref> = [],
+	pendingAnchors: ReadonlyArray<PendingElementHandleAnchor> = [],
 ): void {
 	const bindings = graphBindingMap(graph);
 	const aliases = semanticAliasMap(graph);
@@ -342,6 +349,7 @@ export function collectElementHandleDiagnostics(
 	}
 
 	resolveElementHandleIdrefs(graph, pendingIdrefs, firstBindingByHandle);
+	resolveElementHandleAnchors(graph, pendingAnchors, firstBindingByHandle);
 }
 
 /**
@@ -391,6 +399,57 @@ function resolveElementHandleIdrefs(
 			handleGraphNodeId: handleBinding.id,
 			boundHostNodeId: bound.hostNodeId,
 			order: graph.elementHandleIdrefs.length,
+		});
+	}
+}
+
+/**
+ * The same resolution the IDREF pass runs, for the CSS anchor positions.
+ *
+ * Every gate is the same gate and for the same reason - an anchor name that
+ * resolves to no rendered instance is as silently broken as an IDREF that
+ * resolves to no element - with one difference: an anchor record does NOT put a
+ * minted id on the element the handle is bound to. CSS reads the dashed-ident
+ * name off that element's own inline style, so the id would be bytes nothing
+ * reads. That is why the two records stay apart.
+ */
+function resolveElementHandleAnchors(
+	graph: MutableSemanticGraphArtifact,
+	pendingAnchors: ReadonlyArray<PendingElementHandleAnchor>,
+	boundByHandle: ReadonlyMap<string, SemanticElementHandleBinding>,
+): void {
+	for (const reference of pendingAnchors) {
+		const bound = boundByHandle.get(reference.handleName);
+		if (!bound) {
+			graph.diagnostics.push(unboundAnchorElementHandleDiagnostic(reference));
+			continue;
+		}
+		if (bound.rowOwner || bound.keyedRepeatScopeIds.length > 0) {
+			graph.diagnostics.push(rowOwnedAnchorElementHandleDiagnostic(reference));
+			continue;
+		}
+		const handleBinding = graph.graphBindings.find(
+			(binding) => binding.kind === 'element' && binding.name === bound.handleName,
+		);
+		if (!handleBinding) {
+			graph.diagnostics.push(unboundAnchorElementHandleDiagnostic(reference));
+			continue;
+		}
+		if (handleBinding.sharedDefinitionId !== undefined) {
+			const widgetRoot = widgetRootComponentName(graph, handleBinding.sharedDefinitionId);
+			if (
+				widgetRoot === undefined ||
+				widgetRoot === reference.componentName ||
+				widgetRoot === bound.componentName
+			) {
+				graph.diagnostics.push(widgetRootAnchorElementHandleDiagnostic(reference));
+				continue;
+			}
+		}
+		graph.elementHandleAnchors.push({
+			...reference,
+			handleGraphNodeId: handleBinding.id,
+			order: graph.elementHandleAnchors.length,
 		});
 	}
 }
@@ -469,6 +528,20 @@ function collectAttribute(
 	// record: the element that must carry the minted id is rendered HERE, and the
 	// id crosses the edge as a value the child spreads onto its own markup.
 	if (!hostNodeId) {
+		// An anchor position lowers to an inline style on an element THIS markup
+		// renders, and a component tag renders none, so it cannot cross the edge
+		// the way a minted id can.
+		if (anchorStyleProperty(attributeName)) {
+			state.graph.diagnostics.push(
+				anchorElementHandleHostRequiredDiagnostic({
+					attributeName,
+					ownerTagName,
+					span: sourceSpan(attribute, state.filename),
+				}),
+			);
+			if (expressionValue) walk(expressionValue, state);
+			return;
+		}
 		collectIdrefAttribute(attributeName, expressionValue, state, walk, null);
 		return;
 	}
@@ -589,6 +662,8 @@ function collectAttribute(
 	// Must sit above the generic attribute branch, or the handle falls through to
 	// an ordinary value binding.
 	if (collectIdrefAttribute(attributeName, expressionValue, state, walk, hostNodeId)) return;
+	if (collectAnchorAttribute(attribute, attributeName, expressionValue, state, walk, hostNodeId))
+		return;
 
 	const conditionalClass = conditionalClassTarget(attributeName, expressionValue);
 	if (conditionalClass) {
@@ -968,6 +1043,53 @@ function collectIdrefAttribute(
 			? { keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds] }
 			: {}),
 		...(state.currentAsyncBoundaryId ? { asyncBoundaryId: state.currentAsyncBoundaryId } : {}),
+	});
+	return true;
+}
+
+/**
+ * `anchorName={handle}` / `positionAnchor={handle}` on a host element.
+ *
+ * Unlike an IDREF attribute, these names are not DOM attributes at all, so a
+ * non-handle value cannot be left to fall through: `anchorName="mine"` would be
+ * written into the HTML as `anchorname="mine"`, which no browser reads and
+ * nothing else would report. Every value that is not one element() handle
+ * written directly is refused here. Returns whether this attribute was claimed.
+ */
+function collectAnchorAttribute(
+	attribute: AnyNode,
+	attributeName: string,
+	expressionValue: AnyNode | undefined,
+	state: WalkState,
+	walk: SemanticGraphWalk,
+	hostNodeId: string,
+): boolean {
+	if (!anchorStyleProperty(attributeName)) return false;
+	const handleName = expressionValue
+		? resolvedElementHandleName(expressionValue, state)
+		: undefined;
+	if (!handleName) {
+		state.graph.diagnostics.push(
+			anchorElementHandleValueDiagnostic({
+				attributeName,
+				source: expressionValue
+					? expressionSource(expressionValue, state.source)
+					: 'no value',
+				span: sourceSpan(expressionValue ?? attribute, state.filename),
+			}),
+		);
+		if (expressionValue) walk(expressionValue, state);
+		return true;
+	}
+	// Whether the handle is ever bound is not knowable until the whole file has
+	// been walked, so this is a pending record exactly like an IDREF's.
+	state.pendingElementHandleAnchors.push({
+		hostNodeId,
+		attributeName,
+		handleName,
+		source: expressionSource(expressionValue!, state.source),
+		componentName: state.currentComponentName ?? undefined,
+		sourceSpan: sourceSpan(expressionValue!, state.filename),
 	});
 	return true;
 }
