@@ -22,10 +22,14 @@ export const otpState = shared(
 			// literal function types: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
 			onComplete: undefined as ((value: string) => void) | undefined,
-			write(next: string) {
-				// the input's maxlength already truncated; the slice is belt and braces
-				const code = next.slice(0, otp.length);
-				if (code === otp.value) return;
+			// Takes no parameter on purpose. A handler can call a shared method and
+			// it can assign one event field to one cell, so the field writes the
+			// raw text and this reads it back; a method that took the text instead
+			// costs the calling handler its own props (MARKLESS_CAPTURE_OPAQUE_PROP).
+			commit() {
+				// `maxlength` truncates typing, but a pasted or autofilled string is
+				// not truncated by the platform, so the slice is what enforces it.
+				const code = otp.value.slice(0, otp.length);
 				otp.value = code;
 				otp.onChange?.(code);
 				if (code.length === otp.length) otp.onComplete?.(code);
@@ -69,7 +73,10 @@ export function OtpField({ onInput, ...rest }: OtpFieldProps) @{
 		inputmode="numeric"
 		autocomplete="one-time-code"
 		onInput={(event) => {
-			otp.write(event.currentTarget.value);
+			// Two statements, both of the shapes a handler supports: one event
+			// field into one cell, then a shared method with no arguments.
+			otp.value = event.currentTarget.value;
+			otp.commit();
 			onInput?.(event);
 		}}
 	/>
