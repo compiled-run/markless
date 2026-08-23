@@ -145,34 +145,68 @@ and id lifetimes go through markless primitives. Select cannot meet it yet, and
 the reason is two walls rather than a shortcut anyone took. Both were measured
 here by writing the primitive-based shape and running the suite.
 
-**1. A handler can reach no element but its own `event.target`.**
+**1. A handle read in a handler answers for one widget on the page, not for the
+handler's own widget.**
 
-An `element()` handle resolves in `el=` and in an IDREF attribute; read from a
-handler body it is `undefined`, silently, with no diagnostic. Measured: the
-trigger's key rule was written `const list = select.contentEl;` and gated on
-`list !== undefined`. Eighteen rows went red, including `Alt+ArrowDown`, which
-only calls `setOpen(true)` and never touches the list. Dropping that one guard
-turned `Alt+ArrowDown` green again, so the guard — not the handler — was what
-failed: the handle read `undefined`.
+*The write-only half of this wall is fixed; the instance half was measured
+2026-08-23 and is what still holds the family to `element-reach.ts`.*
 
-`attach={(host) => ...}` is the only primitive handed a live element, and it
-cannot pass one on. Writing it to a plain instance field is
-`MARKLESS_SHARED_SEED_UNKNOWN_FIELD` ("declares no graph field named
-'triggerNode'"). Declaring that field with `state()` instead clears that
-diagnostic and hits `MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE`: the
-emitted behavior module still names the shared binding, because a behavior is
-compiled into a module of its own and no graph write is lowered into it. So a
-behavior can touch its own host element and nothing else.
+The original wall was that an `element()` handle resolved in `el=` and in an
+IDREF attribute but read as `undefined` from a handler body, silently, with no
+diagnostic. Measured then: the trigger's key rule was written
+`const list = select.contentEl;` and gated on `list !== undefined`. Eighteen rows
+went red, including `Alt+ArrowDown`, which only calls `setOpen(true)` and never
+touches the list. Dropping that one guard turned `Alt+ArrowDown` green again, so
+the guard — not the handler — was what failed: the handle read `undefined`.
 
-Together those close every route from a handler to a sibling part, which is why
-the trigger reaches its listbox through the id markless minted for it
-(`aria-controls` → `getElementById`) and the listbox reaches its trigger back
-through the same id. The id lifetime is the framework's; only the lookup is not.
+That half is closed. `element() handles resolve as values in handlers` landed on
+this branch, witnessed by `packages/compiler/test/element-handle-values.test.ts`,
+and shared-instance members are included: `focusOpeningOption(select.contentEl,
+search, isFromEnd)` and `select.triggerEl?.focus()` both compile with no
+diagnostic and emit `context.getElementHandle("shared:…/element:contentEl")`.
 
-What would close it: an `element()` handle that reads as its bound element from
-a handler body — the same value `attach` is already handed. That one capability
-removes four of this family's six queries, and the same four in radio group,
-tree and navbar.
+What the read does not do is answer per widget instance.
+`ProtocolViewPayload['elementHandles']` records `{hostNodeId, handleId, name}`,
+and the `handleId` of a widget-scoped handle is one module-level string shared by
+every instance of that widget. `materializeElementHandles`
+(`packages/web/src/resume-locators.ts`) files those records in a flat
+`byHandleId` map, which `resume-events.ts` hands to event symbols as
+`getElementHandle`. Last registration wins, so every handler on the page — in
+whichever widget — is given that one element. An IDREF position is unaffected,
+because the id is minted on the element itself: that is why
+`aria-controls={select.contentEl}` has always named the right listbox.
+
+Measured 2026-08-23, writing the whole four-site conversion this family wants
+(the listbox read off `select.contentEl`, the trigger focused off a new
+`select.triggerEl` bound with `el=`): 54 browser rows, 53 green, with `CSR: the
+arrow walk skips an option nobody may choose` red. Its scenario,
+`unavailable-options.tsrx`, is the only keyboard scenario carrying two selects,
+and the walking one is first of the two. Focus never left the trigger, because
+`focusOpeningOption` was handed the *second* select's `hidden` listbox and
+nothing in a hidden subtree can take focus. Moving the locked select ahead of the
+walking one — the same handler code, only the registration order changed —
+returned all 54. That is the flat map, not the walk.
+
+The older half of the wall still stands beside it: `attach={(host) => ...}` is
+the only primitive handed a live element, and it cannot pass one on. Writing it
+to a plain instance field is `MARKLESS_SHARED_SEED_UNKNOWN_FIELD` ("declares no
+graph field named 'triggerNode'"). Declaring that field with `state()` instead
+clears that diagnostic and hits
+`MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE`: the emitted behavior module
+still names the shared binding, because a behavior is compiled into a module of
+its own and no graph write is lowered into it. So a behavior can touch its own
+host element and nothing else.
+
+So the trigger still reaches its listbox through the id markless minted for it
+(`aria-controls` → `getElementById`) and the listbox still reaches its trigger
+back through the same id. The id lifetime is the framework's; only the lookup is
+not.
+
+What would close it: a handle read that carries the reading handler's widget
+instance, so `getElementHandle` answers per instance instead of per module. With
+that, the conversion above removes four of this family's six queries, and the
+same four in radio group, tree and navbar. The two that walk the options stay
+either way — they are wall 2.
 
 **2. Nothing yields the rows of a repeated part in order.**
 
