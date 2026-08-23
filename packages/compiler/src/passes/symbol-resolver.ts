@@ -432,8 +432,21 @@ function inlineSharedMethodCalls(
 					method.body.includes(invocation.calleeSource),
 			);
 			const arrow = `(${dispatches ? 'async ' : ''}(${method.parameters}) => {${method.body}})`;
-			const replaced = replaceMethodCalls(emitted, callee, (args) => `${arrow}(${args})`);
-			if (replaced === emitted) continue;
+			// The dispatching body is awaited where the authored call stood, so the
+			// statements the author wrote after it still run after it. Left
+			// unawaited, the call is fire-and-forget: the rest of the handler races
+			// the dispatch, and the end-of-dispatch flush closes over only the
+			// awaited leg, so whatever the dispatch writes late is dropped. The
+			// parentheses keep the await a valid operand wherever the call stood.
+			const replaced = replaceMethodCalls(
+				emitted,
+				callee,
+				(args) => (dispatches ? `(await ${arrow}(${args}))` : `${arrow}(${args})`),
+				dispatches,
+			);
+			// `null` is the refusal: the call sits where `await` is not legal, so
+			// nothing is inlined and the unresolved authored call fails the compile.
+			if (replaced === null || replaced === emitted) continue;
 			emitted = replaced;
 			if (property.sourceSpan) spans.push(property.sourceSpan);
 		}
@@ -488,12 +501,22 @@ function sharedMethodSource(
  * an argument list containing parentheses or commas keeps its own boundaries. A
  * source the parser cannot read is returned unchanged: it inlines nothing rather
  * than splicing text it did not understand.
+ *
+ * `awaitsCall` says the replacement text contains `await`, which is legal only
+ * inside an async function. The handler the author wrote is usually synchronous,
+ * so the function that encloses the call is marked async here as well - both to
+ * keep this source parsable by every later pass and because the emitter reads
+ * that same leading `async` when it decides whether the symbol module it prints
+ * is async. A call whose nearest enclosing function is a nested synchronous one
+ * cannot be fixed that way without changing what the author wrote, so this
+ * returns `null` and inlines nothing rather than emit source that will not parse.
  */
 function replaceMethodCalls(
 	source: string,
 	callee: string,
 	build: (argumentSource: string) => string,
-): string {
+	awaitsCall = false,
+): string | null {
 	const moduleSource = `const __marklessInlineSource = ${source};`;
 	let ast: AnyNode;
 	try {
@@ -505,7 +528,18 @@ function replaceMethodCalls(
 	}
 	const offset = moduleSource.indexOf(source);
 	const edits: Array<{ start: number; end: number; text: string }> = [];
+	// Every function in this source, so a replacement carrying `await` can ask
+	// which one encloses the call it stands in.
+	const functions: Array<{ start: number; end: number; isAsync: boolean }> = [];
 	walkNode(ast, (node) => {
+		if (
+			node.type === 'ArrowFunctionExpression' ||
+			node.type === 'FunctionExpression' ||
+			node.type === 'FunctionDeclaration'
+		) {
+			if (typeof node.start === 'number' && typeof node.end === 'number')
+				functions.push({ start: node.start, end: node.end, isAsync: node.async === true });
+		}
 		if (node.type !== 'CallExpression') return;
 		const target = node.callee as AnyNode | undefined;
 		if (
@@ -533,9 +567,29 @@ function replaceMethodCalls(
 	const ordered = [...edits].sort((left, right) => left.start - right.start);
 	const applied: typeof ordered = [];
 	for (const edit of ordered) if (!applied.some((held) => held.end >= edit.end)) applied.push(edit);
+	const mutations = [...applied];
+	if (awaitsCall) {
+		const asyncified = new Set<number>();
+		for (const edit of applied) {
+			const enclosing = [...functions]
+				.filter((fn) => fn.start <= edit.start && fn.end >= edit.end)
+				.sort((left, right) => left.end - left.start - (right.end - right.start));
+			const innermost = enclosing[0];
+			// No enclosing function at all, or a nested synchronous one: `await`
+			// cannot stand here, and marking an inner function async would change
+			// what its own caller receives.
+			if (!innermost) return null;
+			if (innermost.isAsync) continue;
+			if (enclosing.length > 1) return null;
+			asyncified.add(innermost.start);
+		}
+		for (const start of asyncified) mutations.push({ start, end: start, text: 'async ' });
+	}
+
 	let emitted = moduleSource;
-	for (const edit of [...applied].reverse())
-		emitted = emitted.slice(0, edit.start) + edit.text + emitted.slice(edit.end);
+	// Highest offset first, so every earlier offset is still valid when applied.
+	for (const mutation of [...mutations].sort((left, right) => right.start - left.start))
+		emitted = emitted.slice(0, mutation.start) + mutation.text + emitted.slice(mutation.end);
 	return emitted.slice(offset, emitted.length - 1);
 }
 
