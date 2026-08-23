@@ -210,7 +210,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 				...pass,
 				run({ inputs }) {
 					const semanticGraph = inputs.semanticGraph as SemanticGraphArtifact;
-					if (hasExternalParseDiagnostic(semanticGraph)) {
+					if (hasUnserveableDiagnostic(semanticGraph)) {
 						return { publicRenderPlan: emptyPublicRenderPlanArtifact() };
 					}
 					return {
@@ -230,7 +230,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 				...pass,
 				run({ inputs }) {
 					const semanticGraph = inputs.semanticGraph as SemanticGraphArtifact;
-					if (hasExternalParseDiagnostic(semanticGraph)) {
+					if (hasUnserveableDiagnostic(semanticGraph)) {
 						return { publicRenderModule: emptyPublicRenderModuleArtifact() };
 					}
 					return {
@@ -437,9 +437,26 @@ function parserErrorSpan(
 	return { filename: source.filename, start, end: Math.min(source.source.length, start + 1) };
 }
 
-function hasExternalParseDiagnostic(semanticGraph: SemanticGraphArtifact): boolean {
+/**
+ * Diagnostics that make the render modules unserveable, so emitting them would
+ * only produce source no host can run. A parse error leaves nothing to emit
+ * from; an unbound shared call (defect 69) leaves a call the server prelude
+ * would emit verbatim and throw on, while the client body drops it — the exact
+ * client-works/server-throws split the refusal exists to end.
+ *
+ * This is deliberately a short list, not "every error diagnostic": most refusals
+ * still emit, and their tests assert on that emitted source.
+ */
+const unserveableDiagnosticCodes: ReadonlySet<string> = new Set([
+	'MARKLESS_PARSE_ERROR',
+	'MARKLESS_SHARED_CALL_UNBOUND',
+]);
+
+function hasUnserveableDiagnostic(semanticGraph: SemanticGraphArtifact): boolean {
 	return semanticGraph.diagnostics.some(
-		(diagnostic) => diagnostic.phase === 'parse' && diagnostic.code === 'MARKLESS_PARSE_ERROR',
+		(diagnostic) =>
+			(diagnostic.phase === 'parse' && diagnostic.code === 'MARKLESS_PARSE_ERROR') ||
+			(diagnostic.severity === 'error' && unserveableDiagnosticCodes.has(diagnostic.code)),
 	);
 }
 

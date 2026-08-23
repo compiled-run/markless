@@ -25,6 +25,7 @@ import {
 	invalidSharedScopeDiagnostic,
 	sharedDefinitionCycleDiagnostic,
 	unboundCallbackSlotDiagnostic,
+	unboundSharedCallDiagnostic,
 } from './diagnostics.ts';
 import { collectComputedBinding } from './collect-state.ts';
 import { collectExpressionReads } from './collect-expressions.ts';
@@ -75,6 +76,34 @@ export function collectSharedInstance(input: {
 		source: expressionSource(input.init, input.state.source),
 		sourceSpan: sourceSpan(input.init, input.state.filename),
 	});
+}
+
+/**
+ * Defect 69. `krs();` as a statement — a shared call whose result is thrown
+ * away. It is the one shared-call shape no later pass can act on, because
+ * everything a shared instance offers is reached through the name the call was
+ * bound to, so the build refuses it here instead of letting the client drop it
+ * and the server emit it into a prelude that throws.
+ */
+export function collectUnboundSharedCall(statement: AnyNode, state: WalkState): void {
+	// Inside a shared factory the same spelling is a dependency between
+	// definitions, which `collectSharedDependencies` already owns.
+	if (state.currentSharedDefinitionId) return;
+	if (!state.currentComponentName) return;
+
+	const call = statement.expression as AnyNode | undefined;
+	if (!call || call.type !== 'CallExpression') return;
+
+	const target =
+		resolveSharedCall(call, state)?.definition ?? unlinkedImportedSharedTarget(call, state);
+	if (!target) return;
+
+	state.graph.diagnostics.push(
+		unboundSharedCallDiagnostic({
+			definitionName: target.name,
+			span: sourceSpan(call, state.filename),
+		}),
+	);
 }
 
 /**

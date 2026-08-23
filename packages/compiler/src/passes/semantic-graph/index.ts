@@ -47,6 +47,7 @@ import {
 	collectSharedCallbackBindings,
 	collectSharedCallbackInvocations,
 	collectSharedFactoryGraph,
+	collectUnboundSharedCall,
 	moduleInterfaceSharedDefinitions,
 } from './collect-shared.ts';
 import { attachKeyedRepeatRowHost, collectKeyedRepeat } from './collect-repeat.ts';
@@ -370,6 +371,9 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 			break;
 		case 'VariableDeclaration':
 			collectVariableDeclaration(node, state);
+			break;
+		case 'ExpressionStatement':
+			collectUnboundSharedCall(node, state);
 			break;
 		case 'IfStatement':
 			walk(node.test as AnyNode | undefined, state);

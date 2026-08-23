@@ -79,7 +79,44 @@ export function parseModule(
 		const fatal = compileErrors.find((error) => error.type === 'fatal');
 		if (fatal) throw fatal;
 	}
-	return normalizeProgram(program, { onNode: blankMarklessAllowDirective });
+	return normalizeProgram(program, {
+		onNode: (node) => {
+			blankMarklessAllowDirective(node);
+			dropCommentContainers(node);
+		},
+	});
+}
+
+/**
+ * `{/* … *\/}` is a comment, not a child. The parser reports it as a
+ * `JSXExpressionContainer` wrapping a `JSXEmptyExpression`, and every collector
+ * that walks children would otherwise read it as a dynamic child and carry the
+ * comment text through as an authored expression — emitted as `return (/* … *\/)`,
+ * an empty parenthesized expression that fails to parse. Removing it from its
+ * parent's children is the JSX-standard lowering, and doing it once here spares
+ * every downstream pass from having to know the shape.
+ *
+ * Only the array entry goes; no other node's offsets move, so spans and source
+ * mapping stay exactly where the author wrote them.
+ */
+function dropCommentContainers(node: BaseNode): void {
+	const children = (node as BaseNode & { children?: unknown }).children;
+	if (!Array.isArray(children)) return;
+	for (let index = children.length - 1; index >= 0; index -= 1) {
+		if (isCommentContainer(children[index])) children.splice(index, 1);
+	}
+}
+
+function isCommentContainer(node: unknown): boolean {
+	if (!node || typeof node !== 'object') return false;
+	const candidate = node as {
+		type?: unknown;
+		expression?: { type?: unknown } | null;
+	};
+	if (candidate.type !== 'JSXExpressionContainer' && candidate.type !== 'TSRXExpression') {
+		return false;
+	}
+	return candidate.expression?.type === 'JSXEmptyExpression';
 }
 
 const marklessAllowDirective = /^\/\/\s*markless-allow\s+[A-Z0-9_]+:\s*\S(?:.*\S)?$/;
