@@ -61,9 +61,11 @@ test('SSR resume: every expression-gated @if follows the write', async () => {
 	await expectArmsFollowTheWrite(screen.container);
 });
 
-// KNOWN RED, both modes - see the note further down. The compiler mints this
-// condition's computed with both shared reads as dependencies and ships it in the
-// payload; the arm still never moves off the value it was wired with.
+// Defect 39: the composed part's branch-condition computed was never
+// instance-qualified, so the arm subscribed to an id no cell answered to and
+// froze at its wire-time value. The branch's own component now declares that
+// computed, so composition qualifies it and its shared-instance dependencies
+// like any other component-owned computed.
 test('CSR: a condition comparing two fields of a shared instance follows the write', async () => {
 	const screen = await render(Page);
 	await expectSharedArmFollowsTheWrite(screen.container as HTMLElement);
@@ -103,8 +105,7 @@ test('a bare initially-true @if renders and then follows the write', async () =>
 // condition whose FIRST value is true is recorded as arm 1 by `readBranchArm`
 // (packages/web/src/resume-branches.ts:112) while the DOM shows arm 0, so the
 // write that takes it to arm 1 is discarded by the `newArm === currentArm` guard
-// at :128. The shared-instance arm above fails for a related reason: its computed
-// never moves off its wire-time value at all.
+// at :128.
 test('a solo initially-true recombined condition follows the write (CSR)', async () => {
 	const screen = await render(Page);
 	const container = screen.container as HTMLElement;
