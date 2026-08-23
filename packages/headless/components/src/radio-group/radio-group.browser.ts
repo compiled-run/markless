@@ -204,6 +204,7 @@ function expectHelpRendered() {
 
 function expectFormConfigRendered() {
 	// One name for the whole group, one value per option: what a radio submits.
+	// The name is declared once, by `radiogroup.field`, and every option takes it.
 	expect(field(MonthlyField).getAttribute('name')).toBe('plan');
 	expect(field(AnnualField).getAttribute('name')).toBe('plan');
 	expect(field(MonthlyField).getAttribute('value')).toBe('monthly');
@@ -211,6 +212,26 @@ function expectFormConfigRendered() {
 	// aria-required goes on the group, per the cross-library convention.
 	expect(el(Root).getAttribute('aria-required')).toBe('true');
 	expect(field(MonthlyField).required).toBe(true);
+	expect(field(AnnualField).required).toBe(true);
+}
+
+// The group field declares what a form receives and shows nothing: it holds no
+// content, takes no room, and adds no control of its own to the group.
+function expectGroupFieldIsHidden() {
+	const declared = el(Label).nextElementSibling as HTMLElement;
+	expect(declared.textContent).toBe('');
+	expect(getComputedStyle(declared).position).toBe('absolute');
+	expect(declared.getBoundingClientRect().height).toBeLessThanOrEqual(1);
+	// Every control in the group is still an option's own hidden radio.
+	expect(page.getByRole('radio').elements().length).toBe(2);
+}
+
+// A group with no field part: nothing is named, so a form receives nothing from
+// it. This is what makes the field worth mounting rather than a formality.
+function expectNamelessGroupSubmitsNothing() {
+	expect(field(MonthlyField).getAttribute('name')).toBe('');
+	expect(field(MonthlyField).required).toBe(false);
+	expect(el(Root).getAttribute('aria-required')).toBe('false');
 }
 
 async function expectChosenOptionSubmits() {
@@ -337,6 +358,18 @@ for (const mode of MODES) {
 		if (mode === 'CSR') await render(PlanPickerForm);
 		else await renderSSR(PlanPickerForm);
 		expectFormConfigRendered();
+	});
+
+	test(`${mode}: the group field declares the form name and shows nothing`, async () => {
+		if (mode === 'CSR') await render(PlanPickerForm);
+		else await renderSSR(PlanPickerForm);
+		expectGroupFieldIsHidden();
+	});
+
+	test(`${mode}: a group with no field part names nothing and requires nothing`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+		expectNamelessGroupSubmitsNothing();
 	});
 
 	test(`${mode}: only the chosen option appears in what the form submits`, async () => {
@@ -479,6 +512,24 @@ test('CSR: options from a keyed loop each get their own instance', async () => {
 	// The choice landed in one row only.
 	expect(page.getByTestId('row-indicator').elements()[0]?.textContent).toBe('');
 	expect(page.getByTestId('row-indicator').elements()[2]?.textContent).toBe('');
+});
+
+// Pinned on a framework wall, measured on this tip (2026-08-23). What a part
+// writes to the group instance does not reach parts built inside a keyed `@for`
+// row: the rows read the instance as the root left it, so options from a loop
+// carry name="" however the field is authored. Measured three ways in this
+// scenario - field before the loop, field after it, and the read taken through a
+// computed cell on the instance rather than a bare field read - all three give
+// ["","",""], and a 2s poll never resolves, so it is not a late refresh.
+// Flat options are unaffected (the form rows above are green), and the same
+// scenario's own choose/arrow rows pass, so this is only about what a part
+// declares for a row, not about the rows themselves. Naming it here rather than
+// keeping the name on the root: the root is not where QDS declares it, and a
+// second surface for one value is the thing the family is not allowed to invent.
+test.skip('CSR: every option from a loop submits under the name the field declares', async () => {
+	await render(OptionsFromData);
+	const fields = page.getByTestId('row-field').elements() as HTMLInputElement[];
+	expect(fields.map((row) => row.getAttribute('name'))).toEqual(['plan', 'plan', 'plan']);
 });
 
 test('CSR: an arrow key walks a looped group', async () => {

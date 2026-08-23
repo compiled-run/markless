@@ -141,3 +141,27 @@ A real clipboard paste and SMS autofill are not drivable from browser mode. Both
 reach the page as one input event carrying the whole string, which is what
 `pasteInto()` writes — the honest substitute, named so the paste rows are not
 read as end-to-end coverage.
+
+## The field is stretched over the boxes
+
+QDS's mechanism, from `otp.css`: the root is the positioned box and the field is
+absolutely placed over it, invisible but interactive, so a click or tap anywhere
+on the boxes lands on the one real input. Ours now matches, with the declarations
+inline rather than in a stylesheet — the family ships no CSS, and the `ui-qds-*`
+identity attributes a stylesheet would hook are gone by owner ruling. `style` is
+therefore family-owned on both the root and the field, and omitted from both prop
+types; a consumer styles the boxes through `class`.
+
+Three details the browser forced, all measured 2026-08-23:
+
+- `opacity: 0`, not `visibility`/`display`: a hidden control takes no typing and
+  leaves the accessibility tree. The suite pins this both ways.
+- `box-sizing: border-box`: an input's own border and padding are added to a
+  `height: 100%` content box, which left the field 6px past the boxes.
+- a module-scope constant cannot be read from inside a `computed()` in the
+  `shared()` factory — the body is lifted into its own symbol, and the reference
+  throws `ReferenceError` at render. The style strings are written out in full.
+
+`shiftPWManagers` (QDS's prop, default on) widens the input 45px past the root
+and clips that strip away, which takes a password manager's icon off the boxes.
+A clipped strip catches no clicks either, so nothing beside the boxes is caught.

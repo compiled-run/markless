@@ -12,6 +12,7 @@ import WithOnChange from './scenarios/with-onchange.tsrx';
 import WithOnComplete from './scenarios/with-oncomplete.tsrx';
 import WithPattern from './scenarios/with-pattern.tsrx';
 import WithoutOnChange from './scenarios/without-onchange.tsrx';
+import WithoutShift from './scenarios/without-shift.tsrx';
 
 // Colocated browser suite for the otp family. Each test renders a realistic
 // consumer scenario, and the locators name the part anatomy: root, field, item,
@@ -65,6 +66,41 @@ function pasteInto(input: HTMLInputElement, text: string) {
 	input.focus();
 	input.value = text;
 	input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+// What a pointer landing on this spot actually hits. The family's whole shape is
+// that the answer is always the field, however the boxes are laid out.
+function topmostOver(box: Element) {
+	const spot = box.getBoundingClientRect();
+	return document.elementFromPoint(spot.left + spot.width / 2, spot.top + spot.height / 2);
+}
+
+// The mechanism this family is built on, matched to QDS's otp.css: the root is
+// the positioned box, and the field is stretched over it, invisible but still
+// the thing every gesture on a box reaches.
+function expectFieldStretchesOverTheBoxes(boxes: number) {
+	const input = el<HTMLInputElement>(Field);
+	expect(getComputedStyle(el(Root)).position).toBe('relative');
+
+	const painted = getComputedStyle(input);
+	expect(painted.position).toBe('absolute');
+	expect(painted.opacity).toBe('0');
+
+	// Invisible is not hidden: a hidden control takes no typing and leaves the
+	// accessibility tree, so this row also guards against fixing the paint with
+	// `visibility` or `display`.
+	expect(painted.visibility).toBe('visible');
+	expect(painted.display).not.toBe('none');
+
+	const over = input.getBoundingClientRect();
+	const root = el(Root).getBoundingClientRect();
+	expect(over.top).toBe(root.top);
+	expect(over.bottom).toBe(root.bottom);
+	expect(over.left).toBe(root.left);
+
+	for (let index = 0; index < boxes; index++) {
+		expect(topmostOver(item('item-', index))).toBe(input);
+	}
 }
 
 function expectFieldConfig(input: HTMLInputElement, length: number) {
@@ -186,6 +222,31 @@ for (const mode of MODES) {
 		expectBasicRendered();
 	});
 
+	test(`${mode}: the field is stretched invisibly over every box`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+		expectFieldStretchesOverTheBoxes(6);
+	});
+
+	test(`${mode}: a password manager's icon is pushed past the boxes and clipped away`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+		const input = el<HTMLInputElement>(Field);
+		// The strip the icon sits in: widened past the root, then clipped, so the
+		// icon is neither on the boxes nor able to catch a click beside them.
+		expect(getComputedStyle(input).clipPath).not.toBe('none');
+		expect(input.getBoundingClientRect().right).toBeGreaterThan(el(Root).getBoundingClientRect().right);
+	});
+
+	test(`${mode}: a field asked not to shift covers the root exactly`, async () => {
+		if (mode === 'CSR') await render(WithoutShift);
+		else await renderSSR(WithoutShift);
+		const input = el<HTMLInputElement>(Field);
+		expect(getComputedStyle(input).clipPath).toBe('none');
+		expect(input.getBoundingClientRect().right).toBe(el(Root).getBoundingClientRect().right);
+		expect(topmostOver(item('item-', 0))).toBe(input);
+	});
+
 	test(`${mode}: the accessibility tree holds exactly one form control`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
@@ -255,6 +316,20 @@ test('CSR: each keystroke fills the next box and leaves the rest empty', async (
 	expect(item('item-', 0).textContent).toBe('4');
 	expect(item('item-', 2).getAttribute('ui-empty')).toBe('');
 	expect(el<HTMLInputElement>(Field).value).toBe('42');
+});
+
+// The point of stretching the field over the boxes: a person aims at a box and
+// the input is what they hit, so no box needs a handler of its own.
+test('CSR: clicking a box focuses the field, and typing then fills it', async () => {
+	await render(Basic);
+	// `force` skips the check that refuses a click on a covered element - being
+	// covered by the field is exactly what is under test here.
+	await userEvent.click(item('item-', 2), { force: true });
+	await expect.poll(() => document.activeElement).toBe(el(Field));
+
+	await userEvent.keyboard('7');
+	await expect.poll(() => item('item-', 0).textContent).toBe('7');
+	expect(el<HTMLInputElement>(Field).value).toBe('7');
 });
 
 test('CSR: Backspace takes the last character back out of its box', async () => {

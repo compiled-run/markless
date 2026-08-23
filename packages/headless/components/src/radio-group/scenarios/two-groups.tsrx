@@ -4,8 +4,9 @@ import * as radiogroup from '../index.ts';
 // through one must leave the other's choice exactly where it was.
 export function TwoGroups() @{
 	<section>
-		<radiogroup.root name="plan" data-testid="left-root">
+		<radiogroup.root data-testid="left-root">
 			<radiogroup.label data-testid="left-label">Billing Period</radiogroup.label>
+			<radiogroup.field name="plan" />
 			<radiogroup.item value="monthly" data-testid="left-monthly">
 				<radiogroup.itemfield data-testid="left-monthly-field" />
 				<radiogroup.itemtrigger data-testid="left-monthly-trigger">
@@ -21,8 +22,9 @@ export function TwoGroups() @{
 				<radiogroup.itemlabel data-testid="left-annual-label">Annual</radiogroup.itemlabel>
 			</radiogroup.item>
 		</radiogroup.root>
-		<radiogroup.root name="support" data-testid="right-root">
+		<radiogroup.root data-testid="right-root">
 			<radiogroup.label data-testid="right-label">Support Plan</radiogroup.label>
+			<radiogroup.field name="support" />
 			<radiogroup.item value="basic" data-testid="right-basic">
 				<radiogroup.itemfield data-testid="right-basic-field" />
 				<radiogroup.itemtrigger data-testid="right-basic-trigger">

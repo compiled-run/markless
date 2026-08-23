@@ -3,6 +3,7 @@ import VisuallyHidden from '../base/visually-hidden.tsrx';
 import type {
 	RadioGroupDescriptionProps,
 	RadioGroupErrorProps,
+	RadioGroupFieldProps,
 	RadioGroupInstanceState,
 	RadioGroupItemFieldProps,
 	RadioGroupItemIndicatorProps,
@@ -62,8 +63,6 @@ export function RadioGroupRoot({
 	orientation = 'vertical',
 	loop = true,
 	disabled = false,
-	required = false,
-	name = '',
 	onChange,
 	children,
 	...rest
@@ -74,8 +73,6 @@ export function RadioGroupRoot({
 	group.orientation = orientation;
 	group.loop = loop;
 	group.disabled = disabled;
-	group.required = required;
-	group.name = name;
 
 	<fieldset
 		{...rest}
@@ -92,6 +89,19 @@ export function RadioGroupRoot({
 
 export function RadioGroupLabel({ children, ...rest }: RadioGroupLabelProps) @{
 	<legend {...rest}>{children}</legend>
+}
+
+// What a form receives, said once for the whole group: every option's hidden
+// radio reads the name and the requirement from here, so a group is renamed in
+// one place. It can be written anywhere inside the root.
+export function RadioGroupField({ name = '', required = false }: RadioGroupFieldProps) @{
+	const group = radiogroupState();
+	group.name = name;
+	group.required = required;
+
+	// A part has to render markup to be served as a component, and this one has
+	// nothing to show, so it renders the empty span every field part hides in.
+	<VisuallyHidden />
 }
 
 export function RadioGroupDescription({ children, ...rest }: RadioGroupDescriptionProps) @{

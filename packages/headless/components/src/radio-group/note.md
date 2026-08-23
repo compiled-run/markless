@@ -118,3 +118,34 @@ DOM order is the navigation order:
 to the enabled ones, from the event's own target. No registry, no ids. Arrow keys
 move focus **and** choose — the APG rule for this pattern, and the one every
 hand-rolled radio group in the wild gets wrong.
+
+## The group field, and what a loop cannot pick up from it
+
+`radiogroup.field` is QDS's group-level part (`radio-group-field.tsx`) and it is
+back: it takes `name` and `required`, writes them onto the group instance, and
+shows nothing. QDS's root carries neither prop, so ours no longer does either —
+one place decides what a form receives, and it is the field.
+
+Measured 2026-08-23, and the reason one suite row is skipped: **what a part
+writes to the group instance never reaches parts built inside a keyed `@for`
+row.** Options written flat take the name (the plan-picker form rows are green);
+options from a loop carry `name=""`. Three shapes were measured in
+`options-from-data.tsrx`, all giving `["","",""]`:
+
+- the field written before the loop
+- the field written after the loop
+- the item field reading the name through a `computed()` cell on the instance
+  rather than as a bare field read
+
+A 2 second poll never resolves, so this is not a late refresh — the rows read the
+instance as the root left it. It is not QDS's documented ordering constraint
+either (QDS warns only about a field written after items have rendered); here the
+field is first and the rows still miss it.
+
+The hole is bounded: looped options still choose, walk and reconcile, they just
+submit under no name. It was not visible before this change because `name` used
+to be a root prop, and the root always writes before rows are built. The fix is a
+framework one — a part's declaration has to reach the rows of a loop in the same
+widget — not a family workaround, and keeping `name` on the root as a second
+place to declare it is exactly the alternative surface the family is not allowed
+to invent.
