@@ -15,6 +15,11 @@ export type PaginationRootProps = Omit<PropsOf<'nav'>, 'onChange'> & {
 	readonly count: number;
 	/** Which page is showing, counting from 1. Omit it and it starts at page 1. */
 	readonly page?: number;
+	/**
+	 * How many pages to show on each side of the current one when the family
+	 * computes its range. Omit it and it is 1.
+	 */
+	readonly siblingCount?: number;
 	/** Nothing navigates while this is set, and every control reports unavailable. */
 	readonly disabled?: boolean;
 	/**
@@ -25,10 +30,10 @@ export type PaginationRootProps = Omit<PropsOf<'nav'>, 'onChange'> & {
 };
 
 /**
- * One page's box. It exists to carry `ui-active` for a stylesheet, so a consumer
- * can style the current page's surroundings; the control inside it carries the
- * ARIA. `value` is repeated on the control because the control is written by the
- * consumer, not by this part, and a part reads its own props only.
+ * One page's box, and the part that declares WHICH page this row of the anatomy
+ * stands for. The control inside it - an `itemtrigger` or an `itemlink` - reads
+ * that page number back off the item and carries the ARIA for it, so the number
+ * is written once, on the wrapper, exactly as the QDS reference declares it.
  */
 export type PaginationItemProps = PropsOf<'div'> & {
 	/** Which page this box stands for, counting from 1. */
@@ -36,25 +41,20 @@ export type PaginationItemProps = PropsOf<'div'> & {
 };
 
 /**
- * A consumer's `onClick` runs after the page has already moved.
+ * The control inside a `pagination.item`. It takes no page number of its own:
+ * the enclosing item already declared one, and this part reads it back to decide
+ * where a click goes and whether it is the current page.
  *
- * The native `value` is omitted before ours replaces it: a `<button value>` is a
- * string that a form submits, and this one is a page number nothing submits.
+ * A consumer's `onClick` runs after the page has already moved.
  */
-export type PaginationItemTriggerProps = Omit<PropsOf<'button'>, 'value'> & {
-	/** Which page this control goes to, counting from 1. */
-	readonly value: number;
-};
+export type PaginationItemTriggerProps = PropsOf<'button'>;
 
 /**
  * The same control as `itemtrigger` over an `<a>`, for pagination that is real
  * navigation with real URLs. An anchor has no `disabled` attribute, so an
  * unavailable link reports `aria-disabled` and stays in the tab order.
  */
-export type PaginationItemLinkProps = PropsOf<'a'> & {
-	/** Which page this link goes to, counting from 1. */
-	readonly value: number;
-};
+export type PaginationItemLinkProps = PropsOf<'a'>;
 
 /** Steps to the next page. Natively `disabled` on the last page. */
 export type PaginationForwardTriggerProps = PropsOf<'button'>;
@@ -67,6 +67,18 @@ export type PaginationBackTriggerProps = PropsOf<'button'>;
  * fields, plus the consumer's `onChange`, stored by the root for the writers to
  * call.
  */
-export type PaginationInstanceState = Seeded<PaginationRootProps, 'count' | 'page' | 'disabled'> & {
+export type PaginationInstanceState = Seeded<
+	PaginationRootProps,
+	'count' | 'page' | 'siblingCount' | 'disabled'
+> & {
 	onChange?: PaginationRootProps['onChange'];
 };
+
+/**
+ * The per-item instance: one page number, seeded by the `item` part and read by
+ * whichever control that item wraps. It is its own widget-scoped definition, so
+ * every rendered `item` starts a fresh one and the control inside resolves to
+ * the nearest one - which is the same nesting the QDS reference gets from a
+ * second context provider on the item.
+ */
+export type PaginationItemInstanceState = Seeded<PaginationItemProps, 'value'>;
