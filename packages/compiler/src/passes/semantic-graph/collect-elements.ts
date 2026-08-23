@@ -159,6 +159,7 @@ export function collectTemplateExpression(node: AnyNode, state: WalkState): void
 		target: state.currentTextTarget ?? { kind: 'text' },
 		asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
 		computedGraphNodeId: composite?.graphNodeId,
+		componentName: state.currentComponentName ?? undefined,
 	});
 }
 
@@ -223,6 +224,7 @@ export function collectConditionalBranchText(node: AnyNode, state: WalkState): v
 			sourceSpan: sourceSpanValue,
 			target,
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
+			componentName: state.currentComponentName ?? undefined,
 		});
 	}
 }
@@ -604,6 +606,7 @@ function collectAttribute(
 			target: conditionalClass.target,
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
 			computedGraphNodeId: composite?.graphNodeId,
+			componentName: state.currentComponentName ?? undefined,
 		});
 		walk(expressionValue, state);
 		return;
@@ -663,6 +666,7 @@ function collectAttribute(
 			target: bindingTargetForAttribute(attributeName),
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
 			computedGraphNodeId: composite?.graphNodeId,
+			componentName: state.currentComponentName ?? undefined,
 		});
 		walk(expressionValue, state);
 	}
@@ -698,6 +702,7 @@ function collectStyleObjectAttribute(
 			target: bindingTargetForAttribute('style'),
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
 			computedGraphNodeId: composite.graphNodeId,
+			componentName: state.currentComponentName ?? undefined,
 		});
 		walk(usageNode, state);
 		return;

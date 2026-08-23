@@ -259,3 +259,129 @@ test('the colliding module compiles with no diagnostic', async () => {
 	expect(compiled.semanticGraph.diagnostics).toEqual([]);
 	expect(compiled.publicRenderModule.diagnostics ?? []).toEqual([]);
 });
+
+// A third pair, for the two positions the seed and el-handle fixtures cannot
+// reach: a BRANCH CONDITION over the instance (`@if (LOCAL.open)`) and a
+// TEMPLATE READ of it (`{LOCAL.label}`) lowered on the finished graph. Both
+// factories declare the same property names on purpose - a borrowed instance
+// then resolves to something that exists, so the collision is a silent swap
+// rather than a refusal, which is exactly the shape that ships broken.
+const branchingModuleSource = (alphaLocal: string, betaLocal: string) => `
+import { shared, state } from '@markless/core';
+
+export const alpha = shared(() => {
+	const cell = state({ label: 'alpha', open: true });
+
+	return { ...cell };
+}, { scope: 'widget' });
+
+export const beta = shared(() => {
+	const cell = state({ label: 'beta', open: false });
+
+	return { ...cell };
+}, { scope: 'widget' });
+
+export function Alpha({ label }) @{
+	const ${alphaLocal} = alpha();
+	${alphaLocal}.label = label;
+
+	<div data-alpha>
+		<b>{${alphaLocal}.label}</b>
+		@if (${alphaLocal}.open) {
+			<span data-alpha-open>alpha open</span>
+		}
+	</div>
+}
+
+export default function Beta({ label }) @{
+	const ${betaLocal} = beta();
+	${betaLocal}.label = label;
+
+	<div data-beta>
+		<b>{${betaLocal}.label}</b>
+		@if (${betaLocal}.open) {
+			<span data-beta-open>beta open</span>
+		}
+	</div>
+}
+`;
+
+// What each branch flip actually subscribes to, as `branch site -> node.path`.
+// A wrong node here is one widget's arm flipping on another widget's cell.
+function branchTestReads(compiled: Compiled): Array<[unknown, unknown]> {
+	return compiled.symbolResolver.symbols.flatMap((symbol) =>
+		symbol.kind === 'branch-update'
+			? (symbol.testReads ?? []).map(
+					(read) =>
+						[symbol.branchSiteId, `${read.graphNodeId}.${read.path.join('.')}`] as [
+							unknown,
+							unknown,
+						],
+				)
+			: [],
+	);
+}
+
+// Leg one. `@if (w.open)` inside Alpha tests ALPHA's cell. The branch site
+// carried no component, so the resolver matched the name against every instance
+// in the module and the last `w` in the file won: both arms flipped on beta.
+test('each branch condition tests the instance its own body declares', async () => {
+	const compiled = await compile(branchingModuleSource('w', 'w'));
+
+	expect(branchTestReads(compiled)).toEqual([
+		['branch-site:0', 'shared:src/parts.tsrx#alpha/state:cell.open'],
+		['branch-site:1', 'shared:src/parts.tsrx#beta/state:cell.open'],
+	]);
+});
+
+// Every graph node a template read lowers onto, as `source -> node.path`, in
+// document order.
+function loweredTemplateReads(compiled: Compiled): Array<[unknown, unknown]> {
+	const templateSources = new Set(
+		compiled.semanticGraph.templateReads.map((read) => read.source),
+	);
+	return compiled.stateLowering.reads.flatMap((read) =>
+		templateSources.has(read.source) && read.sourceSpan === undefined
+			? [[read.source, `${read.graphNodeId}.${read.path.join('.')}`] as [unknown, unknown]]
+			: [],
+	);
+}
+
+// Leg two. A template read carried no component either, so state lowering
+// resolved `{w.label}` module-wide: the two parts' reads produced ONE lowered
+// read on the last-declared instance's node, and Alpha's text was beta's cell.
+test('each part lowers its template read onto its own widget cell', async () => {
+	const compiled = await compile(branchingModuleSource('w', 'w'));
+
+	expect(loweredTemplateReads(compiled)).toEqual([
+		['w.label', 'shared:src/parts.tsrx#alpha/state:cell.label'],
+		['w.label', 'shared:src/parts.tsrx#beta/state:cell.label'],
+	]);
+});
+
+// Byte-stability for the branching pair, the same way the other two are pinned.
+test('the colliding branching module compiles to the same artifact as a distinct-name module', async () => {
+	const colliding = await compile(branchingModuleSource('w', 'w'));
+	const control = await compile(branchingModuleSource('w', 'seat'));
+
+	const shape = (compiled: Compiled, locals: ReadonlyArray<string>) =>
+		[...new Set(locals)].reduce(
+			(text, local) => text.replace(new RegExp(`\\b${local}\\b`, 'g'), 'LOCAL'),
+			JSON.stringify({
+				components: compiled.publicRenderModule.componentDefinitions,
+				renderChunks: compiled.renderData.chunks,
+				payload: compiled.payloadArena,
+				ssr: compiled.publicRenderModule.ssrModuleSource,
+			}),
+		);
+
+	expect(shape(colliding, ['w'])).toEqual(shape(control, ['w', 'seat']));
+});
+
+// The branching pair stays fully accepted too.
+test('the colliding branching module compiles with no diagnostic', async () => {
+	const compiled = await compile(branchingModuleSource('w', 'w'));
+
+	expect(compiled.semanticGraph.diagnostics).toEqual([]);
+	expect(compiled.publicRenderModule.diagnostics ?? []).toEqual([]);
+});

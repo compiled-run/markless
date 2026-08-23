@@ -40,8 +40,17 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 			continue;
 		}
 
-		const lookup = scopedGraphLookup(input, null);
-		const resolved = resolveStateGraphPath(input, read.source, lookup, null);
+		// The reading component scopes the instance resolver: two parts spelling
+		// their instance locals alike are two reads of two different cells, and
+		// module-wide resolution collapsed them onto the last-declared one.
+		const lookup = scopedGraphLookup(input, null, read.componentName);
+		const resolved = resolveStateGraphPath(
+			input,
+			read.source,
+			lookup,
+			null,
+			read.componentName,
+		);
 		if (!resolved) {
 			if (
 				isDynamicGraphPathSource(

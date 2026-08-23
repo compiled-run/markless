@@ -395,6 +395,10 @@ export type SemanticBranchSite = {
 	// Arm index inside the owning boundary (0 = @try, 1 = @pending, 2 = @catch).
 	readonly asyncBoundaryArm?: number;
 	readonly armTests?: ReadonlyArray<unknown>;
+	// The component body the condition was authored in. Without it the test text
+	// resolves module-wide and a bare instance local matches a same-named local
+	// declared in a sibling component (defect 46). Absent outside every component.
+	readonly componentName?: string;
 };
 
 export type SemanticSyncPolicyCondition =
@@ -587,6 +591,10 @@ export type SemanticTemplateRead = {
 	readonly target: SemanticTemplateBindingTarget;
 	readonly asyncBoundaryId?: string;
 	readonly computedGraphNodeId?: string;
+	// The component body this read was authored in, for the same reason the branch
+	// site carries one: `{w.label}` in two components is two reads of two different
+	// instances, and without the component they lower to a single node (defect 46).
+	readonly componentName?: string;
 };
 
 export type SemanticElementHandleBinding = {
