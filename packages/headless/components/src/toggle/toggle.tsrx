@@ -21,10 +21,12 @@ export const toggleState = shared(
 			value: '',
 		});
 		const triggerEl = element<HTMLButtonElement>();
+		const describedEl = element<HTMLDivElement>();
 
 		return {
 			...toggle,
 			triggerEl,
+			describedEl,
 			flip() {
 				const next = toggle.checked === true ? false : true;
 				toggle.checked = next;
@@ -62,6 +64,7 @@ export function ToggleTrigger({ children, onClick, ...rest }: ToggleTriggerProps
 		el={toggle.triggerEl}
 		type="button"
 		role="switch"
+		aria-describedby={toggle.describedEl}
 		aria-checked={toggle.checked ? 'true' : 'false'}
 		aria-disabled={toggle.disabled ? 'true' : 'false'}
 		aria-invalid={toggle.invalid ? 'true' : 'false'}
@@ -85,15 +88,27 @@ export function ToggleLabel({ children, ...rest }: ToggleLabelProps) @{
 	<label {...rest} for={toggle.triggerEl}>{children}</label>
 }
 
+// The message the switch names. One part stands behind both `toggle.description`
+// and `toggle.error` because an element() handle may be bound in exactly one place
+// (MARKLESS_ELEMENT_HANDLE_DUPLICATE) and a control may name exactly one id (a
+// handle list in an IDREF position is MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE,
+// recorded as U-C). A switch that mounts one message is described by it; a switch
+// that mounts both is described by the first of them.
+function ToggleMessage({ children, ...rest }: ToggleDescriptionProps) @{
+	const toggle = toggleState();
+
+	<div {...rest} el={toggle.describedEl}>{children}</div>
+}
+
 export function ToggleDescription({ children, ...rest }: ToggleDescriptionProps) @{
-	<div {...rest}>{children}</div>
+	<ToggleMessage {...rest}>{children}</ToggleMessage>
 }
 
 export function ToggleError({ children, ...rest }: ToggleErrorProps) @{
 	const toggle = toggleState();
 	toggle.invalid = true;
 
-	<div {...rest}>{children}</div>
+	<ToggleMessage {...rest}>{children}</ToggleMessage>
 }
 
 // No change handler of its own: the input is clipped, aria-hidden and out of the

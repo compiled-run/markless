@@ -38,7 +38,12 @@ function el<T extends Element = HTMLElement>(locator: { element(): Element | nul
 
 function expectBasicRendered() {
 	expect(el(Root).getAttribute('role')).toBe('progressbar');
-	expect(el(Root).getAttribute('aria-label')).toBe('progress');
+	// The visible label names the bar, by a minted id nobody spelled. The bar
+	// carries no aria-label of its own: one hard-coded word was the name of every
+	// bar on the page, and it beat whatever the consumer spread in.
+	expect(el(Root).hasAttribute('aria-label')).toBe(false);
+	expect(el(Root).getAttribute('aria-labelledby')).toBe(el(Label).id);
+	expect(el(Label).id).toBeTruthy();
 	expect(el(Root).getAttribute('aria-valuemin')).toBe('0');
 	expect(el(Root).getAttribute('aria-valuemax')).toBe('100');
 	expect(el(Root).getAttribute('aria-valuenow')).toBe('30');
@@ -56,8 +61,10 @@ function expectBasicRendered() {
 
 function expectIndeterminateRendered() {
 	expect(el(Indicator).getAttribute('ui-progress')).toBe('indeterminate');
-	// An unknown amount announces no current value at all.
+	// An unknown amount announces no current value at all: neither the number nor
+	// the percentage a reader would speak instead of it.
 	expect(el(Root).hasAttribute('aria-valuenow')).toBe(false);
+	expect(el(Root).hasAttribute('aria-valuetext')).toBe(false);
 	expect(el(Root).hasAttribute('ui-value')).toBe(false);
 	expect(el(Indicator).getAttribute('style')).toBe('transform: translateX(-100%)');
 }

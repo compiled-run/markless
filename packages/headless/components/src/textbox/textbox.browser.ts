@@ -111,6 +111,9 @@ function expectPartRestrictions() {
 function expectHelpRendered() {
 	expect(el(Description).textContent).toBe("We'll never share your email");
 	expect(el<HTMLInputElement>(Input).getAttribute('aria-invalid')).toBe('false');
+	// The help text is the control's description, by a minted id nobody spelled.
+	expect(el<HTMLInputElement>(Input).getAttribute('aria-describedby')).toBe(el(Description).id);
+	expect(el(Description).id).toBeTruthy();
 }
 
 function expectInvalidRendered() {
@@ -118,6 +121,11 @@ function expectInvalidRendered() {
 	// Every part of one widget instance seeds before any part renders, so the
 	// error part's `textbox.invalid = true` is what the control reads.
 	expect(el<HTMLInputElement>(AfterInput).getAttribute('aria-invalid')).toBe('true');
+	// An invalid control says why: the error is its description.
+	expect(el<HTMLInputElement>(AfterInput).getAttribute('aria-describedby')).toBe(
+		el(AfterError).id,
+	);
+	expect(el(AfterError).id).toBeTruthy();
 
 	// The same error written BEFORE the control: document order does not decide
 	// what a part reads, so this control is invalid too.
@@ -128,9 +136,13 @@ function expectInvalidRendered() {
 function expectHelpAndErrorRendered() {
 	expect(el(Description).textContent).toBe('Enter a valid email address');
 	expect(el(TextboxError).textContent).toBe('Email format is invalid');
-	// Neither message is named by the control: an aria-describedby handle list is
-	// not expressible yet (U-C), so no part wires its id onto the control.
-	expect(el<HTMLInputElement>(Input).hasAttribute('aria-describedby')).toBe(false);
+	// A control may name exactly one id: an aria-describedby handle LIST is not
+	// expressible yet (U-C), so a field that mounts both messages is described by
+	// the first of them and the second is on the page unattached. The row turns
+	// red - which is the signal to name both - the day a list can be spelled.
+	const described = el<HTMLInputElement>(Input).getAttribute('aria-describedby');
+	expect(described).toBeTruthy();
+	expect(document.getElementById(described as string)).toBe(el(Description));
 }
 
 for (const mode of MODES) {
@@ -176,7 +188,7 @@ for (const mode of MODES) {
 		expectInvalidRendered();
 	});
 
-	test(`${mode}: help text and an error render together, neither named by the control`, async () => {
+	test(`${mode}: help text and an error render together, the first of them naming the control`, async () => {
 		if (mode === 'CSR') await render(FieldWithHelpAndError);
 		else await renderSSR(FieldWithHelpAndError);
 		expectHelpAndErrorRendered();

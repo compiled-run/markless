@@ -9,6 +9,9 @@ export type ProgressRootProps = PropsOf<'div'> & {
 	readonly max?: number;
 };
 
+/** What `progress.root` hands the bar it renders: everything it was given. */
+export type ProgressBarProps = PropsOf<'div'>;
+
 export type ProgressLabelProps = PropsOf<'span'>;
 
 /** The full length of the range; the indicator sits inside it. */
