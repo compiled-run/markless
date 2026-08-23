@@ -40,8 +40,8 @@ import { collectExpressionReads, resolvedSymbolAt } from './collect-expressions.
 import {
 	extractSyncPolicy,
 	firstDetachedSyncPolicyReference,
-	firstSyncPolicyActionCall,
 	hasSyncEventPolicyCandidate,
+	unextractableSyncPolicyDiagnostic,
 } from './collect-sync-policy.ts';
 import {
 	attachHostElementRequiredDiagnostic,
@@ -1334,69 +1334,6 @@ function eventAttributeSuggestion(attributeName: string): string {
 
 function isFunctionExpressionLike(node: AnyNode): boolean {
 	return node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression';
-}
-
-function unextractableSyncPolicyDiagnostic(
-	attributeName: string,
-	value: AnyNode | undefined,
-	handlers: ReadonlyArray<AnyNode>,
-	state: Pick<WalkState, 'filename' | 'source'>,
-): SemanticGraphDiagnostic {
-	const detached = firstDetachedSyncPolicyReference({
-		type: 'ArrayExpression',
-		elements: handlers,
-	} as AnyNode);
-	if (detached) {
-		const source = state.source.slice(detached.start, detached.end).trim();
-		return {
-			code: 'MARKLESS_SYNC_POLICY_UNEXTRACTABLE',
-			severity: 'error',
-			phase: 'sync-policy',
-			title: 'Cannot extract synchronous event policy',
-			passId: 'tsrx-semantic-graph',
-			artifactKeys: ['semanticGraph'],
-			message: `\`${source}\` detaches ${detached.action} from the event, so the compiler cannot prove when the default action is cancelled for ${attributeName}.`,
-			why: 'preventDefault() and stopPropagation() must run before lazy handler symbols load; a detached reference hides which action runs and under what condition.',
-			primarySpan: { filename: state.filename, start: detached.start, end: detached.end },
-			suggestions: [
-				{
-					message: `Call it directly on the event parameter instead of detaching ${detached.action}.`,
-				},
-			],
-			docsUrl: 'https://markless.dev/errors/MARKLESS_SYNC_POLICY_UNEXTRACTABLE',
-		};
-	}
-
-	const actionCall =
-		handlers.map((handler) => firstSyncPolicyActionCall(handler)).find(Boolean) ??
-		firstSyncPolicyActionCall(value);
-	const actionLabel = actionCall?.action ?? 'preventDefault/stopPropagation';
-
-	return {
-		code: 'MARKLESS_SYNC_POLICY_UNEXTRACTABLE',
-		severity: 'error',
-		phase: 'sync-policy',
-		title: 'Cannot extract synchronous event policy',
-		passId: 'tsrx-semantic-graph',
-		artifactKeys: ['semanticGraph'],
-		message: `Cannot extract a synchronous ${actionLabel} policy for ${attributeName} because the guard is not limited to graph state, event fields, props, and constants.`,
-		why: 'preventDefault() and stopPropagation() must run before lazy handler symbols load. The compiler can only emit a synchronous policy when the condition is fully represented in the resumable graph/event data plane.',
-		primarySpan:
-			(actionCall ? sourceSpan(actionCall.node, state.filename) : undefined) ??
-			(value ? sourceSpan(value, state.filename) : undefined) ??
-			fallbackSpan(state.filename),
-		suggestions: [
-			{
-				message:
-					'Move the browser-critical condition into graph state and simple event-field comparisons, or remove preventDefault()/stopPropagation() from the lazy handler.',
-			},
-		],
-		docsUrl: 'https://markless.dev/errors/MARKLESS_SYNC_POLICY_UNEXTRACTABLE',
-	};
-}
-
-function fallbackSpan(filename: string): SourceSpan {
-	return { filename, start: 0, end: 0 };
 }
 
 type EventHandlerExpression = {

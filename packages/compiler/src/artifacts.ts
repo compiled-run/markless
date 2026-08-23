@@ -64,6 +64,11 @@ export type SemanticComponentPropBinding =
 			readonly parameters?: ReadonlyArray<string>;
 			readonly value?: unknown;
 			readonly sourceSpan?: SourceSpan;
+			// A consumer's event callback becomes a real event record on whatever
+			// element the child spreads it onto, so its browser-critical policy has
+			// to cross the edge with it or the default action wins.
+			readonly hasSyncPolicyCandidate?: boolean;
+			readonly syncPolicy?: SemanticSyncPolicy;
 	  }
 	// An element() handle written into an IDREF attribute on a CHILD COMPONENT
 	// tag. The value that crosses the edge is the id minted for the referenced

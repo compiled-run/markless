@@ -79,6 +79,10 @@ export function forwardedSpreadViewRecords(input: ProtocolViewPayloadInput): {
 						hostNodeId,
 						eventName: normalizeEventName(prop.name),
 						symbolIds: [symbolId],
+						// Without this the consumer's preventDefault waits for the lazy
+						// callback symbol, which lands after the native default action:
+						// a forwarded onSubmit navigates the page.
+						...(prop.syncPolicy ? { syncPolicy: prop.syncPolicy } : {}),
 					});
 				}
 				// Composition keeps a parent record only for a host the parent's own
