@@ -356,6 +356,38 @@ function graphBindingLocalNames(
 	]);
 }
 
+/**
+ * The callee text of every callback slot a shared() factory in this module
+ * dispatches through and no component in this module fills.
+ *
+ * A filled slot is minted as a capture slot and lowered into a routed invoke. An
+ * unfilled one is minted nowhere, so without this set the authored callee — a
+ * name that only exists inside the shared() factory, never in the handler module
+ * the method is inlined into — is printed verbatim and throws a ReferenceError
+ * the first time the gesture dispatches. The call folds to `undefined` instead,
+ * which is what `f?.()` means when nothing answers f, and what an absent
+ * optional callback prop already folds to on a slot that IS filled.
+ */
+function unfilledCallbackSlotSources(
+	semanticGraph: SymbolModulesInput['semanticGraph'],
+): ReadonlySet<string> {
+	const invocations = semanticGraph?.sharedCallbackInvocations ?? [];
+	if (invocations.length === 0) return new Set();
+
+	const bindings = semanticGraph?.sharedCallbackBindings ?? [];
+	return new Set(
+		invocations.flatMap((invocation) =>
+			bindings.some(
+				(binding) =>
+					binding.definitionId === invocation.definitionId &&
+					binding.slotName === invocation.slotName,
+			)
+				? []
+				: [invocation.calleeSource],
+		),
+	);
+}
+
 function unresolvedGraphReferences(
 	modules: ReadonlyArray<GeneratedSymbolModule>,
 	symbols: ReadonlyArray<PlannedSymbol>,
@@ -3742,6 +3774,12 @@ export type EventHandlerEmissionInput = {
 	readonly localNames: ReadonlySet<string>;
 	/** The component-routed capture slots, as `emitSymbolModules` filters them. */
 	readonly captureSlots: ReadonlyArray<CaptureSlot>;
+	/**
+	 * Callee texts of the module's callback slots that no component fills, as
+	 * `unfilledCallbackSlotSources` reads them off the semantic graph. A call
+	 * through one folds to `undefined`; omitted means none.
+	 */
+	readonly unfilledCallbackSlotSources?: ReadonlySet<string>;
 	/** Whether some other symbol binds this one as a callback route. */
 	readonly usesArgumentVector: boolean;
 	/** The authored file the handler was extracted from; names the map. */
@@ -4339,6 +4377,7 @@ type EventHandlerRewrite = {
 	readonly reads: ReadonlyArray<LoweredStateRead>;
 	readonly valueSlots: ReadonlyArray<CaptureSlot>;
 	readonly callbackSlots: ReadonlyArray<CaptureSlot>;
+	readonly unfilledCallbackSlotSources: ReadonlySet<string>;
 	/** The handler's own parameters, as capture arguments still see them. */
 	readonly eventParameters: ReadonlyArray<string>;
 	/** The parameters write lowering sees, which a callback prop blanks. */
@@ -4361,6 +4400,7 @@ function eventHandlerRewrite(
 		reads: symbol.reads ?? [],
 		valueSlots: input.captureSlots.filter((slot) => !callbackCaptureSlot(slot)),
 		callbackSlots: input.captureSlots.filter(callbackCaptureSlot),
+		unfilledCallbackSlotSources: input.unfilledCallbackSlotSources ?? new Set(),
 		eventParameters: parameters,
 		writeValueInput: {
 			valueSource: undefined,
@@ -4404,6 +4444,9 @@ function rewriteEventHandlerNode(
 
 	const invocation = captureInvocationNode(node, rewrite);
 	if (invocation) return carryEventHandlerComments(node, invocation);
+
+	const unfilled = unfilledCallbackSlotNode(node, rewrite);
+	if (unfilled) return carryEventHandlerComments(node, unfilled);
 
 	const write = eventWriteNode(node, rewrite);
 	if (write) return carryEventHandlerComments(node, write);
@@ -4509,6 +4552,29 @@ function captureInvocationNode(
 	);
 
 	return eventAwaitNode(callbackSlotInvokeNode(slot, args));
+}
+
+/**
+ * `undefined`, for a dispatch through a callback slot nothing fills.
+ *
+ * Nothing answers the slot, so there is no route to invoke and no argument whose
+ * evaluation any consumer could observe — which is exactly the semantics of the
+ * `slot?.(...)` the author wrote. Folding here is what makes the authored callee
+ * impossible to print: it names a shared() factory local that does not exist in
+ * the handler module, and `captureInvocationNode` above matches only slots the
+ * capture analysis minted, which it does only for a slot some component fills.
+ */
+function unfilledCallbackSlotNode(
+	node: AnyNode,
+	rewrite: EventHandlerRewrite,
+): EmissionNode | null {
+	if (rewrite.unfilledCallbackSlotSources.size === 0) return null;
+	if (node.type !== 'CallExpression' || !isNode(node.callee)) return null;
+
+	const calleeText = valueNodeText(node.callee, rewrite.source);
+	if (!rewrite.unfilledCallbackSlotSources.has(calleeText)) return null;
+
+	return identifierNode('undefined');
 }
 
 const CALLBACK_SLOT_FN = 'marklessInvokeCallbackSlot';
@@ -5156,6 +5222,7 @@ export function buildSymbolModuleEmission(
 			symbol,
 			localNames: input.localNames ?? emptyLocalNames,
 			captureSlots: input.captureSlots,
+			unfilledCallbackSlotSources: unfilledCallbackSlotSources(input.semanticGraph),
 			usesArgumentVector: input.usesArgumentVector === true,
 			sourceFileName: input.sourceFileName,
 			moduleDeclarations: input.moduleDeclarations,
