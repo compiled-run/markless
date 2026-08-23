@@ -9,6 +9,12 @@ import { planSymbolResolver } from '../src/passes/symbol-resolver.ts';
 // and computed-gated arms beside it moved on the same write. The branch-condition
 // position now mints the same synthetic computed the attribute and prop positions
 // mint, so the site tests one graph node exactly as `@if (someComputed)` does.
+//
+// Defect 34: the BARE half of the same freeze. `@if (p.open)` over a shared
+// instance resolved through the module's binding names, which answer a part local
+// only when it happens to repeat the factory's own state variable name, so the
+// arm worked in the families that spell it that way and froze silently anywhere
+// else. The branch position now asks the shared-instance resolver first.
 
 const localState = `
 import { computed, state } from '@markless/core';
@@ -93,6 +99,9 @@ async function branchFacts(filename: string, source: string) {
 						branchSiteId: symbol.branchSiteId,
 						testSource: symbol.testSource,
 						wakeSet: symbol.testReads.map((read) => read.graphNodeId),
+						// The node alone is not the read: a shared instance field is one
+						// path into a cell the whole widget shares.
+						reads: symbol.testReads.map((read) => [read.graphNodeId, read.path]),
 						// What a write has to move for this arm to be rebuilt.
 						roots: symbol.testReads.flatMap((read) =>
 							(bindingsById.get(read.graphNodeId)?.dependencies ?? []).map(
@@ -241,28 +250,85 @@ test('a condition over props alone mints nothing', async () => {
 	expect(branches[0]?.wakeSet).toEqual([]);
 });
 
-test('a recombined condition over a shared instance reaches the instance state', async () => {
+test('a condition over a shared instance reaches the instance state, bare or recombined', async () => {
 	const { branches } = await branchFacts('shared.tsrx', sharedInstance);
 
-	// A BARE read of a shared instance still has no wake set here: the branch
-	// position resolves its test through graph bindings and aliases only, and a
-	// part local holding an instance is neither. The recombined read does resolve,
-	// because the composite collector falls back to the shared-instance resolver
-	// that the branch position never calls.
-	expect(branches[0]?.wakeSet).toEqual([]);
+	// Defect 34: a BARE read reached no node here, because the branch position
+	// resolved its test through graph bindings and aliases only and a part local
+	// holding an instance is neither - so `p.open` froze while `p.value === 'b'`
+	// two lines down moved, the recombined one having gone through the composite
+	// collector's shared-instance fallback. Both spellings now land on the cell.
+	expect(branches[0]?.reads).toEqual([['shared:shared.tsrx#picker/state:cell', ['open']]]);
 	expect(branches[1]?.wakeSet).toEqual(['computed:templateExpression:0']);
 	expect(branches[1]?.roots).toEqual(['shared:shared.tsrx#picker/state:cell']);
 });
 
-test('a bare shared read only resolves when the part local repeats the factory name', async () => {
-	// Why the shipped families never saw the bare-read half of this freeze: they
-	// all write `const checkbox = checkboxState()`, and the factory's own state
-	// variable is called `checkbox` too, so the branch test resolves by name
-	// coincidence rather than by knowing what the local holds. Rename either side
-	// and the same arm freezes - the case above. Closing that gap means teaching
-	// the branch position the shared-instance resolver, outside this change.
+const shippedFamilyShape = `
+import { shared, state } from '@markless/core';
+
+export const checkboxState = shared(() => {
+	const checkbox = state({ checked: false, disabled: false });
+
+	return {
+		...checkbox,
+		toggle() {
+			checkbox.checked = !checkbox.checked;
+		},
+	};
+}, { scope: 'widget' });
+
+export function CheckboxIndicator() @{
+	const checkbox = checkboxState();
+
+	<span data-indicator>
+		<button type="button" onClick={() => checkbox.toggle()}>t</button>
+		@if (checkbox.checked) { <b data-on>on</b> } @else { <i data-off>off</i> }
+	</span>
+}
+`;
+
+test('a bare shared read resolves the same way whichever name the part local has', async () => {
+	// The shipped families all write `const checkbox = checkboxState()`, and the
+	// factory's own state variable is called `checkbox` too, so this arm used to
+	// resolve by name coincidence. It now resolves because the branch position asks
+	// the shared-instance resolver what the local holds, and the node and path it
+	// answers with are the ones the coincidence produced.
 	const { branches } = await branchFacts('match.tsrx', sharedInstanceNameMatch);
 
 	expect(branches[0]?.wakeSet).toEqual(['shared:match.tsrx#pickerState/state:picker']);
 	expect(branches[1]?.wakeSet).toEqual(['computed:templateExpression:0']);
+});
+
+test('the shipped-family arm keeps the branch record it already emitted', async () => {
+	// The canary for defect 34's fix: every family ships `@if (checkbox.checked)`
+	// over a same-named part local. Compiling this module before and after the
+	// resolver change produced byte-identical output across every artifact; this
+	// pins the record that carries the arm, so a later change to the branch
+	// position cannot move it without saying so here.
+	const compiled = await compileTsrxModule({
+		filename: 'Checkbox.tsrx',
+		source: shippedFamilyShape,
+		buildId: 'b',
+		resolverId: 'r',
+		symbols: [],
+	});
+
+	expect(compiled.protocolView.branches?.map((branch) => [branch.id, branch.testReads])).toEqual([
+		[
+			'branch-site:0',
+			[
+				{
+					source: 'checkbox.checked',
+					graphNodeId: 'shared:Checkbox.tsrx#checkboxState/state:checkbox',
+					path: ['checked'],
+				},
+			],
+		],
+	]);
+	// A bare read is still a bare read: nothing new is minted to carry it.
+	expect(
+		compiled.semanticGraph.graphBindings.filter((binding) =>
+			binding.id.startsWith('computed:templateExpression:'),
+		),
+	).toHaveLength(0);
 });
