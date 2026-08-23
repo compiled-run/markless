@@ -60,7 +60,7 @@ export function OtpRoot({
 
 // One tab stop, one accessibility-tree control, one paste target. A consumer's
 // `onInput` runs after the family has taken the value.
-export function OtpField({ onInput, ...rest }: OtpFieldProps) @{
+export function OtpField({ onInput, onFocus, ...rest }: OtpFieldProps) @{
 	const otp = otpState();
 
 	<input
@@ -72,6 +72,22 @@ export function OtpField({ onInput, ...rest }: OtpFieldProps) @{
 		disabled={otp.disabled}
 		inputmode="numeric"
 		autocomplete="one-time-code"
+		onFocus={(event) => {
+			// Focus lands the caret at offset 0 on a field that already holds a
+			// code, so the next keystroke would prepend. QDS's policy, same here:
+			// the caret goes to the end of what is typed so far. `event.target`,
+			// not `currentTarget` or `otp.fieldEl`: a resumed event has finished
+			// dispatching (currentTarget is null) and the handle is not rebound
+			// to the served node, so the target is the only live handle here.
+			// instanceof, not a cast: the capture analysis parses this body with a
+			// JavaScript-only parser, so a type annotation would throw the parse.
+			const field = event.target;
+			if (field instanceof HTMLInputElement) {
+				const end = field.value.length;
+				field.setSelectionRange(end, end);
+			}
+			onFocus?.(event);
+		}}
 		onInput={(event) => {
 			// Two statements, both of the shapes a handler supports: one event
 			// field into one cell, then a shared method with no arguments.
