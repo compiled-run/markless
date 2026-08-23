@@ -8,6 +8,7 @@ export default function OverlayPrimitivePage() @{
 	let isModalOpen = state(false);
 	let modalDismissals = state(0);
 	let modalReason = state('none');
+	let modalPressed = state('none');
 	let isMenuOpen = state(false);
 	let menuDismissals = state(0);
 	let menuReason = state('none');
@@ -44,6 +45,11 @@ export default function OverlayPrimitivePage() @{
 				hidden={isModalOpen !== true}
 				onDismiss={(event) => {
 					modalReason = event.detail.reason;
+					modalPressed = event.detail.pressTarget ? 'element' : 'none';
+					// Stamping the node the report carried, rather than recording a
+					// description of it, is what makes identity provable.
+					if (event.detail.pressTarget)
+						event.detail.pressTarget.setAttribute('data-press-target-seen', '');
 					modalDismissals = modalDismissals + 1;
 					// A modal ignores an outside press: Escape is the only reason it
 					// answers to. The behaviour reported both; the policy is here.
@@ -60,6 +66,7 @@ export default function OverlayPrimitivePage() @{
 				>Close</button>
 				<output data-modal-dismissals>{modalDismissals}</output>
 				<output data-modal-reason>{modalReason}</output>
+				<output data-modal-pressed>{modalPressed}</output>
 			</div>
 		</div>
 

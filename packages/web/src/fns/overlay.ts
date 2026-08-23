@@ -12,7 +12,8 @@
  * shown at first render therefore never enlists, which is what will make a future
  * `inline` mode free; an element rendered hidden and later shown enlists on that
  * first flip. While enlisted the topmost element receives a `dismiss` event when
- * Escape is pressed or a press lands outside it, carrying `detail.reason`.
+ * Escape is pressed or a press lands outside it, carrying `detail.reason` and,
+ * for an outside press, the `detail.pressTarget` the press landed on.
  *
  * What it deliberately does not do. It never closes anything and never moves
  * focus. `dismiss` is a report, not an action: the family reads it with an
@@ -33,6 +34,21 @@ const MODAL_SELECTOR = '[aria-modal="true"]';
 const DISMISS_EVENT = 'dismiss';
 
 export type OverlayDismissReason = 'escape' | 'outside-press';
+
+/**
+ * What a `dismiss` report carries.
+ *
+ * `pressTarget` is the element the press actually landed on, and it is present
+ * only for `outside-press` - Escape has no target, so the key is absent rather
+ * than undefined. Reporting where the press was is still not policy: whether a
+ * press on the family's own trigger counts as a dismissal is the family's call,
+ * and this is what lets it answer that by asking where rather than by timing how
+ * soon.
+ */
+export type OverlayDismissDetail = {
+	readonly reason: OverlayDismissReason;
+	readonly pressTarget?: Element;
+};
 
 type OverlayEntry = {
 	readonly element: HTMLElement;
@@ -145,12 +161,23 @@ function findEntry(element: HTMLElement): OverlayEntry | undefined {
 	return stack.find((entry) => entry.element === element);
 }
 
-function reportDismiss(element: HTMLElement, reason: OverlayDismissReason): void {
+function reportDismiss(
+	element: HTMLElement,
+	reason: OverlayDismissReason,
+	pressTarget?: Element,
+): void {
+	// Built conditionally so Escape's detail has no `pressTarget` key at all: a
+	// key set to undefined still answers `in`, and absence is the contract.
+	const detail: OverlayDismissDetail = pressTarget ? { reason, pressTarget } : { reason };
 	// Not bubbling: a nested surface's dismissal is not its parent's. The
 	// framework's own dispatch reaches the handler through the container's
 	// capture listener, which a non-bubbling event still passes through.
 	element.dispatchEvent(
-		new CustomEvent(DISMISS_EVENT, { bubbles: false, cancelable: true, detail: { reason } }),
+		new CustomEvent<OverlayDismissDetail>(DISMISS_EVENT, {
+			bubbles: false,
+			cancelable: true,
+			detail,
+		}),
 	);
 }
 
@@ -284,5 +311,7 @@ function onPointerDown(event: Event): void {
 	if (target instanceof Node && top.element.contains(target)) return;
 	// The report is made on the press, not the click, so a drag that starts
 	// inside the surface and ends outside it never counts as an outside press.
-	reportDismiss(top.element, 'outside-press');
+	// The pressed element rides along, so a family can tell a press on its own
+	// trigger from an unrelated one by asking where it landed.
+	reportDismiss(top.element, 'outside-press', target instanceof Element ? target : undefined);
 }
