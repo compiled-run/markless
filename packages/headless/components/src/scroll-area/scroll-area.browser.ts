@@ -181,15 +181,12 @@ for (const mode of MODES) {
 		expect(el(Viewport).hasAttribute('aria-label')).toBe(false);
 	});
 
-	// U-M: an `element()` handle passed to a part as an attribute never reaches
-	// the element. The heading mints no `id` and the viewport comes back with no
-	// `aria-labelledby` at all - silently, in both modes. This is the graph half
-	// of the spread-across-a-component-edge gap already recorded in
-	// `checklist/note.md` limit 1: the spread forwards the value, but no view
-	// record binds a handle passed that way, so the IDREF is never minted.
-	// `named-by-heading.tsrx` writes the id by hand instead; delete the `.fails`
-	// the day the binding lands.
-	test.fails(`${mode}: a viewport named by a heading handle mints the IDREF`, async () => {
+	// An `element()` handle passed to a part as an attribute now reaches the
+	// element. The consumer renders the heading, so the consumer mints the id and
+	// hands it across the component edge as a string; the part's `{...rest}`
+	// writes it like any other attribute value. `named-by-heading.tsrx` keeps the
+	// hand-written-id spelling working alongside it.
+	test(`${mode}: a viewport named by a heading handle mints the IDREF`, async () => {
 		if (mode === 'CSR') await render(NamedByHandle);
 		else await renderSSR(NamedByHandle);
 		const named = el(Viewport).getAttribute('aria-labelledby');

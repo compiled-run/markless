@@ -65,6 +65,29 @@ export type SemanticComponentPropBinding =
 			readonly value?: unknown;
 			readonly sourceSpan?: SourceSpan;
 	  }
+	// An element() handle written into an IDREF attribute on a CHILD COMPONENT
+	// tag. The value that crosses the edge is the id minted for the referenced
+	// element, not the handle: the PARENT renders that element, so only the
+	// parent can spell the id, and the child writes it as an ordinary attribute
+	// through its `{...rest}`. Carrying the handle itself instead would hand the
+	// child a DOM object to stringify into an IDREF that names nothing.
+	// The field is `graphNodeId`, the same name the other id-carrying kinds use,
+	// so the value rides the generic prop transport into the emitted component
+	// definitions instead of needing a second passthrough. `kind` is what says
+	// how to read it: an element node here is an identity to mint, never a value
+	// to seed, and every consumer that treats a graph node as a dependency is
+	// gated on `kind` rather than on the field being present.
+	| {
+			readonly name: string;
+			readonly source: string;
+			readonly kind: 'element-handle-id';
+			readonly graphNodeId: string;
+			// Always empty: a handle resolves to an element node with nothing left of
+			// the path, or it is not a handle. Carried so the pair travels through
+			// the generic transport that moves every id-carrying prop.
+			readonly path: ReadonlyArray<string>;
+			readonly sourceSpan?: SourceSpan;
+	  }
 	// `{...rest}` written on a CHILD COMPONENT tag. It carries no single name: the
 	// whole props object the parent was handed crosses the edge, minus what the
 	// parent's signature took out of the rest binding.
@@ -596,8 +619,12 @@ export type SemanticElementHandleBinding = {
  * `boundHostNodeId`, is the consuming emitter's lowering concern.
  */
 export type SemanticElementHandleIdref = {
-	/** The host element that carries the IDREF attribute. */
-	readonly hostNodeId: string;
+	// The host element that carries the IDREF attribute, or null when the
+	// attribute was written on a component/part tag: no element of THIS markup
+	// carries it, the value crosses the component edge and the child writes it.
+	// The record still belongs here, because the element that must carry the
+	// minted id is the one this component renders.
+	readonly hostNodeId: string | null;
 	/** The IDREF attribute on that host, e.g. `aria-labelledby`. */
 	readonly attributeName: string;
 	/** The resolved element() handle binding name. */

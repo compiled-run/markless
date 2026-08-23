@@ -35,6 +35,7 @@ import {
 	memberTagUnresolvedDiagnostic,
 } from './diagnostics.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
+import { isIdrefAttribute } from './idref-attributes.ts';
 
 export function collectComponentProps(component: AnyNode, state: WalkState): void {
 	const firstParam = asNodes(component.params)[0];
@@ -256,6 +257,26 @@ function componentPropBindings(
 			resolveGraphPath(source, bindings, aliases) ??
 			resolveSharedInstanceGraphPath(source, state.graph);
 		if (graph) {
+			// `aria-labelledby={headingEl}` names an element the PARENT renders, so
+			// what crosses the edge is the id minted for it, not the handle. Sent as
+			// an ordinary graph reference the child receives a DOM object and writes
+			// an IDREF that names nothing. The matching record - and the mint on the
+			// referenced element - is collected in collect-elements.
+			if (
+				isIdrefAttribute(name) &&
+				graph.binding.kind === 'element' &&
+				graph.path.length === 0
+			) {
+				props.push({
+					name,
+					source,
+					kind: 'element-handle-id',
+					graphNodeId: graph.binding.id,
+					path: [],
+					sourceSpan: span,
+				});
+				continue;
+			}
 			props.push({
 				name,
 				source,

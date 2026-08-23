@@ -604,6 +604,19 @@ async function evaluatePrerenderDataComponent(input: {
 					);
 				} else if (prop.kind === 'graph-reference' && prop.graphNodeId) {
 					childProps[prop.name] = read(prop.graphNodeId, prop.path ?? []);
+				} else if (
+					prop.kind === 'element-handle-id' &&
+					prop.graphNodeId &&
+					definition.readResidue
+				) {
+					// The element this IDREF names is rendered by THIS component, so this
+					// render spells the id and the child receives a string. The same
+					// compiled reader that writes the id onto that element answers here,
+					// so the two sides of the relationship cannot disagree.
+					childProps[prop.name] = definition.readResidue(
+						{ kind: 'element-handle-id', handleGraphNodeId: prop.graphNodeId },
+						{ read, idPrefix: input.idPrefix },
+					);
 				} else if (prop.kind === 'absent') {
 					childProps[prop.name] = undefined;
 				} else if (prop.kind === 'serializable' && 'value' in prop) {
