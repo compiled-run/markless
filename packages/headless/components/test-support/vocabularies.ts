@@ -57,7 +57,17 @@ export const nvdaVocabulary: Vocabulary = {
 	// unverified against our markup
 	textbox: 'edit',
 	// unverified against our markup
+	navigation: 'navigation landmark',
+	// unverified against our markup
+	link: 'link',
+	// unverified against our markup
+	region: 'region',
+	// unverified against our markup
+	image: 'graphic',
+	// unverified against our markup
 	selected: 'selected',
+	// unverified against our markup
+	currentPage: 'current page',
 	// unverified against our markup
 	expanded: 'expanded',
 	// unverified against our markup
@@ -99,7 +109,17 @@ export const voiceOverVocabulary: Vocabulary = {
 	// unverified against our markup
 	textbox: 'text field',
 	// unverified against our markup
+	navigation: 'navigation',
+	// unverified against our markup
+	link: 'link',
+	// unverified against our markup
+	region: 'region',
+	// unverified against our markup
+	image: 'image',
+	// unverified against our markup
 	selected: 'selected',
+	// unverified against our markup
+	currentPage: 'current page',
 	// unverified against our markup
 	expanded: 'expanded',
 	// unverified against our markup
