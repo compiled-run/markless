@@ -333,16 +333,19 @@ async function expectOmittedCallbackStillTicks() {
 // composes a checkbox of its own is an instance boundary rather than the last
 // writer of one shared seed.
 //
-// Four of the seven flipped. The three below are pinned on a NEW named defect,
-// measured on this branch: A SEEDED SELECT-ALL DOES NOT MOVE ON THE FIRST
-// GESTURE AFTER RESUME. Before the seed phase composed the root, the served
-// payload carried no value at all for the select-all's `checkbox.checked`, and
-// the first click wrote one. With a value served, the first click no longer
-// changes what the trigger renders — the gesture reaches the checkbox and the
-// group's own derive still answers from the served set, because the group write
-// (`checklist.setAll`) is the dispatch that never leaves the widget. Un-pin with
-// that dispatch, or with a resume that lets a seeded widget's own write win.
-const gestureLeg = (mode: (typeof MODES)[number]) => (mode === 'CSR' ? test : test.skip);
+// Four of the seven flipped. The three below were pinned on A SEEDED SELECT-ALL
+// DOES NOT MOVE ON THE FIRST GESTURE AFTER RESUME, and U119 un-pinned them to
+// measure that pin against a real fix rather than leave it asserted. They are
+// left running because the pin no longer describes them honestly: the composed
+// payload defect U119 chartered them against — composition's shared-definition
+// dedupe kept whichever record collapsed first and so discarded the only record
+// carrying `projectionIds` — is real and is FIXED (witness:
+// packages/web/test/projection-ids-payload.test.ts), and these three rows did
+// not move with it. Measured on this tree, before and after that fix, they are
+// GREEN when this file runs alone and RED, identically, under the whole
+// `--project ui` lane. So the isolated pass is not evidence, the remaining
+// cause is the dispatch defect named above rather than the served payload, and
+// whoever lands that dispatch should find these three already asserting it.
 
 for (const mode of MODES) {
 	test(`${mode}: the starter renders a named group, a select-all and three items`, async () => {
@@ -405,7 +408,7 @@ for (const mode of MODES) {
 		await expectSelectAllTicksEverything();
 	});
 
-	gestureLeg(mode)(`${mode}: the select-all unticks every item`, async () => {
+	test(`${mode}: the select-all unticks every item`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 		await expectSelectAllUnticksEverything();
@@ -417,7 +420,7 @@ for (const mode of MODES) {
 		await expectMixedSelectAllTicksEverything();
 	});
 
-	gestureLeg(mode)(`${mode}: ticking one item moves the select-all to mixed`, async () => {
+	test(`${mode}: ticking one item moves the select-all to mixed`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 		await expectOneItemMovesTheSelectAllToMixed();
@@ -447,7 +450,7 @@ for (const mode of MODES) {
 		await expectConsumerCallbackCarriesTheWholeSet();
 	});
 
-	gestureLeg(mode)(`${mode}: an omitted onChange still ticks`, async () => {
+	test(`${mode}: an omitted onChange still ticks`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 		await expectOmittedCallbackStillTicks();
