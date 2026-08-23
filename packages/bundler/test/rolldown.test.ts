@@ -139,7 +139,7 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(result.code).toContain('inlineResumerSources:');
 		expect(result.code).not.toContain('__MARKLESS_INLINE_SYNC_POLICY__');
 		expect(result.code).not.toContain('runInlineResumer');
-		expect(result.code).toContain('renderCsr: App');
+		expect(result.code).toContain('renderCsr: marklessCsrApp');
 		expect(result.code).toContain('renderSsr(props, marklessRenderContext) {');
 		expect(result.code).toContain('const marklessSsrStateValues = new Map');
 		expect(renderDataModuleSource(result)).toContain(
@@ -191,7 +191,7 @@ describe('TSRX Rolldown plugin structure', () => {
 			environment: 'client',
 		});
 
-		expect(result.code).toContain('renderCsr: App');
+		expect(result.code).toContain('renderCsr: marklessCsrApp');
 		expect(result.code).not.toContain('inlineResumerSources:');
 		expect(result.code).not.toContain('resumeEventOnlyFromPayloadDocument');
 		expect(result.code).not.toContain('resumeContainerEvent');
@@ -214,7 +214,7 @@ describe('TSRX Rolldown plugin structure', () => {
 			prerenderWakeVariant: true,
 		});
 
-		expect(result.code).toContain('renderCsr: App');
+		expect(result.code).toContain('renderCsr: marklessCsrApp');
 		expect(result.code).not.toContain('renderSsr(props, marklessRenderContext) {');
 	});
 
@@ -238,8 +238,8 @@ describe('TSRX Rolldown plugin structure', () => {
 			'/workspace/app/src/App.tsrx',
 		)) as { readonly code: string };
 
-		expect(directResult.code).toContain('renderCsr: App');
-		expect(resumedResult.code).not.toContain('renderCsr: App');
+		expect(directResult.code).toContain('renderCsr: marklessCsrApp');
+		expect(resumedResult.code).not.toContain('renderCsr: marklessCsrApp');
 	});
 
 	test('client definitions use canonical render data without the retired CSR producer', async () => {
@@ -575,7 +575,7 @@ let active = state(true);
 
 		expect(result.code).toContain('renderSsr(props, marklessRenderContext) {');
 		expect(renderDataModuleSource(result)).toContain('"source":"active ? \'on\' : \'off\'"');
-		expect(result.code).not.toContain('renderCsr: App');
+		expect(result.code).not.toContain('renderCsr: marklessCsrApp');
 	});
 
 	test('transformTsrxModule omits alternate render entry exports', async () => {
@@ -595,8 +595,14 @@ let active = state(true);
 			source: keyedSource,
 		});
 
-		expect(result.code).toContain('export function App()');
-		expect(result.code).toContain('renderCsr: App');
+		// The module publishes its root under the authored name as the merged
+		// surface; the direct render body it calls stays module-local, so the name
+		// is bound once and `import { App }` reaches the whole surface.
+		expect(result.code).toContain('export const App = {');
+		expect(result.code).toContain('...marklessCompiledApp,');
+		expect(result.code).not.toContain('export function App()');
+		expect(result.code).toContain('function marklessCsrApp()');
+		expect(result.code).toContain('renderCsr: marklessCsrApp');
 		expect(result.code).toContain('export default marklessCompiledApp;');
 		expect(renderDataModuleSource(result)).toContain('<main><section><!--markless-slot:0-->');
 		expect(result.code).toContain('const marklessDirectChunkData');

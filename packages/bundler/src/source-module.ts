@@ -170,17 +170,33 @@ export function payloadModule(payload: {
 	].join('\n');
 }
 
+/** The module-local name a direct-CSR module's root renders under. */
+function csrRootLocalName(rootExportName: string): string {
+	return `marklessCsr${rootExportName}`;
+}
+
+// The direct-CSR module declares its root as `export function <Root>()`. This
+// module publishes ONE binding per component name (see emitComponentExports),
+// so that declaration becomes module-local and the published name is the merged
+// surface instead. Leaving both would be a duplicate declaration - a SyntaxError
+// in every variant that carries the direct module and the SSR module at once.
 function emitPublicRenderModule(
 	source: string,
 	input: { readonly executionLogEnabled: boolean; readonly rootExportName: string | null },
 ): string {
-	if (!input.executionLogEnabled || !input.rootExportName) return source;
+	if (!input.rootExportName) return source;
 	const declaration = `export function ${input.rootExportName}()`;
-	if (!source.includes(declaration)) return source;
+	if (!source.includes(declaration)) {
+		throw new Error(`MARKLESS_CSR_ROOT_DECLARATION_MISSING: ${input.rootExportName}`);
+	}
+	const localName = csrRootLocalName(input.rootExportName);
+	if (!input.executionLogEnabled) {
+		return source.replace(declaration, `function ${localName}()`);
+	}
 	const implementationName = `marklessRender${input.rootExportName}`;
 	return [
 		source.replace(declaration, `function ${implementationName}()`),
-		`export function ${input.rootExportName}() {`,
+		`function ${localName}() {`,
 		`\tconst output = ${implementationName}();`,
 		'\tglobalThis.__mxLoadLog().then(log => log.logMarklessRenderSummary());',
 		'\treturn output;',
@@ -240,6 +256,16 @@ export function emitSourceModule(input: {
 		input.publicRenderRootExportName === null &&
 		!!input.publicSsrModuleSource &&
 		!!input.renderDataId;
+	// The direct-CSR module only reaches the emitted module in the variants below;
+	// everywhere else its root has no binding here, so `renderCsr` has nothing to
+	// point at and the root's published name carries the SSR surface alone.
+	const csrRootName =
+		input.environment !== 'server' &&
+		!symbolsOnly &&
+		!input.prerenderRecords &&
+		input.publicRenderRootExportName
+			? csrRootLocalName(input.publicRenderRootExportName)
+			: null;
 	return [
 		(!input.publicSsrModuleSource && !input.publicRenderModuleSource) ||
 		symbolsOnly ||
@@ -326,6 +352,7 @@ export function emitSourceModule(input: {
 					resumeModuleUrl: input.resumeModuleUrl,
 					prerenderWakeModuleUrl: input.prerenderWakeModuleUrl,
 					rootExportName: input.publicRenderRootExportName,
+					csrRootName,
 					symbolLoaderName: routeSymbols ? 'marklessSsrLoadSymbolRoute' : 'loadSymbol',
 					ssrExportName: input.publicRenderSsrExportName,
 					ssrComponents: input.publicRenderSsrComponentExports ?? [],
@@ -568,6 +595,8 @@ function emitCompiledAppDefault(input: {
 	readonly resumeModuleUrl?: string;
 	readonly prerenderWakeModuleUrl?: string;
 	readonly rootExportName: string | null;
+	/** Module-local name of the direct-CSR root, when this variant carries it. */
+	readonly csrRootName: string | null;
 	readonly symbolLoaderName: string;
 	readonly ssrExportName: string | null;
 	readonly ssrComponents: ReadonlyArray<{
@@ -578,10 +607,7 @@ function emitCompiledAppDefault(input: {
 	readonly prerenderRecords?: boolean;
 	readonly dev?: boolean;
 }): string {
-	const renderCsrEntry =
-		input.rootExportName && input.environment !== 'server' && !input.prerenderRecords
-			? [`	renderCsr: ${input.rootExportName},`]
-			: [];
+	const renderCsrEntry = input.csrRootName ? [`	renderCsr: ${input.csrRootName},`] : [];
 	const symbolLoaderEntry =
 		input.environment !== 'server' && input.rootExportName === null
 			? [`\tloadSymbol: ${input.symbolLoaderName},`]
@@ -673,7 +699,79 @@ function emitCompiledAppDefault(input: {
 		...metadataEntries,
 		'};',
 		'export default marklessCompiledApp;',
+		...emitComponentExports({
+			ssrComponents: input.ssrComponents,
+			rootExportName: input.ssrComponents.find(
+				(component) => component.ssrFunctionName === input.ssrExportName,
+			)?.exportName,
+			servesSsr: !!servesSsr,
+		}),
 	].join('\n');
+}
+
+// Names this emitted module already binds. A component exported under one of
+// them would be a duplicate declaration, so it is a loud build error rather than
+// a module that throws `SyntaxError` at load.
+const RESERVED_MODULE_BINDINGS: ReadonlySet<string> = new Set([
+	'loadBehaviorSymbol',
+	'loadSymbol',
+	'marklessCompiledApp',
+	'marklessLoadLocalSymbol',
+	'marklessPrerenderData',
+	'marklessRenderData',
+	'marklessRenderSsr',
+	'marklessSsrLoadSymbolRoute',
+	'payloadRuntimeDemandMap',
+	'payloadState',
+	'payloadView',
+	'readMarklessBehaviorSourceSymbol',
+	'resumeContainerEvent',
+]);
+
+/**
+ * One real ES named export per component the module serves, so plain ESM reaches
+ * them: a `.ts` barrel writing `export { CheckboxRoot as root } from
+ * './checkbox.tsrx'`, and an app writing `import { Gallery } from
+ * './Gallery.tsrx'`, are both named reads the bundler resolves at LINK time.
+ * Publishing components only on the default export's map answered neither
+ * (MISSING_EXPORT at build, "does not provide an export named" in the browser).
+ *
+ * The root is published merged - the module surface plus its own part's
+ * `renderSsr` - because both consumers reach it by that one name: `render(Gallery,
+ * { target })` reads the surface (`renderCsr`/`renderData`/`loadSymbol`), while a
+ * barrel re-export composed as a member tag reads the part. Every other component
+ * is published as exactly the part `marklessSsrComponentPart` hands a composed
+ * child, through the same access path, so a named import and a member tag reach
+ * one object.
+ */
+function emitComponentExports(input: {
+	readonly ssrComponents: ReadonlyArray<{
+		readonly exportName: string;
+		readonly ssrFunctionName: string;
+	}>;
+	readonly rootExportName: string | undefined;
+	readonly servesSsr: boolean;
+}): ReadonlyArray<string> {
+	return input.ssrComponents.map((component) => {
+		if (RESERVED_MODULE_BINDINGS.has(component.exportName)) {
+			throw new Error(`MARKLESS_COMPONENT_EXPORT_NAME_RESERVED: ${component.exportName}`);
+		}
+		const part = `marklessCompiledApp.renderSsrComponents[${JSON.stringify(component.exportName)}]`;
+		const isRoot = component.exportName === input.rootExportName;
+		if (input.servesSsr) {
+			return `export const ${component.exportName} = ${
+				isRoot ? `{ ...marklessCompiledApp, renderSsr: ${part}.renderSsr }` : part
+			};`;
+		}
+		// SSR dropped (a client production CSR build): the surface carries the
+		// root's client render path and nothing per-part. The root still answers
+		// `render()`; a non-root name has to link, but binding it to the surface
+		// would render the ROOT wherever a part was asked for. It is published
+		// inert instead, so composing or rendering it fails loudly.
+		return isRoot
+			? `export const ${component.exportName} = marklessCompiledApp;`
+			: `export const ${component.exportName} = { marklessCsrOnlyPart: ${JSON.stringify(component.exportName)} };`;
+	});
 }
 
 function emitResumeContainerEvent(

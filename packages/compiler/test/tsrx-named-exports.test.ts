@@ -4,11 +4,14 @@ import { compileTsrxModulesWithInterfaces } from './multi-module-compile-support
 // A compiled `.tsrx` module is consumed by plain ESM as well as by member tags:
 // a `.ts` barrel writes `export { CheckboxRoot as root } from './checkbox.tsrx'`
 // and an app writes `import { Gallery } from './Gallery.tsrx'`. Both are named
-// reads the bundler resolves at link time. Publishing components only on the
-// default export's `renderSsrComponents` map answered neither, so the barrel
-// failed with MISSING_EXPORT and the browser reported "does not provide an
-// export named". These pin the emitted shape of the named exports and that the
-// default export's map is untouched beside them.
+// reads the bundler resolves at link time.
+//
+// The compiler does not emit those exports - it cannot, because the client
+// production module drops `publicSsrModuleSource` entirely and the names still
+// have to link there. What the compiler owns is the LIST: one entry per
+// component the module serves, with the SSR function each is rendered by. The
+// bundler turns that list into the real named exports; the emission itself is
+// pinned in packages/bundler/test/tsrx-named-exports.test.ts.
 
 const PARTS = `export function Card({ label }) @{
 	<div class="card">{label}</div>
@@ -24,39 +27,7 @@ async function compileParts(source = PARTS) {
 	return parts!;
 }
 
-const namedExportsOf = (ssrModuleSource: string) =>
-	[...ssrModuleSource.matchAll(/^export const (\w+) = \{ renderSsr: (\w+) \};$/gm)].map(
-		(match) => [match[1], match[2]] as const,
-	);
-
-test('every exported component of a compiled module is a real ES named export', async () => {
-	const parts = await compileParts();
-
-	expect(namedExportsOf(parts.publicRenderModule.ssrModuleSource)).toEqual([
-		['Card', 'marklessRenderSsr'],
-		['Badge', 'marklessRenderSsrBadge'],
-	]);
-});
-
-test('a named export is bound to the same per-component surface the map publishes', async () => {
-	// `marklessSsrComponentPart` hands a composed child `{ renderSsr }` for the
-	// part it names. A named import that resolved to a bare function instead
-	// would lose the part identity every compose seam reads through.
-	const parts = await compileParts();
-	const ssr = parts.publicRenderModule.ssrModuleSource;
-
-	for (const component of parts.publicRenderModule.ssrComponentExports ?? []) {
-		expect(namedExportsOf(ssr)).toContainEqual([
-			component.exportName,
-			component.ssrFunctionName,
-		]);
-	}
-	// Not a bare function: `export { marklessRenderSsrBadge as Badge }` would
-	// link and then compose without a surface.
-	expect(ssr).not.toMatch(/export \{ marklessRenderSsr\w* as \w+ \}/);
-});
-
-test('the default export map the bundler reads is unchanged beside the named exports', async () => {
+test('a module serving several components lists every one of them under its export name', async () => {
 	const parts = await compileParts();
 
 	expect(parts.publicRenderModule.ssrComponentExports).toEqual([
@@ -66,21 +37,24 @@ test('the default export map the bundler reads is unchanged beside the named exp
 	expect(parts.publicRenderModule.ssrExportName).toBe('marklessRenderSsr');
 });
 
-test('the ssr functions a named export binds are declared in the same module', async () => {
-	// The export statements are appended to the SSR module source, so every name
-	// they bind has to be declared above them or the module throws on load.
-	const ssr = (await compileParts()).publicRenderModule.ssrModuleSource;
+test('the ssr function each entry names is declared in the ssr module source', async () => {
+	// The bundler binds each published name to the surface built from these
+	// functions, so an entry naming a function the module never declared would
+	// emit a module that throws on load.
+	const parts = await compileParts();
+	const ssr = parts.publicRenderModule.ssrModuleSource;
 
-	for (const [, functionName] of namedExportsOf(ssr)) {
-		const declaration = ssr.indexOf(`function ${functionName}(`);
-		expect(declaration, `${functionName} is declared`).toBeGreaterThanOrEqual(0);
-		expect(declaration).toBeLessThan(ssr.indexOf(`export const `));
+	for (const component of parts.publicRenderModule.ssrComponentExports ?? []) {
+		expect(ssr, `${component.ssrFunctionName} is declared`).toContain(
+			`function ${component.ssrFunctionName}(`,
+		);
 	}
 });
 
-test('a module whose only component is its root still publishes that name', async () => {
+test('a module whose only component is its root still lists that name', async () => {
 	// A single-component module is exactly what an app entry imports by name
-	// (`import { Gallery } from './Gallery.tsrx'`).
+	// (`import { Gallery } from './Gallery.tsrx'`), so withholding its entry
+	// would leave that import unanswerable.
 	const only = await compileParts(`export function Gallery() @{
 	<main><h1>Gallery</h1></main>
 }`);
@@ -88,4 +62,13 @@ test('a module whose only component is its root still publishes that name', asyn
 	expect(only.publicRenderModule.ssrComponentExports).toEqual([
 		{ exportName: 'Gallery', ssrFunctionName: 'marklessRenderSsr' },
 	]);
+});
+
+test('the compiler publishes no named export of its own', async () => {
+	// Emission lives at ONE place. A second producer here would collide with the
+	// bundler's, and would still miss the client production module the compiler
+	// never reaches.
+	const ssr = (await compileParts()).publicRenderModule.ssrModuleSource;
+
+	expect(ssr).not.toMatch(/^export const (Card|Badge) =/m);
 });
