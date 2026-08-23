@@ -79,8 +79,8 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Source emission omits the canonical SSR module from production ordinary and symbols-only client output while retaining it for server, prerender, and development output.',
 	"packages/bundler/src/source-module.ts :: input.environment === 'client' &&":
 		'Source emission keeps SSR code out of production ordinary and symbols-only client output while dev uses the canonical SSR surface for mounting.',
-	"packages/bundler/src/source-module.ts :: input.rootExportName && input.environment !== 'server' && !input.prerenderRecords":
-		'Compiled app metadata includes a direct render entry outside server-only output.',
+	"packages/bundler/src/source-module.ts :: input.environment !== 'server' &&":
+		'The direct render module reaches only these emitted variants, so its root binding - and the compiled app entry pointing at it - exist exactly there.',
 	"packages/bundler/src/source-module.ts :: input.environment !== 'server' && input.rootExportName === null":
 		'Non-server linked artifacts retain their emitted symbol loader when no direct render body exists.',
 	"packages/bundler/src/source-module.ts :: (input.environment !== 'client' || input.prerenderRecords || input.dev);":
