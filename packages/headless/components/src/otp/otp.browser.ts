@@ -273,11 +273,19 @@ test('CSR: Backspace takes the last character back out of its box', async () => 
 	expect(el<HTMLInputElement>(Field).value).toBe('4');
 });
 
-// The eight test.fails rows in this file share one framework defect (U121
-// receipt, 2026-08-22): a shared cell written earlier in the same dispatch
-// reads back as null, so commit()'s slice throws; the handler grammar refuses
-// every detour. The throw escapes the row as an unhandled dispatch error, so
-// test.fails cannot contain it — skipped. Un-skip with the write-then-read fix.
+// Eight rows here were skipped on one framework defect (U121/U126 receipts,
+// 2026-08-22): `otp.value.slice(...)` in commit() lowered to a read of the whole
+// callee chain, so the emitted call invoked a detached String.prototype.slice
+// with no receiver and threw "slice called on null or undefined". Fixed in
+// collect-expressions.ts (a method call reads its receiver). Five of the eight
+// run green now; the three below stayed red on causes the receiver fix does not
+// touch, each re-pinned with what U130 measured on 2026-08-22.
+
+// WithOnChange only: the family takes the value (onChange receives the whole
+// code, and the field reads "1234" back), but no box ever fills - all four read
+// "" with ui-empty set. The same boxes fill in WithoutOnChange and in
+// WithOnComplete, so the item refresh is lost in the dispatch that also runs a
+// consumer callback writing page state, not in the slice.
 test.skip('CSR: typing past the declared length adds nothing', async () => {
 	await render(WithOnChange);
 	el(Field).focus();
@@ -297,7 +305,7 @@ test('CSR: a whole code arriving at once fills every box', async () => {
 	expect(el<HTMLInputElement>(Field).value).toBe('123456');
 });
 
-test.skip('CSR: a longer code arriving at once keeps only the declared length', async () => {
+test('CSR: a longer code arriving at once keeps only the declared length', async () => {
 	await render(Basic);
 	pasteInto(el<HTMLInputElement>(Field), '12345678');
 
@@ -326,6 +334,10 @@ test('CSR: typing in one field leaves its neighbour alone', async () => {
 	expect(item('app-item-', 2).getAttribute('ui-empty')).toBe('');
 });
 
+// A component instance inside an @for arm never follows the shared cell: all six
+// looped boxes render and the field holds "135", but every box stays "" with
+// ui-empty set, before and after the paste. The same item outside a loop
+// follows the code, so what is missing is the looped instance's refresh.
 test.skip('CSR: a box written by a loop follows the code like any other', async () => {
 	await render(ItemsFromData);
 	pasteInto(el<HTMLInputElement>(Field), '135');
@@ -339,7 +351,7 @@ test.skip('CSR: a box written by a loop follows the code like any other', async 
 
 // --- consumer callbacks ---------------------------------------------------
 
-test.skip('CSR: each keystroke calls onChange once with the whole code', async () => {
+test('CSR: each keystroke calls onChange once with the whole code', async () => {
 	await render(WithOnChange);
 	expect(el(Calls).textContent).toBe('0');
 	el(Field).focus();
@@ -354,7 +366,7 @@ test.skip('CSR: each keystroke calls onChange once with the whole code', async (
 	await expect.poll(() => el(Calls).textContent).toBe('2');
 });
 
-test.skip("CSR: the consumer's own onInput runs, after the family has taken the value", async () => {
+test("CSR: the consumer's own onInput runs, after the family has taken the value", async () => {
 	await render(WithOnChange);
 	el(Field).focus();
 
@@ -375,7 +387,7 @@ test('CSR: a field with no onChange still fills its boxes', async () => {
 	expect(el<HTMLInputElement>(Field).value).toBe('12');
 });
 
-test.skip('CSR: onComplete fires once, on the keystroke that fills the last box', async () => {
+test('CSR: onComplete fires once, on the keystroke that fills the last box', async () => {
 	await render(WithOnComplete);
 	el(Field).focus();
 
@@ -393,7 +405,7 @@ test.skip('CSR: onComplete fires once, on the keystroke that fills the last box'
 	await expect.poll(() => el(Completions).textContent).toBe('1');
 });
 
-test.skip('CSR: a whole code arriving at once completes in one call', async () => {
+test('CSR: a whole code arriving at once completes in one call', async () => {
 	await render(WithOnComplete);
 	pasteInto(el<HTMLInputElement>(Field), '9876');
 
@@ -410,6 +422,10 @@ test('CSR: a filled code submits under its name', async () => {
 
 // --- SSR resume -----------------------------------------------------------
 
+// The served value and boxes are right; the keystroke lands in the wrong place.
+// focus() on a field the server filled leaves the caret at offset 0, so typing
+// "5" produces "51234", not "12345". Nothing moves the caret to the end of an
+// existing code - a family gap, not a resume one.
 test.skip('SSR: the served field and boxes carry the code, and the next keystroke moves both', async () => {
 	await renderSSR(Prefilled);
 	// What the server sent, before anything resumed.
