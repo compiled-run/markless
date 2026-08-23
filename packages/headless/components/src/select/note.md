@@ -1,0 +1,236 @@
+# select — implementation notes
+
+Research: `goals/headless-components/notes/research-select.md`.
+QDS source read as structural truth: `~/dev/open-source/qwik-design-system/libs/components/src/select/`.
+
+## Shape
+
+Eight parts, the QDS folder listing exactly: `select.root`, `.label`, `.trigger`,
+`.content`, `.item`, `.itemlabel`, `.itemindicator`, `.field`. QDS's own
+lowercase compound spelling, forced because a JSX member tag cannot carry a
+hyphen.
+
+One widget family, `selectState`, rooted by `select.root`: `value`, `open`,
+`disabled`, `required`, `name`, the two typeahead cells, the `labelEl` and
+`contentEl` handles, the consumer's `onChange` and `onOpenChange`, and
+`choose()` / `setOpen()`. It is exported as `state` beside the parts, per the
+owner's namespace ruling.
+
+`selectItemState` is a second widget-scoped family rooted by each `select.item`,
+holding that option's `value` and `disabled`. It is exported as `itemstate` for
+a consumer whose own part sits inside an option, matching radio group.
+
+**The typeahead buffer is two graph cells and a `Date.now()` comparison.** QDS
+holds two class instances here — `SelectNavigation` (five memo fields over four
+parallel arrays) and `SelectTypeahead` (a search string plus a live `setTimeout`
+handle). Neither is needed and neither would be allowed: the landed
+`MARKLESS_SHARED_FACTORY_CLASS_INSTANCE` diagnostic refuses a class instance on
+a `shared()` factory. `search` plus `searchAt` replaces the timer, and every
+navigation question is answered by a DOM walk from `event.target`, so there is
+no item registry in this family at all.
+
+## Deviations from QDS, and the constraint that forced each
+
+1. **`role="combobox"` on the trigger.** QDS ships `aria-haspopup="listbox"` on
+   a bare `<button>`, which a reader announces as "button, collapsed" and which
+   fails aria-at's `Role 'combobox' is conveyed` assertion. This is a deliberate
+   behaviour deviation, argued in research §2.1, and `select.sr.ts` is what
+   holds it.
+2. **`aria-labelledby` on the trigger names the label part only.** QDS writes a
+   two-id list, `"{label} {trigger}"`, including a label id that may not exist.
+   A handle list in an IDREF position is `MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE`,
+   so the trigger names one handle — the one `select.label` binds. That is also
+   the APG select-only example's own shape, and it removes the dangling
+   reference a select written without a label part would carry.
+3. **`value` is required on `select.item`.** QDS falls back to `value ?? String(index)`
+   from a construction-order counter. Markless seeds are order-independent and
+   the owner ruled out a runtime creation-order counter, so an option is named
+   by its value and nothing counts positions. Same ruling as tabs, radio group
+   and otp.
+4. **No `multiple`.** Research §9 question 3, recommended "later": it is the one
+   prop that turns `value` into a union and doubles the keyboard table. Six of
+   seven surveyed libraries carry it, so this is a scope decision, not a
+   capability one.
+5. **No `displayValue`, and no `value` part to replace it.** See below.
+6. **`select.field` carries the chosen value, not the whole option list.** QDS
+   rebuilds a `<select>` with an `<option>` per registered item. There is no item
+   registry here, and none is needed: a single-option `<select>` submits the same
+   name/value pair, which is what `only the chosen option appears in what the form
+   submits` proves. The empty value submits as `{"plan":""}`, which is what a
+   native `<select>` with no choice does.
+7. **No `ui-highlighted`.** QDS tracks a `highlightedIndex` cell and reflects it.
+   This family roves real DOM focus, so `:focus` is the highlight and a consumer
+   styles it with the platform's own selector.
+8. **`{...rest}` is spread first**, so a consumer cannot silently overwrite the
+   ARIA state. QDS spreads it last on several parts. Same call tabs made.
+
+## Roving DOM focus, not aria-activedescendant
+
+Research §9 question 1 recommended roving, matching QDS, Radix, Kobalte and
+Bits. The compiler settles it outright:
+`packages/compiler/src/passes/semantic-graph/idref-attributes.ts` leaves
+`aria-activedescendant` out of `IDREF_ATTRIBUTES` deliberately, because it names
+one row of a live collection. So the activedescendant model is not expressible
+today and roving is the only model this family could ship.
+
+## The `displayValue` claim, measured — and disproved
+
+Research §7 predicted that because the popup is never unmounted, the option list
+is in the DOM at first paint, so the trigger could show a preselected value's
+**label text** without QDS's `displayValue` prop.
+
+It cannot, and the reason is not about mounting. QDS's folder listing has no
+`value` part, so the trigger's words are consumer-authored in QDS too; QDS
+reaches the label through its item registry (`itemLabelText`, read by
+`getSelectedLabels`). This family has no registry by design, and a consumer
+`computed()` cannot query the DOM, so nothing maps a value back to its option's
+label. `prefilled.tsrx` therefore authors the trigger's text directly, which is
+the honest shape. Restoring the QDS behaviour needs either a value-to-label
+registry or a `select.value` part that reads the chosen option — neither is in
+the QDS part list, so both are owner decisions rather than an implementation
+gap.
+
+## What the compiler forced — measured on this tip
+
+Everything below was measured by running the suite, not assumed.
+
+1. **A module-scope helper returning an array is refused.** Research §6d
+   sanctioned one pure module-scope helper (`matchOption`) on the strength of the
+   f18b6c23 declaration-carry commit. Written that way, the module fails with
+   `MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED`: *"Cannot connect helper
+   'enabledOptions' return value to graph state. This slice supports returning
+   one state() or computed() binding directly."* A same-module function called
+   from a component body is read as a state helper regardless of what it
+   returns. Both DOM walks are therefore written out in each handler that needs
+   them, which is what the twelve shipped families already do.
+2. **A two-parameter shared method aborts the handler.** `select.typed(search, now)`
+   compiled with no diagnostic and then silently killed the rest of the handler:
+   the popup never opened and the roving focus never moved (7 red rows). The
+   otp note records a **one**-parameter method working, so the boundary is
+   arity, not parameters as such. Rewritten as two cell assignments in the
+   handler (`select.search = search; select.searchAt = now;`), the same rows are
+   green. This is the sharpest finding in the unit and it narrows the
+   parameterised-method capability the research leaned on.
+3. **A `computed()` read from a handler body does not guard.** `select.item`'s
+   click rule was written `if (locked !== true)` over a
+   `computed(() => item.disabled || select.disabled)`. The guard let a disabled
+   option be chosen in both CSR and SSR. Reading the two state cells instead
+   (`item.disabled !== true && select.disabled !== true`) fixes it. The same
+   computed is correct in every *render* position on the same element —
+   `aria-disabled` and `ui-disabled` are right — so this is specifically the
+   handler-body read path.
+4. **`preventDefault()` from a deferred handler cannot suppress the native
+   click.** Enter and Space on the trigger were in the prevented key set and
+   still produced a click, so the key rule opened the popup and the click
+   toggled it straight back shut. They are now absent from both the prevented
+   set and the opening set: the button's own activation opens the popup, and the
+   key rule only lands the roving focus. What a person experiences is unchanged.
+5. **Focus into a freshly opened listbox needs more than one frame.** The
+   listbox is `hidden` until the open cell reaches the DOM, and nothing inside a
+   hidden subtree can take focus. A single `requestAnimationFrame` landed the
+   first open and raced later ones (4 intermittently red rows). The landing is
+   now retried per frame, up to twelve, until `document.activeElement` is the
+   option it aimed at.
+
+## Keyboard model
+
+Collapsed, on the trigger: `ArrowDown`/`Home` open on the first enabled option,
+`ArrowUp`/`End` open on the last, `Enter`/`Space` open through the native click
+and land on the first, `Alt+ArrowDown` opens and leaves focus on the combobox,
+and a printable character opens on the first option whose text starts with the
+buffer. A chosen option always wins over the first/last default, which is QDS's
+`getInitialHighlightIndex` rule.
+
+Open, on the listbox: `ArrowDown`/`ArrowUp` move the roving focus one enabled
+option and stop at the ends (a select's list has a top and a bottom; unlike a
+radio group it does not wrap). `Home`/`End` are absolute moves in the same walk.
+A printable character moves the focus. `Enter`/`Space` commit and close and hand
+focus back to the trigger. `Escape` closes, leaves the value untouched, and hands
+focus back. `Tab` commits and closes and keeps its native move.
+
+**Moving the highlight is never choosing.** That is the rule separating this
+family from radio group, where the APG says an arrow always chooses, and it is
+the row most likely to be got backwards by whoever writes both families in the
+same week. `select.browser.ts` and `select.sr.ts` each carry it, the second as a
+negative proof that the word "selected" is *absent* from the announcement.
+
+Commit-by-key goes through the option's own click rule (`option.click()`) rather
+than duplicating the value read. That keeps one place in the family where a
+value is taken, and it is also why no option carries its value in a DOM
+attribute — the owner's ruling forbids `data-*`, and nothing needs it.
+
+Typeahead matches the option's own words with any `aria-hidden` subtree left
+out, so an indicator reading "Chosen" is never typeable. QDS's all-same-character
+cycling rule (type "a" repeatedly to walk the options starting with "a") is not
+carried; research §9 question 4 kept v1 on plain prefix matching.
+
+## Rows this family does not carry
+
+- **A widget-root part inside a flipping `@if` arm is refused** with
+  `MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED`, so "this option appears when a
+  checkbox is on" — an everyday form — is a framework wall.
+  `optional-option.tsrx` decides its arm from a module constant, the same shape
+  otp's `armed-length.tsrx` and tabs' `arm-tabs.tsrx` settled on, and this note
+  carries the verdict instead of a red row.
+- **`@if` and `@for` cannot be direct children of a component tag**
+  (`MARKLESS_PARSE_ERROR`), so both `options-from-data.tsrx` and
+  `optional-option.tsrx` wrap their arm in a `<div role="presentation">` inside
+  `select.content`. Presentational children are re-parented in the accessibility
+  tree, so the listbox still owns its options; the reader rows prove it.
+
+## What the loop proved
+
+Research §9 question 5 called a `select.item` inside a keyed `@for` the
+highest-value spike of the tranche, unproven for any family: otp proved a *part*
+survives a repeat, but a `select.item` roots its own widget instance, which is
+the untested combination. **It works.** `options-from-data.tsrx` renders three
+options from data, each gets its own instance, choosing lands in exactly one
+row, and the arrow walk moves between them — green in the browser suite with no
+pin. That closes the open question the research left for this family.
+
+## The screen-reader lane, and one thing it needs from outside this folder
+
+`select.sr.ts` carries Sequences A–E from research §4c as captured expectations,
+plus three rows aria-at's plan has no test for: a disabled option, a whole
+disabled select, and the hidden native control staying silent. Every word in it
+was read off this reader's own transcript rather than invented — the collapsed
+state, for instance, is announced as "not expanded", not "collapsed".
+
+Two honest limits are recorded in the file itself. A reader cannot walk into a
+`hidden` listbox, so every row that reads an option needs a scenario handed over
+open (`open-list.tsrx`, `long-open-list.tsrx`, and the first select in
+`unavailable-options.tsrx`). And aria-at's "13 options" set-size assertion has no
+equivalent announcement in a virtual reader, so it is carried as reaching all
+thirteen names in authored order.
+
+The five words this family needs — `combobox`, `listbox`, `option`, `selected`,
+`notSelected` — are not in `test-support/driver.ts`'s shared `Vocabulary`, which
+is outside this unit's file contract. They live in a local table in
+`select.sr.ts` with the same verified/unverified marking `vocabularies.ts` uses.
+Promoting them into the shared table, so `Conveys` can name them like every
+other role, is a follow-up.
+
+**The lane needs `fileParallelism: false`.** Measured three ways on this tip:
+
+| Run | Result |
+| --- | --- |
+| `select.sr.ts` alone | 10 passed |
+| whole lane, parallel, without `src/select/**` | 79 passed, 0 failed |
+| whole lane, parallel, with select | 3 failed (pagination, tabs, collapsible) |
+| whole lane, `--no-file-parallelism` | 89 passed, 0 failed |
+
+The three reds are in families this unit never touched, they are poll timeouts
+at 1.7–2.0s, and they disappear when the lane runs serially. This is the same
+effect `packages/headless/components/vitest.config.ts` already pins for the
+browser project, in a comment quoting its own measurement (p99 gesture latency
+1230ms parallel vs 363ms serial, and serial being *faster* overall). The
+screen-reader config never got that line, and the eleventh file is what pushed
+the lane over. The fix is one line in
+`packages/headless/components/test-support/vitest.config.ts`, which is outside
+this unit's contract.
+
+## Not wired into the barrel
+
+`src/index.ts` does not carry `select` yet, and neither does the package's
+`exports` map, so the scenarios import `../index.ts` directly. Both are the PM's
+to wire at fan-in.
