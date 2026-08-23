@@ -279,7 +279,9 @@ test('CSR: Backspace takes the last character back out of its box', async () => 
 // with no receiver and threw "slice called on null or undefined". Fixed in
 // collect-expressions.ts (a method call reads its receiver). Five of the eight
 // run green now; the three below stayed red on causes the receiver fix does not
-// touch, each re-pinned with what U130 measured on 2026-08-22.
+// touch, each re-pinned with what U130 measured on 2026-08-22. The third, the
+// caret row, has since been re-pinned again on a different cause (U134) — the
+// family carries the caret policy now, and the wall moved to the framework.
 
 // WithOnChange only: the family takes the value (onChange receives the whole
 // code, and the field reads "1234" back), but no box ever fills - all four read
@@ -422,10 +424,22 @@ test('CSR: a filled code submits under its name', async () => {
 
 // --- SSR resume -----------------------------------------------------------
 
-// The served value and boxes are right; the keystroke lands in the wrong place.
-// focus() on a field the server filled leaves the caret at offset 0, so typing
-// "5" produces "51234", not "12345". Nothing moves the caret to the end of an
-// existing code - a family gap, not a resume one.
+// Still pinned, on a framework wall rather than the family gap U130 named.
+// The family now carries the caret policy (OtpField's onFocus, QDS's rule:
+// setSelectionRange to the end of the code), and the CSR row above proves it
+// runs. It cannot run in TIME: a handler body is a symbol the framework
+// dispatches asynchronously, so `focus()` followed immediately by a keystroke
+// types before the caret has moved. Measured on this base 2026-08-22 (U134):
+//   - CSR, focus() then keyboard('5') back to back -> "51234"
+//   - CSR, focus() then a 300ms wait -> selectionStart 4, then "12345"
+//   - SSR, same, with the resume dispatch logged as "ran warm
+//     bound:symbol%3A0" inside the wait window -> same two results
+// So the deferral is framework-wide, not an SSR-resume delay. Two further
+// framework facts measured while pinning this, both of which shape any fix:
+//   - inside a resumed handler `event.currentTarget` is null (the event has
+//     finished dispatching), so the handler reaches the field via `event.target`
+//   - `otp.fieldEl`, an element() handle, is `undefined` inside a handler after
+//     SSR resume; the handle is not rebound to the served node
 test.skip('SSR: the served field and boxes carry the code, and the next keystroke moves both', async () => {
 	await renderSSR(Prefilled);
 	// What the server sent, before anything resumed.
@@ -471,6 +485,25 @@ for (const mode of MODES) {
 		expect(item('sms-item-', 5).getAttribute('ui-empty')).toBe('');
 	});
 }
+
+// The caret policy the family now carries, matched to QDS's `handleFocus`
+// (otp-field.tsx:211-223: `setSelectionRange(code.length, code.length)`).
+// The poll is not slack, it is the assertion: a handler body is a symbol the
+// framework dispatches asynchronously, so the caret moves a turn after focus,
+// never during it. This row proves the policy; the pinned SSR row below is
+// what proves it in time for the very next keystroke, and that is still red.
+test('CSR: focusing a field that already holds a code puts the caret at the end', async () => {
+	await render(Prefilled);
+	const input = el<HTMLInputElement>(Field);
+	input.focus();
+
+	await expect.poll(() => input.selectionStart).toBe(4);
+	expect(input.selectionEnd).toBe(4);
+
+	await userEvent.keyboard('5');
+	await expect.poll(() => input.value).toBe('12345');
+	await expect.poll(() => item('item-', 4).textContent).toBe('5');
+});
 
 test('CSR: an arm-delivered box follows the code like any other', async () => {
 	await render(ArmedLength);
