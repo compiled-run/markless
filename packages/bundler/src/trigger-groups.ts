@@ -13,7 +13,7 @@ import {
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
 import { emitSymbolResolverModule } from '@markless/compiler';
 import type { SourceSymbolRow } from './source-module.ts';
-import type { SourceSymbolRoute } from './source-module.ts';
+import type { SourceLazySymbolRoute } from './source-module.ts';
 import { adaptImportedCaptureResolver } from './bound-resolver.ts';
 
 export type PrerenderTriggerGroup = {
@@ -57,7 +57,7 @@ export function emitPrerenderTriggerGroupModule(input: {
 	readonly group: PrerenderTriggerGroup;
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
 	readonly boundRows: ReadonlyArray<BoundSymbolResolverRow>;
-	readonly symbolRoutes?: ReadonlyArray<SourceSymbolRoute>;
+	readonly symbolRoutes?: ReadonlyArray<SourceLazySymbolRoute>;
 	readonly armRendererModuleId?: string;
 }): string {
 	const armRendererModuleId = input.armRendererModuleId ?? input.group.armRendererModuleId;
@@ -75,7 +75,11 @@ export function emitPrerenderTriggerGroupModule(input: {
 			'export function loadSymbol(symbolId) {',
 			...routes.flatMap((route) => [
 				`\tif (symbolId.startsWith(${JSON.stringify(route.prefix)})) {`,
-				`\t\treturn import(${JSON.stringify(symbolRouteImportSource(route.importSource))}).then((mod) => mod.loadSymbol ? mod.loadSymbol(symbolId.slice(${route.prefix.length})) : Promise.reject(new Error(\`Unknown child async symbol \${symbolId}\`)));`,
+				'importSource' in route
+					? `\t\treturn import(${JSON.stringify(symbolRouteImportSource(route.importSource))}).then((mod) => mod.loadSymbol ? mod.loadSymbol(symbolId.slice(${route.prefix.length})) : Promise.reject(new Error(\`Unknown child async symbol \${symbolId}\`)));`
+					: // A same-module child's symbols are this page's own; re-enter the
+						// table so a remainder carrying another child's path routes too.
+						`\t\treturn ${route.prefix.length > 0 ? 'loadSymbol' : 'marklessLoadLocalSymbol'}(symbolId.slice(${route.prefix.length}));`,
 				'\t}',
 			]),
 			'\treturn marklessLoadLocalSymbol(symbolId);',
