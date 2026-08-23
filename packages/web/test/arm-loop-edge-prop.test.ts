@@ -87,14 +87,7 @@ describe('a component edge prop reading the @for binding', () => {
 		expect(output.html).toBe('<nav><button>1</button><button>2</button><button>3</button></nav>');
 	});
 
-	// PINNED - the arm renders its chunk with an EMPTY read context
-	// (`renderChunk(armChunkId, {})`, packages/web/src/ssr-data/renderer.ts:370),
-	// so everything under the arm loses `repeatItem`/`repeatIndex`/`repeatKey`
-	// and `sharedSeeds`. The direct-child row above shares every other input and
-	// passes, so the arm frame is the whole difference. The projection path
-	// (renderer.ts:324) and the async-arm path (renderer.ts:429) already forward
-	// the row; the branch arm is the one that does not. Un-pin with that fix.
-	test.fails('resolves when the edge sits inside an @if arm inside the row', async () => {
+	test('resolves when the edge sits inside an @if arm inside the row', async () => {
 		const seen: Array<unknown> = [];
 		const output = await render(
 			repeatChunks(
@@ -135,9 +128,7 @@ describe('a component edge prop reading the @for binding', () => {
 		expect(output.html).toContain('<button>3</button>');
 	});
 
-	// PINNED on the same renderer.ts:370 cause: the index and key travel in the
-	// same read context the arm drops.
-	test.fails('carries the row index and key through the arm, as a direct child does', async () => {
+	test('carries the row index and key through the arm, as a direct child does', async () => {
 		const indices: Array<number | undefined> = [];
 		const keys: Array<unknown> = [];
 		await renderSsrData({
@@ -189,5 +180,69 @@ describe('a component edge prop reading the @for binding', () => {
 
 		expect(indices).toEqual([0, 1, 2]);
 		expect(keys).toEqual([1, 2, 3]);
+	});
+
+	// The sibling suspect: a dynamic host inside the row renders its children
+	// chunk through the same `renderChunk(chunkId, ...)` seam
+	// (packages/web/src/ssr-data/renderer.ts:456). The host decides WHICH tag
+	// wraps its children, never which row they are inside.
+	test('carries the row through a dynamic host inside the row', async () => {
+		const seen: Array<unknown> = [];
+		const output = await renderSsrData({
+			renderData: {
+				root: { componentName: 'Pagination', templateId: 'template:Pagination' },
+				chunks: repeatChunks(
+					[
+						{
+							kind: 'dynamic-host',
+							hostNodeId: 'host:0',
+							cardinality: 'zero-or-one',
+							nullishTag: 'omit',
+							tag: { kind: 'graph-read', graphNodeId: 'state:tag', path: [] },
+							staticAttributes: {},
+							attributeSlots: [],
+							childChunkId: 'host-children:0',
+							staticIndex: 0,
+							coordinate: { kind: 'child-index', path: [0, 0] },
+						},
+					],
+					[
+						{
+							id: 'host-children:0',
+							kind: 'dynamic-host-children',
+							componentName: 'Pagination',
+							statics: ['<!--markless-slot:0-->', ''],
+							hosts: [],
+							slots: [childSlot('component-edge:0', 0)],
+						},
+					],
+				),
+				repeats: [
+					{
+						repeatId: 'repeat:pages',
+						collectionGraphNodeId: 'state:entries',
+						keyPath: ['value'],
+						rowChunkId: 'row:pages',
+					},
+				],
+				boundaries: [],
+				branches: [],
+			},
+			read: (residue) => {
+				if (residue.kind !== 'graph-read') return true;
+				return residue.graphNodeId === 'state:entries' ? entries : 'span';
+			},
+			renderChild: (_slot, context) => {
+				seen.push(context.repeatItem);
+				const value = (context.repeatItem as { readonly value: number } | undefined)?.value;
+				if (value === undefined) throw new Error('MARKLESS_TEST_ROW_MISSING');
+				return { html: `<button>${value}</button>`, elementCount: 1 };
+			},
+		});
+
+		expect(seen).toEqual(entries);
+		expect(output.html).toBe(
+			'<nav><span><button>1</button></span><span><button>2</button></span><span><button>3</button></span></nav>',
+		);
 	});
 });
