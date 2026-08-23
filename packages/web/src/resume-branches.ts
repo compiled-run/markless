@@ -109,7 +109,7 @@ function createBranchRegistration(
 		branchesById.set(branch.id, branch);
 		for (const armRecordSet of branch.armRecords ?? [])
 			for (const armEvent of armRecordSet.events) input.eventTypes.add(armEvent.eventName);
-		let currentArm = readBranchArm(input.graph, branch);
+		let currentArm = wiredBranchArm(input.graph, branch);
 		currentArmByBranchId.set(branch.id, currentArm);
 		for (const testRead of branch.testReads) {
 			const release = onceRelease(
@@ -225,6 +225,15 @@ function onceRelease(release: () => void): () => void {
 		released = true;
 		if (typeof release === 'function') release();
 	};
+}
+
+// The arm the render PAINTED, which the guard has to compare against. A minted
+// condition computed is cell-backed here and holds no value until its first
+// demand refresh, so reading the graph answers the else arm for a branch painted
+// at arm 0 and the first real update is then discarded as a no-change.
+function wiredBranchArm(graph: RuntimeGraph, branch: ResumeBranchRecord): number {
+	const painted = (branch as { readonly takenArm?: number }).takenArm;
+	return typeof painted === 'number' ? painted : readBranchArm(graph, branch);
 }
 
 function readBranchArm(graph: RuntimeGraph, branch: ResumeBranchRecord): number {
