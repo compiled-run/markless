@@ -23,7 +23,7 @@ import {
 	componentEdgeInstancePath,
 	componentEdgeInstanceSegment,
 } from '../component-edge-instance.ts';
-import { getIdentifierName, walkNode, type AnyNode } from '../ast/nodes.ts';
+import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
 import {
 	createSymbolSourceSemanticsReader,
@@ -490,15 +490,18 @@ function inlineSharedMethodCalls(
 			// the dispatch, and the end-of-dispatch flush closes over only the
 			// awaited leg, so whatever the dispatch writes late is dropped. The
 			// parentheses keep the await a valid operand wherever the call stood.
+			// `awaited` is false only where `replaceMethodCalls` has established
+			// there is nothing after the call to order against.
 			const replaced = replaceMethodCalls(
 				emitted,
 				callee,
-				(args) => (dispatches ? `(await ${arrow}(${args}))` : `${arrow}(${args})`),
+				(args, awaited) =>
+					dispatches && awaited ? `(await ${arrow}(${args}))` : `${arrow}(${args})`,
 				dispatches,
 			);
-			// `null` is the refusal: the call sits where `await` is not legal, so
-			// nothing is inlined and the unresolved authored call fails the compile.
-			if (replaced === null || replaced === emitted) continue;
+			// Unchanged is the refusal: no call site could be inlined, so the
+			// authored calls stand and fail the compile as unresolved references.
+			if (replaced === emitted) continue;
 			emitted = replaced;
 			if (property.sourceSpan) spans.push(property.sourceSpan);
 		}
@@ -604,16 +607,31 @@ function sharedMethodParameterEnd(propertySource: string, open: number): number 
  * so the function that encloses the call is marked async here as well - both to
  * keep this source parsable by every later pass and because the emitter reads
  * that same leading `async` when it decides whether the symbol module it prints
- * is async. A call whose nearest enclosing function is a nested synchronous one
- * cannot be fixed that way without changing what the author wrote, so this
- * returns `null` and inlines nothing rather than emit source that will not parse.
+ * is async.
+ *
+ * A call inside a NESTED synchronous function cannot be fixed that way: marking
+ * that function async changes what its own caller receives, and the author wrote
+ * a callback, not a promise. Two cases are separated there:
+ *
+ * - the call stands alone as the last statement of that function, which is the
+ *   shape a callback passed to a runtime option has - `onDismiss: () => {
+ *   modal.setOpen(false); }`. Nothing follows it, so there is no ordering for
+ *   `await` to protect and none is emitted: the body is inlined as it stands and
+ *   the function keeps returning what it returned.
+ * - anywhere else, the site is left alone. The authored call survives into the
+ *   emitted module, where the unresolved-reference check names it and fails the
+ *   compile - loudly, rather than by quietly dropping the statement.
+ *
+ * Either way it is decided PER CALL SITE. A single unsupported site used to
+ * abandon the whole replacement, which left every other call of the same method
+ * in the same handler unlowered as well.
  */
 function replaceMethodCalls(
 	source: string,
 	callee: string,
-	build: (argumentSource: string) => string,
+	build: (argumentSource: string, awaited: boolean) => string,
 	awaitsCall = false,
-): string | null {
+): string {
 	const moduleSource = `const __marklessInlineSource = ${source};`;
 	let ast: AnyNode;
 	try {
@@ -624,10 +642,16 @@ function replaceMethodCalls(
 		return source;
 	}
 	const offset = moduleSource.indexOf(source);
-	const edits: Array<{ start: number; end: number; text: string }> = [];
+	const edits: Array<{ start: number; end: number; text: string; unawaited: string }> = [];
 	// Every function in this source, so a replacement carrying `await` can ask
-	// which one encloses the call it stands in.
-	const functions: Array<{ start: number; end: number; isAsync: boolean }> = [];
+	// which one encloses the call it stands in, and whether the call is the last
+	// thing that function does.
+	const functions: Array<{
+		start: number;
+		end: number;
+		isAsync: boolean;
+		tail: { start: number; end: number } | null;
+	}> = [];
 	walkNode(ast, (node) => {
 		if (
 			node.type === 'ArrowFunctionExpression' ||
@@ -635,7 +659,12 @@ function replaceMethodCalls(
 			node.type === 'FunctionDeclaration'
 		) {
 			if (typeof node.start === 'number' && typeof node.end === 'number')
-				functions.push({ start: node.start, end: node.end, isAsync: node.async === true });
+				functions.push({
+					start: node.start,
+					end: node.end,
+					isAsync: node.async === true,
+					tail: tailStatementExpressionSpan(node),
+				});
 		}
 		if (node.type !== 'CallExpression') return;
 		const target = node.callee as AnyNode | undefined;
@@ -655,7 +684,12 @@ function replaceMethodCalls(
 					: '',
 			)
 			.join(', ');
-		edits.push({ start: node.start, end: node.end, text: build(argumentSource) });
+		edits.push({
+			start: node.start,
+			end: node.end,
+			text: build(argumentSource, true),
+			unawaited: build(argumentSource, false),
+		});
 	});
 	if (edits.length === 0) return source;
 
@@ -664,22 +698,41 @@ function replaceMethodCalls(
 	const ordered = [...edits].sort((left, right) => left.start - right.start);
 	const applied: typeof ordered = [];
 	for (const edit of ordered) if (!applied.some((held) => held.end >= edit.end)) applied.push(edit);
-	const mutations = [...applied];
+	let mutations: Array<{ start: number; end: number; text: string }> = [...applied];
 	if (awaitsCall) {
 		const asyncified = new Set<number>();
+		mutations = [];
 		for (const edit of applied) {
 			const enclosing = [...functions]
 				.filter((fn) => fn.start <= edit.start && fn.end >= edit.end)
 				.sort((left, right) => left.end - left.start - (right.end - right.start));
 			const innermost = enclosing[0];
-			// No enclosing function at all, or a nested synchronous one: `await`
-			// cannot stand here, and marking an inner function async would change
-			// what its own caller receives.
-			if (!innermost) return null;
-			if (innermost.isAsync) continue;
-			if (enclosing.length > 1) return null;
+			// No enclosing function at all: `await` cannot stand here and there is
+			// nothing to mark async, so the site is skipped and its authored call
+			// survives for the unresolved-reference check to refuse.
+			if (!innermost) continue;
+			if (innermost.isAsync) {
+				mutations.push(edit);
+				continue;
+			}
+			if (enclosing.length > 1) {
+				// A nested synchronous function. Marking it async would change what
+				// its caller receives, so only a call standing alone as its last
+				// statement is inlined, unawaited: nothing follows it there, so the
+				// order the author wrote is kept exactly.
+				if (
+					innermost.tail &&
+					innermost.tail.start === edit.start &&
+					innermost.tail.end === edit.end
+				) {
+					mutations.push({ start: edit.start, end: edit.end, text: edit.unawaited });
+				}
+				continue;
+			}
+			mutations.push(edit);
 			asyncified.add(innermost.start);
 		}
+		if (mutations.length === 0) return source;
 		for (const start of asyncified) mutations.push({ start, end: start, text: 'async ' });
 	}
 
@@ -688,6 +741,32 @@ function replaceMethodCalls(
 	for (const mutation of [...mutations].sort((left, right) => right.start - left.start))
 		emitted = emitted.slice(0, mutation.start) + mutation.text + emitted.slice(mutation.end);
 	return emitted.slice(offset, emitted.length - 1);
+}
+
+/**
+ * The span of the expression a function's LAST statement evaluates, when its
+ * body is a block ending in a bare expression statement.
+ *
+ * "Last statement" is read off the function's own statement list, so a call
+ * buried in a branch does not qualify: something after that branch could still
+ * run. The expression's own span is returned rather than the statement's,
+ * because the call has to BE the statement — `foo(instance.close())` ends the
+ * body too, and there the call's value is consumed by `foo`.
+ */
+function tailStatementExpressionSpan(
+	node: AnyNode,
+): { readonly start: number; readonly end: number } | null {
+	const body = node.body as AnyNode | undefined;
+	if (body?.type !== 'BlockStatement') return null;
+
+	const statements = asNodes(body.body);
+	const last = statements[statements.length - 1];
+	if (last?.type !== 'ExpressionStatement') return null;
+
+	const expression = last.expression as AnyNode | undefined;
+	if (typeof expression?.start !== 'number' || typeof expression.end !== 'number') return null;
+
+	return { start: expression.start, end: expression.end };
 }
 
 function eventWrites(
