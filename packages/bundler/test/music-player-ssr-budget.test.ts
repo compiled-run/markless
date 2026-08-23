@@ -134,7 +134,14 @@ const clientBuild = resolve(demo, '.output/public/build');
 // edges, layer-7 keep-path, per-edge claim prep) — same capability cost classes the
 // attribution priced; measured 66,080 on this tip, 5 B margin. Repayment: bundler-diet
 // owns the measured 1,087 B pay-per-use ceiling from the attribution entry above.
-const MAX_SHIPPED_JS_GZIP_BYTES = 66_085;
+// 66,085 -> 66,510 (bridge 2026-08-23): +423 across the correctness merges since the
+// last bridge — the component-scoping stack (U176/U178/U180/U181, emitted scoping
+// carried into lowered reads) and the per-render widget registries (U179, ~54-70 B
+// of concurrency-safety plumbing so renderToString is safe under concurrent
+// requests). Measured 66,508 on this tip. Repayment: bundler-diet still owns the
+// measured 1,087 B pay-per-use ceiling, now plus a chartered server-only-module
+// extraction for the registry plumbing.
+const MAX_SHIPPED_JS_GZIP_BYTES = 66_510;
 
 test('music-player-ssr production build stays within its shipped JS budget', async () => {
 	await rm(resolve(demo, '.output'), { force: true, recursive: true });
