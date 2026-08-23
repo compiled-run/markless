@@ -141,7 +141,10 @@ const clientBuild = resolve(demo, '.output/public/build');
 // requests). Measured 66,508 on this tip. Repayment: bundler-diet still owns the
 // measured 1,087 B pay-per-use ceiling, now plus a chartered server-only-module
 // extraction for the registry plumbing.
-const MAX_SHIPPED_JS_GZIP_BYTES = 66_510;
+// 66,510 -> 67,330 (2026-08-23): +794 across the handle/dispatch capability chain
+// (handle value-reads + trigger-group handle records, per-instance keying, anchor
+// attribute lowering, bubble walk defect 67 at +215). Measured 67,304.
+const MAX_SHIPPED_JS_GZIP_BYTES = 67_330;
 
 test('music-player-ssr production build stays within its shipped JS budget', async () => {
 	await rm(resolve(demo, '.output'), { force: true, recursive: true });
