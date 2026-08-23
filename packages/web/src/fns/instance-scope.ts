@@ -29,6 +29,76 @@ export function marklessRowFreeSymbolId(symbolId: string, instancePath?: string)
 	return path.replace(ROW_SEGMENT, '') + symbolId.slice(path.length);
 }
 
+const INSTANCE_SEGMENT = /[cp]\d+:|r:[^:]*:/g;
+
+/**
+ * What a rendered row's record knows that a bound symbol's id cannot.
+ *
+ * A bound symbol is minted per component EDGE, so its id carries the build-time
+ * branch/repeat scope and never a row value; the record that matched the
+ * dispatch carries the value, as the `r:<key>:` segment of its host id. Each
+ * pair here says: an id spelled against this row-free instance prefix belongs to
+ * that rendered row, and reaches it under this with-rows prefix. Longest prefix
+ * first, and every `rowFree` is non-empty, so an id carrying no instance path at
+ * all - the parent's own page-space nodes, which a capture slot reads - matches
+ * nothing and is left exactly as spelled.
+ */
+export type MarklessRowScope = ReadonlyArray<{
+	readonly rowFree: string;
+	readonly withRows: string;
+}>;
+
+export function marklessRecordRowScope(hostNodeId: string): MarklessRowScope | undefined {
+	const path = marklessInstancePath(hostNodeId);
+	if (!path.includes('r:')) return undefined;
+	const pairs: Array<{ rowFree: string; withRows: string }> = [];
+	let rowFree = '';
+	let withRows = '';
+	for (const segment of path.match(INSTANCE_SEGMENT) ?? []) {
+		withRows += segment;
+		if (segment.startsWith('r:')) continue;
+		rowFree += segment;
+		pairs.push({ rowFree, withRows });
+	}
+	return pairs.length > 0 ? pairs.reverse() : undefined;
+}
+
+export function marklessRowScopedGraphNodeId(graphNodeId: string, scope: MarklessRowScope): string {
+	for (const { rowFree, withRows } of scope)
+		if (graphNodeId.startsWith(rowFree))
+			return withRows + graphNodeId.slice(rowFree.length);
+	return graphNodeId;
+}
+
+// A dispatched bound symbol reaches this graph twice over: the capture adapter
+// reads the parent's nodes as the parent spells them, and the bound base reads
+// its own instance's nodes already carrying the build-time edge prefix. Only the
+// second kind is a row's, which is what the prefix match above decides. The tag
+// keeps a re-entrant dispatch - a bound handler invoking a parent callback that
+// runs through this same path - from inserting the row a second time.
+type MarklessRowScopedGraph = RuntimeGraph & { readonly marklessRowScope?: string };
+
+export function marklessRowScopedGraph(
+	graph: RuntimeGraph,
+	scope: MarklessRowScope,
+): RuntimeGraph {
+	const tag = scope.map((pair) => pair.withRows).join('|');
+	if ((graph as MarklessRowScopedGraph).marklessRowScope === tag) return graph;
+	const qualify = (graphNodeId: string) => marklessRowScopedGraphNodeId(graphNodeId, scope);
+	return {
+		...graph,
+		marklessRowScope: tag,
+		read: (graphNodeId, path) => graph.read(qualify(graphNodeId), path),
+		write: (write) => graph.write({ ...write, graphNodeId: qualify(write.graphNodeId) }),
+		update: (update) => graph.update({ ...update, graphNodeId: qualify(update.graphNodeId) }),
+		call: (call) => graph.call({ ...call, graphNodeId: qualify(call.graphNodeId) }),
+		delete: (deletion) =>
+			graph.delete({ ...deletion, graphNodeId: qualify(deletion.graphNodeId) }),
+		subscribe: (subscription) =>
+			graph.subscribe({ ...subscription, graphNodeId: qualify(subscription.graphNodeId) }),
+	} as MarklessRowScopedGraph;
+}
+
 // A symbol loaded through the child's own composed loader already answers in
 // page space, so resume must not scope it a second time.
 const composedSymbols = new WeakSet<object>();
