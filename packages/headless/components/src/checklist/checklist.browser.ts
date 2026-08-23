@@ -345,9 +345,11 @@ async function expectOmittedCallbackStillTicks() {
 // GREEN when this file runs alone and RED, identically, under the whole
 // `--project ui` lane. So the isolated pass is not evidence, the remaining
 // cause is the dispatch defect named above rather than the served payload.
-// Order-dependent rows can honestly be neither test nor test.fails, so the
-// three SSR variants are skipped until that dispatch defect lands; un-skip
-// them in the same change set as the fix.
+// U173 re-measured under the serial lane: these three SSR variants passed one
+// full run and failed the next on VALUE assertions (false vs true/mixed), not
+// timeouts — so contention explained the rotation but not these rows. A real
+// intermittent SSR-resume defect remains (the seeded select-all first-gesture
+// class); skipped until it lands, un-skip in the same change set.
 
 for (const mode of MODES) {
 	test(`${mode}: the starter renders a named group, a select-all and three items`, async () => {

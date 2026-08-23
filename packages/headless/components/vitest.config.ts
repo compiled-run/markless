@@ -22,6 +22,11 @@ export default defineProject({
 		// pull all three into the browser project, where the real-reader specs
 		// have no reader to drive.
 		include: ['src/**/*.browser.ts'],
+		// Serial on purpose (U173 measurement): parallel iframes contend on one
+		// dev server and CPU until gesture latency crosses the 1000ms poll
+		// ceiling (p99 1230ms parallel vs 363ms serial) — and serial is FASTER
+		// (~50s vs ~118s; cold imports 24s vs 1265s cumulative).
+		fileParallelism: false,
 		browser: {
 			enabled: true,
 			headless: true,
