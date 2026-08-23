@@ -4,6 +4,7 @@ import { render } from '@markless/web/render';
 import AlphaPage from './fixtures/nav-page-alpha.tsrx?markless-route';
 import BetaPage from './fixtures/nav-page-beta.tsrx?markless-route';
 import SlowPage from './fixtures/nav-page-slow.tsrx?markless-route';
+import { armNavSettleGate } from './fixtures/nav-settle-gate.ts';
 
 // T110 / spec D8 navigation transitions: a client route swap holds the
 // outgoing page LIVE AND INTERACTIVE while the destination renders and its
@@ -19,6 +20,16 @@ import SlowPage from './fixtures/nav-page-slow.tsrx?markless-route';
 // packages/router/test/navigation-hold.test.ts and
 // packages/web/test/settle-tracker-timing.test.ts. No assertion here may
 // depend on real-wait durations; only on ORDERINGS and DOM-state existence.
+//
+// That discipline also governs the PREMISES, not just the assertions. The
+// fast destination settles through a test-opened gate (fixtures/
+// nav-settle-gate.ts) rather than its own wall-clock timer, because "settles
+// inside the 250ms deadline" must be true by construction: a nominal 80ms
+// timer is not 80ms on a contended machine, and a destination that genuinely
+// misses the deadline is REQUIRED to show its @pending arm, so a wall-clock
+// premise turns correct D8 behavior into a flaky failure of this invariant.
+// The slow destination keeps its timer: overshooting a deadline is robust
+// under load in a way that undershooting one is not.
 //
 // The route renderer targets document.body, so each test drives a dedicated
 // iframe document and records every DOM state transition of its body with a
@@ -99,6 +110,59 @@ function firstSampleWith(samples: readonly BodySample[], marker: string): BodySa
 	return samples.find((sample) => sample.html.includes(marker));
 }
 
+// Observer-driven wait: resolves on the mutation that satisfies the predicate,
+// so it costs only the time the runtime actually needs. waitForBody's 8ms poll
+// would spend that much of the navigation deadline on polling granularity
+// alone, which is exactly the wall-clock dependence this file must not have.
+function whenBody(
+	routeDocument: Document,
+	predicate: (html: string) => boolean,
+	label: string,
+): Promise<void> {
+	if (predicate(routeDocument.body.innerHTML)) return Promise.resolve();
+	return new Promise((resolve, reject) => {
+		const finish = (fail?: Error) => {
+			observer.disconnect();
+			clearTimeout(timer);
+			if (fail) reject(fail);
+			else resolve();
+		};
+		const observer = new MutationObserver(() => {
+			if (predicate(routeDocument.body.innerHTML)) finish();
+		});
+		observer.observe(routeDocument.body, {
+			attributes: true,
+			characterData: true,
+			childList: true,
+			subtree: true,
+		});
+		const timer = setTimeout(() => finish(new Error(`Timed out waiting for ${label}.`)), 5000);
+	});
+}
+
+// One throwaway round trip to the destination and back, so the measured swap
+// navigates to a page whose modules are already resident. Uses the same gate,
+// so the warm-up cannot hang on a wall-clock read either.
+async function warmDestination(routeDocument: Document): Promise<void> {
+	const warmGate = armNavSettleGate();
+	navigateTo(routeDocument, BetaPage, '/beta');
+	await warmGate.reached;
+	warmGate.open();
+	await waitForBody(
+		routeDocument,
+		(html) => html.includes('data-nav-settled="beta"'),
+		5000,
+		'beta warm-up settle',
+	);
+	navigateTo(routeDocument, AlphaPage, '/alpha');
+	await waitForBody(
+		routeDocument,
+		(html) => html.includes('data-nav-settled="alpha"') && !html.includes('data-nav-page="beta"'),
+		5000,
+		'alpha restore after warm-up',
+	);
+}
+
 test('fast route swap: no pending frame, one swap, outgoing page stays interactive', async () => {
 	const routeDocument = createRouteDocument();
 
@@ -110,13 +174,53 @@ test('fast route swap: no pending frame, one swap, outgoing page stays interacti
 		'alpha settle',
 	);
 
+	// Warm the destination before the swap under test. A destination's settle
+	// is not just its own read: a COLD destination also has to pull its lazily
+	// fetched symbol and runtime modules off the dev server, and that load —
+	// not the page's read — is what actually spends the 250ms budget under
+	// load. A swap toward an unloaded page is not the "fast swap" this test is
+	// about, and D8 is right to show @pending for it. The measured navigation
+	// below therefore starts from an already-resident destination.
+	await warmDestination(routeDocument);
+
 	const sampler = sampleBody(routeDocument);
+	// The destination's read suspends on this gate instead of a wall-clock
+	// timer, so "settles inside the navigation deadline" is true by
+	// construction rather than by the machine keeping its timers punctual.
+	const gate = armNavSettleGate();
 	navigateTo(routeDocument, BetaPage, '/beta');
 
 	// The outgoing page must still be live: click its counter DURING the hold.
 	const tap = routeDocument.querySelector<HTMLButtonElement>('button[data-alpha-tap]');
 	if (!tap) throw new Error('Expected the alpha tap button in the live DOM.');
 	tap.click();
+
+	// Premise pin: wait for the destination's read to actually suspend, so the
+	// boundary really is pending and its @pending arm really was rendered and
+	// could leak. Waiting on the gate itself (not a poll) costs no deadline
+	// budget however long the destination's render takes; if the read never
+	// suspends this test hangs to its timeout instead of passing vacuously.
+	await gate.reached;
+
+	// Still held, so the outgoing page must service the mid-transition click:
+	// wait for its own counter update to reach the live DOM. Holding the gate
+	// until then is what makes "the outgoing page stays interactive DURING the
+	// transition" a real claim rather than a race the swap can win.
+	await whenBody(routeDocument, (html) => html.includes('Taps 1'), 'the outgoing page tap');
+
+	// At this instant the destination has rendered with a pending boundary, so
+	// the hold is the only thing keeping its @pending arm out of view: the live
+	// document must still be the whole outgoing page, carrying nothing of the
+	// destination at all.
+	const heldHtml = routeDocument.body.innerHTML;
+	expect(heldHtml).toContain('data-nav-page="alpha"');
+	expect(heldHtml).not.toContain('data-nav-page="beta"');
+	expect(heldHtml).not.toContain('data-nav-pending');
+
+	// Release it: the read resumes on a microtask, and microtasks always drain
+	// before the next macrotask, so the destination settles inside the 250ms
+	// deadline no matter how contended the machine is.
+	gate.open();
 
 	await waitForBody(
 		routeDocument,
