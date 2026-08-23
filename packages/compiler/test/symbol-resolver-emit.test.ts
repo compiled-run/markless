@@ -221,6 +221,155 @@ test('emitSymbolResolverModule resolves bound rows and fails loudly for unknown 
 	expect(output).toContain('"ancestry":[{}]');
 });
 
+// The graph-less spellings the resolver used to emit; each fell through to the
+// runtime's per-dispatch `marklessWidgetScope.active` pointer, which two
+// containers with interleaving async symbol bodies share.
+const GRAPHLESS_RESOLVER_CALLS = [
+	'marklessComposedGraphNodeId(graphNodeId, path)',
+	'marklessComposedGraphNodeId(record.graphNodeId, path)',
+];
+
+function widgetScopedResolverInput(baseChunk: string) {
+	return {
+		symbols: [{ id: 'symbol:dialog', chunk: baseChunk, exportName: 'symbol_dialog' }],
+		boundSymbols: [
+			{
+				id: 'bound:dialog',
+				baseSymbolId: 'symbol:dialog',
+				instancePath: 'c0:p2:',
+				componentEdgePath: ['edge:0'],
+				ancestry: [
+					{ componentEdgeId: 'edge:0', branchScopeIds: [], keyedRepeatScopeIds: [] },
+				],
+				// A page-space id is what makes the resolver import the runtime's
+				// widget-aware reading instead of concatenating the instance path.
+				captureSlots: [
+					{
+						slotId: 'slot:open',
+						path: [],
+						route: {
+							kind: 'compiler-known-constant' as const,
+							componentEdgeId: 'edge:0',
+							value: 'Save',
+						},
+					},
+					{
+						slotId: 'slot:shared',
+						path: [],
+						route: {
+							kind: 'graph-reference' as const,
+							componentEdgeId: 'edge:0',
+							graphNodeId: 'shared:/src/Dialog.tsrx#Dialog',
+							path: [],
+						},
+					},
+				],
+			},
+		],
+	};
+}
+
+test('emitSymbolResolverModule hands the dispatching graph to the widget-scope resolver', async () => {
+	const baseChunk = `data:text/javascript,${encodeURIComponent(
+		[
+			'export async function symbol_dialog(context) {',
+			'	context.graph.write({ graphNodeId: "shared:/src/Dialog.tsrx#Dialog/state:open", value: true });',
+			'	context.graph.read("state:label", []);',
+			'	context.read("state:legacy", []);',
+			'}',
+		].join('\n'),
+	)}`;
+	const output = emitSymbolResolverModule(widgetScopedResolverInput(baseChunk));
+
+	expect(output).toContain(
+		"import { marklessComposedGraphNodeId, marklessGraphWidgetRegistry } from '@markless/web/fns/instance-scope';",
+	);
+	expect(output).toContain('const registry = marklessGraphWidgetRegistry(graph);');
+	for (const graphless of GRAPHLESS_RESOLVER_CALLS) expect(output).not.toContain(graphless);
+
+	// Stands in for the runtime module so the test can see which registry the
+	// emitted closure handed over, rather than only that it typechecks.
+	const runtimeStub = `data:text/javascript,${encodeURIComponent(
+		[
+			'export function marklessGraphWidgetRegistry(graph) { return graph ? graph.registryTag : "active-pointer"; }',
+			'export function marklessComposedGraphNodeId(graphNodeId, path, registry) {',
+			'	globalThis.__u254ResolverCalls.push({ graphNodeId, registry });',
+			'	return path + graphNodeId;',
+			'}',
+		].join('\n'),
+	)}`;
+	const stubbed = output.replace(
+		"'@markless/web/fns/instance-scope'",
+		JSON.stringify(runtimeStub),
+	);
+	const calls: Array<{ graphNodeId: string; registry: unknown }> = [];
+	(globalThis as { __u254ResolverCalls?: unknown }).__u254ResolverCalls = calls;
+
+	const generatedModule = (await import(
+		`data:text/javascript,${encodeURIComponent(stubbed)}`
+	)) as { loadSymbol(id: string): Promise<(context: unknown) => unknown> };
+	const bound = await generatedModule.loadSymbol('bound:dialog');
+
+	const dispatch = async (registryTag: string) => {
+		const writes: Array<{ graphNodeId: string }> = [];
+		await bound({
+			graph: {
+				registryTag,
+				read: () => undefined,
+				write: (record: { graphNodeId: string }) => writes.push(record),
+			},
+			read: () => undefined,
+		});
+		return writes;
+	};
+
+	expect(await dispatch('graph:A')).toEqual([
+		{ graphNodeId: 'c0:p2:shared:/src/Dialog.tsrx#Dialog/state:open', value: true },
+	]);
+	expect(calls.length).toBeGreaterThanOrEqual(3);
+	expect(new Set(calls.map((call) => call.registry))).toEqual(new Set(['graph:A']));
+
+	// The second container's dispatch must reach its own registry, not the one the
+	// first dispatch left behind.
+	calls.length = 0;
+	await dispatch('graph:B');
+	expect(new Set(calls.map((call) => call.registry))).toEqual(new Set(['graph:B']));
+	delete (globalThis as { __u254ResolverCalls?: unknown }).__u254ResolverCalls;
+});
+
+test('emitSymbolResolverModule leaves page-local instance scoping free of the widget runtime', () => {
+	const output = emitSymbolResolverModule({
+		symbols: [{ id: 'symbol:child', chunk: '/assets/child.js', exportName: 'symbol_child' }],
+		boundSymbols: [
+			{
+				id: 'bound:child',
+				baseSymbolId: 'symbol:child',
+				instancePath: 'c0:',
+				componentEdgePath: ['edge:0'],
+				ancestry: [
+					{ componentEdgeId: 'edge:0', branchScopeIds: [], keyedRepeatScopeIds: [] },
+				],
+				captureSlots: [
+					{
+						slotId: 'slot:count',
+						path: [],
+						route: {
+							kind: 'graph-reference',
+							componentEdgeId: 'edge:0',
+							graphNodeId: 'state:count',
+							path: [],
+						},
+					},
+				],
+			},
+		],
+	});
+
+	expect(output).not.toContain('@markless/web/fns/instance-scope');
+	expect(output).toContain('const scoped = (graphNodeId) =>');
+	expect(output).toContain('path + graphNodeId');
+});
+
 test('emitSymbolResolverModule exports the symbol manifest with protocol and build identity', async () => {
 	const output = emitSymbolResolverModule({
 		buildId: 'build:abc123',
