@@ -141,6 +141,33 @@ export function repeatRowStateScopeUnsupportedDiagnostic(input: {
 	};
 }
 
+// Sibling @for loops sharing an item name compile fine - the row context answers
+// both. A name that is one loop's ITEM and another's INDEX cannot: the emitted
+// row readers share one scope, so the name would have to mean two things at once.
+export function repeatBindingNameConflictDiagnostic(input: {
+	readonly name: string;
+	readonly node: AnyNode;
+	readonly filename: string;
+}): CompilerDiagnostic {
+	return {
+		code: 'MARKLESS_REPEAT_BINDING_NAME_CONFLICT',
+		severity: 'error',
+		phase: 'public-render',
+		title: 'Two @for loops give the same name two different meanings',
+		message: `"${input.name}" is one @for loop's item and another @for loop's index in the same file. Rename one of them.`,
+		why: 'Every @for expression in a file is compiled into readers that share one set of row bindings, so a name can bind to the row item or the row index, never to both.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'public-render-plan',
+		artifactKeys: ['publicRenderPlan'],
+		suggestions: [
+			{
+				message: `Rename this loop's binding - two loops may reuse a name freely as long as both use it the same way (both items, or both indexes).`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_BINDING_NAME_CONFLICT',
+	};
+}
+
 // Spec 01-tsrx-host-contract: children are an opaque compiler-owned template
 // projection. Inspecting or transforming them React-style is diagnosed.
 export function childrenOpacityDiagnostic(input: {

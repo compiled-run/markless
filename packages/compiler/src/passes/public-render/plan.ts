@@ -17,6 +17,7 @@ import { resolveBoundaryRunners } from './boundary-runner.ts';
 import { gatePlanDisagreementDiagnostic, tryBlockToggleRerenderDiagnostic } from './diagnostics.ts';
 import {
 	collectChildrenOpacityDiagnostics,
+	collectRepeatBindingConflictDiagnostics,
 	collectUndeclaredTemplateReadDiagnostics,
 	collectUnsupportedConstructDiagnostics,
 	componentConditionalRootDiagnostics,
@@ -48,6 +49,15 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 	if (!selectedRoot) return emptyPlan(componentRootDiagnostics(ast, input.source.filename));
 
 	stripExtractedSyncPolicyCalls(input.symbolResolver.symbols, input.semanticGraph);
+	const repeatBindingConflictDiagnostics = collectRepeatBindingConflictDiagnostics({
+		// Module-wide, because the emitted row prelude is built from the module's
+		// whole keyed-repeat list rather than one component's slice of it.
+		root: ast,
+		filename: input.source.filename,
+	});
+	if (repeatBindingConflictDiagnostics.length > 0) {
+		return emptyPlan(repeatBindingConflictDiagnostics);
+	}
 	const undeclaredTemplateReadDiagnostics = collectUndeclaredTemplateReadDiagnostics({
 		ast,
 		component: selectedRoot.component,
