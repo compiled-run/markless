@@ -116,6 +116,44 @@ function expectUnavailableRendered() {
 	expectOpen(el(OpenTrigger), el(OpenContent));
 }
 
+// A prop the part destructured out of its parameters must not come back through
+// `{...rest}`. `CollapsibleRoot` is written `({ open = false, disabled = false,
+// onChange, children, ...rest })` and renders `<div {...rest} ui-open={…}>`, so
+// neither `open` nor `disabled` is in `rest` in the authored source and neither
+// may be written on the root element. Before the spread lowering subtracted the
+// destructured names the served root came back as
+//
+//   <div data-testid="open-root" open="" disabled="" ui-open="" ui-disabled="">
+//
+// in BOTH modes, which is why the rows below run in both.
+//
+// What the family does project is `ui-open`/`ui-closed`/`ui-disabled`, and the
+// trigger's own `disabled` is a real <button> attribute the part writes. Only
+// the raw prop names on the root are asserted absent.
+function expectUnavailableRootsDropDestructuredProps() {
+	for (const root of [el(ShutRoot), el(OpenRoot)]) {
+		expect(root.hasAttribute('open')).toBe(false);
+		expect(root.hasAttribute('disabled')).toBe(false);
+	}
+	// The projections the parts do write are still there.
+	expect(el(OpenRoot).getAttribute('ui-open')).toBe('');
+	expect(el(ShutRoot).getAttribute('ui-disabled')).toBe('');
+	// The trigger's `disabled` is the part's own attribute, not a leaked prop.
+	expect(el(ShutTrigger).hasAttribute('disabled')).toBe(true);
+}
+
+function expectFaqRootsDropDestructuredProps() {
+	// The question written `open` passes the prop and still carries no `open`
+	// attribute, only the flag.
+	expect(el(RulesRoot).hasAttribute('open')).toBe(false);
+	expect(el(RulesRoot).hasAttribute('disabled')).toBe(false);
+	expect(el(RulesRoot).getAttribute('ui-open')).toBe('');
+	// A question that passed neither prop carries neither, defaults included.
+	expect(el(PermitRoot).hasAttribute('open')).toBe(false);
+	expect(el(PermitRoot).hasAttribute('disabled')).toBe(false);
+	expect(el(PermitRoot).getAttribute('ui-closed')).toBe('');
+}
+
 function expectUnavailableBlocks() {
 	el(ShutTrigger).click();
 	expectClosed(el(ShutTrigger), el(ShutContent));
@@ -207,6 +245,18 @@ for (const mode of MODES) {
 		else await renderSSR(Unavailable);
 		expectUnavailableRendered();
 		expectUnavailableBlocks();
+	});
+
+	test(`${mode}: an unavailable root drops the open and disabled props it destructured`, async () => {
+		if (mode === 'CSR') await render(Unavailable);
+		else await renderSSR(Unavailable);
+		expectUnavailableRootsDropDestructuredProps();
+	});
+
+	test(`${mode}: an FAQ root drops the open prop it destructured`, async () => {
+		if (mode === 'CSR') await render(Faq);
+		else await renderSSR(Faq);
+		expectFaqRootsDropDestructuredProps();
 	});
 
 	test(`${mode}: the trigger opens the panel and closes it again`, async () => {
