@@ -488,6 +488,12 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_ELEMENT_HANDLE_IDREF_ROW_OWNED'
 		| 'MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT'
 		| 'MARKLESS_ELEMENT_HANDLE_IDREF_ID_CONFLICT'
+		| 'MARKLESS_ELEMENT_HANDLE_ANCHOR_VALUE'
+		| 'MARKLESS_ELEMENT_HANDLE_ANCHOR_HOST_REQUIRED'
+		| 'MARKLESS_ELEMENT_HANDLE_ANCHOR_UNBOUND'
+		| 'MARKLESS_ELEMENT_HANDLE_ANCHOR_ROW_OWNED'
+		| 'MARKLESS_ELEMENT_HANDLE_ANCHOR_WIDGET_ROOT'
+		| 'MARKLESS_ELEMENT_HANDLE_ANCHOR_STYLE_DYNAMIC'
 		| 'MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED'
 		| 'MARKLESS_OVERLAY_VALUE_UNSUPPORTED'
 		| 'MARKLESS_OVERLAY_HOST_ELEMENT_REQUIRED'
@@ -651,6 +657,36 @@ export type SemanticElementHandleIdref = {
 	readonly asyncBoundaryId?: string;
 };
 
+/**
+ * One CSS anchor position that named an element() handle: `anchorName={handle}`
+ * or `positionAnchor={handle}` on a host element.
+ *
+ * Deliberately parallel to SemanticElementHandleIdref, and deliberately not the
+ * same record. An IDREF forces a minted `id` onto the element the handle is
+ * bound to; an anchor position does not, because CSS reads the dashed-ident
+ * name off the anchor's own inline style rather than off an id. Merging the two
+ * records would make every anchored trigger also carry an id nothing reads.
+ *
+ * Like the IDREF record it holds no spelling: which CSS property, and what the
+ * name string is, are the consuming emitter's lowering concern.
+ */
+export type SemanticElementHandleAnchor = {
+	/** The host element carrying the anchor attribute. */
+	readonly hostNodeId: string;
+	/** The authored attribute, `anchorName` or `positionAnchor`. */
+	readonly attributeName: string;
+	/** The resolved element() handle binding name. */
+	readonly handleName: string;
+	/** The graph node the handle declares; what the anchor name is derived from. */
+	readonly handleGraphNodeId: string;
+	/** The authored expression, which differs from handleName through an alias. */
+	readonly source: string;
+	readonly componentName?: string;
+	readonly sourceSpan?: SourceSpan;
+	/** Document order of the anchor positions in this file; stable across compiles. */
+	readonly order: number;
+};
+
 export type SemanticBehavior = {
 	readonly hostNodeId: string;
 	readonly source: string;
@@ -731,7 +767,23 @@ export type SemanticMarkupResidue =
 	// The id minted for one element() handle: written on the element `el=` bound
 	// it and on every IDREF position that named it, so both sides spell one
 	// string the author never sees.
-	| { readonly kind: 'element-handle-id'; readonly handleGraphNodeId: string };
+	| { readonly kind: 'element-handle-id'; readonly handleGraphNodeId: string }
+	// One element's whole inline style attribute value, when at least one CSS
+	// anchor position on it named an element() handle. The declarations render
+	// the SAME per-instance token the minted id renders, spelled as the
+	// `--mx-<slug>` dashed-ident anchor positioning requires. The consumer's own
+	// static style rides in front of them in one residue rather than in a second
+	// style attribute, because two style attributes on one element clobber.
+	| {
+			readonly kind: 'element-handle-anchor-style';
+			readonly declarations: ReadonlyArray<{
+				/** The CSS property, e.g. `anchor-name`. */
+				readonly property: string;
+				readonly handleGraphNodeId: string;
+			}>;
+			/** The consumer's authored style declarations, already lowered to CSS. */
+			readonly staticStyle?: string;
+	  };
 
 type SemanticMarkupLocatedSlot = {
 	readonly coordinate: SemanticMarkupSlotCoordinate;
@@ -856,6 +908,7 @@ export type SemanticGraphArtifact = {
 	readonly overlays: ReadonlyArray<SemanticOverlay>;
 	readonly elementHandleBindings: ReadonlyArray<SemanticElementHandleBinding>;
 	readonly elementHandleIdrefs: ReadonlyArray<SemanticElementHandleIdref>;
+	readonly elementHandleAnchors: ReadonlyArray<SemanticElementHandleAnchor>;
 	readonly localBindings: ReadonlyArray<SemanticLocalBinding>;
 	readonly localDeclarations: ReadonlyArray<SemanticLocalDeclaration>;
 	readonly aliases: ReadonlyArray<SemanticGraphAlias>;

@@ -10,7 +10,11 @@ import type {
 	SourceSpan,
 } from '../../artifacts.ts';
 import type { FrameworkApiName } from './imports.ts';
-import type { PendingElementHandleIdref, WalkState } from './types.ts';
+import type {
+	PendingElementHandleAnchor,
+	PendingElementHandleIdref,
+	WalkState,
+} from './types.ts';
 
 export function storageKeyStaticDiagnostic(input: {
 	readonly argument: 'key' | 'fallback';
@@ -1029,6 +1033,133 @@ export function idrefElementHandleIdConflictDiagnostic(input: {
 		span: input.span,
 		suggestion: 'Remove the authored id from this element, or drop the element() handle and write the IDREF attribute with your own id string.',
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_ID_CONFLICT',
+	});
+}
+
+/**
+ * `anchorName` and `positionAnchor` are not DOM attributes: they lower to an
+ * inline CSS declaration whose value is the per-instance name minted for one
+ * element() handle. A value that is not one handle written directly has no name
+ * to spell, and letting it fall through would write a bogus `anchorname="..."`
+ * attribute into the HTML that no browser reads.
+ */
+export function anchorElementHandleValueDiagnostic(input: {
+	readonly attributeName: string;
+	readonly source: string;
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_ELEMENT_HANDLE_ANCHOR_VALUE',
+		title: 'A CSS anchor position takes one element() handle',
+		message: `Cannot resolve ${input.attributeName}={${input.source}}. ${input.attributeName} takes exactly one element() handle written directly, not a string, a list, or a choice between handles.`,
+		why: 'The anchor name is minted per rendered widget so two widgets on one page cannot collide, and only an element() handle names the element it is minted for. There is no authored spelling of that name to accept here.',
+		span: input.span,
+		suggestion: `Write ${input.attributeName}={handle} with an element() handle, and put every other positioning declaration in your own CSS.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_ANCHOR_VALUE',
+	});
+}
+
+/**
+ * An anchor position lowers to an inline style on the element that carries it.
+ * On a component or part tag there is no element of this markup to style: the
+ * value would have to cross the edge and be merged into whatever style the
+ * child writes, which is the child's markup to decide, not this one's.
+ */
+export function anchorElementHandleHostRequiredDiagnostic(input: {
+	readonly attributeName: string;
+	readonly ownerTagName: string | null;
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_ELEMENT_HANDLE_ANCHOR_HOST_REQUIRED',
+		title: 'A CSS anchor position belongs on an element',
+		message: `Cannot resolve ${input.attributeName} on <${input.ownerTagName ?? 'component'}> because it is a component, not an element.`,
+		why: 'The anchor name lowers to an inline style declaration on the element that carries the attribute. A component tag renders no element of its own here, so there is nothing to declare the style on.',
+		span: input.span,
+		suggestion: `Move ${input.attributeName} onto the element inside that component that should carry the anchor.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_ANCHOR_HOST_REQUIRED',
+	});
+}
+
+/**
+ * The anchor half of MARKLESS_ELEMENT_HANDLE_IDREF_UNBOUND, and it fails the
+ * same silent way: an unbound handle would emit an anchor name naming no
+ * element, so the popup lays out against its containing block and looks merely
+ * misplaced rather than broken.
+ */
+export function unboundAnchorElementHandleDiagnostic(
+	reference: PendingElementHandleAnchor,
+): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_ELEMENT_HANDLE_ANCHOR_UNBOUND',
+		title: 'element() handle is used as a CSS anchor but never bound',
+		message: `Cannot resolve ${reference.attributeName}={${reference.source}} because "${reference.handleName}" is never bound with el={${reference.handleName}} in this component.`,
+		why: 'A CSS anchor position names another element. With no el={handle} binding there is no element to name, so the compiler would emit an anchor name pointing at nothing and the browser would silently fall back to positioning against the containing block.',
+		span: reference.sourceSpan,
+		suggestion: `Bind the handle to the element it names with el={${reference.handleName}}, or remove the ${reference.attributeName} attribute.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_ANCHOR_UNBOUND',
+	});
+}
+
+/**
+ * A handle bound inside a keyed repeat locates one element per row, so one
+ * authored anchor name would be declared on every row. CSS resolves a duplicate
+ * anchor-name to the LAST element in source order, silently, which is the same
+ * ambiguity the IDREF row refusal exists to keep visible.
+ */
+export function rowOwnedAnchorElementHandleDiagnostic(
+	reference: PendingElementHandleAnchor,
+): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_ELEMENT_HANDLE_ANCHOR_ROW_OWNED',
+		title: 'A repeated element() handle cannot be a CSS anchor',
+		message: `Cannot resolve ${reference.attributeName}={${reference.source}} because "${reference.handleName}" is bound inside a keyed repeat, so it names one element per row rather than one element.`,
+		why: 'Every row would declare the same anchor name, and CSS resolves a duplicated anchor-name to whichever element comes last in source order. Nothing reports that, so the popup would anchor to the last row.',
+		span: reference.sourceSpan,
+		suggestion: 'Bind a separate element() handle outside the repeat for the element this attribute anchors to, or move both ends of the relationship inside the row.',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_ANCHOR_ROW_OWNED',
+	});
+}
+
+/**
+ * Same boundary as the IDREF widget-root refusal: the token naming a rendered
+ * widget instance is written into the seed map the root hands its parts, so the
+ * root itself cannot read it and a page-scoped factory never gets one. Minting
+ * without it would give two widgets on one page the same anchor name.
+ */
+export function widgetRootAnchorElementHandleDiagnostic(
+	reference: PendingElementHandleAnchor,
+): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_ELEMENT_HANDLE_ANCHOR_WIDGET_ROOT',
+		title: 'This shared() element() handle cannot be a CSS anchor here',
+		message: `Cannot resolve ${reference.attributeName}={${reference.source}} because "${reference.handleName}" is declared in a shared() factory that this component roots, or in a factory that is not { scope: 'widget' }.`,
+		why: 'A widget-scoped factory is one graph per rendered widget, so the anchor name has to carry which widget it belongs to. That token is written when the widget root seeds the parts placed inside it, which happens after the root itself has started rendering and never happens at all for a page-wide factory.',
+		span: reference.sourceSpan,
+		suggestion: "Move the element() handle and both ends of the relationship into parts placed inside the widget root, and give the factory { scope: 'widget' }.",
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_ANCHOR_WIDGET_ROOT',
+	});
+}
+
+/**
+ * The anchor declarations and the consumer's own style share one inline style
+ * attribute, so they are composed into one value at compile time. A style whose
+ * value is only known at render time cannot be composed that way without
+ * emitting two style attributes, where the browser keeps the first and drops
+ * the other silently.
+ */
+export function anchorElementHandleDynamicStyleDiagnostic(input: {
+	readonly attributeName: string;
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_ELEMENT_HANDLE_ANCHOR_STYLE_DYNAMIC',
+		title: 'A CSS anchor cannot share an element with a computed style',
+		message: `Cannot compose ${input.attributeName} with the style attribute on this element, because that style is computed at render time rather than written as a literal or an object of literals.`,
+		why: 'Both end up in the same inline style attribute. The compiler merges them into one value so the element carries exactly one style attribute; a render-time value would have to be merged in the browser, and emitting two style attributes instead would let the parser drop one without saying so.',
+		span: input.span,
+		suggestion: 'Move the computed declarations into a class, or move the anchor attribute onto a wrapper element that carries no computed style.',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_ANCHOR_STYLE_DYNAMIC',
 	});
 }
 

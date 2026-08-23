@@ -1,5 +1,5 @@
 import { parseModule } from '../../js-ast.ts';
-import type { PublicRenderModuleInput } from '../../artifacts.ts';
+import type { PublicRenderModuleInput, SemanticMarkupResidue } from '../../artifacts.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
 import { sharedInstanceVisibleFrom } from '../semantic-graph/collect-shared.ts';
 import {
@@ -72,20 +72,53 @@ export function renderDecisionSources(
  */
 export const MARKLESS_WIDGET_INSTANCE_KEY = 'markless:widget-instance';
 
-/** Every element() handle whose minted id one chunk set has to spell. */
+/**
+ * Every element() handle one chunk set has to spell, in either rendering: as a
+ * minted `mx-` id, or as the `--mx-` dashed-ident a CSS anchor position needs.
+ * One collection because it answers one question - whether this chunk set needs
+ * the widget-instance token - and both renderings need it for the same handles.
+ */
 export function elementHandleIdSources(chunks: RenderChunks): ReadonlyArray<string> {
 	const handles = new Set<string>();
+	const add = (residue: SemanticMarkupResidue) => {
+		if (residue.kind === 'element-handle-id') handles.add(residue.handleGraphNodeId);
+		if (residue.kind === 'element-handle-anchor-style')
+			for (const declaration of residue.declarations)
+				handles.add(declaration.handleGraphNodeId);
+	};
 	for (const chunk of chunks) {
 		for (const slot of chunk.slots) {
-			if ('residue' in slot && slot.residue.kind === 'element-handle-id')
-				handles.add(slot.residue.handleGraphNodeId);
+			if ('residue' in slot) add(slot.residue);
 			if (slot.kind !== 'dynamic-host') continue;
-			for (const attribute of slot.attributeSlots)
-				if (attribute.residue.kind === 'element-handle-id')
-					handles.add(attribute.residue.handleGraphNodeId);
+			for (const attribute of slot.attributeSlots) add(attribute.residue);
 		}
 	}
 	return [...handles];
+}
+
+/**
+ * Which of the two renderings a chunk set actually asks for. Pay-per-use: a
+ * module with no anchor position carries no anchor branch, and a module with no
+ * IDREF carries no mint at all.
+ */
+export function elementHandleResidueKinds(chunks: RenderChunks): {
+	readonly id: boolean;
+	readonly anchorStyle: boolean;
+} {
+	let id = false;
+	let anchorStyle = false;
+	const see = (residue: SemanticMarkupResidue) => {
+		if (residue.kind === 'element-handle-id') id = true;
+		if (residue.kind === 'element-handle-anchor-style') anchorStyle = true;
+	};
+	for (const chunk of chunks) {
+		for (const slot of chunk.slots) {
+			if ('residue' in slot) see(slot.residue);
+			if (slot.kind !== 'dynamic-host') continue;
+			for (const attribute of slot.attributeSlots) see(attribute.residue);
+		}
+	}
+	return { id, anchorStyle };
 }
 
 /**
@@ -104,17 +137,37 @@ export function elementHandleIdSources(chunks: RenderChunks): ReadonlyArray<stri
 export function elementHandleIdReadCase(input: {
 	readonly idPrefixSource: string;
 	readonly widgetInstanceSource: string | null;
+	/** Defaults to the id rendering only; the anchor branch is opt-in. */
+	readonly kinds?: { readonly id: boolean; readonly anchorStyle: boolean };
 }): string {
-	const prefix = input.widgetInstanceSource
-		? `(residue.handleGraphNodeId.startsWith('shared:')?(${input.widgetInstanceSource}??${MISSING_WIDGET_INSTANCE}):${input.idPrefixSource})`
-		: input.idPrefixSource;
-	return `if(residue.kind==='element-handle-id')return 'mx-'+(${prefix}+residue.handleGraphNodeId).replace(/\\W+/g,'-');`;
+	// One slug expression, two renderings. `mx-<slug>` is the id an IDREF names;
+	// `--mx-<slug>` is the CSS dashed-ident an anchor position names. The
+	// existing sanitizer already reduces the slug to [A-Za-z0-9-], so prefixing
+	// `--` always yields a valid <dashed-ident> and the two spellings of one
+	// identity cannot drift.
+	const slug = (handle: string) => {
+		const prefix = input.widgetInstanceSource
+			? `(${handle}.startsWith('shared:')?(${input.widgetInstanceSource}??${missingWidgetInstance(handle)}):${input.idPrefixSource})`
+			: input.idPrefixSource;
+		return `(${prefix}+${handle}).replace(/\\W+/g,'-')`;
+	};
+	const kinds = input.kinds ?? { id: true, anchorStyle: false };
+	return [
+		kinds.id
+			? `if(residue.kind==='element-handle-id')return 'mx-'+${slug('residue.handleGraphNodeId')};`
+			: '',
+		// The consumer's own declarations come first so the anchor names, which
+		// are plumbing rather than design, win the cascade.
+		kinds.anchorStyle
+			? `if(residue.kind==='element-handle-anchor-style')return (residue.staticStyle?residue.staticStyle+';':'')+residue.declarations.map(a=>a.property+':--mx-'+${slug('a.handleGraphNodeId')}).join(';');`
+			: '',
+	].join('');
 }
 
 // A part rendered outside every widget root has no token; refusing loudly is
-// the only alternative to minting an id a second widget would mint too.
-const MISSING_WIDGET_INSTANCE =
-	"(()=>{throw new Error('MARKLESS_ELEMENT_HANDLE_WIDGET_INSTANCE_MISSING: '+residue.handleGraphNodeId)})()";
+// the only alternative to minting a name a second widget would mint too.
+const missingWidgetInstance = (handle: string) =>
+	`(()=>{throw new Error('MARKLESS_ELEMENT_HANDLE_WIDGET_INSTANCE_MISSING: '+${handle})})()`;
 
 /** Whether any of these handles is declared by a shared() factory. */
 export function hasSharedElementHandle(handles: ReadonlyArray<string>): boolean {
@@ -237,6 +290,7 @@ export function emitClientResidueReader(
 					widgetInstanceSource: hasSharedElementHandle(handles)
 						? `${CONTEXT}.read(${JSON.stringify(MARKLESS_WIDGET_INSTANCE_KEY)})`
 						: null,
+					kinds: elementHandleResidueKinds(componentChunks),
 				})
 			: '';
 	return [
