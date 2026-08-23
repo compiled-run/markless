@@ -21,6 +21,7 @@
 		"./otp": "./src/otp/index.ts",
 		"./pagination": "./src/pagination/index.ts",
 		"./qr-code": "./src/qr-code/index.ts",
+		"./scroll-area": "./src/scroll-area/index.ts",
 		"./checklist": "./src/checklist/index.ts",
 		"./progress": "./src/progress/index.ts",
 		"./textbox": "./src/textbox/index.ts",
