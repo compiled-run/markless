@@ -860,7 +860,7 @@ test('M10 intrinsic contract accepts Markless spellings, native events, element 
 	expect(syntactic).toEqual([]);
 	expect(
 		semantic,
-		'M10 accepted intrinsic attributes must use native DOM event types and concrete host element types without diagnostics.',
+		'M10 accepted intrinsic attributes must use native DOM event types, markless-dispatched event types such as overlay `dismiss`, and concrete host element types without diagnostics.',
 	).toEqual([]);
 }, 20_000);
 
@@ -876,7 +876,9 @@ test('M10 intrinsic contract rejects className, bogus and tag-wrong attributes, 
 	);
 	expectDiagnosticSpan(fixture.source, diagnosticMatching(diagnostics, /src/), 'src');
 	expectDiagnosticSpan(fixture.source, diagnosticMatching(diagnostics, /invalid/), 'invalid');
-	expect(diagnostics).toHaveLength(4);
+	// A `dismiss` detail that were `any` would accept this narrowing silently.
+	expectDiagnosticSpan(fixture.source, diagnosticMatching(diagnostics, /outside-press/), 'only');
+	expect(diagnostics).toHaveLength(5);
 }, 20_000);
 
 test('M16 PropsOf and Children from @markless/core type a component and its children in .tsrx', async () => {

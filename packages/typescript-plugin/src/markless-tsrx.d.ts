@@ -46,7 +46,33 @@ declare namespace __MarklessTypeService {
 	) => unknown;
 	type OneOrMany<T> = T | readonly T[];
 
+	/**
+	 * Why the overlay primitive dismissed the topmost enlisted element: a person
+	 * pressed Escape, or pressed outside it. `@markless/web` owns the strings -
+	 * `OverlayDismissReason` in `src/fns/overlay.ts` is what builds the event - and
+	 * this file restates rather than imports them because it is handed to a
+	 * consumer's program as a root file, so every module it names must resolve from
+	 * the plugin's own declared dependencies, which the runtime is not. The two
+	 * spellings change together.
+	 */
+	type OverlayDismissReason = 'escape' | 'outside-press';
+
+	type OverlayDismissDetail = {
+		readonly reason: OverlayDismissReason;
+	};
+
+	/**
+	 * Events markless dispatches itself, which no DOM lib knows. They sit here
+	 * rather than in `GlobalEventHandlersEventMap` so `onDismiss` on an element
+	 * typechecks without also blessing `dismiss` for every `addEventListener` in a
+	 * consumer's unrelated DOM code.
+	 */
+	type MarklessEventMap = {
+		dismiss: CustomEvent<OverlayDismissDetail>;
+	};
+
 	type ElementEventMap<E extends globalThis.Element> = GlobalEventHandlersEventMap &
+		MarklessEventMap &
 		(E extends HTMLMediaElement ? HTMLMediaElementEventMap : {}) &
 		(E extends HTMLVideoElement ? HTMLVideoElementEventMap : {});
 
