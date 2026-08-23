@@ -1,10 +1,10 @@
 import type { NVDAPlaywright, VoiceOverPlaywright } from '@guidepup/playwright';
-import type { Keys, ScreenReaderDriver, Vocabulary } from '../sr/driver.ts';
+import type { Keys, ScreenReaderDriver, Vocabulary } from './driver.ts';
 
 /**
  * The half of a driver a real screen reader supplies: the commands.
  *
- * `../sr/driver.ts` is the seam every transcript expectation is written
+ * `./driver.ts` is the seam every transcript expectation is written
  * against, and it takes no position on which reader is speaking. The virtual
  * lane fills it with a reader written in JavaScript that reads a container; this
  * fills it with NVDA or VoiceOver reading a served page through Playwright. The

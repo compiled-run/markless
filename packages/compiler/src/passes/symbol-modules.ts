@@ -27,6 +27,8 @@ import {
 	type ArmImportedInterfaces,
 } from './arm-child-content.ts';
 import { asNodes, isNode, type AnyNode } from '../ast/nodes.ts';
+import { parseJavaScriptModule } from '../js-ast.ts';
+import { isClassInstanceValue } from './semantic-graph/collect-state.ts';
 import {
 	arrayNode,
 	arrowFunctionNode,
@@ -151,9 +153,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 	const boundaryArmsById = renderBoundaryArms(input.renderData, asyncComputedNodeIds);
 	const sourceFileName = input.source?.filename ?? 'markless-module.tsrx';
 	const authoredSource = input.source?.source ?? '';
-	return {
-		passId: 'symbol-modules',
-		modules: input.symbolResolver.symbols.flatMap((symbol) => {
+	const modules: GeneratedSymbolModule[] = input.symbolResolver.symbols.flatMap((symbol) => {
 			if (unsupportedCaptureSymbolIds.has(symbol.id)) return [];
 			if (symbol.kind === 'branch-update') {
 				const arms = branchArms.armsBySite.get(symbol.branchSiteId);
@@ -197,8 +197,108 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 				input.omitAuthoredSource === true,
 				sourceFileName,
 			);
-		}),
-		diagnostics: [...input.captureAnalysis.diagnostics, ...branchArms.diagnostics],
+	});
+
+	return {
+		passId: 'symbol-modules',
+		modules,
+		diagnostics: [
+			...input.captureAnalysis.diagnostics,
+			...branchArms.diagnostics,
+			...divergentModuleInstanceCarries(modules).map(divergentModuleInstanceDiagnostic),
+		],
+	};
+}
+
+// ---------------------------------------------------------------------------
+// One authored instance, one instance per handler module.
+//
+// A handler symbol module is fetched and evaluated on its own, so a same-file
+// module-scope declaration the handler still names is copied into every handler
+// module that names it. With one handler that is exactly the intent — the
+// instance is built browser-side, inside the module that uses it. With two it
+// stops being one instance: each module runs its own `new`, and whatever the
+// methods accumulate diverges with nothing to say so.
+//
+// The carry is read back off the modules that were actually emitted rather than
+// recorded during emission, so what this reports is what shipped. The fact and
+// the refusal are deliberately separate: `divergentModuleInstanceCarries` is the
+// measurement, `divergentModuleInstanceDiagnostic` is the current policy on it.
+// Relaxing refusal to recording is swapping the second, not rewriting the first.
+// ---------------------------------------------------------------------------
+
+// This pass owns the code; readers import it rather than restating the string.
+export const MODULE_INSTANCE_DIVERGENT_HANDLERS_CODE =
+	'MARKLESS_MODULE_INSTANCE_DIVERGENT_HANDLERS' as const;
+
+type DivergentModuleInstance = {
+	readonly name: string;
+	readonly symbolIds: ReadonlyArray<string>;
+};
+
+function divergentModuleInstanceCarries(
+	modules: ReadonlyArray<GeneratedSymbolModule>,
+): ReadonlyArray<DivergentModuleInstance> {
+	const symbolIdsByName = new Map<string, string[]>();
+	for (const emitted of modules) {
+		if (emitted.kind !== 'event-handler' && emitted.kind !== 'callback-prop') continue;
+		for (const name of moduleScopeInstanceNames(emitted.source)) {
+			const seen = symbolIdsByName.get(name);
+			if (seen) seen.push(emitted.symbolId);
+			else symbolIdsByName.set(name, [emitted.symbolId]);
+		}
+	}
+
+	return [...symbolIdsByName]
+		.filter(([, symbolIds]) => symbolIds.length > 1)
+		.map(([name, symbolIds]) => ({ name, symbolIds }));
+}
+
+/** Module-scope bindings this emitted module initializes with a class instance. */
+function moduleScopeInstanceNames(source: string): ReadonlyArray<string> {
+	let ast: AnyNode;
+	try {
+		ast = parseJavaScriptModule(source);
+	} catch {
+		// A module the compiler just printed and cannot reparse is a different
+		// defect; it is not evidence that this one is absent, so claim nothing.
+		return [];
+	}
+
+	return asNodes(ast.body).flatMap((statement) => {
+		if (statement.type !== 'VariableDeclaration') return [];
+		return asNodes(statement.declarations).flatMap((declarator) => {
+			const init = declarator.init;
+			if (!isNode(init) || !isClassInstanceValue(init)) return [];
+			const id = declarator.id;
+			return isNode(id) && id.type === 'Identifier' && typeof id.name === 'string'
+				? [id.name]
+				: [];
+		});
+	});
+}
+
+function divergentModuleInstanceDiagnostic(
+	carry: DivergentModuleInstance,
+): SymbolModulesDiagnostic {
+	return {
+		code: MODULE_INSTANCE_DIVERGENT_HANDLERS_CODE,
+		severity: 'error',
+		phase: 'public-render',
+		passId: 'symbol-modules',
+		artifactKeys: ['symbolModules'],
+		title: 'This module-scope instance would become one instance per handler',
+		message: `Module-scope instance "${carry.name}" is carried into ${carry.symbolIds.length} handler modules (${carry.symbolIds.join(', ')}). Each of those modules runs its own constructor, so they hold ${carry.symbolIds.length} separate instances and anything one of them records is invisible to the others.`,
+		why: 'Every handler symbol module is loaded on its own when its handler first fires, so a declaration in the authoring file has to be copied into each one that names it. One handler gets the intended browser-side instance. Two or more get a copy each, and nothing at runtime reveals that they have drifted apart.',
+		suggestions: [
+			{
+				message: `Move "${carry.name}" and its class into their own module and import it. An import resolves to one module instance that every handler module shares, so the handlers agree.`,
+			},
+			{
+				message: `Or hold the data in shared() or state() instead, so the graph owns it and the payload carries it. Use this when the value has to survive resume or be read during the server render; the imported-module route keeps it browser-only.`,
+			},
+		],
+		docsUrl: `https://markless.dev/errors/${MODULE_INSTANCE_DIVERGENT_HANDLERS_CODE}`,
 	};
 }
 
@@ -1570,6 +1670,30 @@ function referencedModuleDeclarationSources(
 	declarations: readonly string[],
 	filename: string,
 ): string[] {
+	return referencedModuleDeclarations(
+		initializerReferencedNames(initializerSource, filename),
+		declarations,
+		filename,
+	);
+}
+
+/**
+ * The same transitive selection, entered from a reference set a caller already
+ * holds rather than from an expression source.
+ *
+ * An event handler reaches the selection this way: its emitted body is built
+ * before the module declarations are chosen, and it is the *emitted* body that
+ * decides which names are still free. A name the lowering turned into a
+ * `context.graph.read(...)` is no longer a reference to a module binding, so
+ * selecting from the authored text instead would pull declarations the module
+ * does not need.
+ */
+function referencedModuleDeclarations(
+	seedReferences: ReadonlySet<string>,
+	declarations: readonly string[],
+	filename: string,
+): string[] {
+	const references = new Set(seedReferences);
 	const remaining = declarations.map((declaration) => {
 		const parsed = parseEmissionSource(declaration, filename, 'ts').program as unknown as AnyNode;
 		return {
@@ -1579,7 +1703,6 @@ function referencedModuleDeclarationSources(
 		};
 	});
 
-	const references = initializerReferencedNames(initializerSource, filename);
 	const selected: string[] = [];
 	let changed = true;
 	while (changed) {
@@ -3392,6 +3515,25 @@ export type EventHandlerEmissionInput = {
 	readonly usesArgumentVector: boolean;
 	/** The authored file the handler was extracted from; names the map. */
 	readonly sourceFileName: string;
+	/**
+	 * The authored file's module-scope declarations, as `emitSymbolModules`
+	 * projects them.
+	 *
+	 * A handler symbol module is a module of its own, so a same-file module-scope
+	 * `const`/`function`/`class` the handler body still names after lowering is
+	 * not in scope there unless this emitter carries it across. Omitted means
+	 * none, which is what a caller that only has one symbol's source can say.
+	 */
+	readonly moduleDeclarations?: readonly string[];
+	/**
+	 * The authored file's imports, as the semantic graph collected them.
+	 *
+	 * Only consulted for a carried module-scope declaration's own free names: the
+	 * symbol's `moduleImports` were selected against the handler body, so an
+	 * import that only the carried declaration needs is not among them. A module
+	 * that carries no declaration filters exactly the imports it did before.
+	 */
+	readonly moduleImports?: readonly SemanticModuleImport[];
 };
 
 /** The body of the `/* scalar leaf marker: ... *\/` comment, delimiters excluded. */
@@ -3496,17 +3638,28 @@ export function buildEventHandlerEmission(
 	}
 
 	const importedReference = eventHandlerImportedReference(symbol);
-	const bodyStatements = importedReference
-		? [importedHandlerCallStatement(input, projection)]
-		: eventHandlerAuthoredStatements(input, projection, source);
+	const statementsFor = (handler: EventHandlerProjection | null): EmissionNode[] =>
+		importedReference
+			? [importedHandlerCallStatement(input, handler)]
+			: eventHandlerAuthoredStatements(input, handler, handler?.source ?? symbol.source);
 
 	// The string path decides which imports survive by scanning the emitted
 	// *body* text only, so this reads the same statements and no others.
-	const referenced = deriveReferencedIdentifierNames(bodyStatements);
+	const carried = eventHandlerModuleScopeCarry(
+		input,
+		symbol,
+		projection,
+		source,
+		statementsFor,
+	);
+	const { bodyStatements, declarationStatements } = carried;
+	const referenced = carried.referenced;
 	const imports = uniqueModuleImports(
-		(symbol.moduleImports ?? []).filter((moduleImport) =>
-			referenced.has(moduleImport.localName),
-		),
+		[
+			...(symbol.moduleImports ?? []),
+			// A carried declaration can name an import the handler body never did.
+			...(declarationStatements.length === 0 ? [] : (input.moduleImports ?? [])),
+		].filter((moduleImport) => referenced.has(moduleImport.localName)),
 	);
 
 	const isAsync =
@@ -3535,6 +3688,7 @@ export function buildEventHandlerEmission(
 					source: moduleImport.source,
 				}),
 			),
+			...declarationStatements,
 			exportNamedDeclarationNode(
 				eventHandlerFunctionNode(exportName, isAsync, [
 					...(importedReference ? [] : eventHandlerParameterStatements(input)),
@@ -3542,9 +3696,127 @@ export function buildEventHandlerEmission(
 				]),
 			),
 		]),
-		source,
+		source: carried.source,
 		outputFileName: `${exportName}.js`,
 		site,
+	};
+}
+
+/**
+ * The emitted body, the module-scope declarations it needs, and the reference
+ * set both together produce.
+ *
+ * Two passes, and the second only happens when the first found a free name that
+ * a module-scope declaration binds. The order is forced: which declarations the
+ * module needs is a question about the *emitted* body, and the emitted body is
+ * built from a parse. So the body is built once to ask the question, and — only
+ * when the answer is non-empty — the declarations and the handler are reparsed
+ * together as one text and the body is rebuilt from that parse.
+ *
+ * Reparsing rather than splicing two trees is what keeps the source map honest:
+ * a node's `start`/`end` index the text it came from, so declarations parsed
+ * separately would carry offsets into a string the print site never sees. This
+ * is the same one-text rule `stateInitializerProjection` follows, and the reason
+ * is the same.
+ */
+function eventHandlerModuleScopeCarry(
+	input: EventHandlerEmissionInput,
+	symbol: EventHandlerSymbol,
+	projection: EventHandlerProjection | null,
+	source: string,
+	statementsFor: (handler: EventHandlerProjection | null) => EmissionNode[],
+): {
+	readonly bodyStatements: EmissionNode[];
+	readonly declarationStatements: ReadonlyArray<EmissionNode>;
+	readonly referenced: ReadonlySet<string>;
+	readonly source: string;
+} {
+	const firstPass = statementsFor(projection);
+	const empty = {
+		bodyStatements: firstPass,
+		declarationStatements: [] as ReadonlyArray<EmissionNode>,
+		referenced: deriveReferencedIdentifierNames(firstPass),
+		source,
+	};
+
+	const declarations = input.moduleDeclarations ?? [];
+	if (declarations.length === 0 || !projection) return empty;
+
+	const reached = new Set(
+		referencedModuleDeclarations(
+			deriveReferencedIdentifierNames(firstPass),
+			declarations,
+			input.sourceFileName,
+		),
+	);
+	if (reached.size === 0) return empty;
+	// Authored order, not reachability order. Reachability finds `const nav = new
+	// Nav()` before it finds `class Nav`, and emitting them that way runs the
+	// constructor while the class binding is still in its temporal dead zone —
+	// a module that throws the moment the first interaction loads it. Authored
+	// order is the order the consumer already proved evaluates.
+	const selected = declarations.filter((declaration) => reached.has(declaration));
+
+	const reprojected = eventHandlerModuleScopeProjection(
+		selected,
+		symbol.source,
+		input.sourceFileName,
+	);
+	// A projection that will not reparse leaves the module exactly as it was
+	// before this carry existed, rather than emitting a half-bound one.
+	if (!reprojected) return empty;
+
+	const bodyStatements = statementsFor(reprojected.handler);
+
+	return {
+		bodyStatements,
+		declarationStatements: reprojected.declarationStatements,
+		// A carried declaration's own free names decide imports too: a module-scope
+		// class extending an imported base needs that import in this module.
+		referenced: new Set([
+			...deriveReferencedIdentifierNames(bodyStatements),
+			...deriveReferencedIdentifierNames(reprojected.declarationStatements),
+		]),
+		source: reprojected.source,
+	};
+}
+
+/**
+ * Parse the selected module-scope declarations and the authored handler together
+ * as one text, and split the result back into the two the emitter needs.
+ *
+ * `null` for every shape `eventHandlerProjection` also refuses, so the caller's
+ * fallback is the module it would have emitted anyway.
+ */
+function eventHandlerModuleScopeProjection(
+	declarations: readonly string[],
+	handlerSource: string,
+	filename: string,
+): {
+	readonly source: string;
+	readonly declarationStatements: ReadonlyArray<EmissionNode>;
+	readonly handler: EventHandlerProjection;
+} | null {
+	const trimmed = handlerSource.trim();
+	if (!trimmed) return null;
+
+	const source = [...declarations, `(${trimmed});`].join('\n');
+	let parsed: ReturnType<typeof parseEmissionSource>;
+	try {
+		parsed = parseEmissionSource(source, filename, 'ts');
+	} catch {
+		return null;
+	}
+	if (parsed.errors.length > 0) return null;
+
+	const statements = asNodes((parsed.program as unknown as AnyNode).body);
+	const last = statements.at(-1);
+	if (!last || last.type !== 'ExpressionStatement' || !isNode(last.expression)) return null;
+
+	return {
+		source,
+		declarationStatements: statements.slice(0, -1) as unknown as ReadonlyArray<EmissionNode>,
+		handler: { source, expression: last.expression },
 	};
 }
 
@@ -4655,6 +4927,8 @@ export function buildSymbolModuleEmission(
 			captureSlots: input.captureSlots,
 			usesArgumentVector: input.usesArgumentVector === true,
 			sourceFileName: input.sourceFileName,
+			moduleDeclarations: input.moduleDeclarations,
+			moduleImports: input.moduleImports,
 		});
 	}
 

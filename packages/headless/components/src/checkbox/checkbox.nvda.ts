@@ -1,8 +1,8 @@
 import { nvdaTest } from '@guidepup/playwright';
-import { FAMILY_ANCHORS, PREVIEW_ORIGIN } from '../../../../apps/sr-gallery/preview-server.ts';
+import { FAMILY_ANCHORS, PREVIEW_ORIGIN } from '../../../../../apps/sr-gallery/preview-server.ts';
 import { readCheckboxTranscript } from './checkbox-transcript.ts';
-import { realDriver } from './page-driver.ts';
-import { nvdaSpec } from './vocabularies.ts';
+import { realDriver } from '../../test-support/page-driver.ts';
+import { nvdaSpec } from '../../test-support/vocabularies.ts';
 
 // Real NVDA reading the served gallery. The expectations are the shared ones in
 // checkbox-transcript.ts; the only thing this file decides is which reader.

@@ -8,7 +8,10 @@ const repoRoot = fileURLToPath(new URL('../../../../', import.meta.url));
 
 export default defineConfig({
 	...screenReaderConfig,
-	testDir: fileURLToPath(new URL('.', import.meta.url)),
+	// The specs are colocated beside their families under src/, the way the
+	// browser and virtual-reader suites are; this folder holds only the
+	// family-agnostic machinery they share.
+	testDir: fileURLToPath(new URL('../src', import.meta.url)),
 	// A real reader speaks in real time and cannot be hurried; these are not the
 	// timings of an ordinary browser test.
 	timeout: 5 * 60_000,
@@ -28,7 +31,7 @@ export default defineConfig({
 		timeout: 180_000,
 	},
 	projects: [
-		{ name: 'nvda', testMatch: /.*\.nvda\.spec\.ts$/ },
-		{ name: 'voiceover', testMatch: /.*\.voiceover\.spec\.ts$/ },
+		{ name: 'nvda', testMatch: /.*\.nvda\.ts$/ },
+		{ name: 'voiceover', testMatch: /.*\.voiceover\.ts$/ },
 	],
 });

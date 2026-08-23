@@ -1,19 +1,25 @@
 import { expect } from '@playwright/test';
-import { missingFacts, readUntil, type Conveys, type ScreenReaderDriver } from '../sr/driver.ts';
+import {
+	missingFacts,
+	readUntil,
+	type Conveys,
+	type ScreenReaderDriver,
+} from '../../test-support/driver.ts';
 
 /**
  * The checkbox family's Basic scenario, read by a real screen reader.
  *
- * Every expectation below is a `Conveys` from `../sr/driver.ts` - the same
- * shape `sr/checkbox.sr.test.ts` asserts in, naming facts (role, accessible
+ * Every expectation below is a `Conveys` from `../../test-support/driver.ts` -
+ * the same shape `checkbox.sr.ts` asserts in, naming facts (role, accessible
  * name, state) rather than any reader's wording. The words for those facts come
  * from the driver, so this file runs unchanged against NVDA and VoiceOver.
  *
  * It covers the two steps of the aria-at checkbox plan whose reader wording is
- * recorded in `../sr/README.md`: reading an unchecked box, and reading it again
- * after Space. The states the virtual lane also covers - indeterminate,
- * disabled, invalid - are deliberately absent until a CI run prints what these
- * readers actually say about our markup. See `vocabularies.ts`.
+ * recorded in `../../test-support/README.md`: reading an unchecked box, and
+ * reading it again after Space. The states the virtual lane also covers -
+ * indeterminate, disabled, invalid - are deliberately absent until a CI run
+ * prints what these readers actually say about our markup. See
+ * `../../test-support/vocabularies.ts`.
  */
 
 /** The name the Basic scenario gives its box. */

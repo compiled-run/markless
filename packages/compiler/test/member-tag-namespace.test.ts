@@ -107,6 +107,50 @@ export function Gallery() @{
 	expect(diagnostic?.primarySpan?.filename).toBe('src/Gallery.tsrx');
 });
 
+test('a member tag that walks two segments into a .tsrx surface is a loud error', async () => {
+	// A compiled .tsrx publishes its parts in one flat map keyed by export name,
+	// so nothing under the module surface can hold a second segment. Emitting the
+	// tag anyway took its LAST segment and composed whatever answered to that,
+	// silently rendering a different part.
+	const { gallery } = await compileGallery(`import * as parts from './parts.tsrx';
+export function Gallery() @{
+	<section><parts.forms.field /></section>
+}`);
+
+	const diagnostic = gallery.semanticGraph.diagnostics.find(
+		(item) => item.code === 'MARKLESS_COMPONENT_TAG_UNRESOLVED',
+	);
+	expect(diagnostic?.severity).toBe('error');
+	expect(diagnostic?.message).toContain('parts.forms.field');
+	expect(diagnostic?.message).toContain('./parts.tsrx');
+	expect(diagnostic?.why).toContain('Card');
+	expect(diagnostic?.primarySpan?.filename).toBe('src/Gallery.tsrx');
+});
+
+test('a named import of a .tsrx cannot be walked into either', async () => {
+	// `import { forms } from './parts.tsrx'` names a component, never an object
+	// holding more of them, so `<forms.field />` is the same unrepresentable read.
+	const { gallery } = await compileGallery(`import { forms } from './parts.tsrx';
+export function Gallery() @{
+	<section><forms.field /></section>
+}`);
+
+	const diagnostic = gallery.semanticGraph.diagnostics.find(
+		(item) => item.code === 'MARKLESS_COMPONENT_TAG_UNRESOLVED',
+	);
+	expect(diagnostic?.severity).toBe('error');
+	expect(diagnostic?.message).toContain('forms.field');
+});
+
+test('a single-segment member tag over the same module stays a clean compile', async () => {
+	const { gallery } = await compileGallery(`import * as parts from './parts.tsrx';
+export function Gallery() @{
+	<section><parts.Badge text="New" /></section>
+}`);
+
+	expect(gallery.semanticGraph.diagnostics).toEqual([]);
+});
+
 test('an unlinked member tag stays deferred, because the module has not answered yet', async () => {
 	// No interface for './unknown.tsrx' means the compiler cannot know what it
 	// serves. Erroring here would fail a module purely for compile order.

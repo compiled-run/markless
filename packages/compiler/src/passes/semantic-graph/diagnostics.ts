@@ -260,6 +260,33 @@ export function memberTagPartMissingDiagnostic(input: {
 	});
 }
 
+// A compiled .tsrx module serves its components from one flat map on its
+// surface, keyed by the name it exports each under. A tag that walks two
+// segments into that surface names a place the map cannot hold, and composing
+// its last segment alone would render a different part without saying so.
+export function memberTagNestedPartDiagnostic(input: {
+	readonly tagName: string;
+	readonly surfacePath: ReadonlyArray<string>;
+	readonly importSource: string;
+	readonly served: ReadonlyArray<string>;
+	readonly node: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	const served = input.served.length
+		? input.served.map((name) => `\`${name}\``).join(', ')
+		: 'no components';
+	const path = input.surfacePath.join('.');
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_COMPONENT_TAG_UNRESOLVED',
+		title: 'Member component tag must name one component of a module surface',
+		message: `Cannot resolve \`<${input.tagName} />\` because \`${input.importSource}\` serves its components one level deep and \`${path}\` walks ${input.surfacePath.length} levels into it.`,
+		why: `That module serves ${served}, each under a single export name. Nothing on its surface holds a nested group, so this tag names no component, and composing only \`${input.surfacePath.at(-1)}\` would silently render a different one.`,
+		span: sourceSpan(input.node, input.filename),
+		suggestion: `Name a component \`${input.importSource}\` exports directly, or group the parts in a plain \`.ts\` barrel and import that instead.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_COMPONENT_TAG_UNRESOLVED',
+	});
+}
+
 export function computedDependencyGraphCycleDiagnostic(input: {
 	readonly cycle: ReadonlyArray<string>;
 }): SemanticGraphDiagnostic {
