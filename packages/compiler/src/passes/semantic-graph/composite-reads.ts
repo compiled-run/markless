@@ -69,7 +69,12 @@ export function pureCompositeReadSources(
 		return pureCompositeReadSources(node.expression as AnyNode | undefined, state, options);
 	}
 	if (isLiteralExpression(node)) return [];
-	if (node.type === 'Identifier') return [expressionSource(node, state.source)];
+	if (node.type === 'Identifier') {
+		// `undefined` is an Identifier to the parser but a value here, like false
+		// or null; reporting it as a read source kills the computed mint.
+		const source = expressionSource(node, state.source);
+		return source === 'undefined' ? [] : [source];
+	}
 	if (node.type === 'MemberExpression') return memberReadSources(node, state);
 	if (node.type === 'CallExpression') {
 		return options.methodCalls === true ? methodCallReadSources(node, state, options) : null;

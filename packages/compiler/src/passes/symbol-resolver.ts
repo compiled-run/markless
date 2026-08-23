@@ -853,7 +853,8 @@ function collectElementHandleCalls(
 	const wrappedSource = `${prefix}${source};`;
 	let ast: AnyNode;
 	try {
-		ast = parseJavaScriptModule(wrappedSource);
+		// TS filename: handler sources can carry annotations and casts.
+		ast = parseJavaScriptModule(wrappedSource, 'generated.ts');
 	} catch {
 		return [];
 	}
