@@ -1,4 +1,4 @@
-import { computed, shared, state } from '@markless/core';
+import { computed, element, shared, state } from '@markless/core';
 import type {
 	TabsContentProps,
 	TabsInstanceState,
@@ -37,8 +37,9 @@ export const tabsState = shared(
 export const tabsPartState = shared(
 	() => {
 		const part: TabsPartInstanceState = state({ value: '' });
+		const el = element<HTMLButtonElement>();
 
-		return { ...part };
+		return { ...part, el };
 	},
 	{ scope: 'widget' },
 );
@@ -90,6 +91,7 @@ export function TabsTrigger({
 
 	<button
 		{...rest}
+		el={tab.el}
 		type="button"
 		role="tab"
 		aria-selected={isSelected ? 'true' : 'false'}
@@ -131,11 +133,9 @@ export function TabsTrigger({
 				return;
 			}
 
-			// `target`, not `currentTarget`: a lazy handler symbol runs after the
-			// native dispatch has finished, and `currentTarget` is null by then.
-			const here = (event.target as HTMLElement).closest('[role="tab"]') as
-				| HTMLButtonElement
-				| null;
+			// This trigger's own element off its own instance handle: a handler on
+			// the element that binds the handle resolves per instance now.
+			const here = tab.el;
 			if (!here) {
 				onKeydown?.(event);
 				return;
