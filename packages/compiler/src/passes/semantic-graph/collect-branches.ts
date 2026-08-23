@@ -1,7 +1,49 @@
 import { asNodes, childNodes, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
+import { type CompositeReadOptions, collectCompositeTemplateExpression } from './composite-reads.ts';
 import { stateWriteInTemplateDiagnostic } from './diagnostics.ts';
 import type { WalkState } from './types.ts';
+
+/**
+ * What counts as part of the read in a branch condition.
+ *
+ * A condition is a predicate, so the shapes a template text position deliberately
+ * leaves out are the plainest way to write one: `!open` and `ticked.includes(id)`
+ * have no shorter form, and `group.value === item.value` is the only way to say
+ * "this row is the selected one". Left out, the condition resolved to no graph
+ * node, the flip symbol was minted with an empty wake set, and the arm rendered
+ * once and then froze while its siblings updated around it.
+ *
+ * `requireWritableRead` keeps the byte cost where the behavior is: a condition
+ * over props alone is settled by the render that produced it, so it mints nothing
+ * and keeps the empty wake set it has today.
+ */
+const BRANCH_CONDITION_READ_OPTIONS: CompositeReadOptions & {
+	readonly requireWritableRead: boolean;
+} = {
+	unaryOperators: true,
+	methodCalls: true,
+	requireWritableRead: true,
+};
+
+/**
+ * The source the branch site tests. A plain graph read is its own source. A
+ * recombined condition becomes one synthetic computed - the same mint the
+ * attribute and prop positions use - and the site tests that computed by name,
+ * so every read inside the condition wakes the flip exactly as `@if (someComputed)`
+ * already does. A condition that resolves to no graph node at all (a repeat local,
+ * an opaque call) mints nothing and keeps its authored source.
+ */
+function branchTestSource(test: AnyNode | undefined, state: WalkState): string {
+	if (!test) return '';
+	const authored = expressionSource(test, state.source);
+	const composite = collectCompositeTemplateExpression(test, state, BRANCH_CONDITION_READ_OPTIONS);
+	if (!composite) return authored;
+	const minted = state.graph.graphBindings.find(
+		(binding) => binding.id === composite.graphNodeId,
+	);
+	return minted ? minted.name : authored;
+}
 
 // Records @if/@switch sites as first-class branch records sharing the unified
 // document-order comment-anchor allocator with async boundaries. The
@@ -15,11 +57,12 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			`@if (${test ? expressionSource(test, state.source) : ''})`,
 			state,
 		);
+		const ifTestSource = branchTestSource(test, state);
 		state.graph.branchSites.push({
 			id: `branch-site:${state.nextBranchSiteId++}`,
 			kind: 'if',
 			armCount: (node.consequent ? 1 : 0) + (node.alternate ? 1 : 0),
-			testSource: test ? expressionSource(test, state.source) : '',
+			testSource: ifTestSource,
 			anchorOrder: state.nextAnchorOrder++,
 			...(state.currentAsyncBoundaryId
 				? {
@@ -38,11 +81,12 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			`@switch (${discriminant ? expressionSource(discriminant, state.source) : ''})`,
 			state,
 		);
+		const switchTestSource = branchTestSource(discriminant, state);
 		state.graph.branchSites.push({
 			id: `branch-site:${state.nextBranchSiteId++}`,
 			kind: 'switch',
 			armCount: asNodes(node.cases).length,
-			testSource: discriminant ? expressionSource(discriminant, state.source) : '',
+			testSource: switchTestSource,
 			anchorOrder: state.nextAnchorOrder++,
 			...(switchArmTests(node) ? { armTests: switchArmTests(node)! } : {}),
 			...(state.currentAsyncBoundaryId
