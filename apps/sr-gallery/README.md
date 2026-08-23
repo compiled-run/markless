@@ -25,7 +25,7 @@ node apps/sr-gallery/scripts/boot-check.ts   # serve it and check every family r
 ```
 
 `preview-server.ts` owns the port and the anchors. The boot check and
-`packages/headless/components/sr-real/playwright.config.ts` import them from
+`packages/headless/components/test-support/playwright.config.ts` import them from
 there rather than spelling their own.
 
 ## It does not render yet
@@ -33,7 +33,7 @@ there rather than spelling their own.
 `pnpm --dir apps/sr-gallery build` fails and `dev` serves a page that never
 mounts. The cause is in the compiler, not here: a component that uses a member
 tag (`<checkbox.root>`) loses its own export through the public-render pass.
-`packages/headless/components/sr-real/README.md` has the exact errors and the
+`packages/headless/components/test-support/README.md` has the exact errors and the
 narrowing that shows it is the member tag rather than the package boundary.
 
 The screen-reader workflow already runs the boot check as its gate, so these
