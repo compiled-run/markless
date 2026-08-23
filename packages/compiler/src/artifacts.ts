@@ -1442,7 +1442,8 @@ export type GeneratedSymbolModule = {
 export type SymbolModulesDiagnostic = CompilerDiagnostic & {
 	readonly code:
 		| 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED'
-		| 'MARKLESS_MODULE_INSTANCE_DIVERGENT_HANDLERS';
+		| 'MARKLESS_MODULE_INSTANCE_DIVERGENT_HANDLERS'
+		| 'MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE';
 	readonly phase: 'public-render';
 	readonly passId: 'symbol-modules';
 };
