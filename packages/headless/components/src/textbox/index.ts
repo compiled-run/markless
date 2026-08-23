@@ -5,6 +5,8 @@ export {
 	TextboxLabel as label,
 	TextboxRoot as root,
 	TextboxTextarea as textarea,
+	textboxState,
+	textboxState as state,
 } from './textbox.tsrx';
 export type {
 	TextboxDescriptionProps,

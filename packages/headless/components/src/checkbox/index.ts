@@ -6,6 +6,8 @@ export {
 	CheckboxLabel as label,
 	CheckboxRoot as root,
 	CheckboxTrigger as trigger,
+	checkboxState,
+	checkboxState as state,
 } from './checkbox.tsrx';
 export type {
 	CheckboxChecked,

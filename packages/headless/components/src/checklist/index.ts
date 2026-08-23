@@ -10,6 +10,8 @@ export {
 	ChecklistRoot as root,
 	ChecklistSelectAll as selectall,
 	ChecklistSelectAllIndicator as selectallindicator,
+	checklistState,
+	checklistState as state,
 } from './checklist.tsrx';
 export type {
 	ChecklistChecked,

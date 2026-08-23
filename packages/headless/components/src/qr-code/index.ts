@@ -4,6 +4,8 @@ export {
 	QrCodePatternPath as patternpath,
 	QrCodePatternSvg as patternsvg,
 	QrCodeRoot as root,
+	qrCodeState,
+	qrCodeState as state,
 } from './qr-code.tsrx';
 export type {
 	QrCodeFrameProps,
