@@ -42,8 +42,9 @@ disclosure directly:
 | Concern | QDS (through `popover="auto"`) | Here |
 | --- | --- | --- |
 | show / hide | top layer, `popovertarget` | `hidden` on the panel |
-| light dismiss | the browser | not offered; focus-out and pointer-leave close |
-| Escape closes, focus returns | the browser | written by hand, in two parts |
+| light dismiss | the browser | the `overlay` mark reports the outside press; `onDismiss` closes |
+| Escape closes | the browser | the `overlay` mark reports it; `onDismiss` closes |
+| focus returns on Escape | the browser | written by hand — the primitive moves no focus |
 | one dropdown at a time | popover-stack eviction | one `value` on the root |
 | detached top-layer entries | a known Fluent UI hazard | not reachable — never in the top layer |
 
@@ -104,15 +105,15 @@ Everything below is measured on this tip, not assumed.
    - the top-level `ArrowLeft`/`ArrowRight` walk is on `itemtrigger` **and** on
      `itemlink`, and stays on `root` as the fallback for a consumer's own
      focusable written straight into the navbar;
-   - the in-dropdown walk and `Escape` are on `itemlink`, and stay on
-     `itemcontent` as the fallback for a consumer's own focusable inside a panel;
+   - the in-dropdown walk is on `itemlink`, and stays on `itemcontent` as the
+     fallback for a consumer's own focusable inside a panel;
    - close-on-pointer-leave moved from `root` to `item` for the same reason,
      and it is still decided against the **landmark** — `nav.contains(relatedTarget)`
      — so moving from a trigger into its own dropdown never closes anything.
-   `navbar.itemlink` resolves `navbarState()` for this: it needs `closeAll()` for
-   Escape. It does **not** resolve the item instance, so it works at the top
-   level and inside a dropdown alike, and reads which position it is in off the
-   DOM.
+   `navbar.itemlink` resolves no instance at all (it did read `navbarState()`
+   while it carried its own `Escape` branch; the overlay primitive owns that
+   report now). It works at the top level and inside a dropdown alike, and reads
+   which position it is in off the DOM.
 2. **A handler symbol's shared-instance reads are rewritten at the symbol's top
    level and NOT inside a nested closure.** Writing the hover delay the obvious
    way —
@@ -223,89 +224,99 @@ Note that the collections this family walks include **consumer-written links**
 have to work for a part that roots no instance of its own, not only for
 `navbar.item`.
 
-## Overlay primitive: adoption attempted and measured 2026-08-23 (U219)
+## Overlay primitive: LANDED 2026-08-23 (U244, at `8494898d`)
 
 The owner's order is that this family's dropdowns ride the overlay primitive
-(`packages/web/src/fns/overlay.ts`, kind `disclosure`) instead of hand-rolled
-dismissal and focus return. **The conversion was written and measured on this
-tip, and it does not hold. The shipped code in this folder is UNCHANGED.** Four
-walls, in the order they stopped the work. None of them is family-side, and
-three of them are outside this family's file contract.
+instead of hand-rolled dismissal. **They do, as of this commit.** The panel
+carries the bare `overlay` attribute, and `navbar.itemcontent`'s `onDismiss`
+decides what a dismissal means. Nothing is imported for it.
 
-Baseline before and after the probes: 47/47 green.
+Measured on this tip: 47/47 before the conversion, **51/51 after** (the four new
+rows are listed under "Test lanes"), and the screen-reader lane's 12 rows —
+including its own Escape row — still green.
 
-**1. The primitive's `onDismiss` cannot write the family's state. Fatal, and it
-is a compile error rather than a silent failure.** `onDismiss` is the only way
-the family learns the primitive closed a surface, and the navbar's "which
-dropdown is showing" is a `shared()` widget instance. Writing the obvious
-callback —
+### What the earlier attempt hit, and why none of it holds now
 
-```js
-openOverlay(item.contentEl, {
-    kind: 'disclosure',
-    onDismiss: () => { navbar.closeAll(); },   // refused
-});
-```
+U219 wrote this conversion against the previous `openOverlay(element, options)`
+surface and recorded four walls. The architecture that landed at `e21d8203`
+retired all four, three of them by removing the thing that broke:
 
-— is `MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE`: *"The emitted
-event-handler module for symbol:5 still names `navbar` directly … this module
-would throw a ReferenceError the first time it runs."* This is the same wall
-"What the runtime forced" §2 records for the hover timer, met from the other
-side: a shared-instance read is rewritten at the handler symbol's top level and
-not inside a nested closure. The `overlay-primitive.tsrx` fixture does not hit it
-because its `onDismiss` writes **component-local** `state()` cells, not a shared
-instance. Without `onDismiss` the graph never learns the surface closed:
-`aria-expanded` stays `"true"` and the panel stays shown. Measured with the rest
-of the conversion in place and `onDismiss` dropped: **44/47, and the three reds
-are exactly the three Escape rows** (`CSR: escape inside a dropdown …`, `CSR:
-escape on the trigger …`, `SSR: escape after resume …`), each `expected 'true' to
-be 'false'` on `aria-expanded`.
+1. **`onDismiss` could not write the family's state.** It was
+   `MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE` — a callback inside an
+   options object is a nested closure, and a shared-instance read is rewritten at
+   the handler symbol's top level. `onDismiss` is now an ordinary event attribute
+   on the element, so its body is a handler top level: `navbar.closeAll()` and
+   `item.graceUntil = …` both compile and both run.
+2. **A widget-scoped `element()` handle answered for the wrong item.** The
+   conversion no longer passes a handle to anything. The `dismiss` event is
+   dispatched on the panel itself and routed to that panel's own handler, so a
+   page with three entries reaches the entry that is showing. The suite row `CSR:
+   with two entries on the page a dismissal reaches the one that is showing`
+   opens the SECOND entry precisely because last-registration-wins would have
+   answered for it.
+3. **`openOverlay` always moved focus into the surface.** The primitive moves no
+   focus at all now, so there is nothing to suppress. The Escape row asserts the
+   panel carries no `tabindex`, which is what the old forced focus move left
+   behind.
+4. **`@markless/ui` could not import the primitive.** There is nothing to import.
+   `packages/headless/components/package.json` is untouched.
 
-**2. A widget-scoped `element()` handle read in a handler answers for the wrong
-item.** This is the select family's defect 63 (`src/select/note.md`, "What a
-handler cannot reach" §1) landing here exactly as that note predicts. The read
-compiles and emits `getElementHandle`, but `handleId` is one module-level string
-shared by every instance of the widget and the resume map is flat, so last
-registration wins. Measured directly, clicking the **Products** trigger in
-`basic.tsrx` with the conversion in place:
+### What the conversion removed, and what it added
 
-```
-{ productsOverlayOpen: false, docsOverlayOpen: true,
-  active: "docs-itemtrigger", productsHidden: true, docsHidden: true }
-```
+Gone: the three hand-rolled `Escape` branches on `itemtrigger`, `itemcontent` and
+`itemlink`, and `Escape` from those three `preventDefault` guard lists — the
+primitive's document listener reads `defaultPrevented`, and this family has no
+default to suppress. `navbar.itemlink` now resolves no widget instance at all;
+`closeAll()` for its own Escape branch was the only reason it read `navbarState`.
 
-The primitive was handed the **Docs** panel and focus landed on the **Docs**
-trigger. Every scenario in this suite has more than one item, so this is not an
-edge case: it is every dropdown but the last one on the page. `aria-controls`
-keeps working for the reason it always has — the id is minted on the element
-itself, not looked up through the flat map.
+Kept, because the primitive deliberately does not do it: the focus return. Escape
+from inside an entry has to land on the button that opened the panel, so
+`onDismiss` reads whether focus was inside the entry **before** it closes — a
+hidden subtree cannot hold focus, so the answer is gone a moment later — and puts
+it back on the trigger.
 
-**3. `openOverlay` always moves focus into the surface, and a navbar dropdown
-must not take focus when it opens.** A click on a disclosure trigger leaves focus
-on the trigger, and a hover-open must move focus nowhere at all — moving it is a
-serious accessibility fault, not a cosmetic one. The primitive offers no way to
-open without focusing: `initialFocus` only *redirects* the move (defaulting to
-the surface, with a `tabindex="-1"` added to it). Pointing `initialFocus` at the
-trigger was the closest available shape, and wall 2 is what made even that land
-on the wrong control. What would close it: an option on `OverlayOptions` that
-suppresses the focus move entirely for `disclosure`.
+New: light dismiss on an outside press, which this family did not offer before
+(see the QDS comparison table above, where the row reads "not offered"). QDS gets
+it from `popover="auto"`; adopting the primitive brings the family closer to the
+reference rather than further.
 
-**4. `@markless/ui` cannot import the primitive.** `packages/headless/components/package.json`
-declares only `@markless/core`, so `@markless/web/fns/overlay` does not resolve
-from this package. The measurements above used a relative cross-package path
-(`../../../../web/src/fns/overlay.ts`) as a probe only; that path is not
-shippable. The dependency edit is outside this family's file contract.
+### The one collision, and the guard
 
-What the adoption would remove, once walls 1–3 are closed: the three hand-rolled
-`Escape` branches (on `itemtrigger`, `itemcontent` and `itemlink`), each of which
-today closes the navbar and then walks the DOM to put focus back on the button —
-`box?.querySelector('[aria-expanded]')` — plus `Escape` from the three
-`preventDefault` guard lists. Light dismiss on an outside press would be **new**
-behaviour rather than a replacement: this family does not offer it today (see the
-QDS comparison table above), and QDS gets it from `popover="auto"`, so adopting
-the primitive brings the family closer to the reference rather than further. The
-focus-movement walks are untouched either way; they need the ordered collection
-that nothing builds, and that is the separate open owner decision.
+The primitive reports on **pointerdown**, and a press on the trigger of an open
+dropdown lands outside the panel — so the press dismisses and the `click` that
+follows the same press would toggle the dropdown straight back open. Measured:
+with the guard removed, exactly one row goes red (`CSR: a real press on the
+trigger of an open dropdown closes it and leaves it closed`) and it fails on
+`aria-expanded` still being `"true"`.
+
+The guard reuses the grace window the hover model already ships:
+`onDismiss` arms `item.graceUntil`, and the trigger's existing
+`if (item.graceUntil <= Date.now())` swallows the click. It is on the ITEM
+instance, so it never suppresses a click on a different entry's trigger — pressing
+the Docs trigger while Products is showing still opens Docs.
+
+Its price, recorded rather than hidden: the window is armed by **any**
+outside press, not only a press on the trigger, because the `dismiss` report
+carries a reason and nothing else. So a press somewhere else on the page followed
+by a click on the same entry's trigger inside `clickGrace` (300 ms by default)
+does not re-open that entry. Narrowing it needs the press target, or its
+coordinates, on the report.
+
+### `onDismiss` has no type, and the stopgap for that is in this folder
+
+`overlay-dismiss.d.ts` declares `dismiss` on `GlobalEventHandlersEventMap`, and
+**it does not belong here.** The type service builds its element attribute map
+from that interface (`packages/typescript-plugin/src/markless-tsrx.d.ts`), the
+overlay landing never added the event to it, and without the declaration
+`onDismiss` on any element is `TS2322: Property 'onDismiss' does not exist`. A
+component family declaring a framework event globally leaks to every package in
+the program. The declaration should move into the type service's own file and be
+deleted from here; the edit is outside this family's file contract.
+
+One more thing the compiler required: `MARKLESS_EVENT_SPREAD_SHADOWED`. A part
+that spreads `{...rest}` and writes its own `onDismiss` has to destructure the
+prop and call it, the way every other handler in this family does.
+`navbar.itemcontent` takes `onDismiss` and runs the consumer's after its own.
 
 ## Panels stay mounted
 
@@ -319,9 +330,23 @@ can run).
 
 ## Test lanes
 
-`navbar.browser.ts` — 47 rows, all green: the shared rows in both modes, the
-consumer callback, gestures, the full keyboard model, four resume rows, and the
-hover block.
+`navbar.browser.ts` — 51 rows, all green: the shared rows in both modes, the
+consumer callback, gestures, the full keyboard model, four resume rows, the
+dismissal block, and the hover block.
+
+The four dismissal rows are what the overlay adoption is proved by:
+
+- `escape arrives as a dismissal and only the family moves focus` — the mark is
+  bare, the panel closes, focus lands on the trigger, and the panel took no
+  `tabindex`, so the only focus move on the page was the family's;
+- `a press outside the panel closes the dropdown that was showing` — behaviour
+  this family did not have before;
+- `with two entries on the page a dismissal reaches the one that is showing` —
+  the second entry, because that is the one a shared flat handle map would get
+  wrong;
+- `a real press on the trigger of an open dropdown closes it and leaves it
+  closed` — the pointerdown-versus-click collision, and the only row in the file
+  that presses with a real pointer, which is why it sits last.
 
 **The hover rows run last, and the order is load-bearing.** The pointer in a real
 browser stays where the previous test left it, so a row that hovers leaves the
@@ -338,19 +363,13 @@ the change back to collapsed on Escape, and the named page-content region. The
 `listBoundary` assertion (priority 3) has no row because there is no list; §4 of
 the deviations above carries the decision.
 
-### Known lane problem, and it is not this family's
+### The lane problem this note used to carry is fixed
 
-Adding a thirteenth `*.sr.ts` file pushes the screen-reader project past its
-concurrency ceiling. With twelve files the lane is 12/12 green; with this
-family's file added, three rows in **other** families (pagination, tabs,
-collapsible) fail on poll timeouts, and they fail identically whether this
-family's file carries twelve rows or two. Each of those files passes alone, and
-`navbar.sr.ts` passes alone.
-
-This is the same contention the `ui` browser project already hit, and the fix is
-the same one that project took: serialize the lane. It belongs in
-`packages/headless/components/test-support/vitest.config.ts` — `fileParallelism:
-false`, matching commit `1622662d` — which is outside this unit's file contract.
+It recorded that adding a thirteenth `*.sr.ts` file pushed the screen-reader
+project past its concurrency ceiling, and that the fix — `fileParallelism: false`
+in `packages/headless/components/test-support/vitest.config.ts` — was outside the
+unit's contract. That config now carries it. Re-measured 2026-08-23 (U244):
+`pnpm test:sr` runs 14 files, 98 passed, 7 expected fail, 4 skipped, exit 0.
 
 ## Not wired into the barrel
 
@@ -363,6 +382,12 @@ to wire at fan-in.
 - **A scheduled callback cannot reach the graph.** Point 2 above. Worth
   chartering; the hover delay works today only because the timer can bounce the
   crossing back through the browser.
+- **`dismiss` has no type in the type service.** `overlay-dismiss.d.ts` in this
+  folder is a stopgap that leaks a global declaration out of a component package;
+  it belongs in `packages/typescript-plugin/src/markless-tsrx.d.ts`.
+- **A `dismiss` report says why, not where.** Without the press target the
+  trigger-collision guard has to be a time window on the item, which also
+  swallows an unrelated press-then-click inside `clickGrace`.
 - **A navbar entry inside a flipping arm.** Point 9 above.
 - **A dev-mode diagnostic for an unnamed landmark.** Deviation 5.
 - **`Home`/`End` at the top level.** `spec.md` promises them and QDS's code

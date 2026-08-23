@@ -415,6 +415,70 @@ test('CSR: escape on the trigger of an open dropdown closes it', async () => {
 	await expect.poll(() => document.activeElement).toBe(el(ProductsTrigger));
 });
 
+// --- dismissal, through the overlay primitive -------------------------------
+//
+// The panel carries the bare `overlay` attribute, so Escape and an outside press
+// arrive as a `dismiss` report on the panel and the family's `onDismiss` decides
+// what they mean. The primitive closes nothing and moves no focus, which is what
+// the rows below are shaped to prove: every state change they see is the
+// family's own.
+
+test('CSR: escape arrives as a dismissal and only the family moves focus', async () => {
+	await render(Basic);
+	// The mark is bare - no value, nothing imported to put it there.
+	expect(el(ProductsContent).hasAttribute('overlay')).toBe(true);
+	expect(el(ProductsContent).getAttribute('overlay')).toBe('');
+
+	el(ProductsTrigger).focus();
+	await userEvent.keyboard('{ArrowDown}');
+	await expect.poll(() => document.activeElement).toBe(el(KeyboardsLink));
+
+	await userEvent.keyboard('{Escape}');
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('false');
+	expect(el(ProductsContent).hasAttribute('hidden')).toBe(true);
+	// The trigger is where the family puts focus back. The primitive never focused
+	// the panel on the way in, so it never made it focusable either.
+	await expect.poll(() => document.activeElement).toBe(el(ProductsTrigger));
+	expect(el(ProductsContent).hasAttribute('tabindex')).toBe(false);
+	// A disclosure is not modal, so nothing on the page was taken out of reach.
+	expect(document.body.hasAttribute('inert')).toBe(false);
+	expect(document.body.style.overflow).toBe('');
+});
+
+test('CSR: a press outside the panel closes the dropdown that was showing', async () => {
+	await render(ClickOnly);
+	el(ProductsTrigger).click();
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
+
+	// New behaviour rather than a replacement: before the primitive this family
+	// offered no light dismiss at all, and QDS gets it from `popover="auto"`. The
+	// report is made on the press, not the click.
+	document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('false');
+	expect(el(ProductsContent).hasAttribute('hidden')).toBe(true);
+	// Nothing had focus inside the entry, so nothing was moved to a trigger.
+	expect(el(ProductsTrigger)).not.toBe(document.activeElement);
+});
+
+// The defect the previous adoption attempt died on: one widget-scoped handle
+// shared by every instance meant the dismissal answered for the LAST entry on the
+// page. Opening the SECOND entry is what makes that visible.
+test('CSR: with two entries on the page a dismissal reaches the one that is showing', async () => {
+	await render(Basic);
+	el(DocsTrigger).focus();
+	await userEvent.keyboard('{ArrowDown}');
+	await expect.poll(() => document.activeElement).toBe(el(StartLink));
+
+	await userEvent.keyboard('{Escape}');
+	await expect.poll(() => el(DocsTrigger).getAttribute('aria-expanded')).toBe('false');
+	// The entry that was showing, and its own trigger.
+	await expect.poll(() => document.activeElement).toBe(el(DocsTrigger));
+	expect(el(DocsContent).hasAttribute('hidden')).toBe(true);
+	// The entry that was already closed is untouched.
+	expect(el(ProductsTrigger).getAttribute('aria-expanded')).toBe('false');
+	expect(el(ProductsContent).hasAttribute('hidden')).toBe(true);
+});
+
 // A native <button> already activates on both, so these two rows prove the
 // family does not get in the way rather than that it implements anything.
 test('CSR: enter on a focused trigger opens its dropdown', async () => {
@@ -610,4 +674,31 @@ test('SSR: a pointer resting on an entry after resume opens it after the delay',
 
 	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
 	expect(el(ProductsContent).hasAttribute('hidden')).toBe(false);
+});
+
+// The one collision the primitive brings, and it is here at the end because it is
+// the only row that presses with a real pointer: `userEvent.click` sends
+// pointerdown, and every other click row in this file uses `.click()`, which
+// sends none.
+//
+// A press on the trigger of an OPEN dropdown lands outside the panel, so the
+// primitive reports it - and the click that follows the same press would toggle
+// the dropdown straight back open. The item's own grace window is what stops the
+// two from fighting.
+test('CSR: a real press on the trigger of an open dropdown closes it and leaves it closed', async () => {
+	await render(ClickOnly);
+	await userEvent.click(el(ProductsTrigger));
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
+
+	await userEvent.click(el(ProductsTrigger));
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('false');
+	// Still closed past the end of the grace window: the click did not re-open what
+	// the press closed, and nothing re-opens it later either.
+	await new Promise((resolve) => setTimeout(resolve, 400));
+	expect(el(ProductsTrigger).getAttribute('aria-expanded')).toBe('false');
+	expect(el(ProductsContent).hasAttribute('hidden')).toBe(true);
+
+	// And the entry still opens on the next press, now that the window is over.
+	await userEvent.click(el(ProductsTrigger));
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
 });
