@@ -1,19 +1,20 @@
-import type { Keys, Vocabulary } from '../sr/driver.ts';
+import type { Keys, Vocabulary } from './driver.ts';
 import { commaSegments, type RealDriverSpec } from './page-driver.ts';
 
 /**
  * What NVDA and VoiceOver call the facts a checkbox announcement has to convey.
  *
- * Three of these words are recorded in `../sr/README.md`, taken from the
+ * Three of these words are recorded in `./README.md`, taken from the
  * w3c/aria-at plans: the role, "not checked", and the indeterminate state.
  * The rest are the readers' documented wording and have never been observed
  * against our markup, because neither reader can be driven on a developer
  * machine without an assistive technology install and, on macOS, a permission
  * grant.
  *
- * `sr/README.md` says never to invent an expected phrase. The rule this file
+ * `./README.md` says never to invent an expected phrase. The rule this file
  * follows instead: every slot is filled so a driver is complete, and
- * `checkbox-transcript.ts` asserts only on the slots marked verified below.
+ * `../src/checkbox/checkbox-transcript.ts` asserts only on the slots marked
+ * verified below.
  * The first CI run that reaches a real reader prints the actual transcript on
  * failure, and whoever reads it corrects these words and widens the suite.
  */
@@ -22,11 +23,11 @@ import { commaSegments, type RealDriverSpec } from './page-driver.ts';
 export const SOURCED_FACTS = ['checkbox', 'notChecked', 'checked'] as const;
 
 export const nvdaVocabulary: Vocabulary = {
-	// sourced: ../sr/README.md reader table
+	// sourced: ./README.md reader table
 	checkbox: 'check box',
-	// sourced: ../sr/README.md reader table
+	// sourced: ./README.md reader table
 	notChecked: 'not checked',
-	// sourced: ../sr/README.md reader table
+	// sourced: ./README.md reader table
 	partiallyChecked: 'half checked',
 	// unverified against our markup
 	checked: 'checked',
@@ -39,11 +40,11 @@ export const nvdaVocabulary: Vocabulary = {
 };
 
 export const voiceOverVocabulary: Vocabulary = {
-	// sourced: ../sr/README.md reader table
+	// sourced: ./README.md reader table
 	checkbox: 'checkbox',
-	// sourced: ../sr/README.md reader table
+	// sourced: ./README.md reader table
 	notChecked: 'unchecked',
-	// sourced: ../sr/README.md reader table
+	// sourced: ./README.md reader table
 	partiallyChecked: 'mixed',
 	// unverified against our markup
 	checked: 'checked',

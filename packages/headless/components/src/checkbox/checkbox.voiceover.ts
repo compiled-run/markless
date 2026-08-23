@@ -1,8 +1,8 @@
 import { voiceOverTest } from '@guidepup/playwright';
-import { FAMILY_ANCHORS, PREVIEW_ORIGIN } from '../../../../apps/sr-gallery/preview-server.ts';
+import { FAMILY_ANCHORS, PREVIEW_ORIGIN } from '../../../../../apps/sr-gallery/preview-server.ts';
 import { readCheckboxTranscript } from './checkbox-transcript.ts';
-import { realDriver } from './page-driver.ts';
-import { voiceOverSpec } from './vocabularies.ts';
+import { realDriver } from '../../test-support/page-driver.ts';
+import { voiceOverSpec } from '../../test-support/vocabularies.ts';
 
 // Real VoiceOver reading the served gallery. Same expectations as the NVDA
 // spec, a different vocabulary for the same facts.

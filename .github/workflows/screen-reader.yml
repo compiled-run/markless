@@ -14,8 +14,9 @@ name: Screen reader
 # matrix and nothing else changes.
 #
 # The two real-reader lanes read a served page: apps/sr-gallery renders every
-# family's Basic scenario, and packages/headless/components/sr-real drives NVDA
-# or VoiceOver over it with the same transcript expectations the virtual lane
+# family's Basic scenario, and each family's <family>.nvda.ts / .voiceover.ts,
+# colocated under packages/headless/components/src/<family>/, drives NVDA or
+# VoiceOver over it with the same transcript expectations the virtual lane
 # uses. The gallery is built and booted first, in its own step, because a page
 # that never rendered and a reader that never spoke look identical downstream.
 # If that step fails the lane falls back to the drivability smoke, which is the
@@ -87,7 +88,7 @@ jobs:
               run: pnpm typecheck:sr-real
 
             - name: Read the ${{ matrix.family }} family with the virtual screen reader
-              run: pnpm test:sr -- sr/${{ matrix.family }}.sr.test.ts
+              run: pnpm test:sr -- src/${{ matrix.family }}/${{ matrix.family }}.sr.ts
 
     # Real NVDA on a real Windows desktop session. guidepup/setup-action
     # installs NVDA and the keyboard automation it needs.
@@ -97,9 +98,9 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                # Only families with a spec under sr-real/. A family joins this
-                # list when its <family>.nvda.spec.ts exists, not before: a name
-                # with no spec file makes the run find no tests.
+                # Only families with a real-reader spec. A family joins this list
+                # when its src/<family>/<family>.nvda.ts exists, not before: a
+                # name with no spec file makes the run find no tests.
                 family: [checkbox]
 
         steps:
@@ -135,7 +136,7 @@ jobs:
 
             - name: Read the ${{ matrix.family }} family with NVDA
               if: steps.gallery.outcome == 'success'
-              run: pnpm test:sr-real -- --project=nvda ${{ matrix.family }}.nvda.spec.ts
+              run: pnpm test:sr-real -- --project=nvda ${{ matrix.family }}/${{ matrix.family }}.nvda.ts
 
             # Fallback, not a pass: the gallery did not render, so this proves
             # only that the runner can drive the reader at all.
@@ -160,7 +161,7 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                # See the nvda job: only families with a spec under sr-real/.
+                # See the nvda job: only families with a real-reader spec.
                 family: [checkbox]
 
         steps:
@@ -193,7 +194,7 @@ jobs:
 
             - name: Read the ${{ matrix.family }} family with VoiceOver
               if: steps.gallery.outcome == 'success'
-              run: pnpm test:sr-real -- --project=voiceover ${{ matrix.family }}.voiceover.spec.ts
+              run: pnpm test:sr-real -- --project=voiceover ${{ matrix.family }}/${{ matrix.family }}.voiceover.ts
 
             - name: Prove the runner can drive VoiceOver
               if: steps.gallery.outcome != 'success'
