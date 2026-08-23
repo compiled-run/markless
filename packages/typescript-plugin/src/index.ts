@@ -2,6 +2,10 @@ import upstreamTsrxTypeScriptPlugin from '@tsrx/typescript-plugin';
 import { join } from 'node:path';
 import { installMarklessCompletions } from './completions.ts';
 import {
+	installMarklessInlayHints,
+	setMarklessInlayHintConfiguration,
+} from './inlay-hints.ts';
+import {
 	MARKLESS_TSRX_PARSE_ERROR_CODE,
 	clampMarklessDiagnosticStart,
 	getMarklessTsrxParseFailure,
@@ -42,8 +46,17 @@ const parseFailureVersions = new Map<string, string>();
 const plugin = (modules: TsserverPluginModules) => {
 	const upstream = upstreamPlugin(modules);
 	const getUpstreamExternalFiles = upstream.getExternalFiles?.bind(upstream);
+	const upstreamConfigurationChanged = (
+		upstream as { onConfigurationChanged?: (configuration: unknown) => void }
+	).onConfigurationChanged?.bind(upstream);
 	return {
 		...upstream,
+		// tsserver's `configurePlugin` command reaches onConfigurationChanged on the object
+		// the plugin factory returned, not on the language service create() produced.
+		onConfigurationChanged(configuration: unknown) {
+			upstreamConfigurationChanged?.(configuration);
+			setMarklessInlayHintConfiguration(configuration);
+		},
 		getExternalFiles(project: any, updateLevel: any) {
 			const externalFiles = getUpstreamExternalFiles?.(project, updateLevel) ?? [];
 			if (!projectContainsTsrx(project)) return externalFiles;
@@ -80,6 +93,12 @@ const plugin = (modules: TsserverPluginModules) => {
 					typeof value === 'function' ? value.bind(languageService) : value;
 			}
 			installMarklessCompletions(
+				modules.typescript,
+				info,
+				enhancedLanguageService,
+				getSourceSnapshot,
+			);
+			installMarklessInlayHints(
 				modules.typescript,
 				info,
 				enhancedLanguageService,

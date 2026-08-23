@@ -6,7 +6,9 @@ type FileNameOrUri = string | { readonly fsPath: string };
 type ScriptSnapshot = {
 	getText(start: number, end: number): string;
 	getLength(): number;
-	getChangeRange(): unknown;
+	// Accepted but never called here, so it stays wide enough for a real ts.IScriptSnapshot
+	// (whose getChangeRange takes the previous snapshot) as well as for a test stub.
+	getChangeRange?: unknown;
 };
 type VirtualCodeSnapshot = {
 	getText(start: number, end: number): string;

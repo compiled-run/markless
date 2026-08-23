@@ -177,6 +177,17 @@ export class TsserverHarness {
 		return this.requestBody('definitionAndBoundSpan', { file, ...position });
 	}
 
+	// The inlay-hint request is span-based and uses raw offsets, not line/offset positions.
+	// Responses come back with authored line/offset positions, converted by tsserver from
+	// the offsets the language service returned.
+	provideInlayHints(file: string, start: number, length: number): Promise<any[]> {
+		return this.requestBody('provideInlayHints', { file, start, length });
+	}
+
+	configurePlugin(pluginName: string, configuration: unknown): void {
+		this.send('configurePlugin', { pluginName, configuration });
+	}
+
 	jsxClosingTag(file: string, position: SourcePosition): Promise<any> {
 		return this.requestBody('jsxClosingTag', { file, ...position });
 	}
