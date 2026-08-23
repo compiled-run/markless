@@ -15,18 +15,6 @@
 	"sideEffects": false,
 	"exports": {
 		".": "./src/index.ts",
-		"./base": "./src/base/index.ts",
-		"./checkbox": "./src/checkbox/index.ts",
-		"./collapsible": "./src/collapsible/index.ts",
-		"./otp": "./src/otp/index.ts",
-		"./pagination": "./src/pagination/index.ts",
-		"./qr-code": "./src/qr-code/index.ts",
-		"./radio-group": "./src/radio-group/index.ts",
-		"./scroll-area": "./src/scroll-area/index.ts",
-		"./tabs": "./src/tabs/index.ts",
-		"./checklist": "./src/checklist/index.ts",
-		"./progress": "./src/progress/index.ts",
-		"./textbox": "./src/textbox/index.ts",
 		"./toggle": "./src/toggle/index.ts"
 	},
 	"dependencies": {
