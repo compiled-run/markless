@@ -1,6 +1,5 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
-import { SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE } from '../src/passes/symbol-modules.ts';
 
 /**
  * A `@for` row local shadowing a graph binding of the same name.
@@ -12,12 +11,15 @@ import { SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE } from '../src/passes/sym
  * child props already apply; handler and helper expressions now apply it too, so
  * a name an enclosing `@for` declares never reaches `resolveGraphPath`.
  *
- * What the row read lowers to instead is a separate, older gap these tests do not
- * pin: a bare row local in a handler survives as an authored identifier rather
- * than becoming `context.locals?.<name>`, which is equally true of a row local
- * that shadows nothing. When the shadowed name is a graph binding the fail-closed
- * guard in `symbol-modules` catches that surviving identifier and fails the
- * build, which is the outcome doctrine asks for: never a silent wrong read.
+ * What the row read lowers to instead was a separate, older gap: the row local
+ * survived as an authored identifier rather than becoming `context.locals?.<name>`.
+ * While it did, a shadowed name at least failed the build — the fail-closed guard
+ * in `symbol-modules` saw a free identifier that named a graph binding — and a
+ * name shadowing nothing shipped a module referring to something it never bound.
+ * `localReadNode` closes both: the read reaches the row's own item through the
+ * route the write band already used, so these tests now pin where it lands rather
+ * than that the build refuses it. `repeat-row-local-reads.test.ts` covers the
+ * positions and the unshadowed case.
  */
 
 async function compile(source: string) {
@@ -58,11 +60,12 @@ export function Page() @{
 	// held a DOM node.
 	expect(loweredReads(result)).not.toContain('box->element:box');
 	expect(eventSymbolSources(result)).toEqual([expect.not.stringContaining('graph.read')]);
-	// Nothing binds the surviving row local yet, so the build refuses rather than
-	// shipping a handler that reads the wrong node.
-	expect(result.symbolModules.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
-		SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE,
-	);
+	// It is the row's own item that the handler measures, and the repeat runtime
+	// is what supplies it.
+	expect(eventSymbolSources(result)).toEqual([
+		expect.stringContaining('measure(context.locals?.box)'),
+	]);
+	expect(result.symbolModules.diagnostics).toEqual([]);
 });
 
 test('a row local shadowing a state() name is never read as that cell', async () => {
@@ -88,9 +91,10 @@ export function Page() @{
 	// only the row's own `label.id` stops resolving to it.
 	expect(loweredReads(result)).toEqual(['label->state:label']);
 	expect(eventSymbolSources(result)).toEqual([expect.not.stringContaining('state:label')]);
-	expect(result.symbolModules.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
-		SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE,
-	);
+	expect(eventSymbolSources(result)).toEqual([
+		expect.stringContaining('pick(context.locals?.label?.id)'),
+	]);
+	expect(result.symbolModules.diagnostics).toEqual([]);
 });
 
 test('a graph binding read inside a repeat that shadows nothing still resolves', async () => {
