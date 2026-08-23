@@ -8,10 +8,12 @@
  * off that same attribute. Nothing here is called from authored code.
  *
  * What it does. A marked element joins the overlay stack when it BECOMES shown -
- * a transition out of `hidden`, never the state it was rendered in. An element
- * shown at first render therefore never enlists, which is what will make a future
- * `inline` mode free; an element rendered hidden and later shown enlists on that
- * first flip. While enlisted the topmost element receives a `dismiss` event when
+ * a transition out of `hidden` - and, at startup, when it is ALREADY shown and
+ * its visibility is bound. Those two are the same rule: enlistment follows the
+ * `hidden` binding, not the DOM state the element happened to be rendered in. An
+ * element with no `hidden` binding at all - the inline shape - therefore never
+ * enlists whatever it looks like, which is what will make a future `inline` mode
+ * free. While enlisted the topmost element receives a `dismiss` event when
  * Escape is pressed or a press lands outside it, carrying `detail.reason` and,
  * for an outside press, the `detail.pressTarget` the press landed on.
  *
@@ -27,6 +29,8 @@
  * from the document while it is on the stack leaves its background marks behind,
  * so families hide their surface rather than unmounting it.
  */
+
+import type { OverlayHiddenBoundRoot } from '../overlay-handoff.ts';
 
 /** The DOM spelling the compiler lowers the `overlay` mark to. */
 const OVERLAY_SELECTOR = '[overlay]';
@@ -115,6 +119,13 @@ export function installOverlayBehavior(root: Element | Document): (() => void) |
 		subtree: true,
 	});
 
+	// A surface served open never flips, so the observer would never see it. The
+	// runtime hands over the hosts whose `hidden` is bound; anything marked, in
+	// that set, and currently shown is open BECAUSE its binding says so, which is
+	// enlistment. An element outside the set looks identical in the DOM and is
+	// left alone - that is the inline shape, and it stays free.
+	for (const element of hiddenBoundSurfaces(root)) enlist(element, owner);
+
 	return () => {
 		observer.disconnect();
 		// Anything this root enlisted has to leave the stack with it, or the
@@ -126,6 +137,15 @@ export function installOverlayBehavior(root: Element | Document): (() => void) |
 
 function ownerDocumentOf(root: Element | Document): Document {
 	return (root as Element).ownerDocument ?? (root as Document);
+}
+
+function hiddenBoundSurfaces(root: Element | Document): ReadonlyArray<HTMLElement> {
+	const bound = (root as OverlayHiddenBoundRoot).__marklessOverlayHiddenBound;
+	if (!bound) return [];
+	return bound.filter(
+		(element): element is HTMLElement =>
+			element.matches?.(OVERLAY_SELECTOR) === true && (element as HTMLElement).hidden !== true,
+	);
 }
 
 function enlist(element: HTMLElement, owner: Document): void {

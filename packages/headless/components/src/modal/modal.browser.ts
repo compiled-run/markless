@@ -725,23 +725,52 @@ test('SSR: two sibling dialogs each reach only their own handler', async () => {
 });
 
 /**
- * A dialog served already showing renders modal markup, and nothing else.
+ * A dialog served already showing joins the stack, and is modal like any other.
  *
- * The overlay behaviour enlists an element that *becomes* shown - a transition
- * out of `hidden` - and deliberately never enlists one that was shown at first
- * render, because that is what will make a future inline mode free. A served
- * `<modal.root open>` therefore never joins the stack: its markup is right, and
- * the background is not inert, the page is not locked, and Escape reaches
- * nothing. Recorded as a gap in note.md rather than worked around here; the row
- * pins what actually happens so the day it changes is visible.
+ * The backdrop is served with no `hidden` attribute, so it never transitions and
+ * the behaviour's MutationObserver never sees it. What puts it on the stack is
+ * the payload: the compiler recorded a `hidden` attribute update for that host,
+ * which says the surface is shown BECAUSE its binding is currently false rather
+ * than because nothing gates it. An element with no such record - the inline
+ * shape - still never enlists, which is what keeps a future inline mode free.
+ *
+ * What this row cannot show yet is enlistment at load. The behaviour installs
+ * with the resume runtime, and this page's runtime is woken by its first
+ * container event, so a served-open dialog is not modal until something wakes
+ * it. That startup gate is pinned below rather than worked around.
  */
-test('SSR: a dialog served open renders modal markup but never enlists', async () => {
+test('SSR: a dialog served open enlists once the behaviour starts', async () => {
 	await renderSSR(ServedOpen);
 
 	expectShowing(el<HTMLElement>(Backdrop), el<HTMLElement>(Content));
 	expect(el(Content).getAttribute('role')).toBe('dialog');
 	expect(el(Root).getAttribute('ui-open')).toBe('');
-	// The gap, pinned:
+	// The startup gate, pinned: nothing has woken the runtime, so nothing is on
+	// the stack and the page behind the dialog is still reachable.
 	expectBackgroundReachable(el(Background));
-	expect(document.body.style.overflow).toBe('');
+
+	// A press inside the dialog is a container event and wakes the runtime. It
+	// arms no dismissal of its own: the press began inside the layer.
+	el(Content).dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+
+	// Now on the stack, with modality derived from the content's authored
+	// aria-modal, exactly as a dialog opened by its trigger - and the backdrop
+	// never transitioned out of `hidden`, so a flip cannot be what put it there.
+	await expect.poll(() => el(Background).hasAttribute('inert')).toBe(true);
+	expectBackgroundOutOfReach(el(Background));
+	expect(document.body.style.overflow).toBe('hidden');
+
+	// And Escape reaches it, which is the whole point of being enlisted: the
+	// family's own handler hides the layer, and hiding it is what leaves the
+	// stack and gives the background back.
+	//
+	// The released scroll lock is not asserted here. That count is document-wide
+	// and shared by every row in this file, and the disabled scenario leaves a
+	// surface standing that no Escape can close, so by the time this row runs the
+	// count no longer returns to zero. The background marks are per-row, so they
+	// are what this row reads.
+	await userEvent.keyboard('{Escape}');
+	await expect.poll(() => el(Backdrop).hasAttribute('hidden')).toBe(true);
+	await expect.poll(() => el(Background).hasAttribute('inert')).toBe(false);
+	expect(el(Background).hasAttribute('aria-hidden')).toBe(false);
 });

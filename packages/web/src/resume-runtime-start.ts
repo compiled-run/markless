@@ -1,6 +1,7 @@
 import type { DomJournalEntry, DomJournalResult } from '@markless/runtime';
 import type { AsyncBoundarySettleTracker } from './resume-async-wiring.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
+import type { OverlayHiddenBoundRoot } from './overlay-handoff.ts';
 import type {
 	ResumeAsyncBoundaryRecord,
 	ResumePreparedCore,
@@ -31,6 +32,26 @@ type RuntimeShared = ReturnType<
 type MarklessOverlayHost = {
 	__marklessOverlay?: (root: Element) => Promise<(() => void) | undefined> | undefined;
 };
+
+/**
+ * The hosts whose `hidden` attribute a payload record writes.
+ *
+ * This is the whole signal that separates a surface served open from an element
+ * with no visibility gating at all - the served DOM spells both the same way.
+ * Read off `domUpdates` rather than the DOM because the DOM cannot answer it.
+ */
+function hiddenBoundElements(
+	view: ResumeRuntimeInput['view'],
+	elementsByHostId: ResumePreparedCore['elementsByHostId'],
+): ReadonlyArray<Element> {
+	const bound: Element[] = [];
+	for (const update of view.domUpdates) {
+		if (update.target?.kind !== 'attribute' || update.target.name !== 'hidden') continue;
+		const element = elementsByHostId.get(update.hostNodeId);
+		if (element) bound.push(element as unknown as Element);
+	}
+	return bound;
+}
 
 export async function startResumeRuntime(input: {
 	readonly runtimeInput: ResumeRuntimeInput;
@@ -195,10 +216,16 @@ export async function startResumeRuntime(input: {
 	// makes every app ship the chunk. It is then FETCHED only once a root turns out
 	// to carry a marked element, which is why the installer takes the root and
 	// answers `undefined` for a root with no mark on it.
-	const overlayTeardown = await (globalThis as MarklessOverlayHost).__marklessOverlay?.(
-		runtimeInput.root as unknown as Element,
-	);
-	if (overlayTeardown) storeContainerSubscription(overlayTeardown);
+	const installOverlay = (globalThis as MarklessOverlayHost).__marklessOverlay;
+	if (installOverlay) {
+		// The installer's own gate is the mark query; this scan is behind the same
+		// `undefined` an app with no `overlay` demand already answers, so a page
+		// without elevation walks no records.
+		(runtimeInput.root as unknown as OverlayHiddenBoundRoot).__marklessOverlayHiddenBound =
+			hiddenBoundElements(runtimeInput.view, prepared.elementsByHostId);
+		const overlayTeardown = await installOverlay(runtimeInput.root as unknown as Element);
+		if (overlayTeardown) storeContainerSubscription(overlayTeardown);
+	}
 	// Container capture listeners see every DOM event of a registered type,
 	// including non-markless ones (router links): unmatched must pass through.
 	const dispatchCaptured = (event: Parameters<typeof events.dispatch>[0]) =>
