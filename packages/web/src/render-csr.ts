@@ -61,7 +61,10 @@ export async function renderCsrRuntime(input: {
 	let dispatchHandler: CsrDispatch;
 	let dispatchTail = Promise.resolve();
 	const dispatchQueued: CsrDispatch = (event, dispatchOptions) => {
-		const dispatch = () => dispatchHandler(event, dispatchOptions);
+		// A queued dispatch can reach its turn after teardown; the container it
+		// was aimed at is gone, so it has nothing left to run.
+		const dispatch = async () =>
+			disposed ? undefined : dispatchHandler(event, dispatchOptions);
 		const next = dispatchTail.then(dispatch, dispatch);
 		dispatchTail = next.catch(() => {});
 		return next;
