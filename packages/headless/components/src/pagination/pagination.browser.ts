@@ -500,22 +500,14 @@ for (const mode of MODES) {
 		expectTwoWidgetsRendered();
 	});
 
-	// PINNED for SSR only. The index key is GONE: `scenarios/products.tsrx` keys on
-	// `entry.key` now, and the compiled repeat record carries `keyPath: ["key"]`
-	// with `directSupported: true`, where on the previous `key i` it carried
-	// `keyPath: []` and `directSupported: false` (both measured off
-	// `compileTsrxModule`). The CSR half renders the whole range.
-	//
-	// What still refuses the SSR half is a second, compiler-side gap that no key
-	// can reach: `rowScopedEdgeIds`
-	// (packages/compiler/src/passes/public-render/ssr-module.ts) walks a repeat
-	// row's child-component and nested-repeat slots but never descends into a
+	// UN-PINNED. Both halves of the cause are fixed now: the loop keys on
+	// `entry.key` (`keyPath: ["key"]`, `directSupported: true`), and
+	// `rowScopedEdgeIds`
+	// (packages/compiler/src/passes/public-render/ssr-module.ts) descends into a
 	// branch arm's templates, so `<pagination.itemtrigger>` inside this row's `@if`
-	// is not row-scoped. A non-row-scoped edge refuses on `repeatItem !== undefined`
-	// alone, whatever the key, which is why the refusal text still says "keyed by
-	// position". Un-pinning needs that walk to follow branch arms - a compiler
-	// change, outside this family.
-	(mode === 'SSR' ? test.fails : test)(`${mode}: the looped scenario renders the range the consumer computed`, async () => {
+	// is row-scoped and the SSR render composes one instance per row instead of
+	// refusing with MARKLESS_ROW_COMPONENT_INTERACTIVE.
+	test(`${mode}: the looped scenario renders the range the consumer computed`, async () => {
 		if (mode === 'CSR') await render(Products);
 		else await renderSSR(Products);
 		expectProductsRendered();
@@ -569,10 +561,19 @@ for (const mode of MODES) {
 		await expectLinkMovesTheCurrentPage();
 	});
 
-	// PINNED on the branch-arm row-scoping gap described above, in both modes: SSR
-	// refuses the render outright, and in CSR the click on a page inside the arm
-	// routes nowhere - the heading stays `Page 1 of 20` (measured on the keyed
-	// loop, so this is no longer an index-key cause).
+	// RE-PINNED on a different, downstream cause. The row-scoping gap above is
+	// gone: SSR now serves the whole range and its click DOES route - dispatch
+	// matches the row-scoped record `r:page%3A5:c2:h2` and runs
+	// `bound:symbol%3A0:component-edge%3A2[b=branch%3A0;k=repeat%3A0]` warm. What
+	// the handler cannot do is land a write: measured right after the click and
+	// again 200ms later, `calls` stays `0`, `aria-current` stays on page 1, and
+	// the heading stays `Page 1 of 20`. CSR fails identically, and CSR never
+	// loads `ssrModuleSource`, so the remaining cause is shared - the bound
+	// symbol module for an edge scoped `[b=...;k=...]` carries the build-time
+	// branch/repeat scope (packages/compiler/src/passes/symbol-resolver.ts
+	// `boundSymbolId`) but no row value, so the body that runs cannot reach the
+	// row instance the record named. Fixing it is a symbol-module/runtime change,
+	// outside this family and outside the SSR emission pass.
 	test.fails(`${mode}: the rendered controls follow the page as the range changes`, async () => {
 		if (mode === 'CSR') await render(Products);
 		else await renderSSR(Products);
@@ -652,9 +653,13 @@ test('SSR: the served page carries the current page and both bounds', async () =
 	expect(at('itemtrigger-1').hasAttribute('aria-current')).toBe(false);
 });
 
-// PINNED on the same branch-arm row-scoping gap: the server render is refused
-// with MARKLESS_ROW_COMPONENT_INTERACTIVE before anything reaches the page, so
-// resume has nothing to resume.
+// RE-PINNED on the post-click half only. The served half is now GREEN and stays
+// asserted below: the server no longer refuses with
+// MARKLESS_ROW_COMPONENT_INTERACTIVE, so the range and the single gap arrive on
+// the page exactly as the consumer computed them. What still fails is the same
+// downstream cause as the row above - the first click after resume routes to the
+// row-scoped record but its bound symbol lands no write, so the row SET never
+// changes.
 test.fails('SSR: the served looped range is the one the consumer computed', async () => {
 	await renderSSR(Products);
 	expect(renderedPages()).toEqual(['1', '2', '3', '4', '5', '20']);

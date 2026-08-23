@@ -341,6 +341,9 @@ function rowScopedEdgeIds(
 				edgeIds.add(slot.componentEdgeId);
 				if (slot.projectionChunkId) walk(slot.projectionChunkId);
 			} else if (slot.kind === 'repeat') walk(slot.rowTemplateId);
+			// An arm decides WHETHER its body renders, never which row it is inside:
+			// a component an arm holds is still the row's, so the walk follows it.
+			else if (slot.kind === 'branch') for (const armId of slot.armTemplateIds) walk(armId);
 		}
 	};
 	for (const chunk of chunks) if (chunk.kind === 'repeat-row') walk(chunk.id);
