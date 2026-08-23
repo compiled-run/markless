@@ -1,6 +1,7 @@
 import { parseModule } from '../../js-ast.ts';
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
+import { sharedInstanceVisibleFrom } from '../semantic-graph/collect-shared.ts';
 import {
 	componentEdgesFor,
 	componentPropNames,
@@ -127,6 +128,7 @@ export function hasSharedElementHandle(handles: ReadonlyArray<string>): boolean 
 // readers declare it from the same description.
 export function sharedInstancePreludeLines(
 	semanticGraph: PublicRenderModuleInput['semanticGraph'],
+	componentName: string | undefined,
 	text: string,
 	bound: ReadonlySet<string>,
 	readSource: (graphNodeId: string, path: ReadonlyArray<string>) => string,
@@ -135,6 +137,10 @@ export function sharedInstancePreludeLines(
 	const declared = new Set<string>();
 	for (const instance of semanticGraph.sharedInstances ?? []) {
 		if (declared.has(instance.localName) || bound.has(instance.localName)) continue;
+		// Only the locals this component's body actually declares: a sibling
+		// component's same-named instance would rebuild the wrong widget's members
+		// under that name, and the emitted scope would read them (defect 46).
+		if (!sharedInstanceVisibleFrom(instance, componentName)) continue;
 		if (!references(text, instance.localName)) continue;
 
 		const definition = semanticGraph.sharedDefinitions.find(
@@ -217,6 +223,7 @@ export function emitClientResidueReader(
 	lines.push(
 		...sharedInstancePreludeLines(
 			input.semanticGraph,
+			componentName,
 			text,
 			bound,
 			(graphNodeId, path) =>

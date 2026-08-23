@@ -258,10 +258,12 @@ function componentPropBindings(
 		// already read it: the row owns that name, so neither resolver may answer
 		// for it. Without this a loop item named like some widget local resolves
 		// to that local's cell, and every row sends the same value to its child.
+		// The instance local must be THIS component's: a same-named local declared
+		// in a sibling component is not in scope here (defect 46).
 		const graph = repeatRowBindsName(source, state)
 			? null
 			: (resolveGraphPath(source, bindings, aliases) ??
-				resolveSharedInstanceGraphPath(source, state.graph));
+				resolveSharedInstanceGraphPath(source, state.graph, state.currentComponentName));
 		if (graph) {
 			// `aria-labelledby={headingEl}` names an element the PARENT renders, so
 			// what crosses the edge is the id minted for it, not the handle. Sent as

@@ -58,7 +58,7 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 			root.component,
 			root.root,
 			input.source.source,
-			sharedInstanceLocalNames(input.semanticGraph),
+			sharedInstanceLocalNames(input.semanticGraph, root.componentName),
 		) &&
 		root.propNames.length === 0 &&
 		input.semanticGraph.componentEdges.length === 0 &&

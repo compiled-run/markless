@@ -499,6 +499,7 @@ function emitSsrDataLines(
 		'const error=marklessSsrDataContext.asyncError;',
 		...sharedInstancePreludeLines(
 			input.semanticGraph,
+			componentName,
 			preludeText,
 			new Set([
 				...repeats.map((repeat) => repeat.itemName),
