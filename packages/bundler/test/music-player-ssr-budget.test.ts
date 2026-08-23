@@ -144,7 +144,10 @@ const clientBuild = resolve(demo, '.output/public/build');
 // 66,510 -> 67,330 (2026-08-23): +794 across the handle/dispatch capability chain
 // (handle value-reads + trigger-group handle records, per-instance keying, anchor
 // attribute lowering, bubble walk defect 67 at +215). Measured 67,304.
-const MAX_SHIPPED_JS_GZIP_BYTES = 67_330;
+// 67,330 -> 67,360 (2026-08-23, same day): measured 67,343 on the real checkout
+// after the demand-gated overlay landed (worker's worktree measured 67,330 flat);
+// +13 = the non-bubbling dispatch fix's share here plus gzip run variance.
+const MAX_SHIPPED_JS_GZIP_BYTES = 67_360;
 
 test('music-player-ssr production build stays within its shipped JS budget', async () => {
 	await rm(resolve(demo, '.output'), { force: true, recursive: true });
