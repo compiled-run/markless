@@ -19,6 +19,7 @@ import {
 } from '../../artifact-helpers/graph-paths.ts';
 import { collectExpressionReads } from './collect-expressions.ts';
 import { collectObjectPatternAliases } from './collect-aliases.ts';
+import { repeatRowBindsName } from './collect-repeat.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
 	type GraphReadScope,
@@ -253,9 +254,14 @@ function componentPropBindings(
 
 		// The enclosing family's instance answers through its own return map, so
 		// `checklist.allChecked` reaches the computed rather than a state member.
-		const graph =
-			resolveGraphPath(source, bindings, aliases) ??
-			resolveSharedInstanceGraphPath(source, state.graph);
+		// An enclosing `@for` row binding goes first, the way markup residues
+		// already read it: the row owns that name, so neither resolver may answer
+		// for it. Without this a loop item named like some widget local resolves
+		// to that local's cell, and every row sends the same value to its child.
+		const graph = repeatRowBindsName(source, state)
+			? null
+			: (resolveGraphPath(source, bindings, aliases) ??
+				resolveSharedInstanceGraphPath(source, state.graph));
 		if (graph) {
 			// `aria-labelledby={headingEl}` names an element the PARENT renders, so
 			// what crosses the edge is the id minted for it, not the handle. Sent as
