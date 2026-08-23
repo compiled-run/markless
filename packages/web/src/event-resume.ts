@@ -358,23 +358,59 @@ async function dispatchEvent(input: {
 	readonly element?: EventResumeDomElement;
 	readonly eventRecord?: EventResumeRecord;
 }): Promise<void> {
-	const matched = input.eventRecord
-		? {
-				element:
-					input.element ??
-					input.elementsByHostId.get(input.eventRecord.hostNodeId) ??
-					input.event.target,
-				eventRecord: input.eventRecord,
-			}
-		: findEventRecord(input.event.target, input.event.type, input.view, input.elementsByHostId);
-	if (!matched?.element) return;
-	if (!protocolEventDispatchesMarkless(matched.eventRecord)) return;
+	// A pinned record is a direct invocation, not a DOM dispatch: it runs alone.
+	const path = input.eventRecord
+		? [
+				{
+					element:
+						input.element ??
+						input.elementsByHostId.get(input.eventRecord.hostNodeId) ??
+						input.event.target,
+					eventRecord: input.eventRecord,
+				},
+			]
+		: collectDispatchPath(
+				input.event.target,
+				input.event.type,
+				input.view,
+				input.elementsByHostId,
+			);
+	if (path.length === 0) return;
 
+	const propagation = trackPropagationStops(input.event);
+	let stopAfterElement: EventResumeDomElement | undefined;
+	try {
+		for (const matched of path) {
+			if (!matched.element) return;
+			// A record owned by another system ends the markless walk, exactly as it
+			// did when the innermost match was the only record that ever ran.
+			if (!protocolEventDispatchesMarkless(matched.eventRecord)) return;
+			if (stopAfterElement && matched.element !== stopAfterElement) return;
+			await runEventRecord(input, matched.element, matched.eventRecord);
+			if (propagation.stoppedImmediate()) return;
+			if (propagation.stopped()) stopAfterElement = matched.element;
+		}
+	} finally {
+		propagation.release();
+	}
+}
+
+async function runEventRecord(
+	input: {
+		readonly event: EventResumeDomEvent;
+		readonly graph: EventResumeGraph;
+		readonly loadSymbol: ResumeEventFromPayloadDocumentInput['loadSymbol'];
+		readonly elementsByHostId: ReadonlyMap<string, EventResumeDomElement>;
+		readonly getElementHandle: (handleIdOrName: string) => EventResumeDomElement | undefined;
+	},
+	element: EventResumeDomElement,
+	eventRecord: EventResumeRecord,
+): Promise<void> {
 	try {
 		const baseContext = {
 			graph: input.graph,
 			event: input.event,
-			element: matched.element,
+			element,
 			getElementHandle: input.getElementHandle,
 		};
 		const invokeSymbol = async (symbolId: string, context: EventResumeSymbolContext) => {
@@ -385,7 +421,7 @@ async function dispatchEvent(input: {
 		};
 		const invokeCallback = (symbolId: string, args: ReadonlyArray<unknown>) =>
 			invokeSymbol(symbolId, { ...baseContext, args, invokeCallback, invokeSymbol });
-		for (const symbolId of matched.eventRecord.symbolIds) {
+		for (const symbolId of eventRecord.symbolIds) {
 			const result = invokeSymbol(symbolId, baseContext);
 			applyDomJournalResult(
 				isPromiseLike(result) ? await result : result,
@@ -548,25 +584,89 @@ function materializeElementHandles(
 	};
 }
 
-function findEventRecord(
+// The DOM runs every listener on the target-to-root chain, innermost first, each
+// on the element it was declared on. A nested widget root and the widget that
+// encloses it both answer for the same key, so the walk collects the whole path
+// rather than the first record it finds.
+function collectDispatchPath(
 	target: EventResumeDomElement | null,
 	eventName: string,
 	view: ProtocolViewPayload,
 	elementsByHostId: ReadonlyMap<string, EventResumeDomElement>,
-):
-	| {
-			readonly element: EventResumeDomElement;
-			readonly eventRecord: EventResumeRecord;
-	  }
-	| undefined {
+): Array<{
+	readonly element: EventResumeDomElement;
+	readonly eventRecord: EventResumeRecord;
+}> {
+	const path: Array<{
+		readonly element: EventResumeDomElement;
+		readonly eventRecord: EventResumeRecord;
+	}> = [];
 	for (let element = target; element; element = element.parentElement ?? null) {
 		for (const eventRecord of view.events) {
 			if (eventRecord.eventName !== eventName) continue;
 			if (elementsByHostId.get(eventRecord.hostNodeId) === element) {
-				return { element, eventRecord };
+				path.push({ element, eventRecord });
 			}
 		}
 	}
+	return path;
+}
+
+// Dispatch runs from one capture listener on the container root, so the DOM's
+// own propagation flags never see this synthetic walk: a handler's
+// stopPropagation call has to be observed here. This entry can hold several
+// records on one element, so it reads stopImmediatePropagation too.
+function trackPropagationStops(event: EventResumeDomEvent): {
+	readonly stopped: () => boolean;
+	readonly stoppedImmediate: () => boolean;
+	readonly release: () => void;
+} {
+	const host = event as unknown as Record<string, unknown>;
+	// An entry capture may have applied the innermost record's stopPropagation
+	// policy before this walk started; the DOM flag is the only trace it leaves.
+	let stopped = host.cancelBubble === true;
+	let immediate = false;
+	let patched = false;
+	const restore: Array<() => void> = [];
+	const patch = (name: string, mark: () => void): void => {
+		const own = Object.getOwnPropertyDescriptor(host, name);
+		const native = host[name];
+		try {
+			Object.defineProperty(host, name, {
+				configurable: true,
+				enumerable: false,
+				writable: true,
+				value: (...args: unknown[]) => {
+					mark();
+					return typeof native === 'function'
+						? (native as (...call: unknown[]) => unknown).apply(event, args)
+						: undefined;
+				},
+			});
+		} catch {
+			// A frozen event still reports through cancelBubble below.
+			return;
+		}
+		patched = true;
+		restore.push(() => {
+			if (own) Object.defineProperty(host, name, own);
+			else delete host[name];
+		});
+	};
+	patch('stopPropagation', () => {
+		stopped = true;
+	});
+	patch('stopImmediatePropagation', () => {
+		stopped = true;
+		immediate = true;
+	});
+	return {
+		stopped: () => stopped || (!patched && host.cancelBubble === true),
+		stoppedImmediate: () => immediate,
+		release: () => {
+			for (const undo of restore) undo();
+		},
+	};
 }
 
 function deserializeEventGraphValue(payload: unknown): unknown {

@@ -133,20 +133,19 @@ export function createEventWiring(input: {
 		event: ResumeDomEvent,
 		options: ResumeDispatchOptions = {},
 	): Promise<void> {
-		const beforeExecution = marklessExecutionLogSnapshot();
 		const target = event.target;
 		if (!target) throw unmatchedDispatchError(event, undefined);
 		const selector = describeResumeEventTarget(target);
 		const ignoredDisposed = input.ignoredDisposedEventTargets.has(target);
 		if (!containsElement(input.root, target) && !ignoredDisposed)
 			throw unmatchedDispatchError(event, selector);
-		const matched = findDispatchMatch(target, event.type, eventRecords, rowEventRecords);
-		if (!matched) {
+		const path = collectDispatchPath(target, event.type, eventRecords, rowEventRecords);
+		if (path.length === 0) {
 			if (ignoredDisposed) return;
 			await marklessLogInteraction({
 				eventName: event.type,
 				eventRecord: null,
-				before: beforeExecution,
+				before: marklessExecutionLogSnapshot(),
 				view: input.view,
 				selector,
 				noMatch: true,
@@ -158,10 +157,39 @@ export function createEventWiring(input: {
 			if (options.ignoreUnmatched === true) return;
 			throw unmatchedDispatchError(event, selector);
 		}
-		if ('rowMatch' in matched)
-			return dispatchRowEvent(matched.element, matched.rowMatch, event, options);
-		const { element, eventRecord } = matched;
-		if (!protocolEventDispatchesMarkless(eventRecord)) return;
+		const propagation = trackPropagationStops(event);
+		let stopAfterElement: ResumeDomElement | undefined;
+		try {
+			for (const matched of path) {
+				if (stopAfterElement && matched.element !== stopAfterElement) return;
+				if ('rowMatch' in matched)
+					await dispatchRowEvent(matched.element, matched.rowMatch, event, options);
+				else {
+					// A record owned by another system (a router link) ends the markless
+					// walk, exactly as it did when only the innermost record ever ran.
+					if (!protocolEventDispatchesMarkless(matched.eventRecord)) return;
+					await dispatchViewEvent(
+						matched.element,
+						matched.eventRecord,
+						event,
+						options,
+						selector,
+					);
+				}
+				if (propagation.stopped()) stopAfterElement = matched.element;
+			}
+		} finally {
+			propagation.release();
+		}
+	}
+	async function dispatchViewEvent(
+		element: ResumeDomElement,
+		eventRecord: ResumeEventRecord,
+		event: ResumeDomEvent,
+		options: ResumeDispatchOptions,
+		selector: string,
+	): Promise<void> {
+		const beforeExecution = marklessExecutionLogSnapshot();
 		if (eventRecord.syncPolicy && !options.syncPolicyAlreadyApplied)
 			runPolicy?.(eventRecord.syncPolicy, input.graph, event);
 		let activeSymbolId: string | undefined;
@@ -398,24 +426,71 @@ async function marklessLogInteraction(input: {
 	}
 }
 
-function findDispatchMatch(
+type ResumeDispatchMatch =
+	| { readonly element: ResumeDomElement; readonly rowMatch: ResumeRowEventMatch }
+	| { readonly element: ResumeDomElement; readonly eventRecord: ResumeEventRecord };
+
+// The DOM runs every listener on the target-to-root chain, innermost first, each
+// on the element it was declared on. A nested widget root and the widget that
+// encloses it both answer for the same key, so the walk collects the whole path
+// rather than the first record it finds. One record per element, row before
+// view, is the precedence this match already had.
+function collectDispatchPath(
 	target: ResumeDomElement,
 	eventName: string,
 	eventRecords: WeakMap<ResumeDomElement, Map<string, ResumeEventRecord>>,
 	rowEventRecords: ResumeRowEventRecords,
-):
-	| { readonly element: ResumeDomElement; readonly rowMatch: ResumeRowEventMatch }
-	| { readonly element: ResumeDomElement; readonly eventRecord: ResumeEventRecord }
-	| null {
+): ResumeDispatchMatch[] {
+	const path: ResumeDispatchMatch[] = [];
 	let current: ResumeDomElement | null | undefined = target;
 	while (current) {
 		const rowMatch = rowEventRecords.get(current)?.get(eventName);
-		if (rowMatch) return { element: current, rowMatch };
-		const eventRecord = eventRecords.get(current)?.get(eventName);
-		if (eventRecord) return { element: current, eventRecord };
+		if (rowMatch) path.push({ element: current, rowMatch });
+		else {
+			const eventRecord = eventRecords.get(current)?.get(eventName);
+			if (eventRecord) path.push({ element: current, eventRecord });
+		}
 		current = current.parentElement;
 	}
-	return null;
+	return path;
+}
+
+// Dispatch runs from one capture listener on the container root, so the DOM's
+// own propagation flags never see this synthetic walk: a handler's
+// stopPropagation call has to be observed here.
+// stopImmediatePropagation needs no separate reading here: this walk carries at
+// most one record per element, so there is never a same-element listener left
+// for it to drop that stopPropagation would not already have stopped.
+function trackPropagationStops(event: ResumeDomEvent): {
+	readonly stopped: () => boolean;
+	readonly release: () => void;
+} {
+	const host = event as unknown as Record<string, unknown>;
+	// An entry capture may have applied the innermost record's stopPropagation
+	// policy before this walk started; the DOM flag is the only trace it leaves.
+	let stopped = host.cancelBubble === true;
+	let patched = false;
+	const own = Object.prototype.hasOwnProperty.call(host, 'stopPropagation');
+	const native = host.stopPropagation;
+	try {
+		host.stopPropagation = (...args: unknown[]) => {
+			stopped = true;
+			return typeof native === 'function'
+				? (native as (...call: unknown[]) => unknown).apply(event, args)
+				: undefined;
+		};
+		patched = true;
+	} catch {
+		// A frozen event still reports through cancelBubble.
+	}
+	return {
+		stopped: () => stopped || (!patched && host.cancelBubble === true),
+		release: () => {
+			if (!patched) return;
+			if (own) host.stopPropagation = native;
+			else delete host.stopPropagation;
+		},
+	};
 }
 // Local copy of the resume-locators containsElement: importing that module
 // here regroups the wall-counted chunk graph, which costs more than the
