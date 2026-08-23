@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
-import { compileTsrxModule } from '../src/index.ts';
+import type { ModuleGraphInterfaceArtifact } from '../src/artifacts.ts';
+import { compileTsrxModule, linkBarrelComponents, moduleLinkResolutionKey } from '../src/index.ts';
 
 // The ratified consumer surface is `family.state()`: a namespace-member call on
 // a family object that reaches a widget-scoped shared definition through a
@@ -321,6 +322,176 @@ export default function Page() @{
 	expect(consumer.semanticGraph.sharedInstances).toEqual([]);
 	expect(refusal?.message).toContain('fam.stat()');
 	expect(refusal?.message).toContain('`state`');
+});
+
+// A bundler never hands the consumer the barrel's authored interface: it hands
+// the one `linkBarrelComponents` synthesizes while walking the barrel, with
+// specifiers rebased for the importing module. So the tests above only hold in a
+// real build if that synthesis carries the shared re-export chain too — the walk
+// used to publish components alone, and every `family.state()` behind a plain
+// `.ts` barrel refused.
+
+type FakeModules = Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
+
+/** Runs the barrel walk with resolution and interface reads already answered. */
+function walkBarrels(input: {
+	readonly parent: string;
+	readonly imports: ReadonlyArray<string>;
+	/** `specifier` written in `importer` to the module id it names. */
+	readonly resolves: ReadonlyArray<readonly [string, string, string]>;
+	readonly modules: FakeModules;
+}) {
+	const resolution = Object.fromEntries(
+		input.resolves.map(([specifier, importer, target]) => [
+			moduleLinkResolutionKey(specifier, importer),
+			target,
+		]),
+	);
+	const artifact = linkBarrelComponents({
+		parent: input.parent,
+		moduleImports: input.imports.map((source) => ({ source })),
+		resolution,
+		moduleInterface: (filename) => input.modules[filename] ?? null,
+		// Both fixtures keep every module one directory deep, so the specifier the
+		// parent would write is the file's own name.
+		rebase: (target) => `./${target.slice('src/'.length)}`,
+	});
+	expect(artifact.pendingResolutions).toEqual([]);
+	expect(artifact.pendingInterfaces).toEqual([]);
+	expect(artifact.diagnostics).toEqual([]);
+	return artifact;
+}
+
+test('the barrel walk republishes the aliased shared re-export the consumer calls', async () => {
+	const owner = await compile('src/fam.tsrx', family);
+	const barrel = await compile(
+		'src/index.ts',
+		`export { Root as root, pnl as state } from './fam.tsrx';`,
+	);
+
+	const artifact = walkBarrels({
+		parent: 'src/page.tsrx',
+		imports: ['./index.ts'],
+		resolves: [
+			['./index.ts', 'src/page.tsrx', 'src/index.ts'],
+			['./fam.tsrx', 'src/index.ts', 'src/fam.tsrx'],
+		],
+		modules: {
+			'src/index.ts': barrel.moduleGraphInterface,
+			'src/fam.tsrx': owner.moduleGraphInterface,
+		},
+	});
+
+	// The chain the shared resolver walks, sources rebased for the consumer.
+	expect(artifact.interfaces['./index.ts']?.reexports).toEqual([
+		{ exportName: 'state', importedName: 'pnl', source: './fam.tsrx' },
+	]);
+	// The component half of the same walk is untouched.
+	expect(
+		artifact.interfaces['./index.ts']?.linkedComponents?.map((component) => component.exportPath),
+	).toEqual([['root']]);
+	// The owning module is reachable under the specifier the chain names, and is
+	// linked as a child once however many exports of it the barrel re-exported.
+	expect(artifact.interfaces['./fam.tsrx']).toBe(owner.moduleGraphInterface);
+	expect(artifact.children.map((child) => [child.specifier, child.source])).toEqual([
+		['./fam.tsrx', 'src/fam.tsrx'],
+	]);
+
+	const consumer = await compile(
+		'src/page.tsrx',
+		`
+import * as fam from './index.ts';
+
+export default function Report() @{
+	const s = fam.state();
+	<span data-report>{s.open}</span>
+}
+`,
+		artifact.interfaces,
+	);
+
+	expect(
+		consumer.semanticGraph.diagnostics.filter((item) => item.severity === 'error'),
+	).toEqual([]);
+	expect(
+		consumer.semanticGraph.sharedInstances.map((instance) => instance.definitionId),
+	).toEqual([definitionId]);
+});
+
+test('the barrel walk republishes a namespace re-export over a nested barrel', async () => {
+	const owner = await compile('src/fam.tsrx', family);
+	const familyIndex = await compile(
+		'src/fam/index.ts',
+		`export { Root as root, pnl as state } from './fam.tsrx';`,
+	);
+	const packageBarrel = await compile('src/ui.ts', `export * as fam from './fam/index.ts';`);
+
+	const artifact = walkBarrels({
+		parent: 'src/page.tsrx',
+		imports: ['./ui.ts'],
+		resolves: [
+			['./ui.ts', 'src/page.tsrx', 'src/ui.ts'],
+			['./fam/index.ts', 'src/ui.ts', 'src/fam/index.ts'],
+			['./fam.tsrx', 'src/fam/index.ts', 'src/fam.tsrx'],
+		],
+		modules: {
+			'src/ui.ts': packageBarrel.moduleGraphInterface,
+			'src/fam/index.ts': familyIndex.moduleGraphInterface,
+			'src/fam.tsrx': owner.moduleGraphInterface,
+		},
+	});
+
+	// The namespace segment is spent on the nested barrel, which is republished
+	// under its own rebased specifier rather than flattened into the package one.
+	expect(artifact.interfaces['./ui.ts']?.reexports).toEqual([
+		{ exportName: 'fam', importedName: '*', source: './fam/index.ts' },
+	]);
+	expect(artifact.interfaces['./fam/index.ts']?.reexports).toEqual([
+		{ exportName: 'state', importedName: 'pnl', source: './fam.tsrx' },
+	]);
+
+	const consumer = await compile(
+		'src/page.tsrx',
+		`
+import * as ui from './ui.ts';
+
+export default function Report() @{
+	const s = ui.fam.state();
+	<span data-report>{s.open}</span>
+}
+`,
+		artifact.interfaces,
+	);
+
+	expect(
+		consumer.semanticGraph.diagnostics.filter((item) => item.severity === 'error'),
+	).toEqual([]);
+	expect(
+		consumer.semanticGraph.sharedInstances.map((instance) => instance.definitionId),
+	).toEqual([definitionId]);
+});
+
+// Fail-closed: the walk republishes component and shared re-exports and nothing
+// else, so a barrel over a plain helper still resolves to no shared definition.
+test('the barrel walk republishes no chain for a re-export that reaches neither', async () => {
+	const helper = await compile('src/helper.tsrx', `export function formatLabel() { return 'x'; }`);
+	const barrel = await compile('src/index.ts', `export { formatLabel as state } from './helper.tsrx';`);
+
+	const artifact = walkBarrels({
+		parent: 'src/page.tsrx',
+		imports: ['./index.ts'],
+		resolves: [
+			['./index.ts', 'src/page.tsrx', 'src/index.ts'],
+			['./helper.tsrx', 'src/index.ts', 'src/helper.tsrx'],
+		],
+		modules: {
+			'src/index.ts': barrel.moduleGraphInterface,
+			'src/helper.tsrx': helper.moduleGraphInterface,
+		},
+	});
+
+	expect(artifact.interfaces).toEqual({});
+	expect(artifact.children).toEqual([]);
 });
 
 // The refusal reads a call, not a name: an ordinary imported function called

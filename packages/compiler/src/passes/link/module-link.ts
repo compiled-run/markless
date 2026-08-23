@@ -380,6 +380,13 @@ export function linkedManifestHasBrowserTriggers(manifest: LinkedSymbolClaimMani
  * to the `.tsrx` modules that do, and every reached component is reported with
  * its specifier rebased to the module that imports the barrel.
  *
+ * The same walk carries the family's shared definitions: `export { famState as
+ * state } from './fam.tsrx'` reaches no component, but it is the ratified
+ * `family.state()` surface, so the chain is republished as re-exports whose
+ * sources are rebased for the importing module. The shared-call resolver walks
+ * those exactly as it walks an authored barrel's; a chain that reaches no
+ * published definition contributes nothing and stays fail-closed there.
+ *
  * Resolution and reading are inputs, never work this pass does. A specifier the
  * driver has not resolved yet, or a file whose interface it has not read yet,
  * comes back as `pendingResolutions` / `pendingInterfaces`; the driver fills
@@ -412,6 +419,16 @@ export type BarrelComponentLinkArtifact = {
 	readonly pendingInterfaces: string[];
 };
 
+/**
+ * What one barrel level publishes: the components reached under it, and the
+ * re-exports that reach a shared definition, sources already rebased for the
+ * module that imports the outermost barrel.
+ */
+type BarrelWalk = {
+	readonly linkedComponents: ModuleGraphInterfaceLinkedComponent[];
+	readonly sharedReexports: ModuleGraphInterfaceReexport[];
+};
+
 export function linkBarrelComponents(
 	input: BarrelComponentLinkInput,
 ): BarrelComponentLinkArtifact {
@@ -436,14 +453,23 @@ export function linkBarrelComponents(
 		return known;
 	};
 
+	// One child per module the walk reached, however many exports reached it.
+	const linkChild = (source: string, specifier: string): void => {
+		const child = { parent: input.parent, specifier, source, externalized: false };
+		if (children.some((existing) => linkedModuleChildKey(existing) === linkedModuleChildKey(child)))
+			return;
+		children.push(child);
+	};
+
 	const walkBarrel = (
 		filename: string,
 		prefix: ReadonlyArray<string>,
 		seen: ReadonlySet<string>,
-	): ModuleGraphInterfaceLinkedComponent[] => {
-		if (seen.has(filename)) return [];
+	): BarrelWalk => {
+		if (seen.has(filename)) return { linkedComponents: [], sharedReexports: [] };
 		const reexports = readInterface(filename)?.reexports ?? [];
-		const linked: ModuleGraphInterfaceLinkedComponent[] = [];
+		const linkedComponents: ModuleGraphInterfaceLinkedComponent[] = [];
+		const sharedReexports: ModuleGraphInterfaceReexport[] = [];
 		for (const reexport of reexports) {
 			const target = resolveId(reexport.source, filename);
 			if (target === undefined) continue;
@@ -452,40 +478,63 @@ export function linkBarrelComponents(
 				continue;
 			}
 			const exportPath = [...prefix, reexport.exportName];
+			const specifier = input.rebase(target);
 			if (!TSRX_SOURCE_FILE.test(target)) {
-				linked.push(
-					...walkBarrel(
-						target,
-						reexport.importedName === '*' ? exportPath : prefix,
-						new Set([...seen, filename]),
-					),
+				const nested = walkBarrel(
+					target,
+					reexport.importedName === '*' ? exportPath : prefix,
+					new Set([...seen, filename]),
 				);
+				linkedComponents.push(...nested.linkedComponents);
+				// The nested barrel is republished under the specifier this module
+				// would import it by, so one re-export segment steps into it.
+				if (nested.sharedReexports.length > 0) {
+					interfaces[specifier] = {
+						passId: 'module-graph-interface',
+						filename: target,
+						exports: [],
+						reexports: nested.sharedReexports,
+						render: { version: 1, components: [] },
+					};
+					sharedReexports.push({
+						exportName: reexport.exportName,
+						importedName: reexport.importedName,
+						source: specifier,
+					});
+				}
 				continue;
 			}
 			const targetInterface = readInterface(target);
-			const component = targetInterface?.render.components.find(
+			if (!targetInterface) continue;
+			const component = targetInterface.render.components.find(
 				(candidate) => candidate.exportName === reexport.importedName,
 			);
-			if (!targetInterface || !component) continue;
-			const specifier = input.rebase(target);
+			const sharedDefinition = targetInterface.sharedDefinitions?.some(
+				(candidate) => candidate.exportName === reexport.importedName,
+			);
+			if (!component && !sharedDefinition) continue;
 			interfaces[specifier] = targetInterface;
-			children.push({
-				parent: input.parent,
-				specifier,
-				source: target,
-				externalized: false,
-			});
-			linked.push({
-				exportPath,
-				source: specifier,
-				importKind: reexport.importedName === 'default' ? 'default' : 'named',
-				...(reexport.importedName === 'default'
-					? {}
-					: { importedName: reexport.importedName }),
-				componentName: component.componentName,
-			});
+			linkChild(target, specifier);
+			if (component) {
+				linkedComponents.push({
+					exportPath,
+					source: specifier,
+					importKind: reexport.importedName === 'default' ? 'default' : 'named',
+					...(reexport.importedName === 'default'
+						? {}
+						: { importedName: reexport.importedName }),
+					componentName: component.componentName,
+				});
+			}
+			if (sharedDefinition) {
+				sharedReexports.push({
+					exportName: reexport.exportName,
+					importedName: reexport.importedName,
+					source: specifier,
+				});
+			}
 		}
-		return linked;
+		return { linkedComponents, sharedReexports };
 	};
 
 	for (const moduleImport of input.moduleImports) {
@@ -494,13 +543,14 @@ export function linkBarrelComponents(
 		const barrel = resolveId(moduleImport.source, input.parent);
 		// An import that names no module in this build is not a barrel to follow.
 		if (barrel === undefined || barrel === null) continue;
-		const linkedComponents = walkBarrel(barrel, [], new Set());
-		if (linkedComponents.length === 0) continue;
+		const { linkedComponents, sharedReexports } = walkBarrel(barrel, [], new Set());
+		if (linkedComponents.length === 0 && sharedReexports.length === 0) continue;
 		interfaces[moduleImport.source] = {
 			passId: 'module-graph-interface',
 			filename: barrel,
 			exports: [],
 			linkedComponents,
+			...(sharedReexports.length > 0 ? { reexports: sharedReexports } : {}),
 			render: { version: 1, components: [] },
 		};
 	}
