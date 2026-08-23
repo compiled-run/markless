@@ -1,8 +1,7 @@
 import { textbox } from '../../index.ts';
 
-// A signup form: a single-line username beside a multi-line bio. Two independent
-// instances, which is what a real page looks like and what proves a keystroke in
-// one field leaves the other alone.
+// A signup form: a single-line username beside a multi-line bio, two independent
+// instances on one page.
 export default function SignupForm() @{
 	<form>
 		<textbox.root name="username" data-testid="username-root">

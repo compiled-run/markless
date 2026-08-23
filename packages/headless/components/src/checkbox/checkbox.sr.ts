@@ -9,11 +9,10 @@ import SettingsList from './scenarios/settings-list.tsrx';
 import UnavailableOptions from './scenarios/unavailable-options.tsrx';
 import WithHelp from './scenarios/with-help.tsrx';
 
-// What a screen reader says about the checkbox family, asserted the way the
-// w3c/aria-at checkbox (tri-state) plan asserts it: each step names the facts
-// the announcement has to convey - role, accessible name, state - and never a
-// product's wording. `sr` is the only line that picks a reader, so the same
-// expectations run against NVDA and VoiceOver once those drivers land.
+// Rows follow the w3c/aria-at tri-state checkbox plan and assert the facts an
+// announcement must convey - role, name, state - never a reader product's wording.
+// `sr` is the only line that picks a reader, so the same expectations run against
+// NVDA and VoiceOver once those drivers land.
 const sr = virtualDriver;
 
 // One scenario per test: the trigger id is minted per container, so two
@@ -147,11 +146,10 @@ test('a box with only help text under it is never conveyed as invalid', async ()
 	await readUntil(sr, { name: "We'll send you updates about new features" });
 });
 
-// Recorded red, not asserted green. aria-at's checkbox plan expects the
-// description to be conveyed with the box; `<checkbox.description>` writes a
-// plain div and wires no aria-describedby, so the reader announces it only as a
-// separate item further down the page. This turns red the day that is wired,
-// and whoever wires it deletes the `.fails`.
+// Expected red: aria-at's plan expects the description to be conveyed with the box,
+// but `<checkbox.description>` writes a plain div and wires no aria-describedby, so
+// the reader announces it as a separate item further down. Whoever wires the
+// describedby deletes the `.fails`.
 test.fails('the help text under a box is conveyed with the box itself', async () => {
 	await open(WithHelp);
 	expectConveys(await readUntil(sr, { role: 'checkbox' }), {
@@ -167,10 +165,9 @@ test.fails('the help text under a box is conveyed with the box itself', async ()
 	).toEqual([]);
 });
 
-// Recorded red, not asserted green. The authoring practices give a checkbox one
-// activation key, space; the trigger calls preventDefault() on Enter, but the
-// component source already records that the request lands after dispatch
-// returns, so Enter still toggles. Red the day that ordering is fixed.
+// Expected red: a checkbox has one activation key, Space. The trigger does call
+// preventDefault() on Enter, but that lands after dispatch returns, so Enter still
+// toggles. Whoever fixes that ordering deletes the `.fails`.
 test.fails('pressing enter leaves a checkbox alone', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'checkbox' });

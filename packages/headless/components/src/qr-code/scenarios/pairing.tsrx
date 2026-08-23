@@ -1,10 +1,8 @@
 import { state } from '@markless/core';
 import * as qrcode from '../index.ts';
 
-// A pairing code that rotates. `value` is bound to page state, so pressing the
-// button re-encodes the pattern; the QDS reference copies `value` into a signal
-// once at mount and never follows the prop again, which leaves the displayed
-// code silently stale.
+// A pairing code that rotates. `value` is bound to page state, so pressing the button
+// re-encodes the pattern rather than leaving a stale code on screen.
 export default function Pairing() @{
 	const session = state({ token: 'alpha' });
 

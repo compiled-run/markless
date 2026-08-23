@@ -32,8 +32,8 @@ export type PaginationRootProps = Omit<PropsOf<'nav'>, 'onChange'> & {
 /**
  * One page's box, and the part that declares WHICH page this row of the anatomy
  * stands for. The control inside it - an `itemtrigger` or an `itemlink` - reads
- * that page number back off the item and carries the ARIA for it, so the number
- * is written once, on the wrapper, exactly as the QDS reference declares it.
+ * that page number back off the item and carries the ARIA for it, so the number is
+ * written once, on the wrapper.
  */
 export type PaginationItemProps = PropsOf<'div'> & {
 	/** Which page this box stands for, counting from 1. */
@@ -77,8 +77,7 @@ export type PaginationInstanceState = Seeded<
 /**
  * The per-item instance: one page number, seeded by the `item` part and read by
  * whichever control that item wraps. It is its own widget-scoped definition, so
- * every rendered `item` starts a fresh one and the control inside resolves to
- * the nearest one - which is the same nesting the QDS reference gets from a
- * second context provider on the item.
+ * every rendered `item` starts a fresh one and the control inside resolves to the
+ * nearest one.
  */
 export type PaginationItemInstanceState = Seeded<PaginationItemProps, 'value'>;

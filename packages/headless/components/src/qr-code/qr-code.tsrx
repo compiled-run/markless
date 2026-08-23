@@ -32,9 +32,9 @@ export function QrCodeRoot({ value, recovery = 'medium', children, ...rest }: Qr
 	qr.value = value;
 	qr.recovery = recovery;
 
-	// No default accessible name. QDS names the code after the string it carries,
-	// which reads a pairing token or a TOTP secret aloud; only the consumer knows
-	// what the code is FOR, so only the consumer can name it.
+	// No default accessible name. Naming the code after the string it carries would
+	// read a pairing token or a TOTP secret aloud, and only the consumer knows what
+	// the code is FOR, so only the consumer can name it.
 	<div {...rest} role="img">{children}</div>
 }
 

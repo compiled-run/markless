@@ -1,10 +1,8 @@
 import * as qrcode from '../index.ts';
 
-// Deliberately missing an `aria-label`, and it is the only scenario here that
-// is. It exists so the suite can assert what the family does NOT do: invent a
-// name. The QDS reference defaults to `QR code for ${value}`, which for this
-// value reads a pairing token aloud and for a two-factor code reads the TOTP
-// secret aloud.
+// The only scenario here deliberately missing an `aria-label`, so the suite can
+// assert what the family does NOT do: invent a name. A name built from the value
+// would read this pairing token aloud, and a TOTP secret on a two-factor screen.
 //
 // A real screen must name its code. This one is a probe, not a pattern to copy.
 export default function Unnamed() @{

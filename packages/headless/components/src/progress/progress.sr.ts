@@ -7,21 +7,15 @@ import Complete from './scenarios/complete.tsrx';
 import CustomRange from './scenarios/custom-range.tsrx';
 import Indeterminate from './scenarios/indeterminate.tsrx';
 
-// What a screen reader says about the progress family: each step names the facts
-// the announcement has to convey - role, accessible name, and the value - and
-// never a product's wording. `sr` is the only line that picks a reader, so the
-// same expectations run against NVDA and VoiceOver once those drivers land.
+// Rows assert the facts an announcement must convey - role, name, value - never a
+// reader product's wording. `sr` is the only line that picks a reader, so the same
+// expectations run against NVDA and VoiceOver once those drivers land.
 //
-// aria-at coverage, recorded honestly: there is no aria-at test plan for
-// `role="progressbar"` to seed these sequences from. The reference is the ARIA
-// specification's progressbar role and the APG's meter/progress guidance: a
-// progress bar conveys its role, its accessible name, and its current value,
-// where `aria-valuetext` is what a reader speaks when it is present, and an
-// indeterminate bar carries no `aria-valuenow` at all.
+// No aria-at test plan exists for `role="progressbar"`, so these sequences follow the
+// ARIA specification and the APG meter/progress guidance instead.
 //
-// A progress bar has no gesture. It is not focusable, it is not operable, and a
-// person only ever reads it - which is why every row below is a read and none is
-// a keypress.
+// A progress bar is not focusable and not operable, so every row here is a read and
+// none is a keypress.
 const sr = virtualDriver;
 
 async function open(component: Parameters<typeof render>[0]) {
@@ -41,8 +35,8 @@ test('reading the starter conveys the progressbar role and its current value', a
 	await open(Basic);
 	const announcement = await readUntil(sr, { role: 'progressbar' });
 	expectConveys(announcement, { role: 'progressbar' });
-	// The percentage is our own `aria-valuetext`, not the reader's wording, so
-	// asserting the string is asserting our markup rather than a product's phrase.
+	// The percentage is our own `aria-valuetext`, so this asserts our markup rather
+	// than a reader product's phrasing.
 	expect(announcement, `${sr.name} announced "${announcement}"`).toContain('30%');
 });
 
@@ -78,11 +72,6 @@ test('an indeterminate bar is still conveyed as a progressbar', async () => {
 	await readUntil(sr, { name: 'Loading...' });
 });
 
-// The bar's name is the label a person can see. It used to be the hard-coded word
-// "progress" for every bar on every page, with the visible `progress.label`
-// announced as a separate item no reader could connect to it; the bar now carries
-// `aria-labelledby` pointing at the label part instead, and no aria-label of its
-// own.
 test('the bar is conveyed with the name its visible label gives it', async () => {
 	await open(Basic);
 	const announcement = await readUntil(sr, { role: 'progressbar' });
@@ -91,10 +80,8 @@ test('the bar is conveyed with the name its visible label gives it', async () =>
 	).toEqual([]);
 });
 
-// The ARIA specification's rule is that an indeterminate bar reports no current
-// value at all. It used to carry no `aria-valuenow` and yet an `aria-valuetext` of
-// "0%", computed from `min`, so a reader announced a job that had not started
-// rather than one whose progress is unknown.
+// A "0%" computed from `min` would announce a job that has not started rather than
+// one whose progress is unknown, so the announcement must carry no percentage at all.
 test('an indeterminate bar conveys no current value', async () => {
 	await open(Indeterminate);
 	const announcement = await readUntil(sr, { role: 'progressbar' });

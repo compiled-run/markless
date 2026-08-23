@@ -202,7 +202,8 @@ function alignmentPositions(version: number, size: number): number[] {
 	return positions;
 }
 
-function bitOf(value: number, index: number): boolean {
+/** Whether bit `index` of `value` is set. */
+function isBitSet(value: number, index: number): boolean {
 	return ((value >>> index) & 1) !== 0;
 }
 
@@ -225,8 +226,8 @@ class QrSymbol {
 		);
 	}
 
-	private setFunction(x: number, y: number, dark: boolean): void {
-		this.modules[y]![x] = dark;
+	private setFunction(x: number, y: number, isDark: boolean): void {
+		this.modules[y]![x] = isDark;
 		this.reserved[y]![x] = true;
 	}
 
@@ -255,16 +256,16 @@ class QrSymbol {
 			remainder = (remainder << 1) ^ ((remainder >>> 9) * 0x537);
 		const bits = ((data << 10) | remainder) ^ 0x5412;
 
-		for (let index = 0; index <= 5; index++) this.setFunction(8, index, bitOf(bits, index));
-		this.setFunction(8, 7, bitOf(bits, 6));
-		this.setFunction(8, 8, bitOf(bits, 7));
-		this.setFunction(7, 8, bitOf(bits, 8));
-		for (let index = 9; index < 15; index++) this.setFunction(14 - index, 8, bitOf(bits, index));
+		for (let index = 0; index <= 5; index++) this.setFunction(8, index, isBitSet(bits, index));
+		this.setFunction(8, 7, isBitSet(bits, 6));
+		this.setFunction(8, 8, isBitSet(bits, 7));
+		this.setFunction(7, 8, isBitSet(bits, 8));
+		for (let index = 9; index < 15; index++) this.setFunction(14 - index, 8, isBitSet(bits, index));
 
 		for (let index = 0; index < 8; index++)
-			this.setFunction(this.size - 1 - index, 8, bitOf(bits, index));
+			this.setFunction(this.size - 1 - index, 8, isBitSet(bits, index));
 		for (let index = 8; index < 15; index++)
-			this.setFunction(8, this.size - 15 + index, bitOf(bits, index));
+			this.setFunction(8, this.size - 15 + index, isBitSet(bits, index));
 		// The module below the lower-left finder is dark in every symbol.
 		this.setFunction(8, this.size - 8, true);
 	}
@@ -277,11 +278,11 @@ class QrSymbol {
 		const bits = (this.version << 12) | remainder;
 
 		for (let index = 0; index < 18; index++) {
-			const dark = bitOf(bits, index);
+			const isDark = isBitSet(bits, index);
 			const far = this.size - 11 + (index % 3);
 			const near = Math.floor(index / 3);
-			this.setFunction(far, near, dark);
-			this.setFunction(near, far, dark);
+			this.setFunction(far, near, isDark);
+			this.setFunction(near, far, isDark);
 		}
 	}
 
@@ -317,10 +318,10 @@ class QrSymbol {
 			for (let vertical = 0; vertical < this.size; vertical++) {
 				for (let column = 0; column < 2; column++) {
 					const x = right - column;
-					const upward = ((right + 1) & 2) === 0;
-					const y = upward ? this.size - 1 - vertical : vertical;
+					const isUpward = ((right + 1) & 2) === 0;
+					const y = isUpward ? this.size - 1 - vertical : vertical;
 					if (!this.reserved[y]![x] && bitIndex < data.length * 8) {
-						this.modules[y]![x] = bitOf(data[bitIndex >>> 3]!, 7 - (bitIndex & 7));
+						this.modules[y]![x] = isBitSet(data[bitIndex >>> 3]!, 7 - (bitIndex & 7));
 						bitIndex++;
 					}
 				}
@@ -332,34 +333,34 @@ class QrSymbol {
 		for (let y = 0; y < this.size; y++) {
 			for (let x = 0; x < this.size; x++) {
 				if (this.reserved[y]![x]) continue;
-				let invert: boolean;
+				let isInverted: boolean;
 				switch (mask) {
 					case 0:
-						invert = (x + y) % 2 === 0;
+						isInverted = (x + y) % 2 === 0;
 						break;
 					case 1:
-						invert = y % 2 === 0;
+						isInverted = y % 2 === 0;
 						break;
 					case 2:
-						invert = x % 3 === 0;
+						isInverted = x % 3 === 0;
 						break;
 					case 3:
-						invert = (x + y) % 3 === 0;
+						isInverted = (x + y) % 3 === 0;
 						break;
 					case 4:
-						invert = (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0;
+						isInverted = (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0;
 						break;
 					case 5:
-						invert = ((x * y) % 2) + ((x * y) % 3) === 0;
+						isInverted = ((x * y) % 2) + ((x * y) % 3) === 0;
 						break;
 					case 6:
-						invert = (((x * y) % 2) + ((x * y) % 3)) % 2 === 0;
+						isInverted = (((x * y) % 2) + ((x * y) % 3)) % 2 === 0;
 						break;
 					default:
-						invert = (((x + y) % 2) + ((x * y) % 3)) % 2 === 0;
+						isInverted = (((x + y) % 2) + ((x * y) % 3)) % 2 === 0;
 						break;
 				}
-				if (invert) this.modules[y]![x] = !this.modules[y]![x];
+				if (isInverted) this.modules[y]![x] = !this.modules[y]![x];
 			}
 		}
 	}
@@ -368,41 +369,41 @@ class QrSymbol {
 		let score = 0;
 
 		for (let y = 0; y < this.size; y++) {
-			let runDark = false;
+			let isRunDark = false;
 			let runLength = 0;
 			const history = [0, 0, 0, 0, 0, 0, 0];
 			for (let x = 0; x < this.size; x++) {
-				if (this.modules[y]![x] === runDark) {
+				if (this.modules[y]![x] === isRunDark) {
 					runLength++;
 					if (runLength === 5) score += PENALTY_RUN_OF_FIVE;
 					else if (runLength > 5) score++;
 				} else {
 					this.pushRun(runLength, history);
-					if (!runDark) score += countFinderLookalikes(history) * PENALTY_FINDER_LOOKALIKE;
-					runDark = this.modules[y]![x]!;
+					if (!isRunDark) score += countFinderLookalikes(history) * PENALTY_FINDER_LOOKALIKE;
+					isRunDark = this.modules[y]![x]!;
 					runLength = 1;
 				}
 			}
-			score += this.terminateRun(runDark, runLength, history) * PENALTY_FINDER_LOOKALIKE;
+			score += this.terminateRun(isRunDark, runLength, history) * PENALTY_FINDER_LOOKALIKE;
 		}
 
 		for (let x = 0; x < this.size; x++) {
-			let runDark = false;
+			let isRunDark = false;
 			let runLength = 0;
 			const history = [0, 0, 0, 0, 0, 0, 0];
 			for (let y = 0; y < this.size; y++) {
-				if (this.modules[y]![x] === runDark) {
+				if (this.modules[y]![x] === isRunDark) {
 					runLength++;
 					if (runLength === 5) score += PENALTY_RUN_OF_FIVE;
 					else if (runLength > 5) score++;
 				} else {
 					this.pushRun(runLength, history);
-					if (!runDark) score += countFinderLookalikes(history) * PENALTY_FINDER_LOOKALIKE;
-					runDark = this.modules[y]![x]!;
+					if (!isRunDark) score += countFinderLookalikes(history) * PENALTY_FINDER_LOOKALIKE;
+					isRunDark = this.modules[y]![x]!;
 					runLength = 1;
 				}
 			}
-			score += this.terminateRun(runDark, runLength, history) * PENALTY_FINDER_LOOKALIKE;
+			score += this.terminateRun(isRunDark, runLength, history) * PENALTY_FINDER_LOOKALIKE;
 		}
 
 		for (let y = 0; y < this.size - 1; y++) {
@@ -432,9 +433,9 @@ class QrSymbol {
 		history.unshift(length);
 	}
 
-	private terminateRun(runDark: boolean, runLength: number, history: number[]): number {
+	private terminateRun(isRunDark: boolean, runLength: number, history: number[]): number {
 		let length = runLength;
-		if (runDark) {
+		if (isRunDark) {
 			this.pushRun(length, history);
 			length = 0;
 		}
@@ -447,15 +448,15 @@ class QrSymbol {
 /** The 1:1:3:1:1 run ratio a reader mistakes for a finder pattern. */
 function countFinderLookalikes(history: readonly number[]): number {
 	const unit = history[1]!;
-	const core =
+	const isCoreRatio =
 		unit > 0 &&
 		history[2] === unit &&
 		history[3] === unit * 3 &&
 		history[4] === unit &&
 		history[5] === unit;
 	return (
-		(core && history[0]! >= unit * 4 && history[6]! >= unit ? 1 : 0) +
-		(core && history[6]! >= unit * 4 && history[0]! >= unit ? 1 : 0)
+		(isCoreRatio && history[0]! >= unit * 4 && history[6]! >= unit ? 1 : 0) +
+		(isCoreRatio && history[6]! >= unit * 4 && history[0]! >= unit ? 1 : 0)
 	);
 }
 

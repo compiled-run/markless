@@ -10,9 +10,6 @@ import TwoCodes from './scenarios/two-codes.tsrx';
 import TwoFactorSetup from './scenarios/two-factor-setup.tsrx';
 import Unnamed from './scenarios/unnamed.tsrx';
 
-// Colocated browser suite for the qr-code family. Each test renders a realistic
-// consumer scenario, and the locators name the part anatomy: root, frame,
-// patternsvg, patternpath, overlay.
 const Root = page.getByTestId('root');
 const Frame = page.getByTestId('frame');
 const PatternSvg = page.getByTestId('patternsvg');
@@ -38,10 +35,8 @@ const TOTP_SECRET = 'JBSWY3DPEHPK3PXP';
 const PAIR_ALPHA = 'https://example.com/pair/alpha';
 const PAIR_BRAVO = 'https://example.com/pair/bravo';
 
-// A row that asserts the same thing in both modes runs once per mode. The SSR
-// harness rewrites a literal SSR mount call site, so the mount cannot be passed
-// by reference or wrapped in a helper - the branch below keeps both call sites
-// literal, which is why this idiom rather than a `mount` parameter.
+// The SSR harness rewrites a literal `renderSSR` call site, so the mount cannot be
+// passed by reference or hidden in a helper: each test branches on the mode instead.
 const MODES = ['CSR', 'SSR'] as const;
 
 function el<T extends Element = HTMLElement>(locator: { element(): Element | null }) {
@@ -133,8 +128,7 @@ function expectBasicRendered() {
 }
 
 function expectNoNameIsInvented() {
-	// The deliberate break with QDS: a consumer who wrote no name gets no name,
-	// rather than one built from the value.
+	// A consumer who wrote no name gets no name, rather than one built from the value.
 	expect(el(Root).getAttribute('role')).toBe('img');
 	expect(el(Root).hasAttribute('aria-label')).toBe(false);
 	expect(el(Root).hasAttribute('aria-labelledby')).toBe(false);
@@ -215,10 +209,8 @@ async function expectRotatingTheValueReDerivesThePattern() {
 	expectPairingStartsAtAlpha();
 
 	el(Rotate).click();
-	// The single most valuable row in the family: the QDS reference copies
-	// `value` into a signal at mount and tracks the signal, so a rotated code
-	// keeps showing the first one. Here the pattern is a derive over the seeded
-	// prop, so it follows.
+	// The pattern is a derive over the seeded prop rather than a copy taken at mount,
+	// so a rotated code shows the new value instead of the first one.
 	await expect.poll(() => el(PatternPath).getAttribute('d')).toBe(qrPath(PAIR_BRAVO, 'medium'));
 	await expect
 		.poll(() => el(PatternSvg).getAttribute('viewBox'))
@@ -327,22 +319,10 @@ test('SSR: the first write after resume re-derives a bound pattern', async () =>
 
 // --- the secret stays off the widget --------------------------------------
 //
-// A prop the part destructured out of its parameters must not come back through
-// `{...rest}`. `QrCodeRoot` is written `({ value, recovery = 'medium',
-// children, ...rest })` and renders `<div {...rest} role="img">`, so `value` and
-// `recovery` are not in `rest` in the authored source and must not be written.
-// Before the spread lowering subtracted the destructured names the served
-// element came back as
-//
-//   <div data-testid="root" value="otpauth://totp/Acme:me@example.com?secret=…"
-//        recovery="quartile" aria-label="…" role="img">
-//
-// in BOTH modes, which is why both rows below run in both.
-//
-// This is the one family where the leaked prop is the secret: the whole point of
-// dropping QDS's `QR code for ${value}` default name (research note §2, defect
-// 1) is that a TOTP secret must not be readable off the widget, and an attribute
-// carrying it is exactly as readable as a name carrying it.
+// `QrCodeRoot` destructures `value` and `recovery`, so neither is left in `{...rest}`
+// and neither may reach the element as a raw attribute. This is the one family where
+// the leaked prop would be the secret itself: a TOTP secret must not be readable off
+// the widget, and an attribute carrying it is exactly as readable as a name would be.
 
 for (const mode of MODES) {
 	test(`${mode}: the encoded value does not reach the root element as an attribute`, async () => {

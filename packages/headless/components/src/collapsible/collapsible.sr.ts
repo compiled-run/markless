@@ -5,20 +5,14 @@ import { virtualDriver } from '../../test-support/virtual-driver.ts';
 import Basic from './scenarios/basic.tsrx';
 import Unavailable from './scenarios/unavailable.tsrx';
 
-// What a screen reader says about the collapsible family, asserted the way the
-// w3c/aria-at disclosure plan asserts it: each step names the facts the
-// announcement has to convey - role, accessible name, state - and never a
-// product's wording. Disclosure is the specification's name for this pattern and
-// the name aria-at uses for its plans; collapsible is the name the libraries ship.
-// See goals/headless-components/notes/research-collapsible.md.
+// Rows follow the w3c/aria-at disclosure plan and assert the facts an announcement
+// must convey - role, name, state - never a reader product's wording. The whole
+// pattern is one assertion: `aria-expanded` on the trigger, which aria-at makes
+// `stateChangeToExpanded` at priority 1, with no live region anywhere in the plan.
+// `sr` is the only line that picks a reader, so the same expectations run against
+// NVDA and VoiceOver once those drivers land.
 //
-// The whole pattern is one assertion: `aria-expanded` on the trigger conveys the
-// state, which aria-at makes `stateChangeToExpanded` at priority 1, with no live
-// region anywhere in the plan. `sr` is the only line that picks a reader, so the
-// same expectations run against NVDA and VoiceOver once those drivers land.
-//
-// aria-at coverage, recorded honestly: the disclosure plan has no test for a
-// trigger nobody may operate, so that row is ours.
+// The plan has no test for a trigger nobody may operate, so that row is ours.
 const sr = virtualDriver;
 
 async function open(component: Parameters<typeof render>[0]) {
@@ -35,13 +29,12 @@ function expectConveys(phrase: string, conveys: Conveys) {
 }
 
 /**
- * The panel reaches the DOM after the dispatch the trigger woke returns, so the
- * reader is asked again until the new state is what it reads.
+ * The panel reaches the DOM only after the dispatch the trigger woke returns, so the
+ * reader is asked again until it reads the new state.
  *
- * It walks forward rather than re-reading the item in place, which is where this
- * family differs from the checkbox one: opening the panel GROWS the reading tree
- * under the cursor, so stepping off the item and back onto it lands on the newly
- * revealed content instead of on the trigger. The walk wraps around a tree this
+ * It walks forward rather than re-reading in place: opening the panel grows the
+ * reading tree under the cursor, so stepping off the item and back onto it lands on
+ * the revealed content instead of on the trigger. The walk wraps around a tree this
  * small, so it reaches the trigger either way and never reads a stale item.
  */
 async function expectAnnouncesAfterChange(conveys: Conveys) {
@@ -101,9 +94,6 @@ test('the text inside an opened panel becomes reachable', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'button' });
 	await sr.press(sr.keys.enter);
-	// No reannounce here: opening the panel grows the reading tree under the
-	// cursor, so stepping off the item and back onto it lands on the new content
-	// rather than on the trigger. Walking forward is what this row is about.
 	await settle();
 	await readUntil(sr, { name: 'A button that shows and hides the content below it.' });
 });
@@ -136,10 +126,8 @@ test('a section locked open still conveys that it is expanded', async () => {
 	await readUntil(sr, { name: 'Only the workspace owner can change this.' });
 });
 
-// The APG gives the disclosure control exactly two activation keys, and this is
-// the Space half. It is a separate row from Enter rather than a loop over both
-// keys, because the two go through different halves of a native button's
-// activation behaviour and a family can break one without touching the other.
+// A separate row from Enter rather than a loop over both keys: the two go through
+// different halves of a native button's activation, and one can break alone.
 test('pressing space announces the trigger as expanded', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'button' });

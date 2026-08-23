@@ -33,23 +33,25 @@ export const checklistState = shared(
 
 		return {
 			...checklist,
-			// literal function type: a callback slot is only recognised from the written annotation
+			// The literal function type matters: a callback slot is recognised only from
+			// the written annotation, never inferred.
 			onChange: undefined as ((value: readonly string[]) => void) | undefined,
 			allChecked: computed((): boolean | 'mixed' => {
 				const ticked = checklist.value;
 				const offered = checklist.values;
 				if (ticked.length === 0) return false;
-				return ticked.length === offered.length ? true : 'mixed';
+				if (ticked.length === offered.length) return true;
+				return 'mixed';
 			}),
-			setItem(itemValue: string, on: boolean) {
-				const next = on
+			setItem(itemValue: string, isOn: boolean) {
+				const next = isOn
 					? [...checklist.value, itemValue]
 					: checklist.value.filter((held) => held !== itemValue);
 				checklist.value = next;
 				checklist.onChange?.(next);
 			},
-			setAll(on: boolean) {
-				const next = on ? [...checklist.values] : [];
+			setAll(isOn: boolean) {
+				const next = isOn ? [...checklist.values] : [];
 				checklist.value = next;
 				checklist.onChange?.(next);
 			},
@@ -58,7 +60,8 @@ export const checklistState = shared(
 	{ scope: 'widget' },
 );
 
-// mixed resolves to all: a select-all's mixed state is computed, never a destination
+// The select-all's mixed state is computed from the items, never a destination a
+// click can reach: activating it from mixed ticks everything.
 export function ChecklistRoot({
 	value = [],
 	values = [],

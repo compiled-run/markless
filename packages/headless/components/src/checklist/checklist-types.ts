@@ -4,8 +4,8 @@ import type { PropsOf, Seeded } from '@markless/core';
 export type ChecklistChecked = boolean | 'mixed';
 
 /**
- * The group and the select-all's own checkbox root are one element, the way QDS
- * has them: `role="group"` plus the checkbox root's own behavior.
+ * The group and the select-all's own checkbox root are one element: `role="group"`
+ * plus the checkbox root's own behavior.
  */
 export type ChecklistRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/** The values that are ticked. Omit it and nothing is ticked. */
