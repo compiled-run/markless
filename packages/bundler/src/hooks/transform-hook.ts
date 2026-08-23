@@ -10,9 +10,11 @@ import {
 import {
 	fallbackImportedSource,
 	forceImportedModules,
+	linkBarrelComponentInterfaces,
 	linkModuleGraph,
 	linkedInterfaceClaims,
 	linkedInterfaces,
+	mergeLinkedModuleChildren,
 	resolveImportedModuleInterfaces,
 } from '../link-driver.ts';
 import { MARKLESS_VIRTUAL_PREFIX, transformTsrxModule } from '../transform.ts';
@@ -223,10 +225,35 @@ async function runFirstPassTransform(
 				provisional.moduleImports,
 				fallbackImportedSource,
 			);
-			if (provisionalImports.length === 0) throw error;
+			// A consumer whose only import is a plain `.ts` barrel contributes no
+			// interface request above, so the barrel walk is the whole recovery:
+			// without it the shared call behind the barrel can never resolve.
+			let provisionalBarrels: Awaited<ReturnType<typeof linkBarrelComponentInterfaces>>;
+			try {
+				provisionalBarrels = await linkBarrelComponentInterfaces(
+					pluginContext,
+					manifestSource,
+					provisional.moduleImports,
+					moduleLinkArtifacts,
+					internalOptions.buildId,
+				);
+			} catch {
+				throw error;
+			}
+			const provisionalChildren = mergeLinkedModuleChildren(
+				provisionalImports,
+				provisionalBarrels.children,
+			);
+			// Nothing new to link against means the recompile would only rethrow.
+			if (
+				provisionalChildren.length === 0 &&
+				Object.keys(provisionalBarrels.interfaces).length === 0
+			) {
+				throw error;
+			}
 			await forceImportedModules(
 				pluginContext,
-				provisionalImports,
+				provisionalChildren,
 				moduleLinkArtifacts,
 				moduleMetadata,
 				internalOptions,
@@ -234,10 +261,15 @@ async function runFirstPassTransform(
 			);
 			linkedTransformInput = {
 				...transformInput,
-				importedModuleInterfaces: linkModuleGraph(provisionalImports, {
-					moduleArtifacts: moduleLinkArtifacts,
-					metadata: moduleMetadata,
-				}).interfaces,
+				// The barrel's synthetic entries first, so a real compiled interface
+				// for the same specifier always wins.
+				importedModuleInterfaces: {
+					...provisionalBarrels.interfaces,
+					...linkModuleGraph(provisionalChildren, {
+						moduleArtifacts: moduleLinkArtifacts,
+						metadata: moduleMetadata,
+					}).interfaces,
+				},
 			};
 			linkedTransformResult = await transformTsrxModule(linkedTransformInput);
 		}
