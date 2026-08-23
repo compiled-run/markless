@@ -82,7 +82,54 @@ const clientBuild = resolve(demo, '.output/public/build');
 // ES named exports per served component (plain-ESM consumers link — the sr-gallery gate), and
 // handler symbol modules carry same-file module-scope declarations they name. Both are
 // consumer-capability payload, not waste. Repayment stays with bundler-diet.
-const MAX_SHIPPED_JS_GZIP_BYTES = 65_452;
+// MEASUREMENT LANDMINE, found by U157: this wall's number is a NODE_ENV=test build, because vitest
+// sets NODE_ENV=test and the build below inherits it. The same `pnpm --dir <demo> build` run from a
+// plain shell reads 143 B LOWER (65,833 against this entry's 65,976) - confirmed by re-running the
+// CLI build with NODE_ENV=test and getting the test's number exactly. Measure this wall through the
+// test, or export NODE_ENV=test, or you will under-read it by ~143 B. The two fixture walls in
+// fixture-builds.test.ts have no such offset (measured identical both ways).
+// 65,452 -> 65,995 (re-anchor 2026-08-23, U157 attribution of the row/widget layer stack): growth
+// of +553 since the 65,452 anchor commit (76d4a492), measured at 65,976 across 78 chunks - 78 at
+// every step, so no chunk appeared or split. The old constant was sound: that commit measures
+// 65,280 by CLI here, i.e. 65,423 in this wall's own NODE_ENV=test terms, leaving the 29 B margin
+// its de-minimis entry intended. U116, named as a candidate when this attribution was commissioned,
+// is therefore already paid for by that entry and is not part of what follows. Attribution below is
+// by building the tree at each merge along the first-parent chain, then confirmed by
+// revert-measurement on the tip; the two methods agree to within 3 B of gzip run variance.
+//   +103  U124-U137, the compiler block (template-literal interpolations visible to the symbol
+//         import scan, bare `undefined` as a value not a read source, branch arms and dynamic hosts
+//         forwarding the loop row, rest-spreads excluding destructured props, method calls keeping
+//         their receiver, the symbol-module read-back audit, row-scoping walking branch arms).
+//         Compiler EMISSION inside this demo's own modules, not shipped library: the two
+//         non-composing fixture walls moved -1 and 0 across the same span.
+//   +29   U140, the disposed-container guard (a dispatch arriving after its container is torn down
+//         is ignored instead of throwing). Runtime by nature - it is a teardown race, and nothing
+//         at build time knows when a container dies.
+//   +421  U139+U143+U150, the instance-scope row/widget stack: layer 4 (bound symbols carry the row
+//         segment, so a per-row write lands on its own row), layer 5 (widget-root resolution
+//         follows the dispatched row), layer 6 (bound-symbol widget ids resolve through the root
+//         registry). Revert-measured as ONE set on the tip, both ways: reverting all three returns
+//         the CLI build to 65,412, exactly the pre-layer-4 chain build, and the test's own build to
+//         65,558, i.e. +418 against this entry's 65,976. The 3 B between the two is gzip run
+//         variance. They cannot be split by revert because layers 5 and 6 edit layer 4's own code in
+//         fns/instance-scope.ts; the per-layer shares come from the CLI chain builds instead (+256
+//         layer 4, +97 layer 5, +68 layer 6 together with U153, which the shares above use so they
+//         sum to the +553 total). Compile-time impossible for the reason the +215 T067b entry gave:
+//         a keyed row's key is a RUNTIME value, while a bound symbol's id is minted per component
+//         EDGE and carries build-time branch/repeat scope only. Only the record that matched the
+//         dispatch knows which row it was, so the graph has to be re-spelled against that record.
+//   +0    U138, U142, U145, U147, U149, U151, U153 and every @markless/ui family added in this
+//         window. Measured, not assumed: with the three layers reverted, the tip build reads the
+//         pre-layer-4 number exactly. U147 (shared runtime exports) costs this demo nothing, as its
+//         packet predicted - those exports are consumer capability this demo never links.
+// Margin is 19 B for gzip run variance, on a local macOS worktree measurement; per this wall's
+// convention the next CI (Linux) actual re-anchors on top. Readings of 65,800 / 65,863 / 65,912
+// were reported from the root checkout while this window was still landing - all three are below
+// 65,976 and consistent with it, being earlier points on the same climb.
+// Repayment owed by bundler-diet - and the fixture walls carry the priced version of that debt: the
+// same three layers cost a row-free, widget-free app 1,087 B, all of it retained capability code it
+// never runs. That is the trim to take, and it is measured, not estimated.
+const MAX_SHIPPED_JS_GZIP_BYTES = 65_995;
 
 test('music-player-ssr production build stays within its shipped JS budget', async () => {
 	await rm(resolve(demo, '.output'), { force: true, recursive: true });
