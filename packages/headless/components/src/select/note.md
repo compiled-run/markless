@@ -29,6 +29,12 @@ a `shared()` factory. `search` plus `searchAt` replaces the timer, and every
 navigation question is answered by a DOM walk from `event.target`, so there is
 no item registry in this family at all.
 
+**Every DOM query the family makes lives in `element-reach.ts`.** No handler in
+`select.tsrx` holds a DOM reference: each one hands `event.target` to a named
+function that does one job. Two framework walls, both measured below, are why
+that module exists at all; the section "What a handler cannot reach" states them
+and what would close them.
+
 ## Deviations from QDS, and the constraint that forced each
 
 1. **`role="combobox"` on the trigger.** QDS ships `aria-haspopup="listbox"` on
@@ -131,6 +137,70 @@ Everything below was measured by running the suite, not assumed.
    first open and raced later ones (4 intermittently red rows). The landing is
    now retried per frame, up to twelve, until `document.activeElement` is the
    option it aimed at.
+
+## What a handler cannot reach — measured on this tip
+
+The owner's order is that no part of the library selects DOM nodes: references
+and id lifetimes go through markless primitives. Select cannot meet it yet, and
+the reason is two walls rather than a shortcut anyone took. Both were measured
+here by writing the primitive-based shape and running the suite.
+
+**1. A handler can reach no element but its own `event.target`.**
+
+An `element()` handle resolves in `el=` and in an IDREF attribute; read from a
+handler body it is `undefined`, silently, with no diagnostic. Measured: the
+trigger's key rule was written `const list = select.contentEl;` and gated on
+`list !== undefined`. Eighteen rows went red, including `Alt+ArrowDown`, which
+only calls `setOpen(true)` and never touches the list. Dropping that one guard
+turned `Alt+ArrowDown` green again, so the guard — not the handler — was what
+failed: the handle read `undefined`.
+
+`attach={(host) => ...}` is the only primitive handed a live element, and it
+cannot pass one on. Writing it to a plain instance field is
+`MARKLESS_SHARED_SEED_UNKNOWN_FIELD` ("declares no graph field named
+'triggerNode'"). Declaring that field with `state()` instead clears that
+diagnostic and hits `MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE`: the
+emitted behavior module still names the shared binding, because a behavior is
+compiled into a module of its own and no graph write is lowered into it. So a
+behavior can touch its own host element and nothing else.
+
+Together those close every route from a handler to a sibling part, which is why
+the trigger reaches its listbox through the id markless minted for it
+(`aria-controls` → `getElementById`) and the listbox reaches its trigger back
+through the same id. The id lifetime is the framework's; only the lookup is not.
+
+What would close it: an `element()` handle that reads as its bound element from
+a handler body — the same value `attach` is already handed. That one capability
+removes four of this family's six queries, and the same four in radio group,
+tree and navbar.
+
+**2. Nothing yields the rows of a repeated part in order.**
+
+The arrow walk and the typeahead need the options under one listbox, in the
+order a person walks them, with the disabled ones left out. No primitive
+produces that collection. A registry the items fill from their own bodies is not
+an answer: seeds are order-independent, a resumed page never re-runs those
+bodies, and a keyed `@for` can reorder rows after they registered.
+
+What would close it: a collection handle — `const options = collection()` in the
+widget-scoped factory, bound with `el={options.member}` on the repeated part,
+read from a handler as its members in document order, maintained by the same
+bookkeeping that already fills `element()` handles and mints their ids. It is
+also the prerequisite `idref-attributes.ts` names for putting
+`aria-activedescendant` in `IDREF_ATTRIBUTES`, which says in as many words that
+the attribute "names one row of a live collection".
+
+**3. A widget-root element honours only its first handler.**
+
+`select.item` is a widget root and already carries `onClick`. Moving the listbox
+key rule onto it — which would have let each option answer for itself instead of
+being found by a walk — compiled clean and did nothing: twelve rows red, with
+`symbol:3` recorded as *running* in the debug log while even its pure-state
+branches (`Tab` committing through `select.choose`) had no effect. Reordering the
+branches and moving every DOM call out of the handler changed nothing. The key
+rule therefore stays on `select.content`, which is where it works. Worth a
+separate charter: the failure is silent, and a consumer adding a second handler
+to any widget-root part would hit it the same way.
 
 ## Keyboard model
 
