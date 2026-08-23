@@ -416,13 +416,22 @@ export function NavbarItemContent({
 			// Read before the close: a hidden subtree cannot hold focus, so after the
 			// dispatch lands the answer is no longer available.
 			const wasFocusInside = box !== null && box.contains(document.activeElement);
+			// Where the press landed, which the report carries for `outside-press` and
+			// omits for Escape. `contains` rather than `===`: a consumer is free to put
+			// an icon or a span inside the trigger, and the press lands on that.
+			// The double cast is a stopgap on a type-service slip, not a DOM fact: see
+			// note.md, `pressTarget` is declared with the branded markup `Element`.
+			const pressed = event.detail.pressTarget as unknown as HTMLElement | undefined;
+			const onOwnTrigger = pressed !== undefined && back !== null && back.contains(pressed);
 			navbar.closeAll();
 			// The press that dismissed may be the same press whose click the trigger is
-			// about to see. Without this, pressing the trigger of an open dropdown would
-			// close it on the press and re-open it on the click. The window is the
-			// item's own, so a press outside never suppresses a click on a different
-			// entry's trigger.
-			item.graceUntil = Date.now() + navbar.clickGrace;
+			// about to see: without a guard, pressing the trigger of an open dropdown
+			// closes it on the press and re-opens it on the click. Armed by IDENTITY, not
+			// by timing - only a press on this item's own trigger can produce that
+			// collision, so a press anywhere else leaves the very next click free even
+			// though it falls inside `clickGrace`. The window still bounds the swallow,
+			// because the click that pairs with the press may never arrive.
+			if (onOwnTrigger) item.graceUntil = Date.now() + navbar.clickGrace;
 			// The primitive moves no focus, so the return is the family's to write:
 			// Escape from inside the entry has to land on the button that opened the
 			// panel, or a person is left standing on nothing. A dismissal that reached
