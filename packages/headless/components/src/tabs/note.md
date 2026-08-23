@@ -157,6 +157,6 @@ panel.
 
 ## Not wired into the barrel
 
-`src/index.ts` does not carry `tabs` yet, and neither does the package's
+The family is wired into src/index.ts (root barrel; per-family subpaths removed per the one-surface ruling).
 `exports` map, so the scenarios import `../index.ts` directly. Both are the PM's
 to wire at fan-in.

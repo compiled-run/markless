@@ -265,3 +265,6 @@ next step, and needs the gallery to render.
 
 [vsr]: https://github.com/guidepup/virtual-screen-reader
 [aria-at]: https://github.com/w3c/aria-at
+
+
+> Staleness note (2026-08-23): four gaps listed above closed at fc66d3f9 — toggle/textbox help text is conveyed with the control (checkbox's remains pinned), the progress bar is named by its visible label, and an indeterminate bar reports no value.
