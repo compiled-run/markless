@@ -5,6 +5,8 @@ import type {
 	LoweredStateRead,
 	LoweredStateWrite,
 	PlannedSymbol,
+	SemanticGraphAlias,
+	SemanticGraphBinding,
 	SemanticModuleImport,
 	SourceSpan,
 	SymbolResolverInput,
@@ -14,6 +16,7 @@ import {
 	graphBindingMap,
 	resolveGraphPath,
 	semanticAliasMap,
+	type ResolvedGraphPath,
 } from '../artifact-helpers/graph-paths.ts';
 import {
 	componentEdgeInstancePath,
@@ -27,6 +30,7 @@ import {
 } from './capture-semantics.ts';
 import {
 	componentSharedSeedWrite,
+	resolveSharedInstanceGraphPath,
 	sharedCallbackSlotGraphNodeId,
 } from './semantic-graph/collect-shared.ts';
 import { resolveBoundaryRunners } from './public-render/boundary-runner.ts';
@@ -247,7 +251,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 		// authored text, which names no binding once it is more than a bare read.
 		const resolved = site.testComputedGraphNodeId
 			? { binding: { id: site.testComputedGraphNodeId }, path: [] as ReadonlyArray<string> }
-			: resolveGraphPath(site.testSource, branchBindings, branchAliases);
+			: resolveBranchTestRead(site.testSource, input, branchBindings, branchAliases);
 		symbols.push({
 			id: `symbol:${nextSymbolId++}`,
 			kind: 'branch-update',
@@ -279,6 +283,27 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			})),
 		diagnostics: input.payloadArena.diagnostics,
 	};
+}
+
+/**
+ * What a BARE branch condition tests. The instance resolver goes first because it
+ * is the only reading that knows what a part local HOLDS: the binding map answers
+ * `panel.open` only when the part's local happens to repeat the factory's own
+ * state variable name, which is a spelling coincidence, not evidence. It answers
+ * nothing when the root is not an instance local, so every other shape keeps the
+ * resolution it had. Neither answering still mints nothing rather than a node no
+ * one proved: a repeat local or a literal is settled by the render that made it.
+ */
+function resolveBranchTestRead(
+	testSource: string,
+	input: SymbolResolverInput,
+	bindings: ReadonlyMap<string, SemanticGraphBinding>,
+	aliases: ReadonlyMap<string, SemanticGraphAlias>,
+): ResolvedGraphPath | null {
+	return (
+		resolveSharedInstanceGraphPath(testSource, input.semanticGraph) ??
+		resolveGraphPath(testSource, bindings, aliases)
+	);
 }
 
 export function planBoundSymbolResolver(
