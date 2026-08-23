@@ -328,6 +328,10 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 						symbolIds: eventSymbolsForHost(input, event.hostNodeId, event.eventName).map(
 							(symbolId) => boundEventSymbols.get(symbolId) ?? symbolId,
 						),
+						// Cloned rows dispatch through the row record, not the template
+						// host's, so dropping the policy here left every row past the
+						// first with no synchronous preventDefault.
+						...(event.syncPolicy ? { syncPolicy: event.syncPolicy } : {}),
 					})),
 			},
 		];

@@ -1,3 +1,4 @@
+import { isEventAttribute } from 'yuku-tsrx';
 import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, expressionSourceOrFallback, sourceSpan } from '../../ast/source.ts';
 import type { SemanticComponentEdge, SemanticComponentPropBinding } from '../../artifacts.ts';
@@ -37,6 +38,12 @@ import {
 } from './diagnostics.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
 import { isIdrefAttribute } from './idref-attributes.ts';
+import {
+	extractSyncPolicy,
+	firstDetachedSyncPolicyReference,
+	hasSyncEventPolicyCandidate,
+	unextractableSyncPolicyDiagnostic,
+} from './collect-sync-policy.ts';
 
 export function collectComponentProps(component: AnyNode, state: WalkState): void {
 	const firstParam = asNodes(component.params)[0];
@@ -140,7 +147,10 @@ export function collectComponentEdge(
 		);
 	}
 
-	const props = componentPropBindings(node, state, tagName);
+	const props = componentPropBindings(node, state, tagName, {
+		childComponentName,
+		importSource: importSource.importSource,
+	});
 	state.graph.componentEdges.push({
 		id: `component-edge:${state.nextComponentEdgeId++}`,
 		parentComponentName: state.currentComponentName,
@@ -171,6 +181,7 @@ function componentPropBindings(
 	node: AnyNode,
 	state: WalkState,
 	childComponentName: string,
+	link?: { readonly childComponentName: string; readonly importSource?: string },
 ): ReadonlyArray<SemanticComponentPropBinding> {
 	// Component-body scope: an unscoped map resolves `checklist` to the shared
 	// factory's own local of the same name, which is a different node.
@@ -240,6 +251,27 @@ function componentPropBindings(
 				continue;
 			}
 
+			// An event callback the child spreads onto its own element becomes a
+			// real event record there, so a preventDefault inside it is exactly as
+			// browser-critical as one written on a host element - and just as late
+			// if it waits for the lazy symbol. Extract it here, refuse it here.
+			const syncPolicy = isEventAttribute(name)
+				? extractSyncPolicy(callback, state)
+				: undefined;
+			const hasSyncPolicyCandidate = isEventAttribute(name)
+				? hasSyncEventPolicyCandidate(callback) ||
+					Boolean(firstDetachedSyncPolicyReference(callback))
+				: false;
+			if (
+				hasSyncPolicyCandidate &&
+				!syncPolicy &&
+				spreadForwardsProp(name, link, state, childComponentName)
+			) {
+				state.graph.diagnostics.push(
+					unextractableSyncPolicyDiagnostic(name, callback, [callback], state),
+				);
+			}
+
 			props.push({
 				name,
 				source: expressionSource(callback, state.source),
@@ -248,6 +280,8 @@ function componentPropBindings(
 					expressionSource(parameter, state.source),
 				),
 				sourceSpan: sourceSpan(callback, state.filename),
+				...(hasSyncPolicyCandidate ? { hasSyncPolicyCandidate } : {}),
+				...(syncPolicy ? { syncPolicy } : {}),
 			});
 			continue;
 		}
@@ -519,6 +553,32 @@ function resolveImportedChildComponent(
 			served: servedComponentNames(moduleInterface),
 		},
 	};
+}
+
+// True when the child writes this prop onto one of its own elements through a
+// `{...rest}` spread - the only shape where a consumer callback becomes a real
+// event record with no handler of the child's own around it. A same-module
+// child answers `false`: its interface is built by the end of this compile, so
+// the walk cannot read it yet, and a guess here would refuse working code.
+function spreadForwardsProp(
+	propName: string,
+	link: { readonly childComponentName: string; readonly importSource?: string } | undefined,
+	state: WalkState,
+	fallbackChildName: string,
+): boolean {
+	if (!link?.importSource) return false;
+	const moduleInterface = state.importedModuleInterfaces[link.importSource];
+	if (!moduleInterface) return false;
+	const childName = link.childComponentName || fallbackChildName;
+	const spreadHosts =
+		moduleInterface.render.components.find(
+			(component) => component.componentName === childName,
+		)?.spreadHosts ?? [];
+
+	return spreadHosts.some(
+		(spread) =>
+			!spread.destructuredNames.includes(propName) && !spread.excludeNames.includes(propName),
+	);
 }
 
 function servedComponentNames(
