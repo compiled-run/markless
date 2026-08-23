@@ -34,6 +34,7 @@ export const virtualDriver: ScreenReaderDriver = {
 		link: 'link',
 		region: 'region',
 		image: 'image',
+		dialog: 'dialog',
 		selected: 'selected',
 		currentPage: 'current page',
 		expanded: 'expanded',
