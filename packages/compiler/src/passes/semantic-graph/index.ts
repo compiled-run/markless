@@ -47,6 +47,7 @@ import {
 	collectSharedCallbackBindings,
 	collectSharedCallbackInvocations,
 	collectSharedFactoryGraph,
+	moduleInterfaceSharedDefinitions,
 } from './collect-shared.ts';
 import { attachKeyedRepeatRowHost, collectKeyedRepeat } from './collect-repeat.ts';
 import { collectBranchSite } from './collect-branches.ts';
@@ -142,8 +143,18 @@ export async function buildSemanticGraph(
 		graph,
 		hostIds: state.hostIds,
 	});
+	// Shared definitions publish here rather than with the rest of the interface:
+	// a definition's returned properties and the factory nodes they name are
+	// collected after that point, and a consumer adopts exactly those.
+	const sharedDefinitions = moduleInterfaceSharedDefinitions({
+		statements,
+		filename: input.filename,
+		sharedDefinitions: graph.sharedDefinitions,
+		graphBindings: graph.graphBindings,
+	});
 	graph.moduleGraphInterface = {
 		...graph.moduleGraphInterface,
+		...(sharedDefinitions.length > 0 ? { sharedDefinitions } : {}),
 		render: {
 			version: 1,
 			components: graph.components.flatMap((component) => {
