@@ -86,12 +86,7 @@ export function createResumeRuntime(
 	};
 	const storeContainerSubscription = (release: () => void) => {
 		if (typeof release !== 'function') return;
-		if (
-			typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' &&
-			__MARKLESS_DEBUG_ENABLED__ &&
-			disposed
-		)
-			release();
+		if (disposed) release();
 		else containerSubscriptionReleases.push(release);
 	};
 	const registerComputedRefreshes = async (
@@ -357,17 +352,17 @@ export function createResumeRuntime(
 		hostSubscriptionReleases.delete(hostNodeId);
 	}
 	function dispose(): void {
-		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__) {
-			if (disposed) return;
-			disposed = true;
-		}
+		if (disposed) return;
+		disposed = true;
 		for (const eventType of eventTypes)
 			input.root.removeEventListener?.(eventType, dispatchCaptured, { capture: true });
 		input.root.removeEventListener?.(SHARED_PATCH_EVENT_TYPE, receiveSharedPatch, {
 			capture: true,
 		});
 		behaviorRuntime?.disconnect();
-		for (const hostNodeId of Array.from(elementsByHostId.keys())) disposeHost(hostNodeId);
+		// A dispatch after container teardown is never an unmatched defect.
+		for (const hostNodeId of Array.from(elementsByHostId.keys()))
+			disposeHost(hostNodeId, { ignoreFutureEvents: true });
 		for (const release of containerSubscriptionReleases.splice(0)) release();
 		storagePlane?.dispose();
 		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__) {
@@ -509,8 +504,11 @@ export function createResumeRuntime(
 	}
 	const runtime: ResumeRuntime = {
 		start,
-		dispatch: async (event: ResumeDomEvent, options?: ResumeDispatchOptions) =>
-			(await getEvents()).dispatch(event, options),
+		dispatch: async (event: ResumeDomEvent, options?: ResumeDispatchOptions) => {
+			if (disposed) return;
+			const wiring = await getEvents();
+			if (!disposed) await wiring.dispatch(event, options);
+		},
 		activateBehaviors: async (hostNodeId: string) =>
 			(await loadBehaviorRuntime()).activateBehaviors(hostNodeId),
 		// D8 navigation transitions: settled means every boundary committed its
