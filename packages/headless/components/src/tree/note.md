@@ -60,10 +60,12 @@ landed recursion fixture passes `depth`.
 ## What the compiler forced — measured on this tip
 
 1. **A handler on the element that ROOTS a widget instance cannot read that
-   instance.** PARTLY STALE — re-measured 2026-08-23: the instance read itself
-   works on a widget ROOT, but a handler declared on `tree.item` is never woken
-   at all, so the code below stands unchanged. See "Re-measured 2026-08-23" and
-   the U205 correction under it. `tree.root`'s own `onFocusin` and
+   instance.** STALE IN BOTH HALVES as of 2026-08-23 — the instance read was
+   re-measured working on a widget ROOT that day (U202), and the never-woken half
+   (defect 58) was closed the same day (U211). The shipped code below is
+   unchanged all the same: neither re-measurement was followed by a conversion in
+   this folder. See the U202 and U205 sections below, both re-anchored.
+   `tree.root`'s own `onFocusin` and
    `onKeydown` threw
    `ReferenceError: tree is not defined` out of the lowered symbol on the first
    event. Both handlers are therefore written against the DOM alone, and the two
@@ -122,7 +124,11 @@ all measured:
    probe two item bodies called it and the rendered value stayed empty, while the
    same method called from a handler on the same run appended as written. This is
    the closest miss of the three: the syntax is accepted, only the body-time
-   execution is missing.
+   execution is missing. *Not re-measured since `handler callbacks route
+   shared-instance writes` (commit `7d009f8f`, defect 66) landed on 2026-08-23.
+   That landing is about handler-time writes and this gap is body-time, so it is
+   not obviously the same thing — but the route is cheap to re-try and nobody
+   has.*
 
 Without registration there is no ordered row collection, so `ArrowDown`/`ArrowUp`
 /`Home`/`End`, the descend and ascend steps, the roving tab stop and the
@@ -131,13 +137,37 @@ toggling (`ArrowRight` to open, `ArrowLeft` to close, `Enter`/`Space`) no longer
 needs the DOM at all now that limit 1 has lifted — it is only focus MOVEMENT that
 is stuck.
 
-### Corrected 2026-08-23 (U205): the item's toggling could NOT be converted
+### Corrected 2026-08-23 (U205): the item's toggling could NOT be converted — its cause CLOSED the same day (U211)
 
 The paragraph above expected `ArrowRight`/`ArrowLeft`/`Enter`/`Space` to drop the
-DOM once limit 1 lifted. It was tried and it does not work, so the shipped
-keyboard is unchanged and every key is still handled on `tree.root`.
+DOM once limit 1 lifted. It was tried on 2026-08-23 and did not work then, so the
+shipped keyboard is unchanged and every key is still handled on `tree.root`. The
+cause U205 found has since been closed; read the re-anchor below before treating
+anything in this section as current.
 
-**A keydown handler declared on `tree.item` never runs.** The handler was written
+**A keydown handler declared on `tree.item` never runs. — CLOSED 2026-08-23
+(defect 58, non-reproducing).**
+
+*Re-measured 2026-08-23 by the headless-pilot board, unit
+`U211-widget-root-handler-wake`: a nested widget-rooting element's handler wakes
+and runs, at two nesting depths, in CSR and after resume. It was fixed
+collaterally by `handler callbacks route shared-instance writes` (commit
+`7d009f8f`, defect 66), which is on this tip and postdates every measurement in
+this section. The shipped keyboard here is unchanged — every key is still handled
+on `tree.root` — because the conversion was not re-tried after that landing.*
+
+***The live claim for the next reader is defect 67, not 58.*** *What U211 did
+reproduce is narrower: only the innermost element on a bubble path is resumed, so
+an enclosing element's same-event handler is dropped. That is exactly the shape a
+per-item keydown would take here — `tree.item` rows nest inside one another and
+inside `tree.root`, and `tree.root`'s single `onKeydown` is the enclosing handler
+this family's whole navigation depends on. So the conversion U205 tried is
+plausibly blocked again by 67 even though 58 is gone, and it should be re-tried
+only after 67 lands. Its fix is in flight as board unit
+`U232-bubble-path-dispatch`. Nothing in that paragraph was measured in this
+family; it follows from U211's reproduction.*
+
+The measurement that opened 58, kept as history: the handler was written
 on the item's own root element, calling `item.toggle()`. It compiles clean, the
 runtime matches the event (`keydown matched event record c1:h2`, and
 `bound:symbol:2:component-edge:1` runs), and then the trace says
@@ -153,6 +183,11 @@ woken**. What is missing here is the wake, not the instance read. So the
 rooting-element limit is lifted for the root of a widget (`tree.root`,
 `navbar.root`, `navbar.item`, all of which wake and run today) and not for
 `tree.item`, whose keydown record is matched but never woken.
+
+*That last split no longer holds: `tree.item` wakes too as of 2026-08-23 (U211,
+and `7d009f8f` behind it). The first half of the reading — that the missing piece
+was the wake and not the instance read — is what survived, and it is why closing
+the wake was enough.*
 
 The capability to raise: **ordered item registration into an ancestor widget
 instance** — a descendant widget or part appending its `element()` handle, and

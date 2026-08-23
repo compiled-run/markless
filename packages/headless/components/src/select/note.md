@@ -294,9 +294,25 @@ also the prerequisite `idref-attributes.ts` names for putting
 `aria-activedescendant` in `IDREF_ATTRIBUTES`, which says in as many words that
 the attribute "names one row of a live collection".
 
-**3. A widget-root element honours only its first handler.**
+**3. A widget-root element honours only its first handler. — CLOSED 2026-08-23
+(defect 57, non-reproducing).**
 
-`select.item` is a widget root and already carries `onClick`. Moving the listbox
+*Re-measured 2026-08-23 by the headless-pilot board, unit
+`U211-widget-root-handler-wake`: a widget-root element runs both its handlers, in
+CSR and after resume, at two nesting depths. It was fixed collaterally by
+`handler callbacks route shared-instance writes` (commit `7d009f8f`, defect 66),
+which is on this tip and postdates the measurement below. The shipped code here
+is unchanged: the key rule is still on `select.content`, because moving it was
+never re-tried after that landing. Whoever tries the move next should know what
+U211 did reproduce, and what still constrains it — defect 67: only the innermost
+element on a bubble path is resumed, so a `keydown` on `select.item` would drop
+`select.content`'s same-event handler for the same key. Its fix is in flight as
+board unit `U232-bubble-path-dispatch`. That constraint follows from U211's
+reproduction, not from a measurement in this family. The history below is kept
+because it is what the family was designed around.*
+
+The measurement that opened it: `select.item` is a widget root and already
+carries `onClick`. Moving the listbox
 key rule onto it — which would have let each option answer for itself instead of
 being found by a walk — compiled clean and did nothing: twelve rows red, with
 `symbol:3` recorded as *running* in the debug log while even its pure-state
