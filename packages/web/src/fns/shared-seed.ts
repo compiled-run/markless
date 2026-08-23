@@ -9,7 +9,7 @@ import {
 	childrenWidgetRootPath,
 	childSurfaceOf,
 	type ChildrenProjectionLink,
-	widgetRootsOf,
+	renderedWidgetRootsOf,
 } from '../prerender/children-projection.ts';
 import { MARKLESS_SSR_CALLBACKS_PROP, marklessSsrSpreadProps } from './ssr.ts';
 
@@ -32,17 +32,20 @@ const seedProjectingChild: SharedSeedPass = async (
 	// Static registration before descent: the projecting child's own instance
 	// names the widget its parts belong to, so a part's minted element() id can
 	// carry which rendered widget it is part of.
-	// Defect 65, CSR half: only a child that ROOTS a widget may name one — a
+	// Defect 65, CSR half: only a child that STARTS a widget may name one — a
 	// projecting PART must leave the enclosing token inherited, or a binder in its
-	// projection mints an id the reader never spells. `widgetRootsOf` answers by
-	// payload cell ownership, which the compiler assigns to exactly one component
-	// per family, so it names the same root the SSR half gates on.
+	// projection mints an id the reader never spells. Defect 68: starting one is
+	// not the same as owning its cells. A child that composes a family root around
+	// its own children roots no cell yet begins that instance, and the parts
+	// projected through it resolve to it, so the question is the composition-aware
+	// one the SSR marker answers — payload ownership alone withholds the token from
+	// a composing child and leaves its parts resolving no instance at all.
 	const base = context.idPrefix + (context.rowSegment ?? '') + rootEdge.symbolPrefix;
 	const chain = childrenProjectionChain(context.surface, rootEdge.childComponentName);
 	const composedRoot = chain.map((link) => link.edge.symbolPrefix).join('');
 	const inheritedSeeds = new Map(inherited ?? []);
 	const seeded =
-		widgetRootsOf(context.surface, rootEdge.childComponentName).length > 0
+		renderedWidgetRootsOf(context.surface, rootEdge.childComponentName).length > 0
 			? inheritedSeeds.set(MARKLESS_WIDGET_INSTANCE_KEY, base + composedRoot)
 			: inheritedSeeds;
 	await applySharedSeeds(context, context.surface, context.symbolPrefix, rootEdge, read, seeded);
@@ -177,13 +180,17 @@ function projectedEdges(
 		),
 	)[0];
 	if (rootProjectionChunkId === undefined || !rootEdge) return [];
-	const families = widgetRootsOf(surface, rootEdge.childComponentName);
+	// The boundary asks the same composition-aware question the token gate asks, so
+	// a row that COMPOSES a root of this root's family ends the walk exactly as one
+	// that declares the family itself does. The SSR twin is
+	// `marklessSsrWidgetBoundary` over the same spliced marker.
+	const families = renderedWidgetRootsOf(surface, rootEdge.childComponentName);
 	const startsOwnInstance = (edgeId: string): boolean => {
 		if (families.length === 0) return false;
 		const edge = edges.find((candidate) => candidate.id === edgeId);
 		return (
 			edge !== undefined &&
-			widgetRootsOf(surface, edge.childComponentName).some((definitionId) =>
+			renderedWidgetRootsOf(surface, edge.childComponentName).some((definitionId) =>
 				families.includes(definitionId),
 			)
 		);

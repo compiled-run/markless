@@ -36,6 +36,26 @@ export function widgetRootsOf(surface: PrerenderDataSurface, componentName: stri
 	);
 }
 
+/**
+ * The widget families a rendered instance of a placed child STARTS: the families
+ * its own payload roots, plus the families rooted by the composed roots its own
+ * body wraps its `children` in. The CSR twin of the compiler's
+ * `marklessWidgetRoots` marker, which splices the composed roots' families the
+ * same way (`widgetRootMarkerLine`'s `composedRootSurfaceArgs`). A component
+ * that composes a family root around its children owns no cell of that family,
+ * yet every rendered instance of it starts an instance of it — so payload
+ * ownership alone answers no where the render answers yes.
+ */
+export function renderedWidgetRootsOf(
+	surface: PrerenderDataSurface,
+	componentName: string,
+): string[] {
+	const composed = childrenProjectionChain(surface, componentName).flatMap((link) =>
+		widgetRootsOf(link.surface, link.edge.childComponentName),
+	);
+	return [...new Set([...widgetRootsOf(surface, componentName), ...composed])];
+}
+
 // The surface that publishes a placed child: its own module when the child is
 // declared there, otherwise the module it was imported from.
 export function childSurfaceOf(
