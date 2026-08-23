@@ -125,10 +125,16 @@ async function expectGuardedRestSpreadCallbackFires(container: ParentNode) {
 
 	item.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
 
-	// The part's own write lands first, the same way it does for `family` above,
-	// so poll it before blaming the consumer's counter.
-	await expect.poll(() => item.textContent).toBe('1');
-	await expect.poll(() => required(container, '[data-log="keydown"]').textContent).toBe('1');
+	// Asserted as one record rather than two polls: on SSR resume the two halves
+	// fail in OPPOSITE directions depending on what ran before this row (see the
+	// pinned SSR row below), and two sequential polls report only whichever half
+	// happens to be checked first.
+	await expect
+		.poll(() => ({
+			part: item.textContent,
+			consumer: required(container, '[data-log="keydown"]').textContent,
+		}))
+		.toEqual({ part: '1', consumer: '1' });
 }
 
 test('CSR: a root-held callback fires from a part one and two levels below the root', async () => {
@@ -169,16 +175,58 @@ test('CSR: a part that guards an optional event prop out of a rest spread reache
 // bound row for this part - on the `<NkfItem>` edge, with a `callback-route` to
 // the consumer's own handler symbol. The CSR row above is green on that binding.
 //
-// Still red, measured on this tree: SSR resume runs the part's emitted symbol
-// WITHOUT the bound row's capture adapter. The child module's symbol is emitted
-// as `context.graph.read("prop:props", ["onKeyDown"])?.(event)`, and the adapter
-// that turns that legacy read into the parent-proven callback route
-// (`createBoundGraph`, packages/bundler/src/bound-resolver.ts) only runs when the
-// dispatcher loads the BOUND id. The part's own write still lands, so the symbol
-// did run - under an id that is not the bound one. The seam is which symbol id
-// the served payload names for a composed child's own event record
-// (`boundEventSymbolIds`, packages/compiler/src/passes/protocol-view.ts), or the
-// emission choice in symbol-modules.ts; neither file is in this unit's contract.
+// Still red - but NOT for the reason this comment used to give. U161 measured
+// the served bytes and the runtime, and the symbol-id half of defect 20 is
+// already correct on this tree:
+//
+//   - the served view record for the part's own event names the BOUND id
+//     (`{"hostNodeId":"c16:h1","eventName":"keydown",
+//     "symbolIds":["bound:symbol%3A0:component-edge%3A16"]}`), so
+//     `boundEventSymbolIds` (protocol-view.ts) already maps it;
+//   - the served resolver carries `createBoundGraph` and that row's capture
+//     slot with `legacyGraphRead {graphNodeId:"prop:props",path:["onKeyDown"]}`
+//     and a `callback-route` to the consumer's `symbol:6`, which is exactly the
+//     key the child's emitted `context.graph.read("prop:props",["onKeyDown"])`
+//     produces;
+//   - run ALONE, the dispatch executes `nested-callback-family.tsrx:symbol:0`,
+//     `nested-callback.tsrx:symbol:6` AND the keydown output's dom update
+//     `symbol:14`, and the consumer's counter reaches 1.
+//
+// What is actually broken is order-dependent, and the two halves fail in
+// OPPOSITE directions:
+//
+//   this row alone                    -> part=0 consumer=1
+//   after the CSR row above has run   -> part=1 consumer=0
+//
+// So one of the part's own text update and the consumer's callback lands, never
+// both, and which one lands is decided by whether the symbol modules were
+// already loaded. Nothing is thrown and no violation is recorded either way.
+//
+// U165 ruled OUT the one cause that had been proposed for it. The proposal was
+// the unawaited inlined dispatch: `inlineSharedMethodCalls`
+// (packages/compiler/src/passes/symbol-resolver.ts) replaces a call to a shared
+// method that dispatches to a consumer callback with an async IIFE, and it used
+// to leave that IIFE unawaited, so the statements the author wrote after the
+// call raced it. That defect was real and is fixed, and it does reorder the
+// collapsible family, whose `toggle()` calls `collapsible.onChange?.(open)`.
+//
+// It is not this row. `nkf` declares no callback slot, so `record()` dispatches
+// to nobody, and this part's handler compiles to a SYNCHRONOUS inline with no
+// await anywhere in it - measured on the emitted module for `NkfItem`:
+//
+//   export function symbol_0(context) {
+//     const event = context.event;
+//     (() => { context.graph.write({ ...path: ["keys"]... }); })();
+//     context.graph.read("prop:props", ["onKeyDown"])?.(event);
+//   }
+//
+// Both legs are already in authored order and neither is deferred, and the
+// module is not even async. So nothing about await ordering can move this row:
+// what fails is that `context.graph.read("prop:props", ["onKeyDown"])` answers
+// undefined in the warm state, which is the `prop:props` placeholder fallback
+// this file's header already describes. Still a resume/runtime seam, and still
+// outside this unit's contract - but now with the compiler-side explanation
+// eliminated by measurement rather than left open.
 test.fails('SSR resume: the same guarded rest-spread callback reaches its consumer', async () => {
 	const { errors, stop } = watchPageErrors();
 	const container = (await renderSSR(Page)).container;

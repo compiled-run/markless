@@ -586,6 +586,19 @@ function emitSsrDataLines(
 			),
 		),
 	);
+	// The composed child that encloses this component's own children roots the
+	// widget those children resolve. It is composed during THIS component's
+	// render, which happens after the consumer already rendered them, so the
+	// seed phase forwards the same props to it before any part renders.
+	const childrenRootEdgeIds = childrenProjectionChain(
+		input.renderData.chunks,
+		componentName,
+		(edgeId) =>
+			componentEdgeInstanceSegment(
+				input.semanticGraph.componentEdges.find((edge) => edge.id === edgeId),
+				input.semanticGraph.componentEdges,
+			),
+	).map((link) => link.componentEdgeId);
 	// One seed block per edge, keyed by edge id, so the widget root's case can run
 	// its parts' seeds too. An edge nobody projects never reaches an emitted case.
 	const seedBlockByEdgeId = new Map<string, string>();
@@ -705,7 +718,18 @@ function emitSsrDataLines(
 			? `if(marklessSsrDataContext.repeatKey===undefined){marklessAssertPresentationalRowChild(output,${JSON.stringify(edge.childComponentName)});return output;}`
 			: `if(marklessSsrDataContext.repeatItem!==undefined){marklessAssertPresentationalRowChild(output,${JSON.stringify(edge.childComponentName)});return output;}`;
 		return [
-			`case ${JSON.stringify(edge.id)}:{const child=${placement};const childProps={${props.join(',')}};const output=await ${childSurface}?.renderSsr?.(childProps,{...marklessSsrRenderContext,idPrefix:marklessSsrIdPrefix+child.hostPrefix${projectedEdgeIds.has(edge.id) ? ',sharedSeeds:marklessSsrDataContext.sharedSeeds' : ''}});if(!output)throw new Error('MARKLESS_SSR_DATA_CHILD_RENDER_MISSING: ${edge.id}');${refusal}marklessSsrChildren.push({...child,output,callbackProps:childProps.__marklessSsrCallbacks??{}});return output;}`,
+			`case ${JSON.stringify(edge.id)}:{const child=${placement};const childProps={${props.join(',')}};const output=await ${childSurface}?.renderSsr?.(childProps,{...marklessSsrRenderContext,idPrefix:marklessSsrIdPrefix+child.hostPrefix${
+					// A widget ROOT reads its own instance's seeds too: the parts placed
+					// inside it wrote them before it rendered, and its consume line
+					// merges them over its statics. Not the child THIS component
+					// composes around its own children: that one renders inside this
+					// render from props this body already computed, so it stays on the
+					// instance it was composed in.
+					projectedEdgeIds.has(edge.id) ||
+					(projectionChunkId !== undefined && !childrenRootEdgeIds.includes(edge.id))
+						? ',sharedSeeds:marklessSsrDataContext.sharedSeeds'
+						: ''
+				}});if(!output)throw new Error('MARKLESS_SSR_DATA_CHILD_RENDER_MISSING: ${edge.id}');${refusal}marklessSsrChildren.push({...child,output,callbackProps:childProps.__marklessSsrCallbacks??{}});return output;}`,
 		];
 	});
 	// U-H: every part of one widget instance seeds before any part renders, so a
@@ -811,19 +835,6 @@ function emitSsrDataLines(
 			? [`marklessSsrRenderStateValues.set(${JSON.stringify(initial.graphNodeId)},(${source})());`]
 			: [];
 	});
-	// The composed child that encloses this component's own children roots the
-	// widget those children resolve. It is composed during THIS component's
-	// render, which happens after the consumer already rendered them, so the
-	// seed phase forwards the same props to it before any part renders.
-	const childrenRootEdgeIds = childrenProjectionChain(
-		input.renderData.chunks,
-		componentName,
-		(edgeId) =>
-			componentEdgeInstanceSegment(
-				input.semanticGraph.componentEdges.find((edge) => edge.id === edgeId),
-				input.semanticGraph.componentEdges,
-			),
-	).map((link) => link.componentEdgeId);
 	const composedRootEdgeIds = childrenRootEdgeIds.filter((edgeId) => !rowScopedEdges.has(edgeId));
 	const seedForward = composedRootEdgeIds.flatMap((edgeId) => {
 		const block = seedBlockByEdgeId.get(edgeId);
