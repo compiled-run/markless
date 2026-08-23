@@ -15,6 +15,7 @@ import {
 	childrenProjectionChain,
 	childrenWidgetRootMarkerLine,
 	projectedSeedPartsUnder,
+	rowProjectedEdgeIdsUnder,
 	sharedSeedConsumeLine,
 	sharedSeedMarkerLine,
 	sharedSeedPassLines,
@@ -622,6 +623,20 @@ function emitSsrDataLines(
 			),
 		),
 	);
+	// Defect 56. A part inside a repeat row of a widget root's projection renders
+	// inside that widget, so it READS the instance the root's seed phase wrote —
+	// even though the row cannot WRITE one, which is why the seed walks above stop
+	// at the loop. Without this the row rendered with no seeds at all and every
+	// field a sibling part declared came back as the family's own initial value.
+	const rowProjectedEdgeIds = new Set(
+		chunks.flatMap((chunk) =>
+			chunk.slots.flatMap((slot) =>
+				slot.kind === 'child-component' && slot.projectionChunkId
+					? rowProjectedEdgeIdsUnder(input.renderData.chunks, slot.projectionChunkId)
+					: [],
+			),
+		),
+	);
 	// The composed child that encloses this component's own children roots the
 	// widget those children resolve. It is composed during THIS component's
 	// render, which happens after the consumer already rendered them, so the
@@ -782,6 +797,7 @@ function emitSsrDataLines(
 					// render from props this body already computed, so it stays on the
 					// instance it was composed in.
 					projectedEdgeIds.has(edge.id) ||
+					rowProjectedEdgeIds.has(edge.id) ||
 					(projectionChunkId !== undefined && !childrenRootEdgeIds.includes(edge.id))
 						? ',sharedSeeds:marklessSsrDataContext.sharedSeeds'
 						: ''
