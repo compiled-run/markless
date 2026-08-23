@@ -212,6 +212,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 				input.symbolResolver.symbols,
 				graphBindingLocalNames(input.semanticGraph),
 				sharedInstanceLocalNames(input.semanticGraph),
+				localNamesBySymbol,
 			).map(unresolvedGraphReferenceDiagnostic),
 		],
 	};
@@ -348,6 +349,15 @@ type UnresolvedGraphReference = {
 	 * — which is what the state advice asks for — moves the same crash one line up.
 	 */
 	readonly sharedInstance?: boolean;
+	/**
+	 * Whether the name is a `@for` row local rather than a component binding.
+	 *
+	 * The row's item never lives in the graph — the repeat runtime hands it to the
+	 * module as `context.locals` — so the state advice does not apply: hoisting it
+	 * into a local reads the same missing name. What failed is the position, which
+	 * is what the advice has to name.
+	 */
+	readonly rowLocal?: boolean;
 };
 
 /** Names that denote graph state in the authored file, as the author spelled them. */
@@ -406,20 +416,32 @@ function unfilledCallbackSlotSources(
 	);
 }
 
+/**
+ * The names an emitted module refers to but nothing in it binds, filtered to the
+ * ones that mean the compiler dropped something on the floor.
+ *
+ * A graph binding is one such name. A `@for` row local is the other: the repeat
+ * runtime supplies the row's item through `context.locals`, so a row local that
+ * survives as a free identifier is a position `localReadNode` could not express —
+ * an assignment target, a callee — and the module would reference nothing at
+ * runtime. Both fail the build rather than ship.
+ */
 function unresolvedGraphReferences(
 	modules: ReadonlyArray<GeneratedSymbolModule>,
 	symbols: ReadonlyArray<PlannedSymbol>,
 	graphNames: ReadonlySet<string>,
 	sharedInstanceNames: ReadonlySet<string>,
+	localNamesBySymbol: ReadonlyMap<string, ReadonlySet<string>>,
 ): ReadonlyArray<UnresolvedGraphReference> {
-	if (graphNames.size === 0) return [];
+	if (graphNames.size === 0 && localNamesBySymbol.size === 0) return [];
 
 	return modules.flatMap((emitted) => {
 		const free = freeIdentifierNames(emitted.source);
 		const symbol = symbols.find((candidate) => candidate.id === emitted.symbolId);
+		const localNames = localNamesBySymbol.get(emitted.symbolId) ?? emptyLocalNames;
 
 		return [...free]
-			.filter((name) => graphNames.has(name))
+			.filter((name) => graphNames.has(name) || localNames.has(name))
 			.sort()
 			.map((name) => ({
 				symbolId: emitted.symbolId,
@@ -429,6 +451,10 @@ function unresolvedGraphReferences(
 					? { expression: unresolvedGraphExpression(symbol, name) }
 					: {}),
 				...(sharedInstanceNames.has(name) ? { sharedInstance: true } : {}),
+				// The row local wins the description when a name is both: inside the
+				// row it is the row's item, which is the same precedence the lowering
+				// applies.
+				...(localNames.has(name) ? { rowLocal: true } : {}),
 			}));
 	});
 }
@@ -571,6 +597,7 @@ function unresolvedGraphReferenceDiagnostic(
 		? `The expression is \`${reference.expression}\`.`
 		: `It appears in the module for ${reference.symbolId}.`;
 
+	if (reference.rowLocal === true) return rowLocalReferenceDiagnostic(reference, where);
 	if (reference.sharedInstance === true) return sharedInstanceReferenceDiagnostic(reference, where);
 
 	return {
@@ -588,6 +615,41 @@ function unresolvedGraphReferenceDiagnostic(
 			},
 			{
 				message: `Or assign a shape the compiler already lowers: a direct read (\`${reference.name}.<field>\`), a field of the event (\`event.currentTarget.value\`), or that read passed straight to an imported or global call (\`Number(${reference.name}.<field>)\`).`,
+			},
+		],
+		docsUrl: `https://markless.dev/errors/${SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE}`,
+	};
+}
+
+/**
+ * The same refusal for a `@for` row local, which needs different advice.
+ *
+ * A read of the row's item is lowered to `context.locals?.<name>` wherever that
+ * expression can stand. Where it cannot — as the target of an assignment, or as
+ * the callee of a bare call — the authored name is left alone, and the module
+ * would reference something it never binds. The state advice is wrong here: the
+ * row's item is not in the graph, so hoisting it into a local reads the same
+ * missing name one line earlier.
+ */
+function rowLocalReferenceDiagnostic(
+	reference: UnresolvedGraphReference,
+	where: string,
+): SymbolModulesDiagnostic {
+	return {
+		code: SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE,
+		severity: 'error',
+		phase: 'public-render',
+		passId: 'symbol-modules',
+		artifactKeys: ['symbolModules'],
+		title: `This expression uses the row item "${reference.name}" in a position the compiler cannot lower`,
+		message: `The emitted ${reference.kind} module for ${reference.symbolId} still names "${reference.name}" directly. ${where} "${reference.name}" is the item of the enclosing @for row, which the repeat runtime supplies to the module rather than the module declaring it, so this module would throw a ReferenceError the first time it runs.`,
+		why: 'A handler in a repeat row is compiled into a module of its own and runs outside the authored @for callback, so every use of the row item is rewritten to read it from the row the runtime is dispatching. Reading the item is rewritten; writing to it, or calling it, is not, because the rewritten form is not a legal assignment target or callee. Shipping that module would move a build-time gap into a runtime crash on the first click.',
+		suggestions: [
+			{
+				message: `Read from "${reference.name}" instead of writing to it: pass \`${reference.name}\` or one of its fields to a function, or use it in an expression. Reads in every one of those positions are lowered.`,
+			},
+			{
+				message: `To record a change per row, write it to state the component owns and key it by the row — \`selected = ${reference.name}.id\` — rather than mutating the row item, which the list would not see.`,
 			},
 		],
 		docsUrl: `https://markless.dev/errors/${SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE}`,
@@ -4462,7 +4524,9 @@ function eventHandlerAuthoredStatements(
 	const statements = eventHandlerBodyNodes(fn);
 	if (statements.length === 0) return [voidContextStatement()];
 
-	const rewrite = eventHandlerRewrite(input, source);
+	// Narrowed by the handler's own bindings before the first statement is walked:
+	// a parameter or declaration named like the row local is that binding.
+	const rewrite = scopedEventHandlerRewrite(fn, eventHandlerRewrite(input, source));
 	return statements.map((statement) => rewriteEventHandlerNode(statement, undefined, rewrite));
 }
 
@@ -4525,6 +4589,105 @@ function eventHandlerRewrite(
 	};
 }
 
+const FUNCTION_LIKE_NODE_TYPES: ReadonlySet<string> = new Set([
+	'ArrowFunctionExpression',
+	'FunctionExpression',
+	'FunctionDeclaration',
+]);
+
+function isFunctionLikeNode(node: AnyNode): boolean {
+	return FUNCTION_LIKE_NODE_TYPES.has(String(node.type));
+}
+
+/**
+ * The same rewrite, with the row locals one function body actually sees.
+ *
+ * A `@for` row local is a name, not a span, so the only thing that separates the
+ * row's item from an unrelated binding of the same name is scope. Inside
+ * `[1].map((row) => measure(row))` the authored `row` is the callback's own
+ * parameter and lowering it to `context.locals?.row` would hand the row's item
+ * to code that asked for the callback's argument — a wrong read that reads like
+ * a correct one. Dropping the name here instead leaves it authored, which is the
+ * fail-closed side: the emitted module names something it does not bind, and the
+ * unresolved-reference guard is what decides whether that ships.
+ *
+ * The mutable claim sets are shared with the parent rewrite on purpose: a write
+ * claimed inside a nested function is still claimed for the handler.
+ */
+function scopedEventHandlerRewrite(
+	fn: AnyNode,
+	rewrite: EventHandlerRewrite,
+): EventHandlerRewrite {
+	const localNames = localNamesVisibleIn(fn, rewrite.localNames);
+	if (localNames === rewrite.localNames) return rewrite;
+
+	return {
+		...rewrite,
+		localNames,
+		writeValueInput: { ...rewrite.writeValueInput, localNames },
+	};
+}
+
+/** The row locals a function neither takes as a parameter nor declares. */
+function localNamesVisibleIn(
+	fn: AnyNode,
+	localNames: ReadonlySet<string>,
+): ReadonlySet<string> {
+	if (localNames.size === 0) return localNames;
+
+	const bound = new Set<string>();
+	for (const parameter of asNodes(fn.params)) collectPatternNames(parameter, bound);
+	if (isNode(fn.body)) collectOwnScopeBindingNames(fn.body, bound);
+	if (bound.size === 0) return localNames;
+
+	const visible = new Set<string>();
+	for (const name of localNames) {
+		if (!bound.has(name)) visible.add(name);
+	}
+
+	return visible.size === localNames.size ? localNames : visible;
+}
+
+/**
+ * Every name a function body declares in its own scope.
+ *
+ * Nested functions are not descended into — their parameters and declarations
+ * belong to them, and the walk narrows again when it enters one — but a nested
+ * function's own name does bind out here, so the id is taken and the body is
+ * not. Over-collecting only silences a lowering; under-collecting would emit
+ * `context.locals` for a name that is something else, so the walk errs toward
+ * taking a name.
+ */
+function collectOwnScopeBindingNames(root: AnyNode, into: Set<string>): void {
+	const stack: unknown[] = [root];
+
+	while (stack.length > 0) {
+		const value = stack.pop();
+		if (!value || typeof value !== 'object') continue;
+
+		if (Array.isArray(value)) {
+			for (const item of value) stack.push(item);
+			continue;
+		}
+
+		const node = value as AnyNode;
+		if (isFunctionLikeNode(node)) {
+			collectPatternNames(node.id, into);
+			continue;
+		}
+		if (node.type === 'VariableDeclarator') collectPatternNames(node.id, into);
+		if (node.type === 'ClassDeclaration' || node.type === 'ClassExpression') {
+			collectPatternNames(node.id, into);
+		}
+		if (node.type === 'CatchClause') collectPatternNames(node.param, into);
+
+		for (const [key, child] of Object.entries(node)) {
+			if (EVENT_WALK_IGNORED_KEYS.has(key)) continue;
+			stack.push(child);
+		}
+	}
+}
+
 /**
  * One node of the handler body, rewritten.
  *
@@ -4580,8 +4743,9 @@ function rewriteEventHandlerNode(
 		};
 	}
 
+	const scoped = isFunctionLikeNode(node) ? scopedEventHandlerRewrite(node, rewrite) : rewrite;
 	return rewriteEventHandlerChildren(node, (child) =>
-		rewriteEventHandlerNode(child, node, rewrite),
+		rewriteEventHandlerNode(child, node, scoped),
 	);
 }
 
@@ -4852,12 +5016,16 @@ function rewriteCaptureArgumentNode(
 		};
 	}
 
+	const scoped = isFunctionLikeNode(node) ? scopedEventHandlerRewrite(node, rewrite) : rewrite;
 	return rewriteEventHandlerChildren(node, (child) =>
-		rewriteCaptureArgumentNode(child, node, rewrite),
+		rewriteCaptureArgumentNode(child, node, scoped),
 	);
 }
 
-/** `context.capture.read("slot")` or `context.graph.read("id", ["path"])`. */
+/**
+ * `context.capture.read("slot")`, `context.graph.read("id", ["path"])`, or
+ * `context.locals?.<row local>`.
+ */
 function eventReadNode(
 	node: AnyNode,
 	parent: AnyNode | undefined,
@@ -4871,6 +5039,11 @@ function eventReadNode(
 	const handleRead = elementHandleReadNode(text, rewrite);
 	if (handleRead) return handleRead;
 
+	// Ahead of the recorded reads, for the same reason the handle read refuses a
+	// row local: inside the row, the row's name is the row's item.
+	const localRead = localReadNode(node, parent, text, rewrite);
+	if (localRead) return localRead;
+
 	const read = rewrite.reads.find((candidate) => candidate.source === text);
 	if (!read) return null;
 
@@ -4882,6 +5055,41 @@ function eventReadNode(
 		graphNodeId: read.graphNodeId,
 		path: read.path,
 	});
+}
+
+/**
+ * `context.locals?.<name>` for a `@for` row local read as a value.
+ *
+ * The row's item is not in the graph — the repeat runtime hands it to the module
+ * through `context.locals` — so a read of it matches no `LoweredStateRead` and
+ * used to survive as the authored name. When that name also named a graph
+ * binding the unresolved-reference guard failed the build; when it named nothing
+ * else, the module shipped referring to an identifier it never binds. Both reach
+ * `context.locals` here, by the same route `localValueNode` already gives the
+ * right-hand side of a write, so `measure(row.id)` and `picked = row.id` name
+ * one value.
+ *
+ * The path must be static dotted text: `row[i]` is refused so the walk descends
+ * instead and lowers the base and the computed key separately, and a callee is
+ * refused because an optional chain cannot be called in that position — both
+ * leave the name authored rather than emitting something the route cannot say.
+ */
+function localReadNode(
+	node: AnyNode,
+	parent: AnyNode | undefined,
+	text: string,
+	rewrite: EventHandlerRewrite,
+): EmissionNode | null {
+	if (rewrite.localNames.size === 0) return null;
+	if (node.type !== 'Identifier' && node.type !== 'MemberExpression') return null;
+	if (parent?.type === 'CallExpression' || parent?.type === 'NewExpression') {
+		if (parent.callee === node) return null;
+	}
+
+	const path = staticDottedPath(text);
+	if (!path || !rewrite.localNames.has(path[0] ?? '')) return null;
+
+	return optionalPathNode(memberChainNode('context.locals'), path);
 }
 
 /**
