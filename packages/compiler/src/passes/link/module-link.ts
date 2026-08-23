@@ -298,6 +298,27 @@ export function linkedImportedClaimKind(
 		: undefined;
 }
 
+/**
+ * The component a claim belongs to, so the consuming module can hand it to the
+ * edge that composes that component and to no other.
+ *
+ * The symbol's own `owner` is read from its FIRST capture slot, and a handler's
+ * first slot is often a graph read that no component declares (`owner: {}`), so
+ * the claim would arrive anonymous. Every slot of one symbol comes from the one
+ * authored function that declared it, so the first slot naming a component names
+ * the symbol's component. A widget-callback slot names none by construction: its
+ * slot belongs to the family, not to one part, and such a claim stays anonymous.
+ */
+export function linkedClaimOwnerComponentName(
+	captureSymbol: ExtractedCaptureSymbol,
+): string | undefined {
+	return (
+		captureSymbol.owner?.componentName ??
+		captureSymbol.captureSlots.find((slot) => slot.owner?.componentName !== undefined)?.owner
+			?.componentName
+	);
+}
+
 // The parent-bound symbol rows a composed child contributes. A child only
 // contributes rows once its claims and its capture metadata agree on a symbol
 // the parent has to bind — through a prop, or through a widget callback slot.
@@ -316,12 +337,18 @@ export function linkedImportedSymbolInputs(input: {
 			);
 			const claimKind = captureSymbol ? linkedImportedClaimKind(captureSymbol) : undefined;
 			if (!captureSymbol || !claimKind) return [];
+			// The claim's owner travels with it: a module publishes one manifest for
+			// every component it exports, and this row is offered to every edge into
+			// that module, so only the owner distinguishes the edge that composes
+			// this component from its siblings.
+			const ownerComponentName = linkedClaimOwnerComponentName(captureSymbol);
 			return [
 				{
 					id: `imported:${encodeURIComponent(child.source)}:${symbol.symbolId}`,
 					chunk: symbol.virtualModuleId,
 					exportName: symbol.exportName,
 					componentEdgeId: child.componentEdgeId,
+					...(ownerComponentName ? { ownerComponentName } : {}),
 					claimKind,
 					captureSymbol,
 				},

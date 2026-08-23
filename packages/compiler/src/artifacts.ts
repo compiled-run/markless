@@ -1559,6 +1559,10 @@ export type SymbolResolverModuleInput = {
 		readonly chunk: string;
 		readonly exportName: string;
 		readonly componentEdgeId?: string;
+		// The component that declares this claim in the child module. A module
+		// publishes one claim manifest for every component it exports, so an edge
+		// is offered its siblings' claims too; the owner is what tells them apart.
+		readonly ownerComponentName?: string;
 		// Why the parent has to bind this row; a widget-callback claim binds the
 		// callback slot alone and leaves the child's own captures to the child.
 		readonly claimKind?: 'prop-bound' | 'widget-callback';

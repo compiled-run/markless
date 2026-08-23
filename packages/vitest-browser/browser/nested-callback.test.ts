@@ -155,30 +155,30 @@ test('CSR: a part that guards an optional event prop out of a rest spread reache
 	expect(errors).toEqual([]);
 });
 
-// Defect 20, pinned red: the seam is OUTSIDE this unit's contract.
+// Defect 20, HALF fixed (U159), still pinned red for the other half.
 //
-// Measured, not predicted. The failure is not the `context.graph.read
-// ("prop:props", …)` crash the packet expected at resume-events.ts:173 — the
-// keydown dispatch reaches the part, the part's own write lands, and the
-// consumer's handler is then skipped in silence with no page error. Rewriting
-// the guarded `onKeyDown?.(event)` as an unconditional `onKeyDown(event)` names
-// the cause: MARKLESS_CAPTURE_OPAQUE_PROP, `prop "onKeyDown" is not passed by
-// the parent that renders "NkfItem"`, reported on `component-edge:15` — the
-// `<NkfRoot>` edge, not the `<NkfItem>` edge the consumer actually wrote it on.
-// So a claim is bound to the wrong edge, and at the guarded call site that wrong
-// edge folds to a valueless constant that `invoke` no-ops.
+// Fixed here: the claim used to bind to the wrong edge. A module publishes ONE
+// claim manifest for every component it exports and the linker handed the whole
+// manifest to every edge into that module, so `<NkfRoot>` was offered
+// `<NkfItem>`'s `onKeyDown` claim. Rewriting the guarded call as an
+// unconditional `onKeyDown(event)` used to name it: MARKLESS_CAPTURE_OPAQUE_PROP
+// on the `<NkfRoot>` edge for `<NkfItem>`'s prop. Claims now carry their owning
+// component from the linker (`ownerComponentName`, module-link.ts) and capture
+// analysis gives an edge only the claims that edge's component owns, so the
+// unconditional variant compiles and the served resolver now carries exactly one
+// bound row for this part - on the `<NkfItem>` edge, with a `callback-route` to
+// the consumer's own handler symbol. The CSR row above is green on that binding.
 //
-// The binding is made in `linkedImportedSymbolInputs` (packages/compiler/src/
-// passes/link/module-link.ts:304): a module publishes ONE claim manifest for
-// every component it exports, and every edge into that module is handed the
-// whole manifest, so `<NkfRoot>` is offered `<NkfItem>`'s claim. Filtering it in
-// capture analysis was tried and cannot work: the extracted claim carries no
-// `owner.componentName` to test against (forcing the filter to require one turns
-// all four rows red), so the component identity has to come from the linker.
-// `module-link.ts` is not in this unit's file contract; a follow-up owns it.
-//
-// The three rows above are green and pin the defect-18 fix; this row stays
-// red-pinned so the defect is not lost.
+// Still red, measured on this tree: SSR resume runs the part's emitted symbol
+// WITHOUT the bound row's capture adapter. The child module's symbol is emitted
+// as `context.graph.read("prop:props", ["onKeyDown"])?.(event)`, and the adapter
+// that turns that legacy read into the parent-proven callback route
+// (`createBoundGraph`, packages/bundler/src/bound-resolver.ts) only runs when the
+// dispatcher loads the BOUND id. The part's own write still lands, so the symbol
+// did run - under an id that is not the bound one. The seam is which symbol id
+// the served payload names for a composed child's own event record
+// (`boundEventSymbolIds`, packages/compiler/src/passes/protocol-view.ts), or the
+// emission choice in symbol-modules.ts; neither file is in this unit's contract.
 test.fails('SSR resume: the same guarded rest-spread callback reaches its consumer', async () => {
 	const { errors, stop } = watchPageErrors();
 	const container = (await renderSSR(Page)).container;
