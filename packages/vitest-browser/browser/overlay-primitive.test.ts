@@ -1,3 +1,4 @@
+import { closeOverlay, isOverlayOpen } from '@markless/web/fns/overlay';
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../src/index.ts';
 import NestedPage from './fixtures/overlay-nested-page.tsrx';
@@ -12,7 +13,26 @@ import Page from './fixtures/overlay-primitive.tsrx';
 // against a server render that resumed, because the primitive is handed
 // element() handles and a handle that resolves in CSR is not evidence that it
 // resolves in a handler after resume.
-afterEach(() => cleanup());
+// The primitive owns state that outlives the rendered container: a document-wide
+// scroll-lock count and the focus it moved. cleanup() only unmounts, so a test
+// that fails between open and close leaves its entry on the stack forever — the
+// count never falls back to zero, so no later close ever releases the lock and
+// every later test in the file reads a scroll lock it never took. Draining the
+// stack through the primitive's own API returns that count honestly instead of
+// hiding the symptom, which is what keeps one failure from being reported as six.
+afterEach(() => {
+	try {
+		const open = [...document.querySelectorAll('*')].filter((node) => isOverlayOpen(node));
+		// Reverse document order is innermost-first, the only order a nested stack
+		// unwinds in.
+		for (const surface of open.reverse()) closeOverlay(surface);
+	} finally {
+		cleanup();
+		document.body.style.overflow = '';
+		document.body.style.paddingRight = '';
+		if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+	}
+});
 
 function requireElement<T extends Element>(container: ParentNode, selector: string): T {
 	const found = container.querySelector<T>(selector);
@@ -52,7 +72,17 @@ async function expectModalOpensWithModality(container: ParentNode) {
 	expect(page.background.hasAttribute('inert')).toBe(false);
 
 	page.modalTrigger.click();
-	await expect.poll(() => parts(container).modalContent.hidden).toBe(false);
+	// `hidden` is one commit of the dispatch, not the whole of it: the handler's
+	// later writes land as their own commits, so a poll that settles on `hidden`
+	// alone hands the assertions below a half-applied dispatch. `modalHandled` is
+	// the last thing the handler writes, so waiting for it proves every earlier
+	// statement — openOverlay included — has already run.
+	await expect
+		.poll(() => {
+			const now = parts(container);
+			return { hidden: now.modalContent.hidden, handled: now.modalHandled.textContent };
+		})
+		.toEqual({ hidden: false, handled: 'opened' });
 
 	const open = parts(container);
 	// The primitive is handed the element() handle itself, so this is also the
@@ -73,7 +103,14 @@ async function expectModalOpensWithModality(container: ParentNode) {
 	expect(open.modalContent.contains(document.activeElement)).toBe(true);
 
 	open.modalClose.click();
-	await expect.poll(() => parts(container).modalContent.hidden).toBe(true);
+	// Releasing the scroll lock is the close path's last observable effect, so it
+	// is what says the close finished rather than merely started.
+	await expect
+		.poll(() => {
+			const now = parts(container);
+			return { hidden: now.modalContent.hidden, overflow: document.body.style.overflow };
+		})
+		.toEqual({ hidden: true, overflow: '' });
 
 	const closed = parts(container);
 	expect(closed.background.hasAttribute('inert')).toBe(false);
@@ -87,10 +124,23 @@ async function expectModalOpensWithModality(container: ParentNode) {
 async function expectEscapeDismissesModal(container: ParentNode) {
 	const page = parts(container);
 	page.modalTrigger.click();
-	await expect.poll(() => parts(container).modalContent.hidden).toBe(false);
+	// Escape is dispatched at whatever is focused, so the press has to wait for the
+	// whole open dispatch, not just the `hidden` commit.
+	await expect
+		.poll(() => {
+			const now = parts(container);
+			return { hidden: now.modalContent.hidden, handled: now.modalHandled.textContent };
+		})
+		.toEqual({ hidden: false, handled: 'opened' });
 
 	pressEscape(container);
-	await expect.poll(() => parts(container).modalContent.hidden).toBe(true);
+	// The dismissal counter is the last thing onDismiss writes.
+	await expect
+		.poll(() => {
+			const now = parts(container);
+			return { hidden: now.modalContent.hidden, dismissals: now.modalDismissals.textContent };
+		})
+		.toEqual({ hidden: true, dismissals: '1' });
 	expect(parts(container).modalDismissals.textContent).toBe('1');
 	expect(document.activeElement).toBe(parts(container).modalTrigger);
 }
@@ -98,7 +148,14 @@ async function expectEscapeDismissesModal(container: ParentNode) {
 async function expectModalIgnoresOutsidePointer(container: ParentNode) {
 	const page = parts(container);
 	page.modalTrigger.click();
-	await expect.poll(() => parts(container).modalContent.hidden).toBe(false);
+	// The pointer press below only means anything once the surface is actually on
+	// the overlay stack, which the handler's last write is the proof of.
+	await expect
+		.poll(() => {
+			const now = parts(container);
+			return { hidden: now.modalContent.hidden, handled: now.modalHandled.textContent };
+		})
+		.toEqual({ hidden: false, handled: 'opened' });
 
 	// A modal does not light-dismiss. The background is inert, so a real click
 	// never reaches it either; a synthetic pointerdown proves the primitive
@@ -109,13 +166,29 @@ async function expectModalIgnoresOutsidePointer(container: ParentNode) {
 	expect(parts(container).modalDismissals.textContent).toBe('0');
 
 	parts(container).modalClose.click();
-	await expect.poll(() => parts(container).modalContent.hidden).toBe(true);
+	await expect
+		.poll(() => {
+			const now = parts(container);
+			return { hidden: now.modalContent.hidden, overflow: document.body.style.overflow };
+		})
+		.toEqual({ hidden: true, overflow: '' });
 }
 
 async function expectDisclosureLightDismisses(container: ParentNode) {
 	const page = parts(container);
 	page.menuTrigger.click();
-	await expect.poll(() => parts(container).menuContent.hidden).toBe(false);
+	// The menu handler writes no outcome of its own, so the second commit driven by
+	// the same cell — the trigger's aria-expanded — is what says the dispatch has
+	// been applied in full rather than only as far as `hidden`.
+	await expect
+		.poll(() => {
+			const now = parts(container);
+			return {
+				hidden: now.menuContent.hidden,
+				expanded: now.menuTrigger.getAttribute('aria-expanded'),
+			};
+		})
+		.toEqual({ hidden: false, expanded: 'true' });
 
 	// A non-modal surface leaves the page usable: no inert, no scroll lock, no
 	// aria-modal. This is what a navbar or a menu needs.
@@ -131,7 +204,12 @@ async function expectDisclosureLightDismisses(container: ParentNode) {
 	expect(parts(container).menuDismissals.textContent).toBe('0');
 
 	pointerDown(parts(container).background);
-	await expect.poll(() => parts(container).menuContent.hidden).toBe(true);
+	await expect
+		.poll(() => {
+			const now = parts(container);
+			return { hidden: now.menuContent.hidden, dismissals: now.menuDismissals.textContent };
+		})
+		.toEqual({ hidden: true, dismissals: '1' });
 	expect(parts(container).menuDismissals.textContent).toBe('1');
 	expect(document.activeElement).toBe(parts(container).menuTrigger);
 }
@@ -139,11 +217,21 @@ async function expectDisclosureLightDismisses(container: ParentNode) {
 async function expectSurfaceNeverUnmounts(container: ParentNode) {
 	const before = parts(container).modalContent;
 	parts(container).modalTrigger.click();
-	await expect.poll(() => parts(container).modalContent.hidden).toBe(false);
+	await expect
+		.poll(() => {
+			const now = parts(container);
+			return { hidden: now.modalContent.hidden, handled: now.modalHandled.textContent };
+		})
+		.toEqual({ hidden: false, handled: 'opened' });
 	expect(parts(container).modalContent).toBe(before);
 
 	parts(container).modalClose.click();
-	await expect.poll(() => parts(container).modalContent.hidden).toBe(true);
+	await expect
+		.poll(() => {
+			const now = parts(container);
+			return { hidden: now.modalContent.hidden, overflow: document.body.style.overflow };
+		})
+		.toEqual({ hidden: true, overflow: '' });
 	// Same node throughout: the surface leaves the overlay stack while it is
 	// still attached, which is the only ordering the primitive can guarantee.
 	expect(parts(container).modalContent).toBe(before);
@@ -164,11 +252,27 @@ function nestedParts(container: ParentNode) {
 async function expectNestedStackUnwinds(container: ParentNode) {
 	const page = nestedParts(container);
 	page.outerTrigger.click();
-	await expect.poll(() => nestedParts(container).outerContent.hidden).toBe(false);
+	// These families write no outcome text, so the primitive's own mark on the
+	// background is the observable that says the open dispatch finished; `hidden`
+	// is only the state write that started it.
+	await expect
+		.poll(() => {
+			const now = nestedParts(container);
+			return { hidden: now.outerContent.hidden, outsideInert: now.outside.hasAttribute('inert') };
+		})
+		.toEqual({ hidden: false, outsideInert: true });
 	expect(nestedParts(container).outside.hasAttribute('inert')).toBe(true);
 
 	nestedParts(container).innerTrigger.click();
-	await expect.poll(() => nestedParts(container).innerContent.hidden).toBe(false);
+	await expect
+		.poll(() => {
+			const now = nestedParts(container);
+			return {
+				hidden: now.innerContent.hidden,
+				outerCloseInert: now.outerClose.hasAttribute('inert'),
+			};
+		})
+		.toEqual({ hidden: false, outerCloseInert: true });
 
 	const both = nestedParts(container);
 	// B is a descendant of A, so opening B takes A's own siblings out but leaves
@@ -180,7 +284,17 @@ async function expectNestedStackUnwinds(container: ParentNode) {
 
 	// Escape closes the topmost entry and nothing below it.
 	pressEscape(container);
-	await expect.poll(() => nestedParts(container).innerContent.hidden).toBe(true);
+	// Popping B hands modality back to A, so B's controls losing their mark is what
+	// says the unwind of one entry completed.
+	await expect
+		.poll(() => {
+			const now = nestedParts(container);
+			return {
+				hidden: now.innerContent.hidden,
+				outerCloseInert: now.outerClose.hasAttribute('inert'),
+			};
+		})
+		.toEqual({ hidden: true, outerCloseInert: false });
 
 	const afterInner = nestedParts(container);
 	expect(afterInner.outerContent.hidden).toBe(false);
@@ -191,7 +305,18 @@ async function expectNestedStackUnwinds(container: ParentNode) {
 	expect(document.activeElement).toBe(afterInner.innerTrigger);
 
 	pressEscape(container);
-	await expect.poll(() => nestedParts(container).outerContent.hidden).toBe(true);
+	// The last entry leaving the stack is what releases the background and the
+	// scroll lock together.
+	await expect
+		.poll(() => {
+			const now = nestedParts(container);
+			return {
+				hidden: now.outerContent.hidden,
+				outsideInert: now.outside.hasAttribute('inert'),
+				overflow: document.body.style.overflow,
+			};
+		})
+		.toEqual({ hidden: true, outsideInert: false, overflow: '' });
 	expect(nestedParts(container).outside.hasAttribute('inert')).toBe(false);
 	expect(document.body.style.overflow).toBe('');
 	expect(document.activeElement).toBe(nestedParts(container).outerTrigger);
