@@ -42,16 +42,6 @@ export type RadioGroupInstanceState = Seeded<
 	onChange?: RadioGroupRootProps['onChange'];
 };
 
-/**
- * What `radiogroupState()` hands back. Written out so the factory can declare
- * its return type, which contextually types `choose`'s parameter: a shared
- * method is inlined into every handler that calls it, and a handler's source
- * has to stay parseable as plain JavaScript.
- */
-export type RadioGroupInstance = RadioGroupInstanceState & {
-	choose(next: string): void;
-};
-
 export type RadioGroupItemProps = PropsOf<'div'> & {
 	/** Submitted when this option is the chosen one. Required: no index stands in for it. */
 	readonly value: string;

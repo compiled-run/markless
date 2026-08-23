@@ -8,6 +8,11 @@ export {
 	RadioGroupItemTrigger as itemtrigger,
 	RadioGroupLabel as label,
 	RadioGroupRoot as root,
+	radiogroupItemState,
+	// One option's instance, for a consumer whose own part sits inside an item.
+	radiogroupItemState as itemstate,
+	radiogroupState,
+	radiogroupState as state,
 } from './radio-group.tsrx';
 export type {
 	RadioGroupDescriptionProps,

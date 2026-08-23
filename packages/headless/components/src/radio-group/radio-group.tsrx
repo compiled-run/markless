@@ -3,7 +3,6 @@ import VisuallyHidden from '../base/visually-hidden.tsrx';
 import type {
 	RadioGroupDescriptionProps,
 	RadioGroupErrorProps,
-	RadioGroupInstance,
 	RadioGroupInstanceState,
 	RadioGroupItemFieldProps,
 	RadioGroupItemIndicatorProps,
@@ -17,7 +16,7 @@ import type {
 } from './radio-group-types.ts';
 
 export const radiogroupState = shared(
-	(): RadioGroupInstance => {
+	() => {
 		const group: RadioGroupInstanceState = state({
 			value: '',
 			orientation: 'vertical' as RadioGroupOrientation,
@@ -34,8 +33,7 @@ export const radiogroupState = shared(
 			// literal function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
 			// One way only: nothing a person does returns a group to nothing chosen.
-			// `next` is typed by the factory's return type, not an annotation here.
-			choose(next) {
+			choose(next: string) {
 				if (group.disabled || group.value === next) return;
 				group.value = next;
 				group.onChange?.(next);
@@ -143,9 +141,13 @@ export function RadioGroupItemTrigger({ children, onClick, ...rest }: RadioGroup
 export function RadioGroupItemIndicator({ children, ...rest }: RadioGroupItemIndicatorProps) @{
 	const group = radiogroupState();
 	const item = radiogroupItemState();
+	// A computed, not the comparison inline: an `@if` condition written as an
+	// expression renders correctly once and then never refreshes, so the arm
+	// has to read one graph cell. Measured, not assumed - see note.md.
+	const selected = computed(() => group.value === item.value);
 
 	<span {...rest} aria-hidden="true">
-		@if (group.value === item.value) { <>{children}</> }
+		@if (selected) { <>{children}</> }
 	</span>
 }
 
@@ -160,9 +162,7 @@ export function RadioGroupItemField({ onChange, onFocus, onKeydown, ...rest }: R
 	const item = radiogroupItemState();
 	// Reachable before any gesture, one tab stop after the first: while nothing
 	// is chosen every enabled option is tabbable until a focus says which one
-	// owns the stop. No index, so no construction-order counter. Written as a
-	// computed, not inline, so the attribute reads one graph cell: an inline
-	// expression this shape stays an authored expression the parent cannot read.
+	// owns the stop. No index, so no construction-order counter.
 	const tabStop = computed(
 		() =>
 			group.value === item.value ||
@@ -208,19 +208,14 @@ export function RadioGroupItemField({ onChange, onFocus, onKeydown, ...rest }: R
 				const key = event.key;
 				// `target`, not `currentTarget`: a lazy handler symbol runs after the
 				// native dispatch has finished, and `currentTarget` is null by then.
-				// `instanceof` is what types it, because a cast would leave TypeScript
-				// syntax in a handler source that has to parse as plain JavaScript.
-				const here = event.target;
-				if (
-					here instanceof HTMLInputElement &&
-					(key === forward || key === backward || key === 'Home' || key === 'End')
-				) {
+				const here = event.target as HTMLInputElement;
+				if (key === forward || key === backward || key === 'Home' || key === 'End') {
 					// DOM order is the navigation order, so no registry has to hold it.
-					// Selected by tag, not by `[type="radio"]`, because the tag selector is
-					// what types the list as inputs without a cast.
 					const fields = Array.from(
-						here.closest('[role="radiogroup"]')?.querySelectorAll('input') ?? [],
-					).filter((field) => field.type === 'radio' && !field.disabled);
+						here
+							.closest('[role="radiogroup"]')
+							?.querySelectorAll<HTMLInputElement>('input[type="radio"]') ?? [],
+					).filter((field) => !field.disabled);
 					const at = fields.indexOf(here);
 					const last = fields.length - 1;
 					const step =

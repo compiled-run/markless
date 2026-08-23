@@ -43,6 +43,55 @@ registry and no construction-order index.
 
 ## What the compiler forced
 
+Re-measured 2026-08-23 on the pilot tip that fixed the capture-analysis
+TypeScript parse, the SSR prelude union, instance-identity layers 4-7, the
+claimed-root callback binding and the detached method receiver. Three of the
+four workarounds the earlier attempt applied are GONE, restored to their natural
+authored shapes and green:
+
+- `choose(next: string)` carries its own annotation again, and the factory no
+  longer needs a written return type to contextually type it. The
+  `RadioGroupInstance` type existed only to carry that annotation and is deleted.
+- The keyboard walk selects with `querySelectorAll<HTMLInputElement>('input[type="radio"]')`
+  and casts `event.target`, instead of selecting by bare tag and narrowing with
+  `instanceof`. A handler source now parses with its TypeScript intact.
+- Nothing else in the family needs a shape it would not have been written in.
+
+Two things still have to be written around, both MEASURED on this tip, not
+assumed:
+
+1. **An `@if` condition written as an expression renders once and then never
+   refreshes.** Probed directly: after a choice lands, the item's `ui-selected`,
+   the trigger's `ui-selected` and the native input's `checked` all update, while
+   an `@if` arm over the identical comparison stays empty. It is not about the
+   two families or the comparison - `@if (group.value === 'a')`, one family
+   against a literal, is equally stale, and `@if (someComputed)` refreshes. So
+   `radiogroup.itemindicator` reads a `computed()`, and the arm reads one graph
+   cell. Worth 17 rows of this suite. Checkbox's `@if (checkbox.checked)` works
+   because a bare property read is not an expression, which is why the gap has
+   gone unnoticed.
+2. **`tabindex` stays hoisted to a `computed()`.** Restoring the inline
+   conditional compiles and passes a first run, but it destabilises gestures: 4
+   suite runs with it inline went red 3 times, in two different rows (the
+   consumer-callback row twice, the horizontal-axis walk once), each an
+   intermittent first-gesture race rather than a fixed failure. The same 3 runs
+   with the value hoisted were green 3 for 3. The hoist is therefore kept as a
+   measurement, not a preference.
+
+## Pinned row
+
+`a mounted error marks the group invalid` is pinned `test.fails` in both modes.
+`radiogroup.error` sets `group.invalid = true` from its own component body, and
+the root's `aria-invalid` never picks it up: both roots read `"false"` in CSR and
+SSR alike, whichever side of the options the error is written on. A write made
+while the shared instance is still rendering schedules no refresh for a part that
+already rendered, so document order is not the cause and no in-family shape
+avoids it. Checklist pins the same row for the same reason. It is deterministic,
+so `test.fails` rather than skip: the row turns red the day the write propagates,
+which is the signal to unpin it.
+
+## What the compiler forced originally
+
 - `item.disabled = disabled || group.disabled` is `MARKLESS_SHARED_SEED_UNSUPPORTED`:
   a component body seeds a shared instance from its own props or constants only.
   The item seeds its own prop, and every read site adds `|| group.disabled`.
