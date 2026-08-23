@@ -5,6 +5,7 @@ export {
 	InnerLabel as innerlabel,
 	Outer as outer,
 	OuterDisplay as outerdisplay,
+	Stopper as stopper,
 	innerState,
 	outerState,
 } from './parts.tsrx';

@@ -3,7 +3,8 @@ import { computed, shared, state } from '@markless/core';
 // Outer family: rooted by `Outer`, read by parts placed in its children.
 export const outerState = shared(
 	() => {
-		const s = state({ clicks: 0, keys: 0 });
+		// `trail` records the order handlers ran in, which counters cannot show.
+		const s = state({ clicks: 0, keys: 0, trail: '' });
 
 		return {
 			...s,
@@ -12,6 +13,9 @@ export const outerState = shared(
 			},
 			key() {
 				s.keys = s.keys + 1;
+			},
+			note(tag) {
+				s.trail = s.trail + tag + '|';
 			},
 		};
 	},
@@ -46,7 +50,10 @@ export function Outer({ children }) @{
 		data-wrh-outer
 		tabindex={0}
 		onClick={() => s.bump()}
-		onKeydown={() => s.key()}
+		onKeydown={() => {
+			s.key();
+			s.note('outer');
+		}}
 	>{children}</div>
 }
 
@@ -56,7 +63,19 @@ export function OuterDisplay() @{
 	<p data-wrh-outer-display>
 		<span data-wrh-outer-clicks>{s.clicks}</span>
 		<span data-wrh-outer-keys>{s.keys}</span>
+		<span data-wrh-trail>{s.trail}</span>
 	</p>
+}
+
+// A handler that stops the walk. The enclosing `Outer` also answers for keydown,
+// so its record must not run once this one has called stopPropagation.
+export function Stopper() @{
+	const s = outerState();
+
+	<button data-wrh-stopper type="button" onKeydown={(event) => {
+		s.note('stop');
+		event.stopPropagation();
+	}}>stop</button>
 }
 
 // Defect 58 shape: a NESTED widget-rooting element carrying a handler. `Inner`
@@ -88,6 +107,7 @@ export function Inner({ children, onClick, onKeydown, ...rest }) @{
 		}}
 		onKeydown={(event) => {
 			if (outer.clicks >= 0) s.hit();
+			outer.note('inner');
 			onKeydown?.(event);
 		}}
 	>{children}</div>

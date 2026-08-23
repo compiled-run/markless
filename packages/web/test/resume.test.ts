@@ -4152,12 +4152,15 @@ test('resume runtime wires current branch arm records eagerly without loading sy
 	expect(root.listeners.map((listener) => listener.type)).toContain('click');
 	expect(loadedSymbols).toEqual([]);
 
+	// The root carries a click record of its own, so the button's click bubbles
+	// into it: both run, innermost first. The gate under test is that the arm's
+	// UPDATE symbol still stays unloaded until the cell it reads is invalidated.
 	await resume.dispatch(event('click', armButton, ''));
-	expect(loadedSymbols).toEqual(['symbol:arm-click']);
+	expect(loadedSymbols).toEqual(['symbol:arm-click', 'symbol:read-handle']);
 
 	graph.write({ graphNodeId: 'state:label', value: 'b' });
 	await graph.flush();
-	expect(loadedSymbols).toEqual(['symbol:arm-click', 'symbol:arm-text']);
+	expect(loadedSymbols).toEqual(['symbol:arm-click', 'symbol:read-handle', 'symbol:arm-text']);
 	expect(updateElements).toEqual([armSection]);
 });
 

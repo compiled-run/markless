@@ -22,6 +22,8 @@ function reads(container: ParentNode) {
 		hits: container.querySelector('[data-wrh-inner-hits]'),
 		taps: container.querySelector('[data-wrh-inner-taps]'),
 		deepHits: container.querySelector('[data-wrh-deep] [data-wrh-inner-hits]'),
+		stopper: container.querySelector<HTMLElement>('[data-wrh-stopper]'),
+		trail: container.querySelector('[data-wrh-trail]'),
 	};
 }
 
@@ -140,4 +142,50 @@ test('CSR: a key on a nested widget root also runs the enclosing root handler', 
 test('SSR resume: a key on a nested widget root also runs the enclosing root handler', async () => {
 	const screen = await renderSSR(Page);
 	await expectBubblesToEnclosingRoot(screen.container);
+});
+
+// The DOM runs the innermost handler first. `trail` records the order, which the
+// per-widget counters cannot show: both would read 1 either way round.
+async function expectInnerRunsBeforeOuter(container: ParentNode) {
+	const { inner, trail } = reads(container);
+	await expect.poll(() => trail?.textContent).toBe('');
+
+	press(inner as HTMLElement);
+	await expect.poll(() => trail?.textContent).toBe('inner|outer|');
+}
+
+// stopPropagation() inside a handler keeps the records of OUTER elements from
+// running, exactly as it keeps outer DOM listeners from running.
+async function expectStopPropagationHoldsTheWalk(container: ParentNode) {
+	const { stopper, keys, trail } = reads(container);
+	expect(stopper).not.toBeNull();
+	await expect.poll(() => `trail=${trail?.textContent} keys=${keys?.textContent}`).toBe(
+		'trail= keys=0',
+	);
+
+	// The stopper's own handler runs; the enclosing widget root's keydown does not.
+	press(stopper as HTMLElement);
+	await expect.poll(() => `trail=${trail?.textContent} keys=${keys?.textContent}`).toBe(
+		'trail=stop| keys=0',
+	);
+}
+
+test('CSR: the inner handler runs before the enclosing one', async () => {
+	const screen = await render(Page);
+	await expectInnerRunsBeforeOuter(screen.container as HTMLElement);
+});
+
+test('SSR resume: the inner handler runs before the enclosing one', async () => {
+	const screen = await renderSSR(Page);
+	await expectInnerRunsBeforeOuter(screen.container);
+});
+
+test('CSR: stopPropagation keeps the enclosing root handler from running', async () => {
+	const screen = await render(Page);
+	await expectStopPropagationHoldsTheWalk(screen.container as HTMLElement);
+});
+
+test('SSR resume: stopPropagation keeps the enclosing root handler from running', async () => {
+	const screen = await renderSSR(Page);
+	await expectStopPropagationHoldsTheWalk(screen.container);
 });

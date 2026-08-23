@@ -8,6 +8,7 @@ export default function WidgetRootHandlersPage() @{
 	<section data-wrh-page>
 		<wrh.outer>
 			<wrh.outerdisplay />
+			<wrh.stopper />
 			<wrh.inner>
 				<wrh.innerlabel>outer item</wrh.innerlabel>
 				<wrh.innerdisplay />
