@@ -32,10 +32,8 @@ export const tabsState = shared(
 	{ scope: 'widget' },
 );
 
-// A second family, rooted by each `tabs.trigger` and each `tabs.content`: the
-// part's own `value`, held as a graph cell rather than read back off the prop.
-// A comparison against a prop renders correctly and then never refreshes after
-// resume - measured, see note.md - so both sides of the test are cells.
+// The trigger's own value as a graph cell. Compared against its prop instead,
+// the trigger stops refreshing once the page has resumed - measured, see note.md.
 export const tabsPartState = shared(
 	() => {
 		const part: TabsPartInstanceState = state({ value: '' });
@@ -67,8 +65,6 @@ export function TabsRoot({
 export function TabsList({ children, ...rest }: TabsListProps) @{
 	const tabs = tabsState();
 
-	// aria-orientation is what QDS never emits: it writes only ui-orientation,
-	// which no assistive technology reads.
 	<div
 		{...rest}
 		role="tablist"
@@ -88,7 +84,7 @@ export function TabsTrigger({
 	const tabs = tabsState();
 	const tab = tabsPartState();
 	tab.value = value;
-	// One graph cell, read in every position: a comparison written inline in an
+	// One cell read in every position: the same comparison written inline in an
 	// attribute renders once and then goes stale. Measured, see note.md.
 	const selected = computed(() => tabs.value === tab.value);
 
@@ -105,13 +101,14 @@ export function TabsTrigger({
 			onClick?.(event);
 		}}
 		onFocus={(event) => {
-			// Automatic activation: arrowing moves focus, and focus shows the tab.
 			if (tabs.selectOnFocus) tabs.show(tab.value);
 			onFocus?.(event);
 		}}
 		onKeydown={(event) => {
-			// The six keys, guarded by event fields alone: a browser-critical
-			// policy has to be readable before the handler symbol loads.
+			// Guarded by event fields alone: a policy that has to beat the browser
+			// must be readable before the handler symbol loads, and a guard written
+			// over locals derived from graph state is
+			// MARKLESS_SYNC_POLICY_UNEXTRACTABLE.
 			if (
 				event.key === 'ArrowRight' ||
 				event.key === 'ArrowLeft' ||
@@ -127,30 +124,43 @@ export function TabsTrigger({
 			const forward = horizontal ? 'ArrowRight' : 'ArrowDown';
 			const backward = horizontal ? 'ArrowLeft' : 'ArrowUp';
 			const key = event.key;
+			const walks = key === forward || key === backward || key === 'Home' || key === 'End';
+			if (!walks) {
+				onKeydown?.(event);
+				return;
+			}
+
 			// `target`, not `currentTarget`: a lazy handler symbol runs after the
 			// native dispatch has finished, and `currentTarget` is null by then.
 			const here = (event.target as HTMLElement).closest('[role="tab"]') as
 				| HTMLButtonElement
 				| null;
-			if (here && (key === forward || key === backward || key === 'Home' || key === 'End')) {
-				// DOM order is the navigation order, so no registry has to hold it.
-				const walk = Array.from(
-					here
-						.closest('[role="tablist"]')
-						?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [],
-				).filter((tab) => !tab.disabled);
-				const at = walk.indexOf(here);
-				const last = walk.length - 1;
-				const step =
-					key === 'Home' ? -at : key === 'End' ? last - at : key === forward ? 1 : -1;
-				const raw = at + step;
-				const to = raw < 0 ? (tabs.loop ? last : 0) : raw > last ? (tabs.loop ? 0 : last) : raw;
-				const next = walk[to];
-				// Focus only. Whether focus also shows the tab is selectOnFocus's
-				// call, made once in onFocus — unlike a radio group, where the APG
-				// says an arrow always chooses.
-				if (at >= 0 && next) next.focus();
+			if (!here) {
+				onKeydown?.(event);
+				return;
 			}
+
+			const list = here.closest('[role="tablist"]');
+			const open = Array.from(
+				list?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [],
+			).filter((candidate) => !candidate.disabled);
+			const at = open.indexOf(here);
+			if (at < 0) {
+				onKeydown?.(event);
+				return;
+			}
+
+			const last = open.length - 1;
+			const step = key === 'Home' ? -at : key === 'End' ? last - at : key === forward ? 1 : -1;
+			const raw = at + step;
+			const beforeFirst = tabs.loop ? last : 0;
+			const afterLast = tabs.loop ? 0 : last;
+			const to = raw < 0 ? beforeFirst : raw > last ? afterLast : raw;
+			const next = open[to];
+			// Focus only. Whether focus also shows the tab is selectOnFocus's call,
+			// made once in onFocus - unlike a radio group, where the APG says an
+			// arrow always chooses.
+			if (next) next.focus();
 			onKeydown?.(event);
 		}}
 	>{children}</button>
@@ -158,13 +168,13 @@ export function TabsTrigger({
 
 export function TabsContent({ value, children, ...rest }: TabsContentProps) @{
 	const tabs = tabsState();
-	// The panel compares against its own prop, where the trigger compares against
-	// a cell. Rooting a part instance here instead stops `hidden` refreshing at
-	// all, in CSR as well as SSR — measured both ways, see note.md.
+	// The panel compares against its prop where the trigger compares against a
+	// cell: rooting a part instance here stops `hidden` refreshing in CSR too.
+	// Measured both ways, see note.md.
 	const showing = computed(() => tabs.value === value);
 
-	// Hidden hides the panel, it never detaches it: a panel that unmounts loses
-	// the focus, scroll position and form state inside it on every tab change.
+	// `hidden` rather than an arm: a panel that unmounts loses the focus, scroll
+	// position and form state inside it on every tab change.
 	<div
 		{...rest}
 		role="tabpanel"
