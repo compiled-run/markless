@@ -9,6 +9,7 @@ import SavedSettingsForm from './scenarios/saved-settings-form.tsrx';
 import SettingsList from './scenarios/settings-list.tsrx';
 import UnavailableOptions from './scenarios/unavailable-options.tsrx';
 import WithHelp from './scenarios/with-help.tsrx';
+import WithOnChange from './scenarios/with-onchange.tsrx';
 
 const Root = page.getByTestId('root');
 const Trigger = page.getByTestId('trigger');
@@ -30,6 +31,14 @@ const DigestLabel = page.getByTestId('digest-label');
 const OffRoot = page.getByTestId('off-root');
 const OffTrigger = page.getByTestId('off-trigger');
 const OnRoot = page.getByTestId('on-root');
+// The consumer-handler example: first starts off, second starts on, locked is disabled.
+const FirstTrigger = page.getByTestId('first-trigger');
+const FirstValue = page.getByTestId('first-value');
+const SecondTrigger = page.getByTestId('second-trigger');
+const SecondValue = page.getByTestId('second-value');
+const LockedTrigger = page.getByTestId('locked-trigger');
+const LockedValue = page.getByTestId('locked-value');
+const Calls = page.getByTestId('calls');
 
 // The SSR harness rewrites a literal `renderSSR` call site, so the mount cannot be
 // passed by reference or hidden in a helper: each test branches on the mode instead.
@@ -145,6 +154,43 @@ function expectInvalidRendered() {
 	expect(el(ToggleError).id).toBeTruthy();
 }
 
+async function expectConsumerCallbackFires() {
+	// Nothing fired on mount, first render or resume.
+	expect(el(Calls).textContent).toBe('0');
+	expect(el(FirstValue).textContent).toBe('');
+
+	el(FirstTrigger).click();
+	await expect.poll(() => el(FirstValue).textContent).toBe('true');
+	// Called once, with the next value, and the switch moved with it.
+	await expect.poll(() => el(Calls).textContent).toBe('1');
+	expect(el(FirstTrigger).getAttribute('aria-checked')).toBe('true');
+	// The siblings' handlers did not run.
+	expect(el(SecondValue).textContent).toBe('');
+	expect(el(LockedValue).textContent).toBe('');
+}
+
+async function expectEachInstanceReachesItsOwnHandler() {
+	// The switch that starts on reports the value it flips to, not the one it left.
+	el(SecondTrigger).click();
+	await expect.poll(() => el(SecondValue).textContent).toBe('false');
+	await expect.poll(() => el(Calls).textContent).toBe('1');
+	expect(el(FirstValue).textContent).toBe('');
+
+	el(FirstTrigger).click();
+	await expect.poll(() => el(FirstValue).textContent).toBe('true');
+	await expect.poll(() => el(Calls).textContent).toBe('2');
+	// Each click reached only its own consumer handler.
+	expect(el(SecondValue).textContent).toBe('false');
+}
+
+async function expectDisabledCallbackStaysSilent() {
+	el(LockedTrigger).click();
+	// A disabled trigger neither flips nor reaches the handler the consumer passed.
+	await expect.poll(() => el(LockedTrigger).getAttribute('aria-checked')).toBe('false');
+	expect(el(LockedValue).textContent).toBe('');
+	expect(el(Calls).textContent).toBe('0');
+}
+
 function expectErrorFirstRendered() {
 	// The same error written BEFORE the trigger: seeding completes before any
 	// part renders, so document order does not decide what a part reads.
@@ -225,6 +271,24 @@ for (const mode of MODES) {
 		else await renderSSR(ErrorBeforeTrigger);
 		expectErrorFirstRendered();
 	});
+
+	test(`${mode}: a click calls the consumer onChange once with the next value`, async () => {
+		if (mode === 'CSR') await render(WithOnChange);
+		else await renderSSR(WithOnChange);
+		await expectConsumerCallbackFires();
+	});
+
+	test(`${mode}: two sibling switches each reach only their own handler`, async () => {
+		if (mode === 'CSR') await render(WithOnChange);
+		else await renderSSR(WithOnChange);
+		await expectEachInstanceReachesItsOwnHandler();
+	});
+
+	test(`${mode}: a disabled switch never calls the consumer onChange`, async () => {
+		if (mode === 'CSR') await render(WithOnChange);
+		else await renderSSR(WithOnChange);
+		await expectDisabledCallbackStaysSilent();
+	});
 }
 
 test('CSR: clicking the label flips the switch it names', async () => {
@@ -272,6 +336,43 @@ test('CSR: a disabled trigger ignores Space and Enter', async () => {
 	await userEvent.keyboard(' ');
 	await userEvent.keyboard('{Enter}');
 	expect(el(OffTrigger).getAttribute('aria-checked')).toBe('false');
+});
+
+// The trigger carries no keyboard rule of its own, so the consumer's onChange has
+// to arrive through the native button activation these rows press.
+async function expectKeyCallsConsumerCallback(key: string) {
+	el(FirstTrigger).focus();
+	expect(document.activeElement).toBe(el(FirstTrigger));
+
+	await userEvent.keyboard(key);
+	await expect.poll(() => el(FirstValue).textContent).toBe('true');
+	await expect.poll(() => el(Calls).textContent).toBe('1');
+
+	await userEvent.keyboard(key);
+	await expect.poll(() => el(FirstValue).textContent).toBe('false');
+	await expect.poll(() => el(Calls).textContent).toBe('2');
+}
+
+test('CSR: Space on the focused trigger calls the consumer onChange', async () => {
+	await render(WithOnChange);
+	await expectKeyCallsConsumerCallback(' ');
+});
+
+test('CSR: Enter on the focused trigger calls the consumer onChange', async () => {
+	await render(WithOnChange);
+	await expectKeyCallsConsumerCallback('{Enter}');
+});
+
+test('CSR: Space and Enter on a disabled switch never call the consumer onChange', async () => {
+	await render(WithOnChange);
+	el(LockedTrigger).focus();
+	// A disabled button cannot take focus, so a key press cannot reach it.
+	expect(document.activeElement).not.toBe(el(LockedTrigger));
+	await userEvent.keyboard(' ');
+	await userEvent.keyboard('{Enter}');
+	expect(el(LockedTrigger).getAttribute('aria-checked')).toBe('false');
+	expect(el(LockedValue).textContent).toBe('');
+	expect(el(Calls).textContent).toBe('0');
 });
 
 test('CSR: clicking the trigger syncs the hidden field and what the form submits', async () => {

@@ -4,6 +4,7 @@ import type {
 	ToggleDescriptionProps,
 	ToggleErrorProps,
 	ToggleFieldProps,
+	ToggleInstanceState,
 	ToggleLabelProps,
 	ToggleRootProps,
 	ToggleThumbProps,
@@ -12,7 +13,7 @@ import type {
 
 export const toggleState = shared(
 	() => {
-		const toggle = state({
+		const toggle: ToggleInstanceState = state({
 			checked: false,
 			disabled: false,
 			required: false,
@@ -27,8 +28,11 @@ export const toggleState = shared(
 			...toggle,
 			triggerEl,
 			describedEl,
+			onChange: undefined as ((checked: boolean) => void) | undefined,
 			flip() {
+				if (toggle.disabled) return;
 				toggle.checked = toggle.checked !== true;
+				toggle.onChange?.(toggle.checked);
 			},
 		};
 	},
@@ -46,6 +50,7 @@ export function ToggleRoot({
 	...rest
 }: ToggleRootProps) @{
 	const toggle = toggleState();
+	toggle.onChange = onChange;
 	toggle.checked = checked;
 	toggle.disabled = disabled;
 	toggle.required = required;
