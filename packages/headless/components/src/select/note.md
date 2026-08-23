@@ -148,8 +148,10 @@ here by writing the primitive-based shape and running the suite.
 **1. A handle read in a handler answers for one widget on the page, not for the
 handler's own widget.**
 
-*The write-only half of this wall is fixed; the instance half was measured
-2026-08-23 and is what still holds the family to `element-reach.ts`.*
+*The read-as-undefined half of this wall is fixed. The instance half was
+re-measured 2026-08-23 against the landed per-instance fix, and it is what still
+holds the family to `element-reach.ts` — it now fails loudly rather than
+silently.*
 
 The original wall was that an `element()` handle resolved in `el=` and in an
 IDREF attribute but read as `undefined` from a handler body, silently, with no
@@ -186,6 +188,44 @@ and the walking one is first of the two. Focus never left the trigger, because
 nothing in a hidden subtree can take focus. Moving the locked select ahead of the
 walking one — the same handler code, only the registration order changed —
 returned all 54. That is the flat map, not the walk.
+
+**Re-measured 2026-08-23 against the landed per-instance fix, and it is still one
+row red — for a new reason.** `widget-scoped element() handle reads resolve per
+instance` (`packages/web/src/fns/instance-scope.ts` qualifying a widget-scoped
+handle id with the rendered widget's root path, `resume-locators.ts` filing per
+key and refusing an ambiguous one) is on this tip, and its own suite,
+`packages/vitest-browser/browser/handle-instance.test.ts`, is 9/9 here. The
+family's suite is 54/54 before the conversion. With the conversion re-applied
+exactly as written above: 53 green, the same row red, and the wrong element is
+gone — the read now throws
+`MARKLESS_ELEMENT_HANDLE_INSTANCE_AMBIGUOUS`, *"Element handle
+`shared:…/select.tsrx#selectState/element:contentEl` is registered by 2 rendered
+widgets on this page, and the reading handler named no instance."* The throw is
+the fix working as designed: the fallback to the module-level id is refused
+rather than answered with whichever widget registered last.
+
+What was ruled out, each by its own run:
+
+- **Not the member-tag spelling.** The same two-select page written with direct
+  component tags (`<SelectRoot>`, `<SelectTrigger>`, `<SelectContent>`) instead
+  of `select.root` and friends throws identically.
+- **Not the nested widget.** Replacing every `select.item` — each of which roots
+  a `selectItemState` instance of its own — with a plain
+  `<div role="option" tabindex={-1}>` throws identically.
+- **Not a sibling-part read.** The narrower conversion, where only
+  `select.content`'s own key handler reads `select.contentEl` — the handle that
+  same part binds with `el=` — and the trigger keeps its DOM hop, throws from
+  `symbol:2`, the content's handler. A handler on the very element that binds the
+  handle names no instance either.
+
+So the per-instance keying holds for the shape its fixture pins (a widget root
+component whose two children are a binding part and a reading part, both direct
+children) and does not reach this family's. The next question is which of the two
+halves loses the path: the registration qualifying under one instance path, or
+the reading symbol resolving under another. Both live in
+`packages/web/src/fns/instance-scope.ts`, outside this folder. Until one of them
+answers, `element-reach.ts` stays exactly as it is — the conversion above is
+written out in full so it is re-appliable in one sitting.
 
 The older half of the wall still stands beside it: `attach={(host) => ...}` is
 the only primitive handed a live element, and it cannot pass one on. Writing it
