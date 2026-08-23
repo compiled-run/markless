@@ -452,18 +452,16 @@ for (const mode of MODES) {
 		expectTwoWidgetsRendered();
 	});
 
-	// PINNED - a component-edge prop that reads the loop's item throws when the
-	// edge sits inside an arm inside the loop. `<pagination.itemtrigger
-	// value={entry.value}>` written under `@if (entry.type === 'page')` inside
-	// `@for (const entry of entries; ...)` reaches the shared-seed evaluator with
-	// no row bound: `readResidue` evaluates the authored expression against an
-	// undefined `entry` and throws `Cannot read properties of undefined (reading
-	// 'value')` out of `edgeChildProps` (packages/web/src/fns/shared-seed.ts:148 ->
-	// packages/web/src/prerender/evaluator.ts:482). The same edge prop written as a
-	// DIRECT child of the loop resolves today - `checklist`'s items-from-data
-	// scenario does exactly that - so the arm is what loses the row, not the loop.
-	// This is the one genuinely new shape this family asked for.
-	test.fails(`${mode}: the looped scenario renders the range the consumer computed`, async () => {
+	// PINNED for SSR only. The arm-inside-a-loop defect this row was pinned on is
+	// FIXED (packages/web/src/ssr-data/renderer.ts:370 forwards the row into the
+	// arm's chunk), and the CSR half of this row now renders the whole range. What
+	// stops the SSR half is a second, unrelated refusal:
+	// MARKLESS_ROW_COMPONENT_INTERACTIVE, because `scenarios/products.tsrx` writes
+	// `@for (const entry of entries; index i; key i)` and an index key carries no
+	// row value to route an interactive part's clicks to. Un-pin by keying that
+	// loop on a stable field of the entry - which first needs such a field to
+	// exist, since an ellipsis entry has none (`PageEntry`, pagination-range.ts).
+	(mode === 'SSR' ? test.fails : test)(`${mode}: the looped scenario renders the range the consumer computed`, async () => {
 		if (mode === 'CSR') await render(Products);
 		else await renderSSR(Products);
 		expectProductsRendered();
@@ -517,8 +515,10 @@ for (const mode of MODES) {
 		await expectLinkMovesTheCurrentPage();
 	});
 
-	// PINNED on the same arm-inside-a-loop defect as the row above: the scenario
-	// never renders, so the changing row set it exists to exercise is unmeasured.
+	// PINNED on the same index-key cause as the row above, in both modes: SSR
+	// refuses the render outright, and in CSR the click on a page inside the arm
+	// routes nowhere - the heading stays `Page 1 of 20` - because an index-keyed
+	// row carries no row value to route the interaction to.
 	test.fails(`${mode}: the rendered controls follow the page as the range changes`, async () => {
 		if (mode === 'CSR') await render(Products);
 		else await renderSSR(Products);
@@ -598,8 +598,9 @@ test('SSR: the served page carries the current page and both bounds', async () =
 	expect(at('itemtrigger-1').hasAttribute('aria-current')).toBe(false);
 });
 
-// PINNED on the same arm-inside-a-loop defect: the server render throws before
-// anything reaches the page, so resume has nothing to resume.
+// PINNED on the same index-key cause: the server render is refused with
+// MARKLESS_ROW_COMPONENT_INTERACTIVE before anything reaches the page, so resume
+// has nothing to resume.
 test.fails('SSR: the served looped range is the one the consumer computed', async () => {
 	await renderSSR(Products);
 	expect(renderedPages()).toEqual(['1', '2', '3', '4', '5', '20']);

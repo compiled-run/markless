@@ -367,7 +367,15 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 					throw new Error(`MARKLESS_SSR_DATA_BRANCH_SELECTOR_MISSING: ${slot.branchSiteId}`);
 				const arm = await input.selectBranchArm(slot, context);
 				const armChunkId = slot.armTemplateIds[arm];
-				const body = armChunkId ? await renderChunk(armChunkId, {}) : { html: '', tokens: [] };
+				// An arm decides WHETHER its body renders, never which row it is inside.
+				const body = armChunkId
+					? await renderChunk(armChunkId, {
+							...context,
+							item: context.repeatItem,
+							index: context.repeatIndex,
+							key: context.repeatKey,
+						})
+					: { html: '', tokens: [] };
 				const id = `${idPrefix}${slot.branchSiteId}`;
 				const marker = input.renderData.branches?.some(
 					(branch) =>
@@ -453,7 +461,13 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 						? renderAttribute(attribute.name, value)
 						: renderSpreadAttributes(value);
 				}
-				const body = await renderChunk(slot.childChunkId, {});
+				// A dynamic host picks the tag around its children, never their row.
+				const body = await renderChunk(slot.childChunkId, {
+					...context,
+					item: context.repeatItem,
+					index: context.repeatIndex,
+					key: context.repeatKey,
+				});
 				return {
 					html: `<${tag}${attributes}>${body.html}</${tag}>`,
 					tokens: [
