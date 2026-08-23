@@ -6,6 +6,7 @@ export * as otp from './otp/index.ts';
 export * as pagination from './pagination/index.ts';
 export * as progress from './progress/index.ts';
 export * as qrcode from './qr-code/index.ts';
+export * as radiogroup from './radio-group/index.ts';
 export * as scrollarea from './scroll-area/index.ts';
 export * as textbox from './textbox/index.ts';
 export * as toggle from './toggle/index.ts';
