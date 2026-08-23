@@ -606,7 +606,7 @@ export function collectSharedCallbackBindings(state: WalkState): void {
 		const [localName, slotName, ...rest] = splitStaticGraphPath(write.target);
 		if (!localName || !slotName || rest.length > 0) continue;
 
-		const resolved = findSharedInstance(localName, state.graph);
+		const resolved = findSharedInstance(localName, state.graph, write.componentName);
 		if (!resolved) continue;
 
 		const definition = definitionsById.get(resolved.definition.id);
@@ -702,11 +702,39 @@ export type SharedInstanceGraph = {
 	readonly sharedInstances: ReadonlyArray<SemanticSharedInstance>;
 };
 
+/**
+ * Whether a read inside `componentName` can see this instance local. An instance
+ * declared in a component body is that component's local and nothing outside it
+ * may resolve through the name; one declared at module scope has no owner, so
+ * every component sees it, the way module scope works in plain JavaScript.
+ *
+ * No `componentName` is a reader outside every component body — a shared factory,
+ * module scope, or a call site with no component in hand. It keeps the
+ * module-wide reading, so nothing that resolves correctly today changes shape.
+ */
+export function sharedInstanceVisibleFrom(
+	instance: SemanticSharedInstance,
+	componentName: string | null | undefined,
+): boolean {
+	if (componentName === undefined || componentName === null) return true;
+	return instance.componentName === undefined || instance.componentName === componentName;
+}
+
+/**
+ * Defect 46. Without the reading component, a bare root name matched EVERY
+ * instance in the module and the last declaration won: a read in one component
+ * resolved to a local declared only in another whenever the two names coincided,
+ * so a part rendered a different widget's cell with nothing to say so.
+ */
 export function findSharedInstance(
 	localName: string,
 	graph: Pick<SharedInstanceGraph, 'sharedDefinitions' | 'sharedInstances'>,
+	componentName?: string | null,
 ): { readonly instance: SemanticSharedInstance; readonly definition: SemanticSharedDefinition } | null {
-	const instance = findLast(graph.sharedInstances, (item) => item.localName === localName);
+	const instance = findLast(
+		graph.sharedInstances,
+		(item) => item.localName === localName && sharedInstanceVisibleFrom(item, componentName),
+	);
 	if (!instance) return null;
 
 	const definition = graph.sharedDefinitions.find((item) => item.id === instance.definitionId);
@@ -719,6 +747,7 @@ export function findSharedInstance(
 export function resolveSharedInstanceGraphPath(
 	source: string,
 	graph: SharedInstanceGraph,
+	componentName?: string | null,
 ): ResolvedGraphPath | null {
 	const segments = splitStaticGraphPath(source);
 	if (segments.length < 2) return null;
@@ -726,7 +755,7 @@ export function resolveSharedInstanceGraphPath(
 	const [localName, propertyName, ...propertyPath] = segments;
 	if (!localName || !propertyName) return null;
 
-	const resolved = findSharedInstance(localName, graph);
+	const resolved = findSharedInstance(localName, graph, componentName);
 	if (!resolved) return null;
 
 	const property = findLast(
@@ -759,7 +788,7 @@ export function componentSharedSeedWrite(
 	if (write.operation !== 'assign' || write.assignmentOperator !== undefined) return null;
 	if (!write.componentName || write.valueSource === undefined) return null;
 
-	const resolved = resolveSharedInstanceGraphPath(write.target, graph);
+	const resolved = resolveSharedInstanceGraphPath(write.target, graph, write.componentName);
 	if (!resolved || resolved.binding.sharedDefinitionId === undefined) return null;
 
 	return { resolved, componentName: write.componentName };

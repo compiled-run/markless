@@ -36,6 +36,13 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 	const aliases = semanticAliasMap(input.semanticGraph);
 	const componentBindings = graphBindingMap(input.semanticGraph, null);
 	const componentAliases = semanticAliasMap(input.semanticGraph, null);
+	// The component a host element belongs to. Its chunk is the only record of
+	// which component body a hostNodeId-keyed read was authored in.
+	const componentByHostNodeId = new Map<string, string>(
+		renderData.chunks.flatMap((chunk) =>
+			chunk.hosts.map((host) => [host.hostNodeId, chunk.componentName] as const),
+		),
+	);
 
 	for (const binding of input.semanticGraph.graphBindings) {
 		bindings.set(binding.name, binding);
@@ -162,10 +169,17 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			];
 		}
 
-		// Component scope only: a factory local and the instance local markup names routinely collide.
+		// Component scope only: a factory local and the instance local markup names
+		// routinely collide. A template read carries no component of its own, so the
+		// reading component is the one that renders the host it is bound to; without
+		// it a read resolves to a sibling component's same-named local (defect 46).
 		const resolved =
 			resolveGraphPath(read.source, componentBindings, componentAliases) ??
-			resolveSharedInstanceGraphPath(read.source, input.semanticGraph);
+			resolveSharedInstanceGraphPath(
+				read.source,
+				input.semanticGraph,
+				componentByHostNodeId.get(read.hostNodeId),
+			);
 		if (!resolved) return [];
 
 		return [
@@ -299,7 +313,11 @@ function resolveElementHandleBinding(
 	bindings: ReadonlyMap<string, SemanticGraphBinding>,
 	aliases: ReturnType<typeof semanticAliasMap>,
 ): SemanticGraphBinding | undefined {
-	const shared = resolveSharedInstanceGraphPath(binding.handleName, input.semanticGraph);
+	const shared = resolveSharedInstanceGraphPath(
+		binding.handleName,
+		input.semanticGraph,
+		binding.componentName,
+	);
 	if (shared?.binding.kind === 'element' && shared.path.length === 0) return shared.binding;
 
 	const direct = resolveGraphPath(binding.handleName, bindings, aliases);

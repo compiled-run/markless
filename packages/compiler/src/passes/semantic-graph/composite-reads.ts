@@ -214,10 +214,12 @@ export function mintTemplateExpressionComputed(
 	for (const source of readSources) {
 		// Component scope first: a factory local and the instance local routinely collide.
 		// An enclosing row binding outranks both - it is the name's real declaration.
+		// ...and only THIS component's instance locals; a sibling component's
+		// same-named local is not in scope here (defect 46).
 		const resolved = repeatRowBindsName(source, state)
 			? null
 			: (resolveGraphPath(source, bindings, aliases) ??
-				resolveSharedInstanceGraphPath(source, state.graph));
+				resolveSharedInstanceGraphPath(source, state.graph, state.currentComponentName));
 		if (!resolved) return null;
 		if (
 			resolved.binding.kind !== 'state' &&
@@ -264,7 +266,7 @@ export function readsWritableGraphCell(
 		if (repeatRowBindsName(source, state)) return false;
 		const resolved =
 			resolveGraphPath(source, scope.bindings, scope.aliases) ??
-			resolveSharedInstanceGraphPath(source, state.graph);
+			resolveSharedInstanceGraphPath(source, state.graph, state.currentComponentName);
 		return resolved?.binding.kind === 'state' || resolved?.binding.kind === 'computed';
 	});
 }

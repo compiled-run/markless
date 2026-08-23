@@ -6,6 +6,7 @@ import {
 	findSharedInstance,
 	resolveSharedInstanceGraphPath,
 	sharedCallbackSlotGraphNodeId,
+	sharedInstanceVisibleFrom,
 } from '../semantic-graph/collect-shared.ts';
 import { sharedInstancePreludeLines } from './residue-reader.ts';
 import type { PublicRenderRoot } from './types.ts';
@@ -34,7 +35,7 @@ export function renderBodyLines(
 			binding.kind === 'computed' ? [[binding.name, binding]] : [],
 		),
 	);
-	const sharedInstanceNames = sharedInstanceLocalNames(input.semanticGraph);
+	const sharedInstanceNames = sharedInstanceLocalNames(input.semanticGraph, rootInfo.componentName);
 	const lines: string[] = [];
 	let emittedRoot = false;
 	for (const statement of childNodes(body)) {
@@ -61,6 +62,7 @@ export function renderBodyLines(
 			computedBindings,
 			input,
 			stateValuesName,
+			rootInfo.componentName,
 		);
 		if (computedLine) {
 			lines.push(computedLine);
@@ -75,6 +77,7 @@ export function renderBodyLines(
 			stateValueFunctionName,
 			stateValuesName,
 			statePayloadName,
+			rootInfo.componentName,
 		);
 		if (seedLine) {
 			lines.push(seedLine);
@@ -99,13 +102,14 @@ function sharedStateSeedLine(
 	stateValueFunctionName: string,
 	stateValuesName: string,
 	statePayloadName: string,
+	componentName: string,
 ): string | null {
 	if (statement.type !== 'ExpressionStatement') return null;
 	const assignment = statement.expression as AnyNode | undefined;
 	if (assignment?.type !== 'AssignmentExpression' || assignment.operator !== '=') return null;
 
 	const target = expressionSource(assignment.left as AnyNode, input.source.source);
-	const resolved = resolveSharedInstanceGraphPath(target, input.semanticGraph);
+	const resolved = resolveSharedInstanceGraphPath(target, input.semanticGraph, componentName);
 	if (!resolved) {
 		return callbackSlotSeedLine(
 			target,
@@ -113,6 +117,7 @@ function sharedStateSeedLine(
 			stateValueFunctionName,
 			stateValuesName,
 			statePayloadName,
+			componentName,
 		);
 	}
 
@@ -139,13 +144,14 @@ function callbackSlotSeedLine(
 	stateValueFunctionName: string,
 	stateValuesName: string,
 	statePayloadName: string,
+	componentName: string,
 ): string | null {
 	void stateValueFunctionName;
 	void stateValuesName;
 	const [localName, slotName, ...rest] = target.split('.');
 	if (!localName || !slotName || rest.length > 0) return null;
 
-	const instance = findSharedInstance(localName, input.semanticGraph);
+	const instance = findSharedInstance(localName, input.semanticGraph, componentName);
 	if (!instance) return null;
 
 	const binding = (input.semanticGraph.sharedCallbackBindings ?? []).find(
@@ -193,6 +199,7 @@ function computedDeclarationLine(
 	computedBindings: ReadonlyMap<string, GraphBinding>,
 	input: PublicRenderModuleInput,
 	stateValuesName: string,
+	componentName: string,
 ): string | null {
 	if (statement.type !== 'VariableDeclaration') return null;
 	const declarations = asNodes(statement.declarations);
@@ -214,6 +221,7 @@ function computedDeclarationLine(
 	// No instance local exists here; rebuild it from the graph, as the residue readers do.
 	const prelude = sharedInstancePreludeLines(
 		input.semanticGraph,
+		componentName,
 		binding.functionSource,
 		new Set(),
 		(graphNodeId, path) =>
@@ -262,8 +270,15 @@ function stateDeclarationLine(
 // local for it.
 export function sharedInstanceLocalNames(
 	semanticGraph: Pick<PublicRenderModuleInput['semanticGraph'], 'sharedInstances'>,
+	componentName?: string,
 ): ReadonlySet<string> {
-	return new Set((semanticGraph.sharedInstances ?? []).map((instance) => instance.localName));
+	return new Set(
+		(semanticGraph.sharedInstances ?? []).flatMap((instance) =>
+			// Another component's instance local is an ordinary name here, and
+			// dropping the statement that declares it would delete real code.
+			sharedInstanceVisibleFrom(instance, componentName) ? [instance.localName] : [],
+		),
+	);
 }
 
 export function isSharedInstanceDeclaration(
@@ -356,7 +371,7 @@ export function renderValuePreludeLines(
 			binding.kind === 'computed' ? [[binding.name, binding] as const] : [],
 		),
 	);
-	const sharedInstanceNames = sharedInstanceLocalNames(input.semanticGraph);
+	const sharedInstanceNames = sharedInstanceLocalNames(input.semanticGraph, rootInfo.componentName);
 	const statements = childNodes(body).filter((statement) => {
 		if (isIgnorableTextNode(statement)) return false;
 		return statement !== rootInfo.root && returnArgument(statement) !== rootInfo.root;
