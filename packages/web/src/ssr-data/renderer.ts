@@ -1,4 +1,5 @@
 import { marklessAttributeValue } from '../dom-attribute.ts';
+import { MARKLESS_WIDGET_INSTANCE_KEY } from '../prerender/shared-seed-slot.ts';
 import {
 	ASYNC_BOUNDARY_ARM,
 	renderPayloadScripts,
@@ -319,19 +320,25 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 				return { html: renderSpreadAttributes(await input.read(slot.residue, context), slot.excludeNames), tokens: [] };
 			case 'child-component': {
 				anchors.push(anchorRecord(idPrefix, context.chunkId, slot, slot.componentEdgeId));
+				// The widget root reads the same seed map its projected parts read, so the
+				// pass runs once and its answer travels the root edge as well as the projection.
+				const childSeeds = slot.projectionChunkId
+					? await input.seedChild?.(slot, context)
+					: undefined;
 				// A projection renders inside the row that placed it, so the row travels with it.
 				const projection = slot.projectionChunkId
 					? await renderChunk(slot.projectionChunkId, {
 							item: context.repeatItem,
 							index: context.repeatIndex,
 							key: context.repeatKey,
-							sharedSeeds: await input.seedChild?.(slot, context),
+							sharedSeeds: childSeeds,
 						})
 					: undefined;
 				if (!input.renderChild)
 					throw new Error(`MARKLESS_SSR_DATA_CHILD_RENDERER_MISSING: ${slot.componentEdgeId}`);
 				const child = await input.renderChild(slot, {
 					...context,
+					...(childSeeds ? { sharedSeeds: rootEdgeSeeds(childSeeds, context.sharedSeeds) } : {}),
 					...(projection ? { projectionHtml: projection.html } : {}),
 				});
 				if (!child || typeof child !== 'object')
@@ -478,6 +485,24 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 			}
 		}
 	}
+}
+
+/**
+ * What the widget ROOT edge reads: every seed its parts wrote, but still the
+ * instance token of the widget it was PLACED IN. The root's own template belongs
+ * to the enclosing instance the way it did before it read seeds at all, so the
+ * ids it mints stay put while the values its parts seeded reach it. Placed in
+ * nothing, it keeps the instance it started itself — that token is the only one
+ * its own handles can mint from.
+ */
+function rootEdgeSeeds(
+	childSeeds: ReadonlyMap<string, unknown>,
+	inherited: ReadonlyMap<string, unknown> | undefined,
+): ReadonlyMap<string, unknown> {
+	const enclosing = inherited?.get(MARKLESS_WIDGET_INSTANCE_KEY);
+	if (enclosing === undefined || enclosing === childSeeds.get(MARKLESS_WIDGET_INSTANCE_KEY))
+		return childSeeds;
+	return new Map(childSeeds).set(MARKLESS_WIDGET_INSTANCE_KEY, enclosing);
 }
 
 function commentToken(
