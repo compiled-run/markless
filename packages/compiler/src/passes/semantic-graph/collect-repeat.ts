@@ -149,3 +149,26 @@ function firstRepeatRow(node: AnyNode): AnyNode | undefined {
 
 	return row;
 }
+
+/**
+ * True when an enclosing `@for` declares the name this expression is rooted in,
+ * as the row item or as the row index. Such a name is a per-row binding, so no
+ * module-level or component-level node may answer for it however the two happen
+ * to be spelled - a resolver that answers anyway hands every row one node, and
+ * the rows then render identical values with nothing to say so.
+ *
+ * The test is the one `expressionResidue` already applies to markup residues, so
+ * a child's prop and the text beside it read the row's name the same way.
+ */
+export function repeatRowBindsName(source: string, state: WalkState): boolean {
+	if (state.currentKeyedRepeatScopeIds.length === 0) return false;
+
+	return state.currentKeyedRepeatScopeIds.some((scopeId) => {
+		const repeat = state.graph.keyedRepeats.find((candidate) => candidate.id === scopeId);
+		if (!repeat) return false;
+
+		return [repeat.itemName, repeat.indexName].some(
+			(name) => name !== undefined && (source === name || source.startsWith(`${name}.`)),
+		);
+	});
+}

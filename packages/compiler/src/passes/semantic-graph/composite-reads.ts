@@ -10,6 +10,7 @@ import {
 	resolveGraphPath,
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
+import { repeatRowBindsName } from './collect-repeat.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import type { WalkState } from './types.ts';
 
@@ -212,9 +213,11 @@ export function mintTemplateExpressionComputed(
 	let readsGraphCell = false;
 	for (const source of readSources) {
 		// Component scope first: a factory local and the instance local routinely collide.
-		const resolved =
-			resolveGraphPath(source, bindings, aliases) ??
-			resolveSharedInstanceGraphPath(source, state.graph);
+		// An enclosing row binding outranks both - it is the name's real declaration.
+		const resolved = repeatRowBindsName(source, state)
+			? null
+			: (resolveGraphPath(source, bindings, aliases) ??
+				resolveSharedInstanceGraphPath(source, state.graph));
 		if (!resolved) return null;
 		if (
 			resolved.binding.kind !== 'state' &&
@@ -258,6 +261,7 @@ export function readsWritableGraphCell(
 	scope: GraphReadScope,
 ): boolean {
 	return readSources.some((source) => {
+		if (repeatRowBindsName(source, state)) return false;
 		const resolved =
 			resolveGraphPath(source, scope.bindings, scope.aliases) ??
 			resolveSharedInstanceGraphPath(source, state.graph);
