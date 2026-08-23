@@ -12,17 +12,6 @@ export type ModalDismissReason = 'escape' | 'outside-press';
 /** The event the overlay behaviour delivers on the enlisted backdrop. */
 export type ModalDismissEvent = CustomEvent<{ readonly reason: ModalDismissReason }>;
 
-// `dismiss` is a real DOM event the overlay behaviour dispatches, so it belongs
-// in the DOM event map: that is what gives every element an `onDismiss` the
-// compiler already lowers. The declaration lives here because the intrinsic
-// element types are owned by the typescript-plugin, which this family does not
-// edit; note.md records it as a home to revisit.
-declare global {
-	interface GlobalEventHandlersEventMap {
-		dismiss: ModalDismissEvent;
-	}
-}
-
 export type ModalRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/** Whether the dialog is showing. Omit it and the dialog starts closed. */
 	readonly open?: boolean;
