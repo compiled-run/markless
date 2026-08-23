@@ -211,7 +211,7 @@ export function createEventWiring(input: {
 			// only the component edge, so without this the handler for row B would
 			// spell the same node as the handler for row A - the write lands
 			// nowhere, or worse, on the wrong row.
-			const rowScope = marklessRecordRowScope(eventRecord.hostNodeId);
+			const rowScope = marklessRecordRowScope(eventRecord.hostNodeId, input.graph);
 			// The same question for the element handles, which the row scope cannot
 			// answer: a widget-scoped handle is one element per rendered widget and
 			// the compiled symbol spells the module-level id, so without an instance
@@ -230,6 +230,7 @@ export function createEventWiring(input: {
 								getElementHandle: marklessInstanceScopedElementHandle(
 									context.getElementHandle,
 									recordInstancePath,
+									input.graph,
 								),
 							}
 						: {}),

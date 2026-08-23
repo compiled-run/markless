@@ -1,3 +1,4 @@
+import type { RuntimeGraph } from '@markless/runtime';
 import {
 	mismatchedElementLocatorError,
 	missingElementLocatorError,
@@ -190,6 +191,10 @@ function elementsAndAnchorOffset(
 export type ComposedArmRecordQualifier = (
 	boundaryId: string,
 	set: ResumeArmRecordSet,
+	// The settling page's own graph: widget-scoped ids in a composed arm belong to
+	// a rendered widget of THIS container, and the registry that names them is
+	// filed against this graph.
+	graph?: RuntimeGraph,
 ) => ResumeArmRecordSet;
 
 let installedQualifier: ComposedArmRecordQualifier | undefined;

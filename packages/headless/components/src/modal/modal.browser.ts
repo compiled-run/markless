@@ -570,11 +570,7 @@ test('CSR: closing the second dialog returns focus into the first', async () => 
 
 // --- keyboard and focus ---------------------------------------------------
 
-// Five rows are `test.fails` pins for defect 72 (board): the click record on
-// modal.close at depth root>backdrop>content>close never runs - deterministic,
-// order-dependent, green in isolation; Escape and consumer buttons in the same
-// content work. They un-pin the day the dispatch fix lands.
-test.fails('CSR: the dialog opens from the keyboard and the controls inside it are reachable', async () => {
+test('CSR: the dialog opens from the keyboard and the controls inside it are reachable', async () => {
 	await render(Basic);
 	el<HTMLElement>(Trigger).focus();
 	await userEvent.keyboard('{Enter}');
@@ -588,7 +584,7 @@ test.fails('CSR: the dialog opens from the keyboard and the controls inside it a
 	await closeBasic();
 });
 
-test.fails('CSR: tabbing off the last control in the dialog does not reach the page behind', async () => {
+test('CSR: tabbing off the last control in the dialog does not reach the page behind', async () => {
 	await render(Basic);
 	await openBasic();
 
@@ -642,7 +638,7 @@ test('CSR: a disabled trigger does not open the dialog and a disabled close does
 	await expect.poll(() => el(OpenBackdrop).hasAttribute('hidden')).toBe(true);
 });
 
-test.fails('CSR: a form inside the surface saves and the dialog closes with focus restored', async () => {
+test('CSR: a form inside the surface saves and the dialog closes with focus restored', async () => {
 	await render(Form);
 
 	el(FormTrigger).click();
@@ -690,7 +686,7 @@ test('SSR: the served dialog is closed, attached and already named', async () =>
 	expectBackgroundReachable(el(Background));
 });
 
-test.fails('SSR: the first open after resume marks the background and the first close restores focus', async () => {
+test('SSR: the first open after resume marks the background and the first close restores focus', async () => {
 	await renderSSR(Basic);
 
 	await openBasic();
@@ -705,7 +701,7 @@ test.fails('SSR: the first open after resume marks the background and the first 
 	await expect.poll(() => document.activeElement).toBe(el(Trigger));
 });
 
-test.fails('SSR: opening twice after resume does not double-mark the background', async () => {
+test('SSR: opening twice after resume does not double-mark the background', async () => {
 	await renderSSR(Basic);
 
 	await openBasic();

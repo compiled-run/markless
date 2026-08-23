@@ -234,7 +234,7 @@ export async function settleAsyncBoundaryRange(
 		await input.commitArm!(boundary, {
 			...rendered,
 			html: rendered.html,
-			armRecords: (composedArmRecordQualifier()?.(boundary.id, armRecords) ?? armRecords),
+			armRecords: (composedArmRecordQualifier()?.(boundary.id, armRecords, input.graph) ?? armRecords),
 		});
 		input.settleTracker?.markSettled(boundary.id);
 		return;
@@ -261,7 +261,7 @@ export async function settleAsyncBoundaryRange(
 		if (armRecords) {
 			await input.commitArm(boundary, {
 				html: update.html,
-				armRecords: (composedArmRecordQualifier()?.(boundary.id, armRecords) ?? armRecords),
+				armRecords: (composedArmRecordQualifier()?.(boundary.id, armRecords, input.graph) ?? armRecords),
 			});
 			input.settleTracker?.markSettled(boundary.id);
 			return;

@@ -58,13 +58,16 @@ export type MarklessRowScope = ReadonlyArray<{
 // empty pair list is what says "no row named, resolve the projection anyway".
 const EMPTY_ROW_SCOPE: MarklessRowScope = [];
 
-export function marklessRecordRowScope(hostNodeId: string): MarklessRowScope | undefined {
+export function marklessRecordRowScope(
+	hostNodeId: string,
+	graph?: RuntimeGraph,
+): MarklessRowScope | undefined {
 	const path = marklessInstancePath(hostNodeId);
 	// No row to thread, but a bound symbol still spells widget ids against its
 	// projection site rather than the root that owns them, so a page carrying any
 	// widget root gets the adapter with no pairs: widget resolution, nothing else.
 	if (!path.includes('r:'))
-		return marklessWidgetScope.active.rootPaths.size > 0 ? EMPTY_ROW_SCOPE : undefined;
+		return marklessGraphWidgetRegistry(graph).rootPaths.size > 0 ? EMPTY_ROW_SCOPE : undefined;
 	const pairs: Array<{ rowFree: string; withRows: string; rowBoundary?: boolean }> = [];
 	let rowFree = '';
 	let withRows = '';
@@ -82,8 +85,12 @@ export function marklessRecordRowScope(hostNodeId: string): MarklessRowScope | u
 	return pairs.length > 0 ? pairs.reverse() : undefined;
 }
 
-export function marklessRowScopedGraphNodeId(graphNodeId: string, scope: MarklessRowScope): string {
-	const widget = marklessRowWidgetGraphNodeId(graphNodeId, scope);
+export function marklessRowScopedGraphNodeId(
+	graphNodeId: string,
+	scope: MarklessRowScope,
+	registry: MarklessWidgetRegistry,
+): string {
+	const widget = marklessRowWidgetGraphNodeId(graphNodeId, scope, registry);
 	if (widget !== undefined) return widget;
 	for (const { rowFree, withRows, rowBoundary } of scope)
 		if (!rowBoundary && graphNodeId.startsWith(rowFree))
@@ -110,6 +117,7 @@ export function marklessRowScopedGraphNodeId(graphNodeId: string, scope: Markles
 function marklessRowWidgetGraphNodeId(
 	graphNodeId: string,
 	scope: MarklessRowScope,
+	registry: MarklessWidgetRegistry,
 ): string | undefined {
 	const pageSpace = PAGE_SPACE_ID.exec(graphNodeId);
 	// A prefix already carrying a row is either resolved or a re-entrant pass
@@ -120,14 +128,18 @@ function marklessRowWidgetGraphNodeId(
 	const sharedId = graphNodeId.slice(edgePath.length);
 	for (const { rowFree, withRows } of scope) {
 		if (!edgePath.startsWith(rowFree)) continue;
-		const rootPath = marklessWidgetRootPath(sharedId, withRows + edgePath.slice(rowFree.length));
+		const rootPath = marklessWidgetRootPath(
+			sharedId,
+			withRows + edgePath.slice(rowFree.length),
+			registry,
+		);
 		if (rootPath) return rootPath + sharedId;
 	}
 	// No row answered - either none was named, or the widget is rooted outside
 	// every row the dispatch is in. The projection site itself is then the whole
 	// question the registry was built to answer, and an id whose prefix already
 	// names its own root resolves back to itself.
-	const rootPath = marklessWidgetRootPathThroughRows(sharedId, edgePath);
+	const rootPath = marklessWidgetRootPathThroughRows(sharedId, edgePath, registry);
 	return rootPath ? rootPath + sharedId : undefined;
 }
 
@@ -137,7 +149,7 @@ function marklessRowWidgetGraphNodeId(
 // second kind is a row's, which is what the prefix match above decides. The tag
 // keeps a re-entrant dispatch - a bound handler invoking a parent callback that
 // runs through this same path - from inserting the row a second time.
-type MarklessRowScopedGraph = RuntimeGraph & { readonly marklessRowScope?: string };
+type MarklessRowScopedGraph = MarklessScopedGraph & { readonly marklessRowScope?: string };
 
 export function marklessRowScopedGraph(
 	graph: RuntimeGraph,
@@ -145,8 +157,10 @@ export function marklessRowScopedGraph(
 ): RuntimeGraph {
 	const tag = scope.map((pair) => pair.withRows).join('|');
 	if ((graph as MarklessRowScopedGraph).marklessRowScope === tag) return graph;
-	const qualify = (graphNodeId: string) => marklessRowScopedGraphNodeId(graphNodeId, scope);
-	return {
+	const registry = marklessGraphWidgetRegistry(graph);
+	const qualify = (graphNodeId: string) =>
+		marklessRowScopedGraphNodeId(graphNodeId, scope, registry);
+	const scoped = {
 		...graph,
 		marklessRowScope: tag,
 		read: (graphNodeId, path) => graph.read(qualify(graphNodeId), path),
@@ -158,6 +172,10 @@ export function marklessRowScopedGraph(
 		subscribe: (subscription) =>
 			graph.subscribe({ ...subscription, graphNodeId: qualify(subscription.graphNodeId) }),
 	} as MarklessRowScopedGraph;
+	// A wrapper is a new object, so it would otherwise mint a registry of its own
+	// and re-read every definition. File it against the one its base already has.
+	marklessShareWidgetRegistry(scoped, registry);
+	return scoped;
 }
 
 // A symbol loaded through the child's own composed loader already answers in
@@ -192,12 +210,17 @@ function scopeSymbol(symbol: ResumeSymbol, instancePath: string): ResumeSymbol {
 			getElementHandle: marklessInstanceScopedElementHandle(
 				context.getElementHandle,
 				instancePath,
+				context.graph,
 			),
 			...(context.read
 				? {
 						read: (graphNodeId: string, path?: ReadonlyArray<string>) =>
 							context.graph.read(
-								marklessComposedGraphNodeId(graphNodeId, instancePath),
+								marklessComposedGraphNodeId(
+									graphNodeId,
+									instancePath,
+									marklessGraphWidgetRegistry(context.graph),
+								),
 								path,
 							),
 					}
@@ -217,11 +240,15 @@ function scopeSymbol(symbol: ResumeSymbol, instancePath: string): ResumeSymbol {
  * handle is already one element per key, and a page-scoped `shared()` graph is
  * page space by design.
  */
-export function marklessWidgetHandleId(handleId: string, instancePath: string): string {
+export function marklessWidgetHandleId(
+	handleId: string,
+	instancePath: string,
+	registry: MarklessWidgetRegistry = marklessWidgetScope.active,
+): string {
 	if (!instancePath) return handleId;
 	const pageSpace = PAGE_SPACE_ID.exec(handleId);
 	if (!pageSpace || pageSpace[2] !== 'shared') return handleId;
-	return marklessComposedGraphNodeId(handleId, instancePath);
+	return marklessComposedGraphNodeId(handleId, instancePath, registry);
 }
 
 /**
@@ -238,6 +265,7 @@ export function marklessWidgetHandleId(handleId: string, instancePath: string): 
 export function marklessInstanceScopedElementHandle(
 	getElementHandle: ResumeSymbolContext['getElementHandle'],
 	instancePath: string,
+	graph?: RuntimeGraph,
 ): ResumeSymbolContext['getElementHandle'] {
 	// Several context builders cast an object literal into the symbol context, so
 	// a context that never carried a handle reader reaches here as undefined.
@@ -246,7 +274,11 @@ export function marklessInstanceScopedElementHandle(
 		// Resolved per read, not per symbol: the widget registry is filled by the
 		// scoped graph this same context builds, so the answer exists only once the
 		// symbol body runs.
-		const scoped = marklessWidgetHandleId(handleIdOrName, instancePath);
+		const scoped = marklessWidgetHandleId(
+			handleIdOrName,
+			instancePath,
+			graph ? marklessGraphWidgetRegistry(graph) : marklessWidgetScope.active,
+		);
 		return (
 			(scoped === handleIdOrName ? undefined : getElementHandle(scoped)) ??
 			getElementHandle(handleIdOrName)
@@ -275,16 +307,14 @@ export function marklessInstanceScopedGraph(
 	if (!instancePath) return graph;
 	// Resume loads a widget piece's symbol by its instance path alone; the widget
 	// roots it must map onto are the qualified definition ids the payload carries,
-	// along with the projection sites composition registered them under.
-	for (const definition of graph.listSharedDefinitions?.() ?? [])
-		if (definition.scope === 'widget') {
-			const rootPath = marklessInstancePath(definition.id);
-			marklessNoteWidgetRoot(marklessWidgetScope.active, definition.id, rootPath);
-			for (const projectionId of definition.projectionIds ?? [])
-				marklessNoteWidgetRoot(marklessWidgetScope.active, projectionId, rootPath);
-		}
+	// along with the projection sites composition registered them under. Re-read
+	// per adapter, not once per registry: a settled arm can add definitions after
+	// this graph's registry was first asked for.
+	const registry = marklessGraphWidgetRegistry(graph);
+	marklessNoteGraphWidgetRoots(registry, graph);
 	// Page-space families (shared, storage) keep their page ids through every adapter.
-	const qualify = (graphNodeId: string) => marklessComposedGraphNodeId(graphNodeId, instancePath);
+	const qualify = (graphNodeId: string) =>
+		marklessComposedGraphNodeId(graphNodeId, instancePath, registry);
 	return {
 		...graph,
 		marklessPageGraph: (graph as MarklessScopedGraph).marklessPageGraph ?? graph,
@@ -331,28 +361,90 @@ export type MarklessWidgetRegistry = {
 };
 
 /**
- * The browser's registry: one page, one graph, one set of rendered widgets, and
- * no composition in sight - resume fills it from the payload it was served.
+ * One registry per RUNTIME GRAPH, and a graph is one rendered page.
  *
- * A server is the opposite: many renders are in flight at once and they all
- * spell their roots against the same RELATIVE instance paths, because a path is
- * relative to the level that composed it and every page is built from the same
- * modules. So composition works against a registry of its own - minted and
- * threaded in composition.ts, which the browser's own chunk does not carry -
- * and this one keeps answering the readers that ask outside a compose.
+ * A widget root path is only ever an answer about the container that rendered
+ * it, so a realm-wide map is a category error: two Markless roots on one page
+ * each render their own widgets, and a torn-down container's roots must not
+ * answer for the render that replaces it. Filing the registry against the graph
+ * makes both true by construction - the entries die with the graph, and a
+ * lookup can only reach the rendered widgets of the graph it was asked about.
+ *
+ * The key is the PAGE graph, recovered through `marklessPageGraph`, because
+ * every scope adapter below hands its symbol a fresh wrapper object over the
+ * same page graph and all of them must reach the same answer.
  */
-const pageRegistry: MarklessWidgetRegistry = { rootPaths: new Map(), rowRooted: new Set() };
+const graphRegistries = new WeakMap<object, MarklessWidgetRegistry>();
+
+// Nothing writes to this one. It is the answer for a lookup with no graph in
+// hand and no compose running: no rendered widget, so no id belongs to one.
+const NO_WIDGETS: MarklessWidgetRegistry = { rootPaths: new Map(), rowRooted: new Set() };
 
 /**
- * Which registry the lookups below read, and the page's own.
+ * Which registry the lookups below read when the CALLER names no graph.
  *
- * `active` is `page` except inside a compose, where composition.ts swaps in the
- * render's registry and swaps it back. It is a field rather than a scope
- * function because only a server ever composes twice at once: keeping the swap
- * (and the registration that writes through to `page`) in composition.ts is what
- * keeps it out of the chunk the browser downloads.
+ * Two readers cannot name one. Inside a compose there is no graph yet, so
+ * composition.ts swaps this to the render's own registry and swaps it back.
+ * And the generated symbol-resolver module's bound-symbol adapter holds the
+ * dispatching graph in a closure it never passes on, so it reaches this field
+ * instead - which is why every entry point that DOES hold a graph points this
+ * at that graph's registry before running anything (`marklessScopeWidgetsTo`).
+ *
+ * `composing` is what keeps a dispatch from stealing the field out from under a
+ * compose. Only a server ever composes and dispatches at once.
  */
-export const marklessWidgetScope = { active: pageRegistry, page: pageRegistry };
+export const marklessWidgetScope = { active: NO_WIDGETS, composing: false };
+
+/**
+ * Points the graph-less readers at the registry of the graph now being read.
+ *
+ * A dispatch is not synchronous, so this is a pointer re-aimed per entry rather
+ * than a scope that unwinds: the next entry re-aims it, and a torn-down
+ * container's registry is never re-aimed at again. Two containers dispatching
+ * async bodies that interleave their writes are the one case it cannot separate
+ * - the readers that hold a graph are exact regardless.
+ */
+function marklessScopeWidgetsTo(registry: MarklessWidgetRegistry): MarklessWidgetRegistry {
+	if (!marklessWidgetScope.composing) marklessWidgetScope.active = registry;
+	return registry;
+}
+
+function marklessRegistryHolder(graph: RuntimeGraph): object {
+	return (graph as MarklessScopedGraph).marklessPageGraph ?? graph;
+}
+
+/**
+ * This graph's rendered widgets, minted on first ask and filled from the graph
+ * itself: the payload's widget-scoped definitions carry their qualified root ids
+ * and the projection sites composition registered them under, which is every
+ * answer a lookup needs and the only place resume has ever read them from.
+ */
+export function marklessGraphWidgetRegistry(graph?: RuntimeGraph): MarklessWidgetRegistry {
+	if (!graph) return marklessWidgetScope.active;
+	const holder = marklessRegistryHolder(graph);
+	const held = graphRegistries.get(holder);
+	if (held) return marklessScopeWidgetsTo(held);
+	const registry: MarklessWidgetRegistry = { rootPaths: new Map(), rowRooted: new Set() };
+	graphRegistries.set(holder, registry);
+	marklessNoteGraphWidgetRoots(registry, graph);
+	return marklessScopeWidgetsTo(registry);
+}
+
+// Every scope adapter hands its symbol a fresh wrapper over the same page graph,
+// and all of them must reach the one registry that page's widgets are filed in.
+function marklessShareWidgetRegistry(graph: object, registry: MarklessWidgetRegistry): void {
+	graphRegistries.set(graph, registry);
+}
+
+function marklessNoteGraphWidgetRoots(registry: MarklessWidgetRegistry, graph: RuntimeGraph): void {
+	for (const definition of graph.listSharedDefinitions?.() ?? [])
+		if (definition.scope === 'widget') {
+			const rootPath = marklessInstancePath(definition.id);
+			marklessNoteWidgetRoot(registry, definition.id, rootPath);
+			for (const projectionId of definition.projectionIds ?? [])
+				marklessNoteWidgetRoot(registry, projectionId, rootPath);
+		}
+}
 
 export function marklessNoteWidgetRoot(
 	registry: MarklessWidgetRegistry,
@@ -366,8 +458,12 @@ export function marklessNoteWidgetRoot(
 
 // The widget this child-local `shared:` id belongs to: the answer registered for
 // the longest prefix of the reading instance's path.
-function marklessWidgetRootPath(graphNodeId: string, instancePath: string): string {
-	return widgetRootPathFor(graphNodeId, instancePath) ?? '';
+function marklessWidgetRootPath(
+	graphNodeId: string,
+	instancePath: string,
+	registry: MarklessWidgetRegistry,
+): string {
+	return widgetRootPathFor(graphNodeId, instancePath, registry) ?? '';
 }
 
 /**
@@ -381,12 +477,16 @@ function marklessWidgetRootPath(graphNodeId: string, instancePath: string): stri
  * per-row root always wins over the row-free reading; only a path no rendered
  * row answers is asked again with its rows dropped.
  */
-function marklessWidgetRootPathThroughRows(graphNodeId: string, instancePath: string): string {
-	const withRows = widgetRootPathFor(graphNodeId, instancePath);
+function marklessWidgetRootPathThroughRows(
+	graphNodeId: string,
+	instancePath: string,
+	registry: MarklessWidgetRegistry,
+): string {
+	const withRows = widgetRootPathFor(graphNodeId, instancePath, registry);
 	if (withRows !== undefined) return withRows;
 	const rowFree = instancePath.replace(ROW_SEGMENT, '');
 	if (rowFree === instancePath) return '';
-	return widgetRootPathFor(graphNodeId, rowFree) ?? '';
+	return widgetRootPathFor(graphNodeId, rowFree, registry) ?? '';
 }
 
 /**
@@ -413,8 +513,12 @@ function marklessWidgetRootPathThroughRows(graphNodeId: string, instancePath: st
  * really did root: an id belonging to no widget at all - a page-scoped
  * `shared()` graph, a storage slot - is page space and stays exactly as spelled.
  */
-function marklessUnresolvedWidgetGraphNodeId(graphNodeId: string, instancePath: string): string {
-	const rowRootedDefinitions = marklessWidgetScope.active.rowRooted;
+function marklessUnresolvedWidgetGraphNodeId(
+	graphNodeId: string,
+	instancePath: string,
+	registry: MarklessWidgetRegistry,
+): string {
+	const rowRootedDefinitions = registry.rowRooted;
 	if (instancePath.includes('r:') || rowRootedDefinitions.size === 0) return graphNodeId;
 	const slash = graphNodeId.lastIndexOf('/');
 	const rowRooted =
@@ -425,8 +529,12 @@ function marklessUnresolvedWidgetGraphNodeId(graphNodeId: string, instancePath: 
 
 // `undefined` is "no widget claims this id from here", which is not the same
 // answer as a widget whose root is the page itself.
-function widgetRootPathFor(graphNodeId: string, instancePath: string): string | undefined {
-	const widgetRootPaths = marklessWidgetScope.active.rootPaths;
+function widgetRootPathFor(
+	graphNodeId: string,
+	instancePath: string,
+	registry: MarklessWidgetRegistry,
+): string | undefined {
+	const widgetRootPaths = registry.rootPaths;
 	if (widgetRootPaths.size === 0) return undefined;
 	// The id is either a definition id (`shared:<file>#<export>`) or one of its
 	// nodes (`<definitionId>/<kind>:<name>`). The definition id carries the module
@@ -448,7 +556,11 @@ function widgetRootPathFor(graphNodeId: string, instancePath: string): string | 
 // graph and a persisted storage slot are page-space on purpose. The compiler
 // refuses at build time to emit an id belonging to neither, so this stays a
 // concatenation.
-export function marklessComposedGraphNodeId(graphNodeId: string, instancePath: string): string {
+export function marklessComposedGraphNodeId(
+	graphNodeId: string,
+	instancePath: string,
+	registry: MarklessWidgetRegistry = marklessWidgetScope.active,
+): string {
 	if (!instancePath) return graphNodeId;
 	const pageSpace = PAGE_SPACE_ID.exec(graphNodeId);
 	if (!pageSpace) return instancePath + graphNodeId;
@@ -456,9 +568,9 @@ export function marklessComposedGraphNodeId(graphNodeId: string, instancePath: s
 	// Only a widget lookup writes a prefix onto a `shared:` id, so a prefixed one
 	// names a widget root: composing it AGAIN is another rendered widget.
 	if (pageSpace[1]) return instancePath + graphNodeId;
-	const rootPath = marklessWidgetRootPathThroughRows(graphNodeId, instancePath);
+	const rootPath = marklessWidgetRootPathThroughRows(graphNodeId, instancePath, registry);
 	if (rootPath) return rootPath + graphNodeId;
-	return marklessUnresolvedWidgetGraphNodeId(graphNodeId, instancePath);
+	return marklessUnresolvedWidgetGraphNodeId(graphNodeId, instancePath, registry);
 }
 
 // Composed child-owned boundaries load their update symbol through the
@@ -473,6 +585,7 @@ export function marklessComposedGraphNodeId(graphNodeId: string, instancePath: s
 function composedBoundaryArmRecords(
 	boundaryId: string,
 	set: ResumeArmRecordSet,
+	graph?: RuntimeGraph,
 ): ResumeArmRecordSet {
 	const exhaustive = {
 		locators: true,
@@ -488,18 +601,26 @@ function composedBoundaryArmRecords(
 	if (!prefix) return set;
 	// Host/symbol ids take the whole prefix; graph ids only its instance-path part.
 	const instancePath = marklessInstancePath(prefix);
+	const registry = marklessGraphWidgetRegistry(graph);
 	const prefixHost = <T extends { readonly hostNodeId: string }>(record: T): T => ({
 		...record,
 		hostNodeId: prefix + record.hostNodeId,
 	});
 	const qualifyRead = <T extends { readonly graphNodeId: string }>(read: T): T => ({
 		...read,
-		graphNodeId: marklessComposedGraphNodeId(read.graphNodeId, instancePath),
+		graphNodeId: marklessComposedGraphNodeId(read.graphNodeId, instancePath, registry),
 	});
 	// Arm-scoped branch records ride the protocol's untyped record bag.
 	const qualifyLooseRead = (record: Record<string, unknown>): Record<string, unknown> =>
 		typeof record.graphNodeId === 'string'
-			? { ...record, graphNodeId: marklessComposedGraphNodeId(record.graphNodeId, instancePath) }
+			? {
+					...record,
+					graphNodeId: marklessComposedGraphNodeId(
+						record.graphNodeId,
+						instancePath,
+						registry,
+					),
+				}
 			: record;
 	return {
 		locators: set.locators.map(prefixHost),
@@ -520,7 +641,7 @@ function composedBoundaryArmRecords(
 		})),
 		elementHandles: set.elementHandles.map((handle) => ({
 			...prefixHost(handle),
-			handleId: marklessWidgetHandleId(handle.handleId, instancePath),
+			handleId: marklessWidgetHandleId(handle.handleId, instancePath, registry),
 		})),
 		keyedRepeats: set.keyedRepeats?.map((repeat) => ({
 			...repeat,
@@ -531,6 +652,7 @@ function composedBoundaryArmRecords(
 						collectionGraphNodeId: marklessComposedGraphNodeId(
 							repeat.collectionGraphNodeId,
 							instancePath,
+							registry,
 						),
 					}
 				: {}),

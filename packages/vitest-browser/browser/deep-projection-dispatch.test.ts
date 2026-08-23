@@ -50,14 +50,14 @@ test('SSR resume: the same deep click record runs', async () => {
 });
 
 /**
- * Defect 72, seated. Pinned `test.fails` until the fix lands.
+ * Defect 72, fixed. This row is the regression fence.
  *
- * `pageRegistry` in packages/web/src/fns/instance-scope.ts is a module-level
- * singleton — one Map for the whole JS realm — that every render writes widget
- * root paths into and that nothing ever clears. Tearing a container down leaves
- * its entries behind.
+ * `pageRegistry` in packages/web/src/fns/instance-scope.ts used to be a
+ * module-level singleton — one Map for the whole JS realm — that every render
+ * wrote widget root paths into and that nothing ever cleared. Tearing a
+ * container down left its entries behind.
  *
- * Measured at the moment this row fails, the map holds:
+ * Measured at the moment this row failed, the map held:
  *
  *   c0:p2:p3:p4:<defId>  =>  c0:p2:p3:p4:   <- stale, from the torn-down nested render
  *   c0:<defId>           =>  c0:            <- this page's widget A, the correct answer
@@ -84,10 +84,11 @@ test('SSR resume: the same deep click record runs', async () => {
  * - A consumer's own button in the same surface still works. It is not a
  *   widget-scoped part, so it never asks this registry at all.
  *
- * The fix is a scoping decision this unit was not authorised to make: the
- * registry has to stop being one process-global Map shared by every container.
+ * The fix: one registry per RuntimeGraph, held in a WeakMap and filled from the
+ * graph's own widget-scoped definitions. A torn-down container's graph is the
+ * only thing its roots were ever filed against, so it strands no keys.
  */
-test.fails('CSR: an earlier nested render leaves the flat page deep close working', async () => {
+test('CSR: an earlier nested render leaves the flat page deep close working', async () => {
 	await render(NestedPage);
 	cleanup();
 
