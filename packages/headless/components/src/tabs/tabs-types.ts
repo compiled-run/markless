@@ -48,10 +48,6 @@ export type TabsContentProps = PropsOf<'div'> & {
 };
 
 /**
- * The shared instance every tabs part reads and writes: the root's seeded
- * fields, plus the consumer's `onChange`, stored by the root for `show()`.
- */
-/**
  * One instance per rendered `tabs.trigger` and per rendered `tabs.content`,
  * holding that part's own `value`. The parts test the root's showing value
  * against this cell rather than against their prop, because a comparison with a
@@ -59,6 +55,10 @@ export type TabsContentProps = PropsOf<'div'> & {
  */
 export type TabsPartInstanceState = Seeded<TabsTriggerProps, 'value'>;
 
+/**
+ * The shared instance every tabs part reads and writes: the root's seeded
+ * fields, plus the consumer's `onChange`, stored by the root for `show()`.
+ */
 export type TabsInstanceState = Seeded<
 	TabsRootProps,
 	'value' | 'orientation' | 'loop' | 'selectOnFocus'

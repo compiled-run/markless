@@ -136,10 +136,63 @@ Everything below is measured on this tip, not assumed.
 
 ## Navigation
 
-DOM order is the navigation order, so no registry holds it:
+DOM order is the navigation order:
 `closest('[role="tablist"]').querySelectorAll('[role="tab"]')` from the event's
 own target, filtered to the enabled buttons. Home and End are absolute moves in
 the same walk. Looping is the root's `loop`, default `false` as in QDS.
+
+This is the shape the owner's 2026-08-24 no-DOM-selectors order bans, and it is
+still here because the replacement is not expressible on this tip. What was
+measured, and what the framework would have to grow, is the section below.
+
+## Why the roving walk still traverses the DOM
+
+Two independent capabilities are missing. Either one alone blocks the rework;
+both were measured on this tip (commit c4edc6d9) by building the replacement and
+running this suite, not inferred.
+
+**1. An `element()` handle does not resolve inside a lazy event handler.**
+`specs/framework/04-events-symbols-behaviors.md` documents the supported shape —
+`<input el={input} />` beside `onClick={() => input?.focus()}` — and
+`07-diagnostics.md:68` repeats it ("Use element() plus el={...}, then read the
+element handle inside the handler"). Written on the trigger, with the handle
+declared in the component body and bound `el={here}` on the very button the
+handler sits on, `here` reads `undefined` inside that button's own `onKeydown`.
+Measured in **both** modes: CSR and after SSR resume. The same read through a
+shared instance (`tab.el`, the handle declared in the `tabsPartState` factory and
+returned from it, which `03-state-graph.md:712` sanctions) is `undefined` in CSR
+too. otp measured the shared-instance form undefined after resume (otp/note.md);
+this extends it to the component-local form and to CSR. With no resolvable
+handle, `event.target` is the only node a handler can reach, and a walk to a
+sibling has nowhere to go but the DOM.
+
+**2. A widget root cannot collect an ordered registry of its parts.** Even given
+handles, the walk needs the enabled tabs in authored order, which only the set of
+rendered triggers knows. Both spellings fail:
+
+- a part body writing into the root's instance
+  (`tabs.walk = [...tabs.walk, value]`) is refused at compile time with
+  `MARKLESS_SHARED_SEED_UNSUPPORTED`: "a component body seeds a shared instance
+  only from its own props or from constants";
+- the same write routed through a parameterised method on the root instance
+  (`tabs.enlist(tab)`, with `enlist` pushing onto a cell in the factory)
+  **compiles clean and silently does nothing**. The cell is reachable from the
+  handler — it reads as an `object` — and it is empty. Measured with an array of
+  part instances, with an array of plain strings, and with a scalar string
+  accumulator: all three arrive at the handler empty. No diagnostic is emitted
+  for the no-op, which is itself a fail-closed gap.
+
+QDS reaches the same registry through a Qwik context array its items push into at
+render; that is the mechanism markless has no equivalent for. The capability the
+owner's order points at ("a roving walk over a collection of items") is therefore
+two requests: a handle that resolves in a lazy handler, and a per-widget ordered
+part registry — or the chartered per-part ordinal, which would answer the second
+by giving each trigger its position and the root its count.
+
+`attach` is not a third route: a behavior's inputs may not carry DOM nodes, and
+`04-events-symbols-behaviors.md:113` states that resume startup records behavior
+metadata without running the behavior code, so a registry built that way is not
+populated before the first arrow key.
 
 Unlike a radio group, an arrow key moves focus only. Whether focus also shows
 the tab is `selectOnFocus`'s call, made once in the trigger's `onFocus` and
