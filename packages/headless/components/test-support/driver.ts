@@ -40,8 +40,17 @@ export type Vocabulary = {
 	readonly progressbar: string;
 	/** A single- or multi-line text entry field. */
 	readonly textbox: string;
+	/** The landmark a set of navigation controls is presented in - `<nav>`. */
+	readonly navigation: string;
+	readonly link: string;
+	/** A named container a person can jump to - `role="region"`. */
+	readonly region: string;
+	/** A single graphic that is one object in the tree - `role="img"`. */
+	readonly image: string;
 	/** The state a chosen tab is in - `aria-selected="true"`. */
 	readonly selected: string;
+	/** The page you are on inside a set of page controls - `aria-current="page"`. */
+	readonly currentPage: string;
 	/** A disclosure trigger whose panel is showing - `aria-expanded="true"`. */
 	readonly expanded: string;
 	/** A disclosure trigger whose panel is hidden - `aria-expanded="false"`. */
