@@ -60,7 +60,10 @@ landed recursion fixture passes `depth`.
 ## What the compiler forced — measured on this tip
 
 1. **A handler on the element that ROOTS a widget instance cannot read that
-   instance.** `tree.root`'s own `onFocusin` and `onKeydown` throw
+   instance.** STALE — re-measured 2026-08-23 and it no longer holds; see
+   "Re-measured 2026-08-23" below. What follows describes the code as it still
+   stands, not a limit that is still there. `tree.root`'s own `onFocusin` and
+   `onKeydown` threw
    `ReferenceError: tree is not defined` out of the lowered symbol on the first
    event. Both handlers are therefore written against the DOM alone, and the two
    pieces of state they maintain live on the container element rather than in
@@ -85,6 +88,56 @@ landed recursion fixture passes `depth`.
    child selector for exactly this reason.
 4. **`tree.itemcontent` reads a `computed()`, not the comparison inline.** The
    inline read renders the group closed and never refreshes at the first level.
+
+## Re-measured 2026-08-23 (U202, at `c4edc6d9`)
+
+The owner's "no DOM selectors" order sent this family back for a rework. Two
+facts were measured with throwaway probe scenarios before any code was touched,
+and they decide what the rework can and cannot do. The probes were deleted; the
+shipped code in this folder is UNCHANGED and still walks the DOM.
+
+**The rooting-element limit has LIFTED.** A handler written on the element that
+roots a widget instance now reads and writes that instance, and calls its shared
+methods. Probe: a component rooting a `widget`-scoped instance, with
+`onKeydown={() => { probe.hits = probe.hits + 1 }}` on its own root element, and
+a sibling part rendering `probe.hits`. One keystroke rendered `1`. Calling a
+shared method from the same handler also ran. So "What the compiler forced" item
+1 above is no longer true, and `tree.root`'s handlers may read `treeState()`.
+
+**Registering items into the enclosing instance is still not expressible**, and
+that is what the keyboard walk actually needs — an ordered collection of the
+tree's rows, each with a focusable element reference. Three routes, all closed,
+all measured:
+
+1. A plain (non-`state()`) array field on the shared instance:
+   `MARKLESS_SHARED_SEED_UNKNOWN_FIELD` — "Instance callback fields such as
+   `rows` are not supported yet (tracked)".
+2. Accumulating into a `state()` array from a component body
+   (`tree.rows = tree.rows.concat([...])`): `MARKLESS_SHARED_SEED_UNSUPPORTED` —
+   "a component body seeds a shared instance only from its own props or from
+   constants". Reading the enclosing instance is neither.
+3. Calling a shared method on the enclosing instance from a component body
+   (`tree.register(name)`): compiles clean and **silently does nothing**. In one
+   probe two item bodies called it and the rendered value stayed empty, while the
+   same method called from a handler on the same run appended as written. This is
+   the closest miss of the three: the syntax is accepted, only the body-time
+   execution is missing.
+
+Without registration there is no ordered row collection, so `ArrowDown`/`ArrowUp`
+/`Home`/`End`, the descend and ascend steps, the roving tab stop and the
+typeahead scan cannot be re-expressed through primitives. `tree.item`'s own
+toggling (`ArrowRight` to open, `ArrowLeft` to close, `Enter`/`Space`) no longer
+needs the DOM at all now that limit 1 has lifted — it is only focus MOVEMENT that
+is stuck.
+
+The capability to raise: **ordered item registration into an ancestor widget
+instance** — a descendant widget or part appending its `element()` handle, and
+the per-item facts a walk reads, to a collection field on an enclosing widget's
+shared instance, readable and indexable from any handler inside that widget. It
+is the mechanism QDS spells as its ref-array registration and
+`base/src/helpers/item-registry.ts` (see `notes/T012-design-system-from-code.md`
+§2). Making route 3 execute at body time would be the smallest change that
+unlocks it.
 
 ## Open/closed is `hidden`, never an arm
 
