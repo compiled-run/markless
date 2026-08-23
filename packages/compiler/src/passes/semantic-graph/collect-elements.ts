@@ -30,6 +30,7 @@ import {
 import { collectComponentEdge } from './collect-components.ts';
 import {
 	collectCompositeTemplateExpression,
+	type CompositeReadOptions,
 	joinReadSources,
 	mintTemplateExpressionComputed,
 	pureCompositeReadSources,
@@ -75,6 +76,23 @@ import type {
 	SemanticGraphWalk,
 	WalkState,
 } from './types.ts';
+
+/**
+ * What every template position - attribute value, conditional class test, text -
+ * counts as part of a read.
+ *
+ * `unaryOperators` is on: `ui-tall={!board.wide}` rendered once and never moved,
+ * because the gate listed conditionals, binaries, logicals and template literals
+ * and left the unary out, so the read resolved to no graph node and the update
+ * record was dropped. The reads under the operator are already decomposed exactly
+ * as `board.wide === false` decomposes them.
+ *
+ * `methodCalls` stays off: nothing in a template is unexpressible without it, and
+ * a computed minted for every `.format()` and `.toFixed()` in a page's text is
+ * bytes with no behavior behind them. Widening it is its own change with its own
+ * byte measurement.
+ */
+const TEMPLATE_READ_OPTIONS: CompositeReadOptions = { unaryOperators: true };
 
 export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGraphWalk): void {
 	collectComponentEdge(node, state, walk);
@@ -132,7 +150,7 @@ export function collectTemplateExpression(node: AnyNode, state: WalkState): void
 
 	const expression = node.expression as AnyNode | undefined;
 	if (!expression) return;
-	const composite = collectCompositeTemplateExpression(expression, state);
+	const composite = collectCompositeTemplateExpression(expression, state, TEMPLATE_READ_OPTIONS);
 
 	state.graph.templateReads.push({
 		hostNodeId: state.currentHostNodeId,
@@ -600,7 +618,11 @@ function collectAttribute(
 	if (conditionalClass) {
 		// A test that is not a plain graph read resolves to no graph node later, so
 		// without this computed the whole record is dropped and the class never moves.
-		const composite = collectCompositeTemplateExpression(conditionalClass.test, state);
+		const composite = collectCompositeTemplateExpression(
+			conditionalClass.test,
+			state,
+			TEMPLATE_READ_OPTIONS,
+		);
 		state.graph.templateReads.push({
 			hostNodeId,
 			source: expressionSource(conditionalClass.test, state.source),
@@ -657,6 +679,7 @@ function collectAttribute(
 		}
 		// A recombined value resolves to no graph node, so without this nothing subscribes it.
 		const composite = collectCompositeTemplateExpression(expressionValue, state, {
+			...TEMPLATE_READ_OPTIONS,
 			requireWritableRead: true,
 		});
 		state.graph.templateReads.push({
