@@ -463,8 +463,7 @@ function collectDispatchPath(
 			const eventRecord = eventRecords.get(current)?.get(eventName);
 			if (eventRecord) path.push({ element: current, eventRecord });
 		}
-		if (!bubbles) break;
-		current = current.parentElement;
+		current = bubbles ? current.parentElement : null;
 	}
 	return path;
 }

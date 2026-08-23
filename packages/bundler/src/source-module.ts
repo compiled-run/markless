@@ -251,6 +251,7 @@ export function emitSourceModule(input: {
 	readonly directCsr?: boolean;
 	/** Whether the app's serialized state defines computed nodes. */
 	readonly hasComputedState?: boolean;
+	readonly hasOverlayMarks?: boolean;
 }) {
 	if (input.directCsr && input.prerenderRecords) input = { ...input, prerenderRecords: false };
 	const symbolsOnly = input.environment === 'client' && input.clientOutput === 'symbols-only';
@@ -299,6 +300,12 @@ export function emitSourceModule(input: {
 					"import { installMarklessDerivedReconcile } from '@markless/web/fns/reconcile-plane';",
 					'installMarklessDerivedReconcile();',
 				].join('\n')
+			: null,
+		// Same split for elevation, and for the same reason: a CSR mount reaches the
+		// runtime's start without ever loading a resume module, so a marked CSR app
+		// has to name the behaviour here or it would never install.
+		input.environment === 'client' && input.hasOverlayMarks === true
+			? emitOverlayLoaderInstall()
 			: null,
 		'',
 		emitLoadSymbol(input),
@@ -427,6 +434,34 @@ function payloadHasComputed(payloadState: unknown): boolean {
 	return Array.isArray(computed) && computed.length > 0;
 }
 
+/**
+ * The one line that makes elevation cost nothing until it is used.
+ *
+ * Writing the `import()` specifier HERE rather than in the runtime is the whole
+ * mechanism: a module every app loads cannot name the behaviour without making
+ * every app ship its chunk. The handoff is a global rather than a slot module
+ * for the same reason - a slot module is bytes every app pays for a capability
+ * most of them do not have. Nothing is fetched until the runtime calls it.
+ */
+function emitOverlayLoaderInstall(): string {
+	return [
+		'globalThis.__marklessOverlay = (root) =>',
+		"\troot.querySelector('[overlay]')",
+		"\t\t? import('@markless/web/fns/overlay').then((m) => m.installOverlayBehavior(root))",
+		'\t\t: undefined;',
+	].join('\n');
+}
+
+/** True when the compiler recorded an `overlay` mark for this module. */
+function demandsOverlay(runtimeDemandMap: unknown): boolean {
+	const records = (
+		runtimeDemandMap as {
+			readonly payloadRecords?: ReadonlyArray<{ readonly kind?: string }>;
+		}
+	)?.payloadRecords;
+	return Array.isArray(records) && records.some((record) => record.kind === 'overlay');
+}
+
 export function emitResumeModule(input: {
 	readonly payloadId: string;
 	readonly resolverId: string;
@@ -509,6 +544,12 @@ export function emitResumeModule(input: {
 					'installMarklessDerivedReconcile();',
 				].join('\n')
 			: null,
+		// Elevation is pay-per-use the same way, but one step further: this module
+		// is the ONLY place the overlay behaviour's specifier is written, so an app
+		// the compiler recorded no `overlay` demand for never emits its chunk at
+		// all. The loader stays unresolved until a resumed root turns out to carry
+		// a marked element, so having the mark somewhere is still not fetching it.
+		demandsOverlay(input.runtimeDemandMap) ? emitOverlayLoaderInstall() : null,
 		scalarSpecializations.length > 0
 			? [
 					"import { marklessDecodeScalarCell, marklessReadScalarCell, marklessScalarSpecializedError } from '@markless/web/fns/scalar-specialized';",

@@ -103,6 +103,8 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Compiled app metadata omits server document fields from client output.',
 	"packages/bundler/src/source-module.ts :: input.environment === 'client' && input.directCsr === true && input.hasComputedState === true":
 		'A CSR mount builds its graph from client output that has no resume module, so the derived reconcile plane installs there instead of in the resume module.',
+	"packages/bundler/src/source-module.ts :: input.environment === 'client' && input.hasOverlayMarks === true":
+		'Same reason for elevation: a CSR mount reaches the runtime start without a resume module, and the overlay behaviour must be named by client output or its chunk is never emitted.',
 	"packages/bundler/src/transform.ts :: const linkedClientRenderData = input.environment === 'client' && !input.prerenderRecords;":
 		'Build-time source emission recursively links ordinary client render-data modules while prerender records use their separately resolved shape.',
 	"packages/bundler/src/transform.ts :: input.environment === 'server' ? await compilePrerenderInlineResumerSources() : undefined;":

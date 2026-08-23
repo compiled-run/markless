@@ -12,6 +12,8 @@ export default function OverlayPrimitivePage() @{
 	let menuDismissals = state(0);
 	let menuReason = state('none');
 	let isAlwaysShownDismissals = state(0);
+	let isBackdropOpen = state(false);
+	let backdropDismissals = state(0);
 
 	<section data-overlay-page>
 		<button
@@ -78,6 +80,36 @@ export default function OverlayPrimitivePage() @{
 				<button type="button" data-menu-item>Item</button>
 				<output data-menu-dismissals>{menuDismissals}</output>
 				<output data-menu-reason>{menuReason}</output>
+			</div>
+		</div>
+
+		<div data-backdrop-widget>
+			<button
+				type="button"
+				data-backdrop-trigger
+				onClick={() => {
+					isBackdropOpen = true;
+				}}
+			>Open backdrop modal</button>
+			<div
+				data-backdrop
+				overlay
+				hidden={isBackdropOpen !== true}
+				onDismiss={(event) => {
+					backdropDismissals = backdropDismissals + 1;
+					if (event.detail.reason === 'escape') isBackdropOpen = false;
+				}}
+			>
+				<div data-backdrop-content role="dialog" aria-modal="true">
+					<button
+						type="button"
+						data-backdrop-close
+						onClick={() => {
+							isBackdropOpen = false;
+						}}
+					>Close</button>
+					<output data-backdrop-dismissals>{backdropDismissals}</output>
+				</div>
 			</div>
 		</div>
 

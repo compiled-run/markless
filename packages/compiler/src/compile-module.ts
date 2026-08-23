@@ -333,6 +333,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 							inputs.protocolView as CompileTsrxModuleResult['protocolView'],
 						protocolState:
 							inputs.protocolState as CompileTsrxModuleResult['protocolState'],
+						overlays: (inputs.semanticGraph as SemanticGraphArtifact).overlays,
 					};
 					const runtimeDemandMaps = {
 						'plain-ssr': createRuntimeDemandMap(demandInput, 'plain-ssr'),

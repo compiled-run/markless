@@ -29,6 +29,7 @@
 
 /** The DOM spelling the compiler lowers the `overlay` mark to. */
 const OVERLAY_SELECTOR = '[overlay]';
+const MODAL_SELECTOR = '[aria-modal="true"]';
 const DISMISS_EVENT = 'dismiss';
 
 export type OverlayDismissReason = 'escape' | 'outside-press';
@@ -116,10 +117,14 @@ function enlist(element: HTMLElement, owner: Document): void {
 	const entry: OverlayEntry = { element, undo: [] };
 	stack.push(entry);
 
-	// Modality is derived, never configured: the family authored `aria-modal` on
-	// the element and this module reads it. Anything else - what closes, where
-	// focus lands - stays the family's own handler.
-	if (element.getAttribute('aria-modal') === 'true') {
+	// Modality is derived, never configured: the family authored `aria-modal` and
+	// this module reads it. The mark and `aria-modal` sit on different elements in
+	// the shape a modal actually needs - `<backdrop overlay><content role="dialog"
+	// aria-modal="true">` - because the backdrop is what elevates while the dialog
+	// role belongs to the content, so the test reads the enlisted element or its
+	// subtree. Anything else - what closes, where focus lands - stays the family's
+	// own handler.
+	if (element.matches?.(MODAL_SELECTOR) || element.querySelector(MODAL_SELECTOR)) {
 		entry.undo.push(hideBackground(element));
 		entry.undo.push(lockScroll(owner));
 	}

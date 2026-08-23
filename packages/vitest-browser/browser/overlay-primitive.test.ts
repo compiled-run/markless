@@ -74,6 +74,11 @@ function parts(container: ParentNode) {
 		menuReason: requireElement(container, '[data-menu-reason]'),
 		alwaysShown: requireElement<HTMLElement>(container, '[data-always-shown]'),
 		alwaysShownDismissals: requireElement(container, '[data-always-shown-dismissals]'),
+		backdropTrigger: requireElement<HTMLButtonElement>(container, '[data-backdrop-trigger]'),
+		backdrop: requireElement<HTMLElement>(container, '[data-backdrop]'),
+		backdropContent: requireElement<HTMLElement>(container, '[data-backdrop-content]'),
+		backdropClose: requireElement<HTMLButtonElement>(container, '[data-backdrop-close]'),
+		backdropDismissals: requireElement(container, '[data-backdrop-dismissals]'),
 	};
 }
 
@@ -310,6 +315,64 @@ async function expectDismissHandlerClosesThroughSharedState(container: ParentNod
 		.toEqual({ hidden: true, expanded: 'false', backgroundInert: false });
 }
 
+async function expectBackdropWrappedModalDerivesModality(container: ParentNode) {
+	// The enlisted element carries no aria-modal of its own; the content it wraps
+	// does. Modality has to follow the surface, not the attribute's exact host, or
+	// the one shape a modal actually needs would silently be non-modal.
+	const page = parts(container);
+	expect(page.backdrop.hasAttribute('overlay')).toBe(true);
+	expect(page.backdrop.hasAttribute('aria-modal')).toBe(false);
+	expect(page.backdropContent.getAttribute('aria-modal')).toBe('true');
+
+	page.backdropTrigger.click();
+	await expect
+		.poll(() => {
+			const now = parts(container);
+			return {
+				hidden: now.backdrop.hidden,
+				backgroundInert: now.background.hasAttribute('inert'),
+				overflow: document.body.style.overflow,
+			};
+		})
+		.toEqual({ hidden: false, backgroundInert: true, overflow: 'hidden' });
+
+	const open = parts(container);
+	expect(open.background.getAttribute('aria-hidden')).toBe('true');
+	// The chain down to the surface is not marked: the content inside the backdrop
+	// is what the user is meant to reach.
+	expect(open.backdropContent.hasAttribute('inert')).toBe(false);
+	expect(open.backdropClose.hasAttribute('inert')).toBe(false);
+
+	open.backdropClose.click();
+	await expect
+		.poll(() => {
+			const now = parts(container);
+			return {
+				hidden: now.backdrop.hidden,
+				backgroundInert: now.background.hasAttribute('inert'),
+				overflow: document.body.style.overflow,
+			};
+		})
+		.toEqual({ hidden: true, backgroundInert: false, overflow: '' });
+
+	// The same subtree test must not turn a plain disclosure modal: this menu holds
+	// no aria-modal anywhere inside it, so it still takes no document-wide mark.
+	parts(container).menuTrigger.click();
+	await expect
+		.poll(() => {
+			const now = parts(container);
+			return {
+				hidden: now.menuContent.hidden,
+				expanded: now.menuTrigger.getAttribute('aria-expanded'),
+			};
+		})
+		.toEqual({ hidden: false, expanded: 'true' });
+	await settle();
+	expect(parts(container).background.hasAttribute('inert')).toBe(false);
+	expect(parts(container).background.hasAttribute('aria-hidden')).toBe(false);
+	expect(document.body.style.overflow).toBe('');
+}
+
 function nestedParts(container: ParentNode) {
 	return {
 		outside: requireElement<HTMLButtonElement>(container, '[data-outside]'),
@@ -435,6 +498,16 @@ test('CSR: only the topmost enlisted element receives Escape', async () => {
 test('SSR resume: only the topmost enlisted element receives Escape', async () => {
 	const screen = await renderSSR(Page);
 	await expectTopmostOnlyReceivesEscape(screen.container);
+});
+
+test('CSR: a backdrop-wrapped modal derives modality from the content it wraps', async () => {
+	const screen = await render(Page);
+	await expectBackdropWrappedModalDerivesModality(screen.container as HTMLElement);
+});
+
+test('SSR resume: a backdrop-wrapped modal derives modality from the content it wraps', async () => {
+	const screen = await renderSSR(Page);
+	await expectBackdropWrappedModalDerivesModality(screen.container);
 });
 
 test('CSR: a marked element shown at first render never enlists', async () => {
