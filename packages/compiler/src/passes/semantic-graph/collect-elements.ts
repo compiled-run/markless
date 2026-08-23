@@ -28,6 +28,7 @@ import {
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
 import { collectComponentEdge } from './collect-components.ts';
+import { overlayLiteralValue } from './overlay-attribute.ts';
 import {
 	collectCompositeTemplateExpression,
 	type CompositeReadOptions,
@@ -1221,16 +1222,6 @@ function singleStaticTextChild(node: AnyNode): string | null {
 // The whole value grammar for overlay: bare (true), {true}, {false}. Anything
 // else - identifier, member access, call, template, non-boolean literal - is a
 // null return, which the caller turns into MARKLESS_OVERLAY_VALUE_UNSUPPORTED.
-function overlayLiteralValue(
-	value: AnyNode | undefined,
-	expression: AnyNode | undefined,
-): boolean | null {
-	if (!value) return true;
-	const literal = expression ?? value;
-	if (literal.type === 'Literal' && typeof literal.value === 'boolean') return literal.value;
-	return null;
-}
-
 // No overlay case here on purpose: bare `overlay` already keys as
 // ["overlay","true"] via the !value branch, and overlay={true} keys identically
 // via the expression branch, so @if arm merging already treats the two spellings

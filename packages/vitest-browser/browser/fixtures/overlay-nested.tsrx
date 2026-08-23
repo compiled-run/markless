@@ -1,39 +1,24 @@
-import { element, shared, state } from '@markless/core';
-import { closeOverlay, openOverlay } from '@markless/web/fns/overlay';
+import { shared, state } from '@markless/core';
 
 // Two families in one module so the page can put the inner surface inside the
-// outer one. This is the shape a real family takes: the element() handles live
-// on the shared instance and the methods hand them to the primitive.
-//
-// Handle names are unique per module, not per shared definition, so the inner
-// family cannot reuse the outer family's names.
+// outer one. This is the shape a real family takes on the attribute surface:
+// shared state decides shown-ness, `overlay` marks the surface, and `onDismiss`
+// is where the family writes its own policy. No handles, no imports.
 //
 // The page that arranges these lives in ./overlay-nested-page.tsrx. It has to be
 // a separate module: a default-export page declared alongside the components it
 // composes renders only the first component and drops the rest of the tree.
 export const outer = shared(
 	() => {
-		const s = state({ open: false });
-		const outerContentEl = element<HTMLDivElement>();
-		const outerTriggerEl = element<HTMLButtonElement>();
+		const s = state({ isOpen: false });
 
 		return {
 			...s,
-			outerContentEl,
-			outerTriggerEl,
 			show() {
-				s.open = true;
-				openOverlay(outerContentEl, {
-					kind: 'modal',
-					trigger: outerTriggerEl,
-					onDismiss: () => {
-						s.open = false;
-					},
-				});
+				s.isOpen = true;
 			},
 			hide() {
-				s.open = false;
-				closeOverlay(outerContentEl);
+				s.isOpen = false;
 			},
 		};
 	},
@@ -42,27 +27,15 @@ export const outer = shared(
 
 export const inner = shared(
 	() => {
-		const s = state({ open: false });
-		const innerContentEl = element<HTMLDivElement>();
-		const innerTriggerEl = element<HTMLButtonElement>();
+		const s = state({ isOpen: false });
 
 		return {
 			...s,
-			innerContentEl,
-			innerTriggerEl,
 			show() {
-				s.open = true;
-				openOverlay(innerContentEl, {
-					kind: 'modal',
-					trigger: innerTriggerEl,
-					onDismiss: () => {
-						s.open = false;
-					},
-				});
+				s.isOpen = true;
 			},
 			hide() {
-				s.open = false;
-				closeOverlay(innerContentEl);
+				s.isOpen = false;
 			},
 		};
 	},
@@ -72,13 +45,13 @@ export const inner = shared(
 export function OuterRoot({ children }) @{
 	const a = outer();
 
-	<div data-outer-root ui-open={a.open}>{children}</div>
+	<div data-outer-root ui-open={a.isOpen}>{children}</div>
 }
 
 export function OuterTrigger() @{
 	const a = outer();
 
-	<button type="button" data-outer-trigger el={a.outerTriggerEl} onClick={() => a.show()}>Open A</button>
+	<button type="button" data-outer-trigger onClick={() => a.show()}>Open A</button>
 }
 
 export function OuterContent({ children }) @{
@@ -86,10 +59,12 @@ export function OuterContent({ children }) @{
 
 	<div
 		data-outer-content
-		el={a.outerContentEl}
+		overlay
 		role="dialog"
-		hidden={a.open !== true}
-		ui-open={a.open}
+		aria-modal="true"
+		hidden={a.isOpen !== true}
+		ui-open={a.isOpen}
+		onDismiss={() => a.hide()}
 	>
 		<button type="button" data-outer-close onClick={() => a.hide()}>Close A</button>
 		{children}
@@ -99,13 +74,13 @@ export function OuterContent({ children }) @{
 export function InnerRoot({ children }) @{
 	const b = inner();
 
-	<div data-inner-root ui-open={b.open}>{children}</div>
+	<div data-inner-root ui-open={b.isOpen}>{children}</div>
 }
 
 export function InnerTrigger() @{
 	const b = inner();
 
-	<button type="button" data-inner-trigger el={b.innerTriggerEl} onClick={() => b.show()}>Open B</button>
+	<button type="button" data-inner-trigger onClick={() => b.show()}>Open B</button>
 }
 
 export function InnerContent() @{
@@ -113,10 +88,12 @@ export function InnerContent() @{
 
 	<div
 		data-inner-content
-		el={b.innerContentEl}
+		overlay
 		role="dialog"
-		hidden={b.open !== true}
-		ui-open={b.open}
+		aria-modal="true"
+		hidden={b.isOpen !== true}
+		ui-open={b.isOpen}
+		onDismiss={() => b.hide()}
 	>
 		<button type="button" data-inner-close onClick={() => b.hide()}>Close B</button>
 	</div>

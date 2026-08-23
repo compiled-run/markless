@@ -313,7 +313,9 @@ export function App() @{
 	expect(
 		graph.elementHandleIdrefs.map((idref) => [idref.hostNodeId, idref.boundHostNodeId]),
 	).toEqual([['h1', 'h2']]);
-	expect(statics(graph)).not.toContain('overlay');
+	// The mark lowers to its own normalized attribute and leaves the IDREF's
+	// minted id and reference slots exactly where they were.
+	expect(statics(graph)).toContain('<div overlay="" role="dialog"');
 	expect(idSlots(graph)).toEqual([
 		['aria-labelledby', 'element:heading'],
 		['id', 'element:heading'],

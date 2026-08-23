@@ -139,7 +139,13 @@ export function createEventWiring(input: {
 		const ignoredDisposed = input.ignoredDisposedEventTargets.has(target);
 		if (!containsElement(input.root, target) && !ignoredDisposed)
 			throw unmatchedDispatchError(event, selector);
-		const path = collectDispatchPath(target, event.type, eventRecords, rowEventRecords);
+		const path = collectDispatchPath(
+			target,
+			event.type,
+			eventRecords,
+			rowEventRecords,
+			event.bubbles !== false,
+		);
 		if (path.length === 0) {
 			if (ignoredDisposed) return;
 			await marklessLogInteraction({
@@ -435,11 +441,18 @@ type ResumeDispatchMatch =
 // encloses it both answer for the same key, so the walk collects the whole path
 // rather than the first record it finds. One record per element, row before
 // view, is the precedence this match already had.
+//
+// A non-bubbling event is the exception the DOM itself makes: only the target's
+// own listeners run. Dispatch reaches this walk from a capture listener on the
+// container, which sees such an event too, so the walk has to make the same cut
+// or `focus`, `blur`, and the runtime's own `dismiss` would run on every
+// ancestor that declared the same handler.
 function collectDispatchPath(
 	target: ResumeDomElement,
 	eventName: string,
 	eventRecords: WeakMap<ResumeDomElement, Map<string, ResumeEventRecord>>,
 	rowEventRecords: ResumeRowEventRecords,
+	bubbles = true,
 ): ResumeDispatchMatch[] {
 	const path: ResumeDispatchMatch[] = [];
 	let current: ResumeDomElement | null | undefined = target;
@@ -450,6 +463,7 @@ function collectDispatchPath(
 			const eventRecord = eventRecords.get(current)?.get(eventName);
 			if (eventRecord) path.push({ element: current, eventRecord });
 		}
+		if (!bubbles) break;
 		current = current.parentElement;
 	}
 	return path;

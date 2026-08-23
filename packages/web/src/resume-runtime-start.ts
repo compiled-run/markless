@@ -174,6 +174,16 @@ export async function startResumeRuntime(input: {
 		behaviors.installRemovalObserver();
 	}
 	if ((runtimeInput.view.branches ?? []).length > 0) await loadBranchRuntime();
+	// Pay-per-use: the overlay behaviour is fetched only by a page that actually
+	// carries the mark, and the query that decides is the same one the module
+	// would run anyway. The behaviour itself does nothing until a marked element
+	// transitions out of `hidden`.
+	if ((runtimeInput.root as unknown as Element).querySelector?.('[overlay]')) {
+		const teardown = (await import('./fns/overlay.ts')).installOverlayBehavior(
+			runtimeInput.root as unknown as Element,
+		);
+		if (teardown) storeContainerSubscription(teardown);
+	}
 	// Container capture listeners see every DOM event of a registered type,
 	// including non-markless ones (router links): unmatched must pass through.
 	const dispatchCaptured = (event: Parameters<typeof events.dispatch>[0]) =>

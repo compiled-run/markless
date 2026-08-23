@@ -196,13 +196,16 @@ test('a spread cannot carry overlay', async () => {
 	]);
 });
 
-test('overlay never leaks into the emitted statics', async () => {
-	// staticAttributeValue would otherwise emit ` overlay=""` for the bare form
-	// and ` overlay="true"` for the explicit one.
-	for (const [name, mark] of [
-		['LeakBare', 'overlay'],
-		['LeakTrue', 'overlay={true}'],
-		['LeakFalse', 'overlay={false}'],
+test('overlay lowers to one normalized valueless attribute, never the authored spelling', async () => {
+	// The authored word is the emitted word, because elevation is CSS the consumer
+	// writes against `[overlay]` and the behaviour module reads stack membership
+	// off the element. What must never happen is staticAttributeValue's own
+	// rendering of whatever was authored: ` overlay="true"` for the `={true}`
+	// spelling, or an attribute at all for `={false}`.
+	for (const [name, mark, expected] of [
+		['LeakBare', 'overlay', '<div overlay="" class="sheet">Menu</div>'],
+		['LeakTrue', 'overlay={true}', '<div overlay="" class="sheet">Menu</div>'],
+		['LeakFalse', 'overlay={false}', '<div class="sheet">Menu</div>'],
 	] as const) {
 		const graph = await graphOf(
 			name,
@@ -211,8 +214,8 @@ test('overlay never leaks into the emitted statics', async () => {
 		}`,
 		);
 
-		expect(statics(graph)).not.toContain('overlay');
-		expect(statics(graph)).toContain('<div class="sheet">Menu</div>');
+		expect(statics(graph)).not.toContain('overlay="true"');
+		expect(statics(graph)).toContain(expected);
 	}
 });
 
