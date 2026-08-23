@@ -107,12 +107,12 @@ test('a handle read inside a keyed row loses to the row local of the same name',
 	// row's identifier is the row's own item, so the handle lowering must not
 	// claim it.
 	//
-	// What the row read lowers to INSTEAD is a separate, older defect this test
-	// deliberately does not assert: state lowering already resolves the row local
-	// to the element binding's graph node, so the row handler emits
-	// `graph.read("element:box")` — with or without the handle lowering. That is a
-	// name-resolution gap in `state-lowering`, not in this pass; pinning it here
-	// would freeze the wrong answer.
+	// What the row read lowers to INSTEAD was once a second defect here: name
+	// resolution resolved the row local to the element binding's graph node, so
+	// the row handler emitted `graph.read("element:box")` with or without the
+	// handle lowering. That gap is closed upstream in `collect-expressions`, and
+	// `repeat-row-shadowing.test.ts` pins it; this test stays on the one question
+	// it owns, which is that the handle lowering declines the name.
 	const result = await compile(`
 import { element, state } from '@markless/core';
 import { measure } from './measure.ts';
