@@ -4,9 +4,10 @@ import {
 	marklessInstancePath,
 	marklessInstanceScopedGraph,
 	marklessMarkComposedSymbol,
-	marklessRegisterWidgetInstanceIds,
-	marklessRegisterWidgetProjections,
+	marklessNoteWidgetRoot,
+	marklessWidgetScope,
 } from './instance-scope.ts';
+import type { MarklessWidgetRegistry } from './instance-scope.ts';
 import type { ResumeSymbol, ResumeSymbolContext } from '../resume-types.ts';
 
 // Composition works on the DRAFT payload the compiled render modules build:
@@ -105,6 +106,99 @@ export function marklessComposedInstancePath(child: {
 }
 
 export { marklessComposedGraphNodeId };
+
+// Per-render widget registries, filed against the objects one render's compose
+// tree already threads along: the children array a level composes, and the
+// composed state that level returns, which the level above finds on its child.
+// They live here rather than beside the lookups they feed because only a server
+// composes twice at once — the browser's own chunk carries the lookups.
+const renderRegistries = new WeakMap<object, MarklessWidgetRegistry>();
+
+function heldRegistry(carrier: unknown): MarklessWidgetRegistry | undefined {
+	return carrier && typeof carrier === 'object'
+		? renderRegistries.get(carrier as object)
+		: undefined;
+}
+
+/**
+ * The registry one compose level works against: the union of what its children
+ * carry, minted once per children array so the level's view compose and its
+ * state compose reach the same answer.
+ */
+export function marklessComposeWidgetRegistry(
+	children: ReadonlyArray<{ readonly output?: { readonly state?: unknown } }>,
+): MarklessWidgetRegistry {
+	const held = renderRegistries.get(children);
+	if (held) return held;
+	const registry: MarklessWidgetRegistry = { rootPaths: new Map(), rowRooted: new Set() };
+	for (const child of children) {
+		const from = heldRegistry(child.output?.state);
+		if (!from) continue;
+		for (const [id, rootPath] of from.rootPaths) registry.rootPaths.set(id, rootPath);
+		for (const definitionId of from.rowRooted) registry.rowRooted.add(definitionId);
+	}
+	renderRegistries.set(children, registry);
+	return registry;
+}
+
+/** Hands the registry a composed state carries to whatever record replaces it. */
+export function marklessCarryWidgetRegistry<T extends object>(from: unknown, to: T): T {
+	const held = heldRegistry(from);
+	if (held) renderRegistries.set(to, held);
+	return to;
+}
+
+/** Files this level's registry on the state it returns, for the level above. */
+function marklessAttachWidgetRegistry<T extends object>(
+	state: T,
+	registry: MarklessWidgetRegistry,
+): T {
+	renderRegistries.set(state, registry);
+	return state;
+}
+
+/**
+ * Runs one compose against one render's registry.
+ *
+ * Composition is synchronous from the first registration to the last lookup, so
+ * no other render can reach the scope between the two assignments; the await
+ * points a second `renderToString` interleaves at are all OUTSIDE this call.
+ */
+export function marklessWithWidgetRegistry<T>(
+	registry: MarklessWidgetRegistry,
+	compose: () => T,
+): T {
+	const previous = marklessWidgetScope.active;
+	marklessWidgetScope.active = registry;
+	try {
+		return compose();
+	} finally {
+		marklessWidgetScope.active = previous;
+	}
+}
+
+// The render's own registry is what every lookup inside this compose reads, so
+// the renders beside it cannot answer for it. The page registry still takes the
+// same entry, because a browser has only that one and the readers that ask
+// outside a compose - resume, a dispatched callback slot - ask it.
+function marklessRegisterWidgetRoot(id: string, rootPath: string): void {
+	const { active, page } = marklessWidgetScope;
+	marklessNoteWidgetRoot(active, id, rootPath);
+	if (active !== page) marklessNoteWidgetRoot(page, id, rootPath);
+}
+
+function marklessRegisterWidgetInstanceIds(ids: Iterable<string>): void {
+	for (const id of ids) marklessRegisterWidgetRoot(id, marklessInstancePath(id));
+}
+
+// A part is a SIBLING of the root composition placed it in (`c0:p1:` beside
+// `c0:c0:`), so the root walk cannot reach that root from the part's own path;
+// the composing child declared where its children land and this is that answer.
+function marklessRegisterWidgetProjections(
+	entries: Iterable<readonly [string, string]>,
+): void {
+	for (const [id, rootPath] of entries) marklessRegisterWidgetRoot(id, rootPath);
+}
 
 // Rewrites a child state draft from child-local ids into page-space ids: prop
 // reads with a live parent route become that route, everything else takes the
@@ -270,6 +364,14 @@ function marklessMergedSharedDefinitions(
 	});
 }
 
+/**
+ * Composes one level against ONE render's widget registry.
+ *
+ * The registry is this level's children's, unioned - so the roots the levels
+ * below registered are all here, and the roots a render running beside this one
+ * registered are not. The composed state carries it out, which is how the level
+ * above finds it on its own child.
+ */
 export function marklessComposeState<T extends ComposeStateDraft>(
 	state: T,
 	children: ReadonlyArray<ComposeChild>,
@@ -278,6 +380,17 @@ export function marklessComposeState<T extends ComposeStateDraft>(
 		.map((child) => child.output?.state)
 		.filter((childState): childState is ComposeStateDraft => Boolean(childState));
 	if (!childStates.length) return state;
+	const registry = marklessComposeWidgetRegistry(children);
+	return marklessWithWidgetRegistry(registry, () =>
+		marklessAttachWidgetRegistry(marklessComposedState(state, children, childStates), registry),
+	);
+}
+
+function marklessComposedState<T extends ComposeStateDraft>(
+	state: T,
+	children: ReadonlyArray<ComposeChild>,
+	childStates: ReadonlyArray<ComposeStateDraft>,
+) {
 	marklessRegisterComposedWidgets(children);
 	for (const child of children) {
 		const output = child.output;

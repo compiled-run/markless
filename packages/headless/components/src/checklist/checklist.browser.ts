@@ -347,9 +347,15 @@ async function expectOmittedCallbackStillTicks() {
 // cause is the dispatch defect named above rather than the served payload.
 // U173 re-measured under the serial lane: these three SSR variants passed one
 // full run and failed the next on VALUE assertions (false vs true/mixed), not
-// timeouts — so contention explained the rotation but not these rows. A real
-// intermittent SSR-resume defect remains (the seeded select-all first-gesture
-// class); skipped until it lands, un-skip in the same change set.
+// timeouts — so contention explained the rotation but not these rows.
+//
+// U177 then found what did: they are not intermittent at all. They fail every
+// time this file renders CONCURRENTLY with checkbox's, and pass in every serial
+// arrangement and against every unrelated pairing. U179 named the mechanism —
+// the widget-root registries in `@markless/web`'s instance-scope were module
+// globals, so two `renderToString` calls interleaving at their awaits resolved
+// each other's composed roots, and the served select-all pointed at the OTHER
+// page's widget. The registries are per render now, so the rows below run.
 
 for (const mode of MODES) {
 	test(`${mode}: the starter renders a named group, a select-all and three items`, async () => {
@@ -421,7 +427,7 @@ for (const mode of MODES) {
 		await expectSelectAllTicksEverything();
 	});
 
-	(mode === 'SSR' ? test.skip : test)(`${mode}: the select-all unticks every item`, async () => {
+	test(`${mode}: the select-all unticks every item`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 		await expectSelectAllUnticksEverything();
@@ -433,7 +439,7 @@ for (const mode of MODES) {
 		await expectMixedSelectAllTicksEverything();
 	});
 
-	(mode === 'SSR' ? test.skip : test)(`${mode}: ticking one item moves the select-all to mixed`, async () => {
+	test(`${mode}: ticking one item moves the select-all to mixed`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 		await expectOneItemMovesTheSelectAllToMixed();
@@ -463,7 +469,7 @@ for (const mode of MODES) {
 		await expectConsumerCallbackCarriesTheWholeSet();
 	});
 
-	(mode === 'SSR' ? test.skip : test)(`${mode}: an omitted onChange still ticks`, async () => {
+	test(`${mode}: an omitted onChange still ticks`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 		await expectOmittedCallbackStillTicks();

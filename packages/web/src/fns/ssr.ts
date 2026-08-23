@@ -1,13 +1,16 @@
 import {
+	marklessCarryWidgetRegistry,
 	marklessComposedInstancePath,
 	marklessComposedSyncPolicy,
 	marklessComposeState,
+	marklessComposeWidgetRegistry,
 	marklessRegisterComposedWidgets,
 	marklessCsrChildReadIsStatic,
 	marklessCsrRemapChildGraph,
 	marklessCsrRemapChildDomUpdate,
 	marklessCsrRemapChildKeyedRepeat,
 	marklessCsrRemapGraphOutput,
+	marklessWithWidgetRegistry,
 } from './composition.ts';
 import type {
 	ComposeChild,
@@ -623,14 +626,16 @@ export function marklessSsrAttachSnapshots<T extends ComposeStateDraft>(
 ) {
 	if (snapshots.length === 0) return state;
 	const byId = new Map(snapshots.map((entry) => [entry.graphNodeId, entry.snapshot]));
-	return {
+	// The record that replaces a composed state stands in for it at the level
+	// above, so the render registry composition filed on it travels along.
+	return marklessCarryWidgetRegistry(state, {
 		...state,
 		computed: (state.computed ?? []).map((computed) =>
 			byId.has(computed.graphNodeId)
 				? { ...computed, snapshot: byId.get(computed.graphNodeId) }
 				: computed,
 		),
-	};
+	});
 }
 export function marklessSsrMergeBranches(
 	payloadBranches: ReadonlyArray<SsrBranchRecord> | undefined,
@@ -724,7 +729,10 @@ export function marklessSsrSeedPropCells(
 		];
 	});
 	if (seeded.length === 0) return state;
-	return { ...state, cells: [...(state.cells ?? []), ...seeded] };
+	return marklessCarryWidgetRegistry(state, {
+		...state,
+		cells: [...(state.cells ?? []), ...seeded],
+	});
 }
 
 function marklessSsrValueKind(value: unknown) {
@@ -781,7 +789,22 @@ function marklessSsrUnbindLocalView(view: SsrViewDraft, localHostIds: ReadonlySe
 	};
 }
 
+// View composition runs before state composition and registers the same widget
+// roots, so both work against the ONE registry this level's children carry —
+// this render's, never a render in flight beside it.
 export function marklessSsrComposeView(
+	structure: SsrDataStructure,
+	view: SsrViewDraft,
+	children: ReadonlyArray<SsrComposedChild>,
+	asyncSnapshots: ReadonlyArray<SsrAsyncSnapshotEntry>,
+	idPrefix = '',
+) {
+	return marklessWithWidgetRegistry(marklessComposeWidgetRegistry(children), () =>
+		marklessSsrComposedView(structure, view, children, asyncSnapshots, idPrefix),
+	);
+}
+
+function marklessSsrComposedView(
 	structure: SsrDataStructure,
 	view: SsrViewDraft,
 	children: ReadonlyArray<SsrComposedChild>,
