@@ -522,8 +522,9 @@ function sharedMethodSource(
 	propertySource: string,
 ): { readonly parameters: string; readonly body: string } | null {
 	const open = propertySource.indexOf('(');
-	const close = propertySource.indexOf(')', open + 1);
-	if (open === -1 || close === -1) return null;
+	if (open === -1) return null;
+	const close = sharedMethodParameterEnd(propertySource, open);
+	if (close === -1) return null;
 
 	const bodyStart = propertySource.indexOf('{', close);
 	const bodyEnd = propertySource.lastIndexOf('}');
@@ -533,6 +534,50 @@ function sharedMethodSource(
 		parameters: propertySource.slice(open + 1, close),
 		body: propertySource.slice(bodyStart + 1, bodyEnd),
 	};
+}
+
+/**
+ * Where the parameter list's own closing parenthesis stands.
+ *
+ * A first-`)` scan cuts a parameter whose type or default carries parentheses
+ * of its own - `done: () => void`, `now = Date.now()` - in half. The arrow
+ * spliced in from that half does not parse, so every later pass reads the
+ * handler as unreadable and the emitter prints an empty symbol: the whole
+ * handler body disappears at dispatch with no diagnostic anywhere. The parser
+ * answers the question exactly, and a source it cannot read falls back to a
+ * delimiter scan, which is still right wherever the old first-`)` scan was.
+ */
+function sharedMethodParameterEnd(propertySource: string, open: number): number {
+	const moduleSource = `const __marklessSharedMethod = { ${propertySource} };`;
+	const offset = moduleSource.indexOf(propertySource);
+	try {
+		// Authored method text keeps its TypeScript annotations.
+		const ast = parseJavaScriptModule(moduleSource, 'generated.ts');
+		let bodyStart = -1;
+		walkNode(ast, (node) => {
+			if (bodyStart !== -1) return;
+			if (node.type !== 'FunctionExpression' && node.type !== 'ArrowFunctionExpression') return;
+			const body = node.body as AnyNode | undefined;
+			if (typeof body?.start === 'number') bodyStart = body.start - offset;
+		});
+		if (bodyStart > open) {
+			const close = propertySource.lastIndexOf(')', bodyStart);
+			if (close > open) return close;
+		}
+	} catch {
+		// An unparsable method falls through to the scan below.
+	}
+
+	let depth = 0;
+	for (let index = open; index < propertySource.length; index += 1) {
+		const character = propertySource[index];
+		if (character === '(') depth += 1;
+		else if (character === ')') {
+			depth -= 1;
+			if (depth === 0) return index;
+		}
+	}
+	return -1;
 }
 
 /**
