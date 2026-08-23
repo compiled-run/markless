@@ -13,6 +13,7 @@ export const otpState = shared(
 			length: 0,
 			value: '',
 			disabled: false,
+			shiftPWManagers: true,
 		});
 		const fieldEl = element<HTMLInputElement>();
 
@@ -22,9 +23,22 @@ export const otpState = shared(
 			// literal function types: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
 			onComplete: undefined as ((value: string) => void) | undefined,
-			// Zero-arg by choice, not by force: MARKLESS_CAPTURE_OPAQUE_PROP no
-			// longer refuses a parameterised shared method here (measured 2026-08-23,
-			// note.md). Reading otp.value back keeps the write in one place.
+			// The field covers the root instead of sitting beside the boxes, so a
+			// click or tap anywhere on them lands on the one real input. Invisible
+			// has to stay interactive, which rules out `visibility` and `display`.
+			// The strings are written out in full because this body is lifted into
+			// its own symbol, where a module constant cannot be read.
+			fieldStyle: computed(() => {
+				// `box-sizing`: an input's own border and padding would otherwise be
+				// added to the 100%, leaving the field a few pixels past the boxes.
+				if (!otp.shiftPWManagers) {
+					return 'position: absolute; inset: 0; box-sizing: border-box; height: 100%; width: 100%; opacity: 0;';
+				}
+				// A password manager paints its icon at the input's right edge. The
+				// input is widened past the root and that strip clipped away, which
+				// takes the icon off the boxes; a clipped strip catches no clicks.
+				return 'position: absolute; inset: 0; box-sizing: border-box; height: 100%; width: calc(100% + 45px); opacity: 0; clip-path: inset(0 45px 0 0);';
+			}),
 			commit() {
 				// `maxlength` truncates typing, but a pasted or autofilled string is
 				// not truncated by the platform, so the slice is what enforces it.
@@ -42,6 +56,7 @@ export function OtpRoot({
 	length,
 	value = '',
 	disabled = false,
+	shiftPWManagers = true,
 	onChange,
 	onComplete,
 	children,
@@ -53,8 +68,10 @@ export function OtpRoot({
 	otp.length = length;
 	otp.value = value;
 	otp.disabled = disabled;
+	otp.shiftPWManagers = shiftPWManagers;
 
-	<div {...rest} ui-disabled={otp.disabled}>{children}</div>
+	// Positioned so the field stretches over these boxes and nothing else.
+	<div {...rest} style="position: relative;" ui-disabled={otp.disabled}>{children}</div>
 }
 
 // One tab stop, one accessibility-tree control, one paste target. A consumer's
@@ -65,6 +82,7 @@ export function OtpField({ onInput, onFocus, ...rest }: OtpFieldProps) @{
 	<input
 		{...rest}
 		el={otp.fieldEl}
+		style={otp.fieldStyle}
 		type="text"
 		value={otp.value}
 		maxlength={otp.length}
@@ -72,14 +90,12 @@ export function OtpField({ onInput, onFocus, ...rest }: OtpFieldProps) @{
 		inputmode="numeric"
 		autocomplete="one-time-code"
 		onFocus={(event) => {
-			// Focus lands the caret at offset 0 on a field that already holds a
-			// code, so the next keystroke would prepend. QDS's policy, same here:
-			// the caret goes to the end of what is typed so far. `event.target`,
-			// not `currentTarget` or `otp.fieldEl`: a resumed event has finished
-			// dispatching (currentTarget is null) and the handle is not rebound
-			// to the served node, so the target is the only live handle here.
-			// instanceof, not a cast: the capture analysis parses this body with a
-			// JavaScript-only parser, so a type annotation would throw the parse.
+			// Focus lands the caret at offset 0, so without this the next keystroke
+			// would prepend to a code already entered.
+			// `event.target`: a resumed handler runs after the event has finished
+			// dispatching, so `currentTarget` is null and `otp.fieldEl` is unbound.
+			// `instanceof` rather than a cast: this body is parsed as JavaScript, so
+			// a type annotation here would fail the parse.
 			const field = event.target;
 			if (field instanceof HTMLInputElement) {
 				const end = field.value.length;
@@ -88,8 +104,7 @@ export function OtpField({ onInput, onFocus, ...rest }: OtpFieldProps) @{
 			onFocus?.(event);
 		}}
 		onInput={(event) => {
-			// currentTarget is live here only because this handler is not resumed;
-			// after SSR resume it is null, which is why onFocus uses event.target.
+			// `currentTarget` is live here because this handler is never resumed.
 			otp.value = event.currentTarget.value;
 			otp.commit();
 			onInput?.(event);
