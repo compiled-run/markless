@@ -2,6 +2,7 @@ import { marklessBoundSymbolId, marklessLiveBoundGraphRoute } from './bound-symb
 import {
 	marklessComposedGraphNodeId,
 	marklessInstancePath,
+	marklessInstanceScopedElementHandle,
 	marklessInstanceScopedGraph,
 	marklessMarkComposedSymbol,
 	marklessNoteWidgetRoot,
@@ -495,6 +496,13 @@ function marklessComposedSymbol(
 				...marklessInstanceScopedGraph(context.graph, instancePath),
 				read,
 			},
+			// A widget-scoped element() handle is one element per rendered widget,
+			// so it resolves against this instance the way this instance's graph
+			// nodes do.
+			getElementHandle: marklessInstanceScopedElementHandle(
+				context.getElementHandle,
+				instancePath,
+			),
 			...(context.read ? { read } : {}),
 		});
 	};
