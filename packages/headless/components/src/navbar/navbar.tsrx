@@ -421,7 +421,7 @@ export function NavbarItemContent({
 			// an icon or a span inside the trigger, and the press lands on that.
 			// The double cast is a stopgap on a type-service slip, not a DOM fact: see
 			// note.md, `pressTarget` is declared with the branded markup `Element`.
-			const pressed = event.detail.pressTarget as unknown as HTMLElement | undefined;
+			const pressed = event.detail.pressTarget;
 			const onOwnTrigger = pressed !== undefined && back !== null && back.contains(pressed);
 			navbar.closeAll();
 			// The press that dismissed may be the same press whose click the trigger is

@@ -60,7 +60,7 @@ declare namespace __MarklessTypeService {
 	type OverlayDismissDetail = {
 		readonly reason: OverlayDismissReason;
 		/** The pointerdown's target for `outside-press`; the key is absent for `escape`. */
-		readonly pressTarget?: Element;
+		readonly pressTarget?: globalThis.Element;
 	};
 
 	/**

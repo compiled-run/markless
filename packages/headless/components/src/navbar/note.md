@@ -348,18 +348,11 @@ The report now carries `pressTarget` for `outside-press` (and omits the key for
     const pressed = event.detail.pressTarget;
     const onOwnTrigger = pressed !== undefined && back !== null && back.contains(pressed);
 
-The `as unknown as HTMLElement | undefined` on that read is a stopgap, and it is
-carried here rather than hidden. `markless-tsrx.d.ts` declares
-`pressTarget?: Element` with a bare `Element`, which inside
-`declare namespace __MarklessTypeService` resolves to that namespace's own branded
-markup `Element` — an interface with no DOM members at all, so
-`back.contains(pressed)` is `TS2345: Argument of type 'Element' is not assignable
-to parameter of type 'Node'`. Every other DOM element reference in that file is
-spelled `globalThis.Element` (the IDREF type two lines below `Element`'s own
-declaration, and eight generic constraints), so this is a slip rather than a
-decision, and the fix is that one word. It is outside this folder, so this unit
-could not make it; the cast comes out the day it lands. Any consumer who touches
-`event.detail.pressTarget` as a node hits the same error today.
+RESOLVED 2026-08-23, same day: `markless-tsrx.d.ts` had declared
+`pressTarget?: Element` with a bare `Element`, which inside the type-service
+namespace resolved to the branded markup `Element` and made every DOM use
+`TS2345`. It now reads `globalThis.Element`, and the family's stopgap cast is
+gone — the read is just `event.detail.pressTarget`.
 
 `back` is the same `box.querySelector('[aria-expanded]')` climb the Escape focus
 return already uses, not an `element()` handle — a handle does not read back as
