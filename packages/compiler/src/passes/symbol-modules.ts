@@ -3183,6 +3183,15 @@ export type ValueExpressionEmissionInput = {
 	readonly graphReads: ReadonlyArray<LoweredStateRead>;
 	readonly moduleImports: ReadonlyArray<SemanticModuleImport>;
 	readonly localNames: ReadonlySet<string>;
+	/**
+	 * Handle reads that outrank a graph read of the same text.
+	 *
+	 * A handler's write value is lowered through this band, so without it a handle
+	 * on the right of an assignment — `modal.opened = openOverlay(contentEl)` —
+	 * lowers to `graph.read("element:contentEl")` and the callee is handed
+	 * `undefined`.
+	 */
+	readonly elementHandleReads?: ReadonlyArray<LoweredElementHandleRead>;
 	/** The authored file the value came from; names the map at the print site. */
 	readonly sourceFileName: string;
 };
@@ -3305,6 +3314,10 @@ function valueExpressionNode(
 	const leaf =
 		literalValueNode(node, text) ??
 		eventFieldValueNode(text, input.eventParameters) ??
+		// Ahead of the graph read: state lowering resolves a handle read to the
+		// element binding's graph node, and a graph node is not where a DOM
+		// element lives.
+		elementHandleValueNode(text, input.elementHandleReads ?? [], input.localNames) ??
 		graphReadValueNode(text, input.graphReads) ??
 		localValueNode(text, input.localNames);
 	if (leaf) return leaf;
@@ -3669,6 +3682,12 @@ function rewriteGraphReadsAndLocals(
 	}
 
 	const text = valueNodeText(node, source);
+
+	const handle = text
+		? elementHandleValueNode(text, input.elementHandleReads ?? [], input.localNames)
+		: null;
+	if (handle) return handle;
+
 	const graphRead = text
 		? input.graphReads.find((read) => read.source === text)
 		: undefined;
@@ -4398,6 +4417,10 @@ function eventHandlerRewrite(
 ): EventHandlerRewrite {
 	const { symbol } = input;
 	const parameters = symbol.parameters ?? [];
+	const handleReads =
+		symbol.kind === 'event-handler' || symbol.kind === 'callback-prop'
+			? (symbol.elementHandleReads ?? [])
+			: [];
 
 	return {
 		source,
@@ -4413,16 +4436,14 @@ function eventHandlerRewrite(
 			// writes, because a callback prop has no DOM event to read fields off.
 			eventParameters: symbol.kind === 'callback-prop' ? [] : parameters,
 			graphReads: symbol.reads ?? [],
+			elementHandleReads: handleReads,
 			moduleImports: symbol.moduleImports ?? [],
 			localNames: input.localNames,
 			sourceFileName: input.sourceFileName,
 		},
 		elementHandleCalls:
 			symbol.kind === 'event-handler' ? (symbol.elementHandleCalls ?? []) : [],
-		elementHandleReads:
-			symbol.kind === 'event-handler' || symbol.kind === 'callback-prop'
-				? (symbol.elementHandleReads ?? [])
-				: [],
+		elementHandleReads: handleReads,
 		localNames: input.localNames,
 		claimedWrites: new Set(),
 		claimedHandleCalls: new Set(),
@@ -4467,6 +4488,9 @@ function rewriteEventHandlerNode(
 	const read = eventReadNode(node, parent, text, rewrite);
 	if (read) return carryEventHandlerComments(node, read);
 
+	const unclaimedWrite = unclaimedWriteNode(node, rewrite);
+	if (unclaimedWrite) return carryEventHandlerComments(node, unclaimedWrite);
+
 	if (node.type === 'ChainExpression' && isNode(node.expression)) {
 		return chainExpressionNode(node, rewriteEventHandlerNode(node.expression, node, rewrite));
 	}
@@ -4484,6 +4508,86 @@ function rewriteEventHandlerNode(
 	return rewriteEventHandlerChildren(node, (child) =>
 		rewriteEventHandlerNode(child, node, rewrite),
 	);
+}
+
+/**
+ * A write no recorded `LoweredStateWrite` claimed, with its TARGET left alone.
+ *
+ * The upstream lowering records no write for an assignment inside a nested arrow
+ * — `openOverlay(el, { onDismiss: () => { hits = hits + 1; } })` records only the
+ * reads — so `eventWriteNode` finds nothing to lower and the generic descent used
+ * to reach the target identifier and rewrite it as a value read. That emitted
+ * `context.graph.read("state:hits") = ...`, which is not a legal assignment
+ * target and not even parseable, so the module shipped broken and the read-back
+ * check that exists to catch exactly this went quiet because it could not reparse
+ * what it was handed.
+ *
+ * Refusing the target keeps the authored name standing instead, which is the
+ * shape `unresolvedGraphReferences` is built to see: the module reparses, the
+ * name is free, it is a graph binding in this file, and the compile fails with a
+ * `MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE` error naming it. The value
+ * side is still lowered, because reading state there is legal and supported.
+ *
+ * `null` for every node that is not a write, which sends the caller on.
+ */
+function unclaimedWriteNode(node: AnyNode, rewrite: EventHandlerRewrite): EmissionNode | null {
+	if (node.type === 'AssignmentExpression' && isNode(node.left)) {
+		return {
+			...(node as unknown as EmissionNode),
+			left: eventWriteTargetNode(node.left, rewrite),
+			right: isNode(node.right)
+				? rewriteEventHandlerNode(node.right, node, rewrite)
+				: (node.right as unknown as EmissionNode),
+		};
+	}
+
+	if (node.type === 'UpdateExpression' && isNode(node.argument)) {
+		return {
+			...(node as unknown as EmissionNode),
+			argument: eventWriteTargetNode(node.argument, rewrite),
+		};
+	}
+
+	if (node.type === 'UnaryExpression' && node.operator === 'delete' && isNode(node.argument)) {
+		return {
+			...(node as unknown as EmissionNode),
+			argument: eventWriteTargetNode(node.argument, rewrite),
+		};
+	}
+
+	return null;
+}
+
+/**
+ * The target of a write the lowering did not claim, left as the author wrote it.
+ *
+ * Only the reference spine is preserved. A computed key is an ordinary value —
+ * `rows[selectedIndex] = next` reads `selectedIndex` — so that subexpression is
+ * still walked, which is the one place inside a target where lowering a read is
+ * both legal and required.
+ */
+function eventWriteTargetNode(node: AnyNode, rewrite: EventHandlerRewrite): EmissionNode {
+	if (node.type === 'MemberExpression') {
+		return {
+			...(node as unknown as EmissionNode),
+			object: isNode(node.object)
+				? eventWriteTargetNode(node.object, rewrite)
+				: (node.object as unknown as EmissionNode),
+			property:
+				node.computed === true && isNode(node.property)
+					? rewriteEventHandlerNode(node.property, node, rewrite)
+					: (node.property as unknown as EmissionNode),
+		};
+	}
+
+	if (node.type === 'ChainExpression' && isNode(node.expression)) {
+		return {
+			...(node as unknown as EmissionNode),
+			expression: eventWriteTargetNode(node.expression, rewrite),
+		};
+	}
+
+	return node as unknown as EmissionNode;
 }
 
 /**
@@ -4879,18 +4983,30 @@ function eventWriteValueNode(node: AnyNode, rewrite: EventHandlerRewrite): Emiss
 	);
 }
 
+function elementHandleReadNode(text: string, rewrite: EventHandlerRewrite): EmissionNode | null {
+	return elementHandleValueNode(text, rewrite.elementHandleReads, rewrite.localNames);
+}
+
 /**
  * `context.getElementHandle("panel")`, for a handle read as a VALUE.
  *
  * A row-local of the same name wins: inside a keyed row `item` is the row's own
  * item, whatever a module-level handle is called. That is the same precedence
  * `localValueNode` applies in the value band.
+ *
+ * Both bands call this one function, because a handle is read in both: the
+ * handler walk reaches statement-position reads, and the value band reaches the
+ * right-hand side of every state write the handler makes.
  */
-function elementHandleReadNode(text: string, rewrite: EventHandlerRewrite): EmissionNode | null {
-	if (rewrite.elementHandleReads.length === 0) return null;
-	const handle = rewrite.elementHandleReads.find((candidate) => candidate.source === text);
+function elementHandleValueNode(
+	text: string,
+	handleReads: ReadonlyArray<LoweredElementHandleRead>,
+	localNames: ReadonlySet<string>,
+): EmissionNode | null {
+	if (handleReads.length === 0) return null;
+	const handle = handleReads.find((candidate) => candidate.source === text);
 	if (!handle) return null;
-	if (rewrite.localNames.has(text.split('.')[0] ?? '')) return null;
+	if (localNames.has(text.split('.')[0] ?? '')) return null;
 
 	return callNode(memberChainNode('context.getElementHandle'), [literalNode(handle.handleId)]);
 }
