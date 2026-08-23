@@ -195,7 +195,7 @@ function emitNode(
 			builder,
 			{
 				kind: 'text',
-				residue: expressionResidue(expression, context, repeat),
+				residue: expressionResidue(expression, context, repeat, builder.componentName),
 				...(getIdentifierName(expression) === 'children' ? { raw: true } : {}),
 			},
 			path,
@@ -390,7 +390,7 @@ function emitNode(
 				addSlot(builder, {
 					kind: 'spread-attributes',
 					coordinate: { kind: 'child-index', path },
-					residue: expressionResidue(expression, context, repeat),
+					residue: expressionResidue(expression, context, repeat, builder.componentName),
 					excludeNames: spreadsRestBinding
 						? [...new Set([...declaredAttributeNames, ...context.destructuredNames])]
 						: declaredAttributeNames,
@@ -453,10 +453,17 @@ function emitNode(
 			kind: 'attribute',
 			name,
 			coordinate: { kind: 'child-index', path },
-			residue: expressionResidue(expression, context, repeat),
+			residue: expressionResidue(expression, context, repeat, builder.componentName),
 			...(alwaysPresent ? { alwaysPresent: true } : {}),
 			...(name === 'class' && repeat
-				? { directClassMatch: directClassMatch(expression, context, repeat) }
+				? {
+						directClassMatch: directClassMatch(
+							expression,
+							context,
+							repeat,
+							builder.componentName,
+						),
+					}
 				: {}),
 		});
 		if (alwaysPresent) append(builder, '"');
@@ -526,14 +533,15 @@ function directClassMatch(
 	expression: AnyNode,
 	context: CollectionContext,
 	repeat: { readonly id: string; readonly itemName: string },
+	componentName: string,
 ) {
 	if (expression.type !== 'ConditionalExpression') return undefined;
 	const test = expression.test as AnyNode | undefined;
 	if (test?.type !== 'BinaryExpression' || (test.operator !== '===' && test.operator !== '==')) {
 		return undefined;
 	}
-	const left = expressionResidue(test.left as AnyNode, context, repeat);
-	const right = expressionResidue(test.right as AnyNode, context, repeat);
+	const left = expressionResidue(test.left as AnyNode, context, repeat, componentName);
+	const right = expressionResidue(test.right as AnyNode, context, repeat, componentName);
 	const graph = left.kind === 'graph-read' ? left : right.kind === 'graph-read' ? right : null;
 	const item = left.kind === 'repeat-item' ? left : right.kind === 'repeat-item' ? right : null;
 	const consequent = expression.consequent as AnyNode | undefined;
@@ -582,7 +590,7 @@ function emitDynamicHost(
 			if (expression) {
 				attributeSlots.push({
 					kind: 'spread',
-					residue: expressionResidue(expression, context, repeat),
+					residue: expressionResidue(expression, context, repeat, builder.componentName),
 				});
 			}
 			continue;
@@ -625,7 +633,7 @@ function emitDynamicHost(
 			attributeSlots.push({
 				kind: 'attribute',
 				name,
-				residue: expressionResidue(expression, context, repeat),
+				residue: expressionResidue(expression, context, repeat, builder.componentName),
 			});
 		}
 	}
@@ -658,7 +666,7 @@ function emitDynamicHost(
 			hostNodeId,
 			cardinality: 'zero-or-one',
 			nullishTag: 'omit',
-			tag: expressionResidue(tagExpression, context, repeat),
+			tag: expressionResidue(tagExpression, context, repeat, builder.componentName),
 			staticAttributes,
 			attributeSlots,
 			childChunkId,
@@ -703,6 +711,7 @@ function expressionResidue(
 	expression: AnyNode,
 	context: CollectionContext,
 	repeat: { readonly id: string; readonly itemName: string } | null,
+	componentName: string,
 ): SemanticMarkupResidue {
 	const source = expressionSource(expression, context.source);
 	if (repeat && (source === repeat.itemName || source.startsWith(`${repeat.itemName}.`))) {
@@ -719,7 +728,7 @@ function expressionResidue(
 				source,
 				graphBindingMap(context.graph, null),
 				semanticAliasMap(context.graph, null),
-			) ?? resolveSharedInstanceGraphPath(source, context.graph))
+			) ?? resolveSharedInstanceGraphPath(source, context.graph, componentName))
 		: null;
 	if (resolved) {
 		return { kind: 'graph-read', graphNodeId: resolved.binding.id, path: resolved.path };

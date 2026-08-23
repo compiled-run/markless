@@ -143,6 +143,115 @@ test('the colliding module compiles to the same artifact as a distinct-name modu
 	expect(shape(colliding, ['w'])).toEqual(shape(control, ['w', 'seat']));
 });
 
+// A second pair, exercising what the seed fixture cannot reach: each part
+// RENDERS its instance's cell and binds an `el=` handle that only its OWN
+// factory declares. The two factories name their handles differently on
+// purpose - a borrowed instance then has no such property at all, so the
+// borrowing shows up as a refusal rather than as a silent swap.
+const renderingModuleSource = (alphaLocal: string, betaLocal: string) => `
+import { shared, state, element } from '@markless/core';
+
+export const alpha = shared(() => {
+	const cell = state({ label: 'alpha' });
+	const markEl = element();
+
+	return { ...cell, markEl };
+}, { scope: 'widget' });
+
+export const beta = shared(() => {
+	const cell = state({ label: 'beta' });
+	const spotEl = element();
+
+	return { ...cell, spotEl };
+}, { scope: 'widget' });
+
+export function Alpha({ label }) @{
+	const ${alphaLocal} = alpha();
+	${alphaLocal}.label = label;
+
+	<div data-alpha el={${alphaLocal}.markEl}>{${alphaLocal}.label}</div>
+}
+
+export default function Beta({ label }) @{
+	const ${betaLocal} = beta();
+	${betaLocal}.label = label;
+
+	<div data-beta el={${betaLocal}.spotEl}>{${betaLocal}.label}</div>
+}
+`;
+
+// Every graph node a markup chunk's slots read, as `chunk -> node`. This is what
+// the served template actually renders, so a wrong node here is a part painting
+// another widget's value on screen.
+function markupReads(compiled: Compiled): Array<[unknown, unknown]> {
+	return compiled.semanticGraph.markup.chunks.flatMap((chunk) =>
+		chunk.slots.flatMap((slot) => {
+			const residue = (
+				slot as {
+					readonly residue?: { readonly kind: string; readonly graphNodeId?: string };
+				}
+			).residue;
+			return residue?.kind === 'graph-read'
+				? [[chunk.id, residue.graphNodeId] as [unknown, unknown]]
+				: [];
+		}),
+	);
+}
+
+// The markup residue: THE proven leak. `template:Alpha` used to resolve
+// `{w.label}` against every instance in the module, and the last `w` in the file
+// won, so Alpha's rendered text came out of beta's cell.
+test('each part renders the cell its own factory declared', async () => {
+	const compiled = await compile(renderingModuleSource('w', 'w'));
+
+	expect(markupReads(compiled)).toEqual([
+		['template:Alpha', 'shared:src/parts.tsrx#alpha/state:cell'],
+		['template:Beta', 'shared:src/parts.tsrx#beta/state:cell'],
+	]);
+});
+
+// State lowering resolves on the FINISHED graph, so the collision lands there
+// too: both parts' `w.label = label` lowered into beta's node, which is one
+// widget's render writing another widget's cell.
+test('each part lowers its seed write into its own widget cell', async () => {
+	const compiled = await compile(renderingModuleSource('w', 'w'));
+
+	// document order: Alpha's write, then Beta's
+	expect(compiled.stateLowering.writes.map((write) => write.graphNodeId)).toEqual([
+		'shared:src/parts.tsrx#alpha/state:cell',
+		'shared:src/parts.tsrx#beta/state:cell',
+	]);
+});
+
+// The element-handle route fails CLOSED, which makes the same collision a
+// refusal rather than a swap: `el={w.markEl}` inside Alpha resolved `w` to
+// beta's instance, beta declares no `markEl`, and a compile that should be
+// accepted was rejected with MARKLESS_ELEMENT_HANDLE_REQUIRED.
+test('each part binds the el handle its own factory declared', async () => {
+	const compiled = await compile(renderingModuleSource('w', 'w'));
+
+	expect(compiled.semanticGraph.diagnostics).toEqual([]);
+});
+
+// Byte-stability for the rendering pair, the same way the seed pair is pinned.
+test('the colliding rendering module compiles to the same artifact as a distinct-name module', async () => {
+	const colliding = await compile(renderingModuleSource('w', 'w'));
+	const control = await compile(renderingModuleSource('w', 'seat'));
+
+	const shape = (compiled: Compiled, locals: ReadonlyArray<string>) =>
+		[...new Set(locals)].reduce(
+			(text, local) => text.replace(new RegExp(`\\b${local}\\b`, 'g'), 'LOCAL'),
+			JSON.stringify({
+				components: compiled.publicRenderModule.componentDefinitions,
+				renderChunks: compiled.renderData.chunks,
+				payload: compiled.payloadArena,
+				ssr: compiled.publicRenderModule.ssrModuleSource,
+			}),
+		);
+
+	expect(shape(colliding, ['w'])).toEqual(shape(control, ['w', 'seat']));
+});
+
 // The compile stays fully accepted: a resolution fix mints no new refusal.
 test('the colliding module compiles with no diagnostic', async () => {
 	const compiled = await compile(moduleSource('w', 'w'));

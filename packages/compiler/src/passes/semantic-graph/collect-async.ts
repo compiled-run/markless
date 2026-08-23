@@ -283,7 +283,7 @@ function graphDependency(
 	// Own scope first: a factory local and the instance local naming it routinely collide.
 	const resolved =
 		resolveGraphPath(source, bindings, aliases) ??
-		resolveSharedInstanceGraphPath(source, state.graph);
+		resolveSharedInstanceGraphPath(source, state.graph, state.currentComponentName);
 	if (!resolved) return null;
 
 	return {

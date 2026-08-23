@@ -247,7 +247,9 @@ export function collectElementHandleDiagnostics(
 		// instance local shares its name), so the shared route wins whenever it is
 		// the one that lands on an element node.
 		const resolved =
-			elementHandlePath(resolveSharedInstanceGraphPath(binding.handleName, graph)) ??
+			elementHandlePath(
+				resolveSharedInstanceGraphPath(binding.handleName, graph, binding.componentName),
+			) ??
 			resolveGraphPath(binding.handleName, bindings, aliases);
 		const graphBinding = resolved?.binding;
 		if (moduleElementNames.has(binding.handleName)) continue;
@@ -990,7 +992,9 @@ function resolvedElementHandleName(expression: AnyNode, state: WalkState): strin
 	// two-route lookup the el= path uses, so one form does not silently become a
 	// value read while the other records a relationship.
 	const resolved =
-		elementHandlePath(resolveSharedInstanceGraphPath(source, state.graph)) ??
+		elementHandlePath(
+			resolveSharedInstanceGraphPath(source, state.graph, state.currentComponentName),
+		) ??
 		// A member path such as `label.id` is a render-time DOM read, not identity;
 		// it keeps falling through to MARKLESS_ELEMENT_HANDLE_RENDER_READ.
 		elementHandlePath(
