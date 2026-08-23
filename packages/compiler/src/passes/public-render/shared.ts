@@ -732,6 +732,18 @@ function payloadNodeOwners(
 		if (queue) queue.push(binding.componentName);
 		else pending.set(binding.id, [binding.componentName]);
 	}
+	// A branch-condition computed is read by the branch record, not by any chunk
+	// slot, so chunk ownership cannot see it. The component whose arms the branch
+	// decides declares it.
+	const branchOwner = new Map<string, string>();
+	for (const branch of input.renderData.branches) {
+		const graphNodeId = branch.testComputedGraphNodeId;
+		if (graphNodeId === undefined || branchOwner.has(graphNodeId)) continue;
+		const armChunk = input.renderData.chunks.find((chunk) =>
+			branch.armChunkIds.includes(chunk.id),
+		);
+		if (armChunk) branchOwner.set(graphNodeId, armChunk.componentName);
+	}
 	// A widget-scoped shared() graph is one instance per rendered widget, so its
 	// nodes belong to the widget root, not the module root: that component's
 	// composed instance path is the widget root.
@@ -744,7 +756,9 @@ function payloadNodeOwners(
 			);
 		const queue = pending.get(graphNodeId);
 		const declared = queue && queue.length > 1 ? queue.shift() : queue?.[0];
-		return declared ?? chunkOwner.get(graphNodeId) ?? rootComponentName;
+		return (
+			declared ?? chunkOwner.get(graphNodeId) ?? branchOwner.get(graphNodeId) ?? rootComponentName
+		);
 	};
 	return {
 		cells: input.protocolState.cells.map((cell) => ownerOf(cell.graphNodeId)),
