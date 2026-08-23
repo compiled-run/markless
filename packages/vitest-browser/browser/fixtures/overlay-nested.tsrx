@@ -7,6 +7,10 @@ import { closeOverlay, openOverlay } from '@markless/web/fns/overlay';
 //
 // Handle names are unique per module, not per shared definition, so the inner
 // family cannot reuse the outer family's names.
+//
+// The page that arranges these lives in ./overlay-nested-page.tsrx. It has to be
+// a separate module: a default-export page declared alongside the components it
+// composes renders only the first component and drops the rest of the tree.
 export const outer = shared(
 	() => {
 		const s = state({ open: false });
@@ -116,19 +120,4 @@ export function InnerContent() @{
 	>
 		<button type="button" data-inner-close onClick={() => b.hide()}>Close B</button>
 	</div>
-}
-
-export default function OverlayNestedPage() @{
-	<section data-nested-page>
-		<button type="button" data-outside>Outside</button>
-		<OuterRoot>
-			<OuterTrigger />
-			<OuterContent>
-				<InnerRoot>
-					<InnerTrigger />
-					<InnerContent />
-				</InnerRoot>
-			</OuterContent>
-		</OuterRoot>
-	</section>
 }

@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../src/index.ts';
-import NestedPage from './fixtures/overlay-nested.tsrx';
+import NestedPage from './fixtures/overlay-nested-page.tsrx';
 import Page from './fixtures/overlay-primitive.tsrx';
 
 // The overlay primitive is the behaviour half of an elevated surface: a stack

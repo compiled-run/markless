@@ -36,16 +36,19 @@ export default function OverlayPrimitivePage() @{
 				aria-expanded={modalOpen ? 'true' : 'false'}
 				onClick={() => {
 					modalOpen = true;
-					modalHandled = openOverlay(modalContent, {
+					// The call is its own statement, not the right-hand side of the
+					// state assignment: a handle read inside a state-write's value
+					// expression still lowers to a graph read rather than the live
+					// node, so the primitive would be handed `undefined`.
+					const opened = openOverlay(modalContent, {
 						kind: 'modal',
 						trigger: modalTrigger,
 						onDismiss: () => {
 							modalOpen = false;
 							modalDismissals = modalDismissals + 1;
 						},
-					})
-						? 'opened'
-						: 'refused';
+					});
+					modalHandled = opened ? 'opened' : 'refused';
 				}}
 			>Open modal</button>
 			<div

@@ -33,7 +33,13 @@ export type OverlayOptions = {
 	readonly trigger?: Element | undefined;
 	/** Where focus goes on open. Defaults to the surface itself. */
 	readonly initialFocus?: Element | undefined;
-	/** Where focus goes on close. Defaults to whatever had focus on open. */
+	/**
+	 * Where focus goes on close. Defaults to the trigger - the invoker is where
+	 * the APG returns focus - and to whatever had focus on open when no trigger
+	 * was named. Reading the active element alone is not enough: a surface opened
+	 * from a keyboard shortcut, or by a press the browser did not move focus for,
+	 * would otherwise restore focus to the body.
+	 */
 	readonly finalFocus?: Element | undefined;
 	/** Called when the primitive closed the surface itself. */
 	readonly onDismiss?: ((reason: OverlayDismissReason) => void) | undefined;
@@ -82,7 +88,7 @@ export function openOverlay(surface: Element | undefined, options: OverlayOption
 		kind: options.kind,
 		trigger: options.trigger,
 		onDismiss: options.onDismiss,
-		restoreFocusTo: options.finalFocus ?? owner.activeElement ?? undefined,
+		restoreFocusTo: options.finalFocus ?? options.trigger ?? owner.activeElement ?? undefined,
 		undo: [],
 	};
 
