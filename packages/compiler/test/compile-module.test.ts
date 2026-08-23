@@ -2369,15 +2369,24 @@ export function App() @{
 	expect(diagnostic?.message).not.toContain('control-flow');
 });
 
-test('compileTsrxModule parenthesizes non-atomic @if tests in SSR output', async () => {
+// This used to interpolate the authored test straight into `((...)?0:1)`, where
+// `primary ?? fallback` needs its own parentheses to keep its precedence. A
+// non-atomic test is now lifted to one synthetic computed instead, so the arm
+// interpolates a graph read and the authored text sits inside the seed's derive.
+// Both halves still have to be there, and still have to be parenthesized.
+test('compileTsrxModule decides a non-atomic @if test from a seeded computed in SSR output', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/BranchPrecedence.tsrx',
 		source: `import { state } from '@markless/core'; export function App() @{ let primary = state(null); let fallback = state(true); <section>@if (primary ?? fallback) { <p>Shown</p> } @else { <p>Hidden</p> }</section> }`,
 		symbols: [],
 	});
+	const ssr = result.publicRenderModule.ssrModuleSource ?? '';
 
-	expect(result.publicRenderModule.ssrModuleSource).toContain(
-		'const arm=((primary ?? fallback)?0:1)',
+	expect(ssr).toContain(
+		'const arm=((marklessSsrReadPublicPath(marklessSsrRenderStateValues.get("computed:templateExpression:0"),[]))?0:1)',
+	);
+	expect(ssr).toContain(
+		'marklessSsrRenderStateValues.set("computed:templateExpression:0",(() => primary ?? fallback)());',
 	);
 });
 

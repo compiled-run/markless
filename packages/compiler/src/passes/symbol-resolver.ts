@@ -242,7 +242,12 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 	const branchBindings = graphBindingMap(input.semanticGraph);
 	const branchAliases = semanticAliasMap(input.semanticGraph);
 	for (const site of input.semanticGraph.branchSites) {
-		const resolved = resolveGraphPath(site.testSource, branchBindings, branchAliases);
+		// A recombined condition already has its node: the semantic graph minted one
+		// computed over every read inside it. Prefer that over re-resolving the
+		// authored text, which names no binding once it is more than a bare read.
+		const resolved = site.testComputedGraphNodeId
+			? { binding: { id: site.testComputedGraphNodeId }, path: [] as ReadonlyArray<string> }
+			: resolveGraphPath(site.testSource, branchBindings, branchAliases);
 		symbols.push({
 			id: `symbol:${nextSymbolId++}`,
 			kind: 'branch-update',

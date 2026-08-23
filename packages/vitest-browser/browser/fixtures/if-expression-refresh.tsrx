@@ -24,6 +24,7 @@ export default function IfExpressionRefreshPage() @{
 	let open = state(false);
 	let label = state('dark');
 	let hidden = state(true);
+	let mode = state('on');
 	const isB = computed(() => value === 'b');
 
 	<div data-page>
@@ -35,6 +36,7 @@ export default function IfExpressionRefreshPage() @{
 				open = !open;
 				label = label === 'dark' ? 'lit-up' : 'dark';
 				hidden = !hidden;
+				mode = mode === 'on' ? 'off' : 'on';
 			}}
 		>flip</button>
 
@@ -60,6 +62,14 @@ export default function IfExpressionRefreshPage() @{
 
 		@if (value !== 'b') {
 			<p data-initially-true>initially true</p>
+		}
+
+		@if (hidden) {
+			<p data-bare-initially-true>bare initially true</p>
+		}
+
+		@if (mode === 'on') {
+			<p data-solo-initially-true>solo initially true</p>
 		}
 
 		<Row />

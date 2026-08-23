@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { buildSemanticGraph, lowerStateAccess } from '../src/index.ts';
+import { buildSemanticGraph, compileTsrxModule, lowerStateAccess } from '../src/index.ts';
 import { planPayloadArena } from '../src/passes/payload-arena.ts';
 import { planSymbolResolver } from '../src/passes/symbol-resolver.ts';
 
@@ -105,6 +105,101 @@ async function branchFacts(filename: string, source: string) {
 	);
 	return { semanticGraph, branches };
 }
+
+// The browser fixture's three recombined shapes in one module: a condition that
+// starts FALSE, one that starts TRUE, and one over two fields of a shared
+// instance. What the client needs from the compiler for each is the same three
+// facts, so they are pinned together below.
+const wiringShapes = `
+import { shared, state } from '@markless/core';
+
+export const row = shared(() => {
+	const cell = state({ value: 'a', own: 'b' });
+
+	return {
+		...cell,
+		pick() {
+			cell.value = cell.value === 'b' ? 'a' : 'b';
+		},
+	};
+}, { scope: 'widget' });
+
+export default function Page() @{
+	let value = state('a');
+	let hidden = state(true);
+
+	<div data-page>
+		<button type="button" data-toggle onClick={() => { value = value === 'b' ? 'a' : 'b'; hidden = !hidden; }}>flip</button>
+		@if (value === 'b') { <p data-comparison>c</p> }
+		@if (value !== 'b') { <p data-initially-true>t</p> }
+		<Row />
+	</div>
+}
+
+export function Row() @{
+	const r = row();
+
+	<span data-row>
+		<button type="button" data-row-toggle onClick={() => r.pick()}>pick</button>
+		@if (r.value === r.own) { <b data-cross>cross</b> }
+	</span>
+}
+`;
+
+test('the payload carries each branch-condition computed the client has to read', async () => {
+	const compiled = await compileTsrxModule({
+		filename: 'fixture.tsrx',
+		source: wiringShapes,
+		buildId: 'b',
+		resolverId: 'r',
+		symbols: [],
+	});
+
+	// Every site tests exactly one node, and it is the minted computed.
+	expect(
+		compiled.protocolView.branches?.map((branch) => [
+			branch.id,
+			branch.testReads.map((read) => read.graphNodeId),
+		]),
+	).toEqual([
+		['branch-site:0', ['computed:templateExpression:0']],
+		['branch-site:1', ['computed:templateExpression:1']],
+		['branch-site:2', ['computed:templateExpression:2']],
+	]);
+
+	// And each of those nodes ships with the dependencies that wake it and the
+	// derive the client re-runs, including the shared-instance one whose two
+	// reads land on the same cell by different paths.
+	expect(
+		compiled.protocolState.computed.map((node) => ({
+			graphNodeId: node.graphNodeId,
+			dependencies: node.dependencies?.map((dependency) => [
+				dependency.graphNodeId,
+				dependency.path,
+			]),
+			hasDerive: node.deriveSymbolId !== undefined,
+		})),
+	).toEqual([
+		{
+			graphNodeId: 'computed:templateExpression:0',
+			dependencies: [['state:value', []]],
+			hasDerive: true,
+		},
+		{
+			graphNodeId: 'computed:templateExpression:1',
+			dependencies: [['state:value', []]],
+			hasDerive: true,
+		},
+		{
+			graphNodeId: 'computed:templateExpression:2',
+			dependencies: [
+				['shared:fixture.tsrx#row/state:cell', ['value']],
+				['shared:fixture.tsrx#row/state:cell', ['own']],
+			],
+			hasDerive: true,
+		},
+	]);
+});
 
 test('a recombined @if condition joins a synthetic computed over the reads inside it', async () => {
 	const { branches } = await branchFacts('local.tsrx', localState);

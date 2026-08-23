@@ -27,22 +27,26 @@ const BRANCH_CONDITION_READ_OPTIONS: CompositeReadOptions & {
 };
 
 /**
- * The source the branch site tests. A plain graph read is its own source. A
- * recombined condition becomes one synthetic computed - the same mint the
- * attribute and prop positions use - and the site tests that computed by name,
- * so every read inside the condition wakes the flip exactly as `@if (someComputed)`
- * already does. A condition that resolves to no graph node at all (a repeat local,
- * an opaque call) mints nothing and keeps its authored source.
+ * What the branch site tests. A plain graph read is its own source. A recombined
+ * condition becomes one synthetic computed - the same mint the attribute and prop
+ * positions use - and the site records that node's id, so every read inside the
+ * condition wakes the flip exactly as `@if (someComputed)` already does. A
+ * condition that resolves to no graph node at all (a repeat local, an opaque call)
+ * mints nothing.
+ *
+ * `testSource` stays the AUTHORED text in every case: it is what a diagnostic
+ * quotes back at the author, and a generated name reads as noise there.
  */
-function branchTestSource(test: AnyNode | undefined, state: WalkState): string {
-	if (!test) return '';
-	const authored = expressionSource(test, state.source);
+function branchTest(
+	test: AnyNode | undefined,
+	state: WalkState,
+): { readonly testSource: string; readonly testComputedGraphNodeId?: string } {
+	if (!test) return { testSource: '' };
+	const testSource = expressionSource(test, state.source);
 	const composite = collectCompositeTemplateExpression(test, state, BRANCH_CONDITION_READ_OPTIONS);
-	if (!composite) return authored;
-	const minted = state.graph.graphBindings.find(
-		(binding) => binding.id === composite.graphNodeId,
-	);
-	return minted ? minted.name : authored;
+	return composite
+		? { testSource, testComputedGraphNodeId: composite.graphNodeId }
+		: { testSource };
 }
 
 // Records @if/@switch sites as first-class branch records sharing the unified
@@ -57,12 +61,12 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			`@if (${test ? expressionSource(test, state.source) : ''})`,
 			state,
 		);
-		const ifTestSource = branchTestSource(test, state);
+		const ifTest = branchTest(test, state);
 		state.graph.branchSites.push({
 			id: `branch-site:${state.nextBranchSiteId++}`,
 			kind: 'if',
 			armCount: (node.consequent ? 1 : 0) + (node.alternate ? 1 : 0),
-			testSource: ifTestSource,
+			...ifTest,
 			anchorOrder: state.nextAnchorOrder++,
 			...(state.currentAsyncBoundaryId
 				? {
@@ -81,12 +85,12 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			`@switch (${discriminant ? expressionSource(discriminant, state.source) : ''})`,
 			state,
 		);
-		const switchTestSource = branchTestSource(discriminant, state);
+		const switchTest = branchTest(discriminant, state);
 		state.graph.branchSites.push({
 			id: `branch-site:${state.nextBranchSiteId++}`,
 			kind: 'switch',
 			armCount: asNodes(node.cases).length,
-			testSource: switchTestSource,
+			...switchTest,
 			anchorOrder: state.nextAnchorOrder++,
 			...(switchArmTests(node) ? { armTests: switchArmTests(node)! } : {}),
 			...(state.currentAsyncBoundaryId

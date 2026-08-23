@@ -61,6 +61,9 @@ test('SSR resume: every expression-gated @if follows the write', async () => {
 	await expectArmsFollowTheWrite(screen.container);
 });
 
+// KNOWN RED, both modes - see the note further down. The compiler mints this
+// condition's computed with both shared reads as dependencies and ships it in the
+// payload; the arm still never moves off the value it was wired with.
 test('CSR: a condition comparing two fields of a shared instance follows the write', async () => {
 	const screen = await render(Page);
 	await expectSharedArmFollowsTheWrite(screen.container as HTMLElement);
@@ -71,16 +74,62 @@ test('SSR resume: a condition comparing two fields of a shared instance follows 
 	await expectSharedArmFollowsTheWrite(screen.container);
 });
 
-// The remaining half of defect 30: a recombined condition whose FIRST value is
-// true. The synthetic computed reaches `marklessSsrRenderStateValues` through a
-// local the render body never declares, so the seed reads undefined, the server
-// picks the else arm, and the client's arm bookkeeping starts out one step behind
-// what the DOM shows. The seeding lives in the public-render emitter, outside
-// this change's reach; the arm below is the shape that proves it.
+// The control for the three tests below: a branch on a PLAIN state read that
+// starts true. It renders and then hides, in the same page, on the same click,
+// so nothing about "starts true" is broken on its own.
+test('a bare initially-true @if renders and then follows the write', async () => {
+	const screen = await render(Page);
+	const container = screen.container as HTMLElement;
+	const shown = () => container.querySelector('[data-bare-initially-true]') !== null;
+
+	expect(shown()).toBe(true);
+	click(container, '[data-toggle]');
+	await expect.poll(shown).toBe(false);
+});
+
+// KNOWN RED - the client half of defect 33, outside the compiler.
+//
+// The SSR seed gap is closed: the server now seeds every branch-condition
+// computed, so the `expect(shown()).toBe(true)` below passes where the server
+// used to serve the else arm. What still fails is the FLIP.
+//
+// The payload is complete. `packages/compiler/test/if-expression-refresh.test.ts`
+// pins that each of these sites tests exactly one minted computed, and that each
+// of those computeds ships with the dependencies that wake it and the derive the
+// client re-runs. So the miss is in how the resume path reads that computed, not
+// in what the compiler emitted.
+//
+// The shape of the miss, from the arms that pass beside the ones that fail: a
+// condition whose FIRST value is true is recorded as arm 1 by `readBranchArm`
+// (packages/web/src/resume-branches.ts:112) while the DOM shows arm 0, so the
+// write that takes it to arm 1 is discarded by the `newArm === currentArm` guard
+// at :128. The shared-instance arm above fails for a related reason: its computed
+// never moves off its wire-time value at all.
+test('a solo initially-true recombined condition follows the write (CSR)', async () => {
+	const screen = await render(Page);
+	const container = screen.container as HTMLElement;
+	const shown = () => container.querySelector('[data-solo-initially-true]') !== null;
+
+	expect(shown()).toBe(true);
+	click(container, '[data-toggle]');
+	await expect.poll(shown).toBe(false);
+});
+
+test('an initially-true recombined condition follows the write (CSR)', async () => {
+	const screen = await render(Page);
+	const container = screen.container as HTMLElement;
+	const shown = () => container.querySelector('[data-initially-true]') !== null;
+
+	expect(shown()).toBe(true);
+	click(container, '[data-toggle]');
+	await expect.poll(shown).toBe(false);
+});
+
 test('an initially-true recombined condition renders and then follows the write', async () => {
 	const screen = await renderSSR(Page);
 	const shown = () => screen.container.querySelector('[data-initially-true]') !== null;
 
+	// The seed fix: the server serves the arm the author's condition asks for.
 	expect(shown()).toBe(true);
 	click(screen.container, '[data-toggle]');
 	await expect.poll(shown).toBe(false);
