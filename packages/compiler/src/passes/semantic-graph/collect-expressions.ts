@@ -208,7 +208,10 @@ function collectReadsIn(
 		const callee = node.callee as AnyNode | undefined;
 		if (callee?.type === 'MemberExpression') {
 			const method = getStaticMemberPropertyName(callee);
-			if (method && isMutatingCollectionMethod(method)) {
+			if (
+				method &&
+				(isMutatingCollectionMethod(method) || callsMethodOnReadValue(callee, state))
+			) {
 				collectReadsIn(callee.object as AnyNode | undefined, state, region);
 				for (const argument of asNodes(node.arguments)) {
 					collectReadsIn(argument, state, region);
@@ -252,6 +255,41 @@ function collectReadsIn(
 	for (const child of childNodes(node)) {
 		collectReadsIn(child, state, region);
 	}
+}
+
+/**
+ * Whether `callee` calls a method *on* a read value rather than calling a member
+ * the graph itself declares.
+ *
+ * `otp.value.slice(0, n)` reads `otp.value` and calls a string method on it, so
+ * the read has to land on the receiver: recording it at the whole callee chain
+ * lowers to `read(id, ["value", "slice"])(0, n)`, a detached function invoked
+ * with no `this`. `otp.onChange?.(code)` and `otp.commit()` are the other shape -
+ * the member itself is the callable the graph holds - and their read stays at
+ * the chain so the callback-slot and shared-method paths keep matching it.
+ *
+ * A graph-declared callable is always written directly on the binding, so a
+ * receiver that is itself a member path is a value. A binding that holds a
+ * scalar is a value too: a string or a number declares no members of its own.
+ */
+function callsMethodOnReadValue(callee: AnyNode, state: WalkState): boolean {
+	if (callee.computed === true) return false;
+
+	const object = unwrapChainExpression(callee.object as AnyNode | undefined);
+	if (!object) return false;
+	if (object.type === 'MemberExpression') return true;
+	if (object.type !== 'Identifier') return false;
+
+	const source = expressionSource(object, state.source);
+	if (!source) return false;
+
+	const resolved = resolveGraphPath(
+		source,
+		graphBindingMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
+		semanticAliasMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
+	);
+
+	return resolved?.binding.valueKind === 'scalar';
 }
 
 function collectDeleteComputedPropertyReads(
