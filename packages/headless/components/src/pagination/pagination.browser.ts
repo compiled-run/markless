@@ -473,7 +473,9 @@ for (const mode of MODES) {
 	// `PaginationItem` takes `value` out of its props and never writes it, and the
 	// rendered box is `<div value="1">` all the same. Harmless in the DOM, wrong in
 	// principle: a part's own configuration is not markup.
-	test.fails(`${mode}: a destructured prop does not reach the element`, async () => {
+	// Flipped by the rest-binding spread fix (6d8f6818): destructured props are
+	// excluded from {...rest}, so this asserts the shipped behavior now.
+	test(`${mode}: a destructured prop does not reach the element`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 		expect(at('item-1').hasAttribute('value')).toBe(false);
