@@ -68,6 +68,7 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			armCount: (node.consequent ? 1 : 0) + (node.alternate ? 1 : 0),
 			...ifTest,
 			anchorOrder: state.nextAnchorOrder++,
+			...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
 			...(state.currentAsyncBoundaryId
 				? {
 						asyncBoundaryId: state.currentAsyncBoundaryId,
@@ -92,6 +93,7 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			armCount: asNodes(node.cases).length,
 			...switchTest,
 			anchorOrder: state.nextAnchorOrder++,
+			...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
 			...(switchArmTests(node) ? { armTests: switchArmTests(node)! } : {}),
 			...(state.currentAsyncBoundaryId
 				? {

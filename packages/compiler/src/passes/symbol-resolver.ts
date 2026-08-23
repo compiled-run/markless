@@ -251,7 +251,13 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 		// authored text, which names no binding once it is more than a bare read.
 		const resolved = site.testComputedGraphNodeId
 			? { binding: { id: site.testComputedGraphNodeId }, path: [] as ReadonlyArray<string> }
-			: resolveBranchTestRead(site.testSource, input, branchBindings, branchAliases);
+			: resolveBranchTestRead(
+					site.testSource,
+					input,
+					branchBindings,
+					branchAliases,
+					site.componentName,
+				);
 		symbols.push({
 			id: `symbol:${nextSymbolId++}`,
 			kind: 'branch-update',
@@ -293,15 +299,20 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
  * nothing when the root is not an instance local, so every other shape keeps the
  * resolution it had. Neither answering still mints nothing rather than a node no
  * one proved: a repeat local or a literal is settled by the render that made it.
+ *
+ * `componentName` is the body the condition was authored in. Without it the
+ * instance resolver matched the local against every instance in the module and
+ * the last declaration won, so one widget's arm flipped on another widget's cell.
  */
 function resolveBranchTestRead(
 	testSource: string,
 	input: SymbolResolverInput,
 	bindings: ReadonlyMap<string, SemanticGraphBinding>,
 	aliases: ReadonlyMap<string, SemanticGraphAlias>,
+	componentName?: string,
 ): ResolvedGraphPath | null {
 	return (
-		resolveSharedInstanceGraphPath(testSource, input.semanticGraph) ??
+		resolveSharedInstanceGraphPath(testSource, input.semanticGraph, componentName) ??
 		resolveGraphPath(testSource, bindings, aliases)
 	);
 }
