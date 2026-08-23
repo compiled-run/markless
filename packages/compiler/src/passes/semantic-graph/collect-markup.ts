@@ -52,6 +52,9 @@ type CollectionContext = {
 	// Names the component being emitted destructured out of its props, so a
 	// spread of the rest binding can say what it can never carry.
 	destructuredNames: ReadonlyArray<string>;
+	// The rest binding those names were taken out of. Only a spread of THIS
+	// identifier carries consumer props; any other object is the author's own.
+	restName: string | null;
 };
 
 type ChunkBuilder = {
@@ -91,6 +94,7 @@ export function collectSemanticMarkup(input: {
 		styleScopeClass: null,
 		styleConstResolver: null,
 		destructuredNames: [],
+		restName: null,
 	};
 	const components: Array<{
 		readonly name: string;
@@ -119,9 +123,9 @@ export function collectSemanticMarkup(input: {
 	for (const component of components) {
 		context.styleScopeClass =
 			collectStyleScopes(component.root, input.filename).styleScopes[0]?.scopeId ?? null;
-		context.destructuredNames = [
-			...(propsRestSignature(component.node)?.destructuredNames ?? []),
-		];
+		const restSignature = propsRestSignature(component.node);
+		context.destructuredNames = [...(restSignature?.destructuredNames ?? [])];
+		context.restName = restSignature?.restName ?? null;
 		const builder = createChunk(`template:${component.name}`, 'template', component.name);
 		emitNode(component.root, [0], builder, context, null);
 		chunks.push(finishChunk(builder));
@@ -377,16 +381,24 @@ function emitNode(
 			const expression = unwrapExpressionContainer(
 				(attribute.argument ?? attribute.value) as AnyNode | undefined,
 			);
-			if (expression)
+			if (expression) {
+				// A name the part took out of its own props can never be inside the
+				// rest binding, so spreading `rest` must not write it. Any other
+				// object is one the author built: it keeps every key it carries.
+				const spreadsRestBinding =
+					context.restName !== null && getIdentifierName(expression) === context.restName;
 				addSlot(builder, {
 					kind: 'spread-attributes',
 					coordinate: { kind: 'child-index', path },
 					residue: expressionResidue(expression, context, repeat),
-					excludeNames: declaredAttributeNames,
+					excludeNames: spreadsRestBinding
+						? [...new Set([...declaredAttributeNames, ...context.destructuredNames])]
+						: declaredAttributeNames,
 					...(context.destructuredNames.length > 0
 						? { destructuredNames: context.destructuredNames }
 						: {}),
 				});
+			}
 			continue;
 		}
 		const name = getIdentifierName(attribute.name as AnyNode | undefined);
