@@ -179,24 +179,142 @@ test("SSR: a resumed bound handler in a keyed row writes its own row's widget gr
 	expect(pageWidgetTicks(container)).toEqual({ root: '0', trigger: '0' });
 });
 
-// PINNED - a widget rooted OUTSIDE every row still cannot be written from a
-// bound handler, and no row is involved in the failure. Measured on this base:
-// the record `c4:h1` matches, `bound:symbol%3A0:component-edge%3A4` runs, and it
-// reads and writes `c3:p4:shared:<file>#rowWidget/state:w` - the PROJECTION SITE
-// the part sits at, never resolved to the widget root at `c3:` that owns the
-// cells. Nothing is listening on that id, so the number never moves.
+// --- a widget rooted OUTSIDE the loop its parts are projected from ----------
 //
-// This is a different layer from the row threading above: the bound symbol's
-// graph never runs its ids through the widget-root lookup at all, so there is
-// nothing for a row to correct. It is also what still pins pagination's
-// `the rendered controls follow the page as the range changes`, whose
-// `pagination.root` sits outside the consumer's `@for`. The day it is fixed,
-// unmark this row and assert the row widgets are untouched by the click.
-test.fails('CSR: a bound handler writes a widget rooted outside every row', async () => {
+// No row is involved in this failure, which is what makes it a layer of its own.
+// Measured on the base this test was written against: the record `c4:h1`
+// matches, `bound:symbol%3A0:component-edge%3A4` runs, and it reads and writes
+// `c3:p4:shared:<file>#rowWidget/state:w` - the PROJECTION SITE the part sits
+// at, never resolved to the widget root at `c3:` that owns the cells. Nothing
+// listens on that id, so the record matches, the symbol runs warm, and the
+// number never moves. The bound symbol's graph simply never ran its ids through
+// the widget-root lookup, so there was nothing for a row to correct.
+//
+// This is pagination's shape: `pagination.root` sits outside the consumer's
+// `@for` while the interactive item parts are projected inside it.
+// The root OUTSIDE the repeat with its parts projected from INSIDE the rows.
+// Every trigger's record names a row, but no widget root was ever registered
+// under one, so the row pairs answer nothing and the projection site has to.
+function outsideWidget(container: HTMLElement): HTMLElement {
+	const found = container.querySelector<HTMLElement>('[data-outside-widget]');
+	if (!found) throw new Error('Expected the widget rooted outside the repeat.');
+	return found;
+}
+
+function seatTrigger(container: HTMLElement, key: string): HTMLButtonElement {
+	const found = outsideWidget(container).querySelector<HTMLButtonElement>(
+		`[data-seat="${key}"] [data-widget-trigger]`,
+	);
+	if (!found) throw new Error(`Expected the ${key} seat's trigger.`);
+	return found;
+}
+
+// Root and every seat read the one cell, so a fix that moves only the clicked
+// seat - or only the root - is caught.
+function outsideWidgetTicks(container: HTMLElement): Record<string, string> {
+	return {
+		root:
+			outsideWidget(container)
+				.querySelector('[data-widget-root]')
+				?.getAttribute('data-widget-ticks') ?? '',
+		alpha: seatTrigger(container, 'alpha').textContent ?? '',
+		beta: seatTrigger(container, 'beta').textContent ?? '',
+	};
+}
+
+test('CSR: parts projected from rows write the widget rooted outside the repeat', async () => {
+	const screen = await render(RowBoundSymbolPage);
+	const container = screen.container as HTMLElement;
+	expect(outsideWidgetTicks(container)).toEqual({ root: '0', alpha: '0', beta: '0' });
+
+	seatTrigger(container, 'beta').click();
+	await expect
+		.poll(() => outsideWidgetTicks(container))
+		.toEqual({ root: '1', alpha: '1', beta: '1' });
+
+	// A different row's part reaches the same root, so the count keeps climbing.
+	seatTrigger(container, 'alpha').click();
+	await expect
+		.poll(() => outsideWidgetTicks(container))
+		.toEqual({ root: '2', alpha: '2', beta: '2' });
+
+	// The per-row roots and the root beside them never moved.
+	expect(widgetTicks(container, 'alpha')).toEqual({ root: '0', trigger: '0' });
+	expect(widgetTicks(container, 'beta')).toEqual({ root: '0', trigger: '0' });
+	expect(pageWidgetTicks(container)).toEqual({ root: '0', trigger: '0' });
+	await expect.poll(() => widgetBumps(container)).toBe('2');
+});
+
+test('SSR: resumed parts projected from rows write the widget rooted outside the repeat', async () => {
+	const screen = await renderSSR(RowBoundSymbolPage);
+	const container = screen.container as HTMLElement;
+	expect(outsideWidgetTicks(container)).toEqual({ root: '0', alpha: '0', beta: '0' });
+
+	seatTrigger(container, 'beta').click();
+	await expect
+		.poll(() => outsideWidgetTicks(container))
+		.toEqual({ root: '1', alpha: '1', beta: '1' });
+
+	seatTrigger(container, 'alpha').click();
+	await expect
+		.poll(() => outsideWidgetTicks(container))
+		.toEqual({ root: '2', alpha: '2', beta: '2' });
+
+	expect(widgetTicks(container, 'beta')).toEqual({ root: '0', trigger: '0' });
+	expect(pageWidgetTicks(container)).toEqual({ root: '0', trigger: '0' });
+	await expect.poll(() => widgetBumps(container)).toBe('2');
+});
+
+test('CSR: a bound handler writes a widget rooted outside every row', async () => {
 	const screen = await render(RowBoundSymbolPage);
 	const container = screen.container as HTMLElement;
 	expect(pageWidgetTicks(container)).toEqual({ root: '0', trigger: '0' });
 
 	pageWidgetTrigger(container).click();
 	await expect.poll(() => pageWidgetTicks(container)).toEqual({ root: '1', trigger: '1' });
+	// Reaching the root outside the rows must not reach any row's own widget.
+	expect(widgetTicks(container, 'alpha')).toEqual({ root: '0', trigger: '0' });
+	expect(widgetTicks(container, 'beta')).toEqual({ root: '0', trigger: '0' });
+
+	pageWidgetTrigger(container).click();
+	await expect.poll(() => pageWidgetTicks(container)).toEqual({ root: '2', trigger: '2' });
+	expect(widgetTicks(container, 'beta')).toEqual({ root: '0', trigger: '0' });
+
+	// The captured page cell still counts in page space, one per click.
+	await expect.poll(() => widgetBumps(container)).toBe('2');
+});
+
+test('SSR: a resumed bound handler writes a widget rooted outside every row', async () => {
+	const screen = await renderSSR(RowBoundSymbolPage);
+	const container = screen.container as HTMLElement;
+	expect(pageWidgetTicks(container)).toEqual({ root: '0', trigger: '0' });
+
+	pageWidgetTrigger(container).click();
+	await expect.poll(() => pageWidgetTicks(container)).toEqual({ root: '1', trigger: '1' });
+	expect(widgetTicks(container, 'alpha')).toEqual({ root: '0', trigger: '0' });
+	expect(widgetTicks(container, 'beta')).toEqual({ root: '0', trigger: '0' });
+
+	await expect.poll(() => widgetBumps(container)).toBe('1');
+});
+
+// Both directions in one dispatch sequence: a root inside a row and a root
+// outside every row answer the SAME `shared()` call from the same part, so a fix
+// that resolves one by losing the other is caught here rather than in pagination.
+test('CSR: row widgets and the widget outside every row stay independent', async () => {
+	const screen = await render(RowBoundSymbolPage);
+	const container = screen.container as HTMLElement;
+
+	widgetTrigger(container, 'alpha').click();
+	await expect.poll(() => widgetTicks(container, 'alpha')).toEqual({ root: '1', trigger: '1' });
+	expect(pageWidgetTicks(container)).toEqual({ root: '0', trigger: '0' });
+
+	pageWidgetTrigger(container).click();
+	await expect.poll(() => pageWidgetTicks(container)).toEqual({ root: '1', trigger: '1' });
+	expect(widgetTicks(container, 'alpha')).toEqual({ root: '1', trigger: '1' });
+	expect(widgetTicks(container, 'beta')).toEqual({ root: '0', trigger: '0' });
+
+	widgetTrigger(container, 'beta').click();
+	await expect.poll(() => widgetTicks(container, 'beta')).toEqual({ root: '1', trigger: '1' });
+	expect(pageWidgetTicks(container)).toEqual({ root: '1', trigger: '1' });
+	expect(widgetTicks(container, 'alpha')).toEqual({ root: '1', trigger: '1' });
 });

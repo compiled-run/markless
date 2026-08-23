@@ -625,6 +625,25 @@ for (const mode of MODES) {
 	// arrives. So the anatomy alone is not the blocker and the row alone is not
 	// the blocker; the combination is, and both remaining halves live in the
 	// compiler and runtime rather than in this family.
+	//
+	// RE-MEASURED again after the widget-root projection fix ("a bound symbol
+	// resolves widget ids through the root that owns them"), which is what turned
+	// the equivalent framework fixture green. This row did NOT move: 42 passed /
+	// 13 expected fail before and after, and the same nothing-moved reading 400ms
+	// past the click on page 5.
+	//
+	// What that fix ruled out, and the remaining cause it names. Clicking page 5
+	// dispatches record `r:page%3A5:c3:h2` and runs the bound symbol, whose own
+	// instance path is `c3:`. The ROOT's cells resolve correctly - the id
+	// `c0:shared:…#paginationState/state:pagination` is reached and written. The
+	// ITEM's do not: the widget-root registry holds one root per rendered item at
+	// `r:page%3A5:c0:p2:` and no entry under `c3:` at all, so the item's
+	// `#paginationItemState` id stays in page space no matter how the row is
+	// threaded. The gap is a REGISTRATION one - the item part's projection site
+	// is registered in the root's subtree (`c0:p2:`) while the dispatching part
+	// is spelled in the consumer's (`c3:`) - and it lives in composition's
+	// projection bridge, not in the resolution this family or the row scope can
+	// reach.
 	test.fails(`${mode}: the rendered controls follow the page as the range changes`, async () => {
 		if (mode === 'CSR') await render(Products);
 		else await renderSSR(Products);
