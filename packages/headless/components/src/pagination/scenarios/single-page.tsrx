@@ -6,7 +6,9 @@ import * as pagination from '../index.ts';
 export default function SinglePage() @{
 	<pagination.root count={1} data-testid="root">
 		<pagination.backtrigger data-testid="backtrigger">Previous</pagination.backtrigger>
-		<pagination.itemtrigger value={1} data-testid="itemtrigger-1">1</pagination.itemtrigger>
+		<pagination.item value={1} data-testid="item-1">
+			<pagination.itemtrigger data-testid="itemtrigger-1">1</pagination.itemtrigger>
+		</pagination.item>
 		<pagination.forwardtrigger data-testid="forwardtrigger">Next</pagination.forwardtrigger>
 	</pagination.root>
 }

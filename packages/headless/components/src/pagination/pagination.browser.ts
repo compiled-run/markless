@@ -14,11 +14,15 @@ import WithoutOnChange from './scenarios/without-onchange.tsrx';
 
 // Colocated browser suite for the pagination family. Each test renders a
 // realistic consumer scenario, and the locators name the part anatomy: root,
-// item, itemtrigger, itemlink, forwardtrigger, backtrigger.
+// item, itemtrigger, itemlink, forwardtrigger, backtrigger. The page number
+// lives on the ITEM in every scenario; the control inside it takes none.
 //
-// The `pageRange` rows live here rather than in a plain unit file because the
-// package's browser project includes `src/**/*.browser.ts` only - a
-// `pagination-range.test.ts` beside the function would never be run by anything.
+// The `pageRange` rows below import the INTERNAL module on purpose. The function
+// is not family API any more - a consumer reads the range as `p.getEntries()` -
+// but the arithmetic still deserves direct rows, and they live here rather than
+// in a plain unit file because the package's browser project includes
+// `src/**/*.browser.ts` only: a `pagination-range.test.ts` beside the function
+// would never be run by anything.
 const Root = page.getByTestId('root');
 const Back = page.getByTestId('backtrigger');
 const Forward = page.getByTestId('forwardtrigger');
@@ -208,6 +212,12 @@ function expectBasicRendered() {
 	expect(at('itemtrigger-2').hasAttribute('aria-current')).toBe(false);
 	expect(at('itemtrigger-5').hasAttribute('aria-current')).toBe(false);
 
+	// The anatomy: the item is the box, the control lives inside it, and the page
+	// number was written once - on the item. The control was told nothing.
+	expect(at('itemtrigger-1').parentElement).toBe(at('item-1'));
+	expect(at('itemtrigger-1').hasAttribute('value')).toBe(false);
+	expect(at('itemtrigger-5').hasAttribute('value')).toBe(false);
+
 	// The item box carries the styling flag; the control carries the ARIA.
 	expect(at('item-1').getAttribute('ui-active')).toBe('');
 	expect(at('item-2').hasAttribute('ui-active')).toBe(false);
@@ -245,16 +255,16 @@ function expectClampedRendered() {
 }
 
 function expectDisabledRendered() {
+	// The scenario says `disabled` once, on the root. Everything below is what the
+	// family derived from that - no control on the page was told to be shut.
 	expect(el(Root).getAttribute('ui-disabled')).toBe('');
 	expect(el(Back).hasAttribute('disabled')).toBe(true);
 	expect(el(Forward).hasAttribute('disabled')).toBe(true);
-	expect(at('itemtrigger-3').hasAttribute('disabled')).toBe(true);
-	// The consumer wrote `disabled={false}` on this one. The family writes its own
-	// `disabled` after the spread, so the family wins and the control stays shut.
 	expect(at('itemtrigger-2').hasAttribute('disabled')).toBe(true);
-	// The consumer wrote `aria-current="page"` on a page nobody is on. Same rule,
-	// same outcome: the family's `undefined` after the spread removes it.
-	expect(at('itemtrigger-4').hasAttribute('aria-current')).toBe(false);
+	expect(at('itemtrigger-3').hasAttribute('disabled')).toBe(true);
+	expect(at('itemtrigger-4').hasAttribute('disabled')).toBe(true);
+	// And the current page is derived too: page 3 is showing, so the control
+	// inside the item that declared 3 is the one - and it is the only one.
 	expectOnlyCurrent('itemtrigger-3');
 	// An anchor has no `disabled` attribute, so it reports aria-disabled instead
 	// and stays where a reader can find it.
@@ -275,6 +285,10 @@ function expectLinksRendered() {
 	expect(at('itemlink-1').tagName).toBe('A');
 	expect(at('itemlink-1').getAttribute('href')).toBe('#page-1');
 	expect(at('itemlink-4').getAttribute('href')).toBe('#page-4');
+	// Same anatomy as the button flavour: the item declares the page, the anchor
+	// carries the href and is told no page number of its own.
+	expect(at('itemlink-2').parentElement).toBe(at('item-2'));
+	expect(at('itemlink-2').hasAttribute('value')).toBe(false);
 	expectOnlyCurrent('itemlink-2');
 	// Nothing is unavailable here, so no link claims to be.
 	expect(at('itemlink-1').hasAttribute('aria-disabled')).toBe(false);
@@ -292,9 +306,14 @@ function expectTwoWidgetsRendered() {
 }
 
 function expectProductsRendered() {
-	// pageRange(1, 20, 1) is 1 2 3 4 5, a gap, 20: six controls and one gap.
+	// The family's own range, read by the consumer as one zero-arg accessor: at
+	// page 1 of 20 that is 1 2 3 4 5, a gap, 20 - six controls and one gap.
 	expect(renderedPages()).toEqual(['1', '2', '3', '4', '5', '20']);
 	expect(ellipsisCount()).toBe(1);
+	// Every rendered control sits inside an item, in the loop too.
+	expect(triggers().every((control) => control.parentElement?.dataset.testid === 'item')).toBe(
+		true,
+	);
 	// The gap is the consumer's own span, and it is hidden from a reader: exposed
 	// it announces "horizontal ellipsis", which is not information.
 	expect(at('ellipsis').getAttribute('aria-hidden')).toBe('true');
@@ -439,17 +458,22 @@ for (const mode of MODES) {
 		expectSinglePageRendered();
 	});
 
-	// PINNED - a seeded page cannot be clamped, and the clamp cannot move to the
-	// read side either. A component body may seed a shared cell only from a bare
-	// prop or a constant (MARKLESS_SHARED_SEED_UNSUPPORTED refuses both
-	// `pagination.page = Math.min(...)` and a component-local const holding it), so
-	// the root cannot narrow `page` on the way in. Doing the clamp in the parts
-	// instead - `Math.max(Math.min(pagination.page, pagination.count), 1) ===
-	// item.value` - compiles and renders right, and then never refreshes: measured
-	// on this base, every click row went red the moment the comparison stopped
-	// being a plain cell read. Plain reads and live clicks are worth more than a
-	// seeded out-of-range page, so this row stays pinned. `goTo()` still clamps
-	// every write, so a pagination only sits out of range until the first gesture.
+	// PINNED, and narrower than it used to be. The family DOES clamp internally
+	// now - `getEntries()` narrows the page before it picks a range, so a
+	// bookmarked `?page=99` gets the last page's range. What it cannot clamp is
+	// the comparison a hand-written item is marked current by, which is what this
+	// row asserts.
+	//
+	// A component body may seed a shared cell only from a bare prop or a constant
+	// (MARKLESS_SHARED_SEED_UNSUPPORTED refuses both `pagination.page =
+	// Math.min(...)` and a component-local const holding it), so the root cannot
+	// narrow `page` on the way in. Doing the clamp in the parts instead -
+	// `Math.max(Math.min(pagination.page, pagination.count), 1) === item.value` -
+	// compiles and renders right, and then never refreshes: measured on this base,
+	// every click row went red the moment the comparison stopped being a plain
+	// cell read. Plain reads and live clicks are worth more than a seeded
+	// out-of-range page, so this row stays pinned. `goTo()` still clamps every
+	// write, so a pagination only sits out of range until the first gesture.
 	test.fails(`${mode}: a page number past the end is clamped to the last page`, async () => {
 		if (mode === 'CSR') await render(Clamped);
 		else await renderSSR(Clamped);
@@ -504,9 +528,11 @@ for (const mode of MODES) {
 	// `entry.key` (`keyPath: ["key"]`, `directSupported: true`), and
 	// `rowScopedEdgeIds`
 	// (packages/compiler/src/passes/public-render/ssr-module.ts) descends into a
-	// branch arm's templates, so `<pagination.itemtrigger>` inside this row's `@if`
-	// is row-scoped and the SSR render composes one instance per row instead of
-	// refusing with MARKLESS_ROW_COMPONENT_INTERACTIVE.
+	// branch arm's templates, so the parts inside this row's `@if` are row-scoped
+	// and the SSR render composes one instance per row instead of refusing with
+	// MARKLESS_ROW_COMPONENT_INTERACTIVE. The row now nests `item > itemtrigger`
+	// rather than a bare trigger, so it is TWO composed parts deep inside the arm
+	// and still renders.
 	test(`${mode}: the looped scenario renders the range the consumer computed`, async () => {
 		if (mode === 'CSR') await render(Products);
 		else await renderSSR(Products);
@@ -525,19 +551,40 @@ for (const mode of MODES) {
 		await expectStepControlsWalkToTheBounds();
 	});
 
-	test(`${mode}: a click calls the consumer onChange once with the new page`, async () => {
+	// PINNED, and newly so: these three were green while the trigger was a direct
+	// child of the root, and the correct anatomy - item > itemtrigger - is what
+	// exposed the cause.
+	//
+	// A consumer callback held on the widget-root's shared instance only reaches
+	// the consumer when the part that dispatches is a DIRECT child of the root
+	// part. One more component level in between and the WRITE still lands - the
+	// page moves and aria-current follows it - while `pagination.onChange?.(next)`
+	// reaches nobody.
+	//
+	// Measured on this base, and the measurement rules the second shared
+	// definition out as a cause. Clicking `forwardtrigger` as a direct child:
+	// `calls=1, page=2`. The same scenario with nothing changed but that trigger
+	// wrapped in a `pagination.item`: `calls=0, page=''`, and the page still moved.
+	// `forwardtrigger` never reads the item instance, so what silences it is the
+	// nesting depth alone, not the per-item state the controls beside it resolve.
+	//
+	// The family cannot fix this from inside the anatomy the owner ratified: the
+	// routing lives in the compiler's shared-callback wiring, not in these parts.
+	test.fails(`${mode}: a click calls the consumer onChange once with the new page`, async () => {
 		if (mode === 'CSR') await render(WithOnChange);
 		else await renderSSR(WithOnChange);
 		await expectConsumerCallbackFires();
 	});
 
-	test(`${mode}: clicking the page already showing calls nothing`, async () => {
+	test.fails(`${mode}: clicking the page already showing calls nothing`, async () => {
 		if (mode === 'CSR') await render(WithOnChange);
 		else await renderSSR(WithOnChange);
 		await expectTheCurrentPageFiresNothing();
 	});
 
-	test(`${mode}: back and forward report through the same callback`, async () => {
+	// The step controls themselves ARE direct children of the root, so their half
+	// of this row routes; it opens by clicking a page control, which does not.
+	test.fails(`${mode}: back and forward report through the same callback`, async () => {
 		if (mode === 'CSR') await render(WithOnChange);
 		else await renderSSR(WithOnChange);
 		await expectStepControlsReportThroughTheSameCallback();
@@ -561,19 +608,23 @@ for (const mode of MODES) {
 		await expectLinkMovesTheCurrentPage();
 	});
 
-	// RE-PINNED on a different, downstream cause. The row-scoping gap above is
-	// gone: SSR now serves the whole range and its click DOES route - dispatch
-	// matches the row-scoped record `r:page%3A5:c2:h2` and runs
-	// `bound:symbol%3A0:component-edge%3A2[b=branch%3A0;k=repeat%3A0]` warm. What
-	// the handler cannot do is land a write: measured right after the click and
-	// again 200ms later, `calls` stays `0`, `aria-current` stays on page 1, and
-	// the heading stays `Page 1 of 20`. CSR fails identically, and CSR never
-	// loads `ssrModuleSource`, so the remaining cause is shared - the bound
-	// symbol module for an edge scoped `[b=...;k=...]` carries the build-time
-	// branch/repeat scope (packages/compiler/src/passes/symbol-resolver.ts
-	// `boundSymbolId`) but no row value, so the body that runs cannot reach the
-	// row instance the record named. Fixing it is a symbol-module/runtime change,
-	// outside this family and outside the SSR emission pass.
+	// STILL PINNED, re-measured on the bound-symbol row fix (9733c5eb, "bound
+	// symbols carry the row segment"). The range is served and rendered
+	// correctly - the row above is green - and what a row's click still cannot do
+	// is land anything at all.
+	//
+	// Measured after that fix, 400ms past the click on page 5: `aria-current` is
+	// still on page 1, the consumer callback count is still `0`, and the heading
+	// is still `Page 1 of 20`. Nothing moved.
+	//
+	// The two flat measurements bound the cause. In `Basic`, the same
+	// `item > itemtrigger` nesting outside a loop moves `aria-current` on click.
+	// In `WithOnChange`, flat, the write lands and only the consumer callback is
+	// lost. Here - the one place that is BOTH inside a keyed row and one part
+	// deeper than the root's direct children - neither the write nor the callback
+	// arrives. So the anatomy alone is not the blocker and the row alone is not
+	// the blocker; the combination is, and both remaining halves live in the
+	// compiler and runtime rather than in this family.
 	test.fails(`${mode}: the rendered controls follow the page as the range changes`, async () => {
 		if (mode === 'CSR') await render(Products);
 		else await renderSSR(Products);
@@ -653,13 +704,12 @@ test('SSR: the served page carries the current page and both bounds', async () =
 	expect(at('itemtrigger-1').hasAttribute('aria-current')).toBe(false);
 });
 
-// RE-PINNED on the post-click half only. The served half is now GREEN and stays
+// PINNED on the post-click half only. The served half is GREEN and stays
 // asserted below: the server no longer refuses with
-// MARKLESS_ROW_COMPONENT_INTERACTIVE, so the range and the single gap arrive on
-// the page exactly as the consumer computed them. What still fails is the same
-// downstream cause as the row above - the first click after resume routes to the
-// row-scoped record but its bound symbol lands no write, so the row SET never
-// changes.
+// MARKLESS_ROW_COMPONENT_INTERACTIVE, so the range and its single gap arrive on
+// the page exactly as the family computed them, through the `item > itemtrigger`
+// anatomy. What still fails is the row above's remaining cause - the first click
+// after resume lands nothing, so the row SET never changes.
 test.fails('SSR: the served looped range is the one the consumer computed', async () => {
 	await renderSSR(Products);
 	expect(renderedPages()).toEqual(['1', '2', '3', '4', '5', '20']);
