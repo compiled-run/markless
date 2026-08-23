@@ -154,10 +154,10 @@ export function RadioGroupItemIndicator({ children, ...rest }: RadioGroupItemInd
 	// A computed, not the comparison inline: an `@if` condition written as an
 	// expression renders correctly once and then never refreshes, so the arm
 	// has to read one graph cell. Measured, not assumed - see note.md.
-	const selected = computed(() => group.value === item.value);
+	const isSelected = computed(() => group.value === item.value);
 
 	<span {...rest} aria-hidden="true">
-		@if (selected) { <>{children}</> }
+		@if (isSelected) { <>{children}</> }
 	</span>
 }
 
@@ -173,7 +173,7 @@ export function RadioGroupItemField({ onChange, onFocus, onKeydown, ...rest }: R
 	// Reachable before any gesture, one tab stop after the first: while nothing
 	// is chosen every enabled option is tabbable until a focus says which one
 	// owns the stop. No index, so no construction-order counter.
-	const tabStop = computed(
+	const isTabStop = computed(
 		() =>
 			group.value === item.value ||
 			(group.value === '' && (group.tabbable === '' || group.tabbable === item.value)),
@@ -189,7 +189,7 @@ export function RadioGroupItemField({ onChange, onFocus, onKeydown, ...rest }: R
 			checked={group.value === item.value}
 			disabled={item.disabled || group.disabled}
 			required={group.required}
-			tabindex={tabStop ? 0 : -1}
+			tabindex={isTabStop ? 0 : -1}
 			onChange={(event) => {
 				group.choose(item.value);
 				onChange?.(event);
@@ -212,9 +212,9 @@ export function RadioGroupItemField({ onChange, onFocus, onKeydown, ...rest }: R
 					event.preventDefault();
 				}
 
-				const horizontal = group.orientation === 'horizontal';
-				const forward = horizontal ? 'ArrowRight' : 'ArrowDown';
-				const backward = horizontal ? 'ArrowLeft' : 'ArrowUp';
+				const isHorizontal = group.orientation === 'horizontal';
+				const forward = isHorizontal ? 'ArrowRight' : 'ArrowDown';
+				const backward = isHorizontal ? 'ArrowLeft' : 'ArrowUp';
 				const key = event.key;
 				// `target`, not `currentTarget`: a lazy handler symbol runs after the
 				// native dispatch has finished, and `currentTarget` is null by then.

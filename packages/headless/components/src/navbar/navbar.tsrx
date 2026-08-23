@@ -193,7 +193,7 @@ export function NavbarItem({
 	item.active = active;
 	// One graph cell, read in every position: a comparison written inline in an
 	// attribute renders once and then goes stale.
-	const open = computed(() => navbar.value === item.value);
+	const isOpen = computed(() => navbar.value === item.value);
 
 	// `ui-navbar-item` is anatomy, not state: it is the name every climb needs for
 	// "the item this control belongs to".
@@ -205,8 +205,8 @@ export function NavbarItem({
 	<div
 		{...rest}
 		ui-navbar-item=""
-		ui-open={open}
-		ui-closed={open !== true}
+		ui-open={isOpen}
+		ui-closed={isOpen !== true}
 		ui-active={item.active}
 		onPointerover={(event) => {
 			const from = event.target as HTMLElement;
@@ -228,11 +228,11 @@ export function NavbarItem({
 			// start: if you are already browsing the navbar you expect the next one at
 			// once, rather than for a fixed window after the last close.
 			const now = Date.now();
-			const ready =
+			const isReadyToOpen =
 				navbar.value !== '' ||
 				navbar.delay <= 0 ||
 				(item.restingUntil !== 0 && now >= item.restingUntil);
-			if (ready) {
+			if (isReadyToOpen) {
 				window.clearTimeout(item.openTimer);
 				item.openTimer = 0;
 				item.restingUntil = 0;
@@ -291,7 +291,7 @@ export function NavbarItemTrigger({
 }: NavbarItemTriggerProps) @{
 	const navbar = navbarState();
 	const item = navbarItemState();
-	const open = computed(() => navbar.value === item.value);
+	const isOpen = computed(() => navbar.value === item.value);
 
 	// A native <button> already activates on Enter and on Space, so those two keys
 	// need no rule; ArrowDown is the authoring practices' optional "open and step
@@ -299,10 +299,10 @@ export function NavbarItemTrigger({
 	<button
 		{...rest}
 		type="button"
-		aria-expanded={open ? 'true' : 'false'}
+		aria-expanded={isOpen ? 'true' : 'false'}
 		aria-controls={item.contentEl}
-		ui-open={open}
-		ui-closed={open !== true}
+		ui-open={isOpen}
+		ui-closed={isOpen !== true}
 		onClick={(event) => {
 			// A dropdown that just opened under the resting pointer is not something the
 			// click that followed should shut. A timestamp comparison rather than a
@@ -389,7 +389,7 @@ export function NavbarItemTrigger({
 export function NavbarItemContent({ children, onKeydown, ...rest }: NavbarItemContentProps) @{
 	const navbar = navbarState();
 	const item = navbarItemState();
-	const open = computed(() => navbar.value === item.value);
+	const isOpen = computed(() => navbar.value === item.value);
 
 	// Closed hides the panel, it never detaches it: the trigger points at this
 	// element's minted id, and an unmount would leave that reference dangling.
@@ -397,9 +397,9 @@ export function NavbarItemContent({ children, onKeydown, ...rest }: NavbarItemCo
 		{...rest}
 		el={item.contentEl}
 		ui-navbar-dropdown=""
-		hidden={open !== true}
-		ui-open={open}
-		ui-closed={open !== true}
+		hidden={isOpen !== true}
+		ui-open={isOpen}
+		ui-closed={isOpen !== true}
 		onKeydown={(event) => {
 			// Guarded by event fields alone, for the reason the root's handler gives.
 			if (
@@ -428,7 +428,7 @@ export function NavbarItemContent({ children, onKeydown, ...rest }: NavbarItemCo
 				return;
 			}
 
-			const moves =
+			const isNavigationKey =
 				key === 'ArrowUp' ||
 				key === 'ArrowDown' ||
 				key === 'ArrowLeft' ||
@@ -437,7 +437,7 @@ export function NavbarItemContent({ children, onKeydown, ...rest }: NavbarItemCo
 				key === 'End';
 			const panel = from.closest('[ui-navbar-dropdown]');
 			const here = from.closest('a[href], button:not([disabled])') as HTMLElement | null;
-			if (!moves || panel === null || here === null) {
+			if (!isNavigationKey || panel === null || here === null) {
 				onKeydown?.(event);
 				return;
 			}
@@ -449,8 +449,8 @@ export function NavbarItemContent({ children, onKeydown, ...rest }: NavbarItemCo
 			);
 			const at = walk.indexOf(here);
 			const last = walk.length - 1;
-			const forward = key === 'ArrowDown' || key === 'ArrowRight';
-			const step = key === 'Home' ? -at : key === 'End' ? last - at : forward ? 1 : -1;
+			const isForwardKey = key === 'ArrowDown' || key === 'ArrowRight';
+			const step = key === 'Home' ? -at : key === 'End' ? last - at : isForwardKey ? 1 : -1;
 			const raw = at + step;
 			const to = raw < 0 ? last : raw > last ? 0 : raw;
 			const next = walk[to];
@@ -517,23 +517,23 @@ export function NavbarItemLink({ current, children, onKeydown, ...rest }: Navbar
 			// panel's own links; at the top level only the left and right arrows walk,
 			// and they skip anything inside an open dropdown. Both stay on the DOM for
 			// the reason the root's walk gives: no primitive builds the collection.
-			const inside = panel !== null;
-			const forward = key === 'ArrowRight' || (inside && key === 'ArrowDown');
-			const backward = key === 'ArrowLeft' || (inside && key === 'ArrowUp');
-			const jump = inside && (key === 'Home' || key === 'End');
-			const scope = inside ? panel : from.closest('nav');
+			const isInsideDropdown = panel !== null;
+			const isForwardKey = key === 'ArrowRight' || (isInsideDropdown && key === 'ArrowDown');
+			const isBackwardKey = key === 'ArrowLeft' || (isInsideDropdown && key === 'ArrowUp');
+			const isJumpKey = isInsideDropdown && (key === 'Home' || key === 'End');
+			const scope = isInsideDropdown ? panel : from.closest('nav');
 			const here = from.closest('a[href], button:not([disabled])') as HTMLElement | null;
-			if (here === null || scope === null || (!forward && !backward && !jump)) {
+			if (here === null || scope === null || (!isForwardKey && !isBackwardKey && !isJumpKey)) {
 				onKeydown?.(event);
 				return;
 			}
 
 			const walk = Array.from(
 				scope.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'),
-			).filter((control) => inside || control.closest('[ui-navbar-dropdown]') === null);
+			).filter((control) => isInsideDropdown || control.closest('[ui-navbar-dropdown]') === null);
 			const at = walk.indexOf(here);
 			const last = walk.length - 1;
-			const step = key === 'Home' ? -at : key === 'End' ? last - at : forward ? 1 : -1;
+			const step = key === 'Home' ? -at : key === 'End' ? last - at : isForwardKey ? 1 : -1;
 			const raw = at + step;
 			const to = raw < 0 ? last : raw > last ? 0 : raw;
 			const next = walk[to];

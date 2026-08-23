@@ -17,14 +17,14 @@
  * listbox is still `hidden` when the key handler runs and nothing inside a
  * hidden subtree can take focus, so the landing is retried per frame.
  */
-export function focusOpeningOption(target: HTMLElement, search: string, fromEnd: boolean): void {
+export function focusOpeningOption(target: HTMLElement, search: string, isFromEnd: boolean): void {
 	const listbox = listboxControlledBy(target);
 	if (listbox === null) return;
 
 	let tries = 12;
 	const land = () => {
 		const options = walkableOptions(listbox);
-		const end = fromEnd ? options[options.length - 1] : options[0];
+		const end = isFromEnd ? options[options.length - 1] : options[0];
 		// A chosen option wins over the first-or-last default.
 		const chosen = options.find((option) => option.getAttribute('aria-selected') === 'true');
 		const wanted = search === '' ? (chosen ?? end) : matchingOption(options, search);
@@ -99,9 +99,9 @@ function matchingOption(options: HTMLElement[], search: string): HTMLElement | u
 function optionWords(option: HTMLElement): string {
 	let words = '';
 	for (const node of Array.from(option.childNodes)) {
-		const decoration =
+		const isDecoration =
 			node.nodeType === 1 && (node as Element).getAttribute('aria-hidden') === 'true';
-		if (decoration) continue;
+		if (isDecoration) continue;
 		words += node.textContent ?? '';
 	}
 	return words.trim().toLowerCase();

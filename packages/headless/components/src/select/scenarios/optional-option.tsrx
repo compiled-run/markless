@@ -4,7 +4,7 @@ import * as select from '../index.ts';
 // a state cell: a widget-root part inside an arm that FLIPS is refused at compile
 // time (MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED), so the everyday "this option
 // appears when a checkbox is on" form is a framework wall - see note.md.
-const OFFERS_LIFETIME = true;
+const IS_LIFETIME_OFFERED = true;
 
 export function OptionalOption() @{
 	<select.root data-testid="root">
@@ -15,7 +15,7 @@ export function OptionalOption() @{
 				<select.item value="monthly" data-testid="monthly">
 					<select.itemlabel>Monthly</select.itemlabel>
 				</select.item>
-				@if (OFFERS_LIFETIME) {
+				@if (IS_LIFETIME_OFFERED) {
 					<select.item value="lifetime" data-testid="lifetime">
 						<select.itemlabel>Lifetime</select.itemlabel>
 					</select.item>

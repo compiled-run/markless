@@ -12,7 +12,7 @@ import * as tabs from '../index.ts';
 //   * The condition is a module constant rather than a flipping cell: a FLIPPING
 //     arm holding a shared-instance part is refused today
 //     (MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED, recorded in otp.browser.ts).
-const teamPlan = true;
+const isTeamPlan = true;
 
 export default function ArmTabs() @{
 	<tabs.root value="overview" data-testid="root">
@@ -23,7 +23,7 @@ export default function ArmTabs() @{
 		</tabs.list>
 		<div data-testid="panels">
 			<tabs.content value="overview" data-testid="overview-content">Overview.</tabs.content>
-			@if (teamPlan) {
+			@if (isTeamPlan) {
 				<tabs.content value="team" data-testid="team-content">Seats and invites.</tabs.content>
 			}
 			<tabs.content value="billing" data-testid="billing-content">Invoices.</tabs.content>

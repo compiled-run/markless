@@ -86,15 +86,15 @@ export function TabsTrigger({
 	tab.value = value;
 	// One cell read in every position: the same comparison written inline in an
 	// attribute renders once and then goes stale. Measured, see note.md.
-	const selected = computed(() => tabs.value === tab.value);
+	const isSelected = computed(() => tabs.value === tab.value);
 
 	<button
 		{...rest}
 		type="button"
 		role="tab"
-		aria-selected={selected ? 'true' : 'false'}
-		tabindex={selected ? 0 : -1}
-		ui-selected={selected}
+		aria-selected={isSelected ? 'true' : 'false'}
+		tabindex={isSelected ? 0 : -1}
+		ui-selected={isSelected}
 		ui-vertical={tabs.orientation === 'vertical'}
 		onClick={(event) => {
 			tabs.show(tab.value);
@@ -120,12 +120,13 @@ export function TabsTrigger({
 				event.preventDefault();
 			}
 
-			const horizontal = tabs.orientation !== 'vertical';
-			const forward = horizontal ? 'ArrowRight' : 'ArrowDown';
-			const backward = horizontal ? 'ArrowLeft' : 'ArrowUp';
+			const isHorizontal = tabs.orientation !== 'vertical';
+			const forward = isHorizontal ? 'ArrowRight' : 'ArrowDown';
+			const backward = isHorizontal ? 'ArrowLeft' : 'ArrowUp';
 			const key = event.key;
-			const walks = key === forward || key === backward || key === 'Home' || key === 'End';
-			if (!walks) {
+			const isNavigationKey =
+				key === forward || key === backward || key === 'Home' || key === 'End';
+			if (!isNavigationKey) {
 				onKeydown?.(event);
 				return;
 			}
@@ -171,16 +172,16 @@ export function TabsContent({ value, children, ...rest }: TabsContentProps) @{
 	// The panel compares against its prop where the trigger compares against a
 	// cell: rooting a part instance here stops `hidden` refreshing in CSR too.
 	// Measured both ways, see note.md.
-	const showing = computed(() => tabs.value === value);
+	const isShowing = computed(() => tabs.value === value);
 
 	// `hidden` rather than an arm: a panel that unmounts loses the focus, scroll
 	// position and form state inside it on every tab change.
 	<div
 		{...rest}
 		role="tabpanel"
-		hidden={showing !== true}
-		tabindex={showing ? 0 : -1}
+		hidden={isShowing !== true}
+		tabindex={isShowing ? 0 : -1}
 		aria-live="off"
-		ui-selected={showing}
+		ui-selected={isShowing}
 	>{children}</div>
 }

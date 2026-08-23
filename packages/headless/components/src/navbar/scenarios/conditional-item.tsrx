@@ -14,7 +14,7 @@ import * as navbar from '../index.ts';
 //     (MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED). A navbar whose entries depend on
 //     whether a person is signed in is the everyday shape this cannot express
 //     yet, and it is recorded in note.md rather than worked around here.
-const signedIn = true;
+const isSignedIn = true;
 
 export default function ConditionalItem() @{
 	<navbar.root aria-label="Primary" hover={false} data-testid="root">
@@ -22,7 +22,7 @@ export default function ConditionalItem() @{
 			<navbar.itemlink href="/products" data-testid="products-itemlink">Products</navbar.itemlink>
 		</navbar.item>
 		<div data-testid="account">
-			@if (signedIn) {
+			@if (isSignedIn) {
 				<navbar.item value="account" data-testid="account-item">
 					<navbar.itemtrigger data-testid="account-itemtrigger">Account</navbar.itemtrigger>
 					<navbar.itemcontent data-testid="account-itemcontent">
