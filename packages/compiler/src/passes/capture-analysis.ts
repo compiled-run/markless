@@ -44,6 +44,11 @@ export const SHARED_FACTORY_CLASS_INSTANCE_CODE =
 export const STATE_PROPERTY_CLASS_INSTANCE_CODE =
 	'MARKLESS_STATE_PROPERTY_CLASS_INSTANCE' as const;
 
+// Every source this pass re-parses came out of a `.tsrx` module, so it is
+// TypeScript. `parseJavaScriptModule` picks its dialect from the filename and
+// defaults to `.js`, which rejects annotations and casts.
+const CAPTURE_SOURCE_PARSE_FILENAME = 'generated.ts';
+
 export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArtifact {
 	const semantics = createSymbolSourceSemanticsReader();
 	const localSymbols = input.symbolResolver.symbols.map((symbol) => {
@@ -794,7 +799,9 @@ function referenceInvocationIsAbsentSafe(source: string, reference: string): boo
 	const moduleSource = `const __marklessCaptureSource = ${source};`;
 	let ast: AnyNode;
 	try {
-		ast = parseJavaScriptModule(moduleSource);
+		// Handler sources are TypeScript: parsing them as JavaScript throws on the
+		// first annotation or cast, and the catch would read that as unconditional.
+		ast = parseJavaScriptModule(moduleSource, CAPTURE_SOURCE_PARSE_FILENAME);
 	} catch {
 		return false;
 	}
@@ -1258,7 +1265,7 @@ function unwrapParens(node: AnyNode): AnyNode {
 function parsedExpression(source: string): AnyNode | undefined {
 	let ast: AnyNode;
 	try {
-		ast = parseJavaScriptModule(`(${source});`);
+		ast = parseJavaScriptModule(`(${source});`, CAPTURE_SOURCE_PARSE_FILENAME);
 	} catch {
 		return undefined;
 	}
