@@ -22,10 +22,9 @@ export const otpState = shared(
 			// literal function types: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
 			onComplete: undefined as ((value: string) => void) | undefined,
-			// Takes no parameter on purpose. A handler can call a shared method and
-			// it can assign one event field to one cell, so the field writes the
-			// raw text and this reads it back; a method that took the text instead
-			// costs the calling handler its own props (MARKLESS_CAPTURE_OPAQUE_PROP).
+			// Zero-arg by choice, not by force: MARKLESS_CAPTURE_OPAQUE_PROP no
+			// longer refuses a parameterised shared method here (measured 2026-08-23,
+			// note.md). Reading otp.value back keeps the write in one place.
 			commit() {
 				// `maxlength` truncates typing, but a pasted or autofilled string is
 				// not truncated by the platform, so the slice is what enforces it.
@@ -89,8 +88,8 @@ export function OtpField({ onInput, onFocus, ...rest }: OtpFieldProps) @{
 			onFocus?.(event);
 		}}
 		onInput={(event) => {
-			// Two statements, both of the shapes a handler supports: one event
-			// field into one cell, then a shared method with no arguments.
+			// currentTarget is live here only because this handler is not resumed;
+			// after SSR resume it is null, which is why onFocus uses event.target.
 			otp.value = event.currentTarget.value;
 			otp.commit();
 			onInput?.(event);

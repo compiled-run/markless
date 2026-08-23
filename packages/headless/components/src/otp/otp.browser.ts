@@ -277,24 +277,27 @@ test('CSR: Backspace takes the last character back out of its box', async () => 
 // 2026-08-22): `otp.value.slice(...)` in commit() lowered to a read of the whole
 // callee chain, so the emitted call invoked a detached String.prototype.slice
 // with no receiver and threw "slice called on null or undefined". Fixed in
-// collect-expressions.ts (a method call reads its receiver). Five of the eight
-// run green now; the three below stayed red on causes the receiver fix does not
-// touch, each re-pinned with what U130 measured on 2026-08-22. The third, the
-// caret row, has since been re-pinned again on a different cause (U134) — the
-// family carries the caret policy now, and the wall moved to the framework.
+// collect-expressions.ts (a method call reads its receiver). Five ran green on
+// that fix; the last three were re-verified against this tip on 2026-08-23
+// (U182) and two of them are green now. Only the caret row below is still
+// pinned, and on a framework wall rather than anything the family can shape
+// around.
 
-// WithOnChange only: the family takes the value (onChange receives the whole
-// code, and the field reads "1234" back), but no box ever fills - all four read
-// "" with ui-empty set. The same boxes fill in WithoutOnChange and in
-// WithOnComplete, so the item refresh is lost in the dispatch that also runs a
-// consumer callback writing page state, not in the slice.
-test.skip('CSR: typing past the declared length adds nothing', async () => {
+// Green since 2026-08-23. The U130 pin said "no box ever fills in WithOnChange";
+// re-measured on this tip, every box fills — typing 1,2,3,4,5 one key at a time
+// walks the boxes to ["1","2","3","4"] and stops, identical to WithoutOnChange.
+// What was left was this row's own read order: `maxlength` truncates the input's
+// value in the browser, before any handler runs, so polling the field value
+// returns immediately and the hard assertion on the box raced the refresh the
+// keystroke scheduled. The row now polls the box — the committed write, per the
+// section note above — and asserts the field value after it.
+test('CSR: typing past the declared length adds nothing', async () => {
 	await render(WithOnChange);
 	el(Field).focus();
 
 	await userEvent.keyboard('12345');
-	await expect.poll(() => el<HTMLInputElement>(Field).value).toBe('1234');
-	expect(item('item-', 3).textContent).toBe('4');
+	await expect.poll(() => item('item-', 3).textContent).toBe('4');
+	expect(el<HTMLInputElement>(Field).value).toBe('1234');
 });
 
 test('CSR: a whole code arriving at once fills every box', async () => {
@@ -336,11 +339,11 @@ test('CSR: typing in one field leaves its neighbour alone', async () => {
 	expect(item('app-item-', 2).getAttribute('ui-empty')).toBe('');
 });
 
-// A component instance inside an @for arm never follows the shared cell: all six
-// looped boxes render and the field holds "135", but every box stays "" with
-// ui-empty set, before and after the paste. The same item outside a loop
-// follows the code, so what is missing is the looped instance's refresh.
-test.skip('CSR: a box written by a loop follows the code like any other', async () => {
+// Green since 2026-08-23. The U130 pin said a component instance inside an @for
+// arm never follows the shared cell — six looped boxes rendered but stayed ""
+// after the paste. Un-skipped and re-run against this tip, the looped instance
+// follows the code like a flat one, so the row is the arm/row layers' witness.
+test('CSR: a box written by a loop follows the code like any other', async () => {
 	await render(ItemsFromData);
 	pasteInto(el<HTMLInputElement>(Field), '135');
 
@@ -424,18 +427,24 @@ test('CSR: a filled code submits under its name', async () => {
 
 // --- SSR resume -----------------------------------------------------------
 
-// Still pinned, on a framework wall rather than the family gap U130 named.
-// The family now carries the caret policy (OtpField's onFocus, QDS's rule:
-// setSelectionRange to the end of the code), and the CSR row above proves it
-// runs. It cannot run in TIME: a handler body is a symbol the framework
-// dispatches asynchronously, so `focus()` followed immediately by a keystroke
-// types before the caret has moved. Measured on this base 2026-08-22 (U134):
-//   - CSR, focus() then keyboard('5') back to back -> "51234"
-//   - CSR, focus() then a 300ms wait -> selectionStart 4, then "12345"
-//   - SSR, same, with the resume dispatch logged as "ran warm
-//     bound:symbol%3A0" inside the wait window -> same two results
-// So the deferral is framework-wide, not an SSR-resume delay. Two further
-// framework facts measured while pinning this, both of which shape any fix:
+// Still pinned, and re-measured against this tip on 2026-08-23 (U182). The wall
+// is unchanged in kind from the U134 pin: the family carries the caret policy
+// (OtpField's onFocus, QDS's rule: setSelectionRange to the end of the code) and
+// the CSR row below proves it runs, but it cannot run in TIME. A handler body is
+// a symbol the framework dispatches asynchronously, so `focus()` followed
+// immediately by a keystroke types before the caret has moved. What this tip
+// measured, with the same scenario driven both ways:
+//   - SSR, focus() then keyboard('5') back to back -> "51234"
+//   - SSR, focus() then a 400ms wait -> selectionStart 4, then "12345", box 4 "5"
+//   - CSR, focus() then keyboard('5') back to back -> "51234" (identical)
+// The CSR arm is the one that matters for the pin: the deferral is framework-
+// wide, not an SSR-resume delay, so no SSR-side change moves this row. The
+// await-ordering fix on this tip did not shorten the window either. The row
+// stays as written rather than polling the caret first, because polling is what
+// the green CSR row below already does — this row exists to hold the harder
+// claim that the policy lands before the very next keystroke.
+// Two framework facts measured while first pinning this still hold, and both
+// shape any fix:
 //   - inside a resumed handler `event.currentTarget` is null (the event has
 //     finished dispatching), so the handler reaches the field via `event.target`
 //   - `otp.fieldEl`, an element() handle, is `undefined` inside a handler after
@@ -490,7 +499,7 @@ for (const mode of MODES) {
 // (otp-field.tsx:211-223: `setSelectionRange(code.length, code.length)`).
 // The poll is not slack, it is the assertion: a handler body is a symbol the
 // framework dispatches asynchronously, so the caret moves a turn after focus,
-// never during it. This row proves the policy; the pinned SSR row below is
+// never during it. This row proves the policy; the pinned SSR row above is
 // what proves it in time for the very next keystroke, and that is still red.
 test('CSR: focusing a field that already holds a code puts the caret at the end', async () => {
 	await render(Prefilled);
