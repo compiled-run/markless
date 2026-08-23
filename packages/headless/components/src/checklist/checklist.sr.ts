@@ -5,11 +5,11 @@
 // ACCESSIBLE NAME, which is note.md limit 8, not a seed. See note.md.
 import { render } from '@markless/vitest-browser';
 import { afterEach, expect, test } from 'vitest';
-import { missingFacts, readUntil, type Conveys } from './driver.ts';
-import { virtualDriver } from './virtual-driver.ts';
-import Basic from '../src/checklist/scenarios/basic.tsrx';
-import Partial from '../src/checklist/scenarios/partial.tsrx';
-import UnavailableOptions from '../src/checklist/scenarios/unavailable-options.tsrx';
+import { missingFacts, readUntil, type Conveys } from '../../test-support/driver.ts';
+import { virtualDriver } from '../../test-support/virtual-driver.ts';
+import Basic from './scenarios/basic.tsrx';
+import Partial from './scenarios/partial.tsrx';
+import UnavailableOptions from './scenarios/unavailable-options.tsrx';
 
 // What a screen reader says about the checklist family, asserted the way the
 // w3c/aria-at checkbox (tri-state) plan asserts it: each step names the facts the

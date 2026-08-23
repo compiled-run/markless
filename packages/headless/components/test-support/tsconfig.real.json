@@ -1,0 +1,15 @@
+{
+	"extends": "../../../../tsconfig.json",
+	"compilerOptions": {
+		"types": ["node"]
+	},
+	"exclude": [],
+	"include": [
+		"./page-driver.ts",
+		"./vocabularies.ts",
+		"./playwright.config.ts",
+		"../src/**/*.nvda.ts",
+		"../src/**/*.voiceover.ts",
+		"../../../../apps/sr-gallery/preview-server.ts"
+	]
+}

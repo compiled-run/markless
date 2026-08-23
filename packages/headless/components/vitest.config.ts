@@ -13,6 +13,14 @@ export default defineProject({
 		name: 'ui',
 		// Family suites are colocated beside their components; the framework-
 		// machinery witnesses live in the framework's own browser project.
+		//
+		// The suffix is load-bearing, not decoration. A family folder also holds
+		// its screen-reader suites - <family>.sr.ts for the virtual reader, and
+		// <family>.nvda.ts / <family>.voiceover.ts for the real ones - and those
+		// belong to other runners (test-support/vitest.config.ts and
+		// test-support/playwright.config.ts). Widening this to src/**/*.ts would
+		// pull all three into the browser project, where the real-reader specs
+		// have no reader to drive.
 		include: ['src/**/*.browser.ts'],
 		browser: {
 			enabled: true,

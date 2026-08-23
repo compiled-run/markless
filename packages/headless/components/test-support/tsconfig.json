@@ -7,7 +7,8 @@
 		"../../../../packages/*/test",
 		"../../../../packages/headless/*/test",
 		"../../../../packages/bundler/fixtures",
-		"vitest.config.ts"
+		"vitest.config.ts",
+		"playwright.config.ts"
 	],
 	"include": [
 		"./*.ts",

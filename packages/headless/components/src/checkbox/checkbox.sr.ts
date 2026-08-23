@@ -1,13 +1,13 @@
 import { render } from '@markless/vitest-browser';
 import { afterEach, expect, test } from 'vitest';
-import { missingFacts, readUntil, type Conveys } from './driver.ts';
-import { virtualDriver } from './virtual-driver.ts';
-import Basic from '../src/checkbox/scenarios/basic.tsrx';
-import Invalid from '../src/checkbox/scenarios/invalid.tsrx';
-import PartialSelection from '../src/checkbox/scenarios/partial-selection.tsrx';
-import SettingsList from '../src/checkbox/scenarios/settings-list.tsrx';
-import UnavailableOptions from '../src/checkbox/scenarios/unavailable-options.tsrx';
-import WithHelp from '../src/checkbox/scenarios/with-help.tsrx';
+import { missingFacts, readUntil, type Conveys } from '../../test-support/driver.ts';
+import { virtualDriver } from '../../test-support/virtual-driver.ts';
+import Basic from './scenarios/basic.tsrx';
+import Invalid from './scenarios/invalid.tsrx';
+import PartialSelection from './scenarios/partial-selection.tsrx';
+import SettingsList from './scenarios/settings-list.tsrx';
+import UnavailableOptions from './scenarios/unavailable-options.tsrx';
+import WithHelp from './scenarios/with-help.tsrx';
 
 // What a screen reader says about the checkbox family, asserted the way the
 // w3c/aria-at checkbox (tri-state) plan asserts it: each step names the facts
