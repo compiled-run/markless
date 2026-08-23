@@ -32,10 +32,19 @@ const seedProjectingChild: SharedSeedPass = async (
 	// Static registration before descent: the projecting child's own instance
 	// names the widget its parts belong to, so a part's minted element() id can
 	// carry which rendered widget it is part of.
+	// Defect 65, CSR half: only a child that ROOTS a widget may name one — a
+	// projecting PART must leave the enclosing token inherited, or a binder in its
+	// projection mints an id the reader never spells. `widgetRootsOf` answers by
+	// payload cell ownership, which the compiler assigns to exactly one component
+	// per family, so it names the same root the SSR half gates on.
 	const base = context.idPrefix + (context.rowSegment ?? '') + rootEdge.symbolPrefix;
 	const chain = childrenProjectionChain(context.surface, rootEdge.childComponentName);
 	const composedRoot = chain.map((link) => link.edge.symbolPrefix).join('');
-	const seeded = new Map(inherited ?? []).set(MARKLESS_WIDGET_INSTANCE_KEY, base + composedRoot);
+	const inheritedSeeds = new Map(inherited ?? []);
+	const seeded =
+		widgetRootsOf(context.surface, rootEdge.childComponentName).length > 0
+			? inheritedSeeds.set(MARKLESS_WIDGET_INSTANCE_KEY, base + composedRoot)
+			: inheritedSeeds;
 	await applySharedSeeds(context, context.surface, context.symbolPrefix, rootEdge, read, seeded);
 	// The composed roots the child's own composition put this widget's parts
 	// inside seed the same instance, so they run before any part does.
