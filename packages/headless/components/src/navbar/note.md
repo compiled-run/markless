@@ -325,13 +325,63 @@ collapsible and tabs ship, and it is independently the fix for the Fluent UI
 hazard the research quotes (a surface that unmounts before its close-side effect
 can run).
 
+## The trigger-collision guard is armed by identity
+
+One press can produce two reports. `userEvent.click` on the trigger of an open
+dropdown sends a `pointerdown` that lands outside the panel, so the primitive
+reports a dismissal and the family closes — and then the `click` from that same
+press reaches the trigger, whose handler would toggle the entry straight back
+open. Something has to tell the trigger that the close it is about to undo was
+caused by its own press.
+
+The first version of that guard was a deadline on the item: any dismissal set
+`graceUntil` to now plus `clickGrace`, and the trigger swallowed every click
+before it. It worked for the collision and cost a real interaction. A person who
+pressed anywhere else on the page while a dropdown was showing — dismissing it —
+and then went straight to a trigger had that click swallowed too, because the
+window could not tell the two presses apart. 300 ms is easily inside a normal
+reach across a header.
+
+The report now carries `pressTarget` for `outside-press` (and omits the key for
+`escape`, which has no target), so `onDismiss` asks where instead of how soon:
+
+    const pressed = event.detail.pressTarget;
+    const onOwnTrigger = pressed !== undefined && back !== null && back.contains(pressed);
+
+The `as unknown as HTMLElement | undefined` on that read is a stopgap, and it is
+carried here rather than hidden. `markless-tsrx.d.ts` declares
+`pressTarget?: Element` with a bare `Element`, which inside
+`declare namespace __MarklessTypeService` resolves to that namespace's own branded
+markup `Element` — an interface with no DOM members at all, so
+`back.contains(pressed)` is `TS2345: Argument of type 'Element' is not assignable
+to parameter of type 'Node'`. Every other DOM element reference in that file is
+spelled `globalThis.Element` (the IDREF type two lines below `Element`'s own
+declaration, and eight generic constraints), so this is a slip rather than a
+decision, and the fix is that one word. It is outside this folder, so this unit
+could not make it; the cast comes out the day it lands. Any consumer who touches
+`event.detail.pressTarget` as a node hits the same error today.
+
+`back` is the same `box.querySelector('[aria-expanded]')` climb the Escape focus
+return already uses, not an `element()` handle — a handle does not read back as
+an element inside a handler on this tip, measured above. `contains` rather than
+`===` because a consumer is free to put an icon or a span inside the trigger, and
+that is what the press lands on.
+
+Only that press can collide, so only that press arms the swallow. The deadline
+did not go away, it just stopped being the whole guard: the click that pairs with
+a press may never arrive (the pointer moves off before release), so the armed
+state still has to expire on its own rather than wait for a click that is not
+coming. Hover-opening still arms it on its own account, for the unrelated reason
+that a dropdown opened under a resting pointer should not be shut by the click
+that follows.
+
 ## Test lanes
 
-`navbar.browser.ts` — 51 rows, all green: the shared rows in both modes, the
+`navbar.browser.ts` — 52 rows, all green: the shared rows in both modes, the
 consumer callback, gestures, the full keyboard model, four resume rows, the
 dismissal block, and the hover block.
 
-The four dismissal rows are what the overlay adoption is proved by:
+The five dismissal rows are what the overlay adoption is proved by:
 
 - `escape arrives as a dismissal and only the family moves focus` — the mark is
   bare, the panel closes, focus lands on the trigger, and the panel took no
@@ -341,6 +391,10 @@ The four dismissal rows are what the overlay adoption is proved by:
 - `with two entries on the page a dismissal reaches the one that is showing` —
   the second entry, because that is the one a shared flat handle map would get
   wrong;
+- `a press away from the trigger leaves the next click on it working` — the
+  identity guard below, and the row that goes red the moment the swallow is armed
+  on any dismissal again (measured: arming unconditionally fails it on the click
+  that should have re-opened the entry);
 - `a real press on the trigger of an open dropdown closes it and leaves it
   closed` — the pointerdown-versus-click collision, and the only row in the file
   that presses with a real pointer, which is why it sits last.
@@ -381,9 +435,16 @@ to wire at fan-in.
   crossing back through the browser.
 - ~~`dismiss` has no type in the type service.~~ RESOLVED 2026-08-23: declared in
   `markless-tsrx.d.ts` via `MarklessEventMap`; the folder stopgap is deleted.
-- **A `dismiss` report says why, not where.** Without the press target the
-  trigger-collision guard has to be a time window on the item, which also
-  swallows an unrelated press-then-click inside `clickGrace`.
+- ~~A `dismiss` report says why, not where.~~ RESOLVED 2026-08-23: the detail
+  carries `pressTarget` for `outside-press` and omits the key for `escape`, so
+  `navbar.itemcontent` arms the swallow by identity — only when the press landed
+  on this item's own trigger. What that bought is in
+  [The trigger-collision guard is armed by identity](#the-trigger-collision-guard-is-armed-by-identity).
+- **`pressTarget` is declared with the wrong `Element`.** One bare `Element` in
+  `packages/typescript-plugin/src/markless-tsrx.d.ts` where every neighbour says
+  `globalThis.Element`; the folder carries a cast until it is fixed. Section
+  [The trigger-collision guard is armed by identity](#the-trigger-collision-guard-is-armed-by-identity)
+  has the error and the one-word fix.
 - **A navbar entry inside a flipping arm.** Point 9 above.
 - **A dev-mode diagnostic for an unnamed landmark.** Deviation 5.
 - **`Home`/`End` at the top level.** `spec.md` promises them and QDS's code

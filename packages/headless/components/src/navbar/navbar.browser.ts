@@ -460,6 +460,31 @@ test('CSR: a press outside the panel closes the dropdown that was showing', asyn
 	expect(el(ProductsTrigger)).not.toBe(document.activeElement);
 });
 
+// The row that prices the identity guard. While the swallow was armed on every
+// dismissal, ANY press closed the entry and then ate the next click on its
+// trigger for the whole grace window - so a person who pressed somewhere else and
+// then went to the trigger got nothing. Reading where the press landed is what
+// lets the family arm the swallow only for the press that can actually collide.
+test('CSR: a press away from the trigger leaves the next click on it working', async () => {
+	await render(ClickOnly);
+	el(ProductsTrigger).click();
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
+
+	// An outside press that landed nowhere near this entry's trigger.
+	const pressedAt = Date.now();
+	document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('false');
+
+	// Inside the window the old guard would have swallowed this click in: the
+	// scenario takes the family's default, 300 ms. Asserted rather than assumed, so
+	// a slow poll fails the row instead of passing it for the wrong reason.
+	const waited = Date.now() - pressedAt;
+	el(ProductsTrigger).click();
+	expect(waited).toBeLessThan(300);
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
+	expect(el(ProductsContent).hasAttribute('hidden')).toBe(false);
+});
+
 // The defect the previous adoption attempt died on: one widget-scoped handle
 // shared by every instance meant the dismissal answered for the LAST entry on the
 // page. Opening the SECOND entry is what makes that visible.
