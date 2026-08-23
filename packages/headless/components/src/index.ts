@@ -13,3 +13,4 @@ export * as select from './select/index.ts';
 export * as tabs from './tabs/index.ts';
 export * as textbox from './textbox/index.ts';
 export * as toggle from './toggle/index.ts';
+export * as tree from './tree/index.ts';
