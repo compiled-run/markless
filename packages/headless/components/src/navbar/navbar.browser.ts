@@ -26,7 +26,6 @@ const ProductsTrigger = page.getByTestId('products-itemtrigger');
 const ProductsContent = page.getByTestId('products-itemcontent');
 const KeyboardsLink = page.getByTestId('keyboards-itemlink');
 const MiceLink = page.getByTestId('mice-itemlink');
-const DocsItem = page.getByTestId('docs-item');
 const DocsTrigger = page.getByTestId('docs-itemtrigger');
 const DocsContent = page.getByTestId('docs-itemcontent');
 const StartLink = page.getByTestId('start-itemlink');
@@ -35,7 +34,6 @@ const ApiLink = page.getByTestId('api-itemlink');
 const CurrentDocsItem = page.getByTestId('docs-item');
 // The realistic header, where the sign-in button lives outside the landmark.
 const SignIn = page.getByTestId('signin');
-const PricingLink = page.getByTestId('pricing-itemlink');
 const StudioLink = page.getByTestId('studio-itemlink');
 const CloudLink = page.getByTestId('cloud-itemlink');
 // The consumer-callback pair.
@@ -73,11 +71,6 @@ function all(testid: string) {
 function expectClosed(trigger: Element, content: Element) {
 	expect(trigger.getAttribute('aria-expanded')).toBe('false');
 	expect(content.hasAttribute('hidden')).toBe(true);
-}
-
-function expectOpen(trigger: Element, content: Element) {
-	expect(trigger.getAttribute('aria-expanded')).toBe('true');
-	expect(content.hasAttribute('hidden')).toBe(false);
 }
 
 function expectBasicRendered() {

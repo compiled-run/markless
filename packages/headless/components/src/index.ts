@@ -3,6 +3,7 @@ export * as checkbox from './checkbox/index.ts';
 export * as checklist from './checklist/index.ts';
 export * as collapsible from './collapsible/index.ts';
 export * as otp from './otp/index.ts';
+export * as navbar from './navbar/index.ts';
 export * as pagination from './pagination/index.ts';
 export * as progress from './progress/index.ts';
 export * as qrcode from './qr-code/index.ts';
