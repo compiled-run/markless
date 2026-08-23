@@ -47,6 +47,8 @@ export type Vocabulary = {
 	readonly region: string;
 	/** A single graphic that is one object in the tree - `role="img"`. */
 	readonly image: string;
+	/** A window laid over the page that carries its own name - `role="dialog"`. */
+	readonly dialog: string;
 	/** The state a chosen tab is in - `aria-selected="true"`. */
 	readonly selected: string;
 	/** The page you are on inside a set of page controls - `aria-current="page"`. */

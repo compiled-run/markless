@@ -64,6 +64,9 @@ export const nvdaVocabulary: Vocabulary = {
 	region: 'region',
 	// unverified against our markup
 	image: 'graphic',
+	// unverified against our markup; aria-at's modal-dialog plan asserts this role
+	// as "dialog" at priority 1
+	dialog: 'dialog',
 	// unverified against our markup
 	selected: 'selected',
 	// unverified against our markup
@@ -116,6 +119,9 @@ export const voiceOverVocabulary: Vocabulary = {
 	region: 'region',
 	// unverified against our markup
 	image: 'image',
+	// unverified against our markup; aria-at's modal-dialog plan asserts this role
+	// as "dialog" at priority 1
+	dialog: 'dialog',
 	// unverified against our markup
 	selected: 'selected',
 	// unverified against our markup
