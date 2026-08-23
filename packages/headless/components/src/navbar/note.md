@@ -302,16 +302,13 @@ by a click on the same entry's trigger inside `clickGrace` (300 ms by default)
 does not re-open that entry. Narrowing it needs the press target, or its
 coordinates, on the report.
 
-### `onDismiss` has no type, and the stopgap for that is in this folder
+### `onDismiss` has no type — RESOLVED 2026-08-23
 
-`overlay-dismiss.d.ts` declares `dismiss` on `GlobalEventHandlersEventMap`, and
-**it does not belong here.** The type service builds its element attribute map
-from that interface (`packages/typescript-plugin/src/markless-tsrx.d.ts`), the
-overlay landing never added the event to it, and without the declaration
-`onDismiss` on any element is `TS2322: Property 'onDismiss' does not exist`. A
-component family declaring a framework event globally leaks to every package in
-the program. The declaration should move into the type service's own file and be
-deleted from here; the edit is outside this family's file contract.
+The stopgap `overlay-dismiss.d.ts` that used to live in this folder is deleted.
+The `dismiss` event is now declared in the type service itself
+(`packages/typescript-plugin/src/markless-tsrx.d.ts`, `MarklessEventMap`
+intersected into `ElementEventMap` — deliberately not the global
+`GlobalEventHandlersEventMap`, so unrelated consumer DOM code is untouched).
 
 One more thing the compiler required: `MARKLESS_EVENT_SPREAD_SHADOWED`. A part
 that spreads `{...rest}` and writes its own `onDismiss` has to destructure the
@@ -382,9 +379,8 @@ to wire at fan-in.
 - **A scheduled callback cannot reach the graph.** Point 2 above. Worth
   chartering; the hover delay works today only because the timer can bounce the
   crossing back through the browser.
-- **`dismiss` has no type in the type service.** `overlay-dismiss.d.ts` in this
-  folder is a stopgap that leaks a global declaration out of a component package;
-  it belongs in `packages/typescript-plugin/src/markless-tsrx.d.ts`.
+- ~~`dismiss` has no type in the type service.~~ RESOLVED 2026-08-23: declared in
+  `markless-tsrx.d.ts` via `MarklessEventMap`; the folder stopgap is deleted.
 - **A `dismiss` report says why, not where.** Without the press target the
   trigger-collision guard has to be a time window on the item, which also
   swallows an unrelated press-then-click inside `clickGrace`.
