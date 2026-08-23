@@ -1,5 +1,5 @@
 import { analyze, isEventAttribute } from 'yuku-tsrx';
-import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
+import { asNodes, childNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
 import {
 	getComponentFunction,
@@ -16,6 +16,7 @@ import {
 	conditionalComponentRootDiagnostic,
 	elementGuardReturnUnsupportedDiagnostic,
 	noRenderableRootDiagnostic,
+	repeatBindingNameConflictDiagnostic,
 	undeclaredTemplateReadDiagnostic,
 	unsupportedRenderBodyDiagnostic,
 	unsupportedRenderConstructDiagnostic,
@@ -274,6 +275,53 @@ export function componentUnsupportedBodyDiagnostics(
 		}
 	}
 	return [];
+}
+
+/**
+ * Refuses the one @for naming clash the emitters cannot serve: a name that is
+ * one loop's item and another loop's index.
+ *
+ * Two loops both calling their item `row` are fine - every row reader binds the
+ * name off the same row context, so one declaration answers both. Item-versus
+ * -index is different: the two loops want the same name bound to different
+ * context fields in a scope that has room for one binding. Refuse it here, where
+ * both loops still have spans, rather than emitting a module that cannot parse.
+ */
+export function collectRepeatBindingConflictDiagnostics(input: {
+	readonly root: AnyNode;
+	readonly filename: string;
+}) {
+	const asItem = new Set<string>();
+	const asIndex = new Set<string>();
+	const conflicts: Array<{ readonly name: string; readonly node: AnyNode }> = [];
+	walkNode(input.root, (node) => {
+		// Only `@for` heads: a plain JS for-of in module code declares no index and
+		// contributes no row binding to the emitted readers.
+		if (node.type !== 'JSXForExpression') return;
+		const statement = node.statement as AnyNode | undefined;
+		if (!statement) return;
+		const itemName = getIdentifierName(
+			asNodes((statement.left as AnyNode | undefined)?.declarations)[0]?.id as
+				| AnyNode
+				| undefined,
+		);
+		const indexName = getIdentifierName(statement.index as AnyNode | undefined);
+		if (itemName) {
+			if (asIndex.has(itemName)) conflicts.push({ name: itemName, node });
+			asItem.add(itemName);
+		}
+		if (indexName) {
+			if (asItem.has(indexName)) conflicts.push({ name: indexName, node });
+			asIndex.add(indexName);
+		}
+	});
+	return conflicts.map((conflict) =>
+		repeatBindingNameConflictDiagnostic({
+			name: conflict.name,
+			node: conflict.node,
+			filename: input.filename,
+		}),
+	);
 }
 
 export function collectUndeclaredTemplateReadDiagnostics(input: {
