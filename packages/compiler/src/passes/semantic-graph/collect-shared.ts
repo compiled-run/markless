@@ -1,7 +1,11 @@
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import type {
+	ModuleGraphInterfaceArtifact,
+	ModuleGraphInterfaceSharedDefinition,
 	SemanticGraphBinding,
+	SemanticGraphDiagnostic,
+	SemanticModuleImport,
 	SemanticSharedDefinition,
 	SemanticSharedDependency,
 	SemanticSharedInstance,
@@ -24,7 +28,7 @@ import {
 } from './diagnostics.ts';
 import { collectComputedBinding } from './collect-state.ts';
 import { collectExpressionReads } from './collect-expressions.ts';
-import { getCallName, getFrameworkApiForCall } from './imports.ts';
+import { getCallName, getFrameworkApiForCall, isFrameworkApiName } from './imports.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
 
 export function collectSharedDefinition(input: {
@@ -52,15 +56,18 @@ export function collectSharedInstance(input: {
 	readonly init: AnyNode;
 	readonly state: WalkState;
 }): void {
-	const callName = getCallName(input.init);
-	if (!callName) return;
+	const resolved = resolveSharedCall(input.init, input.state);
+	const target = resolved?.definition ?? unlinkedImportedSharedTarget(input.init, input.state);
+	if (!target) {
+		reportUnresolvedSharedCall(input.init, input.state);
+		return;
+	}
 
-	const definition = resolveSharedDefinitionCall(callName, input.state);
-	if (!definition) return;
+	if (resolved?.published) adoptSharedDefinition(resolved.published, input.state);
 
 	input.state.graph.sharedInstances.push({
-		definitionId: definition.id,
-		definitionName: definition.name,
+		definitionId: target.id,
+		definitionName: target.name,
 		localName: input.localName,
 		...(input.state.currentComponentName
 			? { componentName: input.state.currentComponentName }
@@ -70,28 +77,383 @@ export function collectSharedInstance(input: {
 	});
 }
 
-function resolveSharedDefinitionCall(
-	callName: string,
-	state: WalkState,
-): { readonly id: string; readonly name: string } | undefined {
-	const sameModuleDefinition = state.graph.sharedDefinitions.find(
-		(shared) => shared.name === callName,
-	);
-	if (sameModuleDefinition) return sameModuleDefinition;
+/**
+ * What a call spelled `family()`, `fam.state()` or `ui.checkbox.state()` names.
+ * Reading is separate from adopting on purpose: the helper-return collector asks
+ * the same question one step earlier, to stop claiming a `.tsrx` import that is
+ * really a shared definition, and it must not write anything into the graph.
+ */
+export type ResolvedSharedCall = {
+	readonly definition: SemanticSharedDefinition;
+	/** Absent for a definition this module declares itself. */
+	readonly published?: ModuleGraphInterfaceSharedDefinition;
+};
 
-	const importedDefinition = state.graph.moduleImports.find(
-		(moduleImport) =>
-			moduleImport.kind === 'named' &&
-			moduleImport.localName === callName &&
-			moduleImport.importedName &&
-			isTsrxModuleImport(moduleImport.source),
+export function resolveSharedCall(init: AnyNode, state: WalkState): ResolvedSharedCall | null {
+	const path = staticCalleePath(init);
+	if (!path) return null;
+
+	const [rootName, ...memberPath] = path;
+	if (!rootName) return null;
+
+	if (memberPath.length === 0) {
+		const sameModuleDefinition = state.graph.sharedDefinitions.find(
+			(shared) => shared.name === rootName,
+		);
+		if (sameModuleDefinition) return { definition: sameModuleDefinition };
+	}
+
+	const moduleImport = state.graph.moduleImports.find((item) => item.localName === rootName);
+	if (!moduleImport) return null;
+
+	const published = resolvePublishedSharedDefinition({
+		moduleInterface: interfaceForSource(moduleImport.source, state),
+		exportPath: importExportPath(moduleImport, memberPath),
+		state,
+		seen: new Set(),
+	});
+	return published ? { definition: published.definition, published } : null;
+}
+
+/**
+ * The pre-interface reading of `import { session } from './session.tsrx'`: a
+ * name imported from a `.tsrx` and called is that module's shared definition,
+ * identified by the specifier because nothing here knows the module's own
+ * filename. It stands only while no interface for that module is linked; once
+ * one is, `resolveSharedCall` answers first with the definition's real identity.
+ */
+function unlinkedImportedSharedTarget(
+	init: AnyNode,
+	state: WalkState,
+): { readonly id: string; readonly name: string } | null {
+	const callName = getCallName(init);
+	if (!callName) return null;
+
+	const moduleImport = state.graph.moduleImports.find(
+		(item) =>
+			item.kind === 'named' &&
+			item.localName === callName &&
+			item.importedName !== undefined &&
+			item.source.endsWith('.tsrx'),
 	);
-	if (!importedDefinition?.importedName) return undefined;
+	if (!moduleImport?.importedName) return null;
 
 	return {
-		id: sharedDefinitionId(importedDefinition.source, importedDefinition.importedName),
-		name: importedDefinition.importedName,
+		id: sharedDefinitionId(moduleImport.source, moduleImport.importedName),
+		name: moduleImport.importedName,
 	};
+}
+
+/**
+ * The export path a call walks from the module it imports: a namespace import
+ * spends no segment reaching the surface, a default import spends `default`, and
+ * a named import spends the name it imported. Mirrors how an imported component
+ * tag walks a barrel, because it is the same barrel.
+ */
+function importExportPath(
+	moduleImport: SemanticModuleImport,
+	memberPath: ReadonlyArray<string>,
+): ReadonlyArray<string> {
+	return [
+		...(moduleImport.kind === 'namespace'
+			? []
+			: moduleImport.kind === 'default'
+				? ['default']
+				: [moduleImport.importedName ?? moduleImport.localName]),
+		...memberPath,
+	];
+}
+
+/**
+ * Follows an export path to the module that declares the definition. One segment
+ * is either the definition the module publishes, or a re-export to follow:
+ * `export { famState as state } from './fam.tsrx'` renames it, and
+ * `export * as fam from './fam/index.ts'` spends the segment on the namespace.
+ */
+function resolvePublishedSharedDefinition(input: {
+	readonly moduleInterface: ModuleGraphInterfaceArtifact | undefined;
+	readonly exportPath: ReadonlyArray<string>;
+	readonly state: WalkState;
+	readonly seen: ReadonlySet<string>;
+}): ModuleGraphInterfaceSharedDefinition | null {
+	const { moduleInterface, exportPath } = input;
+	const [segment, ...rest] = exportPath;
+	if (!moduleInterface || !segment) return null;
+	if (input.seen.has(moduleInterface.filename)) return null;
+
+	if (rest.length === 0) {
+		const published = moduleInterface.sharedDefinitions?.find(
+			(candidate) => candidate.exportName === segment,
+		);
+		if (published) return published;
+	}
+
+	for (const reexport of moduleInterface.reexports ?? []) {
+		if (reexport.exportName !== segment) continue;
+		// `export * as ns from` binds a namespace, so the segment is spent on the
+		// namespace and the rest of the path walks inside it; a named re-export
+		// renames one export, so the whole path continues under the new name.
+		const nextPath =
+			reexport.importedName === '*' ? rest : rest.length === 0 ? [reexport.importedName] : null;
+		if (!nextPath) continue;
+
+		const resolved = resolvePublishedSharedDefinition({
+			moduleInterface: interfaceForSource(reexport.source, input.state),
+			exportPath: nextPath,
+			state: input.state,
+			seen: new Set([...input.seen, moduleInterface.filename]),
+		});
+		if (resolved) return resolved;
+	}
+
+	return null;
+}
+
+/**
+ * The interface a specifier names. The exact key is the specifier the importing
+ * module wrote; a specifier written inside a barrel is relative to that barrel,
+ * and the linker keys the same interface under the path it rebased for this
+ * module, so a module file that exactly one supplied interface names is the
+ * second reading. Two candidates is an ambiguity nobody may guess through.
+ */
+function interfaceForSource(
+	source: string,
+	state: WalkState,
+): ModuleGraphInterfaceArtifact | undefined {
+	const exact = state.importedModuleInterfaces[source];
+	if (exact) return exact;
+
+	const tail = source.replace(/^(?:\.\.?\/)+/, '');
+	const candidates = Object.values(state.importedModuleInterfaces).filter(
+		(candidate) => candidate.filename === tail || candidate.filename.endsWith(`/${tail}`),
+	);
+	return candidates.length === 1 ? candidates[0] : undefined;
+}
+
+// The definition and its factory nodes become this module's own, so every
+// consumer of the graph — instance qualification, returned-property lowering,
+// seeding — reads a cross-module call exactly the way it reads a same-module one.
+function adoptSharedDefinition(
+	published: ModuleGraphInterfaceSharedDefinition,
+	state: WalkState,
+): void {
+	if (!state.graph.sharedDefinitions.some((item) => item.id === published.definition.id)) {
+		state.graph.sharedDefinitions.push(published.definition);
+	}
+	for (const binding of published.graphBindings) {
+		if (state.graph.graphBindings.some((item) => item.id === binding.id)) continue;
+		state.graph.graphBindings.push(binding);
+	}
+}
+
+/**
+ * Fail closed on a call that means to reach a shared definition and reaches
+ * none. Two readings say it means to: the member is spelled with a framework API
+ * name, which is the ratified `family.state()` surface, or the module it walks
+ * publishes shared definitions and this is not one of them. Both are read only
+ * off a zero-argument call, because a shared definition is called with none.
+ */
+function reportUnresolvedSharedCall(init: AnyNode, state: WalkState): void {
+	if (!state.currentComponentName) return;
+	if (asNodes(init.arguments).length > 0) return;
+
+	const path = staticCalleePath(init);
+	const memberName = path?.[path.length - 1];
+	if (!path || !memberName || path.length < 2) return;
+
+	const moduleImport = state.graph.moduleImports.find((item) => item.localName === path[0]);
+	if (!moduleImport) return;
+
+	const moduleInterface = interfaceForSource(moduleImport.source, state);
+	const publishedNames = reachableSharedExportPaths({
+		moduleInterface,
+		state,
+		prefix: [],
+		seen: new Set(),
+	});
+	if (!isFrameworkApiName(memberName) && publishedNames.length === 0) return;
+	// The module answered with this name under another kind, so the call is that
+	// export being used, not a shared definition that failed to resolve.
+	if (
+		moduleInterface?.exports.some((candidate) => candidate.exportName === memberName) ||
+		moduleInterface?.render.components.some((candidate) => candidate.exportName === memberName)
+	) {
+		return;
+	}
+
+	state.graph.diagnostics.push(
+		unresolvedSharedCallDiagnostic({
+			callSource: expressionSource(init, state.source),
+			importSource: moduleImport.source,
+			publishedNames,
+			known: moduleInterface !== undefined,
+			span: sourceSpan(init, state.filename),
+		}),
+	);
+}
+
+/**
+ * Every shared definition a module hands out, spelled the way a caller of that
+ * module writes it (`state`, `checkbox.state`). Read only to say what a refused
+ * call could have named instead, so it walks the same re-export chain the
+ * resolver walks.
+ */
+function reachableSharedExportPaths(input: {
+	readonly moduleInterface: ModuleGraphInterfaceArtifact | undefined;
+	readonly state: WalkState;
+	readonly prefix: ReadonlyArray<string>;
+	readonly seen: ReadonlySet<string>;
+}): ReadonlyArray<string> {
+	const { moduleInterface } = input;
+	if (!moduleInterface || input.seen.has(moduleInterface.filename)) return [];
+
+	const seen = new Set([...input.seen, moduleInterface.filename]);
+	const own = (moduleInterface.sharedDefinitions ?? []).map((published) =>
+		[...input.prefix, published.exportName].join('.'),
+	);
+
+	return [
+		...own,
+		...(moduleInterface.reexports ?? []).flatMap((reexport) => {
+			const target = interfaceForSource(reexport.source, input.state);
+			if (reexport.importedName === '*') {
+				return reachableSharedExportPaths({
+					moduleInterface: target,
+					state: input.state,
+					prefix: [...input.prefix, reexport.exportName],
+					seen,
+				});
+			}
+			// A named re-export renames one export, so it contributes that one name
+			// under this module's spelling of it.
+			return (target?.sharedDefinitions ?? []).some(
+				(published) => published.exportName === reexport.importedName,
+			)
+				? [[...input.prefix, reexport.exportName].join('.')]
+				: [];
+		}),
+	];
+}
+
+function unresolvedSharedCallDiagnostic(input: {
+	readonly callSource: string;
+	readonly importSource: string;
+	readonly publishedNames: ReadonlyArray<string>;
+	readonly known: boolean;
+	readonly span?: ReturnType<typeof sourceSpan>;
+}): SemanticGraphDiagnostic {
+	const resolves = !input.known
+		? `This build has no compiled interface for ${JSON.stringify(input.importSource)}, so nothing behind it resolves.`
+		: input.publishedNames.length > 0
+			? `${JSON.stringify(input.importSource)} publishes these shared definitions: ${input.publishedNames
+					.map((name) => `\`${name}\``)
+					.join(', ')}.`
+			: `${JSON.stringify(input.importSource)} publishes no shared() definitions.`;
+
+	return {
+		code: 'MARKLESS_SHARED_CALL_UNRESOLVED',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'Shared definition call does not resolve',
+		message: `\`${input.callSource}\` reaches no shared() definition. ${resolves}`,
+		why: 'A call the compiler cannot resolve to a shared() definition creates no graph instance, so every read of it would render a dead value and every write would go nowhere — silently, at runtime.',
+		primarySpan: input.span,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [
+			{
+				message:
+					"Export the definition from the module this call names, and compile that module in this build. Before: `export const famState = shared(() => ..., { scope: 'widget' })` in `fam.tsrx` with nothing re-exporting it; after: `export { famState as state } from './fam.tsrx';` in the family index, so `fam.state()` names it.",
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_CALL_UNRESOLVED',
+	};
+}
+
+/**
+ * `family` and `fam.state` and `ui.checkbox.state` as segment lists; a computed
+ * or otherwise dynamic callee is not a path and answers with nothing.
+ */
+function staticCalleePath(node: AnyNode | undefined | null): ReadonlyArray<string> | null {
+	if (node?.type !== 'CallExpression') return null;
+
+	const segments: string[] = [];
+	let current = node.callee as AnyNode | undefined;
+	while (current?.type === 'MemberExpression') {
+		if (current.computed === true) return null;
+		const property = getIdentifierName(current.property as AnyNode | undefined);
+		if (!property) return null;
+		segments.unshift(property);
+		current = current.object as AnyNode | undefined;
+	}
+
+	const rootName = getIdentifierName(current);
+	if (!rootName) return null;
+
+	return [rootName, ...segments];
+}
+
+/**
+ * The shared definitions this module hands to modules that import it. Published
+ * from the finished graph, because a definition's returned properties and the
+ * factory nodes they name only exist once the factory graph has been collected.
+ */
+export function moduleInterfaceSharedDefinitions(input: {
+	readonly statements: ReadonlyArray<AnyNode>;
+	readonly filename: string;
+	readonly sharedDefinitions: ReadonlyArray<SemanticSharedDefinition>;
+	readonly graphBindings: ReadonlyArray<SemanticGraphBinding>;
+}): ReadonlyArray<ModuleGraphInterfaceSharedDefinition> {
+	const exportNames = exportedLocalNames(input.statements);
+
+	return input.sharedDefinitions.flatMap((definition) => {
+		// A definition this module adopted from an import is that module's to
+		// publish; republishing it here would give one definition two owners.
+		if (definition.id !== sharedDefinitionId(input.filename, definition.exportedName)) return [];
+
+		return (exportNames.get(definition.name) ?? []).map((exportName) => ({
+			exportName,
+			definition,
+			graphBindings: input.graphBindings.filter(
+				(binding) => binding.sharedDefinitionId === definition.id,
+			),
+		}));
+	});
+}
+
+// `export const pnl = ...` and `export { pnl as state }` — the names this
+// module's own bindings answer to from outside.
+function exportedLocalNames(
+	statements: ReadonlyArray<AnyNode>,
+): ReadonlyMap<string, ReadonlyArray<string>> {
+	const names = new Map<string, string[]>();
+	const add = (localName: string, exportName: string): void => {
+		names.set(localName, [...(names.get(localName) ?? []), exportName]);
+	};
+
+	for (const statement of statements) {
+		if (statement.type !== 'ExportNamedDeclaration') continue;
+
+		const declaration = statement.declaration as AnyNode | undefined;
+		if (declaration?.type === 'VariableDeclaration') {
+			for (const declarator of asNodes(declaration.declarations)) {
+				const localName = getIdentifierName(declarator.id as AnyNode | undefined);
+				if (localName) add(localName, localName);
+			}
+			continue;
+		}
+
+		// A specifier with a source re-exports another module's binding, which is
+		// that module's definition to publish, not this one's.
+		if (statement.source) continue;
+		for (const specifier of asNodes(statement.specifiers)) {
+			const localName = getIdentifierName(specifier.local as AnyNode | undefined);
+			const exportName = getIdentifierName(specifier.exported as AnyNode | undefined);
+			if (localName && exportName) add(localName, exportName);
+		}
+	}
+
+	return names;
 }
 
 export function collectSharedDefinitionDependencies(
@@ -413,10 +775,6 @@ export function findLast<T>(
 	}
 
 	return undefined;
-}
-
-function isTsrxModuleImport(source: string): boolean {
-	return source.endsWith('.tsrx');
 }
 
 function collectFactoryDependencies(input: {
