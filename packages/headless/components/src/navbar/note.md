@@ -177,6 +177,40 @@ inside". QDS reaches the same place through `ui-qds-popover-content`; the
 suggested filtering on `[popover]` instead, which is only available to a family
 that uses the top layer.
 
+## Re-measured 2026-08-23 (U202, at `c4edc6d9`)
+
+The owner's "no DOM selectors" order sent this family back for a rework. The
+measurements were taken in `src/tree/` with throwaway probe scenarios and they
+apply here unchanged; `src/tree/note.md`, "Re-measured 2026-08-23", carries the
+probe details and the exact diagnostics. The shipped code in this folder is
+UNCHANGED and still walks the DOM.
+
+Two results decide what this family's rework can do.
+
+**A handler on a widget-rooting element can now read its own instance.** That
+lifts the reason every walk in this family starts at `event.target` and climbs.
+The nearest-part logic — `from.closest('[ui-navbar-item]')` in the item's pointer
+handlers, `from.closest('nav')` in the root's, `box.querySelector('[aria-expanded]')`
+for the Escape focus return — is expressible through `element()` handles held on
+the instance the handler already reads: the item keeps a handle for its own box,
+the root for its `<nav>`, the item for its trigger. Containment tests
+(`root.contains(relatedTarget)`) are then asked of a graph-held handle and select
+nothing, so they survive the ban.
+
+**Ordered item registration into the enclosing instance is not expressible.**
+Three routes measured, all closed (diagnostics in the tree note). That is exactly
+what the two arrow-key walks need: the ordered collection of top-level controls,
+and the ordered collection of one panel's links. Neither collection can be built,
+so `ArrowLeft`/`ArrowRight` at the top level, the six movement keys inside a
+panel, and `ArrowDown`'s step into the panel's first control have no
+primitive-only form today. The capability to raise is named in the tree note:
+ordered item registration into an ancestor widget instance.
+
+Note that the collections this family walks include **consumer-written links**
+(`navbar.itemlink`, and plain `<a href>` inside a panel), so registration would
+have to work for a part that roots no instance of its own, not only for
+`navbar.item`.
+
 ## Panels stay mounted
 
 `hidden` decides whether a dropdown shows; an arm never does. The trigger's
