@@ -14,9 +14,10 @@ One widget family, `tabsState`, rooted by `tabs.root`: `value`, `orientation`,
 exported as `state` beside the parts, per the owner's namespace ruling.
 
 `tabsPartState` is a second, widget-scoped family rooted by each `tabs.trigger`.
-It holds nothing but that tab's own `value`, and it exists for one measured
-reason (below). It is deliberately **not** in `index.ts`: it is a workaround,
-not consumer surface.
+It holds that tab's own `value`, for one measured reason (below), and since
+2026-08-23 an `element()` handle, `el`, bound to the tab's button so the key rule
+can read its own element instead of selecting for it. It is deliberately **not**
+in `index.ts`: it is a workaround, not consumer surface.
 
 ## Deviations from QDS, and the constraint that forced each
 
@@ -122,8 +123,11 @@ Everything below is measured on this tip, not assumed.
    `event.key`.** A guard written over locals derived from graph state is
    `MARKLESS_SYNC_POLICY_UNEXTRACTABLE`; the orientation gate therefore lives in
    a second, non-preventing branch — the same split QDS reaches through `sync$`.
-5. **`event.target`, not `currentTarget`.** A lazy handler symbol runs after the
-   native dispatch has finished, and `currentTarget` is null by then.
+5. **`currentTarget` is null in a lazy handler.** A handler symbol runs after
+   the native dispatch has finished. Until 2026-08-23 that left `event.target`
+   as the trigger's only route to its own button; the key rule now reads
+   `tab.el`, the handle that same button binds (below). The fact still holds for
+   any handler that needs the node an event actually landed on.
 6. **`@if` cannot be a direct child of a component tag.** `@if` written straight
    inside `<tabs.root>` or `<tabs.list>` is `MARKLESS_PARSE_ERROR` ("Expected
    '</' to close the JSX element, but found '@'"); an arm needs an intrinsic
@@ -136,39 +140,85 @@ Everything below is measured on this tip, not assumed.
 
 ## Navigation
 
-DOM order is the navigation order:
-`closest('[role="tablist"]').querySelectorAll('[role="tab"]')` from the event's
-own target, filtered to the enabled buttons. Home and End are absolute moves in
-the same walk. Looping is the root's `loop`, default `false` as in QDS.
+DOM order is the navigation order. The tab the walk starts from is no longer
+found by selector: the trigger binds `el={tab.el}`, a handle declared in the
+`tabsPartState` factory, and its key rule reads that handle back. From there the
+ordered set is still `here.closest('[role="tablist"]')
+.querySelectorAll('[role="tab"]')`, filtered to the enabled buttons. Home and End
+are absolute moves in the same walk. Looping is the root's `loop`, default
+`false` as in QDS.
 
-This is the shape the owner's 2026-08-24 no-DOM-selectors order bans, and it is
-still here because the replacement is not expressible on this tip. What was
-measured, and what the framework would have to grow, is the section below.
+The collection half is the shape the owner's 2026-08-24 no-DOM-selectors order
+bans, and it is still here because the replacement is not expressible on this
+tip — and because the ordered-collection surface is an open owner decision, so
+this unit was told not to convert it. What was measured is the section below.
 
 ## Why the roving walk still traverses the DOM
 
-Two independent capabilities are missing. Either one alone blocks the rework;
-both were measured on this tip (commit c4edc6d9) by building the replacement and
-running this suite, not inferred.
+Two independent capabilities were missing when this family was written. One
+closed on 2026-08-23; the other is now the only wall.
 
-**1. An `element()` handle does not resolve inside a lazy event handler.**
-`specs/framework/04-events-symbols-behaviors.md` documents the supported shape —
-`<input el={input} />` beside `onClick={() => input?.focus()}` — and
-`07-diagnostics.md:68` repeats it ("Use element() plus el={...}, then read the
-element handle inside the handler"). Written on the trigger, with the handle
-declared in the component body and bound `el={here}` on the very button the
-handler sits on, `here` reads `undefined` inside that button's own `onKeydown`.
-Measured in **both** modes: CSR and after SSR resume. The same read through a
-shared instance (`tab.el`, the handle declared in the `tabsPartState` factory and
-returned from it, which `03-state-graph.md:712` sanctions) is `undefined` in CSR
-too. otp measured the shared-instance form undefined after resume (otp/note.md);
-this extends it to the component-local form and to CSR. With no resolvable
-handle, `event.target` is the only node a handler can reach, and a walk to a
-sibling has nowhere to go but the DOM.
+**1. An `element()` handle does not resolve inside a lazy event handler. —
+CLOSED 2026-08-23 (defect 54, and defect 63 behind it).**
 
-**2. A widget root cannot collect an ordered registry of its parts.** Even given
-handles, the walk needs the enabled tabs in authored order, which only the set of
-rendered triggers knows. Both spellings fail:
+*Converted here on 2026-08-23: `tabsPartState` declares
+`const el = element<HTMLButtonElement>()`, the trigger binds `el={tab.el}`, and
+that button's own `onKeydown` reads `const here = tab.el` where it used to write
+`(event.target as HTMLElement).closest('[role="tab"]')`. The browser suite is 44
+passed / 1 expected fail and the reader suite 7 passed / 1 expected fail, both
+identical to the counts measured on the same tip before the conversion — and the
+arrow, Home and End rows only pass at all if the handle resolves, because the
+handler returns early when it does not. The history below is kept because two
+separate landings were needed and the second was not where the first looked.*
+
+The original wall: `specs/framework/04-events-symbols-behaviors.md` documents the
+supported shape — `<input el={input} />` beside `onClick={() => input?.focus()}`
+— and `07-diagnostics.md:68` repeats it ("Use element() plus el={...}, then read
+the element handle inside the handler"), yet a handle declared in the component
+body and bound `el={here}` on the very button the handler sits on read
+`undefined` inside that button's own `onKeydown`, in **both** modes, silently.
+The same read through a shared instance (`tab.el`, declared in the
+`tabsPartState` factory and returned from it, which `03-state-graph.md:712`
+sanctions) was `undefined` in CSR too. otp measured the shared-instance form
+undefined after resume (otp/note.md); this family extended it to the
+component-local form and to CSR.
+
+Two landings closed it, both on this branch. `element() handles resolve as values
+in handlers` (commit `1d8777e9`, defect 54, witnessed by
+`packages/compiler/test/element-handle-values.test.ts`) made the read compile and
+emit `context.getElementHandle(...)` for shared members, call arguments and
+cross-element reads. That alone was not enough: a widget-scoped handle id is one
+module-level string, so the read answered for whichever widget registered last.
+Defect 63 fixed that in two halves — `a8eaf144` qualifies a widget-scoped handle
+id with the rendered widget's root path, and `0de21164` gives the **bound**
+symbol dispatch path the same scoping the graph already had. The second half is
+what this family needed: the trigger forwards a consumer callback
+(`onKeydown?.(event)`), so its handler is a bound symbol, and a bound symbol's id
+names only its component edge. `packages/vitest-browser/browser/handle-instance.test.ts`
+pins both.
+
+Each `tabs.trigger` roots its own `tabsPartState` instance, so `tab.el` is one
+element per instance rather than one per widget — the ambiguity
+`MARKLESS_ELEMENT_HANDLE_DUPLICATE` refuses, and the reason a handle on
+`tabsState` still could not name a single tab (see the pairing section above).
+
+**Defects 57 and 58 do not reproduce here either.** Both were re-measured on
+2026-08-23 and returned non-reproducing (headless-pilot board, unit
+`U211-widget-root-handler-wake`): a widget-root element runs both its handlers,
+and a nested widget-rooting element's handler wakes and runs, at two nesting
+depths, in CSR and after resume. This family is standing evidence for the first
+of the two — `tabs.trigger` is a widget-root element carrying three handlers
+(`onClick`, `onFocus`, `onKeydown`), and the suite exercises all three. What that
+unit did reproduce is narrower: only the innermost element on a bubble path is
+resumed, so an **enclosing** element's same-event handler is dropped. No part of
+this family is exposed to it, because `tabs.root` and `tabs.list` write no
+handlers of their own; a consumer who spreads one onto `tabs.list` would be, and
+that follows from the unit's reproduction rather than from a measurement here.
+
+**2. A widget root cannot collect an ordered registry of its parts. — still
+open, and now the only wall.** Even with handles, the walk needs the enabled tabs
+in authored order, which only the set of rendered triggers knows. Both spellings
+failed when measured on commit c4edc6d9, and neither has been re-measured since:
 
 - a part body writing into the root's instance
   (`tabs.walk = [...tabs.walk, value]`) is refused at compile time with
@@ -180,14 +230,19 @@ rendered triggers knows. Both spellings fail:
   handler — it reads as an `object` — and it is empty. Measured with an array of
   part instances, with an array of plain strings, and with a scalar string
   accumulator: all three arrive at the handler empty. No diagnostic is emitted
-  for the no-op, which is itself a fail-closed gap.
+  for the no-op, which is itself a fail-closed gap. `handler callbacks route
+  shared-instance writes` (commit `7d009f8f`, defect 66) has landed since, and
+  may well have changed this outcome; it was deliberately not re-tried on
+  2026-08-23, because the ordered-collection surface is an open owner decision
+  and this unit was scoped out of touching the walk.
 
 QDS reaches the same registry through a Qwik context array its items push into at
 render; that is the mechanism markless has no equivalent for. The capability the
-owner's order points at ("a roving walk over a collection of items") is therefore
-two requests: a handle that resolves in a lazy handler, and a per-widget ordered
-part registry — or the chartered per-part ordinal, which would answer the second
-by giving each trigger its position and the root its count.
+owner's order points at ("a roving walk over a collection of items") was two
+requests. The first — a handle that resolves in a lazy handler, per instance —
+landed on 2026-08-23 and is used here. What is left is a per-widget ordered part
+registry, or the chartered per-part ordinal, which would answer it by giving each
+trigger its position and the root its count.
 
 `attach` is not a third route: a behavior's inputs may not carry DOM nodes, and
 `04-events-symbols-behaviors.md:113` states that resume startup records behavior
