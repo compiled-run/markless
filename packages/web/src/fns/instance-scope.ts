@@ -54,9 +54,16 @@ export type MarklessRowScope = ReadonlyArray<{
 	readonly rowBoundary?: boolean;
 }>;
 
+// A dispatch with no row still needs the widget-projection reading below; the
+// empty pair list is what says "no row named, resolve the projection anyway".
+const EMPTY_ROW_SCOPE: MarklessRowScope = [];
+
 export function marklessRecordRowScope(hostNodeId: string): MarklessRowScope | undefined {
 	const path = marklessInstancePath(hostNodeId);
-	if (!path.includes('r:')) return undefined;
+	// No row to thread, but a bound symbol still spells widget ids against its
+	// projection site rather than the root that owns them, so a page carrying any
+	// widget root gets the adapter with no pairs: widget resolution, nothing else.
+	if (!path.includes('r:')) return widgetRootPaths.size > 0 ? EMPTY_ROW_SCOPE : undefined;
 	const pairs: Array<{ rowFree: string; withRows: string; rowBoundary?: boolean }> = [];
 	let rowFree = '';
 	let withRows = '';
@@ -94,9 +101,10 @@ export function marklessRowScopedGraphNodeId(graphNodeId: string, scope: Markles
  * symbol runs, and nothing moves. Threading the dispatched record's row through
  * the edge path first is what makes the lookup reach this row's own root.
  *
- * `undefined` means "not a widget id this row can answer", and every such id -
- * a storage slot, a page-scoped `shared()` graph, a widget rooted outside any
- * row - falls through to the caller and resolves exactly as it does today.
+ * `undefined` means "no rendered widget owns this id", and every such id - a
+ * storage slot, a page-scoped `shared()` graph - falls through to the caller and
+ * resolves exactly as it does today. A widget rooted OUTSIDE every row is not
+ * one of them: no row can answer it, so the projection site answers it below.
  */
 function marklessRowWidgetGraphNodeId(
 	graphNodeId: string,
@@ -114,7 +122,12 @@ function marklessRowWidgetGraphNodeId(
 		const rootPath = marklessWidgetRootPath(sharedId, withRows + edgePath.slice(rowFree.length));
 		if (rootPath) return rootPath + sharedId;
 	}
-	return undefined;
+	// No row answered - either none was named, or the widget is rooted outside
+	// every row the dispatch is in. The projection site itself is then the whole
+	// question the registry was built to answer, and an id whose prefix already
+	// names its own root resolves back to itself.
+	const rootPath = marklessWidgetRootPathThroughRows(sharedId, edgePath);
+	return rootPath ? rootPath + sharedId : undefined;
 }
 
 // A dispatched bound symbol reaches this graph twice over: the capture adapter
@@ -264,7 +277,32 @@ export function marklessRegisterWidgetProjections(
 // The widget this child-local `shared:` id belongs to: the answer registered for
 // the longest prefix of the reading instance's path.
 function marklessWidgetRootPath(graphNodeId: string, instancePath: string): string {
-	if (widgetRootPaths.size === 0) return '';
+	return widgetRootPathFor(graphNodeId, instancePath) ?? '';
+}
+
+/**
+ * The same question asked of a path that may carry rows the ROOT does not.
+ *
+ * One root per rendered widget means a root inside a repeat is registered under
+ * its row and a root outside one is registered without any - but a part
+ * projected INTO an outside root from inside the repeat carries the row in its
+ * own path regardless. The walk below chops segments off the right, so a leading
+ * `r:<key>:` blocks it from ever reaching that root. Rows are asked first, so a
+ * per-row root always wins over the row-free reading; only a path no rendered
+ * row answers is asked again with its rows dropped.
+ */
+function marklessWidgetRootPathThroughRows(graphNodeId: string, instancePath: string): string {
+	const withRows = widgetRootPathFor(graphNodeId, instancePath);
+	if (withRows !== undefined) return withRows;
+	const rowFree = instancePath.replace(ROW_SEGMENT, '');
+	if (rowFree === instancePath) return '';
+	return widgetRootPathFor(graphNodeId, rowFree) ?? '';
+}
+
+// `undefined` is "no widget claims this id from here", which is not the same
+// answer as a widget whose root is the page itself.
+function widgetRootPathFor(graphNodeId: string, instancePath: string): string | undefined {
+	if (widgetRootPaths.size === 0) return undefined;
 	// The id is either a definition id (`shared:<file>#<export>`) or one of its
 	// nodes (`<definitionId>/<kind>:<name>`). The definition id carries the module
 	// path, which has separators of its own, so ask the registry both ways instead
@@ -278,7 +316,7 @@ function marklessWidgetRootPath(graphNodeId: string, instancePath: string): stri
 			(slash > 0 ? widgetRootPaths.get(prefix + graphNodeId.slice(0, slash)) : undefined);
 		if (rootPath !== undefined) return rootPath;
 	}
-	return '';
+	return undefined;
 }
 
 // Every id family a component owns is instance-local; a page-scoped shared()
@@ -294,7 +332,7 @@ export function marklessComposedGraphNodeId(graphNodeId: string, instancePath: s
 	// names a widget root: composing it AGAIN is another rendered widget.
 	return pageSpace[1]
 		? instancePath + graphNodeId
-		: marklessWidgetRootPath(graphNodeId, instancePath) + graphNodeId;
+		: marklessWidgetRootPathThroughRows(graphNodeId, instancePath) + graphNodeId;
 }
 
 // Composed child-owned boundaries load their update symbol through the

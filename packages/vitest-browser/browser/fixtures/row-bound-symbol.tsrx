@@ -57,6 +57,10 @@ function RowCounter({ label, onBump }) @{
 	>{hits}</button>
 }
 
+// `data-outside-widget` is pagination's own shape: one root OUTSIDE the repeat,
+// owning a single widget graph, with every interactive part projected from
+// INSIDE a row. Each trigger's record then carries a row segment no widget root
+// was ever registered under, and all of them must still land on that one root.
 export default function RowBoundSymbolPage() @{
 	let bumps = state(0);
 	let widgetBumps = state(0);
@@ -91,6 +95,16 @@ export default function RowBoundSymbolPage() @{
 		<div data-page-widget>
 			<WidgetRoot>
 				<WidgetTrigger onBump={() => { widgetBumps++; }} />
+			</WidgetRoot>
+		</div>
+
+		<div data-outside-widget>
+			<WidgetRoot>
+				@for (const seat of rows; key seat.key) {
+					<span data-seat={seat.key}>
+						<WidgetTrigger onBump={() => { widgetBumps++; }} />
+					</span>
+				}
 			</WidgetRoot>
 		</div>
 	</main>
