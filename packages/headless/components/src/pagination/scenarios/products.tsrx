@@ -28,7 +28,7 @@ export default function Products() @{
 				<li>
 					<pagination.backtrigger data-testid="backtrigger">Previous</pagination.backtrigger>
 				</li>
-				@for (const entry of entries; index i; key i) {
+				@for (const entry of entries; key entry.key) {
 					<li>
 						@if (entry.type === 'page') {
 							<pagination.itemtrigger

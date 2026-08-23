@@ -2,11 +2,23 @@
  * One entry in a page range: a page a person can go to, or a gap between two
  * runs of pages. The gap carries no page number because there is nothing to
  * navigate to - the consumer renders it as an `aria-hidden` ellipsis.
+ *
+ * Every entry carries a `key` that identifies it across ranges, so a consumer
+ * loops on `key entry.key` rather than on the index. An index key names a slot,
+ * not an entry, so when the range slides the same index means a different page
+ * and an interactive part inside the row has no row value to route a click to.
+ * A page's key is its number; a gap's is the side it sits on, since a range
+ * holds at most one gap on each side of the current page.
  */
-export type PageEntry = { readonly type: 'page'; readonly value: number } | { readonly type: 'ellipsis' };
+export type PageEntry =
+	| { readonly type: 'page'; readonly value: number; readonly key: string }
+	| { readonly type: 'ellipsis'; readonly key: string };
 
-const pageEntry = (value: number): PageEntry => ({ type: 'page', value });
-const ellipsis = (): PageEntry => ({ type: 'ellipsis' });
+/** Which side of the current page a gap sits on. */
+type GapSide = 'leading' | 'trailing';
+
+const pageEntry = (value: number): PageEntry => ({ type: 'page', value, key: `page:${value}` });
+const ellipsis = (side: GapSide): PageEntry => ({ type: 'ellipsis', key: `ellipsis-${side}` });
 
 /**
  * Which page numbers a pagination shows, and where the gaps fall.
@@ -50,17 +62,17 @@ export function pageRange(page: number, count: number, siblingCount = 1): PageEn
 		const leftItems = Array.from({ length: 3 + 2 * siblingCount }, (_, index) =>
 			pageEntry(index + 1),
 		);
-		return [...leftItems, ellipsis(), pageEntry(count)];
+		return [...leftItems, ellipsis('trailing'), pageEntry(count)];
 	}
 
 	if (showLeft && !showRight) {
 		const length = 3 + 2 * siblingCount;
 		const rightItems = Array.from({ length }, (_, index) => pageEntry(count - length + index + 1));
-		return [pageEntry(1), ellipsis(), ...rightItems];
+		return [pageEntry(1), ellipsis('leading'), ...rightItems];
 	}
 
 	const middle = Array.from({ length: rightSibling - leftSibling + 1 }, (_, index) =>
 		pageEntry(leftSibling + index),
 	);
-	return [pageEntry(1), ellipsis(), ...middle, ellipsis(), pageEntry(count)];
+	return [pageEntry(1), ellipsis('leading'), ...middle, ellipsis('trailing'), pageEntry(count)];
 }

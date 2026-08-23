@@ -136,6 +136,52 @@ test('pageRange: a gap never stands for a single page', () => {
 	expect(pages(pageRange(18, 20, 1))).toEqual([1, '...', 16, 17, 18, 19, 20]);
 });
 
+test('pageRange: every entry carries a key, and the keys are unique within a range', () => {
+	// The key is what lets a consumer write `key entry.key` instead of `key i`. A
+	// duplicate inside one range would collapse two rows into one, so uniqueness is
+	// the part worth pinning, at every page of a long count.
+	for (let showing = 1; showing <= 20; showing += 1) {
+		const keys = pageRange(showing, 20, 1).map((entry) => entry.key);
+		expect(keys.every((key) => key.length > 0)).toBe(true);
+		expect(new Set(keys).size).toBe(keys.length);
+	}
+});
+
+test('pageRange: a page keeps its key as the range slides, and a gap keeps its side', () => {
+	// This is the whole point of the field: the same page is the same row across
+	// two different ranges, so it is reconciled rather than rebuilt. Page 20 is the
+	// tail on both, and page 1 the head.
+	expect(pageRange(1, 20, 1).map((entry) => entry.key)).toEqual([
+		'page:1',
+		'page:2',
+		'page:3',
+		'page:4',
+		'page:5',
+		'ellipsis-trailing',
+		'page:20',
+	]);
+	expect(pageRange(10, 20, 1).map((entry) => entry.key)).toEqual([
+		'page:1',
+		'ellipsis-leading',
+		'page:9',
+		'page:10',
+		'page:11',
+		'ellipsis-trailing',
+		'page:20',
+	]);
+	// The lone gap of a head-run range is the TRAILING one, and the lone gap of a
+	// tail-run range is the LEADING one, so a gap never changes sides under a row.
+	expect(pageRange(20, 20, 1).map((entry) => entry.key)).toEqual([
+		'page:1',
+		'ellipsis-leading',
+		'page:16',
+		'page:17',
+		'page:18',
+		'page:19',
+		'page:20',
+	]);
+});
+
 test('pageRange: the range is seven entries wide at every page of a long count', () => {
 	// Worth pinning because it is easy to assume the range shrinks at the ends. It
 	// does not - what changes is how many of the seven are pages and how many are
@@ -452,15 +498,21 @@ for (const mode of MODES) {
 		expectTwoWidgetsRendered();
 	});
 
-	// PINNED for SSR only. The arm-inside-a-loop defect this row was pinned on is
-	// FIXED (packages/web/src/ssr-data/renderer.ts:370 forwards the row into the
-	// arm's chunk), and the CSR half of this row now renders the whole range. What
-	// stops the SSR half is a second, unrelated refusal:
-	// MARKLESS_ROW_COMPONENT_INTERACTIVE, because `scenarios/products.tsrx` writes
-	// `@for (const entry of entries; index i; key i)` and an index key carries no
-	// row value to route an interactive part's clicks to. Un-pin by keying that
-	// loop on a stable field of the entry - which first needs such a field to
-	// exist, since an ellipsis entry has none (`PageEntry`, pagination-range.ts).
+	// PINNED for SSR only. The index key is GONE: `scenarios/products.tsrx` keys on
+	// `entry.key` now, and the compiled repeat record carries `keyPath: ["key"]`
+	// with `directSupported: true`, where on the previous `key i` it carried
+	// `keyPath: []` and `directSupported: false` (both measured off
+	// `compileTsrxModule`). The CSR half renders the whole range.
+	//
+	// What still refuses the SSR half is a second, compiler-side gap that no key
+	// can reach: `rowScopedEdgeIds`
+	// (packages/compiler/src/passes/public-render/ssr-module.ts) walks a repeat
+	// row's child-component and nested-repeat slots but never descends into a
+	// branch arm's templates, so `<pagination.itemtrigger>` inside this row's `@if`
+	// is not row-scoped. A non-row-scoped edge refuses on `repeatItem !== undefined`
+	// alone, whatever the key, which is why the refusal text still says "keyed by
+	// position". Un-pinning needs that walk to follow branch arms - a compiler
+	// change, outside this family.
 	(mode === 'SSR' ? test.fails : test)(`${mode}: the looped scenario renders the range the consumer computed`, async () => {
 		if (mode === 'CSR') await render(Products);
 		else await renderSSR(Products);
@@ -515,10 +567,10 @@ for (const mode of MODES) {
 		await expectLinkMovesTheCurrentPage();
 	});
 
-	// PINNED on the same index-key cause as the row above, in both modes: SSR
+	// PINNED on the branch-arm row-scoping gap described above, in both modes: SSR
 	// refuses the render outright, and in CSR the click on a page inside the arm
-	// routes nowhere - the heading stays `Page 1 of 20` - because an index-keyed
-	// row carries no row value to route the interaction to.
+	// routes nowhere - the heading stays `Page 1 of 20` (measured on the keyed
+	// loop, so this is no longer an index-key cause).
 	test.fails(`${mode}: the rendered controls follow the page as the range changes`, async () => {
 		if (mode === 'CSR') await render(Products);
 		else await renderSSR(Products);
@@ -598,9 +650,9 @@ test('SSR: the served page carries the current page and both bounds', async () =
 	expect(at('itemtrigger-1').hasAttribute('aria-current')).toBe(false);
 });
 
-// PINNED on the same index-key cause: the server render is refused with
-// MARKLESS_ROW_COMPONENT_INTERACTIVE before anything reaches the page, so resume
-// has nothing to resume.
+// PINNED on the same branch-arm row-scoping gap: the server render is refused
+// with MARKLESS_ROW_COMPONENT_INTERACTIVE before anything reaches the page, so
+// resume has nothing to resume.
 test.fails('SSR: the served looped range is the one the consumer computed', async () => {
 	await renderSSR(Products);
 	expect(renderedPages()).toEqual(['1', '2', '3', '4', '5', '20']);
