@@ -295,7 +295,8 @@ export function NavbarItemTrigger({
 
 	// A native <button> already activates on Enter and on Space, so those two keys
 	// need no rule; ArrowDown is the authoring practices' optional "open and step
-	// inside", and Escape is its dismissal requirement.
+	// inside". Escape is not here: the overlay primitive reports it as a `dismiss`
+	// on the panel, and `navbar.itemcontent` decides what it means.
 	<button
 		{...rest}
 		type="button"
@@ -315,22 +316,13 @@ export function NavbarItemTrigger({
 			if (
 				event.key === 'ArrowDown' ||
 				event.key === 'ArrowLeft' ||
-				event.key === 'ArrowRight' ||
-				event.key === 'Escape'
+				event.key === 'ArrowRight'
 			) {
 				event.preventDefault();
 			}
 
 			const key = event.key;
 			const from = event.target as HTMLElement;
-
-			if (key === 'Escape') {
-				navbar.closeAll();
-				const back = from.closest('button') as HTMLElement | null;
-				back?.focus();
-				onKeydown?.(event);
-				return;
-			}
 
 			if (key === 'ArrowDown') {
 				navbar.show(item.value);
@@ -386,47 +378,75 @@ export function NavbarItemTrigger({
 	>{children}</button>
 }
 
-export function NavbarItemContent({ children, onKeydown, ...rest }: NavbarItemContentProps) @{
+export function NavbarItemContent({
+	children,
+	onDismiss,
+	onKeydown,
+	...rest
+}: NavbarItemContentProps) @{
 	const navbar = navbarState();
 	const item = navbarItemState();
 	const isOpen = computed(() => navbar.value === item.value);
 
 	// Closed hides the panel, it never detaches it: the trigger points at this
 	// element's minted id, and an unmount would leave that reference dangling.
+	// Never detaching is also what the overlay mark below requires - an enlisted
+	// element removed from the document leaves the stack's marks behind.
+	//
+	// `overlay` is the bare attribute the primitive reads, and nothing is imported
+	// for it. The panel enlists when `hidden` flips off and leaves the stack when it
+	// flips back on, and while it is enlisted the primitive reports Escape and an
+	// outside press as a `dismiss`. It closes nothing and moves no focus: both are
+	// decided in `onDismiss` below.
 	<div
 		{...rest}
 		el={item.contentEl}
+		overlay
 		ui-navbar-dropdown=""
 		hidden={isOpen !== true}
 		ui-open={isOpen}
 		ui-closed={isOpen !== true}
+		onDismiss={(event) => {
+			// A disclosure answers to both reasons - Escape, and a press outside the
+			// panel - which is what the authoring practices' dismissability
+			// requirement asks for and what QDS gets from `popover="auto"`.
+			const from = event.target as HTMLElement;
+			const box = from.closest('[ui-navbar-item]');
+			const back = box?.querySelector('[aria-expanded]') as HTMLElement | null;
+			// Read before the close: a hidden subtree cannot hold focus, so after the
+			// dispatch lands the answer is no longer available.
+			const wasFocusInside = box !== null && box.contains(document.activeElement);
+			navbar.closeAll();
+			// The press that dismissed may be the same press whose click the trigger is
+			// about to see. Without this, pressing the trigger of an open dropdown would
+			// close it on the press and re-open it on the click. The window is the
+			// item's own, so a press outside never suppresses a click on a different
+			// entry's trigger.
+			item.graceUntil = Date.now() + navbar.clickGrace;
+			// The primitive moves no focus, so the return is the family's to write:
+			// Escape from inside the entry has to land on the button that opened the
+			// panel, or a person is left standing on nothing. A dismissal that reached
+			// no focus of ours moves none.
+			if (event.detail.reason === 'escape' && wasFocusInside) back?.focus();
+			onDismiss?.(event);
+		}}
 		onKeydown={(event) => {
 			// Guarded by event fields alone, for the reason the root's handler gives.
+			// Escape is not in the list: the primitive's document listener reads
+			// `defaultPrevented`, and this family has no default to suppress.
 			if (
 				event.key === 'ArrowUp' ||
 				event.key === 'ArrowDown' ||
 				event.key === 'ArrowLeft' ||
 				event.key === 'ArrowRight' ||
 				event.key === 'Home' ||
-				event.key === 'End' ||
-				event.key === 'Escape'
+				event.key === 'End'
 			) {
 				event.preventDefault();
 			}
 
 			const key = event.key;
 			const from = event.target as HTMLElement;
-
-			if (key === 'Escape') {
-				// The dismissal requirement: close, and put focus back on the button that
-				// opened it, or a person is left standing on nothing.
-				navbar.closeAll();
-				const box = from.closest('[ui-navbar-item]');
-				const back = box?.querySelector('[aria-expanded]') as HTMLElement | null;
-				back?.focus();
-				onKeydown?.(event);
-				return;
-			}
 
 			const isNavigationKey =
 				key === 'ArrowUp' ||
@@ -461,8 +481,10 @@ export function NavbarItemContent({ children, onKeydown, ...rest }: NavbarItemCo
 }
 
 export function NavbarItemLink({ current, children, onKeydown, ...rest }: NavbarItemLinkProps) @{
-	const navbar = navbarState();
-
+	// It resolves no instance at all: the only reason it once read `navbarState`
+	// was `closeAll()` for its own Escape branch, and the overlay primitive owns
+	// that report now.
+	//
 	// The priority-1 assertion the QDS reference cannot make: `spec.md` designed
 	// this part, named it `navbar.itemlink`, and the code never shipped it, so
 	// aria-at's `stateCurrentPage` had nowhere to land.
@@ -483,15 +505,16 @@ export function NavbarItemLink({ current, children, onKeydown, ...rest }: Navbar
 		onKeydown={(event) => {
 			// Guarded by event fields alone, for the reason the trigger's handler gives.
 			// Every key this part might act on is listed, because which ones it DOES act
-			// on is decided below from where the link sits.
+			// on is decided below from where the link sits. Escape is not among them:
+			// the panel this link sits in carries the overlay mark, and the primitive
+			// reports Escape there.
 			if (
 				event.key === 'ArrowUp' ||
 				event.key === 'ArrowDown' ||
 				event.key === 'ArrowLeft' ||
 				event.key === 'ArrowRight' ||
 				event.key === 'Home' ||
-				event.key === 'End' ||
-				event.key === 'Escape'
+				event.key === 'End'
 			) {
 				event.preventDefault();
 			}
@@ -499,19 +522,6 @@ export function NavbarItemLink({ current, children, onKeydown, ...rest }: Navbar
 			const key = event.key;
 			const from = event.target as HTMLElement;
 			const panel = from.closest('[ui-navbar-dropdown]');
-
-			if (key === 'Escape') {
-				if (panel !== null) {
-					// The dismissal requirement: close, and put focus back on the button
-					// that opened this panel, or a person is left standing on nothing.
-					navbar.closeAll();
-					const box = from.closest('[ui-navbar-item]');
-					const back = box?.querySelector('[aria-expanded]') as HTMLElement | null;
-					back?.focus();
-				}
-				onKeydown?.(event);
-				return;
-			}
 
 			// One walk, two scopes. Inside a dropdown all six movement keys walk the
 			// panel's own links; at the top level only the left and right arrows walk,
