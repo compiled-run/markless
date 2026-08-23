@@ -460,7 +460,14 @@ function collectAttribute(
 		return;
 	}
 
-	if (!hostNodeId) return;
+	// A component/part tag has no host node of its own, so nothing below this
+	// point applies - but an IDREF handle written there is still this component's
+	// record: the element that must carry the minted id is rendered HERE, and the
+	// id crosses the edge as a value the child spreads onto its own markup.
+	if (!hostNodeId) {
+		collectIdrefAttribute(attributeName, expressionValue, state, walk, null);
+		return;
+	}
 
 	if (isEventAttribute(attributeName)) {
 		if (expressionValue?.type === 'ArrayExpression') {
@@ -575,44 +582,9 @@ function collectAttribute(
 		return;
 	}
 
-	// Must sit above the generic attribute branch: an element() handle in an IDREF
-	// position is identity, not a value. Left to fall through it becomes an
-	// ordinary attribute binding that writes a DOM element into a string
-	// attribute - the page renders, the relationship does not exist, and nothing
-	// says so. Non-handle values in these same attributes are untouched.
-	if (expressionValue && isIdrefAttribute(attributeName)) {
-		const classified = classifyIdrefValue(expressionValue, state);
-		if (classified?.kind === 'composite') {
-			state.graph.diagnostics.push(
-				compositeIdrefElementHandleDiagnostic({
-					attributeName,
-					source: expressionSource(expressionValue, state.source),
-					span: sourceSpan(expressionValue, state.filename),
-				}),
-			);
-			walk(expressionValue, state);
-			return;
-		}
-		if (classified?.kind === 'handle') {
-			// No templateRead and no boundHostNodeId yet: whether this handle is ever
-			// bound is not knowable until the whole file has been walked.
-			state.pendingElementHandleIdrefs.push({
-				hostNodeId,
-				attributeName,
-				handleName: classified.handleName,
-				source: expressionSource(expressionValue, state.source),
-				componentName: state.currentComponentName ?? undefined,
-				sourceSpan: sourceSpan(expressionValue, state.filename),
-				...(state.currentKeyedRepeatScopeIds.length > 0
-					? { keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds] }
-					: {}),
-				...(state.currentAsyncBoundaryId
-					? { asyncBoundaryId: state.currentAsyncBoundaryId }
-					: {}),
-			});
-			return;
-		}
-	}
+	// Must sit above the generic attribute branch, or the handle falls through to
+	// an ordinary value binding.
+	if (collectIdrefAttribute(attributeName, expressionValue, state, walk, hostNodeId)) return;
 
 	const conditionalClass = conditionalClassTarget(attributeName, expressionValue);
 	if (conditionalClass) {
@@ -945,6 +917,54 @@ type IdrefValueClassification =
  * refused rather than lowered. `null` is everything else, including an ordinary
  * id string, which keeps its existing templateRead.
  */
+/**
+ * An element() handle in an IDREF position is identity, not a value. Left to
+ * fall through it becomes an ordinary binding that writes a DOM element into a
+ * string attribute - the page renders, the relationship does not exist, and
+ * nothing says so. Non-handle values in these same attributes are untouched.
+ *
+ * `hostNodeId` is null when the attribute sits on a component/part tag, which
+ * changes only who writes the attribute, not who owns the record. Returns
+ * whether this attribute was claimed.
+ */
+function collectIdrefAttribute(
+	attributeName: string,
+	expressionValue: AnyNode | undefined,
+	state: WalkState,
+	walk: SemanticGraphWalk,
+	hostNodeId: string | null,
+): boolean {
+	if (!expressionValue || !isIdrefAttribute(attributeName)) return false;
+	const classified = classifyIdrefValue(expressionValue, state);
+	if (classified?.kind === 'composite') {
+		state.graph.diagnostics.push(
+			compositeIdrefElementHandleDiagnostic({
+				attributeName,
+				source: expressionSource(expressionValue, state.source),
+				span: sourceSpan(expressionValue, state.filename),
+			}),
+		);
+		walk(expressionValue, state);
+		return true;
+	}
+	if (classified?.kind !== 'handle') return false;
+	// No templateRead and no boundHostNodeId yet: whether this handle is ever
+	// bound is not knowable until the whole file has been walked.
+	state.pendingElementHandleIdrefs.push({
+		hostNodeId,
+		attributeName,
+		handleName: classified.handleName,
+		source: expressionSource(expressionValue, state.source),
+		componentName: state.currentComponentName ?? undefined,
+		sourceSpan: sourceSpan(expressionValue, state.filename),
+		...(state.currentKeyedRepeatScopeIds.length > 0
+			? { keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds] }
+			: {}),
+		...(state.currentAsyncBoundaryId ? { asyncBoundaryId: state.currentAsyncBoundaryId } : {}),
+	});
+	return true;
+}
+
 function classifyIdrefValue(
 	expression: AnyNode,
 	state: WalkState,

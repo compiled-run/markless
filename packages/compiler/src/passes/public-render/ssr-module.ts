@@ -64,6 +64,22 @@ import { collectSsrPropEvents } from './component-wiring.ts';
 import { boundSymbolsForEdge, componentEdgeGraphRoutes } from './component-wiring.ts';
 import type { PublicRenderRoot } from './types.ts';
 
+/**
+ * The minted id for one handle, as an expression usable anywhere this module's
+ * render scope is live. It runs the SAME case the residue reader runs rather
+ * than respelling the mint, because the element carrying the id and the IDREF
+ * naming it must never be able to disagree about how it is spelled.
+ */
+function elementHandleIdSource(handleGraphNodeId: string): string {
+	const readCase = elementHandleIdReadCase({
+		idPrefixSource: 'marklessSsrIdPrefix',
+		widgetInstanceSource: hasSharedElementHandle([handleGraphNodeId])
+			? `marklessSsrRenderStateValues.get(${JSON.stringify(MARKLESS_WIDGET_INSTANCE_KEY)})`
+			: null,
+	});
+	return `(residue=>{${readCase}})({kind:'element-handle-id',handleGraphNodeId:${JSON.stringify(handleGraphNodeId)}})`;
+}
+
 export function emitPublicSsrRenderModule(
 	input: PublicRenderModuleInput,
 	rootInfo: PublicRenderRoot,
@@ -633,6 +649,14 @@ function emitSsrDataLines(
 				return [`...marklessSsrSpreadProps(marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(${JSON.stringify(prop.graphNodeId)}),${JSON.stringify(prop.path)}),${JSON.stringify(prop.excludeNames)})`];
 			if (prop.kind === 'graph-reference')
 				return [`${objectPropertyName(prop.name)}:marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(${JSON.stringify(prop.graphNodeId)}),${JSON.stringify(prop.path)})`];
+			// An IDREF handle written on this child's tag: the element it names is
+			// rendered by THIS component, so this render spells the id and the child
+			// receives a string. Emitting `prop.source` here handed the child the
+			// handle itself, which stringifies to an IDREF naming nothing.
+			if (prop.kind === 'element-handle-id')
+				return [
+					`${objectPropertyName(prop.name)}:${elementHandleIdSource(prop.graphNodeId)}`,
+				];
 			return prop.source ? [`${objectPropertyName(prop.name)}:(${prop.source})`] : [];
 		});
 		const projectionChunkId = chunks.flatMap((chunk) =>
