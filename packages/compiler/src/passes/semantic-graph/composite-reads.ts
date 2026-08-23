@@ -35,7 +35,21 @@ export type GraphReadScope = {
  * and `.toFixed()` in a page's text is cost with no behavior behind it. Widening
  * the template positions is its own change, with its own byte measurement.
  */
-export type CompositeReadOptions = { readonly methodCalls?: boolean };
+/**
+ * Whether a unary operator standing over the whole expression counts as part of
+ * the read.
+ *
+ * A component edge says yes: `tall={!board.wide}` is the plainest way to write an
+ * inverted flag, and the reads under the operator are already decomposed exactly
+ * as `board.wide === false` decomposes them. Left out, the negation missed the
+ * lift and fell through to the refusal, so the prop never reached the child. A
+ * template position keeps the narrower gate: its byte output is measured, and
+ * widening it is its own change with its own measurement.
+ */
+export type CompositeReadOptions = {
+	readonly methodCalls?: boolean;
+	readonly unaryOperators?: boolean;
+};
 
 export function isCompositeTemplateExpression(
 	node: AnyNode,
@@ -46,7 +60,10 @@ export function isCompositeTemplateExpression(
 		node.type === 'BinaryExpression' ||
 		node.type === 'LogicalExpression' ||
 		node.type === 'TemplateLiteral' ||
-		(options.methodCalls === true && isMethodCallExpression(node))
+		(options.methodCalls === true && isMethodCallExpression(node)) ||
+		// `delete` mutates rather than reads; the read collector already refuses it,
+		// so an operator that is not a pure value still reaches the loud refusal.
+		(options.unaryOperators === true && node.type === 'UnaryExpression')
 	);
 }
 
@@ -159,10 +176,9 @@ function isLiteralExpression(node: AnyNode | undefined): boolean {
 export function collectCompositeTemplateExpression(
 	node: AnyNode,
 	state: WalkState,
-	options: {
+	options: CompositeReadOptions & {
 		readonly requireWritableRead?: boolean;
 		readonly scope?: GraphReadScope;
-		readonly methodCalls?: boolean;
 	} = {},
 ): { readonly graphNodeId: string } | null {
 	if (!isCompositeTemplateExpression(node, options)) return null;
