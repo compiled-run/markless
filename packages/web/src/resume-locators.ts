@@ -6,6 +6,7 @@ import type {
 	ResumeViewRecord,
 } from './resume-types.ts';
 import {
+	ambiguousElementHandleError,
 	mismatchedElementLocatorError,
 	missingElementLocatorError,
 } from './inline/resume-errors.ts';
@@ -32,37 +33,98 @@ export function materializeDomLocators(
 	return byHostId;
 }
 
+// The instance path a composed widget-scoped handle id carries, restated here
+// for the reason fns/instance-scope.ts restates the serializer's grammar: the
+// lean resume chunk strips one prefix rather than taking an import edge for it.
+const HANDLE_INSTANCE_PATH = /^(?:[cp]\d+:|r:[^:]*:)+(?=shared:)/;
+
+/**
+ * One element per key, and a loud refusal when a key names more than one.
+ *
+ * A widget-scoped handle is one element PER RENDERED WIDGET, so composition
+ * qualifies its id with the rendered widget's own root path and the reading
+ * handler asks with the same path. Every registration is filed under three keys
+ * all the same: that qualified id, the id exactly as the module compiled it, and
+ * the handle's name — the last two are how a single-instance page, and a handler
+ * whose instance the qualification could not name, still resolve.
+ *
+ * Which is why the multi-registration case throws instead of answering. Two
+ * rendered widgets file the same compiled id and the same name; handing back
+ * whichever registered last is the defect this registry exists to end, and it is
+ * silent — the handler runs, touches a real element, and the wrong one moves.
+ */
 export function materializeElementHandles(
 	root: ResumeDomElement,
 	elementsByHostId: Map<string, ResumeDomElement>,
 	handles: ResumeViewRecord['elementHandles'],
 ): ElementHandleRegistry {
-	const byHandleId = new Map<string, ResumeDomElement>(),
-		byName = new Map<string, ResumeDomElement>(),
-		keysByHostId = new Map<string, { readonly handleId: string; readonly name: string }>();
+	type Held = {
+		readonly handleId: string;
+		readonly keys: ReadonlyArray<string>;
+		readonly element: ResumeDomElement;
+	};
+	// One element routinely carries more than one handle - a library part binds
+	// its family's own, and the consumer binds theirs onto the same tag - so a
+	// host holds a LIST. Filing one per host drops whichever registered first.
+	const byKey = new Map<string, ResumeDomElement[]>(),
+		heldByHostId = new Map<string, Held[]>();
+	function unfile(held: Held): void {
+		for (const key of held.keys) {
+			const filed = byKey.get(key);
+			if (!filed) continue;
+			const at = filed.indexOf(held.element);
+			if (at >= 0) filed.splice(at, 1);
+			if (filed.length === 0) byKey.delete(key);
+		}
+	}
+	function deleteHost(hostNodeId: string): void {
+		const held = heldByHostId.get(hostNodeId);
+		if (!held) return;
+		for (const entry of held) unfile(entry);
+		heldByHostId.delete(hostNodeId);
+	}
 	function register(
 		hostNodeId: string,
 		handle: { readonly handleId: string; readonly name: string },
 		element: ResumeDomElement,
 	): void {
-		byHandleId.set(handle.handleId, element);
-		byName.set(handle.name, element);
-		keysByHostId.set(hostNodeId, { handleId: handle.handleId, name: handle.name });
+		const held = heldByHostId.get(hostNodeId) ?? [];
+		// The same handle registered again on the same host replaces its own entry
+		// rather than doubling it, which would read as two rendered widgets and
+		// refuse. Every OTHER handle on that host stays exactly where it is.
+		for (let index = held.length - 1; index >= 0; index--)
+			if (held[index]!.handleId === handle.handleId) {
+				unfile(held[index]!);
+				held.splice(index, 1);
+			}
+		const keys = [
+			...new Set([
+				handle.handleId,
+				handle.handleId.replace(HANDLE_INSTANCE_PATH, ''),
+				handle.name,
+			]),
+		];
+		for (const key of keys) {
+			const filed = byKey.get(key);
+			if (filed) filed.push(element);
+			else byKey.set(key, [element]);
+		}
+		held.push({ handleId: handle.handleId, keys, element });
+		heldByHostId.set(hostNodeId, held);
 	}
 	for (const handle of handles) {
 		const element = elementsByHostId.get(handle.hostNodeId);
 		if (element) register(handle.hostNodeId, handle, element);
 	}
 	return {
-		get: (id) => connectedElement(root, byHandleId.get(id) ?? byName.get(id)),
-		register,
-		deleteHost(hostNodeId) {
-			const keys = keysByHostId.get(hostNodeId);
-			if (!keys) return;
-			byHandleId.delete(keys.handleId);
-			byName.delete(keys.name);
-			keysByHostId.delete(hostNodeId);
+		get(id) {
+			const filed = byKey.get(id);
+			if (!filed || filed.length === 0) return undefined;
+			if (filed.length > 1) throw ambiguousElementHandleError(id, filed.length);
+			return connectedElement(root, filed[0]);
 		},
+		register,
+		deleteHost,
 	};
 }
 

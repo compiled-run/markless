@@ -24,7 +24,7 @@ import {
 	marklessBoundSymbolId,
 	marklessDomUpdateSymbolId,
 } from './bound-symbol.ts';
-import { marklessRowSegment } from './instance-scope.ts';
+import { marklessRowSegment, marklessWidgetHandleId } from './instance-scope.ts';
 import { marklessSerializeGraphValue } from './state-serialize.ts';
 import type { SsrDataStructure } from '../ssr-data/renderer.ts';
 import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
@@ -1224,10 +1224,15 @@ export function marklessSsrAppendChildView(context: {
 				? { symbolId: marklessBoundSymbolId(context.child, behavior.symbolId) }
 				: {}),
 		});
+	// A widget-scoped handle id is one module-level string every instance of that
+	// widget spells, so it takes the same qualification every other record's graph
+	// ids take here. Without it the served payload files both instances' elements
+	// under one key and the last one registered answers every handler on the page.
 	for (const handle of childView.elementHandles)
 		context.elementHandles.push({
 			...handle,
 			hostNodeId: context.child.hostPrefix + handle.hostNodeId,
+			handleId: marklessWidgetHandleId(handle.handleId as string, childInstancePath),
 		});
 	for (const branch of childView.branches ?? []) {
 		const liveTestReads = (branch.testReads ?? []).filter(
@@ -1391,6 +1396,7 @@ export function marklessSsrPrefixBoundaryArmRecords(
 		elementHandles: (set.elementHandles ?? []).map((handle) => ({
 			...handle,
 			hostNodeId: child.hostPrefix + handle.hostNodeId,
+			handleId: marklessWidgetHandleId(handle.handleId as string, instancePath),
 		})),
 		keyedRepeats: (set.keyedRepeats ?? []).flatMap((repeat) => {
 			const mapped = marklessCsrRemapChildKeyedRepeat(

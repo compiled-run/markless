@@ -189,6 +189,10 @@ function scopeSymbol(symbol: ResumeSymbol, instancePath: string): ResumeSymbol {
 		symbol({
 			...context,
 			graph: marklessInstanceScopedGraph(context.graph, instancePath),
+			getElementHandle: marklessInstanceScopedElementHandle(
+				context.getElementHandle,
+				instancePath,
+			),
 			...(context.read
 				? {
 						read: (graphNodeId: string, path?: ReadonlyArray<string>) =>
@@ -199,6 +203,55 @@ function scopeSymbol(symbol: ResumeSymbol, instancePath: string): ResumeSymbol {
 					}
 				: {}),
 		});
+}
+
+/**
+ * A widget-scoped `element()` handle names one element PER RENDERED WIDGET, and
+ * its compiled id is one module-level string every instance of that widget
+ * spells. Qualifying it exactly as the widget's graph nodes are qualified is
+ * what turns it back into a key: the registration and the reading handler both
+ * land on the rendered widget's own root path, so a page carrying two instances
+ * answers each handler with its own element instead of the last registration.
+ *
+ * A handle that is not widget-scoped is returned untouched. A component-local
+ * handle is already one element per key, and a page-scoped `shared()` graph is
+ * page space by design.
+ */
+export function marklessWidgetHandleId(handleId: string, instancePath: string): string {
+	if (!instancePath) return handleId;
+	const pageSpace = PAGE_SPACE_ID.exec(handleId);
+	if (!pageSpace || pageSpace[2] !== 'shared') return handleId;
+	return marklessComposedGraphNodeId(handleId, instancePath);
+}
+
+/**
+ * The reading half of the same key.
+ *
+ * The compiled symbol asks for the module-level id, so the instance it is
+ * running in is what has to be added here. The qualified id is asked first; the
+ * id exactly as compiled answers when this page registered no qualified handle
+ * at all - a single-instance page, or a handle whose host never travelled
+ * through composition. The registry itself refuses a raw id that more than one
+ * rendered widget registered, so the fallback can never hand back an arbitrary
+ * instance's element.
+ */
+export function marklessInstanceScopedElementHandle(
+	getElementHandle: ResumeSymbolContext['getElementHandle'],
+	instancePath: string,
+): ResumeSymbolContext['getElementHandle'] {
+	// Several context builders cast an object literal into the symbol context, so
+	// a context that never carried a handle reader reaches here as undefined.
+	if (typeof getElementHandle !== 'function') return getElementHandle;
+	return (handleIdOrName: string) => {
+		// Resolved per read, not per symbol: the widget registry is filled by the
+		// scoped graph this same context builds, so the answer exists only once the
+		// symbol body runs.
+		const scoped = marklessWidgetHandleId(handleIdOrName, instancePath);
+		return (
+			(scoped === handleIdOrName ? undefined : getElementHandle(scoped)) ??
+			getElementHandle(handleIdOrName)
+		);
+	};
 }
 
 // Only ids the symbol itself spells are child-local. Shared definitions and the
@@ -465,7 +518,10 @@ function composedBoundaryArmRecords(
 				: {}),
 			...(behavior.symbolId ? { symbolId: prefix + behavior.symbolId } : {}),
 		})),
-		elementHandles: set.elementHandles.map(prefixHost),
+		elementHandles: set.elementHandles.map((handle) => ({
+			...prefixHost(handle),
+			handleId: marklessWidgetHandleId(handle.handleId, instancePath),
+		})),
 		keyedRepeats: set.keyedRepeats?.map((repeat) => ({
 			...repeat,
 			id: prefix + repeat.id,
