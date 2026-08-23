@@ -570,13 +570,13 @@ for (const mode of MODES) {
 	//
 	// The family cannot fix this from inside the anatomy the owner ratified: the
 	// routing lives in the compiler's shared-callback wiring, not in these parts.
-	test.fails(`${mode}: a click calls the consumer onChange once with the new page`, async () => {
+	test(`${mode}: a click calls the consumer onChange once with the new page`, async () => {
 		if (mode === 'CSR') await render(WithOnChange);
 		else await renderSSR(WithOnChange);
 		await expectConsumerCallbackFires();
 	});
 
-	test.fails(`${mode}: clicking the page already showing calls nothing`, async () => {
+	test(`${mode}: clicking the page already showing calls nothing`, async () => {
 		if (mode === 'CSR') await render(WithOnChange);
 		else await renderSSR(WithOnChange);
 		await expectTheCurrentPageFiresNothing();
@@ -584,7 +584,7 @@ for (const mode of MODES) {
 
 	// The step controls themselves ARE direct children of the root, so their half
 	// of this row routes; it opens by clicking a page control, which does not.
-	test.fails(`${mode}: back and forward report through the same callback`, async () => {
+	test(`${mode}: back and forward report through the same callback`, async () => {
 		if (mode === 'CSR') await render(WithOnChange);
 		else await renderSSR(WithOnChange);
 		await expectStepControlsReportThroughTheSameCallback();
