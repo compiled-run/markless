@@ -10,7 +10,15 @@
  * CI, and later against a W3C AT Driver connection, without an edit.
  */
 
-/** What one reader calls the facts a checkbox announcement has to convey. */
+/**
+ * What one reader calls the facts an announcement has to convey.
+ *
+ * One flat table, because `Conveys` names a role and a list of states out of the
+ * same key space. A family adds the slots it needs and every driver fills them;
+ * a slot no driver can fill honestly does not belong here — see the negative
+ * proofs in the suites, which assert a fact is *absent* rather than inventing a
+ * word for its absence.
+ */
 export type Vocabulary = {
 	readonly checkbox: string;
 	/** What a reader calls the element a set of checkboxes is presented in. */
@@ -20,6 +28,24 @@ export type Vocabulary = {
 	readonly partiallyChecked: string;
 	readonly disabled: string;
 	readonly invalid: string;
+	/** A two-state control that is on or off rather than ticked - `role="switch"`. */
+	readonly switch: string;
+	/** The element a set of radios is presented in - `role="radiogroup"`. */
+	readonly radiogroup: string;
+	readonly radio: string;
+	readonly tablist: string;
+	readonly tab: string;
+	readonly tabpanel: string;
+	readonly button: string;
+	readonly progressbar: string;
+	/** A single- or multi-line text entry field. */
+	readonly textbox: string;
+	/** The state a chosen tab is in - `aria-selected="true"`. */
+	readonly selected: string;
+	/** A disclosure trigger whose panel is showing - `aria-expanded="true"`. */
+	readonly expanded: string;
+	/** A disclosure trigger whose panel is hidden - `aria-expanded="false"`. */
+	readonly notExpanded: string;
 };
 
 /** The key names an operation is written in, per reader. */
@@ -27,6 +53,9 @@ export type Keys = {
 	/** The one key that toggles a checkbox, per the WAI-ARIA authoring practices. */
 	readonly space: string;
 	readonly enter: string;
+	/** The two keys a radio group and a tab list move through their set with. */
+	readonly arrowDown: string;
+	readonly arrowRight: string;
 };
 
 export type ScreenReaderDriver = {

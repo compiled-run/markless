@@ -70,8 +70,11 @@ run against three different readers that phrase everything differently:
 | indeterminate  | `partially checked`  | `half checked`     | `mixed`       |
 
 `driver.ts` holds that seam. A driver supplies the commands (`next`, `press`,
-`reannounce`) **and** that reader's vocabulary for the six facts; the suite
-names facts, never words. `virtual-driver.ts` fills it with the JavaScript
+`reannounce`) **and** that reader's vocabulary for every fact; the suite names
+facts, never words. A fact no reader has an honest word for does not get one
+invented: it is asserted as an **absence** instead — `missingFacts(…, { state:
+['selected'] })` is expected *not* to be empty — which is how "this tab is not
+the one showing" and "this field is not invalid" are proven. `virtual-driver.ts` fills it with the JavaScript
 reader; `page-driver.ts` fills it with NVDA or VoiceOver driven over a served
 page through Playwright, and `vocabularies.ts` supplies each of those two
 readers' word for each fact. A W3C AT Driver connection fills the same shape
@@ -82,6 +85,16 @@ Expectations are ordered: `readUntil` walks the reading cursor forward until an
 announcement conveys what was asked for, and throws with the whole transcript
 when it never does — a walk that never arrives is the same defect as a wrong
 phrase.
+
+**After a gesture that reshapes the page, walk forward — do not re-read in
+place.** `reannounce()` steps off the item and back onto it, which re-reads from
+the live DOM and is right when the gesture only changed an attribute (a checkbox
+ticking, a switch flipping). When the gesture reveals or hides content —
+`collapsible` opening its panel, `tabs` swapping which panel is showing — the
+tree grows or shrinks under the cursor and stepping back lands somewhere else
+entirely. Those suites poll `next()` instead, which wraps around a tree this
+small and reaches the item either way. A suite that gets this wrong is not
+wrong every run, which is worse: it is flaky.
 
 ## What the real lanes share, and what they decide
 
@@ -104,20 +117,69 @@ code: it imports through the `@markless/ui` barrel and carries no test hooks.
 The one affordance for a driver is `data-gallery-ready` on `<html>`, set after
 the mount resolves, so a reader waits on the DOM rather than on a timer.
 
-## Two expectations are recorded red
+## Which families the virtual lane reads
 
-`src/checkbox/checkbox.sr.ts` ends with two `test.fails` cases. They are
-aria-at expectations the family does not meet yet, written the correct way round
-so the suite turns **red the day the gap is closed** and whoever closes it
-deletes the `.fails`:
+Eight, one `src/<family>/<family>.sr.ts` each: `checkbox`, `checklist`,
+`collapsible`, `progress`, `radio-group`, `tabs`, `textbox`, `toggle`. The
+runner config takes `src/**/*.sr.ts`, so a new file joins the lane by existing;
+the workflow matrix is the only list that has to be edited by hand.
 
-- **the help text is conveyed with the box.** `<checkbox.description>` renders a
-  plain `div` and wires no `aria-describedby`, so a reader announces it as a
-  separate item further down the page instead of as part of the box.
+Four of the eight are seeded from a w3c/aria-at test plan, and the other four say
+so in their own header comment rather than implying a plan exists:
+
+| family                | plan it is seeded from                                              |
+| --------------------- | ------------------------------------------------------------------- |
+| `checkbox`            | `tests/apg/checkbox` and `tests/apg/checkbox-tri-state`               |
+| `checklist`           | the same two plans, read as a group                                   |
+| `radio-group`         | `tests/apg/radiogroup-roving-tabindex`                                |
+| `tabs`                | `tests/apg/tabs-automatic-activation` and `…-manual-activation`       |
+| `collapsible`         | the disclosure plan — disclosure is the specification's name for it   |
+| `toggle`              | **no aria-at plan for `role="switch"`;** the APG switch pattern       |
+| `progress`            | **no aria-at plan for `role="progressbar"`;** the ARIA specification  |
+| `textbox`             | **no aria-at plan for a plain text input;** the ARIA specification    |
+
+An absence is written down, never papered over. Where a family's own rows go
+past what its plan covers — a disabled option, a whole disabled group, a vertical
+tab list — the suite says the row is ours rather than the plan's.
+
+## Some expectations are recorded red
+
+Several suites end in `test.fails` cases. They are expectations something does
+not meet yet, written the correct way round so the suite turns **red the day the
+gap is closed** and whoever closes it deletes the `.fails`. Two of them are about
+this lane rather than about a family, which is the distinction to keep:
+
+Gaps in a family:
+
+- **the help text is conveyed with the control** (`checkbox`, `toggle`,
+  `textbox`). The description part renders a plain `div` and wires no
+  `aria-describedby`, so a reader announces it as a separate item further down
+  the page instead of as part of the control. In `textbox` the same gap has a
+  worse form, recorded separately: a field conveyed as invalid whose error text
+  is unreachable, so a person is told the field is wrong and never told why.
 - **Enter leaves a checkbox alone.** The authoring practices give a checkbox one
   activation key, Space. The trigger calls `preventDefault()` on Enter, but the
   component source already records that the request lands after dispatch
   returns, so Enter still toggles.
+- **the panel carries the name of the tab that shows it** (`tabs`). aria-at gives
+  that name priority 1; `tabs.content` wires no `aria-labelledby`, so a reader
+  reaches an unnamed region.
+- **the bar carries the name its visible label gives it** (`progress`), and **an
+  indeterminate bar reports no current value**. `progress.root` writes a
+  hard-coded `aria-label="progress"` and an `aria-valuetext` computed from `min`,
+  so every bar is named "progress" and a bar whose progress is unknown announces
+  "0%".
+
+A gap in this lane, not in a family:
+
+- **an arrow announces the radio it chose** (`radio-group`). Measured: after the
+  arrow the option's `input.checked` is `true` and its indicator reads "Chosen",
+  while the `checked` *content attribute* stays `null` — the platform makes that
+  attribute the default state and the property the current one, and the family
+  sets the property. `@guidepup/virtual-screen-reader` reads the attribute, so it
+  announces "not checked" about a radio the browser considers checked. This is
+  exactly the assertion the real-reader lanes exist to carry: NVDA and VoiceOver
+  read the platform accessibility tree, which is built from the property.
 
 ## Known blocker: the gallery does not render yet
 
@@ -170,9 +232,12 @@ disagree, that disagreement is the finding.
 1. Write `src/<family>/<family>.sr.ts` against `virtualDriver`, seeded from that
    family's aria-at test plan where one exists.
 2. Add any fact the family needs to `Vocabulary` in `driver.ts`, and give every
-   driver its word for it.
-3. Add the family name to each `matrix.family` list in
-   `.github/workflows/screen-reader.yml`. Nothing else in the workflow changes.
+   driver its word for it. A fact only some readers speak — "not selected", "not
+   invalid" — gets no slot; assert its absence instead.
+3. Add the family name to the `virtual` job's `matrix.family` list in
+   `.github/workflows/screen-reader.yml`, and to the `nvda` and `voiceover` lists
+   only once that family has a `.nvda.ts` / `.voiceover.ts` spec — a name with no
+   spec file makes the run find no tests. Nothing else in the workflow changes.
 
 Never invent an expected phrase. Every phrase traces to an aria-at assertion or
 to what the reader actually says about our rendered DOM. Where those two

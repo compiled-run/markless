@@ -37,6 +37,31 @@ export const nvdaVocabulary: Vocabulary = {
 	disabled: 'unavailable',
 	// unverified against our markup
 	invalid: 'invalid entry',
+	// unverified against our markup
+	switch: 'switch',
+	// unverified against our markup; the radio-group research note records
+	// aria-at's own transcript for this role as "group"
+	radiogroup: 'grouping',
+	// unverified against our markup; aria-at's radiogroup plan says "radio button"
+	radio: 'radio button',
+	// unverified against our markup; aria-at's tabs plan says "tab list"
+	tablist: 'tab list',
+	// unverified against our markup
+	tab: 'tab',
+	// unverified against our markup; aria-at's tabs plan says "tab panel"
+	tabpanel: 'tab panel',
+	// unverified against our markup
+	button: 'button',
+	// unverified against our markup
+	progressbar: 'progress bar',
+	// unverified against our markup
+	textbox: 'edit',
+	// unverified against our markup
+	selected: 'selected',
+	// unverified against our markup
+	expanded: 'expanded',
+	// unverified against our markup
+	notExpanded: 'collapsed',
 };
 
 export const voiceOverVocabulary: Vocabulary = {
@@ -54,11 +79,42 @@ export const voiceOverVocabulary: Vocabulary = {
 	disabled: 'dimmed',
 	// unverified against our markup
 	invalid: 'invalid data',
+	// unverified against our markup
+	switch: 'switch',
+	// unverified against our markup; the radio-group research note records
+	// aria-at's own transcript for this role as "group"
+	radiogroup: 'group',
+	// unverified against our markup; aria-at's radiogroup plan says "radio button"
+	radio: 'radio button',
+	// unverified against our markup; aria-at's tabs plan says "tab list"
+	tablist: 'tab list',
+	// unverified against our markup
+	tab: 'tab',
+	// unverified against our markup; aria-at's tabs plan says "tab panel"
+	tabpanel: 'tab panel',
+	// unverified against our markup
+	button: 'button',
+	// unverified against our markup
+	progressbar: 'progress indicator',
+	// unverified against our markup
+	textbox: 'text field',
+	// unverified against our markup
+	selected: 'selected',
+	// unverified against our markup
+	expanded: 'expanded',
+	// unverified against our markup
+	notExpanded: 'collapsed',
 };
 
-// The authoring practices give a checkbox one activation key. Both readers pass
-// a key name straight to the focused item, so the name is the browser's.
-const keys: Keys = { space: 'Space', enter: 'Enter' };
+// The authoring practices give a checkbox one activation key, and a radio group
+// and a tab list one movement key each. Both readers pass a key name straight to
+// the focused item, so the names are the browser's.
+const keys: Keys = {
+	space: 'Space',
+	enter: 'Enter',
+	arrowDown: 'ArrowDown',
+	arrowRight: 'ArrowRight',
+};
 
 export const nvdaSpec: RealDriverSpec = {
 	name: 'NVDA',
