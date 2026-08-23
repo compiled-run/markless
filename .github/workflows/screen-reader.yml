@@ -71,7 +71,6 @@ jobs:
                         progress,
                         qr-code,
                         radio-group,
-                        scroll-area,
                         tabs,
                         textbox,
                         toggle,
