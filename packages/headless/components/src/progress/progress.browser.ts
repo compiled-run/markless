@@ -81,6 +81,47 @@ function expectCustomRangeRendered() {
 	expect(el(RangeRoot).getAttribute('aria-valuetext')).toBe('38%');
 }
 
+// A prop the part destructured out of its parameters must not come back through
+// `{...rest}`. `ProgressRoot` is written `({ value = null, min = 0, max = 100,
+// children, ...rest })` and renders `<div {...rest} role="progressbar" …>`, so
+// none of `value`, `min` or `max` is in `rest` in the authored source and none
+// may be written as a plain attribute. Before the spread lowering subtracted the
+// destructured names the served root came back as
+//
+//   <div data-testid="range-root" value="5000" min="2000" max="10000"
+//        role="progressbar" aria-valuemin="2000" …>
+//
+// in BOTH modes, which is why the rows below run in both.
+//
+// The claim is about the RAW prop names only. The root legitimately projects the
+// same numbers through `aria-valuemin`/`aria-valuemax`/`aria-valuenow` and
+// through the `ui-` flags, and those are the part's own writes — the rows below
+// assert they survive, so an over-eager subtraction would show up as red here
+// rather than passing by deleting everything.
+function expectRootDropsDestructuredProps(root: Element) {
+	expect(root.hasAttribute('value')).toBe(false);
+	expect(root.hasAttribute('min')).toBe(false);
+	expect(root.hasAttribute('max')).toBe(false);
+}
+
+function expectCustomRangeRootsDropDestructuredProps() {
+	expectRootDropsDestructuredProps(el(StepsRoot));
+	expectRootDropsDestructuredProps(el(RangeRoot));
+	// The aria projections of those same numbers are still written.
+	expect(el(StepsRoot).getAttribute('aria-valuemax')).toBe('25');
+	expect(el(RangeRoot).getAttribute('aria-valuemin')).toBe('2000');
+	expect(el(RangeRoot).getAttribute('aria-valuenow')).toBe('5000');
+	expect(el(StepsRoot).getAttribute('ui-progress')).toBe('loading');
+}
+
+function expectBasicRootDropsDestructuredProps() {
+	// Only `value` was passed here; `min` and `max` took their defaults, and a
+	// defaulted prop is just as destructured as a passed one.
+	expectRootDropsDestructuredProps(el(Root));
+	expect(el(Root).getAttribute('aria-valuenow')).toBe('30');
+	expect(el(Root).getAttribute('ui-progress')).toBe('loading');
+}
+
 for (const mode of MODES) {
 	test(`${mode}: the starter renders a seeded range across every part`, async () => {
 		if (mode === 'CSR') await render(Basic);
@@ -104,6 +145,18 @@ for (const mode of MODES) {
 		if (mode === 'CSR') await render(CustomRange);
 		else await renderSSR(CustomRange);
 		expectCustomRangeRendered();
+	});
+
+	test(`${mode}: a consumer-owned range drops the value, min and max props it destructured`, async () => {
+		if (mode === 'CSR') await render(CustomRange);
+		else await renderSSR(CustomRange);
+		expectCustomRangeRootsDropDestructuredProps();
+	});
+
+	test(`${mode}: the starter root drops the value prop it destructured`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+		expectBasicRootDropsDestructuredProps();
 	});
 }
 
