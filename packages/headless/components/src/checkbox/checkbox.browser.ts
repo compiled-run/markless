@@ -12,9 +12,6 @@ import UnavailableOptions from './scenarios/unavailable-options.tsrx';
 import WithoutOnChange from './scenarios/without-onchange.tsrx';
 import WithHelp from './scenarios/with-help.tsrx';
 
-// Colocated browser suite for the checkbox family. Each test renders a realistic
-// consumer scenario, and the locators name the part anatomy: root, trigger,
-// indicator, label, description, error, field.
 const Root = page.getByTestId('root');
 const Trigger = page.getByTestId('trigger');
 const Indicator = page.getByTestId('indicator');
@@ -24,7 +21,7 @@ const HiddenInput = page.getByTestId('field');
 const SubmitButton = page.getByTestId('submit');
 const Submitted = page.getByTestId('submitted');
 const Calls = page.getByTestId('calls');
-// The settings list, where each option's purpose prefixes its part role.
+// The settings list: emails starts off, digest starts on, alerts starts mixed.
 const EmailsRoot = page.getByTestId('emails-root');
 const EmailsTrigger = page.getByTestId('emails-trigger');
 const EmailsIndicator = page.getByTestId('emails-indicator');
@@ -53,30 +50,18 @@ const FirstValue = page.getByTestId('first-value');
 const SecondTrigger = page.getByTestId('second-trigger');
 const SecondValue = page.getByTestId('second-value');
 
-// A row that asserts the same thing in both modes runs once per mode. The SSR
-// harness rewrites a literal SSR mount call site, so the mount cannot be
-// passed by reference or wrapped in a helper — the branch below keeps both call
-// sites literal, which is why this idiom rather than a `mount` parameter.
+// The SSR harness rewrites a literal `renderSSR` call site, so the mount cannot be
+// passed by reference or hidden in a helper: each test branches on the mode instead.
 const MODES = ['CSR', 'SSR'] as const;
 
-// Two runtime errors escape as unhandled rejections while this suite runs, and
-// neither is a defect in the family or in these assertions:
-//   * a click on a <label> — an element whose whole job is to name a trigger —
-//     reaches the delegated listener, which has no record for it;
-//   * a container from an earlier SSR test still answers document-level events
-//     after cleanup(), so a later click or keypress lands on a stale resume.
-// They are captured here so they cannot masquerade as a failure of this suite,
-// and recorded red once in shared-read-refresh.test.ts, which turns red itself
-// the day the runtime stops raising them.
 function el<T extends Element = HTMLElement>(locator: { element(): Element | null }) {
 	const found = locator.element();
 	if (!found) throw new Error('Expected the part to be on the page.');
 	return found as T;
 }
 
-// A real submit would navigate the test iframe, so the event is dispatched.
-// What is proven is what the browser itself put in the FormData for this form,
-// which is the whole point of the field part.
+// A real submit would navigate the test iframe, so the event is dispatched directly.
+// What the page then shows is the FormData the browser itself built for this form.
 function submit() {
 	el(page.getByTestId('form')).dispatchEvent(
 		new Event('submit', { bubbles: true, cancelable: true }),
@@ -146,15 +131,14 @@ function expectPrefilledFieldRendered() {
 }
 
 function expectPartialFieldRendered() {
-	// QDS asserts the attribute here too, not the IDL property.
+	// The served markup, so the attribute rather than the IDL property.
 	expect(el(HiddenInput).getAttribute('indeterminate')).toBe('');
 	expect(el(HiddenInput).hasAttribute('checked')).toBe(false);
 }
 
 async function expectFieldFollowsTheTrigger() {
 	el(Trigger).click();
-	// `checked` and `indeterminate` on the field are comparisons over the cell
-	// the trigger wrote, in a different part from the one that wrote it. A live
+	// The field is a different part from the trigger that wrote the state. A live
 	// `checked` lands on the property, which is what a submission reads.
 	await expect.poll(() => el<HTMLInputElement>(HiddenInput).checked).toBe(true);
 	// A checkbox with no value of its own submits the browser default "on".
@@ -196,10 +180,6 @@ function expectInvalidRendered() {
 	expect(el(BeforeTrigger).getAttribute('aria-invalid')).toBe('true');
 }
 
-// `onChange` is a callback slot on the shared instance: the root fills it with
-// its own prop at build time, and `toggle()` dispatches through that route. The
-// slot never becomes a graph node, so these assertions are about a call that
-// reaches the consumer, not about a value the payload carried (U-B).
 async function expectConsumerCallbackFires() {
 	// Nothing fired on mount, first render or resume.
 	expect(el(Calls).textContent).toBe('0');
@@ -336,20 +316,14 @@ for (const mode of MODES) {
 
 // --- gestures -------------------------------------------------------------
 //
-// Every derived position follows a write now: the tri-state `aria-checked`, the
-// root's `ui-checked` / `ui-mixed` flags and the hidden field's `checked` /
-// `indeterminate` are all comparisons over the shared instance, and each one
-// moves with the plain read beside it. The parts that observe the write are in
-// different components from the part that made it. These stay CSR-only: the
-// indicator's arm is a branch in a projected part, which does not re-render
-// after an SSR resume (U-F in notes/parity-table.md).
+// CSR-only: these rows read the indicator, whose content is an arm inside a
+// projected part, and such an arm does not re-render after an SSR resume. The
+// derived attributes do follow a resume, and the SSR row below covers them.
 
 test('CSR: clicking one option leaves its neighbours alone', async () => {
 	await render(SettingsList);
 	el(EmailsTrigger).click();
 	await expect.poll(() => el(EmailsIndicator).textContent).toBe('Checked');
-	// The trigger's tri-state and the root's flag are comparisons over the same
-	// cell the click wrote, and they moved with it.
 	await expect.poll(() => el(EmailsTrigger).getAttribute('aria-checked')).toBe('true');
 	expect(el(EmailsRoot).getAttribute('ui-checked')).toBe('');
 	// The click landed in one family only: the neighbours kept their own values.
@@ -403,8 +377,6 @@ test('CSR: clicking the label toggles the option it names', async () => {
 	await expect.poll(() => el(DigestIndicator).textContent).toBe('');
 });
 
-// The derived ATTRIBUTES do follow a resume, so this is the resume half of the
-// tri-state rows without the blocked arm. SSR-only by nature.
 test('SSR: the tri-state attributes follow a click after resume', async () => {
 	await renderSSR(SettingsList);
 
@@ -435,12 +407,10 @@ test('CSR: Space on the focused trigger toggles the checkbox', async () => {
 	await expect.poll(() => el(Indicator).textContent).toBe('Checked');
 });
 
-// U-M: a Markless handler runs after dispatch returns, so the trigger's
+// A Markless handler runs after dispatch returns, so the trigger's
 // `event.preventDefault()` on Enter lands after the browser has already decided
-// whether to activate the button. The rule is expressed and the handler does run
-// — `defaultPrevented` is true a tick later — but nothing enforces it, so whether
-// Enter toggles is a race. This asserts the race rather than one side of it; the
-// behavioural row is blocked in notes/parity-table.md.
+// whether to activate the button. This row asserts that timing, not either outcome:
+// `defaultPrevented` is false when the dispatch is made and true a tick later.
 test('CSR: the trigger asks to prevent Enter, and the request lands too late', async () => {
 	await render(Basic);
 	el(Trigger).focus();

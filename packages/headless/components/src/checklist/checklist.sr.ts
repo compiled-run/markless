@@ -1,8 +1,7 @@
-// No longer pinned at suite level: T072's component-tag spread forwarding puts the
-// consumer's attributes on the parts, and T073's seed-time computed reader makes
-// the item rows announce their real state. The four rows still pinned are the
-// SELECT-ALL rows, on one named defect: THE SELECT-ALL AND THE GROUP SHARE ONE
-// ACCESSIBLE NAME, which is note.md limit 8, not a seed. See note.md.
+// Every skipped row here is skipped on one open defect: THE SELECT-ALL AND THE GROUP
+// SHARE ONE ACCESSIBLE NAME. `checklist.root` is both the group element and the
+// select-all's checkbox root, so `checklist.label` names both, and a reader announces
+// the select-all under the group's own name. See note.md.
 import { render } from '@markless/vitest-browser';
 import { afterEach, expect, test } from 'vitest';
 import { missingFacts, readUntil, type Conveys } from '../../test-support/driver.ts';
@@ -11,17 +10,14 @@ import Basic from './scenarios/basic.tsrx';
 import Partial from './scenarios/partial.tsrx';
 import UnavailableOptions from './scenarios/unavailable-options.tsrx';
 
-// What a screen reader says about the checklist family, asserted the way the
-// w3c/aria-at checkbox (tri-state) plan asserts it: each step names the facts the
-// announcement has to convey - role, accessible name, state - and never a
-// product's wording. The sequences are the ones in the family's research note,
-// which reads them off `tests/apg/checkbox-tri-state` and its sibling
-// `tests/apg/checkbox` plan. `sr` is the only line that picks a reader, so the
-// same expectations run against NVDA and VoiceOver once those drivers land.
+// Rows follow the w3c/aria-at tri-state checkbox plan and its dual-state sibling, and
+// assert the facts an announcement must convey - role, name, state - never a reader
+// product's wording. `sr` is the only line that picks a reader, so the same
+// expectations run against NVDA and VoiceOver once those drivers land.
 //
-// aria-at's reference takes the group's name from a `fieldset`/`legend`, which is
-// exactly what `checklist.root` and `checklist.label` render, so the group rows
-// below are the plan's own shape rather than an adaptation of it.
+// aria-at takes the group's name from a `fieldset`/`legend`, which is what
+// `checklist.root` and `checklist.label` render, so the group rows are the plan's own
+// shape rather than an adaptation of it.
 const sr = virtualDriver;
 
 // One scenario per test: the trigger id is minted per container, so two scenarios
@@ -54,12 +50,6 @@ async function settle() {
 
 // Sequence A, entering the group: aria-at asserts the group's name and its role
 // before the control's own facts, both at priority 2.
-// Pinned on a NEW named defect, measured on this branch: THE SELECT-ALL AND THE
-// GROUP SHARE ONE ACCESSIBLE NAME. `checklist.root` is both the group and the
-// select-all's checkbox root, so `checklist.label` names both and the reader
-// announces the select-all as the group's own name. Naming them apart needs the
-// `aria-labelledby` half of note.md limit 8, not a seed. The seed reader this
-// unit landed is no longer the cause: the item rows below now run.
 test.skip('entering the list conveys the group and its name before the select-all', async () => {
 	await open(Basic);
 	expectConveys(await readUntil(sr, { role: 'group' }), {
@@ -70,12 +60,6 @@ test.skip('entering the list conveys the group and its name before the select-al
 
 // Sequence C, the unchecked half: reading the select-all conveys its role, its
 // name and that it is not checked.
-// Pinned on a NEW named defect, measured on this branch: THE SELECT-ALL AND THE
-// GROUP SHARE ONE ACCESSIBLE NAME. `checklist.root` is both the group and the
-// select-all's checkbox root, so `checklist.label` names both and the reader
-// announces the select-all as the group's own name. Naming them apart needs the
-// `aria-labelledby` half of note.md limit 8, not a seed. The seed reader this
-// unit landed is no longer the cause: the item rows below now run.
 test.skip('reading an untouched select-all conveys the checkbox role, its name and that it is not checked', async () => {
 	await open(Basic);
 	expectConveys(await readUntil(sr, { role: 'checkbox', name: 'All condiments' }), {
@@ -99,17 +83,10 @@ test('each item conveys the checkbox role, its own name and that it is not check
 	}
 });
 
-// Our own row, replacing aria-at's `operateUncheckedCheckbox`. That assertion
-// expects unchecked -> mixed, which is the standalone tri-state cycle; a
-// select-all never cycles into mixed, because its mixed state is computed from
-// the items and is not a value a person can choose. Recorded here so nobody
-// later "fixes" this family to match the plan.
-// Pinned on a NEW named defect, measured on this branch: THE SELECT-ALL AND THE
-// GROUP SHARE ONE ACCESSIBLE NAME. `checklist.root` is both the group and the
-// select-all's checkbox root, so `checklist.label` names both and the reader
-// announces the select-all as the group's own name. Naming them apart needs the
-// `aria-labelledby` half of note.md limit 8, not a seed. The seed reader this
-// unit landed is no longer the cause: the item rows below now run.
+// Ours, replacing aria-at's `operateUncheckedCheckbox`. That assertion expects
+// unchecked -> mixed, the standalone tri-state cycle; a select-all never cycles into
+// mixed, because its mixed state is computed from the items rather than chosen.
+// Recorded here so nobody later "fixes" this family to match the plan.
 test.skip('pressing space on an untouched select-all announces it as checked, never as partially checked', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'checkbox', name: 'All condiments' });
@@ -150,9 +127,6 @@ test('checking one item announces that item only, and says nothing about the sel
 	expect(spoken).not.toContain('All condiments');
 });
 
-// Pinned: `disabled` on an item crosses the same composed-family edge as
-// `checked`, so the reader is told the box is available when the group says it is
-// not. Measured in src/checklist/note.md.
 test('an item nobody may change conveys that it is disabled and space leaves it alone', async () => {
 	await open(UnavailableOptions);
 	const name = 'Not available on your plan';
@@ -170,17 +144,15 @@ test('an item nobody may change conveys that it is disabled and space leaves it 
 	});
 });
 
-// --- pinned ---------------------------------------------------------------
+// --- groups that start with something ticked ------------------------------
 //
-// Every row below reads a group that starts with something already ticked. A
-// composed family's root cannot be seeded from the enclosing family's instance
-// today, so such a group renders as if it were empty and the reader is told the
-// truth about the DOM rather than about the group. The gap is measured in
-// src/checklist/note.md; whoever lands it deletes these pins.
+// A composed family's root cannot be seeded from the enclosing family's instance
+// today, so such a group renders as if it were empty and a reader is told the truth
+// about the DOM rather than about the group. See note.md.
 
-// Sequence A, the state step: NVDA and JAWS say "half checked", VoiceOver says
-// "mixed", and aria-at asserts the STATE at priority 1 rather than any one
-// reader's token - which is why this asks the driver for the fact, not the word.
+// Sequence A, the state step: readers differ on the word ("half checked", "mixed"),
+// and aria-at asserts the STATE at priority 1, which is why this asks the driver for
+// the fact rather than for a token.
 test.fails('reading a partly ticked select-all conveys it as partially checked', async () => {
 	await open(Partial);
 	expectConveys(await readUntil(sr, { role: 'checkbox', name: 'All condiments' }), {
@@ -190,16 +162,8 @@ test.fails('reading a partly ticked select-all conveys it as partially checked',
 	});
 });
 
-// Sequence D (`operateMixedCheckbox`): aria-at asserts only the state change, and
-// it agrees with our design even though the APG example's cycle does not. Green
-// today for the wrong reason - the select-all in this scenario renders unticked
-// rather than partly ticked - and green for the right one once the row above is.
-// Pinned on a NEW named defect, measured on this branch: THE SELECT-ALL AND THE
-// GROUP SHARE ONE ACCESSIBLE NAME. `checklist.root` is both the group and the
-// select-all's checkbox root, so `checklist.label` names both and the reader
-// announces the select-all as the group's own name. Naming them apart needs the
-// `aria-labelledby` half of note.md limit 8, not a seed. The seed reader this
-// unit landed is no longer the cause: the item rows below now run.
+// Sequence D (`operateMixedCheckbox`): aria-at asserts only the state change, which
+// agrees with our design even though the APG example's cycle does not.
 test.skip('pressing space on a partly ticked select-all announces it as checked', async () => {
 	await open(Partial);
 	await readUntil(sr, { role: 'checkbox', name: 'All condiments' });

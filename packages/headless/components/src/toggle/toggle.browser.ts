@@ -10,9 +10,6 @@ import SettingsList from './scenarios/settings-list.tsrx';
 import UnavailableOptions from './scenarios/unavailable-options.tsrx';
 import WithHelp from './scenarios/with-help.tsrx';
 
-// Colocated browser suite for the toggle family. Each test renders a realistic
-// consumer scenario, and the locators name the part anatomy: root, trigger,
-// thumb, label, description, error, field.
 const Root = page.getByTestId('root');
 const Trigger = page.getByTestId('trigger');
 const Thumb = page.getByTestId('thumb');
@@ -22,7 +19,7 @@ const ToggleError = page.getByTestId('error');
 const HiddenInput = page.getByTestId('field');
 const SubmitButton = page.getByTestId('submit');
 const Submitted = page.getByTestId('submitted');
-// The settings list, where each switch's purpose prefixes its part role.
+// The settings list: emails starts off, digest starts on.
 const EmailsRoot = page.getByTestId('emails-root');
 const EmailsTrigger = page.getByTestId('emails-trigger');
 const EmailsLabel = page.getByTestId('emails-label');
@@ -34,10 +31,8 @@ const OffRoot = page.getByTestId('off-root');
 const OffTrigger = page.getByTestId('off-trigger');
 const OnRoot = page.getByTestId('on-root');
 
-// A row that asserts the same thing in both modes runs once per mode. The SSR
-// harness rewrites a literal SSR mount call site, so the mount cannot be
-// passed by reference or wrapped in a helper — the branch below keeps both call
-// sites literal, which is why this idiom rather than a `mount` parameter.
+// The SSR harness rewrites a literal `renderSSR` call site, so the mount cannot be
+// passed by reference or hidden in a helper: each test branches on the mode instead.
 const MODES = ['CSR', 'SSR'] as const;
 
 function el<T extends Element = HTMLElement>(locator: { element(): Element | null }) {
@@ -87,9 +82,8 @@ async function expectClickFlips() {
 	expect(el(DigestTrigger).getAttribute('aria-checked')).toBe('true');
 }
 
-// The switch this clicks rendered as on because `<toggle.root checked>` seeded
-// it, and the server carries that seed in the payload, so a resumed instance
-// holds `true` and the first click reaches 'false' (U-L, fixed).
+// `<toggle.root checked>` seeds this switch on, and the server carries that seed in
+// the payload, so a resumed instance holds `true` and the first click reaches false.
 async function expectCheckedFlipsOff() {
 	el(DigestTrigger).click();
 	await expect.poll(() => el(DigestTrigger).getAttribute('aria-checked')).toBe('false');
@@ -143,8 +137,8 @@ function expectHelpRendered() {
 
 function expectInvalidRendered() {
 	expect(el(ToggleError).textContent).toBe('This field is required');
-	// Every part of one widget instance seeds before any part renders, so the
-	// error part's `toggle.invalid = true` is what the trigger reads.
+	// Seeding completes before any part renders, so the error part's
+	// `toggle.invalid = true` is what the trigger reads.
 	expect(el(Trigger).getAttribute('aria-invalid')).toBe('true');
 	// An invalid switch says why: the error is its description.
 	expect(el(Trigger).getAttribute('aria-describedby')).toBe(el(ToggleError).id);
@@ -294,12 +288,11 @@ test('CSR: clicking the trigger syncs the hidden field and what the form submits
 });
 
 // --- why the Submit button is never clicked ------------------------------
-
-// The Judge asked tranche 2 to try a real click on Submit instead of dispatching
-// the event. It cannot be done: a real click navigates the harness iframe to
-// `/?notifications=enabled` and kills the run. The reason is below — a consumer's
-// handler runs after dispatch returns, so its `event.preventDefault()` lands
-// after the browser has already committed the navigation.
+//
+// A real click on Submit navigates the harness iframe and kills the run, because a
+// consumer's handler runs after dispatch returns and its `event.preventDefault()`
+// lands once the browser has already committed the navigation. This row pins that
+// ordering, and it is why every form row above dispatches the event instead.
 test('CSR: a consumer submit handler runs after dispatch returns', async () => {
 	await render(SavedSettingsForm);
 

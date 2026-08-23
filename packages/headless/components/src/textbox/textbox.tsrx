@@ -116,12 +116,9 @@ export function TextboxLabel({ children, ...rest }: TextboxLabelProps) @{
 	<label {...rest} el={textbox.labelEl} for={textbox.inputEl}>{children}</label>
 }
 
-// The message the control names. One part stands behind both `textbox.description`
-// and `textbox.error` because an element() handle may be bound in exactly one
-// place (MARKLESS_ELEMENT_HANDLE_DUPLICATE) and a control may name exactly one id
-// (a handle list in an IDREF position is MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE,
-// recorded as U-C). A field that mounts one message is named by it; a field that
-// mounts both is named by the first of them, which is the boundary U-C removes.
+// One part stands behind both `textbox.description` and `textbox.error`: an
+// element() handle binds in exactly one place, and aria-describedby here names
+// exactly one id. A field that mounts both messages is described by the first.
 function TextboxMessage({ children, ...rest }: TextboxDescriptionProps) @{
 	const textbox = textboxState();
 

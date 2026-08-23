@@ -7,16 +7,12 @@ import Unavailable from './scenarios/unavailable.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
 import WithoutOnChange from './scenarios/without-onchange.tsrx';
 
-// Colocated browser suite for the collapsible family. Each test renders a
-// realistic consumer scenario, and the locators name the part anatomy: root,
-// trigger, content.
 const Root = page.getByTestId('root');
 const Trigger = page.getByTestId('trigger');
 const Content = page.getByTestId('content');
 const Calls = page.getByTestId('calls');
 const Order = page.getByTestId('order');
-// The FAQ, where each question's subject prefixes its part role. The middle
-// question is the one written open.
+// The FAQ. `rules` is the one question written open.
 const PermitRoot = page.getByTestId('permit-root');
 const PermitTrigger = page.getByTestId('permit-trigger');
 const PermitContent = page.getByTestId('permit-content');
@@ -39,10 +35,8 @@ const SecondTrigger = page.getByTestId('second-trigger');
 const SecondValue = page.getByTestId('second-value');
 const FirstContent = page.getByTestId('first-content');
 
-// A row that asserts the same thing in both modes runs once per mode. The SSR
-// harness rewrites a literal SSR mount call site, so the mount cannot be passed
-// by reference or wrapped in a helper - the branch below keeps both call sites
-// literal, which is why this idiom rather than a `mount` parameter.
+// The SSR harness rewrites a literal `renderSSR` call site, so the mount cannot be
+// passed by reference or hidden in a helper: each test branches on the mode instead.
 const MODES = ['CSR', 'SSR'] as const;
 
 function el<T extends Element = HTMLElement>(locator: { element(): Element | null }) {
@@ -64,21 +58,18 @@ function expectOpen(trigger: Element, content: Element) {
 function expectBasicRendered() {
 	expectClosed(el(Trigger), el(Content));
 	expect(el(Trigger).getAttribute('type')).toBe('button');
-	// The trigger names its own panel, by a minted id nobody spelled. This is the
-	// family's cross-part IDREF: the handle is bound on the content part and read
-	// on the trigger part.
+	// The cross-part IDREF: the handle is bound on the content and read on the trigger.
 	expect(el(Content).id).toBeTruthy();
 	expect(el(Trigger).getAttribute('aria-controls')).toBe(el(Content).id);
 	// Closed hides the panel, it never detaches it.
 	expect(document.contains(el(Content))).toBe(true);
 	expect(el(Content).textContent).toContain('shows and hides');
-	// Closed and open are flags on every part, so a stylesheet can reach them.
+	// Open and closed are flags on every part, so a stylesheet can reach them.
 	expect(el(Root).getAttribute('ui-closed')).toBe('');
 	expect(el(Root).hasAttribute('ui-open')).toBe(false);
 	expect(el(Content).getAttribute('ui-closed')).toBe('');
-	// A deliberate break with the QDS reference: the disclosure pattern conveys
-	// the change through aria-expanded, so a live region here would announce the
-	// whole revealed panel on top of it.
+	// No live region: aria-expanded already conveys the change, and a live region
+	// would announce the whole revealed panel on top of it.
 	expect(el(Root).hasAttribute('aria-live')).toBe(false);
 }
 
@@ -116,20 +107,10 @@ function expectUnavailableRendered() {
 	expectOpen(el(OpenTrigger), el(OpenContent));
 }
 
-// A prop the part destructured out of its parameters must not come back through
-// `{...rest}`. `CollapsibleRoot` is written `({ open = false, disabled = false,
-// onChange, children, ...rest })` and renders `<div {...rest} ui-open={…}>`, so
-// neither `open` nor `disabled` is in `rest` in the authored source and neither
-// may be written on the root element. Before the spread lowering subtracted the
-// destructured names the served root came back as
-//
-//   <div data-testid="open-root" open="" disabled="" ui-open="" ui-disabled="">
-//
-// in BOTH modes, which is why the rows below run in both.
-//
-// What the family does project is `ui-open`/`ui-closed`/`ui-disabled`, and the
-// trigger's own `disabled` is a real <button> attribute the part writes. Only
-// the raw prop names on the root are asserted absent.
+// `CollapsibleRoot` destructures `open` and `disabled` out of its parameters, so
+// neither is left in `{...rest}` and neither may reach the root element as a raw
+// attribute. Only the raw prop names are asserted absent: the `ui-` projections are
+// the family's own writes, and the trigger's `disabled` is a real button attribute.
 function expectUnavailableRootsDropDestructuredProps() {
 	for (const root of [el(ShutRoot), el(OpenRoot)]) {
 		expect(root.hasAttribute('open')).toBe(false);
@@ -161,8 +142,6 @@ function expectUnavailableBlocks() {
 	expectOpen(el(OpenTrigger), el(OpenContent));
 }
 
-// `onChange` is a callback slot on the shared instance: the root fills it with
-// its own prop at build time, and `toggle()` dispatches through that route.
 async function expectConsumerCallbackFires() {
 	// Nothing fired on mount, first render or resume.
 	expect(el(Calls).textContent).toBe('0');
@@ -305,9 +284,8 @@ test('CSR: opening one question leaves its neighbours alone', async () => {
 
 // --- keyboard -------------------------------------------------------------
 //
-// The APG gives the disclosure control exactly two keys, Enter and Space, and
-// both are what a native <button> already does. These rows prove the family does
-// not get in the way of either.
+// The APG gives the disclosure control exactly two keys, and a native <button>
+// already does both. These rows prove the family does not get in the way.
 
 test('CSR: Space on the focused trigger opens the panel', async () => {
 	await render(Basic);

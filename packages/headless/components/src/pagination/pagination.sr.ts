@@ -7,23 +7,18 @@ import Disabled from './scenarios/disabled.tsrx';
 import Links from './scenarios/links.tsrx';
 import TwoWidgets from './scenarios/two-widgets.tsrx';
 
-// What a screen reader says about the pagination family. Each step names the
-// facts the announcement has to convey - role, accessible name, state - and
-// never a product's wording, so the same expectations run against NVDA and
-// VoiceOver once those drivers land. `sr` is the only line that picks a reader.
+// Rows assert the facts an announcement must convey - role, name, state - never a
+// reader product's wording. `sr` is the only line that picks a reader, so the same
+// expectations run against NVDA and VoiceOver once those drivers land.
 //
-// aria-at coverage, recorded honestly: there is none. The 40 test-plan folders
-// under w3c/aria-at/tests/apg (read 2026-08-22, listed in full in
-// goals/headless-components/notes/research-otp.md §4) contain no pagination
-// plan, and w3.org/WAI/ARIA/apg has no pagination pattern - there is no role
-// and no keyboard contract to conform to. The sequence letters below are
-// research-pagination.md §6, which derives them from the semantics and says so.
-// The one place a specification does name this exact case is WAI-ARIA 1.2's
-// `aria-current`, whose `page` token is defined for a link in a set of
-// pagination links; sequence C is that token.
+// There is no aria-at plan and no APG pattern for pagination: no role and no keyboard
+// contract to conform to. The sequence letters below come from
+// research-pagination.md §6, which derives them from the semantics. The one place a
+// specification names this exact case is WAI-ARIA's `aria-current`, whose `page`
+// token is defined for a link in a set of pagination links; that is sequence C.
 //
-// Every expectation here was captured from this reader's own output against
-// these scenarios before it was written down, not predicted from the markup.
+// Every expectation here was captured from this reader's own output against these
+// scenarios, not predicted from the markup.
 const sr = virtualDriver;
 
 async function open(component: Parameters<typeof render>[0]) {
@@ -43,9 +38,8 @@ function expectDoesNotConvey(phrase: string, conveys: Conveys) {
 	expect(missingFacts(sr, phrase, conveys), `${sr.name} announced "${phrase}"`).not.toEqual([]);
 }
 
-// Sequence A: the landmark. This is the row QDS fails, and the reason it matters
-// is that a page with a site nav, a breadcrumb and a pagination has three
-// navigation landmarks; unnamed, a reader lists three identical entries.
+// Sequence A: the landmark. A page with a site nav, a breadcrumb and a pagination has
+// three navigation landmarks; unnamed, a reader lists three identical entries.
 test('the pagination conveys the navigation landmark and its name', async () => {
 	await open(Basic);
 	expectConveys(await readUntil(sr, { role: 'navigation' }), {
@@ -154,22 +148,11 @@ test('a locked pagination conveys every control as unavailable, links included',
 	});
 });
 
-// Recorded red, not asserted green. Sequence A is about telling two navigation
-// landmarks apart, and `two-widgets.tsrx` is written to do exactly that: its
-// first pagination passes `aria-label="Reviews pages"`, and its own comment says
-// the consumer's name wins because `aria-label` sits before the spread in
-// `PaginationRoot`.
-//
-// It does not. Captured from this reader against that scenario: both landmarks
-// announce "navigation, Pagination", so a person listing the landmarks on that
-// page gets two identical entries and cannot tell the reviews pagination from
-// the orders one - the precise failure the family's own default label exists to
-// prevent. pagination.tsrx says as much in prose ("Only the second half holds
-// today - a spread does not overwrite an attribute written before it either"),
-// and this is that half, measured at the announcement.
-//
-// Not fixed here: this suite is coverage. Whoever makes a consumer's `aria-label`
-// reach the `<nav>` deletes the `.fails`.
+// Expected red: `two-widgets.tsrx` passes `aria-label="Reviews pages"` on its first
+// pagination, and a spread does not overwrite an attribute written before it, so both
+// landmarks announce "navigation, Pagination". A person listing the landmarks gets
+// two identical entries — the exact failure the default label exists to prevent.
+// Whoever makes a consumer's `aria-label` reach the `<nav>` deletes the `.fails`.
 test.fails('a consumer replaces the landmark name so two paginations differ', async () => {
 	await open(TwoWidgets);
 	expect(missingFacts(sr, await readUntil(sr, { role: 'navigation' }), {

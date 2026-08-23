@@ -10,9 +10,6 @@ import PrefilledField from './scenarios/prefilled.tsrx';
 import SignupForm from './scenarios/signup-form.tsrx';
 import FieldWithHelp from './scenarios/with-help.tsrx';
 
-// Colocated browser suite for the textbox family. Each test renders a realistic
-// consumer scenario, and the locators name the part anatomy: root, input,
-// textarea, label, description, error.
 const Root = page.getByTestId('root');
 const Input = page.getByTestId('input');
 const Label = page.getByTestId('label');
@@ -36,10 +33,8 @@ const AfterError = page.getByTestId('after-error');
 const BeforeInput = page.getByTestId('before-input');
 const BeforeError = page.getByTestId('before-error');
 
-// A row that asserts the same thing in both modes runs once per mode. The SSR
-// harness rewrites a literal SSR mount call site, so the mount cannot be
-// passed by reference or wrapped in a helper — the branch below keeps both call
-// sites literal, which is why this idiom rather than a `mount` parameter.
+// The SSR harness rewrites a literal `renderSSR` call site, so the mount cannot be
+// passed by reference or hidden in a helper: each test branches on the mode instead.
 const MODES = ['CSR', 'SSR'] as const;
 
 function el<T extends Element = HTMLElement>(locator: { element(): Element | null }) {
@@ -136,10 +131,9 @@ function expectInvalidRendered() {
 function expectHelpAndErrorRendered() {
 	expect(el(Description).textContent).toBe('Enter a valid email address');
 	expect(el(TextboxError).textContent).toBe('Email format is invalid');
-	// A control may name exactly one id: an aria-describedby handle LIST is not
-	// expressible yet (U-C), so a field that mounts both messages is described by
-	// the first of them and the second is on the page unattached. The row turns
-	// red - which is the signal to name both - the day a list can be spelled.
+	// aria-describedby here names exactly one id, so a field mounting both messages
+	// is described by the first and the second sits on the page unattached. This row
+	// turns red - the signal to name both - the day a handle list is expressible.
 	const described = el<HTMLInputElement>(Input).getAttribute('aria-describedby');
 	expect(described).toBeTruthy();
 	expect(document.getElementById(described as string)).toBe(el(Description));
@@ -195,17 +189,15 @@ for (const mode of MODES) {
 	});
 }
 
-// U-N: an element() handle binds one live host, so the single-line control and
-// the multi-line control cannot share one. The label's `for` therefore names the
-// single-line control, and in a family that mounts only a textarea it renders a
-// minted id no element carries. Clicking such a label focuses nothing. Turns
-// green the day an IDREF over an unbound handle renders no attribute (or one
-// handle may name whichever of two alternative controls is mounted).
+// Expected red: an element() handle binds one live host, so the single-line and
+// multi-line controls cannot share one. The label's `for` always names the
+// single-line control, so a field that mounts only a textarea renders a minted id no
+// element carries and clicking that label focuses nothing.
 test.fails('CSR: a label beside a multiline control names an element that exists', async () => {
 	await render(SignupForm);
 	const named = el(BioLabel).getAttribute('for');
 	expect(named).not.toBeNull();
-	expect(document.querySelector(`#${named}`)).not.toBeNull();
+	expect(document.getElementById(named as string)).not.toBeNull();
 });
 
 // --- typing ---------------------------------------------------------------

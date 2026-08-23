@@ -4,8 +4,6 @@ import * as qrcode from '../index.ts';
 // land last and win. This scenario writes the three a consumer could plausibly
 // pass by accident - a `role` on the root, a `viewBox` on the pattern svg, a `d`
 // on the path - and the suite asserts none of them displaced the real one.
-// The QDS reference spreads last on its frame, where a consumer prop overwrites
-// the part's identity attribute.
 export default function SpreadFirst() @{
 	<qrcode.root
 		data-testid="root"

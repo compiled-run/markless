@@ -1,8 +1,7 @@
 import { progress } from '../../index.ts';
 
-// Bars whose range is not the default 0–100: a wizard counting steps, and a
-// gauge that does not start at zero. One scenario — "the consumer owns the
-// range" — so both bars live in this example rather than in a file each.
+// Bars whose range is not the default 0–100: a wizard counting steps, and a gauge
+// that does not start at zero.
 export default function CustomRange() @{
 	<section>
 		<progress.root value={20} max={25} data-testid="steps-root">

@@ -12,17 +12,12 @@ import TwoWidgets from './scenarios/two-widgets.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
 import WithoutOnChange from './scenarios/without-onchange.tsrx';
 
-// Colocated browser suite for the pagination family. Each test renders a
-// realistic consumer scenario, and the locators name the part anatomy: root,
-// item, itemtrigger, itemlink, forwardtrigger, backtrigger. The page number
-// lives on the ITEM in every scenario; the control inside it takes none.
+// The page number lives on the ITEM in every scenario; the control inside it takes
+// none.
 //
-// The `pageRange` rows below import the INTERNAL module on purpose. The function
-// is not family API any more - a consumer reads the range as `p.getEntries()` -
-// but the arithmetic still deserves direct rows, and they live here rather than
-// in a plain unit file because the package's browser project includes
-// `src/**/*.browser.ts` only: a `pagination-range.test.ts` beside the function
-// would never be run by anything.
+// The `pageRange` rows below import the internal module on purpose: the arithmetic
+// deserves direct rows, and they live here rather than in a plain unit file because
+// the package's browser project includes `src/**/*.browser.ts` only.
 const Root = page.getByTestId('root');
 const Back = page.getByTestId('backtrigger');
 const Forward = page.getByTestId('forwardtrigger');
@@ -30,15 +25,18 @@ const Heading = page.getByTestId('heading');
 const Calls = page.getByTestId('calls');
 const Order = page.getByTestId('order');
 const Page = page.getByTestId('page');
-// The two paginations on one page, each part role prefixed by its subject.
+// The two paginations on one page, each part prefixed by its subject.
 const FirstRoot = page.getByTestId('first-root');
 const SecondRoot = page.getByTestId('second-root');
 const SecondForward = page.getByTestId('second-forwardtrigger');
 
-// A row that asserts the same thing in both modes runs once per mode. The SSR
-// harness rewrites a literal SSR mount call site, so the mount cannot be passed
-// by reference or wrapped in a helper - the branch below keeps both call sites
-// literal, which is why this idiom rather than a `mount` parameter.
+// Every item control on the page, whatever a scenario prefixed its test id with.
+// `aria-current` is written by `itemtrigger` and `itemlink` and nowhere else, so
+// this set is the whole population the current-page rows care about.
+const ItemControls = page.getByTestId(/item(trigger|link)/);
+
+// The SSR harness rewrites a literal `renderSSR` call site, so the mount cannot be
+// passed by reference or hidden in a helper: each test branches on the mode instead.
 const MODES = ['CSR', 'SSR'] as const;
 
 function el<T extends Element = HTMLElement>(locator: { element(): Element | null }) {
@@ -47,15 +45,17 @@ function el<T extends Element = HTMLElement>(locator: { element(): Element | nul
 	return found as T;
 }
 
+// `first()` because the looped scenario gives every rendered control the same test
+// id, and these rows want the first one in document order.
 function at(testId: string): HTMLElement {
-	const found = document.querySelector(`[data-testid="${testId}"]`);
+	const found = page.getByTestId(testId).first().query();
 	if (!found) throw new Error(`Expected [data-testid="${testId}"] to be on the page.`);
 	return found as HTMLElement;
 }
 
 /** Every page control the loop rendered, in document order. */
 function triggers(): HTMLElement[] {
-	return Array.from(document.querySelectorAll('[data-testid="itemtrigger"]'));
+	return page.getByTestId('itemtrigger').elements() as HTMLElement[];
 }
 
 function renderedPages(): string[] {
@@ -63,7 +63,7 @@ function renderedPages(): string[] {
 }
 
 function ellipsisCount(): number {
-	return document.querySelectorAll('[data-testid="ellipsis"]').length;
+	return page.getByTestId('ellipsis').elements().length;
 }
 
 function clickPage(value: number): void {
@@ -74,7 +74,7 @@ function clickPage(value: number): void {
 
 /** Which controls claim to be the current page. One, or the family is broken. */
 function currentControls(): Element[] {
-	return Array.from(document.querySelectorAll('[aria-current]'));
+	return ItemControls.elements().filter((control) => control.hasAttribute('aria-current'));
 }
 
 function expectOnlyCurrent(testId: string): void {
@@ -85,11 +85,6 @@ function expectOnlyCurrent(testId: string): void {
 }
 
 // --- the page range -------------------------------------------------------
-//
-// A plain function of three numbers, ported from the QDS reference's shipped
-// arithmetic rather than from the prose around it - the reference's own research
-// document quotes two different thresholds for where the second gap starts, so
-// the rows below pin what the code does.
 
 function pages(entries: ReturnType<typeof pageRange>): Array<number | '...'> {
 	return entries.map((entry) => (entry.type === 'page' ? entry.value : '...'));
@@ -130,10 +125,9 @@ test('pageRange: two siblings widen the middle run', () => {
 });
 
 test('pageRange: a gap never stands for a single page', () => {
-	// The exact flip pages, pinned. The head gap first appears at page 4, because
-	// at page 3 the page it would hide is page 2 and the page itself is better
-	// than a gap standing for it. The tail gap is gone by page 18 for the mirror
-	// reason: `rightSibling < count - 1`, not `count - 2`.
+	// The head gap first appears at page 4: at page 3 the page it would hide is page
+	// 2, and the page itself is better than a gap standing for it. The tail gap is
+	// gone by page 18 for the mirror reason.
 	expect(pages(pageRange(3, 20, 1))).toEqual([1, 2, 3, 4, 5, '...', 20]);
 	expect(pages(pageRange(4, 20, 1))).toEqual([1, '...', 3, 4, 5, '...', 20]);
 	expect(pages(pageRange(17, 20, 1))).toEqual([1, '...', 16, 17, 18, '...', 20]);
@@ -141,9 +135,7 @@ test('pageRange: a gap never stands for a single page', () => {
 });
 
 test('pageRange: every entry carries a key, and the keys are unique within a range', () => {
-	// The key is what lets a consumer write `key entry.key` instead of `key i`. A
-	// duplicate inside one range would collapse two rows into one, so uniqueness is
-	// the part worth pinning, at every page of a long count.
+	// A duplicate key inside one range would collapse two rows into one.
 	for (let showing = 1; showing <= 20; showing += 1) {
 		const keys = pageRange(showing, 20, 1).map((entry) => entry.key);
 		expect(keys.every((key) => key.length > 0)).toBe(true);
@@ -152,9 +144,8 @@ test('pageRange: every entry carries a key, and the keys are unique within a ran
 });
 
 test('pageRange: a page keeps its key as the range slides, and a gap keeps its side', () => {
-	// This is the whole point of the field: the same page is the same row across
-	// two different ranges, so it is reconciled rather than rebuilt. Page 20 is the
-	// tail on both, and page 1 the head.
+	// The same page is the same row across two different ranges, so a keyed loop
+	// reconciles it rather than rebuilding it.
 	expect(pageRange(1, 20, 1).map((entry) => entry.key)).toEqual([
 		'page:1',
 		'page:2',
@@ -187,9 +178,8 @@ test('pageRange: a page keeps its key as the range slides, and a gap keeps its s
 });
 
 test('pageRange: the range is seven entries wide at every page of a long count', () => {
-	// Worth pinning because it is easy to assume the range shrinks at the ends. It
-	// does not - what changes is how many of the seven are pages and how many are
-	// gaps, which is exactly the shape the looped scenario exercises.
+	// The range does not shrink at the ends: what changes is how many of the seven
+	// entries are pages and how many are gaps.
 	for (let showing = 1; showing <= 20; showing += 1) {
 		expect(pageRange(showing, 20, 1).length).toBe(7);
 	}
@@ -198,17 +188,13 @@ test('pageRange: the range is seven entries wide at every page of a long count',
 // --- rendered anatomy -----------------------------------------------------
 
 function expectBasicRendered() {
-	// The one non-negotiable ARIA fact of this family: the root is a navigation
-	// landmark, and a landmark on a page that has several of them carries a name.
-	// The QDS reference's spec promises this and its shipped code omits it.
+	// The root is a navigation landmark, and a landmark on a page that has several of
+	// them carries a name.
 	expect(el(Root).tagName).toBe('NAV');
 	expect(el(Root).getAttribute('aria-label')).toBe('Pagination');
 
-	// Page 1 is showing, so exactly one control says so - and it says it with
-	// `aria-current="page"`, the token WAI-ARIA defines for this exact case.
 	expectOnlyCurrent('itemtrigger-1');
-	// Absent, never "false". `aria-current="false"` is valid and means the same
-	// thing, and no library in the survey writes it.
+	// Absent on the other pages, never "false".
 	expect(at('itemtrigger-2').hasAttribute('aria-current')).toBe(false);
 	expect(at('itemtrigger-5').hasAttribute('aria-current')).toBe(false);
 
@@ -222,8 +208,8 @@ function expectBasicRendered() {
 	expect(at('item-1').getAttribute('ui-active')).toBe('');
 	expect(at('item-2').hasAttribute('ui-active')).toBe(false);
 
-	// Page 1 has nothing before it, and native `disabled` takes the control out of
-	// the tab order rather than leaving a focusable dead end.
+	// Page 1 has nothing before it, and native `disabled` takes the control out of the
+	// tab order rather than leaving a focusable dead end.
 	expect(el(Back).hasAttribute('disabled')).toBe(true);
 	expect(el(Forward).hasAttribute('disabled')).toBe(false);
 
@@ -234,8 +220,8 @@ function expectBasicRendered() {
 	expect(el(Back).getAttribute('aria-label')).toBe('Previous page');
 	expect(el(Forward).getAttribute('aria-label')).toBe('Next page');
 
-	// No live region anywhere: the content changed because the person asked for
-	// it, and announcing the nav on top of that is the anti-pattern.
+	// No live region: the content changed because the person asked for it, and
+	// announcing the nav on top of that is the anti-pattern.
 	expect(el(Root).hasAttribute('aria-live')).toBe(false);
 }
 
@@ -280,8 +266,8 @@ function expectDisabledDoesNotMove() {
 }
 
 function expectLinksRendered() {
-	// Real URLs, kept exactly as written: this is the part that exists so a
-	// crawler can follow pagination and a person can open page 3 in a new tab.
+	// Real URLs, kept exactly as written, so a crawler can follow pagination and a
+	// person can open page 3 in a new tab.
 	expect(at('itemlink-1').tagName).toBe('A');
 	expect(at('itemlink-1').getAttribute('href')).toBe('#page-1');
 	expect(at('itemlink-4').getAttribute('href')).toBe('#page-4');
@@ -458,47 +444,32 @@ for (const mode of MODES) {
 		expectSinglePageRendered();
 	});
 
-	// PINNED, and narrower than it used to be. The family DOES clamp internally
-	// now - `getEntries()` narrows the page before it picks a range, so a
-	// bookmarked `?page=99` gets the last page's range. What it cannot clamp is
-	// the comparison a hand-written item is marked current by, which is what this
-	// row asserts.
-	//
-	// A component body may seed a shared cell only from a bare prop or a constant
-	// (MARKLESS_SHARED_SEED_UNSUPPORTED refuses both `pagination.page =
-	// Math.min(...)` and a component-local const holding it), so the root cannot
-	// narrow `page` on the way in. Doing the clamp in the parts instead -
-	// `Math.max(Math.min(pagination.page, pagination.count), 1) === item.value` -
-	// compiles and renders right, and then never refreshes: measured on this base,
-	// every click row went red the moment the comparison stopped being a plain
-	// cell read. Plain reads and live clicks are worth more than a seeded
-	// out-of-range page, so this row stays pinned. `goTo()` still clamps every
-	// write, so a pagination only sits out of range until the first gesture.
+	// Expected red, and narrowly. `getEntries()` does clamp, so a bookmarked
+	// `?page=99` gets the last page's range; what stays unclamped is the comparison
+	// that marks an item current, which is what this row asserts. A component body
+	// may seed a shared cell only from a bare prop or a constant, so the root cannot
+	// clamp on the way in, and clamping inside the parts turns the comparison into an
+	// expression that renders once and never refreshes. Plain reads and live clicks
+	// are worth more than a seeded out-of-range page.
 	test.fails(`${mode}: a page number past the end is clamped to the last page`, async () => {
 		if (mode === 'CSR') await render(Clamped);
 		else await renderSSR(Clamped);
 		expectClampedRendered();
 	});
 
-	// PINNED - a consumer's own attribute cannot replace one the part writes before
-	// the spread. `<nav aria-label="Pagination" {...rest}>` renders the family's
-	// label even when `rest` carries the consumer's, so attribute order does not
-	// decide who wins and the spread never overwrites. The family keeps the
-	// spread-before-state order anyway, because that is what stops a consumer
-	// overwriting aria-current and disabled; what it cannot yet offer is a
-	// REPLACEABLE default, which is what a second pagination on a page needs.
+	// Expected red: a spread never overwrites an attribute written before it, so
+	// `<nav aria-label="Pagination" {...rest}>` keeps the family's label even when
+	// `rest` carries the consumer's. The family keeps that order because it is what
+	// stops a consumer overwriting aria-current and disabled; what it cannot yet
+	// offer is a REPLACEABLE default, which a second pagination on a page needs.
 	test.fails(`${mode}: a consumer aria-label replaces the default landmark name`, async () => {
 		if (mode === 'CSR') await render(TwoWidgets);
 		else await renderSSR(TwoWidgets);
 		expect(el(FirstRoot).getAttribute('aria-label')).toBe('Reviews pages');
 	});
 
-	// PINNED - a destructured prop still reaches the element through `{...rest}`.
-	// `PaginationItem` takes `value` out of its props and never writes it, and the
-	// rendered box is `<div value="1">` all the same. Harmless in the DOM, wrong in
-	// principle: a part's own configuration is not markup.
-	// Flipped by the rest-binding spread fix (6d8f6818): destructured props are
-	// excluded from {...rest}, so this asserts the shipped behavior now.
+	// `PaginationItem` takes `value` out of its props, so it is not in `{...rest}` and
+	// must not reach the box: a part's own configuration is not markup.
 	test(`${mode}: a destructured prop does not reach the element`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
@@ -524,15 +495,6 @@ for (const mode of MODES) {
 		expectTwoWidgetsRendered();
 	});
 
-	// UN-PINNED. Both halves of the cause are fixed now: the loop keys on
-	// `entry.key` (`keyPath: ["key"]`, `directSupported: true`), and
-	// `rowScopedEdgeIds`
-	// (packages/compiler/src/passes/public-render/ssr-module.ts) descends into a
-	// branch arm's templates, so the parts inside this row's `@if` are row-scoped
-	// and the SSR render composes one instance per row instead of refusing with
-	// MARKLESS_ROW_COMPONENT_INTERACTIVE. The row now nests `item > itemtrigger`
-	// rather than a bare trigger, so it is TWO composed parts deep inside the arm
-	// and still renders.
 	test(`${mode}: the looped scenario renders the range the consumer computed`, async () => {
 		if (mode === 'CSR') await render(Products);
 		else await renderSSR(Products);
@@ -551,24 +513,10 @@ for (const mode of MODES) {
 		await expectStepControlsWalkToTheBounds();
 	});
 
-	// PINNED, and newly so: these three were green while the trigger was a direct
-	// child of the root, and the correct anatomy - item > itemtrigger - is what
-	// exposed the cause.
-	//
-	// A consumer callback held on the widget-root's shared instance only reaches
-	// the consumer when the part that dispatches is a DIRECT child of the root
-	// part. One more component level in between and the WRITE still lands - the
-	// page moves and aria-current follows it - while `pagination.onChange?.(next)`
-	// reaches nobody.
-	//
-	// Measured on this base, and the measurement rules the second shared
-	// definition out as a cause. Clicking `forwardtrigger` as a direct child:
-	// `calls=1, page=2`. The same scenario with nothing changed but that trigger
-	// wrapped in a `pagination.item`: `calls=0, page=''`, and the page still moved.
-	// `forwardtrigger` never reads the item instance, so what silences it is the
-	// nesting depth alone, not the per-item state the controls beside it resolve.
-	//
-	// The family cannot fix this from inside the anatomy the owner ratified: the
+	// A consumer callback held on the widget-root's shared instance only reaches the
+	// consumer when the part that dispatches is a DIRECT child of the root part. One
+	// more component level in between and the write still lands - the page moves and
+	// aria-current follows - while `pagination.onChange?.(next)` reaches nobody. The
 	// routing lives in the compiler's shared-callback wiring, not in these parts.
 	test(`${mode}: a click calls the consumer onChange once with the new page`, async () => {
 		if (mode === 'CSR') await render(WithOnChange);
@@ -608,42 +556,15 @@ for (const mode of MODES) {
 		await expectLinkMovesTheCurrentPage();
 	});
 
-	// STILL PINNED, re-measured on the bound-symbol row fix (9733c5eb, "bound
-	// symbols carry the row segment"). The range is served and rendered
-	// correctly - the row above is green - and what a row's click still cannot do
-	// is land anything at all.
-	//
-	// Measured after that fix, 400ms past the click on page 5: `aria-current` is
-	// still on page 1, the consumer callback count is still `0`, and the heading
-	// is still `Page 1 of 20`. Nothing moved.
-	//
-	// The two flat measurements bound the cause. In `Basic`, the same
-	// `item > itemtrigger` nesting outside a loop moves `aria-current` on click.
-	// In `WithOnChange`, flat, the write lands and only the consumer callback is
-	// lost. Here - the one place that is BOTH inside a keyed row and one part
-	// deeper than the root's direct children - neither the write nor the callback
-	// arrives. So the anatomy alone is not the blocker and the row alone is not
-	// the blocker; the combination is, and both remaining halves live in the
-	// compiler and runtime rather than in this family.
-	//
-	// RE-MEASURED again after the widget-root projection fix ("a bound symbol
-	// resolves widget ids through the root that owns them"), which is what turned
-	// the equivalent framework fixture green. This row did NOT move: 42 passed /
-	// 13 expected fail before and after, and the same nothing-moved reading 400ms
-	// past the click on page 5.
-	//
-	// What that fix ruled out, and the remaining cause it names. Clicking page 5
-	// dispatches record `r:page%3A5:c3:h2` and runs the bound symbol, whose own
-	// instance path is `c3:`. The ROOT's cells resolve correctly - the id
-	// `c0:shared:…#paginationState/state:pagination` is reached and written. The
-	// ITEM's do not: the widget-root registry holds one root per rendered item at
-	// `r:page%3A5:c0:p2:` and no entry under `c3:` at all, so the item's
-	// `#paginationItemState` id stays in page space no matter how the row is
-	// threaded. The gap is a REGISTRATION one - the item part's projection site
-	// is registered in the root's subtree (`c0:p2:`) while the dispatching part
-	// is spelled in the consumer's (`c3:`) - and it lives in composition's
-	// projection bridge, not in the resolution this family or the row scope can
-	// reach.
+	// Expected red: a click inside a keyed row lands nothing at all - not the write,
+	// not the callback. The two flat cases bound the cause. In `Basic` the same
+	// `item > itemtrigger` nesting outside a loop moves aria-current on click; in
+	// `WithOnChange`, flat, the write lands and only the callback is lost. Here, both
+	// inside a keyed row AND one part deeper than the root's direct children, neither
+	// arrives. The item part's projection site is registered in the root's subtree
+	// while the dispatching part is spelled in the consumer's, so the item's shared
+	// id stays in page space; that registration gap lives in composition's projection
+	// bridge, not in this family.
 	test.fails(`${mode}: the rendered controls follow the page as the range changes`, async () => {
 		if (mode === 'CSR') await render(Products);
 		else await renderSSR(Products);
@@ -671,9 +592,7 @@ test('CSR: Tab reaches every page control in document order', async () => {
 
 test('CSR: Tab skips a disabled step control', async () => {
 	await render(Basic);
-	// Page 1: back is natively disabled, so focus never lands on it. A person
-	// infers unavailability from being on page 1, which is the trade every
-	// library makes here.
+	// Page 1: back is natively disabled, so focus never lands on it.
 	el(Back).focus();
 	expect(document.activeElement).not.toBe(el(Back));
 });
@@ -723,12 +642,9 @@ test('SSR: the served page carries the current page and both bounds', async () =
 	expect(at('itemtrigger-1').hasAttribute('aria-current')).toBe(false);
 });
 
-// PINNED on the post-click half only. The served half is GREEN and stays
-// asserted below: the server no longer refuses with
-// MARKLESS_ROW_COMPONENT_INTERACTIVE, so the range and its single gap arrive on
-// the page exactly as the family computed them, through the `item > itemtrigger`
-// anatomy. What still fails is the row above's remaining cause - the first click
-// after resume lands nothing, so the row SET never changes.
+// Expected red on the post-click half only: the served range arrives exactly as the
+// family computed it, and then the first click after resume lands nothing, for the
+// row-dispatch reason named above.
 test.fails('SSR: the served looped range is the one the consumer computed', async () => {
 	await renderSSR(Products);
 	expect(renderedPages()).toEqual(['1', '2', '3', '4', '5', '20']);

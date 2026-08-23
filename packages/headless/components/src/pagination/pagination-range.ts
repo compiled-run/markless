@@ -23,12 +23,9 @@ const ellipsis = (side: GapSide): PageEntry => ({ type: 'ellipsis', key: `ellips
 /**
  * Which page numbers a pagination shows, and where the gaps fall.
  *
- * This is a plain function of three numbers: no state, no component, no
- * framework. A consumer holds it in a `computed()` and loops over the result.
- * That is deliberate - the family's parts render markup and carry ARIA, and the
- * arithmetic that decides which markup to render stays outside them, so a
- * consumer who wants a different range algorithm writes their own function and
- * the parts do not change.
+ * A plain function of three numbers: no state, no component, no framework. A
+ * consumer holds it in a `computed()` and loops over the result, so anyone who wants
+ * a different range algorithm writes their own function and the parts do not change.
  *
  * @param page which page is showing, counting from 1
  * @param count how many pages there are in total
@@ -48,24 +45,21 @@ export function pageRange(page: number, count: number, siblingCount = 1): PageEn
 	const leftSibling = Math.max(page - siblingCount, 1);
 	const rightSibling = Math.min(page + siblingCount, count);
 
-	// The thresholds are the ported ones, and they are the reason this comment
-	// exists. A gap is only drawn when it would hide MORE than one page: at
-	// `rightSibling === count - 1` the single page between the siblings and the
-	// last page is rendered as itself, because a gap standing for one page is
-	// worse than the page. QDS's own research document quotes two different
-	// thresholds for this line; the shipped code uses these, the suite pins them,
-	// and the exact flip pages are asserted there.
-	const showLeft = leftSibling > 2;
-	const showRight = rightSibling < count - 1;
+	// A gap is only drawn when it would hide MORE than one page: at
+	// `rightSibling === count - 1` the single page between the siblings and the last
+	// page is rendered as itself, because a gap standing for one page is worse than
+	// the page. The suite pins the exact flip pages.
+	const isLeadingGapShown = leftSibling > 2;
+	const isTrailingGapShown = rightSibling < count - 1;
 
-	if (!showLeft && showRight) {
+	if (!isLeadingGapShown && isTrailingGapShown) {
 		const leftItems = Array.from({ length: 3 + 2 * siblingCount }, (_, index) =>
 			pageEntry(index + 1),
 		);
 		return [...leftItems, ellipsis('trailing'), pageEntry(count)];
 	}
 
-	if (showLeft && !showRight) {
+	if (isLeadingGapShown && !isTrailingGapShown) {
 		const length = 3 + 2 * siblingCount;
 		const rightItems = Array.from({ length }, (_, index) => pageEntry(count - length + index + 1));
 		return [pageEntry(1), ellipsis('leading'), ...rightItems];

@@ -1,8 +1,8 @@
 import { state } from '@markless/core';
 import { toggle } from '../../index.ts';
 
-// A settings form with a switch in it. It writes what the browser actually put
-// in the FormData, so the assertions read a submission rather than an attribute.
+// A settings form with a switch in it. On submit it renders the FormData the browser
+// actually built, so a test can read a submission rather than an attribute.
 export default function NotificationsForm() @{
 	let submitted = state('');
 

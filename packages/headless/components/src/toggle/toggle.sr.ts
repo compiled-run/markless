@@ -8,18 +8,14 @@ import SettingsList from './scenarios/settings-list.tsrx';
 import UnavailableOptions from './scenarios/unavailable-options.tsrx';
 import WithHelp from './scenarios/with-help.tsrx';
 
-// What a screen reader says about the toggle family, asserted the way the
-// w3c/aria-at plans assert: each step names the facts the announcement has to
-// convey - role, accessible name, state - and never a product's wording. `sr` is
-// the only line that picks a reader, so the same expectations run against NVDA
-// and VoiceOver once those drivers land.
+// Rows assert the facts an announcement must convey - role, name, state - never a
+// reader product's wording. `sr` is the only line that picks a reader, so the same
+// expectations run against NVDA and VoiceOver once those drivers land.
 //
-// aria-at coverage, recorded honestly: there is no aria-at test plan for
-// `role="switch"` to seed these sequences from. The APG's switch pattern is the
-// reference instead - a switch conveys role, name and on/off, it has one
-// activation key (Space), and unlike a checkbox it has no third state. Where a
-// sequence below matches an aria-at checkbox assertion it is because the two
-// patterns agree on that step, not because a switch plan was read.
+// No aria-at test plan exists for `role="switch"`, so the reference is the APG switch
+// pattern: role, name and on/off, one activation key (Space), and no third state.
+// Where a row matches an aria-at checkbox assertion, that is the two patterns
+// agreeing on a step, not a switch plan being read.
 const sr = virtualDriver;
 
 // One scenario per test: the trigger id is minted per container, so two
@@ -141,8 +137,7 @@ test('a switch with only help text under it is never conveyed as invalid', async
 	// This reader speaks "not invalid" as its own fact, so the assertion above
 	// cannot be read as "invalid is absent"; that is what this line proves.
 	expect(missingFacts(sr, announcement, { state: ['invalid'] })).not.toEqual([]);
-	// The help text is reachable as its own item too, and attached to the switch
-	// on top of that - the row below is what proves the attachment.
+	// Reachable as its own item too; the row below proves it is also attached.
 	await readUntil(sr, { name: '(Receive notifications about important updates)' });
 });
 

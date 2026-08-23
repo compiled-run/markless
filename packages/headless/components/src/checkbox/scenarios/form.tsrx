@@ -1,9 +1,8 @@
 import { state } from '@markless/core';
 import { checkbox } from '../../index.ts';
 
-// The accept-the-terms form every signup has. It writes what the browser
-// actually put in the FormData, so the assertions read a submission rather than
-// an attribute.
+// The accept-the-terms form every signup has. On submit it renders the FormData the
+// browser actually built, so a test can read a submission rather than an attribute.
 export default function TermsForm() @{
 	let submitted = state('');
 

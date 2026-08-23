@@ -53,9 +53,7 @@ export function CollapsibleRoot({
 export function CollapsibleTrigger({ children, onClick, ...rest }: CollapsibleTriggerProps) @{
 	const collapsible = collapsibleState();
 
-	// A native <button> already activates on Enter and on Space, so the trigger
-	// needs no key rule of its own; the whole disclosure pattern is this element
-	// saying whether the panel below it is showing.
+	// A native <button> already activates on Enter and on Space, so no key rule here.
 	<button
 		{...rest}
 		el={collapsible.triggerEl}
@@ -75,8 +73,8 @@ export function CollapsibleTrigger({ children, onClick, ...rest }: CollapsibleTr
 export function CollapsibleContent({ children, ...rest }: CollapsibleContentProps) @{
 	const collapsible = collapsibleState();
 
-	// Closed hides the panel, it never detaches it: the trigger points at this
-	// element's minted id, and an unmount would leave that reference dangling.
+	// Closed hides the panel, never detaches it: the trigger's aria-controls points at
+	// this element's minted id, and an unmount would leave that reference dangling.
 	<div
 		{...rest}
 		el={collapsible.contentEl}

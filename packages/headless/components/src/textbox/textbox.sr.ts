@@ -1,5 +1,5 @@
 import { render } from '@markless/vitest-browser';
-import { userEvent } from 'vite-plus/test/browser';
+import { page, userEvent } from 'vite-plus/test/browser';
 import { afterEach, expect, test } from 'vitest';
 import { missingFacts, readUntil, type Conveys } from '../../test-support/driver.ts';
 import { virtualDriver } from '../../test-support/virtual-driver.ts';
@@ -9,17 +9,17 @@ import Locked from './scenarios/locked.tsrx';
 import Prefilled from './scenarios/prefilled.tsrx';
 import WithHelp from './scenarios/with-help.tsrx';
 
-// What a screen reader says about the textbox family: each step names the facts
-// the announcement has to convey - role, accessible name, state, and the value the
-// field holds - and never a product's wording. `sr` is the only line that picks a
-// reader, so the same expectations run against NVDA and VoiceOver once those
-// drivers land.
+// Rows assert the facts an announcement must convey - role, name, state, and the
+// value the field holds - never a reader product's wording. `sr` is the only line
+// that picks a reader, so the same expectations run against NVDA and VoiceOver once
+// those drivers land.
 //
-// aria-at coverage, recorded honestly: aria-at has no plan for a plain text input.
-// The reference is the ARIA specification's textbox role and the HTML accessibility
-// mapping: a text field conveys its role, its accessible name, its value, and the
-// restrictions on it - required, read-only, disabled, invalid.
+// aria-at has no plan for a plain text input, so the reference is the ARIA textbox
+// role and the HTML accessibility mapping: role, name, value, and the restrictions
+// on the field - required, read-only, disabled, invalid.
 const sr = virtualDriver;
+
+const Input = page.getByTestId('input');
 
 // One scenario per test: the input id is minted per container, so two scenarios
 // alive in one document give two inputs the same id and every `<label for>` after
@@ -45,9 +45,6 @@ test('reading the starter conveys the textbox role and its name', async () => {
 	});
 });
 
-// The name comes from `aria-labelledby` on the input pointing at the label part,
-// which is what makes the label a name rather than a nearby piece of text. This row
-// is the one that catches that reference going missing.
 test('a field that arrives with a value conveys that value', async () => {
 	await open(Prefilled);
 	const announcement = await readUntil(sr, { role: 'textbox' });
@@ -59,11 +56,9 @@ test('a field that arrives with a value conveys that value', async () => {
 // Typing is the family's one gesture, and what a person hears afterwards has to be
 // what the field now holds.
 test('what a person types becomes the value the reader conveys', async () => {
-	const { container } = await render(Basic);
-	const root = container as unknown as HTMLElement;
-	await sr.start(root);
+	await open(Basic);
 	await readUntil(sr, { role: 'textbox' });
-	await userEvent.fill(root.querySelector('[data-testid="input"]') as HTMLInputElement, 'ada');
+	await userEvent.fill(Input.element() as HTMLInputElement, 'ada');
 	await expect.poll(async () => (await sr.reannounce()).includes('ada')).toBe(true);
 });
 
@@ -75,9 +70,8 @@ test('a field a person may read but not change conveys every restriction on it',
 		name: 'Username',
 		state: ['disabled'],
 	});
-	// read-only and required are facts this reader states in its own words, and the
-	// seam holds no slot for either yet; asserted as our markup rather than as a
-	// vocabulary entry until a second reader says what it calls them.
+	// The driver vocabulary holds no slot for read-only or required yet, so these two
+	// stay literal until a second reader says what it calls them.
 	expect(announcement, `${sr.name} announced "${announcement}"`).toContain('read only');
 	expect(announcement, `${sr.name} announced "${announcement}"`).toContain('required');
 });
@@ -111,10 +105,8 @@ test('the help text under a field is conveyed with the field itself', async () =
 	).toEqual([]);
 });
 
-// Mounting `<textbox.error>` marks the control invalid, and the error's own text
-// is the control's description, so a person is told the field is invalid AND told
-// why. A field that mounts help text and an error together is described by the
-// first of the two - one control names one id until the handle list (U-C) lands.
+// Mounting `<textbox.error>` marks the control invalid and its text becomes the
+// control's description, so a person is told both that the field is invalid and why.
 test('the reason a field is invalid is conveyed with the field', async () => {
 	await open(Invalid);
 	const announcement = await readUntil(sr, { role: 'textbox', name: 'Password' });

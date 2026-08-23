@@ -28,8 +28,7 @@ export const toggleState = shared(
 			triggerEl,
 			describedEl,
 			flip() {
-				const next = toggle.checked === true ? false : true;
-				toggle.checked = next;
+				toggle.checked = toggle.checked !== true;
 			},
 		};
 	},
@@ -88,12 +87,9 @@ export function ToggleLabel({ children, ...rest }: ToggleLabelProps) @{
 	<label {...rest} for={toggle.triggerEl}>{children}</label>
 }
 
-// The message the switch names. One part stands behind both `toggle.description`
-// and `toggle.error` because an element() handle may be bound in exactly one place
-// (MARKLESS_ELEMENT_HANDLE_DUPLICATE) and a control may name exactly one id (a
-// handle list in an IDREF position is MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE,
-// recorded as U-C). A switch that mounts one message is described by it; a switch
-// that mounts both is described by the first of them.
+// One part stands behind both `toggle.description` and `toggle.error`: an element()
+// handle binds in exactly one place, and aria-describedby here names exactly one id.
+// A switch that mounts both messages is therefore described by the first of them.
 function ToggleMessage({ children, ...rest }: ToggleDescriptionProps) @{
 	const toggle = toggleState();
 

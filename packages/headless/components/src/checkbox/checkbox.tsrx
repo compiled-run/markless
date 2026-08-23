@@ -28,7 +28,7 @@ export const checkboxState = shared(
 			triggerEl,
 			onChange: undefined as ((checked: boolean | 'mixed') => void) | undefined,
 			toggle() {
-				// mixed resolves to checked, like a native indeterminate box
+				// mixed resolves to checked, like a native indeterminate box.
 				checkbox.checked = checkbox.checked !== true;
 				checkbox.onChange?.(checkbox.checked);
 			},
@@ -84,8 +84,7 @@ export function CheckboxTrigger({ children, onClick, onKeydown, ...rest }: Check
 			onClick?.(event);
 		}}
 		onKeydown={(event) => {
-			// A native button activates on Enter; a checkbox must not. The request
-			// lands after dispatch returns, so today it only sometimes wins (U-M).
+			// A native button activates on Enter; a checkbox must not.
 			if (event.key === 'Enter') {
 				event.preventDefault();
 			}
