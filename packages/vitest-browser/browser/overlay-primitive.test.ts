@@ -68,6 +68,7 @@ function parts(container: ParentNode) {
 		modalClose: requireElement<HTMLButtonElement>(container, '[data-modal-close]'),
 		modalDismissals: requireElement(container, '[data-modal-dismissals]'),
 		modalReason: requireElement(container, '[data-modal-reason]'),
+		modalPressed: requireElement(container, '[data-modal-pressed]'),
 		menuTrigger: requireElement<HTMLButtonElement>(container, '[data-menu-trigger]'),
 		menuContent: requireElement<HTMLElement>(container, '[data-menu-content]'),
 		menuDismissals: requireElement(container, '[data-menu-dismissals]'),
@@ -174,6 +175,54 @@ async function expectOutsidePressReportedNotEnforced(container: ParentNode) {
 	await settle();
 	expect(parts(container).modalContent.hidden).toBe(false);
 	expect(parts(container).background.hasAttribute('inert')).toBe(true);
+
+	parts(container).modalClose.click();
+	await expect
+		.poll(() => {
+			const now = parts(container);
+			return { hidden: now.modalContent.hidden, overflow: document.body.style.overflow };
+		})
+		.toEqual({ hidden: true, overflow: '' });
+}
+
+async function expectOutsidePressCarriesTheElementPressed(container: ParentNode) {
+	// The report says why AND where. Escape has no target at all, so a family that
+	// wants to ignore the press that opened it can ask which element was pressed
+	// instead of guessing from how soon the press arrived.
+	await openModal(container);
+
+	pressEscape(container);
+	await expect
+		.poll(() => {
+			const now = parts(container);
+			return {
+				hidden: now.modalContent.hidden,
+				dismissals: now.modalDismissals.textContent,
+				reason: now.modalReason.textContent,
+				pressed: now.modalPressed.textContent,
+			};
+		})
+		.toEqual({ hidden: true, dismissals: '1', reason: 'escape', pressed: 'none' });
+	// Nothing was stamped, because Escape carried no element to stamp.
+	expect(parts(container).background.hasAttribute('data-press-target-seen')).toBe(false);
+
+	await openModal(container);
+	pointerDown(parts(container).background);
+	await expect
+		.poll(() => {
+			const now = parts(container);
+			return {
+				dismissals: now.modalDismissals.textContent,
+				reason: now.modalReason.textContent,
+				pressed: now.modalPressed.textContent,
+			};
+		})
+		.toEqual({ dismissals: '2', reason: 'outside-press', pressed: 'element' });
+	// The handler stamped the node the report handed it, so this is identity: the
+	// element the press landed on is the one that arrived, not one that matched a
+	// description of it.
+	expect(parts(container).background.hasAttribute('data-press-target-seen')).toBe(true);
+	expect(parts(container).modalContent.hasAttribute('data-press-target-seen')).toBe(false);
 
 	parts(container).modalClose.click();
 	await expect
@@ -478,6 +527,16 @@ test('CSR: an outside press is reported, never enforced', async () => {
 test('SSR resume: an outside press is reported, never enforced', async () => {
 	const screen = await renderSSR(Page);
 	await expectOutsidePressReportedNotEnforced(screen.container);
+});
+
+test('CSR: an outside press carries the element pressed and Escape carries none', async () => {
+	const screen = await render(Page);
+	await expectOutsidePressCarriesTheElementPressed(screen.container as HTMLElement);
+});
+
+test('SSR resume: an outside press carries the element pressed and Escape carries none', async () => {
+	const screen = await renderSSR(Page);
+	await expectOutsidePressCarriesTheElementPressed(screen.container);
 });
 
 test('CSR: a surface without aria-modal leaves the page usable', async () => {
