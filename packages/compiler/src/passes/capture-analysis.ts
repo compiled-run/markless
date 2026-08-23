@@ -143,6 +143,7 @@ function importedCaptureSymbols(
 			(candidate) => candidate.id === symbol.componentEdgeId,
 		);
 		if (!edge) return [];
+		if (!claimBelongsToEdge(symbol.ownerComponentName, edge, input)) return [];
 		const captureSymbol = symbol.captureSymbol;
 		// Absent callback props fold to undefined only at optional/guarded call sites.
 		const absentPropIsUndefined = (slot: CaptureSlot) =>
@@ -225,6 +226,33 @@ function importedCaptureSymbols(
 			},
 		];
 	});
+}
+
+/**
+ * Whether this edge is the one that composes the claim's owning component.
+ *
+ * A child module publishes ONE claim manifest for every component it exports,
+ * and the linker offers that manifest to every edge into the module, so
+ * `<NkfRoot>` is handed `<NkfItem>`'s `onKeyDown` claim. Binding it there names a
+ * prop the root never takes: the capture refuses against the wrong edge, and at a
+ * guarded call site the claim folds to a valueless constant the consumer's
+ * handler is then skipped by.
+ *
+ * A claim whose owner this module composes nowhere keeps today's behaviour: the
+ * edge that received it is the only reader it has, and a widget-callback claim
+ * carries no owner at all (its slot belongs to the family, not to one part), so
+ * requiring an owner here would refuse every one of them.
+ */
+function claimBelongsToEdge(
+	ownerComponentName: string | undefined,
+	edge: SemanticComponentEdge,
+	input: CaptureAnalysisInput,
+): boolean {
+	if (ownerComponentName === undefined) return true;
+	if (edge.childComponentName === ownerComponentName) return true;
+	return !input.semanticGraph.componentEdges.some(
+		(candidate) => candidate.childComponentName === ownerComponentName,
+	);
 }
 
 // Projected children are compiler-owned template content, not a runtime prop
