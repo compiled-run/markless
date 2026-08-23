@@ -8,6 +8,7 @@ export * as progress from './progress/index.ts';
 export * as qrcode from './qr-code/index.ts';
 export * as radiogroup from './radio-group/index.ts';
 export * as scrollarea from './scroll-area/index.ts';
+export * as select from './select/index.ts';
 export * as tabs from './tabs/index.ts';
 export * as textbox from './textbox/index.ts';
 export * as toggle from './toggle/index.ts';

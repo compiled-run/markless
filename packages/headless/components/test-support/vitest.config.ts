@@ -15,6 +15,9 @@ export default defineConfig({
 		// suffix is what separates the lanes: the `ui` browser project takes only
 		// `.browser.ts`, and this one only `.sr.ts`.
 		include: ['src/**/*.sr.ts'],
+		// Serial like the browser project (same measured contention class: parallel
+		// iframes push gesture polls past the ceiling; serial is green and faster).
+		fileParallelism: false,
 		browser: {
 			enabled: true,
 			headless: true,
