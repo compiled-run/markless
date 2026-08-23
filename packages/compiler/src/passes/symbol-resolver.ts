@@ -2,6 +2,7 @@ import type {
 	BoundSymbolResolverArtifact,
 	BoundSymbolResolverInput,
 	BoundSymbolResolverRow,
+	LoweredElementHandleRead,
 	LoweredStateRead,
 	LoweredStateWrite,
 	PlannedSymbol,
@@ -53,6 +54,12 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			),
 		),
 	];
+	// Every handle this module can name, by the graph node state lowering resolves
+	// its reads to. A read that lands here is a handle read, not a state read.
+	const handlesByGraphNodeId = elementHandlesByGraphNodeId(input.payloadArena);
+
+	const handleReadsOf = (reads: ReadonlyArray<LoweredStateRead> | undefined) =>
+		elementHandleReads(reads, handlesByGraphNodeId);
 
 	for (const event of input.payloadArena.view.events) {
 		if (event.handlerSource === undefined) continue;
@@ -65,6 +72,12 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 		);
 		const source = inlined.source;
 		const moduleImports = referencedModuleImports(input.semanticGraph.moduleImports, source);
+		const reads = eventReads(
+			input.stateLowering?.reads,
+			[sourceSpan, ...inlined.spans],
+			source,
+			semanticsReader,
+		);
 
 		symbols.push({
 			id: `symbol:${nextSymbolId++}`,
@@ -76,17 +89,13 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			parameters: event.handlerParameters,
 			...(moduleImports.length > 0 ? { moduleImports } : {}),
 			order: 0,
-			reads: eventReads(
-				input.stateLowering?.reads,
-				[sourceSpan, ...inlined.spans],
-				source,
-				semanticsReader,
-			),
+			reads,
 			writes: eventWrites(source, input.stateLowering?.writes, [
 				sourceSpan,
 				...inlined.spans,
 			]),
 			elementHandleCalls: collectElementHandleCalls(source, reachableElementHandles),
+			elementHandleReads: handleReadsOf(reads),
 		});
 	}
 
@@ -102,6 +111,12 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			);
 			const source = inlined.source;
 			const moduleImports = referencedModuleImports(input.semanticGraph.moduleImports, source);
+			const reads = eventReads(
+				input.stateLowering?.reads,
+				[prop.sourceSpan, ...inlined.spans],
+				source,
+				semanticsReader,
+			);
 			symbols.push({
 				id: `symbol:${nextSymbolId++}`,
 				kind: 'callback-prop',
@@ -111,16 +126,12 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				sourceSpan: prop.sourceSpan,
 				parameters: prop.parameters ?? [],
 				...(moduleImports.length > 0 ? { moduleImports } : {}),
-				reads: eventReads(
-					input.stateLowering?.reads,
-					[prop.sourceSpan, ...inlined.spans],
-					source,
-					semanticsReader,
-				),
+				reads,
 				writes: eventWrites(source, input.stateLowering?.writes, [
 					prop.sourceSpan,
 					...inlined.spans,
 				]),
+				elementHandleReads: handleReadsOf(reads),
 			});
 		}
 	}
@@ -961,6 +972,60 @@ function findModuleImport(
 	if (!rootName) return undefined;
 
 	return imports.find((item) => item.localName === rootName);
+}
+
+/**
+ * Every element() handle this module renders, keyed by the graph node that state
+ * lowering resolves a read of it to.
+ *
+ * Handles bound in a keyed row and handles inside an async boundary arm are
+ * collected too: a handler in either place still names the same authored handle,
+ * and the resume registry answers by the same name.
+ */
+function elementHandlesByGraphNodeId(
+	payloadArena: SymbolResolverInput['payloadArena'],
+): ReadonlyMap<string, { readonly handleId: string; readonly name: string }> {
+	const byGraphNodeId = new Map<string, { handleId: string; name: string }>();
+	for (const handle of [
+		...payloadArena.view.elementHandles,
+		...payloadArena.view.keyedRepeats.flatMap((repeat) => repeat.rowElementHandles ?? []),
+		...payloadArena.view.asyncBoundaries.flatMap((boundary) =>
+			boundary.armRecords.flatMap((arm) => arm.elementHandles),
+		),
+	]) {
+		if (!byGraphNodeId.has(handle.handleId))
+			byGraphNodeId.set(handle.handleId, { handleId: handle.handleId, name: handle.name });
+	}
+	return byGraphNodeId;
+}
+
+/**
+ * The reads that are really handle reads.
+ *
+ * `element()` handles are not graph values, so lowering a read of one into
+ * `graph.read` answers `undefined` at dispatch — the defect this record exists to
+ * close. The read stays in `reads` as well, so nothing that counts a handler's
+ * graph dependencies changes shape; only the emitter treats it differently.
+ */
+function elementHandleReads(
+	reads: ReadonlyArray<LoweredStateRead> | undefined,
+	handlesByGraphNodeId: ReadonlyMap<string, { readonly handleId: string; readonly name: string }>,
+): ReadonlyArray<LoweredElementHandleRead> {
+	if (!reads || reads.length === 0 || handlesByGraphNodeId.size === 0) return [];
+	const collected: LoweredElementHandleRead[] = [];
+	for (const read of reads) {
+		const handle = handlesByGraphNodeId.get(read.graphNodeId);
+		// A path off a handle is a DOM property, not part of the handle's identity;
+		// the emitter rebuilds it from the authored node.
+		if (!handle) continue;
+		if (collected.some((existing) => existing.source === read.source)) continue;
+		collected.push({
+			source: read.source,
+			handleId: handle.handleId,
+			handleName: handle.name,
+		});
+	}
+	return collected;
 }
 
 // Handler statements like box.focus() reference element() handles; they must

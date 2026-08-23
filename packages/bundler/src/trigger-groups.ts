@@ -284,6 +284,15 @@ export function planPrerenderTriggerGroups(input: {
 						closureView.elementHandles.forEach((handle, index) => {
 							if (handle.name === call.handleName) selected.elementHandles.add(index);
 						});
+				// A handle read as a VALUE needs its record in this page's payload
+				// just as much as a method call on it does: without the record the
+				// resume registry has no entry and the handler reads `undefined`.
+				if ('elementHandleReads' in symbol)
+					for (const read of symbol.elementHandleReads ?? [])
+						closureView.elementHandles.forEach((handle, index) => {
+							if (handle.handleId === read.handleId || handle.name === read.handleName)
+								selected.elementHandles.add(index);
+						});
 			}
 			closeComputedGraph(graphNodeIds, input.state);
 			for (const graphNodeId of graphNodeIds) {

@@ -4,6 +4,7 @@ import type {
 	GeneratedSymbolModule,
 	PublicRenderPlanAsyncBoundaryArms,
 	PublicRenderPlanBranchArms,
+	LoweredElementHandleRead,
 	LoweredStateRead,
 	LoweredStateWrite,
 	PlannedSymbol,
@@ -4383,6 +4384,10 @@ type EventHandlerRewrite = {
 	/** The parameters write lowering sees, which a callback prop blanks. */
 	readonly writeValueInput: ValueExpressionEmissionInput;
 	readonly elementHandleCalls: ReadonlyArray<EventElementHandleCall>;
+	/** Handle reads in value position, which lower to `getElementHandle`. */
+	readonly elementHandleReads: ReadonlyArray<LoweredElementHandleRead>;
+	/** Row-local names, which shadow a handle of the same name. */
+	readonly localNames: ReadonlySet<string>;
 	readonly claimedWrites: Set<LoweredStateWrite>;
 	readonly claimedHandleCalls: Set<EventElementHandleCall>;
 };
@@ -4414,6 +4419,11 @@ function eventHandlerRewrite(
 		},
 		elementHandleCalls:
 			symbol.kind === 'event-handler' ? (symbol.elementHandleCalls ?? []) : [],
+		elementHandleReads:
+			symbol.kind === 'event-handler' || symbol.kind === 'callback-prop'
+				? (symbol.elementHandleReads ?? [])
+				: [],
+		localNames: input.localNames,
 		claimedWrites: new Set(),
 		claimedHandleCalls: new Set(),
 	};
@@ -4679,6 +4689,9 @@ function eventReadNode(
 	if (!isGraphReadExpression(node)) return null;
 	if (!isValuePositionGraphRead(node, parent)) return null;
 
+	const handleRead = elementHandleReadNode(text, rewrite);
+	if (handleRead) return handleRead;
+
 	const read = rewrite.reads.find((candidate) => candidate.source === text);
 	if (!read) return null;
 
@@ -4866,6 +4879,22 @@ function eventWriteValueNode(node: AnyNode, rewrite: EventHandlerRewrite): Emiss
 	);
 }
 
+/**
+ * `context.getElementHandle("panel")`, for a handle read as a VALUE.
+ *
+ * A row-local of the same name wins: inside a keyed row `item` is the row's own
+ * item, whatever a module-level handle is called. That is the same precedence
+ * `localValueNode` applies in the value band.
+ */
+function elementHandleReadNode(text: string, rewrite: EventHandlerRewrite): EmissionNode | null {
+	if (rewrite.elementHandleReads.length === 0) return null;
+	const handle = rewrite.elementHandleReads.find((candidate) => candidate.source === text);
+	if (!handle) return null;
+	if (rewrite.localNames.has(text.split('.')[0] ?? '')) return null;
+
+	return callNode(memberChainNode('context.getElementHandle'), [literalNode(handle.handleId)]);
+}
+
 /** `context.getElementHandle("chart")?.setData(1)`. */
 function elementHandleCallNode(
 	node: AnyNode,
@@ -4951,7 +4980,12 @@ function eventHandlerScalarLeafStatements(
 
 	const writes = symbol.writes ?? [];
 	if (writes.length !== 1) return null;
-	if ((symbol.moduleImports ?? []).length > 0 || (symbol.elementHandleCalls ?? []).length > 0) {
+	if (
+		(symbol.moduleImports ?? []).length > 0 ||
+		(symbol.elementHandleCalls ?? []).length > 0 ||
+		// A handle read needs the resume registry, so this is no scalar leaf.
+		(symbol.elementHandleReads ?? []).length > 0
+	) {
 		return null;
 	}
 

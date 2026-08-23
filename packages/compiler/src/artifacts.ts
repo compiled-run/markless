@@ -1002,6 +1002,22 @@ export type LoweredStateRead = {
 	readonly path: ReadonlyArray<string>;
 };
 
+/**
+ * One place a handler reads an `element()` handle as a VALUE.
+ *
+ * State lowering resolves `panel` and `tabs.panelEl` to the element binding's
+ * graph node, which is not a graph value: reading it through `graph.read`
+ * answers `undefined`. This record says the read is a handle, so the emitter can
+ * lower it to `context.getElementHandle(...)`, which the resume registry answers
+ * with the live DOM node. `handleId` is the registry's precise key; `handleName`
+ * is the authored name it also accepts.
+ */
+export type LoweredElementHandleRead = {
+	readonly source: string;
+	readonly handleId: string;
+	readonly handleName: string;
+};
+
 export type LoweredStateWrite = {
 	readonly source: string;
 	readonly sourceSpan?: SourceSpan;
@@ -1184,6 +1200,7 @@ export type PlannedSymbol =
 				readonly offset: number;
 				readonly endOffset: number;
 			}>;
+			readonly elementHandleReads?: ReadonlyArray<LoweredElementHandleRead>;
 	  }
 	| {
 			readonly id: string;
@@ -1196,6 +1213,7 @@ export type PlannedSymbol =
 			readonly moduleImports?: ReadonlyArray<SemanticModuleImport>;
 			readonly reads?: ReadonlyArray<LoweredStateRead>;
 			readonly writes?: ReadonlyArray<LoweredStateWrite>;
+			readonly elementHandleReads?: ReadonlyArray<LoweredElementHandleRead>;
 	  }
 	| {
 			readonly id: string;
