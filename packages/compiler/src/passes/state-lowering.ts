@@ -88,7 +88,13 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 	for (const read of input.semanticGraph.stateReads) {
 		const sharedDefinitionId = read.sharedDefinitionId ?? null;
 		const lookup = scopedGraphLookup(input, sharedDefinitionId, read.componentName);
-		const resolved = resolveStateGraphPath(input, read.source, lookup, sharedDefinitionId);
+		const resolved = resolveStateGraphPath(
+			input,
+			read.source,
+			lookup,
+			sharedDefinitionId,
+			read.componentName,
+		);
 		if (!resolved) {
 			if (
 				isDynamicGraphPathSource(
@@ -153,7 +159,13 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 			continue;
 		}
 
-		const resolved = resolveStateGraphPath(input, write.target, lookup, sharedDefinitionId);
+		const resolved = resolveStateGraphPath(
+			input,
+			write.target,
+			lookup,
+			sharedDefinitionId,
+			write.componentName,
+		);
 		if (!resolved) {
 			const excludedAliasPath = findRestAliasExcludedPath(write.target, lookup.aliases);
 			if (excludedAliasPath) {
@@ -337,12 +349,13 @@ function resolveStateGraphPath(
 	source: string,
 	lookup: GraphLookup,
 	sharedDefinitionId: string | null,
+	componentName?: string,
 ): ResolvedStateGraphPath | null {
 	const direct = resolveGraphPath(source, lookup.bindings, lookup.aliases);
 	if (direct) return direct;
 	if (sharedDefinitionId) return null;
 
-	return resolveSharedInstanceGraphPath(source, input.semanticGraph);
+	return resolveSharedInstanceGraphPath(source, input.semanticGraph, componentName);
 }
 
 function templateExpressionStaticDiagnostic({
