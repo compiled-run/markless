@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import type { ModuleGraphInterfaceArtifact } from '../src/artifacts.ts';
 import { compileTsrxModule, linkBarrelComponents, moduleLinkResolutionKey } from '../src/index.ts';
+import { widgetRootComponents } from '../src/passes/public-render/shared-seed-pass.ts';
 
 // The ratified consumer surface is `family.state()`: a namespace-member call on
 // a family object that reaches a widget-scoped shared definition through a
@@ -266,6 +267,56 @@ export default function Report() @{
 	expect(
 		(consumer.protocolState.sharedDefinitions ?? []).map((item) => [item.id, item.scope]),
 	).toEqual([[definitionId, 'widget']]);
+});
+
+// A widget-scoped definition is rooted by the module that DECLARES it. A
+// consumer that resolves an adopted one is a part of somebody else's widget, so
+// the consumer module roots nothing: rooting the read there gave the definition
+// a second owner, and the consumer's own component served a second instance of
+// the family's cells beside the one it meant to read.
+test('the consumer module roots no widget for the definition it adopted', async () => {
+	const owner = await compile('src/fam.tsrx', family);
+	const barrel = await compile(
+		'src/index.ts',
+		`export { Root as root, pnl as state } from './fam.tsrx';`,
+	);
+	const throughBarrel = await compile(
+		'src/page.tsrx',
+		`
+import * as fam from './index.ts';
+
+export default function Report() @{
+	const s = fam.state();
+	<span data-report>{s.open}</span>
+}
+`,
+		{ './index.ts': barrel.moduleGraphInterface, './fam.tsrx': owner.moduleGraphInterface },
+	);
+	const throughNamedImport = await compile(
+		'src/named.tsrx',
+		`
+import { pnl } from './fam.tsrx';
+
+export default function Report() @{
+	const s = pnl();
+	<span data-report>{s.open}</span>
+}
+`,
+		{ './fam.tsrx': owner.moduleGraphInterface },
+	);
+
+	// The declaring module's own root is untouched: it still roots the family.
+	expect([...widgetRootComponents(owner as never)]).toEqual([[definitionId, 'Root']]);
+	expect([...widgetRootComponents(throughBarrel as never)]).toEqual([]);
+	expect([...widgetRootComponents(throughNamedImport as never)]).toEqual([]);
+	// Both consumers still resolve the definition — they read it, they just do
+	// not start a widget of their own for it.
+	expect(
+		throughBarrel.semanticGraph.sharedInstances.map((instance) => instance.definitionId),
+	).toEqual([definitionId]);
+	expect(
+		throughNamedImport.semanticGraph.sharedInstances.map((instance) => instance.definitionId),
+	).toEqual([definitionId]);
 });
 
 // Fail-closed: an indirection the compiler cannot follow to a .tsrx shared
