@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { marklessSsrComponentPart } from '@markless/web/fns/ssr';
 import { transformTsrxModule } from '../src/transform.ts';
+import { MARKLESS_SHARED_CALL_UNCOMPILED } from '../src/source-module.ts';
 
 // Plain ESM has to reach the components of a compiled `.tsrx` module. Two shapes
 // do it, and both are resolved by the bundler at LINK time, before anything
@@ -77,13 +78,39 @@ function moduleExportNames(code: string): ReadonlyArray<string> {
  */
 function publishedExports(code: string, compiledApp: unknown): Record<string, unknown> {
 	const published: Record<string, unknown> = {};
-	for (const [, name, expression] of code.matchAll(/^export const (\w+) = ([\s\S]*?);$/gm)) {
-		published[name!] = new Function(
+	for (const match of code.matchAll(/^export const (\w+) = /gm)) {
+		const start = match.index + match[0].length;
+		published[match[1]!] = new Function(
 			'marklessCompiledApp',
-			`return (${expression});`,
+			`return (${initializerAt(code, start)});`,
 		)(compiledApp);
 	}
 	return published;
+}
+
+/**
+ * The initializer expression starting at `start`, up to the `;` that ends the
+ * declaration. Scanned with nesting and string depth rather than matched to the
+ * first `;`: a published binding whose body is a block (the shared-definition
+ * export throws from one) carries semicolons of its own, and a lazy regex stops
+ * inside it and hands `new Function` a fragment.
+ */
+function initializerAt(code: string, start: number): string {
+	let depth = 0;
+	let quote: string | null = null;
+	for (let index = start; index < code.length; index += 1) {
+		const character = code[index]!;
+		if (quote) {
+			if (character === '\\') index += 1;
+			else if (character === quote) quote = null;
+			continue;
+		}
+		if (character === "'" || character === '"' || character === '`') quote = character;
+		else if ('([{'.includes(character)) depth += 1;
+		else if (')]}'.includes(character)) depth -= 1;
+		else if (character === ';' && depth === 0) return code.slice(start, index);
+	}
+	throw new Error(`Unterminated export initializer at ${start}:\n${code.slice(start)}`);
 }
 
 function compiledAppStub() {
@@ -210,6 +237,42 @@ test('a non-root part a client production build cannot serve is published inert'
 		published.Trigger,
 	);
 	expect((published.Trigger as { renderSsr?: unknown }).renderSsr).toBeUndefined();
+});
+
+test('an authored shared definition stays a real named export of the compiled module', async () => {
+	// `export const sel = shared(...)` is authored source the emitted module
+	// replaces wholesale, so without this wiring a `.ts` barrel writing
+	// `export { sel as state } from './sel.tsrx'` failed to LINK — a SyntaxError
+	// before anything ran. The compiler publishes the name on the module-graph
+	// interface's `sharedDefinitions`; this pins that the bundler reads it there
+	// and hands it to the emitter, in every variant a barrel can link against.
+	for (const options of [
+		{},
+		{ environment: 'server' as const },
+		{ environment: 'client' as const },
+		{ environment: 'client' as const, dev: true },
+		{ environment: 'client' as const, prerenderRecords: true },
+		{ environment: 'client' as const, clientOutput: 'symbols-only' as const },
+	]) {
+		const code = await emit(FAMILY, options);
+		expect(code, JSON.stringify(options)).toMatch(/^export const sel = /m);
+	}
+});
+
+test('the published shared binding refuses an uncompiled call by name', async () => {
+	// A compiled consumer's `family.state()` is lowered by the compiler and never
+	// reaches this binding, so anything that DOES reach it is an uncompiled call
+	// site — there is no widget to resolve the instance against. It throws rather
+	// than becoming a second, unratified way to run a shared definition.
+	const published = publishedExports(await emit(FAMILY, { environment: 'server' }), {
+		...compiledAppStub(),
+	});
+	const sel = published.sel as () => unknown;
+
+	expect(typeof sel).toBe('function');
+	expect(() => sel()).toThrow(MARKLESS_SHARED_CALL_UNCOMPILED);
+	expect(() => sel()).toThrow(/\bsel\b/);
+	expect(() => sel()).toThrow(/this call site was not compiled/);
 });
 
 test('a component exported under a name this module already binds is a loud error', async () => {

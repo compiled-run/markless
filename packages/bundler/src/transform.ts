@@ -511,6 +511,12 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					publicRenderSsrComponentExports:
 						compiled.publicRenderModule.ssrComponentExports,
 					canonicalRenderData: prerenderInterfacesComplete(compiled, input),
+					// The interface publishes exactly the shared definitions this
+					// module owns AND exports, each under the name it exports it as,
+					// so the emitted module keeps the binding a `.ts` barrel links.
+					sharedDefinitionExports: compiled.moduleGraphInterface?.sharedDefinitions?.map(
+						(published) => published.exportName,
+					),
 					hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
 					symbols: symbolRows,
 					behaviorSymbols,

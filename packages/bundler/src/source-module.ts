@@ -238,6 +238,13 @@ export function emitSourceModule(input: {
 	readonly canonicalRenderData?: boolean;
 	readonly symbols: ReadonlyArray<SourceSymbolRow>;
 	readonly behaviorSymbols?: ReadonlyArray<SourceSymbolRow>;
+	/**
+	 * Names the authored module exports as shared definitions (`export const
+	 * nscShared = shared(...)`). The emitted module replaces the authored one
+	 * wholesale, so without these a `.ts` barrel re-exporting the name never
+	 * links.
+	 */
+	readonly sharedDefinitionExports?: ReadonlyArray<string>;
 	readonly symbolRoutes: ReadonlyArray<SourceLazySymbolRoute>;
 	readonly hasBoundSymbols?: boolean;
 	readonly prerenderRecords?: boolean;
@@ -360,10 +367,53 @@ export function emitSourceModule(input: {
 					prerenderRecords: input.prerenderRecords,
 					dev: input.dev,
 				}),
+		// Emitted in every variant, symbols-only included: a barrel re-exporting
+		// the name has to link whatever this build serves.
+		...emitSharedDefinitionExports(
+			input.sharedDefinitionExports ?? [],
+			input.publicRenderSsrComponentExports ?? [],
+		),
 		'',
 	]
 		.filter((line): line is string => line !== null)
 		.join('\n');
+}
+
+export const MARKLESS_SHARED_CALL_UNCOMPILED = 'MARKLESS_SHARED_CALL_UNCOMPILED';
+
+/**
+ * One real ES named export per authored shared definition, bound to a callable
+ * that only ever throws.
+ *
+ * The export exists for two reasons, and neither is "run the definition".
+ * Linking first: a `.ts` barrel writing `export { nscShared as state } from
+ * './family.tsrx'` is resolved before anything runs, and the emitted module
+ * replacing the authored one wholesale made that a SyntaxError. Failing closed
+ * second: a compiled consumer's `family.state()` is lowered by the compiler and
+ * never reaches this binding, so anything that DOES reach it is an uncompiled
+ * call site, which cannot be served correctly — a shared instance resolves
+ * against the widget the caller renders under, and an uncompiled call has no
+ * such caller. It throws by name rather than quietly becoming a second,
+ * unratified runtime API.
+ */
+function emitSharedDefinitionExports(
+	sharedExports: ReadonlyArray<string>,
+	ssrComponents: ReadonlyArray<{ readonly exportName: string }>,
+): ReadonlyArray<string> {
+	if (sharedExports.length === 0) return [];
+	// A name this module already binds would be a duplicate declaration, so it is
+	// a loud build error, never a silently skipped export the barrel then fails
+	// to find.
+	const taken = new Set<string>([
+		...RESERVED_MODULE_BINDINGS,
+		...ssrComponents.map((component) => component.exportName),
+	]);
+	return sharedExports.map((name) => {
+		if (taken.has(name)) throw new Error(`MARKLESS_SHARED_EXPORT_NAME_RESERVED: ${name}`);
+		taken.add(name);
+		const message = `${MARKLESS_SHARED_CALL_UNCOMPILED}: ${name} — a shared definition can only be called from a compiled module; this call site was not compiled.`;
+		return `export const ${name} = () => { throw new Error(${JSON.stringify(message)}); };`;
+	});
 }
 
 /**
