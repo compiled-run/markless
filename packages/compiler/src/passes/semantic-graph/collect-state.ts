@@ -45,7 +45,7 @@ import {
 } from './diagnostics.ts';
 import type { SemanticView } from 'yuku-tsrx';
 import type { WalkState } from './types.ts';
-import { collectSharedInstance } from './collect-shared.ts';
+import { collectSharedInstance, resolveSharedCall } from './collect-shared.ts';
 
 export function collectVariableDeclaration(node: AnyNode, state: WalkState): void {
 	const declarationKind = variableDeclarationKind(node);
@@ -574,6 +574,9 @@ function collectHelperReturnAlias(
 	if (!state.currentComponentName || state.currentHelperCall) return false;
 	const helperName = getCallName(init);
 	if (!helperName) return false;
+	// An imported `.tsrx` name that IS a shared definition is the shared
+	// resolver's call, not a helper this collector can claim and refuse.
+	if (resolveSharedCall(init, state)) return false;
 
 	const crossModuleSource = crossModuleHelperSource(helperName, state);
 	if (crossModuleSource) {

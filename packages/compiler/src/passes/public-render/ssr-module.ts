@@ -393,6 +393,25 @@ export function ssrSeedForwardBlockLines(
 	];
 }
 
+// Sibling `@for` loops may bind the same authored name - two lists both calling
+// their item `row` is ordinary authoring. This prelude is ONE scope shared by
+// every row render, so each name may be declared once; the declaration is the
+// same whichever loop asked for it, because every row reads its item off the
+// same context. A name meaning an item in one loop and an index in another is
+// refused by `collectRepeatBindingConflictDiagnostics` before emission.
+function repeatLocalLines(
+	repeats: PublicRenderModuleInput['semanticGraph']['keyedRepeats'],
+): string[] {
+	const declared = new Map<string, string>();
+	for (const repeat of repeats)
+		if (!declared.has(repeat.itemName))
+			declared.set(repeat.itemName, 'marklessSsrDataContext.repeatItem');
+	for (const repeat of repeats)
+		if (repeat.indexName && !declared.has(repeat.indexName))
+			declared.set(repeat.indexName, 'marklessSsrDataContext.repeatIndex');
+	return [...declared].map(([name, source]) => `const ${name}=${source};`);
+}
+
 function emitSsrDataLines(
 	input: PublicRenderModuleInput,
 	componentName: string,
@@ -436,8 +455,7 @@ function emitSsrDataLines(
 	const residueSources = authoredResidueSources(chunks);
 	const repeats = input.semanticGraph.keyedRepeats;
 	const localLines = [
-		...repeats.map((repeat) => `const ${repeat.itemName}=marklessSsrDataContext.repeatItem;`),
-		...repeats.flatMap((repeat) => repeat.indexName ? [`const ${repeat.indexName}=marklessSsrDataContext.repeatIndex;`] : []),
+		...repeatLocalLines(repeats),
 		'const error=marklessSsrDataContext.asyncError;',
 		...sharedInstancePreludeLines(
 			input.semanticGraph,

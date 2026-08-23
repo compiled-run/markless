@@ -175,12 +175,25 @@ export type ModuleGraphInterfaceLinkedComponent = {
 	readonly componentName: string;
 };
 
+/**
+ * A `shared()` definition this module exports, published whole: the definition
+ * record its own parts resolve, plus the factory graph nodes its returned
+ * properties name. An importing module adopts both, so `family.state()` there
+ * resolves to the same definition — same id, same nodes — as `family()` here.
+ */
+export type ModuleGraphInterfaceSharedDefinition = {
+	readonly exportName: string;
+	readonly definition: SemanticSharedDefinition;
+	readonly graphBindings: ReadonlyArray<SemanticGraphBinding>;
+};
+
 export type ModuleGraphInterfaceArtifact = {
 	readonly passId: 'module-graph-interface';
 	readonly filename: string;
 	readonly exports: ReadonlyArray<ModuleGraphInterfaceExport>;
 	readonly reexports?: ReadonlyArray<ModuleGraphInterfaceReexport>;
 	readonly linkedComponents?: ReadonlyArray<ModuleGraphInterfaceLinkedComponent>;
+	readonly sharedDefinitions?: ReadonlyArray<ModuleGraphInterfaceSharedDefinition>;
 	readonly render: {
 		readonly version: 1;
 		readonly components: ReadonlyArray<{
@@ -428,6 +441,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_STATE_WRITE_IN_TEMPLATE'
 		| 'MARKLESS_STATE_WRITE_IN_COMPUTED'
 		| 'MARKLESS_SHARED_DEFINITION_CYCLE'
+		| 'MARKLESS_SHARED_CALL_UNRESOLVED'
 		| 'MARKLESS_SHARED_SCOPE_INVALID'
 		| 'MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT'
 		| 'MARKLESS_ELEMENT_HANDLE_REQUIRED'
