@@ -31,4 +31,14 @@ export function IntrinsicContract() @{
 	<button attach={[installButton]} onClick={(event) => event.currentTarget.focus()}>
 		Array attach, single handler
 	</button>
+	<div
+		overlay
+		onDismiss={(event) => {
+			const reason: 'escape' | 'outside-press' = event.detail.reason;
+			const concreteTarget: HTMLDivElement = event.currentTarget;
+			concreteTarget.hidden = reason === 'escape';
+		}}
+	>
+		Overlay dismissal
+	</div>
 }
