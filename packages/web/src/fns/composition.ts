@@ -1,6 +1,7 @@
 import { marklessBoundSymbolId, marklessLiveBoundGraphRoute } from './bound-symbol.ts';
 import {
 	marklessComposedGraphNodeId,
+	marklessGraphWidgetRegistry,
 	marklessInstancePath,
 	marklessInstanceScopedElementHandle,
 	marklessInstanceScopedGraph,
@@ -142,6 +143,14 @@ export function marklessComposeWidgetRegistry(
 	return registry;
 }
 
+/**
+ * The registry a composed state carries, for a reader that holds the draft but
+ * not the graph it will become. Composition's own answer, before serving.
+ */
+export function marklessComposedWidgetRegistry(from: unknown): MarklessWidgetRegistry | undefined {
+	return heldRegistry(from);
+}
+
 /** Hands the registry a composed state carries to whatever record replaces it. */
 export function marklessCarryWidgetRegistry<T extends object>(from: unknown, to: T): T {
 	const held = heldRegistry(from);
@@ -170,22 +179,26 @@ export function marklessWithWidgetRegistry<T>(
 	compose: () => T,
 ): T {
 	const previous = marklessWidgetScope.active;
+	const composing = marklessWidgetScope.composing;
 	marklessWidgetScope.active = registry;
+	// A dispatch reaching a graph mid-compose must not re-aim the field this
+	// compose is reading through; nested composes restore the flag they found.
+	marklessWidgetScope.composing = true;
 	try {
 		return compose();
 	} finally {
 		marklessWidgetScope.active = previous;
+		marklessWidgetScope.composing = composing;
 	}
 }
 
 // The render's own registry is what every lookup inside this compose reads, so
-// the renders beside it cannot answer for it. The page registry still takes the
-// same entry, because a browser has only that one and the readers that ask
-// outside a compose - resume, a dispatched callback slot - ask it.
+// the renders beside it cannot answer for it. Nothing is written through to a
+// realm-wide map: the readers that ask AFTER a compose - resume, a dispatched
+// bound symbol, a callback slot - ask the registry filed against the page graph
+// this render produced, and fill it from the widget definitions it serves.
 function marklessRegisterWidgetRoot(id: string, rootPath: string): void {
-	const { active, page } = marklessWidgetScope;
-	marklessNoteWidgetRoot(active, id, rootPath);
-	if (active !== page) marklessNoteWidgetRoot(page, id, rootPath);
+	marklessNoteWidgetRoot(marklessWidgetScope.active, id, rootPath);
 }
 
 function marklessRegisterWidgetInstanceIds(ids: Iterable<string>): void {
@@ -480,6 +493,9 @@ function marklessComposedSymbol(
 	instancePath: string,
 ): ResumeSymbol {
 	const composed = (context: ResumeSymbolContext) => {
+		// This dispatch runs long after the compose that placed this child, so the
+		// rendered widgets it asks about are the ones its own page graph carries.
+		const registry = marklessGraphWidgetRegistry(context.graph);
 		// One route for both read channels: `context.read` is the same child-local
 		// id space `graph.read` is, so an unmapped one would read the page graph raw.
 		const read = (graphNodeId: string, path: ReadonlyArray<string> = []) => {
@@ -487,6 +503,7 @@ function marklessComposedSymbol(
 				{ graphNodeId, path },
 				graphProps,
 				instancePath,
+				registry,
 			);
 			return context.graph.read(mapped?.graphNodeId ?? graphNodeId, mapped?.path ?? path);
 		};
@@ -502,6 +519,7 @@ function marklessComposedSymbol(
 			getElementHandle: marklessInstanceScopedElementHandle(
 				context.getElementHandle,
 				instancePath,
+				context.graph,
 			),
 			...(context.read ? { read } : {}),
 		});
@@ -513,13 +531,18 @@ export function marklessCsrRemapChildGraph(
 	record: ComposeGraphRead,
 	graphProps: ComposeGraphProps,
 	instancePath = '',
+	registry?: MarklessWidgetRegistry,
 ): ComposeGraphRead | null {
 	const propName = marklessCompositionPropName(record.graphNodeId, record.path);
 	if (propName === null)
 		return instancePath
 			? {
 					...record,
-					graphNodeId: marklessComposedGraphNodeId(record.graphNodeId, instancePath),
+					graphNodeId: marklessComposedGraphNodeId(
+						record.graphNodeId,
+						instancePath,
+						registry,
+					),
 				}
 			: record;
 	const binding = marklessCompositionGraphProp(graphProps, propName);

@@ -1,4 +1,9 @@
-import { marklessComposedGraphNodeId, marklessInstancePath } from './instance-scope.ts';
+import {
+	marklessComposedGraphNodeId,
+	marklessGraphWidgetRegistry,
+	marklessInstancePath,
+} from './instance-scope.ts';
+import type { RuntimeGraph } from '@markless/runtime';
 
 type CallbackSlotContext = {
 	readonly graph: {
@@ -39,6 +44,7 @@ export function marklessInvokeCallbackSlot(
 	const slotPath = marklessComposedGraphNodeId(
 		graphNodeId,
 		context.graph.marklessInstancePath ?? '',
+		marklessGraphWidgetRegistry(context.graph as unknown as RuntimeGraph),
 	);
 	const rootPath = slotPath.slice(0, slotPath.length - graphNodeId.length);
 	const composerPath = marklessInstancePath(slotSymbolId)

@@ -4,7 +4,10 @@ import {
 	protocolProjectionSegment,
 	protocolRowSegment,
 } from '../../serializer/src/protocol.ts';
-import { marklessComposeState } from '../src/fns/composition.ts';
+import {
+	marklessComposeState,
+	marklessComposedWidgetRegistry,
+} from '../src/fns/composition.ts';
 import {
 	marklessComposedGraphNodeId,
 	marklessInstanceScopedGraph,
@@ -64,11 +67,14 @@ test('two placements of one composing component root two widgets, not one', () =
 		`${second}${protocolInstanceSegment(0)}${CELL}`,
 	]);
 
-	// And each placement's projected parts read that placement's cells.
-	expect(marklessComposedGraphNodeId(CELL, partPath(first))).toBe(
+	// And each placement's projected parts read that placement's cells. The
+	// registry is asked for by name: widget roots belong to the render that made
+	// them, so a reader outside the compose says WHICH render it means.
+	const widgets = marklessComposedWidgetRegistry(composed);
+	expect(marklessComposedGraphNodeId(CELL, partPath(first), widgets)).toBe(
 		`${first}${protocolInstanceSegment(0)}${CELL}`,
 	);
-	expect(marklessComposedGraphNodeId(CELL, partPath(second))).toBe(
+	expect(marklessComposedGraphNodeId(CELL, partPath(second), widgets)).toBe(
 		`${second}${protocolInstanceSegment(0)}${CELL}`,
 	);
 });
@@ -77,17 +83,18 @@ test('a keyed row composes a widget of its own', () => {
 	const rows = ['alpha', 'beta'].map(
 		(key) => protocolRowSegment(key) + protocolInstanceSegment(0),
 	);
-	marklessComposeState({ cells: [], computed: [] }, rows.map(groupRootChild));
+	const composed = marklessComposeState({ cells: [], computed: [] }, rows.map(groupRootChild));
+	const widgets = marklessComposedWidgetRegistry(composed);
 
 	const [alpha, beta] = rows;
-	expect(marklessComposedGraphNodeId(CELL, partPath(alpha!))).toBe(
+	expect(marklessComposedGraphNodeId(CELL, partPath(alpha!), widgets)).toBe(
 		`${alpha}${protocolInstanceSegment(0)}${CELL}`,
 	);
-	expect(marklessComposedGraphNodeId(CELL, partPath(beta!))).toBe(
+	expect(marklessComposedGraphNodeId(CELL, partPath(beta!), widgets)).toBe(
 		`${beta}${protocolInstanceSegment(0)}${CELL}`,
 	);
-	expect(marklessComposedGraphNodeId(CELL, partPath(alpha!))).not.toBe(
-		marklessComposedGraphNodeId(CELL, partPath(beta!)),
+	expect(marklessComposedGraphNodeId(CELL, partPath(alpha!), widgets)).not.toBe(
+		marklessComposedGraphNodeId(CELL, partPath(beta!), widgets),
 	);
 });
 
