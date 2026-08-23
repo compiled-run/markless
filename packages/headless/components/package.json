@@ -23,6 +23,7 @@
 		"./qr-code": "./src/qr-code/index.ts",
 		"./radio-group": "./src/radio-group/index.ts",
 		"./scroll-area": "./src/scroll-area/index.ts",
+		"./tabs": "./src/tabs/index.ts",
 		"./checklist": "./src/checklist/index.ts",
 		"./progress": "./src/progress/index.ts",
 		"./textbox": "./src/textbox/index.ts",
