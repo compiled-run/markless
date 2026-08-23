@@ -206,6 +206,11 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 			...input.captureAnalysis.diagnostics,
 			...branchArms.diagnostics,
 			...divergentModuleInstanceCarries(modules).map(divergentModuleInstanceDiagnostic),
+			...unresolvedGraphReferences(
+				modules,
+				input.symbolResolver.symbols,
+				graphBindingLocalNames(input.semanticGraph),
+			).map(unresolvedGraphReferenceDiagnostic),
 		],
 	};
 }
@@ -299,6 +304,232 @@ function divergentModuleInstanceDiagnostic(
 			},
 		],
 		docsUrl: `https://markless.dev/errors/${MODULE_INSTANCE_DIVERGENT_HANDLERS_CODE}`,
+	};
+}
+
+// ---------------------------------------------------------------------------
+// A graph binding that survived lowering as a bare name.
+//
+// Every emitter in this pass reaches state through `context.graph.read`, and the
+// name the author wrote for the binding — `s` in `s.n = s.text.slice(0, 3).length`
+// — exists only inside the component. A symbol module is its own module: nothing
+// declares `s` there, so a module that still names it throws `ReferenceError` the
+// first time its handler fires. Nothing before this point notices, because the
+// value bands are written to decline a shape they cannot lower and let the
+// authored text through as-is.
+//
+// The check is a read-back over the modules that were actually emitted, in the
+// same shape as `divergentModuleInstanceCarries` above and for the same reason:
+// what it reports is what shipped, not what some band intended. It flags only
+// names that are graph bindings in this file, so a global the author legitimately
+// calls is never mistaken for one — and it goes quiet on its own the day a band
+// learns to lower the shape, because then the name is no longer in the module.
+// ---------------------------------------------------------------------------
+
+// This pass owns the code; readers import it rather than restating the string.
+export const SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE =
+	'MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE' as const;
+
+type UnresolvedGraphReference = {
+	readonly symbolId: string;
+	readonly kind: PlannedSymbol['kind'];
+	/** The authored binding name the emitted module still refers to. */
+	readonly name: string;
+	/** The authored expression that carried it, when the symbol records one. */
+	readonly expression?: string;
+};
+
+/** Names that denote graph state in the authored file, as the author spelled them. */
+function graphBindingLocalNames(
+	semanticGraph: SymbolModulesInput['semanticGraph'],
+): ReadonlySet<string> {
+	if (!semanticGraph) return new Set();
+
+	return new Set([
+		// A prop binding is not included: props lower through their own path, and
+		// `props`/`open` style names collide with globals often enough that a
+		// fail-closed error on one would be worse than the gap it closes.
+		...semanticGraph.graphBindings.flatMap((binding) =>
+			binding.kind === 'prop' ? [] : [binding.name],
+		),
+		...semanticGraph.sharedInstances.map((instance) => instance.localName),
+	]);
+}
+
+function unresolvedGraphReferences(
+	modules: ReadonlyArray<GeneratedSymbolModule>,
+	symbols: ReadonlyArray<PlannedSymbol>,
+	graphNames: ReadonlySet<string>,
+): ReadonlyArray<UnresolvedGraphReference> {
+	if (graphNames.size === 0) return [];
+
+	return modules.flatMap((emitted) => {
+		const free = freeIdentifierNames(emitted.source);
+		const symbol = symbols.find((candidate) => candidate.id === emitted.symbolId);
+
+		return [...free]
+			.filter((name) => graphNames.has(name))
+			.sort()
+			.map((name) => ({
+				symbolId: emitted.symbolId,
+				kind: emitted.kind,
+				name,
+				...(unresolvedGraphExpression(symbol, name)
+					? { expression: unresolvedGraphExpression(symbol, name) }
+					: {}),
+			}));
+	});
+}
+
+/** The authored assignment or expression the surviving name came from, when recorded. */
+function unresolvedGraphExpression(
+	symbol: PlannedSymbol | undefined,
+	name: string,
+): string | undefined {
+	const writes = symbol && 'writes' in symbol ? (symbol.writes ?? []) : [];
+	for (const write of writes) {
+		if (typeof write.valueSource !== 'string') continue;
+		if (!identifierRootNames(write.valueSource).has(name)) continue;
+
+		return `${write.source} ${write.assignmentOperator ?? '='} ${write.valueSource}`;
+	}
+
+	return undefined;
+}
+
+/** The dotted roots a recorded value source names, without re-parsing it. */
+function identifierRootNames(valueSource: string): ReadonlySet<string> {
+	return new Set(
+		[...valueSource.matchAll(/(^|[^.\w$])([A-Za-z_$][\w$]*)/g)].flatMap((match) =>
+			match[2] ? [match[2]] : [],
+		),
+	);
+}
+
+/**
+ * The names an emitted module refers to but never binds.
+ *
+ * Referenced names come from the same tree walk the import filter uses, so a name
+ * that appears only inside a string literal is not counted. Bound names are every
+ * import local, declaration id, parameter, and catch binding in the module, which
+ * over-approximates deliberately: over-counting a binding can only make this walk
+ * quieter, never louder.
+ */
+function freeIdentifierNames(source: string): ReadonlySet<string> {
+	let ast: AnyNode;
+	try {
+		ast = parseJavaScriptModule(source);
+	} catch {
+		// A module the compiler just printed and cannot reparse is a different
+		// defect; it is not evidence that this one is present, so claim nothing.
+		return new Set();
+	}
+
+	const bound = new Set<string>();
+	collectBoundIdentifierNames(ast, bound);
+
+	const free = new Set<string>();
+	for (const name of deriveReferencedIdentifierNames(asNodes(ast.body))) {
+		if (!bound.has(name)) free.add(name);
+	}
+
+	return free;
+}
+
+/** Every name the module itself binds, anywhere and at any depth. */
+function collectBoundIdentifierNames(root: unknown, into: Set<string>): void {
+	const seen = new Set<object>();
+	const stack: unknown[] = [root];
+
+	while (stack.length > 0) {
+		const value = stack.pop();
+		if (!value || typeof value !== 'object') continue;
+		if (seen.has(value)) continue;
+		seen.add(value);
+
+		if (Array.isArray(value)) {
+			for (const item of value) stack.push(item);
+			continue;
+		}
+
+		const node = value as AnyNode;
+		if (BINDING_PATTERN_PARENT_TYPES.has(String(node.type))) {
+			collectPatternNames(node.local ?? node.id ?? node.param, into);
+		}
+		if (Array.isArray(node.params)) {
+			for (const parameter of node.params) collectPatternNames(parameter, into);
+		}
+
+		for (const [key, child] of Object.entries(node)) {
+			if (REFERENCE_WALK_IGNORED_KEYS.has(key)) continue;
+			stack.push(child);
+		}
+	}
+}
+
+/** Node types whose `local`, `id`, or `param` is a binding position. */
+const BINDING_PATTERN_PARENT_TYPES: ReadonlySet<string> = new Set([
+	'ImportSpecifier',
+	'ImportDefaultSpecifier',
+	'ImportNamespaceSpecifier',
+	'VariableDeclarator',
+	'FunctionDeclaration',
+	'FunctionExpression',
+	'ArrowFunctionExpression',
+	'ClassDeclaration',
+	'ClassExpression',
+	'CatchClause',
+]);
+
+/** Every name a binding pattern introduces, destructuring included. */
+function collectPatternNames(pattern: unknown, into: Set<string>): void {
+	if (!isNode(pattern)) return;
+
+	if (pattern.type === 'Identifier' && typeof pattern.name === 'string') {
+		into.add(pattern.name);
+		return;
+	}
+	if (pattern.type === 'AssignmentPattern') return collectPatternNames(pattern.left, into);
+	if (pattern.type === 'RestElement') return collectPatternNames(pattern.argument, into);
+	if (pattern.type === 'ArrayPattern') {
+		for (const element of asNodes(pattern.elements)) collectPatternNames(element, into);
+		return;
+	}
+	if (pattern.type === 'ObjectPattern') {
+		for (const property of asNodes(pattern.properties)) {
+			collectPatternNames(
+				property.type === 'RestElement' ? property.argument : property.value,
+				into,
+			);
+		}
+	}
+}
+
+function unresolvedGraphReferenceDiagnostic(
+	reference: UnresolvedGraphReference,
+): SymbolModulesDiagnostic {
+	const where = reference.expression
+		? `The expression is \`${reference.expression}\`.`
+		: `It appears in the module for ${reference.symbolId}.`;
+
+	return {
+		code: SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE,
+		severity: 'error',
+		phase: 'public-render',
+		passId: 'symbol-modules',
+		artifactKeys: ['symbolModules'],
+		title: `This expression reads "${reference.name}" in a shape the compiler cannot lower`,
+		message: `The emitted ${reference.kind} module for ${reference.symbolId} still names "${reference.name}" directly. ${where} "${reference.name}" is a state binding that lives in the component, not in the handler module, so this module would throw a ReferenceError the first time it runs.`,
+		why: 'A handler is compiled into a module of its own and every read of state has to be rewritten into a graph read. When an expression nests a state read under a call — `s.text.slice(0, 3).length` — the rewrite has no name for the value it would read, so nothing is rewritten and the authored text is emitted as it stands. Shipping that module would move a build-time gap into a runtime crash on the first click.',
+		suggestions: [
+			{
+				message: `Read the state into a local first, then use the local: \`const value = ${reference.name}.<field>;\` on its own line, and build the expression out of \`value\`. A local read is lowered, and everything after it is plain JavaScript.`,
+			},
+			{
+				message: `Or assign a shape the compiler already lowers: a direct read (\`${reference.name}.<field>\`), a field of the event (\`event.currentTarget.value\`), or that read passed straight to an imported or global call (\`Number(${reference.name}.<field>)\`).`,
+			},
+		],
+		docsUrl: `https://markless.dev/errors/${SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE}`,
 	};
 }
 
