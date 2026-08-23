@@ -63,7 +63,8 @@ export function marklessRecordRowScope(hostNodeId: string): MarklessRowScope | u
 	// No row to thread, but a bound symbol still spells widget ids against its
 	// projection site rather than the root that owns them, so a page carrying any
 	// widget root gets the adapter with no pairs: widget resolution, nothing else.
-	if (!path.includes('r:')) return widgetRootPaths.size > 0 ? EMPTY_ROW_SCOPE : undefined;
+	if (!path.includes('r:'))
+		return marklessWidgetScope.active.rootPaths.size > 0 ? EMPTY_ROW_SCOPE : undefined;
 	const pairs: Array<{ rowFree: string; withRows: string; rowBoundary?: boolean }> = [];
 	let rowFree = '';
 	let withRows = '';
@@ -225,12 +226,9 @@ export function marklessInstanceScopedGraph(
 	for (const definition of graph.listSharedDefinitions?.() ?? [])
 		if (definition.scope === 'widget') {
 			const rootPath = marklessInstancePath(definition.id);
-			widgetRootPaths.set(definition.id, rootPath);
-			noteWidgetRoot(definition.id, rootPath);
-			for (const projectionId of definition.projectionIds ?? []) {
-				widgetRootPaths.set(projectionId, rootPath);
-				noteWidgetRoot(projectionId, rootPath);
-			}
+			marklessNoteWidgetRoot(marklessWidgetScope.active, definition.id, rootPath);
+			for (const projectionId of definition.projectionIds ?? [])
+				marklessNoteWidgetRoot(marklessWidgetScope.active, projectionId, rootPath);
 		}
 	// Page-space families (shared, storage) keep their page ids through every adapter.
 	const qualify = (graphNodeId: string) => marklessComposedGraphNodeId(graphNodeId, instancePath);
@@ -257,46 +255,60 @@ export function marklessInstanceScopedGraph(
 // the browser never imports the serializer's protocol module.
 const PAGE_SPACE_ID = /^((?:[cp]\d+:|r:[^:]*:)*)(shared|storage):/;
 
-// Widget-scoped shared() definitions are the one page-space family that is NOT
-// page-wide: one graph per rendered widget. This answers, for an id a part
-// spells, WHICH rendered widget's instance path holds its nodes. Composition
-// registers as it merges children; resume registers from the payload. A page
-// with no widget-scoped definition never fills it and never pays for the lookup.
-const widgetRootPaths = new Map<string, string>();
+/**
+ * One render's answer to "which rendered widget owns this id".
+ *
+ * Widget-scoped shared() definitions are the one page-space family that is NOT
+ * page-wide: one graph per rendered widget. `rootPaths` answers, for an id a
+ * part spells, WHICH rendered widget's instance path holds its nodes.
+ * Composition fills it as it merges children; resume fills it from the payload.
+ * A page with no widget-scoped definition never fills it and never pays for the
+ * lookup.
+ *
+ * `rowRooted` names the definitions at least one of whose rendered roots stands
+ * inside a repeat. Such a widget has one graph per ROW, so which graph an id
+ * names is runtime identity - and the reading instance path of a dispatched
+ * bound symbol carries no row, because a bound symbol is minted per component
+ * EDGE. That set is what tells the two failures apart below: an id no widget
+ * claims at all, and an id whose widget is real but whose row has yet to arrive.
+ */
+export type MarklessWidgetRegistry = {
+	readonly rootPaths: Map<string, string>;
+	readonly rowRooted: Set<string>;
+};
 
 /**
- * The definitions at least one of whose rendered roots stands inside a repeat.
+ * The browser's registry: one page, one graph, one set of rendered widgets, and
+ * no composition in sight - resume fills it from the payload it was served.
  *
- * Such a widget has one graph per ROW, so which graph an id names is runtime
- * identity - and the reading instance path of a dispatched bound symbol carries
- * no row, because a bound symbol is minted per component EDGE. This set is what
- * tells the two failures apart below: an id no widget claims at all, and an id
- * whose widget is real but whose row has yet to arrive.
+ * A server is the opposite: many renders are in flight at once and they all
+ * spell their roots against the same RELATIVE instance paths, because a path is
+ * relative to the level that composed it and every page is built from the same
+ * modules. So composition works against a registry of its own - minted and
+ * threaded in composition.ts, which the browser's own chunk does not carry -
+ * and this one keeps answering the readers that ask outside a compose.
  */
-const rowRootedDefinitions = new Set<string>();
+const pageRegistry: MarklessWidgetRegistry = { rootPaths: new Map(), rowRooted: new Set() };
 
-function noteWidgetRoot(id: string, rootPath: string): void {
-	if (rootPath.includes('r:')) rowRootedDefinitions.add(id.slice(marklessInstancePath(id).length));
-}
+/**
+ * Which registry the lookups below read, and the page's own.
+ *
+ * `active` is `page` except inside a compose, where composition.ts swaps in the
+ * render's registry and swaps it back. It is a field rather than a scope
+ * function because only a server ever composes twice at once: keeping the swap
+ * (and the registration that writes through to `page`) in composition.ts is what
+ * keeps it out of the chunk the browser downloads.
+ */
+export const marklessWidgetScope = { active: pageRegistry, page: pageRegistry };
 
-export function marklessRegisterWidgetInstanceIds(ids: Iterable<string>): void {
-	for (const id of ids) {
-		const rootPath = marklessInstancePath(id);
-		widgetRootPaths.set(id, rootPath);
-		noteWidgetRoot(id, rootPath);
-	}
-}
-
-// A part is a SIBLING of the root composition placed it in (`c0:p1:` beside
-// `c0:c0:`), so the walk below cannot reach that root from the part's own path;
-// the composing child declared where its children land and this is that answer.
-export function marklessRegisterWidgetProjections(
-	entries: Iterable<readonly [string, string]>,
+export function marklessNoteWidgetRoot(
+	registry: MarklessWidgetRegistry,
+	id: string,
+	rootPath: string,
 ): void {
-	for (const [id, rootPath] of entries) {
-		widgetRootPaths.set(id, rootPath);
-		noteWidgetRoot(id, rootPath);
-	}
+	registry.rootPaths.set(id, rootPath);
+	if (rootPath.includes('r:'))
+		registry.rowRooted.add(id.slice(marklessInstancePath(id).length));
 }
 
 // The widget this child-local `shared:` id belongs to: the answer registered for
@@ -349,6 +361,7 @@ function marklessWidgetRootPathThroughRows(graphNodeId: string, instancePath: st
  * `shared()` graph, a storage slot - is page space and stays exactly as spelled.
  */
 function marklessUnresolvedWidgetGraphNodeId(graphNodeId: string, instancePath: string): string {
+	const rowRootedDefinitions = marklessWidgetScope.active.rowRooted;
 	if (instancePath.includes('r:') || rowRootedDefinitions.size === 0) return graphNodeId;
 	const slash = graphNodeId.lastIndexOf('/');
 	const rowRooted =
@@ -360,6 +373,7 @@ function marklessUnresolvedWidgetGraphNodeId(graphNodeId: string, instancePath: 
 // `undefined` is "no widget claims this id from here", which is not the same
 // answer as a widget whose root is the page itself.
 function widgetRootPathFor(graphNodeId: string, instancePath: string): string | undefined {
+	const widgetRootPaths = marklessWidgetScope.active.rootPaths;
 	if (widgetRootPaths.size === 0) return undefined;
 	// The id is either a definition id (`shared:<file>#<export>`) or one of its
 	// nodes (`<definitionId>/<kind>:<name>`). The definition id carries the module
