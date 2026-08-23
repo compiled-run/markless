@@ -209,6 +209,7 @@ export function SelectContent({ children, onKeydown, ...rest }: SelectContentPro
 			const isTypeaheadChar = key.length === 1 && key !== ' ';
 			const isNavigationKey =
 				key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End';
+			// Enter, Space, and Tab choose the focused option as the value.
 			const isSelectionKey = key === 'Enter' || key === ' ' || key === 'Tab';
 
 			if (isTypeaheadChar) {
