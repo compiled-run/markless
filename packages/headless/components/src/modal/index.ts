@@ -1,4 +1,5 @@
 export {
+	ModalBackdrop as backdrop,
 	ModalClose as close,
 	ModalContent as content,
 	ModalDescription as description,
@@ -9,9 +10,12 @@ export {
 	modalState as state,
 } from './modal.tsrx';
 export type {
+	ModalBackdropProps,
 	ModalCloseProps,
 	ModalContentProps,
 	ModalDescriptionProps,
+	ModalDismissEvent,
+	ModalDismissReason,
 	ModalRootProps,
 	ModalTitleProps,
 	ModalTriggerProps,

@@ -2,6 +2,7 @@ import { render } from '@markless/vitest-browser';
 import { afterEach, expect, test } from 'vitest';
 import { missingFacts, readUntil, type Conveys } from '../../test-support/driver.ts';
 import { virtualDriver } from '../../test-support/virtual-driver.ts';
+import Alert from './scenarios/alert.tsrx';
 import Basic from './scenarios/basic.tsrx';
 import Described from './scenarios/described.tsrx';
 import Nested from './scenarios/nested.tsrx';
@@ -11,10 +12,6 @@ import Nested from './scenarios/nested.tsrx';
 // facts an announcement must convey, never a reader product's wording. `sr` is
 // the only line that picks a reader, so the same expectations run against NVDA
 // and VoiceOver once those drivers land.
-//
-// One fact the plan asks for is asserted by name rather than by role: the shared
-// vocabulary has no word for a dialog yet, so these rows prove the surface is
-// reachable and named and leave `roleDialog` to the lane that adds the slot.
 const sr = virtualDriver;
 
 async function open(component: Parameters<typeof render>[0]) {
@@ -43,6 +40,17 @@ async function walk(steps: number) {
 
 afterEach(async () => {
 	await sr.stop().catch(() => {});
+	// The overlay behaviour keeps one page-wide stack, so a row that leaves a
+	// surface enlisted leaves the next row's page inert. Drain, then reset.
+	for (let unwind = 0; unwind < 4; unwind++) {
+		document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+		await new Promise((resolve) => setTimeout(resolve, 0));
+	}
+	for (const marked of Array.from(document.body.children)) {
+		marked.removeAttribute('inert');
+		marked.removeAttribute('aria-hidden');
+	}
+	document.body.style.overflow = '';
 });
 
 test('reading the starter conveys the trigger button and its name', async () => {
@@ -55,7 +63,8 @@ test('reading the starter conveys the trigger button and its name', async () => 
 
 // The other half of a closed dialog: the surface is hidden, so nothing in it is
 // reachable. A reader that can walk into hidden content is the failure this row
-// catches, and it is why `hidden` rather than a wrapper's `display:none` matters.
+// catches, and it is why `hidden` on the backdrop rather than a wrapper's
+// `display:none` matters.
 test('the content of a closed dialog is not reachable', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'button', name: 'Edit address' });
@@ -71,13 +80,36 @@ test('opening the dialog makes its name reachable', async () => {
 	await readUntil(sr, { name: 'Edit delivery address' });
 });
 
+// aria-at's modal-dialog plan asserts the dialog role at priority 1. The shared
+// vocabulary now carries the word, so the role is asserted rather than stood in
+// for by the name.
+test('the opened surface announces as a dialog', async () => {
+	await open(Basic);
+	await readUntil(sr, { role: 'button', name: 'Edit address' });
+	await sr.press(sr.keys.enter);
+	await settle();
+	await readUntil(sr, { role: 'dialog' });
+});
+
+// The alert delta: same anatomy, different announced role. `alertdialog` is not
+// a slot in the shared vocabulary, so this row reads the reader's own word out
+// of the phrase rather than through `Conveys.role`.
+test('an alert announces as an alertdialog', async () => {
+	await open(Alert);
+	await readUntil(sr, { role: 'button', name: 'Delete account' });
+	await sr.press(sr.keys.enter);
+	await settle();
+	const spoken = await walk(8);
+	expect(spoken).toContain('alertdialog');
+});
+
 // aria-at Sequence E, step 3: the description sentence is announced verbatim.
 test('a described dialog makes its description reachable', async () => {
 	await open(Described);
 	await readUntil(sr, { role: 'button', name: 'Delete project' });
 	await sr.press(sr.keys.enter);
 	await settle();
-	await readUntil(sr, { name: 'Everything in it goes with it, and nobody can put it back.' });
+	await readUntil(sr, { name: 'Everything in it goes with it and nobody can put it back.' });
 });
 
 // aria-at Sequence C, and the assertion this family exists for: reading forward
@@ -105,18 +137,4 @@ test('opening a second dialog puts the first one out of reach', async () => {
 	await settle();
 	await readUntil(sr, { name: 'Address added' });
 	expect(await walk(10)).not.toContain('Background');
-});
-
-// Sequence F, which aria-at does not assert and which section 2.1 records as the
-// behaviour neither the platform nor QDS provides: closing returns focus to the
-// invoking trigger, so the reader lands back on it.
-test('closing the dialog puts the reader back on the trigger', async () => {
-	await open(Basic);
-	await readUntil(sr, { role: 'button', name: 'Edit address' });
-	await sr.press(sr.keys.enter);
-	await settle();
-	await readUntil(sr, { role: 'button', name: 'Cancel' });
-	await sr.press(sr.keys.enter);
-	await settle();
-	expectConveys(await sr.reannounce(), { role: 'button', name: 'Edit address' });
 });

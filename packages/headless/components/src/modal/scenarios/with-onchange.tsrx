@@ -24,10 +24,12 @@ export default function WithOnChange() @{
 					log.order = log.order + '-click';
 				}}
 			>Shipping</modal.trigger>
-			<modal.content data-testid="first-content">
-				<modal.title data-testid="first-title">Shipping</modal.title>
-				<modal.close data-testid="first-close">Done</modal.close>
-			</modal.content>
+			<modal.backdrop data-testid="first-backdrop">
+				<modal.content data-testid="first-content">
+					<modal.title data-testid="first-title">Shipping</modal.title>
+					<modal.close data-testid="first-close">Done</modal.close>
+				</modal.content>
+			</modal.backdrop>
 		</modal.root>
 		<modal.root
 			data-testid="second-root"
@@ -37,10 +39,12 @@ export default function WithOnChange() @{
 			}}
 		>
 			<modal.trigger data-testid="second-trigger">Returns</modal.trigger>
-			<modal.content data-testid="second-content">
-				<modal.title data-testid="second-title">Returns</modal.title>
-				<modal.close data-testid="second-close">Done</modal.close>
-			</modal.content>
+			<modal.backdrop data-testid="second-backdrop">
+				<modal.content data-testid="second-content">
+					<modal.title data-testid="second-title">Returns</modal.title>
+					<modal.close data-testid="second-close">Done</modal.close>
+				</modal.content>
+			</modal.backdrop>
 		</modal.root>
 		<p data-testid="first-value">{log.first}</p>
 		<p data-testid="second-value">{log.second}</p>
