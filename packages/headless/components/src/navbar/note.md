@@ -223,6 +223,90 @@ Note that the collections this family walks include **consumer-written links**
 have to work for a part that roots no instance of its own, not only for
 `navbar.item`.
 
+## Overlay primitive: adoption attempted and measured 2026-08-23 (U219)
+
+The owner's order is that this family's dropdowns ride the overlay primitive
+(`packages/web/src/fns/overlay.ts`, kind `disclosure`) instead of hand-rolled
+dismissal and focus return. **The conversion was written and measured on this
+tip, and it does not hold. The shipped code in this folder is UNCHANGED.** Four
+walls, in the order they stopped the work. None of them is family-side, and
+three of them are outside this family's file contract.
+
+Baseline before and after the probes: 47/47 green.
+
+**1. The primitive's `onDismiss` cannot write the family's state. Fatal, and it
+is a compile error rather than a silent failure.** `onDismiss` is the only way
+the family learns the primitive closed a surface, and the navbar's "which
+dropdown is showing" is a `shared()` widget instance. Writing the obvious
+callback —
+
+```js
+openOverlay(item.contentEl, {
+    kind: 'disclosure',
+    onDismiss: () => { navbar.closeAll(); },   // refused
+});
+```
+
+— is `MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE`: *"The emitted
+event-handler module for symbol:5 still names `navbar` directly … this module
+would throw a ReferenceError the first time it runs."* This is the same wall
+"What the runtime forced" §2 records for the hover timer, met from the other
+side: a shared-instance read is rewritten at the handler symbol's top level and
+not inside a nested closure. The `overlay-primitive.tsrx` fixture does not hit it
+because its `onDismiss` writes **component-local** `state()` cells, not a shared
+instance. Without `onDismiss` the graph never learns the surface closed:
+`aria-expanded` stays `"true"` and the panel stays shown. Measured with the rest
+of the conversion in place and `onDismiss` dropped: **44/47, and the three reds
+are exactly the three Escape rows** (`CSR: escape inside a dropdown …`, `CSR:
+escape on the trigger …`, `SSR: escape after resume …`), each `expected 'true' to
+be 'false'` on `aria-expanded`.
+
+**2. A widget-scoped `element()` handle read in a handler answers for the wrong
+item.** This is the select family's defect 63 (`src/select/note.md`, "What a
+handler cannot reach" §1) landing here exactly as that note predicts. The read
+compiles and emits `getElementHandle`, but `handleId` is one module-level string
+shared by every instance of the widget and the resume map is flat, so last
+registration wins. Measured directly, clicking the **Products** trigger in
+`basic.tsrx` with the conversion in place:
+
+```
+{ productsOverlayOpen: false, docsOverlayOpen: true,
+  active: "docs-itemtrigger", productsHidden: true, docsHidden: true }
+```
+
+The primitive was handed the **Docs** panel and focus landed on the **Docs**
+trigger. Every scenario in this suite has more than one item, so this is not an
+edge case: it is every dropdown but the last one on the page. `aria-controls`
+keeps working for the reason it always has — the id is minted on the element
+itself, not looked up through the flat map.
+
+**3. `openOverlay` always moves focus into the surface, and a navbar dropdown
+must not take focus when it opens.** A click on a disclosure trigger leaves focus
+on the trigger, and a hover-open must move focus nowhere at all — moving it is a
+serious accessibility fault, not a cosmetic one. The primitive offers no way to
+open without focusing: `initialFocus` only *redirects* the move (defaulting to
+the surface, with a `tabindex="-1"` added to it). Pointing `initialFocus` at the
+trigger was the closest available shape, and wall 2 is what made even that land
+on the wrong control. What would close it: an option on `OverlayOptions` that
+suppresses the focus move entirely for `disclosure`.
+
+**4. `@markless/ui` cannot import the primitive.** `packages/headless/components/package.json`
+declares only `@markless/core`, so `@markless/web/fns/overlay` does not resolve
+from this package. The measurements above used a relative cross-package path
+(`../../../../web/src/fns/overlay.ts`) as a probe only; that path is not
+shippable. The dependency edit is outside this family's file contract.
+
+What the adoption would remove, once walls 1–3 are closed: the three hand-rolled
+`Escape` branches (on `itemtrigger`, `itemcontent` and `itemlink`), each of which
+today closes the navbar and then walks the DOM to put focus back on the button —
+`box?.querySelector('[aria-expanded]')` — plus `Escape` from the three
+`preventDefault` guard lists. Light dismiss on an outside press would be **new**
+behaviour rather than a replacement: this family does not offer it today (see the
+QDS comparison table above), and QDS gets it from `popover="auto"`, so adopting
+the primitive brings the family closer to the reference rather than further. The
+focus-movement walks are untouched either way; they need the ordered collection
+that nothing builds, and that is the separate open owner decision.
+
 ## Panels stay mounted
 
 `hidden` decides whether a dropdown shows; an arm never does. The trigger's
