@@ -325,41 +325,40 @@ test('SSR: the first write after resume re-derives a bound pattern', async () =>
 	await expect.poll(() => page.getByTestId('token').element()?.textContent).toBe('bravo');
 });
 
-// --- pinned on a framework defect -----------------------------------------
+// --- the secret stays off the widget --------------------------------------
 //
-// **A prop the part destructured out of its parameters still reaches the
-// element through `{...rest}`.** Measured on this tree: `QrCodeRoot` is written
-// `({ value, recovery = 'medium', children, ...rest })` and renders
-// `<div {...rest} role="img">`, and the served element comes back as
+// A prop the part destructured out of its parameters must not come back through
+// `{...rest}`. `QrCodeRoot` is written `({ value, recovery = 'medium',
+// children, ...rest })` and renders `<div {...rest} role="img">`, so `value` and
+// `recovery` are not in `rest` in the authored source and must not be written.
+// Before the spread lowering subtracted the destructured names the served
+// element came back as
 //
 //   <div data-testid="root" value="otpauth://totp/Acme:me@example.com?secret=…"
 //        recovery="quartile" aria-label="…" role="img">
 //
-// in BOTH modes. `value` and `recovery` are not in `rest` in the authored
-// source, so the spread lowering is not subtracting the destructured names.
+// in BOTH modes, which is why both rows below run in both.
 //
-// This is not specific to this family - every family here destructures its own
-// props the same way, so `collapsible.root` leaks `open`/`disabled` and
-// `progress.root` leaks `value`/`min`/`max` by the same route. It shows up here
-// because this is the one family where the leaked prop is the secret: the whole
-// point of dropping QDS's `QR code for ${value}` default name (research note
-// §2, defect 1) is that a TOTP secret must not be readable off the widget, and
-// an attribute carrying it is exactly as readable as a name carrying it.
-//
-// Both rows below are the assertions the family is supposed to be able to make.
-// Whoever lands the spread-subtraction fix deletes the `.fails`.
+// This is the one family where the leaked prop is the secret: the whole point of
+// dropping QDS's `QR code for ${value}` default name (research note §2, defect
+// 1) is that a TOTP secret must not be readable off the widget, and an attribute
+// carrying it is exactly as readable as a name carrying it.
 
-test.fails('the encoded value does not reach the root element as an attribute', async () => {
-	await render(Unnamed);
-	expect(el(Root).outerHTML).not.toContain('8f3a');
-	expect(el(Root).hasAttribute('value')).toBe(false);
-});
+for (const mode of MODES) {
+	test(`${mode}: the encoded value does not reach the root element as an attribute`, async () => {
+		if (mode === 'CSR') await render(Unnamed);
+		else await renderSSR(Unnamed);
+		expect(el(Root).outerHTML).not.toContain('8f3a');
+		expect(el(Root).hasAttribute('value')).toBe(false);
+	});
 
-test.fails('a TOTP secret never appears anywhere in the code\'s own markup', async () => {
-	await render(TwoFactorSetup);
-	const markup = el(Root).outerHTML;
-	expect(markup).not.toContain(TOTP_SECRET);
-	expect(markup).not.toContain('otpauth');
-	expect(markup).not.toContain('me@example.com');
-	expect(el(Root).hasAttribute('recovery')).toBe(false);
-});
+	test(`${mode}: a TOTP secret never appears anywhere in the code's own markup`, async () => {
+		if (mode === 'CSR') await render(TwoFactorSetup);
+		else await renderSSR(TwoFactorSetup);
+		const markup = el(Root).outerHTML;
+		expect(markup).not.toContain(TOTP_SECRET);
+		expect(markup).not.toContain('otpauth');
+		expect(markup).not.toContain('me@example.com');
+		expect(el(Root).hasAttribute('recovery')).toBe(false);
+	});
+}

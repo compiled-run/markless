@@ -69,24 +69,24 @@ test('the signature reaches the emitted record, so a reader can tell what the sp
 	expect(slot?.destructuredNames).toEqual(['value', 'recovery', 'children']);
 });
 
-// --- pinned on the defect this unit was cut for --------------------------
+// --- the defect this unit was cut for ------------------------------------
 //
-// `destructuredNames` reaches the emitted slot but nothing subtracts it: the
-// renderer only consults `excludeNames`, so `<div {...rest} role="img">` serves
-// `value="otpauth://…secret…" recovery="quartile"` in both modes. Deleting the
-// `.fails` is the assertion the fix has to satisfy. The one origin of this slot
-// is `packages/compiler/src/passes/semantic-graph/collect-markup.ts` (the
-// `spread-attributes` case around line 382); `passes/render-data/index.ts`
-// hands `semanticGraph.markup.chunks` through untouched.
+// `destructuredNames` reached the emitted slot but nothing subtracted it: the
+// renderer only consults `excludeNames`, so `<div {...rest} role="img">` served
+// `value="otpauth://…secret…" recovery="quartile"` in both modes. The fix folds
+// the destructured names into `excludeNames` at the one origin of this slot,
+// `packages/compiler/src/passes/semantic-graph/collect-markup.ts` (the
+// `spread-attributes` case); `passes/render-data/index.ts` hands
+// `semanticGraph.markup.chunks` through untouched.
 
-test.fails('a destructured prop is excluded from the spread it was taken out of', async () => {
+test('a destructured prop is excluded from the spread it was taken out of', async () => {
 	const [slot] = await spreadSlots(qrCodeRoot);
 	expect(slot?.excludeNames).toEqual(
 		expect.arrayContaining(['role', 'value', 'recovery', 'children']),
 	);
 });
 
-test.fails('the exclusion is structural, not the qr-code names', async () => {
+test('the exclusion is structural, not the qr-code names', async () => {
 	const [slot] = await spreadSlots(progressRoot);
 	expect(slot?.excludeNames).toEqual(
 		expect.arrayContaining(['aria-busy', 'min', 'max', 'amount', 'kids']),
