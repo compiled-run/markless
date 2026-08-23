@@ -2,11 +2,11 @@
  * Every DOM query this family makes, in one module.
  *
  * Two framework walls put them here, both measured on this tip and written up in
- * `note.md`: a handler can reach no element but its own `event.target`, and
- * nothing yields the rows of a repeated part in order. Until those close, a hop
- * to a sibling part and a walk over the options have to be asked of the
- * document. When they close this file is deleted and the handlers in
- * `select.tsrx` keep the shape they already have.
+ * `note.md`: a handle read in a handler answers for one widget on the page
+ * rather than the handler's own, and nothing yields the rows of a repeated part
+ * in order. Until those close, a hop to a sibling part and a walk over the
+ * options have to be asked of the document. When they close this file is deleted
+ * and the handlers in `select.tsrx` keep the shape they already have.
  *
  * Each function takes the element the gesture happened on and does one job, so a
  * handler never holds a DOM reference of its own.
