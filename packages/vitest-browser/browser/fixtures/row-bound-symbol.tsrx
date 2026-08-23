@@ -57,6 +57,79 @@ function RowCounter({ label, onBump }) @{
 	>{hits}</button>
 }
 
+// --- pagination's full shape: two widget families, one nested in the other ---
+//
+// `navWidget` is rooted OUTSIDE the repeat and holds the page. `seatWidget` is
+// rooted by the ITEM part, which the consumer writes INSIDE the repeat, so one
+// seat instance exists per rendered row. The trigger nested inside the item
+// reads BOTH: the row's own seat and the root's page. That is
+// `pagination.root` / `pagination.item` / `pagination.itemtrigger` exactly.
+const navWidget = shared(
+	() => {
+		const nav = state({ page: 1 });
+		return {
+			...nav,
+			// `value = 1` rather than a type annotation: the capture analysis parses
+			// this inlined body with a JavaScript-only parser, as the pagination
+			// family's own `goTo` explains.
+			goTo(value = 1) {
+				nav.page = value;
+			},
+		};
+	},
+	{ scope: 'widget' },
+);
+
+const seatWidget = shared(
+	() => {
+		const seat = state({ value: 1, hits: 0 });
+		return {
+			...seat,
+			hit() {
+				seat.hits = seat.hits + 1;
+			},
+		};
+	},
+	{ scope: 'widget' },
+);
+
+function NavRoot({ children }) @{
+	const nav = navWidget();
+	<div data-nav-root data-nav-page={nav.page}>{children}</div>
+}
+
+// The item seeds its own seat and is the widget root every control inside it
+// resolves to. It reads the root's page as well, so its rendered attribute
+// proves the page moved without asking the trigger.
+function NavItem({ value, children }) @{
+	const nav = navWidget();
+	const seat = seatWidget();
+	seat.value = value;
+	<div
+		data-nav-item={value}
+		data-nav-hits={seat.hits}
+		data-nav-active={nav.page === seat.value}
+	>{children}</div>
+}
+
+// `onClick` is what makes this handler a BOUND symbol, as `PaginationItemTrigger`'s
+// does. `seat.hit()` moves THIS row's item widget; `nav.goTo(seat.value)` moves
+// the root's page and can only send the right number if the row's own seat is
+// what the dispatch read.
+function NavItemTrigger({ onClick }) @{
+	const nav = navWidget();
+	const seat = seatWidget();
+	<button
+		type="button"
+		data-nav-trigger={seat.value}
+		onClick={(event) => {
+			seat.hit();
+			nav.goTo(seat.value);
+			onClick?.(event);
+		}}
+	>{seat.hits}</button>
+}
+
 // `data-outside-widget` is pagination's own shape: one root OUTSIDE the repeat,
 // owning a single widget graph, with every interactive part projected from
 // INSIDE a row. Each trigger's record then carries a row segment no widget root
@@ -64,9 +137,16 @@ function RowCounter({ label, onBump }) @{
 export default function RowBoundSymbolPage() @{
 	let bumps = state(0);
 	let widgetBumps = state(0);
+	let navCalls = state(0);
 	let rows = state([
 		{ key: 'alpha', label: 'alpha', open: true },
 		{ key: 'beta', label: 'beta', open: true },
+	]);
+	let seats = state([
+		{ key: 'seat:1', value: 1, kind: 'page' },
+		{ key: 'seat:2', value: 2, kind: 'page' },
+		{ key: 'gap', value: 0, kind: 'gap' },
+		{ key: 'seat:3', value: 3, kind: 'page' },
 	]);
 
 	<main>
@@ -96,6 +176,25 @@ export default function RowBoundSymbolPage() @{
 			<WidgetRoot>
 				<WidgetTrigger onBump={() => { widgetBumps++; }} />
 			</WidgetRoot>
+		</div>
+
+		<output data-nav-calls>{navCalls}</output>
+		<div data-nav>
+			<NavRoot>
+				<ul data-nav-seats>
+					@for (const entry of seats; key entry.key) {
+						<li>
+							@if (entry.kind === 'page') {
+								<NavItem value={entry.value}>
+									<NavItemTrigger onClick={() => { navCalls++; }} />
+								</NavItem>
+							} @else {
+								<span data-nav-gap>…</span>
+							}
+						</li>
+					}
+				</ul>
+			</NavRoot>
 		</div>
 
 		<div data-outside-widget>

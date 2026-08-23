@@ -226,8 +226,11 @@ export function marklessInstanceScopedGraph(
 		if (definition.scope === 'widget') {
 			const rootPath = marklessInstancePath(definition.id);
 			widgetRootPaths.set(definition.id, rootPath);
-			for (const projectionId of definition.projectionIds ?? [])
+			noteWidgetRoot(definition.id, rootPath);
+			for (const projectionId of definition.projectionIds ?? []) {
 				widgetRootPaths.set(projectionId, rootPath);
+				noteWidgetRoot(projectionId, rootPath);
+			}
 		}
 	// Page-space families (shared, storage) keep their page ids through every adapter.
 	const qualify = (graphNodeId: string) => marklessComposedGraphNodeId(graphNodeId, instancePath);
@@ -261,8 +264,27 @@ const PAGE_SPACE_ID = /^((?:[cp]\d+:|r:[^:]*:)*)(shared|storage):/;
 // with no widget-scoped definition never fills it and never pays for the lookup.
 const widgetRootPaths = new Map<string, string>();
 
+/**
+ * The definitions at least one of whose rendered roots stands inside a repeat.
+ *
+ * Such a widget has one graph per ROW, so which graph an id names is runtime
+ * identity - and the reading instance path of a dispatched bound symbol carries
+ * no row, because a bound symbol is minted per component EDGE. This set is what
+ * tells the two failures apart below: an id no widget claims at all, and an id
+ * whose widget is real but whose row has yet to arrive.
+ */
+const rowRootedDefinitions = new Set<string>();
+
+function noteWidgetRoot(id: string, rootPath: string): void {
+	if (rootPath.includes('r:')) rowRootedDefinitions.add(id.slice(marklessInstancePath(id).length));
+}
+
 export function marklessRegisterWidgetInstanceIds(ids: Iterable<string>): void {
-	for (const id of ids) widgetRootPaths.set(id, marklessInstancePath(id));
+	for (const id of ids) {
+		const rootPath = marklessInstancePath(id);
+		widgetRootPaths.set(id, rootPath);
+		noteWidgetRoot(id, rootPath);
+	}
 }
 
 // A part is a SIBLING of the root composition placed it in (`c0:p1:` beside
@@ -271,7 +293,10 @@ export function marklessRegisterWidgetInstanceIds(ids: Iterable<string>): void {
 export function marklessRegisterWidgetProjections(
 	entries: Iterable<readonly [string, string]>,
 ): void {
-	for (const [id, rootPath] of entries) widgetRootPaths.set(id, rootPath);
+	for (const [id, rootPath] of entries) {
+		widgetRootPaths.set(id, rootPath);
+		noteWidgetRoot(id, rootPath);
+	}
 }
 
 // The widget this child-local `shared:` id belongs to: the answer registered for
@@ -297,6 +322,39 @@ function marklessWidgetRootPathThroughRows(graphNodeId: string, instancePath: st
 	const rowFree = instancePath.replace(ROW_SEGMENT, '');
 	if (rowFree === instancePath) return '';
 	return widgetRootPathFor(graphNodeId, rowFree) ?? '';
+}
+
+/**
+ * The two spellings of one containment, and the one that has to wait for a row.
+ *
+ * A widget root is filed under the path it RENDERED at, rows and all
+ * (`r:page%3A5:c0:p2:`). A dispatching bound symbol runs at the compose tree's
+ * path for that same containment, which names the component edges and no row
+ * (`c0:p2:p3:`) - a bound symbol is minted per edge, and a row key is a runtime
+ * value no symbol id can hold. Neither spelling is a prefix of the other, so the
+ * walk above can never get from one to the other on its own.
+ *
+ * Leaving the id in page space here is what breaks the projection bridge: the
+ * write lands on an id no rendered widget owns, the record matches, the symbol
+ * runs, and nothing moves. Keeping the reading path ON the id instead hands the
+ * question to `marklessRowWidgetGraphNodeId`, which is spelled for exactly this
+ * input - it holds the dispatched record's rows and re-asks the registry with
+ * them, reaching the ONE root this row rendered. An alias resolved at lookup,
+ * never a second registry entry, so one containment still yields one instance.
+ *
+ * Two guards keep that from minting a phantom instance instead. The path must
+ * carry no row of its own, because a path that already names its rows and STILL
+ * found no root is not waiting on one. And the definition must be one some row
+ * really did root: an id belonging to no widget at all - a page-scoped
+ * `shared()` graph, a storage slot - is page space and stays exactly as spelled.
+ */
+function marklessUnresolvedWidgetGraphNodeId(graphNodeId: string, instancePath: string): string {
+	if (instancePath.includes('r:') || rowRootedDefinitions.size === 0) return graphNodeId;
+	const slash = graphNodeId.lastIndexOf('/');
+	const rowRooted =
+		rowRootedDefinitions.has(graphNodeId) ||
+		(slash > 0 && rowRootedDefinitions.has(graphNodeId.slice(0, slash)));
+	return rowRooted ? instancePath + graphNodeId : graphNodeId;
 }
 
 // `undefined` is "no widget claims this id from here", which is not the same
@@ -330,9 +388,10 @@ export function marklessComposedGraphNodeId(graphNodeId: string, instancePath: s
 	if (pageSpace[2] === 'storage') return graphNodeId;
 	// Only a widget lookup writes a prefix onto a `shared:` id, so a prefixed one
 	// names a widget root: composing it AGAIN is another rendered widget.
-	return pageSpace[1]
-		? instancePath + graphNodeId
-		: marklessWidgetRootPathThroughRows(graphNodeId, instancePath) + graphNodeId;
+	if (pageSpace[1]) return instancePath + graphNodeId;
+	const rootPath = marklessWidgetRootPathThroughRows(graphNodeId, instancePath);
+	if (rootPath) return rootPath + graphNodeId;
+	return marklessUnresolvedWidgetGraphNodeId(graphNodeId, instancePath);
 }
 
 // Composed child-owned boundaries load their update symbol through the

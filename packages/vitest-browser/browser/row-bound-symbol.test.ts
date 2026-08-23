@@ -297,6 +297,147 @@ test('SSR: a resumed bound handler writes a widget rooted outside every row', as
 	await expect.poll(() => widgetBumps(container)).toBe('1');
 });
 
+// --- pagination's full shape: a root outside the loop, an item widget per row --
+//
+// The two previous sections each hold ONE widget family. This one holds two at
+// once, nested the way pagination's anatomy nests them: `navWidget` rooted
+// outside the repeat carries the page, `seatWidget` rooted by the ITEM part
+// inside the repeat carries that row's own cells, and the trigger nested inside
+// the item reads both.
+//
+// Measured on the base this section was written against, by dumping the
+// widget-root registry during pagination's own `Products` render and its click
+// on page 5. At render every item root is filed under the row it rendered in -
+// `r:page%3A5:c0:p2:` - and the root under `c0:`. At dispatch the bound symbol's
+// graph runs at `c0:p2:p3:`, the ROW-FREE spelling of the same containment. The
+// root resolves (`c0:` carries no row), the item does not: no registry key is
+// spelled without a row, so `#paginationItemState/state:item` stays in page
+// space and `goTo(item.value)` reads a node no rendered widget owns. The write
+// still lands, with the wrong number, which is why nothing appears to move.
+//
+// So the two spellings of one containment are the RENDERED path the registry
+// files roots under and the row-free compose path a bound symbol dispatches
+// with, and the dispatched record's row is the only thing that can join them.
+function navRoot(container: HTMLElement): HTMLElement {
+	const found = container.querySelector<HTMLElement>('[data-nav-root]');
+	if (!found) throw new Error('Expected the nav root outside the repeat.');
+	return found;
+}
+
+function navItem(container: HTMLElement, value: number): HTMLElement {
+	const found = container.querySelector<HTMLElement>(`[data-nav-item="${value}"]`);
+	if (!found) throw new Error(`Expected the item for page ${value}.`);
+	return found;
+}
+
+function navTrigger(container: HTMLElement, value: number): HTMLButtonElement {
+	const found = navItem(container, value).querySelector<HTMLButtonElement>('[data-nav-trigger]');
+	if (!found) throw new Error(`Expected the trigger inside the item for page ${value}.`);
+	return found;
+}
+
+// The root's page, plus every item's own hit count and whether it reads itself
+// as the current one. Item state and root state are asserted together on every
+// click, so a fix that moves one without the other is caught.
+function navReading(container: HTMLElement): {
+	page: string;
+	hits: Record<number, string>;
+	active: Record<number, string>;
+} {
+	const hits: Record<number, string> = {};
+	const active: Record<number, string> = {};
+	for (const value of [1, 2, 3]) {
+		hits[value] = navItem(container, value).getAttribute('data-nav-hits') ?? '';
+		active[value] = navItem(container, value).getAttribute('data-nav-active') ?? '';
+		// The trigger renders the same seat cell the item's attribute does, from
+		// one instance path deeper, so both are asserted.
+		if (navTrigger(container, value).textContent !== hits[value])
+			throw new Error(`Item ${value} and its trigger disagree on the seat's hits.`);
+	}
+	return {
+		page: navRoot(container).getAttribute('data-nav-page') ?? '',
+		hits,
+		active,
+	};
+}
+
+function navCalls(container: HTMLElement): string {
+	return container.querySelector('[data-nav-calls]')?.textContent ?? '';
+}
+
+async function expectTheRowsItemAndTheRootBothMove(container: HTMLElement): Promise<void> {
+	expect(navReading(container)).toEqual({
+		page: '1',
+		hits: { 1: '0', 2: '0', 3: '0' },
+		active: { 1: 'true', 2: '', 3: '' },
+	});
+
+	// Page 3 sits past the gap row, so its seat is neither the first nor the last
+	// rendered item: a fix that lands on a fixed row rather than the dispatched
+	// one is caught.
+	navTrigger(container, 3).click();
+	await expect.poll(() => navReading(container)).toEqual({
+		page: '3',
+		hits: { 1: '0', 2: '0', 3: '1' },
+		active: { 1: '', 2: '', 3: 'true' },
+	});
+
+	navTrigger(container, 2).click();
+	await expect.poll(() => navReading(container)).toEqual({
+		page: '2',
+		hits: { 1: '0', 2: '1', 3: '1' },
+		active: { 1: '', 2: 'true', 3: '' },
+	});
+
+	navTrigger(container, 2).click();
+	await expect.poll(() => navReading(container)).toEqual({
+		page: '2',
+		hits: { 1: '0', 2: '2', 3: '1' },
+		active: { 1: '', 2: 'true', 3: '' },
+	});
+
+	// The consumer's own callback is a page-space cell reached through the bound
+	// symbol's capture adapter, counted once per click and never dragged into a row.
+	await expect.poll(() => navCalls(container)).toBe('3');
+}
+
+test("CSR: a row's item widget and the root outside the loop both move on one click", async () => {
+	const screen = await render(RowBoundSymbolPage);
+	await expectTheRowsItemAndTheRootBothMove(screen.container as HTMLElement);
+});
+
+test("SSR: a resumed row's item widget and the root outside the loop both move", async () => {
+	const screen = await renderSSR(RowBoundSymbolPage);
+	await expectTheRowsItemAndTheRootBothMove(screen.container as HTMLElement);
+});
+
+// The other widgets on the page answer the same `shared()` machinery, so a fix
+// that reaches the nested item family by collapsing the single-family cases is
+// caught here rather than in pagination.
+test('CSR: the nested item family leaves every other widget on the page alone', async () => {
+	const screen = await render(RowBoundSymbolPage);
+	const container = screen.container as HTMLElement;
+
+	navTrigger(container, 3).click();
+	await expect.poll(() => navRoot(container).getAttribute('data-nav-page')).toBe('3');
+
+	expect(widgetTicks(container, 'alpha')).toEqual({ root: '0', trigger: '0' });
+	expect(widgetTicks(container, 'beta')).toEqual({ root: '0', trigger: '0' });
+	expect(pageWidgetTicks(container)).toEqual({ root: '0', trigger: '0' });
+	expect(outsideWidgetTicks(container)).toEqual({ root: '0', alpha: '0', beta: '0' });
+	expect(readings(container)).toEqual({ alpha: '0', beta: '0' });
+
+	// And the reverse direction: the per-row widgets still move on their own
+	// while the nested item family holds what it was given.
+	widgetTrigger(container, 'beta').click();
+	await expect.poll(() => widgetTicks(container, 'beta')).toEqual({ root: '1', trigger: '1' });
+	expect(navReading(container)).toEqual({
+		page: '3',
+		hits: { 1: '0', 2: '0', 3: '1' },
+		active: { 1: '', 2: '', 3: 'true' },
+	});
+});
+
 // Both directions in one dispatch sequence: a root inside a row and a root
 // outside every row answer the SAME `shared()` call from the same part, so a fix
 // that resolves one by losing the other is caught here rather than in pagination.
