@@ -1,5 +1,10 @@
 import type { RuntimeGraph } from '@markless/runtime';
 import { protocolEventDispatchesMarkless } from '@markless/serializer/protocol';
+import {
+	marklessInstancePath,
+	marklessRecordRowScope,
+	marklessRowScopedGraph,
+} from './fns/instance-scope.ts';
 import type {
 	ElementHandleRegistry,
 	ResumeDispatchOptions,
@@ -167,8 +172,20 @@ export function createEventWiring(input: {
 			}
 			const activation = input.activateBehaviorsFromTrigger(eventRecord.hostNodeId);
 			if (activation) await activation;
+			// Which rendered row this record belongs to. A bound symbol's id names
+			// only the component edge, so without this the handler for row B would
+			// spell the same node as the handler for row A - the write lands
+			// nowhere, or worse, on the wrong row.
+			const rowScope = marklessRecordRowScope(eventRecord.hostNodeId);
 			const runSymbol = async (symbolId: string, context: ResumeSymbolContext) =>
-				(await input.loadSymbol(symbolId))({ ...context, invokeCallback, invokeSymbol });
+				(await input.loadSymbol(symbolId))({
+					...context,
+					...(rowScope && isBoundSymbolId(symbolId)
+						? { graph: marklessRowScopedGraph(context.graph, rowScope) }
+						: {}),
+					invokeCallback,
+					invokeSymbol,
+				});
 			// A symbol reached through a callback slot runs inside a dispatching
 			// body no caller awaits, so its failure is reported here rather than
 			// escaping the dispatch as an unhandled rejection.
@@ -309,6 +326,14 @@ export function createEventWiring(input: {
 			: {}),
 		dispatch,
 	};
+}
+
+// Only a bound symbol needs the row threaded in: every other id reaches its
+// instance through the path it already carries, which the loader boundary
+// consumes. A nested compose may have prefixed the bound id, so the reading is
+// taken past any instance path.
+function isBoundSymbolId(symbolId: string): boolean {
+	return symbolId.slice(marklessInstancePath(symbolId).length).startsWith('bound:');
 }
 
 function recordDebugInteraction(root: Element, element: Element, eventName: string, record: any) {
