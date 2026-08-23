@@ -201,9 +201,32 @@ test('CSR: a part that guards an optional event prop out of a rest spread reache
 // So one of the part's own text update and the consumer's callback lands, never
 // both, and which one lands is decided by whether the symbol modules were
 // already loaded. Nothing is thrown and no violation is recorded either way.
-// That is a resume/runtime seam (module-warm state in @markless/web's resume
-// path or in the loaded bound-resolver adapter), not the compiler's
-// record-to-id mapping, and it is outside this unit's contract.
+//
+// U165 ruled OUT the one cause that had been proposed for it. The proposal was
+// the unawaited inlined dispatch: `inlineSharedMethodCalls`
+// (packages/compiler/src/passes/symbol-resolver.ts) replaces a call to a shared
+// method that dispatches to a consumer callback with an async IIFE, and it used
+// to leave that IIFE unawaited, so the statements the author wrote after the
+// call raced it. That defect was real and is fixed, and it does reorder the
+// collapsible family, whose `toggle()` calls `collapsible.onChange?.(open)`.
+//
+// It is not this row. `nkf` declares no callback slot, so `record()` dispatches
+// to nobody, and this part's handler compiles to a SYNCHRONOUS inline with no
+// await anywhere in it - measured on the emitted module for `NkfItem`:
+//
+//   export function symbol_0(context) {
+//     const event = context.event;
+//     (() => { context.graph.write({ ...path: ["keys"]... }); })();
+//     context.graph.read("prop:props", ["onKeyDown"])?.(event);
+//   }
+//
+// Both legs are already in authored order and neither is deferred, and the
+// module is not even async. So nothing about await ordering can move this row:
+// what fails is that `context.graph.read("prop:props", ["onKeyDown"])` answers
+// undefined in the warm state, which is the `prop:props` placeholder fallback
+// this file's header already describes. Still a resume/runtime seam, and still
+// outside this unit's contract - but now with the compiler-side explanation
+// eliminated by measurement rather than left open.
 test.fails('SSR resume: the same guarded rest-spread callback reaches its consumer', async () => {
 	const { errors, stop } = watchPageErrors();
 	const container = (await renderSSR(Page)).container;
