@@ -725,18 +725,30 @@ function emitSsrDataLines(
 		// part mints an id that names WHICH rendered widget it belongs to.
 		if (projectionChunkId !== undefined) {
 			projectionChunkByEdgeId.set(edge.id, projectionChunkId);
+			const surfaceArgs = childSurfaceArgsByEdgeId.get(edge.id) ?? `${component},undefined`;
+			const registerInstance = `marklessSsrSeeds.set(${JSON.stringify(
+				MARKLESS_WIDGET_INSTANCE_KEY,
+			)},marklessSsrIdPrefix+${
+				// A widget rooted per row is one instance per row, so the token its
+				// parts mint ids from names the row as well as the edge.
+				rowScopedEdges.has(edge.id)
+					? 'marklessSsrRowSegment(marklessSsrDataContext.repeatKey)+'
+					: ''
+			}${JSON.stringify(child.symbolPrefix)}+marklessSsrChildrenWidgetRoot(${surfaceArgs}));`;
+			// Defect 65: a projecting child that does NOT root a widget is a PART of
+			// the widget it was placed in, so the parts written inside it belong to
+			// that instance and it must not register a token of its own - the element
+			// its projected part binds would then mint an id the reference, spelled by
+			// the enclosing instance, does not spell. Which families a child roots is
+			// answered where that child was compiled, so a child this module cannot
+			// prove roots one asks the same marker the boundary check reads.
 			if (seedCall)
 				widgetInstanceLineByEdgeId.set(
 					edge.id,
-					`marklessSsrSeeds.set(${JSON.stringify(
-						MARKLESS_WIDGET_INSTANCE_KEY,
-					)},marklessSsrIdPrefix+${
-						// A widget rooted per row is one instance per row, so the token its
-						// parts mint ids from names the row as well as the edge.
-						rowScopedEdges.has(edge.id)
-							? 'marklessSsrRowSegment(marklessSsrDataContext.repeatKey)+'
-							: ''
-					}${JSON.stringify(child.symbolPrefix)}+marklessSsrChildrenWidgetRoot(${childSurfaceArgsByEdgeId.get(edge.id) ?? `${component},undefined`}));`,
+					!edge.importSource &&
+						widgetRootDefinitionIds(input, edge.childComponentName).length > 0
+						? registerInstance
+						: `if(marklessSsrWidgetRoots(${surfaceArgs}).length)${registerInstance}`,
 				);
 		}
 		// The composed child declares where ITS composition puts the children written
