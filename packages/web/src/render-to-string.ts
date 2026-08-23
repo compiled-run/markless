@@ -549,17 +549,28 @@ function renderInlineResumerScript(
 	return `<script data-async-resumer${nonceAttribute}${resumeModuleAttribute}${settleModuleAttribute}${selfWakeAttribute}>${escapeInlineScript(source + selfWakeSource)}</script>`;
 }
 
+/**
+ * Every sync policy the page ships, wherever it was recorded.
+ *
+ * A repeat row's handler carries its policy on the row record rather than on
+ * `events`, so scanning only `events` picks the policy-free resumer for a page
+ * whose policies all sit on rows - the policy data is served and nothing on the
+ * page can apply it.
+ */
+function viewSyncPolicies(view: ProtocolViewPayload): ReadonlyArray<ProtocolSyncPolicy> {
+	return [
+		...view.events,
+		...(view.keyedRepeats ?? []).flatMap((repeat) => repeat.rowEvents),
+	].flatMap((event) => (event.syncPolicy ? [event.syncPolicy] : []));
+}
+
 function hasSyncPolicies(view: ProtocolViewPayload): boolean {
-	return view.events.some((event) => !!event.syncPolicy);
+	return viewSyncPolicies(view).length > 0;
 }
 
 function hasGraphSyncPolicies(view: ProtocolViewPayload): boolean {
-	return view.events.some(
-		(event) =>
-			!!event.syncPolicy &&
-			syncPolicyBranches(event.syncPolicy).some((branch) =>
-				syncPolicyConditionReadsGraph(branch.when),
-			),
+	return viewSyncPolicies(view).some((policy) =>
+		syncPolicyBranches(policy).some((branch) => syncPolicyConditionReadsGraph(branch.when)),
 	);
 }
 

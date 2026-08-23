@@ -2951,6 +2951,97 @@ test('renderToString emits the resumer for keyed-repeat row events', async () =>
 	expect(html).toContain('eventRecord: null');
 });
 
+test('renderToString selects the policy-capable resumer for a row-borne sync policy', async () => {
+	const html = await renderToString(
+		() => ({
+			html: '<section><article><h2>Alpha</h2><button>Choose</button></article></section>',
+			state: createProtocolStatePayload({
+				cells: [
+					{ graphNodeId: 'state:menu', name: 'menu', valueKind: 'object', value: { open: true } },
+				],
+			}),
+			view: {
+				version: ASYNC_PROTOCOL_VERSION,
+				locators: [],
+				// The page's ONLY policy sits on a repeat row. Scanning `events` alone
+				// would ship the policy data with a resumer that cannot apply it.
+				events: [],
+				domUpdates: [],
+				behaviors: [],
+				elementHandles: [],
+				asyncBoundaries: [],
+				keyedRepeats: [
+					{
+						id: 'repeat:0',
+						parentHostNodeId: 'h1',
+						collectionGraphNodeId: 'state:entries',
+						collectionPath: [],
+						keyPath: ['code'],
+						itemName: 'entry',
+						rowElementCount: 3,
+						rowEvents: [
+							{
+								hostPath: [1],
+								eventName: 'click',
+								symbolIds: ['symbol:0'],
+								syncPolicy: {
+									when: {
+										type: 'and',
+										conditions: [
+											{ type: 'graph-truthy', graphNodeId: 'state:menu', path: ['open'] },
+											{ type: 'event-equals', field: 'button', value: 0 },
+										],
+									},
+									actions: ['preventDefault'],
+								},
+							},
+						],
+					},
+				],
+			},
+		}),
+		{ resumeModuleUrl: '/app.js' },
+	);
+
+	expect(html).toContain('__MARKLESS_INLINE_SYNC_POLICY__=true');
+	// The row policy reads the graph, so the graph-capable flavour is the one owed.
+	expect(html).toContain('__MARKLESS_INLINE_GRAPH_SYNC_POLICY__=true');
+});
+
+test('renderToString keeps the policy-free resumer when no row carries a sync policy', async () => {
+	const html = await renderToString(
+		() => ({
+			html: '<section><article><h2>Alpha</h2><button>Choose</button></article></section>',
+			state: createProtocolStatePayload({ cells: [] }),
+			view: {
+				version: ASYNC_PROTOCOL_VERSION,
+				locators: [],
+				events: [],
+				domUpdates: [],
+				behaviors: [],
+				elementHandles: [],
+				asyncBoundaries: [],
+				keyedRepeats: [
+					{
+						id: 'repeat:0',
+						parentHostNodeId: 'h1',
+						collectionGraphNodeId: 'state:entries',
+						collectionPath: [],
+						keyPath: ['code'],
+						itemName: 'entry',
+						rowElementCount: 3,
+						rowEvents: [{ hostPath: [1], eventName: 'click', symbolIds: ['symbol:0'] }],
+					},
+				],
+			},
+		}),
+		{ resumeModuleUrl: '/app.js' },
+	);
+
+	expect(html).toContain('__MARKLESS_INLINE_SYNC_POLICY__=false');
+	expect(html).toContain('__MARKLESS_INLINE_GRAPH_SYNC_POLICY__=false');
+});
+
 test('renderToString emits the resumer for keyed-repeat row events in a served async arm', async () => {
 	const html = await renderToString(
 		() => ({

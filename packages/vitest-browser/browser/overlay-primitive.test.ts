@@ -2,6 +2,7 @@ import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../src/index.ts';
 import NestedPage from './fixtures/overlay-nested-page.tsrx';
 import Page from './fixtures/overlay-primitive.tsrx';
+import ServedOpenPage from './fixtures/overlay-served-open-page.tsrx';
 
 // The overlay surface is the bare `overlay` attribute and nothing else. A marked
 // element joins the stack when it BECOMES shown; Escape and outside presses are
@@ -327,6 +328,75 @@ async function expectShownAtFirstRenderNeverEnlists(container: ParentNode) {
 	expect(parts(container).alwaysShownDismissals.textContent).toBe('0');
 }
 
+function servedParts(container: ParentNode) {
+	return {
+		outside: requireElement<HTMLButtonElement>(container, '[data-outside]'),
+		outsideCount: requireElement(container, '[data-outside-count]'),
+		servedOpen: requireElement<HTMLElement>(container, '[data-served-open]'),
+		servedDismissals: requireElement(container, '[data-served-dismissals]'),
+		servedReason: requireElement(container, '[data-served-reason]'),
+		inlineShown: requireElement<HTMLElement>(container, '[data-inline-shown]'),
+		inlineDismissals: requireElement(container, '[data-inline-dismissals]'),
+	};
+}
+
+async function expectServedOpenEnlistsAndInlineNever(container: ParentNode) {
+	const page = servedParts(container);
+	// Both are marked, both are shown, and neither carries `hidden` in the served
+	// DOM. The only thing that separates them is that one's visibility is bound,
+	// which no amount of looking at the DOM can answer - the payload's `hidden`
+	// attribute record is what names the bound one.
+	expect(page.servedOpen.hidden).toBe(false);
+	expect(page.inlineShown.hidden).toBe(false);
+
+	// The boundary this row also pins: the overlay behaviour starts with the
+	// resume runtime, and the runtime is woken by the first container event. Until
+	// something wakes it nothing is enlisted, so a page served with an open
+	// surface is not yet modal. That is a startup gate, not the behaviour's rule;
+	// the day the runtime wakes itself this line is what makes the change visible.
+	expect(page.outside.hasAttribute('inert')).toBe(false);
+
+	// Any container event does it. This one changes nothing about the surfaces.
+	page.outside.click();
+	await expect.poll(() => servedParts(container).outsideCount.textContent).toBe('1');
+
+	// With the behaviour started the bound surface is enlisted, with modality
+	// derived from its own aria-modal. It never transitioned out of `hidden`, so a
+	// flip cannot be what put it on the stack.
+	await expect.poll(() => servedParts(container).outside.hasAttribute('inert')).toBe(true);
+	expect(document.body.style.overflow).toBe('hidden');
+	// The unbound one is not what took those marks: it is not aria-modal, and it
+	// takes nothing.
+	expect(page.inlineShown.hasAttribute('aria-modal')).toBe(false);
+
+	// Escape reaches the enlisted surface and nothing else.
+	pressEscape(container);
+	await expect
+		.poll(() => {
+			const now = servedParts(container);
+			return {
+				dismissals: now.servedDismissals.textContent,
+				reason: now.servedReason.textContent,
+				hidden: now.servedOpen.hidden,
+			};
+		})
+		.toEqual({ dismissals: '1', reason: 'escape', hidden: true });
+	expect(servedParts(container).inlineDismissals.textContent).toBe('0');
+
+	// Its handler hid it, so it left the stack and gave the document back.
+	await expect.poll(() => servedParts(container).outside.hasAttribute('inert')).toBe(false);
+	expect(document.body.style.overflow).toBe('');
+
+	// With the stack empty the inline element is still the only marked thing
+	// showing, and it still receives nothing - not one report, not one mark.
+	pressEscape(container);
+	pointerDown(page.outside);
+	await settle();
+	expect(servedParts(container).inlineDismissals.textContent).toBe('0');
+	expect(servedParts(container).outside.hasAttribute('inert')).toBe(false);
+	expect(document.body.style.overflow).toBe('');
+}
+
 async function expectSurfaceNeverUnmounts(container: ParentNode) {
 	const before = parts(container).modalContent;
 	await openModal(container);
@@ -577,6 +647,16 @@ test('CSR: a marked element shown at first render never enlists', async () => {
 test('SSR resume: a marked element shown at first render never enlists', async () => {
 	const screen = await renderSSR(Page);
 	await expectShownAtFirstRenderNeverEnlists(screen.container);
+});
+
+test('CSR: a surface open because its hidden binding is false enlists, an unbound one never does', async () => {
+	const screen = await render(ServedOpenPage);
+	await expectServedOpenEnlistsAndInlineNever(screen.container as HTMLElement);
+});
+
+test('SSR resume: a surface open because its hidden binding is false enlists, an unbound one never does', async () => {
+	const screen = await renderSSR(ServedOpenPage);
+	await expectServedOpenEnlistsAndInlineNever(screen.container);
 });
 
 test('CSR: the surface stays attached across enlist and release', async () => {
