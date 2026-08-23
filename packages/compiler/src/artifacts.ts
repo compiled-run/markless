@@ -360,6 +360,11 @@ export type SemanticBranchSite = {
 	readonly kind: 'if' | 'switch';
 	readonly armCount: number;
 	readonly testSource: string;
+	// Set when the condition recombined reads the graph cannot name on their own
+	// (`!open`, `a === b`, `list.includes(x)`) into one synthetic computed. The
+	// site tests THAT node; `testSource` stays the authored text so a diagnostic
+	// quotes what the file says rather than a generated name.
+	readonly testComputedGraphNodeId?: string;
 	readonly anchorOrder: number;
 	// Inside an @try arm: excluded from the page comment-anchor stream; flip
 	// wiring (if any) lives in the owning boundary's arm coordinate space.
@@ -844,6 +849,7 @@ export type RenderDataBranch = {
 	readonly branchSiteId: string;
 	readonly kind: SemanticBranchSite['kind'];
 	readonly testSource: string;
+	readonly testComputedGraphNodeId?: string;
 	readonly testReads: ReadonlyArray<{
 		readonly graphNodeId: string;
 		readonly path: ReadonlyArray<string>;

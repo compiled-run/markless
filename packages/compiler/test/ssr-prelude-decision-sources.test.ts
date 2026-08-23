@@ -1,13 +1,18 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
 
-// A branch test the compiler cannot reduce to ONE graph read keeps its authored
-// source, and that source may spell shared-instance locals (`group`, `item`)
-// that appear nowhere in the component's markup. The SSR module builds its
-// prelude from markup residue alone, so those names reached `selectBranchArm`
-// unbound and the server threw `ReferenceError: group is not defined` while the
-// browser - whose reader unions the same decision sources into its prelude -
-// rendered the arm fine.
+// A branch test over more than one read used to reach `selectBranchArm` as
+// authored text, spelling shared-instance locals (`group`, `item`) that appear
+// nowhere in the component's markup; the server threw `ReferenceError: group is
+// not defined` while the browser rendered the arm fine, and the fix declared
+// those locals in the SSR prelude.
+//
+// That path is superseded, not deleted. A recombined condition is now lifted to
+// ONE synthetic computed at the semantic-graph level - the same mint the
+// attribute and prop positions use - so the arm reads a graph node by id and the
+// authored text survives only inside the derive the module seeds that node from.
+// These tests pin the current emission: the arm reads the node, the module seeds
+// it, and the two together decide the same way the author wrote.
 const twoInstanceBranch = `
 import { shared, state } from '@markless/core';
 
@@ -107,36 +112,63 @@ function callbackBody(source: string, key: string): string {
 	throw new Error(`unterminated ${key} callback`);
 }
 
-test('a branch test over two shared instances declares both locals in the SSR prelude', async () => {
-	const compiled = await compile('src/radio.tsrx', twoInstanceBranch);
-	const arm = callbackBody(
-		ssrFunction(compiled.publicRenderModule.ssrModuleSource ?? '', 'marklessRenderSsrItem'),
-		'selectBranchArm',
-	);
+/** The one emitted line that seeds `graphNodeId` into the SSR state map. */
+function seedLine(source: string, graphNodeId: string): string {
+	const line = source
+		.split('\n')
+		.find((candidate) =>
+			candidate.includes(`marklessSsrRenderStateValues.set(${JSON.stringify(graphNodeId)},`),
+		);
+	if (!line) throw new Error(`no emitted seed for ${graphNodeId}`);
+	return line.trim();
+}
 
-	expect(arm).toContain('group.value === item.picked');
-	expect(arm).toMatch(/const group = \{"value": marklessSsrReadPublicPath\(/);
-	expect(arm).toMatch(/const item = \{"picked": marklessSsrReadPublicPath\(/);
+const GROUP_CELL = 'shared:src/radio.tsrx#groupState/state:cell';
+const ITEM_CELL = 'shared:src/radio.tsrx#itemState/state:cell';
+
+test('a branch test over two shared instances is decided by one seeded computed', async () => {
+	const compiled = await compile('src/radio.tsrx', twoInstanceBranch);
+	const item = ssrFunction(
+		compiled.publicRenderModule.ssrModuleSource ?? '',
+		'marklessRenderSsrItem',
+	);
+	const arm = callbackBody(item, 'selectBranchArm');
+
+	// The arm names a graph node, not two locals it would have to have in scope.
+	expect(arm).toContain(
+		'marklessSsrReadPublicPath(marklessSsrRenderStateValues.get("computed:templateExpression:0"),[])',
+	);
+	expect(arm).not.toContain('const group =');
+	expect(arm).not.toContain('const item =');
+
+	// The module seeds that node before the render, from both shared instances,
+	// and the authored condition is what the seed derives.
+	const seed = seedLine(item, 'computed:templateExpression:0');
+	expect(seed).toContain(`read(${JSON.stringify(GROUP_CELL)},[])`);
+	expect(seed).toContain(`read(${JSON.stringify(ITEM_CELL)},[])`);
+	expect(seed).toContain('group.value === item.picked');
 });
 
-// The emitted arm run for real: the defect was a ReferenceError at render, not a
-// missing string, so the proof has to evaluate the callback the server calls.
-test('the emitted branch arm decides from those locals instead of throwing', async () => {
+// The emitted lines run for real: the defect was a wrong arm at render (an
+// unseeded read is `undefined`, so the server took the else arm whenever the
+// author's condition was true), not a missing string. The proof therefore
+// evaluates the seed and the callback the server actually calls, together.
+test('the emitted seed and arm decide the same way the author wrote', async () => {
 	const compiled = await compile('src/radio.tsrx', twoInstanceBranch);
-	const arm = callbackBody(
-		ssrFunction(compiled.publicRenderModule.ssrModuleSource ?? '', 'marklessRenderSsrItem'),
-		'selectBranchArm',
+	const item = ssrFunction(
+		compiled.publicRenderModule.ssrModuleSource ?? '',
+		'marklessRenderSsrItem',
 	);
-	const selectArm = new Function(
+	const decide = new Function(
 		'marklessSsrReadPublicPath',
 		'marklessSsrRenderStateValues',
 		'marklessSsrBranches',
 		'marklessSsrDataSlot',
 		'marklessSsrDataContext',
-		arm,
+		`${seedLine(item, 'computed:templateExpression:0')}\n${callbackBody(item, 'selectBranchArm')}`,
 	) as (
 		read: (value: unknown, path: ReadonlyArray<string>) => unknown,
-		values: { get: (id: string) => unknown },
+		values: Map<string, unknown>,
 		branches: Array<unknown>,
 		slot: { branchSiteId: string },
 		context: { asyncError: undefined },
@@ -146,13 +178,20 @@ test('the emitted branch arm decides from those locals instead of throwing', asy
 			(carrier, key) => (carrier as Record<string, unknown> | undefined)?.[key],
 			value,
 		);
-	const run = (cell: Record<string, string>) =>
-		selectArm(read, { get: () => cell }, [], { branchSiteId: 'branch-site:0' }, {
-			asyncError: undefined,
-		});
+	const run = (value: string, picked: string) =>
+		decide(
+			read,
+			new Map<string, unknown>([
+				[GROUP_CELL, { value }],
+				[ITEM_CELL, { picked }],
+			]),
+			[],
+			{ branchSiteId: 'branch-site:0' },
+			{ asyncError: undefined },
+		);
 
-	expect(run({ value: 'a', picked: 'a' })).toBe(0);
-	expect(run({ value: 'a', picked: 'b' })).toBe(1);
+	expect(run('a', 'a')).toBe(0);
+	expect(run('a', 'b')).toBe(1);
 });
 
 // The union may not hand a prelude to a component that never needed one: a

@@ -155,6 +155,9 @@ function branchRecord(
 		branchSiteId: site.id,
 		kind: site.kind,
 		testSource: site.testSource,
+		...(site.testComputedGraphNodeId
+			? { testComputedGraphNodeId: site.testComputedGraphNodeId }
+			: {}),
 		testReads:
 			symbol?.kind === 'branch-update'
 				? symbol.testReads.map((read) => ({

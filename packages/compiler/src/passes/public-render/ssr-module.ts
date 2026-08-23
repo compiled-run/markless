@@ -439,6 +439,22 @@ function emitSsrDataLines(
 					: residueIds;
 			}),
 		),
+		// A branch condition the compiler recombined into one computed is read the
+		// same way a text slot reads its residue: off the state map, by id. Left
+		// out of the seed pass the server read `undefined` and took the else arm
+		// whenever the authored condition was true, so the served HTML disagreed
+		// with what the client resumed to.
+		...chunks.flatMap((chunk) =>
+			chunk.slots.flatMap((slot) =>
+				slot.kind === 'branch'
+					? (
+							input.renderData.branches.find(
+								(branch) => branch.branchSiteId === slot.branchSiteId,
+							)?.testReads ?? []
+						).map((read) => read.graphNodeId)
+					: [],
+			),
+		),
 		// A node this component reads ONLY to hand to the child it composes is
 		// still read by this render: without it the child is composed from the
 		// factory placeholder rather than from what this body just seeded. Row
