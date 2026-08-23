@@ -765,6 +765,48 @@ export function invalidSharedScopeDiagnostic(input: {
 	});
 }
 
+/**
+ * Defect 69. `krs();` instead of `const group = krs();`. The call used to
+ * compile: the client body dropped it, and the server prelude emitted it
+ * verbatim, where it reached the bundler's fail-closed `MARKLESS_SHARED_CALL_UNCOMPILED`
+ * export and threw at render time — so the same page worked client-rendered and
+ * threw server-rendered.
+ *
+ * It is refused rather than lowered because an unbound call cannot carry
+ * meaning: every read and write of a shared instance resolves through the local
+ * name the call was bound to, so a call with no name contributes nothing a later
+ * pass can resolve. Refusing at build time is also free of regression risk,
+ * since a call in this shape threw on every server render and no working code
+ * can depend on it.
+ */
+export function unboundSharedCallDiagnostic(input: {
+	readonly definitionName: string;
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	const binding = `const ${input.definitionName}Instance = ${input.definitionName}()`;
+	return {
+		code: 'MARKLESS_SHARED_CALL_UNBOUND',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'a shared() call must be bound to a name',
+		message: `shared() definition "${input.definitionName}" is called but its result is discarded.`,
+		why: 'Reads and writes of a shared instance resolve through the name the call was bound to. An unbound call names nothing, so it lowers to no client behavior while the server render still tries to run it and throws.',
+		primarySpan: input.span,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		source: input.definitionName,
+		suggestions: [
+			{
+				message: `Bind the call and read through the name: \`${binding}\`.`,
+			},
+			{
+				message: 'Delete the call if nothing in this component reads the shared instance.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_CALL_UNBOUND',
+	};
+}
+
 // A shared() definition that several components of its own module resolve is a
 // widget family shape. Left without a scope it is page-scoped, so two of those
 // widgets on one page silently share one graph. The warning makes the scope a
