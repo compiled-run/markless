@@ -127,7 +127,7 @@ function expectStarterRendered() {
 	expect(el(Root).hasAttribute('aria-multiselectable')).toBe(false);
 }
 
-function expectNestedRendered() {
+async function expectNestedRendered() {
 	// A closed parent MUST say so, which is the announcement QDS drops.
 	expect(el(SrcItem).getAttribute('aria-expanded')).toBe('false');
 	expect(el(SrcItem).getAttribute('ui-closed')).toBe('');
@@ -136,7 +136,7 @@ function expectNestedRendered() {
 	expect(el(SrcContent).hasAttribute('hidden')).toBe(true);
 	// Closed hides the group; it never detaches it, so the nodes under it and the
 	// widget instances they root are all still there.
-	expect(document.contains(el(IndexItem))).toBe(true);
+	await expect.element(IndexItem).toBeInTheDocument();
 	expect(el(IndexItem).getAttribute('aria-level')).toBe('2');
 	expect(el(AppItem).getAttribute('aria-level')).toBe('2');
 	expect(el(IndexItem).hasAttribute('aria-expanded')).toBe(false);
@@ -164,7 +164,7 @@ function expectItemsDropDestructuredProps() {
 	expect(el(SrcItem).getAttribute('aria-level')).toBe('1');
 }
 
-function expectPreopenedRendered() {
+async function expectPreopenedRendered() {
 	// The branch written open is open before anything on the client has run, and
 	// its children are on the screen.
 	expect(el(SrcItem).getAttribute('aria-expanded')).toBe('true');
@@ -181,7 +181,7 @@ function expectPreopenedRendered() {
 		'app-item',
 		'docs-item',
 	]);
-	expect(document.contains(el(IntroItem))).toBe(true);
+	await expect.element(IntroItem).toBeInTheDocument();
 }
 
 function expectDeepRendered() {
@@ -256,7 +256,7 @@ async function expectTriggerOpensAndCloses() {
 	await expect.poll(() => el(SrcItem).getAttribute('aria-expanded')).toBe('false');
 	expect(el(SrcContent).hasAttribute('hidden')).toBe(true);
 	// Closing hid the group; it never took it out of the page.
-	expect(document.contains(el(IndexItem))).toBe(true);
+	await expect.element(IndexItem).toBeInTheDocument();
 }
 
 async function expectConsumerCallbackFires() {
@@ -302,7 +302,7 @@ for (const mode of MODES) {
 	test(`${mode}: a nested tree renders its group, its levels and its closed state`, async () => {
 		if (mode === 'CSR') await render(Nested);
 		else await renderSSR(Nested);
-		expectNestedRendered();
+		await expectNestedRendered();
 	});
 
 	test(`${mode}: a node drops the props it destructured`, async () => {
@@ -322,7 +322,7 @@ for (const mode of MODES) {
 	test.fails(`${mode}: branches written open render open`, async () => {
 		if (mode === 'CSR') await render(Preopened);
 		else await renderSSR(Preopened);
-		expectPreopenedRendered();
+		await expectPreopenedRendered();
 	});
 
 	test(`${mode}: a node written open still reports itself open`, async () => {
@@ -545,7 +545,7 @@ test('CSR: Enter on a row closes it again', async () => {
 	await expect.poll(() => el(AssetsItem).getAttribute('aria-expanded')).toBe('true');
 	await userEvent.keyboard('{Enter}');
 	await expect.poll(() => el(AssetsItem).getAttribute('aria-expanded')).toBe('false');
-	expect(document.contains(el(LogoItem))).toBe(true);
+	await expect.element(LogoItem).toBeInTheDocument();
 });
 
 // --- typeahead ------------------------------------------------------------
@@ -681,7 +681,7 @@ for (const mode of MODES) {
 	test(`${mode}: the top level of a loop over nested data renders its nodes`, async () => {
 		if (mode === 'CSR') await render(NodesFromData);
 		else await renderSSR(NodesFromData);
-		const folders = Array.from(document.querySelectorAll('[data-testid="folder-item"]'));
+		const folders = page.getByTestId('folder-item').elements();
 		expect(folders).toHaveLength(2);
 		expect(folders[0]?.getAttribute('aria-level')).toBe('1');
 		expect(folders[0]?.getAttribute('aria-expanded')).toBe('false');
@@ -698,7 +698,7 @@ for (const mode of MODES) {
 	nestedLoop(`${mode}: the nested level of a loop over nested data renders its nodes`, async () => {
 		if (mode === 'CSR') await render(NodesFromData);
 		else await renderSSR(NodesFromData);
-		const files = Array.from(document.querySelectorAll('[data-testid="file-item"]'));
+		const files = page.getByTestId('file-item').elements();
 		expect(files).toHaveLength(3);
 		expect(files[0]?.getAttribute('aria-level')).toBe('2');
 	});
@@ -745,10 +745,8 @@ test('CSR: a second-level node opens and closes its own group from the first ges
 
 test('CSR: a looped node opens the folder the click landed on', async () => {
 	await render(NodesFromData);
-	const triggers = Array.from(
-		document.querySelectorAll<HTMLElement>('[data-testid="folder-itemtrigger"]'),
-	);
-	const folders = Array.from(document.querySelectorAll('[data-testid="folder-item"]'));
+	const triggers = page.getByTestId('folder-itemtrigger').elements() as HTMLElement[];
+	const folders = page.getByTestId('folder-item').elements();
 	const second = triggers[1];
 	if (!second) throw new Error('Expected two folders from the loop.');
 

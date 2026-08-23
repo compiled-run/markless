@@ -65,7 +65,7 @@ function el<T extends Element = HTMLElement>(locator: { element(): Element | nul
 }
 
 function all(testid: string) {
-	return Array.from(document.querySelectorAll(`[data-testid="${testid}"]`));
+	return page.getByTestId(testid).elements();
 }
 
 function expectClosed(trigger: Element, content: Element) {
@@ -73,7 +73,7 @@ function expectClosed(trigger: Element, content: Element) {
 	expect(content.hasAttribute('hidden')).toBe(true);
 }
 
-function expectBasicRendered() {
+async function expectBasicRendered() {
 	// The landmark, and its name. aria-at makes both priority 1, and the family
 	// writes no default name - `{...rest}` is spread first so the consumer's own
 	// `aria-label` is the only name there is.
@@ -85,7 +85,7 @@ function expectBasicRendered() {
 	expect(el(ProductsTrigger).getAttribute('type')).toBe('button');
 	// A closed dropdown is hidden, never detached, so the trigger's aria-controls
 	// still resolves and the links inside keep their text.
-	expect(document.contains(el(ProductsContent))).toBe(true);
+	await expect.element(ProductsContent).toBeInTheDocument();
 	expect(el(ProductsContent).textContent).toContain('Keyboards');
 	// Flags for a stylesheet, on every part.
 	expect(el(ProductsItem).getAttribute('ui-closed')).toBe('');
@@ -181,7 +181,7 @@ async function expectClickOpensAndCloses() {
 	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('false');
 	expect(el(ProductsContent).hasAttribute('hidden')).toBe(true);
 	// Closing hid the panel; it never took it out of the page.
-	expect(document.contains(el(ProductsContent))).toBe(true);
+	await expect.element(ProductsContent).toBeInTheDocument();
 	expect(el(ProductsTrigger).getAttribute('aria-controls')).toBe(el(ProductsContent).id);
 }
 
@@ -201,7 +201,7 @@ for (const mode of MODES) {
 	test(`${mode}: the starter renders a named landmark with every dropdown closed`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
-		expectBasicRendered();
+		await expectBasicRendered();
 	});
 
 	test(`${mode}: no menu, menubar or menuitem role is anywhere in the landmark`, async () => {
