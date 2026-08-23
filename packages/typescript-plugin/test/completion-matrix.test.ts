@@ -912,6 +912,83 @@ test('M16 PropsOf and Children import into a plain .ts file and PropsOf is exact
 	).toEqual([]);
 }, 20_000);
 
+test('M17 real tsserver serves a part inlay hint naming the element each part renders', async () => {
+	// Only the consuming file is opened: the part modules reach the checker through the
+	// project, which is the state a real editor is in when the hint is first painted.
+	const fixture = openFixture('inlay-parts.tsrx');
+	const hints = await server.provideInlayHints(fixture.file, 0, fixture.source.length);
+
+	expect(
+		hints.map((hint) => hint.text).sort(),
+		'M17 missing capability: every part tag whose props resolve to PropsOf<tag> must be labelled, and nothing else may be. A hint for the no-element part, the native <div>, or any of the four closing tags would show up here.',
+	).toEqual([': button', ': div', ': em', ': input', ': section']);
+
+	const expectedHints = [
+		{ tag: '<widget.root', text: ': div' },
+		{ tag: '<widget.trigger', text: ': button' },
+		{ tag: '<Panel', text: ': section' },
+		{ tag: '<LocalBadge', text: ': em' },
+	];
+	for (const { tag, text } of expectedHints) {
+		expect(
+			inlayHintAt(hints, fixture.source, tag),
+			`M17 missing capability: ${tag} must carry ${text} immediately after its tag name.`,
+		).toMatchObject({
+			text,
+			kind: 'Type',
+			whitespaceBefore: false,
+			whitespaceAfter: false,
+		});
+	}
+}, 30_000);
+
+test('M17 a part hint names the element its props reach, not the first element in its markup', async () => {
+	const fixture = openFixture('inlay-parts.tsrx');
+	const hints = await server.provideInlayHints(fixture.file, 0, fixture.source.length);
+
+	expect(
+		inlayHintAt(hints, fixture.source, '<widget.wrapped')?.text,
+		'M17 missing capability: widget.wrapped is typed PropsOf<"input"> and renders its <input> inside a <span>. Reading the markup instead of the props type would label it span.',
+	).toBe(': input');
+	expect(
+		inlayHintAt(hints, fixture.source, '<widget.field'),
+		'M17 missing capability: a part whose props name no element must produce no hint rather than a guess.',
+	).toBeUndefined();
+	expect(
+		inlayHintAt(hints, fixture.source, '<div'),
+		'M17 missing capability: an intrinsic tag already names its element and must stay unlabelled.',
+	).toBeUndefined();
+}, 30_000);
+
+test('M17 part hints are limited to the requested span and can be switched off by plugin configuration', async () => {
+	const fixture = openFixture('inlay-parts.tsrx');
+	const triggerTag = '<widget.trigger';
+	const triggerStart = fixture.source.indexOf(triggerTag);
+	const spanned = await server.provideInlayHints(
+		fixture.file,
+		triggerStart,
+		triggerTag.length + 1,
+	);
+	expect(
+		spanned.map((hint) => hint.text),
+		'M17 missing capability: a hint request must answer only for the tags inside the span the editor asked about.',
+	).toEqual([': button']);
+
+	try {
+		server.configurePlugin(corePlugin, { partHints: false });
+		expect(
+			await server.provideInlayHints(fixture.file, 0, fixture.source.length),
+			"M17 missing capability: the extension's own switch reaches the plugin through configurePlugin and must silence the part hints.",
+		).toEqual([]);
+	} finally {
+		server.configurePlugin(corePlugin, { partHints: true });
+	}
+	expect(
+		(await server.provideInlayHints(fixture.file, 0, fixture.source.length)).length,
+		'M17 missing capability: re-enabling the switch must bring the hints back.',
+	).toBe(5);
+}, 30_000);
+
 test('M10 plugin does not add the Markless declaration to a project without TSRX', async () => {
 	const plainProject = mkdtempSync(join(tmpdir(), 'markless-plain-tsx-'));
 	writeFileSync(
@@ -1417,6 +1494,15 @@ function completionNames(completion: any): string[] {
 
 function displayText(info: any): string {
 	return info?.displayString ?? info?.displayParts?.map((part: any) => part.text).join('') ?? '';
+}
+
+// A part hint is painted at the authored offset immediately past the tag name, which is
+// where `tag` ends in the fixture source.
+function inlayHintAt(hints: readonly any[], source: string, tag: string): any {
+	const position = positionAtSearch(source, tag, tag.length);
+	return hints.find(
+		(hint) => hint.position.line === position.line && hint.position.offset === position.offset,
+	);
 }
 
 function diagnosticMatching(diagnostics: any[], pattern: RegExp): any {
