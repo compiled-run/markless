@@ -57,6 +57,7 @@ import {
 	elementHandleIdSources,
 	hasSharedElementHandle,
 	MARKLESS_WIDGET_INSTANCE_KEY,
+	renderDecisionSources,
 	sharedInstancePreludeLines,
 } from './residue-reader.ts';
 import { collectSsrPropEvents } from './component-wiring.ts';
@@ -454,12 +455,19 @@ function emitSsrDataLines(
 	]);
 	const residueSources = authoredResidueSources(chunks);
 	const repeats = input.semanticGraph.keyedRepeats;
+	// The prelude serves every callback, not just the markup reader: an arm test
+	// the compiler could not reduce to one graph read is authored in the same
+	// scope and may spell shared instances the markup never mentions. Same union
+	// the client reader takes, so one component scope is spelled one way.
+	const preludeText = [
+		...new Set([...residueSources, ...renderDecisionSources(input, componentName)]),
+	].join('\n');
 	const localLines = [
 		...repeatLocalLines(repeats),
 		'const error=marklessSsrDataContext.asyncError;',
 		...sharedInstancePreludeLines(
 			input.semanticGraph,
-			authoredResidueSources(chunks).join('\n'),
+			preludeText,
 			new Set([
 				...repeats.map((repeat) => repeat.itemName),
 				...repeats.flatMap((repeat) => (repeat.indexName ? [repeat.indexName] : [])),
