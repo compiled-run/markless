@@ -39,24 +39,35 @@ const INSTANCE_SEGMENT = /[cp]\d+:|r:[^:]*:/g;
  * dispatch carries the value, as the `r:<key>:` segment of its host id. Each
  * pair here says: an id spelled against this row-free instance prefix belongs to
  * that rendered row, and reaches it under this with-rows prefix. Longest prefix
- * first, and every `rowFree` is non-empty, so an id carrying no instance path at
- * all - the parent's own page-space nodes, which a capture slot reads - matches
- * nothing and is left exactly as spelled.
+ * first, and every node-qualifying `rowFree` is non-empty, so an id carrying no
+ * instance path at all - the parent's own page-space nodes, which a capture slot
+ * reads - matches nothing and is left exactly as spelled.
+ *
+ * `rowBoundary` pairs are the exception, and only widget-root resolution reads
+ * them. They stand at a row segment rather than after an edge segment, so their
+ * `rowFree` may be empty; qualifying an ordinary node against one would drag the
+ * parent's own page-space cells into the row.
  */
 export type MarklessRowScope = ReadonlyArray<{
 	readonly rowFree: string;
 	readonly withRows: string;
+	readonly rowBoundary?: boolean;
 }>;
 
 export function marklessRecordRowScope(hostNodeId: string): MarklessRowScope | undefined {
 	const path = marklessInstancePath(hostNodeId);
 	if (!path.includes('r:')) return undefined;
-	const pairs: Array<{ rowFree: string; withRows: string }> = [];
+	const pairs: Array<{ rowFree: string; withRows: string; rowBoundary?: boolean }> = [];
 	let rowFree = '';
 	let withRows = '';
 	for (const segment of path.match(INSTANCE_SEGMENT) ?? []) {
 		withRows += segment;
-		if (segment.startsWith('r:')) continue;
+		// The boundary pair comes second at the same `rowFree`, so reversing puts
+		// the row-carrying answer ahead of the plain one the edge segment pushed.
+		if (segment.startsWith('r:')) {
+			pairs.push({ rowFree, withRows, rowBoundary: true });
+			continue;
+		}
 		rowFree += segment;
 		pairs.push({ rowFree, withRows });
 	}
@@ -64,10 +75,46 @@ export function marklessRecordRowScope(hostNodeId: string): MarklessRowScope | u
 }
 
 export function marklessRowScopedGraphNodeId(graphNodeId: string, scope: MarklessRowScope): string {
-	for (const { rowFree, withRows } of scope)
-		if (graphNodeId.startsWith(rowFree))
+	const widget = marklessRowWidgetGraphNodeId(graphNodeId, scope);
+	if (widget !== undefined) return widget;
+	for (const { rowFree, withRows, rowBoundary } of scope)
+		if (!rowBoundary && graphNodeId.startsWith(rowFree))
 			return withRows + graphNodeId.slice(rowFree.length);
 	return graphNodeId;
+}
+
+/**
+ * A widget-scoped `shared:` id as a bound symbol spells it: `c1:p2:shared:…`.
+ *
+ * The prefix is the component EDGE the widget's part was compiled at, so it
+ * names no row - while the widget-root registry holds one root per RENDERED
+ * widget, filed under the row the root was rendered in. Asking it with the edge
+ * path finds nothing, `marklessComposedGraphNodeId` leaves the id in page space,
+ * and the write lands on an id no rendered widget owns: the record matches, the
+ * symbol runs, and nothing moves. Threading the dispatched record's row through
+ * the edge path first is what makes the lookup reach this row's own root.
+ *
+ * `undefined` means "not a widget id this row can answer", and every such id -
+ * a storage slot, a page-scoped `shared()` graph, a widget rooted outside any
+ * row - falls through to the caller and resolves exactly as it does today.
+ */
+function marklessRowWidgetGraphNodeId(
+	graphNodeId: string,
+	scope: MarklessRowScope,
+): string | undefined {
+	const pageSpace = PAGE_SPACE_ID.exec(graphNodeId);
+	// A prefix already carrying a row is either resolved or a re-entrant pass
+	// over an id this same adapter wrote; the graph tag catches the common case.
+	if (!pageSpace || pageSpace[2] !== 'shared' || !pageSpace[1] || pageSpace[1].includes('r:'))
+		return undefined;
+	const edgePath = pageSpace[1];
+	const sharedId = graphNodeId.slice(edgePath.length);
+	for (const { rowFree, withRows } of scope) {
+		if (!edgePath.startsWith(rowFree)) continue;
+		const rootPath = marklessWidgetRootPath(sharedId, withRows + edgePath.slice(rowFree.length));
+		if (rootPath) return rootPath + sharedId;
+	}
+	return undefined;
 }
 
 // A dispatched bound symbol reaches this graph twice over: the capture adapter

@@ -1,4 +1,43 @@
-import { state } from '@markless/core';
+import { shared, state } from '@markless/core';
+
+// A widget-scoped family shaped like the item families (tabs, radio-group,
+// checklist): one graph per rendered widget, a root that owns the cells, and a
+// part that reaches them through the same `shared()` call. One root per keyed
+// `@for` row puts every row's widget graph under that row's `r:<key>:` segment,
+// which is what the trigger's BOUND handler has to find.
+const rowWidget = shared(
+	() => {
+		const w = state({ ticks: 0 });
+		return {
+			...w,
+			bump() {
+				w.ticks = w.ticks + 1;
+			},
+		};
+	},
+	{ scope: 'widget' },
+);
+
+function WidgetRoot({ children }) @{
+	const w = rowWidget();
+	<div data-widget-root data-widget-ticks={w.ticks}>{children}</div>
+}
+
+// `onBump` makes this handler a BOUND symbol, exactly as `RowCounter`'s does,
+// and `w.bump()` is the widget-scoped write that bound body has to land. The two
+// together are pagination's shape: an item part inside a row whose handler takes
+// a consumer callback and calls a family method.
+function WidgetTrigger({ onBump }) @{
+	const w = rowWidget();
+	<button
+		type="button"
+		data-widget-trigger
+		onClick={(event) => {
+			w.bump();
+			onBump?.(event);
+		}}
+	>{w.ticks}</button>
+}
 
 // An interactive component inside an `@if` arm inside a value-keyed `@for` row.
 // Each rendered instance owns its own `hits`, so clicking one row's button must
@@ -20,6 +59,7 @@ function RowCounter({ label, onBump }) @{
 
 export default function RowBoundSymbolPage() @{
 	let bumps = state(0);
+	let widgetBumps = state(0);
 	let rows = state([
 		{ key: 'alpha', label: 'alpha', open: true },
 		{ key: 'beta', label: 'beta', open: true },
@@ -38,5 +78,20 @@ export default function RowBoundSymbolPage() @{
 				</li>
 			}
 		</ul>
+		<output data-widget-bumps>{widgetBumps}</output>
+		<ul data-widget-rows>
+			@for (const widgetRow of rows; key widgetRow.key) {
+				<li data-widget-row={widgetRow.key}>
+					<WidgetRoot>
+						<WidgetTrigger onBump={() => { widgetBumps++; }} />
+					</WidgetRoot>
+				</li>
+			}
+		</ul>
+		<div data-page-widget>
+			<WidgetRoot>
+				<WidgetTrigger onBump={() => { widgetBumps++; }} />
+			</WidgetRoot>
+		</div>
 	</main>
 }
