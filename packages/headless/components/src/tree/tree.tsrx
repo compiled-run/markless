@@ -20,9 +20,8 @@ export const treeState = shared(
 	{ scope: 'widget' },
 );
 
-// A second family, rooted by every `tree.item` - including an item written
-// inside another item's content, which is the nesting this family exists for.
-// A node's own parts read this instance; the nodes below it root their own.
+// Rooted by every `tree.item`, including one written inside another item's
+// content: a node's own parts read this instance, the nodes below root their own.
 export const treeItemState = shared(
 	() => {
 		const item: TreeItemInstanceState = state({ open: false, leaf: false, level: 1 });
@@ -54,14 +53,13 @@ export function TreeRoot({
 	tree.disabled = disabled;
 
 	// The container holds the tree's only tab stop until focus has been inside it
-	// once, and the focusin handler takes it back out of the tab order from then
-	// on, so Shift+Tab out of the first row leaves the tree instead of being
-	// caught by the container and sent back in.
+	// once. `focusin` then takes it out of the tab order, so Shift+Tab out of the
+	// first row leaves the tree instead of being caught and sent back in.
 	//
-	// Every handler below is written against the DOM alone. A handler on the
-	// element that ROOTS a widget instance cannot read that instance: the lowered
-	// symbol throws `ReferenceError: tree is not defined` on the first keystroke.
-	// Measured on this tip - see note.md.
+	// Every keystroke in the tree is handled HERE rather than on the row it landed
+	// on. A handler declared on `tree.item` is matched as an event record and its
+	// symbol is then never woken, so its body never runs - measured on this tip,
+	// see note.md. That is what keeps the toggling on the DOM as well.
 	<div
 		{...rest}
 		role="tree"
@@ -72,39 +70,31 @@ export function TreeRoot({
 			// native dispatch has finished, and `currentTarget` is null by then.
 			const target = event.target as HTMLElement;
 			const root = target.closest('[role="tree"]') as HTMLElement | null;
-			if (!root) return;
-			const rows = Array.from(root.querySelectorAll<HTMLElement>('[role="treeitem"]'));
-			if (target === root) {
-				// Tabbing onto the container hands focus to the remembered row, or
-				// to the first one nothing has visited yet.
-				const visible = rows.filter((row) => !row.closest('[role="group"][hidden]'));
-				const remembered = visible.find((row) => row.getAttribute('tabindex') === '0');
-				const first = remembered ?? visible[0];
-				if (first) first.focus();
-				onFocusin?.(event);
-				return;
-			}
 			const row = target.closest('[role="treeitem"]') as HTMLElement | null;
-			if (!row) {
-				onFocusin?.(event);
-				return;
+
+			if (root && target === root) {
+				// Tabbing onto the container hands focus to the remembered row, or to
+				// the first one nothing has visited yet.
+				const visible = Array.from(
+					root.querySelectorAll<HTMLElement>('[role="treeitem"]'),
+				).filter((one) => !one.closest('[role="group"][hidden]'));
+				const remembered = visible.find((one) => one.getAttribute('tabindex') === '0');
+				(remembered ?? visible[0])?.focus();
+			} else if (root && row) {
+				// Roving. Container and rows render their tabindex as literals, so the
+				// framework writes each once and these are the only moves afterwards.
+				root.setAttribute('tabindex', '-1');
+				for (const one of root.querySelectorAll<HTMLElement>('[role="treeitem"]')) {
+					one.setAttribute('tabindex', one === row ? '0' : '-1');
+				}
 			}
-			// The container renders `tabindex="0"` as a literal, so the framework
-			// writes it once and never again; this is the only thing that moves it.
-			root.setAttribute('tabindex', '-1');
-			// Roving, written straight onto the rows: a row renders `tabindex="-1"`
-			// as a literal, so the framework writes that attribute once and never
-			// again, and this is the only thing that moves it afterwards.
-			for (const other of rows) {
-				other.setAttribute('tabindex', other === row ? '0' : '-1');
-			}
+
 			onFocusin?.(event);
 		}}
 		onKeydown={(event) => {
-			// The six navigation keys, guarded by event fields alone: a
-			// browser-critical policy has to be readable before the handler symbol
-			// loads. Enter and Space are deliberately absent - the row's own
-			// trigger is a native button, and preventing its keys would break it.
+			// Guarded by event fields alone: a browser-critical policy has to be
+			// readable before the handler symbol loads. Enter and Space are absent on
+			// purpose - the row's own trigger is a native button.
 			if (
 				event.key === 'ArrowDown' ||
 				event.key === 'ArrowUp' ||
@@ -119,30 +109,33 @@ export function TreeRoot({
 			const key = event.key;
 			const target = event.target as HTMLElement;
 			const root = target.closest('[role="tree"]') as HTMLElement | null;
-			if (!root) return;
-			// DOM order is the navigation order, and a row inside a closed group is
-			// not in it. No registry holds either fact.
-			const rows = Array.from(
-				root.querySelectorAll<HTMLElement>('[role="treeitem"]'),
-			).filter((row) => !row.closest('[role="group"][hidden]'));
-			const here = target.closest('[role="treeitem"]') as HTMLElement | null;
-			if (!here) {
-				// Focus is on the container itself: the first move enters the tree.
-				const first = rows[0];
-				if (first && (key === 'ArrowDown' || key === 'Home' || key === 'ArrowRight')) {
-					first.focus();
-				}
+			if (!root) {
 				onKeydown?.(event);
 				return;
 			}
 
-			// The row's own trigger, and only its own: a descendant node's trigger
-			// is not this row's, and clicking "the first focusable inside" is the
-			// heuristic that follows a link instead of opening a folder.
+			// DOM order is the navigation order, and a row inside a closed group is
+			// not in it. No registry holds either fact: the walk needs an ordered
+			// collection of the tree's rows, which no primitive builds today. Pending
+			// capability: ordered item registration into an ancestor widget instance.
+			const rows = Array.from(root.querySelectorAll<HTMLElement>('[role="treeitem"]')).filter(
+				(row) => !row.closest('[role="group"][hidden]'),
+			);
+			const here = target.closest('[role="treeitem"]') as HTMLElement | null;
+
+			if (!here) {
+				// Focus is on the container itself: the first move enters the tree.
+				if (key === 'ArrowDown' || key === 'Home' || key === 'ArrowRight') rows[0]?.focus();
+				onKeydown?.(event);
+				return;
+			}
+
+			// The row's own trigger, and only its own. Clicking "the first focusable
+			// inside" is the heuristic that follows a link instead of opening a folder.
 			const found = here.querySelector('[ui-treeitemtrigger]') as HTMLElement | null;
 			const trigger = found && found.closest('[role="treeitem"]') === here ? found : null;
-			// The row reports its own open state, so the walk never needs an
-			// instance it cannot reach: a leaf carries no aria-expanded at all.
+			// The row reports its own open state, so the walk never needs an instance
+			// it cannot reach: a leaf carries no aria-expanded at all.
 			const expanded = here.getAttribute('aria-expanded');
 			const at = rows.indexOf(here);
 			const last = rows.length - 1;
@@ -153,16 +146,15 @@ export function TreeRoot({
 			else if (key === 'Home') next = rows[0] ?? null;
 			else if (key === 'End') next = rows[last] ?? null;
 			else if (key === 'ArrowRight') {
-				// Two phases, and never one keystroke doing both: a closed node
-				// opens and focus stays put; an open node hands focus to its first
-				// child; a leaf does nothing.
+				// Two phases, and never one keystroke doing both: a closed node opens
+				// and focus stays put, an open node hands focus to its first child, a
+				// leaf does nothing.
 				if (expanded === 'false') trigger?.click();
 				else if (expanded === 'true') {
-					// The first child is the next visible row, as long as it really is
-					// inside this one - an open node with nothing in it moves nowhere,
-					// where a plain step would have walked to a sibling. Written by
-					// containment rather than by a child selector, because the arm and
-					// loop wrappers a scenario needs sit between the group and its rows.
+					// An open node with nothing in it moves nowhere, where a plain step
+					// would have walked to a sibling - so the next row has to be INSIDE
+					// this one. Containment rather than a child selector, because the arm
+					// and loop wrappers a scenario needs sit between them.
 					const below = rows[at + 1];
 					next = below && here.contains(below) ? below : null;
 				}
@@ -170,16 +162,14 @@ export function TreeRoot({
 				if (expanded === 'true') trigger?.click();
 				else next = here.parentElement?.closest('[role="treeitem"]') ?? null;
 			} else if (target === here && (key === 'Enter' || key === ' ')) {
-				// Gated on the row itself, the way QDS gates its whole keyboard: a
-				// native button inside the row activates itself, and handling the
-				// key here as well would toggle the node twice.
+				// Gated on the row itself: a native button inside the row activates
+				// itself, and handling the key here as well would toggle the node twice.
 				trigger?.click();
-			} else if (target === here && key.length === 1 && key !== ' ') {
-				// Typeahead over the visible rows, matched on each row's own label.
-				// The buffer and the moment its last key landed live on the container
-				// element rather than in the graph: this handler sits on the element
-				// that roots the tree instance and cannot read it. A clock
-				// comparison, never a pending timer.
+			} else if (target === here && key.length === 1) {
+				// Typeahead over the visible rows, matched on each row's own label. The
+				// buffer and the moment its last key landed live on the container
+				// element, and a clock comparison replaces a pending timer so nothing is
+				// outstanding across resume.
 				const now = Date.now();
 				const since = Number(root.getAttribute('ui-typeahead-at') ?? '0');
 				const buffer = root.getAttribute('ui-typeahead') ?? '';
@@ -206,8 +196,8 @@ export function TreeRoot({
 }
 
 // The tree's own heading. It cannot name the tree it heads today - an IDREF
-// handle read on a widget root is MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT -
-// so the consumer writes `aria-label` on the root. See note.md.
+// handle read on a widget root is MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT - so
+// the consumer writes `aria-label` on the root.
 export function TreeLabel({ children, ...rest }: TreeLabelProps) @{
 	<span {...rest}>{children}</span>
 }
@@ -226,13 +216,12 @@ export function TreeItem({
 	item.leaf = leaf;
 	item.level = level;
 	// One graph cell per attribute: an inline comparison in an attribute renders
-	// once and then goes stale. Measured on tabs and radio group, carried here.
+	// once and then goes stale.
 	const closed = computed(() => item.leaf !== true && item.open !== true);
 	const showing = computed(() => item.leaf !== true && item.open === true);
 
-	// aria-expanded is the WAI-ARIA rule QDS gets backwards: a closed parent MUST
-	// report "false", and a leaf must report nothing at all, or a reader cannot
-	// tell a node with nothing in it from a node that has not been opened.
+	// aria-expanded the way WAI-ARIA asks: a closed parent reports "false", a leaf
+	// reports nothing, or a reader cannot tell the two apart.
 	<div
 		{...rest}
 		role="treeitem"
@@ -249,9 +238,9 @@ export function TreeItemTrigger({ children, onClick, ...rest }: TreeItemTriggerP
 	const tree = treeState();
 	const item = treeItemState();
 
-	// tabindex -1: the row is the tab stop, and a second stop per node would give
-	// a tree of 200 files 400 of them. The keyboard walk reaches this button by
-	// clicking it, which is why it is marked rather than guessed at.
+	// tabindex -1: the row is the tab stop, and a second stop per node would give a
+	// tree of 200 files 400 of them. `ui-treeitemtrigger` is anatomy - it is how the
+	// root's keyboard finds THIS row's trigger rather than the first link in it.
 	<button
 		{...rest}
 		type="button"
@@ -270,15 +259,13 @@ export function TreeItemTrigger({ children, onClick, ...rest }: TreeItemTriggerP
 
 export function TreeItemContent({ children, ...rest }: TreeItemContentProps) @{
 	const item = treeItemState();
-	// One graph cell, read in every position: this part renders children that
-	// root instances of the same family, and the inline comparison a sibling part
-	// can write does not survive that here.
+	// One graph cell, read in every position: this part renders children that root
+	// instances of the same family, and an inline comparison does not survive that.
 	const showing = computed(() => item.open === true);
 
-	// Closed hides the group, it never detaches it. An `@if` arm would detach it,
-	// and a widget root inside an arm that flips at runtime is refused outright
-	// (MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED) - every node in here is one. Same
-	// rule the landed tabs panel and collapsible content follow.
+	// Closed hides the group, it never detaches it: a widget root inside an arm that
+	// flips at runtime is MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED, and every node in
+	// here is one.
 	<div
 		{...rest}
 		role="group"
@@ -297,8 +284,7 @@ export function TreeItemLabel({ children, ...rest }: TreeItemLabelProps) @{
 export function TreeItemIndicator({ children, ...rest }: TreeItemIndicatorProps) @{
 	const item = treeItemState();
 
-	// Decorative: the row beside it already reports the state to a reader, and a
-	// second announcement of the same fact is noise.
+	// Decorative: the row beside it already reports the state to a reader.
 	<span
 		{...rest}
 		aria-hidden="true"

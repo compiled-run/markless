@@ -191,11 +191,23 @@ Two results decide what this family's rework can do.
 lifts the reason every walk in this family starts at `event.target` and climbs.
 The nearest-part logic — `from.closest('[ui-navbar-item]')` in the item's pointer
 handlers, `from.closest('nav')` in the root's, `box.querySelector('[aria-expanded]')`
-for the Escape focus return — is expressible through `element()` handles held on
-the instance the handler already reads: the item keeps a handle for its own box,
-the root for its `<nav>`, the item for its trigger. Containment tests
-(`root.contains(relatedTarget)`) are then asked of a graph-held handle and select
-nothing, so they survive the ban.
+for the Escape focus return — looked expressible through `element()` handles held
+on the instance the handler already reads: the item keeping a handle for its own
+box, the root for its `<nav>`, the item for its trigger.
+
+**Corrected 2026-08-23 (U205): it is not.** The conversion was written and
+measured. `navbarState` took a `navEl` bound with `el=` on the `<nav>`,
+`navbarItemState` took `boxEl` on the item `<div>` and `triggerEl` on the
+trigger, and the six `.closest()` climbs became `navbar.navEl`, `item.boxEl` and
+`item.triggerEl`. It compiles clean with no diagnostic, and 18 of the 47 rows go
+red: every path guarded on a handle behaves as if the handle were empty — focus
+never moves, the landmark never closes, the hover never opens. `contentEl` keeps
+working because it is only ever read in an ATTRIBUTE position (`aria-controls`),
+which is the one position a handle is measured to serve.
+
+So the shipped climbs stay, and the reason they exist is now two facts rather
+than one: a lazily loaded handler has no `currentTarget`, AND an `element()`
+handle does not read back as an element inside a handler.
 
 **Ordered item registration into the enclosing instance is not expressible.**
 Three routes measured, all closed (diagnostics in the tree note). That is exactly

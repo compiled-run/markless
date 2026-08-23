@@ -60,9 +60,10 @@ landed recursion fixture passes `depth`.
 ## What the compiler forced — measured on this tip
 
 1. **A handler on the element that ROOTS a widget instance cannot read that
-   instance.** STALE — re-measured 2026-08-23 and it no longer holds; see
-   "Re-measured 2026-08-23" below. What follows describes the code as it still
-   stands, not a limit that is still there. `tree.root`'s own `onFocusin` and
+   instance.** PARTLY STALE — re-measured 2026-08-23: the instance read itself
+   works on a widget ROOT, but a handler declared on `tree.item` is never woken
+   at all, so the code below stands unchanged. See "Re-measured 2026-08-23" and
+   the U205 correction under it. `tree.root`'s own `onFocusin` and
    `onKeydown` threw
    `ReferenceError: tree is not defined` out of the lowered symbol on the first
    event. Both handlers are therefore written against the DOM alone, and the two
@@ -129,6 +130,29 @@ typeahead scan cannot be re-expressed through primitives. `tree.item`'s own
 toggling (`ArrowRight` to open, `ArrowLeft` to close, `Enter`/`Space`) no longer
 needs the DOM at all now that limit 1 has lifted — it is only focus MOVEMENT that
 is stuck.
+
+### Corrected 2026-08-23 (U205): the item's toggling could NOT be converted
+
+The paragraph above expected `ArrowRight`/`ArrowLeft`/`Enter`/`Space` to drop the
+DOM once limit 1 lifted. It was tried and it does not work, so the shipped
+keyboard is unchanged and every key is still handled on `tree.root`.
+
+**A keydown handler declared on `tree.item` never runs.** The handler was written
+on the item's own root element, calling `item.toggle()`. It compiles clean, the
+runtime matches the event (`keydown matched event record c1:h2`, and
+`bound:symbol:2:component-edge:1` runs), and then the trace says
+`keydown [div] · woke 0 modules`: the handler's own symbol module is never woken,
+so its body never executes. A `console.log` as the first statement in that
+handler printed nothing across a full suite run, while the same `console.log` in
+`tree.root`'s `onFocusin` printed on every focus (`focusin ... woke 1 modules`).
+All 15 keyboard rows went red, none with a runtime error.
+
+U202's probe measured something narrower than it concluded: a handler on the
+element rooting a widget instance can read that instance **when its symbol is
+woken**. What is missing here is the wake, not the instance read. So the
+rooting-element limit is lifted for the root of a widget (`tree.root`,
+`navbar.root`, `navbar.item`, all of which wake and run today) and not for
+`tree.item`, whose keydown record is matched but never woken.
 
 The capability to raise: **ordered item registration into an ancestor widget
 instance** — a descendant widget or part appending its `element()` handle, and
