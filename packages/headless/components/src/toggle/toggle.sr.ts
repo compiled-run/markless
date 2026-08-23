@@ -141,16 +141,15 @@ test('a switch with only help text under it is never conveyed as invalid', async
 	// This reader speaks "not invalid" as its own fact, so the assertion above
 	// cannot be read as "invalid is absent"; that is what this line proves.
 	expect(missingFacts(sr, announcement, { state: ['invalid'] })).not.toEqual([]);
-	// The help text is reachable, just not attached to the switch - see below.
+	// The help text is reachable as its own item too, and attached to the switch
+	// on top of that - the row below is what proves the attachment.
 	await readUntil(sr, { name: '(Receive notifications about important updates)' });
 });
 
-// Recorded red, not asserted green. The same gap `checkbox.sr.ts` records:
-// `<toggle.description>` writes a plain div and wires no aria-describedby, so
-// the reader announces it as a separate item further down the page instead of as
-// part of the switch. This turns red the day that is wired, and whoever wires it
-// deletes the `.fails`.
-test.fails('the help text under a switch is conveyed with the switch itself', async () => {
+// The help text is part of the switch, not a separate item further down the page:
+// `<toggle.description>` binds the handle the trigger names through
+// `aria-describedby`, so the reader speaks it with the switch.
+test('the help text under a switch is conveyed with the switch itself', async () => {
 	await open(WithHelp);
 	await readUntil(sr, { role: 'switch' });
 	expect(

@@ -100,11 +100,10 @@ test('a field with only help text under it is never conveyed as invalid', async 
 	expect(missingFacts(sr, announcement, { state: ['invalid'] })).not.toEqual([]);
 });
 
-// Recorded red, not asserted green. The same gap `checkbox.sr.ts` records:
-// `<textbox.description>` renders a plain div and wires no `aria-describedby`, so
-// the reader announces the help text as a separate item rather than as part of the
-// field. Whoever wires it deletes the `.fails`.
-test.fails('the help text under a field is conveyed with the field itself', async () => {
+// The help text is part of the field, not a separate item further down the page:
+// `<textbox.description>` binds the handle the control names through
+// `aria-describedby`, so the reader speaks it with the field.
+test('the help text under a field is conveyed with the field itself', async () => {
 	await open(WithHelp);
 	const announcement = await readUntil(sr, { role: 'textbox' });
 	expect(
@@ -112,12 +111,11 @@ test.fails('the help text under a field is conveyed with the field itself', asyn
 	).toEqual([]);
 });
 
-// Recorded red, not asserted green. Mounting `<textbox.error>` marks the control
-// invalid, which the reader does convey - but the error's own text is wired to
-// nothing, so a person is told the field is invalid and never told why. This is
-// the more serious half of the missing-description gap: an invalid field with an
-// unreachable reason. Whoever wires `aria-describedby` deletes the `.fails`.
-test.fails('the reason a field is invalid is conveyed with the field', async () => {
+// Mounting `<textbox.error>` marks the control invalid, and the error's own text
+// is the control's description, so a person is told the field is invalid AND told
+// why. A field that mounts help text and an error together is described by the
+// first of the two - one control names one id until the handle list (U-C) lands.
+test('the reason a field is invalid is conveyed with the field', async () => {
 	await open(Invalid);
 	const announcement = await readUntil(sr, { role: 'textbox', name: 'Password' });
 	expect(missingFacts(sr, announcement, { name: 'Password is required' })).toEqual([]);

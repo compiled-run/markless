@@ -136,6 +136,9 @@ function expectSavedFieldRendered() {
 function expectHelpRendered() {
 	expect(el(Description).textContent).toBe('(Receive notifications about important updates)');
 	expect(el(Trigger).getAttribute('aria-invalid')).toBe('false');
+	// The help text is the switch's description, by a minted id nobody spelled.
+	expect(el(Trigger).getAttribute('aria-describedby')).toBe(el(Description).id);
+	expect(el(Description).id).toBeTruthy();
 }
 
 function expectInvalidRendered() {
@@ -143,6 +146,9 @@ function expectInvalidRendered() {
 	// Every part of one widget instance seeds before any part renders, so the
 	// error part's `toggle.invalid = true` is what the trigger reads.
 	expect(el(Trigger).getAttribute('aria-invalid')).toBe('true');
+	// An invalid switch says why: the error is its description.
+	expect(el(Trigger).getAttribute('aria-describedby')).toBe(el(ToggleError).id);
+	expect(el(ToggleError).id).toBeTruthy();
 }
 
 function expectErrorFirstRendered() {

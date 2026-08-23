@@ -139,9 +139,16 @@ test('a vertical tab list conveys its showing tab and its locked tab', async () 
 // Recorded red, not asserted green. Sequence F step 3: aria-at gives the panel's
 // own accessible name priority 1, taken from `aria-labelledby` pointing at the tab
 // that shows it. `tabs.content` wires no such reference, so a reader reaches an
-// unnamed region and reads its text with no idea which tab it belongs to. The gap
-// is measured in goals/headless-components/notes/research-tabs.md; whoever wires
-// it deletes the `.fails`.
+// unnamed region and reads its text with no idea which tab it belongs to.
+//
+// Still red after the 2026-08-22 attempt, and now for a measured reason rather
+// than an assumed one. The showing-pair shape - the selected trigger putting its
+// text in a `<span el={tabs.showingTabEl}>` inside an `@if`, every panel naming
+// that one handle - is `MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED`, because the arm
+// holds an attribute binding and `selected` flips. Binding the handle on the
+// button unconditionally compiles and is worse: one widget mints one id, so every
+// trigger renders the same one. note.md carries the full transcript. Whoever lands
+// a value-keyed shared() instance deletes the `.fails`.
 test.fails('the showing panel is conveyed with the name of the tab that shows it', async () => {
 	await open(Basic);
 	const announcement = await readUntil(sr, { role: 'tabpanel' });

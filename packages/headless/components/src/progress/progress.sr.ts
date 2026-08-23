@@ -78,13 +78,12 @@ test('an indeterminate bar is still conveyed as a progressbar', async () => {
 	await readUntil(sr, { name: 'Loading...' });
 });
 
-// Recorded red, not asserted green. `progress.root` writes a hard-coded
-// `aria-label="progress"`, so the bar's accessible name is the word "progress" for
-// every bar on every page, and the visible `progress.label` is announced as a
-// separate item the reader cannot connect to it. A person hears "progress bar,
-// progress" and then, later, "Export data 30%". Whoever gives the root a real name
-// - `aria-labelledby` pointing at the label part - deletes the `.fails`.
-test.fails('the bar is conveyed with the name its visible label gives it', async () => {
+// The bar's name is the label a person can see. It used to be the hard-coded word
+// "progress" for every bar on every page, with the visible `progress.label`
+// announced as a separate item no reader could connect to it; the bar now carries
+// `aria-labelledby` pointing at the label part instead, and no aria-label of its
+// own.
+test('the bar is conveyed with the name its visible label gives it', async () => {
 	await open(Basic);
 	const announcement = await readUntil(sr, { role: 'progressbar' });
 	expect(
@@ -92,13 +91,11 @@ test.fails('the bar is conveyed with the name its visible label gives it', async
 	).toEqual([]);
 });
 
-// Recorded red, not asserted green. An indeterminate bar correctly carries no
-// `aria-valuenow`, but `valueText` still computes a percentage from `min`, so
-// `aria-valuetext` says "0%" and the reader announces a job that has not started
-// rather than one whose progress is unknown. The ARIA specification's rule is that
-// an indeterminate bar reports no current value at all; whoever stops writing
-// `aria-valuetext` in that case deletes the `.fails`.
-test.fails('an indeterminate bar conveys no current value', async () => {
+// The ARIA specification's rule is that an indeterminate bar reports no current
+// value at all. It used to carry no `aria-valuenow` and yet an `aria-valuetext` of
+// "0%", computed from `min`, so a reader announced a job that had not started
+// rather than one whose progress is unknown.
+test('an indeterminate bar conveys no current value', async () => {
 	await open(Indeterminate);
 	const announcement = await readUntil(sr, { role: 'progressbar' });
 	expect(announcement, `${sr.name} announced "${announcement}"`).not.toContain('0%');

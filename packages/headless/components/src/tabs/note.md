@@ -60,11 +60,38 @@ inside a keyed repeat), `MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT` (the root ma
 not read its own factory's handle there). Collapsible wires exactly this pairing
 because it has one pair; tabs has N.
 
+The single-pair shape the IDREF capability *can* express was tried and refused,
+on this tip, on 2026-08-22. One widget-scoped handle is one element per rendered
+widget, so the showing tab is the only tab that may carry it:
+
+```tsx
+<button role="tab" …>
+	@if (selected) { <span el={tabs.showingTabEl}>{children}</span> }
+	@else { <span>{children}</span> }
+</button>
+…
+<div role="tabpanel" aria-labelledby={tabs.showingTabEl} …>
+```
+
+That is `MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED`: "this `@if (selected)` cannot be
+rebuilt when `selected` changes because it holds a attribute binding." Binding the
+handle on the button itself instead compiles, and is worse: every trigger in the
+widget renders the same minted id, so three tabs carry three copies of one id and
+every panel resolves to the first of them — the exact ambiguity
+`MARKLESS_ELEMENT_HANDLE_DUPLICATE` refuses when it is spelled twice in source.
+`el={…}` takes a bare handle, so there is no third spelling that binds only the
+showing tab.
+
 What would satisfy it is a widget-scoped instance **keyed by the authored value**
 that two parts in different subtrees both resolve — `shared()` takes only
 `scope`, so there is no key today. Research §6b states the full requirement.
 `tabs.browser.ts` asserts both attributes absent, so that row turns red the day
 the capability lands.
+
+Until then a consumer can name a panel itself: `{...rest}` is spread first and the
+family writes no `aria-label` on `tabs.content`, so
+`<tabs.content value="overview" aria-label="Overview">` reaches a reader named.
+The family cannot do it for them, because only the consumer knows the tab's text.
 
 ## What the compiler forced
 

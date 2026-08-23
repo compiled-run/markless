@@ -21,8 +21,9 @@ export const textboxState = shared(
 		const inputEl = element<HTMLInputElement>();
 		const textareaEl = element<HTMLTextAreaElement>();
 		const labelEl = element<HTMLLabelElement>();
+		const describedEl = element<HTMLDivElement>();
 
-		return { ...textbox, inputEl, textareaEl, labelEl };
+		return { ...textbox, inputEl, textareaEl, labelEl, describedEl };
 	},
 	{ scope: 'widget' },
 );
@@ -68,6 +69,7 @@ export function TextboxInput({
 		{...rest}
 		el={textbox.inputEl}
 		aria-labelledby={textbox.labelEl}
+		aria-describedby={textbox.describedEl}
 		name={textbox.name}
 		value={textbox.value}
 		aria-invalid={textbox.invalid ? 'true' : 'false'}
@@ -94,6 +96,7 @@ export function TextboxTextarea({
 		{...rest}
 		el={textbox.textareaEl}
 		aria-labelledby={textbox.labelEl}
+		aria-describedby={textbox.describedEl}
 		name={textbox.name}
 		value={textbox.value}
 		aria-invalid={textbox.invalid ? 'true' : 'false'}
@@ -113,8 +116,20 @@ export function TextboxLabel({ children, ...rest }: TextboxLabelProps) @{
 	<label {...rest} el={textbox.labelEl} for={textbox.inputEl}>{children}</label>
 }
 
+// The message the control names. One part stands behind both `textbox.description`
+// and `textbox.error` because an element() handle may be bound in exactly one
+// place (MARKLESS_ELEMENT_HANDLE_DUPLICATE) and a control may name exactly one id
+// (a handle list in an IDREF position is MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE,
+// recorded as U-C). A field that mounts one message is named by it; a field that
+// mounts both is named by the first of them, which is the boundary U-C removes.
+function TextboxMessage({ children, ...rest }: TextboxDescriptionProps) @{
+	const textbox = textboxState();
+
+	<div {...rest} el={textbox.describedEl}>{children}</div>
+}
+
 export function TextboxDescription({ children, ...rest }: TextboxDescriptionProps) @{
-	<div {...rest}>{children}</div>
+	<TextboxMessage {...rest}>{children}</TextboxMessage>
 }
 
 export function TextboxError({ children, ...rest }: TextboxErrorProps) @{
@@ -122,5 +137,5 @@ export function TextboxError({ children, ...rest }: TextboxErrorProps) @{
 	// Mounting the error part is what marks the control invalid.
 	textbox.invalid = true;
 
-	<div {...rest}>{children}</div>
+	<TextboxMessage {...rest}>{children}</TextboxMessage>
 }
