@@ -1587,7 +1587,8 @@ export type RuntimeDemandMapRecordKind =
 	| 'branch'
 	| 'dom-update'
 	| 'element-handle'
-	| 'keyed-repeat';
+	| 'keyed-repeat'
+	| 'overlay';
 
 export type RuntimeDemandMapRecord = {
 	readonly recordId: string;

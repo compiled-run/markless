@@ -18,6 +18,20 @@ type RuntimeShared = ReturnType<
 	(typeof import('./resume-runtime-shared.ts'))['createResumeRuntimeShared']
 >;
 
+/**
+ * Where the app's own emitted module leaves its overlay installer, and the whole
+ * cost of elevation to an app that has no `overlay` mark: one optional call.
+ *
+ * A global rather than a module slot, and an installer rather than a loader,
+ * because both alternatives put bytes in modules every app ships to carry a
+ * capability most of them do not have - the same trap the `import()` specifier
+ * itself is. The mark query and the import both live on the emitted side, so an
+ * app without the capability pays for neither.
+ */
+type MarklessOverlayHost = {
+	__marklessOverlay?: (root: Element) => Promise<(() => void) | undefined> | undefined;
+};
+
 export async function startResumeRuntime(input: {
 	readonly runtimeInput: ResumeRuntimeInput;
 	readonly prepared: ResumePreparedCore;
@@ -174,6 +188,17 @@ export async function startResumeRuntime(input: {
 		behaviors.installRemovalObserver();
 	}
 	if ((runtimeInput.view.branches ?? []).length > 0) await loadBranchRuntime();
+	// Pay-per-use in two stages, because fetching less is not the same as shipping
+	// less. The chunk is EMITTED only for an app the compiler recorded an `overlay`
+	// demand for: that app's own module is the ONLY place the `import()` specifier
+	// is written, because a specifier in this module - which every app loads -
+	// makes every app ship the chunk. It is then FETCHED only once a root turns out
+	// to carry a marked element, which is why the installer takes the root and
+	// answers `undefined` for a root with no mark on it.
+	const overlayTeardown = await (globalThis as MarklessOverlayHost).__marklessOverlay?.(
+		runtimeInput.root as unknown as Element,
+	);
+	if (overlayTeardown) storeContainerSubscription(overlayTeardown);
 	// Container capture listeners see every DOM event of a registered type,
 	// including non-markless ones (router links): unmatched must pass through.
 	const dispatchCaptured = (event: Parameters<typeof events.dispatch>[0]) =>

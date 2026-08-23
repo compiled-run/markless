@@ -113,6 +113,9 @@ test('default compiler passes declare stable artifact boundaries', () => {
 				passId: 'runtime-demand-map',
 				description: expect.stringContaining('runtime module demands'),
 				consumes: [
+					// Elevation is a fact about the emitted markup, not a payload
+					// record, so the overlay demand can only come from the graph.
+					'semanticGraph',
 					'symbolResolver',
 					'captureAnalysis',
 					'symbolModules',

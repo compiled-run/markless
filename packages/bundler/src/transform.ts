@@ -505,6 +505,9 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					prerenderRecords: input.prerenderRecords,
 					directCsr: input.directCsr,
 					hasComputedState: compiled.payloadScripts.state.computed.length > 0,
+					hasOverlayMarks: compiled.runtimeDemandMap.payloadRecords.some(
+						(record) => record.kind === 'overlay',
+					),
 					resumeModuleUrl: input.resumeModuleUrl,
 					prerenderWakeModuleUrl: input.prerenderWakeModuleUrl,
 					publicRenderModuleSource: compiled.publicRenderModule.moduleSource,
@@ -773,6 +776,10 @@ const RECORD_NEEDS_FULL_RESUME = {
 	[PROTOCOL_EVENT_ACTION_KIND.event]: () => false,
 	[PROTOCOL_EVENT_ACTION_KIND.externalDelegate]: () => false,
 	'keyed-repeat': (runtimeDemandMap) => !recordKindReplaced(runtimeDemandMap, 'keyed-repeat'),
+	// The overlay behaviour installs from the resume runtime's start, which no lean
+	// tier reaches. A marked app on a lean tier would emit the chunk and never run
+	// it, so the mark forces the tier that can honour it.
+	overlay: () => true,
 } satisfies Record<
 	RuntimeDemandMapRecordKind,
 	(runtimeDemandMap: RuntimeDemandMapArtifact) => boolean

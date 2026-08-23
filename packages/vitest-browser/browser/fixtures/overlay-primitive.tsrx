@@ -1,20 +1,19 @@
-import { element, state } from '@markless/core';
-import { closeOverlay, openOverlay } from '@markless/web/fns/overlay';
+import { state } from '@markless/core';
 
-// The primitive is handed element() handles, never selectors: the page names the
-// surface and the trigger, and the runtime does the rest.
+// The whole surface is the bare `overlay` attribute. Nothing is imported, no
+// handles are passed, and every policy decision - what closes, where focus goes -
+// is written here as an ordinary `onDismiss` handler.
 export default function OverlayPrimitivePage() @{
 	let background = state(0);
-	let modalOpen = state(false);
+	let isModalOpen = state(false);
 	let modalDismissals = state(0);
-	let modalHandled = state('idle');
-	let menuOpen = state(false);
+	let modalReason = state('none');
+	let isMenuOpen = state(false);
 	let menuDismissals = state(0);
-
-	let modalContent = element<HTMLDivElement>();
-	let modalTrigger = element<HTMLButtonElement>();
-	let menuContent = element<HTMLDivElement>();
-	let menuTrigger = element<HTMLButtonElement>();
+	let menuReason = state('none');
+	let isAlwaysShownDismissals = state(0);
+	let isBackdropOpen = state(false);
+	let backdropDismissals = state(0);
 
 	<section data-overlay-page>
 		<button
@@ -31,44 +30,36 @@ export default function OverlayPrimitivePage() @{
 			<button
 				type="button"
 				data-modal-trigger
-				el={modalTrigger}
 				aria-haspopup="dialog"
-				aria-expanded={modalOpen ? 'true' : 'false'}
+				aria-expanded={isModalOpen ? 'true' : 'false'}
 				onClick={() => {
-					modalOpen = true;
-					// The call is its own statement, not the right-hand side of the
-					// state assignment: a handle read inside a state-write's value
-					// expression still lowers to a graph read rather than the live
-					// node, so the primitive would be handed `undefined`.
-					const opened = openOverlay(modalContent, {
-						kind: 'modal',
-						trigger: modalTrigger,
-						onDismiss: () => {
-							modalOpen = false;
-							modalDismissals = modalDismissals + 1;
-						},
-					});
-					modalHandled = opened ? 'opened' : 'refused';
+					isModalOpen = true;
 				}}
 			>Open modal</button>
 			<div
 				data-modal-content
-				el={modalContent}
+				overlay
 				role="dialog"
-				hidden={modalOpen !== true}
-				ui-open={modalOpen}
+				aria-modal="true"
+				hidden={isModalOpen !== true}
+				onDismiss={(event) => {
+					modalReason = event.detail.reason;
+					modalDismissals = modalDismissals + 1;
+					// A modal ignores an outside press: Escape is the only reason it
+					// answers to. The behaviour reported both; the policy is here.
+					if (event.detail.reason === 'escape') isModalOpen = false;
+				}}
 			>
 				<h2 data-modal-title>Delivery address</h2>
 				<button
 					type="button"
 					data-modal-close
 					onClick={() => {
-						modalOpen = false;
-						closeOverlay(modalContent);
+						isModalOpen = false;
 					}}
 				>Close</button>
 				<output data-modal-dismissals>{modalDismissals}</output>
-				<output data-modal-handled>{modalHandled}</output>
+				<output data-modal-reason>{modalReason}</output>
 			</div>
 		</div>
 
@@ -76,34 +67,56 @@ export default function OverlayPrimitivePage() @{
 			<button
 				type="button"
 				data-menu-trigger
-				el={menuTrigger}
-				aria-expanded={menuOpen ? 'true' : 'false'}
+				aria-expanded={isMenuOpen ? 'true' : 'false'}
 				onClick={() => {
-					if (menuOpen === true) {
-						menuOpen = false;
-						closeOverlay(menuContent);
-						return;
-					}
-					menuOpen = true;
-					openOverlay(menuContent, {
-						kind: 'disclosure',
-						trigger: menuTrigger,
-						onDismiss: () => {
-							menuOpen = false;
-							menuDismissals = menuDismissals + 1;
-						},
-					});
+					isMenuOpen = isMenuOpen !== true;
 				}}
 			>Open menu</button>
-			<div
-				data-menu-content
-				el={menuContent}
-				hidden={menuOpen !== true}
-				ui-open={menuOpen}
-			>
+			<div data-menu-content overlay hidden={isMenuOpen !== true} onDismiss={(event) => {
+				menuReason = event.detail.reason;
+				menuDismissals = menuDismissals + 1;
+				isMenuOpen = false;
+			}}>
 				<button type="button" data-menu-item>Item</button>
 				<output data-menu-dismissals>{menuDismissals}</output>
+				<output data-menu-reason>{menuReason}</output>
 			</div>
+		</div>
+
+		<div data-backdrop-widget>
+			<button
+				type="button"
+				data-backdrop-trigger
+				onClick={() => {
+					isBackdropOpen = true;
+				}}
+			>Open backdrop modal</button>
+			<div
+				data-backdrop
+				overlay
+				hidden={isBackdropOpen !== true}
+				onDismiss={(event) => {
+					backdropDismissals = backdropDismissals + 1;
+					if (event.detail.reason === 'escape') isBackdropOpen = false;
+				}}
+			>
+				<div data-backdrop-content role="dialog" aria-modal="true">
+					<button
+						type="button"
+						data-backdrop-close
+						onClick={() => {
+							isBackdropOpen = false;
+						}}
+					>Close</button>
+					<output data-backdrop-dismissals>{backdropDismissals}</output>
+				</div>
+			</div>
+		</div>
+
+		<div data-always-shown overlay onDismiss={() => {
+			isAlwaysShownDismissals = isAlwaysShownDismissals + 1;
+		}}>
+			<output data-always-shown-dismissals>{isAlwaysShownDismissals}</output>
 		</div>
 	</section>
 }

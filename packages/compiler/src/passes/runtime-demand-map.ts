@@ -50,6 +50,11 @@ const KEYED_REPEAT = ['web/repeat-runtime', 'web/resume-keyed-repeats'];
 const BRANCH = ['web/resume-branches'];
 const ASYNC_BOUNDARY = ['web/resume-async-boundaries'];
 const BEHAVIOR = ['web/resume-behaviors'];
+// The overlay behaviour. Recording the demand here is what makes it emittable at
+// all: no module the runtime always loads may write the `import()` specifier, or
+// every app would ship the chunk, so the app's own emitted module writes it and
+// this record is what tells the bundler to.
+const OVERLAY = ['web/fns/overlay'];
 const FULL_RESUME_CORE = ['web/resume-locators'];
 const FULL_TIER_COMMON = [
 	'web/resume-runtime',
@@ -81,6 +86,7 @@ const RECORD_KINDS = [
 	PROTOCOL_EVENT_ACTION_KIND.event,
 	PROTOCOL_EVENT_ACTION_KIND.externalDelegate,
 	'keyed-repeat',
+	'overlay',
 ] as const satisfies ReadonlyArray<RuntimeDemandMapRecordKind>;
 
 const RUNTIME_DEMAND_CLASSIFIER = {
@@ -103,6 +109,10 @@ export function createRuntimeDemandMap(input: {
 	readonly publicRenderModule: PublicRenderModuleArtifact;
 	readonly protocolView: ProtocolViewPayload;
 	readonly protocolState: ProtocolStatePayload;
+	// Elevation is a compile-time fact about the emitted markup, not a runtime
+	// record: the behaviour reads the mark off the DOM, so the payload carries no
+	// overlay record and this is the only place the demand can come from.
+	readonly overlays?: ReadonlyArray<{ readonly hostNodeId: string }>;
 }, demandClass: RuntimeDemandClass): RuntimeDemandMapArtifact {
 	const storageRequiresFullResume = (input.protocolState.storage?.length ?? 0) > 0;
 	const storageFreePayload = input.protocolState.version === ASYNC_PROTOCOL_VERSION;
@@ -146,6 +156,7 @@ export function createRuntimeDemandMap(input: {
 		},
 		dispatchCore,
 		fullTier,
+		input.overlays ?? [],
 	);
 	return {
 		passId: 'runtime-demand-map',
@@ -174,6 +185,10 @@ export function createRuntimeDemandMap(input: {
 			...BRANCH,
 			...ASYNC_BOUNDARY,
 			...BEHAVIOR,
+			// Conditional, unlike the kinds above: the overlay behaviour is only
+			// reachable in an app that compiled a mark, so listing it unconditionally
+			// would let the execution oracle excuse it everywhere.
+			...((input.overlays ?? []).length > 0 ? OVERLAY : []),
 			...FULL_RESUME_CORE,
 			...fullTier,
 		]),
@@ -550,6 +565,7 @@ function payloadDemandRecords(
 	replacement: { readonly scalarEventKeys: ReadonlySet<string>; readonly scalarRows: boolean },
 	dispatchCore: ReadonlyArray<string>,
 	fullTier: ReadonlyArray<string>,
+	overlays: ReadonlyArray<{ readonly hostNodeId: string }>,
 ): RuntimeDemandMapArtifact['payloadRecords'] {
 	const rowDispatchCore = replacement.scalarRows ? ROW_LEAN_DISPATCH_CORE : fullTier;
 	return [
@@ -640,6 +656,15 @@ function payloadDemandRecords(
 			kind: 'element-handle',
 			hostNodeId: record.hostNodeId,
 			runtimeModuleIds: FULL_RESUME_CORE,
+		})),
+		// The behaviour installs from the resume runtime's start, so a marked app
+		// demands the full tier with it; the slot is what the app module writes the
+		// loader into.
+		...overlays.map((record): RuntimeDemandMapRecord => ({
+			recordId: `overlay:${record.hostNodeId}`,
+			kind: 'overlay',
+			hostNodeId: record.hostNodeId,
+			runtimeModuleIds: unique([...fullTier, ...OVERLAY]),
 		})),
 	];
 }

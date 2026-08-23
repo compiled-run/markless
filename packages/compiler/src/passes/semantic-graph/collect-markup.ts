@@ -32,6 +32,7 @@ import {
 	idrefElementHandleIdConflictDiagnostic,
 } from './diagnostics.ts';
 import { anchorStyleProperty, isIdrefAttribute } from './idref-attributes.ts';
+import { OVERLAY_DOM_ATTRIBUTE, overlayLiteralValue } from './overlay-attribute.ts';
 import {
 	createStyleConstResolver,
 	lowerStyleObject,
@@ -158,6 +159,13 @@ function finishChunk(builder: ChunkBuilder): SemanticMarkupChunk {
 
 function append(builder: ChunkBuilder, value: string): void {
 	builder.statics[builder.statics.length - 1] += value;
+}
+
+// `overlay={false}` is the absent case and lowers to nothing; a non-literal never
+// reaches markup collection because the semantic pass refuses it first.
+function isElevated(attribute: AnyNode): boolean {
+	const value = attribute.value as AnyNode | undefined;
+	return overlayLiteralValue(value, unwrapExpressionContainer(value)) === true;
 }
 
 function addSlot(builder: ChunkBuilder, slot: NewSlot): void {
@@ -409,15 +417,19 @@ function emitNode(
 			continue;
 		}
 		const name = getIdentifierName(attribute.name as AnyNode | undefined);
-		// overlay is a compiler-side elevation mark, not a DOM attribute: without this
-		// skip staticAttributeValue leaks ` overlay=""` (bare) or ` overlay="true"`
-		// ({true}) straight into the emitted statics.
+		// overlay lowers to one normalized valueless attribute, never to whatever
+		// staticAttributeValue would have made of the authored spelling: bare and
+		// `={true}` both write ` overlay=""`, `={false}` writes nothing, and a
+		// non-literal never reaches here because the semantic pass refuses it.
+		if (name === OVERLAY_DOM_ATTRIBUTE) {
+			if (isElevated(attribute)) append(builder, ` ${OVERLAY_DOM_ATTRIBUTE}=""`);
+			continue;
+		}
 		if (
 			!name ||
 			isEventAttribute(name) ||
 			name === 'attach' ||
 			name === 'el' ||
-			name === 'overlay' ||
 			// A CSS anchor position is not a DOM attribute: it lowers to the one
 			// style slot below, so writing it here would leak `anchorname="..."`.
 			anchorStyleProperty(name) !== undefined ||
@@ -688,15 +700,16 @@ function emitDynamicHost(
 			continue;
 		}
 		const name = getIdentifierName(attribute.name as AnyNode | undefined);
-		// overlay is a compiler-side elevation mark, not a DOM attribute: without this
-		// skip staticAttributeValue leaks ` overlay=""` (bare) or ` overlay="true"`
-		// ({true}) straight into the emitted statics.
+		// Same normalized lowering as the static-host path above.
+		if (name === OVERLAY_DOM_ATTRIBUTE) {
+			if (isElevated(attribute)) staticAttributes[OVERLAY_DOM_ATTRIBUTE] = '';
+			continue;
+		}
 		if (
 			!name ||
 			isEventAttribute(name) ||
 			name === 'attach' ||
 			name === 'el' ||
-			name === 'overlay' ||
 			anchorStyleProperty(name) !== undefined ||
 			(name === 'style' && anchorStyle !== null)
 		)

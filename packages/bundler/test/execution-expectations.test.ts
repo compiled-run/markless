@@ -67,6 +67,7 @@ test('generated demand map carries per-kind replacement phase flags', async () =
 			'event',
 			'external-delegate',
 			'keyed-repeat',
+			'overlay',
 		].map((kind) => ({ kind, replaced: false })),
 	);
 	expect(payload.runtimeDemandMap.actions[0].payloadRecordIds).toEqual([
@@ -213,6 +214,7 @@ test('scalar-looking actions with extra authored work stay on the full dispatch 
 			'event',
 			'external-delegate',
 			'keyed-repeat',
+			'overlay',
 		].map((kind) => ({ kind, replaced: false })),
 	);
 	expect(payload.runtimeDemandMap.actions[0].plan).toBeUndefined();
@@ -249,6 +251,7 @@ test('mixed scalar modules leave replacement phase flags open', async () => {
 			'event',
 			'external-delegate',
 			'keyed-repeat',
+			'overlay',
 		].map((kind) => ({ kind, replaced: false })),
 	);
 });
