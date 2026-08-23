@@ -12,7 +12,7 @@ import type { ScreenReaderDriver } from './driver.ts';
 export const virtualDriver: ScreenReaderDriver = {
 	name: 'virtual',
 	// The words this reader speaks, taken from its own output for our markup,
-	// not from its docs. NVDA and VoiceOver drivers fill the same six slots.
+	// not from its docs. NVDA and VoiceOver drivers fill the same slots.
 	vocabulary: {
 		checkbox: 'checkbox',
 		group: 'group',
@@ -21,11 +21,24 @@ export const virtualDriver: ScreenReaderDriver = {
 		partiallyChecked: 'partially checked',
 		disabled: 'disabled',
 		invalid: 'invalid',
+		switch: 'switch',
+		radiogroup: 'radiogroup',
+		radio: 'radio',
+		tablist: 'tablist',
+		tab: 'tab',
+		tabpanel: 'tabpanel',
+		button: 'button',
+		progressbar: 'progressbar',
+		textbox: 'textbox',
+		selected: 'selected',
+		expanded: 'expanded',
+		notExpanded: 'not expanded',
 	},
 	// Guidepup's docs spell the toggle key "Space", which its press() forwards to
 	// user-event as `{Space}`; user-event has no key by that name, so the button
 	// activation behaviour never runs and nothing toggles. The character does.
-	keys: { space: ' ', enter: 'Enter' },
+	// The arrow keys are user-event's own names and need no such correction.
+	keys: { space: ' ', enter: 'Enter', arrowDown: 'ArrowDown', arrowRight: 'ArrowRight' },
 	segments: (phrase) => phrase.split(', '),
 	start: (container) => virtual.start({ container }),
 	stop: () => virtual.stop(),

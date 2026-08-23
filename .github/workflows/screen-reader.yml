@@ -59,7 +59,19 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                family: [checkbox, checklist]
+                # Every family with a src/<family>/<family>.sr.ts. One job per
+                # family, so a red lane names the family in its own job title.
+                family:
+                    [
+                        checkbox,
+                        checklist,
+                        collapsible,
+                        progress,
+                        radio-group,
+                        tabs,
+                        textbox,
+                        toggle,
+                    ]
 
         steps:
             - uses: actions/checkout@v4
