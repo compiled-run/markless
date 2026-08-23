@@ -69,7 +69,10 @@ const resumeOnDemandEntries = [
 // though: the largest closure this wall governs is now resume-runtime.ts at
 // 20,996, a single-file closure this change does not touch. This is a measured
 // value, not an estimate -- every governed entry was re-measured here.
-const sourceByteLimit = 20996;
+// 20,996 -> 20,983 (re-anchor 2026-08-22, teardown-dispatch fix): the disposed
+// flag went unconditional and hosts dispose with ignoreFutureEvents; comment
+// trims inside resume-runtime.ts paid for the logic, net -13.
+const sourceByteLimit = 20983;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',
