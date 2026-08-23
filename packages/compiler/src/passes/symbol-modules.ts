@@ -211,6 +211,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 				modules,
 				input.symbolResolver.symbols,
 				graphBindingLocalNames(input.semanticGraph),
+				sharedInstanceLocalNames(input.semanticGraph),
 			).map(unresolvedGraphReferenceDiagnostic),
 		],
 	};
@@ -338,6 +339,15 @@ type UnresolvedGraphReference = {
 	readonly name: string;
 	/** The authored expression that carried it, when the symbol records one. */
 	readonly expression?: string;
+	/**
+	 * Whether the name is a shared() instance rather than a state cell.
+	 *
+	 * The two fail for different reasons and take different advice: a state read
+	 * is lowered once it stands on its own line, while a shared instance never
+	 * exists in the handler module at all, so hoisting a member of it into a local
+	 * — which is what the state advice asks for — moves the same crash one line up.
+	 */
+	readonly sharedInstance?: boolean;
 };
 
 /** Names that denote graph state in the authored file, as the author spelled them. */
@@ -353,8 +363,15 @@ function graphBindingLocalNames(
 		...semanticGraph.graphBindings.flatMap((binding) =>
 			binding.kind === 'prop' ? [] : [binding.name],
 		),
-		...semanticGraph.sharedInstances.map((instance) => instance.localName),
+		...sharedInstanceLocalNames(semanticGraph),
 	]);
+}
+
+/** The local names shared() instances are bound to in this file. */
+function sharedInstanceLocalNames(
+	semanticGraph: SymbolModulesInput['semanticGraph'],
+): ReadonlySet<string> {
+	return new Set((semanticGraph?.sharedInstances ?? []).map((instance) => instance.localName));
 }
 
 /**
@@ -393,6 +410,7 @@ function unresolvedGraphReferences(
 	modules: ReadonlyArray<GeneratedSymbolModule>,
 	symbols: ReadonlyArray<PlannedSymbol>,
 	graphNames: ReadonlySet<string>,
+	sharedInstanceNames: ReadonlySet<string>,
 ): ReadonlyArray<UnresolvedGraphReference> {
 	if (graphNames.size === 0) return [];
 
@@ -410,6 +428,7 @@ function unresolvedGraphReferences(
 				...(unresolvedGraphExpression(symbol, name)
 					? { expression: unresolvedGraphExpression(symbol, name) }
 					: {}),
+				...(sharedInstanceNames.has(name) ? { sharedInstance: true } : {}),
 			}));
 	});
 }
@@ -447,11 +466,18 @@ function identifierRootNames(valueSource: string): ReadonlySet<string> {
  * import local, declaration id, parameter, and catch binding in the module, which
  * over-approximates deliberately: over-counting a binding can only make this walk
  * quieter, never louder.
+ *
+ * Read as TypeScript, because an emitted handler module can carry TypeScript: a
+ * shared() method inlined into it keeps the annotations the author wrote on its
+ * parameters (`(next: boolean) => { ... }`). Parsed as plain JavaScript that
+ * module threw, the catch below claimed nothing, and this whole check went quiet
+ * for exactly the modules an inlined method could break — a fail-open the
+ * annotations alone were enough to trigger.
  */
 function freeIdentifierNames(source: string): ReadonlySet<string> {
 	let ast: AnyNode;
 	try {
-		ast = parseJavaScriptModule(source);
+		ast = parseJavaScriptModule(source, 'generated.ts');
 	} catch {
 		// A module the compiler just printed and cannot reparse is a different
 		// defect; it is not evidence that this one is present, so claim nothing.
@@ -545,6 +571,8 @@ function unresolvedGraphReferenceDiagnostic(
 		? `The expression is \`${reference.expression}\`.`
 		: `It appears in the module for ${reference.symbolId}.`;
 
+	if (reference.sharedInstance === true) return sharedInstanceReferenceDiagnostic(reference, where);
+
 	return {
 		code: SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE,
 		severity: 'error',
@@ -560,6 +588,42 @@ function unresolvedGraphReferenceDiagnostic(
 			},
 			{
 				message: `Or assign a shape the compiler already lowers: a direct read (\`${reference.name}.<field>\`), a field of the event (\`event.currentTarget.value\`), or that read passed straight to an imported or global call (\`Number(${reference.name}.<field>)\`).`,
+			},
+		],
+		docsUrl: `https://markless.dev/errors/${SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE}`,
+	};
+}
+
+/**
+ * The same refusal for a shared() instance, which needs different advice.
+ *
+ * A handler that CALLS a method of the instance is compiled by copying that
+ * method's body into the handler module, so the instance is never named there.
+ * Passing the method instead of calling it — `{ onDismiss: modal.dismissed }`, or
+ * the same read hoisted into a local first — leaves nothing to copy: the emitted
+ * module names an instance that only exists inside the shared() factory, and the
+ * first dispatch throws. The state advice makes that worse, because hoisting the
+ * read into a local is exactly the spelling that fails here.
+ */
+function sharedInstanceReferenceDiagnostic(
+	reference: UnresolvedGraphReference,
+	where: string,
+): SymbolModulesDiagnostic {
+	return {
+		code: SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE,
+		severity: 'error',
+		phase: 'public-render',
+		passId: 'symbol-modules',
+		artifactKeys: ['symbolModules'],
+		title: `This expression passes "${reference.name}" around instead of calling it`,
+		message: `The emitted ${reference.kind} module for ${reference.symbolId} still names "${reference.name}" directly. ${where} "${reference.name}" is a shared() instance built by the component, and no instance exists inside the handler module, so this module would throw a ReferenceError the first time it runs.`,
+		why: 'A handler is compiled into a module of its own, and a call to a shared() method is compiled by copying that method\'s body in. Only a call has a body to copy: a method read as a value — passed to a function, stored in a local, or set as an object property — leaves the instance name standing with nothing behind it.',
+		suggestions: [
+			{
+				message: `Call it inside a closure at the point of use: \`() => ${reference.name}.<method>()\`. The call is copied into the handler module, and the closure around it is passed on as an ordinary function.`,
+			},
+			{
+				message: `Do not hoist the method into a local first (\`const handler = ${reference.name}.<method>;\`). That is the same read one line earlier and fails the same way.`,
 			},
 		],
 		docsUrl: `https://markless.dev/errors/${SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE}`,
@@ -2228,7 +2292,13 @@ function deriveReferencedIdentifierNames(root: unknown): ReadonlySet<string> {
 	return names;
 }
 
-/** Side tables and back-pointers, which are not tree structure. */
+/**
+ * Side tables and back-pointers, which are not tree structure, and the
+ * TypeScript annotation positions, which are not runtime references: a parameter
+ * typed `next: ModalState` names a type, and counting that name as a reference
+ * would keep an import alive and could report a graph binding as unresolved on
+ * the strength of a type alias sharing its name.
+ */
 const REFERENCE_WALK_IGNORED_KEYS: ReadonlySet<string> = new Set([
 	'parent',
 	'loc',
@@ -2236,6 +2306,11 @@ const REFERENCE_WALK_IGNORED_KEYS: ReadonlySet<string> = new Set([
 	'leadingComments',
 	'trailingComments',
 	'comments',
+	'typeAnnotation',
+	'returnType',
+	'typeParameters',
+	'typeArguments',
+	'superTypeArguments',
 ]);
 
 function syncComputedDeriveStatements(
@@ -4817,8 +4892,31 @@ function eventReadNode(
  * span is dropped from the replacement list and the authored text survives.
  */
 function eventWriteNode(node: AnyNode, rewrite: EventHandlerRewrite): EmissionNode | null {
-	for (const write of rewrite.symbol.writes ?? []) {
-		if (rewrite.claimedWrites.has(write)) continue;
+	const writes = rewrite.symbol.writes ?? [];
+
+	return (
+		matchedWriteNode(node, writes, rewrite, (write) => !rewrite.claimedWrites.has(write)) ??
+		// A shared() method called twice in one handler — `modal.setOpen(true)` in
+		// the body and `modal.setOpen(false)` inside an options callback — is
+		// inlined once per call site, so the same authored write appears twice in
+		// the source being walked. The lowering upstream records it once, and
+		// consuming that record on the first copy left the second naming the
+		// factory-local instance: a ReferenceError on dispatch that nothing said.
+		// A record another occurrence already claimed still describes this one —
+		// the graph node, path and operator all come from the node's own text — so
+		// the second copy lowers off the same record rather than being left alone.
+		matchedWriteNode(node, writes, rewrite, (write) => rewrite.claimedWrites.has(write))
+	);
+}
+
+function matchedWriteNode(
+	node: AnyNode,
+	writes: ReadonlyArray<LoweredStateWrite>,
+	rewrite: EventHandlerRewrite,
+	admits: (write: LoweredStateWrite) => boolean,
+): EmissionNode | null {
+	for (const write of writes) {
+		if (!admits(write)) continue;
 		if (!eventWriteNodeMatches(node, write, rewrite.source)) continue;
 
 		const lowered = loweredEventWriteNode(node, write, rewrite);
