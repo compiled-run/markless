@@ -322,40 +322,25 @@ function asPropsRecord(value: unknown): Readonly<Record<string, unknown>> {
 		: {};
 }
 
-// Every payload node one same-module component claims: the ids it declared, and
-// the state positions the producer partitioned to it when several components of
-// one module spell the same id.
-function marklessClaimedGraphNodes(definition: PrerenderDataDefinition): ReadonlySet<string> {
-	const claimed = new Set<string>(definition.stateGraphNodeIds ?? []);
-	for (const index of definition.stateCellIndexes ?? []) {
-		const cell = definition.state.cells[index];
-		if (cell) claimed.add(cell.graphNodeId);
-	}
-	for (const index of definition.stateComputedIndexes ?? []) {
-		const computed = definition.state.computed[index];
-		if (computed) claimed.add(computed.graphNodeId);
-	}
-	if (definition.propCellId) claimed.add(definition.propCellId);
-	return claimed;
-}
-
-// Whether this component is the one that should run the derive behind a
-// graph node's initial value. Deliberately conservative: it answers no only
-// when another same-module component positively claims the node and this one
-// does not, so an unpartitioned surface keeps evaluating exactly what it
-// evaluates today rather than silently dropping a derive.
+// Whether this component is the one that should run the derive behind a graph
+// node's initial value. `stateGraphNodeIds` is every payload node a component
+// declared plus the ones its own chunks read, so it is the claim. Deliberately
+// conservative: this answers no only when another same-module component
+// positively claims the node and this one does not, so an unpartitioned surface
+// keeps evaluating exactly what it evaluates today rather than silently
+// dropping a derive.
 function marklessOwnsDerivedNode(
 	surface: PrerenderDataSurface,
 	componentName: string,
 	graphNodeId: string,
 ): boolean {
-	const definition = surface.components[componentName];
-	if (definition && marklessClaimedGraphNodes(definition).has(graphNodeId)) return true;
-	for (const [name, candidate] of Object.entries(surface.components)) {
-		if (name === componentName) continue;
-		if (marklessClaimedGraphNodes(candidate).has(graphNodeId)) return false;
+	let claimed = false;
+	for (const name in surface.components) {
+		if (!surface.components[name]?.stateGraphNodeIds?.includes(graphNodeId)) continue;
+		if (name === componentName) return true;
+		claimed = true;
 	}
-	return true;
+	return !claimed;
 }
 
 async function evaluatePrerenderDataComponent(input: {
