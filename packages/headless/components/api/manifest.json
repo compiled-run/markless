@@ -94,6 +94,7 @@
 			{
 				"part": "button",
 				"component": "Button",
+				"doc": "A button. Give it `pressed` and it becomes a toggle button that reports\n`aria-pressed` and flips on each activation; leave `pressed` off and it is an\nordinary button with no state of its own.",
 				"props": [
 					{
 						"name": "pressed",
@@ -112,11 +113,13 @@
 			{
 				"part": "label",
 				"component": "Label",
+				"doc": "A plain `<label>`. It wires nothing on its own: `for` is passed straight\nthrough, so the consumer decides what it names. A family that owns its own\ncontrol ships its own label part instead, already pointed at that control.",
 				"props": []
 			},
 			{
 				"part": "visuallyhidden",
 				"component": "VisuallyHidden",
+				"doc": "Content that is hidden from sight but still reached by screen readers and\nstill focusable. The clipping style is written inline and no class ships, so\nno consumer stylesheet can collide with it.",
 				"props": []
 			}
 		]
