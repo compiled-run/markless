@@ -589,6 +589,9 @@ function prerenderDataModuleSource(
 			residueReaderSource,
 			residueReaderImports,
 			residueReaderDeclarations,
+			// A build-time gate answer, not render data: stripped here so widening the
+			// gate adds no payload byte to the modules it turns the pass on for.
+			rootsWidget: _rootsWidget,
 			...record
 		} = definition as Readonly<Record<string, unknown>> & {
 			readonly residueReaderSource?: string;
@@ -597,6 +600,7 @@ function prerenderDataModuleSource(
 				readonly line: string;
 			}>;
 			readonly residueReaderDeclarations?: ReadonlyArray<string>;
+			readonly rootsWidget?: boolean;
 		};
 		for (const entry of residueReaderImports ?? []) {
 			readerImports.set(
@@ -615,13 +619,29 @@ function prerenderDataModuleSource(
 	});
 	const preludes = [...readerImports.values(), ...readerDeclarations];
 	// Pay-per-use gate: this module's render data is loaded by exactly the pages
-	// that compose it, so a build with no shared-seed symbol never loads the pass.
-	const seedsShared = compiled.publicRenderModule.componentDefinitions.some((definition) =>
-		Object.values(
-			(definition as { readonly initialValueKinds?: Readonly<Record<string, string>> })
-				.initialValueKinds ?? {},
-		).includes('shared-seed'),
-	);
+	// that compose it, so a build that needs nothing from the pass never loads it.
+	//
+	// Two facts turn it on, because the pass does two jobs. It RUNS a widget
+	// root's shared seeds, which a module with a `shared-seed` symbol needs; and
+	// it FILES the widget-instance token every `shared()` element() handle mints
+	// its id from, which a module that roots a widget-scoped family needs whether
+	// or not that family plans a seed. A family of element() handles over constant
+	// state plans no seed symbol at all, so gating on seeds alone left its parts
+	// minting against a token nobody had filed (MARKLESS_ELEMENT_HANDLE_WIDGET_
+	// INSTANCE_MISSING on CSR, while SSR's own marker answered). `rootsWidget` is
+	// the compiler's `widgetRootComponents` answer for this module — the same fact
+	// the SSR `marklessWidgetRoots` marker publishes — and it is stripped from the
+	// record above, so a module the gate turns on pays only the two lines below.
+	const seedsShared = compiled.publicRenderModule.componentDefinitions.some((definition) => {
+		const record = definition as {
+			readonly initialValueKinds?: Readonly<Record<string, string>>;
+			readonly rootsWidget?: boolean;
+		};
+		return (
+			record.rootsWidget === true ||
+			Object.values(record.initialValueKinds ?? {}).includes('shared-seed')
+		);
+	});
 	return [
 		...(seedsShared
 			? [

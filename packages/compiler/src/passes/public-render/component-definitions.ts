@@ -4,6 +4,7 @@ import { asNodes, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { firstComponentRoot } from './plan.ts';
 import { sharedCallbackSlotGraphNodeId } from '../semantic-graph/collect-shared.ts';
 import { emitClientResidueReader, emitClientResidueReaderPrelude } from './residue-reader.ts';
+import { widgetRootDefinitionIds } from './shared-seed-pass.ts';
 import {
 	callbackSymbolIds,
 	componentPropNames,
@@ -229,6 +230,12 @@ export function collectPublicRenderComponentDefinitions(
 						? componentPropCellId(componentNode)
 						: null,
 				ownsModuleData: componentName === rootInfo.componentName,
+				// Build-time only: the bundler reads it to decide whether this module's
+				// render-data needs the shared-seed pass, then strips it before the
+				// record is serialised, so it costs the payload nothing.
+				...(widgetRootDefinitionIds(input, componentName).length > 0
+					? { rootsWidget: true }
+					: {}),
 				...residueReaderFields(),
 			},
 		];
