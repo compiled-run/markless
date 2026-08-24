@@ -317,7 +317,17 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 		// rooting list wired for events and unable to follow its own collection.
 		// The row still renders one root element per item, which is all the
 		// reconcile needs.
-		if (!render || indexKeyed.has(repeat.id) || !rowRootsOneElement(input, render)) return [];
+		// No row start offset means the parent's prefix holds a sibling whose
+		// element count is only known at render time, so no position can name a
+		// row. Shipping the record anyway would pair every key with the wrong
+		// element - the reconcile has no second way to find a row - so the repeat
+		// stays unresumed instead of resumed wrong.
+		if (
+			!render ||
+			indexKeyed.has(repeat.id) ||
+			render.rowStartOffset === undefined ||
+			!rowRootsOneElement(input, render)
+		) return [];
 		const rowHostPaths = hostPathsForChunk(input, render.rowChunkId, true);
 		// Row-owned handles ride the repeat, in row-relative coordinates, for the
 		// same reason row events do: the resumed set is whatever the parent's live
@@ -344,6 +354,8 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 				keyPath: repeat.keyPath,
 				itemName: render.itemName,
 				rowElementCount: render.rowElementCount,
+				// Pay-per-use: rows that already start the parent say nothing.
+				...(render.rowStartOffset > 0 ? { rowStartOffset: render.rowStartOffset } : {}),
 				rowEvents: oneRecordPerEvent(input.payloadArena.view.events)
 					.filter((event) => rowHostPaths.has(event.hostNodeId))
 					.map((event) => ({

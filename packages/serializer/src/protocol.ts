@@ -304,6 +304,13 @@ export type ProtocolViewPayload = {
 		readonly keyPath: ReadonlyArray<string>;
 		readonly itemName: string;
 		readonly rowElementCount: number;
+		/**
+		 * Element children of the parent that stand before the rows. Rows occupy
+		 * `[rowStartOffset, rowStartOffset + items.length)` among the parent's child
+		 * elements; a repeat whose rows begin at 0 omits the field. A repeat whose
+		 * prefix has no compile-time element count ships no record at all.
+		 */
+		readonly rowStartOffset?: number;
 		readonly rowElementHandles?: ReadonlyArray<{
 			readonly hostPath: ReadonlyArray<number>;
 			readonly handleId: string;
