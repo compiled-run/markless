@@ -22,6 +22,15 @@ export function reportMarker(element: Element | undefined): string {
 		.join('|');
 }
 
+// Both handle reads of one handler leave together, so neither can fold away:
+// the item's own element and the whole set its group holds.
+const orders: string[] = [];
+
+export function appendOrder(element: Element | undefined, order: string): string {
+	orders.push(`${reportOne(element)}=${order}`);
+	return orders.join(' ');
+}
+
 // One module, one array, however many lazy symbol chunks import it: the running
 // order of handlers compiled into DIFFERENT modules is only observable from a
 // place both of them can reach.

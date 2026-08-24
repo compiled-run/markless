@@ -21,6 +21,17 @@ function all(container: ParentNode, selector: string) {
 	return [...container.querySelectorAll<HTMLElement>(selector)];
 }
 
+// The trail is served EMPTY, so polling it for '' cannot tell a finished reset
+// from one whose lazy handler is still loading - and a reset landing mid-list
+// would rewrite the very order these rows are about. `data-resets` counts the
+// resets that actually ran, which is a settle point with only one meaning.
+async function resetTrail(container: ParentNode) {
+	const root = one(container, '[data-mb-events-root]');
+	one(container, '[data-mb-reset]').click();
+	await expect.poll(() => root.getAttribute('data-resets')).toBe('1');
+	expect(root.getAttribute('data-trail')).toBe('');
+}
+
 // ---------------------------------------------------------------- radio-group
 
 // The shape the ruling names: one `<input>` carries the ITEM instance's singular
@@ -125,8 +136,7 @@ test('SSR resume: the heterogeneous set reads back across all three tags', async
 
 async function expectAuthoredOrder(container: ParentNode) {
 	const root = one(container, '[data-mb-events-root]');
-	one(container, '[data-mb-reset]').click();
-	await expect.poll(() => root.getAttribute('data-trail')).toBe('');
+	await resetTrail(container);
 
 	one(container, '[data-mb-order]').click();
 	await expect.poll(() => root.getAttribute('data-trail')).toBe('one|two|three');
@@ -144,8 +154,7 @@ test('SSR resume: an event array runs its handlers in authored order after resum
 
 async function expectStopImmediateToEndTheList(container: ParentNode) {
 	const root = one(container, '[data-mb-events-root]');
-	one(container, '[data-mb-reset]').click();
-	await expect.poll(() => root.getAttribute('data-trail')).toBe('');
+	await resetTrail(container);
 
 	one(container, '[data-mb-stop]').click();
 	await expect.poll(() => root.getAttribute('data-trail')).toBe('first|second');
@@ -170,8 +179,7 @@ test('SSR resume: stopImmediatePropagation ends the list after resume too', asyn
 async function expectSpreadHandlerToMerge(container: ParentNode) {
 	const page = one(container, '[data-mb-events-page]');
 	const root = one(container, '[data-mb-events-root]');
-	one(container, '[data-mb-reset]').click();
-	await expect.poll(() => root.getAttribute('data-trail')).toBe('');
+	await resetTrail(container);
 
 	one(container, '[data-mb-merge]').click();
 	// The part's own handler ran (its widget state carries `part`), and the
@@ -193,8 +201,7 @@ test('SSR resume: a spread-carried handler merges with the part own after resume
 async function expectMergedListToHonorStopImmediate(container: ParentNode) {
 	const page = one(container, '[data-mb-events-page]');
 	const root = one(container, '[data-mb-events-root]');
-	one(container, '[data-mb-reset]').click();
-	await expect.poll(() => root.getAttribute('data-trail')).toBe('');
+	await resetTrail(container);
 
 	one(container, '[data-mb-merge-stop]').click();
 	await expect.poll(() => root.getAttribute('data-trail')).toBe('part-stop');

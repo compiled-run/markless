@@ -3,7 +3,9 @@ import { mark, resetTrail } from './mb-report.ts';
 
 export const mbEvents = shared(
 	() => {
-		const s = state({ trail: '' });
+		// `resets` is the trail's settle point: `trail` is served empty, so a test
+		// polling it for '' cannot tell a finished reset from one still in flight.
+		const s = state({ trail: '', resets: 0 });
 
 		return { ...s };
 	},
@@ -13,7 +15,7 @@ export const mbEvents = shared(
 export function MbEventsRoot({ children }) @{
 	const box = mbEvents();
 
-	<div data-mb-events-root data-trail={box.trail}>{children}</div>
+	<div data-mb-events-root data-trail={box.trail} data-resets={box.resets}>{children}</div>
 }
 
 // `onClick={[a, b, c]}` runs in the order it is written. Each entry is its own
@@ -64,5 +66,8 @@ export function MbMergeStopTrigger({ children, ...rest }) @{
 export function MbReset() @{
 	const box = mbEvents();
 
-	<button type="button" data-mb-reset onClick={() => { box.trail = resetTrail(); }}>reset</button>
+	<button type="button" data-mb-reset onClick={() => {
+		box.trail = resetTrail();
+		box.resets = box.resets + 1;
+	}}>reset</button>
 }

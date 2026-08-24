@@ -88,12 +88,17 @@ declare namespace __MarklessTypeService {
 	 * writes rather than replacing it, the way two listeners on one element behave
 	 * on the platform.
 	 *
-	 * KNOWN GAP: the slot type is still the single-handler one. Widening it to
-	 * `OneOrMany<...>` is what the compiler now implements, but a part that writes
-	 * `{ onClick, ...rest }` infers its own prop from this slot, and a union with
-	 * an array arm is not callable - `onClick?.(event)` then fails to typecheck
-	 * across @markless/ui. Widening needs the part-prop type separated from the
-	 * JSX attribute type first, which is a change in that package.
+	 * KNOWN GAP, and why it stays one: the slot type is the single-handler one,
+	 * so the list form the compiler implements is legal to compile but not to
+	 * typecheck. Separating the JSX attribute type from the part-prop type -
+	 * `IntrinsicElements` reading an `OneOrMany` twin while `PropsOf` keeps the
+	 * callable spelling - was tried and does not hold: completion-matrix row M16
+	 * pins `PropsOf<Tag>` and `JSX.IntrinsicElements[Tag]` MUTUALLY assignable, and
+	 * mutual assignability makes them the same type, so the array arm cannot live
+	 * in one without reaching the other and making `onClick?.(event)` uncallable.
+	 * The two requirements are in direct conflict; closing this needs an owner
+	 * ruling on which of them gives, not another type shape. It is not a
+	 * @markless/ui change: no family edit was needed to reach the conflict.
 	 */
 	type NativeEventAttributes<E extends globalThis.Element> = {
 		[Name in keyof ElementEventMap<E> as Name extends string
