@@ -264,6 +264,12 @@ export function emitSourceModule(input: {
 		input.publicRenderRootExportName === null &&
 		!!input.publicSsrModuleSource &&
 		!!input.renderDataId;
+	// Whether the compiler's SSR body lands in THIS module. Its per-component
+	// functions spread bare `marklessRenderData`, so the import list has to widen
+	// wherever this is true.
+	const emitsSsrBody =
+		!!input.publicSsrModuleSource &&
+		!(input.environment === 'client' && (symbolsOnly || (!input.prerenderRecords && !input.dev)));
 	// The direct-CSR module only reaches the emitted module in the variants below;
 	// everywhere else its root has no binding here, so `renderCsr` has nothing to
 	// point at and the root's published name carries the SSR surface alone.
@@ -285,7 +291,9 @@ export function emitSourceModule(input: {
 			!canonicalRenderData)
 			? ''
 			: canonicalRenderData
-				? `import { marklessPrerenderData } from '${input.renderDataId}';`
+				? emitsSsrBody
+					? `import { marklessPrerenderData, marklessRenderData } from '${input.renderDataId}';`
+					: `import { marklessPrerenderData } from '${input.renderDataId}';`
 				: `import { marklessRenderData } from '${input.renderDataId}';`,
 		symbolsOnly
 			? ''
@@ -340,9 +348,7 @@ export function emitSourceModule(input: {
 					executionLogEnabled: input.executionLog !== 'never',
 					rootExportName: input.publicRenderRootExportName,
 				}),
-		input.environment === 'client' && (symbolsOnly || (!input.prerenderRecords && !input.dev))
-			? ''
-			: input.publicSsrModuleSource,
+		emitsSsrBody ? input.publicSsrModuleSource : '',
 		routeSymbols
 			? emitLazySymbolRouteFunction(
 					input.symbolRoutes,
