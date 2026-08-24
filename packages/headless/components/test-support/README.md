@@ -9,8 +9,9 @@ component, the same way `<family>.browser.ts` is:
 | -------------------------------------- | ----------------------------------------------- |
 | `src/<family>/<family>.browser.ts`      | the DOM contract, in Chromium                    |
 | `src/<family>/<family>.sr.ts`           | the announcement, read by a JavaScript reader    |
-| `src/<family>/<family>.nvda.ts`         | the announcement, read by real NVDA              |
-| `src/<family>/<family>.voiceover.ts`    | the announcement, read by real VoiceOver         |
+| `src/<family>/<family>-transcript.ts`   | what a real reader must convey, as facts        |
+| `src/<family>/<family>.nvda.ts`         | that transcript, read by real NVDA               |
+| `src/<family>/<family>.voiceover.ts`    | that transcript, read by real VoiceOver          |
 
 A browser suite proves the trigger carries `role="checkbox"` and
 `aria-checked="mixed"`. That is necessary and not sufficient: correct attributes
@@ -118,11 +119,17 @@ the assertion can name.
 | `ScreenReaderDriver`, `Conveys`, `missingFacts`, `readUntil` | each reader's words for a fact  |
 | the facts each announcement has to convey                     | how a phrase splits into facts  |
 
-Nothing spells an expected phrase. `src/checkbox/checkbox-transcript.ts` names
-facts as `Conveys` values from `driver.ts`, and `vocabularies.ts` supplies each
-reader's word for each fact. That is why one transcript function runs against
-both readers, and why a third reader is a driver plus two lines rather than a
-copied suite.
+Nothing spells an expected phrase. Each family's
+`src/<family>/<family>-transcript.ts` names facts as `Conveys` values from
+`driver.ts`, and `vocabularies.ts` supplies each reader's word for each fact.
+That is why one transcript function runs against both readers, and why a third
+reader is a driver plus two lines rather than a copied suite.
+
+The transcript file is where a family's expectations live, and `.nvda.ts` /
+`.voiceover.ts` are the thin halves: open the gallery anchor, wait for
+`data-gallery-ready`, `navigateToWebContent()`, hand the transcript a
+`realDriver`. Nothing that decides what an announcement must convey belongs in
+either reader file, because two copies of an expectation drift.
 
 ## The page the real readers read
 
@@ -134,13 +141,16 @@ the mount resolves, so a reader waits on the DOM rather than on a timer.
 
 ## Which families the virtual lane reads
 
-Eight, one `src/<family>/<family>.sr.ts` each: `checkbox`, `checklist`,
-`collapsible`, `progress`, `radio-group`, `tabs`, `textbox`, `toggle`. The
-runner config takes `src/**/*.sr.ts`, so a new file joins the lane by existing;
-the workflow matrix is the only list that has to be edited by hand.
+Nineteen, one `src/<family>/<family>.sr.ts` each: `accordion`, `carousel`,
+`checkbox`, `checklist`, `collapsible`, `combobox`, `modal`, `navbar`, `otp`,
+`pagination`, `progress`, `qr-code`, `radio-group`, `select`, `tabs`, `textbox`,
+`toaster`, `toggle`, `tree`. The runner config takes `src/**/*.sr.ts`, so a new
+file joins the lane by existing; the workflow matrix is the only list that has to
+be edited by hand.
 
-Four of the eight are seeded from a w3c/aria-at test plan, and the other four say
-so in their own header comment rather than implying a plan exists:
+Some are seeded from a w3c/aria-at test plan, and the rest say so in their own
+header comment rather than implying a plan exists. The families whose provenance
+is recorded here:
 
 | family                | plan it is seeded from                                              |
 | --------------------- | ------------------------------------------------------------------- |
@@ -156,6 +166,27 @@ so in their own header comment rather than implying a plan exists:
 An absence is written down, never papered over. Where a family's own rows go
 past what its plan covers — a disabled option, a whole disabled group, a vertical
 tab list — the suite says the row is ours rather than the plan's.
+
+## Which families the real readers read
+
+Five, and each is three files rather than two:
+
+| family        | transcript                                    | what it reads                                      |
+| ------------- | --------------------------------------------- | -------------------------------------------------- |
+| `checkbox`    | `src/checkbox/checkbox-transcript.ts`         | an unchecked box, then the same box after Space      |
+| `select`      | `src/select/select-transcript.ts`             | the collapsed combobox, then its options once open   |
+| `modal`       | `src/modal/modal-transcript.ts`               | the dialog is reachable only after its trigger opens |
+| `radio-group` | `src/radio-group/radio-group-transcript.ts`   | every option, then the one a choice landed on        |
+| `tabs`        | `src/tabs/tabs-transcript.ts`                 | the tab list, then the panel a tab change revealed   |
+
+Unlike the virtual lane, joining is not automatic: the `nvda` and `voiceover`
+matrices in `.github/workflows/screen-reader.yml` name the five families by hand,
+and a name with no `.nvda.ts` / `.voiceover.ts` file makes that run find no tests.
+
+`radio-group` is the family these lanes exist for. The virtual reader records its
+arrow row red — the family sets `input.checked` and never the content attribute
+that reader reads — and NVDA and VoiceOver read the platform accessibility tree,
+which is built from the property.
 
 ## Some expectations are recorded red
 
@@ -227,17 +258,23 @@ workflow edit.
 ## Two vocabularies are part-verified
 
 The reader table above records three words per reader, taken from the w3c/aria-at
-plans: the role, "not checked", and the indeterminate state. The other four
-slots in `Vocabulary` are each reader's documented wording and have **never been
-observed against our markup**, because neither reader can be driven on a
-developer machine without an install and, on macOS, a permission grant.
+plans: the role, "not checked", and the indeterminate state. Every other slot in
+`Vocabulary` is either that reader's documented wording or the wording its
+aria-at plan uses, and has **never been observed against our markup**, because
+neither reader can be driven on a developer machine without an install and, on
+macOS, a permission grant. `vocabularies.ts` marks each slot which it is.
 
-So `src/checkbox/checkbox-transcript.ts` asserts only on the sourced words, and
-covers two steps of the aria-at checkbox plan: reading an unchecked box, and
-reading it after Space. When a lane fails, `readUntil` throws with the whole
-transcript — that transcript is the evidence for correcting `vocabularies.ts`
-and widening the suite to the indeterminate, disabled and invalid states the
-virtual lane already covers.
+So the five transcripts assert on role, accessible name and the states their
+plan records, and stay off the words nobody has heard yet. When a lane fails,
+`readUntil` throws with the whole transcript — that transcript is the evidence
+for correcting `vocabularies.ts` and widening a suite to the states the virtual
+lane already covers.
+
+One case is neither sourced nor documented: NVDA and VoiceOver speak **no role
+word at all** for a listbox option — they read the choice's name. That is written
+as the empty string, and `missingFacts` skips an empty slot rather than failing a
+fact against a word that does not exist. It is the encoding for "this reader has
+no word", never a placeholder for one nobody has looked up.
 
 Never bend an assertion to fit a phrase. Where aria-at and a real reader
 disagree, that disagreement is the finding.
@@ -247,12 +284,21 @@ disagree, that disagreement is the finding.
 1. Write `src/<family>/<family>.sr.ts` against `virtualDriver`, seeded from that
    family's aria-at test plan where one exists.
 2. Add any fact the family needs to `Vocabulary` in `driver.ts`, and give every
-   driver its word for it. A fact only some readers speak — "not selected", "not
-   invalid" — gets no slot; assert its absence instead.
-3. Add the family name to the `virtual` job's `matrix.family` list in
+   driver its word for it — `virtual-driver.ts` from that reader's own output,
+   `vocabularies.ts` for NVDA and VoiceOver. A fact only some readers speak —
+   "not selected", "not invalid" — gets no slot; assert its absence instead. A
+   fact one reader has no word for gets the empty string in that reader's table.
+3. To join the real-reader matrices, write `src/<family>/<family>-transcript.ts`
+   holding every expectation as `Conveys` facts, then two thin files —
+   `<family>.nvda.ts` and `<family>.voiceover.ts` — that open the gallery anchor
+   and hand that transcript a `realDriver`. Never a second copy of an
+   expectation: the transcript is the one place a fact is written down.
+4. Add the family name to the `virtual` job's `matrix.family` list in
    `.github/workflows/screen-reader.yml`, and to the `nvda` and `voiceover` lists
-   only once that family has a `.nvda.ts` / `.voiceover.ts` spec — a name with no
-   spec file makes the run find no tests. Nothing else in the workflow changes.
+   only once step 3 exists — a name with no spec file makes the run find no
+   tests. Nothing else in the workflow changes.
+5. Give the family a section in `apps/sr-gallery` on the anchor the reader files
+   name: the real lanes read that served page, not a rendered container.
 
 Never invent an expected phrase. Every phrase traces to an aria-at assertion or
 to what the reader actually says about our rendered DOM. Where those two
@@ -272,11 +318,17 @@ bending the assertion to fit.
   runner image update can break that write. Advisory is not "ignorable", and
   deleting the job is not a fix.
 
-The two real-reader jobs today run `scripts/ci/screen-reader-smoke.mjs`, which
-starts the reader, reads one item, and stops. That proves the expensive and
-fragile half — that the runner can drive the reader at all — which is the half
-no developer machine can reproduce. Pointing them at the family suites is the
-next step, and needs the gallery to render.
+Both real-reader jobs are matrixed over the five families above and read the
+served gallery. A boot check runs first and is allowed to fail; when it fails the
+job falls back to `scripts/ci/screen-reader-smoke.mjs`, which starts the reader,
+reads one item, and stops. That fallback is not a pass — it proves only that the
+runner can drive the reader at all, which is the expensive, fragile half no
+developer machine can reproduce. Nothing in the workflow has to change the day
+the gallery renders; the boot check starts succeeding and the family suites run.
+
+**These lanes run in CI only.** Neither reader can be driven on a developer
+machine without an install and, on macOS, a permission grant, so `pnpm test:sr`
+— the virtual lane — is the whole of what a local run proves.
 
 [vsr]: https://github.com/guidepup/virtual-screen-reader
 [aria-at]: https://github.com/w3c/aria-at

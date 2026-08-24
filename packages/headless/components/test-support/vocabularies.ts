@@ -51,6 +51,12 @@ export const nvdaVocabulary: Vocabulary = {
 	// unverified against our markup; aria-at's tabs plan says "tab panel"
 	tabpanel: 'tab panel',
 	// unverified against our markup
+	combobox: 'combo box',
+	// unverified against our markup
+	listbox: 'list box',
+	// this reader speaks no role word for an option; it reads the choice's name
+	option: '',
+	// unverified against our markup
 	button: 'button',
 	// unverified against our markup
 	progressbar: 'progress bar',
@@ -111,6 +117,12 @@ export const voiceOverVocabulary: Vocabulary = {
 	tab: 'tab',
 	// unverified against our markup; aria-at's tabs plan says "tab panel"
 	tabpanel: 'tab panel',
+	// unverified against our markup
+	combobox: 'combo box',
+	// unverified against our markup
+	listbox: 'list box',
+	// this reader speaks no role word for an option; it reads the choice's name
+	option: '',
 	// unverified against our markup
 	button: 'button',
 	// unverified against our markup
