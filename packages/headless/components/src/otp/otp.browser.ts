@@ -16,7 +16,8 @@ import WithoutShift from './scenarios/without-shift.tsrx';
 
 // Colocated browser suite for the otp family. Each test renders a realistic
 // consumer scenario, and the locators name the part anatomy: root, field, item,
-// itemindicator. The family paints slots over ONE real <input>, so most of these
+// itemindicator. The family paints slots over ONE real.
+ <input>, so most of these
 // rows are assertions about that input and about the paint following it.
 const Root = page.getByTestId('root');
 const Field = page.getByTestId('field');
@@ -348,17 +349,15 @@ test('CSR: Backspace takes the last character back out of its box', async () => 
 	expect(el<HTMLInputElement>(Field).value).toBe('4');
 });
 
-// Eight rows here were skipped on one framework defect (U121/U126 receipts,
-// 2026-08-22): `otp.value.slice(...)` in commit() lowered to a read of the whole
+// Eight rows here were skipped on one framework defect: `otp.value.slice(...)` in commit() lowered to a read of the whole
 // callee chain, so the emitted call invoked a detached String.prototype.slice
 // with no receiver and threw "slice called on null or undefined". Fixed in
 // collect-expressions.ts (a method call reads its receiver). Five ran green on
-// that fix; the last three were re-verified against this tip on 2026-08-23
-// (U182) and two of them are green now. Only the caret row below is still
+// that fix; two of the last three are green now. Only the caret row below is still
 // pinned, and on a framework wall rather than anything the family can shape
 // around.
 
-// Green since 2026-08-23. The U130 pin said "no box ever fills in WithOnChange";
+// An earlier pin said no box ever fills in WithOnChange;
 // re-measured on this tip, every box fills — typing 1,2,3,4,5 one key at a time
 // walks the boxes to ["1","2","3","4"] and stops, identical to WithoutOnChange.
 // What was left was this row's own read order: `maxlength` truncates the input's
@@ -414,7 +413,7 @@ test('CSR: typing in one field leaves its neighbour alone', async () => {
 	expect(item('app-item-', 2).getAttribute('ui-empty')).toBe('');
 });
 
-// Green since 2026-08-23. The U130 pin said a component instance inside an @for
+// An earlier pin said a component instance inside an @for
 // arm never follows the shared cell — six looped boxes rendered but stayed ""
 // after the paste. Un-skipped and re-run against this tip, the looped instance
 // follows the code like a flat one, so the row is the arm/row layers' witness.
@@ -502,8 +501,8 @@ test('CSR: a filled code submits under its name', async () => {
 
 // --- SSR resume -----------------------------------------------------------
 
-// Still pinned, and re-measured against this tip on 2026-08-23 (U182). The wall
-// is unchanged in kind from the U134 pin: the family carries the caret policy
+// Still pinned, and re-measured against this tip. The wall
+// is unchanged in kind: the family carries the caret policy
 // (OtpField's onFocus, QDS's rule: setSelectionRange to the end of the code) and
 // the CSR row below proves it runs, but it cannot run in TIME. A handler body is
 // a symbol the framework dispatches asynchronously, so `focus()` followed
@@ -551,9 +550,11 @@ test('SSR: a code arriving at once after resume fills every box', async () => {
 // The arm-delivered verdict this family was asked for, in two halves. A part is
 // not a widget root, so an arm that is DECIDED once carries its items fine — the
 // rows below prove it in both modes. An arm that FLIPS is refused at compile
-// time: `<otp.item>` inside `@if (someState)` fails the module with
+// time: `.
+<otp.item>` inside `@if (someState)` fails the module with
 // MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED ("cannot be rebuilt when ... changes
-// because <otp.item> has to run to produce its content"), measured on this base
+// because.
+ <otp.item> has to run to produce its content"), measured on this base
 // by compiling the scenario. That is a framework limit, not a family one, so the
 // scenario decides its arm from a module constant and this note carries the
 // verdict instead of a red row.

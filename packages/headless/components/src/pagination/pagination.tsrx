@@ -23,7 +23,8 @@ export const paginationState = shared(
 		return {
 			...pagination,
 			// Which pages to show, read as a zero-arg accessor:
-			// `const p = pagination.state(); const entries = computed(() => p.getEntries())`.
+			// `.
+const p = pagination.state(); const entries = computed(() => p.getEntries())`.
 			//
 			// The clamp lives here rather than on the way in: a component body may seed
 			// a shared cell only from a bare prop or a constant, so the root cannot
@@ -33,7 +34,8 @@ export const paginationState = shared(
 				const showing = Math.min(Math.max(pagination.page, 1), Math.max(pagination.count, 1));
 				return pageRange(showing, pagination.count, pagination.siblingCount);
 			},
-			// The literal function type matters: a callback slot is recognised only from
+			// The literal.
+ function type matters: a callback slot is recognised only from
 			// the written annotation, never inferred.
 			onChange: undefined as ((page: number) => void) | undefined,
 			// `value = 1` rather than `value: number`, and the default is never used. A

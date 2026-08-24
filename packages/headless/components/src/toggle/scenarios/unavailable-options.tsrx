@@ -1,7 +1,5 @@
 import { toggle } from '../../index.ts';
 
-// Switches a person may see but not change: one off and one already on. A
-// disabled trigger must not flip, and the root reports both flags at once.
 export default function UnavailableOptions() @{
 	<section>
 		<toggle.root disabled data-testid="off-root">

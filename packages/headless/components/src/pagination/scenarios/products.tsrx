@@ -2,14 +2,17 @@ import { computed, state } from '@markless/core';
 import { pagination } from '../../index.ts';
 
 // Twenty pages, so the range has gaps and the set of rendered controls CHANGES as the
-// page moves. Which pages and which gaps is the family's business; the `<ul>`, the
-// `<li>`s and the ellipsis are the consumer's own markup.
+// page moves. Which pages and which gaps is the family's business; the `.
+<ul>`, the
+// `.
+<li>`s and the ellipsis are the consumer's own markup.
 //
 // `pagination.entries(...)` rather than the ratified `p.getEntries()` accessor: a
 // consumer module cannot read another module's shared state yet — see the note in
 // ../index.ts. The cost shows below, where the count is written twice.
 //
-// The `<ul>` is load-bearing, not decoration: a construct cannot open directly inside
+// The `.
+<ul>` is load-bearing, not decoration: a construct cannot open directly inside
 // a component tag's children, so the loop needs an element to open in.
 export default function Products() @{
 	const nav = state({ page: 1, calls: 0 });

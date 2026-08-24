@@ -87,7 +87,8 @@ async function focused() {
 function expectBasicRendered() {
 	// The trigger is a combobox, not a button: a reader that says "button,
 	// collapsed" fails aria-at's `Role 'combobox' is conveyed` row, and that is
-	// exactly what QDS's bare <button aria-haspopup> produces.
+	// exactly what QDS's bare.
+ <button aria-haspopup> produces.
 	expect(el(Trigger).tagName).toBe('BUTTON');
 	expect(el(Trigger).getAttribute('role')).toBe('combobox');
 	expect(el(Trigger).getAttribute('aria-haspopup')).toBe('listbox');
@@ -591,10 +592,11 @@ test('CSR: the hidden native control is never reached by Tab', async () => {
 // nobody hand-writes thirteen options. `select.item` roots its own widget
 // instance, which is the combination no shipped family has proven.
 
-// Was defect 75: the click ran and aria-selected never turned true, because the
+// The click ran and aria-selected never turned true, because the
 // item's own instance read resolved to the template definition no row rendered
 // into, so `select.choose` was handed `undefined`. Fixed in the row-rooted
-// widget lookup; the framework witness is keyed-instance-refresh.test.ts.
+// widget lookup; the framework witness is keyed-instance-refresh.
+test.ts.
 test('CSR: options from a keyed loop each get their own instance', async () => {
 	await render(OptionsFromData);
 	const rows = page.getByTestId('row').elements();

@@ -12,8 +12,7 @@
  * the input, so nothing about the highlight can be read back off the document's
  * focus. That is why an option carries its own value in the markup as
  * `ui-value` - it is the only channel from an element the walk was handed back
- * to the family state that names it. See note.md, "The value in the markup".
- */
+ * to the family state that names it. */
 
 type Options = ReadonlyArray<HTMLElement>;
 

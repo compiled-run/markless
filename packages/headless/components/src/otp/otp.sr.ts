@@ -11,10 +11,8 @@ import Prefilled from './scenarios/prefilled.tsrx';
 // product's wording, so the same expectations run against NVDA and VoiceOver
 // once those drivers land. `sr` is the only line that picks a reader.
 //
-// aria-at coverage, recorded honestly: there is none. The 40 test-plan folders
-// under w3c/aria-at/tests/apg were read 2026-08-22 and listed in full in
-// goals/headless-components/notes/research-otp.md §4; none of them is an OTP, a
-// PIN, or a plain text-input plan, and w3.org/WAI/ARIA/apg has no one-time-code
+// aria-at coverage, recorded honestly: there is none. None of the 40 test-plan folders
+// under w3c/aria-at/tests/apg is an OTP, PIN, or plain text-input plan, and w3.org/WAI/ARIA/apg has no one-time-code
 // pattern either. So unlike tabs, this family has no community-vetted assertion
 // set. The sequence letters below are research-otp.md §6, which derives them
 // from the semantics and says so.

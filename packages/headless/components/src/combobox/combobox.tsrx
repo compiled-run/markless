@@ -63,7 +63,8 @@ export const comboboxState = shared(
 			contentEl,
 			describedEl,
 			optionEls,
-			// literal function type: a callback slot is only recognised from the written annotation
+			// literal.
+ function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string | readonly string[]) => void) | undefined,
 			onInput: undefined as ((value: string) => void) | undefined,
 			onOpenChange: undefined as ((open: boolean) => void) | undefined,
@@ -336,8 +337,7 @@ export function ComboboxTrigger({ children, onClick, ...rest }: ComboboxTriggerP
 // removed from the document leaves the stack's marks behind.
 //
 // `overlay` is the bare attribute the primitive reads, and nothing is imported
-// for it. It is written unconditionally, which is a known deviation for `inline`
-// - see note.md, "One content part, two modes".
+// for it. It is written unconditionally, which is a known deviation for `inline`.
 export function ComboboxContent({
 	children,
 	onDismiss,
@@ -376,7 +376,8 @@ export function ComboboxContent({
 			const isOwnTrigger = pressed !== undefined && trigger !== undefined && trigger.contains(pressed);
 			if (isInline !== true) combobox.setOpen(false);
 			if (isInline !== true && isOwnTrigger) combobox.pressGraceUntil = Date.now() + PRESS_GRACE;
-			// The primitive moves no focus, so the return is the family's to write.
+			// The primitive moves no focus, so the.
+ return is the family's to write.
 			// Escape has to leave the caret in the field a person was typing in.
 			if (isInline !== true && event.detail.reason === 'escape') combobox.inputEl?.focus();
 			onDismiss?.(event);
@@ -416,8 +417,7 @@ export function ComboboxItem({
 
 	// `ui-value` is this option's own name in the markup. The highlight is family
 	// state keyed by value and DOM focus never lands on an option, so an element
-	// the walk was handed has no other way back to the value it stands for. See
-	// note.md, "The value in the markup".
+	// the walk was handed has no other way back to the value it stands for.
 	<div
 		{...rest}
 		el={combobox.optionEls}
@@ -431,7 +431,7 @@ export function ComboboxItem({
 		ui-disabled={isLocked}
 		onClick={(event) => {
 			// The two cells, not the `isLocked` computed: a computed() read from a
-			// handler body does not guard. See note.md.
+			// handler body does not guard..
 			if (item.disabled !== true && combobox.disabled !== true) {
 				const held = combobox.value;
 				const wasChosen = typeof held === 'string' ? held === item.value : held.includes(item.value);
@@ -502,14 +502,16 @@ export function ComboboxError({ children, ...rest }: ComboboxErrorProps) @{
 	<ComboboxMessage {...rest} role="alert">{children}</ComboboxMessage>
 }
 
-// A `<select>` holding exactly the choice that was made. A single-option
-// `<select>` submits the same name/value pair a rebuilt option list would, and
+// A `.
+<select>` holding exactly the choice that was made. A single-option
+// `.
+<select>` submits the same name/value pair a rebuilt option list would, and
 // the option carries the value as its text because the option element's
 // attribute type does not yet take one. Same shape select ships.
 //
 // One option per chosen value - what `multiple` wants - needs a `@for` over a
 // read off the shared instance, and that lowers to `ReferenceError: combobox is
-// not defined`. See note.md, "A repeat cannot be sourced from the instance".
+// not defined`.
 export function ComboboxField({ ...rest }: ComboboxFieldProps) @{
 	const combobox = comboboxState();
 

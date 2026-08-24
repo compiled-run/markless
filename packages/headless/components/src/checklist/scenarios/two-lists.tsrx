@@ -1,7 +1,5 @@
 import { checklist } from '../../index.ts';
 
-// Two checklists on one page. Each root is its own instance boundary, so a
-// select-all in one must leave the other's items exactly where they were.
 export default function TwoLists() @{
 	<section>
 		<checklist.root values={['lettuce', 'tomato']} data-testid="left-root">

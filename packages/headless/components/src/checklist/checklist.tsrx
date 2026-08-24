@@ -33,7 +33,8 @@ export const checklistState = shared(
 
 		return {
 			...checklist,
-			// The literal function type matters: a callback slot is recognised only from
+			// The literal.
+ function type matters: a callback slot is recognised only from
 			// the written annotation, never inferred.
 			onChange: undefined as ((value: readonly string[]) => void) | undefined,
 			allChecked: computed((): boolean | 'mixed' => {

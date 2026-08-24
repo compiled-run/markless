@@ -1,8 +1,6 @@
 import { state } from '@markless/core';
 import { progress } from '../../index.ts';
 
-// A live job: the consumer owns the amount and raises it from outside the
-// family as work completes.
 export default function Live() @{
 	let amount = state(30);
 

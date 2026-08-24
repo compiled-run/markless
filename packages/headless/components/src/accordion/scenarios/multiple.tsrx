@@ -1,7 +1,5 @@
 import { accordion } from '../../index.ts';
 
-// Several sections may show at once, and the value is the list of the ones that
-// do. Two are written open.
 export default function Multiple() @{
 	<section>
 		<accordion.root multiple value={['engine', 'brakes']} data-testid="root">

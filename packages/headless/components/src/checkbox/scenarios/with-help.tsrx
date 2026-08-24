@@ -1,6 +1,5 @@
 import { checkbox } from '../../index.ts';
 
-// A checkbox with help text under it. No error is mounted, so the trigger is valid.
 export default function WithHelp() @{
 	<checkbox.root data-testid="root">
 		<checkbox.label data-testid="label">Subscribe to newsletter</checkbox.label>

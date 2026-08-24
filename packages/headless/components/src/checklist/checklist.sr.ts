@@ -1,7 +1,7 @@
-// Every skipped row here is skipped on one open defect: THE SELECT-ALL AND THE GROUP
-// SHARE ONE ACCESSIBLE NAME. `checklist.root` is both the group element and the
-// select-all's checkbox root, so `checklist.label` names both, and a reader announces
-// the select-all under the group's own name. See note.md.
+// The skipped rows here all rest on one open limitation: the select-all and the
+// group share one accessible name. `checklist.root` is both the group element and
+// the select-all's checkbox root, so `checklist.label` names both, and a reader
+// announces the select-all under the group's own name.
 import { render } from '@markless/vitest-browser';
 import { afterEach, expect, test } from 'vitest';
 import { missingFacts, readUntil, type Conveys } from '../../test-support/driver.ts';
@@ -21,7 +21,8 @@ import UnavailableOptions from './scenarios/unavailable-options.tsrx';
 const sr = virtualDriver;
 
 // One scenario per test: the trigger id is minted per container, so two scenarios
-// alive in one document give two elements the same id and every `<label for>`
+// alive in one document give two elements the same id and every `.
+<label for>`
 // after the first resolves to the wrong trigger.
 async function open(component: Parameters<typeof render>[0]) {
 	const { container } = await render(component);
@@ -58,8 +59,6 @@ test.skip('entering the list conveys the group and its name before the select-al
 	});
 });
 
-// Sequence C, the unchecked half: reading the select-all conveys its role, its
-// name and that it is not checked.
 test.skip('reading an untouched select-all conveys the checkbox role, its name and that it is not checked', async () => {
 	await open(Basic);
 	expectConveys(await readUntil(sr, { role: 'checkbox', name: 'All condiments' }), {
@@ -101,7 +100,6 @@ test.skip('pressing space on an untouched select-all announces it as checked, ne
 	);
 });
 
-// Sequence F's second step, on an item rather than on the parent.
 test('pressing space on an item announces that item as checked', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'checkbox', name: 'Lettuce' });
@@ -144,13 +142,9 @@ test('an item nobody may change conveys that it is disabled and space leaves it 
 	});
 });
 
-// --- groups that start with something ticked ------------------------------
-//
 // A composed family's root cannot be seeded from the enclosing family's instance
 // today, so such a group renders as if it were empty and a reader is told the truth
-// about the DOM rather than about the group. See note.md.
-
-// Sequence A, the state step: readers differ on the word ("half checked", "mixed"),
+// about the DOM rather than about the group.// Sequence A, the state step: readers differ on the word ("half checked", "mixed"),
 // and aria-at asserts the STATE at priority 1, which is why this asks the driver for
 // the fact rather than for a token.
 test.fails('reading a partly ticked select-all conveys it as partially checked', async () => {
@@ -175,8 +169,6 @@ test.skip('pressing space on a partly ticked select-all announces it as checked'
 	});
 });
 
-// Sequence C, the checked half: an item the group starts with ticked has to be
-// conveyed as checked.
 test('an item the group starts with ticked is conveyed as checked', async () => {
 	await open(Partial);
 	expectConveys(await readUntil(sr, { role: 'checkbox', name: 'Tomato' }), {

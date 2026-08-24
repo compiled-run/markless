@@ -9,8 +9,7 @@ import type { ToastOptions, ToastRecord, ToastTone } from './toaster-types.ts';
  * parameter (`MARKLESS_STATE_STALE_LOCAL_WRITE`). Handing the array to a pure
  * function and writing back what it returns is the shape that lowers, which is
  * why every write in `toaster.tsrx` reads `toaster.queue = someFunctionHere(...)`.
- * See note.md, "What the compiler forced".
- */
+ *. */
 
 /** A message shows for this long unless its caller says otherwise. */
 export const DEFAULT_DURATION = 4000;
@@ -94,8 +93,7 @@ export function dismiss(held: readonly ToastRecord[], id: string): ToastRecord[]
  * A message waiting its turn ages with the rest: the queue is a line, not a
  * freezer. Sonner counts down only what is showing, which needs the showing
  * count inside the clock - and the count is a prop of `toaster.root`, which a
- * page-scoped graph cannot be seeded with. See note.md.
- */
+ * page-scoped graph cannot be seeded with.. */
 export function expire(held: readonly ToastRecord[], now: number): ToastRecord[] {
 	return held.filter((one) => one.dueAt === 0 || one.dueAt > now);
 }

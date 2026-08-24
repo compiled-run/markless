@@ -48,7 +48,7 @@ const MODES = ['CSR', 'SSR'] as const;
 // A carousel is layout before it is behaviour: the viewport has to clip, the
 // track has to lay the slides out along the axis, and the slides have to have a
 // size. Without it every row here ran against a bare stack of divs, which is
-// what let defect 82 hide - an auto-height vertical viewport measures its own
+// what hid the failure: an auto-height vertical viewport measures its own
 // content, so every slide reads as visible.
 beforeEach(() => {
 	installCarouselCss();
@@ -145,7 +145,7 @@ for (const mode of MODES) {
 		expect(el(ForwardTrigger).getAttribute('aria-label')).toBe('Next slide');
 	});
 
-	// Defect 82, fixed. The trigger's handler always ran; the navigation math
+	// The trigger's handler always ran; the navigation math
 	// killed it. `slidesPerView` measured the viewport's size along the axis on
 	// every step, and a vertical carousel's viewport is auto-height unless the
 	// consumer constrains it, so the measurement reported all three slides
@@ -171,7 +171,7 @@ for (const mode of MODES) {
 		await expect.poll(() => el(MiddleItem).hasAttribute('ui-active')).toBe(true);
 	});
 
-	// Defect 78, fixed. The trigger's handler is a BOUND symbol - it forwards the
+	// The trigger's handler is a BOUND symbol - it forwards the
 	// consumer's onClick - so it dispatched at the page's own edge path (`c4:`)
 	// while the two rendered carousels are rooted at `c0:` and `c5:`. Its graph
 	// reads were already spelled against the widget root by the bound edge's

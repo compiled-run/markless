@@ -4,8 +4,6 @@ import { readCheckboxTranscript } from './checkbox-transcript.ts';
 import { realDriver } from '../../test-support/page-driver.ts';
 import { voiceOverSpec } from '../../test-support/vocabularies.ts';
 
-// Real VoiceOver reading the served gallery. Same expectations as the NVDA
-// spec, a different vocabulary for the same facts.
 voiceOverTest('VoiceOver conveys the checkbox family and follows it through a toggle', async ({
 	page,
 	voiceOver,

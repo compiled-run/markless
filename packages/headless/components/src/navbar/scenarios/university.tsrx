@@ -10,9 +10,10 @@ import { navbar } from '../../index.ts';
 // link names inside a dropdown, the current page, and the named region.
 //
 // One assertion in the plan has no counterpart here on purpose: `listBoundary`,
-// priority 3, which wants the `<ul>`/`<li>` this family does not render. The QDS
+// priority 3, which wants the `.
+<ul>`/`<li>` this family does not render. The QDS
 // reference dropped the list deliberately and the measured cost is that one
-// weakest-tier row; note.md records it rather than letting it pass unnoticed.
+// weakest-tier row.
 export default function University() @{
 	<div>
 		<navbar.root aria-label="Mythical University" data-testid="root">

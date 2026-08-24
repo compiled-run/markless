@@ -31,7 +31,8 @@ export const radiogroupState = shared(
 
 		return {
 			...group,
-			// literal function type: a callback slot is only recognised from the written annotation
+			// literal.
+ function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
 			// One way only: nothing a person does returns a group to nothing chosen.
 			choose(next: string) {
@@ -153,7 +154,7 @@ export function RadioGroupItemIndicator({ children, ...rest }: RadioGroupItemInd
 	const item = radiogroupItemState();
 	// A computed, not the comparison inline: an `@if` condition written as an
 	// expression renders correctly once and then never refreshes, so the arm
-	// has to read one graph cell. Measured, not assumed - see note.md.
+	// has to read one graph cell. Measured, not assumed.
 	const isSelected = computed(() => group.value === item.value);
 
 	<span {...rest} aria-hidden="true">

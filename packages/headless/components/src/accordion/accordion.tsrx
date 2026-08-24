@@ -27,7 +27,8 @@ export const accordionState = shared(
 		return {
 			...accordion,
 			triggerEls,
-			// literal function type: a callback slot is only recognised from the written annotation
+			// literal.
+ function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string | readonly string[]) => void) | undefined,
 			/**
 			 * Open a section, or close it if it is the one showing. Single mode
@@ -169,7 +170,8 @@ export function AccordionItemTrigger({
 	});
 	const isLocked = computed(() => item.disabled || accordion.disabled);
 
-	// A native <button> already activates on Enter and on Space, so neither key
+	// A native.
+ <button> already activates on Enter and on Space, so neither key
 	// has a rule here; the keydown below is the roving walk and nothing else.
 	<button
 		{...rest}
@@ -241,9 +243,6 @@ export function AccordionItemContent({
 		ui-open={isOpen}
 		ui-closed={isOpen !== true}
 		onBeforematch={(event) => {
-			// The browser is about to reveal this panel to show a person their
-			// search hit. Opening the section here is what keeps the family's own
-			// state and the document in step.
 			accordion.reveal(item.value);
 			onBeforematch?.(event);
 		}}

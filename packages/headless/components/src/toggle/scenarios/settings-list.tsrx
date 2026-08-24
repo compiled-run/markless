@@ -1,6 +1,5 @@
 import { toggle } from '../../index.ts';
 
-// A settings page: two independent switches, one off and one already on.
 export default function SettingsList() @{
 	<section>
 		<toggle.root data-testid="emails-root">

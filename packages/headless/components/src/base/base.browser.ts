@@ -19,13 +19,11 @@ test('CSR: base one-offs render their single elements', async () => {
 	await expect.element(Button).toBeInTheDocument();
 	expect(el(Button).getAttribute('type')).toBe('button');
 	expect(el(Button).hasAttribute('aria-pressed')).toBe(false);
-	// The scenario omits `disabled`, so no attribute at all rather than an empty one.
 	expect(el(Button).hasAttribute('disabled')).toBe(false);
 
 	expect(el(Label).tagName).toBe('LABEL');
 	expect(el(Label).getAttribute('for')).toBe('field-id');
 
-	// Located by its text, so it is still in the accessibility tree despite the clip.
 	expect(el(Hidden).tagName).toBe('SPAN');
 	expect(getComputedStyle(el(Hidden)).position).toBe('absolute');
 	expect(el(Hidden).hasAttribute('class')).toBe(false);

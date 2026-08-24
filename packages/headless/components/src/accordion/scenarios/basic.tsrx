@@ -1,7 +1,5 @@
 import { accordion } from '../../index.ts';
 
-// The starter a consumer copies: three sections, nothing open, one open at a
-// time.
 export default function Basic() @{
 	<section>
 		<accordion.root data-testid="root">

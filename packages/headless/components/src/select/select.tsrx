@@ -46,7 +46,8 @@ export const selectState = shared(
 			contentEl,
 			triggerEl,
 			optionEls,
-			// literal function type: a callback slot is only recognised from the written annotation
+			// literal.
+ function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
 			onOpenChange: undefined as ((open: boolean) => void) | undefined,
 			choose(next: string) {
@@ -162,7 +163,7 @@ export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectT
 					? (isSearchStale ? '' : select.search) + key.toLowerCase()
 					: '';
 				// Two cell assignments rather than one method taking both: a
-				// shared method of arity two aborts the handler. See note.md.
+				// shared method of arity two aborts the handler..
 				if (isTypeaheadChar) {
 					select.search = search;
 					select.searchAt = now;
@@ -272,7 +273,7 @@ export function SelectItem({
 		ui-disabled={isLocked}
 		onClick={(event) => {
 			// The two cells, not the `isLocked` computed: a computed() read from a
-			// handler body does not guard. See note.md.
+			// handler body does not guard..
 			if (item.disabled !== true && select.disabled !== true) {
 				select.choose(item.value);
 				select.setOpen(false);
@@ -294,8 +295,10 @@ export function SelectItemIndicator({ children, ...rest }: SelectItemIndicatorPr
 	<span {...rest} aria-hidden="true" ui-hidden={isChosen !== true}>{children}</span>
 }
 
-// A `<select>` holding exactly the choice that was made. A single-option
-// `<select>` submits the same name/value pair a rebuilt option list would, and
+// A `.
+<select>` holding exactly the choice that was made. A single-option
+// `.
+<select>` submits the same name/value pair a rebuilt option list would, and
 // the option carries the value as its text because the option element's
 // attribute type does not yet take one.
 export function SelectField({ ...rest }: SelectFieldProps) @{

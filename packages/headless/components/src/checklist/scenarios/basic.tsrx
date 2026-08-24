@@ -1,8 +1,5 @@
 import { checklist } from '../../index.ts';
 
-// The starter a consumer copies: a select-all over three condiments, none ticked.
-// Every part is a checklist part - the family names the whole anatomy, and each
-// one renders a single element.
 export default function Basic() @{
 	<checklist.root values={['lettuce', 'tomato', 'mustard']} data-testid="root">
 		<checklist.label data-testid="label">Sandwich Condiments</checklist.label>

@@ -1,9 +1,8 @@
 import { state } from '@markless/core';
 import { modal } from '../../index.ts';
 
-// The dialog opened without a gesture. The ruling allows exactly one
-// `modal.trigger` per root, so every other opener is the consumer flipping the
-// open state itself - which is what this page's own button does.
+// Exactly one `modal.trigger` per root is allowed, so every other opener is the
+// consumer flipping the open state itself.
 export default function Controlled() @{
 	const page = state({ isOpen: false });
 

@@ -1,11 +1,9 @@
 import { toaster } from '../../index.ts';
 
-// The ruled surface, quarantined: `toasts.toast(...)` is a shared() method
-// called from another module, which the compiler now REFUSES loudly (defect 95
-// fail-closed half). This file must never be imported statically by the suite -
+// Quarantined: `toasts.toast(...)` is a shared() method
+// called from another module, which the compiler refuses loudly. This file must never be imported statically by the suite -
 // the pinned row imports it dynamically and asserts the refusal. It becomes the
-// Basic scenario's third button again when the owner's F2/F3 ruling ships the
-// capability.
+// Basic scenario third button again when the compiler ships the capability.
 export default function Method() @{
 	const toasts = toaster.state();
 

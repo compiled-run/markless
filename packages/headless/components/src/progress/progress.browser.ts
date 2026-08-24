@@ -32,7 +32,6 @@ function el<T extends Element = HTMLElement>(locator: { element(): Element | nul
 
 function expectBasicRendered() {
 	expect(el(Root).getAttribute('role')).toBe('progressbar');
-	// The visible label names the bar through a minted id; the bar mints no name itself.
 	expect(el(Root).hasAttribute('aria-label')).toBe(false);
 	expect(el(Root).getAttribute('aria-labelledby')).toBe(el(Label).id);
 	expect(el(Label).id).toBeTruthy();
@@ -52,7 +51,6 @@ function expectBasicRendered() {
 
 function expectIndeterminateRendered() {
 	expect(el(Indicator).getAttribute('ui-progress')).toBe('indeterminate');
-	// Neither the number nor the percentage a reader would speak instead of it.
 	expect(el(Root).hasAttribute('aria-valuenow')).toBe(false);
 	expect(el(Root).hasAttribute('aria-valuetext')).toBe(false);
 	expect(el(Root).hasAttribute('ui-value')).toBe(false);
@@ -66,12 +64,10 @@ function expectCompleteRendered() {
 }
 
 function expectCustomRangeRendered() {
-	// A wizard counting steps: the top of the range is the step count, not 100.
 	expect(el(StepsRoot).getAttribute('aria-valuemax')).toBe('25');
 	expect(el(StepsRoot).getAttribute('aria-valuetext')).toBe('80%');
 	expect(el(StepsRoot).getAttribute('ui-progress')).toBe('loading');
 
-	// A gauge that does not start at zero reports both ends.
 	expect(el(RangeRoot).getAttribute('aria-valuemin')).toBe('2000');
 	expect(el(RangeRoot).getAttribute('aria-valuemax')).toBe('10000');
 	expect(el(RangeRoot).getAttribute('aria-valuenow')).toBe('5000');
@@ -99,8 +95,6 @@ function expectCustomRangeRootsDropDestructuredProps() {
 }
 
 function expectBasicRootDropsDestructuredProps() {
-	// Here `min` and `max` took their defaults: a defaulted prop is just as
-	// destructured as a passed one.
 	expectRootDropsDestructuredProps(el(Root));
 	expect(el(Root).getAttribute('aria-valuenow')).toBe('30');
 	expect(el(Root).getAttribute('ui-progress')).toBe('loading');

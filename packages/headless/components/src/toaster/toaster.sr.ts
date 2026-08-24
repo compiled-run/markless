@@ -48,9 +48,8 @@ test('the region asks to be read politely', async () => {
 
 // ---------------------------------------------------------------------------
 // The three rows below are pinned on the wall the ui lane's header describes in
-// full: A COMPONENT INSIDE A REPEAT RENDERS NOTHING ON THE CLIENT. The owner
-// ruling of 2026-08-24 removed the default rows `toaster.root` used to render for
-// a bare root, so every row is now written out of the family's parts inside a
+// full: a component inside a repeat renders nothing on the client. `toaster.root`
+// renders no default rows for a bare root, so every row is written out of the family's parts inside a
 // `@for` - exactly the shape that wall blocks.
 //
 // These are pinned rather than deleted because what they assert is still the

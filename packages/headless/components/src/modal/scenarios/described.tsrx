@@ -1,7 +1,5 @@
 import { modal } from '../../index.ts';
 
-// The starter plus a description, which is the sentence a reader announces after
-// the dialog's name.
 export default function Described() @{
 	<section>
 		<button type="button" data-testid="background">Background</button>

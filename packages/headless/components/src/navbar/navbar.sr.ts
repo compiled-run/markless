@@ -10,7 +10,6 @@ import University from './scenarios/university.tsrx';
 // the announcement has to convey - role, accessible name, state - and never a
 // product's wording. `sr` is the only line that picks a reader, so the same
 // expectations run against NVDA and VoiceOver once those drivers land.
-// See goals/headless-components/notes/research-navbar.md §4.
 //
 // Unlike most families here, these rows are BACKED BY AN ARIA-AT PLAN rather
 // than derived from the authoring practices alone. The scenario is that plan's
@@ -18,10 +17,11 @@ import University from './scenarios/university.tsrx';
 // three buttons - so the sequences below are the plan's sequences.
 //
 // aria-at coverage, recorded honestly:
-//   * `listBoundary`, priority 3, wants the `<ul>`/`<li>` this family does not
+//   * `listBoundary`, priority 3, wants the `.
+<ul>`/`<li>` this family does not
 //     render. The QDS reference dropped the list deliberately and the measured
 //     cost is that one weakest-tier assertion; it has no row here because there
-//     is nothing to assert, and note.md carries the decision.
+//     is nothing to assert.
 //   * `nameMythicalUniversity` is priority 1 and the family writes NO default
 //     name, so the scenario supplies one. A navbar with no `aria-label` fails
 //     that assertion, which is exactly why the research recommends a dev-mode

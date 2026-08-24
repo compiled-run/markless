@@ -5,7 +5,7 @@ import type { PropsOf, Seeded } from '@markless/core';
  *
  * The vocabulary is owned by `OverlayDismissReason` in
  * `packages/web/src/fns/overlay.ts` and is restated here only because
- * `@markless/ui` does not depend on `@markless/web`; see note.md.
+ * `@markless/ui` does not depend on `@markless/web`.
  */
 export type ModalDismissReason = 'escape' | 'outside-press';
 
