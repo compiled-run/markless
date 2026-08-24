@@ -81,6 +81,97 @@ export function moduleScopeDeclarations(
 	});
 }
 
+/**
+ * Module-level exported functions whose body resolves a shared() definition this
+ * file declares.
+ *
+ * `moduleScopeDeclarations` carries such a function into the emitted symbol
+ * modules with its `export` keyword removed, which is right for an ordinary
+ * helper and wrong here twice over. The export is what a consumer imports, and
+ * dropping it silently changes what this module publishes; and the copy that
+ * does survive could not run anyway, because the shared() declaration it calls
+ * is excluded from the carry (its factory ships as payload nodes, not as code)
+ * and the runtime resolves only graph-kind properties. So the carried function
+ * names a resolver that is not there.
+ *
+ * Reported rather than repaired: which of the two the author meant — a part the
+ * family publishes, or a plain helper that takes the instance as an argument —
+ * is not something this seam can decide.
+ */
+export function exportedSharedResolvingFunctions(
+	source: string,
+	filename: string,
+): ReadonlyArray<{ readonly name: string; readonly definitionName: string }> {
+	const ast = parseModule(source, filename) as unknown as AnyNode;
+	const sharedImports = frameworkApiImportNames(ast, 'shared');
+	if (sharedImports.size === 0) return [];
+
+	const definitionNames = new Set<string>();
+	for (const statement of asNodes(ast.body)) {
+		const declaration =
+			statement.type === 'ExportNamedDeclaration'
+				? (statement.declaration as AnyNode | undefined)
+				: statement;
+		if (!declaration) continue;
+		if (isSharedDefinitionDeclaration(declaration, sharedImports)) {
+			for (const name of declaredNames(declaration)) definitionNames.add(name);
+		}
+	}
+	if (definitionNames.size === 0) return [];
+
+	return asNodes(ast.body).flatMap((statement) => {
+		// A component is not a plain function: its body is where resolving a
+		// shared() definition is the supported, working shape.
+		if (statement.type !== 'ExportNamedDeclaration' || getComponentFunction(statement)) return [];
+		const declaration = statement.declaration as AnyNode | undefined;
+		if (!declaration) return [];
+		const bodies = functionBodiesOf(declaration);
+		if (bodies.length === 0) return [];
+
+		const names = declaredNames(declaration);
+		return bodies.flatMap((body) => {
+			const definitionName = resolvedSharedDefinitionName(body, definitionNames);
+			return definitionName && names[0] ? [{ name: names[0], definitionName }] : [];
+		});
+	});
+}
+
+/** The function bodies an exported declaration introduces, if it introduces any. */
+function functionBodiesOf(declaration: AnyNode): ReadonlyArray<AnyNode> {
+	if (declaration.type === 'FunctionDeclaration') {
+		const body = declaration.body as AnyNode | undefined;
+		return body ? [body] : [];
+	}
+	if (declaration.type !== 'VariableDeclaration') return [];
+	return asNodes(declaration.declarations).flatMap((declarator) => {
+		const init = declarator.init as AnyNode | undefined;
+		if (init?.type !== 'ArrowFunctionExpression' && init?.type !== 'FunctionExpression') return [];
+		const body = init.body as AnyNode | undefined;
+		return body ? [body] : [];
+	});
+}
+
+/** The first shared() definition this body calls to resolve an instance. */
+function resolvedSharedDefinitionName(
+	body: AnyNode,
+	definitionNames: ReadonlySet<string>,
+): string | null {
+	let found: string | null = null;
+	const visit = (node: AnyNode | null | undefined): void => {
+		if (found || !node || typeof node !== 'object') return;
+		if (node.type === 'CallExpression') {
+			const callName = getIdentifierName(node.callee as AnyNode | undefined);
+			if (callName && definitionNames.has(callName)) {
+				found = callName;
+				return;
+			}
+		}
+		for (const child of childNodes(node)) visit(child);
+	};
+	visit(body);
+	return found;
+}
+
 function declaredNames(declaration: AnyNode): ReadonlyArray<string> {
 	if (declaration.type === 'VariableDeclaration') {
 		return asNodes(declaration.declarations).flatMap((declarator) => {

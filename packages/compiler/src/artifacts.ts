@@ -1254,6 +1254,25 @@ export type SymbolResolverInput = {
 	readonly stateLowering?: StateLoweringArtifact;
 };
 
+/**
+ * A shared() method body this symbol adopted from a file other than the one
+ * being compiled.
+ *
+ * The splice copies authored text, not scope: the definition module's own
+ * imports never travel with it, and this module's imports are matched against
+ * the copied text by name alone. Both halves are recorded here because both are
+ * silent otherwise — the first ships a free name that throws on the first
+ * dispatch, the second binds the foreign body's name to the consumer's value.
+ */
+export type PlannedSymbolCrossModuleInline = {
+	/** The files the adopted bodies were authored in. */
+	readonly definitionFilenames: ReadonlyArray<string>;
+	/** The `instance.method` calls whose bodies were adopted. */
+	readonly methods: ReadonlyArray<string>;
+	/** This module's import locals whose names occur in the adopted text. */
+	readonly capturedImportNames: ReadonlyArray<string>;
+};
+
 export type PlannedSymbol =
 	| {
 			readonly id: string;
@@ -1264,6 +1283,7 @@ export type PlannedSymbol =
 			readonly sourceSpan?: SourceSpan;
 			readonly parameters: ReadonlyArray<string>;
 			readonly moduleImports?: ReadonlyArray<SemanticModuleImport>;
+			readonly crossModuleInline?: PlannedSymbolCrossModuleInline;
 			readonly order: number;
 			readonly reads?: ReadonlyArray<LoweredStateRead>;
 			readonly writes?: ReadonlyArray<LoweredStateWrite>;
@@ -1288,6 +1308,7 @@ export type PlannedSymbol =
 			readonly sourceSpan?: SourceSpan;
 			readonly parameters?: ReadonlyArray<string>;
 			readonly moduleImports?: ReadonlyArray<SemanticModuleImport>;
+			readonly crossModuleInline?: PlannedSymbolCrossModuleInline;
 			readonly reads?: ReadonlyArray<LoweredStateRead>;
 			readonly writes?: ReadonlyArray<LoweredStateWrite>;
 			readonly elementHandleReads?: ReadonlyArray<LoweredElementHandleRead>;
@@ -1593,6 +1614,8 @@ export type SymbolModulesDiagnostic = CompilerDiagnostic & {
 	readonly code:
 		| 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED'
 		| 'MARKLESS_MODULE_INSTANCE_DIVERGENT_HANDLERS'
+		| 'MARKLESS_SHARED_METHOD_CROSS_MODULE'
+		| 'MARKLESS_SHARED_INSTANCE_EXPORTED_FUNCTION'
 		| 'MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE';
 	readonly phase: 'public-render';
 	readonly passId: 'symbol-modules';
