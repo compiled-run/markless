@@ -8,6 +8,7 @@ import type {
 	LoweredStateRead,
 	LoweredStateWrite,
 	PlannedSymbol,
+	PlannedSymbolCrossModuleInline,
 	RenderDataArtifact,
 	RenderDataBranch,
 	SemanticGraphArtifact,
@@ -78,6 +79,7 @@ import {
 	type EmittedModule,
 } from './emit-codegen.ts';
 import {
+	exportedSharedResolvingFunctions,
 	moduleScopeDeclarations,
 	moduleScopeLines,
 	SSR_CALLBACKS_PROP_NAME,
@@ -211,6 +213,9 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 			...input.captureAnalysis.diagnostics,
 			...branchArms.diagnostics,
 			...divergentModuleInstanceCarries(modules).map(divergentModuleInstanceDiagnostic),
+			...sharedResolvingExportedFunctions(input.source).map(
+				sharedInstanceExportedFunctionDiagnostic,
+			),
 			...unresolvedGraphReferences(
 				modules,
 				input.symbolResolver.symbols,
@@ -375,7 +380,72 @@ type UnresolvedGraphReference = {
 	 * this check the gap ships silently and crashes only client-side.
 	 */
 	readonly moduleDeclaration?: boolean;
+	/**
+	 * The cross-module shared() method splice this name came out of.
+	 *
+	 * The three flags above are allowlist hits: the name is one this module
+	 * declares, so the guard can recognise it. A foreign body brings names this
+	 * module never declares, which is why the allowlist cannot see them at all —
+	 * so for a symbol carrying the mark the guard reports every free name the
+	 * emitted module does not bind, plus every import of this module the splice
+	 * captured by name.
+	 */
+	readonly crossModuleInline?: PlannedSymbolCrossModuleInline & {
+		/** Whether this name is a captured import rather than an unbound free name. */
+		readonly captured: boolean;
+	};
 };
+
+// This pass owns the code; readers import it rather than restating the string.
+export const SHARED_METHOD_CROSS_MODULE_CODE = 'MARKLESS_SHARED_METHOD_CROSS_MODULE' as const;
+
+/**
+ * Names a symbol module may refer to without this module binding them.
+ *
+ * Only used for symbols carrying a cross-module inline mark, where the guard
+ * reports every OTHER free name. Over-listing here can only make that report
+ * quieter, so this stays to platform names an authored handler really does call.
+ */
+const CROSS_MODULE_KNOWN_GLOBALS: ReadonlySet<string> = new Set([
+	'Array',
+	'Boolean',
+	'Date',
+	'Error',
+	'Infinity',
+	'Intl',
+	'JSON',
+	'Map',
+	'Math',
+	'NaN',
+	'Number',
+	'Object',
+	'Promise',
+	'RegExp',
+	'Set',
+	'String',
+	'Symbol',
+	'WeakMap',
+	'WeakSet',
+	'clearInterval',
+	'clearTimeout',
+	'console',
+	'document',
+	'fetch',
+	'globalThis',
+	'isNaN',
+	'localStorage',
+	'navigator',
+	'parseFloat',
+	'parseInt',
+	'queueMicrotask',
+	'requestAnimationFrame',
+	'sessionStorage',
+	'setInterval',
+	'setTimeout',
+	'structuredClone',
+	'undefined',
+	'window',
+]);
 
 /** Names that denote graph state in the authored file, as the author spelled them. */
 function graphBindingLocalNames(
@@ -451,7 +521,13 @@ function unresolvedGraphReferences(
 	localNamesBySymbol: ReadonlyMap<string, ReadonlySet<string>>,
 	moduleDeclaredNames: ReadonlySet<string>,
 ): ReadonlyArray<UnresolvedGraphReference> {
-	if (graphNames.size === 0 && localNamesBySymbol.size === 0 && moduleDeclaredNames.size === 0) {
+	const anyCrossModuleInline = symbols.some((symbol) => crossModuleInlineOf(symbol) !== undefined);
+	if (
+		graphNames.size === 0 &&
+		localNamesBySymbol.size === 0 &&
+		moduleDeclaredNames.size === 0 &&
+		!anyCrossModuleInline
+	) {
 		return [];
 	}
 
@@ -460,7 +536,7 @@ function unresolvedGraphReferences(
 		const symbol = symbols.find((candidate) => candidate.id === emitted.symbolId);
 		const localNames = localNamesBySymbol.get(emitted.symbolId) ?? emptyLocalNames;
 
-		return [...free]
+		const allowlisted = [...free]
 			.filter(
 				(name) =>
 					graphNames.has(name) || localNames.has(name) || moduleDeclaredNames.has(name),
@@ -487,7 +563,52 @@ function unresolvedGraphReferences(
 					? { moduleDeclaration: true }
 					: {}),
 			}));
+
+		// The inversion. For an ordinary symbol the allowlist above is the whole
+		// report, because every name the compiler could have dropped is a name this
+		// module declares. A symbol that adopted a body from another file breaks
+		// that assumption: the body's own free names belong to a scope this module
+		// does not have, so the allowlist is empty exactly where the module is
+		// broken. Here the test runs the other way — everything the emitted module
+		// leaves unbound is reported unless a platform global explains it.
+		const crossModuleInline = crossModuleInlineOf(symbol);
+		if (!crossModuleInline) return allowlisted;
+
+		const reported = new Set(allowlisted.map((item) => item.name));
+		const mark = (name: string, captured: boolean) => ({
+			symbolId: emitted.symbolId,
+			kind: emitted.kind,
+			name,
+			...(unresolvedGraphExpression(symbol, name)
+				? { expression: unresolvedGraphExpression(symbol, name) }
+				: {}),
+			crossModuleInline: { ...crossModuleInline, captured },
+		});
+
+		return [
+			...allowlisted,
+			...[...free]
+				.filter((name) => !reported.has(name) && !CROSS_MODULE_KNOWN_GLOBALS.has(name))
+				.sort()
+				.map((name) => mark(name, false)),
+			// A captured import is BOUND in the emitted module, so it is never free:
+			// the import statement this module carried is exactly what hides it. It
+			// is reported from the mark instead, which recorded the same match the
+			// carry made.
+			...crossModuleInline.capturedImportNames
+				.filter((name) => !reported.has(name))
+				.sort()
+				.map((name) => mark(name, true)),
+		];
 	});
+}
+
+/** The cross-module inline mark a planned symbol carries, if its kind can carry one. */
+function crossModuleInlineOf(
+	symbol: PlannedSymbol | undefined,
+): PlannedSymbolCrossModuleInline | undefined {
+	if (symbol?.kind !== 'event-handler' && symbol?.kind !== 'callback-prop') return undefined;
+	return symbol.crossModuleInline;
 }
 
 /**
@@ -652,6 +773,9 @@ function unresolvedGraphReferenceDiagnostic(
 		? `The expression is \`${reference.expression}\`.`
 		: `It appears in the module for ${reference.symbolId}.`;
 
+	// Highest precedence: the other three describe a name this file declares, and
+	// none of them is true of a name that arrived from another file.
+	if (reference.crossModuleInline) return sharedMethodCrossModuleDiagnostic(reference, where);
 	if (reference.rowLocal === true) return rowLocalReferenceDiagnostic(reference, where);
 	if (reference.sharedInstance === true) return sharedInstanceReferenceDiagnostic(reference, where);
 	if (reference.moduleDeclaration === true) {
@@ -676,6 +800,52 @@ function unresolvedGraphReferenceDiagnostic(
 			},
 		],
 		docsUrl: `https://markless.dev/errors/${SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE}`,
+	};
+}
+
+/**
+ * The refusal for a shared() method called from a module other than the one that
+ * defines it.
+ *
+ * The call is compiled by copying the method's authored text into this module's
+ * handler. Within the defining module that is sound: the text lands back in the
+ * scope it was written in. Across modules it does not — the defining module's
+ * imports and module-scope declarations stay behind, and this module's imports
+ * are matched against the copied text by name, so a name that happens to match
+ * binds to the consumer's value instead of the author's. Neither half is
+ * detectable at runtime before it misbehaves: the first throws on the first
+ * gesture, the second quietly calls the wrong function.
+ */
+function sharedMethodCrossModuleDiagnostic(
+	reference: UnresolvedGraphReference,
+	where: string,
+): SymbolModulesDiagnostic {
+	const mark = reference.crossModuleInline;
+	const methods = (mark?.methods ?? []).map((method) => `\`${method}()\``).join(', ');
+	const files = (mark?.definitionFilenames ?? []).join(', ');
+	const captured = mark?.captured === true;
+	const what = captured
+		? `The import of "${reference.name}" in this file was matched against that copied text by name alone, so the copied body calls THIS module's "${reference.name}" rather than the one the definition file means.`
+		: `"${reference.name}" is a name the copied body expects from ${files}, and nothing in this module binds it, so this module would throw a ReferenceError the first time it runs.`;
+
+	return {
+		code: SHARED_METHOD_CROSS_MODULE_CODE,
+		severity: 'error',
+		phase: 'public-render',
+		passId: 'symbol-modules',
+		artifactKeys: ['symbolModules'],
+		title: `A shared() method cannot be called from another module yet (${methods || 'a shared() method'})`,
+		message: `The emitted ${reference.kind} module for ${reference.symbolId} was built by copying the body of ${methods || 'a shared() method'} out of ${files} into this file. ${where} ${what}`,
+		why: 'Calling a shared() method compiles to copying the method\'s authored body into the calling handler, because no shared instance exists inside a handler module to call the method on. Copying text moves the statements but not the scope they were written in, so the copy only means what the author wrote while the definition and the call are in one file. Across files the definition module\'s imports and module-scope declarations do not travel, and the calling module\'s imports are matched against the copied text by name, which can capture a same-named binding that means something else entirely. Both failures are invisible until the gesture runs, so this build refuses instead.',
+		suggestions: [
+			{
+				message: `Call ${methods || 'the method'} from a part the family itself publishes, in ${files}, and compose that part here. Inside its own module the same call compiles and runs today.`,
+			},
+			{
+				message: `Or have this module write the state directly instead of going through the method — a plain assignment to a field of the shared instance is lowered to a graph write and needs no body to copy.`,
+			},
+		],
+		docsUrl: `https://markless.dev/errors/${SHARED_METHOD_CROSS_MODULE_CODE}`,
 	};
 }
 
@@ -783,6 +953,57 @@ function moduleDeclarationReferenceDiagnostic(
 			},
 		],
 		docsUrl: `https://markless.dev/errors/${SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE}`,
+	};
+}
+
+// This pass owns the code; readers import it rather than restating the string.
+export const SHARED_INSTANCE_EXPORTED_FUNCTION_CODE =
+	'MARKLESS_SHARED_INSTANCE_EXPORTED_FUNCTION' as const;
+
+function sharedResolvingExportedFunctions(
+	source: SymbolModulesInput['source'],
+): ReadonlyArray<{ readonly name: string; readonly definitionName: string }> {
+	if (!source) return [];
+	try {
+		return exportedSharedResolvingFunctions(source.source, source.filename);
+	} catch {
+		// Same reason as `sourceModuleScopeLines`: the semantic pass owns parse
+		// diagnostics, and this projection must not replace one with a raw error.
+		return [];
+	}
+}
+
+/**
+ * The refusal for an exported module-level function that resolves a shared()
+ * definition.
+ *
+ * The carry into symbol modules strips the `export` keyword, so what this file
+ * publishes changes without a word, and the private copy that lands could not
+ * run: the shared() declaration it calls is not carried with it. Neither half is
+ * visible in a passing build, which is why it is stated here instead.
+ */
+function sharedInstanceExportedFunctionDiagnostic(entry: {
+	readonly name: string;
+	readonly definitionName: string;
+}): SymbolModulesDiagnostic {
+	return {
+		code: SHARED_INSTANCE_EXPORTED_FUNCTION_CODE,
+		severity: 'error',
+		phase: 'public-render',
+		passId: 'symbol-modules',
+		artifactKeys: ['symbolModules'],
+		title: `The exported function "${entry.name}" resolves a shared() definition at module scope`,
+		message: `"${entry.name}" is exported from this file and calls \`${entry.definitionName}()\` in its body. A shared() instance is resolved by a component as it renders, and this function is not a component, so there is no instance for the call to return. Compiling this file drops the \`export\` keyword from "${entry.name}" and carries the rest into the emitted symbol modules, where \`${entry.definitionName}\` is not carried at all — the definition ships as payload graph nodes rather than as code. The copy that lands would throw the moment it runs, and the export a consumer imported is gone.`,
+		why: 'A shared() definition is graph data, not module code: its factory is compiled into payload nodes and the runtime resolves a property of it only for a component instance that asked for one. That makes a component body the only place a resolving call means anything. An exported plain function is neither carried with its definition nor reachable as a part, so the compiler would have to silently publish less than the file says it publishes.',
+		suggestions: [
+			{
+				message: `Make "${entry.name}" a part this family publishes — a component whose body resolves \`${entry.definitionName}()\` — and compose it where the behavior is wanted.`,
+			},
+			{
+				message: `Or keep "${entry.name}" a plain function and pass what it needs in: take the values as parameters and call it from a component that resolved \`${entry.definitionName}()\` itself.`,
+			},
+		],
+		docsUrl: `https://markless.dev/errors/${SHARED_INSTANCE_EXPORTED_FUNCTION_CODE}`,
 	};
 }
 

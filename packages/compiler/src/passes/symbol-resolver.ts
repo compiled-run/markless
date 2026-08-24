@@ -6,6 +6,7 @@ import type {
 	LoweredStateRead,
 	LoweredStateWrite,
 	PlannedSymbol,
+	PlannedSymbolCrossModuleInline,
 	SemanticGraphAlias,
 	SemanticGraphBinding,
 	SemanticModuleImport,
@@ -80,6 +81,10 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 		);
 		const source = inlined.source;
 		const moduleImports = referencedModuleImports(input.semanticGraph.moduleImports, source);
+		const crossModuleInline = crossModuleInlineMark(
+			inlined.foreignBodies,
+			input.semanticGraph.moduleImports,
+		);
 		const reads = eventReads(
 			input.stateLowering?.reads,
 			[sourceSpan, ...inlined.spans],
@@ -96,6 +101,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			sourceSpan,
 			parameters: event.handlerParameters,
 			...(moduleImports.length > 0 ? { moduleImports } : {}),
+			...(crossModuleInline ? { crossModuleInline } : {}),
 			order,
 			reads,
 			writes: eventWrites(source, input.stateLowering?.writes, [
@@ -119,6 +125,10 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			);
 			const source = inlined.source;
 			const moduleImports = referencedModuleImports(input.semanticGraph.moduleImports, source);
+			const crossModuleInline = crossModuleInlineMark(
+				inlined.foreignBodies,
+				input.semanticGraph.moduleImports,
+			);
 			const reads = eventReads(
 				input.stateLowering?.reads,
 				[prop.sourceSpan, ...inlined.spans],
@@ -134,6 +144,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				sourceSpan: prop.sourceSpan,
 				parameters: prop.parameters ?? [],
 				...(moduleImports.length > 0 ? { moduleImports } : {}),
+				...(crossModuleInline ? { crossModuleInline } : {}),
 				reads,
 				writes: eventWrites(source, input.stateLowering?.writes, [
 					prop.sourceSpan,
@@ -468,10 +479,16 @@ function inlineSharedMethodCalls(
 	source: string,
 	semanticGraph: SymbolResolverInput['semanticGraph'],
 	semanticsReader: SymbolSourceSemanticsReader,
-): { readonly source: string; readonly spans: ReadonlyArray<SourceSpan> } {
-	if (!source || semanticGraph.sharedInstances.length === 0) return { source, spans: [] };
+): {
+	readonly source: string;
+	readonly spans: ReadonlyArray<SourceSpan>;
+	readonly foreignBodies: ReadonlyArray<ForeignInlinedBody>;
+} {
+	if (!source || semanticGraph.sharedInstances.length === 0)
+		return { source, spans: [], foreignBodies: [] };
 
 	const spans: SourceSpan[] = [];
+	const foreignBodies: ForeignInlinedBody[] = [];
 	let emitted = source;
 	for (const instance of semanticGraph.sharedInstances) {
 		const definition = semanticGraph.sharedDefinitions.find(
@@ -512,10 +529,57 @@ function inlineSharedMethodCalls(
 			if (replaced === emitted) continue;
 			emitted = replaced;
 			if (property.sourceSpan) spans.push(property.sourceSpan);
+			// The definition file the body was adopted from. A body from THIS file
+			// is the supported same-module inline; a body from another file arrived
+			// with its own module scope, which this module does not have.
+			const definitionFilename =
+				property.sourceSpan?.filename ?? definition.sourceSpan?.filename;
+			if (definitionFilename !== undefined && definitionFilename !== semanticGraph.filename) {
+				foreignBodies.push({
+					filename: definitionFilename,
+					method: `${instance.localName}.${property.name}`,
+					body: method.body,
+				});
+			}
 		}
 	}
 
-	return { source: emitted, spans };
+	return { source: emitted, spans, foreignBodies };
+}
+
+/** One shared() method body spliced in from a file other than the compiled one. */
+type ForeignInlinedBody = {
+	readonly filename: string;
+	readonly method: string;
+	readonly body: string;
+};
+
+/**
+ * The cross-module inline mark, or undefined when every inlined body was this
+ * module's own.
+ *
+ * `capturedImportNames` is the collision half: this module's imports are matched
+ * against the spliced text by `referencedModuleImports`, so a consumer import
+ * whose local name also occurs in the foreign body is carried into the emitted
+ * module and silently binds the foreign body's free name to the CONSUMER's
+ * value. The match uses the same predicate the carry uses, so what is reported
+ * is exactly what shipped.
+ */
+function crossModuleInlineMark(
+	foreignBodies: ReadonlyArray<ForeignInlinedBody>,
+	moduleImports: ReadonlyArray<SemanticModuleImport>,
+): PlannedSymbolCrossModuleInline | undefined {
+	if (foreignBodies.length === 0) return undefined;
+
+	const foreignText = foreignBodies.map((item) => item.body).join('\n');
+	const sortedUnique = (values: ReadonlyArray<string>) => [...new Set(values)].sort();
+	return {
+		definitionFilenames: sortedUnique(foreignBodies.map((item) => item.filename)),
+		methods: sortedUnique(foreignBodies.map((item) => item.method)),
+		capturedImportNames: sortedUnique(
+			referencedModuleImports(moduleImports, foreignText).map((item) => item.localName),
+		),
+	};
 }
 
 /**
