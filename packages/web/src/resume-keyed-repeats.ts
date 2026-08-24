@@ -116,20 +116,24 @@ export function wireKeyedRepeats(input: {
 		if (!parent) continue;
 		const items = readKeyedRepeatCollection(input.graph, repeat),
 			rowRootsByKey = new Map<unknown, ResumeDomElement>();
-		// A page served with no rows already shows whatever the server painted for
-		// the `@empty` arm, so this runtime must not paint a second one. It also
-		// keeps no handle on those nodes - it did not make them - which is safe
-		// because a zero-row boot keys no row, so no row can ever come back and
-		// ask for the arm to leave (the nextRows walk below bails first).
-		const arm: MountedEmptyArm = { mounted: items.length === 0, nodes: [] };
-		for (const [rowIndex, rowRoot] of repeatRowElements(parent, repeat, items.length)) {
-			const rowKey = repeatItemKey(items[rowIndex], repeat);
-			rowRootsByKey.set(rowKey, rowRoot);
+		// One row-event loop, run for a served row at boot and for a minted row the
+		// moment it exists. The wiring lives here, so the reconcile is handed this.
+		const registerRowEvents = (rowRoot: ResumeDomElement, rowKey: unknown): void => {
 			for (const rowEvent of repeat.rowEvents) {
 				const host = rowEventHost(rowRoot, rowEvent.hostPath);
 				if (!host) continue;
 				input.events.addRowEvent(host, { repeat, parent, rowRoot, rowKey, rowEvent });
 			}
+		};
+		// A page served with no rows already shows whatever the server painted for
+		// the `@empty` arm, so this runtime must not paint a second one - and it
+		// keeps no handle on those nodes, because it did not make them. `mounted`
+		// with no `nodes` is exactly that state, and the mint declines in it.
+		const arm: MountedEmptyArm = { mounted: items.length === 0, nodes: [] };
+		for (const [rowIndex, rowRoot] of repeatRowElements(parent, repeat, items.length)) {
+			const rowKey = repeatItemKey(items[rowIndex], repeat);
+			rowRootsByKey.set(rowKey, rowRoot);
+			registerRowEvents(rowRoot, rowKey);
 		}
 		if (!repeat.collectionGraphNodeId) continue;
 		input.storeContainerSubscription(
@@ -139,7 +143,14 @@ export function wireKeyedRepeats(input: {
 				path: repeat.collectionPath,
 				run() {
 					validateOneRepeat(input.graph, repeat);
-					applyKeyedRepeatRowOrder(input.graph, repeat, parent, rowRootsByKey, arm);
+					applyKeyedRepeatRowOrder(
+						input.graph,
+						repeat,
+						parent,
+						rowRootsByKey,
+						arm,
+						registerRowEvents,
+					);
 				},
 			}),
 		);
@@ -151,20 +162,36 @@ function applyKeyedRepeatRowOrder(
 	parent: ResumeDomElement,
 	rowRootsByKey: Map<unknown, ResumeDomElement>,
 	arm: MountedEmptyArm,
+	registerRowEvents?: (rowRoot: ResumeDomElement, rowKey: unknown) => void,
 ): void {
 	const nextRows: ResumeDomElement[] = [];
-	for (const item of readKeyedRepeatCollection(graph, repeat)) {
-		const rowRoot = rowRootsByKey.get(repeatItemKey(item, repeat));
-		if (!rowRoot) return;
-		nextRows.push(rowRoot);
-	}
-	const mutableParent = parent as MutableRepeatParent;
 	// Compare against every attached row THIS repeat owns, not the first
 	// nextRows.length children. A prefix comparison calls [A,B,C] -> [A,B]
 	// already-in-order and returns before the removal pass below, so a row
 	// dropped off the END of the collection stayed in the document forever
 	// while a row dropped from the middle left correctly.
 	const knownRows = new Set(rowRootsByKey.values());
+	for (const item of readKeyedRepeatCollection(graph, repeat)) {
+		const rowKey = repeatItemKey(item, repeat);
+		let rowRoot = rowRootsByKey.get(rowKey);
+		if (!rowRoot) {
+			// A key that was never served. The record carries this row's markup only
+			// when the compiler proved the client can finish it alone; without it the
+			// list stays as served, because half a row is worse than none. Same
+			// refusal for a server-painted `@empty` arm this runtime cannot take out:
+			// rows standing behind a live "nothing matches" is worse than no growth.
+			if (!repeat.rowTemplate) return;
+			if (repeat.emptyArm && arm.mounted && arm.nodes.length === 0) return;
+			rowRoot = mintRepeatRow(parent, repeat, item);
+			rowRootsByKey.set(rowKey, rowRoot);
+			// The anchor walk below puts following rows in front of anything it does
+			// not know, so a fresh row joins knownRows before that walk, not after.
+			knownRows.add(rowRoot);
+			registerRowEvents?.(rowRoot, rowKey);
+		}
+		nextRows.push(rowRoot);
+	}
+	const mutableParent = parent as MutableRepeatParent;
 	const currentRows = elementChildren(parent).filter((child) => knownRows.has(child));
 	if (
 		currentRows.length === nextRows.length &&
@@ -247,12 +274,80 @@ function renderEmptyArm(
 	repeat: ResumeKeyedRepeatRecord,
 ): ReadonlyArray<ResumeDomNode> {
 	const template = parent.ownerDocument?.createElement?.('template');
-	if (!template) throw emptyArmRendererMissingError(repeat);
+	if (!template)
+		throw repeatRuntimeError(
+			repeat,
+			'MARKLESS_REPEAT_EMPTY_ARM_RENDERER_MISSING',
+			'has no document to render its @empty arm markup with.',
+		);
 	template.innerHTML = repeat.emptyArm!.html;
 	const nodes = Array.from(template.content?.childNodes ?? []) as ReadonlyArray<ResumeDomNode>;
-	if (nodes.length === 0) throw emptyArmEmptyError(repeat);
+	if (nodes.length === 0)
+		throw repeatRuntimeError(
+			repeat,
+			'MARKLESS_REPEAT_EMPTY_ARM_EMPTY',
+			'rendered an @empty arm of no nodes, so nothing would speak for the emptied list.',
+		);
 	return nodes;
 }
+/**
+ * Build one row for a key that was never served, from the markup the record
+ * carries.
+ *
+ * The mint renders and fills; it wires nothing and starts nothing, and the
+ * compiler ships `rowTemplate` only for a row that needs no more than that. Slot
+ * coordinates are FRAGMENT-relative, one segment ahead of the ROW-ROOT-relative
+ * `hostPath` a row event carries: `[0]` here is the row root.
+ */
+function mintRepeatRow(
+	parent: ResumeDomElement,
+	repeat: ResumeKeyedRepeatRecord,
+	item: unknown,
+): ResumeDomElement {
+	const rowTemplate = repeat.rowTemplate!,
+		host = parent.ownerDocument as MintingDocument | undefined,
+		template = host?.createElement?.('template');
+	if (!template || !host?.createTextNode)
+		throw repeatRuntimeError(
+			repeat,
+			'MARKLESS_REPEAT_ROW_MINT_RENDERER_MISSING',
+			'has no document to build a row for an unserved key with.',
+		);
+	template.innerHTML = rowTemplate.html;
+	const nodes = Array.from(template.content?.childNodes ?? []) as ReadonlyArray<ResumeDomNode>;
+	const rowRoot = nodes.find((node) => node.nodeType === 1) as ResumeDomElement | undefined,
+		slots = rowTemplate.textSlots ?? [],
+		anchors = slots.map((slot) => nodeAtPath(nodes, slot.path) as ReplaceableNode | undefined);
+	if (!rowRoot || anchors.some((anchor) => !anchor?.replaceWith))
+		throw repeatRuntimeError(
+			repeat,
+			'MARKLESS_REPEAT_ROW_MINT_EMPTY',
+			'built no row from its markup, and half a row is worse than none.',
+		);
+	for (const [at, slot] of slots.entries())
+		anchors[at]!.replaceWith!(host.createTextNode(String(readPath(item, slot.itemPath) ?? '')));
+	return rowRoot;
+}
+// A local copy of fns/direct's walk, for the reason the census splice below is a
+// local copy: importing that module pulls it into this on-demand module's static
+// closure, which the leanness guard measures.
+function nodeAtPath(
+	nodes: ReadonlyArray<ResumeDomNode>,
+	path: ReadonlyArray<number>,
+): ResumeDomNode | undefined {
+	let siblings: ReadonlyArray<ResumeDomNode> = nodes,
+		node: ResumeDomNode | undefined;
+	for (const index of path) {
+		node = siblings[index];
+		if (!node) return undefined;
+		siblings = node.childNodes ?? [];
+	}
+	return node;
+}
+type MintingDocument = NonNullable<ResumeDomElement['ownerDocument']> & {
+	readonly createTextNode?: (data: string) => ResumeDomNode;
+};
+type ReplaceableNode = ResumeDomNode & { readonly replaceWith?: (node: ResumeDomNode) => void };
 // A local copy of resume-locators' census splice, for the reason resume-branches
 // keeps its own DOM-walk helpers: importing that module here pulls it and the
 // resume-errors chunk into this on-demand module's static closure, which the
@@ -312,10 +407,12 @@ function censusRoot(element: ResumeDomElement): ResumeDomElement | undefined {
 		if (node.__marklessCensus) return node;
 	return undefined;
 }
-function emptyArmError(repeat: ResumeKeyedRepeatRecord, code: string, detail: string): Error {
-	const error = new Error(
-		`${code}: The @empty arm of ${repeat.id} ${detail}`,
-	) as Error & Record<string, unknown>;
+function repeatRuntimeError(
+	repeat: ResumeKeyedRepeatRecord,
+	code: string,
+	detail: string,
+): Error {
+	const error = new Error(`${code}: ${repeat.id} ${detail}`) as Error & Record<string, unknown>;
 	error.name = 'KeyedRepeatRuntimeError';
 	error.code = code;
 	error.severity = 'error';
@@ -323,20 +420,6 @@ function emptyArmError(repeat: ResumeKeyedRepeatRecord, code: string, detail: st
 	error.repeatId = repeat.id;
 	error.docsUrl = `https://markless.dev/errors/${code}`;
 	return error;
-}
-function emptyArmRendererMissingError(repeat: ResumeKeyedRepeatRecord): Error {
-	return emptyArmError(
-		repeat,
-		'MARKLESS_REPEAT_EMPTY_ARM_RENDERER_MISSING',
-		'could not be built: this host provides no document to render its markup with.',
-	);
-}
-function emptyArmEmptyError(repeat: ResumeKeyedRepeatRecord): Error {
-	return emptyArmError(
-		repeat,
-		'MARKLESS_REPEAT_EMPTY_ARM_EMPTY',
-		'rendered no nodes, so nothing would speak for the emptied list.',
-	);
 }
 export function readKeyedRepeatCollection(
 	graph: Pick<RuntimeGraph, 'read'>,
