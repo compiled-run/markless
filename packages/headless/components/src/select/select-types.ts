@@ -46,6 +46,11 @@ export type SelectInstanceState = Seeded<
 	onOpenChange?: SelectRootProps['onOpenChange'];
 };
 
+/**
+ * One option. Clicking it, or activating it from the keyboard, chooses it
+ * and closes the popup. It takes focus as the list is walked, but it is never a
+ * tab stop - only `select.trigger` is.
+ */
 export type SelectItemProps = PropsOf<'div'> & {
 	/** Submitted when this option is the chosen one. Required: no index stands in for it. */
 	readonly value: string;
@@ -63,12 +68,28 @@ export type SelectItemInstanceState = Seeded<SelectItemProps, 'value' | 'disable
 /** The select's name. Named by `aria-labelledby` from the trigger and the listbox. */
 export type SelectLabelProps = PropsOf<'label'>;
 
+/**
+ * The control a person opens the list from, and the family's only tab stop. It
+ * shows the current choice and reports `role="combobox"`; a consumer's `onClick`
+ * and `onKeydown` run after the family's.
+ */
 export type SelectTriggerProps = PropsOf<'button'>;
 
+/**
+ * The popup the options go in. Closed hides it, never detaches it - the
+ * trigger's `aria-controls` points at this element. It owns the arrow, Home,
+ * End, Enter, Space, Escape and typeahead keys while it is showing.
+ */
 export type SelectContentProps = PropsOf<'div'>;
 
+/** The words shown for one option. Plain markup: it decides nothing on its own. */
 export type SelectItemLabelProps = PropsOf<'span'>;
 
+/**
+ * One option's chosen mark. It stays in the page and carries `ui-hidden` while
+ * its option is not the chosen one, and it is `aria-hidden`, so the state it
+ * draws is never announced twice.
+ */
 export type SelectItemIndicatorProps = PropsOf<'span'>;
 
 /**

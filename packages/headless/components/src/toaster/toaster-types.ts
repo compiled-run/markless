@@ -61,6 +61,12 @@ export type ToasterInstanceState = {
 	ticker: number;
 };
 
+/**
+ * One message's row. Everything it shows comes from the `toast` record it is
+ * given. It reports `ui-tone` and `ui-front`, and the family owns its `style`
+ * attribute to carry the stacking, so style it from a stylesheet rather than a
+ * `style` prop.
+ */
 export type ToasterItemProps = PropsOf<'li'> & {
 	/** The message this row shows. */
 	readonly toast: ToastRecord;
@@ -78,8 +84,20 @@ export type ToasterItemInstanceState = {
 	index: number;
 };
 
+/**
+ * The message's headline. Leave it empty and it renders the title the record
+ * carries; give it children and they are shown instead.
+ */
 export type ToasterItemTitleProps = PropsOf<'div'>;
+/**
+ * The line under the headline. Leave it empty and it renders the description the
+ * record carries; give it children and they are shown instead.
+ */
 export type ToasterItemDescriptionProps = PropsOf<'div'>;
+/**
+ * The tone's mark. Leave it empty and it renders the character minted for the
+ * tone. It is `aria-hidden`, because the words carry the meaning, not the symbol.
+ */
 export type ToasterItemIconProps = PropsOf<'span'>;
 /**
  * The button that dismisses the message it sits in. It takes no id: the item

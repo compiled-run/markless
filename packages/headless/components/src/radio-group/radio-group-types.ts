@@ -45,6 +45,11 @@ export type RadioGroupInstanceState = Seeded<
 	onChange?: RadioGroupRootProps['onChange'];
 };
 
+/**
+ * One option: its trigger, indicator, label and hidden radio go inside. It
+ * carries the option's `value` and reports `ui-selected` and `ui-disabled`, but
+ * holds no radio semantics itself - those live on the native input inside it.
+ */
 export type RadioGroupItemProps = PropsOf<'div'> & {
 	/** Submitted when this option is the chosen one. Required: no index stands in for it. */
 	readonly value: string;
@@ -62,15 +67,31 @@ export type RadioGroupItemInstanceState = Seeded<RadioGroupItemProps, 'value' | 
 /** The group's name, rendered as the `<legend>` a `<fieldset>` is named by. */
 export type RadioGroupLabelProps = PropsOf<'legend'>;
 
+/** Supporting text for the group. It renders its children and changes nothing else. */
 export type RadioGroupDescriptionProps = PropsOf<'div'>;
 
+/**
+ * The group's validation message. Mounting it is what marks the group invalid
+ * for as long as it is in the page, so render it only when there is an error to
+ * show.
+ */
 export type RadioGroupErrorProps = PropsOf<'div'>;
 
 /** A consumer's `onClick` runs after the option has been chosen. */
 export type RadioGroupItemTriggerProps = PropsOf<'div'>;
 
+/**
+ * One option's chosen mark. Its children render only while that option is the
+ * chosen one, and the element is `aria-hidden`, so the state it draws is never
+ * announced twice.
+ */
 export type RadioGroupItemIndicatorProps = PropsOf<'span'>;
 
+/**
+ * One option's label. Its `for` points at that option's hidden radio, so
+ * clicking the text chooses the option and focus lands where the arrow keys
+ * expect it.
+ */
 export type RadioGroupItemLabelProps = PropsOf<'label'>;
 
 /**

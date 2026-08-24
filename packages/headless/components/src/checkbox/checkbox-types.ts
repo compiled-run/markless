@@ -3,10 +3,17 @@ import type { PropsOf, Seeded } from '@markless/core';
 /** A checkbox is on, off, or mixed — the third value is what `indeterminate` means to a form. */
 export type CheckboxChecked = boolean | 'mixed';
 
+/**
+ * The checkbox itself; the trigger, label, description, error and field parts go
+ * inside it. It holds the checked value and the form details that
+ * `checkbox.field` submits, so one place decides what a form receives.
+ */
 export type CheckboxRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/** The value the checkbox shows. Omit it and the checkbox starts off. */
 	readonly checked?: CheckboxChecked;
+	/** Nobody can toggle the checkbox, and `checkbox.trigger` is disabled outright. */
 	readonly disabled?: boolean;
+	/** Marks the hidden `checkbox.field` input required, so a form refuses to submit unchecked. */
 	readonly required?: boolean;
 	/** Submitted under this name by `checkbox.field`. */
 	readonly name?: string;
@@ -35,12 +42,24 @@ export type CheckboxInstanceState = Seeded<
 	onChange?: CheckboxRootProps['onChange'];
 };
 
+/**
+ * The check mark. Its children render only while the checkbox is on or mixed,
+ * and the element is `aria-hidden`, so the state it draws is never announced a
+ * second time.
+ */
 export type CheckboxIndicatorProps = PropsOf<'span'>;
 
+/** The checkbox's label. Its `for` points at `checkbox.trigger`, so clicking the text toggles. */
 export type CheckboxLabelProps = PropsOf<'label'>;
 
+/** Supporting text beside the checkbox. It renders its children and changes nothing else. */
 export type CheckboxDescriptionProps = PropsOf<'div'>;
 
+/**
+ * The validation message. Mounting it is what marks the checkbox invalid -
+ * `checkbox.trigger` reports `aria-invalid` for as long as this part is in the
+ * page - so render it only when there is an error to show.
+ */
 export type CheckboxErrorProps = PropsOf<'div'>;
 
 /**

@@ -3,6 +3,11 @@ import type { PropsOf, Seeded } from '@markless/core';
 /** Which axis the arrow keys walk, and the axis `aria-orientation` reports. */
 export type TabsOrientation = 'horizontal' | 'vertical';
 
+/**
+ * The tabs themselves; the list, triggers and panels go inside it. It holds
+ * which tab is showing and how the arrow keys walk; a trigger and the panel it
+ * shows find each other by matching `value`, never by position.
+ */
 export type TabsRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/**
 	 * The value of the tab that is showing. Omit it and no tab shows: a tab is

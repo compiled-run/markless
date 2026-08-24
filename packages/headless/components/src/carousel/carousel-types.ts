@@ -18,6 +18,11 @@ export type CarouselSensitivity = {
 	readonly touch?: number;
 };
 
+/**
+ * The carousel itself; the scroll area, slides, nav list and triggers go inside
+ * it. It holds which slide is showing plus every setting the other parts read -
+ * orientation, looping, autoplay, drag - so a trigger never carries its own copy.
+ */
 export type CarouselRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/**
 	 * The value of the slide showing now. A slide is named by its `value`, and

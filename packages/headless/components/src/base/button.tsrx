@@ -1,5 +1,10 @@
 import { computed, type PropsOf, state } from '@markless/core';
 
+/**
+ * A button. Give it `pressed` and it becomes a toggle button that reports
+ * `aria-pressed` and flips on each activation; leave `pressed` off and it is an
+ * ordinary button with no state of its own.
+ */
 type ButtonProps = Pick<PropsOf<'button'>, 'children' | 'disabled'> & {
 	/**
 	 * Provide it and the button becomes a toggle button: it reports `aria-pressed`

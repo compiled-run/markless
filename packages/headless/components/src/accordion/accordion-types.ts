@@ -1,5 +1,10 @@
 import type { PropsOf, Seeded } from '@markless/core';
 
+/**
+ * The accordion itself; every section goes inside it. It holds which section is
+ * showing, and every other accordion part reads that from here rather than
+ * keeping a copy.
+ */
 export type AccordionRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/**
 	 * Which section is showing. A plain string names one section; with `multiple`
@@ -28,6 +33,10 @@ export type AccordionRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	readonly onChange?: (value: string | readonly string[]) => void;
 };
 
+/**
+ * One section: its label, trigger and panel go inside. It carries the section's
+ * own `value`, which is the name the root's `value` matches against.
+ */
 export type AccordionItemProps = PropsOf<'div'> & {
 	/** This section's own name, and what the root's `value` names. */
 	readonly value: string;

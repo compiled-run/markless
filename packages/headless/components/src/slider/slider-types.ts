@@ -13,6 +13,13 @@ export type SliderSide = 'start' | 'end';
 /** What the callbacks report: one number, or the pair a two-value slider holds. */
 export type SliderValue = number | [number, number];
 
+/**
+ * The slider itself; the label, track and thumbs go inside it. It holds the
+ * range and the current value, and the shape of `value` is what decides the
+ * slider: one number for one thumb, a pair for two. The family owns this
+ * element's `style` attribute to carry the filled portion, so style the root
+ * from a stylesheet rather than a `style` prop.
+ */
 export type SliderRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/** Where the slider sits now. A pair means two values. Omit it and it starts at `min`. */
 	readonly value?: SliderValue;
@@ -69,6 +76,12 @@ export type SliderLabelProps = PropsOf<'span'>;
  */
 export type SliderTrackProps = PropsOf<'div'>;
 
+/**
+ * The handle a person drags or arrows, and the `role="slider"` element a reader
+ * announces - a two-value slider has two of them, one per side. The family owns
+ * its `style` attribute to carry the position along the track, so style it from
+ * a stylesheet rather than a `style` prop.
+ */
 export type SliderThumbProps = PropsOf<'div'> & {
 	/** Which of the two values this thumb holds. Omit it on a one-value slider. */
 	readonly side?: SliderSide;
