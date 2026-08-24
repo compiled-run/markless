@@ -27,11 +27,6 @@ export default function Basic() @{
 				});
 			}}
 		>Fail</button>
-		<button
-			type="button"
-			data-testid="method"
-			onClick={() => toasts.toast('Through the method', { duration: Infinity })}
-		>Method</button>
 		<Elsewhere />
 		<toaster.root data-testid="root" />
 	</main>

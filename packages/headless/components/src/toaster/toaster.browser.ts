@@ -10,7 +10,6 @@ const Root = page.getByTestId('root');
 const Save = page.getByTestId('save');
 const Sticky = page.getByTestId('sticky');
 const Elsewhere = page.getByTestId('elsewhere');
-const Method = page.getByTestId('method');
 
 afterEach(async () => {
 	await cleanup();
@@ -166,19 +165,16 @@ test('CSR: a dialog leaves the messages behind it reachable', async () => {
 	expect((el(Root).querySelector('[ui-toast]') as HTMLElement).closest('[inert]')).toBe(null);
 });
 
-// Expected red, and the reason this family cannot ship its ruled surface yet: a
-// shared() method called from a handler in ANOTHER module is copied into that
-// handler's own module, where neither the family's imports nor the graph wiring
-// exist. Measured on this tip, in this order, each after the previous was fixed:
-// `ReferenceError: toastId is not defined` (the copied body keeps the family's
-// helper names, and a symbol module is built from the CALLING module's imports),
-// then `TypeError: Cannot read properties of undefined` for a read of
-// `toaster.queue` through a local, then `TypeError: Cannot add property minted,
-// object is not extensible` for a write straight to an instance field. No
-// diagnostic at any step: the compile is clean and the failure is at dispatch.
-// The same method called from a part inside `toaster.tsrx` works.
-test.fails('CSR: the imperative surface a consumer is meant to call', async () => {
-	await render(Basic);
-	el<HTMLButtonElement>(Method).click();
-	await expect.poll(() => titles()).toEqual(['Through the method']);
+// The ruled surface (defect 95): a shared() method called from a handler in
+// ANOTHER module is text-spliced without the family's imports or graph wiring.
+// It used to compile clean and crash at dispatch in three shapes; the compiler
+// now REFUSES it loudly at build time, naming the absent identifiers and the
+// import capture. This row pins the refusal: the quarantined scenario cannot
+// even load. It becomes a rendering test again when the owner's F2-vs-F3 ruling
+// ships the capability (carry the definition context, or route the call through
+// the family's own emitted module).
+// The browser sees only the failed fetch; the diagnostic text itself is pinned
+// in packages/compiler/test/cross-module-shared-method.test.ts.
+test('the imperative surface is refused at build time until the capability ships', async () => {
+	await expect(import('./scenarios/method.tsrx')).rejects.toThrow();
 });
