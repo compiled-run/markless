@@ -1,3 +1,4 @@
+import { computed } from '@markless/core';
 import { toaster } from '../../index.ts';
 
 // Four messages against a region that shows two: the other two wait their turn,
@@ -8,6 +9,9 @@ import { toaster } from '../../index.ts';
 // rather than a `visible` prop the root no longer has.
 export default function Limits() @{
 	const toasts = toaster.state();
+	// The call goes through computed(): a call in the repeat header reaches the SSR
+	// module verbatim, with `toasts` unbound there.
+	const shown = computed(() => toaster.shown(toasts.queue, 2));
 
 	<main>
 		<button
@@ -31,7 +35,7 @@ export default function Limits() @{
 		<output data-testid="queued">{toasts.queue.length}</output>
 		<toaster.root data-testid="root">
 			<div role="presentation" data-testid="rows">
-				@for (const message of toaster.shown(toasts.queue, 2); key message.id) {
+				@for (const message of shown; key message.id) {
 					<toaster.item toast={message} data-testid="item">
 						<toaster.itemtitle data-testid="itemtitle" />
 						<toaster.itemclose data-testid="itemclose" aria-label="Dismiss">×</toaster.itemclose>
