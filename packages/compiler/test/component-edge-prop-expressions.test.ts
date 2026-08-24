@@ -162,9 +162,13 @@ export default function TreeNode({ depth }) @{
 	const depth = tree.semanticGraph.componentEdges[0]?.props.find((prop) => prop.name === 'depth');
 
 	expect(depth?.kind).toBe('opaque');
+	// The edge expression itself, not the module: the `@if (depth > 0)` beside it
+	// is a branch condition and mints its own computed so the arm can re-decide.
 	expect(
-		tree.semanticGraph.graphBindings.filter((binding) =>
-			binding.id.startsWith('computed:templateExpression:'),
+		tree.semanticGraph.graphBindings.filter(
+			(binding) =>
+				binding.id.startsWith('computed:templateExpression:') &&
+				binding.functionSource?.includes('depth - 1'),
 		),
 	).toEqual([]);
 	expect(

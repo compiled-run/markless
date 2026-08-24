@@ -237,17 +237,22 @@ test('the bare-read and computed arms keep the graph node they already had', asy
 	).toHaveLength(3);
 });
 
-test('a condition over props alone mints nothing', async () => {
-	// No write can move a prop after the render that read it, so the byte cost of a
-	// computed buys no behavior here; the site keeps the empty wake set it had.
+test('a condition over props alone mints the same computed a condition over state does', async () => {
+	// A prop is not settled by the render that read it: a parent can pass a live
+	// graph reference, and an empty wake set here froze the child's arm while the
+	// parent's cell moved. The mint is what carries the prop read into the served
+	// payload, so the branch re-decides on the next write.
 	const { semanticGraph, branches } = await branchFacts('props.tsrx', propsOnly);
+	const minted = semanticGraph.graphBindings.filter((binding) =>
+		binding.id.startsWith('computed:templateExpression:'),
+	);
 
-	expect(
-		semanticGraph.graphBindings.filter((binding) =>
-			binding.id.startsWith('computed:templateExpression:'),
-		),
-	).toHaveLength(0);
-	expect(branches[0]?.wakeSet).toEqual([]);
+	expect(minted).toHaveLength(1);
+	expect(minted[0]?.dependencies.map((dependency) => [dependency.graphNodeId, dependency.path])).toEqual([
+		['prop:props', ['left']],
+		['prop:props', ['right']],
+	]);
+	expect(branches[0]?.wakeSet).toEqual(['computed:templateExpression:0']);
 });
 
 test('a condition over a shared instance reaches the instance state, bare or recombined', async () => {
