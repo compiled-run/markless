@@ -90,6 +90,22 @@ export type ScreenReaderDriver = {
 	press(key: string): Promise<void>;
 	/** Say the item under the cursor again, without moving on. */
 	reannounce(): Promise<string>;
+	/**
+	 * Wait for the announcement the page's own focus move set in motion, and hand
+	 * it back.
+	 *
+	 * A gesture that moves a roving focus makes a reader speak by itself - it is
+	 * following the focus, not being asked. That announcement can still be in
+	 * flight when `press()` returns, so this waits for the reader's reading
+	 * position to agree with what the page has focused and then answers with what
+	 * it said there.
+	 *
+	 * It waits for the reader, never for the page: a caller asserts the gesture's
+	 * own DOM outcome first (the focus is where the gesture had to put it), or
+	 * this will honestly answer with what the reader said about the item the
+	 * gesture moved *off*.
+	 */
+	settleOnFocus(): Promise<string>;
 	lastSpokenPhrase(): Promise<string>;
 	spokenPhraseLog(): Promise<string[]>;
 	clearSpokenPhraseLog(): Promise<void>;
