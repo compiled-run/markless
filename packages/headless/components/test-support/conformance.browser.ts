@@ -68,7 +68,7 @@ const descriptors: readonly FamilyDescriptor[] = [
 		family: 'base',
 		mount: { CSR: () => render(BaseParts), SSR: () => renderSSR(BaseParts) },
 		root: 'base-parts',
-		parts: ['base-parts', 'button', 'label', 'hidden'],
+		parts: ['base-parts', 'button', 'label', 'field', 'hidden'],
 		// A bag of primitives rather than a family: no root part, so no root
 		// contract to hold it to beyond the wrapper the scenario writes.
 		rootAria: {},

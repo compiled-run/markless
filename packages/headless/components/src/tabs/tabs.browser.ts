@@ -4,6 +4,7 @@ import { expect, test } from 'vitest';
 import ArmTabs from './scenarios/arm-tabs.tsrx';
 import Basic from './scenarios/basic.tsrx';
 import ConsumerAttributes from './scenarios/consumer-attributes.tsrx';
+import FromData from './scenarios/from-data.tsrx';
 import Looping from './scenarios/looping.tsrx';
 import ManualActivation from './scenarios/manual-activation.tsrx';
 import SettingsPanels from './scenarios/settings-panels.tsrx';
@@ -179,6 +180,27 @@ async function expectClickMovesThePanels() {
 	expect(el(OverviewContent).hasAttribute('hidden')).toBe(true);
 }
 
+// Re-queried on every read: a resumed keyed row is re-anchored, so a reference
+// held from before the click can be a detached element.
+const rowTriggers = () => page.getByTestId('row-trigger').elements();
+const rowPanels = () => page.getByTestId('row-content').elements();
+const shownRow = () => rowPanels().findIndex((panel) => !panel.hasAttribute('hidden'));
+const selectedRow = () =>
+	rowTriggers().findIndex((trigger) => trigger.getAttribute('aria-selected') === 'true');
+
+// `panelsMove` is false on a resumed page for the reason the pinned row below
+// records: a `tabs.content` never refreshes after resume, written out or looped.
+async function expectRowTabsSwitch(panelsMove: boolean) {
+	expect(rowTriggers().length).toBe(3);
+	expect(rowPanels().length).toBe(3);
+	expect(selectedRow()).toBe(0);
+	expect(shownRow()).toBe(0);
+
+	(rowTriggers()[1] as HTMLElement).click();
+	await expect.poll(selectedRow).toBe(1);
+	if (panelsMove) await expect.poll(shownRow).toBe(1);
+}
+
 async function expectClickingTheShowingTabChangesNothing() {
 	el(OverviewTrigger).click();
 	await expect.poll(() => el(OverviewTrigger).getAttribute('aria-selected')).toBe('true');
@@ -256,6 +278,12 @@ for (const mode of MODES) {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 		await expectClickingTheShowingTabChangesNothing();
+	});
+
+	test(`${mode}: tabs authored over a list render and switch`, async () => {
+		if (mode === 'CSR') await render(FromData);
+		else await renderSSR(FromData);
+		await expectRowTabsSwitch(mode === 'CSR');
 	});
 }
 
@@ -468,6 +496,14 @@ test('SSR: the selection is in the served HTML, and the first click after resume
 test.fails('SSR: clicking a tab moves the panels', async () => {
 	await renderSSR(Basic);
 	await expectClickMovesThePanels();
+});
+
+// The same pin, reached through a keyed `@for`: looping the parts neither fixes
+// nor worsens it.
+test.fails('SSR: clicking a looped tab moves the looped panels', async () => {
+	await renderSSR(FromData);
+	(rowTriggers()[1] as HTMLElement).click();
+	await expect.poll(shownRow).toBe(1);
 });
 
 test('SSR: the keyboard walk works on a resumed page', async () => {
