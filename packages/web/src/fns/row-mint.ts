@@ -1,4 +1,4 @@
-import type { ResumeDomElement, ResumeDomNode, ResumeKeyedRepeatRecord } from './resume-types.ts';
+import type { ResumeDomElement, ResumeDomNode, ResumeKeyedRepeatRecord } from '../resume-types.ts';
 
 /**
  * The nodes a resumed client BUILDS for a keyed repeat, and nothing else.

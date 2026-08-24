@@ -360,7 +360,7 @@ function repeatRecordModules(
 test('a repeat that only reorders served rows demands no row mint', () => {
 	const modules = repeatRecordModules(repeatDemandMap({}));
 	expect(modules).toContain('web/resume-keyed-repeats');
-	expect(modules).not.toContain('web/resume-row-mint');
+	expect(modules).not.toContain('web/fns/row-mint');
 });
 
 test('a repeat carrying row markup demands the row mint', () => {
@@ -368,12 +368,12 @@ test('a repeat carrying row markup demands the row mint', () => {
 		repeatRecordModules(
 			repeatDemandMap({ rowTemplate: { html: '<li></li>', textSlots: [] } }),
 		),
-	).toContain('web/resume-row-mint');
+	).toContain('web/fns/row-mint');
 });
 
 test('a repeat carrying an @empty arm demands the row mint', () => {
 	expect(repeatRecordModules(repeatDemandMap({ emptyArm: { html: '<li></li>' } }))).toContain(
-		'web/resume-row-mint',
+		'web/fns/row-mint',
 	);
 });
 
@@ -384,5 +384,5 @@ test('the row mint reaches a row action through its own repeat record', () => {
 	});
 	const action = map.actions.find((candidate) => candidate.recordKind === 'keyed-repeat-row');
 	expect(action?.payloadRecordIds).toContain('keyed-repeat:repeat:0');
-	expect(action?.runtimeModuleIds).toContain('web/resume-row-mint');
+	expect(action?.runtimeModuleIds).toContain('web/fns/row-mint');
 });

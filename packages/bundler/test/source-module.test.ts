@@ -783,10 +783,10 @@ test('emitResumeModule writes the row-mint loader only for a repeat that can bui
 			runtimeDemandMap: repeatDemandMap([
 				'web/repeat-runtime',
 				'web/resume-keyed-repeats',
-				'web/resume-row-mint',
+				'web/fns/row-mint',
 			]),
 		}),
-	).toContain("globalThis.__marklessRowMint = () => import('@markless/web/resume-row-mint');");
+	).toContain("globalThis.__marklessRowMint = () => import('@markless/web/fns/row-mint');");
 });
 
 test('emitResumeModule leaves a reorder-only repeat with no row-mint specifier', () => {
@@ -796,7 +796,7 @@ test('emitResumeModule leaves a reorder-only repeat with no row-mint specifier',
 	});
 
 	expect(reorderOnly).not.toContain('__marklessRowMint');
-	expect(reorderOnly).not.toContain('resume-row-mint');
+	expect(reorderOnly).not.toContain('fns/row-mint');
 });
 
 test('emitResumeModule leaves a repeat-free page with no row-mint specifier', () => {

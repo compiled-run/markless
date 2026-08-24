@@ -21,7 +21,7 @@ import type {
  * minted row does; the line below stands in for the loader a compiled app emits.
  */
 (globalThis as { __marklessRowMint?: () => Promise<unknown> }).__marklessRowMint = () =>
-	import('../src/resume-row-mint.ts');
+	import('../src/fns/row-mint.ts');
 
 type Node = {
 	nodeType: number;

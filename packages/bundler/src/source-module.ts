@@ -462,7 +462,7 @@ function emitOverlayLoaderInstall(): string {
  * global and refuses to build without one.
  */
 function emitRowMintLoaderInstall(): string {
-	return "globalThis.__marklessRowMint = () => import('@markless/web/resume-row-mint');";
+	return "globalThis.__marklessRowMint = () => import('@markless/web/fns/row-mint');";
 }
 
 /**
@@ -489,7 +489,7 @@ function demandsRowMint(runtimeDemandMap: unknown): boolean {
 	);
 }
 
-const ROW_MINT_RUNTIME_MODULE_ID = 'web/resume-row-mint';
+const ROW_MINT_RUNTIME_MODULE_ID = 'web/fns/row-mint';
 
 /** True when the compiler recorded an `overlay` mark for this module. */
 function demandsOverlay(runtimeDemandMap: unknown): boolean {

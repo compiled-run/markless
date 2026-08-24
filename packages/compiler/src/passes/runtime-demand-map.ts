@@ -59,7 +59,7 @@ const OVERLAY = ['web/fns/overlay'];
 // reach it. A record carrying neither `rowTemplate` nor `emptyArm` cannot mint a
 // row or raise an `@empty` arm at all, so recording the demand per record is
 // what lets the bundler keep the chunk off every app whose repeats only reorder.
-const ROW_MINT = ['web/resume-row-mint'];
+const ROW_MINT = ['web/fns/row-mint'];
 const FULL_RESUME_CORE = ['web/resume-locators'];
 const FULL_TIER_COMMON = [
 	'web/resume-runtime',

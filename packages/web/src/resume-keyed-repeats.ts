@@ -74,7 +74,7 @@ type RepeatReadableGraph = Pick<RuntimeGraph, 'read'>;
  * no edge. An absent loader is a page that cannot build nodes, and every mint
  * site below already refuses without one.
  */
-type RowMint = typeof import('./resume-row-mint.ts');
+type RowMint = typeof import('./fns/row-mint.ts');
 type RowMintHost = { readonly __marklessRowMint?: () => Promise<RowMint> };
 let rowMint: RowMint | undefined,
 	rowMintLoad: Promise<RowMint> | undefined;

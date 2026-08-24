@@ -21,7 +21,7 @@ import type { ResumeDomElement, ResumeViewRecord } from '../src/resume-types.ts'
  * keyed-repeat-row-mint-ungated.test.ts.
  */
 (globalThis as { __marklessRowMint?: () => Promise<unknown> }).__marklessRowMint = () =>
-	import('../src/resume-row-mint.ts');
+	import('../src/fns/row-mint.ts');
 
 type Node = {
 	nodeType: number;
