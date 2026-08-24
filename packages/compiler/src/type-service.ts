@@ -116,7 +116,7 @@ export function compileTsrxForTypeService(
 		errors,
 		comments,
 	}) as Program;
-	const emittedCode = emitProgramForTypeService(sourceAst, source);
+	const emittedCode = emitProgramForTypeService(sourceAst, source, comments);
 	const generated = finalizeSourceMapMarkers(emittedCode);
 	addImportInsertionMappings(sourceAst, source, generated.mappings);
 
@@ -132,13 +132,31 @@ export function compileTsrxForTypeService(
 
 export const compile_to_volar_mappings = compileTsrxForTypeService;
 
-function emitProgramForTypeService(program: Program, source: string): string {
-	const statements = asNodes(program.body);
-	const body = statements
-		.map((statement) => emitTopLevelStatement(statement, source))
-		.filter(Boolean)
-		.join('\n');
-	return `/** @jsxImportSource @markless/typescript-plugin */\n${body}`;
+function emitProgramForTypeService(
+	program: Program,
+	source: string,
+	comments: readonly MarklessParserComment[] = [],
+): string {
+	// Statement spans exclude the gap a doc comment sits in, so it has to be carried over by hand.
+	const docComments = comments
+		.filter((comment) => comment.type === 'Block' && comment.value.startsWith('*'))
+		.sort((left, right) => left.start - right.start);
+	const parts: string[] = [];
+	let cursor = 0;
+	for (const statement of asNodes(program.body)) {
+		const span = sourceSpan(statement);
+		const emitted = emitTopLevelStatement(statement, source);
+		if (emitted && span) {
+			for (const comment of docComments) {
+				if (comment.start >= cursor && comment.end <= span.start) {
+					parts.push(source.slice(comment.start, comment.end));
+				}
+			}
+		}
+		if (emitted) parts.push(emitted);
+		if (span) cursor = Math.max(cursor, span.end);
+	}
+	return `/** @jsxImportSource @markless/typescript-plugin */\n${parts.join('\n')}`;
 }
 
 function emitTopLevelStatement(statement: TsrxAstNode, source: string): string {
