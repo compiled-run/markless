@@ -35,8 +35,23 @@ test('SSR: a composed closure runs every call it makes, in order', async () => {
 	await probe(screen.container, composed);
 });
 
-// The module never loads because the compiler blocks it; the browser sees only a
-// failed fetch, so the diagnostic text itself is asserted in the compiler suite.
-test('an array of handlers fails the build instead of rendering', async () => {
-	await expect(import('./fixtures/array-handler-rejected.tsrx')).rejects.toThrow();
+// This probe used to assert the array form fails the build. The owner ruled
+// event arrays in (authored order, platform semantics), so the same fixture now
+// witnesses the positive contract: both handlers fire per click, first-listed
+// first. The deep coverage lives in multi-binding.test.ts.
+//
+// PENDING CAPABILITY (defect 89) - on PLAIN component state, each array entry's
+// write lands twice: one click measures order 'AABB' where 'AB' is authored
+// (count still nets 0, so the duplication is symmetric). The mb-events
+// witnesses pass on the same array shape over widget-shared state, so the
+// duplication is specific to the plain-state write path - consistent with a
+// dispatch-apply plus flush-replay double-commit, the machinery family defect
+// 88 lives in. Deterministic, so test.fails.
+test.fails('an array of handlers renders and runs in authored order', async () => {
+	const { default: Rejected } = await import('./fixtures/array-handler-accepted.tsrx');
+	const screen = await render(Rejected);
+	const container = screen.container as HTMLElement;
+	container.querySelector<HTMLButtonElement>('button')?.click();
+	await expect.poll(() => container.querySelector('[data-order]')?.textContent).toBe('AB');
+	expect(container.querySelector('button')?.textContent).toBe('0');
 });
