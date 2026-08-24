@@ -504,30 +504,49 @@ function attachDirectRepeatEvents(
 	const eventNames = new Set(repeat.eventControls.map((event) => event.eventName));
 	for (const eventName of eventNames) {
 		parent.addEventListener(eventName, async (event) => {
-			let target: Node | null = event.target as Node | null;
-			while (target && target !== parent) {
-				for (let eventIndex = 0; eventIndex < repeat.eventControls.length; eventIndex++) {
-					const eventControl = repeat.eventControls[eventIndex];
-					if (eventControl.eventName !== eventName) continue;
-					const record = (target as unknown as DirectExpandoElement)[
-						`__marklessDirectRepeat${repeatIndex}Event${eventIndex}`
-					] as DirectRowRecord | undefined;
-					if (!record || record.removed) continue;
-					const loaded = loadSymbol(eventControl.symbolId);
-					const symbol = isMarklessPublicThenable(loaded) ? await loaded : loaded;
-					const value = symbol({
-						graph,
-						event,
-						element: target,
-						getElementHandle: () => undefined,
-						locals: { [eventControl.itemContext.itemName]: record.item },
-					});
-					if (isMarklessPublicThenable(value)) await value;
-					sync();
-					graph.flush();
-					return;
+			// One row host's handler entries are one listener list, and this single
+			// delegated listener is the only one the DOM sees: stopImmediatePropagation
+			// leaves no flag to read here, so the call itself is what ends the list.
+			let stopped = false;
+			const host = event as unknown as Record<string, unknown>;
+			const native = host.stopImmediatePropagation as (...args: unknown[]) => unknown;
+			host.stopImmediatePropagation = (...args: unknown[]) => {
+				stopped = true;
+				return native.apply(event, args);
+			};
+			try {
+				let target: Node | null = event.target as Node | null;
+				while (target && target !== parent) {
+					let ran = false;
+					for (let eventIndex = 0; eventIndex < repeat.eventControls.length; eventIndex++) {
+						const eventControl = repeat.eventControls[eventIndex];
+						if (eventControl.eventName !== eventName) continue;
+						const record = (target as unknown as DirectExpandoElement)[
+							`__marklessDirectRepeat${repeatIndex}Event${eventIndex}`
+						] as DirectRowRecord | undefined;
+						if (!record || record.removed) continue;
+						const loaded = loadSymbol(eventControl.symbolId);
+						const symbol = isMarklessPublicThenable(loaded) ? await loaded : loaded;
+						const value = symbol({
+							graph,
+							event,
+							element: target,
+							getElementHandle: () => undefined,
+							locals: { [eventControl.itemContext.itemName]: record.item },
+						});
+						if (isMarklessPublicThenable(value)) await value;
+						ran = true;
+						if (stopped) break;
+					}
+					if (ran) {
+						sync();
+						graph.flush();
+						return;
+					}
+					target = target.parentElement || target.parentNode;
 				}
-				target = target.parentElement || target.parentNode;
+			} finally {
+				host.stopImmediatePropagation = native;
 			}
 		});
 	}

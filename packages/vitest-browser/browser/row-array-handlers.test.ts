@@ -17,7 +17,11 @@ import Page from './fixtures/row-array-handlers.tsrx';
 afterEach(() => cleanup());
 
 function trace(container: ParentNode) {
-	return container.querySelector('p')?.textContent;
+	return container.querySelector('[data-trace]')?.textContent;
+}
+
+function stopTrace(container: ParentNode) {
+	return container.querySelector('[data-stop-trace]')?.textContent;
 }
 
 function clickFirstRow(container: ParentNode) {
@@ -26,34 +30,55 @@ function clickFirstRow(container: ParentNode) {
 	row.click();
 }
 
+function clickStopRow(container: ParentNode) {
+	const row = container.querySelector<HTMLElement>('[data-stop-list] li');
+	if (!row) throw new Error('Expected a stop row.');
+	row.click();
+}
+
 test('SSR resume: one click on a row runs every handler entry once, in order', async () => {
 	const screen = await renderSSR(Page);
 	const container = screen.container;
-	expect([...container.querySelectorAll('li')].map((row) => row.textContent)).toEqual([
-		'alpha',
-		'bravo',
-	]);
+	expect([...container.querySelectorAll('ul:not([data-stop-list]) li')].map((row) =>
+		row.textContent,
+	)).toEqual(['alpha', 'bravo']);
 
 	clickFirstRow(container);
-	await expect.poll(() => trace(container)).toBe('AB');
+	await expect.poll(() => trace(container)).toBe('ABC');
 });
 
-// OPEN DEFECT, direct CSR only - the row runs entry A and stops, so the trace
-// reads 'A' where the SSR row above reads 'AB'.
-//
-// The cause is downstream of this package and not the duplicate records that
-// defect 89's sibling fix removed: `attachDirectRepeatEvents` in
-// packages/web/src/fns/direct.ts walks `repeat.eventControls`, runs the first
-// control whose row expando matches, and returns from the listener - so exactly
-// one entry ever fires per click. Measured before and after the render-data
-// dedupe (four controls, then two): 'A' both times, so deduping neither caused
-// nor cured it. Repairing it means letting that listener run every control for
-// the matched row+event instead of returning on the first, which is a change to
-// packages/web. Deterministic, so test.fails.
-test.fails('CSR: one click on a row runs every handler entry once, in order', async () => {
+test('CSR: one click on a row runs every handler entry once, in order', async () => {
 	const screen = await render(Page);
 	const container = screen.container as HTMLElement;
 
 	clickFirstRow(container);
-	await expect.poll(() => trace(container)).toBe('AB');
+	await expect.poll(() => trace(container)).toBe('ABC');
+});
+
+// A row host's handler entries are one DOM listener list, so the entry that
+// calls stopImmediatePropagation is the last one to run: the third entry never
+// fires. Both render paths have to agree on that, which is what the non-row
+// mb-events witnesses already pin for a plain element.
+// OPEN DEFECT, SSR resume only - the row runs XYZ where CSR now reads XY.
+// Resume honours stopImmediatePropagation for a plain element but not for a
+// row: in packages/web/src/resume-events.ts the dispatch walk hands
+// `propagation.stoppedImmediate` to `dispatchViewEvent` and NOT to
+// `dispatchRowEvent`, whose `for (const symbolId of rowEvent.symbolIds)` loop
+// therefore has nothing to read and runs the list to the end. Deterministic, so
+// test.fails. Repairing it is a change to resume-events.ts, which the direct-CSR
+// unit that pinned this does not own.
+test.fails('SSR resume: stopImmediatePropagation in a row entry ends the list', async () => {
+	const screen = await renderSSR(Page);
+	const container = screen.container;
+
+	clickStopRow(container);
+	await expect.poll(() => stopTrace(container)).toBe('XY');
+});
+
+test('CSR: stopImmediatePropagation in a row entry ends the list', async () => {
+	const screen = await render(Page);
+	const container = screen.container as HTMLElement;
+
+	clickStopRow(container);
+	await expect.poll(() => stopTrace(container)).toBe('XY');
 });
