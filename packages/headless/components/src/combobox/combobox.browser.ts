@@ -654,20 +654,29 @@ for (const mode of MODES) {
 		await expectTheConsumerFilterRecomputes();
 	});
 
-	// PENDING CAPABILITY - a keyed repeat does not follow its source. Measured
-	// twice on this tip, both shapes red in CSR and SSR: with the source a
-	// `computed()` over the adopted instance, and with it a plain `state()` array
-	// rewritten from the family's own `onInput`. In both, a text read of the same
-	// array updates - the page renders `matches.length` as 2 - while the `@for`
-	// keeps all four rows. The rows root a widget each (`combobox.item`), which is
-	// the one thing this shape has that the landed repeat witnesses in
-	// packages/vitest-browser/browser/ do not. Deterministic, so test.fails.
+	// PENDING CAPABILITY - a row that is not its parent's first child. The list
+	// DOES follow its source now: three defects behind this were fixed and are
+	// witnessed in packages/vitest-browser/browser/krg.test.ts (a row dropped off
+	// the END of the collection never left; a widget-rooting repeat was never
+	// wired at all because its row chunk owns no element host; a `computed()`
+	// collection read as empty at wire time, so no served row was ever keyed).
+	// The list now narrows to the right COUNT and picks the wrong rows: this
+	// scenario's `<p data-testid="count">` sits before the options inside the
+	// same parent, and the reconcile addresses rows as the parent's first N child
+	// elements, so every key is shifted by one. Measured here as
+	// ['Grape','Cherry'] where ['Apple','Grape'] is wanted. Closing it needs a row
+	// start offset in the view payload, which is a new protocol field.
+	// Deterministic, so test.fails.
 	test.fails(`${mode}: the consumer's own filter narrows the list as the field is typed in`, async () => {
 		if (mode === 'CSR') await render(Filtered);
 		else await renderSSR(Filtered);
 		await expectTheConsumerFilterNarrowsTheList();
 	});
 
+	// PENDING CAPABILITY - same row start offset as the row above. Emptying the
+	// list is the one shrink the offset still defeats: the count `<p>` is taken
+	// for a row, so one element is always left where zero are wanted, and the
+	// `@empty` arm never gets to speak. Deterministic, so test.fails.
 	test.fails(`${mode}: the empty arm is what speaks when nothing matches`, async () => {
 		if (mode === 'CSR') await render(Filtered);
 		else await renderSSR(Filtered);
