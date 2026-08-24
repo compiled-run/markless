@@ -135,7 +135,8 @@ for (const mode of MODES) {
 		expect(el(ForwardTrigger).getAttribute('aria-label')).toBe('Next slide');
 	});
 
-	// Pinned: defect 78-adjacent (vertical stepping fails upstream of the engine).
+	// Pinned: defect 78-adjacent. Same measured cause as the row below - the
+	// stepping handler throws before the engine is reached.
 	test.fails(`${mode}: a vertical carousel says so and still steps`, async () => {
 		if (mode === 'CSR') await render(Vertical);
 		else await renderSSR(Vertical);
@@ -147,7 +148,22 @@ for (const mode of MODES) {
 		await expect.poll(() => el(MiddleItem).hasAttribute('ui-active')).toBe(true);
 	});
 
-	// Pinned: defect 78 (cross-instance refresh clears the other carousel's marker).
+	// Pinned: defect 78, and the cause is now measured - it is NOT the keyed-loop
+	// instance seat that defect 75 stood on, so the row-rooted widget lookup does
+	// not move it. Nothing clears the other carousel's marker: the LEFT trigger
+	// never steps at all, because its handler throws
+	//
+	//   Element handle …#carouselState/element:scrollEl is registered by 2
+	//   rendered widgets on this page, and the reading handler named no instance.
+	//
+	// A widget-scoped element() handle keeps its module-level id, while the graph
+	// nodes of the same widget are spelled against the widget ROOT's edge path by
+	// the time a part reads them. So the graph half resolves and the handle half
+	// has only the reading part's own edge path to go on - `c4:` for the forward
+	// trigger, against roots at `c0:` and `c5:` - and `carousel.root` binds no
+	// handle of its own, so `widgetRootPath` cannot answer for the trigger's host
+	// either. Fixing it needs a bridge from a dispatching host to the rendered
+	// widget it stands inside that does not depend on that host binding a handle.
 	test.fails(`${mode}: a trigger in one carousel leaves the other alone`, async () => {
 		if (mode === 'CSR') await render(TwoCarousels);
 		else await renderSSR(TwoCarousels);
