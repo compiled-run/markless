@@ -2,7 +2,6 @@ import type { RuntimeGraph } from '@markless/runtime';
 import { protocolEventDispatchesMarkless } from '@markless/serializer/protocol';
 import {
 	marklessInstancePath,
-	marklessInstanceScopedElementHandle,
 	marklessRecordRowScope,
 	marklessRowScopedGraph,
 } from './fns/instance-scope.ts';
@@ -212,27 +211,17 @@ export function createEventWiring(input: {
 			// spell the same node as the handler for row A - the write lands
 			// nowhere, or worse, on the wrong row.
 			const rowScope = marklessRecordRowScope(eventRecord.hostNodeId, input.graph);
-			// The same question for the element handles, which the row scope cannot
-			// answer: a widget-scoped handle is one element per rendered widget and
-			// the compiled symbol spells the module-level id, so without an instance
-			// path the read lands on the flat key every instance filed and the
-			// registry refuses it. The registrations on this record's own host are
-			// what name the widget it is dispatching from.
-			const recordInstancePath =
-				input.elementHandles.widgetRootPath?.(eventRecord.hostNodeId) ??
-				marklessInstancePath(eventRecord.hostNodeId);
+			// Element handles need no answer here. A bound symbol's own resolver
+			// spells them against the bound edge's instance path, exactly as it
+			// already spells that symbol's graph nodes, so the widget a handle read
+			// belongs to is decided by the same fact for both halves. Reading it off
+			// this record's host instead only ever answered when the dispatching part
+			// happened to bind a handle of its own.
 			const runSymbol = async (symbolId: string, context: ResumeSymbolContext) =>
 				(await input.loadSymbol(symbolId))({
 					...context,
 					...(rowScope && isBoundSymbolId(symbolId)
-						? {
-								graph: marklessRowScopedGraph(context.graph, rowScope),
-								getElementHandle: marklessInstanceScopedElementHandle(
-									context.getElementHandle,
-									recordInstancePath,
-									input.graph,
-								),
-							}
+						? { graph: marklessRowScopedGraph(context.graph, rowScope) }
 						: {}),
 					invokeCallback,
 					invokeSymbol,

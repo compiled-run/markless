@@ -306,8 +306,6 @@ export type ResumeRuntime = {
 };
 export type ElementHandleRegistry = {
 	readonly get: (handleIdOrName: string) => ResumeElementHandleValue;
-	/** The rendered widget this host sits in, as the instance path its own qualified handles carry. */
-	readonly widgetRootPath?: (hostNodeId: string) => string | undefined;
 	readonly register: (
 		hostNodeId: string,
 		handle: { readonly handleId: string; readonly name: string },
