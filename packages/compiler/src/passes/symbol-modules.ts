@@ -3448,15 +3448,22 @@ function valueExpressionNode(
 	const text = valueNodeText(node, source);
 	if (!text) return null;
 
-	const leaf =
-		literalValueNode(node, text) ??
-		eventFieldValueNode(text, input.eventParameters) ??
-		// Ahead of the graph read: state lowering resolves a handle read to the
-		// element binding's graph node, and a graph node is not where a DOM
-		// element lives.
-		elementHandleValueNode(text, input.elementHandleReads ?? [], input.localNames) ??
-		graphReadValueNode(text, input.graphReads) ??
-		localValueNode(text, input.localNames);
+	const literalOrEventField =
+		literalValueNode(node, text) ?? eventFieldValueNode(text, input.eventParameters);
+	if (literalOrEventField) return literalOrEventField;
+
+	// Ahead of the graph read: state lowering resolves a handle read to the
+	// element binding's graph node, and a graph node is not where a DOM element
+	// lives. A refusal stops here rather than falling through, because the graph
+	// read below matches the same text.
+	const handle = elementHandleValueLowering(
+		text,
+		input.elementHandleReads ?? [],
+		input.localNames,
+	);
+	if (handle) return handle.kind === 'lowered' ? handle.node : null;
+
+	const leaf = graphReadValueNode(text, input.graphReads) ?? localValueNode(text, input.localNames);
 	if (leaf) return leaf;
 
 	if (node.type === 'ArrayExpression') return arrayLiteralValueNode(node, source, input);
@@ -3821,9 +3828,12 @@ function rewriteGraphReadsAndLocals(
 	const text = valueNodeText(node, source);
 
 	const handle = text
-		? elementHandleValueNode(text, input.elementHandleReads ?? [], input.localNames)
+		? elementHandleValueLowering(text, input.elementHandleReads ?? [], input.localNames)
 		: null;
-	if (handle) return handle;
+	if (handle?.kind === 'lowered') return handle.node;
+	// A refused handle read keeps the authored name, which the graph read below
+	// would otherwise swallow into a `graph.read` that answers `undefined`.
+	if (handle) return node as unknown as EmissionNode;
 
 	const graphRead = text
 		? input.graphReads.find((read) => read.source === text)
@@ -5036,8 +5046,12 @@ function eventReadNode(
 	if (!isGraphReadExpression(node)) return null;
 	if (!isValuePositionGraphRead(node, parent)) return null;
 
-	const handleRead = elementHandleReadNode(text, rewrite);
-	if (handleRead) return handleRead;
+	// A refusal returns `null` rather than falling through: the recorded read
+	// below matches the same text and would emit a `graph.read` off the element
+	// binding, which answers `undefined`. Declining sends the walk into the
+	// node's children, where the authored name survives for the guard to fail on.
+	const handleRead = elementHandleReadLowering(text, rewrite);
+	if (handleRead) return handleRead.kind === 'lowered' ? handleRead.node : null;
 
 	// Ahead of the recorded reads, for the same reason the handle read refuses a
 	// row local: inside the row, the row's name is the row's item.
@@ -5289,12 +5303,36 @@ function eventWriteValueNode(node: AnyNode, rewrite: EventHandlerRewrite): Emiss
 	);
 }
 
-function elementHandleReadNode(text: string, rewrite: EventHandlerRewrite): EmissionNode | null {
-	return elementHandleValueNode(text, rewrite.elementHandleReads, rewrite.localNames);
+/**
+ * What this band does with a text that state lowering resolved to a handle.
+ *
+ * `null` means the text is no handle read, which sends the caller on to the
+ * graph-read case. `refused` means it IS one and this band cannot spell it, and
+ * that answer must NOT fall through: the graph read matches the same text and
+ * would emit `graph.read("element:els", ["0", "id"])`, which answers `undefined`
+ * with nothing to say so. Leaving the authored name standing instead is the
+ * shape `unresolvedGraphReferences` sees, and the compile fails naming it.
+ */
+type ElementHandleValueLowering =
+	| { readonly kind: 'lowered'; readonly node: EmissionNode }
+	| { readonly kind: 'refused' };
+
+function elementHandleReadLowering(
+	text: string,
+	rewrite: EventHandlerRewrite,
+): ElementHandleValueLowering | null {
+	return elementHandleValueLowering(text, rewrite.elementHandleReads, rewrite.localNames);
 }
 
 /**
  * `context.getElementHandle("panel")`, for a handle read as a VALUE.
+ *
+ * A member chain THROUGH the handle keeps its tail: `box.tagName.length` lowers
+ * to `context.getElementHandle("element:box")?.tagName.length`, not to the
+ * handle alone. State lowering hands the whole chain over as one read, so
+ * substituting the record's `source` wholesale replaced the property access as
+ * well as the handle — the handler then measured the element instead of the
+ * number, and nothing said so.
  *
  * A row-local of the same name wins: inside a keyed row `item` is the row's own
  * item, whatever a module-level handle is called. That is the same precedence
@@ -5304,17 +5342,65 @@ function elementHandleReadNode(text: string, rewrite: EventHandlerRewrite): Emis
  * handler walk reaches statement-position reads, and the value band reaches the
  * right-hand side of every state write the handler makes.
  */
-function elementHandleValueNode(
+function elementHandleValueLowering(
 	text: string,
 	handleReads: ReadonlyArray<LoweredElementHandleRead>,
 	localNames: ReadonlySet<string>,
-): EmissionNode | null {
+): ElementHandleValueLowering | null {
 	if (handleReads.length === 0) return null;
 	const handle = handleReads.find((candidate) => candidate.source === text);
 	if (!handle) return null;
 	if (localNames.has(text.split('.')[0] ?? '')) return null;
 
-	return callNode(memberChainNode('context.getElementHandle'), [literalNode(handle.handleId)]);
+	const call = callNode(memberChainNode('context.getElementHandle'), [
+		literalNode(handle.handleId),
+	]);
+	const path = handle.path ?? [];
+	if (path.length === 0) return { kind: 'lowered', node: call };
+
+	// Only a tail the author wrote as plain dots is rebuildable from the path:
+	// `els[0].id` arrives here as `["0", "id"]`, and `?.0.id` is not JavaScript.
+	if (!path.every((segment) => VALUE_IDENTIFIER_PATTERN.test(segment))) return { kind: 'refused' };
+
+	const tail = `.${path.join('.')}`;
+	if (!handle.source.endsWith(tail)) return { kind: 'refused' };
+
+	// What is left of the source once the tail is removed has to be the handle
+	// itself — `box`, or `t.panelEl` reached through a shared() instance. Any
+	// other spelling means the split landed somewhere else in the chain, and
+	// rebuilding from it would move a property onto the wrong object.
+	const root = handle.source.slice(0, handle.source.length - tail.length);
+	if (root !== handle.handleName && !root.endsWith(`.${handle.handleName}`)) {
+		return { kind: 'refused' };
+	}
+
+	return { kind: 'lowered', node: elementHandlePropertyPathNode(call, path) };
+}
+
+/**
+ * `context.getElementHandle("element:box")?.tagName.length`.
+ *
+ * Only the first hop is optional, and deliberately: the registry answers
+ * `undefined` for a handle whose element never mounted, so that hop can miss.
+ * Every hop after it is an ordinary property of a live DOM node, and marking
+ * those optional too would hide a misspelled property behind `undefined`.
+ */
+function elementHandlePropertyPathNode(
+	base: EmissionNode,
+	path: ReadonlyArray<string>,
+): EmissionNode {
+	let expression = base;
+	for (const [index, part] of path.entries()) {
+		expression = {
+			type: 'MemberExpression',
+			object: expression,
+			property: identifierNode(part),
+			computed: false,
+			optional: index === 0,
+		};
+	}
+
+	return { type: 'ChainExpression', expression };
 }
 
 /** `context.getElementHandle("chart")?.setData(1)`. */

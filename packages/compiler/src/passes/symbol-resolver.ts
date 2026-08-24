@@ -1094,14 +1094,16 @@ function elementHandleReads(
 	const collected: LoweredElementHandleRead[] = [];
 	for (const read of reads) {
 		const handle = handlesByGraphNodeId.get(read.graphNodeId);
-		// A path off a handle is a DOM property, not part of the handle's identity;
-		// the emitter rebuilds it from the authored node.
+		// A path off a handle is a DOM property, not part of the handle's identity,
+		// so it is carried beside the handle rather than folded into it: the
+		// emitter rebuilds the tail onto `getElementHandle(...)`.
 		if (!handle) continue;
 		if (collected.some((existing) => existing.source === read.source)) continue;
 		collected.push({
 			source: read.source,
 			handleId: handle.handleId,
 			handleName: handle.name,
+			...(read.path.length > 0 ? { path: read.path } : {}),
 		});
 	}
 	return collected;
