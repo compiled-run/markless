@@ -151,8 +151,7 @@ const clientBuild = resolve(demo, '.output/public/build');
 // (defect 72 incl. emitted-resolver graph pass) + served-open enlist handoff + plural
 // element-handle machinery with the live row-walk read (+320 of it). Bundler-diet owns
 // the repayment alongside the standing pay-per-use obligations.
-// 67,940 -> 68,170 (2026-08-24): measured 68,156 - the multi-binding chain. Bundler-diet repayment.
-const MAX_SHIPPED_JS_GZIP_BYTES = 68_170;
+const MAX_SHIPPED_JS_GZIP_BYTES = 67_940;
 
 test('music-player-ssr production build stays within its shipped JS budget', async () => {
 	await rm(resolve(demo, '.output'), { force: true, recursive: true });

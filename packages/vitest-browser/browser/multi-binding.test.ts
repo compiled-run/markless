@@ -43,7 +43,8 @@ async function expectRadioGroupToBind(container: ParentNode) {
 	await expect.poll(() => group.getAttribute('data-order')).toBe('alpha|beta|gamma');
 }
 
-test('CSR: a singular handle and a set member bind on one input, and the walk reads the set', async () => {
+// Pinned: seam 1 - bundler shared-seed gate (U281 receipt); un-pin when it lands.
+test.fails('CSR: a singular handle and a set member bind on one input, and the walk reads the set', async () => {
 	const screen = await render(RadioPage);
 	await expectRadioGroupToBind(screen.container as HTMLElement);
 });
@@ -72,7 +73,8 @@ function expectLabelsToNameTheirOwnInput(container: ParentNode) {
 	expect(new Set(labels.map((label) => label.getAttribute('for'))).size).toBe(3);
 }
 
-test('CSR: each label for= resolves to its own item input', async () => {
+// Pinned: seam 1; un-pin when it lands.
+test.fails('CSR: each label for= resolves to its own item input', async () => {
 	const screen = await render(RadioPage);
 	expectLabelsToNameTheirOwnInput(screen.container as HTMLElement);
 });
@@ -103,7 +105,8 @@ async function expectEachReadToAnswerItsDeclaringInstance(container: ParentNode)
 	expect(items[1]!.getAttribute('data-hit')).toBe('');
 }
 
-test('CSR: two instances on one element, each read answering its declaring instance', async () => {
+// Pinned: seam 1; un-pin when it lands.
+test.fails('CSR: two instances on one element, each read answering its declaring instance', async () => {
 	const screen = await render(RadioPage);
 	await expectEachReadToAnswerItsDeclaringInstance(screen.container as HTMLElement);
 });

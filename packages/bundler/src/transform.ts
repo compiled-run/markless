@@ -615,10 +615,7 @@ function prerenderDataModuleSource(
 	});
 	const preludes = [...readerImports.values(), ...readerDeclarations];
 	// Pay-per-use gate: this module's render data is loaded by exactly the pages
-	// that compose it, so a build that needs neither shared seeds nor
-	// widget-instance tokens never loads the pass. The pass does both jobs, and a
-	// family declaring only element() handles and constant state plans no seed
-	// symbol - gating on seeds alone left its parts with no token to mint from.
+	// that compose it, so a build with no shared-seed symbol never loads the pass.
 	const seedsShared = compiled.publicRenderModule.componentDefinitions.some((definition) =>
 		Object.values(
 			(definition as { readonly initialValueKinds?: Readonly<Record<string, string>> })
@@ -626,7 +623,7 @@ function prerenderDataModuleSource(
 		).includes('shared-seed'),
 	);
 	return [
-		...(seedsShared || compiled.publicRenderModule.needsWidgetInstanceTokens
+		...(seedsShared
 			? [
 					"import { installMarklessSharedSeedPass } from '@markless/web/fns/shared-seed';",
 					'installMarklessSharedSeedPass();',

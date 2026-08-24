@@ -2027,13 +2027,6 @@ export type PublicRenderModuleArtifact = {
 		readonly ssrFunctionName: string;
 	}>;
 	readonly componentDefinitions: ReadonlyArray<Readonly<Record<string, unknown>>>;
-	/**
-	 * Whether this module's render path spells an id for a `shared()` element()
-	 * handle, which it can only do from the widget-instance token the shared-seed
-	 * pass files. A build-time fact for the bundler's pay-per-use gate; it rides
-	 * the artifact, never the emitted payload.
-	 */
-	readonly needsWidgetInstanceTokens: boolean;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };
 

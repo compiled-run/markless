@@ -191,34 +191,6 @@ export function hasSharedElementHandle(handles: ReadonlyArray<string>): boolean 
 	return handles.some((handle) => handle.startsWith('shared:'));
 }
 
-/**
- * Whether this module's render path has to read a widget-instance token.
- *
- * A `shared()` element() handle spells its id from the token naming which
- * rendered widget it belongs to, so a module that spells one cannot render
- * until that token is filed. This is the module-wide roll-up of the
- * per-component question `emitClientResidueReader` asks, and the bundler gates
- * the token-filing pass on it: a family declaring only element() handles and
- * constant state plans no seed symbol, so gating on seeds alone left the pass
- * uninstalled and the first mint threw
- * MARKLESS_ELEMENT_HANDLE_WIDGET_INSTANCE_MISSING on CSR.
- *
- * An IDREF handed to a child (`for={item.fieldEl}`) is minted by the parent
- * that renders the element, so its edge props count as surely as markup does.
- */
-export function needsWidgetInstanceTokens(input: PublicRenderModuleInput): boolean {
-	return (
-		hasSharedElementHandle(elementHandleIdSources(input.renderData.chunks)) ||
-		hasSharedElementHandle(
-			input.semanticGraph.componentEdges.flatMap((edge) =>
-				edge.props.flatMap((prop) =>
-					prop.kind === 'element-handle-id' && prop.graphNodeId ? [prop.graphNodeId] : [],
-				),
-			),
-		)
-	);
-}
-
 // A component's shared-instance local (`const checkbox = checkboxState()`) is
 // not a graph binding: it names a factory whose returned properties each stand
 // for one graph node. A composite residue over that local (`checkbox.checked

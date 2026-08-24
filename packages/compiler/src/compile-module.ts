@@ -477,7 +477,6 @@ function emptyPublicRenderModuleArtifact(): PublicRenderModuleArtifact {
 		ssrModuleSource: '',
 		ssrExportName: null,
 		componentDefinitions: [],
-		needsWidgetInstanceTokens: false,
 		diagnostics: [],
 	};
 }
