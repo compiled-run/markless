@@ -111,10 +111,17 @@ being a namespace call.
    projects nothing renders NOTHING; and a repeat of a trivial local component
    with no `shared()` of its own, also in a plain `<ol>`, renders NOTHING. So the
    wall is the component in the repeat — not the projected slot, not the widget
-   scope, and not the `{children}`-beside-a-construct shape that defect 97 was
-   about. No diagnostic in any form. **This is now the family's blocking wall:**
-   with the default rows gone, the written-out parts are the only path, and it is
-   the exact shape this blocks.
+   scope, and not the `{children}`-beside-a-construct shape that was measured
+   alongside it. No diagnostic in any form. **This is now the family's blocking
+   wall:** with the default rows gone, the written-out parts are the only path,
+   and it is the exact shape this blocks.
+
+   Narrowed further since: `scenarios/one-message.tsrx` writes the same parts out
+   with no `@for` around them, and every one of them renders, on the client and in
+   the served HTML alike — `ui-tone`, the stacking style, the self-closed
+   `itemtitle` / `itemdescription` / `itemicon` serving the record's own words, and
+   a written-into `itemtitle` serving its children. So the repeat is the only thing
+   between this family and a working consumer page; the parts are finished.
 6. **A repeat body may hold only one element.** Two siblings inside `@for` is
    `MARKLESS_PARSE_ERROR` ("Expected '</' to close the JSX element, but found
    '@'"). Measured while probing point 5.
