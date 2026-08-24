@@ -77,7 +77,11 @@ import {
 	withLeadingBlockComment,
 	type EmittedModule,
 } from './emit-codegen.ts';
-import { moduleScopeLines, SSR_CALLBACKS_PROP_NAME } from './public-render/shared.ts';
+import {
+	moduleScopeDeclarations,
+	moduleScopeLines,
+	SSR_CALLBACKS_PROP_NAME,
+} from './public-render/shared.ts';
 
 export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtifact {
 	const moduleDeclarations = sourceModuleScopeLines(input.source);
@@ -213,6 +217,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 				graphBindingLocalNames(input.semanticGraph),
 				sharedInstanceLocalNames(input.semanticGraph),
 				localNamesBySymbol,
+				sourceModuleScopeDeclaredNames(input.source),
 			).map(unresolvedGraphReferenceDiagnostic),
 		],
 	};
@@ -358,6 +363,18 @@ type UnresolvedGraphReference = {
 	 * is what the advice has to name.
 	 */
 	readonly rowLocal?: boolean;
+	/**
+	 * Whether a module-scope declaration in the same authored file binds the name.
+	 *
+	 * An emitted module is fetched and evaluated on its own, so a same-file
+	 * `const`, `function`, or `class` it names has to be copied into it. Every
+	 * emitter that can reach such a name performs that carry; a name that arrives
+	 * here means one of them did not, and the module would throw a ReferenceError
+	 * on its first run in the browser. The server never sees it — SSR renders
+	 * from the authored module, where the declaration is in scope — so without
+	 * this check the gap ships silently and crashes only client-side.
+	 */
+	readonly moduleDeclaration?: boolean;
 };
 
 /** Names that denote graph state in the authored file, as the author spelled them. */
@@ -432,8 +449,11 @@ function unresolvedGraphReferences(
 	graphNames: ReadonlySet<string>,
 	sharedInstanceNames: ReadonlySet<string>,
 	localNamesBySymbol: ReadonlyMap<string, ReadonlySet<string>>,
+	moduleDeclaredNames: ReadonlySet<string>,
 ): ReadonlyArray<UnresolvedGraphReference> {
-	if (graphNames.size === 0 && localNamesBySymbol.size === 0) return [];
+	if (graphNames.size === 0 && localNamesBySymbol.size === 0 && moduleDeclaredNames.size === 0) {
+		return [];
+	}
 
 	return modules.flatMap((emitted) => {
 		const free = freeIdentifierNames(emitted.source);
@@ -441,7 +461,10 @@ function unresolvedGraphReferences(
 		const localNames = localNamesBySymbol.get(emitted.symbolId) ?? emptyLocalNames;
 
 		return [...free]
-			.filter((name) => graphNames.has(name) || localNames.has(name))
+			.filter(
+				(name) =>
+					graphNames.has(name) || localNames.has(name) || moduleDeclaredNames.has(name),
+			)
 			.sort()
 			.map((name) => ({
 				symbolId: emitted.symbolId,
@@ -455,8 +478,40 @@ function unresolvedGraphReferences(
 				// row it is the row's item, which is the same precedence the lowering
 				// applies.
 				...(localNames.has(name) ? { rowLocal: true } : {}),
+				// Lowest precedence of the three: a name the graph or a row already
+				// explains is explained better by them. This claims only the names
+				// none of the others do — the ones an emitter should have carried.
+				...(moduleDeclaredNames.has(name) &&
+				!graphNames.has(name) &&
+				!localNames.has(name)
+					? { moduleDeclaration: true }
+					: {}),
 			}));
 	});
+}
+
+/**
+ * The names this authored file's module-scope declarations bind.
+ *
+ * Import locals are not among them: `moduleScopeDeclarations` skips import
+ * statements, and it must — an import IS emitted into the module that needs it,
+ * so counting its local would report every correctly emitted import as a gap.
+ */
+function sourceModuleScopeDeclaredNames(
+	source: SymbolModulesInput['source'],
+): ReadonlySet<string> {
+	if (!source) return new Set();
+	try {
+		return new Set(
+			moduleScopeDeclarations(source.source, source.filename).flatMap((declaration) => [
+				...declaration.names,
+			]),
+		);
+	} catch {
+		// Same reason as `sourceModuleScopeLines`: the semantic pass owns parse
+		// diagnostics, and this projection must not replace one with a raw error.
+		return new Set();
+	}
 }
 
 /** The authored assignment or expression the surviving name came from, when recorded. */
@@ -599,6 +654,9 @@ function unresolvedGraphReferenceDiagnostic(
 
 	if (reference.rowLocal === true) return rowLocalReferenceDiagnostic(reference, where);
 	if (reference.sharedInstance === true) return sharedInstanceReferenceDiagnostic(reference, where);
+	if (reference.moduleDeclaration === true) {
+		return moduleDeclarationReferenceDiagnostic(reference, where);
+	}
 
 	return {
 		code: SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE,
@@ -686,6 +744,42 @@ function sharedInstanceReferenceDiagnostic(
 			},
 			{
 				message: `Do not hoist the method into a local first (\`const handler = ${reference.name}.<method>;\`). That is the same read one line earlier and fails the same way.`,
+			},
+		],
+		docsUrl: `https://markless.dev/errors/${SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE}`,
+	};
+}
+
+/**
+ * The same refusal for a same-file module-scope declaration, which is a compiler
+ * gap rather than an authoring mistake.
+ *
+ * The other two refusals name shapes the author can respell. This one cannot be
+ * respelled: reading a module-scope `const` from a handler or a computed is
+ * ordinary, supported code, and the carry that copies the declaration into the
+ * emitted module is the compiler's job. So the advice is to report it, and the
+ * text says plainly that the server render hides it — this exact gap shipped
+ * once as a client-only ReferenceError because SSR stayed green.
+ */
+function moduleDeclarationReferenceDiagnostic(
+	reference: UnresolvedGraphReference,
+	where: string,
+): SymbolModulesDiagnostic {
+	return {
+		code: SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE,
+		severity: 'error',
+		phase: 'public-render',
+		passId: 'symbol-modules',
+		artifactKeys: ['symbolModules'],
+		title: `The emitted module for ${reference.symbolId} is missing the declaration of "${reference.name}"`,
+		message: `The emitted ${reference.kind} module for ${reference.symbolId} still names "${reference.name}" directly. ${where} "${reference.name}" is declared at module scope in this file, and the emitted module does not declare it, so this module would throw a ReferenceError the first time it runs in the browser. The server render would not: it evaluates the authored module, where the declaration is in scope.`,
+		why: 'Every symbol is compiled into a module that is fetched and evaluated on its own, so a module-scope declaration it still names has to be copied into it. That copy is the compiler\'s to make, and this check exists because a missing one is invisible otherwise: the server renders from the authored module and stays green, so the gap reaches the browser and crashes on the first re-render rather than failing the build.',
+		suggestions: [
+			{
+				message: `This is a compiler gap, not a mistake in this file: reading a module-scope declaration from a component is supported. Report it with the authored source of "${reference.name}" and the symbol kind above.`,
+			},
+			{
+				message: `To keep building meanwhile, move "${reference.name}" inside the component that uses it, or into a module you import from — an imported binding is carried into the emitted module already.`,
 			},
 		],
 		docsUrl: `https://markless.dev/errors/${SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE}`,
