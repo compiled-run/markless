@@ -131,18 +131,15 @@ for (const mode of MODES) {
 		expectRootDropsDestructuredProps();
 	});
 
-	test(`${mode}: a surface with no title or description carries unresolved naming references`, async () => {
+	test(`${mode}: a surface with no title or description omits its naming references`, async () => {
 		if (mode === 'CSR') await render(Unnamed);
 		else await renderSSR(Unnamed);
 
+		// Unbound IDREFs are omitted, never emitted dangling.
 		const content = el<HTMLElement>(Content);
-		const labelledby = content.getAttribute('aria-labelledby');
-		const describedby = content.getAttribute('aria-describedby');
 		expect(content.getAttribute('role')).toBe('dialog');
-		expect(labelledby).toBeTruthy();
-		expect(describedby).toBeTruthy();
-		expect(document.getElementById(labelledby as string)).toBe(null);
-		expect(document.getElementById(describedby as string)).toBe(null);
+		expect(content.hasAttribute('aria-labelledby')).toBe(false);
+		expect(content.hasAttribute('aria-describedby')).toBe(false);
 		expect(el(Trigger).getAttribute('aria-controls')).toBe(content.id);
 	});
 
