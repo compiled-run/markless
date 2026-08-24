@@ -1,6 +1,8 @@
 export type AsyncComputedValue<T> = T extends Promise<infer Value> ? Awaited<Value> : T;
 
-export type ElementHandle<T extends Element = Element> = T | undefined;
+// An array-typed handle is an ordered collection: empty before anything renders,
+// never absent - so the array case carries no undefined.
+export type ElementHandle<T extends Element | readonly Element[] = Element> = T extends readonly (infer E extends Element)[] ? E[] : T | undefined;
 
 export type SharedScope = 'request' | 'container' | 'page' | 'widget';
 
@@ -59,7 +61,7 @@ export function computed<T>(derive: () => T): AsyncComputedValue<T> {
 	return frameworkApi<AsyncComputedValue<T>>('computed', derive);
 }
 
-export function element<T extends Element = Element>(): ElementHandle<T> {
+export function element<T extends Element | Element[] = Element>(): ElementHandle<T> {
 	return frameworkApi<ElementHandle<T>>('element');
 }
 

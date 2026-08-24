@@ -1461,7 +1461,7 @@ test('M18 a plural element() handle reads as its array type argument and a singu
 	expect(
 		displayText(plural),
 		'M18 missing capability: a handler read of an array-typed handle must carry the array type argument the author wrote.',
-	).toContain('optionEls: ElementHandle<HTMLDivElement[]>');
+	).toContain('optionEls: HTMLDivElement[]'); // the conditional ElementHandle resolves eagerly - the hover shows the real array type
 	expect(
 		displayText(singular),
 		'M18 missing capability: a handle beside it that was not written with an array type argument must stay singular.',
@@ -1489,23 +1489,14 @@ test('M18 a single-element method on a plural read is an error at the authored t
 	expectDiagnosticSpan(fixture.source, focusDiagnostic, 'focus');
 }, 30_000);
 
-// Anchored to today's measured editor output, not to the contract Markless wants.
-// `element<T extends Element = Element>(): ElementHandle<T>` and
-// `ElementHandle<T> = T | undefined` in packages/core/src/framework-api.ts still
-// describe a single optional element, so the authoring form the compiler
-// implements is red on the call and optional on every read. Fixing core must
-// turn these two into an empty list in the same change set.
-test('M18-defect the plural authoring form is still red at the element() call and optional on read', async () => {
+// core's element() now accepts array type arguments (ElementHandle's array case
+// is E[] with no undefined - a collection is empty, never absent), so the plural
+// authoring form carries no diagnostics at all.
+test('M18 the plural authoring form is clean at the call and non-optional on read', async () => {
 	const fixture = openFixture('element-handles.tsrx');
 	const diagnostics = await server.semanticDiagnosticsSync(fixture.file);
 
-	expect(
-		diagnostics.map((diagnostic: any) => String(diagnostic.text).split('\n')[0]),
-	).toEqual([
-		"Type 'HTMLDivElement[]' does not satisfy the constraint 'Element'.",
-		"'s.optionEls' is possibly 'undefined'.",
-		"'s.optionEls' is possibly 'undefined'.",
-	]);
+	expect(diagnostics.map((diagnostic: any) => String(diagnostic.text).split('\n')[0])).toEqual([]);
 }, 30_000);
 
 const branchEntries = ['@else', '@empty', '@case', '@default', '@pending', '@catch'];
