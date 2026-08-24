@@ -6,8 +6,9 @@ export const PREVIEW_PORT = 4319;
 export const PREVIEW_ORIGIN = `http://${PREVIEW_HOST}:${PREVIEW_PORT}`;
 
 /**
- * The anchor each family's Basic scenario sits on. One page, one section per
- * family: a reader lands on `${PREVIEW_ORIGIN}/#checkbox` and the checkbox
+ * The anchor each family's Basic scenario sits on, plus a section of its own for
+ * a second shape a reader announces differently. One page, one section per
+ * anchor: a reader lands on `${PREVIEW_ORIGIN}/#checkbox` and the checkbox
  * section is the first thing under the cursor.
  */
 export const FAMILY_ANCHORS = {
@@ -22,6 +23,7 @@ export const FAMILY_ANCHORS = {
 	tabs: '/#tabs',
 	popover: '/#popover',
 	slider: '/#slider',
+	'slider-range': '/#slider-range',
 } as const;
 
 export type FamilyName = keyof typeof FAMILY_ANCHORS;
