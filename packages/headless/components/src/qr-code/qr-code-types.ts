@@ -1,6 +1,11 @@
 import type { PropsOf } from '@markless/core';
 import type { QrRecovery } from './qr-encode.ts';
 
+/**
+ * The code itself; the frame, pattern and any overlay go inside it. It encodes
+ * the value and renders `role="img"`, which makes everything inside it
+ * presentational - give it your own `aria-label` saying what the code is for.
+ */
 export type QrCodeRootProps = PropsOf<'div'> & {
 	/** The text the code carries - usually a URL. */
 	readonly value: string;

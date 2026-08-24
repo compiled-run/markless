@@ -31,6 +31,11 @@ export type OtpRootProps = Omit<PropsOf<'div'>, 'onChange' | 'style'> & {
  */
 export type OtpFieldProps = Omit<PropsOf<'input'>, 'value' | 'style'>;
 
+/**
+ * One box of the code. It draws its own character and reports `ui-empty` and
+ * `ui-disabled` for styling, and it is `aria-hidden`: the boxes are decoration
+ * over the single real input, which is what a reader announces instead.
+ */
 export type OtpItemProps = PropsOf<'div'> & {
 	/**
 	 * Which character of the code this box shows, counting from 0. Writing the
@@ -39,6 +44,11 @@ export type OtpItemProps = PropsOf<'div'> & {
 	readonly index: number;
 };
 
+/**
+ * A caret slot inside a box, for the consumer to style. It carries no state of
+ * its own: the surrounding `otp.item` is what reports `ui-empty` and
+ * `ui-disabled`.
+ */
 export type OtpItemIndicatorProps = PropsOf<'span'>;
 
 /**

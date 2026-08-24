@@ -4,6 +4,7 @@
 			{
 				"part": "item",
 				"component": "AccordionItem",
+				"doc": "One section: its label, trigger and panel go inside. It carries the section's\nown `value`, which is the name the root's `value` matches against.",
 				"props": [
 					{
 						"name": "value",
@@ -41,6 +42,7 @@
 			{
 				"part": "root",
 				"component": "AccordionRoot",
+				"doc": "The accordion itself; every section goes inside it. It holds which section is\nshowing, and every other accordion part reads that from here rather than\nkeeping a copy.",
 				"props": [
 					{
 						"name": "value",
@@ -174,6 +176,7 @@
 			{
 				"part": "root",
 				"component": "CarouselRoot",
+				"doc": "The carousel itself; the scroll area, slides, nav list and triggers go inside\nit. It holds which slide is showing plus every setting the other parts read -\norientation, looping, autoplay, drag - so a trigger never carries its own copy.",
 				"props": [
 					{
 						"name": "value",
@@ -278,11 +281,13 @@
 			{
 				"part": "description",
 				"component": "CheckboxDescription",
+				"doc": "Supporting text beside the checkbox. It renders its children and changes nothing else.",
 				"props": []
 			},
 			{
 				"part": "error",
 				"component": "CheckboxError",
+				"doc": "The validation message. Mounting it is what marks the checkbox invalid -\n`checkbox.trigger` reports `aria-invalid` for as long as this part is in the\npage - so render it only when there is an error to show.",
 				"props": []
 			},
 			{
@@ -294,16 +299,19 @@
 			{
 				"part": "indicator",
 				"component": "CheckboxIndicator",
+				"doc": "The check mark. Its children render only while the checkbox is on or mixed,\nand the element is `aria-hidden`, so the state it draws is never announced a\nsecond time.",
 				"props": []
 			},
 			{
 				"part": "label",
 				"component": "CheckboxLabel",
+				"doc": "The checkbox's label. Its `for` points at `checkbox.trigger`, so clicking the text toggles.",
 				"props": []
 			},
 			{
 				"part": "root",
 				"component": "CheckboxRoot",
+				"doc": "The checkbox itself; the trigger, label, description, error and field parts go\ninside it. It holds the checked value and the form details that\n`checkbox.field` submits, so one place decides what a form receives.",
 				"props": [
 					{
 						"name": "checked",
@@ -316,13 +324,15 @@
 						"name": "disabled",
 						"type": "boolean",
 						"required": false,
-						"default": "false"
+						"default": "false",
+						"doc": "Nobody can toggle the checkbox, and `checkbox.trigger` is disabled outright."
 					},
 					{
 						"name": "required",
 						"type": "boolean",
 						"required": false,
-						"default": "false"
+						"default": "false",
+						"doc": "Marks the hidden `checkbox.field` input required, so a form refuses to submit unchecked."
 					},
 					{
 						"name": "name",
@@ -359,6 +369,7 @@
 			{
 				"part": "error",
 				"component": "ChecklistError",
+				"doc": "The group's validation message. Mounting it marks the select-all's checkbox\ninvalid for as long as it is in the page; an item's own message goes in a\n`checklist.error` written inside that item instead.",
 				"props": []
 			},
 			{
@@ -375,12 +386,14 @@
 					{
 						"name": "value",
 						"type": "string",
-						"required": true
+						"required": true,
+						"doc": "This item's name in the group's ticked set, and what a form submits for it."
 					},
 					{
 						"name": "disabled",
 						"type": "boolean",
-						"required": false
+						"required": false,
+						"doc": "This one item is locked. The root's own `disabled` locks every item regardless."
 					},
 					{
 						"name": "name",
@@ -393,21 +406,25 @@
 			{
 				"part": "itemdescription",
 				"component": "ChecklistItemDescription",
+				"doc": "Supporting text for one item. It renders its children and changes nothing else.",
 				"props": []
 			},
 			{
 				"part": "itemindicator",
 				"component": "ChecklistItemIndicator",
+				"doc": "One item's check mark. Its children render while that item is ticked, and the\nelement is `aria-hidden`.",
 				"props": []
 			},
 			{
 				"part": "itemlabel",
 				"component": "ChecklistItemLabel",
+				"doc": "One item's label. Its `for` points at that item's trigger, so clicking the text ticks it.",
 				"props": []
 			},
 			{
 				"part": "itemtrigger",
 				"component": "ChecklistItemTrigger",
+				"doc": "One item's checkbox. Ticking it updates the group's whole set, which is what\nthe select-all is computed from.",
 				"props": []
 			},
 			{
@@ -453,11 +470,13 @@
 			{
 				"part": "selectall",
 				"component": "ChecklistSelectAll",
+				"doc": "The one trigger that ticks or clears every item. It reports mixed while only\nsome items are ticked, but mixed is never somewhere a click lands: activating\nit from mixed ticks everything.",
 				"props": []
 			},
 			{
 				"part": "selectallindicator",
 				"component": "ChecklistSelectAllIndicator",
+				"doc": "The select-all's check mark. Its children render while the select-all is on or\nmixed, and the element is `aria-hidden`.",
 				"props": []
 			}
 		]
@@ -473,6 +492,7 @@
 			{
 				"part": "root",
 				"component": "CollapsibleRoot",
+				"doc": "One trigger and one panel that shows or hides. It holds whether the panel is\nopen, and both other parts read that from here. An accordion is the many-panel\nversion of the same idea.",
 				"props": [
 					{
 						"name": "open",
@@ -516,11 +536,13 @@
 			{
 				"part": "content",
 				"component": "ComboboxContent",
+				"doc": "The list the options go in. Closed hides it, never detaches it - the input's\n`aria-controls` points at this element - so an id, scroll position and the\nhighlight all survive a close.",
 				"props": []
 			},
 			{
 				"part": "description",
 				"component": "ComboboxDescription",
+				"doc": "Supporting text for the field, named by the input's `aria-describedby`. One\nelement can be named that way, so mounting this alongside `combobox.error`\ndescribes by whichever renders first.",
 				"props": []
 			},
 			{
@@ -538,11 +560,13 @@
 			{
 				"part": "input",
 				"component": "ComboboxInput",
+				"doc": "The text field, and the only tab stop in the family. It owns the arrow, Home,\nEnd, Enter, Escape and Backspace keys; a consumer's own handlers run after the\nfamily's. Filtering the option list from the typed text is the consumer's job.",
 				"props": []
 			},
 			{
 				"part": "item",
 				"component": "ComboboxItem",
+				"doc": "One option. It never takes DOM focus - the caret stays in the input, and the\nhighlight is family state keyed by `value` - so a pointer or a script that\nfocuses an option puts focus straight back in the field.",
 				"props": [
 					{
 						"name": "value",
@@ -568,11 +592,13 @@
 			{
 				"part": "itemindicator",
 				"component": "ComboboxItemIndicator",
+				"doc": "One option's chosen mark. It stays in the page and carries `ui-hidden` while\nits option is not chosen, and it is `aria-hidden`, so the state it draws is\nnever announced twice.",
 				"props": []
 			},
 			{
 				"part": "itemlabel",
 				"component": "ComboboxItemLabel",
+				"doc": "The words shown for one option. Plain markup: it decides nothing on its own.",
 				"props": []
 			},
 			{
@@ -720,6 +746,7 @@
 			{
 				"part": "root",
 				"component": "ModalRoot",
+				"doc": "The dialog itself; the trigger, backdrop, surface and close control go inside\nit. It holds whether the dialog is showing and whether this is an alert\ndialog. The root renders no elevated layer of its own - `modal.backdrop` is\nthe element that is elevated.",
 				"props": [
 					{
 						"name": "open",
@@ -858,6 +885,7 @@
 			{
 				"part": "item",
 				"component": "OtpItem",
+				"doc": "One box of the code. It draws its own character and reports `ui-empty` and\n`ui-disabled` for styling, and it is `aria-hidden`: the boxes are decoration\nover the single real input, which is what a reader announces instead.",
 				"props": [
 					{
 						"name": "index",
@@ -870,6 +898,7 @@
 			{
 				"part": "itemindicator",
 				"component": "OtpItemIndicator",
+				"doc": "A caret slot inside a box, for the consumer to style. It carries no state of\nits own: the surrounding `otp.item` is what reports `ui-empty` and\n`ui-disabled`.",
 				"props": []
 			},
 			{
@@ -1018,6 +1047,7 @@
 			{
 				"part": "root",
 				"component": "PopoverRoot",
+				"doc": "The popover itself; the trigger and the surface go inside it. It holds whether\nthe surface is showing and which side it is placed on, and it is the anchor\nend of the CSS anchor placement, so the family owns this element's `style`\nattribute - style the root from a stylesheet rather than a `style` prop.",
 				"props": [
 					{
 						"name": "open",
@@ -1060,16 +1090,19 @@
 			{
 				"part": "indicator",
 				"component": "ProgressIndicator",
+				"doc": "The filled part of the track. The family owns its `style` attribute - the fill\nis a `translateX` written from the value - so style this part from a\nstylesheet rather than a `style` prop.",
 				"props": []
 			},
 			{
 				"part": "label",
 				"component": "ProgressLabel",
+				"doc": "The bar's name. Mounting it is what names the `role=\"progressbar\"` element,\nand like every other part it carries `ui-progress`, `ui-value`, `ui-min` and\n`ui-max` for styling.",
 				"props": []
 			},
 			{
 				"part": "root",
 				"component": "ProgressRoot",
+				"doc": "The progress bar itself; the label, track and indicator go inside it. It\nrenders the `role=\"progressbar\"` element and holds the value and range every\nother part reads. It sets no `aria-label` of its own - name it with a\n`progress.label`, or spread your own label in.",
 				"props": [
 					{
 						"name": "value",
@@ -1131,6 +1164,7 @@
 			{
 				"part": "root",
 				"component": "QrCodeRoot",
+				"doc": "The code itself; the frame, pattern and any overlay go inside it. It encodes\nthe value and renders `role=\"img\"`, which makes everything inside it\npresentational - give it your own `aria-label` saying what the code is for.",
 				"props": [
 					{
 						"name": "value",
@@ -1154,16 +1188,19 @@
 			{
 				"part": "description",
 				"component": "RadioGroupDescription",
+				"doc": "Supporting text for the group. It renders its children and changes nothing else.",
 				"props": []
 			},
 			{
 				"part": "error",
 				"component": "RadioGroupError",
+				"doc": "The group's validation message. Mounting it is what marks the group invalid\nfor as long as it is in the page, so render it only when there is an error to\nshow.",
 				"props": []
 			},
 			{
 				"part": "item",
 				"component": "RadioGroupItem",
+				"doc": "One option: its trigger, indicator, label and hidden radio go inside. It\ncarries the option's `value` and reports `ui-selected` and `ui-disabled`, but\nholds no radio semantics itself - those live on the native input inside it.",
 				"props": [
 					{
 						"name": "value",
@@ -1189,11 +1226,13 @@
 			{
 				"part": "itemindicator",
 				"component": "RadioGroupItemIndicator",
+				"doc": "One option's chosen mark. Its children render only while that option is the\nchosen one, and the element is `aria-hidden`, so the state it draws is never\nannounced twice.",
 				"props": []
 			},
 			{
 				"part": "itemlabel",
 				"component": "RadioGroupItemLabel",
+				"doc": "One option's label. Its `for` points at that option's hidden radio, so\nclicking the text chooses the option and focus lands where the arrow keys\nexpect it.",
 				"props": []
 			},
 			{
@@ -1270,6 +1309,7 @@
 			{
 				"part": "content",
 				"component": "SelectContent",
+				"doc": "The popup the options go in. Closed hides it, never detaches it - the\ntrigger's `aria-controls` points at this element. It owns the arrow, Home,\nEnd, Enter, Space, Escape and typeahead keys while it is showing.",
 				"props": []
 			},
 			{
@@ -1281,6 +1321,7 @@
 			{
 				"part": "item",
 				"component": "SelectItem",
+				"doc": "One option. Clicking it, or activating it from the keyboard, chooses it\nand closes the popup. It takes focus as the list is walked, but it is never a\ntab stop - only `select.trigger` is.",
 				"props": [
 					{
 						"name": "value",
@@ -1300,11 +1341,13 @@
 			{
 				"part": "itemindicator",
 				"component": "SelectItemIndicator",
+				"doc": "One option's chosen mark. It stays in the page and carries `ui-hidden` while\nits option is not the chosen one, and it is `aria-hidden`, so the state it\ndraws is never announced twice.",
 				"props": []
 			},
 			{
 				"part": "itemlabel",
 				"component": "SelectItemLabel",
+				"doc": "The words shown for one option. Plain markup: it decides nothing on its own.",
 				"props": []
 			},
 			{
@@ -1370,6 +1413,7 @@
 			{
 				"part": "trigger",
 				"component": "SelectTrigger",
+				"doc": "The control a person opens the list from, and the family's only tab stop. It\nshows the current choice and reports `role=\"combobox\"`; a consumer's `onClick`\nand `onKeydown` run after the family's.",
 				"props": []
 			}
 		]
@@ -1385,6 +1429,7 @@
 			{
 				"part": "root",
 				"component": "SliderRoot",
+				"doc": "The slider itself; the label, track and thumbs go inside it. It holds the\nrange and the current value, and the shape of `value` is what decides the\nslider: one number for one thumb, a pair for two. The family owns this\nelement's `style` attribute to carry the filled portion, so style the root\nfrom a stylesheet rather than a `style` prop.",
 				"props": [
 					{
 						"name": "value",
@@ -1444,6 +1489,7 @@
 			{
 				"part": "thumb",
 				"component": "SliderThumb",
+				"doc": "The handle a person drags or arrows, and the `role=\"slider\"` element a reader\nannounces - a two-value slider has two of them, one per side. The family owns\nits `style` attribute to carry the position along the track, so style it from\na stylesheet rather than a `style` prop.",
 				"props": [
 					{
 						"name": "side",
@@ -1492,6 +1538,7 @@
 			{
 				"part": "root",
 				"component": "TabsRoot",
+				"doc": "The tabs themselves; the list, triggers and panels go inside it. It holds\nwhich tab is showing and how the arrow keys walk; a trigger and the panel it\nshows find each other by matching `value`, never by position.",
 				"props": [
 					{
 						"name": "value",
@@ -1549,11 +1596,13 @@
 			{
 				"part": "description",
 				"component": "TextboxDescription",
+				"doc": "Supporting text for the box, named by the control's `aria-describedby`. One\nelement can be named that way, so mounting this alongside `textbox.error`\ndescribes by whichever renders first.",
 				"props": []
 			},
 			{
 				"part": "error",
 				"component": "TextboxError",
+				"doc": "The validation message. Mounting it is what marks the control invalid - it\nreports `aria-invalid` for as long as this part is in the page - so render it\nonly when there is an error to show.",
 				"props": []
 			},
 			{
@@ -1565,11 +1614,13 @@
 			{
 				"part": "label",
 				"component": "TextboxLabel",
+				"doc": "The box's name. Its `for` points at the control, so clicking the text focuses it.",
 				"props": []
 			},
 			{
 				"part": "root",
 				"component": "TextboxRoot",
+				"doc": "The text box itself; the label, the control, and any description or error go\ninside it. It holds the text and the restrictions, and reports `ui-disabled`,\n`ui-required`, `ui-readonly` and `ui-empty` for styling. Put either a\n`textbox.input` or a `textbox.textarea` inside - the root renders no control\nof its own.",
 				"props": [
 					{
 						"name": "value",
@@ -1582,19 +1633,22 @@
 						"name": "disabled",
 						"type": "boolean",
 						"required": false,
-						"default": "false"
+						"default": "false",
+						"doc": "Nobody can type in the control, and it drops out of the tab order."
 					},
 					{
 						"name": "required",
 						"type": "boolean",
 						"required": false,
-						"default": "false"
+						"default": "false",
+						"doc": "The control must hold text before a form submits."
 					},
 					{
 						"name": "readonly",
 						"type": "boolean",
 						"required": false,
-						"default": "false"
+						"default": "false",
+						"doc": "The text can be read and selected but not changed."
 					},
 					{
 						"name": "name",
@@ -1624,6 +1678,7 @@
 			{
 				"part": "item",
 				"component": "ToasterItem",
+				"doc": "One message's row. Everything it shows comes from the `toast` record it is\ngiven. It reports `ui-tone` and `ui-front`, and the family owns its `style`\nattribute to carry the stacking, so style it from a stylesheet rather than a\n`style` prop.",
 				"props": [
 					{
 						"name": "toast",
@@ -1648,16 +1703,19 @@
 			{
 				"part": "itemdescription",
 				"component": "ToasterItemDescription",
+				"doc": "The line under the headline. Leave it empty and it renders the description the\nrecord carries; give it children and they are shown instead.",
 				"props": []
 			},
 			{
 				"part": "itemicon",
 				"component": "ToasterItemIcon",
+				"doc": "The tone's mark. Leave it empty and it renders the character minted for the\ntone. It is `aria-hidden`, because the words carry the meaning, not the symbol.",
 				"props": []
 			},
 			{
 				"part": "itemtitle",
 				"component": "ToasterItemTitle",
+				"doc": "The message's headline. Leave it empty and it renders the title the record\ncarries; give it children and they are shown instead.",
 				"props": []
 			},
 			{
@@ -1673,11 +1731,13 @@
 			{
 				"part": "description",
 				"component": "ToggleDescription",
+				"doc": "Supporting text for the switch, named by the trigger's `aria-describedby`. One\nelement can be named that way, so mounting this alongside `toggle.error`\ndescribes by whichever renders first.",
 				"props": []
 			},
 			{
 				"part": "error",
 				"component": "ToggleError",
+				"doc": "The validation message. Mounting it is what marks the switch invalid - the\ntrigger reports `aria-invalid` for as long as this part is in the page - so\nrender it only when there is an error to show.",
 				"props": []
 			},
 			{
@@ -1689,11 +1749,13 @@
 			{
 				"part": "label",
 				"component": "ToggleLabel",
+				"doc": "The switch's label. Its `for` points at `toggle.trigger`, so clicking the text flips it.",
 				"props": []
 			},
 			{
 				"part": "root",
 				"component": "ToggleRoot",
+				"doc": "The switch itself; the trigger, thumb, label, messages and field go inside it.\nIt holds whether the switch is on and the form details `toggle.field`\nsubmits, so one place decides what a form receives.",
 				"props": [
 					{
 						"name": "checked",
@@ -1706,13 +1768,15 @@
 						"name": "disabled",
 						"type": "boolean",
 						"required": false,
-						"default": "false"
+						"default": "false",
+						"doc": "Nobody can flip the switch, and `toggle.trigger` is disabled outright."
 					},
 					{
 						"name": "required",
 						"type": "boolean",
 						"required": false,
-						"default": "false"
+						"default": "false",
+						"doc": "Marks the hidden `toggle.field` input required, so a form refuses to submit with the switch off."
 					},
 					{
 						"name": "name",

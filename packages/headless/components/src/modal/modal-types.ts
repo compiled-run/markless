@@ -12,6 +12,12 @@ export type ModalDismissReason = 'escape' | 'outside-press';
 /** The event the overlay behaviour delivers on the enlisted backdrop. */
 export type ModalDismissEvent = CustomEvent<{ readonly reason: ModalDismissReason }>;
 
+/**
+ * The dialog itself; the trigger, backdrop, surface and close control go inside
+ * it. It holds whether the dialog is showing and whether this is an alert
+ * dialog. The root renders no elevated layer of its own - `modal.backdrop` is
+ * the element that is elevated.
+ */
 export type ModalRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/** Whether the dialog is showing. Omit it and the dialog starts closed. */
 	readonly open?: boolean;

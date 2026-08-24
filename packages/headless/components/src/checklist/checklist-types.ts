@@ -24,6 +24,11 @@ export type ChecklistRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 /** Names the group by naming the select-all trigger, whose id the family mints. */
 export type ChecklistLabelProps = PropsOf<'label'>;
 
+/**
+ * The group's validation message. Mounting it marks the select-all's checkbox
+ * invalid for as long as it is in the page; an item's own message goes in a
+ * `checklist.error` written inside that item instead.
+ */
 export type ChecklistErrorProps = PropsOf<'div'>;
 
 /**
@@ -33,8 +38,17 @@ export type ChecklistErrorProps = PropsOf<'div'>;
  */
 export type ChecklistFieldProps = PropsOf<'input'>;
 
+/**
+ * The one trigger that ticks or clears every item. It reports mixed while only
+ * some items are ticked, but mixed is never somewhere a click lands: activating
+ * it from mixed ticks everything.
+ */
 export type ChecklistSelectAllProps = PropsOf<'button'>;
 
+/**
+ * The select-all's check mark. Its children render while the select-all is on or
+ * mixed, and the element is `aria-hidden`.
+ */
 export type ChecklistSelectAllIndicatorProps = PropsOf<'span'>;
 
 /**
@@ -42,18 +56,30 @@ export type ChecklistSelectAllIndicatorProps = PropsOf<'span'>;
  * group's ticked set holds and what a form submits — position is never identity.
  */
 export type ChecklistItemProps = PropsOf<'div'> & {
+	/** This item's name in the group's ticked set, and what a form submits for it. */
 	readonly value: string;
+	/** This one item is locked. The root's own `disabled` locks every item regardless. */
 	readonly disabled?: boolean;
 	/** Submitted under this name by a `checklist.field` written inside the item. */
 	readonly name?: string;
 };
 
+/**
+ * One item's checkbox. Ticking it updates the group's whole set, which is what
+ * the select-all is computed from.
+ */
 export type ChecklistItemTriggerProps = PropsOf<'button'>;
 
+/** One item's label. Its `for` points at that item's trigger, so clicking the text ticks it. */
 export type ChecklistItemLabelProps = PropsOf<'label'>;
 
+/** Supporting text for one item. It renders its children and changes nothing else. */
 export type ChecklistItemDescriptionProps = PropsOf<'div'>;
 
+/**
+ * One item's check mark. Its children render while that item is ticked, and the
+ * element is `aria-hidden`.
+ */
 export type ChecklistItemIndicatorProps = PropsOf<'span'>;
 
 /**

@@ -1,5 +1,10 @@
 import type { PropsOf, Seeded } from '@markless/core';
 
+/**
+ * One trigger and one panel that shows or hides. It holds whether the panel is
+ * open, and both other parts read that from here. An accordion is the many-panel
+ * version of the same idea.
+ */
 export type CollapsibleRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/** Whether the panel is showing. Omit it and the panel starts closed. */
 	readonly open?: boolean;

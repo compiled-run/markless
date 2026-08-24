@@ -7,6 +7,12 @@ import type { PropsOf, Seeded } from '@markless/core';
  */
 export type PopoverSide = 'top' | 'bottom' | 'start' | 'end';
 
+/**
+ * The popover itself; the trigger and the surface go inside it. It holds whether
+ * the surface is showing and which side it is placed on, and it is the anchor
+ * end of the CSS anchor placement, so the family owns this element's `style`
+ * attribute - style the root from a stylesheet rather than a `style` prop.
+ */
 export type PopoverRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/** Whether the surface is showing. Omit it and the popover starts closed. */
 	readonly open?: boolean;

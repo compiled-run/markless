@@ -93,6 +93,11 @@ export type ComboboxInstanceState = Seeded<
 	onOpenChange?: ComboboxRootProps['onOpenChange'];
 };
 
+/**
+ * One option. It never takes DOM focus - the caret stays in the input, and the
+ * highlight is family state keyed by `value` - so a pointer or a script that
+ * focuses an option puts focus straight back in the field.
+ */
 export type ComboboxItemProps = PropsOf<'div'> & {
 	/** This option's value. Required: no index stands in for it. */
 	readonly value: string;
@@ -116,17 +121,38 @@ export type ComboboxItemInstanceState = Seeded<ComboboxItemProps, 'value' | 'lab
 /** The combobox's name. Named by `aria-labelledby` from the input and the list. */
 export type ComboboxLabelProps = PropsOf<'label'>;
 
+/**
+ * The text field, and the only tab stop in the family. It owns the arrow, Home,
+ * End, Enter, Escape and Backspace keys; a consumer's own handlers run after the
+ * family's. Filtering the option list from the typed text is the consumer's job.
+ */
 export type ComboboxInputProps = PropsOf<'input'>;
 
 /** Deliberately not a tab stop: only the input is. */
 export type ComboboxTriggerProps = PropsOf<'button'>;
 
+/**
+ * The list the options go in. Closed hides it, never detaches it - the input's
+ * `aria-controls` points at this element - so an id, scroll position and the
+ * highlight all survive a close.
+ */
 export type ComboboxContentProps = PropsOf<'div'>;
 
+/** The words shown for one option. Plain markup: it decides nothing on its own. */
 export type ComboboxItemLabelProps = PropsOf<'span'>;
 
+/**
+ * One option's chosen mark. It stays in the page and carries `ui-hidden` while
+ * its option is not chosen, and it is `aria-hidden`, so the state it draws is
+ * never announced twice.
+ */
 export type ComboboxItemIndicatorProps = PropsOf<'span'>;
 
+/**
+ * Supporting text for the field, named by the input's `aria-describedby`. One
+ * element can be named that way, so mounting this alongside `combobox.error`
+ * describes by whichever renders first.
+ */
 export type ComboboxDescriptionProps = PropsOf<'div'>;
 
 /** Its presence is what a reader is told about first. */

@@ -1,9 +1,16 @@
 import type { PropsOf, Seeded } from '@markless/core';
 
+/**
+ * The switch itself; the trigger, thumb, label, messages and field go inside it.
+ * It holds whether the switch is on and the form details `toggle.field`
+ * submits, so one place decides what a form receives.
+ */
 export type ToggleRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/** Whether the switch reads as on. Omit it and the switch starts off. */
 	readonly checked?: boolean;
+	/** Nobody can flip the switch, and `toggle.trigger` is disabled outright. */
 	readonly disabled?: boolean;
+	/** Marks the hidden `toggle.field` input required, so a form refuses to submit with the switch off. */
 	readonly required?: boolean;
 	/** Submitted under this name by `toggle.field`. */
 	readonly name?: string;
@@ -35,10 +42,21 @@ export type ToggleTriggerProps = PropsOf<'button'>;
 /** The moving piece inside the trigger. It renders an element and nothing else. */
 export type ToggleThumbProps = PropsOf<'span'>;
 
+/** The switch's label. Its `for` points at `toggle.trigger`, so clicking the text flips it. */
 export type ToggleLabelProps = PropsOf<'label'>;
 
+/**
+ * Supporting text for the switch, named by the trigger's `aria-describedby`. One
+ * element can be named that way, so mounting this alongside `toggle.error`
+ * describes by whichever renders first.
+ */
 export type ToggleDescriptionProps = PropsOf<'div'>;
 
+/**
+ * The validation message. Mounting it is what marks the switch invalid - the
+ * trigger reports `aria-invalid` for as long as this part is in the page - so
+ * render it only when there is an error to show.
+ */
 export type ToggleErrorProps = PropsOf<'div'>;
 
 /**
