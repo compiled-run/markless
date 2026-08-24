@@ -343,6 +343,54 @@ function marklessOwnsDerivedNode(
 	return !claimed;
 }
 
+// Whether a graph node id belongs to this surface's own module. Node ids are
+// minted per module, so the same id can name unrelated cells on either side of
+// an import; this is what keeps a composing parent's value from answering for
+// a child's own node of the same name.
+function marklessSurfaceDeclaresGraphNode(
+	surface: PrerenderDataSurface,
+	graphNodeId: string,
+): boolean {
+	for (const name in surface.components) {
+		const definition = surface.components[name];
+		if (!definition) continue;
+		if (definition.stateGraphNodeIds?.includes(graphNodeId)) return true;
+		if (definition.initialValues?.some((initial) => initial.graphNodeId === graphNodeId))
+			return true;
+		if (definition.state.cells.some((cell) => cell.graphNodeId === graphNodeId)) return true;
+		if (definition.state.computed.some((computed) => computed.graphNodeId === graphNodeId))
+			return true;
+	}
+	return false;
+}
+
+// A child's derive is compiled against ITS module's node ids, but the symbol a
+// composing parent binds is rebound to the parent's route, so it asks this
+// evaluation for a node the child's module never declared. Same-module children
+// answer by accident - the producer hands every component in a module the whole
+// module's initial values - and across an import there is nothing to answer
+// with, so the derive used to paint `undefined` on the first client paint.
+// Carrying the routed values down closes that, and only for ids foreign to the
+// child.
+function marklessBoundGraphValues(
+	inherited: ReadonlyMap<string, unknown> | undefined,
+	childSurface: PrerenderDataSurface,
+	props: NonNullable<PrerenderDataDefinition['edges']>[number]['props'],
+	read: PrerenderRead,
+): ReadonlyMap<string, unknown> | undefined {
+	const seen = new Map<string, unknown>(inherited ?? []);
+	for (const prop of props) {
+		if (!prop.graphNodeId || seen.has(prop.graphNodeId)) continue;
+		seen.set(prop.graphNodeId, read(prop.graphNodeId, []));
+	}
+	const routed = new Map<string, unknown>();
+	for (const [graphNodeId, value] of seen) {
+		if (!marklessSurfaceDeclaresGraphNode(childSurface, graphNodeId))
+			routed.set(graphNodeId, value);
+	}
+	return routed.size > 0 ? routed : undefined;
+}
+
 async function evaluatePrerenderDataComponent(input: {
 	readonly surface: PrerenderDataSurface;
 	readonly componentName: string;
@@ -362,6 +410,9 @@ async function evaluatePrerenderDataComponent(input: {
 	// What the component this one is projected into seeded into its widget's
 	// shared instance, written before this render started.
 	readonly sharedSeeds?: ReadonlyMap<string, unknown>;
+	// Values for graph nodes a composing ancestor routed into this component and
+	// this component's own module never declared.
+	readonly boundGraphValues?: ReadonlyMap<string, unknown>;
 }): Promise<
 	SsrRenderOutput & {
 		// The render-data path emits the full ssr-data structure, not just anchors.
@@ -411,9 +462,10 @@ async function evaluatePrerenderDataComponent(input: {
 			)
 				? ['value']
 				: path;
-		return input.graph
-			? input.graph.read(graphNodeId, graphPath)
-			: readPath(values.get(graphNodeId), path);
+		if (input.graph) return input.graph.read(graphNodeId, graphPath);
+		if (input.boundGraphValues?.has(graphNodeId))
+			return readPath(input.boundGraphValues.get(graphNodeId), path);
+		return readPath(values.get(graphNodeId), path);
 	};
 	for (const initial of definition.initialValues ?? []) {
 		if (initial.value.kind !== 'symbol-function') continue;
@@ -693,6 +745,12 @@ async function evaluatePrerenderDataComponent(input: {
 				graph: input.graph,
 				requireHtml: input.requireHtml,
 				sharedSeeds: context.sharedSeeds,
+				boundGraphValues: marklessBoundGraphValues(
+					input.boundGraphValues,
+					childSurface,
+					edge.props,
+					read,
+				),
 			});
 			children.push({
 				output: output as SsrComposableChildOutput,
