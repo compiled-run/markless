@@ -69,8 +69,9 @@ module — `SyntaxError: does not provide an export named 'pushToast'`. That is 
 makes `toaster.toast()` unavailable as a bare namespace call.
 
 A namespace-level PURE function over a value the caller already holds is fine, and
-is how `say`, `drop` and `shown` ship. `toaster.shown(toasts.queue, 2)` is called
-straight from a repeat header in `limits.tsrx` and compiles and runs — which
+is how `say`, `drop` and `shown` ship. A bare `toaster.shown(toasts.queue, 2)` in a
+repeat header compiles but dies at SSR render with `toasts` unbound; `limits.tsrx`
+routes the call through a `computed()`, which binds correctly — which
 corrects an earlier reading here that grouped `toaster.shown()` with
 `toaster.toast()` as unavailable. The difference is resolving an instance, not
 being a namespace call.
