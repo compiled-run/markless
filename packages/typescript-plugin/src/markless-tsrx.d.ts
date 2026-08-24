@@ -92,7 +92,12 @@ declare namespace __MarklessTypeService {
 	type MarklessAttributes<E extends globalThis.Element> = {
 		attach?: OneOrMany<NativeElementBehavior<E>>;
 		children?: Child;
-		el?: E | undefined;
+		/**
+		 * Cardinality is declared at the `element<T>()` call, not here, so this
+		 * position accepts both shapes: a singular handle, and an array-typed
+		 * handle bound on an element the markup renders many times.
+		 */
+		el?: E | readonly E[] | undefined;
 		/**
 		 * Render this element above the rest of the UI, escaping clipping and
 		 * stacking ancestors. Elevation only: no dismissal, focus, positioning,

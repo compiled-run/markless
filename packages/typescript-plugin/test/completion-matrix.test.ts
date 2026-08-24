@@ -1447,6 +1447,67 @@ test("M7c' tsserver loads both plugins from compilerOptions.plugins alone, with 
 	}
 }, 30_000);
 
+test('M18 a plural element() handle reads as its array type argument and a singular one does not', async () => {
+	const fixture = openFixture('element-handles.tsrx');
+	const plural = await server.quickinfo(
+		fixture.file,
+		positionAfterMarker(fixture.marked, '/*M18_PLURAL*/'),
+	);
+	const singular = await server.quickinfo(
+		fixture.file,
+		positionAfterMarker(fixture.marked, '/*M18_SINGULAR*/'),
+	);
+
+	expect(
+		displayText(plural),
+		'M18 missing capability: a handler read of an array-typed handle must carry the array type argument the author wrote.',
+	).toContain('optionEls: ElementHandle<HTMLDivElement[]>');
+	expect(
+		displayText(singular),
+		'M18 missing capability: a handle beside it that was not written with an array type argument must stay singular.',
+	).toContain('contentEl: ElementHandle<HTMLDivElement>');
+
+	// The hover shows the alias, so the resolved element type is proved by use
+	// instead: `.length` typed as number and `[0]` typed as the element are in
+	// the fixture, and neither is among the diagnostics M18-defect records.
+	const semantic = await server.semanticDiagnosticsSync(fixture.file);
+	expect(
+		semantic.filter((diagnostic: any) => /not assignable/.test(String(diagnostic.text))),
+		'M18 missing capability: an array-typed handle must resolve to HTMLDivElement[], so .length is a number, [0] is an HTMLDivElement, and el= accepts it.',
+	).toEqual([]);
+}, 30_000);
+
+test('M18 a single-element method on a plural read is an error at the authored token', async () => {
+	const fixture = openFixture('element-handles-errors.tsrx');
+	const diagnostics = await server.semanticDiagnosticsSync(fixture.file);
+	const focusDiagnostic = diagnosticMatching(diagnostics, /Property 'focus' does not exist/);
+
+	expect(
+		String(focusDiagnostic?.text),
+		'M18 missing capability: a plural handle is many elements, so a singular DOM method on it must be rejected against the array type.',
+	).toContain("does not exist on type 'HTMLDivElement[]'");
+	expectDiagnosticSpan(fixture.source, focusDiagnostic, 'focus');
+}, 30_000);
+
+// Anchored to today's measured editor output, not to the contract Markless wants.
+// `element<T extends Element = Element>(): ElementHandle<T>` and
+// `ElementHandle<T> = T | undefined` in packages/core/src/framework-api.ts still
+// describe a single optional element, so the authoring form the compiler
+// implements is red on the call and optional on every read. Fixing core must
+// turn these two into an empty list in the same change set.
+test('M18-defect the plural authoring form is still red at the element() call and optional on read', async () => {
+	const fixture = openFixture('element-handles.tsrx');
+	const diagnostics = await server.semanticDiagnosticsSync(fixture.file);
+
+	expect(
+		diagnostics.map((diagnostic: any) => String(diagnostic.text).split('\n')[0]),
+	).toEqual([
+		"Type 'HTMLDivElement[]' does not satisfy the constraint 'Element'.",
+		"'s.optionEls' is possibly 'undefined'.",
+		"'s.optionEls' is possibly 'undefined'.",
+	]);
+}, 30_000);
+
 const branchEntries = ['@else', '@empty', '@case', '@default', '@pending', '@catch'];
 
 function stripSnippetSyntax(insertText: string): string {
