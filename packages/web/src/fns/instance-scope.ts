@@ -263,37 +263,37 @@ export function marklessInstanceScopedLoadSymbol(
 
 function scopeSymbol(symbol: ResumeSymbol, instancePath: string): ResumeSymbol {
 	if (composedSymbols.has(symbol)) return symbol;
-	return (context: ResumeSymbolContext) => {
-		// A CSR container activates its authored behaviors before it demand-loads
-		// the runtime graph, so a behavior on an element inside a component reaches
-		// here with no graph at all - the context type says otherwise, render-csr.ts
-		// casts. There is nothing to scope and the behavior still has to run,
-		// exactly as one on the root component's own element already does; only the
-		// element handles carry a scope this context can honour.
-		const graph: RuntimeGraph | undefined = context.graph;
-		return symbol({
+	return (context: ResumeSymbolContext) =>
+		symbol({
 			...context,
-			...(graph ? { graph: marklessInstanceScopedGraph(graph, instancePath) } : {}),
+			// A CSR container activates its authored behaviors BEFORE it demand-loads
+			// the runtime graph, so a behavior on an element inside a component
+			// arrives with no graph at all - the context type says otherwise,
+			// render-csr.ts casts one in. There is nothing to scope, and the behavior
+			// still has to run: it gets the absent graph its caller handed over,
+			// exactly as a behavior on the root component's own element already does.
+			// Only the element handles carry a scope a graph-less context can honour.
+			graph: (context.graph &&
+				marklessInstanceScopedGraph(context.graph, instancePath)) as RuntimeGraph,
 			getElementHandle: marklessInstanceScopedElementHandle(
 				context.getElementHandle,
 				instancePath,
-				graph,
+				context.graph,
 			),
-			...(context.read && graph
+			...(context.read
 				? {
 						read: (graphNodeId: string, path?: ReadonlyArray<string>) =>
-							graph.read(
+							context.graph.read(
 								marklessComposedGraphNodeId(
 									graphNodeId,
 									instancePath,
-									marklessGraphWidgetRegistry(graph),
+									marklessGraphWidgetRegistry(context.graph),
 								),
 								path,
 							),
 					}
 				: {}),
 		});
-	};
 }
 
 /**
@@ -373,11 +373,6 @@ export function marklessInstanceScopedGraph(
 	instancePath: string,
 ): MarklessScopedGraph {
 	if (!instancePath) return graph;
-	// Callers that hold no graph must say so and be answered, not read through:
-	// this used to walk straight into `graph.listSharedDefinitions` and report an
-	// undefined property read from a stack no author could place.
-	if ((graph as RuntimeGraph | undefined) === undefined)
-		throw new Error(`MARKLESS_INSTANCE_SCOPE_GRAPH_MISSING: ${instancePath}`);
 	// Resume loads a widget piece's symbol by its instance path alone; the widget
 	// roots it must map onto are the qualified definition ids the payload carries,
 	// along with the projection sites composition registered them under. Re-read
