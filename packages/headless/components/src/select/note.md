@@ -26,15 +26,17 @@ parallel arrays) and `SelectTypeahead` (a search string plus a live `setTimeout`
 handle). Neither is needed and neither would be allowed: the landed
 `MARKLESS_SHARED_FACTORY_CLASS_INSTANCE` diagnostic refuses a class instance on
 a `shared()` factory. `search` plus `searchAt` replaces the timer, and every
-navigation question is answered by a DOM walk from `event.target`, so there is
+navigation question is answered from the options themselves, so there is
 no item registry in this family at all.
 
-**Every DOM query the family still makes lives in `element-reach.ts`.** No
-handler in `select.tsrx` holds a DOM reference of its own: the listbox and the
-trigger are read as `element()` handles off the handler's own widget instance,
-and only the walk over the options is asked of the document. One framework wall
-is why that module still exists; the section "What a handler cannot reach"
-states it, and records the wall that closed on 2026-08-23.
+**This family makes no DOM query.** Nothing in it calls `querySelector`,
+`querySelectorAll`, or `closest`. Every element a handler touches arrives as an
+`element()` handle read off the handler's own widget instance: `contentEl` and
+`triggerEl` for the listbox and the combobox, and `optionEls` — one array-typed
+handle bound on every option — for the walk. `element-reach.ts` existed only to
+hold the queries and is gone; what is left is `option-focus.ts`, plain functions
+handed the options and asked to move the focus among them. The section "What a
+handler cannot reach" records both walls and the dates they closed.
 
 ## Deviations from QDS, and the constraint that forced each
 
@@ -276,23 +278,63 @@ and `Space` hand focus back with `select.triggerEl?.focus()` instead of finding
 the combobox by its `aria-controls` id. `select.triggerEl` is a new handle on the
 shared factory, bound with `el=` on the trigger — the anchor-positioning work
 wants it anyway. The same four sites are waiting in radio group, tree and navbar.
-The two that walk the options stay either way — they are wall 2.
+The two that walk the options were wall 2, and are now converted too: they take
+`select.optionEls`, the array-typed handle bound on every option.
 
-**2. Nothing yields the rows of a repeated part in order.**
+**2. Nothing yields the rows of a repeated part in order. — CLOSED 2026-08-23
+(behaviour; one type-surface gap named below).**
 
-The arrow walk and the typeahead need the options under one listbox, in the
-order a person walks them, with the disabled ones left out. No primitive
-produces that collection. A registry the items fill from their own bodies is not
-an answer: seeds are order-independent, a resumed page never re-runs those
-bodies, and a keyed `@for` can reorder rows after they registered.
+*Closed by array-typed `element()` handles, the capability the goal card calls
+C-prime, witnessed by `packages/vitest-browser/browser/array-element-handles.test.ts`
+and `packages/compiler/test/array-element-handles.test.ts`. The conversion is
+landed: `optionEls` is declared `element<HTMLDivElement[]>()` on the shared
+factory, bound `el={select.optionEls}` on `select.item`, and read by all four
+walk sites. The history below is kept because the shape that closed it is not
+the shape this note asked for.*
 
-What would close it: a collection handle — `const options = collection()` in the
-widget-scoped factory, bound with `el={options.member}` on the repeated part,
-read from a handler as its members in document order, maintained by the same
-bookkeeping that already fills `element()` handles and mints their ids. It is
-also the prerequisite `idref-attributes.ts` names for putting
-`aria-activedescendant` in `IDREF_ATTRIBUTES`, which says in as many words that
-the attribute "names one row of a live collection".
+The wall was that the arrow walk and the typeahead need the options under one
+listbox, in the order a person walks them, with the disabled ones left out, and
+no primitive produced that collection. A registry the items fill from their own
+bodies was never an answer: seeds are order-independent, a resumed page never
+re-runs those bodies, and a keyed `@for` can reorder rows after they registered.
+
+What closed it is not the `collection()` primitive this note asked for. It is
+`element()` itself, widened: an array TYPE ARGUMENT declares the handle plural,
+the same `el=` binding is then allowed on many elements, and a handler reading it
+is answered with the live elements as a plain array in document order. Nothing
+new to learn, and the ordering problem this note raised is answered at the
+source — the read walks the document rather than a filed list, so a reorder or a
+removal is already accounted for by the next read rather than needing to be
+tracked.
+
+Measured here on 2026-08-23, the whole conversion applied: the family's browser
+suite runs 53 of 54, and the one red is `CSR: options from a keyed loop each get
+their own instance`, which is red at this tip **before** the conversion and red
+at `7942701e` before the capability merged — it is a keyed-repeat widget-instance
+defect, not a walk defect, and no row it owns is one this unit touched. Every
+walking row is green, including the two-select page and the looped listbox. The
+screen-reader lane is unchanged at 106 passed / 7 expected fail / 4 skipped.
+
+**The gap that stops it shipping: the capability has no type surface.** The
+runtime and the compiler both take the array type argument, but the workspace
+typecheck refuses the source that writes it, in two places, neither of them in
+this family:
+
+- `packages/core/src/framework-api.ts` — `element<T extends Element = Element>()`
+  and `ElementHandle<T extends Element>`. `HTMLDivElement[]` does not satisfy
+  `Element`, so the declaration is `TS2344`.
+- `packages/typescript-plugin/src/markless-tsrx.d.ts` — `el?: E | undefined` on
+  `MarklessAttributes`. Binding a plural handle on a `<div>` is `TS2322`.
+
+The capability's own witnesses do not catch this because they live under
+`packages/vitest-browser/browser/`, and the root `tsconfig.json` includes only
+`packages/*/src/**`. This family is inside the typechecked set, so it is the
+first consumer to meet the gap.
+
+The prerequisite this wall also carried is now within reach:
+`idref-attributes.ts` names an ordered collection as what
+`aria-activedescendant` needs before it can join `IDREF_ATTRIBUTES`, which says
+in as many words that the attribute "names one row of a live collection".
 
 **3. A widget-root element honours only its first handler. — CLOSED 2026-08-23
 (defect 57, non-reproducing).**
