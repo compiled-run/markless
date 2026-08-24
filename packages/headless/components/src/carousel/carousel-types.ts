@@ -1,4 +1,4 @@
-import type { ElementHandle, PropsOf, Seeded } from '@markless/core';
+import type { PropsOf, Seeded } from '@markless/core';
 
 /** Which axis the slides run along. */
 export type CarouselOrientation = 'horizontal' | 'vertical';
@@ -109,12 +109,6 @@ export type CarouselInstanceState = Seeded<
 	isDragging: boolean;
 	/** The running autoplay interval, or 0. A number, so the graph can hold it. */
 	autoplayTimer: number;
-	titleEl: ElementHandle<HTMLDivElement>;
-	/** The clipping window; its size is the viewport the engine measures against. */
-	viewportEl: ElementHandle<HTMLDivElement>;
-	scrollEl: ElementHandle<HTMLDivElement>;
-	/** Every slide, live and in document order. The engine measures these. */
-	slideEls: ElementHandle<HTMLDivElement[]>;
 	onChange?: CarouselRootProps['onChange'];
 };
 
