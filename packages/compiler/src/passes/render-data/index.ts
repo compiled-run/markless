@@ -197,18 +197,18 @@ function branchRecord(
  * element, so an element without one cannot exist). Static text and a `{text}`
  * slot occupy an index and produce no element. Anything whose element count is
  * decided at render time - a branch arm, another repeat, an async boundary, a
- * child component - answers undefined, and the caller drops the repeat rather
+ * child component - answers 'unknown', and the caller drops the repeat rather
  * than pair rows against a position it cannot defend.
  */
 function repeatRowStartOffset(
 	chunks: SemanticGraphArtifact['markup']['chunks'],
 	repeatId: string,
-): number | undefined {
+): number | 'unknown' {
 	const owner = chunks.find((chunk) =>
 		chunk.slots.some((slot) => slot.kind === 'repeat' && slot.repeatId === repeatId),
 	);
 	const anchor = owner?.slots.find((slot) => slot.kind === 'repeat' && slot.repeatId === repeatId);
-	if (!owner || anchor?.coordinate.kind !== 'comment-anchor') return undefined;
+	if (!owner || anchor?.coordinate.kind !== 'comment-anchor') return 'unknown';
 	const path = anchor.coordinate.path;
 	const parentPath = path.slice(0, -1);
 	const samePath = (candidate: ReadonlyArray<number>, index: number) =>
@@ -224,7 +224,7 @@ function repeatRowStartOffset(
 		const sibling = owner.slots.find(
 			(slot) => slot.coordinate.kind === 'comment-anchor' && samePath(slot.coordinate.path, index),
 		);
-		if (sibling && sibling.kind !== 'text') return undefined;
+		if (sibling && sibling.kind !== 'text') return 'unknown';
 	}
 	return offset;
 }
@@ -322,7 +322,7 @@ function repeatRecord(
 		rowChunkId,
 		...(slot?.emptyTemplateId ? { emptyChunkId: slot.emptyTemplateId } : {}),
 		rowElementCount: chunks.find((chunk) => chunk.id === rowChunkId)?.hosts.length ?? 0,
-		...(rowStartOffset === undefined ? {} : { rowStartOffset }),
+		...(rowStartOffset === 0 ? {} : { rowStartOffset }),
 		...(parent ? { parentPath: relativePath(parent.coordinate.path) } : {}),
 		...(classWrites.length > 0 ? { classWrites } : {}),
 		...(eventControls.length > 0 ? { eventControls } : {}),
