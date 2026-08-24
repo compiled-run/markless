@@ -92,7 +92,20 @@
 			{
 				"part": "button",
 				"component": "Button",
-				"props": []
+				"props": [
+					{
+						"name": "pressed",
+						"type": "boolean",
+						"required": false,
+						"doc": "Provide it and the button becomes a toggle button: it reports `aria-pressed`\nand flips on every activation. Omit it and this is a plain button, with no\npressed state for a reader to announce."
+					},
+					{
+						"name": "onChange",
+						"type": "(pressed: boolean) => void",
+						"required": false,
+						"doc": "Called with the new state each time a person flips a toggle button. Omit it\nand the button still flips; the call site simply does nothing."
+					}
+				]
 			},
 			{
 				"part": "label",
@@ -1155,27 +1168,6 @@
 				"props": []
 			},
 			{
-				"part": "field",
-				"component": "RadioGroupField",
-				"doc": "What a form receives from this group, declared once for the whole group rather\nthan repeated on every option. Mount it beside the label; the options pick the\nname and the requirement up from here wherever they are written.",
-				"props": [
-					{
-						"name": "name",
-						"type": "string",
-						"required": false,
-						"default": "''",
-						"doc": "The name every option in this group submits under. Omit it and none is submitted."
-					},
-					{
-						"name": "required",
-						"type": "boolean",
-						"required": false,
-						"default": "false",
-						"doc": "A choice is needed before the form submits."
-					}
-				]
-			},
-			{
 				"part": "item",
 				"component": "RadioGroupItem",
 				"props": [
@@ -1197,7 +1189,7 @@
 			{
 				"part": "itemfield",
 				"component": "RadioGroupItemField",
-				"doc": "The visually hidden native radio that carries the option into a form and is\nthe element a person actually focuses. It takes no configuration of its own:\n`name` and `required` come from `radiogroup.field` and `value` from\n`radiogroup.item`, so one place decides what a form receives.",
+				"doc": "The visually hidden native radio that carries the option into a form and is\nthe element a person actually focuses. It takes no configuration of its own:\n`name` and `required` come from `radiogroup.root` and `value` from\n`radiogroup.item`, so one place decides what a form receives.",
 				"props": []
 			},
 			{
@@ -1254,6 +1246,20 @@
 						"required": false,
 						"default": "false",
 						"doc": "Nobody can change any option."
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The name every option in this group submits under, declared once here rather\nthan repeated on every option. Omit it and the group submits nothing."
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "A choice is needed before the form submits."
 					},
 					{
 						"name": "onChange",
