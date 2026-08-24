@@ -18,6 +18,10 @@
  * a slot no driver can fill honestly does not belong here — see the negative
  * proofs in the suites, which assert a fact is *absent* rather than inventing a
  * word for its absence.
+ *
+ * One reader having no word for a fact the others do speak is the exception, and
+ * it is written as the empty string: `missingFacts` then skips that fact for that
+ * reader rather than failing it against a word nobody has observed.
  */
 export type Vocabulary = {
 	readonly checkbox: string;
@@ -36,6 +40,12 @@ export type Vocabulary = {
 	readonly tablist: string;
 	readonly tab: string;
 	readonly tabpanel: string;
+	/** The trigger that shows a set of choices - `role="combobox"`. */
+	readonly combobox: string;
+	/** The popup a combobox shows its choices in - `role="listbox"`. */
+	readonly listbox: string;
+	/** One choice inside a listbox - `role="option"`. */
+	readonly option: string;
 	readonly button: string;
 	readonly progressbar: string;
 	/** A single- or multi-line text entry field. */
@@ -129,14 +139,16 @@ export function missingFacts(
 ): string[] {
 	const spoken = driver.segments(phrase);
 	const missing: string[] = [];
-	if (conveys.role && !spoken.includes(driver.vocabulary[conveys.role])) {
+	// An empty slot is a reader with no word for the fact, not a fact it omitted.
+	const absent = (word: string) => word !== '' && !spoken.includes(word);
+	if (conveys.role && absent(driver.vocabulary[conveys.role])) {
 		missing.push(`role "${driver.vocabulary[conveys.role]}"`);
 	}
 	if (conveys.name !== undefined && !spoken.includes(conveys.name)) {
 		missing.push(`name "${conveys.name}"`);
 	}
 	for (const state of conveys.state ?? []) {
-		if (!spoken.includes(driver.vocabulary[state])) {
+		if (absent(driver.vocabulary[state])) {
 			missing.push(`state "${driver.vocabulary[state]}"`);
 		}
 	}
