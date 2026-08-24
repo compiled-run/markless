@@ -2,6 +2,7 @@ import { render, renderSSR } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { afterEach, expect, test } from 'vitest';
 import Basic from './scenarios/basic.tsrx';
+import Rtl from './scenarios/rtl.tsrx';
 import ServedOpen from './scenarios/served-open.tsrx';
 import Sided from './scenarios/sided.tsrx';
 import Unnamed from './scenarios/unnamed.tsrx';
@@ -29,6 +30,8 @@ const FirstValue = page.getByTestId('first-value');
 const SecondTrigger = page.getByTestId('second-trigger');
 const SecondContent = page.getByTestId('second-content');
 const SecondValue = page.getByTestId('second-value');
+const StartTrigger = page.getByTestId('start-trigger');
+const StartContent = page.getByTestId('start-content');
 
 // The SSR harness rewrites a literal `renderSSR` call site, so the mount cannot be
 // passed by reference or hidden in a helper: each test branches on the mode instead.
@@ -78,8 +81,13 @@ async function openBasic() {
 	await expect.poll(() => el(Content).hasAttribute('hidden')).toBe(false);
 }
 
-async function placed(content: { element(): Element | null }) {
-	await expect.poll(() => el<HTMLElement>(content).style.top).not.toBe('');
+// The placement is a CSS anchor, so the surface is in place on the layout that
+// shows it - there is nothing to wait for beyond reading a box.
+function expectAnchored(content: Element) {
+	const style = (content as HTMLElement).style;
+	expect(style.position).toBe('absolute');
+	expect(style.getPropertyValue('position-anchor')).toBe('--ui-popover');
+	expect(style.getPropertyValue('position-area')).not.toBe('');
 }
 
 function expectBasicRendered() {
@@ -175,14 +183,15 @@ test('CSR: the surface is placed under the trigger it belongs to', async () => {
 	await render(Basic);
 	await openBasic();
 
-	await placed(Content);
+	expectAnchored(el(Content));
 	const surface = el(Content).getBoundingClientRect();
 	const anchor = el(Trigger).getBoundingClientRect();
-	expect(el<HTMLElement>(Content).style.position).toBe('absolute');
 	expect(Math.abs(surface.top - anchor.bottom)).toBeLessThanOrEqual(SLACK);
 	expect(Math.abs(surface.left - anchor.left)).toBeLessThanOrEqual(SLACK);
 });
 
+// Two popovers on one page each carry the same anchor name, so this is also the
+// row that would catch a surface finding the other popover's trigger.
 test('CSR: side places the surface beside or above the trigger, and says which on the surface', async () => {
 	await render(Sided);
 	expect(el(EndContent).getAttribute('ui-side')).toBe('end');
@@ -190,7 +199,6 @@ test('CSR: side places the surface beside or above the trigger, and says which o
 
 	el(EndTrigger).click();
 	await expect.poll(() => el(EndContent).hasAttribute('hidden')).toBe(false);
-	await placed(EndContent);
 	const beside = el(EndContent).getBoundingClientRect();
 	const endAnchor = el(EndTrigger).getBoundingClientRect();
 	expect(Math.abs(beside.left - endAnchor.right)).toBeLessThanOrEqual(SLACK);
@@ -198,10 +206,26 @@ test('CSR: side places the surface beside or above the trigger, and says which o
 
 	el(TopTrigger).click();
 	await expect.poll(() => el(TopContent).hasAttribute('hidden')).toBe(false);
-	await placed(TopContent);
 	const above = el(TopContent).getBoundingClientRect();
 	const topAnchor = el(TopTrigger).getBoundingClientRect();
 	expect(Math.abs(above.bottom - topAnchor.top)).toBeLessThanOrEqual(SLACK);
+	expect(Math.abs(above.left - topAnchor.left)).toBeLessThanOrEqual(SLACK);
+});
+
+// `start` and `end` are the writing direction's sides, and only a right-to-left
+// page tells them apart from left and right.
+test('CSR: start and end follow the writing direction', async () => {
+	await render(Rtl);
+
+	const startSurface = el(StartContent).getBoundingClientRect();
+	const startAnchor = el(StartTrigger).getBoundingClientRect();
+	expect(Math.abs(startSurface.left - startAnchor.right)).toBeLessThanOrEqual(SLACK);
+	expect(Math.abs(startSurface.top - startAnchor.top)).toBeLessThanOrEqual(SLACK);
+
+	const endSurface = el(EndContent).getBoundingClientRect();
+	const endAnchor = el(EndTrigger).getBoundingClientRect();
+	expect(Math.abs(endSurface.right - endAnchor.left)).toBeLessThanOrEqual(SLACK);
+	expect(Math.abs(endSurface.top - endAnchor.top)).toBeLessThanOrEqual(SLACK);
 });
 
 test('CSR: Escape closes the surface and hands focus back to the trigger', async () => {
@@ -326,6 +350,20 @@ test('SSR: the served surface is hidden, and the first click after resume shows 
 	el(Trigger).click();
 	await expect.poll(() => el(Content).hasAttribute('hidden')).toBe(false);
 	await expect.poll(() => el(Trigger).getAttribute('aria-expanded')).toBe('true');
+});
+
+// The old placement measured two boxes from the opening click, so a surface that
+// arrived already showing was never placed. A CSS anchor needs no gesture.
+test('SSR: a popover served open is placed against its trigger with no interaction', async () => {
+	await renderSSR(ServedOpen);
+	expectShowing(el(Trigger), el(Content));
+
+	expectAnchored(el(Content));
+	const surface = el(Content).getBoundingClientRect();
+	const anchor = el(Trigger).getBoundingClientRect();
+	expect(surface.width).toBeGreaterThan(0);
+	expect(Math.abs(surface.top - anchor.bottom)).toBeLessThanOrEqual(SLACK);
+	expect(Math.abs(surface.left - anchor.left)).toBeLessThanOrEqual(SLACK);
 });
 
 test('SSR: a popover served open is showing, and Escape closes it', async () => {

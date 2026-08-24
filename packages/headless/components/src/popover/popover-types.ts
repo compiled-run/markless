@@ -13,6 +13,11 @@ export type PopoverRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/**
 	 * Where the surface is placed against the trigger. It is also written on
 	 * `popover.content` as `ui-side`, so styling can follow the placement.
+	 *
+	 * The placement is a CSS anchor, so it holds while the page scrolls and
+	 * reflows without any script. The family owns the `style` attribute on
+	 * `popover.root`, `popover.trigger` and `popover.content` to carry it -
+	 * style those three parts from a stylesheet rather than a `style` prop.
 	 */
 	readonly side?: PopoverSide;
 	/**
