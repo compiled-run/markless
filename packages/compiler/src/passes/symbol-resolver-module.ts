@@ -58,7 +58,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 	return [
 		...(scopesWidgetGraphs
 			? [
-					`import { marklessComposedGraphNodeId, marklessGraphWidgetRegistry } from '@markless/web/fns/instance-scope';`,
+					`import { marklessComposedGraphNodeId, marklessGraphWidgetRegistry, marklessWidgetHandleId } from '@markless/web/fns/instance-scope';`,
 					'',
 				]
 			: []),
@@ -209,6 +209,17 @@ function instanceScopeLines(widgetAware: boolean): string[] {
 		'		...context,',
 		'		graph: scopeGraph(context.graph),',
 		`		...(context.read ? { read: (graphNodeId, readPath) => context.graph.read(${scoped('graphNodeId', 'marklessGraphWidgetRegistry(context.graph)')}, readPath) } : {}),`,
+		// A widget-scoped element() handle is spelled module-level in this symbol
+		// exactly as its graph nodes are, so it takes the SAME instance path - the
+		// bound edge's, which names the rendered widget even when the dispatching
+		// part binds no handle of its own.
+		...(widgetAware
+			? [
+					'		...(typeof context.getElementHandle === "function"',
+					'			? { getElementHandle: (handleIdOrName) => context.getElementHandle(marklessWidgetHandleId(handleIdOrName, path, marklessGraphWidgetRegistry(context.graph))) }',
+					'			: {}),',
+				]
+			: []),
 		'	});',
 		'}',
 		'',

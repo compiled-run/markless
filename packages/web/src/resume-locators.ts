@@ -38,10 +38,6 @@ export function materializeDomLocators(
 // lean resume chunk strips one prefix rather than taking an import edge for it.
 const HANDLE_INSTANCE_PATH = /^(?:[cp]\d+:|r:[^:]*:)+(?=shared:)/;
 
-// The same grammar over a HOST id, which ends in its own `h<n>` segment rather
-// than a page-space id.
-const HOST_INSTANCE_PATH = /^(?:[cp]\d+:|r:[^:]*:)+/;
-
 /**
  * One element per key, and a loud refusal when a key names more than one.
  *
@@ -76,12 +72,6 @@ export function materializeElementHandles(
 	// host holds a LIST. Filing one per host drops whichever registered first.
 	const byKey = new Map<string, ResumeDomElement[]>(),
 		heldByHostId = new Map<string, Held[]>();
-	// Which rendered widget a host sits in, for a reader that cannot say. A bound
-	// symbol is minted per component EDGE, so a handler dispatched through one
-	// carries no instance path; the handles its own host bound are already
-	// qualified with the widget's root path, and one host sits in one instance.
-	// `null` is two roots claiming one host, which must not answer.
-	const widgetRootByHostPath = new Map<string, string | null>();
 	function unfile(held: Held): void {
 		for (const key of held.keys) {
 			const filed = byKey.get(key);
@@ -125,15 +115,6 @@ export function materializeElementHandles(
 		}
 		held.push({ handleId: handle.handleId, keys, element });
 		heldByHostId.set(hostNodeId, held);
-		const rootPath = HANDLE_INSTANCE_PATH.exec(handle.handleId)?.[0];
-		if (rootPath) {
-			const hostPath = HOST_INSTANCE_PATH.exec(hostNodeId)?.[0] ?? '';
-			const noted = widgetRootByHostPath.get(hostPath);
-			widgetRootByHostPath.set(
-				hostPath,
-				noted === undefined || noted === rootPath ? rootPath : null,
-			);
-		}
 	}
 	// The keys that answer as a SET, declared at `element<T[]>()` and stamped on
 	// every record the handle produced. Empty on a page with no array handle.
@@ -186,9 +167,6 @@ export function materializeElementHandles(
 				if (connected) live.add(connected);
 			}
 			return documentOrder([...live]);
-		},
-		widgetRootPath(hostNodeId) {
-			return widgetRootByHostPath.get(HOST_INSTANCE_PATH.exec(hostNodeId)?.[0] ?? '') ?? undefined;
 		},
 		register,
 		deleteHost,

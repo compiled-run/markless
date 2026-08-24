@@ -276,15 +276,21 @@ test('emitSymbolResolverModule hands the dispatching graph to the widget-scope r
 			'	context.graph.write({ graphNodeId: "shared:/src/Dialog.tsrx#Dialog/state:open", value: true });',
 			'	context.graph.read("state:label", []);',
 			'	context.read("state:legacy", []);',
+			'	context.getElementHandle("shared:/src/Dialog.tsrx#Dialog/element:panel");',
 			'}',
 		].join('\n'),
 	)}`;
 	const output = emitSymbolResolverModule(widgetScopedResolverInput(baseChunk));
 
 	expect(output).toContain(
-		"import { marklessComposedGraphNodeId, marklessGraphWidgetRegistry } from '@markless/web/fns/instance-scope';",
+		"import { marklessComposedGraphNodeId, marklessGraphWidgetRegistry, marklessWidgetHandleId } from '@markless/web/fns/instance-scope';",
 	);
 	expect(output).toContain('const registry = marklessGraphWidgetRegistry(graph);');
+	// An element() handle is spelled against the same instance path as this
+	// symbol's graph nodes: both halves name the widget by the bound edge.
+	expect(output).toContain(
+		'getElementHandle: (handleIdOrName) => context.getElementHandle(marklessWidgetHandleId(handleIdOrName, path, marklessGraphWidgetRegistry(context.graph)))',
+	);
 	for (const graphless of GRAPHLESS_RESOLVER_CALLS) expect(output).not.toContain(graphless);
 
 	// Stands in for the runtime module so the test can see which registry the
@@ -296,6 +302,10 @@ test('emitSymbolResolverModule hands the dispatching graph to the widget-scope r
 			'	globalThis.__u254ResolverCalls.push({ graphNodeId, registry });',
 			'	return path + graphNodeId;',
 			'}',
+			'export function marklessWidgetHandleId(handleId, path, registry) {',
+			'	globalThis.__u254HandleCalls.push({ handleId, path, registry });',
+			'	return path + handleId;',
+			'}',
 		].join('\n'),
 	)}`;
 	const stubbed = output.replace(
@@ -304,6 +314,8 @@ test('emitSymbolResolverModule hands the dispatching graph to the widget-scope r
 	);
 	const calls: Array<{ graphNodeId: string; registry: unknown }> = [];
 	(globalThis as { __u254ResolverCalls?: unknown }).__u254ResolverCalls = calls;
+	const handleCalls: Array<{ handleId: string; path: string; registry: unknown }> = [];
+	(globalThis as { __u254HandleCalls?: unknown }).__u254HandleCalls = handleCalls;
 
 	const generatedModule = (await import(
 		`data:text/javascript,${encodeURIComponent(stubbed)}`
@@ -319,9 +331,11 @@ test('emitSymbolResolverModule hands the dispatching graph to the widget-scope r
 				write: (record: { graphNodeId: string }) => writes.push(record),
 			},
 			read: () => undefined,
+			getElementHandle: (id: string) => asked.push(id),
 		});
 		return writes;
 	};
+	const asked: string[] = [];
 
 	expect(await dispatch('graph:A')).toEqual([
 		{ graphNodeId: 'c0:p2:shared:/src/Dialog.tsrx#Dialog/state:open', value: true },
@@ -329,12 +343,25 @@ test('emitSymbolResolverModule hands the dispatching graph to the widget-scope r
 	expect(calls.length).toBeGreaterThanOrEqual(3);
 	expect(new Set(calls.map((call) => call.registry))).toEqual(new Set(['graph:A']));
 
+	// Defect 78: the handle read takes the bound edge's instance path, the same
+	// one the write above took, and the same registry. Left module-level, a page
+	// with two rendered widgets has two registrations under it and refuses.
+	expect(handleCalls).toEqual([
+		{
+			handleId: 'shared:/src/Dialog.tsrx#Dialog/element:panel',
+			path: 'c0:p2:',
+			registry: 'graph:A',
+		},
+	]);
+	expect(asked).toEqual(['c0:p2:shared:/src/Dialog.tsrx#Dialog/element:panel']);
+
 	// The second container's dispatch must reach its own registry, not the one the
 	// first dispatch left behind.
 	calls.length = 0;
 	await dispatch('graph:B');
 	expect(new Set(calls.map((call) => call.registry))).toEqual(new Set(['graph:B']));
 	delete (globalThis as { __u254ResolverCalls?: unknown }).__u254ResolverCalls;
+	delete (globalThis as { __u254HandleCalls?: unknown }).__u254HandleCalls;
 });
 
 test('emitSymbolResolverModule leaves page-local instance scoping free of the widget runtime', () => {
