@@ -1,5 +1,5 @@
 import { slideValues } from './carousel-navigation.ts';
-import type { CarouselAlign, CarouselOrientation } from './carousel-types.ts';
+import type { CarouselAlign, CarouselMove, CarouselOrientation } from './carousel-types.ts';
 
 /**
  * The slide-math engine. It is a plain module rather than graph state on
@@ -209,8 +209,21 @@ export class SlideEngine {
 		return clamp(position, 0, Math.max(0, furthest));
 	}
 
-	/** How many slides fit in the viewport at once, never fewer than one. */
-	slidesPerView(slideEls: readonly HTMLElement[]): number {
+	/**
+	 * How many slides the viewport shows at once, never fewer than one.
+	 *
+	 * Only a `move="view"` carousel asks. A carousel that steps by a fixed count
+	 * navigates by that count, and a measurement must not override it: the
+	 * viewport's size along the axis is only a window when the consumer has
+	 * constrained it, and the block axis usually is not. A vertical carousel
+	 * whose viewport is auto-height measures its own content, so every slide
+	 * reads as visible, `reachableValues` leaves one reachable slide, and the
+	 * triggers go dead. Width does not fail the same way, which is why the
+	 * horizontal-first shape survived until the vertical rows ran.
+	 */
+	slidesPerView(slideEls: readonly HTMLElement[], move: CarouselMove): number {
+		if (move !== 'view') return 1;
+
 		const first = slideEls[0];
 		if (!first) return 1;
 
@@ -218,7 +231,16 @@ export class SlideEngine {
 		const slideSize = first[names.size];
 		if (slideSize <= 0) return 1;
 
-		return Math.max(1, Math.round(this.viewport[names.client] / slideSize));
+		const windowSize = this.viewport[names.client];
+		if (windowSize <= 0) return 1;
+
+		// A viewport that does not clip is not windowing anything, so it cannot
+		// report a slide count either. Falling back to one keeps every slide
+		// reachable rather than collapsing navigation to the first.
+		const travel = this.scrollArea[names.scroll] - windowSize;
+		if (travel <= 0) return 1;
+
+		return Math.max(1, Math.min(slideEls.length, Math.round(windowSize / slideSize)));
 	}
 
 	private closestIndex(

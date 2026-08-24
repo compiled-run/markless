@@ -1,11 +1,9 @@
 import * as carousel from '../index.ts';
-import { CAROUSEL_CSS } from './carousel-css.ts';
 
 // The same carousel with a nav list, which is the APG's tabbed variant: the
 // pickers are tabs and the slides become the panels they control.
 export default function Tabbed() @{
 	<section>
-		<style>{CAROUSEL_CSS}</style>
 		<carousel.root value="paris" data-testid="root">
 			<carousel.title data-testid="title">Featured destinations</carousel.title>
 			<carousel.scrollarea data-testid="scrollarea" data-viewport>

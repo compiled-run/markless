@@ -79,7 +79,7 @@ export const carouselState = shared(
 			step(direction: number) {
 				const slides = slideEls ?? [];
 				const engine = slideEngine(scrollEl, viewportEl, carousel.orientation);
-				const perView = engine ? engine.slidesPerView(slides) : 1;
+				const perView = engine ? engine.slidesPerView(slides, carousel.move) : 1;
 				const reachable = reachableValues(slides, perView, carousel.move, carousel.loop);
 				const isWrapping = carousel.rewind || carousel.loop;
 
@@ -97,7 +97,7 @@ export const carouselState = shared(
 			walk(key: string) {
 				const slides = slideEls ?? [];
 				const engine = slideEngine(scrollEl, viewportEl, carousel.orientation);
-				const perView = engine ? engine.slidesPerView(slides) : 1;
+				const perView = engine ? engine.slidesPerView(slides, carousel.move) : 1;
 				const reachable = reachableValues(slides, perView, carousel.move, carousel.loop);
 				const isWrapping = carousel.rewind || carousel.loop;
 
@@ -136,7 +136,7 @@ export const carouselState = shared(
 				carousel.autoplayTimer = window.setInterval(() => {
 					const slides = slideEls ?? [];
 					const engine = slideEngine(scrollEl, viewportEl, carousel.orientation);
-					const perView = engine ? engine.slidesPerView(slides) : 1;
+					const perView = engine ? engine.slidesPerView(slides, carousel.move) : 1;
 					const reachable = reachableValues(slides, perView, carousel.move, carousel.loop);
 
 					const next = autoplayValue(reachable, carousel.value);
