@@ -22,10 +22,15 @@ async function compileGallery(gallery: string) {
 	return { parts: parts!, gallery: result! };
 }
 
-const namedPartsOf = (ssrModuleSource: string) =>
-	[...ssrModuleSource.matchAll(/marklessSsrComponentPart\([^,]+,"([^"]+)"\)/g)].map(
-		(match) => match[1],
-	);
+// WHICH parts the module names, not how many times: a part is reached from the
+// render call and again from the element()-handle marker.
+const namedPartsOf = (ssrModuleSource: string) => [
+	...new Set(
+		[...ssrModuleSource.matchAll(/marklessSsrComponentPart\([^,]+,"([^"]+)"\)/g)].map(
+			(match) => match[1],
+		),
+	),
+];
 
 test('a namespace member tag composes the part it names, not the module root', async () => {
 	// Badge is not the module's root component, so taking the module surface

@@ -960,24 +960,21 @@ function emitSsrDataLines(
 					...templateComputedLines,
 					...seedForward,
 				];
-	// Pay-per-use: a module that declares no element() handle knows nothing this
-	// marker could report, so it emits none and its bytes are what they were.
-	const declaresElementHandles = input.semanticGraph.graphBindings.some(
-		(binding) => binding.kind === 'element',
-	);
-	const importedChildSurfaceArgs = declaresElementHandles
-		? [
-				...new Set(
-					[...childSurfaceArgsByEdgeId].flatMap(([edgeId, args]) =>
-						input.semanticGraph.componentEdges.some(
-							(edge) => edge.id === edgeId && edge.importSource,
-						)
-							? [args]
-							: [],
-					),
-				),
-			]
-		: [];
+	// Keyed on what rendering this component PUTS ON THE PAGE, not on what this
+	// file declares: a wrapper that binds no handle itself still renders an
+	// imported part that binds one, and gating on local declarations reported an
+	// empty roster and dropped that part's IDREF.
+	const importedChildSurfaceArgs = [
+		...new Set(
+			[...childSurfaceArgsByEdgeId].flatMap(([edgeId, args]) =>
+				input.semanticGraph.componentEdges.some(
+					(edge) => edge.id === edgeId && edge.importSource,
+				)
+					? [args]
+					: [],
+			),
+		),
+	];
 	return {
 		seedForward: seedForwardLines,
 		composedRootSurfaceArgs,

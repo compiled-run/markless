@@ -155,16 +155,12 @@ function expectDescribedRendered() {
 	expect(el(Description).textContent).toContain('nobody can put it back');
 }
 
-// An IDREF position takes a bare element() handle and nothing else, so the choice is
-// "always" or "never"; a reference resolving to nothing counts as absent for the name.
-function expectUnnamedCarriesUnresolvedReferences() {
+// A shared() IDREF whose handle no rendered part of this widget binds writes no
+// attribute at all, rather than one naming an id that is not on the page.
+function expectUnnamedOmitsUnboundReferences() {
 	const content = el<HTMLElement>(Content);
-	const labelledby = content.getAttribute('aria-labelledby');
-	const describedby = content.getAttribute('aria-describedby');
-	expect(labelledby).toBeTruthy();
-	expect(describedby).toBeTruthy();
-	expect(document.getElementById(labelledby as string)).toBe(null);
-	expect(document.getElementById(describedby as string)).toBe(null);
+	expect(content.hasAttribute('aria-labelledby')).toBe(false);
+	expect(content.hasAttribute('aria-describedby')).toBe(false);
 }
 
 async function expectTriggerOpensAndCloseButtonCloses() {
@@ -244,10 +240,10 @@ for (const mode of MODES) {
 		expectDescribedRendered();
 	});
 
-	test(`${mode}: a dialog with no naming parts carries references that resolve to nothing`, async () => {
+	test(`${mode}: a dialog with no naming parts omits the references entirely`, async () => {
 		if (mode === 'CSR') await render(Unnamed);
 		else await renderSSR(Unnamed);
-		expectUnnamedCarriesUnresolvedReferences();
+		expectUnnamedOmitsUnboundReferences();
 	});
 
 	test(`${mode}: the trigger opens the dialog and the close button closes it`, async () => {
