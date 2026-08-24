@@ -266,7 +266,15 @@ function scopeSymbol(symbol: ResumeSymbol, instancePath: string): ResumeSymbol {
 	return (context: ResumeSymbolContext) =>
 		symbol({
 			...context,
-			graph: marklessInstanceScopedGraph(context.graph, instancePath),
+			// A CSR container activates its authored behaviors BEFORE it demand-loads
+			// the runtime graph, so a behavior on an element inside a component
+			// arrives with no graph at all - the context type says otherwise,
+			// render-csr.ts casts one in. There is nothing to scope, and the behavior
+			// still has to run: it gets the absent graph its caller handed over,
+			// exactly as a behavior on the root component's own element already does.
+			// Only the element handles carry a scope a graph-less context can honour.
+			graph: (context.graph &&
+				marklessInstanceScopedGraph(context.graph, instancePath)) as RuntimeGraph,
 			getElementHandle: marklessInstanceScopedElementHandle(
 				context.getElementHandle,
 				instancePath,
