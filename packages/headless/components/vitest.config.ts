@@ -21,7 +21,10 @@ export default defineProject({
 		// test-support/playwright.config.ts). Widening this to src/**/*.ts would
 		// pull all three into the browser project, where the real-reader specs
 		// have no reader to drive.
-		include: ['src/**/*.browser.ts'],
+		// Two roots: the colocated family suites, and the cross-family conformance
+		// battery in test-support/, which holds every family to one shared set of
+		// checks and so belongs to no single family folder.
+		include: ['src/**/*.browser.ts', 'test-support/**/*.browser.ts'],
 		// Serial on purpose (U173 measurement): parallel iframes contend on one
 		// dev server and CPU until gesture latency crosses the 1000ms poll
 		// ceiling (p99 1230ms parallel vs 363ms serial) — and serial is FASTER
