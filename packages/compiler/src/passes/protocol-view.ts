@@ -359,6 +359,7 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 					? { rowStartOffset: render.rowStartOffset }
 					: {}),
 				...mintableEmptyArm(input, render),
+				...mintableRowTemplate(input, render),
 				rowEvents: oneRecordPerEvent(input.payloadArena.view.events)
 					.filter((event) => rowHostPaths.has(event.hostNodeId))
 					.map((event) => ({
@@ -413,6 +414,69 @@ function mintableEmptyArm(
 	if (wired) return {};
 	const html = chunk.statics.join('');
 	return html ? { emptyArm: { html } } : {};
+}
+
+/**
+ * One row's markup, carried only when the mint can finish the row alone.
+ *
+ * A row appended to the collection after resume was never served, so the only
+ * way it can exist is for the client to build it - and the client has no
+ * renderer, only the payload. This ships the row chunk's finished markup, which
+ * is honest for exactly two shapes: a row with NO slots, and a row whose every
+ * slot is text read off the repeated item. Anything else is a part the mint
+ * cannot fill - a value from outside the row, an attribute, a nested construct,
+ * a child component - and half a row is worse than none.
+ *
+ * The slot markers stay in the html on purpose: they are the positions the row's
+ * text occupies, and `textSlots` addresses them by the same fragment-relative
+ * path the chunk records, so the mint walks to each one instead of re-parsing.
+ * These are FRAGMENT-relative coordinates - `[0]` is the row root - not the
+ * ROW-ROOT-relative ones `rowEvents[].hostPath` carries.
+ *
+ * Pay-per-use: a row this refuses emits no field at all, so its record is
+ * byte-identical to what it was before this existed.
+ */
+function mintableRowTemplate(
+	input: ProtocolViewPayloadInput,
+	render: RenderDataArtifact['repeats'][number],
+): {
+	readonly rowTemplate?: {
+		readonly html: string;
+		readonly textSlots?: ReadonlyArray<{
+			readonly path: ReadonlyArray<number>;
+			readonly itemPath: ReadonlyArray<string>;
+		}>;
+	};
+} {
+	const chunk = renderDataOf(input).chunks.find(
+		(candidate) => candidate.id === render.rowChunkId,
+	);
+	if (!chunk) return {};
+	// A repeat whose row roots a widget is refused outright, in the same terms the
+	// record gate already answers widget-rooting for repeats: the row's content is
+	// a child component, whose graph is one instance per rendered row. The slot
+	// whitelist below refuses a child-component slot too, so this costs nothing
+	// today - it is stated so that widening the whitelist later cannot quietly
+	// open the widget hole, where a minted row would be a widget with no graph.
+	if (chunk.slots.some((slot) => slot.kind === 'child-component')) return {};
+	const textSlots: Array<{
+		readonly path: ReadonlyArray<number>;
+		readonly itemPath: ReadonlyArray<string>;
+	}> = [];
+	for (const slot of chunk.slots) {
+		// A row that reads anything but its own item cannot be minted from the item
+		// alone, and every non-text slot is wiring the mint does not do.
+		if (slot.kind !== 'text' || slot.residue.kind !== 'repeat-item') return {};
+		textSlots.push({ path: slot.coordinate.path, itemPath: slot.residue.path });
+	}
+	const html = chunk.statics.join('');
+	if (!html) return {};
+	return {
+		rowTemplate: {
+			html,
+			...(textSlots.length > 0 ? { textSlots } : {}),
+		},
+	};
 }
 
 function boundaryUpdateSymbols(input: ProtocolViewPayloadInput): ReadonlyMap<string, string> {

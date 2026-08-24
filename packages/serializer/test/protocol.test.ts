@@ -302,3 +302,86 @@ test('keyed repeat @empty arm markup round-trips and refuses a malformed shape',
 		),
 	).toThrow(/keyedRepeat\[0\]\.emptyArm/);
 });
+
+// A keyed repeat's row markup crosses the wire on the same record, and is
+// refused in the same place: the mint builds a row from this and nothing else,
+// so a malformed template must never reach it.
+test('keyed repeat row markup round-trips and refuses a malformed shape', () => {
+	const rowTemplate = {
+		html: '<li><b><!--markless-slot:0--></b></li>',
+		textSlots: [{ path: [0, 0, 0], itemPath: ['title'] }],
+	};
+	const repeat = {
+		id: 'repeat:rows',
+		parentHostNodeId: 'h0',
+		collectionGraphNodeId: 'state:rows',
+		collectionPath: [],
+		keyPath: ['id'],
+		itemName: 'row',
+		rowElementCount: 1,
+		rowTemplate,
+		rowEvents: [],
+	};
+	const view: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		keyedRepeats: [repeat],
+		asyncBoundaries: [],
+	};
+	const state: ProtocolStatePayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		cells: [],
+		computed: [],
+	};
+
+	const decoded = decodePayloadScripts(renderPayloadScripts({ state, view }));
+	expect(decoded.view.keyedRepeats?.[0]?.rowTemplate).toEqual(rowTemplate);
+
+	expect(() =>
+		decodePayloadScripts(
+			renderPayloadScripts({
+				state,
+				view: { ...view, keyedRepeats: [{ ...repeat, rowTemplate: { html: 7 } }] } as never,
+			}),
+		),
+	).toThrow(/keyedRepeat\[0\]\.rowTemplate/);
+
+	// A path is a walk to a node, so a negative or fractional step names nothing.
+	expect(() =>
+		decodePayloadScripts(
+			renderPayloadScripts({
+				state,
+				view: {
+					...view,
+					keyedRepeats: [
+						{
+							...repeat,
+							rowTemplate: { ...rowTemplate, textSlots: [{ path: [-1], itemPath: ['title'] }] },
+						},
+					],
+				} as never,
+			}),
+		),
+	).toThrow(/keyedRepeat\[0\]\.rowTemplate\.textSlots\[0\]/);
+
+	expect(() =>
+		decodePayloadScripts(
+			renderPayloadScripts({
+				state,
+				view: {
+					...view,
+					keyedRepeats: [
+						{
+							...repeat,
+							rowTemplate: { ...rowTemplate, textSlots: [{ path: [0], itemPath: [7] }] },
+						},
+					],
+				} as never,
+			}),
+		),
+	).toThrow(/keyedRepeat\[0\]\.rowTemplate\.textSlots\[0\]/);
+});

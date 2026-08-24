@@ -320,6 +320,33 @@ export type ProtocolViewPayload = {
 		 * stands. A repeat with no `@empty` arm omits the field entirely.
 		 */
 		readonly emptyArm?: { readonly html: string };
+		/**
+		 * One row's compiled markup, for the mint that builds a row the server never
+		 * rendered - an item appended to the collection after resume.
+		 *
+		 * `html` is the row chunk's statics joined, slot markers KEPT: the marker
+		 * comments are where the row's own text lives, so the mint finds each text
+		 * position by walking to it rather than by re-parsing. `textSlots` names
+		 * those positions - `path` is FRAGMENT-relative (`[0]` is the row root),
+		 * `itemPath` is the property path to read off the item - and is omitted
+		 * when the row has none, which is the fully static row.
+		 *
+		 * Carried only for a row the client can finish alone: static markup, or
+		 * markup whose every slot is text read off the repeated item. A row holding
+		 * anything else - a value from outside the row, an attribute, a nested
+		 * construct, a component - needs wiring the mint cannot do, so it ships
+		 * nothing and the served behaviour stands.
+		 *
+		 * Pay-per-use: a repeat whose row is not mintable emits no field at all, so
+		 * its record is byte-identical to what it was before this existed.
+		 */
+		readonly rowTemplate?: {
+			readonly html: string;
+			readonly textSlots?: ReadonlyArray<{
+				readonly path: ReadonlyArray<number>;
+				readonly itemPath: ReadonlyArray<string>;
+			}>;
+		};
 		readonly rowElementHandles?: ReadonlyArray<{
 			readonly hostPath: ReadonlyArray<number>;
 			readonly handleId: string;
