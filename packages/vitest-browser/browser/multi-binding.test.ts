@@ -169,21 +169,16 @@ test('CSR: stopImmediatePropagation ends the rest of the same element handler li
 	await expectStopImmediateToEndTheList(screen.container as HTMLElement);
 });
 
-// Pinned: defect 88. Re-measured on this tree, and the earlier reading was
-// wrong in a way that matters. The stop IS honoured here - the resume walk runs
-// handler one, runs handler two, sees stoppedImmediate and never reaches handler
-// three - and handler two's write DOES reach the graph: `graph.read(...)` holds
-// 'first|second' at the end of the dispatch. What is missing is the DOM update
-// for that second write: the dispatch's own `flushRuntimeGraph()` applies only
-// 'first', and nothing flushes again, so `data-trail` stays 'first' forever.
-// A single extra `graph.flush()` in the same dispatch makes this test pass, which
-// places the fault in the flush scheduler, not in the event walk: in
-// packages/runtime/src/graph.ts `scheduleFlush` sets `flushScheduled = true` and
-// only `runFlush` clears it, while `flush()` short-circuits on an in-flight
-// `activeFlush` without running - so a write landing during an active flush
-// strands its dirty paths and wedges every later `scheduleFlush` as a no-op.
-// That file is outside the unit that measured this, so the pin stays.
-test.fails('SSR resume: stopImmediatePropagation ends the list after resume too', async () => {
+// Was defect 88, and it was never about the stop or about resume. The event walk
+// was always right; the runtime flush scheduler had a lost wakeup. Handler two's
+// write landed while handler one's flush was still active - past its drain loop,
+// not yet settled - so it armed `flushScheduled`, then found `flush()`
+// short-circuiting on `activeFlush`. Only `runFlush` cleared that flag, so it
+// outlived the pass, every later `scheduleFlush` no-opped, and the second write
+// sat in the graph ('first|second' on read) while `data-trail` stayed 'first'.
+// Fixed in packages/runtime/src/graph.ts by clearing `flushScheduled` alongside
+// `activeFlush`, which lets the re-arm that was already there wake.
+test('SSR resume: stopImmediatePropagation ends the list after resume too', async () => {
 	const screen = await renderSSR(EventsPage);
 	await expectStopImmediateToEndTheList(screen.container);
 });

@@ -387,6 +387,12 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			await notifyJournalListeners();
 		} finally {
 			activeFlush = undefined;
+			// A write landing while this pass is active arms flushScheduled, then
+			// finds flush() short-circuit on activeFlush, so the flag outlives the
+			// pass that would clear it and every later scheduleFlush no-ops. Clearing
+			// it here keeps it truthful, so the re-arm below can wake: any write that
+			// reached the graph is applied by a flush nobody had to call explicitly.
+			flushScheduled = false;
 
 			if (dirtyPaths.length > 0) {
 				scheduleFlush();
