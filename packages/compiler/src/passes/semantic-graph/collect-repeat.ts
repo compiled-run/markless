@@ -1,11 +1,13 @@
 import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
-import { expressionSource } from '../../ast/source.ts';
+import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
 	graphBindingMap,
 	resolveGraphPath,
 	semanticAliasMap,
 	splitStaticGraphPath,
 } from '../../artifact-helpers/graph-paths.ts';
+import type { SemanticGraphDiagnostic } from '../../artifacts.ts';
+import { findSharedInstance, resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
 	repeatCollectionUnreadableDiagnostic,
 	repeatKeyIsIndexDiagnostic,
@@ -77,11 +79,42 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 		);
 	}
 
-	const resolvedCollection = resolveGraphPath(
-		collectionSource,
-		graphBindingMap(state.graph, state.currentSharedDefinitionId ?? null),
-		semanticAliasMap(state.graph, state.currentSharedDefinitionId ?? null),
-	);
+	// A component's shared-instance local (`const box = someFamily()`) is a
+	// `sharedInstances` row, not a graph binding, and the cell it names carries a
+	// sharedDefinitionId that graph-scope filtering drops. Without this second arm
+	// the repeat kept `box.items` as an authored expression and the SSR module
+	// re-emitted it into a scope with no `box` at all - a first-render
+	// ReferenceError with nothing said at build time. Attribute reads already
+	// resolve through the same fallback in collect-markup.
+	const resolvedCollection =
+		resolveGraphPath(
+			collectionSource,
+			graphBindingMap(state.graph, state.currentSharedDefinitionId ?? null),
+			semanticAliasMap(state.graph, state.currentSharedDefinitionId ?? null),
+		) ??
+		// An enclosing @for's row item owns the name whatever a module-wide
+		// instance is called, so the row binding must not reach past itself.
+		(repeatRowBindsName(collectionSource, state)
+			? null
+			: resolveSharedInstanceGraphPath(
+					collectionSource,
+					state.graph,
+					// Defect 46: a null component name matches every instance in the
+					// module and the last declaration wins.
+					state.currentComponentName,
+				));
+
+	if (!resolvedCollection && unresolvedSharedInstanceRoot(collectionSource, state)) {
+		state.graph.diagnostics.push(
+			sharedInstanceRepeatUnresolvedDiagnostic({
+				node,
+				itemName,
+				collectionSource,
+				filename: state.filename,
+			}),
+		);
+		return null;
+	}
 
 	const repeatIndex = state.graph.keyedRepeats.length;
 	state.graph.keyedRepeats.push({
@@ -123,6 +156,56 @@ export function attachKeyedRepeatRowHost(
 	state.graph.keyedRepeats[repeatIndex] = {
 		...repeat,
 		rowHostNodeId,
+	};
+}
+
+/**
+ * True when the collection is rooted in a name this component holds a shared
+ * instance under, yet neither resolver could answer for it. The instance local
+ * exists only inside the component function, so the authored expression names
+ * nothing wherever the repeat is emitted; recording it would ship a build that
+ * throws on its first server render.
+ *
+ * The known shape that lands here is a factory returning its state binding bare
+ * (`return box`) instead of a spread object (`return { ...box }`): the bare
+ * return registers no returned properties, so `box.items` reaches no graph node.
+ */
+function unresolvedSharedInstanceRoot(collectionSource: string, state: WalkState): boolean {
+	if (repeatRowBindsName(collectionSource, state)) return false;
+
+	const [rootName, propertyName] = splitStaticGraphPath(collectionSource);
+	if (!rootName || !propertyName) return false;
+
+	return findSharedInstance(rootName, state.graph, state.currentComponentName) !== null;
+}
+
+// Same code as the unreadable-collection refusal: both say this @for has no
+// source of rows it could evaluate. The text is specific to the shared-instance
+// receiver so the fix is the one the author actually needs.
+function sharedInstanceRepeatUnresolvedDiagnostic(input: {
+	readonly node: AnyNode;
+	readonly itemName: string;
+	readonly collectionSource: string;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	const [rootName] = splitStaticGraphPath(input.collectionSource);
+
+	return {
+		code: 'MARKLESS_REPEAT_COLLECTION_UNREADABLE',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'This @for collection reaches no cell on its shared instance',
+		message: `@for (const ${input.itemName} of ${input.collectionSource}) reads through \`${rootName}\`, a shared instance local of this component, but \`${input.collectionSource}\` resolves to no graph cell. \`${rootName}\` exists only inside the component function, so the rows would be taken from an expression that names nothing where the repeat renders.`,
+		why: 'Rows come from a reactive graph read; a shared-instance path that resolves to no cell leaves the repeat with an authored expression whose receiver is undeclared in the emitted scope, which throws on the first server render.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [
+			{
+				message: `Return the cell as a property of a spread object from the shared factory, so \`${input.collectionSource}\` names a graph cell. Before: \`shared(() => { const box = state({ items: [] }); return box; })\`; after: \`shared(() => { const box = state({ items: [] }); return { ...box }; })\`.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_COLLECTION_UNREADABLE',
 	};
 }
 
