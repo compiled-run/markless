@@ -632,6 +632,10 @@ function collectCssMappings(ast: unknown, source: string): TsrxCodeMapping[] {
 	const mappings: TsrxCodeMapping[] = [];
 	walkNode(ast, (node) => {
 		if (node.type !== 'JSXStyleElement' || typeof node.css !== 'string') return;
+		// A body that starts with `{` is an interpolation container, not CSS text -
+		// no valid stylesheet opens with a bare block, and handing the expression
+		// to the CSS service reports "at-rule or selector expected" on real code.
+		if (node.css.trimStart().startsWith('{')) return;
 		const span = sourceSpan(node);
 		const cssStart = source.indexOf(node.css, span?.start ?? 0);
 		const sourceOffset = cssStart === -1 ? (span?.start ?? 0) : cssStart;
