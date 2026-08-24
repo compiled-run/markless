@@ -53,6 +53,12 @@ If you have no receipt, say which sites you checked instead of saying "all". A q
 always acceptable; an unpriced "all" is not.
 <!-- guessless-integration:end -->
 
+## Code comments
+
+Comments are a last resort: write one only for value a maintainer could not easily get from the code itself (a constraint the code cannot show, a measured landmine, a non-obvious why). Everything else is noise — delete it on sight when you touch a file.
+
+Never write, and always remove when seen: comments naming task/unit/defect numbers or internal process shorthand (U123, T045, "defect 84", packet/receipt language) — that history lives in the goal board and git, not in source; comments narrating what the next line does; comments justifying a change to a reviewer; restated ruling text. A pin comment in a test may cite the mechanism it pins, in plain words, without process numbers.
+
 
 
 <!-- Source: .ruler/claude.md -->
