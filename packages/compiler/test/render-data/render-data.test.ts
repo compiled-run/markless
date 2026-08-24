@@ -351,6 +351,38 @@ export function App() @{
 	]);
 });
 
+test('renderData keeps one row eventControl per handler entry for a row handler array', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/RowArrayHandler.tsrx',
+		source: `
+import { state } from '@markless/core';
+export function App() @{
+	let trace = state('');
+	let rows = state([{ id: 'alpha' }, { id: 'bravo' }]);
+	<main>
+		<p>{trace}</p>
+		<ul>@for (const row of rows; key row.id) { <li onClick={[() => (trace = trace + 'A'), () => (trace = trace + 'B')]}>{row.id}</li> }</ul>
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	// The semantic graph keeps a record per authored entry, and each entry already
+	// fans out to the whole host+event handler list, so an undeduped repeat record
+	// carries entries-squared controls (four here) instead of one per entry.
+	expect(result.semanticGraph.events).toHaveLength(2);
+	const eventControls = result.renderData.repeats[0]?.eventControls ?? [];
+	expect(eventControls.map((control) => control.symbolId)).toHaveLength(2);
+	expect(new Set(eventControls.map((control) => control.symbolId)).size).toBe(2);
+	expect(eventControls.map((control) => control.eventName)).toEqual(['click', 'click']);
+	// Authored order, and every entry's own source - the whole ordered list survives.
+	expect(eventControls.map((control) => control.handlerSource)).toEqual([
+		"() => (trace = trace + 'A')",
+		"() => (trace = trace + 'B')",
+	]);
+});
+
 test('renderData keeps one interaction per distinct host+event pair', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/TwoEvents.tsrx',

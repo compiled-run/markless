@@ -268,9 +268,16 @@ function repeatRecord(
 	const rowHostPaths = new Map(
 		(rowChunk?.hosts ?? []).map((host) => [host.hostNodeId, relativePath(host.coordinate.path)]),
 	);
+	// Same shape as `interactions` above: an event ARRAY pushes one semantic record
+	// per entry and each entry already fans out to the whole host+event handler
+	// list, so keeping them all squares a row's controls (two entries, four records).
+	const seenRowEventKeys = new Set<string>();
 	const eventControls = semanticGraph.events.flatMap((event) => {
 		const hostPath = rowHostPaths.get(event.hostNodeId);
 		if (!hostPath) return [];
+		const key = `${event.hostNodeId}:${event.eventName}`;
+		if (seenRowEventKeys.has(key)) return [];
+		seenRowEventKeys.add(key);
 		return symbolResolver.symbols.flatMap((symbol) =>
 			symbol.kind === 'event-handler' &&
 			symbol.hostNodeId === event.hostNodeId &&
