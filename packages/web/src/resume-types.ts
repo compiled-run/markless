@@ -198,7 +198,10 @@ export type ResumeViewRecord = Pick<
 	readonly asyncBoundaries: ReadonlyArray<ResumeAsyncBoundaryPayload>;
 };
 export type ResumeSymbolContext = {
-	readonly graph: RuntimeGraph;
+	// A CSR container activates authored behaviors BEFORE it demand-loads the
+	// runtime graph, so an activation-seam context genuinely carries none.
+	// Dispatch paths narrow this back to a required graph locally.
+	readonly graph?: RuntimeGraph;
 	readonly read?: RuntimeGraph['read'];
 	readonly key?: unknown;
 	readonly signal?: AbortSignal;

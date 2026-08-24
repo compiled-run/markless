@@ -232,7 +232,6 @@ async function activateAuthoredBehaviors(
 		if (!element) throw new Error(`MARKLESS_CSR_BEHAVIOR_HOST_MISSING: ${behavior.hostNodeId}`);
 		const symbol = await loadSymbol(behavior.symbolId);
 		const result = await symbol({
-			graph: undefined as unknown as RuntimeGraph,
 			element,
 			getElementHandle: () => undefined,
 			behaviorInputs: behavior.inputValues ?? [],

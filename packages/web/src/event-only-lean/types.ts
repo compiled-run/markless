@@ -61,7 +61,9 @@ export type EventOnlyResumeDomUpdateRecord = ProtocolViewPayload['domUpdates'][n
 export type EventOnlyResumeBehaviorRecord = ProtocolViewPayload['behaviors'][number];
 
 export type EventOnlyResumeSymbolContext = {
-	readonly graph: EventOnlyResumeGraph;
+	// The contract is full resume's, whose activation seam genuinely carries no
+	// graph; lean's own producers always supply one.
+	readonly graph?: EventOnlyResumeGraph;
 	readonly event?: EventOnlyResumeDomEvent;
 	readonly element: EventOnlyResumeDomElement;
 	// Lean resume owns no handles; the contract is full resume's, which an
