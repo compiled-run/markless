@@ -1,0 +1,231 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`every virtual module a TypeScript-free source emits stays byte-identical > virtual modules for a source that carries no TypeScript 1`] = `
+"--- render-data ---
+const TONES = { calm: 'Calm', loud: 'Loud' };
+export const marklessRenderData = {"passId":"render-data","filename":"/workspace/app/src/untypedTone.tsrx","root":{"componentName":"UntypedTonePage","templateId":"template:UntypedTonePage"},"chunks":[{"id":"template:UntypedTonePage","kind":"template","componentName":"UntypedTonePage","statics":["<main","><!--markless-slot:1-->","</main>"],"hosts":[{"hostNodeId":"h0","tagName":"main","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"attribute","name":"data-label","coordinate":{"kind":"child-index","path":[0]},"residue":{"kind":"authored-expression","source":"TONES[view.tone]"},"staticIndex":0},{"kind":"text","residue":{"kind":"graph-read","graphNodeId":"state:view","path":["tone"]},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":1}]}],"hosts":[{"id":"h0","tagName":"main","hostNodeId":"h0"}],"initialValues":[{"graphNodeId":"state:view","value":{"kind":"constant","value":{"tone":"calm"}}}],"branches":[],"repeats":[],"boundaries":[],"interactions":[]};
+const marklessPrerenderComponents = {"UntypedTonePage":{...{"name":"UntypedTonePage","state":{"version":1,"cells":[{"graphNodeId":"state:view","name":"view","valueKind":"object","value":{"version":1,"root":{"$ref":0},"records":[{"id":0,"type":"object","fields":[["tone","calm"]]}]}}],"computed":[],"sharedDefinitions":[]},"view":{"version":1,"locators":[{"hostNodeId":"h0","strategy":"dom-order","index":0,"tagName":"main"}],"events":[],"domUpdates":[{"hostNodeId":"h0","source":"view.tone","graphNodeId":"state:view","path":["tone"],"target":{"kind":"text"},"symbolId":"symbol:0"}],"behaviors":[],"elementHandles":[],"keyedRepeats":[],"branches":[],"asyncBoundaries":[]},"rootChunkId":"template:UntypedTonePage","chunks":[{"id":"template:UntypedTonePage","kind":"template","componentName":"UntypedTonePage","hosts":[{"hostNodeId":"h0","tagName":"main","coordinate":{"kind":"child-index","path":[0]}}],"slots":[{"kind":"attribute","name":"data-label","coordinate":{"kind":"child-index","path":[0]},"residue":{"kind":"authored-expression","source":"TONES[view.tone]"},"staticIndex":0},{"kind":"text","residue":{"kind":"graph-read","graphNodeId":"state:view","path":["tone"]},"coordinate":{"kind":"comment-anchor","path":[0,0]},"staticIndex":1}],"nativeTemplateId":"markless-render-data:%2Fworkspace%2Fapp%2Fsrc%2FuntypedTone.tsrx:UntypedTonePage:template:template%3AUntypedTonePage"}],"hostNodeIds":["h0"],"branchIds":[],"boundaryIds":[],"repeatIds":[],"initialValues":[{"graphNodeId":"state:view","value":{"kind":"constant","value":{"tone":"calm"}}}],"initialValueKinds":{},"stateGraphNodeIds":["state:view"],"branches":[],"repeats":[],"boundaries":[],"edges":[],"propCellId":null,"ownsModuleData":true},readResidue:(residue,marklessResidueContext)=>{const view=marklessResidueContext.read("state:view");switch(residue.source){case "TONES[view.tone]":return (TONES[view.tone]);default:throw new Error('MARKLESS_PRERENDER_RESIDUE_MISSING: '+residue.source);}}}};
+export const marklessPrerenderData = {
+	rootComponentName: "UntypedTonePage",
+	renderData: marklessRenderData,
+	components: marklessPrerenderComponents,
+	imports: {},
+};
+--- payload ---
+export const state = {
+	"version": 1,
+	"cells": [
+		{
+			"graphNodeId": "state:view",
+			"name": "view",
+			"valueKind": "object",
+			"value": {
+				"version": 1,
+				"root": {
+					"$ref": 0
+				},
+				"records": [
+					{
+						"id": 0,
+						"type": "object",
+						"fields": [
+							[
+								"tone",
+								"calm"
+							]
+						]
+					}
+				]
+			}
+		}
+	],
+	"computed": [],
+	"sharedDefinitions": []
+};
+export const runtimeDemandMap = {
+	"passId": "runtime-demand-map",
+	"version": 1,
+	"recordKinds": [
+		{
+			"kind": "async-boundary",
+			"replaced": false
+		},
+		{
+			"kind": "behavior",
+			"replaced": false
+		},
+		{
+			"kind": "branch",
+			"replaced": false
+		},
+		{
+			"kind": "dom-update",
+			"replaced": false
+		},
+		{
+			"kind": "element-handle",
+			"replaced": false
+		},
+		{
+			"kind": "event",
+			"replaced": false
+		},
+		{
+			"kind": "external-delegate",
+			"replaced": false
+		},
+		{
+			"kind": "keyed-repeat",
+			"replaced": false
+		},
+		{
+			"kind": "overlay",
+			"replaced": false
+		}
+	],
+	"symbols": [
+		{
+			"symbolId": "symbol:0",
+			"kind": "dom-update",
+			"runtimeModuleIds": [
+				"web/fns/update-text"
+			]
+		}
+	],
+	"payloadRecords": [
+		{
+			"recordId": "dom-update:h0:symbol:0",
+			"kind": "dom-update",
+			"hostNodeId": "h0",
+			"symbolIds": [
+				"symbol:0"
+			],
+			"runtimeModuleIds": [
+				"web/fns/update-text"
+			]
+		}
+	],
+	"actions": [],
+	"unknownRecordModuleIds": [
+		"core/web/resume-storage-free",
+		"web/dom-journal",
+		"web/dom-update",
+		"web/inline/sync-policy-core",
+		"web/payload-full-storage-free",
+		"web/payload-graph-construct",
+		"web/payload-resume",
+		"web/repeat-runtime",
+		"web/resume-async-boundaries",
+		"web/resume-async-wiring",
+		"web/resume-behaviors",
+		"web/resume-branches",
+		"web/resume-events",
+		"web/resume-keyed-repeats",
+		"web/resume-locators",
+		"web/resume-runtime",
+		"web/resume-runtime-shared",
+		"web/resume-runtime-start",
+		"web/runtime-error-reporting"
+	]
+};
+export const view = {
+	"version": 1,
+	"locators": [
+		{
+			"hostNodeId": "h0",
+			"strategy": "dom-order",
+			"index": 0,
+			"tagName": "main"
+		}
+	],
+	"events": [],
+	"domUpdates": [
+		{
+			"hostNodeId": "h0",
+			"source": "view.tone",
+			"graphNodeId": "state:view",
+			"path": [
+				"tone"
+			],
+			"target": {
+				"kind": "text"
+			},
+			"symbolId": "symbol:0"
+		}
+	],
+	"behaviors": [],
+	"elementHandles": [],
+	"keyedRepeats": [],
+	"branches": [],
+	"asyncBoundaries": []
+};
+
+--- resolver ---
+export async function loadSymbol(id) {
+	if (id === "symbol:0") return import(/* @vite-ignore */ "virtual:markless:symbol:%2Fworkspace%2Fapp%2Fsrc%2FuntypedTone.tsrx:symbol%3A0")
+		.then((mod) => { mod.init__virtual_markless_symbol?.(); return mod.symbol_0_740gat; });
+	throw new Error(\`Unknown async symbol \${id}\`);
+}
+
+--- resume ---
+import { runtimeDemandMap as payloadRuntimeDemandMap } from 'virtual:markless:payload:%2Fworkspace%2Fapp%2Fsrc%2FuntypedTone.tsrx';
+
+
+
+globalThis.__mxLoadLog ||= () => import("virtual:markless:dev-log");
+
+function loadSymbol(symbolId) {
+	if (symbolId === "symbol:0") return import('virtual:markless:symbol:%2Fworkspace%2Fapp%2Fsrc%2FuntypedTone.tsrx:symbol%3A0')
+		.then((mod) => readMarklessSourceSymbol(mod, "symbol_0_740gat"));
+	return Promise.reject(new Error(\`Unknown async symbol \${symbolId}\`));
+}
+function readMarklessSourceSymbol(mod, exportName) {
+	mod.init__virtual_markless_symbol?.();
+	return mod[exportName];
+}
+
+
+
+
+async function marklessFullResumeHandoff(handoff) {
+	handoff.root.__asyncResumeRuntimeStarted = true;
+	const { resumeFromPayloadDocument } = await import('@markless/core/web/resume-storage-free');
+	const { runtime } = await resumeFromPayloadDocument({
+		document: handoff.document,
+		root: handoff.root,
+		loadSymbol: loadSymbol,
+	});
+	await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });
+}
+async function marklessResumeContainerEvent(input) {
+	await marklessFullResumeHandoff({ ...input, document: input.root });
+}
+export function resumeContainerEvent(input) {
+	const root = input.root;
+	if (!root.__marklessDispatch) {
+		let handler = marklessResumeContainerEvent, tail = Promise.resolve(), lastEvent = null, lastEventTime = undefined;
+		root.__marklessRegisterDispatch = next => {
+			const fallback = handler;
+			handler = input => next(input, fallback);
+		};
+		root.__marklessDispatch = next => {
+			const event = next.event, eventTime = event?.timeStamp;
+			if (event === lastEvent && eventTime === lastEventTime) return tail;
+			lastEvent = event;
+			lastEventTime = eventTime;
+			const run = () => handler(next);
+			return tail = tail.then(run, run);
+		};
+	}
+	return root.__marklessDispatch(input);
+}
+
+--- symbol ---
+globalThis.__mxLog?.add("symbol:symbol:0");
+import { marklessUpdateText } from "@markless/web/fns/update-text";
+/* text update leaf marker: type: "setText" */
+export function symbol_0_740gat(context) {
+	return marklessUpdateText(context, "h0");
+}
+"
+`;
