@@ -24,8 +24,7 @@ import { UnavailableOptions } from './scenarios/unavailable-options.tsrx';
 const sr = virtualDriver;
 
 // One scenario per test: the field ids are minted per container, so two scenarios
-// alive in one document give two inputs the same id and every `.
-<label for>` after
+// alive in one document give two inputs the same id and every `<label for>` after
 // the first resolves to the wrong field.
 async function open(component: Parameters<typeof render>[0]) {
 	const { container } = await render(component);
@@ -132,8 +131,7 @@ test.fails('arrowing to the next option announces that option as checked', async
 	});
 });
 
-// Ours, not aria-at's: the plan has no disabled-option.
- test. An option nobody may
+// Ours, not aria-at's: the plan has no disabled-option test. An option nobody may
 // choose has to say so, and the group it sits in stays usable.
 test('an option nobody may choose conveys that it is disabled', async () => {
 	await open(UnavailableOptions);

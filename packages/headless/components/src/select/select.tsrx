@@ -46,8 +46,7 @@ export const selectState = shared(
 			contentEl,
 			triggerEl,
 			optionEls,
-			// literal.
- function type: a callback slot is only recognised from the written annotation
+			// literal function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
 			onOpenChange: undefined as ((open: boolean) => void) | undefined,
 			choose(next: string) {
@@ -295,10 +294,8 @@ export function SelectItemIndicator({ children, ...rest }: SelectItemIndicatorPr
 	<span {...rest} aria-hidden="true" ui-hidden={isChosen !== true}>{children}</span>
 }
 
-// A `.
-<select>` holding exactly the choice that was made. A single-option
-// `.
-<select>` submits the same name/value pair a rebuilt option list would, and
+// A `<select>` holding exactly the choice that was made. A single-option
+// `<select>` submits the same name/value pair a rebuilt option list would, and
 // the option carries the value as its text because the option element's
 // attribute type does not yet take one.
 export function SelectField({ ...rest }: SelectFieldProps) @{

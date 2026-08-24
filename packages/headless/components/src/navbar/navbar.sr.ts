@@ -17,8 +17,7 @@ import University from './scenarios/university.tsrx';
 // three buttons - so the sequences below are the plan's sequences.
 //
 // aria-at coverage, recorded honestly:
-//   * `listBoundary`, priority 3, wants the `.
-<ul>`/`<li>` this family does not
+//   * `listBoundary`, priority 3, wants the `<ul>`/`<li>` this family does not
 //     render. The QDS reference dropped the list deliberately and the measured
 //     cost is that one weakest-tier assertion; it has no row here because there
 //     is nothing to assert.

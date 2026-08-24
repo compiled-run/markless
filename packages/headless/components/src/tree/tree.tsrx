@@ -30,8 +30,7 @@ export const treeItemState = shared(
 		return {
 			...item,
 			labelEl,
-			// literal.
- function type: a callback slot is only recognised from the written annotation
+			// literal function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((open: boolean) => void) | undefined,
 			toggle() {
 				if (item.leaf) return;

@@ -522,8 +522,7 @@ test('SSR: the selection is in the served HTML, and the first click after resume
 // The trigger takes the first shape and is fine in both modes, so a part
 // reading its own prop is not the whole story either.
 //
-// Deterministic, so.
- test.fails rather than skip: the row turns red the day the
+// Deterministic, so test.fails rather than skip: the row turns red the day the
 // panel refreshes, which is the signal to unpin it.
 test.fails('SSR: clicking a tab moves the panels', async () => {
 	await renderSSR(Basic);

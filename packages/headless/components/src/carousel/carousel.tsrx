@@ -57,8 +57,7 @@ export const carouselState = shared(
 			viewportEl,
 			slideEls,
 			navEls,
-			// literal.
- function type: a callback slot is only recognised from the written annotation
+			// literal function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
 
 			/** Shows a slide: the graph records it, the engine moves to it. */

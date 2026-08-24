@@ -63,8 +63,7 @@ export const comboboxState = shared(
 			contentEl,
 			describedEl,
 			optionEls,
-			// literal.
- function type: a callback slot is only recognised from the written annotation
+			// literal function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string | readonly string[]) => void) | undefined,
 			onInput: undefined as ((value: string) => void) | undefined,
 			onOpenChange: undefined as ((open: boolean) => void) | undefined,
@@ -376,8 +375,7 @@ export function ComboboxContent({
 			const isOwnTrigger = pressed !== undefined && trigger !== undefined && trigger.contains(pressed);
 			if (isInline !== true) combobox.setOpen(false);
 			if (isInline !== true && isOwnTrigger) combobox.pressGraceUntil = Date.now() + PRESS_GRACE;
-			// The primitive moves no focus, so the.
- return is the family's to write.
+			// The primitive moves no focus, so the return is the family's to write.
 			// Escape has to leave the caret in the field a person was typing in.
 			if (isInline !== true && event.detail.reason === 'escape') combobox.inputEl?.focus();
 			onDismiss?.(event);
@@ -502,10 +500,8 @@ export function ComboboxError({ children, ...rest }: ComboboxErrorProps) @{
 	<ComboboxMessage {...rest} role="alert">{children}</ComboboxMessage>
 }
 
-// A `.
-<select>` holding exactly the choice that was made. A single-option
-// `.
-<select>` submits the same name/value pair a rebuilt option list would, and
+// A `<select>` holding exactly the choice that was made. A single-option
+// `<select>` submits the same name/value pair a rebuilt option list would, and
 // the option carries the value as its text because the option element's
 // attribute type does not yet take one. Same shape select ships.
 //

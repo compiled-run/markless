@@ -1,8 +1,7 @@
 import { modal } from '../../index.ts';
 
 // `disabled` is not a prop this family ships. It reaches the underlying
-// `.
-<button>` through `{...rest}`, which is the whole point of spreading: the
+// `<button>` through `{...rest}`, which is the whole point of spreading: the
 // consumer already holds the default element's native surface.
 export default function Disabled() @{
 	<section>

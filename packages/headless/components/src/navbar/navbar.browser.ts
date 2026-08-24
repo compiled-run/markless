@@ -259,8 +259,6 @@ for (const mode of MODES) {
 	});
 }
 
-// --- the consumer's callback ----------------------------------------------
-
 test('CSR: a click calls onChange once with the entry now showing', async () => {
 	await render(WithOnChange);
 	// Nothing fired on mount or first render.
@@ -290,8 +288,6 @@ test('CSR: switching entries calls onChange once with the new one', async () => 
 	await expect.poll(() => el(Calls).textContent).toBe('2');
 });
 
-// --- gestures --------------------------------------------------------------
-
 test('CSR: focus leaving the landmark closes what was showing', async () => {
 	await render(SiteHeader);
 	el(ProductsTrigger).focus();
@@ -316,8 +312,6 @@ test('CSR: a dropdown in one navbar is untouched by the other', async () => {
 	expect(el(PrimaryProductsContent).hasAttribute('hidden')).toBe(false);
 	expect(el(FooterLegalContent).hasAttribute('hidden')).toBe(false);
 });
-
-// --- keyboard --------------------------------------------------------------
 
 test('CSR: the right and left arrows walk the top-level controls and wrap', async () => {
 	await render(Basic);
@@ -415,8 +409,6 @@ test('CSR: escape on the trigger of an open dropdown closes it', async () => {
 	await expect.poll(() => document.activeElement).toBe(el(ProductsTrigger));
 });
 
-// --- dismissal, through the overlay primitive -------------------------------
-//
 // The panel carries the bare `overlay` attribute, so Escape and an outside press
 // arrive as a `dismiss` report on the panel and the family's `onDismiss` decides
 // what they mean. The primitive closes nothing and moves no focus, which is what
@@ -504,8 +496,7 @@ test('CSR: with two entries on the page a dismissal reaches the one that is show
 	expect(el(ProductsContent).hasAttribute('hidden')).toBe(true);
 });
 
-// A native.
- <button> already activates on both, so these two rows prove the
+// A native <button> already activates on both, so these two rows prove the
 // family does not get in the way rather than that it implements anything.
 test('CSR: enter on a focused trigger opens its dropdown', async () => {
 	await render(Basic);
@@ -531,8 +522,6 @@ test('CSR: the arrows in one navbar never reach the other navbar', async () => {
 	await expect.poll(() => document.activeElement).toBe(el(PrimaryProductsTrigger));
 	expect(el(FooterRoot).contains(document.activeElement)).toBe(false);
 });
-
-// --- resume ----------------------------------------------------------------
 
 test('SSR: the served landmark is closed, and the panels are present but hidden', async () => {
 	await renderSSR(Basic);
@@ -589,8 +578,6 @@ test('SSR: escape after resume closes the dropdown and returns focus', async () 
 	await expect.poll(() => document.activeElement).toBe(el(ProductsTrigger));
 });
 
-// --- hover -----------------------------------------------------------------
-//
 // These rows run LAST, and the order is load-bearing rather than tidy. The
 // pointer in a real browser stays where the previous test left it, so a row that
 // hovers leaves the cursor parked over the next test's freshly rendered navbar

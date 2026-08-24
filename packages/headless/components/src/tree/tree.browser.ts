@@ -318,8 +318,7 @@ for (const mode of MODES) {
 	// follows the node perfectly from the first gesture onward, which the
 	// second-level row further down witnesses directly. `tree.root` -> `tree.item`
 	// is a widget root inside a widget root, which is what separates this from
-	// collapsible's `open` prop on a top-level root. Deterministic, so.
- test.fails.
+	// collapsible's `open` prop on a top-level root. Deterministic, so test.fails.
 	test.fails(`${mode}: branches written open render open`, async () => {
 		if (mode === 'CSR') await render(Preopened);
 		else await renderSSR(Preopened);
@@ -715,8 +714,7 @@ for (const mode of MODES) {
 // wiring is right; what does not land is the seed's first read from a part whose
 // own node was itself produced inside another node's content.
 //
-// Deterministic, so.
- test.fails rather than skip. The rest of the family works
+// Deterministic, so test.fails rather than skip. The rest of the family works
 // around it by not depending on a second-level node being served open, and the
 // keyboard rows use a first-level open branch.
 test.fails('CSR: a node written open inside a node written open serves its group showing', async () => {

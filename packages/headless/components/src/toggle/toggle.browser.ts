@@ -86,8 +86,7 @@ async function expectClickFlips() {
 	expect(el(DigestTrigger).getAttribute('aria-checked')).toBe('true');
 }
 
-// `.
-<toggle.root checked>` seeds this switch on, and the server carries that seed in
+// `<toggle.root checked>` seeds this switch on, and the server carries that seed in
 // the payload, so a resumed instance holds `true` and the first click reaches false.
 async function expectCheckedFlipsOff() {
 	el(DigestTrigger).click();

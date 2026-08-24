@@ -140,10 +140,8 @@ test('a vertical tab list conveys its showing tab and its locked tab', async () 
 // that shows it. `tabs.content` wires no such reference, so a reader reaches an
 // unnamed region and reads its text with no idea which tab it belongs to.
 //
-// Still red after the 2026-08-22 attempt, and now for a measured reason rather
-// than an assumed one. The showing-pair shape - the selected trigger putting its
-// text in a `.
-<span el={tabs.showingTabEl}>` inside an `@if`, every panel naming
+// The showing-pair shape - the selected trigger putting its
+// text in a `<span el={tabs.showingTabEl}>` inside an `@if`, every panel naming
 // that one handle - is `MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED`, because the arm
 // holds an attribute binding and `selected` flips. Binding the handle on the
 // button unconditionally compiles and is worse: one widget mints one id, so every

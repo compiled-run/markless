@@ -68,8 +68,7 @@ export function CollapsibleRoot({
 export function CollapsibleTrigger({ children, onClick, ...rest }: CollapsibleTriggerProps) @{
 	const collapsible = collapsibleState();
 
-	// A native.
- <button> already activates on Enter and on Space, so no key rule here.
+	// A native <button> already activates on Enter and on Space, so no key rule here.
 	<button
 		{...rest}
 		el={collapsible.triggerEl}

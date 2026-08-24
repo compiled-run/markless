@@ -22,8 +22,7 @@ const sr = virtualDriver;
 const Input = page.getByTestId('input');
 
 // One scenario per test: the input id is minted per container, so two scenarios
-// alive in one document give two inputs the same id and every `.
-<label for>` after
+// alive in one document give two inputs the same id and every `<label for>` after
 // the first resolves to the wrong field.
 async function open(component: Parameters<typeof render>[0]) {
 	const { container } = await render(component);
@@ -96,8 +95,7 @@ test('a field with only help text under it is never conveyed as invalid', async 
 });
 
 // The help text is part of the field, not a separate item further down the page:
-// `.
-<textbox.description>` binds the handle the control names through
+// `<textbox.description>` binds the handle the control names through
 // `aria-describedby`, so the reader speaks it with the field.
 test('the help text under a field is conveyed with the field itself', async () => {
 	await open(WithHelp);
@@ -107,8 +105,7 @@ test('the help text under a field is conveyed with the field itself', async () =
 	).toEqual([]);
 });
 
-// Mounting `.
-<textbox.error>` marks the control invalid and its text becomes the
+// Mounting `<textbox.error>` marks the control invalid and its text becomes the
 // control's description, so a person is told both that the field is invalid and why.
 test('the reason a field is invalid is conveyed with the field', async () => {
 	await open(Invalid);

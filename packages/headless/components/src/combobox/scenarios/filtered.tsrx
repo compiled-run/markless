@@ -10,8 +10,7 @@ import { combobox } from '../../index.ts';
 // declares it, so a consumer reading one is a part of that widget.
 function Options() @{
 	const c = combobox.state();
-	// The list is written INSIDE the computed. A module-level.
- const read from one
+	// The list is written INSIDE the computed. A module-level const read from one
 	// is not carried into the lowered symbol - `ReferenceError: FRUITS is not
 	// defined` at the first refresh - so the data lives where it is read.
 	const matches = computed(() =>

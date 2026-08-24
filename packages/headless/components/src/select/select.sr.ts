@@ -85,8 +85,7 @@ function expectConveys(phrase: string, facts: readonly string[]) {
 }
 
 // Move the reading cursor forward until an announcement conveys everything asked
-// for, and.
- return it. Throws with the transcript so far when it does not, because
+// for, and return it. Throws with the transcript so far when it does not, because
 // a walk that never arrives is the same defect as a wrong phrase.
 async function readFor(facts: readonly string[], limit = 40): Promise<string> {
 	const seen: string[] = [];
@@ -231,8 +230,7 @@ test('Escape leaves the select conveying collapsed', async () => {
 	await expectAnnouncesAfterChange([say.combobox, say.collapsed]);
 });
 
-// Ours, not aria-at's: the plan has no disabled-option.
- test. An option nobody
+// Ours, not aria-at's: the plan has no disabled-option test. An option nobody
 // may choose has to say so, and the select it sits in stays usable.
 test('an option nobody may choose conveys that it is disabled', async () => {
 	await open(UnavailableOptions);
@@ -250,13 +248,11 @@ test('a select nobody may touch conveys disabled on the combobox', async () => {
 	]);
 });
 
-// Ours, not aria-at's: the hidden native control. A bare `.
-<select>` carries the
+// Ours, not aria-at's: the hidden native control. A bare `<select>` carries the
 // combobox role natively, so a form-participating select that failed to hide it
 // would put the same choice in the tree twice. `aria-hidden` plus `tabindex="-1"`
 // is what makes the correct expected result silence, and this row proves it by
-// counting: one combobox is announced on a page that holds two `.
-<select>`-shaped
+// counting: one combobox is announced on a page that holds two `<select>`-shaped
 // controls.
 test('the hidden native control is never announced beside the real combobox', async () => {
 	await open(SignupForm);

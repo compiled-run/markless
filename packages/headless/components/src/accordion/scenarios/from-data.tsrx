@@ -1,10 +1,8 @@
 import { computed } from '@markless/core';
 import { accordion } from '../../index.ts';
 
-// The data lives inside the `computed()` because a module-level.
- const read from
-// one is not carried into the lowered symbol. The `.
-<div>` around the loop is
+// The data lives inside the `computed()` because a module-level const read from
+// one is not carried into the lowered symbol. The `<div>` around the loop is
 // forced: a construct cannot open directly inside a component tag.
 export default function FromData() @{
 	const sections = computed(() => [

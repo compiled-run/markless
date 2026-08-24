@@ -152,8 +152,7 @@ test('a locked pagination conveys every control as unavailable, links included',
 // pagination, and a spread does not overwrite an attribute written before it, so both
 // landmarks announce "navigation, Pagination". A person listing the landmarks gets
 // two identical entries — the exact failure the default label exists to prevent.
-// Whoever makes a consumer's `aria-label` reach the `.
-<nav>` deletes the `.fails`.
+// Whoever makes a consumer's `aria-label` reach the `<nav>` deletes the `.fails`.
 test.fails('a consumer replaces the landmark name so two paginations differ', async () => {
 	await open(TwoWidgets);
 	expect(missingFacts(sr, await readUntil(sr, { role: 'navigation' }), {

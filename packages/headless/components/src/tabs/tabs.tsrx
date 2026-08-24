@@ -20,8 +20,7 @@ export const tabsState = shared(
 
 		return {
 			...tabs,
-			// literal.
- function type: a callback slot is only recognised from the written annotation
+			// literal function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
 			show(next: string) {
 				if (tabs.value === next) return;

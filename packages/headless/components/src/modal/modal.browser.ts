@@ -570,8 +570,7 @@ test('CSR: a display-contents wrapper breaks neither the opening focus nor the t
 
 	el(WrapTrigger).click();
 	await expect.poll(() => el(WrapBackdrop).hasAttribute('hidden')).toBe(false);
-	// A consumer's `.
-<form style="display: contents">` between the layer and the
+	// A consumer's `<form style="display: contents">` between the layer and the
 	// surface changes the box tree but must not change where focus lands.
 	await expect.poll(() => el(WrapContent).contains(document.activeElement)).toBe(true);
 

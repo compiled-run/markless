@@ -31,8 +31,7 @@ export const radiogroupState = shared(
 
 		return {
 			...group,
-			// literal.
- function type: a callback slot is only recognised from the written annotation
+			// literal function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
 			// One way only: nothing a person does returns a group to nothing chosen.
 			choose(next: string) {

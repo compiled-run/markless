@@ -16,8 +16,7 @@ import WithoutShift from './scenarios/without-shift.tsrx';
 
 // Colocated browser suite for the otp family. Each test renders a realistic
 // consumer scenario, and the locators name the part anatomy: root, field, item,
-// itemindicator. The family paints slots over ONE real.
- <input>, so most of these
+// itemindicator. The family paints slots over ONE real <input>, so most of these
 // rows are assertions about that input and about the paint following it.
 const Root = page.getByTestId('root');
 const Field = page.getByTestId('field');
@@ -297,8 +296,6 @@ for (const mode of MODES) {
 	});
 }
 
-// --- typing ---------------------------------------------------------------
-//
 // Every box is a comparison over the same cell the keystroke wrote, read in a
 // different part from the one that wrote it, so these poll for the committed
 // write rather than sleeping.
@@ -428,8 +425,6 @@ test('CSR: a box written by a loop follows the code like any other', async () =>
 	expect(boxes[3]?.getAttribute('ui-empty')).toBe('');
 });
 
-// --- consumer callbacks ---------------------------------------------------
-
 test('CSR: each keystroke calls onChange once with the whole code', async () => {
 	await render(WithOnChange);
 	expect(el(Calls).textContent).toBe('0');
@@ -499,8 +494,6 @@ test('CSR: a filled code submits under its name', async () => {
 	await expect.poll(() => submit().textContent).toBe('{"code":"123456"}');
 });
 
-// --- SSR resume -----------------------------------------------------------
-
 // Still pinned, and re-measured against this tip. The wall
 // is unchanged in kind: the family carries the caret policy
 // (OtpField's onFocus, QDS's rule: setSelectionRange to the end of the code) and
@@ -545,16 +538,12 @@ test('SSR: a code arriving at once after resume fills every box', async () => {
 	expect(item('item-', 0).textContent).toBe('2');
 });
 
-// --- boxes from an arm ----------------------------------------------------
-//
 // The arm-delivered verdict this family was asked for, in two halves. A part is
 // not a widget root, so an arm that is DECIDED once carries its items fine — the
 // rows below prove it in both modes. An arm that FLIPS is refused at compile
-// time: `.
-<otp.item>` inside `@if (someState)` fails the module with
+// time: `<otp.item>` inside `@if (someState)` fails the module with
 // MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED ("cannot be rebuilt when ... changes
-// because.
- <otp.item> has to run to produce its content"), measured on this base
+// because <otp.item> has to run to produce its content"), measured on this base
 // by compiling the scenario. That is a framework limit, not a family one, so the
 // scenario decides its arm from a module constant and this note carries the
 // verdict instead of a red row.

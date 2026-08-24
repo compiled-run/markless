@@ -6,8 +6,7 @@ import { navbar } from '../../index.ts';
 // Two shapes forced this layout, both measured by the families that landed
 // before this one:
 //   * `@if` cannot be a direct child of a component tag - `@if` written straight
-//     inside.
- <navbar.root> is MARKLESS_PARSE_ERROR ("Expected '</' to close the
+//     inside <navbar.root> is MARKLESS_PARSE_ERROR ("Expected '</' to close the
 //     JSX element, but found '@'"), so an arm needs an intrinsic element around
 //     it.
 //   * The condition is a module constant rather than a flipping cell: a FLIPPING

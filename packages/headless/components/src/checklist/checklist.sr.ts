@@ -21,8 +21,7 @@ import UnavailableOptions from './scenarios/unavailable-options.tsrx';
 const sr = virtualDriver;
 
 // One scenario per test: the trigger id is minted per container, so two scenarios
-// alive in one document give two elements the same id and every `.
-<label for>`
+// alive in one document give two elements the same id and every `<label for>`
 // after the first resolves to the wrong trigger.
 async function open(component: Parameters<typeof render>[0]) {
 	const { container } = await render(component);

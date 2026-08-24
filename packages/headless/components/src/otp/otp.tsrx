@@ -20,8 +20,7 @@ export const otpState = shared(
 		return {
 			...otp,
 			fieldEl,
-			// literal.
- function types: a callback slot is only recognised from the written annotation
+			// literal function types: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
 			onComplete: undefined as ((value: string) => void) | undefined,
 			// The field covers the root instead of sitting beside the boxes, so a

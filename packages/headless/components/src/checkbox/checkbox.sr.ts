@@ -17,8 +17,7 @@ const sr = virtualDriver;
 
 // One scenario per test: the trigger id is minted per container, so two
 // scenarios alive in one document give two elements the same id and every
-// `.
-<label for>` after the first resolves to the wrong trigger.
+// `<label for>` after the first resolves to the wrong trigger.
 async function open(component: Parameters<typeof render>[0]) {
 	const { container } = await render(component);
 	await sr.start(container as unknown as HTMLElement);
@@ -147,8 +146,7 @@ test('a box with only help text under it is never conveyed as invalid', async ()
 });
 
 // Expected red: aria-at's plan expects the description to be conveyed with the box,
-// but `.
-<checkbox.description>` writes a plain div and wires no aria-describedby, so
+// but `<checkbox.description>` writes a plain div and wires no aria-describedby, so
 // the reader announces it as a separate item further down. Whoever wires the
 // describedby deletes the `.fails`.
 test.fails('the help text under a box is conveyed with the box itself', async () => {

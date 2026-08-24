@@ -20,8 +20,7 @@ import { WithError } from './scenarios/with-error.tsrx';
 //
 // The behaviours asserted here are the sixteen read off Qwik UI's own handlers.
 // Where one
-// cannot ship, the row is `.
-test.fails` with the reason beside it rather than
+// cannot ship, the row is `test.fails` with the reason beside it rather than
 // absent.
 const Root = page.getByTestId('root');
 const Label = page.getByTestId('label');
@@ -439,8 +438,7 @@ function expectFormPartsRendered() {
 }
 
 async function expectOnlyTheChosenOptionIsSubmitted() {
-	// Nothing chosen submits the empty value, which is what a native `.
-<select>`
+	// Nothing chosen submits the empty value, which is what a native `<select>`
 	// with no choice does.
 	await expectSubmitted({ plan: '' });
 	el(Annual).click();
@@ -656,8 +654,7 @@ for (const mode of MODES) {
 		await expectTheConsumerFilterRecomputes();
 	});
 
-	// The rows this scenario's `.
-<p data-testid="count">` sits in front of are
+	// The rows this scenario's `<p data-testid="count">` sits in front of are
 	// found by their own position now: `rowStartOffset` on the keyed-repeat
 	// record states how many element siblings stand before the rows, so the
 	// pairing is no longer shifted by one.
@@ -671,8 +668,7 @@ for (const mode of MODES) {
 	// builds it. The keyed-repeat record now carries the arm's finished markup,
 	// which it does for exactly one shape: an arm whose markup is fully static and
 	// whose elements no record names, because the mint wires nothing. This arm is
-	// a `.
-<p>` of literal text, so it qualifies.
+	// a `<p>` of literal text, so it qualifies.
 	//
 	// Shipping the arm as inert markup was tried and withdrawn: the arm's host
 	// carries a `dom-order` locator, so putting the arm into the document without
@@ -796,8 +792,7 @@ for (const mode of MODES) {
 // writes `overlay` unconditionally and an inline list enlists in the overlay
 // stack, which it never should. Everything a person
 // experiences is right - the dismissal handler ignores the report in inline mode
-// - so this is the one assertion that cannot be made. Deterministic, so.
- test.fails rather than skip: it turns red the day the capability lands.
+// - so this is the one assertion that cannot be made. Deterministic, so test.fails rather than skip: it turns red the day the capability lands.
 test.fails('an inline list carries no overlay mark and never enlists', async () => {
 	await render(Inline);
 	expect(el(Content).hasAttribute('overlay')).toBe(false);

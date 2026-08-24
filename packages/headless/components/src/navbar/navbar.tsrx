@@ -9,8 +9,7 @@ import type {
 	NavbarRootProps,
 } from './navbar-types.ts';
 
-// A `.
-<nav>` landmark holding buttons that show and hide panels. It is a
+// A `<nav>` landmark holding buttons that show and hide panels. It is a
 // DISCLOSURE, not a menubar - see navbar-types.ts.
 //
 // Which dropdown is showing lives on the ROOT, named by the item's `value`, not
@@ -27,8 +26,7 @@ export const navbarState = shared(
 
 		return {
 			...navbar,
-			// literal.
- function type: a callback slot is only recognised from the written annotation
+			// literal function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
 			// `next = ''` rather than `next: string`. A shared method that dispatches is
 			// inlined into its caller, and the capture analysis then parses that handler
@@ -295,8 +293,7 @@ export function NavbarItemTrigger({
 	const item = navbarItemState();
 	const isOpen = computed(() => navbar.value === item.value);
 
-	// A native.
- <button> already activates on Enter and on Space, so those two keys
+	// A native <button> already activates on Enter and on Space, so those two keys
 	// need no rule; ArrowDown is the authoring practices' optional "open and step
 	// inside". Escape is not here: the overlay primitive reports it as a `dismiss`
 	// on the panel, and `navbar.itemcontent` decides what it means.
@@ -435,8 +432,7 @@ export function NavbarItemContent({
 			// though it falls inside `clickGrace`. The window still bounds the swallow,
 			// because the click that pairs with the press may never arrive.
 			if (onOwnTrigger) item.graceUntil = Date.now() + navbar.clickGrace;
-			// The primitive moves no focus, so the.
- return is the family's to write:
+			// The primitive moves no focus, so the return is the family's to write:
 			// Escape from inside the entry has to land on the button that opened the
 			// panel, or a person is left standing on nothing. A dismissal that reached
 			// no focus of ours moves none.

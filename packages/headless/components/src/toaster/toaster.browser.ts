@@ -31,19 +31,14 @@ function titles() {
 // lands - the rows that read the queue's own length are green - and no element
 // follows it. No diagnostic is produced either way.
 //
-// This was measured on this tip, and it CORRECTS the diagnosis these pins used to
-// carry ("a repeat inside a projected children slot never renders"). Projection is
-// not the cause. A probe put two repeats over the same queue on one page:
+// Projection is not the cause. A probe put two repeats over the same queue on one page:
 //
-//   - a repeat of PLAIN.
- <li> markup inside `toaster.root`'s projected children
+//   - a repeat of PLAIN <li> markup inside `toaster.root`'s projected children
 //     RENDERS (1 row for 1 message);
-//   - a repeat of `toaster.item` inside a plain.
- <ol> that projects nothing
+//   - a repeat of `toaster.item` inside a plain <ol> that projects nothing
 //     renders NOTHING (0 rows);
 //   - a repeat of a trivial local component with no `shared()` of its own, also
-//     in a plain.
- <ol>, renders NOTHING (0 rows).
+//     in a plain <ol>, renders NOTHING (0 rows).
 //
 // So the wall is the component in the repeat, not the projected slot, not the
 // widget scope, and not the `{children}`-beside-a-construct shape the
@@ -212,8 +207,7 @@ test('CSR: a dialog does not take the live region out of reach', async () => {
 // even load. It becomes a rendering test again when the compiler ships the capability (carry the definition context, or route the call through
 // the family's own emitted module).
 // The browser sees only the failed fetch; the diagnostic text itself is pinned
-// in packages/compiler/test/cross-module-shared-method.
-test.ts.
+// in packages/compiler/test/cross-module-shared-method.test.ts.
 test('the imperative surface is refused at build time until the capability ships', async () => {
 	await expect(import('./scenarios/method.tsrx')).rejects.toThrow();
 });

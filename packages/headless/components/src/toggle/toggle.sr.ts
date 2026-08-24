@@ -20,8 +20,7 @@ const sr = virtualDriver;
 
 // One scenario per test: the trigger id is minted per container, so two
 // scenarios alive in one document give two elements the same id and every
-// `.
-<label for>` after the first resolves to the wrong trigger.
+// `<label for>` after the first resolves to the wrong trigger.
 async function open(component: Parameters<typeof render>[0]) {
 	const { container } = await render(component);
 	await sr.start(container as unknown as HTMLElement);
@@ -142,8 +141,7 @@ test('a switch with only help text under it is never conveyed as invalid', async
 });
 
 // The help text is part of the switch, not a separate item further down the page:
-// `.
-<toggle.description>` binds the handle the trigger names through
+// `<toggle.description>` binds the handle the trigger names through
 // `aria-describedby`, so the reader speaks it with the switch.
 test('the help text under a switch is conveyed with the switch itself', async () => {
 	await open(WithHelp);

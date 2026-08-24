@@ -82,10 +82,8 @@ test('a code with no name given is announced with no name, not with its value', 
 
 // Sequence B: nothing inside is reachable. `patternsvg` is `aria-hidden`, so a
 // lap over the widget only ever arrives back at the image; without it some
-// reader and browser combinations expose the `.
-<svg>` as a second graphic and a
-// few expose `.
-<path>` elements, producing an announcement nested inside an
+// reader and browser combinations expose the `<svg>` as a second graphic and a
+// few expose `<path>` elements, producing an announcement nested inside an
 // image.
 test('nothing inside the code is reachable, so a lap only ever finds the image', async () => {
 	await open(Basic);

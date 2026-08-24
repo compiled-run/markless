@@ -340,8 +340,7 @@ test('CSR: opening one question leaves its neighbours alone', async () => {
 	expectOpen(el(PermitTrigger), el(PermitContent));
 });
 
-// The APG gives the disclosure control exactly two keys, and a native.
- <button>
+// The APG gives the disclosure control exactly two keys, and a native <button>
 // already does both. These rows prove the family does not get in the way.
 
 test('CSR: Space on the focused trigger opens the panel', async () => {

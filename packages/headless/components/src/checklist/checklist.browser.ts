@@ -262,8 +262,7 @@ async function expectOmittedCallbackStillTicks() {
 	await expect.poll(() => el(SelectAllTrigger).getAttribute('aria-checked')).toBe('mixed');
 }
 
-// Every `.
-test.skip` below is skipped on the dispatch defect named at the top of the
+// Every `test.skip` below is skipped on the dispatch defect named at the top of the
 // file: the gesture reaches the composed checkbox and stops there, so the group's
 // value never moves. Un-skip when a part's slot invocation reaches the root edge's
 // callback.
@@ -309,8 +308,7 @@ for (const mode of MODES) {
 	// children, and only the SSR module excludes that composed wrapper from the
 	// widget-root seed forward; the CSR prerender path forwards to every projecting
 	// edge alike, so the delegating wrapper contributes no seed block and the trigger
-	// reads `aria-invalid="false"`. `.
-test.fails` rather than skip because it is
+	// reads `aria-invalid="false"`. `test.fails` rather than skip because it is
 	// deterministic: the row turns red the day CSR gets the same exclusion.
 	(mode === 'CSR' ? test.fails : test)(`${mode}: a mounted error marks the group invalid, written after the items or before them`, async () => {
 		if (mode === 'CSR') await render(WithError);
