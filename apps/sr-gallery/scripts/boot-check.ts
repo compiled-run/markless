@@ -51,6 +51,19 @@ const appDir = fileURLToPath(new URL('..', import.meta.url));
 const BOOT_TIMEOUT_MS = 120_000;
 const POLL_INTERVAL_MS = 250;
 
+// A squatter on the port would answer waitForBoot for a server that never
+// bound, so the check would read someone else's tree and go green. Probe
+// BEFORE spawning our own server, while any answer must be foreign.
+try {
+	await fetch(PREVIEW_ORIGIN);
+	console.error(
+		`::error::${PREVIEW_ORIGIN} already answers before this check started its server — an orphaned dev server is squatting the port; kill it and rerun.`,
+	);
+	process.exit(1);
+} catch {
+	// Nothing listening: the port is ours to take.
+}
+
 const server = spawn('pnpm', ['exec', 'vp', 'dev'], {
 	cwd: appDir,
 	stdio: ['ignore', 'inherit', 'inherit'],
