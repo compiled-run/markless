@@ -12,7 +12,16 @@ import type { ResumeDomElement, ResumeViewRecord } from '../src/resume-types.ts'
  * served row went through. What the browser witnesses cannot read is the pinned
  * element census, so these assertions read it directly: a row that entered the
  * document without saying so would shift the index of every element after it.
+ *
+ * The repeat runtime no longer names the mint's module: a compiled app writes the
+ * loader into `__marklessRowMint`, and only a build whose records can build nodes
+ * does. Standing in for that emit is all the line below is - every assertion in
+ * this file is the one it was, against a runtime that is handed the mint rather
+ * than importing it. The refusal when nothing hands it one has its own file:
+ * keyed-repeat-row-mint-ungated.test.ts.
  */
+(globalThis as { __marklessRowMint?: () => Promise<unknown> }).__marklessRowMint = () =>
+	import('../src/resume-row-mint.ts');
 
 type Node = {
 	nodeType: number;

@@ -65,12 +65,23 @@ type RepeatReadableGraph = Pick<RuntimeGraph, 'read'>;
  *
  * One promise per document, `loaded ||=`: a second repeat that needs the mint
  * joins the first repeat's import instead of starting its own.
+ *
+ * The `import()` specifier is NOT written here. This module is loaded by every
+ * repeat, so naming the mint here would make every app with any keyed repeat
+ * emit its chunk - the whole point of the gate. The app's own resume module
+ * writes the loader into `__marklessRowMint`, and only for a page the compiler
+ * recorded a mintable repeat for; the type import below is erased, so it costs
+ * no edge. An absent loader is a page that cannot build nodes, and every mint
+ * site below already refuses without one.
  */
 type RowMint = typeof import('./resume-row-mint.ts');
+type RowMintHost = { readonly __marklessRowMint?: () => Promise<RowMint> };
 let rowMint: RowMint | undefined,
 	rowMintLoad: Promise<RowMint> | undefined;
-function loadRowMint(): Promise<RowMint> {
-	return (rowMintLoad ||= import('./resume-row-mint.ts').then((module) => (rowMint = module)));
+function loadRowMint(): Promise<RowMint> | undefined {
+	const load = (globalThis as RowMintHost).__marklessRowMint;
+	if (!load) return undefined;
+	return (rowMintLoad ||= load().then((module) => (rowMint = module)));
 }
 
 export function validateOneRepeat(
@@ -153,7 +164,7 @@ export function wireKeyedRepeats(input: {
 		// a repeat that only reorders never touches the import at all - and a repeat
 		// that does starts the fetch at wiring time, not at the first gesture.
 		const builds = Boolean(repeat.rowTemplate ?? repeat.emptyArm);
-		if (builds) void loadRowMint().catch(() => undefined);
+		if (builds) void loadRowMint()?.catch(() => undefined);
 		for (const [rowIndex, rowRoot] of repeatRowElements(parent, repeat, items.length)) {
 			const rowKey = repeatItemKey(items[rowIndex], repeat);
 			rowRootsByKey.set(rowKey, rowRoot);
@@ -185,7 +196,7 @@ export function wireKeyedRepeats(input: {
 					// itself never yields - it reads the collection and finishes every DOM
 					// and census move in one turn.
 					if (!builds || rowMint) return apply(rowMint);
-					return loadRowMint().then(apply);
+					return loadRowMint()?.then(apply) ?? apply(undefined);
 				},
 			}),
 		);

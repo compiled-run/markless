@@ -760,3 +760,50 @@ test('a CSR mount installs the reconcile plane only when the payload carries com
 		emitSourceModule({ ...baseInput, environment: 'server', hasComputedState: true }),
 	).not.toContain('reconcile-plane');
 });
+
+/**
+ * The row mint's specifier is written HERE or nowhere: `resume-keyed-repeats` is
+ * loaded by every repeat, so naming the mint there would put its chunk in every
+ * app that renders a list. These assertions are the gate - the emit follows the
+ * compiler's per-record demand, and a page whose repeats only reorder gets no
+ * loader and therefore no chunk.
+ */
+function repeatDemandMap(runtimeModuleIds: ReadonlyArray<string>) {
+	return {
+		payloadRecords: [
+			{ recordId: 'keyed-repeat:repeat:0', kind: 'keyed-repeat', runtimeModuleIds },
+		],
+	};
+}
+
+test('emitResumeModule writes the row-mint loader only for a repeat that can build', () => {
+	expect(
+		emitResumeModule({
+			...baseInput,
+			runtimeDemandMap: repeatDemandMap([
+				'web/repeat-runtime',
+				'web/resume-keyed-repeats',
+				'web/resume-row-mint',
+			]),
+		}),
+	).toContain("globalThis.__marklessRowMint = () => import('@markless/web/resume-row-mint');");
+});
+
+test('emitResumeModule leaves a reorder-only repeat with no row-mint specifier', () => {
+	const reorderOnly = emitResumeModule({
+		...baseInput,
+		runtimeDemandMap: repeatDemandMap(['web/repeat-runtime', 'web/resume-keyed-repeats']),
+	});
+
+	expect(reorderOnly).not.toContain('__marklessRowMint');
+	expect(reorderOnly).not.toContain('resume-row-mint');
+});
+
+test('emitResumeModule leaves a repeat-free page with no row-mint specifier', () => {
+	expect(
+		emitResumeModule({
+			...baseInput,
+			runtimeDemandMap: { payloadRecords: [{ recordId: 'overlay:h0', kind: 'overlay' }] },
+		}),
+	).not.toContain('__marklessRowMint');
+});

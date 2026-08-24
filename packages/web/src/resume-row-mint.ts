@@ -6,8 +6,10 @@ import type { ResumeDomElement, ResumeDomNode, ResumeKeyedRepeatRecord } from '.
  * A repeat that only reorders, removes and re-inserts served rows never reaches
  * this module: the two record fields that need it - `rowTemplate` (markup for a
  * key the server never sent) and `emptyArm` (markup for "nothing matches") - are
- * absent on such a record, and `resume-keyed-repeats` loads this module only when
- * one of them is present. Every helper below is therefore spelled locally: an
+ * absent on such a record, and the compiler folds the demand for this module into
+ * a keyed-repeat record only when one of them is present - so an app whose
+ * repeats only reorder never writes this module's specifier and never emits its
+ * chunk at all. Every helper below is therefore spelled locally: an
  * import from the repeat module would pull that module's whole closure back in
  * and there would be nothing left to gate.
  */
