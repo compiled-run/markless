@@ -17,11 +17,9 @@ import type {
 	ComboboxTriggerProps,
 } from './combobox-types.ts';
 
-/**
- * How long a press that dismissed the list keeps the trigger's own click from
- * re-opening it, in milliseconds. Armed by identity - only a press on this
- * combobox's trigger arms it - so the window never swallows an unrelated click.
- */
+// Comparisons this family renders are held in one graph cell and read in every position: written inline in an attribute they render once and then go stale.
+
+/** How long a press that dismissed the list keeps the trigger's own click from re-opening it, in milliseconds. */
 const PRESS_GRACE = 300;
 
 export const comboboxState = shared(
@@ -51,8 +49,7 @@ export const comboboxState = shared(
 		const triggerEl = element<HTMLButtonElement>();
 		const contentEl = element<HTMLDivElement>();
 		const describedEl = element<HTMLDivElement>();
-		// The array type argument is what makes this handle plural: one handle
-		// bound on every option, read back as the live options in document order.
+		// The array type argument is what makes this handle plural: one handle bound on every option, read back in document order.
 		const optionEls = element<HTMLDivElement[]>();
 
 		return {
@@ -173,17 +170,14 @@ export function ComboboxRoot({
 	>{children}</div>
 }
 
-// `for` names the input, so a click on the label lands the caret in the field
-// without this part writing a handler for it (behaviour 5.3).
+// `for` names the input, so a click on the label lands the caret in the field without a handler here.
 export function ComboboxLabel({ children, ...rest }: ComboboxLabelProps) @{
 	const combobox = comboboxState();
 
 	<label {...rest} el={combobox.labelEl} for={combobox.inputEl}>{children}</label>
 }
 
-// The only tab stop in the family, and the element that owns the keyboard. DOM
-// focus never leaves it: that is the whole difference between this family and
-// select, and every rule below follows from it.
+// The only tab stop in the family: DOM focus never leaves the input, which is the whole difference between this family and select.
 export function ComboboxInput({
 	onInput,
 	onKeydown,
@@ -207,9 +201,7 @@ export function ComboboxInput({
 		aria-controls={combobox.contentEl}
 		aria-describedby={combobox.describedEl}
 		aria-invalid={combobox.invalid ? 'true' : 'false'}
-		// An inline list is part of the page: nothing expands, so neither word is
-		// written. `false` rather than `undefined`, because the attribute writer
-		// reads `false` as "remove this" and `undefined` as no record at all.
+		// An inline list is part of the page, so neither word is written; `false` removes the attribute where `undefined` writes no record at all.
 		aria-expanded={combobox.inline === true ? false : combobox.open === true ? 'true' : 'false'}
 		aria-haspopup={combobox.inline === true ? false : 'listbox'}
 		ui-open={combobox.open}
@@ -218,17 +210,13 @@ export function ComboboxInput({
 			const next = (event.target as HTMLInputElement).value;
 			const isMultiple = combobox.multiple === true;
 			combobox.typed(next);
-			// Emptying the field in single mode gives the choice back: the text IS
-			// the selection there. With `multiple` the text is only a filter.
+			// Emptying the field in single mode gives the choice back: the text is the selection there, where with `multiple` it is only a filter.
 			if (next === '' && isMultiple !== true) combobox.choose('', '');
 			if (next !== '') combobox.setOpen(true);
 			onInput?.(event);
 		}}
 		onKeydown={(event) => {
-			// The prevented keys are written out from event fields alone: this policy
-			// has to be readable before the handler symbol loads. Printable keys are
-			// deliberately absent - typing belongs to the field, and this family has
-			// no typeahead buffer to feed.
+			// Written out from event fields alone: the policy has to be readable before the handler symbol loads.
 			if (
 				event.key === 'ArrowDown' ||
 				event.key === 'ArrowUp' ||
@@ -252,16 +240,10 @@ export function ComboboxInput({
 			const isJumpKey = key === 'Home' || key === 'End';
 
 			if (key === 'Backspace') {
-				// The FAMILY's text, not the field's. A lazily loaded handler runs
-				// after the native dispatch, so by the time this line runs the browser
-				// has already deleted the character and the element reads empty - which
-				// would make the very first backspace give a chosen value back. The
-				// cell still holds what the last input event reported, which is exactly
-				// "the text before this keystroke".
+				// The family's cell, not the field's: a lazily loaded handler runs after the native dispatch, so the element already reads empty and only the cell still holds the text from before this keystroke.
 				combobox.wasFieldEmpty = combobox.input === '';
 			} else if (isStepKey && isShowing !== true) {
-				// Closed: the key opens the list and lands the highlight at the end it
-				// asks for - down on the first option, up on the last.
+				// Closed: the key opens the list and lands the highlight at the end it asks for.
 				combobox.setOpen(true);
 				const landing = nextHighlightValue(options, '', key, isLooping);
 				if (landing !== undefined) combobox.isKeyboardMove = true;
@@ -271,16 +253,14 @@ export function ComboboxInput({
 				if (landing !== undefined) combobox.isKeyboardMove = true;
 				if (landing !== undefined) combobox.highlighted = landing;
 			} else if (key === 'Enter' && isShowing && highlighted !== '') {
-				// Through the option's own click rule, so one place in this family
-				// reads a value and one place decides whether the list closes.
+				// Through the option's own click rule, so one place decides whether the list closes.
 				clickOptionWithValue(options, highlighted);
 				if (isMultiple) combobox.input = '';
 				if (isMultiple) combobox.wasFieldReset = true;
 			} else if (key === 'Escape' && isInline !== true) {
-				// An inline list has nothing to close, which is what upstream asserts.
+				// An inline list has nothing to close.
 				combobox.setOpen(false);
 			} else if (key === 'Tab' && isInline !== true) {
-				// Closes, and the native move is left alone.
 				combobox.setOpen(false);
 			}
 			onKeydown?.(event);
@@ -289,9 +269,7 @@ export function ComboboxInput({
 			const key = event.key;
 			const isMultiple = combobox.multiple === true;
 			const isArmed = combobox.removeOnBackspace === true;
-			// Either the field was already empty when the key went down, or an Enter
-			// selection had just emptied it. The two flags are why the FIRST
-			// backspace deletes text and only the second gives a value back.
+			// The two flags are why the first backspace deletes text and only the second gives a value back.
 			const wasEmpty = combobox.wasFieldEmpty === true || combobox.wasFieldReset === true;
 			const isEmptyNow = (event.target as HTMLInputElement).value === '';
 			if (key === 'Backspace' && isMultiple && isArmed && wasEmpty && isEmptyNow) {
@@ -302,8 +280,7 @@ export function ComboboxInput({
 	/>
 }
 
-// Not a tab stop, on purpose: only the input is one. Clicking it puts the caret
-// back in the field and toggles the list.
+// Not a tab stop: only the input is one.
 export function ComboboxTrigger({ children, onClick, ...rest }: ComboboxTriggerProps) @{
 	const combobox = comboboxState();
 
@@ -319,9 +296,7 @@ export function ComboboxTrigger({ children, onClick, ...rest }: ComboboxTriggerP
 		ui-open={combobox.open}
 		ui-closed={combobox.open !== true}
 		onClick={(event) => {
-			// The press that dismissed an open list is the same press whose click
-			// arrives here: without this the trigger would close on the press and
-			// re-open on the click. Armed by identity in `onDismiss` below.
+			// Without this the trigger closes an open list on the press and re-opens it on the click; armed by identity in `onDismiss` below.
 			const isOpen = combobox.open === true;
 			if (combobox.pressGraceUntil <= Date.now()) combobox.inputEl?.focus();
 			if (combobox.pressGraceUntil <= Date.now()) combobox.setOpen(isOpen !== true);
@@ -330,13 +305,8 @@ export function ComboboxTrigger({ children, onClick, ...rest }: ComboboxTriggerP
 	>{children}</button>
 }
 
-// Closed hides the list, it never detaches it: the input points at this
-// element's minted id, and an unmount would leave that reference dangling.
-// Never detaching is also what the overlay mark requires - an enlisted element
-// removed from the document leaves the stack's marks behind.
-//
-// `overlay` is the bare attribute the primitive reads, and nothing is imported
-// for it. It is written unconditionally, which is a known deviation for `inline`.
+// Closed hides the list, never detaches it: the input points at this element's minted id, and an enlisted element removed from the document leaves the overlay stack's marks behind.
+// `overlay` is written unconditionally, which is a known deviation for `inline`.
 export function ComboboxContent({
 	children,
 	onDismiss,
@@ -344,8 +314,6 @@ export function ComboboxContent({
 	...rest
 }: ComboboxContentProps) @{
 	const combobox = comboboxState();
-	// One graph cell, read in every position: a comparison written inline in an
-	// attribute renders once and then goes stale.
 	const isShowing = computed(() => combobox.inline === true || combobox.open === true);
 
 	<div
@@ -359,8 +327,7 @@ export function ComboboxContent({
 		ui-open={isShowing}
 		ui-closed={isShowing !== true}
 		onPointerenter={(event) => {
-			// A pointer that is genuinely in the list may highlight; a keyboard walk
-			// that happens to run under a resting mouse may not be overruled by it.
+			// A keyboard walk must not be overruled by a mouse that merely happens to be resting over the list.
 			combobox.isKeyboardMove = false;
 			combobox.isPointerInContent = true;
 			onPointerenter?.(event);
@@ -369,14 +336,11 @@ export function ComboboxContent({
 			const isInline = combobox.inline === true;
 			const pressed = event.detail.pressTarget;
 			const trigger = combobox.triggerEl;
-			// Where the press landed, which the report carries for `outside-press`
-			// and omits for Escape. `contains` rather than `===`: a consumer is free
-			// to put an icon inside the trigger, and the press lands on that.
+			// `contains` rather than `===`: a consumer may put an icon inside the trigger, and the press lands on that.
 			const isOwnTrigger = pressed !== undefined && trigger !== undefined && trigger.contains(pressed);
 			if (isInline !== true) combobox.setOpen(false);
 			if (isInline !== true && isOwnTrigger) combobox.pressGraceUntil = Date.now() + PRESS_GRACE;
-			// The primitive moves no focus, so the return is the family's to write.
-			// Escape has to leave the caret in the field a person was typing in.
+			// The primitive moves no focus, so Escape leaving the caret in the field is the family's to write.
 			if (isInline !== true && event.detail.reason === 'escape') combobox.inputEl?.focus();
 			onDismiss?.(event);
 		}}
@@ -396,15 +360,10 @@ export function ComboboxItem({
 	const combobox = comboboxState();
 	const item = comboboxItemState();
 	item.value = value;
-	// Written in the body rather than as a destructuring default: a default that
-	// names another parameter is not readable from a template position
-	// (MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED).
+	// In the body rather than a destructuring default: a default naming another parameter is unreadable from a template position (MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED).
 	item.label = label ?? value;
-	// Own prop only: a seed is built from this component's props, so the
-	// combobox's own `disabled` is added at every read site instead.
+	// Own prop only: a seed is built from this component's props, so the combobox's own `disabled` is added at every read site instead.
 	item.disabled = disabled;
-	// One graph cell, read in every position: a comparison written inline in an
-	// attribute renders once and then goes stale.
 	const isChosen = computed(() => {
 		const held = combobox.value;
 		if (typeof held === 'string') return held === item.value;
@@ -413,9 +372,7 @@ export function ComboboxItem({
 	const isHighlighted = computed(() => combobox.highlighted === item.value);
 	const isLocked = computed(() => item.disabled || combobox.disabled);
 
-	// `ui-value` is this option's own name in the markup. The highlight is family
-	// state keyed by value and DOM focus never lands on an option, so an element
-	// the walk was handed has no other way back to the value it stands for.
+	// `ui-value` is the option's name in the markup: the highlight is keyed by value and DOM focus never lands on an option, so a walked element has no other way back to the value it stands for.
 	<div
 		{...rest}
 		el={combobox.optionEls}
@@ -428,14 +385,12 @@ export function ComboboxItem({
 		ui-highlighted={isHighlighted}
 		ui-disabled={isLocked}
 		onClick={(event) => {
-			// The two cells, not the `isLocked` computed: a computed() read from a
-			// handler body does not guard..
+			// The two cells, not the `isLocked` computed: a computed() read from a handler body does not guard.
 			if (item.disabled !== true && combobox.disabled !== true) {
 				const held = combobox.value;
 				const wasChosen = typeof held === 'string' ? held === item.value : held.includes(item.value);
 				combobox.choose(item.value, item.label);
-				// Choosing closes; UNCHOOSING leaves the list up, which is Qwik UI's
-				// own rule and the one most likely to be "fixed" by a later reader.
+				// Choosing closes; unchoosing deliberately leaves the list up.
 				if (
 					wasChosen !== true &&
 					combobox.multiple !== true &&
@@ -447,14 +402,12 @@ export function ComboboxItem({
 			onClick?.(event);
 		}}
 		onFocus={(event) => {
-			// The safety net that keeps the caret in the field whatever focuses an
-			// option - a consumer's own script, a browser's find-in-page, a click.
+			// Keeps the caret in the field whatever focuses an option - a consumer's script, find-in-page, a click.
 			combobox.inputEl?.focus();
 			onFocus?.(event);
 		}}
 		onPointerover={(event) => {
-			// Only a pointer genuinely inside the list highlights. Without the guard
-			// a list opening under a resting mouse steals the keyboard's highlight.
+			// Without this guard a list opening under a resting mouse steals the keyboard's highlight.
 			if (combobox.isPointerInContent === true || combobox.inline === true) {
 				if (item.disabled !== true) combobox.highlighted = item.value;
 			}
@@ -479,11 +432,7 @@ export function ComboboxItemIndicator({ children, ...rest }: ComboboxItemIndicat
 	<span {...rest} aria-hidden="true" ui-hidden={isChosen !== true}>{children}</span>
 }
 
-// One part stands behind both `combobox.description` and `combobox.error`: an
-// element() handle binds in exactly one place, and `aria-describedby` names
-// exactly one id (an IDREF LIST is MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE). A
-// combobox that mounts both messages is described by the first. Same call
-// textbox made.
+// One part stands behind both `combobox.description` and `combobox.error`: a handle binds in one place and `aria-describedby` names one id (an IDREF list is MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE), so mounting both describes by the first.
 function ComboboxMessage({ children, ...rest }: ComboboxDescriptionProps) @{
 	const combobox = comboboxState();
 
@@ -494,20 +443,13 @@ export function ComboboxDescription({ children, ...rest }: ComboboxDescriptionPr
 	<ComboboxMessage {...rest}>{children}</ComboboxMessage>
 }
 
-// `role="alert"` so the message is spoken when it appears, which is what makes
-// mounting this part worth doing at all.
+// `role="alert"` so the message is spoken when it appears.
 export function ComboboxError({ children, ...rest }: ComboboxErrorProps) @{
 	<ComboboxMessage {...rest} role="alert">{children}</ComboboxMessage>
 }
 
-// A `<select>` holding exactly the choice that was made. A single-option
-// `<select>` submits the same name/value pair a rebuilt option list would, and
-// the option carries the value as its text because the option element's
-// attribute type does not yet take one. Same shape select ships.
-//
-// One option per chosen value - what `multiple` wants - needs a `@for` over a
-// read off the shared instance, and that lowers to `ReferenceError: combobox is
-// not defined`.
+// A single-option `<select>` submits the same name/value pair a rebuilt option list would; the value rides as text because the option element's attribute type does not yet take one.
+// One option per chosen value - what `multiple` wants - needs a `@for` over a shared-instance read, which lowers to `ReferenceError: combobox is not defined`.
 export function ComboboxField({ ...rest }: ComboboxFieldProps) @{
 	const combobox = comboboxState();
 

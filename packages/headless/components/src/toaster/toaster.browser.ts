@@ -24,10 +24,9 @@ function titles() {
 	return [...el(Root).querySelectorAll('[ui-toasttitle]')].map((one) => one.textContent);
 }
 
-// ---------------------------------------------------------------------------
-// THE WALL EVERY PINNED ROW BELOW SHARES
+// Every pinned row below shares one wall.
 //
-// A COMPONENT INSIDE A REPEAT RENDERS NOTHING ON THE CLIENT. The queue write
+// A component inside a repeat renders nothing on the client. The queue write
 // lands - the rows that read the queue's own length are green - and no element
 // follows it. No diagnostic is produced either way.
 //
@@ -53,7 +52,6 @@ function titles() {
 // A repeat body may also hold only ONE element: two siblings inside `@for` is
 // MARKLESS_PARSE_ERROR ("Expected '</' to close the JSX element, but found '@'").
 // Measured while probing the above; not otherwise load-bearing here.
-// ---------------------------------------------------------------------------
 
 test('CSR: the region is on the page before anything is said', async () => {
 	await render(Basic);
@@ -99,9 +97,6 @@ test.fails('CSR: saying the same id again updates the message in place', async (
 	expect(el(Root).querySelectorAll('[ui-toast]')).toHaveLength(1);
 });
 
-// Merged: the written-out close button IS the only close button now, so the row
-// that used to test the default row's button and the row that tested the custom
-// path's button are one row.
 test.fails('CSR: the close button on a row dismisses the message it sits in', async () => {
 	await render(Basic);
 	el<HTMLButtonElement>(Sticky).click();
@@ -199,13 +194,12 @@ test('CSR: a dialog does not take the live region out of reach', async () => {
 	expect(el(Root).closest('[inert]')).toBe(null);
 });
 
-// A shared() method called from a handler in
-// ANOTHER module is text-spliced without the family's imports or graph wiring.
-// It used to compile clean and crash at dispatch in three shapes; the compiler
-// now REFUSES it loudly at build time, naming the absent identifiers and the
-// import capture. This row pins the refusal: the quarantined scenario cannot
-// even load. It becomes a rendering test again when the compiler ships the capability (carry the definition context, or route the call through
-// the family's own emitted module).
+// A shared() method called from a handler in another module is text-spliced
+// without the family's imports or graph wiring, so the compiler refuses it at
+// build time, naming the absent identifiers and the import capture. This row
+// pins the refusal: the quarantined scenario cannot even load. It becomes a
+// rendering test again once the compiler can carry the definition context or
+// route the call through the family's own emitted module.
 // The browser sees only the failed fetch; the diagnostic text itself is pinned
 // in packages/compiler/test/cross-module-shared-method.test.ts.
 test('the imperative surface is refused at build time until the capability ships', async () => {

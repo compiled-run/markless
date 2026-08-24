@@ -12,9 +12,6 @@ import Vertical from './scenarios/vertical.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
 import WithoutOnChange from './scenarios/without-onchange.tsrx';
 
-// Colocated browser suite for the tabs family. Each test renders a realistic
-// consumer scenario, and the locators name the QDS part anatomy: root, list,
-// trigger, content - prefixed per tab, the way a consumer names their own tabs.
 const Root = page.getByTestId('root');
 const List = page.getByTestId('list');
 const OverviewTrigger = page.getByTestId('overview-trigger');
@@ -23,7 +20,6 @@ const BillingTrigger = page.getByTestId('billing-trigger');
 const OverviewContent = page.getByTestId('overview-content');
 const UsageContent = page.getByTestId('usage-content');
 const BillingContent = page.getByTestId('billing-content');
-// The settings page, where one tab is closed to everyone.
 const ProfileTrigger = page.getByTestId('profile-trigger');
 const TeamTrigger = page.getByTestId('team-trigger');
 const DangerTrigger = page.getByTestId('danger-trigger');
@@ -31,15 +27,12 @@ const ProfileContent = page.getByTestId('profile-content');
 const DangerContent = page.getByTestId('danger-content');
 const DisplayName = page.getByTestId('display-name');
 const Delete = page.getByTestId('delete');
-// Tabs stacked down the side.
 const InboxTrigger = page.getByTestId('inbox-trigger');
 const SentTrigger = page.getByTestId('sent-trigger');
-// The looping pair: a row and a column.
 const RowOne = page.getByTestId('row-one');
 const RowThree = page.getByTestId('row-three');
 const ColumnOne = page.getByTestId('column-one');
 const ColumnThree = page.getByTestId('column-three');
-// Panels expensive enough that arrowing must not open them.
 const DailyTrigger = page.getByTestId('daily-trigger');
 const WeeklyTrigger = page.getByTestId('weekly-trigger');
 const MonthlyTrigger = page.getByTestId('monthly-trigger');

@@ -10,10 +10,6 @@ import Untitled from './scenarios/untitled.tsrx';
 import Vertical from './scenarios/vertical.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
 
-// Colocated browser suite for the carousel family. The locators name the QDS
-// part anatomy - root, title, scrollarea, item, backtrigger, forwardtrigger,
-// navlist, navtrigger, playtrigger - prefixed per slide the way a consumer names
-// their own slides.
 const Root = page.getByTestId('root');
 const Title = page.getByTestId('title');
 const ScrollArea = page.getByTestId('scrollarea');
@@ -29,10 +25,8 @@ const OsloNav = page.getByTestId('oslo-navtrigger');
 const LimaNav = page.getByTestId('lima-navtrigger');
 const TopItem = page.getByTestId('top-item');
 const MiddleItem = page.getByTestId('middle-item');
-// The consumer handler's log.
 const Last = page.getByTestId('last');
 const Calls = page.getByTestId('calls');
-// Two carousels sharing slide values on purpose.
 const LeftOne = page.getByTestId('left-one');
 const LeftTwo = page.getByTestId('left-two');
 const RightOne = page.getByTestId('right-one');
