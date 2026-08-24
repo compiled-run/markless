@@ -1,0 +1,28 @@
+export {
+	CarouselBackTrigger as backtrigger,
+	CarouselForwardTrigger as forwardtrigger,
+	CarouselItem as item,
+	CarouselNavList as navlist,
+	CarouselNavTrigger as navtrigger,
+	CarouselPlayTrigger as playtrigger,
+	CarouselRoot as root,
+	CarouselScrollArea as scrollarea,
+	CarouselTitle as title,
+	carouselState,
+	carouselState as state,
+} from './carousel.tsrx';
+export type {
+	CarouselAlign,
+	CarouselBackTriggerProps,
+	CarouselForwardTriggerProps,
+	CarouselItemProps,
+	CarouselMove,
+	CarouselNavListProps,
+	CarouselNavTriggerProps,
+	CarouselOrientation,
+	CarouselPlayTriggerProps,
+	CarouselRootProps,
+	CarouselScrollAreaProps,
+	CarouselSensitivity,
+	CarouselTitleProps,
+} from './carousel-types.ts';
