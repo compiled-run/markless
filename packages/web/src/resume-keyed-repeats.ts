@@ -1,10 +1,55 @@
 import type { RuntimeGraph } from '@markless/runtime';
 import type {
+	ElementHandleRegistry,
 	ResumeDomElement,
 	ResumeKeyedRepeatRecord,
+	ResumeRuntimeInput,
 	ResumeViewRecord,
 } from './resume-types.ts';
 import type { ResumeEventWiring } from './resume-events.ts';
+
+/**
+ * Give every computed-backed repeat collection a readable value before wiring.
+ *
+ * `wireKeyedRepeats` keys the SERVED rows by reading the collection once. A
+ * `computed()` collection has no value in the resumed graph until something
+ * writes it - the payload carries the derive symbol, not the result - so that
+ * read answered an empty list, no served row was ever keyed, and the repeat
+ * could never reconcile: growth found no row to reuse and shrink found no row
+ * to remove. Deriving it here reproduces the served collection exactly, because
+ * no dependency has moved yet.
+ */
+export async function primeKeyedRepeatCollections(input: {
+	readonly graph: RuntimeGraph;
+	readonly repeats: ReadonlyArray<ResumeKeyedRepeatRecord>;
+	readonly computed: NonNullable<ResumeRuntimeInput['state']>['computed'];
+	readonly root: ResumeDomElement;
+	readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
+	readonly elementHandles: ElementHandleRegistry;
+}): Promise<void> {
+	const backing = new Set(
+		input.repeats.flatMap((repeat) =>
+			repeat.collectionGraphNodeId ? [repeat.collectionGraphNodeId] : [],
+		),
+	);
+	if (backing.size === 0) return;
+	for (const record of input.computed ?? []) {
+		if (!backing.has(record.graphNodeId)) continue;
+		if (record.async !== false || typeof record.deriveSymbolId !== 'string') continue;
+		if (input.graph.read(record.graphNodeId, []) !== undefined) continue;
+		await (
+			await import('./resume-sync-computed.ts')
+		).refreshSyncComputed({
+			computed: record as Parameters<
+				typeof import('./resume-sync-computed.ts').refreshSyncComputed
+			>[0]['computed'],
+			graph: input.graph,
+			root: input.root,
+			loadSymbol: input.loadSymbol,
+			elementHandles: input.elementHandles,
+		});
+	}
+}
 
 type RepeatReadableGraph = Pick<RuntimeGraph, 'read'>;
 
@@ -114,7 +159,13 @@ function applyKeyedRepeatRowOrder(
 		readonly insertBefore?: (node: ResumeDomElement, before: unknown) => unknown;
 		readonly removeChild?: (node: ResumeDomElement) => unknown;
 	};
-	const currentRows = elementChildren(parent).slice(0, nextRows.length);
+	// Compare against every attached row THIS repeat owns, not the first
+	// nextRows.length children. A prefix comparison calls [A,B,C] -> [A,B]
+	// already-in-order and returns before the removal pass below, so a row
+	// dropped off the END of the collection stayed in the document forever
+	// while a row dropped from the middle left correctly.
+	const knownRows = new Set(rowRootsByKey.values());
+	const currentRows = elementChildren(parent).filter((child) => knownRows.has(child));
 	if (
 		currentRows.length === nextRows.length &&
 		currentRows.every((row, index) => row === nextRows[index])

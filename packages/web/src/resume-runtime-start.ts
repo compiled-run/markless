@@ -114,7 +114,16 @@ export async function startResumeRuntime(input: {
 		);
 	}
 	if ((runtimeInput.view.keyedRepeats ?? []).length > 0) {
-		(await import('./resume-keyed-repeats.ts')).wireKeyedRepeats({
+		const keyedRepeats = await import('./resume-keyed-repeats.ts');
+		await keyedRepeats.primeKeyedRepeatCollections({
+			graph: runtimeInput.graph,
+			repeats: runtimeInput.view.keyedRepeats ?? [],
+			computed: runtimeInput.state?.computed ?? [],
+			root: runtimeInput.root,
+			loadSymbol: runtimeInput.loadSymbol,
+			elementHandles: prepared.elementHandles,
+		});
+		keyedRepeats.wireKeyedRepeats({
 			graph: runtimeInput.graph,
 			view: runtimeInput.view,
 			elementsByHostId: prepared.elementsByHostId,

@@ -309,7 +309,15 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 	);
 	return (input.payloadArena.view.keyedRepeats ?? []).flatMap((repeat) => {
 		const render = renderEntries.get(repeat.id);
-		if (!render || indexKeyed.has(repeat.id) || render.rowElementCount === 0) return [];
+		// A row whose only child is a component owns NO element host of its own -
+		// the component's elements belong to the component's chunk - so
+		// rowElementCount is 0 and this gate used to drop the record entirely.
+		// The record is what carries row-order reconciliation, not just row-
+		// relative event and handle coordinates, so dropping it left a widget-
+		// rooting list wired for events and unable to follow its own collection.
+		// The row still renders one root element per item, which is all the
+		// reconcile needs.
+		if (!render || indexKeyed.has(repeat.id) || !rowRootsOneElement(input, render)) return [];
 		const rowHostPaths = hostPathsForChunk(input, render.rowChunkId, true);
 		// Row-owned handles ride the repeat, in row-relative coordinates, for the
 		// same reason row events do: the resumed set is whatever the parent's live
@@ -438,6 +446,20 @@ function branchArmHostPaths(
 	chunkId: string,
 ): ReadonlyMap<string, ArmHostPlacement> {
 	return armHostPaths(renderDataOf(input), input.semanticGraph, chunkId);
+}
+
+// Does one item of this repeat render one root element? Either the row chunk
+// owns element hosts, or the row's root IS a child component, whose own chunk
+// owns them. A row that renders neither (text only) is left out: the reconcile
+// addresses rows as the parent's child ELEMENTS, so a row with no element of
+// its own has nothing to move.
+function rowRootsOneElement(
+	input: ProtocolViewPayloadInput,
+	render: { readonly rowElementCount: number; readonly rowChunkId: string },
+): boolean {
+	if (render.rowElementCount > 0) return true;
+	const chunk = renderDataOf(input).chunks.find((candidate) => candidate.id === render.rowChunkId);
+	return (chunk?.slots ?? []).some((slot) => slot.kind === 'child-component');
 }
 
 function hostPathsForChunk(
