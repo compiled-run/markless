@@ -237,6 +237,112 @@ export type StructureToken =
 
 type RenderedPart = { readonly html: string; readonly tokens: ReadonlyArray<StructureToken> };
 
+/**
+ * Defect 97. The HTML side splices a projection INSIDE the child, at the
+ * `{children}` position; the token side used to append it after the child's own
+ * tokens, so the served locator table stopped naming the element a document walk
+ * reaches at that index. The child is the only party that knows where its
+ * `{children}` landed, so the projection's token span rides the projection HTML
+ * into the child render and the child's own `{children}` slot reports it back:
+ * `renderChunk` then sorts it by that slot's coordinate, exactly as it sorts the
+ * child's own hosts. The mark below is the carrier. It is stripped by the same
+ * slot that reports the tokens, so it never reaches the served bytes.
+ */
+const PROJECTION_MARK_PREFIX = '<!--markless-projection:';
+const PROJECTION_MARK_PATTERN = /<!--markless-projection:(\d+)-->/g;
+
+type ProjectionSpan = {
+	readonly mark: string;
+	readonly tokens: ReadonlyArray<StructureToken>;
+	consumed: boolean;
+};
+
+// Keyed by a counter rather than by the projection HTML: two renders in flight at
+// once (concurrent requests, or `@for` rows rendered with Promise.all) can produce
+// byte-identical projections whose tokens name different hosts.
+const projectionSpans = new Map<string, ProjectionSpan>();
+let nextProjectionKey = 0;
+
+function openProjectionSpan(tokens: ReadonlyArray<StructureToken>): ProjectionSpan {
+	const key = String(nextProjectionKey++);
+	const span: ProjectionSpan = { mark: `${PROJECTION_MARK_PREFIX}${key}-->`, tokens, consumed: false };
+	projectionSpans.set(key, span);
+	return span;
+}
+
+function closeProjectionSpan(span: ProjectionSpan | undefined): void {
+	if (span) projectionSpans.delete(span.mark.slice(PROJECTION_MARK_PREFIX.length, -3));
+}
+
+/**
+ * Takes the marks out of one slot's text and answers with the token spans they
+ * carried. `inDocument` is false when the text is being escaped into a text node
+ * or an attribute: the projection's markup is then not in the DOM at all, so its
+ * tokens must be dropped rather than counted.
+ */
+function claimProjectionSpans(
+	text: string,
+	inDocument: boolean,
+): { readonly text: string; readonly tokens: ReadonlyArray<StructureToken> } {
+	if (!text.includes(PROJECTION_MARK_PREFIX)) return { text, tokens: [] };
+	const tokens: StructureToken[] = [];
+	const stripped = text.replaceAll(PROJECTION_MARK_PATTERN, (_match, key: string) => {
+		const span = projectionSpans.get(key);
+		if (!span) return '';
+		// A child that renders `{children}` twice puts one token stream in two
+		// places; the tokens are counted once, where the first copy landed.
+		if (inDocument && !span.consumed) tokens.push(...span.tokens);
+		span.consumed = true;
+		return '';
+	});
+	return { text: stripped, tokens };
+}
+
+/** Belt and braces: a mark must never reach the served bytes. */
+function withoutProjectionMarks(html: string): string {
+	return html.includes(PROJECTION_MARK_PREFIX) ? html.replaceAll(PROJECTION_MARK_PATTERN, '') : html;
+}
+
+/**
+ * The splice for a child that is NOT rendered by this renderer — a hand-written
+ * Link-style component that interpolates `children` into a string it built itself.
+ * No slot reported the position, but the mark is still sitting in the returned
+ * HTML, so the position is read off the bytes: count the start tags and the
+ * framework's own comments that precede it, then take that many tokens.
+ */
+function spliceTokensAtMark(
+	tokens: ReadonlyArray<StructureToken>,
+	htmlBeforeMark: string,
+	projectionTokens: ReadonlyArray<StructureToken>,
+): ReadonlyArray<StructureToken> {
+	const elements = htmlBeforeMark.match(/<[a-zA-Z][a-zA-Z0-9:_.-]*/g)?.length ?? 0;
+	const comments = htmlBeforeMark.match(/<!--\/?markless:/g)?.length ?? 0;
+	let seenElements = 0;
+	let seenComments = 0;
+	let index = 0;
+	while (index < tokens.length && (seenElements < elements || seenComments < comments)) {
+		if (tokens[index]!.kind === 'element') seenElements++;
+		else seenComments++;
+		index++;
+	}
+	return [...tokens.slice(0, index), ...projectionTokens, ...tokens.slice(index)];
+}
+
+function projectionNotRenderedError(
+	componentName: string,
+	edgeId: string,
+): Error & Record<string, unknown> {
+	const message = `MARKLESS_PROJECTION_NOT_RENDERED: <${componentName}> was given projected children but never rendered them, so the elements written into it are counted by the served locator table and absent from the served HTML — every locator after that point would attach to the wrong element. Render \`{children}\` in <${componentName}>'s own markup. A \`{children}\` written inside an @if/@else (or another construct arm) is not rendered today: move it out of the arm, or keep the arm's default content and place the children outside it.`;
+	const error = new Error(message) as Error & Record<string, unknown>;
+	error.code = 'MARKLESS_PROJECTION_NOT_RENDERED';
+	error.severity = 'error';
+	error.phase = 'runtime';
+	error.componentName = componentName;
+	error.componentEdgeId = edgeId;
+	error.docsUrl = 'https://markless.dev/errors/MARKLESS_PROJECTION_NOT_RENDERED';
+	return error;
+}
+
 export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSsrDataOutput> {
 	const idPrefix = input.idPrefix ?? '';
 	const chunks = new Map(input.renderData.chunks.map((chunk) => [chunk.id, chunk]));
@@ -319,7 +425,12 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 		switch (slot.kind) {
 			case 'text': {
 				const value = await input.read(slot.residue, context);
-				return { html: slot.raw ? String(value ?? '') : escapeHtml(value), tokens: [] };
+				// The `{children}` of a projecting component is exactly this slot: it
+				// reports the projection's token span so `renderChunk` can sort it into
+				// the child's own stream by this slot's coordinate.
+				const claimed = claimProjectionSpans(String(value ?? ''), slot.raw === true);
+				if (slot.raw) return { html: claimed.text, tokens: claimed.tokens };
+				return { html: value == null ? '' : escapeHtml(claimed.text), tokens: [] };
 			}
 			case 'attribute': {
 				const value = await input.read(slot.residue, context);
@@ -348,11 +459,21 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 					: undefined;
 				if (!input.renderChild)
 					throw new Error(`MARKLESS_SSR_DATA_CHILD_RENDERER_MISSING: ${slot.componentEdgeId}`);
-				const child = await input.renderChild(slot, {
-					...context,
-					...(childSeeds ? { sharedSeeds: rootEdgeSeeds(childSeeds, context.sharedSeeds) } : {}),
-					...(projection ? { projectionHtml: projection.html } : {}),
-				});
+				// Nothing to splice when the projection contributes no structure, so the
+				// mark is spent only where it buys something.
+				const span = projection && projection.tokens.length > 0
+					? openProjectionSpan(projection.tokens)
+					: undefined;
+				let child;
+				try {
+					child = await input.renderChild(slot, {
+						...context,
+						...(childSeeds ? { sharedSeeds: rootEdgeSeeds(childSeeds, context.sharedSeeds) } : {}),
+						...(projection ? { projectionHtml: (span?.mark ?? '') + projection.html } : {}),
+					});
+				} finally {
+					closeProjectionSpan(span);
+				}
 				if (!child || typeof child !== 'object')
 					throw new Error(`MARKLESS_SSR_DATA_CHILD_STRUCTURE_MISSING: ${slot.componentEdgeId}`);
 				if (child.coordinates) {
@@ -372,13 +493,21 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 					hostNodeId: `${idPrefix}__child:${slot.componentEdgeId}:${index}`,
 					tagName: '*',
 				}));
-				return {
-					html: child.html,
-					tokens: [
-						...(childTokens ?? countTokens),
-						...(projection?.tokens ?? []),
-					],
-				};
+				const baseTokens = childTokens ?? countTokens;
+				const html = withoutProjectionMarks(child.html);
+				// Spliced: the child's own `{children}` slot already placed the projection
+				// where the HTML puts it, so appending it again would double-count it.
+				if (span?.consumed) return { html, tokens: baseTokens };
+				if (span) {
+					const markAt = child.html.indexOf(span.mark);
+					if (markAt < 0)
+						throw projectionNotRenderedError(slot.childComponentName, slot.componentEdgeId);
+					return {
+						html,
+						tokens: spliceTokensAtMark(baseTokens, child.html.slice(0, markAt), span.tokens),
+					};
+				}
+				return { html, tokens: [...baseTokens, ...(projection?.tokens ?? [])] };
 			}
 			case 'branch': {
 				anchors.push(anchorRecord(idPrefix, context.chunkId, slot, slot.branchSiteId));
