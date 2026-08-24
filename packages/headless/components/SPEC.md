@@ -29,7 +29,7 @@ Established roles (shipped in 3+ families, or ruled by the owner):
 | `description` | supporting text wired via `aria-describedby` | modal, textbox, combobox |
 | `error` | validation message | textbox, combobox, radio-group |
 | `indicator` | a purely-presentational state marker | select, radio-group, tree |
-| `field` | the form-integration element | select, combobox, radio-group |
+| `field` | the form-integration element | select, combobox, radio-group `itemfield` |
 | `input` | the editable text element | combobox, textbox, otp |
 | `title` | the accessible name of a roled surface | modal, toaster `itemtitle`, popover (chartered) |
 | `close` | dismisses the surface it sits in | modal, toaster `itemclose`, popover (chartered) |
