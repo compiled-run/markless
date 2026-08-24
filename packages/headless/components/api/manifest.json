@@ -863,7 +863,7 @@
 						"name": "index",
 						"type": "number",
 						"required": true,
-						"doc": "Which character of the code this box shows, counting from 0."
+						"doc": "Which character of the code this box shows, counting from 0. Writing the\nboxes is what sets the length of the code: six boxes, a six-character code."
 					}
 				]
 			},
@@ -877,12 +877,6 @@
 				"component": "OtpRoot",
 				"doc": "The box the field is stretched over, so `style` is the family's: it is what\nmakes the field measure itself against this element rather than the page.\nEverything else about the look of the boxes belongs to a consumer's class.",
 				"props": [
-					{
-						"name": "length",
-						"type": "number",
-						"required": true,
-						"doc": "How many characters the code has. Every item declares its own place in it."
-					},
 					{
 						"name": "value",
 						"type": "string",
@@ -914,7 +908,7 @@
 						"name": "onComplete",
 						"type": "(value: string) => void",
 						"required": false,
-						"doc": "Called once with the whole code the moment it reaches `length` characters."
+						"doc": "Called once with the whole code the moment it holds one character per box."
 					}
 				]
 			}
