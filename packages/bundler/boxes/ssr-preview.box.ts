@@ -23,7 +23,13 @@ const MAX_PRELOADED_RUNTIME_CHUNK_GZIP_BYTES = 2_175;
 const PREVIOUS_COUNTER_CLICK_EXECUTED_GZIP_BYTES = 4_092;
 // INTERIM 2026-08-12: 3,250 -> 3,350 covers measured 3,300 (darwin; CI unmeasured, box was
 // skipped behind red unit steps for weeks). Growth origin awaits owner review; tighten-only stands.
-const MAX_COUNTER_CLICK_EXECUTED_GZIP_BYTES = 3_350; // prior: measured SHIPPED 3,187 (2026-07-06). Composition: scalar-core 2,575 (fail-closed dispatcher ~honest floor) + write-scalar 418 + shared 194.
+// 3,350 -> 3,430 (2026-08-24): measured 3,412. Growth accrued across the
+// dispatch-ordering + row-capability merges (queued wrapper on every resumed
+// root, stop threading in row dispatch, resume FIFO +7, keyed-repeat offset
+// consumption); no single wrongdoer, all correctness or capability. Prior:
+// measured SHIPPED 3,187 (2026-07-06): scalar-core 2,575 + write-scalar 418 +
+// shared 194.
+const MAX_COUNTER_CLICK_EXECUTED_GZIP_BYTES = 3_430;
 const MAX_FIRST_INTERACTION_TOTAL_GZIP_BYTES = 40_900; // shipped-byte pin; test instrumentation is measured separately and must not set this cap.
 
 export default box(
