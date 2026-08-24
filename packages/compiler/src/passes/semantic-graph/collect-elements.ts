@@ -153,11 +153,11 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 	state.currentHostNodeId = previousHost;
 }
 
-export function collectTemplateExpression(node: AnyNode, state: WalkState): void {
-	if (!state.currentHostNodeId) return;
-
-	const expression = node.expression as AnyNode | undefined;
-	if (!expression) return;
+export function collectTemplateExpression(
+	expression: AnyNode | undefined,
+	state: WalkState,
+): void {
+	if (!state.currentHostNodeId || !expression) return;
 	const composite = collectCompositeTemplateExpression(expression, state, TEMPLATE_READ_OPTIONS);
 
 	state.graph.templateReads.push({

@@ -71,6 +71,20 @@ export function isPlainHostTemplateNode(node: AnyNode): boolean {
 	);
 }
 
+// A bare `{expr}` written where markup takes statements - an @if/@switch arm,
+// a @for row, a @try arm - parses as a block holding one expression statement,
+// not as an expression container. Only call this in those statement positions:
+// an arrow handler body `() => { count++ }` has the identical shape and is a
+// real block.
+export function markupInterpolationExpression(node: AnyNode): AnyNode | undefined {
+	if (node.type !== 'BlockStatement') return undefined;
+	const body = asNodes(node.body);
+	if (body.length !== 1) return undefined;
+	const [statement] = body;
+	if (statement?.type !== 'ExpressionStatement') return undefined;
+	return statement.expression as AnyNode | undefined;
+}
+
 export function getElementTagName(node: AnyNode): string | null {
 	const name = (node.id ?? (node.openingElement as AnyNode | undefined)?.name) as
 		| AnyNode
