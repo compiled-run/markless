@@ -27,6 +27,12 @@ const RENDERED_ROLE: Record<FamilyName, string> = {
 	textbox: 'textbox',
 	progress: 'progressbar',
 	checklist: 'checkbox',
+	select: 'combobox',
+	// A closed dialog is in the tree behind a hidden backdrop, so its role is in
+	// the DOM whether or not the trigger has been pressed.
+	modal: 'dialog',
+	'radio-group': 'radiogroup',
+	tabs: 'tablist',
 };
 
 const appDir = fileURLToPath(new URL('..', import.meta.url));

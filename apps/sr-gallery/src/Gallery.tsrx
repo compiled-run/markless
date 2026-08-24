@@ -1,8 +1,19 @@
-import { checkbox, checklist, progress, textbox, toggle } from '@markless/ui';
+import {
+	checkbox,
+	checklist,
+	modal,
+	progress,
+	radiogroup,
+	select,
+	tabs,
+	textbox,
+	toggle,
+} from '@markless/ui';
 
 // Every shipped family's Basic scenario - the starter a consumer copies - on one
 // page, each in a section a reader can jump to by its anchor: /#checkbox,
-// /#toggle, /#textbox, /#progress, /#checklist.
+// /#toggle, /#textbox, /#progress, /#checklist, /#select, /#modal,
+// /#radio-group, /#tabs.
 //
 // This is consumer code, not test code. It imports through the package barrel
 // the way a reader of the docs would, carries no test hooks, and the markup is
@@ -81,6 +92,91 @@ export function Gallery() @{
 						<checklist.itemlabel>Mustard</checklist.itemlabel>
 					</checklist.item>
 				</checklist.root>
+			</div>
+		</section>
+
+		<section id="select">
+			<h2>Select</h2>
+			<div class="scenario">
+				<select.root>
+					<select.label>Favorite Fruit</select.label>
+					<select.trigger>Choose a Fruit</select.trigger>
+					<select.content>
+						<select.item value="apple">
+							<select.itemlabel>Apple</select.itemlabel>
+							<select.itemindicator>Chosen</select.itemindicator>
+						</select.item>
+						<select.item value="banana">
+							<select.itemlabel>Banana</select.itemlabel>
+							<select.itemindicator>Chosen</select.itemindicator>
+						</select.item>
+						<select.item value="cherry">
+							<select.itemlabel>Cherry</select.itemlabel>
+							<select.itemindicator>Chosen</select.itemindicator>
+						</select.item>
+					</select.content>
+				</select.root>
+			</div>
+		</section>
+
+		<section id="modal">
+			<h2>Modal</h2>
+			<div class="scenario">
+				<modal.root>
+					<modal.trigger>Edit address</modal.trigger>
+					<modal.backdrop>
+						<modal.content>
+							<modal.title>Edit delivery address</modal.title>
+							<modal.close>Cancel</modal.close>
+						</modal.content>
+					</modal.backdrop>
+				</modal.root>
+			</div>
+		</section>
+
+		<section id="radio-group">
+			<h2>Radio group</h2>
+			<div class="scenario">
+				<radiogroup.root>
+					<radiogroup.label>Billing Period</radiogroup.label>
+					<radiogroup.item value="monthly">
+						<radiogroup.itemfield />
+						<radiogroup.itemtrigger>
+							<radiogroup.itemindicator>Chosen</radiogroup.itemindicator>
+						</radiogroup.itemtrigger>
+						<radiogroup.itemlabel>Monthly</radiogroup.itemlabel>
+					</radiogroup.item>
+					<radiogroup.item value="annual">
+						<radiogroup.itemfield />
+						<radiogroup.itemtrigger>
+							<radiogroup.itemindicator>Chosen</radiogroup.itemindicator>
+						</radiogroup.itemtrigger>
+						<radiogroup.itemlabel>Annual</radiogroup.itemlabel>
+					</radiogroup.item>
+					<radiogroup.item value="lifetime">
+						<radiogroup.itemfield />
+						<radiogroup.itemtrigger>
+							<radiogroup.itemindicator>Chosen</radiogroup.itemindicator>
+						</radiogroup.itemtrigger>
+						<radiogroup.itemlabel>Lifetime</radiogroup.itemlabel>
+					</radiogroup.item>
+				</radiogroup.root>
+			</div>
+		</section>
+
+		<section id="tabs">
+			<h2>Tabs</h2>
+			<div class="scenario">
+				<tabs.root value="overview">
+					<tabs.list>
+						<tabs.trigger value="overview">Overview</tabs.trigger>
+						<tabs.trigger value="usage">Usage</tabs.trigger>
+						<tabs.trigger value="billing">Billing</tabs.trigger>
+					</tabs.list>
+					<tabs.content value="overview">Everything that happened this month.</tabs.content>
+					<tabs.content value="usage">How much of the plan you have used.</tabs.content>
+					<tabs.content value="billing">Your next invoice is due on the 1st.</tabs.content>
+				</tabs.root>
 			</div>
 		</section>
 	</main>

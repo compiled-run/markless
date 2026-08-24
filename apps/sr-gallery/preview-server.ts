@@ -6,9 +6,9 @@ export const PREVIEW_PORT = 4319;
 export const PREVIEW_ORIGIN = `http://${PREVIEW_HOST}:${PREVIEW_PORT}`;
 
 /**
- * The anchor each family's Basic scenario sits on. One page, five sections: a
- * reader lands on `${PREVIEW_ORIGIN}/#checkbox` and the checkbox section is the
- * first thing under the cursor.
+ * The anchor each family's Basic scenario sits on. One page, one section per
+ * family: a reader lands on `${PREVIEW_ORIGIN}/#checkbox` and the checkbox
+ * section is the first thing under the cursor.
  */
 export const FAMILY_ANCHORS = {
 	checkbox: '/#checkbox',
@@ -16,6 +16,10 @@ export const FAMILY_ANCHORS = {
 	textbox: '/#textbox',
 	progress: '/#progress',
 	checklist: '/#checklist',
+	select: '/#select',
+	modal: '/#modal',
+	'radio-group': '/#radio-group',
+	tabs: '/#tabs',
 } as const;
 
 export type FamilyName = keyof typeof FAMILY_ANCHORS;
