@@ -10,6 +10,8 @@ import type {
 	AccordionRootProps,
 } from './accordion-types.ts';
 
+// One computed() cell per comparison - the same comparison written inline in an attribute renders once and then goes stale.
+
 export const accordionState = shared(
 	() => {
 		const accordion: AccordionInstanceState = state({
@@ -19,9 +21,7 @@ export const accordionState = shared(
 			disabled: false,
 			disableUntilFound: false,
 		});
-		// The array type argument is what makes this handle plural: one handle
-		// bound on every section trigger, read back as the live triggers in
-		// document order. It is what the keyboard walk is handed.
+		// The array type argument makes the handle plural: bound on every trigger, read back as the live triggers in document order.
 		const triggerEls = element<HTMLButtonElement[]>();
 
 		return {
@@ -29,14 +29,7 @@ export const accordionState = shared(
 			triggerEls,
 			// literal function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string | readonly string[]) => void) | undefined,
-			/**
-			 * Open a section, or close it if it is the one showing. Single mode
-			 * holds one name and opening a section closes whatever was open;
-			 * `multiple` holds a list and each section answers for itself.
-			 *
-			 * `collapsible` is the allow-zero switch: without it the section that is
-			 * showing refuses to close, so the accordion always has one open.
-			 */
+			// `collapsible` is the allow-zero switch: without it the showing section refuses to close, so one is always open.
 			toggle(next: string) {
 				if (accordion.disabled) return;
 				const held = accordion.value;
@@ -55,12 +48,7 @@ export const accordionState = shared(
 				accordion.value = after;
 				accordion.onChange?.(after);
 			},
-			/**
-			 * Show a section that the browser has just found text inside. It only
-			 * ever opens: find-in-page revealing a panel is not a person asking for
-			 * the one that was open to close, and it is not subject to `collapsible`
-			 * either, which only ever refuses a close.
-			 */
+			// Find-in-page only ever opens: it is not a person asking for the open section to close, so `collapsible` does not apply.
 			reveal(next: string) {
 				const held = accordion.value;
 				if (accordion.multiple) {
@@ -121,11 +109,8 @@ export function AccordionItem({ value, disabled = false, children, ...rest }: Ac
 	const accordion = accordionState();
 	const item = accordionItemState();
 	item.value = value;
-	// Own prop only: a seed is built from this component's props, so the
-	// accordion's own `disabled` is added at every read site instead.
+	// Own prop only: a seed is built from this component's props, so the accordion's own `disabled` is added at every read site.
 	item.disabled = disabled;
-	// One graph cell, read in every position: the same comparison written inline
-	// in an attribute renders once and then goes stale.
 	const isOpen = computed(() => {
 		const held = accordion.value;
 		if (typeof held === 'string') return held === item.value;
@@ -133,9 +118,6 @@ export function AccordionItem({ value, disabled = false, children, ...rest }: Ac
 	});
 	const isLocked = computed(() => item.disabled || accordion.disabled);
 
-	// `ui-value` is this section's own name in the markup: it is what a
-	// stylesheet and a test can read a section back by, and the family state
-	// names sections by value rather than by position.
 	<div
 		{...rest}
 		ui-value={item.value}
@@ -145,9 +127,7 @@ export function AccordionItem({ value, disabled = false, children, ...rest }: Ac
 	>{children}</div>
 }
 
-// The APG asks for the trigger to sit in a heading, and this is also what names
-// the panel: `accordion.itemcontent` points `aria-labelledby` at this element,
-// whose words are the trigger's own.
+// The heading the APG asks for, and what names the panel: `accordion.itemcontent` points aria-labelledby at this element.
 export function AccordionItemLabel({ children, ...rest }: AccordionItemLabelProps) @{
 	const item = accordionItemState();
 
@@ -169,8 +149,7 @@ export function AccordionItemTrigger({
 	});
 	const isLocked = computed(() => item.disabled || accordion.disabled);
 
-	// A native <button> already activates on Enter and on Space, so neither key
-	// has a rule here; the keydown below is the roving walk and nothing else.
+	// A native button already activates on Enter and Space, so the keydown below is the roving walk and nothing else.
 	<button
 		{...rest}
 		el={accordion.triggerEls}
@@ -185,9 +164,7 @@ export function AccordionItemTrigger({
 			onClick?.(event);
 		}}
 		onKeydown={(event) => {
-			// Written out from event fields alone: this policy has to be readable
-			// before the handler symbol loads, and a guard over locals derived from
-			// graph state is MARKLESS_SYNC_POLICY_UNEXTRACTABLE.
+			// Written from event fields alone: a guard over locals derived from graph state is MARKLESS_SYNC_POLICY_UNEXTRACTABLE.
 			if (
 				event.key === 'ArrowDown' ||
 				event.key === 'ArrowUp' ||
@@ -197,9 +174,7 @@ export function AccordionItemTrigger({
 				event.preventDefault();
 			}
 
-			// `document.activeElement`, not `event.currentTarget`: a lazily loaded
-			// handler runs after the native dispatch, so `currentTarget` is null by
-			// then, while focus has not moved off the button that was pressed.
+			// `document.activeElement`, not `event.currentTarget`: a lazily loaded handler runs after the native dispatch, when `currentTarget` is null.
 			const next = nextTriggerToFocus(accordion.triggerEls, document.activeElement, event.key);
 			if (next) next.focus();
 			onKeydown?.(event);
@@ -219,19 +194,13 @@ export function AccordionItemContent({
 		if (typeof held === 'string') return held === item.value;
 		return held.includes(item.value);
 	});
-	// Three values from one expression: absent while the section shows, plain
-	// `hidden` when the consumer has turned find-in-page off, and
-	// `hidden="until-found"` otherwise. `false` rather than `undefined` for the
-	// open case, because the attribute writer reads `false` as "remove this" and
-	// `undefined` as no record at all.
+	// The open case is `false`, not `undefined`: the attribute writer reads `false` as "remove this" and `undefined` as no record at all.
 	const hiddenPath = computed(() => {
 		if (isOpen) return false;
 		return accordion.disableUntilFound ? true : 'until-found';
 	});
 
-	// Closed hides the panel, it never detaches it: the trigger's aria-controls
-	// points at this element's minted id, an unmount would leave that reference
-	// dangling, and `hidden="until-found"` only reaches text that is in the page.
+	// Closed hides the panel, never detaches it: the trigger's aria-controls points at this element's minted id, and find-in-page only reaches text that is in the page.
 	<div
 		{...rest}
 		el={item.contentEl}

@@ -102,10 +102,7 @@ export function ModalBackdrop({
 		ui-open={modal.open}
 		ui-closed={modal.open !== true}
 		onDismiss={(event) => {
-			// Escape closes every dialog. An outside press is the one an alert
-			// refuses, and the reports that reach here are presses landing beyond
-			// the layer entirely - a press on the layer itself is the pair of
-			// handlers below, because the behaviour counts its own element as inside.
+			// Escape closes every dialog; an outside press is the one an alert refuses. Only presses beyond the layer entirely report here, because the behaviour counts its own element as inside.
 			const isRefused = modal.alert === true && event.detail.reason === 'outside-press';
 			if (isRefused !== true) {
 				modal.setOpen(false);
@@ -115,15 +112,12 @@ export function ModalBackdrop({
 			onDismiss?.(event);
 		}}
 		onPointerdown={(event) => {
-			// A dismissal starts here and finishes on the click, so a drag that began
-			// inside the dialog and ended on the layer never closes it.
+			// A dismissal starts here and finishes on the release, so a drag that began inside the dialog and ended on the layer never closes it.
 			armBackdropPress(modal.backdropEl, event.target, event.button);
 			onPointerdown?.(event);
 		}}
 		onPointerup={(event) => {
-			// The release is what completes the dismissal. Reading it here rather than
-			// on `click` keeps the whole gesture in the pointer vocabulary the press
-			// began in, and a release outside the layer never reaches this handler.
+			// Read here rather than on `click`, keeping the whole gesture in the pointer vocabulary the press began in.
 			const isOutsidePress = isBackdropPressFinished(modal.backdropEl, event.target);
 			if (isOutsidePress && modal.alert !== true) {
 				modal.setOpen(false);
@@ -138,10 +132,7 @@ export function ModalBackdrop({
 export function ModalContent({ children, ...rest }: ModalContentProps) @{
 	const modal = modalState();
 
-	// `aria-modal` is authored, not toggled: the overlay behaviour reads it off
-	// this subtree when the backdrop enlists, and that is what takes the rest of
-	// the page out of reach. tabindex makes the surface itself a focus target,
-	// which is where an opening dialog lands.
+	// `aria-modal` is authored, not toggled: the overlay behaviour reads it off this subtree when the backdrop enlists, and tabindex makes the surface itself the focus target an opening dialog lands on.
 	<div
 		{...rest}
 		el={modal.contentEl}

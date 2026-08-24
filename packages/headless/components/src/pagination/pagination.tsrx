@@ -11,6 +11,8 @@ import type {
 	PaginationRootProps,
 } from './pagination-types.ts';
 
+// This family holds no computed(): a widget-scoped shared computed read in a part's attribute renders once and never refreshes, so every part compares against `pagination.page` with a plain unclamped cell read.
+
 export const paginationState = shared(
 	() => {
 		const pagination: PaginationInstanceState = state({
@@ -22,36 +24,22 @@ export const paginationState = shared(
 
 		return {
 			...pagination,
-			// Which pages to show, read as a zero-arg accessor:
-			// `const p = pagination.state(); const entries = computed(() => p.getEntries())`.
-			//
-			// The clamp lives here rather than on the way in: a component body may seed
-			// a shared cell only from a bare prop or a constant, so the root cannot
-			// narrow `page` as it arrives. Narrowing at every read is what makes a
-			// bookmarked `?page=99` render the last page's range.
+			// Clamped on the read, not on the way in: a component body may seed a shared cell only from a bare prop or a constant.
 			getEntries() {
 				const showing = Math.min(Math.max(pagination.page, 1), Math.max(pagination.count, 1));
 				return pageRange(showing, pagination.count, pagination.siblingCount);
 			},
-			// The literal function type matters: a callback slot is recognised only from
-			// the written annotation, never inferred.
+			// The literal function type matters: a callback slot is recognised only from the written annotation, never inferred.
 			onChange: undefined as ((page: number) => void) | undefined,
-			// `value = 1` rather than `value: number`, and the default is never used. A
-			// dispatching shared method is inlined into the handler that calls it, and
-			// the capture analysis parses that handler with a JavaScript-only parser; a
-			// type annotation makes the parse throw, and every `onClick?.(event)` in the
-			// handler is then reported as an unconditional call, refusing the build. The
-			// default carries the same `number` type in plain JavaScript.
+			// `value = 1`, never `value: number`: a dispatching shared method is inlined into its caller and re-parsed as plain JavaScript, where an annotation throws.
 			goTo(value = 1) {
 				if (pagination.disabled) return;
 				const next = Math.min(Math.max(value, 1), Math.max(pagination.count, 1));
-				// Going where you already are is not a page change, so no callback fires.
 				if (next === pagination.page) return;
 				pagination.page = next;
 				pagination.onChange?.(next);
 			},
-			// These repeat goTo()'s body rather than calling it: a shared method has no
-			// receiver to reach its siblings through.
+			// These repeat goTo()'s body rather than calling it: a shared method has no receiver to reach its siblings through.
 			back() {
 				if (pagination.disabled) return;
 				if (pagination.page <= 1) return;
@@ -71,11 +59,7 @@ export const paginationState = shared(
 	{ scope: 'widget' },
 );
 
-// The per-item instance, and the reason `itemtrigger` and `itemlink` take no page
-// number of their own. A widget-scoped definition is rooted by the component that
-// SEEDS it, so each rendered `PaginationItem` owns its own `value` and a control
-// nested inside resolves to the nearest enclosing item. Two definitions are live at
-// once inside one control: the family instance from the root, and this one.
+// Rooted by the component that seeds it, so a control nested in a `PaginationItem` resolves to that item and needs no page number of its own.
 export const paginationItemState = shared(
 	() => {
 		const item: PaginationItemInstanceState = state({ value: 1 });
@@ -85,21 +69,7 @@ export const paginationItemState = shared(
 	{ scope: 'widget' },
 );
 
-// Every part below compares against `pagination.page` with a plain cell read, and
-// that spelling is load-bearing.
-//
-// This family holds no computed(): a widget-scoped shared computed read in a part's
-// attribute renders once and then never refreshes, because writing the cell
-// underneath it wakes no DOM update. Wrapping a comparison in a clamp turns it into
-// an expression, which stops refreshing for the same reason, so the comparisons stay
-// unclamped by design. `goTo()` clamps every write, and `getEntries()` clamps on the
-// read side because a consumer holds it in a computed() and reads a value rather
-// than an attribute. A bookmarked `?page=99` therefore gets the last page's range
-// while the comparisons here still see 99, until the first gesture clamps it.
-//
-// The nav's name is written BEFORE the spread and the state attributes after it, so
-// a consumer can replace the landmark's name and cannot replace aria-current or
-// disabled.
+// The landmark's name is written before the spread and its state attributes after, so a consumer can rename it but cannot overwrite the state.
 export function PaginationRoot({
 	count,
 	page = 1,
@@ -119,9 +89,6 @@ export function PaginationRoot({
 	<nav aria-label="Pagination" {...rest} ui-disabled={pagination.disabled}>{children}</nav>
 }
 
-// The one part that declares a page number. Its `value` seeds the per-item
-// instance, and the control it wraps reads that back rather than being told the
-// number a second time.
 export function PaginationItem({ value, children, ...rest }: PaginationItemProps) @{
 	const pagination = paginationState();
 	const item = paginationItemState();
@@ -138,10 +105,7 @@ export function PaginationItemTrigger({
 	const pagination = paginationState();
 	const item = paginationItemState();
 
-	// aria-current is absent on the pages you are not on, never "false" - the
-	// attribute's own default is already "false". The absent branch must be spelled
-	// `false` rather than `undefined`: an `undefined` branch compiles to no DOM-update
-	// record at all, so the attribute would render once and never move again.
+	// The absent aria-current branch is spelled `false`, never `undefined`: an `undefined` branch compiles to no DOM-update record, so the attribute would never move again.
 	<button
 		{...rest}
 		type="button"
@@ -159,8 +123,7 @@ export function PaginationItemLink({ children, onClick, ...rest }: PaginationIte
 	const pagination = paginationState();
 	const item = paginationItemState();
 
-	// An anchor has no `disabled`, so an unavailable link says so with
-	// aria-disabled and stays focusable; goTo() is what refuses to move.
+	// An anchor has no `disabled`, so it stays focusable and says so with aria-disabled; goTo() is what refuses to move.
 	<a
 		{...rest}
 		aria-current={pagination.page === item.value ? 'page' : false}

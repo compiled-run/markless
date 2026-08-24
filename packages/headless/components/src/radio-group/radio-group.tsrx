@@ -44,8 +44,7 @@ export const radiogroupState = shared(
 	{ scope: 'widget' },
 );
 
-// A second family, rooted by `radiogroup.item`: the parts inside one option read
-// this instance, while the item's own body still reads the group's.
+// Rooted by `radiogroup.item`: the parts inside one option read this instance, while the item's own body still reads the group's.
 export const radiogroupItemState = shared(
 	() => {
 		const item: RadioGroupItemInstanceState = state({ value: '', disabled: false });
@@ -56,8 +55,7 @@ export const radiogroupItemState = shared(
 	{ scope: 'widget' },
 );
 
-// A fieldset named by its legend: the group's accessible name with no id, no
-// IDREF and no minted token, and native disabling of every option it holds.
+// A fieldset named by its legend: an accessible name with no id, IDREF or minted token, plus native disabling of every option it holds.
 export function RadioGroupRoot({
 	value = '',
 	orientation = 'vertical',
@@ -91,16 +89,13 @@ export function RadioGroupLabel({ children, ...rest }: RadioGroupLabelProps) @{
 	<legend {...rest}>{children}</legend>
 }
 
-// What a form receives, said once for the whole group: every option's hidden
-// radio reads the name and the requirement from here, so a group is renamed in
-// one place. It can be written anywhere inside the root.
+/** Names the group for a form, once: every option's hidden radio reads the name and the requirement from here. */
 export function RadioGroupField({ name = '', required = false }: RadioGroupFieldProps) @{
 	const group = radiogroupState();
 	group.name = name;
 	group.required = required;
 
-	// A part has to render markup to be served as a component, and this one has
-	// nothing to show, so it renders the empty span every field part hides in.
+	// A part has to render markup to be served as a component, and this one has nothing to show.
 	<VisuallyHidden />
 }
 
@@ -120,8 +115,7 @@ export function RadioGroupItem({ value, disabled = false, children, ...rest }: R
 	const group = radiogroupState();
 	const item = radiogroupItemState();
 	item.value = value;
-	// Own prop only: a seed is built from this component's props, so the group's
-	// own `disabled` is added at every read site instead.
+	// Own prop only: a seed is built from this component's props, so the group's own `disabled` is added at every read site.
 	item.disabled = disabled;
 
 	<div
@@ -131,8 +125,7 @@ export function RadioGroupItem({ value, disabled = false, children, ...rest }: R
 	>{children}</div>
 }
 
-// No role and no aria-checked: the radio semantics live on the native input this
-// sits beside, and a half-stated role on a div is worse than none.
+// No role and no aria-checked: the radio semantics live on the native input this sits beside, and a half-stated role is worse than none.
 export function RadioGroupItemTrigger({ children, onClick, ...rest }: RadioGroupItemTriggerProps) @{
 	const group = radiogroupState();
 	const item = radiogroupItemState();
@@ -151,9 +144,7 @@ export function RadioGroupItemTrigger({ children, onClick, ...rest }: RadioGroup
 export function RadioGroupItemIndicator({ children, ...rest }: RadioGroupItemIndicatorProps) @{
 	const group = radiogroupState();
 	const item = radiogroupItemState();
-	// A computed, not the comparison inline: an `@if` condition written as an
-	// expression renders correctly once and then never refreshes, so the arm
-	// has to read one graph cell. Measured, not assumed.
+	// A computed, not the comparison inline: an `@if` condition written as an expression renders once and then never refreshes.
 	const isSelected = computed(() => group.value === item.value);
 
 	<span {...rest} aria-hidden="true">
@@ -170,9 +161,7 @@ export function RadioGroupItemLabel({ children, ...rest }: RadioGroupItemLabelPr
 export function RadioGroupItemField({ onChange, onFocus, onKeydown, ...rest }: RadioGroupItemFieldProps) @{
 	const group = radiogroupState();
 	const item = radiogroupItemState();
-	// Reachable before any gesture, one tab stop after the first: while nothing
-	// is chosen every enabled option is tabbable until a focus says which one
-	// owns the stop. No index, so no construction-order counter.
+	// While nothing is chosen every enabled option is tabbable, until a focus says which one owns the stop - no index, so no construction-order counter.
 	const isTabStop = computed(
 		() =>
 			group.value === item.value ||
@@ -199,8 +188,7 @@ export function RadioGroupItemField({ onChange, onFocus, onKeydown, ...rest }: R
 				onFocus?.(event);
 			}}
 			onKeydown={(event) => {
-				// The six keys, guarded by event fields alone: a browser-critical
-				// policy has to be readable before the handler symbol loads.
+				// Guarded by event fields alone: this policy has to be readable before the handler symbol loads.
 				if (
 					event.key === 'ArrowDown' ||
 					event.key === 'ArrowUp' ||
@@ -216,8 +204,7 @@ export function RadioGroupItemField({ onChange, onFocus, onKeydown, ...rest }: R
 				const forward = isHorizontal ? 'ArrowRight' : 'ArrowDown';
 				const backward = isHorizontal ? 'ArrowLeft' : 'ArrowUp';
 				const key = event.key;
-				// `target`, not `currentTarget`: a lazy handler symbol runs after the
-				// native dispatch has finished, and `currentTarget` is null by then.
+				// `target`, not `currentTarget`: a lazy handler symbol runs after the native dispatch, when `currentTarget` is null.
 				const here = event.target as HTMLInputElement;
 				if (key === forward || key === backward || key === 'Home' || key === 'End') {
 					// DOM order is the navigation order, so no registry has to hold it.

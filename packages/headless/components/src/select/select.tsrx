@@ -19,6 +19,8 @@ import type {
 	SelectTriggerProps,
 } from './select-types.ts';
 
+// One computed() cell per comparison - a comparison written inline in an attribute renders once and then goes stale.
+
 /** How long a typeahead buffer stays open, in milliseconds. */
 const TYPEAHEAD_WINDOW = 750;
 
@@ -36,8 +38,7 @@ export const selectState = shared(
 		const labelEl = element<HTMLLabelElement>();
 		const contentEl = element<HTMLDivElement>();
 		const triggerEl = element<HTMLButtonElement>();
-		// The array type argument is what makes this handle plural: one handle
-		// bound on every option, read back as the live options in document order.
+		// The array type argument makes the handle plural: bound on every option, read back as the live options in document order.
 		const optionEls = element<HTMLDivElement[]>();
 
 		return {
@@ -64,7 +65,6 @@ export const selectState = shared(
 	{ scope: 'widget' },
 );
 
-/** One instance per option, rooted by `select.item`. */
 export const selectItemState = shared(
 	() => {
 		const item: SelectItemInstanceState = state({ value: '', disabled: false });
@@ -109,8 +109,7 @@ export function SelectLabel({ children, ...rest }: SelectLabelProps) @{
 	<label {...rest} el={select.labelEl}>{children}</label>
 }
 
-// role="combobox", against QDS: a bare button with aria-haspopup is announced as
-// "button, collapsed" and fails aria-at's `Role 'combobox' is conveyed` row.
+// role="combobox", against QDS: a bare button with aria-haspopup is announced as "button, collapsed" and fails aria-at's `Role 'combobox' is conveyed` row.
 export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectTriggerProps) @{
 	const select = selectState();
 
@@ -131,8 +130,7 @@ export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectT
 			onClick?.(event);
 		}}
 		onKeydown={(event) => {
-			// The prevented keys are written out from event fields alone: this
-			// policy has to be readable before the handler symbol loads.
+			// The prevented keys are written from event fields alone: this policy has to be readable before the handler symbol loads.
 			if (
 				event.key === 'ArrowDown' ||
 				event.key === 'ArrowUp' ||
@@ -145,10 +143,7 @@ export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectT
 			const key = event.key;
 			const isOpenAtFirstKey = key === 'ArrowDown' || key === 'Home';
 			const isOpenAtLastKey = key === 'ArrowUp' || key === 'End';
-			// Enter and Space are the button's own activation. preventDefault()
-			// from a lazily loaded handler runs after the native dispatch, so a
-			// key rule that also opened would toggle straight back shut: the
-			// click opens the popup and this handler only lands the focus.
+			// Enter and Space stay the button's own activation: a lazy handler's preventDefault lands after the native dispatch, so also opening here would toggle straight back shut.
 			const isActivationKey = key === 'Enter' || key === ' ';
 			const isTypeaheadChar = key.length === 1 && key !== ' ';
 
@@ -161,8 +156,7 @@ export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectT
 				const search = isTypeaheadChar
 					? (isSearchStale ? '' : select.search) + key.toLowerCase()
 					: '';
-				// Two cell assignments rather than one method taking both: a
-				// shared method of arity two aborts the handler..
+				// Two cell assignments rather than one method taking both: a shared method of arity two aborts the handler.
 				if (isTypeaheadChar) {
 					select.search = search;
 					select.searchAt = now;
@@ -179,8 +173,7 @@ export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectT
 	>{children}</button>
 }
 
-// Closed hides the listbox, it never detaches it: the trigger points at this
-// element's minted id, and an unmount would leave that reference dangling.
+// Closed hides the listbox, never detaches it: the trigger points at this element's minted id, and an unmount would leave that reference dangling.
 export function SelectContent({ children, onKeydown, ...rest }: SelectContentProps) @{
 	const select = selectState();
 
@@ -207,13 +200,11 @@ export function SelectContent({ children, onKeydown, ...rest }: SelectContentPro
 			}
 
 			const key = event.key;
-			// `target`, not `currentTarget`: a lazy handler symbol runs after the
-			// native dispatch has finished, and `currentTarget` is null by then.
+			// `target`, not `currentTarget`: a lazy handler symbol runs after the native dispatch, when `currentTarget` is null.
 			const here = event.target as HTMLElement;
 			const isTypeaheadChar = key.length === 1 && key !== ' ';
 			const isNavigationKey =
 				key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End';
-			// Enter, Space, and Tab choose the focused option as the value.
 			const isSelectionKey = key === 'Enter' || key === ' ' || key === 'Tab';
 
 			if (isTypeaheadChar) {
@@ -224,17 +215,13 @@ export function SelectContent({ children, onKeydown, ...rest }: SelectContentPro
 				select.searchAt = now;
 				focusMatchingOption(select.optionEls, search);
 			} else if (isNavigationKey) {
-				// Moving is not choosing. A reader that says "selected" after an
-				// arrow is this family's most common bug, so the walk is focus only.
+				// Moving is not choosing: the walk is focus only, or a reader says "selected" on every arrow.
 				focusNeighbourOption(select.optionEls, here, key);
 			} else if (isSelectionKey) {
-				// Through the option's own click rule, so one place in this family
-				// reads a value. Tab keeps its native move; the other two hand
-				// focus back.
+				// Routed through the option's own click rule, so one place in this family reads a value.
 				commitFocusedOption(select.optionEls, here);
 				if (key !== 'Tab') select.triggerEl?.focus();
 			} else if (key === 'Escape') {
-				// Closing leaves the value untouched: the highlight never committed.
 				select.setOpen(false);
 				select.triggerEl?.focus();
 			}
@@ -253,11 +240,8 @@ export function SelectItem({
 	const select = selectState();
 	const item = selectItemState();
 	item.value = value;
-	// Own prop only: a seed is built from this component's props, so the
-	// select's own `disabled` is added at every read site instead.
+	// Own prop only: a seed is built from this component's props, so the select's own `disabled` is added at every read site.
 	item.disabled = disabled;
-	// One graph cell, read in every position: a comparison written inline in an
-	// attribute renders once and then goes stale.
 	const isChosen = computed(() => select.value === item.value);
 	const isLocked = computed(() => item.disabled || select.disabled);
 
@@ -271,8 +255,7 @@ export function SelectItem({
 		ui-selected={isChosen}
 		ui-disabled={isLocked}
 		onClick={(event) => {
-			// The two cells, not the `isLocked` computed: a computed() read from a
-			// handler body does not guard..
+			// The two cells, not the `isLocked` computed: a computed() read from a handler body does not guard.
 			if (item.disabled !== true && select.disabled !== true) {
 				select.choose(item.value);
 				select.setOpen(false);
@@ -294,10 +277,7 @@ export function SelectItemIndicator({ children, ...rest }: SelectItemIndicatorPr
 	<span {...rest} aria-hidden="true" ui-hidden={isChosen !== true}>{children}</span>
 }
 
-// A `<select>` holding exactly the choice that was made. A single-option
-// `<select>` submits the same name/value pair a rebuilt option list would, and
-// the option carries the value as its text because the option element's
-// attribute type does not yet take one.
+// A single-option `<select>` submits the same name/value pair a rebuilt list would; the value rides as text because the option element's attribute type does not yet take one.
 export function SelectField({ ...rest }: SelectFieldProps) @{
 	const select = selectState();
 

@@ -24,10 +24,7 @@ import type {
 	ToasterRootProps,
 } from './toaster-types.ts';
 
-/**
- * One queue per page, not per widget: a message raised by a component that never
- * renders the region still has to reach it, and `toaster.root` is placed once.
- */
+// One queue per page, not per widget: a message raised by a component that never renders the region still has to reach it.
 export const toasterState = shared(
 	() => {
 		const toaster: ToasterInstanceState = state({
@@ -42,19 +39,12 @@ export const toasterState = shared(
 		return {
 			...toaster,
 			regionEl,
-			/**
-			 * Say something. The id comes back so the same message can be said again
-			 * later - a save that starts as "Saving..." and finishes as "Saved" is one
-			 * message updated in place, not two.
-			 */
+			/** Raise a message; the returned id lets the same message be updated in place later. */
 			toast(title: string, options?: ToastOptions) {
 				const id = toastId(options, toaster.minted + 1);
 				toaster.minted = toaster.minted + 1;
 				toaster.queue = enqueue(toaster.queue, id, title, options, Date.now(), DEFAULT_DURATION);
-				// One clock for the whole stack, started by the first message and
-				// stopped when the last one leaves: per-message timers would have to
-				// be owned, cancelled and rebuilt across a resume, and a row this
-				// runtime minted after resume never ran a body that could start one.
+				// One clock for the whole stack: a per-message timer cannot survive resume, because a row minted after it never ran a body that could start one.
 				if (toaster.ticker === 0) {
 					toaster.ticker = window.setInterval(() => {
 						if (toaster.paused) return;
@@ -69,7 +59,6 @@ export const toasterState = shared(
 				}
 				return id;
 			},
-			/** Take one message away. Whatever was waiting behind it moves up. */
 			dismiss(id: string) {
 				toaster.queue = dismiss(toaster.queue, id);
 			},
@@ -80,7 +69,6 @@ export const toasterState = shared(
 				toaster.queue = holdAll(toaster.queue, Date.now());
 				toaster.paused = true;
 			},
-			/** Leaving starts them again from where each message stopped. */
 			resume() {
 				if (toaster.paused !== true) return;
 				toaster.queue = releaseAll(toaster.queue, Date.now());
@@ -91,7 +79,6 @@ export const toasterState = shared(
 	{ scope: 'page' },
 );
 
-/** One instance per rendered `toaster.item`, read by the parts inside it. */
 export const toasterItemState = shared(
 	() => {
 		const item: ToasterItemInstanceState = state({
@@ -108,11 +95,7 @@ export const toasterItemState = shared(
 	{ scope: 'widget' },
 );
 
-/**
- * The region every message appears in: the live region and the container, and
- * nothing else. The rows are the consumer's own markup, written out of the parts
- * below, the same way every other family in this library works.
- */
+// No attach= on this root: a behavior on a page-scoped root crashes the render.
 export function ToasterRoot({
 	children,
 	onPointerover,
@@ -126,10 +109,7 @@ export function ToasterRoot({
 	<ol
 		{...rest}
 		el={toaster.regionEl}
-		// No attach= here: a behavior on a page-scoped root crashes the render.
-		// The F8 shortcut it would have carried is in toaster-hotkey.ts, unwired.
-		// The region is in the DOM before the first message on purpose: a live
-		// region that arrives together with its text is not announced.
+		// The region is in the DOM before the first message: a live region that arrives together with its text is not announced.
 		aria-live="polite"
 		aria-atomic="false"
 		aria-relevant="additions"
@@ -153,22 +133,11 @@ export function ToasterRoot({
 			onFocusout?.(event);
 		}}
 	>
-		{/*
-		  * Just `{children}`. The default rows that used to sit here in an
-		  * `@if (children === undefined)` arm were the library's ONLY
-		  * `{children}`-beside-a-construct shape - the one the census study measured
-		  * as Fixture B/C - and removing them removes that shape from the library
-		  * entirely. Every remaining part projects its children with no construct
-		  * next to them.
-		  */}
 		{children}
 	</ol>
 }
 
-/**
- * One message, written out. `--index` and `--offset` are the stacking data a
- * consumer's own styles read, and `ui-front` marks the one at the front.
- */
+/** One message. `--index` and `--offset` are the stacking data a consumer's own styles read; `ui-front` marks the front one. */
 export function ToasterItem({ toast, children, ...rest }: ToasterItemProps) @{
 	const toaster = toasterState();
 	const item = toasterItemState();
@@ -177,9 +146,7 @@ export function ToasterItem({ toast, children, ...rest }: ToasterItemProps) @{
 	item.description = toast.description;
 	item.tone = toast.tone;
 	item.icon = toast.icon;
-	// One cell per rendered fact, each read in one position: the row's place in
-	// the queue moves whenever the queue does, and an expression written inline in
-	// an attribute renders once and then goes stale.
+	// One computed() cell per rendered fact - an expression written inline in an attribute renders once and then goes stale.
 	const isFront = computed(() => positionOf(toaster.queue, item.id) === 0);
 	const stacking = computed(() => stackingStyle(positionOf(toaster.queue, item.id)));
 

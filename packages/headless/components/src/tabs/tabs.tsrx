@@ -32,8 +32,7 @@ export const tabsState = shared(
 	{ scope: 'widget' },
 );
 
-// The trigger's own value as a graph cell. Compared against its prop instead,
-// the trigger stops refreshing once the page has resumed - measured.
+// The trigger's own value as a graph cell: compared against its prop instead, the trigger stops refreshing once the page has resumed.
 export const tabsPartState = shared(
 	() => {
 		const part: TabsPartInstanceState = state({ value: '' });
@@ -85,8 +84,7 @@ export function TabsTrigger({
 	const tabs = tabsState();
 	const tab = tabsPartState();
 	tab.value = value;
-	// One cell read in every position: the same comparison written inline in an
-	// attribute renders once and then goes stale. Measured.
+	// One computed() cell - the same comparison written inline in an attribute renders once and then goes stale.
 	const isSelected = computed(() => tabs.value === tab.value);
 
 	<button
@@ -107,10 +105,7 @@ export function TabsTrigger({
 			onFocus?.(event);
 		}}
 		onKeydown={(event) => {
-			// Guarded by event fields alone: a policy that has to beat the browser
-			// must be readable before the handler symbol loads, and a guard written
-			// over locals derived from graph state is
-			// MARKLESS_SYNC_POLICY_UNEXTRACTABLE.
+			// Guarded by event fields alone: a guard over locals derived from graph state is MARKLESS_SYNC_POLICY_UNEXTRACTABLE.
 			if (
 				event.key === 'ArrowRight' ||
 				event.key === 'ArrowLeft' ||
@@ -133,8 +128,7 @@ export function TabsTrigger({
 				return;
 			}
 
-			// This trigger's own element off its own instance handle: a handler on
-			// the element that binds the handle resolves per instance now.
+			// This trigger's own element off its own instance handle: a handler on the element that binds the handle resolves per instance.
 			const here = tab.el;
 			if (!here) {
 				onKeydown?.(event);
@@ -158,9 +152,7 @@ export function TabsTrigger({
 			const afterLast = tabs.loop ? 0 : last;
 			const to = raw < 0 ? beforeFirst : raw > last ? afterLast : raw;
 			const next = open[to];
-			// Focus only. Whether focus also shows the tab is selectOnFocus's call,
-			// made once in onFocus - unlike a radio group, where the APG says an
-			// arrow always chooses.
+			// Focus only: whether focus also shows the tab is selectOnFocus's call, made once in onFocus.
 			if (next) next.focus();
 			onKeydown?.(event);
 		}}
@@ -169,13 +161,10 @@ export function TabsTrigger({
 
 export function TabsContent({ value, children, ...rest }: TabsContentProps) @{
 	const tabs = tabsState();
-	// The panel compares against its prop where the trigger compares against a
-	// cell: rooting a part instance here stops `hidden` refreshing in CSR too.
-	// Measured both ways.
+	// The panel compares against its prop where the trigger compares against a cell: rooting a part instance here stops `hidden` refreshing in CSR.
 	const isShowing = computed(() => tabs.value === value);
 
-	// `hidden` rather than an arm: a panel that unmounts loses the focus, scroll
-	// position and form state inside it on every tab change.
+	// `hidden` rather than an arm: a panel that unmounts loses the focus, scroll position and form state inside it on every tab change.
 	<div
 		{...rest}
 		role="tabpanel"

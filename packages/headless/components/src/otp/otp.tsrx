@@ -23,25 +23,16 @@ export const otpState = shared(
 			// literal function types: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
 			onComplete: undefined as ((value: string) => void) | undefined,
-			// The field covers the root instead of sitting beside the boxes, so a
-			// click or tap anywhere on them lands on the one real input. Invisible
-			// has to stay interactive, which rules out `visibility` and `display`.
-			// The strings are written out in full because this body is lifted into
-			// its own symbol, where a module constant cannot be read.
+			// The field covers the root so a tap anywhere on the boxes lands on it; the strings are written out in full because this body is lifted into its own symbol, where a module constant cannot be read.
 			fieldStyle: computed(() => {
-				// `box-sizing`: an input's own border and padding would otherwise be
-				// added to the 100%, leaving the field a few pixels past the boxes.
 				if (!otp.shiftPWManagers) {
 					return 'position: absolute; inset: 0; box-sizing: border-box; height: 100%; width: 100%; opacity: 0;';
 				}
-				// A password manager paints its icon at the input's right edge. The
-				// input is widened past the root and that strip clipped away, which
-				// takes the icon off the boxes; a clipped strip catches no clicks.
+				// A password manager paints its icon at the input's right edge, so the input is widened past the root and that strip clipped away.
 				return 'position: absolute; inset: 0; box-sizing: border-box; height: 100%; width: calc(100% + 45px); opacity: 0; clip-path: inset(0 45px 0 0);';
 			}),
 			commit() {
-				// `maxlength` truncates typing, but a pasted or autofilled string is
-				// not truncated by the platform, so the slice is what enforces it.
+				// `maxlength` truncates typing but not a paste or autofill, so the slice is what enforces the length.
 				const code = otp.value.slice(0, otp.length);
 				otp.value = code;
 				otp.onChange?.(code);
@@ -74,8 +65,7 @@ export function OtpRoot({
 	<div {...rest} style="position: relative;" ui-disabled={otp.disabled}>{children}</div>
 }
 
-// One tab stop, one accessibility-tree control, one paste target. A consumer's
-// `onInput` runs after the family has taken the value.
+/** The one tab stop, accessibility-tree control and paste target; a consumer's `onInput` runs after the family has taken the value. */
 export function OtpField({ onInput, onFocus, ...rest }: OtpFieldProps) @{
 	const otp = otpState();
 
@@ -90,12 +80,8 @@ export function OtpField({ onInput, onFocus, ...rest }: OtpFieldProps) @{
 		inputmode="numeric"
 		autocomplete="one-time-code"
 		onFocus={(event) => {
-			// Focus lands the caret at offset 0, so without this the next keystroke
-			// would prepend to a code already entered.
-			// `event.target`: a resumed handler runs after the event has finished
-			// dispatching, so `currentTarget` is null and `otp.fieldEl` is unbound.
-			// `instanceof` rather than a cast: this body is parsed as JavaScript, so
-			// a type annotation here would fail the parse.
+			// Focus lands the caret at offset 0, so without this the next keystroke prepends to the code already entered.
+			// `event.target` and `instanceof`: a resumed handler runs after dispatch, when `currentTarget` is null, and this body is re-parsed as JavaScript, where a cast would throw.
 			const field = event.target;
 			if (field instanceof HTMLInputElement) {
 				const end = field.value.length;
@@ -112,8 +98,7 @@ export function OtpField({ onInput, onFocus, ...rest }: OtpFieldProps) @{
 	/>
 }
 
-// aria-hidden: the input already carries the code, so an exposed item would put
-// every character in the tree twice.
+// aria-hidden: the input already carries the code, so an exposed item would put every character in the tree twice.
 export function OtpItem({ index, children, ...rest }: OtpItemProps) @{
 	const otp = otpState();
 	const item = state({ index });
