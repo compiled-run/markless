@@ -18,6 +18,9 @@ export {
 	// copied into the handler with neither its imports nor its graph wiring.
 	dismiss as drop,
 	say,
+	// The visible cap, exported because the root renders no rows of its own: how
+	// many messages show is the consumer's repeat to decide.
+	shownSlice as shown,
 } from './toaster-queue.ts';
 export type {
 	ToastOptions,

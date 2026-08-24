@@ -25,6 +25,15 @@ export default function OverModal() @{
 				</modal.content>
 			</modal.backdrop>
 		</modal.root>
-		<toaster.root data-testid="root" />
+		<toaster.root data-testid="root">
+			<div role="presentation" data-testid="rows">
+				@for (const message of toasts.queue; key message.id) {
+					<toaster.item toast={message} data-testid="item">
+						<toaster.itemtitle data-testid="itemtitle" />
+						<toaster.itemclose data-testid="itemclose" aria-label="Dismiss">×</toaster.itemclose>
+					</toaster.item>
+				}
+			</div>
+		</toaster.root>
 	</main>
 }

@@ -2,7 +2,6 @@ import { cleanup, render, renderSSR } from '@markless/vitest-browser';
 import { page } from 'vite-plus/test/browser';
 import { afterEach, expect, test } from 'vitest';
 import Basic from './scenarios/basic.tsrx';
-import Custom from './scenarios/custom.tsrx';
 import Limits from './scenarios/limits.tsrx';
 import OverModal from './scenarios/over-modal.tsrx';
 
@@ -25,6 +24,42 @@ function titles() {
 	return [...el(Root).querySelectorAll('[ui-toasttitle]')].map((one) => one.textContent);
 }
 
+// ---------------------------------------------------------------------------
+// THE WALL EVERY PINNED ROW BELOW SHARES
+//
+// A COMPONENT INSIDE A REPEAT RENDERS NOTHING ON THE CLIENT. The queue write
+// lands - the rows that read the queue's own length are green - and no element
+// follows it. No diagnostic is produced either way.
+//
+// This was measured on this tip, and it CORRECTS the diagnosis these pins used to
+// carry ("a repeat inside a projected children slot never renders"). Projection is
+// not the cause. A probe put two repeats over the same queue on one page:
+//
+//   - a repeat of PLAIN <li> markup inside `toaster.root`'s projected children
+//     RENDERS (1 row for 1 message);
+//   - a repeat of `toaster.item` inside a plain <ol> that projects nothing
+//     renders NOTHING (0 rows);
+//   - a repeat of a trivial local component with no `shared()` of its own, also
+//     in a plain <ol>, renders NOTHING (0 rows).
+//
+// So the wall is the component in the repeat, not the projected slot, not the
+// widget scope, and not the `{children}`-beside-a-construct shape that defect 97
+// was about. Defect 97's server-side splice fix (packages/web/src/ssr-data/
+// renderer.ts, pinned by packages/compiler/test/projection-splice.test.ts and
+// packages/vitest-browser/browser/projection-splice.test.ts) is a different bug
+// and does not move these.
+//
+// This matters more than it used to. The owner ruling of 2026-08-24 removed the
+// default rows `toaster.root` used to render for a bare root, so the written-out
+// parts are now the family's ONLY path - and that path is exactly the shape this
+// wall blocks. Until a component renders inside a repeat, the family renders no
+// messages for any consumer.
+//
+// A repeat body may also hold only ONE element: two siblings inside `@for` is
+// MARKLESS_PARSE_ERROR ("Expected '</' to close the JSX element, but found '@'").
+// Measured while probing the above; not otherwise load-bearing here.
+// ---------------------------------------------------------------------------
+
 test('CSR: the region is on the page before anything is said', async () => {
 	await render(Basic);
 	expect(el(Root).getAttribute('aria-live')).toBe('polite');
@@ -32,20 +67,35 @@ test('CSR: the region is on the page before anything is said', async () => {
 	expect(titles()).toEqual([]);
 });
 
-test('CSR: a message appears once', async () => {
+test('SSR: the served region is a live region before anything is said', async () => {
+	await renderSSR(Basic);
+	expect(el(Root).getAttribute('aria-live')).toBe('polite');
+	expect(el(Root).getAttribute('aria-relevant')).toBe('additions');
+});
+
+// Green without a rendered row: the queue is the fact, and the region's own
+// length readout is plain markup rather than a component in a repeat.
+test('CSR: more messages than a capped region shows are queued, not dropped', async () => {
+	await render(Limits);
+	el<HTMLButtonElement>(page.getByTestId('four')).click();
+	// All four are held: the repeat shows two, the queue keeps everything.
+	await expect.poll(() => el(page.getByTestId('queued')).textContent).toBe('4');
+});
+
+test.fails('CSR: a message appears once', async () => {
 	await render(Basic);
 	el<HTMLButtonElement>(Sticky).click();
 	await expect.poll(() => titles()).toEqual(['Upload failed']);
 	expect(el(Root).querySelectorAll('[ui-toast]')).toHaveLength(1);
 });
 
-test('CSR: a component that never renders the region reaches the same queue', async () => {
+test.fails('CSR: a component that never renders the region reaches the same queue', async () => {
 	await render(Basic);
 	el<HTMLButtonElement>(Elsewhere).click();
 	await expect.poll(() => titles()).toEqual(['From elsewhere']);
 });
 
-test('CSR: saying the same id again updates the message in place', async () => {
+test.fails('CSR: saying the same id again updates the message in place', async () => {
 	await render(Basic);
 	el<HTMLButtonElement>(Save).click();
 	await expect.poll(() => titles()).toEqual(['Saved']);
@@ -54,7 +104,10 @@ test('CSR: saying the same id again updates the message in place', async () => {
 	expect(el(Root).querySelectorAll('[ui-toast]')).toHaveLength(1);
 });
 
-test('CSR: the close button on a row dismisses that row', async () => {
+// Merged: the written-out close button IS the only close button now, so the row
+// that used to test the default row's button and the row that tested the custom
+// path's button are one row.
+test.fails('CSR: the close button on a row dismisses the message it sits in', async () => {
 	await render(Basic);
 	el<HTMLButtonElement>(Sticky).click();
 	await expect.poll(() => titles()).toEqual(['Upload failed']);
@@ -62,7 +115,7 @@ test('CSR: the close button on a row dismisses that row', async () => {
 	await expect.poll(() => titles()).toEqual([]);
 });
 
-test('SSR: the close button on a minted row dismisses that row', async () => {
+test.fails('SSR: the close button on a resumed row dismisses the message it sits in', async () => {
 	await renderSSR(Basic);
 	el<HTMLButtonElement>(Sticky).click();
 	await expect.poll(() => titles()).toEqual(['Upload failed']);
@@ -70,7 +123,7 @@ test('SSR: the close button on a minted row dismisses that row', async () => {
 	await expect.poll(() => titles()).toEqual([]);
 });
 
-test('CSR: a message never takes focus away from what a person was doing', async () => {
+test.fails('CSR: a message never takes focus away from what a person was doing', async () => {
 	await render(Basic);
 	el<HTMLButtonElement>(Save).focus();
 	el<HTMLButtonElement>(Save).click();
@@ -78,11 +131,12 @@ test('CSR: a message never takes focus away from what a person was doing', async
 	expect(document.activeElement).toBe(el(Save));
 });
 
-// Expected red, and the same wall as the pinned row below: every clock in this
-// family is started by `toast()`, which is the method a consumer module cannot
-// call. A message raised by writing the queue is never handed to a ticker, so
-// nothing expires it. Auto-dismiss, hover-pause and tab-pause all hang off that
-// one call, so they are pinned together rather than one row each.
+// Two walls at once now. The older one: every clock in this family is started by
+// `toast()`, the method a consumer module cannot call (note.md), so a message
+// raised by writing the queue is never handed to a ticker and nothing expires it.
+// Auto-dismiss, hover-pause and tab-pause all hang off that one call and are
+// pinned together rather than one row each. The newer one is the shared wall
+// above: even with a ticker, the row is not on the page to leave it.
 test.fails('CSR: a message with its own duration leaves by itself', async () => {
 	await render(Basic);
 	el<HTMLButtonElement>(Save).click();
@@ -90,51 +144,14 @@ test.fails('CSR: a message with its own duration leaves by itself', async () => 
 	await expect.poll(() => titles(), { timeout: 1500 }).toEqual([]);
 });
 
-test('SSR: a message raised after resume renders in the served region', async () => {
+test.fails('SSR: a message raised after resume renders in the served region', async () => {
 	await renderSSR(Basic);
-	expect(el(Root).getAttribute('aria-live')).toBe('polite');
 	el<HTMLButtonElement>(Sticky).click();
 	await expect.poll(() => titles()).toEqual(['Upload failed']);
 });
 
-test('CSR: more messages than the region shows are queued, not dropped', async () => {
-	await render(Limits);
-	el<HTMLButtonElement>(page.getByTestId('four')).click();
-	await expect.poll(() => titles()).toEqual(['One', 'Two']);
-	// All four are still held: the region shows two, the queue keeps everything.
-	expect(el(page.getByTestId('queued')).textContent).toBe('4');
-});
-
-test('CSR: dismissing a showing message brings the next one forward', async () => {
-	await render(Limits);
-	el<HTMLButtonElement>(page.getByTestId('four')).click();
-	await expect.poll(() => titles()).toEqual(['One', 'Two']);
-	(el(Root).querySelector('[ui-toastclose]') as HTMLButtonElement).click();
-	await expect.poll(() => titles()).toEqual(['Two', 'Three']);
-	expect(el(page.getByTestId('queued')).textContent).toBe('3');
-});
-
-// Expected red, all three: a consumer's own `@for` written INSIDE `toaster.root`
-// renders nothing. The rows are a repeat inside a component's children slot, and
-// the slot is filled once at render - the queue write lands (the same write fills
-// the default rows in every green row above) and no row follows it.
-//
-// Defect 97 was one of the two walls measured here and it is now FIXED, but it was
-// the OTHER shape's wall: with the default rows in an `@else` arm, the page threw
-// `RuntimeResumeError: Resume locator h2 expected <div> at DOM order index 3`,
-// because the server appended a projection's structure tokens after the child's
-// own instead of splicing them in at the `{children}` position. That splice landed
-// in packages/web/src/ssr-data/renderer.ts and is pinned by
-// packages/compiler/test/projection-splice.test.ts and
-// packages/vitest-browser/browser/projection-splice.test.ts.
-//
-// These three rows measure the shape `toaster.root` actually ships (`{children}`
-// outside the construct, an `@if (children === undefined)` arm after it), where the
-// throw was already absent and the rows simply never appear. That is a CLIENT-side
-// gap - a repeat inside a projected children slot never renders - and the fix above
-// is server-side, so it does not move them. Neither shape produces a diagnostic.
 test.fails('CSR: the parts written out render the message they were given', async () => {
-	await render(Custom);
+	await render(Basic);
 	el<HTMLButtonElement>(page.getByTestId('two')).click();
 	await expect.poll(() => page.getByTestId('itemtitle').elements().map((one) => one.textContent))
 		.toEqual(['Saved', 'Copied']);
@@ -145,7 +162,7 @@ test.fails('CSR: the parts written out render the message they were given', asyn
 });
 
 test.fails('CSR: a written-out item carries its place in the stack', async () => {
-	await render(Custom);
+	await render(Basic);
 	el<HTMLButtonElement>(page.getByTestId('two')).click();
 	await expect.poll(() => page.getByTestId('item').elements()).toHaveLength(2);
 	const rows = page.getByTestId('item').elements();
@@ -155,16 +172,16 @@ test.fails('CSR: a written-out item carries its place in the stack', async () =>
 	expect(rows[1]?.hasAttribute('ui-front')).toBe(false);
 });
 
-test.fails('CSR: the close button written out dismisses the message it sits in', async () => {
-	await render(Custom);
-	el<HTMLButtonElement>(page.getByTestId('two')).click();
-	await expect.poll(() => page.getByTestId('item').elements()).toHaveLength(2);
-	(page.getByTestId('itemclose').elements()[0] as HTMLButtonElement).click();
-	await expect.poll(() => page.getByTestId('itemtitle').elements().map((one) => one.textContent))
-		.toEqual(['Copied']);
+test.fails('CSR: a capped region shows its cap, and dismissing brings the next forward', async () => {
+	await render(Limits);
+	el<HTMLButtonElement>(page.getByTestId('four')).click();
+	await expect.poll(() => titles()).toEqual(['One', 'Two']);
+	(el(Root).querySelector('[ui-toastclose]') as HTMLButtonElement).click();
+	await expect.poll(() => titles()).toEqual(['Two', 'Three']);
+	expect(el(page.getByTestId('queued')).textContent).toBe('3');
 });
 
-test('CSR: a dialog leaves the messages behind it reachable', async () => {
+test.fails('CSR: a dialog leaves the messages behind it reachable', async () => {
 	await render(OverModal);
 	el<HTMLButtonElement>(page.getByTestId('modal-trigger')).click();
 	await expect.poll(() => el(page.getByTestId('modal-backdrop')).hasAttribute('hidden')).toBe(false);
@@ -174,6 +191,17 @@ test('CSR: a dialog leaves the messages behind it reachable', async () => {
 	expect(el(Root).hasAttribute('inert')).toBe(false);
 	expect(el(Root).getAttribute('aria-hidden')).toBe(null);
 	expect((el(Root).querySelector('[ui-toast]') as HTMLElement).closest('[inert]')).toBe(null);
+});
+
+// The half of the row above that does NOT need a rendered message: a dialog must
+// not take the live region out of reach, whether or not anything has been said.
+test('CSR: a dialog does not take the live region out of reach', async () => {
+	await render(OverModal);
+	el<HTMLButtonElement>(page.getByTestId('modal-trigger')).click();
+	await expect.poll(() => el(page.getByTestId('modal-backdrop')).hasAttribute('hidden')).toBe(false);
+	expect(el(Root).hasAttribute('inert')).toBe(false);
+	expect(el(Root).getAttribute('aria-hidden')).toBe(null);
+	expect(el(Root).closest('[inert]')).toBe(null);
 });
 
 // The ruled surface (defect 95): a shared() method called from a handler in
