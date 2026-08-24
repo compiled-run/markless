@@ -3,6 +3,7 @@ export * as carousel from './carousel/index.ts';
 export * as checkbox from './checkbox/index.ts';
 export * as checklist from './checklist/index.ts';
 export * as collapsible from './collapsible/index.ts';
+export * as combobox from './combobox/index.ts';
 export * as modal from './modal/index.ts';
 export * as otp from './otp/index.ts';
 export * as navbar from './navbar/index.ts';
