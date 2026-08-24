@@ -120,6 +120,27 @@ Everything below was measured by running the suite, not assumed.
    handler (`select.search = search; select.searchAt = now;`), the same rows are
    green. This is the sharpest finding in the unit and it narrows the
    parameterised-method capability the research leaned on.
+
+   **Re-anchored 2026-08-23 — counter-measured, and the arity rule does not
+   hold.** The combobox family ships `choose(next: string, label: string)`, a
+   shared method of arity two called from two handlers, and the handler runs to
+   completion: `packages/headless/components/src/combobox/combobox.tsrx:76`
+   declares it, `combobox.tsrx:223` and `:438` call it, and
+   `packages/headless/components/src/combobox/note.md:165-167` records the
+   measurement as that unit's own counter-measurement of this line (board unit
+   `U275-combobox-family` receipt). The measurement above is kept as history: it
+   was real on the older tip it was taken on, and what changed underneath it was
+   not re-measured here. What is now unsupported is the *rule* it was read as —
+   "arity two aborts the handler" — not the red rows it recorded.
+
+   **Available, not done:** `select.tsrx:164-165` carries the comment *"Two cell
+   assignments rather than one method taking both: a shared method of arity two
+   aborts the handler. See note.md."* On the counter-measurement above, that
+   workaround could collapse into one `select.typed(search, now)` method and the
+   comment could go. **The code is deliberately untouched by this re-anchor** —
+   changing it is a behaviour change owed a suite run, not a note edit. Recorded
+   here so whoever picks it up knows the constraint that forced the shape is the
+   thing in doubt.
 3. **A `computed()` read from a handler body does not guard.** `select.item`'s
    click rule was written `if (locked !== true)` over a
    `computed(() => item.disabled || select.disabled)`. The guard let a disabled
