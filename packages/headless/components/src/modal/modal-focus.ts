@@ -27,8 +27,7 @@ function land(target: HTMLElement | undefined): void {
  *
  * The surface itself takes it, not the first control inside it. Naming that
  * control would mean asking the DOM for the surface's focusable descendants,
- * and the library selects no DOM nodes. An alert is the exception the ruling
- * names: it prefers its close control, which is a part and so has a handle.
+ * and the library selects no DOM nodes. An alert is the exception: it prefers its close control, which is a part and so has a handle.
  */
 export function focusIntoSurface(
 	content: HTMLElement | undefined,
@@ -45,7 +44,7 @@ export function focusIntoSurface(
  *
  * The property is `__marklessOverlayFocusOrigin` in
  * `packages/web/src/overlay-handoff.ts`, restated here only because
- * `@markless/ui` does not depend on `@markless/web`; see note.md.
+ * `@markless/ui` does not depend on `@markless/web`.
  */
 type OverlayFocusOriginHost = {
 	__marklessOverlayFocusOrigin?: Element;
@@ -54,7 +53,7 @@ type OverlayFocusOriginHost = {
 /**
  * Hand focus back to whatever opened the dialog.
  *
- * Two openers, two answers, exactly as ruled. A trigger press is the one the
+ * Two openers, two answers. A trigger press is the one the
  * family saw happen, so the trigger wins outright - a synthetic press does not
  * focus the button it presses, and the captured reading on that path would be
  * the body. Anything else opened it without telling the family, and the only

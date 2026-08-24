@@ -337,7 +337,7 @@ for (const mode of MODES) {
 	// The spike research-tree.md §6c.2 named: four levels of ONE component
 	// composing itself, each level rooting its own widget instance of the same
 	// family. Green in both modes since the page's symbol route table re-enters
-	// itself instead of stopping after one strip (defect 51).
+	// itself instead of stopping after one strip.
 	test(`${mode}: a self-composing node unrolls to the depth its prop names`, async () => {
 		if (mode === 'CSR') await render(Deep);
 		else await renderSSR(Deep);

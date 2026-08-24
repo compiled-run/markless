@@ -14,7 +14,7 @@ export {
 export {
 	// The queue's arithmetic, exported because a consumer's own handler is where
 	// a message is raised today: `toasts.queue = toaster.say(toasts.queue, ...)`.
-	// See note.md - a `toasts.toast(...)` method call from a consumer module is
+	// A `toasts.toast(...)` method call from a consumer module is
 	// copied into the handler with neither its imports nor its graph wiring.
 	dismiss as drop,
 	say,

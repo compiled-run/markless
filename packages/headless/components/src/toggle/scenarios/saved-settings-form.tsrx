@@ -1,8 +1,6 @@
 import { state } from '@markless/core';
 import { toggle } from '../../index.ts';
 
-// The same form reopened on saved settings: already on, still required, and
-// submitting its own value rather than the browser default "on".
 export default function SavedSettingsForm() @{
 	let submitted = state('');
 

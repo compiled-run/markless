@@ -13,7 +13,7 @@ import { navbar } from '../../index.ts';
 //     arm holding a shared-instance part is refused today
 //     (MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED). A navbar whose entries depend on
 //     whether a person is signed in is the everyday shape this cannot express
-//     yet, and it is recorded in note.md rather than worked around here.
+//     yet.
 const isSignedIn = true;
 
 export default function ConditionalItem() @{

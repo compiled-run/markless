@@ -142,7 +142,6 @@ test('a box with only help text under it is never conveyed as invalid', async ()
 	// This reader speaks "not invalid" as its own fact, so the assertion above
 	// cannot be read as "invalid is absent"; that is what this line proves.
 	expect(missingFacts(sr, announcement, { state: ['invalid'] })).not.toEqual([]);
-	// The help text is reachable, just not attached to the box - see below.
 	await readUntil(sr, { name: "We'll send you updates about new features" });
 });
 
@@ -156,7 +155,6 @@ test.fails('the help text under a box is conveyed with the box itself', async ()
 		role: 'checkbox',
 		name: 'Subscribe to newsletter',
 		state: ['notChecked'],
-		// aria-at asserts the description is part of what the box conveys.
 	});
 	expect(
 		missingFacts(sr, await sr.lastSpokenPhrase(), {

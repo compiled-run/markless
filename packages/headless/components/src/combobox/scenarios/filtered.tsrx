@@ -12,8 +12,7 @@ function Options() @{
 	const c = combobox.state();
 	// The list is written INSIDE the computed. A module-level const read from one
 	// is not carried into the lowered symbol - `ReferenceError: FRUITS is not
-	// defined` at the first refresh - so the data lives where it is read. See
-	// note.md, "What the compiler forced".
+	// defined` at the first refresh - so the data lives where it is read.
 	const matches = computed(() =>
 		['Apple', 'Banana', 'Cherry', 'Grape'].filter((fruit) =>
 			fruit.toLowerCase().includes(c.input.toLowerCase()),

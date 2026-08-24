@@ -1,7 +1,5 @@
 import { checkbox } from '../../index.ts';
 
-// A settings page: three independent options, one off, one on, and one in the
-// third state a "some selected" parent shows.
 export default function SettingsList() @{
 	<section>
 		<checkbox.root data-testid="emails-root">

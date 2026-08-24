@@ -18,7 +18,7 @@ import WithOnChange from './scenarios/with-onchange.tsrx';
 //
 // The family is a DISCLOSURE, not a menubar, and the row that asserts no
 // `menu`/`menubar` role anywhere is the single most important accessibility
-// assertion here. See goals/headless-components/notes/research-navbar.md §1.
+// assertion here.
 const Root = page.getByTestId('root');
 const HomeItemLink = page.getByTestId('home-itemlink');
 const ProductsItem = page.getByTestId('products-item');
@@ -259,8 +259,6 @@ for (const mode of MODES) {
 	});
 }
 
-// --- the consumer's callback ----------------------------------------------
-
 test('CSR: a click calls onChange once with the entry now showing', async () => {
 	await render(WithOnChange);
 	// Nothing fired on mount or first render.
@@ -290,8 +288,6 @@ test('CSR: switching entries calls onChange once with the new one', async () => 
 	await expect.poll(() => el(Calls).textContent).toBe('2');
 });
 
-// --- gestures --------------------------------------------------------------
-
 test('CSR: focus leaving the landmark closes what was showing', async () => {
 	await render(SiteHeader);
 	el(ProductsTrigger).focus();
@@ -316,8 +312,6 @@ test('CSR: a dropdown in one navbar is untouched by the other', async () => {
 	expect(el(PrimaryProductsContent).hasAttribute('hidden')).toBe(false);
 	expect(el(FooterLegalContent).hasAttribute('hidden')).toBe(false);
 });
-
-// --- keyboard --------------------------------------------------------------
 
 test('CSR: the right and left arrows walk the top-level controls and wrap', async () => {
 	await render(Basic);
@@ -415,8 +409,6 @@ test('CSR: escape on the trigger of an open dropdown closes it', async () => {
 	await expect.poll(() => document.activeElement).toBe(el(ProductsTrigger));
 });
 
-// --- dismissal, through the overlay primitive -------------------------------
-//
 // The panel carries the bare `overlay` attribute, so Escape and an outside press
 // arrive as a `dismiss` report on the panel and the family's `onDismiss` decides
 // what they mean. The primitive closes nothing and moves no focus, which is what
@@ -531,8 +523,6 @@ test('CSR: the arrows in one navbar never reach the other navbar', async () => {
 	expect(el(FooterRoot).contains(document.activeElement)).toBe(false);
 });
 
-// --- resume ----------------------------------------------------------------
-
 test('SSR: the served landmark is closed, and the panels are present but hidden', async () => {
 	await renderSSR(Basic);
 	// What the server sent, before anything on the client has run.
@@ -588,8 +578,6 @@ test('SSR: escape after resume closes the dropdown and returns focus', async () 
 	await expect.poll(() => document.activeElement).toBe(el(ProductsTrigger));
 });
 
-// --- hover -----------------------------------------------------------------
-//
 // These rows run LAST, and the order is load-bearing rather than tidy. The
 // pointer in a real browser stays where the previous test left it, so a row that
 // hovers leaves the cursor parked over the next test's freshly rendered navbar
@@ -692,7 +680,7 @@ test('CSR: a right click on the trigger leaves a hover-opened dropdown showing',
 // The row the navbar research flagged as the family's one genuinely new
 // framework requirement: no family shipped before this one schedules a callback,
 // and nothing proved a pending timer survives - or is correctly abandoned across
-// - an SSR resume. It is green, and note.md records the shape that made it so.
+// - an SSR resume.
 test('SSR: a pointer resting on an entry after resume opens it after the delay', async () => {
 	await renderSSR(HoverTiming);
 	await userEvent.hover(el(ProductsTrigger));

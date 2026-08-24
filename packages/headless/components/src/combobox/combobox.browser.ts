@@ -18,8 +18,8 @@ import { WithError } from './scenarios/with-error.tsrx';
 // input, trigger, content, item, itemlabel, itemindicator, description, error,
 // field - prefixed per option, the way a consumer names their own choices.
 //
-// The behaviours asserted here are the sixteen read off Qwik UI's own handlers
-// in goals/headless-components/notes/research-combobox.md section 5. Where one
+// The behaviours asserted here are the sixteen read off Qwik UI's own handlers.
+// Where one
 // cannot ship, the row is `test.fails` with the reason beside it rather than
 // absent.
 const Root = page.getByTestId('root');
@@ -784,17 +784,15 @@ for (const mode of MODES) {
 
 // ============================================================ pinned rows
 
-// PENDING CAPABILITY - conditional `overlay`. The owner ruled on 2026-08-23 that
-// `overlay` accepts an INSTANCE-CONSTANT conditional value, which is what lets
+// Pending capability: `overlay` accepts an INSTANCE-CONSTANT conditional value, which is what lets
 // one content part serve both modes. The compiler does not implement it yet:
 // `overlayLiteralValue` in packages/compiler/src/passes/semantic-graph/
 // overlay-attribute.ts returns null for anything but a boolean literal, and the
 // caller refuses it as MARKLESS_OVERLAY_VALUE_UNSUPPORTED. So `combobox.content`
 // writes `overlay` unconditionally and an inline list enlists in the overlay
-// stack, which the owner's ruling says it never should. Everything a person
+// stack, which it never should. Everything a person
 // experiences is right - the dismissal handler ignores the report in inline mode
-// - so this is the one assertion that cannot be made. Deterministic, so
-// test.fails rather than skip: it turns red the day the capability lands.
+// - so this is the one assertion that cannot be made. Deterministic, so test.fails rather than skip: it turns red the day the capability lands.
 test.fails('an inline list carries no overlay mark and never enlists', async () => {
 	await render(Inline);
 	expect(el(Content).hasAttribute('overlay')).toBe(false);

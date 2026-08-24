@@ -1,7 +1,5 @@
 import { collapsible } from '../../index.ts';
 
-// The starter a consumer copies: one button that shows and hides the panel under
-// it, closed to begin with.
 export default function Basic() @{
 	<collapsible.root data-testid="root">
 		<collapsible.trigger data-testid="trigger">What is a collapsible?</collapsible.trigger>

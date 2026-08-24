@@ -31,9 +31,7 @@ function titles() {
 // lands - the rows that read the queue's own length are green - and no element
 // follows it. No diagnostic is produced either way.
 //
-// This was measured on this tip, and it CORRECTS the diagnosis these pins used to
-// carry ("a repeat inside a projected children slot never renders"). Projection is
-// not the cause. A probe put two repeats over the same queue on one page:
+// Projection is not the cause. A probe put two repeats over the same queue on one page:
 //
 //   - a repeat of PLAIN <li> markup inside `toaster.root`'s projected children
 //     RENDERS (1 row for 1 message);
@@ -43,15 +41,12 @@ function titles() {
 //     in a plain <ol>, renders NOTHING (0 rows).
 //
 // So the wall is the component in the repeat, not the projected slot, not the
-// widget scope, and not the `{children}`-beside-a-construct shape that defect 97
-// was about. Defect 97's server-side splice fix (packages/web/src/ssr-data/
-// renderer.ts, pinned by packages/compiler/test/projection-splice.test.ts and
-// packages/vitest-browser/browser/projection-splice.test.ts) is a different bug
-// and does not move these.
+// widget scope, and not the `{children}`-beside-a-construct shape the
+// server-side splice fix in packages/web/src/ssr-data/renderer.ts addresses -
+// that is a different bug and does not move these.
 //
-// This matters more than it used to. The owner ruling of 2026-08-24 removed the
-// default rows `toaster.root` used to render for a bare root, so the written-out
-// parts are now the family's ONLY path - and that path is exactly the shape this
+// `toaster.root` renders no default rows for a bare root, so the written-out
+// parts are the family's ONLY path - and that path is exactly the shape this
 // wall blocks. Until a component renders inside a repeat, the family renders no
 // messages for any consumer.
 //
@@ -132,7 +127,7 @@ test.fails('CSR: a message never takes focus away from what a person was doing',
 });
 
 // Two walls at once now. The older one: every clock in this family is started by
-// `toast()`, the method a consumer module cannot call (note.md), so a message
+// `toast()`, the method a consumer module cannot call, so a message
 // raised by writing the queue is never handed to a ticker and nothing expires it.
 // Auto-dismiss, hover-pause and tab-pause all hang off that one call and are
 // pinned together rather than one row each. The newer one is the shared wall
@@ -204,13 +199,12 @@ test('CSR: a dialog does not take the live region out of reach', async () => {
 	expect(el(Root).closest('[inert]')).toBe(null);
 });
 
-// The ruled surface (defect 95): a shared() method called from a handler in
+// A shared() method called from a handler in
 // ANOTHER module is text-spliced without the family's imports or graph wiring.
 // It used to compile clean and crash at dispatch in three shapes; the compiler
 // now REFUSES it loudly at build time, naming the absent identifiers and the
 // import capture. This row pins the refusal: the quarantined scenario cannot
-// even load. It becomes a rendering test again when the owner's F2-vs-F3 ruling
-// ships the capability (carry the definition context, or route the call through
+// even load. It becomes a rendering test again when the compiler ships the capability (carry the definition context, or route the call through
 // the family's own emitted module).
 // The browser sees only the failed fetch; the diagnostic text itself is pinned
 // in packages/compiler/test/cross-module-shared-method.test.ts.

@@ -3,7 +3,7 @@ import { select } from '../../index.ts';
 // An option that only some builds offer. The condition is a module constant, not
 // a state cell: a widget-root part inside an arm that FLIPS is refused at compile
 // time (MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED), so the everyday "this option
-// appears when a checkbox is on" form is a framework wall - see note.md.
+// appears when a checkbox is on" form is a framework wall.
 const IS_LIFETIME_OFFERED = true;
 
 export function OptionalOption() @{

@@ -93,8 +93,6 @@ test('pressing enter announces the trigger as expanded', async () => {
 	});
 });
 
-// The panel a person opened has to be reachable, or the state change announced
-// nothing useful.
 test('the text inside an opened panel becomes reachable', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'button' });
@@ -103,8 +101,6 @@ test('the text inside an opened panel becomes reachable', async () => {
 	await readUntil(sr, { name: 'A button that shows and hides the content below it.' });
 });
 
-// Ours, not aria-at's: a trigger nobody may operate has to say so rather than
-// simply not respond, and its state stays what it was.
 test('a section nobody may change conveys disabled, and its state does not move', async () => {
 	await open(Unavailable);
 	expectConveys(await readUntil(sr, { role: 'button', name: 'Billing history' }), {
@@ -131,8 +127,6 @@ test('a section locked open still conveys that it is expanded', async () => {
 	await readUntil(sr, { name: 'Only the workspace owner can change this.' });
 });
 
-// A separate row from Enter rather than a loop over both keys: the two go through
-// different halves of a native button's activation, and one can break alone.
 test('pressing space announces the trigger as expanded', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'button' });

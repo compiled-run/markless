@@ -49,8 +49,6 @@ function sideOf(value: string, recovery: 'low' | 'medium' | 'quartile' | 'high')
 	return encodeQrModules(value, recovery).length;
 }
 
-// --- the pure functions ---------------------------------------------------
-//
 // The encoder is the one piece of this family that is not markup, and it is a
 // pure function, so it is asserted directly rather than through the DOM.
 
@@ -95,8 +93,6 @@ test('non-ASCII text encodes as UTF-8 bytes', () => {
 test('text too long for the largest symbol is refused rather than truncated', () => {
 	expect(() => qrPath('x'.repeat(1400), 'high')).toThrow(/more room/);
 });
-
-// --- the rendered anatomy -------------------------------------------------
 
 function expectBasicRendered() {
 	const modules = encodeQrModules(BASIC_VALUE, 'medium');
@@ -274,8 +270,6 @@ for (const mode of MODES) {
 	});
 }
 
-// --- SSR ------------------------------------------------------------------
-//
 // This is the family's whole pitch, so it is asserted rather than claimed: the
 // pattern is finished markup on arrival, and for a static value nothing on the
 // client has to run at all.
@@ -317,8 +311,6 @@ test('SSR: the first write after resume re-derives a bound pattern', async () =>
 	await expect.poll(() => page.getByTestId('token').element()?.textContent).toBe('bravo');
 });
 
-// --- the secret stays off the widget --------------------------------------
-//
 // `QrCodeRoot` destructures `value` and `recovery`, so neither is left in `{...rest}`
 // and neither may reach the element as a raw attribute. This is the one family where
 // the leaked prop would be the secret itself: a TOTP secret must not be readable off

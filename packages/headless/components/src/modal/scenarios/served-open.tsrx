@@ -1,8 +1,5 @@
 import { modal } from '../../index.ts';
 
-// A dialog the server sends already showing. Base UI's dismissal cases all use
-// `defaultOpen`, and it is a real consumer shape, so it gets a row of its own -
-// the one shape whose surface is never hidden and therefore never flips.
 export default function ServedOpen() @{
 	<section>
 		<button type="button" data-testid="background">Background</button>

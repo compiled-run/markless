@@ -2,9 +2,7 @@ import { modal } from '../../index.ts';
 
 // `disabled` is not a prop this family ships. It reaches the underlying
 // `<button>` through `{...rest}`, which is the whole point of spreading: the
-// consumer already holds the default element's native surface. One root proves
-// a disabled trigger will not open; the other proves a disabled close will not
-// close the dialog it sits in.
+// consumer already holds the default element's native surface.
 export default function Disabled() @{
 	<section>
 		<button type="button" data-testid="background">Background</button>

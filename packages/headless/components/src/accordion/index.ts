@@ -5,7 +5,6 @@ export {
 	AccordionItemTrigger as itemtrigger,
 	AccordionRoot as root,
 	accordionItemState,
-	// One section's instance, for a consumer whose own part sits inside a section.
 	accordionItemState as itemstate,
 	accordionState,
 	accordionState as state,

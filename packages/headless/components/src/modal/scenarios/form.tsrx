@@ -1,14 +1,8 @@
 import { state } from '@markless/core';
 import { modal } from '../../index.ts';
 
-// Two shapes Base UI's own suite reaches for. The first is the commonest real
-// dialog: a form inside the surface whose save control closes it. The second
-// wraps the surface in a `display: contents` ancestor, which is what a consumer
-// gets the moment they put the form outside `modal.content` instead of inside -
-// it must break neither the opening focus nor the tab cycle.
-//
 // The save control is type="button" rather than type="submit" because a native
-// submit navigates the page here; note.md records the measurement.
+// submit navigates the page here.
 export default function Form() @{
 	const page = state({ saved: '' });
 

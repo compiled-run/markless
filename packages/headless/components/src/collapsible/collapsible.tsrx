@@ -111,8 +111,6 @@ export function CollapsibleContent({
 		ui-open={collapsible.open}
 		ui-closed={collapsible.open !== true}
 		onBeforematch={(event) => {
-			// The browser is about to reveal this panel to show a person their search
-			// hit. Opening here is what keeps the family's state and the document in step.
 			collapsible.reveal();
 			onBeforematch?.(event);
 		}}

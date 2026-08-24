@@ -2,7 +2,7 @@ import { select } from '../../index.ts';
 
 // A select that arrives with a choice already made. The trigger's own words are
 // the consumer's: the family ships no `value` part and no `displayValue` prop,
-// so nothing maps a value back to its option's label text (see note.md).
+// so nothing maps a value back to its option's label text ().
 export function Prefilled() @{
 	<select.root value="banana" data-testid="root">
 		<select.label data-testid="label">Favorite Fruit</select.label>

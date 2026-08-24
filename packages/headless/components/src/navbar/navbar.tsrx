@@ -104,7 +104,7 @@ export function NavbarRoot({
 	//
 	// Every walk below starts at `event.target` and climbs. A lazily loaded handler
 	// has no `currentTarget`, and an `element()` handle bound on a widget-rooting
-	// element reads back empty in a handler - measured on this tip, see note.md.
+	// element reads back empty in a handler - measured on this tip.
 	<nav
 		{...rest}
 		ui-open={navbar.value !== ''}
@@ -162,7 +162,7 @@ export function NavbarRoot({
 			// DOM order is the navigation order. The walk needs the ordered collection
 			// of the navbar's top-level controls, and no primitive builds one today -
 			// pending capability: ordered item registration into an ancestor widget
-			// instance, see note.md.
+			// instance.
 			const walk = Array.from(
 				nav.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'),
 			).filter((control) => control.closest('[ui-navbar-dropdown]') === null);
@@ -419,8 +419,8 @@ export function NavbarItemContent({
 			// Where the press landed, which the report carries for `outside-press` and
 			// omits for Escape. `contains` rather than `===`: a consumer is free to put
 			// an icon or a span inside the trigger, and the press lands on that.
-			// The double cast is a stopgap on a type-service slip, not a DOM fact: see
-			// note.md, `pressTarget` is declared with the branded markup `Element`.
+			// The double cast is a stopgap on a type-service slip, not a DOM fact:
+			// `pressTarget` is declared with the branded markup `Element`.
 			const pressed = event.detail.pressTarget;
 			const onOwnTrigger = pressed !== undefined && back !== null && back.contains(pressed);
 			navbar.closeAll();

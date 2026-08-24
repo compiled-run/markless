@@ -1,7 +1,5 @@
 import { checklist } from '../../index.ts';
 
-// Two lists nobody can fully use: the first locks one option, the second locks
-// the whole group from the root, which reaches every item and the select-all.
 export default function UnavailableOptions() @{
 	<section>
 		<checklist.root value={['tomato']} values={['tomato', 'caviar']} data-testid="root">

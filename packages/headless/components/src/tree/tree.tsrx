@@ -59,7 +59,7 @@ export function TreeRoot({
 	// Every keystroke in the tree is handled HERE rather than on the row it landed
 	// on. A handler declared on `tree.item` is matched as an event record and its
 	// symbol is then never woken, so its body never runs - measured on this tip,
-	// see note.md. That is what keeps the toggling on the DOM as well.
+	//. That is what keeps the toggling on the DOM as well.
 	<div
 		{...rest}
 		role="tree"

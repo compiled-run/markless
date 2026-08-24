@@ -12,7 +12,7 @@ import type { PropsOf, Seeded } from '@markless/core';
  * readers into application mode and promises desktop-menu behaviour that site
  * navigation does not have; the authoring practices, the aria-at plan and every
  * surveyed library agree that navigation is a set of buttons that show and hide
- * panels. See goals/headless-components/notes/research-navbar.md §1.
+ * panels.
  */
 export type NavbarRootProps = Omit<PropsOf<'nav'>, 'onChange'> & {
 	/**

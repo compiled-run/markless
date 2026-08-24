@@ -7,18 +7,12 @@ import {
 } from '../../test-support/driver.ts';
 
 /**
- * The checkbox family's Basic scenario, read by a real screen reader.
- *
  * Expectations are `Conveys` facts rather than any reader's wording, so this file
- * runs unchanged against NVDA and VoiceOver.
- *
- * It covers only the two aria-at steps whose reader wording is recorded in
- * `../../test-support/README.md`: reading an unchecked box, and reading it again
- * after Space. Indeterminate, disabled and invalid stay on the virtual lane until a
- * CI run prints what these readers actually say about our markup.
+ * runs unchanged against NVDA and VoiceOver. It covers the two aria-at steps
+ * whose reader wording is recorded: reading an unchecked box, and reading it
+ * again after Space.
  */
 
-/** The name the Basic scenario gives its box. */
 const BOX = 'Checkbox Label';
 
 export const unchecked: Conveys = {
@@ -48,12 +42,6 @@ async function expectAnnouncesAfterChange(
 		.toEqual([]);
 }
 
-/**
- * Walk the reader to the checkbox and read it, before and after Space.
- *
- * Both reader specs call this, so the expectations live in one place and a new
- * reader is a driver plus two lines rather than a copied suite.
- */
 export async function readCheckboxTranscript(
 	sr: ScreenReaderDriver,
 	options: { readonly changeTimeoutMs: number },

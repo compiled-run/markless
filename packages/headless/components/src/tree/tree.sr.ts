@@ -15,8 +15,7 @@ import Nested from './scenarios/nested.tsrx';
 // neighbours are the disclosure plans, which cover one aria-expanded button and
 // its panel - one node of a tree, with no level, no set position and no roving
 // tab stop. So every sequence below is DERIVED from the WAI-ARIA tree semantics
-// and is ours, not a community-vetted assertion set. The letters are
-// goals/headless-components/notes/research-tree.md §4c.
+// and is ours, not a community-vetted assertion set.
 //
 // Two of those facts have no slot in the shared reader vocabulary - the tree and
 // treeitem roles, and the level - so the rows that need them assert on the
@@ -28,7 +27,7 @@ import Nested from './scenarios/nested.tsrx';
 // is a measurement, not a preference: this lane runs its files in parallel, and
 // a seven-row version of this file pushed three OTHER families' gesture rows
 // (pagination, tabs, collapsible) past their poll ceiling. Three rows leave the
-// lane green. See note.md.
+// lane green..
 const sr = virtualDriver;
 
 let mounted: HTMLElement | undefined;
@@ -54,7 +53,7 @@ test('reading a closed tree conveys the container, the closed parent and the end
 	// A: the container's role and its name are what tell a person what they are
 	// inside. `tree` has no vocabulary slot, so the role word is asserted on the
 	// phrase. The name comes from the consumer's `aria-label`, because a tree
-	// cannot be named by its own label part - see note.md.
+	// cannot be named by its own label part.
 	const container = await readUntil(sr, { name: 'Project files' });
 	expect(container, `${sr.name} announced "${container}"`).toContain('tree');
 
@@ -119,7 +118,7 @@ test('opening a node announces it as expanded, and descending announces the next
 	// whole subtree - "src index.ts app.tsrx" - because the row has no accessible
 	// name of its own and the reader computes one from its contents. Naming the
 	// row from `tree.itemlabel` would need an IDREF handle read on a widget root,
-	// which is MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT today. See note.md.
+	// which is MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT today..
 	expect(opened, `${sr.name} announced "${opened}"`).toContain('index.ts');
 
 	// C: the child of the opened node announces the next level down. A tree whose

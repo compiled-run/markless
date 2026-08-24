@@ -1,6 +1,5 @@
 import { toggle } from '../../index.ts';
 
-// A switch with help text under it. No error is mounted, so the trigger is valid.
 export default function WithHelp() @{
 	<toggle.root data-testid="root">
 		<toggle.label data-testid="label">Enable notifications</toggle.label>

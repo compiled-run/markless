@@ -1,8 +1,5 @@
 import { collapsible } from '../../index.ts';
 
-// Two sections nobody may change: one locked shut, one locked open. A locked
-// section still renders its panel and still reports its state; the trigger is
-// simply not operable.
 export default function Unavailable() @{
 	<section>
 		<collapsible.root disabled data-testid="shut-root">

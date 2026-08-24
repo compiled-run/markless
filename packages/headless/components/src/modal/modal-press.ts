@@ -19,7 +19,6 @@ function isOnBackdrop(backdrop: HTMLElement | undefined, target: EventTarget | n
 	return backdrop !== undefined && target === backdrop;
 }
 
-/** Arm the layer when a primary-button press starts on the layer itself. */
 export function armBackdropPress(
 	backdrop: HTMLElement | undefined,
 	target: EventTarget | null,

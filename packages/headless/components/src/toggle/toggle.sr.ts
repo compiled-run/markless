@@ -137,7 +137,6 @@ test('a switch with only help text under it is never conveyed as invalid', async
 	// This reader speaks "not invalid" as its own fact, so the assertion above
 	// cannot be read as "invalid is absent"; that is what this line proves.
 	expect(missingFacts(sr, announcement, { state: ['invalid'] })).not.toEqual([]);
-	// Reachable as its own item too; the row below proves it is also attached.
 	await readUntil(sr, { name: '(Receive notifications about important updates)' });
 });
 

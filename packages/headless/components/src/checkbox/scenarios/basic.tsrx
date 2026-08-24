@@ -1,6 +1,5 @@
 import { checkbox } from '../../index.ts';
 
-// The starter a consumer copies: one labelled checkbox, off to begin with.
 export default function Basic() @{
 	<checkbox.root data-testid="root">
 		<checkbox.trigger data-testid="trigger">

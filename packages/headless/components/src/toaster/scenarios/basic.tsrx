@@ -2,11 +2,11 @@ import { toaster } from '../../index.ts';
 
 // The starter a consumer copies: the region, buttons that say something, and the
 // rows written out of the family's own parts. There is no shorter form - the root
-// renders no rows of its own (owner ruling), so the markup below IS the path.
+// renders no rows of its own, so the markup below IS the path.
 //
 // The message is raised by writing the queue from the handler - the shape this
 // compiler lowers today. `toasts.toast(...)` is the shape the family means to
-// ship and cannot yet; note.md and the pinned rows in the suite carry why.
+// ship and cannot yet; the pinned rows in the suite carry why.
 export default function Basic() @{
 	const toasts = toaster.state();
 

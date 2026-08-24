@@ -11,9 +11,8 @@ import { UnavailableOptions } from './scenarios/unavailable-options.tsrx';
 // What a screen reader says about the select family, asserted the way the
 // w3c/aria-at `tests/apg/combobox-select-only` plan asserts it: each step names
 // the facts the announcement has to convey - role, accessible name, state - and
-// never a product's wording. The sequence letters below are the ones in
-// goals/headless-components/notes/research-select.md, which reads them off that
-// plan. `sr` is the only line that picks a reader, so the same expectations run
+// never a product's wording. The sequence letters below are those the plan uses.
+// `sr` is the only line that picks a reader, so the same expectations run
 // against NVDA and VoiceOver once those drivers land.
 //
 // aria-at coverage, recorded honestly: that plan carries no test for a disabled

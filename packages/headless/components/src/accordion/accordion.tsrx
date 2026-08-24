@@ -241,9 +241,6 @@ export function AccordionItemContent({
 		ui-open={isOpen}
 		ui-closed={isOpen !== true}
 		onBeforematch={(event) => {
-			// The browser is about to reveal this panel to show a person their
-			// search hit. Opening the section here is what keeps the family's own
-			// state and the document in step.
 			accordion.reveal(item.value);
 			onBeforematch?.(event);
 		}}

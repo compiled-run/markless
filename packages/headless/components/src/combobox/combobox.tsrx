@@ -336,8 +336,7 @@ export function ComboboxTrigger({ children, onClick, ...rest }: ComboboxTriggerP
 // removed from the document leaves the stack's marks behind.
 //
 // `overlay` is the bare attribute the primitive reads, and nothing is imported
-// for it. It is written unconditionally, which is a known deviation for `inline`
-// - see note.md, "One content part, two modes".
+// for it. It is written unconditionally, which is a known deviation for `inline`.
 export function ComboboxContent({
 	children,
 	onDismiss,
@@ -416,8 +415,7 @@ export function ComboboxItem({
 
 	// `ui-value` is this option's own name in the markup. The highlight is family
 	// state keyed by value and DOM focus never lands on an option, so an element
-	// the walk was handed has no other way back to the value it stands for. See
-	// note.md, "The value in the markup".
+	// the walk was handed has no other way back to the value it stands for.
 	<div
 		{...rest}
 		el={combobox.optionEls}
@@ -431,7 +429,7 @@ export function ComboboxItem({
 		ui-disabled={isLocked}
 		onClick={(event) => {
 			// The two cells, not the `isLocked` computed: a computed() read from a
-			// handler body does not guard. See note.md.
+			// handler body does not guard..
 			if (item.disabled !== true && combobox.disabled !== true) {
 				const held = combobox.value;
 				const wasChosen = typeof held === 'string' ? held === item.value : held.includes(item.value);
@@ -509,7 +507,7 @@ export function ComboboxError({ children, ...rest }: ComboboxErrorProps) @{
 //
 // One option per chosen value - what `multiple` wants - needs a `@for` over a
 // read off the shared instance, and that lowers to `ReferenceError: combobox is
-// not defined`. See note.md, "A repeat cannot be sourced from the instance".
+// not defined`.
 export function ComboboxField({ ...rest }: ComboboxFieldProps) @{
 	const combobox = comboboxState();
 

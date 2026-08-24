@@ -153,7 +153,7 @@ export function RadioGroupItemIndicator({ children, ...rest }: RadioGroupItemInd
 	const item = radiogroupItemState();
 	// A computed, not the comparison inline: an `@if` condition written as an
 	// expression renders correctly once and then never refreshes, so the arm
-	// has to read one graph cell. Measured, not assumed - see note.md.
+	// has to read one graph cell. Measured, not assumed.
 	const isSelected = computed(() => group.value === item.value);
 
 	<span {...rest} aria-hidden="true">

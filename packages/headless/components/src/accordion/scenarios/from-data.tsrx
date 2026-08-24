@@ -1,11 +1,9 @@
 import { computed } from '@markless/core';
 import { accordion } from '../../index.ts';
 
-// An accordion authored over a list, which is the normal case for an FAQ. The
-// rows root a widget each (`accordion.item`), and the data lives inside the
-// `computed()` because a module-level const read from one is not carried into
-// the lowered symbol. The `<div>` around the loop is forced: a construct cannot
-// open directly inside a component tag.
+// The data lives inside the `computed()` because a module-level const read from
+// one is not carried into the lowered symbol. The `<div>` around the loop is
+// forced: a construct cannot open directly inside a component tag.
 export default function FromData() @{
 	const sections = computed(() => [
 		{ value: 'alpha', question: 'The first question', answer: 'The first answer.' },

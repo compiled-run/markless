@@ -7,8 +7,7 @@ import Basic from './scenarios/basic.tsrx';
 import Described from './scenarios/described.tsrx';
 import Nested from './scenarios/nested.tsrx';
 
-// Rows follow the w3c/aria-at modal-dialog plan (Sequences A-F in
-// goals/headless-components/notes/research-modal.md section 4c) and assert the
+// Rows follow the w3c/aria-at modal-dialog plan (Sequences A-F) and assert the
 // facts an announcement must convey, never a reader product's wording. `sr` is
 // the only line that picks a reader, so the same expectations run against NVDA
 // and VoiceOver once those drivers land.
@@ -81,8 +80,6 @@ test('opening the dialog makes its name reachable', async () => {
 });
 
 // aria-at's modal-dialog plan asserts the dialog role at priority 1. The shared
-// vocabulary now carries the word, so the role is asserted rather than stood in
-// for by the name.
 test('the opened surface announces as a dialog', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'button', name: 'Edit address' });

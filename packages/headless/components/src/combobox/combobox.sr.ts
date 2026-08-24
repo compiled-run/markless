@@ -205,8 +205,7 @@ test('the hidden native control is never announced beside the real combobox', as
 // compiler leaves it out of IDREF_ATTRIBUTES deliberately (see
 // packages/compiler/src/passes/semantic-graph/idref-attributes.ts). Until it
 // lands, the highlight is visible and inaudible - and this row is what says so
-// out loud rather than the file staying silent about it. Deterministic, so
-// test.fails.
+// out loud rather than the file staying silent about it. Deterministic, so test.fails.
 test.fails('arrowing announces the option the highlight moved to', async () => {
 	await open(OpenList);
 	await readFor([say.combobox]);

@@ -33,7 +33,7 @@ export const tabsState = shared(
 );
 
 // The trigger's own value as a graph cell. Compared against its prop instead,
-// the trigger stops refreshing once the page has resumed - measured, see note.md.
+// the trigger stops refreshing once the page has resumed - measured.
 export const tabsPartState = shared(
 	() => {
 		const part: TabsPartInstanceState = state({ value: '' });
@@ -86,7 +86,7 @@ export function TabsTrigger({
 	const tab = tabsPartState();
 	tab.value = value;
 	// One cell read in every position: the same comparison written inline in an
-	// attribute renders once and then goes stale. Measured, see note.md.
+	// attribute renders once and then goes stale. Measured.
 	const isSelected = computed(() => tabs.value === tab.value);
 
 	<button
@@ -171,7 +171,7 @@ export function TabsContent({ value, children, ...rest }: TabsContentProps) @{
 	const tabs = tabsState();
 	// The panel compares against its prop where the trigger compares against a
 	// cell: rooting a part instance here stops `hidden` refreshing in CSR too.
-	// Measured both ways, see note.md.
+	// Measured both ways.
 	const isShowing = computed(() => tabs.value === value);
 
 	// `hidden` rather than an arm: a panel that unmounts loses the focus, scroll

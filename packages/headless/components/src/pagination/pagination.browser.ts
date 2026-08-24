@@ -84,8 +84,6 @@ function expectOnlyCurrent(testId: string): void {
 	expect(current[0]?.getAttribute('aria-current')).toBe('page');
 }
 
-// --- the page range -------------------------------------------------------
-
 function pages(entries: ReturnType<typeof pageRange>): Array<number | '...'> {
 	return entries.map((entry) => (entry.type === 'page' ? entry.value : '...'));
 }
@@ -184,8 +182,6 @@ test('pageRange: the range is seven entries wide at every page of a long count',
 		expect(pageRange(showing, 20, 1).length).toBe(7);
 	}
 });
-
-// --- rendered anatomy -----------------------------------------------------
 
 function expectBasicRendered() {
 	// The root is a navigation landmark, and a landmark on a page that has several of
@@ -306,8 +302,6 @@ function expectProductsRendered() {
 	expect(el(Heading).textContent).toContain('Page 1 of 20');
 	expectOnlyCurrent('itemtrigger');
 }
-
-// --- gestures -------------------------------------------------------------
 
 async function expectClickingAPageMovesCurrent() {
 	at('itemtrigger-3').click();
@@ -572,8 +566,6 @@ for (const mode of MODES) {
 	});
 }
 
-// --- keyboard -------------------------------------------------------------
-//
 // There is no APG pattern for pagination and no keyboard contract to conform to:
 // every control is an ordinary tab stop and nothing roves. What these rows prove
 // is that the family does not get in the way of what a native button and a
@@ -624,8 +616,6 @@ test('CSR: Enter on a focused step control steps one page', async () => {
 	await userEvent.keyboard('{Enter}');
 	await expect.poll(() => at('itemtrigger-2').getAttribute('aria-current')).toBe('page');
 });
-
-// --- resume ---------------------------------------------------------------
 
 test('SSR: the served page carries the current page and both bounds', async () => {
 	await renderSSR(Basic);

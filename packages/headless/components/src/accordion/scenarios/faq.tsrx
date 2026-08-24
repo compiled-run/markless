@@ -1,9 +1,7 @@
 import { accordion } from '../../index.ts';
 
-// A section written open, a section nobody may open - last, so the walk's End
-// has an enabled section to land on short of it - and an accordion that always
-// keeps one section showing: `collapsible` is off, so pressing the open
-// section's own trigger does not close it.
+// The disabled section is last, so the walk's End has an enabled section to
+// land on short of it.
 export default function Faq() @{
 	<section>
 		<accordion.root value="rules" collapsible={false} data-testid="root">

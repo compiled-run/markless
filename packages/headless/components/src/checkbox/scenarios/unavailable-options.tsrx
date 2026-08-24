@@ -1,7 +1,5 @@
 import { checkbox } from '../../index.ts';
 
-// Options a person may see but not change: one off and one already on. A
-// disabled trigger must not toggle, and the root reports both flags at once.
 export default function UnavailableOptions() @{
 	<section>
 		<checkbox.root disabled data-testid="off-root">
