@@ -3,6 +3,7 @@ import { page } from 'vite-plus/test/browser';
 import { afterEach, expect, test } from 'vitest';
 import Basic from './scenarios/basic.tsrx';
 import Limits from './scenarios/limits.tsrx';
+import OneMessage from './scenarios/one-message.tsrx';
 import OverModal from './scenarios/over-modal.tsrx';
 
 const Root = page.getByTestId('root');
@@ -52,6 +53,11 @@ function titles() {
 // A repeat body may also hold only ONE element: two siblings inside `@for` is
 // MARKLESS_PARSE_ERROR ("Expected '</' to close the JSX element, but found '@'").
 // Measured while probing the above; not otherwise load-bearing here.
+//
+// The wall is the repeat and nothing else: `one-message.tsrx` writes the same
+// parts out with no `@for` around them and every one of them renders, which is
+// what the two rows below pin. The parts themselves are not what the rows above
+// are waiting on.
 
 test('CSR: the region is on the page before anything is said', async () => {
 	await render(Basic);
@@ -73,6 +79,27 @@ test('CSR: more messages than a capped region shows are queued, not dropped', as
 	el<HTMLButtonElement>(page.getByTestId('four')).click();
 	// All four are held: the repeat shows two, the queue keeps everything.
 	await expect.poll(() => el(page.getByTestId('queued')).textContent).toBe('4');
+});
+
+// Each of these parts branches on `children`, so a self-closed placement has to
+// serve the record's own words and a written-into one has to serve the children.
+function expectPartsFilled() {
+	expect(el(page.getByTestId('itemtitle')).textContent).toBe('Saved');
+	expect(el(page.getByTestId('itemdescription')).textContent).toBe('On disk.');
+	expect(el(page.getByTestId('itemicon')).textContent).toBe('✓');
+	expect(el(page.getByTestId('itemicon')).getAttribute('aria-hidden')).toBe('true');
+	expect(el(page.getByTestId('written-itemtitle')).textContent).toBe('Written instead');
+	expect(el(page.getByTestId('item')).getAttribute('ui-tone')).toBe('success');
+}
+
+test('CSR: a written-out row renders the message it was given', async () => {
+	await render(OneMessage);
+	expectPartsFilled();
+});
+
+test('SSR: the served row renders the message it was given', async () => {
+	await renderSSR(OneMessage);
+	expectPartsFilled();
 });
 
 test.fails('CSR: a message appears once', async () => {
