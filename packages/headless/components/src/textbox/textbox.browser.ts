@@ -21,20 +21,17 @@ const UsernameLabel = page.getByTestId('username-label');
 const BioRoot = page.getByTestId('bio-root');
 const BioTextarea = page.getByTestId('bio-textarea');
 const BioLabel = page.getByTestId('bio-label');
-// The part-restrictions example holds one field the control tightens and one it
-// tries to loosen.
 const StricterRoot = page.getByTestId('stricter-root');
 const StricterInput = page.getByTestId('stricter-input');
 const LooserRoot = page.getByTestId('looser-root');
 const LooserInput = page.getByTestId('looser-input');
-// The invalid example holds the error written after the control and before it.
 const AfterInput = page.getByTestId('after-input');
 const AfterError = page.getByTestId('after-error');
 const BeforeInput = page.getByTestId('before-input');
 const BeforeError = page.getByTestId('before-error');
 
-// The SSR harness rewrites a literal `renderSSR` call site, so the mount cannot be
-// passed by reference or hidden in a helper: each test branches on the mode instead.
+// The SSR harness rewrites a literal `renderSSR` call site, so each test must branch
+// on the mode rather than take the mount by reference.
 const MODES = ['CSR', 'SSR'] as const;
 
 function el<T extends Element = HTMLElement>(locator: { element(): Element | null }) {
@@ -53,10 +50,9 @@ function expectBasicRendered() {
 	expect(el(Root).hasAttribute('ui-disabled')).toBe(false);
 	expect(el(Root).hasAttribute('ui-required')).toBe(false);
 	expect(el(Root).hasAttribute('ui-readonly')).toBe(false);
-	// The label points at its own control, by a minted id nobody spelled.
+	// The label and control name each other by a minted id nobody spelled.
 	expect(el(Label).getAttribute('for')).toBe(control.getAttribute('id'));
 	expect(control.id).toBeTruthy();
-	// The control points back at the label for its name.
 	expect(control.getAttribute('aria-labelledby')).toBe(el(Label).id);
 }
 
@@ -66,8 +62,6 @@ function expectSignupFormRendered() {
 	expect(username.tagName).toBe('INPUT');
 	expect(bio.tagName).toBe('TEXTAREA');
 	expect(bio.getAttribute('name')).toBe('bio');
-	// Both controls carry their name the other way round, from the label they
-	// point at, which is one handle bound once and readable by either control.
 	expect(username.getAttribute('aria-labelledby')).toBe(el(UsernameLabel).id);
 	expect(bio.getAttribute('aria-labelledby')).toBe(el(BioLabel).id);
 	// Two instances mint two labels, so neither names the other's control.
@@ -90,15 +84,13 @@ function expectLockedRendered() {
 }
 
 function expectPartRestrictions() {
-	// A restriction the control adds reaches the DOM; the root, which was not
-	// told, keeps reporting what it was given.
+	// A restriction the control adds reaches the DOM; the root, not told, reports
+	// what it was given.
 	const stricter = el<HTMLInputElement>(StricterInput);
 	expect(stricter.hasAttribute('required')).toBe(true);
 	expect(stricter.hasAttribute('readonly')).toBe(true);
 	expect(el(StricterRoot).hasAttribute('ui-required')).toBe(false);
 
-	// The other direction does not work: a part may add a restriction, never
-	// remove one the root set.
 	expect(el<HTMLInputElement>(LooserInput).hasAttribute('required')).toBe(true);
 	expect(el(LooserRoot).getAttribute('ui-required')).toBe('');
 }
@@ -106,24 +98,20 @@ function expectPartRestrictions() {
 function expectHelpRendered() {
 	expect(el(Description).textContent).toBe("We'll never share your email");
 	expect(el<HTMLInputElement>(Input).getAttribute('aria-invalid')).toBe('false');
-	// The help text is the control's description, by a minted id nobody spelled.
 	expect(el<HTMLInputElement>(Input).getAttribute('aria-describedby')).toBe(el(Description).id);
 	expect(el(Description).id).toBeTruthy();
 }
 
 function expectInvalidRendered() {
 	expect(el(AfterError).textContent).toBe('Password is required');
-	// Every part of one widget instance seeds before any part renders, so the
-	// error part's `textbox.invalid = true` is what the control reads.
+	// Every part of one widget instance seeds before any part renders, so document
+	// order does not decide what a part reads - the error marks the control either way.
 	expect(el<HTMLInputElement>(AfterInput).getAttribute('aria-invalid')).toBe('true');
-	// An invalid control says why: the error is its description.
 	expect(el<HTMLInputElement>(AfterInput).getAttribute('aria-describedby')).toBe(
 		el(AfterError).id,
 	);
 	expect(el(AfterError).id).toBeTruthy();
 
-	// The same error written BEFORE the control: document order does not decide
-	// what a part reads, so this control is invalid too.
 	expect(el(BeforeError).textContent).toBe('Password is required');
 	expect(el<HTMLInputElement>(BeforeInput).getAttribute('aria-invalid')).toBe('true');
 }
@@ -131,9 +119,8 @@ function expectInvalidRendered() {
 function expectHelpAndErrorRendered() {
 	expect(el(Description).textContent).toBe('Enter a valid email address');
 	expect(el(TextboxError).textContent).toBe('Email format is invalid');
-	// aria-describedby here names exactly one id, so a field mounting both messages
-	// is described by the first and the second sits on the page unattached. This row
-	// turns red - the signal to name both - the day a handle list is expressible.
+	// aria-describedby names exactly one id, so the second message sits unattached
+	// until a handle list is expressible.
 	const described = el<HTMLInputElement>(Input).getAttribute('aria-describedby');
 	expect(described).toBeTruthy();
 	expect(document.getElementById(described as string)).toBe(el(Description));
@@ -189,10 +176,8 @@ for (const mode of MODES) {
 	});
 }
 
-// Expected red: an element() handle binds one live host, so the single-line and
-// multi-line controls cannot share one. The label's `for` always names the
-// single-line control, so a field that mounts only a textarea renders a minted id no
-// element carries and clicking that label focuses nothing.
+// Expected red: an element() handle binds one live host, so the label's `for` always
+// names the single-line control and a textarea-only field names an id nothing carries.
 test.fails('CSR: a label beside a multiline control names an element that exists', async () => {
 	await render(SignupForm);
 	const named = el(BioLabel).getAttribute('for');
@@ -200,16 +185,13 @@ test.fails('CSR: a label beside a multiline control names an element that exists
 	expect(document.getElementById(named as string)).not.toBeNull();
 });
 
-// --- typing ---------------------------------------------------------------
-
 test('CSR: the control takes typing and the root follows it out of empty', async () => {
 	await render(Basic);
 	expect(el(Root).getAttribute('ui-empty')).toBe('');
 
 	await userEvent.fill(el<HTMLInputElement>(Input), 'test user');
 	expect(el<HTMLInputElement>(Input).value).toBe('test user');
-	// `ui-empty` is a comparison over the same cell the keystroke wrote, in a
-	// different part from the one that wrote it.
+	// `ui-empty` reads the cell the keystroke wrote, from a different part.
 	await expect.poll(() => el(Root).hasAttribute('ui-empty')).toBe(false);
 });
 
