@@ -179,7 +179,13 @@ const clientBuild = resolve(demo, '.output/public/build');
 // demo's repeats are non-mintable, so the mint chunk vanished from the build.
 // Repays part of the +643/+237 mint growth above; the remaining resume-module
 // delta stays with the bundler-diet clawbacks (shared resume-census leaf).
-const MAX_SHIPPED_JS_GZIP_BYTES = 69_140;
+// 69,140 -> 69,800 (2026-08-24): measured 69,774, +634 - the projection-token
+// splice (census T1, defect 97): ssr-data/renderer.ts ships in this fixture's
+// client bundle, so the splice machinery is paid here even though the demo has
+// no after-children projections. Clawback named for bundler-diet: the renderer's
+// client copy should demand-gate or split the projection-splice path the same
+// way the row mint did (fns-module + demand record precedent).
+const MAX_SHIPPED_JS_GZIP_BYTES = 69_800;
 
 test('music-player-ssr production build stays within its shipped JS budget', async () => {
 	await rm(resolve(demo, '.output'), { force: true, recursive: true });
