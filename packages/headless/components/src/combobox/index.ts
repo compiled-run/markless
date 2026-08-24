@@ -1,0 +1,31 @@
+export {
+	ComboboxContent as content,
+	ComboboxDescription as description,
+	ComboboxError as error,
+	ComboboxField as field,
+	ComboboxInput as input,
+	ComboboxItem as item,
+	ComboboxItemIndicator as itemindicator,
+	ComboboxItemLabel as itemlabel,
+	ComboboxLabel as label,
+	ComboboxRoot as root,
+	ComboboxTrigger as trigger,
+	comboboxItemState,
+	// One option's instance, for a consumer whose own part sits inside an item.
+	comboboxItemState as itemstate,
+	comboboxState,
+	comboboxState as state,
+} from './combobox.tsrx';
+export type {
+	ComboboxContentProps,
+	ComboboxDescriptionProps,
+	ComboboxErrorProps,
+	ComboboxFieldProps,
+	ComboboxInputProps,
+	ComboboxItemIndicatorProps,
+	ComboboxItemLabelProps,
+	ComboboxItemProps,
+	ComboboxLabelProps,
+	ComboboxRootProps,
+	ComboboxTriggerProps,
+} from './combobox-types.ts';
