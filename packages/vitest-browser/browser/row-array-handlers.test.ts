@@ -59,15 +59,12 @@ test('CSR: one click on a row runs every handler entry once, in order', async ()
 // calls stopImmediatePropagation is the last one to run: the third entry never
 // fires. Both render paths have to agree on that, which is what the non-row
 // mb-events witnesses already pin for a plain element.
-// OPEN DEFECT, SSR resume only - the row runs XYZ where CSR now reads XY.
-// Resume honours stopImmediatePropagation for a plain element but not for a
-// row: in packages/web/src/resume-events.ts the dispatch walk hands
-// `propagation.stoppedImmediate` to `dispatchViewEvent` and NOT to
-// `dispatchRowEvent`, whose `for (const symbolId of rowEvent.symbolIds)` loop
-// therefore has nothing to read and runs the list to the end. Deterministic, so
-// test.fails. Repairing it is a change to resume-events.ts, which the direct-CSR
-// unit that pinned this does not own.
-test.fails('SSR resume: stopImmediatePropagation in a row entry ends the list', async () => {
+// Was defect 92: the dispatch walk in packages/web/src/resume-events.ts handed
+// `propagation.stoppedImmediate` to `dispatchViewEvent` and not to
+// `dispatchRowEvent`, so the row's `for (const symbolId of rowEvent.symbolIds)`
+// loop had nothing to read and ran to the end. The row loop now reads the same
+// flag the view loop does.
+test('SSR resume: stopImmediatePropagation in a row entry ends the list', async () => {
 	const screen = await renderSSR(Page);
 	const container = screen.container;
 
