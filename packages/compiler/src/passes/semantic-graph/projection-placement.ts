@@ -14,7 +14,10 @@ import type {
  * Every sibling is classified, never guessed — the same sweep the repeat's row
  * offset uses. An element is a host record at that exact child index
  * (collect-elements mints a host id for every host element, so an element
- * without one cannot exist). Static text and a `{text}` slot occupy an index
+ * without one cannot exist), and it counts as itself plus every element it
+ * renders beneath it: these are counts of elements in document order, not of
+ * sibling positions, so `<span><i></i></span>` is two.
+ * Static text and a `{text}` slot occupy an index
  * and render no element. Anything whose element count render time decides -
  * a repeat, an async boundary, a dynamic host that may be omitted, a branch
  * whose arms disagree, a child component from a module this compile never saw -
@@ -51,7 +54,7 @@ type ProjectionSite = {
 	readonly path: ReadonlyArray<number>;
 };
 
-/** How many elements one chunk renders at its own top level. */
+/** How many elements one chunk renders, each host counted with its subtree. */
 export function chunkElementCount(
 	input: ChunkScopeInput & { readonly chunkId: string },
 ): ModuleGraphInterfaceElementCount {
@@ -213,7 +216,19 @@ function positionCount(
 ): ModuleGraphInterfaceElementCount {
 	const isAt = (path: ReadonlyArray<number>) =>
 		isDirectChild(path, parentPath) && path[path.length - 1] === index;
-	if (chunk.hosts.some((host) => isAt(host.coordinate.path))) return 1;
+	if (chunk.hosts.some((host) => isAt(host.coordinate.path))) {
+		// A host is itself plus everything it renders beneath it, so a DOM census
+		// walking the served markup meets the same number.
+		const inside = countSiblings(
+			scope,
+			chunk,
+			[...parentPath, index],
+			() => true,
+			seen,
+			projection,
+		);
+		return inside === UNKNOWN ? UNKNOWN : 1 + inside;
+	}
 	const slot = chunk.slots.find(
 		(candidate) =>
 			candidate.coordinate.kind === 'comment-anchor' && isAt(candidate.coordinate.path),

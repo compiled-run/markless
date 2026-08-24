@@ -7,7 +7,9 @@ type RenderComponent = ModuleGraphInterfaceArtifact['render']['components'][numb
 // The module-graph interface publishes where a component's `{children}` hole
 // sits among the elements beside it, so an importer can place the children it
 // passes while compiling. Nothing reads these fields yet: these tests pin the
-// facts, and the counts are of ELEMENTS - text never shifts a child position.
+// facts. The counts are of ELEMENTS in document order - text renders none, and
+// an element counts with everything nested inside it, so a DOM census walking
+// the served markup meets the same number.
 async function components(source: string): Promise<ReadonlyArray<RenderComponent>> {
 	const result = await compileTsrxModule({ filename: 'src/App.tsrx', source, symbols: [] });
 	expect(result.semanticGraph.diagnostics).toEqual([]);
@@ -28,7 +30,9 @@ test('a navbar that ends in {children} reports nothing after the hole', async ()
 		'Navbar',
 	);
 
-	expect(navbar.elementCount).toBe(1);
+	// The `<nav>` counts with its subtree, and its subtree contains the hole, so
+	// how many elements Navbar renders is the caller's answer, not this module's.
+	expect(navbar.elementCount).toBe('unknown');
 	expect(navbar.projection).toEqual({
 		elementsBeforeProjection: 1,
 		elementsAfterProjection: 0,
@@ -61,8 +65,41 @@ test('a component with no {children} publishes an element count and no projectio
 		'Card',
 	);
 
-	expect(card.elementCount).toBe(1);
+	// The `<article>` and the `<h2>` it wraps are both elements in the served
+	// markup, so the count is two.
+	expect(card.elementCount).toBe(2);
 	expect(card.projection).toBeUndefined();
+});
+
+test('a wrapped element counts with its wrapper, at any depth', async () => {
+	const [pair, triple] = await Promise.all([
+		component(`export function Pair() @{ <span><i></i></span> }`, 'Pair'),
+		component(`export function Triple() @{ <div><span><i></i></span></div> }`, 'Triple'),
+	]);
+
+	expect(pair.elementCount).toBe(2);
+	expect(triple.elementCount).toBe(3);
+});
+
+test('nested elements beside the hole count with their subtrees', async () => {
+	const shell = await component(
+		`export function Shell({ children }) @{
+	<div>
+		<header><h1>title</h1></header>
+		{children}
+		<footer><nav><a href="/">home</a></nav></footer>
+	</div>
+}`,
+		'Shell',
+	);
+
+	// Before: the `<header>` and its `<h1>`. After: the `<footer>`, its `<nav>`,
+	// and the `<a>` inside that. A sibling sweep would have said one and one.
+	expect(shell.projection).toEqual({
+		elementsBeforeProjection: 2,
+		elementsAfterProjection: 3,
+		projectionInsideConstruct: false,
+	});
 });
 
 test('a toaster whose @if arms disagree reports an unknown count after the hole', async () => {
