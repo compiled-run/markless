@@ -221,13 +221,13 @@ test('CSR: a part that guards an optional event prop out of a rest spread reache
 //   }
 //
 // Both legs are already in authored order and neither is deferred, and the
-// module is not even async. So nothing about await ordering can move this row:
-// what fails is that `context.graph.read("prop:props", ["onKeyDown"])` answers
-// undefined in the warm state, which is the `prop:props` placeholder fallback
-// this file's header already describes. Still a resume/runtime seam, and still
-// outside this unit's contract - but now with the compiler-side explanation
-// eliminated by measurement rather than left open.
-test.fails('SSR resume: the same guarded rest-spread callback reaches its consumer', async () => {
+// module is not even async — the compiler-side explanation was eliminated by
+// measurement. The real blocker was never `prop:props` either: it was the
+// runtime flush lost wakeup (defect 88) — a write landing while a flush's
+// journal-apply was in flight stranded its dirty paths, so the consumer's
+// update never reached the DOM. Fixed in runtime/graph.ts (flushScheduled now
+// cleared alongside activeFlush); causality measured both ways at the fix.
+test('SSR resume: the same guarded rest-spread callback reaches its consumer', async () => {
 	const { errors, stop } = watchPageErrors();
 	const container = (await renderSSR(Page)).container;
 	await expectGuardedRestSpreadCallbackFires(container);
