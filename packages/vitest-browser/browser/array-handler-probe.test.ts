@@ -37,21 +37,17 @@ test('SSR: a composed closure runs every call it makes, in order', async () => {
 
 // This probe used to assert the array form fails the build. The owner ruled
 // event arrays in (authored order, platform semantics), so the same fixture now
-// witnesses the positive contract: both handlers fire per click, first-listed
-// first. The deep coverage lives in multi-binding.test.ts.
+// witnesses the positive contract: every handler fires once per click,
+// first-listed first. The deep coverage lives in multi-binding.test.ts.
 //
-// PENDING CAPABILITY (defect 89) - on PLAIN component state, each array entry's
-// write lands twice: one click measures order 'AABB' where 'AB' is authored
-// (count still nets 0, so the duplication is symmetric). The mb-events
-// witnesses pass on the same array shape over widget-shared state, so the
-// duplication is specific to the plain-state write path - consistent with a
-// dispatch-apply plus flush-replay double-commit, the machinery family defect
-// 88 lives in. Deterministic, so test.fails.
-test.fails('an array of handlers renders and runs in authored order', async () => {
-	const { default: Rejected } = await import('./fixtures/array-handler-accepted.tsrx');
-	const screen = await render(Rejected);
+// Defect 89, fixed: render-data emitted one interaction record per array entry
+// and gave each the whole handler list, so direct CSR attached N listeners and
+// ran N handlers apiece ('AAABBBCCC' for three entries).
+test('an array of handlers renders and runs in authored order', async () => {
+	const { default: Accepted } = await import('./fixtures/array-handler-accepted.tsrx');
+	const screen = await render(Accepted);
 	const container = screen.container as HTMLElement;
 	container.querySelector<HTMLButtonElement>('button')?.click();
-	await expect.poll(() => container.querySelector('[data-order]')?.textContent).toBe('AB');
+	await expect.poll(() => container.querySelector('[data-order]')?.textContent).toBe('ABC');
 	expect(container.querySelector('button')?.textContent).toBe('0');
 });
