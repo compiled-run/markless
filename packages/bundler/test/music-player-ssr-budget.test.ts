@@ -147,7 +147,11 @@ const clientBuild = resolve(demo, '.output/public/build');
 // 67,330 -> 67,360 (2026-08-23, same day): measured 67,343 on the real checkout
 // after the demand-gated overlay landed (worker's worktree measured 67,330 flat);
 // +13 = the non-bubbling dispatch fix's share here plus gzip run variance.
-const MAX_SHIPPED_JS_GZIP_BYTES = 67_360;
+// 67,360 -> 67,940 (2026-08-23): measured 67,926. +566 = per-graph widget registries
+// (defect 72 incl. emitted-resolver graph pass) + served-open enlist handoff + plural
+// element-handle machinery with the live row-walk read (+320 of it). Bundler-diet owns
+// the repayment alongside the standing pay-per-use obligations.
+const MAX_SHIPPED_JS_GZIP_BYTES = 67_940;
 
 test('music-player-ssr production build stays within its shipped JS budget', async () => {
 	await rm(resolve(demo, '.output'), { force: true, recursive: true });

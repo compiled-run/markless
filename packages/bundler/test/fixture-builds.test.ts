@@ -18,9 +18,11 @@ const fixtures = [
 		runtimeBudget: {
 			dist: 'packages/bundler/fixtures/vite-csr/dist',
 			entryHtml: 'packages/bundler/fixtures/vite-csr/dist/index.html',
-			// 3,100 -> 3,300 (2026-08-23): +217 measured for the DOM-faithful bubble
-			// walk (defect 67) - every record on the target-to-root chain dispatches.
-			maxRuntimeChunkGzipBytes: 3_300,
+			// 3,100 -> 3,300 (2026-08-23): +217 for the DOM-faithful bubble walk (defect 67).
+			// 3,300 -> 3,460 (2026-08-23): +149 measured 3,449 - per-graph widget registries
+			// (defect 72) + plural element-handle reads (C-prime) + keyed-row removal.
+			// Repayment owed to bundler-diet with the existing pay-per-use obligation.
+			maxRuntimeChunkGzipBytes: 3_460,
 			// anti-bloat wall — tightened by the runtime-stdlib goal; any increase must be justified
 			// Recalibrated to actuals for chained-async key-phase gating (runtime gate + self-wake + single-flight); zero slack.
 			// DE-MINIMIS INTERIM chain (settlement bridge +94); REPAYMENT OBLIGATION
@@ -79,10 +81,10 @@ const fixtures = [
 		runtimeBudget: {
 			dist: 'packages/bundler/fixtures/vite-plus/dist',
 			entryHtml: 'packages/bundler/fixtures/vite-plus/dist/index.html',
-			// 2,950 -> 3,290 (2026-08-23): +215 measured for the bubble walk (defect 67).
-			// 3,290 -> 3,300 (2026-08-23, same day): +18 for the non-bubbling dispatch fix
-			// + the overlay demand seam, measured 3,292; matched to vite-csr's wall.
-			maxRuntimeChunkGzipBytes: 3_300,
+			// 2,950 -> 3,290 (2026-08-23): +215 bubble walk; 3,290 -> 3,300: +18 dispatch fix.
+			// 3,300 -> 3,455 (2026-08-23): +143 measured 3,443 - same registry + plural-handle
+			// chain as vite-csr; bundler-diet repayment.
+			maxRuntimeChunkGzipBytes: 3_455,
 			// anti-bloat wall — tightened by the runtime-stdlib goal; any increase must be justified
 			// Recalibrated to actuals for chained-async key-phase gating (runtime gate + self-wake + single-flight); zero slack. CI (Linux) emits slightly larger bytes than local macOS; wall tracks CI actuals.
 			// DE-MINIMIS INTERIM chain (settlement bridge +94); REPAYMENT OBLIGATION
