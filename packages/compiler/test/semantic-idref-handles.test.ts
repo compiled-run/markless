@@ -243,7 +243,7 @@ test('aria-activedescendant is not an IDREF position in this slice', async () =>
 		'ActiveDescendant',
 		`import { element } from '@markless/core';
 export function App() @{
-	const option = element<HTMLLIElement>();
+	const option = element<HTMLLIElement[]>();
 	<ul aria-activedescendant={option}><li el={option}>One</li></ul>
 }`,
 	);
@@ -414,7 +414,7 @@ test('a row-owned handle in an IDREF position is refused', async () => {
 		`import { element, state } from '@markless/core';
 export function App() @{
 	const rows = state([{ id: 'a', label: 'A' }]);
-	const row = element<HTMLLIElement>();
+	const row = element<HTMLLIElement[]>();
 	<section>
 		<div aria-controls={row}>Controls</div>
 		<ul>@for (const item of rows; key item.id) { <li el={row}>{item.label}</li> }</ul>

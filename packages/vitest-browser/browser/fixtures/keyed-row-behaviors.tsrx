@@ -8,7 +8,9 @@ export function App() @{
 		{ id: 'c', label: 'Gamma' },
 		{ id: 'd', label: 'Delta' },
 	]);
-	const row = element<HTMLTableRowElement>();
+	// One handle, one row host, N rows: a repeat binding is plural by definition,
+	// so the declaration says so with an array type argument.
+	const row = element<HTMLTableRowElement[]>();
 
 	<main>
 		<nav>

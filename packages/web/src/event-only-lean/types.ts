@@ -64,9 +64,11 @@ export type EventOnlyResumeSymbolContext = {
 	readonly graph: EventOnlyResumeGraph;
 	readonly event?: EventOnlyResumeDomEvent;
 	readonly element: EventOnlyResumeDomElement;
-	// Lean resume owns no element handles, but the symbol contract it shares with
-	// full resume is the one the compiled symbol is typed against.
-	readonly getElementHandle: (handleIdOrName: string) => EventOnlyResumeDomElement | undefined;
+	// Lean resume owns no handles; the contract is full resume's, which an
+	// array-typed element<T[]>() handle makes answer a set.
+	readonly getElementHandle: (
+		id: string,
+	) => EventOnlyResumeDomElement | ReadonlyArray<EventOnlyResumeDomElement> | undefined;
 	readonly domUpdate?: EventOnlyResumeDomUpdateRecord;
 	readonly locals?: Readonly<Record<string, unknown>>;
 	readonly value?: unknown;

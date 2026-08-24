@@ -351,7 +351,7 @@ test('a handle bound inside a keyed repeat cannot be an anchor', async () => {
 		`import { element, state } from '@markless/core';
 export function App() @{
 	const s = state({ rows: [{ id: 1 }] });
-	const rowEl = element<HTMLLIElement>();
+	const rowEl = element<HTMLLIElement[]>();
 	<section>
 		<ul>
 			@for (row of s.rows; key row.id) {

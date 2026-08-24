@@ -153,6 +153,9 @@ export type SemanticGraphBinding = {
 	readonly asyncCapable?: boolean;
 	readonly dependencies?: ReadonlyArray<SemanticGraphDependency>;
 	readonly functionSource?: string;
+	// element() only: the declared type argument was written as an array, so this
+	// handle names an ordered SET of elements rather than one.
+	readonly plural?: boolean;
 };
 
 export type ModuleGraphInterfaceHelperReturn = {
@@ -484,6 +487,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT'
 		| 'MARKLESS_ELEMENT_HANDLE_REQUIRED'
 		| 'MARKLESS_ELEMENT_HANDLE_DUPLICATE'
+		| 'MARKLESS_ELEMENT_HANDLE_PLURAL_IDREF'
 		| 'MARKLESS_ROW_ELEMENT_HANDLE_UNSUPPORTED'
 		| 'MARKLESS_ELEMENT_HANDLE_UNBOUND'
 		| 'MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED'
@@ -1123,6 +1127,7 @@ export type PayloadArmRecordSet = {
 		readonly hostNodeId: string;
 		readonly handleId: string;
 		readonly name: string;
+		readonly plural?: boolean;
 	}>;
 };
 
@@ -1169,6 +1174,7 @@ export type PayloadKeyedRepeat = {
 		readonly hostNodeId: string;
 		readonly handleId: string;
 		readonly name: string;
+		readonly plural?: boolean;
 	}>;
 	readonly rowBehaviors?: ReadonlyArray<PayloadBehavior>;
 };
@@ -1223,6 +1229,7 @@ export type PayloadArenaArtifact = {
 			readonly hostNodeId: string;
 			readonly handleId: string;
 			readonly name: string;
+			readonly plural?: boolean;
 		}>;
 		readonly asyncBoundaries: ReadonlyArray<PayloadAsyncBoundary>;
 		readonly branchSites: ReadonlyArray<{ readonly id: string; readonly anchorOrder: number }>;
@@ -1874,6 +1881,7 @@ export type PublicRenderPlanKeyedRepeat = {
 		readonly hostPath: ReadonlyArray<number>;
 		readonly handleId: string;
 		readonly name: string;
+		readonly plural?: boolean;
 	}>;
 	readonly rowBehaviors?: ReadonlyArray<{
 		readonly hostPath: ReadonlyArray<number>;

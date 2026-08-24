@@ -134,6 +134,7 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 							hostNodeId: binding.hostNodeId,
 							handleId: graphBinding.id,
 							name: graphBinding.name,
+							...(graphBinding.plural ? { plural: true as const } : {}),
 						},
 					];
 				},
@@ -203,6 +204,7 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 				hostNodeId: binding.hostNodeId,
 				handleId: graphBinding.id,
 				name: graphBinding.name,
+				...(graphBinding.plural ? { plural: true as const } : {}),
 			},
 		];
 	});

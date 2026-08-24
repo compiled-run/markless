@@ -112,12 +112,21 @@ function applyKeyedRepeatRowOrder(
 	const mutableParent = parent as ResumeDomElement & {
 		readonly appendChild?: (node: ResumeDomElement) => unknown;
 		readonly insertBefore?: (node: ResumeDomElement, before: unknown) => unknown;
+		readonly removeChild?: (node: ResumeDomElement) => unknown;
 	};
 	const currentRows = elementChildren(parent).slice(0, nextRows.length);
 	if (
 		currentRows.length === nextRows.length &&
 		currentRows.every((row, index) => row === nextRows[index])
 	) return;
+	// A key that left the collection takes its row out of the document. Without
+	// this the served row stayed attached and every read of the rows - an
+	// ordered element() set most of all - kept answering a row that is gone.
+	// The record is kept in rowRootsByKey so the same key can return.
+	const staying = new Set(nextRows);
+	for (const rowRoot of rowRootsByKey.values())
+		if (!staying.has(rowRoot) && elementChildren(parent).includes(rowRoot))
+			mutableParent.removeChild?.(rowRoot);
 	for (const rowRoot of nextRows) {
 		if (mutableParent.appendChild) mutableParent.appendChild(rowRoot);
 		else mutableParent.insertBefore?.(rowRoot, null);

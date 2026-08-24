@@ -11,6 +11,7 @@ import type {
 	ResumeAsyncBoundaryRecord,
 	ResumeBehaviorRecord,
 	ResumeDomElement,
+	ResumeElementHandleValue,
 	ResumeDomNode,
 	ResumeEventRecord,
 	ResumeKeyedRepeatRecord,
@@ -100,7 +101,7 @@ export function createArmCommitter(
 			records: ProtocolStatePayload['computed'],
 		) => Promise<void> | void;
 		readonly loadSymbol?: (symbolId: string) => unknown | Promise<unknown>;
-		readonly getElementHandle?: (handleId: string) => ResumeDomElement | undefined;
+		readonly getElementHandle?: (handleId: string) => ResumeElementHandleValue;
 		readonly storeHostSubscription?: (hostNodeId: string, release: () => void) => void;
 		readonly registerKeyedRepeats?: (
 			records: ReadonlyArray<ResumeKeyedRepeatRecord>,

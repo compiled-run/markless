@@ -61,6 +61,10 @@ export function materializeElementHandles(
 	root: ResumeDomElement,
 	elementsByHostId: Map<string, ResumeDomElement>,
 	handles: ResumeViewRecord['elementHandles'],
+	// Row-owned handles are not registered: their elements are whatever the
+	// repeat's live children hold at READ time, so a reorder or a removal needs
+	// no bookkeeping to stay true. See rowMembers().
+	keyedRepeats: ResumeViewRecord['keyedRepeats'] = [],
 ): ElementHandleRegistry {
 	type Held = {
 		readonly handleId: string;
@@ -131,16 +135,57 @@ export function materializeElementHandles(
 			);
 		}
 	}
+	// The keys that answer as a SET, declared at `element<T[]>()` and stamped on
+	// every record the handle produced. Empty on a page with no array handle.
+	const pluralKeys = new Set<string>(),
+		rowHandles = (keyedRepeats ?? []).flatMap((repeat) =>
+			(repeat.rowElementHandles ?? []).map((handle) => ({ ...handle, repeat })),
+		);
+	for (const handle of [...handles, ...rowHandles])
+		if (handle.plural)
+			for (const key of [
+				handle.handleId,
+				handle.handleId.replace(HANDLE_INSTANCE_PATH, ''),
+				handle.name,
+			])
+				pluralKeys.add(key);
 	for (const handle of handles) {
 		const element = elementsByHostId.get(handle.hostNodeId);
 		if (element) register(handle.hostNodeId, handle, element);
 	}
+	// Row members are walked, never filed: a repeat's rows ARE its parent's
+	// element children, so insert, remove and reorder need no bookkeeping.
+	function rowMembers(id: string): ResumeDomElement[] {
+		const members: ResumeDomElement[] = [];
+		for (const handle of rowHandles) {
+			if (handle.handleId !== id && handle.name !== id) continue;
+			const parent = elementsByHostId.get(handle.repeat.parentHostNodeId);
+			for (const rowRoot of parent?.childNodes ?? []) {
+				if (rowRoot.nodeType !== 1) continue;
+				let node: ResumeDomNode | undefined = rowRoot;
+				for (const index of handle.hostPath) node = node?.childNodes?.[index];
+				if (node?.nodeType === 1) members.push(node as ResumeDomElement);
+			}
+		}
+		return members;
+	}
 	return {
+		// One key, one answer, and the DECLARATION decides which kind: an array
+		// handle answers its live members in document order, every other handle
+		// answers the one element and still refuses when a key names two.
 		get(id) {
-			const filed = byKey.get(id);
-			if (!filed || filed.length === 0) return undefined;
-			if (filed.length > 1) throw ambiguousElementHandleError(id, filed.length);
-			return connectedElement(root, filed[0]);
+			if (!pluralKeys.has(id)) {
+				const filed = byKey.get(id);
+				if (!filed?.length) return undefined;
+				if (filed.length > 1) throw ambiguousElementHandleError(id, filed.length);
+				return connectedElement(root, filed[0]);
+			}
+			const live = new Set<ResumeDomElement>();
+			for (const element of [...(byKey.get(id) ?? []), ...rowMembers(id)]) {
+				const connected = connectedElement(root, element);
+				if (connected) live.add(connected);
+			}
+			return documentOrder([...live]);
 		},
 		widgetRootPath(hostNodeId) {
 			return widgetRootByHostPath.get(HOST_INSTANCE_PATH.exec(hostNodeId)?.[0] ?? '') ?? undefined;
@@ -148,6 +193,21 @@ export function materializeElementHandles(
 		register,
 		deleteHost,
 	};
+}
+
+// Document order asked of the document, not of the pinned census: rows the
+// runtime moved or appended are not in the census. Hosts with no comparison
+// (the node test doubles) keep insertion order; those doubles never reorder.
+function documentOrder(elements: ResumeDomElement[]): ResumeDomElement[] {
+	const compare = (elements[0] as { readonly compareDocumentPosition?: unknown } | undefined)
+		?.compareDocumentPosition;
+	if (typeof compare !== 'function') return elements;
+	return elements.sort((left, right) =>
+		// DOCUMENT_POSITION_FOLLOWING (4) means right comes after left.
+		((left as unknown as Node).compareDocumentPosition(right as unknown as Node) & 4) !== 0
+			? -1
+			: 1,
+	);
 }
 
 export function connectedElement(

@@ -87,7 +87,7 @@ import { state, element } from '@markless/core';
 
 export function App() @{
 	const rows = state([{ id: 'a' }]);
-	let rowInput = element<HTMLInputElement>();
+	let rowInput = element<HTMLInputElement[]>();
 
 	<ul>
 		@for (const row of rows; key row.id) {
@@ -323,7 +323,7 @@ test('planPayloadArena places keyed row handles and behaviors on the repeat reco
 import { installRow } from './row-behavior.ts';
 export function App() @{
 	const rows = state([{ id: 'a', label: 'Alpha' }]);
-	const row = element<HTMLTableRowElement>();
+	const row = element<HTMLTableRowElement[]>();
 	<table><tbody>@for (const item of rows; key item.id) {
 		<tr el={row} attach={installRow(item.id)}><td>{item.label}</td></tr>
 	}</tbody></table>

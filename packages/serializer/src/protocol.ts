@@ -293,6 +293,8 @@ export type ProtocolViewPayload = {
 		readonly hostNodeId: string;
 		readonly handleId: string;
 		readonly name: string;
+		/** Declared `element<T[]>()`: this handle names an ordered set, and a read answers an array. */
+		readonly plural?: boolean;
 	}>;
 	readonly keyedRepeats?: ReadonlyArray<{
 		readonly id: string;
@@ -302,6 +304,12 @@ export type ProtocolViewPayload = {
 		readonly keyPath: ReadonlyArray<string>;
 		readonly itemName: string;
 		readonly rowElementCount: number;
+		readonly rowElementHandles?: ReadonlyArray<{
+			readonly hostPath: ReadonlyArray<number>;
+			readonly handleId: string;
+			readonly name: string;
+			readonly plural?: boolean;
+		}>;
 		readonly rowEvents: ReadonlyArray<{
 			readonly hostPath: ReadonlyArray<number>;
 			readonly eventName: string;
