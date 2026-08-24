@@ -69,8 +69,8 @@ export function createProtocolViewPayload(
 			),
 			...forwarded.locators,
 		],
-		events: [
-			...input.payloadArena.view.events
+		events: mergeForwardedEvents(
+			oneRecordPerEvent(input.payloadArena.view.events)
 				.filter((event) => !excludedHostIds.has(event.hostNodeId))
 				.map((event) => ({
 					hostNodeId: event.hostNodeId,
@@ -78,8 +78,8 @@ export function createProtocolViewPayload(
 					syncPolicy: event.syncPolicy,
 					symbolIds: eventSymbols.get(`${event.hostNodeId}:${event.eventName}`) ?? [],
 				})),
-			...forwarded.events,
-		],
+			forwarded.events,
+		),
 		domUpdates: input.payloadArena.view.domUpdates
 			.filter((domUpdate) => !armHostIds(input).has(domUpdate.hostNodeId))
 			.map((domUpdate) => ({
@@ -336,7 +336,7 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 				keyPath: repeat.keyPath,
 				itemName: render.itemName,
 				rowElementCount: render.rowElementCount,
-				rowEvents: input.payloadArena.view.events
+				rowEvents: oneRecordPerEvent(input.payloadArena.view.events)
 					.filter((event) => rowHostPaths.has(event.hostNodeId))
 					.map((event) => ({
 						hostPath: rowHostPaths.get(event.hostNodeId)!,
@@ -404,7 +404,7 @@ function wiredArmRecordSet(
 	const branches = bindArmBranchEventSymbols(input, armScopedBranchRecords(input, boundaryId, arm));
 	return {
 		locators: set.locators.filter((locator) => !flipHostIds.has(locator.hostNodeId)),
-		events: set.events
+		events: oneRecordPerEvent(set.events)
 			.filter((event) => !flipHostIds.has(event.hostNodeId))
 			.map((event) => ({
 				hostNodeId: event.hostNodeId,
@@ -578,7 +578,7 @@ function branchArmRecords(input: ProtocolViewPayloadInput, branchSiteId: string)
 	return branch.armChunkIds.map((chunkId) => {
 		const hostIds = branchArmHostPaths(input, chunkId);
 		return {
-			events: input.payloadArena.view.events
+			events: oneRecordPerEvent(input.payloadArena.view.events)
 				.filter((event) => hostIds.has(event.hostNodeId))
 				.map((event) => ({
 					hostPath: hostIds.get(event.hostNodeId)!.path,
@@ -619,6 +619,67 @@ function branchArmRecords(input: ProtocolViewPayloadInput, branchSiteId: string)
 				})),
 		};
 	});
+}
+
+/**
+ * One record per element and event name, whatever the plurality of handlers.
+ *
+ * `onClick={[a, b]}` collects two semantic events on one host, and the runtime
+ * files exactly one record per element and event name - a second record would
+ * replace the first and only the last handler would ever run. The symbols of
+ * every entry already ride the first record's `symbolIds`, in authored order.
+ */
+function oneRecordPerEvent<T extends { readonly hostNodeId: string; readonly eventName: string }>(
+	events: ReadonlyArray<T>,
+): ReadonlyArray<T> {
+	const seen = new Set<string>();
+	return events.filter((event) => {
+		const key = `${event.hostNodeId}:${event.eventName}`;
+		if (seen.has(key)) return false;
+		seen.add(key);
+		return true;
+	});
+}
+
+/**
+ * A spread-carried handler MERGES with the part's own rather than replacing it,
+ * which is the platform's own semantics for two listeners on one element (and
+ * Qwik's); React's last-writer-wins is the deliberate divergence.
+ *
+ * The part's own symbols stay first: a part writes its handler expecting to act,
+ * and a consumer passing one through `{...rest}` is adding to that, not taking
+ * it over. A forwarded event on a host with no record of its own becomes one.
+ */
+function mergeForwardedEvents<
+	T extends {
+		readonly hostNodeId: string;
+		readonly eventName: string;
+		readonly symbolIds: ReadonlyArray<string>;
+	},
+	F extends {
+		readonly hostNodeId: string;
+		readonly eventName: string;
+		readonly symbolIds: ReadonlyArray<string>;
+	},
+>(own: ReadonlyArray<T>, forwarded: ReadonlyArray<F>): ReadonlyArray<T | F> {
+	if (forwarded.length === 0) return own;
+	const merged: Array<T | F> = [...own];
+	const appended: F[] = [];
+	for (const event of forwarded) {
+		const at = merged.findIndex(
+			(candidate) =>
+				candidate.hostNodeId === event.hostNodeId && candidate.eventName === event.eventName,
+		);
+		if (at < 0) {
+			appended.push(event);
+			continue;
+		}
+		merged[at] = {
+			...merged[at]!,
+			symbolIds: [...merged[at]!.symbolIds, ...event.symbolIds],
+		};
+	}
+	return [...merged, ...appended];
 }
 
 function boundEventSymbolIds(input: ProtocolViewPayloadInput): ReadonlyMap<string, string> {

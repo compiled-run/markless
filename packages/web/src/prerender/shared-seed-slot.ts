@@ -16,6 +16,24 @@ import type {
 export const MARKLESS_WIDGET_INSTANCE_KEY = 'markless:widget-instance';
 
 /**
+ * The same token, filed PER shared definition.
+ *
+ * One element can carry handles declared by two different widget families - a
+ * radio item's own field handle and the group's set, a tree label's item handle
+ * and the root's - so "which rendered widget am I inside" has no single answer
+ * on that element. It has one answer per DEFINITION, which is what the reading
+ * handle names: a handle's graph node id is `<definitionId>/element:<name>`, so
+ * the mint asks for its own family's token and gets the instance the handle was
+ * DECLARED in, never whichever family last seeded this scope.
+ *
+ * The plain key above stays filed too: a page with one widget family reads it
+ * exactly as before, and it is the fallback when no per-definition token exists.
+ */
+export function marklessWidgetInstanceKey(definitionId: string): string {
+	return `${MARKLESS_WIDGET_INSTANCE_KEY}|${definitionId}`;
+}
+
+/**
  * A projecting component's shared-instance seeds, which the components
  * projected into it must read before they render. Answering means running the
  * projected-into child's seed symbols from its props, so the answer is

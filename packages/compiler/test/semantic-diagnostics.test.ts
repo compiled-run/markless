@@ -855,7 +855,7 @@ test('B914 reports non-function event prop expressions', async () => {
 	]);
 });
 
-test('an array of handlers in an event attribute fails the build and teaches the closure form', async () => {
+test('an array of handlers in an event attribute lowers to one record per handler, in order', async () => {
 	const source = `
 import { state } from '@markless/core';
 
@@ -868,29 +868,27 @@ export function Toggle() @{
 `;
 	const graph = await buildSemanticGraph({ filename: 'src/Toggle.tsrx', source });
 
-	expect(graph.diagnostics).toEqual([
-		expect.objectContaining({
-			code: 'MARKLESS_EVENT_HANDLER_ARRAY_UNSUPPORTED',
-			severity: 'error',
-			phase: 'semantic-graph',
-			title: 'One handler per event attribute',
-			message:
-				'`onClick` takes one handler, not a list. Compose the calls yourself in a single function.',
-			primarySpan: expect.objectContaining({ start: source.indexOf('[track') }),
-			suggestions: [
-				{
-					message:
-						'Write one function that calls both: onClick={(event) => { track(event); /* ... */ }}.',
-				},
-				{ message: 'The list-shaped attribute is `attach`, which still takes an array.' },
-			],
-		}),
+	expect(graph.diagnostics).toEqual([]);
+	// One record per authored handler, all on the same host and event name: the
+	// list IS the plurality, and the order they stand in is the order they run.
+	expect(
+		graph.events.map((event) => ({
+			hostNodeId: event.hostNodeId,
+			eventName: event.eventName,
+			handlerSource: event.handlerSource,
+		})),
+	).toEqual([
+		// A named local resolves to its declaration, exactly as one written alone does.
+		{ hostNodeId: 'h0', eventName: 'click', handlerSource: '() => count++' },
+		{
+			hostNodeId: 'h0',
+			eventName: 'click',
+			handlerSource: '(event) => event.currentTarget.blur()',
+		},
 	]);
-	// Fail closed: no handler symbol is minted from the rejected array.
-	expect(graph.events).toEqual([]);
 });
 
-test('an array in attach stays legal while an array in an event attribute does not', async () => {
+test('an array in attach still collects one behavior per entry', async () => {
 	const graph = await buildSemanticGraph({
 		filename: 'src/Attach.tsrx',
 		source: `

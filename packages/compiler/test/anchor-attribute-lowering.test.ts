@@ -201,8 +201,11 @@ test('the SSR string renders both halves of the pair from one compiled slug', as
 function runMint(input: { readonly idPrefix: string; readonly widgetInstance?: string | null }) {
 	const body = elementHandleIdReadCase({
 		idPrefixSource: JSON.stringify(input.idPrefix),
-		widgetInstanceSource:
-			input.widgetInstance === undefined ? null : JSON.stringify(input.widgetInstance),
+		// The reader now asks its own FAMILY for the token (one element can carry
+		// handles from two widget instances), so the harness answers as a reader
+		// rather than as a fixed expression.
+		widgetInstanceRead:
+			input.widgetInstance === undefined ? null : () => JSON.stringify(input.widgetInstance),
 		kinds: { id: true, anchorStyle: true },
 	});
 	return new Function('residue', body) as (residue: unknown) => string | undefined;
@@ -276,7 +279,10 @@ test('a part with no rooted widget instance refuses instead of minting a stray n
 	// widget root has no instance token, and two widgets on one page sharing an
 	// anchor name would silently anchor every popup to the last trigger.
 	expect(source).toContain(
-		`marklessSsrRenderStateValues.get(${JSON.stringify(MARKLESS_WIDGET_INSTANCE_KEY)})??(()=>{throw new Error('MARKLESS_ELEMENT_HANDLE_WIDGET_INSTANCE_MISSING: '+a.handleGraphNodeId)})()`,
+		// The per-FAMILY token is asked first now, because one element can carry
+		// handles from two widget instances; the plain key is the fallback, and
+		// neither answering is still the loud refusal.
+		`${JSON.stringify(MARKLESS_WIDGET_INSTANCE_KEY)}+'|'+a.handleGraphNodeId.slice(0,a.handleGraphNodeId.indexOf('/')))??marklessSsrRenderStateValues.get(${JSON.stringify(MARKLESS_WIDGET_INSTANCE_KEY)}))??(()=>{throw new Error('MARKLESS_ELEMENT_HANDLE_WIDGET_INSTANCE_MISSING: '+a.handleGraphNodeId)})()`,
 	);
 });
 

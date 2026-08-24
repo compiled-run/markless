@@ -386,7 +386,7 @@ async function dispatchEvent(input: {
 			// did when the innermost match was the only record that ever ran.
 			if (!protocolEventDispatchesMarkless(matched.eventRecord)) return;
 			if (stopAfterElement && matched.element !== stopAfterElement) return;
-			await runEventRecord(input, matched.element, matched.eventRecord);
+			await runEventRecord(input, matched.element, matched.eventRecord, propagation.stoppedImmediate);
 			if (propagation.stoppedImmediate()) return;
 			if (propagation.stopped()) stopAfterElement = matched.element;
 		}
@@ -405,6 +405,7 @@ async function runEventRecord(
 	},
 	element: EventResumeDomElement,
 	eventRecord: EventResumeRecord,
+	stopsImmediately?: () => boolean,
 ): Promise<void> {
 	try {
 		const baseContext = {
@@ -427,6 +428,9 @@ async function runEventRecord(
 				isPromiseLike(result) ? await result : result,
 				input.elementsByHostId,
 			);
+			// One element's handlers are one listener list: stopImmediatePropagation
+			// ends it here, not only at the next element up.
+			if (stopsImmediately?.()) return;
 		}
 	} finally {
 		await input.graph.flush();

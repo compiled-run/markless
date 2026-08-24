@@ -136,7 +136,7 @@ export function elementHandleResidueKinds(chunks: RenderChunks): {
  */
 export function elementHandleIdReadCase(input: {
 	readonly idPrefixSource: string;
-	readonly widgetInstanceSource: string | null;
+	readonly widgetInstanceRead: ((handleExpression: string) => string) | null;
 	/** Defaults to the id rendering only; the anchor branch is opt-in. */
 	readonly kinds?: { readonly id: boolean; readonly anchorStyle: boolean };
 }): string {
@@ -146,8 +146,8 @@ export function elementHandleIdReadCase(input: {
 	// `--` always yields a valid <dashed-ident> and the two spellings of one
 	// identity cannot drift.
 	const slug = (handle: string) => {
-		const prefix = input.widgetInstanceSource
-			? `(${handle}.startsWith('shared:')?(${input.widgetInstanceSource}??${missingWidgetInstance(handle)}):${input.idPrefixSource})`
+		const prefix = input.widgetInstanceRead
+			? `(${handle}.startsWith('shared:')?(${input.widgetInstanceRead(handle)}??${missingWidgetInstance(handle)}):${input.idPrefixSource})`
 			: input.idPrefixSource;
 		return `(${prefix}+${handle}).replace(/\\W+/g,'-')`;
 	};
@@ -162,6 +162,23 @@ export function elementHandleIdReadCase(input: {
 			? `if(residue.kind==='element-handle-anchor-style')return (residue.staticStyle?residue.staticStyle+';':'')+residue.declarations.map(a=>a.property+':--mx-'+${slug('a.handleGraphNodeId')}).join(';');`
 			: '',
 	].join('');
+}
+
+/**
+ * Which rendered widget a MINTING handle belongs to, asked of its own family.
+ *
+ * One element routinely carries handles declared by two different widget
+ * families now, so a single "the widget instance I am inside" token cannot
+ * answer for both. A handle's graph node id is `<definitionId>/element:<name>`,
+ * so the family is read off the handle itself and the per-definition token is
+ * asked for first; the plain token answers a page that files only one.
+ */
+export function widgetInstanceReadSource(
+	get: (keyExpression: string) => string,
+): (handleExpression: string) => string {
+	const plain = JSON.stringify(MARKLESS_WIDGET_INSTANCE_KEY);
+	return (handle) =>
+		`(${get(`${plain}+'|'+${handle}.slice(0,${handle}.indexOf('/'))`)}??${get(plain)})`;
 }
 
 // A part rendered outside every widget root has no token; refusing loudly is
@@ -287,8 +304,8 @@ export function emitClientResidueReader(
 		handles.length > 0
 			? elementHandleIdReadCase({
 					idPrefixSource: `(${CONTEXT}.idPrefix??'')`,
-					widgetInstanceSource: hasSharedElementHandle(handles)
-						? `${CONTEXT}.read(${JSON.stringify(MARKLESS_WIDGET_INSTANCE_KEY)})`
+					widgetInstanceRead: hasSharedElementHandle(handles)
+						? widgetInstanceReadSource((key) => `${CONTEXT}.read(${key})`)
 						: null,
 					kinds: elementHandleResidueKinds(componentChunks),
 				})

@@ -1,20 +1,13 @@
-// Guard `spread-event-shadow`: an element that carries both a props spread and
-// its own handler for some event must destructure that event prop out of the
-// props signature. Otherwise the consumer's handler for that event arrives
-// inside the spread object and the element's own handler silently stands in its
-// place. The check is syntactic: it reads the component signature and the
-// element's attributes, and needs no type information.
-import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
-import { sourceSpan } from '../../ast/source.ts';
-import {
-	getElementAttributes,
-	getElementTagName,
-	isHostTagName,
-	isSpreadAttribute,
-} from '../../ast/tsrx.ts';
-import { isEventAttribute } from 'yuku-tsrx';
-import type { SemanticGraphDiagnostic } from '../../artifacts.ts';
-import { spreadEventShadowDiagnostic } from './diagnostics.ts';
+// The props-rest signature reader: which parameter name an element spreads, and
+// which props the author already took out of that rest binding. Read by the
+// markup collector to describe a spread host on the module graph interface.
+//
+// This file used to also refuse a part that spreads its props AND writes its own
+// handler for the same event (`MARKLESS_EVENT_SPREAD_SHADOWED`). It no longer
+// does: a spread-carried handler MERGES with the part's own, which is what two
+// listeners on one element do on the platform. See mergeForwardedEvents in
+// passes/protocol-view.ts.
+import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 
 /**
  * The props signature a spread can carry consumer props through: the component's
@@ -43,52 +36,4 @@ export function propsRestSignature(component: AnyNode): PropsRestSignature | und
 		if (name) destructuredNames.add(name);
 	}
 	return restName ? { restName, destructuredNames } : undefined;
-}
-
-export function collectSpreadEventShadowDiagnostics(input: {
-	readonly component: AnyNode;
-	readonly componentName: string;
-	readonly filename: string;
-}): ReadonlyArray<SemanticGraphDiagnostic> {
-	const signature = propsRestSignature(input.component);
-	if (!signature) return [];
-
-	const diagnostics: SemanticGraphDiagnostic[] = [];
-	const visit = (node: AnyNode): void => {
-		for (const child of childNodes(node)) visit(child);
-		const tagName = getElementTagName(node);
-		if (!tagName || !isHostTagName(tagName)) return;
-
-		const attributes = getElementAttributes(node);
-		// Only a spread of the props rest binding can carry consumer props; any
-		// other object is the author's own and shadows nothing they did not write.
-		const spread = attributes.find(
-			(attribute) =>
-				isSpreadAttribute(attribute) &&
-				getIdentifierName(
-					(attribute.argument ?? attribute.value) as AnyNode | undefined,
-				) === signature.restName,
-		);
-		if (!spread) return;
-
-		for (const attribute of attributes) {
-			if (isSpreadAttribute(attribute)) continue;
-			const name = getIdentifierName(attribute.name as AnyNode | undefined);
-			if (!name || !isEventAttribute(name)) continue;
-			if (signature.destructuredNames.has(name)) continue;
-			diagnostics.push(
-				spreadEventShadowDiagnostic({
-					componentName: input.componentName,
-					eventPropName: name,
-					restName: signature.restName,
-					tagName,
-					span: sourceSpan(attribute, input.filename),
-					filename: input.filename,
-				}),
-			);
-		}
-	};
-
-	visit(input.component.body as AnyNode);
-	return diagnostics;
 }
