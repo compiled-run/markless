@@ -75,8 +75,8 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Source emission adds the development resume edge only to client output.',
 	"packages/bundler/src/source-module.ts :: input.environment === 'server' || symbolsOnly || input.prerenderRecords":
 		'Source emission excludes client render bodies from server and symbols-only shapes.',
-	"packages/bundler/src/source-module.ts :: input.environment === 'client' && (symbolsOnly || (!input.prerenderRecords && !input.dev))":
-		'Source emission omits the canonical SSR module from production ordinary and symbols-only client output while retaining it for server, prerender, and development output.',
+	"packages/bundler/src/source-module.ts :: !(input.environment === 'client' && (symbolsOnly || (!input.prerenderRecords && !input.dev)));":
+		'Source emission omits the canonical SSR module from production ordinary and symbols-only client output while retaining it for server, prerender, and development output; the same resolved answer decides which render-data names the module imports.',
 	"packages/bundler/src/source-module.ts :: input.environment === 'client' &&":
 		'Source emission keeps SSR code out of production ordinary and symbols-only client output while dev uses the canonical SSR surface for mounting.',
 	"packages/bundler/src/source-module.ts :: input.environment !== 'server' &&":

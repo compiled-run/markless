@@ -99,6 +99,40 @@ test('ordinary client entries pair initializer loaders with canonical render dat
 	expect(devCode).toContain('\trenderSsr(props, marklessRenderContext)');
 });
 
+test('a client module carrying the SSR body binds the render data it spreads', () => {
+	// The compiler's per-component SSR functions spread bare `marklessRenderData`;
+	// leaving it out of the import is a ReferenceError at module evaluation.
+	const ssrBody =
+		'async function marklessRenderSsr(props, marklessRenderContext) { return { ...marklessRenderData }; }';
+	const devCode = emitSourceModule({
+		...baseInput,
+		dev: true,
+		renderDataId: 'virtual:markless:render-data:App',
+		canonicalRenderData: true,
+		publicSsrModuleSource: ssrBody,
+		publicRenderSsrExportName: 'marklessRenderSsr',
+	});
+
+	expect(devCode).toContain(ssrBody);
+	expect(devCode).toContain(
+		`import { marklessPrerenderData, marklessRenderData } from 'virtual:markless:render-data:App';`,
+	);
+
+	const prodCode = emitSourceModule({
+		...baseInput,
+		renderDataId: 'virtual:markless:render-data:App',
+		canonicalRenderData: true,
+		publicSsrModuleSource: ssrBody,
+		publicRenderSsrExportName: 'marklessRenderSsr',
+	});
+
+	expect(prodCode).not.toContain(ssrBody);
+	expect(prodCode).toContain(
+		`import { marklessPrerenderData } from 'virtual:markless:render-data:App';`,
+	);
+	expect(prodCode).not.toContain('marklessRenderData');
+});
+
 test('emitSourceModule gives every authored behavior a direct mount-time loader', () => {
 	const code = emitSourceModule({
 		...baseInput,
