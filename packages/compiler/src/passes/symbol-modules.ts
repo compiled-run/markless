@@ -4753,10 +4753,58 @@ function rewriteEventHandlerNode(
 		};
 	}
 
-	const scoped = isFunctionLikeNode(node) ? scopedEventHandlerRewrite(node, rewrite) : rewrite;
+	if (isFunctionLikeNode(node)) {
+		const scoped = scopedEventHandlerRewrite(node, rewrite);
+		const rewritten = rewriteEventHandlerChildren(node, (child) =>
+			rewriteEventHandlerNode(child, node, scoped),
+		);
+
+		return asyncIfAwaited(node, rewritten);
+	}
+
 	return rewriteEventHandlerChildren(node, (child) =>
-		rewriteEventHandlerNode(child, node, scoped),
+		rewriteEventHandlerNode(child, node, rewrite),
 	);
+}
+
+/**
+ * A nested function the rewrite gave an `await` has to be declared `async`.
+ *
+ * The band turns a filled callback slot into `await context.capture.invoke(...)`,
+ * and the author's function did not have to be async to call the callback. In a
+ * module, `await` outside an async function is a reserved word, so the emitted
+ * module was a SyntaxError — `carousel.onChange?.(next)` inside a `setInterval`
+ * callback is exactly that shape. The handler's own declaration is marked from
+ * the same fact upstream (`eventHandlerFunctionNode`); this covers every function
+ * nested inside it.
+ *
+ * A callback that becomes async returns a promise its caller — `setInterval` —
+ * ignores, which is the same thing the handler band already does everywhere a
+ * callback slot is invoked, and the only way to spell the authored call at all.
+ */
+function asyncIfAwaited(node: AnyNode, rewritten: EmissionNode): EmissionNode {
+	if (node.async === true) return rewritten;
+	if (!containsOwnAwait((rewritten as unknown as AnyNode).body)) return rewritten;
+
+	return { ...rewritten, async: true };
+}
+
+/**
+ * An `await` this function body owns — a nested function owns its own, and is
+ * marked from its own body by the same walk.
+ */
+function containsOwnAwait(node: unknown): boolean {
+	if (Array.isArray(node)) return node.some((item) => containsOwnAwait(item));
+	if (!isNode(node)) return false;
+	if (node.type === 'AwaitExpression') return true;
+	if (isFunctionLikeNode(node)) return false;
+
+	for (const [key, child] of Object.entries(node)) {
+		if (EVENT_WALK_IGNORED_KEYS.has(key)) continue;
+		if (containsOwnAwait(child)) return true;
+	}
+
+	return false;
 }
 
 /**
@@ -5295,12 +5343,47 @@ function eventWriteArgumentNodes(
 	return args;
 }
 
-/** The band-local twin of `eventWriteValueSource`, from an authored node. */
+/**
+ * The band-local twin of `eventWriteValueSource`, from an authored node.
+ *
+ * A value that carries a function body carries STATEMENTS, and a statement can
+ * write graph state: `s.timer = setInterval(() => { s.count = s.count + 1; })`
+ * is the ordinary timer shape. The value band below knows only reads, so it
+ * matched the tick's assignment TARGET against the recorded read of the same
+ * text and emitted `context.graph.read(...) = ...` — a module that parses and
+ * throws `Invalid left-hand side in assignment` on every tick.
+ *
+ * Such a value is handed to the handler band instead, which is the one band that
+ * lowers a write. It also fails closed on a write it cannot lower:
+ * `unclaimedWriteNode` leaves the authored target standing and the
+ * unresolved-reference guard fails the compile naming it. The routing is
+ * conditional only to keep the emitted bytes of every function-free value
+ * exactly where they were; the value band cannot lower a function anyway, so
+ * every value routed here was already falling through to the read rewrite.
+ */
 function eventWriteValueNode(node: AnyNode, rewrite: EventHandlerRewrite): EmissionNode {
+	if (containsFunctionLikeNode(node)) return rewriteEventHandlerNode(node, undefined, rewrite);
+
 	return (
 		valueExpressionNode(node, rewrite.source, rewrite.writeValueInput) ??
 		rewriteGraphReadsAndLocals(node, rewrite.source, rewrite.writeValueInput)
 	);
+}
+
+function containsFunctionLikeNode(node: AnyNode): boolean {
+	if (isFunctionLikeNode(node)) return true;
+
+	for (const [key, child] of Object.entries(node)) {
+		if (EVENT_WALK_IGNORED_KEYS.has(key)) continue;
+
+		if (Array.isArray(child)) {
+			if (child.some((item) => isNode(item) && containsFunctionLikeNode(item))) return true;
+			continue;
+		}
+		if (isNode(child) && containsFunctionLikeNode(child)) return true;
+	}
+
+	return false;
 }
 
 /**
