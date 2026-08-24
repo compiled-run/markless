@@ -98,6 +98,52 @@ export function CartButton() @{
 }
 `;
 
+// Defect 86. The component's `box` is a shared-instance local, not a graph
+// binding, so `box.items` only resolves through the shared-instance arm; without
+// it the repeat kept `box.items` as an authored expression and the SSR module
+// re-emitted it into a scope holding no `box`.
+const sharedRepeatSource = `
+import { shared, state } from '@markless/core';
+
+export const listBox = shared(() => {
+	const box = state({ items: [{ id: 'a', label: 'A' }] });
+
+	return { ...box };
+}, { scope: 'widget' });
+
+export function List() @{
+	const box = listBox();
+
+	<ul>
+		@for (const item of box.items; key item.id) {
+			<li>{item.label}</li>
+		}
+	</ul>
+}
+`;
+
+// Defect 90's shape: a factory returning its state binding bare registers no
+// returned properties, so `box.items` reaches no cell and the repeat must refuse.
+const bareReturnRepeatSource = `
+import { shared, state } from '@markless/core';
+
+export const listBox = shared(() => {
+	const box = state({ items: [{ id: 'a', label: 'A' }] });
+
+	return box;
+}, { scope: 'widget' });
+
+export function List() @{
+	const box = listBox();
+
+	<ul>
+		@for (const item of box.items; key item.id) {
+			<li>{item.label}</li>
+		}
+	</ul>
+}
+`;
+
 const keyedPanelSource = `
 import { state } from '@markless/core';
 
@@ -1096,4 +1142,49 @@ test('buildSemanticGraph records graph bindings inside shared factories', async 
 		]),
 	);
 	expect(graph.diagnostics).toEqual([]);
+});
+
+test('buildSemanticGraph resolves a keyed repeat over a shared instance to its graph cell', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/List.tsrx',
+		source: sharedRepeatSource,
+	});
+	const parent = graph.hostNodes.find((hostNode) => hostNode.tagName === 'ul');
+	const row = graph.hostNodes.find((hostNode) => hostNode.tagName === 'li');
+
+	expect(graph.diagnostics).toEqual([]);
+	expect(graph.keyedRepeats).toEqual([
+		{
+			id: 'repeat:0',
+			parentHostNodeId: parent?.id,
+			rowHostNodeId: row?.id,
+			itemName: 'item',
+			collectionSource: 'box.items',
+			// Without this the repeat carried only `box.items`, and the SSR module
+			// re-emitted that into a scope with no `box`: a first-render ReferenceError.
+			collectionGraphNodeId: 'shared:src/List.tsrx#listBox/state:box',
+			collectionPath: ['items'],
+			keySource: 'item.id',
+			keyPath: ['id'],
+		},
+	]);
+});
+
+test('buildSemanticGraph refuses a keyed repeat whose shared instance exposes no cell for it', async () => {
+	const graph = await buildSemanticGraph({
+		filename: 'src/List.tsrx',
+		source: bareReturnRepeatSource,
+	});
+
+	expect(graph.keyedRepeats).toEqual([]);
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_REPEAT_COLLECTION_UNREADABLE',
+			severity: 'error',
+			phase: 'semantic-graph',
+			title: 'This @for collection reaches no cell on its shared instance',
+		}),
+	]);
+	// The refusal has to name the shape that does work, or the author has nothing to change.
+	expect(graph.diagnostics[0]?.suggestions?.[0]?.message).toContain('return { ...box }');
 });
