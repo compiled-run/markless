@@ -54,3 +54,7 @@ always acceptable; an unpriced "all" is not.
 Comments are a last resort: write one only for value a maintainer could not easily get from the code itself (a constraint the code cannot show, a measured landmine, a non-obvious why). Everything else is noise — delete it on sight when you touch a file.
 
 Never write, and always remove when seen: comments naming task/unit/defect numbers or internal process shorthand (U123, T045, "defect 84", packet/receipt language) — that history lives in the goal board and git, not in source; comments narrating what the next line does; comments justifying a change to a reviewer; restated ruling text. A pin comment in a test may cite the mechanism it pins, in plain words, without process numbers.
+
+## @markless/ui part naming
+
+Any work adding or renaming a part in packages/headless/components follows `packages/headless/components/SPEC.md` (component roles + semantic prefixes, the 3-use-case rule for new roles, capability-naming rules). A name outside the established set is a blocked owner question, never an improvisation.
