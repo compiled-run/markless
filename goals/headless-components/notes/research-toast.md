@@ -19,6 +19,42 @@ make all three visible rather than to make the family look ready.
 
 ---
 
+## Re-anchored 2026-08-23
+
+Under the stale-measurements doctrine, three findings below are **anchors, not facts**. They were
+measured on 2026-08-22 and re-measured on 2026-08-23, when
+`markless-component-research-toaster.md` went back over the same ground under a different charter
+(Sonner-grade UX, a unified manager) and overturned them. **The original wording is left in place as
+history**; each of the three sites carries a pointer back here.
+
+Verified first-hand on `feat/headless-ui-pilot` at `d6e6725b`, by reading each cited file in a
+checkout of that tip rather than carrying the toaster note's citations over.
+
+| Where | What this note said (2026-08-22) | What holds on 2026-08-23 | Evidence |
+| --- | --- | --- | --- |
+| §7 "What is not expressible today", §8 point 1, §10 q3 | "no fixture anywhere combines widget parts with `@for`", so parts inside a keyed repeat are unproven, and toast must be gated on a spike and sequenced last | **Widget roots in a keyed `@for` render and each get their own instance** — four `rpt-*` fixtures do exactly that, one of them against the real `@markless/ui` checkbox family. The "no fixture anywhere" wording is stale and the spike is not owed. **The second half of the worry survives, and is now a measured red rather than an unknown** — see the caveat under this table. | `packages/vitest-browser/browser/fixtures/rpt-ui-page.tsrx`, `rpt-static-page.tsrx`, `rpt-reorder-page.tsrx`, `rpt-plain-child.tsrx` |
+| §7 "The area" | The announcing live region should be a **hidden inner region**, separate from the visible stack | That shape breaks the moment a modal opens. The overlay pass descends into a subtree that holds a live region so the region survives, and **marks that subtree's siblings** — so a hidden inner region keeps announcing while the visible stack around it goes `inert` and `aria-hidden`. **The live region must be the toaster root itself.** | `packages/web/src/fns/overlay.ts:253-276` — `collectOutsideSubtrees` skips a child carrying `aria-live`, descends into one whose subtree holds a live region (`holdsLiveRegion`), and pushes every other child onto the marked list. Read in the toaster note §5.4 |
+| §7 "The messages", §10 q4 | `toast.close` cannot work out which message it renders, so the message must be handed to every row part as a prop | **Solved and shipped: an item-level `shared()` seeded from the item's own props**, which every descendant part of that row resolves. Recommendation (a) is no longer the only honest option, and option (b) is no longer the "harder form" it was called. | `packages/headless/components/src/combobox/combobox.tsrx:122-129` (`comboboxItemState`), `packages/headless/components/src/radio-group/radio-group.tsrx:49-56` (`radiogroupItemState`) |
+
+**The caveat that survives the first row, and it is the one toast actually needs.** §8 point 1 named
+two unknowns: whether family parts may live inside a keyed repeat at all, and whether an array that
+**grows** re-renders correctly. Only the first is retired. The second is now measured, and it is red:
+`packages/headless/components/src/combobox/note.md:118-134` records that **a keyed repeat does not
+follow its source when the rows root widgets** — measured twice, in CSR and SSR, with the source
+both a `computed()` and a plain `state()` array. The array itself updates (the rendered
+`matches.length` goes from `4` to `2`) while the `@for` keeps every row in the DOM. The combobox
+note's own reading of why is the part that matters here: the landed repeat witnesses reorder rows
+rather than change the list's length. `packages/headless/components/src/select/note.md:311-315`
+records a related red row from the same ground (`CSR: options from a keyed loop each get their own
+instance`), called there a keyed-repeat widget-instance defect.
+
+**A toast queue is a runtime-growing array whose rows root parts, so this is the exact shape that is
+red.** §10 q3 should therefore be read as narrowed, not answered: what it asks for is no longer a
+spike into whether the combination is possible, but a named framework follow-up that the combobox
+unit already filed as its own top priority. Toast still waits on it.
+
+---
+
 ## 1. Name and alternates
 
 Searched under: toast, snackbar, notification, notifications, alert, flash message, banner, growl,
@@ -457,6 +493,10 @@ export function ToastArea({ label = 'Notifications', limit = 3, stayFor = 0, chi
 - **The live region is separate, hidden, permanent, and carries text only.** That is O'Hara's rule
   and the resolution of §6's step-2 failure: nothing announced is unreachable, because what is
   announced is words and what is reachable is the visible stack.
+  **Re-anchored 2026-08-23 — this bullet is superseded.** A hidden inner region makes the visible
+  stack `inert` and `aria-hidden` whenever a modal is open, because the overlay pass spares the
+  subtree holding the live region and marks its siblings. The live region must be the toaster root
+  itself. See "Re-anchored 2026-08-23" above for the evidence.
 - **`aria-live` flips between polite and assertive**, defaulting polite (§5's overuse finding).
   `role="status"` is kept alongside because it is what `getByRole('status')` finds; the docs must say
   the role is the semantics and `aria-live` is the urgency.
@@ -489,6 +529,11 @@ inside a `@for` is the unproven case (§8), and a toast row genuinely has no sta
 projection of one array entry. The cost is that `toast.close` cannot work out "which message am I"
 from an instance and has to be told, which is §10 question 4.
 
+**Re-anchored 2026-08-23 — the cost is no longer forced.** A row part learning which item it renders
+is solved and shipped: an item-level `shared()` seeded from the row's own props, resolved by every
+descendant part. A widget-scoped root inside a `@for` is also no longer the unproven case. See
+"Re-anchored 2026-08-23" above, and the caveat there about arrays that grow.
+
 ### Timing, and 2.2.1
 
 **Default `stayFor: 0` — messages stay until dismissed.** That is the WCAG 2.2.1 / SC 2.2.3 default
@@ -511,6 +556,11 @@ behaviour every library has and 2.2.1 arguably requires.
 | A page-scoped `shared()` shipped from a library package | the scope is in the public type; **no shipped family uses anything but `widget`**, so it is unexercised |
 | Pause-on-hover for the dismiss timer | the timer question again |
 
+**Re-anchored 2026-08-23.** Row 1's stated blocker ("no fixture anywhere...") is stale, and row 2's
+("no per-row instance") is solved. Row 1 stays in the table for a different reason: a keyed repeat
+does not follow a source array whose length changes when the rows root widgets. See "Re-anchored
+2026-08-23" above.
+
 ---
 
 ## 8. Contribution to the overlay-primitive memo
@@ -527,6 +577,12 @@ in the cluster:
    `research-tabs.md` §6b(5) names), and whether an array that grows *after* resume re-renders
    correctly. The design in §7 sidesteps the first by giving rows no instance; the second is
    unavoidable. **Spike it before the toast unit is cut, and sequence toast last in tranche 4.**
+
+   **Re-anchored 2026-08-23 — half retired, half now red.** The "no fixture anywhere" half is stale:
+   four `rpt-*` fixtures put widget-rooting parts inside a keyed `@for`, one against the real
+   `@markless/ui` checkbox family. The growing-array half is no longer unknown either — it is
+   measured red, because a keyed repeat does not follow its source when the rows root widgets. See
+   "Re-anchored 2026-08-23" above.
 2. **Toast is the first family that wants a non-`widget` `shared()` scope**, and the first whose
    shared definition is *public API* rather than internal. Both are conventions, not framework
    limits, and both are stated in the conventions this migration works under. The memo should record
@@ -606,12 +662,20 @@ scope and should stay out: it is pointer-only and duplicates the close button.
    correctly across SSR and resume.
 3. **Family parts inside `@for`, and an array that grows after resume** (§8 point 1). Unproven,
    blocking, cheap to probe. **Toast should be sequenced last in tranche 4 and gated on this spike.**
+   **Re-anchored 2026-08-23 — narrowed, not answered.** Family parts inside a keyed `@for` are
+   proven. The growing array is the live blocker and it is now red rather than unproven, so what
+   toast waits on is a framework fix the combobox unit already filed as its top-priority follow-up,
+   not a probe. See "Re-anchored 2026-08-23" above.
 4. **How does `toast.close` learn its message key?** The design gives rows no instance (§7), so the
    options are: (a) `<toast.close message={m}>` — explicit, a little ugly, and honest; (b) give
    `toast.root` a widget-scoped instance seeded with the message, which reopens q3 in its harder
    form; (c) drop `toast.close` and let consumers write
    `<button onClick={() => toasts.dismiss(m.key)}>`, which the "every piece of markup is free"
    principle arguably favours. Recommended: (a) for v1, revisit once q3 is answered.
+   **Re-anchored 2026-08-23 — answered, and option (b) is the shipped shape.** A row part learns its
+   own item from an item-level `shared()` seeded from that row's props, which is what combobox and
+   radio group already do. It no longer "reopens q3 in its harder form", because the part of q3 it
+   depended on is retired. See "Re-anchored 2026-08-23" above.
 5. **`role="status"` vs `role="log"` for the announcing region.** Recommended: `status` +
    `aria-atomic="true"`. `log` announces only additions (GeoLibre's argument, §5) but carries history
    semantics we do not implement. Worth one word, since it is a one-token change and awkward to alter
