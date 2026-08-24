@@ -148,7 +148,7 @@ describe('TSRX Rolldown plugin structure', () => {
 		expect(result.code).toContain('export default marklessCompiledApp;');
 		expect(result.code).not.toContain('source: marklessSource');
 		const resumeModule = result.virtualModules.find((module) => module.type === 'resume');
-		expect(resumeModule?.source).toContain('export async function resumeContainerEvent');
+		expect(resumeModule?.source).toContain('export function resumeContainerEvent(input) {');
 		expect(resumeModule?.source).toContain('await Promise.resolve(loadSymbol("symbol:0"))'); // T015e: specialized dispatcher awaits the symbol directly
 		expect(result.virtualModules.map((item) => item.type)).toEqual(
 			expect.arrayContaining(['payload', 'render-data', 'resolver', 'resume', 'symbol']),
@@ -503,8 +503,8 @@ let count = state(0);
 		});
 
 		const resumeModule = result.virtualModules.find((module) => module.type === 'resume');
-		expect(result.code).not.toContain('export async function resumeContainerEvent');
-		expect(resumeModule?.source).toContain('export async function resumeContainerEvent');
+		expect(result.code).not.toContain('function resumeContainerEvent');
+		expect(resumeModule?.source).toContain('export function resumeContainerEvent(input) {');
 		expect(result.code).toContain('export { marklessSsrLoadSymbolRoute as loadSymbol };');
 		expect(result.code).toContain('function marklessSsrLoadSymbolRoute(symbolId)');
 		expect(resumeModule?.source).toContain('marklessSsrLoadSymbolRoute'); // composed pages are excluded from specialization (T015g PM); the routed loader wires the full path
@@ -534,8 +534,8 @@ let count = state(0);
 		});
 
 		const resumeModule = result.virtualModules.find((module) => module.type === 'resume');
-		expect(result.code).not.toContain('export async function resumeContainerEvent');
-		expect(resumeModule?.source).toContain('export async function resumeContainerEvent');
+		expect(result.code).not.toContain('function resumeContainerEvent');
+		expect(resumeModule?.source).toContain('export function resumeContainerEvent(input) {');
 		expect(resumeModule?.source).toContain('marklessSsrLoadSymbolRoute'); // composed pages are excluded from specialization (T015g PM); the routed loader wires the full path
 		expect(result.code).toContain('const marklessLoadLocalSymbol = loadSymbol;');
 		expect(result.code).toContain('function marklessSsrLoadSymbolRoute(symbolId)');
@@ -557,7 +557,7 @@ let count = state(0);
 			code: string;
 		};
 
-		expect(result.code).not.toContain('export async function resumeContainerEvent');
+		expect(result.code).not.toContain('function resumeContainerEvent');
 		expect(result.code).not.toContain('document.createElement');
 		expect(result.code).not.toContain('export default App;');
 	});
@@ -584,7 +584,7 @@ let active = state(true);
 			source,
 		});
 
-		expect(result.code).not.toContain('export async function resumeContainerEvent');
+		expect(result.code).not.toContain('function resumeContainerEvent');
 		expect(result.code).not.toContain('export function render(');
 		expect(result.code).not.toContain('export function renderToString(');
 	});
@@ -690,7 +690,7 @@ let active = state(true);
 		const resolverSource = (await callLoad(plugin, `\0${resolverId}`)) as string;
 		expect(resolverSource).toContain('if (id === "symbol:0")');
 		const resumeSource = (await callLoad(plugin, `\0${resumeId}`)) as string;
-		expect(resumeSource).toContain('export async function resumeContainerEvent');
+		expect(resumeSource).toContain('export function resumeContainerEvent(input) {');
 		expect(resumeSource).toContain('marklessResumeSpecializedScalarEvent');
 		expect(resumeSource).not.toContain('resumeScalarCoreEventFromPayloadDocument');
 		const symbolIds = ['symbol:0', 'symbol:1'].map(
@@ -778,7 +778,7 @@ let count = state(0);
 		expect(resumeVirtualModuleId(filename)).toBe(
 			`virtual:markless:resume:${encodeURIComponent(filename)}`,
 		);
-		expect(result.code).toContain('export async function resumeContainerEvent');
+		expect(result.code).toContain('export function resumeContainerEvent(input) {');
 		expect(result.code).toContain('marklessResumeSpecializedScalarEvent');
 		expect(result.code).not.toContain('resumeScalarCoreEventFromPayloadDocument');
 		expect(result.code).not.toContain('const marklessCompiledApp = {');

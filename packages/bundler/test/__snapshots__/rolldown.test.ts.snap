@@ -39,8 +39,27 @@ async function marklessFullResumeHandoff(handoff) {
 	});
 	await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });
 }
-export async function resumeContainerEvent(input) {
+async function marklessResumeContainerEvent(input) {
 	await marklessFullResumeHandoff({ ...input, document: input.root });
+}
+export function resumeContainerEvent(input) {
+	const root = input.root;
+	if (!root.__marklessDispatch) {
+		let handler = marklessResumeContainerEvent, tail = Promise.resolve(), lastEvent = null, lastEventTime = undefined;
+		root.__marklessRegisterDispatch = next => {
+			const fallback = handler;
+			handler = input => next(input, fallback);
+		};
+		root.__marklessDispatch = next => {
+			const event = next.event, eventTime = event?.timeStamp;
+			if (event === lastEvent && eventTime === lastEventTime) return tail;
+			lastEvent = event;
+			lastEventTime = eventTime;
+			const run = () => handler(next);
+			return tail = tail.then(run, run);
+		};
+	}
+	return root.__marklessDispatch(input);
 }
 "
 `;

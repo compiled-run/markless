@@ -167,7 +167,14 @@ const clientBuild = resolve(demo, '.output/public/build');
 // bundler-diet: demand-gate the mint (load only when a repeat record carries
 // emptyArm) and lift the splice into a shared leaf module (resume-census.ts)
 // both resume-locators and resume-keyed-repeats import.
-const MAX_SHIPPED_JS_GZIP_BYTES = 69_100;
+// 69,100 -> 69,360 (2026-08-24): measured 69,337, +237 from two merges. (a) The
+// keyed-repeat row mint (defect 84 tier 1) grew the resume closure - the
+// demand-gate ladder step (load the mint only when a record carries rowTemplate/
+// emptyArm) is the named clawback and also covers the earlier +643. (b) Every
+// resumed page now ships the queued dispatch wrapper (defect 93: unserialized
+// dispatch interleaved handler bodies; measured +242 gzip in isolation, less in
+// context) - correctness, not weight to claw back.
+const MAX_SHIPPED_JS_GZIP_BYTES = 69_360;
 
 test('music-player-ssr production build stays within its shipped JS budget', async () => {
 	await rm(resolve(demo, '.output'), { force: true, recursive: true });
