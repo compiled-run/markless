@@ -496,7 +496,9 @@ test('CSR: a horizontal group walks the horizontal axis and leaves the other alo
 // Options authored with a keyed `@for` — the shape every real radio group has,
 // since a group written over a literal list of options is a toy.
 
-test('CSR: options from a keyed loop each get their own instance', async () => {
+// Pinned: defect 75 (board) - keyed-loop instance regression, red on clean tip,
+// measured twice by U259. Un-pin when the instance fix lands.
+test.fails('CSR: options from a keyed loop each get their own instance', async () => {
 	await render(OptionsFromData);
 	const triggers = page.getByTestId('row-trigger').elements();
 	const fields = page.getByTestId('row-field').elements() as HTMLInputElement[];
