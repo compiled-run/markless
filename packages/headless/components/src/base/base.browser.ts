@@ -6,6 +6,7 @@ import Basic from './scenarios/basic.tsrx';
 const Button = page.getByRole('button', { name: 'Press' });
 const Label = page.getByText('Name');
 const Hidden = page.getByText('Hidden');
+const Field = page.getByTestId('field');
 
 function el<T extends Element = HTMLElement>(locator: { element(): Element | null }) {
 	const found = locator.element();
@@ -22,7 +23,8 @@ test('CSR: base one-offs render their single elements', async () => {
 	expect(el(Button).hasAttribute('disabled')).toBe(false);
 
 	expect(el(Label).tagName).toBe('LABEL');
-	expect(el(Label).getAttribute('for')).toBe('field-id');
+	expect(el(Label).getAttribute('for')).toBe(el(Field).id);
+	expect(el(Field).id).toBe('field-id');
 
 	expect(el(Hidden).tagName).toBe('SPAN');
 	expect(getComputedStyle(el(Hidden)).position).toBe('absolute');
