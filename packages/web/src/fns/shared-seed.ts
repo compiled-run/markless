@@ -1,6 +1,7 @@
 import {
 	installSharedSeedPass,
 	MARKLESS_WIDGET_INSTANCE_KEY,
+	marklessWidgetInstanceKey,
 	type SharedSeedPass,
 } from '../prerender/shared-seed-slot.ts';
 import type { PrerenderDataDefinition, PrerenderDataSurface } from '../prerender/evaluator.ts';
@@ -44,8 +45,14 @@ const seedProjectingChild: SharedSeedPass = async (
 	const chain = childrenProjectionChain(context.surface, rootEdge.childComponentName);
 	const composedRoot = chain.map((link) => link.edge.symbolPrefix).join('');
 	const inheritedSeeds = new Map(inherited ?? []);
+	const rootedDefinitions = renderedWidgetRootsOf(context.surface, rootEdge.childComponentName);
+	// Filed per definition as well as under the plain key: an element inside this
+	// child can carry handles from ANOTHER family's instance, and that family's
+	// token must not be overwritten by this one. See marklessWidgetInstanceKey.
+	for (const definitionId of rootedDefinitions)
+		inheritedSeeds.set(marklessWidgetInstanceKey(definitionId), base + composedRoot);
 	const seeded =
-		renderedWidgetRootsOf(context.surface, rootEdge.childComponentName).length > 0
+		rootedDefinitions.length > 0
 			? inheritedSeeds.set(MARKLESS_WIDGET_INSTANCE_KEY, base + composedRoot)
 			: inheritedSeeds;
 	await applySharedSeeds(context, context.surface, context.symbolPrefix, rootEdge, read, seeded);

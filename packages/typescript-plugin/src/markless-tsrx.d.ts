@@ -79,9 +79,26 @@ declare namespace __MarklessTypeService {
 		(E extends HTMLVideoElement ? HTMLVideoElementEventMap : {});
 
 	/**
-	 * One handler per event attribute. Compose several calls in your own closure:
-	 * `onClick={(event) => { toggle(); onClick?.(event); }}`. `attach` is the
-	 * list-shaped attribute, and it keeps its array form.
+	 * One handler, or a list of them run in the order they are written:
+	 * `onClick={[open, track]}`. Each entry is its own handler - its own reads,
+	 * writes and sync policy - so nothing about standing second changes what it is.
+	 * A handler that calls `stopImmediatePropagation()` ends the list.
+	 *
+	 * A handler a consumer passes through `{...rest}` MERGES with the one the part
+	 * writes rather than replacing it, the way two listeners on one element behave
+	 * on the platform.
+	 *
+	 * KNOWN GAP, and why it stays one: the slot type is the single-handler one,
+	 * so the list form the compiler implements is legal to compile but not to
+	 * typecheck. Separating the JSX attribute type from the part-prop type -
+	 * `IntrinsicElements` reading an `OneOrMany` twin while `PropsOf` keeps the
+	 * callable spelling - was tried and does not hold: completion-matrix row M16
+	 * pins `PropsOf<Tag>` and `JSX.IntrinsicElements[Tag]` MUTUALLY assignable, and
+	 * mutual assignability makes them the same type, so the array arm cannot live
+	 * in one without reaching the other and making `onClick?.(event)` uncallable.
+	 * The two requirements are in direct conflict; closing this needs an owner
+	 * ruling on which of them gives, not another type shape. It is not a
+	 * @markless/ui change: no family edit was needed to reach the conflict.
 	 */
 	type NativeEventAttributes<E extends globalThis.Element> = {
 		[Name in keyof ElementEventMap<E> as Name extends string
@@ -89,15 +106,41 @@ declare namespace __MarklessTypeService {
 			: never]?: EventHandler<ElementEventMap<E>[Name], E>;
 	};
 
+	/**
+	 * What an `el=` list may hold: handles of either cardinality. A singular handle
+	 * reads as `Element | undefined`, an array-typed one as `Element[]`, and both
+	 * are legal entries in the same list.
+	 */
+	type ElementHandleList = readonly (
+		| globalThis.Element
+		| readonly globalThis.Element[]
+		| undefined
+	)[];
+
 	type MarklessAttributes<E extends globalThis.Element> = {
 		attach?: OneOrMany<NativeElementBehavior<E>>;
 		children?: Child;
 		/**
 		 * Cardinality is declared at the `element<T>()` call, not here, so this
-		 * position accepts both shapes: a singular handle, and an array-typed
-		 * handle bound on an element the markup renders many times.
+		 * position accepts every shape a declaration can produce: a singular handle,
+		 * an array-typed handle bound on an element the markup renders many times,
+		 * and a LIST of handles - `el={[item.fieldEl, group.fieldEls]}` - which binds
+		 * each of them on this one element under its own declaration's rules.
+		 *
+		 * A set may be declared with a WIDER element type than the tag it binds on:
+		 * `element<HTMLElement[]>()` is one ordered collection spanning `<nav>`,
+		 * `<button>` and `<a>`, and the runtime holds all three.
+		 *
+		 * Accepted unsoundness, deliberate and named: what this position wants is
+		 * "any array whose element type is a SUPERTYPE of this tag's element", and
+		 * TypeScript cannot express it. Array types are covariant, so any union that
+		 * admits `readonly Element[]` - which the widened declaration requires -
+		 * also admits `readonly HTMLButtonElement[]`. A `HTMLButtonElement[]` handle
+		 * bound on a `<div>` therefore typechecks here and hands the author a div
+		 * where their type promised a button. The narrow `readonly E[]` arm is kept
+		 * first so the exact-match case still infers and completes as itself.
 		 */
-		el?: E | readonly E[] | undefined;
+		el?: E | readonly E[] | ElementHandleList | undefined;
 		/**
 		 * Render this element above the rest of the UI, escaping clipping and
 		 * stacking ancestors. Elevation only: no dismissal, focus, positioning,

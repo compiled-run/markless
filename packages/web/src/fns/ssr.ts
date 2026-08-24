@@ -1132,7 +1132,7 @@ export function marklessSsrAppendChildView(context: {
 		for (const symbolId of symbolIds)
 			if (callbackSymbolId || context.child.externalSymbolIds.has(symbolId))
 				context.externalSymbolIds.add(symbolId);
-		context.events.push({
+		const composed = {
 			...event,
 			hostNodeId: context.child.hostPrefix + event.hostNodeId,
 			symbolIds,
@@ -1145,7 +1145,33 @@ export function marklessSsrAppendChildView(context: {
 						),
 					}
 				: {}),
-		});
+		};
+		// The consumer's `{...rest}` handler for this same element was forwarded
+		// into the PARENT's payload, so the part's own record and the consumer's
+		// only meet here. One element, one listener list: they merge into one
+		// record with the part's own symbols first - a part writes its handler
+		// expecting to act, and a consumer passing one through is adding to that.
+		// Merging here rather than in a resumer keeps every entry (full resume,
+		// lean event-only, CSR) reading one already-ordered record.
+		const forwardedAt = context.events.findIndex(
+			(held) =>
+				held.hostNodeId === composed.hostNodeId && held.eventName === composed.eventName,
+		);
+		if (forwardedAt < 0) {
+			context.events.push(composed);
+			continue;
+		}
+		const forwarded = context.events[forwardedAt]!;
+		context.events[forwardedAt] = {
+			...composed,
+			...(composed.syncPolicy || !forwarded.syncPolicy
+				? {}
+				: { syncPolicy: forwarded.syncPolicy }),
+			symbolIds: [
+				...composed.symbolIds,
+				...forwarded.symbolIds.filter((symbolId) => !composed.symbolIds.includes(symbolId)),
+			],
+		};
 	}
 	for (const update of childView.domUpdates) {
 		const mapped = marklessCsrRemapChildDomUpdate(

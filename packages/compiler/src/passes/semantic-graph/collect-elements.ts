@@ -383,6 +383,33 @@ export function collectElementHandleDiagnostics(
 const HANDLE_PATH = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)?$/;
 
 /**
+ * The handle expressions one `el=` binds. An array LITERAL is a list of handles
+ * to bind on this element; anything else is the single handle it always was.
+ *
+ * A hole (`[a, , b]`) is nothing at all and is skipped; a spread is kept as its
+ * own entry so it reaches the handle refusal by name instead of vanishing.
+ */
+function elementHandleBindingExpressions(value: AnyNode): ReadonlyArray<AnyNode> {
+	if (value.type !== 'ArrayExpression') return [value];
+	return asNodes(value.elements).filter((entry): entry is AnyNode => Boolean(entry));
+}
+
+/**
+ * The handlers one event attribute binds, in authored order. The same reading of
+ * an array literal `el=` takes, for the same reason: the list is the plurality,
+ * and everything else is the single handler the attribute always carried.
+ *
+ * An attribute with no value at all stays one absent handler, which is the
+ * record shape `onClick` written bare has always produced.
+ */
+function eventHandlerExpressions(
+	value: AnyNode | undefined,
+): ReadonlyArray<AnyNode | undefined> {
+	if (value?.type !== 'ArrayExpression') return [value];
+	return asNodes(value.elements).filter((entry): entry is AnyNode => Boolean(entry));
+}
+
+/**
  * Turns the walk's pending IDREF references into records, now that every
  * `el={handle}` binding in the file is known. A reference whose handle was never
  * bound never becomes a record: it becomes an error, because an IDREF pointing
@@ -589,48 +616,42 @@ function collectAttribute(
 	}
 
 	if (isEventAttribute(attributeName)) {
-		if (expressionValue?.type === 'ArrayExpression') {
-			state.graph.diagnostics.push(
-				eventHandlerArrayDiagnostic(attributeName, expressionValue, state),
-			);
-			collectExpressionReads(expressionValue, state);
-			walk(expressionValue, state);
-			return;
-		}
+		// `onClick={[a, b]}` runs both handlers on one event, in the order they are
+		// written. Each entry is analyzed on its own — its own reads, writes and
+		// sync policy — so nothing about being second changes what a handler is.
+		for (const entry of eventHandlerExpressions(expressionValue)) {
+			const invalidHandler = invalidEventHandlerExpression(attributeName, entry, state);
+			if (invalidHandler) {
+				state.graph.diagnostics.push(invalidHandler);
+				continue;
+			}
 
-		const invalidHandler = invalidEventHandlerExpression(attributeName, expressionValue, state);
-		if (invalidHandler) {
-			state.graph.diagnostics.push(invalidHandler);
-			collectExpressionReads(expressionValue, state);
-			walk(expressionValue, state);
-			return;
+			const handler = eventHandlerExpression(entry, state);
+			const syncPolicy = extractSyncPolicy(handler?.node, state);
+			const hasSyncPolicyCandidate = handler
+				? hasSyncEventPolicyCandidate(handler.node) ||
+					Boolean(firstDetachedSyncPolicyReference(handler.node))
+				: false;
+			if (hasSyncPolicyCandidate && !syncPolicy) {
+				state.graph.diagnostics.push(
+					unextractableSyncPolicyDiagnostic(
+						attributeName,
+						value,
+						handler ? [handler.node] : [],
+						state,
+					),
+				);
+			}
+			state.graph.events.push({
+				id: `event:${state.nextEventId++}`,
+				hostNodeId,
+				eventName: normalizeEventName(attributeName),
+				...(handler ? { handlerSource: handler.source, handlerSpan: handler.span } : {}),
+				handlerParameters: handler ? handlerParameterNames(handler.node) : [],
+				hasSyncPolicyCandidate,
+				syncPolicy,
+			});
 		}
-
-		const handler = eventHandlerExpression(expressionValue, state);
-		const syncPolicy = extractSyncPolicy(handler?.node, state);
-		const hasSyncPolicyCandidate = handler
-			? hasSyncEventPolicyCandidate(handler.node) ||
-				Boolean(firstDetachedSyncPolicyReference(handler.node))
-			: false;
-		if (hasSyncPolicyCandidate && !syncPolicy) {
-			state.graph.diagnostics.push(
-				unextractableSyncPolicyDiagnostic(
-					attributeName,
-					value,
-					handler ? [handler.node] : [],
-					state,
-				),
-			);
-		}
-		state.graph.events.push({
-			id: `event:${state.nextEventId++}`,
-			hostNodeId,
-			eventName: normalizeEventName(attributeName),
-			...(handler ? { handlerSource: handler.source, handlerSpan: handler.span } : {}),
-			handlerParameters: handler ? handlerParameterNames(handler.node) : [],
-			hasSyncPolicyCandidate,
-			syncPolicy,
-		});
 		collectExpressionReads(expressionValue, state);
 		walk(expressionValue, state);
 		return;
@@ -655,13 +676,19 @@ function collectAttribute(
 
 	if (attributeName === 'el') {
 		if (expressionValue) {
-			state.graph.elementHandleBindings.push({
-				hostNodeId,
-				handleName: expressionSource(expressionValue, state.source),
-				componentName: state.currentComponentName ?? undefined,
-				sourceSpan: sourceSpan(expressionValue, state.filename),
-				keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds],
-			});
+			// `el={[a, b]}` binds every handle in the list on this one element, each
+			// still under its own declaration's rules: a singular handle stays
+			// exactly-one and IDREF-capable, an array-typed one gains a member. Each
+			// entry becomes its own binding, so a non-handle in the list reaches the
+			// same MARKLESS_ELEMENT_HANDLE_REQUIRED refusal a bare `el={junk}` does.
+			for (const entry of elementHandleBindingExpressions(expressionValue))
+				state.graph.elementHandleBindings.push({
+					hostNodeId,
+					handleName: expressionSource(entry, state.source),
+					componentName: state.currentComponentName ?? undefined,
+					sourceSpan: sourceSpan(entry, state.filename),
+					keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds],
+				});
 		}
 		return;
 	}
@@ -1458,35 +1485,6 @@ function handlerParameterNames(node: AnyNode): string[] {
 		const name = getIdentifierName(parameter);
 		return name ? [name] : [];
 	});
-}
-
-function eventHandlerArrayDiagnostic(
-	attributeName: string,
-	node: AnyNode,
-	state: WalkState,
-): SemanticGraphDiagnostic {
-	const calls = asNodes(node.elements).map((element) => {
-		const name = getIdentifierName(element);
-		return name ? `${name}(event)` : '/* ... */';
-	});
-	const body = calls.length > 0 ? calls.join('; ') : '/* ... */';
-
-	return {
-		code: 'MARKLESS_EVENT_HANDLER_ARRAY_UNSUPPORTED',
-		severity: 'error',
-		phase: 'semantic-graph',
-		title: 'One handler per event attribute',
-		primarySpan: sourceSpan(node, state.filename),
-		passId: 'tsrx-semantic-graph',
-		artifactKeys: ['semanticGraph'],
-		message: `\`${attributeName}\` takes one handler, not a list. Compose the calls yourself in a single function.`,
-		why: 'An event attribute compiles to one lazy handler symbol. A closure you write keeps the call order, early returns, and conditions visible in your own code instead of hiding them in a framework rule.',
-		suggestions: [
-			{ message: `Write one function that calls both: ${attributeName}={(event) => { ${body} }}.` },
-			{ message: 'The list-shaped attribute is `attach`, which still takes an array.' },
-		],
-		docsUrl: 'https://markless.dev/errors/MARKLESS_EVENT_HANDLER_ARRAY_UNSUPPORTED',
-	};
 }
 
 function invalidEventHandlerExpression(

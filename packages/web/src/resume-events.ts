@@ -82,6 +82,27 @@ export function createEventWiring(input: {
 			byName = new Map();
 			eventRecords.set(element, byName);
 		}
+		// One element, one listener list. A part's own record and a record the
+		// consumer's `{...rest}` forwarded onto the same element arrive as two
+		// records - they are compiled by two different modules and only meet here -
+		// so the second MERGES into the first instead of replacing it. The part's
+		// own symbols stay first: the consumer is adding to the part's behavior,
+		// not taking it over. (React's last-writer-wins is the deliberate
+		// divergence; this is what two DOM listeners do.)
+		const held = byName.get(record.eventName);
+		const added = held
+			? record.symbolIds.filter((symbolId) => !held.symbolIds.includes(symbolId))
+			: [];
+		if (held && held !== record && added.length > 0) {
+			byName.set(record.eventName, {
+				...held,
+				...(held.syncPolicy ? {} : record.syncPolicy ? { syncPolicy: record.syncPolicy } : {}),
+				symbolIds: [...held.symbolIds, ...added],
+			});
+			input.eventTypes.add(record.eventName);
+			input.registerDelegatedEventRecord?.(element, record);
+			return;
+		}
 		byName.set(record.eventName, record);
 		input.eventTypes.add(record.eventName);
 		input.registerDelegatedEventRecord?.(element, record);
@@ -179,8 +200,10 @@ export function createEventWiring(input: {
 						event,
 						options,
 						selector,
+						propagation.stoppedImmediate,
 					);
 				}
+				if (propagation.stoppedImmediate()) return;
 				if (propagation.stopped()) stopAfterElement = matched.element;
 			}
 		} finally {
@@ -193,6 +216,7 @@ export function createEventWiring(input: {
 		event: ResumeDomEvent,
 		options: ResumeDispatchOptions,
 		selector: string,
+		stopsImmediately?: () => boolean,
 	): Promise<void> {
 		const beforeExecution = marklessExecutionLogSnapshot();
 		if (eventRecord.syncPolicy && !options.syncPolicyAlreadyApplied)
@@ -255,6 +279,9 @@ export function createEventWiring(input: {
 			for (const symbolId of eventRecord.symbolIds) {
 				activeSymbolId = symbolId;
 				await runSymbol(symbolId, baseContext);
+				// One element's handlers are one listener list: a handler that calls
+				// stopImmediatePropagation ends it here, before the next one runs.
+				if (stopsImmediately?.()) return;
 			}
 		} catch (error) {
 			await input.reportRuntimeError(error, {
@@ -466,32 +493,51 @@ function collectDispatchPath(
 // for it to drop that stopPropagation would not already have stopped.
 function trackPropagationStops(event: ResumeDomEvent): {
 	readonly stopped: () => boolean;
+	readonly stoppedImmediate: () => boolean;
 	readonly release: () => void;
 } {
 	const host = event as unknown as Record<string, unknown>;
 	// An entry capture may have applied the innermost record's stopPropagation
 	// policy before this walk started; the DOM flag is the only trace it leaves.
 	let stopped = host.cancelBubble === true;
+	// stopImmediatePropagation is the DOM's own answer for several listeners on
+	// ONE element, which is what a handler array and a merged spread handler are:
+	// the rest of this element's list is skipped, not only the ancestors'.
+	let immediate = false;
+	const restore: Array<() => void> = [];
 	let patched = false;
-	const own = Object.prototype.hasOwnProperty.call(host, 'stopPropagation');
-	const native = host.stopPropagation;
-	try {
-		host.stopPropagation = (...args: unknown[]) => {
-			stopped = true;
-			return typeof native === 'function'
-				? (native as (...call: unknown[]) => unknown).apply(event, args)
-				: undefined;
-		};
+	const patch = (name: string, mark: () => void): void => {
+		const own = Object.prototype.hasOwnProperty.call(host, name);
+		const native = host[name];
+		try {
+			host[name] = (...args: unknown[]) => {
+				mark();
+				return typeof native === 'function'
+					? (native as (...call: unknown[]) => unknown).apply(event, args)
+					: undefined;
+			};
+		} catch {
+			// A frozen event still reports through cancelBubble.
+			return;
+		}
 		patched = true;
-	} catch {
-		// A frozen event still reports through cancelBubble.
-	}
+		restore.push(() => {
+			if (own) host[name] = native;
+			else delete host[name];
+		});
+	};
+	patch('stopPropagation', () => {
+		stopped = true;
+	});
+	patch('stopImmediatePropagation', () => {
+		stopped = true;
+		immediate = true;
+	});
 	return {
 		stopped: () => stopped || (!patched && host.cancelBubble === true),
+		stoppedImmediate: () => immediate,
 		release: () => {
-			if (!patched) return;
-			if (own) host.stopPropagation = native;
-			else delete host.stopPropagation;
+			for (const undo of restore) undo();
 		},
 	};
 }
