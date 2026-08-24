@@ -17,9 +17,12 @@ export const tabsState = shared(
 			loop: false,
 			selectOnFocus: true,
 		});
+		// The array type argument makes the handle plural: bound on every trigger, read back as the live triggers in document order.
+		const triggerEls = element<HTMLButtonElement[]>();
 
 		return {
 			...tabs,
+			triggerEls,
 			// literal function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
 			show(next: string) {
@@ -89,7 +92,7 @@ export function TabsTrigger({
 
 	<button
 		{...rest}
-		el={tab.el}
+		el={[tab.el, tabs.triggerEls]}
 		type="button"
 		role="tab"
 		aria-selected={isSelected ? 'true' : 'false'}
@@ -135,10 +138,7 @@ export function TabsTrigger({
 				return;
 			}
 
-			const list = here.closest('[role="tablist"]');
-			const open = Array.from(
-				list?.querySelectorAll<HTMLButtonElement>('[role="tab"]') ?? [],
-			).filter((candidate) => !candidate.disabled);
+			const open = Array.from(tabs.triggerEls ?? []).filter((candidate) => !candidate.disabled);
 			const at = open.indexOf(here);
 			if (at < 0) {
 				onKeydown?.(event);

@@ -33,7 +33,8 @@ export const accordionState = shared(
 			toggle(next: string) {
 				if (accordion.disabled) return;
 				const held = accordion.value;
-				if (accordion.multiple) {
+				const isMultiple = accordion.multiple;
+				if (isMultiple) {
 					const current = typeof held === 'string' ? (held === '' ? [] : [held]) : held;
 					const isHeld = current.includes(next);
 					if (isHeld && accordion.collapsible !== true) return;
@@ -51,7 +52,8 @@ export const accordionState = shared(
 			// Find-in-page only ever opens: it is not a person asking for the open section to close, so `collapsible` does not apply.
 			reveal(next: string) {
 				const held = accordion.value;
-				if (accordion.multiple) {
+				const isMultiple = accordion.multiple;
+				if (isMultiple) {
 					const current = typeof held === 'string' ? (held === '' ? [] : [held]) : held;
 					if (current.includes(next)) return;
 					const after = [...current, next];

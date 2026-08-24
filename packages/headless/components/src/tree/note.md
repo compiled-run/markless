@@ -36,11 +36,11 @@ per-node-handler rows say the instances stay apart.
 4. **`leaf` is an explicit prop.** Inferring it from "has no `tree.itemcontent`"
    would need a child-to-parent seed; getting `aria-expanded`'s presence right is
    a required rule, not a nicety.
-5. **`Enter` and `Space` on a row click that row's OWN trigger**, found by a
-   marker attribute (`ui-treeitemtrigger`) and checked to belong to this row.
-   QDS clicks "the first focusable inside the row", which follows a link written
-   before the trigger. `file-explorer.tsrx` writes the link first on purpose and
-   the browser suite asserts the link is not followed.
+5. **`Enter` and `Space` on a row click that row's OWN trigger**, found in the
+   tree's own `triggerEls` set and checked to belong to this row rather than a
+   row nested inside it. QDS clicks "the first focusable inside the row", which
+   follows a link written before the trigger. `file-explorer.tsrx` writes the
+   link first on purpose and the browser suite asserts the link is not followed.
 6. **The indicator carries `ui-open`/`ui-closed` and `aria-hidden="true"`.** QDS
    ships a bare `<span>` with no state at all, which a stylesheet cannot rotate.
 7. **No typeahead timer.** QDS holds a `window.setTimeout` handle in a signal.
@@ -197,6 +197,16 @@ is the mechanism QDS spells as its ref-array registration and
 `base/src/helpers/item-registry.ts` (see `notes/T012-design-system-from-code.md`
 §2). Making route 3 execute at body time would be the smallest change that
 unlocks it.
+
+**LANDED, and this family is converted — 2026-08-24.** `element<T[]>()` is that
+collection: one plural handle bound on every part of a kind reads back live and
+in document order, and `el={[a, b]}` lets a part carry an item-instance handle
+and a root-instance set membership at once. `treeState` now holds `rootEl`,
+`rowEls`, `groupEls`, `triggerEls` and `labelEls`; `tree-walk.ts` turns them into
+the visible-row walk, "which row am I on", "this row's own trigger or label" and
+"the row one level up". No selector is read anywhere in `tree.tsrx`, and
+`ui-treeitemtrigger` and `ui-treeitemlabel` are gone with the queries that
+needed them.
 
 ## Open/closed is `hidden`, never an arm
 

@@ -23,17 +23,20 @@ export const CAROUSEL_CSS = `
 
 const STYLE_ID = 'carousel-scenario-css';
 
+// The sheet this module put on the document, held rather than looked up again.
+let installed: HTMLStyleElement | undefined;
+
 /**
  * Puts the scenario layout on the document, once. Idempotent and re-checked on
  * every call, so a harness that rebuilds the document between rows still gets a
  * laid-out carousel rather than a bare stack of divs.
  */
 export function installCarouselCss(): void {
-	const existing = document.getElementById(STYLE_ID);
-	if (existing?.isConnected) return;
+	if (installed?.isConnected) return;
 
 	const style = document.createElement('style');
 	style.id = STYLE_ID;
 	style.textContent = CAROUSEL_CSS;
 	document.head.append(style);
+	installed = style;
 }
