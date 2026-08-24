@@ -135,12 +135,72 @@ function marklessRowWidgetGraphNodeId(
 		);
 		if (rootPath) return rootPath + sharedId;
 	}
+	// The prefix walk above can only CHOP segments, so it never crosses a root
+	// that stands deeper than the reading edge path; a widget rooted inside this
+	// dispatch's row is exactly that shape.
+	const rowRooted = marklessRowRootedGraphNodeId(sharedId, edgePath, scope, registry);
+	if (rowRooted) return rowRooted;
 	// No row answered - either none was named, or the widget is rooted outside
 	// every row the dispatch is in. The projection site itself is then the whole
 	// question the registry was built to answer, and an id whose prefix already
 	// names its own root resolves back to itself.
 	const rootPath = marklessWidgetRootPathThroughRows(sharedId, edgePath, registry);
 	return rootPath ? rootPath + sharedId : undefined;
+}
+
+/**
+ * The rendered root this dispatch's ROW holds for the definition being read.
+ *
+ * The two spellings of one containment differ by more than the row. A part
+ * authored inside a repeat is compiled once, at the projection edge the repeat
+ * itself sits at (`c0:`), while the renderer files one root per rendered row and
+ * files it under the row's own projection slot as well (`r:banana:c0:p1:`). The
+ * prefix walk in `widgetRootPathFor` only ever chops segments off the right, so
+ * from `c0:` it can reach `c0:` and nothing longer: the row's root is invisible
+ * to it, the projection site answers with the template definition no row ever
+ * rendered into, and the read comes back undefined. That is what makes a keyed
+ * option's click write `undefined` into its group.
+ *
+ * Asked from the other end it is exact: the dispatched record names the row, the
+ * registry holds one root per rendered row, and only one of them both stands
+ * inside that row and extends the edge path the reader spelled. Rows are tried
+ * longest first, so a nested repeat answers with its innermost row. Anything
+ * less than a single answer is left to the caller - two roots matching means the
+ * question was ambiguous, and an ambiguous id must resolve exactly as it does
+ * today rather than pick one.
+ */
+function marklessRowRootedGraphNodeId(
+	sharedId: string,
+	edgePath: string,
+	scope: MarklessRowScope,
+	registry: MarklessWidgetRegistry,
+): string | undefined {
+	if (registry.rowRooted.size === 0) return undefined;
+	// `sharedId` is either a definition id or one of its nodes, and the module
+	// path inside it carries separators of its own - so ask both ways rather than
+	// guess which separator splits them.
+	const slash = sharedId.lastIndexOf('/');
+	const definitionId = registry.rowRooted.has(sharedId)
+		? sharedId
+		: slash > 0 && registry.rowRooted.has(sharedId.slice(0, slash))
+			? sharedId.slice(0, slash)
+			: undefined;
+	if (definitionId === undefined) return undefined;
+	for (const { withRows } of scope) {
+		if (!withRows.includes('r:')) continue;
+		let answer: string | undefined;
+		for (const [id, rootPath] of registry.rootPaths) {
+			if (!rootPath.startsWith(withRows) || id !== rootPath + definitionId) continue;
+			const beyondRow = rootPath.slice(withRows.length);
+			// One containment, two spellings: whichever is shorter must be a prefix
+			// of the other, or these are different places that share a row.
+			if (!beyondRow.startsWith(edgePath) && !edgePath.startsWith(beyondRow)) continue;
+			if (answer !== undefined && answer !== rootPath) return undefined;
+			answer = rootPath;
+		}
+		if (answer !== undefined) return answer + sharedId;
+	}
+	return undefined;
 }
 
 // A dispatched bound symbol reaches this graph twice over: the capture adapter
