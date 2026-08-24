@@ -73,6 +73,7 @@ type SsrAnchoredRecord = SsrRecord & {
 type SsrBranchRecord = SsrAnchoredRecord & {
 	readonly testReads?: ReadonlyArray<ComposeGraphRead>;
 	readonly symbolId?: string;
+	readonly takenArm?: number;
 	readonly armRecords?: ReadonlyArray<SsrArmRecordSet>;
 };
 type SsrArmRecordSet = SsrRecord & {
@@ -1264,28 +1265,30 @@ export function marklessSsrAppendChildView(context: {
 		const liveTestReads = (branch.testReads ?? []).filter(
 			(read) => !marklessCsrChildReadIsStatic(read, context.child.graphProps),
 		);
-		// A branch decided only by an explicitly constant/absent prop rendered
-		// its final arm with the child. It has no live parent graph route to wire.
-		if (liveTestReads.length === 0) continue;
+		const armRecords = branch.armRecords?.map((arm) =>
+			marklessSsrPrefixArmRecord(arm, context.child),
+		);
+		// A branch decided only by an explicitly constant/absent prop has no live
+		// parent route to re-decide it, but the arm it painted still owns records
+		// that have to follow their values; it stays as a decide-less record.
+		const decided = liveTestReads.length === 0;
+		if (decided && !marklessSsrDecidedArmIsLive(branch, armRecords)) continue;
+		const { symbolId: childSymbolId, ...unwired } = branch;
 		const mappedBranch = {
-			...branch,
+			...unwired,
 			id: context.child.hostPrefix + branch.id,
-			testReads: marklessSsrRemapChildReads(
-				liveTestReads,
-				context.child.graphProps,
-				context.child.hostPrefix + branch.id,
-				childInstancePath,
-			),
-			...(branch.symbolId
-				? { symbolId: marklessBoundSymbolId(context.child, branch.symbolId) }
+			testReads: decided
+				? []
+				: marklessSsrRemapChildReads(
+						liveTestReads,
+						context.child.graphProps,
+						context.child.hostPrefix + branch.id,
+						childInstancePath,
+					),
+			...(childSymbolId && !decided
+				? { symbolId: marklessBoundSymbolId(context.child, childSymbolId) }
 				: {}),
-			...(branch.armRecords
-				? {
-						armRecords: branch.armRecords.map((arm) =>
-							marklessSsrPrefixArmRecord(arm, context.child),
-						),
-					}
-				: {}),
+			...(armRecords ? { armRecords } : {}),
 		};
 		if (context.child.asyncBoundaryId) {
 			const armBranches = context.boundaryArmBranches.get(context.child.asyncBoundaryId) ?? [];
@@ -1508,6 +1511,31 @@ export function marklessSsrRemapChildReads<T extends ComposeGraphRead>(
 		return { ...read, graphNodeId: mapped.graphNodeId, path: mapped.path };
 	});
 }
+function marklessSsrArmRecordSetIsLive(arm: SsrArmRecordSet | undefined): boolean {
+	return Boolean(
+		arm &&
+			((arm.events?.length ?? 0) > 0 ||
+				(arm.domUpdates?.length ?? 0) > 0 ||
+				(arm.behaviors?.length ?? 0) > 0 ||
+				(arm.elementHandles?.length ?? 0) > 0 ||
+				(arm.keyedRepeats?.length ?? 0) > 0 ||
+				(arm.branches?.length ?? 0) > 0),
+	);
+}
+
+// Whether a branch nothing can re-decide still has records to wire. Throwing
+// beats dropping: a live arm whose painted index the render never reported
+// would otherwise go stale in silence.
+function marklessSsrDecidedArmIsLive(
+	branch: SsrBranchRecord,
+	armRecords: ReadonlyArray<SsrArmRecordSet> | undefined,
+): boolean {
+	if (!armRecords?.some(marklessSsrArmRecordSetIsLive)) return false;
+	if (typeof branch.takenArm !== 'number')
+		throw new Error(`MARKLESS_DECIDED_BRANCH_ARM_UNKNOWN: ${branch.id}`);
+	return marklessSsrArmRecordSetIsLive(armRecords[branch.takenArm]);
+}
+
 export function marklessSsrPrefixArmRecord(arm: SsrArmRecordSet, child: SsrPrefixChild) {
 	const instancePath = marklessComposedInstancePath(child);
 	return {
