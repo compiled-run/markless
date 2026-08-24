@@ -10,10 +10,12 @@ import Modal from '../src/modal/scenarios/basic.tsrx';
 import Navbar from '../src/navbar/scenarios/basic.tsrx';
 import Otp from '../src/otp/scenarios/basic.tsrx';
 import Pagination from '../src/pagination/scenarios/basic.tsrx';
+import Popover from '../src/popover/scenarios/basic.tsrx';
 import Progress from '../src/progress/scenarios/basic.tsrx';
 import QrCode from '../src/qr-code/scenarios/basic.tsrx';
 import { Basic as RadioGroup } from '../src/radio-group/scenarios/basic.tsrx';
 import { Basic as Select } from '../src/select/scenarios/basic.tsrx';
+import Slider from '../src/slider/scenarios/basic.tsrx';
 import Tabs from '../src/tabs/scenarios/basic.tsrx';
 import Textbox from '../src/textbox/scenarios/basic.tsrx';
 import Toaster from '../src/toaster/scenarios/basic.tsrx';
@@ -281,6 +283,26 @@ const descriptors: readonly FamilyDescriptor[] = [
 		supportsDisabled: true,
 	},
 	{
+		family: 'popover',
+		mount: { CSR: () => render(Popover), SSR: () => renderSSR(Popover) },
+		root: 'root',
+		parts: ['root', 'trigger', 'content', 'title', 'description', 'close'],
+		rootAria: { role: null },
+		openCycle: {
+			trigger: 'trigger',
+			surface: 'content',
+			haspopup: 'dialog',
+			ridesOverlay: true,
+			// The surface is a dialog a person walks into, not one focus is put
+			// into: the family moves focus only to hand it back on Escape.
+			focusLands: false,
+			focusReturns: false,
+		},
+		// Which edge the surface settles against is what a consumer styles on.
+		valuedAttributes: ['ui-side'],
+		supportsDisabled: false,
+	},
+	{
 		family: 'progress',
 		mount: { CSR: () => render(Progress), SSR: () => renderSSR(Progress) },
 		root: 'root',
@@ -367,6 +389,19 @@ const descriptors: readonly FamilyDescriptor[] = [
 			focusLands: false,
 			focusReturns: false,
 		},
+		supportsDisabled: true,
+	},
+	{
+		family: 'slider',
+		mount: { CSR: () => render(Slider), SSR: () => renderSSR(Slider) },
+		root: 'root',
+		parts: ['root', 'label', 'valuelabel', 'track', 'thumb'],
+		// One thumb is the whole control, so the root takes no wrapper role; the
+		// thumb is the element carrying role="slider".
+		rootAria: { role: null },
+		// The rail's numbers and which way it runs are what a consumer styles
+		// against, so they are key-value by design rather than presence marks.
+		valuedAttributes: ['ui-orientation', 'ui-value', 'ui-min', 'ui-max'],
 		supportsDisabled: true,
 	},
 	{
