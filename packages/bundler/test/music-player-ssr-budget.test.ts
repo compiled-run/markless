@@ -174,7 +174,12 @@ const clientBuild = resolve(demo, '.output/public/build');
 // resumed page now ships the queued dispatch wrapper (defect 93: unserialized
 // dispatch interleaved handler bodies; measured +242 gzip in isolation, less in
 // context) - correctness, not weight to claw back.
-const MAX_SHIPPED_JS_GZIP_BYTES = 69_360;
+// 69,360 -> 69,140 (2026-08-24): measured 69,103 - the row-mint demand gate
+// landed (demand-map runtimeModuleIds + app-emitted fns/row-mint loader): this
+// demo's repeats are non-mintable, so the mint chunk vanished from the build.
+// Repays part of the +643/+237 mint growth above; the remaining resume-module
+// delta stays with the bundler-diet clawbacks (shared resume-census leaf).
+const MAX_SHIPPED_JS_GZIP_BYTES = 69_140;
 
 test('music-player-ssr production build stays within its shipped JS budget', async () => {
 	await rm(resolve(demo, '.output'), { force: true, recursive: true });
