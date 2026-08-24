@@ -664,18 +664,18 @@ for (const mode of MODES) {
 		await expectTheConsumerFilterNarrowsTheList();
 	});
 
-	// PENDING CAPABILITY - minting the `@empty` arm. The rows now leave correctly
-	// when the filter matches nothing, so the count is 0; what is missing is the
-	// arm itself. It was never served (the list had four matches at boot), the
-	// view payload carries no markup for it, and nothing in resume can build one.
+	// The arm was never served - the list had four matches at boot - so the client
+	// builds it. The keyed-repeat record now carries the arm's finished markup,
+	// which it does for exactly one shape: an arm whose markup is fully static and
+	// whose elements no record names, because the mint wires nothing. This arm is
+	// a `<p>` of literal text, so it qualifies.
 	//
 	// Shipping the arm as inert markup was tried and withdrawn: the arm's host
-	// carries a `dom-order` locator (measured on a two-row fixture - the arm's
-	// host h2 holds strategy 'dom-order', index 2), so putting the arm into the
-	// document without splicing the element census would shift the index of every
-	// element after it. Closing this needs the mint to go through the census
-	// splice, alongside the row mint. Deterministic, so test.fails.
-	test.fails(`${mode}: the empty arm is what speaks when nothing matches`, async () => {
+	// carries a `dom-order` locator, so putting the arm into the document without
+	// splicing the element census would shift the index of every element after it.
+	// The mint reports both the insert and the removal to the census, which is why
+	// this closes without disturbing anything below the list.
+	test(`${mode}: the empty arm is what speaks when nothing matches`, async () => {
 		if (mode === 'CSR') await render(Filtered);
 		else await renderSSR(Filtered);
 		await expectTheEmptyArmSpeaksWhenNothingMatches();
