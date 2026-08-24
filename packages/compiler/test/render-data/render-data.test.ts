@@ -325,3 +325,54 @@ export function App() @{
 	]);
 	expect(result.renderData.repeats[0]).not.toHaveProperty('collectionSource');
 });
+
+test('renderData carries one interaction per host+event for a handler array', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/ArrayHandler.tsrx',
+		source: `
+import { state } from '@markless/core';
+export function App() @{
+	let order = state('');
+	<button type="button" onClick={[() => (order = order + 'A'), () => (order = order + 'B')]}>{order}</button>
+}
+`,
+		symbols: [],
+	});
+
+	// The semantic graph keeps a record per authored entry; render-data must not,
+	// or direct CSR attaches one listener per entry and runs every handler twice.
+	expect(result.semanticGraph.events).toHaveLength(2);
+	expect(result.renderData.interactions).toEqual([
+		expect.objectContaining({
+			hostNodeId: result.semanticGraph.events[0]?.hostNodeId,
+			eventName: 'click',
+			symbolIds: [expect.any(String), expect.any(String)],
+		}),
+	]);
+});
+
+test('renderData keeps one interaction per distinct host+event pair', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/TwoEvents.tsrx',
+		source: `
+import { state } from '@markless/core';
+export function App() @{
+	let count = state(0);
+	<div>
+		<button type="button" onClick={[() => count++, () => count++]} onFocus={() => count--}>{count}</button>
+		<a href="#x" onClick={() => count++}>Link</a>
+	</div>
+}
+`,
+		symbols: [],
+	});
+
+	expect(
+		result.renderData.interactions.map(
+			(interaction) => `${interaction.hostNodeId}:${interaction.eventName}`,
+		),
+	).toEqual([...new Set(
+		result.semanticGraph.events.map((event) => `${event.hostNodeId}:${event.eventName}`),
+	)]);
+	expect(result.renderData.interactions).toHaveLength(3);
+});

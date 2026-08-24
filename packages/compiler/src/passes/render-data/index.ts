@@ -28,6 +28,16 @@ export function createRenderData(input: {
 	const { semanticGraph, symbolResolver } = input;
 	const slots = semanticGraph.markup.chunks.flatMap((chunk) => chunk.slots);
 	const boundaryRunners = resolveBoundaryRunners(semanticGraph);
+	// An event ARRAY pushes one semantic record per entry, and every record already
+	// carries the whole host+event handler list below - so keeping them all makes
+	// direct CSR attach one listener per entry and run each handler once per entry.
+	const seenInteractionKeys = new Set<string>();
+	const interactionEvents = semanticGraph.events.filter((event) => {
+		const key = `${event.hostNodeId}:${event.eventName}`;
+		if (seenInteractionKeys.has(key)) return false;
+		seenInteractionKeys.add(key);
+		return true;
+	});
 
 	return {
 		passId: 'render-data',
@@ -67,7 +77,7 @@ export function createRenderData(input: {
 					),
 			};
 		}),
-		interactions: semanticGraph.events.map((event) => ({
+		interactions: interactionEvents.map((event) => ({
 			eventId: event.id,
 			hostNodeId: event.hostNodeId,
 			eventName: event.eventName,
