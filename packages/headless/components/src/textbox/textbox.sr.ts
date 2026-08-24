@@ -9,21 +9,12 @@ import Locked from './scenarios/locked.tsrx';
 import Prefilled from './scenarios/prefilled.tsrx';
 import WithHelp from './scenarios/with-help.tsrx';
 
-// Rows assert the facts an announcement must convey - role, name, state, and the
-// value the field holds - never a reader product's wording. `sr` is the only line
-// that picks a reader, so the same expectations run against NVDA and VoiceOver once
-// those drivers land.
-//
-// aria-at has no plan for a plain text input, so the reference is the ARIA textbox
-// role and the HTML accessibility mapping: role, name, value, and the restrictions
-// on the field - required, read-only, disabled, invalid.
+// Rows assert the facts an announcement must convey - role, name, state, value - never a reader product's wording.
 const sr = virtualDriver;
 
 const Input = page.getByTestId('input');
 
-// One scenario per test: the input id is minted per container, so two scenarios
-// alive in one document give two inputs the same id and every `<label for>` after
-// the first resolves to the wrong field.
+// One scenario per test: input ids are minted per container, so two live scenarios give two inputs the same id and every `<label for>` after the first resolves wrong.
 async function open(component: Parameters<typeof render>[0]) {
 	const { container } = await render(component);
 	await sr.start(container as unknown as HTMLElement);
@@ -53,8 +44,6 @@ test('a field that arrives with a value conveys that value', async () => {
 	expect(announcement, `${sr.name} announced "${announcement}"`).toContain('test value');
 });
 
-// Typing is the family's one gesture, and what a person hears afterwards has to be
-// what the field now holds.
 test('what a person types becomes the value the reader conveys', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'textbox' });
@@ -70,8 +59,7 @@ test('a field a person may read but not change conveys every restriction on it',
 		name: 'Username',
 		state: ['disabled'],
 	});
-	// The driver vocabulary holds no slot for read-only or required yet, so these two
-	// stay literal until a second reader says what it calls them.
+	// No vocabulary slot for read-only or required yet, so these two stay literal.
 	expect(announcement, `${sr.name} announced "${announcement}"`).toContain('read only');
 	expect(announcement, `${sr.name} announced "${announcement}"`).toContain('required');
 });
@@ -89,14 +77,11 @@ test('a field with only help text under it is never conveyed as invalid', async 
 	await open(WithHelp);
 	const announcement = await readUntil(sr, { role: 'textbox' });
 	expectConveys(announcement, { role: 'textbox', name: 'Email' });
-	// This reader speaks "not invalid" as its own fact, so the assertion above
-	// cannot be read as "invalid is absent"; that is what this line proves.
+	// This reader speaks "not invalid" as its own fact, so the absence needs its own assertion.
 	expect(missingFacts(sr, announcement, { state: ['invalid'] })).not.toEqual([]);
 });
 
-// The help text is part of the field, not a separate item further down the page:
-// `<textbox.description>` binds the handle the control names through
-// `aria-describedby`, so the reader speaks it with the field.
+// The description binds the handle the control names through aria-describedby, so it is part of the field rather than a separate item down the page.
 test('the help text under a field is conveyed with the field itself', async () => {
 	await open(WithHelp);
 	const announcement = await readUntil(sr, { role: 'textbox' });
@@ -105,8 +90,7 @@ test('the help text under a field is conveyed with the field itself', async () =
 	).toEqual([]);
 });
 
-// Mounting `<textbox.error>` marks the control invalid and its text becomes the
-// control's description, so a person is told both that the field is invalid and why.
+// Mounting the error part marks the control invalid and makes its text the description, so a person is told both that the field is invalid and why.
 test('the reason a field is invalid is conveyed with the field', async () => {
 	await open(Invalid);
 	const announcement = await readUntil(sr, { role: 'textbox', name: 'Password' });

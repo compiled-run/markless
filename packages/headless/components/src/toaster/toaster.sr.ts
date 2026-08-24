@@ -3,12 +3,7 @@ import { afterEach, expect, test } from 'vitest';
 import { virtualDriver } from '../../test-support/virtual-driver.ts';
 import Basic from './scenarios/basic.tsrx';
 
-// Rows assert the facts an announcement must convey, never a reader product's
-// wording. `sr` is the only line that picks a reader, so the same expectations
-// run against NVDA and VoiceOver once those drivers land.
-//
-// aria-at has no test plan for a toast stack, so these rows follow the ARIA
-// specification's live-region rules and the APG's status guidance instead.
+// Rows assert the facts an announcement must convey, never a reader product's wording.
 const sr = virtualDriver;
 
 async function open(component: Parameters<typeof render>[0]) {
@@ -27,17 +22,14 @@ function region(container: HTMLElement) {
 	return found;
 }
 
-// The region has to be in the page BEFORE anything is said. A live region added
-// at the same moment as its text is not announced by any reader, which is the
-// single most common way a toast is silently missed.
+// A live region added at the same moment as its text is announced by no reader.
 test('the region is on the page before the first message', async () => {
 	const container = await open(Basic);
 	expect(region(container).getAttribute('aria-live')).toBe('polite');
 	expect(region(container).querySelectorAll('[ui-toast]')).toHaveLength(0);
 });
 
-// Polite, not assertive: a message that is not an emergency waits for the reader
-// to finish what it is saying rather than cutting a person off mid-sentence.
+// Polite, not assertive: a message that is not an emergency must not cut a person off mid-sentence.
 test('the region asks to be read politely', async () => {
 	const container = await open(Basic);
 	expect(region(container).getAttribute('aria-live')).toBe('polite');
@@ -46,22 +38,9 @@ test('the region asks to be read politely', async () => {
 	expect(region(container).getAttribute('aria-relevant')).toBe('additions');
 });
 
-// The three rows below are pinned on the wall `toaster.browser.ts` describes in
-// full: a component inside a repeat renders nothing on the client. `toaster.root`
-// renders no default rows for a bare root, so every row is written out of the
-// family's parts inside a `@for` - exactly the shape that wall blocks.
-//
-// These are pinned rather than deleted because what they assert is still the
-// contract a reader depends on, and each one goes green the moment a component
-// renders inside a repeat. Nothing about the announcement rules changed; only the
-// markup that carries them stopped reaching the page.
-//
-// The two rows above stay green: a live region has to be on the page before its
-// first message, and that is a fact about the region itself, not about any row.
+// The three rows below are expected red on one cause: a component inside a repeat renders nothing on the client, and every toast row is written inside a `@for`.
 
-// The words a reader speaks are the message's own. The tone mark beside them is
-// decoration - a reader that spoke "×" before "Upload failed" would be reading
-// punctuation at a person.
+// The tone mark is decoration - a reader that spoke it before the message would be reading punctuation at a person.
 test.fails('the tone mark is not part of what is read', async () => {
 	const container = await open(Basic);
 	const say = container.querySelector('[data-testid="sticky"]') as HTMLButtonElement;
@@ -72,8 +51,7 @@ test.fails('the tone mark is not part of what is read', async () => {
 	expect(container.querySelector('[ui-toasticon]')?.getAttribute('aria-hidden')).toBe('true');
 });
 
-// One message, said once: a row that renders twice is announced twice, and the
-// queue's own update-in-place rule is what keeps that from happening.
+// A row that renders twice is announced twice; the queue's update-in-place rule is what prevents it.
 test.fails('a message said twice under one id is one thing to read', async () => {
 	const container = await open(Basic);
 	const save = container.querySelector('[data-testid="save"]') as HTMLButtonElement;
@@ -83,8 +61,7 @@ test.fails('a message said twice under one id is one thing to read', async () =>
 	await expect.poll(() => container.querySelectorAll('[ui-toast]')).toHaveLength(1);
 });
 
-// The dismiss button carries a name of its own. Its visible character is "×",
-// which a reader would otherwise announce as "times" or skip entirely.
+// The visible character is "×", which a reader would otherwise announce as "times" or skip entirely.
 test.fails('the dismiss button is named', async () => {
 	const container = await open(Basic);
 	const say = container.querySelector('[data-testid="sticky"]') as HTMLButtonElement;

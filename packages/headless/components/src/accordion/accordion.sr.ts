@@ -5,10 +5,7 @@ import { virtualDriver } from '../../test-support/virtual-driver.ts';
 import Basic from './scenarios/basic.tsrx';
 import Faq from './scenarios/faq.tsrx';
 
-// What a screen reader says about the accordion family. Each row names the facts
-// an announcement has to convey - role, accessible name, state - and never a
-// reader product's wording. `sr` is the only line that picks a reader, so the
-// same expectations run against NVDA and VoiceOver once those drivers land.
+// Rows assert the facts an announcement must convey - role, name, state - never a reader product's wording.
 const sr = virtualDriver;
 
 async function open(component: Parameters<typeof render>[0]) {
@@ -24,15 +21,7 @@ function expectConveys(phrase: string, conveys: Conveys) {
 	expect(missingFacts(sr, phrase, conveys), `${sr.name} announced "${phrase}"`).toEqual([]);
 }
 
-/**
- * The panel reaches the DOM only after the dispatch the trigger woke returns, so
- * the reader is asked again until it reads the new state.
- *
- * It walks forward rather than re-reading in place: opening a section grows the
- * reading tree under the cursor, so stepping off the item and back onto it lands
- * on the revealed content instead of on the trigger. The walk wraps around a
- * tree this small, so it reaches the trigger either way.
- */
+/** Walks forward rather than re-reading in place: opening a section grows the tree under the cursor, so a re-read lands on the revealed content. */
 async function expectAnnouncesAfterChange(conveys: Conveys) {
 	await expect
 		.poll(async () => {
@@ -42,8 +31,7 @@ async function expectAnnouncesAfterChange(conveys: Conveys) {
 		.toEqual([]);
 }
 
-// Nothing changed is not something a poll can wait for: give the dispatch the
-// same room a real activation gets, then read the item once.
+// Nothing-changed is not something a poll can wait for, so give the dispatch the room a real activation gets.
 async function settle() {
 	await new Promise((resolve) => setTimeout(resolve, 150));
 }
@@ -57,11 +45,7 @@ test('reading the starter conveys the button role, its name and that it is not e
 	});
 });
 
-// A closed panel carries `hidden="until-found"`, which the browser's UA rule
-// gives `content-visibility: hidden`, so a real accessibility tree does not
-// contain this text. This reader models `hidden` and `display:none` but not
-// `content-visibility`, so it walks into the panel and speaks it. The row turns
-// green when the reader models content-visibility.
+// Expected red against this reader, not the markup: a closed panel is hidden="until-found", and the reader models `hidden` and display:none but not content-visibility.
 test.fails('the text inside a closed panel is not reachable', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'button' });

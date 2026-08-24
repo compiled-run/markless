@@ -8,19 +8,10 @@ import SettingsList from './scenarios/settings-list.tsrx';
 import UnavailableOptions from './scenarios/unavailable-options.tsrx';
 import WithHelp from './scenarios/with-help.tsrx';
 
-// Rows assert the facts an announcement must convey - role, name, state - never a
-// reader product's wording. `sr` is the only line that picks a reader, so the same
-// expectations run against NVDA and VoiceOver once those drivers land.
-//
-// No aria-at test plan exists for `role="switch"`, so the reference is the APG switch
-// pattern: role, name and on/off, one activation key (Space), and no third state.
-// Where a row matches an aria-at checkbox assertion, that is the two patterns
-// agreeing on a step, not a switch plan being read.
+// Rows assert the facts an announcement must convey - role, name, state - never a reader product's wording.
 const sr = virtualDriver;
 
-// One scenario per test: the trigger id is minted per container, so two
-// scenarios alive in one document give two elements the same id and every
-// `<label for>` after the first resolves to the wrong trigger.
+// One scenario per test: trigger ids are minted per container, so two live scenarios give two elements the same id and every `<label for>` after the first resolves wrong.
 async function open(component: Parameters<typeof render>[0]) {
 	const { container } = await render(component);
 	await sr.start(container as unknown as HTMLElement);
@@ -34,14 +25,12 @@ function expectConveys(phrase: string, conveys: Conveys) {
 	expect(missingFacts(sr, phrase, conveys), `${sr.name} announced "${phrase}"`).toEqual([]);
 }
 
-// A flip reaches the DOM after the dispatch it woke returns, so the reader is
-// asked again until the new state is what it reads.
+// A flip reaches the DOM after the dispatch it woke returns, so the reader is asked again until the new state is what it reads.
 async function expectAnnouncesAfterChange(conveys: Conveys) {
 	await expect.poll(async () => missingFacts(sr, await sr.reannounce(), conveys)).toEqual([]);
 }
 
-// Nothing changed is not something a poll can wait for: give the dispatch the
-// same room a real flip gets, then read the item once.
+// Nothing-changed is not something a poll can wait for, so give the dispatch the room a real flip gets.
 async function settle() {
 	await new Promise((resolve) => setTimeout(resolve, 150));
 }
@@ -134,15 +123,12 @@ test('a switch with only help text under it is never conveyed as invalid', async
 		name: 'Enable notifications',
 		state: ['notChecked'],
 	});
-	// This reader speaks "not invalid" as its own fact, so the assertion above
-	// cannot be read as "invalid is absent"; that is what this line proves.
+	// This reader speaks "not invalid" as its own fact, so the absence needs its own assertion.
 	expect(missingFacts(sr, announcement, { state: ['invalid'] })).not.toEqual([]);
 	await readUntil(sr, { name: '(Receive notifications about important updates)' });
 });
 
-// The help text is part of the switch, not a separate item further down the page:
-// `<toggle.description>` binds the handle the trigger names through
-// `aria-describedby`, so the reader speaks it with the switch.
+// The description binds the handle the trigger names through aria-describedby, so it is part of the switch rather than a separate item down the page.
 test('the help text under a switch is conveyed with the switch itself', async () => {
 	await open(WithHelp);
 	await readUntil(sr, { role: 'switch' });

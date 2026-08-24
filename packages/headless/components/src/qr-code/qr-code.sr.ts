@@ -7,20 +7,10 @@ import SpreadFirst from './scenarios/spread-first.tsrx';
 import TwoFactorSetup from './scenarios/two-factor-setup.tsrx';
 import Unnamed from './scenarios/unnamed.tsrx';
 
-// Rows assert the facts an announcement must convey - role, name - never a reader
-// product's wording. `sr` is the only line that picks a reader, so the same
-// expectations run against NVDA and VoiceOver once those drivers land.
-//
-// There is no aria-at plan and no APG pattern here, because a QR code is an image
-// rather than an interaction pattern. The sequence letters below come from
-// research-qr-code.md §6, which derives them from the semantics of `role="img"`.
-//
-// Every expectation here was captured from this reader's own output against these
-// scenarios, not predicted from the markup.
+// Rows assert the facts an announcement must convey - role, name - never a reader product's wording.
 const sr = virtualDriver;
 
-// The strings the scenarios encode. The family's worst failure mode is reading one of
-// them aloud, so the rows that catch it have to hold the actual string.
+// The strings the scenarios encode: the family's worst failure is reading one aloud, so the rows that catch it hold the actual string.
 const SITE_URL = 'https://markless.dev';
 const PAIRING_TOKEN = 'https://example.com/pair/8f3a';
 
@@ -47,9 +37,7 @@ async function lap(steps: number): Promise<string[]> {
 	return seen;
 }
 
-// Sequence A: one announcement, one object. Not "group", not a hundred path
-// segments - the geometry says nothing and is hidden, so the code is a leaf
-// carrying the consumer's name.
+// The geometry says nothing and is hidden, so the code is a leaf carrying the consumer's name.
 test('the code conveys the image role and the name the consumer gave it', async () => {
 	await open(Basic);
 	expectConveys(await readUntil(sr, { role: 'image' }), {
@@ -58,9 +46,7 @@ test('the code conveys the image role and the name the consumer gave it', async 
 	});
 });
 
-// Sequence A, the negative half, and the reason the family refuses a default name: a
-// name built from the value would read a URL aloud here and a TOTP secret aloud on
-// the two-factor screen.
+// Why the family refuses a default name: one built from the value would read a URL aloud here and a shared secret aloud on the two-factor screen.
 test('the encoded string is never announced', async () => {
 	await open(Basic);
 	for (const phrase of await lap(14)) {
@@ -68,23 +54,16 @@ test('the encoded string is never announced', async () => {
 	}
 });
 
-// Deliberately unnamed: an unnamed code is a real defect on a real screen, and this
-// row proves it stays the consumer's to fix rather than being papered over with the
-// pairing token.
+// An unnamed code is a real defect, and it stays the consumer's to fix rather than being papered over with the encoded value.
 test('a code with no name given is announced with no name, not with its value', async () => {
 	await open(Unnamed);
 	const announcement = await readUntil(sr, { role: 'image' });
 	expectConveys(announcement, { role: 'image' });
 	expect(announcement, `${sr.name} announced "${announcement}"`).not.toContain(PAIRING_TOKEN);
-	// Nothing beyond the role: no name, invented or otherwise.
 	expect(sr.segments(announcement)).toHaveLength(1);
 });
 
-// Sequence B: nothing inside is reachable. `patternsvg` is `aria-hidden`, so a
-// lap over the widget only ever arrives back at the image; without it some
-// reader and browser combinations expose the `<svg>` as a second graphic and a
-// few expose `<path>` elements, producing an announcement nested inside an
-// image.
+// Without aria-hidden on the pattern, some reader and browser pairs expose the `<svg>` as a second graphic and a few expose its paths.
 test('nothing inside the code is reachable, so a lap only ever finds the image', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'image' });
@@ -93,9 +72,7 @@ test('nothing inside the code is reachable, so a lap only ever finds the image',
 	}
 });
 
-// Every part spreads the consumer's props first, so the family's own attributes
-// land last and win. `spread-first.tsrx` passes `role="button"` on the root,
-// which is the one prop that could turn the code into something it is not.
+// Every part spreads the consumer's props first, so the family's own attributes land last and win.
 test("a consumer's own role does not displace the image role", async () => {
 	await open(SpreadFirst);
 	expectConveys(await readUntil(sr, { role: 'image' }), {
@@ -104,15 +81,7 @@ test("a consumer's own role does not displace the image role", async () => {
 	});
 });
 
-// Expected red, and the cause is the reader rather than the markup. An element with
-// `role="img"` is a leaf whose descendants are presentational, which is what makes a
-// decorative logo safe inside `overlay`; the virtual reader builds its own tree from
-// the DOM and does not prune children-presentational roles the way Chromium's tree
-// does, so it walks in and announces the overlay's text. NVDA and VoiceOver are
-// expected to pass this row. Kept red rather than ignored because the family has a
-// markup-side answer available - `aria-hidden` on `overlay`, the way `patternsvg`
-// already carries one - and choosing between that and fixing the reader lane is a
-// design decision, not a coverage one.
+// Expected red against this reader, not the markup: it does not prune children-presentational roles the way a browser's tree does, so it walks into the image and reads the overlay.
 test.fails('the overlay inside the code is never announced', async () => {
 	await open(TwoFactorSetup);
 	const name = 'Scan to add this account to your authenticator app';

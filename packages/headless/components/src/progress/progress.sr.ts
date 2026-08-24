@@ -7,15 +7,7 @@ import Complete from './scenarios/complete.tsrx';
 import CustomRange from './scenarios/custom-range.tsrx';
 import Indeterminate from './scenarios/indeterminate.tsrx';
 
-// Rows assert the facts an announcement must convey - role, name, value - never a
-// reader product's wording. `sr` is the only line that picks a reader, so the same
-// expectations run against NVDA and VoiceOver once those drivers land.
-//
-// No aria-at test plan exists for `role="progressbar"`, so these sequences follow the
-// ARIA specification and the APG meter/progress guidance instead.
-//
-// A progress bar is not focusable and not operable, so every row here is a read and
-// none is a keypress.
+// Rows assert the facts an announcement must convey - role, name, value - never a reader product's wording.
 const sr = virtualDriver;
 
 async function open(component: Parameters<typeof render>[0]) {
@@ -35,8 +27,7 @@ test('reading the starter conveys the progressbar role and its current value', a
 	await open(Basic);
 	const announcement = await readUntil(sr, { role: 'progressbar' });
 	expectConveys(announcement, { role: 'progressbar' });
-	// The percentage is our own `aria-valuetext`, so this asserts our markup rather
-	// than a reader product's phrasing.
+	// The percentage is our own aria-valuetext, so this pins our markup, not a reader's phrasing.
 	expect(announcement, `${sr.name} announced "${announcement}"`).toContain('30%');
 });
 
@@ -53,8 +44,7 @@ test('a finished job conveys a full bar', async () => {
 	expect(announcement, `${sr.name} announced "${announcement}"`).toContain('100%');
 });
 
-// A bar whose range is not 0-100 has to be conveyed as a proportion of its own
-// range, or a reader reads "8000" and a person hears a number with no meaning.
+// Without a proportion of its own range, a reader speaks the raw number and a person hears one with no meaning.
 test('a bar with its own range conveys the value as a proportion of that range', async () => {
 	await open(CustomRange);
 	const first = await readUntil(sr, { role: 'progressbar' });
@@ -78,8 +68,7 @@ test('the bar is conveyed with the name its visible label gives it', async () =>
 	).toEqual([]);
 });
 
-// A "0%" computed from `min` would announce a job that has not started rather than
-// one whose progress is unknown, so the announcement must carry no percentage at all.
+// A "0%" computed from `min` would announce a job that has not started rather than one whose progress is unknown.
 test('an indeterminate bar conveys no current value', async () => {
 	await open(Indeterminate);
 	const announcement = await readUntil(sr, { role: 'progressbar' });
