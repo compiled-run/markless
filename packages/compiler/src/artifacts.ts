@@ -1079,6 +1079,14 @@ export type LoweredElementHandleRead = {
 	readonly source: string;
 	readonly handleId: string;
 	readonly handleName: string;
+	/**
+	 * The DOM property tail read off the handle, when the source reads one:
+	 * `box.tagName.length` records `["tagName", "length"]`. Absent when the read
+	 * is of the handle itself. Without it the record said only "this text is a
+	 * handle" and the emitter replaced the whole chain with the handle, so
+	 * `measure(box.tagName.length)` shipped as `measure(<the element>)`.
+	 */
+	readonly path?: ReadonlyArray<string>;
 };
 
 export type LoweredStateWrite = {
