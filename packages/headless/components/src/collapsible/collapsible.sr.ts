@@ -6,14 +6,7 @@ import Basic from './scenarios/basic.tsrx';
 import Unavailable from './scenarios/unavailable.tsrx';
 import WithoutFindInPage from './scenarios/without-find-in-page.tsrx';
 
-// Rows follow the w3c/aria-at disclosure plan and assert the facts an announcement
-// must convey - role, name, state - never a reader product's wording. The whole
-// pattern is one assertion: `aria-expanded` on the trigger, which aria-at makes
-// `stateChangeToExpanded` at priority 1, with no live region anywhere in the plan.
-// `sr` is the only line that picks a reader, so the same expectations run against
-// NVDA and VoiceOver once those drivers land.
-//
-// The plan has no test for a trigger nobody may operate, so that row is ours.
+// Rows assert the facts an announcement must convey - role, name, state - never a reader product's wording.
 const sr = virtualDriver;
 
 async function open(component: Parameters<typeof render>[0]) {
@@ -29,15 +22,7 @@ function expectConveys(phrase: string, conveys: Conveys) {
 	expect(missingFacts(sr, phrase, conveys), `${sr.name} announced "${phrase}"`).toEqual([]);
 }
 
-/**
- * The panel reaches the DOM only after the dispatch the trigger woke returns, so the
- * reader is asked again until it reads the new state.
- *
- * It walks forward rather than re-reading in place: opening the panel grows the
- * reading tree under the cursor, so stepping off the item and back onto it lands on
- * the revealed content instead of on the trigger. The walk wraps around a tree this
- * small, so it reaches the trigger either way and never reads a stale item.
- */
+/** Walks forward rather than re-reading in place: opening the panel grows the tree under the cursor, so a re-read lands on the revealed content. */
 async function expectAnnouncesAfterChange(conveys: Conveys) {
 	await expect
 		.poll(async () => {
@@ -47,8 +32,7 @@ async function expectAnnouncesAfterChange(conveys: Conveys) {
 		.toEqual([]);
 }
 
-// Nothing changed is not something a poll can wait for: give the dispatch the
-// same room a real activation gets, then read the item once.
+// Nothing-changed is not something a poll can wait for, so give the dispatch the room a real activation gets.
 async function settle() {
 	await new Promise((resolve) => setTimeout(resolve, 150));
 }
@@ -62,13 +46,7 @@ test('reading the starter conveys the button role, its name and that it is not e
 	});
 });
 
-// The other half of a closed disclosure: the panel is hidden, so nothing in it is
-// reachable. A reader that can walk into hidden content is the failure this row
-// catches, and it is why `hidden` rather than `display:none` on a wrapper matters.
-// A closed panel now defaults to hidden="until-found" (content-visibility:
-// hidden), which the virtual reader does not model - the same limitation the
-// accordion suite pins. The reachability fact is asserted where it is true by
-// construction: a panel that opted out of find-in-page is plain hidden.
+// Asserted on the opted-out-of-find-in-page scenario, where the panel is plain `hidden`: this reader does not model hidden="until-found", which is the default.
 test('the text inside a closed panel is not reachable', async () => {
 	await open(WithoutFindInPage);
 	await readUntil(sr, { role: 'button' });
@@ -80,8 +58,6 @@ test('the text inside a closed panel is not reachable', async () => {
 	expect(walked.join(' | ')).not.toContain('A button that shows and hides the content below it.');
 });
 
-// aria-at's `stateChangeToExpanded`, priority 1. The APG gives the disclosure
-// control Enter and Space; this is the Enter half.
 test('pressing enter announces the trigger as expanded', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'button' });

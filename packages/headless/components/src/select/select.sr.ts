@@ -8,24 +8,10 @@ import { Prefilled } from './scenarios/prefilled.tsrx';
 import { SignupForm } from './scenarios/signup-form.tsrx';
 import { UnavailableOptions } from './scenarios/unavailable-options.tsrx';
 
-// What a screen reader says about the select family, asserted the way the
-// w3c/aria-at `tests/apg/combobox-select-only` plan asserts it: each step names
-// the facts the announcement has to convey - role, accessible name, state - and
-// never a product's wording. The sequence letters below are those the plan uses.
-// `sr` is the only line that picks a reader, so the same expectations run
-// against NVDA and VoiceOver once those drivers land.
-//
-// aria-at coverage, recorded honestly: that plan carries no test for a disabled
-// option, for a whole disabled select, or for the hidden native control, so the
-// rows covering those below are ours rather than the plan's. Its option-count
-// assertion ("13 options") is carried here as reading every one of the thirteen
-// names in order, which is the same claim a virtual reader can actually make.
+// Rows assert the facts an announcement must convey - role, name, state - never a reader product's wording.
 const sr = virtualDriver;
 
-// The five words this family needs that `test-support/driver.ts`'s shared
-// Vocabulary does not carry yet. They live here because that file is outside
-// this unit's contract; promoting them into the shared table (so `Conveys` can
-// name them like every other role) is a follow-up, not a family concern.
+// Words this family needs that the shared Vocabulary in test-support/driver.ts does not carry yet.
 const WORDS: Record<string, Record<string, string>> = {
 	// measured: this reader's own output for our markup
 	virtual: {
@@ -38,7 +24,7 @@ const WORDS: Record<string, Record<string, string>> = {
 		collapsed: 'not expanded',
 		disabled: 'disabled',
 	},
-	// unverified against our markup; aria-at's combobox plan says "combo box"
+	// unverified against our markup
 	NVDA: {
 		combobox: 'combo box',
 		listbox: 'list box',
@@ -64,8 +50,7 @@ const WORDS: Record<string, Record<string, string>> = {
 
 const say = WORDS[sr.name] ?? WORDS.virtual;
 
-// One scenario per test: two selects alive in one document give two listboxes
-// the same minted ids, and every IDREF after the first resolves to the wrong one.
+// One scenario per test: two live selects mint the same listbox ids, so every IDREF after the first resolves to the wrong one.
 async function open(component: Parameters<typeof render>[0]) {
 	const { container } = await render(component);
 	await sr.start(container as unknown as HTMLElement);
@@ -84,9 +69,7 @@ function expectConveys(phrase: string, facts: readonly string[]) {
 	expect(missing(phrase, facts), `${sr.name} announced "${phrase}"`).toEqual([]);
 }
 
-// Move the reading cursor forward until an announcement conveys everything asked
-// for, and return it. Throws with the transcript so far when it does not, because
-// a walk that never arrives is the same defect as a wrong phrase.
+// Walk forward until an announcement conveys everything asked for; a walk that never arrives is the same defect as a wrong phrase.
 async function readFor(facts: readonly string[], limit = 40): Promise<string> {
 	const seen: string[] = [];
 	let phrase = await sr.lastSpokenPhrase();
@@ -102,38 +85,27 @@ async function readFor(facts: readonly string[], limit = 40): Promise<string> {
 	);
 }
 
-// Every gesture in this family hands the focus somewhere, and this reader speaks
-// on its own when it does. Callers wait for the gesture's own DOM outcome first;
-// this waits for the reader to catch up with the focus and then asserts the one
-// announcement that catching up produced.
+// Wait for the reader to catch up with a moved focus, then assert the announcement that catching up produced.
 async function expectAnnouncesAfterChange(facts: readonly string[]) {
 	expectConveys(await sr.settleOnFocus(), facts);
 }
 
-// Sequence A: entering the collapsed combobox. Step 3 is the row QDS fails -
-// with no role="combobox" on the trigger a reader says "button" - and it is
-// aria-at's `Role 'combobox' is conveyed` assertion.
 test('entering the select conveys the combobox role and the select name', async () => {
 	await open(Basic);
 	expectConveys(await readFor([say.combobox]), [say.combobox, 'Favorite Fruit']);
 });
 
-// Sequence A, the last step: a select that is not showing its popup says so.
 test('a select that is not showing its popup conveys that it is collapsed', async () => {
 	await open(Basic);
 	expectConveys(await readFor([say.combobox]), [say.combobox, say.collapsed]);
 });
 
-// Sequence B: the popup, once it is showing. The listbox is named by the same
-// label the combobox is, which is what makes the popup findable on its own.
 test('a select showing its popup conveys expanded and a named listbox', async () => {
 	await open(OpenList);
 	expectConveys(await readFor([say.combobox]), [say.combobox, say.expanded]);
 	expectConveys(await readFor([say.listbox]), [say.listbox, 'Favorite Fruit']);
 });
 
-// Sequence B, the option step: the chosen option is conveyed as selected and the
-// others are not. This is the state a select carries that a menu does not.
 test('the chosen option is the only one conveyed as selected', async () => {
 	await open(OpenList);
 	expectConveys(await readFor(['Apple']), ['Apple', say.notSelected]);
@@ -141,11 +113,7 @@ test('the chosen option is the only one conveyed as selected', async () => {
 	expectConveys(await readFor(['Cherry']), ['Cherry', say.notSelected]);
 });
 
-// aria-at asserts the number of options in the popup. A virtual reader has no
-// set-size announcement, so the honest form of that claim is that every one of
-// the thirteen names is reached, in the order they were authored - read in one
-// walk rather than thirteen, because this lane runs its files in parallel and a
-// suite that re-walks the tree per name starves the other families' polls.
+// One walk, not thirteen: this lane runs files in parallel and a suite that re-walks the tree per name starves the other families' polls.
 test("all thirteen options are reached in order, aria-at's reference count", async () => {
 	await open(LongOpenList);
 	const names = [
@@ -175,12 +143,7 @@ test("all thirteen options are reached in order, aria-at's reference count", asy
 	expect(reached).toEqual(names);
 });
 
-// Sequence C, and the single most valuable row in this file: moving the
-// highlight is not choosing. A reader that says "selected" here means the arrow
-// handler committed, which is the select family's most common bug and the exact
-// mirror image of the radio-group rule. The move is Banana to Cherry on purpose:
-// Banana is the option this select arrived on, so a row that arrowed onto it
-// would read a "selected" the family was right to say.
+// Moving the highlight is not choosing: a "selected" here means the arrow handler committed. Banana to Cherry on purpose - Banana is the option this select arrived on.
 test('arrowing off the chosen option announces the next one as not selected', async () => {
 	await open(OpenList);
 	await readFor(['Banana', say.selected]);
@@ -188,36 +151,19 @@ test('arrowing off the chosen option announces the next one as not selected', as
 	expect(cherry, 'the scenario names its third option').not.toBeNull();
 
 	await sr.press(sr.keys.arrowDown);
-	// The gesture's own outcome, before the reader is asked anything: an arrow in
-	// this family moves the roving focus, so the focus landing on the next option
-	// is the arrow having happened. Waiting for it is waiting for the gesture, not
-	// for the announcement to come out the way this row wants - a family that
-	// committed the choice would land the focus here too, and be caught below.
+	// Wait for the gesture's own outcome - the roving focus landing - before asking the reader anything.
 	await expect.poll(() => document.activeElement).toBe(cherry);
 
-	// One announcement - the reader's own, made because the focus moved - carries
-	// both halves of this row. It is not a re-read: `reannounce()` steps off the
-	// item and back onto it, and that round trip is a fixpoint at a list's "end
-	// of" boundary, so a cursor knocked onto that boundary by the focus
-	// announcement still in flight never comes back. Measured in-lane: the cursor
-	// parked on "end of listbox" and every re-read after it returned that same
-	// phrase until the deadline, which is why this row failed under lane load and
-	// passed alone.
+	// Not a re-read: `reannounce()` round-trips through a list's "end of" boundary, which is a fixpoint the cursor never leaves under lane load.
 	const announced = await sr.settleOnFocus();
 	expectConveys(announced, ['Cherry', say.notSelected]);
-	// The negative proof, spelled out: "selected" is a word this announcement
-	// must be missing, not merely a word "not selected" happens to contain. It
-	// reads the same announcement the line above did, so the two halves cannot
-	// land on different ones.
+	// "selected" must be missing outright, not merely contained in "not selected".
 	expect(missing(announced, [say.selected]), `${sr.name} announced "${announced}"`).toEqual([
 		say.selected,
 	]);
 });
 
-// Sequence E: Escape closes. The reader-facing half is that the select goes back
-// to conveying collapsed. The other half of the sequence - that the value is the
-// one it arrived with - is behind a hidden listbox this reader cannot walk into,
-// so `select.browser.ts` carries it instead of this file guessing at it.
+// Escape must also leave the value untouched, but that is behind a hidden listbox this reader cannot walk into, so select.browser.ts carries it.
 test('Escape leaves the select conveying collapsed', async () => {
 	await open(Prefilled);
 	await readFor([say.combobox]);
@@ -230,15 +176,12 @@ test('Escape leaves the select conveying collapsed', async () => {
 	await expectAnnouncesAfterChange([say.combobox, say.collapsed]);
 });
 
-// Ours, not aria-at's: the plan has no disabled-option test. An option nobody
-// may choose has to say so, and the select it sits in stays usable.
 test('an option nobody may choose conveys that it is disabled', async () => {
 	await open(UnavailableOptions);
 	expectConveys(await readFor(['Banana']), ['Banana', say.disabled]);
 });
 
-// Ours, not aria-at's: a whole disabled select. The trigger is a native disabled
-// button, so the reader conveys it on the combobox itself.
+// The trigger is a native disabled button, so the reader conveys it on the combobox itself.
 test('a select nobody may touch conveys disabled on the combobox', async () => {
 	await open(UnavailableOptions);
 	expectConveys(await readFor([say.combobox, 'Support Plan']), [
@@ -248,12 +191,7 @@ test('a select nobody may touch conveys disabled on the combobox', async () => {
 	]);
 });
 
-// Ours, not aria-at's: the hidden native control. A bare `<select>` carries the
-// combobox role natively, so a form-participating select that failed to hide it
-// would put the same choice in the tree twice. `aria-hidden` plus `tabindex="-1"`
-// is what makes the correct expected result silence, and this row proves it by
-// counting: one combobox is announced on a page that holds two `<select>`-shaped
-// controls.
+// A bare `<select>` carries the combobox role natively, so failing to hide it puts the same choice in the tree twice - proven here by counting.
 test('the hidden native control is never announced beside the real combobox', async () => {
 	await open(SignupForm);
 	const log: string[] = [];

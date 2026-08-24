@@ -9,15 +9,10 @@ import SettingsList from './scenarios/settings-list.tsrx';
 import UnavailableOptions from './scenarios/unavailable-options.tsrx';
 import WithHelp from './scenarios/with-help.tsrx';
 
-// Rows follow the w3c/aria-at tri-state checkbox plan and assert the facts an
-// announcement must convey - role, name, state - never a reader product's wording.
-// `sr` is the only line that picks a reader, so the same expectations run against
-// NVDA and VoiceOver once those drivers land.
+// Rows assert the facts an announcement must convey - role, name, state - never a reader product's wording.
 const sr = virtualDriver;
 
-// One scenario per test: the trigger id is minted per container, so two
-// scenarios alive in one document give two elements the same id and every
-// `<label for>` after the first resolves to the wrong trigger.
+// One scenario per test: trigger ids are minted per container, so two live scenarios give two elements the same id and every `<label for>` after the first resolves wrong.
 async function open(component: Parameters<typeof render>[0]) {
 	const { container } = await render(component);
 	await sr.start(container as unknown as HTMLElement);
@@ -31,14 +26,12 @@ function expectConveys(phrase: string, conveys: Conveys) {
 	expect(missingFacts(sr, phrase, conveys), `${sr.name} announced "${phrase}"`).toEqual([]);
 }
 
-// A toggle reaches the DOM after the dispatch it woke returns, so the reader is
-// asked again until the new state is what it reads.
+// A toggle reaches the DOM after the dispatch it woke returns, so the reader is asked again until the new state is what it reads.
 async function expectAnnouncesAfterChange(conveys: Conveys) {
 	await expect.poll(async () => missingFacts(sr, await sr.reannounce(), conveys)).toEqual([]);
 }
 
-// Nothing changed is not something a poll can wait for: give the dispatch the
-// same room a real toggle gets, then read the item once.
+// Nothing-changed is not something a poll can wait for, so give the dispatch the room a real toggle gets.
 async function settle() {
 	await new Promise((resolve) => setTimeout(resolve, 150));
 }
@@ -139,16 +132,12 @@ test('a box with only help text under it is never conveyed as invalid', async ()
 		name: 'Subscribe to newsletter',
 		state: ['notChecked'],
 	});
-	// This reader speaks "not invalid" as its own fact, so the assertion above
-	// cannot be read as "invalid is absent"; that is what this line proves.
+	// This reader speaks "not invalid" as its own fact, so the absence needs its own assertion.
 	expect(missingFacts(sr, announcement, { state: ['invalid'] })).not.toEqual([]);
 	await readUntil(sr, { name: "We'll send you updates about new features" });
 });
 
-// Expected red: aria-at's plan expects the description to be conveyed with the box,
-// but `<checkbox.description>` writes a plain div and wires no aria-describedby, so
-// the reader announces it as a separate item further down. Whoever wires the
-// describedby deletes the `.fails`.
+// Expected red: the description part writes a plain div and wires no aria-describedby, so the reader announces it as a separate item further down.
 test.fails('the help text under a box is conveyed with the box itself', async () => {
 	await open(WithHelp);
 	expectConveys(await readUntil(sr, { role: 'checkbox' }), {
@@ -163,9 +152,7 @@ test.fails('the help text under a box is conveyed with the box itself', async ()
 	).toEqual([]);
 });
 
-// Expected red: a checkbox has one activation key, Space. The trigger does call
-// preventDefault() on Enter, but that lands after dispatch returns, so Enter still
-// toggles. Whoever fixes that ordering deletes the `.fails`.
+// Expected red: the trigger does call preventDefault() on Enter, but it lands after dispatch returns, so Enter still toggles.
 test.fails('pressing enter leaves a checkbox alone', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'checkbox' });

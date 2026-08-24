@@ -1,7 +1,4 @@
-// The skipped rows here all rest on one open limitation: the select-all and the
-// group share one accessible name. `checklist.root` is both the group element and
-// the select-all's checkbox root, so `checklist.label` names both, and a reader
-// announces the select-all under the group's own name.
+// Every skipped row rests on one limitation: the root is both the group element and the select-all's checkbox root, so one label names both.
 import { render } from '@markless/vitest-browser';
 import { afterEach, expect, test } from 'vitest';
 import { missingFacts, readUntil, type Conveys } from '../../test-support/driver.ts';
@@ -10,19 +7,10 @@ import Basic from './scenarios/basic.tsrx';
 import Partial from './scenarios/partial.tsrx';
 import UnavailableOptions from './scenarios/unavailable-options.tsrx';
 
-// Rows follow the w3c/aria-at tri-state checkbox plan and its dual-state sibling, and
-// assert the facts an announcement must convey - role, name, state - never a reader
-// product's wording. `sr` is the only line that picks a reader, so the same
-// expectations run against NVDA and VoiceOver once those drivers land.
-//
-// aria-at takes the group's name from a `fieldset`/`legend`, which is what
-// `checklist.root` and `checklist.label` render, so the group rows are the plan's own
-// shape rather than an adaptation of it.
+// Rows assert the facts an announcement must convey - role, name, state - never a reader product's wording.
 const sr = virtualDriver;
 
-// One scenario per test: the trigger id is minted per container, so two scenarios
-// alive in one document give two elements the same id and every `<label for>`
-// after the first resolves to the wrong trigger.
+// One scenario per test: trigger ids are minted per container, so two live scenarios give two elements the same id and every `<label for>` after the first resolves wrong.
 async function open(component: Parameters<typeof render>[0]) {
 	const { container } = await render(component);
 	await sr.start(container as unknown as HTMLElement);
@@ -36,20 +24,16 @@ function expectConveys(phrase: string, conveys: Conveys) {
 	expect(missingFacts(sr, phrase, conveys), `${sr.name} announced "${phrase}"`).toEqual([]);
 }
 
-// A toggle reaches the DOM after the dispatch it woke returns, so the reader is
-// asked again until the new state is what it reads.
+// A toggle reaches the DOM after the dispatch it woke returns, so the reader is asked again until the new state is what it reads.
 async function expectAnnouncesAfterChange(conveys: Conveys) {
 	await expect.poll(async () => missingFacts(sr, await sr.reannounce(), conveys)).toEqual([]);
 }
 
-// Nothing changed is not something a poll can wait for: give the dispatch the
-// same room a real toggle gets, then read the item once.
+// Nothing-changed is not something a poll can wait for, so give the dispatch the room a real toggle gets.
 async function settle() {
 	await new Promise((resolve) => setTimeout(resolve, 150));
 }
 
-// Sequence A, entering the group: aria-at asserts the group's name and its role
-// before the control's own facts, both at priority 2.
 test.skip('entering the list conveys the group and its name before the select-all', async () => {
 	await open(Basic);
 	expectConveys(await readUntil(sr, { role: 'group' }), {
@@ -67,9 +51,7 @@ test.skip('reading an untouched select-all conveys the checkbox role, its name a
 	});
 });
 
-// Sequence F, from the sibling dual-state plan: every item is its own tab stop,
-// with no position-in-set fact, because a checkbox group is not a set the way a
-// radio group is. That is the audible difference between the two families.
+// No position-in-set fact: a checkbox group is not a set the way a radio group is, and that is the audible difference between the families.
 test('each item conveys the checkbox role, its own name and that it is not checked', async () => {
 	await open(Basic);
 	for (const name of ['Lettuce', 'Tomato', 'Mustard']) {
@@ -81,10 +63,7 @@ test('each item conveys the checkbox role, its own name and that it is not check
 	}
 });
 
-// Ours, replacing aria-at's `operateUncheckedCheckbox`. That assertion expects
-// unchecked -> mixed, the standalone tri-state cycle; a select-all never cycles into
-// mixed, because its mixed state is computed from the items rather than chosen.
-// Recorded here so nobody later "fixes" this family to match the plan.
+// A select-all never cycles into mixed: its mixed state is computed from the items rather than chosen.
 test.skip('pressing space on an untouched select-all announces it as checked, never as partially checked', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'checkbox', name: 'All condiments' });
@@ -110,11 +89,7 @@ test('pressing space on an item announces that item as checked', async () => {
 	});
 });
 
-// Sequence E: the parent's state changed but focus did not move, and nothing
-// announces it. This is the family's known accessibility weakness and the reason
-// `aria-controls` on the parent matters - it gives a reader a way to REACH the
-// controlled set. It must not be solved with aria-live on the select-all, which
-// would announce on every single item toggle.
+// A known weakness: the parent's state changes with no announcement. It must not be solved with aria-live on the select-all, which would speak on every item toggle.
 test('checking one item announces that item only, and says nothing about the select-all', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'checkbox', name: 'Lettuce' });
@@ -141,11 +116,7 @@ test('an item nobody may change conveys that it is disabled and space leaves it 
 	});
 });
 
-// A composed family's root cannot be seeded from the enclosing family's instance
-// today, so such a group renders as if it were empty and a reader is told the truth
-// about the DOM rather than about the group.// Sequence A, the state step: readers differ on the word ("half checked", "mixed"),
-// and aria-at asserts the STATE at priority 1, which is why this asks the driver for
-// the fact rather than for a token.
+// Expected red: a composed family's root cannot be seeded from the enclosing family's instance, so the group renders as if it were empty.
 test.fails('reading a partly ticked select-all conveys it as partially checked', async () => {
 	await open(Partial);
 	expectConveys(await readUntil(sr, { role: 'checkbox', name: 'All condiments' }), {
@@ -155,8 +126,6 @@ test.fails('reading a partly ticked select-all conveys it as partially checked',
 	});
 });
 
-// Sequence D (`operateMixedCheckbox`): aria-at asserts only the state change, which
-// agrees with our design even though the APG example's cycle does not.
 test.skip('pressing space on a partly ticked select-all announces it as checked', async () => {
 	await open(Partial);
 	await readUntil(sr, { role: 'checkbox', name: 'All condiments' });
