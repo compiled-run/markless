@@ -9,7 +9,6 @@ import {
 	holdAll,
 	releaseAll,
 	positionOf,
-	shownSlice,
 	stackingStyle,
 	toastId,
 } from './toaster-queue.ts';
@@ -24,9 +23,6 @@ import type {
 	ToasterItemTitleProps,
 	ToasterRootProps,
 } from './toaster-types.ts';
-
-/** How many messages show at once when a root does not say. */
-const DEFAULT_VISIBLE = 3;
 
 /**
  * One queue per page, not per widget: a message raised by a component that never
@@ -113,18 +109,11 @@ export const toasterItemState = shared(
 );
 
 /**
- * The region every message appears in, and the whole family's easy path: written
- * with no children it renders the messages itself.
- *
- * The rows it renders are deliberately plain - static markup, text read from the
- * message, and one close button. That is exactly the shape this runtime can
- * build for itself after a resume, so a page served with an empty stack still
- * grows a real row for the first message a person's click raises. Writing the
- * rows out by hand (the custom path below) buys per-message attributes and gives
- * that up; note.md carries the measurement.
+ * The region every message appears in: the live region and the container, and
+ * nothing else. The rows are the consumer's own markup, written out of the parts
+ * below, the same way every other family in this library works.
  */
 export function ToasterRoot({
-	visible,
 	children,
 	onPointerover,
 	onPointerout,
@@ -133,9 +122,6 @@ export function ToasterRoot({
 	...rest
 }: ToasterRootProps) @{
 	const toaster = toasterState();
-	// The showing slice is a cell of this component, not of the page-wide graph:
-	// `visible` is a prop, and a page-scoped factory is never handed props.
-	const shown = computed(() => shownSlice(toaster.queue, visible ?? DEFAULT_VISIBLE));
 
 	<ol
 		{...rest}
@@ -167,24 +153,15 @@ export function ToasterRoot({
 			onFocusout?.(event);
 		}}
 	>
+		{/*
+		  * Just `{children}`. The default rows that used to sit here in an
+		  * `@if (children === undefined)` arm were the library's ONLY
+		  * `{children}`-beside-a-construct shape - the one the census study measured
+		  * as Fixture B/C - and removing them removes that shape from the library
+		  * entirely. Every remaining part projects its children with no construct
+		  * next to them.
+		  */}
 		{children}
-		@if (children === undefined) {
-			@for (const message of shown; key message.id) {
-				<li ui-toast="">
-					<span ui-toasticon="" aria-hidden="true">{message.icon}</span>
-					<div ui-toasttitle="">{message.title}</div>
-					<div ui-toastdescription="">{message.description}</div>
-					<button
-						type="button"
-						ui-toastclose=""
-						aria-label="Dismiss"
-						onClick={() => {
-							toaster.dismiss(message.id);
-						}}
-					>×</button>
-				</li>
-			}
-		}
 	</ol>
 }
 

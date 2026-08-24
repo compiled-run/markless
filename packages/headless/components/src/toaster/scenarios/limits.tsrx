@@ -2,6 +2,10 @@ import { toaster } from '../../index.ts';
 
 // Four messages against a region that shows two: the other two wait their turn,
 // and dismissing one brings the next forward. Nothing is dropped.
+//
+// The cap is the consumer's own now. `toaster.root` renders no rows, so how many
+// show is decided by what the repeat below iterates - `toaster.shown(queue, 2)`
+// rather than a `visible` prop the root no longer has.
 export default function Limits() @{
 	const toasts = toaster.state();
 
@@ -25,6 +29,15 @@ export default function Limits() @{
 			}}
 		>Four</button>
 		<output data-testid="queued">{toasts.queue.length}</output>
-		<toaster.root data-testid="root" visible={2} />
+		<toaster.root data-testid="root">
+			<div role="presentation" data-testid="rows">
+				@for (const message of toaster.shown(toasts.queue, 2); key message.id) {
+					<toaster.item toast={message} data-testid="item">
+						<toaster.itemtitle data-testid="itemtitle" />
+						<toaster.itemclose data-testid="itemclose" aria-label="Dismiss">×</toaster.itemclose>
+					</toaster.item>
+				}
+			</div>
+		</toaster.root>
 	</main>
 }

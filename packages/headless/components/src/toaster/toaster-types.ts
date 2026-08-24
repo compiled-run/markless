@@ -37,13 +37,12 @@ export type ToastOptions = {
  * The region every message appears in. It is on the page before the first
  * message, because a live region added at the same moment as its text is not
  * announced.
+ *
+ * There is no `visible` prop: the root renders no rows of its own, so how many
+ * messages show is decided by the consumer's own repeat. `toaster.shown(queue, n)`
+ * is the cap they write against.
  */
-export type ToasterRootProps = PropsOf<'ol'> & {
-	/** How many messages show at once. The rest wait their turn; none are dropped. */
-	readonly visible?: number;
-	/** Milliseconds each message shows for, unless it says otherwise. */
-	readonly duration?: number;
-};
+export type ToasterRootProps = PropsOf<'ol'>;
 
 /**
  * The cells every toaster part reads and writes. One graph per page.

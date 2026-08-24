@@ -18,12 +18,16 @@ widget-scoped, because a component that never renders the region still has to
 reach the same queue — `basic.tsrx`'s `Elsewhere` button is that row, and it is
 green.
 
-`toaster.root` renders the messages itself when it is written with no children.
-Those default rows are deliberately plain — static markup, text read from the
-message, one close button — because that is exactly the shape this runtime can
-build for itself after a resume. The SSR rows in the suite are the proof: a page
-served with an empty stack grows a real, working row for a message raised by a
-click after resume.
+`toaster.root` renders NO rows of its own (owner ruling, 2026-08-24). The region
+is the live region and the container; the messages are the consumer's own markup,
+written out of the parts above, exactly like every other family in this library.
+There is no easy path and no `visible` prop — how many messages show is decided by
+what the consumer's own repeat iterates, and `toaster.shown(queue, n)` is the cap
+they write against.
+
+Removing those default rows also removed the library's ONLY
+`{children}`-beside-a-construct shape (the census study's Fixture B/C source).
+Every remaining part projects its children with no construct next to them.
 
 ## The wall this family is blocked on
 
@@ -55,25 +59,32 @@ What that costs, exactly:
   auto-dismiss, hover-pause and tab-pause are all unreachable from a consumer
   page. One pinned row carries all three rather than three thin pins.
 - What consumers can do today is write the queue from their own handler:
-  `toasts.queue = toaster.say(toasts.queue, 'Saved', { id: 'save' })`. Every
-  green row in the suite goes through that shape. It is a workaround kept
-  visible, not the shipped surface.
+  `toasts.queue = toaster.say(toasts.queue, 'Saved', { id: 'save' })`. Every row
+  in the suite that raises a message goes through that shape. It is a workaround
+  kept visible, not the shipped surface.
 
-A namespace-level function is not an escape hatch either: `export function
-toast()` that resolves the instance itself is DROPPED from the compiled module —
-`SyntaxError: does not provide an export named 'pushToast'`. So `toaster.toast()`
-and `toaster.shown()` as bare namespace calls are both unavailable, in every form
-measured.
+A namespace-level function that RESOLVES THE INSTANCE ITSELF is not an escape
+hatch: `export function toast()` written that way is DROPPED from the compiled
+module — `SyntaxError: does not provide an export named 'pushToast'`. That is what
+makes `toaster.toast()` unavailable as a bare namespace call.
+
+A namespace-level PURE function over a value the caller already holds is fine, and
+is how `say`, `drop` and `shown` ship. `toaster.shown(toasts.queue, 2)` is called
+straight from a repeat header in `limits.tsrx` and compiles and runs — which
+corrects an earlier reading here that grouped `toaster.shown()` with
+`toaster.toast()` as unavailable. The difference is resolving an instance, not
+being a namespace call.
 
 ## What else the compiler forced — measured on this tip
 
 1. **A page-scoped factory takes no prop seeds.** `toaster.visible = visible` is
    `MARKLESS_SHARED_SEED_UNKNOWN_FIELD`; seeds are written when a widget root
-   seeds its parts, and a page-wide factory never gets one. `visible` is
-   therefore a prop of `toaster.root` read by a component-local `computed()`, and
-   a per-root `duration` prop is not shippable at all — it would have to reach
-   the enqueue, which only the graph can carry. The prop is absent rather than
-   dead: per-message `duration` covers the same ground.
+   seeds its parts, and a page-wide factory never gets one. This is why `visible`
+   was a prop of `toaster.root` read by a component-local `computed()` rather than
+   a cell. Both props are gone now: the root renders no rows, so `visible` had
+   nothing left to cap and the consumer's own repeat decides. A per-root
+   `duration` was never shippable either — it would have to reach the enqueue,
+   which only the graph can carry, and per-message `duration` covers that ground.
 2. **A destructuring default cannot be READ.** `visible = 3` in the parameter
    list plus `computed(() => ... visible)` is
    `MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED`. The prop is destructured
@@ -91,36 +102,45 @@ measured.
    `activateAuthoredBehaviors`. That is what the F8 hotkey was written as
    (`toaster-hotkey.ts` is still here, unwired), so the hotkey ships nowhere and
    the focus-restore rule that rode with it does not either.
-5. **A consumer's own `@for` inside `toaster.root` renders nothing.** The custom
-   path is pinned three rows deep. With the default rows in an `@else` arm the
-   page threw `RuntimeResumeError: Resume locator h2 expected <div> at DOM order
-   index 3`; with `{children}` rendered outside the construct the throw goes away
-   and the rows simply never appear. No diagnostic either way.
-6. **A construct cannot be the direct child of a component tag**
-   (`MARKLESS_PARSE_ERROR`), so `custom.tsrx` wraps its loop in a
+5. **A COMPONENT INSIDE A REPEAT RENDERS NOTHING.** This supersedes the earlier
+   reading here, "a consumer's own `@for` inside `toaster.root` renders nothing" —
+   projection is not the cause. Measured with two repeats over the same queue on
+   one page: a repeat of plain `<li>` markup inside `toaster.root`'s projected
+   children RENDERS; a repeat of `toaster.item` inside a plain `<ol>` that
+   projects nothing renders NOTHING; and a repeat of a trivial local component
+   with no `shared()` of its own, also in a plain `<ol>`, renders NOTHING. So the
+   wall is the component in the repeat — not the projected slot, not the widget
+   scope, and not the `{children}`-beside-a-construct shape that defect 97 was
+   about. No diagnostic in any form. **This is now the family's blocking wall:**
+   with the default rows gone, the written-out parts are the only path, and it is
+   the exact shape this blocks.
+6. **A repeat body may hold only one element.** Two siblings inside `@for` is
+   `MARKLESS_PARSE_ERROR` ("Expected '</' to close the JSX element, but found
+   '@'"). Measured while probing point 5.
+7. **A construct cannot be the direct child of a component tag**
+   (`MARKLESS_PARSE_ERROR`), so every scenario wraps its loop in a
    `<div role="presentation">` — the same shape select ships.
-7. **The default export must be the first component in a `.tsrx` module.**
+8. **The default export must be the first component in a `.tsrx` module.**
    A module whose default export is declared after another component renders the
    other one. Cost an hour of a wrong reading during the probes.
 
-## What the mint accepts, and what the default rows gave up for it
+## The mint, and why this family no longer reaches it
 
 The landed tier-1 mint (`mintableRowTemplate` in
 `packages/compiler/src/passes/protocol-view.ts`) carries a row template only when
-every slot in the row is TEXT read off the repeated item. No dynamic attributes,
-no nested constructs, no child components. So the default rows carry:
+every slot in the row is TEXT read off the repeated item — no dynamic attributes,
+no nested constructs, no child components.
 
-- static `ui-toast`, `ui-toasttitle`, `ui-toastdescription`, `ui-toasticon`,
-  `ui-toastclose` markers, and a static `aria-label="Dismiss"`;
-- text slots for the title, the description and the tone's own character, which
-  is why `icon` is minted into the record at enqueue rather than derived in the
-  row;
-- one row event: the close button, whose handler writes the root's array.
+The default rows were written to fit inside exactly that, which is why `icon` is
+minted into the record at enqueue rather than derived in the row: the mint can
+carry a text slot but not a computed attribute. With those rows removed, the
+family's only path is `toaster.item` inside a consumer's repeat — a child
+component, which the mint does not accept. So this family reaches no mint at all
+now, and `ui-tone`, `ui-front` and the `--index` / `--offset` stacking data (which
+the default rows could never have carried) are the things it renders instead.
 
-What they do NOT carry, and cannot: `ui-tone` per row, `ui-front`, and the
-`--index` / `--offset` stacking data. Those live on `toaster.item` in the custom
-path, where a child component may carry dynamic attributes — and the custom path
-gives up the mint in exchange, which is the honest trade rather than a bug.
+`icon` stays on the record regardless: `toaster.itemicon` reads it off the item's
+instance, so it is still a fact the queue carries rather than a lookup in a part.
 
 ## Behaviour that is implemented and unreachable
 
