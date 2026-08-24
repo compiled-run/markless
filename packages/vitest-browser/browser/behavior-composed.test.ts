@@ -9,10 +9,11 @@ import App from './fixtures/behavior-composed.tsrx';
 // live prop binding or its own dispatch.
 //
 // The composed-symbol adapter in `packages/web/src/fns/composition.ts` reads the
-// same graph-less context; it is pinned directly in
-// `packages/web/test/composed-behavior-graph.test.ts`, because the only shape
-// that installs it - a child whose computed() derives from a graph-bound prop -
-// cannot be rendered same-module at all (see that test's note).
+// same graph-less context. The shape that installs it - a child whose
+// computed() derives from a graph-bound prop - is now in this fixture too, so
+// the browser covers the same-module row that
+// `packages/web/test/composed-behavior-graph.test.ts` could only pin as a unit
+// while defect 100 killed the render.
 afterEach(() => cleanup());
 
 function requireElement<T extends Element>(container: ParentNode, selector: string): T {
@@ -31,6 +32,10 @@ test('CSR: an attach behavior on a child component part runs, and the prop bindi
 	expect(requireElement(container, 'button[data-child-part]').getAttribute('data-label')).toBe(
 		'row',
 	);
+	// The composed-symbol row: the child's computed() over the live prop.
+	expect(requireElement(container, 'button[data-child-part]').getAttribute('data-derived')).toBe(
+		'row!',
+	);
 
 	// The behavior pass must not have cost the child its own dispatch.
 	requireElement<HTMLButtonElement>(container, 'button[data-child-part]').click();
@@ -43,6 +48,10 @@ test('CSR: an attach behavior on a child component part runs, and the prop bindi
 	await expect
 		.poll(() => requireElement(container, 'button[data-child-part]').getAttribute('data-label'))
 		.toBe('moved');
+	// Nor the derive its dependency on that prop.
+	await expect
+		.poll(() => requireElement(container, 'button[data-child-part]').getAttribute('data-derived'))
+		.toBe('moved!');
 });
 
 test('SSR resume: the child component behavior runs once its host is woken', async () => {
@@ -52,6 +61,10 @@ test('SSR resume: the child component behavior runs once its host is woken', asy
 	// Served HTML carries no stamp: attach is browser work.
 	expect(requireElement(container, 'button[data-child-part]').getAttribute('data-attached')).toBe(
 		null,
+	);
+	// The derive is server work, so its value is already in the served HTML.
+	expect(requireElement(container, 'button[data-child-part]').getAttribute('data-derived')).toBe(
+		'row!',
 	);
 
 	requireElement<HTMLButtonElement>(container, 'button[data-child-part]').click();
