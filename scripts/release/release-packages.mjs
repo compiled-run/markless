@@ -19,10 +19,29 @@ import { fileURLToPath } from 'node:url';
 
 export const repoRoot = resolve(fileURLToPath(import.meta.url), '../../..');
 
-/** Every packages/<dir>/package.json that parses, in directory order. */
+/**
+ * Every packages/<dir>/package.json that parses, in directory order — plus one
+ * level deeper where a directory holds no manifest of its own (packages/headless
+ * is a folder of packages, and pnpm's workspace globs already publish through
+ * it, so the release set must see what publish would).
+ */
 export function workspacePackages(root = repoRoot) {
 	return readdirSync(resolve(root, 'packages'), { withFileTypes: true })
 		.filter((entry) => entry.isDirectory())
+		.flatMap((entry) => {
+			const hasManifest = (() => {
+				try {
+					JSON.parse(readFileSync(resolve(root, 'packages', entry.name, 'package.json'), 'utf8'));
+					return true;
+				} catch {
+					return false;
+				}
+			})();
+			if (hasManifest) return [entry];
+			return readdirSync(resolve(root, 'packages', entry.name), { withFileTypes: true })
+				.filter((child) => child.isDirectory())
+				.map((child) => ({ ...child, name: `${entry.name}/${child.name}` }));
+		})
 		.map((entry) => {
 			const directory = `packages/${entry.name}`;
 			const manifestPath = resolve(root, directory, 'package.json');

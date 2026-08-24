@@ -1,6 +1,7 @@
 {
 	"name": "@markless/ui",
 	"version": "0.3.3",
+	"private": true,
 	"description": "Headless, accessible UI components for Markless.",
 	"license": "MIT",
 	"repository": {
