@@ -487,6 +487,28 @@ function assertOptionalKeyedRepeats(record: Record<string, unknown>): void {
 		assertRowEvents(repeat.rowEvents, `${context}.rowEvents`);
 		assertOptionalRowElementHandles(repeat, `${context}.rowElementHandles`);
 		assertOptionalEmptyArm(repeat, `${context}.emptyArm`);
+		assertOptionalRowTemplate(repeat, `${context}.rowTemplate`);
+	}
+}
+
+function assertOptionalRowTemplate(record: Record<string, unknown>, context: string): void {
+	const template = record.rowTemplate;
+	if (template === undefined) return;
+	assertRecordShape(template, context);
+	assertStringField(template, 'html', context);
+	const textSlots = template.textSlots;
+	if (textSlots === undefined) return;
+	if (!Array.isArray(textSlots)) {
+		throw invalidPayloadShapeError(
+			contextPayloadType(context),
+			`Invalid ${context}: expected textSlots array.`,
+		);
+	}
+	for (const [index, slot] of textSlots.entries()) {
+		const slotContext = `${context}.textSlots[${index}]`;
+		assertRecordShape(slot, slotContext);
+		assertNonNegativeIntegerArrayField(slot, 'path', slotContext);
+		assertStringArrayField(slot, 'itemPath', slotContext);
 	}
 }
 
