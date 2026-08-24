@@ -1,5 +1,5 @@
-import { element, shared, state } from '@markless/core';
-import { anchorSurface } from './popover-anchor.ts';
+import { computed, element, shared, state } from '@markless/core';
+import { surfaceAnchorStyle } from './popover-anchor.ts';
 import type {
 	PopoverCloseProps,
 	PopoverContentProps,
@@ -60,6 +60,7 @@ export function PopoverRoot({
 
 	<div
 		{...rest}
+		style="anchor-scope: --ui-popover;"
 		ui-open={popover.open}
 		ui-closed={popover.open !== true}
 	>{children}</div>
@@ -71,6 +72,7 @@ export function PopoverTrigger({ children, onClick, ...rest }: PopoverTriggerPro
 	<button
 		{...rest}
 		el={popover.triggerEl}
+		style="anchor-name: --ui-popover;"
 		type="button"
 		aria-haspopup="dialog"
 		aria-expanded={popover.open ? 'true' : 'false'}
@@ -78,13 +80,7 @@ export function PopoverTrigger({ children, onClick, ...rest }: PopoverTriggerPro
 		ui-open={popover.open}
 		ui-closed={popover.open !== true}
 		onClick={(event) => {
-			if (popover.graceUntil <= Date.now()) {
-				popover.setOpen(popover.open !== true);
-				// The surface is still `hidden` here, so the placement waits for the DOM rather than for this call.
-				if (popover.open === true) {
-					anchorSurface(popover.triggerEl, popover.contentEl, popover.side);
-				}
-			}
+			if (popover.graceUntil <= Date.now()) popover.setOpen(popover.open !== true);
 			onClick?.(event);
 		}}
 	>{children}</button>
@@ -94,10 +90,12 @@ export function PopoverTrigger({ children, onClick, ...rest }: PopoverTriggerPro
 // `overlay` is a bare attribute the primitive reads; while enlisted it reports Escape and outside presses as `dismiss`, closing nothing and moving no focus itself.
 export function PopoverContent({ children, onDismiss, ...rest }: PopoverContentProps) @{
 	const popover = popoverState();
+	const placement = computed(() => surfaceAnchorStyle(popover.side));
 
 	<div
 		{...rest}
 		el={popover.contentEl}
+		style={placement}
 		overlay
 		role="dialog"
 		aria-labelledby={popover.titleEl}
