@@ -76,7 +76,7 @@ test('a same-module route re-enters the route table instead of stopping after on
 
 	expect(imported).toEqual([
 		'./deep.tsrx?markless-symbols -> c0:p1:symbol:2',
-		'../index.ts?markless-symbols -> symbol:2',
+		'../../index.ts?markless-symbols -> symbol:2',
 	]);
 	// Never dead-ends in the page's own table, which is where the thrown
 	// `Unknown async symbol` came from.
@@ -101,7 +101,7 @@ test('the self branch recurses while child-module branches keep their bytes', as
 	// Unchanged: a route naming a child module still imports that module's
 	// symbols variant and hands it the remainder.
 	expect(source).toContain(
-		'	if (symbolId.startsWith("c0:p1:")) {\n		return import("../index.ts?markless-symbols").then((mod) => mod.loadSymbol ? mod.loadSymbol(symbolId.slice(6)) : Promise.reject(new Error(`Unknown child async symbol ${symbolId}`)));\n	}',
+		'	if (symbolId.startsWith("c0:p1:")) {\n		return import("../../index.ts?markless-symbols").then((mod) => mod.loadSymbol ? mod.loadSymbol(symbolId.slice(6)) : Promise.reject(new Error(`Unknown child async symbol ${symbolId}`)));\n	}',
 	);
 	expect(source.endsWith('	return marklessLoadLocalSymbol(symbolId);\n}')).toBe(true);
 });
@@ -111,7 +111,7 @@ test('the self branch recurses while child-module branches keep their bytes', as
 // imported family's routes.
 const DEEP_ROUTES: ReadonlyArray<SourceLazySymbolRoute> = [
 	{ prefix: 'c0:p4:p5:', importSource: './deep.tsrx' },
-	{ prefix: 'c0:p1:', importSource: '../index.ts' },
+	{ prefix: 'c0:p1:', importSource: '../../index.ts' },
 	{ prefix: 'c6:p7:', self: true },
 ];
 
@@ -147,6 +147,6 @@ test('a prerendered page routes its same-module children too', async () => {
 		'\tif (symbolId.startsWith("c6:p7:")) {\n\t\treturn loadSymbol(symbolId.slice(6));\n\t}',
 	);
 	expect(source).toContain('import("./deep.tsrx?markless-symbols")');
-	expect(source).toContain('import("../index.ts?markless-symbols")');
+	expect(source).toContain('import("../../index.ts?markless-symbols")');
 	expect(source).toContain('\treturn marklessLoadLocalSymbol(symbolId);');
 });
