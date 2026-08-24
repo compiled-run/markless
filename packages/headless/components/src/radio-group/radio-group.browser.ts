@@ -181,7 +181,7 @@ function expectHelpRendered() {
 }
 
 function expectFormConfigRendered() {
-	// The name is declared once, by `radiogroup.field`, and every option takes it.
+	// The name is declared once, on `radiogroup.root`, and every option takes it.
 	expect(field(MonthlyField).getAttribute('name')).toBe('plan');
 	expect(field(AnnualField).getAttribute('name')).toBe('plan');
 	expect(field(MonthlyField).getAttribute('value')).toBe('monthly');
@@ -192,16 +192,14 @@ function expectFormConfigRendered() {
 	expect(field(AnnualField).required).toBe(true);
 }
 
-function expectGroupFieldIsHidden() {
-	const declared = el(Label).nextElementSibling as HTMLElement;
-	expect(declared.textContent).toBe('');
-	expect(getComputedStyle(declared).position).toBe('absolute');
-	expect(declared.getBoundingClientRect().height).toBeLessThanOrEqual(1);
-	// The group field adds no control of its own: both radios belong to options.
+// Declaring the form name on the root renders nothing of its own: the legend is
+// followed straight by the first option, and both radios belong to options.
+function expectRootConfigAddsNoControl() {
+	expect(el(Label).nextElementSibling).toBe(el(Monthly));
 	expect(page.getByRole('radio').elements().length).toBe(2);
 }
 
-// With no field part nothing is named, so a form receives nothing from the group.
+// With no name on the root nothing is named, so a form receives nothing from the group.
 function expectNamelessGroupSubmitsNothing() {
 	expect(field(MonthlyField).getAttribute('name')).toBe('');
 	expect(field(MonthlyField).required).toBe(false);
@@ -330,13 +328,13 @@ for (const mode of MODES) {
 		expectFormConfigRendered();
 	});
 
-	test(`${mode}: the group field declares the form name and shows nothing`, async () => {
+	test(`${mode}: the root declares the form name without rendering a control`, async () => {
 		if (mode === 'CSR') await render(PlanPickerForm);
 		else await renderSSR(PlanPickerForm);
-		expectGroupFieldIsHidden();
+		expectRootConfigAddsNoControl();
 	});
 
-	test(`${mode}: a group with no field part names nothing and requires nothing`, async () => {
+	test(`${mode}: a group with no name names nothing and requires nothing`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 		expectNamelessGroupSubmitsNothing();
@@ -471,7 +469,7 @@ test('CSR: options from a keyed loop each get their own instance', async () => {
 	expect(page.getByTestId('row-indicator').elements()[2]?.textContent).toBe('');
 });
 
-test('CSR: every option from a loop submits under the name the field declares', async () => {
+test('CSR: every option from a loop submits under the name the root declares', async () => {
 	await render(OptionsFromData);
 	await expect
 		.poll(() =>

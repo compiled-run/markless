@@ -13,10 +13,8 @@ export function PlanPickerForm() @{
 			submitted = JSON.stringify(Object.fromEntries(new FormData(event.target as HTMLFormElement)));
 		}}
 	>
-		<radiogroup.root data-testid="root">
+		<radiogroup.root data-testid="root" name="plan" required>
 			<radiogroup.label data-testid="label">Billing Period</radiogroup.label>
-			<radiogroup.field name="plan" required />
-
 			<radiogroup.item value="monthly" data-testid="monthly">
 				<radiogroup.itemfield data-testid="monthly-field" />
 				<radiogroup.itemtrigger data-testid="monthly-trigger">

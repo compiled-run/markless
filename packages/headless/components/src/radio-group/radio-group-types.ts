@@ -17,6 +17,13 @@ export type RadioGroupRootProps = Omit<PropsOf<'fieldset'>, 'onChange'> & {
 	/** Nobody can change any option. */
 	readonly disabled?: boolean;
 	/**
+	 * The name every option in this group submits under, declared once here rather
+	 * than repeated on every option. Omit it and the group submits nothing.
+	 */
+	readonly name?: string;
+	/** A choice is needed before the form submits. */
+	readonly required?: boolean;
+	/**
 	 * Intended to be called with the new value when a person picks a different
 	 * option. Omit it and picking still works; the call site simply does nothing.
 	 */
@@ -24,33 +31,19 @@ export type RadioGroupRootProps = Omit<PropsOf<'fieldset'>, 'onChange'> & {
 };
 
 /**
- * What a form receives from this group, declared once for the whole group rather
- * than repeated on every option. Mount it beside the label; the options pick the
- * name and the requirement up from here wherever they are written.
- */
-export type RadioGroupFieldProps = {
-	/** The name every option in this group submits under. Omit it and none is submitted. */
-	readonly name?: string;
-	/** A choice is needed before the form submits. */
-	readonly required?: boolean;
-};
-
-/**
  * The shared instance every group part reads and writes: the root's seeded
- * fields, what `radiogroup.field` declares for a form, plus what no prop
- * carries - `invalid`, set by a mounted error part; `tabbable`, the option
- * holding the group's single tab stop while nothing is chosen; and the
- * consumer's `onChange`, stored by the root for `choose()`.
+ * fields, plus what no prop carries - `invalid`, set by a mounted error part;
+ * `tabbable`, the option holding the group's single tab stop while nothing is
+ * chosen; and the consumer's `onChange`, stored by the root for `choose()`.
  */
 export type RadioGroupInstanceState = Seeded<
 	RadioGroupRootProps,
-	'value' | 'orientation' | 'loop' | 'disabled'
-> &
-	Seeded<RadioGroupFieldProps, 'name' | 'required'> & {
-		invalid: boolean;
-		tabbable: string;
-		onChange?: RadioGroupRootProps['onChange'];
-	};
+	'value' | 'orientation' | 'loop' | 'disabled' | 'name' | 'required'
+> & {
+	invalid: boolean;
+	tabbable: string;
+	onChange?: RadioGroupRootProps['onChange'];
+};
 
 export type RadioGroupItemProps = PropsOf<'div'> & {
 	/** Submitted when this option is the chosen one. Required: no index stands in for it. */
@@ -83,7 +76,7 @@ export type RadioGroupItemLabelProps = PropsOf<'label'>;
 /**
  * The visually hidden native radio that carries the option into a form and is
  * the element a person actually focuses. It takes no configuration of its own:
- * `name` and `required` come from `radiogroup.field` and `value` from
+ * `name` and `required` come from `radiogroup.root` and `value` from
  * `radiogroup.item`, so one place decides what a form receives.
  */
 export type RadioGroupItemFieldProps = PropsOf<'input'>;
