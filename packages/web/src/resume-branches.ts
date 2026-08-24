@@ -348,6 +348,20 @@ function isLiveComment(value: unknown): value is ResumeDomComment {
 	);
 }
 
+// Composition strips the flip machinery off a branch whose test is a constant
+// or absent prop; the arm it painted keeps its records and still has to wire.
+function isDecidedBranch(branch: {
+	readonly testReads?: ReadonlyArray<unknown>;
+	readonly takenArm?: number;
+	readonly armRecords?: ReadonlyArray<unknown>;
+}): boolean {
+	return (
+		!branch.testReads?.length &&
+		typeof branch.takenArm === 'number' &&
+		Boolean(branch.armRecords?.[branch.takenArm])
+	);
+}
+
 function materializeBranchLocators(
 	root: ResumeDomElement,
 	branches: NonNullable<ResumeViewRecord['branches']>,
@@ -355,7 +369,9 @@ function materializeBranchLocators(
 	const records: RegisteredResumeBranch[] = [],
 		comments = walkComments(root);
 	for (const branch of branches) {
-		if (!branch.symbolId || !branch.testReads?.length) continue;
+		if (!branch.symbolId || !branch.testReads?.length) {
+			if (!isDecidedBranch(branch)) continue;
+		}
 		// Arm-scoped records arrive with LIVE anchors (resolved in the owning
 		// boundary's own arm-branch census by expandBoundaryArmRecords).
 		const live = isLiveComment(branch.startAnchor) && isLiveComment(branch.endAnchor);

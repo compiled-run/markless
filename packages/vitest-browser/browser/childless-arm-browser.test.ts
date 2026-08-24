@@ -47,6 +47,10 @@ async function expectBareArmRefreshes(container: ParentNode) {
 	widget(container, 'self').bump?.click();
 
 	await expect.poll(() => widget(container, 'self').bare?.textContent).toBe('41');
+	// Text inside an element the arm owns must track the same value as a bare arm.
+	await expect
+		.poll(() => widget(container, 'self').value?.querySelector('[data-cb-own]')?.textContent)
+		.toBe('41');
 	// The other widget holds its own shared instance.
 	expect(widget(container, 'written').bare?.textContent).toBe('bare');
 }
