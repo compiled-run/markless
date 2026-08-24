@@ -73,6 +73,11 @@ test('CSR: a served key that comes back is rendered again in both lists', async 
 // (packages/web/src/settle-kernel.ts and packages/web/src/ssr-data/renderer.ts).
 // Growth needs the row's markup, its widget instance, and its handle and event
 // wiring all minted client-side, which is new machinery rather than a repair.
+// Reusing the settle kernel client-side was evaluated and rejected: its input is
+// the whole render-data surface - every chunk and every component definition
+// (SurfaceLike in settle-kernel.ts) - so shipping it would put the entire
+// template corpus in the browser payload. A minted row also has to enter the
+// element census through the splice, the same requirement the `@empty` arm hit.
 // A key that WAS served and comes back is a different case and it works: the
 // detached row is held in rowRootsByKey and re-appended, which is what the
 // `restore` rows above assert. Deterministic, so test.fails.
@@ -196,16 +201,11 @@ test('SSR resume: a computed filter that matches nothing empties both lists', as
 // after them, which is exactly the combobox's filtered list: a `<p>` carrying
 // `matches.length`, then the options, then `@empty`.
 //
-// PENDING CAPABILITY - the reconcile addresses rows as the parent's FIRST
-// items.length child elements (`elementChildren(parent).slice(0, items.length)`
-// in packages/web/src/resume-keyed-repeats.ts, on both the wiring and the row
-// dispatch paths). Nothing in the served DOM says where the rows begin - a
-// repeat renders no anchor comment, measured on this fixture - and the view
-// payload carries no row start offset, so the pairing is shifted by the number
-// of preceding siblings and every key names the wrong element. Closing it means
-// emitting that offset from the compiler, which is a new protocol field rather
-// than a repair. Deterministic, so test.fails.
-test.fails('CSR: rows preceded by a sibling still drop the right row', async () => {
+// The reconcile no longer assumes the rows are the parent's FIRST children:
+// `rowStartOffset` on the keyed-repeat record states how many element siblings
+// stand in front of them, counted by the compiler from the parent chunk's own
+// children, so the pairing survives a static sibling before the rows.
+test('CSR: rows preceded by a sibling still drop the right row', async () => {
 	const screen = await render(SiblingPage);
 	const container = screen.container as HTMLElement;
 	expect(plain(container)).toEqual(['alpha', 'bravo', 'charlie']);
@@ -215,7 +215,7 @@ test.fails('CSR: rows preceded by a sibling still drop the right row', async () 
 	expect(container.querySelector('[data-krg-header]')).not.toBeNull();
 });
 
-test.fails('SSR resume: rows preceded by a sibling still drop the right row', async () => {
+test('SSR resume: rows preceded by a sibling still drop the right row', async () => {
 	const screen = await renderSSR(SiblingPage);
 	const container = screen.container;
 

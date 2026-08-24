@@ -654,29 +654,27 @@ for (const mode of MODES) {
 		await expectTheConsumerFilterRecomputes();
 	});
 
-	// PENDING CAPABILITY - a row that is not its parent's first child. The list
-	// DOES follow its source now: three defects behind this were fixed and are
-	// witnessed in packages/vitest-browser/browser/krg.test.ts (a row dropped off
-	// the END of the collection never left; a widget-rooting repeat was never
-	// wired at all because its row chunk owns no element host; a `computed()`
-	// collection read as empty at wire time, so no served row was ever keyed).
-	// The list now narrows to the right COUNT and picks the wrong rows: this
-	// scenario's `<p data-testid="count">` sits before the options inside the
-	// same parent, and the reconcile addresses rows as the parent's first N child
-	// elements, so every key is shifted by one. Measured here as
-	// ['Grape','Cherry'] where ['Apple','Grape'] is wanted. Closing it needs a row
-	// start offset in the view payload, which is a new protocol field.
-	// Deterministic, so test.fails.
-	test.fails(`${mode}: the consumer's own filter narrows the list as the field is typed in`, async () => {
+	// The rows this scenario's `<p data-testid="count">` sits in front of are
+	// found by their own position now: `rowStartOffset` on the keyed-repeat
+	// record states how many element siblings stand before the rows, so the
+	// pairing is no longer shifted by one.
+	test(`${mode}: the consumer's own filter narrows the list as the field is typed in`, async () => {
 		if (mode === 'CSR') await render(Filtered);
 		else await renderSSR(Filtered);
 		await expectTheConsumerFilterNarrowsTheList();
 	});
 
-	// PENDING CAPABILITY - same row start offset as the row above. Emptying the
-	// list is the one shrink the offset still defeats: the count `<p>` is taken
-	// for a row, so one element is always left where zero are wanted, and the
-	// `@empty` arm never gets to speak. Deterministic, so test.fails.
+	// PENDING CAPABILITY - minting the `@empty` arm. The rows now leave correctly
+	// when the filter matches nothing, so the count is 0; what is missing is the
+	// arm itself. It was never served (the list had four matches at boot), the
+	// view payload carries no markup for it, and nothing in resume can build one.
+	//
+	// Shipping the arm as inert markup was tried and withdrawn: the arm's host
+	// carries a `dom-order` locator (measured on a two-row fixture - the arm's
+	// host h2 holds strategy 'dom-order', index 2), so putting the arm into the
+	// document without splicing the element census would shift the index of every
+	// element after it. Closing this needs the mint to go through the census
+	// splice, alongside the row mint. Deterministic, so test.fails.
 	test.fails(`${mode}: the empty arm is what speaks when nothing matches`, async () => {
 		if (mode === 'CSR') await render(Filtered);
 		else await renderSSR(Filtered);

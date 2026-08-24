@@ -976,6 +976,11 @@ export type RenderDataRepeat = {
 	readonly rowChunkId: string;
 	readonly emptyChunkId?: string;
 	readonly rowElementCount: number;
+	// How many element children of the parent the rows start after. Absent is the
+	// ordinary case - the rows start the parent - so it costs nothing to say.
+	// 'unknown' means the prefix holds a sibling whose element count is not a
+	// compile-time constant, so no offset exists and the repeat is not resumable.
+	readonly rowStartOffset?: number | 'unknown';
 	readonly parentPath?: ReadonlyArray<number>;
 	readonly classWrites?: ReadonlyArray<PublicRenderPlanClassWrite>;
 	readonly eventControls?: ReadonlyArray<PublicRenderPlanEventControl>;

@@ -91,9 +91,7 @@ export function findKeyedRepeatRowEventMatch(input: {
 				input.materializeHost(repeat.parentHostNodeId);
 			if (!parent) continue;
 			const items = readKeyedRepeatCollection(input.graph, repeat);
-			for (const [rowIndex, rowRoot] of elementChildren(parent)
-				.slice(0, items.length)
-				.entries()) {
+			for (const [rowIndex, rowRoot] of repeatRowElements(parent, repeat, items.length)) {
 				const rowKey = repeatItemKey(items[rowIndex], repeat);
 				for (const rowEvent of rowEvents) {
 					if (rowEventHost(rowRoot, rowEvent.hostPath) === element) {
@@ -117,9 +115,7 @@ export function wireKeyedRepeats(input: {
 		if (!parent) continue;
 		const items = readKeyedRepeatCollection(input.graph, repeat),
 			rowRootsByKey = new Map<unknown, ResumeDomElement>();
-		for (const [rowIndex, rowRoot] of elementChildren(parent)
-			.slice(0, items.length)
-			.entries()) {
+		for (const [rowIndex, rowRoot] of repeatRowElements(parent, repeat, items.length)) {
 			const rowKey = repeatItemKey(items[rowIndex], repeat);
 			rowRootsByKey.set(rowKey, rowRoot);
 			for (const rowEvent of repeat.rowEvents) {
@@ -178,8 +174,16 @@ function applyKeyedRepeatRowOrder(
 	for (const rowRoot of rowRootsByKey.values())
 		if (!staying.has(rowRoot) && elementChildren(parent).includes(rowRoot))
 			mutableParent.removeChild?.(rowRoot);
+	// Rows go back into their own span, not onto the end of the parent. Appending
+	// was right only while a repeat owned every child; with a sibling in front of
+	// the rows the anchor is the first element after the row span that this
+	// repeat does not own, and appending past it would put the rows behind it.
+	const anchor = elementChildren(parent)
+		.slice(repeat.rowStartOffset ?? 0)
+		.find((child) => !knownRows.has(child));
 	for (const rowRoot of nextRows) {
-		if (mutableParent.appendChild) mutableParent.appendChild(rowRoot);
+		if (anchor) mutableParent.insertBefore?.(rowRoot, anchor);
+		else if (mutableParent.appendChild) mutableParent.appendChild(rowRoot);
 		else mutableParent.insertBefore?.(rowRoot, null);
 	}
 }
@@ -226,6 +230,22 @@ function readPath(value: unknown, path: ReadonlyArray<string>): unknown {
 		cursor = cursor[key] as Record<string, unknown> | null | undefined;
 	}
 	return cursor;
+}
+/**
+ * The parent's child elements that are this repeat's rows, paired with their row
+ * index. Rows sit at `[rowStartOffset, rowStartOffset + count)`: the offset is
+ * the compiler's count of element siblings in front of them, absent when the
+ * rows already start the parent.
+ */
+function repeatRowElements(
+	parent: ResumeDomElement,
+	repeat: ResumeKeyedRepeatRecord,
+	count: number,
+): ReadonlyArray<readonly [number, ResumeDomElement]> {
+	const offset = repeat.rowStartOffset ?? 0;
+	return elementChildren(parent)
+		.slice(offset, offset + count)
+		.map((rowRoot, rowIndex) => [rowIndex, rowRoot] as const);
 }
 function elementChildren(element: ResumeDomElement): ResumeDomElement[] {
 	return Array.from(element.childNodes ?? []).filter(

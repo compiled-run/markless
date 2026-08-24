@@ -183,6 +183,52 @@ function branchRecord(
 	};
 }
 
+/**
+ * How many element children of the parent stand before this repeat's rows.
+ *
+ * The resume reconcile addresses rows by position among the parent's child
+ * ELEMENTS, so a static sibling in front of them shifts every key. Nothing in
+ * the served DOM says where the rows begin - a repeat leaves no anchor comment -
+ * so the count is stated here, from the one place that knows the parent's
+ * children: the chunk that emitted them.
+ *
+ * Every sibling is classified, never guessed. An element is a host record at
+ * that exact child index (collect-elements mints a host id for every host
+ * element, so an element without one cannot exist). Static text and a `{text}`
+ * slot occupy an index and produce no element. Anything whose element count is
+ * decided at render time - a branch arm, another repeat, an async boundary, a
+ * child component - answers 'unknown', and the caller drops the repeat rather
+ * than pair rows against a position it cannot defend.
+ */
+function repeatRowStartOffset(
+	chunks: SemanticGraphArtifact['markup']['chunks'],
+	repeatId: string,
+): number | 'unknown' {
+	const owner = chunks.find((chunk) =>
+		chunk.slots.some((slot) => slot.kind === 'repeat' && slot.repeatId === repeatId),
+	);
+	const anchor = owner?.slots.find((slot) => slot.kind === 'repeat' && slot.repeatId === repeatId);
+	if (!owner || anchor?.coordinate.kind !== 'comment-anchor') return 'unknown';
+	const path = anchor.coordinate.path;
+	const parentPath = path.slice(0, -1);
+	const samePath = (candidate: ReadonlyArray<number>, index: number) =>
+		candidate.length === parentPath.length + 1 &&
+		candidate[candidate.length - 1] === index &&
+		parentPath.every((step, depth) => candidate[depth] === step);
+	let offset = 0;
+	for (let index = 0; index < (path[path.length - 1] ?? 0); index++) {
+		if (owner.hosts.some((host) => samePath(host.coordinate.path, index))) {
+			offset++;
+			continue;
+		}
+		const sibling = owner.slots.find(
+			(slot) => slot.coordinate.kind === 'comment-anchor' && samePath(slot.coordinate.path, index),
+		);
+		if (sibling && sibling.kind !== 'text') return 'unknown';
+	}
+	return offset;
+}
+
 function repeatRecord(
 	repeat: SemanticGraphArtifact['keyedRepeats'][number],
 	slots: ReadonlyArray<SemanticMarkupSlot>,
@@ -234,6 +280,7 @@ function repeatRecord(
 				: [],
 		);
 	});
+	const rowStartOffset = repeatRowStartOffset(chunks, repeat.id);
 	const payloadRepeat = payloadArena?.view.keyedRepeats.find((item) => item.id === repeat.id);
 	const rowElementHandles = payloadRepeat?.rowElementHandles?.flatMap((handle) => {
 		const hostPath = rowHostPaths.get(handle.hostNodeId);
@@ -275,6 +322,7 @@ function repeatRecord(
 		rowChunkId,
 		...(slot?.emptyTemplateId ? { emptyChunkId: slot.emptyTemplateId } : {}),
 		rowElementCount: chunks.find((chunk) => chunk.id === rowChunkId)?.hosts.length ?? 0,
+		...(rowStartOffset === 0 ? {} : { rowStartOffset }),
 		...(parent ? { parentPath: relativePath(parent.coordinate.path) } : {}),
 		...(classWrites.length > 0 ? { classWrites } : {}),
 		...(eventControls.length > 0 ? { eventControls } : {}),
