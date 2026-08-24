@@ -903,10 +903,11 @@ export function BoxRoot() @{
 
 test('a shared seed naming only a prop compiles, and carries no declaration', async () => {
 	// The other side of the rule, and a sharper reading of it than the diagnostic
-	// text gives: a seed value's every word has to be a prop local or one of the
-	// six keywords, so even a string literal is refused (`'plain'` matches the
-	// rule's identifier scan). A prop read is what the emitter is actually handed,
-	// and it names nothing to carry.
+	// text gives: every *name* a seed value uses has to be a prop local or one of
+	// the six keywords. String and template text is not a name and is blanked
+	// before the scan, so `'plain'` seeds fine; `${}` code is still a name and is
+	// still refused (`state-lowering-seed-scan.test.ts` pins both edges). A prop
+	// read is what the emitter is actually handed, and it names nothing to carry.
 	const result = await compileTsrxModule({
 		filename: '/workspace/app/src/SharedSeedProp.tsrx',
 		source: `
