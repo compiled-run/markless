@@ -11,6 +11,7 @@ import {
 	templateAsValueDiagnostic,
 } from './diagnostics.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
+import { getFrameworkApiForCall } from './imports.ts';
 import type { SemanticView } from 'yuku-tsrx';
 import type { DeferredComputedWrite, WalkState } from './types.ts';
 
@@ -130,6 +131,81 @@ export function collectDelete(node: AnyNode, state: WalkState): void {
 		operation: 'delete',
 		optional: target.optional === true || isChainExpression(originalTarget),
 	});
+}
+
+/**
+ * The writes a function nested inside a write's VALUE performs when it runs.
+ *
+ * `s.timer = window.setInterval(() => { s.count = s.count + 1; }, 50)` is two
+ * writes, not one: the handle now, and the counter on every tick. The generic
+ * walk stops at an assignment - it takes the write and hands the value to the
+ * read collector - so the tick's write was recorded nowhere. Emission then
+ * matched the target's authored text against the reads that value collector HAD
+ * recorded and emitted `context.graph.read(...) = ...`, which parses and throws
+ * `Invalid left-hand side in assignment` on every tick.
+ *
+ * Only writes are collected. Reads in the value are already recorded by
+ * `collectExpressionReads`, which descends into function bodies, so collecting
+ * them here would double every one.
+ *
+ * The descent mirrors the generic walk's write rules rather than reusing it:
+ * markup, elements and component sites inside a nested function body are not
+ * collected today, and turning that on is a separate decision. A write this
+ * walk still misses is not silent - the emission band leaves its target
+ * authored, and the unresolved-reference guard fails the compile naming it.
+ */
+export function collectNestedFunctionWrites(
+	value: AnyNode | undefined,
+	state: WalkState,
+): void {
+	if (!value) return;
+
+	if (isFunctionLikeNode(value)) {
+		collectWritesIn(value.body as AnyNode | undefined, state);
+		return;
+	}
+
+	// A derive's body is the one place a write is banned rather than lowered, and
+	// the ban is decided by the generic walk's creation site, which this descent
+	// does not maintain. Leaving it alone keeps the ban's owner single.
+	if (getFrameworkApiForCall(value, state.frameworkApiImports) === 'computed') return;
+
+	for (const child of childNodes(value)) collectNestedFunctionWrites(child, state);
+}
+
+/** The generic walk's write cases, applied inside a nested function body. */
+function collectWritesIn(node: AnyNode | undefined, state: WalkState): void {
+	if (!node) return;
+
+	if (node.type === 'AssignmentExpression') {
+		collectAssignment(node, state);
+		collectNestedFunctionWrites(node.right as AnyNode | undefined, state);
+		return;
+	}
+
+	if (node.type === 'UpdateExpression') {
+		collectUpdate(node, state);
+		return;
+	}
+
+	if (node.type === 'UnaryExpression' && node.operator === 'delete') {
+		collectDelete(node, state);
+		return;
+	}
+
+	if (getFrameworkApiForCall(node, state.frameworkApiImports) === 'computed') return;
+
+	if (node.type === 'CallExpression') collectCollectionCall(node, state);
+
+	for (const child of childNodes(node)) collectWritesIn(child, state);
+}
+
+function isFunctionLikeNode(node: AnyNode): boolean {
+	return (
+		node.type === 'ArrowFunctionExpression' ||
+		node.type === 'FunctionExpression' ||
+		node.type === 'FunctionDeclaration'
+	);
 }
 
 /**
