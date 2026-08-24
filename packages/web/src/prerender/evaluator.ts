@@ -322,6 +322,42 @@ function asPropsRecord(value: unknown): Readonly<Record<string, unknown>> {
 		: {};
 }
 
+// Every payload node one same-module component claims: the ids it declared, and
+// the state positions the producer partitioned to it when several components of
+// one module spell the same id.
+function marklessClaimedGraphNodes(definition: PrerenderDataDefinition): ReadonlySet<string> {
+	const claimed = new Set<string>(definition.stateGraphNodeIds ?? []);
+	for (const index of definition.stateCellIndexes ?? []) {
+		const cell = definition.state.cells[index];
+		if (cell) claimed.add(cell.graphNodeId);
+	}
+	for (const index of definition.stateComputedIndexes ?? []) {
+		const computed = definition.state.computed[index];
+		if (computed) claimed.add(computed.graphNodeId);
+	}
+	if (definition.propCellId) claimed.add(definition.propCellId);
+	return claimed;
+}
+
+// Whether this component is the one that should run the derive behind a
+// graph node's initial value. Deliberately conservative: it answers no only
+// when another same-module component positively claims the node and this one
+// does not, so an unpartitioned surface keeps evaluating exactly what it
+// evaluates today rather than silently dropping a derive.
+function marklessOwnsDerivedNode(
+	surface: PrerenderDataSurface,
+	componentName: string,
+	graphNodeId: string,
+): boolean {
+	const definition = surface.components[componentName];
+	if (definition && marklessClaimedGraphNodes(definition).has(graphNodeId)) return true;
+	for (const [name, candidate] of Object.entries(surface.components)) {
+		if (name === componentName) continue;
+		if (marklessClaimedGraphNodes(candidate).has(graphNodeId)) return false;
+	}
+	return true;
+}
+
 async function evaluatePrerenderDataComponent(input: {
 	readonly surface: PrerenderDataSurface;
 	readonly componentName: string;
@@ -396,6 +432,14 @@ async function evaluatePrerenderDataComponent(input: {
 	};
 	for (const initial of definition.initialValues ?? []) {
 		if (initial.value.kind !== 'symbol-function') continue;
+		// A constant initial value is seed data every same-module component may
+		// read, so the producer hands the whole list to each of them. Running a
+		// derive symbol is not seeding: it belongs to the one component that
+		// declared it, and only that component's evaluation carries the edge
+		// binding the symbol was compiled against. A page that runs its child's
+		// derive reaches it unbound and dies on the capture context it never got.
+		if (!marklessOwnsDerivedNode(input.surface, input.componentName, initial.graphNodeId))
+			continue;
 		const symbolId = initial.value.symbolId;
 		// This component's reads are already the row's, so the loader answers row-free.
 		const loaded = await input.loadSymbol(
