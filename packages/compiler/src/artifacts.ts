@@ -275,22 +275,23 @@ export type ModuleGraphInterfaceSpreadHost = {
 };
 
 /**
- * How many child ELEMENTS one position renders — a whole chunk's top level, or
- * a single sibling slot. `'unknown'` is the honest answer whenever render time
- * decides the number: a repeat's rows, an async boundary's arm, a dynamic host
- * that may be omitted, a branch whose arms disagree, or a child component whose
- * markup this module never saw.
+ * How many ELEMENTS one position renders in DOCUMENT order — a host counts
+ * itself plus its whole subtree, so the number is what a preorder element walk
+ * (the census) would meet, not a child index. `'unknown'` is the honest answer
+ * whenever render time decides the number: a repeat's rows, an async boundary's
+ * arm, a dynamic host that may be omitted, a branch whose arms disagree, or a
+ * child component whose markup this module never saw.
  */
 export type ModuleGraphInterfaceElementCount = number | 'unknown';
 
 /**
- * Where a component's `{children}` hole sits among the elements beside it, so
- * an importer can say — while compiling, never at render time — which child
- * position the children it passes will occupy.
+ * Where a component's `{children}` hole sits among the elements around it, in
+ * DOCUMENT-order element counts (each host counts its whole subtree), so an
+ * importer can say — while compiling, never at render time — how many elements
+ * a preorder walk meets before and after the children it passes.
  *
- * The counts are of ELEMENTS only: static text and a `{text}` slot occupy a
- * child index and render no element, so they do not shift the projected
- * children. Anything whose element count render time decides answers
+ * The counts are of ELEMENTS only: static text and a `{text}` slot render no
+ * element, so they do not shift the projected children. Anything whose element count render time decides answers
  * `'unknown'` and absorbs the whole side.
  *
  * `projectionInsideConstruct` says the hole is not in the component's root
