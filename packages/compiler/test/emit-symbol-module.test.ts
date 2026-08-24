@@ -48,6 +48,7 @@ import {
 	SYMBOL_MODULE_AST_KINDS,
 	SYMBOL_MODULE_UNMIGRATED_KINDS,
 	SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE,
+	unresolvedModuleDeclarationDiagnostics,
 	type SymbolModuleEmissionInput,
 	type ValueExpressionEmission,
 } from '../src/passes/symbol-modules.ts';
@@ -757,27 +758,29 @@ export function App() @{
 });
 
 // ---------------------------------------------------------------------------
-// The guard behind the carry.
+// Module-scope declarations an async computed names travel with its module.
 //
-// Fixing the derive emitter fixes one emitter. The reason the gap shipped at all
-// is that nothing checked: `unresolvedGraphReferences` computed the free names
-// of every emitted module and then dropped the ones a module-scope declaration
-// binds, so a forgotten carry produced no diagnostic. It is reported now, which
-// turns "silent at build time, ReferenceError in the browser" into a build
-// error — and immediately named a second emitter with the same gap.
+// The runner module is fetched and evaluated on its own exactly like the derive
+// and behavior modules above, and the authored async function is spliced into it
+// whole — so a module-scope `const` it reads has to be copied in. This is the
+// emitter the widened guard named after the behavior carry landed.
 // ---------------------------------------------------------------------------
 
-test('an emitted module that leaves a module-scope declaration free is reported', async () => {
-	// Repointed from the behavior band, which now carries. The async-computed
-	// runner is the next live example of the shape the guard exists to catch:
-	// `AsyncComputedRunnerEmissionInput` has no `moduleDeclarations` field, so
-	// there is no channel for the declarations to arrive through. Checked by
-	// reading the emission-input types in `symbol-modules.ts`; the two other
-	// emitters with no such field today are `SharedSeedEmissionInput` and the
-	// dom-binding input. If this carry lands later, repoint again — do not delete.
-	const result = await compileTsrxModule({
-		filename: '/workspace/app/src/AsyncRunner.tsrx',
-		source: `
+/** The emitted async-runner modules for a compiled source, with the diagnostics. */
+async function asyncRunnerModules(filename: string, source: string) {
+	const result = await compileTsrxModule({ filename, source, symbols: [] });
+	return {
+		modules: result.symbolModules.modules.filter(
+			(module) => module.kind === 'async-computed-runner',
+		),
+		diagnostics: result.symbolModules.diagnostics,
+	};
+}
+
+test('a module-scope const an async computed reads is carried into the runner module', async () => {
+	const { modules, diagnostics } = await asyncRunnerModules(
+		'/workspace/app/src/AsyncRunnerConst.tsrx',
+		`
 import { computed, state } from '@markless/core';
 
 const ENDPOINT = 'ready';
@@ -789,26 +792,221 @@ export function App() @{
 	<main><span>{data}</span></main>
 }
 `,
+	);
+
+	expect(modules).toHaveLength(1);
+	const emitted = modules[0]!.source;
+	expect(emitted).toContain("const ENDPOINT = 'ready';");
+	// The read itself survives as a reference to the carried binding.
+	expect(emitted).toContain('ENDPOINT');
+	// And the carry is not a compile error of its own.
+	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+});
+
+test('an async computed that names no module-scope declaration carries none', async () => {
+	const { modules } = await asyncRunnerModules(
+		'/workspace/app/src/AsyncRunnerNoConst.tsrx',
+		`
+import { computed, state } from '@markless/core';
+
+const UNUSED = 'ready';
+
+export function App() @{
+	let id = state(1);
+	const data = computed(async () => 'fixed' + id);
+
+	<main><span>{data}</span></main>
+}
+`,
+	);
+
+	expect(modules).toHaveLength(1);
+	expect(modules[0]!.source).not.toContain('UNUSED');
+});
+
+test('carried runner declarations keep authored order, so a class is bound before it is used', async () => {
+	const { modules } = await asyncRunnerModules(
+		'/workspace/app/src/AsyncRunnerOrder.tsrx',
+		`
+import { computed, state } from '@markless/core';
+
+class Endpoint {
+	constructor(public host: string) {}
+	url(id: number) { return this.host + id; }
+}
+const endpoint = new Endpoint('ready');
+
+export function App() @{
+	let id = state(1);
+	const data = computed(async () => endpoint.url(id));
+
+	<main><span>{data}</span></main>
+}
+`,
+	);
+
+	expect(modules).toHaveLength(1);
+	const emitted = modules[0]!.source;
+	// Reachability finds `const endpoint = new Endpoint('ready')` first; emitting
+	// that order runs the constructor inside the class binding's dead zone.
+	expect(emitted).toContain('class Endpoint');
+	expect(emitted.indexOf('class Endpoint')).toBeLessThan(emitted.indexOf('new Endpoint('));
+});
+
+// ---------------------------------------------------------------------------
+// Why the shared-seed emitter gets no carry.
+//
+// It is the one remaining emitter that splices authored text and has no
+// `moduleDeclarations` channel, so the obvious reading is that it has the same
+// gap the derive, behavior, and runner bands had. It does not, and this is the
+// evidence: `isUnloweredSharedSeed` in `state-lowering.ts` allows a
+// component-body seed to name only that component's own prop locals and six
+// literal keywords, so a seed expression that would need a carry fails the build
+// two passes before the emitter runs. Adding a carry there would be code no
+// authored file can reach.
+//
+// This test is what makes that claim falsifiable: relax the seed rule and it
+// goes red, which is the signal to give the emitter a channel after all.
+// ---------------------------------------------------------------------------
+
+test('a shared seed naming a module-scope const is refused before it reaches the emitter', async () => {
+	const result = await compileTsrxModule({
+		filename: '/workspace/app/src/SharedSeedConst.tsrx',
+		source: `
+import { shared, state } from '@markless/core';
+
+const TAG = 'box';
+
+export const boxState = shared(() => {
+	const box = state({ tag: '' });
+
+	return { ...box };
+}, { scope: 'widget' });
+
+export function BoxRoot() @{
+	const box = boxState();
+	box.tag = TAG;
+
+	<div ui-tag={box.tag} />
+}
+`,
 		symbols: [],
 	});
 
-	const runner = result.symbolModules.modules.find(
-		(module) => module.kind === 'async-computed-runner',
+	const refused = result.stateLowering.diagnostics.filter(
+		(diagnostic) => diagnostic.code === 'MARKLESS_SHARED_SEED_UNSUPPORTED',
 	);
-	// The premise: the name really is free in the emitted module.
-	expect(runner?.source).toContain('ENDPOINT');
-	expect(runner?.source).not.toContain("const ENDPOINT = 'ready'");
+	expect(refused).toHaveLength(1);
+	expect(refused[0]!.severity).toBe('error');
+	expect(refused[0]!.message).toContain('TAG');
+});
 
-	const reported = result.symbolModules.diagnostics.filter(
-		(diagnostic) => diagnostic.code === SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE,
+test('a shared seed naming only a prop compiles, and carries no declaration', async () => {
+	// The other side of the rule, and a sharper reading of it than the diagnostic
+	// text gives: a seed value's every word has to be a prop local or one of the
+	// six keywords, so even a string literal is refused (`'plain'` matches the
+	// rule's identifier scan). A prop read is what the emitter is actually handed,
+	// and it names nothing to carry.
+	const result = await compileTsrxModule({
+		filename: '/workspace/app/src/SharedSeedProp.tsrx',
+		source: `
+import { shared, state } from '@markless/core';
+
+const UNUSED = 'box';
+
+export const boxState = shared(() => {
+	const box = state({ tag: '' });
+
+	return { ...box };
+}, { scope: 'widget' });
+
+export function BoxRoot({ tag }) @{
+	const box = boxState();
+	box.tag = tag;
+
+	<div ui-tag={box.tag} />
+}
+`,
+		symbols: [],
+	});
+
+	expect(
+		result.stateLowering.diagnostics.filter(
+			(diagnostic) => diagnostic.code === 'MARKLESS_SHARED_SEED_UNSUPPORTED',
+		),
+	).toEqual([]);
+	const seeds = result.symbolModules.modules.filter((module) => module.kind === 'shared-seed');
+	expect(seeds).toHaveLength(1);
+	expect(seeds[0]!.source).not.toContain('UNUSED');
+});
+
+// ---------------------------------------------------------------------------
+// The guard behind the carry.
+//
+// Fixing the derive emitter fixes one emitter. The reason the gap shipped at all
+// is that nothing checked: `unresolvedGraphReferences` computed the free names
+// of every emitted module and then dropped the ones a module-scope declaration
+// binds, so a forgotten carry produced no diagnostic. It is reported now, which
+// turns "silent at build time, ReferenceError in the browser" into a build
+// error — and immediately named a second emitter with the same gap.
+// ---------------------------------------------------------------------------
+
+test('an emitted module that leaves a module-scope declaration free is reported', () => {
+	// This test was pointed at whichever emitter still lacked a carry channel:
+	// the behavior band, then the async-computed runner. Both carry now, and so
+	// do the shared-seed band and every other emitter that splices authored text
+	// — so no authored file reaches this branch of the filter any more, and there
+	// is no compiled fixture left to point at. It is pinned by construction
+	// instead, through `unresolvedModuleDeclarationDiagnostics`, which runs the
+	// same private filter and the same diagnostic builder production runs.
+	//
+	// Checked by reading every `*EmissionInput` type in `symbol-modules.ts`
+	// against the ten `PlannedSymbol` kinds (qualified, not a guessless receipt):
+	// the three emitters with no channel — dom-update, branch-update, and
+	// async-boundary-update — assemble their whole module from render data, ids,
+	// and JSON, so they splice no authored identifier and have nothing to carry.
+	// If a future emitter does splice authored text, this filter is what catches
+	// a missing carry, and that is what this pins.
+	const reported = unresolvedModuleDeclarationDiagnostics(
+		[
+			{
+				symbolId: 'sym:free-declaration',
+				kind: 'async-computed-runner',
+				exportName: 'sym_free_declaration',
+				// The premise: the name really is free in the emitted module.
+				source: 'export function sym_free_declaration(context) {\n\treturn ENDPOINT;\n}\n',
+			},
+		],
+		new Set(['ENDPOINT']),
 	);
+
 	expect(reported).toHaveLength(1);
+	expect(reported[0]!.code).toBe(SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE);
 	expect(reported[0]!.severity).toBe('error');
 	expect(reported[0]!.title).toContain('ENDPOINT');
 	// The message has to say why the server stayed green, or the reader will
 	// take a passing SSR render as evidence the module is fine.
 	expect(reported[0]!.message).toContain('ReferenceError');
 	expect(reported[0]!.message).toContain('server render');
+});
+
+test('a module that binds the declaration it names is not reported', () => {
+	// The other half of the pin: the filter has to go quiet on a carried module,
+	// or every correctly carried emitter would fail the build.
+	expect(
+		unresolvedModuleDeclarationDiagnostics(
+			[
+				{
+					symbolId: 'sym:carried-declaration',
+					kind: 'async-computed-runner',
+					exportName: 'sym_carried_declaration',
+					source:
+						"const ENDPOINT = 'ready';\nexport function sym_carried_declaration(context) {\n\treturn ENDPOINT;\n}\n",
+				},
+			],
+			new Set(['ENDPOINT']),
+		),
+	).toEqual([]);
 });
 
 test('a correctly carried derive module produces no unresolved-reference diagnostic', async () => {

@@ -1952,6 +1952,20 @@ export function emitStateInitializerModuleNodes(
 // not assign and is overwritten by every field it did.
 // ---------------------------------------------------------------------------
 
+/**
+ * No module-scope declaration carry, and none is possible.
+ *
+ * Every other emitter that splices authored text takes `moduleDeclarations` so a
+ * same-file `const`/`class` the text names travels into the module it is fetched
+ * as. This one cannot need it: `isUnloweredSharedSeed` in `state-lowering.ts`
+ * refuses any component-body seed whose value names anything but this
+ * component's own prop locals and the six literal keywords (`true`, `false`,
+ * `null`, `undefined`, `NaN`, `Infinity`). A module-scope declaration is never
+ * among them, so a seed expression that would need a carry fails the build two
+ * passes before this emitter sees it. `unresolvedGraphReferences` still covers
+ * the emitted module, so relaxing that rule surfaces here as a build error
+ * rather than as a browser ReferenceError.
+ */
 export type SharedSeedEmissionInput = {
 	readonly symbol: Extract<PlannedSymbol, { readonly kind: 'shared-seed' }>;
 	readonly propReads: ReadonlyArray<StateInitializerPropRead>;
@@ -2906,6 +2920,25 @@ export type AsyncComputedRunnerEmissionInput = {
 	readonly omitAuthoredSource: boolean;
 	/** The authored file the runner was extracted from; names the map. */
 	readonly sourceFileName: string;
+	/**
+	 * The authored file's module-scope declarations, as `emitSymbolModules`
+	 * projects them.
+	 *
+	 * A runner module is fetched and evaluated on its own, so a same-file
+	 * module-scope `const`/`function`/`class` the authored runner names is not in
+	 * scope there unless this emitter carries it across. Omitted means none, which
+	 * is what a caller holding only one symbol's source can say.
+	 */
+	readonly moduleDeclarations?: readonly string[];
+	/**
+	 * The authored file's imports, as the semantic graph collected them.
+	 *
+	 * Only consulted for a carried declaration's own free names: the symbol's own
+	 * `moduleImports` were selected against the runner, so an import only the
+	 * carried declaration needs is not among them. A module that carries no
+	 * declaration emits exactly the imports it did before.
+	 */
+	readonly moduleImports?: readonly SemanticModuleImport[];
 };
 
 /**
@@ -2926,8 +2959,18 @@ export function buildAsyncComputedRunnerEmission(
 		symbolId: input.symbol.id,
 	};
 
-	const projection = asyncRunnerProjection(input.symbol.source, input.sourceFileName);
-	const imports = dedupeModuleImports(input.symbol.moduleImports ?? []);
+	const carried = asyncRunnerModuleScopeCarry(input);
+	const projection = carried.projection;
+	// A carried declaration can name an import the runner never did — a
+	// module-scope class extending an imported base needs that import here.
+	const imports = dedupeModuleImports([
+		...(input.symbol.moduleImports ?? []),
+		...(carried.declarationStatements.length === 0
+			? []
+			: (input.moduleImports ?? []).filter((moduleImport) =>
+					carried.declarationReferences.has(moduleImport.localName),
+				)),
+	]);
 
 	const body: EmissionNode[] = [
 		...imports.map((moduleImport) =>
@@ -2938,6 +2981,7 @@ export function buildAsyncComputedRunnerEmission(
 				source: moduleImport.source,
 			}),
 		),
+		...carried.declarationStatements,
 		...(input.omitAuthoredSource
 			? []
 			: [
@@ -3072,39 +3116,108 @@ function asyncRunnerDependencyBinding(dependency: SemanticGraphDependency): {
 type AsyncRunnerProjection = {
 	/** The one text every printed node carries an offset into. */
 	readonly source: string;
+	readonly declarationStatements: ReadonlyArray<EmissionNode>;
 	readonly runnerExpression: EmissionNode;
 };
 
 /**
- * Parse the runner expression, once.
+ * Parse the selected module-scope declarations and the runner expression
+ * together, once.
  *
- * Only the runner carries authored spans — the imports, the `read` binding, the
- * dependency reads, and the call are all synthesized — so this is the whole of
- * the source the map points into. The runner is parenthesized so it parses as an
- * expression statement whatever its authored form; `preserveParens: false` drops
- * the wrapper and the printer re-derives whatever parentheses the expression
+ * The runner and the declarations are the only authored spans — the imports, the
+ * `read` binding, the dependency reads, and the call are all synthesized — so
+ * this is the whole of the source the map points into. One parse matters for
+ * that map: a node's `start`/`end` index the text it was parsed from, so
+ * declarations parsed separately would carry offsets into a string the print
+ * site never names. The runner is parenthesized so it parses as an expression
+ * statement whatever its authored form; `preserveParens: false` drops the
+ * wrapper and the printer re-derives whatever parentheses the expression
  * actually needs in initializer position.
+ *
+ * A declaration list that does not reparse into exactly one statement each is
+ * refused rather than emitted; with no declarations the refusal is the original
+ * "runner source must be a single expression" check, unchanged.
  */
-function asyncRunnerProjection(runnerSource: string, filename: string): AsyncRunnerProjection {
-	const source = `(${runnerSource});`;
-	const { program, errors } = parseEmissionSource(source, filename, 'ts');
-	if (errors.length > 0) {
+function asyncRunnerProjection(
+	runnerSource: string,
+	filename: string,
+	declarations: readonly string[] = [],
+): AsyncRunnerProjection {
+	const projection = declarationCarryProjection(
+		declarations,
+		runnerSource,
+		filename,
+		'async-computed-runner',
+	);
+	if (projection.declarationStatements.length !== declarations.length) {
 		throw new Error(
-			`symbol-modules: async-computed-runner emission could not parse its projected source (${errors
-				.map((error) => error.message)
-				.join('; ')})`,
+			'symbol-modules: async-computed-runner emission expected its projected source to be its declarations and a single expression',
 		);
 	}
 
-	const statements = asNodes((program as unknown as AnyNode).body);
-	const last = statements.at(-1);
-	if (!last || last.type !== 'ExpressionStatement' || !isNode(last.expression)) {
-		throw new Error(
-			'symbol-modules: async-computed-runner emission expected its projected source to be an expression statement',
-		);
+	return {
+		source: projection.source,
+		declarationStatements: projection.declarationStatements,
+		runnerExpression: projection.expression,
+	};
+}
+
+/**
+ * The runner expression, the module-scope declarations it needs, and the free
+ * names those declarations bring with them.
+ *
+ * Same two-pass shape as `behaviorModuleScopeCarry`. The runner is spliced whole
+ * rather than lowered — its dependencies become `const` bindings *around* it, so
+ * a name the dependency band already bound is shadowed inside the exported
+ * function and a declaration carried under the same name changes nothing — so
+ * the first pass is just the runner's own parse and the names it mentions are
+ * the seed. Only a non-empty answer costs a second parse, and that one parses
+ * declarations and runner as ONE text so every node's `start`/`end` indexes the
+ * string the print site names.
+ */
+function asyncRunnerModuleScopeCarry(input: AsyncComputedRunnerEmissionInput): {
+	readonly projection: AsyncRunnerProjection;
+	readonly declarationStatements: ReadonlyArray<EmissionNode>;
+	readonly declarationReferences: ReadonlySet<string>;
+} {
+	const projection = asyncRunnerProjection(input.symbol.source, input.sourceFileName);
+	const empty = {
+		projection,
+		declarationStatements: [] as ReadonlyArray<EmissionNode>,
+		declarationReferences: new Set<string>() as ReadonlySet<string>,
+	};
+
+	const declarations = input.moduleDeclarations ?? [];
+	if (declarations.length === 0) return empty;
+
+	const reached = new Set(
+		referencedModuleDeclarations(
+			deriveReferencedIdentifierNames(projection.runnerExpression),
+			declarations,
+			input.sourceFileName,
+		),
+	);
+	if (reached.size === 0) return empty;
+	// Authored order, not reachability order: reachability finds `const client =
+	// new Client()` before it finds `class Client`, and emitting them that way
+	// runs the constructor while the class binding is still in its temporal dead
+	// zone.
+	const selected = declarations.filter((declaration) => reached.has(declaration));
+
+	let carried: AsyncRunnerProjection;
+	try {
+		carried = asyncRunnerProjection(input.symbol.source, input.sourceFileName, selected);
+	} catch {
+		// A text that will not reparse into the same shape leaves the module exactly
+		// as it was before this carry existed, rather than emitting a half-bound one.
+		return empty;
 	}
 
-	return { source, runnerExpression: last.expression as unknown as EmissionNode };
+	return {
+		projection: carried,
+		declarationStatements: carried.declarationStatements,
+		declarationReferences: deriveReferencedIdentifierNames(carried.declarationStatements),
+	};
 }
 
 function symbolExportName(symbolId: string): string {
@@ -6154,6 +6267,8 @@ export function buildSymbolModuleEmission(
 			captureSlots: input.captureSlots,
 			omitAuthoredSource: input.omitAuthoredSource,
 			sourceFileName: input.sourceFileName,
+			moduleDeclarations: input.moduleDeclarations,
+			moduleImports: input.moduleImports,
 		});
 	}
 
@@ -6192,6 +6307,42 @@ export function emitSymbolModuleNodes(input: SymbolModuleEmissionInput): Emitted
 // deletion mechanical: these two functions go when the cluster goes, and no
 // existing declaration was edited to add them.
 // ---------------------------------------------------------------------------
+
+/**
+ * The widened module-declaration filter, run over emitted modules a caller
+ * supplies directly.
+ *
+ * Every emitter that can splice authored text now carries the module-scope
+ * declarations that text names, so no authored file reaches the filter's
+ * module-declaration branch any more — which is the intent, and which also means
+ * an end-to-end fixture can no longer pin it. This seam keeps it pinned by
+ * handing the real filter and the real diagnostic builder one emitted module
+ * that leaves a declared name free. It runs production's own code: the pass
+ * still calls the private `unresolvedGraphReferences` with its full argument
+ * set, and nothing here relaxes what that call reports.
+ *
+ * Four emitters have no carry channel, and none of them can need one. The
+ * dom-update, branch-update, and async-boundary-update bands synthesize their
+ * whole module from render data, ids, and JSON, so they splice no authored
+ * identifier at all. The shared-seed band does splice authored text, but
+ * `isUnloweredSharedSeed` in `state-lowering.ts` refuses any seed value naming
+ * anything but this component's prop locals and six literal keywords, so a
+ * module-scope declaration cannot reach it. The filter still covers all four, so
+ * relaxing either rule surfaces as a build error rather than a browser crash.
+ */
+export function unresolvedModuleDeclarationDiagnostics(
+	modules: ReadonlyArray<GeneratedSymbolModule>,
+	moduleDeclaredNames: ReadonlySet<string>,
+): ReadonlyArray<SymbolModulesDiagnostic> {
+	return unresolvedGraphReferences(
+		modules,
+		[],
+		new Set(),
+		new Set(),
+		new Map(),
+		moduleDeclaredNames,
+	).map(unresolvedGraphReferenceDiagnostic);
+}
 
 /** The string path's `supportedValueSource`, for parity measurement only. */
 /** The string path's `eventWriteValueSource`, for parity measurement only. */

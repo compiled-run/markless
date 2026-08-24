@@ -24,6 +24,20 @@ function expectFirstRender(container: ParentNode) {
 	expect(text(container, '[data-labelled]')).toBe('total:3');
 }
 
+/**
+ * The async computed's own lane.
+ *
+ * Its runner is a third module, fetched and evaluated on its own, and it names
+ * `ENDPOINT` plus `scale` — which drags `class Scale` and `RATE` along. The
+ * assertion is deliberately *after* resolution: before the runner carry the
+ * module threw `ReferenceError: ENDPOINT is not defined` the moment the promise
+ * was started, so the boundary never left its pending arm.
+ */
+async function expectResolvedFetch(container: ParentNode, expected: string) {
+	await expect.poll(() => text(container, '[data-fetched]')).toBe(expected);
+	expect(text(container, '[data-failed]')).toBeUndefined();
+}
+
 async function expectReDerive(container: ParentNode) {
 	container.querySelector<HTMLButtonElement>('[data-bump]')?.click();
 
@@ -59,4 +73,30 @@ test('SSR resume: a state change re-derives a computed that reads a module-scope
 	const screen = await renderSSR(App);
 	expectFirstRender(screen.container);
 	await expectReDerive(screen.container);
+});
+
+test('CSR: an async computed reading a module-scope const lands after it resolves', async () => {
+	const screen = await render(App);
+	await expectResolvedFetch(screen.container as HTMLElement, 'api/3');
+});
+
+test('CSR: a state change re-runs an async computed that reads a module-scope const', async () => {
+	const screen = await render(App);
+	await expectResolvedFetch(screen.container as HTMLElement, 'api/3');
+
+	(screen.container as HTMLElement).querySelector<HTMLButtonElement>('[data-bump]')?.click();
+	await expectResolvedFetch(screen.container as HTMLElement, 'api/6');
+});
+
+test('SSR: an async computed reading a module-scope const renders it', async () => {
+	const screen = await renderSSR(App);
+	await expectResolvedFetch(screen.container, 'api/3');
+});
+
+test('SSR resume: a state change re-runs an async computed that reads a module-scope const', async () => {
+	const screen = await renderSSR(App);
+	await expectResolvedFetch(screen.container, 'api/3');
+
+	screen.container.querySelector<HTMLButtonElement>('[data-bump]')?.click();
+	await expectResolvedFetch(screen.container, 'api/6');
 });
