@@ -46,6 +46,12 @@ export function realDriver(reader: RealReader, spec: RealDriverSpec): ScreenRead
 			await reader.next();
 			return reader.lastSpokenPhrase();
 		},
+		// Nothing to drain over this seam: NVDA and VoiceOver follow the focus
+		// themselves and speak it in their own process, and guidepup's
+		// `lastSpokenPhrase()` reads the speech that came out. The virtual lane
+		// needs a wait here because its reader announces from a listener inside the
+		// page, one task-queue turn behind the gesture.
+		settleOnFocus: () => reader.lastSpokenPhrase(),
 		lastSpokenPhrase: () => reader.lastSpokenPhrase(),
 		// The reader hands back its own log array, which keeps growing under the
 		// caller's feet; a copy is what a test can hold on to.

@@ -103,10 +103,12 @@ async function readFor(facts: readonly string[], limit = 40): Promise<string> {
 	);
 }
 
-// A gesture reaches the DOM after the dispatch it woke returns, so the reader is
-// asked again until the new state is what it reads.
+// Every gesture in this family hands the focus somewhere, and this reader speaks
+// on its own when it does. Callers wait for the gesture's own DOM outcome first;
+// this waits for the reader to catch up with the focus and then asserts the one
+// announcement that catching up produced.
 async function expectAnnouncesAfterChange(facts: readonly string[]) {
-	await expect.poll(async () => missing(await sr.reannounce(), facts)).toEqual([]);
+	expectConveys(await sr.settleOnFocus(), facts);
 }
 
 // Sequence A: entering the collapsed combobox. Step 3 is the row QDS fails -
@@ -183,11 +185,34 @@ test("all thirteen options are reached in order, aria-at's reference count", asy
 test('arrowing off the chosen option announces the next one as not selected', async () => {
 	await open(OpenList);
 	await readFor(['Banana', say.selected]);
+	const cherry = document.querySelector('[data-testid="cherry"]');
+	expect(cherry, 'the scenario names its third option').not.toBeNull();
+
 	await sr.press(sr.keys.arrowDown);
-	await expectAnnouncesAfterChange(['Cherry', say.notSelected]);
+	// The gesture's own outcome, before the reader is asked anything: an arrow in
+	// this family moves the roving focus, so the focus landing on the next option
+	// is the arrow having happened. Waiting for it is waiting for the gesture, not
+	// for the announcement to come out the way this row wants - a family that
+	// committed the choice would land the focus here too, and be caught below.
+	await expect.poll(() => document.activeElement).toBe(cherry);
+
+	// One announcement - the reader's own, made because the focus moved - carries
+	// both halves of this row. It is not a re-read: `reannounce()` steps off the
+	// item and back onto it, and that round trip is a fixpoint at a list's "end
+	// of" boundary, so a cursor knocked onto that boundary by the focus
+	// announcement still in flight never comes back. Measured in-lane: the cursor
+	// parked on "end of listbox" and every re-read after it returned that same
+	// phrase until the deadline, which is why this row failed under lane load and
+	// passed alone.
+	const announced = await sr.settleOnFocus();
+	expectConveys(announced, ['Cherry', say.notSelected]);
 	// The negative proof, spelled out: "selected" is a word this announcement
-	// must be missing, not merely a word "not selected" happens to contain.
-	expect(missing(await sr.reannounce(), [say.selected])).toEqual([say.selected]);
+	// must be missing, not merely a word "not selected" happens to contain. It
+	// reads the same announcement the line above did, so the two halves cannot
+	// land on different ones.
+	expect(missing(announced, [say.selected]), `${sr.name} announced "${announced}"`).toEqual([
+		say.selected,
+	]);
 });
 
 // Sequence E: Escape closes. The reader-facing half is that the select goes back

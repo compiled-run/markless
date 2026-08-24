@@ -96,6 +96,21 @@ entirely. Those suites poll `next()` instead, which wraps around a tree this
 small and reaches the item either way. A suite that gets this wrong is not
 wrong every run, which is worse: it is flaky.
 
+**When the gesture moves a roving focus, take the announcement the reader made
+by itself — `settleOnFocus()`, not `reannounce()`.** A focus move makes this
+reader speak from a `focusin` listener that opens with one task-queue hop, so
+the announcement is often still queued when `press()` returns, and a re-read
+started in that window races it. Worse, the re-read's round trip — step off the
+item, step back on — is a *fixpoint* at a list's "end of" boundary: previous
+lands on the last item, next lands back on the boundary. A cursor knocked onto
+that boundary by the in-flight announcement is stuck there, so every later
+re-read returns the same phrase and polling can never recover. Measured on
+`select`'s arrow row, which passed alone and failed in-lane once `carousel`'s
+timer made the lane slow enough for the two to overlap. `settleOnFocus()` waits
+for the reader's cursor to reach what the page focused and answers with what it
+said there, which is both the announcement a person would hear and the only one
+the assertion can name.
+
 ## What the real lanes share, and what they decide
 
 | shared with the virtual lane                                 | decided per reader              |
