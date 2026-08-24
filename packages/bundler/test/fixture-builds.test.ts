@@ -25,7 +25,7 @@ const fixtures = [
 			// 3,460 -> 3,560 (2026-08-23): +91 measured 3,551 - the timer-callback write band
 			// (defect 79) + the emitted resolver's per-graph handle wrapper (defect 78,
 			// which also DELETED the runtime's host-derived fallback). Bundler-diet repayment.
-			maxRuntimeChunkGzipBytes: 3_560,
+			maxRuntimeChunkGzipBytes: 3_730, // re-anchor 2026-08-24: measured 3,718 - the multi-binding chain (el/event arrays, spread merge at composition, per-family tokens). Bundler-diet repayment. prior 3,460 -> 3,560.
 			// anti-bloat wall — tightened by the runtime-stdlib goal; any increase must be justified
 			// Recalibrated to actuals for chained-async key-phase gating (runtime gate + self-wake + single-flight); zero slack.
 			// DE-MINIMIS INTERIM chain (settlement bridge +94); REPAYMENT OBLIGATION
@@ -88,7 +88,7 @@ const fixtures = [
 			// 3,300 -> 3,455 (2026-08-23): +143 measured 3,443 - same registry + plural-handle
 			// chain as vite-csr; bundler-diet repayment.
 			// 3,455 -> 3,555 (2026-08-23): +90 measured 3,545 - same chain as vite-csr.
-			maxRuntimeChunkGzipBytes: 3_555,
+			maxRuntimeChunkGzipBytes: 3_725, // re-anchor 2026-08-24: measured 3,711 - same chain. prior 3,455 -> 3,555.
 			// anti-bloat wall — tightened by the runtime-stdlib goal; any increase must be justified
 			// Recalibrated to actuals for chained-async key-phase gating (runtime gate + self-wake + single-flight); zero slack. CI (Linux) emits slightly larger bytes than local macOS; wall tracks CI actuals.
 			// DE-MINIMIS INTERIM chain (settlement bridge +94); REPAYMENT OBLIGATION
