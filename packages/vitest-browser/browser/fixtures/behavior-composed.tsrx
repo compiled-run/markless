@@ -1,4 +1,5 @@
 import { computed, state } from '@markless/core';
+import { ImportedComposedChild } from './behavior-composed-child.tsrx';
 
 // The composition-shaped sibling of `behavior-page-scope.tsrx`: a child
 // component that takes a LIVE graph-bound prop and carries an authored
@@ -12,6 +13,12 @@ import { computed, state } from '@markless/core';
 // combination could not be rendered at all until defect 100 was fixed, so this
 // is the same-module row `packages/web/test/composed-behavior-graph.test.ts`
 // had to pin as a unit instead.
+//
+// The page composes that shape TWICE: once from `ComposedChild` below, declared
+// in this module, and once from `ImportedComposedChild`, compiled in a module of
+// its own. Both children bind the same `page.label` cell, so one relabel click
+// exercises the live-prop refresh across both the same-module and the
+// cross-module path.
 function ComposedChild({ label }) @{
 	const data = state({ count: 0 });
 	const shout = computed(() => `${label}!`);
@@ -35,6 +42,7 @@ export default function BehaviorComposed() @{
 
 	<main data-behavior-composed>
 		<ComposedChild label={page.label} />
+		<ImportedComposedChild label={page.label} />
 		<button
 			type="button"
 			data-relabel
