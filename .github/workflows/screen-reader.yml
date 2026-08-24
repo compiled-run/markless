@@ -68,14 +68,17 @@ jobs:
                         checklist,
                         collapsible,
                         modal,
+                        navbar,
                         otp,
                         pagination,
                         progress,
                         qr-code,
                         radio-group,
+                        select,
                         tabs,
                         textbox,
                         toggle,
+                        tree,
                     ]
 
         steps:
