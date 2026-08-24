@@ -493,9 +493,26 @@ function marklessComposedSymbol(
 	instancePath: string,
 ): ResumeSymbol {
 	const composed = (context: ResumeSymbolContext) => {
+		const graph = context.graph;
+		// A CSR container activates its authored behaviors BEFORE it demand-loads
+		// the runtime graph, so a behavior on a composed child's element arrives
+		// with no graph at all. Composed symbols are marked precisely so the
+		// instance-scope adapter skips them, which is why the guard defect 96
+		// landed there does not cover this path. There is nothing to remap, and
+		// the behavior still has to run: it gets the absent graph its caller
+		// handed over. Only the element handles carry a scope it can honour.
+		if (!graph)
+			return symbol({
+				...context,
+				getElementHandle: marklessInstanceScopedElementHandle(
+					context.getElementHandle,
+					instancePath,
+					graph,
+				),
+			});
 		// This dispatch runs long after the compose that placed this child, so the
 		// rendered widgets it asks about are the ones its own page graph carries.
-		const registry = marklessGraphWidgetRegistry(context.graph);
+		const registry = marklessGraphWidgetRegistry(graph);
 		// One route for both read channels: `context.read` is the same child-local
 		// id space `graph.read` is, so an unmapped one would read the page graph raw.
 		const read = (graphNodeId: string, path: ReadonlyArray<string> = []) => {
@@ -505,12 +522,12 @@ function marklessComposedSymbol(
 				instancePath,
 				registry,
 			);
-			return context.graph.read(mapped?.graphNodeId ?? graphNodeId, mapped?.path ?? path);
+			return graph.read(mapped?.graphNodeId ?? graphNodeId, mapped?.path ?? path);
 		};
 		return symbol({
 			...context,
 			graph: {
-				...marklessInstanceScopedGraph(context.graph, instancePath),
+				...marklessInstanceScopedGraph(graph, instancePath),
 				read,
 			},
 			// A widget-scoped element() handle is one element per rendered widget,

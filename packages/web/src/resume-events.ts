@@ -18,6 +18,13 @@ import type {
 	ResumeSymbolContext,
 } from './resume-types.ts';
 
+// Only the CSR activation seam is graph-less, and it never reaches dispatch:
+// every context built here carries `input.graph`. Dispatch declares that shape
+// for itself rather than re-checking a graph it is holding.
+type DispatchSymbolContext = Omit<ResumeSymbolContext, 'graph'> & {
+	readonly graph: RuntimeGraph;
+};
+
 export type ResumeRowEventMatch = {
 	readonly repeat: ResumeKeyedRepeatRecord;
 	readonly parent: ResumeDomElement;
@@ -247,7 +254,7 @@ export function createEventWiring(input: {
 			// belongs to is decided by the same fact for both halves. Reading it off
 			// this record's host instead only ever answered when the dispatching part
 			// happened to bind a handle of its own.
-			const runSymbol = async (symbolId: string, context: ResumeSymbolContext) =>
+			const runSymbol = async (symbolId: string, context: DispatchSymbolContext) =>
 				(await input.loadSymbol(symbolId))({
 					...context,
 					...(rowScope && isBoundSymbolId(symbolId)
@@ -261,7 +268,9 @@ export function createEventWiring(input: {
 			// escaping the dispatch as an unhandled rejection.
 			const invokeSymbol = async (symbolId: string, context: ResumeSymbolContext) => {
 				try {
-					return await runSymbol(symbolId, context);
+					// The callback channel belongs to this dispatch, so a context that
+					// arrived without one runs on the dispatch's own graph.
+					return await runSymbol(symbolId, { ...context, graph: context.graph ?? input.graph });
 				} catch (error) {
 					await input.reportRuntimeError(error, {
 						phase: 'event',
@@ -279,7 +288,7 @@ export function createEventWiring(input: {
 				event,
 				element,
 				getElementHandle: input.elementHandles.get,
-			} as ResumeSymbolContext;
+			} as DispatchSymbolContext;
 			const invokeCallback = (symbolId: string, args: ReadonlyArray<unknown>) =>
 				invokeSymbol(symbolId, { ...baseContext, args, invokeCallback, invokeSymbol });
 			for (const symbolId of eventRecord.symbolIds) {
@@ -337,11 +346,13 @@ export function createEventWiring(input: {
 			};
 			// A row's symbol dispatches through the same callback channel a view
 			// event's does; the row's own item locals travel with it.
-			const runSymbol = async (symbolId: string, context: ResumeSymbolContext) =>
+			const runSymbol = async (symbolId: string, context: DispatchSymbolContext) =>
 				(await input.loadSymbol(symbolId))({ ...context, invokeCallback, invokeSymbol });
 			const invokeSymbol = async (symbolId: string, context: ResumeSymbolContext) => {
 				try {
-					return await runSymbol(symbolId, context);
+					// The callback channel belongs to this dispatch, so a context that
+					// arrived without one runs on the dispatch's own graph.
+					return await runSymbol(symbolId, { ...context, graph: context.graph ?? input.graph });
 				} catch (error) {
 					await input.reportRuntimeError(error, {
 						phase: 'event',
@@ -360,7 +371,7 @@ export function createEventWiring(input: {
 				element,
 				getElementHandle: input.elementHandles.get,
 				locals,
-			} as ResumeSymbolContext;
+			} as DispatchSymbolContext;
 			const invokeCallback = (symbolId: string, args: ReadonlyArray<unknown>) =>
 				invokeSymbol(symbolId, { ...baseContext, args, invokeCallback, invokeSymbol });
 			for (const symbolId of rowEvent.symbolIds) {
