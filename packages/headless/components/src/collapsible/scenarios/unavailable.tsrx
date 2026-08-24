@@ -1,4 +1,4 @@
-import * as collapsible from '../index.ts';
+import { collapsible } from '../../index.ts';
 
 // Two sections nobody may change: one locked shut, one locked open. A locked
 // section still renders its panel and still reports its state; the trigger is
