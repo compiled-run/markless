@@ -5,7 +5,7 @@ import {
 	focusMatchingOption,
 	focusNeighbourOption,
 	focusOpeningOption,
-} from './element-reach.ts';
+} from './option-focus.ts';
 import type {
 	SelectContentProps,
 	SelectFieldProps,
@@ -36,12 +36,16 @@ export const selectState = shared(
 		const labelEl = element<HTMLLabelElement>();
 		const contentEl = element<HTMLDivElement>();
 		const triggerEl = element<HTMLButtonElement>();
+		// The array type argument is what makes this handle plural: one handle
+		// bound on every option, read back as the live options in document order.
+		const optionEls = element<HTMLDivElement[]>();
 
 		return {
 			...select,
 			labelEl,
 			contentEl,
 			triggerEl,
+			optionEls,
 			// literal function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
 			onOpenChange: undefined as ((open: boolean) => void) | undefined,
@@ -167,7 +171,7 @@ export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectT
 
 				// Alt+ArrowDown opens the popup and leaves focus on the combobox.
 				if (!event.altKey) {
-					focusOpeningOption(select.contentEl, search, isOpenAtLastKey);
+					focusOpeningOption(select.optionEls, search, isOpenAtLastKey);
 				}
 			}
 			onKeydown?.(event);
@@ -218,16 +222,16 @@ export function SelectContent({ children, onKeydown, ...rest }: SelectContentPro
 				const search = (isSearchStale ? '' : select.search) + key.toLowerCase();
 				select.search = search;
 				select.searchAt = now;
-				focusMatchingOption(select.contentEl, search);
+				focusMatchingOption(select.optionEls, search);
 			} else if (isNavigationKey) {
 				// Moving is not choosing. A reader that says "selected" after an
 				// arrow is this family's most common bug, so the walk is focus only.
-				focusNeighbourOption(select.contentEl, here, key);
+				focusNeighbourOption(select.optionEls, here, key);
 			} else if (isSelectionKey) {
 				// Through the option's own click rule, so one place in this family
 				// reads a value. Tab keeps its native move; the other two hand
 				// focus back.
-				commitFocusedOption(here);
+				commitFocusedOption(select.optionEls, here);
 				if (key !== 'Tab') select.triggerEl?.focus();
 			} else if (key === 'Escape') {
 				// Closing leaves the value untouched: the highlight never committed.
@@ -259,6 +263,7 @@ export function SelectItem({
 
 	<div
 		{...rest}
+		el={select.optionEls}
 		role="option"
 		aria-selected={isChosen ? 'true' : 'false'}
 		aria-disabled={isLocked ? 'true' : 'false'}
