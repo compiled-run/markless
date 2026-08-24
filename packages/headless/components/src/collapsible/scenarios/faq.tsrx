@@ -1,4 +1,4 @@
-import * as collapsible from '../index.ts';
+import { collapsible } from '../../index.ts';
 
 // A parking FAQ, the shape the accessibility test plans use: several questions in
 // a list, one of them already open on load. Each question is its own widget, so

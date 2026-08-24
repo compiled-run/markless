@@ -4,6 +4,7 @@ import { missingFacts, readUntil, type Conveys } from '../../test-support/driver
 import { virtualDriver } from '../../test-support/virtual-driver.ts';
 import Basic from './scenarios/basic.tsrx';
 import Unavailable from './scenarios/unavailable.tsrx';
+import WithoutFindInPage from './scenarios/without-find-in-page.tsrx';
 
 // Rows follow the w3c/aria-at disclosure plan and assert the facts an announcement
 // must convey - role, name, state - never a reader product's wording. The whole
@@ -64,8 +65,12 @@ test('reading the starter conveys the button role, its name and that it is not e
 // The other half of a closed disclosure: the panel is hidden, so nothing in it is
 // reachable. A reader that can walk into hidden content is the failure this row
 // catches, and it is why `hidden` rather than `display:none` on a wrapper matters.
+// A closed panel now defaults to hidden="until-found" (content-visibility:
+// hidden), which the virtual reader does not model - the same limitation the
+// accordion suite pins. The reachability fact is asserted where it is true by
+// construction: a panel that opted out of find-in-page is plain hidden.
 test('the text inside a closed panel is not reachable', async () => {
-	await open(Basic);
+	await open(WithoutFindInPage);
 	await readUntil(sr, { role: 'button' });
 	const walked: string[] = [];
 	for (let step = 0; step < 6; step++) {
