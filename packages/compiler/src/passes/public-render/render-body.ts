@@ -21,6 +21,7 @@ export function renderBodyLines(
 	stateValuesName: string,
 	statePayloadName: string,
 	rootLines: ReadonlyArray<string>,
+	bodySharedComputedLines: ReadonlyArray<string> = [],
 ): string[] {
 	const body = rootInfo.component.body as AnyNode | undefined;
 	if (!body) return indentLines(rootLines);
@@ -38,9 +39,14 @@ export function renderBodyLines(
 	const sharedInstanceNames = sharedInstanceLocalNames(input.semanticGraph, rootInfo.componentName);
 	const lines: string[] = [];
 	let emittedRoot = false;
+	let derivedSharedComputed = bodySharedComputedLines.length === 0;
 	for (const statement of childNodes(body)) {
 		if (isIgnorableTextNode(statement)) continue;
 		if (statement === rootInfo.root || returnArgument(statement) === rootInfo.root) {
+			if (!derivedSharedComputed) {
+				lines.push(...bodySharedComputedLines);
+				derivedSharedComputed = true;
+			}
 			lines.push(...rootLines);
 			emittedRoot = true;
 			continue;
@@ -65,6 +71,12 @@ export function renderBodyLines(
 			rootInfo.componentName,
 		);
 		if (computedLine) {
+			// The local is evaluated here, so a factory computed it reads has to be
+			// derived above it — the render lines run too late for this read.
+			if (!derivedSharedComputed) {
+				lines.push(...bodySharedComputedLines);
+				derivedSharedComputed = true;
+			}
 			lines.push(computedLine);
 			continue;
 		}
@@ -89,7 +101,10 @@ export function renderBodyLines(
 		const source = expressionSource(statement, input.source.source);
 		if (source) lines.push(source);
 	}
-	if (!emittedRoot) lines.push(...rootLines);
+	if (!emittedRoot) {
+		if (!derivedSharedComputed) lines.push(...bodySharedComputedLines);
+		lines.push(...rootLines);
+	}
 	return indentLines(lines);
 }
 

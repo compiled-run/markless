@@ -157,6 +157,7 @@ export function emitPublicSsrRenderModule(
 					? 'marklessCloneState(payloadState)'
 					: `marklessSelectStateNodes(marklessCloneState(payloadState), ${JSON.stringify(ownedNodes.cellIndexes)}, ${JSON.stringify(ownedNodes.computedIndexes)})`,
 				rootDataLines.seedForward,
+				rootDataLines.bodySharedComputed,
 			),
 		),
 		// A module that composes no same-module child owns every payload node, so
@@ -193,6 +194,7 @@ export function emitPublicSsrRenderModule(
 					: []),
 			...dataRenderLines,
 			],
+			rootDataLines.bodySharedComputed,
 		),
 		'	const html = marklessSsrRendered.html;',
 		'	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, payloadView, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);',
@@ -389,6 +391,12 @@ function rowScopedEdgeIds(
 export type SsrDataLines = {
 	readonly render: string[];
 	readonly seedForward: string[];
+	/**
+	 * Factory computed derives a component-body `computed()` reads. The body local
+	 * is evaluated where it is declared, which is before the render lines run, so
+	 * these have to be emitted inside the body instead of with the render lines.
+	 */
+	readonly bodySharedComputed: string[];
 	/** The composed children-root child surfaces, for this component's widget-root marker. */
 	readonly composedRootSurfaceArgs: string[];
 	/** The imported child surfaces, for this component's element()-handle marker. */
@@ -408,6 +416,7 @@ export function ssrSeedForwardBlockLines(
 	valuesName: string,
 	payloadStateExpression: string,
 	seedForward: ReadonlyArray<string>,
+	bodySharedComputed: ReadonlyArray<string> = [],
 ): string[] {
 	if (seedForward.length === 0) return [];
 	return [
@@ -421,6 +430,7 @@ export function ssrSeedForwardBlockLines(
 			'marklessSsrRenderStateValues',
 			'marklessSsrPayloadState',
 			seedForward,
+			bodySharedComputed,
 		),
 	];
 }
@@ -442,6 +452,29 @@ function repeatLocalLines(
 		if (repeat.indexName && !declared.has(repeat.indexName))
 			declared.set(repeat.indexName, 'marklessSsrDataContext.repeatIndex');
 	return [...declared].map(([name, source]) => `const ${name}=${source};`);
+}
+
+// A component-body `computed()` whose expression names a shared instance rebuilds
+// the whole instance from the graph, factory computeds included.
+function bodyComputedReadsSharedInstance(
+	input: PublicRenderModuleInput,
+	componentName: string,
+): boolean {
+	return input.semanticGraph.graphBindings.some(
+		(binding) =>
+			binding.kind === 'computed' &&
+			binding.async !== true &&
+			binding.sharedDefinitionId === undefined &&
+			binding.componentName === componentName &&
+			!!binding.functionSource &&
+			sharedInstancePreludeLines(
+				input.semanticGraph,
+				componentName,
+				binding.functionSource,
+				new Set(),
+				() => 'undefined',
+			).length > 0,
+	);
 }
 
 function emitSsrDataLines(
@@ -909,13 +942,18 @@ function emitSsrDataLines(
 	// Derived after the static seed map, so the factory's state nodes are already
 	// readable when the derive runs.
 	const sharedComputedSources = collectSsrSharedComputedSources(input);
-	const sharedComputedLines = input.protocolState.computed.flatMap((computed) => {
+	const allSharedComputedLines = input.protocolState.computed.flatMap((computed) => {
 		const source = sharedComputedSources.get(computed.graphNodeId);
 		if (!source || !componentGraphNodeIds.has(computed.graphNodeId)) return [];
 		return [
 			`marklessSsrRenderStateValues.set(${JSON.stringify(computed.graphNodeId)},(${source})({read:(marklessSsrSharedId,marklessSsrSharedPath)=>marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(marklessSsrSharedId),marklessSsrSharedPath)}));`,
 		];
 	});
+	// A body `computed()` over the instance evaluates where it is declared, which
+	// is before these lines: leaving them here derived the factory computed after
+	// the local that read it and the local saw undefined.
+	const hoistsSharedComputed = bodyComputedReadsSharedInstance(input, componentName);
+	const sharedComputedLines = hoistsSharedComputed ? [] : allSharedComputedLines;
 	const templateComputedSharedSources = collectSsrTemplateComputedSources(input);
 	const templateComputedLines = input.renderData.initialValues.flatMap((initial) => {
 		// Held in a const so the discriminated narrowing survives into the callback.
@@ -977,6 +1015,7 @@ function emitSsrDataLines(
 	];
 	return {
 		seedForward: seedForwardLines,
+		bodySharedComputed: hoistsSharedComputed ? allSharedComputedLines : [],
 		composedRootSurfaceArgs,
 		importedChildSurfaceArgs,
 		render: [
