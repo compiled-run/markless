@@ -8,7 +8,7 @@ import { otp } from '../../index.ts';
 const isBackupCode = false;
 
 export default function ArmedLength() @{
-	<otp.root length={6} data-testid="root">
+	<otp.root data-testid="root">
 		<otp.field data-testid="field" aria-label="Verification code" />
 		<div data-testid="boxes">
 			@if (isBackupCode) {

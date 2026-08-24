@@ -15,7 +15,7 @@ export default function VerificationForm() @{
 			submitted = JSON.stringify(Object.fromEntries(new FormData(event.target as HTMLFormElement)));
 		}}
 	>
-		<otp.root length={6} data-testid="root">
+		<otp.root data-testid="root">
 			<label data-testid="label">Verification code<otp.field name="code" data-testid="field" /></label>
 			<div data-testid="boxes">
 				<otp.item index={0} data-testid="item-0" />

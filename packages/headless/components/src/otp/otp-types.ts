@@ -6,8 +6,6 @@ import type { PropsOf, Seeded } from '@markless/core';
  * Everything else about the look of the boxes belongs to a consumer's class.
  */
 export type OtpRootProps = Omit<PropsOf<'div'>, 'onChange' | 'style'> & {
-	/** How many characters the code has. Every item declares its own place in it. */
-	readonly length: number;
 	/** The code entered so far. Omit it and the field starts empty. */
 	readonly value?: string;
 	/** Nothing can be typed while this is set. */
@@ -19,7 +17,7 @@ export type OtpRootProps = Omit<PropsOf<'div'>, 'onChange' | 'style'> & {
 	readonly shiftPWManagers?: boolean;
 	/** Called with the whole code every time it changes, not with the character typed. */
 	readonly onChange?: (value: string) => void;
-	/** Called once with the whole code the moment it reaches `length` characters. */
+	/** Called once with the whole code the moment it holds one character per box. */
 	readonly onComplete?: (value: string) => void;
 };
 
@@ -34,20 +32,25 @@ export type OtpRootProps = Omit<PropsOf<'div'>, 'onChange' | 'style'> & {
 export type OtpFieldProps = Omit<PropsOf<'input'>, 'value' | 'style'>;
 
 export type OtpItemProps = PropsOf<'div'> & {
-	/** Which character of the code this box shows, counting from 0. */
+	/**
+	 * Which character of the code this box shows, counting from 0. Writing the
+	 * boxes is what sets the length of the code: six boxes, a six-character code.
+	 */
 	readonly index: number;
 };
 
 export type OtpItemIndicatorProps = PropsOf<'span'>;
 
 /**
- * The shared instance every otp part reads: the root's seeded fields, plus the
- * two consumer callbacks the root stores for `write()` to dispatch through.
+ * The shared instance every otp part reads: the root's seeded fields, the length
+ * the boxes register as they render, plus the two consumer callbacks the root
+ * stores for `write()` to dispatch through.
  */
 export type OtpInstanceState = Seeded<
 	OtpRootProps,
-	'length' | 'value' | 'disabled' | 'shiftPWManagers'
+	'value' | 'disabled' | 'shiftPWManagers'
 > & {
+	length: number;
 	onChange?: OtpRootProps['onChange'];
 	onComplete?: OtpRootProps['onComplete'];
 };

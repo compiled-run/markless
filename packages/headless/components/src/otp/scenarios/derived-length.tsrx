@@ -1,9 +1,10 @@
 import { state } from '@markless/core';
 import { otp } from '../../index.ts';
 
-// What a real sign-in does with a finished code: the page counts the completions
-// so a second, no-op input cannot fire a second submit.
-export default function WithOnComplete() @{
+// Five boxes, and nothing anywhere says five. The count is what the boxes
+// themselves register as they render, so a sixth box next sprint is the whole
+// change: onComplete would then wait for a sixth character on its own.
+export default function DerivedLength() @{
 	const log = state({ code: '', completions: 0 });
 
 	<section>
@@ -19,6 +20,7 @@ export default function WithOnComplete() @{
 			<otp.item index={1} data-testid="item-1" />
 			<otp.item index={2} data-testid="item-2" />
 			<otp.item index={3} data-testid="item-3" />
+			<otp.item index={4} data-testid="item-4" />
 		</otp.root>
 		<p data-testid="code">{log.code}</p>
 		<p data-testid="completions">{log.completions}</p>

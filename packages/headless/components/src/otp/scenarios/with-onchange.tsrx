@@ -10,7 +10,6 @@ export default function WithOnChange() @{
 
 	<section>
 		<otp.root
-			length={4}
 			data-testid="root"
 			onChange={(next: string) => {
 				log.value = next;

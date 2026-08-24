@@ -5,7 +5,7 @@ import { otp } from '../../index.ts';
 // are written here too, and the family's own values win — the spread comes
 // first, so a consumer adds attributes and never replaces the family's.
 export default function WithPattern() @{
-	<otp.root length={6} data-testid="root">
+	<otp.root data-testid="root">
 		<otp.field
 			data-testid="field"
 			aria-label="Verification code"

@@ -6,7 +6,8 @@ Research: `goals/headless-components/notes/research-otp.md`.
 
 One widget family, `otpState`, rooted by `otp.root`. It holds `length`, `value`,
 `disabled`, the `element()` handle for the field, the consumer's `onChange` and
-`onComplete`, and `commit()`.
+`onComplete`, and `commit()`. Of those, `length` is the only one the root does
+not seed: it comes from the boxes.
 
 The family paints slots over **one real `<input>`**. That is the load-bearing
 decision and most of this suite is an assertion about it:
@@ -20,17 +21,69 @@ decision and most of this suite is an assertion about it:
   `maxlength` are what make the family worth shipping: the platform's own
   one-time-code autofill and numeric keypad, for free.
 
-`length` is a declared prop, replacing QDS's construction-order item count. It is
+## The length comes from the boxes
+
+There is no `length` prop. `otp.item` registers its own place as it renders —
+`otp.length = index + 1` — so writing six boxes gives a six-character code and
+adding a seventh next sprint changes nothing else at the call site. That count is
 what `maxlength` truncates typing against, and what `commit()`'s slice enforces
 for a paste or an autofill (the platform does not truncate those).
+
+Two things this shape has to live with, both measured on the pilot tip:
+
+- **One past the LAST box's index, not the highest.** The registration cannot be
+  a max, because the right-hand side of a shared write in a part body must not
+  read the shared instance. The SSR emitter copies that expression into the seed
+  function verbatim, where the `otpState()` local is out of scope, so
+  `otp.length = Math.max(otp.length, index + 1)` fails the render with
+  `ReferenceError: otp is not defined`. A guard fails the same way: an
+  `if (index >= otp.length) …` wrapper leaks into the SSR body as written while
+  the assignment inside it lowers to a seed with the guard silently dropped. So
+  boxes must be written in index order — which the `index` prop's own contract
+  already says, since it is the character's place in the code.
+- **The field is written before the boxes and still gets the count.** `maxlength`
+  binds to a shared read, so the registrations that land after the field rendered
+  refresh it, in both modes. `expectFieldConfig` asserts this on every scenario.
+
+### Open framework gap: a box inside a construct arm never registers
+
+A shared write in a part's render body reaches the family's shared instance when
+the part is written flat under the root (`basic.tsrx`) **and** when it is nested
+inside plain elements (`verification-form.tsrx` puts its six boxes inside a
+`<div>` and gets `maxlength="6"` in both modes). It is dropped when the part
+instance comes out of a construct arm: `items-from-data.tsrx` (`@for`) and
+`armed-length.tsrx` (`@if`) both render their boxes and both leave the shared
+`length` at its initial `0`, on CSR and on SSR alike. Nothing else differs
+between those scenarios and the passing ones — same part, same statement, same
+index order — so the hosting construct is the whole cause.
+
+What the suite does with it. The painting an arm does carry stays asserted:
+`CSR/SSR: boxes delivered by an @if arm paint like boxes written flat` and
+`CSR/SSR: boxes written by a loop render exactly as boxes written flat` are green
+and unchanged in what they claim. The count those same boxes fail to register is
+held by three pinned rows, so the claim is written down rather than dropped:
+`CSR: a box written by a loop follows the code like any other`,
+`CSR/SSR: boxes delivered by an @if arm register the length of the code`, and
+`CSR: an arm-delivered box follows the code like any other`. Every one of them
+fails on the count (`maxlength` reads `0`) and none on the boxes.
+
+The derived count itself is asserted on every non-arm scenario, and
+`derived-length.tsrx` is the dedicated witness: five boxes, nothing anywhere
+saying five, `onComplete` silent at four characters and firing at the fifth.
+
+This is the same construct-arm area the family already carries a wall in (see
+"Boxes from an arm" below) and it is a framework charter, not something the
+family can shape around: the only in-family workaround is a written `length`,
+which the owner ruling removed.
 
 `otp.item` reads `otp.value.slice(index, index + 1)`, not `otp.value[index]`: a
 graph read path has to be statically resolvable.
 
 ## Deviations from the QDS part list, and why
 
-1. **No per-item hidden input, and no item count from construction order.** The
-   single input plus a declared `length` replaces both.
+1. **No per-item hidden input.** The single input replaces the whole row of
+   them. The item count QDS derives from construction order is kept, in the form
+   above.
 2. **`itemindicator` is a bare `<span>` with no state.** It is a caret slot the
    consumer styles; the item beside it reports `ui-empty` and `ui-disabled`.
 3. **The consumer's `onInput` runs after the family has taken the value.** The
@@ -80,14 +133,16 @@ skipped on it; all eight are accounted for below.
 Of the three rows still skipped going into 2026-08-23, two are green and
 un-skipped:
 
-- **`CSR: a box written by a loop follows the code like any other`** — green. The
-  old pin said a component instance inside an `@for` arm never follows the shared
-  cell. The arm and row layers on this tip fixed it; a looped `otp.item` now
-  follows the code exactly like a flat one.
-- **`CSR: typing past the declared length adds nothing`** — green, and the old
+- **`CSR: a box written by a loop follows the code like any other`** — went green
+  when the length was a prop, and is pinned again now that it is derived. The old
+  pin said a component instance inside an `@for` arm never follows the shared
+  cell; the arm and row layers fixed the *reading* half, and a looped `otp.item`
+  does follow the code. What it cannot do is *write* the shared cell, which is
+  what registering a length needs. See the construct-arm gap above.
+- **`CSR: typing past the last box adds nothing`** — green, and the old
   pin was wrong about the cause. It claimed no box ever fills in `WithOnChange`.
   Re-measured key by key on this tip, every box fills, and the walk stops at the
-  declared length: typing `1,2,3,4,5` gives `["1","2","3","4"]` with the field at
+  last box: typing `1,2,3,4,5` gives `["1","2","3","4"]` with the field at
   `"1234"`, identical to `WithoutOnChange`. The failure was the row's own read
   order. `maxlength` truncates the input's value **in the browser, before any
   handler runs**, so polling the field value returned immediately and the hard
@@ -127,7 +182,9 @@ Two framework facts measured while pinning it still hold, and both shape any fix
 ## Boxes from an arm
 
 The arm-delivered verdict, in two halves. A part is not a widget root, so an
-`@if` arm that is **decided once** carries its items fine, in both modes. An arm
+`@if` arm that is **decided once** carries its items fine, in both modes — it
+paints them; what it does not carry is the shared write those items make, which
+is the open gap recorded above. An arm
 that **flips** is refused at compile time: `<otp.item>` inside `@if (someState)`
 fails the module with `MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED` — "cannot be
 rebuilt when ... changes because `<otp.item>` has to run to produce its content".
