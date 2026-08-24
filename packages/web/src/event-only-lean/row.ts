@@ -28,6 +28,10 @@ import {
 export async function resumeScalarRowEventFromPayloadDocument(
 	input: ResumeEventOnlyFromPayloadDocumentInput,
 ): Promise<EventOnlyResumeContainer> {
+	// A wake carries no event at all - `0`, the shape the self-wake and the
+	// overlay primer both send. There is no row to match and nothing to run, so
+	// the only thing asked for is that the runtime start.
+	if (!input.event) return resumeFullEventOnly(input);
 	const action = rowAction(input.event.type, input.runtimeDemandMap);
 	if (!action?.plan) return resumeFullEventOnly(input);
 	const state = readPayloadScript(input.document, 'markless/state') as ProtocolStatePayload;

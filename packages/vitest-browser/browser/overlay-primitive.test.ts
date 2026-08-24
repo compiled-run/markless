@@ -36,6 +36,11 @@ afterEach(async () => {
 		document.body.style.overflow = '';
 		document.body.style.paddingRight = '';
 		if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+		// The drain above presses Escape on a page whose primer may still be armed.
+		// A reason left standing would be taken by the NEXT page's installer, so it
+		// is dropped with everything else this row owned.
+		(globalThis as { __marklessOverlayPrimedDismissal?: unknown })
+			.__marklessOverlayPrimedDismissal = undefined;
 	}
 });
 
@@ -397,6 +402,66 @@ async function expectServedOpenEnlistsAndInlineNever(container: ParentNode) {
 	expect(document.body.style.overflow).toBe('');
 }
 
+type FocusOriginHost = { readonly __marklessOverlayFocusOrigin?: Element };
+
+async function expectFocusIsReadAtEnlistAndNeverMoved(container: ParentNode) {
+	const page = parts(container);
+	page.background.focus();
+	expect(document.activeElement).toBe(page.background);
+
+	page.modalTrigger.click();
+	await expect.poll(() => parts(container).modalContent.hidden).toBe(false);
+
+	// What the page was on at the moment it enlisted, left on the element that
+	// enlisted. Taken before the background was marked - marking makes the
+	// subtree inert, which blurs the button, so a reading taken afterwards would
+	// answer the body.
+	const enlisted = parts(container).modalContent as HTMLElement & FocusOriginHost;
+	expect(enlisted.__marklessOverlayFocusOrigin).toBe(page.background);
+
+	// Read, never moved. The surface has not taken focus, and neither has
+	// anything inside it: focus movement is the family's job and no family here
+	// asked for one.
+	expect(document.activeElement).not.toBe(enlisted);
+	expect(enlisted.contains(document.activeElement)).toBe(false);
+
+	pressEscape(container);
+	await expect.poll(() => parts(container).modalContent.hidden).toBe(true);
+	// Leaving the stack does not erase the reading: a family restores focus after
+	// its surface is already off the stack.
+	expect(
+		(parts(container).modalContent as HTMLElement & FocusOriginHost)
+			.__marklessOverlayFocusOrigin,
+	).toBe(page.background);
+}
+
+async function expectFirstEscapeDismissesWithoutAWake(container: ParentNode) {
+	const page = servedParts(container);
+	// Nothing has been pressed, so the runtime is still asleep and the behaviour
+	// is not installed - the state the startup-gate row above pins.
+	expect(page.servedOpen.hidden).toBe(false);
+	expect(page.outside.hasAttribute('inert')).toBe(false);
+
+	// One press, and it is the FIRST one the page ever sees. Without the primer
+	// it is spent on the waking.
+	pressEscape(container);
+
+	await expect
+		.poll(() => {
+			const now = servedParts(container);
+			return {
+				dismissals: now.servedDismissals.textContent,
+				reason: now.servedReason.textContent,
+				hidden: now.servedOpen.hidden,
+			};
+		})
+		.toEqual({ dismissals: '1', reason: 'escape', hidden: true });
+	// Exactly one report: the primer leaves a reason, it does not replay a press
+	// that the behaviour would then hear a second time.
+	expect(servedParts(container).inlineDismissals.textContent).toBe('0');
+	await expect.poll(() => servedParts(container).outside.hasAttribute('inert')).toBe(false);
+}
+
 async function expectSurfaceNeverUnmounts(container: ParentNode) {
 	const before = parts(container).modalContent;
 	await openModal(container);
@@ -677,6 +742,24 @@ test('CSR: a dismiss handler writing shared state is what closes the surface', a
 test('SSR resume: a dismiss handler writing shared state is what closes the surface', async () => {
 	const screen = await renderSSR(Page);
 	await expectDismissHandlerClosesThroughSharedState(screen.container);
+});
+
+test('CSR: the focus a page held is read at enlist and never moved', async () => {
+	const screen = await render(Page);
+	await expectFocusIsReadAtEnlistAndNeverMoved(screen.container as HTMLElement);
+});
+
+test('SSR resume: the focus a page held is read at enlist and never moved', async () => {
+	const screen = await renderSSR(Page);
+	await expectFocusIsReadAtEnlistAndNeverMoved(screen.container);
+});
+
+// Only the served page can show this. A client render has the behaviour
+// installed before the reader can press anything, so its first Escape was never
+// the one at risk.
+test('SSR resume: the first Escape on a served-open page dismisses it', async () => {
+	const screen = await renderSSR(ServedOpenPage);
+	await expectFirstEscapeDismissesWithoutAWake(screen.container);
 });
 
 test('CSR: a nested overlay unwinds one entry at a time', async () => {

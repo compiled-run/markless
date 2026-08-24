@@ -39,7 +39,42 @@ export function focusIntoSurface(
 	land(content);
 }
 
-/** Hand focus back to the control that opened the dialog. */
-export function focusBackToInvoker(invoker: HTMLElement | undefined): void {
-	land(invoker);
+/**
+ * Where the overlay behaviour left the focus the page had when the surface
+ * enlisted.
+ *
+ * The property is `__marklessOverlayFocusOrigin` in
+ * `packages/web/src/overlay-handoff.ts`, restated here only because
+ * `@markless/ui` does not depend on `@markless/web`; see note.md.
+ */
+type OverlayFocusOriginHost = {
+	__marklessOverlayFocusOrigin?: Element;
+};
+
+/**
+ * Hand focus back to whatever opened the dialog.
+ *
+ * Two openers, two answers, exactly as ruled. A trigger press is the one the
+ * family saw happen, so the trigger wins outright - a synthetic press does not
+ * focus the button it presses, and the captured reading on that path would be
+ * the body. Anything else opened it without telling the family, and the only
+ * record of what the page was on is the reading the overlay behaviour took when
+ * the surface enlisted.
+ */
+export function focusBackToOpener(
+	trigger: HTMLElement | undefined,
+	surface: HTMLElement | undefined,
+	isTriggerOpened: boolean,
+): void {
+	land(isTriggerOpened ? trigger : capturedOpener(surface));
+}
+
+function capturedOpener(surface: HTMLElement | undefined): HTMLElement | undefined {
+	const captured = (surface as OverlayFocusOriginHost | undefined)?.__marklessOverlayFocusOrigin;
+	// The body is what `document.activeElement` answers when nothing on the page
+	// held focus - a dialog the server sent open is the ordinary case - and
+	// putting focus on the body is not restoring it, so nothing moves.
+	return captured instanceof HTMLElement && captured !== captured.ownerDocument.body
+		? captured
+		: undefined;
 }

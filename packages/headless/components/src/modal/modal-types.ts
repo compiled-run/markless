@@ -68,4 +68,13 @@ export type ModalDescriptionProps = PropsOf<'p'>;
  */
 export type ModalInstanceState = Seeded<ModalRootProps, 'open' | 'alert'> & {
 	onChange?: ModalRootProps['onChange'];
+	/**
+	 * Whether the trigger part is what opened the dialog that is showing now.
+	 *
+	 * It decides where focus goes when the dialog closes: the trigger when the
+	 * trigger opened it, and otherwise the element the overlay behaviour read at
+	 * enlist. Nothing renders from it, but it lives in the instance state because
+	 * that is the only thing a part's handler may write to.
+	 */
+	isTriggerOpened: boolean;
 };

@@ -149,10 +149,14 @@ its own locks and background marks, so there is nothing left to gate.
 
 1. **Finding 1** - the dead click record on a part three levels under the root. This is the blocking
    one, and it is a dispatch or instance-resolution question, not a family workaround.
-2. **A hook for a prop-driven state landing.** Without one, the ruled programmatic focus-restore
-   contract cannot be implemented, and no family can react to a consumer flipping a bound value.
+2. **A hook for a prop-driven state landing.** No family can react to a consumer flipping a bound
+   value. This no longer blocks programmatic focus restore - the overlay behaviour reads
+   `document.activeElement` at enlist and the family restores to that reading - but it still blocks
+   anything a family would want to DO at the moment a consumer opens it.
 3. **`OverlayDismissReason` cannot be imported.** `@markless/ui` does not depend on `@markless/web`,
    so `modal-types.ts` restates the reason vocabulary that `packages/web/src/fns/overlay.ts` owns.
+   `modal-focus.ts` now restates a second web-owned fact the same way - the
+   `__marklessOverlayFocusOrigin` property that `packages/web/src/overlay-handoff.ts` documents.
    Declaring the dependency is a decision about whether `@markless/ui` becomes web-only.
 4. **`dismiss` has no slot in the intrinsic element types.** `onDismiss` on a `<div>` does not
    type-check, so `modal-types.ts` augments `GlobalEventHandlersEventMap` to add it. The event is
