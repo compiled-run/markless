@@ -189,7 +189,13 @@ export function createEventWiring(input: {
 			for (const matched of path) {
 				if (stopAfterElement && matched.element !== stopAfterElement) return;
 				if ('rowMatch' in matched)
-					await dispatchRowEvent(matched.element, matched.rowMatch, event, options);
+					await dispatchRowEvent(
+						matched.element,
+						matched.rowMatch,
+						event,
+						options,
+						propagation.stoppedImmediate,
+					);
 				else {
 					// A record owned by another system (a router link) ends the markless
 					// walk, exactly as it did when only the innermost record ever ran.
@@ -310,6 +316,7 @@ export function createEventWiring(input: {
 		match: ResumeRowEventMatch,
 		event: ResumeDomEvent,
 		options: ResumeDispatchOptions,
+		stopsImmediately?: () => boolean,
 	): Promise<void> {
 		const beforeExecution = marklessExecutionLogSnapshot();
 		const { findRepeatItemByKey, readKeyedRepeatCollection, validateOneRepeat } =
@@ -359,6 +366,10 @@ export function createEventWiring(input: {
 			for (const symbolId of rowEvent.symbolIds) {
 				activeSymbolId = symbolId;
 				await runSymbol(symbolId, baseContext);
+				// A row host's entries are one listener list too: the entry that calls
+				// stopImmediatePropagation is the last one to run. The stopping entry's
+				// own writes still commit - the `finally` below flushes them.
+				if (stopsImmediately?.()) return;
 			}
 		} catch (error) {
 			await input.reportRuntimeError(error, {
@@ -488,9 +499,10 @@ function collectDispatchPath(
 // Dispatch runs from one capture listener on the container root, so the DOM's
 // own propagation flags never see this synthetic walk: a handler's
 // stopPropagation call has to be observed here.
-// stopImmediatePropagation needs no separate reading here: this walk carries at
-// most one record per element, so there is never a same-element listener left
-// for it to drop that stopPropagation would not already have stopped.
+// stopImmediatePropagation is read separately: one element's record carries an
+// ordered symbolIds list, so there IS a same-element listener left for it to
+// drop that stopPropagation alone would not stop. Row hosts and view hosts read
+// the same flag.
 function trackPropagationStops(event: ResumeDomEvent): {
 	readonly stopped: () => boolean;
 	readonly stoppedImmediate: () => boolean;
