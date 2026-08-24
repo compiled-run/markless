@@ -46,20 +46,18 @@ test('the region asks to be read politely', async () => {
 	expect(region(container).getAttribute('aria-relevant')).toBe('additions');
 });
 
-// ---------------------------------------------------------------------------
-// The three rows below are pinned on the wall the ui lane's header describes in
+// The three rows below are pinned on the wall `toaster.browser.ts` describes in
 // full: a component inside a repeat renders nothing on the client. `toaster.root`
-// renders no default rows for a bare root, so every row is written out of the family's parts inside a
-// `@for` - exactly the shape that wall blocks.
+// renders no default rows for a bare root, so every row is written out of the
+// family's parts inside a `@for` - exactly the shape that wall blocks.
 //
 // These are pinned rather than deleted because what they assert is still the
 // contract a reader depends on, and each one goes green the moment a component
-// renders inside a repeat. Nothing about the ANNOUNCEMENT rules changed; only the
+// renders inside a repeat. Nothing about the announcement rules changed; only the
 // markup that carries them stopped reaching the page.
 //
 // The two rows above stay green: a live region has to be on the page before its
 // first message, and that is a fact about the region itself, not about any row.
-// ---------------------------------------------------------------------------
 
 // The words a reader speaks are the message's own. The tone mark beside them is
 // decoration - a reader that spoke "×" before "Upload failed" would be reading

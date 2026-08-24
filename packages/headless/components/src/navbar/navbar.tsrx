@@ -9,12 +9,12 @@ import type {
 	NavbarRootProps,
 } from './navbar-types.ts';
 
-// A `<nav>` landmark holding buttons that show and hide panels. It is a
-// DISCLOSURE, not a menubar - see navbar-types.ts.
-//
-// Which dropdown is showing lives on the ROOT, named by the item's `value`, not
-// as an `open` flag per item: opening one has to close the others, and an
-// instance rooted by an item cannot reach its siblings.
+// A disclosure, not a menubar - see navbar-types.ts.
+// Every keyboard walk here reads the DOM: no primitive builds an ordered collection of a widget's items.
+// Every preventDefault guard reads event fields alone, so it decides before the handler symbol loads.
+// Walks start at `event.target`: a lazily loaded handler has no `currentTarget`, and a handle bound on a widget-rooting element reads back empty.
+
+// Which dropdown is showing lives on the root, named by value: an instance rooted by an item cannot reach its siblings.
 export const navbarState = shared(
 	() => {
 		const navbar: NavbarInstanceState = state({
@@ -28,18 +28,13 @@ export const navbarState = shared(
 			...navbar,
 			// literal function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
-			// `next = ''` rather than `next: string`. A shared method that dispatches is
-			// inlined into its caller, and the capture analysis then parses that handler
-			// with a JavaScript-only parser: an annotation makes the parse throw and
-			// every `onClick?.(event)` beside it is reported as an unconditional call
-			// (MARKLESS_CAPTURE_OPAQUE_PROP).
+			// `next = ''` rather than `next: string`: the inlined handler is re-parsed as plain JavaScript and an annotation throws (MARKLESS_CAPTURE_OPAQUE_PROP).
 			show(next = '') {
 				if (navbar.value === next) return;
 				navbar.value = next;
 				navbar.onChange?.(next);
 			},
-			// Repeats show()'s body rather than calling it: a shared method has no
-			// receiver to reach its siblings through.
+			// Repeats show()'s body rather than calling it: a shared method has no receiver to reach its siblings through.
 			toggle(next = '') {
 				const to = navbar.value === next ? '' : next;
 				if (navbar.value === to) return;
@@ -56,13 +51,7 @@ export const navbarState = shared(
 	{ scope: 'widget' },
 );
 
-// Rooted by each `navbar.item`: that item's own name, whether it leads to the
-// section a person is in, and the two facts a hover has to remember between one
-// pointer event and the next.
-//
-// The panel's minted id is bound here rather than on the root, because a navbar
-// root holds N items and one handle is one element per rendered widget
-// (MARKLESS_ELEMENT_HANDLE_DUPLICATE).
+// The panel's id is minted here, not on the root: one handle is one element per rendered widget (MARKLESS_ELEMENT_HANDLE_DUPLICATE).
 export const navbarItemState = shared(
 	() => {
 		const item: NavbarItemInstanceState = state({
@@ -98,19 +87,12 @@ export function NavbarRoot({
 	navbar.delay = delay;
 	navbar.clickGrace = clickGrace;
 
-	// No default aria-label: a page can carry a primary nav and a footer nav, and an
-	// invented "Navigation" on both is two landmarks a reader cannot tell apart.
-	// `{...rest}` is spread first so a consumer's own name is the name.
-	//
-	// Every walk below starts at `event.target` and climbs. A lazily loaded handler
-	// has no `currentTarget`, and an `element()` handle bound on a widget-rooting
-	// element reads back empty in a handler - measured on this tip.
+	// No default aria-label: an invented "Navigation" on both a primary and a footer nav is two landmarks a reader cannot tell apart.
 	<nav
 		{...rest}
 		ui-open={navbar.value !== ''}
 		ui-closed={navbar.value === ''}
 		onFocusout={(event) => {
-			// Focus left the navbar entirely, so nothing should still be showing.
 			const root = (event.target as HTMLElement).closest('nav');
 			const next = event.relatedTarget as Node | null;
 			if (root !== null && (next === null || root.contains(next) !== true)) {
@@ -119,11 +101,7 @@ export function NavbarRoot({
 			onFocusout?.(event);
 		}}
 		onPointerout={(event) => {
-			// Closing on leave belongs to the ROOT, not to the item. Moving from one
-			// item to the next fires the leaving item's pointerout BEFORE the arriving
-			// item's pointerover, so an item that closed on its own leave would take the
-			// navbar to "nothing showing" a moment before the next item asks whether
-			// anything is showing - and every switch would pay the cold-start delay.
+			// Closing on leave belongs to the root: the leaving item's pointerout fires before the arriving item's pointerover.
 			const root = (event.target as HTMLElement).closest('nav');
 			const went = event.relatedTarget as Node | null;
 			if (
@@ -136,9 +114,6 @@ export function NavbarRoot({
 			onPointerout?.(event);
 		}}
 		onKeydown={(event) => {
-			// The two keys the top level owns, guarded by event fields alone: a
-			// browser-critical policy has to be readable before the handler symbol
-			// loads.
 			if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
 				event.preventDefault();
 			}
@@ -152,25 +127,17 @@ export function NavbarRoot({
 			const from = event.target as HTMLElement;
 			const nav = from.closest('nav');
 			const here = from.closest('a[href], button:not([disabled])') as HTMLElement | null;
-			// A link inside an open dropdown is not a top-level control, and the arrow
-			// keys there belong to the content part.
 			if (nav === null || here === null || here.closest('[ui-navbar-dropdown]') !== null) {
 				onKeydown?.(event);
 				return;
 			}
 
-			// DOM order is the navigation order. The walk needs the ordered collection
-			// of the navbar's top-level controls, and no primitive builds one today -
-			// pending capability: ordered item registration into an ancestor widget
-			// instance.
 			const walk = Array.from(
 				nav.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'),
 			).filter((control) => control.closest('[ui-navbar-dropdown]') === null);
 			const at = walk.indexOf(here);
 			const last = walk.length - 1;
 			const raw = at + (key === 'ArrowRight' ? 1 : -1);
-			// The ends wrap, which is what the authoring practices' own
-			// disclosure-navigation example does.
 			const to = raw < 0 ? last : raw > last ? 0 : raw;
 			const next = walk[to];
 			if (at >= 0 && next) next.focus();
@@ -191,17 +158,10 @@ export function NavbarItem({
 	const item = navbarItemState();
 	item.value = value;
 	item.active = active;
-	// One graph cell, read in every position: a comparison written inline in an
-	// attribute renders once and then goes stale.
+	// One graph cell, read in every position: the same comparison written inline in an attribute renders once and then goes stale.
 	const isOpen = computed(() => navbar.value === item.value);
 
-	// `ui-navbar-item` is anatomy, not state: it is the name every climb needs for
-	// "the item this control belongs to".
-	//
-	// The pointer handlers sit on the ITEM rather than on the trigger, so moving
-	// from a trigger down into its own dropdown never counts as leaving. That is why
-	// this family needs no close delay and no safe polygon: the panel is inside the
-	// element the pointer is still in.
+	// The pointer handlers sit on the item, not the trigger, so moving from a trigger into its own dropdown never counts as leaving.
 	<div
 		{...rest}
 		ui-navbar-item=""
@@ -212,8 +172,7 @@ export function NavbarItem({
 			const from = event.target as HTMLElement;
 			const box = from.closest('[ui-navbar-item]') as HTMLElement | null;
 			const came = event.relatedTarget as Node | null;
-			// pointerover fires again for every element inside the item; only the
-			// crossing that came from outside it is an enter.
+			// pointerover fires again for every element inside the item; only a crossing from outside it is an enter.
 			if (
 				navbar.hover !== true ||
 				navbar.value === item.value ||
@@ -224,9 +183,6 @@ export function NavbarItem({
 				return;
 			}
 
-			// Instant while any dropdown is already showing, delayed only on the cold
-			// start: if you are already browsing the navbar you expect the next one at
-			// once, rather than for a fixed window after the last close.
 			const now = Date.now();
 			const isReadyToOpen =
 				navbar.value !== '' ||
@@ -239,11 +195,7 @@ export function NavbarItem({
 				item.graceUntil = now + navbar.clickGrace;
 				navbar.show(item.value);
 			} else if (item.restingUntil === 0) {
-				// The timer touches the DOM only, and re-delivers the crossing rather
-				// than opening: shared-instance reads are rewritten at the handler
-				// symbol's top level and NOT inside a nested closure, so `navbar.show()`
-				// in here is `ReferenceError: navbar is not defined`. The deadline left
-				// on the instance is what tells the second run the wait is over.
+				// The timer re-delivers the crossing rather than opening: shared reads are rewritten only at the handler's top level, so `navbar.show()` inside this closure is a ReferenceError.
 				const wait = navbar.delay;
 				item.restingUntil = now + wait;
 				item.openTimer = window.setTimeout(() => {
@@ -257,20 +209,12 @@ export function NavbarItem({
 			const box = from.closest('[ui-navbar-item]') as HTMLElement | null;
 			const nav = from.closest('nav');
 			const went = event.relatedTarget as Node | null;
-			// Leaving this item abandons the open it had scheduled.
 			if (box !== null && (went === null || box.contains(went) !== true)) {
 				window.clearTimeout(item.openTimer);
 				item.openTimer = 0;
 				item.restingUntil = 0;
 			}
-			// Closing is decided against the LANDMARK, not against the item: moving from
-			// a trigger down into its own dropdown, or across to the next entry, must
-			// not close anything.
-			//
-			// It lives here rather than on the root because the runtime hands an event
-			// to the NEAREST part that declared a handler for it and stops: with the
-			// same rule written on `navbar.root`, the item's own handler shadowed it and
-			// the root's never ran.
+			// Written here rather than on the root: the runtime hands the event to the nearest part that declared a handler and stops.
 			if (
 				navbar.hover === true &&
 				nav !== null &&
@@ -293,10 +237,7 @@ export function NavbarItemTrigger({
 	const item = navbarItemState();
 	const isOpen = computed(() => navbar.value === item.value);
 
-	// A native <button> already activates on Enter and on Space, so those two keys
-	// need no rule; ArrowDown is the authoring practices' optional "open and step
-	// inside". Escape is not here: the overlay primitive reports it as a `dismiss`
-	// on the panel, and `navbar.itemcontent` decides what it means.
+	// Escape is not here: the overlay primitive reports it as a `dismiss` on the panel.
 	<button
 		{...rest}
 		type="button"
@@ -305,14 +246,11 @@ export function NavbarItemTrigger({
 		ui-open={isOpen}
 		ui-closed={isOpen !== true}
 		onClick={(event) => {
-			// A dropdown that just opened under the resting pointer is not something the
-			// click that followed should shut. A timestamp comparison rather than a
-			// second timer, read where the decision is made.
+			// A dropdown that just opened under the resting pointer must not be shut by the click that followed.
 			if (item.graceUntil <= Date.now()) navbar.toggle(item.value);
 			onClick?.(event);
 		}}
 		onKeydown={(event) => {
-			// Guarded by event fields alone, for the reason the root's handler gives.
 			if (
 				event.key === 'ArrowDown' ||
 				event.key === 'ArrowLeft' ||
@@ -328,11 +266,7 @@ export function NavbarItemTrigger({
 				navbar.show(item.value);
 				const box = from.closest('[ui-navbar-item]');
 				const panel = box === null ? null : box.querySelector('[ui-navbar-dropdown]');
-				// The panel is still `hidden` on the next line: the write above starts a
-				// dispatch and the DOM lands after this handler returns, and nothing
-				// inside a hidden subtree can take focus. So the focus move waits for the
-				// DOM rather than for the call, in a callback that touches the DOM only,
-				// and it gives up after 200 ms rather than spinning.
+				// The panel is still `hidden` here - the DOM lands after this handler returns - so the focus move waits for the DOM, not the call.
 				let tries = 0;
 				const stepIn = () => {
 					tries = tries + 1;
@@ -355,9 +289,6 @@ export function NavbarItemTrigger({
 				return;
 			}
 
-			// The top level walks with the left and right arrows, and the walk skips
-			// anything inside an open dropdown. It stays on the DOM for the reason the
-			// root's walk gives: no primitive builds the ordered collection.
 			const nav = from.closest('nav');
 			const here = from.closest('a[href], button:not([disabled])') as HTMLElement | null;
 			if (nav !== null && here !== null) {
@@ -367,8 +298,6 @@ export function NavbarItemTrigger({
 				const at = walk.indexOf(here);
 				const last = walk.length - 1;
 				const raw = at + (key === 'ArrowRight' ? 1 : -1);
-				// The ends wrap, which is what the authoring practices' own
-				// disclosure-navigation example does.
 				const to = raw < 0 ? last : raw > last ? 0 : raw;
 				const next = walk[to];
 				if (at >= 0 && next) next.focus();
@@ -388,16 +317,8 @@ export function NavbarItemContent({
 	const item = navbarItemState();
 	const isOpen = computed(() => navbar.value === item.value);
 
-	// Closed hides the panel, it never detaches it: the trigger points at this
-	// element's minted id, and an unmount would leave that reference dangling.
-	// Never detaching is also what the overlay mark below requires - an enlisted
-	// element removed from the document leaves the stack's marks behind.
-	//
-	// `overlay` is the bare attribute the primitive reads, and nothing is imported
-	// for it. The panel enlists when `hidden` flips off and leaves the stack when it
-	// flips back on, and while it is enlisted the primitive reports Escape and an
-	// outside press as a `dismiss`. It closes nothing and moves no focus: both are
-	// decided in `onDismiss` below.
+	// Closed hides the panel, never detaches it: the trigger points at this element's minted id, and an enlisted element removed from the document leaves the overlay stack's marks behind.
+	// `overlay` is a bare attribute the primitive reads; while enlisted it reports Escape and outside presses as `dismiss`, closing nothing and moving no focus itself.
 	<div
 		{...rest}
 		el={item.contentEl}
@@ -407,42 +328,23 @@ export function NavbarItemContent({
 		ui-open={isOpen}
 		ui-closed={isOpen !== true}
 		onDismiss={(event) => {
-			// A disclosure answers to both reasons - Escape, and a press outside the
-			// panel - which is what the authoring practices' dismissability
-			// requirement asks for and what QDS gets from `popover="auto"`.
 			const from = event.target as HTMLElement;
 			const box = from.closest('[ui-navbar-item]');
 			const back = box?.querySelector('[aria-expanded]') as HTMLElement | null;
-			// Read before the close: a hidden subtree cannot hold focus, so after the
-			// dispatch lands the answer is no longer available.
+			// Read before the close: a hidden subtree cannot hold focus, so afterwards the answer is gone.
 			const wasFocusInside = box !== null && box.contains(document.activeElement);
-			// Where the press landed, which the report carries for `outside-press` and
-			// omits for Escape. `contains` rather than `===`: a consumer is free to put
-			// an icon or a span inside the trigger, and the press lands on that.
-			// The double cast is a stopgap on a type-service slip, not a DOM fact:
-			// `pressTarget` is declared with the branded markup `Element`.
+			// `contains` rather than `===`: a consumer may put an icon inside the trigger, and the press lands on that.
 			const pressed = event.detail.pressTarget;
 			const onOwnTrigger = pressed !== undefined && back !== null && back.contains(pressed);
 			navbar.closeAll();
-			// The press that dismissed may be the same press whose click the trigger is
-			// about to see: without a guard, pressing the trigger of an open dropdown
-			// closes it on the press and re-opens it on the click. Armed by IDENTITY, not
-			// by timing - only a press on this item's own trigger can produce that
-			// collision, so a press anywhere else leaves the very next click free even
-			// though it falls inside `clickGrace`. The window still bounds the swallow,
-			// because the click that pairs with the press may never arrive.
+			// Without this, pressing an open dropdown's trigger closes it on the press and re-opens it on the click; armed by identity, so a press elsewhere leaves the next click free.
 			if (onOwnTrigger) item.graceUntil = Date.now() + navbar.clickGrace;
-			// The primitive moves no focus, so the return is the family's to write:
-			// Escape from inside the entry has to land on the button that opened the
-			// panel, or a person is left standing on nothing. A dismissal that reached
-			// no focus of ours moves none.
+			// The primitive moves no focus, so Escape's return to the trigger is the family's to write.
 			if (event.detail.reason === 'escape' && wasFocusInside) back?.focus();
 			onDismiss?.(event);
 		}}
 		onKeydown={(event) => {
-			// Guarded by event fields alone, for the reason the root's handler gives.
-			// Escape is not in the list: the primitive's document listener reads
-			// `defaultPrevented`, and this family has no default to suppress.
+			// Escape is not in the list: the primitive's document listener reads `defaultPrevented`.
 			if (
 				event.key === 'ArrowUp' ||
 				event.key === 'ArrowDown' ||
@@ -471,8 +373,6 @@ export function NavbarItemContent({
 				return;
 			}
 
-			// The panel's own links, in DOM order. It stays on the DOM for the reason
-			// the root's walk gives: no primitive builds the ordered collection.
 			const walk = Array.from(
 				panel.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'),
 			);
@@ -490,33 +390,13 @@ export function NavbarItemContent({
 }
 
 export function NavbarItemLink({ current, children, onKeydown, ...rest }: NavbarItemLinkProps) @{
-	// It resolves no instance at all: the only reason it once read `navbarState`
-	// was `closeAll()` for its own Escape branch, and the overlay primitive owns
-	// that report now.
-	//
-	// The priority-1 assertion the QDS reference cannot make: `spec.md` designed
-	// this part, named it `navbar.itemlink`, and the code never shipped it, so
-	// aria-at's `stateCurrentPage` had nowhere to land.
-	//
-	// It roots no ITEM instance, so it works at the top level and inside a dropdown
-	// alike, and `current` is per LINK: a dropdown holds many links and only one of
-	// them is the page you are on.
-	//
-	// `false` rather than `undefined` on the links you are not on: the attribute
-	// writer reads `false` as "remove this", where `undefined` compiles to no update
-	// record at all. And `current` carries no destructuring default because a
-	// template position reads the raw prop
-	// (MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED).
+	// `false` rather than `undefined` removes the attribute; `undefined` compiles to no update record at all.
+	// `current` takes no destructuring default: a template position reads the raw prop (MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED).
 	<a
 		{...rest}
 		aria-current={current === true ? 'page' : false}
 		ui-active={current === true}
 		onKeydown={(event) => {
-			// Guarded by event fields alone, for the reason the trigger's handler gives.
-			// Every key this part might act on is listed, because which ones it DOES act
-			// on is decided below from where the link sits. Escape is not among them:
-			// the panel this link sits in carries the overlay mark, and the primitive
-			// reports Escape there.
 			if (
 				event.key === 'ArrowUp' ||
 				event.key === 'ArrowDown' ||
@@ -532,10 +412,7 @@ export function NavbarItemLink({ current, children, onKeydown, ...rest }: Navbar
 			const from = event.target as HTMLElement;
 			const panel = from.closest('[ui-navbar-dropdown]');
 
-			// One walk, two scopes. Inside a dropdown all six movement keys walk the
-			// panel's own links; at the top level only the left and right arrows walk,
-			// and they skip anything inside an open dropdown. Both stay on the DOM for
-			// the reason the root's walk gives: no primitive builds the collection.
+			// One walk, two scopes: inside a dropdown all six keys walk its links, at the top level only the arrows walk and they skip open dropdowns.
 			const isInsideDropdown = panel !== null;
 			const isForwardKey = key === 'ArrowRight' || (isInsideDropdown && key === 'ArrowDown');
 			const isBackwardKey = key === 'ArrowLeft' || (isInsideDropdown && key === 'ArrowUp');
