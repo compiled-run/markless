@@ -17,11 +17,13 @@
 
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { chromium } from '@playwright/test';
+import { chromium, type Page } from '@playwright/test';
 import { FAMILY_ANCHORS, PREVIEW_ORIGIN, type FamilyName } from '../preview-server.ts';
 
+type AriaRole = Parameters<Page['getByRole']>[0];
+
 /** The role each family puts in the accessibility tree when it has rendered. */
-const RENDERED_ROLE: Record<FamilyName, string> = {
+const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	checkbox: 'checkbox',
 	toggle: 'switch',
 	textbox: 'textbox',
@@ -101,7 +103,12 @@ async function main() {
 		for (const [family, anchor] of Object.entries(FAMILY_ANCHORS) as [FamilyName, string][]) {
 			const section = anchor.slice(anchor.indexOf('#') + 1);
 			const role = RENDERED_ROLE[family];
-			const count = await page.locator(`#${section} [role="${role}"]`).count();
+			// Roles are read off the accessibility tree, not off a `role` attribute:
+			// a native <input> is a textbox without ever spelling the role out.
+			const count = await page
+				.locator(`#${section}`)
+				.getByRole(role, { includeHidden: true })
+				.count();
 			if (count === 0) {
 				failures.push(`#${section} rendered no role="${role}", so ${family} is not on the page.`);
 				continue;
