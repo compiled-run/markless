@@ -252,8 +252,7 @@ test('the play trigger flips its label and never claims a pressed state', async 
 	expect(el(PlayTrigger).hasAttribute('aria-pressed')).toBe(false);
 });
 
-// Pinned: defect 79 (setInterval-callback graph writes never reach the DOM) - board ledger; un-pin when it lands.
-test.fails('autoplay advances the slides and turns the live region off while it runs', async () => {
+test('autoplay advances the slides and turns the live region off while it runs', async () => {
 	await render(GalleryAutoplay);
 
 	await userEvent.click(el(PlayTrigger));
