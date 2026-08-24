@@ -5,6 +5,7 @@ import { collectPublicRenderComponentDefinitions } from './component-definitions
 import { emitDirectPublicRenderModule } from './direct-module.ts';
 import { emitPublicSsrRenderModule } from './ssr-module.ts';
 import { firstComponentRoot, selectPublicRenderRoot } from './plan.ts';
+import { needsWidgetInstanceTokens } from './residue-reader.ts';
 import { hasExecutableBodyStatements, sharedInstanceLocalNames } from './render-body.ts';
 import { sameModuleSsrComponentNames, ssrComponentFunctionName } from './same-module.ts';
 import { componentPropNames, isFragmentNode } from './shared.ts';
@@ -32,6 +33,7 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 			ssrExportName: null,
 			ssrComponentExports: [],
 			componentDefinitions: [],
+			needsWidgetInstanceTokens: false,
 			diagnostics: input.publicRenderPlan.diagnostics,
 		};
 	}
@@ -117,6 +119,7 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 		ssrExportName: ssrModuleSource ? 'marklessRenderSsr' : null,
 		ssrComponentExports,
 		componentDefinitions,
+		needsWidgetInstanceTokens: !!root && needsWidgetInstanceTokens(input),
 		diagnostics: input.publicRenderPlan.diagnostics,
 	};
 }
