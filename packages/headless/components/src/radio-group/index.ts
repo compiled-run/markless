@@ -1,7 +1,6 @@
 export {
 	RadioGroupDescription as description,
 	RadioGroupError as error,
-	RadioGroupField as field,
 	RadioGroupItem as item,
 	RadioGroupItemField as itemfield,
 	RadioGroupItemIndicator as itemindicator,
@@ -18,7 +17,6 @@ export {
 export type {
 	RadioGroupDescriptionProps,
 	RadioGroupErrorProps,
-	RadioGroupFieldProps,
 	RadioGroupItemFieldProps,
 	RadioGroupItemIndicatorProps,
 	RadioGroupItemLabelProps,

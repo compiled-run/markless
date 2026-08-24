@@ -2,14 +2,13 @@ import { state } from '@markless/core';
 import { radiogroup } from '../../index.ts';
 
 // What a real radio group looks like: the options are data, and the items come
-// from a keyed loop over them. The field is written after the loop on purpose:
-// where it sits must not decide what the options submit under.
+// from a keyed loop over them - rows built by a loop take the group's name the
+// same as options written flat.
 export function OptionsFromData() @{
 	let plans = state(['monthly', 'annual', 'lifetime']);
 
-	<radiogroup.root data-testid="root">
+	<radiogroup.root data-testid="root" name="plan">
 		<radiogroup.label data-testid="label">Billing Period</radiogroup.label>
-		<radiogroup.field name="plan" />
 		<div data-testid="rows">
 			@for (const plan of plans; key plan) {
 				<radiogroup.item value={plan} data-testid="row">

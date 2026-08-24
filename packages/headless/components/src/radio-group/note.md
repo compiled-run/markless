@@ -25,7 +25,8 @@ registry and no construction-order index.
    before any item. `name` and `required` are plain props on `radiogroup.root`
    here: one fewer part, no ordering footgun, and `field` keeps the meaning it
    has in checkbox, toggle and textbox — the hidden native control. Research §7
-   argues this; §9.1 flagged it as wanting a ruling.
+   argues this, §9.1 flagged it as wanting a ruling, and the ruling is that the
+   family has one field part, `itemfield`.
 2. **`root` is a `<fieldset>` and `label` is its `<legend>`.** The group's
    accessible name with no id, no IDREF and no minted token, which is what
    `MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT` makes impossible via
@@ -160,33 +161,21 @@ set on a hand-rolled clipping span (duplicates the a11y-critical style
 `firstElementChild`), and binding it on the item host (still needs a
 `querySelector` per row to reach the input).
 
-## The group field, and what a loop cannot pick up from it
+## Why `name` and `required` sit on the root
 
-`radiogroup.field` is QDS's group-level part (`radio-group-field.tsx`) and it is
-back: it takes `name` and `required`, writes them onto the group instance, and
-shows nothing. QDS's root carries neither prop, so ours no longer does either —
-one place decides what a form receives, and it is the field.
+The group's form configuration is declared by `radiogroup.root`, and
+`radiogroup.itemfield` is the family's one `field` part — the hidden native
+radio, the same meaning `field` carries in checkbox, toggle, textbox, select and
+combobox. A second, renderless `field` part carrying `name` and `required` was
+tried and removed: one role, one meaning.
 
-Measured 2026-08-23, and the reason one suite row is skipped: **what a part
-writes to the group instance never reaches parts built inside a keyed `@for`
-row.** Options written flat take the name (the plan-picker form rows are green);
-options from a loop carry `name=""`. Three shapes were measured in
-`options-from-data.tsrx`, all giving `["","",""]`:
-
-- the field written before the loop
-- the field written after the loop
-- the item field reading the name through a `computed()` cell on the instance
-  rather than as a bare field read
-
-A 2 second poll never resolves, so this is not a late refresh — the rows read the
-instance as the root left it. It is not QDS's documented ordering constraint
-either (QDS warns only about a field written after items have rendered); here the
-field is first and the rows still miss it.
-
-The hole is bounded: looped options still choose, walk and reconcile, they just
-submit under no name. It was not visible before this change because `name` used
-to be a root prop, and the root always writes before rows are built. The fix is a
-framework one — a part's declaration has to reach the rows of a loop in the same
-widget — not a family workaround, and keeping `name` on the root as a second
-place to declare it is exactly the alternative surface the family is not allowed
-to invent.
+That placement is also what makes looped options submit. Measured 2026-08-23:
+**what a part writes to the group instance never reaches parts built inside a
+keyed `@for` row.** With `name` declared by a separate part, options written flat
+took it while rows from a loop carried `name=""`, and a 2 second poll never
+resolved it — the rows read the instance as the root left it. Three shapes were
+measured in `options-from-data.tsrx` (the part before the loop, after the loop,
+and the item field reading through a `computed()` cell), all giving `["","",""]`.
+The root always writes before rows are built, so declaring there avoids the hole
+rather than working around it. The framework gap is still real for any other part
+that writes to a shared instance a loop's rows read.
