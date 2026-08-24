@@ -137,7 +137,6 @@ export function ToasterRoot({
 	</ol>
 }
 
-/** One message. `--index` and `--offset` are the stacking data a consumer's own styles read; `ui-front` marks the front one. */
 export function ToasterItem({ toast, children, ...rest }: ToasterItemProps) @{
 	const toaster = toasterState();
 	const item = toasterItemState();
@@ -153,7 +152,6 @@ export function ToasterItem({ toast, children, ...rest }: ToasterItemProps) @{
 	<li {...rest} ui-toast="" ui-tone={item.tone} ui-front={isFront} style={stacking}>{children}</li>
 }
 
-/** The message's words. Left empty it renders the title it was given. */
 export function ToasterItemTitle({ children, ...rest }: ToasterItemTitleProps) @{
 	const item = toasterItemState();
 
@@ -166,7 +164,6 @@ export function ToasterItemTitle({ children, ...rest }: ToasterItemTitleProps) @
 	</div>
 }
 
-/** The line under the title. Left empty it renders the description it was given. */
 export function ToasterItemDescription({ children, ...rest }: ToasterItemDescriptionProps) @{
 	const item = toasterItemState();
 
@@ -179,7 +176,6 @@ export function ToasterItemDescription({ children, ...rest }: ToasterItemDescrip
 	</div>
 }
 
-/** The tone's mark. Hidden from readers: the words carry the meaning. */
 export function ToasterItemIcon({ children, ...rest }: ToasterItemIconProps) @{
 	const item = toasterItemState();
 
@@ -192,7 +188,6 @@ export function ToasterItemIcon({ children, ...rest }: ToasterItemIconProps) @{
 	</span>
 }
 
-/** Dismisses the message it sits in. It needs no id: the item it is inside knows. */
 export function ToasterItemClose({ children, onClick, ...rest }: ToasterItemCloseProps) @{
 	const toaster = toasterState();
 	const item = toasterItemState();

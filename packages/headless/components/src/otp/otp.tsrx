@@ -63,7 +63,6 @@ export function OtpRoot({
 	<div {...rest} style="position: relative;" ui-disabled={otp.disabled}>{children}</div>
 }
 
-/** The one tab stop, accessibility-tree control and paste target; a consumer's `onInput` runs after the family has taken the value. */
 export function OtpField({ onInput, onFocus, ...rest }: OtpFieldProps) @{
 	const otp = otpState();
 
