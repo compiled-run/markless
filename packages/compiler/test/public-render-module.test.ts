@@ -282,6 +282,31 @@ export function App() @{
 	expect(graphOnly.publicRenderModule.ssrModuleSource).not.toContain('repeatItems:');
 });
 
+test('SSR repeat rows over a shared instance come from the graph, not a callback', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/SharedList.tsrx',
+		source: `
+import { shared, state } from '@markless/core';
+export const listBox = shared(() => {
+	const box = state({ items: [{ id: 'a', label: 'A' }] });
+	return { ...box };
+}, { scope: 'widget' });
+export function List() @{
+	const box = listBox();
+	<ul>@for (const item of box.items; key item.id) { <li>{item.label}</li> }</ul>
+}
+`,
+		symbols: [],
+	});
+
+	const source = result.publicRenderModule.ssrModuleSource;
+	// Defect 86: this used to emit `case "repeat:0":return (box.items);` into a
+	// module scope that declares no `box`, throwing on the first server render.
+	expect(source).not.toContain('repeatItems:');
+	expect(source).not.toContain('box.items');
+	expect(source).toContain('"shared:src/SharedList.tsrx#listBox/state:box"');
+});
+
 test('SSR seeds only the prop cells an arm rebuild reads back', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/Lantern.tsrx',
