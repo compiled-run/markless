@@ -290,3 +290,99 @@ test('callback capture writes close over DOM and async subscribers and disable s
 	expect(result.unknownRecordModuleIds).not.toContain('core/web/resume');
 	expect(result.unknownRecordModuleIds).not.toContain('web/payload-full');
 });
+
+/**
+ * The building half of a keyed repeat is folded into the record that can reach
+ * it, because the record is where the fact lives: `rowTemplate` is markup for a
+ * key the server never sent, `emptyArm` is markup for "nothing matches", and a
+ * record carrying neither can never mint or raise anything. The bundler reads
+ * this to decide whether the app writes the mint's specifier at all, so a repeat
+ * that only reorders must leave the module id off - otherwise every app with a
+ * list ships the chunk.
+ */
+function repeatDemandMap(
+	repeat: Record<string, unknown>,
+): ReturnType<typeof createRuntimeDemandMap> {
+	return createRuntimeDemandMap(
+		{
+			symbolResolver: {
+				passId: 'symbol-resolver',
+				dynamicImportOwner: 'generated-symbol-resolver',
+				syncPolicies: [],
+				diagnostics: [],
+				symbols: [],
+			},
+			symbolModules: { passId: 'symbol-modules', modules: [], diagnostics: [] },
+			publicRenderModule: {
+				passId: 'public-render-module',
+				moduleSource: '',
+				ssrModuleSource: '',
+				rootExportName: null,
+				ssrExportName: null,
+				diagnostics: [],
+			},
+			protocolView: {
+				version: 1,
+				locators: [],
+				behaviors: [],
+				elementHandles: [],
+				branches: [],
+				events: [],
+				domUpdates: [],
+				asyncBoundaries: [],
+				keyedRepeats: [
+					{
+						id: 'repeat:0',
+						parentHostNodeId: 'host:list',
+						collectionGraphNodeId: 'state:rows',
+						collectionPath: [],
+						keyPath: ['id'],
+						itemName: 'row',
+						rowEvents: [],
+						...repeat,
+					},
+				],
+			},
+			protocolState: { version: 1, cells: [], computed: [] },
+		} as never,
+		'plain-ssr',
+	);
+}
+
+function repeatRecordModules(
+	map: ReturnType<typeof createRuntimeDemandMap>,
+): ReadonlyArray<string> {
+	return (
+		map.payloadRecords.find((record) => record.kind === 'keyed-repeat')?.runtimeModuleIds ?? []
+	);
+}
+
+test('a repeat that only reorders served rows demands no row mint', () => {
+	const modules = repeatRecordModules(repeatDemandMap({}));
+	expect(modules).toContain('web/resume-keyed-repeats');
+	expect(modules).not.toContain('web/fns/row-mint');
+});
+
+test('a repeat carrying row markup demands the row mint', () => {
+	expect(
+		repeatRecordModules(
+			repeatDemandMap({ rowTemplate: { html: '<li></li>', textSlots: [] } }),
+		),
+	).toContain('web/fns/row-mint');
+});
+
+test('a repeat carrying an @empty arm demands the row mint', () => {
+	expect(repeatRecordModules(repeatDemandMap({ emptyArm: { html: '<li></li>' } }))).toContain(
+		'web/fns/row-mint',
+	);
+});
+
+test('the row mint reaches a row action through its own repeat record', () => {
+	const map = repeatDemandMap({
+		rowTemplate: { html: '<li></li>', textSlots: [] },
+		rowEvents: [{ hostPath: [0], eventName: 'click', symbolIds: [] }],
+	});
+	const action = map.actions.find((candidate) => candidate.recordKind === 'keyed-repeat-row');
+	expect(action?.payloadRecordIds).toContain('keyed-repeat:repeat:0');
+	expect(action?.runtimeModuleIds).toContain('web/fns/row-mint');
+});

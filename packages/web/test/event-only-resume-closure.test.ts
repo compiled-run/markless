@@ -14,6 +14,7 @@ const resumeOnDemandEntries = [
 	join(repoRoot, 'packages/web/src/resume-behaviors.ts'),
 	join(repoRoot, 'packages/web/src/resume-branches.ts'),
 	join(repoRoot, 'packages/web/src/resume-keyed-repeats.ts'),
+	join(repoRoot, 'packages/web/src/fns/row-mint.ts'),
 	join(repoRoot, 'packages/web/src/resume-sync-computed.ts'),
 ] as const;
 // 4,800 gzip bytes * the observed ~6.02 raw:minified+gzip ratio leaves a

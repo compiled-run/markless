@@ -55,6 +55,11 @@ const BEHAVIOR = ['web/resume-behaviors'];
 // every app would ship the chunk, so the app's own emitted module writes it and
 // this record is what tells the bundler to.
 const OVERLAY = ['web/fns/overlay'];
+// The node-BUILDING half of a keyed repeat, folded into the record that can
+// reach it. A record carrying neither `rowTemplate` nor `emptyArm` cannot mint a
+// row or raise an `@empty` arm at all, so recording the demand per record is
+// what lets the bundler keep the chunk off every app whose repeats only reorder.
+const ROW_MINT = ['web/fns/row-mint'];
 const FULL_RESUME_CORE = ['web/resume-locators'];
 const FULL_TIER_COMMON = [
 	'web/resume-runtime',
@@ -608,6 +613,7 @@ function payloadDemandRecords(
 			runtimeModuleIds: unique([
 				...rowDispatchCore,
 				...KEYED_REPEAT,
+				...(record.rowTemplate ?? record.emptyArm ? ROW_MINT : []),
 				...(replacement.scalarRows ? [] : renderRuntimeModuleIds),
 			]),
 		})),

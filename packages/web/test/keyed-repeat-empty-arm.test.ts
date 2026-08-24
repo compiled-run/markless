@@ -16,7 +16,12 @@ import type {
  * document without saying so would shift the index of every element after this
  * repeat. These assertions read the census directly, which the browser witnesses
  * in vitest-browser cannot do.
+ *
+ * Raising the arm is node-building, so it comes from the same handed-in module a
+ * minted row does; the line below stands in for the loader a compiled app emits.
  */
+(globalThis as { __marklessRowMint?: () => Promise<unknown> }).__marklessRowMint = () =>
+	import('../src/fns/row-mint.ts');
 
 type Node = {
 	nodeType: number;

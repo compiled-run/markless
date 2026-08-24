@@ -452,6 +452,45 @@ function emitOverlayLoaderInstall(): string {
 	].join('\n');
 }
 
+/**
+ * The same one line for the row mint, and for the same reason.
+ *
+ * `resume-keyed-repeats` is loaded by EVERY repeat, so it cannot name the
+ * building half: doing so makes an app whose rows only reorder emit the mint
+ * chunk anyway. Written here, the specifier exists only in a build the compiler
+ * recorded a mintable repeat for; the repeat runtime reads the loader off the
+ * global and refuses to build without one.
+ */
+function emitRowMintLoaderInstall(): string {
+	return "globalThis.__marklessRowMint = () => import('@markless/web/fns/row-mint');";
+}
+
+/**
+ * True when the compiler folded the mint into a keyed-repeat record - which it
+ * does exactly for a record carrying `rowTemplate` or `emptyArm`, the two fields
+ * that make a repeat able to build nodes.
+ */
+function demandsRowMint(runtimeDemandMap: unknown): boolean {
+	const records = (
+		runtimeDemandMap as {
+			readonly payloadRecords?: ReadonlyArray<{
+				readonly kind?: string;
+				readonly runtimeModuleIds?: ReadonlyArray<string>;
+			}>;
+		}
+	)?.payloadRecords;
+	return (
+		Array.isArray(records) &&
+		records.some(
+			(record) =>
+				record.kind === 'keyed-repeat' &&
+				record.runtimeModuleIds?.includes(ROW_MINT_RUNTIME_MODULE_ID) === true,
+		)
+	);
+}
+
+const ROW_MINT_RUNTIME_MODULE_ID = 'web/fns/row-mint';
+
 /** True when the compiler recorded an `overlay` mark for this module. */
 function demandsOverlay(runtimeDemandMap: unknown): boolean {
 	const records = (
@@ -548,6 +587,12 @@ export function emitResumeModule(input: {
 		// all. The loader stays unresolved until a resumed root turns out to carry
 		// a marked element, so having the mark somewhere is still not fetching it.
 		demandsOverlay(input.runtimeDemandMap) ? emitOverlayLoaderInstall() : null,
+		// Row building is pay-per-use the same way: this module is the ONLY place
+		// the mint's specifier is written, so an app whose repeats carry neither
+		// `rowTemplate` nor `emptyArm` never emits its chunk. The loader stays
+		// unresolved until a repeat that can build actually wires, so having a
+		// mintable repeat somewhere is still not fetching it.
+		demandsRowMint(input.runtimeDemandMap) ? emitRowMintLoaderInstall() : null,
 		scalarSpecializations.length > 0
 			? [
 					"import { marklessDecodeScalarCell, marklessReadScalarCell, marklessScalarSpecializedError } from '@markless/web/fns/scalar-specialized';",
