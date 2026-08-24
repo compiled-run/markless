@@ -119,6 +119,47 @@ to the enabled ones, from the event's own target. No registry, no ids. Arrow key
 move focus **and** choose — the APG rule for this pattern, and the one every
 hand-rolled radio group in the wild gets wrong.
 
+### Why the collection handle cannot replace that walk yet
+
+Measured 2026-08-23 on the pilot tip that landed array-typed `element()` handles
+(the C-prime capability). Converting the walk needs `element<HTMLInputElement[]>()`
+on the group instance, bound on **the element the walk focuses** — the native
+radio. That element already carries `el={item.fieldEl}`, because
+`radiogroup.itemlabel` points `for` at it, and the suite pins
+`label[for] === input[id]` for every option.
+
+An element accepts exactly one `el`, so the two cannot both land there. Both
+spellings were compiled, and both are refused:
+
+- `el={[item.fieldEl, group.fieldEls]}` — `MARKLESS_ELEMENT_HANDLE_REQUIRED`:
+  "[item.fieldEl, group.fieldEls]" is an unknown value, not an element() handle.
+- dropping the singular so the plural can bind — `MARKLESS_ELEMENT_HANDLE_IDREF_UNBOUND`
+  on `for={item.fieldEl}`.
+
+Pointing `for` at the plural handle instead is refused by design: the C-prime
+ruling keeps IDREF positions at exactly one element
+(`MARKLESS_ELEMENT_HANDLE_PLURAL_IDREF`).
+
+So the gap is not radio-group's shape, it is that one element cannot be both a
+singular IDREF target and a member of a declared set. Two ways out, both bigger
+than this family:
+
+1. Let `el` carry several handles on one element, each resolved under the rules it
+   already has (one singular IDREF target beside one plural membership). Then this
+   family converts with no other change.
+2. Move the radio semantics onto `radiogroup.itemtrigger` as a
+   `<button role="radio">`, the shape checkbox already ships — the trigger becomes
+   the focusable element and the label's target, the native input becomes
+   aria-hidden form plumbing, and the set binds the triggers. That reverses
+   deviation 3 above and makes the trigger mandatory, so it is a family redesign,
+   not a conversion.
+
+Workarounds that keep both today were rejected as worse than the walk: binding the
+set on a hand-rolled clipping span (duplicates the a11y-critical style
+`base/visually-hidden.tsrx` owns, and reaches the input through
+`firstElementChild`), and binding it on the item host (still needs a
+`querySelector` per row to reach the input).
+
 ## The group field, and what a loop cannot pick up from it
 
 `radiogroup.field` is QDS's group-level part (`radio-group-field.tsx`) and it is
