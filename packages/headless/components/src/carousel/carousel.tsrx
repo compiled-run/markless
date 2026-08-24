@@ -115,10 +115,7 @@ export const carouselState = shared(
 				pickers[landed]?.focus();
 			},
 
-			/**
-			 * The APG's rule: any focus or hover inside stops the rotation, and only
-			 * the rotation control starts it again.
-			 */
+			/** The APG's rule: any focus or hover inside stops the rotation, and only the rotation control starts it again. */
 			stopAutoplay() {
 				if (carousel.autoplayTimer !== 0) window.clearInterval(carousel.autoplayTimer);
 				carousel.autoplayTimer = 0;
@@ -155,9 +152,7 @@ export const carouselState = shared(
 				const track = scrollEl;
 				if (!engine || !track) return;
 
-				// Pointer capture rather than window listeners: the gesture keeps
-				// arriving here once the pointer leaves the carousel, and markup
-				// window events are not an authored surface yet.
+				// Pointer capture rather than window listeners: the gesture keeps arriving here once the pointer leaves the carousel.
 				track.setPointerCapture(pointerId);
 				carousel.isDragging = true;
 				engine.beginDrag(along, isTouch ? carousel.touchSensitivity : carousel.mouseSensitivity);
@@ -264,9 +259,7 @@ export function CarouselScrollArea({
 }: CarouselScrollAreaProps) @{
 	const carousel = carouselState();
 
-	// Two elements, as QDS has them: the window stays still and the track behind
-	// it moves. The consumer's props land on the window, which is the element
-	// they place and size; the track is what the engine writes its transform on.
+	// Two elements: the consumer's props land on the window they place and size, while the track behind it is what the engine writes its transform on.
 	<div
 		{...rest}
 		el={carousel.viewportEl}
@@ -303,15 +296,12 @@ export function CarouselScrollArea({
 
 export function CarouselItem({ value, children, ...rest }: CarouselItemProps) @{
 	const carousel = carouselState();
-	// The slide's own value as a graph cell. Compared against the prop instead,
-	// the comparison stops refreshing once the page has resumed.
+	// The slide's own value as a graph cell: compared against the prop instead, the comparison stops refreshing once the page has resumed.
 	const slide: CarouselPartInstanceState = state({ value });
-	// One cell read in every position: the same comparison written inline in an
-	// attribute renders once and then goes stale.
+	// One computed() cell - the same comparison written inline in an attribute renders once and then goes stale.
 	const isCurrent = computed(() => carousel.value === slide.value);
 
-	// No focus handler here: focusin bubbles, and the root already stops the
-	// rotation for anything focused inside the carousel.
+	// No focus handler here: focusin bubbles, and the root already stops the rotation for anything focused inside.
 	<div
 		{...rest}
 		el={carousel.slideEls}
@@ -356,10 +346,7 @@ export function CarouselNavTrigger({
 			onFocus?.(event);
 		}}
 		onKeydown={(event) => {
-			// Guarded by event fields alone: a policy that has to beat the browser
-			// must be readable before the handler symbol loads, and a guard written
-			// over locals derived from graph state is
-			// MARKLESS_SYNC_POLICY_UNEXTRACTABLE.
+			// Guarded by event fields alone: a guard over locals derived from graph state is MARKLESS_SYNC_POLICY_UNEXTRACTABLE.
 			if (
 				event.key === 'ArrowRight' ||
 				event.key === 'ArrowLeft' ||

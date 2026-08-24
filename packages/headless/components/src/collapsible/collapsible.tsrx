@@ -26,13 +26,7 @@ export const collapsibleState = shared(
 				collapsible.open = collapsible.open !== true;
 				collapsible.onChange?.(collapsible.open);
 			},
-			/**
-			 * Show the panel the browser has just found text inside. It only ever
-			 * opens: find-in-page reaching into a closed panel is not a person asking
-			 * for an open one to close, and `disabled` does not refuse it either -
-			 * the browser is already revealing the text, so the family's own state
-			 * follows the document rather than disagreeing with it.
-			 */
+			// Find-in-page only ever opens, and `disabled` does not refuse it: the browser is already revealing the text.
 			reveal() {
 				if (collapsible.open === true) return;
 				collapsible.open = true;
@@ -91,19 +85,13 @@ export function CollapsibleContent({
 	...rest
 }: CollapsibleContentProps) @{
 	const collapsible = collapsibleState();
-	// Three values from one expression: absent while the panel shows, plain
-	// `hidden` when the consumer has turned find-in-page off, and
-	// `hidden="until-found"` otherwise. `false` rather than `undefined` for the
-	// open case, because the attribute writer reads `false` as "remove this" and
-	// `undefined` as no record at all.
+	// The open case is `false`, not `undefined`: the attribute writer reads `false` as "remove this" and `undefined` as no record at all.
 	const hiddenPath = computed(() => {
 		if (collapsible.open === true) return false;
 		return collapsible.disableUntilFound ? true : 'until-found';
 	});
 
-	// Closed hides the panel, never detaches it: the trigger's aria-controls points at
-	// this element's minted id, an unmount would leave that reference dangling, and
-	// `hidden="until-found"` only reaches text that is in the page.
+	// Closed hides the panel, never detaches it: the trigger's aria-controls points at this element's minted id, and find-in-page only reaches text that is in the page.
 	<div
 		{...rest}
 		el={collapsible.contentEl}
