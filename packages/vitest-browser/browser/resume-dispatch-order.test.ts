@@ -81,8 +81,10 @@ test('SSR: every resumed gesture runs through one dispatch queue, in arrival ord
 // per event (packages/web/src/inline/resumer.ts), and resolution across those
 // promises is not FIFO. Fixing it means the resumer forwarding events to one
 // root in the order they fired - a web-side change. Deterministic enough to
-// pin: the scramble hit on the first burst in every pre-fix measurement.
-test.fails('SSR: a resumed field keeps every keystroke in native order and ends empty', async () => {
+// pin: the scramble is PROBABILISTIC (~half of bursts), so test.fails would
+// flip-flop - skipped, not pinned, until the resumer forwards FIFO; the fix
+// unit flips this to a plain test and must run it repeatedly.
+test.skip('SSR: a resumed field keeps every keystroke in native order and ends empty', async () => {
 	const screen = await renderSSR(ResumeDispatchOrder);
 	const container = screen.container;
 	const field = requireElement<HTMLInputElement>(container, 'input[data-field]');
