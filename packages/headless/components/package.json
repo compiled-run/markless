@@ -1,7 +1,6 @@
 {
 	"name": "@markless/ui",
 	"version": "0.3.3",
-	"private": true,
 	"description": "Headless, accessible UI components for Markless.",
 	"license": "MIT",
 	"repository": {
@@ -10,13 +9,38 @@
 		"directory": "packages/headless/components"
 	},
 	"files": [
-		"dist"
+		"src",
+		"!src/**/*.browser.ts",
+		"!src/**/*.sr.ts",
+		"!src/**/*.nvda.ts",
+		"!src/**/*.voiceover.ts",
+		"!src/**/*-transcript.ts",
+		"!src/**/note.md",
+		"!src/**/scenarios"
 	],
 	"type": "module",
 	"sideEffects": false,
 	"exports": {
 		".": "./src/index.ts",
-		"./toggle": "./src/toggle/index.ts"
+		"./accordion": "./src/accordion/index.ts",
+		"./carousel": "./src/carousel/index.ts",
+		"./checkbox": "./src/checkbox/index.ts",
+		"./checklist": "./src/checklist/index.ts",
+		"./collapsible": "./src/collapsible/index.ts",
+		"./combobox": "./src/combobox/index.ts",
+		"./modal": "./src/modal/index.ts",
+		"./otp": "./src/otp/index.ts",
+		"./navbar": "./src/navbar/index.ts",
+		"./pagination": "./src/pagination/index.ts",
+		"./progress": "./src/progress/index.ts",
+		"./qrcode": "./src/qr-code/index.ts",
+		"./radiogroup": "./src/radio-group/index.ts",
+		"./select": "./src/select/index.ts",
+		"./tabs": "./src/tabs/index.ts",
+		"./textbox": "./src/textbox/index.ts",
+		"./toaster": "./src/toaster/index.ts",
+		"./toggle": "./src/toggle/index.ts",
+		"./tree": "./src/tree/index.ts"
 	},
 	"dependencies": {
 		"@markless/core": "workspace:*"
@@ -34,5 +58,10 @@
 		"vite": {
 			"optional": true
 		}
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true,
+		"marklessShipsSource": true
 	}
 }

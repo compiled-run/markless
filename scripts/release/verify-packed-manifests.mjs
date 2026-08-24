@@ -184,9 +184,13 @@ try {
 			),
 			...Object.entries(manifest.bin ?? {}).map(([binName, path]) => [`bin.${binName}`, path]),
 		];
+		// A source-shipped package's exports live under src by design.
+		const shipsSource = manifest.publishConfig?.marklessShipsSource === true ||
+			(manifest.marklessShipsSource === true);
+		const requiredPrefix = shipsSource ? './src/' : './dist/';
 		for (const [where, path] of targets) {
-			if (!path.startsWith('./dist/')) {
-				failures.push(`${label}: ${where} -> ${path} must target ./dist`);
+			if (!path.startsWith(requiredPrefix)) {
+				failures.push(`${label}: ${where} -> ${path} must target ${requiredPrefix.slice(0, -1)}`);
 				continue;
 			}
 			const relativePath = path.slice('./'.length);

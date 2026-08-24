@@ -61,6 +61,30 @@ function verifyPackage(packageDir) {
 	if (manifest.publishConfig?.access !== 'public') {
 		failures.push(`${label}: publishConfig.access must be "public"`);
 	}
+	// A source-shipped package (consumer-compiled .tsrx, like the router's app
+	// entries but package-wide): exports stay on src, the tarball ships src, and
+	// the dist rules below do not apply. The flag is the package's own fact.
+	if (manifest.publishConfig?.marklessShipsSource === true) {
+		if (manifest.publishConfig?.provenance !== true) {
+			failures.push(`${label}: publishConfig.provenance must be true (npm provenance attestation)`);
+		}
+		if (typeof manifest.repository?.url !== 'string') {
+			failures.push(`${label}: repository.url is required for npm provenance`);
+		}
+		if (!Array.isArray(manifest.files) || !manifest.files.some((f) => f === 'src' || f.startsWith('src'))) {
+			failures.push(`${label}: files must ship "src" (source-shipped package)`);
+		}
+		for (const [subpath, target] of Object.entries(manifest.exports ?? {})) {
+			for (const path of targetPaths(target)) {
+				if (!path.startsWith('./src/')) {
+					failures.push(`${label}: ${subpath} -> ${path} must target ./src (source-shipped package)`);
+				} else if (!path.includes('*') && !existsSync(resolve(packageDir, path))) {
+					failures.push(`${label}: ${subpath} -> ${path} missing on disk`);
+				}
+			}
+		}
+		return failures;
+	}
 	// Provenance is a package-owned fact, declared once per manifest. The
 	// release workflow must not set NPM_CONFIG_PROVENANCE=true instead; that
 	// would be a second copy of it that can drift.

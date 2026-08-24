@@ -120,6 +120,14 @@ describe('publish manifest shape', () => {
 			expect(manifest.version, `${packageName} version`).toBe(releaseVersion);
 			expect(manifest.license, `${packageName} license`).toBe('MIT');
 			expect(manifest.publishConfig?.access, `${packageName} access`).toBe('public');
+			if (manifest.publishConfig?.marklessShipsSource === true) {
+				// Source-shipped: the tarball IS src, compiled in the consumer's build.
+				expect(
+					manifest.files?.[0],
+					`${packageName} ships src (source-shipped package)`,
+				).toBe('src');
+				return;
+			}
 			expect(manifest.files, `${packageName} files field`).toContain('dist');
 			expect(
 				manifest.files,
@@ -133,6 +141,11 @@ describe('publish manifest shape', () => {
 
 		test(`@markless/${packageName} publishConfig.exports mirrors the dev exports surface into dist`, () => {
 			const manifest = readManifest(packageName);
+			if (manifest.publishConfig?.marklessShipsSource === true) {
+				// Source-shipped: dev exports ARE the published exports; no dist mirror.
+				expect(manifest.publishConfig?.exports, `${packageName} needs no dist mirror`).toBeUndefined();
+				return;
+			}
 			const devExports = manifest.exports ?? {};
 			const publishedExports = manifest.publishConfig?.exports;
 			expect(publishedExports, `${packageName} publishConfig.exports`).toBeDefined();
