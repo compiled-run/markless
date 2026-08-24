@@ -1616,6 +1616,33 @@ export function submoduleUnsupportedDiagnostic(
 	};
 }
 
+// A plain `else` after an @if arm still parses: TSRX reads it as sibling markup
+// text plus a swallowed body, so the page renders the word "else" and the arm's
+// escaped source instead of the branch the author wrote. Nothing downstream can
+// recover the intent, so the spelling is refused at the graph.
+export function branchElseSpellingDiagnostic(input: {
+	readonly node: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_BRANCH_ELSE_SPELLING',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'A branch alternative is spelled `else` instead of `@else`',
+		message:
+			'This `else` follows an @if arm but is not written as `@else`, so it is not read as a branch at all. TSRX parses it as literal text next to the @if, and the block after it becomes a separate expression, so the page renders the word "else" followed by the arm\'s own source as escaped text.',
+		why: 'Markless branches are spelled with the `@` sigil — `@if`, `@else if`, `@else` — because that sigil is what tells the parser a construct starts here. Without it the parser has no branch to attach the alternative to, and the mistake is silent: the module compiles and ships visible garbage instead of failing.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [
+			{ message: 'Write the alternative as `@else { ... }`.' },
+			{ message: 'For a chained condition, write `@else if (condition) { ... }`.' },
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_BRANCH_ELSE_SPELLING',
+	};
+}
+
 export function fallbackSpan(filename: string): SourceSpan {
 	return {
 		filename,

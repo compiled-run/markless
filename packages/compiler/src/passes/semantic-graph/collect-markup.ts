@@ -29,6 +29,7 @@ import type {
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
 	anchorElementHandleDynamicStyleDiagnostic,
+	branchElseSpellingDiagnostic,
 	idrefElementHandleIdConflictDiagnostic,
 } from './diagnostics.ts';
 import { anchorStyleProperty, isIdrefAttribute } from './idref-attributes.ts';
@@ -795,11 +796,37 @@ function emitNodes(
 	const prefix = startPath.slice(0, -1);
 	const startIndex = startPath[startPath.length - 1] ?? 0;
 	let childIndex = startIndex;
+	let previous: AnyNode | null = null;
 	for (const node of nodes) {
 		if (isIgnorableStaticTextNode(node)) continue;
+		if (isPlainElseSpelling(previous, node)) {
+			context.graph.diagnostics.push(
+				branchElseSpellingDiagnostic({ node, filename: context.filename }),
+			);
+		}
+		previous = node;
 		childIndex += emitNode(node, [...prefix, childIndex], builder, context, repeat);
 	}
 	return childIndex - startIndex;
+}
+
+/**
+ * A plain `else` after an @if arm parses as sibling text rather than a branch,
+ * so the arm silently renders as the word "else" plus escaped source. The text
+ * is anchored on the preceding sibling: only text directly after a
+ * JSXIfExpression can be a mis-spelled alternative.
+ *
+ * Two spellings fail open, and the trimmed text tells them apart from prose:
+ * a bare `else` (`} else {`, `} else <p/>`, `} else {}`, or `else` on its own
+ * line all trim to exactly that), and `else if (...)`, whose condition stays in
+ * the text node. Prose that merely starts with the word — "else, sign in." or
+ * "elsewhere" — matches neither and stays clean.
+ */
+const PLAIN_ELSE_TEXT = /^else$|^else\s+if\s*\(/;
+
+function isPlainElseSpelling(previous: AnyNode | null, node: AnyNode): boolean {
+	if (!previous || previous.type !== 'JSXIfExpression') return false;
+	return isStaticTextNode(node) && PLAIN_ELSE_TEXT.test(staticTextValue(node).trim());
 }
 
 function emitAsyncArm(
