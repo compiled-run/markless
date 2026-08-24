@@ -252,6 +252,7 @@ const PROJECTION_MARK_PREFIX = '<!--markless-projection:';
 const PROJECTION_MARK_PATTERN = /<!--markless-projection:(\d+)-->/g;
 
 type ProjectionSpan = {
+	readonly key: string;
 	readonly mark: string;
 	readonly tokens: ReadonlyArray<StructureToken>;
 	consumed: boolean;
@@ -265,13 +266,9 @@ let nextProjectionKey = 0;
 
 function openProjectionSpan(tokens: ReadonlyArray<StructureToken>): ProjectionSpan {
 	const key = String(nextProjectionKey++);
-	const span: ProjectionSpan = { mark: `${PROJECTION_MARK_PREFIX}${key}-->`, tokens, consumed: false };
+	const span: ProjectionSpan = { key, mark: `${PROJECTION_MARK_PREFIX}${key}-->`, tokens, consumed: false };
 	projectionSpans.set(key, span);
 	return span;
-}
-
-function closeProjectionSpan(span: ProjectionSpan | undefined): void {
-	if (span) projectionSpans.delete(span.mark.slice(PROJECTION_MARK_PREFIX.length, -3));
 }
 
 /**
@@ -332,7 +329,7 @@ function projectionNotRenderedError(
 	componentName: string,
 	edgeId: string,
 ): Error & Record<string, unknown> {
-	const message = `MARKLESS_PROJECTION_NOT_RENDERED: <${componentName}> was given projected children but never rendered them, so the elements written into it are counted by the served locator table and absent from the served HTML — every locator after that point would attach to the wrong element. Render \`{children}\` in <${componentName}>'s own markup. A \`{children}\` written inside an @if/@else (or another construct arm) is not rendered today: move it out of the arm, or keep the arm's default content and place the children outside it.`;
+	const message = `MARKLESS_PROJECTION_NOT_RENDERED: <${componentName}> was given projected children but never rendered them, so they are counted by the served locator table and absent from the served HTML. Render \`{children}\` in <${componentName}>'s own markup — a \`{children}\` written inside an @if/@else arm is not rendered today, so move it out of the arm.`;
 	const error = new Error(message) as Error & Record<string, unknown>;
 	error.code = 'MARKLESS_PROJECTION_NOT_RENDERED';
 	error.severity = 'error';
@@ -472,7 +469,7 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 						...(projection ? { projectionHtml: (span?.mark ?? '') + projection.html } : {}),
 					});
 				} finally {
-					closeProjectionSpan(span);
+					if (span) projectionSpans.delete(span.key);
 				}
 				if (!child || typeof child !== 'object')
 					throw new Error(`MARKLESS_SSR_DATA_CHILD_STRUCTURE_MISSING: ${slot.componentEdgeId}`);

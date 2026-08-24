@@ -117,11 +117,22 @@ test('CSR: dismissing a showing message brings the next one forward', async () =
 // Expected red, all three: a consumer's own `@for` written INSIDE `toaster.root`
 // renders nothing. The rows are a repeat inside a component's children slot, and
 // the slot is filled once at render - the queue write lands (the same write fills
-// the default rows in every green row above) and no row follows it. Measured two
-// ways on this tip: with the default rows in an `@else` arm, the page threw
+// the default rows in every green row above) and no row follows it.
+//
+// Defect 97 was one of the two walls measured here and it is now FIXED, but it was
+// the OTHER shape's wall: with the default rows in an `@else` arm, the page threw
 // `RuntimeResumeError: Resume locator h2 expected <div> at DOM order index 3`,
-// and with `{children}` rendered outside the construct the throw goes away and
-// the rows simply never appear. Neither shape produces a diagnostic.
+// because the server appended a projection's structure tokens after the child's
+// own instead of splicing them in at the `{children}` position. That splice landed
+// in packages/web/src/ssr-data/renderer.ts and is pinned by
+// packages/compiler/test/projection-splice.test.ts and
+// packages/vitest-browser/browser/projection-splice.test.ts.
+//
+// These three rows measure the shape `toaster.root` actually ships (`{children}`
+// outside the construct, an `@if (children === undefined)` arm after it), where the
+// throw was already absent and the rows simply never appear. That is a CLIENT-side
+// gap - a repeat inside a projected children slot never renders - and the fix above
+// is server-side, so it does not move them. Neither shape produces a diagnostic.
 test.fails('CSR: the parts written out render the message they were given', async () => {
 	await render(Custom);
 	el<HTMLButtonElement>(page.getByTestId('two')).click();

@@ -122,6 +122,83 @@ export function Box({ children }) @{
 }
 `;
 
+// Every green family root has `{children}` LAST by accident, so the old append
+// happened to agree with the document. These shapes are that accident, plus the
+// nesting and repetition the families actually use. The capture is byte-compared
+// against the pre-fix renderer; nothing here may move.
+const NO_REGRESSION_SHAPES: ReadonlyArray<readonly [string, string]> = [
+	[
+		'children-last',
+		`
+export default function Page() @{
+	<main><Box><p ui-projected="">hello</p></Box><i ui-tail=""></i></main>
+}
+
+export function Box({ children }) @{
+	<div ui-box=""><span ui-lead="">lead</span>{children}</div>
+}
+`,
+	],
+	[
+		'nested-projection',
+		`
+export default function Page() @{
+	<main><Outer><Inner><b ui-deep="">deep</b></Inner></Outer></main>
+}
+
+export function Outer({ children }) @{
+	<section ui-outer="">{children}</section>
+}
+
+export function Inner({ children }) @{
+	<article ui-inner=""><h2 ui-title="">t</h2>{children}</article>
+}
+`,
+	],
+	[
+		'projection-in-a-row',
+		`
+import { state } from '@markless/core';
+
+export default function Page() @{
+	let rows = state([{ id: 'a' }, { id: 'b' }]);
+
+	<ul>
+		@for (const row of rows; key row.id) {
+			<Cell><em ui-cell="">{row.id}</em></Cell>
+		}
+	</ul>
+}
+
+export function Cell({ children }) @{
+	<li ui-wrap="">{children}</li>
+}
+`,
+	],
+	[
+		'projection-with-a-branch-after-it',
+		`
+export default function Page() @{
+	<main><Box><p ui-projected="">hello</p></Box></main>
+}
+
+export function Box({ children }) @{
+	<div ui-box="">{children}@if (true) { <span ui-arm="">arm</span> }</div>
+}
+`,
+	],
+];
+
+test.for(NO_REGRESSION_SHAPES)(
+	'%s: the served table names the element the document walk reaches',
+	async ([, source]) => {
+		const rendered = await renderFixture(source);
+		expect(rendered.html).toMatch(/ui-(projected|cell|deep)/);
+		expect(locatorDisagreements(rendered.html, rendered.structure.locators)).toEqual([]);
+		expect(rendered.structure.elementCount).toBe(documentTagNames(rendered.html).length);
+	},
+);
+
 test('fixture A: markup after {children} keeps the served table in document order', async () => {
 	const rendered = await renderFixture(FIXTURE_A);
 	expect(rendered.html).toContain('ui-projected');
