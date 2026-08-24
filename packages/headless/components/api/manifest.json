@@ -1,0 +1,1835 @@
+{
+	"accordion": {
+		"parts": [
+			{
+				"part": "item",
+				"component": "AccordionItem",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": true,
+						"doc": "This section's own name, and what the root's `value` names."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "This one section opens and closes for nobody."
+					}
+				]
+			},
+			{
+				"part": "itemcontent",
+				"component": "AccordionItemContent",
+				"doc": "The panel. It stays in the page when its section is closed - `hidden` decides\nwhether it shows, never an arm - so focus, scroll position and the ids other\nparts point at all survive a close.",
+				"props": []
+			},
+			{
+				"part": "itemlabel",
+				"component": "AccordionItemLabel",
+				"doc": "The heading a section's trigger sits in. The APG asks for one, and it is what\nnames the panel: `accordion.itemcontent` points its `aria-labelledby` here.",
+				"props": []
+			},
+			{
+				"part": "itemtrigger",
+				"component": "AccordionItemTrigger",
+				"doc": "A consumer's `onClick` runs after the section has opened or closed.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "AccordionRoot",
+				"props": [
+					{
+						"name": "value",
+						"type": "string | readonly string[]",
+						"required": false,
+						"default": "''",
+						"doc": "Which section is showing. A plain string names one section; with `multiple`\nit is the list of sections that are showing. Omit it and everything starts\nclosed."
+					},
+					{
+						"name": "multiple",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Several sections may show at once. Without it, opening one closes the rest."
+					},
+					{
+						"name": "collapsible",
+						"type": "boolean",
+						"required": false,
+						"default": "true",
+						"doc": "Whether the section that is showing may be closed again, leaving nothing\nopen. On by default, which is Qwik UI's own default."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nothing opens or closes while this is set."
+					},
+					{
+						"name": "disableUntilFound",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Closed panels are hidden outright rather than with `until-found`, so the\nbrowser's find-in-page cannot reach the text inside them."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: string | readonly string[]) => void",
+						"required": false,
+						"doc": "Called with the new value when a person opens or closes a section. Omit it\nand the accordion still works; the call site simply does nothing."
+					}
+				]
+			}
+		]
+	},
+	"base": {
+		"parts": [
+			{
+				"part": "button",
+				"component": "Button",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "Label",
+				"props": []
+			},
+			{
+				"part": "visuallyhidden",
+				"component": "VisuallyHidden",
+				"props": []
+			}
+		]
+	},
+	"carousel": {
+		"parts": [
+			{
+				"part": "backtrigger",
+				"component": "CarouselBackTrigger",
+				"doc": "Moves back one step. Labelled \"Previous slide\" unless you say otherwise.",
+				"props": []
+			},
+			{
+				"part": "forwardtrigger",
+				"component": "CarouselForwardTrigger",
+				"doc": "Moves forward one step. Labelled \"Next slide\" unless you say otherwise.",
+				"props": []
+			},
+			{
+				"part": "item",
+				"component": "CarouselItem",
+				"doc": "One slide. It carries `role=\"group\"` and `aria-roledescription=\"slide\"`, or\n`role=\"tabpanel\"` when the carousel has a nav list to pick slides with.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": true,
+						"doc": "Names the slide. A `carousel.navtrigger` with the same value shows it. Required."
+					}
+				]
+			},
+			{
+				"part": "navlist",
+				"component": "CarouselNavList",
+				"doc": "The row of slide pickers. `role=\"tablist\"`.",
+				"props": []
+			},
+			{
+				"part": "navtrigger",
+				"component": "CarouselNavTrigger",
+				"doc": "One slide picker. `role=\"tab\"` inside the nav list's `role=\"tablist\"`.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": true,
+						"doc": "Names the slide this picker shows. Required."
+					}
+				]
+			},
+			{
+				"part": "playtrigger",
+				"component": "CarouselPlayTrigger",
+				"doc": "Starts and stops autoplay. Its label says which one the press will do.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "CarouselRoot",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The value of the slide showing now. A slide is named by its `value`, and\nnothing counts positions for you, so name the slide that should show."
+					},
+					{
+						"name": "autoplay",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Slides advance on their own. Start it from a `carousel.playtrigger`."
+					},
+					{
+						"name": "draggable",
+						"type": "boolean",
+						"required": false,
+						"default": "true",
+						"doc": "A drag moves the slides. Omit it and dragging is on."
+					},
+					{
+						"name": "align",
+						"type": "'start' | 'center' | 'end'",
+						"required": false,
+						"default": "'start'",
+						"doc": "Where a slide comes to rest in the viewport. Omit it and slides rest at the start."
+					},
+					{
+						"name": "rewind",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Moving past the last slide lands on the first. Omit it and the ends stop."
+					},
+					{
+						"name": "loop",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The slides run in an endless ring. Omit it and the ends stop."
+					},
+					{
+						"name": "autoplayInterval",
+						"type": "number",
+						"required": false,
+						"default": "3000",
+						"doc": "How long each slide is shown while autoplay runs, in milliseconds."
+					},
+					{
+						"name": "sensitivity",
+						"type": "CarouselSensitivity",
+						"required": false,
+						"doc": "How far the slides travel for a given drag distance."
+					},
+					{
+						"name": "move",
+						"type": "number | 'view'",
+						"required": false,
+						"default": "1",
+						"doc": "How many slides a back or forward trigger moves."
+					},
+					{
+						"name": "orientation",
+						"type": "'horizontal' | 'vertical'",
+						"required": false,
+						"default": "'horizontal'",
+						"doc": "Which axis the slides run along. Omit it and they run left to right."
+					},
+					{
+						"name": "mousewheel",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The wheel moves the slides. Omit it and the wheel scrolls the page."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: string) => void",
+						"required": false,
+						"doc": "Called with the new value whenever the showing slide changes."
+					}
+				]
+			},
+			{
+				"part": "scrollarea",
+				"component": "CarouselScrollArea",
+				"doc": "The window the slides move behind, and the element a drag is measured on.",
+				"props": []
+			},
+			{
+				"part": "title",
+				"component": "CarouselTitle",
+				"doc": "The carousel's heading. Mounting it names the carousel for a screen reader.",
+				"props": []
+			}
+		]
+	},
+	"checkbox": {
+		"parts": [
+			{
+				"part": "description",
+				"component": "CheckboxDescription",
+				"props": []
+			},
+			{
+				"part": "error",
+				"component": "CheckboxError",
+				"props": []
+			},
+			{
+				"part": "field",
+				"component": "CheckboxField",
+				"doc": "The visually hidden native input that carries the checkbox into a form. It\ntakes no configuration of its own: `name`, `value` and `required` come from\n`checkbox.root`, so one place decides what a form receives.",
+				"props": []
+			},
+			{
+				"part": "indicator",
+				"component": "CheckboxIndicator",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "CheckboxLabel",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "CheckboxRoot",
+				"props": [
+					{
+						"name": "checked",
+						"type": "boolean | 'mixed'",
+						"required": false,
+						"default": "false",
+						"doc": "The value the checkbox shows. Omit it and the checkbox starts off."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false"
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false"
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "Submitted under this name by `checkbox.field`."
+					},
+					{
+						"name": "value",
+						"type": "string",
+						"required": false,
+						"default": "'on'",
+						"doc": "Submitted instead of the browser default `\"on\"`."
+					},
+					{
+						"name": "onChange",
+						"type": "(checked: CheckboxChecked) => void",
+						"required": false,
+						"doc": "Intended to be called with the new value when a person toggles the checkbox.\nOmit it and the toggle still works; the call site simply does nothing."
+					}
+				]
+			},
+			{
+				"part": "trigger",
+				"component": "CheckboxTrigger",
+				"doc": "A consumer's `onClick` and `onKeydown` run after the checkbox has toggled.",
+				"props": []
+			}
+		]
+	},
+	"checklist": {
+		"parts": [
+			{
+				"part": "error",
+				"component": "ChecklistError",
+				"props": []
+			},
+			{
+				"part": "field",
+				"component": "ChecklistField",
+				"doc": "The visually hidden native input that carries the enclosing checkbox into a\nform. It takes no configuration of its own: `name` and `value` come from the\npart that roots the instance, so one place decides what a form receives.",
+				"props": []
+			},
+			{
+				"part": "item",
+				"component": "ChecklistItem",
+				"doc": "Roots one item's checkbox instance. `value` is required, because it is what the\ngroup's ticked set holds and what a form submits — position is never identity.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": true
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"doc": "Submitted under this name by a `checklist.field` written inside the item."
+					}
+				]
+			},
+			{
+				"part": "itemdescription",
+				"component": "ChecklistItemDescription",
+				"props": []
+			},
+			{
+				"part": "itemindicator",
+				"component": "ChecklistItemIndicator",
+				"props": []
+			},
+			{
+				"part": "itemlabel",
+				"component": "ChecklistItemLabel",
+				"props": []
+			},
+			{
+				"part": "itemtrigger",
+				"component": "ChecklistItemTrigger",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "ChecklistLabel",
+				"doc": "Names the group by naming the select-all trigger, whose id the family mints.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "ChecklistRoot",
+				"doc": "The group and the select-all's own checkbox root are one element: `role=\"group\"`\nplus the checkbox root's own behavior.",
+				"props": [
+					{
+						"name": "value",
+						"type": "readonly string[]",
+						"required": false,
+						"default": "[]",
+						"doc": "The values that are ticked. Omit it and nothing is ticked."
+					},
+					{
+						"name": "values",
+						"type": "readonly string[]",
+						"required": false,
+						"default": "[]",
+						"doc": "Every value the list offers. Select-all compares the ticked set against this."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nobody can change any item, and the select-all is locked too."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: readonly string[]) => void",
+						"required": false,
+						"doc": "Intended to be called with the whole new ticked set whenever an item or the\nselect-all changes. Omit it and the ticking still works."
+					}
+				]
+			},
+			{
+				"part": "selectall",
+				"component": "ChecklistSelectAll",
+				"props": []
+			},
+			{
+				"part": "selectallindicator",
+				"component": "ChecklistSelectAllIndicator",
+				"props": []
+			}
+		]
+	},
+	"collapsible": {
+		"parts": [
+			{
+				"part": "content",
+				"component": "CollapsibleContent",
+				"doc": "The panel. It stays in the page when the collapsible is closed - `hidden`\ndecides whether it shows, never an arm - so focus, scroll position and the\nids other parts point at all survive a close. A closed panel carries\n`hidden=\"until-found\"` unless the root turns that off, which is what lets the\nbrowser's find-in-page reach the text inside it and open the panel on a hit.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "CollapsibleRoot",
+				"props": [
+					{
+						"name": "open",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Whether the panel is showing. Omit it and the panel starts closed."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nothing opens or closes while this is set."
+					},
+					{
+						"name": "disableUntilFound",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "A closed panel is hidden outright rather than with `until-found`, so the\nbrowser's find-in-page cannot reach the text inside it."
+					},
+					{
+						"name": "onChange",
+						"type": "(open: boolean) => void",
+						"required": false,
+						"doc": "Called with the new value when a person opens or closes the panel. Omit it\nand the panel still opens and closes; the call site simply does nothing."
+					}
+				]
+			},
+			{
+				"part": "trigger",
+				"component": "CollapsibleTrigger",
+				"doc": "A consumer's `onClick` runs after the panel has opened or closed.",
+				"props": []
+			}
+		]
+	},
+	"combobox": {
+		"parts": [
+			{
+				"part": "content",
+				"component": "ComboboxContent",
+				"props": []
+			},
+			{
+				"part": "description",
+				"component": "ComboboxDescription",
+				"props": []
+			},
+			{
+				"part": "error",
+				"component": "ComboboxError",
+				"doc": "Its presence is what a reader is told about first.",
+				"props": []
+			},
+			{
+				"part": "field",
+				"component": "ComboboxField",
+				"doc": "The visually hidden native `<select>` that carries the choice into a form. It\ntakes no configuration of its own: `name`, `required` and `disabled` come from\n`combobox.root`, so one place decides what a form receives.",
+				"props": []
+			},
+			{
+				"part": "input",
+				"component": "ComboboxInput",
+				"props": []
+			},
+			{
+				"part": "item",
+				"component": "ComboboxItem",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": true,
+						"doc": "This option's value. Required: no index stands in for it."
+					},
+					{
+						"name": "label",
+						"type": "string",
+						"required": false,
+						"doc": "The words the field shows once this option is chosen. Omit it and the value\nis used. Qwik UI harvests this from `ItemLabel`'s children at pre-render;\nmarkless has no build-time child scan, so the text arrives as data."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nobody can choose this option, and the arrow walk steps past it."
+					}
+				]
+			},
+			{
+				"part": "itemindicator",
+				"component": "ComboboxItemIndicator",
+				"props": []
+			},
+			{
+				"part": "itemlabel",
+				"component": "ComboboxItemLabel",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "ComboboxLabel",
+				"doc": "The combobox's name. Named by `aria-labelledby` from the input and the list.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "ComboboxRoot",
+				"doc": "A combobox is a text field with a list attached. It is NOT a select: DOM focus\nnever leaves the input, the highlighted option is family state rather than the\nfocused element, and printable keys belong to the field.\n\nThe root holds the family's configuration and renders `role=\"group\"`, exactly\nas Qwik UI's `HComboboxRootImpl` does.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string | readonly string[]",
+						"required": false,
+						"default": "''",
+						"doc": "The chosen option's value. A plain string in the ordinary case; with\n`multiple` it is the list of chosen values. Omit it and nothing is chosen."
+					},
+					{
+						"name": "open",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The list is showing. Omit it and it starts closed."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nobody can change the choice or type in the field."
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "A choice is needed before the form submits."
+					},
+					{
+						"name": "invalid",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The control is in an invalid state, reported as `aria-invalid` on the input."
+					},
+					{
+						"name": "multiple",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "More than one option can be chosen at a time, and `value` becomes a list."
+					},
+					{
+						"name": "removeOnBackspace",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Backspace in an empty field removes the last chosen value. `multiple` only."
+					},
+					{
+						"name": "loop",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The arrow walk wraps around the ends instead of stopping at them."
+					},
+					{
+						"name": "inline",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The list is part of the page rather than a popup: it is always showing, and\nnothing dismisses it. Spelled as a native-style boolean attribute,\nnever as a mode enum."
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "Submitted under this name by `combobox.field`."
+					},
+					{
+						"name": "placeholder",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The field's placeholder. The root's value wins over the input's own."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: string | readonly string[]) => void",
+						"required": false,
+						"doc": "Called with the new selection when a person chooses or unchooses an option:\na string ordinarily, the whole list with `multiple`."
+					},
+					{
+						"name": "onInput",
+						"type": "(value: string) => void",
+						"required": false,
+						"doc": "Called with the field's new text every time a person types in it."
+					},
+					{
+						"name": "onOpenChange",
+						"type": "(open: boolean) => void",
+						"required": false,
+						"doc": "Called when the list opens or closes."
+					}
+				]
+			},
+			{
+				"part": "trigger",
+				"component": "ComboboxTrigger",
+				"doc": "Deliberately not a tab stop: only the input is.",
+				"props": []
+			}
+		]
+	},
+	"modal": {
+		"parts": [
+			{
+				"part": "backdrop",
+				"component": "ModalBackdrop",
+				"doc": "The dimming layer, and the element that is actually elevated: it carries the\n`overlay` mark, the `hidden` gating, and the dismissal reports the overlay\nbehaviour delivers. It wraps `modal.content` rather than sitting beside it,\nso styling the layer and the dialog together is ordinary nesting.\n\nA consumer's `onDismiss` runs after the family has applied its own policy, so\na handler can see which way the family went.",
+				"props": []
+			},
+			{
+				"part": "close",
+				"component": "ModalClose",
+				"doc": "A consumer's `onClick` runs after the dialog has closed.",
+				"props": []
+			},
+			{
+				"part": "content",
+				"component": "ModalContent",
+				"doc": "The dialog surface. It stays in the page when the modal is closed - `hidden`\non the backdrop decides whether it shows, never an arm - because the overlay\nbehaviour marks the background off an attached element and unmarks it the\nsame way. A surface that detaches while showing leaves the rest of the page\ninert with nothing left to unmark it.",
+				"props": []
+			},
+			{
+				"part": "description",
+				"component": "ModalDescription",
+				"doc": "A sentence the reader announces after the name.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "ModalRoot",
+				"props": [
+					{
+						"name": "open",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Whether the dialog is showing. Omit it and the dialog starts closed."
+					},
+					{
+						"name": "alert",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "An alert dialog: it announces as `alertdialog`, it refuses to close on an\noutside press, and opening it puts focus on the close control rather than\non the surface. Escape still closes it."
+					},
+					{
+						"name": "onChange",
+						"type": "(open: boolean) => void",
+						"required": false,
+						"doc": "Called with the new value when the dialog opens or closes - including when\na dismissal closes it. Omit it and the dialog still opens and closes; the\ncall site simply does nothing."
+					}
+				]
+			},
+			{
+				"part": "title",
+				"component": "ModalTitle",
+				"doc": "The dialog's name. Mounting it is what names the surface.",
+				"props": []
+			},
+			{
+				"part": "trigger",
+				"component": "ModalTrigger",
+				"doc": "A consumer's `onClick` runs after the dialog has opened.",
+				"props": []
+			}
+		]
+	},
+	"navbar": {
+		"parts": [
+			{
+				"part": "item",
+				"component": "NavbarItem",
+				"doc": "One top-level entry. It wraps either a plain `navbar.itemlink` or a\n`navbar.itemtrigger` and the `navbar.itemcontent` that trigger shows, and it\nis the element the pointer enters and leaves, so moving from a trigger down\ninto its own dropdown never counts as leaving.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": true,
+						"doc": "Names the item. The root's `value` names the item whose dropdown shows. Required."
+					},
+					{
+						"name": "active",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "This entry leads to the section a person is in. It writes `ui-active` for a\nstylesheet and nothing else: the ARIA for \"the page you are on now\" belongs\non the one link that is that page, which is `navbar.itemlink`'s `current`."
+					}
+				]
+			},
+			{
+				"part": "itemcontent",
+				"component": "NavbarItemContent",
+				"doc": "One dropdown. It stays in the page when it is closed - `hidden` decides\nwhether it shows, never an arm - so the trigger's `aria-controls` never\ndangles and the focus, scroll position and form state inside a panel survive a\nclose.\n\nA consumer's `onKeydown` runs after the family's.",
+				"props": []
+			},
+			{
+				"part": "itemlink",
+				"component": "NavbarItemLink",
+				"doc": "A navigation link. It works at the top level of the navbar and inside a\ndropdown, and it is the only part that can carry `aria-current=\"page\"`.",
+				"props": [
+					{
+						"name": "current",
+						"type": "boolean",
+						"required": false,
+						"doc": "This link is the page a person is on now. It writes `aria-current=\"page\"`,\nwhich the aria-at disclosure-navigation plan makes a priority-1 assertion.\nSet it on the one link that is the current page, never on the whole section."
+					}
+				]
+			},
+			{
+				"part": "itemtrigger",
+				"component": "NavbarItemTrigger",
+				"doc": "The button that shows and hides one item's dropdown. `aria-expanded` says\nwhich way it is, `aria-controls` names the panel by a minted id.\n\nA consumer's `onClick` and `onKeydown` both run after the family's.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "NavbarRoot",
+				"doc": "The `<nav>` landmark that holds the site's primary navigation.\n\nIt is a landmark, so it needs a name, and this family writes none: a page can\ncarry a primary nav and a footer nav, and an invented \"Navigation\" on both is\ntwo landmarks a reader cannot tell apart. `{...rest}` is spread first, so\n`<navbar.root aria-label=\"Primary\">` is the whole story.\n\nThe family is a DISCLOSURE, never a menubar. `role=\"menubar\"` puts screen\nreaders into application mode and promises desktop-menu behaviour that site\nnavigation does not have; the authoring practices, the aria-at plan and every\nsurveyed library agree that navigation is a set of buttons that show and hide\npanels.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "Which item's dropdown is showing, named by that item's `value`. Omit it, or\npass the empty string, and every dropdown is closed.\n\nOne value on the root rather than an `open` flag per item, because opening\none dropdown closes the others and only a value the whole navbar shares can\nsay that."
+					},
+					{
+						"name": "hover",
+						"type": "boolean",
+						"required": false,
+						"default": "true",
+						"doc": "Dropdowns open when the pointer rests on an item. Omit it and they do."
+					},
+					{
+						"name": "delay",
+						"type": "number",
+						"required": false,
+						"default": "200",
+						"doc": "How long the pointer must rest on an item before its dropdown opens, in\nmilliseconds. Omit it and it is 200. It applies to the first dropdown only:\nonce one is showing, moving to another opens it at once."
+					},
+					{
+						"name": "clickGrace",
+						"type": "number",
+						"required": false,
+						"default": "300",
+						"doc": "How long after a dropdown opened under the pointer a click on the same\ntrigger is ignored, in milliseconds. Omit it and it is 300. Without it the\nclick that lands while the pointer is resting shuts the panel it just\nopened."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: string) => void",
+						"required": false,
+						"doc": "Called with the value of the item now showing its dropdown, or the empty\nstring when everything closed. Omit it and the navbar still opens and\ncloses; the call site simply does nothing."
+					}
+				]
+			}
+		]
+	},
+	"otp": {
+		"parts": [
+			{
+				"part": "field",
+				"component": "OtpField",
+				"doc": "The one real text input: everything a person types goes here, which is what\nmakes paste, one-time-code autofill, undo and a single tab stop free. It is\ninvisible and stretched over the whole root, so a click or tap anywhere on the\nboxes lands on it. `value` and `style` are the family's, so a consumer cannot\nset them here; `pattern` and everything else an `<input>` accepts reaches the\nelement through the spread.",
+				"props": []
+			},
+			{
+				"part": "item",
+				"component": "OtpItem",
+				"props": [
+					{
+						"name": "index",
+						"type": "number",
+						"required": true,
+						"doc": "Which character of the code this box shows, counting from 0."
+					}
+				]
+			},
+			{
+				"part": "itemindicator",
+				"component": "OtpItemIndicator",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "OtpRoot",
+				"doc": "The box the field is stretched over, so `style` is the family's: it is what\nmakes the field measure itself against this element rather than the page.\nEverything else about the look of the boxes belongs to a consumer's class.",
+				"props": [
+					{
+						"name": "length",
+						"type": "number",
+						"required": true,
+						"doc": "How many characters the code has. Every item declares its own place in it."
+					},
+					{
+						"name": "value",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The code entered so far. Omit it and the field starts empty."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nothing can be typed while this is set."
+					},
+					{
+						"name": "shiftPWManagers",
+						"type": "boolean",
+						"required": false,
+						"default": "true",
+						"doc": "Keep a password manager's icon off the boxes. Omit it and the icon is\npushed past the right edge, which is what most code fields want."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: string) => void",
+						"required": false,
+						"doc": "Called with the whole code every time it changes, not with the character typed."
+					},
+					{
+						"name": "onComplete",
+						"type": "(value: string) => void",
+						"required": false,
+						"doc": "Called once with the whole code the moment it reaches `length` characters."
+					}
+				]
+			}
+		]
+	},
+	"pagination": {
+		"parts": [
+			{
+				"part": "backtrigger",
+				"component": "PaginationBackTrigger",
+				"doc": "Steps to the previous page. Natively `disabled` on page 1.",
+				"props": []
+			},
+			{
+				"part": "forwardtrigger",
+				"component": "PaginationForwardTrigger",
+				"doc": "Steps to the next page. Natively `disabled` on the last page.",
+				"props": []
+			},
+			{
+				"part": "item",
+				"component": "PaginationItem",
+				"doc": "One page's box, and the part that declares WHICH page this row of the anatomy\nstands for. The control inside it - an `itemtrigger` or an `itemlink` - reads\nthat page number back off the item and carries the ARIA for it, so the number is\nwritten once, on the wrapper.",
+				"props": [
+					{
+						"name": "value",
+						"type": "number",
+						"required": true,
+						"doc": "Which page this box stands for, counting from 1."
+					}
+				]
+			},
+			{
+				"part": "itemlink",
+				"component": "PaginationItemLink",
+				"doc": "The same control as `itemtrigger` over an `<a>`, for pagination that is real\nnavigation with real URLs. An anchor has no `disabled` attribute, so an\nunavailable link reports `aria-disabled` and stays in the tab order.",
+				"props": []
+			},
+			{
+				"part": "itemtrigger",
+				"component": "PaginationItemTrigger",
+				"doc": "The control inside a `pagination.item`. It takes no page number of its own:\nthe enclosing item already declared one, and this part reads it back to decide\nwhere a click goes and whether it is the current page.\n\nA consumer's `onClick` runs after the page has already moved.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "PaginationRoot",
+				"doc": "The `<nav>` landmark that holds the page controls. It is a landmark, so it\ncarries a name: `aria-label=\"Pagination\"` by default, and a consumer's own\n`aria-label` replaces it - a page with a site nav, a breadcrumb and a\npagination has three navigation landmarks, and a reader lists them by name.",
+				"props": [
+					{
+						"name": "count",
+						"type": "number",
+						"required": true,
+						"doc": "How many pages there are in total - pages, not rows. How many rows fit on a\npage is the consumer's data layer, and a component told about the data twice\ncan disagree with itself."
+					},
+					{
+						"name": "page",
+						"type": "number",
+						"required": false,
+						"default": "1",
+						"doc": "Which page is showing, counting from 1. Omit it and it starts at page 1."
+					},
+					{
+						"name": "siblingCount",
+						"type": "number",
+						"required": false,
+						"default": "1",
+						"doc": "How many pages to show on each side of the current one when the family\ncomputes its range. Omit it and it is 1."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nothing navigates while this is set, and every control reports unavailable."
+					},
+					{
+						"name": "onChange",
+						"type": "(page: number) => void",
+						"required": false,
+						"doc": "Called with the new page number when a person moves to another page. Omit it\nand the pagination still moves; the call site simply does nothing."
+					}
+				]
+			}
+		]
+	},
+	"popover": {
+		"parts": [
+			{
+				"part": "close",
+				"component": "PopoverClose",
+				"doc": "A consumer's `onClick` runs after the popover has closed.",
+				"props": []
+			},
+			{
+				"part": "content",
+				"component": "PopoverContent",
+				"doc": "The surface. It is not modal: it carries no `aria-modal`, so the page behind it\nstays reachable, keeps its focus, and is never made inert.\n\nIt stays in the page when the popover is closed - `hidden` decides whether it\nshows, never an arm - because an elevated element removed from the document\nwhile it is showing leaves the overlay stack's marks behind.\n\nA consumer's `onDismiss` runs after the family has closed the popover, so a\nhandler can see which way the family went.",
+				"props": []
+			},
+			{
+				"part": "description",
+				"component": "PopoverDescription",
+				"doc": "A sentence the reader announces after the name.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "PopoverRoot",
+				"props": [
+					{
+						"name": "open",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Whether the surface is showing. Omit it and the popover starts closed."
+					},
+					{
+						"name": "side",
+						"type": "'top' | 'bottom' | 'start' | 'end'",
+						"required": false,
+						"default": "'bottom'",
+						"doc": "Where the surface is placed against the trigger. It is also written on\n`popover.content` as `ui-side`, so styling can follow the placement.\n\nThe placement is a CSS anchor, so it holds while the page scrolls and\nreflows without any script. The family owns the `style` attribute on\n`popover.root`, `popover.trigger` and `popover.content` to carry it -\nstyle those three parts from a stylesheet rather than a `style` prop."
+					},
+					{
+						"name": "onChange",
+						"type": "(open: boolean) => void",
+						"required": false,
+						"doc": "Called with the new value when the popover opens or closes - including when\nEscape or a press outside closes it. Omit it and the popover still opens and\ncloses; the call site simply does nothing."
+					}
+				]
+			},
+			{
+				"part": "title",
+				"component": "PopoverTitle",
+				"doc": "The surface's name. Mounting it is what names the surface.",
+				"props": []
+			},
+			{
+				"part": "trigger",
+				"component": "PopoverTrigger",
+				"doc": "A consumer's `onClick` runs after the popover has opened or closed.",
+				"props": []
+			}
+		]
+	},
+	"progress": {
+		"parts": [
+			{
+				"part": "indicator",
+				"component": "ProgressIndicator",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "ProgressLabel",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "ProgressRoot",
+				"props": [
+					{
+						"name": "value",
+						"type": "number | null",
+						"required": false,
+						"default": "null",
+						"doc": "How far along the task is. Omit it, or pass `null`, for an unknown amount."
+					},
+					{
+						"name": "min",
+						"type": "number",
+						"required": false,
+						"default": "0",
+						"doc": "The bottom of the range. Omit it and the range starts at 0."
+					},
+					{
+						"name": "max",
+						"type": "number",
+						"required": false,
+						"default": "100",
+						"doc": "The top of the range. Omit it and the range ends at 100."
+					}
+				]
+			},
+			{
+				"part": "track",
+				"component": "ProgressTrack",
+				"doc": "The full length of the range; the indicator sits inside it.",
+				"props": []
+			}
+		]
+	},
+	"qrcode": {
+		"parts": [
+			{
+				"part": "frame",
+				"component": "QrCodeFrame",
+				"doc": "The box around the code. Give it light-coloured padding of roughly four\nmodules: the encoded symbol carries no margin of its own, and readers need\nthat quiet zone to find the code.",
+				"props": []
+			},
+			{
+				"part": "overlay",
+				"component": "QrCodeOverlay",
+				"doc": "A box centred on the code, for a logo. Anything in here is decorative:\nthe root is `role=\"img\"`, which makes everything inside it presentational,\nso put nothing a reader needs to hear in an overlay.",
+				"props": []
+			},
+			{
+				"part": "patternpath",
+				"component": "QrCodePatternPath",
+				"doc": "One `<path>` covering every dark module.",
+				"props": []
+			},
+			{
+				"part": "patternsvg",
+				"component": "QrCodePatternSvg",
+				"doc": "The `<svg>` the pattern is drawn in. Its rendered size is CSS.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "QrCodeRoot",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": true,
+						"doc": "The text the code carries - usually a URL."
+					},
+					{
+						"name": "recovery",
+						"type": "'low' | 'medium' | 'quartile' | 'high'",
+						"required": false,
+						"default": "'medium'",
+						"doc": "How much of the code can be damaged or covered and still be read:\n\"low\" 7%, \"medium\" 15%, \"quartile\" 25%, \"high\" 30%. Omit it for \"medium\".\nA logo sitting on top of the code needs \"quartile\" or \"high\"."
+					}
+				]
+			}
+		]
+	},
+	"radiogroup": {
+		"parts": [
+			{
+				"part": "description",
+				"component": "RadioGroupDescription",
+				"props": []
+			},
+			{
+				"part": "error",
+				"component": "RadioGroupError",
+				"props": []
+			},
+			{
+				"part": "field",
+				"component": "RadioGroupField",
+				"doc": "What a form receives from this group, declared once for the whole group rather\nthan repeated on every option. Mount it beside the label; the options pick the\nname and the requirement up from here wherever they are written.",
+				"props": [
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The name every option in this group submits under. Omit it and none is submitted."
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "A choice is needed before the form submits."
+					}
+				]
+			},
+			{
+				"part": "item",
+				"component": "RadioGroupItem",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": true,
+						"doc": "Submitted when this option is the chosen one. Required: no index stands in for it."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nobody can choose this option, and the arrow keys walk past it."
+					}
+				]
+			},
+			{
+				"part": "itemfield",
+				"component": "RadioGroupItemField",
+				"doc": "The visually hidden native radio that carries the option into a form and is\nthe element a person actually focuses. It takes no configuration of its own:\n`name` and `required` come from `radiogroup.field` and `value` from\n`radiogroup.item`, so one place decides what a form receives.",
+				"props": []
+			},
+			{
+				"part": "itemindicator",
+				"component": "RadioGroupItemIndicator",
+				"props": []
+			},
+			{
+				"part": "itemlabel",
+				"component": "RadioGroupItemLabel",
+				"props": []
+			},
+			{
+				"part": "itemtrigger",
+				"component": "RadioGroupItemTrigger",
+				"doc": "A consumer's `onClick` runs after the option has been chosen.",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "RadioGroupLabel",
+				"doc": "The group's name, rendered as the `<legend>` a `<fieldset>` is named by.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "RadioGroupRoot",
+				"doc": "The group is a `<fieldset>` so its `<legend>` names it natively: no id, no\nIDREF, and better support than `aria-labelledby` on a `role=\"radiogroup\"` div.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The value of the chosen option. Omit it and nothing is chosen."
+					},
+					{
+						"name": "orientation",
+						"type": "'horizontal' | 'vertical'",
+						"required": false,
+						"default": "'vertical'",
+						"doc": "Which axis the arrow keys walk. Omit it and the options stack top to bottom."
+					},
+					{
+						"name": "loop",
+						"type": "boolean",
+						"required": false,
+						"default": "true",
+						"doc": "Arrow past the last option and land on the first. Omit it and the ends still wrap."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nobody can change any option."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: string) => void",
+						"required": false,
+						"doc": "Intended to be called with the new value when a person picks a different\noption. Omit it and picking still works; the call site simply does nothing."
+					}
+				]
+			}
+		]
+	},
+	"select": {
+		"parts": [
+			{
+				"part": "content",
+				"component": "SelectContent",
+				"props": []
+			},
+			{
+				"part": "field",
+				"component": "SelectField",
+				"doc": "The visually hidden native `<select>` that carries the choice into a form. It\ntakes no configuration of its own: `name`, `required` and `disabled` come\nfrom `select.root` and the value from whichever option was chosen, so one\nplace decides what a form receives.",
+				"props": []
+			},
+			{
+				"part": "item",
+				"component": "SelectItem",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": true,
+						"doc": "Submitted when this option is the chosen one. Required: no index stands in for it."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nobody can choose this option, and the arrow keys walk past it."
+					}
+				]
+			},
+			{
+				"part": "itemindicator",
+				"component": "SelectItemIndicator",
+				"props": []
+			},
+			{
+				"part": "itemlabel",
+				"component": "SelectItemLabel",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "SelectLabel",
+				"doc": "The select's name. Named by `aria-labelledby` from the trigger and the listbox.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "SelectRoot",
+				"doc": "The root carries the whole family's configuration and renders no role of its\nown, exactly as QDS's `SelectRoot` does. `multiple` is deliberately absent:\nit is the one prop that turns `value` into a union and doubles the keyboard\ntable, and the research note files it as a scope decision for a later tranche.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The value of the chosen option. Omit it and nothing is chosen."
+					},
+					{
+						"name": "open",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The popup is showing. Omit it and it starts closed."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nobody can change the choice."
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "A choice is needed before the form submits."
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "Submitted under this name by `select.field`."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: string) => void",
+						"required": false,
+						"doc": "Intended to be called with the new value when a person chooses a different\noption. Omit it and choosing still works; the call site simply does nothing."
+					},
+					{
+						"name": "onOpenChange",
+						"type": "(open: boolean) => void",
+						"required": false,
+						"doc": "Called when the popup opens or closes."
+					}
+				]
+			},
+			{
+				"part": "trigger",
+				"component": "SelectTrigger",
+				"props": []
+			}
+		]
+	},
+	"slider": {
+		"parts": [
+			{
+				"part": "label",
+				"component": "SliderLabel",
+				"doc": "Names the slider for a reader: every thumb points its `aria-labelledby` here.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "SliderRoot",
+				"props": [
+					{
+						"name": "value",
+						"type": "number | [number, number]",
+						"required": false,
+						"doc": "Where the slider sits now. A pair means two values. Omit it and it starts at `min`."
+					},
+					{
+						"name": "min",
+						"type": "number",
+						"required": false,
+						"default": "0",
+						"doc": "The bottom of the range. Omit it and the range starts at 0."
+					},
+					{
+						"name": "max",
+						"type": "number",
+						"required": false,
+						"default": "100",
+						"doc": "The top of the range. Omit it and the range ends at 100."
+					},
+					{
+						"name": "step",
+						"type": "number",
+						"required": false,
+						"default": "1",
+						"doc": "The smallest change a person can make. Omit it and it is 1."
+					},
+					{
+						"name": "orientation",
+						"type": "'horizontal' | 'vertical'",
+						"required": false,
+						"default": "'horizontal'",
+						"doc": "Which axis the slider runs along. Omit it and it runs left to right."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nobody can change the value."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: SliderValue) => void",
+						"required": false,
+						"doc": "Called with the new value every time it changes, including during a drag."
+					},
+					{
+						"name": "onChangeEnd",
+						"type": "(value: SliderValue) => void",
+						"required": false,
+						"doc": "Called once the change settles: the pointer released, or the key that moved it."
+					}
+				]
+			},
+			{
+				"part": "thumb",
+				"component": "SliderThumb",
+				"props": [
+					{
+						"name": "side",
+						"type": "'start' | 'end'",
+						"required": false,
+						"default": "'end'",
+						"doc": "Which of the two values this thumb holds. Omit it on a one-value slider."
+					}
+				]
+			},
+			{
+				"part": "track",
+				"component": "SliderTrack",
+				"doc": "The rail, and the hit area a pointer gesture runs on. The family ships no CSS,\nso the consumer owes it `position: relative` and `touch-action: none` —\nwithout the second one a touch scrolls the page instead of moving a thumb.",
+				"props": []
+			},
+			{
+				"part": "valuelabel",
+				"component": "SliderValueLabel",
+				"doc": "The current value as text: one number, or both separated by an en dash. It\ntakes no children — a consumer who wants their own wording writes their own\nelement and reads `ui-value` off it.",
+				"props": []
+			}
+		]
+	},
+	"tabs": {
+		"parts": [
+			{
+				"part": "content",
+				"component": "TabsContent",
+				"doc": "One panel. It stays in the page when its tab is not the showing one — `hidden`\ndecides whether it shows, never an arm — so focus, scroll position and form\nstate inside a panel all survive a tab change.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": true,
+						"doc": "Names the panel. The trigger part with the same value shows it. Required."
+					}
+				]
+			},
+			{
+				"part": "list",
+				"component": "TabsList",
+				"doc": "The row of tabs. `role=\"tablist\"`, and the element the arrow keys walk inside.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "TabsRoot",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The value of the tab that is showing. Omit it and no tab shows: a tab is\nnamed by its `value`, and nothing counts positions for you."
+					},
+					{
+						"name": "orientation",
+						"type": "'horizontal' | 'vertical'",
+						"required": false,
+						"default": "'horizontal'",
+						"doc": "Which axis the arrow keys walk. Omit it and the tabs run left to right."
+					},
+					{
+						"name": "loop",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Arrow past the last tab and land on the first. Omit it and the ends stop."
+					},
+					{
+						"name": "selectOnFocus",
+						"type": "boolean",
+						"required": false,
+						"default": "true",
+						"doc": "Arrowing to a tab shows it. Turn it off and arrowing only moves focus; Enter or Space shows it."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: string) => void",
+						"required": false,
+						"doc": "Called with the new value when a person changes tab. Omit it and the tabs\nstill change; the call site simply does nothing."
+					}
+				]
+			},
+			{
+				"part": "trigger",
+				"component": "TabsTrigger",
+				"doc": "One tab. `role=\"tab\"` makes every child of this element presentational, so it\ntakes label content only — a close button or a link inside a tab is stripped\nof its own semantics, and has to be a sibling of the tab instead.\n\nA consumer's `onClick`, `onFocus` and `onKeydown` all run after the family's.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": true,
+						"doc": "Names the tab. The content part with the same value is the panel it shows. Required."
+					}
+				]
+			}
+		]
+	},
+	"textbox": {
+		"parts": [
+			{
+				"part": "description",
+				"component": "TextboxDescription",
+				"props": []
+			},
+			{
+				"part": "error",
+				"component": "TextboxError",
+				"props": []
+			},
+			{
+				"part": "input",
+				"component": "TextboxInput",
+				"doc": "The control a person types into. `disabled`, `required` and `readonly` may be\nset here as well as on the root, and a restriction set in either place stands:\na part can add a restriction, never remove one.",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "TextboxLabel",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "TextboxRoot",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The text the box shows. Omit it and the box starts empty."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false"
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false"
+					},
+					{
+						"name": "readonly",
+						"type": "boolean",
+						"required": false,
+						"default": "false"
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "Submitted under this name by whichever control the family renders."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: string) => void",
+						"required": false,
+						"doc": "Called with the new text as a person types. Omit it and the box still works;\nthe call site simply does nothing."
+					}
+				]
+			},
+			{
+				"part": "textarea",
+				"component": "TextboxTextarea",
+				"doc": "The same control over more than one line.",
+				"props": []
+			}
+		]
+	},
+	"toaster": {
+		"parts": [
+			{
+				"part": "item",
+				"component": "ToasterItem",
+				"props": [
+					{
+						"name": "toast",
+						"type": "ToastRecord",
+						"required": true,
+						"doc": "The message this row shows."
+					},
+					{
+						"name": "index",
+						"type": "number",
+						"required": false,
+						"doc": "Where it stands in the stack: 0 is the front one."
+					}
+				]
+			},
+			{
+				"part": "itemclose",
+				"component": "ToasterItemClose",
+				"doc": "The button that dismisses the message it sits in. It takes no id: the item\naround it holds one, the same way `select.itemindicator` reads its option.",
+				"props": []
+			},
+			{
+				"part": "itemdescription",
+				"component": "ToasterItemDescription",
+				"props": []
+			},
+			{
+				"part": "itemicon",
+				"component": "ToasterItemIcon",
+				"props": []
+			},
+			{
+				"part": "itemtitle",
+				"component": "ToasterItemTitle",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "ToasterRoot",
+				"doc": "The region every message appears in. It is on the page before the first\nmessage, because a live region added at the same moment as its text is not\nannounced.\n\nThere is no `visible` prop: the root renders no rows of its own, so how many\nmessages show is decided by the consumer's own repeat. `toaster.shown(queue, n)`\nis the cap they write against.",
+				"props": []
+			}
+		]
+	},
+	"toggle": {
+		"parts": [
+			{
+				"part": "description",
+				"component": "ToggleDescription",
+				"props": []
+			},
+			{
+				"part": "error",
+				"component": "ToggleError",
+				"props": []
+			},
+			{
+				"part": "field",
+				"component": "ToggleField",
+				"doc": "The visually hidden native input that carries the switch into a form. It takes\nno configuration of its own: `name`, `value` and `required` come from\n`toggle.root`, so one place decides what a form receives.",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "ToggleLabel",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "ToggleRoot",
+				"props": [
+					{
+						"name": "checked",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Whether the switch reads as on. Omit it and the switch starts off."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false"
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false"
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "Submitted under this name by `toggle.field`."
+					},
+					{
+						"name": "value",
+						"type": "string",
+						"required": false,
+						"default": "'on'",
+						"doc": "Submitted instead of the browser default `\"on\"`."
+					},
+					{
+						"name": "onChange",
+						"type": "(checked: boolean) => void",
+						"required": false,
+						"doc": "Called with the new value when a person flips the switch. Omit it and the\nswitch still works; the call site simply does nothing."
+					}
+				]
+			},
+			{
+				"part": "thumb",
+				"component": "ToggleThumb",
+				"doc": "The moving piece inside the trigger. It renders an element and nothing else.",
+				"props": []
+			},
+			{
+				"part": "trigger",
+				"component": "ToggleTrigger",
+				"doc": "A consumer's `onClick` runs after the switch has flipped.",
+				"props": []
+			}
+		]
+	},
+	"tree": {
+		"parts": [
+			{
+				"part": "item",
+				"component": "TreeItem",
+				"doc": "One node. A node that holds children renders a `tree.itemcontent` with more\n`tree.item`s inside it, and each of those roots its own instance.",
+				"props": [
+					{
+						"name": "open",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "This node's children are showing. Omit it and the node starts closed."
+					},
+					{
+						"name": "leaf",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "This node has no children. A leaf reports no open state at all, which is\nthe WAI-ARIA rule a reader needs to tell \"nothing to open\" from \"closed\"."
+					},
+					{
+						"name": "level",
+						"type": "number",
+						"required": false,
+						"default": "1",
+						"doc": "How deep this node sits, counting from 1. It is written rather than read\noff the enclosing node, because a component that roots an instance of a\nfamily cannot also read the enclosing instance of that same family."
+					},
+					{
+						"name": "onChange",
+						"type": "(open: boolean) => void",
+						"required": false,
+						"doc": "Called with the new state when a person opens or closes this node."
+					}
+				]
+			},
+			{
+				"part": "itemcontent",
+				"component": "TreeItemContent",
+				"doc": "The container of one node's children, `role=\"group\"`. It stays in the page\nwhen the node is closed - `hidden` decides whether it shows, never an arm -\nso the ids inside it, the focus in it, and the widget instances under it all\nsurvive a close.",
+				"props": []
+			},
+			{
+				"part": "itemindicator",
+				"component": "TreeItemIndicator",
+				"doc": "A decorative open/closed marker. It is hidden from the accessibility tree.",
+				"props": []
+			},
+			{
+				"part": "itemlabel",
+				"component": "TreeItemLabel",
+				"doc": "The node's name. The trigger points at it, and typeahead matches on it.",
+				"props": []
+			},
+			{
+				"part": "itemtrigger",
+				"component": "TreeItemTrigger",
+				"doc": "The control that opens and closes one node. A consumer's `onClick` runs after.",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "TreeLabel",
+				"doc": "The tree's own heading. It does not name the tree; see `TreeRootProps`.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "TreeRoot",
+				"doc": "The tree container. It carries `role=\"tree\"` and owns the one tab stop the\nwhole tree has, plus the typeahead buffer every row types into.\n\nThe tree's accessible name comes through `{...rest}` as a plain `aria-label`:\nnaming it from `tree.label` would need an IDREF handle read on a widget root,\nwhich is `MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT` today..",
+				"props": [
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nobody can open or close anything while this is set."
+					}
+				]
+			}
+		]
+	}
+}

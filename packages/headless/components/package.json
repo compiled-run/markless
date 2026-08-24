@@ -9,6 +9,7 @@
 		"directory": "packages/headless/components"
 	},
 	"files": [
+		"api",
 		"src",
 		"!src/**/*.browser.ts",
 		"!src/**/*.sr.ts",
@@ -22,6 +23,7 @@
 	"sideEffects": false,
 	"exports": {
 		".": "./src/index.ts",
+		"./api/manifest.json": "./api/manifest.json",
 		"./accordion": "./src/accordion/index.ts",
 		"./carousel": "./src/carousel/index.ts",
 		"./checkbox": "./src/checkbox/index.ts",
@@ -42,6 +44,15 @@
 		"./toggle": "./src/toggle/index.ts",
 		"./tree": "./src/tree/index.ts"
 	},
+	"publishConfig": {
+		"access": "public",
+		"marklessShipsSource": true,
+		"provenance": true
+	},
+	"scripts": {
+		"api:extract": "node api-extract/write.ts",
+		"api:check": "vp test run --config api-extract/vitest.config.ts"
+	},
 	"dependencies": {
 		"@markless/core": "workspace:*"
 	},
@@ -58,10 +69,5 @@
 		"vite": {
 			"optional": true
 		}
-	},
-	"publishConfig": {
-		"access": "public",
-		"provenance": true,
-		"marklessShipsSource": true
 	}
 }
