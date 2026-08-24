@@ -358,6 +358,7 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 				...(typeof render.rowStartOffset === 'number' && render.rowStartOffset > 0
 					? { rowStartOffset: render.rowStartOffset }
 					: {}),
+				...mintableEmptyArm(input, render),
 				rowEvents: oneRecordPerEvent(input.payloadArena.view.events)
 					.filter((event) => rowHostPaths.has(event.hostNodeId))
 					.map((event) => ({
@@ -374,6 +375,44 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 			},
 		];
 	});
+}
+
+/**
+ * The `@empty` arm's markup, carried only when resume can defend minting it.
+ *
+ * The arm was never served on a page whose list had matches at boot, so the only
+ * way it can ever speak is for the client to build it - and the client has no
+ * renderer, only the payload. This ships the finished markup, which is honest
+ * for exactly one shape: a chunk with NO slots. Every slot is a part the mint
+ * cannot fill (a text read, an attribute read, a nested construct, a child
+ * component), and a half-built arm is worse than none.
+ *
+ * A host inside the arm that any record names is refused for the same reason.
+ * The mint registers nothing, so an arm carrying an event would paint a dead
+ * button. Both refusals leave the served behaviour exactly as it is today.
+ *
+ * Pay-per-use: a repeat with no `@empty` arm emits no field at all, so its
+ * render data is byte-identical to what it was before this existed.
+ */
+function mintableEmptyArm(
+	input: ProtocolViewPayloadInput,
+	render: RenderDataArtifact['repeats'][number],
+): { readonly emptyArm?: { readonly html: string } } {
+	if (!render.emptyChunkId) return {};
+	const chunk = renderDataOf(input).chunks.find(
+		(candidate) => candidate.id === render.emptyChunkId,
+	);
+	if (!chunk || chunk.slots.length > 0) return {};
+	const armHosts = new Set(chunk.hosts.map((host) => host.hostNodeId));
+	const wired = [
+		...input.payloadArena.view.events,
+		...input.payloadArena.view.domUpdates,
+		...input.payloadArena.view.behaviors,
+		...input.payloadArena.view.elementHandles,
+	].some((record) => armHosts.has(record.hostNodeId));
+	if (wired) return {};
+	const html = chunk.statics.join('');
+	return html ? { emptyArm: { html } } : {};
 }
 
 function boundaryUpdateSymbols(input: ProtocolViewPayloadInput): ReadonlyMap<string, string> {

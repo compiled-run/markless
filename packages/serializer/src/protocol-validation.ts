@@ -486,7 +486,15 @@ function assertOptionalKeyedRepeats(record: Record<string, unknown>): void {
 			assertNonNegativeIntegerField(repeat, 'rowStartOffset', context);
 		assertRowEvents(repeat.rowEvents, `${context}.rowEvents`);
 		assertOptionalRowElementHandles(repeat, `${context}.rowElementHandles`);
+		assertOptionalEmptyArm(repeat, `${context}.emptyArm`);
 	}
+}
+
+function assertOptionalEmptyArm(record: Record<string, unknown>, context: string): void {
+	const arm = record.emptyArm;
+	if (arm === undefined) return;
+	assertRecordShape(arm, context);
+	assertStringField(arm, 'html', context);
 }
 
 function assertOptionalRowElementHandles(

@@ -311,6 +311,15 @@ export type ProtocolViewPayload = {
 		 * prefix has no compile-time element count ships no record at all.
 		 */
 		readonly rowStartOffset?: number;
+		/**
+		 * The `@empty` arm's finished markup, for the mint that raises it when the
+		 * collection empties after resume and takes it back out when a row returns.
+		 * Carried only for a repeat that HAS an `@empty` arm whose markup is fully
+		 * static and whose elements no record names: everything else would need
+		 * wiring the mint cannot do, so it ships nothing and the served behaviour
+		 * stands. A repeat with no `@empty` arm omits the field entirely.
+		 */
+		readonly emptyArm?: { readonly html: string };
 		readonly rowElementHandles?: ReadonlyArray<{
 			readonly hostPath: ReadonlyArray<number>;
 			readonly handleId: string;
