@@ -677,6 +677,86 @@ export function App() @{
 });
 
 // ---------------------------------------------------------------------------
+// Module-scope declarations an attach behavior names travel with its module.
+//
+// The sibling of the derive carry above, and the gap the widened guard exposed:
+// a behavior module is fetched and evaluated on its own, so a module-scope
+// `const` the attached factory reads has to be *in* it. SSR hoists the
+// declaration into its own render, so the server stayed green and only the
+// browser threw a ReferenceError on attach.
+// ---------------------------------------------------------------------------
+
+/** The emitted behavior modules for a compiled source, with the pass diagnostics. */
+async function behaviorModules(filename: string, source: string) {
+	const result = await compileTsrxModule({ filename, source, symbols: [] });
+	return {
+		modules: result.symbolModules.modules.filter((module) => module.kind === 'behavior'),
+		diagnostics: result.symbolModules.diagnostics,
+	};
+}
+
+test('a module-scope const an attach behavior reads is carried into the behavior module', async () => {
+	const { modules, diagnostics } = await behaviorModules(
+		'/workspace/app/src/BehaviorConst.tsrx',
+		`
+const LABEL = 'ready';
+
+export function App() @{
+	<canvas attach={(el) => { el.dataset.state = LABEL; }} />
+}
+`,
+	);
+
+	expect(modules).toHaveLength(1);
+	const emitted = modules[0]!.source;
+	expect(emitted).toContain("const LABEL = 'ready';");
+	// The read itself survives as a reference to the carried binding.
+	expect(emitted).toContain('el.dataset.state = LABEL');
+	// And the carry is not a compile error of its own.
+	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+});
+
+test('a behavior that names no module-scope declaration carries none', async () => {
+	const { modules } = await behaviorModules(
+		'/workspace/app/src/BehaviorNoConst.tsrx',
+		`
+const UNUSED = 'idle';
+
+export function App() @{
+	<canvas attach={(el) => { el.dataset.state = 'ready'; }} />
+}
+`,
+	);
+
+	expect(modules).toHaveLength(1);
+	expect(modules[0]!.source).not.toContain('UNUSED');
+});
+
+test('carried behavior declarations keep authored order, so a class is bound before it is used', async () => {
+	const { modules } = await behaviorModules(
+		'/workspace/app/src/BehaviorOrder.tsrx',
+		`
+class Painter {
+	constructor(public tone: string) {}
+	paint(el: HTMLElement) { el.dataset.tone = this.tone; }
+}
+const painter = new Painter('warm');
+
+export function App() @{
+	<canvas attach={(el) => { painter.paint(el); }} />
+}
+`,
+	);
+
+	expect(modules).toHaveLength(1);
+	const emitted = modules[0]!.source;
+	// Reachability finds `const painter = new Painter('warm')` first; emitting
+	// that order runs the constructor inside the class binding's dead zone.
+	expect(emitted).toContain('class Painter');
+	expect(emitted.indexOf('class Painter')).toBeLessThan(emitted.indexOf('new Painter('));
+});
+
+// ---------------------------------------------------------------------------
 // The guard behind the carry.
 //
 // Fixing the derive emitter fixes one emitter. The reason the gap shipped at all
@@ -688,33 +768,43 @@ export function App() @{
 // ---------------------------------------------------------------------------
 
 test('an emitted module that leaves a module-scope declaration free is reported', async () => {
-	// The behavior band takes no `moduleDeclarations` at all, so its module is a
-	// live example of the shape the guard exists to catch. If the behavior carry
-	// is implemented later this fixture stops erroring, and this test should then
-	// be repointed at whichever emitter still has no carry channel — not deleted.
+	// Repointed from the behavior band, which now carries. The async-computed
+	// runner is the next live example of the shape the guard exists to catch:
+	// `AsyncComputedRunnerEmissionInput` has no `moduleDeclarations` field, so
+	// there is no channel for the declarations to arrive through. Checked by
+	// reading the emission-input types in `symbol-modules.ts`; the two other
+	// emitters with no such field today are `SharedSeedEmissionInput` and the
+	// dom-binding input. If this carry lands later, repoint again — do not delete.
 	const result = await compileTsrxModule({
-		filename: '/workspace/app/src/Behavior.tsrx',
+		filename: '/workspace/app/src/AsyncRunner.tsrx',
 		source: `
-const LABEL = 'ready';
+import { computed, state } from '@markless/core';
+
+const ENDPOINT = 'ready';
 
 export function App() @{
-	<canvas attach={(el) => { el.dataset.state = LABEL; }} />
+	let id = state(1);
+	const data = computed(async () => ENDPOINT + id);
+
+	<main><span>{data}</span></main>
 }
 `,
 		symbols: [],
 	});
 
-	const behavior = result.symbolModules.modules.find((module) => module.kind === 'behavior');
+	const runner = result.symbolModules.modules.find(
+		(module) => module.kind === 'async-computed-runner',
+	);
 	// The premise: the name really is free in the emitted module.
-	expect(behavior?.source).toContain('LABEL');
-	expect(behavior?.source).not.toContain("const LABEL = 'ready'");
+	expect(runner?.source).toContain('ENDPOINT');
+	expect(runner?.source).not.toContain("const ENDPOINT = 'ready'");
 
 	const reported = result.symbolModules.diagnostics.filter(
 		(diagnostic) => diagnostic.code === SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE,
 	);
 	expect(reported).toHaveLength(1);
 	expect(reported[0]!.severity).toBe('error');
-	expect(reported[0]!.title).toContain('LABEL');
+	expect(reported[0]!.title).toContain('ENDPOINT');
 	// The message has to say why the server stayed green, or the reader will
 	// take a passing SSR render as evidence the module is fine.
 	expect(reported[0]!.message).toContain('ReferenceError');

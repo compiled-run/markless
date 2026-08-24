@@ -1593,6 +1593,25 @@ export type BehaviorEmissionInput = {
 	readonly omitAuthoredSource: boolean;
 	/** The authored file the behavior was extracted from; names the map. */
 	readonly sourceFileName: string;
+	/**
+	 * The authored file's module-scope declarations, as `emitSymbolModules`
+	 * projects them.
+	 *
+	 * A behavior module is fetched and evaluated on its own, so a same-file
+	 * module-scope `const`/`function`/`class` the attached factory names is not in
+	 * scope there unless this emitter carries it across. Omitted means none, which
+	 * is what a caller holding only one symbol's source can say.
+	 */
+	readonly moduleDeclarations?: readonly string[];
+	/**
+	 * The authored file's imports, as the semantic graph collected them.
+	 *
+	 * Only consulted for a carried declaration's own free names: the symbol's own
+	 * `moduleImport` was selected against the factory, so an import only the
+	 * carried declaration needs is not it. A module that carries no declaration
+	 * emits exactly the imports it did before.
+	 */
+	readonly moduleImports?: readonly SemanticModuleImport[];
 };
 
 /**
@@ -1612,19 +1631,29 @@ export function buildBehaviorEmission(input: BehaviorEmissionInput): EmissionPri
 	};
 
 	const inputCount = input.symbol.inputSources.length;
-	const projection = behaviorProjection(input.symbol.functionSource, input.sourceFileName);
+	const carried = behaviorModuleScopeCarry(input);
+	const projection = carried.projection;
+	// A carried declaration can name an import the factory never did — a
+	// module-scope class extending an imported base needs that import here.
+	const imports = dedupeModuleImports([
+		...(input.symbol.moduleImport ? [input.symbol.moduleImport] : []),
+		...(carried.declarationStatements.length === 0
+			? []
+			: (input.moduleImports ?? []).filter((moduleImport) =>
+					carried.declarationReferences.has(moduleImport.localName),
+				)),
+	]);
 
 	const body: EmissionNode[] = [
-		...(input.symbol.moduleImport
-			? [
-					moduleImportNode({
-						kind: input.symbol.moduleImport.kind,
-						localName: input.symbol.moduleImport.localName,
-						importedName: input.symbol.moduleImport.importedName,
-						source: input.symbol.moduleImport.source,
-					}),
-				]
-			: []),
+		...imports.map((moduleImport) =>
+			moduleImportNode({
+				kind: moduleImport.kind,
+				localName: moduleImport.localName,
+				importedName: moduleImport.importedName,
+				source: moduleImport.source,
+			}),
+		),
+		...carried.declarationStatements,
 		...(input.omitAuthoredSource
 			? []
 			: [
@@ -1699,11 +1728,13 @@ function behaviorInputsExpression(inputCount: number): EmissionNode {
 type BehaviorProjection = {
 	/** The one text every printed node carries an offset into. */
 	readonly source: string;
+	readonly declarationStatements: ReadonlyArray<EmissionNode>;
 	readonly functionExpression: EmissionNode;
 };
 
 /**
- * Parse the authored behavior factory once, as an expression.
+ * Parse the selected module-scope declarations and the authored behavior factory
+ * together, once.
  *
  * The factory is parenthesized so it parses as an expression statement in every
  * authored form — a `function` at statement start would otherwise be a
@@ -1711,32 +1742,89 @@ type BehaviorProjection = {
  * (`callableBehaviorFunctionSource`). `preserveParens: false` then drops the
  * wrapper, and the printer re-derives whatever parentheses calling the factory
  * actually needs.
+ *
+ * A declaration list that does not reparse into exactly one statement each is
+ * refused rather than emitted: the caller's fallback is the module it would have
+ * built before this carry existed. With no declarations the refusal is the
+ * original "factory source must be a single expression" check, unchanged.
  */
-function behaviorProjection(functionSource: string, filename: string): BehaviorProjection {
-	const source = `(${functionSource});`;
-	const { program, errors } = parseEmissionSource(source, filename, 'ts');
-	if (errors.length > 0) {
+function behaviorProjection(
+	functionSource: string,
+	filename: string,
+	declarations: readonly string[] = [],
+): BehaviorProjection {
+	const projection = declarationCarryProjection(
+		declarations,
+		functionSource,
+		filename,
+		'behavior',
+	);
+	if (projection.declarationStatements.length !== declarations.length) {
 		throw new Error(
-			`symbol-modules: behavior emission could not parse its factory source (${errors
-				.map((error) => error.message)
-				.join('; ')})`,
+			'symbol-modules: behavior emission expected its projected source to be its declarations and a single expression',
 		);
 	}
 
-	const statements = asNodes((program as unknown as AnyNode).body);
-	const last = statements.at(-1);
-	if (
-		statements.length !== 1 ||
-		!last ||
-		last.type !== 'ExpressionStatement' ||
-		!isNode(last.expression)
-	) {
-		throw new Error(
-			'symbol-modules: behavior emission expected its factory source to be a single expression',
-		);
+	return {
+		source: projection.source,
+		declarationStatements: projection.declarationStatements,
+		functionExpression: projection.expression,
+	};
+}
+
+/**
+ * The behavior factory, the module-scope declarations it needs, and the free
+ * names those declarations bring with them.
+ *
+ * Same two-pass shape as `eventHandlerModuleScopeCarry` and
+ * `syncComputedDeriveModuleScopeCarry`. The behavior factory is spliced whole
+ * rather than lowered, so the first pass is just its own parse and the names it
+ * mentions are the seed; only a non-empty answer costs a second parse, and that
+ * one parses declarations and factory as ONE text so every node's `start`/`end`
+ * indexes the string the print site names — which is what keeps the map honest.
+ */
+function behaviorModuleScopeCarry(input: BehaviorEmissionInput): {
+	readonly projection: BehaviorProjection;
+	readonly declarationStatements: ReadonlyArray<EmissionNode>;
+	readonly declarationReferences: ReadonlySet<string>;
+} {
+	const projection = behaviorProjection(input.symbol.functionSource, input.sourceFileName);
+	const empty = {
+		projection,
+		declarationStatements: [] as ReadonlyArray<EmissionNode>,
+		declarationReferences: new Set<string>() as ReadonlySet<string>,
+	};
+
+	const declarations = input.moduleDeclarations ?? [];
+	if (declarations.length === 0) return empty;
+
+	const reached = new Set(
+		referencedModuleDeclarations(
+			deriveReferencedIdentifierNames(projection.functionExpression),
+			declarations,
+			input.sourceFileName,
+		),
+	);
+	if (reached.size === 0) return empty;
+	// Authored order, not reachability order: reachability finds `const nav = new
+	// Nav()` before it finds `class Nav`, and emitting them that way runs the
+	// constructor while the class binding is still in its temporal dead zone.
+	const selected = declarations.filter((declaration) => reached.has(declaration));
+
+	let carried: BehaviorProjection;
+	try {
+		carried = behaviorProjection(input.symbol.functionSource, input.sourceFileName, selected);
+	} catch {
+		// A text that will not reparse into the same shape leaves the module exactly
+		// as it was before this carry existed, rather than emitting a half-bound one.
+		return empty;
 	}
 
-	return { source, functionExpression: last.expression as unknown as EmissionNode };
+	return {
+		projection: carried,
+		declarationStatements: carried.declarationStatements,
+		declarationReferences: deriveReferencedIdentifierNames(carried.declarationStatements),
+	};
 }
 
 // ---------------------------------------------------------------------------
@@ -1996,11 +2084,50 @@ function stateInitializerProjection(
 	initializerSource: string,
 	filename: string,
 ): StateInitializerProjection {
-	const source = [...declarations, `(${initializerSource});`].join('\n');
+	const projection = declarationCarryProjection(
+		declarations,
+		initializerSource,
+		filename,
+		'state-initializer',
+	);
+
+	return {
+		source: projection.source,
+		program: projection.program,
+		declarationStatements: projection.declarationStatements,
+		initializerExpression: projection.expression,
+	};
+}
+
+type DeclarationCarryProjection = {
+	/** The one text every printed node carries an offset into. */
+	readonly source: string;
+	readonly program: unknown;
+	readonly declarationStatements: ReadonlyArray<EmissionNode>;
+	readonly expression: EmissionNode;
+};
+
+/**
+ * The one parse every "carry the module-scope declarations an authored
+ * expression needs" emitter shares.
+ *
+ * The state-initializer band, the behavior band, and — through their own
+ * variants — the derive and handler bands all need the same two things from one
+ * text: the declaration statements to place at module scope, and the authored
+ * expression to place inside the exported function. `label` only names the band
+ * in the two errors, so each site's message reads as its own.
+ */
+function declarationCarryProjection(
+	declarations: readonly string[],
+	expressionSource: string,
+	filename: string,
+	label: string,
+): DeclarationCarryProjection {
+	const source = [...declarations, `(${expressionSource});`].join('\n');
 	const { program, errors } = parseEmissionSource(source, filename, 'ts');
 	if (errors.length > 0) {
 		throw new Error(
-			`symbol-modules: state-initializer emission could not parse its projected source (${errors
+			`symbol-modules: ${label} emission could not parse its projected source (${errors
 				.map((error) => error.message)
 				.join('; ')})`,
 		);
@@ -2010,7 +2137,7 @@ function stateInitializerProjection(
 	const last = statements.at(-1);
 	if (!last || last.type !== 'ExpressionStatement' || !isNode(last.expression)) {
 		throw new Error(
-			'symbol-modules: state-initializer emission expected its projected source to end in an expression statement',
+			`symbol-modules: ${label} emission expected its projected source to end in an expression statement`,
 		);
 	}
 
@@ -2018,7 +2145,7 @@ function stateInitializerProjection(
 		source,
 		program,
 		declarationStatements: statements.slice(0, -1) as unknown as ReadonlyArray<EmissionNode>,
-		initializerExpression: last.expression as unknown as EmissionNode,
+		expression: last.expression as unknown as EmissionNode,
 	};
 }
 
@@ -6016,6 +6143,8 @@ export function buildSymbolModuleEmission(
 			symbol,
 			omitAuthoredSource: input.omitAuthoredSource,
 			sourceFileName: input.sourceFileName,
+			moduleDeclarations: input.moduleDeclarations,
+			moduleImports: input.moduleImports,
 		});
 	}
 
