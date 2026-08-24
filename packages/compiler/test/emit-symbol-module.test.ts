@@ -854,27 +854,25 @@ export function App() @{
 });
 
 // ---------------------------------------------------------------------------
-// Module-scope declarations a shared() seed names travel with its module.
+// Why the shared-seed emitter gets no carry.
 //
-// The last emitter that splices authored text and had no carry channel. A seed
-// module runs browser-side on resume, so the same gap applies: the seed
-// expression is the author's, and a module-scope `const` in it is not in scope
-// where the seed module runs.
+// It is the one remaining emitter that splices authored text and has no
+// `moduleDeclarations` channel, so the obvious reading is that it has the same
+// gap the derive, behavior, and runner bands had. It does not, and this is the
+// evidence: `isUnloweredSharedSeed` in `state-lowering.ts` allows a
+// component-body seed to name only that component's own prop locals and six
+// literal keywords, so a seed expression that would need a carry fails the build
+// two passes before the emitter runs. Adding a carry there would be code no
+// authored file can reach.
+//
+// This test is what makes that claim falsifiable: relax the seed rule and it
+// goes red, which is the signal to give the emitter a channel after all.
 // ---------------------------------------------------------------------------
 
-/** The emitted shared-seed modules for a compiled source, with the diagnostics. */
-async function sharedSeedModules(filename: string, source: string) {
-	const result = await compileTsrxModule({ filename, source, symbols: [] });
-	return {
-		modules: result.symbolModules.modules.filter((module) => module.kind === 'shared-seed'),
-		diagnostics: result.symbolModules.diagnostics,
-	};
-}
-
-test('a module-scope const a shared seed reads is carried into the seed module', async () => {
-	const { modules, diagnostics } = await sharedSeedModules(
-		'/workspace/app/src/SharedSeedConst.tsrx',
-		`
+test('a shared seed naming a module-scope const is refused before it reaches the emitter', async () => {
+	const result = await compileTsrxModule({
+		filename: '/workspace/app/src/SharedSeedConst.tsrx',
+		source: `
 import { shared, state } from '@markless/core';
 
 const TAG = 'box';
@@ -892,21 +890,26 @@ export function BoxRoot() @{
 	<div ui-tag={box.tag} />
 }
 `,
-	);
+		symbols: [],
+	});
 
-	expect(modules).toHaveLength(1);
-	const emitted = modules[0]!.source;
-	expect(emitted).toContain("const TAG = 'box';");
-	// The read itself survives as a reference to the carried binding.
-	expect(emitted).toContain('TAG');
-	// And the carry is not a compile error of its own.
-	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+	const refused = result.stateLowering.diagnostics.filter(
+		(diagnostic) => diagnostic.code === 'MARKLESS_SHARED_SEED_UNSUPPORTED',
+	);
+	expect(refused).toHaveLength(1);
+	expect(refused[0]!.severity).toBe('error');
+	expect(refused[0]!.message).toContain('TAG');
 });
 
-test('a shared seed that names no module-scope declaration carries none', async () => {
-	const { modules } = await sharedSeedModules(
-		'/workspace/app/src/SharedSeedNoConst.tsrx',
-		`
+test('a shared seed naming only a prop compiles, and carries no declaration', async () => {
+	// The other side of the rule, and a sharper reading of it than the diagnostic
+	// text gives: a seed value's every word has to be a prop local or one of the
+	// six keywords, so even a string literal is refused (`'plain'` matches the
+	// rule's identifier scan). A prop read is what the emitter is actually handed,
+	// and it names nothing to carry.
+	const result = await compileTsrxModule({
+		filename: '/workspace/app/src/SharedSeedProp.tsrx',
+		source: `
 import { shared, state } from '@markless/core';
 
 const UNUSED = 'box';
@@ -917,52 +920,24 @@ export const boxState = shared(() => {
 	return { ...box };
 }, { scope: 'widget' });
 
-export function BoxRoot() @{
+export function BoxRoot({ tag }) @{
 	const box = boxState();
-	box.tag = 'plain';
+	box.tag = tag;
 
 	<div ui-tag={box.tag} />
 }
 `,
-	);
+		symbols: [],
+	});
 
-	expect(modules).toHaveLength(1);
-	expect(modules[0]!.source).not.toContain('UNUSED');
-});
-
-test('carried seed declarations keep authored order, so a class is bound before it is used', async () => {
-	const { modules } = await sharedSeedModules(
-		'/workspace/app/src/SharedSeedOrder.tsrx',
-		`
-import { shared, state } from '@markless/core';
-
-class Tagger {
-	constructor(public tone: string) {}
-	tag() { return this.tone; }
-}
-const tagger = new Tagger('warm');
-
-export const boxState = shared(() => {
-	const box = state({ tag: '' });
-
-	return { ...box };
-}, { scope: 'widget' });
-
-export function BoxRoot() @{
-	const box = boxState();
-	box.tag = tagger.tag();
-
-	<div ui-tag={box.tag} />
-}
-`,
-	);
-
-	expect(modules).toHaveLength(1);
-	const emitted = modules[0]!.source;
-	// Reachability finds `const tagger = new Tagger('warm')` first; emitting that
-	// order runs the constructor inside the class binding's dead zone.
-	expect(emitted).toContain('class Tagger');
-	expect(emitted.indexOf('class Tagger')).toBeLessThan(emitted.indexOf('new Tagger('));
+	expect(
+		result.stateLowering.diagnostics.filter(
+			(diagnostic) => diagnostic.code === 'MARKLESS_SHARED_SEED_UNSUPPORTED',
+		),
+	).toEqual([]);
+	const seeds = result.symbolModules.modules.filter((module) => module.kind === 'shared-seed');
+	expect(seeds).toHaveLength(1);
+	expect(seeds[0]!.source).not.toContain('UNUSED');
 });
 
 // ---------------------------------------------------------------------------
