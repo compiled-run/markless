@@ -77,7 +77,11 @@ import {
 	withLeadingBlockComment,
 	type EmittedModule,
 } from './emit-codegen.ts';
-import { moduleScopeLines, SSR_CALLBACKS_PROP_NAME } from './public-render/shared.ts';
+import {
+	moduleScopeDeclarations,
+	moduleScopeLines,
+	SSR_CALLBACKS_PROP_NAME,
+} from './public-render/shared.ts';
 
 export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtifact {
 	const moduleDeclarations = sourceModuleScopeLines(input.source);
@@ -213,6 +217,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 				graphBindingLocalNames(input.semanticGraph),
 				sharedInstanceLocalNames(input.semanticGraph),
 				localNamesBySymbol,
+				sourceModuleScopeDeclaredNames(input.source),
 			).map(unresolvedGraphReferenceDiagnostic),
 		],
 	};
@@ -358,6 +363,18 @@ type UnresolvedGraphReference = {
 	 * is what the advice has to name.
 	 */
 	readonly rowLocal?: boolean;
+	/**
+	 * Whether a module-scope declaration in the same authored file binds the name.
+	 *
+	 * An emitted module is fetched and evaluated on its own, so a same-file
+	 * `const`, `function`, or `class` it names has to be copied into it. Every
+	 * emitter that can reach such a name performs that carry; a name that arrives
+	 * here means one of them did not, and the module would throw a ReferenceError
+	 * on its first run in the browser. The server never sees it — SSR renders
+	 * from the authored module, where the declaration is in scope — so without
+	 * this check the gap ships silently and crashes only client-side.
+	 */
+	readonly moduleDeclaration?: boolean;
 };
 
 /** Names that denote graph state in the authored file, as the author spelled them. */
@@ -432,8 +449,11 @@ function unresolvedGraphReferences(
 	graphNames: ReadonlySet<string>,
 	sharedInstanceNames: ReadonlySet<string>,
 	localNamesBySymbol: ReadonlyMap<string, ReadonlySet<string>>,
+	moduleDeclaredNames: ReadonlySet<string>,
 ): ReadonlyArray<UnresolvedGraphReference> {
-	if (graphNames.size === 0 && localNamesBySymbol.size === 0) return [];
+	if (graphNames.size === 0 && localNamesBySymbol.size === 0 && moduleDeclaredNames.size === 0) {
+		return [];
+	}
 
 	return modules.flatMap((emitted) => {
 		const free = freeIdentifierNames(emitted.source);
@@ -441,7 +461,10 @@ function unresolvedGraphReferences(
 		const localNames = localNamesBySymbol.get(emitted.symbolId) ?? emptyLocalNames;
 
 		return [...free]
-			.filter((name) => graphNames.has(name) || localNames.has(name))
+			.filter(
+				(name) =>
+					graphNames.has(name) || localNames.has(name) || moduleDeclaredNames.has(name),
+			)
 			.sort()
 			.map((name) => ({
 				symbolId: emitted.symbolId,
@@ -455,8 +478,40 @@ function unresolvedGraphReferences(
 				// row it is the row's item, which is the same precedence the lowering
 				// applies.
 				...(localNames.has(name) ? { rowLocal: true } : {}),
+				// Lowest precedence of the three: a name the graph or a row already
+				// explains is explained better by them. This claims only the names
+				// none of the others do — the ones an emitter should have carried.
+				...(moduleDeclaredNames.has(name) &&
+				!graphNames.has(name) &&
+				!localNames.has(name)
+					? { moduleDeclaration: true }
+					: {}),
 			}));
 	});
+}
+
+/**
+ * The names this authored file's module-scope declarations bind.
+ *
+ * Import locals are not among them: `moduleScopeDeclarations` skips import
+ * statements, and it must — an import IS emitted into the module that needs it,
+ * so counting its local would report every correctly emitted import as a gap.
+ */
+function sourceModuleScopeDeclaredNames(
+	source: SymbolModulesInput['source'],
+): ReadonlySet<string> {
+	if (!source) return new Set();
+	try {
+		return new Set(
+			moduleScopeDeclarations(source.source, source.filename).flatMap((declaration) => [
+				...declaration.names,
+			]),
+		);
+	} catch {
+		// Same reason as `sourceModuleScopeLines`: the semantic pass owns parse
+		// diagnostics, and this projection must not replace one with a raw error.
+		return new Set();
+	}
 }
 
 /** The authored assignment or expression the surviving name came from, when recorded. */
@@ -599,6 +654,9 @@ function unresolvedGraphReferenceDiagnostic(
 
 	if (reference.rowLocal === true) return rowLocalReferenceDiagnostic(reference, where);
 	if (reference.sharedInstance === true) return sharedInstanceReferenceDiagnostic(reference, where);
+	if (reference.moduleDeclaration === true) {
+		return moduleDeclarationReferenceDiagnostic(reference, where);
+	}
 
 	return {
 		code: SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE,
@@ -686,6 +744,42 @@ function sharedInstanceReferenceDiagnostic(
 			},
 			{
 				message: `Do not hoist the method into a local first (\`const handler = ${reference.name}.<method>;\`). That is the same read one line earlier and fails the same way.`,
+			},
+		],
+		docsUrl: `https://markless.dev/errors/${SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE}`,
+	};
+}
+
+/**
+ * The same refusal for a same-file module-scope declaration, which is a compiler
+ * gap rather than an authoring mistake.
+ *
+ * The other two refusals name shapes the author can respell. This one cannot be
+ * respelled: reading a module-scope `const` from a handler or a computed is
+ * ordinary, supported code, and the carry that copies the declaration into the
+ * emitted module is the compiler's job. So the advice is to report it, and the
+ * text says plainly that the server render hides it — this exact gap shipped
+ * once as a client-only ReferenceError because SSR stayed green.
+ */
+function moduleDeclarationReferenceDiagnostic(
+	reference: UnresolvedGraphReference,
+	where: string,
+): SymbolModulesDiagnostic {
+	return {
+		code: SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE,
+		severity: 'error',
+		phase: 'public-render',
+		passId: 'symbol-modules',
+		artifactKeys: ['symbolModules'],
+		title: `The emitted module for ${reference.symbolId} is missing the declaration of "${reference.name}"`,
+		message: `The emitted ${reference.kind} module for ${reference.symbolId} still names "${reference.name}" directly. ${where} "${reference.name}" is declared at module scope in this file, and the emitted module does not declare it, so this module would throw a ReferenceError the first time it runs in the browser. The server render would not: it evaluates the authored module, where the declaration is in scope.`,
+		why: 'Every symbol is compiled into a module that is fetched and evaluated on its own, so a module-scope declaration it still names has to be copied into it. That copy is the compiler\'s to make, and this check exists because a missing one is invisible otherwise: the server renders from the authored module and stays green, so the gap reaches the browser and crashes on the first re-render rather than failing the build.',
+		suggestions: [
+			{
+				message: `This is a compiler gap, not a mistake in this file: reading a module-scope declaration from a component is supported. Report it with the authored source of "${reference.name}" and the symbol kind above.`,
+			},
+			{
+				message: `To keep building meanwhile, move "${reference.name}" inside the component that uses it, or into a module you import from — an imported binding is carried into the emitted module already.`,
 			},
 		],
 		docsUrl: `https://markless.dev/errors/${SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE}`,
@@ -1143,7 +1237,13 @@ function emitSymbolModule(
 				symbolId: symbol.id,
 				kind: symbol.kind,
 				exportName: symbolExportName(symbol.id),
-				source: emitSyncComputedDeriveModule(symbol, captureSlots, omitAuthoredSource),
+				source: emitSyncComputedDeriveModule(
+					symbol,
+					captureSlots,
+					omitAuthoredSource,
+					moduleDeclarations,
+					moduleImports,
+				),
 			},
 		];
 	}
@@ -2234,23 +2334,86 @@ const DERIVE_SOURCE_FILENAME = 'markless-sync-computed-derive.ts';
 export function syncComputedDeriveEmissionInput(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'sync-computed-derive' }>,
 	captureSlots: ReadonlyArray<CaptureSlot>,
+	moduleDeclarations: readonly string[] = [],
 ): EmissionPrintInput {
-	return syncComputedDeriveEmission(symbol, captureSlots).input;
+	return syncComputedDeriveEmission(symbol, captureSlots, moduleDeclarations).input;
+}
+
+/**
+ * The derive body, the module-scope declarations it needs, and the text both
+ * were parsed from.
+ *
+ * Same two-pass shape as `eventHandlerModuleScopeCarry`, and for the same
+ * reasons. Which declarations the module needs is a question about the *emitted*
+ * body — a name the lowering turned into a `context.graph.read(...)` is no
+ * longer a reference to a module binding — so the body is built once to ask it,
+ * and only a non-empty answer costs a second parse. Declarations and derive are
+ * reparsed as ONE text so every node's `start`/`end` indexes the string the
+ * print site names, which is what keeps the source map honest.
+ */
+function syncComputedDeriveModuleScopeCarry(
+	symbol: Extract<PlannedSymbol, { readonly kind: 'sync-computed-derive' }>,
+	captureSlots: ReadonlyArray<CaptureSlot>,
+	moduleDeclarations: readonly string[],
+): {
+	readonly wrappedSource: string;
+	readonly statements: ReadonlyArray<EmissionNode>;
+	readonly declarationStatements: ReadonlyArray<EmissionNode>;
+} {
+	const bare = `${DERIVE_SOURCE_PREFIX}${symbol.source}${DERIVE_SOURCE_SUFFIX}`;
+	const firstPass = syncComputedDeriveStatements(symbol, captureSlots, bare);
+	const empty = {
+		wrappedSource: bare,
+		statements: firstPass.statements,
+		declarationStatements: [] as ReadonlyArray<EmissionNode>,
+	};
+	if (moduleDeclarations.length === 0) return empty;
+
+	const reached = new Set(
+		referencedModuleDeclarations(
+			deriveReferencedIdentifierNames(firstPass.statements),
+			moduleDeclarations,
+			DERIVE_SOURCE_FILENAME,
+		),
+	);
+	if (reached.size === 0) return empty;
+	// Authored order, not reachability order: reachability finds `const rate =
+	// new Rate()` before it finds `class Rate`, and emitting them that way runs
+	// the constructor while the class binding is still in its temporal dead zone.
+	const selected = moduleDeclarations.filter((declaration) => reached.has(declaration));
+
+	const carriedSource = `${selected.join('\n')}\n${bare}`;
+	const carried = syncComputedDeriveStatements(symbol, captureSlots, carriedSource);
+	// A text that will not reparse into the same shape leaves the module exactly
+	// as it was before this carry existed, rather than emitting a half-bound one.
+	if (carried.declarationStatements.length !== selected.length) return empty;
+
+	return {
+		wrappedSource: carriedSource,
+		statements: carried.statements,
+		declarationStatements: carried.declarationStatements,
+	};
 }
 
 function syncComputedDeriveEmission(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'sync-computed-derive' }>,
 	captureSlots: ReadonlyArray<CaptureSlot>,
-): { readonly input: EmissionPrintInput; readonly statements: ReadonlyArray<EmissionNode> } {
+	moduleDeclarations: readonly string[],
+): {
+	readonly input: EmissionPrintInput;
+	readonly statements: ReadonlyArray<EmissionNode>;
+	readonly declarationStatements: ReadonlyArray<EmissionNode>;
+} {
 	const exportName = symbolExportName(symbol.id);
-	const wrappedSource = `${DERIVE_SOURCE_PREFIX}${symbol.source}${DERIVE_SOURCE_SUFFIX}`;
-	const statements = syncComputedDeriveStatements(symbol, captureSlots, wrappedSource);
+	const carried = syncComputedDeriveModuleScopeCarry(symbol, captureSlots, moduleDeclarations);
+	const { wrappedSource, statements, declarationStatements } = carried;
 
 	const input: EmissionPrintInput = {
 		program: {
 			type: 'Program',
 			sourceType: 'module',
 			body: [
+				...declarationStatements,
 				{
 					type: 'ExportNamedDeclaration',
 					specifiers: [],
@@ -2279,21 +2442,30 @@ function syncComputedDeriveEmission(
 		},
 	};
 
-	return { input, statements };
+	return { input, statements, declarationStatements };
 }
 
 function emitSyncComputedDeriveModule(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'sync-computed-derive' }>,
 	captureSlots: ReadonlyArray<CaptureSlot>,
 	omitAuthoredSource: boolean,
+	moduleDeclarations: readonly string[],
+	moduleImports: readonly SemanticModuleImport[],
 ): string {
-	const emission = syncComputedDeriveEmission(symbol, captureSlots);
+	const emission = syncComputedDeriveEmission(symbol, captureSlots, moduleDeclarations);
 	const printed = printEmittedModule(emission.input);
-	const referenced = deriveReferencedIdentifierNames(emission.statements);
+	// A carried declaration's own free names decide imports too: a module-scope
+	// class extending an imported base needs that import in this module.
+	const referenced = new Set([
+		...deriveReferencedIdentifierNames(emission.statements),
+		...deriveReferencedIdentifierNames(emission.declarationStatements),
+	]);
 	const imports = uniqueModuleImports(
-		(symbol.moduleImports ?? []).filter((moduleImport) =>
-			referenced.has(moduleImport.localName),
-		),
+		[
+			...(symbol.moduleImports ?? []),
+			// A carried declaration can name an import the derive body never did.
+			...(emission.declarationStatements.length === 0 ? [] : moduleImports),
+		].filter((moduleImport) => referenced.has(moduleImport.localName)),
 	);
 
 	return [
@@ -2379,10 +2551,13 @@ function syncComputedDeriveStatements(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'sync-computed-derive' }>,
 	captureSlots: ReadonlyArray<CaptureSlot>,
 	wrappedSource: string,
-): EmissionNode[] {
-	const derive = parseDeriveFunction(wrappedSource);
-	const body = derive?.body as AnyNode | undefined;
-	if (!body) return [returnUndefinedStatement()];
+): {
+	readonly statements: EmissionNode[];
+	readonly declarationStatements: ReadonlyArray<EmissionNode>;
+} {
+	const parsed = parseDeriveProgram(wrappedSource);
+	const body = parsed?.derive.body as AnyNode | undefined;
+	if (!body) return { statements: [returnUndefinedStatement()], declarationStatements: [] };
 
 	const statements =
 		body.type === 'BlockStatement'
@@ -2391,15 +2566,29 @@ function syncComputedDeriveStatements(
 
 	rewriteDeriveReads(statements, symbol.dependencies ?? [], captureSlots, wrappedSource);
 
-	if (statements.length === 0) return [returnUndefinedStatement()];
-	return statements as unknown as EmissionNode[];
+	const declarationStatements = (parsed?.declarations ??
+		[]) as unknown as ReadonlyArray<EmissionNode>;
+	if (statements.length === 0) {
+		return { statements: [returnUndefinedStatement()], declarationStatements };
+	}
+	return { statements: statements as unknown as EmissionNode[], declarationStatements };
 }
 
 function returnUndefinedStatement(): EmissionNode {
 	return { type: 'ReturnStatement', argument: identifierNode('undefined') };
 }
 
-function parseDeriveFunction(wrappedSource: string): AnyNode | null {
+/**
+ * The derive's function tree, and whatever module-scope declarations were parsed
+ * ahead of it in the same text.
+ *
+ * The wrapper is always the *last* top-level statement, because a carry prepends
+ * the declarations it selected to the same source before parsing. With no carry
+ * the wrapper is also the first, so this reads both shapes.
+ */
+function parseDeriveProgram(
+	wrappedSource: string,
+): { readonly declarations: ReadonlyArray<AnyNode>; readonly derive: AnyNode } | null {
 	let program: AnyNode;
 	try {
 		const parsed = parseEmissionSource(wrappedSource, DERIVE_SOURCE_FILENAME);
@@ -2412,14 +2601,15 @@ function parseDeriveFunction(wrappedSource: string): AnyNode | null {
 		return null;
 	}
 
-	const declaration = asNodes(program.body)[0];
+	const statements = asNodes(program.body);
+	const declaration = statements.at(-1);
 	if (declaration?.type !== 'VariableDeclaration') return null;
 
 	const init = asNodes(declaration.declarations)[0]?.init;
 	if (!isNode(init)) return null;
 	if (init.type !== 'ArrowFunctionExpression' && init.type !== 'FunctionExpression') return null;
 
-	return init;
+	return { declarations: statements.slice(0, -1), derive: init };
 }
 
 /**

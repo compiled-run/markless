@@ -47,6 +47,7 @@ import {
 	eventHandlerRowLocalNames,
 	SYMBOL_MODULE_AST_KINDS,
 	SYMBOL_MODULE_UNMIGRATED_KINDS,
+	SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE,
 	type SymbolModuleEmissionInput,
 	type ValueExpressionEmission,
 } from '../src/passes/symbol-modules.ts';
@@ -547,4 +548,201 @@ test('dispatched emission is deterministic and reaches a reparse fixpoint', asyn
 			expect(emitted.code).toBe(emitSymbolModuleNodes(dispatched.input)?.code);
 		}
 	}
+});
+
+// ---------------------------------------------------------------------------
+// Module-scope declarations a derive names travel with the derive module.
+//
+// A `sync-computed-derive` module is fetched and evaluated on its own in the
+// browser, so a module-scope `const` the derive reads has to be *in* it. It was
+// not: the derive branch returned before the carry the general path performs,
+// the name stayed free, and the first client re-derive threw a ReferenceError.
+// SSR hoisted the declaration into its own render, so the server was green and
+// only the browser crashed.
+// ---------------------------------------------------------------------------
+
+/** The one emitted derive module for a compiled source, by symbol kind. */
+async function deriveModules(filename: string, source: string) {
+	const result = await compileTsrxModule({ filename, source, symbols: [] });
+	return {
+		modules: result.symbolModules.modules.filter(
+			(module) => module.kind === 'sync-computed-derive',
+		),
+		diagnostics: result.symbolModules.diagnostics,
+	};
+}
+
+test('a module-scope const a derive reads is carried into the derive module', async () => {
+	const { modules, diagnostics } = await deriveModules(
+		'/workspace/app/src/DeriveConst.tsrx',
+		`
+import { computed, state } from '@markless/core';
+
+const RATE = 3;
+
+export function App() @{
+	let count = state(1);
+	const scaled = computed(() => count * RATE);
+
+	<main><span>{scaled}</span></main>
+}
+`,
+	);
+
+	expect(modules).toHaveLength(1);
+	const emitted = modules[0]!.source;
+	expect(emitted).toContain('const RATE = 3;');
+	// The read itself survives as a reference to the carried binding.
+	expect(emitted).toContain('RATE');
+	// Nothing about the carry is a compile error.
+	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+});
+
+test('a derive that names no module-scope declaration carries none', async () => {
+	const { modules } = await deriveModules(
+		'/workspace/app/src/DeriveNoConst.tsrx',
+		`
+import { computed, state } from '@markless/core';
+
+const UNUSED = 3;
+
+export function App() @{
+	let count = state(1);
+	const scaled = computed(() => count * 2);
+
+	<main><span>{scaled}</span></main>
+}
+`,
+	);
+
+	expect(modules).toHaveLength(1);
+	expect(modules[0]!.source).not.toContain('UNUSED');
+});
+
+test('carried declarations keep authored order, so a class is bound before it is used', async () => {
+	const { modules } = await deriveModules(
+		'/workspace/app/src/DeriveOrder.tsrx',
+		`
+import { computed, state } from '@markless/core';
+
+class Rate {
+	constructor(public step: number) {}
+	scale(value: number) { return value * this.step; }
+}
+const rate = new Rate(3);
+
+export function App() @{
+	let count = state(1);
+	const scaled = computed(() => rate.scale(count));
+
+	<main><span>{scaled}</span></main>
+}
+`,
+	);
+
+	expect(modules).toHaveLength(1);
+	const emitted = modules[0]!.source;
+	// Reachability finds `const rate = new Rate(3)` first; emitting that order
+	// runs the constructor inside the class binding's temporal dead zone.
+	expect(emitted).toContain('class Rate');
+	expect(emitted.indexOf('class Rate')).toBeLessThan(emitted.indexOf('new Rate('));
+});
+
+test('a carried declaration extending an imported base keeps that import', async () => {
+	const { modules } = await deriveModules(
+		'/workspace/app/src/DeriveImportedBase.tsrx',
+		`
+import { computed, state } from '@markless/core';
+import { Base } from './base.ts';
+
+class Rate extends Base {
+	scale(value: number) { return value * 3; }
+}
+const rate = new Rate();
+
+export function App() @{
+	let count = state(1);
+	const scaled = computed(() => rate.scale(count));
+
+	<main><span>{scaled}</span></main>
+}
+`,
+	);
+
+	expect(modules).toHaveLength(1);
+	const emitted = modules[0]!.source;
+	expect(emitted).toContain('class Rate extends Base');
+	// The derive body never named `Base`; the carried declaration did.
+	expect(emitted).toContain('import { Base } from "./base.ts";');
+});
+
+// ---------------------------------------------------------------------------
+// The guard behind the carry.
+//
+// Fixing the derive emitter fixes one emitter. The reason the gap shipped at all
+// is that nothing checked: `unresolvedGraphReferences` computed the free names
+// of every emitted module and then dropped the ones a module-scope declaration
+// binds, so a forgotten carry produced no diagnostic. It is reported now, which
+// turns "silent at build time, ReferenceError in the browser" into a build
+// error — and immediately named a second emitter with the same gap.
+// ---------------------------------------------------------------------------
+
+test('an emitted module that leaves a module-scope declaration free is reported', async () => {
+	// The behavior band takes no `moduleDeclarations` at all, so its module is a
+	// live example of the shape the guard exists to catch. If the behavior carry
+	// is implemented later this fixture stops erroring, and this test should then
+	// be repointed at whichever emitter still has no carry channel — not deleted.
+	const result = await compileTsrxModule({
+		filename: '/workspace/app/src/Behavior.tsrx',
+		source: `
+const LABEL = 'ready';
+
+export function App() @{
+	<canvas attach={(el) => { el.dataset.state = LABEL; }} />
+}
+`,
+		symbols: [],
+	});
+
+	const behavior = result.symbolModules.modules.find((module) => module.kind === 'behavior');
+	// The premise: the name really is free in the emitted module.
+	expect(behavior?.source).toContain('LABEL');
+	expect(behavior?.source).not.toContain("const LABEL = 'ready'");
+
+	const reported = result.symbolModules.diagnostics.filter(
+		(diagnostic) => diagnostic.code === SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE,
+	);
+	expect(reported).toHaveLength(1);
+	expect(reported[0]!.severity).toBe('error');
+	expect(reported[0]!.title).toContain('LABEL');
+	// The message has to say why the server stayed green, or the reader will
+	// take a passing SSR render as evidence the module is fine.
+	expect(reported[0]!.message).toContain('ReferenceError');
+	expect(reported[0]!.message).toContain('server render');
+});
+
+test('a correctly carried derive module produces no unresolved-reference diagnostic', async () => {
+	const { diagnostics } = await deriveModules(
+		'/workspace/app/src/DeriveCarried.tsrx',
+		`
+import { computed, state } from '@markless/core';
+
+const RATE = 3;
+
+export function App() @{
+	let count = state(1);
+	const scaled = computed(() => count * RATE);
+
+	<main><span>{scaled}</span></main>
+}
+`,
+	);
+
+	// The guard is only quiet because the carry in half one is real: before it,
+	// this same fixture left `RATE` free and would report here.
+	expect(
+		diagnostics.filter(
+			(diagnostic) => diagnostic.code === SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE,
+		),
+	).toEqual([]);
 });
