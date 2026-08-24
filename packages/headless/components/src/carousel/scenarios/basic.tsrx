@@ -1,11 +1,9 @@
 import * as carousel from '../index.ts';
-import { CAROUSEL_CSS } from './carousel-css.ts';
 
 // The starter a consumer copies: a title, three slides, and the two triggers
 // that step through them. No nav list, so the slides stay plain groups.
 export default function Basic() @{
 	<section>
-		<style>{CAROUSEL_CSS}</style>
 		<carousel.root value="paris" data-testid="root">
 			<carousel.title data-testid="title">Featured destinations</carousel.title>
 			<carousel.playtrigger data-testid="playtrigger">Play</carousel.playtrigger>

@@ -1,6 +1,7 @@
 import { render, renderSSR } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
-import { expect, test } from 'vitest';
+import { beforeEach, expect, test } from 'vitest';
+import { installCarouselCss } from './scenarios/carousel-css.ts';
 import Basic from './scenarios/basic.tsrx';
 import GalleryAutoplay from './scenarios/gallery-autoplay.tsrx';
 import Tabbed from './scenarios/tabbed.tsrx';
@@ -43,6 +44,15 @@ const LeftForward = page.getByTestId('left-forwardtrigger');
 // by reference or wrapped in a helper - the branch below keeps both call sites
 // literal, which is why this idiom rather than a `mount` parameter.
 const MODES = ['CSR', 'SSR'] as const;
+
+// A carousel is layout before it is behaviour: the viewport has to clip, the
+// track has to lay the slides out along the axis, and the slides have to have a
+// size. Without it every row here ran against a bare stack of divs, which is
+// what let defect 82 hide - an auto-height vertical viewport measures its own
+// content, so every slide reads as visible.
+beforeEach(() => {
+	installCarouselCss();
+});
 
 function el<T extends Element = HTMLElement>(locator: { element(): Element | null }) {
 	const found = locator.element();
@@ -135,16 +145,27 @@ for (const mode of MODES) {
 		expect(el(ForwardTrigger).getAttribute('aria-label')).toBe('Next slide');
 	});
 
-	// Pinned, and NOT defect 78 after all: with the handle read spelled against
-	// the widget root, the stepping handler now runs to completion instead of
-	// throwing. What is left is the vertical engine itself - the click dispatches,
-	// the record matches, and no slide becomes active. Its own defect.
-	test.fails(`${mode}: a vertical carousel says so and still steps`, async () => {
+	// Defect 82, fixed. The trigger's handler always ran; the navigation math
+	// killed it. `slidesPerView` measured the viewport's size along the axis on
+	// every step, and a vertical carousel's viewport is auto-height unless the
+	// consumer constrains it, so the measurement reported all three slides
+	// visible, `reachableValues` left one reachable slide, and stepping had
+	// nowhere to go. The measurement is now asked for only by a `move="view"`
+	// carousel, which is where a viewport's worth is the unit of movement.
+	test(`${mode}: a vertical carousel says so and still steps`, async () => {
 		if (mode === 'CSR') await render(Vertical);
 		else await renderSSR(Vertical);
 
 		expect(el(Root).hasAttribute('ui-vertical')).toBe(true);
 		expect(el(TopItem).hasAttribute('ui-active')).toBe(true);
+
+		// The slides really do run down rather than across, and the viewport
+		// really does clip. Asserted rather than assumed: a vertical carousel laid
+		// out as a plain stack is the shape that hid this defect.
+		const viewport = el(ScrollArea);
+		expect(viewport.clientHeight).toBeLessThan(viewport.scrollHeight);
+		expect(el(MiddleItem).offsetTop).toBeGreaterThan(el(TopItem).offsetTop);
+		expect(el(MiddleItem).offsetLeft).toBe(el(TopItem).offsetLeft);
 
 		await userEvent.click(el(ForwardTrigger));
 		await expect.poll(() => el(MiddleItem).hasAttribute('ui-active')).toBe(true);

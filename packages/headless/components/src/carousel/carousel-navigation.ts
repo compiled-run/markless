@@ -15,6 +15,11 @@ export function slideValues(slideEls: readonly HTMLElement[]): string[] {
  * The slides a trigger may actually stop on, by value. Stepping by `move` from
  * the first slide leaves a remainder at the end, so the last reachable slide is
  * added and the far end is always reachable.
+ *
+ * `slidesPerView` is one unless the carousel moves by `view`; the engine will
+ * not hand a measured count to a carousel that steps by a fixed number. A count
+ * larger than the slides would otherwise push `last` negative and leave nothing
+ * reachable at all, which is a dead carousel rather than a stopped one.
  */
 export function reachableValues(
 	slideEls: readonly HTMLElement[],
@@ -24,7 +29,7 @@ export function reachableValues(
 ): string[] {
 	const values = slideValues(slideEls);
 	const step = move === 'view' ? Math.max(1, slidesPerView) : Math.max(1, move);
-	const last = isLoop ? values.length - 1 : values.length - slidesPerView;
+	const last = isLoop ? values.length - 1 : values.length - Math.max(1, slidesPerView);
 
 	if (values.length === 0) return [];
 	if (last < 0) return [];

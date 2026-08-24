@@ -1,11 +1,9 @@
 import * as carousel from '../index.ts';
-import { CAROUSEL_CSS } from './carousel-css.ts';
 
 // Two carousels on one page, sharing slide values on purpose: a trigger in one
 // must never move the other.
 export default function TwoCarousels() @{
 	<section>
-		<style>{CAROUSEL_CSS}</style>
 		<carousel.root value="one" data-testid="left-root">
 			<carousel.scrollarea data-testid="left-scrollarea" data-viewport>
 				<carousel.item value="one" data-testid="left-one" data-slide>Left one</carousel.item>

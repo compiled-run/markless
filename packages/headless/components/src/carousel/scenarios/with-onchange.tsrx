@@ -1,6 +1,5 @@
 import { state } from '@markless/core';
 import * as carousel from '../index.ts';
-import { CAROUSEL_CSS } from './carousel-css.ts';
 
 // A consumer watching the showing slide. The log is written straight into the
 // page so a test reads what the handler saw, not what it hoped.
@@ -8,7 +7,6 @@ export default function WithOnChange() @{
 	const log = state({ last: '', calls: 0 });
 
 	<section>
-		<style>{CAROUSEL_CSS}</style>
 		<carousel.root
 			value="paris"
 			onChange={(value) => {

@@ -3,10 +3,9 @@
 Research: `goals/headless-components/notes/research-carousel.md`.
 QDS source read as structural truth: `~/dev/open-source/qwik-design-system/libs/components/src/carousel/`.
 
-**Status: incomplete.** 25 of 30 browser rows pass. Five rows are red and each names a
-real defect, listed under "Open reds" below. There is no `carousel.sr.ts` yet, so the
-family is deliberately **not** registered in `.github/workflows/screen-reader.yml` —
-registering it without a lane would fail that job.
+**Status: green.** All 30 browser rows pass, and the virtual screen-reader lane
+(`carousel.sr.ts`, registered in `.github/workflows/screen-reader.yml`) passes with its
+own pins.
 
 ## Shape
 
@@ -104,38 +103,50 @@ DOM traversal anywhere in the family: no `querySelector*`, no `closest()`.
 15. **No focus handler on `carousel.item`.** `focusin` bubbles, so the root's handler
     already stops rotation for anything focused inside.
 
-## Open reds — five browser rows, each a real defect
+## Closed reds
 
-1. **`a trigger in one carousel leaves the other alone` (CSR and SSR).** Both carousels
-   render their first slide marked. After the *left* carousel's forward trigger is
-   clicked, the *right* carousel's slide loses its `ui-active` marker. The right
-   carousel was never touched. This looks like a widget-instance resolution problem in
-   the refresh rather than anything the family can fix — the parts only ever compare
-   `carousel.value === slide.value` — and it is the same isolation property the C-prime
-   witness pins for handles. Needs a compiler or web owner; both are outside this
-   unit's file contract.
-2. **`a vertical carousel says so and still steps` (CSR and SSR).** The root reports
-   `ui-vertical` and the first slide is marked, but the forward trigger does not move
-   it. Ruled out: viewport measurement — the engine was given a `viewportEl` handle so
-   `slidesPerView` measures the clipping window rather than the track, and the row is
-   unchanged. `ui-active` depends only on `carousel.value`, which `step()` writes
-   before any measurement is used, so the failure is upstream of the engine.
-3. **`autoplay advances the slides`.** The play trigger flips `aria-live` to `off`, so
-   `startAutoplay` runs and its graph write lands. The slide never advances, so the
-   `setInterval` callback's writes to `carousel.value` do not reach the DOM. A timer
-   callback writing graph state outside a dispatch may simply not refresh; navbar's
-   `setTimeout` is the only landed precedent and it writes from inside a handler.
+1. **`a trigger in one carousel leaves the other alone` (CSR and SSR)** — defect 78,
+   fixed compiler-side: a handle read now takes the bound edge's instance path, so the
+   two carousels no longer share one registration.
+2. **`autoplay advances the slides`** — defect 79, fixed compiler-side: writes inside
+   timer callbacks lower through the write-aware band.
+3. **`a vertical carousel says so and still steps` (CSR and SSR)** — defect 82, fixed
+   here. Diagnosis and fix below; the earlier entry ruled measurement out and was
+   wrong about it.
 
-The three autoplay rows that *do* pass (label flip, focus stops rotation, hover stops
-rotation, nothing advances before resume) mean the state machine is right and only the
-tick's write is in question.
+## Defect 82 — the vertical axis, and why measurement was the seat
+
+`step()` reads `slidesPerView` *before* it computes which slides are reachable, so the
+measurement was never downstream of the write the way the old note claimed. What it
+measured was the viewport's size along the axis, and that is only a window when the
+consumer has constrained it. Width usually is — a block-level viewport takes its
+containing block's width — so the horizontal rows measured one slide per view and
+stepped fine. Height usually is not: the vertical scenario's viewport was auto-height,
+so `clientHeight` reported its own content, all three slides read as visible,
+`reachableValues` computed `last = 3 - 3 = 0`, and exactly one slide was reachable.
+`stepValue` then answered the slide already showing, `carousel.value` never changed,
+and no slide activated. The handler ran to completion the whole time.
+
+The fix follows QDS: `itemsPerView` there is a signal fixed at 1, and the visibility
+probe that would raise it is mounted only for `move="view"` (`carousel-root.tsx` gates
+both the browser effect and `<PostRender />` on `isMoveView`). A carousel that steps by
+a fixed count navigates by that count, and a measurement must not override it. Our
+`slidesPerView` now takes `move` and answers 1 unless the consumer asked for `view`,
+and even then refuses a viewport that does not clip — a viewport with no overflow is
+windowing nothing and cannot report a slide count. `reachableValues` also floors the
+count at 1, so a bad number can no longer push `last` negative and empty the reachable
+set, which is a dead carousel rather than a stopped one.
+
+**What hid it: the scenarios had no CSS at all.** Each scenario carried
+`<style>{CAROUSEL_CSS}</style>`, and that element never reached the page — markup
+`<style>` is dropped, verified by dumping the rendered document. So every row ran
+against an unstyled stack of divs, where a vertical viewport degenerates exactly as
+above. The sheet is now installed straight into the document by the suite
+(`installCarouselCss`), and the vertical row asserts the layout it depends on: the
+viewport clips, the slides run down, and they share a left edge. Markup `<style>` is a
+compiler-side gap and is not this family's to fix.
 
 ## Not built
-
-`carousel.sr.ts`, and the workflow registration that depends on it. The screen-reader
-sequences are derived in research §4c — there is no `w3c/aria-at` plan for carousel, so
-those rows would be ours rather than borrowed, and they should be written against a
-family whose behaviour rows are green first.
 
 `scenarios/slides-from-data.tsrx` was written and removed: it is blocked by (3) under
 "What the compiler refused". A carousel authored over a slide array is the normal case,
