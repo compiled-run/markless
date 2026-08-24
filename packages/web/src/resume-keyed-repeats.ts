@@ -2,6 +2,7 @@ import type { RuntimeGraph } from '@markless/runtime';
 import type {
 	ElementHandleRegistry,
 	ResumeDomElement,
+	ResumeDomNode,
 	ResumeKeyedRepeatRecord,
 	ResumeRuntimeInput,
 	ResumeViewRecord,
@@ -115,6 +116,12 @@ export function wireKeyedRepeats(input: {
 		if (!parent) continue;
 		const items = readKeyedRepeatCollection(input.graph, repeat),
 			rowRootsByKey = new Map<unknown, ResumeDomElement>();
+		// A page served with no rows already shows whatever the server painted for
+		// the `@empty` arm, so this runtime must not paint a second one. It also
+		// keeps no handle on those nodes - it did not make them - which is safe
+		// because a zero-row boot keys no row, so no row can ever come back and
+		// ask for the arm to leave (the nextRows walk below bails first).
+		const arm: MountedEmptyArm = { mounted: items.length === 0, nodes: [] };
 		for (const [rowIndex, rowRoot] of repeatRowElements(parent, repeat, items.length)) {
 			const rowKey = repeatItemKey(items[rowIndex], repeat);
 			rowRootsByKey.set(rowKey, rowRoot);
@@ -132,7 +139,7 @@ export function wireKeyedRepeats(input: {
 				path: repeat.collectionPath,
 				run() {
 					validateOneRepeat(input.graph, repeat);
-					applyKeyedRepeatRowOrder(input.graph, repeat, parent, rowRootsByKey);
+					applyKeyedRepeatRowOrder(input.graph, repeat, parent, rowRootsByKey, arm);
 				},
 			}),
 		);
@@ -143,6 +150,7 @@ function applyKeyedRepeatRowOrder(
 	repeat: ResumeKeyedRepeatRecord,
 	parent: ResumeDomElement,
 	rowRootsByKey: Map<unknown, ResumeDomElement>,
+	arm: MountedEmptyArm,
 ): void {
 	const nextRows: ResumeDomElement[] = [];
 	for (const item of readKeyedRepeatCollection(graph, repeat)) {
@@ -150,11 +158,7 @@ function applyKeyedRepeatRowOrder(
 		if (!rowRoot) return;
 		nextRows.push(rowRoot);
 	}
-	const mutableParent = parent as ResumeDomElement & {
-		readonly appendChild?: (node: ResumeDomElement) => unknown;
-		readonly insertBefore?: (node: ResumeDomElement, before: unknown) => unknown;
-		readonly removeChild?: (node: ResumeDomElement) => unknown;
-	};
+	const mutableParent = parent as MutableRepeatParent;
 	// Compare against every attached row THIS repeat owns, not the first
 	// nextRows.length children. A prefix comparison calls [A,B,C] -> [A,B]
 	// already-in-order and returns before the removal pass below, so a row
@@ -164,8 +168,25 @@ function applyKeyedRepeatRowOrder(
 	const currentRows = elementChildren(parent).filter((child) => knownRows.has(child));
 	if (
 		currentRows.length === nextRows.length &&
-		currentRows.every((row, index) => row === nextRows[index])
+		currentRows.every((row, index) => row === nextRows[index]) &&
+		// The rows agreeing is not the whole answer once a repeat has an `@empty`
+		// arm: nothing-to-nothing still has to raise the arm the first time.
+		(nextRows.length > 0 || arm.mounted || !repeat.emptyArm)
 	) return;
+	// The pinned element census is the shipped shape as the framework has moved
+	// it since (see spliceDomOrderCensus). Rows and the `@empty` arm are exactly
+	// such a move, so every attach and detach below is reported to it - a mint
+	// that entered the document without one would shift the index of every
+	// element after this repeat.
+	const census = censusRoot(parent);
+	// The arm speaks only while nothing matches, so it leaves before the rows do
+	// anything, and the row span is its own again by the time rows re-enter.
+	if (arm.mounted && nextRows.length > 0 && arm.nodes.length > 0) {
+		for (const node of arm.nodes) mutableParent.removeChild?.(node);
+		if (census) spliceDomOrderCensus(census, arm.nodes, []);
+		arm.mounted = false;
+		arm.nodes = [];
+	}
 	// A key that left the collection takes its row out of the document. Without
 	// this the served row stayed attached and every read of the rows - an
 	// ordered element() set most of all - kept answering a row that is gone.
@@ -181,11 +202,141 @@ function applyKeyedRepeatRowOrder(
 	const anchor = elementChildren(parent)
 		.slice(repeat.rowStartOffset ?? 0)
 		.find((child) => !knownRows.has(child));
-	for (const rowRoot of nextRows) {
-		if (anchor) mutableParent.insertBefore?.(rowRoot, anchor);
-		else if (mutableParent.appendChild) mutableParent.appendChild(rowRoot);
-		else mutableParent.insertBefore?.(rowRoot, null);
+	for (const rowRoot of nextRows) insertRepeatNode(mutableParent, rowRoot, anchor);
+	if (census && (currentRows.length > 0 || nextRows.length > 0))
+		spliceDomOrderCensus(census, currentRows, nextRows);
+	if (nextRows.length > 0 || arm.mounted || !repeat.emptyArm) return;
+	const nodes = renderEmptyArm(parent, repeat);
+	const armAnchor = elementChildren(parent).slice(repeat.rowStartOffset ?? 0)[0];
+	for (const node of nodes) insertRepeatNode(mutableParent, node, armAnchor);
+	arm.mounted = true;
+	arm.nodes = nodes;
+	if (census) spliceDomOrderCensus(census, [], nodes);
+}
+/**
+ * The `@empty` arm this runtime raised, and the nodes it has to take back out.
+ *
+ * `mounted` with no `nodes` is the server's own arm on a page served with an
+ * empty collection: it is up, and this runtime never removes what it did not
+ * make.
+ */
+type MountedEmptyArm = { mounted: boolean; nodes: ReadonlyArray<ResumeDomNode> };
+type MutableRepeatParent = ResumeDomElement & {
+	readonly appendChild?: (node: ResumeDomNode) => unknown;
+	readonly insertBefore?: (node: ResumeDomNode, before: unknown) => unknown;
+	readonly removeChild?: (node: ResumeDomNode) => unknown;
+};
+function insertRepeatNode(
+	parent: MutableRepeatParent,
+	node: ResumeDomNode,
+	anchor: ResumeDomNode | undefined,
+): void {
+	if (anchor) parent.insertBefore?.(node, anchor);
+	else if (parent.appendChild) parent.appendChild(node);
+	else parent.insertBefore?.(node, null);
+}
+/**
+ * Build the `@empty` arm's nodes from the markup the payload carries.
+ *
+ * A detached template is the same construction `renderBranchHtml` uses for a
+ * flipped `@if` arm; it is spelled here rather than threaded in because the
+ * repeat runtime is reached from two call sites that hand it no renderer.
+ */
+function renderEmptyArm(
+	parent: ResumeDomElement,
+	repeat: ResumeKeyedRepeatRecord,
+): ReadonlyArray<ResumeDomNode> {
+	const template = parent.ownerDocument?.createElement?.('template');
+	if (!template) throw emptyArmRendererMissingError(repeat);
+	template.innerHTML = repeat.emptyArm!.html;
+	const nodes = Array.from(template.content?.childNodes ?? []) as ReadonlyArray<ResumeDomNode>;
+	if (nodes.length === 0) throw emptyArmEmptyError(repeat);
+	return nodes;
+}
+// A local copy of resume-locators' census splice, for the reason resume-branches
+// keeps its own DOM-walk helpers: importing that module here pulls it and the
+// resume-errors chunk into this on-demand module's static closure, which the
+// leanness guard measured at 28,554 source bytes against a 20,983 wall. The
+// SEMANTICS are the one definition - this is the same splice, spelled twice, not
+// a second way to renumber the census.
+function spliceDomOrderCensus(
+	root: ResumeDomElement,
+	removed: Iterable<ResumeDomNode>,
+	inserted: ReadonlyArray<ResumeDomNode>,
+): void {
+	const census = root.__marklessCensus;
+	if (!census) return;
+	for (const node of removed) {
+		const at = census.indexOf(node as ResumeDomElement);
+		if (at >= 0) census.splice(at, censusBlockEnd(census, at) - at);
 	}
+	if (inserted.length)
+		census.splice(censusInsertionSlot(census, inserted[0]!), 0, ...censusElements(inserted));
+}
+function censusBlockEnd(census: ResumeDomElement[], at: number): number {
+	const inside = new Set<ResumeDomNode>(censusElements([census[at]!]));
+	let end = at + 1;
+	while (end < census.length && inside.has(census[end]!)) end++;
+	return end;
+}
+function censusInsertionSlot(census: ResumeDomElement[], first: ResumeDomNode): number {
+	const parent = (first as ResumeDomElement).parentElement;
+	if (!parent) return census.length;
+	let slot = -1;
+	for (const child of parent.childNodes ?? []) {
+		if (child === first) break;
+		const at = census.indexOf(child as ResumeDomElement);
+		if (at >= 0) slot = censusBlockEnd(census, at);
+	}
+	if (slot >= 0) return slot;
+	const at = census.indexOf(parent);
+	return at >= 0 ? at + 1 : census.length;
+}
+function censusElements(nodes: ReadonlyArray<ResumeDomNode>): ResumeDomElement[] {
+	const elements: ResumeDomElement[] = [];
+	(function visit(list: ReadonlyArray<ResumeDomNode>): void {
+		for (const node of list) {
+			if (node.nodeType === 1) elements.push(node as ResumeDomElement);
+			visit(node.childNodes ?? []);
+		}
+	})(nodes);
+	return elements;
+}
+/** The container root that holds the pinned census, walking out from the parent. */
+function censusRoot(element: ResumeDomElement): ResumeDomElement | undefined {
+	for (
+		let node: ResumeDomElement | null | undefined = element;
+		node;
+		node = node.parentElement ?? null
+	)
+		if (node.__marklessCensus) return node;
+	return undefined;
+}
+function emptyArmError(repeat: ResumeKeyedRepeatRecord, code: string, detail: string): Error {
+	const error = new Error(
+		`${code}: The @empty arm of ${repeat.id} ${detail}`,
+	) as Error & Record<string, unknown>;
+	error.name = 'KeyedRepeatRuntimeError';
+	error.code = code;
+	error.severity = 'error';
+	error.phase = 'runtime';
+	error.repeatId = repeat.id;
+	error.docsUrl = `https://markless.dev/errors/${code}`;
+	return error;
+}
+function emptyArmRendererMissingError(repeat: ResumeKeyedRepeatRecord): Error {
+	return emptyArmError(
+		repeat,
+		'MARKLESS_REPEAT_EMPTY_ARM_RENDERER_MISSING',
+		'could not be built: this host provides no document to render its markup with.',
+	);
+}
+function emptyArmEmptyError(repeat: ResumeKeyedRepeatRecord): Error {
+	return emptyArmError(
+		repeat,
+		'MARKLESS_REPEAT_EMPTY_ARM_EMPTY',
+		'rendered no nodes, so nothing would speak for the emptied list.',
+	);
 }
 export function readKeyedRepeatCollection(
 	graph: Pick<RuntimeGraph, 'read'>,

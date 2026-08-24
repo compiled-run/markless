@@ -257,3 +257,48 @@ test('served state payloads reject live directValue cells', () => {
 		decodePayloadScripts(renderPayloadScripts({ state: state as never, view })),
 	).toThrow(/directValue/);
 });
+
+// A keyed repeat's `@empty` arm markup crosses the wire on the repeat record,
+// and a malformed one is refused where every other malformed record is: at the
+// payload boundary, before resume can act on it.
+test('keyed repeat @empty arm markup round-trips and refuses a malformed shape', () => {
+	const repeat = {
+		id: 'repeat:rows',
+		parentHostNodeId: 'h0',
+		collectionGraphNodeId: 'state:rows',
+		collectionPath: [],
+		keyPath: ['id'],
+		itemName: 'row',
+		rowElementCount: 1,
+		rowStartOffset: 1,
+		emptyArm: { html: '<li>nothing</li>' },
+		rowEvents: [],
+	};
+	const view: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		keyedRepeats: [repeat],
+		asyncBoundaries: [],
+	};
+	const state: ProtocolStatePayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		cells: [],
+		computed: [],
+	};
+
+	const decoded = decodePayloadScripts(renderPayloadScripts({ state, view }));
+	expect(decoded.view.keyedRepeats?.[0]?.emptyArm).toEqual({ html: '<li>nothing</li>' });
+
+	expect(() =>
+		decodePayloadScripts(
+			renderPayloadScripts({
+				state,
+				view: { ...view, keyedRepeats: [{ ...repeat, emptyArm: { html: 7 } }] } as never,
+			}),
+		),
+	).toThrow(/keyedRepeat\[0\]\.emptyArm/);
+});
