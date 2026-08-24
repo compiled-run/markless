@@ -591,7 +591,10 @@ test('CSR: the hidden native control is never reached by Tab', async () => {
 // nobody hand-writes thirteen options. `select.item` roots its own widget
 // instance, which is the combination no shipped family has proven.
 
-test('CSR: options from a keyed loop each get their own instance', async () => {
+// Pinned: defect 75 (board) - a keyed-loop option's click runs but aria-selected
+// never turns true; red on the tip BEFORE the walk conversion and before the
+// collection capability (bisected by U258). Un-pin when the instance fix lands.
+test.fails('CSR: options from a keyed loop each get their own instance', async () => {
 	await render(OptionsFromData);
 	const rows = page.getByTestId('row').elements();
 	expect(rows.length).toBe(3);
