@@ -59,6 +59,9 @@ export function App() @{
 		'rowElementCount',
 		'rowEvents',
 		'rowStartOffset',
+		// The item-text row is exactly the tier-1 mintable shape, so the record
+		// carries its rowTemplate; the assertion pins that nothing ELSE appeared.
+		'rowTemplate',
 	]);
 });
 
