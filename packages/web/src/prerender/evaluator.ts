@@ -322,6 +322,27 @@ function asPropsRecord(value: unknown): Readonly<Record<string, unknown>> {
 		: {};
 }
 
+// Whether this component is the one that should run the derive behind a graph
+// node's initial value. `stateGraphNodeIds` is every payload node a component
+// declared plus the ones its own chunks read, so it is the claim. Deliberately
+// conservative: this answers no only when another same-module component
+// positively claims the node and this one does not, so an unpartitioned surface
+// keeps evaluating exactly what it evaluates today rather than silently
+// dropping a derive.
+function marklessOwnsDerivedNode(
+	surface: PrerenderDataSurface,
+	componentName: string,
+	graphNodeId: string,
+): boolean {
+	let claimed = false;
+	for (const name in surface.components) {
+		if (!surface.components[name]?.stateGraphNodeIds?.includes(graphNodeId)) continue;
+		if (name === componentName) return true;
+		claimed = true;
+	}
+	return !claimed;
+}
+
 async function evaluatePrerenderDataComponent(input: {
 	readonly surface: PrerenderDataSurface;
 	readonly componentName: string;
@@ -396,6 +417,14 @@ async function evaluatePrerenderDataComponent(input: {
 	};
 	for (const initial of definition.initialValues ?? []) {
 		if (initial.value.kind !== 'symbol-function') continue;
+		// A constant initial value is seed data every same-module component may
+		// read, so the producer hands the whole list to each of them. Running a
+		// derive symbol is not seeding: it belongs to the one component that
+		// declared it, and only that component's evaluation carries the edge
+		// binding the symbol was compiled against. A page that runs its child's
+		// derive reaches it unbound and dies on the capture context it never got.
+		if (!marklessOwnsDerivedNode(input.surface, input.componentName, initial.graphNodeId))
+			continue;
 		const symbolId = initial.value.symbolId;
 		// This component's reads are already the row's, so the loader answers row-free.
 		const loaded = await input.loadSymbol(
