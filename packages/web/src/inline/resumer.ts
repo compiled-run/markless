@@ -181,6 +181,21 @@ export function createInlineResumerSelfWakeSource(resumeModuleUrl: string | unde
 	return `;(${runInlineResumerSelfWake.toString()})(${JSON.stringify(resumeModuleUrl)});`;
 }
 
+/**
+ * The Escape primer, appended only to a page whose served HTML carries an
+ * `overlay` mark.
+ *
+ * Appended rather than composed into the resumer body for the same reason the
+ * self-wake is: the body is serialized whole, so a flag inside it would put the
+ * text on every page in the world to serve the few that elevate anything. A page
+ * with no mark ships a byte-identical resumer.
+ */
+export function createInlineResumerOverlayPrimerSource(
+	resumeModuleUrl: string | undefined,
+): string {
+	return `;(${runInlineResumerOverlayPrimer.toString()})(${JSON.stringify(resumeModuleUrl)},(url) => import(/* @vite-ignore */ url));`;
+}
+
 // The page's event names vary, so a precompiled boot cannot bake them in. The
 // compiled source leaves this identifier unresolved and the emitter substitutes
 // the page's names; the bundler's compile step fails closed if a minifier ever
@@ -629,6 +644,60 @@ function runInlineResumerSelfWake(fallbackResumeModuleUrl: string | undefined): 
 	} else {
 		wake();
 	}
+}
+
+/**
+ * One window-level listen, from first paint, on a page that elevates something.
+ *
+ * Two facts make it necessary. A page served with an open overlay is on the
+ * stack the moment the behaviour installs, but nothing installs until the
+ * runtime wakes; and Escape is the one gesture with no route into the page -
+ * every other one reaches an authored handler through the container's own
+ * listener, while a dismissal is reported by a document listener that does not
+ * exist yet. So the first Escape on such a page would be spent waking and
+ * dismiss nothing. This listens above the container, leaves the reason where the
+ * behaviour's installer takes it, and lets the wake finish the job.
+ *
+ * Deliberately one-shot, and deliberately not the waker of first resort. The
+ * container's own capture listener runs after this one and wakes the runtime for
+ * any event the page has a record for; waking here as well would start a second
+ * runtime for one gesture. Deciding a task later is what tells the two apart.
+ */
+function runInlineResumerOverlayPrimer(
+	fallbackResumeModuleUrl: string | undefined,
+	loadModule: (url: string) => Promise<InlineResumeModule>,
+): void {
+	const currentScript = document.currentScript as HTMLScriptElement | null;
+	const root = currentScript?.closest<InlineRoot>('[data-async-container]');
+	const resumeModuleUrl =
+		currentScript?.getAttribute?.('data-markless-resume-module') ?? fallbackResumeModuleUrl;
+	if (!root || !resumeModuleUrl) return;
+	const prime = (event: Event) => {
+		removeEventListener('keydown', prime, true);
+		removeEventListener('pointerdown', prime, true);
+		// Window capture runs before the container's own, so this still reads
+		// whether an EARLIER gesture already woke the page. If one did, the
+		// behaviour is installed and owns the keyboard; leaving a reason behind
+		// would dismiss something twice.
+		if (root.__marklessDelegatedDispatch) return;
+		if ((event as KeyboardEvent).key === 'Escape') {
+			(globalThis as { __marklessOverlayPrimedDismissal?: 'escape' })
+				.__marklessOverlayPrimedDismissal = 'escape';
+		}
+		setTimeout(() => {
+			if (root.__marklessDelegatedDispatch) return;
+			root.__marklessDelegatedDispatch = true;
+			// A wake, not a dispatch: `0` is the same no-event shape the self-wake
+			// sends. Forwarding the real event instead would ask the runtime to
+			// match a record for a key no page has one for, and being unmatched is
+			// a reported defect, correctly.
+			loadModule(resumeModuleUrl).then((module) =>
+				module.resumeContainerEvent({ root, event: 0 }),
+			);
+		});
+	};
+	addEventListener('keydown', prime, true);
+	addEventListener('pointerdown', prime, true);
 }
 
 function registerInlineResumerDebug(input: {

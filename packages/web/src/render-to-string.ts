@@ -18,6 +18,7 @@ import { __marklessDebugBootstrapSource } from './debug-channel.ts';
 import type { MarklessExecutionLogMode } from './dev-log.ts';
 import {
 	createInlineResumerDebugRegistrationSource,
+	createInlineResumerOverlayPrimerSource,
 	createPrerenderInlineResumerSource,
 	createInlineResumerSelfWakeSource,
 	createInlineResumerSource,
@@ -171,6 +172,7 @@ export async function assembleSsrContainer(
 					sharedGraphPolicy,
 					syncPolicy,
 				});
+	const overlayPrimer = hasOverlayMark(output.html);
 	const resumerScript =
 		hasPayload && browserTriggers
 			? renderInlineResumerScript(
@@ -195,6 +197,9 @@ export async function assembleSsrContainer(
 					options.nonce,
 					selectedResumeModuleUrl,
 					selfWake,
+					undefined,
+					true,
+					overlayPrimer,
 				)
 			: '';
 	const storageSeedScript = renderStorageSeedScript(
@@ -528,6 +533,24 @@ function renderContainerAttributes(containerId: string | undefined): string {
 		: ' data-async-container';
 }
 
+/**
+ * The DOM spelling the compiler lowers the `overlay` mark to, as it lands in the
+ * served html.
+ *
+ * Read off the html rather than the payload because the payload has no overlay
+ * record to read - the mark is a static attribute, so the served markup IS where
+ * it is written. Owned here rather than imported from the compiler for the same
+ * reason `packages/web/src/fns/overlay.ts` owns its own selector: this module is
+ * the SSR path, and a compiler import would drag the compiler into it. A false
+ * positive (the text appearing in page content) over-ships the primer to one
+ * page; a false negative is impossible, which is the direction that matters.
+ */
+const OVERLAY_MARK_IN_HTML = ' overlay=""';
+
+function hasOverlayMark(html: string): boolean {
+	return html.includes(OVERLAY_MARK_IN_HTML);
+}
+
 function renderInlineResumerScript(
 	source: string,
 	nonce: string | undefined,
@@ -535,6 +558,7 @@ function renderInlineResumerScript(
 	selfWake: boolean,
 	settleModuleUrl?: string,
 	appendSelfWakeSource = true,
+	overlayPrimer = false,
 ): string {
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 	const resumeModuleAttribute = resumeModuleUrl
@@ -546,7 +570,10 @@ function renderInlineResumerScript(
 	const selfWakeAttribute = selfWake ? ' data-markless-self-wake' : '';
 	const selfWakeSource =
 		selfWake && appendSelfWakeSource ? createInlineResumerSelfWakeSource(resumeModuleUrl) : '';
-	return `<script data-async-resumer${nonceAttribute}${resumeModuleAttribute}${settleModuleAttribute}${selfWakeAttribute}>${escapeInlineScript(source + selfWakeSource)}</script>`;
+	const overlayPrimerSource = overlayPrimer
+		? createInlineResumerOverlayPrimerSource(resumeModuleUrl)
+		: '';
+	return `<script data-async-resumer${nonceAttribute}${resumeModuleAttribute}${settleModuleAttribute}${selfWakeAttribute}>${escapeInlineScript(source + selfWakeSource + overlayPrimerSource)}</script>`;
 }
 
 /**

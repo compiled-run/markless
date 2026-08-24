@@ -2574,6 +2574,49 @@ test('renderToString envelope-encodes live directValue state cells before servin
 	expect(html).toContain('"records"');
 });
 
+/**
+ * The Escape primer is pay-per-use, and this is the wall that keeps it that way.
+ *
+ * The gate is the `overlay` mark in the served html, because that is where the
+ * mark is written - it is a static attribute, so no payload record carries it.
+ * A page with no mark has to ship a resumer that is byte-identical to the one it
+ * shipped before the primer existed, which is what the prefix check says: the
+ * marked page's resumer is the unmarked one plus an appended tail and nothing
+ * else.
+ */
+// What elevation costs a page that uses it, in inline-resumer source bytes,
+// before compression. Re-anchor it in the same change set that moves it.
+const OVERLAY_PRIMER_BYTES = 1514;
+
+function inlineResumerSourceOf(html: string): string {
+	const found = /<script data-async-resumer[^>]*>([\s\S]*?)<\/script>/.exec(html);
+	if (!found) throw new Error('Expected an inline resumer script in the served html.');
+	return found[1] ?? '';
+}
+
+test('renderToString ships the overlay Escape primer only for a page that carries the mark', async () => {
+	const serve = (html: string) =>
+		renderToString(
+			() => ({
+				html,
+				state: createProtocolStatePayload({ cells: [] }),
+				view: viewWithClick(),
+			}),
+			{ resumeModuleUrl: '/async-resume.js' },
+		);
+
+	const plain = inlineResumerSourceOf(await serve('<button type="button">Go</button>'));
+	const elevated = inlineResumerSourceOf(
+		await serve('<button type="button" overlay="">Go</button>'),
+	);
+
+	expect(plain).not.toContain('__marklessOverlayPrimedDismissal');
+	expect(elevated).toContain('__marklessOverlayPrimedDismissal');
+	// Appended, never composed in: the unmarked page's bytes are untouched.
+	expect(elevated.startsWith(plain)).toBe(true);
+	expect(elevated.length - plain.length).toBe(OVERLAY_PRIMER_BYTES);
+});
+
 test('renderToString rejects duplicate runtime keys on the static output path', async () => {
 	await expect(
 		renderToString(() => ({

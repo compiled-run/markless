@@ -23,3 +23,37 @@ export type OverlayHiddenBoundRoot = {
 	 */
 	__marklessOverlayHiddenBound?: ReadonlyArray<Element>;
 };
+
+/**
+ * Where an enlisted element carries the focus the page had when it enlisted.
+ *
+ * The behaviour captures and never moves: this is the reading, not a decision.
+ * A family restoring focus when its surface closes reads it off the element it
+ * marked, because the close paths that need it are not all dismissals - a close
+ * button and a completed backdrop press are the family's own handlers, and a
+ * `dismiss` detail cannot reach either. It is a property rather than an export
+ * because `@markless/ui` does not depend on `@markless/web`.
+ *
+ * Written at enlist, BEFORE the background is marked: marking blurs whatever is
+ * inside a subtree that becomes inert, so reading afterwards would answer the
+ * body on exactly the pages this exists for. Never cleared - a family restores
+ * focus after the surface is already off the stack.
+ */
+export type OverlayFocusOriginHost = {
+	__marklessOverlayFocusOrigin?: Element;
+};
+
+/**
+ * The Escape a served page swallowed before the behaviour existed.
+ *
+ * A page served with an open overlay has nothing listening for Escape until the
+ * runtime wakes and this behaviour installs, and the first press is what wakes
+ * it - so that press would be spent on the waking and never dismiss anything.
+ * The inline resumer's primer leaves the reason here instead, and the installer
+ * takes it (once) and reports it to whatever ended up topmost. A global rather
+ * than a root property because the primer runs before any root has an installer
+ * and the page has one container.
+ */
+export type OverlayPrimedDismissalHost = {
+	__marklessOverlayPrimedDismissal?: 'escape';
+};

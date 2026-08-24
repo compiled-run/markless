@@ -673,6 +673,38 @@ test('CSR: flipping the consumer open state shows the surface and marks the back
 	expect(document.body.style.overflow).toBe('');
 });
 
+/**
+ * The ruled second half of focus restore: a dialog nothing triggered gives focus
+ * back to whatever the page was on when it opened.
+ *
+ * There is no trigger part in this scenario, so the family has no handle to
+ * restore to. What it restores to instead is the reading the overlay behaviour
+ * took at enlist - and the behaviour only reads it, which is why this row
+ * focuses the opener itself first: without that the page holds no focus and
+ * there is nothing to give back.
+ */
+for (const mode of MODES) {
+	test(`${mode}: a dialog opened programmatically restores focus to the pre-open element`, async () => {
+		if (mode === 'CSR') await render(Controlled);
+		else await renderSSR(Controlled);
+
+		el<HTMLElement>(Opener).focus();
+		expect(document.activeElement).toBe(el(Opener));
+
+		el(Opener).click();
+		await expect.poll(() => el(Backdrop).hasAttribute('hidden')).toBe(false);
+		// Marking the background inert blurs the opener, so by now the page holds
+		// nothing: the only copy of where focus was is the one taken at enlist.
+		expectBackgroundOutOfReach(el(Background));
+
+		// The family's own close control, not the consumer's - the consumer's own
+		// state flip is the consumer's focus to manage.
+		el(Close).click();
+		await expect.poll(() => el(Backdrop).hasAttribute('hidden')).toBe(true);
+		await expect.poll(() => document.activeElement).toBe(el(Opener));
+	});
+}
+
 // --- resume ---------------------------------------------------------------
 
 test('SSR: the served dialog is closed, attached and already named', async () => {
@@ -737,7 +769,8 @@ test('SSR: two sibling dialogs each reach only their own handler', async () => {
  * What this row cannot show yet is enlistment at load. The behaviour installs
  * with the resume runtime, and this page's runtime is woken by its first
  * container event, so a served-open dialog is not modal until something wakes
- * it. That startup gate is pinned below rather than worked around.
+ * it. That startup gate is pinned below rather than worked around; the row after
+ * it is what says the gate is no longer visible to a reader pressing Escape.
  */
 test('SSR: a dialog served open enlists once the behaviour starts', async () => {
 	await renderSSR(ServedOpen);
@@ -773,4 +806,29 @@ test('SSR: a dialog served open enlists once the behaviour starts', async () => 
 	await expect.poll(() => el(Backdrop).hasAttribute('hidden')).toBe(true);
 	await expect.poll(() => el(Background).hasAttribute('inert')).toBe(false);
 	expect(el(Background).hasAttribute('aria-hidden')).toBe(false);
+});
+
+/**
+ * The gesture a reader actually makes on a dialog the server sent open: Escape,
+ * with nothing pressed first.
+ *
+ * Without the primer this press is spent waking the runtime and dismisses
+ * nothing, because the only thing that reports a dismissal is a document
+ * listener the behaviour has not installed yet. The served page carries an
+ * `overlay` mark, so its inline resumer also listens above the container from
+ * first paint, leaves the reason where the installer takes it, and the wake it
+ * starts finishes the dismissal.
+ */
+test('SSR: the first Escape on a dialog served open closes it', async () => {
+	await renderSSR(ServedOpen);
+
+	expectShowing(el<HTMLElement>(Backdrop), el<HTMLElement>(Content));
+	// Nothing has been pressed, so nothing has woken: this is the untouched page.
+	expectBackgroundReachable(el(Background));
+
+	await userEvent.keyboard('{Escape}');
+
+	await expect.poll(() => el(Backdrop).hasAttribute('hidden')).toBe(true);
+	expect(el(Root).getAttribute('ui-closed')).toBe('');
+	await expect.poll(() => el(Background).hasAttribute('inert')).toBe(false);
 });

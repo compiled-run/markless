@@ -18,8 +18,12 @@
  * for an outside press, the `detail.pressTarget` the press landed on.
  *
  * What it deliberately does not do. It never closes anything and never moves
- * focus. `dismiss` is a report, not an action: the family reads it with an
- * ordinary `onDismiss` handler and decides. The one policy that is not the
+ * focus. It does READ focus - `document.activeElement` at the moment an element
+ * enlists is left on that element, because only this module is present at that
+ * moment and a family restoring focus later cannot go back and look. Reading is
+ * not moving: what to do with it is the family's. `dismiss` is a report, not an
+ * action: the family reads it with an ordinary `onDismiss` handler and decides.
+ * The one policy that is not the
  * family's to implement is modality, because it is document-wide and has to be
  * reference counted across nesting - so an enlisted element that the family
  * authored `aria-modal="true"` on takes the rest of the page out of reach and
@@ -30,7 +34,11 @@
  * so families hide their surface rather than unmounting it.
  */
 
-import type { OverlayHiddenBoundRoot } from '../overlay-handoff.ts';
+import type {
+	OverlayFocusOriginHost,
+	OverlayHiddenBoundRoot,
+	OverlayPrimedDismissalHost,
+} from '../overlay-handoff.ts';
 
 /** The DOM spelling the compiler lowers the `overlay` mark to. */
 const OVERLAY_SELECTOR = '[overlay]';
@@ -126,6 +134,14 @@ export function installOverlayBehavior(root: Element | Document): (() => void) |
 	// left alone - that is the inline shape, and it stays free.
 	for (const element of hiddenBoundSurfaces(root)) enlist(element, owner);
 
+	// The Escape that woke this page arrived before there was anything to report
+	// it to. Reporting it now, to whatever the enlistment above left topmost, is
+	// what makes the FIRST press on a served-open page dismiss rather than the
+	// second. Taken once: a page has one primer and one wake.
+	const primed = takePrimedDismissal();
+	const top = stack[stack.length - 1];
+	if (primed && top) reportDismiss(top.element, primed);
+
 	return () => {
 		observer.disconnect();
 		// Anything this root enlisted has to leave the stack with it, or the
@@ -148,10 +164,23 @@ function hiddenBoundSurfaces(root: Element | Document): ReadonlyArray<HTMLElemen
 	);
 }
 
+function takePrimedDismissal(): OverlayDismissReason | undefined {
+	const host = globalThis as OverlayPrimedDismissalHost;
+	const primed = host.__marklessOverlayPrimedDismissal;
+	host.__marklessOverlayPrimedDismissal = undefined;
+	return primed;
+}
+
 function enlist(element: HTMLElement, owner: Document): void {
 	if (findEntry(element)) return;
 	const entry: OverlayEntry = { element, undo: [] };
 	stack.push(entry);
+
+	// Read before anything below marks the background: marking makes the subtree
+	// the focused element sits in inert, which blurs it, so asking afterwards
+	// answers the body on exactly the pages a family needs this for.
+	const active = owner.activeElement;
+	if (active) (element as OverlayFocusOriginHost).__marklessOverlayFocusOrigin = active;
 
 	// Modality is derived, never configured: the family authored `aria-modal` and
 	// this module reads it. The mark and `aria-modal` sit on different elements in

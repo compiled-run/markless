@@ -1,5 +1,5 @@
 import { element, shared, state } from '@markless/core';
-import { focusBackToInvoker, focusIntoSurface } from './modal-focus.ts';
+import { focusBackToOpener, focusIntoSurface } from './modal-focus.ts';
 import { armBackdropPress, isBackdropPressFinished } from './modal-press.ts';
 import type {
 	ModalBackdropProps,
@@ -17,6 +17,7 @@ export const modalState = shared(
 		const modal: ModalInstanceState = state({
 			open: false,
 			alert: false,
+			isTriggerOpened: false,
 		});
 		const triggerEl = element<HTMLButtonElement>();
 		const backdropEl = element<HTMLDivElement>();
@@ -76,6 +77,7 @@ export function ModalTrigger({ children, onClick, ...rest }: ModalTriggerProps) 
 		ui-open={modal.open}
 		ui-closed={modal.open !== true}
 		onClick={(event) => {
+			modal.isTriggerOpened = true;
 			modal.setOpen(true);
 			focusIntoSurface(modal.contentEl, modal.closeEl, modal.alert);
 			onClick?.(event);
@@ -107,7 +109,8 @@ export function ModalBackdrop({
 			const isRefused = modal.alert === true && event.detail.reason === 'outside-press';
 			if (isRefused !== true) {
 				modal.setOpen(false);
-				focusBackToInvoker(modal.triggerEl);
+				focusBackToOpener(modal.triggerEl, modal.backdropEl, modal.isTriggerOpened);
+				modal.isTriggerOpened = false;
 			}
 			onDismiss?.(event);
 		}}
@@ -124,7 +127,8 @@ export function ModalBackdrop({
 			const isOutsidePress = isBackdropPressFinished(modal.backdropEl, event.target);
 			if (isOutsidePress && modal.alert !== true) {
 				modal.setOpen(false);
-				focusBackToInvoker(modal.triggerEl);
+				focusBackToOpener(modal.triggerEl, modal.backdropEl, modal.isTriggerOpened);
+				modal.isTriggerOpened = false;
 			}
 			onPointerup?.(event);
 		}}
@@ -172,7 +176,8 @@ export function ModalClose({ children, onClick, ...rest }: ModalCloseProps) @{
 		type="button"
 		onClick={(event) => {
 			modal.setOpen(false);
-			focusBackToInvoker(modal.triggerEl);
+			focusBackToOpener(modal.triggerEl, modal.backdropEl, modal.isTriggerOpened);
+			modal.isTriggerOpened = false;
 			onClick?.(event);
 		}}
 	>{children}</button>
