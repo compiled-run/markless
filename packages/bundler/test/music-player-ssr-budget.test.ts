@@ -160,7 +160,14 @@ const clientBuild = resolve(demo, '.output/public/build');
 // resume-keyed-repeats (defect 84 half 1: rows addressed past static siblings +
 // tail-anchor re-insert). The record field itself is absent at zero, so the cost
 // is resume-module code, not payload; joins the bundler-diet clawback above.
-const MAX_SHIPPED_JS_GZIP_BYTES = 68_440;
+// 68,440 -> 69,100 (2026-08-24): measured 69,083 - the @empty arm client mint
+// (defect 84 half 2a): mint/removal logic + a LOCAL census-splice copy (the
+// leanness guard forbids importing resume-locators here). This demo has no
+// @empty arm, so the whole +643 is dead weight here - clawback named for
+// bundler-diet: demand-gate the mint (load only when a repeat record carries
+// emptyArm) and lift the splice into a shared leaf module (resume-census.ts)
+// both resume-locators and resume-keyed-repeats import.
+const MAX_SHIPPED_JS_GZIP_BYTES = 69_100;
 
 test('music-player-ssr production build stays within its shipped JS budget', async () => {
 	await rm(resolve(demo, '.output'), { force: true, recursive: true });

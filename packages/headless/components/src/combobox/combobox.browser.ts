@@ -386,10 +386,10 @@ async function expectBackspaceRemovesTheLastChoiceOnlyWhenTheFieldWasEmpty() {
 	const input = el<HTMLInputElement>(Input);
 	await typeInto(input, 'x');
 	await expect.poll(() => input.value).toBe('x');
-	// This one deletes the text, not a choice.
+	// This one deletes the text, not a choice. Poll like the neighbours: a bare
+	// read after settle() raced the dispatch under full-lane load (measured 1-in-2).
 	await userEvent.keyboard('{Backspace}');
-	await settle();
-	expect(el(Picked).textContent).toBe('olive,basil');
+	await expect.poll(() => el(Picked).textContent).toBe('olive,basil');
 	// This one, on an empty field, gives the last choice back.
 	await userEvent.keyboard('{Backspace}');
 	await expect.poll(() => el(Picked).textContent).toBe('olive');
