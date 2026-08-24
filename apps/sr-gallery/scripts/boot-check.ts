@@ -39,6 +39,12 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	// DOM before the trigger is pressed.
 	popover: 'dialog',
 	slider: 'slider',
+	'slider-range': 'slider',
+};
+
+/** Sections whose point is how many of that role they serve, not merely that they serve one. */
+const RENDERED_COUNT: Partial<Record<FamilyName, number>> = {
+	'slider-range': 2,
 };
 
 const appDir = fileURLToPath(new URL('..', import.meta.url));
@@ -115,6 +121,13 @@ async function main() {
 				.count();
 			if (count === 0) {
 				failures.push(`#${section} rendered no role="${role}", so ${family} is not on the page.`);
+				continue;
+			}
+			const expected = RENDERED_COUNT[family];
+			if (expected !== undefined && count !== expected) {
+				failures.push(
+					`#${section} rendered ${count} role="${role}" element(s), not the ${expected} ${family} serves.`,
+				);
 				continue;
 			}
 			console.log(`#${section} serves the ${family} family: ${count} role="${role}" element(s)`);

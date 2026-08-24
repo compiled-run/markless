@@ -15,7 +15,8 @@ import {
 // Every shipped family's Basic scenario - the starter a consumer copies - on one
 // page, each in a section a reader can jump to by its anchor: /#checkbox,
 // /#toggle, /#textbox, /#progress, /#checklist, /#select, /#modal,
-// /#radio-group, /#tabs, /#popover, /#slider.
+// /#radio-group, /#tabs, /#popover, /#slider. A family whose second shape a
+// reader announces differently gets its own section too: /#slider-range.
 //
 // This is consumer code, not test code. It imports through the package barrel
 // the way a reader of the docs would, carries no test hooks, and the markup is
@@ -203,6 +204,20 @@ export function Gallery() @{
 					<slider.label>Volume</slider.label>
 					<slider.valuelabel />
 					<slider.track class="slider-track"><slider.thumb class="slider-thumb" /></slider.track>
+				</slider.root>
+			</div>
+		</section>
+
+		<section id="slider-range">
+			<h2>Slider (range)</h2>
+			<div class="scenario">
+				<slider.root value={[20, 80]}>
+					<slider.label>Price</slider.label>
+					<slider.valuelabel />
+					<slider.track class="slider-track">
+						<slider.thumb side="start" class="slider-thumb" />
+						<slider.thumb side="end" class="slider-thumb" />
+					</slider.track>
 				</slider.root>
 			</div>
 		</section>
