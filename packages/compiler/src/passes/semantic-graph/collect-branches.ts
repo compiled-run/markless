@@ -14,16 +14,14 @@ import type { WalkState } from './types.ts';
  * node, the flip symbol was minted with an empty wake set, and the arm rendered
  * once and then froze while its siblings updated around it.
  *
- * `requireWritableRead` keeps the byte cost where the behavior is: a condition
- * over props alone is settled by the render that produced it, so it mints nothing
- * and keeps the empty wake set it has today.
+ * A condition over PROPS alone mints too, unlike an attribute or an edge prop: a
+ * parent can pass a live graph reference, and with no minted node the site had an
+ * empty wake set, so the served payload dropped the branch and the child's arm
+ * never re-decided when the parent's cell moved.
  */
-const BRANCH_CONDITION_READ_OPTIONS: CompositeReadOptions & {
-	readonly requireWritableRead: boolean;
-} = {
+const BRANCH_CONDITION_READ_OPTIONS: CompositeReadOptions = {
 	unaryOperators: true,
 	methodCalls: true,
-	requireWritableRead: true,
 };
 
 /**
