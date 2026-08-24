@@ -127,7 +127,7 @@ async function divergingHosts(path: string): Promise<ReadonlyArray<Divergence>> 
 // parts nest several levels deep.
 const REPRESENTATIVE = [
 	'src/navbar/scenarios/items-from-data.tsrx',
-	'src/toaster/scenarios/custom.tsrx',
+	'src/toaster/scenarios/basic.tsrx',
 	'src/accordion/scenarios/basic.tsrx',
 	'src/select/scenarios/basic.tsrx',
 ] as const;
