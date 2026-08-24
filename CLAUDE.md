@@ -55,7 +55,7 @@ always acceptable; an unpriced "all" is not.
 
 ## Code comments
 
-Comments are a last resort: write one only for value a maintainer could not easily get from the code itself (a constraint the code cannot show, a measured landmine, a non-obvious why). Everything else is noise — delete it on sight when you touch a file.
+Comments are a last resort: write one only for value a maintainer could not easily get from the code itself (a constraint the code cannot show, a measured landmine, a non-obvious why) — and even then, AT MOST one terse line at the site, never a paragraph. A family-wide constraint gets one line at the top of the file, not a repeat per handler. Doc comments on public props/types (consumer API surface) stay. A source file should carry a handful of comment lines, not dozens. Everything else is noise — delete it on sight when you touch a file.
 
 Never write, and always remove when seen: comments naming task/unit/defect numbers or internal process shorthand (U123, T045, "defect 84", packet/receipt language) — that history lives in the goal board and git, not in source; comments narrating what the next line does; comments justifying a change to a reviewer; restated ruling text. A pin comment in a test may cite the mechanism it pins, in plain words, without process numbers.
 
