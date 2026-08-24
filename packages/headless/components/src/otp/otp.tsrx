@@ -44,7 +44,6 @@ export const otpState = shared(
 );
 
 export function OtpRoot({
-	length,
 	value = '',
 	disabled = false,
 	shiftPWManagers = true,
@@ -56,7 +55,6 @@ export function OtpRoot({
 	const otp = otpState();
 	otp.onChange = onChange;
 	otp.onComplete = onComplete;
-	otp.length = length;
 	otp.value = value;
 	otp.disabled = disabled;
 	otp.shiftPWManagers = shiftPWManagers;
@@ -102,6 +100,8 @@ export function OtpField({ onInput, onFocus, ...rest }: OtpFieldProps) @{
 export function OtpItem({ index, children, ...rest }: OtpItemProps) @{
 	const otp = otpState();
 	const item = state({ index });
+	// Each box registers its place as it renders, so one past the last box's index is the length of the code. The right-hand side must not read the shared instance: an SSR seed copies it verbatim, where `otp` is out of scope.
+	otp.length = index + 1;
 	// slice, not value[index]: a graph read path has to be statically resolvable
 	const char = computed(() => otp.value.slice(item.index, item.index + 1));
 
