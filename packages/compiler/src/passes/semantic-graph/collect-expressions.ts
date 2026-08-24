@@ -240,6 +240,17 @@ function collectReadsIn(
 	}
 
 	if (node.type === 'MemberExpression') {
+		// A member path standing on a computed value - `(a ? b : c).length`, a
+		// template literal, a call result - names no binding, so recording the
+		// whole spelling as one read hides the graph reads inside the receiver.
+		if (!namesABinding(node)) {
+			collectReadsIn(node.object as AnyNode | undefined, state, region);
+			if (node.computed === true) {
+				collectReadsIn(node.property as AnyNode | undefined, state, region);
+			}
+			return;
+		}
+
 		addStateRead(node, state, region);
 
 		if (node.computed === true) {
@@ -276,9 +287,13 @@ function collectReadsIn(
 function callsMethodOnReadValue(callee: AnyNode, state: WalkState): boolean {
 	if (callee.computed === true) return false;
 
-	const object = unwrapChainExpression(callee.object as AnyNode | undefined);
+	const object = unwrapValueWrappers(callee.object as AnyNode | undefined);
 	if (!object) return false;
 	if (object.type === 'MemberExpression') return true;
+	// Anything that is neither a name nor a member path is a value the expression
+	// computed - a ternary, a template literal, a call result - so the method sits
+	// on that value and the reads to record live inside it.
+	if (!isBindingRoot(object)) return true;
 	if (object.type !== 'Identifier') return false;
 
 	const source = expressionSource(object, state.source);
@@ -403,6 +418,38 @@ function enclosingFunctionRegion(node: AnyNode, state: WalkState): ReadRegion | 
 
 function unwrapChainExpression(node: AnyNode | undefined): AnyNode | undefined {
 	return node?.type === 'ChainExpression' ? (node.expression as AnyNode | undefined) : node;
+}
+
+/**
+ * Strips the wrappers that change no value - authored parentheses and the
+ * optional-chain marker - so a receiver is judged by what it actually is.
+ */
+function unwrapValueWrappers(node: AnyNode | undefined): AnyNode | undefined {
+	let current = node;
+	while (current?.type === 'ChainExpression' || current?.type === 'ParenthesizedExpression') {
+		current = current.expression as AnyNode | undefined;
+	}
+	return current;
+}
+
+/** Whether a node can be the root of a path that names a binding. */
+function isBindingRoot(node: AnyNode): boolean {
+	return node.type === 'Identifier' || node.type === 'ThisExpression' || node.type === 'Super';
+}
+
+/**
+ * Whether a member path spells out a binding - `tree.typeahead`, `items[i].label` -
+ * rather than reaching into a value the surrounding expression just computed.
+ */
+function namesABinding(node: AnyNode): boolean {
+	let current: AnyNode | undefined = node;
+	while (current) {
+		current = unwrapValueWrappers(current);
+		if (!current) return false;
+		if (current.type !== 'MemberExpression') return isBindingRoot(current);
+		current = current.object as AnyNode | undefined;
+	}
+	return false;
 }
 
 function isChainExpression(node: unknown): boolean {

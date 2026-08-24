@@ -138,10 +138,37 @@ export function Page() @{
 });
 
 test('a handle the lowering cannot name fails the compile instead of reading undefined', async () => {
-	// Nested under a call the read lowering has no name for: the value band
-	// declines and the authored identifier survives into the emitted module.
-	// Fail-closed doctrine says that must be a build error, never a silent
-	// `undefined` at the first click.
+	// A dynamic key the read lowering has no name for: the value band declines and
+	// the authored identifier survives into the emitted module. Fail-closed
+	// doctrine says that must be a build error, never a silent `undefined` at the
+	// first click.
+	const result = await compile(`
+import { element } from '@markless/core';
+import { measure } from './measure.ts';
+
+export function Page() @{
+	const box = element<HTMLDivElement>();
+	const key = 'tagName';
+
+	<div>
+		<div el={box}>box</div>
+		<button onClick={() => measure(box[key])}>measure</button>
+	</div>
+}
+`);
+
+	const codes = result.symbolModules.diagnostics.map((diagnostic) => diagnostic.code);
+	expect(codes).toContain(SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE);
+	expect(
+		result.symbolModules.diagnostics.every((diagnostic) => diagnostic.severity === 'error'),
+	).toBe(true);
+});
+
+test('a handle under a method call on a built value is named, not refused', async () => {
+	// `[box].map(...)` calls a method on a value the expression just built, so the
+	// read belongs to `box` inside it. Recording the read at the whole
+	// `[box].map` chain instead left the authored identifier standing and the
+	// compile failed closed; the receiver descent names the handle here.
 	const result = await compile(`
 import { element } from '@markless/core';
 import { measure } from './measure.ts';
@@ -156,9 +183,8 @@ export function Page() @{
 }
 `);
 
-	const codes = result.symbolModules.diagnostics.map((diagnostic) => diagnostic.code);
-	expect(codes).toContain(SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE);
-	expect(
-		result.symbolModules.diagnostics.every((diagnostic) => diagnostic.severity === 'error'),
-	).toBe(true);
+	expect(result.symbolModules.diagnostics).toEqual([]);
+	expect(eventSymbolSources(result)).toEqual([
+		expect.stringContaining('[context.getElementHandle("element:box")].map('),
+	]);
 });
