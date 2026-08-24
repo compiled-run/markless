@@ -67,6 +67,12 @@ export const nvdaVocabulary: Vocabulary = {
 	// unverified against our markup; aria-at's modal-dialog plan asserts this role
 	// as "dialog" at priority 1
 	dialog: 'dialog',
+	// unverified against our markup; ARIA defines `aria-roledescription` as the
+	// word a reader speaks in place of the role, so the author string is the
+	// expected wording for every reader that honours the attribute
+	carousel: 'carousel',
+	// unverified against our markup; same `aria-roledescription` rule as above
+	slide: 'slide',
 	// unverified against our markup
 	selected: 'selected',
 	// unverified against our markup
@@ -122,6 +128,12 @@ export const voiceOverVocabulary: Vocabulary = {
 	// unverified against our markup; aria-at's modal-dialog plan asserts this role
 	// as "dialog" at priority 1
 	dialog: 'dialog',
+	// unverified against our markup; ARIA defines `aria-roledescription` as the
+	// word a reader speaks in place of the role, so the author string is the
+	// expected wording for every reader that honours the attribute
+	carousel: 'carousel',
+	// unverified against our markup; same `aria-roledescription` rule as above
+	slide: 'slide',
 	// unverified against our markup
 	selected: 'selected',
 	// unverified against our markup

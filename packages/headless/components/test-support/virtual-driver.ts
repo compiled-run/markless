@@ -35,6 +35,8 @@ export const virtualDriver: ScreenReaderDriver = {
 		region: 'region',
 		image: 'image',
 		dialog: 'dialog',
+		carousel: 'carousel',
+		slide: 'slide',
 		selected: 'selected',
 		currentPage: 'current page',
 		expanded: 'expanded',

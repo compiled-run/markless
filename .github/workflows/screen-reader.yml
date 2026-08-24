@@ -63,6 +63,7 @@ jobs:
                 # family, so a red lane names the family in its own job title.
                 family:
                     [
+                        carousel,
                         checkbox,
                         checklist,
                         collapsible,
