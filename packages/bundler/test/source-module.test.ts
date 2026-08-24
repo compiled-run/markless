@@ -33,13 +33,13 @@ test('emitSourceModule keeps full resume behind a dynamic handoff', () => {
 	expect(code).not.toContain(
 		"import { resumeEventOnlyFromPayloadDocument } from '@markless/core/web/event-only-resume';",
 	);
-	expect(code).not.toContain('export async function resumeContainerEvent');
+	expect(code).not.toContain('function resumeContainerEvent');
 	expect(code).not.toContain("import('@markless/core/web/resume')");
 	const resumeCode = emitResumeModule({
 		...baseInput,
 		needsFullResume: true,
 	});
-	expect(resumeCode).toContain('export async function resumeContainerEvent');
+	expect(resumeCode).toContain('export function resumeContainerEvent(input) {');
 	expect(resumeCode).toContain("import('@markless/core/web/resume')");
 	expect(code).not.toMatch(/^\s*const\s+marklessFullResumeModule\s*=\s*import\(/m);
 	expect(code).not.toContain(
@@ -125,10 +125,10 @@ test('emitResumeModule routes non-lean event-only entries through the full hando
 	});
 
 	expect(code).not.toContain('resumeEventOnlyFromPayloadDocument');
-	expect(code).not.toContain('export async function resumeContainerEvent');
+	expect(code).not.toContain('function resumeContainerEvent');
 	expect(resumeCode).not.toContain('resumeEventOnlyFromPayloadDocument');
 	expect(resumeCode).toContain("import('@markless/core/web/resume')");
-	expect(resumeCode).toContain('export async function resumeContainerEvent');
+	expect(resumeCode).toContain('export function resumeContainerEvent(input) {');
 	expect(code).not.toContain('loadFullResume: marklessFullResumeHandoff');
 	expect(code).not.toContain("import('@markless/core/web/resume')");
 	expect(code).not.toMatch(/^\s*const\s+marklessFullResumeModule\s*=\s*import\(/m);
@@ -219,6 +219,27 @@ test('emitResumeModule keeps trigger staging behind the prerender wake boundary'
 	expect(staged).toContain('marklessPrerenderBranchTriggerMatches');
 	expect(staged).toContain('input.event === 0');
 	expect(staged).not.toContain('function readMarklessSourceSymbol');
+});
+
+test('every resume module serializes dispatch, streamed or not', () => {
+	// A page with no async boundary and no prerender group is the plain case the
+	// streamed gate used to leave bare, so two fast keystrokes each ran their
+	// handler body as an independent task and interleaved (defect 93).
+	const plain = emitResumeModule({
+		...baseInput,
+		needsFullResume: true,
+	});
+	const lean = emitResumeModule(scalarResumeInput());
+
+	for (const resumeCode of [plain, lean]) {
+		expect(resumeCode).toContain('async function marklessResumeContainerEvent');
+		expect(resumeCode).not.toContain('export async function resumeContainerEvent');
+		expect(resumeCode).toContain('root.__marklessDispatch');
+		expect(resumeCode).toContain('return tail = tail.then(run, run);');
+		// The same-event dedupe guard rides with the queue; it closed the
+		// lost-click defect and must not be separable from it.
+		expect(resumeCode).toContain('if (event === lastEvent && eventTime === lastEventTime)');
+	}
 });
 
 test('emitResumeModule keeps capability-free prerender pages on the lean handoff', () => {
