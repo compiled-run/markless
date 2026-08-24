@@ -73,6 +73,11 @@ test('CSR: a served key that comes back is rendered again in both lists', async 
 // (packages/web/src/settle-kernel.ts and packages/web/src/ssr-data/renderer.ts).
 // Growth needs the row's markup, its widget instance, and its handle and event
 // wiring all minted client-side, which is new machinery rather than a repair.
+// Reusing the settle kernel client-side was evaluated and rejected: its input is
+// the whole render-data surface - every chunk and every component definition
+// (SurfaceLike in settle-kernel.ts) - so shipping it would put the entire
+// template corpus in the browser payload. A minted row also has to enter the
+// element census through the splice, the same requirement the `@empty` arm hit.
 // A key that WAS served and comes back is a different case and it works: the
 // detached row is held in rowRootsByKey and re-appended, which is what the
 // `restore` rows above assert. Deterministic, so test.fails.
