@@ -1,4 +1,4 @@
-import * as tree from '../index.ts';
+import { tree } from '../../index.ts';
 
 type FileNodeProps = {
 	/** How many more levels this node unrolls, counting itself. */

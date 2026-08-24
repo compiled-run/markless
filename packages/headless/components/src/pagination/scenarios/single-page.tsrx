@@ -1,4 +1,4 @@
-import * as pagination from '../index.ts';
+import { pagination } from '../../index.ts';
 
 // One page of results. Both step controls are unavailable at once, because page
 // 1 is also the last page - the boundary case that catches a family which only

@@ -1,4 +1,4 @@
-import * as modal from '../index.ts';
+import { modal } from '../../index.ts';
 
 // A dialog that opens a second dialog. aria-at's own modal fixture is nested, so
 // this is the reference-backed shape: Escape has to close only the one on top,

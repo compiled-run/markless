@@ -1,4 +1,4 @@
-import * as qrcode from '../index.ts';
+import { qrcode } from '../../index.ts';
 
 // Two codes carrying different strings on one page. Each is its own widget
 // instance, so each renders its own pattern; a shared instance would show one

@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as otp from '../index.ts';
+import { otp } from '../../index.ts';
 
 // Six boxes written once instead of six times. The loop is wrapped in a <div>
 // because a construct cannot open directly inside a component tag's children.

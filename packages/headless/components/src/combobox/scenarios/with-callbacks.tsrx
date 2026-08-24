@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as combobox from '../index.ts';
+import { combobox } from '../../index.ts';
 
 // The three callbacks, each writing what it was handed. `onInput` is the one a
 // consumer filters from; `onChange` reports the selection; `onOpenChange` the

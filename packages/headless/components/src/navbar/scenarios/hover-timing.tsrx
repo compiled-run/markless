@@ -1,4 +1,4 @@
-import * as navbar from '../index.ts';
+import { navbar } from '../../index.ts';
 
 // The delay is short so the suite can wait it out honestly rather than faking a
 // clock: 60 ms is long enough that "opened before the delay" is a real failure

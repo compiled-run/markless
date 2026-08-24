@@ -1,4 +1,4 @@
-import * as tree from '../index.ts';
+import { tree } from '../../index.ts';
 
 // A realistic file explorer: folders that open, files that do not, an indicator
 // that a stylesheet can rotate, and a link inside every row. The link is written

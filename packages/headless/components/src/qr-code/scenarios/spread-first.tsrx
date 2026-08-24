@@ -1,4 +1,4 @@
-import * as qrcode from '../index.ts';
+import { qrcode } from '../../index.ts';
 
 // Every part spreads the consumer's props FIRST, so the family's own attributes
 // land last and win. This scenario writes the three a consumer could plausibly

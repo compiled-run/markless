@@ -1,4 +1,4 @@
-import * as select from '../index.ts';
+import { select } from '../../index.ts';
 
 // One option nobody may choose, and beside it a whole select nobody may touch.
 // The first select is handed over open: a reader cannot walk into a `hidden`

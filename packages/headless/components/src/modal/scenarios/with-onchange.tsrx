@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as modal from '../index.ts';
+import { modal } from '../../index.ts';
 
 // Two dialogs with their own consumer handlers. Each handler writes into page
 // state the page renders, so what the DOM shows is what the consumer's callback

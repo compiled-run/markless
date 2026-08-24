@@ -1,4 +1,4 @@
-import * as combobox from '../index.ts';
+import { combobox } from '../../index.ts';
 
 // An option nobody may choose, and a whole combobox nobody may use. The arrow
 // walk steps past the first; the second refuses every gesture.

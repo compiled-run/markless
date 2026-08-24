@@ -1,4 +1,4 @@
-import * as combobox from '../index.ts';
+import { combobox } from '../../index.ts';
 
 // Two of them alive in one document: every handle read, every minted id and
 // every instance write has to answer for its OWN widget.

@@ -1,4 +1,4 @@
-import * as pagination from '../index.ts';
+import { pagination } from '../../index.ts';
 
 // The starter a consumer copies: five pages written out one by one, with a step
 // back and a step forward on either side. Nothing computes the range here,

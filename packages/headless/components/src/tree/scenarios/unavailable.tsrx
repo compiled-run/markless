@@ -1,4 +1,4 @@
-import * as tree from '../index.ts';
+import { tree } from '../../index.ts';
 
 // A tree nobody may open or close: every trigger is a disabled native button,
 // so nothing responds and the flag is on the container for a stylesheet to read.

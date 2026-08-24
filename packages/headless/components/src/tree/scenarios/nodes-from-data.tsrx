@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as tree from '../index.ts';
+import { tree } from '../../index.ts';
 
 // What every real file tree is: nodes authored with a keyed loop over nested
 // data, rather than written out by hand. Widget-rooting parts inside `@for`

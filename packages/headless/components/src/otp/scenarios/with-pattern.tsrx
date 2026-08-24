@@ -1,4 +1,4 @@
-import * as otp from '../index.ts';
+import { otp } from '../../index.ts';
 
 // The careful attribute set the wild writes by hand: a `pattern` on the input
 // alongside everything the family already sets. `maxlength` and `autocomplete`

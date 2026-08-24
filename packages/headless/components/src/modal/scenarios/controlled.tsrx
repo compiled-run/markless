@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as modal from '../index.ts';
+import { modal } from '../../index.ts';
 
 // The dialog opened without a gesture. The ruling allows exactly one
 // `modal.trigger` per root, so every other opener is the consumer flipping the

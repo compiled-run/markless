@@ -1,5 +1,5 @@
 import { computed } from '@markless/core';
-import * as combobox from '../index.ts';
+import { combobox } from '../../index.ts';
 
 // The family ships NO filter. The consumer filters their own list from the text
 // the field is carrying, and `@empty` is what they say when nothing matches -

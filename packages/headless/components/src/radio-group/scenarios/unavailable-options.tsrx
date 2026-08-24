@@ -1,4 +1,4 @@
-import * as radiogroup from '../index.ts';
+import { radiogroup } from '../../index.ts';
 
 // One option nobody may choose inside a group that is otherwise usable, and a
 // whole group nobody may touch.

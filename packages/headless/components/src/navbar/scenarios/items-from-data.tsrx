@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as navbar from '../index.ts';
+import { navbar } from '../../index.ts';
 
 // What a real site header looks like: the entries are data, and the items come
 // from a keyed loop over them.

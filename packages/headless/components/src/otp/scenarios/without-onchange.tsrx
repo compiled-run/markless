@@ -1,4 +1,4 @@
-import * as otp from '../index.ts';
+import { otp } from '../../index.ts';
 
 // The same field with no callback at all. Typing still fills the boxes; the call
 // site simply has nobody to tell.

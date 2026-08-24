@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as modal from '../index.ts';
+import { modal } from '../../index.ts';
 
 // Two shapes Base UI's own suite reaches for. The first is the commonest real
 // dialog: a form inside the surface whose save control closes it. The second

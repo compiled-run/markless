@@ -1,4 +1,4 @@
-import * as navbar from '../index.ts';
+import { navbar } from '../../index.ts';
 
 // The realistic one: a mega menu (a wide dropdown with a grid of links inside),
 // a plain top-level link, and a sign-in button OUTSIDE the nav so the focus-out

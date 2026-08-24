@@ -1,4 +1,4 @@
-import * as select from '../index.ts';
+import { select } from '../../index.ts';
 
 // A select the consumer hands over already showing its popup. The screen-reader
 // rows that read the open listbox use this, so what they measure is the markup

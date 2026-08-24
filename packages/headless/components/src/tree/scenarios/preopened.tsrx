@@ -1,4 +1,4 @@
-import * as tree from '../index.ts';
+import { tree } from '../../index.ts';
 
 // A branch written open on first render, beside one written closed. The server
 // has to send the open one open, and a resume has to leave it open.

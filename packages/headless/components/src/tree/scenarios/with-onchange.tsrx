@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as tree from '../index.ts';
+import { tree } from '../../index.ts';
 
 // Two nodes with their own consumer handlers, one of them nested inside the
 // other. Each handler writes into page state the page renders, so what the DOM

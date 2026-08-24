@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as accordion from '../index.ts';
+import { accordion } from '../../index.ts';
 
 // The consumer's own handlers. Each writes into page state the page renders, so
 // what the DOM shows is what the callback was actually called with, how often,

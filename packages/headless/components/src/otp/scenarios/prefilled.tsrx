@@ -1,4 +1,4 @@
-import * as otp from '../index.ts';
+import { otp } from '../../index.ts';
 
 // A code the page already knows part of: four characters land in the first four
 // boxes and the last two stay empty.

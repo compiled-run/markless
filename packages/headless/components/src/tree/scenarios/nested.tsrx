@@ -1,4 +1,4 @@
-import * as tree from '../index.ts';
+import { tree } from '../../index.ts';
 
 // Two levels, written by hand. `src` holds two files and starts closed; the
 // group holding them stays in the page the whole time and `hidden` decides

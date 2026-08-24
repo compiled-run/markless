@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as modal from '../index.ts';
+import { modal } from '../../index.ts';
 
 // A dialog that passes no onChange at all. It still opens and closes; the count
 // beside it proves nothing was called.

@@ -1,4 +1,4 @@
-import * as modal from '../index.ts';
+import { modal } from '../../index.ts';
 
 // `disabled` is not a prop this family ships. It reaches the underlying
 // `<button>` through `{...rest}`, which is the whole point of spreading: the

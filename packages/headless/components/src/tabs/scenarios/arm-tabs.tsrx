@@ -1,4 +1,4 @@
-import * as tabs from '../index.ts';
+import { tabs } from '../../index.ts';
 
 // A panel offered only on some plans, so it sits inside an @if arm.
 //

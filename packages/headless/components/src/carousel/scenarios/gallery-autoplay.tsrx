@@ -1,4 +1,4 @@
-import * as carousel from '../index.ts';
+import { carousel } from '../../index.ts';
 
 // The realistic one. The APG says the rotation control comes first in the tab
 // sequence inside the carousel, so it is written first; and the interval is

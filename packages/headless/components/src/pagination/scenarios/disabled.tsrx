@@ -1,4 +1,4 @@
-import * as pagination from '../index.ts';
+import { pagination } from '../../index.ts';
 
 // Nothing navigates while the results are loading. Every unavailable-ness on
 // this page is the family's own output: the scenario says `disabled` once, on

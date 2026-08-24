@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as select from '../index.ts';
+import { select } from '../../index.ts';
 
 // The consumer's own handlers, logged so the suite can read what they were
 // called with and how often. `onChange` carries the value, per QDS; the open

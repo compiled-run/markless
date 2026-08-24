@@ -1,4 +1,4 @@
-import * as otp from '../index.ts';
+import { otp } from '../../index.ts';
 
 // Two code fields on one page: an SMS code and an authenticator code, side by
 // side. Typing in one must leave the other exactly where it was.

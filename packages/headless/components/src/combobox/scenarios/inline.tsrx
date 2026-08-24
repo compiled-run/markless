@@ -1,4 +1,4 @@
-import * as combobox from '../index.ts';
+import { combobox } from '../../index.ts';
 
 // `inline` is a boolean on the ROOT, never a part: the list is part of the page
 // rather than a popup, so it is always showing and nothing dismisses it.

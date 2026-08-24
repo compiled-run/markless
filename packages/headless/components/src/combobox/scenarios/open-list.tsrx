@@ -1,4 +1,4 @@
-import * as combobox from '../index.ts';
+import { combobox } from '../../index.ts';
 
 // Handed over already showing. Every row that reads an option needs one of
 // these: a reader cannot walk into a `hidden` list, and neither can a click.

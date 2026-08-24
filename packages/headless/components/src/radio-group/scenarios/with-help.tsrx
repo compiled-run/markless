@@ -1,4 +1,4 @@
-import * as radiogroup from '../index.ts';
+import { radiogroup } from '../../index.ts';
 
 // Help text and a validation message. The second group writes its error BEFORE
 // the options, because document order must not decide whether the group counts

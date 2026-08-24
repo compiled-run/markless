@@ -1,4 +1,4 @@
-import * as navbar from '../index.ts';
+import { navbar } from '../../index.ts';
 
 // Two navigation landmarks on one page, which is the ordinary case and the
 // reason this family writes no default name: a reader lists landmarks by name,

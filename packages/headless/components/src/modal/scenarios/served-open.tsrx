@@ -1,4 +1,4 @@
-import * as modal from '../index.ts';
+import { modal } from '../../index.ts';
 
 // A dialog the server sends already showing. Base UI's dismissal cases all use
 // `defaultOpen`, and it is a real consumer shape, so it gets a row of its own -

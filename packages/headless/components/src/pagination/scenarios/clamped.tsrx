@@ -1,4 +1,4 @@
-import * as pagination from '../index.ts';
+import { pagination } from '../../index.ts';
 
 // A page number out of range, which is what a bookmarked `?page=99` looks like
 // after the results shrank. Page 20 is the one showing, so the last control is

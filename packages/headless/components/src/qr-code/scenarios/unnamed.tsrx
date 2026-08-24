@@ -1,4 +1,4 @@
-import * as qrcode from '../index.ts';
+import { qrcode } from '../../index.ts';
 
 // The only scenario here deliberately missing an `aria-label`, so the suite can
 // assert what the family does NOT do: invent a name. A name built from the value

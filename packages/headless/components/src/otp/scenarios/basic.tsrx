@@ -1,4 +1,4 @@
-import * as otp from '../index.ts';
+import { otp } from '../../index.ts';
 
 // The starter a consumer copies: six empty boxes over one real input, and each
 // box says which character of the code it shows.

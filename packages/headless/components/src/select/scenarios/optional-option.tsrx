@@ -1,4 +1,4 @@
-import * as select from '../index.ts';
+import { select } from '../../index.ts';
 
 // An option that only some builds offer. The condition is a module constant, not
 // a state cell: a widget-root part inside an arm that FLIPS is refused at compile

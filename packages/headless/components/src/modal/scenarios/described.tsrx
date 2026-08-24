@@ -1,4 +1,4 @@
-import * as modal from '../index.ts';
+import { modal } from '../../index.ts';
 
 // The starter plus a description, which is the sentence a reader announces after
 // the dialog's name.

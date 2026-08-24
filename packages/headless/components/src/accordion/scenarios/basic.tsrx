@@ -1,4 +1,4 @@
-import * as accordion from '../index.ts';
+import { accordion } from '../../index.ts';
 
 // The starter a consumer copies: three sections, nothing open, one open at a
 // time.

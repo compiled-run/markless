@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as select from '../index.ts';
+import { select } from '../../index.ts';
 
 // What a real select looks like: the options are data, and the items come from a
 // keyed loop over them. `select.item` roots its own widget instance, so this is

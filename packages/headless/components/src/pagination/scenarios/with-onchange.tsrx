@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as pagination from '../index.ts';
+import { pagination } from '../../index.ts';
 
 // One pagination with a consumer handler. The handler writes into page state the
 // page renders, so what the DOM shows is what the consumer's callback was

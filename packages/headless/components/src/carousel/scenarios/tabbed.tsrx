@@ -1,4 +1,4 @@
-import * as carousel from '../index.ts';
+import { carousel } from '../../index.ts';
 
 // The same carousel with a nav list, which is the APG's tabbed variant: the
 // pickers are tabs and the slides become the panels they control.

@@ -1,4 +1,4 @@
-import * as select from '../index.ts';
+import { select } from '../../index.ts';
 
 // Two selects on one page: arrowing or choosing in one must leave the other
 // exactly where it was.

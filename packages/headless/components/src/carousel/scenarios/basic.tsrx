@@ -1,4 +1,4 @@
-import * as carousel from '../index.ts';
+import { carousel } from '../../index.ts';
 
 // The starter a consumer copies: a title, three slides, and the two triggers
 // that step through them. No nav list, so the slides stay plain groups.

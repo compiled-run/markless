@@ -1,4 +1,4 @@
-import * as combobox from '../index.ts';
+import { combobox } from '../../index.ts';
 
 // The starter a consumer copies: a named field, a button that shows the list,
 // three options, nothing chosen.

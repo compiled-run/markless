@@ -1,5 +1,5 @@
 import { computed } from '@markless/core';
-import * as accordion from '../index.ts';
+import { accordion } from '../../index.ts';
 
 // An accordion authored over a list, which is the normal case for an FAQ. The
 // rows root a widget each (`accordion.item`), and the data lives inside the

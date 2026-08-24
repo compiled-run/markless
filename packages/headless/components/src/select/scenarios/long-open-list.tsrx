@@ -1,4 +1,4 @@
-import * as select from '../index.ts';
+import { select } from '../../index.ts';
 
 // The same thirteen options, handed over with the popup showing. The screen
 // reader lane reads this one: a reader cannot walk into a `hidden` listbox, so

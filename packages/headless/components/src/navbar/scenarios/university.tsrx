@@ -1,4 +1,4 @@
-import * as navbar from '../index.ts';
+import { navbar } from '../../index.ts';
 
 // The w3c/aria-at disclosure-navigation fixture, rebuilt on this family: the
 // "Mythical University" navigation with three buttons and the sample page

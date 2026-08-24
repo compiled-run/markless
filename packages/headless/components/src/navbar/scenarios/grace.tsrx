@@ -1,4 +1,4 @@
-import * as navbar from '../index.ts';
+import { navbar } from '../../index.ts';
 
 // The click-grace window, both halves of it. A dropdown that opened under the
 // resting pointer must survive the click that follows - otherwise pointing at an

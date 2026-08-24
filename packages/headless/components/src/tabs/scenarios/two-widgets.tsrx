@@ -1,4 +1,4 @@
-import * as tabs from '../index.ts';
+import { tabs } from '../../index.ts';
 
 // Two tab sets on one page, sharing the same values on purpose. Each root is its
 // own instance boundary, so clicking in one must leave the other exactly where

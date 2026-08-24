@@ -1,4 +1,4 @@
-import * as radiogroup from '../index.ts';
+import { radiogroup } from '../../index.ts';
 
 // The starter a consumer copies: three billing options, none chosen yet.
 export function Basic() @{

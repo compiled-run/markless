@@ -1,4 +1,4 @@
-import * as modal from '../index.ts';
+import { modal } from '../../index.ts';
 
 // An alert dialog. The three deltas the ruling names are all visible here: it
 // announces as `alertdialog`, an outside press does not dismiss it, and opening

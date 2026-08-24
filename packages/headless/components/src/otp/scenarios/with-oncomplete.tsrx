@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as otp from '../index.ts';
+import { otp } from '../../index.ts';
 
 // What a real sign-in does with a finished code: the page counts the completions
 // so a second, no-op input cannot fire a second submit.

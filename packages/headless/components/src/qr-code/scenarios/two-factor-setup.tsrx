@@ -1,4 +1,4 @@
-import * as qrcode from '../index.ts';
+import { qrcode } from '../../index.ts';
 
 // The realistic screen, and the one that teaches. Three things here are not
 // decoration:

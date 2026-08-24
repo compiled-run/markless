@@ -1,4 +1,4 @@
-import * as carousel from '../index.ts';
+import { carousel } from '../../index.ts';
 
 // Two carousels on one page, sharing slide values on purpose: a trigger in one
 // must never move the other.

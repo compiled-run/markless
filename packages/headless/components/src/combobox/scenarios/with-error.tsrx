@@ -1,4 +1,4 @@
-import * as combobox from '../index.ts';
+import { combobox } from '../../index.ts';
 
 // `invalid` is a root prop here, and the error part carries the message. Qwik UI
 // derives invalidity from the error component's mere presence; that is a

@@ -1,4 +1,4 @@
-import * as tree from '../index.ts';
+import { tree } from '../../index.ts';
 
 // A branch written open INSIDE another branch written open. The node reports
 // itself open at both levels; whether its group is served showing at the second

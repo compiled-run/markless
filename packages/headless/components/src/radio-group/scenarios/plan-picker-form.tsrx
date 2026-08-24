@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as radiogroup from '../index.ts';
+import { radiogroup } from '../../index.ts';
 
 // The plan picker a checkout has: a real form, a required choice, and an output
 // that writes what the browser itself put in the FormData.

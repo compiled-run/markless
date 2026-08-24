@@ -1,4 +1,4 @@
-import * as tabs from '../index.ts';
+import { tabs } from '../../index.ts';
 
 // Tabs stacked down the side of a page: the up and down arrows walk them, and
 // the left and right arrows are somebody else's axis.

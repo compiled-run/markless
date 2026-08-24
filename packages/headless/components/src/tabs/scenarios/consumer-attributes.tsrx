@@ -1,4 +1,4 @@
-import * as tabs from '../index.ts';
+import { tabs } from '../../index.ts';
 
 // A consumer writing the attributes the family owns. `{...rest}` is spread
 // first, so the family's own role and state win — QDS spreads it last, where a

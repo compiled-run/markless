@@ -1,4 +1,4 @@
-import * as navbar from '../index.ts';
+import { navbar } from '../../index.ts';
 
 // A navbar entry only some people see - an admin section, a sign-in-only
 // dashboard - written inside an `@if` arm.

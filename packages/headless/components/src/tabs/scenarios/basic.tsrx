@@ -1,4 +1,4 @@
-import * as tabs from '../index.ts';
+import { tabs } from '../../index.ts';
 
 // The starter a consumer copies: three tabs, three panels, the first one
 // showing.

@@ -1,4 +1,4 @@
-import * as modal from '../index.ts';
+import { modal } from '../../index.ts';
 
 // A dialog with neither a title nor a description. The naming references are
 // still emitted and resolve to nothing, which is the family's one accepted

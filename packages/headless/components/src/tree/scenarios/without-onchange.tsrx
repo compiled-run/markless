@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as tree from '../index.ts';
+import { tree } from '../../index.ts';
 
 // The same shape with no consumer handler anywhere. The node still opens and
 // closes; the call site simply does nothing.

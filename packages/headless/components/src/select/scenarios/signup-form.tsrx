@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as select from '../index.ts';
+import { select } from '../../index.ts';
 
 // The plan picker a signup has: a real form, a required choice, and an output
 // that writes what the browser itself put in the FormData.

@@ -1,4 +1,4 @@
-import * as navbar from '../index.ts';
+import { navbar } from '../../index.ts';
 
 // `hover={false}`: the pointer resting on an entry does nothing, and only a
 // click opens the dropdown. Every library in the survey offers this, and it is

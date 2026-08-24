@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as pagination from '../index.ts';
+import { pagination } from '../../index.ts';
 
 // No consumer callback at all. The pagination still moves; the call site simply
 // has nothing to run. The counter next to it proves nothing fired.

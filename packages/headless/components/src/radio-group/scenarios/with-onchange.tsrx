@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as radiogroup from '../index.ts';
+import { radiogroup } from '../../index.ts';
 
 // The consumer's own handler, logged so the suite can read what it was called
 // with and how often.

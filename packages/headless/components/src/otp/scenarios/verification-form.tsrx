@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as otp from '../index.ts';
+import { otp } from '../../index.ts';
 
 // The shape almost every sign-in flow hand-rolls: a labelled code field inside a
 // form with a submit button. The label wraps the field, so it names the one real

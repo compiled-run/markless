@@ -1,4 +1,4 @@
-import * as modal from '../index.ts';
+import { modal } from '../../index.ts';
 
 // The starter a consumer copies: a button that opens a named dialog, and a
 // button inside it that closes it again. The page button outside the dialog is

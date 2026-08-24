@@ -1,4 +1,4 @@
-import * as tree from '../index.ts';
+import { tree } from '../../index.ts';
 
 // The starter: a flat tree of three end nodes. Nothing here opens, so every row
 // is a leaf and none of them reports an open state at all.

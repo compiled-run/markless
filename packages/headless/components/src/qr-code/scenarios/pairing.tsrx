@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as qrcode from '../index.ts';
+import { qrcode } from '../../index.ts';
 
 // A pairing code that rotates. `value` is bound to page state, so pressing the button
 // re-encodes the pattern rather than leaving a stale code on screen.

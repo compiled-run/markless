@@ -1,4 +1,4 @@
-import * as tree from '../index.ts';
+import { tree } from '../../index.ts';
 
 // Two trees on one page. Arrowing inside one must not reach the other, and each
 // keeps its own tab stop, because every part reads the instance its own root

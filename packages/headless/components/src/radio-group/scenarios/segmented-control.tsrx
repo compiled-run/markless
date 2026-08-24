@@ -1,4 +1,4 @@
-import * as radiogroup from '../index.ts';
+import { radiogroup } from '../../index.ts';
 
 // A segmented control is not another family: it is this one, laid out sideways.
 // The only difference from `basic.tsrx` is `orientation`, which is what decides

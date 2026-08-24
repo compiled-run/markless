@@ -1,4 +1,4 @@
-import * as tabs from '../index.ts';
+import { tabs } from '../../index.ts';
 
 // A settings page: one tab nobody may open, and panels holding their own
 // focusable controls, which is what makes the panel tab stop matter.

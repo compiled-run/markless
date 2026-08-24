@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as carousel from '../index.ts';
+import { carousel } from '../../index.ts';
 
 // A consumer watching the showing slide. The log is written straight into the
 // page so a test reads what the handler saw, not what it hoped.

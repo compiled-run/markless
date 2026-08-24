@@ -1,4 +1,4 @@
-import * as navbar from '../index.ts';
+import { navbar } from '../../index.ts';
 
 // The starter a consumer copies: a named landmark, one plain link, and two
 // entries that show a dropdown. Everything starts closed.

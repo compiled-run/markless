@@ -1,4 +1,4 @@
-import * as combobox from '../index.ts';
+import { combobox } from '../../index.ts';
 
 // A choice already made, served that way. `value` is a value, not a "default":
 // a literal here and a live read from the consumer's own state read the same.

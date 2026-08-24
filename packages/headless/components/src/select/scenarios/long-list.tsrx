@@ -1,4 +1,4 @@
-import * as select from '../index.ts';
+import { select } from '../../index.ts';
 
 // Thirteen options, matching the option count aria-at's combobox-select-only
 // reference carries, so the set-size row diffs against that plan directly. Also

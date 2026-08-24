@@ -1,4 +1,4 @@
-import * as pagination from '../index.ts';
+import { pagination } from '../../index.ts';
 
 // Pagination that is real navigation: every page has a URL, so the controls are
 // anchors rather than buttons. A crawler follows them and a person can open one

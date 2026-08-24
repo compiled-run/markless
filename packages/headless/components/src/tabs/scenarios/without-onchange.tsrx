@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as tabs from '../index.ts';
+import { tabs } from '../../index.ts';
 
 // No onChange anywhere. Tabs still change; the call site simply does nothing.
 // The counter proves nothing else on the page moved.

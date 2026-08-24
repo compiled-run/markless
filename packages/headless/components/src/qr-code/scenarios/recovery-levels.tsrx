@@ -1,4 +1,4 @@
-import * as qrcode from '../index.ts';
+import { qrcode } from '../../index.ts';
 
 // The same string at two recovery levels. More recovery means more error
 // correction codewords, so the symbol is the same size or larger and the

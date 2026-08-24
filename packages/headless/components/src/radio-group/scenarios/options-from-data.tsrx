@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as radiogroup from '../index.ts';
+import { radiogroup } from '../../index.ts';
 
 // What a real radio group looks like: the options are data, and the items come
 // from a keyed loop over them. The field is written after the loop on purpose:

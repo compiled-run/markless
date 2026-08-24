@@ -1,4 +1,4 @@
-import * as pagination from '../index.ts';
+import { pagination } from '../../index.ts';
 
 // Two paginations on one page - reviews above the results, orders below - each
 // with its own page and its own count. A page with more than one navigation

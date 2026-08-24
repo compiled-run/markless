@@ -1,4 +1,4 @@
-import * as navbar from '../index.ts';
+import { navbar } from '../../index.ts';
 
 // The page a person is on now, said in ARIA. `current` sits on the ONE link that
 // is that page - here a link inside a dropdown - and `active` sits on the item

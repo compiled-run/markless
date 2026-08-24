@@ -1,4 +1,4 @@
-import * as accordion from '../index.ts';
+import { accordion } from '../../index.ts';
 
 // A section written open, a section nobody may open - last, so the walk's End
 // has an enabled section to land on short of it - and an accordion that always

@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as combobox from '../index.ts';
+import { combobox } from '../../index.ts';
 
 // More than one choice at a time, with backspace giving the last one back. The
 // consumer owns the chips, because they already own the data the chips are made

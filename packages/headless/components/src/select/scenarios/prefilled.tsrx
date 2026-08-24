@@ -1,4 +1,4 @@
-import * as select from '../index.ts';
+import { select } from '../../index.ts';
 
 // A select that arrives with a choice already made. The trigger's own words are
 // the consumer's: the family ships no `value` part and no `displayValue` prop,

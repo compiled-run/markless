@@ -1,4 +1,4 @@
-import * as carousel from '../index.ts';
+import { carousel } from '../../index.ts';
 
 // Slides stacked down the page instead of across it.
 export default function Vertical() @{

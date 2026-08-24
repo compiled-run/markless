@@ -1,4 +1,4 @@
-import * as accordion from '../index.ts';
+import { accordion } from '../../index.ts';
 
 // Several sections may show at once, and the value is the list of the ones that
 // do. Two are written open.

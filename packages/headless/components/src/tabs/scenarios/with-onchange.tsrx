@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as tabs from '../index.ts';
+import { tabs } from '../../index.ts';
 
 // Two tab sets with their own consumer handlers. Each handler writes into page
 // state the page renders, so what the DOM shows is what the consumer's callback

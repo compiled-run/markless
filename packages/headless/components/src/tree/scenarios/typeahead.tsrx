@@ -1,4 +1,4 @@
-import * as tree from '../index.ts';
+import { tree } from '../../index.ts';
 
 // Enough visibly-named nodes to type against, with distinct first letters, plus
 // one node hidden inside a closed branch. Typing its letter must not reach it:

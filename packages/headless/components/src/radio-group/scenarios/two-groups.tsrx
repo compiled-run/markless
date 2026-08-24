@@ -1,4 +1,4 @@
-import * as radiogroup from '../index.ts';
+import { radiogroup } from '../../index.ts';
 
 // Two groups on one page. Each root is its own instance boundary, so arrowing
 // through one must leave the other's choice exactly where it was.

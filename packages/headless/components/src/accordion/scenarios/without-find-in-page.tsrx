@@ -1,4 +1,4 @@
-import * as accordion from '../index.ts';
+import { accordion } from '../../index.ts';
 
 // `disableUntilFound` turns find-in-page off for this accordion: a closed panel
 // is hidden outright, so the browser never reveals it and never fires

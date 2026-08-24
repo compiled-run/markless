@@ -1,4 +1,4 @@
-import * as carousel from '../index.ts';
+import { carousel } from '../../index.ts';
 
 // No title part. The APG says a carousel's name must not contain the word
 // carousel, and the role description already says it, so an unnamed carousel

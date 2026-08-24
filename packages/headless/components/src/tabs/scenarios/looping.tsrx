@@ -1,4 +1,4 @@
-import * as tabs from '../index.ts';
+import { tabs } from '../../index.ts';
 
 // Arrowing past either end lands on the other, with a tab nobody may open in
 // the middle for the walk to step over. Both a horizontal set and a vertical

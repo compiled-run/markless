@@ -1,4 +1,4 @@
-import * as qrcode from '../index.ts';
+import { qrcode } from '../../index.ts';
 
 // The starter a consumer copies: a code carrying a URL, named for what scanning
 // it does rather than for the string it holds.

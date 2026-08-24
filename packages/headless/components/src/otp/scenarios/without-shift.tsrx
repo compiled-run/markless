@@ -1,4 +1,4 @@
-import * as otp from '../index.ts';
+import { otp } from '../../index.ts';
 
 // A code field on a page with no password manager to make room for: the field
 // covers the boxes and stops at the root's edge, nothing wider.

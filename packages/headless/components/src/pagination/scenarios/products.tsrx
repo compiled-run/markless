@@ -1,5 +1,5 @@
 import { computed, state } from '@markless/core';
-import * as pagination from '../index.ts';
+import { pagination } from '../../index.ts';
 
 // Twenty pages, so the range has gaps and the set of rendered controls CHANGES as the
 // page moves. Which pages and which gaps is the family's business; the `<ul>`, the

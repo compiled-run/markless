@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as combobox from '../index.ts';
+import { combobox } from '../../index.ts';
 
 // A real form, a required choice, a description and an error, and an output
 // that writes what the browser itself put in the FormData.

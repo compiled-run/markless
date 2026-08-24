@@ -1,4 +1,4 @@
-import * as otp from '../index.ts';
+import { otp } from '../../index.ts';
 
 // A code field nobody may type in yet, and one that is locked part-way through —
 // the shape a "resend in 30s" screen shows while it waits.

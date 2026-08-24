@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as navbar from '../index.ts';
+import { navbar } from '../../index.ts';
 
 // The consumer's own callback, and the order it runs in. The handler writes into
 // page state the page renders, so what the DOM shows is what the callback was

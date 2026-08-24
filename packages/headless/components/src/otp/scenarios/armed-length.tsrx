@@ -1,4 +1,4 @@
-import * as otp from '../index.ts';
+import { otp } from '../../index.ts';
 
 // Which code this screen asks for is decided once, before anything renders, so
 // the boxes come out of an @if arm rather than being written flat. A FLIPPING

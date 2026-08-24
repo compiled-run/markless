@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as otp from '../index.ts';
+import { otp } from '../../index.ts';
 
 // The consumer's handlers write what they saw into page state the page renders,
 // so what the DOM shows is the argument the callback actually received and how

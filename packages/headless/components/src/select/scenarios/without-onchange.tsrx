@@ -1,4 +1,4 @@
-import * as select from '../index.ts';
+import { select } from '../../index.ts';
 
 // The same select with neither callback. Choosing and opening still work; the
 // call sites simply do nothing.

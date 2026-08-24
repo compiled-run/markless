@@ -1,4 +1,4 @@
-import * as tabs from '../index.ts';
+import { tabs } from '../../index.ts';
 
 // Panels expensive enough that arrowing should not open them: focus moves, and
 // Enter or Space is what shows the tab.

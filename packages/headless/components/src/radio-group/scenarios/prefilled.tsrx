@@ -1,4 +1,4 @@
-import * as radiogroup from '../index.ts';
+import { radiogroup } from '../../index.ts';
 
 // A group that arrives with a choice already made: the middle option is the one.
 export function Prefilled() @{

@@ -1,4 +1,4 @@
-import * as select from '../index.ts';
+import { select } from '../../index.ts';
 
 // The starter a consumer copies: a named select, three options, nothing chosen.
 export function Basic() @{
