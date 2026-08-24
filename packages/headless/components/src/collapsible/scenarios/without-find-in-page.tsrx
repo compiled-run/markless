@@ -1,8 +1,5 @@
 import { collapsible } from '../../index.ts';
 
-// `disableUntilFound` turns find-in-page off for this collapsible: a closed panel
-// is hidden outright, so the browser never reveals it and never fires
-// `beforematch`.
 export default function WithoutFindInPage() @{
 	<section>
 		<collapsible.root disableUntilFound data-testid="terms-root">

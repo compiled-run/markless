@@ -10,8 +10,7 @@ import Vertical from './scenarios/vertical.tsrx';
 // `tests/apg/tabs-automatic-activation` and `tests/apg/tabs-manual-activation`
 // plans assert it: each step names the facts the announcement has to convey -
 // role, accessible name, state - and never a product's wording. The sequence
-// letters below are the ones in goals/headless-components/notes/research-tabs.md,
-// which reads them off those two plans. `sr` is the only line that picks a reader,
+// letters below are the ones those two plans use. `sr` is the only line that picks a reader,
 // so the same expectations run against NVDA and VoiceOver once those drivers land.
 //
 // aria-at coverage, recorded honestly: both plans are about a tab list a person
@@ -143,11 +142,12 @@ test('a vertical tab list conveys its showing tab and its locked tab', async () 
 //
 // Still red after the 2026-08-22 attempt, and now for a measured reason rather
 // than an assumed one. The showing-pair shape - the selected trigger putting its
-// text in a `<span el={tabs.showingTabEl}>` inside an `@if`, every panel naming
+// text in a `.
+<span el={tabs.showingTabEl}>` inside an `@if`, every panel naming
 // that one handle - is `MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED`, because the arm
 // holds an attribute binding and `selected` flips. Binding the handle on the
 // button unconditionally compiles and is worse: one widget mints one id, so every
-// trigger renders the same one. note.md carries the full transcript. Whoever lands
+// trigger renders the same one. Whoever lands
 // a value-keyed shared() instance deletes the `.fails`.
 test.fails('the showing panel is conveyed with the name of the tab that shows it', async () => {
 	await open(Basic);

@@ -7,7 +7,7 @@
  * The scenarios used to carry this in a `<style>` element of their own. That
  * element never reached the page - markup `<style>` is dropped, so every
  * carousel row was running against an unstyled document - which is what hid
- * defect 82: an unstyled vertical viewport is auto-height, so it measures its
+ * the failure: an unstyled vertical viewport is auto-height, so it measures its
  * own content and reports every slide as visible. Until markup `<style>` lands,
  * the sheet is installed straight into the document by the suite.
  */

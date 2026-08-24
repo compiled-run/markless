@@ -496,9 +496,10 @@ test('CSR: a horizontal group walks the horizontal axis and leaves the other alo
 // Options authored with a keyed `@for` — the shape every real radio group has,
 // since a group written over a literal list of options is a toy.
 
-// Was defect 75: a looped option's own instance read resolved to the template
+// A looped option's own instance read resolved to the template
 // definition no row rendered into, so the write carried `undefined`. Fixed in
-// the row-rooted widget lookup; witness is keyed-instance-refresh.test.ts.
+// the row-rooted widget lookup; witness is keyed-instance-refresh.
+test.ts.
 test('CSR: options from a keyed loop each get their own instance', async () => {
 	await render(OptionsFromData);
 	const triggers = page.getByTestId('row-trigger').elements();

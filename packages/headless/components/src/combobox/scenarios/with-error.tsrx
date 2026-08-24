@@ -2,8 +2,7 @@ import { combobox } from '../../index.ts';
 
 // `invalid` is a root prop here, and the error part carries the message. Qwik UI
 // derives invalidity from the error component's mere presence; that is a
-// render-phase write to an already-rendered part, which is defect 31 - see
-// note.md.
+// render-phase write to an already-rendered part.
 export function WithError() @{
 	<combobox.root invalid data-testid="root">
 		<combobox.label data-testid="label">Favorite Fruit</combobox.label>

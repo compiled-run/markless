@@ -6,8 +6,7 @@ import type { PropsOf, Seeded } from '@markless/core';
  *
  * The tree's accessible name comes through `{...rest}` as a plain `aria-label`:
  * naming it from `tree.label` would need an IDREF handle read on a widget root,
- * which is `MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT` today. See note.md.
- */
+ * which is `MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT` today.. */
 export type TreeRootProps = PropsOf<'div'> & {
 	/** Nobody can open or close anything while this is set. */
 	readonly disabled?: boolean;
@@ -28,8 +27,7 @@ export type TreeItemProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/**
 	 * How deep this node sits, counting from 1. It is written rather than read
 	 * off the enclosing node, because a component that roots an instance of a
-	 * family cannot also read the enclosing instance of that same family - see
-	 * note.md, "Level is a prop".
+	 * family cannot also read the enclosing instance of that same family.
 	 */
 	readonly level?: number;
 	/** Called with the new state when a person opens or closes this node. */
@@ -61,8 +59,7 @@ export type TreeItemIndicatorProps = PropsOf<'span'>;
  * seeded field and nothing else: which row holds the tab stop and what has been
  * typed at the tree both live on the container element, because the handlers
  * that maintain them sit on the element that roots this instance and cannot
- * read it. See note.md, "What the compiler forced".
- */
+ * read it. */
 export type TreeInstanceState = Seeded<TreeRootProps, 'disabled'>;
 
 /**

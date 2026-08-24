@@ -10,9 +10,6 @@ import TwoAccordions from './scenarios/two-accordions.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
 import WithoutFindInPage from './scenarios/without-find-in-page.tsrx';
 
-// The locators name the part anatomy - root, item, itemlabel, itemtrigger,
-// itemcontent - prefixed per section the way a consumer names their own
-// sections.
 const Root = page.getByTestId('root');
 const ShippingItem = page.getByTestId('shipping-item');
 const ShippingLabel = page.getByTestId('shipping-label');
@@ -21,8 +18,7 @@ const ShippingContent = page.getByTestId('shipping-content');
 const ReturnsTrigger = page.getByTestId('returns-trigger');
 const ReturnsContent = page.getByTestId('returns-content');
 const SizingTrigger = page.getByTestId('sizing-trigger');
-// The FAQ. `rules` is the question written open, `billing` is the one nobody may
-// open, and it is last so `End` has an enabled section short of it.
+// `billing` is disabled and last, so `End` has an enabled section short of it.
 const PermitTrigger = page.getByTestId('permit-trigger');
 const PermitContent = page.getByTestId('permit-content');
 const RulesItem = page.getByTestId('rules-item');
@@ -32,27 +28,22 @@ const VisitorTrigger = page.getByTestId('visitor-trigger');
 const BillingItem = page.getByTestId('billing-item');
 const BillingTrigger = page.getByTestId('billing-trigger');
 const BillingContent = page.getByTestId('billing-content');
-// The accordion nobody may change.
 const ShutTrigger = page.getByTestId('shut-trigger');
 const ShutContent = page.getByTestId('shut-content');
 const OpenTrigger = page.getByTestId('open-trigger');
 const OpenContent = page.getByTestId('open-content');
-// Several sections showing at once.
 const EngineTrigger = page.getByTestId('engine-trigger');
 const EngineContent = page.getByTestId('engine-content');
 const BrakesTrigger = page.getByTestId('brakes-trigger');
 const BrakesContent = page.getByTestId('brakes-content');
 const TyresTrigger = page.getByTestId('tyres-trigger');
 const TyresContent = page.getByTestId('tyres-content');
-// The consumer handler's log.
 const FirstTrigger = page.getByTestId('first-trigger');
 const SecondTrigger = page.getByTestId('second-trigger');
 const Last = page.getByTestId('last');
 const Calls = page.getByTestId('calls');
 const Order = page.getByTestId('order');
-// Find-in-page turned off.
 const TermsContent = page.getByTestId('terms-content');
-// Two accordions sharing section values on purpose.
 const LeftOneTrigger = page.getByTestId('left-one-trigger');
 const LeftOneContent = page.getByTestId('left-one-content');
 const LeftTwoTrigger = page.getByTestId('left-two-trigger');
@@ -79,7 +70,6 @@ function expectOpen(trigger: Element, content: Element) {
 	expect(content.hasAttribute('hidden')).toBe(false);
 }
 
-/** Which sections say they are showing, read off the sections themselves. */
 function openValues() {
 	return Array.from(document.querySelectorAll('[ui-open][ui-value]'))
 		.map((section) => section.getAttribute('ui-value') ?? '')
@@ -93,13 +83,9 @@ for (const mode of MODES) {
 
 		expectClosed(el(ShippingTrigger), el(ShippingContent));
 		expectClosed(el(ReturnsTrigger), el(ReturnsContent));
-		// The three-valued `hidden`: closed, but the browser's find-in-page may
-		// still reach the text and reveal it.
 		expect(el(ShippingContent).getAttribute('hidden')).toBe('until-found');
-		// Closed hides the panel, it never detaches it.
 		expect(document.contains(el(ShippingContent))).toBe(true);
 		expect(el(ShippingContent).textContent).toContain('two working days');
-		// Open and closed are flags on every part, so a stylesheet can reach them.
 		expect(el(ShippingItem).getAttribute('ui-closed')).toBe('');
 		expect(el(ShippingItem).hasAttribute('ui-open')).toBe(false);
 		expect(el(Root).hasAttribute('ui-multiple')).toBe(false);
@@ -110,8 +96,6 @@ for (const mode of MODES) {
 		else await renderSSR(Basic);
 
 		expect(el(ShippingTrigger).getAttribute('type')).toBe('button');
-		// The cross-part IDREFs, both minted inside the section: the trigger points
-		// at the panel, and the panel is named by the heading the trigger sits in.
 		expect(el(ShippingContent).id).toBeTruthy();
 		expect(el(ShippingTrigger).getAttribute('aria-controls')).toBe(el(ShippingContent).id);
 		expect(el(ShippingContent).getAttribute('role')).toBe('region');
@@ -158,8 +142,6 @@ for (const mode of MODES) {
 		await expect.poll(() => document.activeElement).toBe(el(ReturnsTrigger));
 		await userEvent.keyboard('{ArrowDown}');
 		await expect.poll(() => document.activeElement).toBe(el(SizingTrigger));
-		// The end comes round: Qwik UI's accordion walks with a wrap and has no
-		// prop to say otherwise.
 		await userEvent.keyboard('{ArrowDown}');
 		await expect.poll(() => document.activeElement).toBe(el(ShippingTrigger));
 		await userEvent.keyboard('{ArrowUp}');
@@ -310,9 +292,7 @@ for (const mode of MODES) {
 
 	// `hidden="until-found"` is not a weaker `hidden`: the browser's own UA rule
 	// gives it `content-visibility: hidden`, which is what keeps the panel out of
-	// layout and out of the accessibility tree until find-in-page reveals it. The
-	// row exists because the whole spelling is worthless if a browser ships the
-	// attribute without the rule.
+	// layout and out of the accessibility tree until find-in-page reveals it.
 	test(`${mode}: a closed panel is hidden from layout, not merely marked`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);

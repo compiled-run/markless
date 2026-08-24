@@ -58,11 +58,9 @@ test('a finished job conveys a full bar', async () => {
 test('a bar with its own range conveys the value as a proportion of that range', async () => {
 	await open(CustomRange);
 	const first = await readUntil(sr, { role: 'progressbar' });
-	// value 20 of max 25 - four fifths of the way, not "20%".
 	expect(first, `${sr.name} announced "${first}"`).toContain('80%');
 	await sr.next();
 	const second = await readUntil(sr, { role: 'progressbar' });
-	// value 5000 in the range 2000-10000 - three eighths of the way.
 	expect(second, `${sr.name} announced "${second}"`).toContain('38%');
 });
 

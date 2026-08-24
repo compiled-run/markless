@@ -1,8 +1,6 @@
 import { state } from '@markless/core';
 import { modal } from '../../index.ts';
 
-// A dialog that passes no onChange at all. It still opens and closes; the count
-// beside it proves nothing was called.
 export default function WithoutOnChange() @{
 	const log = state({ calls: 0 });
 

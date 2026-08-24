@@ -458,7 +458,8 @@ for (const mode of MODES) {
 	});
 
 	// Expected red: a spread never overwrites an attribute written before it, so
-	// `<nav aria-label="Pagination" {...rest}>` keeps the family's label even when
+	// `.
+<nav aria-label="Pagination" {...rest}>` keeps the family's label even when
 	// `rest` carries the consumer's. The family keeps that order because it is what
 	// stops a consumer overwriting aria-current and disabled; what it cannot yet
 	// offer is a REPLACEABLE default, which a second pagination on a page needs.

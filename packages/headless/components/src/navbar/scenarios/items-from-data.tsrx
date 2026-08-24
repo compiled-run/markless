@@ -4,7 +4,8 @@ import { navbar } from '../../index.ts';
 // What a real site header looks like: the entries are data, and the items come
 // from a keyed loop over them.
 //
-// The `<div>` around the loop is load-bearing, not decoration: a construct
+// The `.
+<div>` around the loop is load-bearing, not decoration: a construct
 // cannot open directly inside a component tag's children, so the loop needs an
 // intrinsic element to open in.
 export default function ItemsFromData() @{

@@ -27,7 +27,6 @@ const Order = page.getByTestId('order');
 const Confirm = page.getByTestId('confirm');
 const Opener = page.getByTestId('opener');
 const Closer = page.getByTestId('closer');
-// The nested pair.
 const OuterTrigger = page.getByTestId('outer-trigger');
 const OuterTitle = page.getByTestId('outer-title');
 const OuterBackdrop = page.getByTestId('outer-backdrop');
@@ -36,20 +35,17 @@ const OuterClose = page.getByTestId('outer-close');
 const InnerTrigger = page.getByTestId('inner-trigger');
 const InnerBackdrop = page.getByTestId('inner-backdrop');
 const InnerClose = page.getByTestId('inner-close');
-// The pair with consumer handlers.
 const FirstTrigger = page.getByTestId('first-trigger');
 const FirstBackdrop = page.getByTestId('first-backdrop');
 const FirstClose = page.getByTestId('first-close');
 const FirstValue = page.getByTestId('first-value');
 const SecondTrigger = page.getByTestId('second-trigger');
 const SecondValue = page.getByTestId('second-value');
-// The disabled pair.
 const StuckTrigger = page.getByTestId('stuck-trigger');
 const StuckBackdrop = page.getByTestId('stuck-backdrop');
 const OpenTrigger = page.getByTestId('open-trigger');
 const OpenBackdrop = page.getByTestId('open-backdrop');
 const OpenClose = page.getByTestId('open-close');
-// The form pair.
 const FormTrigger = page.getByTestId('form-trigger');
 const FormBackdrop = page.getByTestId('form-backdrop');
 const FormSubmit = page.getByTestId('form-submit');
@@ -98,7 +94,6 @@ function expectClosed(backdrop: HTMLElement, content: HTMLElement) {
 	expect(backdrop.hasAttribute('hidden')).toBe(true);
 	expect(backdrop.getAttribute('ui-closed')).toBe('');
 	expect(content.getAttribute('ui-closed')).toBe('');
-	// The surface is hidden with the layer, never detached.
 	expect(document.contains(content)).toBe(true);
 }
 
@@ -134,7 +129,6 @@ async function closeBasic() {
 	await expect.poll(() => el(Backdrop).hasAttribute('hidden')).toBe(true);
 }
 
-/** A whole primary-button gesture, which is what a dismissal is made of. */
 function press(target: HTMLElement, button = 0) {
 	target.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button }));
 	target.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button }));
@@ -146,14 +140,11 @@ function expectBasicRendered() {
 	const content = el<HTMLElement>(Content);
 	expectClosed(backdrop, content);
 	expect(content.getAttribute('role')).toBe('dialog');
-	// The surface itself is a focus target, which is where an opening dialog lands.
 	expect(content.getAttribute('tabindex')).toBe('-1');
 	expect(el(Trigger).getAttribute('type')).toBe('button');
 	expect(el(Trigger).getAttribute('aria-haspopup')).toBe('dialog');
-	// Base UI's conformance suite asserts both of these on a dialog trigger.
 	expect(el(Trigger).getAttribute('aria-expanded')).toBe('false');
 	expect(el(Trigger).getAttribute('aria-controls')).toBe(content.id);
-	// The cross-part IDREF: the handle is bound on the title and read on the content.
 	expect(el(Title).id).toBeTruthy();
 	expect(content.getAttribute('aria-labelledby')).toBe(el(Title).id);
 	expect(content.textContent).toContain('Edit delivery address');
@@ -175,15 +166,12 @@ function expectDescribedRendered() {
  * A dialog with no title and no description still carries both references, and
  * neither resolves.
  *
- * This is the family's one accepted regression against QDS, which emits each
- * reference only when its naming part mounted. `aria-labelledby={titled ?
- * titleEl : undefined}` is refused at compile time -
+ * `aria-labelledby={titled ? titleEl : undefined}` is refused at compile time -
  * MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE - because an IDREF position takes a
  * bare element() handle and nothing else, so the choice is "always" or "never",
- * and "never" would lose the dialog's name. The accessible-name computation
- * treats a reference that resolves to nothing as absent, so this costs untidy
- * markup rather than a wrong announcement. The row exists to fail the day the
- * compiler can express the condition.
+ * and "never" would lose the dialog's name. A reference that resolves to
+ * nothing counts as absent for the accessible-name computation. The row fails
+ * the day the compiler can express the condition.
  */
 function expectUnnamedCarriesUnresolvedReferences() {
 	const content = el<HTMLElement>(Content);
@@ -204,9 +192,7 @@ async function expectTriggerOpensAndCloseButtonCloses() {
 	expectBackgroundOutOfReach(el(Background));
 	expect(el(Root).getAttribute('ui-open')).toBe('');
 	expect(el(Trigger).getAttribute('aria-expanded')).toBe('true');
-	// Focus went into the dialog, which is what the APG asks of an opening dialog.
 	await expect.poll(() => el(Content).contains(document.activeElement)).toBe(true);
-	// The page behind stops scrolling while the dialog is showing.
 	expect(document.body.style.overflow).toBe('hidden');
 
 	await closeBasic();
@@ -230,7 +216,6 @@ async function expectEscapeCloses() {
 }
 
 async function expectConsumerCallbackFires() {
-	// Nothing fired on mount, first render or resume.
 	expect(el(Calls).textContent).toBe('0');
 	expect(el(FirstValue).textContent).toBe('');
 	expect(el(Order).textContent).toBe('');
@@ -308,7 +293,6 @@ for (const mode of MODES) {
 	});
 }
 
-// --- modality -------------------------------------------------------------
 
 test('CSR: the page behind an open dialog cannot be reached', async () => {
 	await render(Basic);
@@ -337,13 +321,8 @@ test('CSR: the surface stays in the page across open and close', async () => {
 	expect(document.contains(content)).toBe(true);
 });
 
-// --- dismissal ------------------------------------------------------------
 
 /**
- * Base UI's `ignores a native click whose pointerdown opened the dialog`, which
- * their suite calls out as the highest-value case: the classic open-then-
- * instantly-close defect.
- *
  * Two things stop it here, and the row proves the pair rather than either alone.
  * The behaviour only listens while something is enlisted, and the opening press
  * lands before the layer is on the stack; and the family's own layer press has
@@ -355,7 +334,6 @@ test('CSR: the gesture that opens the dialog does not immediately close it', asy
 	press(el<HTMLElement>(Trigger));
 	await expect.poll(() => el(Backdrop).hasAttribute('hidden')).toBe(false);
 
-	// Still showing after the gesture has fully played out.
 	expect(el(Backdrop).hasAttribute('hidden')).toBe(false);
 	expectShowing(el<HTMLElement>(Backdrop), el<HTMLElement>(Content));
 
@@ -370,7 +348,6 @@ test('CSR: a press on the backdrop is not a dismissal until the release lands th
 	await openBasic();
 
 	el(Backdrop).dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }));
-	// The press alone leaves it showing: a drag out of the dialog is not a dismissal.
 	expect(el(Backdrop).hasAttribute('hidden')).toBe(false);
 	expectShowing(el<HTMLElement>(Backdrop), el<HTMLElement>(Content));
 
@@ -393,8 +370,6 @@ test('CSR: a press inside the surface never dismisses', async () => {
 	await render(Basic);
 	await openBasic();
 
-	// The press lands on a control inside the dialog, so it is neither an outside
-	// press for the behaviour nor a layer press for the family.
 	press(el<HTMLElement>(Save));
 	expect(el(Backdrop).hasAttribute('hidden')).toBe(false);
 
@@ -456,7 +431,6 @@ test('CSR: a click on the close button while the dialog is closed changes nothin
 	expect(el(FirstBackdrop).hasAttribute('hidden')).toBe(true);
 });
 
-// --- alert ----------------------------------------------------------------
 
 test('CSR: an alert announces as alertdialog and refuses an outside press', async () => {
 	await render(Alert);
@@ -464,21 +438,17 @@ test('CSR: an alert announces as alertdialog and refuses an outside press', asyn
 
 	el(Trigger).click();
 	await expect.poll(() => el(Backdrop).hasAttribute('hidden')).toBe(false);
-	// Opening an alert prefers its cancel control over the surface itself.
 	await expect.poll(() => document.activeElement).toBe(el(Close));
 
 	press(el<HTMLElement>(Backdrop));
 	expect(el(Backdrop).hasAttribute('hidden')).toBe(false);
-	// Refusing the press leaves it fully modal, not merely visible.
 	expectShowing(el<HTMLElement>(Backdrop), el<HTMLElement>(Content));
 	expectBackgroundOutOfReach(el(Background));
 	expect(document.body.style.overflow).toBe('hidden');
 
-	// A press reported from beyond the layer is refused on the same grounds.
 	el(Background).dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
 	expect(el(Backdrop).hasAttribute('hidden')).toBe(false);
 
-	// Escape still closes it, which is the one dismissal an alert answers.
 	await userEvent.keyboard('{Escape}');
 	await expect.poll(() => el(Backdrop).hasAttribute('hidden')).toBe(true);
 	expectBackgroundReachable(el(Background));
@@ -496,7 +466,6 @@ test('CSR: an alert still opens and closes from its own controls', async () => {
 	await expect.poll(() => document.activeElement).toBe(el(Trigger));
 });
 
-// --- nesting --------------------------------------------------------------
 
 test('CSR: Escape closes only the dialog on top', async () => {
 	await render(Nested);
@@ -504,7 +473,6 @@ test('CSR: Escape closes only the dialog on top', async () => {
 
 	await userEvent.keyboard('{Escape}');
 	await expect.poll(() => el(InnerBackdrop).hasAttribute('hidden')).toBe(true);
-	// The one underneath is still showing and still modal.
 	expect(el(OuterBackdrop).hasAttribute('hidden')).toBe(false);
 	expect(el(OuterContent).getAttribute('aria-modal')).toBe('true');
 	// And the background the first dialog hid is still hidden, because the marks
@@ -522,7 +490,6 @@ test('CSR: one outside press closes exactly one level of the stack', async () =>
 
 	press(el<HTMLElement>(InnerBackdrop));
 	await expect.poll(() => el(InnerBackdrop).hasAttribute('hidden')).toBe(true);
-	// Unwinding is one level per press: the dialog underneath is untouched.
 	expect(el(OuterBackdrop).hasAttribute('hidden')).toBe(false);
 	expectBackgroundOutOfReach(el(Background));
 
@@ -535,7 +502,6 @@ test('CSR: opening a second dialog from inside the first does not dismiss the fi
 	await render(Nested);
 	await openNestedPair();
 
-	// The press that opened the second dialog landed inside the first, so nothing
 	// about it reads as a dismissal of the first.
 	expect(el(OuterBackdrop).hasAttribute('hidden')).toBe(false);
 	expect(el(InnerBackdrop).hasAttribute('hidden')).toBe(false);
@@ -604,7 +570,8 @@ test('CSR: a display-contents wrapper breaks neither the opening focus nor the t
 
 	el(WrapTrigger).click();
 	await expect.poll(() => el(WrapBackdrop).hasAttribute('hidden')).toBe(false);
-	// A consumer's `<form style="display: contents">` between the layer and the
+	// A consumer's `.
+<form style="display: contents">` between the layer and the
 	// surface changes the box tree but must not change where focus lands.
 	await expect.poll(() => el(WrapContent).contains(document.activeElement)).toBe(true);
 
@@ -659,7 +626,7 @@ test('CSR: flipping the consumer open state shows the surface and marks the back
 	await render(Controlled);
 	expect(el(Backdrop).hasAttribute('hidden')).toBe(true);
 
-	// No trigger part in this scenario at all: the ruling allows one
+	// No trigger part in this scenario at all: at most one
 	// `modal.trigger` per root, so every other opener is the consumer's own state.
 	el(Opener).click();
 	await expect.poll(() => el(Backdrop).hasAttribute('hidden')).toBe(false);

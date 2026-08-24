@@ -1,8 +1,5 @@
 import { collapsible } from '../../index.ts';
 
-// A parking FAQ, the shape the accessibility test plans use: several questions in
-// a list, one of them already open on load. Each question is its own widget, so
-// opening one leaves the others exactly where they were.
 export default function Faq() @{
 	<ul>
 		<li>

@@ -4,8 +4,6 @@ import { readCheckboxTranscript } from './checkbox-transcript.ts';
 import { realDriver } from '../../test-support/page-driver.ts';
 import { nvdaSpec } from '../../test-support/vocabularies.ts';
 
-// Real NVDA reading the served gallery. The expectations are the shared ones in
-// checkbox-transcript.ts; the only thing this file decides is which reader.
 nvdaTest('NVDA conveys the checkbox family and follows it through a toggle', async ({
 	page,
 	nvda,

@@ -18,7 +18,7 @@ import WithOnChange from './scenarios/with-onchange.tsrx';
 //
 // The family is a DISCLOSURE, not a menubar, and the row that asserts no
 // `menu`/`menubar` role anywhere is the single most important accessibility
-// assertion here. See goals/headless-components/notes/research-navbar.md §1.
+// assertion here.
 const Root = page.getByTestId('root');
 const HomeItemLink = page.getByTestId('home-itemlink');
 const ProductsItem = page.getByTestId('products-item');
@@ -504,7 +504,8 @@ test('CSR: with two entries on the page a dismissal reaches the one that is show
 	expect(el(ProductsContent).hasAttribute('hidden')).toBe(true);
 });
 
-// A native <button> already activates on both, so these two rows prove the
+// A native.
+ <button> already activates on both, so these two rows prove the
 // family does not get in the way rather than that it implements anything.
 test('CSR: enter on a focused trigger opens its dropdown', async () => {
 	await render(Basic);
@@ -692,7 +693,7 @@ test('CSR: a right click on the trigger leaves a hover-opened dropdown showing',
 // The row the navbar research flagged as the family's one genuinely new
 // framework requirement: no family shipped before this one schedules a callback,
 // and nothing proved a pending timer survives - or is correctly abandoned across
-// - an SSR resume. It is green, and note.md records the shape that made it so.
+// - an SSR resume.
 test('SSR: a pointer resting on an entry after resume opens it after the delay', async () => {
 	await renderSSR(HoverTiming);
 	await userEvent.hover(el(ProductsTrigger));

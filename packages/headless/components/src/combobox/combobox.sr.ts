@@ -87,7 +87,8 @@ function expectConveys(phrase: string, facts: readonly string[]) {
 }
 
 // Move the reading cursor forward until an announcement conveys everything asked
-// for, and return it. Throws with the transcript so far when it does not, because
+// for, and.
+ return it. Throws with the transcript so far when it does not, because
 // a walk that never arrives is the same defect as a wrong phrase.
 async function readFor(facts: readonly string[], limit = 40): Promise<string> {
 	const seen: string[] = [];
@@ -165,7 +166,8 @@ test('an inline combobox conveys a named listbox', async () => {
 // `aria-expanded="false"` and an implicit popup, so the state is computed from
 // the role rather than from anything authored. The only way out is to stop being
 // a combobox, which the authoring practices' own pattern forbids. Qwik UI's
-// inline mode has the identical announcement. Deterministic, so test.fails.
+// inline mode has the identical announcement. Deterministic, so.
+ test.fails.
 test.fails('an inline combobox claims no expanded state', async () => {
 	await open(Inline);
 	const entering = await readFor([say.combobox]);
@@ -181,7 +183,8 @@ test('an invalid combobox conveys its message', async () => {
 	expectConveys(await readFor(['Pick a fruit that exists.']), ['Pick a fruit that exists.']);
 });
 
-// The hidden native control. A bare `<select>` carries the combobox role
+// The hidden native control. A bare `.
+<select>` carries the combobox role
 // natively, so a form-participating combobox that failed to hide it would put
 // the same choice in the tree twice. `aria-hidden` plus `tabindex="-1"` is what
 // makes the correct expected result silence, and this row proves it by counting:
@@ -205,8 +208,8 @@ test('the hidden native control is never announced beside the real combobox', as
 // compiler leaves it out of IDREF_ATTRIBUTES deliberately (see
 // packages/compiler/src/passes/semantic-graph/idref-attributes.ts). Until it
 // lands, the highlight is visible and inaudible - and this row is what says so
-// out loud rather than the file staying silent about it. Deterministic, so
-// test.fails.
+// out loud rather than the file staying silent about it. Deterministic, so.
+ test.fails.
 test.fails('arrowing announces the option the highlight moved to', async () => {
 	await open(OpenList);
 	await readFor([say.combobox]);

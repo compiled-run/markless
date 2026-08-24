@@ -41,8 +41,7 @@ async function open(component: Parameters<typeof render>[0]) {
  *    miss a poll deadline it otherwise meets.
  * 2. Every tick throws `ReferenceError: Invalid left-hand side in assignment` out of
  *    the compiled interval callback (`carousel.tsrx:symbol:11`). That is the
- *    mechanism of defect 79 - note.md "Open reds" 3 records the symptom, that the
- *    tick's write never reaches the DOM, without naming the throw. Vitest counts
+ *    mechanism behind the tick write never reaching the DOM. Vitest counts
  *    those as unhandled errors and fails the run on them even with every row green,
  *    so a row that lets a tick fire turns the lane red without failing an assertion.
  *
@@ -113,7 +112,7 @@ test('entering the carousel conveys that it is a carousel', async () => {
 // Sequence A, step 2. Expected red, and the family's biggest accessibility debt:
 // `carousel.root` wires no `aria-labelledby` to `carousel.title`, because the root
 // cannot read a handle from the factory it roots in an IDREF position
-// (MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT - note.md "Deviations" 4). Measured on
+// (MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT). Measured on
 // this scenario: the root carries `aria-label=null` and `aria-labelledby=null`, and
 // the title is announced as a separate text item further down instead of as the
 // carousel's name. A page with two carousels therefore offers two identical
@@ -129,7 +128,7 @@ test.fails('a titled carousel is named by its title', async () => {
 
 // Sequence B: no title part. The APG says a carousel's name must not contain the
 // word carousel and `aria-roledescription` already says it, so an unnamed carousel
-// gets no name rather than a bad one (note.md "Deviations" 5). This row is what
+// gets no name rather than a bad one. This row is what
 // catches QDS's `aria-label="content slideshow"` fallback: with it a reader says
 // "content slideshow, carousel", the doubled-role wording research §2.2 rejects.
 test('an untitled carousel conveys the carousel and no invented name', async () => {
@@ -153,7 +152,7 @@ test('arriving on a slide conveys that it is a slide', async () => {
 // Sequence C, step 1. Expected red: QDS names every slide "{n} of {total}", which is
 // the position semantics a person needs to know where they are in the set and how far
 // it goes. Both halves need a per-part ordinal and a sibling count at render, and
-// neither capability has landed (note.md "Deviations" 2), so `carousel.item` writes no
+// neither capability has landed, so `carousel.item` writes no
 // `aria-label` at all. Measured: the slide's phrase is the role word alone and the
 // slide's text content is announced as a separate item. Whoever lands render-time
 // ordinals deletes the `.fails`.
@@ -251,8 +250,8 @@ test('the rotation control is never conveyed as a pressed toggle', async () => {
 //
 // What this row pins instead is the STATIC wiring the announcement depends on: the
 // root is a polite live region while nothing is rotating, so a step a person made is
-// spoken to them. The tick that would fill that region during autoplay is defect 79
-// (note.md "Open reds" 3) and is deliberately not asserted here. When a real-reader
+// spoken to them. The tick that would fill that region during autoplay does not run
+// and is deliberately not asserted here. When a real-reader
 // lane runs, this row is replaced by the announcement itself.
 test('the root is a polite live region while nothing is rotating', async () => {
 	const container = await open(Basic);

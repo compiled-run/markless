@@ -1,9 +1,5 @@
 import { modal } from '../../index.ts';
 
-// A dialog that opens a second dialog. aria-at's own modal fixture is nested, so
-// this is the reference-backed shape: Escape has to close only the one on top,
-// the first has to be unreachable while the second is showing, and closing the
-// second has to put focus back on the button inside the first that opened it.
 export default function Nested() @{
 	<section>
 		<button type="button" data-testid="background">Background</button>

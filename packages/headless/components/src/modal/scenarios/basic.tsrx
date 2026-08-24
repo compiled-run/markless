@@ -1,9 +1,5 @@
 import { modal } from '../../index.ts';
 
-// The starter a consumer copies: a button that opens a named dialog, and a
-// button inside it that closes it again. The page button outside the dialog is
-// what the background-modality rows reach for - it has to become unreachable
-// while the dialog is showing and reachable again after it closes.
 export default function Basic() @{
 	<section>
 		<button type="button" data-testid="background">Background</button>

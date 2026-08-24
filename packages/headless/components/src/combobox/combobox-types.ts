@@ -3,8 +3,7 @@ import type { PropsOf, Seeded } from '@markless/core';
 /**
  * A combobox is a text field with a list attached. It is NOT a select: DOM focus
  * never leaves the input, the highlighted option is family state rather than the
- * focused element, and printable keys belong to the field. `note.md` carries the
- * whole "why this is not select" argument.
+ * focused element, and printable keys belong to the field.
  *
  * The root holds the family's configuration and renders `role="group"`, exactly
  * as Qwik UI's `HComboboxRootImpl` does.
@@ -31,8 +30,8 @@ export type ComboboxRootProps = Omit<PropsOf<'div'>, 'onChange' | 'onInput'> & {
 	readonly loop?: boolean;
 	/**
 	 * The list is part of the page rather than a popup: it is always showing, and
-	 * nothing dismisses it. Spelled as a native-style boolean attribute per the
-	 * owner's ruling, never as a mode enum.
+	 * nothing dismisses it. Spelled as a native-style boolean attribute,
+	 * never as a mode enum.
 	 */
 	readonly inline?: boolean;
 	/** Submitted under this name by `combobox.field`. */

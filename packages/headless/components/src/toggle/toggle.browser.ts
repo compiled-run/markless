@@ -20,18 +20,15 @@ const ToggleError = page.getByTestId('error');
 const HiddenInput = page.getByTestId('field');
 const SubmitButton = page.getByTestId('submit');
 const Submitted = page.getByTestId('submitted');
-// The settings list: emails starts off, digest starts on.
 const EmailsRoot = page.getByTestId('emails-root');
 const EmailsTrigger = page.getByTestId('emails-trigger');
 const EmailsLabel = page.getByTestId('emails-label');
 const DigestRoot = page.getByTestId('digest-root');
 const DigestTrigger = page.getByTestId('digest-trigger');
 const DigestLabel = page.getByTestId('digest-label');
-// Switches nobody may change.
 const OffRoot = page.getByTestId('off-root');
 const OffTrigger = page.getByTestId('off-trigger');
 const OnRoot = page.getByTestId('on-root');
-// The consumer-handler example: first starts off, second starts on, locked is disabled.
 const FirstTrigger = page.getByTestId('first-trigger');
 const FirstValue = page.getByTestId('first-value');
 const SecondTrigger = page.getByTestId('second-trigger');
@@ -73,7 +70,6 @@ function expectSettingsRendered() {
 	expect(el(EmailsRoot).hasAttribute('ui-checked')).toBe(false);
 	expect(el(DigestTrigger).getAttribute('aria-checked')).toBe('true');
 	expect(el(DigestRoot).getAttribute('ui-checked')).toBe('');
-	// Each switch mints its own trigger id, so a label names exactly one.
 	expect(el(EmailsLabel).getAttribute('for')).not.toBe(el(DigestLabel).getAttribute('for'));
 }
 
@@ -82,7 +78,6 @@ async function expectClickFlips() {
 	await expect.poll(() => el(EmailsTrigger).getAttribute('aria-checked')).toBe('true');
 	expect(el(EmailsRoot).getAttribute('ui-checked')).toBe('');
 	expect(el(EmailsTrigger).getAttribute('ui-checked')).toBe('');
-	// The click landed in one family only: the neighbour kept its own value.
 	expect(el(DigestTrigger).getAttribute('aria-checked')).toBe('true');
 
 	el(EmailsTrigger).click();
@@ -91,7 +86,8 @@ async function expectClickFlips() {
 	expect(el(DigestTrigger).getAttribute('aria-checked')).toBe('true');
 }
 
-// `<toggle.root checked>` seeds this switch on, and the server carries that seed in
+// `.
+<toggle.root checked>` seeds this switch on, and the server carries that seed in
 // the payload, so a resumed instance holds `true` and the first click reaches false.
 async function expectCheckedFlipsOff() {
 	el(DigestTrigger).click();
@@ -105,7 +101,6 @@ function expectDisabledRendered() {
 	expect(el<HTMLButtonElement>(OffTrigger).disabled).toBe(true);
 	expect(el(OffTrigger).getAttribute('aria-checked')).toBe('false');
 	expect(el(OffRoot).getAttribute('ui-disabled')).toBe('');
-	// Both flags at once on the switch that is on and locked.
 	expect(el(OnRoot).getAttribute('ui-checked')).toBe('');
 	expect(el(OnRoot).getAttribute('ui-disabled')).toBe('');
 }
@@ -122,9 +117,7 @@ function expectNotificationsFieldRendered() {
 	expect(el(HiddenInput).getAttribute('value')).toBe('on');
 	expect(el(HiddenInput).hasAttribute('checked')).toBe(false);
 	expect(el(HiddenInput).hasAttribute('required')).toBe(false);
-	// Present for a form and for assistive tech, absent from sight.
 	expect(getComputedStyle(el(HiddenInput).parentElement as Element).position).toBe('absolute');
-	// The library ships no class name a consumer stylesheet could collide with.
 	expect((el(HiddenInput).parentElement as Element).hasAttribute('class')).toBe(false);
 	expect(el(SubmitButton).getAttribute('type')).toBe('submit');
 }
@@ -139,7 +132,6 @@ function expectSavedFieldRendered() {
 function expectHelpRendered() {
 	expect(el(Description).textContent).toBe('(Receive notifications about important updates)');
 	expect(el(Trigger).getAttribute('aria-invalid')).toBe('false');
-	// The help text is the switch's description, by a minted id nobody spelled.
 	expect(el(Trigger).getAttribute('aria-describedby')).toBe(el(Description).id);
 	expect(el(Description).id).toBeTruthy();
 }
@@ -149,28 +141,23 @@ function expectInvalidRendered() {
 	// Seeding completes before any part renders, so the error part's
 	// `toggle.invalid = true` is what the trigger reads.
 	expect(el(Trigger).getAttribute('aria-invalid')).toBe('true');
-	// An invalid switch says why: the error is its description.
 	expect(el(Trigger).getAttribute('aria-describedby')).toBe(el(ToggleError).id);
 	expect(el(ToggleError).id).toBeTruthy();
 }
 
 async function expectConsumerCallbackFires() {
-	// Nothing fired on mount, first render or resume.
 	expect(el(Calls).textContent).toBe('0');
 	expect(el(FirstValue).textContent).toBe('');
 
 	el(FirstTrigger).click();
 	await expect.poll(() => el(FirstValue).textContent).toBe('true');
-	// Called once, with the next value, and the switch moved with it.
 	await expect.poll(() => el(Calls).textContent).toBe('1');
 	expect(el(FirstTrigger).getAttribute('aria-checked')).toBe('true');
-	// The siblings' handlers did not run.
 	expect(el(SecondValue).textContent).toBe('');
 	expect(el(LockedValue).textContent).toBe('');
 }
 
 async function expectEachInstanceReachesItsOwnHandler() {
-	// The switch that starts on reports the value it flips to, not the one it left.
 	el(SecondTrigger).click();
 	await expect.poll(() => el(SecondValue).textContent).toBe('false');
 	await expect.poll(() => el(Calls).textContent).toBe('1');
@@ -179,13 +166,11 @@ async function expectEachInstanceReachesItsOwnHandler() {
 	el(FirstTrigger).click();
 	await expect.poll(() => el(FirstValue).textContent).toBe('true');
 	await expect.poll(() => el(Calls).textContent).toBe('2');
-	// Each click reached only its own consumer handler.
 	expect(el(SecondValue).textContent).toBe('false');
 }
 
 async function expectDisabledCallbackStaysSilent() {
 	el(LockedTrigger).click();
-	// A disabled trigger neither flips nor reaches the handler the consumer passed.
 	await expect.poll(() => el(LockedTrigger).getAttribute('aria-checked')).toBe('false');
 	expect(el(LockedValue).textContent).toBe('');
 	expect(el(Calls).textContent).toBe('0');
@@ -302,8 +287,6 @@ test('CSR: clicking the label flips the switch it names', async () => {
 	await expect.poll(() => el(Trigger).getAttribute('aria-checked')).toBe('false');
 });
 
-// --- keyboard -------------------------------------------------------------
-//
 // A switch activates on Space and on Enter, which is exactly what a native
 // button already does, so the trigger carries no keyboard rule of its own.
 
@@ -331,7 +314,6 @@ test('CSR: Enter on the focused trigger flips the switch', async () => {
 test('CSR: a disabled trigger ignores Space and Enter', async () => {
 	await render(UnavailableOptions);
 	el(OffTrigger).focus();
-	// A disabled button cannot take focus, so a key press cannot reach it.
 	expect(document.activeElement).not.toBe(el(OffTrigger));
 	await userEvent.keyboard(' ');
 	await userEvent.keyboard('{Enter}');
@@ -366,7 +348,6 @@ test('CSR: Enter on the focused trigger calls the consumer onChange', async () =
 test('CSR: Space and Enter on a disabled switch never call the consumer onChange', async () => {
 	await render(WithOnChange);
 	el(LockedTrigger).focus();
-	// A disabled button cannot take focus, so a key press cannot reach it.
 	expect(document.activeElement).not.toBe(el(LockedTrigger));
 	await userEvent.keyboard(' ');
 	await userEvent.keyboard('{Enter}');
@@ -380,7 +361,6 @@ test('CSR: clicking the trigger syncs the hidden field and what the form submits
 
 	el(Trigger).click();
 	await expect.poll(() => el<HTMLInputElement>(HiddenInput).checked).toBe(true);
-	// A switch with no value of its own submits the browser default "on".
 	await expect.poll(() => submit().textContent).toBe('{"notifications":"on"}');
 
 	el(Trigger).click();
@@ -388,8 +368,6 @@ test('CSR: clicking the trigger syncs the hidden field and what the form submits
 	await expect.poll(() => submit().textContent).toBe('{}');
 });
 
-// --- why the Submit button is never clicked ------------------------------
-//
 // A real click on Submit navigates the harness iframe and kills the run, because a
 // consumer's handler runs after dispatch returns and its `event.preventDefault()`
 // lands once the browser has already committed the navigation. This row pins that

@@ -9,7 +9,8 @@ import type {
 	NavbarRootProps,
 } from './navbar-types.ts';
 
-// A `<nav>` landmark holding buttons that show and hide panels. It is a
+// A `.
+<nav>` landmark holding buttons that show and hide panels. It is a
 // DISCLOSURE, not a menubar - see navbar-types.ts.
 //
 // Which dropdown is showing lives on the ROOT, named by the item's `value`, not
@@ -26,7 +27,8 @@ export const navbarState = shared(
 
 		return {
 			...navbar,
-			// literal function type: a callback slot is only recognised from the written annotation
+			// literal.
+ function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
 			// `next = ''` rather than `next: string`. A shared method that dispatches is
 			// inlined into its caller, and the capture analysis then parses that handler
@@ -104,7 +106,7 @@ export function NavbarRoot({
 	//
 	// Every walk below starts at `event.target` and climbs. A lazily loaded handler
 	// has no `currentTarget`, and an `element()` handle bound on a widget-rooting
-	// element reads back empty in a handler - measured on this tip, see note.md.
+	// element reads back empty in a handler - measured on this tip.
 	<nav
 		{...rest}
 		ui-open={navbar.value !== ''}
@@ -162,7 +164,7 @@ export function NavbarRoot({
 			// DOM order is the navigation order. The walk needs the ordered collection
 			// of the navbar's top-level controls, and no primitive builds one today -
 			// pending capability: ordered item registration into an ancestor widget
-			// instance, see note.md.
+			// instance.
 			const walk = Array.from(
 				nav.querySelectorAll<HTMLElement>('a[href], button:not([disabled])'),
 			).filter((control) => control.closest('[ui-navbar-dropdown]') === null);
@@ -293,7 +295,8 @@ export function NavbarItemTrigger({
 	const item = navbarItemState();
 	const isOpen = computed(() => navbar.value === item.value);
 
-	// A native <button> already activates on Enter and on Space, so those two keys
+	// A native.
+ <button> already activates on Enter and on Space, so those two keys
 	// need no rule; ArrowDown is the authoring practices' optional "open and step
 	// inside". Escape is not here: the overlay primitive reports it as a `dismiss`
 	// on the panel, and `navbar.itemcontent` decides what it means.
@@ -419,8 +422,8 @@ export function NavbarItemContent({
 			// Where the press landed, which the report carries for `outside-press` and
 			// omits for Escape. `contains` rather than `===`: a consumer is free to put
 			// an icon or a span inside the trigger, and the press lands on that.
-			// The double cast is a stopgap on a type-service slip, not a DOM fact: see
-			// note.md, `pressTarget` is declared with the branded markup `Element`.
+			// The double cast is a stopgap on a type-service slip, not a DOM fact:
+			// `pressTarget` is declared with the branded markup `Element`.
 			const pressed = event.detail.pressTarget;
 			const onOwnTrigger = pressed !== undefined && back !== null && back.contains(pressed);
 			navbar.closeAll();
@@ -432,7 +435,8 @@ export function NavbarItemContent({
 			// though it falls inside `clickGrace`. The window still bounds the swallow,
 			// because the click that pairs with the press may never arrive.
 			if (onOwnTrigger) item.graceUntil = Date.now() + navbar.clickGrace;
-			// The primitive moves no focus, so the return is the family's to write:
+			// The primitive moves no focus, so the.
+ return is the family's to write:
 			// Escape from inside the entry has to land on the button that opened the
 			// panel, or a person is left standing on nothing. A dismissal that reached
 			// no focus of ours moves none.

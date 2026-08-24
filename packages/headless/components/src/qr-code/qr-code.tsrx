@@ -17,7 +17,8 @@ export const qrCodeState = shared(
 
 		return {
 			...qr,
-			// Encoding is a pure function of the two props, so it is a derive rather
+			// Encoding is a pure.
+ function of the two props, so it is a derive rather
 			// than a task over a copy: the server resolves it at render, and a later
 			// write to `value` re-derives it.
 			viewBox: computed(() => qrViewBox(qr.value, qr.recovery)),

@@ -1,7 +1,5 @@
 import { accordion } from '../../index.ts';
 
-// A whole accordion nobody may change. The section written open stays open and
-// the closed one stays closed, whatever anybody presses.
 export default function Locked() @{
 	<section>
 		<accordion.root disabled value="open-one" data-testid="root">

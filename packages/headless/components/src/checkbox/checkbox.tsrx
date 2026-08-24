@@ -28,7 +28,6 @@ export const checkboxState = shared(
 			triggerEl,
 			onChange: undefined as ((checked: boolean | 'mixed') => void) | undefined,
 			toggle() {
-				// mixed resolves to checked, like a native indeterminate box.
 				checkbox.checked = checkbox.checked !== true;
 				checkbox.onChange?.(checkbox.checked);
 			},

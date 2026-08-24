@@ -1,8 +1,6 @@
 import { state } from '@markless/core';
 import { collapsible } from '../../index.ts';
 
-// The same page with no `onChange` on the root. The panel still opens and
-// closes; the counter beside it stays at zero because nothing was ever called.
 export default function WithoutOnChange() @{
 	const log = state({ calls: 0 });
 

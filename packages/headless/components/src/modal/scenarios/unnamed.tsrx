@@ -1,8 +1,7 @@
 import { modal } from '../../index.ts';
 
-// A dialog with neither a title nor a description. The naming references are
-// still emitted and resolve to nothing, which is the family's one accepted
-// regression against QDS - see note.md.
+// With neither a title nor a description, the naming references are still
+// emitted and resolve to nothing.
 export default function Unnamed() @{
 	<section>
 		<button type="button" data-testid="background">Background</button>

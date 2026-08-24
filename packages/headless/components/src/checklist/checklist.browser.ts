@@ -1,8 +1,8 @@
-// The skipped rows in this file all rest on one open defect: A WIDGET CALLBACK
-// SLOT'S DISPATCH NEVER LEAVES THE WIDGET. `checkbox.toggle()` calls
+// The skipped rows in this file all rest on one open limitation: a widget callback
+// slot's dispatch never leaves the widget. `checkbox.toggle()` calls
 // `checkbox.onChange?.(next)`, which the consumer edge answers with
 // `checklist.setAll`, and on a real gesture no checklist symbol runs at all — so
-// nothing a person does to one part moves the group. See note.md.
+// nothing a person does to one part moves the group.
 import { render, renderSSR } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
@@ -20,7 +20,6 @@ const Label = page.getByTestId('label');
 const SelectAllTrigger = page.getByTestId('selectall-trigger');
 const SelectAllIndicator = page.getByTestId('selectall-indicator');
 const SelectAllField = page.getByTestId('selectall-field');
-// One condiment per part, the way a consumer names their own options.
 const Lettuce = page.getByTestId('lettuce');
 const LettuceTrigger = page.getByTestId('lettuce-trigger');
 const LettuceIndicator = page.getByTestId('lettuce-indicator');
@@ -30,26 +29,22 @@ const TomatoTrigger = page.getByTestId('tomato-trigger');
 const TomatoIndicator = page.getByTestId('tomato-indicator');
 const TomatoField = page.getByTestId('tomato-field');
 const MustardTrigger = page.getByTestId('mustard-trigger');
-// Options and groups nobody may change.
 const CaviarTrigger = page.getByTestId('caviar-trigger');
 const CaviarIndicator = page.getByTestId('caviar-indicator');
 const LockedRoot = page.getByTestId('locked-root');
 const LockedSelectAllTrigger = page.getByTestId('locked-selectall-trigger');
 const LockedMustardTrigger = page.getByTestId('locked-mustard-trigger');
 const LockedMustardIndicator = page.getByTestId('locked-mustard-indicator');
-// The group error, written after the items and before them.
 const AfterError = page.getByTestId('after-error');
 const AfterSelectAllTrigger = page.getByTestId('after-selectall-trigger');
 const BeforeError = page.getByTestId('before-error');
 const BeforeSelectAllTrigger = page.getByTestId('before-selectall-trigger');
-// Two lists on one page.
 const LeftSelectAllTrigger = page.getByTestId('left-selectall-trigger');
 const LeftLettuceIndicator = page.getByTestId('left-lettuce-indicator');
 const LeftTomatoIndicator = page.getByTestId('left-tomato-indicator');
 const RightSelectAllTrigger = page.getByTestId('right-selectall-trigger');
 const RightSourdoughIndicator = page.getByTestId('right-sourdough-indicator');
 const RightRyeIndicator = page.getByTestId('right-rye-indicator');
-// The consumer handler's log.
 const Value = page.getByTestId('value');
 const Calls = page.getByTestId('calls');
 const Submitted = page.getByTestId('submitted');
@@ -84,7 +79,6 @@ function expectBasicRendered() {
 	expect(el(Label).tagName).toBe('LABEL');
 	expect(el(Label).textContent).toBe('Sandwich Condiments');
 
-	// Nothing ticked: the select-all is off, not mixed.
 	expect(el(SelectAllTrigger).getAttribute('role')).toBe('checkbox');
 	expect(el(SelectAllTrigger).getAttribute('aria-checked')).toBe('false');
 	expect(el(Root).hasAttribute('ui-mixed')).toBe(false);
@@ -94,7 +88,6 @@ function expectBasicRendered() {
 		expect(el(trigger).getAttribute('role')).toBe('checkbox');
 		expect(el(trigger).getAttribute('aria-checked')).toBe('false');
 	}
-	// Every instance mints its own trigger id, so each label names exactly one.
 	expect(el(Label).getAttribute('for')).toBe(el(SelectAllTrigger).getAttribute('id'));
 	expect(el(LettuceLabel).getAttribute('for')).toBe(el(LettuceTrigger).getAttribute('id'));
 	expect(el(LettuceLabel).getAttribute('for')).not.toBe(el(Label).getAttribute('for'));
@@ -103,7 +96,6 @@ function expectBasicRendered() {
 // One element per part: every part this family ships renders exactly one piece of
 // markup, so a consumer's stylesheet and a screen reader see the tree they wrote.
 function expectOneElementPerPart() {
-	// Presence-only convention: an unchecked item carries no ui-checked attribute.
 	expect(el(Lettuce).hasAttribute('ui-checked')).toBe(false);
 	expect(el(Lettuce).children.length).toBe(2);
 	expect(el(Lettuce).children[0]).toBe(el(LettuceTrigger));
@@ -113,12 +105,10 @@ function expectOneElementPerPart() {
 }
 
 function expectPartialRendered() {
-	// Some but not all: the select-all reports the third state.
 	expect(el(SelectAllTrigger).getAttribute('aria-checked')).toBe('mixed');
 	expect(el(Root).getAttribute('ui-mixed')).toBe('');
 	expect(el(Root).hasAttribute('ui-checked')).toBe(false);
 
-	// Membership decides each item, and only the ticked one is on.
 	expect(el(TomatoTrigger).getAttribute('aria-checked')).toBe('true');
 	expect(el(TomatoIndicator).textContent).toBe('Checked');
 	expect(el(LettuceTrigger).getAttribute('aria-checked')).toBe('false');
@@ -136,12 +126,9 @@ function expectMixedSplitAcrossTriggerAndField() {
 }
 
 function expectDisabledRendered() {
-	// One locked option inside a group that is otherwise usable.
 	expect(el(CaviarTrigger).getAttribute('disabled')).toBe('');
 	expect(el(TomatoTrigger).hasAttribute('disabled')).toBe(false);
 
-	// A whole locked group: the root carries the flag, and so does every trigger,
-	// including the select-all's.
 	expect(el(LockedRoot).getAttribute('ui-disabled')).toBe('');
 	expect(el(LockedSelectAllTrigger).getAttribute('disabled')).toBe('');
 	expect(el(LockedMustardTrigger).getAttribute('disabled')).toBe('');
@@ -161,7 +148,6 @@ function expectGroupErrorRendered() {
 	// Every part of one instance seeds before any part renders, so an error part
 	// written after the items still marks the group's own trigger invalid.
 	expect(el(AfterSelectAllTrigger).getAttribute('aria-invalid')).toBe('true');
-	// The same error written BEFORE the items: document order does not decide.
 	expect(el(BeforeError).textContent).toBe('Pick at least one condiment');
 	expect(el(BeforeSelectAllTrigger).getAttribute('aria-invalid')).toBe('true');
 }
@@ -169,7 +155,6 @@ function expectGroupErrorRendered() {
 function expectFormConfigRendered() {
 	expect(el(LettuceField).getAttribute('name')).toBe('lettuce');
 	expect(el(TomatoField).getAttribute('name')).toBe('tomato');
-	// The item's own value is what a ticked box submits, not the browser default.
 	expect(el(LettuceField).getAttribute('value')).toBe('lettuce');
 	expect(el(TomatoField).getAttribute('value')).toBe('tomato');
 	expect(el(LettuceField).hasAttribute('checked')).toBe(false);
@@ -185,8 +170,6 @@ async function expectTickedItemsSubmit() {
 	await expect.poll(() => submit().textContent).toBe('{"lettuce":"lettuce","tomato":"tomato"}');
 }
 
-// The whole point of the family: one gesture on the select-all writes the whole
-// ticked set, and every item follows because membership is what it renders.
 async function expectSelectAllTicksEverything() {
 	el(SelectAllTrigger).click();
 	await expect.poll(() => el(SelectAllTrigger).getAttribute('aria-checked')).toBe('true');
@@ -219,8 +202,6 @@ async function expectMixedSelectAllTicksEverything() {
 	expect(el(MustardTrigger).getAttribute('aria-checked')).toBe('true');
 }
 
-// The other direction: an item toggle moves the select-all, which is computed from
-// the ticked set and the offered set rather than stored separately.
 async function expectOneItemMovesTheSelectAllToMixed() {
 	expect(el(SelectAllTrigger).getAttribute('aria-checked')).toBe('false');
 	el(LettuceTrigger).click();
@@ -235,7 +216,6 @@ async function expectTickingEveryItemChecksTheSelectAll() {
 	el(TomatoTrigger).click();
 	await expect.poll(() => el(SelectAllTrigger).getAttribute('aria-checked')).toBe('mixed');
 	el(MustardTrigger).click();
-	// Every offered value is now ticked, so the group reports fully on.
 	await expect.poll(() => el(SelectAllTrigger).getAttribute('aria-checked')).toBe('true');
 
 	el(MustardTrigger).click();
@@ -246,14 +226,11 @@ async function expectInstancesStayIsolated() {
 	el(LeftSelectAllTrigger).click();
 	await expect.poll(() => el(LeftLettuceIndicator).textContent).toBe('Checked');
 	expect(el(LeftTomatoIndicator).textContent).toBe('Checked');
-	// The other list never heard about it.
 	expect(el(RightSourdoughIndicator).textContent).toBe('');
 	expect(el(RightRyeIndicator).textContent).toBe('');
 	expect(el(RightSelectAllTrigger).getAttribute('aria-checked')).toBe('false');
 }
 
-// Sibling items inside ONE list: a gesture on one item may not move another's
-// composed checkbox instance, and it may not move the select-all past mixed.
 async function expectSiblingItemsStayIsolated() {
 	el(LettuceTrigger).click();
 	await expect.poll(() => el(LettuceIndicator).textContent).toBe('Checked');
@@ -274,7 +251,6 @@ async function expectConsumerCallbackCarriesTheWholeSet() {
 	await expect.poll(() => el(Value).textContent).toBe('lettuce,tomato');
 	await expect.poll(() => el(Calls).textContent).toBe('2');
 
-	// The select-all hands over the whole set in one call, not one per item.
 	el(SelectAllTrigger).click();
 	await expect.poll(() => el(Value).textContent).toBe('');
 	await expect.poll(() => el(Calls).textContent).toBe('3');
@@ -286,7 +262,8 @@ async function expectOmittedCallbackStillTicks() {
 	await expect.poll(() => el(SelectAllTrigger).getAttribute('aria-checked')).toBe('mixed');
 }
 
-// Every `test.skip` below is skipped on the dispatch defect named at the top of the
+// Every `.
+test.skip` below is skipped on the dispatch defect named at the top of the
 // file: the gesture reaches the composed checkbox and stops there, so the group's
 // value never moves. Un-skip when a part's slot invocation reaches the root edge's
 // callback.
@@ -332,7 +309,8 @@ for (const mode of MODES) {
 	// children, and only the SSR module excludes that composed wrapper from the
 	// widget-root seed forward; the CSR prerender path forwards to every projecting
 	// edge alike, so the delegating wrapper contributes no seed block and the trigger
-	// reads `aria-invalid="false"`. `test.fails` rather than skip because it is
+	// reads `aria-invalid="false"`. `.
+test.fails` rather than skip because it is
 	// deterministic: the row turns red the day CSR gets the same exclusion.
 	(mode === 'CSR' ? test.fails : test)(`${mode}: a mounted error marks the group invalid, written after the items or before them`, async () => {
 		if (mode === 'CSR') await render(WithError);
@@ -407,8 +385,6 @@ for (const mode of MODES) {
 	});
 }
 
-// --- keyboard -------------------------------------------------------------
-//
 // A checkbox group has no roving tabindex and no arrow navigation: every box is
 // its own tab stop and Space is the only activation key, so the family adds no
 // keyboard rule of its own beyond what the composed checkbox already has.
@@ -434,10 +410,6 @@ test.skip('CSR: Space on a focused item moves the select-all to mixed', async ()
 	await expect.poll(() => el(SelectAllTrigger).getAttribute('aria-checked')).toBe('mixed');
 });
 
-// --- repeats ---------------------------------------------------------------
-//
-// Items authored with a keyed `@for` — the shape a real list has, since a
-// checklist over a literal list of options is a toy.
 
 // Skipped on the dispatch defect plus a second one measured here: inside
 // `items-from-data.tsrx` the three row triggers mint ONE id, because the seed pass
@@ -447,12 +419,10 @@ test.skip('CSR: items from a keyed loop each get their own instance', async () =
 	await render(ItemsFromData);
 	const triggers = all('row-trigger');
 	expect(triggers.length).toBe(3);
-	// Three rows, three minted ids: the rows did not share one instance.
 	expect(new Set(triggers.map((trigger) => trigger.id)).size).toBe(3);
 
 	(triggers[1] as HTMLElement).click();
 	await expect.poll(() => triggers[1]?.getAttribute('aria-checked')).toBe('true');
-	// The click landed in one row only.
 	expect(triggers[0]?.getAttribute('aria-checked')).toBe('false');
 	expect(triggers[2]?.getAttribute('aria-checked')).toBe('false');
 	await expect.poll(() => el(SelectAllTrigger).getAttribute('aria-checked')).toBe('mixed');
@@ -467,7 +437,6 @@ test.skip('CSR: the select-all ticks every row of a looped list', async () => {
 	}
 });
 
-// --- gaps -----------------------------------------------------------------
 
 // Expected red: the APG mixed-checkbox example puts an IDREF list on the tri-state
 // parent naming every box it controls, and an IDREF position takes exactly one
