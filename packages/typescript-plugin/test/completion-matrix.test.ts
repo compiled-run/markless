@@ -1465,7 +1465,7 @@ test('M18 a plural element() handle reads as its array type argument and a singu
 	expect(
 		displayText(singular),
 		'M18 missing capability: a handle beside it that was not written with an array type argument must stay singular.',
-	).toContain('contentEl: ElementHandle<HTMLDivElement>');
+	).toContain('contentEl: HTMLDivElement | undefined'); // singular handles also resolve eagerly now, keeping the optionality visible
 
 	// The hover shows the alias, so the resolved element type is proved by use
 	// instead: `.length` typed as number and `[0]` typed as the element are in
