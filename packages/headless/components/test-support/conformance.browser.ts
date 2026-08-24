@@ -1,0 +1,439 @@
+import { render, renderSSR } from '@markless/vitest-browser';
+import Accordion from '../src/accordion/scenarios/basic.tsrx';
+import BaseParts from '../src/base/scenarios/basic.tsrx';
+import Carousel from '../src/carousel/scenarios/basic.tsrx';
+import Checkbox from '../src/checkbox/scenarios/basic.tsrx';
+import Checklist from '../src/checklist/scenarios/basic.tsrx';
+import Collapsible from '../src/collapsible/scenarios/basic.tsrx';
+import { Basic as Combobox } from '../src/combobox/scenarios/basic.tsrx';
+import Modal from '../src/modal/scenarios/basic.tsrx';
+import Navbar from '../src/navbar/scenarios/basic.tsrx';
+import Otp from '../src/otp/scenarios/basic.tsrx';
+import Pagination from '../src/pagination/scenarios/basic.tsrx';
+import Progress from '../src/progress/scenarios/basic.tsrx';
+import QrCode from '../src/qr-code/scenarios/basic.tsrx';
+import { Basic as RadioGroup } from '../src/radio-group/scenarios/basic.tsrx';
+import { Basic as Select } from '../src/select/scenarios/basic.tsrx';
+import Tabs from '../src/tabs/scenarios/basic.tsrx';
+import Textbox from '../src/textbox/scenarios/basic.tsrx';
+import Toaster from '../src/toaster/scenarios/basic.tsrx';
+import Toggle from '../src/toggle/scenarios/basic.tsrx';
+import Tree from '../src/tree/scenarios/basic.tsrx';
+import { runConformance, type FamilyDescriptor } from './conformance.ts';
+
+// Every family's Basic scenario, held against the one shared battery in
+// conformance.ts. The descriptors below are the only per-family code: what the
+// scenario renders, what its root promises, and how its surface opens.
+//
+// The mounts are written out rather than passed by reference because the SSR
+// harness rewrites the marker call site itself, and only accepts an argument
+// that is an identifier imported from a separate `.tsrx` module. That is why the
+// imports above are static and every SSR mount below is spelled in full.
+
+const descriptors: readonly FamilyDescriptor[] = [
+	{
+		family: 'accordion',
+		mount: { CSR: () => render(Accordion), SSR: () => renderSSR(Accordion) },
+		root: 'root',
+		parts: [
+			'root',
+			'shipping-item',
+			'shipping-label',
+			'shipping-trigger',
+			'shipping-content',
+			'returns-item',
+			'returns-label',
+			'returns-trigger',
+			'returns-content',
+			'sizing-item',
+			'sizing-label',
+			'sizing-trigger',
+			'sizing-content',
+		],
+		rootAria: { role: null },
+		openCycle: {
+			trigger: 'shipping-trigger',
+			surface: 'shipping-content',
+			haspopup: null,
+			ridesOverlay: false,
+			focusLands: false,
+			focusReturns: false,
+		},
+		// Each item writes the value it stands for into the markup, which is the
+		// multi-valued case the naming spec keeps key-value.
+		valuedAttributes: ['ui-value'],
+		supportsDisabled: true,
+	},
+	{
+		family: 'base',
+		mount: { CSR: () => render(BaseParts), SSR: () => renderSSR(BaseParts) },
+		root: 'base-parts',
+		parts: ['base-parts', 'button', 'label', 'hidden'],
+		// A bag of primitives rather than a family: no root part, so no root
+		// contract to hold it to beyond the wrapper the scenario writes.
+		rootAria: {},
+		supportsDisabled: false,
+	},
+	{
+		family: 'carousel',
+		mount: { CSR: () => render(Carousel), SSR: () => renderSSR(Carousel) },
+		root: 'root',
+		parts: [
+			'root',
+			'title',
+			'playtrigger',
+			'scrollarea',
+			'paris-item',
+			'oslo-item',
+			'lima-item',
+			'backtrigger',
+			'forwardtrigger',
+		],
+		rootAria: {
+			role: 'group',
+			'aria-roledescription': 'carousel',
+			'aria-live': 'polite',
+			'aria-atomic': 'false',
+		},
+		// The slide's own value, and which edge it settles against: both carry
+		// information a consumer styles on, so both stay key-value.
+		valuedAttributes: ['ui-value', 'ui-align'],
+		supportsDisabled: false,
+	},
+	{
+		family: 'checkbox',
+		mount: { CSR: () => render(Checkbox), SSR: () => renderSSR(Checkbox) },
+		root: 'root',
+		parts: ['root', 'trigger', 'indicator', 'label'],
+		rootAria: { role: null },
+		supportsDisabled: true,
+	},
+	{
+		family: 'checklist',
+		mount: { CSR: () => render(Checklist), SSR: () => renderSSR(Checklist) },
+		root: 'root',
+		parts: [
+			'root',
+			'label',
+			'selectall-trigger',
+			'selectall-indicator',
+			'lettuce',
+			'lettuce-trigger',
+			'lettuce-indicator',
+			'lettuce-label',
+			'tomato',
+			'tomato-trigger',
+			'tomato-indicator',
+			'tomato-label',
+			'mustard',
+			'mustard-trigger',
+			'mustard-indicator',
+			'mustard-label',
+		],
+		rootAria: { role: 'group' },
+		supportsDisabled: true,
+	},
+	{
+		family: 'collapsible',
+		mount: { CSR: () => render(Collapsible), SSR: () => renderSSR(Collapsible) },
+		root: 'root',
+		parts: ['root', 'trigger', 'content'],
+		rootAria: { role: null },
+		openCycle: {
+			trigger: 'trigger',
+			surface: 'content',
+			haspopup: null,
+			ridesOverlay: false,
+			focusLands: false,
+			focusReturns: false,
+		},
+		supportsDisabled: true,
+	},
+	{
+		family: 'combobox',
+		mount: { CSR: () => render(Combobox), SSR: () => renderSSR(Combobox) },
+		root: 'root',
+		parts: [
+			'root',
+			'label',
+			'input',
+			'trigger',
+			'content',
+			'apple',
+			'apple-itemlabel',
+			'apple-itemindicator',
+			'banana',
+			'banana-itemlabel',
+			'banana-itemindicator',
+			'cherry',
+			'cherry-itemlabel',
+			'cherry-itemindicator',
+		],
+		rootAria: { role: 'group' },
+		openCycle: {
+			trigger: 'trigger',
+			surface: 'content',
+			// The popup is declared on the input, which is the element carrying
+			// role="combobox"; the show button beside it declares none.
+			haspopup: null,
+			ridesOverlay: true,
+			// A combobox keeps focus on its input and points at the highlighted
+			// option instead of moving into the list.
+			focusLands: false,
+			focusReturns: false,
+		},
+		// The family's note names this the one place an item's value appears in
+		// the markup, so it is key-value by design.
+		valuedAttributes: ['ui-value'],
+		supportsDisabled: true,
+	},
+	{
+		family: 'modal',
+		mount: { CSR: () => render(Modal), SSR: () => renderSSR(Modal) },
+		root: 'root',
+		parts: ['root', 'trigger', 'backdrop', 'content', 'title', 'close'],
+		rootAria: { role: null },
+		openCycle: {
+			trigger: 'trigger',
+			surface: 'content',
+			// The trigger only opens; the dialog's own close button shuts it.
+			closeBy: 'close',
+			haspopup: 'dialog',
+			ridesOverlay: true,
+			focusLands: true,
+			focusReturns: true,
+		},
+		supportsDisabled: false,
+	},
+	{
+		family: 'navbar',
+		mount: { CSR: () => render(Navbar), SSR: () => renderSSR(Navbar) },
+		root: 'root',
+		parts: [
+			'root',
+			'home-item',
+			'home-itemlink',
+			'products-item',
+			'products-itemtrigger',
+			'products-itemcontent',
+			'keyboards-itemlink',
+			'mice-itemlink',
+			'docs-item',
+			'docs-itemtrigger',
+			'docs-itemcontent',
+			'start-itemlink',
+			'api-itemlink',
+		],
+		rootAria: { role: null, 'aria-label': 'Primary' },
+		openCycle: {
+			trigger: 'products-itemtrigger',
+			surface: 'products-itemcontent',
+			haspopup: null,
+			ridesOverlay: true,
+			focusLands: false,
+			focusReturns: false,
+		},
+		supportsDisabled: false,
+	},
+	{
+		family: 'otp',
+		mount: { CSR: () => render(Otp), SSR: () => renderSSR(Otp) },
+		root: 'root',
+		parts: [
+			'root',
+			'field',
+			'item-0',
+			'item-1',
+			'item-2',
+			'item-3',
+			'item-4',
+			'item-5',
+			'indicator-0',
+			'indicator-1',
+			'indicator-2',
+			'indicator-3',
+			'indicator-4',
+			'indicator-5',
+		],
+		rootAria: { role: null },
+		supportsDisabled: true,
+	},
+	{
+		family: 'pagination',
+		mount: { CSR: () => render(Pagination), SSR: () => renderSSR(Pagination) },
+		root: 'root',
+		parts: [
+			'root',
+			'backtrigger',
+			'item-1',
+			'itemtrigger-1',
+			'item-2',
+			'itemtrigger-2',
+			'item-3',
+			'itemtrigger-3',
+			'item-4',
+			'itemtrigger-4',
+			'item-5',
+			'itemtrigger-5',
+			'forwardtrigger',
+		],
+		rootAria: { role: null, 'aria-label': 'Pagination' },
+		supportsDisabled: true,
+	},
+	{
+		family: 'progress',
+		mount: { CSR: () => render(Progress), SSR: () => renderSSR(Progress) },
+		root: 'root',
+		parts: ['root', 'label', 'track', 'indicator'],
+		rootAria: {
+			role: 'progressbar',
+			'aria-valuemin': '0',
+			'aria-valuemax': '100',
+			'aria-valuenow': '30',
+		},
+		// The bar's numbers are what a consumer styles against, so they are
+		// key-value by design rather than presence marks.
+		valuedAttributes: ['ui-progress', 'ui-value', 'ui-min', 'ui-max'],
+		supportsDisabled: false,
+	},
+	{
+		family: 'qr-code',
+		mount: { CSR: () => render(QrCode), SSR: () => renderSSR(QrCode) },
+		root: 'root',
+		parts: ['root', 'frame', 'patternsvg', 'patternpath'],
+		rootAria: { role: 'img', 'aria-label': 'Scan to open the site' },
+		supportsDisabled: false,
+	},
+	{
+		family: 'radio-group',
+		mount: { CSR: () => render(RadioGroup), SSR: () => renderSSR(RadioGroup) },
+		root: 'root',
+		parts: [
+			'root',
+			'label',
+			'monthly',
+			'monthly-field',
+			'monthly-trigger',
+			'monthly-indicator',
+			'monthly-label',
+			'annual',
+			'annual-field',
+			'annual-trigger',
+			'annual-indicator',
+			'annual-label',
+			'lifetime',
+			'lifetime-field',
+			'lifetime-trigger',
+			'lifetime-indicator',
+			'lifetime-label',
+		],
+		rootAria: {
+			role: 'radiogroup',
+			'aria-orientation': 'vertical',
+			'aria-required': 'false',
+			'aria-invalid': 'false',
+		},
+		supportsDisabled: true,
+	},
+	{
+		family: 'select',
+		mount: { CSR: () => render(Select), SSR: () => renderSSR(Select) },
+		root: 'root',
+		parts: [
+			'root',
+			'label',
+			'trigger',
+			'content',
+			'apple',
+			'apple-itemlabel',
+			'apple-itemindicator',
+			'banana',
+			'banana-itemlabel',
+			'banana-itemindicator',
+			'cherry',
+			'cherry-itemlabel',
+			'cherry-itemindicator',
+		],
+		rootAria: { role: null },
+		openCycle: {
+			trigger: 'trigger',
+			surface: 'content',
+			haspopup: 'listbox',
+			// This family owns its own dismissal handlers rather than carrying the
+			// bare `overlay` mark, so the two dismissal rows do not apply to it.
+			ridesOverlay: false,
+			// The trigger carries role="combobox": the pattern points at the
+			// highlighted option rather than requiring focus to move.
+			focusLands: false,
+			focusReturns: false,
+		},
+		supportsDisabled: true,
+	},
+	{
+		family: 'tabs',
+		mount: { CSR: () => render(Tabs), SSR: () => renderSSR(Tabs) },
+		root: 'root',
+		parts: [
+			'root',
+			'list',
+			'overview-trigger',
+			'usage-trigger',
+			'billing-trigger',
+			'overview-content',
+			'usage-content',
+			'billing-content',
+		],
+		rootAria: { role: null },
+		supportsDisabled: true,
+	},
+	{
+		family: 'textbox',
+		mount: { CSR: () => render(Textbox), SSR: () => renderSSR(Textbox) },
+		root: 'root',
+		parts: ['root', 'label', 'input'],
+		rootAria: { role: null },
+		supportsDisabled: true,
+	},
+	{
+		family: 'toaster',
+		mount: { CSR: () => render(Toaster), SSR: () => renderSSR(Toaster) },
+		root: 'root',
+		// The region is in the DOM before the first message; the rows are not, so
+		// only what the scenario renders at rest is named here.
+		parts: ['root', 'rows', 'save', 'sticky', 'two', 'elsewhere'],
+		rootAria: {
+			role: null,
+			'aria-live': 'polite',
+			'aria-atomic': 'false',
+			'aria-relevant': 'additions',
+		},
+		supportsDisabled: false,
+	},
+	{
+		family: 'toggle',
+		mount: { CSR: () => render(Toggle), SSR: () => renderSSR(Toggle) },
+		root: 'root',
+		parts: ['root', 'label', 'trigger', 'thumb'],
+		rootAria: { role: null },
+		supportsDisabled: true,
+	},
+	{
+		family: 'tree',
+		mount: { CSR: () => render(Tree), SSR: () => renderSSR(Tree) },
+		root: 'root',
+		parts: [
+			'root',
+			'label',
+			'readme-item',
+			'readme-itemlabel',
+			'license-item',
+			'license-itemlabel',
+			'changelog-item',
+			'changelog-itemlabel',
+		],
+		rootAria: { role: 'tree', 'aria-label': 'Project files' },
+		supportsDisabled: true,
+	},
+];
+
+for (const descriptor of descriptors) runConformance(descriptor);
