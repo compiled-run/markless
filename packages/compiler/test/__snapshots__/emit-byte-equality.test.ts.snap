@@ -1432,7 +1432,8 @@ async function marklessRenderSsr(props = {}, marklessSsrRenderContext) {
 		structure: marklessSsrRendered.structure,
 		structureTokens: marklessSsrRendered.structureTokens,
 	};
-}",
+}
+marklessRenderSsr.marklessElementHandles = [...(marklessSsrComponentPart(__marklessSsrComponent0,"Child")?.renderSsr?.marklessElementHandles??[])];",
     "symbolModules": "",
     "symbolResolverModule": "export const symbolManifest = 
 [1,null,null,[],[],{}]

@@ -439,15 +439,26 @@ function emitNode(
 			continue;
 		const idrefHandle = elementHandleIdrefTarget(context, node, name);
 		if (idrefHandle) {
-			append(builder, ` ${name}="`);
+			// A shared() handle names an element some OTHER part of the widget
+			// renders, and whether that part was placed is not a build-time fact of
+			// this file. So the slot writes the whole attribute or nothing, rather
+			// than baking the name into the statics around an id that may name
+			// nothing. A component-local handle is bound in this same markup, so it
+			// keeps the statics it always had.
+			const omittable = idrefHandle.startsWith('shared:');
+			if (!omittable) append(builder, ` ${name}="`);
 			addSlot(builder, {
 				kind: 'attribute',
 				name,
 				coordinate: { kind: 'child-index', path },
-				residue: { kind: 'element-handle-id', handleGraphNodeId: idrefHandle },
-				alwaysPresent: true,
+				residue: {
+					kind: 'element-handle-id',
+					handleGraphNodeId: idrefHandle,
+					...(omittable ? { idref: true as const } : {}),
+				},
+				...(omittable ? {} : { alwaysPresent: true as const }),
 			});
-			append(builder, '"');
+			if (!omittable) append(builder, '"');
 			continue;
 		}
 		if (name === 'class') classSeen = true;
@@ -720,7 +731,11 @@ function emitDynamicHost(
 			attributeSlots.push({
 				kind: 'attribute',
 				name,
-				residue: { kind: 'element-handle-id', handleGraphNodeId: idrefHandle },
+				residue: {
+					kind: 'element-handle-id',
+					handleGraphNodeId: idrefHandle,
+					...(idrefHandle.startsWith('shared:') ? { idref: true as const } : {}),
+				},
 			});
 			continue;
 		}

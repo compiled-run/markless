@@ -813,7 +813,15 @@ export type SemanticMarkupResidue =
 	// The id minted for one element() handle: written on the element `el=` bound
 	// it and on every IDREF position that named it, so both sides spell one
 	// string the author never sees.
-	| { readonly kind: 'element-handle-id'; readonly handleGraphNodeId: string }
+	| {
+			readonly kind: 'element-handle-id';
+			readonly handleGraphNodeId: string;
+			// Set on the REFERENCING side only. An IDREF names an element some other
+			// part renders, so it is the one side that can find nothing to name and
+			// must then write no attribute at all; the id-carrying side renders with
+			// its own element or not at all.
+			readonly idref?: true;
+	  }
 	// One element's whole inline style attribute value, when at least one CSS
 	// anchor position on it named an element() handle. The declarations render
 	// the SAME per-instance token the minted id renders, spelled as the

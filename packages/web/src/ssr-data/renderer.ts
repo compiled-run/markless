@@ -14,7 +14,13 @@ export type SsrDataResidue =
 	| { readonly kind: 'graph-read'; readonly graphNodeId: string; readonly path: ReadonlyArray<string> }
 	| { readonly kind: 'repeat-item'; readonly repeatId: string; readonly path: ReadonlyArray<string> }
 	| { readonly kind: 'authored-expression'; readonly source: string }
-	| { readonly kind: 'element-handle-id'; readonly handleGraphNodeId: string }
+	// `idref` marks the REFERENCING side: the one side that can find no element to
+	// name in this widget, and then writes no attribute rather than a dangling id.
+	| {
+			readonly kind: 'element-handle-id';
+			readonly handleGraphNodeId: string;
+			readonly idref?: true;
+	  }
 	// One element's whole inline style value, when a CSS anchor position on it
 	// named an element() handle. The compiled reader spells each declaration from
 	// the same per-instance token it spells minted ids from, so the anchor and
