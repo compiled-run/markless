@@ -12,6 +12,7 @@ import {
 	isIgnorableStaticTextNode,
 	isSpreadAttribute,
 	isStaticTextNode,
+	markupInterpolationExpression,
 	staticTextValue,
 	unwrapExpressionContainer,
 } from '../../ast/tsrx.ts';
@@ -186,6 +187,26 @@ function addAnchorSlot(
 	} as NewSlot);
 }
 
+function emitTextSlot(
+	expression: AnyNode | undefined,
+	path: ReadonlyArray<number>,
+	builder: ChunkBuilder,
+	context: CollectionContext,
+	repeat: { readonly id: string; readonly itemName: string } | null,
+): number {
+	if (!expression) return 0;
+	addAnchorSlot(
+		builder,
+		{
+			kind: 'text',
+			residue: expressionResidue(expression, context, repeat, builder.componentName),
+			...(getIdentifierName(expression) === 'children' ? { raw: true } : {}),
+		},
+		path,
+	);
+	return 1;
+}
+
 function emitNode(
 	node: AnyNode,
 	path: ReadonlyArray<number>,
@@ -201,19 +222,11 @@ function emitNode(
 	}
 
 	if (node.type === 'JSXExpressionContainer' || node.type === 'TSRXExpression') {
-		const expression = node.expression as AnyNode | undefined;
-		if (!expression) return 0;
-		addAnchorSlot(
-			builder,
-			{
-				kind: 'text',
-				residue: expressionResidue(expression, context, repeat, builder.componentName),
-				...(getIdentifierName(expression) === 'children' ? { raw: true } : {}),
-			},
-			path,
-		);
-		return 1;
+		return emitTextSlot(node.expression as AnyNode | undefined, path, builder, context, repeat);
 	}
+
+	const interpolated = markupInterpolationExpression(node);
+	if (interpolated) return emitTextSlot(interpolated, path, builder, context, repeat);
 
 	if (node.type === 'Fragment' || node.type === 'JSXFragment') {
 		return emitNodes(asNodes(node.children), path, builder, context, repeat);

@@ -335,7 +335,7 @@ function projectionNotRenderedError(
 	componentName: string,
 	edgeId: string,
 ): Error & Record<string, unknown> {
-	const message = `MARKLESS_PROJECTION_NOT_RENDERED: <${componentName}> was given projected children but never rendered them, so they are counted by the served locator table and absent from the served HTML. Render \`{children}\` in <${componentName}>'s own markup — a \`{children}\` written inside an @if/@else arm is not rendered today, so move it out of the arm.`;
+	const message = `MARKLESS_PROJECTION_NOT_RENDERED: <${componentName}> was given projected children but never rendered them, so they are counted by the served locator table and absent from the served HTML. Render \`{children}\` somewhere in <${componentName}>'s own markup, including inside an @if/@else arm.`;
 	const error = new Error(message) as Error & Record<string, unknown>;
 	error.code = 'MARKLESS_PROJECTION_NOT_RENDERED';
 	error.severity = 'error';

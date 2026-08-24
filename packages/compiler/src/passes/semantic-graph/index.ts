@@ -24,7 +24,7 @@ import { collectComponentProps } from './collect-components.ts';
 import { spreadHostsField } from './spread-hosts.ts';
 import { armMaterialField } from './arm-material.ts';
 import { chunkElementCount, projectionPlacementFields } from './projection-placement.ts';
-import { getComponentFunction } from '../../ast/tsrx.ts';
+import { getComponentFunction, markupInterpolationExpression } from '../../ast/tsrx.ts';
 import {
 	collectConditionalBranchText,
 	collectElement,
@@ -372,7 +372,7 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 			return;
 		case 'TSRXExpression':
 		case 'JSXExpressionContainer':
-			collectTemplateExpression(node, state);
+			collectTemplateExpression(node.expression as AnyNode | undefined, state);
 			break;
 		case 'VariableDeclaration':
 			collectVariableDeclaration(node, state);
@@ -401,7 +401,7 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 				const caseBranchId = `branch:${state.nextBranchId++}`;
 				state.currentBranchScopeIds.push(caseBranchId);
 				for (const caseChild of asNodes(switchCase.consequent)) {
-					walk(caseChild, state);
+					walkMarkupStatement(caseChild, state);
 				}
 				state.currentBranchScopeIds.pop();
 			}
@@ -545,8 +545,27 @@ function walkBranch(node: AnyNode | undefined, state: WalkState): void {
 	if (!node) return;
 	const branchId = `branch:${state.nextBranchId++}`;
 	state.currentBranchScopeIds.push(branchId);
-	withCreationSite(state, 'branch', () => walk(node, state));
+	withCreationSite(state, 'branch', () => {
+		if (node.type === 'BlockStatement') {
+			for (const statement of asNodes(node.body)) walkMarkupStatement(statement, state);
+			return;
+		}
+		walkMarkupStatement(node, state);
+	});
 	state.currentBranchScopeIds.pop();
+}
+
+// Only for positions where markup takes statements: there a bare `{expr}` is
+// interpolation, while the same shape inside a handler body is a real block.
+function walkMarkupStatement(node: AnyNode | undefined, state: WalkState): void {
+	if (!node) return;
+	const interpolated = markupInterpolationExpression(node);
+	if (interpolated) {
+		collectTemplateExpression(interpolated, state);
+		walk(interpolated, state);
+		return;
+	}
+	walk(node, state);
 }
 
 function withCreationSite(

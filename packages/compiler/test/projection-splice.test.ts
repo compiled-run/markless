@@ -214,9 +214,17 @@ test('fixture B: a nothing-rendering arm after {children} stays in document orde
 	expect(locatorDisagreements(rendered.html, rendered.structure.locators)).toEqual([]);
 });
 
-test('fixture C: {children} inside a construct arm refuses loudly instead of dropping', async () => {
-	await expect(renderFixture(FIXTURE_C)).rejects.toThrow(/MARKLESS_PROJECTION_NOT_RENDERED/);
-	await expect(renderFixture(FIXTURE_C)).rejects.toThrow(/<Box>/);
+// This shape used to reach the refusal below, because a bare `{children}` in an
+// arm compiled to an empty chunk and the projection never reached the bytes. The
+// arm renders it now, so what is left to hold is that the splice keeps the
+// served table in document order like every other projection position.
+test('fixture C: {children} inside a construct arm renders in document order', async () => {
+	const rendered = await renderFixture(FIXTURE_C);
+	expect(rendered.html).toContain('ui-projected');
+	expect(rendered.html).not.toContain('ui-default');
+	expect(documentTagNames(rendered.html)).toEqual(['main', 'ul', 'li', 'div']);
+	expect(locatorDisagreements(rendered.html, rendered.structure.locators)).toEqual([]);
+	expect(rendered.structure.elementCount).toBe(documentTagNames(rendered.html).length);
 });
 
 test('a child that never renders {children} refuses loudly rather than counting phantoms', async () => {
