@@ -4,7 +4,7 @@ import { realDriver } from '../../test-support/page-driver.ts';
 import { nvdaSpec } from '../../test-support/vocabularies.ts';
 import { readSliderTranscript } from './slider-transcript.ts';
 
-nvdaTest('NVDA conveys the slider thumb, its value, and the value each arrow step moves it to', async ({
+nvdaTest('NVDA conveys the slider thumb, its value, a range slider\'s two same-named thumbs, and the value each arrow step moves it to', async ({
 	page,
 	nvda,
 }) => {
