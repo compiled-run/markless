@@ -20,6 +20,8 @@ export const FAMILY_ANCHORS = {
 	modal: '/#modal',
 	'radio-group': '/#radio-group',
 	tabs: '/#tabs',
+	popover: '/#popover',
+	slider: '/#slider',
 } as const;
 
 export type FamilyName = keyof typeof FAMILY_ANCHORS;

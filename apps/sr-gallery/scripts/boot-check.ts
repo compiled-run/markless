@@ -35,6 +35,10 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	modal: 'dialog',
 	'radio-group': 'radiogroup',
 	tabs: 'tablist',
+	// Closed hides the surface but never detaches it, so the dialog role is in the
+	// DOM before the trigger is pressed.
+	popover: 'dialog',
+	slider: 'slider',
 };
 
 const appDir = fileURLToPath(new URL('..', import.meta.url));

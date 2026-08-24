@@ -92,3 +92,28 @@ input {
 	border-radius: 0.35rem;
 	padding: 0.35rem 0.5rem;
 }
+
+/* The slider family ships no rail size, and a dragged thumb needs touch
+   scrolling off, so the consumer's stylesheet owns both. */
+.slider-track {
+	position: relative;
+	width: 200px;
+	height: 20px;
+	margin-top: 0.75rem;
+	border: 1px solid var(--line);
+	border-radius: 0.35rem;
+	touch-action: none;
+}
+
+/* The family hands the consumer `--slider-offset` and leaves the placing here. */
+.slider-thumb {
+	position: absolute;
+	top: 0;
+	left: var(--slider-offset, 0%);
+	translate: -50% 0;
+	width: 20px;
+	height: 20px;
+	border: 1px solid var(--accent);
+	border-radius: 50%;
+	background: var(--paper);
+}
