@@ -16,6 +16,7 @@
  */
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/compile-module.ts';
+import { moduleScopeLines } from '../src/passes/public-render/shared.ts';
 import {
 	assertDeterministicEmission,
 	EMISSION_TSRX_NODE_CODE,
@@ -149,6 +150,10 @@ async function bothPaths(fixture: Fixture, omitAuthoredSource = false): Promise<
 		symbol,
 		omitAuthoredSource,
 		sourceFileName: fixture.filename,
+		// Production supplies both (buildSymbolModuleEmission); without them this
+		// hand-built input compares a carried module against an uncarried one.
+		moduleDeclarations: moduleScopeLines(fixture.source, fixture.filename),
+		moduleImports: result.semanticGraph.moduleImports,
 	};
 	const emitted = emitBehaviorModuleNodes(input);
 
