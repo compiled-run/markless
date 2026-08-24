@@ -144,6 +144,31 @@ test('resolution holds in a project that declares no TSRX compiler', async () =>
 	}
 }, 60_000);
 
+// Doc comments live in the gap between top-level statements, which the type-service emitter
+// used to drop when it joined per-statement source slices.
+test('a .ts consumer reads the doc comments authored above .tsrx declarations', async () => {
+	const consumer = await openFixture('documented-consumer.ts');
+	const componentHover = await server.quickinfo(
+		consumer.file,
+		positionAtSearch(consumer.source, 'export const panel = DocumentedPanel', 'export const panel = '.length),
+	);
+	const propsHover = await server.quickinfo(
+		consumer.file,
+		positionAtSearch(consumer.source, 'props: DocumentedProps', 'props: '.length),
+	);
+	const memberHover = await server.quickinfo(
+		consumer.file,
+		positionAtSearch(consumer.source, "{ heading: 'hello' }", '{ '.length),
+	);
+
+	expect(diagnosticSummary(consumer.semantic)).toEqual([]);
+	expect(componentHover.documentation).toContain(
+		'A panel whose authored documentation must survive the type-service lowering.',
+	);
+	expect(propsHover.documentation).toContain('Props for the documented panel.');
+	expect(memberHover.documentation).toContain('Heading rendered at the top of the panel.');
+}, 60_000);
+
 test('resolution failure is still reported when the .tsrx module is absent', async () => {
 	const file = fixturePath(project, 'absent.ts');
 	writeFileSync(file, "import { Gone } from './scenarios/gone.tsrx';\nexport const gone = Gone;\n");
