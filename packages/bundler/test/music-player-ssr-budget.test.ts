@@ -152,7 +152,11 @@ const clientBuild = resolve(demo, '.output/public/build');
 // element-handle machinery with the live row-walk read (+320 of it). Bundler-diet owns
 // the repayment alongside the standing pay-per-use obligations.
 // 67,940 -> 68,200 (2026-08-24): measured 68,187 - the multi-binding chain. Bundler-diet repayment.
-const MAX_SHIPPED_JS_GZIP_BYTES = 68_200;
+// 68,200 -> 68,380 (2026-08-24): +164 measured - keyed-repeat records now emitted for
+// widget-rooting repeats (previously dropped entirely = the defect-84 wire gap).
+// Clawback named for bundler-diet: rowElementCount + rowEvents pay-per-use (dead
+// weight on widget-rooted records; rowElementCount has no resume consumer).
+const MAX_SHIPPED_JS_GZIP_BYTES = 68_380;
 
 test('music-player-ssr production build stays within its shipped JS budget', async () => {
 	await rm(resolve(demo, '.output'), { force: true, recursive: true });
