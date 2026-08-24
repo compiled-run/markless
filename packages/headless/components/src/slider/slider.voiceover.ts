@@ -4,7 +4,7 @@ import { realDriver } from '../../test-support/page-driver.ts';
 import { voiceOverSpec } from '../../test-support/vocabularies.ts';
 import { readSliderTranscript } from './slider-transcript.ts';
 
-voiceOverTest('VoiceOver conveys the slider thumb, its value, and the value each arrow step moves it to', async ({
+voiceOverTest('VoiceOver conveys the slider thumb, its value, a range slider\'s two same-named thumbs, and the value each arrow step moves it to', async ({
 	page,
 	voiceOver,
 }) => {
