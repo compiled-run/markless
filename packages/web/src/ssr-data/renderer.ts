@@ -514,10 +514,16 @@ function rootEdgeSeeds(
 	childSeeds: ReadonlyMap<string, unknown>,
 	inherited: ReadonlyMap<string, unknown> | undefined,
 ): ReadonlyMap<string, unknown> {
-	const enclosing = inherited?.get(MARKLESS_WIDGET_INSTANCE_KEY);
-	if (enclosing === undefined || enclosing === childSeeds.get(MARKLESS_WIDGET_INSTANCE_KEY))
-		return childSeeds;
-	return new Map(childSeeds).set(MARKLESS_WIDGET_INSTANCE_KEY, enclosing);
+	// Every instance-token key, not only the plain one: a nested widget root sits
+	// inside another family's instance, and that family's own token has to keep
+	// naming the enclosing instance while this root's names its own.
+	let restored: Map<string, unknown> | undefined;
+	for (const [key, enclosing] of inherited ?? []) {
+		if (!key.startsWith(MARKLESS_WIDGET_INSTANCE_KEY)) continue;
+		if (enclosing === undefined || enclosing === childSeeds.get(key)) continue;
+		(restored ??= new Map(childSeeds)).set(key, enclosing);
+	}
+	return restored ?? childSeeds;
 }
 
 function commentToken(

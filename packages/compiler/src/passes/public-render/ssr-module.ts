@@ -59,6 +59,7 @@ import {
 	elementHandleResidueKinds,
 	hasSharedElementHandle,
 	MARKLESS_WIDGET_INSTANCE_KEY,
+	widgetInstanceReadSource,
 	renderDecisionSources,
 	sharedInstancePreludeLines,
 } from './residue-reader.ts';
@@ -75,8 +76,8 @@ import type { PublicRenderRoot } from './types.ts';
 function elementHandleIdSource(handleGraphNodeId: string): string {
 	const readCase = elementHandleIdReadCase({
 		idPrefixSource: 'marklessSsrIdPrefix',
-		widgetInstanceSource: hasSharedElementHandle([handleGraphNodeId])
-			? `marklessSsrRenderStateValues.get(${JSON.stringify(MARKLESS_WIDGET_INSTANCE_KEY)})`
+		widgetInstanceRead: hasSharedElementHandle([handleGraphNodeId])
+			? widgetInstanceReadSource((key) => `marklessSsrRenderStateValues.get(${key})`)
 			: null,
 	});
 	return `(residue=>{${readCase}})({kind:'element-handle-id',handleGraphNodeId:${JSON.stringify(handleGraphNodeId)}})`;
@@ -523,8 +524,8 @@ function emitSsrDataLines(
 		handleIds.length > 0
 			? elementHandleIdReadCase({
 					idPrefixSource: 'marklessSsrIdPrefix',
-					widgetInstanceSource: hasSharedElementHandle(handleIds)
-						? `marklessSsrRenderStateValues.get(${JSON.stringify(MARKLESS_WIDGET_INSTANCE_KEY)})`
+					widgetInstanceRead: hasSharedElementHandle(handleIds)
+						? widgetInstanceReadSource((key) => `marklessSsrRenderStateValues.get(${key})`)
 						: null,
 					kinds: handleKinds,
 				})

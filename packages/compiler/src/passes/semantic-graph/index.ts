@@ -21,7 +21,6 @@ import {
 	getFrameworkApiForCall,
 } from './imports.ts';
 import { collectComponentProps } from './collect-components.ts';
-import { collectSpreadEventShadowDiagnostics } from './spread-event-guard.ts';
 import { spreadHostsField } from './spread-hosts.ts';
 import { armMaterialField } from './arm-material.ts';
 import { getComponentFunction } from '../../ast/tsrx.ts';
@@ -117,13 +116,6 @@ export async function buildSemanticGraph(
 		state.currentComponentId = `component:${componentSpan.start}:${componentSpan.end}`;
 		prepareComponentLocalBindings(componentFunction.node.body as AnyNode, state);
 		collectComponentProps(componentFunction.node, state);
-		state.graph.diagnostics.push(
-			...collectSpreadEventShadowDiagnostics({
-				component: componentFunction.node,
-				componentName: componentFunction.name,
-				filename: input.filename,
-			}),
-		);
 		walk(componentFunction.node.body as AnyNode, state);
 		mergeComponentLocalDeclarations(state);
 		state.currentComponentName = previousComponentName;

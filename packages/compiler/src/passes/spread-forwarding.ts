@@ -70,9 +70,10 @@ export function forwardedSpreadViewRecords(input: ProtocolViewPayloadInput): {
 						continue;
 					}
 					if (prop.kind !== 'callback' || !isEventAttribute(prop.name)) continue;
-					// The part's own handler owns the event it writes; the shadow guard
-					// (MARKLESS_EVENT_SPREAD_SHADOWED) is what makes that a build error.
-					if (spread.excludeNames.includes(prop.name)) continue;
+					// A handler is additive too. The part's own `onClick=` does not
+					// shadow the consumer's: both run, the part's first, exactly as two
+					// listeners on one element behave on the platform. `excludeNames`
+					// still governs plain attributes, where the element's own wins.
 					const symbolId = callbackSymbolIds.get(`${edge.id}:${prop.name}`);
 					if (!symbolId) continue;
 					events.push({

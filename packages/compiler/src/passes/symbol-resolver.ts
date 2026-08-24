@@ -61,9 +61,16 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 	const handleReadsOf = (reads: ReadonlyArray<LoweredStateRead> | undefined) =>
 		elementHandleReads(reads, handlesByGraphNodeId);
 
+	// `onClick={[a, b]}` is several records on one host and event name. Their
+	// authored order is the order they run, and `order` is where the view payload
+	// files each symbol inside that record's single `symbolIds` list.
+	const eventHandlerOrder = new Map<string, number>();
 	for (const event of input.payloadArena.view.events) {
 		if (event.handlerSource === undefined) continue;
 
+		const orderKey = `${event.hostNodeId}:${event.eventName}`;
+		const order = eventHandlerOrder.get(orderKey) ?? 0;
+		eventHandlerOrder.set(orderKey, order + 1);
 		const sourceSpan = event.handlerSpan;
 		const inlined = inlineSharedMethodCalls(
 			event.handlerSource,
@@ -88,7 +95,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			sourceSpan,
 			parameters: event.handlerParameters,
 			...(moduleImports.length > 0 ? { moduleImports } : {}),
-			order: 0,
+			order,
 			reads,
 			writes: eventWrites(source, input.stateLowering?.writes, [
 				sourceSpan,
