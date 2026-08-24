@@ -13,10 +13,6 @@ import { UnavailableOptions } from './scenarios/unavailable-options.tsrx';
 import { WithOnChange } from './scenarios/with-onchange.tsrx';
 import { WithoutOnChange } from './scenarios/without-onchange.tsrx';
 
-// Colocated browser suite for the select family. Each test renders a realistic
-// consumer scenario, and the locators name the QDS part anatomy: root, label,
-// trigger, content, item, itemlabel, itemindicator, field - prefixed per option,
-// the way a consumer names their own choices.
 const Root = page.getByTestId('root');
 const Label = page.getByTestId('label');
 const Trigger = page.getByTestId('trigger');
@@ -28,32 +24,26 @@ const Banana = page.getByTestId('banana');
 const BananaIndicator = page.getByTestId('banana-itemindicator');
 const Cherry = page.getByTestId('cherry');
 const CherryIndicator = page.getByTestId('cherry-itemindicator');
-// Options and selects nobody may choose.
 const LockedRoot = page.getByTestId('locked-root');
 const LockedTrigger = page.getByTestId('locked-trigger');
 const LockedPremium = page.getByTestId('locked-premium');
 const LockedPremiumIndicator = page.getByTestId('locked-premium-itemindicator');
-// The signup form and its hidden native control.
 const Field = page.getByTestId('field');
 const Monthly = page.getByTestId('monthly');
 const Annual = page.getByTestId('annual');
 const Submitted = page.getByTestId('submitted');
-// Two selects on one page.
 const LeftTrigger = page.getByTestId('left-trigger');
 const LeftContent = page.getByTestId('left-content');
 const LeftBanana = page.getByTestId('left-banana');
 const LeftBananaIndicator = page.getByTestId('left-banana-itemindicator');
 const RightContent = page.getByTestId('right-content');
 const RightBasicIndicator = page.getByTestId('right-basic-itemindicator');
-// The consumer handlers' log.
 const Value = page.getByTestId('value');
 const Calls = page.getByTestId('calls');
 const Opens = page.getByTestId('opens');
 
-// A row that asserts the same thing in both modes runs once per mode. The SSR
-// harness rewrites a literal SSR mount call site, so the mount cannot be passed
-// by reference or wrapped in a helper — the branch below keeps both call sites
-// literal, which is why this idiom rather than a `mount` parameter.
+// The SSR harness rewrites a literal `renderSSR` call site, so each test must branch
+// on the mode rather than take the mount by reference.
 const MODES = ['CSR', 'SSR'] as const;
 
 function el<T extends Element = HTMLElement>(locator: { element(): Element | null }) {
@@ -62,8 +52,7 @@ function el<T extends Element = HTMLElement>(locator: { element(): Element | nul
 	return found as T;
 }
 
-// A real submit would navigate the test iframe, so the event is dispatched. What
-// is proven is what the browser itself put in the FormData for this form.
+// A real submit would navigate the test iframe, so the event is dispatched instead.
 function submit() {
 	el(page.getByTestId('form')).dispatchEvent(
 		new Event('submit', { bubbles: true, cancelable: true }),
@@ -71,9 +60,8 @@ function submit() {
 	return el(Submitted);
 }
 
-// The gesture that opens the popup, and the wait the roving focus needs: the
-// listbox is `hidden` until the open cell reaches the DOM, so the family moves
-// focus one frame later rather than into a subtree nothing can focus.
+// The listbox stays `hidden` until the open cell reaches the DOM, so the roving
+// focus moves one frame later and the caller must wait for aria-expanded.
 async function openWith(key: string) {
 	el(Trigger).focus();
 	await userEvent.keyboard(key);
@@ -85,16 +73,14 @@ async function focused() {
 }
 
 function expectBasicRendered() {
-	// The trigger is a combobox, not a button: a reader that says "button,
-	// collapsed" fails aria-at's `Role 'combobox' is conveyed` row, and that is
-	// exactly what QDS's bare <button aria-haspopup> produces.
+	// The trigger is a combobox, not a button: a reader that says "button, collapsed"
+	// fails aria-at's `Role 'combobox' is conveyed` row.
 	expect(el(Trigger).tagName).toBe('BUTTON');
 	expect(el(Trigger).getAttribute('role')).toBe('combobox');
 	expect(el(Trigger).getAttribute('aria-haspopup')).toBe('listbox');
 	expect(el(Trigger).getAttribute('aria-expanded')).toBe('false');
 	expect(el(Content).getAttribute('role')).toBe('listbox');
-	// Closed hides the popup; it never detaches it, so the trigger's
-	// aria-controls never points at nothing.
+	// Closed hides the popup and never detaches it, so aria-controls always resolves.
 	expect(el<HTMLElement>(Content).hidden).toBe(true);
 	expect(el(Root).getAttribute('ui-closed')).toBe('');
 	expect(el(Root).hasAttribute('ui-open')).toBe(false);
@@ -108,10 +94,8 @@ function expectBasicRendered() {
 	}
 }
 
-// Every IDREF this family writes resolves to an element that is really there.
-// QDS's trigger names a label id unconditionally, so a select written without a
-// label part carries a dangling reference; here the id is minted from the handle
-// the label part binds.
+// The id is minted from the handle the label part binds, so a select written
+// without a label part carries no dangling reference.
 function expectNamedWithNoDanglingIdref() {
 	const labelId = el(Label).getAttribute('id');
 	const contentId = el(Content).getAttribute('id');
@@ -124,9 +108,6 @@ function expectNamedWithNoDanglingIdref() {
 	expect(document.getElementById(contentId as string)).toBe(el(Content));
 }
 
-// One element per part: every part this family ships renders exactly one piece
-// of markup, so a consumer's stylesheet and a screen reader see the tree they
-// wrote.
 function expectOneElementPerPart() {
 	expect(el(Root).children.length).toBe(3);
 	expect(el(Root).children[0]).toBe(el(Label));
@@ -166,7 +147,6 @@ async function expectOptionChoosesAndCloses() {
 
 	el(Banana).click();
 	await expect.poll(() => el(Banana).getAttribute('aria-selected')).toBe('true');
-	// Choosing is what closes the popup, in one gesture.
 	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(true);
 	expect(el(Apple).getAttribute('aria-selected')).toBe('false');
 }
@@ -193,22 +173,21 @@ function expectDisabledRendered() {
 async function expectDisabledBlocks() {
 	el(Banana).click();
 	el(LockedPremium).click();
-	// Give a dispatch the room a real choice gets, then read: nothing moved.
+	// Give a dispatch the room a real choice gets before reading.
 	await new Promise((resolve) => setTimeout(resolve, 150));
 	expect(el(Banana).getAttribute('aria-selected')).toBe('false');
 	expect(el(LockedPremiumIndicator).getAttribute('ui-hidden')).toBe('');
 }
 
 function expectFormConfigRendered() {
-	// The hidden native control is the only thing in this family a form sees,
-	// and it is out of the tab order and out of the accessibility tree.
+	// The hidden native control is the only thing a form sees, and it is out of both
+	// the tab order and the accessibility tree.
 	expect(el(Field).tagName).toBe('SELECT');
 	expect(el(Field).getAttribute('aria-hidden')).toBe('true');
 	expect(el<HTMLSelectElement>(Field).tabIndex).toBe(-1);
 	expect(el<HTMLSelectElement>(Field).name).toBe('plan');
 	expect(el<HTMLSelectElement>(Field).required).toBe(true);
 	expect(el(Root).getAttribute('ui-required')).toBe('');
-	// Present for a form, absent from sight.
 	expect(getComputedStyle(el(Field).parentElement as Element).position).toBe('absolute');
 }
 
@@ -252,7 +231,6 @@ async function expectOmittedCallbacksStillChoose() {
 async function expectSelectsStayIsolated() {
 	el(LeftTrigger).click();
 	await expect.poll(() => el<HTMLElement>(LeftContent).hidden).toBe(false);
-	// The other select never heard about it.
 	expect(el<HTMLElement>(RightContent).hidden).toBe(true);
 
 	el(LeftBanana).click();
@@ -367,18 +345,12 @@ for (const mode of MODES) {
 	});
 }
 
-// --- keyboard, closed -----------------------------------------------------
-//
-// The APG's select-only combobox table. A key that opens the popup also decides
-// where the roving focus lands, and the choice is QDS's: the chosen option if
-// there is one, otherwise the first for a downward key and the last for an
-// upward one.
-
+// A key that opens the popup also decides where the roving focus lands: the chosen
+// option if there is one, else the first for a downward key and the last for an up.
 test('CSR: ArrowDown opens the popup and lands on the first option', async () => {
 	await render(Basic);
 	await openWith('{ArrowDown}');
 	await expect.poll(async () => await focused()).toBe(el(Apple));
-	// Landing on an option is not choosing it.
 	expect(el(Apple).getAttribute('aria-selected')).toBe('false');
 });
 
@@ -388,10 +360,8 @@ test('CSR: ArrowUp opens the popup and lands on the last option', async () => {
 	await expect.poll(async () => await focused()).toBe(el(Cherry));
 });
 
-// Enter and Space reach the popup through the button's own activation rather
-// than through a key rule, because preventDefault() from a deferred handler
-// cannot suppress the native click. What matters to a person is unchanged: the
-// key opens the popup and the roving focus lands on an option.
+// Enter and Space reach the popup through the button's own activation, because
+// preventDefault() from a deferred handler cannot suppress the native click.
 test('CSR: Enter and Space open the popup and land on the first option', async () => {
 	await render(Basic);
 	await openWith('{Enter}');
@@ -434,17 +404,12 @@ test('CSR: the arrow walk skips an option nobody may choose', async () => {
 	await openWith('{ArrowDown}');
 	await expect.poll(async () => await focused()).toBe(el(Apple));
 
-	// apple -> (banana is unavailable) -> cherry
 	await userEvent.keyboard('{ArrowDown}');
 	await expect.poll(async () => await focused()).toBe(el(Cherry));
 });
 
-// --- keyboard, open -------------------------------------------------------
-//
-// The rule that separates this family from a radio group: moving the highlight
-// is not choosing. A reader that says "selected" after an arrow means the arrow
-// handler committed, which is the select family's most common bug.
-
+// Unlike a radio group, moving the highlight is not choosing: a reader that says
+// "selected" after an arrow means the arrow handler committed.
 test('CSR: ArrowDown inside the open listbox moves the highlight and changes nothing', async () => {
 	await render(Basic);
 	await openWith('{ArrowDown}');
@@ -467,7 +432,6 @@ test('CSR: Home and End inside the open listbox reach the ends and stop there', 
 
 	await userEvent.keyboard('{End}');
 	await expect.poll(async () => await focused()).toBe(el(Cherry));
-	// The ends do not wrap: a select's list has a top and a bottom.
 	await userEvent.keyboard('{ArrowDown}');
 	await new Promise((resolve) => setTimeout(resolve, 150));
 	expect(document.activeElement).toBe(el(Cherry));
@@ -497,8 +461,7 @@ test('CSR: Escape closes the popup and leaves the value untouched', async () => 
 	await openWith('{ArrowDown}');
 	await expect.poll(async () => await focused()).toBe(el(Banana));
 
-	// Move the highlight first: the bug this row catches is an Escape that
-	// commits whatever the highlight had reached.
+	// Move the highlight first: this row catches an Escape that commits it.
 	await userEvent.keyboard('{ArrowDown}');
 	await expect.poll(async () => await focused()).toBe(el(Cherry));
 	await userEvent.keyboard('{Escape}');
@@ -518,11 +481,7 @@ test('CSR: Tab out of the open listbox commits and closes', async () => {
 	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(true);
 });
 
-// --- typeahead ------------------------------------------------------------
-//
-// Two graph cells and a Date.now() comparison, where QDS holds a class instance
-// with a live setTimeout handle. The window is 750ms, QDS's own.
-
+// Typeahead is two graph cells and a Date.now() comparison, over a 750ms window.
 test('CSR: typing a letter on the closed combobox opens on the first match', async () => {
 	await render(LongList);
 	el(Trigger).focus();
@@ -574,8 +533,6 @@ test('CSR: typeahead matches the option text, not its aria-hidden decoration', a
 	await expect.poll(async () => await focused()).toBe(el(Cherry));
 });
 
-// --- the hidden control ---------------------------------------------------
-
 test('CSR: the hidden native control is never reached by Tab', async () => {
 	await render(SignupForm);
 	el(Trigger).focus();
@@ -584,12 +541,6 @@ test('CSR: the hidden native control is never reached by Tab', async () => {
 	await new Promise((resolve) => setTimeout(resolve, 150));
 	expect(document.activeElement).not.toBe(el(Field));
 });
-
-// --- repeats --------------------------------------------------------------
-//
-// Options authored with a keyed `@for` — the shape every real select has, since
-// nobody hand-writes thirteen options. `select.item` roots its own widget
-// instance, which is the combination no shipped family has proven.
 
 test('CSR: options from a keyed loop each get their own instance', async () => {
 	await render(OptionsFromData);
@@ -600,7 +551,6 @@ test('CSR: options from a keyed loop each get their own instance', async () => {
 	await expect.poll(() => page.getByTestId('row').elements()[1]?.getAttribute('aria-selected')).toBe(
 		'true',
 	);
-	// The choice landed in one row only.
 	expect(page.getByTestId('row').elements()[0]?.getAttribute('aria-selected')).toBe('false');
 	expect(page.getByTestId('row').elements()[2]?.getAttribute('aria-selected')).toBe('false');
 });

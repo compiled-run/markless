@@ -38,7 +38,6 @@ const WeeklyTrigger = page.getByTestId('weekly-trigger');
 const MonthlyTrigger = page.getByTestId('monthly-trigger');
 const DailyContent = page.getByTestId('daily-content');
 const WeeklyContent = page.getByTestId('weekly-content');
-// The consumer handler's log.
 const FirstOverview = page.getByTestId('first-overview');
 const FirstUsage = page.getByTestId('first-usage');
 const FirstUsageContent = page.getByTestId('first-usage-content');
@@ -54,14 +53,11 @@ const LeftOneContent = page.getByTestId('left-one-content');
 const LeftTwoContent = page.getByTestId('left-two-content');
 const RightOneContent = page.getByTestId('right-one-content');
 const RightTwoContent = page.getByTestId('right-two-content');
-// The consumer who wrote the family's own attributes.
 const OneTrigger = page.getByTestId('one-trigger');
 const TwoContent = page.getByTestId('two-content');
 
-// A row that asserts the same thing in both modes runs once per mode. The SSR
-// harness rewrites a literal SSR mount call site, so the mount cannot be passed
-// by reference or wrapped in a helper - the branch below keeps both call sites
-// literal, which is why this idiom rather than a `mount` parameter.
+// The SSR harness rewrites a literal `renderSSR` call site, so each test must branch
+// on the mode rather than take the mount by reference.
 const MODES = ['CSR', 'SSR'] as const;
 
 function el<T extends Element = HTMLElement>(locator: { element(): Element | null }) {
@@ -95,7 +91,6 @@ function expectOneElementPerPart() {
 	expect(page.getByTestId('list').elements().length).toBe(1);
 	expect(page.getByTestId('overview-trigger').elements().length).toBe(1);
 	expect(page.getByTestId('overview-content').elements().length).toBe(1);
-	// The trigger is a button that submits nothing.
 	expect(el(OverviewTrigger).tagName).toBe('BUTTON');
 	expect(el(OverviewTrigger).getAttribute('type')).toBe('button');
 }
@@ -109,12 +104,10 @@ function expectPanelDisplayFollowsSelection() {
 }
 
 function expectRovingTabindexBeforeAnyGesture() {
-	// One tab stop for the whole set, on the tab that is showing, so Tab lands
-	// on the selected tab and Tab again leaves the tablist for the panel.
+	// One tab stop for the set, on the showing tab, so Tab again leaves for the panel.
 	expect(el(OverviewTrigger).getAttribute('tabindex')).toBe('0');
 	expect(el(UsageTrigger).getAttribute('tabindex')).toBe('-1');
 	expect(el(BillingTrigger).getAttribute('tabindex')).toBe('-1');
-	// The showing panel is its own tab stop; the hidden ones are not.
 	expect(el(OverviewContent).getAttribute('tabindex')).toBe('0');
 	expect(el(UsageContent).getAttribute('tabindex')).toBe('-1');
 }
@@ -132,15 +125,13 @@ function expectSettingsRendered() {
 	expect(el(TeamTrigger).getAttribute('disabled')).toBe('');
 	expect(el(DangerTrigger).hasAttribute('disabled')).toBe(false);
 	expect(el(List).getAttribute('aria-label')).toBe('Settings');
-	// A panel keeps its own focusable controls, so a person can Tab into them.
 	expect(el(ProfileContent).hasAttribute('hidden')).toBe(false);
 	expect(el(DisplayName)).not.toBeNull();
 	expect(el(DangerContent).hasAttribute('hidden')).toBe(true);
 }
 
 function expectArmedPartsResolveTheRoot() {
-	// A panel authored inside an @if arm reads the enclosing root's instance the
-	// way a flat one does. The tab beside it cannot be armed - see the scenario.
+	// The tab beside the armed panel cannot itself be armed - see the scenario.
 	expect(el(page.getByTestId('team-content')).getAttribute('role')).toBe('tabpanel');
 	expect(el(page.getByTestId('team-content')).hasAttribute('hidden')).toBe(true);
 	expect(el(page.getByTestId('overview-content')).hasAttribute('hidden')).toBe(false);
@@ -160,18 +151,12 @@ function expectFamilyOwnsItsOwnAttributes() {
 	expect(el(OneTrigger).getAttribute('aria-selected')).toBe('true');
 	expect(el(List).getAttribute('role')).toBe('tablist');
 	expect(el(TwoContent).getAttribute('role')).toBe('tabpanel');
-	// A consumer cannot show a panel whose tab is not the showing one.
 	expect(el(TwoContent).hasAttribute('hidden')).toBe(true);
 }
 
-// The APG wants aria-controls on the tab and aria-labelledby on the panel, and
-// this family emits neither. element() mints one id per handle per widget
-// instance, and a tabs root is one instance holding N trigger/panel pairs, so a
-// handle in an IDREF position names one element, not the third of four
-// (research-tabs.md 6b; MARKLESS_ELEMENT_HANDLE_IDREF_ROW_OWNED and
-// _COMPOSITE refuse the ways around it). QDS is in the same place. This row
-// turns red - which is the signal to wire them - the day a value-keyed
-// sub-instance can be resolved from two sibling subtrees.
+// element() mints one id per handle per widget instance, and a tabs root is one
+// instance holding N trigger/panel pairs, so aria-controls and aria-labelledby stay
+// unwired until a value-keyed sub-instance is resolvable (research-tabs.md 6b).
 function expectPairingNotWiredYet() {
 	expect(el(OverviewTrigger).hasAttribute('aria-controls')).toBe(false);
 	expect(el(OverviewContent).hasAttribute('aria-labelledby')).toBe(false);
@@ -181,15 +166,14 @@ async function expectClickSelectsTheTab() {
 	el(BillingTrigger).click();
 	await expect.poll(() => el(BillingTrigger).getAttribute('aria-selected')).toBe('true');
 	expect(el(OverviewTrigger).getAttribute('aria-selected')).toBe('false');
-	// The tab stop moved with the selection.
 	await expect.poll(() => el(BillingTrigger).getAttribute('tabindex')).toBe('0');
 	expect(el(OverviewTrigger).getAttribute('tabindex')).toBe('-1');
 }
 
 async function expectClickMovesThePanels() {
 	el(BillingTrigger).click();
-	// ui-selected and hidden are the same cell read twice, so which of the two
-	// moves says whether the cell or the attribute is what went stale.
+	// ui-selected and hidden are the same cell read twice: which one moves says
+	// whether the cell or the attribute went stale.
 	await expect.poll(() => el(BillingContent).getAttribute('ui-selected')).toBe('');
 	await expect.poll(() => el(BillingContent).hasAttribute('hidden')).toBe(false);
 	expect(el(OverviewContent).hasAttribute('hidden')).toBe(true);
@@ -275,13 +259,8 @@ for (const mode of MODES) {
 	});
 }
 
-// --- keyboard -------------------------------------------------------------
-//
-// The APG's rule for this pattern, and where it differs from a radio group: an
-// arrow key moves focus, and whether focus also shows the tab is selectOnFocus's
-// call. Automatic activation is the default, so the panel swap is silent to a
-// screen reader - the documented cost of showing a tab on focus.
-
+// An arrow moves focus; whether focus also shows the tab is selectOnFocus's call,
+// and automatic activation is the default.
 test('CSR: ArrowRight walks to the next tab and shows it', async () => {
 	await render(Basic);
 	el(OverviewTrigger).focus();
@@ -306,7 +285,6 @@ test('CSR: the arrows walk past a tab nobody may open', async () => {
 	await render(SettingsPanels);
 	el(ProfileTrigger).focus();
 
-	// profile -> (team is closed) -> danger
 	await userEvent.keyboard('{ArrowRight}');
 	await expect.poll(() => document.activeElement).toBe(el(DangerTrigger));
 	await expect.poll(() => el(DangerTrigger).getAttribute('aria-selected')).toBe('true');
@@ -347,12 +325,10 @@ test('CSR: a vertical set walks the vertical axis and leaves the other alone', a
 	await render(Vertical);
 	el(InboxTrigger).focus();
 
-	// inbox -> (drafts is closed) -> sent
 	await userEvent.keyboard('{ArrowDown}');
 	await expect.poll(() => document.activeElement).toBe(el(SentTrigger));
 	await expect.poll(() => el(SentTrigger).getAttribute('aria-selected')).toBe('true');
 
-	// The horizontal arrows are not this set's axis: nothing moves.
 	await userEvent.keyboard('{ArrowRight}');
 	await new Promise((resolve) => setTimeout(resolve, 150));
 	expect(document.activeElement).toBe(el(SentTrigger));
@@ -383,15 +359,12 @@ test('CSR: a looping column wraps at both ends', async () => {
 	await expect.poll(() => document.activeElement).toBe(el(ColumnThree));
 });
 
-// --- manual activation ------------------------------------------------------
-
 test('CSR: with selectOnFocus off an arrow moves focus without showing the tab', async () => {
 	await render(ManualActivation);
 	el(DailyTrigger).focus();
 
 	await userEvent.keyboard('{ArrowRight}');
 	await expect.poll(() => document.activeElement).toBe(el(WeeklyTrigger));
-	// Focus moved; the showing tab did not.
 	expect(el(WeeklyTrigger).getAttribute('aria-selected')).toBe('false');
 	expect(el(DailyTrigger).getAttribute('aria-selected')).toBe('true');
 	expect(el(WeeklyContent).hasAttribute('hidden')).toBe(true);
@@ -411,24 +384,18 @@ test('CSR: with selectOnFocus off Enter and Space show the focused tab', async (
 	await expect.poll(() => el(MonthlyTrigger).getAttribute('aria-selected')).toBe('true');
 });
 
-// --- the consumer's callback ------------------------------------------------
-//
-// `onChange` is a callback slot on the shared instance: the root fills it with
-// its own prop at build time, and `show()` dispatches through that route.
-
+// `onChange` is a callback slot on the shared instance: the root fills it from its
+// own prop at build time, and `show()` dispatches through that route.
 test('CSR: onChange is called once, with the new value, before the consumer click handler', async () => {
 	await render(WithOnChange);
-	// Nothing fired on mount or first render.
 	expect(el(Calls).textContent).toBe('0');
 	expect(el(FirstValue).textContent).toBe('');
 
 	el(FirstUsage).click();
 	await expect.poll(() => el(FirstValue).textContent).toBe('usage');
 	await expect.poll(() => el(Calls).textContent).toBe('1');
-	// The family's own handler ran first, the consumer's after it.
 	await expect.poll(() => el(Order).textContent).toBe('change-click');
 	await expect.poll(() => el(FirstUsageContent).hasAttribute('hidden')).toBe(false);
-	// The sibling set's handler did not run.
 	expect(el(SecondValue).textContent).toBe('');
 });
 
@@ -460,14 +427,11 @@ test('CSR: tabs change with no onChange in play', async () => {
 	expect(el(Calls).textContent).toBe('0');
 });
 
-// --- two widgets ------------------------------------------------------------
-
 test('CSR: clicking in one tab set leaves the other where it was', async () => {
 	await render(TwoWidgets);
 	el(LeftTwo).click();
 	await expect.poll(() => el(LeftTwoContent).hasAttribute('hidden')).toBe(false);
 	expect(el(LeftOneContent).hasAttribute('hidden')).toBe(true);
-	// The set beside it, whose tabs carry the same values, did not move.
 	expect(el(RightOneContent).hasAttribute('hidden')).toBe(false);
 	expect(el(RightTwoContent).hasAttribute('hidden')).toBe(true);
 });
@@ -482,8 +446,6 @@ test('CSR: arrowing in one tab set leaves the other where it was', async () => {
 	expect(el(RightTwoContent).hasAttribute('hidden')).toBe(true);
 });
 
-// --- served, then resumed ---------------------------------------------------
-
 test('CSR: clicking a tab moves the panels', async () => {
 	await render(Basic);
 	await expectClickMovesThePanels();
@@ -491,7 +453,6 @@ test('CSR: clicking a tab moves the panels', async () => {
 
 test('SSR: the selection is in the served HTML, and the first click after resume moves the tab', async () => {
 	await renderSSR(Basic);
-	// What the server wrote, before any gesture.
 	expect(el(OverviewTrigger).getAttribute('aria-selected')).toBe('true');
 	expect(el(OverviewContent).hasAttribute('hidden')).toBe(false);
 	expect(el(BillingContent).hasAttribute('hidden')).toBe(true);
@@ -501,22 +462,9 @@ test('SSR: the selection is in the served HTML, and the first click after resume
 	expect(el(OverviewTrigger).getAttribute('aria-selected')).toBe('false');
 });
 
-// PINNED. After resume, a `tabs.content` never refreshes again: `ui-selected`
-// stays absent and `hidden` stays set, so the panels keep whatever the server
-// served while the triggers beside them, in the same widget, move correctly.
-// It is the computed cell that is stale, not one attribute - `ui-selected` and
-// `hidden` are the same cell read twice, and both are wrong.
-//
-// Measured on this tip, both ways round:
-//   * comparing the root's cell against the content's own PROP (what ships)
-//     refreshes in CSR and never after resume;
-//   * comparing against a cell on a part instance the content roots itself
-//     stops `hidden` refreshing in CSR as well, so it is not the fix.
-// The trigger takes the first shape and is fine in both modes, so a part
-// reading its own prop is not the whole story either.
-//
-// Deterministic, so test.fails rather than skip: the row turns red the day the
-// panel refreshes, which is the signal to unpin it.
+// PINNED: after resume a `tabs.content` never refreshes, so the panels keep what the
+// server served while the triggers in the same widget move. Measured both ways round -
+// rooting the comparison on a part instance breaks CSR too, so it is not the fix.
 test.fails('SSR: clicking a tab moves the panels', async () => {
 	await renderSSR(Basic);
 	await expectClickMovesThePanels();
@@ -535,8 +483,7 @@ test('CSR: the panel a consumer opened keeps its control reachable', async () =>
 	await render(SettingsPanels);
 	el(DangerTrigger).click();
 	await expect.poll(() => el(DangerContent).hasAttribute('hidden')).toBe(false);
-	// A control inside a shown panel is focusable, which is the whole reason the
-	// panels are hidden rather than unmounted.
+	// Panels are hidden rather than unmounted so their controls stay focusable.
 	el(Delete).focus();
 	expect(document.activeElement).toBe(el(Delete));
 });

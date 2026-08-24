@@ -11,10 +11,6 @@ import { UnavailableOptions } from './scenarios/unavailable-options.tsrx';
 import { WithHelp } from './scenarios/with-help.tsrx';
 import { WithOnChange } from './scenarios/with-onchange.tsrx';
 
-// Colocated browser suite for the radio-group family. Each test renders a
-// realistic consumer scenario, and the locators name the QDS part anatomy: root,
-// label, description, error, item, itemtrigger, itemindicator, itemlabel,
-// itemfield - prefixed per option, the way a consumer names their own choices.
 const Root = page.getByTestId('root');
 const Label = page.getByTestId('label');
 const Monthly = page.getByTestId('monthly');
@@ -30,37 +26,30 @@ const AnnualLabel = page.getByTestId('annual-label');
 const LifetimeField = page.getByTestId('lifetime-field');
 const LifetimeTrigger = page.getByTestId('lifetime-trigger');
 const LifetimeIndicator = page.getByTestId('lifetime-indicator');
-// The segmented control, which is this family laid out sideways.
 const DayField = page.getByTestId('day-field');
 const WeekField = page.getByTestId('week-field');
 const MonthField = page.getByTestId('month-field');
-// Options and groups nobody may choose.
 const LockedRoot = page.getByTestId('locked-root');
 const LockedBasicField = page.getByTestId('locked-basic-field');
 const LockedPremiumTrigger = page.getByTestId('locked-premium-trigger');
 const LockedPremiumIndicator = page.getByTestId('locked-premium-indicator');
-// Help text, and the error written after the options and before them.
 const AfterDescription = page.getByTestId('after-description');
 const AfterError = page.getByTestId('after-error');
 const AfterRoot = page.getByTestId('after-root');
 const BeforeError = page.getByTestId('before-error');
 const BeforeRoot = page.getByTestId('before-root');
-// Two groups on one page.
 const LeftMonthlyTrigger = page.getByTestId('left-monthly-trigger');
 const LeftAnnualField = page.getByTestId('left-annual-field');
 const LeftAnnualIndicator = page.getByTestId('left-annual-indicator');
 const RightBasicField = page.getByTestId('right-basic-field');
 const RightBasicIndicator = page.getByTestId('right-basic-indicator');
 const RightPremiumIndicator = page.getByTestId('right-premium-indicator');
-// The consumer handler's log, and what a form actually submitted.
 const Value = page.getByTestId('value');
 const Calls = page.getByTestId('calls');
 const Submitted = page.getByTestId('submitted');
 
-// A row that asserts the same thing in both modes runs once per mode. The SSR
-// harness rewrites a literal SSR mount call site, so the mount cannot be passed
-// by reference or wrapped in a helper — the branch below keeps both call sites
-// literal, which is why this idiom rather than a `mount` parameter.
+// The SSR harness rewrites a literal `renderSSR` call site, so each test must branch
+// on the mode rather than take the mount by reference.
 const MODES = ['CSR', 'SSR'] as const;
 
 function el<T extends Element = HTMLElement>(locator: { element(): Element | null }) {
@@ -73,8 +62,7 @@ function field(locator: { element(): Element | null }) {
 	return el<HTMLInputElement>(locator);
 }
 
-// A real submit would navigate the test iframe, so the event is dispatched. What
-// is proven is what the browser itself put in the FormData for this form.
+// A real submit would navigate the test iframe, so the event is dispatched instead.
 function submit() {
 	el(page.getByTestId('form')).dispatchEvent(
 		new Event('submit', { bubbles: true, cancelable: true }),
@@ -91,7 +79,6 @@ function expectBasicRendered() {
 	expect(el(Root).getAttribute('aria-orientation')).toBe('vertical');
 	expect(el(Root).hasAttribute('ui-horizontal')).toBe(false);
 
-	// Nothing chosen: three radios, none checked, no indicator content.
 	expect(page.getByRole('radio').elements().length).toBe(3);
 	for (const option of [MonthlyField, AnnualField, LifetimeField]) {
 		expect(field(option).type).toBe('radio');
@@ -106,17 +93,14 @@ function expectBasicRendered() {
 	expect(el(MonthlyLabel).getAttribute('for')).not.toBe(el(AnnualLabel).getAttribute('for'));
 }
 
-// One element per part: every part this family ships renders exactly one piece
-// of markup, so a consumer's stylesheet and a screen reader see the tree they
-// wrote. The field is the exception a hidden native control forces - it renders
-// inside the clipping span the base family owns.
+// The field is the one exception: a hidden native control renders inside the
+// clipping span the base family owns.
 function expectOneElementPerPart() {
 	expect(el(Monthly).children.length).toBe(3);
 	expect(el(Monthly).children[1]).toBe(el(MonthlyTrigger));
 	expect(el(MonthlyTrigger).children.length).toBe(1);
 	expect(el(MonthlyTrigger).children[0]).toBe(el(MonthlyIndicator));
 	expect(el(Monthly).children[2]).toBe(el(MonthlyLabel));
-	// Present for a form and for a screen reader, absent from sight.
 	expect(getComputedStyle(field(MonthlyField).parentElement as Element).position).toBe('absolute');
 }
 
@@ -130,17 +114,14 @@ function expectPrefilledRendered() {
 	expect(el(LifetimeIndicator).textContent).toBe('');
 }
 
-// Reachability: with nothing chosen the first enabled option is a tab stop, so
-// the group can be entered at all. There is no construction-order index in this
-// family, so every enabled option holds a stop until the first focus says which
-// one owns it.
+// There is no construction-order index here, so every enabled option holds a tab
+// stop until the first focus says which one owns it.
 function expectReachableBeforeAnyGesture() {
 	expect(field(MonthlyField).tabIndex).toBe(0);
 	field(MonthlyField).focus();
 	expect(document.activeElement).toBe(field(MonthlyField));
 }
 
-// Once a choice exists, the chosen option is the one Tab lands on.
 function expectChosenOptionOwnsTheTabStop() {
 	expect(field(AnnualField).tabIndex).toBe(0);
 	expect(field(MonthlyField).tabIndex).toBe(-1);
@@ -154,8 +135,7 @@ async function expectTriggerChooses() {
 	expect(el(AnnualIndicator).textContent).toBe('');
 }
 
-// A radio group has no path back to nothing chosen: a second gesture on the
-// option already chosen leaves it exactly where it was.
+// A radio group has no path back to nothing chosen.
 async function expectChoosingIsOneWay() {
 	el(MonthlyTrigger).click();
 	await expect.poll(() => el(MonthlyIndicator).textContent).toBe('Chosen');
@@ -175,8 +155,7 @@ function expectDisabledRendered() {
 	expect(field(LifetimeField).disabled).toBe(true);
 	expect(field(MonthlyField).disabled).toBe(false);
 
-	// A whole locked group: the root carries the flag, and a fieldset's own
-	// disabled is what actually locks every control inside it.
+	// A fieldset's own `disabled` is what locks every control inside it.
 	expect(el(LockedRoot).getAttribute('ui-disabled')).toBe('');
 	expect(el<HTMLFieldSetElement>(LockedRoot).disabled).toBe(true);
 	expect(field(LockedBasicField).disabled).toBe(true);
@@ -185,7 +164,7 @@ function expectDisabledRendered() {
 async function expectDisabledBlocks() {
 	el(LifetimeTrigger).click();
 	el(LockedPremiumTrigger).click();
-	// Give a dispatch the room a real choice gets, then read: nothing moved.
+	// Give a dispatch the room a real choice gets before reading.
 	await new Promise((resolve) => setTimeout(resolve, 150));
 	expect(el(LifetimeIndicator).textContent).toBe('');
 	expect(el(LockedPremiumIndicator).textContent).toBe('');
@@ -194,16 +173,14 @@ async function expectDisabledBlocks() {
 function expectHelpRendered() {
 	expect(el(AfterDescription).textContent).toBe('Switch plans whenever you like.');
 	expect(el(AfterError).textContent).toBe('Pick a billing period');
-	// Every part of one instance seeds before any part renders, so an error part
-	// written after the options still marks the group invalid.
+	// Every part of one instance seeds before any part renders, so document order
+	// does not decide - the error marks the group either way.
 	expect(el(AfterRoot).getAttribute('aria-invalid')).toBe('true');
-	// The same error written BEFORE the options: document order does not decide.
 	expect(el(BeforeError).textContent).toBe('Pick a support plan');
 	expect(el(BeforeRoot).getAttribute('aria-invalid')).toBe('true');
 }
 
 function expectFormConfigRendered() {
-	// One name for the whole group, one value per option: what a radio submits.
 	// The name is declared once, by `radiogroup.field`, and every option takes it.
 	expect(field(MonthlyField).getAttribute('name')).toBe('plan');
 	expect(field(AnnualField).getAttribute('name')).toBe('plan');
@@ -215,19 +192,16 @@ function expectFormConfigRendered() {
 	expect(field(AnnualField).required).toBe(true);
 }
 
-// The group field declares what a form receives and shows nothing: it holds no
-// content, takes no room, and adds no control of its own to the group.
 function expectGroupFieldIsHidden() {
 	const declared = el(Label).nextElementSibling as HTMLElement;
 	expect(declared.textContent).toBe('');
 	expect(getComputedStyle(declared).position).toBe('absolute');
 	expect(declared.getBoundingClientRect().height).toBeLessThanOrEqual(1);
-	// Every control in the group is still an option's own hidden radio.
+	// The group field adds no control of its own: both radios belong to options.
 	expect(page.getByRole('radio').elements().length).toBe(2);
 }
 
-// A group with no field part: nothing is named, so a form receives nothing from
-// it. This is what makes the field worth mounting rather than a formality.
+// With no field part nothing is named, so a form receives nothing from the group.
 function expectNamelessGroupSubmitsNothing() {
 	expect(field(MonthlyField).getAttribute('name')).toBe('');
 	expect(field(MonthlyField).required).toBe(false);
@@ -273,7 +247,6 @@ async function expectGroupsStayIsolated() {
 	await expect.poll(() => el(page.getByTestId('left-monthly-indicator')).textContent).toBe(
 		'Chosen',
 	);
-	// The other group never heard about it.
 	expect(el(RightBasicIndicator).textContent).toBe('');
 	expect(el(RightPremiumIndicator).textContent).toBe('');
 	expect(field(RightBasicField).hasAttribute('checked')).toBe(false);
@@ -342,9 +315,6 @@ for (const mode of MODES) {
 		await expectDisabledBlocks();
 	});
 
-	// Unpinned: the seed map a part writes now reaches the widget ROOT as well as
-	// the parts projected into it, so `group.invalid = true` from the error part
-	// is what the root renders `aria-invalid` from, in both modes.
 	test(
 		`${mode}: a mounted error marks the group invalid, written after the options or before them`,
 		async () => {
@@ -397,12 +367,7 @@ for (const mode of MODES) {
 	});
 }
 
-// --- keyboard -------------------------------------------------------------
-//
-// The APG's non-obvious rule for this pattern: an arrow key moves focus AND
-// chooses. Unlike tabs, selection is not optional, and a reader that says
-// "unchecked" after an arrow is the most common way this pattern is got wrong.
-
+// Unlike tabs, an arrow key here moves focus AND chooses: selection is not optional.
 test('CSR: ArrowDown moves focus to the next option and chooses it', async () => {
 	await render(Basic);
 	field(MonthlyField).focus();
@@ -464,7 +429,6 @@ test('CSR: the arrow keys walk past an option nobody may choose', async () => {
 	await render(UnavailableOptions);
 	field(MonthlyField).focus();
 
-	// monthly -> (lifetime is unavailable) -> annual
 	await userEvent.keyboard('{ArrowDown}');
 	await expect.poll(() => document.activeElement).toBe(field(AnnualField));
 	await expect.poll(() => el(AnnualIndicator).textContent).toBe('Chosen');
@@ -480,7 +444,6 @@ test('CSR: a horizontal group walks the horizontal axis and leaves the other alo
 	await userEvent.keyboard('{ArrowRight}');
 	await expect.poll(() => document.activeElement).toBe(field(MonthField));
 
-	// The vertical arrows are not this group's axis: nothing moves.
 	await userEvent.keyboard('{ArrowDown}');
 	await new Promise((resolve) => setTimeout(resolve, 150));
 	expect(document.activeElement).toBe(field(MonthField));
@@ -491,17 +454,12 @@ test('CSR: a horizontal group walks the horizontal axis and leaves the other alo
 	await expect.poll(() => document.activeElement).toBe(field(DayField));
 });
 
-// --- repeats ---------------------------------------------------------------
-//
-// Options authored with a keyed `@for` — the shape every real radio group has,
-// since a group written over a literal list of options is a toy.
-
 test('CSR: options from a keyed loop each get their own instance', async () => {
 	await render(OptionsFromData);
 	const triggers = page.getByTestId('row-trigger').elements();
 	const fields = page.getByTestId('row-field').elements() as HTMLInputElement[];
 	expect(triggers.length).toBe(3);
-	// Three rows, three minted ids: the rows did not share one instance.
+	// Three minted ids: the rows did not share one instance.
 	expect(new Set(fields.map((row) => row.id)).size).toBe(3);
 	expect(fields.map((row) => row.value)).toEqual(['monthly', 'annual', 'lifetime']);
 
@@ -509,14 +467,10 @@ test('CSR: options from a keyed loop each get their own instance', async () => {
 	await expect.poll(() => page.getByTestId('row-indicator').elements()[1]?.textContent).toBe(
 		'Chosen',
 	);
-	// The choice landed in one row only.
 	expect(page.getByTestId('row-indicator').elements()[0]?.textContent).toBe('');
 	expect(page.getByTestId('row-indicator').elements()[2]?.textContent).toBe('');
 });
 
-// The seed a part writes before the rows are built reaches keyed rows (the
-// framework's keyed-row-shared-writes witness owns that proof); this row keeps
-// the family-level fact: looped options submit under the declared name.
 test('CSR: every option from a loop submits under the name the field declares', async () => {
 	await render(OptionsFromData);
 	await expect

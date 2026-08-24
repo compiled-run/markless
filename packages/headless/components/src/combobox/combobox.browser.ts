@@ -13,15 +13,6 @@ import { UnavailableOptions } from './scenarios/unavailable-options.tsrx';
 import { WithCallbacks } from './scenarios/with-callbacks.tsrx';
 import { WithError } from './scenarios/with-error.tsrx';
 
-// Colocated browser suite for the combobox family. Each test renders a realistic
-// consumer scenario, and the locators name the QDS part anatomy: root, label,
-// input, trigger, content, item, itemlabel, itemindicator, description, error,
-// field - prefixed per option, the way a consumer names their own choices.
-//
-// The behaviours asserted here are the sixteen read off Qwik UI's own handlers.
-// Where one
-// cannot ship, the row is `test.fails` with the reason beside it rather than
-// absent.
 const Root = page.getByTestId('root');
 const Label = page.getByTestId('label');
 const Input = page.getByTestId('input');
@@ -33,7 +24,6 @@ const AppleIndicator = page.getByTestId('apple-itemindicator');
 const Banana = page.getByTestId('banana');
 const BananaIndicator = page.getByTestId('banana-itemindicator');
 const Cherry = page.getByTestId('cherry');
-// Options and comboboxes nobody may use.
 const Basic1 = page.getByTestId('basic');
 const Premium = page.getByTestId('premium');
 const Ultra = page.getByTestId('ultra');
@@ -41,22 +31,18 @@ const LockedRoot = page.getByTestId('locked-root');
 const LockedInput = page.getByTestId('locked-input');
 const LockedTrigger = page.getByTestId('locked-trigger');
 const LockedLegacy = page.getByTestId('locked-legacy');
-// More than one choice at a time.
 const Olive = page.getByTestId('olive');
 const Basil = page.getByTestId('basil');
 const Caper = page.getByTestId('caper');
 const Picked = page.getByTestId('picked');
-// The consumer's own filtered list.
 const Rows = page.getByTestId('rows');
 const Empty = page.getByTestId('empty');
-// The form and its hidden native control.
 const Field = page.getByTestId('field');
 const Description = page.getByTestId('description');
 const ErrorMessage = page.getByTestId('error');
 const Monthly = page.getByTestId('monthly');
 const Annual = page.getByTestId('annual');
 const Submitted = page.getByTestId('submitted');
-// Two comboboxes on one page.
 const LeftInput = page.getByTestId('left-input');
 const LeftTrigger = page.getByTestId('left-trigger');
 const LeftContent = page.getByTestId('left-content');
@@ -65,16 +51,13 @@ const LeftBananaIndicator = page.getByTestId('left-banana-itemindicator');
 const RightInput = page.getByTestId('right-input');
 const RightContent = page.getByTestId('right-content');
 const RightBasicIndicator = page.getByTestId('right-basic-itemindicator');
-// The consumer handlers' log.
 const Chosen = page.getByTestId('chosen');
 const Typed = page.getByTestId('typed');
 const Opens = page.getByTestId('opens');
 const Changes = page.getByTestId('changes');
 
-// A row that asserts the same thing in both modes runs once per mode. The SSR
-// harness rewrites a literal SSR mount call site, so the mount cannot be passed
-// by reference or wrapped in a helper - the branch below keeps both call sites
-// literal, which is why this idiom rather than a `mount` parameter.
+// The SSR harness rewrites a literal `renderSSR` call site, so each test must branch
+// on the mode rather than take the mount by reference.
 const MODES = ['CSR', 'SSR'] as const;
 
 function el<T extends Element = HTMLElement>(locator: { element(): Element | null }) {
@@ -83,10 +66,8 @@ function el<T extends Element = HTMLElement>(locator: { element(): Element | nul
 	return found as T;
 }
 
-// A real submit would navigate the test iframe, so the event is dispatched. What
-// is proven is what the browser itself put in the FormData for this form. The
-// read polls: the page's own submit handler is a lazily loaded symbol, so the
-// output is still empty on the line after the dispatch.
+// A real submit would navigate the test iframe, so the event is dispatched instead;
+// the read polls because the page's submit handler is a lazily loaded symbol.
 async function expectSubmitted(expected: Record<string, string>) {
 	el(page.getByTestId('form')).dispatchEvent(
 		new Event('submit', { bubbles: true, cancelable: true }),
@@ -96,30 +77,25 @@ async function expectSubmitted(expected: Record<string, string>) {
 		.toEqual(expected);
 }
 
-/** Type into the field the way a person does, one key at a time. */
 async function typeInto(input: HTMLInputElement, text: string) {
 	input.focus();
 	await userEvent.keyboard(text);
 }
 
-/** Give a dispatch the room a real gesture gets, then read. */
+// Give a dispatch the room a real gesture gets, then read.
 async function settle() {
 	await new Promise((resolve) => setTimeout(resolve, 150));
 }
 
-// ---------------------------------------------------------------- 5.1 and 5.2
-
 function expectBasicRendered() {
-	// The INPUT is the role="combobox" element, not the trigger. That is the
-	// whole difference from select, where a button carries the role.
+	// The INPUT carries role="combobox", not the trigger - the difference from select.
 	expect(el(Input).tagName).toBe('INPUT');
 	expect(el(Input).getAttribute('role')).toBe('combobox');
 	expect(el(Input).getAttribute('aria-autocomplete')).toBe('list');
 	expect(el(Input).getAttribute('aria-haspopup')).toBe('listbox');
 	expect(el(Input).getAttribute('aria-expanded')).toBe('false');
 	expect(el(Content).getAttribute('role')).toBe('listbox');
-	// Closed hides the list; it never detaches it, so the input's aria-controls
-	// never points at nothing.
+	// Closed hides the list and never detaches it, so aria-controls always resolves.
 	expect(el<HTMLElement>(Content).hidden).toBe(true);
 	expect(el(Root).getAttribute('role')).toBe('group');
 	expect(el(Root).getAttribute('ui-closed')).toBe('');
@@ -134,8 +110,7 @@ function expectBasicRendered() {
 	}
 }
 
-// 5.1: the trigger is deliberately NOT tabbable. Only the input is a tab stop,
-// which is what makes the whole focus-stays-in-the-field model hold.
+// Only the input is a tab stop, which is what makes focus stay in the field.
 function expectOnlyTheInputIsATabStop() {
 	expect(el(Trigger).getAttribute('tabindex')).toBe('-1');
 	expect(el(Input).hasAttribute('tabindex')).toBe(false);
@@ -144,7 +119,6 @@ function expectOnlyTheInputIsATabStop() {
 	}
 }
 
-// Every IDREF this family writes resolves to an element that is really there.
 function expectNamedWithNoDanglingIdref() {
 	const labelId = el(Label).getAttribute('id');
 	const contentId = el(Content).getAttribute('id');
@@ -171,7 +145,6 @@ function expectOneElementPerPart() {
 	expect(el(AppleIndicator).getAttribute('aria-hidden')).toBe('true');
 }
 
-// 5.2: the trigger focuses the field, then toggles the list.
 async function expectTriggerOpensAndFocusesTheField() {
 	el(Trigger).click();
 	await expect.poll(() => el(Input).getAttribute('aria-expanded')).toBe('true');
@@ -183,16 +156,12 @@ async function expectTriggerOpensAndFocusesTheField() {
 	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(true);
 }
 
-// 5.3: the label names the input with `for`, so a click lands the caret in the
-// field without this family writing a handler for it.
+// The label names the input with `for`, so the caret lands without a handler.
 async function expectLabelFocusesTheField() {
 	el(Label).click();
 	await expect.poll(() => document.activeElement).toBe(el(Input));
 }
 
-// ------------------------------------------------------------------- 5.4/5.13
-
-// 5.13: choosing writes the option's own words into the field.
 async function expectChoosingWritesTheLabelIntoTheField() {
 	el(Trigger).click();
 	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(false);
@@ -200,14 +169,12 @@ async function expectChoosingWritesTheLabelIntoTheField() {
 	el(Banana).click();
 	await expect.poll(() => el(Banana).getAttribute('aria-selected')).toBe('true');
 	await expect.poll(() => el<HTMLInputElement>(Input).value).toBe('Banana');
-	// Choosing is what closes the list, in one gesture.
 	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(true);
 	expect(el(Apple).getAttribute('aria-selected')).toBe('false');
 }
 
-// 5.4, the quirk: clicking the option that is ALREADY chosen unselects it and
-// leaves the list showing. That is Qwik UI's deliberate rule and it is the one
-// most likely to be "fixed" by a later reader, so it gets its own row.
+// Deliberate: clicking the option ALREADY chosen unselects it and leaves the list
+// showing - the rule most likely to be "fixed" by a later reader.
 async function expectClickingTheChosenOptionUnchoosesAndStaysOpen() {
 	el(Trigger).click();
 	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(false);
@@ -218,15 +185,11 @@ async function expectClickingTheChosenOptionUnchoosesAndStaysOpen() {
 	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(false);
 	el(Banana).click();
 	await expect.poll(() => el(Banana).getAttribute('aria-selected')).toBe('false');
-	// Still showing: unchoosing is not choosing.
 	await settle();
 	expect(el<HTMLElement>(Content).hidden).toBe(false);
 }
 
-// ------------------------------------------------------------------------ 5.5
-
-// The pointer highlights only once it is genuinely inside the list. A list that
-// opens under a resting mouse must not steal the keyboard's highlight.
+// A list that opens under a resting mouse must not steal the keyboard's highlight.
 async function expectPointerHighlightsOnlyFromInsideTheList() {
 	el(Apple).dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
 	await settle();
@@ -238,23 +201,18 @@ async function expectPointerHighlightsOnlyFromInsideTheList() {
 	await expect.poll(() => el(Apple).getAttribute('ui-highlighted')).toBe('');
 }
 
-// ------------------------------------------------------------------------ 5.6
-
-// Whatever focuses an option, the caret goes back to the field. This is the
-// safety net that keeps DOM focus in one place no matter what moved it.
+// Whatever focuses an option, the caret goes back to the field.
 async function expectOptionFocusBouncesBackToTheField() {
 	el<HTMLElement>(Apple).focus();
 	await expect.poll(() => document.activeElement).toBe(el(Input));
 }
-
-// ------------------------------------------------------------------------ 5.9
 
 async function expectArrowDownOpensAndHighlightsTheFirst() {
 	el<HTMLElement>(Input).focus();
 	await userEvent.keyboard('{ArrowDown}');
 	await expect.poll(() => el(Input).getAttribute('aria-expanded')).toBe('true');
 	await expect.poll(() => el(Apple).getAttribute('ui-highlighted')).toBe('');
-	// DOM focus never moved: the highlight is state, not a focused element.
+	// The highlight is state, not a focused element.
 	expect(document.activeElement).toBe(el(Input));
 }
 
@@ -273,7 +231,6 @@ async function expectArrowsWalkAndStopAtTheEnds() {
 	await expect.poll(() => el(Banana).getAttribute('ui-highlighted')).toBe('');
 	await userEvent.keyboard('{ArrowUp}');
 	await expect.poll(() => el(Apple).getAttribute('ui-highlighted')).toBe('');
-	// Without `loop`, the top is the top.
 	await userEvent.keyboard('{ArrowUp}');
 	await settle();
 	expect(el(Apple).getAttribute('ui-highlighted')).toBe('');
@@ -309,27 +266,20 @@ async function expectEscapeClosesAndLeavesTheValueAlone() {
 	expect(document.activeElement).toBe(el(Input));
 }
 
-// The walk steps past an option nobody may choose, and `loop` wraps the ends.
 async function expectTheWalkStepsPastLockedOptionsAndLoops() {
 	el<HTMLElement>(page.getByTestId('input')).focus();
 	await userEvent.keyboard('{ArrowDown}');
 	await expect.poll(() => el(Basic1).getAttribute('ui-highlighted')).toBe('');
 	await userEvent.keyboard('{ArrowDown}');
-	// Premium is disabled, so the step lands on Ultra.
+	// Premium is disabled, so the step lands on Ultra; `loop` then wraps the ends.
 	await expect.poll(() => el(Ultra).getAttribute('ui-highlighted')).toBe('');
 	expect(el(Premium).hasAttribute('ui-highlighted')).toBe(false);
-	// `loop` on this root: past the last is the first.
 	await userEvent.keyboard('{ArrowDown}');
 	await expect.poll(() => el(Basic1).getAttribute('ui-highlighted')).toBe('');
 }
 
-// ----------------------------------------------------------------------- 5.11
-
 // The family ships no filter: the consumer filters their own list from
-// `combobox.state().input`, and `@empty` is the empty state the dropped
-// `combobox.empty` part used to be.
-// The consumer's computed reaches the page: `matches.length` is rendered beside
-// the rows and it follows the field.
+// `combobox.state().input`, and `@empty` is the empty state.
 async function expectTheConsumerFilterRecomputes() {
 	await expect.poll(() => page.getByTestId('count').element()?.textContent).toBe('4');
 	await typeInto(el<HTMLInputElement>(Input), 'ap');
@@ -352,14 +302,11 @@ async function expectTheEmptyArmSpeaksWhenNothingMatches() {
 	await expect.poll(() => Empty.element()?.textContent).toBe('Nothing matches');
 }
 
-// --------------------------------------------------------------- 5.10 and D3
-
 async function expectMoreThanOneChoiceAtATime() {
 	el(Olive).click();
 	await expect.poll(() => el(Olive).getAttribute('aria-selected')).toBe('true');
 	el(Caper).click();
 	await expect.poll(() => el(Caper).getAttribute('aria-selected')).toBe('true');
-	// Both, not the last one: that is the whole point of `multiple`.
 	expect(el(Olive).getAttribute('aria-selected')).toBe('true');
 	expect(el(Basil).getAttribute('aria-selected')).toBe('false');
 	await expect.poll(() => el(Picked).textContent).toBe('olive,caper');
@@ -375,8 +322,8 @@ async function expectClickingAChosenOptionGivesItBack() {
 	await expect.poll(() => el(Picked).textContent).toBe('');
 }
 
-// 5.10: the two-flag dance. The FIRST backspace on a field with text deletes
-// text; only a backspace on an already empty field gives a value back.
+// The FIRST backspace on a field with text deletes text; only a backspace on an
+// already empty field gives a value back.
 async function expectBackspaceRemovesTheLastChoiceOnlyWhenTheFieldWasEmpty() {
 	el(Olive).click();
 	await expect.poll(() => el(Picked).textContent).toBe('olive');
@@ -386,16 +333,13 @@ async function expectBackspaceRemovesTheLastChoiceOnlyWhenTheFieldWasEmpty() {
 	const input = el<HTMLInputElement>(Input);
 	await typeInto(input, 'x');
 	await expect.poll(() => input.value).toBe('x');
-	// This one deletes the text, not a choice. Poll like the neighbours: a bare
-	// read after settle() raced the dispatch under full-lane load (measured 1-in-2).
+	// Poll rather than read after settle(): a bare read raced the dispatch under
+	// full-lane load, measured 1-in-2.
 	await userEvent.keyboard('{Backspace}');
 	await expect.poll(() => el(Picked).textContent).toBe('olive,basil');
-	// This one, on an empty field, gives the last choice back.
 	await userEvent.keyboard('{Backspace}');
 	await expect.poll(() => el(Picked).textContent).toBe('olive');
 }
-
-// -------------------------------------------------------------- 5.8 dismissal
 
 async function expectEscapeDismissesTheOpenList() {
 	el(Trigger).click();
@@ -412,9 +356,8 @@ async function expectAPressOutsideDismissesTheOpenList() {
 	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(true);
 }
 
-// The press that dismissed is the same press whose click the trigger is about to
-// see: without the identity guard, pressing the trigger of an open list closes it
-// on the press and re-opens it on the click.
+// Without the identity guard, the dismissing press and the click it becomes would
+// close the list and re-open it.
 async function expectPressingTheTriggerOfAnOpenListClosesItAndLeavesItClosed() {
 	el(Trigger).click();
 	await expect.poll(() => el<HTMLElement>(Content).hidden).toBe(false);
@@ -423,8 +366,6 @@ async function expectPressingTheTriggerOfAnOpenListClosesItAndLeavesItClosed() {
 	await settle();
 	expect(el<HTMLElement>(Content).hidden).toBe(true);
 }
-
-// ---------------------------------------------------------------- 5.15 a form
 
 function expectFormPartsRendered() {
 	expect(el(Field).tagName).toBe('SELECT');
@@ -438,8 +379,7 @@ function expectFormPartsRendered() {
 }
 
 async function expectOnlyTheChosenOptionIsSubmitted() {
-	// Nothing chosen submits the empty value, which is what a native `<select>`
-	// with no choice does.
+	// Nothing chosen submits the empty value, as a native `<select>` does.
 	await expectSubmitted({ plan: '' });
 	el(Annual).click();
 	await expect.poll(() => el(Annual).getAttribute('aria-selected')).toBe('true');
@@ -448,8 +388,6 @@ async function expectOnlyTheChosenOptionIsSubmitted() {
 	await expect.poll(() => el(Monthly).getAttribute('aria-selected')).toBe('true');
 	await expectSubmitted({ plan: 'monthly' });
 }
-
-// --------------------------------------------------------------- locked state
 
 function expectDisabledRendered() {
 	expect(el(Premium).getAttribute('aria-disabled')).toBe('true');
@@ -471,11 +409,7 @@ async function expectDisabledBlocks() {
 	expect(el(LockedLegacy).getAttribute('aria-selected')).toBe('false');
 }
 
-// ---------------------------------------------------------------------- 5.16
-
-// No mount-time dispatch. Qwik UI needs an `initialLoad` latch to suppress three
-// effects on first render; callbacks here fire from handlers, so there is
-// nothing to suppress.
+// Callbacks fire from handlers, so there is no mount-time dispatch to suppress.
 async function expectNoCallbackOnFirstRender() {
 	await settle();
 	expect(el(Opens).textContent).toBe('0');
@@ -486,7 +420,6 @@ async function expectNoCallbackOnFirstRender() {
 async function expectEveryCallbackReportsWhatHappened() {
 	await typeInto(el<HTMLInputElement>(Input), 'ba');
 	await expect.poll(() => el(Typed).textContent).toBe('ba');
-	// Typing opened the list, which is one open report and no change report.
 	await expect.poll(() => el(Opens).textContent).toBe('1');
 	expect(el(Changes).textContent).toBe('0');
 
@@ -495,8 +428,6 @@ async function expectEveryCallbackReportsWhatHappened() {
 	await expect.poll(() => el(Changes).textContent).toBe('1');
 	await expect.poll(() => el(Opens).textContent).toBe('2');
 }
-
-// ------------------------------------------------------- two on one page
 
 async function expectTwoComboboxesStayApart() {
 	const leftLabelId = el(page.getByTestId('left-label')).getAttribute('id');
@@ -509,7 +440,6 @@ async function expectTwoComboboxesStayApart() {
 
 	el(LeftTrigger).click();
 	await expect.poll(() => el<HTMLElement>(LeftContent).hidden).toBe(false);
-	// The other one stayed shut.
 	expect(el<HTMLElement>(RightContent).hidden).toBe(true);
 
 	el(LeftBanana).click();
@@ -520,8 +450,6 @@ async function expectTwoComboboxesStayApart() {
 	expect(el(RightBasicIndicator).getAttribute('ui-hidden')).toBe('');
 }
 
-// ============================================================ the rows
-
 for (const mode of MODES) {
 	test(`${mode}: the family renders its whole anatomy, closed`, async () => {
 		if (mode === 'CSR') await render(Basic);
@@ -529,8 +457,6 @@ for (const mode of MODES) {
 		expectBasicRendered();
 	});
 
-	// A choice served with the page: the option says it is the chosen one and its
-	// indicator is showing, without a gesture having happened.
 	test(`${mode}: a choice made before the page was served renders as chosen`, async () => {
 		if (mode === 'CSR') await render(Prefilled);
 		else await renderSSR(Prefilled);
@@ -644,37 +570,23 @@ for (const mode of MODES) {
 		await expectDisabledBlocks();
 	});
 
-	// The half that works: the consumer's `computed()` over
-	// `combobox.state().input` DOES refresh as the field is typed in. That is what
-	// makes the two pinned rows below a repeat problem rather than a
-	// shared-instance one.
 	test(`${mode}: the consumer's own filter recomputes as the field is typed in`, async () => {
 		if (mode === 'CSR') await render(Filtered);
 		else await renderSSR(Filtered);
 		await expectTheConsumerFilterRecomputes();
 	});
 
-	// The rows this scenario's `<p data-testid="count">` sits in front of are
-	// found by their own position now: `rowStartOffset` on the keyed-repeat
-	// record states how many element siblings stand before the rows, so the
-	// pairing is no longer shifted by one.
+	// `rowStartOffset` on the keyed-repeat record counts the element siblings before
+	// the rows, so a `<p>` in front of them no longer shifts the pairing by one.
 	test(`${mode}: the consumer's own filter narrows the list as the field is typed in`, async () => {
 		if (mode === 'CSR') await render(Filtered);
 		else await renderSSR(Filtered);
 		await expectTheConsumerFilterNarrowsTheList();
 	});
 
-	// The arm was never served - the list had four matches at boot - so the client
-	// builds it. The keyed-repeat record now carries the arm's finished markup,
-	// which it does for exactly one shape: an arm whose markup is fully static and
-	// whose elements no record names, because the mint wires nothing. This arm is
-	// a `<p>` of literal text, so it qualifies.
-	//
-	// Shipping the arm as inert markup was tried and withdrawn: the arm's host
-	// carries a `dom-order` locator, so putting the arm into the document without
-	// splicing the element census would shift the index of every element after it.
-	// The mint reports both the insert and the removal to the census, which is why
-	// this closes without disturbing anything below the list.
+	// The keyed-repeat record carries the arm's finished markup, which works only for
+	// an arm that is fully static and names no element, as this `<p>` is; the mint
+	// reports the insert and the removal to the element census so indices hold.
 	test(`${mode}: the empty arm is what speaks when nothing matches`, async () => {
 		if (mode === 'CSR') await render(Filtered);
 		else await renderSSR(Filtered);
@@ -755,14 +667,13 @@ for (const mode of MODES) {
 		expect(el(Input).getAttribute('aria-describedby')).toBe(el(ErrorMessage).getAttribute('id'));
 	});
 
-	// `inline` is a boolean on the root: the list is part of the page, always
-	// showing, and nothing dismisses it.
+	// `inline` is a boolean on the root: the list is always showing and nothing
+	// dismisses it.
 	test(`${mode}: an inline combobox shows its list without being opened`, async () => {
 		if (mode === 'CSR') await render(Inline);
 		else await renderSSR(Inline);
 		expect(el<HTMLElement>(Content).hidden).toBe(false);
 		expect(el(Root).getAttribute('ui-inline')).toBe('');
-		// Nothing expands, so neither word is written on the field.
 		expect(el(Input).hasAttribute('aria-expanded')).toBe(false);
 		expect(el(Input).hasAttribute('aria-haspopup')).toBe(false);
 	});
@@ -775,38 +686,24 @@ for (const mode of MODES) {
 		await expect.poll(() => el(Apple).getAttribute('ui-highlighted')).toBe('');
 		await userEvent.keyboard('{Enter}');
 		await expect.poll(() => el(Apple).getAttribute('aria-selected')).toBe('true');
-		// Escape is a no-op in an inline list: there is nothing to close.
 		await userEvent.keyboard('{Escape}');
 		await settle();
 		expect(el<HTMLElement>(Content).hidden).toBe(false);
 	});
 }
 
-// ============================================================ pinned rows
-
-// Pending capability: `overlay` accepts an INSTANCE-CONSTANT conditional value, which is what lets
-// one content part serve both modes. The compiler does not implement it yet:
-// `overlayLiteralValue` in packages/compiler/src/passes/semantic-graph/
-// overlay-attribute.ts returns null for anything but a boolean literal, and the
-// caller refuses it as MARKLESS_OVERLAY_VALUE_UNSUPPORTED. So `combobox.content`
-// writes `overlay` unconditionally and an inline list enlists in the overlay
-// stack, which it never should. Everything a person
-// experiences is right - the dismissal handler ignores the report in inline mode
-// - so this is the one assertion that cannot be made. Deterministic, so test.fails rather than skip: it turns red the day the capability lands.
+// PENDING CAPABILITY - `overlay` with an instance-constant conditional value.
+// `overlayLiteralValue` returns null for anything but a boolean literal, so
+// `combobox.content` writes `overlay` unconditionally and an inline list enlists in
+// the overlay stack; the dismissal handler ignores the report, so nothing is broken.
 test.fails('an inline list carries no overlay mark and never enlists', async () => {
 	await render(Inline);
 	expect(el(Content).hasAttribute('overlay')).toBe(false);
 });
 
-// PENDING CAPABILITY - aria-activedescendant. DOM focus stays in the field, so
-// the ONLY channel that tells a reader which option is highlighted is
-// aria-activedescendant, and the compiler leaves it out of IDREF_ATTRIBUTES
-// deliberately (packages/compiler/src/passes/semantic-graph/idref-attributes.ts:
-// "it names one row of a live collection, which needs per-row identity that this
-// slice does not build"). The plural handle landed since that comment was
-// written and it answers the ordered walk, but nothing yet reads ONE row's
-// minted id from an IDREF position. Until it does, the highlight is visible
-// (`ui-highlighted`) and inaudible.
+// PENDING CAPABILITY - aria-activedescendant is out of IDREF_ATTRIBUTES because
+// nothing yet reads ONE row's minted id from an IDREF position, so the highlight is
+// visible (`ui-highlighted`) and inaudible.
 test.fails('the field names the highlighted option for a screen reader', async () => {
 	await render(OpenList);
 	el<HTMLElement>(Input).focus();
@@ -817,24 +714,16 @@ test.fails('the field names the highlighted option for a screen reader', async (
 	expect(named).toBe(el(Apple).getAttribute('id'));
 });
 
-// PENDING CAPABILITY - a composite IDREF. Qwik UI writes
-// `aria-describedby="{description} {error}"`; an IDREF LIST is
-// MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE, so this family names ONE handle and a
-// combobox that mounts both messages is described by the first. Same call select
-// made for aria-labelledby, and the same one textbox made for this attribute.
+// PENDING CAPABILITY - an IDREF list is MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE, so
+// this family names ONE handle and the second message goes undescribed.
 test.fails('a combobox mounting both messages is described by both', async () => {
 	await render(SignupForm);
 	const describedBy = el(Input).getAttribute('aria-describedby') ?? '';
 	expect(describedBy.split(' ').length).toBe(2);
 });
 
-// PENDING BEHAVIOUR - scroll the highlight into view (behaviour 5.14). Qwik UI
-// debounces 100 ms, then rooted an IntersectionObserver at the panel and calls
-// scrollBy with a centring offset, and only while the last move was a keyboard
-// one. Deferred with the behaviour named rather than half-built: it is one
-// `scrollIntoView({ block: 'nearest' })` on the option the walk landed on, and
-// the walk already hands that element back. Nothing about it is blocked; it is
-// scope, and this row is what says so out loud.
+// PENDING BEHAVIOUR - scroll the highlight into view. Not blocked, just unbuilt: one
+// `scrollIntoView({ block: 'nearest' })` on the option the walk already hands back.
 test.fails('the highlighted option is scrolled into view', async () => {
 	await render(OpenList);
 	el<HTMLElement>(Input).focus();

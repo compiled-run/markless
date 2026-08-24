@@ -66,15 +66,11 @@ function el<T extends Element = HTMLElement>(locator: { element(): Element | nul
 	return found as T;
 }
 
-/**
- * The overlay behaviour keeps one module-level stack for the whole page, so a
- * row that leaves a surface enlisted leaves the next row's background inert.
- * Every row closes what it opened; this is the net that catches the one that
- * does not.
- */
+// The overlay behaviour keeps one module-level stack for the whole page, so a row
+// that leaves a surface enlisted leaves the next row's background inert.
 afterEach(async () => {
-	// Drain first: Escape is reported to the topmost enlisted element, so a few
-	// of them unwind whatever a failing row left standing.
+	// Escape is reported to the topmost enlisted element, so a few of them unwind
+	// whatever a failing row left standing.
 	for (let unwind = 0; unwind < 4; unwind++) {
 		document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 		await new Promise((resolve) => setTimeout(resolve, 0));
@@ -89,8 +85,7 @@ afterEach(async () => {
 });
 
 function expectClosed(backdrop: HTMLElement, content: HTMLElement) {
-	// The backdrop carries the gating: it is the elevated element, so it is the
-	// one whose showing and hiding the behaviour watches.
+	// The backdrop is the elevated element, so its showing is what the behaviour watches.
 	expect(backdrop.hasAttribute('hidden')).toBe(true);
 	expect(backdrop.getAttribute('ui-closed')).toBe('');
 	expect(content.getAttribute('ui-closed')).toBe('');
@@ -100,8 +95,7 @@ function expectClosed(backdrop: HTMLElement, content: HTMLElement) {
 function expectShowing(backdrop: HTMLElement, content: HTMLElement) {
 	expect(backdrop.hasAttribute('hidden')).toBe(false);
 	expect(backdrop.getAttribute('ui-open')).toBe('');
-	// aria-modal is authored rather than toggled: the behaviour reads it off this
-	// subtree when the layer enlists, and that read is what makes the page inert.
+	// aria-modal is authored, not toggled: the behaviour reads it at enlist time.
 	expect(content.getAttribute('aria-modal')).toBe('true');
 	expect(content.getAttribute('ui-open')).toBe('');
 }
@@ -112,9 +106,8 @@ function expectBackgroundReachable(background: HTMLElement) {
 }
 
 function expectBackgroundOutOfReach(background: HTMLElement) {
-	// Modality the background can observe: out of the tab order and out of the
-	// accessibility tree, both counted so a nested dialog closing cannot un-hide
-	// a background the dialog under it still hides.
+	// Both marks are counted, so a nested dialog closing cannot un-hide a background
+	// the dialog under it still hides.
 	expect(background.hasAttribute('inert')).toBe(true);
 	expect(background.getAttribute('aria-hidden')).toBe('true');
 }
@@ -162,17 +155,8 @@ function expectDescribedRendered() {
 	expect(el(Description).textContent).toContain('nobody can put it back');
 }
 
-/**
- * A dialog with no title and no description still carries both references, and
- * neither resolves.
- *
- * `aria-labelledby={titled ? titleEl : undefined}` is refused at compile time -
- * MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE - because an IDREF position takes a
- * bare element() handle and nothing else, so the choice is "always" or "never",
- * and "never" would lose the dialog's name. A reference that resolves to
- * nothing counts as absent for the accessible-name computation. The row fails
- * the day the compiler can express the condition.
- */
+// An IDREF position takes a bare element() handle and nothing else, so the choice is
+// "always" or "never"; a reference resolving to nothing counts as absent for the name.
 function expectUnnamedCarriesUnresolvedReferences() {
 	const content = el<HTMLElement>(Content);
 	const labelledby = content.getAttribute('aria-labelledby');
@@ -201,8 +185,8 @@ async function expectTriggerOpensAndCloseButtonCloses() {
 	expectBackgroundReachable(el(Background));
 	expect(document.body.style.overflow).toBe('');
 	expect(el(Trigger).getAttribute('aria-expanded')).toBe('false');
-	// Focus returns to the invoker. The behaviour moves no focus at all now, so
-	// this is the family's own handler and its retry against the inert background.
+	// The behaviour moves no focus, so this is the family's own handler retrying
+	// against the inert background.
 	await expect.poll(() => document.activeElement).toBe(el(Trigger));
 }
 
@@ -224,8 +208,6 @@ async function expectConsumerCallbackFires() {
 	await expect.poll(() => el(FirstValue).textContent).toBe('true');
 	await expect.poll(() => el(Calls).textContent).toBe('1');
 	expect(el(FirstBackdrop).hasAttribute('hidden')).toBe(false);
-	// The consumer's own click handler on the trigger runs after the dialog has
-	// already opened and after onChange has already been called.
 	await expect.poll(() => el(Order).textContent).toBe('change-click');
 	expect(el(SecondValue).textContent).toBe('');
 
@@ -293,14 +275,12 @@ for (const mode of MODES) {
 	});
 }
 
-
 test('CSR: the page behind an open dialog cannot be reached', async () => {
 	await render(Basic);
 	await openBasic();
 
 	expectBackgroundOutOfReach(el(Background));
-	// Focus cannot leave the dialog: the background is inert, so aiming at it
-	// lands nowhere and the dialog keeps the cursor.
+	// The background is inert, so aiming focus at it lands nowhere.
 	el<HTMLElement>(Background).focus();
 	expect(document.activeElement).not.toBe(el(Background));
 
@@ -315,19 +295,13 @@ test('CSR: the surface stays in the page across open and close', async () => {
 	expect(el(Content)).toBe(content);
 
 	await closeBasic();
-	// The same node throughout: a surface that detached while showing would
-	// strand the background's inert and aria-hidden marks with nothing to undo them.
+	// A surface that detached while showing would strand the background's marks.
 	expect(el(Content)).toBe(content);
 	expect(document.contains(content)).toBe(true);
 });
 
-
-/**
- * Two things stop it here, and the row proves the pair rather than either alone.
- * The behaviour only listens while something is enlisted, and the opening press
- * lands before the layer is on the stack; and the family's own layer press has
- * to *start* on the layer, which the opening press did not.
- */
+// Two things stop it: the opening press lands before the layer is on the stack, and
+// the family's own layer press has to start on the layer, which that press did not.
 test('CSR: the gesture that opens the dialog does not immediately close it', async () => {
 	await render(Basic);
 
@@ -337,8 +311,7 @@ test('CSR: the gesture that opens the dialog does not immediately close it', asy
 	expect(el(Backdrop).hasAttribute('hidden')).toBe(false);
 	expectShowing(el<HTMLElement>(Backdrop), el<HTMLElement>(Content));
 
-	// And a fresh press on the layer while showing still dismisses, so this is not
-	// passing by never recording presses at all.
+	// A fresh press still dismisses, so this is not passing by recording no presses.
 	press(el<HTMLElement>(Backdrop));
 	await expect.poll(() => el(Backdrop).hasAttribute('hidden')).toBe(true);
 });
@@ -380,9 +353,8 @@ test('CSR: a press beyond the layer is reported as an outside press and closes t
 	await render(Basic);
 	await openBasic();
 
-	// The behaviour reports this one, because the target is outside the enlisted
-	// element entirely. A press on the layer itself is the family's own pair of
-	// handlers - the behaviour counts its own element as inside.
+	// The behaviour counts its own enlisted element as inside, so only a target
+	// beyond it is reported.
 	el(Background).dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
 	await expect.poll(() => el(Backdrop).hasAttribute('hidden')).toBe(true);
 	expectBackgroundReachable(el(Background));
@@ -395,8 +367,6 @@ test('CSR: closing and reopening rewires dismissal', async () => {
 	await userEvent.keyboard('{Escape}');
 	await expect.poll(() => el(Backdrop).hasAttribute('hidden')).toBe(true);
 
-	// The second open has to register its own dismissal, not run on the first
-	// open's stale wiring.
 	await openBasic();
 	await userEvent.keyboard('{Escape}');
 	await expect.poll(() => el(Backdrop).hasAttribute('hidden')).toBe(true);
@@ -414,8 +384,7 @@ test('CSR: Escape closes the dialog once and calls the consumer once', async () 
 
 	await userEvent.keyboard('{Escape}');
 	await expect.poll(() => el(FirstBackdrop).hasAttribute('hidden')).toBe(true);
-	// Exactly one more call: a double-fire between the behaviour's report and the
-	// family's handler would show up here as 3.
+	// A double-fire between the behaviour's report and the family's handler reads as 3.
 	await expect.poll(() => el(FirstValue).textContent).toBe('false');
 	expect(el(Calls).textContent).toBe('2');
 });
@@ -424,13 +393,12 @@ test('CSR: a click on the close button while the dialog is closed changes nothin
 	await render(WithOnChange);
 	expect(el(Calls).textContent).toBe('0');
 
-	// Our surface is hidden rather than detached, so a closed dialog's close
-	// button is still reachable by script. It must not report a second close.
+	// The surface is hidden rather than detached, so a closed dialog's close button
+	// is still reachable by script and must not report a second close.
 	el(FirstClose).click();
 	await expect.poll(() => el(Calls).textContent).toBe('0');
 	expect(el(FirstBackdrop).hasAttribute('hidden')).toBe(true);
 });
-
 
 test('CSR: an alert announces as alertdialog and refuses an outside press', async () => {
 	await render(Alert);
@@ -466,7 +434,6 @@ test('CSR: an alert still opens and closes from its own controls', async () => {
 	await expect.poll(() => document.activeElement).toBe(el(Trigger));
 });
 
-
 test('CSR: Escape closes only the dialog on top', async () => {
 	await render(Nested);
 	await openNestedPair();
@@ -475,8 +442,6 @@ test('CSR: Escape closes only the dialog on top', async () => {
 	await expect.poll(() => el(InnerBackdrop).hasAttribute('hidden')).toBe(true);
 	expect(el(OuterBackdrop).hasAttribute('hidden')).toBe(false);
 	expect(el(OuterContent).getAttribute('aria-modal')).toBe('true');
-	// And the background the first dialog hid is still hidden, because the marks
-	// are counted rather than set and cleared.
 	expectBackgroundOutOfReach(el(Background));
 
 	await userEvent.keyboard('{Escape}');
@@ -502,7 +467,6 @@ test('CSR: opening a second dialog from inside the first does not dismiss the fi
 	await render(Nested);
 	await openNestedPair();
 
-	// about it reads as a dismissal of the first.
 	expect(el(OuterBackdrop).hasAttribute('hidden')).toBe(false);
 	expect(el(InnerBackdrop).hasAttribute('hidden')).toBe(false);
 
@@ -515,15 +479,12 @@ test('CSR: opening a second dialog from inside the first does not dismiss the fi
 test('CSR: closing the second dialog returns focus into the first', async () => {
 	await render(Nested);
 	await openNestedPair();
-	// The first dialog's own content is out of reach while the second is showing.
-	// Its surface is not marked - it is an ancestor of the second one, and the
-	// chain down to the topmost surface is what the behaviour keeps reachable -
-	// so the fact is asserted on the part of it that sits beside the second dialog.
+	// The first surface is an ancestor of the second, and the chain down to the
+	// topmost surface stays reachable, so the mark is read on a part beside it.
 	expect(el(OuterTitle).hasAttribute('inert')).toBe(true);
 
 	el(InnerClose).click();
 	await expect.poll(() => el(InnerBackdrop).hasAttribute('hidden')).toBe(true);
-	// Focus went back to the button inside the first dialog that opened the second.
 	await expect.poll(() => document.activeElement).toBe(el(InnerTrigger));
 	expect(el(OuterTitle).hasAttribute('inert')).toBe(false);
 	expect(el(OuterBackdrop).hasAttribute('hidden')).toBe(false);
@@ -533,8 +494,6 @@ test('CSR: closing the second dialog returns focus into the first', async () => 
 	await expect.poll(() => document.activeElement).toBe(el(OuterTrigger));
 	expect(document.body.style.overflow).toBe('');
 });
-
-// --- keyboard and focus ---------------------------------------------------
 
 test('CSR: the dialog opens from the keyboard and the controls inside it are reachable', async () => {
 	await render(Basic);
@@ -556,9 +515,7 @@ test('CSR: tabbing off the last control in the dialog does not reach the page be
 
 	el<HTMLElement>(Close).focus();
 	await userEvent.keyboard('{Tab}');
-	// The background is inert, so sequential navigation has nothing outside the
-	// dialog to land on. This is the containment fact a programmatic focus cannot
-	// prove on its own.
+	// Sequential navigation is the containment fact a programmatic focus cannot prove.
 	expect(document.activeElement).not.toBe(el(Background));
 	expect(el(Background).contains(document.activeElement)).toBe(false);
 
@@ -570,8 +527,7 @@ test('CSR: a display-contents wrapper breaks neither the opening focus nor the t
 
 	el(WrapTrigger).click();
 	await expect.poll(() => el(WrapBackdrop).hasAttribute('hidden')).toBe(false);
-	// A consumer's `<form style="display: contents">` between the layer and the
-	// surface changes the box tree but must not change where focus lands.
+	// A `display: contents` form between layer and surface changes the box tree only.
 	await expect.poll(() => el(WrapContent).contains(document.activeElement)).toBe(true);
 
 	el<HTMLElement>(WrapInput).focus();
@@ -582,8 +538,6 @@ test('CSR: a display-contents wrapper breaks neither the opening focus nor the t
 	await expect.poll(() => el(WrapBackdrop).hasAttribute('hidden')).toBe(true);
 	await expect.poll(() => document.activeElement).toBe(el(WrapTrigger));
 });
-
-// --- consumer props through {...rest} -------------------------------------
 
 test('CSR: a disabled trigger does not open the dialog and a disabled close does not close it', async () => {
 	await render(Disabled);
@@ -612,21 +566,17 @@ test('CSR: a form inside the surface saves and the dialog closes with focus rest
 
 	el(FormSubmit).click();
 	await expect.poll(() => el(Saved).textContent).toBe('submitted');
-	// Saving is the consumer's handler; closing is still the family's close
-	// control, which is the shape QDS's own dialogs use.
+	// Saving is the consumer's handler; closing is still the family's close control.
 	el(page.getByTestId('form-close')).click();
 	await expect.poll(() => el(FormBackdrop).hasAttribute('hidden')).toBe(true);
 	await expect.poll(() => document.activeElement).toBe(el(FormTrigger));
 });
 
-// --- consumer-driven open -------------------------------------------------
-
 test('CSR: flipping the consumer open state shows the surface and marks the background', async () => {
 	await render(Controlled);
 	expect(el(Backdrop).hasAttribute('hidden')).toBe(true);
 
-	// No trigger part in this scenario at all: at most one
-	// `modal.trigger` per root, so every other opener is the consumer's own state.
+	// At most one `modal.trigger` per root, so every other opener is consumer state.
 	el(Opener).click();
 	await expect.poll(() => el(Backdrop).hasAttribute('hidden')).toBe(false);
 	expectShowing(el<HTMLElement>(Backdrop), el<HTMLElement>(Content));
@@ -639,16 +589,8 @@ test('CSR: flipping the consumer open state shows the surface and marks the back
 	expect(document.body.style.overflow).toBe('');
 });
 
-/**
- * The ruled second half of focus restore: a dialog nothing triggered gives focus
- * back to whatever the page was on when it opened.
- *
- * There is no trigger part in this scenario, so the family has no handle to
- * restore to. What it restores to instead is the reading the overlay behaviour
- * took at enlist - and the behaviour only reads it, which is why this row
- * focuses the opener itself first: without that the page holds no focus and
- * there is nothing to give back.
- */
+// With no trigger part the family has no handle to restore to, so it restores to the
+// reading the behaviour took at enlist - hence focusing the opener first.
 for (const mode of MODES) {
 	test(`${mode}: a dialog opened programmatically restores focus to the pre-open element`, async () => {
 		if (mode === 'CSR') await render(Controlled);
@@ -659,24 +601,19 @@ for (const mode of MODES) {
 
 		el(Opener).click();
 		await expect.poll(() => el(Backdrop).hasAttribute('hidden')).toBe(false);
-		// Marking the background inert blurs the opener, so by now the page holds
-		// nothing: the only copy of where focus was is the one taken at enlist.
+		// Marking the background inert blurs the opener, so the only copy of where
+		// focus was is the one taken at enlist.
 		expectBackgroundOutOfReach(el(Background));
 
-		// The family's own close control, not the consumer's - the consumer's own
-		// state flip is the consumer's focus to manage.
 		el(Close).click();
 		await expect.poll(() => el(Backdrop).hasAttribute('hidden')).toBe(true);
 		await expect.poll(() => document.activeElement).toBe(el(Opener));
 	});
 }
 
-// --- resume ---------------------------------------------------------------
-
 test('SSR: the served dialog is closed, attached and already named', async () => {
 	await renderSSR(Basic);
-	// What the server sent, before anything on the client has run. The naming
-	// reference is correct in the served HTML because the seed phase runs first.
+	// The naming reference is right in the served HTML because seeding runs first.
 	expectClosed(el<HTMLElement>(Backdrop), el<HTMLElement>(Content));
 	expect(el(Content).getAttribute('role')).toBe('dialog');
 	expect(el(Content).getAttribute('aria-labelledby')).toBe(el(Title).id);
@@ -694,8 +631,7 @@ test('SSR: the first open after resume marks the background and the first close 
 
 	await closeBasic();
 	expectBackgroundReachable(el(Background));
-	// The element() handles the family's handlers read resolved after a resume,
-	// which is the half a client render cannot prove.
+	// The element() handles the family's handlers read resolved after a resume.
 	await expect.poll(() => document.activeElement).toBe(el(Trigger));
 });
 
@@ -722,22 +658,9 @@ test('SSR: two sibling dialogs each reach only their own handler', async () => {
 	expect(el(FirstValue).textContent).toBe('');
 });
 
-/**
- * A dialog served already showing joins the stack, and is modal like any other.
- *
- * The backdrop is served with no `hidden` attribute, so it never transitions and
- * the behaviour's MutationObserver never sees it. What puts it on the stack is
- * the payload: the compiler recorded a `hidden` attribute update for that host,
- * which says the surface is shown BECAUSE its binding is currently false rather
- * than because nothing gates it. An element with no such record - the inline
- * shape - still never enlists, which is what keeps a future inline mode free.
- *
- * What this row cannot show yet is enlistment at load. The behaviour installs
- * with the resume runtime, and this page's runtime is woken by its first
- * container event, so a served-open dialog is not modal until something wakes
- * it. That startup gate is pinned below rather than worked around; the row after
- * it is what says the gate is no longer visible to a reader pressing Escape.
- */
+// The backdrop is served without `hidden`, so it never transitions and the
+// MutationObserver never sees it; what enlists it is the compiler's recorded `hidden`
+// update for that host, which an inline-shaped element does not carry.
 test('SSR: a dialog served open enlists once the behaviour starts', async () => {
 	await renderSSR(ServedOpen);
 
@@ -748,43 +671,26 @@ test('SSR: a dialog served open enlists once the behaviour starts', async () => 
 	// the stack and the page behind the dialog is still reachable.
 	expectBackgroundReachable(el(Background));
 
-	// A press inside the dialog is a container event and wakes the runtime. It
-	// arms no dismissal of its own: the press began inside the layer.
+	// A press inside the dialog wakes the runtime and arms no dismissal of its own.
 	el(Content).dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
 
-	// Now on the stack, with modality derived from the content's authored
-	// aria-modal, exactly as a dialog opened by its trigger - and the backdrop
-	// never transitioned out of `hidden`, so a flip cannot be what put it there.
+	// The backdrop never transitioned out of `hidden`, so a flip cannot be what
+	// put it on the stack.
 	await expect.poll(() => el(Background).hasAttribute('inert')).toBe(true);
 	expectBackgroundOutOfReach(el(Background));
 	expect(document.body.style.overflow).toBe('hidden');
 
-	// And Escape reaches it, which is the whole point of being enlisted: the
-	// family's own handler hides the layer, and hiding it is what leaves the
-	// stack and gives the background back.
-	//
-	// The released scroll lock is not asserted here. That count is document-wide
-	// and shared by every row in this file, and the disabled scenario leaves a
-	// surface standing that no Escape can close, so by the time this row runs the
-	// count no longer returns to zero. The background marks are per-row, so they
-	// are what this row reads.
+	// The scroll-lock count is document-wide and the disabled scenario leaves a
+	// surface no Escape can close, so this row reads the per-row background marks.
 	await userEvent.keyboard('{Escape}');
 	await expect.poll(() => el(Backdrop).hasAttribute('hidden')).toBe(true);
 	await expect.poll(() => el(Background).hasAttribute('inert')).toBe(false);
 	expect(el(Background).hasAttribute('aria-hidden')).toBe(false);
 });
 
-/**
- * The gesture a reader actually makes on a dialog the server sent open: Escape,
- * with nothing pressed first.
- *
- * Without the primer this press is spent waking the runtime and dismisses
- * nothing, because the only thing that reports a dismissal is a document
- * listener the behaviour has not installed yet. The served page carries an
- * `overlay` mark, so its inline resumer also listens above the container from
- * first paint, leaves the reason where the installer takes it, and the wake it
- * starts finishes the dismissal.
- */
+// The served page carries an `overlay` mark, so its inline resumer listens above the
+// container from first paint and the wake it starts finishes the dismissal - without
+// that, this press would be spent waking the runtime and dismiss nothing.
 test('SSR: the first Escape on a dialog served open closes it', async () => {
 	await renderSSR(ServedOpen);
 
