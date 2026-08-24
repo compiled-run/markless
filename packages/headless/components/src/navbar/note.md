@@ -166,19 +166,45 @@ Everything below is measured on this tip, not assumed.
    module constant. **A navbar whose entries depend on whether a person is signed
    in is the everyday shape this cannot express yet.**
 
-## The one identity attribute
+## The identity attributes are gone — 2026-08-24
 
-`ui-navbar-item` and `ui-navbar-dropdown` are anatomy, not state, and they are
-the only two attributes in this family that are not `ui-`-prefixed flags a
-stylesheet reads. They exist because a lazily loaded handler has no
-`currentTarget`, so every walk starts at `event.target` and climbs, and the climb
-needs a name for "the item this control belongs to" and "the panel this link is
-inside". QDS reaches the same place through `ui-qds-popover-content`; the
-`ui-qds-` prefix is what our convention drops, not the idea. The research
-suggested filtering on `[popover]` instead, which is only available to a family
-that uses the top layer.
+`ui-navbar-item` and `ui-navbar-dropdown` were anatomy rather than state: the
+only two attributes in this family that were not `ui-`-prefixed flags a
+stylesheet reads. They existed to give the `.closest()` climbs a name for "the
+item this control belongs to" and "the panel this link is inside". Both climbs
+and both attributes are gone; the family names its own parts with `element()`
+handles instead, so nothing renders them and nothing looks for them.
 
-## Re-measured 2026-08-23 (U262, at `6127a1be`) — the array-handle conversion, and why it is not shipped
+## SHIPPED 2026-08-24 — the array-handle conversion
+
+**This family now reads no DOM selector at all.** Both walls recorded below were
+retired by the framework, and the conversion they blocked is in this folder:
+
+- the heterogeneous type surface (wall 1) — `el` now documents and accepts a set
+  declared with a WIDER element type than the tag it binds on, so one
+  `element<HTMLElement[]>()` spans the trigger `<button>`s and the link `<a>`s;
+- the panel's two bindings (wall 2) — `el={[a, b]}` binds a list of handles on
+  one element under each declaration's own rules, and a handle read names its
+  widget from where the HANDLE was declared rather than from what else
+  registered on the reading host. The panel carries
+  `el={[item.contentEl, navbar.panelEls]}`: the item-instance handle that mints
+  the id `aria-controls` points at, and membership of the root instance's set
+  that the dropdown exclusion is built on.
+
+What the family holds now: `navbar.navEl` (the landmark), `navbar.controlEls`
+(every trigger and link, document order), `navbar.panelEls` (every dropdown), and
+per item `item.boxEl`, `item.triggerEl`, `item.contentEl`. `navbar-walk.ts` turns
+those into the four walks. Both identity attributes are gone with the climbs.
+
+One consequence, recorded rather than hidden: the walks now cover the family's
+own parts, where the selector covered every `a[href]`/`button:not([disabled])` in
+scope. A plain `<a href>` a consumer writes inside a dropdown is no longer a stop
+on the arrow walk. No row in either lane exercises that shape, and the same
+measurement is what makes the counts identical.
+
+The history below is kept because it names what was actually wrong.
+
+## Re-measured 2026-08-23 (U262, at `6127a1be`) — the array-handle conversion, and why it was not shipped then
 
 The collection capability (`element<T[]>()`) landed at `9f8c39c8`, so this family
 was sent back to convert its four ordered walks and its ~20 scope/identity climbs
@@ -261,7 +287,7 @@ dismissal block, failing on `contentEl` refusing inside the panel's own handlers
 Leaving those two handlers on the DOM and keeping both bindings reaches **52/52** —
 but wall 1 still stands, so the file cannot ship.
 
-### What would unblock it
+### What would unblock it — BOTH LANDED, see the 2026-08-24 section above
 
 Either of these, and this family converts to zero DOM traversal outside the panel
 part:

@@ -1,4 +1,5 @@
 import { computed, element, shared, state } from '@markless/core';
+import { ownPart, parentRow, rowAt, visibleRows } from './tree-walk.ts';
 import type {
 	TreeInstanceState,
 	TreeItemContentProps,
@@ -17,8 +18,15 @@ import type {
 export const treeState = shared(
 	() => {
 		const tree: TreeInstanceState = state({ disabled: false });
+		const rootEl = element<HTMLDivElement>();
+		// The array type argument makes a handle plural: bound on every part of its
+		// kind, read back as the live elements in document order.
+		const rowEls = element<HTMLDivElement[]>();
+		const groupEls = element<HTMLDivElement[]>();
+		const triggerEls = element<HTMLButtonElement[]>();
+		const labelEls = element<HTMLSpanElement[]>();
 
-		return { ...tree };
+		return { ...tree, rootEl, rowEls, groupEls, triggerEls, labelEls };
 	},
 	{ scope: 'widget' },
 );
@@ -57,25 +65,32 @@ export function TreeRoot({
 	// The container is the tree's only tab stop until focus lands inside, so Shift+Tab out of the first row leaves the tree.
 	<div
 		{...rest}
+		el={tree.rootEl}
 		role="tree"
 		tabindex={0}
 		ui-disabled={tree.disabled}
 		onFocusin={(event) => {
 			// `target`, not `currentTarget`: a lazy handler symbol runs after the native dispatch, when `currentTarget` is null.
 			const target = event.target as HTMLElement;
-			const root = target.closest('[role="tree"]') as HTMLElement | null;
-			const row = target.closest('[role="treeitem"]') as HTMLElement | null;
+			const root = tree.rootEl;
+			if (root === undefined) {
+				onFocusin?.(event);
+				return;
+			}
 
-			if (root && target === root) {
-				const visible = Array.from(
-					root.querySelectorAll<HTMLElement>('[role="treeitem"]'),
-				).filter((one) => !one.closest('[role="group"][hidden]'));
+			if (target === root) {
+				const visible = visibleRows(tree.rowEls, tree.groupEls);
 				const remembered = visible.find((one) => one.getAttribute('tabindex') === '0');
 				(remembered ?? visible[0])?.focus();
-			} else if (root && row) {
+				onFocusin?.(event);
+				return;
+			}
+
+			const row = rowAt(tree.rowEls, target);
+			if (row) {
 				// Roving is written straight to the DOM: container and rows render tabindex as literals, so nothing else moves it.
 				root.setAttribute('tabindex', '-1');
-				for (const one of root.querySelectorAll<HTMLElement>('[role="treeitem"]')) {
+				for (const one of tree.rowEls ?? []) {
 					one.setAttribute('tabindex', one === row ? '0' : '-1');
 				}
 			}
@@ -97,17 +112,18 @@ export function TreeRoot({
 
 			const key = event.key;
 			const target = event.target as HTMLElement;
-			const root = target.closest('[role="tree"]') as HTMLElement | null;
-			if (!root) {
+			const root = tree.rootEl;
+			if (root === undefined) {
 				onKeydown?.(event);
 				return;
 			}
 
-			// DOM order is the navigation order, and no primitive builds an ordered registry of a widget's items today.
-			const rows = Array.from(root.querySelectorAll<HTMLElement>('[role="treeitem"]')).filter(
-				(row) => !row.closest('[role="group"][hidden]'),
-			);
-			const here = target.closest('[role="treeitem"]') as HTMLElement | null;
+			// Read at the handler's top level: a shared read inside the typeahead closure below is a ReferenceError.
+			const rowEls = tree.rowEls;
+			const labelEls = tree.labelEls;
+			// Document order is the navigation order, and the family's own rows come back in it.
+			const rows = visibleRows(rowEls, tree.groupEls);
+			const here = rowAt(rowEls, target);
 
 			if (!here) {
 				if (key === 'ArrowDown' || key === 'Home' || key === 'ArrowRight') rows[0]?.focus();
@@ -116,8 +132,7 @@ export function TreeRoot({
 			}
 
 			// The row's own trigger, and only its own: "first focusable inside" follows a link instead of opening a folder.
-			const found = here.querySelector('[ui-treeitemtrigger]') as HTMLElement | null;
-			const trigger = found && found.closest('[role="treeitem"]') === here ? found : null;
+			const trigger = ownPart(tree.triggerEls, rowEls, here);
 			const expanded = here.getAttribute('aria-expanded');
 			const at = rows.indexOf(here);
 			const last = rows.length - 1;
@@ -136,7 +151,7 @@ export function TreeRoot({
 				}
 			} else if (key === 'ArrowLeft') {
 				if (expanded === 'true') trigger?.click();
-				else next = here.parentElement?.closest('[role="treeitem"]') ?? null;
+				else next = parentRow(tree.rowEls, here);
 			} else if (target === here && (key === 'Enter' || key === ' ')) {
 				// Gated on the row itself: the trigger inside it is a native button, and handling here too would toggle twice.
 				trigger?.click();
@@ -152,8 +167,7 @@ export function TreeRoot({
 				const order = rows.slice(from).concat(rows.slice(0, from));
 				next =
 					order.find((row) => {
-						const named = row.querySelector('[ui-treeitemlabel]') as HTMLElement | null;
-						const own = named && named.closest('[role="treeitem"]') === row ? named : null;
+						const own = ownPart(labelEls, rowEls, row);
 						const text = (own ? own.textContent : row.textContent) ?? '';
 						return text.trim().toLowerCase().startsWith(search);
 					}) ?? null;
@@ -178,6 +192,7 @@ export function TreeItem({
 	children,
 	...rest
 }: TreeItemProps) @{
+	const tree = treeState();
 	const item = treeItemState();
 	item.onChange = onChange;
 	item.open = open;
@@ -189,6 +204,7 @@ export function TreeItem({
 	// A leaf reports no aria-expanded at all, or a reader cannot tell it from a closed parent.
 	<div
 		{...rest}
+		el={tree.rowEls}
 		role="treeitem"
 		aria-expanded={isShowing ? 'true' : isClosed ? 'false' : undefined}
 		aria-level={item.level}
@@ -203,11 +219,11 @@ export function TreeItemTrigger({ children, onClick, ...rest }: TreeItemTriggerP
 	const tree = treeState();
 	const item = treeItemState();
 
-	// tabindex -1 because the row is the tab stop; `ui-treeitemtrigger` is how the root's keyboard finds THIS row's trigger.
+	// tabindex -1 because the row is the tab stop.
 	<button
 		{...rest}
+		el={tree.triggerEls}
 		type="button"
-		ui-treeitemtrigger=""
 		tabindex={-1}
 		aria-labelledby={item.labelEl}
 		disabled={tree.disabled}
@@ -221,12 +237,14 @@ export function TreeItemTrigger({ children, onClick, ...rest }: TreeItemTriggerP
 }
 
 export function TreeItemContent({ children, ...rest }: TreeItemContentProps) @{
+	const tree = treeState();
 	const item = treeItemState();
 	const isShowing = computed(() => item.open === true);
 
 	// Closed hides the group, never detaches it: every node in here is a widget root, and one inside a runtime-flipping arm is MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED.
 	<div
 		{...rest}
+		el={tree.groupEls}
 		role="group"
 		hidden={isShowing !== true}
 		ui-open={isShowing}
@@ -235,9 +253,10 @@ export function TreeItemContent({ children, ...rest }: TreeItemContentProps) @{
 }
 
 export function TreeItemLabel({ children, ...rest }: TreeItemLabelProps) @{
+	const tree = treeState();
 	const item = treeItemState();
 
-	<span {...rest} el={item.labelEl} ui-treeitemlabel="">{children}</span>
+	<span {...rest} el={[item.labelEl, tree.labelEls]}>{children}</span>
 }
 
 export function TreeItemIndicator({ children, ...rest }: TreeItemIndicatorProps) @{
