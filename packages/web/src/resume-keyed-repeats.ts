@@ -114,7 +114,13 @@ function applyKeyedRepeatRowOrder(
 		readonly insertBefore?: (node: ResumeDomElement, before: unknown) => unknown;
 		readonly removeChild?: (node: ResumeDomElement) => unknown;
 	};
-	const currentRows = elementChildren(parent).slice(0, nextRows.length);
+	// Compare against every attached row THIS repeat owns, not the first
+	// nextRows.length children. A prefix comparison calls [A,B,C] -> [A,B]
+	// already-in-order and returns before the removal pass below, so a row
+	// dropped off the END of the collection stayed in the document forever
+	// while a row dropped from the middle left correctly.
+	const knownRows = new Set(rowRootsByKey.values());
+	const currentRows = elementChildren(parent).filter((child) => knownRows.has(child));
 	if (
 		currentRows.length === nextRows.length &&
 		currentRows.every((row, index) => row === nextRows[index])
