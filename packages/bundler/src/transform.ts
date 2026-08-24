@@ -75,20 +75,79 @@ function loadOxcTransformSync() {
 	return oxcTransformSyncPromise;
 }
 
-async function stripEmittedTypes(code: string): Promise<string> {
+// Returning the raw code on failure ships TypeScript to a JS parser, so every
+// exit here is loud: a silent pass-through is the defect this guards.
+export async function stripEmittedTypes(
+	code: string,
+	moduleId: string,
+	onlyRemoveTypeImports = false,
+): Promise<string> {
 	const oxcTransformSync = await loadOxcTransformSync();
-	if (!oxcTransformSync) return code;
-	try {
-		const out = oxcTransformSync('markless-emitted.ts', code);
-		// transformSync reports failures via `errors` with empty output instead of
-		// throwing (e.g. lib-mode emissions that carry authored TSRX syntax).
-		if (!out.code || (out.errors?.length ?? 0) > 0) return code;
-		return out.code;
-	} catch {
-		// Never make emission fail on the stripper; downstream diagnostics are
-		// more specific about genuinely-invalid code.
-		return code;
+	if (!oxcTransformSync) {
+		throw typeStripError(moduleId, 'rolldown/experimental exposes no transformSync.');
 	}
+	let out: ReturnType<typeof oxcTransformSync>;
+	try {
+		out = oxcTransformSync(
+			'markless-emitted.ts',
+			code,
+			onlyRemoveTypeImports ? { typescript: { onlyRemoveTypeImports: true } } : undefined,
+		);
+	} catch (error) {
+		throw typeStripError(moduleId, error instanceof Error ? error.message : String(error));
+	}
+	// transformSync reports failures via `errors` with empty output instead of throwing.
+	const errors = out.errors ?? [];
+	if (errors.length > 0 || !out.code) {
+		throw typeStripError(
+			moduleId,
+			errors.map((error) => error.message).join('; ') || 'oxc produced no output.',
+		);
+	}
+	return out.code;
+}
+
+// An authored slice spliced into generated code. Reprinting one that carries no
+// TypeScript would inflate every module that has one, so a fragment oxc already
+// accepts as JS keeps its exact bytes and only a genuinely-TS one is rewritten.
+async function stripEmittedTypesFromFragment(
+	code: string,
+	moduleId: string,
+	onlyRemoveTypeImports = false,
+): Promise<string> {
+	if (await parsesAsJavaScript(code)) return code;
+	return (await stripEmittedTypes(code, moduleId, onlyRemoveTypeImports)).trim();
+}
+
+// An authored expression, not a statement: oxc prints it as one, so the
+// statement terminator has to come back off before it is spliced into a record.
+async function stripEmittedTypesFromExpression(
+	source: string,
+	moduleId: string,
+): Promise<string> {
+	const stripped = await stripEmittedTypesFromFragment(source, moduleId);
+	return stripped.endsWith(';') ? stripped.slice(0, -1).trimEnd() : stripped;
+}
+
+async function parsesAsJavaScript(code: string): Promise<boolean> {
+	const oxcTransformSync = await loadOxcTransformSync();
+	if (!oxcTransformSync) return false;
+	try {
+		return (oxcTransformSync('markless-emitted.js', code).errors?.length ?? 0) === 0;
+	} catch {
+		return false;
+	}
+}
+
+function typeStripError(moduleId: string, message: string): MarklessCompileError {
+	return new MarklessCompileError(
+		createCompileErrorPayload({
+			filename: moduleId,
+			source: '',
+			diagnostics: [],
+			details: `MARKLESS_TYPE_STRIP_FAILED: ${moduleId} could not have its TypeScript syntax stripped. ${message}`,
+		}),
+	);
 }
 
 export {
@@ -296,7 +355,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 						// children (e.g. the router's Link) stay on the payload
 						// container until artifact-child prerender lands.
 						source: canonicalRenderData
-							? prerenderDataModuleSource(
+							? await prerenderDataModuleSource(
 									compiled,
 									input.importedModuleInterfaces,
 									input.renderDataImportSources,
@@ -437,6 +496,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 								module.exportName,
 								symbolRows[index]!.exportName,
 							),
+							symbolVirtualModuleId(input.filename, module.symbolId),
 						),
 						`symbol:${module.symbolId}`,
 						executionLogModuleHookMode,
@@ -528,6 +588,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					behaviorSymbols,
 					symbolRoutes,
 				}),
+				input.filename,
 			)),
 		map: null,
 		virtualModules,
@@ -551,13 +612,13 @@ function resolveAuthoredSpecifier(specifier: string, sourceFilename: string): st
 	return resolve(dirname(sourceFilename), specifier);
 }
 
-function prerenderDataModuleSource(
+async function prerenderDataModuleSource(
 	compiled: CompileTsrxModuleResult,
 	importedModuleInterfaces: TransformTsrxModuleInput['importedModuleInterfaces'],
 	renderDataImportSources: TransformTsrxModuleInput['renderDataImportSources'],
 	artifactChildMaterializations: TransformTsrxModuleInput['artifactChildMaterializations'],
 	sourceFilename: string,
-): string {
+): Promise<string> {
 	const importedComponents = new Map<
 		string,
 		{ readonly source: string; readonly local: string }
@@ -582,9 +643,15 @@ function prerenderDataModuleSource(
 	// into the component record instead of travelling through JSON.stringify.
 	// Its module-scope needs travel structurally so relative specifiers can be
 	// rebound to the authored file — this virtual module is not its neighbour.
+	//
+	// These three fields are the only authored slices in this module, so they are
+	// the only ones the type stripper touches: reprinting the whole emission grows
+	// the JSON blob and breaks the CSS entries beside it.
+	const renderDataId = `${MARKLESS_VIRTUAL_PREFIX}render-data:${encodeURIComponent(sourceFilename)}`;
 	const readerImports = new Map<string, string>();
-	const readerDeclarations = new Set<string>();
-	const componentEntries = compiled.publicRenderModule.componentDefinitions.map((definition) => {
+	const readerDeclarations = new Map<string, string>();
+	const componentEntries: string[] = [];
+	for (const definition of compiled.publicRenderModule.componentDefinitions) {
 		const {
 			residueReaderSource,
 			residueReaderImports,
@@ -603,21 +670,39 @@ function prerenderDataModuleSource(
 			readonly rootsWidget?: boolean;
 		};
 		for (const entry of residueReaderImports ?? []) {
+			if (readerImports.has(entry.line)) continue;
+			const rebound = entry.line.replace(
+				JSON.stringify(entry.source),
+				JSON.stringify(resolveAuthoredSpecifier(entry.source, sourceFilename)),
+			);
+			// A lone import statement has no use site here, so the stripper must not
+			// be allowed to treat it as unused and delete it.
 			readerImports.set(
 				entry.line,
-				entry.line.replace(
-					JSON.stringify(entry.source),
-					JSON.stringify(resolveAuthoredSpecifier(entry.source, sourceFilename)),
-				),
+				await stripEmittedTypesFromFragment(rebound, `${renderDataId}:reader-import`, true),
 			);
 		}
-		for (const line of residueReaderDeclarations ?? []) readerDeclarations.add(line);
+		for (const line of residueReaderDeclarations ?? []) {
+			if (readerDeclarations.has(line)) continue;
+			readerDeclarations.set(
+				line,
+				await stripEmittedTypesFromFragment(line, `${renderDataId}:reader-declaration`),
+			);
+		}
 		const data = JSON.stringify(record);
-		return `${JSON.stringify(String(definition.name))}:${
-			residueReaderSource ? `{...${data},readResidue:${residueReaderSource}}` : data
-		}`;
-	});
-	const preludes = [...readerImports.values(), ...readerDeclarations];
+		const reader = residueReaderSource
+			? await stripEmittedTypesFromExpression(
+					residueReaderSource,
+					`${renderDataId}:reader:${String(definition.name)}`,
+				)
+			: undefined;
+		componentEntries.push(
+			`${JSON.stringify(String(definition.name))}:${
+				reader ? `{...${data},readResidue:${reader}}` : data
+			}`,
+		);
+	}
+	const preludes = [...readerImports.values(), ...readerDeclarations.values()];
 	// Pay-per-use gate: this module's render data is loaded by exactly the pages
 	// that compose it, so a build that needs nothing from the pass never loads it.
 	//
