@@ -5,13 +5,19 @@ The page a real screen reader reads.
 Every shipped `@markless/ui` family's Basic scenario — the starter a consumer
 copies — one section each, on an anchor a driver can be sent to:
 
-| family    | anchor       |
-| --------- | ------------ |
-| checkbox  | `/#checkbox`  |
-| toggle    | `/#toggle`    |
-| textbox   | `/#textbox`   |
-| progress  | `/#progress`  |
-| checklist | `/#checklist` |
+| family      | anchor         |
+| ----------- | -------------- |
+| checkbox    | `/#checkbox`    |
+| toggle      | `/#toggle`      |
+| textbox     | `/#textbox`     |
+| progress    | `/#progress`    |
+| checklist   | `/#checklist`   |
+| select      | `/#select`      |
+| modal       | `/#modal`       |
+| radio-group | `/#radio-group` |
+| tabs        | `/#tabs`        |
+| popover     | `/#popover`     |
+| slider      | `/#slider`      |
 
 It is deliberately ordinary consumer code: imports come through the
 `@markless/ui` barrel, the markup is each family's real starter, and there are

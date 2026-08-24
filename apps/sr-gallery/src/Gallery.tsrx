@@ -2,9 +2,11 @@ import {
 	checkbox,
 	checklist,
 	modal,
+	popover,
 	progress,
 	radiogroup,
 	select,
+	slider,
 	tabs,
 	textbox,
 	toggle,
@@ -13,7 +15,7 @@ import {
 // Every shipped family's Basic scenario - the starter a consumer copies - on one
 // page, each in a section a reader can jump to by its anchor: /#checkbox,
 // /#toggle, /#textbox, /#progress, /#checklist, /#select, /#modal,
-// /#radio-group, /#tabs.
+// /#radio-group, /#tabs, /#popover, /#slider.
 //
 // This is consumer code, not test code. It imports through the package barrel
 // the way a reader of the docs would, carries no test hooks, and the markup is
@@ -177,6 +179,31 @@ export function Gallery() @{
 					<tabs.content value="usage">How much of the plan you have used.</tabs.content>
 					<tabs.content value="billing">Your next invoice is due on the 1st.</tabs.content>
 				</tabs.root>
+			</div>
+		</section>
+
+		<section id="popover">
+			<h2>Popover</h2>
+			<div class="scenario">
+				<popover.root>
+					<popover.trigger>Share</popover.trigger>
+					<popover.content>
+						<popover.title>Share this page</popover.title>
+						<popover.description>Anyone with the link can read it.</popover.description>
+						<popover.close>Done</popover.close>
+					</popover.content>
+				</popover.root>
+			</div>
+		</section>
+
+		<section id="slider">
+			<h2>Slider</h2>
+			<div class="scenario">
+				<slider.root value={40}>
+					<slider.label>Volume</slider.label>
+					<slider.valuelabel />
+					<slider.track class="slider-track"><slider.thumb class="slider-thumb" /></slider.track>
+				</slider.root>
 			</div>
 		</section>
 	</main>
