@@ -235,11 +235,14 @@ export type ModuleGraphInterfaceArtifact = {
 				readonly id: string;
 				readonly kind: SemanticMarkupChunk['kind'];
 				readonly slotCount: number;
+				readonly elementCount: ModuleGraphInterfaceElementCount;
 			}>;
 			readonly inputs: ReadonlyArray<{
 				readonly localName: string;
 				readonly path: ReadonlyArray<string>;
 			}>;
+			readonly elementCount: ModuleGraphInterfaceElementCount;
+			readonly projection?: ModuleGraphInterfaceProjection;
 			readonly spreadHosts?: ReadonlyArray<ModuleGraphInterfaceSpreadHost>;
 			readonly armMaterial?: ModuleGraphInterfaceArmMaterial;
 		}>;
@@ -269,6 +272,39 @@ export type ModuleGraphInterfaceSpreadHost = {
 	readonly hostNodeId: string;
 	readonly excludeNames: ReadonlyArray<string>;
 	readonly destructuredNames: ReadonlyArray<string>;
+};
+
+/**
+ * How many child ELEMENTS one position renders — a whole chunk's top level, or
+ * a single sibling slot. `'unknown'` is the honest answer whenever render time
+ * decides the number: a repeat's rows, an async boundary's arm, a dynamic host
+ * that may be omitted, a branch whose arms disagree, or a child component whose
+ * markup this module never saw.
+ */
+export type ModuleGraphInterfaceElementCount = number | 'unknown';
+
+/**
+ * Where a component's `{children}` hole sits among the elements beside it, so
+ * an importer can say — while compiling, never at render time — which child
+ * position the children it passes will occupy.
+ *
+ * The counts are of ELEMENTS only: static text and a `{text}` slot occupy a
+ * child index and render no element, so they do not shift the projected
+ * children. Anything whose element count render time decides answers
+ * `'unknown'` and absorbs the whole side.
+ *
+ * `projectionInsideConstruct` says the hole is not in the component's root
+ * chunk — it sits in a branch arm, an async arm, a repeat row, a dynamic host's
+ * children, or a projection this component forwards to another component. The
+ * counts still describe the hole's own chunk, but whether that chunk renders at
+ * all is decided elsewhere, so a consumer must not treat them as a fixed
+ * position in the served DOM. `projectionChunkId` names that chunk.
+ */
+export type ModuleGraphInterfaceProjection = {
+	readonly elementsBeforeProjection: ModuleGraphInterfaceElementCount;
+	readonly elementsAfterProjection: ModuleGraphInterfaceElementCount;
+	readonly projectionInsideConstruct: boolean;
+	readonly projectionChunkId?: string;
 };
 
 export type SemanticSharedScope = 'request' | 'container' | 'page' | 'widget';

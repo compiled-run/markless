@@ -23,6 +23,7 @@ import {
 import { collectComponentProps } from './collect-components.ts';
 import { spreadHostsField } from './spread-hosts.ts';
 import { armMaterialField } from './arm-material.ts';
+import { chunkElementCount, projectionPlacementFields } from './projection-placement.ts';
 import { getComponentFunction } from '../../ast/tsrx.ts';
 import {
 	collectConditionalBranchText,
@@ -172,6 +173,11 @@ export async function buildSemanticGraph(
 								id: chunk.id,
 								kind: chunk.kind,
 								slotCount: chunk.slots.length,
+								elementCount: chunkElementCount({
+									chunks: graph.markup.chunks,
+									branchSites: graph.branchSites,
+									chunkId: chunk.id,
+								}),
 							})),
 						inputs: graph.componentPropBindings
 							.filter((binding) => binding.componentName === component.name)
@@ -180,6 +186,12 @@ export async function buildSemanticGraph(
 								path: binding.propPath,
 							})),
 						...spreadHostsField(chunks),
+						...projectionPlacementFields({
+							chunks: graph.markup.chunks,
+							branchSites: graph.branchSites,
+							componentName: component.name,
+							rootChunkId: root.id,
+						}),
 						...armMaterialField(graph, component.name, chunks),
 					},
 				];
