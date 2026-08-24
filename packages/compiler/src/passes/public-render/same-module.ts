@@ -10,6 +10,8 @@ import {
 	sharedSeedMarkerLine,
 	sharedSeedPassLines,
 	widgetRootDefinitionIds,
+	elementHandleMarkerLine,
+	componentBoundElementHandles,
 	widgetRootMarkerLine,
 } from './shared-seed-pass.ts';
 import {
@@ -139,6 +141,11 @@ export function emitSameModuleSsrComponents(
 				widgetRootDefinitionIds(input, componentName),
 				functionName,
 				dataLines.composedRootSurfaceArgs,
+			),
+			elementHandleMarkerLine(
+				componentBoundElementHandles(input, componentName),
+				functionName,
+				dataLines.importedChildSurfaceArgs,
 			),
 		].filter((line): line is string => line !== null);
 	});

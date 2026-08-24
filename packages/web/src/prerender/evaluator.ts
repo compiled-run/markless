@@ -28,7 +28,8 @@ import { marklessCsrRemapChildGraph } from '../fns/composition.ts';
 import { marklessBoundSymbolId } from '../fns/bound-symbol.ts';
 import { marklessRowFreeSymbolId, marklessRowSegment } from '../fns/instance-scope.ts';
 import { registerPrerenderStagedComputeds } from './staged-graph.ts';
-import { sharedSeedPass } from './shared-seed-slot.ts';
+import { MARKLESS_ELEMENT_BOUND_KEY_PREFIX, sharedSeedPass } from './shared-seed-slot.ts';
+import { boundElementHandlesOf, projectionHandleChildNames } from './children-projection.ts';
 
 // This evaluator is the seam where a SERIALIZED protocol payload meets the
 // mutable draft the SSR composer works on. They describe the same records; the
@@ -96,6 +97,10 @@ export type PrerenderDataDefinition = {
 		};
 	}>;
 	readonly propCellId?: string | null;
+	// The shared() element() handles a rendered instance of this component binds,
+	// published by the compiler so a widget's seed phase can file them before any
+	// part renders. Absent when it binds none.
+	readonly boundElementHandles?: ReadonlyArray<string>;
 	// Compiled by the same producer as the server module's reader; the browser
 	// never parses or evaluates authored source itself.
 	readonly readResidue?: (
@@ -645,8 +650,8 @@ async function evaluatePrerenderDataComponent(input: {
 				: undefined;
 			return snapshot?.status === 'fulfilled' ? 0 : snapshot?.status === 'rejected' ? 2 : 1;
 		},
-		seedChild: (slot, context) =>
-			sharedSeedPass()?.(
+		seedChild: async (slot, context) => {
+			const seeded = await sharedSeedPass()?.(
 				{
 					...input,
 					// Seeds load by compile-time symbol id; the row reaches them as identity.
@@ -659,7 +664,9 @@ async function evaluatePrerenderDataComponent(input: {
 				slot.componentEdgeId,
 				read,
 				context.sharedSeeds,
-			),
+			);
+			return withBoundElementHandles(seeded, slot, context, input.surface, definition);
+		},
 		renderChild: async (slot, context) => {
 			const edge = (definition.edges ?? []).find(
 				(candidate) => candidate.id === slot.componentEdgeId,
@@ -849,4 +856,39 @@ function placeMaterializedChild<
 				: { ...token, anchorId: idPrefix + token.anchorId },
 		),
 	};
+}
+
+/**
+ * The widget instance's element()-handle roster, filed onto the seed map the
+ * parts read. It runs where the seed phase runs - before any part renders - so
+ * an IDREF written on the FIRST part can still be told whether the element it
+ * names will exist. The server render files the same entries from the compiled
+ * seed pass.
+ */
+function withBoundElementHandles(
+	seeded: ReadonlyMap<string, unknown> | undefined,
+	slot: {
+		readonly componentEdgeId: string;
+		readonly projectionChunkId?: string;
+	},
+	context: { readonly sharedSeeds?: ReadonlyMap<string, unknown> },
+	surface: PrerenderDataSurface,
+	definition: PrerenderDataDefinition,
+): ReadonlyMap<string, unknown> | undefined {
+	if (!slot.projectionChunkId) return seeded;
+	const rootEdge = (definition.edges ?? []).find(
+		(candidate) => candidate.id === slot.componentEdgeId,
+	);
+	const handles = [
+		...new Set(
+			[
+				...(rootEdge ? [rootEdge.childComponentName] : []),
+				...projectionHandleChildNames(surface, definition, slot.projectionChunkId),
+			].flatMap((componentName) => boundElementHandlesOf(surface, componentName)),
+		),
+	];
+	if (handles.length === 0) return seeded;
+	const filed = new Map(seeded ?? context.sharedSeeds ?? []);
+	for (const handle of handles) filed.set(MARKLESS_ELEMENT_BOUND_KEY_PREFIX + handle, true);
+	return filed;
 }

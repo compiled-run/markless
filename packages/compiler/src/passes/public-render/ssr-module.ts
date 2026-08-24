@@ -20,6 +20,10 @@ import {
 	sharedSeedMarkerLine,
 	sharedSeedPassLines,
 	widgetRootDefinitionIds,
+	elementHandleMarkerLine,
+	elementHandleMarkerSource,
+	componentBoundElementHandles,
+	projectedHandleEdgeIdsUnder,
 	widgetRootMarkerLine,
 } from './shared-seed-pass.ts';
 import { emitCatalogHelperImports, stateRuntimeImports } from './runtime-helpers.ts';
@@ -59,6 +63,7 @@ import {
 	elementHandleResidueKinds,
 	hasSharedElementHandle,
 	MARKLESS_WIDGET_INSTANCE_KEY,
+	MARKLESS_ELEMENT_BOUND_KEY_PREFIX,
 	widgetInstanceReadSource,
 	renderDecisionSources,
 	sharedInstancePreludeLines,
@@ -219,6 +224,11 @@ export function emitPublicSsrRenderModule(
 			widgetRootDefinitionIds(input, rootInfo.componentName),
 			'marklessRenderSsr',
 			rootDataLines.composedRootSurfaceArgs,
+		),
+		elementHandleMarkerLine(
+			componentBoundElementHandles(input, rootInfo.componentName),
+			'marklessRenderSsr',
+			rootDataLines.importedChildSurfaceArgs,
 		),
 		...childrenWidgetRootMarkerLines(input, references, [
 			[rootInfo.componentName, 'marklessRenderSsr'],
@@ -381,6 +391,8 @@ export type SsrDataLines = {
 	readonly seedForward: string[];
 	/** The composed children-root child surfaces, for this component's widget-root marker. */
 	readonly composedRootSurfaceArgs: string[];
+	/** The imported child surfaces, for this component's element()-handle marker. */
+	readonly importedChildSurfaceArgs: string[];
 };
 
 /**
@@ -528,6 +540,7 @@ function emitSsrDataLines(
 						? widgetInstanceReadSource((key) => `marklessSsrRenderStateValues.get(${key})`)
 						: null,
 					kinds: handleKinds,
+					boundRead: (key) => `marklessSsrRenderStateValues.get(${key})`,
 				})
 			: '';
 	const branchIds = new Set(chunks.flatMap((chunk) =>
@@ -851,7 +864,27 @@ function emitSsrDataLines(
 					: [];
 			}),
 		];
-		if (blocks.length === 0) return [];
+		// Which element() handles this instance will have an element for, filed
+		// before any part renders so an IDREF written on the FIRST part can be
+		// answered. Every part the projection can reach counts, arms and rows
+		// included: being told about a part that does not render leaves the IDREF
+		// as it is today, being told about none drops a real relationship.
+		const handleLines = [
+			...new Set(
+				[edgeId, ...projectedHandleEdgeIdsUnder(input.renderData.chunks, projectionChunkId)].flatMap(
+					(partEdgeId) => {
+						const args = childSurfaceArgsByEdgeId.get(partEdgeId);
+						return args ? [elementHandleMarkerSource(args)] : [];
+					},
+				),
+			),
+		].map(
+			(source) =>
+				`for(const marklessSsrHandle of ${source})marklessSsrSeeds.set(${JSON.stringify(
+					MARKLESS_ELEMENT_BOUND_KEY_PREFIX,
+				)}+marklessSsrHandle,true);`,
+		);
+		if (blocks.length === 0 && handleLines.length === 0) return [];
 		// Pay-per-use: the family lookup is emitted only where a projected part can
 		// actually sit under another root — a widget with no nested projection
 		// emits exactly the seed pass it emitted before boundaries existed.
@@ -861,7 +894,7 @@ function emitSsrDataLines(
 				needsFamilies
 					? `const marklessSsrWidgetFamilies=marklessSsrWidgetRoots(${rootSurfaceArgs});`
 					: ''
-			}${blocks.join('')}return marklessSsrSeeds;}`,
+			}${handleLines.join('')}${blocks.join('')}return marklessSsrSeeds;}`,
 		];
 	});
 	const bindingLines = input.semanticGraph.graphBindings.flatMap((binding) =>
@@ -927,9 +960,28 @@ function emitSsrDataLines(
 					...templateComputedLines,
 					...seedForward,
 				];
+	// Pay-per-use: a module that declares no element() handle knows nothing this
+	// marker could report, so it emits none and its bytes are what they were.
+	const declaresElementHandles = input.semanticGraph.graphBindings.some(
+		(binding) => binding.kind === 'element',
+	);
+	const importedChildSurfaceArgs = declaresElementHandles
+		? [
+				...new Set(
+					[...childSurfaceArgsByEdgeId].flatMap(([edgeId, args]) =>
+						input.semanticGraph.componentEdges.some(
+							(edge) => edge.id === edgeId && edge.importSource,
+						)
+							? [args]
+							: [],
+					),
+				),
+			]
+		: [];
 	return {
 		seedForward: seedForwardLines,
 		composedRootSurfaceArgs,
+		importedChildSurfaceArgs,
 		render: [
 		"marklessSsrRenderStateValues.set('prop:props',props);",
 		...bindingLines,
