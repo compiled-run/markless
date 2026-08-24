@@ -498,28 +498,26 @@ export function emitResumeModule(input: {
 	const resumeSymbolLoader = routeSymbols ? 'marklessSsrLoadSymbolRoute' : 'loadSymbol';
 	const scalarSpecializations = scalarDispatcherSpecializations(input);
 	const stagedPrerender = (input.prerenderTriggerGroups?.length ?? 0) > 0;
-	const streamedResume =
-		stagedPrerender ||
-		((input.payloadView as { readonly asyncBoundaries?: ReadonlyArray<unknown> } | undefined)
-			?.asyncBoundaries?.length ?? 0) > 0;
-	// Every streamed resume module owns dispatch through the same queue. Staged
-	// modules may replace the active handler, while ordinary modules remain the
-	// fallback authority for interactions outside the staged closure.
-	const bareResumeContainerEvent = emitResumeContainerEvent(
-		resumeSymbolLoader,
-		input.needsFullResume ?? false,
-		(input.payloadState as { readonly version?: unknown } | undefined)?.version ===
-			ASYNC_PROTOCOL_VERSION,
-		input.symbolRoutes.length > 0 ? 'none' : leanResumeMode(input.runtimeDemandMap),
-		scalarSpecializations,
-		input.runtimeDemandMap,
-		input.executionLog !== 'never',
-		input.prerenderDataId,
-		stagedPrerender,
+	// Every resume module owns dispatch through the same queue. Staged modules
+	// may replace the active handler, while ordinary modules remain the fallback
+	// authority for interactions outside the staged closure. The queue is not a
+	// streaming concern: a plain page's keydown, input, and keyup handlers each
+	// run as their own async task, so without it two fast keystrokes interleave
+	// and a deleted character is written back into a live value binding.
+	const resumeContainerEvent = emitQueuedResumeContainerEvent(
+		emitResumeContainerEvent(
+			resumeSymbolLoader,
+			input.needsFullResume ?? false,
+			(input.payloadState as { readonly version?: unknown } | undefined)?.version ===
+				ASYNC_PROTOCOL_VERSION,
+			input.symbolRoutes.length > 0 ? 'none' : leanResumeMode(input.runtimeDemandMap),
+			scalarSpecializations,
+			input.runtimeDemandMap,
+			input.executionLog !== 'never',
+			input.prerenderDataId,
+			stagedPrerender,
+		),
 	);
-	const resumeContainerEvent = streamedResume
-		? emitQueuedResumeContainerEvent(bareResumeContainerEvent)
-		: bareResumeContainerEvent;
 	return [
 		input.boundSymbolDescriptors
 			? `export const ${MARKLESS_BOUND_SYMBOLS_EXPORT} = ${emitBoundSymbolDescriptors(input.boundSymbolDescriptors)};`
