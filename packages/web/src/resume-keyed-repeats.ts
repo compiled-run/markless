@@ -1,5 +1,4 @@
 import type { RuntimeGraph } from '@markless/runtime';
-import { spliceDomOrderCensus } from './resume-locators.ts';
 import type {
 	ElementHandleRegistry,
 	ResumeDomElement,
@@ -253,6 +252,55 @@ function renderEmptyArm(
 	const nodes = Array.from(template.content?.childNodes ?? []) as ReadonlyArray<ResumeDomNode>;
 	if (nodes.length === 0) throw emptyArmEmptyError(repeat);
 	return nodes;
+}
+// A local copy of resume-locators' census splice, for the reason resume-branches
+// keeps its own DOM-walk helpers: importing that module here pulls it and the
+// resume-errors chunk into this on-demand module's static closure, which the
+// leanness guard measured at 28,554 source bytes against a 20,983 wall. The
+// SEMANTICS are the one definition - this is the same splice, spelled twice, not
+// a second way to renumber the census.
+function spliceDomOrderCensus(
+	root: ResumeDomElement,
+	removed: Iterable<ResumeDomNode>,
+	inserted: ReadonlyArray<ResumeDomNode>,
+): void {
+	const census = root.__marklessCensus;
+	if (!census) return;
+	for (const node of removed) {
+		const at = census.indexOf(node as ResumeDomElement);
+		if (at >= 0) census.splice(at, censusBlockEnd(census, at) - at);
+	}
+	if (inserted.length)
+		census.splice(censusInsertionSlot(census, inserted[0]!), 0, ...censusElements(inserted));
+}
+function censusBlockEnd(census: ResumeDomElement[], at: number): number {
+	const inside = new Set<ResumeDomNode>(censusElements([census[at]!]));
+	let end = at + 1;
+	while (end < census.length && inside.has(census[end]!)) end++;
+	return end;
+}
+function censusInsertionSlot(census: ResumeDomElement[], first: ResumeDomNode): number {
+	const parent = (first as ResumeDomElement).parentElement;
+	if (!parent) return census.length;
+	let slot = -1;
+	for (const child of parent.childNodes ?? []) {
+		if (child === first) break;
+		const at = census.indexOf(child as ResumeDomElement);
+		if (at >= 0) slot = censusBlockEnd(census, at);
+	}
+	if (slot >= 0) return slot;
+	const at = census.indexOf(parent);
+	return at >= 0 ? at + 1 : census.length;
+}
+function censusElements(nodes: ReadonlyArray<ResumeDomNode>): ResumeDomElement[] {
+	const elements: ResumeDomElement[] = [];
+	(function visit(list: ReadonlyArray<ResumeDomNode>): void {
+		for (const node of list) {
+			if (node.nodeType === 1) elements.push(node as ResumeDomElement);
+			visit(node.childNodes ?? []);
+		}
+	})(nodes);
+	return elements;
 }
 /** The container root that holds the pinned census, walking out from the parent. */
 function censusRoot(element: ResumeDomElement): ResumeDomElement | undefined {

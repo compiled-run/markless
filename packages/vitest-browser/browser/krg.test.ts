@@ -3,6 +3,7 @@ import { cleanup, render, renderSSR } from '../src/index.ts';
 import ComputedPage from './fixtures/krg-computed-page.tsrx';
 import HandlerPage from './fixtures/krg-handler-page.tsrx';
 import SiblingPage from './fixtures/krg-sibling-page.tsrx';
+import EmptyArmPage from './pages/krg-empty-arm-page.tsrx';
 
 /**
  * Defect 84: a keyed `@for` does not follow its source.
@@ -222,4 +223,114 @@ test('SSR resume: rows preceded by a sibling still drop the right row', async ()
 	press(container, 'data-krg-shrink');
 	await expect.poll(() => plain(container)).toEqual(['alpha', 'charlie']);
 	expect(container.querySelector('[data-krg-header]')).not.toBeNull();
+});
+
+// ================================================= the `@empty` arm after boot
+
+// The arm was never served: this page's lists both had rows at boot, so the only
+// way the arm can speak is for the client to build it from markup the view
+// payload carries. It is carried for the armed list and NOT for the bare one,
+// which is what makes "no arm" here a fact about the transport rather than about
+// the reconcile happening to do nothing.
+
+function armedRows(container: ParentNode) {
+	return [...container.querySelectorAll<HTMLElement>('[data-krg-armed-row]')].map((row) =>
+		row.getAttribute('data-krg-value'),
+	);
+}
+
+function bareRows(container: ParentNode) {
+	return [...container.querySelectorAll<HTMLElement>('[data-krg-bare-row]')].map((row) =>
+		row.getAttribute('data-krg-value'),
+	);
+}
+
+function armedArm(container: ParentNode) {
+	return container.querySelector('[data-krg-armed-empty]');
+}
+
+// The arm belongs in the row span, which on this page is everything after the
+// header. Reading the parent's own children says so; querySelector would find it
+// anywhere under the list and prove nothing about where it landed.
+function armedListChildren(container: ParentNode) {
+	const list = container.querySelector('[data-krg-armed-list]');
+	if (!list) throw new Error('Expected the armed list.');
+	return [...list.children].map((child) => child.getAttribute('data-krg-value') ?? child.tagName);
+}
+
+async function expectShrinkToZeroRaisesTheArm(container: ParentNode) {
+	expect(armedRows(container)).toEqual(['alpha', 'bravo']);
+	expect(armedArm(container)).toBeNull();
+
+	press(container, 'data-krg-none');
+	await expect.poll(() => armedRows(container)).toEqual([]);
+	await expect.poll(() => armedArm(container)?.textContent).toBe('nothing matches');
+	// After the header, and nothing else left in the span.
+	expect(armedListChildren(container)).toEqual(['LI', 'LI']);
+	expect(container.querySelector('[data-krg-armed-header]')).not.toBeNull();
+}
+
+async function expectRegrowthTakesTheArmBack(container: ParentNode) {
+	press(container, 'data-krg-none');
+	await expect.poll(() => armedArm(container)?.textContent).toBe('nothing matches');
+
+	press(container, 'data-krg-restore');
+	await expect.poll(() => armedArm(container)).toBeNull();
+	// Identity, not just count: these are the SERVED rows coming back in their
+	// own order, so the arm's departure did not disturb the row span.
+	expect(armedRows(container)).toEqual(['alpha', 'bravo']);
+	expect(container.querySelector('[data-krg-tail]')?.textContent).toBe('tail');
+}
+
+async function expectARepeatWithNoArmStaysArmless(container: ParentNode) {
+	expect(bareRows(container)).toEqual(['alpha', 'bravo']);
+
+	press(container, 'data-krg-none');
+	await expect.poll(() => bareRows(container)).toEqual([]);
+	const list = container.querySelector('[data-krg-bare-list]');
+	// Only its own header is left: nothing was minted into a list that declared
+	// no `@empty` arm.
+	expect(list?.children.length).toBe(1);
+	expect(container.querySelector('[data-krg-bare-header]')).not.toBeNull();
+}
+
+test('SSR resume: a list that empties after boot raises its `@empty` arm', async () => {
+	const screen = await renderSSR(EmptyArmPage);
+	await expectShrinkToZeroRaisesTheArm(screen.container);
+});
+
+test('SSR resume: a row coming back takes the `@empty` arm out again', async () => {
+	const screen = await renderSSR(EmptyArmPage);
+	await expectRegrowthTakesTheArmBack(screen.container);
+});
+
+test('SSR resume: a repeat with no `@empty` arm empties to nothing at all', async () => {
+	const screen = await renderSSR(EmptyArmPage);
+	await expectARepeatWithNoArmStaysArmless(screen.container);
+});
+
+// A partial shrink is not an empty one: the arm has no business appearing while
+// a row is still standing.
+test('SSR resume: dropping one row of two leaves the arm alone', async () => {
+	const screen = await renderSSR(EmptyArmPage);
+	const container = screen.container;
+
+	press(container, 'data-krg-drop-first');
+	await expect.poll(() => armedRows(container)).toEqual(['bravo']);
+	expect(armedArm(container)).toBeNull();
+});
+
+test('CSR: a list that empties after boot raises its `@empty` arm', async () => {
+	const screen = await render(EmptyArmPage);
+	await expectShrinkToZeroRaisesTheArm(screen.container as HTMLElement);
+});
+
+test('CSR: a row coming back takes the `@empty` arm out again', async () => {
+	const screen = await render(EmptyArmPage);
+	await expectRegrowthTakesTheArmBack(screen.container as HTMLElement);
+});
+
+test('CSR: a repeat with no `@empty` arm empties to nothing at all', async () => {
+	const screen = await render(EmptyArmPage);
+	await expectARepeatWithNoArmStaysArmless(screen.container as HTMLElement);
 });
