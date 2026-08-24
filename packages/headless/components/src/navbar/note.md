@@ -178,6 +178,104 @@ inside". QDS reaches the same place through `ui-qds-popover-content`; the
 suggested filtering on `[popover]` instead, which is only available to a family
 that uses the top layer.
 
+## Re-measured 2026-08-23 (U262, at `6127a1be`) — the array-handle conversion, and why it is not shipped
+
+The collection capability (`element<T[]>()`) landed at `9f8c39c8`, so this family
+was sent back to convert its four ordered walks and its ~20 scope/identity climbs
+onto handles. **The conversion was written in full and measured. It reaches 52/52
+green and then fails `pnpm typecheck`, so it is NOT in this folder.** The shipped
+code below still walks the DOM. Everything here is measured on this tip with the
+family's own suite, not reasoned from the earlier notes.
+
+### What the capability does give this family
+
+An array handle bound across DIFFERENT parts and DIFFERENT sibling instances reads
+back correctly, in document order. One handle (`partEls`) bound on the landmark,
+each item box, each trigger, each panel and each link answered, from a click
+handler on a trigger:
+
+    home-itemlink | products-itemtrigger | products-itemcontent | keyboards-itemlink
+    | mice-itemlink | docs-itemtrigger | docs-itemcontent | start-itemlink | api-itemlink
+
+That is the whole navigation order in one read, and it is enough to express every
+walk this family has:
+
+- **the top level** is every member whose tag is `A` or `BUTTON` that no member
+  carrying `ui-navbar-dropdown` contains — so the dropdown exclusion becomes a
+  containment test against held elements plus an attribute read on the element
+  itself, with no `closest('[ui-navbar-dropdown]')` anywhere;
+- **a panel's own links** are the members that panel contains;
+- **which element am I** is the DEEPEST member holding `event.target` — members
+  come back in document order, so among the landmark, this item's box and this
+  button, the button is last. No per-part handle is needed for identity at all;
+- **which panel does this trigger open** is the member whose `id` equals the
+  trigger's own `aria-controls`.
+
+With that, 45 of the 52 rows went green on the first run, including all four
+arrow walks, the hover block and the two-navbars isolation rows.
+
+### Correction to U205: the failure was never "handles read back empty"
+
+U205 recorded that a handle read inside a handler behaves as if the handle were
+empty, and shipped the climbs on that basis. **That conclusion is wrong, and the
+real rule is narrower and more useful.** The runtime says so directly:
+
+    Element handle …#navbarItemState/element:contentEl is registered by 2 rendered
+    widgets on this page, and the reading handler named no instance. Read the
+    handle from a part of the widget that binds it.
+
+`resume-events.ts` is explicit about how the instance gets named: *"The
+registrations on this record's own host are what name the widget it is dispatching
+from."* And `resume-locators.ts` files a host's widget root as `null` the moment
+two different root paths register on it.
+
+So the rule is: **an element may bind handles from ONE widget instance only.** Bind
+a root-instance handle and an item-instance handle on the same element and it can
+name neither, and every handle read from that element's handlers refuses. That is
+exactly what U205 hit — it bound `navEl`, `boxEl` and `triggerEl` alongside the
+existing `contentEl`, spanning two instances — and it is why tabs works: its
+trigger binds `tab.el` and nothing else.
+
+A single handle read from a handler on a part that binds it, and nothing else, is
+fine. Reads in an ATTRIBUTE position are unaffected either way.
+
+### The two walls that stop the conversion landing
+
+**1. The set is heterogeneous and the type surface is not.** `el` on a `<div>` is
+typed `HTMLDivElement | readonly HTMLDivElement[] | undefined`, on a `<button>`
+`HTMLButtonElement | …`, and so on. One ordered set spanning `<nav>`, `<div>`,
+`<button>` and `<a>` has to be declared `element<HTMLElement[]>()`, and that is
+assignable to none of the narrow slots. Five `TS2322`s, one per binding site. The
+runtime is perfectly happy; only the declaration cannot be written.
+
+**2. `navbar.itemcontent` needs two bindings from two instances, and cannot have
+them.** The panel must carry `contentEl` (item instance) because that is what mints
+the id the trigger's `aria-controls` points at, AND it must be a member of the root
+instance's set, because a panel that is not a member is a panel no walk can see —
+which is what the whole dropdown exclusion is built on. Binding both is what the
+runtime rule above forbids, and writing it as two `el` attributes is additionally
+`TS17001: JSX elements cannot have multiple attributes with the same name`.
+
+Measured, with the panel binding both: 45/52, and the 7 red rows are exactly the
+dismissal block, failing on `contentEl` refusing inside the panel's own handlers.
+Leaving those two handlers on the DOM and keeping both bindings reaches **52/52** —
+but wall 1 still stands, so the file cannot ship.
+
+### What would unblock it
+
+Either of these, and this family converts to zero DOM traversal outside the panel
+part:
+
+- **let one element bind handles from more than one widget instance**, by having a
+  read name its instance from the handle's own declaration rather than from the
+  registrations on the reading host. This is the one that matters: it is what the
+  panel needs, and it is what U205 actually ran into;
+- **let `el` accept a widened element type**, so a heterogeneous ordered set can be
+  declared once as `element<HTMLElement[]>()` and bound on any tag.
+
+Neither is this family's to build, and the packet forbade touching the compiler or
+web, so both are raised rather than attempted.
+
 ## Re-measured 2026-08-23 (U202, at `c4edc6d9`)
 
 The owner's "no DOM selectors" order sent this family back for a rework. The
@@ -209,6 +307,14 @@ which is the one position a handle is measured to serve.
 So the shipped climbs stay, and the reason they exist is now two facts rather
 than one: a lazily loaded handler has no `currentTarget`, AND an `element()`
 handle does not read back as an element inside a handler.
+
+**SUPERSEDED 2026-08-23 (U262).** The second fact is wrong as written. A handle
+reads back fine inside a handler; what U205 actually hit is that an element may
+bind handles from only ONE widget instance, and its conversion bound three
+root-and-item handles on elements that already carried `contentEl`. See
+[Re-measured 2026-08-23 (U262)](#re-measured-2026-08-23-u262-at-6127a1be--the-array-handle-conversion-and-why-it-is-not-shipped),
+which also retires the "ordered item registration is not expressible" paragraph
+below: `element<T[]>()` builds exactly that collection.
 
 **Ordered item registration into the enclosing instance is not expressible.**
 Three routes measured, all closed (diagnostics in the tree note). That is exactly
