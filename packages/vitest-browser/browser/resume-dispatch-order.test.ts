@@ -75,16 +75,15 @@ test('SSR: every resumed gesture runs through one dispatch queue, in arrival ord
 	expect(trailEventTypes(trail)).toEqual(arrivals);
 });
 
-// PENDING CAPABILITY (defect 94) - the queue serializes bodies in ARRIVAL order
-// (pinned above), but events still ARRIVE scrambled: the inline resumer's
-// forward/resume paths each take a fresh loadModule(url) dynamic-import promise
-// per event (packages/web/src/inline/resumer.ts), and resolution across those
-// promises is not FIFO. Fixing it means the resumer forwarding events to one
-// root in the order they fired - a web-side change. Deterministic enough to
-// pin: the scramble is PROBABILISTIC (~half of bursts), so test.fails would
-// flip-flop - skipped, not pinned, until the resumer forwards FIFO; the fix
-// unit flips this to a plain test and must run it repeatedly.
-test.skip('SSR: a resumed field keeps every keystroke in native order and ends empty', async () => {
+// Defect 94, fixed: the queue serializes bodies in ARRIVAL order (pinned
+// above), and arrivals are now in fire order too. The inline resumer used to
+// take a FRESH loadModule(url) dynamic-import promise per event, and resolution
+// order across separate import promises is not FIFO, so roughly half of bursts
+// reached the queue scrambled and it faithfully serialized the wrong order. The
+// resumer now reuses ONE import promise per root: `.then` callbacks on the same
+// promise run in registration order, and the listener registers them
+// synchronously as each event fires.
+test('SSR: a resumed field keeps every keystroke in native order and ends empty', async () => {
 	const screen = await renderSSR(ResumeDispatchOrder);
 	const container = screen.container;
 	const field = requireElement<HTMLInputElement>(container, 'input[data-field]');

@@ -305,9 +305,15 @@ function runPrerenderSettleBoot(
 		});
 		observer.observe(root, { childList: true, subtree: true });
 	};
+	// Same one-promise rule as the classic resumer's `forward`: reusing this
+	// root's import promise is what keeps queued gestures arriving FIFO.
+	let loaded: Promise<InlineResumeModule & SettleModule> | undefined;
 	const resume = (
 		input: InlineDispatchInput | { readonly root: InlineRoot; readonly event: 0 },
-	) => loadModule(resumeModuleUrl).then((module) => module.resumeContainerEvent(input as never));
+	) =>
+		(loaded ||= loadModule(resumeModuleUrl)).then((module) =>
+			module.resumeContainerEvent(input as never),
+		);
 	for (const eventName of eventNames) {
 		root.addEventListener(
 			eventName,
@@ -597,12 +603,15 @@ function runPrerenderInlineResumer(
 	const resumeModuleUrl =
 		currentScript?.getAttribute?.('data-markless-resume-module') ?? fallbackResumeModuleUrl;
 	if (!root || !resumeModuleUrl) return;
+	// One import promise for this root, not one per event: same FIFO rule the
+	// classic resumer's `forward` follows.
+	let loaded: Promise<InlineResumeModule> | undefined;
 	for (const eventName of eventNames) {
 		root.addEventListener(
 			eventName,
 			(event) => {
 				root.__marklessDelegatedDispatch = true;
-				return loadModule(resumeModuleUrl).then((module) =>
+				return (loaded ||= loadModule(resumeModuleUrl)).then((module) =>
 					module.resumeContainerEvent({
 						root,
 						event,
@@ -735,9 +744,14 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 		currentScript?.getAttribute?.('data-markless-resume-module') ??
 		__MARKLESS_INLINE_RESUME_MODULE_URL__;
 	if (!root || !resumeModuleUrl) return;
+	// One import promise per root, reused: `.then` callbacks on the SAME promise
+	// run in registration order, so events reach the dispatch queue in the order
+	// they fired. A fresh import() per event resolves in no guaranteed order, and
+	// the queue then faithfully serializes the scrambled arrivals.
+	let loaded: Promise<InlineResumeModule> | undefined;
 	const forward = (input: Omit<InlineDispatchInput, 'root'>) => {
 		root.__marklessDelegatedDispatch = true;
-		return loadModule(resumeModuleUrl).then((module) =>
+		return (loaded ||= loadModule(resumeModuleUrl)).then((module) =>
 			module.resumeContainerEvent({ root, ...input }),
 		);
 	};
