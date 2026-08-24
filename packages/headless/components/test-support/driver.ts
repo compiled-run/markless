@@ -49,6 +49,14 @@ export type Vocabulary = {
 	readonly image: string;
 	/** A window laid over the page that carries its own name - `role="dialog"`. */
 	readonly dialog: string;
+	/**
+	 * A rotating set of slides - `aria-roledescription="carousel"` on the root.
+	 * ARIA defines `aria-roledescription` as replacing the role word a reader
+	 * speaks, so this slot holds the announced word rather than `group`.
+	 */
+	readonly carousel: string;
+	/** One panel of a carousel - `aria-roledescription="slide"` on an item. */
+	readonly slide: string;
 	/** The state a chosen tab is in - `aria-selected="true"`. */
 	readonly selected: string;
 	/** The page you are on inside a set of page controls - `aria-current="page"`. */
