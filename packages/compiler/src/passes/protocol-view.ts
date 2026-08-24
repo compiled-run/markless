@@ -311,9 +311,25 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 		const render = renderEntries.get(repeat.id);
 		if (!render || indexKeyed.has(repeat.id) || render.rowElementCount === 0) return [];
 		const rowHostPaths = hostPathsForChunk(input, render.rowChunkId, true);
+		// Row-owned handles ride the repeat, in row-relative coordinates, for the
+		// same reason row events do: the resumed set is whatever the parent's live
+		// children are right now, so a read walks rows rather than trusting a
+		// registration list that a reorder or a removal would have gone stale.
+		const rowElementHandles = (repeat.rowElementHandles ?? []).flatMap((handle) => {
+			const hostPath = rowHostPaths.get(handle.hostNodeId);
+			return hostPath
+				? [{
+					hostPath,
+					handleId: handle.handleId,
+					name: handle.name,
+					...(handle.plural ? { plural: true as const } : {}),
+				}]
+				: [];
+		});
 		return [
 			{
 				id: repeat.id,
+				...(rowElementHandles.length > 0 ? { rowElementHandles } : {}),
 				parentHostNodeId: repeat.parentHostNodeId,
 				collectionGraphNodeId: repeat.collectionGraphNodeId,
 				collectionPath: repeat.collectionPath,

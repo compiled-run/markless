@@ -237,7 +237,14 @@ function repeatRecord(
 	const payloadRepeat = payloadArena?.view.keyedRepeats.find((item) => item.id === repeat.id);
 	const rowElementHandles = payloadRepeat?.rowElementHandles?.flatMap((handle) => {
 		const hostPath = rowHostPaths.get(handle.hostNodeId);
-		return hostPath ? [{ hostPath, handleId: handle.handleId, name: handle.name }] : [];
+		return hostPath
+			? [{
+				hostPath,
+				handleId: handle.handleId,
+				name: handle.name,
+				...(handle.plural ? { plural: true as const } : {}),
+			}]
+			: [];
 	});
 	const rowBehaviorRecords = payloadRepeat?.rowBehaviors ?? semanticGraph.behaviors.filter(
 		(behavior) => rowHostPaths.has(behavior.hostNodeId),

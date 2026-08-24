@@ -1188,7 +1188,7 @@ test('buildSemanticGraph reports invalid and duplicate element handle bindings',
 			title: 'element() handle is bound more than once',
 			message:
 				'Cannot bind element handle "input" to multiple live host elements. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package',
-			why: 'A resumed element handle must resolve to one current DOM locator. Binding one handle to multiple live elements would make lazy event code ambiguous.',
+			why: 'A resumed element handle declared as a single element must resolve to one current DOM locator. Binding it to multiple live elements would make lazy event code ambiguous.',
 			primarySpan: {
 				filename: 'src/Handles.tsrx',
 				start: duplicateHandleStart,
@@ -1198,7 +1198,7 @@ test('buildSemanticGraph reports invalid and duplicate element handle bindings',
 			suggestions: [
 				{
 					message:
-						'Create a separate element() handle for each host element, or move repeated element access into keyed state and behavior records.',
+						'Declare the handle as an ordered set by widening its type argument to an array - element<HTMLElement[]>() - written literally as T[], Array<T> or readonly T[]. Reads then answer every bound element in document order. Otherwise create a separate element() handle for each host element.',
 				},
 			],
 			docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_DUPLICATE',
@@ -1434,7 +1434,7 @@ test('keyed rows classify a direct element handle identifier as repeat-owned', a
 		source: `import { element, state } from '@markless/core';
 export function App() @{
 	const rows = state([{ id: 'a' }]);
-	const row = element<HTMLTableRowElement>();
+	const row = element<HTMLTableRowElement[]>();
 	<table><tbody>@for (const item of rows; key item.id) { <tr el={row}><td>{item.id}</td></tr> }</tbody></table>
 }`,
 	});
@@ -1463,7 +1463,7 @@ export function App() @{
 		expect.objectContaining({
 			code: 'MARKLESS_ROW_ELEMENT_HANDLE_UNSUPPORTED',
 			message:
-				'Cannot bind el={row.current} inside a keyed repeat. Stage-one row ownership supports only a direct element() handle identifier such as el={row}. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package',
+				'Cannot bind el={row.current} inside a keyed repeat. A row host takes a declared element() handle, named directly (el={row}) or as one member off a shared() instance (el={select.optionEls}). markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package',
 		}),
 	]);
 });

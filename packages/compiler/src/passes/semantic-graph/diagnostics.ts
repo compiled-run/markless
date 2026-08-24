@@ -1222,6 +1222,27 @@ export function elementHandleRenderReadDiagnostic(input: {
 	});
 }
 
+/**
+ * An IDREF or CSS anchor position names exactly ONE element, and an array-typed
+ * handle names a set. This is the boundary Option C-prime kept: lifting the
+ * duplicate refusal for ordinary `el=` bindings answered "which element does a
+ * resumed handle locate" with an order, but `aria-labelledby` has no order to
+ * ride — it would have to pick a member, and picking silently is the defect.
+ */
+export function pluralIdrefElementHandleDiagnostic(
+	reference: PendingElementHandleIdref | PendingElementHandleAnchor,
+): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_ELEMENT_HANDLE_PLURAL_IDREF',
+		title: 'An array-typed element() handle cannot fill this position',
+		message: `Cannot resolve ${reference.attributeName}={${reference.source}} because "${reference.handleName}" is declared as an array (element<T[]>()), so it names an ordered set of elements rather than one.`,
+		why: 'This attribute points at exactly one element. A handle declared with an array type argument may be bound on many elements, and there is no order in an IDREF or an anchor name to say which member it means, so the compiler would have to pick one silently.',
+		span: reference.sourceSpan,
+		suggestion: `Declare a second, single element() handle for the one element this attribute points at and bind it there, leaving "${reference.handleName}" for the set.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_PLURAL_IDREF',
+	});
+}
+
 export function duplicateElementHandleDiagnostic(
 	binding: SemanticElementHandleBinding,
 ): SemanticGraphDiagnostic {
@@ -1235,16 +1256,18 @@ export function duplicateElementHandleDiagnostic(
 			? `Cannot bind element handle "${binding.handleName}" inside a keyed repeat because one authored handle would point at many row host elements. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`
 			: `Cannot bind element handle "${binding.handleName}" to multiple live host elements. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`,
 		why: repeated
-			? 'Each repeated row has its own DOM locator. A single element() handle cannot serialize one stable locator for every row instance.'
-			: 'A resumed element handle must resolve to one current DOM locator. Binding one handle to multiple live elements would make lazy event code ambiguous.',
+			? 'Each repeated row has its own DOM locator, so one handle declared as a single element cannot say which row it means.'
+			: 'A resumed element handle declared as a single element must resolve to one current DOM locator. Binding it to multiple live elements would make lazy event code ambiguous.',
 		primarySpan: binding.sourceSpan,
 		passId: 'tsrx-semantic-graph',
 		artifactKeys: ['semanticGraph'],
 		elementLocator: binding.hostNodeId,
 		suggestions: [
 			{
-				message:
-					'Create a separate element() handle for each host element, or move repeated element access into keyed state and behavior records.',
+				// The widening is the type argument and nothing else, and it must be
+				// written literally: the graph reads the spelling, not a resolved
+				// type, so an alias for the array type still reads as one element.
+				message: `Declare the handle as an ordered set by widening its type argument to an array - element<HTMLElement[]>() - written literally as T[], Array<T> or readonly T[]. Reads then answer every bound element in document order. Otherwise create a separate element() handle for each host element.`,
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_DUPLICATE',
@@ -1258,9 +1281,9 @@ export function unsupportedRowElementHandleDiagnostic(
 		code: 'MARKLESS_ROW_ELEMENT_HANDLE_UNSUPPORTED',
 		severity: 'error',
 		phase: 'semantic-graph',
-		title: 'Keyed row element handles must be direct identifiers',
-		message: `Cannot bind el={${binding.handleName}} inside a keyed repeat. Stage-one row ownership supports only a direct element() handle identifier such as el={row}. markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`,
-		why: 'The keyed row record owns one host slot per authored handle and repeat key. Member paths, forwarded props, and nested repeat scopes do not identify one compiler-proven row-owned slot.',
+		title: 'This is not a row-ownable element() handle',
+		message: `Cannot bind el={${binding.handleName}} inside a keyed repeat. A row host takes a declared element() handle, named directly (el={row}) or as one member off a shared() instance (el={select.optionEls}). markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package`,
+		why: 'The keyed row record owns one host slot per authored handle and repeat key. Forwarded props, deeper paths, and nested repeat scopes do not identify one compiler-proven row-owned slot.',
 		primarySpan: binding.sourceSpan,
 		passId: 'tsrx-semantic-graph',
 		artifactKeys: ['semanticGraph'],
@@ -1268,7 +1291,7 @@ export function unsupportedRowElementHandleDiagnostic(
 		suggestions: [
 			{
 				message:
-					'Declare one component-local handle with const row = element(), then bind that identifier directly as el={row} on the keyed row host.',
+					'Declare the handle with const row = element<HTMLElement[]>() in this component or in the shared() factory the row reads, then bind el={row} - or el={family.row} - directly on the keyed row host.',
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ROW_ELEMENT_HANDLE_UNSUPPORTED',

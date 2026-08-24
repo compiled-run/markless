@@ -242,6 +242,7 @@ export function assertProtocolViewPayload(
 		assertStringField(handle, 'hostNodeId', context);
 		assertStringField(handle, 'handleId', context);
 		assertStringField(handle, 'name', context);
+		assertOptionalBooleanField(handle, 'plural', context);
 	}
 
 	for (const [index, boundary] of asyncBoundaries.entries()) {
@@ -482,7 +483,43 @@ function assertOptionalKeyedRepeats(record: Record<string, unknown>): void {
 		assertStringField(repeat, 'itemName', context);
 		assertNonNegativeIntegerField(repeat, 'rowElementCount', context);
 		assertRowEvents(repeat.rowEvents, `${context}.rowEvents`);
+		assertOptionalRowElementHandles(repeat, `${context}.rowElementHandles`);
 	}
+}
+
+function assertOptionalRowElementHandles(
+	record: Record<string, unknown>,
+	context: string,
+): void {
+	const handles = record.rowElementHandles;
+	if (handles === undefined) return;
+	if (!Array.isArray(handles)) {
+		throw invalidPayloadShapeError(
+			contextPayloadType(context),
+			`Invalid ${context}: expected array.`,
+		);
+	}
+	for (const [index, handle] of handles.entries()) {
+		const handleContext = `${context}[${index}]`;
+		assertRecordShape(handle, handleContext);
+		assertNonNegativeIntegerArrayField(handle, 'hostPath', handleContext);
+		assertStringField(handle, 'handleId', handleContext);
+		assertStringField(handle, 'name', handleContext);
+		assertOptionalBooleanField(handle, 'plural', handleContext);
+	}
+}
+
+function assertOptionalBooleanField(
+	record: Record<string, unknown>,
+	key: string,
+	context: string,
+): void {
+	const value = record[key];
+	if (value === undefined || typeof value === 'boolean') return;
+	throw invalidPayloadShapeError(
+		contextPayloadType(context),
+		`Invalid ${context}: expected ${key} boolean.`,
+	);
 }
 
 function assertOptionalBranches(record: Record<string, unknown>): void {

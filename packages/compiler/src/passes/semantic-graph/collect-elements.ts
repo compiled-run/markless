@@ -60,6 +60,7 @@ import {
 	unboundElementHandleDiagnostic,
 	compositeIdrefElementHandleDiagnostic,
 	rowOwnedIdrefElementHandleDiagnostic,
+	pluralIdrefElementHandleDiagnostic,
 	widgetRootIdrefElementHandleDiagnostic,
 	unboundIdrefElementHandleDiagnostic,
 	anchorElementHandleValueDiagnostic,
@@ -269,12 +270,24 @@ export function collectElementHandleDiagnostics(
 			if (
 				binding.keyedRepeatScopeIds.length === 1 &&
 				repeat &&
-				/^[A-Za-z_$][\w$]*$/.test(binding.handleName) &&
+				// A member path (`el={select.optionEls}`) is row-ownable now that the
+				// handle it names resolves to one element() node with nothing left
+				// over; what it must not be is a forwarded prop or a nested repeat.
+				HANDLE_PATH.test(binding.handleName) &&
 				graphBinding?.kind === 'element' &&
 				resolved?.path.length === 0
 			) {
+				if (!graphBinding.plural) {
+					graph.diagnostics.push(duplicateElementHandleDiagnostic(binding));
+					continue;
+				}
 				const rowOwned = {
 					...binding,
+					// One authored handle, one row-owned slot per row: the row record
+					// keys by the DECLARED name, not the member spelling that reached it.
+					...(binding.handleName === graphBinding.name
+						? {}
+						: { handleName: graphBinding.name }),
 					rowOwner: { repeatId, keyPath: repeat.keyPath },
 				};
 				graph.elementHandleBindings[bindingIndex] = rowOwned;
@@ -311,12 +324,21 @@ export function collectElementHandleDiagnostics(
 		);
 	}
 
+	// Plurality is DECLARED, at the `element<T[]>()` call, never inferred from how
+	// many elements happened to bind: an author who widens the type argument gets
+	// a set, and one who did not gets the exactly-one rule they wrote.
+	const pluralHandleNames = new Set(
+		graph.graphBindings.flatMap((candidate) =>
+			candidate.kind === 'element' && candidate.plural ? [candidate.name] : [],
+		),
+	);
 	const firstBindingByHandle = new Map<string, SemanticElementHandleBinding>();
 	for (const binding of validElementHandleBindings) {
 		if (!firstBindingByHandle.has(binding.handleName)) {
 			firstBindingByHandle.set(binding.handleName, binding);
 			continue;
 		}
+		if (pluralHandleNames.has(binding.handleName)) continue;
 
 		graph.diagnostics.push(duplicateElementHandleDiagnostic(binding));
 	}
@@ -349,9 +371,16 @@ export function collectElementHandleDiagnostics(
 		}
 	}
 
-	resolveElementHandleIdrefs(graph, pendingIdrefs, firstBindingByHandle);
-	resolveElementHandleAnchors(graph, pendingAnchors, firstBindingByHandle);
+	resolveElementHandleIdrefs(graph, pendingIdrefs, firstBindingByHandle, pluralHandleNames);
+	resolveElementHandleAnchors(graph, pendingAnchors, firstBindingByHandle, pluralHandleNames);
 }
+
+/**
+ * A handle spelling `el=` accepts: a declared local, or one member off a shared()
+ * instance. Nothing with a call, an index, or a deeper path — those do not name
+ * one compiler-proven row-owned slot, which is what the row refusal protects.
+ */
+const HANDLE_PATH = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)?$/;
 
 /**
  * Turns the walk's pending IDREF references into records, now that every
@@ -363,6 +392,7 @@ function resolveElementHandleIdrefs(
 	graph: MutableSemanticGraphArtifact,
 	pendingIdrefs: ReadonlyArray<PendingElementHandleIdref>,
 	boundByHandle: ReadonlyMap<string, SemanticElementHandleBinding>,
+	pluralHandleNames: ReadonlySet<string>,
 ): void {
 	for (const reference of pendingIdrefs) {
 		const bound = boundByHandle.get(reference.handleName);
@@ -370,8 +400,14 @@ function resolveElementHandleIdrefs(
 			graph.diagnostics.push(unboundIdrefElementHandleDiagnostic(reference));
 			continue;
 		}
+		// Row ownership answers first: a handle bound in a repeat is refused for the
+		// reason the row refusal already names, whether or not it is also plural.
 		if (bound.rowOwner || bound.keyedRepeatScopeIds.length > 0) {
 			graph.diagnostics.push(rowOwnedIdrefElementHandleDiagnostic(reference));
+			continue;
+		}
+		if (pluralHandleNames.has(bound.handleName)) {
+			graph.diagnostics.push(pluralIdrefElementHandleDiagnostic(reference));
 			continue;
 		}
 		const handleBinding = graph.graphBindings.find(
@@ -418,6 +454,7 @@ function resolveElementHandleAnchors(
 	graph: MutableSemanticGraphArtifact,
 	pendingAnchors: ReadonlyArray<PendingElementHandleAnchor>,
 	boundByHandle: ReadonlyMap<string, SemanticElementHandleBinding>,
+	pluralHandleNames: ReadonlySet<string>,
 ): void {
 	for (const reference of pendingAnchors) {
 		const bound = boundByHandle.get(reference.handleName);
@@ -427,6 +464,10 @@ function resolveElementHandleAnchors(
 		}
 		if (bound.rowOwner || bound.keyedRepeatScopeIds.length > 0) {
 			graph.diagnostics.push(rowOwnedAnchorElementHandleDiagnostic(reference));
+			continue;
+		}
+		if (pluralHandleNames.has(bound.handleName)) {
+			graph.diagnostics.push(pluralIdrefElementHandleDiagnostic(reference));
 			continue;
 		}
 		const handleBinding = graph.graphBindings.find(

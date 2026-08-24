@@ -260,9 +260,39 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 				...sharedScope(state),
 				declarationKind,
 				writable: false,
+				...(pluralElementTypeArgument(init) ? { plural: true } : {}),
 			});
 		}
 	}
+}
+
+/**
+ * Whether `element<...>()` declared an ordered SET of elements.
+ *
+ * Plurality is the declared type argument and nothing else: `element<T[]>()`,
+ * `element<Array<T>>()` and `element<readonly T[]>()` name many elements, every
+ * other spelling names one. The test is deliberately SYNTACTIC. The semantic
+ * graph has no type checker, so an alias (`type Els = T[]; element<Els>()`)
+ * cannot be resolved here — and guessing would silently classify a collection as
+ * a single handle, which is the mis-binding this rule exists to make impossible.
+ * Fail closed: an unreadable spelling stays singular and the duplicate-binding
+ * refusal names the literal forms that widen it.
+ */
+function pluralElementTypeArgument(init: AnyNode): boolean {
+	const declared = asNodes((init.typeArguments as AnyNode | undefined)?.params)[0];
+	return declared ? isArrayTypeNode(declared) : false;
+}
+
+function isArrayTypeNode(node: AnyNode): boolean {
+	if (node.type === 'TSArrayType') return true;
+	// `readonly T[]` is TSTypeOperator over the array type.
+	if (node.type === 'TSTypeOperator' && node.operator === 'readonly') {
+		const inner = node.typeAnnotation as AnyNode | undefined;
+		return inner ? isArrayTypeNode(inner) : false;
+	}
+	if (node.type !== 'TSTypeReference') return false;
+	const name = getIdentifierName(node.typeName as AnyNode | undefined);
+	return name === 'Array' || name === 'ReadonlyArray';
 }
 
 // One `computed(...)` call becomes one graph node. `name` is whatever names the

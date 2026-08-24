@@ -5,6 +5,13 @@ export type ResumeDomNode = {
 	readonly nodeType: number;
 	readonly childNodes?: ReadonlyArray<ResumeDomNode>;
 };
+// `element<T[]>()` answers every live element it is bound to, in document
+// order; every other handle answers the one element or undefined.
+export type ResumeElementHandleValue =
+	| ResumeDomElement
+	| ReadonlyArray<ResumeDomElement>
+	| undefined;
+
 export type ResumeDomElement = ResumeDomNode & {
 	readonly nodeType: 1;
 	readonly tagName: string;
@@ -197,7 +204,7 @@ export type ResumeSymbolContext = {
 	readonly signal?: AbortSignal;
 	readonly event?: ResumeDomEvent;
 	readonly element: ResumeDomElement;
-	readonly getElementHandle: (handleIdOrName: string) => ResumeDomElement | undefined;
+	readonly getElementHandle: (handleIdOrName: string) => ResumeElementHandleValue;
 	readonly locals?: Readonly<Record<string, unknown>>;
 	readonly arm?: number;
 	readonly branchId?: string;
@@ -298,7 +305,7 @@ export type ResumeRuntime = {
 	readonly holdPendingSettleCommits?: (minVisibleMs: number) => Promise<void> | void;
 };
 export type ElementHandleRegistry = {
-	readonly get: (handleIdOrName: string) => ResumeDomElement | undefined;
+	readonly get: (handleIdOrName: string) => ResumeElementHandleValue;
 	/** The rendered widget this host sits in, as the instance path its own qualified handles carry. */
 	readonly widgetRootPath?: (hostNodeId: string) => string | undefined;
 	readonly register: (

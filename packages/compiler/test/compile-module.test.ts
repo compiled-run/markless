@@ -5551,7 +5551,7 @@ test('compiled CSR keyed row behaviors attach once per key and clean removed rec
 import { installRow } from './row-behavior.ts';
 export function App() @{
 	let rows = state([{ id: 'a', label: 'Alpha' }, { id: 'b', label: 'Beta' }, { id: 'c', label: 'Gamma' }, { id: 'd', label: 'Delta' }]);
-	const row = element<HTMLTableRowElement>();
+	const row = element<HTMLTableRowElement[]>();
 	<main>
 		<button onClick={() => rows = [{ id: 'a', label: 'Alpha next' }, { id: 'b', label: 'Beta next' }, { id: 'c', label: 'Gamma next' }, { id: 'd', label: 'Delta next' }]}>Reuse</button>
 		<button onClick={() => rows = [{ id: 'd', label: 'Delta next' }, { id: 'c', label: 'Gamma next' }, { id: 'b', label: 'Beta next' }, { id: 'a', label: 'Alpha next' }]}>Reorder</button>

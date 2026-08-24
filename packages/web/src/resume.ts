@@ -41,6 +41,7 @@ export function createResumeRuntime(
 		input.root,
 		elementsByHostId,
 		input.view.elementHandles,
+		input.view.keyedRepeats,
 	);
 	const prepared = { elementsByHostId, elementHandles, asyncBoundariesById };
 	let runtime: ResumeRuntime | undefined;
