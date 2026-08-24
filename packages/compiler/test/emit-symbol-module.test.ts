@@ -548,3 +548,129 @@ test('dispatched emission is deterministic and reaches a reparse fixpoint', asyn
 		}
 	}
 });
+
+// ---------------------------------------------------------------------------
+// Module-scope declarations a derive names travel with the derive module.
+//
+// A `sync-computed-derive` module is fetched and evaluated on its own in the
+// browser, so a module-scope `const` the derive reads has to be *in* it. It was
+// not: the derive branch returned before the carry the general path performs,
+// the name stayed free, and the first client re-derive threw a ReferenceError.
+// SSR hoisted the declaration into its own render, so the server was green and
+// only the browser crashed.
+// ---------------------------------------------------------------------------
+
+/** The one emitted derive module for a compiled source, by symbol kind. */
+async function deriveModules(filename: string, source: string) {
+	const result = await compileTsrxModule({ filename, source, symbols: [] });
+	return {
+		modules: result.symbolModules.modules.filter(
+			(module) => module.kind === 'sync-computed-derive',
+		),
+		diagnostics: result.symbolModules.diagnostics,
+	};
+}
+
+test('a module-scope const a derive reads is carried into the derive module', async () => {
+	const { modules, diagnostics } = await deriveModules(
+		'/workspace/app/src/DeriveConst.tsrx',
+		`
+import { computed, state } from '@markless/core';
+
+const RATE = 3;
+
+export function App() @{
+	let count = state(1);
+	const scaled = computed(() => count * RATE);
+
+	<main><span>{scaled}</span></main>
+}
+`,
+	);
+
+	expect(modules).toHaveLength(1);
+	const emitted = modules[0]!.source;
+	expect(emitted).toContain('const RATE = 3;');
+	// The read itself survives as a reference to the carried binding.
+	expect(emitted).toContain('RATE');
+	// Nothing about the carry is a compile error.
+	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+});
+
+test('a derive that names no module-scope declaration carries none', async () => {
+	const { modules } = await deriveModules(
+		'/workspace/app/src/DeriveNoConst.tsrx',
+		`
+import { computed, state } from '@markless/core';
+
+const UNUSED = 3;
+
+export function App() @{
+	let count = state(1);
+	const scaled = computed(() => count * 2);
+
+	<main><span>{scaled}</span></main>
+}
+`,
+	);
+
+	expect(modules).toHaveLength(1);
+	expect(modules[0]!.source).not.toContain('UNUSED');
+});
+
+test('carried declarations keep authored order, so a class is bound before it is used', async () => {
+	const { modules } = await deriveModules(
+		'/workspace/app/src/DeriveOrder.tsrx',
+		`
+import { computed, state } from '@markless/core';
+
+class Rate {
+	constructor(public step: number) {}
+	scale(value: number) { return value * this.step; }
+}
+const rate = new Rate(3);
+
+export function App() @{
+	let count = state(1);
+	const scaled = computed(() => rate.scale(count));
+
+	<main><span>{scaled}</span></main>
+}
+`,
+	);
+
+	expect(modules).toHaveLength(1);
+	const emitted = modules[0]!.source;
+	// Reachability finds `const rate = new Rate(3)` first; emitting that order
+	// runs the constructor inside the class binding's temporal dead zone.
+	expect(emitted).toContain('class Rate');
+	expect(emitted.indexOf('class Rate')).toBeLessThan(emitted.indexOf('new Rate('));
+});
+
+test('a carried declaration extending an imported base keeps that import', async () => {
+	const { modules } = await deriveModules(
+		'/workspace/app/src/DeriveImportedBase.tsrx',
+		`
+import { computed, state } from '@markless/core';
+import { Base } from './base.ts';
+
+class Rate extends Base {
+	scale(value: number) { return value * 3; }
+}
+const rate = new Rate();
+
+export function App() @{
+	let count = state(1);
+	const scaled = computed(() => rate.scale(count));
+
+	<main><span>{scaled}</span></main>
+}
+`,
+	);
+
+	expect(modules).toHaveLength(1);
+	const emitted = modules[0]!.source;
+	expect(emitted).toContain('class Rate extends Base');
+	// The derive body never named `Base`; the carried declaration did.
+	expect(emitted).toContain('import { Base } from "./base.ts";');
+});

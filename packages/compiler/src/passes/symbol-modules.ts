@@ -1143,7 +1143,13 @@ function emitSymbolModule(
 				symbolId: symbol.id,
 				kind: symbol.kind,
 				exportName: symbolExportName(symbol.id),
-				source: emitSyncComputedDeriveModule(symbol, captureSlots, omitAuthoredSource),
+				source: emitSyncComputedDeriveModule(
+					symbol,
+					captureSlots,
+					omitAuthoredSource,
+					moduleDeclarations,
+					moduleImports,
+				),
 			},
 		];
 	}
@@ -2234,23 +2240,86 @@ const DERIVE_SOURCE_FILENAME = 'markless-sync-computed-derive.ts';
 export function syncComputedDeriveEmissionInput(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'sync-computed-derive' }>,
 	captureSlots: ReadonlyArray<CaptureSlot>,
+	moduleDeclarations: readonly string[] = [],
 ): EmissionPrintInput {
-	return syncComputedDeriveEmission(symbol, captureSlots).input;
+	return syncComputedDeriveEmission(symbol, captureSlots, moduleDeclarations).input;
+}
+
+/**
+ * The derive body, the module-scope declarations it needs, and the text both
+ * were parsed from.
+ *
+ * Same two-pass shape as `eventHandlerModuleScopeCarry`, and for the same
+ * reasons. Which declarations the module needs is a question about the *emitted*
+ * body — a name the lowering turned into a `context.graph.read(...)` is no
+ * longer a reference to a module binding — so the body is built once to ask it,
+ * and only a non-empty answer costs a second parse. Declarations and derive are
+ * reparsed as ONE text so every node's `start`/`end` indexes the string the
+ * print site names, which is what keeps the source map honest.
+ */
+function syncComputedDeriveModuleScopeCarry(
+	symbol: Extract<PlannedSymbol, { readonly kind: 'sync-computed-derive' }>,
+	captureSlots: ReadonlyArray<CaptureSlot>,
+	moduleDeclarations: readonly string[],
+): {
+	readonly wrappedSource: string;
+	readonly statements: ReadonlyArray<EmissionNode>;
+	readonly declarationStatements: ReadonlyArray<EmissionNode>;
+} {
+	const bare = `${DERIVE_SOURCE_PREFIX}${symbol.source}${DERIVE_SOURCE_SUFFIX}`;
+	const firstPass = syncComputedDeriveStatements(symbol, captureSlots, bare);
+	const empty = {
+		wrappedSource: bare,
+		statements: firstPass.statements,
+		declarationStatements: [] as ReadonlyArray<EmissionNode>,
+	};
+	if (moduleDeclarations.length === 0) return empty;
+
+	const reached = new Set(
+		referencedModuleDeclarations(
+			deriveReferencedIdentifierNames(firstPass.statements),
+			moduleDeclarations,
+			DERIVE_SOURCE_FILENAME,
+		),
+	);
+	if (reached.size === 0) return empty;
+	// Authored order, not reachability order: reachability finds `const rate =
+	// new Rate()` before it finds `class Rate`, and emitting them that way runs
+	// the constructor while the class binding is still in its temporal dead zone.
+	const selected = moduleDeclarations.filter((declaration) => reached.has(declaration));
+
+	const carriedSource = `${selected.join('\n')}\n${bare}`;
+	const carried = syncComputedDeriveStatements(symbol, captureSlots, carriedSource);
+	// A text that will not reparse into the same shape leaves the module exactly
+	// as it was before this carry existed, rather than emitting a half-bound one.
+	if (carried.declarationStatements.length !== selected.length) return empty;
+
+	return {
+		wrappedSource: carriedSource,
+		statements: carried.statements,
+		declarationStatements: carried.declarationStatements,
+	};
 }
 
 function syncComputedDeriveEmission(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'sync-computed-derive' }>,
 	captureSlots: ReadonlyArray<CaptureSlot>,
-): { readonly input: EmissionPrintInput; readonly statements: ReadonlyArray<EmissionNode> } {
+	moduleDeclarations: readonly string[],
+): {
+	readonly input: EmissionPrintInput;
+	readonly statements: ReadonlyArray<EmissionNode>;
+	readonly declarationStatements: ReadonlyArray<EmissionNode>;
+} {
 	const exportName = symbolExportName(symbol.id);
-	const wrappedSource = `${DERIVE_SOURCE_PREFIX}${symbol.source}${DERIVE_SOURCE_SUFFIX}`;
-	const statements = syncComputedDeriveStatements(symbol, captureSlots, wrappedSource);
+	const carried = syncComputedDeriveModuleScopeCarry(symbol, captureSlots, moduleDeclarations);
+	const { wrappedSource, statements, declarationStatements } = carried;
 
 	const input: EmissionPrintInput = {
 		program: {
 			type: 'Program',
 			sourceType: 'module',
 			body: [
+				...declarationStatements,
 				{
 					type: 'ExportNamedDeclaration',
 					specifiers: [],
@@ -2279,21 +2348,30 @@ function syncComputedDeriveEmission(
 		},
 	};
 
-	return { input, statements };
+	return { input, statements, declarationStatements };
 }
 
 function emitSyncComputedDeriveModule(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'sync-computed-derive' }>,
 	captureSlots: ReadonlyArray<CaptureSlot>,
 	omitAuthoredSource: boolean,
+	moduleDeclarations: readonly string[],
+	moduleImports: readonly SemanticModuleImport[],
 ): string {
-	const emission = syncComputedDeriveEmission(symbol, captureSlots);
+	const emission = syncComputedDeriveEmission(symbol, captureSlots, moduleDeclarations);
 	const printed = printEmittedModule(emission.input);
-	const referenced = deriveReferencedIdentifierNames(emission.statements);
+	// A carried declaration's own free names decide imports too: a module-scope
+	// class extending an imported base needs that import in this module.
+	const referenced = new Set([
+		...deriveReferencedIdentifierNames(emission.statements),
+		...deriveReferencedIdentifierNames(emission.declarationStatements),
+	]);
 	const imports = uniqueModuleImports(
-		(symbol.moduleImports ?? []).filter((moduleImport) =>
-			referenced.has(moduleImport.localName),
-		),
+		[
+			...(symbol.moduleImports ?? []),
+			// A carried declaration can name an import the derive body never did.
+			...(emission.declarationStatements.length === 0 ? [] : moduleImports),
+		].filter((moduleImport) => referenced.has(moduleImport.localName)),
 	);
 
 	return [
@@ -2379,10 +2457,13 @@ function syncComputedDeriveStatements(
 	symbol: Extract<PlannedSymbol, { readonly kind: 'sync-computed-derive' }>,
 	captureSlots: ReadonlyArray<CaptureSlot>,
 	wrappedSource: string,
-): EmissionNode[] {
-	const derive = parseDeriveFunction(wrappedSource);
-	const body = derive?.body as AnyNode | undefined;
-	if (!body) return [returnUndefinedStatement()];
+): {
+	readonly statements: EmissionNode[];
+	readonly declarationStatements: ReadonlyArray<EmissionNode>;
+} {
+	const parsed = parseDeriveProgram(wrappedSource);
+	const body = parsed?.derive.body as AnyNode | undefined;
+	if (!body) return { statements: [returnUndefinedStatement()], declarationStatements: [] };
 
 	const statements =
 		body.type === 'BlockStatement'
@@ -2391,15 +2472,29 @@ function syncComputedDeriveStatements(
 
 	rewriteDeriveReads(statements, symbol.dependencies ?? [], captureSlots, wrappedSource);
 
-	if (statements.length === 0) return [returnUndefinedStatement()];
-	return statements as unknown as EmissionNode[];
+	const declarationStatements = (parsed?.declarations ??
+		[]) as unknown as ReadonlyArray<EmissionNode>;
+	if (statements.length === 0) {
+		return { statements: [returnUndefinedStatement()], declarationStatements };
+	}
+	return { statements: statements as unknown as EmissionNode[], declarationStatements };
 }
 
 function returnUndefinedStatement(): EmissionNode {
 	return { type: 'ReturnStatement', argument: identifierNode('undefined') };
 }
 
-function parseDeriveFunction(wrappedSource: string): AnyNode | null {
+/**
+ * The derive's function tree, and whatever module-scope declarations were parsed
+ * ahead of it in the same text.
+ *
+ * The wrapper is always the *last* top-level statement, because a carry prepends
+ * the declarations it selected to the same source before parsing. With no carry
+ * the wrapper is also the first, so this reads both shapes.
+ */
+function parseDeriveProgram(
+	wrappedSource: string,
+): { readonly declarations: ReadonlyArray<AnyNode>; readonly derive: AnyNode } | null {
 	let program: AnyNode;
 	try {
 		const parsed = parseEmissionSource(wrappedSource, DERIVE_SOURCE_FILENAME);
@@ -2412,14 +2507,15 @@ function parseDeriveFunction(wrappedSource: string): AnyNode | null {
 		return null;
 	}
 
-	const declaration = asNodes(program.body)[0];
+	const statements = asNodes(program.body);
+	const declaration = statements.at(-1);
 	if (declaration?.type !== 'VariableDeclaration') return null;
 
 	const init = asNodes(declaration.declarations)[0]?.init;
 	if (!isNode(init)) return null;
 	if (init.type !== 'ArrowFunctionExpression' && init.type !== 'FunctionExpression') return null;
 
-	return init;
+	return { declarations: statements.slice(0, -1), derive: init };
 }
 
 /**
