@@ -156,7 +156,11 @@ const clientBuild = resolve(demo, '.output/public/build');
 // widget-rooting repeats (previously dropped entirely = the defect-84 wire gap).
 // Clawback named for bundler-diet: rowElementCount + rowEvents pay-per-use (dead
 // weight on widget-rooted records; rowElementCount has no resume consumer).
-const MAX_SHIPPED_JS_GZIP_BYTES = 68_380;
+// 68,380 -> 68,440 (2026-08-24): measured 68,434 - rowStartOffset consumption in
+// resume-keyed-repeats (defect 84 half 1: rows addressed past static siblings +
+// tail-anchor re-insert). The record field itself is absent at zero, so the cost
+// is resume-module code, not payload; joins the bundler-diet clawback above.
+const MAX_SHIPPED_JS_GZIP_BYTES = 68_440;
 
 test('music-player-ssr production build stays within its shipped JS budget', async () => {
 	await rm(resolve(demo, '.output'), { force: true, recursive: true });
