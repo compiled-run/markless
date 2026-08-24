@@ -73,6 +73,20 @@ export function renderDecisionSources(
 export const MARKLESS_WIDGET_INSTANCE_KEY = 'markless:widget-instance';
 
 /**
+ * The seed-map key under which a widget's seed phase files "some part of this
+ * instance binds that element() handle", one entry per handle. The phase runs
+ * before any part renders, so an IDREF position written on the FIRST part can
+ * still be told whether the element it names is going to exist.
+ *
+ * The answer is positive by construction: an entry is filed only because a
+ * placed part declared the binding. A handle that is never bound anywhere is a
+ * build error long before this map exists, so a missing entry means exactly one
+ * thing - this widget renders no element for that handle - and the IDREF
+ * attribute is omitted rather than left naming nothing.
+ */
+export const MARKLESS_ELEMENT_BOUND_KEY_PREFIX = 'markless:element-bound|';
+
+/**
  * Every element() handle one chunk set has to spell, in either rendering: as a
  * minted `mx-` id, or as the `--mx-` dashed-ident a CSS anchor position needs.
  * One collection because it answers one question - whether this chunk set needs
@@ -139,6 +153,8 @@ export function elementHandleIdReadCase(input: {
 	readonly widgetInstanceRead: ((handleExpression: string) => string) | null;
 	/** Defaults to the id rendering only; the anchor branch is opt-in. */
 	readonly kinds?: { readonly id: boolean; readonly anchorStyle: boolean };
+	/** Reads one seed-map key; supplied wherever a shared() IDREF can be omitted. */
+	readonly boundRead?: (keyExpression: string) => string;
 }): string {
 	// One slug expression, two renderings. `mx-<slug>` is the id an IDREF names;
 	// `--mx-<slug>` is the CSS dashed-ident an anchor position names. The
@@ -152,9 +168,18 @@ export function elementHandleIdReadCase(input: {
 		return `(${prefix}+${handle}).replace(/\\W+/g,'-')`;
 	};
 	const kinds = input.kinds ?? { id: true, anchorStyle: false };
+	// Only an IDREF position can be omitted. The element that CARRIES the id mints
+	// unconditionally: it renders only when its own part renders, and an omission
+	// there would write `id="undefined"` instead of nothing.
+	const omitUnbound =
+		input.widgetInstanceRead && input.boundRead
+			? `if(residue.idref&&residue.handleGraphNodeId.startsWith('shared:')&&${input.boundRead(
+					`${JSON.stringify(MARKLESS_ELEMENT_BOUND_KEY_PREFIX)}+residue.handleGraphNodeId`,
+				)}!==true)return undefined;`
+			: '';
 	return [
 		kinds.id
-			? `if(residue.kind==='element-handle-id')return 'mx-'+${slug('residue.handleGraphNodeId')};`
+			? `if(residue.kind==='element-handle-id'){${omitUnbound}return 'mx-'+${slug('residue.handleGraphNodeId')};}`
 			: '',
 		// The consumer's own declarations come first so the anchor names, which
 		// are plumbing rather than design, win the cascade.
@@ -308,6 +333,7 @@ export function emitClientResidueReader(
 						? widgetInstanceReadSource((key) => `${CONTEXT}.read(${key})`)
 						: null,
 					kinds: elementHandleResidueKinds(componentChunks),
+					boundRead: (key) => `${CONTEXT}.read(${key})`,
 				})
 			: '';
 	return [

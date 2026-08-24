@@ -4,7 +4,10 @@ import { asNodes, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { firstComponentRoot } from './plan.ts';
 import { sharedCallbackSlotGraphNodeId } from '../semantic-graph/collect-shared.ts';
 import { emitClientResidueReader, emitClientResidueReaderPrelude } from './residue-reader.ts';
-import { widgetRootDefinitionIds } from './shared-seed-pass.ts';
+import {
+	componentBoundElementHandles,
+	widgetRootDefinitionIds,
+} from './shared-seed-pass.ts';
 import {
 	callbackSymbolIds,
 	componentPropNames,
@@ -235,6 +238,12 @@ export function collectPublicRenderComponentDefinitions(
 				// record is serialised, so it costs the payload nothing.
 				...(widgetRootDefinitionIds(input, componentName).length > 0
 					? { rootsWidget: true }
+					: {}),
+				// The CSR twin of the compiled `marklessElementHandles` marker: which
+				// shared() element() handles a rendered instance of this component
+				// binds, so a widget's seed phase can file them before any part renders.
+				...(componentBoundElementHandles(input, componentName).length > 0
+					? { boundElementHandles: componentBoundElementHandles(input, componentName) }
 					: {}),
 				...residueReaderFields(),
 			},
