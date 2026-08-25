@@ -10,7 +10,9 @@ import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
 
 export const MARKLESS_VIRTUAL_PREFIX = 'virtual:markless:';
 
-const SMALL_SYMBOL_DIRECT_LOAD_LIMIT = 8;
+// At or below this count the loader spells one literal `import()` per symbol, so
+// those symbol modules are dynamic-import roots and cannot be coalesced.
+export const SMALL_SYMBOL_DIRECT_LOAD_LIMIT = 8;
 
 export type SourceSymbolRow = {
 	readonly id: string;

@@ -33,6 +33,7 @@ export type MarklessVirtualModuleType =
 	| 'resume'
 	| 'settle'
 	| 'symbol'
+	| 'symbol-bundle'
 	| 'trigger-group'
 	| 'style';
 
@@ -49,6 +50,8 @@ export interface MarklessVirtualModule {
 	exportName?: string;
 	canonicalRenderData?: boolean;
 	symbolClaims?: ReadonlyArray<string>;
+	/** `symbol-bundle` only: the symbol module ids this bundle ships as one chunk. */
+	bundledSymbolModuleIds?: ReadonlyArray<string>;
 }
 
 export interface TransformTsrxModuleInput {
