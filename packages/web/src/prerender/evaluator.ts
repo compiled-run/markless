@@ -832,6 +832,39 @@ export type RepeatRowComponentRender = {
 	readonly view: import('@markless/serializer').ProtocolViewPayload;
 };
 
+// The graph-node grammar for a shared() instance, restating public-render's
+// spelling for the reason INSTANCE_PATH in fns/instance-scope restates its own.
+const SHARED_INSTANCE_NODE = /^(?:shared|storage):/;
+
+/**
+ * The page's own shared instances, read live for a row born after the page was.
+ *
+ * A minted row renders without the live graph because its own cells do not exist
+ * in it yet, but a page-scoped `shared()` instance is not the row's - it is state
+ * the page has been writing since load. Left to its compile-time factory the row
+ * paints from an empty queue and joins the DOM wrong, with a follow-up refresh to
+ * correct it. A widget-scoped id is instance-prefixed in page space, so only a
+ * page-scoped instance answers here; what the graph lacks keeps its factory.
+ */
+function liveSharedInstanceSeeds(
+	surface: PrerenderDataSurface,
+	componentName: string,
+	read: PrerenderRead,
+	seeded: ReadonlyMap<string, unknown> | undefined,
+): ReadonlyMap<string, unknown> | undefined {
+	let merged: Map<string, unknown> | undefined;
+	for (const initial of surface.components[componentName]?.initialValues ?? []) {
+		const graphNodeId = initial.graphNodeId;
+		if (!SHARED_INSTANCE_NODE.test(graphNodeId)) continue;
+		if (seeded?.has(graphNodeId) || merged?.has(graphNodeId)) continue;
+		const live = read(graphNodeId, []);
+		if (live === undefined) continue;
+		merged ??= new Map(seeded ?? []);
+		merged.set(graphNodeId, live);
+	}
+	return merged ?? seeded;
+}
+
 /**
  * One component edge, rendered for one keyed `@for` row, in page space.
  *
@@ -1025,6 +1058,12 @@ export async function renderRepeatRowComponent(input: {
 							`MARKLESS_PRERENDER_DATA_COMPONENT_MISSING: ${projectedEdge.childComponentName}`,
 						);
 					const part = rowEdgeChildProps(projectedEdge, context, undefined);
+					const partSeeds = liveSharedInstanceSeeds(
+						partSurface,
+						projectedEdge.childComponentName,
+						read,
+						context.sharedSeeds,
+					);
 					const partOutput = await evaluatePrerenderDataComponent({
 						surface: partSurface,
 						componentName: projectedEdge.childComponentName,
@@ -1039,7 +1078,7 @@ export async function renderRepeatRowComponent(input: {
 						loadSymbol: input.loadSymbol,
 						graph: undefined,
 						requireHtml: true,
-						...(context.sharedSeeds ? { sharedSeeds: context.sharedSeeds } : {}),
+						...(partSeeds ? { sharedSeeds: partSeeds } : {}),
 						boundGraphValues: marklessBoundGraphValues(
 							undefined,
 							partSurface,
@@ -1077,7 +1116,12 @@ export async function renderRepeatRowComponent(input: {
 			loadSymbol: input.loadSymbol,
 			graph: undefined,
 			requireHtml: true,
-			sharedSeeds,
+			sharedSeeds: liveSharedInstanceSeeds(
+				childSurface,
+				edge.childComponentName,
+				read,
+				sharedSeeds,
+			),
 			boundGraphValues: marklessBoundGraphValues(undefined, childSurface, edge.props, read),
 		});
 	let output;

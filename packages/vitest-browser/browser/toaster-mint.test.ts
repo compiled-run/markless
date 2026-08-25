@@ -45,6 +45,45 @@ test('a toast raised after load paints, stacks, and dismisses itself', async () 
 	await cleanup();
 });
 
+// A minted row must match a served row at every observable instant, so the row
+// joins the DOM finished. Its `ui-front` and `style` read a page-scoped shared()
+// instance - the queue the page has been writing since load - and rendering them
+// from the compile-time factory instead put the row on screen wrong and left a
+// follow-up refresh to correct it. Under load that correction was skipped and
+// the row simply stayed wrong, which is why the DOM is watched here rather than
+// polled: an attribute rewritten after insertion is the same defect passing.
+test('a minted toast is finished before it joins the DOM', async () => {
+	const screen = await renderSSR(App);
+	const container = screen.container;
+
+	// Registration refreshes the row's records once it is attached, so attributes
+	// are written again - what must never happen is one of them CHANGING, which is
+	// the row admitting it went on screen wrong.
+	const rewrites: string[] = [];
+	const observer = new MutationObserver((records) => {
+		for (const record of records) {
+			if (record.type !== 'attributes') continue;
+			const element = record.target as Element;
+			const name = record.attributeName!;
+			if (record.oldValue !== element.getAttribute(name))
+				rewrites.push(
+					`${element.tagName}[${name}] ${record.oldValue} -> ${element.getAttribute(name)}`,
+				);
+		}
+	});
+	observer.observe(container, { subtree: true, attributes: true, attributeOldValue: true });
+
+	click(container, '[data-say]');
+	await expect.poll(() => toasts(container).length).toBe(1);
+	const first = toasts(container)[0]!;
+	const settled = { front: first.getAttribute('ui-front'), style: first.getAttribute('style') };
+	observer.disconnect();
+
+	expect(settled).toEqual({ front: '', style: '--index: 0; --offset: 0%' });
+	expect(rewrites).toEqual([]);
+	await cleanup();
+});
+
 // The close button reads `item.id` off the widget-scoped `shared()` instance the
 // row's own component wrote. The read has to answer at DISPATCH as well as at
 // render: the handler runs later, on a graph the bound symbol reaches through
