@@ -41,14 +41,14 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	slider: 'slider',
 	tooltip: 'tooltip',
 	'slider-range': 'slider',
-	dateinput: 'spinbutton',
+	datebox: 'spinbutton',
 };
 
 /** Sections whose point is how many of that role they serve, not merely that they serve one. */
 const RENDERED_COUNT: Partial<Record<FamilyName, number>> = {
 	'slider-range': 2,
 	// Three boxes, one per part of the date.
-	dateinput: 3,
+	datebox: 3,
 };
 
 const appDir = fileURLToPath(new URL('..', import.meta.url));

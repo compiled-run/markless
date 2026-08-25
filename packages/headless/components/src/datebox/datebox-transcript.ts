@@ -7,14 +7,14 @@ import type { ScreenReaderDriver } from '../../test-support/driver.ts';
  * wording, so this file runs unchanged against NVDA and VoiceOver.
  *
  * It reads raw phrases rather than the shared `Conveys` seam, for the same reason
- * `./dateinput.sr.ts` keeps its own word table: `spinbutton` has no `Vocabulary`
+ * `./datebox.sr.ts` keeps its own word table: `spinbutton` has no `Vocabulary`
  * slot, and a value or a bound is spoken as a phrase around a number whose
  * separators no real reader has been observed producing for our markup.
  * Containment in the whole phrase is what can be asserted honestly until a CI run
  * prints one.
  */
 
-// The date input section is the last on the gallery page, so a walk that starts at
+// The datebox section is the last on the gallery page, so a walk that starts at
 // the top of the document needs more steps than any other family's.
 const WALK_LIMIT = 280;
 const CHANGE_TIMEOUT_MS = 15_000;
@@ -50,8 +50,8 @@ async function readForPhrase(
 	);
 }
 
-export async function readDateInputTranscript(sr: ScreenReaderDriver, page: Page) {
-	const section = page.locator(`#${FAMILY_ANCHORS.dateinput.slice(2)}`);
+export async function readDateBoxTranscript(sr: ScreenReaderDriver, page: Page) {
+	const section = page.locator(`#${FAMILY_ANCHORS.datebox.slice(2)}`);
 	const boxes = section.getByRole('spinbutton');
 
 	await expect(boxes).toHaveCount(3);

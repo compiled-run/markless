@@ -1,6 +1,15 @@
-# dateinput
+# datebox
 
 A date typed one part at a time: three number boxes in a named group, no calendar.
+
+The family is named `datebox`, ruled by the owner: it joins the shipped
+`checkbox`/`combobox`/`textbox` box family, leaves `date`, `datepicker` and
+`calendar` free for the phase-2 composed picker, and does not stutter against the
+`dayinput`/`monthinput`/`yearinput` part names, which are unchanged. Naming
+research: `goals/headless-components/notes/U471-date-family-name.md`. DevExtreme's
+`dxDateBox` and JTSage DateBox ship the same word; neither is a namespace
+conflict, but a reader arriving from DevExtreme may expect a calendar dropdown
+this family does not have.
 
 Research: `goals/headless-components/notes/U432-dateinput-research.md` — QDS's
 `date-input` read in full (it is implemented; their calendar is not), against
@@ -16,9 +25,9 @@ root because one QDS root holds several dates. That frees `field` for the hidden
 form input, which is what `field` means here (`select.field`, `radiogroup.itemfield`).
 
 `dayinput`/`monthinput`/`yearinput` are the established `input` role with three
-new information prefixes. Minting `segment` as a role was considered and rejected:
-it clears two component use cases, below the spec's three-use bar. The prefixes
-themselves are still an open owner question — see "Researched defaults" below.
+new information prefixes, signed off with the family name. Minting `segment` as a
+role was considered and rejected: it clears two component use cases, below the
+spec's three-use bar.
 
 The order the boxes read in is the order they are written in. There is no format
 prop, and `ArrowLeft`/`ArrowRight` walk them in written order.
@@ -75,17 +84,15 @@ The value is an ISO date string, `yyyy-mm-dd`, and `null` while the boxes do not
 spell a whole one. `min` and `max` are ISO dates too, and they hold the *date*
 rather than any one box: a step that carries the date past a bound pulls the whole
 date back to it, which can move all three boxes at once. Month lengths and the
-comparison are worked out in `date-input-math.ts` — `@markless/ui` depends on
+comparison are worked out in `datebox-math.ts` — `@markless/ui` depends on
 `@markless/core` and nothing else, so there is no date library behind this.
 
 ## Researched defaults applied without an owner answer
 
-The research memo put nine questions to the owner. These were answered by the
-build packet's researched defaults and are still open for revision:
+The research memo put nine questions to the owner. The family name and the three
+segment prefixes have since been ruled on; the rest were answered by the build
+packet's researched defaults and are still open for revision:
 
-- The segment part names `dayinput`/`monthinput`/`yearinput`. `SPEC.md` requires
-  owner sign-off for a new prefix as much as for a new role, and `day`, `month`
-  and `year` are three new prefixes.
 - No `aria-valuetext`. QDS renders none, so a month announces "3" rather than
   "March" and an empty box announces no value. React Aria and the APG both render
   it and both name this as the gap it closes.

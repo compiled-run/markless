@@ -69,7 +69,7 @@ jobs:
                         checklist,
                         collapsible,
                         combobox,
-                        dateinput,
+                        datebox,
                         modal,
                         navbar,
                         otp,
@@ -128,7 +128,7 @@ jobs:
                 # when its src/<family>/<family>.nvda.ts exists, not before: a
                 # name with no spec file makes the run find no tests.
                 family:
-                    [checkbox, dateinput, modal, popover, radio-group, select, slider, tabs, tooltip]
+                    [checkbox, datebox, modal, popover, radio-group, select, slider, tabs, tooltip]
 
         steps:
             - uses: actions/checkout@v4
@@ -190,7 +190,7 @@ jobs:
             matrix:
                 # See the nvda job: only families with a real-reader spec.
                 family:
-                    [checkbox, dateinput, modal, popover, radio-group, select, slider, tabs, tooltip]
+                    [checkbox, datebox, modal, popover, radio-group, select, slider, tabs, tooltip]
 
         steps:
             - uses: actions/checkout@v4

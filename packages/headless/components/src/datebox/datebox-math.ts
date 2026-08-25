@@ -1,5 +1,5 @@
 /**
- * Every calculation the date input makes, as plain functions over plain values.
+ * Every calculation the datebox makes, as plain functions over plain values.
  *
  * The family holds one string per segment - what a person has typed there, "" for
  * an untouched segment - and everything else is derived from those three strings

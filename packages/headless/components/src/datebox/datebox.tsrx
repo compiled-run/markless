@@ -16,27 +16,27 @@ import {
 	resolvedTexts,
 	resolvedValue,
 	type SegmentType,
-} from './date-input-math.ts';
+} from './datebox-math.ts';
 import type {
-	DateInputDayInputProps,
-	DateInputDescriptionProps,
-	DateInputErrorProps,
-	DateInputFieldProps,
-	DateInputInstanceState,
-	DateInputLabelProps,
-	DateInputMonthInputProps,
-	DateInputRootProps,
-	DateInputItemInstanceState,
-	DateInputItemProps,
-	DateInputYearInputProps,
-} from './dateinput-types.ts';
+	DateBoxDayInputProps,
+	DateBoxDescriptionProps,
+	DateBoxErrorProps,
+	DateBoxFieldProps,
+	DateBoxInstanceState,
+	DateBoxLabelProps,
+	DateBoxMonthInputProps,
+	DateBoxRootProps,
+	DateBoxItemInstanceState,
+	DateBoxItemProps,
+	DateBoxYearInputProps,
+} from './datebox-types.ts';
 
 // One computed() cell per comparison: a comparison written inline in an attribute
 // renders once and then goes stale.
 
-export const dateinputState = shared(
+export const dateboxState = shared(
 	() => {
-		const dateinput: DateInputInstanceState = state({
+		const datebox: DateBoxInstanceState = state({
 			seed: '',
 			dayAt: null,
 			monthAt: null,
@@ -52,17 +52,17 @@ export const dateinputState = shared(
 		const segmentEls = element<HTMLSpanElement[]>();
 
 		const value = computed(() =>
-			resolvedValue(dateinput.seed, dateinput.dayAt, dateinput.monthAt, dateinput.yearAt),
+			resolvedValue(datebox.seed, datebox.dayAt, datebox.monthAt, datebox.yearAt),
 		);
 		const dayMax = computed(() =>
-			resolvedDayMax(dateinput.seed, dateinput.dayAt, dateinput.monthAt, dateinput.yearAt),
+			resolvedDayMax(datebox.seed, datebox.dayAt, datebox.monthAt, datebox.yearAt),
 		);
 		const isEmpty = computed(() =>
-			resolvedEmpty(dateinput.seed, dateinput.dayAt, dateinput.monthAt, dateinput.yearAt),
+			resolvedEmpty(datebox.seed, datebox.dayAt, datebox.monthAt, datebox.yearAt),
 		);
 
 		return {
-			...dateinput,
+			...datebox,
 			describedEl,
 			segmentEls,
 			value,
@@ -74,7 +74,7 @@ export const dateinputState = shared(
 			// `event.target`, never `currentTarget`: a dispatch runs after the browser
 			// has finished with the event, and `currentTarget` is null by then.
 			press(from: EventTarget | null, key: string) {
-				if (dateinput.disabled) return;
+				if (datebox.disabled) return;
 
 				const box = from as HTMLSpanElement | null;
 				if (!box) return;
@@ -85,25 +85,25 @@ export const dateinputState = shared(
 				// carried into the dispatch to know it.
 				const type = (box.getAttribute('ui-type') ?? 'day') as SegmentType;
 				const texts = resolvedTexts(
-					dateinput.seed,
-					dateinput.dayAt,
-					dateinput.monthAt,
-					dateinput.yearAt,
+					datebox.seed,
+					datebox.dayAt,
+					datebox.monthAt,
+					datebox.yearAt,
 				);
 				const before = composeIso(texts.year, texts.month, texts.day);
 				const outcome = keyOutcome(
 					type,
 					key,
 					texts,
-					dateinput.min,
-					dateinput.max,
+					datebox.min,
+					datebox.max,
 					new Date(),
 				);
 				if (outcome === null) return;
 
-				dateinput.dayAt = outcome.day;
-				dateinput.monthAt = outcome.month;
-				dateinput.yearAt = outcome.year;
+				datebox.dayAt = outcome.day;
+				datebox.monthAt = outcome.month;
+				datebox.yearAt = outcome.year;
 
 				if (outcome.move !== 0) {
 					const landing = boxes[at + outcome.move];
@@ -111,7 +111,7 @@ export const dateinputState = shared(
 				}
 
 				const after = composeIso(outcome.year, outcome.month, outcome.day);
-				if (after !== before) dateinput.onChange?.(after);
+				if (after !== before) datebox.onChange?.(after);
 			},
 		};
 	},
@@ -120,7 +120,7 @@ export const dateinputState = shared(
 
 // A <fieldset> named by its <legend>: three boxes have no single control to point
 // a `for` at, and a widget root cannot mint an id for a part it contains.
-export function DateInputRoot({
+export function DateBoxRoot({
 	value = '',
 	min = '',
 	max = '',
@@ -130,65 +130,65 @@ export function DateInputRoot({
 	onChange,
 	children,
 	...rest
-}: DateInputRootProps) @{
-	const dateinput = dateinputState();
-	dateinput.onChange = onChange;
-	dateinput.seed = value;
-	dateinput.min = min;
-	dateinput.max = max;
-	dateinput.disabled = disabled;
-	dateinput.required = required;
-	dateinput.name = name;
+}: DateBoxRootProps) @{
+	const datebox = dateboxState();
+	datebox.onChange = onChange;
+	datebox.seed = value;
+	datebox.min = min;
+	datebox.max = max;
+	datebox.disabled = disabled;
+	datebox.required = required;
+	datebox.name = name;
 
 	// The root's own cell: a widget root cannot render a computed declared in the
 	// factory it is creating.
 	const isEmpty = computed(() =>
-		resolvedEmpty(dateinput.seed, dateinput.dayAt, dateinput.monthAt, dateinput.yearAt),
+		resolvedEmpty(datebox.seed, datebox.dayAt, datebox.monthAt, datebox.yearAt),
 	);
-	const ariaDisabled = computed(() => (dateinput.disabled ? 'true' : 'false'));
+	const ariaDisabled = computed(() => (datebox.disabled ? 'true' : 'false'));
 
 	<fieldset
 		{...rest}
 		role="group"
 		aria-disabled={ariaDisabled}
-		ui-disabled={dateinput.disabled}
-		ui-required={dateinput.required}
+		ui-disabled={datebox.disabled}
+		ui-required={datebox.required}
 		ui-empty={isEmpty}
 	>{children}</fieldset>
 }
 
-export function DateInputLabel({ children, ...rest }: DateInputLabelProps) @{
-	const dateinput = dateinputState();
+export function DateBoxLabel({ children, ...rest }: DateBoxLabelProps) @{
+	const datebox = dateboxState();
 
-	<legend {...rest} ui-disabled={dateinput.disabled}>{children}</legend>
+	<legend {...rest} ui-disabled={datebox.disabled}>{children}</legend>
 }
 
 // A focusable element drawing its own digits, not an `<input>`: an input's shown
 // text is its `value` property, which stops following the attribute once a person
 // types, so the graph could never be the one thing that says what a box shows.
-function DateInputItem({
+function DateBoxItem({
 	type,
 	placeholder,
 	showLeadingZero = false,
 	onKeydown,
 	onPaste,
 	...rest
-}: Omit<DateInputItemProps, 'placeholder'> & {
+}: Omit<DateBoxItemProps, 'placeholder'> & {
 	readonly type: SegmentType;
 	readonly placeholder: string;
 }) @{
-	const dateinput = dateinputState();
+	const datebox = dateboxState();
 	// The type as a graph cell: compared against the prop instead, the comparison
 	// stops refreshing once the page has resumed.
-	const segment: DateInputItemInstanceState = state({ type, showLeadingZero, placeholder });
+	const segment: DateBoxItemInstanceState = state({ type, showLeadingZero, placeholder });
 
 	const shown = computed(() =>
 		resolvedDisplay(
 			segment.type,
-			dateinput.seed,
-			dateinput.dayAt,
-			dateinput.monthAt,
-			dateinput.yearAt,
+			datebox.seed,
+			datebox.dayAt,
+			datebox.monthAt,
+			datebox.yearAt,
 			segment.showLeadingZero,
 			segment.placeholder,
 		),
@@ -196,19 +196,19 @@ function DateInputItem({
 	const now = computed(() =>
 		resolvedNumber(
 			segment.type,
-			dateinput.seed,
-			dateinput.dayAt,
-			dateinput.monthAt,
-			dateinput.yearAt,
+			datebox.seed,
+			datebox.dayAt,
+			datebox.monthAt,
+			datebox.yearAt,
 		),
 	);
 	const digits = computed(() =>
 		resolvedDisplay(
 			segment.type,
-			dateinput.seed,
-			dateinput.dayAt,
-			dateinput.monthAt,
-			dateinput.yearAt,
+			datebox.seed,
+			datebox.dayAt,
+			datebox.monthAt,
+			datebox.yearAt,
 			segment.showLeadingZero,
 			'',
 		),
@@ -217,10 +217,10 @@ function DateInputItem({
 		() =>
 			resolvedText(
 				segment.type,
-				dateinput.seed,
-				dateinput.dayAt,
-				dateinput.monthAt,
-				dateinput.yearAt,
+				datebox.seed,
+				datebox.dayAt,
+				datebox.monthAt,
+				datebox.yearAt,
 			) === '',
 	);
 	const named = computed(() => `${segment.type} input`);
@@ -229,22 +229,22 @@ function DateInputItem({
 	);
 	const highest = computed(() =>
 		segment.type === 'day'
-			? dateinput.dayMax
+			? datebox.dayMax
 			: segment.type === 'month'
 				? MAX_MONTH
 				: MAX_YEAR,
 	);
-	const ariaInvalid = computed(() => (dateinput.invalid ? 'true' : 'false'));
-	const ariaDisabled = computed(() => (dateinput.disabled ? 'true' : 'false'));
-	const tabStop = computed(() => (dateinput.disabled ? -1 : 0));
+	const ariaInvalid = computed(() => (datebox.invalid ? 'true' : 'false'));
+	const ariaDisabled = computed(() => (datebox.disabled ? 'true' : 'false'));
+	const tabStop = computed(() => (datebox.disabled ? -1 : 0));
 
 	<span
 		{...rest}
-		el={dateinput.segmentEls}
+		el={datebox.segmentEls}
 		role="spinbutton"
 		tabindex={tabStop}
 		aria-label={named}
-		aria-describedby={dateinput.describedEl}
+		aria-describedby={datebox.describedEl}
 		aria-valuenow={now}
 		aria-valuemin={lowest}
 		aria-valuemax={highest}
@@ -253,7 +253,7 @@ function DateInputItem({
 		ui-type={segment.type}
 		ui-value={digits}
 		ui-placeholder={isPlaceholder}
-		ui-disabled={dateinput.disabled}
+		ui-disabled={datebox.disabled}
 		onKeydown={(event) => {
 			// Guarded by event fields alone, and only `===` chains extract: a guard
 			// over locals derived from graph state is MARKLESS_SYNC_POLICY_UNEXTRACTABLE.
@@ -272,7 +272,7 @@ function DateInputItem({
 				event.preventDefault();
 			}
 
-			dateinput.press(event.target, event.key);
+			datebox.press(event.target, event.key);
 			onKeydown?.(event);
 		}}
 		onPaste={(event) => {
@@ -282,44 +282,45 @@ function DateInputItem({
 	>{shown}</span>
 }
 
-export function DateInputDayInput({ ...rest }: DateInputDayInputProps) @{
-	<DateInputItem placeholder="dd" {...rest} type="day" />
+export function DateBoxDayInput({ ...rest }: DateBoxDayInputProps) @{
+	<DateBoxItem placeholder="dd" {...rest} type="day" />
 }
 
-export function DateInputMonthInput({ ...rest }: DateInputMonthInputProps) @{
-	<DateInputItem placeholder="mm" {...rest} type="month" />
+export function DateBoxMonthInput({ ...rest }: DateBoxMonthInputProps) @{
+	<DateBoxItem placeholder="mm" {...rest} type="month" />
 }
 
-export function DateInputYearInput({ ...rest }: DateInputYearInputProps) @{
-	<DateInputItem placeholder="yyyy" {...rest} type="year" />
+export function DateBoxYearInput({ ...rest }: DateBoxYearInputProps) @{
+	<DateBoxItem placeholder="yyyy" {...rest} type="year" />
 }
 
-// One part stands behind both `dateinput.description` and `dateinput.error`: an
-// element() handle binds in exactly one place, and aria-describedby names exactly
-// one id. A field that mounts both messages is described by the first.
-function DateInputMessage({ children, ...rest }: DateInputDescriptionProps) @{
-	const dateinput = dateinputState();
+// One part stands behind both `datebox.description` and `datebox.error`: a single
+// element() handle may be bound at exactly one site (MARKLESS_ELEMENT_HANDLE_DUPLICATE),
+// and aria-describedby names exactly one id. A field that mounts both messages is
+// described by the first.
+function DateBoxMessage({ children, ...rest }: DateBoxDescriptionProps) @{
+	const datebox = dateboxState();
 
-	<div {...rest} el={dateinput.describedEl}>{children}</div>
+	<div {...rest} el={datebox.describedEl}>{children}</div>
 }
 
-export function DateInputDescription({ children, ...rest }: DateInputDescriptionProps) @{
-	<DateInputMessage {...rest}>{children}</DateInputMessage>
+export function DateBoxDescription({ children, ...rest }: DateBoxDescriptionProps) @{
+	<DateBoxMessage {...rest}>{children}</DateBoxMessage>
 }
 
-export function DateInputError({ children, ...rest }: DateInputErrorProps) @{
-	const dateinput = dateinputState();
+export function DateBoxError({ children, ...rest }: DateBoxErrorProps) @{
+	const datebox = dateboxState();
 	// Mounting the error part is what marks the boxes invalid.
-	dateinput.invalid = true;
+	datebox.invalid = true;
 
-	<DateInputMessage {...rest}>{children}</DateInputMessage>
+	<DateBoxMessage {...rest}>{children}</DateBoxMessage>
 }
 
 // No handler of its own: the input is clipped, aria-hidden and out of the tab
 // order, so nothing but the family ever changes it.
-export function DateInputField({ ...rest }: DateInputFieldProps) @{
-	const dateinput = dateinputState();
-	const submitted = computed(() => dateinput.value ?? '');
+export function DateBoxField({ ...rest }: DateBoxFieldProps) @{
+	const datebox = dateboxState();
+	const submitted = computed(() => datebox.value ?? '');
 
 	<VisuallyHidden>
 		<input
@@ -327,10 +328,10 @@ export function DateInputField({ ...rest }: DateInputFieldProps) @{
 			type="text"
 			tabindex={-1}
 			aria-hidden="true"
-			name={dateinput.name}
+			name={datebox.name}
 			value={submitted}
-			required={dateinput.required}
-			disabled={dateinput.disabled}
+			required={datebox.required}
+			disabled={datebox.disabled}
 		/>
 	</VisuallyHidden>
 }
