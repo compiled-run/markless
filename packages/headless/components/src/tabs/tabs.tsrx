@@ -1,4 +1,5 @@
 import { computed, element, shared, state } from '@markless/core';
+import { nextTriggerToFocus } from './tabs-walk.ts';
 import type {
 	TabsContentProps,
 	TabsInstanceState,
@@ -119,41 +120,14 @@ export function TabsTrigger({
 				event.preventDefault();
 			}
 
-			const isHorizontal = tabs.orientation !== 'vertical';
-			const forward = isHorizontal ? 'ArrowRight' : 'ArrowDown';
-			const backward = isHorizontal ? 'ArrowLeft' : 'ArrowUp';
-			const key = event.key;
-			const isNavigationKey =
-				key === forward || key === backward || key === 'Home' || key === 'End';
-			if (!isNavigationKey) {
-				onKeydown?.(event);
-				return;
-			}
-
 			// This trigger's own element off its own instance handle: a handler on the element that binds the handle resolves per instance.
-			const here = tab.el;
-			if (!here) {
-				onKeydown?.(event);
-				return;
-			}
-
-			// One filter, no snapshot copy in front of it: the members read back as a
-			// plain array already. A single pass is not open here - the compiler cannot
-			// resolve a write to a handler local made inside a loop.
-			const open = (tabs.triggerEls ?? []).filter((candidate) => !candidate.disabled);
-			const at = open.indexOf(here);
-			if (at < 0) {
-				onKeydown?.(event);
-				return;
-			}
-
-			const last = open.length - 1;
-			const step = key === 'Home' ? -at : key === 'End' ? last - at : key === forward ? 1 : -1;
-			const raw = at + step;
-			const beforeFirst = tabs.loop ? last : 0;
-			const afterLast = tabs.loop ? 0 : last;
-			const to = raw < 0 ? beforeFirst : raw > last ? afterLast : raw;
-			const next = open[to];
+			const next = nextTriggerToFocus(
+				tabs.triggerEls,
+				tab.el,
+				event.key,
+				tabs.orientation !== 'vertical',
+				tabs.loop,
+			);
 			// Focus only: whether focus also shows the tab is selectOnFocus's call, made once in onFocus.
 			if (next) next.focus();
 			onKeydown?.(event);

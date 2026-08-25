@@ -1,5 +1,6 @@
 import { computed, element, shared, state } from '@markless/core';
 import VisuallyHidden from '../base/visually-hidden.tsrx';
+import { nextFieldToFocus } from './radio-group-walk.ts';
 import type {
 	RadioGroupDescriptionProps,
 	RadioGroupErrorProps,
@@ -194,30 +195,15 @@ export function RadioGroupItemField({ onChange, onFocus, onKeydown, ...rest }: R
 					event.preventDefault();
 				}
 
-				const isHorizontal = group.orientation === 'horizontal';
-				const forward = isHorizontal ? 'ArrowRight' : 'ArrowDown';
-				const backward = isHorizontal ? 'ArrowLeft' : 'ArrowUp';
-				const key = event.key;
 				// `target`, not `currentTarget`: a lazy handler symbol runs after the native dispatch, when `currentTarget` is null.
-				const here = event.target as HTMLInputElement;
-				const isNavigationKey =
-					key === forward || key === backward || key === 'Home' || key === 'End';
-				if (!isNavigationKey) {
-					onKeydown?.(event);
-					return;
-				}
-
-				// One filter, no snapshot copy in front of it: the members read back as
-				// a plain array already. A single pass is not open here - the compiler
-				// cannot resolve a write to a handler local made inside a loop.
-				const fields = (group.fieldEls ?? []).filter((field) => !field.disabled);
-				const at = fields.indexOf(here);
-				const last = fields.length - 1;
-				const step = key === 'Home' ? -at : key === 'End' ? last - at : key === forward ? 1 : -1;
-				const raw = at + step;
-				const to = raw < 0 ? (group.loop ? last : 0) : raw > last ? (group.loop ? 0 : last) : raw;
-				const next = fields[to];
-				if (at >= 0 && next) {
+				const next = nextFieldToFocus(
+					group.fieldEls,
+					event.target as HTMLInputElement,
+					event.key,
+					group.orientation === 'horizontal',
+					group.loop,
+				);
+				if (next) {
 					next.focus();
 					// APG: an arrow moves focus AND chooses. Unlike tabs, selection is not optional.
 					group.choose(next.value);
