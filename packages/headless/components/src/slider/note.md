@@ -10,25 +10,20 @@ compiler now serves the value the render already derived, so the handler reads t
 computed, and `slider.browser.ts` pins the first keystroke after a resume on both
 the one-value and the two-value slider.
 
-## Why the values are not `start` / `end` computeds on the factory
+## The effective values are `start` / `end` on the instance
 
-`SliderInstanceState` describes the effective numbers as living on the instance,
-and they cannot: SSR derives a factory `computed()` only for a component whose
-markup reads it **directly**. A part-local `computed()` over `slider.start`
-reconstructs the instance from the state cells alone, reads undefined, and drops
-the attribute — five SSR rows go red on `aria-valuenow` the moment the parts read
-factory computeds. A shared method reading one is worse: nothing derives it, so
-nothing serves it, and the first read after a resume is undefined again. Until a
-factory computed derives for any component that reads it, every part and every
-shared method reads the state cells through `slider-math.ts`.
+SSR now derives a factory `computed()` for any component that reaches it — through
+a part-local `computed()`, a template expression, or a handler read — so the
+factory owns `start` and `end` the way `SliderInstanceState` always described, and
+every part and shared method reads those two instead of rebuilding the numbers
+from the state cells.
 
 ## What `slider-math.ts` carries
 
-Not a workaround — it is where the family's arithmetic lives, and every function
-in it still has a caller:
+Where the family's arithmetic lives, and every function in it still has a caller:
 
-- `currentStart` / `currentEnd` / `currentOf` — the seed-versus-written fallback,
-  called by each part's `computed()` and by the shared methods.
+- `currentStart` / `currentEnd` — the seed-versus-written fallback, called by the
+  factory's `start` and `end` computeds and nowhere else.
 - `boundedValue`, `snapToStep`, `clamp`, `keyTarget`, `valueAtFraction`,
   `pointerFraction`, `nearerSide` — the value and geometry rules the keydown
   handler and the drag methods apply.

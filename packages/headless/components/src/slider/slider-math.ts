@@ -87,17 +87,6 @@ export function currentEnd(
 	return endAt ?? endSeed(value, min);
 }
 
-export function currentOf(
-	side: SliderSide,
-	startAt: number | null,
-	endAt: number | null,
-	value: SliderValue | undefined,
-	min: number,
-): number {
-	if (side === 'start') return currentStart(startAt, value, min);
-	return currentEnd(endAt, value, min);
-}
-
 function fractionOf(value: number, min: number, max: number): number {
 	if (max <= min) return 0;
 	return clamp((value - min) / (max - min), 0, 1);
