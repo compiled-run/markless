@@ -231,7 +231,23 @@ export async function startResumeRuntime(input: {
 		behaviors.installVisibilityObserver();
 		behaviors.installRemovalObserver();
 	}
-	if ((runtimeInput.view.branches ?? []).length > 0) await loadBranchRuntime();
+	if ((runtimeInput.view.branches ?? []).length > 0) {
+		const branches = await loadBranchRuntime();
+		// An escalating branch's served arm is already in the DOM; it registers the
+		// way a served boundary arm does, against the branch's own anchor pair.
+		let registerArm: typeof import('./resume-commit-arm.ts').registerArmRecordSet | undefined;
+		for (const branch of branches.branchesById.values()) {
+			const armRecords = branch.servedArmRecords;
+			if (!armRecords) continue;
+			registerArm ??= (await import('./resume-commit-arm.ts')).registerArmRecordSet;
+			await registerArm(
+				await input.armRegistrationDeps(armRecords),
+				input.installArmEventType,
+				branch,
+				{ armRecords },
+			);
+		}
+	}
 	// Pay-per-use in two stages, because fetching less is not the same as shipping
 	// less. The chunk is EMITTED only for an app the compiler recorded an `overlay`
 	// demand for: that app's own module is the ONLY place the `import()` specifier

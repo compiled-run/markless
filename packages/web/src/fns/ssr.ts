@@ -77,6 +77,8 @@ type SsrBranchRecord = SsrAnchoredRecord & {
 	readonly symbolId?: string;
 	readonly takenArm?: number;
 	readonly armRecords?: ReadonlyArray<SsrArmRecordSet>;
+	readonly escalates?: true;
+	readonly servedArmRecords?: SsrArmRecordSet;
 };
 type SsrArmRecordSet = SsrRecord & {
 	readonly locators?: ReadonlyArray<SsrLocatorRecord>;
@@ -916,6 +918,17 @@ function marklessSsrComposedView(
 			.filter((anchor) => anchor.kind === 'branch')
 			.map((anchor) => anchor.id),
 	);
+	const composedBranches = marklessSsrArmizeBranches(
+		structure,
+		marklessSsrResolveAnchorRecords(
+			structure,
+			'branch',
+			branches.filter((branch) => renderedBranchIds.has(idPrefix + branch.id)),
+			idPrefix,
+		),
+		{ locators, events, domUpdates, behaviors, elementHandles, keyedRepeats },
+		idPrefix,
+	);
 	return {
 		view: {
 			...view,
@@ -925,12 +938,7 @@ function marklessSsrComposedView(
 			keyedRepeats,
 			behaviors,
 			elementHandles,
-			branches: marklessSsrResolveAnchorRecords(
-				structure,
-				'branch',
-				branches.filter((branch) => renderedBranchIds.has(idPrefix + branch.id)),
-				idPrefix,
-			),
+			branches: composedBranches,
 			asyncBoundaries: armizedBoundaries,
 			...(Object.keys(asyncRunners).length > 0 ? { asyncRunners } : {}),
 		},
@@ -1070,6 +1078,91 @@ export function marklessSsrArmizeBoundaries(
 		};
 	});
 }
+// An escalating branch holds a component that has to run, so a flip replaces its
+// range wholesale rather than rebuilding markup. Its served records therefore
+// have to leave the page-absolute streams and become arm-relative, exactly as a
+// boundary arm's do. Nothing else armizes: a page with no escalating branch
+// keeps every record where it was, byte for byte.
+export function marklessSsrArmizeBranches(
+	structure: SsrDataStructure,
+	branches: ReadonlyArray<SsrBranchRecord>,
+	streams: {
+		locators: SsrLocatorRecord[];
+		events: SsrEventRecord[];
+		domUpdates: SsrDomUpdateRecord[];
+		behaviors: SsrBehaviorRecord[];
+		elementHandles: SsrHostedRecord[];
+		keyedRepeats: SsrKeyedRepeatRecord[];
+	},
+	idPrefix = '',
+): ReadonlyArray<SsrBranchRecord> {
+	if (!branches.some((branch) => branch.escalates === true)) return branches;
+	const anchorById = new Map(
+		structure.anchors
+			.filter((anchor) => anchor.kind === 'branch')
+			.map((anchor) => [anchor.id, anchor] as const),
+	);
+	return branches.map((branch) => {
+		if (branch.escalates !== true) return branch;
+		const anchor = anchorById.get(idPrefix + branch.id);
+		if (!anchor) throw new Error(`MARKLESS_SSR_DATA_ANCHOR_MISSING: branch:${branch.id}`);
+		return { ...branch, servedArmRecords: marklessSsrMoveArmRange(streams, anchor) };
+	});
+}
+
+function marklessSsrMoveArmRange(
+	streams: {
+		locators: SsrLocatorRecord[];
+		events: SsrEventRecord[];
+		domUpdates: SsrDomUpdateRecord[];
+		behaviors: SsrBehaviorRecord[];
+		elementHandles: SsrHostedRecord[];
+		keyedRepeats: SsrKeyedRepeatRecord[];
+	},
+	anchor: { readonly elementStart: number; readonly elementEnd: number },
+): SsrArmRecordSet {
+	const armLocators: SsrLocatorRecord[] = [];
+	for (let i = streams.locators.length - 1; i >= 0; i--) {
+		const locator = streams.locators[i];
+		if (locator.index < anchor.elementStart || locator.index >= anchor.elementEnd) continue;
+		armLocators.unshift({
+			...locator,
+			strategy: 'arm-relative',
+			index: locator.index - anchor.elementStart,
+		});
+		streams.locators.splice(i, 1);
+	}
+	const armHostIds = new Set(armLocators.map((locator) => locator.hostNodeId));
+	const moved: {
+		events: SsrEventRecord[];
+		domUpdates: SsrDomUpdateRecord[];
+		behaviors: SsrBehaviorRecord[];
+		elementHandles: SsrHostedRecord[];
+	} = { events: [], domUpdates: [], behaviors: [], elementHandles: [] };
+	for (const key of Object.keys(moved) as ReadonlyArray<keyof typeof moved>) {
+		const records: SsrHostedRecord[] = streams[key] ?? [];
+		for (let i = records.length - 1; i >= 0; i--) {
+			if (armHostIds.has(records[i].hostNodeId))
+				(moved[key] as SsrHostedRecord[]).unshift(...records.splice(i, 1));
+		}
+	}
+	const keyedRepeats: SsrKeyedRepeatRecord[] = [];
+	for (let i = (streams.keyedRepeats ?? []).length - 1; i >= 0; i--) {
+		if (armHostIds.has(streams.keyedRepeats[i].parentHostNodeId))
+			keyedRepeats.unshift(...streams.keyedRepeats.splice(i, 1));
+	}
+	armLocators.sort((left, right) => left.index - right.index);
+	return {
+		locators: armLocators,
+		events: moved.events,
+		domUpdates: moved.domUpdates,
+		behaviors: moved.behaviors,
+		elementHandles: moved.elementHandles,
+		...(keyedRepeats.length > 0 ? { keyedRepeats } : {}),
+		branches: [],
+	};
+}
+
 export function marklessSsrIsArmBranchAnchor(text: unknown) {
 	return (
 		typeof text === 'string' &&

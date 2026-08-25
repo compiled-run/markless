@@ -476,10 +476,11 @@ function hasBrowserTriggers(view: ProtocolViewPayload, state: ProtocolStatePaylo
 		// Keyed repeat row events live on rowEvents, not view.events.
 		(view.keyedRepeats ?? []).some((repeat) => repeat.rowEvents.length > 0) ||
 		// Branch arm events live on armRecords, not view.events.
-		(view.branches ?? []).some((branch) =>
-			(branch.armRecords ?? []).some((arm) =>
-				arm.events.some(protocolEventDispatchesMarkless),
-			),
+		(view.branches ?? []).some(
+			(branch) =>
+				(branch.armRecords ?? []).some((arm) =>
+					arm.events.some(protocolEventDispatchesMarkless),
+				) || branchServedArmEventNames(branch).length > 0,
 		) ||
 		// Async boundary arm events also nest under armRecords (D3).
 		view.asyncBoundaries.some((boundary) => boundaryArmEventNames(boundary).length > 0)
@@ -540,6 +541,21 @@ function boundaryArmEventNames(
 	];
 }
 
+// An escalating branch's served arm holds the events the page actually painted;
+// they are the wake set for that arm just as a boundary's armized events are.
+function branchServedArmEventNames(
+	branch: NonNullable<ProtocolViewPayload['branches']>[number],
+): ReadonlyArray<string> {
+	const armRecords = branch.servedArmRecords;
+	if (!armRecords) return [];
+	return [
+		...armRecords.events.filter(protocolEventDispatchesMarkless).map((event) => event.eventName),
+		...(armRecords.keyedRepeats ?? []).flatMap((repeat) =>
+			repeat.rowEvents.map((event) => event.eventName),
+		),
+	];
+}
+
 function browserEventNames(view: ProtocolViewPayload): ReadonlyArray<string> {
 	return [
 		...new Set([
@@ -547,11 +563,12 @@ function browserEventNames(view: ProtocolViewPayload): ReadonlyArray<string> {
 			...(view.keyedRepeats ?? []).flatMap((repeat) =>
 				repeat.rowEvents.map((event) => event.eventName),
 			),
-			...(view.branches ?? []).flatMap((branch) =>
-				(branch.armRecords ?? []).flatMap((arm) =>
+			...(view.branches ?? []).flatMap((branch) => [
+				...(branch.armRecords ?? []).flatMap((arm) =>
 					arm.events.filter(protocolEventDispatchesMarkless).map((event) => event.eventName),
 				),
-			),
+				...branchServedArmEventNames(branch),
+			]),
 			...view.asyncBoundaries.flatMap(boundaryArmEventNames),
 		]),
 	].filter((eventName) => eventName !== 'visible');

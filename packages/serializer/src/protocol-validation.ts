@@ -459,6 +459,15 @@ function assertOptionalStringArrayField(
 	}
 }
 
+function assertArrayField(record: Record<string, unknown>, key: string, context: string): void {
+	if (!Array.isArray(record[key])) {
+		throw invalidPayloadShapeError(
+			contextPayloadType(context),
+			`Invalid ${context}: expected ${key} array.`,
+		);
+	}
+}
+
 function assertOptionalArrayField(
 	record: Record<string, unknown>,
 	key: string,
@@ -610,6 +619,43 @@ function assertOptionalBranches(record: Record<string, unknown>): void {
 			);
 		}
 		assertOptionalBranchArmRecords(branch, context);
+		assertOptionalServedArmRecords(branch, context);
+	}
+}
+
+// An escalating branch replaces its arm wholesale, so the record set it serves
+// must be arm-relative or the runtime would re-register against page indexes.
+function assertOptionalServedArmRecords(record: Record<string, unknown>, context: string): void {
+	if (record.servedArmRecords === undefined) return;
+	if (record.escalates !== true) {
+		throw invalidPayloadShapeError(
+			contextPayloadType(context),
+			`Invalid ${context}: servedArmRecords requires escalates.`,
+		);
+	}
+	const armContext = `${context}.servedArmRecords`;
+	assertRecordShape(record.servedArmRecords, armContext);
+	const arm = record.servedArmRecords as Record<string, unknown>;
+	assertArrayField(arm, 'events', armContext);
+	assertArrayField(arm, 'behaviors', armContext);
+	assertArrayField(arm, 'elementHandles', armContext);
+	assertOptionalArrayField(arm, 'domUpdates', armContext);
+	assertOptionalArrayField(arm, 'keyedRepeats', armContext);
+	assertOptionalArrayField(arm, 'branches', armContext);
+	assertArrayField(arm, 'locators', armContext);
+	for (const [index, locator] of (arm.locators as ReadonlyArray<unknown>).entries()) {
+		const locatorContext = `${armContext}.locators[${index}]`;
+		assertRecordShape(locator, locatorContext);
+		const entry = locator as Record<string, unknown>;
+		assertStringField(entry, 'hostNodeId', locatorContext);
+		assertStringField(entry, 'tagName', locatorContext);
+		if (entry.strategy !== 'arm-relative') {
+			throw invalidPayloadShapeError(
+				contextPayloadType(locatorContext),
+				`Invalid ${locatorContext}: expected arm-relative strategy.`,
+			);
+		}
+		assertNonNegativeIntegerField(entry, 'index', locatorContext);
 	}
 }
 

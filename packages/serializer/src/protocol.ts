@@ -461,6 +461,19 @@ export type ProtocolViewPayload = {
 		 * refresh the arm's own marker range through the branch's update symbol.
 		 */
 		readonly contentReads?: ReadonlyArray<ProtocolBranchContentRead>;
+		/**
+		 * Marks a branch whose arms hold a component that has to run, so a flip
+		 * re-renders the page through the prerender evaluator instead of rebuilding
+		 * markup from `armRecords`. Absent on every branch the compiler could build
+		 * arm parts for, which keeps those payloads byte-identical.
+		 */
+		readonly escalates?: true;
+		/**
+		 * Arm-relative records for the arm THIS render served, moved out of the
+		 * page-absolute streams. Only an escalating branch carries one; `armRecords`
+		 * above stays the compiler's per-arm plan for every other branch.
+		 */
+		readonly servedArmRecords?: ProtocolArmRecordSet;
 	}>;
 	readonly asyncBoundaries: ReadonlyArray<{
 		readonly id: string;
