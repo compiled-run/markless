@@ -376,6 +376,7 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 				id: repeat.id,
 				...(rowElementHandles.length > 0 ? { rowElementHandles } : {}),
 				parentHostNodeId: repeat.parentHostNodeId,
+				...(repeat.ownerHostNodeId ? { ownerHostNodeId: repeat.ownerHostNodeId } : {}),
 				collectionGraphNodeId: repeat.collectionGraphNodeId,
 				collectionPath: repeat.collectionPath,
 				keyPath: repeat.keyPath,

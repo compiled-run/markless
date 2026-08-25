@@ -99,10 +99,43 @@ export function marklessRowScopedGraphNodeId(
 ): string {
 	const widget = marklessRowWidgetGraphNodeId(graphNodeId, scope, registry);
 	if (widget !== undefined) return widget;
+	assertWidgetReadResolved(graphNodeId, registry);
 	for (const { rowFree, withRows, rowBoundary } of scope)
 		if (!rowBoundary && graphNodeId.startsWith(rowFree))
 			return withRows + graphNodeId.slice(rowFree.length);
 	return graphNodeId;
+}
+
+/**
+ * Refuse a widget-scoped read that reached no rendered widget.
+ *
+ * Left alone the id stays in page space, the graph answers `undefined`, and the
+ * handler runs to completion writing nothing - a dismiss that matches no message.
+ * Only an id whose prefix names the edge a part was compiled at, for a definition
+ * this page files as a widget, is that: page-scoped `shared()` and storage ids
+ * are page space on purpose, and a bare widget id claims no instance.
+ */
+function assertWidgetReadResolved(graphNodeId: string, registry: MarklessWidgetRegistry): void {
+	const pageSpace = PAGE_SPACE_ID.exec(graphNodeId);
+	if (!pageSpace || pageSpace[2] !== 'shared' || !pageSpace[1] || pageSpace[1].includes('r:'))
+		return;
+	const sharedId = graphNodeId.slice(pageSpace[1].length);
+	const slash = sharedId.lastIndexOf('/');
+	const definitionId = slash > 0 ? sharedId.slice(0, slash) : sharedId;
+	// The registry files every widget-scoped definition the graph lists, rendered
+	// or not, so membership here is what says "widget-scoped" rather than a guess.
+	if (!registry.rootPaths.has(definitionId) && !registry.rowRooted.has(definitionId)) return;
+	const error = new Error(
+		`MARKLESS_WIDGET_INSTANCE_UNRESOLVED: ${graphNodeId} was read at dispatch from a part whose widget instance no rendered widget owns, so the read would answer for no instance at all.`,
+	) as Error & Record<string, unknown>;
+	error.name = 'WidgetInstanceRuntimeError';
+	error.code = 'MARKLESS_WIDGET_INSTANCE_UNRESOLVED';
+	error.severity = 'error';
+	error.phase = 'runtime';
+	error.graphNodeId = graphNodeId;
+	error.definitionId = definitionId;
+	error.docsUrl = 'https://markless.dev/errors/MARKLESS_WIDGET_INSTANCE_UNRESOLVED';
+	throw error;
 }
 
 /**
@@ -216,7 +249,10 @@ function marklessRowRootedGraphNodeId(
 // second kind is a row's, which is what the prefix match above decides. The tag
 // keeps a re-entrant dispatch - a bound handler invoking a parent callback that
 // runs through this same path - from inserting the row a second time.
-type MarklessRowScopedGraph = MarklessScopedGraph & { readonly marklessRowScope?: string };
+type MarklessRowScopedGraph = MarklessScopedGraph & {
+	readonly marklessRowScope?: string;
+	readonly marklessWidgetHostGraph?: object;
+};
 
 export function marklessRowScopedGraph(
 	graph: RuntimeGraph,
@@ -230,6 +266,12 @@ export function marklessRowScopedGraph(
 	const scoped = {
 		...graph,
 		marklessRowScope: tag,
+		// An own field, not the WeakMap alone: this graph is spread again on its way
+		// to the symbol (the imported-capture adapter builds its own reader over it),
+		// and a copy the map has never seen mints a registry of its own - one that
+		// never heard of a row minted after boot, so the row's parts resolve to
+		// nothing.
+		marklessWidgetHostGraph: marklessRegistryHolder(graph),
 		read: (graphNodeId, path) => graph.read(qualify(graphNodeId), path),
 		write: (write) => graph.write({ ...write, graphNodeId: qualify(write.graphNodeId) }),
 		update: (update) => graph.update({ ...update, graphNodeId: qualify(update.graphNodeId) }),
@@ -486,7 +528,8 @@ function marklessScopeWidgetsTo(registry: MarklessWidgetRegistry): MarklessWidge
 }
 
 function marklessRegistryHolder(graph: RuntimeGraph): object {
-	return (graph as MarklessScopedGraph).marklessPageGraph ?? graph;
+	const scoped = graph as MarklessRowScopedGraph;
+	return scoped.marklessPageGraph ?? scoped.marklessWidgetHostGraph ?? graph;
 }
 
 /**
@@ -727,6 +770,9 @@ function composedBoundaryArmRecords(
 			...repeat,
 			id: prefix + repeat.id,
 			parentHostNodeId: prefix + repeat.parentHostNodeId,
+			...(repeat.ownerHostNodeId
+				? { ownerHostNodeId: prefix + repeat.ownerHostNodeId }
+				: {}),
 			...(repeat.collectionGraphNodeId
 				? {
 						collectionGraphNodeId: marklessComposedGraphNodeId(

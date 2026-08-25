@@ -486,6 +486,7 @@ function assertOptionalKeyedRepeats(record: Record<string, unknown>): void {
 		assertRecordShape(repeat, context);
 		assertStringField(repeat, 'id', context);
 		assertStringField(repeat, 'parentHostNodeId', context);
+		assertOptionalStringField(repeat, 'ownerHostNodeId', context);
 		assertOptionalStringField(repeat, 'collectionGraphNodeId', context);
 		assertStringArrayField(repeat, 'collectionPath', context);
 		assertStringArrayField(repeat, 'keyPath', context);

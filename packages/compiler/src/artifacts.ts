@@ -332,12 +332,20 @@ export type ModuleGraphInterfaceConstructReach =
  * counts still describe the hole's own chunk, but whether that chunk renders at
  * all is decided elsewhere, so a consumer must not treat them as a fixed
  * position in the served DOM. `projectionChunkId` names that chunk.
+ *
+ * `parentHostNodeId` is the host element the hole sits directly inside, in this
+ * component's OWN id space. An importer prefixes it with the child edge's host
+ * prefix to name the same element in page space, which is the only way markup
+ * the importer wrote inside `{children}` can say which element it renders into.
+ * Absent when the hole is at the chunk root, where the enclosing element is the
+ * importer's own.
  */
 export type ModuleGraphInterfaceProjection = {
 	readonly elementsBeforeProjection: ModuleGraphInterfaceElementCount;
 	readonly elementsAfterProjection: ModuleGraphInterfaceElementCount;
 	readonly projectionInsideConstruct: boolean;
 	readonly projectionChunkId?: string;
+	readonly parentHostNodeId?: string;
 };
 
 export type SemanticSharedScope = 'request' | 'container' | 'page' | 'widget';
@@ -437,6 +445,14 @@ export type SemanticHostNode = {
 export type SemanticKeyedRepeat = {
 	readonly id: string;
 	readonly parentHostNodeId: string;
+	// A repeat written inside a child component's `{children}` renders into the
+	// element that child wraps the hole in, not into the enclosing element of the
+	// markup that wrote it. Set when that retarget happened: the parent host above
+	// is the child's, in page space, and these are how many elements the child
+	// renders in front of the hole and which element the OWNER's own markup
+	// encloses the rows in.
+	readonly projectedElementsBefore?: number;
+	readonly ownerHostNodeId?: string;
 	// Present when the repeat renders inside an @try/@pending/@catch arm: the
 	// boundary owns the repeat's async collection read.
 	readonly asyncBoundaryId?: string;
@@ -1044,6 +1060,8 @@ export type RenderDataBranch = {
 export type RenderDataRepeat = {
 	readonly repeatId: string;
 	readonly parentHostNodeId: string;
+	// See SemanticKeyedRepeat: set only for a repeat projected into a child.
+	readonly ownerHostNodeId?: string;
 	readonly rowHostNodeId?: string;
 	readonly itemName: string;
 	readonly collectionGraphNodeId?: string;
@@ -1259,6 +1277,8 @@ export type PayloadBehavior = SemanticBehavior & {
 export type PayloadKeyedRepeat = {
 	readonly id: string;
 	readonly parentHostNodeId: string;
+	// See SemanticKeyedRepeat: set only for a repeat projected into a child.
+	readonly ownerHostNodeId?: string;
 	readonly rowHostNodeId?: string;
 	readonly collectionGraphNodeId: string;
 	readonly collectionPath: ReadonlyArray<string>;

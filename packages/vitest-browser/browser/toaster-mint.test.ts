@@ -46,13 +46,11 @@ test('a toast raised after load paints, stacks, and dismisses itself', async () 
 });
 
 // The close button reads `item.id` off the widget-scoped `shared()` instance the
-// row's own component wrote. At RENDER time that read answers - the tone and the
-// title both come off the same instance and both paint - but the handler runs
-// later, against the live graph, and there the projected part resolves no
-// instance: `dismiss('')` matches no message. What is missing is the minted row's
-// widget registry naming the projection ids of the parts the OWNER projected, not
-// only those of the row's own child.
-test.fails('a minted toast dismisses itself through its own close button', async () => {
+// row's own component wrote. The read has to answer at DISPATCH as well as at
+// render: the handler runs later, on a graph the bound symbol reaches through
+// wrapper after wrapper, and the row's rendered widget is only findable there if
+// every one of those wrappers still names the graph the row was filed against.
+test('a minted toast dismisses itself through its own close button', async () => {
 	const screen = await renderSSR(App);
 	const container = screen.container;
 
@@ -65,13 +63,35 @@ test.fails('a minted toast dismisses itself through its own close button', async
 	await cleanup();
 });
 
+// Three rows, one instance each: the middle row's button dismisses the middle
+// message and nothing else, and the two that stay re-read their new places.
+test('the middle of three minted toasts dismisses only itself', async () => {
+	const screen = await renderSSR(App);
+	const container = screen.container;
+
+	for (const count of [1, 2, 3]) {
+		click(container, '[data-say]');
+		await expect.poll(() => toasts(container).length).toBe(count);
+	}
+	const [first, middle, last] = toasts(container);
+	(middle!.querySelector('[ui-toastclose]') as HTMLElement).click();
+
+	await expect.poll(() => toasts(container).length).toBe(2);
+	expect(toasts(container)).toEqual([first, last]);
+	expect(container.contains(middle!)).toBe(false);
+	// Stacking is a computed over the queue, so the row that was third now reads
+	// second - the rows left behind re-stack rather than keep the places they had.
+	expect(last!.getAttribute('style')).toContain('--index: 1');
+	await cleanup();
+});
+
 // A `@for` written inside a component's `{children}` is markup the OWNER renders
-// and the projecting component splices in, so the repeat's parent host is read off
-// the owner's own markup - `<main>` here - and not the `<ol>` the projection lands
-// inside. The served region carries no repeat anchor at all, so the rows a client
-// mints are appended beside the region instead of into it. Independent of minting:
-// it is where a PROJECTED repeat anchors.
-test.fails('a minted toast lands inside the live region', async () => {
+// and the projecting component splices in. The repeat's parent host used to be
+// read off the owner's own markup - `<main>` here - and not the `<ol>` the
+// projection lands inside, so served rows were never keyed and minted rows were
+// appended beside the region. Independent of minting: it is where a PROJECTED
+// repeat anchors.
+test('a minted toast lands inside the live region', async () => {
 	const screen = await renderSSR(App);
 	const container = screen.container;
 
