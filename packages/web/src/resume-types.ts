@@ -264,6 +264,16 @@ export type ResumeRuntimeErrorHook = (
 	context: ResumeRuntimeErrorContext,
 ) => void | Promise<void>;
 export type ResumeSharedPatchDispatcher = (patch: RuntimeGraphSharedPatch) => void | Promise<void>;
+/**
+ * This page's render-data surface, which a component row is rendered from.
+ *
+ * Per CONTAINER, never a global: a global holds one page, and the second page
+ * module a client-routed document evaluated took the slot from the first. Lazy
+ * so a page that never mints never fetches the render-data chunk.
+ */
+export type ResumeRenderDataThunk = () =>
+	| import('./prerender/evaluator.ts').PrerenderDataSurface
+	| Promise<import('./prerender/evaluator.ts').PrerenderDataSurface>;
 export type ResumeRuntimeInput = {
 	readonly root: ResumeDomElement;
 	readonly graph: RuntimeGraph;
@@ -299,6 +309,7 @@ export type ResumeRuntimeInput = {
 	) => void;
 	readonly onError?: ResumeRuntimeErrorHook;
 	readonly demandAsyncBoundaries?: boolean;
+	readonly renderData?: ResumeRenderDataThunk;
 };
 export type ResumeDispatchOptions = {
 	readonly syncPolicyAlreadyApplied?: boolean;

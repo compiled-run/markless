@@ -19,6 +19,7 @@ import type {
 	ResumeDomElement,
 	ResumeDomNode,
 	ResumeKeyedRepeatRecord,
+	ResumeRenderDataThunk,
 } from '../resume-types.ts';
 
 /**
@@ -34,6 +35,10 @@ import type {
  * async pair the repeat runtime calls around its apply. That keeps the repeat
  * runtime's own module free of every byte of this, which the shipped-byte budget
  * for a page with no component row measures.
+ *
+ * The page it renders against arrives per CONTAINER, from the runtime input,
+ * never off the global: two page modules in one document write the same loader,
+ * so a page named there would be whichever module evaluated last.
  */
 
 /** The runtime's own registrar, handed to the loader positionally by the repeat runtime. */
@@ -69,11 +74,24 @@ export type RowComponentMintApi = {
 };
 
 export function marklessRowComponentMint(
-	surface: PrerenderDataSurface,
+	renderData: ResumeRenderDataThunk | undefined,
 	graph?: RuntimeGraph,
 	host?: RowComponentMintHost,
 ): RowComponentMintApi {
 	let prepared = new Map<unknown, MintedRow>();
+	let surfacePromise: Promise<PrerenderDataSurface> | undefined;
+	// The page is threaded in per container, so a record naming a component with
+	// no page behind it cannot be rendered at all - and a half-built list is
+	// worse than a loud refusal.
+	const pageSurface = (repeat: ResumeKeyedRepeatRecord): Promise<PrerenderDataSurface> => {
+		if (!renderData)
+			throw rowComponentError(
+				repeat,
+				'MARKLESS_REPEAT_ROW_COMPONENT_SURFACE_MISSING',
+				'names a component row, but this container was resumed with no render-data surface to render it against.',
+			);
+		return (surfacePromise ??= Promise.resolve(renderData()));
+	};
 	return {
 		renderEmptyArm,
 		mintRow(parent, repeat, item) {
@@ -82,7 +100,8 @@ export function marklessRowComponentMint(
 		},
 		async rows(repeat, parent, served) {
 			prepared = new Map();
-			if (repeat.rowComponent && graph && host)
+			if (repeat.rowComponent && graph && host) {
+				const surface = await pageSurface(repeat);
 				for (const [rowIndex, item] of readKeyedRepeatCollection(graph, repeat).entries()) {
 					const rowKey = rowKeyOf(item, repeat);
 					if (served.has(rowKey) || prepared.has(rowKey)) continue;
@@ -101,6 +120,7 @@ export function marklessRowComponentMint(
 						}),
 					);
 				}
+			}
 			const minted = [...prepared.values()];
 			return async () => {
 				prepared = new Map();

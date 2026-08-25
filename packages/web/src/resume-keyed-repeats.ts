@@ -4,6 +4,7 @@ import type {
 	ResumeDomElement,
 	ResumeDomNode,
 	ResumeKeyedRepeatRecord,
+	ResumeRenderDataThunk,
 	ResumeRuntimeInput,
 	ResumeViewRecord,
 } from './resume-types.ts';
@@ -68,12 +69,16 @@ type RepeatReadableGraph = Pick<RuntimeGraph, 'read'>;
  * mint`, a superset: the two builders, plus the async pair this module calls
  * around its apply. Every byte of that path lives there, which is what keeps a
  * page without a component row shipping none of it.
+ *
+ * The loader is page-AGNOSTIC - two page modules in one document write the same
+ * one - so the page a row renders against arrives on the wiring, not the global.
  */
 type RowMint = typeof import('./fns/row-mint.ts') &
 	Partial<import('./fns/row-component-mint.ts').RowComponentMintApi>;
 type RowComponentHost = import('./fns/row-component-mint.ts').RowComponentMintHost;
 type RowMintHost = {
 	readonly __marklessRowMint?: (
+		renderData?: ResumeRenderDataThunk,
 		graph?: RuntimeGraph,
 		host?: RowComponentHost,
 	) => Promise<RowMint>;
@@ -93,13 +98,14 @@ function rowMintCell(graph?: RuntimeGraph): RowMintCell {
 	return cell;
 }
 function loadRowMint(
+	renderData?: ResumeRenderDataThunk,
 	graph?: RuntimeGraph,
 	host?: RowComponentHost,
 ): Promise<RowMint> | undefined {
 	const load = (globalThis as RowMintHost).__marklessRowMint;
 	if (!load) return undefined;
 	const cell = rowMintCell(graph);
-	return (cell.load ||= load(graph, host).then((module) => (cell.mint = module)));
+	return (cell.load ||= load(renderData, graph, host).then((module) => (cell.mint = module)));
 }
 
 export function validateOneRepeat(
@@ -158,6 +164,7 @@ export function wireKeyedRepeats(
 		readonly elementsByHostId: Map<string, ResumeDomElement>;
 		readonly events: ResumeEventWiring;
 		readonly storeContainerSubscription: (release: () => void) => void;
+		readonly renderData?: ResumeRenderDataThunk;
 	},
 	// Forwarded to a component row's bridge, never read here: the registrar a row
 	// born after boot commits its records through.
@@ -188,7 +195,10 @@ export function wireKeyedRepeats(
 		// that does starts the fetch at wiring time, not at the first gesture.
 		const builds = Boolean(repeat.rowTemplate ?? repeat.emptyArm ?? repeat.rowComponent),
 			cell = builds ? rowMintCell(input.graph) : undefined;
-		if (builds) void loadRowMint(input.graph, rowComponentHost)?.catch(() => undefined);
+		if (builds)
+			void loadRowMint(input.renderData, input.graph, rowComponentHost)?.catch(
+				() => undefined,
+			);
 		for (const [rowIndex, rowRoot] of repeatRowElements(parent, repeat, items.length).entries()) {
 			const rowKey = repeatItemKey(items[rowIndex], repeat);
 			rowRootsByKey.set(rowKey, rowRoot);
@@ -223,7 +233,7 @@ export function wireKeyedRepeats(
 					// and its registration follows the apply that attaches it.
 					if (!builds || (cell?.mint && !cell.mint.rows)) return apply(cell?.mint);
 					return (
-						loadRowMint(input.graph, rowComponentHost)?.then(async (mint) => {
+						loadRowMint(input.renderData, input.graph, rowComponentHost)?.then(async (mint) => {
 							const commit = await mint.rows?.(repeat, parent, rowRootsByKey);
 							apply(mint);
 							await commit?.();

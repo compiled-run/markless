@@ -136,6 +136,7 @@ export async function startResumeRuntime(input: {
 				elementsByHostId: prepared.elementsByHostId,
 				events,
 				storeContainerSubscription,
+				renderData: runtimeInput.renderData,
 			},
 			{
 				runtimeInput,

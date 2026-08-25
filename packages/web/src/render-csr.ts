@@ -109,6 +109,7 @@ export async function renderCsrRuntime(input: {
 					renderBranchHtml: options.renderBranchHtml ?? globalDocumentBranchHtml(),
 					demandAsyncBoundaries: true,
 					registerDelegatedEventRecord: delegatedTriggers.registerEventRecord,
+					renderData: output.renderData,
 				});
 				await runtime.start();
 				dispatchHandler = (event, dispatchOptions) =>

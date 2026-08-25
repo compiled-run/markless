@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { createRuntimeGraph } from '@markless/runtime';
+import { marklessRowComponentMint } from '../src/fns/row-component-mint.ts';
 import { wireKeyedRepeats } from '../src/resume-keyed-repeats.ts';
 import type { ResumeDomElement, ResumeViewRecord } from '../src/resume-types.ts';
 
@@ -67,7 +68,12 @@ function componentRow(label: string): Node {
 	return el('LI', [el('SPAN', [txt(label)]), el('BUTTON')]);
 }
 
-type MintCall = { readonly rowKey: unknown; readonly item: unknown; readonly host: BridgeHost };
+type MintCall = {
+	readonly rowKey: unknown;
+	readonly item: unknown;
+	readonly host: BridgeHost;
+	readonly page: unknown;
+};
 
 // The bridge, standing in for `@markless/web/fns/row-component-mint` bound to a
 // page's render-data surface: the same shape the emitted loader hands over. It
@@ -82,11 +88,16 @@ type BridgeHost = { readonly wired?: boolean; readonly id?: string } | undefined
 let wiredBridge = true;
 (
 	globalThis as {
-		__marklessRowMint?: (graph?: unknown, host?: BridgeHost) => Promise<unknown>;
+		__marklessRowMint?: (
+			renderData?: () => unknown,
+			graph?: unknown,
+			host?: BridgeHost,
+		) => Promise<unknown>;
 	}
-).__marklessRowMint = async (graph, host) => {
+).__marklessRowMint = async (renderData, graph, host) => {
 	const own = bridge,
-		wired = wiredBridge;
+		wired = wiredBridge,
+		page = renderData?.();
 	let prepared = new Map<unknown, Node>();
 	return {
 		mintRow(_parent: Node, _repeat: unknown, item: { readonly id: string }) {
@@ -106,7 +117,7 @@ let wiredBridge = true;
 				: [];
 			for (const item of items) {
 				if (served.has(item.id) || prepared.has(item.id)) continue;
-				own.mints.push({ rowKey: item.id, item, host });
+				own.mints.push({ rowKey: item.id, item, host, page });
 				prepared.set(item.id, componentRow(item.label));
 			}
 			const minted = [...prepared];
@@ -119,7 +130,13 @@ let wiredBridge = true;
 	};
 };
 
-function fixture(options: { readonly wired?: boolean; readonly host?: BridgeHost } = {}) {
+function fixture(
+	options: {
+		readonly wired?: boolean;
+		readonly host?: BridgeHost;
+		readonly page?: unknown;
+	} = {},
+) {
 	const served = [
 		{ id: 'a', label: 'alpha' },
 		{ id: 'b', label: 'bravo' },
@@ -175,6 +192,7 @@ function fixture(options: { readonly wired?: boolean; readonly host?: BridgeHost
 					registered.push({ host, rowKey: match.rowKey }),
 			} as never,
 			storeContainerSubscription: () => undefined,
+			renderData: (() => options.page ?? { page: 'default' }) as never,
 		},
 		options.wired === false ? undefined : (bridgeHost as never),
 	);
@@ -282,6 +300,20 @@ test('a second container mints through its own registrar', async () => {
 	expect(second.labels()).toEqual(['header', 'alpha', 'bravo', 'charlie', 'footer']);
 });
 
+// The loader is one page-agnostic line every page writes, so the page a row is
+// rendered against has to arrive per container. Two pages sharing one global is
+// exactly the bug: the last module evaluated owned every other page's rows.
+test('each container mints against the page it was wired with', async () => {
+	const first = fixture({ host: { id: 'first' }, page: { page: 'first' } });
+	const second = fixture({ host: { id: 'second' }, page: { page: 'second' } });
+
+	await first.write(GROWN);
+	await second.write(GROWN);
+
+	expect(first.mints.map((mint) => mint.page)).toEqual([{ page: 'first' }]);
+	expect(second.mints.map((mint) => mint.page)).toEqual([{ page: 'second' }]);
+});
+
 // Pay-per-use, and fail-closed: a page whose resume module wrote no bridge has
 // no surface to render a row against, so the list stays exactly as served.
 test('a record naming a row component with no bridge wired leaves the key unrendered', async () => {
@@ -291,4 +323,18 @@ test('a record naming a row component with no bridge wired leaves the key unrend
 
 	expect(mints).toEqual([]);
 	expect(labels()).toEqual(['header', 'alpha', 'bravo', 'footer']);
+});
+
+// Loud, not silent: the record names a component and the container carries no
+// page to render it from, which no amount of retrying can turn into a row.
+test('the real bridge refuses a component row when no page reached the container', async () => {
+	const mint = marklessRowComponentMint(undefined, { read: () => [] } as never, {} as never);
+
+	await expect(
+		mint.rows(
+			{ id: 'repeat:0', keyPath: ['id'], rowComponent: { componentName: 'Page' } } as never,
+			{} as never,
+			new Map(),
+		),
+	).rejects.toThrow('MARKLESS_REPEAT_ROW_COMPONENT_SURFACE_MISSING');
 });

@@ -844,8 +844,9 @@ test('emitResumeModule leaves a repeat-free page with no row-mint specifier', ()
 
 /**
  * The component-row mint needs this page's render-data surface as well as the
- * bridge, so its loader pairs the two imports - and both specifiers exist only
- * where the compiler recorded the demand.
+ * bridge. The loader itself names only the bridge - one document can hold two
+ * page modules, and a page named in the loader would be whichever module
+ * evaluated last - so the surface reaches the runtime on the resume input.
  */
 const COMPONENT_ROW_DEMAND = [
 	'web/repeat-runtime',
@@ -853,7 +854,7 @@ const COMPONENT_ROW_DEMAND = [
 	'web/fns/row-component-mint',
 ];
 
-test('emitResumeModule writes the component-row loader with the page render data', () => {
+test('the component-row loader names the bridge and nothing page-specific', () => {
 	const emitted = emitResumeModule({
 		...baseInput,
 		renderDataId: '\0markless:render-data:page.tsrx',
@@ -861,10 +862,104 @@ test('emitResumeModule writes the component-row loader with the page render data
 	});
 
 	expect(emitted).toContain("import('@markless/web/fns/row-component-mint')");
-	expect(emitted).toContain("import('\0markless:render-data:page.tsrx')");
-	expect(emitted).toContain('mint.marklessRowComponentMint(data.marklessPrerenderData, ...host)');
+	expect(emitted).toContain('mint.marklessRowComponentMint(...input)');
 	// One global: the bridge re-exports the template mint, so no second loader.
 	expect(emitted).not.toContain("import('@markless/web/fns/row-mint')");
+});
+
+// Two pages write the same loader, so the global cannot be the thing that says
+// which page a row belongs to.
+test('every page writes a byte-identical component-row loader', () => {
+	const loaderOf = (renderDataId: string) =>
+		emitResumeModule({
+			...baseInput,
+			renderDataId,
+			runtimeDemandMap: repeatDemandMap(COMPONENT_ROW_DEMAND),
+		})
+			.split('\n')
+			.filter((line) => line.includes('RowMint') || line.includes('row-component-mint'))
+			.join('\n');
+
+	expect(loaderOf('\0markless:render-data:first.tsrx')).toBe(
+		loaderOf('\0markless:render-data:second.tsrx'),
+	);
+});
+
+test('the resume handoff carries this page render data to the runtime, lazily', () => {
+	const emitted = emitResumeModule({
+		...baseInput,
+		renderDataId: '\0markless:render-data:page.tsrx',
+		runtimeDemandMap: repeatDemandMap(COMPONENT_ROW_DEMAND),
+	});
+
+	expect(emitted).toContain(
+		"renderData: () => import('\0markless:render-data:page.tsrx').then((data) => data.marklessPrerenderData),",
+	);
+});
+
+// A prerendered page already holds its surface at the resume call site, so
+// naming it again would be a second edge to the same chunk.
+test('a prerendered page hands its already-bound surface over', () => {
+	const emitted = emitResumeModule({
+		...baseInput,
+		prerenderDataId: '\0markless:render-data:page.tsrx',
+		renderDataId: '\0markless:render-data:page.tsrx',
+		needsFullResume: true,
+		runtimeDemandMap: repeatDemandMap(COMPONENT_ROW_DEMAND),
+	});
+
+	expect(emitted).toContain('renderData: () => marklessPrerenderData,');
+	expect(emitted).toContain("import { marklessPrerenderData } from '\0markless:render-data:page.tsrx';");
+});
+
+test('a page with no component row carries no render-data handoff field', () => {
+	expect(
+		emitResumeModule({
+			...baseInput,
+			renderDataId: '\0markless:render-data:page.tsrx',
+			runtimeDemandMap: repeatDemandMap(['web/repeat-runtime', 'web/resume-keyed-repeats']),
+		}),
+	).not.toContain('renderData:');
+});
+
+/**
+ * A CSR mount never evaluates a resume module, so the page's own client module
+ * is the only place its loader can be installed. Dev hid this: the dev-only
+ * resume re-export dragged the resume module in and installed it there.
+ */
+test('a client module with a component row installs the mint loader itself', () => {
+	const code = emitSourceModule({
+		...baseInput,
+		environment: 'client',
+		devResumeReexport: false,
+		runtimeDemandMap: repeatDemandMap(COMPONENT_ROW_DEMAND),
+	});
+
+	expect(code).toContain("import('@markless/web/fns/row-component-mint')");
+	expect(code).toContain('mint.marklessRowComponentMint(...input)');
+	// The production shape: no edge to the resume module at all, which is what
+	// used to drag the loader in and made this look like it worked in dev.
+	expect(code).not.toContain('resumeContainerEvent');
+});
+
+test('a client module with no component row installs no mint loader', () => {
+	expect(
+		emitSourceModule({
+			...baseInput,
+			environment: 'client',
+			runtimeDemandMap: repeatDemandMap(['web/repeat-runtime', 'web/resume-keyed-repeats']),
+		}),
+	).not.toContain('__marklessRowMint');
+});
+
+test('a server module never installs the mint loader', () => {
+	expect(
+		emitSourceModule({
+			...baseInput,
+			environment: 'server',
+			runtimeDemandMap: repeatDemandMap(COMPONENT_ROW_DEMAND),
+		}),
+	).not.toContain('__marklessRowMint');
 });
 
 // Fail closed: without a canonical render-data module there is no surface to
