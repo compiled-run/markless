@@ -17,7 +17,7 @@
  * there is no authored text to splice and none to map back to. The map is
  * non-null and names the authored file (invariant 3) with no segments, which is
  * asserted here rather than assumed — along with the finding that makes the
- * guard weaker than it reads: `yuku-codegen@0.9.0` returns a non-null map for an
+ * guard weaker than it reads: `yuku-codegen@0.9.1` returns a non-null map for an
  * empty source too.
  */
 import { expect, test } from 'vitest';
