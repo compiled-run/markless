@@ -1,14 +1,23 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawn, type ChildProcess } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { readFile, rm } from 'node:fs/promises';
+import { createServer } from 'node:net';
 import { promisify } from 'node:util';
 import { gzipSync } from 'node:zlib';
+import { protocolEventDispatchesMarkless, type ProtocolViewPayload } from '@markless/serializer';
 import { resolve } from 'pathe';
-import { expect, test } from 'vitest';
+import { beforeAll, expect, test } from 'vitest';
+import { decodePayloadScripts } from '../../serializer/src/protocol-client.ts';
+import type { MarklessBundleGraph } from '../src/types.ts';
+import { MARKLESS_BUILD_PREFIX, MARKLESS_BUNDLE_GRAPH } from '../src/build/chunking.ts';
+import { MARKLESS_EXECUTION_SIZES } from '../src/build/execution-sizes.ts';
+import { parseBundleGraph, type ParsedBundleGraphRecord } from '../src/build/preload-plan.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
 const demo = resolve(root, 'demos/music-player-ssr');
-const clientBuild = resolve(demo, '.output/public/build');
+const clientPublic = resolve(demo, '.output/public');
+const clientBuild = resolve(clientPublic, MARKLESS_BUILD_PREFIX);
 
 // Production `executionLog: never` measurement: 62,464 B across 76 distinct
 // size-map chunks; 62,500 B is the permanent shipped wall (owner ratification
@@ -185,41 +194,367 @@ const clientBuild = resolve(demo, '.output/public/build');
 // no after-children projections. Clawback named for bundler-diet: the renderer's
 // client copy should demand-gate or split the projection-splice path the same
 // way the row mint did (fns-module + demand record precedent).
+// RETIRED 2026-08-24 (owner ruling): "total runtime size as a metric is
+// irrelevant - what matters is page load size, first, 2nd, third interaction
+// size etc." The aggregate number above no longer gates anything; it is
+// reported as an informational line so the history in this comment block stays
+// comparable, and the staged anchors below are what must-not-exceed now.
 const MAX_SHIPPED_JS_GZIP_BYTES = 69_800;
 
-test('music-player-ssr production build stays within its shipped JS budget', async () => {
+// Staged anchors, measured on this tree (local macOS worktree, NODE_ENV=test
+// per the measurement landmine above, MARKLESS_CONSUMER_BUILD=1). Each is a
+// must-not-exceed ceiling of anchor + margin; the margin absorbs gzip run
+// variance and the few bytes an absolute build path costs. Walk them DOWN.
+const STAGE_ANCHORS = {
+	'page-load download': { gzipBytes: 65_067, margin: 128 },
+	'page-load execute': { gzipBytes: 4_010, margin: 32 },
+	'interaction 1 marginal': { gzipBytes: 1_931, margin: 32 },
+	'interaction 2 marginal': { gzipBytes: 1_567, margin: 32 },
+	'interaction 3 marginal': { gzipBytes: 1_094, margin: 32 },
+	'first-navigation marginal': { gzipBytes: 23_860, margin: 128 },
+} as const satisfies Record<string, StageAnchor>;
+
+type StageAnchor = { readonly gzipBytes: number; readonly margin: number };
+
+type StageMeasurement = {
+	readonly stage: string;
+	readonly what: string;
+	readonly chunks: readonly string[];
+	readonly gzipBytes: number;
+};
+
+type BudgetMeasurement = {
+	readonly stages: readonly StageMeasurement[];
+	readonly aggregate: { readonly chunks: number; readonly gzipBytes: number };
+	readonly instrumented: readonly unknown[];
+};
+
+let measured: BudgetMeasurement;
+
+beforeAll(async () => {
+	measured = await measureBuiltDemo();
+}, 240_000);
+
+test('music-player-ssr production build holds every staged budget', () => {
+	expect(measured.stages.length, 'staged measurement must produce stages').toBe(
+		Object.keys(STAGE_ANCHORS).length,
+	);
+	expect(
+		measured.instrumented,
+		'production build must keep execution instrumentation stripped',
+	).toEqual([]);
+	expect(
+		measured.aggregate.chunks,
+		'production build must emit client JS chunks',
+	).toBeGreaterThan(0);
+	expect(stageOverruns(measured.stages, STAGE_ANCHORS), stageReport(measured)).toEqual([]);
+});
+
+test('the staged budget goes red and names the stage it caught', () => {
+	const stage = measured.stages[0]!;
+	const perturbed = { ...STAGE_ANCHORS, [stage.stage]: { gzipBytes: 1, margin: 0 } };
+
+	const overruns = stageOverruns(measured.stages, perturbed);
+
+	expect(overruns).toHaveLength(1);
+	expect(overruns[0]).toContain(stage.stage);
+	expect(overruns[0]).toContain(String(stage.gzipBytes));
+	expect(overruns[0]).toContain('anchor 1 (+0 margin) = 1');
+});
+
+function stageOverruns(
+	stages: readonly StageMeasurement[],
+	anchors: Record<string, StageAnchor>,
+): string[] {
+	const overruns: string[] = [];
+	for (const stage of stages) {
+		const anchor = anchors[stage.stage];
+		if (!anchor) {
+			overruns.push(`${stage.stage}: measured ${stage.gzipBytes} gzip bytes with no anchor`);
+			continue;
+		}
+		const ceiling = anchor.gzipBytes + anchor.margin;
+		if (stage.gzipBytes <= ceiling) continue;
+		overruns.push(
+			`${stage.stage}: measured ${stage.gzipBytes} gzip bytes across ${stage.chunks.length} chunks, over anchor ${anchor.gzipBytes} (+${anchor.margin} margin) = ${ceiling}`,
+		);
+	}
+	return overruns;
+}
+
+function stageReport(budget: BudgetMeasurement): string {
+	const lines = budget.stages.map((stage) => {
+		const anchor = STAGE_ANCHORS[stage.stage as keyof typeof STAGE_ANCHORS];
+		return `  ${stage.stage}: ${stage.gzipBytes} gzip bytes across ${stage.chunks.length} chunks (anchor ${anchor?.gzipBytes ?? '-'} +${anchor?.margin ?? '-'}) - ${stage.what}`;
+	});
+	return [
+		'music-player-ssr staged budget',
+		...lines,
+		`  informational, not gated - total size-mapped shipped JS: ${budget.aggregate.gzipBytes} gzip bytes across ${budget.aggregate.chunks} chunks (retired aggregate wall was ${MAX_SHIPPED_JS_GZIP_BYTES})`,
+	].join('\n');
+}
+
+async function measureBuiltDemo(): Promise<BudgetMeasurement> {
 	await rm(resolve(demo, '.output'), { force: true, recursive: true });
 	// Consumer posture: the wall measures the 'never' build even though the
 	// demo's default build keeps the lab instrument (owner rulings 2026-07-12).
 	await execPnpm(['--dir', demo, 'build'], { MARKLESS_CONSUMER_BUILD: '1' });
 
 	const sizes = JSON.parse(
-		await readFile(resolve(clientBuild, 'execution-sizes.json'), 'utf8'),
+		await readFile(resolve(clientPublic, MARKLESS_EXECUTION_SIZES), 'utf8'),
 	) as Record<string, { readonly chunk?: string; readonly instrument?: true }>;
-	const chunkNames = [
+	const aggregateChunks = [
 		...new Set(
 			Object.values(sizes)
 				.map((entry) => entry.chunk)
 				.filter(isString),
 		),
 	].sort();
-	const compressedChunks = await Promise.all(
-		chunkNames.map(async (fileName) =>
-			gzipSync(await readFile(resolve(clientBuild, fileName)), { level: 9 }),
-		),
+	const graph = parseBundleGraph(
+		JSON.parse(
+			await readFile(resolve(clientPublic, MARKLESS_BUNDLE_GRAPH), 'utf8'),
+		) as MarklessBundleGraph,
 	);
-	const gzipBytes = compressedChunks.reduce((total, chunk) => total + chunk.length, 0);
+	const gzip = gzipByChunk();
+	const sum = (chunks: Iterable<string>) => [...chunks].reduce((total, name) => total + gzip(name), 0);
 
-	expect(chunkNames.length, 'production build must emit client JS chunks').toBeGreaterThan(0);
-	expect(
-		Object.values(sizes).filter((entry) => entry.instrument),
-		'production build must keep execution instrumentation stripped',
-	).toEqual([]);
-	expect(
-		gzipBytes,
-		`production shipped JS: ${gzipBytes} gzip bytes across ${chunkNames.length} distinct chunks`,
-	).toBeLessThanOrEqual(MAX_SHIPPED_JS_GZIP_BYTES);
-}, 120_000);
+	const page = parseServedPage(await renderServedPage());
+	const stages: StageMeasurement[] = [];
+	// The ladder is cumulative: a stage is charged only for the chunks no
+	// earlier stage already pulled in.
+	const pulled = new Set<string>();
+	const stage = (name: string, what: string, chunks: Iterable<string>) => {
+		const marginal = [...chunks].filter((chunk) => !pulled.has(chunk)).sort();
+		for (const chunk of marginal) pulled.add(chunk);
+		stages.push({ stage: name, what, chunks: marginal, gzipBytes: sum(marginal) });
+	};
+
+	stages.push({
+		stage: 'page-load download',
+		what: 'every JS file the served HTML makes the browser fetch before any interaction',
+		chunks: [...page.eagerChunks].sort(),
+		gzipBytes: sum(page.eagerChunks),
+	});
+	stage(
+		'page-load execute',
+		'the static import closure of the resume module the served page names',
+		staticClosure(graph, [page.resumeChunk]),
+	);
+	for (const [index, event] of page.interactions.slice(0, 3).entries()) {
+		stage(
+			`interaction ${index + 1} marginal`,
+			`${event.eventName} on <${event.tagName}> waking ${event.symbolIds.join(', ')}`,
+			wakeClosure(graph, event.symbolIds),
+		);
+	}
+	stage(
+		'first-navigation marginal',
+		'the client render path the served page imports for a router link',
+		staticClosure(graph, page.navigationChunks),
+	);
+
+	return {
+		stages,
+		aggregate: { chunks: aggregateChunks.length, gzipBytes: sum(aggregateChunks) },
+		instrumented: Object.values(sizes).filter((entry) => entry.instrument),
+	};
+}
+
+function staticClosure(
+	graph: ReadonlyMap<string, ParsedBundleGraphRecord>,
+	roots: Iterable<string>,
+): Set<string> {
+	const seen = new Set<string>();
+	const chunks = new Set<string>();
+	const pending = [...roots];
+	while (pending.length > 0) {
+		const name = pending.pop()!;
+		if (seen.has(name)) continue;
+		seen.add(name);
+		if (JS_CHUNK_NAME.test(name)) chunks.add(name);
+		for (const dep of graph.get(name)?.deps ?? []) {
+			if (dep.kind === 'static') pending.push(dep.name);
+		}
+	}
+	return chunks;
+}
+
+// A woken symbol costs one dynamic hop (its own chunk, plus whatever the
+// runtime demand map routes it to) and then everything those import statically.
+function wakeClosure(
+	graph: ReadonlyMap<string, ParsedBundleGraphRecord>,
+	symbolIds: readonly string[],
+): Set<string> {
+	return staticClosure(
+		graph,
+		symbolIds.flatMap((symbolId) => (graph.get(symbolId)?.deps ?? []).map((dep) => dep.name)),
+	);
+}
+
+function gzipByChunk(): (name: string) => number {
+	const cache = new Map<string, number>();
+	return (name: string) => {
+		const cached = cache.get(name);
+		if (cached !== undefined) return cached;
+		const bytes = gzipSync(readFileSync(resolve(clientBuild, name)), { level: 9 }).length;
+		cache.set(name, bytes);
+		return bytes;
+	};
+}
+
+type ServedPage = {
+	readonly eagerChunks: readonly string[];
+	readonly resumeChunk: string;
+	readonly navigationChunks: readonly string[];
+	readonly interactions: readonly {
+		readonly eventName: string;
+		readonly tagName: string;
+		readonly symbolIds: readonly string[];
+	}[];
+};
+
+const MODULEPRELOAD_HREF = /<link\b[^>]*\brel="modulepreload"[^>]*\bhref="([^"]+)"/g;
+const SCRIPT_TAG = /<script\b([^>]*)>([\s\S]*?)<\/script>/g;
+const SCRIPT_SRC = /\bsrc="([^"]+)"/;
+const RESUME_MODULE_ATTRIBUTE = /\bdata-markless-resume-module="([^"]+)"/;
+const ROUTER_LINK_RESUMER_ATTRIBUTE = /\bdata-markless-router-link-resumer\b/;
+const JS_CHUNK_NAME = /\.js$/;
+
+function parseServedPage(html: string): ServedPage {
+	const scripts = [...html.matchAll(SCRIPT_TAG)].map((match) => ({
+		attributes: match[1] ?? '',
+		body: match[2] ?? '',
+	}));
+	const eager = new Set<string>();
+	for (const match of html.matchAll(MODULEPRELOAD_HREF)) eager.add(chunkName(match[1]!));
+	for (const script of scripts) {
+		const src = SCRIPT_SRC.exec(script.attributes);
+		if (src) eager.add(chunkName(src[1]!));
+	}
+
+	const resumer = scripts.find((script) => RESUME_MODULE_ATTRIBUTE.test(script.attributes));
+	if (!resumer) throw new Error('served page carries no resume module marker');
+	const routerLinks = scripts.find((script) =>
+		ROUTER_LINK_RESUMER_ATTRIBUTE.test(script.attributes),
+	);
+	if (!routerLinks) throw new Error('served page carries no router-link resumer');
+
+	const { view } = decodePayloadScripts({
+		stateScript: payloadScript(scripts, 'markless/state'),
+		viewScript: payloadScript(scripts, 'markless/view'),
+	});
+
+	return {
+		eagerChunks: [...eager],
+		resumeChunk: chunkName(RESUME_MODULE_ATTRIBUTE.exec(resumer.attributes)![1]!),
+		navigationChunks: [...new Set(importedChunkNames(routerLinks.body))],
+		interactions: scriptedInteractions(view),
+	};
+}
+
+// The scripted order is DOM order: a reader meets a page's controls top-down,
+// so the first three interactions are the first three dispatching elements.
+function scriptedInteractions(view: ProtocolViewPayload): ServedPage['interactions'] {
+	const locators = new Map(view.locators.map((locator) => [locator.hostNodeId, locator]));
+	return view.events
+		.filter(protocolEventDispatchesMarkless)
+		.flatMap((event) => {
+			const locator = locators.get(event.hostNodeId);
+			return locator
+				? [
+						{
+							eventName: event.eventName,
+							tagName: locator.tagName,
+							symbolIds: [...event.symbolIds],
+							index: locator.index,
+						},
+					]
+				: [];
+		})
+		.sort((left, right) => left.index - right.index)
+		.map(({ index: _index, ...interaction }) => interaction);
+}
+
+function payloadScript(
+	scripts: readonly { readonly attributes: string; readonly body: string }[],
+	type: string,
+): string {
+	const script = scripts.find((item) => item.attributes.includes(`type="${type}"`));
+	if (!script) throw new Error(`served page carries no ${type} payload`);
+	return `<script type="${type}">${script.body}</script>`;
+}
+
+function importedChunkNames(source: string): string[] {
+	const names: string[] = [];
+	for (const match of source.matchAll(/["'`]([^"'`]*\.js)["'`]/g)) {
+		if (match[1]!.includes(MARKLESS_BUILD_PREFIX)) names.push(chunkName(match[1]!));
+	}
+	return names;
+}
+
+function chunkName(href: string): string {
+	return href.slice(href.lastIndexOf('/') + 1);
+}
+
+async function renderServedPage(): Promise<string> {
+	const port = await freePort();
+	const server = spawn(process.execPath, [resolve(demo, '.output/server/index.mjs')], {
+		cwd: demo,
+		env: { ...process.env, HOST: '127.0.0.1', PORT: String(port) },
+		stdio: ['ignore', 'pipe', 'pipe'],
+	});
+	let output = '';
+	const collect = (chunk: Buffer) => {
+		output += chunk.toString();
+	};
+	server.stdout?.on('data', collect);
+	server.stderr?.on('data', collect);
+	try {
+		const response = await servedPageResponse(server, port, () => output);
+		return await response.text();
+	} finally {
+		server.kill('SIGKILL');
+	}
+}
+
+async function servedPageResponse(
+	server: ChildProcess,
+	port: number,
+	output: () => string,
+): Promise<Response> {
+	const url = `http://127.0.0.1:${port}/`;
+	const deadline = Date.now() + 60_000;
+	let last = '';
+	while (Date.now() < deadline) {
+		if (server.exitCode !== null)
+			throw new Error(`built server exited with ${server.exitCode}: ${output()}`);
+		try {
+			const response = await fetch(url);
+			if (response.ok) return response;
+			last = `answered / with ${response.status}`;
+		} catch (error) {
+			last = (error as Error).message;
+		}
+		await new Promise((settle) => setTimeout(settle, 250));
+	}
+	throw new Error(`built server never served ${url} (${last}): ${output()}`);
+}
+
+function freePort(): Promise<number> {
+	return new Promise((settle, fail) => {
+		const probe = createServer();
+		probe.once('error', fail);
+		probe.listen(0, '127.0.0.1', () => {
+			const address = probe.address();
+			if (address === null || typeof address === 'string') {
+				probe.close();
+				fail(new Error('could not reserve a port for the built server'));
+				return;
+			}
+			probe.close(() => settle(address.port));
+		});
+	});
+}
 
 async function execPnpm(args: string[], env: Record<string, string> = {}): Promise<void> {
 	try {
