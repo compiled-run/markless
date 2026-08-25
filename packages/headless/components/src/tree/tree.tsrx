@@ -118,6 +118,22 @@ export function TreeRoot({
 				return;
 			}
 
+			// Before the rows are walked: a key this handler never acts on - Tab, Escape,
+			// a modifier - must not pay for the walk. Length one is the typeahead's range.
+			const isHandledKey =
+				key === 'ArrowDown' ||
+				key === 'ArrowUp' ||
+				key === 'ArrowRight' ||
+				key === 'ArrowLeft' ||
+				key === 'Home' ||
+				key === 'End' ||
+				key === 'Enter' ||
+				key.length === 1;
+			if (!isHandledKey) {
+				onKeydown?.(event);
+				return;
+			}
+
 			// Read at the handler's top level: a shared read inside the typeahead closure below is a ReferenceError.
 			const rowEls = tree.rowEls;
 			const labelEls = tree.labelEls;

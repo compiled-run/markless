@@ -209,7 +209,10 @@ export function RadioGroupItemField({ onChange, onFocus, onKeydown, ...rest }: R
 					return;
 				}
 
-				const fields = Array.from(group.fieldEls ?? []).filter((field) => !field.disabled);
+				// One filter, no snapshot copy in front of it: the members read back as
+				// a plain array already. A single pass is not open here - the compiler
+				// cannot resolve a write to a handler local made inside a loop.
+				const fields = (group.fieldEls ?? []).filter((field) => !field.disabled);
 				const at = fields.indexOf(here);
 				const last = fields.length - 1;
 				const step = key === 'Home' ? -at : key === 'End' ? last - at : key === forward ? 1 : -1;
