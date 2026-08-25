@@ -5,7 +5,7 @@ import Basic from './scenarios/basic.tsrx';
 import Bounded from './scenarios/bounded.tsrx';
 import Disabled from './scenarios/disabled.tsrx';
 import Prefilled from './scenarios/prefilled.tsrx';
-import WithHelp from './scenarios/with-help.tsrx';
+import WithHelpAndError from './scenarios/with-help-and-error.tsrx';
 
 // Rows assert the facts an announcement must convey - role, name, value, bounds - never a reader product's wording.
 const sr = virtualDriver;
@@ -185,12 +185,17 @@ test('a date nobody may change conveys that every box is unavailable', async () 
 	]);
 });
 
-// The description binds the handle each box names through aria-describedby, so it
-// is part of the boxes rather than a separate item further down the page.
-test('the format hint under the boxes is conveyed with a box', async () => {
-	await open(WithHelp);
+// Both messages bind handles each box names through aria-describedby, so both are
+// part of the boxes rather than separate items further down the page.
+test('the error and the format hint are both conveyed with a box', async () => {
+	await open(WithHelpAndError);
 	const phrase = await readFor([say.spinbutton, 'month input']);
-	// Whole-phrase containment: this hint carries commas of its own, and the
-	// driver splits an announcement into facts on commas.
+	// Whole-phrase containment: the hint carries commas of its own, and the driver
+	// splits an announcement into facts on commas.
+	expect(phrase, `${sr.name} announced "${phrase}"`).toContain('Enter a whole date');
 	expect(phrase, `${sr.name} announced "${phrase}"`).toContain('(Month, day, then year)');
+	// What is wrong is conveyed before the format hint.
+	expect(phrase.indexOf('Enter a whole date')).toBeLessThan(
+		phrase.indexOf('(Month, day, then year)'),
+	);
 });

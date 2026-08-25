@@ -744,13 +744,13 @@
 			{
 				"part": "description",
 				"component": "DateBoxDescription",
-				"doc": "Supporting text for the group, named by the root's `aria-describedby`. One\nelement can be named that way, so mounting this alongside `datebox.error`\ndescribes by whichever renders first.",
+				"doc": "Supporting text for the group, named by every box's `aria-describedby`. Mount\nit alongside `datebox.error` and the boxes name both, the error first.",
 				"props": []
 			},
 			{
 				"part": "error",
 				"component": "DateBoxError",
-				"doc": "The validation message. Mounting it is what marks the boxes invalid - they\nreport `aria-invalid` for as long as this part is in the page - so render it\nonly when there is an error to show.",
+				"doc": "The validation message, named by every box's `aria-describedby` ahead of\n`datebox.description`. Mounting it is what marks the boxes invalid - they\nreport `aria-invalid` for as long as this part is in the page - so render it\nonly when there is an error to show.",
 				"props": []
 			},
 			{

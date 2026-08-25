@@ -48,7 +48,8 @@ export const dateboxState = shared(
 			invalid: false,
 			name: '',
 		});
-		const describedEl = element<HTMLDivElement>();
+		const descriptionEl = element<HTMLDivElement>();
+		const errorEl = element<HTMLDivElement>();
 		const segmentEls = element<HTMLSpanElement[]>();
 
 		const value = computed(() =>
@@ -63,7 +64,8 @@ export const dateboxState = shared(
 
 		return {
 			...datebox,
-			describedEl,
+			descriptionEl,
+			errorEl,
 			segmentEls,
 			value,
 			dayMax,
@@ -244,7 +246,9 @@ function DateBoxItem({
 		role="spinbutton"
 		tabindex={tabStop}
 		aria-label={named}
-		aria-describedby={datebox.describedEl}
+		// Error before description: what is wrong is conveyed before the format hint,
+		// wherever the two parts sit in the page.
+		aria-describedby={[datebox.errorEl, datebox.descriptionEl]}
 		aria-valuenow={now}
 		aria-valuemin={lowest}
 		aria-valuemax={highest}
@@ -294,18 +298,10 @@ export function DateBoxYearInput({ ...rest }: DateBoxYearInputProps) @{
 	<DateBoxItem placeholder="yyyy" {...rest} type="year" />
 }
 
-// One part stands behind both `datebox.description` and `datebox.error`: a single
-// element() handle may be bound at exactly one site (MARKLESS_ELEMENT_HANDLE_DUPLICATE),
-// and aria-describedby names exactly one id. A field that mounts both messages is
-// described by the first.
-function DateBoxMessage({ children, ...rest }: DateBoxDescriptionProps) @{
+export function DateBoxDescription({ children, ...rest }: DateBoxDescriptionProps) @{
 	const datebox = dateboxState();
 
-	<div {...rest} el={datebox.describedEl}>{children}</div>
-}
-
-export function DateBoxDescription({ children, ...rest }: DateBoxDescriptionProps) @{
-	<DateBoxMessage {...rest}>{children}</DateBoxMessage>
+	<div {...rest} el={datebox.descriptionEl}>{children}</div>
 }
 
 export function DateBoxError({ children, ...rest }: DateBoxErrorProps) @{
@@ -313,7 +309,7 @@ export function DateBoxError({ children, ...rest }: DateBoxErrorProps) @{
 	// Mounting the error part is what marks the boxes invalid.
 	datebox.invalid = true;
 
-	<DateBoxMessage {...rest}>{children}</DateBoxMessage>
+	<div {...rest} el={datebox.errorEl}>{children}</div>
 }
 
 // No handler of its own: the input is clipped, aria-hidden and out of the tab
