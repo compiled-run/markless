@@ -13,6 +13,7 @@ import {
 	renderedWidgetRootsOf,
 } from '../prerender/children-projection.ts';
 import { MARKLESS_SSR_CALLBACKS_PROP, marklessSsrSpreadProps } from './ssr.ts';
+import { fileBoundElementHandles } from './element-handle-roster.ts';
 
 type SeedEdge = NonNullable<PrerenderDataDefinition['edges']>[number];
 type SeedContext = Parameters<SharedSeedPass>[0];
@@ -23,13 +24,18 @@ type PrerenderReadSeed = (graphNodeId: string, path?: ReadonlyArray<string>) => 
 const seedProjectingChild: SharedSeedPass = async (
 	context,
 	definition,
-	componentEdgeId,
+	slot,
 	read,
 	inherited,
 ) => {
+	const componentEdgeId = slot.componentEdgeId;
+	// Every exit files the roster: an unseeded projection still renders parts, and
+	// their IDREF positions still have to be told which handles bind an element.
+	const roster = (seeds: ReadonlyMap<string, unknown> | undefined) =>
+		fileBoundElementHandles(seeds, inherited, context.surface, definition, slot);
 	const edges = definition.edges ?? [];
 	const rootEdge = edges.find((candidate) => candidate.id === componentEdgeId);
-	if (!rootEdge || rootEdge.materialized) return inherited;
+	if (!rootEdge || rootEdge.materialized) return roster(inherited);
 	// Static registration before descent: the projecting child's own instance
 	// names the widget its parts belong to, so a part's minted element() id can
 	// carry which rendered widget it is part of.
@@ -71,7 +77,7 @@ const seedProjectingChild: SharedSeedPass = async (
 	// document order.
 	for (const edge of projectedEdges(context.surface, definition, componentEdgeId, read))
 		await applySharedSeeds(context, context.surface, context.symbolPrefix, edge, read, seeded);
-	return seeded;
+	return roster(seeded);
 };
 
 /**
