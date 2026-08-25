@@ -216,6 +216,28 @@ for (const mode of MODES) {
 	});
 }
 
+// The thumb's keydown reads its own `now` computed. A resume re-derives a sync
+// computed only when a dependency is written, so this first keystroke - no
+// pointer, no earlier key - is the read that answered undefined and stepped to NaN.
+test('SSR: the first keystroke after a resume steps from the rendered value', async () => {
+	await renderSSR(Basic);
+	el<HTMLElement>(Thumb).focus();
+
+	await userEvent.keyboard('{ArrowRight}');
+	await expect.poll(() => el(Thumb).getAttribute('aria-valuenow')).toBe('41');
+	expect(el(ValueLabel).textContent?.trim()).toBe('41');
+	expect(customProperty(el(Root), '--slider-end')).toBe('41%');
+});
+
+test('SSR: the first keystroke on a two-value slider steps that thumb alone', async () => {
+	await renderSSR(Range);
+	el<HTMLElement>(StartThumb).focus();
+
+	await userEvent.keyboard('{ArrowRight}');
+	await expect.poll(() => el(StartThumb).getAttribute('aria-valuenow')).toBe('21');
+	expect(el(EndThumb).getAttribute('aria-valuenow')).toBe('80');
+});
+
 test('CSR: an arrow moves the value by one step in either direction', async () => {
 	await render(Basic);
 	el<HTMLElement>(Thumb).focus();
