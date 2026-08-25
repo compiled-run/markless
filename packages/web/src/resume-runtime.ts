@@ -290,6 +290,7 @@ export function createResumeRuntime(
 					elementsByHostId,
 					events: eventWiring,
 					storeContainerSubscription,
+					renderData: input.renderData,
 				});
 			},
 			addBehaviors: behaviors
@@ -513,8 +514,7 @@ export function createResumeRuntime(
 		},
 		activateBehaviors: async (hostNodeId: string) =>
 			(await loadBehaviorRuntime()).activateBehaviors(hostNodeId),
-		// Settled means every boundary committed its content AND the flush that
-		// carried it fully applied.
+		// Settled = every boundary committed AND the flush that carried it applied.
 		whenAsyncBoundariesSettled: async () => {
 			if (!settleTracker) return;
 			await settleTracker.whenAllSettled();

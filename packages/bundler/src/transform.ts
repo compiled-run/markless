@@ -600,6 +600,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					hasOverlayMarks: compiled.runtimeDemandMap.payloadRecords.some(
 						(record) => record.kind === 'overlay',
 					),
+					runtimeDemandMap: compiled.runtimeDemandMap,
 					resumeModuleUrl: input.resumeModuleUrl,
 					prerenderWakeModuleUrl: input.prerenderWakeModuleUrl,
 					publicRenderModuleSource: compiled.publicRenderModule.moduleSource,
