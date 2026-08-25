@@ -154,7 +154,7 @@ test('CSR: the parts written out render the message they were given', async () =
 // Measured: two rows minted in one flush both paint `--index: 0` with no
 // `ui-front`; after a third message the first row gains `ui-front` and the second
 // still reads `--index: 0`.
-test.fails('CSR: a written-out item carries its place in the stack', async () => {
+test('CSR: a written-out item carries its place in the stack', async () => {
 	await render(Basic);
 	el<HTMLButtonElement>(page.getByTestId('two')).click();
 	await expect.poll(() => page.getByTestId('item').elements()).toHaveLength(2);
