@@ -157,9 +157,9 @@ export function ToasterItemTitle({ children, ...rest }: ToasterItemTitleProps) @
 
 	<div {...rest} ui-toasttitle="">
 		@if (children) {
-			{children}
+			<>{children}</>
 		} @else {
-			{item.title}
+			<>{item.title}</>
 		}
 	</div>
 }
@@ -169,9 +169,9 @@ export function ToasterItemDescription({ children, ...rest }: ToasterItemDescrip
 
 	<div {...rest} ui-toastdescription="">
 		@if (children) {
-			{children}
+			<>{children}</>
 		} @else {
-			{item.description}
+			<>{item.description}</>
 		}
 	</div>
 }
@@ -181,9 +181,9 @@ export function ToasterItemIcon({ children, ...rest }: ToasterItemIconProps) @{
 
 	<span {...rest} ui-toasticon="" aria-hidden="true">
 		@if (children) {
-			{children}
+			<>{children}</>
 		} @else {
-			{item.icon}
+			<>{item.icon}</>
 		}
 	</span>
 }
