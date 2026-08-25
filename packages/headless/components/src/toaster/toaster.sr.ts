@@ -38,10 +38,8 @@ test('the region asks to be read politely', async () => {
 	expect(region(container).getAttribute('aria-relevant')).toBe('additions');
 });
 
-// The three rows below are expected red on one cause: a component inside a repeat renders nothing on the client, and every toast row is written inside a `@for`.
-
 // The tone mark is decoration - a reader that spoke it before the message would be reading punctuation at a person.
-test.fails('the tone mark is not part of what is read', async () => {
+test('the tone mark is not part of what is read', async () => {
 	const container = await open(Basic);
 	const say = container.querySelector('[data-testid="sticky"]') as HTMLButtonElement;
 	say.click();
@@ -52,7 +50,7 @@ test.fails('the tone mark is not part of what is read', async () => {
 });
 
 // A row that renders twice is announced twice; the queue's update-in-place rule is what prevents it.
-test.fails('a message said twice under one id is one thing to read', async () => {
+test('a message said twice under one id is one thing to read', async () => {
 	const container = await open(Basic);
 	const save = container.querySelector('[data-testid="save"]') as HTMLButtonElement;
 	save.click();
@@ -62,7 +60,7 @@ test.fails('a message said twice under one id is one thing to read', async () =>
 });
 
 // The visible character is "×", which a reader would otherwise announce as "times" or skip entirely.
-test.fails('the dismiss button is named', async () => {
+test('the dismiss button is named', async () => {
 	const container = await open(Basic);
 	const say = container.querySelector('[data-testid="sticky"]') as HTMLButtonElement;
 	say.click();

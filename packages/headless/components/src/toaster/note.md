@@ -103,28 +103,25 @@ being a namespace call.
    `activateAuthoredBehaviors`. That is what the F8 hotkey was written as
    (`toaster-hotkey.ts` is still here, unwired), so the hotkey ships nowhere and
    the focus-restore rule that rode with it does not either.
-5. **A COMPONENT ROW NEVER MINTS CLIENT-SIDE.** (Corrected: served component rows
-   RENDER — measured across projection, plain hosts, and widget-local arrays; the
-   earlier "renders nothing" reading measured growth from an empty queue while the
-   then-live empty-arm defect made present rows look blank.) This supersedes the earlier
-   reading here, "a consumer's own `@for` inside `toaster.root` renders nothing" —
-   projection is not the cause. Measured with two repeats over the same queue on
-   one page: a repeat of plain `<li>` markup inside `toaster.root`'s projected
-   children RENDERS; a repeat of `toaster.item` inside a plain `<ol>` that
-   projects nothing renders NOTHING; and a repeat of a trivial local component
-   with no `shared()` of its own, also in a plain `<ol>`, renders NOTHING. So the
-   wall is the component in the repeat — not the projected slot, not the widget
-   scope, and not the `{children}`-beside-a-construct shape that was measured
-   alongside it. No diagnostic in any form. **This is now the family's blocking
-   wall:** with the default rows gone, the written-out parts are the only path,
-   and it is the exact shape this blocks.
+5. **CLOSED — a component row now mints client-side.** The wall recorded here
+   ("a component row never mints") is gone: `toaster.item` inside a consumer's
+   `@for` raises, lands inside the region, stacks and dismisses. Eleven of the
+   twelve pinned rows in the suite were waiting on it and are now plain `test`.
+   Two smaller measurements replaced it, both recorded at the row that pins them:
 
-   Narrowed further since: `scenarios/one-message.tsrx` writes the same parts out
-   with no `@for` around them, and every one of them renders, on the client and in
-   the served HTML alike — `ui-tone`, the stacking style, the self-closed
-   `itemtitle` / `itemdescription` / `itemicon` serving the record's own words, and
-   a written-into `itemtitle` serving its children. So the repeat is the only thing
-   between this family and a working consumer page; the parts are finished.
+   - **One page module per browser test file.** A compiled page installs its
+     row-minting loader into a single unqualified global (`__marklessRowMint`,
+     written by `packages/bundler/src/source-module.ts`), capturing that module's
+     own render-data id. Import two page modules into one test file and only the
+     last one loaded can mint; every other page throws
+     `MARKLESS_PRERENDER_DATA_COMPONENT_MISSING: <OwnerName>`. That is why the
+     suite is three files rather than one.
+   - **A minted row's `computed()` cells are one flush stale.** The row is
+     evaluated before the page-scoped queue it reads is live, so
+     `positionOf(queue, item.id)` answers -1: `stackingStyle` clamps that to
+     `--index: 0` and `ui-front` is left off the row that IS at the front. The
+     cells correct on the next graph flush, by which time the row minted in that
+     flush is stale in its turn.
 6. **A repeat body may hold only one element.** Two siblings inside `@for` is
    `MARKLESS_PARSE_ERROR` ("Expected '</' to close the JSX element, but found
    '@'"). Measured while probing point 5.
@@ -135,20 +132,20 @@ being a namespace call.
    A module whose default export is declared after another component renders the
    other one. Cost an hour of a wrong reading during the probes.
 
-## The mint, and why this family no longer reaches it
+## The mint this family reaches
 
-The landed tier-1 mint (`mintableRowTemplate` in
-`packages/compiler/src/passes/protocol-view.ts`) carries a row template only when
-every slot in the row is TEXT read off the repeated item — no dynamic attributes,
-no nested constructs, no child components.
+The tier-1 template mint (`mintableRowTemplate` in
+`packages/compiler/src/passes/protocol-view.ts`) carries a row only when every
+slot in it is TEXT read off the repeated item — no dynamic attributes, no nested
+constructs, no child components. That is why `icon` is minted into the record at
+enqueue rather than derived in the row.
 
-The default rows were written to fit inside exactly that, which is why `icon` is
-minted into the record at enqueue rather than derived in the row: the mint can
-carry a text slot but not a computed attribute. With those rows removed, the
-family's only path is `toaster.item` inside a consumer's repeat — a child
-component, which the mint does not accept. So this family reaches no mint at all
-now, and `ui-tone`, `ui-front` and the `--index` / `--offset` stacking data (which
-the default rows could never have carried) are the things it renders instead.
+This family's only path is `toaster.item` inside a consumer's repeat, which that
+template mint does not accept. It is the COMPONENT-row mint that carries it, and
+that mint has landed: a row raised after load paints, lands inside the region,
+stacks and dismisses through its own close button. `ui-tone` and the
+`--index` / `--offset` stacking data ride along; `ui-front` and a second row's
+`--index` are the one flush behind recorded in point 5 above.
 
 `icon` stays on the record regardless: `toaster.itemicon` reads it off the item's
 instance, so it is still a fact the queue carries rather than a lookup in a part.
