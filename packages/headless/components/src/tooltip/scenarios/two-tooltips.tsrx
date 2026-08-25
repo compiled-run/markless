@@ -1,4 +1,4 @@
-import * as tooltip from '../index.ts';
+import { tooltip } from '../../index.ts';
 
 // Two tooltips on one page. Each mints its own anchor name and its own id, so
 // neither can be placed against the other's trigger or describe the other's

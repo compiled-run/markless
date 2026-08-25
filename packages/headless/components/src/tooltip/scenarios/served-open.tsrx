@@ -1,4 +1,4 @@
-import * as tooltip from '../index.ts';
+import { tooltip } from '../../index.ts';
 
 export default function ServedOpen() @{
 	<section style="padding: 120px 40px">

@@ -1,4 +1,4 @@
-import * as tooltip from '../index.ts';
+import { tooltip } from '../../index.ts';
 
 // The tip authored BEFORE the trigger, which the CSS anchor spec's
 // "laid out strictly before" wording reads as a hazard. Measured here: it is not

@@ -1,5 +1,5 @@
-import * as popover from '../../popover/index.ts';
-import * as tooltip from '../index.ts';
+import { popover } from '../../index.ts';
+import { tooltip } from '../../index.ts';
 
 // A tooltip inside an open popover. Both ride the same overlay stack, and only
 // the topmost entry is told about a dismissal.

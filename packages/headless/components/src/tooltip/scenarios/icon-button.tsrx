@@ -1,4 +1,4 @@
-import * as tooltip from '../index.ts';
+import { tooltip } from '../../index.ts';
 
 // The icon-only case: the trigger carries its own accessible name and the
 // tooltip describes it. No library prop is involved in either.

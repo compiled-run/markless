@@ -1,4 +1,4 @@
-import * as tooltip from '../index.ts';
+import { tooltip } from '../../index.ts';
 
 // Several tooltips side by side, each waiting no time at all, so the rows about
 // hovering and staying open are about the family rather than about a timer.
