@@ -816,13 +816,19 @@ function payloadNodeOwners(
 			if (!chunkOwner.has(graphNodeId)) chunkOwner.set(graphNodeId, component.name);
 		}
 	}
-	const pending = new Map<string, string[]>();
-	for (const binding of input.semanticGraph.graphBindings) {
-		if (!binding.componentName) continue;
-		const queue = pending.get(binding.id);
-		if (queue) queue.push(binding.componentName);
-		else pending.set(binding.id, [binding.componentName]);
-	}
+	// Rebuilt per pass: the cells and the computed each resolve duplicate ids from
+	// a full queue, so a cell spelling an id a computed also spells cannot drain
+	// the declarations the computed pass still needs.
+	const declaringComponents = (): Map<string, string[]> => {
+		const pending = new Map<string, string[]>();
+		for (const binding of input.semanticGraph.graphBindings) {
+			if (!binding.componentName) continue;
+			const queue = pending.get(binding.id);
+			if (queue) queue.push(binding.componentName);
+			else pending.set(binding.id, [binding.componentName]);
+		}
+		return pending;
+	};
 	// A branch-condition computed is read by the branch record, not by any chunk
 	// slot, so chunk ownership cannot see it. The component whose arms the branch
 	// decides declares it.
@@ -839,20 +845,22 @@ function payloadNodeOwners(
 	// nodes belong to the widget root, not the module root: that component's
 	// composed instance path is the widget root.
 	const widgetOwner = widgetRootComponents(input);
-	const ownerOf = (graphNodeId: string): string => {
-		if (isPageSpaceGraphNodeId(graphNodeId))
+	const resolveOwners = (graphNodeIds: ReadonlyArray<string>): ReadonlyArray<string> => {
+		const pending = declaringComponents();
+		return graphNodeIds.map((graphNodeId) => {
+			if (isPageSpaceGraphNodeId(graphNodeId))
+				return (
+					widgetOwner.get(graphNodeId.slice(0, graphNodeId.lastIndexOf('/'))) ?? rootComponentName
+				);
+			const queue = pending.get(graphNodeId);
+			const declared = queue && queue.length > 1 ? queue.shift() : queue?.[0];
 			return (
-				widgetOwner.get(graphNodeId.slice(0, graphNodeId.lastIndexOf('/'))) ??
-				rootComponentName
+				declared ?? chunkOwner.get(graphNodeId) ?? branchOwner.get(graphNodeId) ?? rootComponentName
 			);
-		const queue = pending.get(graphNodeId);
-		const declared = queue && queue.length > 1 ? queue.shift() : queue?.[0];
-		return (
-			declared ?? chunkOwner.get(graphNodeId) ?? branchOwner.get(graphNodeId) ?? rootComponentName
-		);
+		});
 	};
 	return {
-		cells: input.protocolState.cells.map((cell) => ownerOf(cell.graphNodeId)),
-		computed: input.protocolState.computed.map((computed) => ownerOf(computed.graphNodeId)),
+		cells: resolveOwners(input.protocolState.cells.map((cell) => cell.graphNodeId)),
+		computed: resolveOwners(input.protocolState.computed.map((computed) => computed.graphNodeId)),
 	};
 }
