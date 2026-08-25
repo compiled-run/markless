@@ -878,6 +878,48 @@ test('emitResumeModule writes no component-row loader without a render-data modu
 	).not.toContain('row-component-mint');
 });
 
+const twoComponentServerInput = {
+	...baseInput,
+	environment: 'server' as const,
+	publicSsrModuleSource: 'function marklessSsrApp(){}\nfunction marklessSsrServed(){}',
+	publicRenderSsrExportName: 'marklessSsrApp',
+	publicRenderSsrComponentExports: [
+		{ exportName: 'App', ssrFunctionName: 'marklessSsrApp' },
+		{ exportName: 'Served', ssrFunctionName: 'marklessSsrServed' },
+	],
+};
+
+// A non-root export is a bare part: no resume module, no preloads. Branding it
+// is what lets the render path refuse it as a page instead of serving it inert.
+test('a non-root component export is branded as a bare part and the root is not', () => {
+	const code = emitSourceModule(twoComponentServerInput);
+
+	expect(code).toContain(
+		'export const App = { ...marklessCompiledApp, renderSsr: marklessCompiledApp.renderSsrComponents["App"].renderSsr };',
+	);
+	expect(code).toContain(
+		'export const Served = { ...marklessCompiledApp.renderSsrComponents["Served"], marklessComponentPart: "Served" };',
+	);
+	// Composition reads the map, so the entries stay unbranded.
+	expect(code).toContain(
+		'renderSsrComponents: { "App": { renderSsr: marklessSsrApp }, "Served": { renderSsr: marklessSsrServed } },',
+	);
+});
+
+test('a CSR-only build brands its inert non-root part too', () => {
+	const code = emitSourceModule({
+		...twoComponentServerInput,
+		environment: 'client',
+		publicCsrModuleSource: 'function marklessCsrApp(){}',
+		publicRenderCsrExportName: 'marklessCsrApp',
+	});
+
+	expect(code).toContain(
+		'export const Served = { marklessCsrOnlyPart: "Served", marklessComponentPart: "Served" };',
+	);
+	expect(code).not.toContain('export const App = { marklessCsrOnlyPart');
+});
+
 test('emitResumeModule leaves a page with no component row byte-identical', () => {
 	const reorderOnly = emitResumeModule({
 		...baseInput,
