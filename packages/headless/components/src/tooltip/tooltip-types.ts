@@ -36,9 +36,9 @@ export type TooltipRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 };
 
 /**
- * The control the tooltip describes. It carries the CSS anchor the tip is placed
- * against, so the family owns this element's `style` attribute - style the
- * trigger from a stylesheet rather than a `style` prop.
+ * The control the tooltip describes. It carries the CSS anchor the tip is
+ * placed against, declared in the part's own scoped stylesheet - your `style`
+ * and `class` compose untouched.
  *
  * It points at the tip with `aria-describedby` at all times, showing or not: a
  * directly referenced hidden element still contributes its text to the
@@ -66,10 +66,10 @@ export type TooltipTriggerProps = PropsOf<'button'>;
  * an elevated element removed from the document while showing leaves the overlay
  * stack's marks behind.
  *
- * The family owns this element's `style` attribute to carry `position: absolute`
- * and the anchor. Everything about where the tip lands - `position-area`,
- * `@position-try`, `position-visibility`, offsets - is your CSS, keyed off
- * `ui-side`.
+ * Its `position: absolute` and anchor binding live in the part's own scoped
+ * stylesheet - your `style` and `class` compose untouched. Everything about
+ * where the tip lands - `position-area`, `@position-try`, `position-visibility`,
+ * offsets - is your CSS, keyed off `ui-side`.
  */
 export type TooltipContentProps = PropsOf<'div'>;
 

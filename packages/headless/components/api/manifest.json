@@ -1822,7 +1822,7 @@
 			{
 				"part": "content",
 				"component": "TooltipContent",
-				"doc": "The tip. It is text, not a surface a person can work in: no links, no buttons,\nnothing to focus.\n\n**Write it after `tooltip.trigger`.** A CSS anchor has to be laid out strictly\nbefore the element that points at it. An ordinary in-flow trigger satisfies\nthat from anywhere in the markup, so the order is only advice - until you\nabsolutely position the trigger yourself, at which point a tip written first\nsilently lands at its containing block instead of beside it. CSS has no way to\nreport that, so put the tip last and the question never comes up.\n\nIt stays in the page when the tooltip is hidden - `hidden` decides whether it\nshows, never an arm - because the trigger points at its minted id and because\nan elevated element removed from the document while showing leaves the overlay\nstack's marks behind.\n\nThe family owns this element's `style` attribute to carry `position: absolute`\nand the anchor. Everything about where the tip lands - `position-area`,\n`@position-try`, `position-visibility`, offsets - is your CSS, keyed off\n`ui-side`.",
+				"doc": "The tip. It is text, not a surface a person can work in: no links, no buttons,\nnothing to focus.\n\n**Write it after `tooltip.trigger`.** A CSS anchor has to be laid out strictly\nbefore the element that points at it. An ordinary in-flow trigger satisfies\nthat from anywhere in the markup, so the order is only advice - until you\nabsolutely position the trigger yourself, at which point a tip written first\nsilently lands at its containing block instead of beside it. CSS has no way to\nreport that, so put the tip last and the question never comes up.\n\nIt stays in the page when the tooltip is hidden - `hidden` decides whether it\nshows, never an arm - because the trigger points at its minted id and because\nan elevated element removed from the document while showing leaves the overlay\nstack's marks behind.\n\nIts `position: absolute` and anchor binding live in the part's own scoped\nstylesheet - your `style` and `class` compose untouched. Everything about\nwhere the tip lands - `position-area`, `@position-try`, `position-visibility`,\noffsets - is your CSS, keyed off `ui-side`.",
 				"props": []
 			},
 			{
@@ -1862,7 +1862,7 @@
 			{
 				"part": "trigger",
 				"component": "TooltipTrigger",
-				"doc": "The control the tooltip describes. It carries the CSS anchor the tip is placed\nagainst, so the family owns this element's `style` attribute - style the\ntrigger from a stylesheet rather than a `style` prop.\n\nIt points at the tip with `aria-describedby` at all times, showing or not: a\ndirectly referenced hidden element still contributes its text to the\ndescription, so tabbing to the trigger conveys the tip without it ever being\nshown.\n\nAn icon-only trigger needs its own accessible name - write `aria-label` on it.\nThe tooltip describes the control; it never names it.",
+				"doc": "The control the tooltip describes. It carries the CSS anchor the tip is\nplaced against, declared in the part's own scoped stylesheet - your `style`\nand `class` compose untouched.\n\nIt points at the tip with `aria-describedby` at all times, showing or not: a\ndirectly referenced hidden element still contributes its text to the\ndescription, so tabbing to the trigger conveys the tip without it ever being\nshown.\n\nAn icon-only trigger needs its own accessible name - write `aria-label` on it.\nThe tooltip describes the control; it never names it.",
 				"props": []
 			}
 		]
