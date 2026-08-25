@@ -12,6 +12,10 @@ export type MarklessExecutionLogMode = 'auto' | 'never' | 'always';
 export interface MarklessDevServer {
 	transformRequest: (url: string, environment: MarklessEnvironment) => Promise<unknown> | unknown;
 	invalidateModule?: (id: string, environment: MarklessEnvironment) => boolean;
+	// Executes a module through the server environment's pipeline. A dependency
+	// shipped as TypeScript source has no other loader: Node refuses to
+	// type-strip anything under node_modules.
+	importModule?: (source: string) => Promise<unknown>;
 }
 
 export interface MarklessRolldownOptions {

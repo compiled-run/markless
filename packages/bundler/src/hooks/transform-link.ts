@@ -14,6 +14,7 @@ import {
 } from '@markless/compiler';
 import {
 	awaitChildClaimPublications,
+	delegateLoadOptions,
 	fallbackImportedSource,
 	forceImportedModules,
 	linkBarrelComponentInterfaces,
@@ -77,7 +78,8 @@ async function scopedDelegateMaterializations(
 	request: TransformRequest,
 	transformed: TransformTsrxModuleResult,
 ): Promise<Readonly<Record<string, ArtifactChildMaterialization>>> {
-	const { pluginContext, id, source, currentEnvironment, materializedRenderDataReach } = request;
+	const { ctx, pluginContext, id, source, currentEnvironment, materializedRenderDataReach } =
+		request;
 	if (
 		!delegateMaterializationScope({
 			clientEnvironment: currentEnvironment === 'client',
@@ -92,6 +94,7 @@ async function scopedDelegateMaterializations(
 		pluginContext,
 		source,
 		transformed.artifactChildren,
+		delegateLoadOptions(ctx),
 	);
 	// A delegate whose import rejected is reported, not swallowed; the edge still skips.
 	warnDelegateImportFailures(pluginContext, delegates);
