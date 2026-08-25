@@ -184,6 +184,9 @@ test('emitResumeModule derives prerender records from linked render data on dema
 	expect(resumeCode).toContain('derivePrerenderResumeRecords(marklessPrerenderData, loadSymbol)');
 	expect(resumeCode).toContain('mergePrerenderPayloadRecords(records, handoff.root)');
 	expect(resumeCode).toContain('resumeFromPrerenderRecords');
+	// One runtime per container, the same shape the staged fallback uses: this
+	// handoff runs on every event, so the derive belongs inside the cache.
+	expect(resumeCode).toContain('handoff.root.__marklessFullResumeRuntime ??=');
 	expect(resumeCode).not.toContain('resumeFromPayloadDocument');
 	expect(resumeCode).not.toContain('App.tsrx');
 	expect(resumeCode).not.toContain('marklessPrerenderPage');
