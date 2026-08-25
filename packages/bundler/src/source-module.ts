@@ -5,6 +5,7 @@ import type {
 	InlineResumerSourceVariants,
 	PrerenderBootArtifact,
 } from '@markless/web/inline/resumer';
+import { MARKLESS_COMPONENT_PART_BRAND } from '@markless/web/render-to-string';
 import type { StorageSeedMetadata } from '@markless/serializer';
 import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
 
@@ -947,9 +948,10 @@ const RESERVED_MODULE_BINDINGS: ReadonlySet<string> = new Set([
  * `renderSsr` - because both consumers reach it by that one name: `render(Gallery,
  * { target })` reads the surface (`renderCsr`/`renderData`/`loadSymbol`), while a
  * barrel re-export composed as a member tag reads the part. Every other component
- * is published as exactly the part `marklessSsrComponentPart` hands a composed
- * child, through the same access path, so a named import and a member tag reach
- * one object.
+ * is published as the part `marklessSsrComponentPart` hands a composed child,
+ * carrying nothing of the module surface. A part rendered AS A PAGE would
+ * therefore be served inert, so the export is branded and `renderSsrOutput`
+ * refuses it; composition reads the unbranded map entry and is untouched.
  */
 function emitComponentExports(input: {
 	readonly ssrComponents: ReadonlyArray<{
@@ -965,9 +967,12 @@ function emitComponentExports(input: {
 		}
 		const part = `marklessCompiledApp.renderSsrComponents[${JSON.stringify(component.exportName)}]`;
 		const isRoot = component.exportName === input.rootExportName;
+		const brand = `${MARKLESS_COMPONENT_PART_BRAND}: ${JSON.stringify(component.exportName)}`;
 		if (input.servesSsr) {
 			return `export const ${component.exportName} = ${
-				isRoot ? `{ ...marklessCompiledApp, renderSsr: ${part}.renderSsr }` : part
+				isRoot
+					? `{ ...marklessCompiledApp, renderSsr: ${part}.renderSsr }`
+					: `{ ...${part}, ${brand} }`
 			};`;
 		}
 		// SSR dropped (a client production CSR build): the surface carries the
@@ -977,7 +982,7 @@ function emitComponentExports(input: {
 		// inert instead, so composing or rendering it fails loudly.
 		return isRoot
 			? `export const ${component.exportName} = marklessCompiledApp;`
-			: `export const ${component.exportName} = { marklessCsrOnlyPart: ${JSON.stringify(component.exportName)} };`;
+			: `export const ${component.exportName} = { marklessCsrOnlyPart: ${JSON.stringify(component.exportName)}, ${brand} };`;
 	});
 }
 
