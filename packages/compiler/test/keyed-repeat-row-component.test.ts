@@ -3,10 +3,13 @@ import {
 	buildSemanticGraph,
 	createProtocolViewPayload,
 	createRenderData,
+	linkBarrelComponents,
 	lowerStateAccess,
+	moduleLinkResolutionKey,
 	planPayloadArena,
 	planSymbolResolver,
 } from '../src/index.ts';
+import type { ModuleGraphInterfaceArtifact } from '../src/artifacts.ts';
 
 /**
  * What the payload says about a row whose whole content is a component.
@@ -45,11 +48,20 @@ async function viewOf(source: string) {
 async function viewOfImportedRow(childSource: string, ownerSource: string) {
 	const child = await buildSemanticGraph({ filename: 'src/row.tsrx', source: childSource });
 	const importedModuleInterfaces = { './row.tsrx': child.moduleGraphInterface };
-	const semanticGraph = await buildSemanticGraph({
-		filename: 'src/App.tsrx',
-		source: ownerSource,
+	return viewFrom(
+		await buildSemanticGraph({
+			filename: 'src/App.tsrx',
+			source: ownerSource,
+			importedModuleInterfaces,
+		}),
 		importedModuleInterfaces,
-	});
+	);
+}
+
+function viewFrom(
+	semanticGraph: Awaited<ReturnType<typeof buildSemanticGraph>>,
+	importedModuleInterfaces: Record<string, ModuleGraphInterfaceArtifact>,
+) {
 	const stateLowering = lowerStateAccess({ semanticGraph });
 	const payloadArena = planPayloadArena({ semanticGraph, stateLowering });
 	const symbolResolver = planSymbolResolver({ semanticGraph, payloadArena });
@@ -460,20 +472,174 @@ test('an imported component whose element count is unknown ships no identity', a
 	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
 });
 
-// The interface publishes chunk kinds per component but never says which
-// components a given one reaches, so a branch anywhere in the child's module
-// refuses the row. Lifting this needs the interface to carry each component's
-// own transitive construct answer instead of a per-component chunk list.
-test('a branch elsewhere in the imported module refuses the row', async () => {
-	const view = await viewOfImportedRow(
-		`export function Row({ item }) @{
+/**
+ * The construct answer is per component, not per module.
+ *
+ * Each component's interface entry carries whether its OWN reachable tree - its
+ * chunks plus every component it renders, across imports - holds a branch or a
+ * boundary. A sibling in the same file that branches says nothing about this
+ * component, so it no longer refuses this row.
+ */
+const siblingBranchModule = `export function Row({ item }) @{
 	<li>{item.label}</li>
 }
 export function Other({ item }) @{
 	<p>@if (item.on) { <b>x</b> } @else { <i>y</i> }</p>
 }
-`,
-		importingApp,
+`;
+
+test('a branch in a SIBLING component of the imported module still mints the row', async () => {
+	const child = await buildSemanticGraph({
+		filename: 'src/row.tsrx',
+		source: siblingBranchModule,
+	});
+	const entries = child.moduleGraphInterface.render.components;
+	expect(entries.find((entry) => entry.componentName === 'Row')?.constructReach).toBe('free');
+	expect(entries.find((entry) => entry.componentName === 'Other')?.constructReach).toBe(
+		'constructs',
 	);
+
+	const view = await viewOfImportedRow(siblingBranchModule, importingApp);
+	expect(view.keyedRepeats?.[0]?.rowComponent?.componentName).toBe('App');
+});
+
+// The answer is transitive: the row's own body is plain markup, and the branch
+// it refuses on is two files down, reached through the child's own import.
+test("a branch in the imported child's OWN imported child refuses the row", async () => {
+	const leaf = await buildSemanticGraph({
+		filename: 'src/leaf.tsrx',
+		source: `export function Leaf({ label }) @{
+	<b>@if (label) { <i>{label}</i> } @else { <s>none</s> }</b>
+}
+`,
+	});
+	expect(leaf.moduleGraphInterface.render.components[0]?.constructReach).toBe('constructs');
+
+	const middleSource = `import { Leaf } from './leaf.tsrx';
+export function Row({ item }) @{
+	<li><Leaf label={item.label} /></li>
+}
+`;
+	const middle = await buildSemanticGraph({
+		filename: 'src/row.tsrx',
+		source: middleSource,
+		importedModuleInterfaces: { './leaf.tsrx': leaf.moduleGraphInterface },
+	});
+	expect(middle.moduleGraphInterface.render.components[0]?.constructReach).toBe('constructs');
+
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/App.tsrx',
+		source: importingApp,
+		importedModuleInterfaces: { './row.tsrx': middle.moduleGraphInterface },
+	});
+	const view = viewFrom(semanticGraph, { './row.tsrx': middle.moduleGraphInterface });
 	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
+});
+
+// The twin of the case above with the branch taken out of the leaf: the same
+// chain of two imports answers 'free', so the construct question composes across
+// modules rather than absorbing. The row still refuses here, on the separate
+// clause that wants a known element count - an imported child's elements are not
+// counted across the import.
+test('a construct-free chain of imported children answers free', async () => {
+	const leaf = await buildSemanticGraph({
+		filename: 'src/leaf.tsrx',
+		source: `export function Leaf({ label }) @{
+	<b>{label}</b>
+}
+`,
+	});
+	const middle = await buildSemanticGraph({
+		filename: 'src/row.tsrx',
+		source: `import { Leaf } from './leaf.tsrx';
+export function Row({ item }) @{
+	<li><Leaf label={item.label} /></li>
+}
+`,
+		importedModuleInterfaces: { './leaf.tsrx': leaf.moduleGraphInterface },
+	});
+	const entry = middle.moduleGraphInterface.render.components[0];
+	expect(entry?.constructReach).toBe('free');
+	expect(entry?.elementCount).toBe('unknown');
+});
+
+// A child the compile never linked leaves the middle module unable to answer, so
+// its own component answers unknown - and unknown never mints.
+test('an unlinked child leaves the importing component unknown, and unknown refuses', async () => {
+	const middle = await buildSemanticGraph({
+		filename: 'src/row.tsrx',
+		source: `import { Leaf } from './leaf.tsrx';
+export function Row({ item }) @{
+	<li><Leaf label={item.label} /></li>
+}
+`,
+	});
+	expect(middle.moduleGraphInterface.render.components[0]?.constructReach).toBe('unknown');
+
+	const semanticGraph = await buildSemanticGraph({
+		filename: 'src/App.tsrx',
+		source: importingApp,
+		importedModuleInterfaces: { './row.tsrx': middle.moduleGraphInterface },
+	});
+	const view = await viewFrom(semanticGraph, { './row.tsrx': middle.moduleGraphInterface });
+	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
+});
+
+// A barrel republishes the declaring module's interface under the specifier the
+// importer would write, so the fact has to survive that hop untouched.
+test('a barrel re-export carries the construct answer through unchanged', async () => {
+	const child = await buildSemanticGraph({
+		filename: 'src/row.tsrx',
+		source: siblingBranchModule,
+	});
+	const linked = linkBarrelComponents({
+		parent: 'src/App.tsrx',
+		moduleImports: [
+			{ source: './parts.ts', kind: 'named' as const, specifier: './parts.ts' } as never,
+		],
+		resolution: {
+			[moduleLinkResolutionKey('./parts.ts', 'src/App.tsrx')]: 'src/parts.ts',
+			[moduleLinkResolutionKey('./row.tsrx', 'src/parts.ts')]: 'src/row.tsrx',
+		},
+		moduleInterface: (filename: string) =>
+			filename === 'src/parts.ts'
+				? ({
+						passId: 'module-graph-interface',
+						filename,
+						exports: [],
+						reexports: [{ exportName: 'Row', importedName: 'Row', source: './row.tsrx' }],
+						render: { version: 1, components: [] },
+					} as never)
+				: filename === 'src/row.tsrx'
+					? child.moduleGraphInterface
+					: null,
+		rebase: (target: string) => `./${target.slice('src/'.length)}`,
+	} as never);
+
+	const republished = linked.interfaces['./row.tsrx'];
+	expect(
+		republished?.render.components.find((entry) => entry.componentName === 'Row')?.constructReach,
+	).toBe('free');
+	expect(
+		republished?.render.components.find((entry) => entry.componentName === 'Other')
+			?.constructReach,
+	).toBe('constructs');
+});
+
+// Pay-per-use in the interface: the entry gains this one field and nothing else.
+test('the interface entry grows exactly one field', async () => {
+	const child = await buildSemanticGraph({
+		filename: 'src/row.tsrx',
+		source: plainImportedRow,
+	});
+	expect(Object.keys(child.moduleGraphInterface.render.components[0]!).sort()).toEqual([
+		'armMaterial',
+		'childChunks',
+		'componentName',
+		'constructReach',
+		'elementCount',
+		'exportName',
+		'inputs',
+		'rootChunkId',
+	]);
 });

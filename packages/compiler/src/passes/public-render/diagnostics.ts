@@ -167,8 +167,8 @@ function refusalCause(
 	switch (refusal.kind) {
 		case 'component':
 			return {
-				message: `This @for row renders <${refusal.componentName}>, and a component in the row is a graph the browser would have to build one of per row.`,
-				suggestion: `Move <${refusal.componentName}> outside the @for and keep the row to plain elements and text read off ${itemName}, or wait for component-rooted rows.`,
+				message: `This @for row renders <${refusal.componentName}>, and what <${refusal.componentName}> renders either reaches a branch or an async boundary or could not be seen from here - so the browser cannot tell how many anchors a new row would need.`,
+				suggestion: `Keep <${refusal.componentName}> and everything it renders free of @if, @switch and @try - and make sure the module declaring it is part of this build - or move <${refusal.componentName}> outside the @for and keep the row to plain elements and text read off ${itemName}.`,
 			};
 		case 'nested-construct':
 			return {

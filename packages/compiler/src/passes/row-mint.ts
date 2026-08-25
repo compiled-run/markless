@@ -1,18 +1,5 @@
-import type {
-	ModuleGraphInterfaceArtifact,
-	SemanticComponentEdge,
-	SemanticMarkupArtifact,
-	SemanticMarkupSlot,
-} from '../artifacts.ts';
-
-type MarkupChunks = SemanticMarkupArtifact['chunks'];
-
-type ChildCensusInput = {
-	readonly chunks: MarkupChunks;
-	readonly componentEdges: ReadonlyArray<SemanticComponentEdge>;
-	readonly componentNames: ReadonlyArray<string>;
-	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
-};
+import type { SemanticComponentEdge, SemanticMarkupSlot } from '../artifacts.ts';
+import { childConstructReach, type ConstructReachInput } from './construct-reach.ts';
 
 export type RowComponentMint = {
 	readonly componentEdgeId: string;
@@ -59,7 +46,7 @@ export type RowComponentMint = {
  * that cannot grow deserves a diagnostic, so the answer lives here once.
  */
 export function resolveRowComponentMint(
-	input: ChildCensusInput & {
+	input: ConstructReachInput & {
 		readonly rowChunkId: string;
 		readonly rowElementCount: number;
 		readonly itemName: string;
@@ -109,70 +96,24 @@ export function mintableFromItem(slot: SemanticMarkupSlot): boolean {
  * Provably is the whole point: a census this module cannot reach is a refusal,
  * never a pass. A child declared here is answered from this module's own chunks.
  * A child behind an import has no chunks here, so the answer comes from the
- * module interface it published.
+ * construct reach its module published PER COMPONENT - a fact about that
+ * component's own tree, so a branching sibling of it says nothing about this row.
  */
 function childIsConstructFree(
-	input: ChildCensusInput,
+	input: ConstructReachInput,
 	edge: SemanticComponentEdge,
 	childTemplateId: string,
 	seen: Set<string>,
 ): boolean {
-	if (edge.importSource === undefined) {
-		return (
-			input.componentNames.includes(edge.childComponentName) &&
-			chunkTreeIsConstructFree(input, childTemplateId, seen)
+	if (edge.importSource !== undefined) {
+		// A known element count is the interface's own proof that none of the chunks
+		// the child reaches is a repeat, an async arm or an omittable host: those
+		// never resolve to a number, and a row rebuilt around one would place its
+		// nodes against a count the served page never had.
+		const entry = input.importedModuleInterfaces?.[edge.importSource]?.render.components.find(
+			(candidate) => candidate.componentName === edge.childComponentName,
 		);
+		if (!entry || entry.elementCount === 'unknown') return false;
 	}
-	const moduleInterface = input.importedModuleInterfaces?.[edge.importSource];
-	const entry = moduleInterface?.render.components.find(
-		(candidate) => candidate.componentName === edge.childComponentName,
-	);
-	if (!moduleInterface || !entry) return false;
-	// A known element count is the interface's own proof that every chunk the
-	// child reaches was visible in its module and that none of them is a repeat,
-	// an async arm or an omittable host: those never resolve to a number. Branch
-	// arms can agree on one, and the interface never says which components the
-	// child reaches, so no component of that module may carry arm chunks either.
-	if (entry.elementCount === 'unknown') return false;
-	return !moduleInterface.render.components.some((candidate) =>
-		candidate.childChunks.some(
-			(chunk) => chunk.kind === 'branch-arm' || chunk.kind === 'async-arm',
-		),
-	);
-}
-
-// A chunk this module holds, and everything it reaches, proven construct-free.
-// A chunk id with no chunk behind it is unknowable, which is not a pass.
-function chunkTreeIsConstructFree(
-	input: ChildCensusInput,
-	chunkId: string,
-	seen: Set<string>,
-): boolean {
-	if (seen.has(chunkId)) return true;
-	seen.add(chunkId);
-	const chunk = input.chunks.find((candidate) => candidate.id === chunkId);
-	if (!chunk) return false;
-	for (const slot of chunk.slots) {
-		if (slot.kind === 'branch' || slot.kind === 'async') return false;
-		if (slot.kind === 'child-component') {
-			if (slot.projectionChunkId && !chunkTreeIsConstructFree(input, slot.projectionChunkId, seen))
-				return false;
-			const childEdge = input.componentEdges.find(
-				(candidate) => candidate.id === slot.componentEdgeId,
-			);
-			if (!childEdge || !childIsConstructFree(input, childEdge, slot.childTemplateId, seen))
-				return false;
-			continue;
-		}
-		const childChunkIds =
-			slot.kind === 'repeat'
-				? [slot.rowTemplateId, ...(slot.emptyTemplateId ? [slot.emptyTemplateId] : [])]
-				: slot.kind === 'dynamic-host'
-					? [slot.childChunkId]
-					: [];
-		for (const childChunkId of childChunkIds) {
-			if (!chunkTreeIsConstructFree(input, childChunkId, seen)) return false;
-		}
-	}
-	return true;
+	return childConstructReach(input, edge, childTemplateId, seen) === 'free';
 }

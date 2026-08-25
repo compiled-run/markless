@@ -23,6 +23,7 @@ import {
 import { collectComponentProps } from './collect-components.ts';
 import { spreadHostsField } from './spread-hosts.ts';
 import { armMaterialField } from './arm-material.ts';
+import { componentConstructReach } from '../construct-reach.ts';
 import { chunkElementCount, projectionPlacementFields } from './projection-placement.ts';
 import { getComponentFunction, markupInterpolationExpression } from '../../ast/tsrx.ts';
 import {
@@ -151,6 +152,16 @@ export async function buildSemanticGraph(
 		sharedDefinitions: graph.sharedDefinitions,
 		graphBindings: graph.graphBindings,
 	});
+	// Answered here, where this module's chunks and its own imported interfaces
+	// are both in hand; an importer has neither.
+	const constructReachInput = {
+		chunks: graph.markup.chunks,
+		componentEdges: graph.componentEdges,
+		componentNames: graph.components.map((component) => component.name),
+		...(input.importedModuleInterfaces
+			? { importedModuleInterfaces: input.importedModuleInterfaces }
+			: {}),
+	};
 	graph.moduleGraphInterface = {
 		...graph.moduleGraphInterface,
 		...(sharedDefinitions.length > 0 ? { sharedDefinitions } : {}),
@@ -185,6 +196,7 @@ export async function buildSemanticGraph(
 								localName: binding.localName,
 								path: binding.propPath,
 							})),
+						constructReach: componentConstructReach(constructReachInput, root.id),
 						...spreadHostsField(chunks),
 						...projectionPlacementFields({
 							chunks: graph.markup.chunks,
