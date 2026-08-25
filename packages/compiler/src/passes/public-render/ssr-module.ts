@@ -68,7 +68,6 @@ import {
 	authoredResidueSources,
 	elementHandleIdReadCase,
 	elementHandleIdSources,
-	elementHandleResidueKinds,
 	hasSharedElementHandle,
 	MARKLESS_WIDGET_INSTANCE_KEY,
 	MARKLESS_ELEMENT_BOUND_KEY_PREFIX,
@@ -508,7 +507,6 @@ function emitSsrDataLines(
 	// Pay-per-use: a module with no IDREF record emits no mint at all, so the
 	// shared renderer never carries one for the pages that never ask for an id.
 	const handleIds = elementHandleIdSources(chunks);
-	const handleKinds = elementHandleResidueKinds(chunks);
 	const mintCase =
 		handleIds.length > 0
 			? elementHandleIdReadCase({
@@ -516,7 +514,6 @@ function emitSsrDataLines(
 					widgetInstanceRead: hasSharedElementHandle(handleIds)
 						? widgetInstanceReadSource((key) => `marklessSsrRenderStateValues.get(${key})`)
 						: null,
-					kinds: handleKinds,
 					boundRead: (key) => `marklessSsrRenderStateValues.get(${key})`,
 				})
 			: '';
