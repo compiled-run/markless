@@ -86,6 +86,25 @@ import {
 	moduleScopeLines,
 	SSR_CALLBACKS_PROP_NAME,
 } from './public-render/shared.ts';
+import { captureSlotFoldsToConstant } from './symbol-resolver.ts';
+
+/**
+ * The branch sites whose every arm refusal a page re-render can answer. The
+ * protocol view runs ahead of this pass, so it asks the same question here
+ * rather than restating the rule; a page with no flippable branch answers
+ * without walking anything.
+ */
+export function armEscalationCandidateSiteIds(input: SymbolModulesInput): ReadonlySet<string> {
+	const flippable = (input.renderData?.branches ?? []).some(
+		(branch) => branch.update !== 'boundary',
+	);
+	if (!flippable) return new Set();
+	return new Set(
+		renderBranchArms(input, asyncComputedGraphNodeIds(input.semanticGraph)).escalationCandidates.map(
+			(candidate) => candidate.branchSiteId,
+		),
+	);
+}
 
 export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtifact {
 	const moduleDeclarations = sourceModuleScopeLines(input.source);
@@ -1105,10 +1124,16 @@ function renderBranchArms(
 					candidate.branchSiteId === branch.branchSiteId,
 			);
 			if (symbol) {
-				diagnostics.push(branchArmUnsupportedDiagnostic(branch, refusals[0], symbol.id));
+				const diagnostic = branchArmUnsupportedDiagnostic(branch, refusals[0], symbol.id);
+				diagnostics.push(diagnostic);
 				// Every refusal escalatable, or none: a branch that also holds a shape
-				// no re-render answers stays plainly refused.
-				if (refusals.length > 0 && refusals.every((refusal) => refusal.escalatable))
+				// no re-render answers stays plainly refused. A refusal that only warns
+				// blocks no build, so its branch keeps shipping the plan it ships today.
+				if (
+					diagnostic.severity === 'error' &&
+					refusals.length > 0 &&
+					refusals.every((refusal) => refusal.escalatable)
+				)
 					escalationCandidates.push({ branchSiteId: branch.branchSiteId, symbolId: symbol.id });
 			}
 			continue;
@@ -3153,13 +3178,64 @@ function matchingDependency(
 	return dependencies.find((dependency) => dependency.source === text) ?? null;
 }
 
+/**
+ * A slot every incoming edge answers with the same compile-time value is the
+ * value. The bound-symbol planner mints no row for such a slot, so nothing at
+ * runtime would supply a capture context to read it from.
+ */
+function constantCaptureSlotNode(slot: CaptureSlot): EmissionNode | null {
+	if (!captureSlotFoldsToConstant(slot)) return null;
+	const constant = slot.routes.flatMap((route) =>
+		route.kind === 'compiler-known-constant' ? [route.value] : [],
+	)[0];
+	return constantValueNode(
+		slot.path.reduce<unknown>(
+			(value, key) =>
+				value === null || value === undefined
+					? undefined
+					: (value as Record<string, unknown>)[key],
+			constant,
+		),
+	);
+}
+
+// Null for anything emission cannot spell exactly; the capture read stays.
+function constantValueNode(value: unknown): EmissionNode | null {
+	if (value === null) return literalNode(null);
+	if (typeof value === 'string' || typeof value === 'boolean') return literalNode(value);
+	if (typeof value === 'number') return Number.isFinite(value) ? literalNode(value) : null;
+	if (Array.isArray(value)) {
+		const elements = value.map((entry) => constantValueNode(entry));
+		return elements.every((entry) => entry !== null)
+			? arrayNode(elements as ReadonlyArray<EmissionNode>)
+			: null;
+	}
+	if (typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+		const properties: EmissionNode[] = [];
+		for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+			const emitted = constantValueNode(entry);
+			if (!emitted) return null;
+			properties.push(stringKeyPropertyNode(key, emitted));
+		}
+		return objectNode(properties);
+	}
+	return null;
+}
+
+function captureSlotReadNode(slot: CaptureSlot): EmissionNode {
+	return (
+		constantCaptureSlotNode(slot) ??
+		callNode(memberChainNode('context.capture.read'), [literalNode(slot.id)])
+	);
+}
+
 function deriveReadNode(
 	dependency: SemanticGraphDependency,
 	captureSlots: ReadonlyArray<CaptureSlot>,
 ): EmissionNode {
 	const slot = captureSlots.find((candidate) => captureSlotMatchesRead(candidate, dependency));
 	if (slot) {
-		return callNode(memberChainNode('context.capture.read'), [literalNode(slot.id)]);
+		return captureSlotReadNode(slot);
 	}
 
 	return graphReadCall({

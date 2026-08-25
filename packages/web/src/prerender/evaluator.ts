@@ -323,24 +323,53 @@ export async function renderPrerenderBranch(
 	readonly html: string;
 	readonly armRecords: ResumeArmRecordSet;
 	readonly computed: ProtocolStatePayload['computed'];
+	readonly cells: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
 }> {
 	let output: SsrRenderOutput;
+	const freshCellIds = new Set<string>();
 	if (isPrerenderDataSurface(page)) {
 		if (!isPrerenderLoadSymbol(propsOrLoadSymbol)) {
 			throw new TypeError('Prerender render data requires a symbol loader.');
 		}
-		output = await evaluatePrerenderDataSurface(page, propsOrLoadSymbol, graph, true);
+		output = await evaluatePrerenderDataSurface(page, propsOrLoadSymbol, graph, true, {}, {
+			branchSiteId,
+			cellIds: freshCellIds,
+		});
 	} else {
 		output = await renderBuiltPage(page, propsOrLoadSymbol, { prerenderSettle: { graph } });
 	}
 	const records = await prepareSsrResumeRecords(output);
+	const arm = prerenderBranchArm({
+		structure: output.structure,
+		branchSiteId,
+		// The structure's element ranges count the render's own elements; the
+		// prepared view has already shifted for the container root, so the range
+		// has to be read off the render's own locators.
+		view: { ...records.view, locators: output.view?.locators ?? [] } as never,
+	});
+	// An escalating branch is armized while its own view is composed, so its
+	// records already left the flat streams as one arm-relative set.
+	const served = (
+		output.view?.branches as
+			| ReadonlyArray<{ readonly id: string; readonly servedArmRecords?: ResumeArmRecordSet }>
+			| undefined
+	)?.find((branch) => branch.id === branchSiteId)?.servedArmRecords;
 	return {
-		...prerenderBranchArm({
-			structure: output.structure,
-			branchSiteId,
-			view: records.view as never,
-		}),
+		...arm,
+		...(served ? { armRecords: served } : {}),
 		computed: records.state.computed,
+		// The arm's own cells, taken before serialization: nothing in the live
+		// graph answers for a component this render is creating.
+		cells: (output.state?.cells ?? []).flatMap((cell) =>
+			freshCellIds.has(cell.graphNodeId)
+				? [
+						{
+							graphNodeId: cell.graphNodeId,
+							value: (cell as { readonly directValue?: unknown }).directValue,
+						},
+					]
+				: [],
+		),
 	};
 }
 
@@ -354,6 +383,7 @@ async function evaluatePrerenderDataSurface(
 	graph: RuntimeGraph | undefined,
 	requireHtml: boolean,
 	props: Readonly<Record<string, unknown>> = {},
+	fresh?: { readonly branchSiteId: string; readonly cellIds: Set<string> },
 ): Promise<SsrRenderOutput & { readonly structure?: SsrDataStructure }> {
 	const rootName = surface.rootComponentName;
 	if (!rootName) throw new Error('MARKLESS_PRERENDER_DATA_ROOT_MISSING');
@@ -366,6 +396,7 @@ async function evaluatePrerenderDataSurface(
 		loadSymbol,
 		graph,
 		requireHtml,
+		...(fresh ? { freshBranchSiteId: fresh.branchSiteId, freshCellIds: fresh.cellIds } : {}),
 	});
 }
 
@@ -444,6 +475,20 @@ function marklessBoundGraphValues(
 	return routed.size > 0 ? routed : undefined;
 }
 
+// The cells this component declares, as against the module's whole list: the
+// producer hands every component in a module all of them.
+function ownedStateCells(
+	definition: PrerenderDataDefinition,
+): ProtocolStatePayload['cells'] {
+	const cellIndexes = definition.stateCellIndexes;
+	if (cellIndexes)
+		return cellIndexes.flatMap((index) =>
+			definition.state.cells[index] ? [definition.state.cells[index]!] : [],
+		);
+	const owned = new Set(definition.stateGraphNodeIds ?? []);
+	return definition.state.cells.filter((cell) => owned.size === 0 || owned.has(cell.graphNodeId));
+}
+
 async function evaluatePrerenderDataComponent(input: {
 	readonly surface: PrerenderDataSurface;
 	readonly componentName: string;
@@ -466,6 +511,13 @@ async function evaluatePrerenderDataComponent(input: {
 	// Values for graph nodes a composing ancestor routed into this component and
 	// this component's own module never declared.
 	readonly boundGraphValues?: ReadonlyMap<string, unknown>;
+	// This component is being created by the render, not re-rendered: its own
+	// state starts from its declaration, and the commit seeds it into the graph.
+	readonly freshInstance?: true;
+	readonly freshCellIds?: Set<string>;
+	// The branch site whose arm this render brings in, forwarded to the renderer
+	// so it can mark that arm's subtree.
+	readonly freshBranchSiteId?: string;
 }): Promise<
 	SsrRenderOutput & {
 		// The render-data path emits the full ssr-data structure, not just anchors.
@@ -490,8 +542,20 @@ async function evaluatePrerenderDataComponent(input: {
 	// Authored state cells belong to the live graph once one exists: an
 	// escalated arm re-settle renders what the interaction wrote, not the
 	// compile-time initial value seeded into `values`.
+	// A fresh instance owns only ITS cells; a module-mate's stay live.
+	const freshOwnCellIds = input.freshInstance
+		? new Set(ownedStateCells(definition).map((cell) => cell.graphNodeId))
+		: undefined;
+	// Composition merges a child's nodes under its instance path, which is the
+	// prefix its symbols already carry; the commit writes composed ids.
+	for (const graphNodeId of freshOwnCellIds ?? [])
+		input.freshCellIds?.add(input.symbolPrefix + graphNodeId);
 	const liveCellIds = input.graph
-		? new Set(definition.state.cells.map((cell) => cell.graphNodeId))
+		? new Set(
+				definition.state.cells
+					.map((cell) => cell.graphNodeId)
+					.filter((graphNodeId) => !freshOwnCellIds?.has(graphNodeId)),
+			)
 		: undefined;
 	const read = (graphNodeId: string, path: ReadonlyArray<string> = []): unknown => {
 		// A minted row loads its symbols through the resume loader, which scopes a
@@ -579,13 +643,8 @@ async function evaluatePrerenderDataComponent(input: {
 			return computed ? [computed.graphNodeId] : [];
 		}),
 	);
-	const cellIndexes = definition.stateCellIndexes;
 	const computedIndexes = definition.stateComputedIndexes;
-	const ownedCells = cellIndexes
-		? cellIndexes.flatMap((index) =>
-				definition.state.cells[index] ? [definition.state.cells[index]!] : [],
-			)
-		: definition.state.cells.filter((cell) => owned.size === 0 || owned.has(cell.graphNodeId));
+	const ownedCells = ownedStateCells(definition);
 	const ownedComputed = computedIndexes
 		? computedIndexes.flatMap((index) =>
 				definition.state.computed[index] ? [definition.state.computed[index]!] : [],
@@ -665,6 +724,7 @@ async function evaluatePrerenderDataComponent(input: {
 	const rendered = await renderSsrData({
 		renderData,
 		idPrefix: input.idPrefix,
+		...(input.freshBranchSiteId ? { freshBranchSiteId: input.freshBranchSiteId } : {}),
 		sharedSeeds: input.sharedSeeds,
 		read: (residue, context) => {
 			if (residue.kind === 'repeat-item') return readPath(context.repeatItem, residue.path);
@@ -819,6 +879,10 @@ async function evaluatePrerenderDataComponent(input: {
 					edge.props,
 					read,
 				),
+				...(input.freshInstance || context.freshInstances
+					? { freshInstance: true as const }
+					: {}),
+				...(input.freshCellIds ? { freshCellIds: input.freshCellIds } : {}),
 			});
 			children.push({
 				output: output as SsrComposableChildOutput,

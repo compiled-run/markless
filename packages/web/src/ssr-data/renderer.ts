@@ -147,6 +147,9 @@ export type SsrDataReadContext = {
 	readonly asyncError?: unknown;
 	readonly projectionHtml?: string;
 	readonly sharedSeeds?: ReadonlyMap<string, unknown>;
+	// Inside an arm this render is bringing into the DOM for the first time, so
+	// the components it holds are new instances rather than live ones.
+	readonly freshInstances?: true;
 };
 
 export type SsrDataStructure = {
@@ -192,6 +195,9 @@ export type RenderSsrDataInput = {
 		readonly index?: number;
 		readonly key?: unknown;
 	};
+	// The branch whose arm this render is bringing into the DOM: everything
+	// inside it is a new instance, so its own state starts from its declaration.
+	readonly freshBranchSiteId?: string;
 	// What the component that placed this one seeded: it travels the composed
 	// edge as well as the projection, because a part may sit behind either.
 	readonly sharedSeeds?: ReadonlyMap<string, unknown>;
@@ -428,6 +434,7 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 					...(repeat.item !== undefined ? { repeatItem: repeat.item } : {}),
 					...(repeat.index !== undefined ? { repeatIndex: repeat.index } : {}),
 					...(repeat.key !== undefined ? { repeatKey: repeat.key } : {}),
+					...(repeat.freshInstances ? { freshInstances: repeat.freshInstances } : {}),
 					sharedSeeds: repeat.sharedSeeds,
 				};
 				const renderedSlot = await renderSlot(slot, context);
@@ -554,6 +561,9 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 							item: context.repeatItem,
 							index: context.repeatIndex,
 							key: context.repeatKey,
+							...(context.freshInstances || slot.branchSiteId === input.freshBranchSiteId
+								? { freshInstances: true as const }
+								: {}),
 						})
 					: { html: '', tokens: [] };
 				const id = `${idPrefix}${slot.branchSiteId}`;

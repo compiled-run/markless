@@ -960,8 +960,11 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 		...(view.keyedRepeats ?? []).flatMap((repeat) =>
 			repeat.rowEvents.map((event) => event.eventName),
 		),
+		// An escalating branch serves one arm record set instead of a per-arm plan,
+		// and a flip brings in elements no payload record names.
 		...(view.branches ?? []).flatMap((branch) =>
-			(branch.armRecords ?? []).flatMap((arm) => arm.events.map((event) => event.eventName)),
+			[...(branch.armRecords ?? []), ...(branch.servedArmRecords ? [branch.servedArmRecords] : [])]
+				.flatMap((arm) => arm.events.map((event) => event.eventName)),
 		),
 		...view.asyncBoundaries.flatMap((boundary) => {
 			// Array.isArray cannot narrow the readonly per-arm plan out of the union.
@@ -980,13 +983,17 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 	// ride the child's own records and `rowEvents` is empty by construction: the
 	// unknown-element hatch below has to open on the record that says the list can
 	// mint such a row, or a row born after boot is never forwarded at all.
-	const mintsComponentRows = [
-		...(view.keyedRepeats ?? []),
-		...view.asyncBoundaries.flatMap((boundary) => {
-			const armRecords = boundary.armRecords as ProtocolArmRecordSet | undefined;
-			return armRecords && !Array.isArray(armRecords) ? (armRecords.keyedRepeats ?? []) : [];
-		}),
-	].some((repeat) => repeat.rowComponent !== undefined);
+	// An escalating branch replaces its arm from a fresh render, so a flip brings
+	// in elements this payload names no record for: same hatch, same reason.
+	const mintsComponentRows =
+		[
+			...(view.keyedRepeats ?? []),
+			...view.asyncBoundaries.flatMap((boundary) => {
+				const armRecords = boundary.armRecords as ProtocolArmRecordSet | undefined;
+				return armRecords && !Array.isArray(armRecords) ? (armRecords.keyedRepeats ?? []) : [];
+			}),
+		].some((repeat) => repeat.rowComponent !== undefined) ||
+		(view.branches ?? []).some((branch) => branch.escalates === true);
 	const eventNames = new Set([
 		...view.events.map((event) => event.eventName),
 		...nestedEventNames,
