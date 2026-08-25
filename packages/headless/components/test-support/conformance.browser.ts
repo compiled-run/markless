@@ -196,8 +196,8 @@ const descriptors: readonly FamilyDescriptor[] = [
 		mount: { CSR: () => render(DateBox), SSR: () => renderSSR(DateBox) },
 		root: 'root',
 		parts: ['root', 'label', 'monthinput', 'dayinput', 'yearinput', 'field'],
-		// A <fieldset> named by its <legend>, so the group's name is the platform's
-		// rather than an idref this family mints.
+		// The minted idref the group's name rides on is checked by `idrefs`, not
+		// here: it has no fixed value to declare.
 		rootAria: { role: 'group', 'aria-disabled': 'false' },
 		// Which part of the date a box holds, and what it holds now: both carry
 		// information a consumer styles on, so both stay key-value.

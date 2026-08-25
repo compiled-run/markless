@@ -22,6 +22,7 @@ import type {
 	DateBoxDescriptionProps,
 	DateBoxErrorProps,
 	DateBoxFieldProps,
+	DateBoxGroupProps,
 	DateBoxInstanceState,
 	DateBoxLabelProps,
 	DateBoxMonthInputProps,
@@ -50,6 +51,7 @@ export const dateboxState = shared(
 		});
 		const descriptionEl = element<HTMLDivElement>();
 		const errorEl = element<HTMLDivElement>();
+		const labelEl = element<HTMLLabelElement>();
 		const segmentEls = element<HTMLSpanElement[]>();
 
 		const value = computed(() =>
@@ -66,6 +68,7 @@ export const dateboxState = shared(
 			...datebox,
 			descriptionEl,
 			errorEl,
+			labelEl,
 			segmentEls,
 			value,
 			dayMax,
@@ -120,8 +123,6 @@ export const dateboxState = shared(
 	{ scope: 'widget' },
 );
 
-// A <fieldset> named by its <legend>: three boxes have no single control to point
-// a `for` at, and a widget root cannot mint an id for a part it contains.
 export function DateBoxRoot({
 	value = '',
 	min = '',
@@ -142,27 +143,33 @@ export function DateBoxRoot({
 	datebox.required = required;
 	datebox.name = name;
 
-	// The root's own cell: a widget root cannot render a computed declared in the
-	// factory it is creating.
+	<DateBoxGroup {...rest}>{children}</DateBoxGroup>
+}
+
+// A separate part rather than the root's own element: a widget root cannot read its
+// own instance token, so the label IDREF only resolves one component deeper.
+function DateBoxGroup({ children, ...rest }: DateBoxGroupProps) @{
+	const datebox = dateboxState();
 	const isEmpty = computed(() =>
 		resolvedEmpty(datebox.seed, datebox.dayAt, datebox.monthAt, datebox.yearAt),
 	);
 	const ariaDisabled = computed(() => (datebox.disabled ? 'true' : 'false'));
 
-	<fieldset
+	<div
 		{...rest}
 		role="group"
+		aria-labelledby={datebox.labelEl}
 		aria-disabled={ariaDisabled}
 		ui-disabled={datebox.disabled}
 		ui-required={datebox.required}
 		ui-empty={isEmpty}
-	>{children}</fieldset>
+	>{children}</div>
 }
 
 export function DateBoxLabel({ children, ...rest }: DateBoxLabelProps) @{
 	const datebox = dateboxState();
 
-	<legend {...rest} ui-disabled={datebox.disabled}>{children}</legend>
+	<label {...rest} el={datebox.labelEl} ui-disabled={datebox.disabled}>{children}</label>
 }
 
 // A focusable element drawing its own digits, not an `<input>`: an input's shown

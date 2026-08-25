@@ -71,10 +71,12 @@ function submit() {
 }
 
 function expectBasicRendered() {
-	expect(el(Root).tagName).toBe('FIELDSET');
+	expect(el(Root).tagName).toBe('DIV');
 	expect(el(Root).getAttribute('role')).toBe('radiogroup');
-	// The legend names the group natively: no id, no IDREF, nothing dangling.
-	expect(el(Label).tagName).toBe('LEGEND');
+	// The label names the group by IDREF, and the id it points at is on the page.
+	expect(el(Label).tagName).toBe('LABEL');
+	expect(el(Root).getAttribute('aria-labelledby')).toBe(el(Label).id);
+	expect(el(Label).id).not.toBe('');
 	expect(el(Label).textContent).toBe('Billing Period');
 	expect(el(Root).hasAttribute('aria-orientation')).toBe(false);
 	expect(el(Root).hasAttribute('ui-horizontal')).toBe(false);
@@ -156,11 +158,14 @@ function expectDisabledRendered() {
 	expect(field(LifetimeField).disabled).toBe(true);
 	expect(field(MonthlyField).disabled).toBe(false);
 
-	// A fieldset's own `disabled` is what locks every control inside it.
+	// No native cascade left to lean on: the group's `disabled` reaches every
+	// option's own input, trigger and item.
 	expect(el(LockedRoot).getAttribute('ui-disabled')).toBe('');
 	expect(el(LockedRoot).getAttribute('aria-disabled')).toBe('true');
-	expect(el<HTMLFieldSetElement>(LockedRoot).disabled).toBe(true);
 	expect(field(LockedBasicField).disabled).toBe(true);
+	expect(el(page.getByTestId('locked-basic')).getAttribute('ui-disabled')).toBe('');
+	expect(el(page.getByTestId('locked-basic-trigger')).getAttribute('ui-disabled')).toBe('');
+	expect(el(page.getByTestId('locked-premium-field')).hasAttribute('disabled')).toBe(true);
 }
 
 async function expectDisabledBlocks() {
