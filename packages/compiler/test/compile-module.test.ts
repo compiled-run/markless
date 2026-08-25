@@ -2217,6 +2217,63 @@ export function App() @{
 	});
 });
 
+// A class expression that is not a two-string-literal conditional has no arms to
+// bake the scope into, so the target carries it as a constant both writers compose.
+test('compileTsrxModule carries the style scope as a constant on a plain dynamic class', async () => {
+	const scopedSource = `
+import { computed, state } from '@markless/core';
+
+export function App() @{
+	let on = state(false);
+	let tone = computed(() => on ? 'line lit' : 'line');
+
+	<div>
+		<style>
+			.line { display: block; }
+			.lit { color: blue; }
+		</style>
+		<p class={tone}>dynamic</p>
+		<button onClick={() => { on = !on; }}>t</button>
+	</div>
+}
+`;
+	const result = await compileTsrxModule({
+		filename: 'src/PlainDynamicScoped.tsrx',
+		source: scopedSource,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	const scope = result.publicRenderPlan.styleScopes[0]!.scopeId;
+
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = await (ssrModule.marklessRenderSsr as () => { readonly html: string })();
+	expect(output.html).toContain(`<p class="line ${scope}">dynamic</p>`);
+
+	const classUpdate = result.protocolView.domUpdates.find(
+		(update) => update.target?.kind === 'class',
+	);
+	expect(classUpdate?.target).toEqual({ kind: 'class', constantClass: scope });
+
+	// The compiled-delegate lane emits its own writer, so it composes the scope too.
+	const domUpdateModule = result.symbolModules.modules.find(
+		(module) => module.kind === 'dom-update' && module.source.includes('"class"'),
+	);
+	expect(domUpdateModule?.source).toContain(
+		`context.value ? context.value + " ${scope}" : "${scope}"`,
+	);
+
+	// Without a <style> block there is no scope to keep and the target is unchanged.
+	const unscoped = await compileTsrxModule({
+		filename: 'src/PlainDynamicUnscoped.tsrx',
+		source: scopedSource.replace(/\t*<style>[\s\S]*?<\/style>\n/, ''),
+		symbols: [],
+	});
+	expect(
+		unscoped.protocolView.domUpdates.find((update) => update.target?.kind === 'class')?.target,
+	).toEqual({ kind: 'class' });
+});
+
 // A <style> block that cannot be scope-compiled is dropped from the build, so
 // the drop has to be explained. `collectStyleScopes` reports it and the public
 // render plan is the single pass that carries those diagnostics to the author;

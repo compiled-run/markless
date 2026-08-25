@@ -666,6 +666,8 @@ export type SemanticTemplateBindingTarget =
 			readonly kind: 'class';
 			readonly trueValue?: string;
 			readonly falseValue?: string;
+			/** Class names every write must keep — the module's style scope, which the runtime would otherwise overwrite. */
+			readonly constantClass?: string;
 	  }
 	| {
 			readonly kind: 'style';

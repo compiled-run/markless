@@ -815,7 +815,7 @@ function collectAttribute(
 			hostNodeId,
 			source: expressionSource(expressionValue, state.source),
 			sourceSpan: sourceSpan(expressionValue, state.filename),
-			target: bindingTargetForAttribute(attributeName),
+			target: bindingTargetForAttribute(attributeName, state.currentStyleScopeClass),
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
 			computedGraphNodeId: composite?.graphNodeId,
 			componentName: state.currentComponentName ?? undefined,
@@ -851,7 +851,7 @@ function collectStyleObjectAttribute(
 			hostNodeId,
 			source: expressionSource(usageNode, state.source),
 			sourceSpan: sourceSpan(usageNode, state.filename),
-			target: bindingTargetForAttribute('style'),
+			target: bindingTargetForAttribute('style', state.currentStyleScopeClass),
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
 			computedGraphNodeId: composite.graphNodeId,
 			componentName: state.currentComponentName ?? undefined,
@@ -1337,8 +1337,14 @@ function staticAttributeKey(node: AnyNode): string | null {
 	return JSON.stringify(attributes);
 }
 
-function bindingTargetForAttribute(attributeName: string): SemanticTemplateBindingTarget {
-	if (attributeName === 'class') return { kind: 'class' };
+function bindingTargetForAttribute(
+	attributeName: string,
+	styleScopeClass: string | null,
+): SemanticTemplateBindingTarget {
+	// The runtime writes the whole class attribute, so a scoped module hands the
+	// writers its scope class to compose back in.
+	if (attributeName === 'class')
+		return styleScopeClass ? { kind: 'class', constantClass: styleScopeClass } : { kind: 'class' };
 	if (attributeName === 'style') return { kind: 'style' };
 
 	if (isDomPropertyBindingName(attributeName)) {

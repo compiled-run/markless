@@ -65,6 +65,13 @@ test('a scoped class toggle carries the scope in both arms of its dom update', a
 	});
 });
 
+test('a dynamic class that is not a two-literal conditional carries the scope as a constant', async () => {
+	const targets = await classTargets(SCOPED);
+	const scope = /mk-[a-z0-9]+/.exec(await statics(SCOPED))?.[0];
+
+	expect(targets).toContainEqual({ kind: 'class', constantClass: scope });
+});
+
 test('a module with no style block emits the same class bytes it always did', async () => {
 	const text = await statics(UNSCOPED);
 
@@ -72,9 +79,14 @@ test('a module with no style block emits the same class bytes it always did', as
 	expect(text).toContain('<p class="box">static</p>');
 	expect(text).toContain('<p>plain</p>');
 	expect(text).toContain('<p class="§">dynamic</p>');
-	expect(await classTargets(UNSCOPED)).toContainEqual({
+
+	const targets = await classTargets(UNSCOPED);
+	expect(targets).toContainEqual({
 		kind: 'class',
 		trueValue: 'box lit',
 		falseValue: 'box',
 	});
+	// No scope to keep, so the plain target stays the bare shape it always was.
+	expect(targets).toContainEqual({ kind: 'class' });
+	expect(targets.some((target) => 'constantClass' in target)).toBe(false);
 });
