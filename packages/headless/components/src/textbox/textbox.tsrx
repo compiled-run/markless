@@ -1,3 +1,6 @@
+// Both controls name the error handle before the description handle: what is
+// wrong is conveyed before the hint, wherever the two parts sit in the page.
+
 import { element, shared, state } from '@markless/core';
 import type {
 	TextboxDescriptionProps,
@@ -21,9 +24,10 @@ export const textboxState = shared(
 		const inputEl = element<HTMLInputElement>();
 		const textareaEl = element<HTMLTextAreaElement>();
 		const labelEl = element<HTMLLabelElement>();
-		const describedEl = element<HTMLDivElement>();
+		const descriptionEl = element<HTMLDivElement>();
+		const errorEl = element<HTMLDivElement>();
 
-		return { ...textbox, inputEl, textareaEl, labelEl, describedEl };
+		return { ...textbox, inputEl, textareaEl, labelEl, descriptionEl, errorEl };
 	},
 	{ scope: 'widget' },
 );
@@ -68,7 +72,7 @@ export function TextboxInput({
 	<input
 		{...rest}
 		el={textbox.inputEl}
-		aria-describedby={textbox.describedEl}
+		aria-describedby={[textbox.errorEl, textbox.descriptionEl]}
 		name={textbox.name}
 		value={textbox.value}
 		aria-invalid={textbox.invalid ? 'true' : undefined}
@@ -96,7 +100,7 @@ export function TextboxTextarea({
 		el={textbox.textareaEl}
 		// The label's for names the input only: one handle cannot bind to both controls.
 		aria-labelledby={textbox.labelEl}
-		aria-describedby={textbox.describedEl}
+		aria-describedby={[textbox.errorEl, textbox.descriptionEl]}
 		name={textbox.name}
 		value={textbox.value}
 		aria-invalid={textbox.invalid ? 'true' : undefined}
@@ -116,17 +120,10 @@ export function TextboxLabel({ children, ...rest }: TextboxLabelProps) @{
 	<label {...rest} el={textbox.labelEl} for={textbox.inputEl}>{children}</label>
 }
 
-// One part stands behind both `textbox.description` and `textbox.error`: an
-// element() handle binds in exactly one place, and aria-describedby here names
-// exactly one id. A field that mounts both messages is described by the first.
-function TextboxMessage({ children, ...rest }: TextboxDescriptionProps) @{
+export function TextboxDescription({ children, ...rest }: TextboxDescriptionProps) @{
 	const textbox = textboxState();
 
-	<div {...rest} el={textbox.describedEl}>{children}</div>
-}
-
-export function TextboxDescription({ children, ...rest }: TextboxDescriptionProps) @{
-	<TextboxMessage {...rest}>{children}</TextboxMessage>
+	<div {...rest} el={textbox.descriptionEl}>{children}</div>
 }
 
 export function TextboxError({ children, ...rest }: TextboxErrorProps) @{
@@ -134,5 +131,5 @@ export function TextboxError({ children, ...rest }: TextboxErrorProps) @{
 	// Mounting the error part is what marks the control invalid.
 	textbox.invalid = true;
 
-	<TextboxMessage {...rest}>{children}</TextboxMessage>
+	<div {...rest} el={textbox.errorEl}>{children}</div>
 }

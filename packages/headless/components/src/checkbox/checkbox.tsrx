@@ -22,12 +22,14 @@ export const checkboxState = shared(
 			value: '',
 		});
 		const triggerEl = element<HTMLButtonElement>();
-		const describedEl = element<HTMLDivElement>();
+		const descriptionEl = element<HTMLDivElement>();
+		const errorEl = element<HTMLDivElement>();
 
 		return {
 			...checkbox,
 			triggerEl,
-			describedEl,
+			descriptionEl,
+			errorEl,
 			onChange: undefined as ((checked: boolean | 'mixed') => void) | undefined,
 			toggle() {
 				checkbox.checked = checkbox.checked !== true;
@@ -76,7 +78,9 @@ export function CheckboxTrigger({ children, onClick, onKeydown, ...rest }: Check
 		aria-checked={
 			checkbox.checked === 'mixed' ? 'mixed' : checkbox.checked === true ? 'true' : 'false'
 		}
-		aria-describedby={checkbox.describedEl}
+		// Error before description: what is wrong is conveyed before the hint,
+		// wherever the two parts sit in the page.
+		aria-describedby={[checkbox.errorEl, checkbox.descriptionEl]}
 		aria-invalid={checkbox.invalid ? 'true' : 'false'}
 		ui-checked={checkbox.checked === true}
 		ui-mixed={checkbox.checked === 'mixed'}
@@ -110,16 +114,10 @@ export function CheckboxLabel({ children, ...rest }: CheckboxLabelProps) @{
 	<label {...rest} for={checkbox.triggerEl}>{children}</label>
 }
 
-// One part stands behind both `checkbox.description` and `checkbox.error`: an element()
-// handle binds in exactly one place, so a box that mounts both is described by the first.
-function CheckboxMessage({ children, ...rest }: CheckboxDescriptionProps) @{
+export function CheckboxDescription({ children, ...rest }: CheckboxDescriptionProps) @{
 	const checkbox = checkboxState();
 
-	<div {...rest} el={checkbox.describedEl}>{children}</div>
-}
-
-export function CheckboxDescription({ children, ...rest }: CheckboxDescriptionProps) @{
-	<CheckboxMessage {...rest}>{children}</CheckboxMessage>
+	<div {...rest} el={checkbox.descriptionEl}>{children}</div>
 }
 
 export function CheckboxError({ children, ...rest }: CheckboxErrorProps) @{
@@ -127,7 +125,7 @@ export function CheckboxError({ children, ...rest }: CheckboxErrorProps) @{
 	// Mounting the error part is what marks the trigger invalid.
 	checkbox.invalid = true;
 
-	<CheckboxMessage {...rest}>{children}</CheckboxMessage>
+	<div {...rest} el={checkbox.errorEl}>{children}</div>
 }
 
 // No change handler of its own: the input is clipped, aria-hidden and out of the

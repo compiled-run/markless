@@ -22,13 +22,15 @@ export const toggleState = shared(
 			value: '',
 		});
 		const triggerEl = element<HTMLButtonElement>();
-		const describedEl = element<HTMLDivElement>();
+		const descriptionEl = element<HTMLDivElement>();
+		const errorEl = element<HTMLDivElement>();
 		const labelEl = element<HTMLLabelElement>();
 
 		return {
 			...toggle,
 			triggerEl,
-			describedEl,
+			descriptionEl,
+			errorEl,
 			labelEl,
 			onChange: undefined as ((checked: boolean) => void) | undefined,
 			flip() {
@@ -71,7 +73,9 @@ export function ToggleTrigger({ children, onClick, ...rest }: ToggleTriggerProps
 		type="button"
 		role="switch"
 		aria-labelledby={toggle.labelEl}
-		aria-describedby={toggle.describedEl}
+		// Error before description: what is wrong is conveyed before the hint,
+		// wherever the two parts sit in the page.
+		aria-describedby={[toggle.errorEl, toggle.descriptionEl]}
 		aria-checked={toggle.checked ? 'true' : 'false'}
 		aria-disabled={toggle.disabled ? 'true' : 'false'}
 		aria-invalid={toggle.invalid ? 'true' : 'false'}
@@ -95,24 +99,18 @@ export function ToggleLabel({ children, ...rest }: ToggleLabelProps) @{
 	<label {...rest} el={toggle.labelEl} for={toggle.triggerEl}>{children}</label>
 }
 
-// One part stands behind both `toggle.description` and `toggle.error`: an element()
-// handle binds in exactly one place, and aria-describedby here names exactly one id.
-// A switch that mounts both messages is therefore described by the first of them.
-function ToggleMessage({ children, ...rest }: ToggleDescriptionProps) @{
+export function ToggleDescription({ children, ...rest }: ToggleDescriptionProps) @{
 	const toggle = toggleState();
 
-	<div {...rest} el={toggle.describedEl}>{children}</div>
-}
-
-export function ToggleDescription({ children, ...rest }: ToggleDescriptionProps) @{
-	<ToggleMessage {...rest}>{children}</ToggleMessage>
+	<div {...rest} el={toggle.descriptionEl}>{children}</div>
 }
 
 export function ToggleError({ children, ...rest }: ToggleErrorProps) @{
 	const toggle = toggleState();
+	// Mounting the error part is what marks the switch invalid.
 	toggle.invalid = true;
 
-	<ToggleMessage {...rest}>{children}</ToggleMessage>
+	<div {...rest} el={toggle.errorEl}>{children}</div>
 }
 
 // No change handler of its own: the input is clipped, aria-hidden and out of the

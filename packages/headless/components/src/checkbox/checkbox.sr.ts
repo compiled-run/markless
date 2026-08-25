@@ -151,6 +151,22 @@ test('the help text under a box is conveyed with the box itself', async () => {
 	).toEqual([]);
 });
 
+// Both messages bind handles the trigger names, so both are part of the box rather than separate items down the page.
+test('the error and the help text are both conveyed with the box', async () => {
+	await open(Invalid);
+	const phrase = await readUntil(sr, { role: 'checkbox', name: 'Accept Terms' });
+	expect(phrase, `${sr.name} announced "${phrase}"`).toContain(
+		'Please accept the terms and conditions',
+	);
+	expect(phrase, `${sr.name} announced "${phrase}"`).toContain(
+		'Read our terms and conditions before accepting',
+	);
+	// What is wrong is conveyed before the hint, though the hint is written above the error in this page.
+	expect(phrase.indexOf('Please accept the terms and conditions')).toBeLessThan(
+		phrase.indexOf('Read our terms and conditions before accepting'),
+	);
+});
+
 // Expected red: the trigger does call preventDefault() on Enter, but it lands after dispatch returns, so Enter still toggles.
 test.fails('pressing enter leaves a checkbox alone', async () => {
 	await open(Basic);

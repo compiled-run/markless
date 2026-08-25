@@ -284,13 +284,13 @@
 			{
 				"part": "description",
 				"component": "CheckboxDescription",
-				"doc": "Supporting text beside the checkbox. It renders its children and changes nothing else.",
+				"doc": "Supporting text beside the checkbox, named by `checkbox.trigger`'s\n`aria-describedby`. Mount it alongside `checkbox.error` and the trigger names\nboth, the error first.",
 				"props": []
 			},
 			{
 				"part": "error",
 				"component": "CheckboxError",
-				"doc": "The validation message. Mounting it is what marks the checkbox invalid -\n`checkbox.trigger` reports `aria-invalid` for as long as this part is in the\npage - so render it only when there is an error to show.",
+				"doc": "The validation message, named by `checkbox.trigger`'s `aria-describedby` ahead\nof `checkbox.description`. Mounting it is what marks the checkbox invalid -\n`checkbox.trigger` reports `aria-invalid` for as long as this part is in the\npage - so render it only when there is an error to show.",
 				"props": []
 			},
 			{
@@ -545,13 +545,13 @@
 			{
 				"part": "description",
 				"component": "ComboboxDescription",
-				"doc": "Supporting text for the field, named by the input's `aria-describedby`. One\nelement can be named that way, so mounting this alongside `combobox.error`\ndescribes by whichever renders first.",
+				"doc": "Supporting text for the field, named by the input's `aria-describedby`. Mount\nit alongside `combobox.error` and the input names both, the error first.",
 				"props": []
 			},
 			{
 				"part": "error",
 				"component": "ComboboxError",
-				"doc": "Its presence is what a reader is told about first.",
+				"doc": "The validation message, named by the input's `aria-describedby` ahead of\n`combobox.description`. It carries `role=\"alert\"`, so a reader speaks it when\nit appears. Unlike the other families, mounting it does not mark the field\ninvalid: `invalid` is a prop on `combobox.root`.",
 				"props": []
 			},
 			{
@@ -1739,13 +1739,13 @@
 			{
 				"part": "description",
 				"component": "TextboxDescription",
-				"doc": "Supporting text for the box, named by the control's `aria-describedby`. One\nelement can be named that way, so mounting this alongside `textbox.error`\ndescribes by whichever renders first.",
+				"doc": "Supporting text for the box, named by the control's `aria-describedby`. Mount\nit alongside `textbox.error` and the control names both, the error first.",
 				"props": []
 			},
 			{
 				"part": "error",
 				"component": "TextboxError",
-				"doc": "The validation message. Mounting it is what marks the control invalid - it\nreports `aria-invalid` for as long as this part is in the page - so render it\nonly when there is an error to show.",
+				"doc": "The validation message, named by the control's `aria-describedby` ahead of\n`textbox.description`. Mounting it is what marks the control invalid - it\nreports `aria-invalid` for as long as this part is in the page - so render it\nonly when there is an error to show.",
 				"props": []
 			},
 			{
@@ -1874,13 +1874,13 @@
 			{
 				"part": "description",
 				"component": "ToggleDescription",
-				"doc": "Supporting text for the switch, named by the trigger's `aria-describedby`. One\nelement can be named that way, so mounting this alongside `toggle.error`\ndescribes by whichever renders first.",
+				"doc": "Supporting text for the switch, named by the trigger's `aria-describedby`.\nMount it alongside `toggle.error` and the trigger names both, the error first.",
 				"props": []
 			},
 			{
 				"part": "error",
 				"component": "ToggleError",
-				"doc": "The validation message. Mounting it is what marks the switch invalid - the\ntrigger reports `aria-invalid` for as long as this part is in the page - so\nrender it only when there is an error to show.",
+				"doc": "The validation message, named by the trigger's `aria-describedby` ahead of\n`toggle.description`. Mounting it is what marks the switch invalid - the\ntrigger reports `aria-invalid` for as long as this part is in the page - so\nrender it only when there is an error to show.",
 				"props": []
 			},
 			{
