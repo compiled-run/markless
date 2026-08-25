@@ -198,7 +198,19 @@ function projectedEdges(
 	// a row that COMPOSES a root of this root's family ends the walk exactly as one
 	// that declares the family itself does. The SSR twin is
 	// `marklessSsrWidgetBoundary` over the same spliced marker.
-	const families = renderedWidgetRootsOf(surface, rootEdge.childComponentName);
+	//
+	// A projecting child that roots nothing is a PART, and the families in scope for
+	// it are the enclosing widget's - otherwise a root written into that part's own
+	// children is not recognised as an instance boundary, and its seeds land in the
+	// enclosing instance's map on top of the seed that instance's root wrote.
+	const families = [
+		...new Set(
+			[
+				rootEdge.childComponentName,
+				...enclosingProjectingChildNames(surface, componentEdgeId),
+			].flatMap((name) => renderedWidgetRootsOf(surface, name)),
+		),
+	];
 	const startsOwnInstance = (edgeId: string): boolean => {
 		if (families.length === 0) return false;
 		const edge = edges.find((candidate) => candidate.id === edgeId);
@@ -231,6 +243,59 @@ function projectedEdges(
 		const edge = edges.find((candidate) => candidate.id === edgeId);
 		return edge && !edge.materialized ? [edge] : [];
 	});
+}
+
+/**
+ * The projecting children of this component whose projections enclose one edge,
+ * innermost first. Which edge sits inside which projection is a build-time fact
+ * of this component's own chunks, so the walk reads them rather than sensing a
+ * rendered tree. Arm, row, and async chunks are stepped THROUGH: they change
+ * whether a part renders, never which widget encloses it.
+ */
+function enclosingProjectingChildNames(
+	surface: PrerenderDataSurface,
+	componentEdgeId: string,
+): string[] {
+	// The whole module's chunks and edges: ids are unique across it, and a module
+	// serving several components attributes a shared chunk to just one of them.
+	const chunks = surface.renderData.chunks;
+	const edges = Object.values(surface.components).flatMap(
+		(component) => component?.edges ?? [],
+	);
+	const ownerEdgeOfChunk = new Map<string, string>();
+	const parentChunkOf = new Map<string, string>();
+	const chunkOfEdge = new Map<string, string>();
+	for (const chunk of chunks)
+		for (const slot of chunk.slots) {
+			if (slot.kind === 'child-component') {
+				chunkOfEdge.set(slot.componentEdgeId, chunk.id);
+				if (slot.projectionChunkId)
+					ownerEdgeOfChunk.set(slot.projectionChunkId, slot.componentEdgeId);
+			} else if (slot.kind === 'branch') {
+				for (const armChunkId of slot.armTemplateIds) parentChunkOf.set(armChunkId, chunk.id);
+			} else if (slot.kind === 'repeat') {
+				parentChunkOf.set(slot.rowTemplateId, chunk.id);
+				if (slot.emptyTemplateId) parentChunkOf.set(slot.emptyTemplateId, chunk.id);
+			} else if (slot.kind === 'async') {
+				for (const armChunkId of Object.values(slot.armTemplateIds))
+					if (typeof armChunkId === 'string') parentChunkOf.set(armChunkId, chunk.id);
+			}
+		}
+	const names: string[] = [];
+	const walked = new Set<string>();
+	let chunkId = chunkOfEdge.get(componentEdgeId);
+	while (chunkId !== undefined && !walked.has(chunkId)) {
+		walked.add(chunkId);
+		const ownerEdgeId = ownerEdgeOfChunk.get(chunkId);
+		if (ownerEdgeId === undefined) {
+			chunkId = parentChunkOf.get(chunkId);
+			continue;
+		}
+		const owner = edges.find((candidate) => candidate.id === ownerEdgeId);
+		if (owner) names.push(owner.childComponentName);
+		chunkId = chunkOfEdge.get(ownerEdgeId);
+	}
+	return names;
 }
 
 // The same arm the renderer will take, asked before the arm renders. A branch
