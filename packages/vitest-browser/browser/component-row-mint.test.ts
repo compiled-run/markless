@@ -7,6 +7,10 @@ const keys = (container: Element): string[] =>
 	Array.from(container.querySelectorAll('[data-card]')).map(
 		(row) => row.getAttribute('data-card') ?? '',
 	);
+const wrappedKeys = (container: Element): string[] =>
+	Array.from(container.querySelectorAll('[data-wrapped]')).map(
+		(row) => row.getAttribute('data-wrapped') ?? '',
+	);
 const tags = (container: Element): string[] =>
 	Array.from(container.querySelectorAll('[data-card] em.tag')).map(
 		(tag) => tag.textContent ?? '',
@@ -72,7 +76,8 @@ test('a removed key leaves no parked DOM and re-adding it wires no stale subscri
 	click(container, '[data-restore]');
 	await expect.poll(() => keys(container)).toEqual(['north', 'south']);
 	// Exactly one row per key: a parked row re-attached beside a fresh mint
-	// would show two, and a stale subscription would dispatch twice.
+	// would show two, and a stale subscription would dispatch twice. The repeat
+	// reattaches the very element it served here rather than minting a new one.
 	expect(container.querySelectorAll('[data-card="south"]').length).toBe(1);
 
 	click(container, '[data-card="south"]');
@@ -93,6 +98,36 @@ test('N served rows plus one client mint match N+1 served rows', async () => {
 	await cleanup();
 
 	expect(grownRows).toEqual(servedRows);
+});
+
+// The two pins below hold the WIDER shape on the board without claiming it ships.
+// Today's mint builds a row only when the row IS the component: one slot, no
+// element of the row's own. Wrapping the component in an <article> gives the row
+// an element, the compiler refuses the mint by design, and the wrapped list
+// renders the rows the server sent and ignores every later one. Widening the
+// mint to element-wrapped component rows is the next step, and these turn green
+// when it lands.
+
+test.fails('a component wrapped in an element of the row also mints', async () => {
+	const screen = await renderSSR(App);
+	const container = screen.container;
+
+	expect(wrappedKeys(container)).toEqual(['north', 'south']);
+
+	click(container, '[data-add]');
+	await expect.poll(() => wrappedKeys(container)).toEqual(['north', 'south', 'east']);
+	await cleanup();
+});
+
+test.fails('a minted element-wrapped component row dispatches its own handler', async () => {
+	const screen = await renderSSR(App);
+	const container = screen.container;
+
+	click(container, '[data-add]');
+	await expect.poll(() => wrappedKeys(container)).toEqual(['north', 'south', 'east']);
+	click(container, '[data-wrapped="east"]');
+	await expect.poll(() => container.querySelector('[data-chosen]')?.textContent).toBe('east');
+	await cleanup();
 });
 
 // Served markup carries resume bookkeeping attributes the client mint has no
