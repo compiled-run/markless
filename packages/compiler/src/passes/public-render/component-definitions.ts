@@ -4,6 +4,7 @@ import { asNodes, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { firstComponentRoot } from './plan.ts';
 import { sharedCallbackSlotGraphNodeId } from '../semantic-graph/collect-shared.ts';
 import { emitClientResidueReader, emitClientResidueReaderPrelude } from './residue-reader.ts';
+import { handlerReadGraphNodeIds } from './ssr-module.ts';
 import {
 	componentBoundElementHandles,
 	widgetRootDefinitionIds,
@@ -42,6 +43,16 @@ export function collectPublicRenderComponentDefinitions(
 	});
 
 	const residueReaderPrelude = emitClientResidueReaderPrelude(input, [...componentNames]);
+	// A CSR mount derives these for the render and then drops the value, leaving a
+	// handler's first read undefined the way a resumed page's is.
+	const handlerReads = handlerReadGraphNodeIds(input);
+	const handlerReadComputedIds = new Set(
+		input.protocolState.computed.flatMap((computed) =>
+			computed.async === false && handlerReads.has(computed.graphNodeId)
+				? [computed.graphNodeId]
+				: [],
+		),
+	);
 
 	return [...componentNames].flatMap((componentName) => {
 		const componentNode = componentMap.get(componentName);
@@ -194,6 +205,19 @@ export function collectPublicRenderComponentDefinitions(
 			componentNames.size > 1
 				? componentOwnedStateNodes(input, componentName, rootInfo.componentName)
 				: undefined;
+		// Positions, the way stateComputedIndexes already spells a node set: a full
+		// graph node id costs far more per page.
+		const ownedComputedIndexes =
+			ownedNodes?.computedIndexes ??
+			input.protocolState.computed.flatMap((computed, index) =>
+				stateGraphNodeIds.length === 0 || stateGraphNodeIds.includes(computed.graphNodeId)
+					? [index]
+					: [],
+			);
+		const servedComputedIndexes = ownedComputedIndexes.filter((index) => {
+			const computed = input.protocolState.computed[index];
+			return !!computed && handlerReadComputedIds.has(computed.graphNodeId);
+		});
 		return [
 			{
 				name: componentName,
@@ -204,6 +228,7 @@ export function collectPublicRenderComponentDefinitions(
 							stateComputedIndexes: ownedNodes.computedIndexes,
 						}
 					: {}),
+				...(servedComputedIndexes.length > 0 ? { servedComputedIndexes } : {}),
 				view: input.protocolView,
 				rootChunkId: rootChunk.id,
 				chunks: nativeChunks,

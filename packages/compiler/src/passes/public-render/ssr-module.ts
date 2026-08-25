@@ -196,6 +196,7 @@ export function emitPublicSsrRenderModule(
 			],
 			rootDataLines.bodySharedComputed,
 		),
+		...rootDataLines.serveComputed,
 		'	const html = marklessSsrRendered.html;',
 		'	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, payloadView, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);',
 		`	const marklessSsrState = ${ssrComposeStateExpression(input, rootInfo.component, rootInfo.componentName)};`,
@@ -401,7 +402,28 @@ export type SsrDataLines = {
 	readonly composedRootSurfaceArgs: string[];
 	/** The imported child surfaces, for this component's element()-handle marker. */
 	readonly importedChildSurfaceArgs: string[];
+	/**
+	 * Routes values this render already derived into the served computed records,
+	 * for the computeds a handler reads. Runs after the render body, where every
+	 * derive has happened; empty when no handler reads a computed.
+	 */
+	readonly serveComputed: string[];
 };
+
+/**
+ * The graph nodes an authored handler reads. A resume re-derives a sync computed
+ * only when a dependency is written, so a computed in this set is one whose value
+ * has to travel in the payload for the handler's first read to answer.
+ */
+export function handlerReadGraphNodeIds(input: PublicRenderModuleInput): ReadonlySet<string> {
+	return new Set(
+		input.symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'event-handler' || symbol.kind === 'callback-prop'
+				? (symbol.reads ?? []).map((read) => read.graphNodeId)
+				: [],
+		),
+	);
+}
 
 /**
  * The seed-phase body for a component whose own children sit inside a widget
@@ -930,21 +952,28 @@ function emitSsrDataLines(
 			}${handleLines.join('')}${blocks.join('')}return marklessSsrSeeds;}`,
 		];
 	});
-	const bindingLines = input.semanticGraph.graphBindings.flatMap((binding) =>
+	// Every computed whose value this render puts in the state map, in emission
+	// order — the only ones a served value can be read back out of.
+	const derivedComputedIds: string[] = [];
+	const bindingLines = input.semanticGraph.graphBindings.flatMap((binding) => {
 		// A shared() node has no render-body local to re-read: its seed value is
 		// already in the state map the factory payload built.
-		binding.sharedDefinitionId === undefined &&
-		(binding.componentName === componentName || (!binding.componentName && componentName === input.renderData.root?.componentName)) &&
-		(binding.kind !== 'computed' || binding.async !== true)
-			? [`if(typeof ${binding.name}!=='undefined')marklessSsrRenderStateValues.set(${JSON.stringify(binding.id)},${binding.name});`]
-			: [],
-	);
+		if (
+			binding.sharedDefinitionId !== undefined ||
+			!(binding.componentName === componentName || (!binding.componentName && componentName === input.renderData.root?.componentName)) ||
+			(binding.kind === 'computed' && binding.async === true)
+		)
+			return [];
+		if (binding.kind === 'computed') derivedComputedIds.push(binding.id);
+		return [`if(typeof ${binding.name}!=='undefined')marklessSsrRenderStateValues.set(${JSON.stringify(binding.id)},${binding.name});`];
+	});
 	// Derived after the static seed map, so the factory's state nodes are already
 	// readable when the derive runs.
 	const sharedComputedSources = collectSsrSharedComputedSources(input);
 	const allSharedComputedLines = input.protocolState.computed.flatMap((computed) => {
 		const source = sharedComputedSources.get(computed.graphNodeId);
 		if (!source || !componentGraphNodeIds.has(computed.graphNodeId)) return [];
+		derivedComputedIds.push(computed.graphNodeId);
 		return [
 			`marklessSsrRenderStateValues.set(${JSON.stringify(computed.graphNodeId)},(${source})({read:(marklessSsrSharedId,marklessSsrSharedPath)=>marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(marklessSsrSharedId),marklessSsrSharedPath)}));`,
 		];
@@ -966,6 +995,7 @@ function emitSsrDataLines(
 			return [];
 		const sharedSource = templateComputedSharedSources.get(initial.graphNodeId);
 		if (sharedSource) {
+			derivedComputedIds.push(initial.graphNodeId);
 			return [
 				`marklessSsrRenderStateValues.set(${JSON.stringify(initial.graphNodeId)},(${sharedSource})({read:(marklessSsrSharedId,marklessSsrSharedPath)=>marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(marklessSsrSharedId),marklessSsrSharedPath)}));`,
 			];
@@ -975,9 +1005,11 @@ function emitSsrDataLines(
 		);
 		// Only authored symbol kinds carry source; the rest emit nothing.
 		const source = symbol && 'source' in symbol ? symbol.source : undefined;
-		return source
-			? [`marklessSsrRenderStateValues.set(${JSON.stringify(initial.graphNodeId)},(${source})());`]
-			: [];
+		if (!source) return [];
+		derivedComputedIds.push(initial.graphNodeId);
+		return [
+			`marklessSsrRenderStateValues.set(${JSON.stringify(initial.graphNodeId)},(${source})());`,
+		];
 	});
 	const composedRootEdgeIds = childrenRootEdgeIds.filter((edgeId) => !rowScopedEdges.has(edgeId));
 	const seedForward = composedRootEdgeIds.flatMap((edgeId) => {
@@ -1013,11 +1045,23 @@ function emitSsrDataLines(
 			),
 		),
 	];
+	const handlerReads = handlerReadGraphNodeIds(input);
+	const servedComputedIds = [...new Set(derivedComputedIds)].filter((graphNodeId) =>
+		handlerReads.has(graphNodeId),
+	);
 	return {
 		seedForward: seedForwardLines,
 		bodySharedComputed: hoistsSharedComputed ? allSharedComputedLines : [],
 		composedRootSurfaceArgs,
 		importedChildSurfaceArgs,
+		serveComputed:
+			servedComputedIds.length === 0
+				? []
+				: [
+						`	marklessSsrServeComputed(marklessSsrPayloadState, marklessSsrRenderStateValues, ${JSON.stringify(
+							servedComputedIds,
+						)});`,
+					],
 		render: [
 		"marklessSsrRenderStateValues.set('prop:props',props);",
 		...bindingLines,

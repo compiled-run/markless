@@ -143,6 +143,15 @@ export function assertProtocolStatePayload(
 		assertBooleanField(computed, 'async', context);
 		assertOptionalComputedDependencies(computed, context);
 		assertOptionalAsyncComputedSnapshot(computed, context);
+		if ('value' in computed) assertSerializedGraphPayload(computed.value, `${context}.value`);
+		// The live-value channel, as on cells: a served payload still carrying one
+		// is a host bug, not something the browser should try to read.
+		if ('directValue' in computed) {
+			throw invalidPayloadShapeError(
+				contextPayloadType(context),
+				`Invalid ${context}: live directValue computeds must be serialized before serving.`,
+			);
+		}
 	}
 
 	assertOptionalSharedDefinitions(payload);
