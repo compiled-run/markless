@@ -8,6 +8,7 @@ import {
 } from '@markless/compiler';
 import { invalidateAllGeneratedModules } from '../dev-invalidation.ts';
 import {
+	delegateLoadOptions,
 	linkedInterfaceClaims,
 	linkedInterfaces,
 	materializeDelegateChildren,
@@ -36,6 +37,7 @@ export async function emitClientRouteArtifact(
 		pluginContext,
 		source,
 		transformed.artifactChildren,
+		delegateLoadOptions(ctx),
 	);
 	warnDelegateImportFailures(pluginContext, delegates);
 	const artifactChildMaterializations = delegates.materializations;

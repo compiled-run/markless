@@ -408,15 +408,92 @@ export function warnDelegateImportFailures(
 	}
 }
 
+// A dependency that ships TypeScript source: Node refuses to type-strip under
+// node_modules, so a plain `import()` can never load one of these.
+const SOURCE_SHIPPED_DELEGATE = /\.(?:m|c)?tsx?$|\.tsrx$/;
+
+// How a delegate module is executed. The build environment's module runner is
+// the only loader that can run a source-shipped package, because it applies the
+// same transform pipeline the app's own modules go through.
+export type DelegateModuleImport = (source: string) => Promise<unknown>;
+
+// One module table per build: a delegate imported by several pages is executed
+// once, and a delegate that failed once is not retried on every later edge.
+export type DelegateModuleCache = ReturnType<typeof createDelegateModuleCache>;
+
+export function createDelegateModuleCache() {
+	const loaded = new Map<string, Record<string, unknown>>();
+	const failures = new Map<string, string>();
+	return {
+		failureFor(source: string) {
+			return failures.get(source);
+		},
+		moduleFor(source: string) {
+			return loaded.get(source);
+		},
+		async load(
+			source: string,
+			importModule: DelegateModuleImport | undefined,
+		): Promise<Record<string, unknown> | undefined> {
+			const cached = loaded.get(source);
+			if (cached) return cached;
+			if (failures.has(source)) return undefined;
+			let firstMessage: string | undefined;
+			// The runner runs first for source-shipped delegates; a plain `import()`
+			// of raw TypeScript is refused before it can produce a module.
+			for (const load of importModule && SOURCE_SHIPPED_DELEGATE.test(source)
+				? [importModule, nodeImport]
+				: [nodeImport, ...(importModule ? [importModule] : [])]) {
+				try {
+					const module = (await load(source)) as Record<string, unknown>;
+					loaded.set(source, module);
+					return module;
+				} catch (error) {
+					firstMessage ??= error instanceof Error ? error.message : String(error);
+				}
+			}
+			failures.set(source, firstMessage ?? 'the delegate module could not be loaded.');
+			return undefined;
+		},
+		clear() {
+			loaded.clear();
+			failures.clear();
+		},
+	};
+}
+
+function nodeImport(source: string): Promise<unknown> {
+	return import(pathToFileURL(source).href);
+}
+
+// The build's own module table and loader, so every delegate edge in a build
+// shares one execution of a given dependency.
+export function delegateLoadOptions(ctx: {
+	readonly state: { readonly delegateModules: DelegateModuleCache };
+	readonly internalOptions: {
+		readonly devServer?: { readonly importModule?: DelegateModuleImport };
+	};
+}) {
+	return {
+		modules: ctx.state.delegateModules,
+		...(ctx.internalOptions.devServer?.importModule
+			? { importModule: ctx.internalOptions.devServer.importModule }
+			: {}),
+	};
+}
+
 // Performs the I/O the `delegate-children` pass may not: resolves each edge,
-// imports the dependency's compiled JavaScript, and calls its `renderSsr`. The
-// build-time `import()` of a dependency's dist is pre-existing; it is the one
-// place a linker executes code the compiler did not produce, which is exactly
-// why it lives here and not in the pass.
+// loads the dependency's module, and calls its `renderSsr`. It is the one place
+// a linker executes code the compiler did not produce, which is exactly why it
+// lives here and not in the pass.
 export async function materializeDelegateChildren(
 	context: LinkResolveContext,
 	parent: string,
 	candidates: ReadonlyArray<LinkedArtifactChild>,
+	options: {
+		readonly modules?: DelegateModuleCache;
+		readonly importModule?: DelegateModuleImport;
+	} = {},
 ): Promise<DelegateChildMaterializationResult> {
 	const resolution: Record<string, string> = {};
 	for (const candidate of delegateChildResolutionRequests(candidates)) {
@@ -426,7 +503,7 @@ export async function materializeDelegateChildren(
 	}
 	const children = planDelegateChildren(candidates, resolution);
 	const byEdge = new Map(candidates.map((candidate) => [candidate.edgeId, candidate]));
-	const loaded = new Map<string, Record<string, unknown>>();
+	const modules = options.modules ?? createDelegateModuleCache();
 	const unloadable = new Map<string, { readonly message: string; readonly edgeIds: string[] }>();
 	const renderings: Record<string, ArtifactChildMaterialization> = {};
 	for (const child of children) {
@@ -439,19 +516,14 @@ export async function materializeDelegateChildren(
 			failed.edgeIds.push(child.edgeId);
 			continue;
 		}
-		let module = loaded.get(source);
+		// A delegate no loader could execute is not materialized, never a crash.
+		const module = await modules.load(source, options.importModule);
 		if (!module) {
-			// Unimportable here (e.g. raw .ts without type stripping): not materialized, never a crash.
-			try {
-				module = (await import(pathToFileURL(source).href)) as Record<string, unknown>;
-			} catch (error) {
-				unloadable.set(source, {
-					message: error instanceof Error ? error.message : String(error),
-					edgeIds: [child.edgeId],
-				});
-				continue;
-			}
-			loaded.set(source, module);
+			unloadable.set(source, {
+				message: modules.failureFor(source) ?? 'the delegate module could not be loaded.',
+				edgeIds: [child.edgeId],
+			});
+			continue;
 		}
 		const component =
 			candidate.importKind === 'default'
