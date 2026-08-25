@@ -341,7 +341,7 @@ for (const mode of MODES) {
 
 // PINNED: same wall as the CSR unroll row - the escalated arm is served empty,
 // so depth-3 never exists to click.
-test.fails('CSR: each unrolled level owns its own open state', async () => {
+test('CSR: each unrolled level owns its own open state', async () => {
 	await render(Deep);
 
 	el(Depth4Trigger).click();
@@ -595,7 +595,7 @@ test('SSR: a node opened after resume stays open, and its children are reachable
 
 // PINNED: SSR unrolls all four levels correctly, and then the click on the
 // second level's trigger never opens it - `aria-expanded` stays absent.
-test.fails('SSR: each unrolled level resumes with its own open state', async () => {
+test('SSR: each unrolled level resumes with its own open state', async () => {
 	await renderSSR(Deep);
 	expectDeepRendered();
 
