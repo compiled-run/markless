@@ -536,6 +536,13 @@ function mintableRowTemplate(
  * its own), the child is declared in this same module, and the edge projects no
  * children. Cross-module and projected rows are later phases; a refusal here
  * emits no field at all, so the record stays byte-identical.
+ *
+ * Also refused when the component's body carries a branch (`@if`/`@switch`) or a
+ * boundary (`@try`): those anchor into a census the page counted once, at boot,
+ * for the rows it served. A row born after resume has no counted anchors, so the
+ * mint would index into another row's - which is why the runtime refuses such a
+ * row loudly. Withholding the field here means the page never gets that far: it
+ * falls back to today's no-growth behaviour instead.
  */
 function mintableRowComponent(
 	input: ProtocolViewPayloadInput,
@@ -567,6 +574,7 @@ function mintableRowComponent(
 			(component) => component.name === edge.childComponentName,
 		)
 	) return {};
+	if (chunkTreeHasConstruct(renderDataOf(input), slot.childTemplateId)) return {};
 	const itemProps = edge.props.filter((prop) => prop.source === render.itemName);
 	return {
 		rowComponent: {
@@ -575,6 +583,34 @@ function mintableRowComponent(
 			...(itemProps.length === 1 ? { itemPropName: itemProps[0]!.name } : {}),
 		},
 	};
+}
+
+// Whether a chunk, or anything it reaches, holds a construct whose anchors the
+// page counted only for the rows it served: a branch or an async boundary.
+function chunkTreeHasConstruct(
+	renderData: RenderDataArtifact,
+	chunkId: string,
+	seen = new Set<string>(),
+): boolean {
+	if (seen.has(chunkId)) return false;
+	seen.add(chunkId);
+	const chunk = renderData.chunks.find((candidate) => candidate.id === chunkId);
+	if (!chunk) return false;
+	for (const slot of chunk.slots) {
+		if (slot.kind === 'branch' || slot.kind === 'async') return true;
+		const childChunkIds =
+			slot.kind === 'repeat'
+				? [slot.rowTemplateId, ...(slot.emptyTemplateId ? [slot.emptyTemplateId] : [])]
+				: slot.kind === 'child-component'
+					? [slot.childTemplateId, ...(slot.projectionChunkId ? [slot.projectionChunkId] : [])]
+					: slot.kind === 'dynamic-host'
+						? [slot.childChunkId]
+						: [];
+		for (const childChunkId of childChunkIds) {
+			if (chunkTreeHasConstruct(renderData, childChunkId, seen)) return true;
+		}
+	}
+	return false;
 }
 
 function boundaryUpdateSymbols(input: ProtocolViewPayloadInput): ReadonlyMap<string, string> {
