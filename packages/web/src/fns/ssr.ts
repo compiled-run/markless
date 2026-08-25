@@ -1104,6 +1104,10 @@ export function marklessSsrArmizeBranches(
 	);
 	return branches.map((branch) => {
 		if (branch.escalates !== true) return branch;
+		// A branch lifted from a child already armized its own arm inside that
+		// child's composition; its records left these streams there, so moving
+		// the range again would overwrite the set with an empty one.
+		if (branch.servedArmRecords) return branch;
 		const anchor = anchorById.get(idPrefix + branch.id);
 		if (!anchor) throw new Error(`MARKLESS_SSR_DATA_ANCHOR_MISSING: branch:${branch.id}`);
 		return { ...branch, servedArmRecords: marklessSsrMoveArmRange(streams, anchor) };
@@ -1410,6 +1414,16 @@ export function marklessSsrAppendChildView(context: {
 				? { symbolId: marklessBoundSymbolId(context.child, childSymbolId!) }
 				: {}),
 			...(armRecords ? { armRecords } : {}),
+			// The arm this child already served keeps its arm-relative
+			// coordinates; only ids and symbols take the child's prefixes.
+			...(branch.servedArmRecords
+				? {
+						servedArmRecords: marklessSsrPrefixBoundaryArmRecords(
+							branch.servedArmRecords,
+							context.child,
+						),
+					}
+				: {}),
 		};
 		if (context.child.asyncBoundaryId) {
 			const armBranches = context.boundaryArmBranches.get(context.child.asyncBoundaryId) ?? [];

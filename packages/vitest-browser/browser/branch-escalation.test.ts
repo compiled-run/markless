@@ -112,10 +112,9 @@ test('CSR: a branch in a child component paints its escalated arm at first paint
 	expectChildArmPainted(screen.container as HTMLElement);
 });
 
-// PINNED in CSR: an arm served open paints, but the records inside it are never
-// registered, so the first gesture on the served arm is dropped. A flip-opened
-// arm takes its clicks; only the one open at first render does not.
-test.fails('CSR: the arm a child branch painted answers its own clicks', async () => {
+// A branch lifted out of a child composes with the arm records that child
+// already served; nothing re-armizes the range and empties them.
+test('CSR: the arm a child branch painted answers its own clicks', async () => {
 	const screen = await render(BranchEscalationChildOpen);
 	const container = screen.container as HTMLElement;
 	requireElement<HTMLElement>(container, '[data-leaf]').click();
@@ -151,9 +150,9 @@ test('CSR: a branch open at first render paints its arm content at first paint',
 	await expect.poll(() => container.querySelector('[data-panel]')?.textContent).toBe('open-1');
 });
 
-// PINNED in CSR: same wall as the child-branch row - the arm served open at first
-// render paints, but its records never register, so its first click is dropped.
-test.fails('CSR: the arm served open at first render takes its first click', async () => {
+// CSR mounts with the served arm's event records already registered, so the
+// first gesture inside it routes before the deferred runtime is demanded.
+test('CSR: the arm served open at first render takes its first click', async () => {
 	const screen = await render(BranchEscalationOpen);
 	const container = screen.container as HTMLElement;
 
