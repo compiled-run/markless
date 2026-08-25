@@ -147,6 +147,7 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 				{
 					id: repeat.repeatId,
 					parentHostNodeId: repeat.parentHostNodeId,
+					...(repeat.ownerHostNodeId ? { ownerHostNodeId: repeat.ownerHostNodeId } : {}),
 					...(repeat.rowHostNodeId ? { rowHostNodeId: repeat.rowHostNodeId } : {}),
 					collectionGraphNodeId: repeat.collectionGraphNodeId,
 					collectionPath: repeat.collectionPath,

@@ -315,6 +315,14 @@ export type ProtocolViewPayload = {
 	readonly keyedRepeats?: ReadonlyArray<{
 		readonly id: string;
 		readonly parentHostNodeId: string;
+		/**
+		 * Where the OWNER's own markup put the rows, when `parentHostNodeId` names
+		 * an element the owner never wrote: a `@for` inside a child's `{children}`
+		 * renders into the element that child wraps its hole in, so the parent above
+		 * is the child's, and this is the host the projecting markup sat in. Only a
+		 * reader that needs the owner's own id space reads it.
+		 */
+		readonly ownerHostNodeId?: string;
 		readonly collectionGraphNodeId?: string;
 		readonly collectionPath: ReadonlyArray<string>;
 		readonly keyPath: ReadonlyArray<string>;

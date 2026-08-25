@@ -53,6 +53,7 @@ import {
 	moduleInterfaceSharedDefinitions,
 } from './collect-shared.ts';
 import { attachKeyedRepeatRowHost, collectKeyedRepeat } from './collect-repeat.ts';
+import { retargetProjectedRepeatHosts } from './projected-repeat-host.ts';
 import { collectBranchSite } from './collect-branches.ts';
 import { collectModuleGraphInterface, collectVariableDeclaration } from './collect-state.ts';
 import { createMutableSemanticGraphArtifact, createWalkState, type WalkState } from './types.ts';
@@ -142,6 +143,15 @@ export async function buildSemanticGraph(
 		filename: input.filename,
 		graph,
 		hostIds: state.hostIds,
+	});
+	// Needs the chunks, so it runs after them: a repeat inside a child's
+	// `{children}` renders into that child's markup, not the enclosing element of
+	// the tag that projected it.
+	retargetProjectedRepeatHosts({
+		graph,
+		...(input.importedModuleInterfaces
+			? { importedModuleInterfaces: input.importedModuleInterfaces }
+			: {}),
 	});
 	// Shared definitions publish here rather than with the rest of the interface:
 	// a definition's returned properties and the factory nodes they name are

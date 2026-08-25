@@ -61,6 +61,7 @@ type SsrRowEventRecord = SsrRecord & { readonly symbolIds: ReadonlyArray<string>
 type SsrKeyedRepeatRecord = SsrRecord & {
 	readonly id: string;
 	readonly parentHostNodeId: string;
+	readonly ownerHostNodeId?: string;
 	readonly collectionGraphNodeId?: string;
 	readonly collectionPath: ReadonlyArray<string>;
 	readonly rowEvents: ReadonlyArray<SsrRowEventRecord>;
@@ -764,8 +765,11 @@ function marklessSsrUnbindLocalView(view: SsrViewDraft, localHostIds: ReadonlySe
 	const domUpdates = view.domUpdates.filter((update) => localHostIds.has(update.hostNodeId));
 	for (const update of domUpdates)
 		if (update.symbolId) update.symbolId = marklessSsrUnbindLocalSymbolId(update.symbolId);
+	// Whose repeat this is, is a question about the markup that WROTE it: a
+	// projected repeat renders into a child's element, so its parent host is never
+	// one of this render's own locators.
 	const keyedRepeats = (view.keyedRepeats ?? [])
-		.filter((repeat) => localHostIds.has(repeat.parentHostNodeId))
+		.filter((repeat) => localHostIds.has(repeat.ownerHostNodeId ?? repeat.parentHostNodeId))
 		.map((repeat) => ({
 			...repeat,
 			rowEvents: repeat.rowEvents.map((event) => ({
@@ -1225,6 +1229,9 @@ export function marklessSsrAppendChildView(context: {
 			...repeat,
 			id: context.child.hostPrefix + repeat.id,
 			parentHostNodeId: context.child.hostPrefix + repeat.parentHostNodeId,
+			...(repeat.ownerHostNodeId
+				? { ownerHostNodeId: context.child.hostPrefix + repeat.ownerHostNodeId }
+				: {}),
 			collectionGraphNodeId: mapped.graphNodeId,
 			collectionPath: mapped.path,
 			rowEvents,
@@ -1461,6 +1468,9 @@ export function marklessSsrPrefixBoundaryArmRecords(
 							...repeat,
 							id: child.hostPrefix + repeat.id,
 							parentHostNodeId: child.hostPrefix + repeat.parentHostNodeId,
+							...(repeat.ownerHostNodeId
+								? { ownerHostNodeId: child.hostPrefix + repeat.ownerHostNodeId }
+								: {}),
 							collectionGraphNodeId: mapped.graphNodeId,
 							collectionPath: mapped.path,
 							rowEvents: repeat.rowEvents.map((event) => ({

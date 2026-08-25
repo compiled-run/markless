@@ -335,19 +335,22 @@ async function deserializeGraphValue(payload: SerializedGraphPayload): Promise<u
  *
  * A repeat whose owner is the page root has none; one owned by a composed child
  * carries that child's prefix on every host it declares, and the record's
- * `parentHostNodeId` is the same host spelled in page space.
+ * `parentHostNodeId` is the same host spelled in page space. A projected repeat
+ * is the exception: its parent host belongs to the CHILD it renders into, and
+ * `ownerHostNodeId` is the owner-space host that question has to be asked of.
  */
 function ownerIdPrefix(
 	surface: PrerenderDataSurface,
 	componentName: string,
 	repeat: ResumeKeyedRepeatRecord,
 ): string {
+	const ownerHost = repeat.ownerHostNodeId ?? repeat.parentHostNodeId;
 	let longest = '';
 	for (const hostNodeId of surface.components[componentName]?.hostNodeIds ?? []) {
 		if (hostNodeId.length <= longest.length) continue;
-		if (repeat.parentHostNodeId.endsWith(hostNodeId)) longest = hostNodeId;
+		if (ownerHost.endsWith(hostNodeId)) longest = hostNodeId;
 	}
-	return longest ? repeat.parentHostNodeId.slice(0, -longest.length) : '';
+	return longest ? ownerHost.slice(0, -longest.length) : '';
 }
 
 function parseRowNodes(
