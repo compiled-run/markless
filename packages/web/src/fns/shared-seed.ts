@@ -12,6 +12,7 @@ import {
 	type ChildrenProjectionLink,
 	renderedWidgetRootsOf,
 } from '../prerender/children-projection.ts';
+import { marklessInstancePath } from './instance-scope.ts';
 import { MARKLESS_SSR_CALLBACKS_PROP, marklessSsrSpreadProps } from './ssr.ts';
 import { fileBoundElementHandles } from './element-handle-roster.ts';
 
@@ -301,15 +302,18 @@ async function applySharedSeeds(
 	if (!child || seeds.length === 0) return;
 
 	const childProps = edgeChildProps(context, edge, read);
+	// A client mint loads these symbols through the resume loader, which scopes a
+	// symbol's reads by prepending its instance path. The seed map is keyed by the
+	// child's own compile-time ids, so an unmatched id is retried without it.
+	const seedSource = (graphNodeId: string): unknown => {
+		if (graphNodeId === child.propCellId || graphNodeId === 'prop:props') return childProps;
+		if (graphNodeId.startsWith('prop:')) return childProps[graphNodeId.slice(5)];
+		if (seeded.has(graphNodeId)) return seeded.get(graphNodeId);
+		const instancePath = marklessInstancePath(graphNodeId);
+		return instancePath ? seedSource(graphNodeId.slice(instancePath.length)) : undefined;
+	};
 	const readSeed: PrerenderReadSeed = (graphNodeId, path = []) =>
-		readPath(
-			graphNodeId === child.propCellId || graphNodeId === 'prop:props'
-				? childProps
-				: graphNodeId.startsWith('prop:')
-					? childProps[graphNodeId.slice(5)]
-					: seeded.get(graphNodeId),
-			path,
-		);
+		readPath(seedSource(graphNodeId), path);
 	for (const initial of seeds) {
 		if (initial.value.kind !== 'symbol-function') continue;
 		const factory = initials.find(
