@@ -481,3 +481,78 @@ test('branch content reads round-trip and refuse a malformed shape', () => {
 		),
 	).toThrow(/branch\[0\]\.contentReads\[0\]/);
 });
+
+// An escalating branch replaces its arm wholesale, so what it serves has to be
+// arm-relative: page-absolute indexes would re-register against the wrong DOM.
+test('served arm records need the escalates mark and arm-relative locators', () => {
+	const armRecords = {
+		locators: [
+			{ hostNodeId: 'h0', tagName: 'EM', strategy: 'arm-relative' as const, index: 0 },
+		],
+		events: [],
+		behaviors: [],
+		elementHandles: [],
+		domUpdates: [],
+		branches: [],
+	};
+	const branch = {
+		id: 'branch:0',
+		startAnchor: { strategy: 'dom-order-comment' as const, index: 0 },
+		endAnchor: { strategy: 'dom-order-comment' as const, index: 1 },
+		escalates: true as const,
+		servedArmRecords: armRecords,
+	};
+	const view: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		branches: [branch],
+		asyncBoundaries: [],
+	};
+	const state: ProtocolStatePayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		cells: [],
+		computed: [],
+	};
+
+	const decoded = decodePayloadScripts(renderPayloadScripts({ state, view }));
+	expect(decoded.view.branches?.[0]?.escalates).toBe(true);
+	expect(decoded.view.branches?.[0]?.servedArmRecords).toEqual(armRecords);
+
+	const { escalates: _escalates, ...withoutMark } = branch;
+	expect(() =>
+		decodePayloadScripts(
+			renderPayloadScripts({ state, view: { ...view, branches: [withoutMark] } as never }),
+		),
+	).toThrow(/servedArmRecords requires escalates/);
+
+	expect(() =>
+		decodePayloadScripts(
+			renderPayloadScripts({
+				state,
+				view: {
+					...view,
+					branches: [
+						{
+							...branch,
+							servedArmRecords: {
+								...armRecords,
+								locators: [
+									{
+										hostNodeId: 'h0',
+										tagName: 'EM',
+										strategy: 'dom-order',
+										index: 4,
+									},
+								],
+							},
+						},
+					],
+				} as never,
+			}),
+		),
+	).toThrow(/servedArmRecords\.locators\[0\]: expected arm-relative strategy/);
+});
