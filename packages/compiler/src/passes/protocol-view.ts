@@ -384,6 +384,7 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 					: {}),
 				...mintableEmptyArm(input, render),
 				...mintableRowTemplate(input, render),
+				...mintableRowComponent(input, render),
 				rowEvents: oneRecordPerEvent(input.payloadArena.view.events)
 					.filter((event) => rowHostPaths.has(event.hostNodeId))
 					.map((event) => ({
@@ -484,12 +485,9 @@ function mintableRowTemplate(
 		(candidate) => candidate.id === render.rowChunkId,
 	);
 	if (!chunk) return {};
-	// A repeat whose row roots a widget is refused outright, in the same terms the
-	// record gate already answers widget-rooting for repeats: the row's content is
-	// a child component, whose graph is one instance per rendered row. The slot
-	// whitelist below refuses a child-component slot too, so this costs nothing
-	// today - it is stated so that widening the whitelist later cannot quietly
-	// open the widget hole, where a minted row would be a widget with no graph.
+	// A row whose content is a child component has a graph, not a template - one
+	// instance per rendered row - so markup could never finish it. Such a row is
+	// named by identity instead, in `rowComponent`; this half stays refused.
 	if (chunk.slots.some((slot) => slot.kind === 'child-component')) return {};
 	const textSlots: Array<{
 		readonly path: ReadonlyArray<number>;
@@ -522,6 +520,59 @@ function mintableRowTemplate(
 			html,
 			...(textSlots.length > 0 ? { textSlots } : {}),
 			...(attributeSlots.length > 0 ? { attributeSlots } : {}),
+		},
+	};
+}
+
+/**
+ * The component a row roots, named by identity, for the mint that builds a row
+ * the server never rendered.
+ *
+ * A component row carries no markup here on purpose: the client rebuilds it by
+ * running the same one-edge render the server ran, so what it needs is the edge
+ * to run and the component that owns it, not a copy of the output.
+ *
+ * Refused unless the row is nothing BUT that component (one slot, no element of
+ * its own), the child is declared in this same module, and the edge projects no
+ * children. Cross-module and projected rows are later phases; a refusal here
+ * emits no field at all, so the record stays byte-identical.
+ */
+function mintableRowComponent(
+	input: ProtocolViewPayloadInput,
+	render: RenderDataArtifact['repeats'][number],
+): {
+	readonly rowComponent?: {
+		readonly componentEdgeId: string;
+		readonly componentName: string;
+		readonly itemPropName?: string;
+	};
+} {
+	const chunk = renderDataOf(input).chunks.find(
+		(candidate) => candidate.id === render.rowChunkId,
+	);
+	if (!chunk || chunk.slots.length !== 1 || render.rowElementCount > 0) return {};
+	const slot = chunk.slots[0]!;
+	if (slot.kind !== 'child-component' || slot.projectionChunkId) return {};
+	const componentName = chunk.componentName;
+	if (!componentName) return {};
+	const edge = (input.semanticGraph?.componentEdges ?? []).find(
+		(candidate) => candidate.id === slot.componentEdgeId,
+	);
+	if (!edge || edge.parentComponentName !== componentName) return {};
+	// Same module, no projection: the child has to be one this module declares,
+	// reachable through this module's own render data.
+	if (edge.importSource !== undefined || edge.children.childCount > 0) return {};
+	if (
+		!(input.semanticGraph?.components ?? []).some(
+			(component) => component.name === edge.childComponentName,
+		)
+	) return {};
+	const itemProps = edge.props.filter((prop) => prop.source === render.itemName);
+	return {
+		rowComponent: {
+			componentEdgeId: slot.componentEdgeId,
+			componentName,
+			...(itemProps.length === 1 ? { itemPropName: itemProps[0]!.name } : {}),
 		},
 	};
 }

@@ -26,6 +26,7 @@ async function viewOf(source: string) {
 	return createProtocolViewPayload({
 		payloadArena,
 		symbolResolver,
+		semanticGraph,
 		renderData: createRenderData({ semanticGraph, symbolResolver }),
 		publicRenderPlan: {
 			asyncBoundaryGates: [],
@@ -220,9 +221,9 @@ export function App() @{
 });
 
 // A widget-rooting repeat: each row's content is a component, so each row is one
-// rendered widget with a graph of its own. The mint builds markup and nothing
-// else, so it can never start a widget - the row ships no template.
-test('a repeat whose row roots a widget ships no markup', async () => {
+// rendered widget with a graph of its own. Markup could never finish such a row,
+// so this half stays refused - and the row is named by identity instead.
+test('a repeat whose row roots a widget ships identity, not markup', async () => {
 	const view = await viewOf(`import { shared, state } from '@markless/core';
 export const rowState = shared(() => ({ open: state(false) }), { scope: 'widget' });
 function Row({ label }) @{
@@ -236,6 +237,7 @@ export function App() @{
 `);
 	expect(view.keyedRepeats).toHaveLength(1);
 	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowTemplate');
+	expect(view.keyedRepeats?.[0]?.rowComponent).toMatchObject({ componentName: 'App' });
 });
 
 // The transport rides the record, so it is gated by everything the record is
