@@ -25,6 +25,7 @@ import { PROTOCOL_PROPS_GRAPH_NODE_ID } from '@markless/serializer';
 import type { SourceSpan } from '../diagnostics.ts';
 import {
 	armChildDescent,
+	armChildOwnValueRefusal,
 	type ArmChildProp,
 	type ArmImportedInterfaces,
 } from './arm-child-content.ts';
@@ -1217,7 +1218,7 @@ function renderChunkParts(
 				const childParts = childComponentParts(context, slot);
 				if (childParts === null)
 					return refuse(
-						`<${slot.childComponentName}> has to run to produce its content`,
+						`<${slot.childComponentName}> ${childRefusalReason(context, slot)}`,
 						componentEdgeSpan(context, slot.componentEdgeId),
 					);
 				for (const part of childParts) {
@@ -1368,6 +1369,23 @@ function staticChildComponentMarkup(
 			hostNodeIds.has(record.hostNodeId),
 	);
 	return wired ? null : chunk.statics.join('');
+}
+
+// Names the one value that kept the flip out; falls back to the shape-level
+// refusal for a child this descent cannot express for any other reason.
+function childRefusalReason(
+	context: ArmPartsContext,
+	slot: Extract<SemanticMarkupSlot, { readonly kind: 'child-component' }>,
+): string {
+	const semanticGraph = context.inline?.semanticGraph;
+	const edge = semanticGraph?.componentEdges.find(
+		(candidate) => candidate.id === slot.componentEdgeId,
+	);
+	const own =
+		semanticGraph && edge && !edge.importSource
+			? armChildOwnValueRefusal(semanticGraph, edge.childComponentName)
+			: undefined;
+	return own ?? 'has to run to produce its content';
 }
 
 function componentEdgeSpan(
