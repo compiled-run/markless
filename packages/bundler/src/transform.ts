@@ -284,8 +284,14 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 			: [];
 	// Scoped <style> CSS ships through the bundler's CSS pipeline: a virtual
 	// .css module imported by the transformed module, never inline JS.
-	const styleScope = compiled.publicRenderPlan.styleScopes[0];
-	const styleId = styleScope ? `${MARKLESS_VIRTUAL_PREFIX}style:${encodedFilename}.css` : null;
+	// Every scope in the plan ships; taking only the first would drop CSS silently.
+	const styleCss = compiled.publicRenderPlan.styleScopes
+		.map((scope) => scope.cssText)
+		.join('\n');
+	const styleId =
+		compiled.publicRenderPlan.styleScopes.length > 0
+			? `${MARKLESS_VIRTUAL_PREFIX}style:${encodedFilename}.css`
+			: null;
 	const pageNeedsFullResume = needsFullResume(
 		compiled.protocolState,
 		compiled.protocolView,
@@ -377,9 +383,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					},
 				]
 			: []),
-		...(styleScope && styleId
-			? [{ id: styleId, type: 'style' as const, source: styleScope.cssText }]
-			: []),
+		...(styleId ? [{ id: styleId, type: 'style' as const, source: styleCss }] : []),
 		{
 			id: payloadId,
 			type: 'payload',

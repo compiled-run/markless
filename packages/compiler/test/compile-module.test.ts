@@ -2274,6 +2274,134 @@ export function App() @{
 	).toEqual({ kind: 'class' });
 });
 
+// Every component in a module mints the module's scope class onto its own
+// elements, so every component's <style> block has to reach the shipped CSS.
+test('compileTsrxModule ships a non-root component style block', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/NonRootStyle.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let count = state(7);
+	<main><Card value={count} /><button>+</button></main>
+}
+
+function Card({ value }) @{
+	<article class="card">
+		<style>
+			.card { color: rebeccapurple; }
+		</style>
+		<strong>{value}</strong>
+	</article>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	expect(result.publicRenderPlan.styleScopes).toHaveLength(1);
+	const scope = result.publicRenderPlan.styleScopes[0]!.scopeId;
+	expect(result.publicRenderPlan.styleScopes[0]!.cssText).toBe(
+		`.card.${scope} { color: rebeccapurple; }`,
+	);
+
+	const ssrOutput = (await renderTestSsr(result)) as { readonly html: string };
+	// The styleless root mints nothing; the styled child mints on its own elements.
+	expect(ssrOutput.html).toBe(
+		`<main><article class="card ${scope}"><strong class="${scope}">7</strong></article><button>+</button></main>`,
+	);
+});
+
+test('compileTsrxModule ships style blocks from every component in a module', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/BothStyled.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let count = state(7);
+	<main class="page">
+		<style>
+			.page { display: grid; }
+		</style>
+		<Card value={count} />
+	</main>
+}
+
+function Card({ value }) @{
+	<article class="card">
+		<style>
+			.card { color: rebeccapurple; }
+		</style>
+		<strong>{value}</strong>
+	</article>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	expect(result.publicRenderPlan.styleScopes).toHaveLength(1);
+	const scope = result.publicRenderPlan.styleScopes[0]!.scopeId;
+	expect(result.publicRenderPlan.styleScopes[0]!.cssText).toBe(
+		[`.page.${scope} { display: grid; }`, `.card.${scope} { color: rebeccapurple; }`].join(
+			'\n',
+		),
+	);
+});
+
+// The single-root-style shape is the shape that already shipped: aggregation
+// must not reorder or rewrite one byte of it.
+test('compileTsrxModule leaves single-component style output byte-identical', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/OnlyRootStyled.tsrx',
+		source: `
+export function App() @{
+	<main class="page">
+		<style>
+			.page { display: grid; }
+			.page h2 { font-size: 2rem; }
+		</style>
+		<h2>Title</h2>
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	const scope = result.publicRenderPlan.styleScopes[0]!.scopeId;
+	expect(result.publicRenderPlan.styleScopes[0]!.cssText).toBe(
+		`.page.${scope} { display: grid; }\n\t\t\t.page h2.${scope} { font-size: 2rem; }`,
+	);
+});
+
+test('compileTsrxModule ships no style scope for a styleless multi-component module', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/NoStyles.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let count = state(7);
+	<main><Card value={count} /></main>
+}
+
+function Card({ value }) @{
+	<article class="card"><strong>{value}</strong></article>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.styleScopes).toEqual([]);
+	const ssrOutput = (await renderTestSsr(result)) as { readonly html: string };
+	expect(ssrOutput.html).toBe(
+		'<main><article class="card"><strong>7</strong></article></main>',
+	);
+});
+
 // A <style> block that cannot be scope-compiled is dropped from the build, so
 // the drop has to be explained. `collectStyleScopes` reports it and the public
 // render plan is the single pass that carries those diagnostics to the author;
