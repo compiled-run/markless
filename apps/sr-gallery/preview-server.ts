@@ -25,7 +25,7 @@ export const FAMILY_ANCHORS = {
 	slider: '/#slider',
 	tooltip: '/#tooltip',
 	'slider-range': '/#slider-range',
-	dateinput: '/#dateinput',
+	datebox: '/#datebox',
 } as const;
 
 export type FamilyName = keyof typeof FAMILY_ANCHORS;

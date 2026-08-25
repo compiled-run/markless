@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import { dateinput } from '../../index.ts';
+import { datebox } from '../../index.ts';
 
 // Two dates with their own consumer handlers, one of them locked. Each handler
 // writes into page state the page renders, so what the DOM shows is what the
@@ -8,7 +8,7 @@ export default function WithOnChange() @{
 	const log = state({ first: '', locked: '', calls: 0 });
 
 	<section>
-		<dateinput.root
+		<datebox.root
 			value="2024-03-30"
 			data-testid="first-root"
 			onChange={(next: string | null) => {
@@ -16,12 +16,12 @@ export default function WithOnChange() @{
 				log.calls = log.calls + 1;
 			}}
 		>
-			<dateinput.label data-testid="first-label">Start date</dateinput.label>
-			<dateinput.monthinput data-testid="first-monthinput" />
-			<dateinput.dayinput data-testid="first-dayinput" />
-			<dateinput.yearinput data-testid="first-yearinput" />
-		</dateinput.root>
-		<dateinput.root
+			<datebox.label data-testid="first-label">Start date</datebox.label>
+			<datebox.monthinput data-testid="first-monthinput" />
+			<datebox.dayinput data-testid="first-dayinput" />
+			<datebox.yearinput data-testid="first-yearinput" />
+		</datebox.root>
+		<datebox.root
 			value="2024-03-30"
 			disabled
 			data-testid="locked-root"
@@ -30,11 +30,11 @@ export default function WithOnChange() @{
 				log.calls = log.calls + 1;
 			}}
 		>
-			<dateinput.label data-testid="locked-label">Locked date</dateinput.label>
-			<dateinput.monthinput data-testid="locked-monthinput" />
-			<dateinput.dayinput data-testid="locked-dayinput" />
-			<dateinput.yearinput data-testid="locked-yearinput" />
-		</dateinput.root>
+			<datebox.label data-testid="locked-label">Locked date</datebox.label>
+			<datebox.monthinput data-testid="locked-monthinput" />
+			<datebox.dayinput data-testid="locked-dayinput" />
+			<datebox.yearinput data-testid="locked-yearinput" />
+		</datebox.root>
 		<p data-testid="first-value">{log.first}</p>
 		<p data-testid="locked-value">{log.locked}</p>
 		<p data-testid="calls">{log.calls}</p>

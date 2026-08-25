@@ -30,7 +30,7 @@
 		"./checklist": "./src/checklist/index.ts",
 		"./collapsible": "./src/collapsible/index.ts",
 		"./combobox": "./src/combobox/index.ts",
-		"./dateinput": "./src/dateinput/index.ts",
+		"./datebox": "./src/datebox/index.ts",
 		"./modal": "./src/modal/index.ts",
 		"./otp": "./src/otp/index.ts",
 		"./navbar": "./src/navbar/index.ts",

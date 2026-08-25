@@ -1,7 +1,7 @@
 import {
 	checkbox,
 	checklist,
-	dateinput,
+	datebox,
 	modal,
 	popover,
 	progress,
@@ -17,7 +17,7 @@ import {
 // Every shipped family's Basic scenario - the starter a consumer copies - on one
 // page, each in a section a reader can jump to by its anchor: /#checkbox,
 // /#toggle, /#textbox, /#progress, /#checklist, /#select, /#modal,
-// /#radio-group, /#tabs, /#popover, /#tooltip, /#slider, /#dateinput. A family
+// /#radio-group, /#tabs, /#popover, /#tooltip, /#slider, /#datebox. A family
 // whose second shape a reader announces differently gets its own section too:
 // /#slider-range.
 //
@@ -235,16 +235,16 @@ export function Gallery() @{
 			</div>
 		</section>
 
-		<section id="dateinput">
-			<h2>Date input</h2>
+		<section id="datebox">
+			<h2>Date box</h2>
 			<div class="scenario">
-				<dateinput.root name="starts">
-					<dateinput.label>Start date</dateinput.label>
-					<dateinput.monthinput />
-					<dateinput.dayinput />
-					<dateinput.yearinput />
-					<dateinput.field />
-				</dateinput.root>
+				<datebox.root name="starts">
+					<datebox.label>Start date</datebox.label>
+					<datebox.monthinput />
+					<datebox.dayinput />
+					<datebox.yearinput />
+					<datebox.field />
+				</datebox.root>
 			</div>
 		</section>
 	</main>

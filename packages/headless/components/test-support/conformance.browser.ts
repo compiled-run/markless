@@ -5,7 +5,7 @@ import Carousel from '../src/carousel/scenarios/basic.tsrx';
 import Checkbox from '../src/checkbox/scenarios/basic.tsrx';
 import Checklist from '../src/checklist/scenarios/basic.tsrx';
 import Collapsible from '../src/collapsible/scenarios/basic.tsrx';
-import DateInput from '../src/dateinput/scenarios/basic.tsrx';
+import DateBox from '../src/datebox/scenarios/basic.tsrx';
 import { Basic as Combobox } from '../src/combobox/scenarios/basic.tsrx';
 import Modal from '../src/modal/scenarios/basic.tsrx';
 import Navbar from '../src/navbar/scenarios/basic.tsrx';
@@ -192,8 +192,8 @@ const descriptors: readonly FamilyDescriptor[] = [
 		supportsDisabled: true,
 	},
 	{
-		family: 'dateinput',
-		mount: { CSR: () => render(DateInput), SSR: () => renderSSR(DateInput) },
+		family: 'datebox',
+		mount: { CSR: () => render(DateBox), SSR: () => renderSSR(DateBox) },
 		root: 'root',
 		parts: ['root', 'label', 'monthinput', 'dayinput', 'yearinput', 'field'],
 		// A <fieldset> named by its <legend>, so the group's name is the platform's
