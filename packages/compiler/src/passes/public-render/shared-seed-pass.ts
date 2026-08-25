@@ -171,6 +171,57 @@ export function rowProjectedEdgeIdsUnder(
 }
 
 /**
+ * The projecting children whose projections enclose one component edge in this
+ * module, innermost first.
+ *
+ * A projecting child that roots no widget family is a PART, and the families in
+ * scope for its boundary check are the enclosing widget's — without them a root
+ * written into that part's own children is not recognised as an instance
+ * boundary, and its seeds land in the enclosing instance's map on top of the
+ * seed that instance's root wrote. Arm, row, and async chunks are stepped
+ * THROUGH: they change whether a part renders, never which widget encloses it.
+ * The CSR twin is `enclosingProjectingChildNames` in @markless/web.
+ */
+export function enclosingProjectingEdgeIds(
+	chunks: PublicRenderModuleInput['renderData']['chunks'],
+	componentEdgeId: string,
+): string[] {
+	const ownerEdgeOfChunk = new Map<string, string>();
+	const parentChunkOf = new Map<string, string>();
+	const chunkOfEdge = new Map<string, string>();
+	for (const chunk of chunks)
+		for (const slot of chunk.slots) {
+			if (slot.kind === 'child-component') {
+				chunkOfEdge.set(slot.componentEdgeId, chunk.id);
+				if (slot.projectionChunkId)
+					ownerEdgeOfChunk.set(slot.projectionChunkId, slot.componentEdgeId);
+			} else if (slot.kind === 'branch') {
+				for (const armChunkId of slot.armTemplateIds) parentChunkOf.set(armChunkId, chunk.id);
+			} else if (slot.kind === 'repeat') {
+				parentChunkOf.set(slot.rowTemplateId, chunk.id);
+				if (slot.emptyTemplateId) parentChunkOf.set(slot.emptyTemplateId, chunk.id);
+			} else if (slot.kind === 'async') {
+				for (const armChunkId of Object.values(slot.armTemplateIds))
+					if (typeof armChunkId === 'string') parentChunkOf.set(armChunkId, chunk.id);
+			}
+		}
+	const found: string[] = [];
+	const walked = new Set<string>();
+	let chunkId = chunkOfEdge.get(componentEdgeId);
+	while (chunkId !== undefined && !walked.has(chunkId)) {
+		walked.add(chunkId);
+		const ownerEdgeId = ownerEdgeOfChunk.get(chunkId);
+		if (ownerEdgeId === undefined) {
+			chunkId = parentChunkOf.get(chunkId);
+			continue;
+		}
+		found.push(ownerEdgeId);
+		chunkId = chunkOfEdge.get(ownerEdgeId);
+	}
+	return found;
+}
+
+/**
  * The parts of one widget that a branch arm holds, each with the arms it sits
  * inside. The compiler knows the seed and which arm chunk holds the part; only
  * WHICH arm renders is a render-time answer, so the emitted seed pass carries

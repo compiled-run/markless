@@ -21,6 +21,7 @@ import {
 	componentSharedSeeds,
 	childrenProjectionChain,
 	childrenWidgetRootMarkerLine,
+	enclosingProjectingEdgeIds,
 	projectedSeedPartsUnder,
 	rowProjectedEdgeIdsUnder,
 	sharedSeedConsumeLine,
@@ -865,10 +866,21 @@ function emitSsrDataLines(
 		// actually sit under another root — a widget with no nested projection
 		// emits exactly the seed pass it emitted before boundaries existed.
 		const needsFamilies = blocks.some((block) => block.includes('marklessSsrWidgetBoundary'));
+		// A projecting child that roots nothing is a PART: the families in scope are
+		// the enclosing widget's, so the boundary check reads them too.
+		const familyArgs = [
+			...(rootSurfaceArgs ? [rootSurfaceArgs] : []),
+			...enclosingProjectingEdgeIds(input.renderData.chunks, edgeId).flatMap((ancestorEdgeId) => {
+				const args = childSurfaceArgsByEdgeId.get(ancestorEdgeId);
+				return args ? [args] : [];
+			}),
+		];
 		return [
 			`case ${JSON.stringify(edgeId)}:{${widgetInstanceLineByEdgeId.get(edgeId) ?? ''}${
 				needsFamilies
-					? `const marklessSsrWidgetFamilies=marklessSsrWidgetRoots(${rootSurfaceArgs});`
+					? `const marklessSsrWidgetFamilies=[${familyArgs
+							.map((args) => `...marklessSsrWidgetRoots(${args})`)
+							.join(',')}];`
 					: ''
 			}${handleLines.join('')}${blocks.join('')}return marklessSsrSeeds;}`,
 		];
