@@ -44,6 +44,14 @@ Added, because QDS ships neither part: `aria-describedby` on each box for
 those go — `aria-invalid` is not supported on `role="group"`, and the boxes are
 the controls the state belongs to.
 
+`description` and `error` are separate parts standing behind separate handles, and
+each box names both: `aria-describedby={[errorEl, descriptionEl]}`, the compiler's
+handle-list form. A field that mounts both is described by both, error first —
+standard announcement order, so what is wrong is conveyed before the format hint,
+whichever order the two parts are written in. A part that was never placed drops
+out of the list rather than dangling, and a field that placed neither carries no
+attribute at all.
+
 The group is named by the platform: `root` is a `<fieldset>` and `label` is its
 `<legend>`, the `radio-group` precedent. Three boxes have no single control for a
 `for` to point at, and a widget root cannot mint an id for a part it contains

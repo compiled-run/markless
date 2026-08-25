@@ -65,14 +65,14 @@ export type DateBoxYearInputProps = DateBoxItemProps;
 export type DateBoxLabelProps = PropsOf<'legend'>;
 
 /**
- * Supporting text for the group, named by the root's `aria-describedby`. One
- * element can be named that way, so mounting this alongside `datebox.error`
- * describes by whichever renders first.
+ * Supporting text for the group, named by every box's `aria-describedby`. Mount
+ * it alongside `datebox.error` and the boxes name both, the error first.
  */
 export type DateBoxDescriptionProps = PropsOf<'div'>;
 
 /**
- * The validation message. Mounting it is what marks the boxes invalid - they
+ * The validation message, named by every box's `aria-describedby` ahead of
+ * `datebox.description`. Mounting it is what marks the boxes invalid - they
  * report `aria-invalid` for as long as this part is in the page - so render it
  * only when there is an error to show.
  */

@@ -10,6 +10,7 @@ import Invalid from './scenarios/invalid.tsrx';
 import LeadingZero from './scenarios/leading-zero.tsrx';
 import Prefilled from './scenarios/prefilled.tsrx';
 import WithHelp from './scenarios/with-help.tsrx';
+import WithHelpAndError from './scenarios/with-help-and-error.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
 
 const Root = page.getByTestId('root');
@@ -19,6 +20,7 @@ const Day = page.getByTestId('dayinput');
 const Year = page.getByTestId('yearinput');
 const Field = page.getByTestId('field');
 const Description = page.getByTestId('description');
+const ErrorMessage = page.getByTestId('error');
 const Submitted = page.getByTestId('submitted');
 const FirstValue = page.getByTestId('first-value');
 const LockedValue = page.getByTestId('locked-value');
@@ -65,6 +67,9 @@ function expectBasicRendered() {
 		expect(el(box).hasAttribute('aria-valuenow')).toBe(false);
 		expect(el(box).getAttribute('ui-placeholder')).toBe('');
 		expect(el(box).getAttribute('ui-value')).toBe('');
+		// Neither message part is placed, so both handles drop out and no empty
+		// attribute is left behind.
+		expect(el(box).hasAttribute('aria-describedby')).toBe(false);
 	}
 
 	expect(el(Month).getAttribute('aria-label')).toBe('month input');
@@ -122,9 +127,13 @@ function expectInvalidRendered() {
 	}
 	// A group carries no aria-invalid of its own, so the message is named from the
 	// boxes: they are the controls the state belongs to.
-	expect(el(page.getByTestId('after-monthinput')).getAttribute('aria-describedby')).toBe(
-		el(page.getByTestId('after-error')).id,
-	);
+	const error = el(page.getByTestId('after-error'));
+	expect(error.id).toBeTruthy();
+	for (const testid of boxes) {
+		// Only the error was placed, so the description drops out of the list and
+		// the error is named alone - no stray space, no dangling id.
+		expect(el(page.getByTestId(testid)).getAttribute('aria-describedby')).toBe(error.id);
+	}
 	// The same error written BEFORE the boxes: seeding completes before any part
 	// renders, so document order does not decide what a part reads.
 	expect(el(page.getByTestId('before-monthinput')).getAttribute('aria-invalid')).toBe('true');
@@ -132,9 +141,26 @@ function expectInvalidRendered() {
 
 function expectHelpRendered() {
 	expect(el(Description).textContent?.trim()).toBe('(Month, day, then year)');
-	expect(el(Month).getAttribute('aria-describedby')).toBe(el(Description).id);
 	expect(el(Description).id).toBeTruthy();
-	expect(el(Month).getAttribute('aria-invalid')).toBe('false');
+	for (const box of [Month, Day, Year]) {
+		// Only the description was placed, so the error drops out of the list.
+		expect(el(box).getAttribute('aria-describedby')).toBe(el(Description).id);
+		expect(el(box).getAttribute('aria-invalid')).toBe('false');
+	}
+}
+
+function expectBothMessagesRendered() {
+	const description = el(Description);
+	const error = el(ErrorMessage);
+	expect(description.id).toBeTruthy();
+	expect(error.id).toBeTruthy();
+	expect(description.id).not.toBe(error.id);
+	for (const box of [Month, Day, Year]) {
+		// Both ids, error first: the hint is written above the error in this page,
+		// so the order is the family's rather than the document's.
+		expect(el(box).getAttribute('aria-describedby')).toBe(`${error.id} ${description.id}`);
+		expect(el(box).getAttribute('aria-invalid')).toBe('true');
+	}
 }
 
 function expectLeadingZeroRendered() {
@@ -175,6 +201,12 @@ for (const mode of MODES) {
 		if (mode === 'CSR') await render(WithHelp);
 		else await renderSSR(WithHelp);
 		expectHelpRendered();
+	});
+
+	test(`${mode}: both messages are named by every box, error first`, async () => {
+		if (mode === 'CSR') await render(WithHelpAndError);
+		else await renderSSR(WithHelpAndError);
+		expectBothMessagesRendered();
 	});
 
 	test(`${mode}: showLeadingZero pads the day and month and never the year`, async () => {
