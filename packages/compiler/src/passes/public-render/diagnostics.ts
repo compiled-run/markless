@@ -115,10 +115,10 @@ export function tryBlockToggleRerenderDiagnostic(input: {
 	};
 }
 
-// Owner-adjustable: `error` follows the fail-closed doctrine - a list that
-// renders its served rows but can never grow is a must-not-ship - but the
-// severity itself has not been ratified. Change this one constant to move it.
-export const KEYED_REPEAT_ROW_MINT_UNSUPPORTED_SEVERITY: 'error' | 'warning' = 'error';
+// A list that renders its served rows but can never grow still ships, and the
+// set of shapes that reach this shrinks as row growth covers more of them, so
+// this warns rather than blocks. Change this one constant to move it.
+export const KEYED_REPEAT_ROW_MINT_UNSUPPORTED_SEVERITY: 'error' | 'warning' = 'warning';
 
 export const KEYED_REPEAT_ROW_MINT_UNSUPPORTED_CODE =
 	'MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED' as const;

@@ -1,6 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
 import {
+	KEYED_REPEAT_ROW_MINT_UNSUPPORTED_CODE,
 	PUBLIC_RENDER_PHASE,
 	PUBLIC_RENDER_PLAN_PASS_ID,
 	PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT_CODE,
@@ -1930,7 +1931,11 @@ export function App() @{
 		symbols: [],
 	});
 
-	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	// The row reads the index, which is not on the item, so no row template ships
+	// and the list can serve and reorder its rows but never grow.
+	expect(
+		result.publicRenderPlan.diagnostics.map((entry) => [entry.code, entry.severity]),
+	).toEqual([[KEYED_REPEAT_ROW_MINT_UNSUPPORTED_CODE, 'warning']]);
 	// Index-reading rows stay off the direct-DOM runtime, which cannot rewrite
 	// index text on reorder yet.
 	expect(result.renderData.repeats[0]).toEqual(
