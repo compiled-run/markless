@@ -194,6 +194,12 @@ export type ProtocolStatePayload = {
 // after it), so arms stay closed, movable, replaceable, streamable units.
 // Arm-scoped branch records resolve their anchors in the arm's own
 // arm-branch comment census; escalated records carry no anchors.
+export type ProtocolBranchContentRead = {
+	readonly graphNodeId: string;
+	readonly path: ReadonlyArray<string>;
+	readonly source: string;
+};
+
 export type ProtocolArmBranchRecord = {
 	readonly id: string;
 	readonly testReads: ReadonlyArray<{
@@ -201,6 +207,7 @@ export type ProtocolArmBranchRecord = {
 		readonly graphNodeId: string;
 		readonly path: ReadonlyArray<string>;
 	}>;
+	readonly contentReads?: ReadonlyArray<ProtocolBranchContentRead>;
 	readonly symbolId?: string;
 	readonly armTests?: ReadonlyArray<unknown>;
 	readonly declaredEmptyArms?: ReadonlyArray<number>;
@@ -360,6 +367,29 @@ export type ProtocolViewPayload = {
 				readonly itemPath: ReadonlyArray<string>;
 			}>;
 		};
+		/**
+		 * The component a row of this repeat roots, named by identity alone.
+		 *
+		 * A row whose whole content is a child component cannot ship markup the way
+		 * `rowTemplate` does: the component has a graph, not a template, and one
+		 * instance per rendered row. So this carries three identifiers and nothing
+		 * else - the client builds the row by running the same one-edge render the
+		 * server ran, under ids qualified by the row's key.
+		 *
+		 * `componentName` is the component that OWNS the edge (the one whose markup
+		 * holds the `@for`), not the child: the child's name already rides on the
+		 * edge. `itemPropName` is the prop the row's item crosses under, carried
+		 * only when exactly one prop is the bare `@for` binding.
+		 *
+		 * Carried only for a key-identified repeat whose row start is known and
+		 * whose child is declared in the same module; anything else is refused, so
+		 * the served behaviour stands and the record is byte-identical.
+		 */
+		readonly rowComponent?: {
+			readonly componentEdgeId: string;
+			readonly componentName: string;
+			readonly itemPropName?: string;
+		};
 		readonly rowElementHandles?: ReadonlyArray<{
 			readonly hostPath: ReadonlyArray<number>;
 			readonly handleId: string;
@@ -396,6 +426,12 @@ export type ProtocolViewPayload = {
 			readonly graphNodeId: string;
 			readonly path: ReadonlyArray<string>;
 		}>;
+		/**
+		 * Reads an arm renders with no element of its own to bind to. Writing one
+		 * through an element update would erase both arms' markers, so these
+		 * refresh the arm's own marker range through the branch's update symbol.
+		 */
+		readonly contentReads?: ReadonlyArray<ProtocolBranchContentRead>;
 	}>;
 	readonly asyncBoundaries: ReadonlyArray<{
 		readonly id: string;

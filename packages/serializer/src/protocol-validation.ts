@@ -488,7 +488,17 @@ function assertOptionalKeyedRepeats(record: Record<string, unknown>): void {
 		assertOptionalRowElementHandles(repeat, `${context}.rowElementHandles`);
 		assertOptionalEmptyArm(repeat, `${context}.emptyArm`);
 		assertOptionalRowTemplate(repeat, `${context}.rowTemplate`);
+		assertOptionalRowComponent(repeat, `${context}.rowComponent`);
 	}
+}
+
+function assertOptionalRowComponent(record: Record<string, unknown>, context: string): void {
+	const rowComponent = record.rowComponent;
+	if (rowComponent === undefined) return;
+	assertRecordShape(rowComponent, context);
+	assertStringField(rowComponent, 'componentEdgeId', context);
+	assertStringField(rowComponent, 'componentName', context);
+	assertOptionalStringField(rowComponent, 'itemPropName', context);
 }
 
 function assertOptionalRowTemplate(record: Record<string, unknown>, context: string): void {
@@ -580,6 +590,7 @@ function assertOptionalBranches(record: Record<string, unknown>): void {
 		assertCommentAnchor(branch.endAnchor, `${context}.endAnchor`);
 		assertOptionalStringField(branch, 'symbolId', context);
 		assertOptionalGraphReads(branch, 'testReads', context);
+		assertOptionalGraphReads(branch, 'contentReads', context);
 		if (branch.armTests !== undefined && !Array.isArray(branch.armTests)) {
 			throw invalidPayloadShapeError(
 				contextPayloadType(context),
