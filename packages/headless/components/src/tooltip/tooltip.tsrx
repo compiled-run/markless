@@ -10,6 +10,10 @@ import type {
 // The tip is placed by CSS anchoring alone: the trigger declares the anchor, the
 // tip points at it, and the geometry is the consumer's stylesheet. Nothing here
 // measures a box, so a tip served already showing is placed on its first layout.
+// The scope class these <style> blocks compile against is per MODULE, so each
+// block's subject must be structurally unique across all three parts: the trigger
+// is this module's only button, the tip is its only element carrying `ui-side`,
+// and the root is the div that is left.
 
 export const tooltipState = shared(
 	() => {
@@ -108,7 +112,12 @@ export function TooltipRoot({
 			tooltip.setOpen(false);
 			onPointerout?.(event);
 		}}
-	>{children}</div>
+	>
+		<style>
+			div:not([ui-side]) { anchor-scope: --ui-tooltip; }
+		</style>
+		{children}
+	</div>
 }
 
 export function TooltipTrigger({ children, onFocus, onBlur, ...rest }: TooltipTriggerProps) @{
@@ -119,7 +128,6 @@ export function TooltipTrigger({ children, onFocus, onBlur, ...rest }: TooltipTr
 	<button
 		{...rest}
 		el={tooltip.triggerEl}
-		anchorName={tooltip.triggerEl}
 		type="button"
 		aria-describedby={tooltip.contentEl}
 		ui-open={tooltip.open}
@@ -132,7 +140,12 @@ export function TooltipTrigger({ children, onFocus, onBlur, ...rest }: TooltipTr
 			tooltip.setOpen(false);
 			onBlur?.(event);
 		}}
-	>{children}</button>
+	>
+		<style>
+			button { anchor-name: --ui-tooltip; }
+		</style>
+		{children}
+	</button>
 }
 
 // Written after the trigger: a CSS anchor must be laid out strictly before the element that names it, which an in-flow trigger satisfies from anywhere - but a consumer who absolutely positions their trigger and writes the tip first gets a silent miss.
@@ -144,8 +157,6 @@ export function TooltipContent({ children, onDismiss, ...rest }: TooltipContentP
 	<div
 		{...rest}
 		el={tooltip.contentEl}
-		positionAnchor={tooltip.triggerEl}
-		style="position:absolute"
 		overlay
 		role="tooltip"
 		hidden={tooltip.open !== true}
@@ -157,5 +168,10 @@ export function TooltipContent({ children, onDismiss, ...rest }: TooltipContentP
 			tooltip.setOpen(false);
 			onDismiss?.(event);
 		}}
-	>{children}</div>
+	>
+		<style>
+			[ui-side] { position: absolute; position-anchor: --ui-tooltip; }
+		</style>
+		{children}
+	</div>
 }

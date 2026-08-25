@@ -78,28 +78,48 @@ announcement. `aria-describedby` does the whole job.
 Not written, all on Higley's avoid list: `aria-haspopup`, `aria-expanded`,
 `aria-controls`, `aria-labelledby`, the `title` attribute, any live region.
 
-## Placement: the family emits identity, your stylesheet owns geometry
+## Placement: the family's stylesheet owns identity, yours owns geometry
 
-The trigger carries `anchorName={tooltip.triggerEl}` and the tip carries
-`positionAnchor={tooltip.triggerEl}` plus a static `style="position:absolute"`.
-Both lower to one inline style declaration whose value is a second rendering of
-the same per-widget-instance token the minted id renders — one identity, two
-spellings, so the trigger that declares the anchor and the tip that names it
-cannot disagree on the server or in the browser.
+The anchoring is three ordinary CSS rules in `<style>` blocks inside the part
+components. **The family writes no `style` attribute on any part** — `style` and
+`class` on all three are entirely the consumer's, and compose untouched:
 
-**This is the first family on the handle-based anchor attributes.** Popover still
-hand-writes a single global `--ui-popover` confined by `anchor-scope` on every
-root, which works but takes the `style` attribute on three parts away from
-consumers and leans on a scoping property to avoid a collision the compiler can
-make unreachable. Migrating it is a separate change set.
+```css
+/* tooltip.root */    div:not([ui-side]) { anchor-scope: --ui-tooltip; }
+/* tooltip.trigger */ button             { anchor-name: --ui-tooltip; }
+/* tooltip.content */ [ui-side]          { position: absolute; position-anchor: --ui-tooltip; }
+```
 
-The reason there is no computed placement here is a refusal, and it is the right
-one: `MARKLESS_ELEMENT_HANDLE_ANCHOR_STYLE_DYNAMIC` — "a CSS anchor cannot share
-an element with a computed style", because both end up in the same inline `style`
-attribute and a render-time value would have to be merged in the browser.
-Popover's `style={computed(...)}` placement is exactly that combination. So
-tooltip cannot copy it, and the answer the compiler pushes us to is the correct
-headless one:
+One anchor name for every tooltip on the page, and `anchor-scope` on each root
+confines it to that root's subtree. That is what keeps two co-rendered tooltips
+apart: without it, `position-anchor` resolves to the *last* matching anchor in
+tree order and both tips stack against the second trigger. The browser lane
+measures exactly that — pull the `anchor-scope` rule and the isolation row fails
+by 21px, which is how it was checked rather than assumed.
+
+### The selectors are discriminated by structure, because the scope class is not
+
+The compiled scope class is per **module**, not per component, so all three
+blocks share one class and each block's rules can reach the other parts'
+elements. The subjects are therefore chosen to be structurally unique inside this
+module: the trigger is the only `button`, the tip is the only element carrying
+`ui-side`, and the root is the `div` that is left (`div:not([ui-side])`). Rename
+a part's element and the discriminator has to be re-picked in the same change.
+
+**Consumer children are not reachable by these rules and never will be.** The
+scope class is minted only onto elements this module renders, so a consumer's own
+`<button>` inside `tooltip.content` carries no class and cannot be caught by
+`button { anchor-name: … }`. That is a property of the scoping, not a promise
+this family makes.
+
+Popover hand-writes the same shape for `--ui-popover`; the two families now agree
+on the mechanism.
+
+There is no computed placement here, and that stays true for a stronger reason
+than before: nothing in the family reaches the `style` attribute at all, so the
+old `MARKLESS_ELEMENT_HANDLE_ANCHOR_STYLE_DYNAMIC` refusal ("a CSS anchor cannot
+share an element with a computed style") no longer has anything to bite on. The
+geometry belongs to the consumer either way:
 
 ```css
 .tip {
@@ -238,7 +258,7 @@ and answering it to buy a nicety is the wrong order. QDS's `getEffectiveDelay` i
 
 `tooltip.browser.ts` — 28 rows, CSR and SSR. The shared rows in both modes
 (describedby while hidden, role + `overlay` + `hidden`, the anchor wiring, the
-dropped props, two instances minting distinct anchors and distinct ids), then the
+dropped props, two instances each landing against their own trigger), then the
 delay being real, focus opening with no wait, both halves of hoverable, the tip
 never closing on its own, Escape with focus on the trigger, a press on the
 trigger, a touch crossing that opens nothing, the pending-timer teardown, the two
@@ -249,6 +269,17 @@ The geometry rows carry the consumer half of the contract themselves — a
 stylesheet appended in `beforeEach` — because the family emits no
 `position-area` of its own. They are the only way to catch a `position-anchor`
 that silently did not resolve.
+
+**Every geometry row asserts a placement static flow cannot produce.** An earlier
+pair of them was false green: `served-open.tsrx` was `side="bottom"` with the tip
+authored last, so an absolutely positioned box with no resolved anchor lands at
+its static position — directly below the trigger — which is precisely where a
+working `position-area: bottom span-all` puts it. The two rows passed with the
+anchoring entirely dead. The scenario is now `side="top"`, so "above the trigger"
+is a placement only a resolved anchor reaches, and the rows were confirmed red by
+renaming the trigger's anchor to something nothing points at: 39px off, not
+green. `reversed.tsrx` keeps `side="bottom"` and stays honest by the opposite
+trick — it authors the tip *first*, so static flow would put it above.
 
 `tooltip.sr.ts` — 5 rows on the virtual reader: reaching the trigger conveys role,
 name and the tip with the tip verified hidden; the icon-only trigger conveying
@@ -278,13 +309,15 @@ both dismissal paths are covered in `tooltip.browser.ts` instead.
 
 ## Still open
 
-- **`anchorName` and `positionAnchor` are not in the type service.** The compiler
-  lowers both and the browser rows prove they work end to end, but
-  `MarklessAttributes` in `packages/typescript-plugin/src/markless-tsrx.d.ts`
-  declares only `attach`, `children`, `el` and `overlay`, so `pnpm typecheck`
-  reports `TS2322` on the two elements that carry them. Two optional properties
-  typed like `el` closes it. Outside this family, and outside this unit's
-  contract.
+- **`TooltipTriggerProps` and `TooltipContentProps` still say the family owns the
+  `style` attribute.** It does not any more — the anchoring moved into the parts'
+  own `<style>` blocks and `style`/`class` on all three parts are the consumer's.
+  Fixing the prose alone is not enough: `api/manifest.json` is a shipped export
+  subpath that snapshots those same doc comments, so it goes stale the moment
+  they change. The two have to move in one change set — edit `tooltip-types.ts`,
+  then `pnpm --dir packages/headless/components api:extract`. The manifest is
+  outside this unit's contract, which is the only reason the prose was left
+  standing.
 - **The gallery section is not wired into the real-reader lanes.**
   `apps/sr-gallery/preview-server.ts` needs `tooltip: '/#tooltip'` in
   `FAMILY_ANCHORS`, and `apps/sr-gallery/scripts/boot-check.ts` needs
