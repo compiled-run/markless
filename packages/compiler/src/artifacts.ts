@@ -1733,10 +1733,23 @@ export type SymbolModulesDiagnostic = CompilerDiagnostic & {
 	readonly passId: 'symbol-modules';
 };
 
+/**
+ * A branch this pass could build no arm parts for, whose every refusal was a
+ * same-module component that has to run. Rebuilding the markup here is
+ * impossible, but re-rendering the page through the prerender evaluator does
+ * run the component, so the link pass may fulfill the candidate with an
+ * escalation symbol. Until something fulfills it, the refusal beside it stands.
+ */
+export type ArmEscalationCandidate = {
+	readonly branchSiteId: string;
+	readonly symbolId: string;
+};
+
 export type SymbolModulesArtifact = {
 	readonly passId: 'symbol-modules';
 	readonly modules: ReadonlyArray<GeneratedSymbolModule>;
 	readonly diagnostics: ReadonlyArray<CaptureAnalysisDiagnostic | SymbolModulesDiagnostic>;
+	readonly armEscalationCandidates?: ReadonlyArray<ArmEscalationCandidate>;
 };
 
 export type RuntimeDemandMapRecordKind =
@@ -2342,13 +2355,21 @@ export type LinkedBoundarySymbolsInput = {
 	readonly resolverId: string;
 	readonly symbolModuleId: (symbolId: string) => string;
 	readonly boundaryExportName: (index: number) => string;
+	/**
+	 * Names the export for a branch whose arms hold a component that has to run.
+	 * A linker that supplies no name fulfills no escalation candidate, so the
+	 * refusal the symbol-modules pass recorded beside it stands.
+	 */
+	readonly branchExportName?: (index: number) => string;
 };
 
 export type LinkedBoundarySymbol = {
 	readonly row: { readonly id: string; readonly chunk: string; readonly exportName: string };
+	// The branch site this symbol fulfilled, for the linker's candidate gate.
+	readonly branchSiteId?: string;
 	readonly manifest: {
 		readonly symbolId: string;
-		readonly kind: 'async-boundary-update';
+		readonly kind: 'async-boundary-update' | 'branch-update';
 		readonly exportName: string;
 		readonly virtualModuleId: string;
 	};
