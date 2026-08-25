@@ -1646,7 +1646,7 @@ export function branchElseSpellingDiagnostic(input: {
 // Owner-adjustable: the spec is unambiguous that a bare container is not a
 // template output node, but the in-repo @markless/ui families still spell arms
 // that way. `warning` until that migration lands, then `error`.
-export const BARE_ARM_INTERPOLATION_SEVERITY: 'error' | 'warning' = 'warning';
+export const BARE_ARM_INTERPOLATION_SEVERITY: 'error' | 'warning' = 'error';
 
 export const BARE_ARM_INTERPOLATION_CODE = 'MARKLESS_BARE_ARM_INTERPOLATION' as const;
 
