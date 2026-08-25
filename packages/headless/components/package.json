@@ -62,7 +62,7 @@
 		"@markless/vitest-browser": "workspace:*",
 		"axe-core": "4.13.0",
 		"playwright": "1.58.2",
-		"yuku-analyzer": "0.9.0"
+		"yuku-analyzer": "0.9.1"
 	},
 	"peerDependencies": {
 		"vite": "^8.0.16",
