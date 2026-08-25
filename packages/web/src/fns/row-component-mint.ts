@@ -163,7 +163,7 @@ async function mintComponentRow(input: {
 	return {
 		rowRoot,
 		nodes: placed.nodes,
-		commit: () => commitMintedRow(input.registration, rendered, elementsByHostId),
+		commit: () => commitMintedRow(input.registration, rendered, elementsByHostId, input.repeat),
 	};
 }
 
@@ -206,6 +206,7 @@ async function commitMintedRow(
 	registration: RowRegistration,
 	rendered: { readonly state: ProtocolStatePayload; readonly view: ProtocolViewPayload },
 	elementsByHostId: ReadonlyMap<string, ResumeDomElement>,
+	repeat: ResumeKeyedRepeatRecord,
 ): Promise<void> {
 	const armRecords: ResumeArmRecordSet = {
 		locators: [],
@@ -219,6 +220,7 @@ async function commitMintedRow(
 	};
 	const deps = await registration.armRegistrationDeps(armRecords);
 	await seedMintedGraphNodes(deps, rendered.state);
+	await mergeMintedWidgetRoots(deps, rendered.state, repeat);
 	const { registerArmRecordSet } = await import('../resume-commit-arm.ts');
 	await registerArmRecordSet(deps, registration.installArmEventType, mintedRowBoundary(), {
 		armRecords,
@@ -256,6 +258,54 @@ async function seedMintedGraphNodes(
 		deps.graphNodeIds?.add?.(cell.graphNodeId);
 	}
 	for (const computed of state.computed) deps.graphNodeIds?.add?.(computed.graphNodeId);
+	// A widget-scoped definition owns nodes the row's cells never list - the ones
+	// its parts reach only through the definition - and the census counts those too.
+	for (const definition of state.sharedDefinitions ?? [])
+		for (const graphNodeId of definition.graphNodeIds) deps.graphNodeIds?.add?.(graphNodeId);
+}
+
+/**
+ * The row's own rendered widgets, filed against the live page graph.
+ *
+ * A graph's widget registry is minted once, from the definitions the payload
+ * served, and a row born after that carries roots no served definition names.
+ * Its parts would otherwise resolve their widget-scoped ids against another
+ * row's root, or against none at all, so the row's registry is merged in before
+ * any record that reads it is registered.
+ */
+async function mergeMintedWidgetRoots(
+	deps: ArmRegistrationDeps,
+	state: ProtocolStatePayload,
+	repeat: ResumeKeyedRepeatRecord,
+): Promise<void> {
+	const definitions = (state.sharedDefinitions ?? []).filter(
+		(definition) => definition.scope === 'widget',
+	);
+	const [{ marklessComposedWidgetRegistry }, instanceScope] = await Promise.all([
+		import('./composition.ts'),
+		import('./instance-scope.ts'),
+	]);
+	const composed = marklessComposedWidgetRegistry(state);
+	if (!composed && definitions.length === 0) return;
+	const registry = instanceScope.marklessGraphWidgetRegistry(deps.graph);
+	const note = (id: string, rootPath: string): void => {
+		const held = registry.rootPaths.get(id);
+		if (held !== undefined && held !== rootPath)
+			throw rowComponentError(
+				repeat,
+				'MARKLESS_REPEAT_ROW_COMPONENT_WIDGET_COLLISION',
+				`built a widget root for ${id} at "${rootPath}" that a live root already claims at "${held}".`,
+			);
+		instanceScope.marklessNoteWidgetRoot(registry, id, rootPath);
+	};
+	for (const [id, rootPath] of composed?.rootPaths ?? []) note(id, rootPath);
+	// Composition answers for the roots it merged; a definition the row serves
+	// outright - a root the row IS - is filed the way the graph files its own.
+	for (const definition of definitions) {
+		const rootPath = instanceScope.marklessInstancePath(definition.id);
+		note(definition.id, rootPath);
+		for (const projectionId of definition.projectionIds ?? []) note(projectionId, rootPath);
+	}
 }
 
 let valueDecoderPromise:

@@ -27,7 +27,11 @@ import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
 import type { ComposeGraphProps } from '../fns/composition.ts';
 import { marklessCsrRemapChildGraph } from '../fns/composition.ts';
 import { marklessBoundSymbolId } from '../fns/bound-symbol.ts';
-import { marklessRowFreeSymbolId, marklessRowSegment } from '../fns/instance-scope.ts';
+import {
+	marklessInstancePath,
+	marklessRowFreeSymbolId,
+	marklessRowSegment,
+} from '../fns/instance-scope.ts';
 import { registerPrerenderStagedComputeds } from './staged-graph.ts';
 import { sharedSeedPass } from './shared-seed-slot.ts';
 
@@ -449,7 +453,14 @@ async function evaluatePrerenderDataComponent(input: {
 	const liveCellIds = input.graph
 		? new Set(definition.state.cells.map((cell) => cell.graphNodeId))
 		: undefined;
-	const read = (graphNodeId: string, path: ReadonlyArray<string> = []) => {
+	const read = (graphNodeId: string, path: ReadonlyArray<string> = []): unknown => {
+		// A minted row loads its symbols through the resume loader, which scopes a
+		// symbol's reads by prepending the instance path. With no live graph to
+		// resolve that against, this component's own values answer to the
+		// compile-time id the symbol was emitted with.
+		const instancePath =
+			input.graph || values.has(graphNodeId) ? '' : marklessInstancePath(graphNodeId);
+		if (instancePath) return read(graphNodeId.slice(instancePath.length), path);
 		if (graphNodeId === definition.propCellId || graphNodeId === 'prop:props') {
 			return readPath(input.props, path);
 		}
