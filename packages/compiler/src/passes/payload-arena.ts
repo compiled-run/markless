@@ -158,6 +158,10 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 		},
 	);
 	const viewDomUpdates = input.semanticGraph.templateReads.flatMap((read) => {
+		// A read authored directly in a branch arm has no host of its own: bound
+		// to the enclosing element it would erase the sibling arm's markers, so
+		// it drives the arm's range instead (branchContentReads below).
+		if (read.armScopeBranchSiteId) return [];
 		if (read.computedGraphNodeId) {
 			return [
 				{
@@ -190,6 +194,27 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 				graphNodeId: resolved.binding.id,
 				path: runtimeGraphReadPath(resolved.binding, resolved.path),
 				target: read.target,
+			},
+		];
+	});
+	const branchContentReads = input.semanticGraph.templateReads.flatMap((read) => {
+		if (!read.armScopeBranchSiteId) return [];
+		const entry = { branchSiteId: read.armScopeBranchSiteId, source: read.source };
+		if (read.computedGraphNodeId)
+			return [{ ...entry, graphNodeId: read.computedGraphNodeId, path: [] }];
+		const resolved =
+			resolveGraphPath(read.source, componentBindings, componentAliases) ??
+			resolveSharedInstanceGraphPath(
+				read.source,
+				input.semanticGraph,
+				componentByHostNodeId.get(read.hostNodeId),
+			);
+		if (!resolved) return [];
+		return [
+			{
+				...entry,
+				graphNodeId: resolved.binding.id,
+				path: runtimeGraphReadPath(resolved.binding, resolved.path),
 			},
 		];
 	});
@@ -300,6 +325,7 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			),
 			elementHandles,
 			asyncBoundaries,
+			...(branchContentReads.length > 0 ? { branchContentReads } : {}),
 			branchSites: renderData.branches.map((site) => ({
 				id: site.branchSiteId,
 				anchorOrder: site.anchorOrder,

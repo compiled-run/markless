@@ -561,6 +561,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_REPEAT_KEY_UNSTABLE'
 		| 'MARKLESS_REPEAT_COLLECTION_UNREADABLE'
 		| 'MARKLESS_BRANCH_ELSE_SPELLING'
+		| 'MARKLESS_BARE_ARM_INTERPOLATION'
 		| 'MARKLESS_TEMPLATE_AS_VALUE'
 		| 'MARKLESS_SUBMODULE_UNSUPPORTED'
 		| 'MARKLESS_COMPONENT_TAG_UNRESOLVED'
@@ -642,6 +643,9 @@ export type SemanticTemplateRead = {
 	readonly hostNodeId: string;
 	readonly target: SemanticTemplateBindingTarget;
 	readonly asyncBoundaryId?: string;
+	// The branch site whose arm body holds this read directly, with no host of
+	// its own. Such a read drives the arm's range, never the enclosing element.
+	readonly armScopeBranchSiteId?: string;
 	readonly computedGraphNodeId?: string;
 	// The component body this read was authored in, for the same reason the branch
 	// site carries one: `{w.label}` in two components is two reads of two different
@@ -1289,6 +1293,14 @@ export type PayloadArenaArtifact = {
 			readonly plural?: boolean;
 		}>;
 		readonly asyncBoundaries: ReadonlyArray<PayloadAsyncBoundary>;
+		// Reads authored directly in a branch arm, with no host of their own.
+		// They refresh the arm's own range instead of the enclosing element.
+		readonly branchContentReads?: ReadonlyArray<{
+			readonly branchSiteId: string;
+			readonly source: string;
+			readonly graphNodeId: string;
+			readonly path: ReadonlyArray<string>;
+		}>;
 		readonly branchSites: ReadonlyArray<{ readonly id: string; readonly anchorOrder: number }>;
 	};
 	readonly diagnostics: ReadonlyArray<PayloadArenaDiagnostic>;
@@ -1830,13 +1842,35 @@ export type ProtocolViewArmRecordSet = {
 	readonly events: ProtocolViewPayload['events'];
 	readonly behaviors: ProtocolViewPayload['behaviors'];
 	readonly elementHandles: ProtocolViewPayload['elementHandles'];
-	readonly branches?: ReadonlyArray<ProtocolViewArmBranchRecord>;
+	readonly branches?: ReadonlyArray<
+		ProtocolViewArmBranchRecord & {
+			readonly contentReads?: ReadonlyArray<ProtocolViewBranchContentRead>;
+		}
+	>;
 };
 
-export type ProtocolViewPayloadWithArmRecords = Omit<ProtocolViewPayload, 'asyncBoundaries'> & {
+// A read an arm renders with no element of its own to bind to; it refreshes
+// the arm's marker range. Widened here rather than in the protocol package
+// because the branch record's owning type lives there and this landing does
+// not touch it - the field belongs in ProtocolViewPayload once ratified.
+export type ProtocolViewBranchContentRead = {
+	readonly graphNodeId: string;
+	readonly path: ReadonlyArray<string>;
+	readonly source: string;
+};
+
+export type ProtocolViewPayloadWithArmRecords = Omit<
+	ProtocolViewPayload,
+	'asyncBoundaries' | 'branches'
+> & {
 	readonly asyncBoundaries: ReadonlyArray<
 		ProtocolViewPayload['asyncBoundaries'][number] & {
 			readonly armRecords?: ReadonlyArray<ProtocolViewArmRecordSet>;
+		}
+	>;
+	readonly branches?: ReadonlyArray<
+		NonNullable<ProtocolViewPayload['branches']>[number] & {
+			readonly contentReads?: ReadonlyArray<ProtocolViewBranchContentRead>;
 		}
 	>;
 };

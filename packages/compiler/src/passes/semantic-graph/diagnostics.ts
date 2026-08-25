@@ -1643,6 +1643,35 @@ export function branchElseSpellingDiagnostic(input: {
 	};
 }
 
+// Owner-adjustable: the spec is unambiguous that a bare container is not a
+// template output node, but the in-repo @markless/ui families still spell arms
+// that way. `warning` until that migration lands, then `error`.
+export const BARE_ARM_INTERPOLATION_SEVERITY: 'error' | 'warning' = 'warning';
+
+export const BARE_ARM_INTERPOLATION_CODE = 'MARKLESS_BARE_ARM_INTERPOLATION' as const;
+
+export function bareArmInterpolationDiagnostic(input: {
+	readonly expressionSource: string;
+	readonly node: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	const wrapped = `<>{${input.expressionSource}}</>`;
+	return {
+		code: BARE_ARM_INTERPOLATION_CODE,
+		severity: BARE_ARM_INTERPOLATION_SEVERITY,
+		phase: 'semantic-graph',
+		title: 'A branch arm renders a bare expression instead of a fragment',
+		message: `\`{${input.expressionSource}}\` stands alone as this arm's whole body. A standalone expression container is not a template output node, so the arm has no markup of its own and its text has nowhere to live but the element around it — which erases whatever the other arm rendered there.`,
+		why: 'Template output is an element, a fragment, or a control-flow construct. A statement container that needs to render text says so with a fragment, which gives the text its own marker range inside the arm.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		source: `{${input.expressionSource}}`,
+		suggestions: [{ message: `Wrap it in a fragment: ${wrapped}` }],
+		docsUrl: `https://markless.dev/errors/${BARE_ARM_INTERPOLATION_CODE}`,
+	};
+}
+
 export function fallbackSpan(filename: string): SourceSpan {
 	return {
 		filename,

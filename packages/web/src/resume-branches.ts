@@ -111,46 +111,44 @@ function createBranchRegistration(
 			for (const armEvent of armRecordSet.events) input.eventTypes.add(armEvent.eventName);
 		let currentArm = wiredBranchArm(input.graph, branch);
 		currentArmByBranchId.set(branch.id, currentArm);
-		for (const testRead of branch.testReads) {
+		async function replaceArmRange(arm: number) {
+			const symbol = await input.loadSymbol(branch.symbolId);
+			const update = await symbol({
+				graph: input.graph,
+				arm,
+				branchId: branch.sourceId ?? branch.id,
+				composedBranchId: branch.id,
+				element: input.root,
+				getElementHandle: input.elementHandles.get,
+			});
+			if (!isResumeBranchUpdate(update)) return;
+			currentArm = update.arm;
+			currentArmByBranchId.set(branch.id, update.arm);
+			const html = branchHtmlToString(update.html);
+			const fragment = input.renderBranchHtml ? input.renderBranchHtml(html) : html;
+			if (branchFragmentEmpty(fragment) && !branch.declaredEmptyArms?.includes(update.arm))
+				throw branchArmEmptyError(branch, update.arm);
+			return [
+				{ type: 'removeRange', locator: `branch:${branch.id}` },
+				{ type: 'insertRange', locator: `branch:${branch.id}:start`, fragment },
+			] as DomJournalResult;
+		}
+		function wireRead(kind: 'test' | 'content', read: ResumeBranchRecord['testReads'][number]) {
 			const release = onceRelease(
 				input.graph.subscribe({
-					id: `branch-test:${branch.id}:${testRead.graphNodeId}:${testRead.path.join('.')}`,
-					graphNodeId: testRead.graphNodeId,
-					path: testRead.path,
+					id: `branch-${kind}:${branch.id}:${read.graphNodeId}:${read.path.join('.')}`,
+					graphNodeId: read.graphNodeId,
+					path: read.path,
 					async run() {
 						// Spec D8: pending is for FIRST APPEARANCES only — including flips.
 						// While the deciding read's async computed is re-running the flip
 						// holds its prior arm (see resume-runtime.ts holdPendingFlip). The
 						// compiler emits at most one test read per branch (symbol-resolver),
 						// so this subscription's read IS the arm decider readBranchArm uses.
-						if (input.holdPendingFlip?.(testRead.graphNodeId)) return;
-						const newArm = readBranchArm(input.graph, branch);
-						if (newArm === currentArm) return;
-						const symbol = await input.loadSymbol(branch.symbolId);
-						const update = await symbol({
-							graph: input.graph,
-							arm: newArm,
-							branchId: branch.sourceId ?? branch.id,
-							composedBranchId: branch.id,
-							element: input.root,
-							getElementHandle: input.elementHandles.get,
-						});
-						if (!isResumeBranchUpdate(update)) return;
-						currentArm = update.arm;
-						currentArmByBranchId.set(branch.id, update.arm);
-						const html = branchHtmlToString(update.html);
-						const fragment = input.renderBranchHtml
-							? input.renderBranchHtml(html)
-							: html;
-						if (
-							branchFragmentEmpty(fragment) &&
-							!branch.declaredEmptyArms?.includes(update.arm)
-						)
-							throw branchArmEmptyError(branch, update.arm);
-						return [
-							{ type: 'removeRange', locator: `branch:${branch.id}` },
-							{ type: 'insertRange', locator: `branch:${branch.id}:start`, fragment },
-						] as DomJournalResult;
+						if (kind === 'test' && input.holdPendingFlip?.(read.graphNodeId)) return;
+						const arm = readBranchArm(input.graph, branch);
+						if (kind === 'test' ? arm === currentArm : arm !== currentArm) return;
+						return replaceArmRange(arm);
 					},
 				}),
 			);
@@ -161,6 +159,8 @@ function createBranchRegistration(
 			}
 			input.storeContainerSubscription(release);
 		}
+		for (const testRead of branch.testReads) wireRead('test', testRead);
+		for (const contentRead of branch.contentReads ?? []) wireRead('content', contentRead);
 	}
 
 	// Escalated arm-scoped toggles (content needs component execution): the

@@ -41,7 +41,7 @@ import {
 	collectUpdate,
 } from './collect-expressions.ts';
 import { collectModuleScopeGraphCreation } from './collect-module-scope.ts';
-import { submoduleUnsupportedDiagnostic } from './diagnostics.ts';
+import { bareArmInterpolationDiagnostic, submoduleUnsupportedDiagnostic } from './diagnostics.ts';
 import {
 	collectSharedDefinitionDependencies,
 	collectImplicitFamilyScopeDiagnostics,
@@ -387,32 +387,43 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 				walk(node.alternate as AnyNode | undefined, state);
 			});
 			return;
-		case 'JSXIfExpression':
+		case 'JSXIfExpression': {
 			collectBranchSite(node, state);
-			walkBranch(node.consequent as AnyNode | undefined, state);
-			walkBranch(node.alternate as AnyNode | undefined, state);
+			const site = lastBranchSiteId(state);
+			withArmScope(state, site, () => {
+				walkBranch(node.consequent as AnyNode | undefined, state);
+				walkBranch(node.alternate as AnyNode | undefined, state);
+			});
 			collectConditionalBranchText(node, state);
 			return;
-		case 'JSXSwitchExpression':
+		}
+		case 'JSXSwitchExpression': {
 			collectBranchSite(node, state);
+			const site = lastBranchSiteId(state);
 			walk(node.discriminant as AnyNode | undefined, state);
-			for (const switchCase of asNodes(node.cases)) {
-				walk(switchCase.test as AnyNode | undefined, state);
-				const caseBranchId = `branch:${state.nextBranchId++}`;
-				state.currentBranchScopeIds.push(caseBranchId);
-				for (const caseChild of asNodes(switchCase.consequent)) {
-					walkMarkupStatement(caseChild, state);
+			withArmScope(state, site, () => {
+				for (const switchCase of asNodes(node.cases)) {
+					walk(switchCase.test as AnyNode | undefined, state);
+					const caseBranchId = `branch:${state.nextBranchId++}`;
+					state.currentBranchScopeIds.push(caseBranchId);
+					for (const caseChild of asNodes(switchCase.consequent)) {
+						walkMarkupStatement(caseChild, state);
+					}
+					state.currentBranchScopeIds.pop();
 				}
-				state.currentBranchScopeIds.pop();
-			}
+			});
 			return;
+		}
 		case 'JSXForExpression':
 			const repeatIndex = collectKeyedRepeat(node, state);
 			const repeat = repeatIndex === null ? null : state.graph.keyedRepeats[repeatIndex];
 			if (repeat) state.currentKeyedRepeatScopeIds.push(repeat.id);
-			for (const child of childNodes(node)) {
-				walk(child, state);
-			}
+			// A row's reads belong to the row template, not to any arm around it.
+			withArmScope(state, null, () => {
+				for (const child of childNodes(node)) {
+					walk(child, state);
+				}
+			});
 			if (repeat) state.currentKeyedRepeatScopeIds.pop();
 			attachKeyedRepeatRowHost(node, state, repeatIndex);
 			return;
@@ -555,17 +566,39 @@ function walkBranch(node: AnyNode | undefined, state: WalkState): void {
 	state.currentBranchScopeIds.pop();
 }
 
-// Only for positions where markup takes statements: there a bare `{expr}` is
-// interpolation, while the same shape inside a handler body is a real block.
+// Only for positions where markup takes statements: there a bare `{expr}` has
+// the shape of a block holding one expression statement, while the same shape
+// inside a handler body is a real block. The spec spells such an arm with a
+// fragment, so recognising it here is how the refusal finds it.
 function walkMarkupStatement(node: AnyNode | undefined, state: WalkState): void {
 	if (!node) return;
 	const interpolated = markupInterpolationExpression(node);
 	if (interpolated) {
+		state.graph.diagnostics.push(
+			bareArmInterpolationDiagnostic({
+				expressionSource: expressionSource(interpolated, state.source),
+				node: interpolated,
+				filename: state.filename,
+			}),
+		);
 		collectTemplateExpression(interpolated, state);
 		walk(interpolated, state);
 		return;
 	}
 	walk(node, state);
+}
+
+function lastBranchSiteId(state: WalkState): string | null {
+	return state.graph.branchSites[state.graph.branchSites.length - 1]?.id ?? null;
+}
+
+function withArmScope(state: WalkState, branchSiteId: string | null, run: () => void): void {
+	const previous = state.currentArmScope;
+	state.currentArmScope = branchSiteId
+		? { branchSiteId, hostNodeId: state.currentHostNodeId }
+		: null;
+	run();
+	state.currentArmScope = previous;
 }
 
 function withCreationSite(
