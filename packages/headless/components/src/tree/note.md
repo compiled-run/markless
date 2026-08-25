@@ -83,6 +83,23 @@ landed recursion fixture passes `depth`.
    child selector for exactly this reason.
 4. **`tree.itemcontent` reads a `computed()`, not the comparison inline.** The
    inline read renders the group closed and never refreshes at the first level.
+5. **A node written inside an arm must hold a value of its own.** `deep.tsrx`'s
+   `FileNode` appears in its own `@if`, and the branch-arm rule refuses any
+   component in an arm unless the compiler can rebuild that arm without running
+   the component. A same-module child that holds a `state()` or a `computed()`
+   is now escalated to a full re-render instead of refused; one that holds
+   neither is refused outright, at error severity, with
+   `MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED: … because <FileNode> has to run to
+   produce its content`. **The widget instance a part roots does not count as a
+   value of the component's own** — `tree.item`'s `open` lives on the shared
+   instance, not in `FileNode`'s body, so the node reads as valueless. Measured
+   2026-08-25 by compiling four shapes directly: the deep scenario refuses; the
+   same shape written with plain `<div>`s and no own value refuses identically,
+   so the recursion and the widget parts are not what blocks it; adding one
+   `state()` or `computed()` to the child makes either compile. `FileNode`
+   therefore derives its label (`computed(() => 'Folder ' + depth)`), which is
+   what keeps this scenario — and with it the whole `tree.browser.ts` file,
+   which imports it — loadable.
 
 ## Re-measured 2026-08-23 (U202, at `c4edc6d9`)
 
@@ -239,17 +256,41 @@ wall lifts.
    widget root inside a widget root. Every keyboard row therefore opens its
    branch by gesture rather than by prop.
 2. **`CSR: a self-composing node unrolls to the depth its prop names`** and the
-   two `deep.tsrx` gesture rows. **SSR renders it correctly** — four levels of one
-   component composing itself, each rooting its own widget instance — and CSR
-   throws `Error: Unknown async symbol c0:p4:p5:c0:p1:symbol:2` out of the client
-   resolver before anything renders. This is research §6c.2's spike: the landed
-   recursion receipts cover a PLAIN self-composing component, and the
-   widget-rooting half of that capability is red on the client only.
+   two `deep.tsrx` gesture rows. Re-measured 2026-08-25, after the scenario was
+   made compilable (item 5 above): **SSR renders it correctly** — four levels of
+   one component composing itself, each rooting its own widget instance — and
+   **CSR serves the recursive arm EMPTY**, `<!--markless:branch:c1:branch-site:0-->`
+   immediately followed by its closing marker inside an otherwise correct
+   `role="group"`, so only `depth-4-item` exists. No diagnostic, no runtime
+   error. The CSR gesture row falls out of that (there is no depth-3 row to
+   click); the SSR gesture row is a second, separate wall — SSR unrolls, and
+   then the click on the second level's trigger never opens it. This is research
+   §6c.2's spike: the landed recursion receipts cover a PLAIN self-composing
+   component, and the widget-rooting half is red on the client only. The old
+   reading of this wall (`Error: Unknown async symbol c0:p4:p5:c0:p1:symbol:2`
+   out of the client resolver) is STALE — nothing throws now.
 3. **`CSR: the nested level of a loop over nested data renders its nodes`.** SSR
    renders three file rows at level 2 from a keyed `@for` inside
    `tree.itemcontent`; CSR renders the outer loop's two folders and zero files,
    with no diagnostic and no runtime error. Research §6c.3 expected this row to
    fail; it fails in one mode.
+
+## Red on this tip, not pinned — 2026-08-25
+
+The lane could not load at all until `deep.tsrx` was made compilable, so these
+three rows had no witness and are not walls anybody chose. They are left red on
+purpose:
+
+- `CSR:` and `SSR: a nested node reaches its own handler, not the one enclosing
+  it` (`with-onchange.tsrx`). After clicking the nested node's trigger, the
+  ENCLOSING node reports `aria-expanded` as well — the row asserts
+  `el(SrcItem).hasAttribute('aria-expanded')` is false and gets true. Both modes.
+- `CSR: a second-level node opens and closes its own group from the first
+  gesture` (`nested-open.tsrx`). The second-level node starts open; the first
+  click on its trigger never closes it (`aria-expanded` stays `"true"`).
+
+Both shapes are the same suspicion — a click on an inner `tree.item` reaching
+more than its own instance — and neither has been diagnosed.
 
 ## Screen-reader lane
 
