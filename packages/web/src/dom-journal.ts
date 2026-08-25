@@ -1,5 +1,6 @@
 import type { DomJournalEntry } from '@markless/runtime';
 import { marklessAttributeValue } from './dom-attribute.ts';
+import { spliceCensus } from './resume-census.ts';
 
 type InsertRangeEntry = Extract<DomJournalEntry, { readonly type: 'insertRange' }>;
 type RemoveRangeEntry = Extract<DomJournalEntry, { readonly type: 'removeRange' }>;
@@ -122,11 +123,8 @@ export function applyDomJournalEntries(
 	}
 }
 
-// Range mutation renumbers the served shape, so every ancestor's pinned element
-// census is spliced by exactly what moved — re-deriving it from the live tree
-// would renumber around foreign nodes the framework does not own. The slot name
-// is shared with resume-locators by literal, not import: a value edge from here
-// regroups the chunk graph.
+// Every ancestor's pinned census is spliced, not re-derived: this module moves
+// ranges anywhere under a resumed root.
 function spliceDomOrderCensus(
 	parent: DomRangeParent,
 	removed: ReadonlyArray<DomRangeNode>,
@@ -134,44 +132,8 @@ function spliceDomOrderCensus(
 ): void {
 	for (let node: DomRangeParent | null | undefined = parent; node; node = node.parentNode) {
 		const census = (node as { __marklessCensus?: DomRangeNode[] }).__marklessCensus;
-		if (!census) continue;
-		for (const one of removed) {
-			const at = census.indexOf(one);
-			if (at >= 0) census.splice(at, blockEnd(census, at) - at);
-		}
-		if (inserted.length)
-			census.splice(insertionSlot(census, inserted[0]!), 0, ...censusElements(inserted));
+		if (census) spliceCensus(census, removed, inserted);
 	}
-}
-
-function blockEnd(census: DomRangeNode[], at: number): number {
-	const inside = new Set<DomRangeNode>(censusElements([census[at]!]));
-	let end = at + 1;
-	while (end < census.length && inside.has(census[end]!)) end++;
-	return end;
-}
-
-function insertionSlot(census: DomRangeNode[], first: DomRangeNode): number {
-	const parent = first.parentNode;
-	if (!parent) return census.length;
-	let slot = -1;
-	for (const child of Array.from(parent.childNodes)) {
-		if (child === first) break;
-		const at = census.indexOf(child);
-		if (at >= 0) slot = blockEnd(census, at);
-	}
-	if (slot >= 0) return slot;
-	const at = census.indexOf(parent as DomRangeNode);
-	return at >= 0 ? at + 1 : census.length;
-}
-
-function censusElements(nodes: ArrayLike<DomRangeNode>): DomRangeNode[] {
-	const elements: DomRangeNode[] = [];
-	for (const node of Array.from(nodes)) {
-		if (node.nodeType === 1) elements.push(node);
-		if (node.childNodes) elements.push(...censusElements(node.childNodes));
-	}
-	return elements;
 }
 
 function renderInsertRangeFragment(

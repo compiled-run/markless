@@ -129,7 +129,7 @@ export function findKeyedRepeatRowEventMatch(input: {
 				input.materializeHost(repeat.parentHostNodeId);
 			if (!parent) continue;
 			const items = readKeyedRepeatCollection(input.graph, repeat);
-			for (const [rowIndex, rowRoot] of repeatRowElements(parent, repeat, items.length)) {
+			for (const [rowIndex, rowRoot] of repeatRowElements(parent, repeat, items.length).entries()) {
 				const rowKey = repeatItemKey(items[rowIndex], repeat);
 				for (const rowEvent of rowEvents) {
 					if (rowEventHost(rowRoot, rowEvent.hostPath) === element) {
@@ -177,7 +177,7 @@ export function wireKeyedRepeats(
 		// that does starts the fetch at wiring time, not at the first gesture.
 		const builds = Boolean(repeat.rowTemplate ?? repeat.emptyArm ?? repeat.rowComponent);
 		if (builds) void loadRowMint(input.graph, rowComponentHost)?.catch(() => undefined);
-		for (const [rowIndex, rowRoot] of repeatRowElements(parent, repeat, items.length)) {
+		for (const [rowIndex, rowRoot] of repeatRowElements(parent, repeat, items.length).entries()) {
 			const rowKey = repeatItemKey(items[rowIndex], repeat);
 			rowRootsByKey.set(rowKey, rowRoot);
 			registerRowEvents(rowRoot, rowKey);
@@ -289,9 +289,8 @@ function applyKeyedRepeatRowOrder(
 	// ordered element() set most of all - kept answering a row that is gone.
 	// The record is kept in rowRootsByKey so the same key can return.
 	const staying = new Set(nextRows);
-	for (const rowRoot of rowRootsByKey.values())
-		if (!staying.has(rowRoot) && elementChildren(parent).includes(rowRoot))
-			mutableParent.removeChild?.(rowRoot);
+	for (const rowRoot of currentRows)
+		if (!staying.has(rowRoot)) mutableParent.removeChild?.(rowRoot);
 	// Rows go back into their own span, not onto the end of the parent. Appending
 	// was right only while a repeat owned every child; with a sibling in front of
 	// the rows the anchor is the first element after the row span that this
@@ -373,12 +372,10 @@ function censusInsertionSlot(census: ResumeDomElement[], first: ResumeDomNode): 
 }
 function censusElements(nodes: ReadonlyArray<ResumeDomNode>): ResumeDomElement[] {
 	const elements: ResumeDomElement[] = [];
-	(function visit(list: ReadonlyArray<ResumeDomNode>): void {
-		for (const node of list) {
-			if (node.nodeType === 1) elements.push(node as ResumeDomElement);
-			visit(node.childNodes ?? []);
-		}
-	})(nodes);
+	for (const node of nodes) {
+		if (node.nodeType === 1) elements.push(node as ResumeDomElement);
+		if (node.childNodes) elements.push(...censusElements(node.childNodes));
+	}
 	return elements;
 }
 /** The container root that holds the pinned census, walking out from the parent. */
@@ -400,17 +397,22 @@ export function readKeyedRepeatCollection(
 	return Array.isArray(value) ? value : Array.from((value ?? []) as Iterable<unknown>);
 }
 function repeatItemKey(item: unknown, repeat: ResumeKeyedRepeatRecord): unknown {
-	return readPath(item, repeat.keyPath);
+	let cursor = item as Record<string, unknown> | null | undefined;
+	for (const key of repeat.keyPath) {
+		if (cursor == null) return undefined;
+		cursor = cursor[key] as Record<string, unknown> | null | undefined;
+	}
+	return cursor;
 }
 function assertUniqueRepeatKeys(
 	repeat: ResumeKeyedRepeatRecord,
 	items: ReadonlyArray<unknown>,
 ): void {
-	const seen = new Map<unknown, true>();
+	const seen = new Set<unknown>();
 	for (const item of items) {
 		const key = repeatItemKey(item, repeat);
 		if (seen.has(key)) throw duplicateRepeatKeyError(repeat, key);
-		seen.set(key, true);
+		seen.add(key);
 	}
 }
 function duplicateRepeatKeyError(repeat: ResumeKeyedRepeatRecord, key: unknown): Error {
@@ -427,29 +429,16 @@ function duplicateRepeatKeyError(repeat: ResumeKeyedRepeatRecord, key: unknown):
 	error.docsUrl = 'https://markless.dev/errors/MARKLESS_REPEAT_KEY_DUPLICATE';
 	return error;
 }
-function readPath(value: unknown, path: ReadonlyArray<string>): unknown {
-	let cursor = value as Record<string, unknown> | null | undefined;
-	for (const key of path) {
-		if (cursor == null) return undefined;
-		cursor = cursor[key] as Record<string, unknown> | null | undefined;
-	}
-	return cursor;
-}
-/**
- * The parent's child elements that are this repeat's rows, paired with their row
- * index. Rows sit at `[rowStartOffset, rowStartOffset + count)`: the offset is
- * the compiler's count of element siblings in front of them, absent when the
- * rows already start the parent.
- */
+// Rows sit at `[rowStartOffset, rowStartOffset + count)`: the offset is the
+// compiler's count of element siblings in front of them, absent when the rows
+// already start the parent.
 function repeatRowElements(
 	parent: ResumeDomElement,
 	repeat: ResumeKeyedRepeatRecord,
 	count: number,
-): ReadonlyArray<readonly [number, ResumeDomElement]> {
+): ReadonlyArray<ResumeDomElement> {
 	const offset = repeat.rowStartOffset ?? 0;
-	return elementChildren(parent)
-		.slice(offset, offset + count)
-		.map((rowRoot, rowIndex) => [rowIndex, rowRoot] as const);
+	return elementChildren(parent).slice(offset, offset + count);
 }
 function elementChildren(element: ResumeDomElement): ResumeDomElement[] {
 	return Array.from(element.childNodes ?? []).filter(
