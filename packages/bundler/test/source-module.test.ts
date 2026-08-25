@@ -841,3 +841,55 @@ test('emitResumeModule leaves a repeat-free page with no row-mint specifier', ()
 		}),
 	).not.toContain('__marklessRowMint');
 });
+
+/**
+ * The component-row mint needs this page's render-data surface as well as the
+ * bridge, so its loader pairs the two imports - and both specifiers exist only
+ * where the compiler recorded the demand.
+ */
+const COMPONENT_ROW_DEMAND = [
+	'web/repeat-runtime',
+	'web/resume-keyed-repeats',
+	'web/fns/row-component-mint',
+];
+
+test('emitResumeModule writes the component-row loader with the page render data', () => {
+	const emitted = emitResumeModule({
+		...baseInput,
+		renderDataId: '\0markless:render-data:page.tsrx',
+		runtimeDemandMap: repeatDemandMap(COMPONENT_ROW_DEMAND),
+	});
+
+	expect(emitted).toContain("import('@markless/web/fns/row-component-mint')");
+	expect(emitted).toContain("import('\0markless:render-data:page.tsrx')");
+	expect(emitted).toContain('mint.marklessRowComponentMint(data.marklessPrerenderData, ...host)');
+	// One global: the bridge re-exports the template mint, so no second loader.
+	expect(emitted).not.toContain("import('@markless/web/fns/row-mint')");
+});
+
+// Fail closed: without a canonical render-data module there is no surface to
+// render a row against, so naming the bridge would only fetch a dead chunk.
+test('emitResumeModule writes no component-row loader without a render-data module', () => {
+	expect(
+		emitResumeModule({
+			...baseInput,
+			runtimeDemandMap: repeatDemandMap(COMPONENT_ROW_DEMAND),
+		}),
+	).not.toContain('row-component-mint');
+});
+
+test('emitResumeModule leaves a page with no component row byte-identical', () => {
+	const reorderOnly = emitResumeModule({
+		...baseInput,
+		renderDataId: '\0markless:render-data:page.tsrx',
+		runtimeDemandMap: repeatDemandMap(['web/repeat-runtime', 'web/resume-keyed-repeats']),
+	});
+
+	expect(reorderOnly).toBe(
+		emitResumeModule({
+			...baseInput,
+			runtimeDemandMap: repeatDemandMap(['web/repeat-runtime', 'web/resume-keyed-repeats']),
+		}),
+	);
+	expect(reorderOnly).not.toContain('row-component-mint');
+});

@@ -96,7 +96,9 @@ export function createArmCommitter(
 			records: ReadonlyArray<ResumeArmBranchRecord>,
 		) => Promise<void>;
 		readonly graph?: import('@markless/runtime').RuntimeGraph;
-		readonly graphNodeIds?: ReadonlySet<string>;
+		// The live registration census: a born-late registration grows it, because a
+		// node registered after boot is not in the boot-time snapshot.
+		readonly graphNodeIds?: ReadonlySet<string> & { readonly add?: (id: string) => unknown };
 		readonly registerComputedRefreshes?: (
 			records: ProtocolStatePayload['computed'],
 		) => Promise<void> | void;

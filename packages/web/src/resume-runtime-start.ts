@@ -76,6 +76,12 @@ export async function startResumeRuntime(input: {
 	}) => void;
 	readonly receiveSharedPatch: RuntimeShared['receiveSharedPatch'];
 	readonly sharedPatchEventType: string;
+	// Handed straight to the repeat runtime, which hands it to a component row's
+	// bridge: the registrar a row born after boot registers its records through.
+	readonly armRegistrationDeps: (
+		records: import('./resume-commit-arm.ts').ArmCommitUpdate['armRecords'],
+	) => Promise<import('./resume-commit-arm.ts').ArmRegistrationDeps>;
+	readonly installArmEventType: (eventType: string) => void;
 }): Promise<AsyncBoundarySettleTracker | undefined> {
 	const {
 		runtimeInput,
@@ -123,13 +129,20 @@ export async function startResumeRuntime(input: {
 			loadSymbol: runtimeInput.loadSymbol,
 			elementHandles: prepared.elementHandles,
 		});
-		keyedRepeats.wireKeyedRepeats({
-			graph: runtimeInput.graph,
-			view: runtimeInput.view,
-			elementsByHostId: prepared.elementsByHostId,
-			events,
-			storeContainerSubscription,
-		});
+		keyedRepeats.wireKeyedRepeats(
+			{
+				graph: runtimeInput.graph,
+				view: runtimeInput.view,
+				elementsByHostId: prepared.elementsByHostId,
+				events,
+				storeContainerSubscription,
+			},
+			{
+				runtimeInput,
+				armRegistrationDeps: input.armRegistrationDeps,
+				installArmEventType: input.installArmEventType,
+			},
+		);
 	}
 	let settleTracker: AsyncBoundarySettleTracker | undefined;
 	if (runtimeInput.view.asyncBoundaries.length > 0) {

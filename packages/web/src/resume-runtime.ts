@@ -415,6 +415,8 @@ export function createResumeRuntime(
 			},
 			receiveSharedPatch,
 			sharedPatchEventType: SHARED_PATCH_EVENT_TYPE,
+			armRegistrationDeps,
+			installArmEventType,
 		});
 		captureListenersStarted = true;
 		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__) {
@@ -511,8 +513,8 @@ export function createResumeRuntime(
 		},
 		activateBehaviors: async (hostNodeId: string) =>
 			(await loadBehaviorRuntime()).activateBehaviors(hostNodeId),
-		// D8 navigation transitions: settled means every boundary committed its
-		// content AND the flush that carried it fully applied.
+		// Settled means every boundary committed its content AND the flush that
+		// carried it fully applied.
 		whenAsyncBoundariesSettled: async () => {
 			if (!settleTracker) return;
 			await settleTracker.whenAllSettled();
@@ -538,9 +540,8 @@ export function registrationGraphNodeCensus(state: ResumeRuntimeInput['state']):
 	return ids;
 }
 
-// Local copies of the resume-locators helpers: importing that module here
-// regroups the wall-counted chunk graph, which costs more than the
-// duplication saves (T120 measurement; re-confirmed on this tree).
+// Local copies of the resume-locators helpers: importing that module regroups
+// the wall-counted chunk graph, which costs more than the duplication saves.
 function connectedElement(
 	root: ResumeDomElement,
 	element: ResumeDomElement | undefined,
