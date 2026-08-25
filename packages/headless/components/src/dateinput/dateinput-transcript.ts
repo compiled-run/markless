@@ -50,7 +50,7 @@ async function readForPhrase(
 	);
 }
 
-export async function readDateinputTranscript(sr: ScreenReaderDriver, page: Page) {
+export async function readDateInputTranscript(sr: ScreenReaderDriver, page: Page) {
 	const section = page.locator(`#${FAMILY_ANCHORS.dateinput.slice(2)}`);
 	const boxes = section.getByRole('spinbutton');
 

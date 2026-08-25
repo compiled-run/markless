@@ -724,7 +724,7 @@
 		"parts": [
 			{
 				"part": "dayinput",
-				"component": "DateinputDayinput",
+				"component": "DateInputDayInput",
 				"doc": "The day of the month, 1 to whatever the chosen month and year allow.",
 				"props": [
 					{
@@ -743,31 +743,31 @@
 			},
 			{
 				"part": "description",
-				"component": "DateinputDescription",
+				"component": "DateInputDescription",
 				"doc": "Supporting text for the group, named by the root's `aria-describedby`. One\nelement can be named that way, so mounting this alongside `dateinput.error`\ndescribes by whichever renders first.",
 				"props": []
 			},
 			{
 				"part": "error",
-				"component": "DateinputError",
+				"component": "DateInputError",
 				"doc": "The validation message. Mounting it is what marks the boxes invalid - they\nreport `aria-invalid` for as long as this part is in the page - so render it\nonly when there is an error to show.",
 				"props": []
 			},
 			{
 				"part": "field",
-				"component": "DateinputField",
+				"component": "DateInputField",
 				"doc": "The element a form submits. It is clipped, out of the tab order and hidden\nfrom readers, and it carries the whole date as `yyyy-mm-dd` under the root's\n`name`.",
 				"props": []
 			},
 			{
 				"part": "label",
-				"component": "DateinputLabel",
+				"component": "DateInputLabel",
 				"doc": "The group's name. It is a `<legend>` inside the root's `<fieldset>`, the\n`radio-group` precedent: three boxes have no single control for a `for` to\npoint at, and this way the group is named by the platform.",
 				"props": []
 			},
 			{
 				"part": "monthinput",
-				"component": "DateinputMonthinput",
+				"component": "DateInputMonthInput",
 				"doc": "The month, 1 to 12.",
 				"props": [
 					{
@@ -786,7 +786,7 @@
 			},
 			{
 				"part": "root",
-				"component": "DateinputRoot",
+				"component": "DateInputRoot",
 				"doc": "A date typed one part at a time, as three number boxes rather than one text\nfield. It is the group the three boxes sit in and the home of the date they\nspell: put a `dateinput.label`, a `dateinput.dayinput`, a\n`dateinput.monthinput` and a `dateinput.yearinput` inside it, in whichever\norder the date should read, and a `dateinput.field` when a form has to submit\nit.\n\nIt reports `ui-disabled`, `ui-required` and `ui-empty` for styling, and it is\nthe element a reader announces as the group the boxes belong to.",
 				"props": [
 					{
@@ -841,7 +841,7 @@
 			},
 			{
 				"part": "yearinput",
-				"component": "DateinputYearinput",
+				"component": "DateInputYearInput",
 				"doc": "The year.",
 				"props": [
 					{

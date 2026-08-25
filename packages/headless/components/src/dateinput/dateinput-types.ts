@@ -12,7 +12,7 @@ import type { SegmentType } from './date-input-math.ts';
  * It reports `ui-disabled`, `ui-required` and `ui-empty` for styling, and it is
  * the element a reader announces as the group the boxes belong to.
  */
-export type DateinputRootProps = Omit<PropsOf<'fieldset'>, 'onChange'> & {
+export type DateInputRootProps = Omit<PropsOf<'fieldset'>, 'onChange'> & {
 	/**
 	 * The date the boxes show, as `yyyy-mm-dd`. Omit it and they start empty.
 	 */
@@ -41,7 +41,7 @@ export type DateinputRootProps = Omit<PropsOf<'fieldset'>, 'onChange'> & {
  * A box draws its own digits, so it takes no children: what it shows is the part
  * of the date it holds, or its placeholder while it holds none.
  */
-export type DateinputSegmentProps = Omit<PropsOf<'span'>, 'children'> & {
+export type DateInputItemProps = Omit<PropsOf<'span'>, 'children'> & {
 	/** The text an empty box shows. Defaults to the box's own shape: `dd`, `mm`, `yyyy`. */
 	readonly placeholder?: string;
 	/** Show a single-digit day or month as `04` rather than `4`. */
@@ -49,41 +49,41 @@ export type DateinputSegmentProps = Omit<PropsOf<'span'>, 'children'> & {
 };
 
 /** The day of the month, 1 to whatever the chosen month and year allow. */
-export type DateinputDayinputProps = DateinputSegmentProps;
+export type DateInputDayInputProps = DateInputItemProps;
 
 /** The month, 1 to 12. */
-export type DateinputMonthinputProps = DateinputSegmentProps;
+export type DateInputMonthInputProps = DateInputItemProps;
 
 /** The year. */
-export type DateinputYearinputProps = DateinputSegmentProps;
+export type DateInputYearInputProps = DateInputItemProps;
 
 /**
  * The group's name. It is a `<legend>` inside the root's `<fieldset>`, the
  * `radio-group` precedent: three boxes have no single control for a `for` to
  * point at, and this way the group is named by the platform.
  */
-export type DateinputLabelProps = PropsOf<'legend'>;
+export type DateInputLabelProps = PropsOf<'legend'>;
 
 /**
  * Supporting text for the group, named by the root's `aria-describedby`. One
  * element can be named that way, so mounting this alongside `dateinput.error`
  * describes by whichever renders first.
  */
-export type DateinputDescriptionProps = PropsOf<'div'>;
+export type DateInputDescriptionProps = PropsOf<'div'>;
 
 /**
  * The validation message. Mounting it is what marks the boxes invalid - they
  * report `aria-invalid` for as long as this part is in the page - so render it
  * only when there is an error to show.
  */
-export type DateinputErrorProps = PropsOf<'div'>;
+export type DateInputErrorProps = PropsOf<'div'>;
 
 /**
  * The element a form submits. It is clipped, out of the tab order and hidden
  * from readers, and it carries the whole date as `yyyy-mm-dd` under the root's
  * `name`.
  */
-export type DateinputFieldProps = Omit<PropsOf<'input'>, 'value' | 'type'>;
+export type DateInputFieldProps = Omit<PropsOf<'input'>, 'value' | 'type'>;
 
 /**
  * The graph cells every date input part reads and writes.
@@ -94,7 +94,7 @@ export type DateinputFieldProps = Omit<PropsOf<'input'>, 'value' | 'type'>;
  * four by `./date-input-math.ts`. Text rather than numbers, because a half-typed
  * `0` on its way to `05` is a real state a number cannot hold.
  */
-export type DateinputInstanceState = {
+export type DateInputInstanceState = {
 	seed: string;
 	dayAt: string | null;
 	monthAt: string | null;
@@ -105,11 +105,11 @@ export type DateinputInstanceState = {
 	required: boolean;
 	invalid: boolean;
 	name: string;
-	onChange?: DateinputRootProps['onChange'];
+	onChange?: DateInputRootProps['onChange'];
 };
 
 /** Which part of the date one box holds, plus how it is asked to draw itself. */
-export type DateinputSegmentInstanceState = {
+export type DateInputItemInstanceState = {
 	type: SegmentType;
 	showLeadingZero: boolean;
 	placeholder: string;

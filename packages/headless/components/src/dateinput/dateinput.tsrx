@@ -18,17 +18,17 @@ import {
 	type SegmentType,
 } from './date-input-math.ts';
 import type {
-	DateinputDayinputProps,
-	DateinputDescriptionProps,
-	DateinputErrorProps,
-	DateinputFieldProps,
-	DateinputInstanceState,
-	DateinputLabelProps,
-	DateinputMonthinputProps,
-	DateinputRootProps,
-	DateinputSegmentInstanceState,
-	DateinputSegmentProps,
-	DateinputYearinputProps,
+	DateInputDayInputProps,
+	DateInputDescriptionProps,
+	DateInputErrorProps,
+	DateInputFieldProps,
+	DateInputInstanceState,
+	DateInputLabelProps,
+	DateInputMonthInputProps,
+	DateInputRootProps,
+	DateInputItemInstanceState,
+	DateInputItemProps,
+	DateInputYearInputProps,
 } from './dateinput-types.ts';
 
 // One computed() cell per comparison: a comparison written inline in an attribute
@@ -36,7 +36,7 @@ import type {
 
 export const dateinputState = shared(
 	() => {
-		const dateinput: DateinputInstanceState = state({
+		const dateinput: DateInputInstanceState = state({
 			seed: '',
 			dayAt: null,
 			monthAt: null,
@@ -120,7 +120,7 @@ export const dateinputState = shared(
 
 // A <fieldset> named by its <legend>: three boxes have no single control to point
 // a `for` at, and a widget root cannot mint an id for a part it contains.
-export function DateinputRoot({
+export function DateInputRoot({
 	value = '',
 	min = '',
 	max = '',
@@ -130,7 +130,7 @@ export function DateinputRoot({
 	onChange,
 	children,
 	...rest
-}: DateinputRootProps) @{
+}: DateInputRootProps) @{
 	const dateinput = dateinputState();
 	dateinput.onChange = onChange;
 	dateinput.seed = value;
@@ -157,7 +157,7 @@ export function DateinputRoot({
 	>{children}</fieldset>
 }
 
-export function DateinputLabel({ children, ...rest }: DateinputLabelProps) @{
+export function DateInputLabel({ children, ...rest }: DateInputLabelProps) @{
 	const dateinput = dateinputState();
 
 	<legend {...rest} ui-disabled={dateinput.disabled}>{children}</legend>
@@ -166,21 +166,21 @@ export function DateinputLabel({ children, ...rest }: DateinputLabelProps) @{
 // A focusable element drawing its own digits, not an `<input>`: an input's shown
 // text is its `value` property, which stops following the attribute once a person
 // types, so the graph could never be the one thing that says what a box shows.
-function DateinputSegment({
+function DateInputItem({
 	type,
 	placeholder,
 	showLeadingZero = false,
 	onKeydown,
 	onPaste,
 	...rest
-}: Omit<DateinputSegmentProps, 'placeholder'> & {
+}: Omit<DateInputItemProps, 'placeholder'> & {
 	readonly type: SegmentType;
 	readonly placeholder: string;
 }) @{
 	const dateinput = dateinputState();
 	// The type as a graph cell: compared against the prop instead, the comparison
 	// stops refreshing once the page has resumed.
-	const segment: DateinputSegmentInstanceState = state({ type, showLeadingZero, placeholder });
+	const segment: DateInputItemInstanceState = state({ type, showLeadingZero, placeholder });
 
 	const shown = computed(() =>
 		resolvedDisplay(
@@ -282,42 +282,42 @@ function DateinputSegment({
 	>{shown}</span>
 }
 
-export function DateinputDayinput({ ...rest }: DateinputDayinputProps) @{
-	<DateinputSegment placeholder="dd" {...rest} type="day" />
+export function DateInputDayInput({ ...rest }: DateInputDayInputProps) @{
+	<DateInputItem placeholder="dd" {...rest} type="day" />
 }
 
-export function DateinputMonthinput({ ...rest }: DateinputMonthinputProps) @{
-	<DateinputSegment placeholder="mm" {...rest} type="month" />
+export function DateInputMonthInput({ ...rest }: DateInputMonthInputProps) @{
+	<DateInputItem placeholder="mm" {...rest} type="month" />
 }
 
-export function DateinputYearinput({ ...rest }: DateinputYearinputProps) @{
-	<DateinputSegment placeholder="yyyy" {...rest} type="year" />
+export function DateInputYearInput({ ...rest }: DateInputYearInputProps) @{
+	<DateInputItem placeholder="yyyy" {...rest} type="year" />
 }
 
 // One part stands behind both `dateinput.description` and `dateinput.error`: an
 // element() handle binds in exactly one place, and aria-describedby names exactly
 // one id. A field that mounts both messages is described by the first.
-function DateinputMessage({ children, ...rest }: DateinputDescriptionProps) @{
+function DateInputMessage({ children, ...rest }: DateInputDescriptionProps) @{
 	const dateinput = dateinputState();
 
 	<div {...rest} el={dateinput.describedEl}>{children}</div>
 }
 
-export function DateinputDescription({ children, ...rest }: DateinputDescriptionProps) @{
-	<DateinputMessage {...rest}>{children}</DateinputMessage>
+export function DateInputDescription({ children, ...rest }: DateInputDescriptionProps) @{
+	<DateInputMessage {...rest}>{children}</DateInputMessage>
 }
 
-export function DateinputError({ children, ...rest }: DateinputErrorProps) @{
+export function DateInputError({ children, ...rest }: DateInputErrorProps) @{
 	const dateinput = dateinputState();
 	// Mounting the error part is what marks the boxes invalid.
 	dateinput.invalid = true;
 
-	<DateinputMessage {...rest}>{children}</DateinputMessage>
+	<DateInputMessage {...rest}>{children}</DateInputMessage>
 }
 
 // No handler of its own: the input is clipped, aria-hidden and out of the tab
 // order, so nothing but the family ever changes it.
-export function DateinputField({ ...rest }: DateinputFieldProps) @{
+export function DateInputField({ ...rest }: DateInputFieldProps) @{
 	const dateinput = dateinputState();
 	const submitted = computed(() => dateinput.value ?? '');
 
