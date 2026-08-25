@@ -155,6 +155,8 @@ export type ResumeBranchUpdate = {
 	// Present only from an escalation symbol: the re-rendered arm's own records.
 	readonly armRecords?: ResumeArmRecordSet;
 	readonly computed?: ProtocolStatePayload['computed'];
+	// State cells of components the escalated render created.
+	readonly cells?: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
 };
 // Async-arm records use indexes relative to the boundary's start anchor.
 export type ResumeArmLocator = {

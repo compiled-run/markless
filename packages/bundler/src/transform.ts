@@ -210,16 +210,9 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		chunk: symbolVirtualModuleId(input.filename, module.symbolId),
 		exportName: scopedSymbolExportName(input.filename, module.exportName),
 	}));
-	const linkedBoundarySymbols = linkedRenderDataBoundarySymbols({
-		compiled,
-		link: input,
-		clientLink: input.environment === 'client',
-		renderDataId,
-		resolverId,
-		symbolModuleId: (symbolId) => symbolVirtualModuleId(input.filename, symbolId),
-		boundaryExportName: (index) =>
-			scopedSymbolExportName(input.filename, `marklessLinkedBoundaryUpdate${index}`),
-	});
+	const linkedBoundarySymbols = linkedRenderDataBoundarySymbols(
+		linkedSymbolInput(compiled, input, renderDataId, resolverId, input.environment === 'client'),
+	);
 	const symbolRows = [
 		...compilerSymbolRows,
 		...linkedBoundarySymbols.map((symbol) => symbol.row),
@@ -791,6 +784,53 @@ export async function preflightTsrxModuleDiagnostics(
 	throwIfBlocked(input, blockingDiagnostics);
 }
 
+// The naming closures that decide what this bundler links. Naming a branch
+// export is what fulfils an escalation candidate, so the same call answers both
+// "what do we emit" and "which refusal still stands".
+function linkedSymbolInput(
+	compiled: CompileTsrxModuleResult,
+	input: Pick<
+		TransformTsrxModuleInput,
+		'filename' | 'importedModuleInterfaces' | 'artifactChildMaterializations'
+	>,
+	renderDataId: string,
+	resolverId: string,
+	clientLink: boolean,
+) {
+	return {
+		compiled,
+		link: input,
+		clientLink,
+		renderDataId,
+		resolverId,
+		symbolModuleId: (symbolId: string) => symbolVirtualModuleId(input.filename, symbolId),
+		boundaryExportName: (index: number) =>
+			scopedSymbolExportName(input.filename, `marklessLinkedBoundaryUpdate${index}`),
+		branchExportName: (index: number) =>
+			scopedSymbolExportName(input.filename, `marklessLinkedBranchUpdate${index}`),
+	} satisfies Parameters<typeof linkedRenderDataBoundarySymbols>[0];
+}
+
+// The client link ships the escalation symbol, so it decides the refusal for
+// every environment: a server build must not refuse the shape its own client
+// build knows how to flip.
+function fulfilledEscalationSymbolIds(
+	compiled: CompileTsrxModuleResult,
+	input: Pick<
+		TransformTsrxModuleInput,
+		'filename' | 'importedModuleInterfaces' | 'artifactChildMaterializations'
+	>,
+	resolverId: string,
+): ReadonlySet<string> {
+	if ((compiled.symbolModules.armEscalationCandidates ?? []).length === 0) return new Set();
+	const renderDataId = `${MARKLESS_VIRTUAL_PREFIX}render-data:${encodeURIComponent(input.filename)}`;
+	return new Set(
+		linkedRenderDataBoundarySymbols(
+			linkedSymbolInput(compiled, input, renderDataId, resolverId, true),
+		).flatMap((symbol) => (symbol.manifest.kind === 'branch-update' ? [symbol.row.id] : [])),
+	);
+}
+
 async function compileWithBlockingDiagnostics(
 	input: Pick<
 		TransformTsrxModuleInput,
@@ -816,10 +856,17 @@ async function compileWithBlockingDiagnostics(
 		// default 'auto' keeps the authored-source strings for dev tooling.
 		omitAuthoredSource: normalizeExecutionLogMode(input.executionLog) === 'never',
 	});
+	const fulfilled = fulfilledEscalationSymbolIds(compiled, input, resolverId);
 	return {
 		compiled,
 		blockingDiagnostics: collectTsrxModuleDiagnostics(compiled).filter(
-			(diagnostic) => diagnostic.severity === 'error',
+			(diagnostic) =>
+				diagnostic.severity === 'error' &&
+				!(
+					diagnostic.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED' &&
+					typeof diagnostic.symbolId === 'string' &&
+					fulfilled.has(diagnostic.symbolId)
+				),
 		),
 	};
 }

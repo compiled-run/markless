@@ -11,6 +11,7 @@ import type {
 import { armChildRead, armHostPaths, type ArmHostPlacement } from './arm-child-content.ts';
 import { resolveRowComponentMint, type RowComponentMint } from './row-mint.ts';
 import { forwardedSpreadViewRecords } from './spread-forwarding.ts';
+import { armEscalationCandidateSiteIds } from './symbol-modules.ts';
 
 function renderDataOf(input: ProtocolViewPayloadInput): RenderDataArtifact {
 	if (!input.renderData) {
@@ -252,8 +253,27 @@ function emittedPairRank(input: ProtocolViewPayloadInput, id: string): number {
 	return emittedAnchorPairs(input).findIndex((pair) => pair.id === id);
 }
 
+// A branch whose arms the symbol-modules pass could build no parts for, and
+// whose every refusal a page re-render answers. Its flip replaces the range
+// wholesale, so the per-arm plan below would double-register what the served
+// arm already carries.
+function escalatingBranchIds(input: ProtocolViewPayloadInput): ReadonlySet<string> {
+	return armEscalationCandidateSiteIds({
+		source: input.source,
+		semanticGraph: input.semanticGraph,
+		symbolResolver: input.symbolResolver,
+		captureAnalysis: input.captureAnalysis ?? {
+			passId: 'capture-analysis',
+			extractedSymbols: [],
+			diagnostics: [],
+		},
+		renderData: input.renderData,
+	} as Parameters<typeof armEscalationCandidateSiteIds>[0]);
+}
+
 function supportedBranchRecords(input: ProtocolViewPayloadInput) {
 	const branchIds = supportedBranchIds(input);
+	const escalatingIds = escalatingBranchIds(input);
 	const branchSymbols = new Map(
 		input.symbolResolver.symbols.flatMap((symbol) =>
 			symbol.kind === 'branch-update' ? [[symbol.branchSiteId, symbol] as const] : [],
@@ -292,7 +312,9 @@ function supportedBranchRecords(input: ProtocolViewPayloadInput) {
 			symbolId: branchSymbols.get(site.id)?.id,
 			testReads: branchSymbols.get(site.id)?.testReads ?? [],
 			...branchContentReadsField(input, site.id),
-			armRecords: branchArmRecords(input, site.id),
+			...(escalatingIds.has(site.id)
+				? { escalates: true as const }
+				: { armRecords: branchArmRecords(input, site.id) }),
 		}));
 }
 

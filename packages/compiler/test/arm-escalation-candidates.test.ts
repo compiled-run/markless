@@ -79,6 +79,38 @@ test('a linker that names branch exports fulfills the candidate with a prerender
 	expect(escalation?.module.source).toContain('arm: context.arm');
 });
 
+// The flip replaces the whole range from a fresh render, so the compiler's
+// per-arm plan must not also register: the served arm already carries it.
+test('an escalating branch is marked in the view and carries no per-arm plan', async () => {
+	const compiled = await compilePage(OWN_STATE_CHILD);
+	const candidate = (compiled.symbolModules.armEscalationCandidates ?? [])[0]!;
+	const branch = (compiled.protocolView.branches ?? []).find(
+		(record) => record.id === candidate.branchSiteId,
+	);
+	expect(branch?.escalates).toBe(true);
+	expect(branch?.armRecords).toBeUndefined();
+	expect(branch?.symbolId).toBe(candidate.symbolId);
+});
+
+test('a branch the compiler can rebuild keeps its per-arm plan and no escalation mark', async () => {
+	const compiled = await compilePage(`
+import { state } from '@markless/core';
+
+export function App() @{
+	let armed = state(false);
+
+	<main>
+		<button type="button" onClick={() => armed = !armed}>Arm</button>
+		@if (armed) { <em class="plain">ready</em> }
+	</main>
+}
+`);
+	expect(compiled.symbolModules.armEscalationCandidates ?? []).toHaveLength(0);
+	const branch = (compiled.protocolView.branches ?? [])[0];
+	expect(branch?.escalates).toBeUndefined();
+	expect(branch?.armRecords).toBeDefined();
+});
+
 // The narrowed set: an imported child brings markup and records this module
 // cannot address, so it stays plainly refused rather than becoming a candidate.
 test('an imported child that has to run is refused, not escalated', async () => {

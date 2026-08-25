@@ -32,6 +32,9 @@ export type ArmCommitUpdate = {
 	readonly elementsByHostId?: ReadonlyMap<string, ResumeDomElement>;
 	readonly eventElementsByHostId?: ReadonlyMap<string, ReadonlyArray<ResumeDomElement>>;
 	readonly computed?: ProtocolStatePayload['computed'];
+	// Cells of components this render created: nothing in the live graph answers
+	// for them until the commit writes them in.
+	readonly cells?: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
 };
 
 export type ArmRegistrationDeps = Parameters<typeof createArmCommitter>[0];
@@ -148,7 +151,7 @@ export async function registerArmRecordSet(
 	deps: ArmRegistrationDeps,
 	installEventType: (eventType: string) => void,
 	boundary: ResumeArmRange,
-	update: Pick<ArmCommitUpdate, 'armRecords' | 'elementsByHostId' | 'computed'>,
+	update: Pick<ArmCommitUpdate, 'armRecords' | 'elementsByHostId' | 'computed' | 'cells'>,
 	eventTypesInstalled?: boolean,
 ) {
 	const exhaustive = {
@@ -185,6 +188,12 @@ export async function registerArmRecordSet(
 		const element = materialized.elementsByHostId.get(handle.hostNodeId);
 		if (!element) throw armRecordHostMissingError(handle.hostNodeId, 'element handle');
 		deps.registerElementHandle(handle.hostNodeId, handle, element);
+	}
+	// Before any refresh subscribes: a derive that runs first would read nothing.
+	for (const cell of update.cells ?? []) {
+		if (!deps.graph) throw new Error('Markless arm state registration is unavailable.');
+		deps.graph.write({ graphNodeId: cell.graphNodeId, value: cell.value });
+		deps.graphNodeIds?.add?.(cell.graphNodeId);
 	}
 	const computedRefreshes = (update.computed ?? []).filter(
 		(computed) => computed.async === false && typeof computed.deriveSymbolId === 'string',
