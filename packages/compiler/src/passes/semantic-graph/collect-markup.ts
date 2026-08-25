@@ -40,6 +40,7 @@ import {
 	lowerStyleObject,
 	type StyleConstResolver,
 } from './style-object.ts';
+import { componentMarkupRoot } from '../public-render/component-markup-root.ts';
 import { collectStyleScopes } from '../public-render/style-scopes.ts';
 import { propsRestSignature } from './spread-event-guard.ts';
 import type { MutableSemanticGraphArtifact } from './types.ts';
@@ -113,7 +114,7 @@ export function collectSemanticMarkup(input: {
 	for (const statement of asNodes(input.ast.body)) {
 		const component = getComponentFunction(statement);
 		if (!component) continue;
-		const root = firstMarkupOutput(component.node);
+		const root = componentMarkupRoot(component.node);
 		if (!root) continue;
 		components.push({
 			name: component.name,
@@ -917,31 +918,9 @@ function expressionResidue(
 
 /** The scope class every element of this component carries, or null when it declares no <style>. */
 export function componentStyleScopeClass(component: AnyNode, filename: string): string | null {
-	const root = firstMarkupOutput(component);
+	const root = componentMarkupRoot(component);
 	if (!root) return null;
 	return collectStyleScopes(root, filename).styleScopes[0]?.scopeId ?? null;
-}
-
-function firstMarkupOutput(component: AnyNode): AnyNode | null {
-	const body = component.body as AnyNode | undefined;
-	for (const node of body ? childNodes(body) : []) {
-		if (
-			node.type === 'Element' ||
-			node.type === 'JSXElement' ||
-			node.type === 'Fragment' ||
-			node.type === 'JSXFragment' ||
-			node.type === 'JSXIfExpression' ||
-			node.type === 'JSXSwitchExpression' ||
-			node.type === 'JSXForExpression' ||
-			node.type === 'JSXTryExpression'
-		)
-			return node;
-		if (node.type === 'ReturnStatement') {
-			const argument = node.argument as AnyNode | undefined;
-			if (argument) return argument;
-		}
-	}
-	return null;
 }
 
 function isPublicRoot(node: AnyNode): boolean {
