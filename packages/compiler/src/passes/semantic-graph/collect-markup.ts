@@ -493,9 +493,12 @@ function emitNode(
 			continue;
 		}
 		if (!expression) continue;
+		// In a scoped module every element carries the scope class, so a dynamic
+		// class is always present and the constant rides the statics after the slot.
+		const scopeSuffix = name === 'class' ? context.styleScopeClass : null;
 		// A value that cannot be absent keeps its name in the statics; otherwise
 		// the slot emits the whole attribute so the runtime decides presence.
-		const alwaysPresent = isAlwaysPresentValue(expression);
+		const alwaysPresent = isAlwaysPresentValue(expression) || scopeSuffix !== null;
 		if (alwaysPresent) append(builder, ` ${name}="`);
 		addSlot(builder, {
 			kind: 'attribute',
@@ -510,11 +513,12 @@ function emitNode(
 							context,
 							repeat,
 							builder.componentName,
+							context.styleScopeClass,
 						),
 					}
 				: {}),
 		});
-		if (alwaysPresent) append(builder, '"');
+		if (alwaysPresent) append(builder, scopeSuffix ? ` ${scopeSuffix}"` : '"');
 	}
 	if (anchorStyle) {
 		append(builder, ' style="');
@@ -662,6 +666,7 @@ function directClassMatch(
 	context: CollectionContext,
 	repeat: { readonly id: string; readonly itemName: string },
 	componentName: string,
+	styleScopeClass: string | null,
 ) {
 	if (expression.type !== 'ConditionalExpression') return undefined;
 	const test = expression.test as AnyNode | undefined;
@@ -687,8 +692,8 @@ function directClassMatch(
 		stateGraphNodeId: graph.graphNodeId,
 		statePath: graph.path,
 		itemPath: item.path,
-		trueClass: consequent.value,
-		falseClass: alternate.value,
+		trueClass: styleScopeClass ? `${consequent.value} ${styleScopeClass}` : consequent.value,
+		falseClass: styleScopeClass ? `${alternate.value} ${styleScopeClass}` : alternate.value,
 	};
 }
 
@@ -908,6 +913,13 @@ function expressionResidue(
 	return computedRead?.computedGraphNodeId
 		? { kind: 'graph-read', graphNodeId: computedRead.computedGraphNodeId, path: [] }
 		: { kind: 'authored-expression', source };
+}
+
+/** The scope class every element of this component carries, or null when it declares no <style>. */
+export function componentStyleScopeClass(component: AnyNode, filename: string): string | null {
+	const root = firstMarkupOutput(component);
+	if (!root) return null;
+	return collectStyleScopes(root, filename).styleScopes[0]?.scopeId ?? null;
 }
 
 function firstMarkupOutput(component: AnyNode): AnyNode | null {

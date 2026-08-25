@@ -57,7 +57,7 @@ import { retargetProjectedRepeatHosts } from './projected-repeat-host.ts';
 import { collectBranchSite } from './collect-branches.ts';
 import { collectModuleGraphInterface, collectVariableDeclaration } from './collect-state.ts';
 import { createMutableSemanticGraphArtifact, createWalkState, type WalkState } from './types.ts';
-import { collectSemanticMarkup } from './collect-markup.ts';
+import { collectSemanticMarkup, componentStyleScopeClass } from './collect-markup.ts';
 
 export async function buildSemanticGraph(
 	input: SemanticGraphInput,
@@ -109,6 +109,7 @@ export async function buildSemanticGraph(
 		});
 		const previousComponentName = state.currentComponentName;
 		const previousComponentId = state.currentComponentId;
+		const previousStyleScopeClass = state.currentStyleScopeClass;
 		const componentSpan = sourceSpan(componentFunction.node, input.filename);
 		if (!componentSpan) {
 			throw new Error(
@@ -117,12 +118,17 @@ export async function buildSemanticGraph(
 		}
 		state.currentComponentName = componentFunction.name;
 		state.currentComponentId = `component:${componentSpan.start}:${componentSpan.end}`;
+		state.currentStyleScopeClass = componentStyleScopeClass(
+			componentFunction.node,
+			input.filename,
+		);
 		prepareComponentLocalBindings(componentFunction.node.body as AnyNode, state);
 		collectComponentProps(componentFunction.node, state);
 		walk(componentFunction.node.body as AnyNode, state);
 		mergeComponentLocalDeclarations(state);
 		state.currentComponentName = previousComponentName;
 		state.currentComponentId = previousComponentId;
+		state.currentStyleScopeClass = previousStyleScopeClass;
 	}
 
 	collectSharedCallbackBindings(state);
