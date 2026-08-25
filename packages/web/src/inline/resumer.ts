@@ -976,6 +976,17 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 				: [];
 		}),
 	]);
+	// A row that IS a component owns no element of the row chunk, so its gestures
+	// ride the child's own records and `rowEvents` is empty by construction: the
+	// unknown-element hatch below has to open on the record that says the list can
+	// mint such a row, or a row born after boot is never forwarded at all.
+	const mintsComponentRows = [
+		...(view.keyedRepeats ?? []),
+		...view.asyncBoundaries.flatMap((boundary) => {
+			const armRecords = boundary.armRecords as ProtocolArmRecordSet | undefined;
+			return armRecords && !Array.isArray(armRecords) ? (armRecords.keyedRepeats ?? []) : [];
+		}),
+	].some((repeat) => repeat.rowComponent !== undefined);
 	const eventNames = new Set([
 		...view.events.map((event) => event.eventName),
 		...nestedEventNames,
@@ -1015,7 +1026,7 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 					}
 					if (element === root) break;
 				}
-				if (nestedEventNames.has(event.type)) {
+				if (mintsComponentRows || nestedEventNames.has(event.type)) {
 					return forward({ event, element: event.target, eventRecord: null });
 				}
 				if (__MARKLESS_INLINE_EXECUTION_LOG__ !== 'never' && globalScope.__mxLog) {
