@@ -27,19 +27,47 @@ export function registerServedArmEventRecords(
 	root: ResumeDomElement,
 	boundaries: ReadonlyArray<ResumeAsyncBoundaryPayload>,
 	register: (element: object, record: ResumeArmRecordSet['events'][number]) => void,
+	// An escalating branch open at first render serves its arm the same way, so
+	// its records need the same pre-runtime pass or its first click is dropped.
+	branches: ReadonlyArray<{
+		readonly startAnchor: ResumeAsyncBoundaryPayload['startAnchor'];
+		readonly endAnchor: ResumeAsyncBoundaryPayload['endAnchor'];
+		readonly servedArmRecords?: unknown;
+	}> = [],
 ): void {
 	let comments: ReadonlyArray<ResumeDomComment> | undefined;
+	const ranges: Array<{
+		readonly startAnchor: ResumeAsyncBoundaryPayload['startAnchor'];
+		readonly endAnchor: ResumeAsyncBoundaryPayload['endAnchor'];
+		readonly armRecords: ResumeArmRecordSet;
+	}> = [];
 	for (const boundary of boundaries) {
 		const armRecords = boundaryArmRecordSet(boundary.armRecords);
-		if (!armRecords?.events.length) continue;
+		if (armRecords?.events.length)
+			ranges.push({
+				startAnchor: boundary.startAnchor,
+				endAnchor: boundary.endAnchor,
+				armRecords,
+			});
+	}
+	for (const branch of branches) {
+		const armRecords = boundaryArmRecordSet(branch.servedArmRecords);
+		if (armRecords?.events.length)
+			ranges.push({
+				startAnchor: branch.startAnchor,
+				endAnchor: branch.endAnchor,
+				armRecords,
+			});
+	}
+	for (const range of ranges) {
 		comments ??= pageCommentCensus(root);
-		const startAnchor = comments[boundary.startAnchor.index];
+		const startAnchor = comments[range.startAnchor.index];
 		if (!startAnchor) continue;
 		const arm = materializeArmRecords({
 			root,
 			startAnchor,
-			endAnchor: comments[boundary.endAnchor.index],
-			armRecords,
+			endAnchor: comments[range.endAnchor.index],
+			armRecords: range.armRecords,
 		});
 		for (const record of arm.events) {
 			const element = arm.elementsByHostId.get(record.hostNodeId);

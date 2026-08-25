@@ -158,6 +158,11 @@ export async function renderCsrRuntime(input: {
 		output.root as unknown as ResumeDomElement,
 		view.asyncBoundaries as ReadonlyArray<ResumeAsyncBoundaryPayload>,
 		delegatedTriggers.registerEventRecord,
+		(view.branches ?? []) as ReadonlyArray<{
+			readonly startAnchor: ResumeAsyncBoundaryPayload['startAnchor'];
+			readonly endAnchor: ResumeAsyncBoundaryPayload['endAnchor'];
+			readonly servedArmRecords?: unknown;
+		}>,
 	);
 	if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 		await registerDelegatedTriggerDebug(output, view);
