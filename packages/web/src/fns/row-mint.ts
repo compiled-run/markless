@@ -60,6 +60,21 @@ export function mintRow(
 	repeat: ResumeKeyedRepeatRecord,
 	item: unknown,
 ): ResumeDomElement {
+	return mintRowNodes(parent, repeat, item).rowRoot;
+}
+
+/**
+ * The same mint, answering with the whole fragment as well as the row root.
+ *
+ * A row element that WRAPS a child component is minted here and finished by the
+ * component bridge, which needs the fragment to walk `rowComponent.slotPath` to
+ * the marker the child's nodes replace.
+ */
+export function mintRowNodes(
+	parent: ResumeDomElement,
+	repeat: ResumeKeyedRepeatRecord,
+	item: unknown,
+): { readonly rowRoot: ResumeDomElement; readonly nodes: ReadonlyArray<ResumeDomNode> } {
 	const rowTemplate = repeat.rowTemplate!,
 		host = parent.ownerDocument as MintingDocument | undefined,
 		template = host?.createElement?.('template');
@@ -97,13 +112,13 @@ export function mintRow(
 	}
 	for (const [at, slot] of slots.entries())
 		anchors[at]!.replaceWith!(host.createTextNode(String(readPath(item, slot.itemPath) ?? '')));
-	return rowRoot;
+	return { rowRoot, nodes };
 }
 
 // A local copy of fns/direct's walk, for the reason this whole module is local:
 // importing that module pulls it into this on-demand module's static closure,
 // which the leanness guard measures.
-function nodeAtPath(
+export function nodeAtPath(
 	nodes: ReadonlyArray<ResumeDomNode>,
 	path: ReadonlyArray<number>,
 ): ResumeDomNode | undefined {

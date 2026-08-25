@@ -356,9 +356,11 @@ export type ProtocolViewPayload = {
 		 * Carried only for a row the client can finish alone: static markup, or
 		 * markup whose every slot - text or attribute - reads off the repeated item.
 		 * A row holding anything else - a value from outside the row, an attribute
-		 * value computed by an expression, a nested construct, a component - needs
-		 * wiring the mint cannot do, so it ships nothing and the served behaviour
-		 * stands.
+		 * value computed by an expression, a nested construct - needs wiring the
+		 * mint cannot do, so it ships nothing and the served behaviour stands. One
+		 * child component is the exception: a row element wrapping one is markup
+		 * here plus identity in `rowComponent`, whose `slotPath` names the marker in
+		 * this html the child's rendered nodes replace.
 		 *
 		 * Pay-per-use: a repeat whose row is not mintable emits no field at all, so
 		 * its record is byte-identical to what it was before this existed, and a row
@@ -379,16 +381,23 @@ export type ProtocolViewPayload = {
 		/**
 		 * The component a row of this repeat roots, named by identity alone.
 		 *
-		 * A row whose whole content is a child component cannot ship markup the way
-		 * `rowTemplate` does: the component has a graph, not a template, and one
-		 * instance per rendered row. So this carries three identifiers and nothing
-		 * else - the client builds the row by running the same one-edge render the
-		 * server ran, under ids qualified by the row's key.
+		 * A child component cannot ship markup the way `rowTemplate` does: it has a
+		 * graph, not a template, and one instance per rendered row. So this carries
+		 * identifiers and nothing else - the client builds the row by running the
+		 * same one-edge render the server ran, under ids qualified by the row's key.
 		 *
 		 * `componentName` is the component that OWNS the edge (the one whose markup
 		 * holds the `@for`), not the child: the child's name already rides on the
 		 * edge. `itemPropName` is the prop the row's item crosses under, carried
 		 * only when exactly one prop is the bare `@for` binding.
+		 *
+		 * `slotPath` appears when a row ELEMENT wraps the component rather than the
+		 * row being the component. The wrapper's markup then rides in `rowTemplate`,
+		 * and this FRAGMENT-relative path (`[0]` is the row root) names the marker
+		 * comment inside it that the child's rendered nodes replace. Its absence is
+		 * the row that IS the component, which has no wrapper and ships no
+		 * `rowTemplate` - the shape this field had before wrappers were minted, so
+		 * such a record stays byte-identical.
 		 *
 		 * Carried only for a key-identified repeat whose row start is known and
 		 * whose child is declared in the same module; anything else is refused, so
@@ -398,6 +407,7 @@ export type ProtocolViewPayload = {
 			readonly componentEdgeId: string;
 			readonly componentName: string;
 			readonly itemPropName?: string;
+			readonly slotPath?: ReadonlyArray<number>;
 		};
 		readonly rowElementHandles?: ReadonlyArray<{
 			readonly hostPath: ReadonlyArray<number>;

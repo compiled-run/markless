@@ -1,4 +1,8 @@
-import type { SemanticComponentEdge, SemanticMarkupArtifact } from '../artifacts.ts';
+import type {
+	SemanticComponentEdge,
+	SemanticMarkupArtifact,
+	SemanticMarkupSlot,
+} from '../artifacts.ts';
 
 type MarkupChunks = SemanticMarkupArtifact['chunks'];
 
@@ -6,19 +10,32 @@ export type RowComponentMint = {
 	readonly componentEdgeId: string;
 	readonly componentName: string;
 	readonly itemPropName?: string;
+	/**
+	 * Where the child's nodes go inside the row's own markup, as the
+	 * fragment-relative path of the marker they replace. Absent when the row IS
+	 * the component and there is no wrapper to place it in.
+	 */
+	readonly slotPath?: ReadonlyArray<number>;
 };
 
 /**
  * The component a row roots, named by identity, for the mint that builds a row
  * the server never rendered.
  *
- * A component row carries no markup: the client rebuilds it by running the same
- * one-edge render the server ran, so what it needs is the edge to run and the
- * component that owns it, not a copy of the output.
+ * A component row carries no markup of its own: the client rebuilds it by
+ * running the same one-edge render the server ran, so what it needs is the edge
+ * to run and the component that owns it, not a copy of the output.
  *
- * Refused unless the row is nothing BUT that component (one slot, no element of
- * its own), the child is declared in this same module, and the edge projects no
- * children. Cross-module and projected rows are later phases.
+ * Two row shapes reach that point. The row can BE the component - one slot, no
+ * element of its own - or a row element can WRAP it, which is the checklist
+ * idiom: `<li data-row={item.id}><Card ... /></li>`. A wrapper is admitted only
+ * when the wrapper's own slots are ones the row template already mints (text or
+ * attribute values read off the repeated item), and the record then carries both
+ * halves: the wrapper markup in `rowTemplate`, the child identity here, and
+ * `slotPath` naming the marker inside the wrapper the child's nodes replace.
+ *
+ * Refused unless the child is declared in this same module and the edge projects
+ * no children. Cross-module and projected rows are later phases.
  *
  * Also refused when the component's body carries a branch (`@if`/`@switch`) or a
  * boundary (`@try`): those anchor into a census the page counted once, at boot,
@@ -39,9 +56,19 @@ export function resolveRowComponentMint(input: {
 	readonly itemName: string;
 }): RowComponentMint | null {
 	const chunk = input.chunks.find((candidate) => candidate.id === input.rowChunkId);
-	if (!chunk || chunk.slots.length !== 1 || input.rowElementCount > 0) return null;
-	const slot = chunk.slots[0]!;
+	if (!chunk) return null;
+	const componentSlots = chunk.slots.filter((candidate) => candidate.kind === 'child-component');
+	if (componentSlots.length !== 1) return null;
+	const slot = componentSlots[0]!;
 	if (slot.kind !== 'child-component' || slot.projectionChunkId) return null;
+	const wraps = input.rowElementCount > 0;
+	if (wraps) {
+		// The wrapper is minted from markup, so its own slots have to be ones that
+		// markup plus the item can finish - and the child needs a marker to land on.
+		if (slot.coordinate.kind !== 'comment-anchor') return null;
+		if (!chunk.slots.every((candidate) => candidate === slot || mintableFromItem(candidate)))
+			return null;
+	} else if (chunk.slots.length !== 1) return null;
 	const componentName = chunk.componentName;
 	if (!componentName) return null;
 	const edge = input.componentEdges.find((candidate) => candidate.id === slot.componentEdgeId);
@@ -56,7 +83,15 @@ export function resolveRowComponentMint(input: {
 		componentEdgeId: slot.componentEdgeId,
 		componentName,
 		...(itemProps.length === 1 ? { itemPropName: itemProps[0]!.name } : {}),
+		...(wraps ? { slotPath: slot.coordinate.path } : {}),
 	};
+}
+
+/** The one slot shape a row template fills alone: a text or attribute read off the row's item. */
+export function mintableFromItem(slot: SemanticMarkupSlot): boolean {
+	return (
+		(slot.kind === 'text' || slot.kind === 'attribute') && slot.residue.kind === 'repeat-item'
+	);
 }
 
 // Whether a chunk, or anything it reaches, holds a construct whose anchors the
