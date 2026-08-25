@@ -695,7 +695,13 @@ function propCaptureRoutes(
 				(edge) => edge.childComponentName === componentName,
 			)
 		: [];
-	if (edges.length === 0) {
+	// A component that composes itself is entered once per level, and one edge
+	// stands for all of them, so no call site's value is the value every instance
+	// receives: the read resolves against the level's own props instead.
+	if (
+		edges.length === 0 ||
+		(componentName && composesItself(componentName, input.semanticGraph.componentEdges))
+	) {
 		return [
 			{ kind: 'graph-reference', graphNodeId: 'prop:props', path: [propName, ...readPath] },
 		];
@@ -847,6 +853,27 @@ export function createCompilerKnownConstantCaptureRoute(
 		componentEdgePath,
 		value,
 	};
+}
+
+// The component reaches itself through same-module edges: direct
+// self-composition and mutual cycles alike.
+function composesItself(
+	componentName: string,
+	edges: ReadonlyArray<SemanticComponentEdge>,
+): boolean {
+	const seen = new Set<string>();
+	const pending = [componentName];
+	while (pending.length > 0) {
+		const current = pending.pop();
+		if (current === undefined || seen.has(current)) continue;
+		seen.add(current);
+		for (const candidate of edges) {
+			if (candidate.importSource || candidate.parentComponentName !== current) continue;
+			if (candidate.childComponentName === componentName) return true;
+			pending.push(candidate.childComponentName);
+		}
+	}
+	return false;
 }
 
 function componentEdgePathsEndingAt(

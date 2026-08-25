@@ -127,12 +127,9 @@ test('SSR: a self-composing node unrolls every escalated arm at first render', a
 	expectNestedUnrolled(screen.container as HTMLElement);
 });
 
-// PINNED in CSR: a component with ONE syntactic call site has its prop folded to
-// that call site's literal inside the compiled derive, so a component composing
-// ITSELF evaluates every level's test against the outermost value. The arm now
-// paints, but `depth > 1` stays true forever and the unroll never terminates.
-// Timed out rather than asserted: the recursion does not end on its own.
-test.fails('CSR: a self-composing node unrolls every escalated arm at first paint', async () => {
+// The timeout is the guard: a prop folded to one call site's literal would make
+// every level's test read the outermost value and never terminate the unroll.
+test('CSR: a self-composing node unrolls every escalated arm at first paint', async () => {
 	const screen = await render(BranchEscalationNestedOpen);
 	expectNestedUnrolled(screen.container as HTMLElement);
 }, 3000);
