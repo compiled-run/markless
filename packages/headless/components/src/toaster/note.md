@@ -103,7 +103,10 @@ being a namespace call.
    `activateAuthoredBehaviors`. That is what the F8 hotkey was written as
    (`toaster-hotkey.ts` is still here, unwired), so the hotkey ships nowhere and
    the focus-restore rule that rode with it does not either.
-5. **A COMPONENT INSIDE A REPEAT RENDERS NOTHING.** This supersedes the earlier
+5. **A COMPONENT ROW NEVER MINTS CLIENT-SIDE.** (Corrected: served component rows
+   RENDER — measured across projection, plain hosts, and widget-local arrays; the
+   earlier "renders nothing" reading measured growth from an empty queue while the
+   then-live empty-arm defect made present rows look blank.) This supersedes the earlier
    reading here, "a consumer's own `@for` inside `toaster.root` renders nothing" —
    projection is not the cause. Measured with two repeats over the same queue on
    one page: a repeat of plain `<li>` markup inside `toaster.root`'s projected

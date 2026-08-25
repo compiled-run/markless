@@ -25,25 +25,10 @@ function titles() {
 	return [...el(Root).querySelectorAll('[ui-toasttitle]')].map((one) => one.textContent);
 }
 
-// Every pinned row below shares one wall.
-//
-// A component inside a repeat renders nothing on the client. The queue write
-// lands - the rows that read the queue's own length are green - and no element
-// follows it. No diagnostic is produced either way.
-//
-// Projection is not the cause. A probe put two repeats over the same queue on one page:
-//
-//   - a repeat of PLAIN <li> markup inside `toaster.root`'s projected children
-//     RENDERS (1 row for 1 message);
-//   - a repeat of `toaster.item` inside a plain <ol> that projects nothing
-//     renders NOTHING (0 rows);
-//   - a repeat of a trivial local component with no `shared()` of its own, also
-//     in a plain <ol>, renders NOTHING (0 rows).
-//
-// So the wall is the component in the repeat, not the projected slot, not the
-// widget scope, and not the `{children}`-beside-a-construct shape the
-// server-side splice fix in packages/web/src/ssr-data/renderer.ts addresses -
-// that is a different bug and does not move these.
+// Every pinned row below shares one wall: a component row never MINTS
+// client-side (served component rows render fine; only a row for a key the
+// payload never carried paints nothing - every row here raises its message by
+// clicking, so all twelve depend on the mint). No diagnostic is produced.
 //
 // `toaster.root` renders no default rows for a bare root, so the written-out
 // parts are the family's ONLY path - and that path is exactly the shape this
