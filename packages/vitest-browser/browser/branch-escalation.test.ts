@@ -1,5 +1,7 @@
 import { expect, test } from 'vitest';
 import { render, renderSSR } from '../src/index.ts';
+import BranchEscalationChildOpen from './fixtures/branch-escalation-child-open.tsrx';
+import BranchEscalationNestedOpen from './fixtures/branch-escalation-nested-open.tsrx';
 import BranchEscalationOpen from './fixtures/branch-escalation-open.tsrx';
 import BranchEscalationPanel from './fixtures/branch-escalation-panel.tsrx';
 import BranchEscalationPlain from './fixtures/branch-escalation-plain.tsrx';
@@ -81,6 +83,85 @@ test('SSR: two escalating branches over one component hold two independent insta
 	requireElement<HTMLButtonElement>(container, 'button[data-left]').click();
 	await expect.poll(() => container.querySelector('[data-slot-left] [data-panel]')).toBeNull();
 	expect(container.querySelector('[data-slot-right] [data-panel]')?.textContent).toBe('right-0');
+});
+
+function expectNestedUnrolled(container: HTMLElement) {
+	expect(
+		[...container.querySelectorAll('[data-node]')].map((node) => node.getAttribute('data-node')),
+	).toEqual(['3', '2', '1']);
+	expect([...container.querySelectorAll('[data-label]')].map((node) => node.textContent)).toEqual([
+		'depth-3-0',
+		'depth-2-0',
+		'depth-1-0',
+	]);
+}
+
+// The branch a child component holds, true at first render: its test reads that
+// child's own prop, so only the child's own evaluation can answer it.
+function expectChildArmPainted(container: HTMLElement) {
+	expect(container.querySelector('[data-leaf]')?.textContent).toBe('inner-0');
+}
+
+test('SSR: a branch in a child component paints its escalated arm at first render', async () => {
+	const screen = await renderSSR(BranchEscalationChildOpen);
+	expectChildArmPainted(screen.container as HTMLElement);
+});
+
+test('CSR: a branch in a child component paints its escalated arm at first paint', async () => {
+	const screen = await render(BranchEscalationChildOpen);
+	expectChildArmPainted(screen.container as HTMLElement);
+});
+
+// PINNED in CSR: an arm served open paints, but the records inside it are never
+// registered, so the first gesture on the served arm is dropped. A flip-opened
+// arm takes its clicks; only the one open at first render does not.
+test.fails('CSR: the arm a child branch painted answers its own clicks', async () => {
+	const screen = await render(BranchEscalationChildOpen);
+	const container = screen.container as HTMLElement;
+	requireElement<HTMLElement>(container, '[data-leaf]').click();
+	await expect.poll(() => container.querySelector('[data-leaf]')?.textContent).toBe('inner-1');
+});
+
+test('SSR: a self-composing node unrolls every escalated arm at first render', async () => {
+	const screen = await renderSSR(BranchEscalationNestedOpen);
+	expectNestedUnrolled(screen.container as HTMLElement);
+});
+
+// PINNED in CSR: a component with ONE syntactic call site has its prop folded to
+// that call site's literal inside the compiled derive, so a component composing
+// ITSELF evaluates every level's test against the outermost value. The arm now
+// paints, but `depth > 1` stays true forever and the unroll never terminates.
+// Timed out rather than asserted: the recursion does not end on its own.
+test.fails('CSR: a self-composing node unrolls every escalated arm at first paint', async () => {
+	const screen = await render(BranchEscalationNestedOpen);
+	expectNestedUnrolled(screen.container as HTMLElement);
+}, 3000);
+
+test('CSR: a branch open at first render paints its arm content at first paint', async () => {
+	const screen = await render(BranchEscalationOpen);
+	const container = screen.container as HTMLElement;
+
+	expect(requireElement<HTMLElement>(container, '[data-panel]').textContent).toBe('open-0');
+
+	// The branch itself still flips from the served state, and the arm the flip
+	// brings in takes its own clicks.
+	requireElement<HTMLButtonElement>(container, 'button[data-arm]').click();
+	await expect.poll(() => container.querySelector('[data-panel]')).toBeNull();
+	requireElement<HTMLButtonElement>(container, 'button[data-arm]').click();
+	await expect.poll(() => container.querySelector('[data-panel]')?.textContent).toBe('open-0');
+
+	requireElement<HTMLElement>(container, '[data-panel]').click();
+	await expect.poll(() => container.querySelector('[data-panel]')?.textContent).toBe('open-1');
+});
+
+// PINNED in CSR: same wall as the child-branch row - the arm served open at first
+// render paints, but its records never register, so its first click is dropped.
+test.fails('CSR: the arm served open at first render takes its first click', async () => {
+	const screen = await render(BranchEscalationOpen);
+	const container = screen.container as HTMLElement;
+
+	requireElement<HTMLElement>(container, '[data-panel]').click();
+	await expect.poll(() => container.querySelector('[data-panel]')?.textContent).toBe('open-1');
 });
 
 test('SSR: a branch open at first render resumes its served arm and takes the first click', async () => {
