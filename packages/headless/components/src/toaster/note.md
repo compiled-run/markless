@@ -25,6 +25,29 @@ There is no easy path and no `visible` prop — how many messages show is decide
 what the consumer's own repeat iterates, and `toaster.shown(queue, n)` is the cap
 they write against.
 
+## Why the region is not a list
+
+The region was an `<ol>` and a row an `<li>` until 2026-08-25. Both are now plain
+`<div>`s, because a consumer's repeat has to sit inside a wrapper element (point 7
+below) and `<ol>` may hold nothing but `<li>`, `<script>` and `<template>`. The
+`<ol>` therefore shipped invalid the moment a consumer wrote the only markup the
+family has: axe's `list` rule ("`<ul>` and `<ol>` must only directly contain
+`<li>`, `<script>` or `<template>` elements", serious) was red on both conformance
+rows for as long as the family has been in the battery.
+
+A wrapper that is a list item is not available either: an `<li>` holding the
+repeated `<li>`s is a nested list item with no list around it, and an `<li
+role="presentation">` is axe's `list` rule again by its `roleNotValid` message.
+`role="list"` plus `role="listitem"` across the wrapper was rejected as building
+the family's semantics on a re-parenting that real readers implement unevenly.
+
+What is lost is the "list, 3 items" a reader says on entering the region. What
+carries the family's accessibility is untouched: the live region and its
+`aria-live` / `aria-atomic` / `aria-relevant` contract, each row's title and
+description, the named dismiss button, and the hover/focus pause of WCAG 2.2.2.
+No screen-reader row in `toaster.sr.ts` asserted list structure, so nothing was
+re-pinned; the announced shape loses only the list wrapper itself.
+
 Removing those default rows also removed the library's ONLY
 `{children}`-beside-a-construct shape (the census study's Fixture B/C source).
 Every remaining part projects its children with no construct next to them.
@@ -125,9 +148,18 @@ being a namespace call.
 6. **A repeat body may hold only one element.** Two siblings inside `@for` is
    `MARKLESS_PARSE_ERROR` ("Expected '</' to close the JSX element, but found
    '@'"). Measured while probing point 5.
-7. **A construct cannot be the direct child of a component tag**
-   (`MARKLESS_PARSE_ERROR`), so every scenario wraps its loop in a
-   `<div role="presentation">` — the same shape select ships.
+7. **A construct cannot be the direct child of a DOTTED component tag**
+   (`MARKLESS_PARSE_ERROR`: "Expected '</' to close the JSX element, but found
+   '@'"), so every scenario wraps its loop in a `<div role="presentation">` — the
+   same shape select ships. Measured more precisely on 2026-08-25: the parser
+   accepts `@for` directly inside `<ToasterRoot>` — a tag spelled as a plain
+   imported identifier — and refuses it inside `<toaster.root>`. The wall is the
+   member-expression tag name, not component tags as such;
+   `packages/vitest-browser/browser/fixtures/toaster-mint-page.tsrx` has been
+   compiling the identifier form all along. The family's markup is not built on
+   that escape: `toaster.root` is the spelling the library documents, and a region
+   whose validity depends on which import spelling a consumer picked would be a
+   trap. It is why the region is a `<div>` rather than an `<ol>`.
 8. **The default export must be the first component in a `.tsrx` module.**
    A module whose default export is declared after another component renders the
    other one. Cost an hour of a wrong reading during the probes.
