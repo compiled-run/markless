@@ -656,6 +656,17 @@ test('CSR: a second-level node opens and closes its own group from the first ges
 	expect(el(SrcItem).getAttribute('aria-expanded')).toBe('true');
 });
 
+// A first-level node, so this is about being served expanded and not about nesting:
+// the collapse derives `undefined`, which the resume graph must not read as "no change".
+test('CSR: a node served expanded collapses on its first gesture', async () => {
+	await render(NestedOpen);
+	expect(el(SrcItem).getAttribute('aria-expanded')).toBe('true');
+
+	el(SrcTrigger).click();
+	await expect.poll(() => el(SrcItem).hasAttribute('aria-expanded')).toBe(false);
+	expect(el(SrcContent).hasAttribute('hidden')).toBe(true);
+});
+
 test('CSR: a looped node opens the folder the click landed on', async () => {
 	await render(NodesFromData);
 	const triggers = page.getByTestId('folder-itemtrigger').elements() as HTMLElement[];
