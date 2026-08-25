@@ -33,8 +33,9 @@ export function componentConstructReach(
 const REACH_RANK: Readonly<Record<ModuleGraphInterfaceConstructReach, number>> = {
 	free: 0,
 	branches: 1,
-	unknown: 2,
-	boundaries: 3,
+	repeats: 2,
+	unknown: 3,
+	boundaries: 4,
 };
 
 function worseReach(
@@ -103,6 +104,10 @@ function chunkTreeConstructReach(
 			reach = worseReach(reach, child);
 			continue;
 		}
+		// How many nodes either one renders is a render-time fact, so a tree rebuilt
+		// around one has no count to place its own nodes against.
+		if (slot.kind === 'repeat' || slot.kind === 'dynamic-host')
+			reach = worseReach(reach, 'repeats');
 		const childChunkIds =
 			slot.kind === 'repeat'
 				? [slot.rowTemplateId, ...(slot.emptyTemplateId ? [slot.emptyTemplateId] : [])]

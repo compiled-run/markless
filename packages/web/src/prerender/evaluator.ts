@@ -1,5 +1,7 @@
 import {
+	projectionNotRenderedError,
 	renderSsrData,
+	withProjectionSpan,
 	type RenderSsrDataOutput,
 	type SsrDataReadContext,
 	type SsrDataResidue,
@@ -871,48 +873,78 @@ export async function renderRepeatRowComponent(input: {
 		hostPrefix = rowSegment + edge.hostPrefix,
 		symbolPrefix = rowSegment + edge.symbolPrefix,
 		read = input.read;
-	const readDecision = (source: string | undefined) =>
+	const readDecision = (source: string | undefined, context: SsrDataReadContext | undefined) =>
 		source &&
 		definition.readResidue?.(
 			{ kind: 'authored-expression', source },
 			{
-				repeatItem: input.item,
-				repeatIndex: input.rowIndex,
+				repeatItem: context?.repeatItem ?? input.item,
+				repeatIndex: context?.repeatIndex ?? input.rowIndex,
 				read,
 				idPrefix: ownerIdPrefix,
 			},
 		);
-	const childProps: Record<string, unknown> = {};
-	const callbacks: Record<string, string> = {};
-	for (const prop of edge.props) {
-		if (prop.name === input.itemPropName) {
-			childProps[prop.name] = input.item;
-		} else if (prop.kind === 'spread' && prop.graphNodeId) {
-			Object.assign(
-				childProps,
-				marklessSsrSpreadProps(read(prop.graphNodeId, prop.path ?? []), prop.excludeNames),
-			);
-		} else if (prop.kind === 'graph-reference' && prop.graphNodeId) {
-			childProps[prop.name] = read(prop.graphNodeId, prop.path ?? []);
-		} else if (prop.kind === 'element-handle-id' && prop.graphNodeId && definition.readResidue) {
-			childProps[prop.name] = definition.readResidue(
-				{ kind: 'element-handle-id', handleGraphNodeId: prop.graphNodeId },
-				{ read, idPrefix: ownerIdPrefix },
-			);
-		} else if (prop.kind === 'absent') {
-			childProps[prop.name] = undefined;
-		} else if (prop.kind === 'serializable' && 'value' in prop) {
-			childProps[prop.name] = prop.value;
-		} else if (prop.kind === 'callback') {
-			const symbolId = edge.boundSymbols?.[prop.name] ?? prop.symbolId;
-			if (symbolId) callbacks[prop.name] = ownerSymbolPrefix + symbolId;
-		} else if (prop.source !== undefined && definition.readResidue) {
-			childProps[prop.name] = readDecision(prop.source);
-		} else {
-			throw new Error(`MARKLESS_PRERENDER_PROP_UNDERIVABLE: ${prop.name}`);
+	const ownerChunks = input.surface.renderData.chunks.filter(
+		(chunk) => chunk.componentName === input.ownerComponentName,
+	);
+	// The projection chunk is a fact of the owner's own markup, so the row record
+	// names the edge and this render reads the chunk off the surface.
+	const projectionChunkId = ownerChunks.flatMap((chunk) =>
+		chunk.slots.flatMap((slot) =>
+			slot.kind === 'child-component' &&
+			slot.componentEdgeId === input.componentEdgeId &&
+			slot.projectionChunkId
+				? [slot.projectionChunkId]
+				: [],
+		),
+	)[0];
+	const rowEdgeChildProps = (
+		forEdge: NonNullable<PrerenderDataDefinition['edges']>[number],
+		context: SsrDataReadContext | undefined,
+		itemPropName: string | undefined,
+	): { readonly props: Record<string, unknown>; readonly callbacks: Record<string, string> } => {
+		const childProps: Record<string, unknown> = {};
+		const callbacks: Record<string, string> = {};
+		for (const prop of forEdge.props) {
+			if (prop.name === itemPropName) {
+				childProps[prop.name] = input.item;
+			} else if (prop.kind === 'spread' && prop.graphNodeId) {
+				Object.assign(
+					childProps,
+					marklessSsrSpreadProps(read(prop.graphNodeId, prop.path ?? []), prop.excludeNames),
+				);
+			} else if (prop.kind === 'graph-reference' && prop.graphNodeId) {
+				childProps[prop.name] = read(prop.graphNodeId, prop.path ?? []);
+			} else if (
+				prop.kind === 'element-handle-id' &&
+				prop.graphNodeId &&
+				definition.readResidue
+			) {
+				childProps[prop.name] = definition.readResidue(
+					{ kind: 'element-handle-id', handleGraphNodeId: prop.graphNodeId },
+					{ read, idPrefix: ownerIdPrefix },
+				);
+			} else if (prop.kind === 'absent') {
+				childProps[prop.name] = undefined;
+			} else if (prop.kind === 'serializable' && 'value' in prop) {
+				childProps[prop.name] = prop.value;
+			} else if (prop.kind === 'callback') {
+				const symbolId = forEdge.boundSymbols?.[prop.name] ?? prop.symbolId;
+				if (symbolId) callbacks[prop.name] = ownerSymbolPrefix + symbolId;
+			} else if (prop.source !== undefined && definition.readResidue) {
+				childProps[prop.name] = readDecision(prop.source, context);
+			} else {
+				throw new Error(`MARKLESS_PRERENDER_PROP_UNDERIVABLE: ${prop.name}`);
+			}
 		}
-	}
-	if (Object.keys(callbacks).length > 0) childProps.__marklessSsrCallbacks = callbacks;
+		if (Object.keys(callbacks).length > 0) childProps.__marklessSsrCallbacks = callbacks;
+		return { props: childProps, callbacks };
+	};
+	const { props: childProps, callbacks } = rowEdgeChildProps(
+		edge,
+		undefined,
+		input.itemPropName,
+	);
 	const childSurface = input.surface.components[edge.childComponentName]
 		? input.surface
 		: input.surface.imports[edge.childComponentName];
@@ -925,27 +957,140 @@ export async function renderRepeatRowComponent(input: {
 			loadSymbol: input.loadSymbol,
 			symbolPrefix: marklessRowFreeSymbolId(ownerSymbolPrefix, ownerSymbolPrefix),
 			rowSegment,
-			readEdgeProp: (prop) => readDecision(prop.source),
+			readEdgeProp: (prop) => readDecision(prop.source, undefined),
 		},
 		definition,
-		{ componentEdgeId: edge.id },
+		{ componentEdgeId: edge.id, ...(projectionChunkId ? { projectionChunkId } : {}) },
 		read,
 		undefined,
 	);
-	const output = await evaluatePrerenderDataComponent({
-		surface: childSurface,
-		componentName: edge.childComponentName,
-		props: childProps,
-		idPrefix: ownerIdPrefix + hostPrefix,
-		symbolPrefix: ownerSymbolPrefix + symbolPrefix,
-		boundSymbols: edge.boundSymbols,
-		graphProps: edge.props,
-		loadSymbol: input.loadSymbol,
-		graph: undefined,
-		requireHtml: true,
-		sharedSeeds,
-		boundGraphValues: marklessBoundGraphValues(undefined, childSurface, edge.props, read),
-	});
+	// The projected children are the OWNER's markup rendered inside this row, so
+	// they render here - in the row's identity - and compose beside the row's own
+	// child exactly as the served path composes them.
+	const projected: Array<MarklessSsrComposedChild> = [];
+	const projectedOutputs: Array<Awaited<ReturnType<typeof evaluatePrerenderDataComponent>>> = [];
+	const projection = projectionChunkId
+		? await renderSsrData({
+				renderData: {
+					...input.surface.renderData,
+					root: {
+						componentName: input.ownerComponentName,
+						templateId: projectionChunkId,
+					},
+					chunks: ownerChunks,
+					branches: definition.branches ?? [],
+					boundaries: definition.boundaries ?? [],
+				},
+				idPrefix: ownerIdPrefix,
+				...(sharedSeeds ? { sharedSeeds } : {}),
+				rootContext: { item: input.item, index: input.rowIndex, key: input.rowKey },
+				read: (residue, context) => {
+					if (residue.kind === 'repeat-item') return readPath(context.repeatItem, residue.path);
+					if (residue.kind === 'graph-read') return read(residue.graphNodeId, residue.path);
+					if (definition.readResidue)
+						return definition.readResidue(residue, {
+							repeatItem: context.repeatItem,
+							repeatIndex: context.repeatIndex,
+							read,
+							idPrefix: ownerIdPrefix,
+						});
+					throw new Error('MARKLESS_PRERENDER_RESIDUE_MISSING');
+				},
+				seedChild: (slot, context) =>
+					sharedSeedPass()?.(
+						{
+							surface: input.surface,
+							idPrefix: ownerIdPrefix,
+							loadSymbol: input.loadSymbol,
+							symbolPrefix: marklessRowFreeSymbolId(ownerSymbolPrefix, ownerSymbolPrefix),
+							rowSegment,
+							readEdgeProp: (prop) => readDecision(prop.source, context),
+						},
+						definition,
+						slot,
+						read,
+						context.sharedSeeds,
+					),
+				renderChild: async (slot, context) => {
+					const projectedEdge = (definition.edges ?? []).find(
+						(candidate) => candidate.id === slot.componentEdgeId,
+					);
+					if (!projectedEdge)
+						throw new Error(`MARKLESS_PRERENDER_CHILD_MISSING: ${slot.componentEdgeId}`);
+					const partSurface = input.surface.components[projectedEdge.childComponentName]
+						? input.surface
+						: input.surface.imports[projectedEdge.childComponentName];
+					if (!partSurface)
+						throw new Error(
+							`MARKLESS_PRERENDER_DATA_COMPONENT_MISSING: ${projectedEdge.childComponentName}`,
+						);
+					const part = rowEdgeChildProps(projectedEdge, context, undefined);
+					const partOutput = await evaluatePrerenderDataComponent({
+						surface: partSurface,
+						componentName: projectedEdge.childComponentName,
+						props:
+							context.projectionHtml === undefined
+								? part.props
+								: { ...part.props, children: context.projectionHtml },
+						idPrefix: ownerIdPrefix + rowSegment + projectedEdge.hostPrefix,
+						symbolPrefix: ownerSymbolPrefix + rowSegment + projectedEdge.symbolPrefix,
+						boundSymbols: projectedEdge.boundSymbols,
+						graphProps: projectedEdge.props,
+						loadSymbol: input.loadSymbol,
+						graph: undefined,
+						requireHtml: true,
+						...(context.sharedSeeds ? { sharedSeeds: context.sharedSeeds } : {}),
+						boundGraphValues: marklessBoundGraphValues(
+							undefined,
+							partSurface,
+							projectedEdge.props,
+							read,
+						),
+					});
+					projectedOutputs.push(partOutput);
+					projected.push({
+						output: partOutput as SsrComposableChildOutput,
+						hostPrefix: rowSegment + projectedEdge.hostPrefix,
+						symbolPrefix: rowSegment + projectedEdge.symbolPrefix,
+						graphProps: projectedEdge.props,
+						asyncBoundaryId: projectedEdge.asyncBoundaryId,
+						boundSymbols: projectedEdge.boundSymbols ?? {},
+						callbackProps: part.callbacks,
+						childrenWidgetRoot: sharedSeedPass()?.childrenWidgetRoot?.(
+							partSurface,
+							projectedEdge.childComponentName,
+						),
+					});
+					return partOutput;
+				},
+			})
+		: undefined;
+	const renderRowChild = (children?: string) =>
+		evaluatePrerenderDataComponent({
+			surface: childSurface,
+			componentName: edge.childComponentName,
+			props: children === undefined ? childProps : { ...childProps, children },
+			idPrefix: ownerIdPrefix + hostPrefix,
+			symbolPrefix: ownerSymbolPrefix + symbolPrefix,
+			boundSymbols: edge.boundSymbols,
+			graphProps: edge.props,
+			loadSymbol: input.loadSymbol,
+			graph: undefined,
+			requireHtml: true,
+			sharedSeeds,
+			boundGraphValues: marklessBoundGraphValues(undefined, childSurface, edge.props, read),
+		});
+	let output;
+	if (projection) {
+		const placed = await withProjectionSpan(projection.structureTokens, (mark) =>
+			renderRowChild(mark + projection.html),
+		);
+		if (!placed.consumed)
+			throw projectionNotRenderedError(edge.childComponentName, edge.id);
+		output = placed.result;
+	} else {
+		output = await renderRowChild();
+	}
 	const child: MarklessSsrComposedChild = {
 		output: output as SsrComposableChildOutput,
 		hostPrefix,
@@ -959,22 +1104,27 @@ export async function renderRepeatRowComponent(input: {
 			edge.childComponentName,
 		),
 	};
-	const asyncSnapshots = (output.state?.computed ?? []).flatMap((computed) =>
-		computed.async && computed.snapshot
-			? [{ graphNodeId: computed.graphNodeId, snapshot: computed.snapshot }]
-			: [],
+	// Projected first, the order the served path pushes them in: the projection
+	// renders before the component it is written into.
+	const children = [...projected, child];
+	const asyncSnapshots = [...projectedOutputs, output].flatMap((composed) =>
+		(composed.state?.computed ?? []).flatMap((computed) =>
+			computed.async && computed.snapshot
+				? [{ graphNodeId: computed.graphNodeId, snapshot: computed.snapshot }]
+				: [],
+		),
 	);
 	// The row chunk is nothing but this edge, so the child's own structure IS the
 	// row's: view composition first, then state, the order composition requires.
 	const composition = marklessSsrComposeView(
 		output.structure!,
 		emptyRowView() as SsrComposableView,
-		[child],
+		children,
 		asyncSnapshots,
 		ownerIdPrefix,
 	);
 	const state = marklessSsrAttachSnapshots(
-		marklessComposeState(emptyRowState(), [child]),
+		marklessComposeState(emptyRowState(), children),
 		asyncSnapshots,
 	);
 	return {

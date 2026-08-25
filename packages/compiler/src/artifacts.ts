@@ -288,13 +288,16 @@ export type ModuleGraphInterfaceElementCount = number | 'unknown';
 
 /**
  * Which constructs one exported component's whole reachable tree carries -
- * branches (`@if`/`@switch`), async boundaries (`@try`), or neither.
+ * branches (`@if`/`@switch`), repeats (`@for`, and a host whose tag the render
+ * may omit), async boundaries (`@try`), or none of them.
  *
- * The two are named apart because they resolve apart. A branch's anchors are a
+ * They are named apart because they resolve apart. A branch's anchors are a
  * pair of comments a client-minted tree can count in its OWN fragment, the way
  * it already counts its elements, so `'branches'` still admits a mint. A
- * boundary's settle bookkeeping has no such row-relative reading, so
- * `'boundaries'` refuses.
+ * repeat's row count and an omittable host's presence are render-time facts, so
+ * a client rebuilding a tree around one has no number to place its nodes
+ * against. A boundary's settle bookkeeping has no row-relative reading at all,
+ * so `'boundaries'` is the worst answer of the four.
  *
  * The answer is TRANSITIVE and computed in the component's own module, where
  * its chunks and the interfaces of the components it imports are both in hand:
@@ -309,6 +312,7 @@ export type ModuleGraphInterfaceElementCount = number | 'unknown';
 export type ModuleGraphInterfaceConstructReach =
 	| 'free'
 	| 'branches'
+	| 'repeats'
 	| 'boundaries'
 	| 'unknown';
 

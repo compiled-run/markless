@@ -29,10 +29,12 @@ export type RowComponentMint = {
  * halves: the wrapper markup in `rowTemplate`, the child identity here, and
  * `slotPath` naming the marker inside the wrapper the child's nodes replace.
  *
- * Refused when the edge projects children: rebuilding those needs the caller's
- * markup as well as the child's own. The child itself may live in another
- * module - the payload's component surface carries the import chain the row
- * render walks - so an imported child mints on the same terms as a local one.
+ * A row that PROJECTS children mints when the projection is component parts and
+ * the text between them (see `projectionIsMintable`): the parts render in the
+ * row's own identity and compose beside the row's child. The child itself may
+ * live in another module - the payload's component surface carries the import
+ * chain the row render walks - so an imported child mints on the same terms as a
+ * local one.
  *
  * Still refused when the component's body carries a boundary (`@try`): its
  * settle bookkeeping reads a census the page counted once, at boot, for the rows
@@ -60,7 +62,7 @@ export function resolveRowComponentMint(
 	const componentSlots = chunk.slots.filter((candidate) => candidate.kind === 'child-component');
 	if (componentSlots.length !== 1) return null;
 	const slot = componentSlots[0]!;
-	if (slot.kind !== 'child-component' || slot.projectionChunkId) return null;
+	if (slot.kind !== 'child-component') return null;
 	const wraps = input.rowElementCount > 0;
 	if (wraps) {
 		// The wrapper is minted from markup, so its own slots have to be ones that
@@ -73,7 +75,12 @@ export function resolveRowComponentMint(
 	if (!componentName) return null;
 	const edge = input.componentEdges.find((candidate) => candidate.id === slot.componentEdgeId);
 	if (!edge || edge.parentComponentName !== componentName) return null;
-	if (edge.children.childCount > 0) return null;
+	if (edge.children.childCount > 0 && slot.projectionChunkId === undefined) return null;
+	if (
+		slot.projectionChunkId !== undefined &&
+		!projectionIsMintable(input, slot.projectionChunkId, new Set())
+	)
+		return null;
 	if (!childIsMintable(input, edge, slot.childTemplateId, new Set())) return null;
 	const itemProps = edge.props.filter((prop) => prop.source === input.itemName);
 	return {
@@ -84,6 +91,41 @@ export function resolveRowComponentMint(
 	};
 }
 
+/**
+ * Whether what a row PROJECTS into its component is content the mint can rebuild.
+ *
+ * The projection is the owner's own markup rendered inside the row, so anything
+ * in it that needs a record - an element to locate, a value to refresh, an arm to
+ * flip - would need that record filed against a row the page never counted. What
+ * the mint CAN rebuild is a projection made of components: each one renders in
+ * the row's own identity and composes its whole record set beside the row's, the
+ * same crossing the row's own child already makes. So the shape admitted here is
+ * component parts and the static text between them, nothing else, and each part
+ * answers the same reach question the row's own child answers.
+ */
+function projectionIsMintable(
+	input: ConstructReachInput,
+	projectionChunkId: string,
+	seen: Set<string>,
+): boolean {
+	if (seen.has(projectionChunkId)) return false;
+	seen.add(projectionChunkId);
+	const chunk = input.chunks.find((candidate) => candidate.id === projectionChunkId);
+	if (!chunk || chunk.hosts.length > 0) return false;
+	return chunk.slots.every((slot) => {
+		if (slot.kind !== 'child-component') return false;
+		if (
+			slot.projectionChunkId !== undefined &&
+			!projectionIsMintable(input, slot.projectionChunkId, seen)
+		)
+			return false;
+		const edge = input.componentEdges.find(
+			(candidate) => candidate.id === slot.componentEdgeId,
+		);
+		return edge !== undefined && childIsMintable(input, edge, slot.childTemplateId, new Set());
+	});
+}
+
 /** The one slot shape a row template fills alone: a text or attribute read off the row's item. */
 export function mintableFromItem(slot: SemanticMarkupSlot): boolean {
 	return (
@@ -92,9 +134,10 @@ export function mintableFromItem(slot: SemanticMarkupSlot): boolean {
 }
 
 /**
- * Whether one component the row reaches is PROVABLY free of an async boundary
- * anywhere in what it renders - the one construct whose bookkeeping the page
- * counted only for the rows it served.
+ * Whether one component the row reaches is PROVABLY free of the constructs a
+ * minted row cannot rebuild: an async boundary, whose settle bookkeeping the page
+ * counted only for the rows it served, and a repeat or omittable host, whose node
+ * count only the render knows.
  *
  * Provably is the whole point: a tree this module cannot reach is a refusal,
  * never a pass. A child declared here is answered from this module's own chunks.
@@ -110,15 +153,14 @@ function childIsMintable(
 	seen: Set<string>,
 ): boolean {
 	if (edge.importSource !== undefined) {
-		// A known element count is the interface's own proof that none of the chunks
-		// the child reaches is a repeat, an async arm or an omittable host: those
-		// never resolve to a number, and a row rebuilt around one would place its
-		// nodes against a count the served page never had.
 		const entry = input.importedModuleInterfaces?.[edge.importSource]?.render.components.find(
 			(candidate) => candidate.componentName === edge.childComponentName,
 		);
-		if (!entry || entry.elementCount === 'unknown') return false;
+		if (!entry) return false;
 	}
+	// The reach IS the proof: a repeat, an omittable host or an async arm each
+	// answer with their own name, and the answer is transitive, so a construct
+	// behind another import still reaches this question.
 	const reach = childConstructReach(input, edge, childTemplateId, seen);
 	return reach === 'free' || reach === 'branches';
 }
