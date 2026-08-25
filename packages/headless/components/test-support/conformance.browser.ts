@@ -5,6 +5,7 @@ import Carousel from '../src/carousel/scenarios/basic.tsrx';
 import Checkbox from '../src/checkbox/scenarios/basic.tsrx';
 import Checklist from '../src/checklist/scenarios/basic.tsrx';
 import Collapsible from '../src/collapsible/scenarios/basic.tsrx';
+import DateInput from '../src/dateinput/scenarios/basic.tsrx';
 import { Basic as Combobox } from '../src/combobox/scenarios/basic.tsrx';
 import Modal from '../src/modal/scenarios/basic.tsrx';
 import Navbar from '../src/navbar/scenarios/basic.tsrx';
@@ -188,6 +189,19 @@ const descriptors: readonly FamilyDescriptor[] = [
 		// The family's note names this the one place an item's value appears in
 		// the markup, so it is key-value by design.
 		valuedAttributes: ['ui-value'],
+		supportsDisabled: true,
+	},
+	{
+		family: 'dateinput',
+		mount: { CSR: () => render(DateInput), SSR: () => renderSSR(DateInput) },
+		root: 'root',
+		parts: ['root', 'label', 'monthinput', 'dayinput', 'yearinput', 'field'],
+		// A <fieldset> named by its <legend>, so the group's name is the platform's
+		// rather than an idref this family mints.
+		rootAria: { role: 'group', 'aria-disabled': 'false' },
+		// Which part of the date a box holds, and what it holds now: both carry
+		// information a consumer styles on, so both stay key-value.
+		valuedAttributes: ['ui-type', 'ui-value'],
 		supportsDisabled: true,
 	},
 	{
