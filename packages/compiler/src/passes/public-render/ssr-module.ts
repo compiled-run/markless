@@ -68,6 +68,7 @@ import {
 	authoredResidueSources,
 	elementHandleIdReadCase,
 	elementHandleIdSources,
+	hasElementHandleIdList,
 	hasSharedElementHandle,
 	MARKLESS_WIDGET_INSTANCE_KEY,
 	MARKLESS_ELEMENT_BOUND_KEY_PREFIX,
@@ -515,6 +516,7 @@ function emitSsrDataLines(
 						? widgetInstanceReadSource((key) => `marklessSsrRenderStateValues.get(${key})`)
 						: null,
 					boundRead: (key) => `marklessSsrRenderStateValues.get(${key})`,
+					...(hasElementHandleIdList(chunks) ? { lists: true } : {}),
 				})
 			: '';
 	const branchIds = new Set(chunks.flatMap((chunk) =>

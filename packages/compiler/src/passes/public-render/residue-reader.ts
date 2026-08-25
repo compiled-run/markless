@@ -91,6 +91,8 @@ export function elementHandleIdSources(chunks: RenderChunks): ReadonlyArray<stri
 	const handles = new Set<string>();
 	const add = (residue: SemanticMarkupResidue) => {
 		if (residue.kind === 'element-handle-id') handles.add(residue.handleGraphNodeId);
+		if (residue.kind === 'element-handle-id-list')
+			for (const handle of residue.handleGraphNodeIds) handles.add(handle);
 	};
 	for (const chunk of chunks) {
 		for (const slot of chunk.slots) {
@@ -120,6 +122,8 @@ export function elementHandleIdReadCase(input: {
 	readonly widgetInstanceRead: ((handleExpression: string) => string) | null;
 	/** Reads one seed-map key; supplied wherever a shared() IDREF can be omitted. */
 	readonly boundRead?: (keyExpression: string) => string;
+	/** Emitted only for a chunk set that writes an IDREF list somewhere. */
+	readonly lists?: boolean;
 }): string {
 	const slug = (handle: string) => {
 		const prefix = input.widgetInstanceRead
@@ -127,16 +131,41 @@ export function elementHandleIdReadCase(input: {
 			: input.idPrefixSource;
 		return `(${prefix}+${handle}).replace(/\\W+/g,'-')`;
 	};
+	const unbound = (handle: string) =>
+		input.widgetInstanceRead && input.boundRead
+			? `${handle}.startsWith('shared:')&&${input.boundRead(
+					`${JSON.stringify(MARKLESS_ELEMENT_BOUND_KEY_PREFIX)}+${handle}`,
+				)}!==true`
+			: null;
 	// Only an IDREF position can be omitted. The element that CARRIES the id mints
 	// unconditionally: it renders only when its own part renders, and an omission
 	// there would write `id="undefined"` instead of nothing.
-	const omitUnbound =
-		input.widgetInstanceRead && input.boundRead
-			? `if(residue.idref&&residue.handleGraphNodeId.startsWith('shared:')&&${input.boundRead(
-					`${JSON.stringify(MARKLESS_ELEMENT_BOUND_KEY_PREFIX)}+residue.handleGraphNodeId`,
-				)}!==true)return undefined;`
-			: '';
-	return `if(residue.kind==='element-handle-id'){${omitUnbound}return 'mx-'+${slug('residue.handleGraphNodeId')};}`;
+	const singleUnbound = unbound('residue.handleGraphNodeId');
+	const omitUnbound = singleUnbound ? `if(residue.idref&&${singleUnbound})return undefined;` : '';
+	const single = `if(residue.kind==='element-handle-id'){${omitUnbound}return 'mx-'+${slug('residue.handleGraphNodeId')};}`;
+	if (!input.lists) return single;
+	// A list is a referencing side by construction, so every entry is omitted on
+	// the same terms; an attribute naming nothing at all is absent rather than
+	// empty, which is what the single form already does.
+	const entryUnbound = unbound('h');
+	const kept = entryUnbound
+		? `residue.handleGraphNodeIds.filter(h=>!(${entryUnbound}))`
+		: 'residue.handleGraphNodeIds';
+	return `${single}if(residue.kind==='element-handle-id-list'){const ids=${kept}.map(h=>'mx-'+${slug('h')});return ids.length?ids.join(' '):undefined;}`;
+}
+
+/** Whether a chunk set writes any IDREF list, so its reader needs the branch. */
+export function hasElementHandleIdList(chunks: RenderChunks): boolean {
+	const isList = (residue: SemanticMarkupResidue) =>
+		residue.kind === 'element-handle-id-list';
+	return chunks.some((chunk) =>
+		chunk.slots.some(
+			(slot) =>
+				('residue' in slot && isList(slot.residue)) ||
+				(slot.kind === 'dynamic-host' &&
+					slot.attributeSlots.some((attribute) => isList(attribute.residue))),
+		),
+	);
 }
 
 /**
@@ -283,6 +312,7 @@ export function emitClientResidueReader(
 						? widgetInstanceReadSource((key) => `${CONTEXT}.read(${key})`)
 						: null,
 					boundRead: (key) => `${CONTEXT}.read(${key})`,
+					...(hasElementHandleIdList(componentChunks) ? { lists: true } : {}),
 				})
 			: '';
 	return [

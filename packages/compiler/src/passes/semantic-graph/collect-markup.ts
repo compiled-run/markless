@@ -439,25 +439,19 @@ function emitNode(
 		// is dropped here so a refused module never leaks `anchorname="..."`.
 		if (!name || isEventAttribute(name) || name === 'attach' || name === 'el' || isCssAnchorAttribute(name))
 			continue;
-		const idrefHandle = elementHandleIdrefTarget(context, node, name);
-		if (idrefHandle) {
-			// A shared() handle names an element some OTHER part of the widget
-			// renders, and whether that part was placed is not a build-time fact of
-			// this file. So the slot writes the whole attribute or nothing, rather
-			// than baking the name into the statics around an id that may name
-			// nothing. A component-local handle is bound in this same markup, so it
-			// keeps the statics it always had.
-			const omittable = idrefHandle.startsWith('shared:');
+		const idrefHandles = elementHandleIdrefTarget(context, node, name);
+		if (idrefHandles) {
+			// An omittable reference writes the whole attribute or nothing, rather
+			// than baking the name into the statics around ids that may name nothing.
+			// Component-local handles are bound in this same markup, so they keep the
+			// statics they always had.
+			const omittable = idrefOmittable(idrefHandles);
 			if (!omittable) append(builder, ` ${name}="`);
 			addSlot(builder, {
 				kind: 'attribute',
 				name,
 				coordinate: { kind: 'child-index', path },
-				residue: {
-					kind: 'element-handle-id',
-					handleGraphNodeId: idrefHandle,
-					...(omittable ? { idref: true as const } : {}),
-				},
+				residue: elementHandleIdrefResidue(idrefHandles),
 				...(omittable ? {} : { alwaysPresent: true as const }),
 			});
 			if (!omittable) append(builder, '"');
@@ -518,23 +512,43 @@ function emitNode(
 }
 
 /**
- * An IDREF attribute whose value resolved to an element() handle is a recorded
- * relationship, not a value binding: its value is the id minted for the handle,
- * so the slot renders from the record rather than from the authored expression.
- * Returns the handle's graph node, or undefined when this attribute is an
- * ordinary value binding.
+ * An IDREF attribute whose value resolved to element() handles is a recorded
+ * relationship, not a value binding: its value is the ids minted for them, so
+ * the slot renders from the records rather than from the authored expression.
+ * Returns the handles' graph nodes in authored order, or undefined when this
+ * attribute is an ordinary value binding.
  */
 function elementHandleIdrefTarget(
 	context: CollectionContext,
 	node: AnyNode,
 	name: string,
-): string | undefined {
+): ReadonlyArray<string> | undefined {
 	if (!isIdrefAttribute(name)) return undefined;
 	const hostNodeId = context.hostIds.get(node);
 	if (!hostNodeId) return undefined;
-	return context.graph.elementHandleIdrefs.find(
-		(idref) => idref.hostNodeId === hostNodeId && idref.attributeName === name,
-	)?.handleGraphNodeId;
+	const handles = context.graph.elementHandleIdrefs
+		.filter((idref) => idref.hostNodeId === hostNodeId && idref.attributeName === name)
+		.map((idref) => idref.handleGraphNodeId);
+	return handles.length > 0 ? handles : undefined;
+}
+
+/** One residue for however many handles an IDREF position named. */
+function elementHandleIdrefResidue(handles: ReadonlyArray<string>): SemanticMarkupResidue {
+	if (handles.length > 1)
+		return { kind: 'element-handle-id-list', handleGraphNodeIds: handles };
+	const handleGraphNodeId = handles[0]!;
+	return {
+		kind: 'element-handle-id',
+		handleGraphNodeId,
+		...(handleGraphNodeId.startsWith('shared:') ? { idref: true as const } : {}),
+	};
+}
+
+// Whether the whole attribute has to be slot-written: a shared() handle names an
+// element some OTHER part renders, and whether that part was placed is not a
+// build-time fact of this file.
+function idrefOmittable(handles: ReadonlyArray<string>): boolean {
+	return handles.some((handle) => handle.startsWith('shared:'));
 }
 
 /**
@@ -645,16 +659,12 @@ function emitDynamicHost(
 		}
 		if (!name || isEventAttribute(name) || name === 'attach' || name === 'el' || isCssAnchorAttribute(name))
 			continue;
-		const idrefHandle = elementHandleIdrefTarget(context, node, name);
-		if (idrefHandle) {
+		const idrefHandles = elementHandleIdrefTarget(context, node, name);
+		if (idrefHandles) {
 			attributeSlots.push({
 				kind: 'attribute',
 				name,
-				residue: {
-					kind: 'element-handle-id',
-					handleGraphNodeId: idrefHandle,
-					...(idrefHandle.startsWith('shared:') ? { idref: true as const } : {}),
-				},
+				residue: elementHandleIdrefResidue(idrefHandles),
 			});
 			continue;
 		}

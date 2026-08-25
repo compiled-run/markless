@@ -841,6 +841,14 @@ export type SemanticMarkupResidue =
 			// its own element or not at all.
 			readonly idref?: true;
 	  }
+	// The space-joined ids of several handles named by one IDREF position that
+	// HTML defines as a list. Referencing side only, and each entry is omitted on
+	// the same terms the single form is, so a description and an error can be
+	// named together without either dangling when its part never rendered.
+	| {
+			readonly kind: 'element-handle-id-list';
+			readonly handleGraphNodeIds: ReadonlyArray<string>;
+	  }
 
 type SemanticMarkupLocatedSlot = {
 	readonly coordinate: SemanticMarkupSlotCoordinate;

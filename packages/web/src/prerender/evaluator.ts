@@ -121,7 +121,7 @@ export type PrerenderDataDefinition = {
 				readonly kind:
 					| 'authored-expression'
 					| 'element-handle-id'
-					| 'element-handle-anchor-style';
+					| 'element-handle-id-list';
 			}
 		>,
 		context: {
@@ -165,7 +165,7 @@ export type PrerenderPageClosure = {
 				readonly kind:
 					| 'authored-expression'
 					| 'element-handle-id'
-					| 'element-handle-anchor-style';
+					| 'element-handle-id-list';
 			}
 		>,
 		context: SsrDataReadContext,
