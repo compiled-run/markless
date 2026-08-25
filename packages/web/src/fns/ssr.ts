@@ -72,6 +72,7 @@ type SsrAnchoredRecord = SsrRecord & {
 };
 type SsrBranchRecord = SsrAnchoredRecord & {
 	readonly testReads?: ReadonlyArray<ComposeGraphRead>;
+	readonly contentReads?: ReadonlyArray<ComposeGraphRead>;
 	readonly symbolId?: string;
 	readonly takenArm?: number;
 	readonly armRecords?: ReadonlyArray<SsrArmRecordSet>;
@@ -1268,12 +1269,22 @@ export function marklessSsrAppendChildView(context: {
 		const armRecords = branch.armRecords?.map((arm) =>
 			marklessSsrPrefixArmRecord(arm, context.child),
 		);
+		// An arm that renders text with no element of its own has no dom update to
+		// carry; its content read refreshes the arm range through the branch
+		// symbol, so it needs the same prop routing every other read gets.
+		const liveContentReads = (branch.contentReads ?? []).filter(
+			(read) => !marklessCsrChildReadIsStatic(read, context.child.graphProps),
+		);
 		// A branch decided only by an explicitly constant/absent prop has no live
 		// parent route to re-decide it, but the arm it painted still owns records
 		// that have to follow their values; it stays as a decide-less record.
 		const decided = liveTestReads.length === 0;
-		if (decided && !marklessSsrDecidedArmIsLive(branch, armRecords)) continue;
-		const { symbolId: childSymbolId, ...unwired } = branch;
+		const { symbolId: childSymbolId, contentReads: _unmappedContentReads, ...unwired } = branch;
+		// Only the branch symbol can rebuild an arm, so a content read without one
+		// has nothing to drive and never justifies keeping the record.
+		const contentDriven = liveContentReads.length > 0 && Boolean(childSymbolId);
+		if (decided && !contentDriven && !marklessSsrDecidedArmIsLive(branch, armRecords)) continue;
+		const keepSymbol = Boolean(childSymbolId) && (!decided || contentDriven);
 		const mappedBranch = {
 			...unwired,
 			id: context.child.hostPrefix + branch.id,
@@ -1285,8 +1296,18 @@ export function marklessSsrAppendChildView(context: {
 						context.child.hostPrefix + branch.id,
 						childInstancePath,
 					),
-			...(childSymbolId && !decided
-				? { symbolId: marklessBoundSymbolId(context.child, childSymbolId) }
+			...(keepSymbol && liveContentReads.length > 0
+				? {
+						contentReads: marklessSsrRemapChildReads(
+							liveContentReads,
+							context.child.graphProps,
+							context.child.hostPrefix + branch.id,
+							childInstancePath,
+						),
+					}
+				: {}),
+			...(keepSymbol
+				? { symbolId: marklessBoundSymbolId(context.child, childSymbolId!) }
 				: {}),
 			...(armRecords ? { armRecords } : {}),
 		};
