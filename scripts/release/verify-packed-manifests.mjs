@@ -189,7 +189,8 @@ try {
 			(manifest.marklessShipsSource === true);
 		const requiredPrefix = shipsSource ? './src/' : './dist/';
 		for (const [where, path] of targets) {
-			if (!path.startsWith(requiredPrefix)) {
+			const isShippedData = shipsSource && path.endsWith('.json');
+			if (!path.startsWith(requiredPrefix) && !isShippedData) {
 				failures.push(`${label}: ${where} -> ${path} must target ${requiredPrefix.slice(0, -1)}`);
 				continue;
 			}

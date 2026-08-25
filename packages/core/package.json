@@ -1,6 +1,6 @@
 {
 	"name": "@markless/core",
-	"version": "0.3.3",
+	"version": "0.4.0",
 	"description": "Markless core authoring APIs: resumable TSRX apps with no hydration and no VDOM.",
 	"license": "MIT",
 	"repository": {

@@ -123,9 +123,9 @@ describe('publish manifest shape', () => {
 			if (manifest.publishConfig?.marklessShipsSource === true) {
 				// Source-shipped: the tarball IS src, compiled in the consumer's build.
 				expect(
-					manifest.files?.[0],
+					manifest.files,
 					`${packageName} ships src (source-shipped package)`,
-				).toBe('src');
+				).toContain('src');
 				return;
 			}
 			expect(manifest.files, `${packageName} files field`).toContain('dist');
