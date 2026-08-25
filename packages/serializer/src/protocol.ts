@@ -331,19 +331,32 @@ export type ProtocolViewPayload = {
 		 * `itemPath` is the property path to read off the item - and is omitted
 		 * when the row has none, which is the fully static row.
 		 *
+		 * `attributeSlots` names the row's dynamic attributes the same way, with the
+		 * attribute `name` to write and a `path` addressing the ELEMENT that carries
+		 * it. The attribute's value is not in the html at all: the statics join
+		 * around it, and the mint writes it from the item under the presence rule
+		 * every other render path uses (absent for null, undefined and false).
+		 *
 		 * Carried only for a row the client can finish alone: static markup, or
-		 * markup whose every slot is text read off the repeated item. A row holding
-		 * anything else - a value from outside the row, an attribute, a nested
-		 * construct, a component - needs wiring the mint cannot do, so it ships
-		 * nothing and the served behaviour stands.
+		 * markup whose every slot - text or attribute - reads off the repeated item.
+		 * A row holding anything else - a value from outside the row, an attribute
+		 * value computed by an expression, a nested construct, a component - needs
+		 * wiring the mint cannot do, so it ships nothing and the served behaviour
+		 * stands.
 		 *
 		 * Pay-per-use: a repeat whose row is not mintable emits no field at all, so
-		 * its record is byte-identical to what it was before this existed.
+		 * its record is byte-identical to what it was before this existed, and a row
+		 * with no dynamic attributes omits `attributeSlots` for the same reason.
 		 */
 		readonly rowTemplate?: {
 			readonly html: string;
 			readonly textSlots?: ReadonlyArray<{
 				readonly path: ReadonlyArray<number>;
+				readonly itemPath: ReadonlyArray<string>;
+			}>;
+			readonly attributeSlots?: ReadonlyArray<{
+				readonly path: ReadonlyArray<number>;
+				readonly name: string;
 				readonly itemPath: ReadonlyArray<string>;
 			}>;
 		};

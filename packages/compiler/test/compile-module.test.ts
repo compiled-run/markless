@@ -5089,11 +5089,16 @@ test('repeat rows support item-derived dynamic attributes (href/testid class)', 
 		filename: 'src/App.tsrx',
 		source: `import { state } from '@markless/core';
 export default function List() @{
-	let rows = state([{ id: 'a' }]);
+	let rows = state([{ id: 'a', href: '#/a', testid: 'repo-link-a' }]);
 	<main>
 		@for (const r of rows; key r.id) {
 			<a class="row-title" href={'#/r/' + r.id} data-testid={'repo-link-' + r.id}>{r.id}</a>
 		}
+		<nav>
+			@for (const r of rows; key r.id) {
+				<a class="row-plain" href={r.href} data-testid={r.testid}>{r.id}</a>
+			}
+		</nav>
 	</main>
 }`,
 		symbols: [],
@@ -5103,6 +5108,24 @@ export default function List() @{
 	// SSR row mapper evaluates the attribute expressions with the item in scope.
 	expect(result.publicRenderModule.ssrModuleSource).toContain("'#/r/' + r.id");
 	expect(result.publicRenderModule.ssrModuleSource).toContain("'repo-link-' + r.id");
+
+	// The same attributes read straight off the item are also a row the client can
+	// build after resume: the payload carries the element path and the name. The
+	// concatenated pair above is not, because the mint reads paths off the item and
+	// evaluates no expression - so that row ships no template at all.
+	const view = result.protocolView as {
+		readonly keyedRepeats?: ReadonlyArray<Record<string, unknown>>;
+	};
+	expect(view.keyedRepeats).toHaveLength(2);
+	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowTemplate');
+	expect(view.keyedRepeats?.[1]?.rowTemplate).toEqual({
+		html: '<a class="row-plain"><!--markless-slot:2--></a>',
+		textSlots: [{ path: [0, 0], itemPath: ['id'] }],
+		attributeSlots: [
+			{ path: [0], name: 'href', itemPath: ['href'] },
+			{ path: [0], name: 'data-testid', itemPath: ['testid'] },
+		],
+	});
 });
 
 const componentRowsPageSource = `import { state } from '@markless/core';
