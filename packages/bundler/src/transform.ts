@@ -30,6 +30,7 @@ import type {
 } from './types.ts';
 import {
 	MARKLESS_VIRTUAL_PREFIX,
+	SMALL_SYMBOL_DIRECT_LOAD_LIMIT,
 	emitResumeModule,
 	emitSettleModule,
 	emitSourceModule,
@@ -58,6 +59,7 @@ import {
 	triggerGroupVirtualModuleId,
 } from './trigger-groups.ts';
 import { adaptImportedCaptureResolver } from './bound-resolver.ts';
+import { emitSymbolBundleModule, planSymbolBundles } from './build/symbol-bundles.ts';
 
 // Authored TS (param annotations, assertions, type aliases) survives compilation
 // into emitted module code, but downstream consumers (Vite builtins, symbol
@@ -271,6 +273,22 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	const selfWakeArmRendererId = prerenderTriggerGroups.some((group) => group.id === 'self-wake')
 		? triggerGroupVirtualModuleId(input.filename, prerenderTriggerGroups.length)
 		: undefined;
+	// The prerender wake closure is the richer wake set when a page has one; the
+	// compiler's trigger groups answer for every other page.
+	const symbolBundles =
+		symbolRows.length > SMALL_SYMBOL_DIRECT_LOAD_LIMIT
+			? planSymbolBundles({
+					filename: input.filename,
+					symbols: compiled.symbolModules.modules.map((module) => ({
+						symbolId: module.symbolId,
+						moduleId: symbolVirtualModuleId(input.filename, module.symbolId),
+					})),
+					interactions:
+						prerenderTriggerGroups.length > 0
+							? prerenderTriggerGroups
+							: compiled.triggerGroups.groups,
+				})
+			: [];
 	// Scoped <style> CSS ships through the bundler's CSS pipeline: a virtual
 	// .css module imported by the transformed module, never inline JS.
 	const styleScope = compiled.publicRenderPlan.styleScopes[0];
@@ -481,6 +499,14 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					},
 				]
 			: []),
+		...symbolBundles.map(
+			(bundle): MarklessVirtualModule => ({
+				id: bundle.id,
+				type: 'symbol-bundle',
+				source: emitSymbolBundleModule(bundle.symbolModuleIds),
+				bundledSymbolModuleIds: bundle.symbolModuleIds,
+			}),
+		),
 		...linkedBoundarySymbols.map((symbol) => symbol.module),
 		...(await Promise.all(
 			compiled.symbolModules.modules.map(
