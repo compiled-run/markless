@@ -134,7 +134,13 @@ function graphRead(graphNodeId: string, path: ReadonlyArray<string> = []): Seman
 
 type RunCase = {
 	readonly context: Record<string, unknown>;
-	readonly expected: { readonly arm: number; readonly html: string };
+	// Branch modules also report `resolved` (the arm's parts were found); the
+	// parity test defaults it to true, so a case states it only when it is false.
+	readonly expected: {
+		readonly arm: number;
+		readonly html: string;
+		readonly resolved?: boolean;
+	};
 };
 
 type BranchFixture = {
@@ -352,6 +358,12 @@ const BRANCH_WITHOUT_TEST_READ: BranchFixture = {
 		// site always flips to arm 1 unless the runtime supplies an arm.
 		{ context: { graph: graphOf({}) }, expected: { arm: 1, html: '<p>No</p>' } },
 		{ context: { arm: 0, graph: graphOf({}) }, expected: { arm: 0, html: '<p>Yes</p>' } },
+		// An arm the table has no parts for is reported unresolved, which is the
+		// runtime's discriminator between a failed arm and one that renders empty.
+		{
+			context: { arm: 5, graph: graphOf({}) },
+			expected: { arm: 5, html: '', resolved: false },
+		},
 	],
 };
 
@@ -714,9 +726,11 @@ test('both paths return the same arm and the same HTML for every case', () => {
 		for (const { context, expected } of fixture.cases) {
 			const fromAssembled = runModule(paths.assembled, paths.exportName, context);
 			const fromPrinted = runModule(paths.printed, paths.exportName, context);
+			const result =
+				fixture.kind === 'branch' ? { resolved: true, ...expected } : expected;
 
-			expect(fromAssembled, `${fixture.name}: assembled result`).toEqual(expected);
-			expect(fromPrinted, `${fixture.name}: printed result`).toEqual(expected);
+			expect(fromAssembled, `${fixture.name}: assembled result`).toEqual(result);
+			expect(fromPrinted, `${fixture.name}: printed result`).toEqual(result);
 		}
 	}
 });

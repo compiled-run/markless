@@ -126,7 +126,12 @@ function createBranchRegistration(
 			currentArmByBranchId.set(branch.id, update.arm);
 			const html = branchHtmlToString(update.html);
 			const fragment = input.renderBranchHtml ? input.renderBranchHtml(html) : html;
-			if (branchFragmentEmpty(fragment) && !branch.declaredEmptyArms?.includes(update.arm))
+			// `resolved` means the module found this arm's parts, so empty text is a value.
+			if (
+				branchFragmentEmpty(fragment) &&
+				update.resolved !== true &&
+				!branch.declaredEmptyArms?.includes(update.arm)
+			)
 				throw branchArmEmptyError(branch, update.arm);
 			return [
 				{ type: 'removeRange', locator: `branch:${branch.id}` },
@@ -229,10 +234,9 @@ function onceRelease(release: () => void): () => void {
 	};
 }
 
-// The arm the render PAINTED, which the guard compares against. A minted
-// condition computed holds no value until its first demand refresh, so reading
-// the graph instead answers the else arm for a branch painted at arm 0, and the
-// first real update is then discarded as a no-change.
+// The arm the render PAINTED wins: a minted condition computed holds no value
+// until its first demand refresh, so the graph answers the else arm for a branch
+// painted at arm 0 and the first real update is discarded as a no-change.
 function wiredBranchArm(graph: RuntimeGraph, branch: ResumeBranchRecord): number {
 	return typeof branch.takenArm === 'number' ? branch.takenArm : readBranchArm(graph, branch);
 }
@@ -537,8 +541,6 @@ function missingCommentAnchorError(
 	);
 }
 
-// Shared diagnostic shape (message text stays authored per site; docsUrl
-// always mirrors the code).
 function branchRuntimeError(message: string, code: string, fields: Record<string, unknown>): Error {
 	const error = new Error(message) as Error & Record<string, unknown>;
 	error.name = 'RuntimeResumeError';
