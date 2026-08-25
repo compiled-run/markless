@@ -40,6 +40,7 @@ import {
 	emitSymbolResolverModule,
 } from './passes/symbol-resolver-module.ts';
 import { planBoundSymbolResolver, planSymbolResolver } from './passes/symbol-resolver.ts';
+import { stripExtractedSyncPolicyCalls } from './passes/semantic-graph/strip-sync-policy-calls.ts';
 
 export async function compileTsrxModule(
 	input: CompileTsrxModuleInput,
@@ -157,13 +158,16 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 			return {
 				...pass,
 				run({ inputs }) {
-					return {
-						symbolResolver: planSymbolResolver({
-							semanticGraph: inputs.semanticGraph as SemanticGraphArtifact,
-							payloadArena: inputs.payloadArena as PayloadArenaArtifact,
-							stateLowering: inputs.stateLowering as StateLoweringArtifact,
-						}),
-					};
+					const semanticGraph = inputs.semanticGraph as SemanticGraphArtifact;
+					const symbolResolver = planSymbolResolver({
+						semanticGraph,
+						payloadArena: inputs.payloadArena as PayloadArenaArtifact,
+						stateLowering: inputs.stateLowering as StateLoweringArtifact,
+					});
+					// Every later pass reads this symbol list, so the eager sync policy's
+					// calls must already be lifted out of it here.
+					stripExtractedSyncPolicyCalls(symbolResolver.symbols, semanticGraph);
+					return { symbolResolver };
 				},
 			};
 		}
