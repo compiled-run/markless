@@ -73,6 +73,9 @@ function expectBasicRendered() {
 	expect(el(Label).getAttribute('for')).toBe(el(Trigger).getAttribute('id'));
 	expect(el(Trigger).id).toBeTruthy();
 	expect(el(Root).getAttribute('aria-disabled')).toBe('false');
+	// Neither message part is placed, so both handles drop out and no empty
+	// attribute is left behind.
+	expect(el(Trigger).hasAttribute('aria-describedby')).toBe(false);
 }
 
 function expectSettingsRendered() {
@@ -150,6 +153,7 @@ function expectHelpRendered() {
 	expect(el(Label).textContent).toBe('Subscribe to newsletter');
 	expect(el(Label).getAttribute('for')).toBe(el(Trigger).id);
 	expect(el(Description).textContent).toBe("We'll send you updates about new features");
+	// Only the description was placed, so the error drops out of the list.
 	expect(el(Trigger).getAttribute('aria-describedby')).toBe(el(Description).id);
 	expect(el(Description).id).toBeTruthy();
 	expect(el(Trigger).getAttribute('aria-invalid')).toBe('false');
@@ -162,11 +166,21 @@ function expectInvalidRendered() {
 	// Every part of one widget instance seeds before any part renders, so the
 	// error part's `checkbox.invalid = true` is what the trigger reads.
 	expect(el(AfterTrigger).getAttribute('aria-invalid')).toBe('true');
+	// Both ids, error first: the hint is written above the error in this page, so
+	// the order is the family's rather than the document's.
+	expect(el(AfterDescription).id).toBeTruthy();
+	expect(el(AfterError).id).toBeTruthy();
+	expect(el(AfterTrigger).getAttribute('aria-describedby')).toBe(
+		`${el(AfterError).id} ${el(AfterDescription).id}`,
+	);
 
 	// The same error written BEFORE the trigger: document order does not decide
 	// what a part reads, so this trigger is invalid too.
 	expect(el(BeforeError).textContent).toBe('Please accept the terms and conditions');
 	expect(el(BeforeTrigger).getAttribute('aria-invalid')).toBe('true');
+	// Only the error was placed here, so it is named alone - no stray space, no
+	// dangling id.
+	expect(el(BeforeTrigger).getAttribute('aria-describedby')).toBe(el(BeforeError).id);
 }
 
 async function expectConsumerCallbackFires() {

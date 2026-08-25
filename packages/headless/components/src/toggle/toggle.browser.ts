@@ -9,6 +9,7 @@ import SavedSettingsForm from './scenarios/saved-settings-form.tsrx';
 import SettingsList from './scenarios/settings-list.tsrx';
 import UnavailableOptions from './scenarios/unavailable-options.tsrx';
 import WithHelp from './scenarios/with-help.tsrx';
+import WithHelpAndError from './scenarios/with-help-and-error.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
 
 const Root = page.getByTestId('root');
@@ -65,6 +66,9 @@ function expectBasicRendered() {
 	expect(el(Trigger).id).toBeTruthy();
 	expect(el(Trigger).getAttribute('aria-labelledby')).toBe(el(Label).id);
 	expect(el(Label).id).toBeTruthy();
+	// Neither message part is placed, so both handles drop out and no empty
+	// attribute is left behind.
+	expect(el(Trigger).hasAttribute('aria-describedby')).toBe(false);
 }
 
 function expectSettingsRendered() {
@@ -133,6 +137,7 @@ function expectSavedFieldRendered() {
 function expectHelpRendered() {
 	expect(el(Description).textContent).toBe('(Receive notifications about important updates)');
 	expect(el(Trigger).getAttribute('aria-invalid')).toBe('false');
+	// Only the description was placed, so the error drops out of the list.
 	expect(el(Trigger).getAttribute('aria-describedby')).toBe(el(Description).id);
 	expect(el(Description).id).toBeTruthy();
 }
@@ -142,8 +147,22 @@ function expectInvalidRendered() {
 	// Seeding completes before any part renders, so the error part's
 	// `toggle.invalid = true` is what the trigger reads.
 	expect(el(Trigger).getAttribute('aria-invalid')).toBe('true');
+	// Only the error was placed, so the description drops out and the error is
+	// named alone - no stray space, no dangling id.
 	expect(el(Trigger).getAttribute('aria-describedby')).toBe(el(ToggleError).id);
 	expect(el(ToggleError).id).toBeTruthy();
+}
+
+function expectBothMessagesRendered() {
+	const description = el(Description);
+	const error = el(ToggleError);
+	expect(description.id).toBeTruthy();
+	expect(error.id).toBeTruthy();
+	expect(description.id).not.toBe(error.id);
+	// Both ids, error first: the hint is written above the error in this page, so
+	// the order is the family's rather than the document's.
+	expect(el(Trigger).getAttribute('aria-describedby')).toBe(`${error.id} ${description.id}`);
+	expect(el(Trigger).getAttribute('aria-invalid')).toBe('true');
 }
 
 async function expectConsumerCallbackFires() {
@@ -250,6 +269,12 @@ for (const mode of MODES) {
 		if (mode === 'CSR') await render(Invalid);
 		else await renderSSR(Invalid);
 		expectInvalidRendered();
+	});
+
+	test(`${mode}: both messages are named by the trigger, error first`, async () => {
+		if (mode === 'CSR') await render(WithHelpAndError);
+		else await renderSSR(WithHelpAndError);
+		expectBothMessagesRendered();
 	});
 
 	test(`${mode}: an error written before the trigger still marks it invalid`, async () => {
