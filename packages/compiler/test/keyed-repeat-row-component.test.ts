@@ -136,6 +136,63 @@ export function App() @{
 	expect(view.keyedRepeats ?? []).toHaveLength(0);
 });
 
+// A branch inside the row component anchors into a census the page counted once,
+// at boot, for the rows it served. A row born after resume has no counted
+// anchors, so the mint is withheld and the page keeps today's no-growth
+// behaviour instead of indexing into another row's anchors.
+const branchingRow = `import { state } from '@markless/core';
+function Row({ item }) @{
+	let open = state(false);
+	<li onClick={() => open = !open}>@if (open) { <b>{item.label}</b> }</li>
+}
+export function App() @{
+	let rows = state([{ id: 'a', label: 'A' }]);
+	<ul>@for (const row of rows; key row.id) { <Row item={row} /> }</ul>
+}
+`;
+
+test('a row component whose body branches ships no identity', async () => {
+	const view = await viewOf(branchingRow);
+	const repeat = view.keyedRepeats?.[0];
+	expect(repeat).toBeDefined();
+	expect(repeat).not.toHaveProperty('rowComponent');
+	expect(repeat).not.toHaveProperty('rowTemplate');
+});
+
+// The twin: same row, same component, no branch in the body - the field still
+// ships, so the gate only ever withholds.
+test('the plain twin of a branching row component still ships its identity', async () => {
+	const view = await viewOf(sameModuleRow);
+	expect(view.keyedRepeats?.[0]?.rowComponent?.componentName).toBe('App');
+});
+
+test('a row component whose body switches ships no identity', async () => {
+	const view = await viewOf(`import { state } from '@markless/core';
+function Row({ item }) @{
+	<li>@switch (item.kind) { @case 'a': { <b>a</b> } @default: { <i>b</i> } }</li>
+}
+export function App() @{
+	let rows = state([{ id: 'a', kind: 'a' }]);
+	<ul>@for (const row of rows; key row.id) { <Row item={row} /> }</ul>
+}
+`);
+	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
+});
+
+test('a row component whose body opens a boundary ships no identity', async () => {
+	const view = await viewOf(`import { computed, state } from '@markless/core';
+function Row({ item }) @{
+	const details = computed(async () => ({ title: item.id }));
+	<li>@try { <b>{details.title}</b> } @catch { <i>failed</i> }</li>
+}
+export function App() @{
+	let rows = state([{ id: 'a' }]);
+	<ul>@for (const row of rows; key row.id) { <Row item={row} /> }</ul>
+}
+`);
+	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
+});
+
 // Position keying leaves a row with no data identity to resume against, so the
 // record never ships - and neither does the component identity riding it.
 test('an index-keyed component repeat ships no record', async () => {
