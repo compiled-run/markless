@@ -127,6 +127,9 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		semanticGraph: input.semanticGraph,
 		filename: input.source.filename,
 		source: input.source.source,
+		...(input.source.importedModuleInterfaces
+			? { importedModuleInterfaces: input.source.importedModuleInterfaces }
+			: {}),
 	});
 	return {
 		passId: 'public-render-plan',
