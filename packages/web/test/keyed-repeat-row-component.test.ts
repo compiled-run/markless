@@ -67,23 +67,26 @@ function componentRow(label: string): Node {
 	return el('LI', [el('SPAN', [txt(label)]), el('BUTTON')]);
 }
 
-type MintCall = { readonly rowKey: unknown; readonly item: unknown };
+type MintCall = { readonly rowKey: unknown; readonly item: unknown; readonly host: BridgeHost };
 
 // The bridge, standing in for `@markless/web/fns/row-component-mint` bound to a
-// page's render-data surface: the same shape the emitted loader hands over. The
-// repeat runtime joins one load per document, so this installs once and every
-// fixture re-aims it - which is itself the production shape.
+// page's render-data surface: the same shape the emitted loader hands over. It
+// is installed once and loaded once per container, and every instance binds the
+// graph, registrar and recorder of the container that loaded it - which is what
+// keeps a second container off the first one's wiring.
 let bridge: { readonly mints: MintCall[]; readonly commits: unknown[] } = {
 	mints: [],
 	commits: [],
 };
-type BridgeHost = { readonly wired?: boolean } | undefined;
+type BridgeHost = { readonly wired?: boolean; readonly id?: string } | undefined;
 let wiredBridge = true;
 (
 	globalThis as {
 		__marklessRowMint?: (graph?: unknown, host?: BridgeHost) => Promise<unknown>;
 	}
 ).__marklessRowMint = async (graph, host) => {
+	const own = bridge,
+		wired = wiredBridge;
 	let prepared = new Map<unknown, Node>();
 	return {
 		mintRow(_parent: Node, _repeat: unknown, item: { readonly id: string }) {
@@ -95,10 +98,7 @@ let wiredBridge = true;
 			served: ReadonlyMap<unknown, Node>,
 		) {
 			prepared = new Map();
-			// The repeat runtime joins one load per document, so the registrar this
-			// double reads is the fixture's own, not the one the first load captured.
-			void host;
-			const items = wiredBridge
+			const items = wired
 				? ((graph as { read: (id: string, path: never[]) => unknown }).read(
 						repeat.collectionGraphNodeId,
 						[],
@@ -106,20 +106,20 @@ let wiredBridge = true;
 				: [];
 			for (const item of items) {
 				if (served.has(item.id) || prepared.has(item.id)) continue;
-				bridge.mints.push({ rowKey: item.id, item });
+				own.mints.push({ rowKey: item.id, item, host });
 				prepared.set(item.id, componentRow(item.label));
 			}
 			const minted = [...prepared];
 			return async () => {
 				prepared = new Map();
 				for (const [rowKey, rowRoot] of minted)
-					bridge.commits.push({ rowKey, attached: rowRoot.parentElement !== null });
+					own.commits.push({ rowKey, attached: rowRoot.parentElement !== null });
 			};
 		},
 	};
 };
 
-function fixture(options: { readonly wired?: boolean } = {}) {
+function fixture(options: { readonly wired?: boolean; readonly host?: BridgeHost } = {}) {
 	const served = [
 		{ id: 'a', label: 'alpha' },
 		{ id: 'b', label: 'bravo' },
@@ -162,6 +162,7 @@ function fixture(options: { readonly wired?: boolean } = {}) {
 	} as unknown as ResumeViewRecord;
 	const graph = createRuntimeGraph({ cells: [{ graphNodeId: 'state:rows', value: served }] });
 	const registered: Array<{ readonly host: Node; readonly rowKey: unknown }> = [];
+	const bridgeHost = options.host ?? { wired: true };
 	wireKeyedRepeats(
 		{
 			graph,
@@ -175,10 +176,11 @@ function fixture(options: { readonly wired?: boolean } = {}) {
 			} as never,
 			storeContainerSubscription: () => undefined,
 		},
-		options.wired === false ? undefined : ({ wired: true } as never),
+		options.wired === false ? undefined : (bridgeHost as never),
 	);
 	return {
 		graph,
+		bridgeHost,
 		list,
 		root,
 		mints,
@@ -261,6 +263,23 @@ test('a component key that comes back reuses its parked row and never mints twic
 	expect(commits).toHaveLength(1);
 	expect(list.childNodes[3]).toBe(minted);
 	expect(labels()).toEqual(['header', 'alpha', 'bravo', 'charlie', 'footer']);
+});
+
+// Two containers in one document each load the bridge with their OWN graph and
+// registrar. A single module-wide memo handed the second container the first
+// one's bridge, so its minted row registered its events on a roster the second
+// container's dispatch never reads and the row rendered dead.
+test('a second container mints through its own registrar', async () => {
+	const first = fixture({ host: { id: 'first' } });
+	const second = fixture({ host: { id: 'second' } });
+
+	await first.write(GROWN);
+	await second.write(GROWN);
+
+	expect(first.mints.map((mint) => mint.host)).toEqual([first.bridgeHost]);
+	expect(second.mints.map((mint) => mint.host)).toEqual([second.bridgeHost]);
+	expect(second.mints[0]!.host).toBe(second.bridgeHost);
+	expect(second.labels()).toEqual(['header', 'alpha', 'bravo', 'charlie', 'footer']);
 });
 
 // Pay-per-use, and fail-closed: a page whose resume module wrote no bridge has

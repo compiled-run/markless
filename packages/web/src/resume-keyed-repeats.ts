@@ -78,17 +78,28 @@ type RowMintHost = {
 		host?: RowComponentHost,
 	) => Promise<RowMint>;
 };
-let rowMint: RowMint | undefined,
-	rowMintLoad: Promise<RowMint> | undefined;
-// The bridge is handed the graph and the registrar positionally, so nothing this
-// module ships names them; `loaded ||=` joins a second repeat to the first load.
+type RowMintCell = { mint?: RowMint; load?: Promise<RowMint> };
+// The bridge BINDS the graph and the registrar it is handed, so the memo is per
+// graph: one module-wide memo gave a second container the FIRST container's
+// registrar, and a row minted there registered its events on a roster that
+// container's dispatch never reads. `cell.load ||=` still joins a second repeat
+// of the same container to one load.
+const rowMintCells = new WeakMap<object, RowMintCell>();
+const noGraphKey = {};
+function rowMintCell(graph?: RuntimeGraph): RowMintCell {
+	const key = graph ?? noGraphKey;
+	let cell = rowMintCells.get(key);
+	if (!cell) rowMintCells.set(key, (cell = {}));
+	return cell;
+}
 function loadRowMint(
 	graph?: RuntimeGraph,
 	host?: RowComponentHost,
 ): Promise<RowMint> | undefined {
 	const load = (globalThis as RowMintHost).__marklessRowMint;
 	if (!load) return undefined;
-	return (rowMintLoad ||= load(graph, host).then((module) => (rowMint = module)));
+	const cell = rowMintCell(graph);
+	return (cell.load ||= load(graph, host).then((module) => (cell.mint = module)));
 }
 
 export function validateOneRepeat(
@@ -175,7 +186,8 @@ export function wireKeyedRepeats(
 		// The three fields that need the building half. Read once, off the record, so
 		// a repeat that only reorders never touches the import at all - and a repeat
 		// that does starts the fetch at wiring time, not at the first gesture.
-		const builds = Boolean(repeat.rowTemplate ?? repeat.emptyArm ?? repeat.rowComponent);
+		const builds = Boolean(repeat.rowTemplate ?? repeat.emptyArm ?? repeat.rowComponent),
+			cell = builds ? rowMintCell(input.graph) : undefined;
 		if (builds) void loadRowMint(input.graph, rowComponentHost)?.catch(() => undefined);
 		for (const [rowIndex, rowRoot] of repeatRowElements(parent, repeat, items.length).entries()) {
 			const rowKey = repeatItemKey(items[rowIndex], repeat);
@@ -209,7 +221,7 @@ export function wireKeyedRepeats(
 					// and census move in one turn. A component row is rendered BEFORE that
 					// turn, for the same reason: its render is async and the apply is not,
 					// and its registration follows the apply that attaches it.
-					if (!builds || (rowMint && !rowMint.rows)) return apply(rowMint);
+					if (!builds || (cell?.mint && !cell.mint.rows)) return apply(cell?.mint);
 					return (
 						loadRowMint(input.graph, rowComponentHost)?.then(async (mint) => {
 							const commit = await mint.rows?.(repeat, parent, rowRootsByKey);
