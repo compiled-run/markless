@@ -3,6 +3,7 @@ import type { RuntimeGraph } from '@markless/runtime';
 import type { SerializedGraphPayload } from '../../../serializer/src/value-decode-client.ts';
 import type { PrerenderDataSurface } from '../prerender/evaluator.ts';
 import type { ArmRegistrationDeps } from '../resume-commit-arm.ts';
+import { isArmBranchAnchorComment } from '../resume-anchor-census.ts';
 import { readKeyedRepeatCollection } from '../resume-keyed-repeats.ts';
 import {
 	mintRow as mintTemplateRow,
@@ -11,8 +12,10 @@ import {
 	renderEmptyArm,
 } from './row-mint.ts';
 import type {
+	ResumeArmBranchRecord,
 	ResumeArmRecordSet,
 	ResumeAsyncBoundaryRecord,
+	ResumeDomComment,
 	ResumeDomElement,
 	ResumeDomNode,
 	ResumeKeyedRepeatRecord,
@@ -147,9 +150,10 @@ async function mintComponentRow(input: {
 	});
 	const childNodes = parseRowNodes(input.parent, input.repeat, rendered.html);
 	assertMintableRowRecords(input.repeat, rendered.view);
-	// The child's locators index its OWN fragment, so they resolve against the
-	// child's nodes whether or not a wrapper goes on to hold them.
+	// The child's locators and branch anchors index its OWN fragment, so they
+	// resolve against the child's nodes whether or not a wrapper holds them.
 	const elementsByHostId = resolveRowHosts(input.repeat, childNodes, rendered.view);
+	const branches = resolveRowBranches(input.repeat, childNodes, rendered.view);
 	const placed = rowComponent.slotPath
 		? placeInWrapper(input, childNodes, rowComponent.slotPath)
 		: { nodes: childNodes, rowRoot: childNodes.find((node) => node.nodeType === 1) };
@@ -163,7 +167,11 @@ async function mintComponentRow(input: {
 	return {
 		rowRoot,
 		nodes: placed.nodes,
-		commit: () => commitMintedRow(input.registration, rendered, elementsByHostId, input.repeat),
+		commit: () =>
+			commitMintedRow(input.registration, rendered, elementsByHostId, input.repeat, {
+				branches,
+				rowKey: input.rowKey,
+			}),
 	};
 }
 
@@ -207,6 +215,10 @@ async function commitMintedRow(
 	rendered: { readonly state: ProtocolStatePayload; readonly view: ProtocolViewPayload },
 	elementsByHostId: ReadonlyMap<string, ResumeDomElement>,
 	repeat: ResumeKeyedRepeatRecord,
+	row: {
+		readonly branches: ReadonlyArray<ResumeArmBranchRecord>;
+		readonly rowKey: unknown;
+	},
 ): Promise<void> {
 	const armRecords: ResumeArmRecordSet = {
 		locators: [],
@@ -217,16 +229,18 @@ async function commitMintedRow(
 		...(rendered.view.keyedRepeats?.length
 			? { keyedRepeats: rendered.view.keyedRepeats as ResumeArmRecordSet['keyedRepeats'] }
 			: {}),
+		...(row.branches.length ? { branches: row.branches } : {}),
 	};
 	const deps = await registration.armRegistrationDeps(armRecords);
 	await seedMintedGraphNodes(deps, rendered.state);
 	await mergeMintedWidgetRoots(deps, rendered.state, repeat);
 	const { registerArmRecordSet } = await import('../resume-commit-arm.ts');
-	await registerArmRecordSet(deps, registration.installArmEventType, mintedRowBoundary(), {
-		armRecords,
-		elementsByHostId,
-		computed: rendered.state.computed,
-	});
+	await registerArmRecordSet(
+		deps,
+		registration.installArmEventType,
+		mintedRowBoundary(repeat, row.rowKey),
+		{ armRecords, elementsByHostId, computed: rendered.state.computed },
+	);
 }
 
 /**
@@ -392,29 +406,75 @@ function resolveRowHosts(
 	return byHostId;
 }
 
-// A branch or async boundary inside a minted row anchors on comments the page
-// census never counted, so registering it would be registering half a row.
+/**
+ * The minted row's branch anchors, by the comment order each was rendered at.
+ *
+ * Same reading as the row's element locators, one node kind over: the record's
+ * indexes count the row's OWN comments, because the row was rendered alone and
+ * the page census never counted a comment it had not served. Resolving them here
+ * hands the registrar live nodes, which is the one form it accepts from a caller
+ * that owns its own census.
+ */
+function resolveRowBranches(
+	repeat: ResumeKeyedRepeatRecord,
+	nodes: ReadonlyArray<ResumeDomNode>,
+	view: ProtocolViewPayload,
+): ReadonlyArray<ResumeArmBranchRecord> {
+	const records = view.branches ?? [];
+	if (!records.length) return [];
+	const comments: ResumeDomComment[] = [];
+	(function visit(list: ReadonlyArray<ResumeDomNode>): void {
+		for (const node of list) {
+			if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))
+				comments.push(node as ResumeDomComment);
+			visit(node.childNodes ?? []);
+		}
+	})(nodes);
+	const anchorAt = (index: number, name: string, id: string): ResumeDomComment => {
+		const comment = comments[index];
+		if (!comment)
+			throw rowComponentError(
+				repeat,
+				'MARKLESS_REPEAT_ROW_COMPONENT_ANCHOR_MISSING',
+				`built a row with no comment at row-relative index ${index} for the ${name} of branch ${id}.`,
+			);
+		return comment;
+	};
+	return records.map(
+		(record) =>
+			({
+				...record,
+				startAnchor: anchorAt(record.startAnchor.index, 'start anchor', record.id),
+				endAnchor: anchorAt(record.endAnchor.index, 'end anchor', record.id),
+			}) as ResumeArmBranchRecord,
+	);
+}
+
+// A boundary inside a minted row settles against bookkeeping the page took once,
+// at boot, for the rows it served, so registering it would register half a row.
 function assertMintableRowRecords(
 	repeat: ResumeKeyedRepeatRecord,
 	view: ProtocolViewPayload,
 ): void {
-	const unsupported = view.branches?.length
-		? '@if'
-		: view.asyncBoundaries.length
-			? '@try'
-			: undefined;
-	if (!unsupported) return;
+	if (!view.asyncBoundaries.length) return;
 	throw rowComponentError(
 		repeat,
 		'MARKLESS_REPEAT_ROW_COMPONENT_UNSUPPORTED',
-		`builds a row containing ${unsupported}, which a minted row cannot register yet.`,
+		'builds a row containing @try, which a minted row cannot register yet.',
 	);
 }
 
-// A minted row is not an arm, and the registrar reaches these only through the
-// branch census - which a phase-1 component row has no anchors for.
-function mintedRowBoundary(): ResumeAsyncBoundaryRecord {
-	return { id: 'markless-row-component-mint' } as unknown as ResumeAsyncBoundaryRecord;
+// A minted row is not an arm; it borrows the registrar's boundary slot to name
+// the flip subscriptions it owns. Per ROW, because that slot is what the branch
+// runtime releases before it rewires - one shared name and a second row would
+// tear down the first row's flips.
+function mintedRowBoundary(
+	repeat: ResumeKeyedRepeatRecord,
+	rowKey: unknown,
+): ResumeAsyncBoundaryRecord {
+	return {
+		id: `markless-row-component-mint:${repeat.id}:${String(rowKey)}`,
+	} as unknown as ResumeAsyncBoundaryRecord;
 }
 
 function rowComponentError(

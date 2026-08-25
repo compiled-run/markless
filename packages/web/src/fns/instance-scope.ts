@@ -1,6 +1,13 @@
 import type { RuntimeGraph } from '@markless/runtime';
 import { installComposedArmRecordQualifier } from '../resume-arm-records.ts';
-import type { ResumeArmRecordSet, ResumeSymbol, ResumeSymbolContext } from '../resume-types.ts';
+import type {
+	ResumeArmBranchRecord,
+	ResumeArmRecordSet,
+	ResumeSymbol,
+	ResumeSymbolContext,
+} from '../resume-types.ts';
+
+type BranchContentReads = NonNullable<ResumeArmBranchRecord['contentReads']>;
 
 // A composed child's compiled symbols spell the child module's own graph node
 // ids, but composition merged that child's nodes into the page graph under its
@@ -679,13 +686,9 @@ function composedBoundaryArmRecords(
 		...read,
 		graphNodeId: marklessComposedGraphNodeId(read.graphNodeId, instancePath, registry),
 	});
-	const contentReadsOf = (
-		branch: unknown,
-	): ReadonlyArray<{ readonly graphNodeId: string }> | undefined => {
+	const contentReadsOf = (branch: unknown): BranchContentReads | undefined => {
 		const reads = (branch as { readonly contentReads?: unknown }).contentReads;
-		return Array.isArray(reads) && reads.length > 0
-			? (reads as ReadonlyArray<{ readonly graphNodeId: string }>)
-			: undefined;
+		return Array.isArray(reads) && reads.length > 0 ? (reads as BranchContentReads) : undefined;
 	};
 	// Arm-scoped branch records ride the protocol's untyped record bag.
 	const qualifyLooseRead = (record: Record<string, unknown>): Record<string, unknown> =>

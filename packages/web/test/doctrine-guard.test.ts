@@ -18,6 +18,8 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Event payload decoding accepts innerHTML only as a legacy script-text fallback.',
 	'packages/web/src/fns/dom-order.ts :: const w = document.createTreeWalker(r, 1);':
 		'The neutral emitted locator helper walks elements by compiler-recorded DOM order.',
+	'packages/web/src/fns/row-component-mint.ts :: if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))':
+		"A client-minted row censuses the compiler-emitted branch anchors in the fragment it just built, before the row joins the page.",
 	'packages/web/src/fns/settle-plan.ts :: const walker = root.ownerDocument!.createTreeWalker(root, 128);':
 		'The settle filler finds the build-emitted hole comments inside one arm template.',
 	'packages/web/src/inline/payload-document.ts :: const text = element.textContent ?? element.text ?? element.innerHTML;':

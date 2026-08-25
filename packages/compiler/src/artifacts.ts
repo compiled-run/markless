@@ -287,10 +287,14 @@ export type ModuleGraphInterfaceSpreadHost = {
 export type ModuleGraphInterfaceElementCount = number | 'unknown';
 
 /**
- * Whether one exported component's whole reachable tree carries a branch
- * (`@if`/`@switch`) or an async boundary (`@try`) - the constructs whose anchors
- * a page counts once, at boot, so a tree born after resume cannot index into
- * them.
+ * Which constructs one exported component's whole reachable tree carries -
+ * branches (`@if`/`@switch`), async boundaries (`@try`), or neither.
+ *
+ * The two are named apart because they resolve apart. A branch's anchors are a
+ * pair of comments a client-minted tree can count in its OWN fragment, the way
+ * it already counts its elements, so `'branches'` still admits a mint. A
+ * boundary's settle bookkeeping has no such row-relative reading, so
+ * `'boundaries'` refuses.
  *
  * The answer is TRANSITIVE and computed in the component's own module, where
  * its chunks and the interfaces of the components it imports are both in hand:
@@ -299,9 +303,14 @@ export type ModuleGraphInterfaceElementCount = number | 'unknown';
  *
  * `'free'` is a proof, not an absence of evidence: `'unknown'` is the honest
  * answer whenever a chunk or a child's interface was not visible, and an
- * importer that cannot see a component's tree must refuse rather than assume.
+ * importer that cannot see a component's tree must refuse rather than assume -
+ * an unseen chunk could hold a boundary, so `'unknown'` outranks `'branches'`.
  */
-export type ModuleGraphInterfaceConstructReach = 'free' | 'constructs' | 'unknown';
+export type ModuleGraphInterfaceConstructReach =
+	| 'free'
+	| 'branches'
+	| 'boundaries'
+	| 'unknown';
 
 /**
  * Where a component's `{children}` hole sits among the elements around it, in

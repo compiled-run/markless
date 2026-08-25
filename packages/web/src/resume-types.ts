@@ -128,6 +128,8 @@ export type ResumeBranchArmRecordSet = NonNullable<
 export type ResumeBranchRecord = {
 	readonly id: string;
 	readonly sourceId?: string;
+	// The arm the render PAINTED, when composition decided the branch outright.
+	readonly takenArm?: number;
 	readonly startAnchor: ResumeDomComment;
 	readonly endAnchor: ResumeDomComment;
 	readonly symbolId: string;
@@ -156,9 +158,14 @@ export type ResumeArmLocator = {
 // re-render. Materialization resolves the payload indexes to live comments.
 export type ResumeArmBranchRecord = {
 	readonly id: string;
+	readonly sourceId?: string;
 	readonly testReads: NonNullable<
 		NonNullable<ProtocolViewPayload['branches']>[number]['testReads']
 	>;
+	readonly contentReads?: NonNullable<ProtocolViewPayload['branches']>[number]['contentReads'];
+	// The arm the render PAINTED. A branch composition decided - a constant or an
+	// absent prop for a test - has no flip to wire and nothing else names its arm.
+	readonly takenArm?: number;
 	readonly symbolId?: string;
 	readonly armTests?: ReadonlyArray<unknown>;
 	readonly declaredEmptyArms?: ReadonlyArray<number>;

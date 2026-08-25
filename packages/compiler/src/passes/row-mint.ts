@@ -34,13 +34,16 @@ export type RowComponentMint = {
  * module - the payload's component surface carries the import chain the row
  * render walks - so an imported child mints on the same terms as a local one.
  *
- * Also refused when the component's body carries a branch (`@if`/`@switch`) or a
- * boundary (`@try`): those anchor into a census the page counted once, at boot,
- * for the rows it served. A row born after resume has no counted anchors, so the
- * mint would index into another row's - which is why the runtime refuses such a
- * row loudly. Refusing here means the page never gets that far: it falls back to
- * today's no-growth behaviour instead. That question must be ANSWERED, not
- * assumed: a child whose census this module cannot reach is refused too.
+ * Still refused when the component's body carries a boundary (`@try`): its
+ * settle bookkeeping reads a census the page counted once, at boot, for the rows
+ * it served, and a row born after resume has none of it - the mint would index
+ * into another row's, which is why the runtime refuses such a row loudly.
+ * Refusing here means the page never gets that far: it falls back to today's
+ * no-growth behaviour instead. A branch is admitted: its anchors are a comment
+ * pair the minted row counts in its own fragment, exactly as it counts its own
+ * elements. That question must be ANSWERED, not assumed: a child whose tree this
+ * module cannot reach is refused too, because the chunk it could not read might
+ * have held a boundary.
  *
  * The public render plan pass asks the same question to decide whether a row
  * that cannot grow deserves a diagnostic, so the answer lives here once.
@@ -71,7 +74,7 @@ export function resolveRowComponentMint(
 	const edge = input.componentEdges.find((candidate) => candidate.id === slot.componentEdgeId);
 	if (!edge || edge.parentComponentName !== componentName) return null;
 	if (edge.children.childCount > 0) return null;
-	if (!childIsConstructFree(input, edge, slot.childTemplateId, new Set())) return null;
+	if (!childIsMintable(input, edge, slot.childTemplateId, new Set())) return null;
 	const itemProps = edge.props.filter((prop) => prop.source === input.itemName);
 	return {
 		componentEdgeId: slot.componentEdgeId,
@@ -89,17 +92,18 @@ export function mintableFromItem(slot: SemanticMarkupSlot): boolean {
 }
 
 /**
- * Whether one component the row reaches is PROVABLY free of the constructs whose
- * anchors the page counted only for the rows it served - a branch or an async
- * boundary - anywhere in what it renders.
+ * Whether one component the row reaches is PROVABLY free of an async boundary
+ * anywhere in what it renders - the one construct whose bookkeeping the page
+ * counted only for the rows it served.
  *
- * Provably is the whole point: a census this module cannot reach is a refusal,
+ * Provably is the whole point: a tree this module cannot reach is a refusal,
  * never a pass. A child declared here is answered from this module's own chunks.
  * A child behind an import has no chunks here, so the answer comes from the
  * construct reach its module published PER COMPONENT - a fact about that
- * component's own tree, so a branching sibling of it says nothing about this row.
+ * component's own tree, so a boundary in a sibling of it says nothing about this
+ * row.
  */
-function childIsConstructFree(
+function childIsMintable(
 	input: ConstructReachInput,
 	edge: SemanticComponentEdge,
 	childTemplateId: string,
@@ -115,5 +119,6 @@ function childIsConstructFree(
 		);
 		if (!entry || entry.elementCount === 'unknown') return false;
 	}
-	return childConstructReach(input, edge, childTemplateId, seen) === 'free';
+	const reach = childConstructReach(input, edge, childTemplateId, seen);
+	return reach === 'free' || reach === 'branches';
 }

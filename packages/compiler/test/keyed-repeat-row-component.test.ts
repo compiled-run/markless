@@ -202,11 +202,26 @@ export function App() @{
 	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowTemplate');
 });
 
-test('a wrapper around a branching component ships neither half', async () => {
+test('a wrapper around a branching component ships both halves', async () => {
 	const view = await viewOf(`import { state } from '@markless/core';
 function Row({ label }) @{
 	let open = state(false);
 	<span onClick={() => open = !open}>@if (open) { <b>{label}</b> }</span>
+}
+export function App() @{
+	let rows = state([{ id: 'a', label: 'A' }]);
+	<ul>@for (const row of rows; key row.id) { <li data-row={row.id}><Row label={row.label} /></li> }</ul>
+}
+`);
+	expect(view.keyedRepeats?.[0]?.rowTemplate?.html).toContain('<li');
+	expect(view.keyedRepeats?.[0]?.rowComponent?.componentName).toBe('App');
+});
+
+test('a wrapper around a component that opens a boundary ships neither half', async () => {
+	const view = await viewOf(`import { computed, state } from '@markless/core';
+function Row({ label }) @{
+	const details = computed(async () => ({ label }));
+	<span>@try { <b>{details.label}</b> } @catch { <i>failed</i> }</span>
 }
 export function App() @{
 	let rows = state([{ id: 'a', label: 'A' }]);
@@ -301,10 +316,9 @@ export function App() @{
 	expect(view.keyedRepeats ?? []).toHaveLength(0);
 });
 
-// A branch inside the row component anchors into a census the page counted once,
-// at boot, for the rows it served. A row born after resume has no counted
-// anchors, so the mint is withheld and the page keeps today's no-growth
-// behaviour instead of indexing into another row's anchors.
+// A branch inside the row component anchors on a comment pair the minted row
+// counts in its own fragment, the way it already counts its own elements, so the
+// identity still ships. A boundary is the half that stays withheld.
 const branchingRow = `import { state } from '@markless/core';
 function Row({ item }) @{
 	let open = state(false);
@@ -316,28 +330,43 @@ export function App() @{
 }
 `;
 
-test('a row component whose body branches ships no identity', async () => {
+test('a row component whose body branches still ships its identity', async () => {
 	const view = await viewOf(branchingRow);
-	const repeat = view.keyedRepeats?.[0];
-	expect(repeat).toBeDefined();
-	expect(repeat).not.toHaveProperty('rowComponent');
-	expect(repeat).not.toHaveProperty('rowTemplate');
+	expect(view.keyedRepeats?.[0]?.rowComponent?.componentName).toBe('App');
 });
 
-// The twin: same row, same component, no branch in the body - the field still
-// ships, so the gate only ever withholds.
+// The twin: same row, same component, no branch in the body - the field ships
+// either way, so the branch clause withholds nothing on its own.
 test('the plain twin of a branching row component still ships its identity', async () => {
 	const view = await viewOf(sameModuleRow);
 	expect(view.keyedRepeats?.[0]?.rowComponent?.componentName).toBe('App');
 });
 
-test('a row component whose body switches ships no identity', async () => {
+test('a row component whose body switches still ships its identity', async () => {
 	const view = await viewOf(`import { state } from '@markless/core';
 function Row({ item }) @{
 	<li>@switch (item.kind) { @case 'a': { <b>a</b> } @default: { <i>b</i> } }</li>
 }
 export function App() @{
 	let rows = state([{ id: 'a', kind: 'a' }]);
+	<ul>@for (const row of rows; key row.id) { <Row item={row} /> }</ul>
+}
+`);
+	expect(view.keyedRepeats?.[0]?.rowComponent?.componentName).toBe('App');
+});
+
+// The split the mint turns on: a branch ARM holding a boundary is a boundary
+// answer, so walking the arms rather than stopping at the branch is what keeps
+// this refusal honest.
+test('a row component whose branch arm opens a boundary ships no identity', async () => {
+	const view = await viewOf(`import { computed, state } from '@markless/core';
+function Row({ item }) @{
+	let open = state(false);
+	const details = computed(async () => ({ title: item.id }));
+	<li onClick={() => open = !open}>@if (open) { @try { <b>{details.title}</b> } @catch { <i>failed</i> } }</li>
+}
+export function App() @{
+	let rows = state([{ id: 'a', label: 'A' }]);
 	<ul>@for (const row of rows; key row.id) { <Row item={row} /> }</ul>
 }
 `);
@@ -426,36 +455,41 @@ export function App() @{
 });
 
 // Both arms render one element, so the interface's element count agrees on a
-// number: the branch is caught by the arm chunks the interface lists, which is
-// the fact that has to carry this case rather than the count.
+// number - the separate clause that wants a known count is satisfied here, and
+// the branch answer is what this case is actually measuring.
 const branchingImportedRow = `export function Row({ item }) @{
 	<li>@if (item.on) { <b>{item.label}</b> } @else { <i>{item.label}</i> }</li>
 }
 `;
 
-test('an imported component whose body branches ships no identity', async () => {
+test('an imported component whose body branches still ships its identity', async () => {
 	const child = await buildSemanticGraph({
 		filename: 'src/row.tsrx',
 		source: branchingImportedRow,
 	});
 	const entry = child.moduleGraphInterface.render.components[0];
+	expect(entry?.constructReach).toBe('branches');
 	expect(entry?.elementCount).toBe(2);
 	expect(entry?.childChunks.map((chunk) => chunk.kind)).toEqual(['branch-arm', 'branch-arm']);
 
 	const view = await viewOfImportedRow(branchingImportedRow, importingApp);
-	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
+	expect(view.keyedRepeats?.[0]?.rowComponent?.componentName).toBe('App');
 });
 
 test('an imported component whose body opens a boundary ships no identity', async () => {
-	const view = await viewOfImportedRow(
-		`import { computed } from '@markless/core';
+	const boundaryImportedRow = `import { computed } from '@markless/core';
 export function Row({ item }) @{
 	const details = computed(async () => ({ title: item.id }));
 	<li>@try { <b>{details.title}</b> } @catch { <i>failed</i> }</li>
 }
-`,
-		importingApp,
-	);
+`;
+	const child = await buildSemanticGraph({
+		filename: 'src/row.tsrx',
+		source: boundaryImportedRow,
+	});
+	expect(child.moduleGraphInterface.render.components[0]?.constructReach).toBe('boundaries');
+
+	const view = await viewOfImportedRow(boundaryImportedRow, importingApp);
 	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
 });
 
@@ -496,24 +530,26 @@ test('a branch in a SIBLING component of the imported module still mints the row
 	const entries = child.moduleGraphInterface.render.components;
 	expect(entries.find((entry) => entry.componentName === 'Row')?.constructReach).toBe('free');
 	expect(entries.find((entry) => entry.componentName === 'Other')?.constructReach).toBe(
-		'constructs',
+		'branches',
 	);
 
 	const view = await viewOfImportedRow(siblingBranchModule, importingApp);
 	expect(view.keyedRepeats?.[0]?.rowComponent?.componentName).toBe('App');
 });
 
-// The answer is transitive: the row's own body is plain markup, and the branch
+// The answer is transitive: the row's own body is plain markup, and the boundary
 // it refuses on is two files down, reached through the child's own import.
-test("a branch in the imported child's OWN imported child refuses the row", async () => {
+test("a boundary in the imported child's OWN imported child refuses the row", async () => {
 	const leaf = await buildSemanticGraph({
 		filename: 'src/leaf.tsrx',
-		source: `export function Leaf({ label }) @{
-	<b>@if (label) { <i>{label}</i> } @else { <s>none</s> }</b>
+		source: `import { computed } from '@markless/core';
+export function Leaf({ label }) @{
+	const shown = computed(async () => label);
+	<b>@try { <i>{shown}</i> } @catch { <s>none</s> }</b>
 }
 `,
 	});
-	expect(leaf.moduleGraphInterface.render.components[0]?.constructReach).toBe('constructs');
+	expect(leaf.moduleGraphInterface.render.components[0]?.constructReach).toBe('boundaries');
 
 	const middleSource = `import { Leaf } from './leaf.tsrx';
 export function Row({ item }) @{
@@ -525,7 +561,7 @@ export function Row({ item }) @{
 		source: middleSource,
 		importedModuleInterfaces: { './leaf.tsrx': leaf.moduleGraphInterface },
 	});
-	expect(middle.moduleGraphInterface.render.components[0]?.constructReach).toBe('constructs');
+	expect(middle.moduleGraphInterface.render.components[0]?.constructReach).toBe('boundaries');
 
 	const semanticGraph = await buildSemanticGraph({
 		filename: 'src/App.tsrx',
@@ -534,6 +570,30 @@ export function Row({ item }) @{
 	});
 	const view = viewFrom(semanticGraph, { './row.tsrx': middle.moduleGraphInterface });
 	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
+});
+
+// The branch twin of the case above: the same two-import chain carries
+// 'branches' up, and the row still mints on it.
+test("a branch in the imported child's OWN imported child still mints the row", async () => {
+	const leaf = await buildSemanticGraph({
+		filename: 'src/leaf.tsrx',
+		source: `export function Leaf({ label }) @{
+	<b>@if (label) { <i>{label}</i> } @else { <s>none</s> }</b>
+}
+`,
+	});
+	expect(leaf.moduleGraphInterface.render.components[0]?.constructReach).toBe('branches');
+
+	const middle = await buildSemanticGraph({
+		filename: 'src/row.tsrx',
+		source: `import { Leaf } from './leaf.tsrx';
+export function Row({ item }) @{
+	<li><Leaf label={item.label} /></li>
+}
+`,
+		importedModuleInterfaces: { './leaf.tsrx': leaf.moduleGraphInterface },
+	});
+	expect(middle.moduleGraphInterface.render.components[0]?.constructReach).toBe('branches');
 });
 
 // The twin of the case above with the branch taken out of the leaf: the same
@@ -623,7 +683,7 @@ test('a barrel re-export carries the construct answer through unchanged', async 
 	expect(
 		republished?.render.components.find((entry) => entry.componentName === 'Other')
 			?.constructReach,
-	).toBe('constructs');
+	).toBe('branches');
 });
 
 // Pay-per-use in the interface: the entry gains this one field and nothing else.
