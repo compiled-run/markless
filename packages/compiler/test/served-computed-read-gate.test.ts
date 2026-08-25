@@ -81,10 +81,10 @@ test('a page whose handlers read no computed emits the module it emitted before'
 	expect(source).toContain("import { marklessCloneState } from '@markless/web/fns/state';");
 });
 
-// The known limit of routing an EXISTING derive: when nothing in the markup reads
-// the factory computed, the render never derives it, so there is no value to
-// serve. Serving it would mean deriving it server-side purely for the payload.
-test('a computed only a handler reads has no render derive to route, so none is served', async () => {
+// This shape used to have no derive to route: nothing in the markup named the
+// factory computed, so the render never worked it out and there was no value to
+// serve. A handler read is a reach of its own now, so the render derives it.
+test('a computed only a handler reads is derived for that read, and served', async () => {
 	const source = await ssr(`${FACTORY}
 export function Thumb() @{
 	const s = slider();
@@ -94,6 +94,8 @@ export function Thumb() @{
 }
 `);
 
-	expect(source).not.toContain('#slider/computed:percent",(({read})');
-	expect(source).not.toContain('marklessSsrServeComputed');
+	expect(source).toContain('#slider/computed:percent",(({read})');
+	expect(source).toContain(
+		'marklessSsrServeComputed(marklessSsrPayloadState, marklessSsrRenderStateValues, ["shared:src/slider.tsrx#slider/computed:percent"]);',
+	);
 });

@@ -8,6 +8,13 @@ import {
 	collectSsrTemplateComputedSources,
 	TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX,
 } from './html.ts';
+import {
+	componentDeriveGraphNodeIds,
+	computedDependencyEdges,
+	handlerReadGraphNodeIds,
+	orderComputedDerives,
+	rowScopedEdgeIds,
+} from './derive-set.ts';
 import { renderBodyLines } from './render-body.ts';
 import {
 	armScopedSeedRefsUnder,
@@ -360,29 +367,6 @@ function childrenWidgetRootMarkerLines(
 	});
 }
 
-function rowScopedEdgeIds(
-	chunks: PublicRenderModuleInput['renderData']['chunks'],
-): ReadonlySet<string> {
-	const byId = new Map(chunks.map((chunk) => [chunk.id, chunk]));
-	const edgeIds = new Set<string>();
-	const walked = new Set<string>();
-	const walk = (chunkId: string) => {
-		if (walked.has(chunkId)) return;
-		walked.add(chunkId);
-		for (const slot of byId.get(chunkId)?.slots ?? []) {
-			if (slot.kind === 'child-component') {
-				edgeIds.add(slot.componentEdgeId);
-				if (slot.projectionChunkId) walk(slot.projectionChunkId);
-			} else if (slot.kind === 'repeat') walk(slot.rowTemplateId);
-			// An arm decides WHETHER its body renders, never which row it is inside:
-			// a component an arm holds is still the row's, so the walk follows it.
-			else if (slot.kind === 'branch') for (const armId of slot.armTemplateIds) walk(armId);
-		}
-	};
-	for (const chunk of chunks) if (chunk.kind === 'repeat-row') walk(chunk.id);
-	return edgeIds;
-}
-
 /**
  * What one component contributes to the emitted SSR function: the render lines
  * and, for a component whose own children sit inside a composed widget root,
@@ -409,21 +393,6 @@ export type SsrDataLines = {
 	 */
 	readonly serveComputed: string[];
 };
-
-/**
- * The graph nodes an authored handler reads. A resume re-derives a sync computed
- * only when a dependency is written, so a computed in this set is one whose value
- * has to travel in the payload for the handler's first read to answer.
- */
-export function handlerReadGraphNodeIds(input: PublicRenderModuleInput): ReadonlySet<string> {
-	return new Set(
-		input.symbolResolver.symbols.flatMap((symbol) =>
-			symbol.kind === 'event-handler' || symbol.kind === 'callback-prop'
-				? (symbol.reads ?? []).map((read) => read.graphNodeId)
-				: [],
-		),
-	);
-}
 
 /**
  * The seed-phase body for a component whose own children sit inside a widget
@@ -506,55 +475,7 @@ function emitSsrDataLines(
 ): SsrDataLines {
 	const rowScopedEdges = rowScopedEdgeIds(input.renderData.chunks);
 	const chunks = input.renderData.chunks.filter((chunk) => chunk.componentName === componentName);
-	const componentGraphNodeIds = new Set([
-		...chunks.flatMap((chunk) =>
-			chunk.slots.flatMap((slot) => {
-				const residueIds =
-					'residue' in slot && slot.residue.kind === 'graph-read'
-						? [slot.residue.graphNodeId]
-						: [];
-				return slot.kind === 'dynamic-host'
-					? [
-							...residueIds,
-							...slot.attributeSlots.flatMap((attribute) =>
-								attribute.residue.kind === 'graph-read'
-									? [attribute.residue.graphNodeId]
-									: [],
-							),
-						]
-					: residueIds;
-			}),
-		),
-		// A branch condition the compiler recombined into one computed is read the
-		// same way a text slot reads its residue: off the state map, by id. Left
-		// out of the seed pass the server read `undefined` and took the else arm
-		// whenever the authored condition was true, so the served HTML disagreed
-		// with what the client resumed to.
-		...chunks.flatMap((chunk) =>
-			chunk.slots.flatMap((slot) =>
-				slot.kind === 'branch'
-					? (
-							input.renderData.branches.find(
-								(branch) => branch.branchSiteId === slot.branchSiteId,
-							)?.testReads ?? []
-						).map((read) => read.graphNodeId)
-					: [],
-			),
-		),
-		// A node this component reads ONLY to hand to the child it composes is
-		// still read by this render: without it the child is composed from the
-		// factory placeholder rather than from what this body just seeded. Row
-		// -scoped edges stay out - their props read locals only the row has.
-		...componentEdgesFor(input, componentName).flatMap((edge) =>
-			rowScopedEdges.has(edge.id)
-				? []
-				: edge.props.flatMap((prop) =>
-						prop.kind === 'graph-reference' || prop.kind === 'spread'
-							? [prop.graphNodeId]
-							: [],
-					),
-		),
-	]);
+	const componentGraphNodeIds = componentDeriveGraphNodeIds(input, componentName);
 	const residueSources = authoredResidueSources(chunks);
 	const repeats = input.semanticGraph.keyedRepeats;
 	// The prelude serves every callback, not just the markup reader: an arm test
@@ -970,13 +891,19 @@ function emitSsrDataLines(
 	// Derived after the static seed map, so the factory's state nodes are already
 	// readable when the derive runs.
 	const sharedComputedSources = collectSsrSharedComputedSources(input);
-	const allSharedComputedLines = input.protocolState.computed.flatMap((computed) => {
-		const source = sharedComputedSources.get(computed.graphNodeId);
-		if (!source || !componentGraphNodeIds.has(computed.graphNodeId)) return [];
-		derivedComputedIds.push(computed.graphNodeId);
-		return [
-			`marklessSsrRenderStateValues.set(${JSON.stringify(computed.graphNodeId)},(${source})({read:(marklessSsrSharedId,marklessSsrSharedPath)=>marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(marklessSsrSharedId),marklessSsrSharedPath)}));`,
-		];
+	// A factory computed another one reads derives first: emitted in declaration
+	// order, the reader saw the state map's `undefined` instead of the value.
+	const allSharedComputedLines = orderComputedDerives(
+		input.protocolState.computed.flatMap((computed) =>
+			sharedComputedSources.has(computed.graphNodeId) &&
+			componentGraphNodeIds.has(computed.graphNodeId)
+				? [computed.graphNodeId]
+				: [],
+		),
+		computedDependencyEdges(input),
+	).ordered.map((graphNodeId) => {
+		derivedComputedIds.push(graphNodeId);
+		return `marklessSsrRenderStateValues.set(${JSON.stringify(graphNodeId)},(${sharedComputedSources.get(graphNodeId)})({read:(marklessSsrSharedId,marklessSsrSharedPath)=>marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(marklessSsrSharedId),marklessSsrSharedPath)}));`;
 	});
 	// A body `computed()` over the instance evaluates where it is declared, which
 	// is before these lines: leaving them here derived the factory computed after
