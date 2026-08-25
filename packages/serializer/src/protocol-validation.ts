@@ -496,18 +496,27 @@ function assertOptionalRowTemplate(record: Record<string, unknown>, context: str
 	if (template === undefined) return;
 	assertRecordShape(template, context);
 	assertStringField(template, 'html', context);
-	const textSlots = template.textSlots;
-	if (textSlots === undefined) return;
-	if (!Array.isArray(textSlots)) {
+	assertOptionalRowTemplateSlots(template.textSlots, `${context}.textSlots`);
+	assertOptionalRowTemplateSlots(template.attributeSlots, `${context}.attributeSlots`, true);
+}
+
+function assertOptionalRowTemplateSlots(
+	slots: unknown,
+	context: string,
+	named = false,
+): void {
+	if (slots === undefined) return;
+	if (!Array.isArray(slots)) {
 		throw invalidPayloadShapeError(
 			contextPayloadType(context),
-			`Invalid ${context}: expected textSlots array.`,
+			`Invalid ${context}: expected array.`,
 		);
 	}
-	for (const [index, slot] of textSlots.entries()) {
-		const slotContext = `${context}.textSlots[${index}]`;
+	for (const [index, slot] of slots.entries()) {
+		const slotContext = `${context}[${index}]`;
 		assertRecordShape(slot, slotContext);
 		assertNonNegativeIntegerArrayField(slot, 'path', slotContext);
+		if (named) assertStringField(slot, 'name', slotContext);
 		assertStringArrayField(slot, 'itemPath', slotContext);
 	}
 }

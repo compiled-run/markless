@@ -423,13 +423,16 @@ function mintableEmptyArm(
  * way it can exist is for the client to build it - and the client has no
  * renderer, only the payload. This ships the row chunk's finished markup, which
  * is honest for exactly two shapes: a row with NO slots, and a row whose every
- * slot is text read off the repeated item. Anything else is a part the mint
- * cannot fill - a value from outside the row, an attribute, a nested construct,
- * a child component - and half a row is worse than none.
+ * slot - text or attribute - reads off the repeated item. Anything else is a
+ * part the mint cannot fill - a value from outside the row, an attribute value
+ * an expression computes, a nested construct, a child component - and half a row
+ * is worse than none.
  *
  * The slot markers stay in the html on purpose: they are the positions the row's
  * text occupies, and `textSlots` addresses them by the same fragment-relative
  * path the chunk records, so the mint walks to each one instead of re-parsing.
+ * An attribute has no marker - its statics join around the missing value - so
+ * `attributeSlots` addresses the element and names the attribute to write.
  * These are FRAGMENT-relative coordinates - `[0]` is the row root - not the
  * ROW-ROOT-relative ones `rowEvents[].hostPath` carries.
  *
@@ -444,6 +447,11 @@ function mintableRowTemplate(
 		readonly html: string;
 		readonly textSlots?: ReadonlyArray<{
 			readonly path: ReadonlyArray<number>;
+			readonly itemPath: ReadonlyArray<string>;
+		}>;
+		readonly attributeSlots?: ReadonlyArray<{
+			readonly path: ReadonlyArray<number>;
+			readonly name: string;
 			readonly itemPath: ReadonlyArray<string>;
 		}>;
 	};
@@ -463,11 +471,25 @@ function mintableRowTemplate(
 		readonly path: ReadonlyArray<number>;
 		readonly itemPath: ReadonlyArray<string>;
 	}> = [];
+	const attributeSlots: Array<{
+		readonly path: ReadonlyArray<number>;
+		readonly name: string;
+		readonly itemPath: ReadonlyArray<string>;
+	}> = [];
 	for (const slot of chunk.slots) {
 		// A row that reads anything but its own item cannot be minted from the item
-		// alone, and every non-text slot is wiring the mint does not do.
-		if (slot.kind !== 'text' || slot.residue.kind !== 'repeat-item') return {};
-		textSlots.push({ path: slot.coordinate.path, itemPath: slot.residue.path });
+		// alone, and every slot that is neither text nor an attribute is wiring the
+		// mint does not do.
+		if (slot.kind !== 'text' && slot.kind !== 'attribute') return {};
+		if (slot.residue.kind !== 'repeat-item') return {};
+		if (slot.kind === 'text')
+			textSlots.push({ path: slot.coordinate.path, itemPath: slot.residue.path });
+		else
+			attributeSlots.push({
+				path: slot.coordinate.path,
+				name: slot.name,
+				itemPath: slot.residue.path,
+			});
 	}
 	const html = chunk.statics.join('');
 	if (!html) return {};
@@ -475,6 +497,7 @@ function mintableRowTemplate(
 		rowTemplate: {
 			html,
 			...(textSlots.length > 0 ? { textSlots } : {}),
+			...(attributeSlots.length > 0 ? { attributeSlots } : {}),
 		},
 	};
 }

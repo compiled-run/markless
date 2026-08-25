@@ -44,7 +44,8 @@ test('a repeat whose row is not mintable carries no row markup', async () => {
 	const view = await viewOf(`${preamble}
 export function App() @{
 	let rows = state([{ id: 'a' }]);
-	<ul>@for (const row of rows; key row.id) { <li class={row.id}>t</li> }</ul>
+	let theme = state('dark');
+	<ul>@for (const row of rows; key row.id) { <li class={theme}>t</li> }</ul>
 }
 `);
 	expect(view.keyedRepeats).toHaveLength(1);
@@ -105,13 +106,57 @@ export function App() @{
 	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowTemplate');
 });
 
-// Fail closed for the other reason: every non-text slot is a part the mint does
-// not fill. One test per slot kind the row can hold.
-test('a row with an attribute binding ships no markup', async () => {
+// The third shape: an attribute whose value is read off the item. There is no
+// marker for it - the statics join around the missing value - so the path names
+// the ELEMENT and the slot carries the attribute name to write.
+test('a row whose attribute reads the item ships the element path and the name', async () => {
+	const view = await viewOf(`${preamble}
+export function App() @{
+	let rows = state([{ id: 'a', label: 'L' }]);
+	<ul>@for (const row of rows; key row.id) { <li data-row={row.id}>{row.label}</li> }</ul>
+}
+`);
+	expect(view.keyedRepeats?.[0]?.rowTemplate).toEqual({
+		html: '<li><!--markless-slot:1--></li>',
+		textSlots: [{ path: [0, 0], itemPath: ['label'] }],
+		attributeSlots: [{ path: [0], name: 'data-row', itemPath: ['id'] }],
+	});
+});
+
+// Pay-per-use inside the field too: a row with no dynamic attribute ships no
+// attributeSlots at all, so its template is the bytes it was.
+test('a row with no dynamic attribute ships no attribute slots', async () => {
 	const view = await viewOf(`${preamble}
 export function App() @{
 	let rows = state([{ id: 'a' }]);
-	<ul>@for (const row of rows; key row.id) { <li class={row.id}>t</li> }</ul>
+	<ul>@for (const row of rows; key row.id) { <li>{row.id}</li> }</ul>
+}
+`);
+	expect(view.keyedRepeats?.[0]?.rowTemplate).not.toHaveProperty('attributeSlots');
+});
+
+// Fail closed for the other reason: every slot that is neither text nor an
+// attribute is a part the mint does not fill. One test per slot kind the row can
+// hold, plus the two attribute values the mint cannot reach.
+test('a row whose attribute reads state outside the item ships no markup', async () => {
+	const view = await viewOf(`${preamble}
+export function App() @{
+	let rows = state([{ id: 'a' }]);
+	let theme = state('dark');
+	<ul>@for (const row of rows; key row.id) { <li class={theme}>t</li> }</ul>
+}
+`);
+	expect(view.keyedRepeats).toHaveLength(1);
+	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowTemplate');
+});
+
+// The mint reads paths off the item; it does not evaluate expressions, so an
+// attribute value computed from the item is still outside what it can finish.
+test('a row whose attribute value is a computed expression ships no markup', async () => {
+	const view = await viewOf(`${preamble}
+export function App() @{
+	let rows = state([{ id: 'a' }]);
+	<ul>@for (const row of rows; key row.id) { <li data-row={'r-' + row.id}>t</li> }</ul>
 }
 `);
 	expect(view.keyedRepeats).toHaveLength(1);
