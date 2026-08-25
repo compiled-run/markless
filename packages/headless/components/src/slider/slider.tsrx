@@ -73,16 +73,15 @@ export const sliderState = shared(
 					side,
 					isRange,
 				);
-				if (bounded === currentOf(side, slider.startAt, slider.endAt, slider.seed, slider.min))
-					return;
+				if (bounded === (side === 'start' ? from : to)) return;
 
 				if (side === 'start') slider.startAt = bounded;
 				else slider.endAt = bounded;
 
 				const landed = reportedValue(
 					isRange,
-					currentStart(slider.startAt, slider.seed, slider.min),
-					currentEnd(slider.endAt, slider.seed, slider.min),
+					side === 'start' ? bounded : from,
+					side === 'start' ? to : bounded,
 				);
 				slider.onChange?.(landed);
 				slider.onChangeEnd?.(landed);
@@ -132,18 +131,19 @@ export const sliderState = shared(
 				const aimed = valueAtFraction(fraction, slider.min, slider.max, slider.step);
 				const side = slider.dragSide;
 				const isRange = Array.isArray(slider.seed);
+				const from = currentStart(slider.startAt, slider.seed, slider.min);
+				const to = currentEnd(slider.endAt, slider.seed, slider.min);
 				const bounded = boundedValue(
 					aimed,
 					slider.min,
 					slider.max,
 					slider.step,
-					currentStart(slider.startAt, slider.seed, slider.min),
-					currentEnd(slider.endAt, slider.seed, slider.min),
+					from,
+					to,
 					side,
 					isRange,
 				);
-				if (bounded === currentOf(side, slider.startAt, slider.endAt, slider.seed, slider.min))
-					return;
+				if (bounded === (side === 'start' ? from : to)) return;
 
 				if (side === 'start') slider.startAt = bounded;
 				else slider.endAt = bounded;
@@ -151,8 +151,8 @@ export const sliderState = shared(
 				slider.onChange?.(
 					reportedValue(
 						isRange,
-						currentStart(slider.startAt, slider.seed, slider.min),
-						currentEnd(slider.endAt, slider.seed, slider.min),
+						side === 'start' ? bounded : from,
+						side === 'start' ? to : bounded,
 					),
 				);
 			},
@@ -327,11 +327,10 @@ export function SliderThumb({ side = 'end', children, onKeydown, ...rest }: Slid
 				event.preventDefault();
 			}
 
-			const from = currentOf(thumb.side, slider.startAt, slider.endAt, slider.seed, slider.min);
 			const next = keyTarget(
 				event.key,
 				event.shiftKey,
-				from,
+				now,
 				slider.min,
 				slider.max,
 				slider.step,
