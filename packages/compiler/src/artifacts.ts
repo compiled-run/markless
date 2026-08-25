@@ -242,6 +242,8 @@ export type ModuleGraphInterfaceArtifact = {
 				readonly path: ReadonlyArray<string>;
 			}>;
 			readonly elementCount: ModuleGraphInterfaceElementCount;
+			// Absent on an interface built before this field existed, which reads as 'unknown'.
+			readonly constructReach?: ModuleGraphInterfaceConstructReach;
 			readonly projection?: ModuleGraphInterfaceProjection;
 			readonly spreadHosts?: ReadonlyArray<ModuleGraphInterfaceSpreadHost>;
 			readonly armMaterial?: ModuleGraphInterfaceArmMaterial;
@@ -283,6 +285,23 @@ export type ModuleGraphInterfaceSpreadHost = {
  * child component whose markup this module never saw.
  */
 export type ModuleGraphInterfaceElementCount = number | 'unknown';
+
+/**
+ * Whether one exported component's whole reachable tree carries a branch
+ * (`@if`/`@switch`) or an async boundary (`@try`) - the constructs whose anchors
+ * a page counts once, at boot, so a tree born after resume cannot index into
+ * them.
+ *
+ * The answer is TRANSITIVE and computed in the component's own module, where
+ * its chunks and the interfaces of the components it imports are both in hand:
+ * a child behind an import contributes the same fact off its own interface, so
+ * the recursion grounds out one module at a time.
+ *
+ * `'free'` is a proof, not an absence of evidence: `'unknown'` is the honest
+ * answer whenever a chunk or a child's interface was not visible, and an
+ * importer that cannot see a component's tree must refuse rather than assume.
+ */
+export type ModuleGraphInterfaceConstructReach = 'free' | 'constructs' | 'unknown';
 
 /**
  * Where a component's `{children}` hole sits among the elements around it, in
