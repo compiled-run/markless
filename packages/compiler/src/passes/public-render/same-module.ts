@@ -129,6 +129,7 @@ export function emitSameModuleSsrComponents(
 				],
 				dataLines.bodySharedComputed,
 			),
+			...dataLines.serveComputed,
 			'	const html = marklessSsrRendered.html;',
 			'	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, payloadView, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);',
 			`	const marklessSsrState = ${ssrComposeStateExpression(input, rootInfo.component, componentName)};`,

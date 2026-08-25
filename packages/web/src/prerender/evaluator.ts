@@ -68,6 +68,10 @@ export type PrerenderDataDefinition = {
 	// components: two of them may spell one graph node id.
 	readonly stateCellIndexes?: ReadonlyArray<number>;
 	readonly stateComputedIndexes?: ReadonlyArray<number>;
+	// Positions into `state.computed` for the sync computeds a handler reads:
+	// their derived value travels with the payload so the first read, before any
+	// dependency write, answers with it.
+	readonly servedComputedIndexes?: ReadonlyArray<number>;
 	readonly initialValues?: PrerenderRenderData['initialValues'];
 	readonly initialValueKinds?: Readonly<Record<string, string>>;
 	readonly branches?: PrerenderRenderData['branches'];
@@ -518,6 +522,12 @@ async function evaluatePrerenderDataComponent(input: {
 	);
 
 	const owned = new Set(definition.stateGraphNodeIds ?? []);
+	const servedComputed = new Set(
+		(definition.servedComputedIndexes ?? []).flatMap((index) => {
+			const computed = definition.state.computed[index];
+			return computed ? [computed.graphNodeId] : [];
+		}),
+	);
 	const cellIndexes = definition.stateCellIndexes;
 	const computedIndexes = definition.stateComputedIndexes;
 	const ownedCells = cellIndexes
@@ -553,7 +563,9 @@ async function evaluatePrerenderDataComponent(input: {
 										key: SERIALIZED_NULL_GRAPH_PAYLOAD,
 									},
 						}
-					: computed,
+					: servedComputed.has(computed.graphNodeId) && values.has(computed.graphNodeId)
+						? { ...computed, directValue: values.get(computed.graphNodeId) }
+						: computed,
 			),
 	};
 	if (definition.propCellId) {
