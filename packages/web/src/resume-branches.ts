@@ -146,7 +146,10 @@ function createBranchRegistration(
 						// compiler emits at most one test read per branch (symbol-resolver),
 						// so this subscription's read IS the arm decider readBranchArm uses.
 						if (kind === 'test' && input.holdPendingFlip?.(read.graphNodeId)) return;
-						const arm = readBranchArm(input.graph, branch);
+						// Decide-less: no test to re-read, so it holds its painted arm.
+						const arm = branch.testReads.length
+							? readBranchArm(input.graph, branch)
+							: currentArm;
 						if (kind === 'test' ? arm === currentArm : arm !== currentArm) return;
 						return replaceArmRange(arm);
 					},
@@ -186,9 +189,8 @@ function createBranchRegistration(
 			);
 	}
 
-	// Re-registration API for commitArm (T103/T104): a fresh arm brings fresh
-	// arm-branch anchors, so previous flip subscriptions release first (no
-	// leaks) and the current arm's in-branch records register like startup.
+	// A fresh arm brings fresh arm-branch anchors, so previous flip
+	// subscriptions release first or they leak.
 	function registerArmBranches(
 		boundaryId: string,
 		records: ReadonlyArray<RegisteredResumeBranch>,
@@ -467,8 +469,8 @@ function disposeRemovedHosts(
 }
 
 // Local copies of the resume-locators DOM-walk helpers: importing that module
-// here regroups it (plus the resume-errors chunk) into this wall-counted
-// chunk, which costs more than the duplication saves (T120 measurement).
+// regroups it (plus resume-errors) into this wall-counted chunk, which measured
+// costlier than the duplication.
 function elementsBetweenAnchors(
 	root: ResumeDomElement,
 	startAnchor: ResumeDomComment,
