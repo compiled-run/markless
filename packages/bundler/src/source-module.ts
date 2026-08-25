@@ -497,7 +497,48 @@ function demandsRowMint(runtimeDemandMap: unknown): boolean {
 	);
 }
 
+/**
+ * The component-rooted mint, which also needs this page's render-data surface.
+ *
+ * The bridge cannot import that surface - it is per-page - so the loader written
+ * here pairs the two imports and hands the surface over. Both specifiers exist
+ * only in a build whose records name a row component.
+ */
+function emitRowComponentMintLoaderInstall(renderDataId: string): string {
+	return [
+		'globalThis.__marklessRowComponentMint = () =>',
+		'\tPromise.all([',
+		"\t\timport('@markless/web/fns/row-component-mint'),",
+		`\t\timport('${renderDataId}'),`,
+		'\t]).then(([mint, data]) => mint.marklessRowComponentMint(data.marklessPrerenderData));',
+	].join('\n');
+}
+
+/**
+ * True when the compiler folded the component mint into a keyed-repeat record -
+ * which it does exactly for a record carrying `rowComponent`.
+ */
+function demandsRowComponentMint(runtimeDemandMap: unknown): boolean {
+	const records = (
+		runtimeDemandMap as {
+			readonly payloadRecords?: ReadonlyArray<{
+				readonly kind?: string;
+				readonly runtimeModuleIds?: ReadonlyArray<string>;
+			}>;
+		}
+	)?.payloadRecords;
+	return (
+		Array.isArray(records) &&
+		records.some(
+			(record) =>
+				record.kind === 'keyed-repeat' &&
+				record.runtimeModuleIds?.includes(ROW_COMPONENT_MINT_RUNTIME_MODULE_ID) === true,
+		)
+	);
+}
+
 const ROW_MINT_RUNTIME_MODULE_ID = 'web/fns/row-mint';
+const ROW_COMPONENT_MINT_RUNTIME_MODULE_ID = 'web/fns/row-component-mint';
 
 /** True when the compiler recorded an `overlay` mark for this module. */
 function demandsOverlay(runtimeDemandMap: unknown): boolean {
@@ -525,6 +566,10 @@ export function emitResumeModule(input: {
 	// their document bytes and no execution.
 	readonly boundSymbolDescriptors?: BoundSymbolDescriptorMap;
 	readonly prerenderDataId?: string;
+	// The page's canonical render-data module, for the component-row mint alone.
+	// `prerenderDataId` is gated on prerendered records, so a plain resumed page
+	// has none - and a component row still has to reach the surface.
+	readonly renderDataId?: string;
 	readonly installResumeSummary?: boolean;
 	// The wake variant serves pages whose container carries no payload
 	// scripts; lean routes read the payload document and must never emit.
@@ -601,6 +646,9 @@ export function emitResumeModule(input: {
 		// unresolved until a repeat that can build actually wires, so having a
 		// mintable repeat somewhere is still not fetching it.
 		demandsRowMint(input.runtimeDemandMap) ? emitRowMintLoaderInstall() : null,
+		input.renderDataId && demandsRowComponentMint(input.runtimeDemandMap)
+			? emitRowComponentMintLoaderInstall(input.renderDataId)
+			: null,
 		scalarSpecializations.length > 0
 			? [
 					"import { marklessDecodeScalarCell, marklessReadScalarCell, marklessScalarSpecializedError } from '@markless/web/fns/scalar-specialized';",
