@@ -112,19 +112,23 @@ export function materializeArmRecords(input: ArmMaterializeInput) {
 
 // Resolves each flip record's anchor pair by position in the arm-local census.
 // A missing anchor is a corrupt census — fail loud (D2), never register half a
-// flip. Escalated records (no anchors) pass through untouched.
+// flip. A record with no index left to read passes through: an escalated record
+// carries no anchors, and a caller that owns its own census — a client-minted
+// row, counting its comments in its own fragment — hands over live ones.
 function materializeArmBranchRecords(
 	input: ArmMaterializeInput,
 ): ReadonlyArray<ResumeArmBranchRecord> {
 	const records = input.armRecords.branches ?? [];
 	if (!records.length) return [];
-	const census = records.some((record) => record.startAnchor)
+	const indexOf = (anchor: ResumeArmBranchRecord['startAnchor']): number | undefined =>
+		(anchor as { readonly index?: number } | undefined)?.index;
+	const census = records.some((record) => indexOf(record.startAnchor) !== undefined)
 		? armBranchCommentCensus(input.root, input.startAnchor, input.endAnchor)
 		: [];
 	return records.map((record) => {
-		if (!record.startAnchor || !record.endAnchor) return record;
-		const startIndex = (record.startAnchor as { readonly index: number }).index;
-		const endIndex = (record.endAnchor as { readonly index: number }).index;
+		const startIndex = indexOf(record.startAnchor);
+		const endIndex = indexOf(record.endAnchor);
+		if (startIndex === undefined || endIndex === undefined) return record;
 		const startAnchor = census[startIndex];
 		const endAnchor = census[endIndex];
 		if (!startAnchor || !endAnchor) throw missingArmBranchAnchorError(record.id, startIndex);

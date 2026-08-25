@@ -140,11 +140,10 @@ function createBranchRegistration(
 					graphNodeId: read.graphNodeId,
 					path: read.path,
 					async run() {
-						// Spec D8: pending is for FIRST APPEARANCES only — including flips.
-						// While the deciding read's async computed is re-running the flip
-						// holds its prior arm (see resume-runtime.ts holdPendingFlip). The
-						// compiler emits at most one test read per branch (symbol-resolver),
-						// so this subscription's read IS the arm decider readBranchArm uses.
+						// Pending is for FIRST APPEARANCES only, flips included: while the
+						// deciding read's async computed re-runs, the flip holds its prior
+						// arm (resume-runtime.ts holdPendingFlip). One test read per branch,
+						// so this subscription IS the arm decider readBranchArm uses.
 						if (kind === 'test' && input.holdPendingFlip?.(read.graphNodeId)) return;
 						// Decide-less: no test to re-read, so it holds its painted arm.
 						const arm = branch.testReads.length
@@ -199,15 +198,16 @@ function createBranchRegistration(
 		armFlipReleasesByBoundary.delete(boundaryId);
 		const behaviorHostIds: string[] = [];
 		for (const record of records) {
-			if (!record.testReads?.length) continue;
-			if (
-				!record.symbolId ||
-				!isLiveComment(record.startAnchor) ||
-				!isLiveComment(record.endAnchor)
-			) {
+			// A decided branch wires with no test at all; what nothing can wire is a
+			// record with neither a test to read nor an arm the render painted.
+			const flips = Boolean(record.testReads?.length);
+			if (!flips && typeof record.takenArm !== 'number') continue;
+			const live = isLiveComment(record.startAnchor) && isLiveComment(record.endAnchor);
+			if (flips && (!record.symbolId || !live)) {
 				wireEscalatedRecord({ ...record, armBoundaryId: boundaryId });
 				continue;
 			}
+			if (!live) continue;
 			const branch = { ...record, armBoundaryId: boundaryId };
 			wireBranchRecord(branch);
 			const arm = currentArmByBranchId.get(branch.id);
@@ -229,13 +229,12 @@ function onceRelease(release: () => void): () => void {
 	};
 }
 
-// The arm the render PAINTED, which the guard has to compare against. A minted
-// condition computed is cell-backed here and holds no value until its first
-// demand refresh, so reading the graph answers the else arm for a branch painted
-// at arm 0 and the first real update is then discarded as a no-change.
+// The arm the render PAINTED, which the guard compares against. A minted
+// condition computed holds no value until its first demand refresh, so reading
+// the graph instead answers the else arm for a branch painted at arm 0, and the
+// first real update is then discarded as a no-change.
 function wiredBranchArm(graph: RuntimeGraph, branch: ResumeBranchRecord): number {
-	const painted = (branch as { readonly takenArm?: number }).takenArm;
-	return typeof painted === 'number' ? painted : readBranchArm(graph, branch);
+	return typeof branch.takenArm === 'number' ? branch.takenArm : readBranchArm(graph, branch);
 }
 
 function readBranchArm(graph: RuntimeGraph, branch: ResumeBranchRecord): number {
