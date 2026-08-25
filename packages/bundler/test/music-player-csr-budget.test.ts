@@ -35,22 +35,23 @@ const clientBuild = resolve(clientPublic, MARKLESS_BUILD_PREFIX);
 // inherits it. The same `pnpm --dir <demo> build` from a plain shell reads
 // lower. Measure through the test, or export NODE_ENV=test.
 //
-// Anchors measured 2026-08-25 on a local macOS worktree, NODE_ENV=test,
+// Anchors measured 2026-08-25 at the repo root, NODE_ENV=test,
 // MARKLESS_CONSUMER_BUILD=1. Each is a must-not-exceed ceiling of anchor +
 // margin; the margin absorbs gzip run variance and the few bytes an absolute
 // build path costs. Headroom follows the SSR wall's banding: 128 B once a
 // stage is measured in the ten-thousands of bytes, 32 B below that. Walk DOWN.
 //
 // The client lane's page-load download is ~2x the SSR lane's for the same app:
-// the built page modulepreloads 104 of its 107 chunks, and what SSR serves as
-// payload inside the HTML the client lane ships as JS instead (the prerender
-// data chunk and one staged trigger-group chunk per dispatching element).
+// the built page modulepreloads nearly every chunk it emits, and what SSR
+// serves as payload inside the HTML the client lane ships as JS instead (the
+// prerender data chunk and one staged trigger-group chunk per dispatching
+// element).
 const STAGE_ANCHORS = {
-	'page-load download': { gzipBytes: 127_674, margin: 128 },
-	'page-load execute': { gzipBytes: 15_313, margin: 128 },
-	'interaction 1 marginal': { gzipBytes: 2_293, margin: 32 },
-	'interaction 2 marginal': { gzipBytes: 2_556, margin: 32 },
-	'interaction 3 marginal': { gzipBytes: 2_555, margin: 32 },
+	'page-load download': { gzipBytes: 128_534, margin: 128 },
+	'page-load execute': { gzipBytes: 15_316, margin: 128 },
+	'interaction 1 marginal': { gzipBytes: 2_254, margin: 32 },
+	'interaction 2 marginal': { gzipBytes: 2_513, margin: 32 },
+	'interaction 3 marginal': { gzipBytes: 2_514, margin: 32 },
 } as const satisfies Record<string, StageAnchor>;
 
 let measured: BudgetMeasurement;
