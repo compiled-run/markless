@@ -68,24 +68,21 @@ test('a minted row is removed and re-added without leaving a second row behind',
 	await cleanup();
 });
 
-// The two rows below pin the wall this shape still stands behind, and they pin
-// it on the SERVED page, where no mint is involved at all: a self-closed row
-// component that roots a widget-scoped shared() registers no working event
-// record, so its own click never runs. The row's callback prop is the witness -
-// it writes page state the row itself does not own, and that stays untouched
-// too. Until a served row of this shape dispatches, "each minted row toggles its
-// own widget state" cannot be measured. Unmark both the day it does.
+// Each rendered row toggles its own widget graph and nothing else: a served row,
+// and a row the client minted after boot, both write only their own instance,
+// and both reach the owner through the row's callback prop.
 
-test.fails('a served row of this shape runs its own click handler', async () => {
-	const screen = await renderSSR(Served);
+test('a served row of this shape runs its own click handler', async () => {
+	const screen = await renderSSR(App);
 	const container = screen.container;
 
 	click(container, '[data-row="north"]');
 	await expect.poll(() => container.querySelector('[data-tapped]')?.textContent).toBe('north');
+	expect(marks(container)).toEqual(['on', 'off']);
 	await cleanup();
 });
 
-test.fails('the minted row toggles its own widget state and the served rows do not move', async () => {
+test('the minted row toggles its own widget state and the served rows do not move', async () => {
 	const screen = await renderSSR(App);
 	const container = screen.container;
 
@@ -94,9 +91,29 @@ test.fails('the minted row toggles its own widget state and the served rows do n
 
 	click(container, '[data-row="east"]');
 	await expect.poll(() => marks(container)).toEqual(['off', 'off', 'on']);
+	// The row's callback prop writes page state the row does not own, so this is
+	// the other half of the proof: the gesture reached the owner too.
+	expect(container.querySelector('[data-tapped]')?.textContent).toBe('east');
 
 	click(container, '[data-row="north"]');
 	await expect.poll(() => marks(container)).toEqual(['on', 'off', 'on']);
+	await expect.poll(() => container.querySelector('[data-tapped]')?.textContent).toBe('north');
+	await cleanup();
+});
+
+// The row below pins a wall this shape still stands behind, and it is not the
+// row's shape at all: a component exported under a name that is not the module's
+// root is published as a bare render part, with no resume module beside it. A
+// page rendered from such an export is served complete and inert - no client
+// runtime is ever fetched, so no gesture on it can dispatch. Unmark it the day a
+// non-root export carries its module's resume wiring.
+
+test.fails('a page rendered from a non-root export dispatches at all', async () => {
+	const screen = await renderSSR(Served);
+	const container = screen.container;
+
+	click(container, '[data-row="north"]');
+	await expect.poll(() => container.querySelector('[data-tapped]')?.textContent).toBe('north');
 	await cleanup();
 });
 
