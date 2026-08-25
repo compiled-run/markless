@@ -2,6 +2,7 @@ import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/no
 import { expressionSource } from '../../ast/source.ts';
 import type {
 	CompilerDiagnostic,
+	ModuleGraphInterfaceArtifact,
 	SemanticGraphArtifact,
 	SemanticMarkupArtifact,
 	SemanticMarkupSlot,
@@ -26,6 +27,7 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 	readonly semanticGraph: SemanticGraphArtifact;
 	readonly filename: string;
 	readonly source: string;
+	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 }): ReadonlyArray<CompilerDiagnostic> {
 	if (input.semanticGraph.keyedRepeats.length === 0) return [];
 	const componentNames = input.semanticGraph.components.map((component) => component.name);
@@ -41,6 +43,9 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 			componentEdges: input.semanticGraph.componentEdges,
 			componentNames,
 			branchSites: input.semanticGraph.branchSites,
+			...(input.importedModuleInterfaces
+				? { importedModuleInterfaces: input.importedModuleInterfaces }
+				: {}),
 			repeatId: repeat.id,
 			itemName: repeat.itemName,
 		});
@@ -82,6 +87,7 @@ function rowMintRefusal(input: {
 	readonly componentEdges: SemanticGraphArtifact['componentEdges'];
 	readonly componentNames: ReadonlyArray<string>;
 	readonly branchSites: SemanticGraphArtifact['branchSites'];
+	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 	readonly repeatId: string;
 	readonly itemName: string;
 }): KeyedRepeatRowMintRefusal | null {
@@ -94,6 +100,9 @@ function rowMintRefusal(input: {
 			chunks: input.chunks,
 			componentEdges: input.componentEdges,
 			componentNames: input.componentNames,
+			...(input.importedModuleInterfaces
+				? { importedModuleInterfaces: input.importedModuleInterfaces }
+				: {}),
 			rowChunkId,
 			rowElementCount: chunk.hosts.length,
 			itemName: input.itemName,

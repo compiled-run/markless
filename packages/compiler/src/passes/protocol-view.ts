@@ -563,6 +563,9 @@ function rowComponentMint(
 		chunks: renderDataOf(input).chunks,
 		componentEdges: input.semanticGraph?.componentEdges ?? [],
 		componentNames: (input.semanticGraph?.components ?? []).map((component) => component.name),
+		...(input.source?.importedModuleInterfaces
+			? { importedModuleInterfaces: input.source.importedModuleInterfaces }
+			: {}),
 		rowChunkId: render.rowChunkId,
 		rowElementCount: render.rowElementCount,
 		itemName: render.itemName,

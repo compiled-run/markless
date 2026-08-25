@@ -1,10 +1,18 @@
 import type {
+	ModuleGraphInterfaceArtifact,
 	SemanticComponentEdge,
 	SemanticMarkupArtifact,
 	SemanticMarkupSlot,
 } from '../artifacts.ts';
 
 type MarkupChunks = SemanticMarkupArtifact['chunks'];
+
+type ChildCensusInput = {
+	readonly chunks: MarkupChunks;
+	readonly componentEdges: ReadonlyArray<SemanticComponentEdge>;
+	readonly componentNames: ReadonlyArray<string>;
+	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
+};
 
 export type RowComponentMint = {
 	readonly componentEdgeId: string;
@@ -34,27 +42,29 @@ export type RowComponentMint = {
  * halves: the wrapper markup in `rowTemplate`, the child identity here, and
  * `slotPath` naming the marker inside the wrapper the child's nodes replace.
  *
- * Refused unless the child is declared in this same module and the edge projects
- * no children. Cross-module and projected rows are later phases.
+ * Refused when the edge projects children: rebuilding those needs the caller's
+ * markup as well as the child's own. The child itself may live in another
+ * module - the payload's component surface carries the import chain the row
+ * render walks - so an imported child mints on the same terms as a local one.
  *
  * Also refused when the component's body carries a branch (`@if`/`@switch`) or a
  * boundary (`@try`): those anchor into a census the page counted once, at boot,
  * for the rows it served. A row born after resume has no counted anchors, so the
  * mint would index into another row's - which is why the runtime refuses such a
  * row loudly. Refusing here means the page never gets that far: it falls back to
- * today's no-growth behaviour instead.
+ * today's no-growth behaviour instead. That question must be ANSWERED, not
+ * assumed: a child whose census this module cannot reach is refused too.
  *
  * The public render plan pass asks the same question to decide whether a row
  * that cannot grow deserves a diagnostic, so the answer lives here once.
  */
-export function resolveRowComponentMint(input: {
-	readonly chunks: MarkupChunks;
-	readonly componentEdges: ReadonlyArray<SemanticComponentEdge>;
-	readonly componentNames: ReadonlyArray<string>;
-	readonly rowChunkId: string;
-	readonly rowElementCount: number;
-	readonly itemName: string;
-}): RowComponentMint | null {
+export function resolveRowComponentMint(
+	input: ChildCensusInput & {
+		readonly rowChunkId: string;
+		readonly rowElementCount: number;
+		readonly itemName: string;
+	},
+): RowComponentMint | null {
 	const chunk = input.chunks.find((candidate) => candidate.id === input.rowChunkId);
 	if (!chunk) return null;
 	const componentSlots = chunk.slots.filter((candidate) => candidate.kind === 'child-component');
@@ -73,11 +83,8 @@ export function resolveRowComponentMint(input: {
 	if (!componentName) return null;
 	const edge = input.componentEdges.find((candidate) => candidate.id === slot.componentEdgeId);
 	if (!edge || edge.parentComponentName !== componentName) return null;
-	// Same module, no projection: the child has to be one this module declares,
-	// reachable through this module's own render data.
-	if (edge.importSource !== undefined || edge.children.childCount > 0) return null;
-	if (!input.componentNames.includes(edge.childComponentName)) return null;
-	if (chunkTreeHasConstruct(input.chunks, slot.childTemplateId)) return null;
+	if (edge.children.childCount > 0) return null;
+	if (!childIsConstructFree(input, edge, slot.childTemplateId, new Set())) return null;
 	const itemProps = edge.props.filter((prop) => prop.source === input.itemName);
 	return {
 		componentEdgeId: slot.componentEdgeId,
@@ -94,30 +101,78 @@ export function mintableFromItem(slot: SemanticMarkupSlot): boolean {
 	);
 }
 
-// Whether a chunk, or anything it reaches, holds a construct whose anchors the
-// page counted only for the rows it served: a branch or an async boundary.
-export function chunkTreeHasConstruct(
-	chunks: MarkupChunks,
-	chunkId: string,
-	seen = new Set<string>(),
+/**
+ * Whether one component the row reaches is PROVABLY free of the constructs whose
+ * anchors the page counted only for the rows it served - a branch or an async
+ * boundary - anywhere in what it renders.
+ *
+ * Provably is the whole point: a census this module cannot reach is a refusal,
+ * never a pass. A child declared here is answered from this module's own chunks.
+ * A child behind an import has no chunks here, so the answer comes from the
+ * module interface it published.
+ */
+function childIsConstructFree(
+	input: ChildCensusInput,
+	edge: SemanticComponentEdge,
+	childTemplateId: string,
+	seen: Set<string>,
 ): boolean {
-	if (seen.has(chunkId)) return false;
+	if (edge.importSource === undefined) {
+		return (
+			input.componentNames.includes(edge.childComponentName) &&
+			chunkTreeIsConstructFree(input, childTemplateId, seen)
+		);
+	}
+	const moduleInterface = input.importedModuleInterfaces?.[edge.importSource];
+	const entry = moduleInterface?.render.components.find(
+		(candidate) => candidate.componentName === edge.childComponentName,
+	);
+	if (!moduleInterface || !entry) return false;
+	// A known element count is the interface's own proof that every chunk the
+	// child reaches was visible in its module and that none of them is a repeat,
+	// an async arm or an omittable host: those never resolve to a number. Branch
+	// arms can agree on one, and the interface never says which components the
+	// child reaches, so no component of that module may carry arm chunks either.
+	if (entry.elementCount === 'unknown') return false;
+	return !moduleInterface.render.components.some((candidate) =>
+		candidate.childChunks.some(
+			(chunk) => chunk.kind === 'branch-arm' || chunk.kind === 'async-arm',
+		),
+	);
+}
+
+// A chunk this module holds, and everything it reaches, proven construct-free.
+// A chunk id with no chunk behind it is unknowable, which is not a pass.
+function chunkTreeIsConstructFree(
+	input: ChildCensusInput,
+	chunkId: string,
+	seen: Set<string>,
+): boolean {
+	if (seen.has(chunkId)) return true;
 	seen.add(chunkId);
-	const chunk = chunks.find((candidate) => candidate.id === chunkId);
+	const chunk = input.chunks.find((candidate) => candidate.id === chunkId);
 	if (!chunk) return false;
 	for (const slot of chunk.slots) {
-		if (slot.kind === 'branch' || slot.kind === 'async') return true;
+		if (slot.kind === 'branch' || slot.kind === 'async') return false;
+		if (slot.kind === 'child-component') {
+			if (slot.projectionChunkId && !chunkTreeIsConstructFree(input, slot.projectionChunkId, seen))
+				return false;
+			const childEdge = input.componentEdges.find(
+				(candidate) => candidate.id === slot.componentEdgeId,
+			);
+			if (!childEdge || !childIsConstructFree(input, childEdge, slot.childTemplateId, seen))
+				return false;
+			continue;
+		}
 		const childChunkIds =
 			slot.kind === 'repeat'
 				? [slot.rowTemplateId, ...(slot.emptyTemplateId ? [slot.emptyTemplateId] : [])]
-				: slot.kind === 'child-component'
-					? [slot.childTemplateId, ...(slot.projectionChunkId ? [slot.projectionChunkId] : [])]
-					: slot.kind === 'dynamic-host'
-						? [slot.childChunkId]
-						: [];
+				: slot.kind === 'dynamic-host'
+					? [slot.childChunkId]
+					: [];
 		for (const childChunkId of childChunkIds) {
-			if (chunkTreeHasConstruct(chunks, childChunkId, seen)) return true;
+			if (!chunkTreeIsConstructFree(input, childChunkId, seen)) return false;
 		}
 	}
-	return false;
+	return true;
 }
