@@ -1,4 +1,5 @@
 import type {
+	ArmEscalationCandidate,
 	CaptureSlot,
 	CaptureSlotRoute,
 	GeneratedSymbolModule,
@@ -210,6 +211,9 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 	return {
 		passId: 'symbol-modules',
 		modules,
+		...(branchArms.escalationCandidates.length > 0
+			? { armEscalationCandidates: branchArms.escalationCandidates }
+			: {}),
 		diagnostics: [
 			...input.captureAnalysis.diagnostics,
 			...branchArms.diagnostics,
@@ -1043,6 +1047,9 @@ function armPartReadPath(
 type ArmRefusal = {
 	readonly detail: string;
 	readonly span?: SourceSpan;
+	// A same-module component that has to run: the one refusal a re-render of the
+	// page through the prerender evaluator can answer.
+	readonly escalatable?: boolean;
 };
 
 type ArmPartsContext = {
@@ -1063,11 +1070,13 @@ function renderBranchArms(
 ): {
 	readonly armsBySite: ReadonlyMap<string, PublicRenderPlanBranchArms>;
 	readonly diagnostics: ReadonlyArray<SymbolModulesDiagnostic>;
+	readonly escalationCandidates: ReadonlyArray<ArmEscalationCandidate>;
 } {
 	const renderData = input.renderData;
-	if (!renderData) return { armsBySite: new Map(), diagnostics: [] };
+	if (!renderData) return { armsBySite: new Map(), diagnostics: [], escalationCandidates: [] };
 	const armsBySite = new Map<string, PublicRenderPlanBranchArms>();
 	const diagnostics: SymbolModulesDiagnostic[] = [];
+	const escalationCandidates: ArmEscalationCandidate[] = [];
 	for (const branch of renderData.branches ?? []) {
 		if (branch.update === 'boundary') continue;
 		const refusals: ArmRefusal[] = [];
@@ -1095,8 +1104,13 @@ function renderBranchArms(
 					candidate.kind === 'branch-update' &&
 					candidate.branchSiteId === branch.branchSiteId,
 			);
-			if (symbol)
+			if (symbol) {
 				diagnostics.push(branchArmUnsupportedDiagnostic(branch, refusals[0], symbol.id));
+				// Every refusal escalatable, or none: a branch that also holds a shape
+				// no re-render answers stays plainly refused.
+				if (refusals.length > 0 && refusals.every((refusal) => refusal.escalatable))
+					escalationCandidates.push({ branchSiteId: branch.branchSiteId, symbolId: symbol.id });
+			}
 			continue;
 		}
 		armsBySite.set(branch.branchSiteId, {
@@ -1107,7 +1121,7 @@ function renderBranchArms(
 			...(branch.declaredEmptyArms ? { declaredEmptyArms: branch.declaredEmptyArms } : {}),
 		});
 	}
-	return { armsBySite, diagnostics };
+	return { armsBySite, diagnostics, escalationCandidates };
 }
 
 function branchArmUnsupportedDiagnostic(
@@ -1169,8 +1183,12 @@ function renderChunkParts(
 	child?: ArmChildScope,
 ): PublicRenderPlanBranchArms['arms'][number] | null {
 	const { renderData, asyncComputedNodeIds } = context;
-	const refuse = (detail: string, span?: SourceSpan) => {
-		context.refusals?.push({ detail, ...(span ? { span } : {}) });
+	const refuse = (detail: string, span?: SourceSpan, escalatable?: boolean) => {
+		context.refusals?.push({
+			detail,
+			...(span ? { span } : {}),
+			...(escalatable ? { escalatable: true } : {}),
+		});
 		return null;
 	};
 	const chunk = (child?.chunks ?? renderData.chunks).find((candidate) => candidate.id === chunkId);
@@ -1216,11 +1234,14 @@ function renderChunkParts(
 				if (child?.imported)
 					return refuse(`<${child.componentName}> shows a component of its own`);
 				const childParts = childComponentParts(context, slot);
-				if (childParts === null)
+				if (childParts === null) {
+					const reason = childRefusalReason(context, slot);
 					return refuse(
-						`<${slot.childComponentName}> ${childRefusalReason(context, slot)}`,
+						`<${slot.childComponentName}> ${reason.detail}`,
 						componentEdgeSpan(context, slot.componentEdgeId),
+						reason.escalatable,
 					);
+				}
 				for (const part of childParts) {
 					if ('text' in part) pushText(part.text);
 					else parts.push(part);
@@ -1372,11 +1393,13 @@ function staticChildComponentMarkup(
 }
 
 // Names the one value that kept the flip out; falls back to the shape-level
-// refusal for a child this descent cannot express for any other reason.
+// refusal for a child this descent cannot express for any other reason. Only a
+// same-module child's own value is escalatable: an imported child's markup and
+// records belong to a module this one cannot address.
 function childRefusalReason(
 	context: ArmPartsContext,
 	slot: Extract<SemanticMarkupSlot, { readonly kind: 'child-component' }>,
-): string {
+): { readonly detail: string; readonly escalatable: boolean } {
 	const semanticGraph = context.inline?.semanticGraph;
 	const edge = semanticGraph?.componentEdges.find(
 		(candidate) => candidate.id === slot.componentEdgeId,
@@ -1385,7 +1408,9 @@ function childRefusalReason(
 		semanticGraph && edge && !edge.importSource
 			? armChildOwnValueRefusal(semanticGraph, edge.childComponentName)
 			: undefined;
-	return own ?? 'has to run to produce its content';
+	return own
+		? { detail: own, escalatable: true }
+		: { detail: 'has to run to produce its content', escalatable: false };
 }
 
 function componentEdgeSpan(

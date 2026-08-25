@@ -34,6 +34,7 @@ import {
 	marklessRowFreeSymbolId,
 	marklessRowSegment,
 } from '../fns/instance-scope.ts';
+import { prerenderBranchArm } from './branch-arm.ts';
 import { registerPrerenderStagedComputeds } from './staged-graph.ts';
 import { sharedSeedPass } from './shared-seed-slot.ts';
 
@@ -304,6 +305,43 @@ export async function renderPrerenderBoundary(
 	}
 	const output = await renderBuiltPage(page, propsOrLoadSymbol, { prerenderSettle: { graph } });
 	return settledBoundaryResult(output, boundaryId);
+}
+
+/**
+ * Re-render the page and hand back one branch's markup with arm-relative
+ * records. The graph the flip already wrote decides the arm, so the render
+ * takes the new arm and RUNS the component it holds under that component's own
+ * instance identity — the identity a parent rebuilding markup could never
+ * spell. `commitArm` registers what comes back against the fresh DOM.
+ */
+export async function renderPrerenderBranch(
+	page: SsrRenderable | PrerenderDataSurface,
+	branchSiteId: string,
+	graph: RuntimeGraph,
+	propsOrLoadSymbol?: unknown | PrerenderLoadSymbol,
+): Promise<{
+	readonly html: string;
+	readonly armRecords: ResumeArmRecordSet;
+	readonly computed: ProtocolStatePayload['computed'];
+}> {
+	let output: SsrRenderOutput;
+	if (isPrerenderDataSurface(page)) {
+		if (!isPrerenderLoadSymbol(propsOrLoadSymbol)) {
+			throw new TypeError('Prerender render data requires a symbol loader.');
+		}
+		output = await evaluatePrerenderDataSurface(page, propsOrLoadSymbol, graph, true);
+	} else {
+		output = await renderBuiltPage(page, propsOrLoadSymbol, { prerenderSettle: { graph } });
+	}
+	const records = await prepareSsrResumeRecords(output);
+	return {
+		...prerenderBranchArm({
+			structure: output.structure,
+			branchSiteId,
+			view: records.view as never,
+		}),
+		computed: records.state.computed,
+	};
 }
 
 function isPrerenderDataSurface(value: unknown): value is PrerenderDataSurface {
