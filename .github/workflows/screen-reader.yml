@@ -69,6 +69,7 @@ jobs:
                         checklist,
                         collapsible,
                         combobox,
+                        dateinput,
                         modal,
                         navbar,
                         otp,
@@ -126,7 +127,8 @@ jobs:
                 # Only families with a real-reader spec. A family joins this list
                 # when its src/<family>/<family>.nvda.ts exists, not before: a
                 # name with no spec file makes the run find no tests.
-                family: [checkbox, modal, popover, radio-group, select, slider, tabs, tooltip]
+                family:
+                    [checkbox, dateinput, modal, popover, radio-group, select, slider, tabs, tooltip]
 
         steps:
             - uses: actions/checkout@v4
@@ -187,7 +189,8 @@ jobs:
             fail-fast: false
             matrix:
                 # See the nvda job: only families with a real-reader spec.
-                family: [checkbox, modal, popover, radio-group, select, slider, tabs, tooltip]
+                family:
+                    [checkbox, dateinput, modal, popover, radio-group, select, slider, tabs, tooltip]
 
         steps:
             - uses: actions/checkout@v4

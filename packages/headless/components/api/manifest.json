@@ -720,6 +720,146 @@
 			}
 		]
 	},
+	"dateinput": {
+		"parts": [
+			{
+				"part": "dayinput",
+				"component": "DateinputDayinput",
+				"doc": "The day of the month, 1 to whatever the chosen month and year allow.",
+				"props": [
+					{
+						"name": "placeholder",
+						"type": "string",
+						"required": false,
+						"doc": "The text an empty box shows. Defaults to the box's own shape: `dd`, `mm`, `yyyy`."
+					},
+					{
+						"name": "showLeadingZero",
+						"type": "boolean",
+						"required": false,
+						"doc": "Show a single-digit day or month as `04` rather than `4`."
+					}
+				]
+			},
+			{
+				"part": "description",
+				"component": "DateinputDescription",
+				"doc": "Supporting text for the group, named by the root's `aria-describedby`. One\nelement can be named that way, so mounting this alongside `dateinput.error`\ndescribes by whichever renders first.",
+				"props": []
+			},
+			{
+				"part": "error",
+				"component": "DateinputError",
+				"doc": "The validation message. Mounting it is what marks the boxes invalid - they\nreport `aria-invalid` for as long as this part is in the page - so render it\nonly when there is an error to show.",
+				"props": []
+			},
+			{
+				"part": "field",
+				"component": "DateinputField",
+				"doc": "The element a form submits. It is clipped, out of the tab order and hidden\nfrom readers, and it carries the whole date as `yyyy-mm-dd` under the root's\n`name`.",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "DateinputLabel",
+				"doc": "The group's name. It is a `<legend>` inside the root's `<fieldset>`, the\n`radio-group` precedent: three boxes have no single control for a `for` to\npoint at, and this way the group is named by the platform.",
+				"props": []
+			},
+			{
+				"part": "monthinput",
+				"component": "DateinputMonthinput",
+				"doc": "The month, 1 to 12.",
+				"props": [
+					{
+						"name": "placeholder",
+						"type": "string",
+						"required": false,
+						"doc": "The text an empty box shows. Defaults to the box's own shape: `dd`, `mm`, `yyyy`."
+					},
+					{
+						"name": "showLeadingZero",
+						"type": "boolean",
+						"required": false,
+						"doc": "Show a single-digit day or month as `04` rather than `4`."
+					}
+				]
+			},
+			{
+				"part": "root",
+				"component": "DateinputRoot",
+				"doc": "A `<fieldset>` named by its `<legend>`, the `radio-group` precedent: three boxes\nhave no single control to point a `for` at, and a group's own name cannot be\nminted from a part it contains.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The date the boxes show, as `yyyy-mm-dd`. Omit it and they start empty."
+					},
+					{
+						"name": "min",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The earliest date the boxes will settle on, as `yyyy-mm-dd`."
+					},
+					{
+						"name": "max",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The latest date the boxes will settle on, as `yyyy-mm-dd`."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nothing can be typed in any box, and they all drop out of the tab order."
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "A whole date is needed before a form submits."
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "Submitted under this name by `dateinput.field`."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: string | null) => void",
+						"required": false,
+						"doc": "Called with the whole date as `yyyy-mm-dd` whenever the boxes spell one, and\nwith `null` while they do not. Omit it and the boxes still work; the call\nsite simply does nothing."
+					}
+				]
+			},
+			{
+				"part": "yearinput",
+				"component": "DateinputYearinput",
+				"doc": "The year.",
+				"props": [
+					{
+						"name": "placeholder",
+						"type": "string",
+						"required": false,
+						"doc": "The text an empty box shows. Defaults to the box's own shape: `dd`, `mm`, `yyyy`."
+					},
+					{
+						"name": "showLeadingZero",
+						"type": "boolean",
+						"required": false,
+						"doc": "Show a single-digit day or month as `04` rather than `4`."
+					}
+				]
+			}
+		]
+	},
 	"modal": {
 		"parts": [
 			{
