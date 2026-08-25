@@ -14,28 +14,36 @@ function scopeClassOf(element: Element): string {
 	return found!;
 }
 
+function expectPainted(element: HTMLElement, scope: string, lit: boolean): void {
+	expect(element.classList.contains('line')).toBe(true);
+	expect(element.classList.contains(scope)).toBe(true);
+	// The scoped rule reaches it, which is the whole point of carrying the class.
+	expect(getComputedStyle(element).color).toBe('rgb(0, 0, 255)');
+	expect(getComputedStyle(element).fontWeight).toBe(lit ? '700' : '400');
+}
+
 async function expectScopedToggle(container: ParentNode): Promise<void> {
 	const staticLine = container.querySelector<HTMLElement>('[data-static]')!;
+	// A two-literal conditional bakes the scope into each arm; a plain expression
+	// has no arms, so the writers compose the scope back on every update.
 	const dynamic = container.querySelector<HTMLElement>('[data-dynamic]')!;
+	const plain = container.querySelector<HTMLElement>('[data-plain]')!;
 	const scope = scopeClassOf(staticLine);
 
-	expect(dynamic.classList.contains('line')).toBe(true);
-	expect(dynamic.classList.contains(scope)).toBe(true);
-	// The scoped rule reaches it, which is the whole point of carrying the class.
-	expect(getComputedStyle(dynamic).color).toBe('rgb(0, 0, 255)');
-	expect(getComputedStyle(dynamic).fontWeight).toBe('400');
+	expectPainted(dynamic, scope, false);
+	expectPainted(plain, scope, false);
 
 	container.querySelector<HTMLButtonElement>('[data-toggle]')!.click();
 	await expect.poll(() => dynamic.classList.contains('lit')).toBe(true);
-	expect(dynamic.classList.contains(scope)).toBe(true);
-	expect(getComputedStyle(dynamic).color).toBe('rgb(0, 0, 255)');
-	expect(getComputedStyle(dynamic).fontWeight).toBe('700');
+	await expect.poll(() => plain.classList.contains('lit')).toBe(true);
+	expectPainted(dynamic, scope, true);
+	expectPainted(plain, scope, true);
 
 	container.querySelector<HTMLButtonElement>('[data-toggle]')!.click();
 	await expect.poll(() => dynamic.classList.contains('lit')).toBe(false);
-	expect(dynamic.classList.contains(scope)).toBe(true);
-	expect(getComputedStyle(dynamic).color).toBe('rgb(0, 0, 255)');
-	expect(getComputedStyle(dynamic).fontWeight).toBe('400');
+	await expect.poll(() => plain.classList.contains('lit')).toBe(false);
+	expectPainted(dynamic, scope, false);
+	expectPainted(plain, scope, false);
 }
 
 test('CSR: a dynamic class keeps the style scope through a toggle both directions', async () => {

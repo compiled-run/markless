@@ -1693,16 +1693,7 @@ function domJournalEntryNode(
 			propertyNode('type', literalNode('setAttr')),
 			propertyNode('locator', locator),
 			propertyNode('name', literalNode('class')),
-			propertyNode(
-				'value',
-				target.trueValue !== undefined && target.falseValue !== undefined
-					? conditionalNode(
-							domUpdateValueNode(),
-							literalNode(target.trueValue),
-							literalNode(target.falseValue),
-						)
-					: domUpdateValueNode(),
-			),
+			propertyNode('value', classDomUpdateValueNode(target)),
 		]);
 	}
 
@@ -1733,6 +1724,29 @@ function domLocatorNode(hostNodeId: string): EmissionNode {
  */
 function domUpdateValueNode(): EmissionNode {
 	return memberChainNode('context.value');
+}
+
+/** The AST twin of dom-update.ts `classTargetValue`. */
+function classDomUpdateValueNode(
+	target: Extract<DomUpdateTarget, { readonly kind: 'class' }>,
+): EmissionNode {
+	const mapped = (): EmissionNode =>
+		target.trueValue !== undefined && target.falseValue !== undefined
+			? conditionalNode(
+					domUpdateValueNode(),
+					literalNode(target.trueValue),
+					literalNode(target.falseValue),
+				)
+			: domUpdateValueNode();
+
+	const constant = target.constantClass;
+	if (constant === undefined) return mapped();
+
+	return conditionalNode(
+		mapped(),
+		binaryNode('+', mapped(), literalNode(` ${constant}`)),
+		literalNode(constant),
+	);
 }
 
 /** The AST twin of `textDomUpdateValueSource`. */
