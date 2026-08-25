@@ -319,7 +319,8 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 		}
 		if (slot.kind === 'attribute') {
 			const value = readResidue(slot.residue, item);
-			if (slot.alwaysPresent) return escapeHtml(value);
+			if (slot.alwaysPresent)
+				return escapeHtml(marklessAttributeValue(slot.name, value) ?? '');
 			const text = marklessAttributeValue(slot.name, value);
 			return text === null ? '' : ` ${slot.name}="${escapeHtml(text)}"`;
 		}

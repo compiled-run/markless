@@ -463,7 +463,11 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 			case 'attribute': {
 				const value = await input.read(slot.residue, context);
 				return {
-					html: slot.alwaysPresent ? escapeHtml(value) : renderAttribute(slot.name, value),
+					// The name and quotes are already in the statics, so an absent value
+					// writes nothing rather than the word "undefined" into them.
+					html: slot.alwaysPresent
+						? escapeHtml(marklessAttributeValue(slot.name, value) ?? '')
+						: renderAttribute(slot.name, value),
 					tokens: [],
 				};
 			}

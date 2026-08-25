@@ -738,7 +738,11 @@ function collectAttribute(
 	if (collectAnchorAttribute(attribute, attributeName, expressionValue, state, walk, hostNodeId))
 		return;
 
-	const conditionalClass = conditionalClassTarget(attributeName, expressionValue);
+	const conditionalClass = conditionalClassTarget(
+		attributeName,
+		expressionValue,
+		state.currentStyleScopeClass,
+	);
 	if (conditionalClass) {
 		// A test that is not a plain graph read resolves to no graph node later, so
 		// without this computed the whole record is dropped and the class never moves.
@@ -1213,9 +1217,13 @@ function mentionsElementHandle(expression: AnyNode, state: WalkState): boolean {
 	return found;
 }
 
+// The runtime writes the whole class attribute, so a scoped module's arms carry
+// the scope class the markup pass put in the served HTML - without it the first
+// toggle strips the scope and every scoped rule stops matching.
 function conditionalClassTarget(
 	attributeName: string,
 	expressionValue: AnyNode | undefined,
+	styleScopeClass: string | null,
 ): {
 	readonly test: AnyNode;
 	readonly target: SemanticTemplateBindingTarget;
@@ -1233,10 +1241,15 @@ function conditionalClassTarget(
 		test,
 		target: {
 			kind: 'class',
-			trueValue,
-			falseValue,
+			trueValue: scopedClassValue(trueValue, styleScopeClass),
+			falseValue: scopedClassValue(falseValue, styleScopeClass),
 		},
 	};
+}
+
+function scopedClassValue(value: string, styleScopeClass: string | null): string {
+	if (!styleScopeClass) return value;
+	return value ? `${value} ${styleScopeClass}` : styleScopeClass;
 }
 
 function stringLiteral(node: AnyNode | undefined): string | null {

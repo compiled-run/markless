@@ -2171,6 +2171,52 @@ export function App() @{
 	expect(output.html).not.toContain('<style');
 });
 
+// A scoped rule only matches an element carrying the scope class, so an element
+// whose class is an expression has to compose with it too.
+test('compileTsrxModule scopes an element whose class is a dynamic expression', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/DynamicScoped.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let on = state(false);
+
+	<div>
+		<style>
+			.line { display: block; }
+			.lit { color: blue; }
+		</style>
+		<p class="line">static</p>
+		<p class={on ? 'line lit' : 'line'}>dynamic</p>
+		<button onClick={() => { on = !on; }}>t</button>
+	</div>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	const scope = result.publicRenderPlan.styleScopes[0]!.scopeId;
+	expect(result.publicRenderPlan.styleScopes[0]!.cssText).toContain(`.line.${scope}`);
+
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = await (ssrModule.marklessRenderSsr as () => { readonly html: string })();
+
+	expect(output.html).toContain(`<p class="line ${scope}">static</p>`);
+	expect(output.html).toContain(`<p class="line ${scope}">dynamic</p>`);
+
+	// The toggle rewrites the whole attribute, so both arms carry the scope.
+	const classUpdate = result.protocolView.domUpdates.find(
+		(update) => update.target?.kind === 'class',
+	);
+	expect(classUpdate?.target).toEqual({
+		kind: 'class',
+		trueValue: `line lit ${scope}`,
+		falseValue: `line ${scope}`,
+	});
+});
+
 // A <style> block that cannot be scope-compiled is dropped from the build, so
 // the drop has to be explained. `collectStyleScopes` reports it and the public
 // render plan is the single pass that carries those diagnostics to the author;

@@ -116,6 +116,8 @@ export type WalkState = {
 	readonly hostIds: WeakMap<object, string>;
 	currentComponentName: string | null;
 	currentComponentId: string | null;
+	/** The <style> scope class of the component being walked; every class this component writes carries it. */
+	currentStyleScopeClass: string | null;
 	currentBranchScopeIds: string[];
 	currentKeyedRepeatScopeIds: string[];
 	currentHostNodeId: string | null;
@@ -245,6 +247,7 @@ export function createWalkState(input: {
 		hostIds: new WeakMap<object, string>(),
 		currentComponentName: null,
 		currentComponentId: null,
+		currentStyleScopeClass: null,
 		currentBranchScopeIds: [],
 		currentKeyedRepeatScopeIds: [],
 		currentHostNodeId: null,
