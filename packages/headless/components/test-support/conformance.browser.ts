@@ -20,6 +20,7 @@ import Tabs from '../src/tabs/scenarios/basic.tsrx';
 import Textbox from '../src/textbox/scenarios/basic.tsrx';
 import Toaster from '../src/toaster/scenarios/basic.tsrx';
 import Toggle from '../src/toggle/scenarios/basic.tsrx';
+import Tooltip from '../src/tooltip/scenarios/basic.tsrx';
 import Tree from '../src/tree/scenarios/basic.tsrx';
 import { runConformance, type FamilyDescriptor } from './conformance.ts';
 
@@ -445,6 +446,20 @@ const descriptors: readonly FamilyDescriptor[] = [
 		parts: ['root', 'label', 'trigger', 'thumb'],
 		rootAria: { role: null },
 		supportsDisabled: true,
+	},
+	{
+		family: 'tooltip',
+		mount: { CSR: () => render(Tooltip), SSR: () => renderSSR(Tooltip) },
+		root: 'root',
+		parts: ['root', 'trigger', 'content'],
+		rootAria: { role: null },
+		// No openCycle: a tooltip's trigger is described by the tip, it does not
+		// activate it. Hover and focus are the only ways in, and clicking the
+		// trigger of a showing tip closes it rather than toggling — so the battery's
+		// click-to-open cycle would be testing a gesture this family refuses. The
+		// dismissal, hover and focus rows live in src/tooltip/tooltip.browser.ts.
+		valuedAttributes: ['ui-side'],
+		supportsDisabled: false,
 	},
 	{
 		family: 'tree',

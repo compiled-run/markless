@@ -105,6 +105,42 @@ input {
 	touch-action: none;
 }
 
+/* The tooltip family emits only the anchor identity and which side was asked
+   for, so every bit of the placement is here: the grid cell against the anchor,
+   where to go when that cell runs off screen, and when to disappear with an
+   anchor that scrolled away. */
+.tip {
+	position-try-fallbacks: flip-block, flip-inline;
+	position-visibility: anchors-visible;
+	max-width: 16rem;
+	padding: 0.25rem 0.5rem;
+	border: 1px solid var(--line);
+	border-radius: 0.35rem;
+	background: var(--paper);
+	color: var(--ink);
+	font-size: 0.9rem;
+}
+
+.tip[ui-side='top'] {
+	position-area: top span-all;
+	margin-bottom: 0.35rem;
+}
+
+.tip[ui-side='bottom'] {
+	position-area: bottom span-all;
+	margin-top: 0.35rem;
+}
+
+.tip[ui-side='start'] {
+	position-area: inline-start span-all;
+	margin-inline-end: 0.35rem;
+}
+
+.tip[ui-side='end'] {
+	position-area: inline-end span-all;
+	margin-inline-start: 0.35rem;
+}
+
 /* The family hands the consumer `--slider-offset` and leaves the placing here. */
 .slider-thumb {
 	position: absolute;
