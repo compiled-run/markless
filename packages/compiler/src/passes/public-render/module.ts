@@ -2,6 +2,7 @@ import { parseModule } from '../../js-ast.ts';
 import type { PublicRenderModuleArtifact, PublicRenderModuleInput } from '../../artifacts.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
 import { collectPublicRenderComponentDefinitions } from './component-definitions.ts';
+import { collectSsrDeriveSetDiagnostics } from './derive-set.ts';
 import { emitDirectPublicRenderModule } from './direct-module.ts';
 import { emitPublicSsrRenderModule } from './ssr-module.ts';
 import { firstComponentRoot, selectPublicRenderRoot } from './plan.ts';
@@ -117,6 +118,9 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 		ssrExportName: ssrModuleSource ? 'marklessRenderSsr' : null,
 		ssrComponentExports,
 		componentDefinitions,
-		diagnostics: input.publicRenderPlan.diagnostics,
+		diagnostics: [
+			...input.publicRenderPlan.diagnostics,
+			...(ssrModuleSource ? collectSsrDeriveSetDiagnostics(input) : []),
+		],
 	};
 }

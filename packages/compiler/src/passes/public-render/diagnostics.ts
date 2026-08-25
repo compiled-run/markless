@@ -265,6 +265,42 @@ export function childrenOpacityDiagnostic(input: {
 	};
 }
 
+export const SERVER_DERIVE_UNREACHABLE_CODE = 'MARKLESS_SERVER_DERIVE_UNREACHABLE' as const;
+
+/**
+ * A `computed()` the server render reaches but cannot derive. The value it would
+ * have carried is simply missing from the served HTML - an attribute reading it
+ * disappears - so the refusal is loud rather than an empty attribute.
+ */
+export function serverDeriveUnreachableDiagnostic(input: {
+	readonly name: string;
+	readonly reason: 'cycle' | 'no-source';
+}): CompilerDiagnostic {
+	const cause =
+		input.reason === 'cycle'
+			? `"${input.name}" is part of a loop of computed values that read each other, so there is no order in which the server can work them out.`
+			: `"${input.name}" is read while this page is rendered on the server, but the compiler has no expression to work it out from.`;
+	return {
+		code: SERVER_DERIVE_UNREACHABLE_CODE,
+		severity: 'error',
+		phase: 'public-render',
+		title: 'This computed value cannot be worked out on the server',
+		message: `${cause} Anything reading it would render as if the value were missing.`,
+		why: 'Server rendering works each computed value out once and puts it in the state the page is served with. A value it cannot work out reads as undefined, and every attribute and piece of text built from it silently disappears from the HTML.',
+		passId: PUBLIC_RENDER_PLAN_PASS_ID,
+		artifactKeys: ['publicRenderModule'],
+		suggestions: [
+			{
+				message:
+					input.reason === 'cycle'
+						? 'Break the loop: have one of these computed values read state directly instead of reading the other computed value.'
+						: 'Compute the value from state the component can read, or pass it in as a prop.',
+			},
+		],
+		docsUrl: `https://markless.dev/errors/${SERVER_DERIVE_UNREACHABLE_CODE}`,
+	};
+}
+
 export function unsupportedRenderRootDiagnostic(input: {
 	readonly message: string;
 	readonly node: AnyNode;

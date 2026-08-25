@@ -4,7 +4,7 @@ import { asNodes, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { firstComponentRoot } from './plan.ts';
 import { sharedCallbackSlotGraphNodeId } from '../semantic-graph/collect-shared.ts';
 import { emitClientResidueReader, emitClientResidueReaderPrelude } from './residue-reader.ts';
-import { handlerReadGraphNodeIds } from './ssr-module.ts';
+import { handlerReadGraphNodeIds } from './derive-set.ts';
 import {
 	componentBoundElementHandles,
 	widgetRootDefinitionIds,
