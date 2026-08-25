@@ -115,6 +115,79 @@ export function tryBlockToggleRerenderDiagnostic(input: {
 	};
 }
 
+// Owner-adjustable: `error` follows the fail-closed doctrine - a list that
+// renders its served rows but can never grow is a must-not-ship - but the
+// severity itself has not been ratified. Change this one constant to move it.
+export const KEYED_REPEAT_ROW_MINT_UNSUPPORTED_SEVERITY: 'error' | 'warning' = 'error';
+
+export const KEYED_REPEAT_ROW_MINT_UNSUPPORTED_CODE =
+	'MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED' as const;
+
+/**
+ * One clause of the row-template mint's refusal, in the author's own terms.
+ *
+ * A refused row still serves whatever the server rendered, and it still
+ * reorders and removes. What it cannot do is GROW: an item appended to the
+ * collection after resume has no markup, because the client carries no
+ * renderer and the payload carries no template for it. Every channel is
+ * otherwise silent about that, which is what this says out loud.
+ */
+export type KeyedRepeatRowMintRefusal =
+	| { readonly kind: 'component'; readonly componentName: string }
+	| { readonly kind: 'nested-construct'; readonly label: string }
+	| { readonly kind: 'attribute'; readonly attributeName: string }
+	| { readonly kind: 'outside-read' };
+
+export function keyedRepeatRowMintUnsupportedDiagnostic(input: {
+	readonly itemName: string;
+	readonly refusal: KeyedRepeatRowMintRefusal;
+	readonly node: AnyNode;
+	readonly filename: string;
+}): CompilerDiagnostic {
+	const cause = refusalCause(input.itemName, input.refusal);
+	return {
+		code: KEYED_REPEAT_ROW_MINT_UNSUPPORTED_CODE,
+		severity: KEYED_REPEAT_ROW_MINT_UNSUPPORTED_SEVERITY,
+		phase: PUBLIC_RENDER_PHASE,
+		title: 'This list can never grow in the browser',
+		message: `${cause.message} The browser has no renderer, so a row that arrives after the page loads has no markup to be built from: this list will render the rows the server sent, reorder them and remove them, and silently ignore every new one.`,
+		why: 'The payload carries one row of finished markup so the browser can build a row the server never rendered. It can fill text read off the row item and nothing else, so a row needing anything more ships no template at all.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: PUBLIC_RENDER_PLAN_PASS_ID,
+		artifactKeys: ['publicRenderPlan'],
+		suggestions: [{ message: cause.suggestion }],
+		docsUrl: `https://markless.dev/errors/${KEYED_REPEAT_ROW_MINT_UNSUPPORTED_CODE}`,
+	};
+}
+
+function refusalCause(
+	itemName: string,
+	refusal: KeyedRepeatRowMintRefusal,
+): { readonly message: string; readonly suggestion: string } {
+	switch (refusal.kind) {
+		case 'component':
+			return {
+				message: `This @for row renders <${refusal.componentName}>, and a component in the row is a graph the browser would have to build one of per row.`,
+				suggestion: `Move <${refusal.componentName}> outside the @for and keep the row to plain elements and text read off ${itemName}, or wait for component-rooted rows.`,
+			};
+		case 'nested-construct':
+			return {
+				message: `This @for row holds ${refusal.label}, and a construct inside the row is wiring the browser would have to register per row.`,
+				suggestion: `Lift ${refusal.label} outside the @for, or keep the row to plain elements and text read off ${itemName}.`,
+			};
+		case 'attribute':
+			return {
+				message: `This @for row sets the ${refusal.attributeName} attribute from a value, and the row template fills text only.`,
+				suggestion: `Render the value as text inside the row instead of as the ${refusal.attributeName} attribute, or wait for attribute rows.`,
+			};
+		case 'outside-read':
+			return {
+				message: `This @for row reads a value that is not a property of ${itemName}, and the browser builds a row from the row item alone.`,
+				suggestion: `Read the value off ${itemName} - put it on the item before the list is built - or keep the row to text read off ${itemName}.`,
+			};
+	}
+}
+
 export function repeatRowStateScopeUnsupportedDiagnostic(input: {
 	readonly apiName: 'state' | 'computed';
 	readonly name: string;
