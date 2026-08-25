@@ -500,18 +500,32 @@ function demandsRowMint(runtimeDemandMap: unknown): boolean {
 /**
  * The component-rooted mint, which also needs this page's render-data surface.
  *
- * The bridge cannot import that surface - it is per-page - so the loader written
- * here pairs the two imports and hands the surface over. Both specifiers exist
- * only in a build whose records name a row component.
+ * It answers the SAME global as the template mint, whose builders it re-exports:
+ * the repeat runtime carries no second loader, so a page with no component row
+ * ships not one byte of this path. The bridge cannot import the surface - it is
+ * per-page - so the loader written here pairs the two imports and hands it over.
  */
 function emitRowComponentMintLoaderInstall(renderDataId: string): string {
 	return [
-		'globalThis.__marklessRowComponentMint = () =>',
+		'globalThis.__marklessRowMint = (...host) =>',
 		'\tPromise.all([',
 		"\t\timport('@markless/web/fns/row-component-mint'),",
 		`\t\timport('${renderDataId}'),`,
-		'\t]).then(([mint, data]) => mint.marklessRowComponentMint(data.marklessPrerenderData));',
+		'\t]).then(([mint, data]) =>',
+		'\t\tmint.marklessRowComponentMint(data.marklessPrerenderData, ...host),',
+		'\t);',
 	].join('\n');
+}
+
+// Fail closed: without a canonical render-data module there is no surface to
+// render a row against, so naming the bridge would only fetch a dead chunk.
+function componentRowLoader(input: {
+	readonly renderDataId?: string;
+	readonly runtimeDemandMap?: unknown;
+}): string | undefined {
+	return input.renderDataId && demandsRowComponentMint(input.runtimeDemandMap)
+		? emitRowComponentMintLoaderInstall(input.renderDataId)
+		: undefined;
 }
 
 /**
@@ -645,10 +659,10 @@ export function emitResumeModule(input: {
 		// `rowTemplate` nor `emptyArm` never emits its chunk. The loader stays
 		// unresolved until a repeat that can build actually wires, so having a
 		// mintable repeat somewhere is still not fetching it.
-		demandsRowMint(input.runtimeDemandMap) ? emitRowMintLoaderInstall() : null,
-		input.renderDataId && demandsRowComponentMint(input.runtimeDemandMap)
-			? emitRowComponentMintLoaderInstall(input.renderDataId)
-			: null,
+		// One global, so a page whose rows are components installs the bridge that
+		// re-exports the template mint instead of a second loader beside it.
+		componentRowLoader(input) ??
+			(demandsRowMint(input.runtimeDemandMap) ? emitRowMintLoaderInstall() : null),
 		scalarSpecializations.length > 0
 			? [
 					"import { marklessDecodeScalarCell, marklessReadScalarCell, marklessScalarSpecializedError } from '@markless/web/fns/scalar-specialized';",

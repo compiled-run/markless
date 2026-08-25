@@ -283,16 +283,13 @@ export function createResumeRuntime(
 					[],
 					records.flatMap((repeat) => repeat.rowEvents),
 				);
-				const { wireKeyedRepeats, rowComponentMintWiring } = await import(
-						'./resume-keyed-repeats.ts'
-					);
+				const { wireKeyedRepeats } = await import('./resume-keyed-repeats.ts');
 				wireKeyedRepeats({
 					graph: input.graph,
 					view: { ...input.view, keyedRepeats: records },
 					elementsByHostId,
 					events: eventWiring,
 					storeContainerSubscription,
-					...rowComponentMintWiring(records, armRegistrationDeps, installArmEventType, input),
 				});
 			},
 			addBehaviors: behaviors
@@ -516,8 +513,8 @@ export function createResumeRuntime(
 		},
 		activateBehaviors: async (hostNodeId: string) =>
 			(await loadBehaviorRuntime()).activateBehaviors(hostNodeId),
-		// D8 navigation transitions: settled means every boundary committed its
-		// content AND the flush that carried it fully applied.
+		// Settled means every boundary committed its content AND the flush that
+		// carried it fully applied.
 		whenAsyncBoundariesSettled: async () => {
 			if (!settleTracker) return;
 			await settleTracker.whenAllSettled();
@@ -543,9 +540,8 @@ export function registrationGraphNodeCensus(state: ResumeRuntimeInput['state']):
 	return ids;
 }
 
-// Local copies of the resume-locators helpers: importing that module here
-// regroups the wall-counted chunk graph, which costs more than the
-// duplication saves (T120 measurement; re-confirmed on this tree).
+// Local copies of the resume-locators helpers: importing that module regroups
+// the wall-counted chunk graph, which costs more than the duplication saves.
 function connectedElement(
 	root: ResumeDomElement,
 	element: ResumeDomElement | undefined,

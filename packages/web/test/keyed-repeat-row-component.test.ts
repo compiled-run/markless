@@ -77,26 +77,47 @@ let bridge: { readonly mints: MintCall[]; readonly commits: unknown[] } = {
 	mints: [],
 	commits: [],
 };
+type BridgeHost = { readonly wired?: boolean } | undefined;
+let wiredBridge = true;
 (
 	globalThis as {
-		__marklessRowComponentMint?: () => Promise<unknown>;
+		__marklessRowMint?: (graph?: unknown, host?: BridgeHost) => Promise<unknown>;
 	}
-).__marklessRowComponentMint = async () => ({
-	async mintRow(input: { readonly item: unknown; readonly rowKey: unknown }) {
-		bridge.mints.push({ rowKey: input.rowKey, item: input.item });
-		const rowRoot = componentRow((input.item as { readonly label: string }).label);
-		return {
-			rowRoot,
-			nodes: [rowRoot],
-			commit: async () => {
-				bridge.commits.push({
-					rowKey: input.rowKey,
-					attached: rowRoot.parentElement !== null,
-				});
-			},
-		};
-	},
-});
+).__marklessRowMint = async (graph, host) => {
+	let prepared = new Map<unknown, Node>();
+	return {
+		mintRow(_parent: Node, _repeat: unknown, item: { readonly id: string }) {
+			return prepared.get(item.id);
+		},
+		async rows(
+			repeat: { readonly collectionGraphNodeId: string },
+			_parent: Node,
+			served: ReadonlyMap<unknown, Node>,
+		) {
+			prepared = new Map();
+			// The repeat runtime joins one load per document, so the registrar this
+			// double reads is the fixture's own, not the one the first load captured.
+			void host;
+			const items = wiredBridge
+				? ((graph as { read: (id: string, path: never[]) => unknown }).read(
+						repeat.collectionGraphNodeId,
+						[],
+					) as ReadonlyArray<{ readonly id: string; readonly label: string }>)
+				: [];
+			for (const item of items) {
+				if (served.has(item.id) || prepared.has(item.id)) continue;
+				bridge.mints.push({ rowKey: item.id, item });
+				prepared.set(item.id, componentRow(item.label));
+			}
+			const minted = [...prepared];
+			return async () => {
+				prepared = new Map();
+				for (const [rowKey, rowRoot] of minted)
+					bridge.commits.push({ rowKey, attached: rowRoot.parentElement !== null });
+			};
+		},
+	};
+};
 
 function fixture(options: { readonly wired?: boolean } = {}) {
 	const served = [
@@ -112,6 +133,7 @@ function fixture(options: { readonly wired?: boolean } = {}) {
 	const mints: MintCall[] = [];
 	const commits: unknown[] = [];
 	bridge = { mints, commits };
+	wiredBridge = options.wired !== false;
 	const view = {
 		locators: [],
 		events: [],
@@ -140,29 +162,21 @@ function fixture(options: { readonly wired?: boolean } = {}) {
 	} as unknown as ResumeViewRecord;
 	const graph = createRuntimeGraph({ cells: [{ graphNodeId: 'state:rows', value: served }] });
 	const registered: Array<{ readonly host: Node; readonly rowKey: unknown }> = [];
-	wireKeyedRepeats({
-		graph,
-		view,
-		elementsByHostId: new Map<string, ResumeDomElement>([
-			['h0', list as unknown as ResumeDomElement],
-		]),
-		events: {
-			addRowEvent: (host: Node, match: { readonly rowKey: unknown }) =>
-				registered.push({ host, rowKey: match.rowKey }),
-		} as never,
-		storeContainerSubscription: () => undefined,
-		...(options.wired === false
-			? {}
-			: {
-					mintRowComponent: {
-						registration: {
-							deps: async () => ({}) as never,
-							installEventType: () => undefined,
-						},
-						loadSymbol: () => undefined,
-					},
-				}),
-	});
+	wireKeyedRepeats(
+		{
+			graph,
+			view,
+			elementsByHostId: new Map<string, ResumeDomElement>([
+				['h0', list as unknown as ResumeDomElement],
+			]),
+			events: {
+				addRowEvent: (host: Node, match: { readonly rowKey: unknown }) =>
+					registered.push({ host, rowKey: match.rowKey }),
+			} as never,
+			storeContainerSubscription: () => undefined,
+		},
+		options.wired === false ? undefined : ({ wired: true } as never),
+	);
 	return {
 		graph,
 		list,
