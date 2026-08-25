@@ -7,7 +7,6 @@ import type {
 	SemanticComponentEdge,
 	SemanticBehavior,
 	SemanticElementHandleBinding,
-	SemanticElementHandleAnchor,
 	SemanticElementHandleIdref,
 	SemanticEvent,
 	SemanticGraphAlias,
@@ -55,7 +54,6 @@ export type MutableSemanticGraphArtifact = {
 	overlays: SemanticOverlay[];
 	elementHandleBindings: SemanticElementHandleBinding[];
 	elementHandleIdrefs: SemanticElementHandleIdref[];
-	elementHandleAnchors: SemanticElementHandleAnchor[];
 	localBindings: SemanticLocalBinding[];
 	localDeclarations: SemanticLocalDeclaration[];
 	aliases: SemanticGraphAlias[];
@@ -83,17 +81,6 @@ export type MutableSemanticGraphArtifact = {
 export type PendingElementHandleIdref = Omit<
 	SemanticElementHandleIdref,
 	'boundHostNodeId' | 'handleGraphNodeId' | 'order'
->;
-
-/**
- * A CSS anchor position seen during the walk, before the graph knows whether
- * its handle is ever bound. Same reason as the IDREF pending record: `el=
- * {handle}` may appear later in the file, so the resolution pass is where a
- * never-bound handle becomes an error instead of a record.
- */
-export type PendingElementHandleAnchor = Omit<
-	SemanticElementHandleAnchor,
-	'handleGraphNodeId' | 'order'
 >;
 
 export type WalkState = {
@@ -134,7 +121,6 @@ export type WalkState = {
 	currentFunctionSite: 'computed' | 'handler' | 'helper' | null;
 	deferredComputedWrites: DeferredComputedWrite[];
 	pendingElementHandleIdrefs: PendingElementHandleIdref[];
-	pendingElementHandleAnchors: PendingElementHandleAnchor[];
 	currentHelperCall: HelperStateCallSite | null;
 	helperFunctions: Map<string, AnyNode>;
 	// `checkbox.root` -> `CheckboxRoot` for module-scope objects that hold
@@ -205,7 +191,6 @@ export function createMutableSemanticGraphArtifact(filename: string): MutableSem
 		overlays: [],
 		elementHandleBindings: [],
 		elementHandleIdrefs: [],
-		elementHandleAnchors: [],
 		localBindings: [],
 		localDeclarations: [],
 		aliases: [],
@@ -260,7 +245,6 @@ export function createWalkState(input: {
 		currentFunctionSite: null,
 		deferredComputedWrites: [],
 		pendingElementHandleIdrefs: [],
-		pendingElementHandleAnchors: [],
 		currentHelperCall: null,
 		helperFunctions: new Map(),
 		memberTagTargets: new Map(),

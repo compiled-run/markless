@@ -86,19 +86,11 @@ export const MARKLESS_WIDGET_INSTANCE_KEY = 'markless:widget-instance';
  */
 export const MARKLESS_ELEMENT_BOUND_KEY_PREFIX = 'markless:element-bound|';
 
-/**
- * Every element() handle one chunk set has to spell, in either rendering: as a
- * minted `mx-` id, or as the `--mx-` dashed-ident a CSS anchor position needs.
- * One collection because it answers one question - whether this chunk set needs
- * the widget-instance token - and both renderings need it for the same handles.
- */
+/** Every element() handle one chunk set spells as a minted `mx-` id. */
 export function elementHandleIdSources(chunks: RenderChunks): ReadonlyArray<string> {
 	const handles = new Set<string>();
 	const add = (residue: SemanticMarkupResidue) => {
 		if (residue.kind === 'element-handle-id') handles.add(residue.handleGraphNodeId);
-		if (residue.kind === 'element-handle-anchor-style')
-			for (const declaration of residue.declarations)
-				handles.add(declaration.handleGraphNodeId);
 	};
 	for (const chunk of chunks) {
 		for (const slot of chunk.slots) {
@@ -108,31 +100,6 @@ export function elementHandleIdSources(chunks: RenderChunks): ReadonlyArray<stri
 		}
 	}
 	return [...handles];
-}
-
-/**
- * Which of the two renderings a chunk set actually asks for. Pay-per-use: a
- * module with no anchor position carries no anchor branch, and a module with no
- * IDREF carries no mint at all.
- */
-export function elementHandleResidueKinds(chunks: RenderChunks): {
-	readonly id: boolean;
-	readonly anchorStyle: boolean;
-} {
-	let id = false;
-	let anchorStyle = false;
-	const see = (residue: SemanticMarkupResidue) => {
-		if (residue.kind === 'element-handle-id') id = true;
-		if (residue.kind === 'element-handle-anchor-style') anchorStyle = true;
-	};
-	for (const chunk of chunks) {
-		for (const slot of chunk.slots) {
-			if ('residue' in slot) see(slot.residue);
-			if (slot.kind !== 'dynamic-host') continue;
-			for (const attribute of slot.attributeSlots) see(attribute.residue);
-		}
-	}
-	return { id, anchorStyle };
 }
 
 /**
@@ -151,23 +118,15 @@ export function elementHandleResidueKinds(chunks: RenderChunks): {
 export function elementHandleIdReadCase(input: {
 	readonly idPrefixSource: string;
 	readonly widgetInstanceRead: ((handleExpression: string) => string) | null;
-	/** Defaults to the id rendering only; the anchor branch is opt-in. */
-	readonly kinds?: { readonly id: boolean; readonly anchorStyle: boolean };
 	/** Reads one seed-map key; supplied wherever a shared() IDREF can be omitted. */
 	readonly boundRead?: (keyExpression: string) => string;
 }): string {
-	// One slug expression, two renderings. `mx-<slug>` is the id an IDREF names;
-	// `--mx-<slug>` is the CSS dashed-ident an anchor position names. The
-	// existing sanitizer already reduces the slug to [A-Za-z0-9-], so prefixing
-	// `--` always yields a valid <dashed-ident> and the two spellings of one
-	// identity cannot drift.
 	const slug = (handle: string) => {
 		const prefix = input.widgetInstanceRead
 			? `(${handle}.startsWith('shared:')?(${input.widgetInstanceRead(handle)}??${missingWidgetInstance(handle)}):${input.idPrefixSource})`
 			: input.idPrefixSource;
 		return `(${prefix}+${handle}).replace(/\\W+/g,'-')`;
 	};
-	const kinds = input.kinds ?? { id: true, anchorStyle: false };
 	// Only an IDREF position can be omitted. The element that CARRIES the id mints
 	// unconditionally: it renders only when its own part renders, and an omission
 	// there would write `id="undefined"` instead of nothing.
@@ -177,16 +136,7 @@ export function elementHandleIdReadCase(input: {
 					`${JSON.stringify(MARKLESS_ELEMENT_BOUND_KEY_PREFIX)}+residue.handleGraphNodeId`,
 				)}!==true)return undefined;`
 			: '';
-	return [
-		kinds.id
-			? `if(residue.kind==='element-handle-id'){${omitUnbound}return 'mx-'+${slug('residue.handleGraphNodeId')};}`
-			: '',
-		// The consumer's own declarations come first so the anchor names, which
-		// are plumbing rather than design, win the cascade.
-		kinds.anchorStyle
-			? `if(residue.kind==='element-handle-anchor-style')return (residue.staticStyle?residue.staticStyle+';':'')+residue.declarations.map(a=>a.property+':--mx-'+${slug('a.handleGraphNodeId')}).join(';');`
-			: '',
-	].join('');
+	return `if(residue.kind==='element-handle-id'){${omitUnbound}return 'mx-'+${slug('residue.handleGraphNodeId')};}`;
 }
 
 /**
@@ -332,7 +282,6 @@ export function emitClientResidueReader(
 					widgetInstanceRead: hasSharedElementHandle(handles)
 						? widgetInstanceReadSource((key) => `${CONTEXT}.read(${key})`)
 						: null,
-					kinds: elementHandleResidueKinds(componentChunks),
 					boundRead: (key) => `${CONTEXT}.read(${key})`,
 				})
 			: '';
