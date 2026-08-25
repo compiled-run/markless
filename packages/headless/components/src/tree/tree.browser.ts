@@ -274,7 +274,7 @@ for (const mode of MODES) {
 	// PINNED: a node written `open` reports itself open while its GROUP is served
 	// hidden, because the seed the node's body writes does not reach the
 	// `tree.itemcontent` part's first read. The group follows from gesture one on.
-	test.fails(`${mode}: branches written open render open`, async () => {
+	test(`${mode}: branches written open render open`, async () => {
 		if (mode === 'CSR') await render(Preopened);
 		else await renderSSR(Preopened);
 		await expectPreopenedRendered();
@@ -632,7 +632,7 @@ for (const mode of MODES) {
 // PINNED: a node seeded `open` has its group served showing only at the first level.
 // The instance is shared and the wiring is right; what does not land is the seed's
 // first read from a part whose node was produced inside another node's content.
-test.fails('CSR: a node written open inside a node written open serves its group showing', async () => {
+test('CSR: a node written open inside a node written open serves its group showing', async () => {
 	await render(NestedOpen);
 	expect(el(SrcItem).getAttribute('aria-expanded')).toBe('true');
 	expect(el(SrcContent).hasAttribute('hidden')).toBe(false);
