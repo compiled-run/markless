@@ -76,7 +76,9 @@ function verifyPackage(packageDir) {
 		}
 		for (const [subpath, target] of Object.entries(manifest.exports ?? {})) {
 			for (const path of targetPaths(target)) {
-				if (!path.startsWith('./src/')) {
+				// Data files (the generated API manifest) ship beside src.
+				const isShippedData = path.endsWith('.json') && manifest.files.some((f) => path.startsWith(`./${f}`));
+				if (!path.startsWith('./src/') && !isShippedData) {
 					failures.push(`${label}: ${subpath} -> ${path} must target ./src (source-shipped package)`);
 				} else if (!path.includes('*') && !existsSync(resolve(packageDir, path))) {
 					failures.push(`${label}: ${subpath} -> ${path} missing on disk`);
