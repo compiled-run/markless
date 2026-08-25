@@ -185,6 +185,13 @@ export type SsrDataCoordinates = {
 export type RenderSsrDataInput = {
 	readonly renderData: SsrRenderData;
 	readonly idPrefix?: string;
+	// The repeat row the root chunk renders inside, for a caller that starts the
+	// render partway down a component's tree: a `@for` row's projection chunk.
+	readonly rootContext?: {
+		readonly item?: unknown;
+		readonly index?: number;
+		readonly key?: unknown;
+	};
 	// What the component that placed this one seeded: it travels the composed
 	// edge as well as the projection, because a part may sit behind either.
 	readonly sharedSeeds?: ReadonlyMap<string, unknown>;
@@ -331,7 +338,25 @@ function spliceTokensAtMark(
 	return [...tokens.slice(0, index), ...projectionTokens, ...tokens.slice(index)];
 }
 
-function projectionNotRenderedError(
+/**
+ * Runs one child render with a projection's token span registered, for a caller
+ * that places a projection itself rather than through `renderChunk` - the client
+ * mint of a `@for` row whose component projects children. `consumed` answers
+ * whether the child's own `{children}` slot reported the span back.
+ */
+export async function withProjectionSpan<T>(
+	tokens: ReadonlyArray<StructureToken>,
+	render: (mark: string) => Promise<T>,
+): Promise<{ readonly result: T; readonly consumed: boolean }> {
+	const span = openProjectionSpan(tokens);
+	try {
+		return { result: await render(span.mark), consumed: span.consumed };
+	} finally {
+		projectionSpans.delete(span.key);
+	}
+}
+
+export function projectionNotRenderedError(
 	componentName: string,
 	edgeId: string,
 ): Error & Record<string, unknown> {
@@ -353,7 +378,7 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 	const anchors: Array<SsrDataCoordinates['anchors'][number]> = [];
 	const rootId = input.renderData.root?.templateId;
 	const rendered = rootId
-		? await renderChunk(rootId, { sharedSeeds: input.sharedSeeds })
+		? await renderChunk(rootId, { ...input.rootContext, sharedSeeds: input.sharedSeeds })
 		: { html: '', tokens: [] };
 	const html = rendered.html;
 	const structure = materializeStructure(rendered.tokens);
