@@ -16,8 +16,10 @@ const Content = page.getByTestId('content');
 const BoldTrigger = page.getByTestId('bold-trigger');
 const BoldContent = page.getByTestId('bold-content');
 const ItalicContent = page.getByTestId('italic-content');
+const FirstRoot = page.getByTestId('first-root');
 const FirstTrigger = page.getByTestId('first-trigger');
 const FirstContent = page.getByTestId('first-content');
+const SecondRoot = page.getByTestId('second-root');
 const SecondTrigger = page.getByTestId('second-trigger');
 const SecondContent = page.getByTestId('second-content');
 const PopoverTrigger = page.getByTestId('popover-trigger');
@@ -99,14 +101,33 @@ function expectShowing(content: Element) {
 	expect(content.hasAttribute('ui-closed')).toBe(false);
 }
 
-// The identity the family emits: one minted token, spelled as an id for the
-// description and as a dashed-ident for the anchor, on the two elements that
-// have to agree about it.
-function expectAnchorWired(trigger: HTMLElement, content: HTMLElement) {
-	const name = trigger.style.getPropertyValue('anchor-name');
-	expect(name, 'the trigger declares an anchor name').toMatch(/^--\S+$/);
-	expect(content.style.position).toBe('absolute');
-	expect(content.style.getPropertyValue('position-anchor')).toBe(name);
+// The family writes no style attribute at all: the anchor is three rules in the
+// parts' own scoped <style> blocks, so the witness is the computed value. One
+// name for every tooltip, confined to a root's subtree by `anchor-scope`.
+const ANCHOR = '--ui-tooltip';
+
+function expectAnchorWired(root: HTMLElement, trigger: HTMLElement, content: HTMLElement) {
+	expect(root.getAttribute('style')).toBe(null);
+	expect(trigger.getAttribute('style')).toBe(null);
+	expect(content.getAttribute('style')).toBe(null);
+	expect(getComputedStyle(root).getPropertyValue('anchor-scope')).toBe(ANCHOR);
+	expect(getComputedStyle(trigger).getPropertyValue('anchor-name')).toBe(ANCHOR);
+	const tip = getComputedStyle(content);
+	expect(tip.position).toBe('absolute');
+	expect(tip.getPropertyValue('position-anchor')).toBe(ANCHOR);
+}
+
+// A `side="top"` tip sitting above a trigger it is authored after: static flow
+// would put it below, so this placement is unreachable without a resolved
+// anchor. The computed value is asserted beside it so a miss says which half
+// broke.
+function expectPlacedAbove(content: Element, trigger: Element) {
+	expect(getComputedStyle(content).getPropertyValue('position-anchor')).toBe(ANCHOR);
+	const tip = content.getBoundingClientRect();
+	const anchor = trigger.getBoundingClientRect();
+	expect(tip.width).toBeGreaterThan(0);
+	expect(tip.height).toBeGreaterThan(0);
+	expect(Math.abs(tip.bottom - anchor.top)).toBeLessThanOrEqual(SLACK);
 }
 
 async function showByHover(trigger: Element, content: Element) {
@@ -143,7 +164,7 @@ for (const mode of MODES) {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 
-		expectAnchorWired(el(Trigger), el(Content));
+		expectAnchorWired(el(Root), el(Trigger), el(Content));
 	});
 
 	test(`${mode}: a root drops the props it destructured`, async () => {
@@ -156,21 +177,34 @@ for (const mode of MODES) {
 		expect(root.hasAttribute('side')).toBe(false);
 	});
 
-	test(`${mode}: two co-rendered tooltips mint distinct anchors and distinct ids`, async () => {
+	// Every tooltip on the page declares the SAME anchor name, so isolation is the
+	// whole claim: each root confines the name to its own subtree. Without that,
+	// `position-anchor` resolves to the last matching anchor in tree order and
+	// BOTH tips stack against the second trigger, which the geometry catches.
+	test(`${mode}: two co-rendered tooltips each land against their own trigger`, async () => {
 		if (mode === 'CSR') await render(TwoTooltips);
 		else await renderSSR(TwoTooltips);
 
 		const first = el<HTMLElement>(FirstTrigger);
 		const second = el<HTMLElement>(SecondTrigger);
-		expectAnchorWired(first, el<HTMLElement>(FirstContent));
-		expectAnchorWired(second, el<HTMLElement>(SecondContent));
+		expectAnchorWired(el(FirstRoot), first, el<HTMLElement>(FirstContent));
+		expectAnchorWired(el(SecondRoot), second, el<HTMLElement>(SecondContent));
 
-		expect(first.style.getPropertyValue('anchor-name')).not.toBe(
-			second.style.getPropertyValue('anchor-name'),
-		);
 		expect(el(FirstContent).id).not.toBe(el(SecondContent).id);
 		expect(first.getAttribute('aria-describedby')).toBe(el(FirstContent).id);
 		expect(second.getAttribute('aria-describedby')).toBe(el(SecondContent).id);
+
+		const firstBox = first.getBoundingClientRect();
+		const secondBox = second.getBoundingClientRect();
+		// The row is only worth anything while the two triggers are far apart.
+		expect(secondBox.top - firstBox.top).toBeGreaterThan(SLACK * 4);
+
+		const firstTip = el(FirstContent).getBoundingClientRect();
+		const secondTip = el(SecondContent).getBoundingClientRect();
+		expect(firstTip.width).toBeGreaterThan(0);
+		expect(secondTip.width).toBeGreaterThan(0);
+		expect(Math.abs(firstTip.bottom - firstBox.top)).toBeLessThanOrEqual(SLACK);
+		expect(Math.abs(secondTip.bottom - secondBox.top)).toBeLessThanOrEqual(SLACK);
 	});
 }
 
@@ -275,17 +309,17 @@ test('CSR: leaving the page with a pending show timer throws nothing', async () 
 });
 
 // The only way to catch a `position-anchor` that silently did not resolve: an
-// unresolved anchor leaves the tip at its containing block instead of beside the
-// trigger, and CSS reports nothing either way. Chromium is the lane this project
-// runs; the mechanism is Baseline but the pixel assertion is engine-specific.
+// unresolved anchor leaves the tip at its static position instead of beside the
+// trigger, and CSS reports nothing either way. `ServedOpen` is `side="top"`
+// while the tip is authored last, so static flow would put it BELOW the trigger
+// and "above" is a placement only a resolved anchor can produce. Chromium is the
+// lane this project runs; the mechanism is Baseline but the pixel assertion is
+// engine-specific.
 test('CSR: an open tip lands against the trigger it names', async () => {
 	await render(ServedOpen);
 	expectShowing(el(Content));
 
-	const tip = el(Content).getBoundingClientRect();
-	const anchor = el(Trigger).getBoundingClientRect();
-	expect(tip.width).toBeGreaterThan(0);
-	expect(Math.abs(tip.top - anchor.bottom)).toBeLessThanOrEqual(SLACK);
+	expectPlacedAbove(el(Content), el(Trigger));
 });
 
 // Measured, against the expectation: authoring the tip FIRST still places it.
@@ -355,17 +389,14 @@ test('SSR: the served tip is present, hidden, elevated and fully wired', async (
 	expect(el(Content).hasAttribute('overlay')).toBe(true);
 	expect(el(Content).textContent).toContain('Save this draft');
 	expect(el(Trigger).getAttribute('aria-describedby')).toBe(el(Content).id);
-	expectAnchorWired(el<HTMLElement>(Trigger), el<HTMLElement>(Content));
+	expectAnchorWired(el(Root), el<HTMLElement>(Trigger), el<HTMLElement>(Content));
 });
 
 test('SSR: a tip served showing is placed with no interaction at all', async () => {
 	await renderSSR(ServedOpen);
 	expectShowing(el(Content));
 
-	const tip = el(Content).getBoundingClientRect();
-	const anchor = el(Trigger).getBoundingClientRect();
-	expect(tip.width).toBeGreaterThan(0);
-	expect(Math.abs(tip.top - anchor.bottom)).toBeLessThanOrEqual(SLACK);
+	expectPlacedAbove(el(Content), el(Trigger));
 });
 
 test('SSR: the first crossing after resume shows the tip', async () => {
