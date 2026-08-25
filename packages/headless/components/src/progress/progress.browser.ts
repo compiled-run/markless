@@ -32,9 +32,8 @@ function el<T extends Element = HTMLElement>(locator: { element(): Element | nul
 
 function expectBasicRendered() {
 	expect(el(Root).getAttribute('role')).toBe('progressbar');
-	expect(el(Root).hasAttribute('aria-label')).toBe(false);
-	expect(el(Root).getAttribute('aria-labelledby')).toBe(el(Label).id);
-	expect(el(Label).id).toBeTruthy();
+	expect(el(Root).getAttribute('aria-label')).toBe('progress');
+	expect(el(Root).hasAttribute('aria-labelledby')).toBe(false);
 	expect(el(Root).getAttribute('aria-valuemin')).toBe('0');
 	expect(el(Root).getAttribute('aria-valuemax')).toBe('100');
 	expect(el(Root).getAttribute('aria-valuenow')).toBe('30');

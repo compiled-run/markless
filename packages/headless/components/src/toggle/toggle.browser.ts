@@ -63,6 +63,8 @@ function expectBasicRendered() {
 	expect(Thumb.query()).not.toBeNull();
 	expect(el(Label).getAttribute('for')).toBe(el(Trigger).getAttribute('id'));
 	expect(el(Trigger).id).toBeTruthy();
+	expect(el(Trigger).getAttribute('aria-labelledby')).toBe(el(Label).id);
+	expect(el(Label).id).toBeTruthy();
 }
 
 function expectSettingsRendered() {

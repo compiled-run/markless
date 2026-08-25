@@ -259,7 +259,6 @@ export function SliderThumb({ side = 'end', children, onKeydown, ...rest }: Slid
 	const highest = computed(() =>
 		thumb.side === 'start' && Array.isArray(slider.seed) ? slider.end : slider.max,
 	);
-	const nowText = computed(() => `${thumb.side === 'start' ? slider.start : slider.end}`);
 	const offset = computed(() =>
 		thumbStyleText(thumb.side === 'start' ? slider.start : slider.end, slider.min, slider.max),
 	);
@@ -275,11 +274,9 @@ export function SliderThumb({ side = 'end', children, onKeydown, ...rest }: Slid
 		tabindex={tabStop}
 		style={offset}
 		aria-labelledby={slider.labelEl}
-		aria-orientation={slider.orientation}
 		aria-valuemin={lowest}
 		aria-valuemax={highest}
 		aria-valuenow={now}
-		aria-valuetext={nowText}
 		aria-disabled={ariaDisabled}
 		ui-orientation={slider.orientation}
 		ui-disabled={slider.disabled}

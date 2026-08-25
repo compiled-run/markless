@@ -81,9 +81,7 @@ export function RadioGroupRoot({
 	<fieldset
 		{...rest}
 		role="radiogroup"
-		aria-orientation={group.orientation === 'horizontal' ? 'horizontal' : 'vertical'}
-		aria-required={group.required ? 'true' : 'false'}
-		aria-invalid={group.invalid ? 'true' : 'false'}
+		aria-disabled={group.disabled ? 'true' : undefined}
 		disabled={group.disabled}
 		ui-horizontal={group.orientation === 'horizontal'}
 		ui-disabled={group.disabled}
@@ -121,7 +119,7 @@ export function RadioGroupItem({ value, disabled = false, children, ...rest }: R
 	>{children}</div>
 }
 
-// No role and no aria-checked: the radio semantics live on the native input this sits beside, and a half-stated role is worse than none.
+// No role: the radio semantics live on the native input this sits beside.
 export function RadioGroupItemTrigger({ children, onClick, ...rest }: RadioGroupItemTriggerProps) @{
 	const group = radiogroupState();
 	const item = radiogroupItemState();

@@ -137,8 +137,7 @@ test('a box with only help text under it is never conveyed as invalid', async ()
 	await readUntil(sr, { name: "We'll send you updates about new features" });
 });
 
-// Expected red: the description part writes a plain div and wires no aria-describedby, so the reader announces it as a separate item further down.
-test.fails('the help text under a box is conveyed with the box itself', async () => {
+test('the help text under a box is conveyed with the box itself', async () => {
 	await open(WithHelp);
 	expectConveys(await readUntil(sr, { role: 'checkbox' }), {
 		role: 'checkbox',

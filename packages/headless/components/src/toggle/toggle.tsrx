@@ -23,11 +23,13 @@ export const toggleState = shared(
 		});
 		const triggerEl = element<HTMLButtonElement>();
 		const describedEl = element<HTMLDivElement>();
+		const labelEl = element<HTMLLabelElement>();
 
 		return {
 			...toggle,
 			triggerEl,
 			describedEl,
+			labelEl,
 			onChange: undefined as ((checked: boolean) => void) | undefined,
 			flip() {
 				if (toggle.disabled) return;
@@ -68,6 +70,7 @@ export function ToggleTrigger({ children, onClick, ...rest }: ToggleTriggerProps
 		el={toggle.triggerEl}
 		type="button"
 		role="switch"
+		aria-labelledby={toggle.labelEl}
 		aria-describedby={toggle.describedEl}
 		aria-checked={toggle.checked ? 'true' : 'false'}
 		aria-disabled={toggle.disabled ? 'true' : 'false'}
@@ -89,7 +92,7 @@ export function ToggleThumb({ children, ...rest }: ToggleThumbProps) @{
 export function ToggleLabel({ children, ...rest }: ToggleLabelProps) @{
 	const toggle = toggleState();
 
-	<label {...rest} for={toggle.triggerEl}>{children}</label>
+	<label {...rest} el={toggle.labelEl} for={toggle.triggerEl}>{children}</label>
 }
 
 // One part stands behind both `toggle.description` and `toggle.error`: an element()

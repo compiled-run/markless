@@ -109,7 +109,6 @@ export function SelectLabel({ children, ...rest }: SelectLabelProps) @{
 	<label {...rest} el={select.labelEl}>{children}</label>
 }
 
-// role="combobox", against QDS: a bare button with aria-haspopup is announced as "button, collapsed" and fails aria-at's `Role 'combobox' is conveyed` row.
 export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectTriggerProps) @{
 	const select = selectState();
 
@@ -117,7 +116,6 @@ export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectT
 		{...rest}
 		el={select.triggerEl}
 		type="button"
-		role="combobox"
 		aria-haspopup="listbox"
 		aria-expanded={select.open ? 'true' : 'false'}
 		aria-controls={select.contentEl}

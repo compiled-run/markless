@@ -72,6 +72,7 @@ function expectBasicRendered() {
 	expect(el(Indicator).textContent).toBe('');
 	expect(el(Label).getAttribute('for')).toBe(el(Trigger).getAttribute('id'));
 	expect(el(Trigger).id).toBeTruthy();
+	expect(el(Root).getAttribute('aria-disabled')).toBe('false');
 }
 
 function expectSettingsRendered() {
@@ -149,6 +150,8 @@ function expectHelpRendered() {
 	expect(el(Label).textContent).toBe('Subscribe to newsletter');
 	expect(el(Label).getAttribute('for')).toBe(el(Trigger).id);
 	expect(el(Description).textContent).toBe("We'll send you updates about new features");
+	expect(el(Trigger).getAttribute('aria-describedby')).toBe(el(Description).id);
+	expect(el(Description).id).toBeTruthy();
 	expect(el(Trigger).getAttribute('aria-invalid')).toBe('false');
 	expect(page.getByTestId('error').query()).toBeNull();
 }
