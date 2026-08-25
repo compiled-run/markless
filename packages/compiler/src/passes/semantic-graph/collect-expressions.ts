@@ -357,8 +357,10 @@ function collectReadsIn(
  * the chain so the callback-slot and shared-method paths keep matching it.
  *
  * A graph-declared callable is always written directly on the binding, so a
- * receiver that is itself a member path is a value. A binding that holds a
- * scalar is a value too: a string or a number declares no members of its own.
+ * receiver that is itself a member path is a value. A binding whose cell holds a
+ * scalar, an array, or a derived result is a value too: only an object cell can
+ * carry the shared methods and callback slots the graph declares, so anything
+ * else names an `Array.prototype`/`String.prototype`-style method on the value.
  */
 function callsMethodOnReadValue(callee: AnyNode, state: WalkState): boolean {
 	if (callee.computed === true) return false;
@@ -380,8 +382,10 @@ function callsMethodOnReadValue(callee: AnyNode, state: WalkState): boolean {
 		graphBindingMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
 		semanticAliasMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
 	);
+	if (!resolved) return false;
 
-	return resolved?.binding.valueKind === 'scalar';
+	if (resolved.binding.kind === 'computed') return true;
+	return resolved.binding.valueKind === 'scalar' || resolved.binding.valueKind === 'array';
 }
 
 function collectDeleteComputedPropertyReads(
