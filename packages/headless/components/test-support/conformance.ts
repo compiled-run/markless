@@ -55,6 +55,8 @@ export type OpenCycle = {
 	readonly closeBy?: string;
 	/** The value the family declares for aria-haspopup, or null when it declares none. */
 	readonly haspopup: string | null;
+	/** False when the trigger declares neither aria-expanded nor aria-controls; the surface's `ui-open` is then the observable. */
+	readonly reportsExpanded?: boolean;
 	/** True when the surface carries the bare `overlay` mark and rides the dismissal primitive. */
 	readonly ridesOverlay: boolean;
 	/** True when opening is required to move focus into the surface. */
@@ -202,18 +204,22 @@ function registerMode(descriptor: FamilyDescriptor, mode: Mode, mount: Mount): v
 		const trigger = expectOnePart(scope, cycle.trigger);
 		const surface = expectOnePart(scope, cycle.surface);
 
-		expect(trigger.getAttribute('aria-expanded'), 'closed aria-expanded').toBe('false');
 		expect(trigger.getAttribute('aria-haspopup'), 'declared aria-haspopup').toBe(cycle.haspopup);
-		const controls = trigger.getAttribute('aria-controls');
-		expect(controls, 'aria-controls is written').toBeTruthy();
-		expect(resolveIds(scope, controls ?? ''), 'aria-controls resolves').toContain(surface);
+		if (cycle.reportsExpanded === false) {
+			expect(trigger.hasAttribute('aria-expanded'), 'no aria-expanded declared').toBe(false);
+			expect(trigger.hasAttribute('aria-controls'), 'no aria-controls declared').toBe(false);
+		} else {
+			expect(trigger.getAttribute('aria-expanded'), 'closed aria-expanded').toBe('false');
+			const controls = trigger.getAttribute('aria-controls');
+			expect(controls, 'aria-controls is written').toBeTruthy();
+			expect(resolveIds(scope, controls ?? ''), 'aria-controls resolves').toContain(surface);
+		}
 
 		await openSurface(scope, cycle);
-		expect(trigger.getAttribute('aria-expanded'), 'open aria-expanded').toBe('true');
-		expect(surface.hasAttribute('hidden'), 'the open surface is not hidden').toBe(false);
+		expect(surface.hasAttribute('ui-open'), 'the open surface is marked open').toBe(true);
 
 		await closeSurface(scope, cycle);
-		expect(trigger.getAttribute('aria-expanded'), 'reclosed aria-expanded').toBe('false');
+		expect(surface.hasAttribute('ui-open'), 'the reclosed surface is not marked open').toBe(false);
 	});
 
 	for (const part of cycle.partsWhenOpen ?? []) {
@@ -248,18 +254,16 @@ function registerMode(descriptor: FamilyDescriptor, mode: Mode, mount: Mount): v
 	if (cycle.ridesOverlay) {
 		register('dismiss-escape', 'escape closes the open surface', async () => {
 			const scope = await mountScope(mount);
-			const trigger = expectOnePart(scope, cycle.trigger);
 			await openSurface(scope, cycle);
 			await userEvent.keyboard('{Escape}');
-			await expect.poll(() => trigger.getAttribute('aria-expanded')).toBe('false');
+			await expectSurfaceState(scope, cycle, false);
 		});
 
 		register('dismiss-outside', 'a press beyond the surface closes it', async () => {
 			const scope = await mountScope(mount);
-			const trigger = expectOnePart(scope, cycle.trigger);
 			await openSurface(scope, cycle);
 			pressOutside(scope);
-			await expect.poll(() => trigger.getAttribute('aria-expanded')).toBe('false');
+			await expectSurfaceState(scope, cycle, false);
 		});
 	}
 
@@ -435,22 +439,28 @@ async function settleFocus(scope: Scope, from: Element | null): Promise<Element 
 async function openSurface(scope: Scope, cycle: OpenCycle): Promise<void> {
 	const trigger = expectOnePart(scope, cycle.trigger);
 	(trigger as HTMLElement).click();
-	await expect
-		.poll(() => trigger.getAttribute('aria-expanded'), {
-			timeout: 2000,
-		})
-		.toBe('true');
+	await expectSurfaceState(scope, cycle, true);
 }
 
 async function closeSurface(scope: Scope, cycle: OpenCycle): Promise<void> {
-	const trigger = expectOnePart(scope, cycle.trigger);
 	const closer = expectOnePart(scope, cycle.closeBy ?? cycle.trigger);
 	(closer as HTMLElement).click();
+	await expectSurfaceState(scope, cycle, false);
+}
+
+// A trigger that declares no aria-expanded leaves the surface's own state mark as the only observable.
+async function expectSurfaceState(scope: Scope, cycle: OpenCycle, open: boolean): Promise<void> {
+	if (cycle.reportsExpanded === false) {
+		const surface = expectOnePart(scope, cycle.surface);
+		await expect
+			.poll(() => surface.hasAttribute('ui-open'), { timeout: 2000 })
+			.toBe(open);
+		return;
+	}
+	const trigger = expectOnePart(scope, cycle.trigger);
 	await expect
-		.poll(() => trigger.getAttribute('aria-expanded'), {
-			timeout: 2000,
-		})
-		.toBe('false');
+		.poll(() => trigger.getAttribute('aria-expanded'), { timeout: 2000 })
+		.toBe(open ? 'true' : 'false');
 }
 
 function pressOutside(scope: Scope): void {

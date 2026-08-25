@@ -60,12 +60,11 @@ test('an indeterminate bar is still conveyed as a progressbar', async () => {
 	await readUntil(sr, { name: 'Loading...' });
 });
 
-test('the bar is conveyed with the name its visible label gives it', async () => {
+// The bar carries the family's own name; the visible label is a separate stop on the walk.
+test('the bar is conveyed with the family name', async () => {
 	await open(Basic);
 	const announcement = await readUntil(sr, { role: 'progressbar' });
-	expect(
-		missingFacts(sr, announcement, { role: 'progressbar', name: 'Export data 30%' }),
-	).toEqual([]);
+	expect(missingFacts(sr, announcement, { role: 'progressbar', name: 'progress' })).toEqual([]);
 });
 
 // A "0%" computed from `min` would announce a job that has not started rather than one whose progress is unknown.

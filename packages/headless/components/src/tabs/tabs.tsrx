@@ -71,7 +71,6 @@ export function TabsList({ children, ...rest }: TabsListProps) @{
 	<div
 		{...rest}
 		role="tablist"
-		aria-orientation={tabs.orientation === 'vertical' ? 'vertical' : 'horizontal'}
 		ui-vertical={tabs.orientation === 'vertical'}
 	>{children}</div>
 }

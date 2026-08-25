@@ -20,30 +20,22 @@ per-node-handler rows say the instances stay apart.
 
 ## Deviations from the QDS part list, and why
 
-1. **`aria-expanded` is emitted the way WAI-ARIA asks, not the way QDS does.** A
-   closed parent reports `"false"`; a leaf reports nothing. QDS writes
-   `isOpen || undefined`, so a collapsed folder and an end node are announced
-   identically and there is no signal that anything can be opened.
-2. **No `aria-selected` anywhere.** QDS writes `aria-selected="false"` on every
-   node of a tree that has no selection concept. This family is a disclosure
-   tree: it opens and closes, and the consumer puts links or buttons in the rows
-   for whatever activation means in their app.
-3. **No `aria-setsize` and no `aria-posinset`.** The APG asks for them only when
+1. **No `aria-setsize` and no `aria-posinset`.** The APG asks for them only when
    the DOM does not fully represent the hierarchy, and with nested
    `role="group"` containers ours does. Captured proof that this is right: the
    virtual reader announces "position 1, set size 2" off the DOM alone, with
    neither attribute emitted.
-4. **`leaf` is an explicit prop.** Inferring it from "has no `tree.itemcontent`"
-   would need a child-to-parent seed; getting `aria-expanded`'s presence right is
-   a required rule, not a nicety.
-5. **`Enter` and `Space` on a row click that row's OWN trigger**, found in the
+2. **`leaf` is an explicit prop.** Inferring it from "has no `tree.itemcontent`"
+   would need a child-to-parent seed, and the open/closed rule needs the answer
+   at render time.
+3. **`Enter` and `Space` on a row click that row's OWN trigger**, found in the
    tree's own `triggerEls` set and checked to belong to this row rather than a
    row nested inside it. QDS clicks "the first focusable inside the row", which
    follows a link written before the trigger. `file-explorer.tsrx` writes the
    link first on purpose and the browser suite asserts the link is not followed.
-6. **The indicator carries `ui-open`/`ui-closed` and `aria-hidden="true"`.** QDS
-   ships a bare `<span>` with no state at all, which a stylesheet cannot rotate.
-7. **No typeahead timer.** QDS holds a `window.setTimeout` handle in a signal.
+4. **The indicator carries `ui-open`/`ui-closed`.** QDS ships a bare `<span>`
+   with no state at all, which a stylesheet cannot rotate.
+5. **No typeahead timer.** QDS holds a `window.setTimeout` handle in a signal.
    Here the buffer and the moment its last key landed are two attributes on the
    container plus a `Date.now()` comparison, so nothing is pending across resume.
 

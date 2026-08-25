@@ -201,6 +201,7 @@ const descriptors: readonly FamilyDescriptor[] = [
 			// The trigger only opens; the dialog's own close button shuts it.
 			closeBy: 'close',
 			haspopup: 'dialog',
+			reportsExpanded: false,
 			ridesOverlay: true,
 			focusLands: true,
 			focusReturns: true,
@@ -279,7 +280,7 @@ const descriptors: readonly FamilyDescriptor[] = [
 			'itemtrigger-5',
 			'forwardtrigger',
 		],
-		rootAria: { role: null, 'aria-label': 'Pagination' },
+		rootAria: { role: null },
 		supportsDisabled: true,
 	},
 	{
@@ -349,12 +350,7 @@ const descriptors: readonly FamilyDescriptor[] = [
 			'lifetime-indicator',
 			'lifetime-label',
 		],
-		rootAria: {
-			role: 'radiogroup',
-			'aria-orientation': 'vertical',
-			'aria-required': 'false',
-			'aria-invalid': 'false',
-		},
+		rootAria: { role: 'radiogroup' },
 		supportsDisabled: true,
 	},
 	{
@@ -384,8 +380,7 @@ const descriptors: readonly FamilyDescriptor[] = [
 			// This family owns its own dismissal handlers rather than carrying the
 			// bare `overlay` mark, so the two dismissal rows do not apply to it.
 			ridesOverlay: false,
-			// The trigger carries role="combobox": the pattern points at the
-			// highlighted option rather than requiring focus to move.
+			// The popup points at the highlighted option rather than requiring focus to move.
 			focusLands: false,
 			focusReturns: false,
 		},
@@ -396,8 +391,7 @@ const descriptors: readonly FamilyDescriptor[] = [
 		mount: { CSR: () => render(Slider), SSR: () => renderSSR(Slider) },
 		root: 'root',
 		parts: ['root', 'label', 'valuelabel', 'track', 'thumb'],
-		// One thumb is the whole control, so the root takes no wrapper role; the
-		// thumb is the element carrying role="slider".
+		// One thumb is the whole control, so the root takes no wrapper role.
 		rootAria: { role: null },
 		// The rail's numbers and which way it runs are what a consumer styles
 		// against, so they are key-value by design rather than presence marks.

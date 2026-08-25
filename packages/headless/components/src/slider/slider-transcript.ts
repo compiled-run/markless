@@ -29,7 +29,7 @@ const RANGE_NAME = 'Price';
 // fact whose wording either one has on record.
 const ROLE = 'slider';
 
-// The thumb carries `aria-valuetext` as the bare number, so the value a reader
+// The thumb carries `aria-valuenow` as the bare number, so the value a reader
 // speaks is that number however it wraps it.
 const RESTING = 40;
 const STEPPED_UP = 41;

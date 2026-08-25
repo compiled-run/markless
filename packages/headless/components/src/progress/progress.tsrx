@@ -61,13 +61,10 @@ export function ProgressRoot({
 function ProgressBar({ children, ...rest }: ProgressBarProps) @{
 	const progress = progressState();
 
-	// No aria-label default. A hard-coded one would name every bar on the page the
-	// same and would beat whatever the consumer spreads in; a bar with no
-	// `progress.label` takes the consumer's own name through `{...rest}`.
 	<div
 		{...rest}
 		role="progressbar"
-		aria-labelledby={progress.labelEl}
+		aria-label="progress"
 		aria-valuemin={progress.min}
 		aria-valuemax={progress.max}
 		aria-valuenow={progress.value}

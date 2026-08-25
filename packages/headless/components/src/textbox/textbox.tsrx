@@ -68,11 +68,10 @@ export function TextboxInput({
 	<input
 		{...rest}
 		el={textbox.inputEl}
-		aria-labelledby={textbox.labelEl}
 		aria-describedby={textbox.describedEl}
 		name={textbox.name}
 		value={textbox.value}
-		aria-invalid={textbox.invalid ? 'true' : 'false'}
+		aria-invalid={textbox.invalid ? 'true' : undefined}
 		disabled={textbox.disabled || disabled === true}
 		required={textbox.required || required === true}
 		readonly={textbox.readonly || readonly === true}
@@ -95,11 +94,12 @@ export function TextboxTextarea({
 	<textarea
 		{...rest}
 		el={textbox.textareaEl}
+		// The label's for names the input only: one handle cannot bind to both controls.
 		aria-labelledby={textbox.labelEl}
 		aria-describedby={textbox.describedEl}
 		name={textbox.name}
 		value={textbox.value}
-		aria-invalid={textbox.invalid ? 'true' : 'false'}
+		aria-invalid={textbox.invalid ? 'true' : undefined}
 		disabled={textbox.disabled || disabled === true}
 		required={textbox.required || required === true}
 		readonly={textbox.readonly || readonly === true}

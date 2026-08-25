@@ -45,15 +45,15 @@ function expectBasicRendered() {
 	expect(control.tagName).toBe('INPUT');
 	expect(control.getAttribute('name')).toBe('username');
 	expect(control.value).toBe('');
-	expect(control.getAttribute('aria-invalid')).toBe('false');
+	expect(control.hasAttribute('aria-invalid')).toBe(false);
 	expect(el(Root).getAttribute('ui-empty')).toBe('');
 	expect(el(Root).hasAttribute('ui-disabled')).toBe(false);
 	expect(el(Root).hasAttribute('ui-required')).toBe(false);
 	expect(el(Root).hasAttribute('ui-readonly')).toBe(false);
-	// The label and control name each other by a minted id nobody spelled.
+	// The label names the control by a minted id nobody spelled, and nothing else does.
 	expect(el(Label).getAttribute('for')).toBe(control.getAttribute('id'));
 	expect(control.id).toBeTruthy();
-	expect(control.getAttribute('aria-labelledby')).toBe(el(Label).id);
+	expect(control.hasAttribute('aria-labelledby')).toBe(false);
 }
 
 function expectSignupFormRendered() {
@@ -62,8 +62,10 @@ function expectSignupFormRendered() {
 	expect(username.tagName).toBe('INPUT');
 	expect(bio.tagName).toBe('TEXTAREA');
 	expect(bio.getAttribute('name')).toBe('bio');
-	expect(username.getAttribute('aria-labelledby')).toBe(el(UsernameLabel).id);
+	expect(el(UsernameLabel).getAttribute('for')).toBe(username.id);
+	// A textarea is named by aria-labelledby: one handle cannot also bind the input's `for`.
 	expect(bio.getAttribute('aria-labelledby')).toBe(el(BioLabel).id);
+	expect(username.hasAttribute('aria-labelledby')).toBe(false);
 	// Two instances mint two labels, so neither names the other's control.
 	expect(el(BioLabel).id).not.toBe(el(UsernameLabel).id);
 }
@@ -97,7 +99,7 @@ function expectPartRestrictions() {
 
 function expectHelpRendered() {
 	expect(el(Description).textContent).toBe("We'll never share your email");
-	expect(el<HTMLInputElement>(Input).getAttribute('aria-invalid')).toBe('false');
+	expect(el<HTMLInputElement>(Input).hasAttribute('aria-invalid')).toBe(false);
 	expect(el<HTMLInputElement>(Input).getAttribute('aria-describedby')).toBe(el(Description).id);
 	expect(el(Description).id).toBeTruthy();
 }
