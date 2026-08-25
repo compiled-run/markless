@@ -2024,7 +2024,31 @@ function createUnknownSymbolError(id) {
     "publicRenderPlan": "{
   "passId": "public-render-plan",
   "styleScopes": [],
-  "diagnostics": []
+  "diagnostics": [
+    {
+      "code": "MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED",
+      "severity": "warning",
+      "phase": "public-render",
+      "title": "This list can never grow in the browser",
+      "message": "This @for row reads a value that is not a property of entry, and the browser builds a row from the row item alone. The browser has no renderer, so a row that arrives after the page loads has no markup to be built from: this list will render the rows the server sent, reorder them and remove them, and silently ignore every new one.",
+      "why": "The payload carries one row of finished markup so the browser can build a row the server never rendered. It can fill text read off the row item and nothing else, so a row needing anything more ships no template at all.",
+      "primarySpan": {
+        "filename": "src/KeyedRepeat.tsrx",
+        "start": 159,
+        "end": 360
+      },
+      "passId": "public-render-plan",
+      "artifactKeys": [
+        "publicRenderPlan"
+      ],
+      "suggestions": [
+        {
+          "message": "Read the value off entry - put it on the item before the list is built - or keep the row to text read off entry."
+        }
+      ],
+      "docsUrl": "https://markless.dev/errors/MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED"
+    }
+  ]
 }",
     "renderDataModuleSource": "export const marklessRenderData = {"passId":"render-data","filename":"src/KeyedRepeat.tsrx","root":{"componentName":"App","templateId":"template:App"},"chunks":[{"id":"repeat:repeat:0:row","kind":"repeat-row","componentName":"App","statics":["<article class=\\"","\\"><h2><!--markless-slot:1-->","</h2><button>Choose</button></article>"],"hosts":[{"hostNodeId":"h2","tagName":"article","coordinate":{"kind":"child-index","path":[0]}},{"hostNodeId":"h3","tagName":"h2","coordinate":{"kind":"child-index","path":[0,0]}},{"hostNodeId":"h4","tagName":"button","coordinate":{"kind":"child-index","path":[0,1]}}],"slots":[{"kind":"attribute","name":"class","coordinate":{"kind":"child-index","path":[0]},"residue":{"kind":"authored-expression","source":"chosen === entry.code ? 'picked' : 'plain'"},"alwaysPresent":true,"directClassMatch":{"stateGraphNodeId":"state:chosen","statePath":[],"itemPath":["code"],"trueClass":"picked","falseClass":"plain"},"staticIndex":0},{"kind":"text","residue":{"kind":"repeat-item","repeatId":"repeat:0","path":["title"]},"coordinate":{"kind":"comment-anchor","path":[0,0,0]},"staticIndex":1}]},{"id":"template:App","kind":"template","componentName":"App","statics":["<main><section><!--markless-slot:0-->","</section></main>"],"hosts":[{"hostNodeId":"h0","tagName":"main","coordinate":{"kind":"child-index","path":[0]}},{"hostNodeId":"h1","tagName":"section","coordinate":{"kind":"child-index","path":[0,0]}}],"slots":[{"kind":"repeat","repeatId":"repeat:0","rowTemplateId":"repeat:repeat:0:row","coordinate":{"kind":"comment-anchor","path":[0,0,0]},"staticIndex":0}]}],"hosts":[{"id":"h0","tagName":"main","hostNodeId":"h0"},{"id":"h1","tagName":"section","hostNodeId":"h1"},{"id":"h2","tagName":"article","hostNodeId":"h2"},{"id":"h3","tagName":"h2","hostNodeId":"h3"},{"id":"h4","tagName":"button","hostNodeId":"h4"}],"initialValues":[{"graphNodeId":"state:entries","value":{"kind":"constant","value":[{"code":"a","title":"Alpha"}]}},{"graphNodeId":"state:chosen","value":{"kind":"constant","value":"a"}}],"branches":[],"repeats":[{"repeatId":"repeat:0","parentHostNodeId":"h1","rowHostNodeId":"h2","itemName":"entry","collectionGraphNodeId":"state:entries","collectionPath":[],"keyPath":["code"],"rowChunkId":"repeat:repeat:0:row","rowElementCount":3,"parentPath":[0],"classWrites":[{"source":"chosen === entry.code ? 'picked' : 'plain'","hostPath":[],"stateGraphNodeId":"state:chosen","statePath":[],"itemPath":["code"],"trueClass":"picked","falseClass":"plain"}],"eventControls":[{"eventName":"click","hostPath":[1],"handlerSource":"() => chosen = entry.code","symbolId":"symbol:0","itemContext":{"kind":"keyed-repeat-item","repeatId":"repeat:0","itemName":"entry","keyPath":["code"]}}],"directSupported":true}],"boundaries":[],"interactions":[{"eventId":"event:0","hostNodeId":"h4","eventName":"click","symbolIds":["symbol:0"]}]};",
     "ssrModuleSource": "import { renderSsrData } from '@markless/web/fns/ssr-data';
