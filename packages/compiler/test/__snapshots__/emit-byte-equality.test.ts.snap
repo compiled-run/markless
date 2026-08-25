@@ -866,9 +866,11 @@ symbol:2
 const marklessBranchArms = [[{ "text": "<p>Shown</p>" }], [{ "text": "<p>Hidden</p>" }]];
 export function symbol_2(context) {
   const arm = context.arm ?? (context.graph.read("state:open") ? 0 : 1);
-  const parts = marklessBranchArms[arm] ?? [];
+  const armParts = marklessBranchArms[arm];
+  const resolved = armParts !== undefined;
+  const parts = armParts ?? [];
   const html = parts.map((part) => part.text !== undefined ? part.text : marklessBranchText(context.graph.read(part.read.graphNodeId, part.read.path))).join("");
-  return { arm, html };
+  return { arm, html, resolved };
 }
 function marklessBranchText(value) {
   return String(value == null ? "" : value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
@@ -1721,9 +1723,11 @@ symbol:2
 const marklessBranchArms = [[{ "text": "<em>Live</em>" }], [{ "text": "<em>Idle</em>" }]];
 export function symbol_2(context) {
   const arm = context.arm ?? (context.graph.read("prop:props", ["active"]) ? 0 : 1);
-  const parts = marklessBranchArms[arm] ?? [];
+  const armParts = marklessBranchArms[arm];
+  const resolved = armParts !== undefined;
+  const parts = armParts ?? [];
   const html = parts.map((part) => part.text !== undefined ? part.text : marklessBranchText(context.graph.read(part.read.graphNodeId, part.read.path))).join("");
-  return { arm, html };
+  return { arm, html, resolved };
 }
 function marklessBranchText(value) {
   return String(value == null ? "" : value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
@@ -2771,9 +2775,11 @@ symbol:2
 const marklessBranchArms = [[{ "text": "<em>Live</em>" }], [{ "text": "<em>Idle</em>" }]];
 export function symbol_2(context) {
   const arm = context.arm ?? (context.graph.read("prop:props", ["active"]) ? 0 : 1);
-  const parts = marklessBranchArms[arm] ?? [];
+  const armParts = marklessBranchArms[arm];
+  const resolved = armParts !== undefined;
+  const parts = armParts ?? [];
   const html = parts.map((part) => part.text !== undefined ? part.text : marklessBranchText(context.graph.read(part.read.graphNodeId, part.read.path))).join("");
-  return { arm, html };
+  return { arm, html, resolved };
 }
 function marklessBranchText(value) {
   return String(value == null ? "" : value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");

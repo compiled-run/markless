@@ -143,7 +143,11 @@ export type ResumeBranchRecord = {
 	readonly armRecords?: ReadonlyArray<ResumeBranchArmRecordSet>;
 };
 export type ResumeBranchHtml = string | ReadonlyArray<string | { readonly text: string }>;
-export type ResumeBranchUpdate = { readonly arm: number; readonly html: ResumeBranchHtml };
+export type ResumeBranchUpdate = {
+	readonly arm: number;
+	readonly html: ResumeBranchHtml;
+	readonly resolved?: boolean;
+};
 // Async-arm records use indexes relative to the boundary's start anchor.
 export type ResumeArmLocator = {
 	readonly hostNodeId: string;

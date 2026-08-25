@@ -3591,19 +3591,28 @@ export function buildBranchUpdateEmission(input: BranchUpdateEmissionInput): Emi
 					logicalNode('??', memberChainNode('context.arm'), armSelector),
 				),
 				constDeclarationNode(
+					'armParts',
+					computedMemberNode(identifierNode('marklessBranchArms'), identifierNode('arm')),
+				),
+				// The runtime's proof the arm exists: empty html is then a value, not a miss.
+				constDeclarationNode(
+					'resolved',
+					binaryNode('!==', identifierNode('armParts'), identifierNode('undefined')),
+				),
+				constDeclarationNode(
 					'parts',
-					logicalNode(
-						'??',
-						computedMemberNode(identifierNode('marklessBranchArms'), identifierNode('arm')),
-						arrayNode([]),
-					),
+					logicalNode('??', identifierNode('armParts'), arrayNode([])),
 				),
 				constDeclarationNode(
 					'html',
 					armPartsHtmlExpression('marklessBranchText', hasRepeatParts),
 				),
 				returnStatementNode(
-					objectNode([shorthandPropertyNode('arm'), shorthandPropertyNode('html')]),
+					objectNode([
+						shorthandPropertyNode('arm'),
+						shorthandPropertyNode('html'),
+						shorthandPropertyNode('resolved'),
+					]),
 				),
 			]),
 		),
