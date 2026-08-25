@@ -430,6 +430,12 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					input.prerenderRecords && prerenderInterfacesComplete(compiled, input)
 						? renderDataId
 						: undefined,
+				// Only the canonical emission exports `marklessPrerenderData`, so a page
+				// without one has no surface a component row could be minted against.
+				renderDataId:
+					canonicalRenderData && compiled.publicRenderModule.renderDataModuleSource
+						? renderDataId
+						: undefined,
 				hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
 				boundSymbolDescriptors,
 				symbols: symbolRows,

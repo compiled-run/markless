@@ -76,6 +76,10 @@ export async function startResumeRuntime(input: {
 	}) => void;
 	readonly receiveSharedPatch: RuntimeShared['receiveSharedPatch'];
 	readonly sharedPatchEventType: string;
+	readonly armRegistrationDeps: (
+		records: import('./resume-commit-arm.ts').ArmCommitUpdate['armRecords'],
+	) => Promise<import('./resume-commit-arm.ts').ArmRegistrationDeps>;
+	readonly installArmEventType: (eventType: string) => void;
 }): Promise<AsyncBoundarySettleTracker | undefined> {
 	const {
 		runtimeInput,
@@ -129,6 +133,12 @@ export async function startResumeRuntime(input: {
 			elementsByHostId: prepared.elementsByHostId,
 			events,
 			storeContainerSubscription,
+			...keyedRepeats.rowComponentMintWiring(
+				runtimeInput.view.keyedRepeats ?? [],
+				input.armRegistrationDeps,
+				input.installArmEventType,
+				runtimeInput,
+			),
 		});
 	}
 	let settleTracker: AsyncBoundarySettleTracker | undefined;

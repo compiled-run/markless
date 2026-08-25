@@ -23,6 +23,7 @@ import {
 	marklessSsrSpreadProps,
 	type MarklessSsrComposedChild,
 } from '../fns/ssr.ts';
+import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
 import type { ComposeGraphProps } from '../fns/composition.ts';
 import { marklessCsrRemapChildGraph } from '../fns/composition.ts';
 import { marklessBoundSymbolId } from '../fns/bound-symbol.ts';
@@ -798,6 +799,182 @@ async function evaluatePrerenderDataComponent(input: {
 		},
 	};
 	return output;
+}
+
+export type RepeatRowComponentRender = {
+	readonly html: string;
+	readonly state: ProtocolStatePayload;
+	readonly view: import('@markless/serializer').ProtocolViewPayload;
+};
+
+/**
+ * One component edge, rendered for one keyed `@for` row, in page space.
+ *
+ * This is the same per-row work `renderChild` does - row segment, props off the
+ * item, the seed pass, then composition - carved out for a client that has to
+ * build a row the server never sent. The row's records are produced here rather
+ * than shipped: a component row is one instance per rendered row, so markup
+ * could never finish it.
+ *
+ * The child is evaluated WITHOUT the live graph on purpose. A minted row's cells
+ * do not exist in it yet, so reading through it would answer `undefined` for
+ * every one of them; the compile-time initial values are what the server's own
+ * first render of that row would have used. Values the OWNER holds still cross
+ * as props, read live.
+ */
+export async function renderRepeatRowComponent(input: {
+	readonly surface: PrerenderDataSurface;
+	readonly ownerComponentName: string;
+	readonly componentEdgeId: string;
+	readonly itemPropName?: string;
+	readonly item: unknown;
+	readonly rowKey: unknown;
+	readonly rowIndex: number;
+	readonly loadSymbol: PrerenderLoadSymbol;
+	readonly read: PrerenderRead;
+	readonly idPrefix?: string;
+	readonly symbolPrefix?: string;
+}): Promise<RepeatRowComponentRender> {
+	const definition = input.surface.components[input.ownerComponentName];
+	if (!definition)
+		throw new Error(`MARKLESS_PRERENDER_DATA_COMPONENT_MISSING: ${input.ownerComponentName}`);
+	const edge = (definition.edges ?? []).find(
+		(candidate) => candidate.id === input.componentEdgeId,
+	);
+	if (!edge) throw new Error(`MARKLESS_PRERENDER_CHILD_MISSING: ${input.componentEdgeId}`);
+	const ownerIdPrefix = input.idPrefix ?? '',
+		ownerSymbolPrefix = input.symbolPrefix ?? '',
+		rowSegment = marklessRowSegment(input.rowKey),
+		hostPrefix = rowSegment + edge.hostPrefix,
+		symbolPrefix = rowSegment + edge.symbolPrefix,
+		read = input.read;
+	const readDecision = (source: string | undefined) =>
+		source &&
+		definition.readResidue?.(
+			{ kind: 'authored-expression', source },
+			{
+				repeatItem: input.item,
+				repeatIndex: input.rowIndex,
+				read,
+				idPrefix: ownerIdPrefix,
+			},
+		);
+	const childProps: Record<string, unknown> = {};
+	const callbacks: Record<string, string> = {};
+	for (const prop of edge.props) {
+		if (prop.name === input.itemPropName) {
+			childProps[prop.name] = input.item;
+		} else if (prop.kind === 'spread' && prop.graphNodeId) {
+			Object.assign(
+				childProps,
+				marklessSsrSpreadProps(read(prop.graphNodeId, prop.path ?? []), prop.excludeNames),
+			);
+		} else if (prop.kind === 'graph-reference' && prop.graphNodeId) {
+			childProps[prop.name] = read(prop.graphNodeId, prop.path ?? []);
+		} else if (prop.kind === 'element-handle-id' && prop.graphNodeId && definition.readResidue) {
+			childProps[prop.name] = definition.readResidue(
+				{ kind: 'element-handle-id', handleGraphNodeId: prop.graphNodeId },
+				{ read, idPrefix: ownerIdPrefix },
+			);
+		} else if (prop.kind === 'absent') {
+			childProps[prop.name] = undefined;
+		} else if (prop.kind === 'serializable' && 'value' in prop) {
+			childProps[prop.name] = prop.value;
+		} else if (prop.kind === 'callback') {
+			const symbolId = edge.boundSymbols?.[prop.name] ?? prop.symbolId;
+			if (symbolId) callbacks[prop.name] = ownerSymbolPrefix + symbolId;
+		} else if (prop.source !== undefined && definition.readResidue) {
+			childProps[prop.name] = readDecision(prop.source);
+		} else {
+			throw new Error(`MARKLESS_PRERENDER_PROP_UNDERIVABLE: ${prop.name}`);
+		}
+	}
+	if (Object.keys(callbacks).length > 0) childProps.__marklessSsrCallbacks = callbacks;
+	const childSurface = input.surface.components[edge.childComponentName]
+		? input.surface
+		: input.surface.imports[edge.childComponentName];
+	if (!childSurface)
+		throw new Error(`MARKLESS_PRERENDER_DATA_COMPONENT_MISSING: ${edge.childComponentName}`);
+	const sharedSeeds = await sharedSeedPass()?.(
+		{
+			surface: input.surface,
+			idPrefix: ownerIdPrefix,
+			loadSymbol: input.loadSymbol,
+			symbolPrefix: marklessRowFreeSymbolId(ownerSymbolPrefix, ownerSymbolPrefix),
+			rowSegment,
+			readEdgeProp: (prop) => readDecision(prop.source),
+		},
+		definition,
+		{ componentEdgeId: edge.id },
+		read,
+		undefined,
+	);
+	const output = await evaluatePrerenderDataComponent({
+		surface: childSurface,
+		componentName: edge.childComponentName,
+		props: childProps,
+		idPrefix: ownerIdPrefix + hostPrefix,
+		symbolPrefix: ownerSymbolPrefix + symbolPrefix,
+		boundSymbols: edge.boundSymbols,
+		graphProps: edge.props,
+		loadSymbol: input.loadSymbol,
+		graph: undefined,
+		requireHtml: true,
+		sharedSeeds,
+		boundGraphValues: marklessBoundGraphValues(undefined, childSurface, edge.props, read),
+	});
+	const child: MarklessSsrComposedChild = {
+		output: output as SsrComposableChildOutput,
+		hostPrefix,
+		symbolPrefix,
+		graphProps: edge.props,
+		asyncBoundaryId: edge.asyncBoundaryId,
+		boundSymbols: edge.boundSymbols ?? {},
+		callbackProps: callbacks,
+		childrenWidgetRoot: sharedSeedPass()?.childrenWidgetRoot?.(
+			childSurface,
+			edge.childComponentName,
+		),
+	};
+	const asyncSnapshots = (output.state?.computed ?? []).flatMap((computed) =>
+		computed.async && computed.snapshot
+			? [{ graphNodeId: computed.graphNodeId, snapshot: computed.snapshot }]
+			: [],
+	);
+	// The row chunk is nothing but this edge, so the child's own structure IS the
+	// row's: view composition first, then state, the order composition requires.
+	const composition = marklessSsrComposeView(
+		output.structure!,
+		emptyRowView() as SsrComposableView,
+		[child],
+		asyncSnapshots,
+		ownerIdPrefix,
+	);
+	const state = marklessSsrAttachSnapshots(
+		marklessComposeState(emptyRowState(), [child]),
+		asyncSnapshots,
+	);
+	return {
+		html: output.html,
+		state: state as unknown as ProtocolStatePayload,
+		view: composition.view as unknown as import('@markless/serializer').ProtocolViewPayload,
+	};
+}
+
+function emptyRowState(): ProtocolStatePayload {
+	return { version: ASYNC_PROTOCOL_VERSION, cells: [], computed: [] };
+}
+
+function emptyRowView(): import('@markless/serializer').ProtocolViewPayload {
+	return {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
 }
 
 async function settledBoundaryResult(output: SsrRenderOutput, boundaryId: string) {

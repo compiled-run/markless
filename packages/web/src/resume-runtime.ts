@@ -283,13 +283,16 @@ export function createResumeRuntime(
 					[],
 					records.flatMap((repeat) => repeat.rowEvents),
 				);
-				const { wireKeyedRepeats } = await import('./resume-keyed-repeats.ts');
+				const { wireKeyedRepeats, rowComponentMintWiring } = await import(
+						'./resume-keyed-repeats.ts'
+					);
 				wireKeyedRepeats({
 					graph: input.graph,
 					view: { ...input.view, keyedRepeats: records },
 					elementsByHostId,
 					events: eventWiring,
 					storeContainerSubscription,
+					...rowComponentMintWiring(records, armRegistrationDeps, installArmEventType, input),
 				});
 			},
 			addBehaviors: behaviors
@@ -415,6 +418,8 @@ export function createResumeRuntime(
 			},
 			receiveSharedPatch,
 			sharedPatchEventType: SHARED_PATCH_EVENT_TYPE,
+			armRegistrationDeps,
+			installArmEventType,
 		});
 		captureListenersStarted = true;
 		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__) {

@@ -84,6 +84,49 @@ function loadRowMint(): Promise<RowMint> | undefined {
 	return (rowMintLoad ||= load().then((module) => (rowMint = module)));
 }
 
+/**
+ * The component-rooted half, behind its own global for the same reason.
+ *
+ * It reaches the render closure and the page's render-data surface, which only
+ * the app's own resume module can name - so that module writes the loader, and
+ * only for a page whose records carry `rowComponent`.
+ */
+type RowComponentMint = import('./fns/row-component-mint.ts').RowComponentMintApi;
+type RowComponentMintRegistration =
+	import('./fns/row-component-mint.ts').RowComponentMintDeps;
+type RowComponentMintHost = {
+	readonly __marklessRowComponentMint?: () => Promise<RowComponentMint>;
+};
+let rowComponentMintLoad: Promise<RowComponentMint> | undefined;
+function loadRowComponentMint(): Promise<RowComponentMint> | undefined {
+	const load = (globalThis as RowComponentMintHost).__marklessRowComponentMint;
+	if (!load) return undefined;
+	return (rowComponentMintLoad ||= load());
+}
+type MintedComponentRow = import('./fns/row-component-mint.ts').MintedRow;
+type PreparedComponentRows = Map<unknown, MintedComponentRow>;
+
+/**
+ * The born-late registrar, handed over only by a record that names a row
+ * component - so a page without one wires exactly as it did before component
+ * rows existed. It lives here rather than in the runtime core because the core's
+ * static source closure is measured against a wall this would push it over.
+ */
+export function rowComponentMintWiring(
+	records: ReadonlyArray<ResumeKeyedRepeatRecord>,
+	deps: RowComponentMintRegistration['deps'],
+	installEventType: RowComponentMintRegistration['installEventType'],
+	host: { readonly loadSymbol: ResumeRuntimeInput['loadSymbol'] },
+) {
+	if (!records.some((record) => record.rowComponent)) return {};
+	return {
+		mintRowComponent: {
+			registration: { deps, installEventType },
+			loadSymbol: host.loadSymbol,
+		},
+	};
+}
+
 export function validateOneRepeat(
 	graph: RepeatReadableGraph,
 	repeat: ResumeKeyedRepeatRecord,
@@ -139,6 +182,12 @@ export function wireKeyedRepeats(input: {
 	readonly elementsByHostId: Map<string, ResumeDomElement>;
 	readonly events: ResumeEventWiring;
 	readonly storeContainerSubscription: (release: () => void) => void;
+	// Present only on a page whose repeats can root a component row: the born-late
+	// registrar plus the symbol loader that render needs.
+	readonly mintRowComponent?: {
+		readonly registration: RowComponentMintRegistration;
+		readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
+	};
 }): void {
 	for (const repeat of input.view.keyedRepeats ?? []) validateOneRepeat(input.graph, repeat);
 	for (const repeat of input.view.keyedRepeats ?? []) {
@@ -165,6 +214,8 @@ export function wireKeyedRepeats(input: {
 		// that does starts the fetch at wiring time, not at the first gesture.
 		const builds = Boolean(repeat.rowTemplate ?? repeat.emptyArm);
 		if (builds) void loadRowMint()?.catch(() => undefined);
+		const componentRows = Boolean(repeat.rowComponent && input.mintRowComponent);
+		if (componentRows) void loadRowComponentMint()?.catch(() => undefined);
 		for (const [rowIndex, rowRoot] of repeatRowElements(parent, repeat, items.length)) {
 			const rowKey = repeatItemKey(items[rowIndex], repeat);
 			rowRootsByKey.set(rowKey, rowRoot);
@@ -178,7 +229,7 @@ export function wireKeyedRepeats(input: {
 				path: repeat.collectionPath,
 				run(): void | Promise<void> {
 					validateOneRepeat(input.graph, repeat);
-					const apply = (mint: RowMint | undefined): void => {
+					const apply = (mint: RowMint | undefined, minted?: PreparedComponentRows): void => {
 						applyKeyedRepeatRowOrder(
 							input.graph,
 							repeat,
@@ -187,6 +238,7 @@ export function wireKeyedRepeats(input: {
 							arm,
 							mint,
 							registerRowEvents,
+							minted,
 						);
 					};
 					// Ordering across the await is the graph's own: `runFlush` awaits this
@@ -194,14 +246,72 @@ export function wireKeyedRepeats(input: {
 					// and a write landing meanwhile joins the same active flush. So no
 					// collection write can apply ahead of a pending mint, and the apply
 					// itself never yields - it reads the collection and finishes every DOM
-					// and census move in one turn.
-					if (!builds || rowMint) return apply(rowMint);
-					return loadRowMint()?.then(apply) ?? apply(undefined);
+					// and census move in one turn. A component row renders BEFORE that
+					// turn, for the same reason: its render is async and the apply is not.
+					if (!componentRows) {
+						if (!builds || rowMint) return apply(rowMint);
+						return loadRowMint()?.then(apply) ?? apply(undefined);
+					}
+					return (async () => {
+						const mint = builds ? (rowMint ?? (await loadRowMint())) : undefined;
+						const minted = await prepareComponentRows(
+							input.graph,
+							repeat,
+							parent,
+							rowRootsByKey,
+							input.mintRowComponent!,
+						);
+						apply(mint, minted);
+						// Registration follows attachment: the census move above is what
+						// puts the row's elements where the page's own records count them.
+						for (const row of minted.values()) await row.commit();
+					})();
 				},
 			}),
 		);
 	}
 }
+/**
+ * Every unserved key's component row, rendered before the order is applied.
+ *
+ * A component row's render is async - it loads symbols and runs the same
+ * one-edge closure the server ran - and the apply that places rows must not
+ * yield, so the rendering happens here and the apply only places what came back.
+ */
+async function prepareComponentRows(
+	graph: RuntimeGraph,
+	repeat: ResumeKeyedRepeatRecord,
+	parent: ResumeDomElement,
+	rowRootsByKey: Map<unknown, ResumeDomElement>,
+	host: {
+		readonly registration: RowComponentMintRegistration;
+		readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
+	},
+): Promise<PreparedComponentRows> {
+	const prepared: PreparedComponentRows = new Map();
+	const mint = await loadRowComponentMint();
+	if (!mint) return prepared;
+	const items = readKeyedRepeatCollection(graph, repeat);
+	for (const [rowIndex, item] of items.entries()) {
+		const rowKey = repeatItemKey(item, repeat);
+		if (rowRootsByKey.has(rowKey) || prepared.has(rowKey)) continue;
+		prepared.set(
+			rowKey,
+			await mint.mintRow({
+				parent,
+				repeat,
+				item,
+				rowKey,
+				rowIndex,
+				graph,
+				loadSymbol: host.loadSymbol,
+				registration: host.registration,
+			}),
+		);
+	}
+	return prepared;
+}
+
 function applyKeyedRepeatRowOrder(
 	graph: RuntimeGraph,
 	repeat: ResumeKeyedRepeatRecord,
@@ -212,6 +322,7 @@ function applyKeyedRepeatRowOrder(
 	// so every refusal below reads `!mint` as the same fact its own guard states.
 	mint: RowMint | undefined,
 	registerRowEvents?: (rowRoot: ResumeDomElement, rowKey: unknown) => void,
+	minted?: PreparedComponentRows,
 ): void {
 	const nextRows: ResumeDomElement[] = [];
 	// Compare against every attached row THIS repeat owns, not the first
@@ -229,9 +340,10 @@ function applyKeyedRepeatRowOrder(
 			// list stays as served, because half a row is worse than none. Same
 			// refusal for a server-painted `@empty` arm this runtime cannot take out:
 			// rows standing behind a live "nothing matches" is worse than no growth.
-			if (!repeat.rowTemplate || !mint) return;
+			const component = minted?.get(rowKey);
+			if (!component && (!repeat.rowTemplate || !mint)) return;
 			if (repeat.emptyArm && arm.mounted && arm.nodes.length === 0) return;
-			rowRoot = mint.mintRow(parent, repeat, item);
+			rowRoot = component ? component.rowRoot : mint!.mintRow(parent, repeat, item);
 			rowRootsByKey.set(rowKey, rowRoot);
 			// The anchor walk below puts following rows in front of anything it does
 			// not know, so a fresh row joins knownRows before that walk, not after.
@@ -266,7 +378,9 @@ function applyKeyedRepeatRowOrder(
 	// A key that left the collection takes its row out of the document. Without
 	// this the served row stayed attached and every read of the rows - an
 	// ordered element() set most of all - kept answering a row that is gone.
-	// The record is kept in rowRootsByKey so the same key can return.
+	// The record is kept in rowRootsByKey so the same key can return - and a
+	// component row's wiring is kept with it. Releasing those subscriptions here
+	// would splice the graph's subscription list while the flush is iterating it.
 	const staying = new Set(nextRows);
 	for (const rowRoot of rowRootsByKey.values())
 		if (!staying.has(rowRoot) && elementChildren(parent).includes(rowRoot))
