@@ -119,6 +119,8 @@ export type ResumeAsyncBoundaryRecord = {
 	readonly asyncReads: ProtocolViewPayload['asyncBoundaries'][number]['asyncReads'];
 	readonly armRecords?: ResumeArmRecordSet | ReadonlyArray<unknown>;
 };
+// The range an arm commit addresses: boundaries and escalating branches alike.
+export type ResumeArmRange = Pick<ResumeAsyncBoundaryRecord, 'id' | 'startAnchor' | 'endAnchor'>;
 export type ResumeBehaviorRecord = ProtocolViewPayload['behaviors'][number];
 export type ResumeKeyedRepeatRecord = NonNullable<ProtocolViewPayload['keyedRepeats']>[number];
 export type ResumeKeyedRepeatRowEvent = ResumeKeyedRepeatRecord['rowEvents'][number];
@@ -141,12 +143,18 @@ export type ResumeBranchRecord = {
 	readonly armTests?: ReadonlyArray<unknown>;
 	readonly declaredEmptyArms?: ReadonlyArray<number>;
 	readonly armRecords?: ReadonlyArray<ResumeBranchArmRecordSet>;
+	// A branch whose arm holds a component that has to run: flips commit a range.
+	readonly escalates?: true;
+	readonly servedArmRecords?: ResumeArmRecordSet;
 };
 export type ResumeBranchHtml = string | ReadonlyArray<string | { readonly text: string }>;
 export type ResumeBranchUpdate = {
 	readonly arm: number;
 	readonly html: ResumeBranchHtml;
 	readonly resolved?: boolean;
+	// Present only from an escalation symbol: the re-rendered arm's own records.
+	readonly armRecords?: ResumeArmRecordSet;
+	readonly computed?: ProtocolStatePayload['computed'];
 };
 // Async-arm records use indexes relative to the boundary's start anchor.
 export type ResumeArmLocator = {

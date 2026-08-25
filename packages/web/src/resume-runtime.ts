@@ -3,8 +3,8 @@ import type { ProtocolStatePayload } from '@markless/serializer';
 import type { AsyncBoundarySettleTracker } from './resume-async-wiring.ts';
 import type { ArmCommitUpdate, ArmRegistrationDeps } from './resume-commit-arm.ts';
 import type {
+	ResumeArmRange,
 	ResumeArmRecordSet,
-	ResumeAsyncBoundaryRecord,
 	ResumeDispatchOptions,
 	ResumeDomElement,
 	ResumeDomEvent,
@@ -235,6 +235,7 @@ export function createResumeRuntime(
 				storeContainerSubscription,
 				storeHostSubscription,
 				addBehaviorRecords: behaviors?.addBehaviorRecords ?? (() => {}),
+				commitArm: commitBoundaryArm,
 				skipStartupBranchIds: options.skipStartupBranchIds,
 			}),
 		);
@@ -250,7 +251,7 @@ export function createResumeRuntime(
 		return events?.dispatch(event, { ignoreUnmatched: true });
 	}
 	async function commitBoundaryArm(
-		boundary: ResumeAsyncBoundaryRecord,
+		boundary: ResumeArmRange,
 		update: ArmCommitUpdate,
 	): Promise<void> {
 		const registration = await armRegistrationDeps(update.armRecords);
