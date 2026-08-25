@@ -84,7 +84,7 @@ async function seedWith(shown: boolean) {
 	const seeded = await pass(
 		context,
 		pageDefinition,
-		'e0',
+		{ componentEdgeId: 'e0', projectionChunkId: 'proj:e0' },
 		(graphNodeId: string) => (graphNodeId === 'state:shown' ? shown : undefined),
 		undefined,
 	);

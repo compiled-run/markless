@@ -16,15 +16,6 @@ import type {
 export const MARKLESS_WIDGET_INSTANCE_KEY = 'markless:widget-instance';
 
 /**
- * The seed-map key prefix under which a widget's seed phase files one entry per
- * element() handle some part of this instance binds, restating
- * MARKLESS_ELEMENT_BOUND_KEY_PREFIX in @markless/compiler so the browser never
- * imports the compiler. A handle with no entry has no element in this widget, so
- * an IDREF naming it writes no attribute at all rather than an id naming nothing.
- */
-export const MARKLESS_ELEMENT_BOUND_KEY_PREFIX = 'markless:element-bound|';
-
-/**
  * The same token, filed PER shared definition.
  *
  * One element can carry handles declared by two different widget families - a
@@ -70,7 +61,9 @@ export type SharedSeedPass = {
 		readonly readEdgeProp?: (prop: { readonly source?: string }) => unknown;
 	},
 	definition: PrerenderDataDefinition,
-	componentEdgeId: string,
+	// The whole slot, not just its edge id: the pass also files this widget's
+	// element()-handle roster, which is read off the projection the slot names.
+	slot: { readonly componentEdgeId: string; readonly projectionChunkId?: string },
 	read: PrerenderRead,
 	inherited: ReadonlyMap<string, unknown> | undefined,
 ) => Promise<ReadonlyMap<string, unknown> | undefined>);
