@@ -23,6 +23,7 @@ export const FAMILY_ANCHORS = {
 	tabs: '/#tabs',
 	popover: '/#popover',
 	slider: '/#slider',
+	tooltip: '/#tooltip',
 	'slider-range': '/#slider-range',
 } as const;
 

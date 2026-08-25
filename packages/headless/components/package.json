@@ -40,6 +40,7 @@
 		"./radiogroup": "./src/radio-group/index.ts",
 		"./select": "./src/select/index.ts",
 		"./slider": "./src/slider/index.ts",
+		"./tooltip": "./src/tooltip/index.ts",
 		"./tabs": "./src/tabs/index.ts",
 		"./textbox": "./src/textbox/index.ts",
 		"./toaster": "./src/toaster/index.ts",

@@ -39,6 +39,7 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	// DOM before the trigger is pressed.
 	popover: 'dialog',
 	slider: 'slider',
+	tooltip: 'tooltip',
 	'slider-range': 'slider',
 };
 

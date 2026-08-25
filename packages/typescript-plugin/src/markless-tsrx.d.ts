@@ -150,6 +150,16 @@ declare namespace __MarklessTypeService {
 		 * exists.
 		 */
 		overlay?: boolean;
+		/**
+		 * Register this element as the CSS anchor for the handle: lowers to an
+		 * inline `anchor-name` carrying the handle's per-instance minted name.
+		 */
+		anchorName?: E | undefined;
+		/**
+		 * Position this element against the handle's anchor: lowers to inline
+		 * `position-anchor`. Geometry (`position-area`, fallbacks) is consumer CSS.
+		 */
+		positionAnchor?: globalThis.Element | undefined;
 	};
 
 	type GlobalAttributes = {
