@@ -124,6 +124,7 @@ export function collectPublicRenderComponentDefinitions(
 		);
 		const usedGraphNodeIds = new Set([
 			...chunkGraphNodeIds(chunks),
+			...branchDecisionGraphNodeIds(chunks, input.renderData.branches),
 			...edges.flatMap((edge) =>
 				edge.props.flatMap((prop) =>
 					'graphNodeId' in prop && typeof prop.graphNodeId === 'string'
@@ -132,13 +133,13 @@ export function collectPublicRenderComponentDefinitions(
 				),
 			),
 		]);
-		const childGraphNodeIds = new Set(
-			chunkGraphNodeIds(
-				input.renderData.chunks.filter(
-					(chunk) => chunk.componentName !== rootInfo.componentName,
-				),
-			),
+		const childChunks = input.renderData.chunks.filter(
+			(chunk) => chunk.componentName !== rootInfo.componentName,
 		);
+		const childGraphNodeIds = new Set([
+			...chunkGraphNodeIds(childChunks),
+			...branchDecisionGraphNodeIds(childChunks, input.renderData.branches),
+		]);
 		// A widget-scoped shared() graph is one instance per rendered widget, so its
 		// nodes travel with the components that resolve it, not with the module root.
 		const widgetScoped = new Set(
@@ -370,6 +371,34 @@ function projectionProp(source: string, node: AnyNode | undefined): Record<strin
 	return {
 		projection: { kind: 'static-markup', markup: source.slice(start, end), elementCount },
 	};
+}
+
+/**
+ * The nodes a branch test reads, for the branches these chunks hold.
+ *
+ * A test the compiler lifts into a computed declares no component of its own,
+ * and an unattributed node otherwise travels with the module root. The root
+ * cannot evaluate a derive written over a child's prop, so counting the test as
+ * a read of the chunk that holds the branch is what keeps the node with the
+ * component whose render answers it.
+ */
+function branchDecisionGraphNodeIds(
+	chunks: PublicRenderModuleInput['renderData']['chunks'],
+	branches: PublicRenderModuleInput['renderData']['branches'],
+): string[] {
+	const held = new Set(
+		chunks.flatMap((chunk) =>
+			chunk.slots.flatMap((slot) => (slot.kind === 'branch' ? [slot.branchSiteId] : [])),
+		),
+	);
+	return branches.flatMap((branch) =>
+		held.has(branch.branchSiteId)
+			? [
+					...(branch.testComputedGraphNodeId ? [branch.testComputedGraphNodeId] : []),
+					...(branch.testReads ?? []).map((read) => read.graphNodeId),
+				]
+			: [],
+	);
 }
 
 function chunkGraphNodeIds(chunks: PublicRenderModuleInput['renderData']['chunks']): string[] {
