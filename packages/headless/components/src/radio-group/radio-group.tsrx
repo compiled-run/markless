@@ -2,6 +2,7 @@ import { computed, element, shared, state } from '@markless/core';
 import VisuallyHidden from '../base/visually-hidden.tsrx';
 import { nextFieldToFocus } from './radio-group-walk.ts';
 import type {
+	RadioGroupBoxProps,
 	RadioGroupDescriptionProps,
 	RadioGroupErrorProps,
 	RadioGroupInstanceState,
@@ -30,10 +31,12 @@ export const radiogroupState = shared(
 		});
 		// The array type argument makes the handle plural: bound on every option's input, read back live and in document order.
 		const fieldEls = element<HTMLInputElement[]>();
+		const labelEl = element<HTMLLabelElement>();
 
 		return {
 			...group,
 			fieldEls,
+			labelEl,
 			// literal function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
 			// One way only: nothing a person does returns a group to nothing chosen.
@@ -58,7 +61,6 @@ export const radiogroupItemState = shared(
 	{ scope: 'widget' },
 );
 
-// A fieldset named by its legend: an accessible name with no id, IDREF or minted token, plus native disabling of every option it holds.
 export function RadioGroupRoot({
 	value = '',
 	orientation = 'vertical',
@@ -79,19 +81,29 @@ export function RadioGroupRoot({
 	group.name = name;
 	group.required = required;
 
-	<fieldset
+	<RadioGroupBox {...rest}>{children}</RadioGroupBox>
+}
+
+// A separate part rather than the root's own element: a widget root cannot read its
+// own instance token, so the label IDREF only resolves one component deeper.
+function RadioGroupBox({ children, ...rest }: RadioGroupBoxProps) @{
+	const group = radiogroupState();
+
+	<div
 		{...rest}
 		role="radiogroup"
+		aria-labelledby={group.labelEl}
 		aria-disabled={group.disabled ? 'true' : undefined}
-		disabled={group.disabled}
 		ui-horizontal={group.orientation === 'horizontal'}
 		ui-disabled={group.disabled}
 		ui-required={group.required}
-	>{children}</fieldset>
+	>{children}</div>
 }
 
 export function RadioGroupLabel({ children, ...rest }: RadioGroupLabelProps) @{
-	<legend {...rest}>{children}</legend>
+	const group = radiogroupState();
+
+	<label {...rest} el={group.labelEl}>{children}</label>
 }
 
 export function RadioGroupDescription({ children, ...rest }: RadioGroupDescriptionProps) @{

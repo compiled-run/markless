@@ -54,10 +54,11 @@ async function typeInto(locator: { element(): Element | null }, keys: string) {
 
 function expectBasicRendered() {
 	expect(el(Root).getAttribute('role')).toBe('group');
-	// The group is named by the platform: a <legend> inside a <fieldset>.
-	expect(el(Root).localName).toBe('fieldset');
-	expect(el(Label).localName).toBe('legend');
-	expect(el(Root).querySelector('legend')).toBe(el(Label));
+	// The label names the group by IDREF, and the id it points at is on the page.
+	expect(el(Root).localName).toBe('div');
+	expect(el(Label).localName).toBe('label');
+	expect(el(Root).getAttribute('aria-labelledby')).toBe(el(Label).id);
+	expect(el(Label).id).not.toBe('');
 	expect(el(Root).getAttribute('aria-disabled')).toBe('false');
 	expect(el(Root).getAttribute('ui-empty')).toBe('');
 

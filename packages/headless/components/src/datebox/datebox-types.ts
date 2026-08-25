@@ -12,7 +12,7 @@ import type { SegmentType } from './datebox-math.ts';
  * It reports `ui-disabled`, `ui-required` and `ui-empty` for styling, and it is
  * the element a reader announces as the group the boxes belong to.
  */
-export type DateBoxRootProps = Omit<PropsOf<'fieldset'>, 'onChange'> & {
+export type DateBoxRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/**
 	 * The date the boxes show, as `yyyy-mm-dd`. Omit it and they start empty.
 	 */
@@ -57,12 +57,15 @@ export type DateBoxMonthInputProps = DateBoxItemProps;
 /** The year. */
 export type DateBoxYearInputProps = DateBoxItemProps;
 
+/** What `datebox.root` hands the group element it renders: everything it was given. */
+export type DateBoxGroupProps = PropsOf<'div'>;
+
 /**
- * The group's name. It is a `<legend>` inside the root's `<fieldset>`, the
- * `radio-group` precedent: three boxes have no single control for a `for` to
- * point at, and this way the group is named by the platform.
+ * The group's name: the element `role="group"` points its `aria-labelledby` at.
+ * Three boxes have no single control for a `for` to point at, so the name is
+ * carried by the IDREF rather than a `for`.
  */
-export type DateBoxLabelProps = PropsOf<'legend'>;
+export type DateBoxLabelProps = PropsOf<'label'>;
 
 /**
  * Supporting text for the group, named by every box's `aria-describedby`. Mount

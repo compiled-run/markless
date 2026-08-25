@@ -762,7 +762,7 @@
 			{
 				"part": "label",
 				"component": "DateBoxLabel",
-				"doc": "The group's name. It is a `<legend>` inside the root's `<fieldset>`, the\n`radio-group` precedent: three boxes have no single control for a `for` to\npoint at, and this way the group is named by the platform.",
+				"doc": "The group's name: the element `role=\"group\"` points its `aria-labelledby` at.\nThree boxes have no single control for a `for` to point at, so the name is\ncarried by the IDREF rather than a `for`.",
 				"props": []
 			},
 			{
@@ -1387,13 +1387,13 @@
 			{
 				"part": "label",
 				"component": "RadioGroupLabel",
-				"doc": "The group's name, rendered as the `<legend>` a `<fieldset>` is named by.",
+				"doc": "The group's name: the element `role=\"radiogroup\"` points its `aria-labelledby` at.",
 				"props": []
 			},
 			{
 				"part": "root",
 				"component": "RadioGroupRoot",
-				"doc": "The group is a `<fieldset>` so its `<legend>` names it natively: no id, no\nIDREF, and better support than `aria-labelledby` on a `role=\"radiogroup\"` div.",
+				"doc": "The group: a `role=\"radiogroup\"` element named by `radiogroup.label` through\n`aria-labelledby`.",
 				"props": [
 					{
 						"name": "value",

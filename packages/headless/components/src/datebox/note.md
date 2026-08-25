@@ -52,10 +52,12 @@ whichever order the two parts are written in. A part that was never placed drops
 out of the list rather than dangling, and a field that placed neither carries no
 attribute at all.
 
-The group is named by the platform: `root` is a `<fieldset>` and `label` is its
-`<legend>`, the `radio-group` precedent. Three boxes have no single control for a
-`for` to point at, and a widget root cannot mint an id for a part it contains
-(`MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT`).
+`root` is a `<div role="group">` and `label` is a `<label>`, the `radio-group`
+precedent. Three boxes have no single control for a `for` to point at, so the
+group's name rides `aria-labelledby` to the label's handle. The root cannot carry
+that IDREF itself (`MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT`), so it renders one
+private component a level down that owns the role and the IDREF — the
+`progress.bar` idiom.
 
 ## Keyboard
 
