@@ -160,12 +160,16 @@ export function collectTemplateExpression(
 	if (!state.currentHostNodeId || !expression) return;
 	const composite = collectCompositeTemplateExpression(expression, state, TEMPLATE_READ_OPTIONS);
 
+	const armScoped =
+		!!state.currentArmScope && state.currentArmScope.hostNodeId === state.currentHostNodeId;
+
 	state.graph.templateReads.push({
 		hostNodeId: state.currentHostNodeId,
 		source: expressionSource(expression, state.source),
 		sourceSpan: sourceSpan(expression, state.filename),
 		target: state.currentTextTarget ?? { kind: 'text' },
 		asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
+		...(armScoped ? { armScopeBranchSiteId: state.currentArmScope!.branchSiteId } : {}),
 		computedGraphNodeId: composite?.graphNodeId,
 		componentName: state.currentComponentName ?? undefined,
 	});

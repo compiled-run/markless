@@ -134,6 +134,8 @@ export type ResumeBranchRecord = {
 	readonly testReads: NonNullable<
 		NonNullable<ProtocolViewPayload['branches']>[number]['testReads']
 	>;
+	// Reads the arm renders with no element of its own; they refresh its range.
+	readonly contentReads?: ResumeBranchRecord['testReads'];
 	readonly armTests?: ReadonlyArray<unknown>;
 	readonly declaredEmptyArms?: ReadonlyArray<number>;
 	readonly armRecords?: ReadonlyArray<ResumeBranchArmRecordSet>;

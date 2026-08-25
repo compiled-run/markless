@@ -679,6 +679,14 @@ function composedBoundaryArmRecords(
 		...read,
 		graphNodeId: marklessComposedGraphNodeId(read.graphNodeId, instancePath, registry),
 	});
+	const contentReadsOf = (
+		branch: unknown,
+	): ReadonlyArray<{ readonly graphNodeId: string }> | undefined => {
+		const reads = (branch as { readonly contentReads?: unknown }).contentReads;
+		return Array.isArray(reads) && reads.length > 0
+			? (reads as ReadonlyArray<{ readonly graphNodeId: string }>)
+			: undefined;
+	};
 	// Arm-scoped branch records ride the protocol's untyped record bag.
 	const qualifyLooseRead = (record: Record<string, unknown>): Record<string, unknown> =>
 		typeof record.graphNodeId === 'string'
@@ -736,6 +744,9 @@ function composedBoundaryArmRecords(
 						...branch,
 						id: prefix + branch.id,
 						testReads: branch.testReads.map(qualifyRead),
+						...(contentReadsOf(branch)
+							? { contentReads: contentReadsOf(branch)!.map(qualifyRead) }
+							: {}),
 						...(branch.symbolId ? { symbolId: prefix + branch.symbolId } : {}),
 						...(branch.armRecords
 							? {

@@ -288,8 +288,32 @@ function supportedBranchRecords(input: ProtocolViewPayloadInput) {
 			},
 			symbolId: branchSymbols.get(site.id)?.id,
 			testReads: branchSymbols.get(site.id)?.testReads ?? [],
+			...branchContentReadsField(input, site.id),
 			armRecords: branchArmRecords(input, site.id),
 		}));
+}
+
+/**
+ * Reads an arm renders directly, with no element of its own to bind to.
+ *
+ * `@if (open) { <>{count}</> }` has text but no host: bound to the enclosing
+ * element the update would set that element's text and erase both arms'
+ * markers. These reads refresh the arm's own marker range instead, through the
+ * branch's existing update symbol, so nothing outside the served arm moves.
+ */
+function branchContentReadsField(input: ProtocolViewPayloadInput, branchSiteId: string) {
+	const reads = (input.payloadArena.view.branchContentReads ?? []).filter(
+		(read) => read.branchSiteId === branchSiteId,
+	);
+	return reads.length > 0
+		? {
+				contentReads: reads.map((read) => ({
+					graphNodeId: read.graphNodeId,
+					path: read.path,
+					source: read.source,
+				})),
+			}
+		: {};
 }
 
 // Row event symbols already exist on the row host nodes; the record maps
@@ -703,6 +727,7 @@ function armScopedBranchRecords(
 		testReads: branchSymbols.get(branch.branchSiteId)?.testReads ?? [],
 		startAnchor: { strategy: 'arm-branch-comment', index: rank * 2 },
 		endAnchor: { strategy: 'arm-branch-comment', index: rank * 2 + 1 },
+		...branchContentReadsField(input, branch.branchSiteId),
 		armRecords: branchArmRecords(input, branch.branchSiteId),
 		...(branch.armTests ? { armTests: branch.armTests } : {}),
 		...(branch.declaredEmptyArms
