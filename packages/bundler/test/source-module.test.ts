@@ -862,7 +862,9 @@ test('emitResumeModule writes the component-row loader with the page render data
 
 	expect(emitted).toContain("import('@markless/web/fns/row-component-mint')");
 	expect(emitted).toContain("import('\0markless:render-data:page.tsrx')");
-	expect(emitted).toContain('mint.marklessRowComponentMint(data.marklessPrerenderData)');
+	expect(emitted).toContain('mint.marklessRowComponentMint(data.marklessPrerenderData, ...host)');
+	// One global: the bridge re-exports the template mint, so no second loader.
+	expect(emitted).not.toContain("import('@markless/web/fns/row-mint')");
 });
 
 // Fail closed: without a canonical render-data module there is no surface to
@@ -873,7 +875,7 @@ test('emitResumeModule writes no component-row loader without a render-data modu
 			...baseInput,
 			runtimeDemandMap: repeatDemandMap(COMPONENT_ROW_DEMAND),
 		}),
-	).not.toContain('__marklessRowComponentMint');
+	).not.toContain('row-component-mint');
 });
 
 test('emitResumeModule leaves a page with no component row byte-identical', () => {

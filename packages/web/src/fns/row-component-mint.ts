@@ -1,7 +1,10 @@
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
+import type { RuntimeGraph } from '@markless/runtime';
 import type { SerializedGraphPayload } from '../../../serializer/src/value-decode-client.ts';
 import type { PrerenderDataSurface } from '../prerender/evaluator.ts';
 import type { ArmRegistrationDeps } from '../resume-commit-arm.ts';
+import { readKeyedRepeatCollection } from '../resume-keyed-repeats.ts';
+import { mintRow as mintTemplateRow, renderEmptyArm } from './row-mint.ts';
 import type {
 	ResumeArmRecordSet,
 	ResumeAsyncBoundaryRecord,
@@ -18,88 +21,146 @@ import type {
  * and the component instead, and this module runs the same one-edge render the
  * server ran, then registers what came back through the born-late arm registrar.
  *
- * It is reached only through the loader the app's own resume module writes into
- * `__marklessRowComponentMint`, because that loader is also the only place the
- * page's render-data surface can be named - the bridge cannot import it.
+ * It stands in for `fns/row-mint` on a page that has a component row - same
+ * `__marklessRowMint` global, same two node-building entry points, plus the
+ * async pair the repeat runtime calls around its apply. That keeps the repeat
+ * runtime's own module free of every byte of this, which the shipped-byte budget
+ * for a page with no component row measures.
  */
 
-export type RowComponentMintDeps = {
-	readonly deps: (records: ResumeArmRecordSet) => Promise<ArmRegistrationDeps>;
-	readonly installEventType: (eventType: string) => void;
+/** The runtime's own registrar, handed to the loader positionally by the repeat runtime. */
+export type RowComponentMintHost = {
+	readonly runtimeInput: { readonly loadSymbol: (symbolId: string) => unknown };
+	readonly armRegistrationDeps: (records: ResumeArmRecordSet) => Promise<ArmRegistrationDeps>;
+	readonly installArmEventType: (eventType: string) => void;
 };
-
-export type MintedRowCommit = () => Promise<void>;
 
 export type MintedRow = {
 	readonly rowRoot: ResumeDomElement;
 	readonly nodes: ReadonlyArray<ResumeDomNode>;
-	readonly commit: MintedRowCommit;
+	readonly commit: () => Promise<void>;
 };
 
 export type RowComponentMintApi = {
-	mintRow(input: {
-		readonly parent: ResumeDomElement;
-		readonly repeat: ResumeKeyedRepeatRecord;
-		readonly item: unknown;
-		readonly rowKey: unknown;
-		readonly rowIndex: number;
-		readonly graph: import('@markless/runtime').RuntimeGraph;
-		readonly loadSymbol: (symbolId: string) => unknown | Promise<unknown>;
-		readonly registration: RowComponentMintDeps;
-	}): Promise<MintedRow>;
+	readonly renderEmptyArm: typeof renderEmptyArm;
+	mintRow(
+		parent: ResumeDomElement,
+		repeat: ResumeKeyedRepeatRecord,
+		item: unknown,
+	): ResumeDomElement | undefined;
+	/**
+	 * Renders every unserved key's row before the apply that places rows runs, and
+	 * answers with the registration that has to follow attachment - a row's hosts
+	 * resolve only once it is where the page census counts it.
+	 */
+	rows(
+		repeat: ResumeKeyedRepeatRecord,
+		parent: ResumeDomElement,
+		served: ReadonlyMap<unknown, ResumeDomElement>,
+	): Promise<() => Promise<void>>;
 };
 
-export function marklessRowComponentMint(surface: PrerenderDataSurface): RowComponentMintApi {
+export function marklessRowComponentMint(
+	surface: PrerenderDataSurface,
+	graph?: RuntimeGraph,
+	host?: RowComponentMintHost,
+): RowComponentMintApi {
+	let prepared = new Map<unknown, MintedRow>();
 	return {
-		async mintRow(input) {
-			const rowComponent = input.repeat.rowComponent;
-			if (!rowComponent)
-				throw rowComponentError(
-					input.repeat,
-					'MARKLESS_REPEAT_ROW_COMPONENT_MISSING',
-					'was asked to build a component row without naming one.',
-				);
-			// The evaluator and the arm registrar are loaded here, not named at the
-			// top: this module is itself the demand gate, and a static edge to either
-			// would put both closures inside it for every page that has one.
-			const { renderRepeatRowComponent } = await import('../prerender/evaluator.ts');
-			const rendered = await renderRepeatRowComponent({
-				surface,
-				ownerComponentName: rowComponent.componentName,
-				componentEdgeId: rowComponent.componentEdgeId,
-				itemPropName: rowComponent.itemPropName,
-				item: input.item,
-				rowKey: input.rowKey,
-				rowIndex: input.rowIndex,
-				loadSymbol: input.loadSymbol,
-				read: (graphNodeId, path = []) => input.graph.read(graphNodeId, path),
-				idPrefix: ownerIdPrefix(surface, rowComponent.componentName, input.repeat),
-			});
-			const nodes = parseRowNodes(input.parent, input.repeat, rendered.html);
-			const rowRoot = nodes.find((node) => node.nodeType === 1) as
-				| ResumeDomElement
-				| undefined;
-			if (!rowRoot)
-				throw rowComponentError(
-					input.repeat,
-					'MARKLESS_REPEAT_ROW_COMPONENT_EMPTY',
-					'built no row from its component, and half a row is worse than none.',
-				);
-			assertMintableRowRecords(input.repeat, rendered.view);
-			const elementsByHostId = resolveRowHosts(input.repeat, nodes, rendered.view);
-			return {
-				rowRoot,
-				nodes,
-				commit: () => commitMintedRow(input.registration, rendered, elementsByHostId),
+		renderEmptyArm,
+		mintRow(parent, repeat, item) {
+			if (!repeat.rowComponent) return mintTemplateRow(parent, repeat, item);
+			return prepared.get(rowKeyOf(item, repeat))?.rowRoot;
+		},
+		async rows(repeat, parent, served) {
+			prepared = new Map();
+			if (repeat.rowComponent && graph && host)
+				for (const [rowIndex, item] of readKeyedRepeatCollection(graph, repeat).entries()) {
+					const rowKey = rowKeyOf(item, repeat);
+					if (served.has(rowKey) || prepared.has(rowKey)) continue;
+					prepared.set(
+						rowKey,
+						await mintComponentRow({
+							surface,
+							parent,
+							repeat,
+							item,
+							rowKey,
+							rowIndex,
+							graph,
+							loadSymbol: host.runtimeInput.loadSymbol,
+							registration: host,
+						}),
+					);
+				}
+			const minted = [...prepared.values()];
+			return async () => {
+				prepared = new Map();
+				for (const row of minted) await row.commit();
 			};
 		},
+	};
+}
+
+function rowKeyOf(item: unknown, repeat: ResumeKeyedRepeatRecord): unknown {
+	let cursor = item as Record<string, unknown> | null | undefined;
+	for (const key of repeat.keyPath) {
+		if (cursor == null) return undefined;
+		cursor = cursor[key] as Record<string, unknown> | null | undefined;
+	}
+	return cursor;
+}
+
+type RowRegistration = RowComponentMintHost;
+
+async function mintComponentRow(input: {
+	readonly surface: PrerenderDataSurface;
+	readonly parent: ResumeDomElement;
+	readonly repeat: ResumeKeyedRepeatRecord;
+	readonly item: unknown;
+	readonly rowKey: unknown;
+	readonly rowIndex: number;
+	readonly graph: RuntimeGraph;
+	readonly loadSymbol: (symbolId: string) => unknown;
+	readonly registration: RowRegistration;
+}): Promise<MintedRow> {
+	const rowComponent = input.repeat.rowComponent!;
+	// Loaded here, not named at the top: this module is the demand gate, and a
+	// static edge would put the evaluator's closure inside every page that has one.
+	const { renderRepeatRowComponent } = await import('../prerender/evaluator.ts');
+	const rendered = await renderRepeatRowComponent({
+		surface: input.surface,
+		ownerComponentName: rowComponent.componentName,
+		componentEdgeId: rowComponent.componentEdgeId,
+		itemPropName: rowComponent.itemPropName,
+		item: input.item,
+		rowKey: input.rowKey,
+		rowIndex: input.rowIndex,
+		loadSymbol: input.loadSymbol,
+		read: (graphNodeId, path = []) => input.graph.read(graphNodeId, path),
+		idPrefix: ownerIdPrefix(input.surface, rowComponent.componentName, input.repeat),
+	});
+	const nodes = parseRowNodes(input.parent, input.repeat, rendered.html);
+	const rowRoot = nodes.find((node) => node.nodeType === 1) as ResumeDomElement | undefined;
+	if (!rowRoot)
+		throw rowComponentError(
+			input.repeat,
+			'MARKLESS_REPEAT_ROW_COMPONENT_EMPTY',
+			'built no row from its component, and half a row is worse than none.',
+		);
+	assertMintableRowRecords(input.repeat, rendered.view);
+	const elementsByHostId = resolveRowHosts(input.repeat, nodes, rendered.view);
+	return {
+		rowRoot,
+		nodes,
+		commit: () => commitMintedRow(input.registration, rendered, elementsByHostId),
 	};
 }
 
 // Registration reads the same seven record kinds a settled arm does, so it goes
 // through the one registrar rather than a second spelling of it.
 async function commitMintedRow(
-	registration: RowComponentMintDeps,
+	registration: RowRegistration,
 	rendered: { readonly state: ProtocolStatePayload; readonly view: ProtocolViewPayload },
 	elementsByHostId: ReadonlyMap<string, ResumeDomElement>,
 ): Promise<void> {
@@ -113,15 +174,14 @@ async function commitMintedRow(
 			? { keyedRepeats: rendered.view.keyedRepeats as ResumeArmRecordSet['keyedRepeats'] }
 			: {}),
 	};
-	const deps = await registration.deps(armRecords);
+	const deps = await registration.armRegistrationDeps(armRecords);
 	await seedMintedGraphNodes(deps, rendered.state);
 	const { registerArmRecordSet } = await import('../resume-commit-arm.ts');
-	await registerArmRecordSet(
-		deps,
-		registration.installEventType,
-		mintedRowBoundary(),
-		{ armRecords, elementsByHostId, computed: rendered.state.computed },
-	);
+	await registerArmRecordSet(deps, registration.installArmEventType, mintedRowBoundary(), {
+		armRecords,
+		elementsByHostId,
+		computed: rendered.state.computed,
+	});
 }
 
 /**
