@@ -27,6 +27,25 @@ export function isIdrefAttribute(attributeName: string): boolean {
 }
 
 /**
+ * The IDREF positions HTML defines as a space-separated LIST of ids, so a static
+ * array of handles is a richer relationship there rather than a broken value. A
+ * description and an error are separate elements, and one control has to be able
+ * to name both.
+ *
+ * `popovertarget` and `for` are deliberately absent: both take exactly one id,
+ * and a list written there is a dangling attribute no browser resolves.
+ */
+export const IDREF_LIST_ATTRIBUTES: ReadonlySet<string> = new Set([
+	'aria-labelledby',
+	'aria-controls',
+	'aria-describedby',
+]);
+
+export function acceptsIdrefList(attributeName: string): boolean {
+	return IDREF_LIST_ATTRIBUTES.has(attributeName);
+}
+
+/**
  * Attribute spellings of CSS anchor positioning. They are not HTML attributes,
  * so they are refused rather than written: the set exists to name what the
  * compiler must reject, not a position it fills.

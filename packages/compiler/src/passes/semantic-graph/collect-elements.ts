@@ -65,7 +65,7 @@ import {
 	unboundIdrefElementHandleDiagnostic,
 	cssAnchorAttributeDiagnostic,
 } from './diagnostics.ts';
-import { isCssAnchorAttribute, isIdrefAttribute } from './idref-attributes.ts';
+import { acceptsIdrefList, isCssAnchorAttribute, isIdrefAttribute } from './idref-attributes.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
 	createStyleConstResolver,
@@ -999,14 +999,17 @@ function resolvePropForwardedElementHandle(
 
 type IdrefValueClassification =
 	| { readonly kind: 'handle'; readonly handleName: string }
+	| { readonly kind: 'handle-list'; readonly handleNames: ReadonlyArray<string> }
 	| { readonly kind: 'composite' };
 
 /**
  * Classifies an IDREF attribute value. `handle` is one element() handle written
- * directly, the only form this slice records. `composite` is any expression that
- * mentions a handle without being one - a list, a join, a choice - which is
- * refused rather than lowered. `null` is everything else, including an ordinary
- * id string, which keeps its existing templateRead.
+ * directly. `handle-list` is a static array literal whose every entry is one,
+ * recorded where the platform defines the attribute as a list of ids.
+ * `composite` is any other expression that mentions a handle without being one -
+ * a join, a choice, an array the compiler cannot read - which is refused rather
+ * than lowered. `null` is everything else, including an ordinary id string,
+ * which keeps its existing templateRead.
  */
 /**
  * An element() handle in an IDREF position is identity, not a value. Left to
@@ -1027,32 +1030,48 @@ function collectIdrefAttribute(
 ): boolean {
 	if (!expressionValue || !isIdrefAttribute(attributeName)) return false;
 	const classified = classifyIdrefValue(expressionValue, state);
-	if (classified?.kind === 'composite') {
+	if (!classified) return false;
+	const source = expressionSource(expressionValue, state.source);
+	const refuse = (reason?: 'single-valued' | 'component-edge') => {
 		state.graph.diagnostics.push(
 			compositeIdrefElementHandleDiagnostic({
 				attributeName,
-				source: expressionSource(expressionValue, state.source),
+				source,
 				span: sourceSpan(expressionValue, state.filename),
+				...(reason ? { reason } : {}),
 			}),
 		);
 		walk(expressionValue, state);
 		return true;
+	};
+	if (classified.kind === 'composite') return refuse();
+
+	const handleNames =
+		classified.kind === 'handle' ? [classified.handleName] : [...classified.handleNames];
+	if (handleNames.length > 1) {
+		if (!acceptsIdrefList(attributeName)) return refuse('single-valued');
+		// The child writes the attribute from ONE prop value, so a list has no
+		// transport across the edge.
+		if (hostNodeId === null) return refuse('component-edge');
 	}
-	if (classified?.kind !== 'handle') return false;
-	// No templateRead and no boundHostNodeId yet: whether this handle is ever
+	// No templateRead and no boundHostNodeId yet: whether these handles are ever
 	// bound is not knowable until the whole file has been walked.
-	state.pendingElementHandleIdrefs.push({
-		hostNodeId,
-		attributeName,
-		handleName: classified.handleName,
-		source: expressionSource(expressionValue, state.source),
-		componentName: state.currentComponentName ?? undefined,
-		sourceSpan: sourceSpan(expressionValue, state.filename),
-		...(state.currentKeyedRepeatScopeIds.length > 0
-			? { keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds] }
-			: {}),
-		...(state.currentAsyncBoundaryId ? { asyncBoundaryId: state.currentAsyncBoundaryId } : {}),
-	});
+	for (const handleName of handleNames) {
+		state.pendingElementHandleIdrefs.push({
+			hostNodeId,
+			attributeName,
+			handleName,
+			source,
+			componentName: state.currentComponentName ?? undefined,
+			sourceSpan: sourceSpan(expressionValue, state.filename),
+			...(state.currentKeyedRepeatScopeIds.length > 0
+				? { keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds] }
+				: {}),
+			...(state.currentAsyncBoundaryId
+				? { asyncBoundaryId: state.currentAsyncBoundaryId }
+				: {}),
+		});
+	}
 	return true;
 }
 
@@ -1062,7 +1081,33 @@ function classifyIdrefValue(
 ): IdrefValueClassification | null {
 	const handleName = resolvedElementHandleName(expression, state);
 	if (handleName) return { kind: 'handle', handleName };
+	const handleNames = staticHandleListNames(expression, state);
+	if (handleNames) return { kind: 'handle-list', handleNames };
 	return mentionsElementHandle(expression, state) ? { kind: 'composite' } : null;
+}
+
+/**
+ * The handles a static array literal names, in authored order, or null when the
+ * expression is not one. Every entry must itself be a handle written directly: a
+ * hole, a spread, or anything the compiler cannot resolve to one handle makes the
+ * whole value composite, because the list would then be a guess about order.
+ */
+function staticHandleListNames(
+	expression: AnyNode,
+	state: WalkState,
+): ReadonlyArray<string> | null {
+	if (expression.type !== 'ArrayExpression') return null;
+	const raw = expression.elements;
+	if (!Array.isArray(raw)) return null;
+	const entries = asNodes(raw);
+	if (entries.length === 0 || entries.length !== raw.length) return null;
+	const names: string[] = [];
+	for (const entry of entries) {
+		const name = resolvedElementHandleName(entry, state);
+		if (!name) return null;
+		names.push(name);
+	}
+	return names;
 }
 
 // A resolution is an element() handle only when it lands on an element node

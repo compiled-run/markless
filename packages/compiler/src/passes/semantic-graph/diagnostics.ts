@@ -967,26 +967,36 @@ export function unboundIdrefElementHandleDiagnostic(
 }
 
 /**
- * An IDREF position takes exactly one handle, written directly. Lists
- * (`aria-labelledby={[a, b]}`), joins, and choices are refused in this slice
- * rather than lowered.
+ * An IDREF position takes handles written directly: one, or a static array of
+ * them where the platform defines the attribute as a list. Joins, choices, and
+ * arrays the compiler cannot read at build time are refused rather than lowered.
  *
- * Refusal is a decision about ownership, not difficulty. Joining ids would make
- * the compiler mint several ids, choose their order, and pick a separator - all
- * of which are id SPELLING, which these records deliberately do not own. A
- * refusal is loud and reversible; a silent join would bake one emitter's
- * spelling into the graph.
+ * Refusal is a decision about ownership, not difficulty. A recombined value
+ * would make the compiler mint ids it cannot see the order of, and id SPELLING
+ * is not something these records own. A refusal is loud and reversible; a silent
+ * join would bake one emitter's spelling into the graph.
+ *
+ * `reason` narrows the message for the two places a static list is still wrong:
+ * an attribute HTML defines as single-valued, and a component tag, where the id
+ * crosses the edge as one prop value rather than as markup this module writes.
  */
 export function compositeIdrefElementHandleDiagnostic(input: {
 	readonly attributeName: string;
 	readonly source: string;
 	readonly span?: SourceSpan;
+	readonly reason?: 'single-valued' | 'component-edge';
 }): SemanticGraphDiagnostic {
+	const message =
+		input.reason === 'single-valued'
+			? `Cannot resolve ${input.attributeName}={${input.source}}. ${input.attributeName} names exactly one element, so it takes one element() handle rather than a list.`
+			: input.reason === 'component-edge'
+				? `Cannot resolve ${input.attributeName}={${input.source}}. The id crosses the component edge as one value, so a list of handles is only available on an element this component renders itself.`
+				: `Cannot resolve ${input.attributeName}={${input.source}}. An IDREF position takes element() handles written directly, not a join, a choice between handles, or an array the compiler cannot read while compiling.`;
 	return semanticGraphDiagnostic({
 		code: 'MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE',
 		title: 'One element() handle per IDREF attribute',
-		message: `Cannot resolve ${input.attributeName}={${input.source}}. An IDREF position takes exactly one element() handle written directly, not a list, a join, or a choice between handles.`,
-		why: 'The compiler resolves the relationship and the emitter mints the id. Combining handles would require the compiler to spell and order several ids inside one attribute value, and id spelling is not something this record owns.',
+		message,
+		why: 'The compiler resolves the relationship and the emitter mints the id. Combining handles would require the compiler to spell and order ids it cannot see, and id spelling is not something this record owns.',
 		span: input.span,
 		suggestion: `Reference one element() handle directly, as ${input.attributeName}={handle}.`,
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE',

@@ -21,17 +21,12 @@ export type SsrDataResidue =
 			readonly handleGraphNodeId: string;
 			readonly idref?: true;
 	  }
-	// One element's whole inline style value, when a CSS anchor position on it
-	// named an element() handle. The compiled reader spells each declaration from
-	// the same per-instance token it spells minted ids from, so the anchor and
-	// the element that declares it cannot disagree.
+	// Several handles named by one IDREF position HTML defines as a list. The
+	// compiled reader joins the ids of the handles this render actually bound, so
+	// a description and an error are named together and neither dangles.
 	| {
-			readonly kind: 'element-handle-anchor-style';
-			readonly declarations: ReadonlyArray<{
-				readonly property: string;
-				readonly handleGraphNodeId: string;
-			}>;
-			readonly staticStyle?: string;
+			readonly kind: 'element-handle-id-list';
+			readonly handleGraphNodeIds: ReadonlyArray<string>;
 	  };
 
 export type SsrDataCoordinate =
