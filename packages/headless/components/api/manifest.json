@@ -1416,7 +1416,7 @@
 			{
 				"part": "trigger",
 				"component": "SelectTrigger",
-				"doc": "The control a person opens the list from, and the family's only tab stop. It\nshows the current choice and reports `role=\"combobox\"`; a consumer's `onClick`\nand `onKeydown` run after the family's.",
+				"doc": "The control a person opens the list from, and the family's only tab stop. It\nshows the current choice and declares `aria-haspopup=\"listbox\"`; a consumer's\n`onClick` and `onKeydown` run after the family's.",
 				"props": []
 			}
 		]
@@ -1813,6 +1813,56 @@
 				"part": "trigger",
 				"component": "ToggleTrigger",
 				"doc": "A consumer's `onClick` runs after the switch has flipped.",
+				"props": []
+			}
+		]
+	},
+	"tooltip": {
+		"parts": [
+			{
+				"part": "content",
+				"component": "TooltipContent",
+				"doc": "The tip. It is text, not a surface a person can work in: no links, no buttons,\nnothing to focus.\n\n**Write it after `tooltip.trigger`.** A CSS anchor has to be laid out strictly\nbefore the element that points at it. An ordinary in-flow trigger satisfies\nthat from anywhere in the markup, so the order is only advice - until you\nabsolutely position the trigger yourself, at which point a tip written first\nsilently lands at its containing block instead of beside it. CSS has no way to\nreport that, so put the tip last and the question never comes up.\n\nIt stays in the page when the tooltip is hidden - `hidden` decides whether it\nshows, never an arm - because the trigger points at its minted id and because\nan elevated element removed from the document while showing leaves the overlay\nstack's marks behind.\n\nThe family owns this element's `style` attribute to carry `position: absolute`\nand the anchor. Everything about where the tip lands - `position-area`,\n`@position-try`, `position-visibility`, offsets - is your CSS, keyed off\n`ui-side`.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "TooltipRoot",
+				"doc": "The tooltip itself; the trigger and the tip go inside it, in that order. It\nholds whether the tip is showing, how long the pointer has to rest before it\nshows, and which side it sits on.\n\nThe pointer handlers live here rather than on the trigger, so moving the\npointer from the trigger onto the tip never counts as leaving.",
+				"props": [
+					{
+						"name": "open",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Whether the tooltip is showing. Omit it and it starts hidden."
+					},
+					{
+						"name": "delay",
+						"type": "number",
+						"required": false,
+						"default": "600",
+						"doc": "How long the pointer must rest on the trigger before the tooltip shows, in\nmilliseconds. Omit it and it is 600. Focus shows it at once, with no wait."
+					},
+					{
+						"name": "side",
+						"type": "'top' | 'bottom' | 'start' | 'end'",
+						"required": false,
+						"default": "'top'",
+						"doc": "Where the tooltip sits against the trigger. It is written on\n`tooltip.content` as `ui-side`; the placement itself is your CSS."
+					},
+					{
+						"name": "onChange",
+						"type": "(open: boolean) => void",
+						"required": false,
+						"doc": "Called with the new value when the tooltip shows or hides, including when\nEscape or a press elsewhere hides it."
+					}
+				]
+			},
+			{
+				"part": "trigger",
+				"component": "TooltipTrigger",
+				"doc": "The control the tooltip describes. It carries the CSS anchor the tip is placed\nagainst, so the family owns this element's `style` attribute - style the\ntrigger from a stylesheet rather than a `style` prop.\n\nIt points at the tip with `aria-describedby` at all times, showing or not: a\ndirectly referenced hidden element still contributes its text to the\ndescription, so tabbing to the trigger conveys the tip without it ever being\nshown.\n\nAn icon-only trigger needs its own accessible name - write `aria-label` on it.\nThe tooltip describes the control; it never names it.",
 				"props": []
 			}
 		]
