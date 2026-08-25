@@ -94,7 +94,7 @@ async function scopedDelegateMaterializations(
 		pluginContext,
 		source,
 		transformed.artifactChildren,
-		delegateLoadOptions(ctx),
+		delegateLoadOptions(ctx, pluginContext),
 	);
 	// A delegate whose import rejected is reported, not swallowed; the edge still skips.
 	warnDelegateImportFailures(pluginContext, delegates);

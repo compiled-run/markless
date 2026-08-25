@@ -37,7 +37,7 @@ export async function emitClientRouteArtifact(
 		pluginContext,
 		source,
 		transformed.artifactChildren,
-		delegateLoadOptions(ctx),
+		delegateLoadOptions(ctx, pluginContext),
 	);
 	warnDelegateImportFailures(pluginContext, delegates);
 	const artifactChildMaterializations = delegates.materializations;

@@ -7,6 +7,7 @@ import {
 	planRenderDataModule,
 } from '@markless/compiler';
 import type { createMarklessDevGraph } from './dev.ts';
+import { createBuildDelegateLoader } from './build/delegate-loader.ts';
 import { createDelegateModuleCache } from './link-driver.ts';
 import { hasExecutionLogModuleHook, requalifyExecutionLogModuleHook } from './execution-log.ts';
 import { ModuleMetadataRegistry } from './module-metadata-registry.ts';
@@ -83,9 +84,11 @@ export function createPluginState() {
 	// An edit clears the child's capture metadata, and Vite can answer its re-request from cache.
 	const recoveringChildMetadata = new Set<string>();
 	const delegateModules = createDelegateModuleCache();
+	const buildDelegateLoader = createBuildDelegateLoader();
 
 	return {
 		delegateModules,
+		buildDelegateLoader,
 		virtualModules,
 		moduleMetadata,
 		prerenderWakeCapabilities,
@@ -109,6 +112,7 @@ export function createPluginState() {
 		// two in-flight re-entry guards were never part of that reset and stay untouched.
 		reset() {
 			delegateModules.clear();
+			buildDelegateLoader.clear();
 			clientSymbolEntrySources.clear();
 			clientRouteArtifactSources.clear();
 			clientRouteArtifactMaterializations.clear();

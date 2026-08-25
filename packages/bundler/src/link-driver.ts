@@ -41,6 +41,7 @@ import {
 } from '@markless/compiler';
 import { dirname, relative, resolve } from 'pathe';
 import { withQuery } from 'ufo';
+import type { BuildDelegateLoader, DelegateSpecifierResolve } from './build/delegate-loader.ts';
 import type { ModuleMetadataRegistry } from './module-metadata-registry.ts';
 import { MARKLESS_VIRTUAL_PREFIX } from './transform.ts';
 import type {
@@ -467,18 +468,37 @@ function nodeImport(source: string): Promise<unknown> {
 }
 
 // The build's own module table and loader, so every delegate edge in a build
-// shares one execution of a given dependency.
-export function delegateLoadOptions(ctx: {
-	readonly state: { readonly delegateModules: DelegateModuleCache };
-	readonly internalOptions: {
-		readonly devServer?: { readonly importModule?: DelegateModuleImport };
-	};
-}) {
+// shares one execution of a given dependency. A dev server hands over its module
+// runner; `vite build` has none, so the build-mode loader compiles the delegate
+// itself and resolves its imports through the build's own resolver.
+export function delegateLoadOptions(
+	ctx: {
+		readonly state: {
+			readonly delegateModules: DelegateModuleCache;
+			readonly buildDelegateLoader: BuildDelegateLoader;
+		};
+		readonly internalOptions: {
+			readonly devServer?: { readonly importModule?: DelegateModuleImport };
+		};
+	},
+	resolveContext: LinkResolveContext,
+) {
+	const { buildDelegateLoader } = ctx.state;
+	const resolve = buildDelegateSpecifierResolve(resolveContext);
 	return {
 		modules: ctx.state.delegateModules,
-		...(ctx.internalOptions.devServer?.importModule
-			? { importModule: ctx.internalOptions.devServer.importModule }
-			: {}),
+		importModule:
+			ctx.internalOptions.devServer?.importModule ??
+			((source: string) => buildDelegateLoader.load(source, resolve)),
+	};
+}
+
+function buildDelegateSpecifierResolve(context: LinkResolveContext): DelegateSpecifierResolve {
+	return async (specifier, importer) => {
+		const resolved = await context.resolve(specifier, importer, { skipSelf: true });
+		if (typeof resolved === 'string') return resolved;
+		if (!resolved || resolved.external) return undefined;
+		return String(resolved.id);
 	};
 }
 
