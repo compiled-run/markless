@@ -1,6 +1,5 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
-import { KEYED_REPEAT_ROW_MINT_UNSUPPORTED_CODE } from '../src/passes/public-render/diagnostics.ts';
 
 /**
  * Defect 28. A `@for` item named like a widget-instance local declared elsewhere
@@ -122,9 +121,9 @@ test('the widget local still resolves inside the part that declares it', async (
 });
 
 // The compile stays fully accepted: this is a resolution fix, not a new refusal.
-// The row wraps <Chair> in an element of its own, so the row can never be built
-// in the browser - a warning about growth, not about the name collision.
-test('the colliding module compiles with no diagnostic beyond the list-growth warning', async () => {
+// The row wraps <Chair> in an element whose own slots read off the item, which
+// the mint builds, so nothing here warns about growth either.
+test('the colliding module compiles with no diagnostic at all', async () => {
 	const compiled = await compile('seat');
 
 	expect(compiled.semanticGraph.diagnostics).toEqual([]);
@@ -133,5 +132,5 @@ test('the colliding module compiles with no diagnostic beyond the list-growth wa
 			entry.code,
 			entry.severity,
 		]),
-	).toEqual([[KEYED_REPEAT_ROW_MINT_UNSUPPORTED_CODE, 'warning']]);
+	).toEqual([]);
 });

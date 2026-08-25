@@ -6,10 +6,15 @@ function Card({ card, onPick }) @{
 	<article data-card={card.key} onClick={(event) => onPick(event.currentTarget.getAttribute('data-card'))}><em class="tag">{card.title}</em></article>
 }
 
+function Tag({ title, onTap }) @{
+	<em class="tag" onClick={(event) => onTap(event.currentTarget.textContent)}>{title}</em>
+}
+
 // The same page the client-mint fixture serves, but with the third row already in
 // the served collection: the SSR-equivalence proof compares the two.
 export function App() @{
 	let chosen = state('none');
+	let tapped = state('none');
 	let cards = state([
 		{ key: 'north', title: 'North' },
 		{ key: 'south', title: 'South' },
@@ -18,10 +23,17 @@ export function App() @{
 
 	<main>
 		<output data-chosen>{chosen}</output>
+		<output data-tapped>{tapped}</output>
 		<div class="cards">
 			<h2 data-static>Cards</h2>
 			@for (const card of cards; key card.key) {
 				<Card card={card} onPick={(key) => chosen = key} />
+			}
+		</div>
+		<div class="wrapped">
+			<h2 data-static>Wrapped</h2>
+			@for (const card of cards; key card.key) {
+				<article data-wrapped={card.key} onClick={() => chosen = card.key}><span class="idx">{card.key}</span><Tag title={card.title} onTap={(title) => tapped = title} /></article>
 			}
 		</div>
 	</main>

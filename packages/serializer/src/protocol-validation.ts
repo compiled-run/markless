@@ -508,6 +508,8 @@ function assertOptionalRowComponent(record: Record<string, unknown>, context: st
 	assertStringField(rowComponent, 'componentEdgeId', context);
 	assertStringField(rowComponent, 'componentName', context);
 	assertOptionalStringField(rowComponent, 'itemPropName', context);
+	if (rowComponent.slotPath !== undefined)
+		assertNonNegativeIntegerArrayField(rowComponent, 'slotPath', context);
 }
 
 function assertOptionalRowTemplate(record: Record<string, unknown>, context: string): void {

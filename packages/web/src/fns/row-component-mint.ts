@@ -4,7 +4,12 @@ import type { SerializedGraphPayload } from '../../../serializer/src/value-decod
 import type { PrerenderDataSurface } from '../prerender/evaluator.ts';
 import type { ArmRegistrationDeps } from '../resume-commit-arm.ts';
 import { readKeyedRepeatCollection } from '../resume-keyed-repeats.ts';
-import { mintRow as mintTemplateRow, renderEmptyArm } from './row-mint.ts';
+import {
+	mintRow as mintTemplateRow,
+	mintRowNodes,
+	nodeAtPath,
+	renderEmptyArm,
+} from './row-mint.ts';
 import type {
 	ResumeArmRecordSet,
 	ResumeAsyncBoundaryRecord,
@@ -140,22 +145,60 @@ async function mintComponentRow(input: {
 		read: (graphNodeId, path = []) => input.graph.read(graphNodeId, path),
 		idPrefix: ownerIdPrefix(input.surface, rowComponent.componentName, input.repeat),
 	});
-	const nodes = parseRowNodes(input.parent, input.repeat, rendered.html);
-	const rowRoot = nodes.find((node) => node.nodeType === 1) as ResumeDomElement | undefined;
+	const childNodes = parseRowNodes(input.parent, input.repeat, rendered.html);
+	assertMintableRowRecords(input.repeat, rendered.view);
+	// The child's locators index its OWN fragment, so they resolve against the
+	// child's nodes whether or not a wrapper goes on to hold them.
+	const elementsByHostId = resolveRowHosts(input.repeat, childNodes, rendered.view);
+	const placed = rowComponent.slotPath
+		? placeInWrapper(input, childNodes, rowComponent.slotPath)
+		: { nodes: childNodes, rowRoot: childNodes.find((node) => node.nodeType === 1) };
+	const rowRoot = placed.rowRoot as ResumeDomElement | undefined;
 	if (!rowRoot)
 		throw rowComponentError(
 			input.repeat,
 			'MARKLESS_REPEAT_ROW_COMPONENT_EMPTY',
 			'built no row from its component, and half a row is worse than none.',
 		);
-	assertMintableRowRecords(input.repeat, rendered.view);
-	const elementsByHostId = resolveRowHosts(input.repeat, nodes, rendered.view);
 	return {
 		rowRoot,
-		nodes,
+		nodes: placed.nodes,
 		commit: () => commitMintedRow(input.registration, rendered, elementsByHostId),
 	};
 }
+
+/**
+ * The row element the author wrapped the component in, minted and filled.
+ *
+ * The wrapper is markup the record already carries, so it goes through the
+ * template mint; the child's nodes then replace the marker `slotPath` names,
+ * leaving one row whose root is the wrapper and whose events the repeat wires
+ * off row-relative paths exactly as a served row's.
+ */
+function placeInWrapper(
+	input: {
+		readonly parent: ResumeDomElement;
+		readonly repeat: ResumeKeyedRepeatRecord;
+		readonly item: unknown;
+	},
+	childNodes: ReadonlyArray<ResumeDomNode>,
+	slotPath: ReadonlyArray<number>,
+): { readonly nodes: ReadonlyArray<ResumeDomNode>; readonly rowRoot: ResumeDomElement } {
+	const wrapper = mintRowNodes(input.parent, input.repeat, input.item);
+	const marker = nodeAtPath(wrapper.nodes, slotPath) as ReplaceableNode | undefined;
+	if (!marker?.replaceWith || childNodes.length === 0)
+		throw rowComponentError(
+			input.repeat,
+			'MARKLESS_REPEAT_ROW_COMPONENT_SLOT_MISSING',
+			`built no place for its component at row path ${slotPath.join('.')}.`,
+		);
+	marker.replaceWith(...childNodes);
+	return wrapper;
+}
+
+type ReplaceableNode = ResumeDomNode & {
+	readonly replaceWith?: (...nodes: ReadonlyArray<ResumeDomNode>) => void;
+};
 
 // Registration reads the same seven record kinds a settled arm does, so it goes
 // through the one registrar rather than a second spelling of it.

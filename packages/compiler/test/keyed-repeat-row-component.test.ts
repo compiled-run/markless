@@ -53,12 +53,129 @@ test('a same-module component row ships the edge, the owning component and the i
 	expect(repeat?.rowComponent?.componentName).toBe('App');
 	expect(repeat?.rowComponent?.itemPropName).toBe('item');
 	expect(typeof repeat?.rowComponent?.componentEdgeId).toBe('string');
-	// Three identifiers and nothing else: no markup crosses in this field.
+	// Three identifiers and nothing else: no markup crosses in this field, and no
+	// slot path - a row that IS the component has no wrapper to place it in, so
+	// its record is byte-identical to what it was before wrappers were minted.
 	expect(Object.keys(repeat!.rowComponent!).sort()).toEqual([
 		'componentEdgeId',
 		'componentName',
 		'itemPropName',
 	]);
+});
+
+// The wrapped shape, which is the checklist idiom: the row element is markup and
+// the child is identity, joined by the path of the marker the child replaces.
+const wrappedRow = `import { state } from '@markless/core';
+function Row({ label }) @{
+	<span>{label}</span>
+}
+export function App() @{
+	let rows = state([{ id: 'a', label: 'A' }]);
+	<ul>@for (const row of rows; key row.id) { <li data-row={row.id}><Row label={row.label} /></li> }</ul>
+}
+`;
+
+test('a row element wrapping a component ships the wrapper markup and the child identity', async () => {
+	const view = await viewOf(wrappedRow);
+	const repeat = view.keyedRepeats?.[0];
+	expect(repeat?.rowTemplate?.html).toContain('<li');
+	expect(repeat?.rowTemplate?.attributeSlots).toEqual([
+		expect.objectContaining({ name: 'data-row', itemPath: ['id'] }),
+	]);
+	expect(repeat?.rowComponent?.componentName).toBe('App');
+	expect(repeat?.rowComponent?.slotPath).toEqual([0, 0]);
+});
+
+// A wrapper with no slots of its own is still a wrapper: the markup half carries
+// the element and nothing else, and the path still says where the child lands.
+test('a bare wrapper element around a component ships markup with no slots', async () => {
+	const view = await viewOf(`import { state } from '@markless/core';
+function Row({ label }) @{
+	<span>{label}</span>
+}
+export function App() @{
+	let rows = state([{ id: 'a', label: 'A' }]);
+	<ul>@for (const row of rows; key row.id) { <li><Row label={row.label} /></li> }</ul>
+}
+`);
+	const repeat = view.keyedRepeats?.[0];
+	expect(Object.keys(repeat!.rowTemplate!)).toEqual(['html']);
+	expect(repeat?.rowComponent?.slotPath).toEqual([0, 0]);
+});
+
+// The wrapper is minted from markup, so a wrapper slot markup cannot finish
+// refuses the whole row rather than shipping a half of each.
+test('a wrapper reading outside its item ships neither half', async () => {
+	const view = await viewOf(`import { state } from '@markless/core';
+function Row({ label }) @{
+	<span>{label}</span>
+}
+export function App() @{
+	let rows = state([{ id: 'a', label: 'A' }]);
+	let title = state('t');
+	<ul>@for (const row of rows; key row.id) { <li data-row={title}><Row label={row.label} /></li> }</ul>
+}
+`);
+	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
+	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowTemplate');
+});
+
+// Two children in one row is two graphs to place, and the record names one.
+test('a row wrapping two components ships neither half', async () => {
+	const view = await viewOf(`import { state } from '@markless/core';
+function Row({ label }) @{
+	<span>{label}</span>
+}
+export function App() @{
+	let rows = state([{ id: 'a', label: 'A' }]);
+	<ul>@for (const row of rows; key row.id) { <li><Row label={row.label} /><Row label={row.id} /></li> }</ul>
+}
+`);
+	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
+	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowTemplate');
+});
+
+// The gates are the row's, not the wrapper's: a cross-module child inside a
+// mintable wrapper is still a child this module cannot run.
+test('a wrapper around a cross-module component ships neither half', async () => {
+	const view = await viewOf(`import { state } from '@markless/core';
+import { Row } from './row.tsrx';
+export function App() @{
+	let rows = state([{ id: 'a', label: 'A' }]);
+	<ul>@for (const row of rows; key row.id) { <li data-row={row.id}><Row label={row.label} /></li> }</ul>
+}
+`);
+	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
+	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowTemplate');
+});
+
+test('a wrapper around a branching component ships neither half', async () => {
+	const view = await viewOf(`import { state } from '@markless/core';
+function Row({ label }) @{
+	let open = state(false);
+	<span onClick={() => open = !open}>@if (open) { <b>{label}</b> }</span>
+}
+export function App() @{
+	let rows = state([{ id: 'a', label: 'A' }]);
+	<ul>@for (const row of rows; key row.id) { <li data-row={row.id}><Row label={row.label} /></li> }</ul>
+}
+`);
+	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
+	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowTemplate');
+});
+
+test('a wrapper around a projecting component ships neither half', async () => {
+	const view = await viewOf(`import { state } from '@markless/core';
+function Row({ children }) @{
+	<span>{children}</span>
+}
+export function App() @{
+	let rows = state([{ id: 'a', label: 'A' }]);
+	<ul>@for (const row of rows; key row.id) { <li data-row={row.id}><Row><b>{row.label}</b></Row></li> }</ul>
+}
+`);
+	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
+	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowTemplate');
 });
 
 // Pay-per-use inside the field: a row whose props are all derived carries no

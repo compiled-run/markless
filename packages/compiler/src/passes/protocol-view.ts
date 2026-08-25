@@ -5,9 +5,11 @@ import type {
 	ProtocolViewPayloadInput,
 	ProtocolViewPayloadWithArmRecords,
 	RenderDataArtifact,
+	SemanticMarkupChunk,
+	SemanticMarkupSlot,
 } from '../artifacts.ts';
 import { armChildRead, armHostPaths, type ArmHostPlacement } from './arm-child-content.ts';
-import { resolveRowComponentMint } from './row-mint.ts';
+import { resolveRowComponentMint, type RowComponentMint } from './row-mint.ts';
 import { forwardedSpreadViewRecords } from './spread-forwarding.ts';
 
 function renderDataOf(input: ProtocolViewPayloadInput): RenderDataArtifact {
@@ -384,7 +386,7 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 					? { rowStartOffset: render.rowStartOffset }
 					: {}),
 				...mintableEmptyArm(input, render),
-				...mintableRowTemplate(input, render),
+				...mintableRowTemplate(input, render, rowComponentMint(input, render)),
 				...mintableRowComponent(input, render),
 				rowEvents: oneRecordPerEvent(input.payloadArena.view.events)
 					.filter((event) => rowHostPaths.has(event.hostNodeId))
@@ -454,6 +456,11 @@ function mintableEmptyArm(
  * an expression computes, a nested construct, a child component - and half a row
  * is worse than none.
  *
+ * A third shape joins them once a row element WRAPS a child component: the
+ * wrapper is this markup, and the child is named by identity in `rowComponent`,
+ * which also carries the path of the marker its nodes replace. The mint that
+ * builds such a row runs both halves.
+ *
  * The slot markers stay in the html on purpose: they are the positions the row's
  * text occupies, and `textSlots` addresses them by the same fragment-relative
  * path the chunk records, so the mint walks to each one instead of re-parsing.
@@ -468,6 +475,7 @@ function mintableEmptyArm(
 function mintableRowTemplate(
 	input: ProtocolViewPayloadInput,
 	render: RenderDataArtifact['repeats'][number],
+	mint: RowComponentMint | null,
 ): {
 	readonly rowTemplate?: {
 		readonly html: string;
@@ -486,10 +494,13 @@ function mintableRowTemplate(
 		(candidate) => candidate.id === render.rowChunkId,
 	);
 	if (!chunk) return {};
-	// A row whose content is a child component has a graph, not a template - one
-	// instance per rendered row - so markup could never finish it. Such a row is
-	// named by identity instead, in `rowComponent`; this half stays refused.
-	if (chunk.slots.some((slot) => slot.kind === 'child-component')) return {};
+	// A child component has a graph, not a template - one instance per rendered
+	// row - so markup could never finish it. It is named by identity instead, in
+	// `rowComponent`; markup carries only the row element that wraps it, and a row
+	// that IS the component has no wrapper to carry.
+	const wrappedComponentSlot = mint?.slotPath ? componentSlotAt(chunk, mint.slotPath) : undefined;
+	if (chunk.slots.some((slot) => slot.kind === 'child-component' && slot !== wrappedComponentSlot))
+		return {};
 	const textSlots: Array<{
 		readonly path: ReadonlyArray<number>;
 		readonly itemPath: ReadonlyArray<string>;
@@ -500,6 +511,7 @@ function mintableRowTemplate(
 		readonly itemPath: ReadonlyArray<string>;
 	}> = [];
 	for (const slot of chunk.slots) {
+		if (slot === wrappedComponentSlot) continue;
 		// A row that reads anything but its own item cannot be minted from the item
 		// alone, and every slot that is neither text nor an attribute is wiring the
 		// mint does not do.
@@ -534,9 +546,20 @@ function mintableRowComponent(
 		readonly componentEdgeId: string;
 		readonly componentName: string;
 		readonly itemPropName?: string;
+		readonly slotPath?: ReadonlyArray<number>;
 	};
 } {
-	const rowComponent = resolveRowComponentMint({
+	const rowComponent = rowComponentMint(input, render);
+	return rowComponent ? { rowComponent } : {};
+}
+
+// The row template and the row component are two halves of one decision, so both
+// read the same answer rather than each deciding what the row is.
+function rowComponentMint(
+	input: ProtocolViewPayloadInput,
+	render: RenderDataArtifact['repeats'][number],
+): RowComponentMint | null {
+	return resolveRowComponentMint({
 		chunks: renderDataOf(input).chunks,
 		componentEdges: input.semanticGraph?.componentEdges ?? [],
 		componentNames: (input.semanticGraph?.components ?? []).map((component) => component.name),
@@ -544,7 +567,18 @@ function mintableRowComponent(
 		rowElementCount: render.rowElementCount,
 		itemName: render.itemName,
 	});
-	return rowComponent ? { rowComponent } : {};
+}
+
+function componentSlotAt(
+	chunk: SemanticMarkupChunk,
+	slotPath: ReadonlyArray<number>,
+): SemanticMarkupSlot | undefined {
+	return chunk.slots.find(
+		(slot) =>
+			slot.kind === 'child-component' &&
+			slot.coordinate.path.length === slotPath.length &&
+			slot.coordinate.path.every((step, at) => step === slotPath[at]),
+	);
 }
 
 function boundaryUpdateSymbols(input: ProtocolViewPayloadInput): ReadonlyMap<string, string> {

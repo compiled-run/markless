@@ -61,15 +61,48 @@ test('a row holding a construct warns that the list can never grow', async () =>
 	expect(rowRecord(compiled)?.rowTemplate).toBeUndefined();
 });
 
-test('a row whose component sits inside an element of its own warns: neither mint can finish it', async () => {
+test('a row whose element wraps a component stays silent - both halves ship', async () => {
 	const compiled = await compilePage(
-		`<ul>@for (const row of rows; key row.id) { <li><Cell label={row.label} /></li> }</ul>`,
+		`<ul>@for (const row of rows; key row.id) { <li data-row={row.id}><Cell label={row.label} /></li> }</ul>`,
+	);
+
+	expect(rowMintWarnings(compiled)).toEqual([]);
+	// The wrapper is markup, the child is identity, and the path joins them: the
+	// mint fills the wrapper's own attribute and drops the child on the marker.
+	expect(rowRecord(compiled)?.rowTemplate?.attributeSlots).toEqual([
+		expect.objectContaining({ name: 'data-row', itemPath: ['id'] }),
+	]);
+	expect(rowRecord(compiled)?.rowComponent).toEqual(
+		expect.objectContaining({ componentName: 'App', slotPath: expect.any(Array) }),
+	);
+});
+
+// The wrapper is minted from markup, so a wrapper slot markup cannot finish
+// still refuses the whole row - the child's identity does not rescue it.
+test('a wrapper reading a value that is not on the item warns, component inside or not', async () => {
+	const compiled = await compilePage(
+		`<ul>@for (const row of rows; key row.id) { <li data-row={chosen}><Cell label={row.label} /></li> }</ul>`,
 	);
 
 	expect(rowMintWarnings(compiled)).toEqual([
 		['warning', expect.stringContaining('This @for row renders <Cell>')],
 	]);
 	expect(rowRecord(compiled)?.rowComponent).toBeUndefined();
+	expect(rowRecord(compiled)?.rowTemplate).toBeUndefined();
+});
+
+// A wrapper holding a construct is refused by the same clause for the same
+// reason: its anchors were counted once, for the rows the page served.
+test('a wrapper holding a branch around a component warns', async () => {
+	const compiled = await compilePage(
+		`<ul>@for (const row of rows; key row.id) { <li>@if (row.on) { <em>on</em> }<Cell label={row.label} /></li> }</ul>`,
+	);
+
+	expect(rowMintWarnings(compiled)).toEqual([
+		['warning', expect.stringContaining('This @for row renders <Cell>')],
+	]);
+	expect(rowRecord(compiled)?.rowComponent).toBeUndefined();
+	expect(rowRecord(compiled)?.rowTemplate).toBeUndefined();
 });
 
 test('a row that IS a same-module component stays silent - the payload names the component', async () => {
