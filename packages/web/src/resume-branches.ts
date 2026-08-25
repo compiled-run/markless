@@ -10,13 +10,7 @@ import type {
 	ResumeViewRecord,
 } from './resume-types.ts';
 
-type ArmDomUpdate = ResumeViewRecord['domUpdates'][number] & {
-	readonly hostPath: ReadonlyArray<number>;
-};
-type ArmBehavior = ResumeBehaviorRecord & { readonly hostPath: ReadonlyArray<number> };
-type ArmHandle = ResumeViewRecord['elementHandles'][number] & {
-	readonly hostPath: ReadonlyArray<number>;
-};
+type Hosted<T> = T & { readonly hostPath: ReadonlyArray<number> };
 type RegisteredResumeBranch = ResumeBranchRecord & {
 	readonly armBoundaryId?: string;
 };
@@ -305,7 +299,9 @@ function materializeBranchArmRecords(
 				symbolIds: armEvent.symbolIds,
 			});
 	}
-	for (const update of set.domUpdates as ReadonlyArray<ArmDomUpdate>) {
+	for (const update of set.domUpdates as ReadonlyArray<
+		Hosted<ResumeViewRecord['domUpdates'][number]>
+	>) {
 		if (!update.symbolId) continue;
 		const host = claim(update.hostPath);
 		if (!host) continue;
@@ -332,7 +328,7 @@ function materializeBranchArmRecords(
 		);
 	}
 	const byHost = new Map<string, ResumeBehaviorRecord[]>();
-	for (const behavior of set.behaviors as ReadonlyArray<ArmBehavior>) {
+	for (const behavior of set.behaviors as ReadonlyArray<Hosted<ResumeBehaviorRecord>>) {
 		const host = claim(behavior.hostPath);
 		if (!host) continue;
 		const records = byHost.get(host.hostNodeId) ?? [];
@@ -340,7 +336,9 @@ function materializeBranchArmRecords(
 		byHost.set(host.hostNodeId, records);
 	}
 	for (const [hostNodeId, records] of byHost) input.addBehaviorRecords(hostNodeId, records);
-	for (const handle of set.elementHandles as ReadonlyArray<ArmHandle>) {
+	for (const handle of set.elementHandles as ReadonlyArray<
+		Hosted<ResumeViewRecord['elementHandles'][number]>
+	>) {
 		const host = claim(handle.hostPath);
 		if (host) input.elementHandles.register(host.hostNodeId, handle, host.element);
 	}
