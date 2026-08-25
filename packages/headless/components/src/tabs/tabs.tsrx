@@ -138,7 +138,10 @@ export function TabsTrigger({
 				return;
 			}
 
-			const open = Array.from(tabs.triggerEls ?? []).filter((candidate) => !candidate.disabled);
+			// One filter, no snapshot copy in front of it: the members read back as a
+			// plain array already. A single pass is not open here - the compiler cannot
+			// resolve a write to a handler local made inside a loop.
+			const open = (tabs.triggerEls ?? []).filter((candidate) => !candidate.disabled);
 			const at = open.indexOf(here);
 			if (at < 0) {
 				onKeydown?.(event);
