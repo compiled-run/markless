@@ -53,6 +53,7 @@ type ComponentLike = {
 	readonly view: ViewLike;
 	readonly rootChunkId: string;
 	readonly stateGraphNodeIds?: ReadonlyArray<string>;
+	readonly stateComputedIndexes?: ReadonlyArray<number>;
 	readonly initialValues?: ReadonlyArray<{
 		readonly graphNodeId: string;
 		readonly value: { readonly kind: string; readonly value?: unknown };
@@ -437,13 +438,18 @@ function settledComputed(
 	serializeComputed: SettleKernelInput['serializeComputed'],
 ): ReadonlyArray<RecordLike> {
 	const owned = new Set(definition.stateGraphNodeIds ?? []);
-	const computed = (definition.state.computed ?? [])
-		.filter((entry) => owned.size === 0 || owned.has(String(entry.graphNodeId)))
-		.map((entry) =>
-			entry.async
-				? { ...structuredClone(entry), snapshot: read(String(entry.graphNodeId), []) }
-				: structuredClone(entry),
-		);
+	const entries = definition.state.computed ?? [];
+	const indexes = definition.stateComputedIndexes;
+	// Computed ids collide across a module's components, so the id set cannot
+	// partition them; the compiler's indexes are the authoritative answer.
+	const partitioned = indexes
+		? indexes.flatMap((index) => (entries[index] ? [entries[index]!] : []))
+		: entries.filter((entry) => owned.size === 0 || owned.has(String(entry.graphNodeId)));
+	const computed = partitioned.map((entry) =>
+		entry.async
+			? { ...structuredClone(entry), snapshot: read(String(entry.graphNodeId), []) }
+			: structuredClone(entry),
+	);
 	return serializeComputed ? serializeComputed(computed) : computed;
 }
 
