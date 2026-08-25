@@ -294,7 +294,7 @@ for (const mode of MODES) {
 	// all), and CSR serves that arm EMPTY - the branch markers are in the group
 	// with nothing between them, so only depth-4 exists. SSR unrolls all four
 	// levels from the same file.
-	const unroll = mode === 'CSR' ? test.fails : test;
+	const unroll = test;
 	unroll(`${mode}: a self-composing node unrolls to the depth its prop names`, async () => {
 		if (mode === 'CSR') await render(Deep);
 		else await renderSSR(Deep);
