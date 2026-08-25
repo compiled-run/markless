@@ -7,6 +7,7 @@ import type {
 	LoweredStateRead,
 	PlannedSymbol,
 	SemanticComponentEdge,
+	SemanticComponentPropDeclaration,
 	SemanticGraphBinding,
 	SemanticLocalBinding,
 	SemanticSharedDefinition,
@@ -274,7 +275,8 @@ function symbolCaptureSlots(
 	semantics: SymbolSourceSemanticsReader,
 ): ReadonlyArray<CaptureSlot> {
 	const reads = lazySymbolReads(symbol, input);
-	const slots = reads.map((read) => captureSlot(read, symbol, input, semantics));
+	const ordinals = new Map<string, number>();
+	const slots = reads.map((read) => captureSlot(read, symbol, input, semantics, ordinals));
 	if (symbol.kind === 'event-handler' || symbol.kind === 'callback-prop')
 		return [...slots, ...widgetCallbackSlots(symbol, input, semantics)];
 
@@ -618,11 +620,33 @@ function rootIdentifierName(source: string): string | undefined {
 	return /^\s*([A-Za-z_$][\w$]*)/.exec(source)?.[1];
 }
 
+/**
+ * What a capture slot is named after: the component and prop an authored read
+ * resolves to, or the graph node and path when no prop declares it. Nothing here
+ * is a source offset — an id built from offsets moves whenever text is inserted
+ * earlier in the module, which makes emitted handler bytes depend on declaration
+ * order.
+ */
+function captureSlotIdentity(
+	read: LoweredStateRead,
+	declaration: SemanticComponentPropDeclaration | undefined,
+	componentName: string | undefined,
+	propName: string | undefined,
+	routePath: ReadonlyArray<string>,
+): string {
+	const owner = componentName ?? 'module';
+	const prop = declaration ? declaration.propPath : propName ? [propName] : undefined;
+	return prop
+		? `prop:${owner}:${[...prop, ...routePath].join('.')}`
+		: `graph:${owner}:${read.graphNodeId}:${routePath.join('.')}`;
+}
+
 function captureSlot(
 	read: LoweredStateRead,
 	symbol: PlannedSymbol,
 	input: CaptureAnalysisInput,
 	semantics: SymbolSourceSemanticsReader,
+	ordinals: Map<string, number>,
 ): CaptureSlot {
 	const declaration = read.bindingId
 		? input.semanticGraph.componentPropBindings.find(
@@ -663,12 +687,13 @@ function captureSlot(
 				: route,
 		);
 	}
-	const spanKey = read.sourceSpan
-		? `${read.sourceSpan.start}:${read.sourceSpan.end}`
-		: `${read.graphNodeId}:${read.path.join('.')}`;
+	// Two reads of the same thing in one symbol stay distinct by arrival order.
+	const identity = captureSlotIdentity(read, declaration, componentName, propName, routePath);
+	const ordinal = ordinals.get(identity) ?? 0;
+	ordinals.set(identity, ordinal + 1);
 
 	return {
-		id: `capture-slot:${read.bindingId ?? read.graphNodeId}:${spanKey}`,
+		id: `capture-slot:${identity}#${ordinal}`,
 		bindingId: read.bindingId ?? `graph-binding:${read.graphNodeId}`,
 		source: read.source,
 		...(read.sourceSpan ? { sourceSpan: read.sourceSpan } : {}),
