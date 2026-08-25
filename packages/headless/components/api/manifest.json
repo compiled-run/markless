@@ -787,7 +787,7 @@
 			{
 				"part": "root",
 				"component": "DateinputRoot",
-				"doc": "A `<fieldset>` named by its `<legend>`, the `radio-group` precedent: three boxes\nhave no single control to point a `for` at, and a group's own name cannot be\nminted from a part it contains.",
+				"doc": "A date typed one part at a time, as three number boxes rather than one text\nfield. It is the group the three boxes sit in and the home of the date they\nspell: put a `dateinput.label`, a `dateinput.dayinput`, a\n`dateinput.monthinput` and a `dateinput.yearinput` inside it, in whichever\norder the date should read, and a `dateinput.field` when a form has to submit\nit.\n\nIt reports `ui-disabled`, `ui-required` and `ui-empty` for styling, and it is\nthe element a reader announces as the group the boxes belong to.",
 				"props": [
 					{
 						"name": "value",
