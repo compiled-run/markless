@@ -274,6 +274,9 @@ async function activateAuthoredBehaviors(
 // shared: a module of its own is a chunk on the resume path's dispatch census.
 const FOCUS_KEY_EVENT_NAMES = ['keydown', 'keyup', 'keypress'];
 const FOCUS_EDITABLE_EVENT_NAMES = ['beforeinput', 'input'];
+// A pointer crosses onto a control before it presses it, and Safari focuses no
+// button on click - so hover, not focus, is what reliably precedes a first press.
+const PRESS_EVENT_NAMES = ['click', 'pointerdown', 'pointerup'];
 
 function focusPreloadEventNames(element: {
 	readonly tagName?: unknown;
@@ -396,8 +399,10 @@ function installDelegatedTriggers(
 	// Focus lands before any key can, so the focused element's key records name
 	// the handler modules this page is about to need. Fetch only; never dispatch.
 	const preloadedSymbolIds = new Set<string>();
-	let releaseFocusPreload: (() => void) | undefined;
-	const preloadFocusKeySymbols = (target: DelegatedEvent['target']) => {
+	const preloadSymbolsFor = (
+		target: DelegatedEvent['target'],
+		namesFor: (element: NonNullable<DelegatedEvent['target']>) => ReadonlyArray<string>,
+	) => {
 		for (
 			let element: DelegatedEvent['target'] = target;
 			element;
@@ -405,7 +410,7 @@ function installDelegatedTriggers(
 		) {
 			const records = recordsByElement.get(element);
 			if (records)
-				for (const eventName of focusPreloadEventNames(element)) {
+				for (const eventName of namesFor(element)) {
 					for (const symbolId of records.get(eventName)?.symbolIds ?? []) {
 						if (preloadedSymbolIds.has(symbolId)) continue;
 						preloadedSymbolIds.add(symbolId);
@@ -415,13 +420,18 @@ function installDelegatedTriggers(
 			if ((element as object) === (output.root as object)) break;
 		}
 	};
-	const installFocusPreload = () => {
-		if (releaseFocusPreload) return;
-		const listener = (event: DelegatedEvent) => preloadFocusKeySymbols(event.target);
-		output.root.addEventListener?.('focusin', listener, { capture: true });
-		releaseFocusPreload = () =>
-			output.root.removeEventListener?.('focusin', listener, { capture: true });
-		releases.push(releaseFocusPreload);
+	const installedPreloadTriggers = new Set<string>();
+	const installPreloadTrigger = (
+		triggerName: string,
+		namesFor: (element: NonNullable<DelegatedEvent['target']>) => ReadonlyArray<string>,
+	) => {
+		if (installedPreloadTriggers.has(triggerName)) return;
+		installedPreloadTriggers.add(triggerName);
+		const listener = (event: DelegatedEvent) => preloadSymbolsFor(event.target, namesFor);
+		output.root.addEventListener?.(triggerName, listener, { capture: true });
+		releases.push(() =>
+			output.root.removeEventListener?.(triggerName, listener, { capture: true }),
+		);
 	};
 	const registerEventRecord = (element: object, record: ProtocolEventRecord) => {
 		const records = recordsByElement.get(element) ?? new Map<string, ProtocolEventRecord>();
@@ -429,7 +439,12 @@ function installDelegatedTriggers(
 		records.set(record.eventName, record);
 		recordsByElement.set(element, records);
 		installEventListener(record.eventName);
-		if (isFocusPreloadEventName(record.eventName)) installFocusPreload();
+		if (isFocusPreloadEventName(record.eventName))
+			installPreloadTrigger('focusin', focusPreloadEventNames);
+		// pointerenter does not bubble, so a delegated listener would only ever see
+		// the container's own crossing.
+		if (PRESS_EVENT_NAMES.includes(record.eventName))
+			installPreloadTrigger('pointerover', () => PRESS_EVENT_NAMES);
 	};
 	for (const record of view.events) {
 		if (record.eventName === 'visible') continue;
