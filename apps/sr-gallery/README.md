@@ -50,6 +50,14 @@ can run the check at once:
 SR_GALLERY_PORT=4325 node apps/sr-gallery/scripts/boot-check.ts
 ```
 
+A fresh dev server spends minutes compiling this page's entry graph on its first
+request, and milliseconds on every request after. So the boot check fetches that
+graph itself — `/`, the module script the HTML names, and the modules that script
+imports — before it launches Chromium, under a single ten-minute budget that
+reports what it was still waiting on if it runs out. The browser then meets a
+warm server and keeps its 30-second budget, which is what makes a red boot check
+mean "a family did not render" rather than "the compiler was slow".
+
 ## It does not render yet
 
 `pnpm --dir apps/sr-gallery build` fails and `dev` serves a page that never
