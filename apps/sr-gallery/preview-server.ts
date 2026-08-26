@@ -44,6 +44,9 @@ export const FAMILY_ANCHORS = {
 	menu: '/#menu',
 	colorpicker: '/#colorpicker',
 	togglegroup: '/#togglegroup',
+	numberbox: '/#numberbox',
+	'numberbox-min-max-step': '/#numberbox-min-max-step',
+	'numberbox-currency': '/#numberbox-currency',
 } as const;
 
 export type FamilyName = keyof typeof FAMILY_ANCHORS;
