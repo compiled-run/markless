@@ -171,7 +171,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 		}
 
 		if (!frameworkApi) {
-			const templateValue = findTemplateValue(init);
+			const templateValue = findTemplateValue(init, state.handledTemplateValues);
 			if (templateValue) {
 				reportTemplateAsValue(
 					state,
@@ -179,7 +179,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 					`${declarationKind ?? 'const'} ${name} = ${expressionSource(init, state.source)}`,
 					name,
 				);
-				markTemplateValueHandled(templateValue);
+				markTemplateValueHandled(templateValue, state);
 			}
 		}
 
@@ -203,7 +203,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 				);
 				continue;
 			}
-			const templateValue = findTemplateValue(initial);
+			const templateValue = findTemplateValue(initial, state.handledTemplateValues);
 			if (templateValue) {
 				reportTemplateAsValue(
 					state,
@@ -211,7 +211,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 					expressionSource(init, state.source),
 					name,
 				);
-				markTemplateValueHandled(templateValue);
+				markTemplateValueHandled(templateValue, state);
 				continue;
 			}
 			const evaluatedInitial = evaluateInitialStateValue(initial);
@@ -339,10 +339,10 @@ export function collectComputedBinding(input: {
 		);
 		return null;
 	}
-	const templateValue = findComputedTemplateValue(body);
+	const templateValue = findComputedTemplateValue(body, state.handledTemplateValues);
 	if (templateValue) {
 		reportTemplateAsValue(state, templateValue, expressionSource(init, state.source), name);
-		markTemplateValueHandled(templateValue);
+		markTemplateValueHandled(templateValue, state);
 		return null;
 	}
 	const isAsync = body?.async === true;
@@ -1272,28 +1272,34 @@ function reportTemplateAsValue(
 	);
 }
 
-function findComputedTemplateValue(node: AnyNode | undefined): AnyNode | null {
+function findComputedTemplateValue(
+	node: AnyNode | undefined,
+	handled: WeakSet<object>,
+): AnyNode | null {
 	if (!node) return null;
 	if (node.type === 'ArrowFunctionExpression') {
 		const body = node.body as AnyNode | undefined;
-		const template = findTemplateValue(body);
+		const template = findTemplateValue(body, handled);
 		if (template) return template;
-		return findReturnTemplateValue(body);
+		return findReturnTemplateValue(body, handled);
 	}
 	if (node.type === 'FunctionExpression') {
-		return findReturnTemplateValue(node.body as AnyNode | undefined);
+		return findReturnTemplateValue(node.body as AnyNode | undefined, handled);
 	}
 	return null;
 }
 
-function findReturnTemplateValue(node: AnyNode | undefined): AnyNode | null {
+function findReturnTemplateValue(
+	node: AnyNode | undefined,
+	handled: WeakSet<object>,
+): AnyNode | null {
 	if (!node) return null;
 	if (node.type === 'ReturnStatement') {
 		const argument = node.argument as AnyNode | undefined;
-		return findTemplateValue(argument);
+		return findTemplateValue(argument, handled);
 	}
 	for (const child of asNodes(node.body)) {
-		const found = findReturnTemplateValue(child);
+		const found = findReturnTemplateValue(child, handled);
 		if (found) return found;
 	}
 	return null;

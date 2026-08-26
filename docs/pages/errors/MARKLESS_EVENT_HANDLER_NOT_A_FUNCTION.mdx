@@ -1,0 +1,22 @@
+# MARKLESS_EVENT_HANDLER_NOT_A_FUNCTION
+
+Event props need a function
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: error
+
+## Message
+
+`…={…}` passes the result of `…`, not a function. The expression would run once while rendering, and the click would receive a number.
+
+## Why
+
+An event prop compiles to a lazy handler symbol that runs on the browser event; only a function can be that handler.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/collect-elements.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

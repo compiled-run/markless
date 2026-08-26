@@ -8,6 +8,7 @@ import type {
 } from '@markless/serializer/protocol';
 import { PROTOCOL_EVENT_ACTION_KIND } from '@markless/serializer/protocol';
 import type { MarklessExecutionLogMode } from '../dev-log.ts';
+import type { OverlayPrimedDismissalHost } from '../overlay-handoff.ts';
 
 type InlineDebugControls = {
 	record(
@@ -104,13 +105,17 @@ export type MarklessSettledArmHandoff = {
 	readonly read: (graphNodeId: string, path?: ReadonlyArray<string>) => unknown;
 };
 
-type InlineRoot = HTMLElement & {
-	__asyncResumeRuntimeStarted?: boolean;
-	__marklessDelegatedDispatch?: boolean;
-	__marklessSettledArms?: Array<MarklessSettledArmHandoff>;
-	__marklessEventOnlyGraph?: Map<string, unknown>;
-	__marklessEventOnlyGraphInitialized?: boolean;
-};
+type InlineRoot = HTMLElement &
+	OverlayPrimedDismissalHost & {
+		__asyncResumeRuntimeStarted?: boolean;
+		__marklessDelegatedDispatch?: boolean;
+		__marklessSettledArms?: Array<MarklessSettledArmHandoff>;
+		__marklessEventOnlyGraph?: Map<string, unknown>;
+		__marklessEventOnlyGraphInitialized?: boolean;
+		// The control a crossing woke this page on. A resting pointer sends no
+		// second crossing, so the runtime's own preload would otherwise miss it.
+		__marklessPrimedHover?: Element;
+	};
 type InlineDispatchInput = {
 	readonly root: InlineRoot;
 	readonly event: Event | 0;
@@ -689,10 +694,8 @@ function runInlineResumerOverlayPrimer(
 		// behaviour is installed and owns the keyboard; leaving a reason behind
 		// would dismiss something twice.
 		if (root.__marklessDelegatedDispatch) return;
-		if ((event as KeyboardEvent).key === 'Escape') {
-			(globalThis as { __marklessOverlayPrimedDismissal?: 'escape' })
-				.__marklessOverlayPrimedDismissal = 'escape';
-		}
+		if ((event as KeyboardEvent).key === 'Escape')
+			root.__marklessOverlayPrimedDismissal = 'escape';
 		setTimeout(() => {
 			if (root.__marklessDelegatedDispatch) return;
 			root.__marklessDelegatedDispatch = true;
@@ -960,8 +963,11 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 		...(view.keyedRepeats ?? []).flatMap((repeat) =>
 			repeat.rowEvents.map((event) => event.eventName),
 		),
+		// An escalating branch serves one arm record set instead of a per-arm plan,
+		// and a flip brings in elements no payload record names.
 		...(view.branches ?? []).flatMap((branch) =>
-			(branch.armRecords ?? []).flatMap((arm) => arm.events.map((event) => event.eventName)),
+			[...(branch.armRecords ?? []), ...(branch.servedArmRecords ? [branch.servedArmRecords] : [])]
+				.flatMap((arm) => arm.events.map((event) => event.eventName)),
 		),
 		...view.asyncBoundaries.flatMap((boundary) => {
 			// Array.isArray cannot narrow the readonly per-arm plan out of the union.
@@ -976,10 +982,111 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 				: [];
 		}),
 	]);
+	// A row that IS a component owns no element of the row chunk, so its gestures
+	// ride the child's own records and `rowEvents` is empty by construction: the
+	// unknown-element hatch below has to open on the record that says the list can
+	// mint such a row, or a row born after boot is never forwarded at all.
+	// An escalating branch replaces its arm from a fresh render, so a flip brings
+	// in elements this payload names no record for: same hatch, same reason.
+	const mintsComponentRows =
+		[
+			...(view.keyedRepeats ?? []),
+			...view.asyncBoundaries.flatMap((boundary) => {
+				const armRecords = boundary.armRecords as ProtocolArmRecordSet | undefined;
+				return armRecords && !Array.isArray(armRecords) ? (armRecords.keyedRepeats ?? []) : [];
+			}),
+		].some((repeat) => repeat.rowComponent !== undefined) ||
+		(view.branches ?? []).some((branch) => branch.escalates === true);
 	const eventNames = new Set([
 		...view.events.map((event) => event.eventName),
 		...nestedEventNames,
 	]);
+	// A key event can only reach an element that already holds focus, so a focus
+	// onto an element with a key record names the handler this page needs next.
+	// A wake, not a dispatch: the real key arrives through the capture listener
+	// below, queued behind this same import promise. Names restated because this
+	// body is serialized by toString().
+	const focusPreloadEventNames = ['keydown', 'keyup', 'keypress', 'beforeinput', 'input'];
+	// A focused control still reaches a press through Enter and Space, so a focus
+	// onto a press-only record names a handler this page needs next too.
+	const pressPreloadEventNames = ['click', 'pointerdown', 'pointerup'];
+	const focusWakeEventNames = [...focusPreloadEventNames, ...pressPreloadEventNames];
+	if (focusWakeEventNames.some((eventName) => eventNames.has(eventName))) {
+		const primeFocus = (event: Event) => {
+			if (root.__marklessDelegatedDispatch) return;
+			let primes = false;
+			for (
+				let element = event.target as Element | null;
+				element && !primes;
+				element = element.parentElement
+			) {
+				const hostNodeId = hostIds.get(element);
+				if (hostNodeId) {
+					const editable =
+						(element as HTMLElement).isContentEditable === true ||
+						element.tagName === 'INPUT' ||
+						element.tagName === 'TEXTAREA' ||
+						element.tagName === 'SELECT';
+					primes = focusWakeEventNames.some(
+						(eventName) =>
+							(editable ||
+								(eventName !== 'beforeinput' && eventName !== 'input')) &&
+							events.has(`${hostNodeId}\n${eventName}`),
+					);
+				}
+				if (element === root) break;
+			}
+			// Same hatch the dispatch listener opens on: a row minted after boot owns
+			// no element this payload names a record for.
+			if (
+				!primes &&
+				(mintsComponentRows ||
+					focusWakeEventNames.some((eventName) => nestedEventNames.has(eventName)))
+			)
+				primes = true;
+			if (!primes) return;
+			root.removeEventListener('focusin', primeFocus, true);
+			root.__marklessDelegatedDispatch = true;
+			(loaded ||= loadModule(resumeModuleUrl)).then((module) =>
+				module.resumeContainerEvent({ root, event: 0 }),
+			);
+		};
+		root.addEventListener('focusin', primeFocus, true);
+	}
+	// A pointer crosses onto a control before it presses it, and Safari focuses no
+	// button on click, so hover is what precedes a first press. Same wake, and
+	// pointerenter is unusable here because it does not bubble.
+	if (pressPreloadEventNames.some((eventName) => eventNames.has(eventName))) {
+		const primeHover = (event: Event) => {
+			if (root.__marklessDelegatedDispatch) return;
+			let primed: Element | undefined;
+			for (
+				let element = event.target as Element | null;
+				element && !primed;
+				element = element.parentElement
+			) {
+				const hostNodeId = hostIds.get(element);
+				if (
+					hostNodeId &&
+					pressPreloadEventNames.some((eventName) =>
+						events.has(`${hostNodeId}\n${eventName}`),
+					)
+				)
+					primed = element;
+				if (element === root) break;
+			}
+			if (!primed) return;
+			// A resting pointer sends no second crossing, so the control the wake was
+			// spent on is left where the runtime's own preload can read it.
+			root.__marklessPrimedHover = primed;
+			root.removeEventListener('pointerover', primeHover, true);
+			root.__marklessDelegatedDispatch = true;
+			(loaded ||= loadModule(resumeModuleUrl)).then((module) =>
+				module.resumeContainerEvent({ root, event: 0 }),
+			);
+		};
+		root.addEventListener('pointerover', primeHover, true);
+	}
 	for (const eventName of eventNames) {
 		if (eventName === 'visible') continue;
 		root.addEventListener(
@@ -1015,7 +1122,7 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 					}
 					if (element === root) break;
 				}
-				if (nestedEventNames.has(event.type)) {
+				if (mintsComponentRows || nestedEventNames.has(event.type)) {
 					return forward({ event, element: event.target, eventRecord: null });
 				}
 				if (__MARKLESS_INLINE_EXECUTION_LOG__ !== 'never' && globalScope.__mxLog) {

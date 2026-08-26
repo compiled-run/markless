@@ -1,0 +1,21 @@
+# MARKLESS_ARTIFACT_CHILD_RENDER_INVALID
+
+Delegate child renderSsr returned no static HTML
+
+- Package: compiler
+- Pass or phase: link
+- Severity: error
+
+## Message
+
+\<…\> renderSsr must return static HTML.
+
+## Why
+
+The materialized edge is the delegate rendered output, so an output without HTML leaves nothing to inline.
+
+## Emitted from
+
+- `packages/compiler/src/passes/link/delegate-children.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
