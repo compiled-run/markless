@@ -78,6 +78,7 @@ export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArt
 		};
 	});
 	const extractedSymbols = [...localSymbols, ...importedCaptureSymbols(input)];
+	const componentScopeBindings = componentScopeLocalBindings(input);
 	const diagnostics = [
 		...extractedSymbols.flatMap((symbol) => opaqueSlotDiagnostics(symbol)),
 		...extractedSymbols.flatMap((symbol) => {
@@ -92,7 +93,7 @@ export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArt
 			// returning here also cannot drop a name-based diagnostic.
 			if (analysisFailed) return [unsupportedCaptureDiagnostic(symbol, undefined)];
 
-			return input.semanticGraph.localBindings.flatMap((binding) =>
+			return componentScopeBindings.flatMap((binding) =>
 				freeNames.has(binding.name) ? [unsupportedCaptureDiagnostic(symbol, binding)] : [],
 			);
 		}),
@@ -104,6 +105,36 @@ export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArt
 		extractedSymbols,
 		diagnostics,
 	};
+}
+
+/**
+ * The local bindings a lazy symbol could actually close over. A free name is
+ * matched against these by name, so the list has to hold only bindings that a
+ * name in another symbol resolves to: a declaration sitting inside some other
+ * symbol's own source is that symbol's local, and a same-named binding
+ * elsewhere is a different binding with a different scope. Declaration and
+ * symbol spans both come from the resolved AST, so containment is the scope
+ * test. A binding with no span stays in the list: nothing proves it nested.
+ */
+function componentScopeLocalBindings(
+	input: CaptureAnalysisInput,
+): ReadonlyArray<SemanticLocalBinding> {
+	const symbolSpans = input.symbolResolver.symbols.flatMap((symbol) =>
+		'sourceSpan' in symbol && symbol.sourceSpan ? [symbol.sourceSpan] : [],
+	);
+	if (symbolSpans.length === 0) return input.semanticGraph.localBindings;
+
+	return input.semanticGraph.localBindings.filter((binding) => {
+		const span = binding.sourceSpan;
+		if (!span) return true;
+
+		return !symbolSpans.some(
+			(owner) =>
+				owner.filename === span.filename &&
+				owner.start < span.start &&
+				span.end < owner.end,
+		);
+	});
 }
 
 /**
