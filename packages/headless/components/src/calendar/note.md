@@ -2,13 +2,13 @@
 
 A month of days a person can choose from. Real buttons, no grid.
 
-**Status: one framework defect short of complete.** 53 of 54 browser rows are
-green in both CSR and SSR, the virtual screen-reader lane is green, the real
-reader lanes and the gallery section they read are written, and the family is
-registered in the shared conformance battery. One row is red, on a defect in how
-the runtime dispatches an event whose target a previous event's own state write
-removed. It is written out under "The one thing still broken" with the
-measurement that shows it.
+**Status: complete.** All 54 browser rows are green in both CSR and SSR, the
+virtual screen-reader lane is green, the real reader lanes and the gallery
+section they read are written, and the family is registered in the shared
+conformance battery. The one framework defect this family used to be short of —
+a keydown refused when the key before it removed the day it landed on — is fixed
+in the runtime; what it was and what fixed it is under "The defect this family
+found".
 
 Research: `goals/headless-components/notes/U488-calendar-research.md` — React Aria's
 `useCalendar*`, Zag/Ark, Bits UI, Melt, Mantine, react-day-picker, the WAI-ARIA APG
@@ -158,9 +158,10 @@ reaches a part's `computed()`, and SSR no longer throws
 `MARKLESS_ELEMENT_HANDLE_WIDGET_INSTANCE_MISSING` on `titleEl` — all thirteen SSR
 rows are green.
 
-## The one thing still broken
+## The defect this family found
 
-**A keydown is refused when the key before it removed the day it landed on.**
+**A keydown was refused when the key before it removed the day it landed on.**
+Fixed in the runtime; kept here because the measurement is what named it.
 
 Press Shift+PageUp twice with nothing between the presses. The first press steps
 the year, which replaces all 42 rows — the keys are the dates — and the second
@@ -199,13 +200,21 @@ exists so that "a dispatch after container teardown is never an unmatched
 defect", but it is filled only when a whole container is torn down, never when a
 keyed repeat disposes a row.
 
-Nothing in the family's shape avoids it. The keys must change when the month
+Nothing in the family's shape avoided it. The keys must change when the month
 changes — they are the dates — so the rows must be rebuilt, and a family cannot
 order a browser's keystrokes against a rewrite its own previous keystroke caused.
-The one red row is written as what should happen:
 
-- `CSR: Shift with the page keys steps a year` — the second Shift+PageUp never
-  reaches the handler, so the title stops at August 2026 instead of August 2025.
+**What fixed it.** A keyed repeat that takes a row out of the document now
+records the parent it hung from, and dispatch finishes the walk across that
+record when the row's own parent link is gone. The event is routed on the path
+it WOULD have taken at press time, so every record above the repeat — here the
+one `onKeydown` on `calendar.content` — still runs. The gesture is not dropped;
+only the removed row's own record is skipped, and only once its key has left the
+collection, because that row has no item left to act on.
+`CSR: Shift with the page keys steps a year` is green, and the title reaches
+August 2025. The runtime side is `packages/web/src/resume-events.ts` and
+`resume-keyed-repeats.ts`, witnessed in
+`packages/vitest-browser/browser/disposed-row-dispatch/`.
 
 The previous note's defect — a `@for` row built after the first render getting its
 own detached copy of the widget — is **gone on this tip** and its entry has been

@@ -33,6 +33,10 @@ export type ResumeRowEventMatch = {
 	readonly rowEvent: ResumeKeyedRepeatRowEvent;
 };
 export type ResumeRowEventRecords = WeakMap<ResumeDomElement, Map<string, ResumeRowEventMatch>>;
+/** A row a keyed repeat took out, carrying the parent it hung from. */
+export type DisposedRepeatRow = ResumeDomElement & {
+	__marklessRowParent?: ResumeDomElement;
+};
 export type ResumeEventWiring = ReturnType<typeof createEventWiring>;
 type ExecutionLogGlobal = typeof globalThis & {
 	__mxLog?: Set<string>;
@@ -71,6 +75,17 @@ export function createEventWiring(input: {
 }) {
 	const eventRecords = new WeakMap<ResumeDomElement, Map<string, ResumeEventRecord>>();
 	const rowEventRecords: ResumeRowEventRecords = new WeakMap();
+	// The detached subtree's own top is the row the repeat took out, and it carries
+	// where it hung. That is what lets a dispatch several microtasks behind its
+	// press finish the walk the DOM would have given it at press time.
+	const detachedRowAnchor = (target: ResumeDomElement): ResumeDomElement | undefined => {
+		let current: ResumeDomElement = target;
+		for (;;) {
+			const parent = current.parentElement;
+			if (!parent) return (current as DisposedRepeatRow).__marklessRowParent;
+			current = parent;
+		}
+	};
 	let debugRegistrations: Set<Promise<unknown>> | undefined;
 	const trackDebug = (pending: Promise<unknown>) => {
 		(debugRegistrations ??= new Set()).add(pending);
@@ -164,7 +179,13 @@ export function createEventWiring(input: {
 		if (!target) throw unmatchedDispatchError(event, undefined);
 		const selector = describeResumeEventTarget(target);
 		const ignoredDisposed = input.ignoredDisposedEventTargets.has(target);
-		if (!containsElement(input.root, target) && !ignoredDisposed)
+		// The browser aimed this event at a page where the row was still there; a
+		// keyed repeat has taken the row out since. The parent it left stands in for
+		// the link the walk would have crossed at press time.
+		const attached = containsElement(input.root, target);
+		const anchor = attached ? undefined : detachedRowAnchor(target);
+		const rowAnchor = anchor && containsElement(input.root, anchor) ? anchor : undefined;
+		if (!attached && !ignoredDisposed && !rowAnchor)
 			throw unmatchedDispatchError(event, selector);
 		const bubbles = event.bubbles !== false;
 		const path = collectDispatchPath(target, event.type, eventRecords, rowEventRecords, bubbles);
@@ -188,6 +209,9 @@ export function createEventWiring(input: {
 			// forwards every captured event; non-markless clicks (e.g. router
 			// links) must pass through silently rather than throw.
 			if (options.ignoreUnmatched === true) return;
+			// Reported above before it is let go: a row the app itself removed is
+			// not a routing defect, but the no-match still belongs in the log.
+			if (rowAnchor) return;
 			throw unmatchedDispatchError(event, selector);
 		}
 		const propagation = trackPropagationStops(event);
@@ -331,6 +355,15 @@ export function createEventWiring(input: {
 		const { findRepeatItemByKey, readKeyedRepeatCollection, validateOneRepeat } =
 			await import('./resume-keyed-repeats.ts');
 		const { repeat, rowKey, rowEvent } = match;
+		// The row is out of the document AND its item is out of the collection, so
+		// this record has no item left to act on. The walk carries on, so an
+		// enclosing record still answers the gesture rather than it being dropped.
+		if (
+			!match.rowRoot.parentElement &&
+			findRepeatItemByKey(readKeyedRepeatCollection(input.graph, repeat), repeat, rowKey) ===
+				undefined
+		)
+			return;
 		if (rowEvent.syncPolicy && !options.syncPolicyAlreadyApplied)
 			runPolicy?.(rowEvent.syncPolicy, input.graph, event);
 		let activeSymbolId: string | undefined;
@@ -502,7 +535,12 @@ function collectDispatchPath(
 			const eventRecord = eventRecords.get(current)?.get(eventName);
 			if (eventRecord) path.push({ element: current, eventRecord });
 		}
-		current = bubbles ? current.parentElement : null;
+		// A detached row root has no parent left, so the walk crosses on the parent
+		// it was removed from - the same link the DOM would have handed it had the
+		// removal not beaten this dispatch to it.
+		current = bubbles
+			? (current.parentElement ?? (current as DisposedRepeatRow).__marklessRowParent ?? null)
+			: null;
 	}
 	return path;
 }
