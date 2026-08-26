@@ -1,8 +1,8 @@
-// The skipped rows in this file all rest on one open limitation: a widget callback
-// slot's dispatch never leaves the widget. `checkbox.toggle()` calls
-// `checkbox.onChange?.(next)`, which the consumer edge answers with
-// `checklist.setAll`, and on a real gesture no checklist symbol runs at all — so
-// nothing a person does to one part moves the group.
+// The skipped rows in this file all rest on one open limitation: nothing a person
+// does to one part moves the group. The dispatch itself is not the gap — measured,
+// `checkbox.toggle()` does reach `checklist.setAll` through the root's callback
+// prop, and `setAll` writes the group's value — but the items' checked bindings
+// never re-read it, so every box stays where it was.
 import { render, renderSSR } from '@markless/vitest-browser';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
@@ -256,16 +256,29 @@ async function expectConsumerCallbackCarriesTheWholeSet() {
 	await expect.poll(() => el(Calls).textContent).toBe('3');
 }
 
+// The select-all's own route, isolated from the item route: one click on the
+// select-all is the whole gesture, so anything the page shows came through the
+// root's inline callback prop and `setAll`.
+async function expectSelectAllRouteReachesTheConsumerCallback() {
+	expect(el(Calls).textContent).toBe('0');
+	el(SelectAllTrigger).click();
+	await expect.poll(() => el(Calls).textContent).toBe('1');
+}
+
+async function expectSelectAllRouteCarriesTheWholeSet() {
+	el(SelectAllTrigger).click();
+	await expect.poll(() => el(Value).textContent).toBe('lettuce,tomato');
+}
+
 async function expectOmittedCallbackStillTicks() {
 	el(LettuceTrigger).click();
 	await expect.poll(() => el(LettuceTrigger).getAttribute('aria-checked')).toBe('true');
 	await expect.poll(() => el(SelectAllTrigger).getAttribute('aria-checked')).toBe('mixed');
 }
 
-// Every `test.skip` below is skipped on the dispatch defect named at the top of the
-// file: the gesture reaches the composed checkbox and stops there, so the group's
-// value never moves. Un-skip when a part's slot invocation reaches the root edge's
-// callback.
+// Every `test.skip` below is skipped on the limitation named at the top of the
+// file: `setAll` writes the group's value and no part re-reads it. Un-skip when a
+// write to the shared instance moves the parts bound to it.
 
 for (const mode of MODES) {
 	test(`${mode}: the starter renders a named group, a select-all and three items`, async () => {
@@ -374,6 +387,22 @@ for (const mode of MODES) {
 		if (mode === 'CSR') await render(WithOnChange);
 		else await renderSSR(WithOnChange);
 		await expectConsumerCallbackCarriesTheWholeSet();
+	});
+
+	test(`${mode}: the select-all reaches the consumer onChange exactly once`, async () => {
+		if (mode === 'CSR') await render(WithOnChange);
+		else await renderSSR(WithOnChange);
+		await expectSelectAllRouteReachesTheConsumerCallback();
+	});
+
+	// Pinned as what should happen: a callback a page hands to a component is
+	// compiled to read its argument from the DOM event, while the component calls
+	// it with real arguments, so the page's handler is given the click rather than
+	// the new ticked set.
+	test.fails(`${mode}: the select-all hands the consumer onChange the whole set`, async () => {
+		if (mode === 'CSR') await render(WithOnChange);
+		else await renderSSR(WithOnChange);
+		await expectSelectAllRouteCarriesTheWholeSet();
 	});
 
 	test(`${mode}: an omitted onChange still ticks`, async () => {
