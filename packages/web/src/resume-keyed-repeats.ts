@@ -8,7 +8,7 @@ import type {
 	ResumeRuntimeInput,
 	ResumeViewRecord,
 } from './resume-types.ts';
-import type { ResumeEventWiring } from './resume-events.ts';
+import type { DisposedRepeatRow, ResumeEventWiring } from './resume-events.ts';
 
 /**
  * Give every computed-backed repeat collection a readable value before wiring.
@@ -61,17 +61,13 @@ type RepeatReadableGraph = Pick<RuntimeGraph, 'read'>;
  * The `import()` specifier is NOT written here: this module is loaded by every
  * repeat, so naming the mint would emit its chunk for every app with any keyed
  * repeat. The app's own resume module writes the loader into `__marklessRowMint`
- * instead, and only for a page the compiler recorded a mintable repeat for; the
- * type imports below erase, so they cost no edge. An absent loader is a page
- * that cannot build nodes, and every mint site below refuses without one.
- *
- * A page with a component row answers the same global with `fns/row-component-
- * mint`, a superset: the two builders, plus the async pair this module calls
- * around its apply. Every byte of that path lives there, which is what keeps a
- * page without a component row shipping none of it.
- *
- * The loader is page-AGNOSTIC - two page modules in one document write the same
- * one - so the page a row renders against arrives on the wiring, not the global.
+ * instead, and only for a page the compiler recorded a mintable repeat for. An
+ * absent loader is a page that cannot build nodes, and every mint site refuses
+ * without one. A page with a component row answers the same global with
+ * `fns/row-component-mint`, a superset carrying every byte of that path, which
+ * is what keeps a page without a component row shipping none of it. The loader
+ * is page-AGNOSTIC - two page modules in one document write the same one - so
+ * the page a row renders against arrives on the wiring, not the global.
  */
 type RowMint = typeof import('./fns/row-mint.ts') &
 	Partial<import('./fns/row-component-mint.ts').RowComponentMintApi>;
@@ -309,10 +305,15 @@ function applyKeyedRepeatRowOrder(
 	// A key that left the collection takes its row out of the document. Without
 	// this the served row stayed attached and every read of the rows - an
 	// ordered element() set most of all - kept answering a row that is gone.
-	// The record is kept in rowRootsByKey so the same key can return.
+	// The record is kept in rowRootsByKey so the same key can return, and where
+	// the row hung is kept ON the row: dispatch runs microtasks behind the press
+	// it answers, so an event still holding this row finishes its walk across it.
 	const staying = new Set(nextRows);
 	for (const rowRoot of currentRows)
-		if (!staying.has(rowRoot)) mutableParent.removeChild?.(rowRoot);
+		if (!staying.has(rowRoot)) {
+			mutableParent.removeChild?.(rowRoot);
+			(rowRoot as DisposedRepeatRow).__marklessRowParent = parent;
+		}
 	// Rows go back into their own span, not onto the end of the parent. Appending
 	// was right only while a repeat owned every child; with a sibling in front of
 	// the rows the anchor is the first element after the row span that this
