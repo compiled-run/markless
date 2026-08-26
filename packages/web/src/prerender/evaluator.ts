@@ -30,9 +30,11 @@ import type { ComposeGraphProps } from '../fns/composition.ts';
 import { marklessCsrRemapChildGraph } from '../fns/composition.ts';
 import { marklessBoundSymbolId } from '../fns/bound-symbol.ts';
 import {
+	marklessEnclosingWidgetGraphNodeId,
 	marklessInstancePath,
 	marklessRowFreeSymbolId,
 	marklessRowSegment,
+	marklessWithEnclosingWidgetRoots,
 } from '../fns/instance-scope.ts';
 import { prerenderBranchArm } from './branch-arm.ts';
 import { registerPrerenderStagedComputeds } from './staged-graph.ts';
@@ -982,7 +984,7 @@ function liveSharedInstanceSeeds(
  * first render of that row would have used. Values the OWNER holds still cross
  * as props, read live.
  */
-export async function renderRepeatRowComponent(input: {
+export type RepeatRowComponentInput = {
 	readonly surface: PrerenderDataSurface;
 	readonly ownerComponentName: string;
 	readonly componentEdgeId: string;
@@ -994,7 +996,41 @@ export async function renderRepeatRowComponent(input: {
 	readonly read: PrerenderRead;
 	readonly idPrefix?: string;
 	readonly symbolPrefix?: string;
-}): Promise<RepeatRowComponentRender> {
+	/**
+	 * The live page's widget instances this row is being minted inside, by the
+	 * definition id its parts spell. Without them a part reading a widget rooted
+	 * outside the row resolves to a fresh instance of its own.
+	 */
+	readonly enclosingWidgetRoots?: ReadonlyMap<string, string>;
+	/**
+	 * The live instance path the repeat host stands at. It rides the row's own
+	 * segment, because a key is only unique WITHIN one rendered repeat: two
+	 * instances of one widget can each mint a row called `file-1`, and ids that
+	 * said only `r:file-1:` would be one row to every reader on the page.
+	 */
+	readonly enclosingInstancePath?: string;
+};
+
+export function renderRepeatRowComponent(
+	input: RepeatRowComponentInput,
+): Promise<RepeatRowComponentRender> {
+	return marklessWithEnclosingWidgetRoots(
+		rowSegmentOf(input),
+		input.enclosingWidgetRoots,
+		() => renderRowComponentEdge(input),
+	);
+}
+
+export function rowSegmentOf(input: {
+	readonly rowKey: unknown;
+	readonly enclosingInstancePath?: string;
+}): string {
+	return marklessRowSegment((input.enclosingInstancePath ?? '') + String(input.rowKey));
+}
+
+async function renderRowComponentEdge(
+	input: RepeatRowComponentInput,
+): Promise<RepeatRowComponentRender> {
 	const definition = input.surface.components[input.ownerComponentName];
 	if (!definition)
 		throw new Error(`MARKLESS_PRERENDER_DATA_COMPONENT_MISSING: ${input.ownerComponentName}`);
@@ -1004,10 +1040,17 @@ export async function renderRepeatRowComponent(input: {
 	if (!edge) throw new Error(`MARKLESS_PRERENDER_CHILD_MISSING: ${input.componentEdgeId}`);
 	const ownerIdPrefix = input.idPrefix ?? '',
 		ownerSymbolPrefix = input.symbolPrefix ?? '',
-		rowSegment = marklessRowSegment(input.rowKey),
+		rowSegment = rowSegmentOf(input),
 		hostPrefix = rowSegment + edge.hostPrefix,
 		symbolPrefix = rowSegment + edge.symbolPrefix,
-		read = input.read;
+		// The seed pass asks for a widget's nodes by the bare id the module spells,
+		// which names no instance at all; the enclosing root is what turns it into
+		// the live widget's node rather than a page-space one nothing ever wrote.
+		enclosingRoots = input.enclosingWidgetRoots,
+		read: PrerenderRead = enclosingRoots?.size
+			? (graphNodeId, path) =>
+					input.read(marklessEnclosingWidgetGraphNodeId(graphNodeId, enclosingRoots), path)
+			: input.read;
 	const readDecision = (source: string | undefined, context: SsrDataReadContext | undefined) =>
 		source &&
 		definition.readResidue?.(

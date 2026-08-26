@@ -600,6 +600,86 @@ export function marklessNoteWidgetRoot(
 		registry.rowRooted.add(id.slice(marklessInstancePath(id).length));
 }
 
+/**
+ * The rendered widgets a client-minted repeat row is standing INSIDE.
+ *
+ * A minted row composes alone, so the registry that render builds holds only the
+ * roots the row itself is. A part reading a widget rooted in an ancestor - the
+ * collection the repeat iterates, most of all - would find nothing and mint a
+ * second instance of it, whose writes no served node ever sees. The mint reads
+ * the live page's roots off its graph and installs them here for the row's
+ * render; the `rowSegment` guard is what keeps a render running beside it from
+ * reading the answer, the same separation `marklessWidgetScope` settles for.
+ */
+const enclosingWidgetScope: {
+	rowSegment: string;
+	roots: ReadonlyMap<string, string> | undefined;
+} = { rowSegment: '', roots: undefined };
+
+/**
+ * The ancestor roots a row minted at `anchorInstancePath` can reach, by the
+ * definition id its parts spell. The anchor is a live position at or above the
+ * repeat host, so this is the same walk a served row's part resolves through.
+ */
+export function marklessEnclosingWidgetRoots(
+	anchorInstancePath: string,
+	registry: MarklessWidgetRegistry,
+): ReadonlyMap<string, string> {
+	const roots = new Map<string, string>();
+	if (!anchorInstancePath) return roots;
+	for (const id of registry.rootPaths.keys()) {
+		const definitionId = id.slice(marklessInstancePath(id).length);
+		if (roots.has(definitionId)) continue;
+		const rootPath = marklessWidgetRootPathThroughRows(
+			definitionId,
+			anchorInstancePath,
+			registry,
+		);
+		if (rootPath) roots.set(definitionId, rootPath);
+	}
+	return roots;
+}
+
+export async function marklessWithEnclosingWidgetRoots<T>(
+	rowSegment: string,
+	roots: ReadonlyMap<string, string> | undefined,
+	render: () => Promise<T>,
+): Promise<T> {
+	if (!roots?.size) return render();
+	const heldSegment = enclosingWidgetScope.rowSegment,
+		heldRoots = enclosingWidgetScope.roots;
+	enclosingWidgetScope.rowSegment = rowSegment;
+	enclosingWidgetScope.roots = roots;
+	try {
+		return await render();
+	} finally {
+		enclosingWidgetScope.rowSegment = heldSegment;
+		enclosingWidgetScope.roots = heldRoots;
+	}
+}
+
+/** The ancestor root for a bare widget id, or the id untouched when none owns it. */
+export function marklessEnclosingWidgetGraphNodeId(
+	graphNodeId: string,
+	roots: ReadonlyMap<string, string>,
+): string {
+	const pageSpace = PAGE_SPACE_ID.exec(graphNodeId);
+	if (!pageSpace || pageSpace[2] !== 'shared' || pageSpace[1]) return graphNodeId;
+	const rootPath = enclosingRootPathFor(graphNodeId, roots);
+	return rootPath ? rootPath + graphNodeId : graphNodeId;
+}
+
+function enclosingRootPathFor(
+	graphNodeId: string,
+	roots: ReadonlyMap<string, string>,
+): string | undefined {
+	const slash = graphNodeId.lastIndexOf('/');
+	return (
+		roots.get(graphNodeId) ??
+		(slash > 0 ? roots.get(graphNodeId.slice(0, slash)) : undefined)
+	);
+}
+
 // The widget this child-local `shared:` id belongs to: the answer registered for
 // the longest prefix of the reading instance's path.
 function marklessWidgetRootPath(
@@ -714,6 +794,13 @@ export function marklessComposedGraphNodeId(
 	if (pageSpace[1]) return instancePath + graphNodeId;
 	const rootPath = marklessWidgetRootPathThroughRows(graphNodeId, instancePath, registry);
 	if (rootPath) return rootPath + graphNodeId;
+	// Only a minted row installs enclosing roots, and only for ids its own render
+	// registered no root for - so a widget the row IS still answers with the row's.
+	const enclosing =
+		enclosingWidgetScope.roots && instancePath.startsWith(enclosingWidgetScope.rowSegment)
+			? enclosingRootPathFor(graphNodeId, enclosingWidgetScope.roots)
+			: undefined;
+	if (enclosing) return enclosing + graphNodeId;
 	return marklessUnresolvedWidgetGraphNodeId(graphNodeId, instancePath, registry);
 }
 

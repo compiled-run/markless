@@ -102,6 +102,7 @@ export function marklessRowComponentMint(
 			prepared = new Map();
 			if (repeat.rowComponent && graph && host) {
 				const surface = await pageSurface(repeat);
+				const enclosing = await enclosingWidgetsFor(graph, repeat);
 				for (const [rowIndex, item] of readKeyedRepeatCollection(graph, repeat).entries()) {
 					const rowKey = rowKeyOf(item, repeat);
 					if (served.has(rowKey) || prepared.has(rowKey)) continue;
@@ -115,6 +116,7 @@ export function marklessRowComponentMint(
 							rowKey,
 							rowIndex,
 							graph,
+							enclosing,
 							loadSymbol: host.runtimeInput.loadSymbol,
 							registration: host,
 						}),
@@ -149,13 +151,18 @@ async function mintComponentRow(input: {
 	readonly rowKey: unknown;
 	readonly rowIndex: number;
 	readonly graph: RuntimeGraph;
+	readonly enclosing: EnclosingWidgets;
 	readonly loadSymbol: (symbolId: string) => unknown;
 	readonly registration: RowRegistration;
 }): Promise<MintedRow> {
 	const rowComponent = input.repeat.rowComponent!;
 	// Loaded here, not named at the top: this module is the demand gate, and a
 	// static edge would put the evaluator's closure inside every page that has one.
-	const { renderRepeatRowComponent } = await import('../prerender/evaluator.ts');
+	const { renderRepeatRowComponent, rowSegmentOf } = await import('../prerender/evaluator.ts');
+	const rowSegment = rowSegmentOf({
+		rowKey: input.rowKey,
+		enclosingInstancePath: input.enclosing.instancePath,
+	});
 	const rendered = await renderRepeatRowComponent({
 		surface: input.surface,
 		ownerComponentName: rowComponent.componentName,
@@ -167,7 +174,10 @@ async function mintComponentRow(input: {
 		loadSymbol: input.loadSymbol,
 		read: (graphNodeId, path = []) => input.graph.read(graphNodeId, path),
 		idPrefix: ownerIdPrefix(input.surface, rowComponent.componentName, input.repeat),
+		enclosingWidgetRoots: input.enclosing.roots,
+		enclosingInstancePath: input.enclosing.instancePath,
 	});
+	assertRowWidgetsResolved(input.repeat, rendered.state);
 	const childNodes = parseRowNodes(input.parent, input.repeat, rendered.html);
 	assertMintableRowRecords(input.repeat, rendered.view);
 	// The child's locators and branch anchors index its OWN fragment, so they
@@ -191,6 +201,7 @@ async function mintComponentRow(input: {
 			commitMintedRow(input.registration, rendered, elementsByHostId, input.repeat, {
 				branches,
 				rowKey: input.rowKey,
+				rowSegment,
 			}),
 	};
 }
@@ -238,6 +249,7 @@ async function commitMintedRow(
 	row: {
 		readonly branches: ReadonlyArray<ResumeArmBranchRecord>;
 		readonly rowKey: unknown;
+		readonly rowSegment: string;
 	},
 ): Promise<void> {
 	const armRecords: ResumeArmRecordSet = {
@@ -253,7 +265,7 @@ async function commitMintedRow(
 	};
 	const deps = await registration.armRegistrationDeps(armRecords);
 	await seedMintedGraphNodes(deps, rendered.state);
-	await mergeMintedWidgetRoots(deps, rendered.state, repeat);
+	await mergeMintedWidgetRoots(deps, rendered.state, repeat, row.rowSegment);
 	const { registerArmRecordSet } = await import('../resume-commit-arm.ts');
 	await registerArmRecordSet(
 		deps,
@@ -261,6 +273,55 @@ async function commitMintedRow(
 		mintedRowBoundary(repeat, row.rowKey),
 		{ armRecords, elementsByHostId, computed: rendered.state.computed },
 	);
+}
+
+type EnclosingWidgets = {
+	readonly instancePath: string;
+	readonly roots: ReadonlyMap<string, string>;
+};
+
+/**
+ * The rendered widgets the repeat host stands inside, off the LIVE graph.
+ *
+ * The anchor is the instance path of the collection node the repeat itself
+ * reads: a live position at or above the repeat host, resolved when the page was
+ * served through the same widget machinery a served row's part resolves through.
+ * Walking the live registry from there answers with the instances an ancestor
+ * widget really rendered, so a minted row's parts read them instead of minting a
+ * second set. A repeat whose collection carries no instance path answers with
+ * nothing, and a row that then reads a widget is refused below rather than
+ * silently forked.
+ */
+async function enclosingWidgetsFor(
+	graph: RuntimeGraph,
+	repeat: ResumeKeyedRepeatRecord,
+): Promise<EnclosingWidgets> {
+	const instanceScope = await import('./instance-scope.ts');
+	const instancePath = instanceScope.marklessInstancePath(repeat.collectionGraphNodeId);
+	const registry = instanceScope.marklessGraphWidgetRegistry(graph);
+	if (registry.rootPaths.size === 0) return { instancePath, roots: new Map() };
+	return {
+		instancePath,
+		roots: instanceScope.marklessEnclosingWidgetRoots(instancePath, registry),
+	};
+}
+
+// A widget-scoped definition whose composed id still names no instance belongs
+// to neither a root the row is nor a live ancestor, so its nodes would be a
+// second instance nothing else reads.
+function assertRowWidgetsResolved(
+	repeat: ResumeKeyedRepeatRecord,
+	state: ProtocolStatePayload,
+): void {
+	for (const definition of state.sharedDefinitions ?? []) {
+		if (definition.scope !== 'widget') continue;
+		if (definition.id.startsWith('shared:'))
+			throw rowComponentError(
+				repeat,
+				'MARKLESS_REPEAT_ROW_COMPONENT_WIDGET_UNRESOLVED',
+				`built a row reading ${definition.id}, which neither the row nor any live widget the repeat stands inside owns.`,
+			);
+	}
 }
 
 /**
@@ -311,6 +372,7 @@ async function mergeMintedWidgetRoots(
 	deps: ArmRegistrationDeps,
 	state: ProtocolStatePayload,
 	repeat: ResumeKeyedRepeatRecord,
+	rowSegment: string,
 ): Promise<void> {
 	const definitions = (state.sharedDefinitions ?? []).filter(
 		(definition) => definition.scope === 'widget',
@@ -339,6 +401,11 @@ async function mergeMintedWidgetRoots(
 		const rootPath = instanceScope.marklessInstancePath(definition.id);
 		note(definition.id, rootPath);
 		for (const projectionId of definition.projectionIds ?? []) note(projectionId, rootPath);
+		// A root OUTSIDE the row is filed again under the row's own path: the row's
+		// symbols run there, and the registry walk only ever chops segments off the
+		// right, so from inside the row it could never reach an ancestor otherwise.
+		if (!rootPath.startsWith(rowSegment))
+			note(rowSegment + definition.id.slice(rootPath.length), rootPath);
 	}
 }
 

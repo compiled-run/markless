@@ -63,10 +63,9 @@ test('CSR: an outside handler takes a minted key out of both lists', async () =>
 	expect(widget(container)).toEqual(['alpha', 'charlie', 'delta']);
 });
 
-// The attribute records which instance a row's own button resolved. A served row
-// answers with the enclosing widget's; a minted row answers '', because the row's
-// render is handed no enclosing instance and builds a second one of its own.
-test.fails('CSR: a row-owned button resolves the enclosing widget on served and minted rows', async () => {
+// The attribute records which instance a row's own button resolved: a minted row
+// has to answer with the enclosing widget's, exactly as a served row does.
+test('CSR: a row-owned button resolves the enclosing widget on served and minted rows', async () => {
 	const screen = await render(Page);
 	const container = screen.container as HTMLElement;
 	expect(owners(container)).toEqual(['rows', 'rows', 'rows']);
@@ -86,9 +85,7 @@ test('CSR: a row-owned button takes off its own row and leaves the rest', async 
 	expect(plain(container)).toEqual(['alpha', 'charlie']);
 });
 
-// The same wall, measured on the list: the write goes to the minted row's own
-// instance, so the collection never moves and the row stays.
-test.fails('CSR: a minted row-owned button takes off its own row', async () => {
+test('CSR: a minted row-owned button takes off its own row', async () => {
 	const screen = await render(Page);
 	const container = screen.container as HTMLElement;
 	press(container, 'data-krgr-add-d');
@@ -108,4 +105,17 @@ test('SSR: a resumed page drops a served key from both lists', async () => {
 	await expect.poll(() => length(container)).toBe('2');
 	expect(plain(container)).toEqual(['alpha', 'charlie']);
 	expect(widget(container)).toEqual(['alpha', 'charlie']);
+});
+
+test('SSR: a minted row-owned button resolves the enclosing widget and drops its row', async () => {
+	const screen = await renderSSR(Page);
+	const container = screen.container as HTMLElement;
+	press(container, 'data-krgr-add-d');
+	await expect.poll(() => widget(container)).toEqual(['alpha', 'bravo', 'charlie', 'delta']);
+	expect(owners(container)).toEqual(['rows', 'rows', 'rows', 'rows']);
+
+	press(container, 'data-krgr-widget-drop', 3);
+	await expect.poll(() => length(container)).toBe('3');
+	expect(widget(container)).toEqual(['alpha', 'bravo', 'charlie']);
+	expect(plain(container)).toEqual(['alpha', 'bravo', 'charlie']);
 });
