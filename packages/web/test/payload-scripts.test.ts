@@ -1298,9 +1298,14 @@ test('runtime resumes directly from async payload scripts', async () => {
 		},
 	});
 
+	// The focus-primed preload rides behind the dispatch listener, never ahead of it.
 	expect(root.listeners).toEqual([
 		expect.objectContaining({
 			type: 'keydown',
+			options: { capture: true },
+		}),
+		expect.objectContaining({
+			type: 'focusin',
 			options: { capture: true },
 		}),
 	]);

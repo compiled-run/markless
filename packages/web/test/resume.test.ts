@@ -535,9 +535,14 @@ test('resume runtime materializes view records and dispatches lazy symbols after
 
 	await resume.start();
 
+	// The focus-primed preload rides behind the dispatch listener, never ahead of it.
 	expect(root.listeners).toEqual([
 		expect.objectContaining({
 			type: 'keydown',
+			options: { capture: true },
+		}),
+		expect.objectContaining({
+			type: 'focusin',
 			options: { capture: true },
 		}),
 	]);

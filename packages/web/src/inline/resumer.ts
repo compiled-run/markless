@@ -998,6 +998,54 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 		...view.events.map((event) => event.eventName),
 		...nestedEventNames,
 	]);
+	// A key event can only reach an element that already holds focus, so a focus
+	// onto an element with a key record names the handler this page needs next.
+	// A wake, not a dispatch: the real key arrives through the capture listener
+	// below, queued behind this same import promise. Names restated because this
+	// body is serialized by toString().
+	const focusPreloadEventNames = ['keydown', 'keyup', 'keypress', 'beforeinput', 'input'];
+	if (focusPreloadEventNames.some((eventName) => eventNames.has(eventName))) {
+		const primeFocus = (event: Event) => {
+			if (root.__marklessDelegatedDispatch) return;
+			let primes = false;
+			for (
+				let element = event.target as Element | null;
+				element && !primes;
+				element = element.parentElement
+			) {
+				const hostNodeId = hostIds.get(element);
+				if (hostNodeId) {
+					const editable =
+						(element as HTMLElement).isContentEditable === true ||
+						element.tagName === 'INPUT' ||
+						element.tagName === 'TEXTAREA' ||
+						element.tagName === 'SELECT';
+					primes = focusPreloadEventNames.some(
+						(eventName) =>
+							(editable ||
+								(eventName !== 'beforeinput' && eventName !== 'input')) &&
+							events.has(`${hostNodeId}\n${eventName}`),
+					);
+				}
+				if (element === root) break;
+			}
+			// Same hatch the dispatch listener opens on: a row minted after boot owns
+			// no element this payload names a record for.
+			if (
+				!primes &&
+				(mintsComponentRows ||
+					focusPreloadEventNames.some((eventName) => nestedEventNames.has(eventName)))
+			)
+				primes = true;
+			if (!primes) return;
+			root.removeEventListener('focusin', primeFocus, true);
+			root.__marklessDelegatedDispatch = true;
+			(loaded ||= loadModule(resumeModuleUrl)).then((module) =>
+				module.resumeContainerEvent({ root, event: 0 }),
+			);
+		};
+		root.addEventListener('focusin', primeFocus, true);
+	}
 	for (const eventName of eventNames) {
 		if (eventName === 'visible') continue;
 		root.addEventListener(
