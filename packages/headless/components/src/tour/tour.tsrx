@@ -16,18 +16,10 @@ import type {
 	TourValueLabelProps,
 } from './tour-types.ts';
 
-// Anchoring is written onto the consumer's own element through the handle they
-// bound, which a <style> block cannot reach. NEVER put `anchor-scope` on the
-// root: a tour's target is outside the root's subtree, so scoping the name there
-// hides it from the card.
-// Each <style> block's subject must be structurally unique across the module:
-// the scope class is per module, not per part.
+// Never put `anchor-scope` on the root: a tour's target is outside the root's
+// subtree, so scoping the anchor name there hides it from the card.
 // Every graph read stands on its own line before it is used - an expression
 // nesting one under a call crashes the handler module.
-// Declaration order is load-bearing. A family is rooted at the first component
-// that resolves it, so the order [item, root, card] is the only one that both
-// lets the card read the step's handles for its IDREFs and leaves the tour
-// rooted at the root; both alternatives were measured and refused.
 
 export const tourState = shared(
 	() => {
@@ -343,7 +335,10 @@ export function TourValueLabel({ children, ...rest }: TourValueLabelProps) @{
 
 export function TourBackTrigger({ children, onClick, ...rest }: TourBackTriggerProps) @{
 	const tour = tourState();
-	const isOff = computed(() => {
+	// Each trigger's gate cell carries its own name: two components in one module
+	// declaring the same `const` name collapse to one cell, and the survivor's
+	// formula silently answers for both.
+	const isBackOff = computed(() => {
 		const locked = tour.disabled;
 		const wraps = tour.loop;
 		const at = tour.step;
@@ -353,7 +348,8 @@ export function TourBackTrigger({ children, onClick, ...rest }: TourBackTriggerP
 	<button
 		{...rest}
 		type="button"
-		disabled={isOff}
+		disabled={isBackOff}
+		ui-disabled={isBackOff}
 		onClick={(event) => {
 			tour.prev();
 			onClick?.(event);
@@ -363,7 +359,7 @@ export function TourBackTrigger({ children, onClick, ...rest }: TourBackTriggerP
 
 export function TourForwardTrigger({ children, onClick, ...rest }: TourForwardTriggerProps) @{
 	const tour = tourState();
-	const isOff = computed(() => {
+	const isForwardOff = computed(() => {
 		const locked = tour.disabled;
 		const wraps = tour.loop;
 		const at = tour.step;
@@ -374,7 +370,8 @@ export function TourForwardTrigger({ children, onClick, ...rest }: TourForwardTr
 	<button
 		{...rest}
 		type="button"
-		disabled={isOff}
+		disabled={isForwardOff}
+		ui-disabled={isForwardOff}
 		onClick={(event) => {
 			tour.next();
 			onClick?.(event);
