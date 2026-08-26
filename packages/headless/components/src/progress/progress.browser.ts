@@ -6,6 +6,7 @@ import Complete from './scenarios/complete.tsrx';
 import CustomRange from './scenarios/custom-range.tsrx';
 import Indeterminate from './scenarios/indeterminate.tsrx';
 import Live from './scenarios/live.tsrx';
+import Measurement from './scenarios/measurement.tsrx';
 import Moving from './scenarios/moving.tsrx';
 import OwnName from './scenarios/own-name.tsrx';
 import OwnText from './scenarios/own-text.tsrx';
@@ -146,7 +147,25 @@ for (const mode of MODES) {
 		else await renderSSR(OwnText);
 		expect(el(ValueLabel).textContent?.trim()).toBe('30 of 100 rows');
 		expect(el(ValueLabel).getAttribute('ui-value')).toBe('30');
-		expect(el(Root).getAttribute('aria-valuetext')).toBe('30%');
+		expect(el(Root).getAttribute('aria-valuetext')).toBe('30 of 100 rows');
+	});
+
+	test(`${mode}: a measurement written as a children prop is what the bar reports`, async () => {
+		if (mode === 'CSR') await render(Measurement);
+		else await renderSSR(Measurement);
+		expect(el(ValueLabel).textContent?.trim()).toBe('30 of 100 rows');
+		expect(el(Root).getAttribute('aria-valuenow')).toBe('30');
+		expect(el(Root).getAttribute('aria-valuetext')).toBe('30 of 100 rows');
+	});
+
+	test(`${mode}: a changed measurement moves what the bar reports`, async () => {
+		if (mode === 'CSR') await render(Measurement);
+		else await renderSSR(Measurement);
+		expect(el(Root).getAttribute('aria-valuetext')).toBe('30 of 100 rows');
+
+		el<HTMLButtonElement>(Advance).click();
+		await expect.poll(() => el(Amount).textContent).toBe('60 of 100 rows');
+		await expect.poll(() => el(Root).getAttribute('aria-valuetext')).toBe('60 of 100 rows');
 	});
 
 	test(`${mode}: the value label follows the amount the bar is moved to`, async () => {
@@ -173,6 +192,17 @@ for (const mode of MODES) {
 		expectBasicRootDropsDestructuredProps();
 	});
 }
+
+// Expected red: the seeded cell the bar reads follows a changed measurement, but the
+// part's own projection of those children does not re-render, so the page shows the
+// first wording while the bar already reports the new one.
+test.fails('CSR: the value label shows a measurement the consumer changes', async () => {
+	await render(Measurement);
+
+	el<HTMLButtonElement>(Advance).click();
+	await expect.poll(() => el(Root).getAttribute('aria-valuetext')).toBe('60 of 100 rows');
+	expect(el(ValueLabel).textContent?.trim()).toBe('60 of 100 rows');
+});
 
 // Expected red: a component-body shared seed runs on the initial render only, so a
 // new `value` prop never re-seeds the instance. The `amount` probe proves the write

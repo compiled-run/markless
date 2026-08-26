@@ -1,4 +1,4 @@
-import { computed, element, shared, state } from '@markless/core';
+import { computed, element, shared, state, type Children } from '@markless/core';
 import type {
 	ProgressBarProps,
 	ProgressIndicatorProps,
@@ -14,6 +14,7 @@ export const progressState = shared(
 			value: null as number | null,
 			min: 0,
 			max: 100,
+			ownText: '' as Children,
 		});
 		const labelEl = element<HTMLSpanElement>();
 
@@ -29,6 +30,8 @@ export const progressState = shared(
 			// rather than a percentage computed from `min`.
 			valueText: computed(() => {
 				if (progress.value === null) return null;
+				if (typeof progress.ownText === 'string' && progress.ownText !== '')
+					return progress.ownText;
 				const covered = (progress.value - progress.min) / (progress.max - progress.min);
 				return `${Math.round(covered * 100)}%`;
 			}),
@@ -119,6 +122,8 @@ export function ProgressIndicator({ children, ...rest }: ProgressIndicatorProps)
 // whose percentage ticks would announce every step over the bar's own value.
 export function ProgressValueLabel({ children, ...rest }: ProgressValueLabelProps) @{
 	const progress = progressState();
+	// A bare prop seed: the text the consumer wrote here is what the bar reports.
+	progress.ownText = children;
 	// An indeterminate bar has no percentage to show, and an empty part is the honest render.
 	const text = computed(() => progress.valueText ?? '');
 

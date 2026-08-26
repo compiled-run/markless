@@ -39,6 +39,7 @@ export type ProgressIndicatorProps = PropsOf<'div'>;
  * The current value as text. Left empty it renders the percentage of the range
  * the bar has covered - the same number the bar reports as `aria-valuetext` -
  * and nothing at all while the amount is unknown. Pass children to write the
- * text yourself.
+ * text yourself. Plain text you pass becomes what the bar reports as
+ * `aria-valuetext`, so a reader speaks your wording rather than the percentage.
  */
 export type ProgressValueLabelProps = PropsOf<'span'>;
