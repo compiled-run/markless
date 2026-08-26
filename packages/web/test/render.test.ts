@@ -2586,7 +2586,7 @@ test('renderToString envelope-encodes live directValue state cells before servin
  */
 // What elevation costs a page that uses it, in inline-resumer source bytes,
 // before compression. Re-anchor it in the same change set that moves it.
-const OVERLAY_PRIMER_BYTES = 1514;
+const OVERLAY_PRIMER_BYTES = 1498;
 
 function inlineResumerSourceOf(html: string): string {
 	const found = /<script data-async-resumer[^>]*>([\s\S]*?)<\/script>/.exec(html);

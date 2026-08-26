@@ -107,7 +107,7 @@ export function firstSyncPolicyActionCall(
 		if (found) return;
 		if (candidate.type !== 'CallExpression') return;
 
-		const callee = candidate.callee as AnyNode | undefined;
+		const callee = unwrapParens(candidate.callee as AnyNode | undefined);
 		if (callee?.type !== 'MemberExpression') return;
 
 		const propertyName = getStaticPropertyName(callee.property as AnyNode | undefined);
@@ -173,17 +173,18 @@ export function firstDetachedSyncPolicyReference(node: AnyNode | undefined): {
 		if (detached || candidate.type !== 'VariableDeclarator') return;
 		const alias = getIdentifierName(candidate.id as AnyNode | undefined);
 		const init = candidate.init as AnyNode | undefined;
-		if (!alias || init?.type !== 'MemberExpression') return;
+		const target = unwrapParens(init);
+		if (!alias || target?.type !== 'MemberExpression') return;
 
-		const action = getStaticPropertyName(init.property as AnyNode | undefined);
+		const action = getStaticPropertyName(target.property as AnyNode | undefined);
 		if (action !== 'preventDefault' && action !== 'stopPropagation') return;
 		if (!callsIdentifier(node, alias)) return;
 
 		detached = {
 			action,
 			alias,
-			start: candidate.start ?? init.start ?? 0,
-			end: candidate.end ?? init.end ?? 0,
+			start: candidate.start ?? init?.start ?? 0,
+			end: candidate.end ?? init?.end ?? 0,
 		};
 	});
 
@@ -232,9 +233,10 @@ function extractSyncActions(
 	walkNode(node, (candidate) => {
 		if (candidate.type !== 'CallExpression') return;
 
-		const callee = candidate.callee as AnyNode | undefined;
+		const callee = unwrapParens(candidate.callee as AnyNode | undefined);
 		if (callee?.type !== 'MemberExpression') return;
-		if (getIdentifierName(callee.object as AnyNode | undefined) !== eventParam) return;
+		if (getIdentifierName(unwrapParens(callee.object as AnyNode | undefined)) !== eventParam)
+			return;
 
 		const propertyName = getStaticPropertyName(callee.property as AnyNode | undefined);
 		if (propertyName === 'preventDefault' || propertyName === 'stopPropagation') {
@@ -255,9 +257,10 @@ function syncActionCallNodes(
 	walkNode(node, (candidate) => {
 		if (candidate.type !== 'CallExpression') return;
 
-		const callee = candidate.callee as AnyNode | undefined;
+		const callee = unwrapParens(candidate.callee as AnyNode | undefined);
 		if (callee?.type !== 'MemberExpression') return;
-		if (getIdentifierName(callee.object as AnyNode | undefined) !== eventParam) return;
+		if (getIdentifierName(unwrapParens(callee.object as AnyNode | undefined)) !== eventParam)
+			return;
 
 		const propertyName = getStaticPropertyName(callee.property as AnyNode | undefined);
 		if (
@@ -272,14 +275,16 @@ function syncActionCallNodes(
 }
 
 function syncActionCall(
-	node: AnyNode | undefined,
+	input: AnyNode | undefined,
 	eventParam: string,
 ): SemanticSyncPolicyAction | null {
+	const node = unwrapParens(input);
 	if (node?.type !== 'CallExpression') return null;
 
-	const callee = node.callee as AnyNode | undefined;
+	const callee = unwrapParens(node.callee as AnyNode | undefined);
 	if (callee?.type !== 'MemberExpression') return null;
-	if (getIdentifierName(callee.object as AnyNode | undefined) !== eventParam) return null;
+	if (getIdentifierName(unwrapParens(callee.object as AnyNode | undefined)) !== eventParam)
+		return null;
 
 	const propertyName = getStaticPropertyName(callee.property as AnyNode | undefined);
 	if (propertyName === 'preventDefault' || propertyName === 'stopPropagation') {
@@ -288,11 +293,23 @@ function syncActionCall(
 	return null;
 }
 
+// The parser keeps authored parentheses as nodes and the formatter re-adds them,
+// so every classifier below must see through them or the same guard is refused
+// with parentheses and accepted without.
+function unwrapParens(node: AnyNode | undefined): AnyNode | undefined {
+	let current = node;
+	while (current?.type === 'ParenthesizedExpression') {
+		current = current.expression as AnyNode | undefined;
+	}
+	return current;
+}
+
 function extractSyncCondition(
-	node: AnyNode | undefined,
+	input: AnyNode | undefined,
 	eventParam: string,
 	state: Pick<WalkState, 'graph' | 'source'>,
 ): SemanticSyncPolicyCondition | undefined {
+	const node = unwrapParens(input);
 	if (!node) return undefined;
 
 	if (node.type === 'LogicalExpression') {
@@ -410,7 +427,8 @@ function syncPolicyConstantValue(
 	return { ok: false };
 }
 
-function staticExpressionPath(node: AnyNode | undefined | null): ReadonlyArray<string> | null {
+function staticExpressionPath(input: AnyNode | undefined | null): ReadonlyArray<string> | null {
+	const node = unwrapParens(input ?? undefined);
 	if (!node) return null;
 
 	const name = getIdentifierName(node);
@@ -446,16 +464,19 @@ function flattenSyncConditions(
 	});
 }
 
-function eventFieldName(node: AnyNode | undefined, eventParam: string): string | null {
+function eventFieldName(input: AnyNode | undefined, eventParam: string): string | null {
+	const node = unwrapParens(input);
 	if (node?.type !== 'MemberExpression') return null;
-	if (getIdentifierName(node.object as AnyNode | undefined) !== eventParam) return null;
+	if (getIdentifierName(unwrapParens(node.object as AnyNode | undefined)) !== eventParam)
+		return null;
 
 	return getStaticPropertyName(node.property as AnyNode | undefined);
 }
 
 function literalValue(
-	node: AnyNode | undefined,
+	input: AnyNode | undefined,
 ): { readonly ok: true; readonly value: unknown } | { readonly ok: false } {
+	const node = unwrapParens(input);
 	if (node?.type !== 'Literal') return { ok: false };
 
 	return { ok: true, value: node.value };

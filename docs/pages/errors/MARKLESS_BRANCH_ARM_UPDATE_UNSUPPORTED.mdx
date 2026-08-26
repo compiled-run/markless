@@ -1,0 +1,21 @@
+# MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED
+
+Changing this … cannot rebuild what it shows
+
+- Package: compiler
+- Pass or phase: symbol-modules
+
+## Message
+
+this … (…) cannot be rebuilt when … changes because ….
+
+## Why
+
+Showing or hiding this content replaces it wholesale from compiled markup plus value reads. A component is rebuilt from the markup its own file compiled, so one that brings state of its own, shows a function it was handed, or — when it comes from another file — shows a value that keeps changing while it is shown has nothing left to be rebuilt from, and the browser would ask for code the build never wrote. That failure stops every other update in the same component.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/symbol-modules.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
