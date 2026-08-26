@@ -100,8 +100,10 @@ export function resolveRowComponentMint(
  * the mint CAN rebuild is a projection made of components: each one renders in
  * the row's own identity and composes its whole record set beside the row's, the
  * same crossing the row's own child already makes. So the shape admitted here is
- * component parts and the static text between them, nothing else, and each part
- * answers the same reach question the row's own child answers.
+ * component parts, a value read off the repeated item, and the static text
+ * between them; each part answers the same reach question the row's own child
+ * answers. A value read off the item needs no record at all - the row render
+ * fills it from the item it was handed, exactly as a row template fills its own.
  */
 function projectionIsMintable(
 	input: ConstructReachInput,
@@ -113,6 +115,7 @@ function projectionIsMintable(
 	const chunk = input.chunks.find((candidate) => candidate.id === projectionChunkId);
 	if (!chunk || chunk.hosts.length > 0) return false;
 	return chunk.slots.every((slot) => {
+		if (mintableFromItem(slot)) return true;
 		if (slot.kind !== 'child-component') return false;
 		if (
 			slot.projectionChunkId !== undefined &&
