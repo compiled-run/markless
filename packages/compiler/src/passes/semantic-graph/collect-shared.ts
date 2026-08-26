@@ -836,6 +836,18 @@ export function sharedDefinitionId(filename: string, exportedName: string): stri
 	return `shared:${filename}#${exportedName}`;
 }
 
+/**
+ * The definition one shared graph node belongs to. A node id is its definition
+ * id followed by `/` and the node's own name, and an exported name carries no
+ * `/`, so the first slash after the `#` ends the definition id.
+ */
+export function sharedDefinitionIdOf(graphNodeId: string): string {
+	const named = graphNodeId.indexOf('#');
+	if (named === -1) return graphNodeId;
+	const end = graphNodeId.indexOf('/', named);
+	return end === -1 ? graphNodeId : graphNodeId.slice(0, end);
+}
+
 // What the semantic graph knows about `const s = session()`: the local name, the
 // definition it came from, and the graph nodes the factory declared. Every
 // consumer that turns `s.status` into a graph node id reads it through here.
