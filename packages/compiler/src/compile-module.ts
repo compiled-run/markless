@@ -19,6 +19,7 @@ import type {
 	SymbolResolverModuleManifest,
 	SymbolResolverPlan,
 } from './artifacts.ts';
+import { memoizedCompile } from './compile-cache.ts';
 import type { SourceSpan } from './diagnostics.ts';
 import { runCompilerPassPipeline } from './pass-pipeline.ts';
 import {
@@ -48,9 +49,15 @@ import {
 import { planBoundSymbolResolver, planSymbolResolver } from './passes/symbol-resolver.ts';
 import { stripExtractedSyncPolicyCalls } from './passes/semantic-graph/strip-sync-policy-calls.ts';
 
-export async function compileTsrxModule(
+export function compileTsrxModule(
 	input: CompileTsrxModuleInput,
 ): Promise<CompileTsrxModuleResult> {
+	return memoizedCompile(input, () => runCompile(input));
+}
+
+// The result is shared between the requests that asked for the same compile, so
+// every artifact it carries is read-only from here on.
+async function runCompile(input: CompileTsrxModuleInput): Promise<CompileTsrxModuleResult> {
 	const symbolResolverModuleInput: SymbolResolverModuleInput = {
 		buildId: input.buildId,
 		resolverId: input.resolverId,

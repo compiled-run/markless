@@ -42,6 +42,7 @@ import {
 import { dirname, relative, resolve } from 'pathe';
 import { withQuery } from 'ufo';
 import type { BuildDelegateLoader, DelegateSpecifierResolve } from './build/delegate-loader.ts';
+import { yieldToEventLoop } from './event-loop.ts';
 import type { ModuleMetadataRegistry } from './module-metadata-registry.ts';
 import { MARKLESS_VIRTUAL_PREFIX } from './transform.ts';
 import type {
@@ -352,6 +353,7 @@ async function barrelModuleInterface(
 	const known = artifacts.get(filename)?.moduleGraphInterface;
 	if (known) return known;
 	if (!existsSync(filename) || !statSync(filename).isFile()) return null;
+	await yieldToEventLoop();
 	const linked = await compileTsrxModuleLinkArtifact({
 		filename,
 		source: readFileSync(filename, 'utf8'),
