@@ -749,6 +749,16 @@ function emitSsrDataLines(
 					? 'marklessSsrRowSegment(marklessSsrDataContext.repeatKey)+'
 					: ''
 			}${JSON.stringify(child.symbolPrefix)}+marklessSsrChildrenWidgetRoot(${surfaceArgs}));`;
+			// The same token filed PER family this child roots, which is what a
+			// handle's minted id asks for: a nested root of another family must not
+			// take over the plain key an outer family's parts still mint from. The
+			// CSR seed pass files exactly these keys; the loop is empty, and so
+			// costs nothing, for a projecting child that roots nothing.
+			const registerFamilies = `for(const marklessSsrFamily of marklessSsrWidgetRoots(${surfaceArgs}))marklessSsrSeeds.set(${JSON.stringify(
+				MARKLESS_WIDGET_INSTANCE_KEY,
+			)}+'|'+marklessSsrFamily,marklessSsrSeeds.get(${JSON.stringify(
+				MARKLESS_WIDGET_INSTANCE_KEY,
+			)}));`;
 			// Defect 65: a projecting child that does NOT root a widget is a PART of
 			// the widget it was placed in, so the parts written inside it belong to
 			// that instance and it must not register a token of its own - the element
@@ -759,10 +769,11 @@ function emitSsrDataLines(
 			if (seedCall)
 				widgetInstanceLineByEdgeId.set(
 					edge.id,
-					!edge.importSource &&
-						widgetRootDefinitionIds(input, edge.childComponentName).length > 0
+					(!edge.importSource &&
+					widgetRootDefinitionIds(input, edge.childComponentName).length > 0
 						? registerInstance
-						: `if(marklessSsrWidgetRoots(${surfaceArgs}).length)${registerInstance}`,
+						: `if(marklessSsrWidgetRoots(${surfaceArgs}).length)${registerInstance}`) +
+						registerFamilies,
 				);
 		}
 		// The composed child declares where ITS composition puts the children written
