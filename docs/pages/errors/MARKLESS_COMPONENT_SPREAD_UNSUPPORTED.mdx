@@ -1,0 +1,21 @@
+# MARKLESS_COMPONENT_SPREAD_UNSUPPORTED
+
+Only the props rest binding can be spread onto a component
+
+- Package: compiler
+- Pass or phase: semantic-graph
+
+## Message
+
+`{...…}` on `<…>` cannot be forwarded, because `…` is not this component's props rest binding.
+
+## Why
+
+What a spread carries onto a child component is decided at build time, from the signature that produced it. An object assembled anywhere else has no build-time contents, so the child would render without the entries and nothing would say so.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

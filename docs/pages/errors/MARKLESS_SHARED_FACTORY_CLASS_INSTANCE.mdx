@@ -1,0 +1,22 @@
+# MARKLESS_SHARED_FACTORY_CLASS_INSTANCE
+
+A shared() factory cannot return a class instance
+
+- Package: compiler
+- Pass or phase: capture-analysis
+- Severity: error
+
+## Message
+
+shared() definition "…" returns …, so the definition declares no fields at all: the payload carries nothing for it, and both the server render and the browser handler name a value that was never built.
+
+## Why
+
+A shared() factory declares the graph fields the payload carries and the server render rebuilds. A class instance declares none, so every read of it is a reference to a binding that does not exist in the module doing the reading.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/capture-analysis.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

@@ -1,0 +1,26 @@
+# MARKLESS_SYNC_POLICY_UNEXTRACTABLE
+
+Cannot extract synchronous event policy
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: error
+
+## Message
+
+Cannot extract a synchronous … policy for … because the guard is not limited to graph state, event fields, props, and constants.
+
+`…` detaches … from the event, so the compiler cannot prove when the default action is cancelled for ….
+
+## Why
+
+preventDefault() and stopPropagation() must run before lazy handler symbols load. The compiler can only emit a synchronous policy when the condition is fully represented in the resumable graph/event data plane.
+
+preventDefault() and stopPropagation() must run before lazy handler symbols load; a detached reference hides which action runs and under what condition.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/collect-sync-policy.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
