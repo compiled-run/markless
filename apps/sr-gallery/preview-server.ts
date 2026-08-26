@@ -43,6 +43,7 @@ export const FAMILY_ANCHORS = {
 	calendar: '/#calendar',
 	menu: '/#menu',
 	colorpicker: '/#colorpicker',
+	togglegroup: '/#togglegroup',
 } as const;
 
 export type FamilyName = keyof typeof FAMILY_ANCHORS;
