@@ -244,6 +244,14 @@ announcing nothing on its own; the hidden card not being a stop on the walk.
 Its `afterEach` unwind is copied from `popover.sr.ts` — the overlay stack is
 page-wide.
 
+`hovercard.nvda.ts` / `hovercard.voiceover.ts` — one row each over the served
+gallery, both reading `hovercard-transcript.ts`: the link trigger announced
+collapsed, the same trigger announced expanded once the focus delay has elapsed
+under it, Tab landing inside the card with the trigger still expanded, and Escape
+closing it and returning focus. Focus is put on the trigger directly rather than
+tabbed onto from wherever the reader left it — a reading cursor is not the
+browser's focus, and this family opens on focus.
+
 **Not tested, and why:** exact announcement wording (there is no `w3c/aria-at`
 test plan for this pattern, so there is nothing to pin utterances against); real
 touch input; anchor positioning outside Chromium in CI.
@@ -258,19 +266,25 @@ card and both dismissal paths live in `hovercard.browser.ts` instead.
 
 ## Still open
 
-- **No NVDA or VoiceOver lane.** This is the family where a real reader could test
-  the *central* claim rather than a corner of it — NVDA and VoiceOver do not
-  hover, but the whole keyboard story here is keyboard: Tab to the link, hear
-  collapsed, hear expanded, Tab in, Escape out. It is not written because it
-  cannot compile: a transcript needs a gallery section to walk to, which means
-  `hovercard: '/#hovercard'` in `FAMILY_ANCHORS` and a matching section in
-  `apps/sr-gallery/src/Gallery.tsrx`, plus `hovercard: 'link'` in the
-  `RENDERED_ROLE` table in `apps/sr-gallery/scripts/boot-check.ts` — that table is
-  total over the anchor names, so the two have to move together. All three files
-  are outside this unit's contract.
+- **No reader has spoken these lanes yet.** `hovercard.nvda.ts` and
+  `hovercard.voiceover.ts` now exist, compile and are collected by the real-reader
+  config — the gallery carries a `/#hovercard` section, and `FAMILY_ANCHORS` and
+  `boot-check.ts`'s total `RENDERED_ROLE` table both name it. Neither reader
+  starts on a macOS dev machine: NVDA answers "NVDA is not supported" (it is
+  Windows-only) and VoiceOver answers "Failed to mount Guidepup preferences",
+  which wants `npx @guidepup/setup setup` and `npx @guidepup/setup install` plus
+  the automation grant. The four steps the transcript pins are the family's
+  central claim rather than a corner of it: hear the link collapsed, hear it
+  expanded after the delay, Tab into the card, Escape back to the trigger. Every
+  DOM half of those four has been measured against the served gallery in
+  Chromium; what is still a guess is the reader half — that neither reader's
+  cursor commands disturb the browser focus the transcript puts on the trigger,
+  and that both pass Tab and Escape through to the page.
 - **Adding a gallery section shifts the walks after it.** Every transcript's
   hard-coded `WALK_LIMIT` counts steps from the top of the gallery page, so a new
-  section moves the ones below it. Tooltip's note already records that
+  section moves the ones below it. The hovercard section was appended last for
+  exactly that reason, so it shifted none of them; its own limit is the largest on
+  the page. Tooltip's note already records that
   `src/slider/slider-transcript.ts` is owed the same correction.
 - **No `./hovercard` export subpath.** `src/index.ts` carries the family, so
   `import { hovercard } from '@markless/ui'` works; the per-family subpath in

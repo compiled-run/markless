@@ -141,6 +141,25 @@ input {
 	margin-inline-start: 0.35rem;
 }
 
+/* Same split as the tip: the hovercard family emits the anchor identity and the
+   asked-for side, and the consumer places it. A card occludes more than a tip
+   does, so the fallbacks matter more here. */
+.card {
+	position-try-fallbacks: flip-block, flip-inline;
+	position-visibility: anchors-visible;
+	width: 18rem;
+	padding: 0.75rem 1rem;
+	border: 1px solid var(--line);
+	border-radius: 0.5rem;
+	background: var(--paper);
+	color: var(--ink);
+}
+
+.card[ui-side='bottom'] {
+	position-area: bottom span-all;
+	margin-top: 0.5rem;
+}
+
 /* The family hands the consumer `--slider-offset` and leaves the placing here. */
 .slider-thumb {
 	position: absolute;

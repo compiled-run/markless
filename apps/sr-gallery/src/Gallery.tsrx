@@ -3,6 +3,7 @@ import {
 	checklist,
 	datebox,
 	fileupload,
+	hovercard,
 	modal,
 	popover,
 	progress,
@@ -19,7 +20,7 @@ import {
 // page, each in a section a reader can jump to by its anchor: /#checkbox,
 // /#toggle, /#textbox, /#progress, /#checklist, /#select, /#modal,
 // /#radio-group, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
-// /#fileupload. A family
+// /#fileupload, /#hovercard. A family
 // whose second shape a reader announces differently gets its own section too:
 // /#slider-range.
 //
@@ -263,6 +264,21 @@ export function Gallery() @{
 					<fileupload.field />
 					<FileRows />
 				</fileupload.root>
+			</div>
+		</section>
+
+		<section id="hovercard">
+			<h2>Hover card</h2>
+			{/* The family's doctrine, kept: everything in the card is also behind the trigger's own link, so a reader who never sees the card loses nothing. */}
+			<div class="scenario">
+				<hovercard.root>
+					<hovercard.trigger href="/users/jane">Jane Doe</hovercard.trigger>
+					<hovercard.content class="card">
+						<a href="/users/jane">Open profile</a>
+						<p>Builds compilers.</p>
+						<a href="/users/jane/followers">312 followers</a>
+					</hovercard.content>
+				</hovercard.root>
 			</div>
 		</section>
 	</main>
