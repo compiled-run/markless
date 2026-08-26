@@ -1,33 +1,24 @@
 /**
  * Placing the surface.
  *
- * A menu opened from its trigger is a CSS anchor: the trigger carries the anchor
- * name, the surface points at it, and the browser resolves the geometry, so a
- * surface that arrives already showing is placed on its first layout with no
- * script. A menu opened from `menu.contextarea` is placed at the point instead,
- * because there is no element to anchor to.
+ * The placement itself is CSS: `menu.content` ships a scoped `<style>` block in
+ * `@layer markless` that anchors the surface to the trigger and picks a
+ * `position-area` off the `ui-side` attribute the part already writes. Nothing
+ * here builds a `position-area`, an anchor name, or a `position` any more.
  *
- * Nothing here measures a box, which is also this family's one real placement
- * limit: a context menu asked for near the bottom right corner overflows rather
- * than flipping. The anchored path can be given `position-try-fallbacks` from a
- * consumer's stylesheet; the point path cannot.
+ * What CSS cannot say is where a pointer was, so a context menu's point arrives
+ * as the two custom properties the block reads. A menu with no `menu.trigger`
+ * resolves no anchor, which leaves the `position-area` inert and the point in
+ * charge; a menu with a trigger sets neither property and stays anchored.
+ *
+ * The point path does not flip near a viewport edge: no box is measured here,
+ * and a consumer's own `position-try-fallbacks` only reaches the anchored path.
  */
 
-import type { MenuPoint, MenuSide } from './menu-types.ts';
+import type { MenuPoint } from './menu-types.ts';
 
-// One name for every menu; `anchor-scope` on each root confines it to that root's subtree, so a surface only ever finds its own trigger. menu.tsrx spells the name out again because the compiler will not read an imported value for `style`.
-const ANCHOR = '--ui-menu';
-
-/** Set on the surface: where it sits, from the point if there is one and against the trigger otherwise. */
-export function surfaceStyle(side: MenuSide, point: MenuPoint | null): string {
-	if (point !== null) return `position: fixed; left: ${point.x}px; top: ${point.y}px;`;
-	return `position: absolute; position-anchor: ${ANCHOR}; position-area: ${areaOf(side)};`;
-}
-
-// `self-inline-*` reads the surface's own writing direction; plain `inline-*` reads the containing block's, which for a surface taken out of flow is usually the document's and so never flips.
-function areaOf(side: MenuSide): string {
-	if (side === 'top') return 'top span-right';
-	if (side === 'start') return 'span-self-block-end self-inline-start';
-	if (side === 'end') return 'span-self-block-end self-inline-end';
-	return 'bottom span-right';
+/** The point a context menu was asked for, as the geometry properties the surface's own CSS reads. */
+export function surfaceStyle(point: MenuPoint | null): string {
+	if (point === null) return '';
+	return `--x: ${point.x}px; --y: ${point.y}px;`;
 }

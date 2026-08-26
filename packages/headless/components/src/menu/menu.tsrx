@@ -145,7 +145,6 @@ export function MenuRoot({
 	<div
 		{...rest}
 		el={menu.rootEl}
-		style="anchor-scope: --ui-menu;"
 		ui-open={menu.open}
 		ui-closed={menu.open !== true}
 		ui-disabled={menu.disabled}
@@ -181,7 +180,18 @@ export function MenuRoot({
 			}
 			onPointerout?.(event);
 		}}
-	>{children}</div>
+	>
+		<style>
+			@layer markless {
+				/* Root and contextarea are not separable by structure, and neither is harmed by the other's declaration. */
+				div:not([role]):not([ui-side]) {
+					anchor-scope: --ui-menu;
+					-webkit-touch-callout: none;
+				}
+			}
+		</style>
+		{children}
+	</div>
 }
 
 export function MenuTrigger({ children, onClick, onKeydown, ...rest }: MenuTriggerProps) @{
@@ -190,7 +200,6 @@ export function MenuTrigger({ children, onClick, onKeydown, ...rest }: MenuTrigg
 	<button
 		{...rest}
 		el={menu.triggerEl}
-		style="anchor-name: --ui-menu;"
 		type="button"
 		aria-haspopup="menu"
 		aria-expanded={menu.open ? 'true' : 'false'}
@@ -236,7 +245,14 @@ export function MenuTrigger({ children, onClick, onKeydown, ...rest }: MenuTrigg
 			focusOpening(surface, isFromEnd);
 			onKeydown?.(event);
 		}}
-	>{children}</button>
+	>
+		<style>
+			@layer markless {
+				button:not([role]) { anchor-name: --ui-menu; }
+			}
+		</style>
+		{children}
+	</button>
 }
 
 // No role, no name, no ARIA state: `aria-haspopup` says a control opens a menu when it is activated, which a region answering a right-click does not do (w3c/aria#1971).
@@ -254,7 +270,6 @@ export function MenuContextarea({
 	<div
 		{...rest}
 		el={menu.contextEl}
-		style="-webkit-touch-callout: none;"
 		ui-open={menu.open}
 		ui-closed={menu.open !== true}
 		onContextmenu={(event) => {
@@ -348,7 +363,7 @@ export function MenuContent({
 	...rest
 }: MenuContentProps) @{
 	const menu = menuState();
-	const placement = computed(() => surfaceStyle(menu.side, menu.position));
+	const placement = computed(() => surfaceStyle(menu.position));
 
 	<div
 		{...rest}
@@ -404,7 +419,25 @@ export function MenuContent({
 			next?.focus();
 			onKeydown?.(event);
 		}}
-	>{children}</div>
+	>
+		<style>
+			@layer markless {
+				/* Fixed on both paths: anchoring works the same, and a context menu's point is in client coordinates. */
+				[ui-side] {
+					position: fixed;
+					position-anchor: --ui-menu;
+					left: var(--x);
+					top: var(--y);
+				}
+				/* `self-inline-*` reads the surface's own writing direction; plain `inline-*` never flips out of flow. */
+				[ui-side="top"] { position-area: top span-right; }
+				[ui-side="bottom"] { position-area: bottom span-right; }
+				[ui-side="start"] { position-area: span-self-block-end self-inline-start; }
+				[ui-side="end"] { position-area: span-self-block-end self-inline-end; }
+			}
+		</style>
+		{children}
+	</div>
 }
 
 export function MenuItem({
