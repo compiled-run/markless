@@ -92,6 +92,22 @@ export function marklessRecordRowScope(
 	return pairs.length > 0 ? pairs.reverse() : undefined;
 }
 
+/**
+ * Which instance authored the symbol a widget root parked in its slot.
+ *
+ * The root path names where the root RENDERED. The authoring position is that
+ * path less the component edge that placed the root — and less the projection
+ * and row segments trailing it, which the same module spells: a root written
+ * inside another component's tag is still the enclosing module's own JSX, so its
+ * callback closure is that module's, not the component it was projected into.
+ */
+export function marklessComposerInstancePath(rootPath: string): string {
+	const segments = rootPath.match(INSTANCE_SEGMENT) ?? [];
+	let end = segments.length;
+	while (end > 0 && !segments[end - 1]!.startsWith('c')) end -= 1;
+	return segments.slice(0, Math.max(end - 1, 0)).join('');
+}
+
 export function marklessRowScopedGraphNodeId(
 	graphNodeId: string,
 	scope: MarklessRowScope,

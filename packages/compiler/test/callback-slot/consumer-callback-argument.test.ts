@@ -121,7 +121,9 @@ function moduleSourceFor(compiled: Compiled, kind: string, needle: string): stri
 test('the invoking side hands the dispatched value over as an argument vector', async () => {
 	const { inner, box } = await compileStack();
 
-	expect(moduleSourceFor(inner, 'event-handler', 'capture.invoke')).toContain('", [next])');
+	expect(moduleSourceFor(inner, 'event-handler', 'marklessInvokeCallbackSlot')).toContain(
+		'/slot:onChange", [next])',
+	);
 	expect(moduleSourceFor(box, 'callback-prop', 'marklessInvokeCallbackSlot')).toContain(
 		'/slot:onChange", [isOn])',
 	);
@@ -142,11 +144,10 @@ test('a DOM handler binds its parameter to the event', async () => {
 	);
 });
 
-// Pinned as what should happen. The page's callback answers a slot the widget
-// dispatches through, but nothing in the page's own module says so: the family
-// answers that slot itself and publishes no claim, so the emitting side falls
-// back to the DOM event and the page is handed the click instead of the value.
-test.fails('a consumer callback binds the argument the slot invoke passed', async () => {
+// The page's callback answers a slot the widget dispatches through. Nothing in
+// the page's own module says so, so the value has to arrive as the dispatched
+// argument vector; binding the DOM event instead hands the page the click.
+test('a consumer callback binds the argument the slot invoke passed', async () => {
 	const { app } = await compileStack();
 	const consumer = moduleSourceFor(app, 'callback-prop', "'set:'");
 
