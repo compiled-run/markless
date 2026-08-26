@@ -1,0 +1,21 @@
+# MARKLESS_RENDER_DATA_STYLE_UNLINKED
+
+Render data links a scoped style module the link does not carry
+
+- Package: compiler
+- Pass or phase: render-data
+- Severity: error
+
+## Message
+
+Render data for … links scoped style module …, which this link does not carry.
+
+## Why
+
+A scoped style that is compiled but never linked ships a component whose markup renders unstyled in the consuming app, with nothing at build time to show it went missing.
+
+## Emitted from
+
+- `packages/compiler/src/passes/render-data/manifest.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

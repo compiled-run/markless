@@ -19,18 +19,32 @@ type Options = ReadonlyArray<HTMLElement>;
  */
 export function focusOpeningOption(
 	options: Options | undefined,
+	labels: Options | undefined,
 	search: string,
 	isFromEnd: boolean,
 ): void {
 	if (!options) return;
-	const walkable = walkableOptions(options);
+
+	// Settled before the retries: nothing the landing reads changes while the
+	// listbox is coming out of `hidden`, so reading it per frame reads it twelve times.
+	let wanted: HTMLElement | undefined;
+	if (search === '') {
+		let end: HTMLElement | undefined;
+		for (const option of options) {
+			if (!isWalkable(option)) continue;
+			// A chosen option wins over the first-or-last default.
+			if (wanted === undefined && option.getAttribute('aria-selected') === 'true') wanted = option;
+			if (isFromEnd) end = option;
+			else if (end === undefined) end = option;
+		}
+		wanted ??= end;
+	} else {
+		wanted = matchingOption(options, labels, search);
+	}
+	if (!wanted) return;
 
 	let tries = 12;
 	const land = () => {
-		const end = isFromEnd ? walkable[walkable.length - 1] : walkable[0];
-		// A chosen option wins over the first-or-last default.
-		const chosen = walkable.find((option) => option.getAttribute('aria-selected') === 'true');
-		const wanted = search === '' ? (chosen ?? end) : matchingOption(walkable, search);
 		wanted?.focus();
 		tries = tries - 1;
 		if (tries > 0 && document.activeElement !== wanted) requestAnimationFrame(land);
@@ -39,9 +53,13 @@ export function focusOpeningOption(
 }
 
 /** Move the roving focus to the first option whose own words start with `search`. */
-export function focusMatchingOption(options: Options | undefined, search: string): void {
+export function focusMatchingOption(
+	options: Options | undefined,
+	labels: Options | undefined,
+	search: string,
+): void {
 	if (!options) return;
-	matchingOption(walkableOptions(options), search)?.focus();
+	matchingOption(options, labels, search)?.focus();
 }
 
 /** Move the roving focus one step, or to an end. The ends do not wrap. */
@@ -51,20 +69,34 @@ export function focusNeighbourOption(
 	key: string,
 ): void {
 	if (!options) return;
-	const walkable = walkableOptions(options);
-	const last = walkable.length - 1;
-	// -1 when the focus sits outside every option a walk may land on, which is
-	// also what an option nobody may choose answers: both start the walk at an end.
-	const at = walkable.findIndex((option) => option.contains(target));
-	const to =
-		key === 'Home'
-			? 0
-			: key === 'End'
-				? last
-				: key === 'ArrowDown'
-					? Math.min(at + 1, last)
-					: Math.max(at - 1, 0);
-	walkable[to]?.focus();
+
+	let first: HTMLElement | undefined;
+	let last: HTMLElement | undefined;
+	let before: HTMLElement | undefined;
+	let after: HTMLElement | undefined;
+	let isHereWalkable = false;
+
+	for (const option of options) {
+		if (!isWalkable(option)) continue;
+		first ??= option;
+		last = option;
+		if (!isHereWalkable && option.contains(target)) {
+			isHereWalkable = true;
+			continue;
+		}
+		if (isHereWalkable) after ??= option;
+		else before = option;
+	}
+
+	if (first === undefined || last === undefined) return;
+	if (key === 'Home') return first.focus();
+	if (key === 'End') return last.focus();
+	// Focus outside every option a walk may land on - an option nobody may choose
+	// answers the same - starts the walk at the first, whichever way the key went.
+	if (!isHereWalkable) return first.focus();
+	// The ends do not wrap: a step past one lands back on the option it came from.
+	if (key === 'ArrowDown') return (after ?? last).focus();
+	return (before ?? first).focus();
 }
 
 /** Commit the option the focus sits in, through that option's own click rule. */
@@ -74,26 +106,29 @@ export function commitFocusedOption(options: Options | undefined, target: HTMLEl
 	options?.find((option) => option.contains(target))?.click();
 }
 
-/** The options a walk may land on. An option nobody may choose is skipped. */
-function walkableOptions(options: Options): HTMLElement[] {
-	return options.filter((option) => option.getAttribute('aria-disabled') !== 'true');
+/** An option nobody may choose is not one a walk may land on. */
+function isWalkable(option: HTMLElement): boolean {
+	return option.getAttribute('aria-disabled') !== 'true';
 }
 
-function matchingOption(options: Options, search: string): HTMLElement | undefined {
-	return options.find((option) => optionWords(option).startsWith(search));
+/** The first walkable option whose own words start with `search`. */
+function matchingOption(
+	options: Options,
+	labels: Options | undefined,
+	search: string,
+): HTMLElement | undefined {
+	for (const option of options) {
+		if (isWalkable(option) && optionWords(option, labels).startsWith(search)) return option;
+	}
+	return undefined;
 }
 
 /**
- * An option's own words. An indicator is `aria-hidden`, so its words are not the
- * option's: reading "Chosen" out of one would make that word typeable.
+ * An option's own words: the label part this option holds. An indicator is
+ * `aria-hidden`, and reading "Chosen" out of one would make that word typeable.
+ * An option written without a label falls back to its whole text.
  */
-function optionWords(option: HTMLElement): string {
-	let words = '';
-	for (const node of Array.from(option.childNodes)) {
-		const isDecoration =
-			node.nodeType === 1 && (node as Element).getAttribute('aria-hidden') === 'true';
-		if (isDecoration) continue;
-		words += node.textContent ?? '';
-	}
-	return words.trim().toLowerCase();
+function optionWords(option: HTMLElement, labels: Options | undefined): string {
+	const own = labels?.find((label) => option.contains(label));
+	return ((own ?? option).textContent ?? '').trim().toLowerCase();
 }

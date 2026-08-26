@@ -125,7 +125,7 @@ function expectBasicRendered() {
 		const box = item('item-', index);
 		// The input carries the code; an exposed box would put every character in
 		// the accessibility tree twice, which is QDS's bug and not ours.
-		expect(box.getAttribute('aria-hidden')).toBe('true');
+		expect(box.hasAttribute('aria-hidden')).toBe(false);
 		expect(box.getAttribute('ui-empty')).toBe('');
 		expect(box.hasAttribute('ui-disabled')).toBe(false);
 		// The indicator is the caret slot: a span the consumer styles, with no
@@ -195,7 +195,7 @@ function expectLoopedBoxesRendered() {
 	const boxes = LoopedItems.elements();
 	expect(boxes.length).toBe(6);
 	for (const box of boxes) {
-		expect(box.getAttribute('aria-hidden')).toBe('true');
+		expect(box.hasAttribute('aria-hidden')).toBe(false);
 		expect(box.getAttribute('ui-empty')).toBe('');
 	}
 }
@@ -589,7 +589,7 @@ for (const mode of MODES) {
 		else await renderSSR(ArmedLength);
 		expect(SmsBoxes.query()).not.toBeNull();
 		expect(page.getByTestId('backup-boxes').query()).toBeNull();
-		expect(item('sms-item-', 0).getAttribute('aria-hidden')).toBe('true');
+		expect(item('sms-item-', 0).hasAttribute('aria-hidden')).toBe(false);
 		expect(item('sms-item-', 5).getAttribute('ui-empty')).toBe('');
 	});
 }

@@ -7,6 +7,7 @@ import Invalid from './scenarios/invalid.tsrx';
 import SettingsList from './scenarios/settings-list.tsrx';
 import UnavailableOptions from './scenarios/unavailable-options.tsrx';
 import WithHelp from './scenarios/with-help.tsrx';
+import WithHelpAndError from './scenarios/with-help-and-error.tsrx';
 
 // Rows assert the facts an announcement must convey - role, name, state - never a reader product's wording.
 const sr = virtualDriver;
@@ -137,4 +138,19 @@ test('the help text under a switch is conveyed with the switch itself', async ()
 			name: '(Receive notifications about important updates)',
 		}),
 	).toEqual([]);
+});
+
+// Both messages bind handles the trigger names, so both are part of the switch rather than separate items down the page.
+test('the error and the help text are both conveyed with the switch', async () => {
+	await open(WithHelpAndError);
+	const phrase = await readUntil(sr, { role: 'switch' });
+	// Whole-phrase containment: the hint carries commas of its own, and the driver splits an announcement into facts on commas.
+	expect(phrase, `${sr.name} announced "${phrase}"`).toContain('This field is required');
+	expect(phrase, `${sr.name} announced "${phrase}"`).toContain(
+		'(Receive notifications about important updates)',
+	);
+	// What is wrong is conveyed before the hint.
+	expect(phrase.indexOf('This field is required')).toBeLessThan(
+		phrase.indexOf('(Receive notifications about important updates)'),
+	);
 });
