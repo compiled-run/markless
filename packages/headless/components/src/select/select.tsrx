@@ -40,6 +40,7 @@ export const selectState = shared(
 		const triggerEl = element<HTMLButtonElement>();
 		// The array type argument makes the handle plural: bound on every option, read back as the live options in document order.
 		const optionEls = element<HTMLDivElement[]>();
+		const optionLabelEls = element<HTMLSpanElement[]>();
 
 		return {
 			...select,
@@ -47,6 +48,7 @@ export const selectState = shared(
 			contentEl,
 			triggerEl,
 			optionEls,
+			optionLabelEls,
 			// literal function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
 			onOpenChange: undefined as ((open: boolean) => void) | undefined,
@@ -163,7 +165,7 @@ export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectT
 
 				// Alt+ArrowDown opens the popup and leaves focus on the combobox.
 				if (!event.altKey) {
-					focusOpeningOption(select.optionEls, search, isOpenAtLastKey);
+					focusOpeningOption(select.optionEls, select.optionLabelEls, search, isOpenAtLastKey);
 				}
 			}
 			onKeydown?.(event);
@@ -211,7 +213,7 @@ export function SelectContent({ children, onKeydown, ...rest }: SelectContentPro
 				const search = (isSearchStale ? '' : select.search) + key.toLowerCase();
 				select.search = search;
 				select.searchAt = now;
-				focusMatchingOption(select.optionEls, search);
+				focusMatchingOption(select.optionEls, select.optionLabelEls, search);
 			} else if (isNavigationKey) {
 				// Moving is not choosing: the walk is focus only, or a reader says "selected" on every arrow.
 				focusNeighbourOption(select.optionEls, here, key);
@@ -264,7 +266,9 @@ export function SelectItem({
 }
 
 export function SelectItemLabel({ children, ...rest }: SelectItemLabelProps) @{
-	<span {...rest}>{children}</span>
+	const select = selectState();
+
+	<span {...rest} el={select.optionLabelEls}>{children}</span>
 }
 
 export function SelectItemIndicator({ children, ...rest }: SelectItemIndicatorProps) @{

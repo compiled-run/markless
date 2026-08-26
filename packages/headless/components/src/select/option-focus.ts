@@ -19,6 +19,7 @@ type Options = ReadonlyArray<HTMLElement>;
  */
 export function focusOpeningOption(
 	options: Options | undefined,
+	labels: Options | undefined,
 	search: string,
 	isFromEnd: boolean,
 ): void {
@@ -38,7 +39,7 @@ export function focusOpeningOption(
 		}
 		wanted ??= end;
 	} else {
-		wanted = matchingOption(options, search);
+		wanted = matchingOption(options, labels, search);
 	}
 	if (!wanted) return;
 
@@ -52,9 +53,13 @@ export function focusOpeningOption(
 }
 
 /** Move the roving focus to the first option whose own words start with `search`. */
-export function focusMatchingOption(options: Options | undefined, search: string): void {
+export function focusMatchingOption(
+	options: Options | undefined,
+	labels: Options | undefined,
+	search: string,
+): void {
 	if (!options) return;
-	matchingOption(options, search)?.focus();
+	matchingOption(options, labels, search)?.focus();
 }
 
 /** Move the roving focus one step, or to an end. The ends do not wrap. */
@@ -107,24 +112,23 @@ function isWalkable(option: HTMLElement): boolean {
 }
 
 /** The first walkable option whose own words start with `search`. */
-function matchingOption(options: Options, search: string): HTMLElement | undefined {
+function matchingOption(
+	options: Options,
+	labels: Options | undefined,
+	search: string,
+): HTMLElement | undefined {
 	for (const option of options) {
-		if (isWalkable(option) && optionWords(option).startsWith(search)) return option;
+		if (isWalkable(option) && optionWords(option, labels).startsWith(search)) return option;
 	}
 	return undefined;
 }
 
 /**
- * An option's own words. An indicator is `aria-hidden`, so its words are not the
- * option's: reading "Chosen" out of one would make that word typeable.
+ * An option's own words: the label part this option holds. An indicator is
+ * `aria-hidden`, and reading "Chosen" out of one would make that word typeable.
+ * An option written without a label falls back to its whole text.
  */
-function optionWords(option: HTMLElement): string {
-	let words = '';
-	for (const node of option.childNodes) {
-		const isDecoration =
-			node.nodeType === 1 && (node as Element).getAttribute('aria-hidden') === 'true';
-		if (isDecoration) continue;
-		words += node.textContent ?? '';
-	}
-	return words.trim().toLowerCase();
+function optionWords(option: HTMLElement, labels: Options | undefined): string {
+	const own = labels?.find((label) => option.contains(label));
+	return ((own ?? option).textContent ?? '').trim().toLowerCase();
 }
