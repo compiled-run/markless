@@ -211,6 +211,10 @@ export type ModuleGraphInterfaceLinkedComponent = {
  * record its own parts resolve, plus the factory graph nodes its returned
  * properties name. An importing module adopts both, so `family.state()` there
  * resolves to the same definition — same id, same nodes — as `family()` here.
+ *
+ * The definition travels whole, so `factoryModuleImports` and
+ * `factoryModuleScope` travel with it: that is how a module copying one of this
+ * factory's expressions can bind the free names the copy carries.
  */
 export type ModuleGraphInterfaceSharedDefinition = {
 	readonly exportName: string;
@@ -242,11 +246,30 @@ export type ModuleGraphInterfaceArtifact = {
 				readonly path: ReadonlyArray<string>;
 			}>;
 			readonly elementCount: ModuleGraphInterfaceElementCount;
+			// Absent on an interface built before this field existed, which reads as 'unknown'.
+			readonly constructReach?: ModuleGraphInterfaceConstructReach;
 			readonly projection?: ModuleGraphInterfaceProjection;
 			readonly spreadHosts?: ReadonlyArray<ModuleGraphInterfaceSpreadHost>;
 			readonly armMaterial?: ModuleGraphInterfaceArmMaterial;
+			readonly seedsFromProps?: ReadonlyArray<ModuleGraphInterfaceSeedFromProp>;
 		}>;
 	};
+};
+
+/**
+ * A shared cell this component writes before it renders, taken from one of its
+ * own props. `prop` is the prop the seed reads and `statePath` the cell it
+ * writes.
+ *
+ * A module that places this component reads it back to answer a question its own
+ * source cannot: the seed is a fact of the component's file, but whether the
+ * value the placement passes can reach that seed is decided where the placement
+ * is written. Absent when the component seeds nothing from a prop, and absent on
+ * an interface built before this field existed.
+ */
+export type ModuleGraphInterfaceSeedFromProp = {
+	readonly prop: string;
+	readonly statePath: string;
 };
 
 /**
@@ -285,6 +308,36 @@ export type ModuleGraphInterfaceSpreadHost = {
 export type ModuleGraphInterfaceElementCount = number | 'unknown';
 
 /**
+ * Which constructs one exported component's whole reachable tree carries -
+ * branches (`@if`/`@switch`), repeats (`@for`, and a host whose tag the render
+ * may omit), async boundaries (`@try`), or none of them.
+ *
+ * They are named apart because they resolve apart. A branch's anchors are a
+ * pair of comments a client-minted tree can count in its OWN fragment, the way
+ * it already counts its elements, so `'branches'` still admits a mint. A
+ * repeat's row count and an omittable host's presence are render-time facts, so
+ * a client rebuilding a tree around one has no number to place its nodes
+ * against. A boundary's settle bookkeeping has no row-relative reading at all,
+ * so `'boundaries'` is the worst answer of the four.
+ *
+ * The answer is TRANSITIVE and computed in the component's own module, where
+ * its chunks and the interfaces of the components it imports are both in hand:
+ * a child behind an import contributes the same fact off its own interface, so
+ * the recursion grounds out one module at a time.
+ *
+ * `'free'` is a proof, not an absence of evidence: `'unknown'` is the honest
+ * answer whenever a chunk or a child's interface was not visible, and an
+ * importer that cannot see a component's tree must refuse rather than assume -
+ * an unseen chunk could hold a boundary, so `'unknown'` outranks `'branches'`.
+ */
+export type ModuleGraphInterfaceConstructReach =
+	| 'free'
+	| 'branches'
+	| 'repeats'
+	| 'boundaries'
+	| 'unknown';
+
+/**
  * Where a component's `{children}` hole sits among the elements around it, in
  * DOCUMENT-order element counts (each host counts its whole subtree), so an
  * importer can say — while compiling, never at render time — how many elements
@@ -300,12 +353,20 @@ export type ModuleGraphInterfaceElementCount = number | 'unknown';
  * counts still describe the hole's own chunk, but whether that chunk renders at
  * all is decided elsewhere, so a consumer must not treat them as a fixed
  * position in the served DOM. `projectionChunkId` names that chunk.
+ *
+ * `parentHostNodeId` is the host element the hole sits directly inside, in this
+ * component's OWN id space. An importer prefixes it with the child edge's host
+ * prefix to name the same element in page space, which is the only way markup
+ * the importer wrote inside `{children}` can say which element it renders into.
+ * Absent when the hole is at the chunk root, where the enclosing element is the
+ * importer's own.
  */
 export type ModuleGraphInterfaceProjection = {
 	readonly elementsBeforeProjection: ModuleGraphInterfaceElementCount;
 	readonly elementsAfterProjection: ModuleGraphInterfaceElementCount;
 	readonly projectionInsideConstruct: boolean;
 	readonly projectionChunkId?: string;
+	readonly parentHostNodeId?: string;
 };
 
 export type SemanticSharedScope = 'request' | 'container' | 'page' | 'widget';
@@ -364,6 +425,13 @@ export type SemanticSharedCallbackBinding = {
 	readonly sourceSpan?: SourceSpan;
 };
 
+/** One module-scope declaration of the file a shared() factory was written in. */
+export type SemanticSharedModuleDeclaration = {
+	readonly names: ReadonlyArray<string>;
+	/** The declaration as authored, without an `export` keyword. */
+	readonly source: string;
+};
+
 export type SemanticSharedDefinition = {
 	readonly id: string;
 	readonly name: string;
@@ -372,6 +440,15 @@ export type SemanticSharedDefinition = {
 	readonly factorySource: string;
 	readonly dependencies?: ReadonlyArray<SemanticSharedDependency>;
 	readonly returnProperties?: ReadonlyArray<SemanticSharedReturnProperty>;
+	/**
+	 * The module scope the factory's expressions were written in, narrowed to
+	 * what `factorySource` names. A module that serves a page by copying one of
+	 * those expressions rebases these specifiers onto its own path and emits
+	 * them beside the copy; without them the copy names nothing.
+	 * Specifiers are relative to the defining file, which `id` spells.
+	 */
+	readonly factoryModuleImports?: ReadonlyArray<SemanticModuleImport>;
+	readonly factoryModuleScope?: ReadonlyArray<SemanticSharedModuleDeclaration>;
 	readonly sourceSpan?: SourceSpan;
 };
 
@@ -405,6 +482,14 @@ export type SemanticHostNode = {
 export type SemanticKeyedRepeat = {
 	readonly id: string;
 	readonly parentHostNodeId: string;
+	// A repeat written inside a child component's `{children}` renders into the
+	// element that child wraps the hole in, not into the enclosing element of the
+	// markup that wrote it. Set when that retarget happened: the parent host above
+	// is the child's, in page space, and these are how many elements the child
+	// renders in front of the hole and which element the OWNER's own markup
+	// encloses the rows in.
+	readonly projectedElementsBefore?: number;
+	readonly ownerHostNodeId?: string;
 	// Present when the repeat renders inside an @try/@pending/@catch arm: the
 	// boundary owns the repeat's async collection read.
 	readonly asyncBoundaryId?: string;
@@ -535,12 +620,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_ELEMENT_HANDLE_IDREF_ROW_OWNED'
 		| 'MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT'
 		| 'MARKLESS_ELEMENT_HANDLE_IDREF_ID_CONFLICT'
-		| 'MARKLESS_ELEMENT_HANDLE_ANCHOR_VALUE'
-		| 'MARKLESS_ELEMENT_HANDLE_ANCHOR_HOST_REQUIRED'
-		| 'MARKLESS_ELEMENT_HANDLE_ANCHOR_UNBOUND'
-		| 'MARKLESS_ELEMENT_HANDLE_ANCHOR_ROW_OWNED'
-		| 'MARKLESS_ELEMENT_HANDLE_ANCHOR_WIDGET_ROOT'
-		| 'MARKLESS_ELEMENT_HANDLE_ANCHOR_STYLE_DYNAMIC'
+		| 'MARKLESS_CSS_ANCHOR_ATTRIBUTE'
 		| 'MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED'
 		| 'MARKLESS_OVERLAY_VALUE_UNSUPPORTED'
 		| 'MARKLESS_OVERLAY_HOST_ELEMENT_REQUIRED'
@@ -560,7 +640,9 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_REPEAT_KEY_IS_INDEX'
 		| 'MARKLESS_REPEAT_KEY_UNSTABLE'
 		| 'MARKLESS_REPEAT_COLLECTION_UNREADABLE'
+		| 'MARKLESS_REPEAT_ROWS_FROZEN'
 		| 'MARKLESS_BRANCH_ELSE_SPELLING'
+		| 'MARKLESS_BARE_ARM_INTERPOLATION'
 		| 'MARKLESS_TEMPLATE_AS_VALUE'
 		| 'MARKLESS_SUBMODULE_UNSUPPORTED'
 		| 'MARKLESS_COMPONENT_TAG_UNRESOLVED'
@@ -617,6 +699,8 @@ export type SemanticTemplateBindingTarget =
 			readonly kind: 'class';
 			readonly trueValue?: string;
 			readonly falseValue?: string;
+			/** Class names every write must keep — the module's style scope, which the runtime would otherwise overwrite. */
+			readonly constantClass?: string;
 	  }
 	| {
 			readonly kind: 'style';
@@ -642,6 +726,9 @@ export type SemanticTemplateRead = {
 	readonly hostNodeId: string;
 	readonly target: SemanticTemplateBindingTarget;
 	readonly asyncBoundaryId?: string;
+	// The branch site whose arm body holds this read directly, with no host of
+	// its own. Such a read drives the arm's range, never the enclosing element.
+	readonly armScopeBranchSiteId?: string;
 	readonly computedGraphNodeId?: string;
 	// The component body this read was authored in, for the same reason the branch
 	// site carries one: `{w.label}` in two components is two reads of two different
@@ -701,36 +788,6 @@ export type SemanticElementHandleIdref = {
 	readonly order: number;
 	readonly keyedRepeatScopeIds?: ReadonlyArray<string>;
 	readonly asyncBoundaryId?: string;
-};
-
-/**
- * One CSS anchor position that named an element() handle: `anchorName={handle}`
- * or `positionAnchor={handle}` on a host element.
- *
- * Deliberately parallel to SemanticElementHandleIdref, and deliberately not the
- * same record. An IDREF forces a minted `id` onto the element the handle is
- * bound to; an anchor position does not, because CSS reads the dashed-ident
- * name off the anchor's own inline style rather than off an id. Merging the two
- * records would make every anchored trigger also carry an id nothing reads.
- *
- * Like the IDREF record it holds no spelling: which CSS property, and what the
- * name string is, are the consuming emitter's lowering concern.
- */
-export type SemanticElementHandleAnchor = {
-	/** The host element carrying the anchor attribute. */
-	readonly hostNodeId: string;
-	/** The authored attribute, `anchorName` or `positionAnchor`. */
-	readonly attributeName: string;
-	/** The resolved element() handle binding name. */
-	readonly handleName: string;
-	/** The graph node the handle declares; what the anchor name is derived from. */
-	readonly handleGraphNodeId: string;
-	/** The authored expression, which differs from handleName through an alias. */
-	readonly source: string;
-	readonly componentName?: string;
-	readonly sourceSpan?: SourceSpan;
-	/** Document order of the anchor positions in this file; stable across compiles. */
-	readonly order: number;
 };
 
 export type SemanticBehavior = {
@@ -822,22 +879,14 @@ export type SemanticMarkupResidue =
 			// its own element or not at all.
 			readonly idref?: true;
 	  }
-	// One element's whole inline style attribute value, when at least one CSS
-	// anchor position on it named an element() handle. The declarations render
-	// the SAME per-instance token the minted id renders, spelled as the
-	// `--mx-<slug>` dashed-ident anchor positioning requires. The consumer's own
-	// static style rides in front of them in one residue rather than in a second
-	// style attribute, because two style attributes on one element clobber.
+	// The space-joined ids of several handles named by one IDREF position that
+	// HTML defines as a list. Referencing side only, and each entry is omitted on
+	// the same terms the single form is, so a description and an error can be
+	// named together without either dangling when its part never rendered.
 	| {
-			readonly kind: 'element-handle-anchor-style';
-			readonly declarations: ReadonlyArray<{
-				/** The CSS property, e.g. `anchor-name`. */
-				readonly property: string;
-				readonly handleGraphNodeId: string;
-			}>;
-			/** The consumer's authored style declarations, already lowered to CSS. */
-			readonly staticStyle?: string;
-	  };
+			readonly kind: 'element-handle-id-list';
+			readonly handleGraphNodeIds: ReadonlyArray<string>;
+	  }
 
 type SemanticMarkupLocatedSlot = {
 	readonly coordinate: SemanticMarkupSlotCoordinate;
@@ -962,7 +1011,6 @@ export type SemanticGraphArtifact = {
 	readonly overlays: ReadonlyArray<SemanticOverlay>;
 	readonly elementHandleBindings: ReadonlyArray<SemanticElementHandleBinding>;
 	readonly elementHandleIdrefs: ReadonlyArray<SemanticElementHandleIdref>;
-	readonly elementHandleAnchors: ReadonlyArray<SemanticElementHandleAnchor>;
 	readonly localBindings: ReadonlyArray<SemanticLocalBinding>;
 	readonly localDeclarations: ReadonlyArray<SemanticLocalDeclaration>;
 	readonly aliases: ReadonlyArray<SemanticGraphAlias>;
@@ -1008,6 +1056,8 @@ export type RenderDataBranch = {
 export type RenderDataRepeat = {
 	readonly repeatId: string;
 	readonly parentHostNodeId: string;
+	// See SemanticKeyedRepeat: set only for a repeat projected into a child.
+	readonly ownerHostNodeId?: string;
 	readonly rowHostNodeId?: string;
 	readonly itemName: string;
 	readonly collectionGraphNodeId?: string;
@@ -1223,6 +1273,8 @@ export type PayloadBehavior = SemanticBehavior & {
 export type PayloadKeyedRepeat = {
 	readonly id: string;
 	readonly parentHostNodeId: string;
+	// See SemanticKeyedRepeat: set only for a repeat projected into a child.
+	readonly ownerHostNodeId?: string;
 	readonly rowHostNodeId?: string;
 	readonly collectionGraphNodeId: string;
 	readonly collectionPath: ReadonlyArray<string>;
@@ -1289,6 +1341,14 @@ export type PayloadArenaArtifact = {
 			readonly plural?: boolean;
 		}>;
 		readonly asyncBoundaries: ReadonlyArray<PayloadAsyncBoundary>;
+		// Reads authored directly in a branch arm, with no host of their own.
+		// They refresh the arm's own range instead of the enclosing element.
+		readonly branchContentReads?: ReadonlyArray<{
+			readonly branchSiteId: string;
+			readonly source: string;
+			readonly graphNodeId: string;
+			readonly path: ReadonlyArray<string>;
+		}>;
 		readonly branchSites: ReadonlyArray<{ readonly id: string; readonly anchorOrder: number }>;
 	};
 	readonly diagnostics: ReadonlyArray<PayloadArenaDiagnostic>;
@@ -1662,15 +1722,29 @@ export type SymbolModulesDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_MODULE_INSTANCE_DIVERGENT_HANDLERS'
 		| 'MARKLESS_SHARED_METHOD_CROSS_MODULE'
 		| 'MARKLESS_SHARED_INSTANCE_EXPORTED_FUNCTION'
+		| 'MARKLESS_SHARED_COMPUTED_CROSS_MODULE'
 		| 'MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE';
 	readonly phase: 'public-render';
 	readonly passId: 'symbol-modules';
+};
+
+/**
+ * A branch this pass could build no arm parts for, whose every refusal was a
+ * same-module component that has to run. Rebuilding the markup here is
+ * impossible, but re-rendering the page through the prerender evaluator does
+ * run the component, so the link pass may fulfill the candidate with an
+ * escalation symbol. Until something fulfills it, the refusal beside it stands.
+ */
+export type ArmEscalationCandidate = {
+	readonly branchSiteId: string;
+	readonly symbolId: string;
 };
 
 export type SymbolModulesArtifact = {
 	readonly passId: 'symbol-modules';
 	readonly modules: ReadonlyArray<GeneratedSymbolModule>;
 	readonly diagnostics: ReadonlyArray<CaptureAnalysisDiagnostic | SymbolModulesDiagnostic>;
+	readonly armEscalationCandidates?: ReadonlyArray<ArmEscalationCandidate>;
 };
 
 export type RuntimeDemandMapRecordKind =
@@ -1819,6 +1893,9 @@ export type ProtocolViewArmBranchRecord = {
 	}>;
 	readonly symbolId?: string;
 	readonly armTests?: ReadonlyArray<unknown>;
+	readonly contentReads?: NonNullable<
+		NonNullable<ProtocolViewPayload['branches']>[number]['contentReads']
+	>;
 	readonly declaredEmptyArms?: ReadonlyArray<number>;
 	readonly startAnchor?: { readonly strategy: 'arm-branch-comment'; readonly index: number };
 	readonly endAnchor?: { readonly strategy: 'arm-branch-comment'; readonly index: number };
@@ -2273,13 +2350,21 @@ export type LinkedBoundarySymbolsInput = {
 	readonly resolverId: string;
 	readonly symbolModuleId: (symbolId: string) => string;
 	readonly boundaryExportName: (index: number) => string;
+	/**
+	 * Names the export for a branch whose arms hold a component that has to run.
+	 * A linker that supplies no name fulfills no escalation candidate, so the
+	 * refusal the symbol-modules pass recorded beside it stands.
+	 */
+	readonly branchExportName?: (index: number) => string;
 };
 
 export type LinkedBoundarySymbol = {
 	readonly row: { readonly id: string; readonly chunk: string; readonly exportName: string };
+	// The branch site this symbol fulfilled, for the linker's candidate gate.
+	readonly branchSiteId?: string;
 	readonly manifest: {
 		readonly symbolId: string;
-		readonly kind: 'async-boundary-update';
+		readonly kind: 'async-boundary-update' | 'branch-update';
 		readonly exportName: string;
 		readonly virtualModuleId: string;
 	};

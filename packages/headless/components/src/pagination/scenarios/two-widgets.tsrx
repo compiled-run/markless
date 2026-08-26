@@ -2,9 +2,8 @@ import { pagination } from '../../index.ts';
 
 // Two paginations on one page - reviews above the results, orders below - each
 // with its own page and its own count. A page with more than one navigation
-// landmark needs each one named, so the reviews pagination replaces the family's
-// default label with its own: `aria-label` sits before the spread, so the
-// consumer's wins.
+// landmark needs each one named, and the family emits no default name, so the
+// reviews pagination writes its own.
 export default function TwoWidgets() @{
 	<section>
 		<pagination.root count={3} aria-label="Reviews pages" data-testid="first-root">
