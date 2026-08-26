@@ -1,5 +1,5 @@
 import { isEventAttribute, normalizeEventName } from 'yuku-tsrx';
-import { parseModule } from '../../js-ast.ts';
+import { ownedModuleAst } from './shared-ast.ts';
 import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
@@ -1319,7 +1319,7 @@ function resolveStaticObjectExpression(node: AnyNode, state: WalkState): AnyNode
 	const declarationStart = resolvedDeclarationStart(node, state);
 	if (declarationStart === null) return null;
 	let found: AnyNode | null = null;
-	const ast = parseModule(state.source, state.filename) as unknown as AnyNode;
+	const ast = ownedModuleAst(state, state.source, state.filename);
 	walkNode(ast, (candidate) => {
 		if (found || candidate.type !== 'VariableDeclarator') return;
 		const id = candidate.id as AnyNode | undefined;
@@ -1512,7 +1512,7 @@ function localFunctionValueSource(
 }
 
 function localFunctionValueNode(declarationStart: number, state: WalkState): AnyNode | null {
-	const ast = parseModule(state.source, state.filename) as unknown as AnyNode;
+	const ast = ownedModuleAst(state, state.source, state.filename);
 	let found: AnyNode | null = null;
 
 	walkNode(ast, (node) => {
