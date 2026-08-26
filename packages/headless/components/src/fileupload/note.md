@@ -117,25 +117,25 @@ measured here before.
 The operating system's picker is outside the document too, so the picker rows spy
 on `showPicker` rather than opening anything.
 
-## The cold first click is not settled
+## The cold first click is green, but it is load-sensitive
 
-`SSR cold first click` passes whenever the fileupload lane runs on its own, and
-fails every time the whole `ui` project runs. The failure is not slowness and not
-the activation window: the spy records **zero** calls, and raising the wait from
-one second to five changes nothing. The failure screenshot shows a clean page with
-the Browse button in view and nothing over it, so the trusted click had a target.
-
-What that leaves is the gesture never reaching the lazily loaded handler at all,
-on a resumed document, under a full-project run. A programmatic `el.click()` on
-the same page in the same run does reach it — only the real, trusted click does
-not. The same run also reddens one popover row in a file this work never touched,
-and that row passes on its own too, so whatever this is may not be the family's.
-
-The fix belongs in dispatch, not in this family, and not in the label fallback:
-when the click does arrive the browser still counts the gesture as active, so
-`showPicker()` is allowed and the button shape is the right one. The row is
-deliberately left unpinned rather than marked a known gap, because the owner set
-it as a gate and a pinned row would hide it.
+`SSR cold first click` used to fail every time the whole `ui` project ran while
+passing whenever this lane ran on its own — the spy recorded **zero** calls, not
+late ones, and raising the wait from one second to five changed nothing. It is
+green in every full-project run measured since the family's six browser files were
+folded into this one, and nothing in the family or the framework was changed to
+make that happen, so the honest reading is that the merge removed whatever
+condition set it off, not that the fragility is understood. What the failure was
+already known not to be: the click listener was installed on a connected root, the
+button was visible and hit-testable, and still no input event of any kind reached
+the test document while the driver's click reported success — the gesture never
+entered the frame at all. That points at how the test driver binds a click to the
+page's test frame, which is a per-file binding and so depends on how many files
+ran first. If the row reddens again, look there before looking at this family:
+check that the frame the driver clicks into is the frame the test is running in,
+and that exactly one test frame is attached to the page at the moment of the
+click. The row stays a plain assertion rather than a pinned known gap, because the
+owner set it as a gate and a pinned row would hide it.
 
 ## Refused in v1
 

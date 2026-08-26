@@ -45,10 +45,9 @@ function fieldNames(side?: string) {
 // Their polls are given longer than the one-second default, because the gesture
 // waits on seven module fetches.
 //
-// The click row passes on its own and fails whenever the whole project runs, with
-// zero calls recorded rather than late ones — the gesture is not reaching the
-// handler at all there. It is left unpinned on purpose: it is a gate, and marking
-// it a known gap would hide it. The family note carries the evidence.
+// The click row has a history of recording zero calls under a full-project run
+// while passing solo. It is left unpinned on purpose: it is a gate, and marking it
+// a known gap would hide it. The family note carries the evidence.
 const COLD_POLL = { timeout: 5000 };
 
 test('SSR cold first click: the very first gesture opens the picker', async () => {
