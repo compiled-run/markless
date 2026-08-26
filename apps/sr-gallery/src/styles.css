@@ -24,7 +24,12 @@ body {
 	margin: 0;
 	background: var(--paper);
 	color: var(--ink);
-	font: 16px/1.55 ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+	font:
+		16px/1.55 ui-sans-serif,
+		system-ui,
+		-apple-system,
+		Segoe UI,
+		sans-serif;
 }
 
 main {
@@ -158,6 +163,55 @@ input {
 .card[ui-side='bottom'] {
 	position-area: bottom span-all;
 	margin-top: 0.5rem;
+}
+
+/* The menu family places and hides its own surface; the paint is the consumer's. */
+.menu-surface {
+	min-width: 10rem;
+	padding: 0.25rem;
+	border: 1px solid var(--line);
+	border-radius: 0.5rem;
+	background: var(--paper);
+	color: var(--ink);
+}
+
+.menu-surface [role^='menuitem'] {
+	padding: 0.25rem 0.6rem;
+	border-radius: 0.35rem;
+	cursor: pointer;
+}
+
+.menu-surface [role^='menuitem']:focus-visible {
+	outline: 2px solid var(--accent);
+}
+
+/* The colour picker positions its plane, rail and thumbs itself, so a consumer
+   owes them a size and something to look at. */
+.picker-plane {
+	width: 200px;
+	height: 160px;
+	border: 1px solid var(--line);
+	border-radius: 0.35rem;
+	background:
+		linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, #3399ff);
+}
+
+.picker-rail {
+	width: 200px;
+	height: 20px;
+	margin-top: 0.75rem;
+	border: 1px solid var(--line);
+	border-radius: 0.35rem;
+	background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+}
+
+.picker-thumb {
+	width: 16px;
+	height: 16px;
+	translate: -50% 50%;
+	border: 1px solid var(--ink);
+	border-radius: 50%;
+	background: transparent;
 }
 
 /* The family hands the consumer `--slider-offset` and leaves the placing here. */

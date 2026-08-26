@@ -5,24 +5,26 @@ The page a real screen reader reads.
 Every shipped `@markless/ui` family's Basic scenario — the starter a consumer
 copies — one section each, on an anchor a driver can be sent to:
 
-| section     | anchor         |
-| ----------- | -------------- |
-| checkbox    | `/#checkbox`    |
-| toggle      | `/#toggle`      |
-| textbox     | `/#textbox`     |
-| progress    | `/#progress`    |
-| checklist   | `/#checklist`   |
-| select      | `/#select`      |
-| modal       | `/#modal`       |
-| radio-group | `/#radio-group` |
-| tabs        | `/#tabs`        |
-| popover     | `/#popover`     |
-| slider      | `/#slider`      |
+| section      | anchor           |
+| ------------ | ---------------- |
+| checkbox     | `/#checkbox`     |
+| toggle       | `/#toggle`       |
+| textbox      | `/#textbox`      |
+| progress     | `/#progress`     |
+| checklist    | `/#checklist`    |
+| select       | `/#select`       |
+| modal        | `/#modal`        |
+| radio-group  | `/#radio-group`  |
+| tabs         | `/#tabs`         |
+| popover      | `/#popover`      |
+| slider       | `/#slider`       |
 | slider-range | `/#slider-range` |
-| tooltip     | `/#tooltip`     |
-| datebox     | `/#datebox`     |
-| fileupload  | `/#fileupload`  |
-| hovercard   | `/#hovercard`   |
+| tooltip      | `/#tooltip`      |
+| datebox      | `/#datebox`      |
+| fileupload   | `/#fileupload`   |
+| hovercard    | `/#hovercard`    |
+| menu         | `/#menu`         |
+| colorpicker  | `/#colorpicker`  |
 
 The slider appears twice: the one-thumb starter, and the two-thumb range shape,
 which a reader announces differently and so gets a section of its own.

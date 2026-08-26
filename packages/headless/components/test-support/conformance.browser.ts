@@ -10,6 +10,7 @@ import Colorpicker from '../src/colorpicker/scenarios/basic.tsrx';
 import DateBox from '../src/datebox/scenarios/basic.tsrx';
 import FileUpload from '../src/fileupload/scenarios/basic.tsrx';
 import Hovercard from '../src/hovercard/scenarios/basic.tsrx';
+import Menu from '../src/menu/scenarios/basic.tsrx';
 import { Basic as Combobox } from '../src/combobox/scenarios/basic.tsrx';
 import Modal from '../src/modal/scenarios/basic.tsrx';
 import Navbar from '../src/navbar/scenarios/basic.tsrx';
@@ -271,6 +272,32 @@ const descriptors: readonly FamilyDescriptor[] = [
 		// src/hovercard/hovercard.browser.ts.
 		valuedAttributes: ['ui-side'],
 		supportsDisabled: false,
+	},
+	{
+		family: 'menu',
+		mount: { CSR: () => render(Menu), SSR: () => renderSSR(Menu) },
+		root: 'root',
+		// The Basic scenario is the trigger menu, so `contextarea` is not on the
+		// page here; the right-click shape is held in src/menu/menu.browser.ts.
+		// The surface is hidden rather than detached when closed, so its items are
+		// present at rest.
+		parts: ['root', 'trigger', 'content', 'item-cut', 'item-copy', 'item-paste', 'item-delete'],
+		rootAria: { role: null },
+		openCycle: {
+			trigger: 'trigger',
+			surface: 'content',
+			haspopup: 'menu',
+			ridesOverlay: true,
+			focusLands: true,
+			// Only Escape hands focus back; a press anywhere - the trigger included,
+			// which reaches the surface as an outside press - is a person choosing
+			// where to be, so the family deliberately leaves focus there. The Escape
+			// return is held in src/menu/menu.browser.ts.
+			focusReturns: false,
+		},
+		// Which way the surface settled is information a consumer styles against.
+		valuedAttributes: ['ui-side'],
+		supportsDisabled: true,
 	},
 	{
 		family: 'modal',
