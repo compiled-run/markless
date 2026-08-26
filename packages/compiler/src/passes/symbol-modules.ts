@@ -5246,7 +5246,17 @@ function importedHandlerCallStatement(
 			callee,
 			usesArguments
 				? [spreadNode(logicalNode('??', memberChainNode('context.args'), arrayNode([])))]
-				: [memberChainNode('context.event')],
+				: symbol.kind === 'callback-prop'
+					? [
+							spreadNode(
+								logicalNode(
+									'??',
+									memberChainNode('context.args'),
+									arrayNode([memberChainNode('context.event')]),
+								),
+							),
+						]
+					: [memberChainNode('context.event')],
 		),
 	);
 }
@@ -5260,22 +5270,35 @@ function eventHandlerParameterStatements(input: EventHandlerEmissionInput): Emis
 	const parameters = symbol.parameters ?? [];
 	if (parameters.length === 0) return [];
 
+	// The binder is not always visible here, so a callback prop tests for the
+	// argument vector at call time rather than being compiled for one route.
+	const argumentAt = (index: number): EmissionNode => ({
+		type: 'ChainExpression',
+		expression: {
+			type: 'MemberExpression',
+			object: memberChainNode('context.args'),
+			property: literalNode(index),
+			computed: true,
+			optional: true,
+		},
+	});
+
 	return parameters.map((parameter, index) => {
-		if (symbol.kind !== 'callback-prop' || (!input.usesArgumentVector && parameters.length <= 1)) {
+		if (symbol.kind !== 'callback-prop') {
 			return constDeclarationNode(parameter, memberChainNode('context.event'));
 		}
 
+		if (!input.usesArgumentVector && parameters.length <= 1) {
+			return constDeclarationNode(parameter, {
+				type: 'ConditionalExpression',
+				test: memberChainNode('context.args'),
+				consequent: argumentAt(index),
+				alternate: memberChainNode('context.event'),
+			});
+		}
+
 		return withTrailingBlockComment(
-			constDeclarationNode(parameter, {
-				type: 'ChainExpression',
-				expression: {
-					type: 'MemberExpression',
-					object: memberChainNode('context.args'),
-					property: literalNode(index),
-					computed: true,
-					optional: true,
-				},
-			}),
+			constDeclarationNode(parameter, argumentAt(index)),
 			` legacy callback binding was: const ${parameter} = context.event; `,
 		);
 	});
