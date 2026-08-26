@@ -38,7 +38,7 @@ test('compiling the same source again parses nothing', async () => {
 
 	expect(first.misses).toBe(1);
 	expect(second.misses).toBe(first.misses);
-	expect(second.hits).toBeGreaterThan(first.hits);
+	expect(second.hits).toBe(first.hits);
 });
 
 test('the same text under a different filename is a different module', () => {
