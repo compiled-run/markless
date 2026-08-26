@@ -8,6 +8,7 @@ import type {
 } from '@markless/serializer/protocol';
 import { PROTOCOL_EVENT_ACTION_KIND } from '@markless/serializer/protocol';
 import type { MarklessExecutionLogMode } from '../dev-log.ts';
+import type { OverlayPrimedDismissalHost } from '../overlay-handoff.ts';
 
 type InlineDebugControls = {
 	record(
@@ -104,13 +105,14 @@ export type MarklessSettledArmHandoff = {
 	readonly read: (graphNodeId: string, path?: ReadonlyArray<string>) => unknown;
 };
 
-type InlineRoot = HTMLElement & {
-	__asyncResumeRuntimeStarted?: boolean;
-	__marklessDelegatedDispatch?: boolean;
-	__marklessSettledArms?: Array<MarklessSettledArmHandoff>;
-	__marklessEventOnlyGraph?: Map<string, unknown>;
-	__marklessEventOnlyGraphInitialized?: boolean;
-};
+type InlineRoot = HTMLElement &
+	OverlayPrimedDismissalHost & {
+		__asyncResumeRuntimeStarted?: boolean;
+		__marklessDelegatedDispatch?: boolean;
+		__marklessSettledArms?: Array<MarklessSettledArmHandoff>;
+		__marklessEventOnlyGraph?: Map<string, unknown>;
+		__marklessEventOnlyGraphInitialized?: boolean;
+	};
 type InlineDispatchInput = {
 	readonly root: InlineRoot;
 	readonly event: Event | 0;
@@ -689,10 +691,8 @@ function runInlineResumerOverlayPrimer(
 		// behaviour is installed and owns the keyboard; leaving a reason behind
 		// would dismiss something twice.
 		if (root.__marklessDelegatedDispatch) return;
-		if ((event as KeyboardEvent).key === 'Escape') {
-			(globalThis as { __marklessOverlayPrimedDismissal?: 'escape' })
-				.__marklessOverlayPrimedDismissal = 'escape';
-		}
+		if ((event as KeyboardEvent).key === 'Escape')
+			root.__marklessOverlayPrimedDismissal = 'escape';
 		setTimeout(() => {
 			if (root.__marklessDelegatedDispatch) return;
 			root.__marklessDelegatedDispatch = true;
