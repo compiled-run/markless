@@ -1,5 +1,6 @@
 import {
 	marklessComposedGraphNodeId,
+	marklessComposerInstancePath,
 	marklessGraphWidgetRegistry,
 	marklessInstancePath,
 	marklessInstanceScopedGraph,
@@ -9,8 +10,11 @@ import type { RuntimeGraph } from '@markless/runtime';
 type CallbackSlotContext = {
 	readonly graph: {
 		read(graphNodeId: string, path?: ReadonlyArray<string>): unknown;
+		getSharedDefinition?: RuntimeGraph['getSharedDefinition'];
+		listSharedDefinitions?: RuntimeGraph['listSharedDefinitions'];
 		readonly marklessInstancePath?: string;
 		readonly marklessPageGraph?: unknown;
+		readonly marklessQualifyGraphNodeId?: (graphNodeId: string) => string;
 	};
 	readonly event?: unknown;
 	readonly invokeSymbol?: (symbolId: string, context: unknown) => unknown;
@@ -41,24 +45,39 @@ export function marklessInvokeCallbackSlot(
 ): unknown {
 	const graph = slotGraph(context, graphNodeId, instancePath);
 	const slotSymbolId = graph.read(graphNodeId, []);
-	if (typeof slotSymbolId !== 'string') return undefined;
+	if (typeof slotSymbolId !== 'string') {
+		assertSlotInstanceRendered(context, graph, graphNodeId, instancePath);
+		return undefined;
+	}
 	if (typeof context.invokeSymbol !== 'function')
 		throw new Error('Bound callback invocation is unavailable');
-	const slotPath = marklessComposedGraphNodeId(
-		graphNodeId,
-		graph.marklessInstancePath ?? '',
-		marklessGraphWidgetRegistry(graph as unknown as RuntimeGraph),
-	);
-	const rootPath = slotPath.slice(0, slotPath.length - graphNodeId.length);
+	const rootPath = marklessInstancePath(slotNodeId(graph, graphNodeId));
 	const composerPath = marklessInstancePath(slotSymbolId)
 		? ''
-		: rootPath.slice(0, rootPath.lastIndexOf(':', rootPath.length - 2) + 1);
+		: marklessComposerInstancePath(rootPath);
 	return context.invokeSymbol(composerPath + slotSymbolId, {
 		...context,
 		graph: graph.marklessPageGraph ?? graph,
 		event: context.event,
 		args,
 	});
+}
+
+/**
+ * Where this slot's node really lives, as the dispatching side's own reads land.
+ *
+ * One adapter's instance path is a partial answer: adapters chain, and each one
+ * qualifies what the one before it handed on. A payload whose resolver predates
+ * the composed qualifier still answers with its own path alone.
+ */
+function slotNodeId(graph: CallbackSlotContext['graph'], graphNodeId: string): string {
+	const qualify = graph.marklessQualifyGraphNodeId;
+	if (typeof qualify === 'function') return qualify(graphNodeId);
+	return marklessComposedGraphNodeId(
+		graphNodeId,
+		graph.marklessInstancePath ?? '',
+		marklessGraphWidgetRegistry(graph as unknown as RuntimeGraph),
+	);
 }
 
 /**
@@ -83,4 +102,48 @@ function slotGraph(
 		context.graph as unknown as RuntimeGraph,
 		instancePath,
 	) as unknown as CallbackSlotContext['graph'];
+}
+
+/**
+ * Refuse a dispatch that reached no widget instance at all.
+ *
+ * An empty slot has two readings, and only one of them is a framework gap. A
+ * consumer that passed no callback leaves a rendered instance whose slot cell is
+ * empty, and the authored `slot?.(...)` must no-op exactly as written. A slot id
+ * that resolved onto no instance is the other one: the handler still runs to its
+ * end, the state still moves, and the consumer is simply never told - which is
+ * invisible from the outside and was how a part projected through a page-local
+ * component lost its dispatch. The rendered definition tells them apart: the id
+ * the read used names a shared definition this page holds, or it names nothing.
+ */
+function assertSlotInstanceRendered(
+	context: CallbackSlotContext,
+	graph: CallbackSlotContext['graph'],
+	graphNodeId: string,
+	instancePath: string,
+): void {
+	const page = (graph.marklessPageGraph ?? context.graph) as RuntimeGraph;
+	// A payload carrying no shared definition cannot answer the question, and a
+	// graph reached before its definitions were installed must not be accused.
+	if (typeof page.getSharedDefinition !== 'function') return;
+	if ((page.listSharedDefinitions?.() ?? []).length === 0) return;
+	const slash = graphNodeId.lastIndexOf('/');
+	if (slash <= 0) return;
+	const definitionId = marklessComposedGraphNodeId(
+		graphNodeId.slice(0, slash),
+		graph.marklessInstancePath ?? instancePath,
+		marklessGraphWidgetRegistry(page),
+	);
+	if (page.getSharedDefinition(definitionId) !== undefined) return;
+	const error = new Error(
+		`MARKLESS_CALLBACK_SLOT_UNRESOLVED: ${graphNodeId} was dispatched from a part whose widget instance no rendered widget owns, so the consumer's callback could never be reached.`,
+	) as Error & Record<string, unknown>;
+	error.name = 'CallbackSlotRuntimeError';
+	error.code = 'MARKLESS_CALLBACK_SLOT_UNRESOLVED';
+	error.severity = 'error';
+	error.phase = 'runtime';
+	error.graphNodeId = graphNodeId;
+	error.definitionId = definitionId;
+	error.docsUrl = 'https://markless.dev/errors/MARKLESS_CALLBACK_SLOT_UNRESOLVED';
+	throw error;
 }

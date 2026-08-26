@@ -92,6 +92,22 @@ export function marklessRecordRowScope(
 	return pairs.length > 0 ? pairs.reverse() : undefined;
 }
 
+/**
+ * Which instance authored the symbol a widget root parked in its slot.
+ *
+ * The root path names where the root RENDERED. The authoring position is that
+ * path less the component edge that placed the root — and less the projection
+ * and row segments trailing it, which the same module spells: a root written
+ * inside another component's tag is still the enclosing module's own JSX, so its
+ * callback closure is that module's, not the component it was projected into.
+ */
+export function marklessComposerInstancePath(rootPath: string): string {
+	const segments = rootPath.match(INSTANCE_SEGMENT) ?? [];
+	let end = segments.length;
+	while (end > 0 && !segments[end - 1]!.startsWith('c')) end -= 1;
+	return segments.slice(0, Math.max(end - 1, 0)).join('');
+}
+
 export function marklessRowScopedGraphNodeId(
 	graphNodeId: string,
 	scope: MarklessRowScope,
@@ -263,9 +279,12 @@ export function marklessRowScopedGraph(
 	const registry = marklessGraphWidgetRegistry(graph);
 	const qualify = (graphNodeId: string) =>
 		marklessRowScopedGraphNodeId(graphNodeId, scope, registry);
+	const outerQualify = (graph as MarklessRowScopedGraph).marklessQualifyGraphNodeId;
 	const scoped = {
 		...graph,
 		marklessRowScope: tag,
+		marklessQualifyGraphNodeId: (graphNodeId: string) =>
+			outerQualify ? outerQualify(qualify(graphNodeId)) : qualify(graphNodeId),
 		// An own field, not the WeakMap alone: this graph is spread again on its way
 		// to the symbol (the imported-capture adapter builds its own reader over it),
 		// and a copy the map has never seen mints a registry of its own - one that
@@ -416,6 +435,9 @@ export function marklessInstanceScopedElementHandle(
 export type MarklessScopedGraph = RuntimeGraph & {
 	readonly marklessPageGraph?: RuntimeGraph;
 	readonly marklessInstancePath?: string;
+	// Reads chain adapter into adapter, so only the composed answer says which id a
+	// read really lands on; one adapter's own path is a partial answer.
+	readonly marklessQualifyGraphNodeId?: (graphNodeId: string) => string;
 };
 
 export function marklessInstanceScopedGraph(
@@ -433,10 +455,13 @@ export function marklessInstanceScopedGraph(
 	// Page-space families (shared, storage) keep their page ids through every adapter.
 	const qualify = (graphNodeId: string) =>
 		marklessComposedGraphNodeId(graphNodeId, instancePath, registry);
+	const outerQualify = (graph as MarklessScopedGraph).marklessQualifyGraphNodeId;
 	return {
 		...graph,
 		marklessPageGraph: (graph as MarklessScopedGraph).marklessPageGraph ?? graph,
 		marklessInstancePath: instancePath,
+		marklessQualifyGraphNodeId: (graphNodeId: string) =>
+			outerQualify ? outerQualify(qualify(graphNodeId)) : qualify(graphNodeId),
 		read: (graphNodeId, path) => graph.read(qualify(graphNodeId), path),
 		write: (write) => graph.write({ ...write, graphNodeId: qualify(write.graphNodeId) }),
 		update: (update) => graph.update({ ...update, graphNodeId: qualify(update.graphNodeId) }),
