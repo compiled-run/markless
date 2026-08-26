@@ -200,10 +200,14 @@ function instanceScopeLines(widgetAware: boolean): string[] {
 		// A graph-less context still has an answer: the runtime hands back the
 		// `active` pointer, which is what an older payload's resolver read anyway.
 		...(widgetAware ? ['		const registry = marklessGraphWidgetRegistry(graph);'] : []),
-		// The wrapper says which path it qualifies by, and keeps the page graph it
-		// qualifies against. A dispatch that resolves a symbol id OUT of the graph
-		// has to undo both to run that symbol where its own module spelled it.
-		`		const wrapped = { ...graph, marklessInstancePath: path, marklessPageGraph: graph.marklessPageGraph ?? graph, read: (graphNodeId, readPath) => graph.read(${scoped('graphNodeId', 'registry')}, readPath) };`,
+		// Reads chain one adapter into the next, so the id a read really lands on is
+		// every adapter's answer applied in turn - not this one's. A dispatch that
+		// resolves a symbol id OUT of the graph needs that whole answer, so the
+		// wrapper carries the composed qualifier alongside its own path and the page
+		// graph it qualifies against.
+		'		const outerQualify = graph.marklessQualifyGraphNodeId;',
+		`		const qualify = (graphNodeId) => { const scopedId = ${scoped('graphNodeId', 'registry')}; return typeof outerQualify === "function" ? outerQualify(scopedId) : scopedId; };`,
+		`		const wrapped = { ...graph, marklessInstancePath: path, marklessPageGraph: graph.marklessPageGraph ?? graph, marklessQualifyGraphNodeId: qualify, read: (graphNodeId, readPath) => graph.read(${scoped('graphNodeId', 'registry')}, readPath) };`,
 		'		for (const name of ["write", "update", "call", "delete", "subscribe"]) {',
 		'			const method = graph[name];',
 		`			if (typeof method === "function") wrapped[name] = (record) => method.call(graph, { ...record, graphNodeId: ${scoped('record.graphNodeId', 'registry')} });`,

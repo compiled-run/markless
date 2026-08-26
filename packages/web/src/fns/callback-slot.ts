@@ -14,6 +14,7 @@ type CallbackSlotContext = {
 		listSharedDefinitions?: RuntimeGraph['listSharedDefinitions'];
 		readonly marklessInstancePath?: string;
 		readonly marklessPageGraph?: unknown;
+		readonly marklessQualifyGraphNodeId?: (graphNodeId: string) => string;
 	};
 	readonly event?: unknown;
 	readonly invokeSymbol?: (symbolId: string, context: unknown) => unknown;
@@ -50,12 +51,7 @@ export function marklessInvokeCallbackSlot(
 	}
 	if (typeof context.invokeSymbol !== 'function')
 		throw new Error('Bound callback invocation is unavailable');
-	const slotPath = marklessComposedGraphNodeId(
-		graphNodeId,
-		graph.marklessInstancePath ?? '',
-		marklessGraphWidgetRegistry(graph as unknown as RuntimeGraph),
-	);
-	const rootPath = slotPath.slice(0, slotPath.length - graphNodeId.length);
+	const rootPath = marklessInstancePath(slotNodeId(graph, graphNodeId));
 	const composerPath = marklessInstancePath(slotSymbolId)
 		? ''
 		: marklessComposerInstancePath(rootPath);
@@ -65,6 +61,23 @@ export function marklessInvokeCallbackSlot(
 		event: context.event,
 		args,
 	});
+}
+
+/**
+ * Where this slot's node really lives, as the dispatching side's own reads land.
+ *
+ * One adapter's instance path is a partial answer: adapters chain, and each one
+ * qualifies what the one before it handed on. A payload whose resolver predates
+ * the composed qualifier still answers with its own path alone.
+ */
+function slotNodeId(graph: CallbackSlotContext['graph'], graphNodeId: string): string {
+	const qualify = graph.marklessQualifyGraphNodeId;
+	if (typeof qualify === 'function') return qualify(graphNodeId);
+	return marklessComposedGraphNodeId(
+		graphNodeId,
+		graph.marklessInstancePath ?? '',
+		marklessGraphWidgetRegistry(graph as unknown as RuntimeGraph),
+	);
 }
 
 /**

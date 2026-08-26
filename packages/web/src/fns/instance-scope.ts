@@ -279,9 +279,12 @@ export function marklessRowScopedGraph(
 	const registry = marklessGraphWidgetRegistry(graph);
 	const qualify = (graphNodeId: string) =>
 		marklessRowScopedGraphNodeId(graphNodeId, scope, registry);
+	const outerQualify = (graph as MarklessRowScopedGraph).marklessQualifyGraphNodeId;
 	const scoped = {
 		...graph,
 		marklessRowScope: tag,
+		marklessQualifyGraphNodeId: (graphNodeId: string) =>
+			outerQualify ? outerQualify(qualify(graphNodeId)) : qualify(graphNodeId),
 		// An own field, not the WeakMap alone: this graph is spread again on its way
 		// to the symbol (the imported-capture adapter builds its own reader over it),
 		// and a copy the map has never seen mints a registry of its own - one that
@@ -432,6 +435,9 @@ export function marklessInstanceScopedElementHandle(
 export type MarklessScopedGraph = RuntimeGraph & {
 	readonly marklessPageGraph?: RuntimeGraph;
 	readonly marklessInstancePath?: string;
+	// Reads chain adapter into adapter, so only the composed answer says which id a
+	// read really lands on; one adapter's own path is a partial answer.
+	readonly marklessQualifyGraphNodeId?: (graphNodeId: string) => string;
 };
 
 export function marklessInstanceScopedGraph(
@@ -449,10 +455,13 @@ export function marklessInstanceScopedGraph(
 	// Page-space families (shared, storage) keep their page ids through every adapter.
 	const qualify = (graphNodeId: string) =>
 		marklessComposedGraphNodeId(graphNodeId, instancePath, registry);
+	const outerQualify = (graph as MarklessScopedGraph).marklessQualifyGraphNodeId;
 	return {
 		...graph,
 		marklessPageGraph: (graph as MarklessScopedGraph).marklessPageGraph ?? graph,
 		marklessInstancePath: instancePath,
+		marklessQualifyGraphNodeId: (graphNodeId: string) =>
+			outerQualify ? outerQualify(qualify(graphNodeId)) : qualify(graphNodeId),
 		read: (graphNodeId, path) => graph.read(qualify(graphNodeId), path),
 		write: (write) => graph.write({ ...write, graphNodeId: qualify(write.graphNodeId) }),
 		update: (update) => graph.update({ ...update, graphNodeId: qualify(update.graphNodeId) }),
