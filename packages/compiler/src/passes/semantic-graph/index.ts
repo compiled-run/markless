@@ -388,6 +388,10 @@ function mergeComponentLocalDeclarations(state: WalkState): void {
 
 function walk(node: AnyNode | null | undefined, state: WalkState): void {
 	if (!node || typeof node !== 'object') return;
+	if (state.handledTemplateValues.has(node)) {
+		for (const child of childNodes(node)) walk(child, state);
+		return;
+	}
 
 	switch (node.type) {
 		case 'Element':

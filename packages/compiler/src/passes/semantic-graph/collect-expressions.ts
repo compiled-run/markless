@@ -62,7 +62,7 @@ export function collectCollectionCall(node: AnyNode, state: WalkState): void {
 	if (diagnoseBannedWriteSite(node, target, state)) return;
 
 	for (const argument of asNodes(node.arguments)) {
-		const templateValue = findTemplateValue(argument);
+		const templateValue = findTemplateValue(argument, state.handledTemplateValues);
 		if (!templateValue) continue;
 		state.graph.diagnostics.push(
 			templateAsValueDiagnostic({
@@ -71,7 +71,7 @@ export function collectCollectionCall(node: AnyNode, state: WalkState): void {
 				filename: state.filename,
 			}),
 		);
-		markTemplateValueHandled(templateValue);
+		markTemplateValueHandled(templateValue, state);
 	}
 
 	state.graph.stateWrites.push({
@@ -100,19 +100,25 @@ const templateValueTypes = new Set([
 	'JSXTryExpression',
 ]);
 
-export function findTemplateValue(node: AnyNode | undefined): AnyNode | null {
+export function findTemplateValue(
+	node: AnyNode | undefined,
+	handled: WeakSet<object>,
+): AnyNode | null {
 	if (!node) return null;
+	if (handled.has(node)) return null;
 	if (templateValueTypes.has(node.type ?? '')) return node;
 	if (node.type !== 'ArrayExpression') return null;
 	for (const element of asNodes(node.elements)) {
-		const found = findTemplateValue(element);
+		const found = findTemplateValue(element, handled);
 		if (found) return found;
 	}
 	return null;
 }
 
-export function markTemplateValueHandled(node: AnyNode): void {
-	Object.assign(node, { type: 'MarklessTemplateValue' });
+// Side record, never a rewrite of `node.type`: the parsed tree is shared between
+// compiles of the same source, so a mark written into it would outlive this walk.
+export function markTemplateValueHandled(node: AnyNode, state: WalkState): void {
+	state.handledTemplateValues.add(node);
 }
 
 export function collectDelete(node: AnyNode, state: WalkState): void {
