@@ -73,9 +73,11 @@ real tab stops, which is what QDS, React Aria and the APG all do.
 
 An input's displayed text is its `value` property, and that property stops
 following the `value` attribute the moment a person types into the element. The
-graph writes attributes, so an `<input>` could never be told what to show. Each
-box is therefore a focusable element that draws its digits as its own text —
-React Aria's shape, for the same reason.
+graph does write `value` as a property (measured later in
+`packages/vitest-browser/browser/colorpicker-gates`), so that is not the reason;
+each box is a focusable element drawing its own digits because three inputs
+would each be a form control with their own native entry, spinbutton semantics
+and per-box bounds — React Aria's shape.
 
 That also removes the race QDS's `input-logic.md` records losing: there is no
 native text for the state to argue with. Two consequences worth knowing:
