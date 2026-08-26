@@ -589,6 +589,34 @@ of one call disagree about where a callback's argument comes from, and the page'
 handler is handed the click: the spy reads `[object PointerEvent]` instead of
 `lettuce,tomato`. That is the pinned red row, one per mode.
 
+**Why the consumer binds the event, measured in the compiler rather than inferred
+here.** A callback prop is lowered to `context.args?.[i]` only when the module
+being emitted can see that some other symbol binds it as a callback route
+(`packages/compiler/src/passes/symbol-modules.ts:143` builds that set;
+`:5242` and `:5264` are the two places it decides between the argument vector and
+`context.event`). Inside `checklist.tsrx` that reading works: the composed
+`CheckboxRoot` comes from another module, so its claim resolves here to a
+`callback-route` naming the arrow, and the arrow binds `context.args?.[0]`. The
+consumer page gets no such reading. `ChecklistRoot` answers its own slot through
+the slot's graph node and therefore publishes no claim onward, so
+`with-onchange.tsrx` compiles with nothing that says its `onChange` answers a
+slot — and the second reading, which matches a page's callback prop against the
+route's `rootComponentName`, cannot fire either: it names the INNER family's root
+(`CheckboxRoot`), never the one the page actually wrote.
+
+The contract the runtime already promises is the one to unify on:
+`marklessInvokeCallbackSlot` and the resolver's `callback-route` branch both hand
+the symbol `args` while leaving `event` beside it, and a DOM dispatch sets `event`
+with no `args` at all. So the binding a callback prop needs is the presence test —
+the argument vector when the dispatcher supplied one, the event otherwise — which
+needs no name matching and moves nothing that works today. That edit is in
+`symbol-modules.ts`, which this family's own sources cannot reach.
+
+Pinned in the compiler at
+`packages/compiler/test/callback-slot/consumer-callback-argument.test.ts`: three
+green rows for the invoking side and the family-side binding, one red row for the
+consumer's.
+
 The consequence for the family: the split hovercard had to make — the root's
 handlers calling the `onChange` prop they close over, `setAll` reserved for another
 component — is not needed here. `setAll` reaches the slot fine. When the argument
