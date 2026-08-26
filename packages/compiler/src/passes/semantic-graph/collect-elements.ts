@@ -49,6 +49,7 @@ import {
 	duplicateAttributeDiagnostic,
 	duplicateElementHandleDiagnostic,
 	elementHandleRequiredDiagnostic,
+	elementHandleDeriveReadDiagnostic,
 	elementHandlePropUnsupportedDiagnostic,
 	elementHandleRenderReadDiagnostic,
 	eventSpreadUnsupportedDiagnostic,
@@ -372,7 +373,58 @@ export function collectElementHandleDiagnostics(
 		}
 	}
 
+	collectElementHandleDeriveReads(graph);
+
 	resolveElementHandleIdrefs(graph, pendingIdrefs, firstBindingByHandle, pluralHandleNames);
+}
+
+/**
+ * Every `computed()` whose body reads an element() handle, refused by name.
+ *
+ * The dependency edges are the witness and the scoping both: each one was
+ * resolved in the scope that declared the derive - a component body, or the
+ * shared factory it was written inside - so a sibling part's same-named handle
+ * never answers here.
+ */
+function collectElementHandleDeriveReads(graph: MutableSemanticGraphArtifact): void {
+	const elementBindings = new Map(
+		graph.graphBindings.flatMap((binding) =>
+			binding.kind === 'element' ? [[binding.id, binding] as const] : [],
+		),
+	);
+	if (elementBindings.size === 0) return;
+	const sharedNames = new Map(
+		graph.sharedDefinitions.map((definition) => [definition.id, definition.name] as const),
+	);
+
+	for (const binding of graph.graphBindings) {
+		if (binding.kind !== 'computed') continue;
+		const declaringScope =
+			binding.componentName ??
+			(binding.sharedDefinitionId ? sharedNames.get(binding.sharedDefinitionId) : undefined);
+		if (!declaringScope) continue;
+		for (const dependency of binding.dependencies ?? []) {
+			const handle = elementBindings.get(dependency.graphNodeId);
+			if (!handle) continue;
+			// Two sibling parts declaring `boxEl` share one graph node id, so a
+			// dependency edge alone does not prove THIS body wrote the read.
+			if (!readsSourceText(binding.functionSource, dependency.source)) continue;
+			graph.diagnostics.push(
+				elementHandleDeriveReadDiagnostic({
+					handleName: handle.name,
+					source: dependency.source,
+					derivedName: binding.name,
+					componentName: declaringScope,
+				}),
+			);
+		}
+	}
+}
+
+function readsSourceText(functionSource: string | undefined, source: string): boolean {
+	if (!functionSource) return false;
+	const escaped = source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	return new RegExp(`(?<![\\w$.])${escaped}(?![\\w$])`).test(functionSource);
 }
 
 /**

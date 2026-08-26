@@ -941,6 +941,30 @@ export function unboundElementHandleDiagnostic(input: {
 }
 
 /**
+ * A derive body can never observe a handle: the element is bound on the DOM and
+ * only a handler-shaped symbol is rewritten into the lookup that answers it, so
+ * the derivation reads `undefined` and publishes a value built out of it. That
+ * is refused rather than warned, because there is no reading of the code where
+ * the author wanted the word "undefined".
+ */
+export function elementHandleDeriveReadDiagnostic(input: {
+	readonly handleName: string;
+	readonly source: string;
+	readonly derivedName: string;
+	readonly componentName: string;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_ELEMENT_HANDLE_UNBOUND',
+		title: 'element() handle is read before it is bound',
+		message: `Cannot read element handle "${input.source}" inside computed "${input.derivedName}" in ${input.componentName}: element() handles are DOM-bound and readable only in event handlers, so "${input.handleName}" is undefined on every derivation.`,
+		why: 'A derive body runs on the graph, where an element node holds no value. Only handler-shaped reads are rewritten into the DOM lookup that answers a handle, so a handle read in a derive compiles and then publishes a value built out of undefined.',
+		suggestion:
+			'Measure the element in an event handler and write the result to a state cell the derive reads, or drop the handle read from the derive body.',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_UNBOUND',
+	});
+}
+
+/**
  * A dangling IDREF handle is an error, not a warning, and it is its own code
  * rather than a promotion of MARKLESS_ELEMENT_HANDLE_UNBOUND.
  *
