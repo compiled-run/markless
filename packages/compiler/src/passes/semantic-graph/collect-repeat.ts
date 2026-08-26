@@ -1,4 +1,4 @@
-import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
+import { asNodes, getIdentifierName, unwrapTypeAssertion, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
 	graphBindingMap,
@@ -8,7 +8,9 @@ import {
 } from '../../artifact-helpers/graph-paths.ts';
 import type { SemanticGraphDiagnostic } from '../../artifacts.ts';
 import { findSharedInstance, resolveSharedInstanceGraphPath } from './collect-shared.ts';
+import { resolvedSymbolAt } from './collect-expressions.ts';
 import {
+	repeatCollectionUndeclaredDiagnostic,
 	repeatCollectionUnreadableDiagnostic,
 	repeatKeyIsIndexDiagnostic,
 	repeatKeyRequiredDiagnostic,
@@ -116,6 +118,22 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 		return null;
 	}
 
+	const undeclaredRoot = resolvedCollection
+		? null
+		: undeclaredCollectionRoot(collectionNode, collectionSource, state);
+	if (undeclaredRoot) {
+		state.graph.diagnostics.push(
+			repeatCollectionUndeclaredDiagnostic({
+				node,
+				itemName,
+				collectionSource,
+				rootName: undeclaredRoot,
+				filename: state.filename,
+			}),
+		);
+		return null;
+	}
+
 	const repeatIndex = state.graph.keyedRepeats.length;
 	state.graph.keyedRepeats.push({
 		id: `repeat:${repeatIndex}`,
@@ -207,6 +225,43 @@ function sharedInstanceRepeatUnresolvedDiagnostic(input: {
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_COLLECTION_UNREADABLE',
 	};
+}
+
+/**
+ * The root identifier of a collection that reached no graph cell and resolves to
+ * no binding at all. Such a name is re-emitted into the server render module,
+ * where it throws a ReferenceError on the first render with nothing said at
+ * build time. A module constant or an import resolves, and stays supported as an
+ * authored collection.
+ *
+ * Resolution answers this rather than a name lookup, because only resolution can
+ * tell an undeclared name from one declared in some other scope of the file. An
+ * expression whose root is not a plain identifier chain - a call, a literal, an
+ * index into something computed - has no binding to judge and is left alone.
+ */
+function undeclaredCollectionRoot(
+	collectionNode: AnyNode,
+	collectionSource: string,
+	state: WalkState,
+): string | null {
+	if (repeatRowBindsName(collectionSource, state)) return null;
+
+	const root = staticRootIdentifier(collectionNode);
+	const rootName = getIdentifierName(root);
+	if (!root || !rootName || typeof root.start !== 'number') return null;
+
+	return resolvedSymbolAt(state.semantic(), root.start) === null ? rootName : null;
+}
+
+/** The identifier a static member chain is rooted in, or null for any other shape. */
+function staticRootIdentifier(node: AnyNode): AnyNode | null {
+	let current = unwrapTypeAssertion(node);
+
+	while (current?.type === 'MemberExpression' && current.computed !== true) {
+		current = unwrapTypeAssertion(current.object as AnyNode | undefined);
+	}
+
+	return current?.type === 'Identifier' ? current : null;
 }
 
 function repeatItemName(node: AnyNode): string | null {

@@ -1228,6 +1228,27 @@ export function repeatCollectionUnreadableDiagnostic(input: {
 	} as SemanticGraphDiagnostic;
 }
 
+// Same code as the unreadable-collection refusal: both say this @for has no
+// source of rows it could evaluate. The text is specific to the undeclared root
+// so the fix is the one the author actually needs.
+export function repeatCollectionUndeclaredDiagnostic(input: {
+	readonly node: AnyNode;
+	readonly itemName: string;
+	readonly collectionSource: string;
+	readonly rootName: string;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_REPEAT_COLLECTION_UNREADABLE',
+		title: 'This @for collection names nothing',
+		message: `@for (const ${input.itemName} of ${input.collectionSource}) is rooted in \`${input.rootName}\`, which this module declares nowhere and imports nowhere. The repeat has no graph cell to read and no binding its authored expression could evaluate against.`,
+		why: 'The collection expression is re-emitted into the server render module, where an undeclared name throws a ReferenceError on the first render.',
+		span: sourceSpan(input.node, input.filename),
+		suggestion: `Declare \`${input.rootName}\` as a \`state()\` cell or a \`computed()\` in this component or its shared family, or correct the spelling if it was meant to name one that exists.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_COLLECTION_UNREADABLE',
+	});
+}
+
 export function repeatKeyIsIndexDiagnostic(input: {
 	readonly node: AnyNode;
 	readonly itemName: string;
