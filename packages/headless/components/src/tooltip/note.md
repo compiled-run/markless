@@ -256,7 +256,7 @@ and answering it to buy a nicety is the wrong order. QDS's `getEffectiveDelay` i
 
 ## Test lanes
 
-`tooltip.browser.ts` — 32 rows, CSR and SSR, with one known gap in both modes.
+`tooltip.browser.ts` — 32 rows, CSR and SSR, all green.
 The shared rows in both modes
 (describedby while hidden, role + `overlay` + `hidden`, the anchor wiring, the
 dropped props, two instances each landing against their own trigger), then the
@@ -266,16 +266,15 @@ trigger, a touch crossing that opens nothing, the pending-timer teardown, the tw
 geometry rows, the toolbar isolation row, the two inside-a-popover rows, and the
 SSR served shape and served-showing placement.
 
-**The known gap: the pointer route reports nothing to the consumer.** A callback
-stored by a component is not visible to that component's own handler modules, and
-the pointer handlers live on the root — the same component whose render puts
-`onChange` on the instance — so `setOpen`'s body reads an empty slot from inside
-them. Focus and blur sit on the trigger, a different component, and report
-normally; the two rows sit side by side so the pinned half is unambiguous. Both
-pointer rows are written as what should happen, so they flip the day the
-framework closes the gap. Hovercard measured the same thing first and works
-around it by calling the prop its root closes over; this family does not, and the
-gap is stated here rather than papered over.
+**Both reporting routes now report.** The pointer handlers live on the root — the
+same component whose render puts `onChange` on the instance — and the framework
+now delivers a callback a component stored on its shared instance to that
+component's own handler modules, so `setOpen`'s body reads the slot from inside
+them. Focus and blur sit on the trigger, a different component, and report the
+same way. The two rows sit side by side because they cross different component
+boundaries, and both are ordinary rows: the pointer pair was written as what
+should happen while the gap was open, and flipped green when the framework closed
+it. Nothing in this family was ever changed to work around it.
 
 The geometry rows carry the consumer half of the contract themselves — a
 stylesheet appended in `beforeEach` — because the family emits no

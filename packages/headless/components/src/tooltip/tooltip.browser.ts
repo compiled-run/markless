@@ -210,11 +210,7 @@ for (const mode of MODES) {
 		expect(Math.abs(secondTip.bottom - secondBox.top)).toBeLessThanOrEqual(SLACK);
 	});
 
-	// Pinned as what should happen: a callback stored by this component is not
-	// visible to its own handler modules, so the pointer handlers - which live on
-	// the root, the same component whose render put `onChange` on the instance -
-	// report nothing.
-	test.fails(`${mode}: the pointer route reports each change to the consumer`, async () => {
+	test(`${mode}: the pointer route reports each change to the consumer`, async () => {
 		if (mode === 'CSR') await render(WithOnChange);
 		else await renderSSR(WithOnChange);
 		expect(el(Calls).textContent).toBe('0');
@@ -230,8 +226,8 @@ for (const mode of MODES) {
 		expect(el(Last).textContent).toBe('false');
 	});
 
-	// The contrasting route, and the reason both are worth a row: focus and blur
-	// sit on the trigger, a different component from the one that stored the slot.
+	// The other route, and the reason both are worth a row: focus and blur sit on
+	// the trigger, a different component from the one that stored the slot.
 	test(`${mode}: the focus route reports each change to the consumer`, async () => {
 		if (mode === 'CSR') await render(WithOnChange);
 		else await renderSSR(WithOnChange);
