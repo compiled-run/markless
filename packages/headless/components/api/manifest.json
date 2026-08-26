@@ -2900,6 +2900,125 @@
 			}
 		]
 	},
+	"tour": {
+		"parts": [
+			{
+				"part": "backdrop",
+				"component": "TourBackdrop",
+				"doc": "The spotlight. It is not a layer with a hole in it - it *is* the hole, sized\nand placed by the anchor, and the dim is its own `box-shadow` spread. The\ncolour, the corner radius and any transition are ordinary CSS of yours.\n\nIt takes no pointer events, so the target underneath stays pressable.",
+				"props": []
+			},
+			{
+				"part": "backtrigger",
+				"component": "TourBackTrigger",
+				"doc": "The previous step. Disabled on the first step unless the tour loops.",
+				"props": []
+			},
+			{
+				"part": "close",
+				"component": "TourClose",
+				"doc": "A consumer's `onClick` runs after the tour has closed.",
+				"props": []
+			},
+			{
+				"part": "description",
+				"component": "TourDescription",
+				"doc": "A sentence the reader announces after the name. Say which element the step means in words - the dim is not accessible, the description is.",
+				"props": []
+			},
+			{
+				"part": "forwardtrigger",
+				"component": "TourForwardTrigger",
+				"doc": "The next step. Disabled on the last step unless the tour loops.",
+				"props": []
+			},
+			{
+				"part": "item",
+				"component": "TourItem",
+				"doc": "One step: the card the person reads, and the element on the page it is about.\n\nThe card is placed by CSS anchoring against the target, so it holds while the\npage scrolls and reflows with no script. A step with no `target` anchors to\nnothing, which leaves its `position-area` inert and the card wherever your own\nungated rule puts it - `inset: 0; margin: auto` for a centred step.",
+				"props": [
+					{
+						"name": "index",
+						"type": "number",
+						"required": true,
+						"doc": "Where this step comes in the tour, counting from zero.\n\nRequired, because `step` is an ordinal and a step has to know its own place\nwhile it renders to decide whether it is the one showing. Number the steps\n`0`, `1`, `2`… in the order you write them: the tour's length is one past\nthe highest number registered, and moving a step lands focus on the card in\nthat document position."
+					},
+					{
+						"name": "target",
+						"type": "HTMLElement",
+						"required": false,
+						"doc": "The element this step is about, as an `element()` handle you bound on it.\n\nPass the handle itself, never inside an array or an object: a handle only\ncrosses a component edge as a bare prop."
+					},
+					{
+						"name": "side",
+						"type": "'top' | 'bottom' | 'start' | 'end'",
+						"required": false,
+						"default": "'bottom'",
+						"doc": "Where the card is placed against the target. It is also written on the card\nas `ui-side`, so styling can follow the placement."
+					}
+				]
+			},
+			{
+				"part": "root",
+				"component": "TourRoot",
+				"doc": "The tour itself; the spotlight and every step's card go inside it. It holds\nwhether the tour is showing and which step it is on.\n\nThe root deliberately carries no anchor scope. A tour's target is an element\nthe consumer owns, somewhere else on the page entirely, so confining the\nanchor name to this subtree would hide it from the card that needs it.",
+				"props": [
+					{
+						"name": "open",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Whether the tour is showing. Omit it and the tour starts closed."
+					},
+					{
+						"name": "loop",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Whether the last step advances to the first and the first goes back to the last. Off by default: a tour has a beginning and an end."
+					},
+					{
+						"name": "closeOnInteractOutside",
+						"type": "boolean",
+						"required": false,
+						"default": "true",
+						"doc": "Whether a press outside the card closes the tour. On by default.\n\nA press inside the current step's own target never closes it whatever this\nsays - the tour just told the person to click that."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Whether the tour refuses to move. The card still shows the step it is on."
+					},
+					{
+						"name": "onChange",
+						"type": "(step: number) => void",
+						"required": false,
+						"doc": "Called with the new step's position when the tour moves."
+					},
+					{
+						"name": "onOpenChange",
+						"type": "(open: boolean) => void",
+						"required": false,
+						"doc": "Called with the new value when the tour opens or closes - including when Escape or a press outside closes it."
+					}
+				]
+			},
+			{
+				"part": "title",
+				"component": "TourTitle",
+				"doc": "The step's name. Mounting it is what names the card.",
+				"props": []
+			},
+			{
+				"part": "valuelabel",
+				"component": "TourValueLabel",
+				"doc": "Where the person is up to. Renders \"2 of 5\" unless you write your own text inside it.",
+				"props": []
+			}
+		]
+	},
 	"tree": {
 		"parts": [
 			{

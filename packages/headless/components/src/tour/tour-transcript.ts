@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import { PREVIEW_ORIGIN } from '../../../../../apps/sr-gallery/preview-server.ts';
+import { FAMILY_ANCHORS, PREVIEW_ORIGIN } from '../../../../../apps/sr-gallery/preview-server.ts';
 import {
 	missingFacts,
 	readUntil,
@@ -12,9 +12,7 @@ import {
  * runs unchanged against NVDA and VoiceOver.
  */
 
-// The tour has no `FAMILY_ANCHORS` entry yet: registering the family on the
-// gallery page is a separate change, and this anchor moves to that table with it.
-export const TOUR_ANCHOR = '/#tour';
+export const TOUR_ANCHOR = FAMILY_ANCHORS.tour;
 export const TOUR_URL = `${PREVIEW_ORIGIN}${TOUR_ANCHOR}`;
 
 // The tour section sits after every earlier family on the gallery page, so a walk
@@ -38,8 +36,10 @@ function expectConveys(sr: ScreenReaderDriver, phrase: string, conveys: Conveys)
  */
 export async function readTourTranscript(sr: ScreenReaderDriver, page: Page) {
 	const section = page.locator(`#${TOUR_ANCHOR.slice(2)}`);
-	const firstCard = section.getByTestId('step-save');
-	const secondCard = section.getByTestId('step-share');
+	// The gallery is consumer code and carries no test hooks, so each card is
+	// reached the way a reader reaches it: by role and the name its title gives it.
+	const firstCard = section.getByRole('dialog', { name: FIRST_TITLE });
+	const secondCard = section.getByRole('dialog', { name: SECOND_TITLE });
 
 	const startButton: Conveys = { role: 'button', name: START };
 	expectConveys(sr, await readUntil(sr, startButton, WALK_LIMIT), startButton);

@@ -70,6 +70,9 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	numberbox: 'textbox',
 	'numberbox-min-max-step': 'textbox',
 	'numberbox-currency': 'textbox',
+	// Every step's card is a role="dialog" that is only `hidden` until its step
+	// comes, so includeHidden finds all of them before the tour is ever started.
+	tour: 'dialog',
 };
 
 /** Sections whose point is how many of that role they serve, not merely that they serve one. */
@@ -90,6 +93,9 @@ const RENDERED_COUNT: Partial<Record<FamilyName, number>> = {
 	numberbox: 2,
 	'numberbox-min-max-step': 2,
 	'numberbox-currency': 2,
+	// One card per step: a count catches a tour that rendered its first step and
+	// lost the rest, which is what a mis-rooted widget instance looks like here.
+	tour: 3,
 };
 
 const appDir = fileURLToPath(new URL('..', import.meta.url));
@@ -362,6 +368,33 @@ async function main() {
 			);
 		} else {
 			console.log(`#numberbox-min-max-step describes its range: ${description.trim()}`);
+		}
+
+		// The role count above sees the cards and nothing else the tour needs: the
+		// opener is the page's own button because the family ships no trigger part,
+		// and the spotlight is presentational by design, so neither has a role to
+		// count. Both are what a reader lane needs to be on the page before it runs.
+		const startTour = page.locator('#tour').getByRole('button', { name: 'Take the tour' });
+		if ((await startTour.count()) !== 1) {
+			failures.push('#tour serves no single "Take the tour" button, so no reader can open it.');
+		} else {
+			console.log('#tour serves the button that starts the tour.');
+		}
+
+		const spotlight = page.locator('#tour [ui-spotlight]');
+		if ((await spotlight.count()) !== 1) {
+			failures.push('#tour renders no spotlight, so the tour has no backdrop mounted.');
+		} else {
+			console.log('#tour renders the tour spotlight.');
+		}
+
+		const firstCard = page
+			.locator('#tour')
+			.getByRole('dialog', { name: 'Save your work', includeHidden: true });
+		if ((await firstCard.count()) !== 1) {
+			failures.push('#tour serves no card named "Save your work".');
+		} else {
+			console.log('#tour serves its first card by name.');
 		}
 
 		if (failures.length > 0) throw new Error(failures.join(' '));

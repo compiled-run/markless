@@ -29,6 +29,7 @@ import Toaster from '../src/toaster/scenarios/basic.tsrx';
 import Toggle from '../src/toggle/scenarios/basic.tsrx';
 import ToggleGroup from '../src/togglegroup/scenarios/basic.tsrx';
 import Tooltip from '../src/tooltip/scenarios/basic.tsrx';
+import Tour from '../src/tour/scenarios/basic.tsrx';
 import Tree from '../src/tree/scenarios/basic.tsrx';
 import { runConformance, type FamilyDescriptor } from './conformance.ts';
 
@@ -592,6 +593,43 @@ const descriptors: readonly FamilyDescriptor[] = [
 		// dismissal, hover and focus rows live in src/tooltip/tooltip.browser.ts.
 		valuedAttributes: ['ui-side'],
 		supportsDisabled: false,
+	},
+	{
+		family: 'tour',
+		mount: { CSR: () => render(Tour), SSR: () => renderSSR(Tour) },
+		root: 'root',
+		parts: [
+			'root',
+			'backdrop',
+			'step-save',
+			'save-title',
+			'save-description',
+			'save-count',
+			'save-back',
+			'save-forward',
+			'save-close',
+			'step-share',
+			'share-title',
+			'share-description',
+			'share-count',
+			'share-back',
+			'share-forward',
+			'share-close',
+			'step-trash',
+			'trash-title',
+			'trash-description',
+			'trash-count',
+			'trash-back',
+			'trash-forward',
+			'trash-close',
+		],
+		rootAria: { role: null },
+		// No openCycle: this family ships no trigger part. A tour is opened by the
+		// consumer flipping `open`, so the battery's click-a-part cycle has nothing
+		// of the family's own to click. The open, dismissal and step rows live in
+		// src/tour/tour.browser.ts.
+		valuedAttributes: ['ui-max', 'ui-side', 'ui-value'],
+		supportsDisabled: true,
 	},
 	{
 		family: 'tree',
