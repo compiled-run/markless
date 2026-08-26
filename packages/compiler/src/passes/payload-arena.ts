@@ -115,6 +115,9 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 	const behaviors = input.semanticGraph.behaviors.map((behavior) =>
 		payloadBehavior(behavior, bindings, aliases),
 	);
+	// A sibling part's destructured prop shares the page's handle name, so an
+	// `el=` binding resolves in the component that authored it, not module-wide.
+	const handleScopeOf = componentGraphScopes(input.semanticGraph, { bindings, aliases });
 	const keyedRepeats = renderData.repeats.flatMap(
 		(repeat): PayloadKeyedRepeat[] => {
 			if (!repeat.collectionGraphNodeId) return [];
@@ -122,12 +125,7 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			const rowElementHandles = input.semanticGraph.elementHandleBindings.flatMap(
 				(binding) => {
 					if (binding.rowOwner?.repeatId !== repeat.repeatId) return [];
-					const graphBinding = resolveElementHandleBinding(
-						binding,
-						input,
-						bindings,
-						aliases,
-					);
+					const graphBinding = resolveElementHandleBinding(binding, input, handleScopeOf);
 					if (!graphBinding || graphBinding.kind !== 'element') return [];
 					return [
 						{
@@ -222,7 +220,7 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 	const elementHandles = input.semanticGraph.elementHandleBindings.flatMap((binding) => {
 		if (binding.rowOwner || binding.keyedRepeatScopeIds.length > 0) return [];
 
-		const graphBinding = resolveElementHandleBinding(binding, input, bindings, aliases);
+		const graphBinding = resolveElementHandleBinding(binding, input, handleScopeOf);
 		if (!graphBinding || graphBinding.kind !== 'element') return [];
 
 		return [
@@ -336,11 +334,40 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 	};
 }
 
+type ComponentGraphScope = {
+	readonly bindings: ReadonlyMap<string, SemanticGraphBinding>;
+	readonly aliases: ReturnType<typeof semanticAliasMap>;
+};
+
+/**
+ * Name lookup scoped to the component a binding was authored in. A page's
+ * `element()` local and a sibling part's destructured prop of the same name are
+ * two declarations, and a module-wide map keeps only whichever came last.
+ */
+function componentGraphScopes(
+	graph: PayloadArenaInput['semanticGraph'],
+	moduleWide: ComponentGraphScope,
+): (componentName: string | undefined) => ComponentGraphScope {
+	const cache = new Map<string, ComponentGraphScope>();
+
+	return (componentName) => {
+		if (componentName === undefined) return moduleWide;
+		const cached = cache.get(componentName);
+		if (cached) return cached;
+
+		const scope = {
+			bindings: graphBindingMap(graph, undefined, componentName),
+			aliases: semanticAliasMap(graph, undefined, componentName),
+		};
+		cache.set(componentName, scope);
+		return scope;
+	};
+}
+
 function resolveElementHandleBinding(
 	binding: PayloadArenaInput['semanticGraph']['elementHandleBindings'][number],
 	input: PayloadArenaInput,
-	bindings: ReadonlyMap<string, SemanticGraphBinding>,
-	aliases: ReturnType<typeof semanticAliasMap>,
+	scopeOf: (componentName: string | undefined) => ComponentGraphScope,
 ): SemanticGraphBinding | undefined {
 	const shared = resolveSharedInstanceGraphPath(
 		binding.handleName,
@@ -349,7 +376,8 @@ function resolveElementHandleBinding(
 	);
 	if (shared?.binding.kind === 'element' && shared.path.length === 0) return shared.binding;
 
-	const direct = resolveGraphPath(binding.handleName, bindings, aliases);
+	const scope = scopeOf(binding.componentName);
+	const direct = resolveGraphPath(binding.handleName, scope.bindings, scope.aliases);
 	if (!direct) return undefined;
 	if (direct.binding.kind === 'element' && direct.path.length === 0) return direct.binding;
 	if (direct.binding.kind !== 'prop' || !binding.componentName) return undefined;

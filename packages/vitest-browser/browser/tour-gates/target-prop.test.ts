@@ -2,6 +2,7 @@ import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import BarePropPage from './bare-prop-page.tsrx';
 import LayeredPage from './layered-page.tsrx';
+import SameModulePage from './same-module-page.tsrx';
 import SteppingPage from './stepping-page.tsrx';
 
 // Gate 1. A tour cannot query for its target, so the family rests on a consumer
@@ -87,21 +88,21 @@ test('SSR resume: the handle crosses two projection layers', async () => {
 	await expectTheHandleCrosses(screen.container as HTMLElement);
 });
 
-// Declaring the part in the SAME module as the consumer is still refused. Both
-// resolvers that decide it - the handle-binding walk and the payload arena's
-// handle records - look the name up module-wide, so the part's own destructured
-// `target` prop answers for the page's handle and the page reads as a nested
-// forward. The page's own `element:target` never reaches the served handle
-// records either, which is why widening this shape needs the arena's resolution
-// scoped, not just the walk's.
-test('a part declared in the consumer module is refused, and the refusal names the supported shape', async () => {
-	const { status, body } = await moduleStatus('./same-module-page.tsrx?import');
-	expect(status).toBe(500);
-	expect(body).toContain('MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED');
-	expect(body).toContain(
-		'this slice only supports element handles passed as direct component props, not through arrays or nested object props.',
-	);
-	expect(body).toContain('or bind it in the component that renders the host element.');
+// Declaring the part in the consumer's OWN module carries the handle the same
+// way. Both resolvers that decide it - the handle-binding walk and the payload
+// arena's handle records - resolve the name in the component that declared it,
+// so the part's destructured `target` prop no longer answers for the page's
+// `element:target` and the page's own handle reaches the served records.
+test('CSR: a part declared in the consumer module receives the handle', async () => {
+	const screen = await render(SameModulePage);
+	await expectTheControlsHold(screen.container as HTMLElement);
+	await expectTheHandleCrosses(screen.container as HTMLElement);
+});
+
+test('SSR resume: the same-module part receives the handle after resume', async () => {
+	const screen = await renderSSR(SameModulePage);
+	await expectTheControlsHold(screen.container as HTMLElement);
+	await expectTheHandleCrosses(screen.container as HTMLElement);
 });
 
 // The shape the refusal's text actually names: a handle reached through a nested

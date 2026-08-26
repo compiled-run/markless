@@ -242,6 +242,7 @@ export function collectElementHandleDiagnostics(
 ): void {
 	const bindings = graphBindingMap(graph);
 	const aliases = semanticAliasMap(graph);
+	const scopeOf = componentGraphScopes(graph, { bindings, aliases });
 	const validElementHandleBindings: SemanticElementHandleBinding[] = [];
 	const moduleElementNames = new Set(
 		graph.diagnostics
@@ -251,6 +252,7 @@ export function collectElementHandleDiagnostics(
 	);
 
 	for (const [bindingIndex, binding] of graph.elementHandleBindings.entries()) {
+		const scope = scopeOf(binding.componentName);
 		// `el={checkbox.triggerEl}` names a handle the shared factory declared. The
 		// component-scope lookup answers first with the factory's state cell (the
 		// instance local shares its name), so the shared route wins whenever it is
@@ -259,7 +261,7 @@ export function collectElementHandleDiagnostics(
 			elementHandlePath(
 				resolveSharedInstanceGraphPath(binding.handleName, graph, binding.componentName),
 			) ??
-			resolveGraphPath(binding.handleName, bindings, aliases);
+			resolveGraphPath(binding.handleName, scope.bindings, scope.aliases);
 		const graphBinding = resolved?.binding;
 		if (moduleElementNames.has(binding.handleName)) continue;
 		if (binding.keyedRepeatScopeIds.length > 0) {
@@ -345,7 +347,8 @@ export function collectElementHandleDiagnostics(
 		validElementHandleBindings.map((binding) => binding.handleName),
 	);
 	for (const read of graph.templateReads) {
-		const resolved = resolveGraphPath(read.source, bindings, aliases);
+		const readScope = scopeOf(read.componentName);
+		const resolved = resolveGraphPath(read.source, readScope.bindings, readScope.aliases);
 		if (!resolved || resolved.binding.kind !== 'element') continue;
 		const handleName = resolved.binding.name;
 		if (resolved.path.length > 0) {
@@ -962,6 +965,35 @@ function attributeValueDiagnostic(
 		node: expressionValue,
 		filename: state.filename,
 	});
+}
+
+/**
+ * Name lookup scoped to the component a binding was authored in. Two components
+ * in one module routinely share a name — a page's `element()` local and a
+ * sibling part's destructured prop of the same name — and a module-wide map
+ * answers with whichever was collected last, so the page's handle is lost.
+ */
+function componentGraphScopes(
+	graph: MutableSemanticGraphArtifact,
+	moduleWide: {
+		readonly bindings: ReadonlyMap<string, SemanticGraphBinding>;
+		readonly aliases: ReturnType<typeof semanticAliasMap>;
+	},
+): (componentName: string | undefined) => typeof moduleWide {
+	const cache = new Map<string, typeof moduleWide>();
+
+	return (componentName) => {
+		if (componentName === undefined) return moduleWide;
+		const cached = cache.get(componentName);
+		if (cached) return cached;
+
+		const scope = {
+			bindings: graphBindingMap(graph, undefined, componentName),
+			aliases: semanticAliasMap(graph, undefined, componentName),
+		};
+		cache.set(componentName, scope);
+		return scope;
+	};
 }
 
 function resolvePropForwardedElementHandle(
