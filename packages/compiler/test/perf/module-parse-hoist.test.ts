@@ -28,6 +28,7 @@ vi.mock('../../src/js-ast.ts', async (importOriginal) => {
 
 const { buildSemanticGraph } = await import('../../src/index.ts');
 const { moduleScopeDeclarations } = await import('../../src/passes/public-render/shared.ts');
+const { parseCacheStats, resetParseCache } = await import('../../src/js-ast.ts');
 const { ownedModuleAst } = await import('../../src/passes/semantic-graph/shared-ast.ts');
 
 /**
@@ -78,16 +79,18 @@ test('module-scope declarations are read from one parse however many emitters as
 	expect(second).toBe(first);
 });
 
-test('one owner holds one tree, and a source it did not parse gets its own', () => {
+test('one owner holds one tree, and a second owner of the same source causes no re-parse', () => {
 	const source = rowsSource(5);
 	parses.source = source;
 	parses.count = 0;
+	resetParseCache();
 	const owner = {};
 
 	const first = ownedModuleAst(owner, source, 'src/Owned.tsrx');
+	const missesAfterFirst = parseCacheStats().misses;
 
 	expect(ownedModuleAst(owner, source, 'src/Owned.tsrx')).toBe(first);
 	expect(parses.count).toBe(1);
-	expect(ownedModuleAst({}, source, 'src/Owned.tsrx')).not.toBe(first);
-	expect(parses.count).toBe(2);
+	expect(ownedModuleAst({}, source, 'src/Owned.tsrx')).toBe(first);
+	expect(parseCacheStats().misses).toBe(missesAfterFirst);
 });
