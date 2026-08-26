@@ -125,9 +125,11 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'			}',
 		// The widget root wrote the answering symbol id into the slot's node, and the
 		// part's own instance resolves that node the way it resolves its other reads.
+		// The row's instance path is what a root answering its OWN slot needs: its
+		// handler spells the node module-level, and the node is on its instance.
 		...(routesCallbackSlots
 			? [
-					'			if (route.kind === "callback-slot-route") return marklessInvokeCallbackSlot(context, route.graphNodeId, args);',
+					'			if (route.kind === "callback-slot-route") return marklessInvokeCallbackSlot(context, route.graphNodeId, args, bound.instancePath);',
 				]
 			: []),
 		'			if (route.kind !== callbackRoute) throw new Error(`Capture slot ${slotId} is not a callback route`);',
