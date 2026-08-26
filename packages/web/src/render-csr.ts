@@ -12,7 +12,11 @@ import { marklessAttributeValue } from './dom-attribute.ts';
 import type { CsrRenderContainer, CsrRenderOptions, CsrRenderOutput } from './render.ts';
 import { marklessInstanceScopedLoadSymbol } from './fns/instance-scope.ts';
 import { registerServedArmEventRecords } from './resume-arm-records.ts';
-import type { ResumeAsyncBoundaryPayload, ResumeDomElement } from './resume-types.ts';
+import type {
+	ResumeAsyncBoundaryPayload,
+	ResumeDispatchOptions,
+	ResumeDomElement,
+} from './resume-types.ts';
 import type { ResumeRuntime, ResumeRuntimeInput, ResumeSymbol } from './resume.ts';
 import { reportRuntimeErrorToHost } from './runtime-error-reporting.ts';
 
@@ -250,12 +254,12 @@ async function activateAuthoredBehaviors(
 function installDelegatedTriggers(
 	output: CsrRenderOutput,
 	view: ProtocolViewPayload,
-	dispatch: (event: NonNullable<Parameters<ResumeRuntime['dispatch']>[0]>) => Promise<void>,
+	dispatch: (
+		event: NonNullable<Parameters<ResumeRuntime['dispatch']>[0]>,
+		dispatchOptions?: ResumeDispatchOptions,
+	) => Promise<void>,
 ): {
-	readonly registerEventRecord: (
-		element: object,
-		record: ProtocolEventRecord,
-	) => void;
+	readonly registerEventRecord: (element: object, record: ProtocolEventRecord) => void;
 	readonly dispose: () => void;
 } {
 	// One capture listener remains the container's dispatch authority.
@@ -269,14 +273,21 @@ function installDelegatedTriggers(
 	const releases: Array<() => void> = [];
 	const installedEventNames = new Set<string>();
 	type DelegatedEvent = NonNullable<Parameters<ResumeRuntime['dispatch']>[0]>;
-	const routes: Partial<Record<string, (event: DelegatedEvent) => Promise<void>>> = {
+	type DelegatedRoute = (
+		event: DelegatedEvent,
+		dispatchOptions?: ResumeDispatchOptions,
+	) => Promise<void>;
+	const routes: Partial<Record<string, DelegatedRoute>> = {
 		[PROTOCOL_EVENT_ACTION_KIND.event]: dispatch,
 		[PROTOCOL_EVENT_ACTION_KIND.externalDelegate]: async () => {},
-	} satisfies Record<ProtocolEventActionKind, (event: DelegatedEvent) => Promise<void>>;
+	} satisfies Record<ProtocolEventActionKind, DelegatedRoute>;
 	const installEventListener = (eventName: string) => {
 		if (eventName === 'visible' || installedEventNames.has(eventName)) return;
 		installedEventNames.add(eventName);
 		const route = async (event: DelegatedEvent) => {
+			// A row event name is listened for on behalf of rows that may not exist
+			// yet, so this listener takes every event of that name, named or not.
+			let named = false;
 			let actionKind: ProtocolEventActionKind | undefined = rowEventNames.has(event.type)
 				? PROTOCOL_EVENT_ACTION_KIND.event
 				: undefined;
@@ -286,7 +297,10 @@ function installDelegatedTriggers(
 				element = element.parentElement ?? null
 			) {
 				const record = recordsByElement.get(element)?.get(event.type);
-				if (record) actionKind = protocolEventActionKind(record);
+				if (record) {
+					actionKind = protocolEventActionKind(record);
+					named = true;
+				}
 			}
 			// This container listener exists for whichever element registered the
 			// record; a sibling with no record of its own is simply not ours.
@@ -299,7 +313,7 @@ function installDelegatedTriggers(
 					throw unroutedDelegatedTriggerError(actionKind);
 				return;
 			}
-			await action(event);
+			await action(event, named ? undefined : { ignoreUnmatched: true });
 		};
 		// addEventListener drops the returned promise, so a rejection would escape
 		// the flush unhandled: contain it here and report it instead.
