@@ -195,11 +195,61 @@ export function hasSharedElementHandle(handles: ReadonlyArray<string>): boolean 
 	return handles.some((handle) => handle.startsWith('shared:'));
 }
 
-// A component's shared-instance local (`const checkbox = checkboxState()`) is
-// not a graph binding: it names a factory whose returned properties each stand
-// for one graph node. A composite residue over that local (`checkbox.checked
-// === true`) can only run once the local is rebuilt from those nodes, so both
-// readers declare it from the same description.
+type SharedInstanceMember = {
+	readonly name: string;
+	readonly graphNodeId: string;
+	readonly path: ReadonlyArray<string>;
+};
+
+type SharedInstanceRebuild = {
+	readonly localName: string;
+	readonly members: ReadonlyArray<SharedInstanceMember>;
+};
+
+/**
+ * A component's shared-instance local (`const checkbox = checkboxState()`) is
+ * not a graph binding: it names a factory whose returned properties each stand
+ * for one graph node. A composite residue over that local (`checkbox.checked
+ * === true`) can only run once the local is rebuilt from those nodes, so every
+ * reader takes the members from this one description.
+ *
+ * Only the cells the text names: a member is read out of the state map by its
+ * own node, never through a sibling member, so the reachable set is the reads
+ * themselves.
+ */
+function sharedInstanceReads(
+	semanticGraph: PublicRenderModuleInput['semanticGraph'],
+	componentName: string | undefined,
+	text: string,
+	bound: ReadonlySet<string>,
+): ReadonlyArray<SharedInstanceRebuild> {
+	const rebuilds: SharedInstanceRebuild[] = [];
+	const declared = new Set<string>();
+	for (const instance of semanticGraph.sharedInstances ?? []) {
+		if (declared.has(instance.localName) || bound.has(instance.localName)) continue;
+		// Only the locals this component's body actually declares: a sibling
+		// component's same-named instance would rebuild the wrong widget's members
+		// under that name, and the emitted scope would read them.
+		if (!sharedInstanceVisibleFrom(instance, componentName)) continue;
+		if (!references(text, instance.localName)) continue;
+
+		const definition = semanticGraph.sharedDefinitions.find(
+			(candidate) => candidate.id === instance.definitionId,
+		);
+		const reads = instanceMemberReads(text, instance.localName);
+		const members = (definition?.returnProperties ?? []).flatMap((property) =>
+			property.kind === 'graph' && (reads === null || reads.has(property.name))
+				? [{ name: property.name, graphNodeId: property.graphNodeId, path: property.path }]
+				: [],
+		);
+		if (members.length === 0) continue;
+
+		declared.add(instance.localName);
+		rebuilds.push({ localName: instance.localName, members });
+	}
+	return rebuilds;
+}
+
 export function sharedInstancePreludeLines(
 	semanticGraph: PublicRenderModuleInput['semanticGraph'],
 	componentName: string | undefined,
@@ -207,35 +257,30 @@ export function sharedInstancePreludeLines(
 	bound: ReadonlySet<string>,
 	readSource: (graphNodeId: string, path: ReadonlyArray<string>) => string,
 ): string[] {
-	const lines: string[] = [];
-	const declared = new Set<string>();
-	for (const instance of semanticGraph.sharedInstances ?? []) {
-		if (declared.has(instance.localName) || bound.has(instance.localName)) continue;
-		// Only the locals this component's body actually declares: a sibling
-		// component's same-named instance would rebuild the wrong widget's members
-		// under that name, and the emitted scope would read them (defect 46).
-		if (!sharedInstanceVisibleFrom(instance, componentName)) continue;
-		if (!references(text, instance.localName)) continue;
+	return sharedInstanceReads(semanticGraph, componentName, text, bound).map(
+		(rebuild) =>
+			`const ${rebuild.localName} = {${rebuild.members
+				.map(
+					(member) =>
+						`${JSON.stringify(member.name)}: ${readSource(member.graphNodeId, member.path)}`,
+				)
+				.join(', ')}};`,
+	);
+}
 
-		const definition = semanticGraph.sharedDefinitions.find(
-			(candidate) => candidate.id === instance.definitionId,
-		);
-		const members = (definition?.returnProperties ?? []).flatMap((property) =>
-			property.kind === 'graph'
-				? [
-						`${JSON.stringify(property.name)}: ${readSource(
-							property.graphNodeId,
-							property.path,
-						)}`,
-					]
-				: [],
-		);
-		if (members.length === 0) continue;
-
-		declared.add(instance.localName);
-		lines.push(`const ${instance.localName} = {${members.join(', ')}};`);
-	}
-	return lines;
+/**
+ * The graph nodes this text reads through a shared instance local. A composite
+ * residue names no node the render data can see, so without these the server
+ * derived nothing for it and the rebuilt local read undefined.
+ */
+export function sharedInstanceReadGraphNodeIds(
+	semanticGraph: PublicRenderModuleInput['semanticGraph'],
+	componentName: string | undefined,
+	text: string,
+): ReadonlyArray<string> {
+	return sharedInstanceReads(semanticGraph, componentName, text, new Set()).flatMap((rebuild) =>
+		rebuild.members.map((member) => member.graphNodeId),
+	);
 }
 
 const CONTEXT = 'marklessResidueContext';
@@ -381,4 +426,24 @@ export function componentAstsForResidueReaders(source: string, filename: string)
 function references(text: string, name: string): boolean {
 	if (!/^[A-Za-z_$][\w$]*$/.test(name)) return false;
 	return new RegExp(`(^|[^\\w$.])${name}([^\\w$]|$)`).test(text);
+}
+
+/**
+ * Which members of `localName` this text reads, or null when it cannot be said.
+ *
+ * Every mention has to be a plain `.member` read for the answer to be complete.
+ * A spread, a bare mention passed on, or an indexed read can reach any member,
+ * so those give up and the whole instance is rebuilt.
+ */
+function instanceMemberReads(text: string, localName: string): ReadonlySet<string> | null {
+	if (!/^[A-Za-z_$][\w$]*$/.test(localName)) return null;
+	const members = new Set<string>();
+	for (const match of text.matchAll(new RegExp(`(^|[^\\w$.])${localName}(?![\\w$])`, 'g'))) {
+		const member = /^\s*\??\.\s*([A-Za-z_$][\w$]*)/.exec(
+			text.slice((match.index ?? 0) + match[0].length),
+		);
+		if (!member?.[1]) return null;
+		members.add(member[1]);
+	}
+	return members;
 }

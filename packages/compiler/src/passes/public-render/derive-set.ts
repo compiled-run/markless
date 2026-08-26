@@ -1,8 +1,20 @@
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import type { CompilerDiagnostic } from '../../diagnostics.ts';
-import { serverDeriveUnreachableDiagnostic } from './diagnostics.ts';
+import { asNodes, isNode, type AnyNode } from '../../ast/nodes.ts';
+import { parseModule } from '../../js-ast.ts';
+import { PUBLIC_RENDER_PLAN_PASS_ID, serverDeriveUnreachableDiagnostic } from './diagnostics.ts';
 import { collectSsrSharedComputedSources } from './html.ts';
-import { componentEdgesFor, repeatCollectionGraphNodeIds } from './shared.ts';
+import {
+	authoredResidueSources,
+	renderDecisionSources,
+	sharedInstanceReadGraphNodeIds,
+} from './residue-reader.ts';
+import {
+	componentEdgesFor,
+	moduleScopeDeclarations,
+	publicRenderValueImports,
+	repeatCollectionGraphNodeIds,
+} from './shared.ts';
 
 export function rowScopedEdgeIds(
 	chunks: PublicRenderModuleInput['renderData']['chunks'],
@@ -148,6 +160,20 @@ function directDeriveRootGraphNodeIds(
 					),
 		),
 		...componentHandlerReadGraphNodeIds(input, componentName),
+		// A composite residue over a shared instance (`checkbox.checked === true`)
+		// names no graph node the render data can see, so the walk above misses it:
+		// the rebuilt local read the state map's `undefined` and the attribute it
+		// fed dropped out of the served HTML.
+		...sharedInstanceReadGraphNodeIds(
+			input.semanticGraph,
+			componentName,
+			[
+				...new Set([
+					...authoredResidueSources(chunks),
+					...renderDecisionSources(input, componentName),
+				]),
+			].join('\n'),
+		),
 	]);
 }
 
@@ -231,6 +257,8 @@ export function collectSsrDeriveSetDiagnostics(
 		...new Set(input.renderData.chunks.map((chunk) => chunk.componentName)),
 	];
 	const reported = new Set<string>();
+	const copiedBodyReported = new Set<string>();
+	const bound = moduleBoundNames(input);
 	const diagnostics: CompilerDiagnostic[] = [];
 	const report = (graphNodeId: string, reason: 'cycle' | 'no-source') => {
 		if (reported.has(graphNodeId)) return;
@@ -258,6 +286,190 @@ export function collectSsrDeriveSetDiagnostics(
 			edges,
 		).cyclic)
 			report(graphNodeId, 'cycle');
+		for (const graphNodeId of reached) {
+			const source = sharedSources.get(graphNodeId);
+			if (source === undefined || copiedBodyReported.has(graphNodeId)) continue;
+			copiedBodyReported.add(graphNodeId);
+			diagnostics.push(
+				...foreignCopiedBodyDiagnostics(input, {
+					graphNodeId,
+					name: syncComputedNames.get(graphNodeId) ?? graphNodeId,
+					source,
+					bound,
+				}),
+			);
+		}
 	}
 	return diagnostics;
+}
+
+/** This pass owns the code; readers import it rather than restating the string. */
+export const SHARED_COMPUTED_CROSS_MODULE_CODE = 'MARKLESS_SHARED_COMPUTED_CROSS_MODULE';
+
+/** The file a `shared:<filename>#<name>/...` node was defined in. */
+function sharedDefinitionFilename(graphNodeId: string): string | null {
+	const hash = graphNodeId.indexOf('#');
+	return graphNodeId.startsWith('shared:') && hash !== -1
+		? graphNodeId.slice('shared:'.length, hash)
+		: null;
+}
+
+/** Every name the emitted server module binds at module scope. */
+function moduleBoundNames(input: PublicRenderModuleInput): ReadonlySet<string> {
+	const declarations = moduleScopeDeclarations(input.source.source, input.source.filename);
+	return new Set([
+		...publicRenderValueImports(
+			input.semanticGraph.moduleImports,
+			input.semanticGraph.componentEdges,
+			declarations.map((declaration) => declaration.source).join('\n'),
+		).map((moduleImport) => moduleImport.localName),
+		...declarations.flatMap((declaration) => [...declaration.names]),
+	]);
+}
+
+/**
+ * The refusal for a factory `computed()` whose expression this module copies out
+ * of another file. The copy carries the authored text and the graph reads the
+ * compiler rewrote into it and nothing else, so a name from the defining file's
+ * module scope either binds to nothing here - a ReferenceError while the page is
+ * served - or matches a same-named import of THIS file and quietly means
+ * something the author never wrote.
+ */
+function foreignCopiedBodyDiagnostics(
+	input: PublicRenderModuleInput,
+	cell: {
+		readonly graphNodeId: string;
+		readonly name: string;
+		readonly source: string;
+		readonly bound: ReadonlySet<string>;
+	},
+): ReadonlyArray<CompilerDiagnostic> {
+	const definedIn = sharedDefinitionFilename(cell.graphNodeId);
+	if (definedIn === null || definedIn === input.source.filename) return [];
+	return [...freeIdentifierNames(cell.source)]
+		.filter((name) => !isPlatformGlobal(name))
+		.map((name) => ({
+			code: SHARED_COMPUTED_CROSS_MODULE_CODE,
+			severity: 'error' as const,
+			phase: 'public-render' as const,
+			passId: PUBLIC_RENDER_PLAN_PASS_ID,
+			artifactKeys: ['publicRenderModule'],
+			title: `A shared() computed cannot be read from another module yet ("${cell.name}")`,
+			message: cell.bound.has(name)
+				? `Serving this page works "${cell.name}" out by copying its expression from ${definedIn} into this file. The copied expression names "${name}", and the import of "${name}" in THIS file was matched against it by name alone, so the served value would be built from this module's "${name}" rather than the one ${definedIn} means.`
+				: `Serving this page works "${cell.name}" out by copying its expression from ${definedIn} into this file. The copied expression names "${name}", and nothing in this module binds it, so rendering this page on the server would throw a ReferenceError.`,
+			why: "A shared() factory has no instance on the server to ask for a computed value, so the server works the value out by copying the factory's own expression into the module of every page that reads it. Copying text moves the statements but not the scope they were written in: the defining file's imports and module-scope constants do not travel, and the copy is matched against the reading file's imports by name. Both failures happen only while the page is being served, so this build refuses instead of shipping one.",
+			suggestions: [
+				{
+					message: `Write "${cell.name}" so it needs nothing from ${definedIn}'s module scope - out of the factory's own state and platform globals only - and it copies into any file unchanged.`,
+				},
+				{
+					message: `Or read "${cell.name}" from a part that ${definedIn} publishes and compose that part here. Inside its own module the same expression copies back into the scope it was written in.`,
+				},
+			],
+			docsUrl: `https://markless.dev/errors/${SHARED_COMPUTED_CROSS_MODULE_CODE}`,
+		}));
+}
+
+// The compiler's own host answers for the platform names a derive may call;
+// browser-only globals are absent there and are named instead.
+const BROWSER_ONLY_GLOBALS: ReadonlySet<string> = new Set([
+	'document',
+	'getComputedStyle',
+	'history',
+	'localStorage',
+	'location',
+	'matchMedia',
+	'requestAnimationFrame',
+	'sessionStorage',
+	'window',
+]);
+
+function isPlatformGlobal(name: string): boolean {
+	return BROWSER_ONLY_GLOBALS.has(name) || name in globalThis;
+}
+
+/** Every name the copied expression uses and does not itself bind. */
+function freeIdentifierNames(source: string): ReadonlySet<string> {
+	let ast: AnyNode;
+	try {
+		ast = parseModule(`(${source})`, 'generated.ts') as unknown as AnyNode;
+	} catch {
+		// Text the compiler just built and cannot reparse is a different defect;
+		// it is no evidence of this one, so claim nothing.
+		return new Set();
+	}
+	const bound = new Set<string>();
+	const referenced = new Set<string>();
+	const seen = new Set<object>();
+	const stack: unknown[] = [ast];
+	while (stack.length > 0) {
+		const value = stack.pop();
+		if (!value || typeof value !== 'object' || seen.has(value)) continue;
+		seen.add(value);
+		if (Array.isArray(value)) {
+			for (const item of value) stack.push(item);
+			continue;
+		}
+		const node = value as AnyNode;
+		if (node.type === 'Identifier' && typeof node.name === 'string') {
+			referenced.add(node.name);
+			continue;
+		}
+		if (BINDING_PARENT_TYPES.has(String(node.type))) collectPatternNames(node.id, bound);
+		for (const parameter of asNodes(node.params)) collectPatternNames(parameter, bound);
+		for (const [key, child] of Object.entries(node)) {
+			if (WALK_IGNORED_KEYS.has(key)) continue;
+			if (node.computed !== true && key === 'property' && node.type === 'MemberExpression')
+				continue;
+			if (node.computed !== true && key === 'key' && node.type === 'Property') continue;
+			stack.push(child);
+		}
+	}
+	return new Set([...referenced].filter((name) => !bound.has(name)));
+}
+
+const BINDING_PARENT_TYPES: ReadonlySet<string> = new Set([
+	'VariableDeclarator',
+	'FunctionDeclaration',
+	'FunctionExpression',
+	'ClassDeclaration',
+	'ClassExpression',
+]);
+
+// Side tables, back-pointers, and the type positions, which name types rather
+// than values a copied expression has to find while the page is served.
+const WALK_IGNORED_KEYS: ReadonlySet<string> = new Set([
+	'parent',
+	'loc',
+	'range',
+	'leadingComments',
+	'trailingComments',
+	'comments',
+	'typeAnnotation',
+	'returnType',
+	'typeParameters',
+	'typeArguments',
+	'superTypeArguments',
+]);
+
+/** Every name a binding pattern introduces, destructuring included. */
+function collectPatternNames(pattern: unknown, into: Set<string>): void {
+	if (!isNode(pattern)) return;
+	if (pattern.type === 'Identifier' && typeof pattern.name === 'string') {
+		into.add(pattern.name);
+		return;
+	}
+	if (pattern.type === 'AssignmentPattern') return collectPatternNames(pattern.left, into);
+	if (pattern.type === 'RestElement') return collectPatternNames(pattern.argument, into);
+	if (pattern.type === 'ArrayPattern') {
+		for (const element of asNodes(pattern.elements)) collectPatternNames(element, into);
+		return;
+	}
+	if (pattern.type === 'ObjectPattern')
+		for (const property of asNodes(pattern.properties))
+			collectPatternNames(
+				property.type === 'RestElement' ? property.argument : property.value,
+				into,
+			);
 }
