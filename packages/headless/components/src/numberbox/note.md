@@ -8,7 +8,7 @@ and takes the `input`/`label`/`description`/`error`/`field` shape from `textbox`
 verbatim, the `backtrigger`/`forwardtrigger` direction pair from `carousel`, and
 `valuelabel` from `slider`.
 
-Research: `goals/headless-components/notes/U561-numberbox-research.md` — React
+Research: the numberbox research memo in the goal notes — React
 Aria's `useNumberField`/`useSpinButton` and `@internationalized/number`, Zag's
 `number-input` machine, Base UI's `number-field`, Kobalte, Mantine,
 `rc-input-number` and Fluent read as source, against the WAI-ARIA APG spinbutton
