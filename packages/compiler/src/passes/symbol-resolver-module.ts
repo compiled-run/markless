@@ -107,7 +107,13 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'			const slot = requiredCaptureSlot(slots, slotId);',
 		'			const route = slot.route;',
 		'			if (route.kind === "compiler-known-constant") return (slot.path ?? []).reduce((value, key) => value == null ? value : value[key], route.value);',
-		'			if (route.kind === "graph-reference") return context.graph.read(route.graphNodeId, route.path ?? []);',
+		// A consumer's element() handle passed as a prop routes to the handle's
+		// graph node, and the graph holds no DOM node: the page's handle registry
+		// is the only place the live element lives.
+		'			if (route.kind === "graph-reference") {',
+		'				const handle = elementHandleRoute(context, route);',
+		'				return handle ? handle.value : context.graph.read(route.graphNodeId, route.path ?? []);',
+		'			}',
 		'			throw new Error(`Capture slot ${slotId} is a callback route`);',
 		'		},',
 		'		invoke(slotId, args) {',
@@ -137,6 +143,22 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'			return context.invokeSymbol(route.callbackSymbolId, { ...context, event: context.event, args });',
 		'		},',
 		'	};',
+		'}',
+		'',
+		// The resolver stays self-contained (it is loaded from a data: URL in some
+		// hosts), so the handle read is emitted rather than imported.
+		'function elementHandleRoute(context, route) {',
+		'	if (typeof context.getElementHandle !== "function") return undefined;',
+		'	const element = context.getElementHandle(route.graphNodeId);',
+		'	if (element === undefined || element === null) return undefined;',
+		'	let receiver = element;',
+		'	let value = element;',
+		'	for (const key of route.path ?? []) {',
+		'		if (value === undefined || value === null) return { value: undefined };',
+		'		receiver = value;',
+		'		value = value[key];',
+		'	}',
+		'	return { value: typeof value === "function" ? value.bind(receiver) : value };',
 		'}',
 		'',
 		'function requiredCaptureSlot(slots, slotId) {',

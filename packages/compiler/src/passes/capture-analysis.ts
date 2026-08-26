@@ -13,6 +13,7 @@ import type {
 	SemanticSharedDefinition,
 	SemanticStateRead,
 	SemanticTemplateRead,
+	SourceSpan,
 } from '../artifacts.ts';
 import {
 	graphBindingMap,
@@ -81,6 +82,14 @@ export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArt
 	const componentScopeBindings = componentScopeLocalBindings(input);
 	const diagnostics = [
 		...extractedSymbols.flatMap((symbol) => opaqueSlotDiagnostics(symbol)),
+		...localSymbols.flatMap((symbol, index) =>
+			unreducedPropReadDiagnostics(
+				symbol,
+				input.symbolResolver.symbols[index],
+				input,
+				semantics,
+			),
+		),
 		...extractedSymbols.flatMap((symbol) => {
 			const { freeNames, analysisFailed } = semantics.read(symbol.source);
 			// A source the analyzer could not read proves nothing about what it
@@ -1153,6 +1162,78 @@ function opaqueSlotDiagnostics(symbol: {
 			];
 		}),
 	);
+}
+
+/**
+ * A prop the emitted symbol still names, with no capture slot behind it.
+ *
+ * State lowering reduces plain dotted prop paths; an indexed one
+ * (`steps[0].target`) produces no read at all, so the prop name survives into
+ * the emitted handler module as a free identifier and the first dispatch throws
+ * `ReferenceError`. A build that passes and then crashes is worse than a build
+ * that refuses, so it refuses here.
+ */
+function unreducedPropReadDiagnostics(
+	symbol: {
+		readonly symbolId: string;
+		readonly source: string;
+		readonly owner?: { readonly componentName?: string };
+		readonly captureSlots: ReadonlyArray<CaptureSlot>;
+	},
+	plan: PlannedSymbol | undefined,
+	input: CaptureAnalysisInput,
+	semantics: SymbolSourceSemanticsReader,
+): ReadonlyArray<CaptureAnalysisDiagnostic> {
+	const { freeNames, analysisFailed } = semantics.read(symbol.source);
+	if (analysisFailed || freeNames.size === 0) return [];
+	const routed = new Set(
+		symbol.captureSlots.flatMap((slot) => (slot.propName ? [slot.propName] : [])),
+	);
+	const span = plan && 'sourceSpan' in plan ? plan.sourceSpan : undefined;
+
+	return input.semanticGraph.componentPropBindings.flatMap((declaration) => {
+		if (!declaration.localName || !freeNames.has(declaration.localName)) return [];
+		if (!declarationOwnsSymbol(declaration, symbol.owner?.componentName, span)) return [];
+		const propName = declaration.propPath[0] ?? declaration.localName;
+		if (routed.has(propName) || routed.has(declaration.localName)) return [];
+		const componentName = declaration.componentName;
+		return [
+			{
+				code: CAPTURE_OPAQUE_PROP_CODE,
+				severity: 'error' as const,
+				phase: CAPTURE_ANALYSIS_PHASE,
+				title: 'Lazy handler prop capture is not resumable',
+				message: `Cannot bind lazy symbol "${symbol.symbolId}" because prop "${propName}" for "${componentName}" is read through a path the compiler cannot reduce to a capture slot, so "${declaration.localName}" would reach the browser unbound.`,
+				why: 'A demanded capture slot must route to a graph node, a compiler-known constant, or a callback symbol. A prop path state lowering cannot reduce - an indexed element, a computed key, or an optional-chained call with no plain read beside it - produces no route at all, and the emitted handler would throw a ReferenceError on its first dispatch.',
+				primarySpan: declaration.sourceSpan,
+				passId: CAPTURE_ANALYSIS_PASS_ID,
+				artifactKeys: ['semanticGraph', 'symbolResolver', 'captureAnalysis'],
+				symbolId: symbol.symbolId,
+				componentName,
+				propName,
+				source: symbol.source,
+				suggestions: [
+					{
+						message: `Read ${declaration.localName} through plain property access (${declaration.localName}.someName), or pass the value this handler needs as its own prop.`,
+					},
+				],
+				docsUrl: 'https://markless.dev/errors/MARKLESS_CAPTURE_OPAQUE_PROP',
+			},
+		];
+	});
+}
+
+// Which component's props a symbol may name: the component its own capture
+// slots already named, or - for a symbol with no slots yet - the one whose
+// source range contains it.
+function declarationOwnsSymbol(
+	declaration: SemanticComponentPropDeclaration,
+	ownerComponentName: string | undefined,
+	span: SourceSpan | undefined,
+): boolean {
+	if (ownerComponentName !== undefined) return declaration.componentName === ownerComponentName;
+	const range = componentSourceRange(declaration.componentId);
+	return Boolean(span && range && range.start <= span.start && range.end >= span.end);
 }
 
 // `binding` is the component-local the symbol was proven to read. It is absent
