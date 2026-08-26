@@ -1935,7 +1935,7 @@
 			{
 				"part": "valuelabel",
 				"component": "ProgressValueLabel",
-				"doc": "The current value as text. Left empty it renders the percentage of the range\nthe bar has covered - the same number the bar reports as `aria-valuetext` -\nand nothing at all while the amount is unknown. Pass children to write the\ntext yourself.",
+				"doc": "The current value as text. Left empty it renders the percentage of the range\nthe bar has covered - the same number the bar reports as `aria-valuetext` -\nand nothing at all while the amount is unknown. Pass children to write the\ntext yourself. Plain text you pass becomes what the bar reports as\n`aria-valuetext`, so a reader speaks your wording rather than the percentage.",
 				"props": []
 			}
 		]
