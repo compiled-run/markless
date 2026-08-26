@@ -53,6 +53,32 @@ type ExecutionLogGlobal = typeof globalThis & {
 	}) => void | Promise<void>;
 };
 
+// Focus reaches an element before any key event can. These are the names a
+// focused element can still receive, so a record naming one is a handler the
+// page is about to need. Restated in render-csr and in the serialized inline
+// boot: neither can reach a shared module without paying a chunk for it.
+const FOCUS_KEY_EVENT_NAMES = ['keydown', 'keyup', 'keypress'];
+const FOCUS_EDITABLE_EVENT_NAMES = ['beforeinput', 'input'];
+
+function focusPreloadEventNames(element: {
+	readonly tagName?: unknown;
+	readonly isContentEditable?: unknown;
+}): ReadonlyArray<string> {
+	const tagName = typeof element.tagName === 'string' ? element.tagName.toUpperCase() : '';
+	return element.isContentEditable === true ||
+		tagName === 'INPUT' ||
+		tagName === 'TEXTAREA' ||
+		tagName === 'SELECT'
+		? [...FOCUS_KEY_EVENT_NAMES, ...FOCUS_EDITABLE_EVENT_NAMES]
+		: FOCUS_KEY_EVENT_NAMES;
+}
+
+function isFocusPreloadEventName(eventName: string): boolean {
+	return (
+		FOCUS_KEY_EVENT_NAMES.includes(eventName) || FOCUS_EDITABLE_EVENT_NAMES.includes(eventName)
+	);
+}
+
 export function createEventWiring(input: {
 	readonly root: ResumeDomElement;
 	readonly graph: RuntimeGraph;
@@ -123,11 +149,13 @@ export function createEventWiring(input: {
 			});
 			input.eventTypes.add(record.eventName);
 			input.registerDelegatedEventRecord?.(element, record);
+			if (isFocusPreloadEventName(record.eventName)) wantFocusPreload();
 			return;
 		}
 		byName.set(record.eventName, record);
 		input.eventTypes.add(record.eventName);
 		input.registerDelegatedEventRecord?.(element, record);
+		if (isFocusPreloadEventName(record.eventName)) wantFocusPreload();
 		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 			trackDebug(
 				recordDebugInteraction(
@@ -141,6 +169,50 @@ export function createEventWiring(input: {
 					},
 				),
 			);
+	};
+	// Fetch only, never a dispatch: a rejection is left for the dispatch that
+	// actually needs the symbol to report.
+	const preloadedSymbolIds = new Set<string>();
+	let focusPreloadWanted = false,
+		focusPreloadArmed = false,
+		releaseFocusPreload: (() => void) | undefined;
+	const focusPreloadListener = (event: ResumeDomEvent) =>
+		preloadFocusKeySymbols(event.target as ResumeDomElement | null);
+	// Armed by startup, after the container's dispatch listeners: this one only
+	// fetches modules and must never sit ahead of the authority that dispatches.
+	const wireFocusPreload = (): void => {
+		if (!focusPreloadWanted || !focusPreloadArmed || releaseFocusPreload) return;
+		input.root.addEventListener?.('focusin', focusPreloadListener, { capture: true });
+		releaseFocusPreload = () =>
+			input.root.removeEventListener?.('focusin', focusPreloadListener, { capture: true });
+	};
+	const wantFocusPreload = (): void => {
+		focusPreloadWanted = true;
+		wireFocusPreload();
+	};
+	const armFocusPreload = (): void => {
+		focusPreloadArmed = true;
+		wireFocusPreload();
+	};
+	const preloadFocusKeySymbols = (target: ResumeDomElement | null | undefined): void => {
+		for (
+			let element: ResumeDomElement | null | undefined = target;
+			element;
+			element = element.parentElement
+		) {
+			const byName = eventRecords.get(element);
+			if (byName)
+				for (const eventName of focusPreloadEventNames(element)) {
+					const record = byName.get(eventName);
+					if (!record) continue;
+					for (const symbolId of record.symbolIds) {
+						if (preloadedSymbolIds.has(symbolId)) continue;
+						preloadedSymbolIds.add(symbolId);
+						void Promise.resolve(input.loadSymbol(symbolId)).catch(() => {});
+					}
+				}
+			if (element === input.root) break;
+		}
 	};
 	const addRowEvent = (host: ResumeDomElement, match: ResumeRowEventMatch) => {
 		let byName = rowEventRecords.get(host);
@@ -442,6 +514,9 @@ export function createEventWiring(input: {
 		rowEventRecords,
 		addEventRecord,
 		addRowEvent,
+		armFocusPreload,
+		preloadFocusKeySymbols,
+		releaseFocusPreload: () => releaseFocusPreload?.(),
 		prepareSyncPolicy,
 		...(typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
 			? { whenDebugRegistered: () => Promise.all(debugRegistrations ?? []) }

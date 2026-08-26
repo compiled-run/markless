@@ -4,6 +4,7 @@ import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import type { OverlayHiddenBoundRoot } from './overlay-handoff.ts';
 import type {
 	ResumeAsyncBoundaryRecord,
+	ResumeDomElement,
 	ResumePreparedCore,
 	ResumeRuntimeInput,
 } from './resume-types.ts';
@@ -280,6 +281,10 @@ export async function startResumeRuntime(input: {
 				}),
 			);
 		}
+	events.armFocusPreload();
+	storeContainerSubscription(() => events.releaseFocusPreload());
+	// The focus that woke this runtime fired its focusin before the wiring existed.
+	events.preloadFocusKeySymbols(marklessActiveElement(runtimeInput.root));
 	if ((runtimeInput.graph.listSharedDefinitions?.() ?? []).length > 0) {
 		runtimeInput.root.addEventListener?.(sharedPatchEventType, receiveSharedPatch, {
 			capture: true,
@@ -310,4 +315,14 @@ async function disposeRemovedAsyncRangeHosts(
 		for (const id of locators.hostIdsInsideRemovedElements(prepared.elementsByHostId, removed))
 			disposeHost(id);
 	}
+}
+
+// The resume DOM surface deliberately names only what resume writes to; the
+// focused element is read straight off the host document instead.
+function marklessActiveElement(root: ResumeDomElement): ResumeDomElement | null {
+	const owner = root.ownerDocument as { readonly activeElement?: unknown } | undefined;
+	const active = owner?.activeElement;
+	return active && (active as ResumeDomElement).nodeType === 1
+		? (active as ResumeDomElement)
+		: null;
 }

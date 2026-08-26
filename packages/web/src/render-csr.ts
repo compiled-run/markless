@@ -162,12 +162,20 @@ export async function renderCsrRuntime(input: {
 		holdPendingSettleCommits: async (ms) =>
 			(await demandRuntime()).holdPendingSettleCommits?.(ms),
 	};
-	const delegatedTriggers = installDelegatedTriggers(output, view, dispatchQueued, {
-		// The graph is demand-loaded, so a policy read before the first dispatch
-		// answers off the values the mount seeded its cells with.
-		read: (graphNodeId, path) =>
-			graph ? graph.read(graphNodeId, path) : readSeededStateValue(state, graphNodeId, path),
-	});
+	const delegatedTriggers = installDelegatedTriggers(
+		output,
+		view,
+		dispatchQueued,
+		{
+			// The graph is demand-loaded, so a policy read before the first dispatch
+			// answers off the values the mount seeded its cells with.
+			read: (graphNodeId, path) =>
+				graph
+					? graph.read(graphNodeId, path)
+					: readSeededStateValue(state, graphNodeId, path),
+		},
+		loadSymbol,
+	);
 	registerServedArmEventRecords(
 		output.root as unknown as ResumeDomElement,
 		view.asyncBoundaries as ReadonlyArray<ResumeAsyncBoundaryPayload>,
@@ -261,6 +269,31 @@ async function activateAuthoredBehaviors(
 	return cleanup;
 }
 
+// Focus reaches an element before any key event can, so a record naming one of
+// these is a handler the page is about to need. Restated here rather than
+// shared: a module of its own is a chunk on the resume path's dispatch census.
+const FOCUS_KEY_EVENT_NAMES = ['keydown', 'keyup', 'keypress'];
+const FOCUS_EDITABLE_EVENT_NAMES = ['beforeinput', 'input'];
+
+function focusPreloadEventNames(element: {
+	readonly tagName?: unknown;
+	readonly isContentEditable?: unknown;
+}): ReadonlyArray<string> {
+	const tagName = typeof element.tagName === 'string' ? element.tagName.toUpperCase() : '';
+	return element.isContentEditable === true ||
+		tagName === 'INPUT' ||
+		tagName === 'TEXTAREA' ||
+		tagName === 'SELECT'
+		? [...FOCUS_KEY_EVENT_NAMES, ...FOCUS_EDITABLE_EVENT_NAMES]
+		: FOCUS_KEY_EVENT_NAMES;
+}
+
+function isFocusPreloadEventName(eventName: string): boolean {
+	return (
+		FOCUS_KEY_EVENT_NAMES.includes(eventName) || FOCUS_EDITABLE_EVENT_NAMES.includes(eventName)
+	);
+}
+
 function installDelegatedTriggers(
 	output: CsrRenderOutput,
 	view: ProtocolViewPayload,
@@ -269,6 +302,7 @@ function installDelegatedTriggers(
 		dispatchOptions?: ResumeDispatchOptions,
 	) => Promise<void>,
 	syncPolicyGraph: SyncPolicyGraph,
+	loadSymbol: ResumeRuntimeInput['loadSymbol'],
 ): {
 	readonly registerEventRecord: (element: object, record: ProtocolEventRecord) => void;
 	readonly dispose: () => void;
@@ -359,12 +393,43 @@ function installDelegatedTriggers(
 			output.root.removeEventListener?.(eventName, listener, { capture: true }),
 		);
 	};
+	// Focus lands before any key can, so the focused element's key records name
+	// the handler modules this page is about to need. Fetch only; never dispatch.
+	const preloadedSymbolIds = new Set<string>();
+	let releaseFocusPreload: (() => void) | undefined;
+	const preloadFocusKeySymbols = (target: DelegatedEvent['target']) => {
+		for (
+			let element: DelegatedEvent['target'] = target;
+			element;
+			element = element.parentElement ?? null
+		) {
+			const records = recordsByElement.get(element);
+			if (records)
+				for (const eventName of focusPreloadEventNames(element)) {
+					for (const symbolId of records.get(eventName)?.symbolIds ?? []) {
+						if (preloadedSymbolIds.has(symbolId)) continue;
+						preloadedSymbolIds.add(symbolId);
+						void Promise.resolve(loadSymbol(symbolId)).catch(() => {});
+					}
+				}
+			if ((element as object) === (output.root as object)) break;
+		}
+	};
+	const installFocusPreload = () => {
+		if (releaseFocusPreload) return;
+		const listener = (event: DelegatedEvent) => preloadFocusKeySymbols(event.target);
+		output.root.addEventListener?.('focusin', listener, { capture: true });
+		releaseFocusPreload = () =>
+			output.root.removeEventListener?.('focusin', listener, { capture: true });
+		releases.push(releaseFocusPreload);
+	};
 	const registerEventRecord = (element: object, record: ProtocolEventRecord) => {
 		const records = recordsByElement.get(element) ?? new Map<string, ProtocolEventRecord>();
 		if (records.get(record.eventName) === record) return;
 		records.set(record.eventName, record);
 		recordsByElement.set(element, records);
 		installEventListener(record.eventName);
+		if (isFocusPreloadEventName(record.eventName)) installFocusPreload();
 	};
 	for (const record of view.events) {
 		if (record.eventName === 'visible') continue;
