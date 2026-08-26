@@ -1,15 +1,14 @@
 import { computed, element, shared, state } from '@markless/core';
 import VisuallyHidden from '../base/visually-hidden.tsrx';
-import { landFocus, landFocusAt } from './calendar-focus.ts';
+import { landFocus, landFocusOn } from './calendar-focus.ts';
 import {
 	type CalendarValue,
 	addMonths,
 	dayLabel,
 	dayNumber,
-	gridDays,
 	heldList,
 	isBlocked,
-	previewSpan,
+	rangeSpan,
 	resolvedFocus,
 	sameMonth,
 	startOfMonth,
@@ -68,7 +67,6 @@ export const calendarState = shared(
 		const labelEl = element<HTMLLabelElement>();
 		const descriptionEl = element<HTMLDivElement>();
 		const errorEl = element<HTMLDivElement>();
-		const dayEls = element<HTMLButtonElement[]>();
 
 		// Every computed() on this factory is written out of platform globals rather
 		// than out of ./calendar-math.ts, and it is not a style choice. When a
@@ -230,7 +228,6 @@ export const calendarState = shared(
 			labelEl,
 			descriptionEl,
 			errorEl,
-			dayEls,
 			month,
 			days,
 			weeks,
@@ -259,10 +256,14 @@ export const calendarState = shared(
 			/** Put the tab stop on one day, following it into another month where it is in one. */
 			focus(iso: string) {
 				const shown = visibleMonth(calendar.monthAt, calendar.monthSeed, todayIso(new Date()));
-				const landing = sameMonth(iso, shown) ? shown : startOfMonth(iso);
-				calendar.monthAt = landing;
+				calendar.monthAt = sameMonth(iso, shown) ? shown : startOfMonth(iso);
 				calendar.focusAt = iso;
-				landFocusAt(dayEls, gridDays(landing, calendar.startofweek).indexOf(iso));
+				landFocusOn(contentEl, iso);
+			},
+
+			/** The tab stop follows a day the person reached themselves, without moving focus again. */
+			hold(iso: string) {
+				calendar.focusAt = iso;
 			},
 
 			/**
@@ -317,10 +318,9 @@ export const calendarState = shared(
 				const next = steppedDate(from, key, shift, calendar.startofweek);
 				if (next === null) return;
 
-				const landing = sameMonth(next, shown) ? shown : startOfMonth(next);
-				calendar.monthAt = landing;
+				calendar.monthAt = sameMonth(next, shown) ? shown : startOfMonth(next);
 				calendar.focusAt = next;
-				landFocusAt(dayEls, gridDays(landing, calendar.startofweek).indexOf(next));
+				landFocusOn(contentEl, next);
 			},
 
 			setOpen(next: boolean) {
@@ -389,7 +389,13 @@ export function CalendarRoot({
 // which is combobox's known deviation for its inline list: the compiler takes a
 // boolean literal there and nothing else, so an inline month still enlists and
 // the dismissal it reports is ignored below.
-export function CalendarContent({ children, onKeydown, onDismiss, ...rest }: CalendarContentProps) @{
+export function CalendarContent({
+	children,
+	onFocusin,
+	onKeydown,
+	onDismiss,
+	...rest
+}: CalendarContentProps) @{
 	const calendar = calendarState();
 	const isShowing = computed(() => calendar.popup !== true || calendar.open === true);
 	const ariaDisabled = computed(() => (calendar.disabled ? 'true' : 'false'));
@@ -407,6 +413,15 @@ export function CalendarContent({ children, onKeydown, onDismiss, ...rest }: Cal
 		hidden={isShowing !== true}
 		ui-open={isShowing}
 		ui-closed={isShowing !== true}
+		onFocusin={(event) => {
+			// One handler for the whole month rather than one per day: the tab stop
+			// follows whichever day was reached, so the next arrow steps from there.
+			// `target`, not `currentTarget`: a lazy handler runs after the native
+			// dispatch, when `currentTarget` is already null.
+			const landed = (event.target as HTMLElement).getAttribute('value');
+			if (landed !== null && landed !== '') calendar.hold(landed);
+			onFocusin?.(event);
+		}}
 		onKeydown={(event) => {
 			// Guarded by event fields alone, and only `===` chains extract: a guard
 			// over locals derived from graph state is MARKLESS_SYNC_POLICY_UNEXTRACTABLE.
@@ -497,21 +512,17 @@ export function CalendarForwardTrigger({
  */
 export function CalendarItem({ value, children, onClick, ...rest }: CalendarItemProps) @{
 	const calendar = calendarState();
-	// The day as a graph cell: compared against the prop instead, the comparison
-	// stops refreshing once the page has resumed.
+	// The day as a graph cell: a computed() that closes over the prop itself is
+	// MARKLESS_CAPTURE_OPAQUE_PROP, because the prop is one loop row's own value.
 	const day: CalendarItemInstanceState = state({ value });
 
 	const named = computed(() => dayLabel(day.value));
 	const shown = computed(() => `${dayNumber(day.value)}`);
-	// A day's own facts are derived here rather than off the shared instance: a
-	// part is in this module, so ./calendar-math.ts resolves for it.
-	const isOutside = computed(
-		() =>
-			sameMonth(
-				day.value,
-				visibleMonth(calendar.monthAt, calendar.monthSeed, todayIso(new Date())),
-			) !== true,
-	);
+	// The month and the tab stop are read off `calendar.month` and
+	// `calendar.focused` rather than rebuilt from `monthAt`: a row the month change
+	// itself created reads that raw cell at its value from before the write, while
+	// the derived cell the same change rebuilt the list from is current.
+	const isOutside = computed(() => sameMonth(day.value, calendar.month) !== true);
 	const isToday = computed(() => day.value === todayIso(new Date()));
 	const isSelected = computed(
 		() => heldList(calendar.seed, calendar.pickedText).indexOf(day.value) !== -1,
@@ -520,76 +531,49 @@ export function CalendarItem({ value, children, onClick, ...rest }: CalendarItem
 	const isBounded = computed(
 		() => calendar.disabled || isBlocked(day.value, calendar.min, calendar.max),
 	);
+	const inSpan = computed(() => {
+		const drawn = rangeSpan(
+			heldList(calendar.seed, calendar.pickedText),
+			calendar.anchorAt,
+			calendar.focused,
+		);
+		return drawn !== null && day.value >= drawn.start && day.value <= drawn.end;
+	});
+	const isSpanStart = computed(() => {
+		const drawn = rangeSpan(
+			heldList(calendar.seed, calendar.pickedText),
+			calendar.anchorAt,
+			calendar.focused,
+		);
+		return drawn !== null && drawn.start === day.value;
+	});
+	const isSpanEnd = computed(() => {
+		const drawn = rangeSpan(
+			heldList(calendar.seed, calendar.pickedText),
+			calendar.anchorAt,
+			calendar.focused,
+		);
+		return drawn !== null && drawn.end === day.value;
+	});
 	const isLocked = computed(
 		() =>
 			calendar.disabled ||
 			isBlocked(day.value, calendar.min, calendar.max) ||
 			calendar.unavailable.indexOf(day.value) !== -1,
 	);
-	const isFocused = computed(() => {
-		const now = todayIso(new Date());
-		const shown = visibleMonth(calendar.monthAt, calendar.monthSeed, now);
-		return (
-			resolvedFocus(
-				shown,
-				calendar.focusAt,
-				heldList(calendar.seed, calendar.pickedText),
-				now,
-				calendar.startofweek,
-			) === day.value
-		);
-	});
-	const inSpan = computed(() => {
-		const drawn = previewSpan(
-			calendar.seed,
-			calendar.pickedText,
-			calendar.anchorAt,
-			calendar.focusAt,
-			calendar.monthAt,
-			calendar.monthSeed,
-			calendar.startofweek,
-		);
-		if (drawn === null) return false;
-		return day.value >= drawn.start && day.value <= drawn.end;
-	});
-	const isSpanStart = computed(() => {
-		const drawn = previewSpan(
-			calendar.seed,
-			calendar.pickedText,
-			calendar.anchorAt,
-			calendar.focusAt,
-			calendar.monthAt,
-			calendar.monthSeed,
-			calendar.startofweek,
-		);
-		return drawn !== null && drawn.start === day.value;
-	});
-	const isSpanEnd = computed(() => {
-		const drawn = previewSpan(
-			calendar.seed,
-			calendar.pickedText,
-			calendar.anchorAt,
-			calendar.focusAt,
-			calendar.monthAt,
-			calendar.monthSeed,
-			calendar.startofweek,
-		);
-		return drawn !== null && drawn.end === day.value;
-	});
-	const ariaPressed = computed(() => (isSelected ? 'true' : 'false'));
-	const ariaDisabled = computed(() => (isLocked ? 'true' : 'false'));
 	// Locked days stay reachable: only a disabled calendar leaves the tab order.
-	const tabStop = computed(() => (calendar.disabled ? -1 : isFocused ? 0 : -1));
+	const isFocused = computed(
+		() => calendar.disabled !== true && calendar.focused === day.value,
+	);
 
 	<button
 		{...rest}
-		el={calendar.dayEls}
 		type="button"
 		value={day.value}
 		aria-label={named}
-		aria-pressed={ariaPressed}
-		aria-disabled={ariaDisabled}
-		tabindex={tabStop}
+		aria-pressed={isSelected ? 'true' : 'false'}
+		aria-disabled={isLocked ? 'true' : 'false'}
+		tabindex={isFocused ? 0 : -1}
 		ui-today={isToday}
 		ui-outside={isOutside}
 		ui-selected={isSelected}
@@ -630,8 +614,10 @@ export function CalendarTrigger({ children, onClick, ...rest }: CalendarTriggerP
 				const now = todayIso(new Date());
 				const shown = visibleMonth(calendar.monthAt, calendar.monthSeed, now);
 				const held = heldList(calendar.seed, calendar.pickedText);
-				const landing = resolvedFocus(shown, calendar.focusAt, held, now, calendar.startofweek);
-				landFocusAt(calendar.dayEls, gridDays(shown, calendar.startofweek).indexOf(landing));
+				landFocusOn(
+					calendar.contentEl,
+					resolvedFocus(shown, calendar.focusAt, held, now, calendar.startofweek),
+				);
 			}
 			onClick?.(event);
 		}}

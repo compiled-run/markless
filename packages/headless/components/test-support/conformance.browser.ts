@@ -1,6 +1,7 @@
 import { render, renderSSR } from '@markless/vitest-browser';
 import Accordion from '../src/accordion/scenarios/basic.tsrx';
 import BaseParts from '../src/base/scenarios/basic.tsrx';
+import Calendar from '../src/calendar/scenarios/basic.tsrx';
 import Carousel from '../src/carousel/scenarios/basic.tsrx';
 import Checkbox from '../src/checkbox/scenarios/basic.tsrx';
 import Checklist from '../src/checklist/scenarios/basic.tsrx';
@@ -191,6 +192,18 @@ const descriptors: readonly FamilyDescriptor[] = [
 		// The family's note names this the one place an item's value appears in
 		// the markup, so it is key-value by design.
 		valuedAttributes: ['ui-value'],
+		supportsDisabled: true,
+	},
+	{
+		family: 'calendar',
+		mount: { CSR: () => render(Calendar), SSR: () => renderSSR(Calendar) },
+		root: 'root',
+		// The Basic scenario is the inline month; `trigger` only exists under
+		// `popup`, so there is no openCycle here. The popup shape - open, focus in,
+		// Escape back to the trigger, outside press - is held in
+		// src/calendar/calendar.browser.ts, where a `popup` root is on the page.
+		parts: ['root', 'label', 'content', 'title', 'back', 'forward', 'field'],
+		rootAria: { role: null },
 		supportsDisabled: true,
 	},
 	{

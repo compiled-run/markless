@@ -70,6 +70,17 @@ async function expectNoAxeViolations(where: HTMLElement, phase: string) {
 const AUGUST_FIRST = '2026-07-26';
 const AUGUST_LAST = '2026-09-05';
 
+function todayIso() {
+	const now = new Date();
+	return `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(2, '0')}-${`${now.getDate()}`.padStart(2, '0')}`;
+}
+
+// Nobody has chosen and nobody has walked, so the tab stop is today when the run
+// happens inside August 2026 and the first of the month when it does not.
+function openingDay() {
+	return todayIso().slice(0, 7) === '2026-08' ? todayIso() : '2026-08-01';
+}
+
 for (const mode of MODES) {
 	test(`${mode}: the month is 42 real buttons, each named by its whole date`, async () => {
 		if (mode === 'CSR') await render(Basic);
@@ -440,7 +451,7 @@ for (const mode of MODES) {
 			.poll(() => (document.activeElement as HTMLElement | null)?.getAttribute('value'), {
 				timeout: 5000,
 			})
-			.toBe('2026-08-01');
+			.toBe(openingDay());
 		await expectNoAxeViolations(where, 'the popup is open');
 
 		dayFor('2026-08-20').click();
@@ -519,3 +530,67 @@ test('CSR: the family drops the props it owns and passes the rest through', asyn
 	}
 	expect(el(Root).getAttribute('data-testid')).toBe('root');
 });
+
+// Every scenario the family ships, swept at rest, with focus inside the month and
+// after a day has been chosen - the three states a person actually meets. The
+// mounts are written out rather than looped over because the SSR harness rewrites
+// a literal `renderSSR` call site and takes nothing passed by reference.
+async function sweepAxe(container: unknown, pick: string, opens = false) {
+	const where = container as unknown as HTMLElement;
+	if (opens) {
+		el<HTMLButtonElement>(Trigger).click();
+		await expect.poll(() => el(Content).hasAttribute('hidden'), { timeout: 5000 }).toBe(false);
+	}
+	await expect.poll(() => days().length, { timeout: 5000 }).toBe(42);
+
+	await expectNoAxeViolations(where, 'at rest');
+	dayFor(pick).focus();
+	await settled();
+	await expectNoAxeViolations(where, 'with focus on a day');
+	dayFor(pick).click();
+	await settled();
+	await expectNoAxeViolations(where, 'after a day is chosen');
+}
+
+for (const mode of MODES) {
+	test(`${mode}: axe sweeps the starter month`, async () => {
+		const mounted = mode === 'CSR' ? await render(Basic) : await renderSSR(Basic);
+		await sweepAxe(mounted.container, '2026-08-10');
+	});
+
+	test(`${mode}: axe sweeps the month a form submits`, async () => {
+		const mounted = mode === 'CSR' ? await render(BookingForm) : await renderSSR(BookingForm);
+		await sweepAxe(mounted.container, '2026-08-10');
+	});
+
+	test(`${mode}: axe sweeps the controlled month`, async () => {
+		const mounted = mode === 'CSR' ? await render(Controlled) : await renderSSR(Controlled);
+		await sweepAxe(mounted.container, '2026-08-20');
+	});
+
+	test(`${mode}: axe sweeps a month of several days`, async () => {
+		const mounted = mode === 'CSR' ? await render(Multiple) : await renderSSR(Multiple);
+		await sweepAxe(mounted.container, '2026-08-06');
+	});
+
+	test(`${mode}: axe sweeps a range half picked`, async () => {
+		const mounted = mode === 'CSR' ? await render(Range) : await renderSSR(Range);
+		await sweepAxe(mounted.container, '2026-08-10');
+	});
+
+	test(`${mode}: axe sweeps a Monday-first month`, async () => {
+		const mounted = mode === 'CSR' ? await render(WeekStart) : await renderSSR(WeekStart);
+		await sweepAxe(mounted.container, '2026-08-10');
+	});
+
+	test(`${mode}: axe sweeps the revealed month`, async () => {
+		const mounted = mode === 'CSR' ? await render(Popup) : await renderSSR(Popup);
+		await sweepAxe(mounted.container, '2026-08-10', true);
+	});
+
+	test(`${mode}: axe sweeps a month beside its typed boxes`, async () => {
+		const mounted =
+			mode === 'CSR' ? await render(PopupWithDateBox) : await renderSSR(PopupWithDateBox);
+		await sweepAxe(mounted.container, '2026-08-20', true);
+	});
+}

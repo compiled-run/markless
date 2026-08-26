@@ -124,6 +124,188 @@
 			}
 		]
 	},
+	"calendar": {
+		"parts": [
+			{
+				"part": "backtrigger",
+				"component": "CalendarBackTrigger",
+				"doc": "Steps the month back one.",
+				"props": []
+			},
+			{
+				"part": "content",
+				"component": "CalendarContent",
+				"doc": "The month itself: the one surface, whether it is shown in place or revealed by\na `calendar.trigger`.\n\nIt is the group a reader announces, named by `calendar.title`, and it owns the\nwhole keyboard model - arrows walk days and weeks, `Home` and `End` reach the\nweek's ends, `PageUp` and `PageDown` step a month, and with Shift a year. Put\nthe title, the two month triggers, the weekday names and the days inside it.",
+				"props": []
+			},
+			{
+				"part": "description",
+				"component": "CalendarDescription",
+				"doc": "Supporting text, named by the month's `aria-describedby` behind `calendar.error`.",
+				"props": []
+			},
+			{
+				"part": "error",
+				"component": "CalendarError",
+				"doc": "The validation message, named by the month's `aria-describedby` ahead of `calendar.description`.",
+				"props": []
+			},
+			{
+				"part": "field",
+				"component": "CalendarField",
+				"doc": "The element a form submits. It is clipped, out of the tab order and hidden from\nreaders, and it carries the chosen date as `yyyy-mm-dd` under the root's\n`name`. A `multiple` or `range` calendar submits nothing through it.",
+				"props": []
+			},
+			{
+				"part": "forwardtrigger",
+				"component": "CalendarForwardTrigger",
+				"doc": "Steps the month on one.",
+				"props": []
+			},
+			{
+				"part": "item",
+				"component": "CalendarItem",
+				"doc": "A real `<button>`, not a grid cell: the whole date is its name, so a voice\ncontrol user can say it and a reader conveys the day without depending on the\ncolumn it sits in. `aria-pressed` rather than `aria-selected`, which a button\ndoes not support.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": true,
+						"doc": "Which day this is, as `yyyy-mm-dd`. One of `calendar.state().days`."
+					}
+				]
+			},
+			{
+				"part": "label",
+				"component": "CalendarLabel",
+				"doc": "A visible caption for the calendar. The month's group is named by\n`calendar.title` rather than by this, so that the name a reader hears follows\nthe month on show.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "CalendarRoot",
+				"doc": "A month of days a person can choose from.\n\nIt holds the date, the month on show and the day the keyboard is on, and it\ndraws nothing itself: put a `calendar.content` inside it, and inside that a\n`calendar.title`, a `calendar.backtrigger`, a `calendar.forwardtrigger` and one\n`calendar.item` per day of `calendar.state().days`. Add a `calendar.field` when\na form has to submit the date, and `popup` with a `calendar.trigger` when the\nmonth should be revealed rather than always shown.\n\nIt reports `ui-disabled`, `ui-readonly`, `ui-required`, `ui-invalid`,\n`ui-multiple`, `ui-range`, `ui-popup`, `ui-open` and `ui-closed` for styling.",
+				"props": [
+					{
+						"name": "value",
+						"type": "CalendarValue",
+						"required": false,
+						"default": "null",
+						"doc": "The date chosen, as `yyyy-mm-dd`. An array of them under `multiple`, and\n`{ start, end }` under `range`. Omit it and nothing is chosen to begin with."
+					},
+					{
+						"name": "month",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The month on show, as any `yyyy-mm-dd` date inside it. Defaults to the month\ntoday is in. Once somebody moves the month, this is no longer what is shown."
+					},
+					{
+						"name": "multiple",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "More than one day can be chosen, and `value` is a list of them."
+					},
+					{
+						"name": "range",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Two days bound a span, and `value` is `{ start, end }`. The first press sets\nan endpoint and reports nothing; the second completes the span and reports\nit once. Not to be set alongside `multiple`."
+					},
+					{
+						"name": "min",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The earliest day that can be chosen, as `yyyy-mm-dd`. Earlier days stay reachable and refuse to be chosen."
+					},
+					{
+						"name": "max",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The latest day that can be chosen, as `yyyy-mm-dd`. Later days stay reachable and refuse to be chosen."
+					},
+					{
+						"name": "unavailable",
+						"type": "readonly IsoDate[]",
+						"required": false,
+						"default": "[]",
+						"doc": "Days that cannot be chosen, as `yyyy-mm-dd`. They stay focusable so a person\nreading with the keyboard can land on one and hear that it is unavailable."
+					},
+					{
+						"name": "startofweek",
+						"type": "number",
+						"required": false,
+						"default": "0",
+						"doc": "Which weekday a row starts on, `0` for Sunday through `6` for Saturday. Defaults to `0`."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nothing can be chosen and no day is a tab stop."
+					},
+					{
+						"name": "readonly",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The days can be walked and read, and none of them will change the date."
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "A date is needed before a form submits."
+					},
+					{
+						"name": "invalid",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The date chosen is not an acceptable one. Reported as `ui-invalid` and on `calendar.field`."
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "Submitted under this name by `calendar.field`."
+					},
+					{
+						"name": "popup",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The month is revealed by a `calendar.trigger` rather than shown in place.\nEscape and a press outside close it; choosing a single date closes it too,\nwhile a range or a list of days stays open."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: CalendarValue) => void",
+						"required": false,
+						"doc": "Called with the whole date once a choice is complete - once per press for a\nsingle date and for `multiple`, and once for a range, on the press that\ncompletes it. Omit it and the days still work."
+					}
+				]
+			},
+			{
+				"part": "title",
+				"component": "CalendarTitle",
+				"doc": "The month and year on show, as text. With no children it draws that text\nitself; give it children and they are shown instead.\n\nIt is announced when it changes, which is how moving the month is conveyed\nwithout moving anybody's focus, and it is the name the month's group carries.",
+				"props": []
+			},
+			{
+				"part": "trigger",
+				"component": "CalendarTrigger",
+				"doc": "Reveals the month. Only for a root that was given `popup`.",
+				"props": []
+			}
+		]
+	},
 	"carousel": {
 		"parts": [
 			{
