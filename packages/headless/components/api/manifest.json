@@ -2619,6 +2619,104 @@
 			}
 		]
 	},
+	"togglegroup": {
+		"parts": [
+			{
+				"part": "item",
+				"component": "ToggleGroupItem",
+				"doc": "One toggle button. A real `<button aria-pressed>`, not a switch: a switch is a\nsetting that takes effect at once, which is what `toggle` is for, while this\nis a control a person presses on and off inside a set.\n\nThe button's own content is its accessible name, so it takes label content and\nneeds no label part. A consumer's `onClick`, `onFocus` and `onKeydown` all run\nafter the family's.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": true,
+						"doc": "What this item contributes to the group's value. Required: position is never identity."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nobody can press this item, and the arrow keys walk past it."
+					}
+				]
+			},
+			{
+				"part": "itemfield",
+				"component": "ToggleGroupItemField",
+				"doc": "The hidden input that carries one pressed item into a form. Written inside the\nitem whose value it submits, it takes no configuration of its own: `name`\ncomes from `togglegroup.root` and `value` from `togglegroup.item`, so one\nplace decides what a form receives. It is in the page only while its item is\npressed, which is what makes a `multiple` group submit its name once per\npressed value with no special handling.",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "ToggleGroupLabel",
+				"doc": "The group's name: the element `role=\"group\"` points its `aria-labelledby` at.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "ToggleGroupRoot",
+				"doc": "A set of toggle buttons - text alignment, or bold/italic/underline. The group\nis a `role=\"group\"` element named by `togglegroup.label`, and every item\ninside it is a real button reporting `aria-pressed`.\n\nArrows move focus and never press: that is the whole difference from\n`radiogroup`, where an arrow also chooses. Enter and Space press the focused\nitem, because the item is a button and the browser activates it.",
+				"props": [
+					{
+						"name": "value",
+						"type": "ToggleGroupValue",
+						"required": false,
+						"default": "''",
+						"doc": "The pressed value, or the pressed values when the group is `multiple`.\nOmit it and nothing is pressed."
+					},
+					{
+						"name": "multiple",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Any number of items may be pressed at once. Omit it and pressing one unpresses the rest."
+					},
+					{
+						"name": "orientation",
+						"type": "'horizontal' | 'vertical'",
+						"required": false,
+						"default": "'horizontal'",
+						"doc": "Which axis the arrow keys walk. Omit it and the items run left to right."
+					},
+					{
+						"name": "loop",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Arrow past the last item and land on the first. Omit it and the ends stop."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nobody can press any item."
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The group keeps at least one pressed item: pressing the last pressed one\ndoes nothing. Omit it and a person can leave the group with nothing pressed."
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The name every `togglegroup.itemfield` submits under, declared once here\nrather than repeated per item. Omit it and the group submits nothing."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: ToggleGroupValue) => void",
+						"required": false,
+						"doc": "Intended to be called with what is pressed now - one value, or the whole\nlist when the group is `multiple`, and `''` or `[]` once nothing is left\npressed. The shape mirrors the shape `value` was written in. Omit it and\npressing still works; the call site simply does nothing."
+					}
+				]
+			}
+		]
+	},
 	"tooltip": {
 		"parts": [
 			{

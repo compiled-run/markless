@@ -50,6 +50,7 @@
 		"./textbox": "./src/textbox/index.ts",
 		"./toaster": "./src/toaster/index.ts",
 		"./toggle": "./src/toggle/index.ts",
+		"./togglegroup": "./src/togglegroup/index.ts",
 		"./tree": "./src/tree/index.ts"
 	},
 	"publishConfig": {
