@@ -502,22 +502,22 @@ that follows.
 
 ## Test lanes
 
-`navbar.browser.ts` — 56 rows with one known gap in both modes: the shared rows
+`navbar.browser.ts` — 56 rows, all green: the shared rows
 in both modes, the consumer callback, gestures, the full keyboard model, four
 resume rows, the dismissal block, the hover block, and the two leaving routes.
 
-**The known gap: closing by moving focus out of the landmark reports nothing to
-the consumer.** A callback stored by a component is not visible to that
-component's own handler modules, and `onFocusout` lives on the root — the same
-component whose render puts `onChange` on the instance — so `closeAll`'s body
-reads an empty slot from inside it. Both rows are written as what should happen
-and flip the day the framework closes the gap.
+**Both leaving routes report the close to the consumer.** `onFocusout` lives on
+the root — the same component whose render puts `onChange` on the instance — and
+the framework now delivers a callback a component stored on its shared instance
+to that component's own handler modules, so `closeAll`'s body reads the slot from
+inside it. Both rows were written as what should happen while the gap was open,
+and flipped green when the framework closed it.
 
-The pointer's leaving route is green, and for a structural reason worth stating:
-the runtime hands a crossing to the nearest part that declared a handler and
-stops, so it is `NavbarItem`'s `onPointerout` that closes — a different component
-from the one that stored the callback. The root's own `onPointerout` never sees a
-crossing that started inside an item.
+The pointer's leaving route closes from somewhere else, which is why it is a
+separate pair of rows: the runtime hands a crossing to the nearest part that
+declared a handler and stops, so it is `NavbarItem`'s `onPointerout` that closes —
+a different component from the one that stored the callback. The root's own
+`onPointerout` never sees a crossing that started inside an item.
 
 The five dismissal rows are what the overlay adoption is proved by:
 

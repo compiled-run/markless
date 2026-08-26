@@ -112,23 +112,22 @@ clear sits above the "already showing" guard rather than below it.
 It also makes teardown mild: a card that goes away mid-wait leaves a dispatch at a
 detached node whose handler finds nothing to do. There is a row for exactly that.
 
-## Measured: a callback the root stores is invisible to the root's own handlers
+## `onChange` goes through `setOpen`, from every part
 
-`onChange` is reported two different ways, and it is not a matter of taste.
+Every change the family makes to `open` goes through the shared `setOpen`, which
+holds the "same value reports nothing" guard and the call to the consumer's
+`onChange` in one place. The root's four handlers use it and so does the content's
+`onDismiss`, even though those are different components: the framework delivers a
+callback a component's render stored on the shared instance to that component's
+own handler modules, so `setOpen`'s body reads a filled slot from inside the
+root's handlers too.
 
-A handler is compiled into a module of its own, and a call to a `shared()` method
-is compiled by **copying that method's body in**. `setOpen`'s body reads the
-`onChange` slot on the instance — and from inside a handler belonging to the same
-component whose render put it there, that slot is empty. Measured: hover and focus
-changes driven through `hovercard.setOpen()` reported nothing at all, ever, while
-the card's own dismissal — written in `HovercardContent`, a different component —
-reported normally through the very same slot.
-
-So the root's four handlers set `hovercard.open` and call the `onChange` **prop
-they close over**, the way every family calls a consumer's `onPointerover`
-passthrough. `setOpen` stays, used by the content's `onDismiss`. Two rows pin the
-two routes, so the day the framework closes this gap the split can be collapsed
-without guessing which half was load-bearing.
+This family once worked around a gap there — the root's handlers set
+`hovercard.open` and called the `onChange` prop they closed over, because the slot
+read empty from inside them. The framework closed the gap and the workaround is
+gone. The two rows that covered the two routes stay, because a close from the
+card's own dismissal and a close from the root's hover and focus handlers still
+reach the consumer by different paths through the tree.
 
 ## Placement: the family's stylesheet owns identity, yours owns geometry
 
@@ -290,7 +289,5 @@ card and both dismissal paths live in `hovercard.browser.ts` instead.
   `import { hovercard } from '@markless/ui'` works; the per-family subpath in
   `package.json` `exports` is a separate edit.
 - **A hint tier in the overlay primitive.** The single-stack debt above.
-- **A callback stored by a component, readable from that component's own
-  handlers.** Would collapse the two `onChange` routes into one.
 - **A scheduled callback that can reach the graph.** Would collapse both
   re-dispatch idioms.

@@ -416,9 +416,9 @@ test('CSR: onChange is called once with each new value, and not for a repeat', a
 	expect(el(Last).textContent).toBe('false');
 });
 
-// The other reporting route, and the reason both are worth a row: the card's own
-// dismissal reports through the slot on the shared instance, while hover and
-// focus report through the prop the root's handlers close over.
+// The other reporting route, and the reason both are worth a row: the close comes
+// from the card's own dismissal rather than from the root's hover and focus
+// handlers.
 test('CSR: Escape reports the close to the consumer once', async () => {
 	await render(WithOnChange);
 	el<HTMLElement>(Trigger).focus();

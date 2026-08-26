@@ -717,10 +717,9 @@ test('CSR: a real press on the trigger of an open dropdown closes it and leaves 
 	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
 });
 
-// Closing by leaving is the root's OWN handler, and these two are pinned as what
-// should happen: a callback stored by this component is not visible to its own
-// handler modules, so the root's `onChange` slot reads empty from inside them.
-test.fails('CSR: focus leaving the landmark reports the close to the consumer', async () => {
+// Closing by leaving is the root's OWN handler: the callback its render stored on
+// the shared instance is what these two read from inside it.
+test('CSR: focus leaving the landmark reports the close to the consumer', async () => {
 	await render(WithOnChangeLeaving);
 	el<HTMLElement>(ProductsTrigger).focus();
 	el(ProductsTrigger).click();
@@ -733,7 +732,7 @@ test.fails('CSR: focus leaving the landmark reports the close to the consumer', 
 	expect(el(Value).textContent).toBe('none');
 });
 
-test.fails('SSR: focus leaving the landmark reports the close to the consumer', async () => {
+test('SSR: focus leaving the landmark reports the close to the consumer', async () => {
 	await renderSSR(WithOnChangeLeaving);
 	el<HTMLElement>(ProductsTrigger).focus();
 	el(ProductsTrigger).click();
@@ -746,9 +745,9 @@ test.fails('SSR: focus leaving the landmark reports the close to the consumer', 
 	expect(el(Value).textContent).toBe('none');
 });
 
-// The contrast, and it is green for a structural reason: the runtime hands the
-// crossing to the nearest part that declared a handler, so it is the ITEM that
-// closes here - a different component from the one that stored the callback.
+// The other route: the runtime hands the crossing to the nearest part that
+// declared a handler, so it is the ITEM that closes here - a different component
+// from the one that stored the callback.
 test('CSR: the pointer leaving the landmark reports the close to the consumer', async () => {
 	await render(WithOnChangeLeaving);
 	await userEvent.hover(el(ProductsTrigger));

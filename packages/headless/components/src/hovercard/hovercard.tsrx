@@ -72,7 +72,6 @@ export function HovercardRoot({
 	// Every handler sits on the root, which wraps both parts, so trigger -> card is
 	// an intra-root move for the pointer and for Tab alike. That is WCAG 1.4.13
 	// hoverable and the focus-enterable card, both from the structure.
-	// Measured: these handlers report through the `onChange` prop they close over, because a shared method's body copied into a handler module cannot see a callback this same component's render put on the instance.
 	<div
 		{...rest}
 		el={hovercard.rootEl}
@@ -108,8 +107,7 @@ export function HovercardRoot({
 				window.clearTimeout(hovercard.openTimer);
 				hovercard.openTimer = 0;
 				hovercard.restingUntil = 0;
-				hovercard.open = true;
-				onChange?.(true);
+				hovercard.setOpen(true);
 			} else if (hovercard.restingUntil === 0) {
 				// The timer re-delivers the crossing rather than showing the card: shared reads are rewritten only at the handler's top level, so `hovercard.setOpen()` inside this closure is a ReferenceError.
 				const wait = hovercard.delay;
@@ -146,8 +144,7 @@ export function HovercardRoot({
 				window.clearTimeout(hovercard.closeTimer);
 				hovercard.closeTimer = 0;
 				hovercard.closingUntil = 0;
-				hovercard.open = false;
-				onChange?.(false);
+				hovercard.setOpen(false);
 			} else if (hovercard.closingUntil === 0) {
 				const wait = hovercard.closeDelay;
 				hovercard.closingUntil = now + wait;
@@ -181,8 +178,7 @@ export function HovercardRoot({
 				window.clearTimeout(hovercard.openTimer);
 				hovercard.openTimer = 0;
 				hovercard.restingUntil = 0;
-				hovercard.open = true;
-				onChange?.(true);
+				hovercard.setOpen(true);
 			} else if (hovercard.restingUntil === 0) {
 				const wait = hovercard.delay;
 				hovercard.restingUntil = now + wait;
@@ -207,10 +203,7 @@ export function HovercardRoot({
 				window.clearTimeout(hovercard.closeTimer);
 				hovercard.closeTimer = 0;
 				hovercard.closingUntil = 0;
-				if (hovercard.open === true) {
-					hovercard.open = false;
-					onChange?.(false);
-				}
+				hovercard.setOpen(false);
 			}
 			onFocusout?.(event);
 		}}
