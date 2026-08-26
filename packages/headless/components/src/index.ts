@@ -6,6 +6,7 @@ export * as checklist from './checklist/index.ts';
 export * as collapsible from './collapsible/index.ts';
 export * as combobox from './combobox/index.ts';
 export * as datebox from './datebox/index.ts';
+export * as fileupload from './fileupload/index.ts';
 export * as modal from './modal/index.ts';
 export * as otp from './otp/index.ts';
 export * as navbar from './navbar/index.ts';

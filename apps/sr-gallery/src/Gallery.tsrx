@@ -2,6 +2,7 @@ import {
 	checkbox,
 	checklist,
 	datebox,
+	fileupload,
 	modal,
 	popover,
 	progress,
@@ -17,7 +18,8 @@ import {
 // Every shipped family's Basic scenario - the starter a consumer copies - on one
 // page, each in a section a reader can jump to by its anchor: /#checkbox,
 // /#toggle, /#textbox, /#progress, /#checklist, /#select, /#modal,
-// /#radio-group, /#tabs, /#popover, /#tooltip, /#slider, /#datebox. A family
+// /#radio-group, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
+// /#fileupload. A family
 // whose second shape a reader announces differently gets its own section too:
 // /#slider-range.
 //
@@ -247,5 +249,36 @@ export function Gallery() @{
 				</datebox.root>
 			</div>
 		</section>
+
+		<section id="fileupload">
+			<h2>File upload</h2>
+			<div class="scenario">
+				<fileupload.root name="attachment">
+					<fileupload.label>Attachments</fileupload.label>
+					<fileupload.droparea>
+						Drop a file here
+						<fileupload.trigger>Browse</fileupload.trigger>
+					</fileupload.droparea>
+					<fileupload.field />
+					<FileRows />
+				</fileupload.root>
+			</div>
+		</section>
 	</main>
+}
+
+// The list is the consumer's own markup and sits inside the root: a component that
+// reads the upload's state is a part of that upload's widget, and one placed
+// outside would start a second upload and repeat over its empty list.
+function FileRows() @{
+	const upload = fileupload.state();
+
+	<div role="presentation">
+		@for (const file of upload.files; key file.id) {
+			<fileupload.item file={file}>
+				<fileupload.itemlabel />
+				<fileupload.itemclose aria-label="Remove">×</fileupload.itemclose>
+			</fileupload.item>
+		}
+	</div>
 }

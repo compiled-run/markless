@@ -6,6 +6,7 @@ import Checkbox from '../src/checkbox/scenarios/basic.tsrx';
 import Checklist from '../src/checklist/scenarios/basic.tsrx';
 import Collapsible from '../src/collapsible/scenarios/basic.tsrx';
 import DateBox from '../src/datebox/scenarios/basic.tsrx';
+import FileUpload from '../src/fileupload/scenarios/basic.tsrx';
 import { Basic as Combobox } from '../src/combobox/scenarios/basic.tsrx';
 import Modal from '../src/modal/scenarios/basic.tsrx';
 import Navbar from '../src/navbar/scenarios/basic.tsrx';
@@ -202,6 +203,18 @@ const descriptors: readonly FamilyDescriptor[] = [
 		// Which part of the date a box holds, and what it holds now: both carry
 		// information a consumer styles on, so both stay key-value.
 		valuedAttributes: ['ui-type', 'ui-value'],
+		supportsDisabled: true,
+	},
+	{
+		family: 'fileupload',
+		mount: { CSR: () => render(FileUpload), SSR: () => renderSSR(FileUpload) },
+		root: 'root',
+		// The rows are not on the page until a file arrives, so only what the
+		// scenario renders at rest is named here. There is no openCycle: nothing
+		// this family owns opens, and the picker it does open is the operating
+		// system's, outside the document entirely.
+		parts: ['root', 'label', 'droparea', 'trigger', 'field', 'rows'],
+		rootAria: { role: null },
 		supportsDisabled: true,
 	},
 	{
