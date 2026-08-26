@@ -72,8 +72,6 @@ export function ModalTrigger({ children, onClick, ...rest }: ModalTriggerProps) 
 		el={modal.triggerEl}
 		type="button"
 		aria-haspopup="dialog"
-		aria-expanded={modal.open ? 'true' : 'false'}
-		aria-controls={modal.contentEl}
 		ui-open={modal.open}
 		ui-closed={modal.open !== true}
 		onClick={(event) => {

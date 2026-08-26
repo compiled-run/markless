@@ -82,9 +82,11 @@ async function openBasic() {
 }
 
 // The placement is a CSS anchor, so the surface is in place on the layout that
-// shows it - there is nothing to wait for beyond reading a box.
+// shows it - there is nothing to wait for beyond reading a box. Read computed,
+// not inline: the anchor binding and the per-side geometry live in the part's own
+// scoped stylesheet, so this also proves that sheet reached the element.
 function expectAnchored(content: Element) {
-	const style = (content as HTMLElement).style;
+	const style = getComputedStyle(content);
 	expect(style.position).toBe('absolute');
 	expect(style.getPropertyValue('position-anchor')).toBe('--ui-popover');
 	expect(style.getPropertyValue('position-area')).not.toBe('');

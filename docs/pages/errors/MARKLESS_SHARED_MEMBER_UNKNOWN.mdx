@@ -1,0 +1,22 @@
+# MARKLESS_SHARED_MEMBER_UNKNOWN
+
+Shared state has no such member
+
+- Package: compiler
+- Pass or phase: state-lowering
+- Severity: error
+
+## Message
+
+Cannot read "…" because the …() shared state declares no member named "…".
+
+## Why
+
+A member read is lowered into a path subscription on a declared graph node. A path the node never declares reads undefined on every render and after resume, so the code that depends on it silently does nothing.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/state-lowering.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
