@@ -31,6 +31,15 @@ export const stepState = shared(
 	{ scope: 'widget' },
 );
 
+export const ownState = shared(
+	() => {
+		const own = state({ slot: 0, taps: 0 });
+
+		return { ...own };
+	},
+	{ scope: 'widget' },
+);
+
 export function Outer({ label, children }) @{
 	const outer = outerState();
 	// The root seeds the family, which is what makes it the family's widget root.
@@ -88,4 +97,31 @@ export function Label() @{
 	const outer = outerState();
 
 	<span data-label-part data-seen-count={outer.count} data-seen-mark={outer.mark} />
+}
+
+// The same registration as `Note`, written as a part that carries a projection.
+export function Tally({ index, children }) @{
+	const outer = outerState();
+	outer.count = index + 1;
+
+	<span data-tally data-index={index} data-seen-mark={outer.mark}>{children}</span>
+}
+
+// The un-projected shape: a nested widget root whose OWN template renders the
+// outer family's writer, so no consumer projects that writer through it.
+export function OwnInner({ index, children }) @{
+	const own = ownState();
+	own.slot = index;
+
+	<div
+		data-own-inner
+		data-slot={own.slot}
+		data-taps={own.taps}
+		onClick={() => {
+			own.taps = own.taps + 1;
+		}}
+	>
+		<Tally index={index}>{children}</Tally>
+		<Label />
+	</div>
 }
