@@ -391,6 +391,7 @@ async function applySharedSeeds(
 		readPath(seedSource(graphNodeId), path);
 	for (const initial of seeds) {
 		if (initial.value.kind !== 'symbol-function') continue;
+		if (!seedFamilyOpen(seeded, initial.graphNodeId)) continue;
 		const factory = initials.find(
 			(candidate) =>
 				candidate.graphNodeId === initial.graphNodeId && candidate.value.kind === 'constant',
@@ -407,6 +408,32 @@ async function applySharedSeeds(
 			throw new Error(`MARKLESS_PRERENDER_DATA_SYMBOL_MISSING: ${initial.value.symbolId}`);
 		seeded.set(initial.graphNodeId, await loaded({ graph: { read: readSeed }, read: readSeed }));
 	}
+}
+
+/**
+ * Whether the pass now running is the one that roots this seed's family.
+ *
+ * Rooting is per FAMILY, not per component: a child that roots one widget family
+ * is still an ordinary part of every other family enclosing it, and its writes
+ * belong to those enclosing instances. The pass root files its own token under
+ * the plain key AND under each family it roots, so a family whose filed token is
+ * some other instance is one this pass does not root — re-running its seeds here
+ * would mint a private copy per nested widget. A family with no filed token is
+ * nobody's yet, so it stays open. The compiler's SSR twin is
+ * `seedFamilyOpenSource` in public-render's shared-seed-pass.
+ */
+function seedFamilyOpen(seeded: ReadonlyMap<string, unknown>, graphNodeId: string): boolean {
+	const own = seeded.get(marklessWidgetInstanceKey(sharedDefinitionIdOf(graphNodeId)));
+	return own === undefined || own === seeded.get(MARKLESS_WIDGET_INSTANCE_KEY);
+}
+
+// Restates the compiler's shared node-id grammar: a node id is its definition id,
+// then `/` and the node's own name; an exported name carries no slash.
+function sharedDefinitionIdOf(graphNodeId: string): string {
+	const named = graphNodeId.indexOf('#');
+	if (named === -1) return graphNodeId;
+	const end = graphNodeId.indexOf('/', named);
+	return end === -1 ? graphNodeId : graphNodeId.slice(0, end);
 }
 
 function readPath(value: unknown, path: ReadonlyArray<string>): unknown {

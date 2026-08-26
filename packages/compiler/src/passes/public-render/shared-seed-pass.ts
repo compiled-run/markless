@@ -2,7 +2,9 @@ import type { PublicRenderModuleInput, SemanticMarkupChunk } from '../../artifac
 import {
 	resolveSharedInstanceGraphPath,
 	sharedDefinitionId,
+	sharedDefinitionIdOf,
 } from '../semantic-graph/collect-shared.ts';
+import { MARKLESS_WIDGET_INSTANCE_KEY } from './residue-reader.ts';
 
 /** The prop a projection is written as, whichever way the consumer spells it. */
 export const PROJECTION_PROP_NAME = 'children' as const;
@@ -565,7 +567,7 @@ export function sharedSeedPassLines(
 		// default seeds undefined the way plain JavaScript would.
 		...seeds.map((seed) => {
 			const id = JSON.stringify(seed.graphNodeId);
-			return `		{ const marklessSharedSeed = (${sharedSeedSource(seed)}); marklessSsrSeeds.set(${id}, ${sharedSeedValueSource(
+			return `		if (${seedFamilyOpenSource(seed.graphNodeId)}) { const marklessSharedSeed = (${sharedSeedSource(seed)}); marklessSsrSeeds.set(${id}, ${sharedSeedValueSource(
 				`marklessSsrSeeds.get(${id})`,
 				seed.path,
 				'marklessSharedSeed',
@@ -575,6 +577,25 @@ export function sharedSeedPassLines(
 		'		return;',
 		'	}',
 	];
+}
+
+/**
+ * Whether the pass now running is the one that roots this seed's family.
+ *
+ * Rooting is per family, not per component: a child that roots one widget family
+ * is still an ordinary part of every other family enclosing it, and its writes
+ * belong to those enclosing instances. The pass root files its own token under
+ * the plain key AND under its own families; a family whose filed token is some
+ * other instance is therefore one this pass does not root, and re-running its
+ * seeds here would mint a private copy. A family with no filed token at all is
+ * nobody's yet, so it stays open.
+ */
+function seedFamilyOpenSource(graphNodeId: string): string {
+	const plain = JSON.stringify(MARKLESS_WIDGET_INSTANCE_KEY);
+	const family = JSON.stringify(
+		`${MARKLESS_WIDGET_INSTANCE_KEY}|${sharedDefinitionIdOf(graphNodeId)}`,
+	);
+	return `(marklessSsrSeeds.get(${family}) ?? marklessSsrSeeds.get(${plain})) === marklessSsrSeeds.get(${plain})`;
 }
 
 /**
