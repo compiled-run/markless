@@ -2,15 +2,12 @@
 
 A product tour: a sequence of steps, each spotlighting an element the **consumer**
 owns, dimming the rest of the page, and showing a positioned card with a title, a
-description and back/forward controls. Built from
-`goals/headless-components/notes/U568-tour-research.md` and the measured gates in
-`packages/vitest-browser/browser/tour-gates/`.
+description and back/forward controls. The measured gates behind the decisions
+here are in `packages/vitest-browser/browser/tour-gates/`.
 
-**This family does not ship yet.** Opening, closing, dismissal, the steps and
-their cards are built; the tour's length reaches the root on the served render
-and not on the client render, for the framework reason under "The blocking gap"
-below. No owner decision is outstanding and no public shape is in question - the
-family's own source is the shape it will ship with.
+The family is complete and its lanes are green in both render modes. What is left
+is registration - the barrel, the api manifest and the gallery section - under
+"Not registered, and not wired into the gallery" below.
 
 ## Shape
 
@@ -86,44 +83,6 @@ Three consequences the declaration order is built around:
 Together these make the card the only component in the family that may write the
 tour's length.
 
-## The blocking gap: the length reaches the root on the server and not in the browser
-
-`tour.count = index + 1` is written by the card - a plain part of the tour that
-happens to render inside `tour.item`'s own widget. On the served render it
-lands; on the client render it is skipped. Same page, same assertion:
-
-| Render | `tour.root` `ui-max` | `tour.valuelabel` |
-| --- | --- | --- |
-| SSR | `3` | `1 of 3` |
-| CSR | `0` | `1 of 0` |
-
-The client seed pass in `packages/web/src/fns/shared-seed.ts` descends only
-*projection* chunks. The card is not projected into `tour.item` by anyone -
-`tour.item` renders it in its own template, as its whole body - so the root's
-pass never reaches that edge, and by the time the step's own pass does,
-`seedFamilyOpen` has the step's token under the plain key and the tour's token
-under the tour's family key. They disagree, so the write is inherited untouched
-rather than applied. The compiler's twin, `seedFamilyOpenSource` in
-`passes/public-render/shared-seed-pass.ts`, runs it.
-
-The witness `packages/vitest-browser/browser/nested-widget-outer-write/` proves
-the neighbouring case in both modes: a part the **page** projects through a
-nested widget. The tour is the un-projected case, and it needs the client half
-to reach a component a nested widget root renders itself.
-
-**The red rows**, all downstream of that one number: `the count comes from the
-cards, with no length prop anywhere`, `next and prev walk the steps and report
-each one`, `focus lands in the incoming card on a step change` and `axe finds no
-wcag2a/wcag21a violation, closed or on any step` - the last three because the
-forward trigger is `disabled` while the count reads 0. On the served render only
-the second of those is still red, and for an unrelated reason: `tour.backtrigger`
-loses its `disabled` on step 0 once the count is non-zero, which nothing the
-trigger reads can explain. Eleven of the sixteen rows pass.
-
-`otp.item` gets away with the same registration because `otpState` has one widget
-and the boxes are ordinary parts of it. The tour needs a per-step widget for the
-title and description IDREFs, so every component that knows `index` is inside one.
-
 ## Compiler constraints this family met, so the next one does not rediscover them
 
 - **Every graph read stands on its own line before it is used.** An expression
@@ -143,6 +102,16 @@ title and description IDREFs, so every component that knows `index` is inside on
   never binds the result to a name; anything that needs the element passes the
   whole array to a plain helper and lets the helper index it. That is why
   `focusIntoCard(cards, to)` takes the array and the index.
+- **Two components in one module may not name a `computed()` the same thing.**
+  `tour.backtrigger` and `tour.forwardtrigger` both held `const isOff`, and the
+  two collapsed to a single cell: every binding of either one answered with the
+  forward trigger's formula. Nothing was reported - the attribute simply never
+  appeared, on both render modes. The symptom is a boolean attribute that is
+  silently absent while the cell's own reads all measure correctly; a
+  byte-identical copy of the same expression under a different name lands. Give
+  each component's gate cell its own name (`isBackOff`, `isForwardOff`).
+  **`numberbox` has the same collision unfixed**, at `NumberboxBackTrigger` and
+  `NumberboxForwardTrigger`.
 - **A component may only forward-reference another same-module component from the
   module's first component.** `progress`, `radio-group`, `togglegroup` and
   `datebox` all declare their inner part immediately after the root, which is the
@@ -289,6 +258,17 @@ written that way on purpose.
 `src/index.ts`, the test-support conformance descriptor, the api manifest, the
 package export and the sr-gallery section all belong to a follow-up unit. The
 scenarios and the browser lane therefore import the family through `../index.ts`
-rather than the library barrel, and a transcript file for the real readers should
-spell its own gallery anchor rather than reading `FAMILY_ANCHORS`, the way
-`togglegroup-transcript.ts` does.
+rather than the library barrel.
+
+`tour-transcript.ts` spells its own gallery anchor in `TOUR_ANCHOR` rather than
+reading `FAMILY_ANCHORS`, because the tour has no entry in that table yet. The
+registration unit moves it there.
+
+## Lanes
+
+`tour.browser.ts` runs every row twice, once per render mode: the closed tour,
+opening and closing, the count read off the cards, the next/prev walk, Escape, an
+outside press, focus landing in the incoming card, and axe over `wcag2a` and
+`wcag21a` closed and on each step. `tour.sr.ts` reads the same family with the
+virtual reader. `tour.nvda.ts` and `tour.voiceover.ts` drive the real readers over
+`tour-transcript.ts` in CI, and are never run on a desktop.
