@@ -7,6 +7,7 @@ import Checklist from '../src/checklist/scenarios/basic.tsrx';
 import Collapsible from '../src/collapsible/scenarios/basic.tsrx';
 import DateBox from '../src/datebox/scenarios/basic.tsrx';
 import FileUpload from '../src/fileupload/scenarios/basic.tsrx';
+import Hovercard from '../src/hovercard/scenarios/basic.tsrx';
 import { Basic as Combobox } from '../src/combobox/scenarios/basic.tsrx';
 import Modal from '../src/modal/scenarios/basic.tsrx';
 import Navbar from '../src/navbar/scenarios/basic.tsrx';
@@ -216,6 +217,21 @@ const descriptors: readonly FamilyDescriptor[] = [
 		parts: ['root', 'label', 'droparea', 'trigger', 'field', 'rows'],
 		rootAria: { role: null },
 		supportsDisabled: true,
+	},
+	{
+		family: 'hovercard',
+		mount: { CSR: () => render(Hovercard), SSR: () => renderSSR(Hovercard) },
+		root: 'root',
+		parts: ['root', 'trigger', 'content'],
+		rootAria: { role: null },
+		// No openCycle: the trigger is a link, and pressing it goes where it points
+		// rather than opening anything. Hover and focus are the only ways in, and
+		// both are timed — so the battery's click-to-open cycle would be asserting a
+		// gesture this family deliberately refuses. The disclosure wiring, the
+		// delays, Tab into the card and both dismissal paths live in
+		// src/hovercard/hovercard.browser.ts.
+		valuedAttributes: ['ui-side'],
+		supportsDisabled: false,
 	},
 	{
 		family: 'modal',

@@ -961,6 +961,63 @@
 			}
 		]
 	},
+	"hovercard": {
+		"parts": [
+			{
+				"part": "content",
+				"component": "HovercardContent",
+				"doc": "The card. Unlike a tooltip's tip this is a surface a person can work in: put\nlinks, buttons and images in it freely.\n\nIt carries no `role`. It is not a description of the trigger and not a dialog;\nits contents are read as themselves. Nothing here writes `aria-describedby`,\nwhich would flatten the whole card into one run-on string with every link\nwelded together and none of them reachable.\n\n**Write it after `hovercard.trigger`.** A CSS anchor has to be laid out\nstrictly before the element that points at it. An ordinary in-flow trigger\nsatisfies that from anywhere in the markup, so the order is only advice -\nuntil you absolutely position the trigger yourself, at which point a card\nwritten first silently lands at its containing block instead of beside it. CSS\nhas no way to report that, so put the card last and the question never comes\nup.\n\nIt stays in the page when the card is hidden - `hidden` decides whether it\nshows, never an arm - because the trigger points at its minted id, because\n`hidden` is what takes its links out of the tab order, and because an elevated\nelement removed from the document while showing leaves the overlay stack's\nmarks behind.\n\nIts `position: absolute` and anchor binding live in the part's own scoped\nstylesheet - your `style` and `class` compose untouched. Everything about\nwhere the card lands - `position-area`, `@position-try`, `position-visibility`,\noffsets - is your CSS, keyed off `ui-side`.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "HovercardRoot",
+				"doc": "The hover card itself; the trigger and the card go inside it, in that order.\nIt holds whether the card is showing, how long the pointer has to rest or\nfocus has to stay before it shows, how long it lingers after the pointer\nleaves, and which side it sits on.\n\nThe pointer and focus handlers live here rather than on the trigger, so moving\nfrom the trigger into the card - with the pointer or with Tab - never counts\nas leaving.",
+				"props": [
+					{
+						"name": "open",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Whether the card is showing. Omit it and it starts hidden."
+					},
+					{
+						"name": "delay",
+						"type": "number",
+						"required": false,
+						"default": "700",
+						"doc": "How long the pointer must rest on the trigger, or focus must stay on it,\nbefore the card shows, in milliseconds. Omit it and it is 700. Focus waits\nthe same time as the pointer: a person tabbing through a paragraph of links\nhas declared no interest in any one of them."
+					},
+					{
+						"name": "closeDelay",
+						"type": "number",
+						"required": false,
+						"default": "300",
+						"doc": "How long the card stays after the pointer leaves, in milliseconds. Omit it\nand it is 300. It is what lets the pointer cross the gap between the trigger\nand the card without the card going away."
+					},
+					{
+						"name": "side",
+						"type": "'top' | 'bottom' | 'start' | 'end'",
+						"required": false,
+						"default": "'bottom'",
+						"doc": "Where the card sits against the trigger. It is written on\n`hovercard.content` as `ui-side`; the placement itself is your CSS."
+					},
+					{
+						"name": "onChange",
+						"type": "(open: boolean) => void",
+						"required": false,
+						"doc": "Called with the new value when the card shows or hides, including when\nEscape or a press elsewhere hides it."
+					}
+				]
+			},
+			{
+				"part": "trigger",
+				"component": "HovercardTrigger",
+				"doc": "The link the card previews. It renders an `<a>` and only an `<a>`, because the\ncard is a shortcut to where the link goes: **never put anything in the card\nthat is not also behind the link.** That is what makes the family defensible\nfor a person on a touch screen, or reading with a virtual cursor, who will\nnever see the card at all - they follow the link and get everything.\n\nIt carries `aria-expanded` and `aria-controls` pointing at the card, so a\nreader is told the surface exists and can be entered. Tab from the trigger\nmoves into the card, because the card is the trigger's next DOM sibling and\nnothing takes it out of the tab order.\n\nIt also carries the CSS anchor the card is placed against, declared in the\npart's own scoped stylesheet - your `style` and `class` compose untouched.",
+				"props": []
+			}
+		]
+	},
 	"modal": {
 		"parts": [
 			{
