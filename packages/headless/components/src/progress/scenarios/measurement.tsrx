@@ -13,7 +13,5 @@ export default function Measurement() @{
 		<button type="button" data-testid="advance" onClick={() => { count = '60 of 100 rows'; }}>
 			Recount
 		</button>
-		{/* Load-bearing: with the value label as the only reader, the click's write is folded away. */}
-		<output data-testid="amount">{count}</output>
 	</section>
 }
