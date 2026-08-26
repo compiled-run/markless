@@ -14,7 +14,7 @@ import { shared, state, computed } from '@markless/core';
 export const box = shared(() => {
 	const s = state({ base: 2, other: 9 });
 	const doubled = computed(() => s.base * 2);
-	const leaf = computed(() => doubled() + 1);
+	const leaf = computed(() => doubled + 1);
 	const unrelated = computed(() => s.other * 3);
 	return { ...s, doubled, leaf, unrelated };
 }, { scope: 'widget' });
@@ -34,7 +34,7 @@ export const panel = shared(() => {
 	const held = state({ spare: 'x', tip: 'y' });
 	const sideline = computed(() => held.spare.length);
 	const stem = computed(() => held.tip.length);
-	const crown = computed(() => stem() + 1);
+	const crown = computed(() => stem + 1);
 	return { ...held, sideline, stem, crown };
 }, { scope: 'widget' });
 

@@ -29,7 +29,7 @@ const SUFFIX = '!';
 export const box = shared(() => {
 	const s = state({ label: 'a' });
 	const loud = computed(() => shout(s.label));
-	const banged = computed(() => loud() + SUFFIX);
+	const banged = computed(() => loud + SUFFIX);
 	const plain = computed(() => s.label + '?');
 	return { ...s, loud, banged, plain };
 }, { scope: 'widget' });

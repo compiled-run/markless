@@ -28,7 +28,7 @@ export const box = shared(() => {
 	const wrapped = computed(() => PREFIX + s.label);
 	const trimmed = computed(() => trim(s.label));
 	const plain = computed(() => s.label + '?');
-	const echoed = computed(() => loud() + '?');
+	const echoed = computed(() => loud + '?');
 	return { ...s, loud, quiet, wrapped, trimmed, plain, echoed };
 }, { scope: 'widget' });
 
@@ -148,7 +148,7 @@ test('a cell reading a sibling carries nothing, and the sibling carries its own 
 	const compiled = await compilePage(pageReading('b.echoed'));
 
 	expect(errors(compiled.page)).toEqual([]);
-	const echoed = deriveModule(compiled.page, "() => loud() + '?'");
+	const echoed = deriveModule(compiled.page, "() => loud + '?'");
 	expect(echoed).toContain('#box/computed:loud');
 	expect(echoed).not.toContain('import { shout }');
 
