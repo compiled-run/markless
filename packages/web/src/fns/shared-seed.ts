@@ -9,6 +9,7 @@ import {
 	childrenProjectionChain,
 	childrenWidgetRootPath,
 	childSurfaceOf,
+	staticProjectionChildren,
 	type ChildrenProjectionLink,
 	renderedWidgetRootsOf,
 } from '../prerender/children-projection.ts';
@@ -70,7 +71,7 @@ const seedProjectingChild: SharedSeedPass = async (
 		chain,
 		rootEdge,
 		context.symbolPrefix + rootEdge.symbolPrefix,
-		edgeChildProps(context, rootEdge, read),
+		edgeChildProps(context, context.surface, rootEdge, read),
 		seeded,
 	);
 	// U-H: every part of this widget instance contributes before any part
@@ -110,7 +111,7 @@ async function applyComposedChainSeeds(
 			seeded,
 		);
 		await applySharedSeeds(context, link.surface, ownerPrefix, link.edge, read, seeded);
-		ownerProps = edgeChildProps(context, link.edge, read);
+		ownerProps = edgeChildProps(context, link.surface, link.edge, read);
 		ownerPrefix += link.edge.symbolPrefix;
 		ownerEdge = link.edge;
 	}
@@ -319,8 +320,10 @@ function takenArm(
 }
 
 // What one component edge hands its child, read in the scope that declared it.
+// `surface` is that declaring scope: the edge's ids are its module's.
 function edgeChildProps(
 	context: SeedContext,
+	surface: PrerenderDataSurface,
 	edge: SeedEdge,
 	read: PrerenderReadSeed,
 ): Record<string, unknown> {
@@ -342,6 +345,13 @@ function edgeChildProps(
 		} else if (prop.source !== undefined && context.readEdgeProp) {
 			childProps[prop.name] = context.readEdgeProp(prop);
 		}
+	}
+	// Static text is the one projection whose value the seed can be told: it is
+	// already in the chunk, so a seed reading `children` gets what the consumer
+	// wrote instead of undefined.
+	if (childProps.children === undefined) {
+		const staticChildren = staticProjectionChildren(surface, edge.id);
+		if (staticChildren !== undefined) childProps.children = staticChildren;
 	}
 	// A widget root's callback-slot seed reads its answer from here, so the seed
 	// pass hands the child the same map the render path hands it.
@@ -366,7 +376,7 @@ async function applySharedSeeds(
 	);
 	if (!child || seeds.length === 0) return;
 
-	const childProps = edgeChildProps(context, edge, read);
+	const childProps = edgeChildProps(context, surface, edge, read);
 	// A client mint loads these symbols through the resume loader, which scopes a
 	// symbol's reads by prepending its instance path. The seed map is keyed by the
 	// child's own compile-time ids, so an unmatched id is retried without it.

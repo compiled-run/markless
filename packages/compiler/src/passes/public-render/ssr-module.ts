@@ -24,7 +24,9 @@ import {
 	childrenWidgetRootMarkerLine,
 	enclosingProjectingEdgeIds,
 	projectedSeedPartsUnder,
+	PROJECTION_PROP_NAME,
 	rowProjectedEdgeIdsUnder,
+	staticProjectionChildren,
 	sharedSeedConsumeLine,
 	sharedSeedMarkerLine,
 	sharedSeedPassLines,
@@ -706,8 +708,18 @@ function emitSsrDataLines(
 		// same props without the projection. It keeps the callbacks map: a widget
 		// root's callback-slot seed is exactly the answer that map carries.
 		const seedProps = [...props];
-		if (hasProjection && !edge.props.some((prop) => prop.name === 'children'))
-			props.push('children:marklessSsrDataContext.projectionHtml');
+		if (hasProjection && !edge.props.some((prop) => prop.name === PROJECTION_PROP_NAME)) {
+			props.push(`${PROJECTION_PROP_NAME}:marklessSsrDataContext.projectionHtml`);
+			// Static text is the one projection whose value the seed can be told: it
+			// is already in the chunk, so the seed reads what the consumer wrote
+			// instead of undefined.
+			const staticChildren = staticProjectionChildren(
+				input.renderData.chunks,
+				projectionChunkId,
+			);
+			if (staticChildren !== undefined)
+				seedProps.push(`${PROJECTION_PROP_NAME}:${JSON.stringify(staticChildren)}`);
+		}
 		const child = {
 			hostPrefix: `c${index}:`,
 			symbolPrefix: componentEdgeInstanceSegment(edge, input.semanticGraph.componentEdges),
