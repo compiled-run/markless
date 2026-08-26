@@ -8,6 +8,7 @@ import Reversed from './scenarios/reversed.tsrx';
 import ServedOpen from './scenarios/served-open.tsrx';
 import Toolbar from './scenarios/toolbar.tsrx';
 import TwoTooltips from './scenarios/two-tooltips.tsrx';
+import WithOnChange from './scenarios/with-onchange.tsrx';
 
 const Background = page.getByTestId('background');
 const Root = page.getByTestId('root');
@@ -24,6 +25,8 @@ const SecondTrigger = page.getByTestId('second-trigger');
 const SecondContent = page.getByTestId('second-content');
 const PopoverTrigger = page.getByTestId('popover-trigger');
 const PopoverContent = page.getByTestId('popover-content');
+const Calls = page.getByTestId('calls');
+const Last = page.getByTestId('last');
 
 // The SSR harness rewrites a literal `renderSSR` call site, so the mount cannot be
 // passed by reference or hidden in a helper: each test branches on the mode instead.
@@ -205,6 +208,44 @@ for (const mode of MODES) {
 		expect(secondTip.width).toBeGreaterThan(0);
 		expect(Math.abs(firstTip.bottom - firstBox.top)).toBeLessThanOrEqual(SLACK);
 		expect(Math.abs(secondTip.bottom - secondBox.top)).toBeLessThanOrEqual(SLACK);
+	});
+
+	// Pinned as what should happen: a callback stored by this component is not
+	// visible to its own handler modules, so the pointer handlers - which live on
+	// the root, the same component whose render put `onChange` on the instance -
+	// report nothing.
+	test.fails(`${mode}: the pointer route reports each change to the consumer`, async () => {
+		if (mode === 'CSR') await render(WithOnChange);
+		else await renderSSR(WithOnChange);
+		expect(el(Calls).textContent).toBe('0');
+
+		enter(el(Trigger));
+		await expect.poll(() => el(Content).hasAttribute('hidden'), { timeout: 2000 }).toBe(false);
+		expect(el(Calls).textContent).toBe('1');
+		expect(el(Last).textContent).toBe('true');
+
+		leave(el(Trigger), el(Background));
+		await expect.poll(() => el(Content).hasAttribute('hidden')).toBe(true);
+		expect(el(Calls).textContent).toBe('2');
+		expect(el(Last).textContent).toBe('false');
+	});
+
+	// The contrasting route, and the reason both are worth a row: focus and blur
+	// sit on the trigger, a different component from the one that stored the slot.
+	test(`${mode}: the focus route reports each change to the consumer`, async () => {
+		if (mode === 'CSR') await render(WithOnChange);
+		else await renderSSR(WithOnChange);
+		expect(el(Calls).textContent).toBe('0');
+
+		el<HTMLElement>(Trigger).focus();
+		await expect.poll(() => el(Content).hasAttribute('hidden'), { timeout: 2000 }).toBe(false);
+		await expect.poll(() => el(Calls).textContent).toBe('1');
+		expect(el(Last).textContent).toBe('true');
+
+		el<HTMLElement>(Background).focus();
+		await expect.poll(() => el(Content).hasAttribute('hidden')).toBe(true);
+		await expect.poll(() => el(Calls).textContent).toBe('2');
+		expect(el(Last).textContent).toBe('false');
 	});
 }
 
