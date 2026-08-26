@@ -33,6 +33,7 @@ import {
 import { asNodes, isNode, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
 import { isClassInstanceValue } from './semantic-graph/collect-state.ts';
+import { ownedModuleAstOrNull } from './semantic-graph/shared-ast.ts';
 import {
 	arrayNode,
 	arrowFunctionNode,
@@ -284,7 +285,7 @@ function divergentModuleInstanceCarries(
 	const symbolIdsByName = new Map<string, string[]>();
 	for (const emitted of modules) {
 		if (emitted.kind !== 'event-handler' && emitted.kind !== 'callback-prop') continue;
-		for (const name of moduleScopeInstanceNames(emitted.source)) {
+		for (const name of moduleScopeInstanceNames(emitted)) {
 			const seen = symbolIdsByName.get(name);
 			if (seen) seen.push(emitted.symbolId);
 			else symbolIdsByName.set(name, [emitted.symbolId]);
@@ -296,16 +297,22 @@ function divergentModuleInstanceCarries(
 		.map(([name, symbolIds]) => ({ name, symbolIds }));
 }
 
+/**
+ * The tree of a module this pass just printed, read as JavaScript and shared by
+ * every reader of that module. A module that carries TypeScript — a shared()
+ * method inlined into it keeps the author's annotations — is rejected here and
+ * gets `null`; the reader that needs it then reparses as TypeScript.
+ */
+function printedModuleAst(emitted: GeneratedSymbolModule): AnyNode | null {
+	return ownedModuleAstOrNull(emitted, emitted.source, 'generated.js');
+}
+
 /** Module-scope bindings this emitted module initializes with a class instance. */
-function moduleScopeInstanceNames(source: string): ReadonlyArray<string> {
-	let ast: AnyNode;
-	try {
-		ast = parseJavaScriptModule(source);
-	} catch {
-		// A module the compiler just printed and cannot reparse is a different
-		// defect; it is not evidence that this one is absent, so claim nothing.
-		return [];
-	}
+function moduleScopeInstanceNames(emitted: GeneratedSymbolModule): ReadonlyArray<string> {
+	// A module the compiler just printed and cannot reparse is a different
+	// defect; it is not evidence that this one is absent, so claim nothing.
+	const ast = printedModuleAst(emitted);
+	if (!ast) return [];
 
 	return asNodes(ast.body).flatMap((statement) => {
 		if (statement.type !== 'VariableDeclaration') return [];
@@ -556,7 +563,7 @@ function unresolvedGraphReferences(
 	}
 
 	return modules.flatMap((emitted) => {
-		const free = freeIdentifierNames(emitted.source);
+		const free = freeIdentifierNames(emitted);
 		const symbol = symbols.find((candidate) => candidate.id === emitted.symbolId);
 		const localNames = localNamesBySymbol.get(emitted.symbolId) ?? emptyLocalNames;
 
@@ -693,21 +700,22 @@ function identifierRootNames(valueSource: string): ReadonlySet<string> {
  * over-approximates deliberately: over-counting a binding can only make this walk
  * quieter, never louder.
  *
- * Read as TypeScript, because an emitted handler module can carry TypeScript: a
- * shared() method inlined into it keeps the annotations the author wrote on its
- * parameters (`(next: boolean) => { ... }`). Parsed as plain JavaScript that
- * module threw, the catch below claimed nothing, and this whole check went quiet
- * for exactly the modules an inlined method could break — a fail-open the
- * annotations alone were enough to trigger.
+ * A module the JavaScript read rejects must be read as TypeScript rather than
+ * skipped: a shared() method inlined into a handler keeps the annotations the
+ * author wrote on its parameters (`(next: boolean) => { ... }`), and treating
+ * that throw as "nothing to report" took this whole check out for exactly the
+ * modules an inlined method could break.
  */
-function freeIdentifierNames(source: string): ReadonlySet<string> {
-	let ast: AnyNode;
-	try {
-		ast = parseJavaScriptModule(source, 'generated.ts');
-	} catch {
-		// A module the compiler just printed and cannot reparse is a different
-		// defect; it is not evidence that this one is present, so claim nothing.
-		return new Set();
+function freeIdentifierNames(emitted: GeneratedSymbolModule): ReadonlySet<string> {
+	let ast = printedModuleAst(emitted);
+	if (!ast) {
+		try {
+			ast = parseJavaScriptModule(emitted.source, 'generated.ts') as AnyNode;
+		} catch {
+			// A module the compiler just printed and cannot reparse at all is a
+			// different defect; claim nothing rather than report a phantom gap.
+			return new Set();
+		}
 	}
 
 	const bound = new Set<string>();
