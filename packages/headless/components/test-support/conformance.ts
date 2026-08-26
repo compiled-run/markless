@@ -1,5 +1,5 @@
 import axe from 'axe-core';
-import { userEvent } from 'vite-plus/test/browser';
+import { page, userEvent } from 'vite-plus/test/browser';
 import { describe, expect, test } from 'vitest';
 
 // One suite held against every @markless/ui family. A family joins by declaring a
@@ -274,7 +274,25 @@ type Scope = {
 	readonly document: Document;
 };
 
+// The cursor rests where the previous suite left it, and a tree mounting under it
+// takes a real pointerover: measured as a hover-open navbar item stealing the
+// surface the click had just opened.
+async function parkPointerClearOfMount(): Promise<void> {
+	const pad = document.createElement('div');
+	pad.dataset.testid = 'conformance-pointer-parking-pad';
+	pad.style.cssText = 'position:fixed;inset:0;z-index:2147483647';
+	document.body.append(pad);
+	try {
+		await userEvent.hover(page.getByTestId('conformance-pointer-parking-pad'), {
+			position: { x: pad.clientWidth - 2, y: pad.clientHeight - 2 },
+		});
+	} finally {
+		pad.remove();
+	}
+}
+
 async function mountScope(mount: Mount): Promise<Scope> {
+	await parkPointerClearOfMount();
 	const result = await mount();
 	const container = result.container;
 	if (!(container instanceof Element)) {
