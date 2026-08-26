@@ -21,7 +21,7 @@ The family is complete, registered, and its lanes are green in both render modes
 | `tour.close` | `button` | dismisses the tour |
 
 `tour.state()` per widget: `open`, `step` (an index), `count` (each card writes
-`index + 1` as it renders), `target`, and `next()`, `prev()`, `skip()`,
+`index + 1` as it renders), `target`, and `next()`, `prev()`,
 `close()`. `tour.itemstate()` per step: `side`,
 `target`.
 
@@ -254,7 +254,7 @@ written that way on purpose.
 ## A consumer module cannot move a tour, and that decides what "controlled" means
 
 Measured while writing `scenarios/controlled.tsrx`: a handler in any module other
-than `tour.tsrx` may not call `tour.state().next()`, `prev()` or `skip()`. The
+than `tour.tsrx` may not call `tour.state().next()` or `prev()`. The
 build refuses with `MARKLESS_SHARED_METHOD_CROSS_MODULE`, because calling a
 `shared()` method compiles by copying the method's authored body into the calling
 handler, and the copy arrives without this module's imports - `focusIntoCard`,
@@ -270,11 +270,9 @@ the whole tour instead of a set repeated per step. That is what the scenario
 shows. Reading `tour.state()` in markup is unaffected; only a handler's *call* of
 a shared method is refused.
 
-The consequence for the public surface: **`skip()` has no part and no reachable
-caller.** It is on `tour.state()`, its body is identical to `close()`, and the
-only module that could call it is `tour.tsrx` itself, which does not. Either give
-it a `tour.skiptrigger` part that means something `close` does not, or drop it -
-an owner call, not a thing to improvise.
+The consequence for the public surface: there is no `skip()`. Its body was
+`close()`'s, no part called it, and no consumer module could - abandoning the
+tour part-way is `close()`, and `state().step` is where the person gave up.
 
 ## Registration
 

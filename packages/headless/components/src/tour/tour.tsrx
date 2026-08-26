@@ -93,20 +93,6 @@ export const tourState = shared(
 				focusIntoCard(cards, to);
 			},
 
-			/** Abandoning the tour part-way. Reported exactly as `close()`; `state().step` is where the person gave up. */
-			skip() {
-				const showing = tour.open;
-				if (showing !== true) return;
-				const bound = itemEls;
-				const cards = bound === undefined ? [] : bound;
-				const at = tour.step;
-				const leaving = tour.target;
-				releaseTarget(leaving);
-				focusBackToTarget(leaving, cards, at);
-				tour.target = undefined;
-				tour.open = false;
-				tour.onOpenChange?.(false);
-			},
 
 			close() {
 				const showing = tour.open;
