@@ -13,6 +13,11 @@
  * the workflow falls back to the drivability smoke.
  *
  *   node apps/sr-gallery/scripts/boot-check.ts
+ *   SR_GALLERY_PORT=4325 node apps/sr-gallery/scripts/boot-check.ts
+ *
+ * `SR_GALLERY_PORT` moves the whole app - this check, the server it spawns and
+ * the vite config that binds - off the default 4319, so two worktrees can run
+ * the check at the same time instead of tripping each other's squatter guard.
  */
 
 import { spawn } from 'node:child_process';
@@ -45,6 +50,9 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	// The browse button is the family's whole keyboard route; the real file input
 	// is aria-hidden, so the button is what has to be in the tree.
 	fileupload: 'button',
+	// The trigger is an <a> and only an <a>: the card is a shortcut to where that
+	// link goes, so the link is the part that must have rendered.
+	hovercard: 'link',
 };
 
 /** Sections whose point is how many of that role they serve, not merely that they serve one. */
@@ -64,18 +72,32 @@ const POLL_INTERVAL_MS = 250;
 try {
 	await fetch(PREVIEW_ORIGIN);
 	console.error(
-		`::error::${PREVIEW_ORIGIN} already answers before this check started its server — an orphaned dev server is squatting the port; kill it and rerun.`,
+		`::error::${PREVIEW_ORIGIN} already answers before this check started its server — an orphaned dev server is squatting the port; kill it and rerun, or set SR_GALLERY_PORT to a free port.`,
 	);
 	process.exit(1);
 } catch {
 	// Nothing listening: the port is ours to take.
 }
 
+// `detached` puts pnpm and the vite server it spawns in one process group, so
+// the teardown below can reach both. Measured without it: signalling pnpm alone
+// left the vite process holding the port, and the next run of this check failed
+// its own squatter guard against the server the previous run started.
 const server = spawn('pnpm', ['exec', 'vp', 'dev'], {
 	cwd: appDir,
 	stdio: ['ignore', 'inherit', 'inherit'],
 	env: process.env,
+	detached: true,
 });
+
+function signalServer(signal: NodeJS.Signals) {
+	try {
+		if (server.pid === undefined) return;
+		process.kill(-server.pid, signal);
+	} catch {
+		// Already gone, or never became a group of its own.
+	}
+}
 
 let leaving = false;
 
@@ -87,11 +109,11 @@ function leave(code: number, message?: string) {
 	// to decide whether the reader gets a page, so a failure that leaves through
 	// an early drain of the event loop must still leave as a failure.
 	process.exitCode = code;
-	server.kill('SIGTERM');
+	signalServer('SIGTERM');
 	// The server owns a listening socket; give it a moment to let go of the port
 	// before the next lane asks for it, then leave regardless.
 	setTimeout(() => {
-		server.kill('SIGKILL');
+		signalServer('SIGKILL');
 		process.exit(code);
 	}, 500);
 }

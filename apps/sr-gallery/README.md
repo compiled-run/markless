@@ -19,6 +19,10 @@ copies — one section each, on an anchor a driver can be sent to:
 | popover     | `/#popover`     |
 | slider      | `/#slider`      |
 | slider-range | `/#slider-range` |
+| tooltip     | `/#tooltip`     |
+| datebox     | `/#datebox`     |
+| fileupload  | `/#fileupload`  |
+| hovercard   | `/#hovercard`   |
 
 The slider appears twice: the one-thumb starter, and the two-thumb range shape,
 which a reader announces differently and so gets a section of its own.
@@ -37,6 +41,14 @@ node apps/sr-gallery/scripts/boot-check.ts   # serve it and check every family r
 `preview-server.ts` owns the port and the anchors. The boot check and
 `packages/headless/components/test-support/playwright.config.ts` import them from
 there rather than spelling their own.
+
+Set `SR_GALLERY_PORT` to serve somewhere other than 4319 — it moves the vite
+config's binding, the boot check and the reader lanes together, so two worktrees
+can run the check at once:
+
+```sh
+SR_GALLERY_PORT=4325 node apps/sr-gallery/scripts/boot-check.ts
+```
 
 ## It does not render yet
 
