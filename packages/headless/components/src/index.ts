@@ -1,5 +1,6 @@
 export * as accordion from './accordion/index.ts';
 export * as base from './base/index.ts';
+export * as calendar from './calendar/index.ts';
 export * as carousel from './carousel/index.ts';
 export * as checkbox from './checkbox/index.ts';
 export * as checklist from './checklist/index.ts';
