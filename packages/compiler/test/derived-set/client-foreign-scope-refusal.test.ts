@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { collectTsrxModuleDiagnostics } from '../../src/index.ts';
-import { SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE } from '../../src/passes/symbol-modules.ts';
+import { SHARED_COMPUTED_CROSS_MODULE_CODE } from '../../src/passes/foreign-scope.ts';
 import { compileTsrxModulesWithInterfaces } from '../multi-module-compile-support.ts';
 
 // Fail-closed. What the client module cannot bind for a copied factory
@@ -53,7 +53,7 @@ function refusals(compiled: Awaited<ReturnType<typeof compileConsumer>>) {
 	return collectTsrxModuleDiagnostics(compiled).filter(
 		(item) =>
 			item.severity === 'error' &&
-			item.code === SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE &&
+			item.code === SHARED_COMPUTED_CROSS_MODULE_CODE &&
 			item.passId === 'symbol-modules' &&
 			item.title.includes('re-derived from another module'),
 	);

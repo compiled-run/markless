@@ -37,7 +37,8 @@ test('a module-const collection whose row reads a state cell is refused', async 
 	const [diagnostic, ...rest] = errors(compiled);
 
 	expect(rest).toEqual([]);
-	expect(diagnostic?.code).toBe('MARKLESS_REPEAT_COLLECTION_UNREADABLE');
+	expect(diagnostic?.code).toBe('MARKLESS_REPEAT_ROWS_FROZEN');
+	expect(diagnostic?.docsUrl).toBe('https://markless.dev/errors/MARKLESS_REPEAT_ROWS_FROZEN');
 	expect(diagnostic?.title).toBe('This @for renders its rows once and never updates them');
 	expect(diagnostic?.message).toContain('`WEEKDAYS`');
 	expect(diagnostic?.message).toContain('`s.picked`');
