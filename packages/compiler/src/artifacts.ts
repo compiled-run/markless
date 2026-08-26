@@ -251,8 +251,25 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly projection?: ModuleGraphInterfaceProjection;
 			readonly spreadHosts?: ReadonlyArray<ModuleGraphInterfaceSpreadHost>;
 			readonly armMaterial?: ModuleGraphInterfaceArmMaterial;
+			readonly seedsFromProps?: ReadonlyArray<ModuleGraphInterfaceSeedFromProp>;
 		}>;
 	};
+};
+
+/**
+ * A shared cell this component writes before it renders, taken from one of its
+ * own props. `prop` is the prop the seed reads and `statePath` the cell it
+ * writes.
+ *
+ * A module that places this component reads it back to answer a question its own
+ * source cannot: the seed is a fact of the component's file, but whether the
+ * value the placement passes can reach that seed is decided where the placement
+ * is written. Absent when the component seeds nothing from a prop, and absent on
+ * an interface built before this field existed.
+ */
+export type ModuleGraphInterfaceSeedFromProp = {
+	readonly prop: string;
+	readonly statePath: string;
 };
 
 /**

@@ -1,5 +1,6 @@
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import type { CompilerDiagnostic } from '../../diagnostics.ts';
+import { childrenSeedPathsByComponent } from '../link/children-seed-paths.ts';
 import { PROJECTION_PROP_NAME, staticProjectionChildren } from './shared-seed-pass.ts';
 
 export const SEED_CHILDREN_UNAVAILABLE_CODE = 'MARKLESS_SEED_CHILDREN_UNAVAILABLE' as const;
@@ -43,18 +44,19 @@ export function seedChildrenUnavailableDiagnostic(input: {
 
 /**
  * Every placement in this module whose child seeds from `children` and whose
- * projection cannot answer that seed. Only a child compiled HERE can be checked:
- * an imported child's seeds are a fact of its own module, and the record a
- * composing module reads carries no seed reads.
+ * projection cannot answer that seed. A child compiled here is read off this
+ * module's own seed routes; an imported one off `seedsFromProps` on the
+ * interface its module published, so the placement is checked where it is
+ * written either way.
  */
 export function collectSeedChildrenDiagnostics(
 	input: PublicRenderModuleInput,
 ): ReadonlyArray<CompilerDiagnostic> {
 	const seedPaths = childrenSeedPathsByComponent(input);
-	if (seedPaths.size === 0) return [];
 	return input.semanticGraph.componentEdges.flatMap((edge) => {
-		if (edge.importSource) return [];
-		const statePath = seedPaths.get(edge.childComponentName);
+		const statePath = edge.importSource
+			? importedChildrenSeedPath(input, edge.importSource, edge.childComponentName)
+			: seedPaths.get(edge.childComponentName);
 		if (statePath === undefined) return [];
 		if (edge.props.some((prop) => prop.name === PROJECTION_PROP_NAME)) return [];
 		const projectionChunkId = input.renderData.chunks.flatMap((chunk) =>
@@ -79,32 +81,14 @@ export function collectSeedChildrenDiagnostics(
 	});
 }
 
-// Which components in this module seed a shared cell from their own `children`,
-// and the state path each one writes. Read from the published seed routes rather
-// than the seed's expression text: the route already names the prop the seed
-// follows, which is the same question asked precisely.
-function childrenSeedPathsByComponent(input: PublicRenderModuleInput): Map<string, string> {
-	const seedSymbols = new Map(
-		input.symbolResolver.symbols.flatMap((symbol) =>
-			symbol.kind === 'shared-seed' && symbol.componentName
-				? [[symbol.id, symbol] as const]
-				: [],
-		),
-	);
-	const paths = new Map<string, string>();
-	for (const seed of input.protocolState.sharedSeeds ?? []) {
-		const symbol = seedSymbols.get(seed.deriveSymbolId);
-		if (!symbol?.componentName || paths.has(symbol.componentName)) continue;
-		if (!seed.dependencies.some((dependency) => readsProjectionProp(dependency.reads))) continue;
-		paths.set(symbol.componentName, symbol.name ?? symbol.graphNodeId);
-	}
-	return paths;
-}
-
-function readsProjectionProp(reads: {
-	readonly graphNodeId: string;
-	readonly path: ReadonlyArray<string>;
-}): boolean {
-	if (reads.graphNodeId === `prop:${PROJECTION_PROP_NAME}`) return true;
-	return reads.graphNodeId === 'prop:props' && reads.path[0] === PROJECTION_PROP_NAME;
+// The cell an imported child seeds from its `children`, off the interface its
+// own module published — the same channel the child's prop names arrive on.
+function importedChildrenSeedPath(
+	input: PublicRenderModuleInput,
+	importSource: string,
+	childComponentName: string,
+): string | undefined {
+	return input.source.importedModuleInterfaces?.[importSource]?.render.components
+		.find((component) => component.componentName === childComponentName)
+		?.seedsFromProps?.find((seed) => seed.prop === PROJECTION_PROP_NAME)?.statePath;
 }

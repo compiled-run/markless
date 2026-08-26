@@ -2,6 +2,7 @@ import type {
 	CaptureAnalysisArtifact,
 	CompileTsrxModuleInput,
 	CompileTsrxModuleResult,
+	ModuleGraphInterfaceArtifact,
 	PayloadArenaArtifact,
 	PublicRenderModuleArtifact,
 	PublicRenderPlanArtifact,
@@ -20,6 +21,11 @@ import type {
 } from './artifacts.ts';
 import type { SourceSpan } from './diagnostics.ts';
 import { runCompilerPassPipeline } from './pass-pipeline.ts';
+import {
+	childrenSeedPathsByComponent,
+	type ChildrenSeedPathsInput,
+} from './passes/link/children-seed-paths.ts';
+import { PROJECTION_PROP_NAME } from './passes/public-render/shared-seed-pass.ts';
 import { defaultCompilerPasses } from './pass-registry.ts';
 import { analyzeCaptures } from './passes/capture-analysis.ts';
 import { planPayloadArena } from './passes/payload-arena.ts';
@@ -81,7 +87,10 @@ export async function compileTsrxModule(
 	return {
 		passGraph: pipeline.passGraph,
 		semanticGraph: artifacts.semanticGraph,
-		moduleGraphInterface: artifacts.semanticGraph.moduleGraphInterface,
+		moduleGraphInterface: withSeedsFromProps(artifacts.semanticGraph.moduleGraphInterface, {
+			symbolResolver: artifacts.symbolResolver,
+			protocolState: artifacts.protocolState,
+		}),
 		stateLowering: artifacts.stateLowering,
 		payloadArena: artifacts.payloadArena,
 		symbolResolver: artifacts.symbolResolver,
@@ -103,6 +112,34 @@ export async function compileTsrxModule(
 		triggerGroups: artifacts.triggerGroups,
 		symbolResolverModule: artifacts.symbolResolverModule,
 		symbolResolverModuleManifest: artifacts.symbolResolverModuleManifest,
+	};
+}
+
+/**
+ * Publishes each component's `children` seed onto the interface a composing
+ * module reads. Written here rather than in the interface's own pass because the
+ * seed routes only exist once protocol state and the symbol resolver are both
+ * finished, which is true for the first time at this return.
+ */
+function withSeedsFromProps(
+	moduleGraphInterface: ModuleGraphInterfaceArtifact,
+	seedInput: ChildrenSeedPathsInput,
+): ModuleGraphInterfaceArtifact {
+	const seedPaths = childrenSeedPathsByComponent(seedInput);
+	if (seedPaths.size === 0) return moduleGraphInterface;
+	return {
+		...moduleGraphInterface,
+		render: {
+			...moduleGraphInterface.render,
+			components: moduleGraphInterface.render.components.map((component) => {
+				const statePath = seedPaths.get(component.componentName);
+				if (statePath === undefined) return component;
+				return {
+					...component,
+					seedsFromProps: [{ prop: PROJECTION_PROP_NAME, statePath }],
+				};
+			}),
+		},
 	};
 }
 
