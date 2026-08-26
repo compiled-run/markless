@@ -148,20 +148,42 @@ function materializeArmBranchRecords(
 ): ReadonlyArray<ResumeArmBranchRecord> {
 	const records = input.armRecords.branches ?? [];
 	if (!records.length) return [];
-	const indexOf = (anchor: ResumeArmBranchRecord['startAnchor']): number | undefined =>
-		(anchor as { readonly index?: number } | undefined)?.index;
-	const census = records.some((record) => indexOf(record.startAnchor) !== undefined)
+	const planned = (anchor: ResumeArmBranchRecord['startAnchor']) =>
+		anchor as { readonly strategy?: string; readonly index?: number } | undefined;
+	// A composed child's own branch arrives still spelling the index it counted in
+	// its OWN module's census, which names nothing here; its anchors carry its
+	// instance-prefixed id, so the anchor text is the exact page-wide address.
+	const composed = (record: ResumeArmBranchRecord) =>
+		planned(record.startAnchor)?.strategy === 'dom-order-comment';
+	const census = records.some(
+		(record) => !composed(record) && planned(record.startAnchor)?.index !== undefined,
+	)
 		? armBranchCommentCensus(input.root, input.startAnchor, input.endAnchor)
 		: [];
+	let pageComments: ReadonlyArray<ResumeDomComment> | undefined;
+	const anchorNamed = (text: string): ResumeDomComment | undefined => {
+		pageComments ??= pageCommentCensus(input.root);
+		return pageComments.find((comment) => commentText(comment) === text);
+	};
 	return records.map((record) => {
-		const startIndex = indexOf(record.startAnchor);
-		const endIndex = indexOf(record.endAnchor);
+		if (composed(record)) {
+			const startAnchor = anchorNamed(`markless:branch:${record.id}`);
+			const endAnchor = anchorNamed(`/markless:branch:${record.id}`);
+			if (!startAnchor || !endAnchor) throw missingComposedArmBranchAnchorError(record.id);
+			return { ...record, startAnchor, endAnchor };
+		}
+		const startIndex = planned(record.startAnchor)?.index;
+		const endIndex = planned(record.endAnchor)?.index;
 		if (startIndex === undefined || endIndex === undefined) return record;
 		const startAnchor = census[startIndex];
 		const endAnchor = census[endIndex];
 		if (!startAnchor || !endAnchor) throw missingArmBranchAnchorError(record.id, startIndex);
 		return { ...record, startAnchor, endAnchor };
 	});
+}
+
+function commentText(comment: ResumeDomComment): string {
+	return comment.data ?? (comment as { readonly textContent?: string }).textContent ?? '';
 }
 
 function armBranchCommentCensus(
@@ -194,6 +216,13 @@ function missingArmBranchAnchorError(id: string, index: number): Error {
 	return runtimeResumeError(
 		'MARKLESS_RESUME_LOCATOR_MISSING',
 		`Arm-scoped branch ${id} expected an arm-branch comment anchor at arm-local index ${index}.`,
+	);
+}
+
+function missingComposedArmBranchAnchorError(id: string): Error {
+	return runtimeResumeError(
+		'MARKLESS_RESUME_LOCATOR_MISSING',
+		`Composed arm-scoped branch ${id} expected its own comment anchor pair inside this arm.`,
 	);
 }
 

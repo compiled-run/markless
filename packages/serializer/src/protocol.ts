@@ -232,9 +232,20 @@ export type ProtocolArmBranchRecord = {
 	readonly symbolId?: string;
 	readonly armTests?: ReadonlyArray<unknown>;
 	readonly declaredEmptyArms?: ReadonlyArray<number>;
-	readonly startAnchor?: { readonly strategy: 'arm-branch-comment'; readonly index: number };
-	readonly endAnchor?: { readonly strategy: 'arm-branch-comment'; readonly index: number };
+	// A composed child's branch inside the arm keeps the `dom-order-comment`
+	// anchors its own module counted; they name its comment text, not an index
+	// into this arm's census.
+	readonly startAnchor?: {
+		readonly strategy: 'arm-branch-comment' | 'dom-order-comment';
+		readonly index: number;
+	};
+	readonly endAnchor?: {
+		readonly strategy: 'arm-branch-comment' | 'dom-order-comment';
+		readonly index: number;
+	};
 	readonly armRecords?: NonNullable<ProtocolViewPayload['branches']>[number]['armRecords'];
+	readonly composedInstancePath?: string;
+	readonly composedGraphProps?: ReadonlyArray<ProtocolComposedGraphProp>;
 };
 
 export type ProtocolArmRecordSet = {
