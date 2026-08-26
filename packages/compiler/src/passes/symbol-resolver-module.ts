@@ -200,7 +200,10 @@ function instanceScopeLines(widgetAware: boolean): string[] {
 		// A graph-less context still has an answer: the runtime hands back the
 		// `active` pointer, which is what an older payload's resolver read anyway.
 		...(widgetAware ? ['		const registry = marklessGraphWidgetRegistry(graph);'] : []),
-		`		const wrapped = { ...graph, read: (graphNodeId, readPath) => graph.read(${scoped('graphNodeId', 'registry')}, readPath) };`,
+		// The wrapper says which path it qualifies by, and keeps the page graph it
+		// qualifies against. A dispatch that resolves a symbol id OUT of the graph
+		// has to undo both to run that symbol where its own module spelled it.
+		`		const wrapped = { ...graph, marklessInstancePath: path, marklessPageGraph: graph.marklessPageGraph ?? graph, read: (graphNodeId, readPath) => graph.read(${scoped('graphNodeId', 'registry')}, readPath) };`,
 		'		for (const name of ["write", "update", "call", "delete", "subscribe"]) {',
 		'			const method = graph[name];',
 		`			if (typeof method === "function") wrapped[name] = (record) => method.call(graph, { ...record, graphNodeId: ${scoped('record.graphNodeId', 'registry')} });`,

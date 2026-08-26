@@ -121,7 +121,7 @@ test('both handlers copy the method body in and capture the same callback slot',
 	expect(sources).toHaveLength(2);
 	for (const source of sources) {
 		expect(source).toContain('context.graph.write(');
-		expect(source).toContain('context.capture.invoke("capture-slot:widget-callback:');
+		expect(source).toContain(`marklessInvokeCallbackSlot(context, "${DEFINITION_ID}/slot:onChange"`);
 		// Nothing of the factory-local instance survives the copy (the module id
 		// spells `box.tsrx`, which is not a reference to it).
 		expect(source).not.toMatch(/\bbox\.(?!tsrx)/);

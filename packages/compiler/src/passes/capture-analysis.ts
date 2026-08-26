@@ -325,27 +325,37 @@ function widgetCallbackSlots(
 				owner: {},
 				path: [],
 				routes: [
-					// A callback prop is invoked by whatever composed its edge, so no
-					// consumer ever binds it and no consumer edge can answer its slot;
-					// the slot's own graph node is the answer, as it is for a part with
-					// no enclosing root.
-					symbol.kind === 'callback-prop'
-						? {
-								kind: 'callback-slot-route' as const,
-								graphNodeId: sharedCallbackSlotGraphNodeId(
-									invocation.definitionId,
-									invocation.slotName,
-								),
-								rootPropName: binding.propName,
-								rootComponentName: binding.componentName,
-							}
-						: {
-								kind: 'widget-callback-route' as const,
-								sharedDefinitionId: invocation.definitionId,
-								slotName: invocation.slotName,
-								rootPropName: binding.propName,
-								rootComponentName: binding.componentName,
-							},
+					// A part's claim, for the composing module to answer from the root
+					// edge that encloses it. A callback prop has no such answer — it is
+					// invoked by whatever composed its edge, so no consumer binds it.
+					...(symbol.kind === 'callback-prop'
+						? []
+						: [
+								{
+									kind: 'widget-callback-route' as const,
+									sharedDefinitionId: invocation.definitionId,
+									slotName: invocation.slotName,
+									rootPropName: binding.propName,
+									rootComponentName: binding.componentName,
+								},
+							]),
+					// The answer that needs no consumer at all: the root wrote the
+					// answering symbol id into the slot's own graph node, and the
+					// dispatching instance resolves that node exactly as it resolves the
+					// rest of the widget's state. A capture context reaches only a part
+					// the composing module BOUND, and it binds one per component edge —
+					// so a part written inside a page-local component, or under a repeat,
+					// runs with no capture context and its dispatch would otherwise fold
+					// away silently.
+					{
+						kind: 'callback-slot-route' as const,
+						graphNodeId: sharedCallbackSlotGraphNodeId(
+							invocation.definitionId,
+							invocation.slotName,
+						),
+						rootPropName: binding.propName,
+						rootComponentName: binding.componentName,
+					},
 				],
 			},
 		];

@@ -42,8 +42,8 @@ async function expectTheRangeArmRuns(container: ParentNode) {
 
 // The same two presses, asked only whether the consumer heard them. The widget
 // root stored the callback and the method body ran to its dispatch, so a silent
-// zero here is the slot read coming back empty for a part whose enclosing
-// component projects into the root rather than being written into it.
+// zero here is a part whose enclosing component projects into the root reaching
+// no answer for the slot - the shape no per-edge binding names.
 async function expectTheConsumerHears(container: ParentNode) {
 	day(container, '2026-08-10')?.click();
 	day(container, '2026-08-12')?.click();
@@ -90,12 +90,12 @@ test('SSR resume: a boolean root prop reaches the copied method body a part call
 	await expectTheRangeArmRuns(screen.container);
 });
 
-test.fails('CSR: a part’s dispatch reaches the consumer callback', async () => {
+test('CSR: a part’s dispatch reaches the consumer callback', async () => {
 	const screen = await render(RangePage);
 	await expectTheConsumerHears(screen.container as HTMLElement);
 });
 
-test.fails('SSR resume: a part’s dispatch reaches the consumer callback', async () => {
+test('SSR resume: a part’s dispatch reaches the consumer callback', async () => {
 	const screen = await renderSSR(RangePage);
 	await expectTheConsumerHears(screen.container);
 });
