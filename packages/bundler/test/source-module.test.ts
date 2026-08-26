@@ -823,7 +823,7 @@ test('emitResumeModule writes the row-mint loader only for a repeat that can bui
 				'web/fns/row-mint',
 			]),
 		}),
-	).toContain("globalThis.__marklessRowMint = () => import('@markless/web/fns/row-mint');");
+	).toContain("globalThis.__marklessRowMint ??= () => import('@markless/web/fns/row-mint');");
 });
 
 test('emitResumeModule leaves a reorder-only repeat with no row-mint specifier', () => {

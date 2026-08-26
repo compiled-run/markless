@@ -481,7 +481,7 @@ function emitOverlayLoaderInstall(): string {
  * global and refuses to build without one.
  */
 function emitRowMintLoaderInstall(): string {
-	return "globalThis.__marklessRowMint = () => import('@markless/web/fns/row-mint');";
+	return "globalThis.__marklessRowMint ??= () => import('@markless/web/fns/row-mint');";
 }
 
 /**

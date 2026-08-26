@@ -71,21 +71,11 @@ test('CSR: a served key that comes back is rendered again in both lists', async 
 	expect(widget(container)).toEqual(['alpha', 'bravo', 'charlie']);
 });
 
-// PENDING CAPABILITY, and narrower again. Minting a row for a key that was never
-// served works for a row the client can finish from the item alone: static
-// markup, text positions, and attributes read off the item. The PLAIN list is
-// now that row - `data-krg-value={item.label}` is an item read - and it grows.
-// The WIDGET list is not: its row roots a component, so the compiler refuses
-// `rowTemplate` for it (packages/compiler/test/keyed-repeat-row-mint.test.ts
-// names the refusal) and those rows stay as served. Each test below asks both
-// lists for the same set, so the widget half is what still fails.
-//
-// Closing it means a minted row starting a widget instance with a graph of its
-// own, which is a different capability from building markup.
-// A key that WAS served and comes back is a third case and it works: the
-// detached row is held in rowRootsByKey and re-appended, which is what the
-// `restore` rows above assert. Deterministic, so test.fails.
-test.fails('CSR: a handler write that admits an unserved key grows both lists', async () => {
+// Minting a row for a key that was never served works for both shapes: a plain
+// row finished from the item alone, and a widget row whose root is a component
+// (the component mint starts the widget instance). A key that WAS served and
+// comes back is held in rowRootsByKey and re-appended - the `restore` rows above.
+test('CSR: a handler write that admits an unserved key grows both lists', async () => {
 	const screen = await render(HandlerPage);
 	const container = screen.container as HTMLElement;
 
@@ -95,7 +85,7 @@ test.fails('CSR: a handler write that admits an unserved key grows both lists', 
 	expect(widget(container)).toEqual(['alpha', 'bravo', 'charlie', 'delta']);
 });
 
-test.fails('CSR: one write that admits an unserved key and drops a served one does both', async () => {
+test('CSR: one write that admits an unserved key and drops a served one does both', async () => {
 	const screen = await render(HandlerPage);
 	const container = screen.container as HTMLElement;
 
@@ -117,7 +107,7 @@ test('SSR resume: a handler write that drops a served key takes its row out of b
 	expect(widget(container)).toEqual(['alpha', 'bravo']);
 });
 
-test.fails('SSR resume: a handler write that admits an unserved key grows both lists', async () => {
+test('SSR resume: a handler write that admits an unserved key grows both lists', async () => {
 	const screen = await renderSSR(HandlerPage);
 	const container = screen.container;
 
@@ -127,7 +117,7 @@ test.fails('SSR resume: a handler write that admits an unserved key grows both l
 	expect(widget(container)).toEqual(['alpha', 'bravo', 'charlie', 'delta']);
 });
 
-test.fails('SSR resume: one write that admits an unserved key and drops a served one does both', async () => {
+test('SSR resume: one write that admits an unserved key and drops a served one does both', async () => {
 	const screen = await renderSSR(HandlerPage);
 	const container = screen.container;
 
@@ -138,12 +128,9 @@ test.fails('SSR resume: one write that admits an unserved key and drops a served
 
 // ============================================================ computed-driven
 
-// This page's two lists are the SAME two unmintable row shapes as the handler
-// page's - a dynamic attribute on the plain row, a component at the widget row's
-// root - so its growth stays pinned for that reason and not because a `computed`
-// collection behaves differently. The computed mint witnesses at the bottom of
-// this file drive the same `computed()` filter over a mintable row and pass.
-test.fails('CSR: widening a computed filter grows both lists past what was served', async () => {
+// This page's two lists are the same two row shapes as the handler page's, so a
+// `computed()` collection is shown to mint exactly as a handler write does.
+test('CSR: widening a computed filter grows both lists past what was served', async () => {
 	const screen = await render(ComputedPage);
 	const container = screen.container as HTMLElement;
 	expect(plain(container)).toEqual(['charlie']);
@@ -155,7 +142,7 @@ test.fails('CSR: widening a computed filter grows both lists past what was serve
 	expect(widget(container)).toEqual(['alpha', 'bravo', 'charlie', 'delta']);
 });
 
-test.fails('CSR: moving a computed filter sideways swaps the row set', async () => {
+test('CSR: moving a computed filter sideways swaps the row set', async () => {
 	const screen = await render(ComputedPage);
 	const container = screen.container as HTMLElement;
 
@@ -174,7 +161,7 @@ test('CSR: a computed filter that matches nothing empties both lists', async () 
 	expect(widget(container)).toEqual([]);
 });
 
-test.fails('SSR resume: widening a computed filter grows both lists past what was served', async () => {
+test('SSR resume: widening a computed filter grows both lists past what was served', async () => {
 	const screen = await renderSSR(ComputedPage);
 	const container = screen.container;
 	expect(plain(container)).toEqual(['charlie']);
@@ -185,7 +172,7 @@ test.fails('SSR resume: widening a computed filter grows both lists past what wa
 	expect(widget(container)).toEqual(['alpha', 'bravo', 'charlie', 'delta']);
 });
 
-test.fails('SSR resume: moving a computed filter sideways swaps the row set', async () => {
+test('SSR resume: moving a computed filter sideways swaps the row set', async () => {
 	const screen = await renderSSR(ComputedPage);
 	const container = screen.container;
 
