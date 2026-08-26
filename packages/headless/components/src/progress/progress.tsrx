@@ -65,7 +65,7 @@ function ProgressBar({ children, ...rest }: ProgressBarProps) @{
 	<div
 		{...rest}
 		role="progressbar"
-		aria-label="progress"
+		aria-labelledby={progress.labelEl}
 		aria-valuemin={progress.min}
 		aria-valuemax={progress.max}
 		aria-valuenow={progress.value}

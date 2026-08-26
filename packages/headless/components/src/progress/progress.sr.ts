@@ -6,6 +6,7 @@ import Basic from './scenarios/basic.tsrx';
 import Complete from './scenarios/complete.tsrx';
 import CustomRange from './scenarios/custom-range.tsrx';
 import Indeterminate from './scenarios/indeterminate.tsrx';
+import OwnName from './scenarios/own-name.tsrx';
 import OwnText from './scenarios/own-text.tsrx';
 
 // Rows assert the facts an announcement must convey - role, name, value - never a reader product's wording.
@@ -76,11 +77,19 @@ test('a value label the consumer wrote is conveyed as its own text', async () =>
 	await readUntil(sr, { name: '30 of 100 rows' });
 });
 
-// The bar carries the family's own name; the visible label is a separate stop on the walk.
-test('the bar is conveyed with the family name', async () => {
+// The bar's name is the label part's text, so a reader hears what the page shows.
+test('the bar is conveyed with the label part as its name', async () => {
 	await open(Basic);
 	const announcement = await readUntil(sr, { role: 'progressbar' });
-	expect(missingFacts(sr, announcement, { role: 'progressbar', name: 'progress' })).toEqual([]);
+	expectConveys(announcement, { role: 'progressbar', name: 'Export data' });
+});
+
+// With no label part mounted the family writes no name of its own, so the one the
+// consumer spread in is what a reader speaks.
+test('a bar named by the consumer conveys that name', async () => {
+	await open(OwnName);
+	const announcement = await readUntil(sr, { role: 'progressbar' });
+	expectConveys(announcement, { role: 'progressbar', name: 'Export data' });
 });
 
 // A "0%" computed from `min` would announce a job that has not started rather than one whose progress is unknown.
