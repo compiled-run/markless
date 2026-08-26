@@ -209,7 +209,9 @@ export function HovercardRoot({
 		}}
 	>
 		<style>
-			div:not([ui-side]) { anchor-scope: --ui-hovercard; }
+			@layer markless {
+				div:not([ui-side]) { anchor-scope: --ui-hovercard; }
+			}
 		</style>
 		{children}
 	</div>
@@ -230,7 +232,9 @@ export function HovercardTrigger({ children, ...rest }: HovercardTriggerProps) @
 		ui-closed={hovercard.open !== true}
 	>
 		<style>
-			a { anchor-name: --ui-hovercard; }
+			@layer markless {
+				a { anchor-name: --ui-hovercard; }
+			}
 		</style>
 		{children}
 	</a>
@@ -262,7 +266,9 @@ export function HovercardContent({ children, onDismiss, ...rest }: HovercardCont
 		}}
 	>
 		<style>
-			[ui-side] { position: absolute; position-anchor: --ui-hovercard; }
+			@layer markless {
+				[ui-side] { --ui-anchor: --ui-hovercard; position: absolute; position-anchor: --ui-hovercard; }
+			}
 		</style>
 		{children}
 	</div>
