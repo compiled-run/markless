@@ -395,11 +395,7 @@ for (const mode of MODES) {
 		await expectSelectAllRouteReachesTheConsumerCallback();
 	});
 
-	// Pinned as what should happen: a callback a page hands to a component is
-	// compiled to read its argument from the DOM event, while the component calls
-	// it with real arguments, so the page's handler is given the click rather than
-	// the new ticked set.
-	test.fails(`${mode}: the select-all hands the consumer onChange the whole set`, async () => {
+	test(`${mode}: the select-all hands the consumer onChange the whole set`, async () => {
 		if (mode === 'CSR') await render(WithOnChange);
 		else await renderSSR(WithOnChange);
 		await expectSelectAllRouteCarriesTheWholeSet();
