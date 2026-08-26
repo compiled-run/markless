@@ -1,0 +1,31 @@
+# MARKLESS_REPEAT_COLLECTION_UNREADABLE
+
+This @for collection cannot be read; This @for collection names nothing; This @for collection reaches no cell on its shared instance
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: error
+
+## Message
+
+@for (const … of ...) has a collection the compiler could not read back as an expression, so the repeat has neither a state graph node nor an authored expression to take its rows from. It would render no rows at all.
+
+@for (const … of …) is rooted in `…`, which this module declares nowhere and imports nowhere. The repeat has no graph cell to read and no binding its authored expression could evaluate against.
+
+@for (const … of …) reads through `…`, a shared instance local of this component, but `…` resolves to no graph cell. `…` exists only inside the component function, so the rows would be taken from an expression that names nothing where the repeat renders.
+
+## Why
+
+Rows come either from a reactive graph read or from the authored collection expression evaluated in module scope; a repeat with neither has no source of rows on the server or in the browser.
+
+Rows come from a reactive graph read; a shared-instance path that resolves to no cell leaves the repeat with an authored expression whose receiver is undeclared in the emitted scope, which throws on the first server render.
+
+The collection expression is re-emitted into the server render module, where an undeclared name throws a ReferenceError on the first render.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/collect-repeat.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

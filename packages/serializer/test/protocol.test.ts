@@ -385,3 +385,174 @@ test('keyed repeat row markup round-trips and refuses a malformed shape', () => 
 		),
 	).toThrow(/keyedRepeat\[0\]\.rowTemplate\.textSlots\[0\]/);
 });
+
+// A row whose content is a component crosses the wire as identity alone. The
+// mint runs an edge from it, so a malformed identity must never reach it.
+test('keyed repeat row component identity round-trips and refuses a malformed shape', () => {
+	const rowComponent = {
+		componentEdgeId: 'edge:0',
+		componentName: 'App',
+		itemPropName: 'item',
+	};
+	const repeat = {
+		id: 'repeat:rows',
+		parentHostNodeId: 'h0',
+		collectionGraphNodeId: 'state:rows',
+		collectionPath: [],
+		keyPath: ['id'],
+		itemName: 'row',
+		rowElementCount: 0,
+		rowComponent,
+		rowEvents: [],
+	};
+	const view: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		keyedRepeats: [repeat],
+		asyncBoundaries: [],
+	};
+	const state: ProtocolStatePayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		cells: [],
+		computed: [],
+	};
+
+	const decoded = decodePayloadScripts(renderPayloadScripts({ state, view }));
+	expect(decoded.view.keyedRepeats?.[0]?.rowComponent).toEqual(rowComponent);
+
+	for (const malformed of [
+		{ componentEdgeId: 'edge:0' },
+		{ ...rowComponent, componentName: 7 },
+		{ ...rowComponent, itemPropName: 7 },
+	]) {
+		expect(() =>
+			decodePayloadScripts(
+				renderPayloadScripts({
+					state,
+					view: { ...view, keyedRepeats: [{ ...repeat, rowComponent: malformed }] } as never,
+				}),
+			),
+		).toThrow(/keyedRepeat\[0\]\.rowComponent/);
+	}
+});
+
+// A read an arm renders with no element of its own to bind to. The field is the
+// protocol's now, not the compiler's, so the wire refuses a malformed one.
+test('branch content reads round-trip and refuse a malformed shape', () => {
+	const contentReads = [{ graphNodeId: 'state:label', path: [], source: 'label' }];
+	const branch = {
+		id: 'branch:0',
+		startAnchor: { strategy: 'dom-order-comment' as const, index: 0 },
+		endAnchor: { strategy: 'dom-order-comment' as const, index: 1 },
+		contentReads,
+	};
+	const view: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		branches: [branch],
+		asyncBoundaries: [],
+	};
+	const state: ProtocolStatePayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		cells: [],
+		computed: [],
+	};
+
+	const decoded = decodePayloadScripts(renderPayloadScripts({ state, view }));
+	expect(decoded.view.branches?.[0]?.contentReads).toEqual(contentReads);
+
+	expect(() =>
+		decodePayloadScripts(
+			renderPayloadScripts({
+				state,
+				view: {
+					...view,
+					branches: [{ ...branch, contentReads: [{ graphNodeId: 'g', path: [], source: 7 }] }],
+				} as never,
+			}),
+		),
+	).toThrow(/branch\[0\]\.contentReads\[0\]/);
+});
+
+// An escalating branch replaces its arm wholesale, so what it serves has to be
+// arm-relative: page-absolute indexes would re-register against the wrong DOM.
+test('served arm records need the escalates mark and arm-relative locators', () => {
+	const armRecords = {
+		locators: [
+			{ hostNodeId: 'h0', tagName: 'EM', strategy: 'arm-relative' as const, index: 0 },
+		],
+		events: [],
+		behaviors: [],
+		elementHandles: [],
+		domUpdates: [],
+		branches: [],
+	};
+	const branch = {
+		id: 'branch:0',
+		startAnchor: { strategy: 'dom-order-comment' as const, index: 0 },
+		endAnchor: { strategy: 'dom-order-comment' as const, index: 1 },
+		escalates: true as const,
+		servedArmRecords: armRecords,
+	};
+	const view: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		branches: [branch],
+		asyncBoundaries: [],
+	};
+	const state: ProtocolStatePayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		cells: [],
+		computed: [],
+	};
+
+	const decoded = decodePayloadScripts(renderPayloadScripts({ state, view }));
+	expect(decoded.view.branches?.[0]?.escalates).toBe(true);
+	expect(decoded.view.branches?.[0]?.servedArmRecords).toEqual(armRecords);
+
+	const { escalates: _escalates, ...withoutMark } = branch;
+	expect(() =>
+		decodePayloadScripts(
+			renderPayloadScripts({ state, view: { ...view, branches: [withoutMark] } as never }),
+		),
+	).toThrow(/servedArmRecords requires escalates/);
+
+	expect(() =>
+		decodePayloadScripts(
+			renderPayloadScripts({
+				state,
+				view: {
+					...view,
+					branches: [
+						{
+							...branch,
+							servedArmRecords: {
+								...armRecords,
+								locators: [
+									{
+										hostNodeId: 'h0',
+										tagName: 'EM',
+										strategy: 'dom-order',
+										index: 4,
+									},
+								],
+							},
+						},
+					],
+				} as never,
+			}),
+		),
+	).toThrow(/servedArmRecords\.locators\[0\]: expected arm-relative strategy/);
+});

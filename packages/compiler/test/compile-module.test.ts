@@ -1,6 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
 import {
+	KEYED_REPEAT_ROW_MINT_UNSUPPORTED_CODE,
 	PUBLIC_RENDER_PHASE,
 	PUBLIC_RENDER_PLAN_PASS_ID,
 	PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT_CODE,
@@ -1930,7 +1931,11 @@ export function App() @{
 		symbols: [],
 	});
 
-	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	// The row reads the index, which is not on the item, so no row template ships
+	// and the list can serve and reorder its rows but never grow.
+	expect(
+		result.publicRenderPlan.diagnostics.map((entry) => [entry.code, entry.severity]),
+	).toEqual([[KEYED_REPEAT_ROW_MINT_UNSUPPORTED_CODE, 'warning']]);
 	// Index-reading rows stay off the direct-DOM runtime, which cannot rewrite
 	// index text on reorder yet.
 	expect(result.renderData.repeats[0]).toEqual(
@@ -2164,6 +2169,237 @@ export function App() @{
 		`<section class="card ${scope}"><h2 class="title ${scope}">Hi</h2><footer class="${scope}">Done</footer></section>`,
 	);
 	expect(output.html).not.toContain('<style');
+});
+
+// A scoped rule only matches an element carrying the scope class, so an element
+// whose class is an expression has to compose with it too.
+test('compileTsrxModule scopes an element whose class is a dynamic expression', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/DynamicScoped.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let on = state(false);
+
+	<div>
+		<style>
+			.line { display: block; }
+			.lit { color: blue; }
+		</style>
+		<p class="line">static</p>
+		<p class={on ? 'line lit' : 'line'}>dynamic</p>
+		<button onClick={() => { on = !on; }}>t</button>
+	</div>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	const scope = result.publicRenderPlan.styleScopes[0]!.scopeId;
+	expect(result.publicRenderPlan.styleScopes[0]!.cssText).toContain(`.line.${scope}`);
+
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = await (ssrModule.marklessRenderSsr as () => { readonly html: string })();
+
+	expect(output.html).toContain(`<p class="line ${scope}">static</p>`);
+	expect(output.html).toContain(`<p class="line ${scope}">dynamic</p>`);
+
+	// The toggle rewrites the whole attribute, so both arms carry the scope.
+	const classUpdate = result.protocolView.domUpdates.find(
+		(update) => update.target?.kind === 'class',
+	);
+	expect(classUpdate?.target).toEqual({
+		kind: 'class',
+		trueValue: `line lit ${scope}`,
+		falseValue: `line ${scope}`,
+	});
+});
+
+// A class expression that is not a two-string-literal conditional has no arms to
+// bake the scope into, so the target carries it as a constant both writers compose.
+test('compileTsrxModule carries the style scope as a constant on a plain dynamic class', async () => {
+	const scopedSource = `
+import { computed, state } from '@markless/core';
+
+export function App() @{
+	let on = state(false);
+	let tone = computed(() => on ? 'line lit' : 'line');
+
+	<div>
+		<style>
+			.line { display: block; }
+			.lit { color: blue; }
+		</style>
+		<p class={tone}>dynamic</p>
+		<button onClick={() => { on = !on; }}>t</button>
+	</div>
+}
+`;
+	const result = await compileTsrxModule({
+		filename: 'src/PlainDynamicScoped.tsrx',
+		source: scopedSource,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	const scope = result.publicRenderPlan.styleScopes[0]!.scopeId;
+
+	const ssrModule = await importPublicRenderTestModule(ssrRenderTestModuleSource(result));
+	const output = await (ssrModule.marklessRenderSsr as () => { readonly html: string })();
+	expect(output.html).toContain(`<p class="line ${scope}">dynamic</p>`);
+
+	const classUpdate = result.protocolView.domUpdates.find(
+		(update) => update.target?.kind === 'class',
+	);
+	expect(classUpdate?.target).toEqual({ kind: 'class', constantClass: scope });
+
+	// The compiled-delegate lane emits its own writer, so it composes the scope too.
+	const domUpdateModule = result.symbolModules.modules.find(
+		(module) => module.kind === 'dom-update' && module.source.includes('"class"'),
+	);
+	expect(domUpdateModule?.source).toContain(
+		`context.value ? context.value + " ${scope}" : "${scope}"`,
+	);
+
+	// Without a <style> block there is no scope to keep and the target is unchanged.
+	const unscoped = await compileTsrxModule({
+		filename: 'src/PlainDynamicUnscoped.tsrx',
+		source: scopedSource.replace(/\t*<style>[\s\S]*?<\/style>\n/, ''),
+		symbols: [],
+	});
+	expect(
+		unscoped.protocolView.domUpdates.find((update) => update.target?.kind === 'class')?.target,
+	).toEqual({ kind: 'class' });
+});
+
+// Every component in a module mints the module's scope class onto its own
+// elements, so every component's <style> block has to reach the shipped CSS.
+test('compileTsrxModule ships a non-root component style block', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/NonRootStyle.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let count = state(7);
+	<main><Card value={count} /><button>+</button></main>
+}
+
+function Card({ value }) @{
+	<article class="card">
+		<style>
+			.card { color: rebeccapurple; }
+		</style>
+		<strong>{value}</strong>
+	</article>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	expect(result.publicRenderPlan.styleScopes).toHaveLength(1);
+	const scope = result.publicRenderPlan.styleScopes[0]!.scopeId;
+	expect(result.publicRenderPlan.styleScopes[0]!.cssText).toBe(
+		`.card.${scope} { color: rebeccapurple; }`,
+	);
+
+	const ssrOutput = (await renderTestSsr(result)) as { readonly html: string };
+	// The styleless root mints nothing; the styled child mints on its own elements.
+	expect(ssrOutput.html).toBe(
+		`<main><article class="card ${scope}"><strong class="${scope}">7</strong></article><button>+</button></main>`,
+	);
+});
+
+test('compileTsrxModule ships style blocks from every component in a module', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/BothStyled.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let count = state(7);
+	<main class="page">
+		<style>
+			.page { display: grid; }
+		</style>
+		<Card value={count} />
+	</main>
+}
+
+function Card({ value }) @{
+	<article class="card">
+		<style>
+			.card { color: rebeccapurple; }
+		</style>
+		<strong>{value}</strong>
+	</article>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	expect(result.publicRenderPlan.styleScopes).toHaveLength(1);
+	const scope = result.publicRenderPlan.styleScopes[0]!.scopeId;
+	expect(result.publicRenderPlan.styleScopes[0]!.cssText).toBe(
+		[`.page.${scope} { display: grid; }`, `.card.${scope} { color: rebeccapurple; }`].join(
+			'\n',
+		),
+	);
+});
+
+// The single-root-style shape is the shape that already shipped: aggregation
+// must not reorder or rewrite one byte of it.
+test('compileTsrxModule leaves single-component style output byte-identical', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/OnlyRootStyled.tsrx',
+		source: `
+export function App() @{
+	<main class="page">
+		<style>
+			.page { display: grid; }
+			.page h2 { font-size: 2rem; }
+		</style>
+		<h2>Title</h2>
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	const scope = result.publicRenderPlan.styleScopes[0]!.scopeId;
+	expect(result.publicRenderPlan.styleScopes[0]!.cssText).toBe(
+		`.page.${scope} { display: grid; }\n\t\t\t.page h2.${scope} { font-size: 2rem; }`,
+	);
+});
+
+test('compileTsrxModule ships no style scope for a styleless multi-component module', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/NoStyles.tsrx',
+		source: `
+import { state } from '@markless/core';
+
+export function App() @{
+	let count = state(7);
+	<main><Card value={count} /></main>
+}
+
+function Card({ value }) @{
+	<article class="card"><strong>{value}</strong></article>
+}
+`,
+		symbols: [],
+	});
+
+	expect(result.publicRenderPlan.styleScopes).toEqual([]);
+	const ssrOutput = (await renderTestSsr(result)) as { readonly html: string };
+	expect(ssrOutput.html).toBe(
+		'<main><article class="card"><strong>7</strong></article></main>',
+	);
 });
 
 // A <style> block that cannot be scope-compiled is dropped from the build, so
@@ -5089,11 +5325,16 @@ test('repeat rows support item-derived dynamic attributes (href/testid class)', 
 		filename: 'src/App.tsrx',
 		source: `import { state } from '@markless/core';
 export default function List() @{
-	let rows = state([{ id: 'a' }]);
+	let rows = state([{ id: 'a', href: '#/a', testid: 'repo-link-a' }]);
 	<main>
 		@for (const r of rows; key r.id) {
 			<a class="row-title" href={'#/r/' + r.id} data-testid={'repo-link-' + r.id}>{r.id}</a>
 		}
+		<nav>
+			@for (const r of rows; key r.id) {
+				<a class="row-plain" href={r.href} data-testid={r.testid}>{r.id}</a>
+			}
+		</nav>
 	</main>
 }`,
 		symbols: [],
@@ -5103,6 +5344,24 @@ export default function List() @{
 	// SSR row mapper evaluates the attribute expressions with the item in scope.
 	expect(result.publicRenderModule.ssrModuleSource).toContain("'#/r/' + r.id");
 	expect(result.publicRenderModule.ssrModuleSource).toContain("'repo-link-' + r.id");
+
+	// The same attributes read straight off the item are also a row the client can
+	// build after resume: the payload carries the element path and the name. The
+	// concatenated pair above is not, because the mint reads paths off the item and
+	// evaluates no expression - so that row ships no template at all.
+	const view = result.protocolView as {
+		readonly keyedRepeats?: ReadonlyArray<Record<string, unknown>>;
+	};
+	expect(view.keyedRepeats).toHaveLength(2);
+	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowTemplate');
+	expect(view.keyedRepeats?.[1]?.rowTemplate).toEqual({
+		html: '<a class="row-plain"><!--markless-slot:2--></a>',
+		textSlots: [{ path: [0, 0], itemPath: ['id'] }],
+		attributeSlots: [
+			{ path: [0], name: 'href', itemPath: ['href'] },
+			{ path: [0], name: 'data-testid', itemPath: ['testid'] },
+		],
+	});
 });
 
 const componentRowsPageSource = `import { state } from '@markless/core';

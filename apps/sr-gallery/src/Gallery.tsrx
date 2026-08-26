@@ -1,6 +1,12 @@
 import {
+	calendar,
 	checkbox,
 	checklist,
+	colorpicker,
+	datebox,
+	fileupload,
+	hovercard,
+	menu,
 	modal,
 	popover,
 	progress,
@@ -10,13 +16,17 @@ import {
 	tabs,
 	textbox,
 	toggle,
+	togglegroup,
+	tooltip,
 } from '@markless/ui';
 
 // Every shipped family's Basic scenario - the starter a consumer copies - on one
 // page, each in a section a reader can jump to by its anchor: /#checkbox,
 // /#toggle, /#textbox, /#progress, /#checklist, /#select, /#modal,
-// /#radio-group, /#tabs, /#popover, /#slider. A family whose second shape a
-// reader announces differently gets its own section too: /#slider-range.
+// /#radio-group, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
+// /#fileupload, /#hovercard, /#calendar, /#menu, /#colorpicker,
+// /#togglegroup. A family whose second shape a reader announces differently
+// gets its own section too: /#slider-range.
 //
 // This is consumer code, not test code. It imports through the package barrel
 // the way a reader of the docs would, carries no test hooks, and the markup is
@@ -62,7 +72,8 @@ export function Gallery() @{
 			<h2>Progress</h2>
 			<div class="scenario">
 				<progress.root value={30}>
-					<progress.label>Export data 30%</progress.label>
+					<progress.label>Export data</progress.label>
+					<progress.valuelabel />
 					<progress.track><progress.indicator /></progress.track>
 				</progress.root>
 			</div>
@@ -197,6 +208,16 @@ export function Gallery() @{
 			</div>
 		</section>
 
+		<section id="tooltip">
+			<h2>Tooltip</h2>
+			<div class="scenario">
+				<tooltip.root>
+					<tooltip.trigger aria-label="Save">Save</tooltip.trigger>
+					<tooltip.content class="tip">Save this draft</tooltip.content>
+				</tooltip.root>
+			</div>
+		</section>
+
 		<section id="slider">
 			<h2>Slider</h2>
 			<div class="scenario">
@@ -221,5 +242,152 @@ export function Gallery() @{
 				</slider.root>
 			</div>
 		</section>
+
+		<section id="datebox">
+			<h2>Date box</h2>
+			<div class="scenario">
+				<datebox.root name="starts">
+					<datebox.label>Start date</datebox.label>
+					<datebox.monthinput />
+					<datebox.dayinput />
+					<datebox.yearinput />
+					<datebox.field />
+				</datebox.root>
+			</div>
+		</section>
+
+		<section id="fileupload">
+			<h2>File upload</h2>
+			<div class="scenario">
+				<fileupload.root name="attachment">
+					<fileupload.label>Attachments</fileupload.label>
+					<fileupload.droparea>
+						Drop a file here
+						<fileupload.trigger>Browse</fileupload.trigger>
+					</fileupload.droparea>
+					<fileupload.field />
+					<FileRows />
+				</fileupload.root>
+			</div>
+		</section>
+
+		<section id="hovercard">
+			<h2>Hover card</h2>
+			{/* The family's doctrine, kept: everything in the card is also behind the trigger's own link, so a reader who never sees the card loses nothing. */}
+			<div class="scenario">
+				<hovercard.root>
+					<hovercard.trigger href="/users/jane">Jane Doe</hovercard.trigger>
+					<hovercard.content class="card">
+						<a href="/users/jane">Open profile</a>
+						<p>Builds compilers.</p>
+						<a href="/users/jane/followers">312 followers</a>
+					</hovercard.content>
+				</hovercard.root>
+			</div>
+		</section>
+
+		<section id="calendar">
+			<h2>Calendar</h2>
+			{/* A fixed month, one day already chosen and one a person may not choose, so what a reader hears on each is the same on every run. */}
+			<div class="scenario">
+				<calendar.root
+					month="2026-08-01"
+					value="2026-08-14"
+					unavailable={['2026-08-19']}
+					name="starts"
+				>
+					<calendar.label>Pick a date</calendar.label>
+					<CalendarMonth />
+					<calendar.field />
+				</calendar.root>
+			</div>
+		</section>
+
+		<section id="menu">
+			<h2>Menu</h2>
+			<div class="scenario">
+				<menu.root>
+					<menu.trigger>Actions</menu.trigger>
+					<menu.content class="menu-surface">
+						<menu.item value="cut">Cut</menu.item>
+						<menu.item value="copy">Copy</menu.item>
+						<menu.item value="paste">Paste</menu.item>
+					</menu.content>
+				</menu.root>
+			</div>
+		</section>
+
+		<section id="colorpicker">
+			<h2>Colour picker</h2>
+			{/* The inline picker, on a fixed colour, so what a reader hears on the plane and the rail is the same on every run. */}
+			<div class="scenario">
+				<colorpicker.root value="#3399ff" name="brand">
+					<colorpicker.label>Brand colour</colorpicker.label>
+					<colorpicker.content>
+						<colorpicker.area class="picker-plane">
+							<colorpicker.thumb class="picker-thumb" />
+						</colorpicker.area>
+						<colorpicker.track channel="hue" class="picker-rail">
+							<colorpicker.thumb channel="hue" class="picker-thumb" />
+						</colorpicker.track>
+					</colorpicker.content>
+					<colorpicker.valuelabel />
+					<colorpicker.field />
+				</colorpicker.root>
+			</div>
+		</section>
+
+		<section id="togglegroup">
+			<h2>Toggle group</h2>
+			<div class="scenario">
+				<togglegroup.root value="left">
+					<togglegroup.label>Text alignment</togglegroup.label>
+					<togglegroup.item value="left">Left</togglegroup.item>
+					<togglegroup.item value="center">Center</togglegroup.item>
+					<togglegroup.item value="right">Right</togglegroup.item>
+				</togglegroup.root>
+			</div>
+		</section>
 	</main>
+}
+
+// The month is the consumer's own markup and sits inside the root, for the reason
+// the file rows below carry: a component that reads the calendar's state is a
+// part of that calendar's widget.
+function CalendarMonth() @{
+	const cal = calendar.state();
+
+	<calendar.content>
+		<div>
+			<calendar.backtrigger>Back</calendar.backtrigger>
+			<calendar.title />
+			<calendar.forwardtrigger>Forward</calendar.forwardtrigger>
+		</div>
+		<div aria-hidden="true">
+			@for (const name of cal.weekdays; key name) {
+				<span>{name}</span>
+			}
+		</div>
+		<div>
+			@for (const day of cal.days; key day) {
+				<calendar.item value={day} />
+			}
+		</div>
+	</calendar.content>
+}
+
+// The list is the consumer's own markup and sits inside the root: a component that
+// reads the upload's state is a part of that upload's widget, and one placed
+// outside would start a second upload and repeat over its empty list.
+function FileRows() @{
+	const upload = fileupload.state();
+
+	<div role="presentation">
+		@for (const file of upload.files; key file.id) {
+			<fileupload.item file={file}>
+				<fileupload.itemlabel />
+				<fileupload.itemclose aria-label="Remove">×</fileupload.itemclose>
+			</fileupload.item>
+		}
+	</div>
 }
