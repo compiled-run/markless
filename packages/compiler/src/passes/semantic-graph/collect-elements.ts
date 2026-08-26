@@ -245,6 +245,19 @@ export function collectElementHandleDiagnostics(
 	const aliases = semanticAliasMap(graph);
 	const scopeOf = componentGraphScopes(graph, { bindings, aliases });
 	const validElementHandleBindings: SemanticElementHandleBinding[] = [];
+	// A handle's identity is its declaring scope plus its name: sibling parts each
+	// declaring `boxEl` share one graph node id but bind two different handles.
+	const declaringScopeByBinding = new Map<SemanticElementHandleBinding, string>();
+	const recordValid = (
+		bound: SemanticElementHandleBinding,
+		declaredBy: SemanticGraphBinding | undefined,
+	): void => {
+		declaringScopeByBinding.set(
+			bound,
+			declaredBy?.sharedDefinitionId ?? declaredBy?.componentName ?? '',
+		);
+		validElementHandleBindings.push(bound);
+	};
 	const moduleElementNames = new Set(
 		graph.diagnostics
 			.filter((diagnostic) => diagnostic.code === 'MARKLESS_ELEMENT_MODULE_SCOPE')
@@ -292,7 +305,7 @@ export function collectElementHandleDiagnostics(
 					rowOwner: { repeatId, keyPath: repeat.keyPath },
 				};
 				graph.elementHandleBindings[bindingIndex] = rowOwned;
-				validElementHandleBindings.push(rowOwned);
+				recordValid(rowOwned, graphBinding);
 				continue;
 			}
 			graph.diagnostics.push(unsupportedRowElementHandleDiagnostic(binding));
@@ -302,10 +315,7 @@ export function collectElementHandleDiagnostics(
 			? resolvePropForwardedElementHandle(binding, resolved, graph)
 			: null;
 		if (forwarded) {
-			validElementHandleBindings.push({
-				...binding,
-				handleName: forwarded.name,
-			});
+			recordValid({ ...binding, handleName: forwarded.name }, forwarded.handle);
 			continue;
 		}
 		if (graphBinding?.kind === 'prop') {
@@ -318,10 +328,11 @@ export function collectElementHandleDiagnostics(
 		}
 		// A handle reached through a shared instance is keyed by the factory's own
 		// name, so every component of the family names one relationship.
-		validElementHandleBindings.push(
+		recordValid(
 			binding.handleName === graphBinding.name
 				? binding
 				: { ...binding, handleName: graphBinding.name },
+			graphBinding,
 		);
 	}
 
@@ -334,9 +345,14 @@ export function collectElementHandleDiagnostics(
 		),
 	);
 	const firstBindingByHandle = new Map<string, SemanticElementHandleBinding>();
+	const firstBindingByScopedHandle = new Map<string, SemanticElementHandleBinding>();
 	for (const binding of validElementHandleBindings) {
 		if (!firstBindingByHandle.has(binding.handleName)) {
 			firstBindingByHandle.set(binding.handleName, binding);
+		}
+		const scopedHandle = `${declaringScopeByBinding.get(binding) ?? ''}\u0000${binding.handleName}`;
+		if (!firstBindingByScopedHandle.has(scopedHandle)) {
+			firstBindingByScopedHandle.set(scopedHandle, binding);
 			continue;
 		}
 		if (pluralHandleNames.has(binding.handleName)) continue;
@@ -406,9 +422,6 @@ function collectElementHandleDeriveReads(graph: MutableSemanticGraphArtifact): v
 		for (const dependency of binding.dependencies ?? []) {
 			const handle = elementBindings.get(dependency.graphNodeId);
 			if (!handle) continue;
-			// Two sibling parts declaring `boxEl` share one graph node id, so a
-			// dependency edge alone does not prove THIS body wrote the read.
-			if (!readsSourceText(binding.functionSource, dependency.source)) continue;
 			graph.diagnostics.push(
 				elementHandleDeriveReadDiagnostic({
 					handleName: handle.name,
@@ -419,12 +432,6 @@ function collectElementHandleDeriveReads(graph: MutableSemanticGraphArtifact): v
 			);
 		}
 	}
-}
-
-function readsSourceText(functionSource: string | undefined, source: string): boolean {
-	if (!functionSource) return false;
-	const escaped = source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-	return new RegExp(`(?<![\\w$.])${escaped}(?![\\w$])`).test(functionSource);
 }
 
 /**
@@ -1055,7 +1062,7 @@ function resolvePropForwardedElementHandle(
 		readonly path: ReadonlyArray<string>;
 	},
 	graph: MutableSemanticGraphArtifact,
-): { readonly name: string } | null {
+): { readonly name: string; readonly handle: SemanticGraphBinding } | null {
 	if (resolved.binding.kind !== 'prop' || !binding.componentName) return null;
 
 	const propName = resolved.path[0];
@@ -1078,7 +1085,7 @@ function resolvePropForwardedElementHandle(
 	);
 	if (!handle || handle.kind !== 'element') return null;
 
-	return { name: handle.name };
+	return { name: handle.name, handle };
 }
 
 type IdrefValueClassification =
