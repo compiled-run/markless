@@ -6,16 +6,17 @@ description and back/forward controls. Built from
 `goals/headless-components/notes/U568-tour-research.md` and the measured gates in
 `packages/vitest-browser/browser/tour-gates/`.
 
-**This family does not ship yet.** Opening, closing, dismissal and every step's
-card are built and green; what is missing is the tour's length, and the reason is
-a framework wall recorded under "The blocking gap" below. It needs an owner
-decision that changes the public shape.
+**This family does not ship yet.** Opening, closing, dismissal, the steps and
+their cards are built; the tour's length reaches the root on the served render
+and not on the client render, for the framework reason under "The blocking gap"
+below. No owner decision is outstanding and no public shape is in question - the
+family's own source is the shape it will ship with.
 
 ## Shape
 
 | Part | Element | Carries |
 | --- | --- | --- |
-| `tour.root` | `div` | the family's state; `ui-open`, `ui-closed`, `ui-disabled`. **No `anchor-scope`, ever** |
+| `tour.root` | `div` | the family's state; `ui-open`, `ui-closed`, `ui-disabled`, `ui-max` (the tour's length). **No `anchor-scope`, ever** |
 | `tour.backdrop` | `div` | the spotlight - anchored to the current target, `box-shadow` dim, `pointer-events: none`, `hidden` with the tour |
 | `tour.item` | `div` | one step: `index`, `target`, `side`. Renders the card one component deeper |
 | `tour.title` | `h2` | the step's accessible name |
@@ -24,8 +25,8 @@ decision that changes the public shape.
 | `tour.backtrigger` / `tour.forwardtrigger` | `button` | previous / next, `disabled` at the ends |
 | `tour.close` | `button` | dismisses the tour |
 
-`tour.state()` per widget: `open`, `step` (an index), `count` (registered by
-nothing today - see the blocking gap), `target`, and `next()`, `prev()`, `skip()`,
+`tour.state()` per widget: `open`, `step` (an index), `count` (each card writes
+`index + 1` as it renders), `target`, and `next()`, `prev()`, `skip()`,
 `close()`. `tour.itemstate()` per step: `side`,
 `target`.
 
@@ -48,71 +49,80 @@ them.
 
 ## Declaration order names every widget root, and it is the whole ballgame
 
-**A `shared()` factory's widget root is the first component in the module that
-resolves it** (`widgetRootComponentName` in the compiler's
-`passes/semantic-graph/collect-elements.ts` takes the first recorded instance).
-Not the outermost component at render, not the one that seeds the most fields -
-the first one written down. Three consequences this family is built around:
+Two parts of the framework decide which component roots a family, and they do
+not decide it the same way. Both are measured on this tip.
+
+- **The IDREF gate roots a family at its first *resolver*.**
+  `widgetRootComponentName` in the compiler's
+  `passes/semantic-graph/collect-elements.ts` takes the first recorded instance,
+  and merely calling the factory records one. A component that only reads a
+  handle out of it still counts.
+- **The seed pass roots a family at its first *seeder*.** A component that
+  resolves a factory without writing to it roots nothing; the first component to
+  write a seed is the one whose instance the family's cells belong to.
+
+Three consequences the declaration order is built around:
 
 1. `tour.item` is declared **first**, so it roots the step's own instance. The
    card is declared after it, so the card may point `aria-labelledby` and
-   `aria-describedby` at that instance's handles. Put the card first and the
-   compiler refuses both IDREFs with
-   `MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT` - a widget's root cannot read its
-   own instance token.
+   `aria-describedby` at that instance's handles. Put the card first and both
+   IDREFs are refused with `MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT` - a
+   widget's root cannot read its own instance token, and resolving the factory
+   first is enough to be called the root.
 2. `tour.root` is declared **between the item and the card**, so the tour's
    instance is rooted at the root rather than at a card. In the earlier build the
    card was the first `tourState()` caller, and that is what made the whole family
    red: a write from the widget-root component seeds a fresh copy per rendered
-   card, so `open` and `step` set by the root never reached the cards.
+   card, so `open` and `step` set by the root never reached the cards. The same
+   thing happens if `tour.item` touches `tourState` at all - it is declared
+   first, so it would root the tour. Measured: 14 of 16 rows red.
 3. A component may only forward-reference another component in the same module
    when it is the module's first component. `tour.item` renders the card, so
    `tour.item` first is the only order that satisfies both 1 and 3 at once. The
-   orders `[root, item, card]` and `[step, card, item]` both die at module
-   evaluation with `ReferenceError: Cannot access '__marklessSsrComponent0'
-   before initialization`; `[root, card, item]` and `[card, step, item]` both die
-   on the IDREF refusal.
+   order `[root, item, card]` dies at module evaluation with `ReferenceError:
+   Cannot access '__marklessSsrComponent0' before initialization`; `[root, card,
+   item]` dies on the IDREF refusal.
 
-## The blocking gap: the tour's length cannot be registered
+Together these make the card the only component in the family that may write the
+tour's length.
 
-`tour.count` has no writer, so `tour.valuelabel` renders "1 of 0" and
-`tour.forwardtrigger` is `disabled` on every step. Four measurements, on this
-tip, say why - and they compose into a wall rather than a preference:
+## The blocking gap: the length reaches the root on the server and not in the browser
 
-- **A write from the component that roots the factory seeds a private copy.**
-  `tour.count = index + 1` from a card, when the card was `tourState`'s first
-  caller, gave `ui-max` 1, 2 and 3 on the three cards and left `open` false in
-  all of them.
-- **A write from inside a nested widget never reaches the outer instance.** With
-  the rooting fixed as above, the same write from the card - now a plain part of
-  the tour, but sitting inside the step's own widget - lands nowhere: every
-  `ui-max` reads 0.
-- **`tour.item` cannot write it either.** The item roots the step's widget, so a
-  write there is that widget's seed, and it forks exactly as the first
-  measurement did.
-- **`otp.item` gets away with it because it roots nothing.** `otpState` has one
-  widget and the boxes are ordinary parts of it, so `otp.length = index + 1`
-  lands. The tour needs a per-step widget for the title and description IDREFs,
-  and every component that knows `index` is therefore inside one.
+`tour.count = index + 1` is written by the card - a plain part of the tour that
+happens to render inside `tour.item`'s own widget. On the served render it
+lands; on the client render it is skipped. Same page, same assertion:
 
-So the count needs an owner decision, and all three candidates change the public
-shape:
+| Render | `tour.root` `ui-max` | `tour.valuelabel` |
+| --- | --- | --- |
+| SSR | `3` | `1 of 3` |
+| CSR | `0` | `1 of 0` |
 
-- **A `count` prop on `tour.root`.** One number at the call site, and it
-  contradicts the family's own "no length prop anywhere" row.
-- **Drop `tour.title` and `tour.description` as parts**, naming the card from
-  props instead. The step then needs no widget of its own and `tour.item` can
-  register the length the way `otp.item` does.
-- **Drop `tour.valuelabel` and end-of-tour disabling**, leaving the consumer to
-  write "2 of 5" and the tour always looping.
+The client seed pass in `packages/web/src/fns/shared-seed.ts` descends only
+*projection* chunks. The card is not projected into `tour.item` by anyone -
+`tour.item` renders it in its own template, as its whole body - so the root's
+pass never reaches that edge, and by the time the step's own pass does,
+`seedFamilyOpen` has the step's token under the plain key and the tour's token
+under the tour's family key. They disagree, so the write is inherited untouched
+rather than applied. The compiler's twin, `seedFamilyOpenSource` in
+`passes/public-render/shared-seed-pass.ts`, runs it.
 
-**The exact red rows**, all four downstream of this one gap, in CSR and SSR
-alike: `the count comes from the cards, with no length prop anywhere`,
-`next and prev walk the steps and report each one`,
-`focus lands in the incoming card on a step change`, and
-`axe finds no wcag2a/wcag21a violation, closed or on any step` - the last three
-because the forward trigger is disabled while the count reads 0. Eight of the
-sixteen rows pass.
+The witness `packages/vitest-browser/browser/nested-widget-outer-write/` proves
+the neighbouring case in both modes: a part the **page** projects through a
+nested widget. The tour is the un-projected case, and it needs the client half
+to reach a component a nested widget root renders itself.
+
+**The red rows**, all downstream of that one number: `the count comes from the
+cards, with no length prop anywhere`, `next and prev walk the steps and report
+each one`, `focus lands in the incoming card on a step change` and `axe finds no
+wcag2a/wcag21a violation, closed or on any step` - the last three because the
+forward trigger is `disabled` while the count reads 0. On the served render only
+the second of those is still red, and for an unrelated reason: `tour.backtrigger`
+loses its `disabled` on step 0 once the count is non-zero, which nothing the
+trigger reads can explain. Eleven of the sixteen rows pass.
+
+`otp.item` gets away with the same registration because `otpState` has one widget
+and the boxes are ordinary parts of it. The tour needs a per-step widget for the
+title and description IDREFs, so every component that knows `index` is inside one.
 
 ## Compiler constraints this family met, so the next one does not rediscover them
 

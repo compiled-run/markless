@@ -114,6 +114,7 @@ for (const mode of MODES) {
 		await openBasic();
 		expect(el(SaveCount).textContent?.trim()).toBe('1 of 3');
 		expect(el(SaveCount).getAttribute('ui-max')).toBe('3');
+		expect(el(Root).getAttribute('ui-max')).toBe('3');
 	});
 
 	test(`${mode}: next and prev walk the steps and report each one`, async () => {

@@ -69,7 +69,10 @@ export type TourItemProps = PropsOf<'div'> & {
 };
 
 /** The card is a non-modal dialog: it carries no `aria-modal`, so the page behind it stays reachable and the target stays clickable. */
-export type TourCardProps = PropsOf<'div'>;
+export type TourCardProps = PropsOf<'div'> & {
+	/** The step's own place, handed down from `tour.item`. */
+	readonly index: number;
+};
 
 /**
  * The spotlight. It is not a layer with a hole in it - it *is* the hole, sized

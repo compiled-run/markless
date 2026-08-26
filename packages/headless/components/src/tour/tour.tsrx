@@ -16,26 +16,18 @@ import type {
 	TourValueLabelProps,
 } from './tour-types.ts';
 
-// The card and the spotlight are both placed by CSS anchoring against a name the
-// family writes onto the consumer's own element, which is the one thing a <style>
-// block cannot do: the scope class is minted only onto elements this module
-// renders. NEVER put `anchor-scope` on the root - a tour's target is outside the
-// root's subtree by construction, so scoping the name there hides it from the
-// card instead of isolating it, and the card lands in the corner.
-// The scope class these <style> blocks compile against is per MODULE, so each
-// block's subject must be structurally unique across every part: the card is the
-// module's only element carrying `ui-side`, the spotlight its only one carrying
-// `ui-spotlight`.
-// Every graph read in this file stands on its own line before it is used: an
-// expression nesting one under a call is emitted as written and crashes the
-// handler module (MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE).
-// DECLARATION ORDER IS LOAD-BEARING, and it is why the item, the root and the
-// card sit in this order: a shared() factory's widget root is the FIRST
-// component in the module that resolves it. `tour.item` must come before the
-// card so the step's own instance is rooted above the element carrying its
-// IDREFs; `tour.root` must come before the card so the tour's instance is rooted
-// at the root and not at a card. Moving any of the three renames a widget root
-// and breaks the family - see note.md.
+// Anchoring is written onto the consumer's own element through the handle they
+// bound, which a <style> block cannot reach. NEVER put `anchor-scope` on the
+// root: a tour's target is outside the root's subtree, so scoping the name there
+// hides it from the card.
+// Each <style> block's subject must be structurally unique across the module:
+// the scope class is per module, not per part.
+// Every graph read stands on its own line before it is used - an expression
+// nesting one under a call crashes the handler module.
+// Declaration order is load-bearing. A family is rooted at the first component
+// that resolves it, so the order [item, root, card] is the only one that both
+// lets the card read the step's handles for its IDREFs and leaves the tour
+// rooted at the root; both alternatives were measured and refused.
 
 export const tourState = shared(
 	() => {
@@ -165,7 +157,7 @@ export function TourItem({ index, target, side = 'bottom', children, ...rest }: 
 	item.side = side;
 	item.target = target;
 
-	<TourCard {...rest}>{children}</TourCard>
+	<TourCard {...rest} index={index}>{children}</TourCard>
 }
 
 export function TourRoot({
@@ -191,14 +183,17 @@ export function TourRoot({
 		ui-open={tour.open}
 		ui-closed={tour.open !== true}
 		ui-disabled={tour.disabled}
+		ui-max={tour.count}
 	>{children}</div>
 }
 
 // A separate component from `tour.item`: the card points aria-labelledby and
 // aria-describedby at handles the step's own widget owns, and a widget's root
 // component cannot read its own instance token.
-function TourCard({ children, onDismiss, onFocus, onKeydown, ...rest }: TourCardProps) @{
+function TourCard({ index, children, onDismiss, onFocus, onKeydown, ...rest }: TourCardProps) @{
 	const tour = tourState();
+	// Registration by index: the last step to render leaves the tour's length behind.
+	tour.count = index + 1;
 	const item = tourItemState();
 	// The step's own `index` prop, not a lookup: a card has to know its place while
 	// it renders, and every registry this library has is handler-time only.
