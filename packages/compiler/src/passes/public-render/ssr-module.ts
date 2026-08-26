@@ -12,6 +12,7 @@ import {
 	componentDeriveGraphNodeIds,
 	computedDependencyEdges,
 	handlerReadGraphNodeIds,
+	foreignSharedComputedScope,
 	orderComputedDerives,
 	rowScopedEdgeIds,
 } from './derive-set.ts';
@@ -109,6 +110,9 @@ export function emitPublicSsrRenderModule(
 	const asyncRunnerDefinitions = collectSsrAsyncRunnerDefinitions(input);
 	const hasAsyncDependencyRegistry = asyncRunnerDefinitions.size > 0;
 	const moduleScope = moduleScopeLines(input.source.source, input.source.filename);
+	// A factory expression copied out of another file arrives with that file's
+	// scope stripped off; this is the part of it the copy still names.
+	const foreignScope = foreignSharedComputedScope(input);
 	const valueImports = publicRenderValueImports(
 		input.semanticGraph.moduleImports,
 		input.semanticGraph.componentEdges,
@@ -264,6 +268,7 @@ export function emitPublicSsrRenderModule(
 	return [
 		...references.filter(hasComponentImportSource).map(emitComponentImport),
 		...valueImports.map(emitValueImport),
+		...foreignScope.importLines,
 		...emitCatalogHelperImports(helperReferenceSource, [
 			{ module: 'ssr-data', names: ['renderSsrData'] },
 			{
@@ -316,6 +321,7 @@ export function emitPublicSsrRenderModule(
 			},
 		]),
 		...moduleScope,
+		...foreignScope.declarations,
 		...sameModuleComponents,
 		...selfBindings,
 		bodySource,
