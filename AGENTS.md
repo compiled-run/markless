@@ -64,6 +64,14 @@ Never write, and always remove when seen: comments naming task/unit/defect numbe
 
 Any work adding or renaming a part in packages/headless/components follows `packages/headless/components/SPEC.md` (component roles + semantic prefixes, the 3-use-case rule for new roles, capability-naming rules). A name outside the established set is a blocked owner question, never an improvisation.
 
+## @markless/ui DOM access
+
+Family source in packages/headless/components (`*.tsrx` and helper `.ts` beside it) reaches other elements only through `element()` handles the family binds. `closest`, `querySelector*`, `matches`, `getElementById`, `getElementsBy*`, `parentElement`/`parentNode`, `children`/`childNodes`, `*ElementChild`, `*ElementSibling` and selector-string lookups are banned there; walks iterate registered handles, never the DOM; `handle.contains(node)` on a family-bound handle is the one allowed predicate. Tests, scenarios and transcripts may query freely. See `packages/headless/components/SPEC.md` "DOM access".
+
+## @markless/ui CSS and recursion
+
+Family CSS defaults (anchor positioning, hidden-until-open, stacking) live in a `<style>` block inside the part's `.tsrx` under `@layer markless`, keyed off `ui-*` attributes; JS never builds CSS strings. Nesting families recurse with the same parts (`item` > `content` > `item`), each nesting `item` rooting its own instance — no second root. See `packages/headless/components/SPEC.md` "CSS defaults" and "Recursive composition".
+
 
 
 <!-- Source: .ruler/claude.md -->

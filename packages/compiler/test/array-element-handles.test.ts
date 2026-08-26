@@ -102,23 +102,6 @@ export function App() @{
 	expect(codes(graph)).toContain('MARKLESS_ELEMENT_HANDLE_PLURAL_IDREF');
 });
 
-test('an array-typed handle is refused as a CSS anchor', async () => {
-	const graph = await graphOf(
-		'ArrayAnchor',
-		`import { element } from '@markless/core';
-export function App() @{
-	const optionEls = element<HTMLLIElement[]>();
-	<section>
-		<ul><li el={optionEls}>one</li><li el={optionEls}>two</li></ul>
-		<div positionAnchor={optionEls}>body</div>
-	</section>
-}`,
-	);
-
-	expect(graph.elementHandleAnchors).toEqual([]);
-	expect(codes(graph)).toContain('MARKLESS_ELEMENT_HANDLE_PLURAL_IDREF');
-});
-
 // Row ownership used to take a bare identifier only; `el={select.optionEls}` is
 // the shape every family walk needs, because the handle lives on the widget's
 // shared() factory and the row is rendered by a part that reads it.

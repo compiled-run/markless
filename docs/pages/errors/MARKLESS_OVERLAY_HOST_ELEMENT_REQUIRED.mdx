@@ -1,0 +1,21 @@
+# MARKLESS_OVERLAY_HOST_ELEMENT_REQUIRED
+
+overlay can only be marked on host elements
+
+- Package: compiler
+- Pass or phase: semantic-graph
+
+## Message
+
+Cannot mark overlay on component …. overlay elevates one concrete host element above the rest of the UI and needs a host element owner.
+
+## Why
+
+Elevation is applied to a DOM element. A component is not a DOM locator and may render zero, one, or many host nodes, and overlay cannot be forwarded to one as a prop because its value must be a literal.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
