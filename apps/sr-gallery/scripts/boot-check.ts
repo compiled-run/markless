@@ -65,6 +65,11 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	colorpicker: 'slider',
 	// The group is a role="group" div; its items are the real buttons.
 	togglegroup: 'button',
+	// A real text input and no role of its own; the submitted field beside it is a
+	// second, aria-hidden one, which includeHidden counts too.
+	numberbox: 'textbox',
+	'numberbox-min-max-step': 'textbox',
+	'numberbox-currency': 'textbox',
 };
 
 /** Sections whose point is how many of that role they serve, not merely that they serve one. */
@@ -80,6 +85,11 @@ const RENDERED_COUNT: Partial<Record<FamilyName, number>> = {
 	colorpicker: 3,
 	// One button per alignment: a count catches a group that rendered only its label.
 	togglegroup: 3,
+	// The typed input plus the clipped field a form submits: a count catches a box
+	// that rendered its text input and nothing to submit.
+	numberbox: 2,
+	'numberbox-min-max-step': 2,
+	'numberbox-currency': 2,
 };
 
 const appDir = fileURLToPath(new URL('..', import.meta.url));
@@ -315,6 +325,43 @@ async function main() {
 			console.log(
 				`The checkbox trigger is reachable by name and reads aria-checked="${name}".`,
 			);
+		}
+
+		// The role count above cannot see these: the step buttons are named by the
+		// family rather than by their text, and the range reaches a reader only
+		// through the description the input points at.
+		for (const label of ['Decrease', 'Increase']) {
+			const trigger = page.locator('#numberbox').getByRole('button', { name: label });
+			// Asked before the attribute: getAttribute on nothing waits out its
+			// timeout instead of saying what was missing.
+			if ((await trigger.count()) !== 1) {
+				failures.push(`#numberbox serves no single "${label}" step button.`);
+				continue;
+			}
+			const controls = await trigger.getAttribute('aria-controls');
+			if (controls === null) {
+				failures.push(`#numberbox has no "${label}" step button pointing at its input.`);
+			} else {
+				console.log(`#numberbox serves a "${label}" step button for ${controls}.`);
+			}
+		}
+
+		const bounded = page
+			.locator('#numberbox-min-max-step')
+			.getByRole('textbox', { name: 'Dose' });
+		const describedBy =
+			(await bounded.count()) === 1 ? await bounded.getAttribute('aria-describedby') : null;
+		let description: string | null = null;
+		for (const id of describedBy?.split(/\s+/).filter(Boolean) ?? []) {
+			const text = await page.locator(`[id="${id}"]`).textContent();
+			if (text !== null && text.includes('0.5')) description = text;
+		}
+		if (description === null) {
+			failures.push(
+				'#numberbox-min-max-step does not describe its range through aria-describedby.',
+			);
+		} else {
+			console.log(`#numberbox-min-max-step describes its range: ${description.trim()}`);
 		}
 
 		if (failures.length > 0) throw new Error(failures.join(' '));

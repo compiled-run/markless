@@ -8,6 +8,7 @@ import {
 	hovercard,
 	menu,
 	modal,
+	numberbox,
 	popover,
 	progress,
 	radiogroup,
@@ -25,8 +26,9 @@ import {
 // /#toggle, /#textbox, /#progress, /#checklist, /#select, /#modal,
 // /#radio-group, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
 // /#fileupload, /#hovercard, /#calendar, /#menu, /#colorpicker,
-// /#togglegroup. A family whose second shape a reader announces differently
-// gets its own section too: /#slider-range.
+// /#togglegroup, /#numberbox. A family whose second shape a reader announces
+// differently gets its own section too: /#slider-range,
+// /#numberbox-min-max-step, /#numberbox-currency.
 //
 // This is consumer code, not test code. It imports through the package barrel
 // the way a reader of the docs would, carries no test hooks, and the markup is
@@ -346,6 +348,52 @@ export function Gallery() @{
 					<togglegroup.item value="center">Center</togglegroup.item>
 					<togglegroup.item value="right">Right</togglegroup.item>
 				</togglegroup.root>
+			</div>
+		</section>
+
+		{/* One numberbox per section: the step buttons are named "Decrease" and "Increase" whatever the field is called, and each root serves one live region, so two shapes under one anchor would leave a reader's walk with no way to tell which control it had reached. */}
+		<section id="numberbox">
+			<h2>Number box</h2>
+			<div class="scenario">
+				<numberbox.root name="quantity">
+					<numberbox.label>Quantity</numberbox.label>
+					<numberbox.backtrigger>-</numberbox.backtrigger>
+					<numberbox.input />
+					<numberbox.forwardtrigger>+</numberbox.forwardtrigger>
+					<numberbox.valuelabel />
+					<numberbox.field />
+				</numberbox.root>
+			</div>
+		</section>
+
+		<section id="numberbox-min-max-step">
+			<h2>Number box (bounded)</h2>
+			{/* With no role="spinbutton" there is no aria-valuemin/aria-valuemax, so the range reaches a reader only through the description. */}
+			<div class="scenario">
+				<numberbox.root value={1.5} min={0.5} max={3} step={0.25} name="dose">
+					<numberbox.label>Dose</numberbox.label>
+					<numberbox.backtrigger>-</numberbox.backtrigger>
+					<numberbox.input />
+					<numberbox.forwardtrigger>+</numberbox.forwardtrigger>
+					<numberbox.description>
+						A number between 0.5 and 3, in steps of 0.25.
+					</numberbox.description>
+					<numberbox.field />
+				</numberbox.root>
+			</div>
+		</section>
+
+		<section id="numberbox-currency">
+			<h2>Number box (currency)</h2>
+			<div class="scenario">
+				<numberbox.root value={1299} min={0} step={0.01} currency="USD" name="price">
+					<numberbox.label>Price</numberbox.label>
+					<numberbox.backtrigger>-</numberbox.backtrigger>
+					<numberbox.input />
+					<numberbox.forwardtrigger>+</numberbox.forwardtrigger>
+					<numberbox.valuelabel />
+					<numberbox.field />
+				</numberbox.root>
 			</div>
 		</section>
 	</main>
