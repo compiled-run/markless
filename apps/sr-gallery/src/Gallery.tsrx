@@ -67,7 +67,8 @@ export function Gallery() @{
 			<h2>Progress</h2>
 			<div class="scenario">
 				<progress.root value={30}>
-					<progress.label>Export data 30%</progress.label>
+					<progress.label>Export data</progress.label>
+					<progress.valuelabel />
 					<progress.track><progress.indicator /></progress.track>
 				</progress.root>
 			</div>
