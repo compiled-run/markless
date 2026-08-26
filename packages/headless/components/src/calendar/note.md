@@ -250,10 +250,9 @@ Neither reader has run against this markup. On this machine the lane prints
 `Failed to mount Guidepup preferences`, so every wording in the tables above is
 the virtual reader's, and the real lanes are unmeasured.
 
-The virtual reader's own lane, `calendar.sr.ts`, is green. One row there needed a
-change on this tip: `calendar.title` is a polite live region, and a click that
-rewrites it can leave its phrase as the last one spoken, so `readDay` steps off
-the day and back onto it when the phrase it gets is not the day's own.
+The virtual reader's own lane, `calendar.sr.ts`, is green. `calendar.title` is a
+polite live region; the runtime no longer re-announces it when a gesture leaves
+its text unchanged, so a day's own phrase is the last one spoken.
 
 ## What v1 refuses regardless
 
