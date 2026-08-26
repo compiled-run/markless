@@ -1673,6 +1673,139 @@
 			}
 		]
 	},
+	"numberbox": {
+		"parts": [
+			{
+				"part": "backtrigger",
+				"component": "NumberboxBackTrigger",
+				"doc": "Steps the number down by one `step`. It is out of the tab order and points its\n`aria-controls` at the input, because the input is the only tab stop and the\narrow keys already do what this button does. Holding it repeats.",
+				"props": []
+			},
+			{
+				"part": "description",
+				"component": "NumberboxDescription",
+				"doc": "Supporting text for the field, named by the input's `aria-describedby`. With no\n`role=\"spinbutton\"` there is no `aria-valuemin`/`aria-valuemax`, so this is\nwhere a range reaches a reader: write it out here when the field has bounds.",
+				"props": []
+			},
+			{
+				"part": "error",
+				"component": "NumberboxError",
+				"doc": "The validation message, named by the input's `aria-describedby` ahead of\n`numberbox.description`. Mounting it is what marks the field invalid - it\nreports `aria-invalid` for as long as this part is in the page - so render it\nonly when there is an error to show.",
+				"props": []
+			},
+			{
+				"part": "field",
+				"component": "NumberboxField",
+				"doc": "The element a form submits. It is clipped, out of the tab order and hidden from\nreaders, and it carries the plain number - no grouping, no currency symbol,\n`.` for a decimal point - under the root's `name`.",
+				"props": []
+			},
+			{
+				"part": "forwardtrigger",
+				"component": "NumberboxForwardTrigger",
+				"doc": "Steps the number up by one `step`. Otherwise `numberbox.backtrigger`, upward.",
+				"props": []
+			},
+			{
+				"part": "input",
+				"component": "NumberboxInput",
+				"doc": "The control a person types into: a real text input, so text review, selection\nand a soft keyboard all behave normally. `disabled`, `readonly` and `required`\nmay be set here as well as on the root, and a restriction set in either place\nstands - a part can add one, never remove one.\n\nIt carries no `name`: what a form submits is `numberbox.field`, because the\ntext here is grouped and may carry a currency symbol.",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "NumberboxLabel",
+				"doc": "The field's name. Its `for` points at the input, so clicking the text focuses it.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "NumberboxRoot",
+				"doc": "One number in one field: a real text input a person types into, two step\nbuttons, and a canonical number on the wire. Put a `numberbox.label`, a\n`numberbox.input` and whichever of `numberbox.backtrigger`,\n`numberbox.forwardtrigger`, `numberbox.valuelabel`, `numberbox.description`,\n`numberbox.error` and `numberbox.field` the page needs inside it.\n\nIt reports `ui-disabled`, `ui-readonly`, `ui-required`, `ui-invalid` and\n`ui-empty` for styling.",
+				"props": [
+					{
+						"name": "value",
+						"type": "number | null",
+						"required": false,
+						"default": "null",
+						"doc": "The number the field shows. `null`, or omitted, and it starts empty."
+					},
+					{
+						"name": "min",
+						"type": "number",
+						"required": false,
+						"doc": "The lowest number the field settles on. Omit it and the field is unbounded below."
+					},
+					{
+						"name": "max",
+						"type": "number",
+						"required": false,
+						"doc": "The highest number the field settles on. Omit it and the field is unbounded above."
+					},
+					{
+						"name": "step",
+						"type": "number",
+						"required": false,
+						"default": "1",
+						"doc": "How far one arrow press moves. `Shift` and the page keys move ten of these."
+					},
+					{
+						"name": "currency",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "An ISO 4217 currency code, such as `USD` or `EUR`. It is data, not a format:\nthe family asks `Intl` where this currency's symbol goes in the reader's own\nlanguage, shows the number that way, and accepts the same characters back\nwhen somebody types or pastes them. A code `Intl` does not know is ignored."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nobody can type in the field or step it, and it drops out of the tab order."
+					},
+					{
+						"name": "readonly",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The number can be read and selected but not changed. The field stays focusable."
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "A number is needed before a form submits."
+					},
+					{
+						"name": "invalid",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The field is reported as holding something wrong. Mounting `numberbox.error` also sets it."
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "Submitted under this name by `numberbox.field`."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: number | null) => void",
+						"required": false,
+						"doc": "Called with the number the field settles on - on blur, on `Enter`, and on\nevery step - or with `null` once it holds none. It does not fire per\nkeystroke; the half-typed value is on `numberbox.state()` for anyone who\nwants it live."
+					}
+				]
+			},
+			{
+				"part": "valuelabel",
+				"component": "NumberboxValueLabel",
+				"doc": "The formatted number as text. It renders the value rather than accepting\nchildren, so there is nothing to keep in step by hand.",
+				"props": []
+			}
+		]
+	},
 	"otp": {
 		"parts": [
 			{

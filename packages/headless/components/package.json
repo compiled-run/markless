@@ -38,6 +38,7 @@
 		"./modal": "./src/modal/index.ts",
 		"./otp": "./src/otp/index.ts",
 		"./navbar": "./src/navbar/index.ts",
+		"./numberbox": "./src/numberbox/index.ts",
 		"./pagination": "./src/pagination/index.ts",
 		"./popover": "./src/popover/index.ts",
 		"./progress": "./src/progress/index.ts",
