@@ -239,7 +239,9 @@ export function collectPublicRenderComponentDefinitions(
 				repeatIds: [...repeatIds],
 				initialValues,
 				initialValueKinds,
-				stateGraphNodeIds: [...stateGraphNodeIds, ...slotGraphNodeIds],
+				// A set: every component binds its props under one id, so a module
+				// with several of them offers the same node more than once.
+				stateGraphNodeIds: [...new Set([...stateGraphNodeIds, ...slotGraphNodeIds])],
 				branches: input.renderData.branches.filter((branch) =>
 					branchIds.has(branch.branchSiteId),
 				),
