@@ -65,7 +65,7 @@ export function wireBranches(input: any) {
 				await activate(hostNodeId);
 		}
 	}
-	function disposeRemovedRangeHosts(
+	async function disposeRemovedRangeHosts(
 		entries: ReadonlyArray<DomJournalEntry>,
 		disposeHost: (hostNodeId: string) => void,
 		asyncBoundaries: Map<
@@ -75,9 +75,28 @@ export function wireBranches(input: any) {
 				readonly endAnchor: ResumeDomComment;
 			}
 		>,
-	): void {
+	): Promise<void> {
 		if (!entries.some((entry) => entry.type === 'removeRange')) return;
-		disposeRemovedHosts(input, entries, disposeHost, branchesById, asyncBoundaries);
+		const { hostIdsInsideRange } = await import('./dom-journal.ts');
+		for (const entry of entries) {
+			if (entry.type !== 'removeRange') continue;
+			const branch = entry.locator.startsWith('branch:')
+				? branchesById.get(entry.locator.slice('branch:'.length))
+				: undefined;
+			const range =
+				branch ??
+				(entry.locator.startsWith('async-boundary:')
+					? asyncBoundaries.get(entry.locator.slice('async-boundary:'.length))
+					: undefined);
+			if (!range) continue;
+			for (const id of hostIdsInsideRange(
+				input.root,
+				range.startAnchor,
+				range.endAnchor,
+				input.elementsByHostId,
+			))
+				disposeHost(id);
+		}
 	}
 	return {
 		branchesById,
@@ -106,6 +125,7 @@ function createBranchRegistration(
 		let currentArm = wiredBranchArm(input.graph, branch);
 		currentArmByBranchId.set(branch.id, currentArm);
 		async function replaceArmRange(arm: number) {
+			const painted = currentArm;
 			const symbol = await input.loadSymbol(branch.symbolId);
 			const update = await symbol({
 				graph: input.graph,
@@ -129,6 +149,12 @@ function createBranchRegistration(
 				!branch.declaredEmptyArms?.includes(update.arm)
 			)
 				throw branchArmEmptyError(branch, update.arm);
+			// A replay that would put this arm back exactly as it stands is not
+			// emitted: nothing moves, so no census is spliced and nothing announces.
+			if (update.arm === painted) {
+				const { domRangeMatchesFragment } = await import('./dom-journal.ts');
+				if (domRangeMatchesFragment(branch.startAnchor, branch.endAnchor, fragment)) return;
+			}
 			return [
 				{ type: 'removeRange', locator: `branch:${branch.id}` },
 				{ type: 'insertRange', locator: `branch:${branch.id}:start`, fragment },
@@ -437,85 +463,6 @@ function rowEventHost(
 		if (!current) return;
 	}
 	return current.nodeType === 1 ? (current as ResumeDomElement) : undefined;
-}
-
-function disposeRemovedHosts(
-	input: any,
-	entries: ReadonlyArray<DomJournalEntry>,
-	disposeHost: (hostNodeId: string) => void,
-	branchesById: Map<string, ResumeBranchRecord>,
-	asyncBoundaries: Map<
-		string,
-		{
-			readonly startAnchor: ResumeDomComment;
-			readonly endAnchor: ResumeDomComment;
-		}
-	>,
-): void {
-	for (const entry of entries) {
-		if (entry.type !== 'removeRange') continue;
-		const branch = entry.locator.startsWith('branch:')
-			? branchesById.get(entry.locator.slice('branch:'.length))
-			: undefined;
-		const range =
-			branch ??
-			(entry.locator.startsWith('async-boundary:')
-				? asyncBoundaries.get(entry.locator.slice('async-boundary:'.length))
-				: undefined);
-		if (!range) continue;
-		for (const id of hostIdsInsideRemovedElements(
-			input.elementsByHostId,
-			elementsBetweenAnchors(input.root, range.startAnchor, range.endAnchor),
-		))
-			disposeHost(id);
-	}
-}
-
-// Local copies of the resume-locators DOM-walk helpers: importing that module
-// regroups it (plus resume-errors) into this wall-counted chunk, which measured
-// costlier than the duplication.
-function elementsBetweenAnchors(
-	root: ResumeDomElement,
-	startAnchor: ResumeDomComment,
-	endAnchor: ResumeDomComment,
-): Set<ResumeDomElement> {
-	const inside = new Set<ResumeDomElement>();
-	let within = false;
-	function visit(node: ResumeDomNode): void {
-		if (node === startAnchor) {
-			within = true;
-			return;
-		}
-		if (node === endAnchor) {
-			within = false;
-			return;
-		}
-		if (within && node.nodeType === 1) inside.add(node as ResumeDomElement);
-		for (const child of node.childNodes ?? []) visit(child);
-	}
-	visit(root);
-	return inside;
-}
-
-function hostIdsInsideRemovedElements(
-	elementsByHostId: Map<string, ResumeDomElement>,
-	removed: Set<ResumeDomElement>,
-): string[] {
-	const ids: string[] = [];
-	for (const [id, element] of elementsByHostId)
-		for (const removedElement of removed)
-			if (containsElement(removedElement, element)) {
-				ids.push(id);
-				break;
-			}
-	return ids;
-}
-
-function containsElement(root: ResumeDomElement, target: ResumeDomElement): boolean {
-	if (root === target) return true;
-	for (const child of root.childNodes ?? [])
-		if (child.nodeType === 1 && containsElement(child as ResumeDomElement, target)) return true;
-	return false;
 }
 
 function walkComments(root: ResumeDomElement): ResumeDomComment[] {

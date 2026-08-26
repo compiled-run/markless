@@ -1,4 +1,5 @@
 import type { DomJournalEntry } from '@markless/runtime';
+import type { ResumeDomComment, ResumeDomElement, ResumeDomNode } from './resume-types.ts';
 import { marklessAttributeValue } from './dom-attribute.ts';
 import { spliceCensus } from './resume-census.ts';
 
@@ -257,6 +258,100 @@ function isAsyncBoundarySnapshotFragment(value: unknown): value is AsyncBoundary
 		value !== null &&
 		(value as { readonly type?: unknown }).type === 'async-boundary-snapshot'
 	);
+}
+
+type ComparableNode = DomRangeNode & {
+	readonly nodeName?: string;
+	readonly nodeValue?: string | null;
+	readonly attributes?: ArrayLike<{ readonly name: string; readonly value: string }>;
+};
+
+// Whether a range already holds, node for node, what a fragment would put back.
+// Replacing a range with itself is still a mutation an aria-live region
+// announces on, and it still drops the focus, selection and claimed hosts the
+// standing nodes carry. An empty range has none of those, so it is not compared.
+export function domRangeMatchesFragment(start: unknown, end: unknown, fragment: unknown): boolean {
+	if (!isDomRangeNode(start) || !isDomRangeNode(end)) return false;
+	const live = rangeContents(start, end);
+	const fresh = fragmentNodes(fragment);
+	if (live.length === 0 || live.length !== fresh.length) return false;
+	for (let index = 0; index < live.length; index++)
+		if (!sameRenderedNode(live[index]!, fresh[index]!)) return false;
+	return true;
+}
+
+function sameRenderedNode(live: ComparableNode, fresh: ComparableNode): boolean {
+	if (live.nodeType !== fresh.nodeType) return false;
+	if (live.nodeType !== 1) return (live.nodeValue ?? '') === (fresh.nodeValue ?? '');
+	if (live.nodeName !== fresh.nodeName || !sameAttributes(live, fresh)) return false;
+	const liveChildren = live.childNodes ?? [];
+	const freshChildren = fresh.childNodes ?? [];
+	if (liveChildren.length !== freshChildren.length) return false;
+	for (let index = 0; index < liveChildren.length; index++)
+		if (!sameRenderedNode(liveChildren[index]!, freshChildren[index]!)) return false;
+	return true;
+}
+
+// A host that answers no attributes cannot be compared, so it never matches.
+function sameAttributes(live: ComparableNode, fresh: ComparableNode): boolean {
+	const standing = live.attributes;
+	const rendered = fresh.attributes;
+	if (!standing || !rendered || standing.length !== rendered.length) return false;
+	const byName = new Map<string, string>();
+	for (let index = 0; index < standing.length; index++)
+		byName.set(standing[index]!.name, standing[index]!.value);
+	for (let index = 0; index < rendered.length; index++)
+		if (byName.get(rendered[index]!.name) !== rendered[index]!.value) return false;
+	return true;
+}
+
+// The removal walk lives here rather than in the branch runtime, whose static
+// closure is byte-walled; a removal flush loads this module anyway.
+export function hostIdsInsideRange(
+	root: ResumeDomElement,
+	startAnchor: ResumeDomComment,
+	endAnchor: ResumeDomComment,
+	elementsByHostId: Map<string, ResumeDomElement>,
+): string[] {
+	const inside = elementsBetweenAnchors(root, startAnchor, endAnchor);
+	const ids: string[] = [];
+	for (const [id, element] of elementsByHostId)
+		for (const removed of inside)
+			if (containsElement(removed, element)) {
+				ids.push(id);
+				break;
+			}
+	return ids;
+}
+
+function elementsBetweenAnchors(
+	root: ResumeDomElement,
+	startAnchor: ResumeDomComment,
+	endAnchor: ResumeDomComment,
+): Set<ResumeDomElement> {
+	const inside = new Set<ResumeDomElement>();
+	let within = false;
+	function visit(node: ResumeDomNode): void {
+		if (node === startAnchor) {
+			within = true;
+			return;
+		}
+		if (node === endAnchor) {
+			within = false;
+			return;
+		}
+		if (within && node.nodeType === 1) inside.add(node as ResumeDomElement);
+		for (const child of node.childNodes ?? []) visit(child);
+	}
+	visit(root);
+	return inside;
+}
+
+function containsElement(root: ResumeDomElement, target: ResumeDomElement): boolean {
+	if (root === target) return true;
+	for (const child of root.childNodes ?? [])
+		if (child.nodeType === 1 && containsElement(child as ResumeDomElement, target)) return true;
+	return false;
 }
 
 function stringifyDomValue(value: unknown): string {
