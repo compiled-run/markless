@@ -1,0 +1,32 @@
+# MARKLESS_PAYLOAD_INVALID
+
+Invalid Markless payload; Invalid resumability payload
+
+- Package: serializer, web
+- Pass or phase: event-only-lean, fns, payload, payload-document-common, protocol-client, protocol-validation
+- Severity: error
+
+## Message
+
+Missing … payload script content.
+
+Missing … payload script.
+
+## Why
+
+Browser resume found …, but it did not expose text content.
+
+Browser resume requires the … script to exist before decoding.
+
+The markless/state payload did not match the resumability protocol shape required by this runtime.
+
+## Emitted from
+
+- `packages/serializer/src/protocol-client.ts`
+- `packages/serializer/src/protocol-validation.ts`
+- `packages/web/src/event-only-lean/lean-shared.ts`
+- `packages/web/src/event-only-lean/scalar-core.ts`
+- `packages/web/src/fns/scalar-specialized.ts`
+- `packages/web/src/payload-document-common.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

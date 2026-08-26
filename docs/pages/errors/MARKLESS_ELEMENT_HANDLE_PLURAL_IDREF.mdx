@@ -1,0 +1,21 @@
+# MARKLESS_ELEMENT_HANDLE_PLURAL_IDREF
+
+An array-typed element() handle cannot fill this position
+
+- Package: compiler
+- Pass or phase: semantic-graph
+
+## Message
+
+Cannot resolve …=\{…\} because "…" is declared as an array (element\<T[]\>()), so it names an ordered set of elements rather than one.
+
+## Why
+
+This attribute points at exactly one element. A handle declared with an array type argument may be bound on many elements, and an IDREF carries no order to say which member it means, so the compiler would have to pick one silently.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

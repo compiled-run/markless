@@ -1,0 +1,26 @@
+# MARKLESS_FRAMEWORK_IMPORT_REQUIRED
+
+Framework API must be imported
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: error
+
+## Message
+
+Cannot use …() until it is imported from markless.
+
+`…` calls your local function `…`, but in `.tsrx` files `…` is a compiler-recognized markless API name. Rename the local function, or import the framework API from `@markless/core`.
+
+## Why
+
+The compiler recognizes `state`/`computed`/`element`/`shared`/`storage` by name in `.tsrx` reactive scopes so that graph ownership stays unambiguous for readers and tools.
+
+…() is a compiler-rewritten markless API. The import makes ownership explicit for TypeScript, editors, junior developers, and AI agents.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
