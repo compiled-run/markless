@@ -112,6 +112,15 @@ export type ProtocolStatePayload = {
 		readonly async: boolean;
 		// Sync computeds only: the update symbol that recomputes this node on resume.
 		readonly deriveSymbolId?: string;
+		// The value the render already derived, in the same envelope a cell value
+		// uses. A resume only re-derives a sync computed when a dependency is
+		// WRITTEN, so without this a handler reading one before the first write
+		// answers undefined. Served only for computeds a handler reads.
+		readonly value?: unknown;
+		// The same value on the live channel cells use: a CSR mount hands it over
+		// in memory, so it never needs an envelope. Never served — payload
+		// decoding rejects it exactly as it rejects a cell's.
+		readonly directValue?: unknown;
 		readonly dependencies?: ReadonlyArray<{
 			readonly graphNodeId: string;
 			readonly path: ReadonlyArray<string>;
@@ -194,6 +203,12 @@ export type ProtocolStatePayload = {
 // after it), so arms stay closed, movable, replaceable, streamable units.
 // Arm-scoped branch records resolve their anchors in the arm's own
 // arm-branch comment census; escalated records carry no anchors.
+export type ProtocolBranchContentRead = {
+	readonly graphNodeId: string;
+	readonly path: ReadonlyArray<string>;
+	readonly source: string;
+};
+
 export type ProtocolArmBranchRecord = {
 	readonly id: string;
 	readonly testReads: ReadonlyArray<{
@@ -201,6 +216,7 @@ export type ProtocolArmBranchRecord = {
 		readonly graphNodeId: string;
 		readonly path: ReadonlyArray<string>;
 	}>;
+	readonly contentReads?: ReadonlyArray<ProtocolBranchContentRead>;
 	readonly symbolId?: string;
 	readonly armTests?: ReadonlyArray<unknown>;
 	readonly declaredEmptyArms?: ReadonlyArray<number>;
@@ -269,6 +285,8 @@ export type ProtocolViewPayload = {
 					readonly kind: 'class';
 					readonly trueValue?: string;
 					readonly falseValue?: string;
+					/** Class names every write must keep — the module's style scope, which the runtime would otherwise overwrite. */
+					readonly constantClass?: string;
 			  }
 			| {
 					readonly kind: 'style';
@@ -299,6 +317,14 @@ export type ProtocolViewPayload = {
 	readonly keyedRepeats?: ReadonlyArray<{
 		readonly id: string;
 		readonly parentHostNodeId: string;
+		/**
+		 * Where the OWNER's own markup put the rows, when `parentHostNodeId` names
+		 * an element the owner never wrote: a `@for` inside a child's `{children}`
+		 * renders into the element that child wraps its hole in, so the parent above
+		 * is the child's, and this is the host the projecting markup sat in. Only a
+		 * reader that needs the owner's own id space reads it.
+		 */
+		readonly ownerHostNodeId?: string;
 		readonly collectionGraphNodeId?: string;
 		readonly collectionPath: ReadonlyArray<string>;
 		readonly keyPath: ReadonlyArray<string>;
@@ -331,14 +357,24 @@ export type ProtocolViewPayload = {
 		 * `itemPath` is the property path to read off the item - and is omitted
 		 * when the row has none, which is the fully static row.
 		 *
+		 * `attributeSlots` names the row's dynamic attributes the same way, with the
+		 * attribute `name` to write and a `path` addressing the ELEMENT that carries
+		 * it. The attribute's value is not in the html at all: the statics join
+		 * around it, and the mint writes it from the item under the presence rule
+		 * every other render path uses (absent for null, undefined and false).
+		 *
 		 * Carried only for a row the client can finish alone: static markup, or
-		 * markup whose every slot is text read off the repeated item. A row holding
-		 * anything else - a value from outside the row, an attribute, a nested
-		 * construct, a component - needs wiring the mint cannot do, so it ships
-		 * nothing and the served behaviour stands.
+		 * markup whose every slot - text or attribute - reads off the repeated item.
+		 * A row holding anything else - a value from outside the row, an attribute
+		 * value computed by an expression, a nested construct - needs wiring the
+		 * mint cannot do, so it ships nothing and the served behaviour stands. One
+		 * child component is the exception: a row element wrapping one is markup
+		 * here plus identity in `rowComponent`, whose `slotPath` names the marker in
+		 * this html the child's rendered nodes replace.
 		 *
 		 * Pay-per-use: a repeat whose row is not mintable emits no field at all, so
-		 * its record is byte-identical to what it was before this existed.
+		 * its record is byte-identical to what it was before this existed, and a row
+		 * with no dynamic attributes omits `attributeSlots` for the same reason.
 		 */
 		readonly rowTemplate?: {
 			readonly html: string;
@@ -346,6 +382,42 @@ export type ProtocolViewPayload = {
 				readonly path: ReadonlyArray<number>;
 				readonly itemPath: ReadonlyArray<string>;
 			}>;
+			readonly attributeSlots?: ReadonlyArray<{
+				readonly path: ReadonlyArray<number>;
+				readonly name: string;
+				readonly itemPath: ReadonlyArray<string>;
+			}>;
+		};
+		/**
+		 * The component a row of this repeat roots, named by identity alone.
+		 *
+		 * A child component cannot ship markup the way `rowTemplate` does: it has a
+		 * graph, not a template, and one instance per rendered row. So this carries
+		 * identifiers and nothing else - the client builds the row by running the
+		 * same one-edge render the server ran, under ids qualified by the row's key.
+		 *
+		 * `componentName` is the component that OWNS the edge (the one whose markup
+		 * holds the `@for`), not the child: the child's name already rides on the
+		 * edge. `itemPropName` is the prop the row's item crosses under, carried
+		 * only when exactly one prop is the bare `@for` binding.
+		 *
+		 * `slotPath` appears when a row ELEMENT wraps the component rather than the
+		 * row being the component. The wrapper's markup then rides in `rowTemplate`,
+		 * and this FRAGMENT-relative path (`[0]` is the row root) names the marker
+		 * comment inside it that the child's rendered nodes replace. Its absence is
+		 * the row that IS the component, which has no wrapper and ships no
+		 * `rowTemplate` - the shape this field had before wrappers were minted, so
+		 * such a record stays byte-identical.
+		 *
+		 * Carried only for a key-identified repeat whose row start is known and
+		 * whose child is declared in the same module; anything else is refused, so
+		 * the served behaviour stands and the record is byte-identical.
+		 */
+		readonly rowComponent?: {
+			readonly componentEdgeId: string;
+			readonly componentName: string;
+			readonly itemPropName?: string;
+			readonly slotPath?: ReadonlyArray<number>;
 		};
 		readonly rowElementHandles?: ReadonlyArray<{
 			readonly hostPath: ReadonlyArray<number>;
@@ -383,6 +455,25 @@ export type ProtocolViewPayload = {
 			readonly graphNodeId: string;
 			readonly path: ReadonlyArray<string>;
 		}>;
+		/**
+		 * Reads an arm renders with no element of its own to bind to. Writing one
+		 * through an element update would erase both arms' markers, so these
+		 * refresh the arm's own marker range through the branch's update symbol.
+		 */
+		readonly contentReads?: ReadonlyArray<ProtocolBranchContentRead>;
+		/**
+		 * Marks a branch whose arms hold a component that has to run, so a flip
+		 * re-renders the page through the prerender evaluator instead of rebuilding
+		 * markup from `armRecords`. Absent on every branch the compiler could build
+		 * arm parts for, which keeps those payloads byte-identical.
+		 */
+		readonly escalates?: true;
+		/**
+		 * Arm-relative records for the arm THIS render served, moved out of the
+		 * page-absolute streams. Only an escalating branch carries one; `armRecords`
+		 * above stays the compiler's per-arm plan for every other branch.
+		 */
+		readonly servedArmRecords?: ProtocolArmRecordSet;
 	}>;
 	readonly asyncBoundaries: ReadonlyArray<{
 		readonly id: string;

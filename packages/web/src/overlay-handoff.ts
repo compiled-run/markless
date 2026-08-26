@@ -14,6 +14,9 @@
  * than a second global because the root is already the thing both sides hold.
  * This module is types only, so naming the property costs no bytes anywhere.
  */
+
+import type { OverlayDismissReason } from './fns/overlay.ts';
+
 export type OverlayHiddenBoundRoot = {
 	/**
 	 * Every element in this root whose `hidden` attribute is written by a payload
@@ -44,16 +47,20 @@ export type OverlayFocusOriginHost = {
 };
 
 /**
- * The Escape a served page swallowed before the behaviour existed.
+ * A gesture swallowed before there was anything to report it to, left on
+ * whatever swallowed it.
  *
- * A page served with an open overlay has nothing listening for Escape until the
- * runtime wakes and this behaviour installs, and the first press is what wakes
- * it - so that press would be spent on the waking and never dismiss anything.
- * The inline resumer's primer leaves the reason here instead, and the installer
- * takes it (once) and reports it to whatever ended up topmost. A global rather
- * than a root property because the primer runs before any root has an installer
- * and the page has one container.
+ * On a ROOT it is the Escape that root's own inline resumer took: a page served
+ * with an open overlay has nothing listening until the runtime wakes and the
+ * behaviour installs, and the first press is what wakes it, so that press would
+ * be spent on the waking and dismiss nothing. Keyed to the root because a second
+ * root installing in the same tick would otherwise report one root's press to
+ * the other's surface.
+ *
+ * On `globalThis` it is the document's: a dismissal the behaviour heard with
+ * nothing live left on the stack to report it to. That one belongs to no root,
+ * so the next installation takes it. Either way it is taken once.
  */
 export type OverlayPrimedDismissalHost = {
-	__marklessOverlayPrimedDismissal?: 'escape';
+	__marklessOverlayPrimedDismissal?: OverlayDismissReason;
 };

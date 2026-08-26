@@ -8,6 +8,7 @@ import {
 	sharedCallbackSlotGraphNodeId,
 	sharedInstanceVisibleFrom,
 } from '../semantic-graph/collect-shared.ts';
+import { splitStaticGraphPath } from '../../artifact-helpers/graph-paths.ts';
 import { sharedInstancePreludeLines } from './residue-reader.ts';
 import type { PublicRenderRoot } from './types.ts';
 
@@ -82,6 +83,15 @@ export function renderBodyLines(
 		}
 		if (isLoweredFrameworkDeclaration(statement)) continue;
 		if (isSharedInstanceDeclaration(statement, sharedInstanceNames)) continue;
+		if (
+			isSharedInstancePathAliasDeclaration(
+				statement,
+				input.semanticGraph.aliases ?? [],
+				sharedInstanceNames,
+				rootInfo.componentName,
+			)
+		)
+			continue;
 
 		const seedLine = sharedStateSeedLine(
 			statement,
@@ -306,6 +316,40 @@ export function isSharedInstanceDeclaration(
 	return declarators.every((declarator) => {
 		const name = getIdentifierName(declarator.id as AnyNode | undefined);
 		return !!name && sharedInstanceNames.has(name);
+	});
+}
+
+/**
+ * `const days = cal.days` beside `const cal = calendarState()`. The instance
+ * local is dropped from the emitted body, so a name declared from a path through
+ * it would read an undeclared receiver; every read through the alias is already
+ * a graph node id, so the declaration goes with it.
+ */
+export function isSharedInstancePathAliasDeclaration(
+	statement: AnyNode,
+	aliases: ReadonlyArray<{
+		readonly name: string;
+		readonly target: string;
+		readonly componentName?: string;
+		readonly sharedDefinitionId?: string;
+	}>,
+	sharedInstanceNames: ReadonlySet<string>,
+	componentName?: string,
+): boolean {
+	if (statement.type !== 'VariableDeclaration' || sharedInstanceNames.size === 0) return false;
+	const declarators = asNodes(statement.declarations);
+	if (declarators.length === 0) return false;
+	return declarators.every((declarator) => {
+		const name = getIdentifierName(declarator.id as AnyNode | undefined);
+		if (!name) return false;
+		return aliases.some(
+			(alias) =>
+				alias.name === name &&
+				alias.sharedDefinitionId === undefined &&
+				alias.componentName !== undefined &&
+				alias.componentName === componentName &&
+				sharedInstanceNames.has(splitStaticGraphPath(alias.target)[0] ?? ''),
+		);
 	});
 }
 

@@ -38,6 +38,7 @@ export type ResumePayloadScriptsInput = EncodedPayloadScripts &
 		| 'applyDomJournal'
 		| 'renderBranchHtml'
 		| 'renderAsyncBoundary'
+		| 'renderData'
 	> & { readonly root: ResumeDomElement };
 
 export type ResumePayloadScriptsResult = {

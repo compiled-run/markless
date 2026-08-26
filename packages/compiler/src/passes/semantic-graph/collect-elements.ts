@@ -1,5 +1,5 @@
 import { isEventAttribute, normalizeEventName } from 'yuku-tsrx';
-import { parseModule } from '../../js-ast.ts';
+import { ownedModuleAst } from './shared-ast.ts';
 import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
@@ -49,6 +49,7 @@ import {
 	duplicateAttributeDiagnostic,
 	duplicateElementHandleDiagnostic,
 	elementHandleRequiredDiagnostic,
+	elementHandleDeriveReadDiagnostic,
 	elementHandlePropUnsupportedDiagnostic,
 	elementHandleRenderReadDiagnostic,
 	eventSpreadUnsupportedDiagnostic,
@@ -63,13 +64,9 @@ import {
 	pluralIdrefElementHandleDiagnostic,
 	widgetRootIdrefElementHandleDiagnostic,
 	unboundIdrefElementHandleDiagnostic,
-	anchorElementHandleValueDiagnostic,
-	anchorElementHandleHostRequiredDiagnostic,
-	unboundAnchorElementHandleDiagnostic,
-	rowOwnedAnchorElementHandleDiagnostic,
-	widgetRootAnchorElementHandleDiagnostic,
+	cssAnchorAttributeDiagnostic,
 } from './diagnostics.ts';
-import { anchorStyleProperty, isIdrefAttribute } from './idref-attributes.ts';
+import { acceptsIdrefList, isCssAnchorAttribute, isIdrefAttribute } from './idref-attributes.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
 	createStyleConstResolver,
@@ -79,7 +76,6 @@ import {
 } from './style-object.ts';
 import type {
 	MutableSemanticGraphArtifact,
-	PendingElementHandleAnchor,
 	PendingElementHandleIdref,
 	SemanticGraphWalk,
 	WalkState,
@@ -160,12 +156,16 @@ export function collectTemplateExpression(
 	if (!state.currentHostNodeId || !expression) return;
 	const composite = collectCompositeTemplateExpression(expression, state, TEMPLATE_READ_OPTIONS);
 
+	const armScoped =
+		!!state.currentArmScope && state.currentArmScope.hostNodeId === state.currentHostNodeId;
+
 	state.graph.templateReads.push({
 		hostNodeId: state.currentHostNodeId,
 		source: expressionSource(expression, state.source),
 		sourceSpan: sourceSpan(expression, state.filename),
 		target: state.currentTextTarget ?? { kind: 'text' },
 		asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
+		...(armScoped ? { armScopeBranchSiteId: state.currentArmScope!.branchSiteId } : {}),
 		computedGraphNodeId: composite?.graphNodeId,
 		componentName: state.currentComponentName ?? undefined,
 	});
@@ -240,10 +240,10 @@ export function collectConditionalBranchText(node: AnyNode, state: WalkState): v
 export function collectElementHandleDiagnostics(
 	graph: MutableSemanticGraphArtifact,
 	pendingIdrefs: ReadonlyArray<PendingElementHandleIdref> = [],
-	pendingAnchors: ReadonlyArray<PendingElementHandleAnchor> = [],
 ): void {
 	const bindings = graphBindingMap(graph);
 	const aliases = semanticAliasMap(graph);
+	const scopeOf = componentGraphScopes(graph, { bindings, aliases });
 	const validElementHandleBindings: SemanticElementHandleBinding[] = [];
 	const moduleElementNames = new Set(
 		graph.diagnostics
@@ -253,6 +253,7 @@ export function collectElementHandleDiagnostics(
 	);
 
 	for (const [bindingIndex, binding] of graph.elementHandleBindings.entries()) {
+		const scope = scopeOf(binding.componentName);
 		// `el={checkbox.triggerEl}` names a handle the shared factory declared. The
 		// component-scope lookup answers first with the factory's state cell (the
 		// instance local shares its name), so the shared route wins whenever it is
@@ -261,7 +262,7 @@ export function collectElementHandleDiagnostics(
 			elementHandlePath(
 				resolveSharedInstanceGraphPath(binding.handleName, graph, binding.componentName),
 			) ??
-			resolveGraphPath(binding.handleName, bindings, aliases);
+			resolveGraphPath(binding.handleName, scope.bindings, scope.aliases);
 		const graphBinding = resolved?.binding;
 		if (moduleElementNames.has(binding.handleName)) continue;
 		if (binding.keyedRepeatScopeIds.length > 0) {
@@ -347,7 +348,8 @@ export function collectElementHandleDiagnostics(
 		validElementHandleBindings.map((binding) => binding.handleName),
 	);
 	for (const read of graph.templateReads) {
-		const resolved = resolveGraphPath(read.source, bindings, aliases);
+		const readScope = scopeOf(read.componentName);
+		const resolved = resolveGraphPath(read.source, readScope.bindings, readScope.aliases);
 		if (!resolved || resolved.binding.kind !== 'element') continue;
 		const handleName = resolved.binding.name;
 		if (resolved.path.length > 0) {
@@ -371,8 +373,58 @@ export function collectElementHandleDiagnostics(
 		}
 	}
 
+	collectElementHandleDeriveReads(graph);
+
 	resolveElementHandleIdrefs(graph, pendingIdrefs, firstBindingByHandle, pluralHandleNames);
-	resolveElementHandleAnchors(graph, pendingAnchors, firstBindingByHandle, pluralHandleNames);
+}
+
+/**
+ * Every `computed()` whose body reads an element() handle, refused by name.
+ *
+ * The dependency edges are the witness and the scoping both: each one was
+ * resolved in the scope that declared the derive - a component body, or the
+ * shared factory it was written inside - so a sibling part's same-named handle
+ * never answers here.
+ */
+function collectElementHandleDeriveReads(graph: MutableSemanticGraphArtifact): void {
+	const elementBindings = new Map(
+		graph.graphBindings.flatMap((binding) =>
+			binding.kind === 'element' ? [[binding.id, binding] as const] : [],
+		),
+	);
+	if (elementBindings.size === 0) return;
+	const sharedNames = new Map(
+		graph.sharedDefinitions.map((definition) => [definition.id, definition.name] as const),
+	);
+
+	for (const binding of graph.graphBindings) {
+		if (binding.kind !== 'computed') continue;
+		const declaringScope =
+			binding.componentName ??
+			(binding.sharedDefinitionId ? sharedNames.get(binding.sharedDefinitionId) : undefined);
+		if (!declaringScope) continue;
+		for (const dependency of binding.dependencies ?? []) {
+			const handle = elementBindings.get(dependency.graphNodeId);
+			if (!handle) continue;
+			// Two sibling parts declaring `boxEl` share one graph node id, so a
+			// dependency edge alone does not prove THIS body wrote the read.
+			if (!readsSourceText(binding.functionSource, dependency.source)) continue;
+			graph.diagnostics.push(
+				elementHandleDeriveReadDiagnostic({
+					handleName: handle.name,
+					source: dependency.source,
+					derivedName: binding.name,
+					componentName: declaringScope,
+				}),
+			);
+		}
+	}
+}
+
+function readsSourceText(functionSource: string | undefined, source: string): boolean {
+	if (!functionSource) return false;
+	const escaped = source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	return new RegExp(`(?<![\\w$.])${escaped}(?![\\w$])`).test(functionSource);
 }
 
 /**
@@ -468,62 +520,6 @@ function resolveElementHandleIdrefs(
 }
 
 /**
- * The same resolution the IDREF pass runs, for the CSS anchor positions.
- *
- * Every gate is the same gate and for the same reason - an anchor name that
- * resolves to no rendered instance is as silently broken as an IDREF that
- * resolves to no element - with one difference: an anchor record does NOT put a
- * minted id on the element the handle is bound to. CSS reads the dashed-ident
- * name off that element's own inline style, so the id would be bytes nothing
- * reads. That is why the two records stay apart.
- */
-function resolveElementHandleAnchors(
-	graph: MutableSemanticGraphArtifact,
-	pendingAnchors: ReadonlyArray<PendingElementHandleAnchor>,
-	boundByHandle: ReadonlyMap<string, SemanticElementHandleBinding>,
-	pluralHandleNames: ReadonlySet<string>,
-): void {
-	for (const reference of pendingAnchors) {
-		const bound = boundByHandle.get(reference.handleName);
-		if (!bound) {
-			graph.diagnostics.push(unboundAnchorElementHandleDiagnostic(reference));
-			continue;
-		}
-		if (bound.rowOwner || bound.keyedRepeatScopeIds.length > 0) {
-			graph.diagnostics.push(rowOwnedAnchorElementHandleDiagnostic(reference));
-			continue;
-		}
-		if (pluralHandleNames.has(bound.handleName)) {
-			graph.diagnostics.push(pluralIdrefElementHandleDiagnostic(reference));
-			continue;
-		}
-		const handleBinding = graph.graphBindings.find(
-			(binding) => binding.kind === 'element' && binding.name === bound.handleName,
-		);
-		if (!handleBinding) {
-			graph.diagnostics.push(unboundAnchorElementHandleDiagnostic(reference));
-			continue;
-		}
-		if (handleBinding.sharedDefinitionId !== undefined) {
-			const widgetRoot = widgetRootComponentName(graph, handleBinding.sharedDefinitionId);
-			if (
-				widgetRoot === undefined ||
-				widgetRoot === reference.componentName ||
-				widgetRoot === bound.componentName
-			) {
-				graph.diagnostics.push(widgetRootAnchorElementHandleDiagnostic(reference));
-				continue;
-			}
-		}
-		graph.elementHandleAnchors.push({
-			...reference,
-			handleGraphNodeId: handleBinding.id,
-			order: graph.elementHandleAnchors.length,
-		});
-	}
-}
-
-/**
  * The component that resolves a widget-scoped factory first owns its nodes, so
  * its rendered instance is the widget root every other part is seeded from.
  */
@@ -592,25 +588,22 @@ function collectAttribute(
 		return;
 	}
 
+	if (isCssAnchorAttribute(attributeName)) {
+		state.graph.diagnostics.push(
+			cssAnchorAttributeDiagnostic({
+				attributeName,
+				span: sourceSpan(attribute, state.filename),
+			}),
+		);
+		if (expressionValue) walk(expressionValue, state);
+		return;
+	}
+
 	// A component/part tag has no host node of its own, so nothing below this
 	// point applies - but an IDREF handle written there is still this component's
 	// record: the element that must carry the minted id is rendered HERE, and the
 	// id crosses the edge as a value the child spreads onto its own markup.
 	if (!hostNodeId) {
-		// An anchor position lowers to an inline style on an element THIS markup
-		// renders, and a component tag renders none, so it cannot cross the edge
-		// the way a minted id can.
-		if (anchorStyleProperty(attributeName)) {
-			state.graph.diagnostics.push(
-				anchorElementHandleHostRequiredDiagnostic({
-					attributeName,
-					ownerTagName,
-					span: sourceSpan(attribute, state.filename),
-				}),
-			);
-			if (expressionValue) walk(expressionValue, state);
-			return;
-		}
 		collectIdrefAttribute(attributeName, expressionValue, state, walk, null);
 		return;
 	}
@@ -731,10 +724,12 @@ function collectAttribute(
 	// Must sit above the generic attribute branch, or the handle falls through to
 	// an ordinary value binding.
 	if (collectIdrefAttribute(attributeName, expressionValue, state, walk, hostNodeId)) return;
-	if (collectAnchorAttribute(attribute, attributeName, expressionValue, state, walk, hostNodeId))
-		return;
 
-	const conditionalClass = conditionalClassTarget(attributeName, expressionValue);
+	const conditionalClass = conditionalClassTarget(
+		attributeName,
+		expressionValue,
+		state.currentStyleScopeClass,
+	);
 	if (conditionalClass) {
 		// A test that is not a plain graph read resolves to no graph node later, so
 		// without this computed the whole record is dropped and the class never moves.
@@ -807,7 +802,7 @@ function collectAttribute(
 			hostNodeId,
 			source: expressionSource(expressionValue, state.source),
 			sourceSpan: sourceSpan(expressionValue, state.filename),
-			target: bindingTargetForAttribute(attributeName),
+			target: bindingTargetForAttribute(attributeName, state.currentStyleScopeClass),
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
 			computedGraphNodeId: composite?.graphNodeId,
 			componentName: state.currentComponentName ?? undefined,
@@ -843,7 +838,7 @@ function collectStyleObjectAttribute(
 			hostNodeId,
 			source: expressionSource(usageNode, state.source),
 			sourceSpan: sourceSpan(usageNode, state.filename),
-			target: bindingTargetForAttribute('style'),
+			target: bindingTargetForAttribute('style', state.currentStyleScopeClass),
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
 			computedGraphNodeId: composite.graphNodeId,
 			componentName: state.currentComponentName ?? undefined,
@@ -1024,6 +1019,35 @@ function attributeValueDiagnostic(
 	});
 }
 
+/**
+ * Name lookup scoped to the component a binding was authored in. Two components
+ * in one module routinely share a name — a page's `element()` local and a
+ * sibling part's destructured prop of the same name — and a module-wide map
+ * answers with whichever was collected last, so the page's handle is lost.
+ */
+function componentGraphScopes(
+	graph: MutableSemanticGraphArtifact,
+	moduleWide: {
+		readonly bindings: ReadonlyMap<string, SemanticGraphBinding>;
+		readonly aliases: ReturnType<typeof semanticAliasMap>;
+	},
+): (componentName: string | undefined) => typeof moduleWide {
+	const cache = new Map<string, typeof moduleWide>();
+
+	return (componentName) => {
+		if (componentName === undefined) return moduleWide;
+		const cached = cache.get(componentName);
+		if (cached) return cached;
+
+		const scope = {
+			bindings: graphBindingMap(graph, undefined, componentName),
+			aliases: semanticAliasMap(graph, undefined, componentName),
+		};
+		cache.set(componentName, scope);
+		return scope;
+	};
+}
+
 function resolvePropForwardedElementHandle(
 	binding: SemanticElementHandleBinding,
 	resolved: {
@@ -1059,14 +1083,17 @@ function resolvePropForwardedElementHandle(
 
 type IdrefValueClassification =
 	| { readonly kind: 'handle'; readonly handleName: string }
+	| { readonly kind: 'handle-list'; readonly handleNames: ReadonlyArray<string> }
 	| { readonly kind: 'composite' };
 
 /**
  * Classifies an IDREF attribute value. `handle` is one element() handle written
- * directly, the only form this slice records. `composite` is any expression that
- * mentions a handle without being one - a list, a join, a choice - which is
- * refused rather than lowered. `null` is everything else, including an ordinary
- * id string, which keeps its existing templateRead.
+ * directly. `handle-list` is a static array literal whose every entry is one,
+ * recorded where the platform defines the attribute as a list of ids.
+ * `composite` is any other expression that mentions a handle without being one -
+ * a join, a choice, an array the compiler cannot read - which is refused rather
+ * than lowered. `null` is everything else, including an ordinary id string,
+ * which keeps its existing templateRead.
  */
 /**
  * An element() handle in an IDREF position is identity, not a value. Left to
@@ -1087,79 +1114,48 @@ function collectIdrefAttribute(
 ): boolean {
 	if (!expressionValue || !isIdrefAttribute(attributeName)) return false;
 	const classified = classifyIdrefValue(expressionValue, state);
-	if (classified?.kind === 'composite') {
+	if (!classified) return false;
+	const source = expressionSource(expressionValue, state.source);
+	const refuse = (reason?: 'single-valued' | 'component-edge') => {
 		state.graph.diagnostics.push(
 			compositeIdrefElementHandleDiagnostic({
 				attributeName,
-				source: expressionSource(expressionValue, state.source),
+				source,
 				span: sourceSpan(expressionValue, state.filename),
+				...(reason ? { reason } : {}),
 			}),
 		);
 		walk(expressionValue, state);
 		return true;
-	}
-	if (classified?.kind !== 'handle') return false;
-	// No templateRead and no boundHostNodeId yet: whether this handle is ever
-	// bound is not knowable until the whole file has been walked.
-	state.pendingElementHandleIdrefs.push({
-		hostNodeId,
-		attributeName,
-		handleName: classified.handleName,
-		source: expressionSource(expressionValue, state.source),
-		componentName: state.currentComponentName ?? undefined,
-		sourceSpan: sourceSpan(expressionValue, state.filename),
-		...(state.currentKeyedRepeatScopeIds.length > 0
-			? { keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds] }
-			: {}),
-		...(state.currentAsyncBoundaryId ? { asyncBoundaryId: state.currentAsyncBoundaryId } : {}),
-	});
-	return true;
-}
+	};
+	if (classified.kind === 'composite') return refuse();
 
-/**
- * `anchorName={handle}` / `positionAnchor={handle}` on a host element.
- *
- * Unlike an IDREF attribute, these names are not DOM attributes at all, so a
- * non-handle value cannot be left to fall through: `anchorName="mine"` would be
- * written into the HTML as `anchorname="mine"`, which no browser reads and
- * nothing else would report. Every value that is not one element() handle
- * written directly is refused here. Returns whether this attribute was claimed.
- */
-function collectAnchorAttribute(
-	attribute: AnyNode,
-	attributeName: string,
-	expressionValue: AnyNode | undefined,
-	state: WalkState,
-	walk: SemanticGraphWalk,
-	hostNodeId: string,
-): boolean {
-	if (!anchorStyleProperty(attributeName)) return false;
-	const handleName = expressionValue
-		? resolvedElementHandleName(expressionValue, state)
-		: undefined;
-	if (!handleName) {
-		state.graph.diagnostics.push(
-			anchorElementHandleValueDiagnostic({
-				attributeName,
-				source: expressionValue
-					? expressionSource(expressionValue, state.source)
-					: 'no value',
-				span: sourceSpan(expressionValue ?? attribute, state.filename),
-			}),
-		);
-		if (expressionValue) walk(expressionValue, state);
-		return true;
+	const handleNames =
+		classified.kind === 'handle' ? [classified.handleName] : [...classified.handleNames];
+	if (handleNames.length > 1) {
+		if (!acceptsIdrefList(attributeName)) return refuse('single-valued');
+		// The child writes the attribute from ONE prop value, so a list has no
+		// transport across the edge.
+		if (hostNodeId === null) return refuse('component-edge');
 	}
-	// Whether the handle is ever bound is not knowable until the whole file has
-	// been walked, so this is a pending record exactly like an IDREF's.
-	state.pendingElementHandleAnchors.push({
-		hostNodeId,
-		attributeName,
-		handleName,
-		source: expressionSource(expressionValue!, state.source),
-		componentName: state.currentComponentName ?? undefined,
-		sourceSpan: sourceSpan(expressionValue!, state.filename),
-	});
+	// No templateRead and no boundHostNodeId yet: whether these handles are ever
+	// bound is not knowable until the whole file has been walked.
+	for (const handleName of handleNames) {
+		state.pendingElementHandleIdrefs.push({
+			hostNodeId,
+			attributeName,
+			handleName,
+			source,
+			componentName: state.currentComponentName ?? undefined,
+			sourceSpan: sourceSpan(expressionValue, state.filename),
+			...(state.currentKeyedRepeatScopeIds.length > 0
+				? { keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds] }
+				: {}),
+			...(state.currentAsyncBoundaryId
+				? { asyncBoundaryId: state.currentAsyncBoundaryId }
+				: {}),
+		});
+	}
 	return true;
 }
 
@@ -1169,7 +1165,33 @@ function classifyIdrefValue(
 ): IdrefValueClassification | null {
 	const handleName = resolvedElementHandleName(expression, state);
 	if (handleName) return { kind: 'handle', handleName };
+	const handleNames = staticHandleListNames(expression, state);
+	if (handleNames) return { kind: 'handle-list', handleNames };
 	return mentionsElementHandle(expression, state) ? { kind: 'composite' } : null;
+}
+
+/**
+ * The handles a static array literal names, in authored order, or null when the
+ * expression is not one. Every entry must itself be a handle written directly: a
+ * hole, a spread, or anything the compiler cannot resolve to one handle makes the
+ * whole value composite, because the list would then be a guess about order.
+ */
+function staticHandleListNames(
+	expression: AnyNode,
+	state: WalkState,
+): ReadonlyArray<string> | null {
+	if (expression.type !== 'ArrayExpression') return null;
+	const raw = expression.elements;
+	if (!Array.isArray(raw)) return null;
+	const entries = asNodes(raw);
+	if (entries.length === 0 || entries.length !== raw.length) return null;
+	const names: string[] = [];
+	for (const entry of entries) {
+		const name = resolvedElementHandleName(entry, state);
+		if (!name) return null;
+		names.push(name);
+	}
+	return names;
 }
 
 // A resolution is an element() handle only when it lands on an element node
@@ -1209,9 +1231,13 @@ function mentionsElementHandle(expression: AnyNode, state: WalkState): boolean {
 	return found;
 }
 
+// The runtime writes the whole class attribute, so a scoped module's arms carry
+// the scope class the markup pass put in the served HTML - without it the first
+// toggle strips the scope and every scoped rule stops matching.
 function conditionalClassTarget(
 	attributeName: string,
 	expressionValue: AnyNode | undefined,
+	styleScopeClass: string | null,
 ): {
 	readonly test: AnyNode;
 	readonly target: SemanticTemplateBindingTarget;
@@ -1229,10 +1255,15 @@ function conditionalClassTarget(
 		test,
 		target: {
 			kind: 'class',
-			trueValue,
-			falseValue,
+			trueValue: scopedClassValue(trueValue, styleScopeClass),
+			falseValue: scopedClassValue(falseValue, styleScopeClass),
 		},
 	};
+}
+
+function scopedClassValue(value: string, styleScopeClass: string | null): string {
+	if (!styleScopeClass) return value;
+	return value ? `${value} ${styleScopeClass}` : styleScopeClass;
 }
 
 function stringLiteral(node: AnyNode | undefined): string | null {
@@ -1320,8 +1351,14 @@ function staticAttributeKey(node: AnyNode): string | null {
 	return JSON.stringify(attributes);
 }
 
-function bindingTargetForAttribute(attributeName: string): SemanticTemplateBindingTarget {
-	if (attributeName === 'class') return { kind: 'class' };
+function bindingTargetForAttribute(
+	attributeName: string,
+	styleScopeClass: string | null,
+): SemanticTemplateBindingTarget {
+	// The runtime writes the whole class attribute, so a scoped module hands the
+	// writers its scope class to compose back in.
+	if (attributeName === 'class')
+		return styleScopeClass ? { kind: 'class', constantClass: styleScopeClass } : { kind: 'class' };
 	if (attributeName === 'style') return { kind: 'style' };
 
 	if (isDomPropertyBindingName(attributeName)) {
@@ -1366,7 +1403,7 @@ function resolveStaticObjectExpression(node: AnyNode, state: WalkState): AnyNode
 	const declarationStart = resolvedDeclarationStart(node, state);
 	if (declarationStart === null) return null;
 	let found: AnyNode | null = null;
-	const ast = parseModule(state.source, state.filename) as unknown as AnyNode;
+	const ast = ownedModuleAst(state, state.source, state.filename);
 	walkNode(ast, (candidate) => {
 		if (found || candidate.type !== 'VariableDeclarator') return;
 		const id = candidate.id as AnyNode | undefined;
@@ -1559,7 +1596,7 @@ function localFunctionValueSource(
 }
 
 function localFunctionValueNode(declarationStart: number, state: WalkState): AnyNode | null {
-	const ast = parseModule(state.source, state.filename) as unknown as AnyNode;
+	const ast = ownedModuleAst(state, state.source, state.filename);
 	let found: AnyNode | null = null;
 
 	walkNode(ast, (node) => {
