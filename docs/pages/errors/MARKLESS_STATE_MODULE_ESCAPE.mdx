@@ -1,0 +1,22 @@
+# MARKLESS_STATE_MODULE_ESCAPE
+
+Module-scope storage cannot be written from render or handlers
+
+- Package: compiler
+- Pass or phase: state-lowering
+- Severity: error
+
+## Message
+
+Cannot write to "…"….
+
+## Why
+
+Module-scope storage outlives a single server render. A handler could read or overwrite data from another user because the value is not part of this document payload.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/state-lowering.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

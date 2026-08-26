@@ -1,0 +1,21 @@
+# MARKLESS_DELEGATE_ARTIFACT_MISSING
+
+Delegate child produced no build-time rendering
+
+- Package: compiler
+- Pass or phase: link
+- Severity: info
+
+## Message
+
+\<…\> resolves to …, which this build did not compile and which handed back no build-time rendering, so the edge stays a runtime import.…
+
+## Why
+
+A delegate is materialized from the rendering its own compiled module produced; without one there is nothing to inline.
+
+## Emitted from
+
+- `packages/compiler/src/passes/link/delegate-children.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

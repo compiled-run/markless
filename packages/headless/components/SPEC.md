@@ -83,3 +83,43 @@ library's spelling:
 Any unit that adds or renames a part checks this spec first. A name outside the
 established roles and prefixes is a blocked question for the owner, not an
 improvisation. This file is the source of truth; AGENTS.md points here.
+
+## DOM access
+
+Family source (`*.tsrx` and the helper `.ts` files beside it) reaches other
+elements only through `element()` handles the family binds itself. Vanilla DOM
+queries and tree walks are banned: `closest`, `querySelector`,
+`querySelectorAll`, `matches`, `getElementById`, `getElementsBy*`,
+`parentElement`, `parentNode`, `children`, `childNodes`, `firstElementChild`,
+`lastElementChild`, `nextElementSibling`, `previousElementSibling`, and any
+selector-string lookup. A part that needs another part's element binds a handle
+to it (or reads the handle the family already holds on its shared instance); a
+walk over a set of parts iterates the handles the family registered, never the
+DOM. The one containment predicate allowed is `handle.contains(node)` where the
+receiver is a handle the family bound — it asks whether a node the platform
+handed over (`relatedTarget`, `activeElement`, a press target) sits inside a
+part the family knows; it never finds anything. Test files, scenarios and
+transcripts may query freely.
+
+Why: a selector or a parent walk couples the family to markup the consumer
+owns, silently breaks under composition and projection, and bypasses the
+instance scoping that makes handles resolve to the right widget.
+
+## CSS defaults
+
+Anything a family needs from CSS — anchor positioning, hidden-until-open,
+overlay stacking — ships as a `<style>` block inside the part's `.tsrx`,
+wrapped in `@layer markless`, written as ordinary CSS keyed off the `ui-*`
+attributes the part already writes (`[ui-side="start"] { position-area: … }`).
+Geometry the consumer styles against is exposed as `--*` custom properties.
+JS never builds CSS strings (`position-area` values, inset math, `style=`
+concatenation) for what CSS can express. The layer is the whole point: a
+consumer's unlayered rule beats the default without `!important`.
+
+## Recursive composition
+
+A family whose parts nest in themselves (tree, menu submenus) recurses with the
+same parts — `item` containing `content` containing `item` — and every nesting
+`item` roots its own item-level instance (tree's `treeItemState` precedent).
+There is no second root and no `sub*` prefix; activation reports to the one
+root.

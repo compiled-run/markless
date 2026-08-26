@@ -1,0 +1,30 @@
+# MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED
+
+Helper-created state return shape is not supported; Helper-created state return shape is not supported yet; Imported helper-created state needs module analysis
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: error
+
+## Message
+
+Cannot call imported helper "…" from "…" as component state because graph analysis is not available for that module.
+
+Cannot connect helper "…" return value "…" to graph state. This slice supports returning one state() or computed() binding directly.
+
+…() creates "…" inside a helper function, but the compiler cannot connect this helper return shape to the component graph binding.
+
+## Why
+
+Object-return and more complex helper return shapes need additional return-path alias artifacts before reads, writes, and payload cells can stay unambiguous.
+
+Per-module compilation can connect helper-created state only when the imported module was compiled with a module graph interface that describes exported helper graph semantics.
+
+The compiler supports same-module direct helper returns and compiled imported helpers. This gate remains for residual helper shapes such as object returns, nested return chains, or imported helpers without module graph interface data.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
