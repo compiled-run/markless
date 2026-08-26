@@ -122,32 +122,27 @@ test('CSR: a right-click reaches the handler', async () => {
 	expect(button()).toBe(2);
 });
 
-// The measured shape on a client-rendered page, kept green so the pinned row
-// below has something exact to contradict: the handler runs after the dispatch
-// has returned (phase 0), nothing cancelled the event while the dispatch was
-// still running, and the flag only goes up afterwards - too late for the
-// browser, which has already decided whether to open its menu.
-test('CSR: nothing cancels the right-click until after the dispatch has returned', async () => {
+// What cancels it on a client render is not the handler either: the handler
+// still arrives after the dispatch has returned (phase 0) and its own
+// preventDefault() is far too late for the browser. The cancel the row below
+// measures comes from somewhere else.
+test('CSR: the handler itself runs after the dispatch has returned', async () => {
 	const probe = watchContextmenu();
 	try {
 		await render(Page);
 		await rightClickTarget();
 		await expect.poll(hits).toBe(1);
 		expect(phase()).toBe(0);
-		expect(probe.cancelledInDispatch).toEqual([false]);
 		await expect.poll(() => probe.seen[0]?.defaultPrevented).toBe(true);
 	} finally {
 		probe.stop();
 	}
 });
 
-// PINNED. A client-rendered page has no inline resumer, so the extracted
-// synchronous policy that cancels the served page's contextmenu in time never
-// runs; the handler's own preventDefault() lands after the dispatch returned.
-// A right-click on a client-rendered menu therefore shows the browser's own
-// menu on top of the widget's. Turns red the day a client render applies the
-// same policy the served page does.
-test.fails('CSR: the right-click default action is cancelled inside the dispatch', async () => {
+// The container listener applies the compiler-extracted synchronous policy
+// itself, before it awaits the demand-loaded handler, so a client-rendered
+// right-click is cancelled on the same beat a served one is.
+test('CSR: the right-click default action is cancelled inside the dispatch', async () => {
 	const probe = watchContextmenu();
 	try {
 		await render(Page);
