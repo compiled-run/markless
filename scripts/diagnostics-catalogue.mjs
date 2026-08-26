@@ -10,7 +10,7 @@
 //   node scripts/diagnostics-catalogue.mjs           write the catalogue + pages
 //   node scripts/diagnostics-catalogue.mjs --check   fail on any drift
 //   node scripts/diagnostics-catalogue.mjs --table   print the table to stdout
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import ts from 'typescript';
 
@@ -48,6 +48,7 @@ function sourceRoots() {
 			continue;
 		}
 		const nested = join(packagesDir, name);
+		if (!statSync(nested).isDirectory()) continue;
 		for (const child of readdirSync(nested).toSorted()) {
 			const childSrc = join(nested, child, 'src');
 			if (existsSync(childSrc)) roots.push(childSrc);
