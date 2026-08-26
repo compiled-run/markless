@@ -67,6 +67,8 @@ export const calendarState = shared(
 		const labelEl = element<HTMLLabelElement>();
 		const descriptionEl = element<HTMLDivElement>();
 		const errorEl = element<HTMLDivElement>();
+		// Plural handle: bound on every day, read back as the live day buttons in document order.
+		const dayEls = element<HTMLButtonElement[]>();
 
 		// Every computed() on this factory is written out of platform globals rather
 		// than out of ./calendar-math.ts, and it is not a style choice. When a
@@ -228,6 +230,7 @@ export const calendarState = shared(
 			labelEl,
 			descriptionEl,
 			errorEl,
+			dayEls,
 			month,
 			days,
 			weeks,
@@ -258,7 +261,7 @@ export const calendarState = shared(
 				const shown = visibleMonth(calendar.monthAt, calendar.monthSeed, todayIso(new Date()));
 				calendar.monthAt = sameMonth(iso, shown) ? shown : startOfMonth(iso);
 				calendar.focusAt = iso;
-				landFocusOn(contentEl, iso);
+				landFocusOn(() => dayEls, iso);
 			},
 
 			/** The tab stop follows a day the person reached themselves, without moving focus again. */
@@ -320,7 +323,7 @@ export const calendarState = shared(
 
 				calendar.monthAt = sameMonth(next, shown) ? shown : startOfMonth(next);
 				calendar.focusAt = next;
-				landFocusOn(contentEl, next);
+				landFocusOn(() => dayEls, next);
 			},
 
 			setOpen(next: boolean) {
@@ -568,6 +571,7 @@ export function CalendarItem({ value, children, onClick, ...rest }: CalendarItem
 
 	<button
 		{...rest}
+		el={calendar.dayEls}
 		type="button"
 		value={day.value}
 		aria-label={named}
@@ -615,7 +619,7 @@ export function CalendarTrigger({ children, onClick, ...rest }: CalendarTriggerP
 				const shown = visibleMonth(calendar.monthAt, calendar.monthSeed, now);
 				const held = heldList(calendar.seed, calendar.pickedText);
 				landFocusOn(
-					calendar.contentEl,
+					() => calendar.dayEls,
 					resolvedFocus(shown, calendar.focusAt, held, now, calendar.startofweek),
 				);
 			}

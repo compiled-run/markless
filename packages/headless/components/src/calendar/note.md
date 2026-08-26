@@ -158,6 +158,28 @@ reaches a part's `computed()`, and SSR no longer throws
 `MARKLESS_ELEMENT_HANDLE_WIDGET_INSTANCE_MISSING` on `titleEl` — all thirteen SSR
 rows are green.
 
+## Finding the focused day: `dayEls`, not a selector
+
+`calendar.item` binds `dayEls`, one plural `element()` handle read back as the
+live day buttons in document order. `landFocusOn` takes a reader for that set
+and picks the day by its `value` attribute, replacing the
+`content.querySelector('button[value=...]')` it used to run.
+
+The read has to be a READER, not the resolved array. A snapshot taken at the
+call resolves to the buttons that existed before the open or before the month
+rewrite, and the retry then re-focuses detached elements for its whole run. The
+`popup` rows were the witnesses.
+
+Converting the selector also woke a race the selector had been losing. The
+landing re-asserts focus for 30 frames, and a press outside during that window
+used to leave the person where they pressed only because the query lost. Now the
+landing gives way on purpose: it remembers the day it landed on, and once some
+OTHER element holds focus it stops. `document.body` is not some other element -
+the month rewrite detaches the focused day and drops focus there, and the move
+has to put it back. Both halves have a row: `a press outside dismisses the popup
+and leaves focus where the person put it`, and `an arrow off the end of the month
+crosses into the next one`.
+
 ## The defect this family found
 
 **A keydown was refused when the key before it removed the day it landed on.**
