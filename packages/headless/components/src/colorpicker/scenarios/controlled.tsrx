@@ -1,8 +1,8 @@
 import { state } from '@markless/core';
 import { colorpicker } from '../../index.ts';
 
-const AREA = 'position: relative; width: 200px; height: 160px; touch-action: none';
-const RAIL = 'position: relative; width: 200px; height: 20px; touch-action: none';
+const AREA = 'width: 200px; height: 160px';
+const RAIL = 'width: 200px; height: 20px';
 
 // Both callbacks reported into the page: `onChange` fires at every step of a
 // gesture, `onChangeEnd` once it settles.

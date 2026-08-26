@@ -1,6 +1,6 @@
 import { colorpicker } from '../../index.ts';
 
-const RAIL = 'position: relative; width: 200px; height: 20px; touch-action: none';
+const RAIL = 'width: 200px; height: 20px';
 
 // Every channel the family names, each on its own rail. The track and the thumb
 // behave identically whichever channel they carry - `channel` says which number

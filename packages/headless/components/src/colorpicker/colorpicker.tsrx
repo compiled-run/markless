@@ -13,6 +13,7 @@ import {
 	hexText,
 	hsbText,
 	hslText,
+	isAmong,
 	isRightToLeft,
 	landFocus,
 	measureBounds,
@@ -79,6 +80,11 @@ export const colorpickerState = shared(
 		const errorEl = element<HTMLDivElement>();
 		const areaEl = element<HTMLDivElement>();
 		const axisEls = element<HTMLDivElement[]>();
+		// Every focusable element the family owns, bound rather than found: the
+		// family never queries the DOM for its own parts.
+		const thumbEls = element<HTMLDivElement[]>();
+		const inputEls = element<HTMLInputElement[]>();
+		const itemEls = element<HTMLButtonElement[]>();
 		const contentEl = element<HTMLDivElement>();
 		const triggerEl = element<HTMLButtonElement>();
 
@@ -127,6 +133,9 @@ export const colorpickerState = shared(
 			errorEl,
 			areaEl,
 			axisEls,
+			thumbEls,
+			inputEls,
+			itemEls,
 			contentEl,
 			triggerEl,
 			value,
@@ -341,9 +350,9 @@ export const colorpickerState = shared(
 
 			/** The full three-channel announcement is what a person hears on the first key after focus arrives. */
 			enterArea(from: EventTarget | null) {
-				const area = areaEl;
-				if (!area) return;
-				if (from !== null && from instanceof Node && area.contains(from)) return;
+				// Focus moving between the plane's own two axis controls is not an
+				// arrival, and identity against their handles says so without a DOM walk.
+				if (isAmong(from, [axisEls])) return;
 				picker.stepping = false;
 			},
 
@@ -411,6 +420,7 @@ export function ColorpickerRoot({
 	<div
 		{...rest}
 		style={rootPainted}
+		ui-picker={true}
 		ui-disabled={picker.disabled}
 		ui-readonly={picker.readonly}
 		ui-required={picker.required}
@@ -420,7 +430,12 @@ export function ColorpickerRoot({
 		ui-popup={picker.popup}
 		ui-open={rootShowing}
 		ui-closed={rootShowing !== true}
-	>{children}</div>
+	>
+		<style>
+			@layer markless { [ui-picker] { anchor-scope: --ui-colorpicker; } }
+		</style>
+		{children}
+	</div>
 }
 
 // One surface, both shapes. Inline it renders in place; with `popup` the same
@@ -447,14 +462,21 @@ export function ColorpickerContent({
 		role="group"
 		aria-labelledby={picker.labelEl}
 		hidden={surfaceShowing !== true}
+		ui-popup={picker.popup}
 		ui-open={surfaceShowing}
 		ui-closed={surfaceShowing !== true}
 		onDismiss={(event) => {
-			const surface = picker.contentEl;
 			const back = picker.triggerEl;
-			// Read before the close: a hidden subtree cannot hold focus, so afterwards the answer is gone.
-			const isFocusInside =
-				surface !== undefined && surface.contains(document.activeElement);
+			// Read before the close: a hidden subtree cannot hold focus, so afterwards
+			// the answer is gone. Identity against the handles the family binds, never
+			// a `contains` walk - every element that can hold focus in here is one of
+			// these four groups.
+			const isFocusInside = isAmong(document.activeElement, [
+				picker.axisEls,
+				picker.thumbEls,
+				picker.inputEls,
+				picker.itemEls,
+			]);
 			if (picker.popup === true) {
 				picker.setOpen(false);
 				// The primitive moves no focus, and a press elsewhere is a person choosing where to be.
@@ -462,7 +484,14 @@ export function ColorpickerContent({
 			}
 			onDismiss?.(event);
 		}}
-	>{children}</div>
+	>
+		<style>
+			@layer markless {
+				[ui-popup] { position: absolute; position-anchor: --ui-colorpicker; }
+			}
+		</style>
+		{children}
+	</div>
 }
 
 export function ColorpickerTrigger({ children, onClick, ...rest }: ColorpickerTriggerProps) @{
@@ -487,7 +516,12 @@ export function ColorpickerTrigger({ children, onClick, ...rest }: ColorpickerTr
 			}
 			onClick?.(event);
 		}}
-	>{children}</button>
+	>
+		<style>
+			@layer markless { button { anchor-name: --ui-colorpicker; } }
+		</style>
+		{children}
+	</button>
 }
 
 export function ColorpickerLabel({ children, ...rest }: ColorpickerLabelProps) @{
@@ -551,7 +585,6 @@ function ColorpickerAxis({ axis }: { readonly axis: 'x' | 'y' }) @{
 		aria-disabled={axisAriaDisabled}
 		aria-readonly={axisAriaReadonly}
 		tabindex={axisTabStop}
-		style="position: absolute; inset: 0"
 		ui-axis={own.axis}
 		ui-value={axisNow}
 		onKeydown={(event) => {
@@ -572,7 +605,11 @@ function ColorpickerAxis({ axis }: { readonly axis: 'x' | 'y' }) @{
 
 			picker.stepArea(event.key, event.shiftKey);
 		}}
-	/>
+	>
+		<style>
+			@layer markless { [ui-axis] { position: absolute; inset: 0; } }
+		</style>
+	</div>
 }
 
 export function ColorpickerArea({
@@ -589,6 +626,7 @@ export function ColorpickerArea({
 		el={picker.areaEl}
 		role="group"
 		aria-labelledby={picker.labelEl}
+		ui-plane={true}
 		// Error before description: what is wrong is conveyed before the hint,
 		// wherever the two parts sit in the page.
 		aria-describedby={[picker.errorEl, picker.descriptionEl]}
@@ -615,6 +653,15 @@ export function ColorpickerArea({
 			onFocusin?.(event);
 		}}
 	>
+		<style>
+			@layer markless {
+				[ui-plane] {
+					position: relative;
+					touch-action: none;
+					forced-color-adjust: none;
+				}
+			}
+		</style>
 		<ColorpickerAxis axis="x" />
 		<ColorpickerAxis axis="y" />
 		{children}
@@ -644,6 +691,7 @@ export function ColorpickerTrack({
 	<div
 		{...rest}
 		el={rail.el}
+		ui-rail={true}
 		ui-channel={rail.channel}
 		ui-disabled={picker.disabled}
 		ui-readonly={picker.readonly}
@@ -663,7 +711,18 @@ export function ColorpickerTrack({
 			picker.endDrag();
 			onPointerup?.(event);
 		}}
-	>{children}</div>
+	>
+		<style>
+			@layer markless {
+				[ui-rail] {
+					position: relative;
+					touch-action: none;
+					forced-color-adjust: none;
+				}
+			}
+		</style>
+		{children}
+	</div>
 }
 
 /**
@@ -734,6 +793,7 @@ export function ColorpickerThumb({ channel, children, onKeydown, ...rest }: Colo
 
 	<div
 		{...rest}
+		el={picker.thumbEls}
 		role={thumbRole}
 		tabindex={thumbTabStop}
 		style={thumbOffset}
@@ -765,7 +825,24 @@ export function ColorpickerThumb({ channel, children, onKeydown, ...rest }: Colo
 			picker.stepRail(handle.channel, event.key, event.shiftKey);
 			onKeydown?.(event);
 		}}
-	>{children}</div>
+	>
+		<style>
+			@layer markless {
+				[role='slider'][ui-channel] {
+					position: absolute;
+					left: var(--colorpicker-offset);
+					forced-color-adjust: none;
+				}
+				[role='presentation'] {
+					position: absolute;
+					left: var(--colorpicker-x);
+					bottom: var(--colorpicker-y);
+					forced-color-adjust: none;
+				}
+			}
+		</style>
+		{children}
+	</div>
 }
 
 /**
@@ -826,6 +903,7 @@ export function ColorpickerInput({
 
 	<input
 		{...rest}
+		el={picker.inputEls}
 		type={boxKind}
 		value={boxShown}
 		aria-label={boxNamed}
@@ -903,6 +981,7 @@ export function ColorpickerItem({ value, children, onClick, ...rest }: Colorpick
 
 	<button
 		{...rest}
+		el={picker.itemEls}
 		type="button"
 		value={swatch.value}
 		style={swatchPainted}

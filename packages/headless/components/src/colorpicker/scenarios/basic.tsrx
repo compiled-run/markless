@@ -1,10 +1,10 @@
 import { colorpicker } from '../../index.ts';
 
-// The starter a consumer copies. The family ships no CSS, so every scenario gives
-// the plane and the rails their own size, `position: relative` for the axis
-// controls the area renders, and turns off touch scrolling.
-const AREA = 'position: relative; width: 200px; height: 160px; touch-action: none';
-const RAIL = 'position: relative; width: 200px; height: 20px; touch-action: none';
+// The starter a consumer copies. The plane and the rails are positioned and
+// take their pointer behaviour from the family's own `@layer markless` defaults,
+// so a scenario owes them nothing but a size.
+const AREA = 'width: 200px; height: 160px';
+const RAIL = 'width: 200px; height: 20px';
 
 export default function Basic() @{
 	<colorpicker.root value="#3399ff" name="brand" data-testid="root">

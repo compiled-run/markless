@@ -1,7 +1,7 @@
 import { colorpicker } from '../../index.ts';
 
-const AREA = 'position: relative; width: 200px; height: 160px; touch-action: none';
-const RAIL = 'position: relative; width: 200px; height: 20px; touch-action: none';
+const AREA = 'width: 200px; height: 160px';
+const RAIL = 'width: 200px; height: 20px';
 
 export default function TypedEntry() @{
 	<colorpicker.root value="#3399ff" data-testid="root">

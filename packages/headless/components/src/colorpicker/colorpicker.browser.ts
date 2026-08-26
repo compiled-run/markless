@@ -30,7 +30,6 @@ const Area = page.getByTestId('area');
 const AreaThumb = page.getByTestId('area-thumb');
 const HueTrack = page.getByTestId('hue-track');
 const HueThumb = page.getByTestId('hue-thumb');
-const AlphaTrack = page.getByTestId('alpha-track');
 const AlphaThumb = page.getByTestId('alpha-thumb');
 const ValueLabel = page.getByTestId('valuelabel');
 const Field = page.getByTestId('field');
@@ -175,7 +174,12 @@ function expectBasicDataSurface() {
 	expect(customProperty(root, '--colorpicker-pure')).toBe('#0080FF');
 	expect(customProperty(el(Area), '--colorpicker-x')).toBe('80%');
 	expect(customProperty(el(Area), '--colorpicker-y')).toBe('100%');
-	expect(el(Area).style.position).toBe('relative');
+	// The positioning default is CSS the family ships, not a style string JS built.
+	expect(window.getComputedStyle(el(Area)).position).toBe('relative');
+	expect(window.getComputedStyle(el(Area)).touchAction).toBe('none');
+	expect(window.getComputedStyle(axes()[0]).position).toBe('absolute');
+	expect(window.getComputedStyle(el(AreaThumb)).position).toBe('absolute');
+	expect(window.getComputedStyle(el(HueTrack)).position).toBe('relative');
 	expect(customProperty(el(AreaThumb), '--colorpicker-x')).toBe('80%');
 
 	expect(el(HueTrack).getAttribute('ui-channel')).toBe('hue');
@@ -516,7 +520,9 @@ test('CSR: an entry that will not parse is reported invalid and then reverts', a
 
 	await userEvent.keyboard('{Enter}');
 	await expect.poll(() => box.value).toBe('#3399FF');
-	expect(box.getAttribute('aria-invalid')).toBe('false');
+	// Polled, not read once: the revert lands on the element and the state the box
+	// reports is recomputed from the graph a tick behind it.
+	await expect.poll(() => box.getAttribute('aria-invalid')).toBe('false');
 });
 
 test('CSR: a channel box takes a number and reports the channel range', async () => {
@@ -586,6 +592,26 @@ test('CSR: the popup surface holds the same picker the inline shape does', async
 	await userEvent.keyboard('{ArrowLeft}');
 	await expect.poll(() => axes()[0].getAttribute('aria-valuenow')).toBe('79');
 	expect(el(ValueLabel).getAttribute('ui-value')).toBe('#369AFF');
+});
+
+// The popup is placed by CSS anchoring alone, tooltip's shipped idiom: the root
+// scopes the name, the trigger declares it, the surface points at it. Nothing here
+// measures a box, so a surface served already showing is placed on its first layout.
+test('CSR: the popup surface is anchored to its trigger by CSS alone', async () => {
+	await render(Popup);
+	const anchor = '--ui-colorpicker';
+	expect(window.getComputedStyle(el(Root)).getPropertyValue('anchor-scope')).toBe(anchor);
+	expect(window.getComputedStyle(el(Trigger)).getPropertyValue('anchor-name')).toBe(anchor);
+	expect(window.getComputedStyle(el(Content)).getPropertyValue('position-anchor')).toBe(anchor);
+	expect(window.getComputedStyle(el(Content)).position).toBe('absolute');
+});
+
+// An inline picker names no anchor and is placed by the page, which is the whole
+// difference between the two shapes in CSS.
+test('CSR: an inline surface is not anchored and stays in flow', async () => {
+	await render(Basic);
+	expect(el(Content).hasAttribute('ui-popup')).toBe(false);
+	expect(window.getComputedStyle(el(Content)).position).toBe('static');
 });
 
 // ------------------------------------------------------------------------- axe

@@ -488,6 +488,24 @@ export function thumbStyleText(color: Hsb, channel: ColorChannel | ''): string {
 
 // ---------------------------------------------------------------------- focus
 
+/**
+ * Identity against the element handles the family binds, never a DOM walk. The
+ * family reaches its own parts only through `element()`, so `contains`,
+ * `closest` and a selector string have no place in this package's source.
+ */
+export function isAmong(
+	target: EventTarget | null,
+	groups: ReadonlyArray<ReadonlyArray<HTMLElement> | undefined>,
+): boolean {
+	if (target === null) return false;
+	for (const group of groups) {
+		if (group === undefined) continue;
+		for (const one of group) if (one === target) return true;
+	}
+	return false;
+}
+
+
 const FOCUS_TRIES = 12;
 
 /**

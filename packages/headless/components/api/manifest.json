@@ -716,6 +716,193 @@
 			}
 		]
 	},
+	"colorpicker": {
+		"parts": [
+			{
+				"part": "area",
+				"component": "ColorpickerArea",
+				"doc": "The saturation-by-brightness plane. It is `role=\"group\"` and renders its own two\none-axis `role=\"slider\"` controls, because one element carries one\n`aria-valuenow` — a single slider would leave brightness unreachable to anyone\nadjusting it with a reader. Put a `colorpicker.thumb` with no `channel` inside\nit as the visible marker.",
+				"props": []
+			},
+			{
+				"part": "content",
+				"component": "ColorpickerContent",
+				"doc": "The one surface both shapes use: in place when the picker is inline, revealed by the trigger under `popup`.",
+				"props": []
+			},
+			{
+				"part": "description",
+				"component": "ColorpickerDescription",
+				"doc": "Supporting text, named by the area's `aria-describedby` after any error.",
+				"props": []
+			},
+			{
+				"part": "error",
+				"component": "ColorpickerError",
+				"doc": "The validation message, named ahead of the description. `invalid` on the root is what marks the control invalid.",
+				"props": []
+			},
+			{
+				"part": "field",
+				"component": "ColorpickerField",
+				"doc": "The element a form submits: an `<input type=\"text\">`, clipped and out of the tab order.",
+				"props": []
+			},
+			{
+				"part": "input",
+				"component": "ColorpickerInput",
+				"doc": "A box a person types into. The graph writes attributes and an input's shown\ntext is its `value` property, so this part only exists because the write was\nmeasured to re-display a box a person had already typed into - the gate is\n`packages/vitest-browser/browser/colorpicker-gates`.",
+				"props": [
+					{
+						"name": "channel",
+						"type": "| 'hue'\n\t| 'saturation'\n\t| 'brightness'\n\t| 'alpha'\n\t| 'red'\n\t| 'green'\n\t| 'blue'\n\t| 'lightness'",
+						"required": false,
+						"doc": "Which number this box carries. Omit it and the box holds the hex."
+					}
+				]
+			},
+			{
+				"part": "item",
+				"component": "ColorpickerItem",
+				"doc": "A real `<button>` carrying `aria-pressed`, boxNamed by the colour and the value it\nstands for. `aria-selected` is not supported on `button`, which is calendar's\nshipped ruling applied unchanged.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": true,
+						"doc": "The colour this swatch chooses, in any notation `value` accepts."
+					}
+				]
+			},
+			{
+				"part": "label",
+				"component": "ColorpickerLabel",
+				"doc": "Names the picker for a reader: `colorpicker.area` and `colorpicker.content` point their `aria-labelledby` here.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "ColorpickerRoot",
+				"doc": "The colour picker itself; the label, the area, the rails, the swatches and the\nform element all go inside it.\n\n`value` is a seed, not a controlled mirror: once a gesture has run the picker\nholds its own colour and the prop is never read again. Feeding every `onChange`\nback into `value` is redundant rather than harmful — and it is what would make\nthe 8-bit hex quantisation visible, since `#5A8FB3` parses back a fraction of a\ndegree off the hue it was written from.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The colour to start on: `#rgb`, `#rrggbb`, `rgb()`, `hsl()` or `hsb()`, with or without alpha. Omit it and the picker starts white."
+					},
+					{
+						"name": "swatches",
+						"type": "readonly string[]",
+						"required": false,
+						"default": "[]",
+						"doc": "The colours `colorpicker.state().swatches` hands back for the consumer to repeat over."
+					},
+					{
+						"name": "alpha",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Keep and show the alpha channel. HTML's own spelling, from `<input type=\"color\" alpha>`."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nobody can change the colour, and every control drops out of the tab order."
+					},
+					{
+						"name": "readonly",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The colour can be read but not changed."
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The form element must carry a colour before a form submits."
+					},
+					{
+						"name": "invalid",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Report the control as invalid. A prop, not a consequence of mounting `colorpicker.error`."
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "Submitted under this name by `colorpicker.field`."
+					},
+					{
+						"name": "popup",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The picker lives behind `colorpicker.trigger` instead of rendering in place."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: string) => void",
+						"required": false,
+						"doc": "Called with the new colour every time it changes, including during a drag."
+					},
+					{
+						"name": "onChangeEnd",
+						"type": "(value: string) => void",
+						"required": false,
+						"doc": "Called once the change settles: the pointer released, the key that moved it, or a typed entry committed."
+					}
+				]
+			},
+			{
+				"part": "thumb",
+				"component": "ColorpickerThumb",
+				"doc": "Inside a rail this is that channel's control; inside the area it is the marker\nthe family positions and nothing more. One part rather than two because the\nconsumer writes the same tag either way - what it is follows from where it sits.",
+				"props": [
+					{
+						"name": "channel",
+						"type": "| 'hue'\n\t| 'saturation'\n\t| 'brightness'\n\t| 'alpha'\n\t| 'red'\n\t| 'green'\n\t| 'blue'\n\t| 'lightness'",
+						"required": false,
+						"doc": "The rail this handle belongs to. Omit it inside `colorpicker.area`."
+					}
+				]
+			},
+			{
+				"part": "track",
+				"component": "ColorpickerTrack",
+				"doc": "One channel's rail and the hit area its pointer gesture runs on. The family\npublishes `--colorpicker-start` and `--colorpicker-end` for the gradient rather\nthan painting one, so the stylesheet owns the look.",
+				"props": [
+					{
+						"name": "channel",
+						"type": "| 'hue'\n\t| 'saturation'\n\t| 'brightness'\n\t| 'alpha'\n\t| 'red'\n\t| 'green'\n\t| 'blue'\n\t| 'lightness'",
+						"required": false,
+						"default": "'hue'",
+						"doc": "Which number this rail carries. Omit it and the rail is the hue rail."
+					}
+				]
+			},
+			{
+				"part": "trigger",
+				"component": "ColorpickerTrigger",
+				"doc": "Opens the popup shape. Only rendered when the root carries `popup`.",
+				"props": []
+			},
+			{
+				"part": "valuelabel",
+				"component": "ColorpickerValueLabel",
+				"doc": "The colour as words and as hex, or whatever the consumer writes instead.",
+				"props": []
+			}
+		]
+	},
 	"combobox": {
 		"parts": [
 			{

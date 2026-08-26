@@ -1,6 +1,6 @@
 import { colorpicker } from '../../index.ts';
 
-const AREA = 'position: relative; width: 200px; height: 160px; touch-action: none';
+const AREA = 'width: 200px; height: 160px';
 const PALETTE = ['#3399FF', '#FF3366', '#33CC66'];
 
 export default function Swatches() @{

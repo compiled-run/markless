@@ -1,6 +1,6 @@
 import { colorpicker } from '../../index.ts';
 
-const RAIL = 'position: relative; width: 200px; height: 20px; touch-action: none';
+const RAIL = 'width: 200px; height: 20px';
 
 // `colorpicker.field` is what a form submits: a plain text input carrying the
 // same hex the callbacks report.
