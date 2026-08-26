@@ -1,8 +1,28 @@
-import type { PublicRenderModuleInput } from '../../artifacts.ts';
+import type { PublicRenderModuleInput, SemanticMarkupChunk } from '../../artifacts.ts';
 import {
 	resolveSharedInstanceGraphPath,
 	sharedDefinitionId,
 } from '../semantic-graph/collect-shared.ts';
+
+/** The prop a projection is written as, whichever way the consumer spells it. */
+export const PROJECTION_PROP_NAME = 'children' as const;
+
+/**
+ * The `children` a projection already has BEFORE it renders. The seed pass runs
+ * ahead of the projection, so a part that seeds from `children` normally sees
+ * undefined; a projection of static text alone is spelled in the chunk's statics
+ * and is therefore the exact string the render will hand that part. Anything
+ * with an element or a read has no value until it renders, and returns nothing.
+ */
+export function staticProjectionChildren(
+	chunks: ReadonlyArray<SemanticMarkupChunk>,
+	projectionChunkId: string | undefined,
+): string | undefined {
+	if (projectionChunkId === undefined) return undefined;
+	const chunk = chunks.find((candidate) => candidate.id === projectionChunkId);
+	if (!chunk || chunk.hosts.length > 0 || chunk.slots.length > 0) return undefined;
+	return chunk.statics.join('');
+}
 
 type SharedSeedSymbol = {
 	readonly graphNodeId: string;

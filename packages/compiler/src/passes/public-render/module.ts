@@ -6,6 +6,7 @@ import { collectSsrDeriveSetDiagnostics } from './derive-set.ts';
 import { emitDirectPublicRenderModule } from './direct-module.ts';
 import { emitPublicSsrRenderModule } from './ssr-module.ts';
 import { firstComponentRoot, selectPublicRenderRoot } from './plan.ts';
+import { collectSeedChildrenDiagnostics } from './seed-children-diagnostics.ts';
 import { hasExecutableBodyStatements, sharedInstanceLocalNames } from './render-body.ts';
 import { sameModuleSsrComponentNames, ssrComponentFunctionName } from './same-module.ts';
 import { componentPropNames, isFragmentNode } from './shared.ts';
@@ -121,6 +122,7 @@ export function emitPublicRenderModule(input: PublicRenderModuleInput): PublicRe
 		diagnostics: [
 			...input.publicRenderPlan.diagnostics,
 			...(ssrModuleSource ? collectSsrDeriveSetDiagnostics(input) : []),
+			...collectSeedChildrenDiagnostics(input),
 		],
 	};
 }
