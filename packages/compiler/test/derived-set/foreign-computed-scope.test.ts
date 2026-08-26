@@ -5,14 +5,12 @@ import { compileTsrxModulesWithInterfaces } from '../multi-module-compile-suppor
 
 // Serving a page that reads a factory computed works the value out by copying
 // the factory's own expression into that page's module. Inside the defining
-// file that is sound - the text lands back in the scope it was written in, and
-// that file's imports and module constants are emitted beside it. Across files
-// neither travels, and the copy is matched against the reading file's imports
-// by name, so an expression that names anything at module scope either threw a
-// ReferenceError while the page was served or was quietly built from the
-// reading file's same-named value. These tests are the refusal, not the
-// capability: carrying the definition file's module scope needs a field the
-// shared() definition record does not have yet.
+// file that is sound - the text lands back in the scope it was written in.
+// Across files the scope has to travel too: the shared() definition record
+// carries the imports and module constants the factory's text names, and the
+// reading module emits the ones its copy still spells. The one shape that
+// cannot be carried is a name the reading module already binds from somewhere
+// else, because one module scope cannot hold two of it.
 
 const HELPERS = `
 export function shout(text) { return String(text).toUpperCase(); }
@@ -75,7 +73,7 @@ test('the defining module still serves its own factory computed', async () => {
 	expect(ssr).toContain('#box/computed:banged"');
 });
 
-test('a consumer reading a cell built on the family import is refused, naming both', async () => {
+test('a consumer reading a cell built on the family import compiles and carries it', async () => {
 	const { consumer } = await compileWithFamily(`
 import { box } from './family.tsrx';
 
@@ -84,22 +82,14 @@ export default function Page() @{
 	<div>{b.loud}</div>
 }
 `);
+	const ssr = consumer.publicRenderModule.ssrModuleSource;
 
-	const refusals = errors(consumer).filter(
-		(item) => item.code === SHARED_COMPUTED_CROSS_MODULE_CODE,
-	);
-	expect(refusals.length).toBeGreaterThan(0);
-	const said = refusals.map((item) => `${item.title}\n${item.message}`).join('\n');
-	// The name the copied expression expects, the cell that dragged it in, and
-	// the file it came from.
-	expect(said).toContain('"shout"');
-	expect(said).toContain('"loud"');
-	expect(said).toContain('src/family.tsrx');
-	expect(said).toContain('ReferenceError');
-	expect(refusals[0]?.title).toContain('cannot be read from another module yet');
+	expect(errors(consumer)).toEqual([]);
+	expect(ssr).toContain('import { shout } from "./helpers.ts";');
+	expect(ssr).toContain('#box/computed:loud"');
 });
 
-test('a module constant the copied expression names is refused the same way', async () => {
+test('a module constant the copied expression names travels with it', async () => {
 	const { consumer } = await compileWithFamily(`
 import { box } from './family.tsrx';
 
@@ -108,20 +98,19 @@ export default function Page() @{
 	<div>{b.banged}</div>
 }
 `);
+	const ssr = consumer.publicRenderModule.ssrModuleSource;
 
-	const named = errors(consumer)
-		.filter((item) => item.code === SHARED_COMPUTED_CROSS_MODULE_CODE)
-		.map((item) => item.message)
-		.join('\n');
+	expect(errors(consumer)).toEqual([]);
 	// `banged` names the module constant; its dependency `loud` names the import.
-	expect(named).toContain('"SUFFIX"');
-	expect(named).toContain('"shout"');
+	expect(ssr).toContain("const SUFFIX = '!';");
+	expect(ssr).toContain('import { shout } from "./helpers.ts";');
 });
 
-// The worse half: the reading file happens to bind the same name, so the copy
-// binds to the consumer's value and the served page is quietly built from a
-// function the family never meant.
-test('a consumer import the copied expression captures is refused as a capture', async () => {
+// The one half that still refuses: the reading file binds the same name from
+// somewhere else, so the carry cannot land - the module would bind "shout"
+// twice, and matching by name alone would build the served value from the
+// consumer's function.
+test('a consumer binding of the same name from another origin refuses, naming both', async () => {
 	const { consumer } = await compileWithFamily(`
 import { box } from './family.tsrx';
 import { shout } from './consumer-helpers.ts';
@@ -133,19 +122,23 @@ export default function Page() @{
 `);
 
 	const captured = errors(consumer).filter(
-		(item) =>
-			item.code === SHARED_COMPUTED_CROSS_MODULE_CODE &&
-			item.message.includes('matched against it by name alone'),
+		(item) => item.code === SHARED_COMPUTED_CROSS_MODULE_CODE,
 	);
 	expect(captured.length).toBeGreaterThan(0);
-	expect(captured[0]?.message).toContain('"shout"');
-	expect(captured[0]?.message).toContain('src/family.tsrx');
+	const said = captured.map((item) => `${item.title}\n${item.message}`).join('\n');
+	expect(said).toContain('"shout"');
+	expect(said).toContain('"loud"');
+	expect(said).toContain('src/family.tsrx');
+	expect(said).toContain('./consumer-helpers.ts');
+	expect(said).toContain('matched against it by name alone');
+	expect(captured[0]?.title).toContain('cannot be read from another module yet');
+	// Nothing is emitted for a name it refused to carry.
+	expect(consumer.publicRenderModule.ssrModuleSource).not.toContain('from "./helpers.ts"');
 });
 
 // A cell written out of the factory's own state and platform globals needs
 // nothing from the defining file's module scope, so it copies into any module
-// unchanged - and must keep compiling, or the refusal would ban shared() cells
-// across modules outright.
+// unchanged - and carries nothing with it.
 test('a self-contained cell is still readable from another module', async () => {
 	const { consumer } = await compileWithFamily(`
 import { box } from './family.tsrx';
@@ -155,9 +148,12 @@ export default function Page() @{
 	<div>{b.plain}</div>
 }
 `);
+	const ssr = consumer.publicRenderModule.ssrModuleSource;
 
 	expect(errors(consumer)).toEqual([]);
-	expect(consumer.publicRenderModule.ssrModuleSource).toContain('#box/computed:plain"');
+	expect(ssr).toContain('#box/computed:plain"');
+	expect(ssr).not.toContain('shout');
+	expect(ssr).not.toContain('SUFFIX');
 });
 
 // Reading a plain state cell of the family copies no expression at all, so

@@ -1,4 +1,9 @@
-import type { PublicRenderModuleInput } from '../../artifacts.ts';
+import type {
+	PublicRenderModuleInput,
+	SemanticModuleImport,
+	SemanticSharedDefinition,
+	SemanticSharedModuleDeclaration,
+} from '../../artifacts.ts';
 import type { CompilerDiagnostic } from '../../diagnostics.ts';
 import { asNodes, isNode, type AnyNode } from '../../ast/nodes.ts';
 import { parseModule } from '../../js-ast.ts';
@@ -11,6 +16,7 @@ import {
 } from './residue-reader.ts';
 import {
 	componentEdgesFor,
+	emitValueImport,
 	moduleScopeDeclarations,
 	publicRenderValueImports,
 	repeatCollectionGraphNodeIds,
@@ -239,26 +245,13 @@ export function orderComputedDerives(
 export function collectSsrDeriveSetDiagnostics(
 	input: PublicRenderModuleInput,
 ): ReadonlyArray<CompilerDiagnostic> {
-	const syncComputedNames = new Map(
-		input.protocolState.computed.flatMap((computed) =>
-			computed.async ? [] : ([[computed.graphNodeId, computed.name]] as const),
-		),
-	);
+	const syncComputedNames = syncComputedNamesByGraphNodeId(input);
 	const sharedSources = collectSsrSharedComputedSources(input);
-	const localComputedIds = new Set(
-		input.semanticGraph.graphBindings.flatMap((binding) =>
-			binding.kind === 'computed' && binding.sharedDefinitionId === undefined
-				? [binding.id]
-				: [],
-		),
-	);
 	const edges = computedDependencyEdges(input);
 	const componentNames = [
 		...new Set(input.renderData.chunks.map((chunk) => chunk.componentName)),
 	];
 	const reported = new Set<string>();
-	const copiedBodyReported = new Set<string>();
-	const bound = moduleBoundNames(input);
 	const diagnostics: CompilerDiagnostic[] = [];
 	const report = (graphNodeId: string, reason: 'cycle' | 'no-source') => {
 		if (reported.has(graphNodeId)) return;
@@ -270,12 +263,7 @@ export function collectSsrDeriveSetDiagnostics(
 			}),
 		);
 	};
-	// A component-local `computed()` is a render-body local, evaluated where it is
-	// declared. A factory computed is the one kind with no local to re-read, so it
-	// is the one kind a missing derive leaves as undefined in the state map.
-	const factoryComputedIds = [...syncComputedNames.keys()].filter(
-		(graphNodeId) => graphNodeId.startsWith('shared:') && !localComputedIds.has(graphNodeId),
-	);
+	const factoryComputedIds = factoryComputedGraphNodeIds(input, syncComputedNames);
 	for (const componentName of componentNames) {
 		const reachable = componentDeriveGraphNodeIds(input, componentName);
 		const reached = factoryComputedIds.filter((graphNodeId) => reachable.has(graphNodeId));
@@ -286,25 +274,43 @@ export function collectSsrDeriveSetDiagnostics(
 			edges,
 		).cyclic)
 			report(graphNodeId, 'cycle');
-		for (const graphNodeId of reached) {
-			const source = sharedSources.get(graphNodeId);
-			if (source === undefined || copiedBodyReported.has(graphNodeId)) continue;
-			copiedBodyReported.add(graphNodeId);
-			diagnostics.push(
-				...foreignCopiedBodyDiagnostics(input, {
-					graphNodeId,
-					name: syncComputedNames.get(graphNodeId) ?? graphNodeId,
-					source,
-					bound,
-				}),
-			);
-		}
 	}
-	return diagnostics;
+	return [...diagnostics, ...foreignSharedComputedScope(input).diagnostics];
 }
 
 /** This pass owns the code; readers import it rather than restating the string. */
 export const SHARED_COMPUTED_CROSS_MODULE_CODE = 'MARKLESS_SHARED_COMPUTED_CROSS_MODULE';
+
+function syncComputedNamesByGraphNodeId(
+	input: PublicRenderModuleInput,
+): ReadonlyMap<string, string> {
+	return new Map(
+		input.protocolState.computed.flatMap((computed) =>
+			computed.async ? [] : ([[computed.graphNodeId, computed.name]] as const),
+		),
+	);
+}
+
+/**
+ * A component-local `computed()` is a render-body local, evaluated where it is
+ * declared. A factory computed is the one kind with no local to re-read, so it is
+ * the one kind a missing derive leaves as undefined in the state map.
+ */
+function factoryComputedGraphNodeIds(
+	input: PublicRenderModuleInput,
+	syncComputedNames: ReadonlyMap<string, string>,
+): ReadonlyArray<string> {
+	const localComputedIds = new Set(
+		input.semanticGraph.graphBindings.flatMap((binding) =>
+			binding.kind === 'computed' && binding.sharedDefinitionId === undefined
+				? [binding.id]
+				: [],
+		),
+	);
+	return [...syncComputedNames.keys()].filter(
+		(graphNodeId) => graphNodeId.startsWith('shared:') && !localComputedIds.has(graphNodeId),
+	);
+}
 
 /** The file a `shared:<filename>#<name>/...` node was defined in. */
 function sharedDefinitionFilename(graphNodeId: string): string | null {
@@ -314,61 +320,294 @@ function sharedDefinitionFilename(graphNodeId: string): string | null {
 		: null;
 }
 
-/** Every name the emitted server module binds at module scope. */
-function moduleBoundNames(input: PublicRenderModuleInput): ReadonlySet<string> {
-	const declarations = moduleScopeDeclarations(input.source.source, input.source.filename);
-	return new Set([
-		...publicRenderValueImports(
-			input.semanticGraph.moduleImports,
-			input.semanticGraph.componentEdges,
-			declarations.map((declaration) => declaration.source).join('\n'),
-		).map((moduleImport) => moduleImport.localName),
-		...declarations.flatMap((declaration) => [...declaration.names]),
-	]);
+type ForeignCopiedBody = {
+	readonly graphNodeId: string;
+	readonly name: string;
+	readonly source: string;
+	readonly definedIn: string;
+};
+
+/** The factory expressions this module's server render copies out of another file. */
+function foreignCopiedBodies(input: PublicRenderModuleInput): ReadonlyArray<ForeignCopiedBody> {
+	const sharedSources = collectSsrSharedComputedSources(input);
+	if (sharedSources.size === 0) return [];
+	const syncComputedNames = syncComputedNamesByGraphNodeId(input);
+	const factoryComputedIds = factoryComputedGraphNodeIds(input, syncComputedNames);
+	if (factoryComputedIds.length === 0) return [];
+	const reached = new Set<string>();
+	for (const componentName of new Set(
+		input.renderData.chunks.map((chunk) => chunk.componentName),
+	)) {
+		const reachable = componentDeriveGraphNodeIds(input, componentName);
+		for (const graphNodeId of factoryComputedIds)
+			if (reachable.has(graphNodeId)) reached.add(graphNodeId);
+	}
+	return [...reached].flatMap((graphNodeId) => {
+		const source = sharedSources.get(graphNodeId);
+		const definedIn = sharedDefinitionFilename(graphNodeId);
+		return source === undefined || definedIn === null || definedIn === input.source.filename
+			? []
+			: [
+					{
+						graphNodeId,
+						name: syncComputedNames.get(graphNodeId) ?? graphNodeId,
+						source,
+						definedIn,
+					},
+				];
+	});
 }
 
 /**
- * The refusal for a factory `computed()` whose expression this module copies out
- * of another file. The copy carries the authored text and the graph reads the
- * compiler rewrote into it and nothing else, so a name from the defining file's
- * module scope either binds to nothing here - a ReferenceError while the page is
- * served - or matches a same-named import of THIS file and quietly means
- * something the author never wrote.
+ * What this module has to emit beside a factory expression it copied out of
+ * another file, and the refusals for the names it cannot satisfy.
+ *
+ * The copy carries the authored text and the graph reads the compiler rewrote
+ * into it, so every other name it spells belongs to the defining file's module
+ * scope. The definition record carries that scope; this narrows it to the names
+ * the copy actually spells, rebases relative specifiers onto this module's own
+ * path, and drops what this module already imports from the same place. A name
+ * this module binds from somewhere else cannot be carried at all - one module
+ * scope cannot hold two of it - so that stays refused.
  */
-function foreignCopiedBodyDiagnostics(
+export type ForeignFactoryScope = {
+	readonly importLines: ReadonlyArray<string>;
+	readonly declarations: ReadonlyArray<string>;
+	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+};
+
+const emptyForeignFactoryScope: ForeignFactoryScope = {
+	importLines: [],
+	declarations: [],
+	diagnostics: [],
+};
+
+export function foreignSharedComputedScope(input: PublicRenderModuleInput): ForeignFactoryScope {
+	const bodies = foreignCopiedBodies(input);
+	if (bodies.length === 0) return emptyForeignFactoryScope;
+
+	const definitionOf = (graphNodeId: string) =>
+		input.semanticGraph.sharedDefinitions.find((definition) =>
+			graphNodeId.startsWith(`${definition.id}/`),
+		);
+	const consumerOrigins = consumerBindingOrigins(input);
+	const importLines: string[] = [];
+	const declarations: string[] = [];
+	const diagnostics: CompilerDiagnostic[] = [];
+	const carried = new Map<string, CarriedBinding>();
+	const refused = new Set<string>();
+
+	const refuse = (body: ForeignCopiedBody, name: string, held: BindingOrigin | undefined) => {
+		const key = `${body.graphNodeId} ${name}`;
+		if (refused.has(key)) return;
+		refused.add(key);
+		diagnostics.push(crossModuleRefusal(body, name, held));
+	};
+
+	for (const body of bodies) {
+		const definition = definitionOf(body.graphNodeId);
+		const needed = neededFactoryScope(definition, body.source);
+		for (const name of needed.unsatisfied) refuse(body, name, consumerOrigins.get(name));
+
+		for (const declaration of needed.declarations) {
+			const origin: BindingOrigin = {
+				key: `declaration:${body.definedIn}:${declaration.source}`,
+				text: `a module-scope declaration in ${body.definedIn}`,
+			};
+			const blocked = declaration.names.flatMap((name) => {
+				const held = carried.get(name)?.origin ?? consumerOrigins.get(name);
+				return held && held.key !== origin.key ? [{ name, held }] : [];
+			});
+			if (blocked.length > 0) {
+				for (const clash of blocked) refuse(body, clash.name, clash.held);
+				continue;
+			}
+			if (declaration.names.every((name) => carried.has(name))) continue;
+			declarations.push(declaration.source);
+			for (const name of declaration.names) carried.set(name, { origin });
+		}
+
+		for (const moduleImport of needed.imports) {
+			const origin = importOrigin(moduleImport, body.definedIn);
+			const held =
+				carried.get(moduleImport.localName)?.origin ??
+				consumerOrigins.get(moduleImport.localName);
+			if (held) {
+				if (held.key !== origin.key) refuse(body, moduleImport.localName, held);
+				continue;
+			}
+			importLines.push(
+				emitValueImport({
+					...moduleImport,
+					source: rebaseSpecifier(
+						moduleImport.source,
+						body.definedIn,
+						input.source.filename,
+					),
+				}),
+			);
+			carried.set(moduleImport.localName, { origin });
+		}
+	}
+
+	return { importLines, declarations, diagnostics };
+}
+
+type BindingOrigin = { readonly key: string; readonly text: string };
+type CarriedBinding = { readonly origin: BindingOrigin };
+
+/** Where each name the emitted server module binds at module scope comes from. */
+function consumerBindingOrigins(
 	input: PublicRenderModuleInput,
-	cell: {
-		readonly graphNodeId: string;
-		readonly name: string;
-		readonly source: string;
-		readonly bound: ReadonlySet<string>;
-	},
-): ReadonlyArray<CompilerDiagnostic> {
-	const definedIn = sharedDefinitionFilename(cell.graphNodeId);
-	if (definedIn === null || definedIn === input.source.filename) return [];
-	return [...freeIdentifierNames(cell.source)]
-		.filter((name) => !isPlatformGlobal(name))
-		.map((name) => ({
-			code: SHARED_COMPUTED_CROSS_MODULE_CODE,
-			severity: 'error' as const,
-			phase: 'public-render' as const,
-			passId: PUBLIC_RENDER_PLAN_PASS_ID,
-			artifactKeys: ['publicRenderModule'],
-			title: `A shared() computed cannot be read from another module yet ("${cell.name}")`,
-			message: cell.bound.has(name)
-				? `Serving this page works "${cell.name}" out by copying its expression from ${definedIn} into this file. The copied expression names "${name}", and the import of "${name}" in THIS file was matched against it by name alone, so the served value would be built from this module's "${name}" rather than the one ${definedIn} means.`
-				: `Serving this page works "${cell.name}" out by copying its expression from ${definedIn} into this file. The copied expression names "${name}", and nothing in this module binds it, so rendering this page on the server would throw a ReferenceError.`,
-			why: "A shared() factory has no instance on the server to ask for a computed value, so the server works the value out by copying the factory's own expression into the module of every page that reads it. Copying text moves the statements but not the scope they were written in: the defining file's imports and module-scope constants do not travel, and the copy is matched against the reading file's imports by name. Both failures happen only while the page is being served, so this build refuses instead of shipping one.",
-			suggestions: [
-				{
-					message: `Write "${cell.name}" so it needs nothing from ${definedIn}'s module scope - out of the factory's own state and platform globals only - and it copies into any file unchanged.`,
-				},
-				{
-					message: `Or read "${cell.name}" from a part that ${definedIn} publishes and compose that part here. Inside its own module the same expression copies back into the scope it was written in.`,
-				},
-			],
-			docsUrl: `https://markless.dev/errors/${SHARED_COMPUTED_CROSS_MODULE_CODE}`,
-		}));
+): ReadonlyMap<string, BindingOrigin> {
+	const declarations = moduleScopeDeclarations(input.source.source, input.source.filename);
+	const origins = new Map<string, BindingOrigin>();
+	for (const declaration of declarations)
+		for (const name of declaration.names)
+			origins.set(name, {
+				key: `declaration:${input.source.filename}:${declaration.source}`,
+				text: 'a module-scope declaration in this file',
+			});
+	for (const moduleImport of publicRenderValueImports(
+		input.semanticGraph.moduleImports,
+		input.semanticGraph.componentEdges,
+		declarations.map((declaration) => declaration.source).join('\n'),
+	))
+		origins.set(moduleImport.localName, importOrigin(moduleImport, input.source.filename));
+	return origins;
+}
+
+function importOrigin(moduleImport: SemanticModuleImport, ownerFilename: string): BindingOrigin {
+	const resolved = resolveSpecifier(moduleImport.source, ownerFilename);
+	const imported =
+		moduleImport.kind === 'named'
+			? (moduleImport.importedName ?? moduleImport.localName)
+			: moduleImport.kind;
+	return {
+		key: `import:${resolved}:${moduleImport.kind}:${imported}`,
+		text: `the ${moduleImport.kind} import "${imported}" of ${moduleImport.source}`,
+	};
+}
+
+/**
+ * The part of a factory's carried module scope one copied expression needs, and
+ * the free names nothing in it explains. A carried declaration's own free names
+ * join the search, so a module constant written out of another one arrives whole.
+ */
+function neededFactoryScope(
+	definition: SemanticSharedDefinition | undefined,
+	copiedSource: string,
+): {
+	readonly imports: ReadonlyArray<SemanticModuleImport>;
+	readonly declarations: ReadonlyArray<SemanticSharedModuleDeclaration>;
+	readonly unsatisfied: ReadonlyArray<string>;
+} {
+	const scope = definition?.factoryModuleScope ?? [];
+	const factoryImports = definition?.factoryModuleImports ?? [];
+	const wanted = new Set(
+		[...freeIdentifierNames(copiedSource)].filter((name) => !isPlatformGlobal(name)),
+	);
+	const keptDeclarations = new Set<SemanticSharedModuleDeclaration>();
+	const keptImports = new Set<SemanticModuleImport>();
+	const satisfied = new Set<string>();
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const declaration of scope) {
+			if (keptDeclarations.has(declaration)) continue;
+			if (!declaration.names.some((name) => wanted.has(name))) continue;
+			keptDeclarations.add(declaration);
+			changed = true;
+			for (const name of declaration.names) satisfied.add(name);
+			for (const name of freeDeclarationNames(declaration.source))
+				if (!isPlatformGlobal(name)) wanted.add(name);
+		}
+		for (const moduleImport of factoryImports) {
+			if (keptImports.has(moduleImport) || !wanted.has(moduleImport.localName)) continue;
+			keptImports.add(moduleImport);
+			satisfied.add(moduleImport.localName);
+			changed = true;
+		}
+	}
+	return {
+		// Emission order is the defining file's own, so a constant written out of
+		// another one still comes after it and evaluates.
+		imports: factoryImports.filter((moduleImport) => keptImports.has(moduleImport)),
+		declarations: scope.filter((declaration) => keptDeclarations.has(declaration)),
+		unsatisfied: [...wanted].filter((name) => !satisfied.has(name)),
+	};
+}
+
+function crossModuleRefusal(
+	body: ForeignCopiedBody,
+	name: string,
+	held: BindingOrigin | undefined,
+): CompilerDiagnostic {
+	return {
+		code: SHARED_COMPUTED_CROSS_MODULE_CODE,
+		severity: 'error',
+		phase: 'public-render',
+		passId: PUBLIC_RENDER_PLAN_PASS_ID,
+		artifactKeys: ['publicRenderModule'],
+		title: `A shared() computed cannot be read from another module yet ("${body.name}")`,
+		message: held
+			? `Serving this page works "${body.name}" out by copying its expression from ${body.definedIn} into this file. The copied expression names "${name}", which ${body.definedIn} means as its own, and THIS file already binds "${name}" as ${held.text}; one module scope cannot hold both, and matched against it by name alone the served value would be built from this module's "${name}" rather than the one ${body.definedIn} means.`
+			: `Serving this page works "${body.name}" out by copying its expression from ${body.definedIn} into this file. The copied expression names "${name}", and nothing in this module binds it, so rendering this page on the server would throw a ReferenceError.`,
+		why: "A shared() factory has no instance on the server to ask for a computed value, so the server works the value out by copying the factory's own expression into the module of every page that reads it. The imports and module-scope constants that expression names travel with the definition and are emitted beside the copy, but a name this file already binds from somewhere else cannot be: the emitted module would bind it twice, and matching by name alone would build the served value from this module's value instead.",
+		suggestions: [
+			held
+				? {
+						message: `Rename this module's "${name}", or import it under another local name, so the one ${body.definedIn} means can be carried in beside the copy.`,
+					}
+				: {
+						message: `Write "${body.name}" so it needs nothing from ${body.definedIn}'s module scope - out of the factory's own state and platform globals only - and it copies into any file unchanged.`,
+					},
+			{
+				message: `Or read "${body.name}" from a part that ${body.definedIn} publishes and compose that part here. Inside its own module the same expression copies back into the scope it was written in.`,
+			},
+		],
+		docsUrl: `https://markless.dev/errors/${SHARED_COMPUTED_CROSS_MODULE_CODE}`,
+	};
+}
+
+function isRelativeSpecifier(specifier: string): boolean {
+	return specifier.startsWith('./') || specifier.startsWith('../');
+}
+
+/** A relative specifier as a path from the project root; anything else unchanged. */
+function resolveSpecifier(specifier: string, importerFilename: string): string {
+	if (!isRelativeSpecifier(specifier)) return specifier;
+	return normalizePathSegments([
+		...importerFilename.split('/').slice(0, -1),
+		...specifier.split('/'),
+	]).join('/');
+}
+
+/** The same module the factory's file names, spelled from the copying file. */
+function rebaseSpecifier(specifier: string, fromFilename: string, toFilename: string): string {
+	if (!isRelativeSpecifier(specifier)) return specifier;
+	const target = resolveSpecifier(specifier, fromFilename).split('/');
+	const base = normalizePathSegments(toFilename.split('/').slice(0, -1));
+	let common = 0;
+	while (common < base.length && common < target.length - 1 && base[common] === target[common])
+		common += 1;
+	const up = base.slice(common).map(() => '..');
+	const down = target.slice(common);
+	return up.length === 0 ? `./${down.join('/')}` : [...up, ...down].join('/');
+}
+
+function normalizePathSegments(segments: ReadonlyArray<string>): ReadonlyArray<string> {
+	const parts: string[] = [];
+	for (const segment of segments) {
+		if (segment === '' || segment === '.') continue;
+		if (segment !== '..') {
+			parts.push(segment);
+			continue;
+		}
+		if (parts.length > 0 && parts.at(-1) !== '..') parts.pop();
+		else parts.push('..');
+	}
+	return parts;
 }
 
 // The compiler's own host answers for the platform names a derive may call;
@@ -391,9 +630,18 @@ function isPlatformGlobal(name: string): boolean {
 
 /** Every name the copied expression uses and does not itself bind. */
 function freeIdentifierNames(source: string): ReadonlySet<string> {
+	return freeNamesOfParse(`(${source})`);
+}
+
+/** The same, for a carried module-scope statement rather than an expression. */
+function freeDeclarationNames(source: string): ReadonlySet<string> {
+	return freeNamesOfParse(source);
+}
+
+function freeNamesOfParse(source: string): ReadonlySet<string> {
 	let ast: AnyNode;
 	try {
-		ast = parseModule(`(${source})`, 'generated.ts') as unknown as AnyNode;
+		ast = parseModule(source, 'generated.ts') as unknown as AnyNode;
 	} catch {
 		// Text the compiler just built and cannot reparse is a different defect;
 		// it is no evidence of this one, so claim nothing.

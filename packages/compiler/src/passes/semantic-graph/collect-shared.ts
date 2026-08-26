@@ -10,6 +10,7 @@ import type {
 	SemanticSharedDefinition,
 	SemanticSharedDependency,
 	SemanticSharedInstance,
+	SemanticSharedModuleDeclaration,
 	SemanticSharedReturnProperty,
 	SemanticSharedScope,
 } from '../../artifacts.ts';
@@ -31,6 +32,8 @@ import {
 import { collectComputedBinding } from './collect-state.ts';
 import { collectExpressionReads } from './collect-expressions.ts';
 import { getCallName, getFrameworkApiForCall, isFrameworkApiName } from './imports.ts';
+import { ownedModuleAst } from './shared-ast.ts';
+import { getComponentFunction } from '../../ast/tsrx.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
 
 export function collectSharedDefinition(input: {
@@ -41,16 +44,126 @@ export function collectSharedDefinition(input: {
 	const args = asNodes(input.init.arguments);
 	const factory = args[0];
 	const scope = sharedScopeFromOptions(args[1], input.state);
+	const factorySource = factory ? expressionSource(factory, input.state.source) : '';
+	const carried = factoryModuleScopeCarry(input.state, factorySource);
 	const definition: SemanticSharedDefinition = {
 		id: sharedDefinitionId(input.state.filename, input.name),
 		name: input.name,
 		exportedName: input.name,
 		...(scope ? { scope } : {}),
-		factorySource: factory ? expressionSource(factory, input.state.source) : '',
+		factorySource,
+		...(carried.imports.length > 0 ? { factoryModuleImports: carried.imports } : {}),
+		...(carried.declarations.length > 0 ? { factoryModuleScope: carried.declarations } : {}),
 		sourceSpan: sourceSpan(input.init, input.state.filename),
 	};
 
 	input.state.graph.sharedDefinitions.push(definition);
+}
+
+/**
+ * The module scope this factory's expressions were written in, narrowed to what
+ * the factory text names. A page in another file serves a factory computed by
+ * copying its expression, and the copy arrives with the defining file's scope
+ * stripped off, so the definition record carries the part of that scope the copy
+ * can still need.
+ *
+ * Narrowing is by identifier text, which over-reaches into member names and
+ * strings. That only costs record bytes: the module that emits the copy narrows
+ * again, precisely, against the copied expression's own free names.
+ */
+function factoryModuleScopeCarry(
+	state: WalkState,
+	factorySource: string,
+): {
+	readonly imports: ReadonlyArray<SemanticModuleImport>;
+	readonly declarations: ReadonlyArray<SemanticSharedModuleDeclaration>;
+} {
+	if (factorySource === '') return { imports: [], declarations: [] };
+	const candidates = carryableModuleScopeDeclarations(state);
+	if (candidates.length === 0 && state.graph.moduleImports.length === 0)
+		return { imports: [], declarations: [] };
+
+	const declarations = new Set<SemanticSharedModuleDeclaration>();
+	const imports = new Set<SemanticModuleImport>();
+	let text = factorySource;
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const declaration of candidates) {
+			if (declarations.has(declaration)) continue;
+			if (!declaration.names.some((name) => namesIdentifier(text, name))) continue;
+			declarations.add(declaration);
+			text += `\n${declaration.source}`;
+			changed = true;
+		}
+		for (const moduleImport of state.graph.moduleImports) {
+			if (imports.has(moduleImport)) continue;
+			if (!namesIdentifier(text, moduleImport.localName)) continue;
+			imports.add(moduleImport);
+			changed = true;
+		}
+	}
+	// Carried in this file's own order: a constant written out of another one has
+	// to be emitted after it or the copy reads it before it is initialized.
+	return {
+		imports: state.graph.moduleImports.filter((moduleImport) => imports.has(moduleImport)),
+		declarations: candidates.filter((declaration) => declarations.has(declaration)),
+	};
+}
+
+/**
+ * The module-scope declarations of this file a copied expression could bind to.
+ * A declaration whose initializer is a framework API call is graph data rather
+ * than module code — it ships as payload nodes — so it is not among them, and a
+ * copy that names one stays refused.
+ */
+function carryableModuleScopeDeclarations(
+	state: WalkState,
+): ReadonlyArray<SemanticSharedModuleDeclaration> {
+	const ast = ownedModuleAst(state, state.source, state.filename);
+	return asNodes(ast.body).flatMap((statement) => {
+		if (statement.type === 'ImportDeclaration' || getComponentFunction(statement)) return [];
+		const declaration =
+			statement.type === 'ExportNamedDeclaration'
+				? (statement.declaration as AnyNode | undefined)
+				: statement;
+		if (!declaration) return [];
+		if (
+			declaration.type !== 'VariableDeclaration' &&
+			declaration.type !== 'FunctionDeclaration' &&
+			declaration.type !== 'ClassDeclaration'
+		)
+			return [];
+		const names = moduleDeclaredNames(declaration);
+		if (names.length === 0) return [];
+		if (
+			declaration.type === 'VariableDeclaration' &&
+			asNodes(declaration.declarations).some(
+				(declarator) =>
+					getFrameworkApiForCall(
+						declarator.init as AnyNode | undefined,
+						state.frameworkApiImports,
+					) !== null,
+			)
+		)
+			return [];
+		return [{ names, source: expressionSource(declaration, state.source) }];
+	});
+}
+
+function moduleDeclaredNames(declaration: AnyNode): ReadonlyArray<string> {
+	if (declaration.type === 'VariableDeclaration')
+		return asNodes(declaration.declarations).flatMap((declarator) => {
+			const name = getIdentifierName(declarator.id as AnyNode | undefined);
+			return name ? [name] : [];
+		});
+	const name = getIdentifierName(declaration.id as AnyNode | undefined);
+	return name ? [name] : [];
+}
+
+function namesIdentifier(text: string, name: string): boolean {
+	if (!/^[A-Za-z_$][\w$]*$/.test(name)) return false;
+	return new RegExp(`(^|[^\\w$.])${name}([^\\w$]|$)`).test(text);
 }
 
 export function collectSharedInstance(input: {

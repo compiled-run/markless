@@ -211,6 +211,10 @@ export type ModuleGraphInterfaceLinkedComponent = {
  * record its own parts resolve, plus the factory graph nodes its returned
  * properties name. An importing module adopts both, so `family.state()` there
  * resolves to the same definition — same id, same nodes — as `family()` here.
+ *
+ * The definition travels whole, so `factoryModuleImports` and
+ * `factoryModuleScope` travel with it: that is how a module copying one of this
+ * factory's expressions can bind the free names the copy carries.
  */
 export type ModuleGraphInterfaceSharedDefinition = {
 	readonly exportName: string;
@@ -404,6 +408,13 @@ export type SemanticSharedCallbackBinding = {
 	readonly sourceSpan?: SourceSpan;
 };
 
+/** One module-scope declaration of the file a shared() factory was written in. */
+export type SemanticSharedModuleDeclaration = {
+	readonly names: ReadonlyArray<string>;
+	/** The declaration as authored, without an `export` keyword. */
+	readonly source: string;
+};
+
 export type SemanticSharedDefinition = {
 	readonly id: string;
 	readonly name: string;
@@ -412,6 +423,15 @@ export type SemanticSharedDefinition = {
 	readonly factorySource: string;
 	readonly dependencies?: ReadonlyArray<SemanticSharedDependency>;
 	readonly returnProperties?: ReadonlyArray<SemanticSharedReturnProperty>;
+	/**
+	 * The module scope the factory's expressions were written in, narrowed to
+	 * what `factorySource` names. A module that serves a page by copying one of
+	 * those expressions rebases these specifiers onto its own path and emits
+	 * them beside the copy; without them the copy names nothing.
+	 * Specifiers are relative to the defining file, which `id` spells.
+	 */
+	readonly factoryModuleImports?: ReadonlyArray<SemanticModuleImport>;
+	readonly factoryModuleScope?: ReadonlyArray<SemanticSharedModuleDeclaration>;
 	readonly sourceSpan?: SourceSpan;
 };
 
