@@ -69,6 +69,7 @@ jobs:
                         checkbox,
                         checklist,
                         collapsible,
+                        colorpicker,
                         combobox,
                         datebox,
                         fileupload,
@@ -136,6 +137,7 @@ jobs:
                     [
                         calendar,
                         checkbox,
+                        colorpicker,
                         datebox,
                         hovercard,
                         menu,
@@ -256,6 +258,7 @@ jobs:
                     [
                         calendar,
                         checkbox,
+                        colorpicker,
                         datebox,
                         hovercard,
                         menu,

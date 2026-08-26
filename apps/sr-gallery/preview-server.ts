@@ -41,6 +41,8 @@ export const FAMILY_ANCHORS = {
 	fileupload: '/#fileupload',
 	hovercard: '/#hovercard',
 	calendar: '/#calendar',
+	menu: '/#menu',
+	colorpicker: '/#colorpicker',
 } as const;
 
 export type FamilyName = keyof typeof FAMILY_ANCHORS;

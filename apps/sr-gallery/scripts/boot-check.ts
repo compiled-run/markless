@@ -59,6 +59,10 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	hovercard: 'link',
 	// The days are real buttons and no grid: there is no gridcell to look for.
 	calendar: 'button',
+	// The surface is hidden until the trigger is pressed, so the trigger is the
+	// part that has to be in the tree at rest.
+	menu: 'button',
+	colorpicker: 'slider',
 };
 
 /** Sections whose point is how many of that role they serve, not merely that they serve one. */
@@ -69,6 +73,9 @@ const RENDERED_COUNT: Partial<Record<FamilyName, number>> = {
 	// Six weeks of days that never shrink, plus back and forward: a count catches
 	// a month that rendered its header and none of its days.
 	calendar: 44,
+	// The plane is two sliders, one per axis, and the hue rail's thumb is a
+	// third: a count catches a plane that rendered only one of its axes.
+	colorpicker: 3,
 };
 
 const appDir = fileURLToPath(new URL('..', import.meta.url));
@@ -213,7 +220,9 @@ async function prewarm(): Promise<void> {
 			throw error;
 		}
 		const ms = Date.now() - requestStarted;
-		console.log(`Pre-warm: ${path} answered ${response.status} in ${ms} ms (${body.length} bytes).`);
+		console.log(
+			`Pre-warm: ${path} answered ${response.status} in ${ms} ms (${body.length} bytes).`,
+		);
 		if (path === '/' && !response.ok) {
 			throw new Error(`The dev server answered ${response.status} for ${PREVIEW_ORIGIN}.`);
 		}
@@ -258,7 +267,9 @@ async function main() {
 				.getByRole(role, { includeHidden: true })
 				.count();
 			if (count === 0) {
-				failures.push(`#${section} rendered no role="${role}", so ${family} is not on the page.`);
+				failures.push(
+					`#${section} rendered no role="${role}", so ${family} is not on the page.`,
+				);
 				continue;
 			}
 			const expected = RENDERED_COUNT[family];
@@ -268,7 +279,9 @@ async function main() {
 				);
 				continue;
 			}
-			console.log(`#${section} serves the ${family} family: ${count} role="${role}" element(s)`);
+			console.log(
+				`#${section} serves the ${family} family: ${count} role="${role}" element(s)`,
+			);
 		}
 
 		const name = await page
@@ -278,7 +291,9 @@ async function main() {
 		if (name === null) {
 			failures.push('The checkbox trigger has no accessible name "Checkbox Label".');
 		} else {
-			console.log(`The checkbox trigger is reachable by name and reads aria-checked="${name}".`);
+			console.log(
+				`The checkbox trigger is reachable by name and reads aria-checked="${name}".`,
+			);
 		}
 
 		if (failures.length > 0) throw new Error(failures.join(' '));

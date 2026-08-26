@@ -2,9 +2,11 @@ import {
 	calendar,
 	checkbox,
 	checklist,
+	colorpicker,
 	datebox,
 	fileupload,
 	hovercard,
+	menu,
 	modal,
 	popover,
 	progress,
@@ -21,7 +23,7 @@ import {
 // page, each in a section a reader can jump to by its anchor: /#checkbox,
 // /#toggle, /#textbox, /#progress, /#checklist, /#select, /#modal,
 // /#radio-group, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
-// /#fileupload, /#hovercard, /#calendar. A family
+// /#fileupload, /#hovercard, /#calendar, /#menu, /#colorpicker. A family
 // whose second shape a reader announces differently gets its own section too:
 // /#slider-range.
 //
@@ -297,6 +299,40 @@ export function Gallery() @{
 					<CalendarMonth />
 					<calendar.field />
 				</calendar.root>
+			</div>
+		</section>
+
+		<section id="menu">
+			<h2>Menu</h2>
+			<div class="scenario">
+				<menu.root>
+					<menu.trigger>Actions</menu.trigger>
+					<menu.content class="menu-surface">
+						<menu.item value="cut">Cut</menu.item>
+						<menu.item value="copy">Copy</menu.item>
+						<menu.item value="paste">Paste</menu.item>
+					</menu.content>
+				</menu.root>
+			</div>
+		</section>
+
+		<section id="colorpicker">
+			<h2>Colour picker</h2>
+			{/* The inline picker, on a fixed colour, so what a reader hears on the plane and the rail is the same on every run. */}
+			<div class="scenario">
+				<colorpicker.root value="#3399ff" name="brand">
+					<colorpicker.label>Brand colour</colorpicker.label>
+					<colorpicker.content>
+						<colorpicker.area class="picker-plane">
+							<colorpicker.thumb class="picker-thumb" />
+						</colorpicker.area>
+						<colorpicker.track channel="hue" class="picker-rail">
+							<colorpicker.thumb channel="hue" class="picker-thumb" />
+						</colorpicker.track>
+					</colorpicker.content>
+					<colorpicker.valuelabel />
+					<colorpicker.field />
+				</colorpicker.root>
 			</div>
 		</section>
 	</main>

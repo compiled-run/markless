@@ -1387,6 +1387,135 @@
 			}
 		]
 	},
+	"menu": {
+		"parts": [
+			{
+				"part": "content",
+				"component": "MenuContent",
+				"doc": "The surface the items go in, `role=\"menu\"`. It is never modal: it writes no\n`aria-modal`, so the page behind it keeps its focus and is never made inert,\nand a wheel does not dismiss it.\n\nIt stays in the page when the menu is closed - `hidden` decides whether it\nshows, never an arm - because an enlisted element removed from the document\nleaves the overlay stack's marks behind.",
+				"props": []
+			},
+			{
+				"part": "contextarea",
+				"component": "MenuContextarea",
+				"doc": "A region that opens the menu where the pointer is: right-click, a touch long\npress, `Shift+F10` or the ContextMenu key on anything focused inside it.\n\nIt carries no role, no name and no ARIA state at all. `aria-haspopup` says a\ncontrol opens a menu when it is activated, which a region that answers a\nright-click does not do, and a context menu is equally discoverable to\neveryone without an announcement of its own (React Aria's reasoning, and\nw3c/aria#1971 is the open discussion). Give `menu.content` an `aria-label`:\nwith no trigger there is nothing else to name the surface.",
+				"props": []
+			},
+			{
+				"part": "item",
+				"component": "MenuItem",
+				"doc": "One command. Given `checked` it is a `menuitemcheckbox` that toggles without\nclosing; inside a `radio` menu it is a `menuitemradio`.\n\nA disabled item is still reachable with the arrows and still announced - the\nAPG's rule, and the divergence from `select`, whose walk skips a disabled\noption - it simply cannot be activated.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": true,
+						"doc": "Reported to `onChange` when this item is activated. Required: no index stands in for it."
+					},
+					{
+						"name": "checked",
+						"type": "boolean",
+						"required": false,
+						"doc": "This item carries a checked state, so it renders as a `menuitemcheckbox`.\nWhich items ARE checked is `menu.root`'s `checked`; writing the prop is what\nsays this item has the state at all."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nobody can activate this item; the arrows still land on it."
+					}
+				]
+			},
+			{
+				"part": "itemtrigger",
+				"component": "MenuItemTrigger",
+				"doc": "An item that opens a submenu. It is the parent menu's item and the submenu's\ntrigger at once, so it is written inside the nested `menu.root` it opens,\nbeside that root's `menu.content`.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "MenuRoot",
+				"doc": "The menu itself. Everything the family renders goes inside it, and it is the\nanchor scope the surface is placed within.\n\nA submenu is a `menu.root` written inside another menu's `menu.content`: the\nnested root starts a menu instance of its own, holding its own open state, its\nown roving focus and its own `onChange`.",
+				"props": [
+					{
+						"name": "open",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Whether the surface is showing. Omit it and the menu starts closed."
+					},
+					{
+						"name": "checked",
+						"type": "readonly string[]",
+						"required": false,
+						"default": "[]",
+						"doc": "The values of the items that start checked - checkbox items, or the one\nchosen radio item. The checked set lives here rather than on each item\nbecause a radio choice unchecks its siblings, which is one decision about\nthe whole menu, and because a seed may only read its own component's props."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nobody can open the menu, and no item may be activated."
+					},
+					{
+						"name": "loop",
+						"type": "boolean",
+						"required": false,
+						"default": "true",
+						"doc": "The arrow walk wraps at both ends. Menus wrap; a listbox does not."
+					},
+					{
+						"name": "radio",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The items of this menu are one radio group: each renders\n`role=\"menuitemradio\"`, and choosing one unchecks the rest. Without it an\nitem carrying `checked` is a `menuitemcheckbox` and the rest are plain\ncommands."
+					},
+					{
+						"name": "side",
+						"type": "'top' | 'bottom' | 'start' | 'end'",
+						"required": false,
+						"default": "'bottom'",
+						"doc": "Where the surface is placed against the trigger. It is also written on\n`menu.content` as `ui-side`, so styling can follow the placement."
+					},
+					{
+						"name": "delay",
+						"type": "number",
+						"required": false,
+						"default": "700",
+						"doc": "How long a pointer rests on `menu.itemtrigger` before its submenu opens, in milliseconds."
+					},
+					{
+						"name": "closeDelay",
+						"type": "number",
+						"required": false,
+						"default": "300",
+						"doc": "How long a submenu stays open after the pointer leaves it, in milliseconds."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: string) => void",
+						"required": false,
+						"doc": "Called with the item's `value` when an item is activated - a command, a\ncheckbox item toggling, or a radio item being chosen. A submenu is its own\nroot, so its activations reach the callback written on the submenu's root."
+					},
+					{
+						"name": "onOpenChange",
+						"type": "(open: boolean) => void",
+						"required": false,
+						"doc": "Called when the surface opens or closes, including when Escape or a press outside closes it."
+					}
+				]
+			},
+			{
+				"part": "trigger",
+				"component": "MenuTrigger",
+				"doc": "The control the menu opens from, and the family's only tab stop. It declares\n`aria-haspopup=\"menu\"`, so a reader says a menu is there before it is opened.",
+				"props": []
+			}
+		]
+	},
 	"modal": {
 		"parts": [
 			{
@@ -1717,7 +1846,7 @@
 			{
 				"part": "root",
 				"component": "PopoverRoot",
-				"doc": "The popover itself; the trigger and the surface go inside it. It holds whether\nthe surface is showing and which side it is placed on, and it is the anchor\nend of the CSS anchor placement, so the family owns this element's `style`\nattribute - style the root from a stylesheet rather than a `style` prop.",
+				"doc": "The popover itself; the trigger and the surface go inside it. It holds whether\nthe surface is showing and which side it is placed on, and it is the anchor\nend of the CSS anchor placement, which lives in the part's own scoped\nstylesheet - your `style` and `class` compose untouched.",
 				"props": [
 					{
 						"name": "open",
@@ -1731,7 +1860,7 @@
 						"type": "'top' | 'bottom' | 'start' | 'end'",
 						"required": false,
 						"default": "'bottom'",
-						"doc": "Where the surface is placed against the trigger. It is also written on\n`popover.content` as `ui-side`, so styling can follow the placement.\n\nThe placement is a CSS anchor, so it holds while the page scrolls and\nreflows without any script. The family owns the `style` attribute on\n`popover.root`, `popover.trigger` and `popover.content` to carry it -\nstyle those three parts from a stylesheet rather than a `style` prop."
+						"doc": "Where the surface is placed against the trigger. It is also written on\n`popover.content` as `ui-side`, so styling can follow the placement.\n\nThe placement is a CSS anchor, so it holds while the page scrolls and\nreflows without any script. The anchor binding and one default\n`position-area` per side ship in the parts' own scoped stylesheets, inside\n`@layer markless` - so any unlayered rule of yours keyed off `ui-side`\nreplaces the default without a specificity fight. `--ui-anchor` on\n`popover.content` names the anchor for your own `anchor()` geometry."
 					},
 					{
 						"name": "onChange",
