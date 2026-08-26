@@ -128,8 +128,17 @@ test('a client-rendered focus fetches the focused element key handler', async ()
 	page.dispose();
 });
 
-test('a client-rendered container with no key record installs no focus listener', async () => {
+test('a client-rendered focus onto a press-only element fetches the press handler', async () => {
 	const page = await mount({ eventName: 'click' });
+
+	expect(page.focusIn()).toBe(true);
+	expect(page.loadedSymbols).toEqual(['symbol:key']);
+	expect(page.handlerRuns()).toBe(0);
+	page.dispose();
+});
+
+test('a client-rendered container with neither key nor press record installs no focus listener', async () => {
+	const page = await mount({ eventName: 'change' });
 
 	expect(page.focusIn()).toBe(false);
 	expect(page.loadedSymbols).toEqual([]);

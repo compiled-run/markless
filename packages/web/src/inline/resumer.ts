@@ -1007,7 +1007,11 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 	// below, queued behind this same import promise. Names restated because this
 	// body is serialized by toString().
 	const focusPreloadEventNames = ['keydown', 'keyup', 'keypress', 'beforeinput', 'input'];
-	if (focusPreloadEventNames.some((eventName) => eventNames.has(eventName))) {
+	// A focused control still reaches a press through Enter and Space, so a focus
+	// onto a press-only record names a handler this page needs next too.
+	const pressPreloadEventNames = ['click', 'pointerdown', 'pointerup'];
+	const focusWakeEventNames = [...focusPreloadEventNames, ...pressPreloadEventNames];
+	if (focusWakeEventNames.some((eventName) => eventNames.has(eventName))) {
 		const primeFocus = (event: Event) => {
 			if (root.__marklessDelegatedDispatch) return;
 			let primes = false;
@@ -1023,7 +1027,7 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 						element.tagName === 'INPUT' ||
 						element.tagName === 'TEXTAREA' ||
 						element.tagName === 'SELECT';
-					primes = focusPreloadEventNames.some(
+					primes = focusWakeEventNames.some(
 						(eventName) =>
 							(editable ||
 								(eventName !== 'beforeinput' && eventName !== 'input')) &&
@@ -1037,7 +1041,7 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 			if (
 				!primes &&
 				(mintsComponentRows ||
-					focusPreloadEventNames.some((eventName) => nestedEventNames.has(eventName)))
+					focusWakeEventNames.some((eventName) => nestedEventNames.has(eventName)))
 			)
 				primes = true;
 			if (!primes) return;
@@ -1052,7 +1056,6 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 	// A pointer crosses onto a control before it presses it, and Safari focuses no
 	// button on click, so hover is what precedes a first press. Same wake, and
 	// pointerenter is unusable here because it does not bubble.
-	const pressPreloadEventNames = ['click', 'pointerdown', 'pointerup'];
 	if (pressPreloadEventNames.some((eventName) => eventNames.has(eventName))) {
 		const primeHover = (event: Event) => {
 			if (root.__marklessDelegatedDispatch) return;

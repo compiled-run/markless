@@ -276,6 +276,7 @@ const FOCUS_KEY_EVENT_NAMES = ['keydown', 'keyup', 'keypress'];
 const FOCUS_EDITABLE_EVENT_NAMES = ['beforeinput', 'input'];
 // A pointer crosses onto a control before it presses it, and Safari focuses no
 // button on click - so hover, not focus, is what reliably precedes a first press.
+// A focused control still reaches these through Enter and Space.
 const PRESS_EVENT_NAMES = ['click', 'pointerdown', 'pointerup'];
 
 function focusPreloadEventNames(element: {
@@ -287,13 +288,15 @@ function focusPreloadEventNames(element: {
 		tagName === 'INPUT' ||
 		tagName === 'TEXTAREA' ||
 		tagName === 'SELECT'
-		? [...FOCUS_KEY_EVENT_NAMES, ...FOCUS_EDITABLE_EVENT_NAMES]
-		: FOCUS_KEY_EVENT_NAMES;
+		? [...FOCUS_KEY_EVENT_NAMES, ...FOCUS_EDITABLE_EVENT_NAMES, ...PRESS_EVENT_NAMES]
+		: [...FOCUS_KEY_EVENT_NAMES, ...PRESS_EVENT_NAMES];
 }
 
 function isFocusPreloadEventName(eventName: string): boolean {
 	return (
-		FOCUS_KEY_EVENT_NAMES.includes(eventName) || FOCUS_EDITABLE_EVENT_NAMES.includes(eventName)
+		FOCUS_KEY_EVENT_NAMES.includes(eventName) ||
+		FOCUS_EDITABLE_EVENT_NAMES.includes(eventName) ||
+		PRESS_EVENT_NAMES.includes(eventName)
 	);
 }
 

@@ -116,8 +116,20 @@ test('focus onto an element with a key record wakes the runtime before the key',
 	expect(resumer.arrivals).toEqual(['wake']);
 });
 
-test('focus onto an element with no key record loads nothing', async () => {
+test('focus onto a press-only element wakes the runtime: Enter and Space reach a press', async () => {
 	const resumer = bootResumer({ events: [{ hostNodeId: 'h1', eventName: 'click' }] });
+
+	expect(resumer.hasListener('focusin')).toBe(true);
+	resumer.fire('focusin');
+	expect(resumer.loadCount()).toBe(1);
+
+	resumer.finishLoad();
+	await settle();
+	expect(resumer.arrivals).toEqual(['wake']);
+});
+
+test('focus onto an element with neither key nor press record loads nothing', async () => {
+	const resumer = bootResumer({ events: [{ hostNodeId: 'h1', eventName: 'change' }] });
 
 	expect(resumer.hasListener('focusin')).toBe(false);
 	resumer.fire('focusin');

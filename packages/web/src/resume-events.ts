@@ -73,13 +73,15 @@ function focusPreloadEventNames(element: {
 		tagName === 'INPUT' ||
 		tagName === 'TEXTAREA' ||
 		tagName === 'SELECT'
-		? [...FOCUS_KEY_EVENT_NAMES, ...FOCUS_EDITABLE_EVENT_NAMES]
-		: FOCUS_KEY_EVENT_NAMES;
+		? [...FOCUS_KEY_EVENT_NAMES, ...FOCUS_EDITABLE_EVENT_NAMES, ...PRESS_EVENT_NAMES]
+		: [...FOCUS_KEY_EVENT_NAMES, ...PRESS_EVENT_NAMES];
 }
 
 function isFocusPreloadEventName(eventName: string): boolean {
 	return (
-		FOCUS_KEY_EVENT_NAMES.includes(eventName) || FOCUS_EDITABLE_EVENT_NAMES.includes(eventName)
+		FOCUS_KEY_EVENT_NAMES.includes(eventName) ||
+		FOCUS_EDITABLE_EVENT_NAMES.includes(eventName) ||
+		PRESS_EVENT_NAMES.includes(eventName)
 	);
 }
 
