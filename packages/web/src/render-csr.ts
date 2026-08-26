@@ -11,6 +11,11 @@ import type { RuntimeGraph } from '@markless/runtime';
 import { marklessAttributeValue } from './dom-attribute.ts';
 import type { CsrRenderContainer, CsrRenderOptions, CsrRenderOutput } from './render.ts';
 import { marklessInstanceScopedLoadSymbol } from './fns/instance-scope.ts';
+import {
+	runSyncPolicyActions,
+	type SyncPolicyDomEvent,
+	type SyncPolicyGraph,
+} from './inline/sync-policy-core.ts';
 import { registerServedArmEventRecords } from './resume-arm-records.ts';
 import type {
 	ResumeAsyncBoundaryPayload,
@@ -157,7 +162,12 @@ export async function renderCsrRuntime(input: {
 		holdPendingSettleCommits: async (ms) =>
 			(await demandRuntime()).holdPendingSettleCommits?.(ms),
 	};
-	const delegatedTriggers = installDelegatedTriggers(output, view, dispatchQueued);
+	const delegatedTriggers = installDelegatedTriggers(output, view, dispatchQueued, {
+		// The graph is demand-loaded, so a policy read before the first dispatch
+		// answers off the values the mount seeded its cells with.
+		read: (graphNodeId, path) =>
+			graph ? graph.read(graphNodeId, path) : readSeededStateValue(state, graphNodeId, path),
+	});
 	registerServedArmEventRecords(
 		output.root as unknown as ResumeDomElement,
 		view.asyncBoundaries as ReadonlyArray<ResumeAsyncBoundaryPayload>,
@@ -258,6 +268,7 @@ function installDelegatedTriggers(
 		event: NonNullable<Parameters<ResumeRuntime['dispatch']>[0]>,
 		dispatchOptions?: ResumeDispatchOptions,
 	) => Promise<void>,
+	syncPolicyGraph: SyncPolicyGraph,
 ): {
 	readonly registerEventRecord: (element: object, record: ProtocolEventRecord) => void;
 	readonly dispose: () => void;
@@ -288,6 +299,7 @@ function installDelegatedTriggers(
 			// A row event name is listened for on behalf of rows that may not exist
 			// yet, so this listener takes every event of that name, named or not.
 			let named = false;
+			let syncPolicyApplied = false;
 			let actionKind: ProtocolEventActionKind | undefined = rowEventNames.has(event.type)
 				? PROTOCOL_EVENT_ACTION_KIND.event
 				: undefined;
@@ -300,6 +312,16 @@ function installDelegatedTriggers(
 				if (record) {
 					actionKind = protocolEventActionKind(record);
 					named = true;
+					// The browser reads defaultPrevented when this dispatch returns,
+					// and the handler module is still being fetched then.
+					if (record.syncPolicy && actionKind === PROTOCOL_EVENT_ACTION_KIND.event) {
+						runSyncPolicyActions(
+							record.syncPolicy,
+							syncPolicyGraph,
+							event as unknown as SyncPolicyDomEvent,
+						);
+						syncPolicyApplied = true;
+					}
 				}
 			}
 			// This container listener exists for whichever element registered the
@@ -313,7 +335,14 @@ function installDelegatedTriggers(
 					throw unroutedDelegatedTriggerError(actionKind);
 				return;
 			}
-			await action(event, named ? undefined : { ignoreUnmatched: true });
+			await action(
+				event,
+				named
+					? syncPolicyApplied
+						? { syncPolicyAlreadyApplied: true }
+						: undefined
+					: { ignoreUnmatched: true },
+			);
 		};
 		// addEventListener drops the returned promise, so a rejection would escape
 		// the flush unhandled: contain it here and report it instead.
@@ -367,6 +396,24 @@ function unroutedDelegatedTriggerError(actionKind: string): Error {
 	error.phase = 'event';
 	error.dispatchModuleId = 'web:render-csr';
 	return error;
+}
+
+// Live-channel values only: a served cell's encoded `value` is an envelope, and
+// an envelope object is truthy whatever it wraps.
+function readSeededStateValue(
+	state: ProtocolStatePayload,
+	graphNodeId: string,
+	path: ReadonlyArray<string> = [],
+): unknown {
+	const seeded =
+		state.cells.find((cell) => cell.graphNodeId === graphNodeId) ??
+		state.computed.find((computed) => computed.graphNodeId === graphNodeId);
+	let value = seeded?.directValue;
+	for (const key of path) {
+		if (value === null || typeof value !== 'object') return undefined;
+		value = (value as Record<string, unknown>)[key];
+	}
+	return value;
 }
 
 function delegatedTargetTag(target: { readonly tagName?: unknown } | null | undefined): string {
