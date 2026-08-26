@@ -390,7 +390,11 @@ async function applyDefaultCsrDomJournal(
 			const target = runtime.getElement(String(entry.locator)) as
 				| CsrDomJournalTarget
 				| undefined;
-			if (target) target.textContent = stringifyDomValue(entry.value);
+			if (!target) continue;
+			// A rewrite with the value already there is still a mutation, and an
+			// aria-live region announces on it.
+			const text = stringifyDomValue(entry.value);
+			if (target.textContent !== text) target.textContent = text;
 			continue;
 		}
 		if (entry.type === 'setAttr') {
