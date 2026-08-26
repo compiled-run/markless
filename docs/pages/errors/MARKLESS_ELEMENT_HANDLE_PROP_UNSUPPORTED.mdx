@@ -1,0 +1,21 @@
+# MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED
+
+Nested prop-forwarded element handles are not supported yet
+
+- Package: compiler
+- Pass or phase: semantic-graph
+
+## Message
+
+Cannot bind el=\{…\} because this slice only supports element handles passed as direct component props, not through arrays or nested object props.
+
+## Why
+
+Direct prop forwarding has one parent-owned element() handle for one child prop. Array and nested object containers need deeper edge tracking before the compiler can prove the owning handle.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

@@ -1,0 +1,22 @@
+# MARKLESS_REPEAT_KEY_IS_INDEX
+
+Keying by index makes row identity follow the position
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: warning
+
+## Message
+
+key … identifies each row of … by its position, not by its data. If … reorders, inserts, or deletes, any row-local state, event wiring, and DOM reuse stay with the slot number.
+
+## Why
+
+The key is the identity root for a repeated graph scope; a positional key pins that scope to the slot, which is only correct when state genuinely belongs to the position.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

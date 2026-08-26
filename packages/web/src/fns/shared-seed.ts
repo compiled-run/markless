@@ -9,9 +9,11 @@ import {
 	childrenProjectionChain,
 	childrenWidgetRootPath,
 	childSurfaceOf,
+	staticProjectionChildren,
 	type ChildrenProjectionLink,
 	renderedWidgetRootsOf,
 } from '../prerender/children-projection.ts';
+import { marklessInstancePath } from './instance-scope.ts';
 import { MARKLESS_SSR_CALLBACKS_PROP, marklessSsrSpreadProps } from './ssr.ts';
 import { fileBoundElementHandles } from './element-handle-roster.ts';
 
@@ -69,7 +71,7 @@ const seedProjectingChild: SharedSeedPass = async (
 		chain,
 		rootEdge,
 		context.symbolPrefix + rootEdge.symbolPrefix,
-		edgeChildProps(context, rootEdge, read),
+		edgeChildProps(context, context.surface, rootEdge, read),
 		seeded,
 	);
 	// U-H: every part of this widget instance contributes before any part
@@ -109,7 +111,7 @@ async function applyComposedChainSeeds(
 			seeded,
 		);
 		await applySharedSeeds(context, link.surface, ownerPrefix, link.edge, read, seeded);
-		ownerProps = edgeChildProps(context, link.edge, read);
+		ownerProps = edgeChildProps(context, link.surface, link.edge, read);
 		ownerPrefix += link.edge.symbolPrefix;
 		ownerEdge = link.edge;
 	}
@@ -197,7 +199,19 @@ function projectedEdges(
 	// a row that COMPOSES a root of this root's family ends the walk exactly as one
 	// that declares the family itself does. The SSR twin is
 	// `marklessSsrWidgetBoundary` over the same spliced marker.
-	const families = renderedWidgetRootsOf(surface, rootEdge.childComponentName);
+	//
+	// A projecting child that roots nothing is a PART, and the families in scope for
+	// it are the enclosing widget's - otherwise a root written into that part's own
+	// children is not recognised as an instance boundary, and its seeds land in the
+	// enclosing instance's map on top of the seed that instance's root wrote.
+	const families = [
+		...new Set(
+			[
+				rootEdge.childComponentName,
+				...enclosingProjectingChildNames(surface, componentEdgeId),
+			].flatMap((name) => renderedWidgetRootsOf(surface, name)),
+		),
+	];
 	const startsOwnInstance = (edgeId: string): boolean => {
 		if (families.length === 0) return false;
 		const edge = edges.find((candidate) => candidate.id === edgeId);
@@ -232,6 +246,59 @@ function projectedEdges(
 	});
 }
 
+/**
+ * The projecting children of this component whose projections enclose one edge,
+ * innermost first. Which edge sits inside which projection is a build-time fact
+ * of this component's own chunks, so the walk reads them rather than sensing a
+ * rendered tree. Arm, row, and async chunks are stepped THROUGH: they change
+ * whether a part renders, never which widget encloses it.
+ */
+function enclosingProjectingChildNames(
+	surface: PrerenderDataSurface,
+	componentEdgeId: string,
+): string[] {
+	// The whole module's chunks and edges: ids are unique across it, and a module
+	// serving several components attributes a shared chunk to just one of them.
+	const chunks = surface.renderData.chunks;
+	const edges = Object.values(surface.components).flatMap(
+		(component) => component?.edges ?? [],
+	);
+	const ownerEdgeOfChunk = new Map<string, string>();
+	const parentChunkOf = new Map<string, string>();
+	const chunkOfEdge = new Map<string, string>();
+	for (const chunk of chunks)
+		for (const slot of chunk.slots) {
+			if (slot.kind === 'child-component') {
+				chunkOfEdge.set(slot.componentEdgeId, chunk.id);
+				if (slot.projectionChunkId)
+					ownerEdgeOfChunk.set(slot.projectionChunkId, slot.componentEdgeId);
+			} else if (slot.kind === 'branch') {
+				for (const armChunkId of slot.armTemplateIds) parentChunkOf.set(armChunkId, chunk.id);
+			} else if (slot.kind === 'repeat') {
+				parentChunkOf.set(slot.rowTemplateId, chunk.id);
+				if (slot.emptyTemplateId) parentChunkOf.set(slot.emptyTemplateId, chunk.id);
+			} else if (slot.kind === 'async') {
+				for (const armChunkId of Object.values(slot.armTemplateIds))
+					if (typeof armChunkId === 'string') parentChunkOf.set(armChunkId, chunk.id);
+			}
+		}
+	const names: string[] = [];
+	const walked = new Set<string>();
+	let chunkId = chunkOfEdge.get(componentEdgeId);
+	while (chunkId !== undefined && !walked.has(chunkId)) {
+		walked.add(chunkId);
+		const ownerEdgeId = ownerEdgeOfChunk.get(chunkId);
+		if (ownerEdgeId === undefined) {
+			chunkId = parentChunkOf.get(chunkId);
+			continue;
+		}
+		const owner = edges.find((candidate) => candidate.id === ownerEdgeId);
+		if (owner) names.push(owner.childComponentName);
+		chunkId = chunkOfEdge.get(ownerEdgeId);
+	}
+	return names;
+}
+
 // The same arm the renderer will take, asked before the arm renders. A branch
 // with no recorded test read has no arm this pass can name, so nothing under it
 // seeds and the render behaves as it did before arms carried seeds.
@@ -253,8 +320,10 @@ function takenArm(
 }
 
 // What one component edge hands its child, read in the scope that declared it.
+// `surface` is that declaring scope: the edge's ids are its module's.
 function edgeChildProps(
 	context: SeedContext,
+	surface: PrerenderDataSurface,
 	edge: SeedEdge,
 	read: PrerenderReadSeed,
 ): Record<string, unknown> {
@@ -276,6 +345,13 @@ function edgeChildProps(
 		} else if (prop.source !== undefined && context.readEdgeProp) {
 			childProps[prop.name] = context.readEdgeProp(prop);
 		}
+	}
+	// Static text is the one projection whose value the seed can be told: it is
+	// already in the chunk, so a seed reading `children` gets what the consumer
+	// wrote instead of undefined.
+	if (childProps.children === undefined) {
+		const staticChildren = staticProjectionChildren(surface, edge.id);
+		if (staticChildren !== undefined) childProps.children = staticChildren;
 	}
 	// A widget root's callback-slot seed reads its answer from here, so the seed
 	// pass hands the child the same map the render path hands it.
@@ -300,18 +376,22 @@ async function applySharedSeeds(
 	);
 	if (!child || seeds.length === 0) return;
 
-	const childProps = edgeChildProps(context, edge, read);
+	const childProps = edgeChildProps(context, surface, edge, read);
+	// A client mint loads these symbols through the resume loader, which scopes a
+	// symbol's reads by prepending its instance path. The seed map is keyed by the
+	// child's own compile-time ids, so an unmatched id is retried without it.
+	const seedSource = (graphNodeId: string): unknown => {
+		if (graphNodeId === child.propCellId || graphNodeId === 'prop:props') return childProps;
+		if (graphNodeId.startsWith('prop:')) return childProps[graphNodeId.slice(5)];
+		if (seeded.has(graphNodeId)) return seeded.get(graphNodeId);
+		const instancePath = marklessInstancePath(graphNodeId);
+		return instancePath ? seedSource(graphNodeId.slice(instancePath.length)) : undefined;
+	};
 	const readSeed: PrerenderReadSeed = (graphNodeId, path = []) =>
-		readPath(
-			graphNodeId === child.propCellId || graphNodeId === 'prop:props'
-				? childProps
-				: graphNodeId.startsWith('prop:')
-					? childProps[graphNodeId.slice(5)]
-					: seeded.get(graphNodeId),
-			path,
-		);
+		readPath(seedSource(graphNodeId), path);
 	for (const initial of seeds) {
 		if (initial.value.kind !== 'symbol-function') continue;
+		if (!seedFamilyOpen(seeded, initial.graphNodeId)) continue;
 		const factory = initials.find(
 			(candidate) =>
 				candidate.graphNodeId === initial.graphNodeId && candidate.value.kind === 'constant',
@@ -328,6 +408,32 @@ async function applySharedSeeds(
 			throw new Error(`MARKLESS_PRERENDER_DATA_SYMBOL_MISSING: ${initial.value.symbolId}`);
 		seeded.set(initial.graphNodeId, await loaded({ graph: { read: readSeed }, read: readSeed }));
 	}
+}
+
+/**
+ * Whether the pass now running is the one that roots this seed's family.
+ *
+ * Rooting is per FAMILY, not per component: a child that roots one widget family
+ * is still an ordinary part of every other family enclosing it, and its writes
+ * belong to those enclosing instances. The pass root files its own token under
+ * the plain key AND under each family it roots, so a family whose filed token is
+ * some other instance is one this pass does not root — re-running its seeds here
+ * would mint a private copy per nested widget. A family with no filed token is
+ * nobody's yet, so it stays open. The compiler's SSR twin is
+ * `seedFamilyOpenSource` in public-render's shared-seed-pass.
+ */
+function seedFamilyOpen(seeded: ReadonlyMap<string, unknown>, graphNodeId: string): boolean {
+	const own = seeded.get(marklessWidgetInstanceKey(sharedDefinitionIdOf(graphNodeId)));
+	return own === undefined || own === seeded.get(MARKLESS_WIDGET_INSTANCE_KEY);
+}
+
+// Restates the compiler's shared node-id grammar: a node id is its definition id,
+// then `/` and the node's own name; an exported name carries no slash.
+function sharedDefinitionIdOf(graphNodeId: string): string {
+	const named = graphNodeId.indexOf('#');
+	if (named === -1) return graphNodeId;
+	const end = graphNodeId.indexOf('/', named);
+	return end === -1 ? graphNodeId : graphNodeId.slice(0, end);
 }
 
 function readPath(value: unknown, path: ReadonlyArray<string>): unknown {
