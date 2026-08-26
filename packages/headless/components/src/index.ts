@@ -14,6 +14,7 @@ export * as menu from './menu/index.ts';
 export * as modal from './modal/index.ts';
 export * as otp from './otp/index.ts';
 export * as navbar from './navbar/index.ts';
+export * as numberbox from './numberbox/index.ts';
 export * as pagination from './pagination/index.ts';
 export * as popover from './popover/index.ts';
 export * as progress from './progress/index.ts';

@@ -14,6 +14,7 @@ import Menu from '../src/menu/scenarios/basic.tsrx';
 import { Basic as Combobox } from '../src/combobox/scenarios/basic.tsrx';
 import Modal from '../src/modal/scenarios/basic.tsrx';
 import Navbar from '../src/navbar/scenarios/basic.tsrx';
+import Numberbox from '../src/numberbox/scenarios/basic.tsrx';
 import Otp from '../src/otp/scenarios/basic.tsrx';
 import Pagination from '../src/pagination/scenarios/basic.tsrx';
 import Popover from '../src/popover/scenarios/basic.tsrx';
@@ -348,6 +349,19 @@ const descriptors: readonly FamilyDescriptor[] = [
 			focusReturns: false,
 		},
 		supportsDisabled: false,
+	},
+	{
+		family: 'numberbox',
+		mount: { CSR: () => render(Numberbox), SSR: () => renderSSR(Numberbox) },
+		root: 'root',
+		parts: ['root', 'label', 'backtrigger', 'input', 'forwardtrigger', 'valuelabel', 'field'],
+		// One control with two buttons that are not tab stops: nothing for a group
+		// role to group that the label does not already name.
+		rootAria: { role: null },
+		// The formatted number is what a consumer styles against, so it is
+		// key-value by design rather than a presence mark.
+		valuedAttributes: ['ui-value'],
+		supportsDisabled: true,
 	},
 	{
 		family: 'otp',
