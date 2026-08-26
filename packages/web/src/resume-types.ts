@@ -146,6 +146,12 @@ export type ResumeBranchRecord = {
 	// A branch whose arm holds a component that has to run: flips commit a range.
 	readonly escalates?: true;
 	readonly servedArmRecords?: ResumeArmRecordSet;
+	// Which instance this branch's update symbol runs as, and where the props it
+	// reads now live. Present only on a branch that travelled through composition.
+	readonly composedInstancePath?: string;
+	readonly composedGraphProps?: NonNullable<
+		NonNullable<ProtocolViewPayload['branches']>[number]['composedGraphProps']
+	>;
 };
 export type ResumeBranchHtml = string | ReadonlyArray<string | { readonly text: string }>;
 export type ResumeBranchUpdate = {

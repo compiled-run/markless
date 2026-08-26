@@ -23,11 +23,17 @@ import {
 	marklessBaseSymbolId,
 	marklessBoundSymbolId,
 	marklessDomUpdateSymbolId,
+	marklessLiveBoundGraphRoute,
 } from './bound-symbol.ts';
-import { marklessRowSegment, marklessWidgetHandleId } from './instance-scope.ts';
+import {
+	marklessInstancePath,
+	marklessRowSegment,
+	marklessWidgetHandleId,
+} from './instance-scope.ts';
 import { marklessSerializeGraphValue } from './state-serialize.ts';
 import type { SsrDataStructure } from '../ssr-data/renderer.ts';
 import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
+import type { ProtocolComposedGraphProp } from '@markless/serializer';
 
 // SSR composition works on DRAFT payload records: the shapes the protocol
 // eventually serializes, still mutable and still carrying producer-only fields.
@@ -79,6 +85,8 @@ type SsrBranchRecord = SsrAnchoredRecord & {
 	readonly armRecords?: ReadonlyArray<SsrArmRecordSet>;
 	readonly escalates?: true;
 	readonly servedArmRecords?: SsrArmRecordSet;
+	readonly composedInstancePath?: string;
+	readonly composedGraphProps?: ReadonlyArray<ProtocolComposedGraphProp>;
 };
 type SsrArmRecordSet = SsrRecord & {
 	readonly locators?: ReadonlyArray<SsrLocatorRecord>;
@@ -1383,12 +1391,21 @@ export function marklessSsrAppendChildView(context: {
 		// parent route to re-decide it, but the arm it painted still owns records
 		// that have to follow their values; it stays as a decide-less record.
 		const decided = liveTestReads.length === 0;
-		const { symbolId: childSymbolId, contentReads: _unmappedContentReads, ...unwired } = branch;
+		const {
+			symbolId: childSymbolId,
+			contentReads: _unmappedContentReads,
+			composedInstancePath: _unroutedInstancePath,
+			composedGraphProps: _unroutedGraphProps,
+			...unwired
+		} = branch;
 		// Only the branch symbol can rebuild an arm, so a content read without one
 		// has nothing to drive and never justifies keeping the record.
 		const contentDriven = liveContentReads.length > 0 && Boolean(childSymbolId);
 		if (decided && !contentDriven && !marklessSsrDecidedArmIsLive(branch, armRecords)) continue;
 		const keepSymbol = Boolean(childSymbolId) && (!decided || contentDriven);
+		const composedRoutes = keepSymbol
+			? marklessSsrComposedBranchRoutes(branch, context.child, childInstancePath)
+			: undefined;
 		const mappedBranch = {
 			...unwired,
 			id: context.child.hostPrefix + branch.id,
@@ -1414,6 +1431,12 @@ export function marklessSsrAppendChildView(context: {
 				? { symbolId: marklessBoundSymbolId(context.child, childSymbolId!) }
 				: {}),
 			...(armRecords ? { armRecords } : {}),
+			...(composedRoutes?.props.length
+				? {
+						composedInstancePath: composedRoutes.instancePath,
+						composedGraphProps: composedRoutes.props,
+					}
+				: {}),
 			// The arm this child already served keeps its arm-relative
 			// coordinates; only ids and symbols take the child's prefixes.
 			...(branch.servedArmRecords
@@ -1648,6 +1671,55 @@ export function marklessSsrRemapChildReads<T extends ComposeGraphRead>(
 		if (!mapped) throw new Error('MARKLESS_COMPOSED_READ_UNMAPPED: ' + recordId);
 		return { ...read, graphNodeId: mapped.graphNodeId, path: mapped.path };
 	});
+}
+/**
+ * The route table and instance path a composed branch's own update symbol
+ * needs, as this level of composition can spell them.
+ *
+ * The symbol reads the part-local prop ids its module spells, and the record's
+ * reads being rewritten leaves it nothing: only this table says where those
+ * props now live. A branch that already carries a path was authored deeper than
+ * this child, so its table names that module and travels this level exactly as
+ * a read does; a branch whose id carries no instance path at all is this
+ * child's own, and this child's route table is the answer. `undefined` means
+ * there is nothing for this level to say.
+ */
+function marklessSsrComposedBranchRoutes(
+	branch: SsrBranchRecord,
+	child: SsrPrefixChild,
+	childInstancePath: string,
+): { readonly instancePath: string; readonly props: ProtocolComposedGraphProp[] } | undefined {
+	if (branch.composedInstancePath !== undefined)
+		return {
+			instancePath: childInstancePath + branch.composedInstancePath,
+			props: (branch.composedGraphProps ?? []).flatMap((prop) => {
+				const mapped = marklessCsrRemapChildGraph(
+					{ graphNodeId: prop.graphNodeId, path: prop.path ?? [] },
+					child.graphProps,
+					childInstancePath,
+				);
+				return mapped ? [marklessSsrComposedGraphProp(prop.name, mapped)] : [];
+			}),
+		};
+	if (marklessInstancePath(branch.id) !== '') return undefined;
+	return {
+		instancePath: childInstancePath,
+		props: (child.graphProps ?? []).flatMap((prop) => {
+			const route = marklessLiveBoundGraphRoute(prop);
+			return route ? [marklessSsrComposedGraphProp(prop.name, route)] : [];
+		}),
+	};
+}
+
+function marklessSsrComposedGraphProp(
+	name: string,
+	route: { readonly graphNodeId: string; readonly path: ReadonlyArray<string> },
+): ProtocolComposedGraphProp {
+	return {
+		name,
+		graphNodeId: route.graphNodeId,
+		...(route.path.length ? { path: route.path } : {}),
+	};
 }
 function marklessSsrArmRecordSetIsLive(arm: SsrArmRecordSet | undefined): boolean {
 	return Boolean(
