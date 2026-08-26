@@ -2,14 +2,8 @@
 
 A product tour: a sequence of steps, each spotlighting an element the **consumer**
 owns, dimming the rest of the page, and showing a positioned card with a title, a
-<<<<<<< HEAD
-description and back/forward controls. Built from
-the tour research memo in the goal notes and the measured gates in
-`packages/vitest-browser/browser/tour-gates/`.
-=======
 description and back/forward controls. The measured gates behind the decisions
 here are in `packages/vitest-browser/browser/tour-gates/`.
->>>>>>> worktree-agent-a6aec4a2b06041ce6
 
 The family is complete and its lanes are green in both render modes. What is left
 is registration - the barrel, the api manifest and the gallery section - under
