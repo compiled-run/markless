@@ -139,13 +139,12 @@ test('CSR: the field carries the dropped file', async () => {
 	await expect.poll(() => fieldNames()).toEqual(['notes.txt']);
 });
 
-// The remove button reaches the right upload and empties the store — the field's
-// own list goes from one file to none — but the row it removed stays on the page.
-// A repeat over widget-scoped state renders rows as they arrive and never takes
-// one away again: measured at three rows going to two, and at one row going to
-// none. Page-scoped state does not behave this way, which is why toaster's
-// dismiss row is green; this family cannot be page-scoped, because `for={handle}`
-// on the label is refused outside widget scope.
+// Every row here is minted, because the served list starts empty, and a minted
+// row's render builds a second instance of the widget-scoped upload instead of
+// resolving the enclosing root's. Its remove button writes that second instance,
+// so the repeat's collection never moves and its reconcile never runs; the field
+// still empties, because the File objects live in a module store keyed by the
+// input element that every instance reaches.
 test.fails('CSR: removing the last file takes its row off the page', async () => {
 	await render(Basic);
 	dropOn(el('droparea'), fileOf('notes.txt'));
@@ -194,9 +193,9 @@ test('CSR: one drop of several files becomes several rows', async () => {
 	expect(el<HTMLInputElement>('field').multiple).toBe(true);
 });
 
-// The same wall the basic suite pins: a repeat over widget-scoped state adds rows
-// and never takes one away. The store underneath is right, which is what the row
-// below this one measures.
+// The same wall: a minted row's button writes its own instance of the upload,
+// not the enclosing one. The field underneath is right, which the row below
+// this one measures.
 test.fails('CSR: a remove button takes off its own row and leaves the rest', async () => {
 	await render(Multiple);
 	dropOn(el('droparea'), fileOf('a.txt'), fileOf('b.txt'), fileOf('c.txt'));
