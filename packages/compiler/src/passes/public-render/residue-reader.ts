@@ -181,8 +181,10 @@ export function widgetInstanceReadSource(
 	get: (keyExpression: string) => string,
 ): (handleExpression: string) => string {
 	const plain = JSON.stringify(MARKLESS_WIDGET_INSTANCE_KEY);
+	// The LAST slash: a definition id carries its module's path, so cutting at the
+	// first one names a directory, and every family under it collapses to one key.
 	return (handle) =>
-		`(${get(`${plain}+'|'+${handle}.slice(0,${handle}.indexOf('/'))`)}??${get(plain)})`;
+		`(${get(`${plain}+'|'+${handle}.slice(0,${handle}.lastIndexOf('/'))`)}??${get(plain)})`;
 }
 
 // A part rendered outside every widget root has no token; refusing loudly is
