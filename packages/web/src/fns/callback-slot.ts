@@ -46,7 +46,7 @@ export function marklessInvokeCallbackSlot(
 	const graph = slotGraph(context, graphNodeId, instancePath);
 	const slotSymbolId = graph.read(graphNodeId, []);
 	if (typeof slotSymbolId !== 'string') {
-		assertSlotInstanceRendered(context, graph, graphNodeId, instancePath);
+		assertSlotInstanceRendered(context, graph, graphNodeId);
 		return undefined;
 	}
 	if (typeof context.invokeSymbol !== 'function')
@@ -115,25 +115,27 @@ function slotGraph(
  * invisible from the outside and was how a part projected through a page-local
  * component lost its dispatch. The rendered definition tells them apart: the id
  * the read used names a shared definition this page holds, or it names nothing.
+ *
+ * Which means the accusation must be priced off the SAME id the read landed on -
+ * `slotNodeId`, the composed answer - and never off one adapter's own path. A
+ * widget composed inside another widget is reached through chained adapters, and
+ * the innermost path alone leaves the definition in page space, where the page
+ * holds nothing: a rendered widget accused of never having rendered.
  */
 function assertSlotInstanceRendered(
 	context: CallbackSlotContext,
 	graph: CallbackSlotContext['graph'],
 	graphNodeId: string,
-	instancePath: string,
 ): void {
 	const page = (graph.marklessPageGraph ?? context.graph) as RuntimeGraph;
 	// A payload carrying no shared definition cannot answer the question, and a
 	// graph reached before its definitions were installed must not be accused.
 	if (typeof page.getSharedDefinition !== 'function') return;
 	if ((page.listSharedDefinitions?.() ?? []).length === 0) return;
-	const slash = graphNodeId.lastIndexOf('/');
+	const resolvedNodeId = slotNodeId(graph, graphNodeId);
+	const slash = resolvedNodeId.lastIndexOf('/');
 	if (slash <= 0) return;
-	const definitionId = marklessComposedGraphNodeId(
-		graphNodeId.slice(0, slash),
-		graph.marklessInstancePath ?? instancePath,
-		marklessGraphWidgetRegistry(page),
-	);
+	const definitionId = resolvedNodeId.slice(0, slash);
 	if (page.getSharedDefinition(definitionId) !== undefined) return;
 	const error = new Error(
 		`MARKLESS_CALLBACK_SLOT_UNRESOLVED: ${graphNodeId} was dispatched from a part whose widget instance no rendered widget owns, so the consumer's callback could never be reached.`,
