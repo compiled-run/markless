@@ -13,9 +13,7 @@ export type MenuPoint = { readonly x: number; readonly y: number };
 
 /**
  * The menu itself. Everything the family renders goes inside it, and it is the
- * anchor end of the CSS anchor placement, so the family owns this element's
- * `style` attribute - style the root from a stylesheet rather than a `style`
- * prop.
+ * anchor scope the surface is placed within.
  *
  * A submenu is a `menu.root` written inside another menu's `menu.content`: the
  * nested root starts a menu instance of its own, holding its own open state, its

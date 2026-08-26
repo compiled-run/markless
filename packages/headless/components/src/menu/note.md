@@ -182,11 +182,18 @@ often a whole page body.
 
 ## Placement
 
-The trigger-opened surface is a CSS anchor - `anchor-scope` on the root,
-`anchor-name` on the trigger, `position-anchor` on the surface - so it is placed
-on its first layout with no script, and a surface served already open is placed
-before anything runs. The context-opened surface is `position: fixed` at the
-point, from a `computed()` style string.
+The placement is CSS, not JavaScript. Each part ships a scoped `<style>` block
+in `@layer markless` - a named layer a consumer's unlayered rule always beats -
+carrying `anchor-scope` on the root, `anchor-name` on the trigger, and
+`position: fixed` plus `position-anchor` plus one `position-area` per `ui-side`
+value on the surface. So the surface is placed on its first layout with no
+script, and a surface served already open is placed before anything runs.
+
+The context-opened surface has no anchor to resolve against - a context menu has
+no `menu.trigger` - which leaves the `position-area` inert and hands the
+placement to `left`/`top`. Those read `--x` and `--y`, the only thing JavaScript
+still writes here: a `computed()` style string carrying the point in client
+coordinates.
 
 **Nothing measures a box, so nothing flips.** A context menu asked for near the
 bottom right corner overflows. The anchored path can be given
@@ -194,8 +201,8 @@ bottom right corner overflows. The anchored path can be given
 Base UI and Radix get flipping free from floating-ui, and this is the price of
 not carrying a positioner.
 
-The family owns the `style` attribute on `menu.root`, `menu.trigger`,
-`menu.content` and `menu.contextarea` - style those four from a stylesheet.
+`menu.content` owns its own `style` attribute, which carries `--x`/`--y` and
+nothing else. The other parts leave `style` alone.
 
 ## Dismissal
 

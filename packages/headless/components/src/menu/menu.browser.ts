@@ -563,7 +563,7 @@ for (const mode of MODES) {
 
 			const placed = el('content').getBoundingClientRect();
 			const from = el('area-text').getBoundingClientRect();
-			expect(el('content').getAttribute('style')).toContain('position: fixed');
+			expect(el('content').getAttribute('style')).toContain('--x:');
 			expect(placed.left).toBeGreaterThanOrEqual(from.left - 1);
 			expect(placed.top).toBeGreaterThanOrEqual(from.top - 1);
 		} finally {
@@ -608,8 +608,8 @@ for (const mode of MODES) {
 
 		const box = el('row').getBoundingClientRect();
 		const style = el('content').getAttribute('style') ?? '';
-		expect(style).toContain(`left: ${box.left + box.width / 2}px`);
-		expect(style).toContain(`top: ${box.top + box.height / 2}px`);
+		expect(style).toContain(`--x: ${box.left + box.width / 2}px`);
+		expect(style).toContain(`--y: ${box.top + box.height / 2}px`);
 		await expectFocused('item-open');
 	});
 
