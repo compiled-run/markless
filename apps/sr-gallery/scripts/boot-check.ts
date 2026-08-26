@@ -63,6 +63,8 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	// part that has to be in the tree at rest.
 	menu: 'button',
 	colorpicker: 'slider',
+	// The group is a role="group" div; its items are the real buttons.
+	togglegroup: 'button',
 };
 
 /** Sections whose point is how many of that role they serve, not merely that they serve one. */
@@ -76,6 +78,8 @@ const RENDERED_COUNT: Partial<Record<FamilyName, number>> = {
 	// The plane is two sliders, one per axis, and the hue rail's thumb is a
 	// third: a count catches a plane that rendered only one of its axes.
 	colorpicker: 3,
+	// One button per alignment: a count catches a group that rendered only its label.
+	togglegroup: 3,
 };
 
 const appDir = fileURLToPath(new URL('..', import.meta.url));
@@ -205,19 +209,36 @@ async function prewarm(): Promise<void> {
 		const requestStarted = Date.now();
 		let response: Response;
 		let body: string;
-		try {
-			response = await fetch(`${PREVIEW_ORIGIN}${path}`, {
-				signal: AbortSignal.timeout(remaining),
-			});
-			body = await response.text();
-		} catch (error) {
-			const name = error instanceof Error ? error.name : '';
-			if (name === 'TimeoutError' || name === 'AbortError') {
+		// Measured: the dev server drops the socket partway through a cold compile
+		// of the entry graph, and the compile it was already doing still lands in
+		// its cache - so the same path answers at once when asked again. Retry
+		// until the deadline rather than reading a dropped socket as a dead server.
+		while (true) {
+			const left = deadline - Date.now();
+			if (left <= 0) {
 				throw new Error(
-					`The dev server was still compiling ${path} after ${PREWARM_TIMEOUT_MS / 60_000} minutes, so the pre-warm gave up before the browser was launched.`,
+					`The dev server did not finish serving the entry module chain within ${PREWARM_TIMEOUT_MS / 60_000} minutes; ${path} was still unserved.`,
 				);
 			}
-			throw error;
+			try {
+				response = await fetch(`${PREVIEW_ORIGIN}${path}`, {
+					signal: AbortSignal.timeout(left),
+				});
+				body = await response.text();
+				break;
+			} catch (error) {
+				const name = error instanceof Error ? error.name : '';
+				if (name === 'TimeoutError' || name === 'AbortError') {
+					throw new Error(
+						`The dev server was still compiling ${path} after ${PREWARM_TIMEOUT_MS / 60_000} minutes, so the pre-warm gave up before the browser was launched.`,
+					);
+				}
+				if (server.exitCode !== null || server.signalCode !== null) throw error;
+				console.log(
+					`Pre-warm: ${path} lost its connection after ${Date.now() - requestStarted} ms (${error instanceof Error ? error.message : String(error)}); asking again.`,
+				);
+				await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+			}
 		}
 		const ms = Date.now() - requestStarted;
 		console.log(

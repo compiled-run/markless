@@ -16,6 +16,7 @@ import {
 	tabs,
 	textbox,
 	toggle,
+	togglegroup,
 	tooltip,
 } from '@markless/ui';
 
@@ -23,9 +24,9 @@ import {
 // page, each in a section a reader can jump to by its anchor: /#checkbox,
 // /#toggle, /#textbox, /#progress, /#checklist, /#select, /#modal,
 // /#radio-group, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
-// /#fileupload, /#hovercard, /#calendar, /#menu, /#colorpicker. A family
-// whose second shape a reader announces differently gets its own section too:
-// /#slider-range.
+// /#fileupload, /#hovercard, /#calendar, /#menu, /#colorpicker,
+// /#togglegroup. A family whose second shape a reader announces differently
+// gets its own section too: /#slider-range.
 //
 // This is consumer code, not test code. It imports through the package barrel
 // the way a reader of the docs would, carries no test hooks, and the markup is
@@ -333,6 +334,18 @@ export function Gallery() @{
 					<colorpicker.valuelabel />
 					<colorpicker.field />
 				</colorpicker.root>
+			</div>
+		</section>
+
+		<section id="togglegroup">
+			<h2>Toggle group</h2>
+			<div class="scenario">
+				<togglegroup.root value="left">
+					<togglegroup.label>Text alignment</togglegroup.label>
+					<togglegroup.item value="left">Left</togglegroup.item>
+					<togglegroup.item value="center">Center</togglegroup.item>
+					<togglegroup.item value="right">Right</togglegroup.item>
+				</togglegroup.root>
 			</div>
 		</section>
 	</main>

@@ -89,6 +89,7 @@ jobs:
                         textbox,
                         toaster,
                         toggle,
+                        togglegroup,
                         tooltip,
                         tree,
                     ]
@@ -147,6 +148,7 @@ jobs:
                         select,
                         slider,
                         tabs,
+                        togglegroup,
                         tooltip,
                     ]
 
@@ -268,6 +270,7 @@ jobs:
                         select,
                         slider,
                         tabs,
+                        togglegroup,
                         tooltip,
                     ]
 
