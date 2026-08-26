@@ -38,7 +38,7 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	textbox: 'textbox',
 	progress: 'progressbar',
 	checklist: 'checkbox',
-	select: 'combobox',
+	select: 'listbox',
 	// A closed dialog is in the tree behind a hidden backdrop, so its role is in
 	// the DOM whether or not the trigger has been pressed.
 	modal: 'dialog',
