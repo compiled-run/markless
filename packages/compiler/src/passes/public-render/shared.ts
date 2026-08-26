@@ -1,4 +1,5 @@
 import { parseModule } from '../../js-ast.ts';
+import { createSourceMemo, ownedModuleAst } from '../semantic-graph/shared-ast.ts';
 import { deserializeGraphValue, type SerializedGraphPayload } from '@markless/serializer';
 import type { PublicRenderModuleInput, SemanticModuleImport } from '../../artifacts.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
@@ -53,10 +54,28 @@ export function moduleScopeLines(source: string, filename: string): string[] {
 	return moduleScopeDeclarations(source, filename).map((declaration) => declaration.source);
 }
 
+export type ModuleScopeDeclaration = {
+	readonly names: ReadonlyArray<string>;
+	readonly source: string;
+};
+
+// Asked once per emitted symbol module and once per residue read, all from the
+// same source text; the answer is plain strings, so it is memoized whole.
+const moduleScopeDeclarationsMemo = createSourceMemo<ReadonlyArray<ModuleScopeDeclaration>>();
+
 export function moduleScopeDeclarations(
 	source: string,
 	filename: string,
-): ReadonlyArray<{ readonly names: ReadonlyArray<string>; readonly source: string }> {
+): ReadonlyArray<ModuleScopeDeclaration> {
+	return moduleScopeDeclarationsMemo(filename, source, () =>
+		collectModuleScopeDeclarations(source, filename),
+	);
+}
+
+function collectModuleScopeDeclarations(
+	source: string,
+	filename: string,
+): ReadonlyArray<ModuleScopeDeclaration> {
 	const ast = parseModule(source, filename) as unknown as AnyNode;
 	const storageImports = frameworkApiImportNames(ast, 'storage');
 	const sharedImports = frameworkApiImportNames(ast, 'shared');
@@ -98,10 +117,27 @@ export function moduleScopeDeclarations(
  * family publishes, or a plain helper that takes the instance as an argument —
  * is not something this seam can decide.
  */
+export type ExportedSharedResolvingFunction = {
+	readonly name: string;
+	readonly definitionName: string;
+};
+
+const exportedSharedResolvingFunctionsMemo =
+	createSourceMemo<ReadonlyArray<ExportedSharedResolvingFunction>>();
+
 export function exportedSharedResolvingFunctions(
 	source: string,
 	filename: string,
-): ReadonlyArray<{ readonly name: string; readonly definitionName: string }> {
+): ReadonlyArray<ExportedSharedResolvingFunction> {
+	return exportedSharedResolvingFunctionsMemo(filename, source, () =>
+		collectExportedSharedResolvingFunctions(source, filename),
+	);
+}
+
+function collectExportedSharedResolvingFunctions(
+	source: string,
+	filename: string,
+): ReadonlyArray<ExportedSharedResolvingFunction> {
 	const ast = parseModule(source, filename) as unknown as AnyNode;
 	const sharedImports = frameworkApiImportNames(ast, 'shared');
 	if (sharedImports.size === 0) return [];
@@ -826,11 +862,40 @@ function graphReadClosure(
 // The declaring component of every payload node, aligned with the payload's own
 // cell and computed order. A duplicated id is resolved positionally: the Nth
 // binding spelling that id owns the Nth node spelling it.
+type PayloadNodeOwners = {
+	readonly cells: ReadonlyArray<string>;
+	readonly computed: ReadonlyArray<string>;
+};
+
+// `componentOwnedStateNodes` asks this once per component from three emit sites,
+// and the answer does not depend on which component asked. Held against the
+// input so it cannot outlive the compile it describes.
+const payloadNodeOwnersByInput = new WeakMap<
+	PublicRenderModuleInput,
+	Map<string, PayloadNodeOwners>
+>();
+
 function payloadNodeOwners(
 	input: PublicRenderModuleInput,
 	rootComponentName: string,
-): { readonly cells: ReadonlyArray<string>; readonly computed: ReadonlyArray<string> } {
-	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
+): PayloadNodeOwners {
+	let byRoot = payloadNodeOwnersByInput.get(input);
+	if (!byRoot) {
+		byRoot = new Map<string, PayloadNodeOwners>();
+		payloadNodeOwnersByInput.set(input, byRoot);
+	}
+	const memoized = byRoot.get(rootComponentName);
+	if (memoized) return memoized;
+	const owners = resolvePayloadNodeOwners(input, rootComponentName);
+	byRoot.set(rootComponentName, owners);
+	return owners;
+}
+
+function resolvePayloadNodeOwners(
+	input: PublicRenderModuleInput,
+	rootComponentName: string,
+): PayloadNodeOwners {
+	const ast = ownedModuleAst(input, input.source.source, input.source.filename);
 	const componentMap = sameModuleComponentMap(ast);
 	const chunkOwner = new Map<string, string>();
 	for (const component of input.semanticGraph.components) {
