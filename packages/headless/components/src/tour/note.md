@@ -3,7 +3,7 @@
 A product tour: a sequence of steps, each spotlighting an element the **consumer**
 owns, dimming the rest of the page, and showing a positioned card with a title, a
 description and back/forward controls. Built from
-`goals/headless-components/notes/U568-tour-research.md` and the measured gates in
+the tour research memo in the goal notes and the measured gates in
 `packages/vitest-browser/browser/tour-gates/`.
 
 **This family does not ship yet.** Opening, closing, dismissal, the steps and

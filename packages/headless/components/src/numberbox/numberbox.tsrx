@@ -590,7 +590,7 @@ export function NumberboxBackTrigger({
 	...rest
 }: NumberboxBackTriggerProps) @{
 	const numberbox = numberboxState();
-	const isOff = computed(() => numberbox.disabled || numberbox.readonly || numberbox.atBackBound);
+	const isBackOff = computed(() => numberbox.disabled || numberbox.readonly || numberbox.atBackBound);
 
 	<button
 		{...rest}
@@ -598,8 +598,8 @@ export function NumberboxBackTrigger({
 		tabindex={-1}
 		aria-label="Decrease"
 		aria-controls={numberbox.inputEl}
-		disabled={isOff}
-		ui-disabled={isOff}
+		disabled={isBackOff}
+		ui-disabled={isBackOff}
 		onPointerdown={(event) => {
 			numberbox.press(false, event.pointerType === 'mouse');
 			onPointerdown?.(event);
@@ -628,7 +628,7 @@ export function NumberboxForwardTrigger({
 	...rest
 }: NumberboxForwardTriggerProps) @{
 	const numberbox = numberboxState();
-	const isOff = computed(
+	const isForwardOff = computed(
 		() => numberbox.disabled || numberbox.readonly || numberbox.atForwardBound,
 	);
 
@@ -638,8 +638,8 @@ export function NumberboxForwardTrigger({
 		tabindex={-1}
 		aria-label="Increase"
 		aria-controls={numberbox.inputEl}
-		disabled={isOff}
-		ui-disabled={isOff}
+		disabled={isForwardOff}
+		ui-disabled={isForwardOff}
 		onPointerdown={(event) => {
 			numberbox.press(true, event.pointerType === 'mouse');
 			onPointerdown?.(event);
