@@ -77,6 +77,15 @@ test('a value label the consumer wrote is conveyed as its own text', async () =>
 	await readUntil(sr, { name: '30 of 100 rows' });
 });
 
+// The bar takes the authored measurement as its own value, so a reader speaks it
+// on the bar rather than a percentage the consumer chose not to show.
+test('the bar conveys the measurement the consumer wrote', async () => {
+	await open(OwnText);
+	const announcement = await readUntil(sr, { role: 'progressbar' });
+	expect(announcement, `${sr.name} announced "${announcement}"`).toContain('30 of 100 rows');
+	expect(announcement, `${sr.name} announced "${announcement}"`).not.toContain('30%');
+});
+
 // The bar's name is the label part's text, so a reader hears what the page shows.
 test('the bar is conveyed with the label part as its name', async () => {
 	await open(Basic);
