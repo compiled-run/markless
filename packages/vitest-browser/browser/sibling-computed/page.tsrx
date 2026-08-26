@@ -13,6 +13,8 @@ export default function SiblingComputedPage() @{
 		<output data-banged>{b.banged}</output>
 		<output data-asked>{b.asked}</output>
 		<output data-shouted>{b.shouted}</output>
+		<output data-seen>{b.seen}</output>
 		<button type="button" data-shout onClick={() => (b.label = 'louder')}>shout</button>
+		<button type="button" data-capture onClick={() => (b.seen = b.banged)}>capture</button>
 	</section>
 }

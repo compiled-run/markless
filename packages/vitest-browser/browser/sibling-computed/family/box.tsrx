@@ -5,7 +5,7 @@ import { computed, shared, state } from '@markless/core';
 // computed() answers with the derived value rather than a handle to call.
 export const box = shared(
 	() => {
-		const s = state({ label: 'quiet' });
+		const s = state({ label: 'quiet', seen: '' });
 		const loud = computed(() => s.label.toUpperCase());
 		const banged = computed(() => loud + '!');
 		const asked = computed(() => banged + '?');

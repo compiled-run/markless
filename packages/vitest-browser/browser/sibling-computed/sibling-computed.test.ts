@@ -41,6 +41,16 @@ async function expectWriteReDerives(container: ParentNode) {
 	await expectChain(container, LOUDER);
 }
 
+/**
+ * A handler reads a derived cell the same way a derive reads a sibling - by
+ * name, off the value the cell already holds. The click is what runs the copied
+ * handler text, so it is where a read spelled as a call would throw.
+ */
+async function expectHandlerReadsValue(container: ParentNode) {
+	container.querySelector<HTMLButtonElement>('[data-capture]')?.click();
+	await expect.poll(() => container.querySelector('[data-seen]')?.textContent).toBe(QUIET.banged);
+}
+
 /** A TypeError raised inside a derive, which no assertion on text would catch. */
 function watchForThrows(): { readonly seen: string[]; readonly stop: () => void } {
 	const seen: string[] = [];
@@ -77,6 +87,30 @@ test('CSR: a write re-derives every cell that reads a sibling', async () => {
 		const screen = await render(SiblingComputedPage);
 		await expectChain(screen.container as HTMLElement, QUIET);
 		await expectWriteReDerives(screen.container as HTMLElement);
+		expect(thrown.seen).toEqual([]);
+	} finally {
+		thrown.stop();
+	}
+});
+
+test('CSR: a handler reading a derived cell writes the value it holds', async () => {
+	const thrown = watchForThrows();
+	try {
+		const screen = await render(SiblingComputedPage);
+		await expectChain(screen.container as HTMLElement, QUIET);
+		await expectHandlerReadsValue(screen.container as HTMLElement);
+		expect(thrown.seen).toEqual([]);
+	} finally {
+		thrown.stop();
+	}
+});
+
+test('SSR resume: a handler reading a derived cell writes the value it holds', async () => {
+	const thrown = watchForThrows();
+	try {
+		const screen = await renderSSR(SiblingComputedPage);
+		await expectChain(screen.container as HTMLElement, QUIET);
+		await expectHandlerReadsValue(screen.container as HTMLElement);
 		expect(thrown.seen).toEqual([]);
 	} finally {
 		thrown.stop();
