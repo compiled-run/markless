@@ -7,11 +7,13 @@ import type {
 	LoweredStateRead,
 	PlannedSymbol,
 	SemanticComponentEdge,
+	SemanticComponentPropDeclaration,
 	SemanticGraphBinding,
 	SemanticLocalBinding,
 	SemanticSharedDefinition,
 	SemanticStateRead,
 	SemanticTemplateRead,
+	SourceSpan,
 } from '../artifacts.ts';
 import {
 	graphBindingMap,
@@ -77,8 +79,17 @@ export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArt
 		};
 	});
 	const extractedSymbols = [...localSymbols, ...importedCaptureSymbols(input)];
+	const componentScopeBindings = componentScopeLocalBindings(input);
 	const diagnostics = [
 		...extractedSymbols.flatMap((symbol) => opaqueSlotDiagnostics(symbol)),
+		...localSymbols.flatMap((symbol, index) =>
+			unreducedPropReadDiagnostics(
+				symbol,
+				input.symbolResolver.symbols[index],
+				input,
+				semantics,
+			),
+		),
 		...extractedSymbols.flatMap((symbol) => {
 			const { freeNames, analysisFailed } = semantics.read(symbol.source);
 			// A source the analyzer could not read proves nothing about what it
@@ -91,7 +102,7 @@ export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArt
 			// returning here also cannot drop a name-based diagnostic.
 			if (analysisFailed) return [unsupportedCaptureDiagnostic(symbol, undefined)];
 
-			return input.semanticGraph.localBindings.flatMap((binding) =>
+			return componentScopeBindings.flatMap((binding) =>
 				freeNames.has(binding.name) ? [unsupportedCaptureDiagnostic(symbol, binding)] : [],
 			);
 		}),
@@ -103,6 +114,36 @@ export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArt
 		extractedSymbols,
 		diagnostics,
 	};
+}
+
+/**
+ * The local bindings a lazy symbol could actually close over. A free name is
+ * matched against these by name, so the list has to hold only bindings that a
+ * name in another symbol resolves to: a declaration sitting inside some other
+ * symbol's own source is that symbol's local, and a same-named binding
+ * elsewhere is a different binding with a different scope. Declaration and
+ * symbol spans both come from the resolved AST, so containment is the scope
+ * test. A binding with no span stays in the list: nothing proves it nested.
+ */
+function componentScopeLocalBindings(
+	input: CaptureAnalysisInput,
+): ReadonlyArray<SemanticLocalBinding> {
+	const symbolSpans = input.symbolResolver.symbols.flatMap((symbol) =>
+		'sourceSpan' in symbol && symbol.sourceSpan ? [symbol.sourceSpan] : [],
+	);
+	if (symbolSpans.length === 0) return input.semanticGraph.localBindings;
+
+	return input.semanticGraph.localBindings.filter((binding) => {
+		const span = binding.sourceSpan;
+		if (!span) return true;
+
+		return !symbolSpans.some(
+			(owner) =>
+				owner.filename === span.filename &&
+				owner.start < span.start &&
+				span.end < owner.end,
+		);
+	});
 }
 
 /**
@@ -274,7 +315,8 @@ function symbolCaptureSlots(
 	semantics: SymbolSourceSemanticsReader,
 ): ReadonlyArray<CaptureSlot> {
 	const reads = lazySymbolReads(symbol, input);
-	const slots = reads.map((read) => captureSlot(read, symbol, input, semantics));
+	const ordinals = new Map<string, number>();
+	const slots = reads.map((read) => captureSlot(read, symbol, input, semantics, ordinals));
 	if (symbol.kind === 'event-handler' || symbol.kind === 'callback-prop')
 		return [...slots, ...widgetCallbackSlots(symbol, input, semantics)];
 
@@ -323,27 +365,37 @@ function widgetCallbackSlots(
 				owner: {},
 				path: [],
 				routes: [
-					// A callback prop is invoked by whatever composed its edge, so no
-					// consumer ever binds it and no consumer edge can answer its slot;
-					// the slot's own graph node is the answer, as it is for a part with
-					// no enclosing root.
-					symbol.kind === 'callback-prop'
-						? {
-								kind: 'callback-slot-route' as const,
-								graphNodeId: sharedCallbackSlotGraphNodeId(
-									invocation.definitionId,
-									invocation.slotName,
-								),
-								rootPropName: binding.propName,
-								rootComponentName: binding.componentName,
-							}
-						: {
-								kind: 'widget-callback-route' as const,
-								sharedDefinitionId: invocation.definitionId,
-								slotName: invocation.slotName,
-								rootPropName: binding.propName,
-								rootComponentName: binding.componentName,
-							},
+					// A part's claim, for the composing module to answer from the root
+					// edge that encloses it. A callback prop has no such answer — it is
+					// invoked by whatever composed its edge, so no consumer binds it.
+					...(symbol.kind === 'callback-prop'
+						? []
+						: [
+								{
+									kind: 'widget-callback-route' as const,
+									sharedDefinitionId: invocation.definitionId,
+									slotName: invocation.slotName,
+									rootPropName: binding.propName,
+									rootComponentName: binding.componentName,
+								},
+							]),
+					// The answer that needs no consumer at all: the root wrote the
+					// answering symbol id into the slot's own graph node, and the
+					// dispatching instance resolves that node exactly as it resolves the
+					// rest of the widget's state. A capture context reaches only a part
+					// the composing module BOUND, and it binds one per component edge —
+					// so a part written inside a page-local component, or under a repeat,
+					// runs with no capture context and its dispatch would otherwise fold
+					// away silently.
+					{
+						kind: 'callback-slot-route' as const,
+						graphNodeId: sharedCallbackSlotGraphNodeId(
+							invocation.definitionId,
+							invocation.slotName,
+						),
+						rootPropName: binding.propName,
+						rootComponentName: binding.componentName,
+					},
 				],
 			},
 		];
@@ -618,11 +670,33 @@ function rootIdentifierName(source: string): string | undefined {
 	return /^\s*([A-Za-z_$][\w$]*)/.exec(source)?.[1];
 }
 
+/**
+ * What a capture slot is named after: the component and prop an authored read
+ * resolves to, or the graph node and path when no prop declares it. Nothing here
+ * is a source offset — an id built from offsets moves whenever text is inserted
+ * earlier in the module, which makes emitted handler bytes depend on declaration
+ * order.
+ */
+function captureSlotIdentity(
+	read: LoweredStateRead,
+	declaration: SemanticComponentPropDeclaration | undefined,
+	componentName: string | undefined,
+	propName: string | undefined,
+	routePath: ReadonlyArray<string>,
+): string {
+	const owner = componentName ?? 'module';
+	const prop = declaration ? declaration.propPath : propName ? [propName] : undefined;
+	return prop
+		? `prop:${owner}:${[...prop, ...routePath].join('.')}`
+		: `graph:${owner}:${read.graphNodeId}:${routePath.join('.')}`;
+}
+
 function captureSlot(
 	read: LoweredStateRead,
 	symbol: PlannedSymbol,
 	input: CaptureAnalysisInput,
 	semantics: SymbolSourceSemanticsReader,
+	ordinals: Map<string, number>,
 ): CaptureSlot {
 	const declaration = read.bindingId
 		? input.semanticGraph.componentPropBindings.find(
@@ -663,12 +737,13 @@ function captureSlot(
 				: route,
 		);
 	}
-	const spanKey = read.sourceSpan
-		? `${read.sourceSpan.start}:${read.sourceSpan.end}`
-		: `${read.graphNodeId}:${read.path.join('.')}`;
+	// Two reads of the same thing in one symbol stay distinct by arrival order.
+	const identity = captureSlotIdentity(read, declaration, componentName, propName, routePath);
+	const ordinal = ordinals.get(identity) ?? 0;
+	ordinals.set(identity, ordinal + 1);
 
 	return {
-		id: `capture-slot:${read.bindingId ?? read.graphNodeId}:${spanKey}`,
+		id: `capture-slot:${identity}#${ordinal}`,
 		bindingId: read.bindingId ?? `graph-binding:${read.graphNodeId}`,
 		source: read.source,
 		...(read.sourceSpan ? { sourceSpan: read.sourceSpan } : {}),
@@ -695,7 +770,13 @@ function propCaptureRoutes(
 				(edge) => edge.childComponentName === componentName,
 			)
 		: [];
-	if (edges.length === 0) {
+	// A component that composes itself is entered once per level, and one edge
+	// stands for all of them, so no call site's value is the value every instance
+	// receives: the read resolves against the level's own props instead.
+	if (
+		edges.length === 0 ||
+		(componentName && composesItself(componentName, input.semanticGraph.componentEdges))
+	) {
 		return [
 			{ kind: 'graph-reference', graphNodeId: 'prop:props', path: [propName, ...readPath] },
 		];
@@ -847,6 +928,27 @@ export function createCompilerKnownConstantCaptureRoute(
 		componentEdgePath,
 		value,
 	};
+}
+
+// The component reaches itself through same-module edges: direct
+// self-composition and mutual cycles alike.
+function composesItself(
+	componentName: string,
+	edges: ReadonlyArray<SemanticComponentEdge>,
+): boolean {
+	const seen = new Set<string>();
+	const pending = [componentName];
+	while (pending.length > 0) {
+		const current = pending.pop();
+		if (current === undefined || seen.has(current)) continue;
+		seen.add(current);
+		for (const candidate of edges) {
+			if (candidate.importSource || candidate.parentComponentName !== current) continue;
+			if (candidate.childComponentName === componentName) return true;
+			pending.push(candidate.childComponentName);
+		}
+	}
+	return false;
 }
 
 function componentEdgePathsEndingAt(
@@ -1060,6 +1162,78 @@ function opaqueSlotDiagnostics(symbol: {
 			];
 		}),
 	);
+}
+
+/**
+ * A prop the emitted symbol still names, with no capture slot behind it.
+ *
+ * State lowering reduces plain dotted prop paths; an indexed one
+ * (`steps[0].target`) produces no read at all, so the prop name survives into
+ * the emitted handler module as a free identifier and the first dispatch throws
+ * `ReferenceError`. A build that passes and then crashes is worse than a build
+ * that refuses, so it refuses here.
+ */
+function unreducedPropReadDiagnostics(
+	symbol: {
+		readonly symbolId: string;
+		readonly source: string;
+		readonly owner?: { readonly componentName?: string };
+		readonly captureSlots: ReadonlyArray<CaptureSlot>;
+	},
+	plan: PlannedSymbol | undefined,
+	input: CaptureAnalysisInput,
+	semantics: SymbolSourceSemanticsReader,
+): ReadonlyArray<CaptureAnalysisDiagnostic> {
+	const { freeNames, analysisFailed } = semantics.read(symbol.source);
+	if (analysisFailed || freeNames.size === 0) return [];
+	const routed = new Set(
+		symbol.captureSlots.flatMap((slot) => (slot.propName ? [slot.propName] : [])),
+	);
+	const span = plan && 'sourceSpan' in plan ? plan.sourceSpan : undefined;
+
+	return input.semanticGraph.componentPropBindings.flatMap((declaration) => {
+		if (!declaration.localName || !freeNames.has(declaration.localName)) return [];
+		if (!declarationOwnsSymbol(declaration, symbol.owner?.componentName, span)) return [];
+		const propName = declaration.propPath[0] ?? declaration.localName;
+		if (routed.has(propName) || routed.has(declaration.localName)) return [];
+		const componentName = declaration.componentName;
+		return [
+			{
+				code: CAPTURE_OPAQUE_PROP_CODE,
+				severity: 'error' as const,
+				phase: CAPTURE_ANALYSIS_PHASE,
+				title: 'Lazy handler prop capture is not resumable',
+				message: `Cannot bind lazy symbol "${symbol.symbolId}" because prop "${propName}" for "${componentName}" is read through a path the compiler cannot reduce to a capture slot, so "${declaration.localName}" would reach the browser unbound.`,
+				why: 'A demanded capture slot must route to a graph node, a compiler-known constant, or a callback symbol. A prop path state lowering cannot reduce - an indexed element, a computed key, or an optional-chained call with no plain read beside it - produces no route at all, and the emitted handler would throw a ReferenceError on its first dispatch.',
+				primarySpan: declaration.sourceSpan,
+				passId: CAPTURE_ANALYSIS_PASS_ID,
+				artifactKeys: ['semanticGraph', 'symbolResolver', 'captureAnalysis'],
+				symbolId: symbol.symbolId,
+				componentName,
+				propName,
+				source: symbol.source,
+				suggestions: [
+					{
+						message: `Read ${declaration.localName} through plain property access (${declaration.localName}.someName), or pass the value this handler needs as its own prop.`,
+					},
+				],
+				docsUrl: 'https://markless.dev/errors/MARKLESS_CAPTURE_OPAQUE_PROP',
+			},
+		];
+	});
+}
+
+// Which component's props a symbol may name: the component its own capture
+// slots already named, or - for a symbol with no slots yet - the one whose
+// source range contains it.
+function declarationOwnsSymbol(
+	declaration: SemanticComponentPropDeclaration,
+	ownerComponentName: string | undefined,
+	span: SourceSpan | undefined,
+): boolean {
+	if (ownerComponentName !== undefined) return declaration.componentName === ownerComponentName;
+	const range = componentSourceRange(declaration.componentId);
+	return Boolean(span && range && range.start <= span.start && range.end >= span.end);
 }
 
 // `binding` is the component-local the symbol was proven to read. It is absent

@@ -72,6 +72,10 @@ function expectBasicRendered() {
 	expect(el(Indicator).textContent).toBe('');
 	expect(el(Label).getAttribute('for')).toBe(el(Trigger).getAttribute('id'));
 	expect(el(Trigger).id).toBeTruthy();
+	expect(el(Root).getAttribute('aria-disabled')).toBe('false');
+	// Neither message part is placed, so both handles drop out and no empty
+	// attribute is left behind.
+	expect(el(Trigger).hasAttribute('aria-describedby')).toBe(false);
 }
 
 function expectSettingsRendered() {
@@ -149,6 +153,9 @@ function expectHelpRendered() {
 	expect(el(Label).textContent).toBe('Subscribe to newsletter');
 	expect(el(Label).getAttribute('for')).toBe(el(Trigger).id);
 	expect(el(Description).textContent).toBe("We'll send you updates about new features");
+	// Only the description was placed, so the error drops out of the list.
+	expect(el(Trigger).getAttribute('aria-describedby')).toBe(el(Description).id);
+	expect(el(Description).id).toBeTruthy();
 	expect(el(Trigger).getAttribute('aria-invalid')).toBe('false');
 	expect(page.getByTestId('error').query()).toBeNull();
 }
@@ -159,11 +166,21 @@ function expectInvalidRendered() {
 	// Every part of one widget instance seeds before any part renders, so the
 	// error part's `checkbox.invalid = true` is what the trigger reads.
 	expect(el(AfterTrigger).getAttribute('aria-invalid')).toBe('true');
+	// Both ids, error first: the hint is written above the error in this page, so
+	// the order is the family's rather than the document's.
+	expect(el(AfterDescription).id).toBeTruthy();
+	expect(el(AfterError).id).toBeTruthy();
+	expect(el(AfterTrigger).getAttribute('aria-describedby')).toBe(
+		`${el(AfterError).id} ${el(AfterDescription).id}`,
+	);
 
 	// The same error written BEFORE the trigger: document order does not decide
 	// what a part reads, so this trigger is invalid too.
 	expect(el(BeforeError).textContent).toBe('Please accept the terms and conditions');
 	expect(el(BeforeTrigger).getAttribute('aria-invalid')).toBe('true');
+	// Only the error was placed here, so it is named alone - no stray space, no
+	// dangling id.
+	expect(el(BeforeTrigger).getAttribute('aria-describedby')).toBe(el(BeforeError).id);
 }
 
 async function expectConsumerCallbackFires() {
@@ -381,16 +398,13 @@ test('CSR: Space on the focused trigger toggles the checkbox', async () => {
 	await expect.poll(() => el(Indicator).textContent).toBe('Checked');
 });
 
-// A Markless handler runs after dispatch returns, so the trigger's
-// `event.preventDefault()` on Enter lands after the browser has already decided
-// whether to activate the button. This row asserts that timing, not either outcome:
-// `defaultPrevented` is false when the dispatch is made and true a tick later.
-test('CSR: the trigger asks to prevent Enter, and the request lands too late', async () => {
+// The trigger's `event.preventDefault()` on Enter is applied as synchronous policy, so it
+// lands before the dispatch returns rather than a tick later.
+test('CSR: the trigger prevents Enter before the dispatch returns', async () => {
 	await render(Basic);
 	el(Trigger).focus();
 
 	const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
 	el(Trigger).dispatchEvent(enter);
-	expect(enter.defaultPrevented).toBe(false);
-	await expect.poll(() => enter.defaultPrevented).toBe(true);
+	expect(enter.defaultPrevented).toBe(true);
 });

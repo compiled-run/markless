@@ -1,0 +1,22 @@
+# MARKLESS_ELEMENT_HANDLE_UNBOUND
+
+element() handle is read before it is bound
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: warning
+
+## Message
+
+Reading element handle "…" will produce undefined because "…" is never bound with el=\{…\} in this component.
+
+## Why
+
+element() handles are DOM locator references, not state. A read is only useful after the handle has a host element binding that resume can locate.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
