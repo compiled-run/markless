@@ -86,7 +86,7 @@ export function PaginationRoot({
 	pagination.siblingCount = siblingCount;
 	pagination.disabled = disabled;
 
-	<nav aria-label="Pagination" {...rest} ui-disabled={pagination.disabled}>{children}</nav>
+	<nav {...rest} ui-disabled={pagination.disabled}>{children}</nav>
 }
 
 export function PaginationItem({ value, children, ...rest }: PaginationItemProps) @{

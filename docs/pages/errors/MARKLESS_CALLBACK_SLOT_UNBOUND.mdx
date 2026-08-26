@@ -1,0 +1,22 @@
+# MARKLESS_CALLBACK_SLOT_UNBOUND
+
+A callback slot is invoked but no component fills it
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: warning
+
+## Message
+
+shared() "…" invokes its "…" callback slot, but no component in this module assigns a callback prop into it.
+
+## Why
+
+Without an assignment there is no widget root to route the call to, so the invocation can never reach a consumer and does nothing at runtime.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

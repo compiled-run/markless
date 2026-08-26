@@ -2,7 +2,7 @@
  * Foundation tests for the emission codegen module
  * (`specs/framework/14-emission-codegen-migration.md`, stage 1 unit 1).
  *
- * These re-run, in-repo and against the installed `yuku-codegen@0.9.0`, the
+ * These re-run, in-repo and against the installed `yuku-codegen@0.9.1`, the
  * printer capabilities the campaign's audit recorded in an ephemeral
  * scratchpad, and they hold invariants 3, 4, 7, and 8 for the module the
  * per-site migrations build on. No emitter is migrated here.
@@ -425,7 +425,7 @@ test('the assertion does not fire on plain TypeScript or on plain JSX', () => {
 	);
 	expect(findTsrxOnlyNodeType(plain)).toBeNull();
 
-	// Plain JSX prints without error in yuku-codegen@0.9.0, so refusing it would
+	// Plain JSX prints without error in yuku-codegen@0.9.1, so refusing it would
 	// be a false positive. Only the TSRX-exclusive node types are refused.
 	const jsx = parseModule('const a = <div className="x">{y}</div>;', 'a.tsx', {
 		...EMISSION_PARSE_OPTIONS,

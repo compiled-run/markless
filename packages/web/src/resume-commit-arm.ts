@@ -8,7 +8,7 @@ import {
 import type {
 	ResumeArmBranchRecord,
 	ResumeArmRecordSet,
-	ResumeAsyncBoundaryRecord,
+	ResumeArmRange,
 	ResumeBehaviorRecord,
 	ResumeDomElement,
 	ResumeElementHandleValue,
@@ -32,6 +32,9 @@ export type ArmCommitUpdate = {
 	readonly elementsByHostId?: ReadonlyMap<string, ResumeDomElement>;
 	readonly eventElementsByHostId?: ReadonlyMap<string, ReadonlyArray<ResumeDomElement>>;
 	readonly computed?: ProtocolStatePayload['computed'];
+	// Cells of components this render created: nothing in the live graph answers
+	// for them until the commit writes them in.
+	readonly cells?: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
 };
 
 export type ArmRegistrationDeps = Parameters<typeof createArmCommitter>[0];
@@ -96,7 +99,9 @@ export function createArmCommitter(
 			records: ReadonlyArray<ResumeArmBranchRecord>,
 		) => Promise<void>;
 		readonly graph?: import('@markless/runtime').RuntimeGraph;
-		readonly graphNodeIds?: ReadonlySet<string>;
+		// The live registration census: a born-late registration grows it, because a
+		// node registered after boot is not in the boot-time snapshot.
+		readonly graphNodeIds?: ReadonlySet<string> & { readonly add?: (id: string) => unknown };
 		readonly registerComputedRefreshes?: (
 			records: ProtocolStatePayload['computed'],
 		) => Promise<void> | void;
@@ -111,7 +116,7 @@ export function createArmCommitter(
 	installEventType: (eventType: string) => void,
 ) {
 	return async function commitArm(
-		boundary: ResumeAsyncBoundaryRecord,
+		boundary: ResumeArmRange,
 		update: ArmCommitUpdate,
 	): Promise<void> {
 		if (!update.nodes && (!deps.renderHtml || update.html === undefined))
@@ -145,8 +150,8 @@ export function createArmCommitter(
 export async function registerArmRecordSet(
 	deps: ArmRegistrationDeps,
 	installEventType: (eventType: string) => void,
-	boundary: ResumeAsyncBoundaryRecord,
-	update: Pick<ArmCommitUpdate, 'armRecords' | 'elementsByHostId' | 'computed'>,
+	boundary: ResumeArmRange,
+	update: Pick<ArmCommitUpdate, 'armRecords' | 'elementsByHostId' | 'computed' | 'cells'>,
 	eventTypesInstalled?: boolean,
 ) {
 	const exhaustive = {
@@ -183,6 +188,12 @@ export async function registerArmRecordSet(
 		const element = materialized.elementsByHostId.get(handle.hostNodeId);
 		if (!element) throw armRecordHostMissingError(handle.hostNodeId, 'element handle');
 		deps.registerElementHandle(handle.hostNodeId, handle, element);
+	}
+	// Before any refresh subscribes: a derive that runs first would read nothing.
+	for (const cell of update.cells ?? []) {
+		if (!deps.graph) throw new Error('Markless arm state registration is unavailable.');
+		deps.graph.write({ graphNodeId: cell.graphNodeId, value: cell.value });
+		deps.graphNodeIds?.add?.(cell.graphNodeId);
 	}
 	const computedRefreshes = (update.computed ?? []).filter(
 		(computed) => computed.async === false && typeof computed.deriveSymbolId === 'string',
@@ -286,7 +297,7 @@ function armRecordHostMissingError(hostNodeId: string, kind: string): Error {
 // Both anchors must be live siblings under one parent BEFORE anything is
 // removed: a corrupt census fails clean instead of half-emptying the page.
 function replaceAnchorRange(
-	boundary: ResumeAsyncBoundaryRecord,
+	boundary: ResumeArmRange,
 	fresh: ReadonlyArray<ResumeDomNode>,
 ): void {
 	const start = boundary.startAnchor as CommitAnchor;
@@ -344,7 +355,7 @@ function captureFocusScroll(
 // by definition and has no prior focus state to preserve.
 function restoreFocusScroll(
 	deps: Parameters<typeof createArmCommitter>[0],
-	boundary: ResumeAsyncBoundaryRecord,
+	boundary: ResumeArmRange,
 	captured: CapturedFocusScroll,
 	freshByHostId: ReadonlyMap<string, ResumeDomElement>,
 ): void {
@@ -376,7 +387,7 @@ function restoreFocusScroll(
 
 function findByTestId(
 	root: ResumeDomElement,
-	boundary: ResumeAsyncBoundaryRecord,
+	boundary: ResumeArmRange,
 	testId: string | undefined,
 ): ResumeDomElement | undefined {
 	if (testId === undefined) return undefined;
@@ -388,7 +399,7 @@ function findByTestId(
 
 // One factory for both commit refusals: identical diagnostic shape, message
 // text unchanged (code-prefixed, author vocabulary per D2/D4).
-function armCommitError(code: string, boundary: ResumeAsyncBoundaryRecord, detail: string): Error {
+function armCommitError(code: string, boundary: ResumeArmRange, detail: string): Error {
 	const error = new Error(`${code}: Async boundary ${boundary.id} ${detail}`) as Error &
 		Record<string, unknown>;
 	error.name = 'RuntimeResumeError';
@@ -399,7 +410,7 @@ function armCommitError(code: string, boundary: ResumeAsyncBoundaryRecord, detai
 	return error;
 }
 
-function armCommitAnchorsError(boundary: ResumeAsyncBoundaryRecord): Error {
+function armCommitAnchorsError(boundary: ResumeArmRange): Error {
 	return armCommitError(
 		'MARKLESS_ARM_COMMIT_ANCHORS_MISSING',
 		boundary,
@@ -407,7 +418,7 @@ function armCommitAnchorsError(boundary: ResumeAsyncBoundaryRecord): Error {
 	);
 }
 
-function armCommitRendererMissingError(boundary: ResumeAsyncBoundaryRecord): Error {
+function armCommitRendererMissingError(boundary: ResumeArmRange): Error {
 	return armCommitError(
 		'MARKLESS_ARM_COMMIT_RENDERER_MISSING',
 		boundary,

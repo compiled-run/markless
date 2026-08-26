@@ -426,8 +426,11 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		write(write) {
 			const path = write.path ?? [];
 			const current = cells.get(write.graphNodeId);
-			if (plane?.commitDerived(write, path)) return;
-			if (Object.is(readPath(current, path), write.value)) return;
+			// Map presence separates an unseeded node from one holding undefined; computeds
+			// carry no payload value, so their first derive to undefined must not read as a no-op.
+			const seeded = cells.has(write.graphNodeId);
+			if (seeded && plane?.commitDerived(write, path)) return;
+			if (seeded && Object.is(readPath(current, path), write.value)) return;
 			cells.set(write.graphNodeId, writePath(current, path, write.value));
 			markDirtyPath(write.graphNodeId, dirtyPathForGraphWrite(current, path));
 			scheduleFlush();
