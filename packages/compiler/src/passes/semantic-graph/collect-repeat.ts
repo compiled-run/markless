@@ -12,10 +12,12 @@ import { resolvedSymbolAt } from './collect-expressions.ts';
 import {
 	repeatCollectionUndeclaredDiagnostic,
 	repeatCollectionUnreadableDiagnostic,
+	repeatFrozenRowsDiagnostic,
 	repeatKeyIsIndexDiagnostic,
 	repeatKeyRequiredDiagnostic,
 	repeatKeyUnstableDiagnostic,
 } from './diagnostics.ts';
+import { firstReactiveRowRead, repeatRowNames } from './repeat-reactivity.ts';
 import type { WalkState } from './types.ts';
 
 export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | null {
@@ -132,6 +134,26 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 			}),
 		);
 		return null;
+	}
+
+	// An off-graph collection is a designed server-only path, correct while the
+	// rows are static. It is a defect only once a row reads something a later
+	// write can move: those rows never reconcile, so the read silently freezes.
+	if (!resolvedCollection) {
+		const reactiveRead = firstReactiveRowRead(node, state, repeatRowNames(itemName, indexName));
+		if (reactiveRead) {
+			state.graph.diagnostics.push(
+				repeatFrozenRowsDiagnostic({
+					node,
+					itemName,
+					collectionSource,
+					rootName: splitStaticGraphPath(collectionSource)[0] ?? collectionSource,
+					readSource: reactiveRead.source,
+					readKind: reactiveRead.kind,
+					filename: state.filename,
+				}),
+			);
+		}
 	}
 
 	const repeatIndex = state.graph.keyedRepeats.length;

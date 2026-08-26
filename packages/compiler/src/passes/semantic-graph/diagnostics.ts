@@ -192,7 +192,7 @@ export function componentSpreadUnsupportedDiagnostic(input: {
 		why: 'What a spread carries onto a child component is decided at build time, from the signature that produced it. An object assembled anywhere else has no build-time contents, so the child would render without the entries and nothing would say so.',
 		span: sourceSpan(input.node, input.filename),
 		suggestion:
-			'Spread the rest binding of this component\'s own props (`function Part({ known, ...rest })` then `<Child {...rest} />`), or write the props you mean out by name on the tag.',
+			"Spread the rest binding of this component's own props (`function Part({ known, ...rest })` then `<Child {...rest} />`), or write the props you mean out by name on the tag.",
 		docsUrl: 'https://markless.dev/errors/MARKLESS_COMPONENT_SPREAD_UNSUPPORTED',
 	});
 }
@@ -1018,7 +1018,8 @@ export function rowOwnedIdrefElementHandleDiagnostic(
 		message: `Cannot resolve ${reference.attributeName}={${reference.source}} because "${reference.handleName}" is bound inside a keyed repeat, so it names one element per row rather than one element.`,
 		why: 'Every row owns its own element and would need its own id. One authored handle cannot name one of them, and picking a row silently would make the relationship point at whichever row happened to render first.',
 		span: reference.sourceSpan,
-		suggestion: 'Bind a separate element() handle outside the repeat for the element this attribute names, or move the relationship inside the row so each row names its own element.',
+		suggestion:
+			'Bind a separate element() handle outside the repeat for the element this attribute names, or move the relationship inside the row so each row names its own element.',
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_ROW_OWNED',
 	});
 }
@@ -1039,7 +1040,8 @@ export function widgetRootIdrefElementHandleDiagnostic(
 		message: `Cannot resolve ${reference.attributeName}={${reference.source}} because "${reference.handleName}" is declared in a shared() factory that this component roots, or in a factory that is not { scope: 'widget' }.`,
 		why: 'A widget-scoped factory is one graph per rendered widget, so the minted id has to carry which widget it belongs to. That token is written when the widget root seeds the parts placed inside it, which happens after the root itself has started rendering and never happens at all for a page-wide factory.',
 		span: reference.sourceSpan,
-		suggestion: "Move the element() handle and both ends of the relationship into parts placed inside the widget root, and give the factory { scope: 'widget' }.",
+		suggestion:
+			"Move the element() handle and both ends of the relationship into parts placed inside the widget root, and give the factory { scope: 'widget' }.",
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT',
 	});
 }
@@ -1059,7 +1061,8 @@ export function idrefElementHandleIdConflictDiagnostic(input: {
 		message: `Cannot mint the id for el={${input.handleName}} because this element already declares an id attribute.`,
 		why: 'An IDREF position is written from the id the compiler mints for the bound element. A second, authored id on the same element would emit two id attributes and leave the relationship pointing at whichever one the HTML parser kept.',
 		span: input.span,
-		suggestion: 'Remove the authored id from this element, or drop the element() handle and write the IDREF attribute with your own id string.',
+		suggestion:
+			'Remove the authored id from this element, or drop the element() handle and write the IDREF attribute with your own id string.',
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_ID_CONFLICT',
 	});
 }
@@ -1245,6 +1248,34 @@ export function repeatCollectionUndeclaredDiagnostic(input: {
 		why: 'The collection expression is re-emitted into the server render module, where an undeclared name throws a ReferenceError on the first render.',
 		span: sourceSpan(input.node, input.filename),
 		suggestion: `Declare \`${input.rootName}\` as a \`state()\` cell or a \`computed()\` in this component or its shared family, or correct the spelling if it was meant to name one that exists.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_COLLECTION_UNREADABLE',
+	});
+}
+
+const REACTIVE_READ_NOUN = {
+	state: 'state cell',
+	computed: 'computed value',
+	prop: 'component prop',
+} as const;
+
+// Same code as the other collection refusals: the collection is again what the
+// repeat cannot read - here it reads once and never again, so the rows freeze.
+export function repeatFrozenRowsDiagnostic(input: {
+	readonly node: AnyNode;
+	readonly itemName: string;
+	readonly collectionSource: string;
+	readonly rootName: string;
+	readonly readSource: string;
+	readonly readKind: keyof typeof REACTIVE_READ_NOUN;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_REPEAT_COLLECTION_UNREADABLE',
+		title: 'This @for renders its rows once and never updates them',
+		message: `@for (const ${input.itemName} of ${input.collectionSource}) takes its rows from \`${input.rootName}\`, which is neither a state cell nor a computed, so the repeat resolves to no graph node and its rows are built on the server and never rebuilt in the browser. The row body reads \`${input.readSource}\`, a ${REACTIVE_READ_NOUN[input.readKind]} that can change after that render, and those rows would silently keep their first-render values.`,
+		why: 'A keyed repeat reconciles through the graph node its collection resolves to; a collection that resolves to none renders its rows once, so any reactive read inside a row is frozen at its first-render value with nothing said at build time.',
+		span: sourceSpan(input.node, input.filename),
+		suggestion: `Put the collection on the graph - \`const ${input.rootName} = state([...])\` or \`const ${input.rootName} = computed(() => ...)\` inside the component - so the rows rebuild when \`${input.readSource}\` changes; or keep the rows static by reading only \`${input.itemName}\` inside them.`,
 		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_COLLECTION_UNREADABLE',
 	});
 }
