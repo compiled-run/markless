@@ -57,6 +57,8 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	// The trigger is an <a> and only an <a>: the card is a shortcut to where that
 	// link goes, so the link is the part that must have rendered.
 	hovercard: 'link',
+	// The days are real buttons and no grid: there is no gridcell to look for.
+	calendar: 'button',
 };
 
 /** Sections whose point is how many of that role they serve, not merely that they serve one. */
@@ -64,6 +66,9 @@ const RENDERED_COUNT: Partial<Record<FamilyName, number>> = {
 	'slider-range': 2,
 	// Three boxes, one per part of the date.
 	datebox: 3,
+	// Six weeks of days that never shrink, plus back and forward: a count catches
+	// a month that rendered its header and none of its days.
+	calendar: 44,
 };
 
 const appDir = fileURLToPath(new URL('..', import.meta.url));

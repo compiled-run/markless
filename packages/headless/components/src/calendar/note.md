@@ -2,12 +2,13 @@
 
 A month of days a person can choose from. Real buttons, no grid.
 
-**Status: one framework defect short of complete.** 36 of 38 browser rows are
-green in both CSR and SSR, the screen-reader lane is green, and the family is
-registered in the shared conformance battery. Two rows are red, both on the same
-measured defect: a `@for` row built *after* the first render gets its own
-detached copy of the widget instead of the one its ancestors hold. It is written
-out under "The one thing still broken" with the transcript that shows it.
+**Status: one framework defect short of complete.** 53 of 54 browser rows are
+green in both CSR and SSR, the virtual screen-reader lane is green, the real
+reader lanes and the gallery section they read are written, and the family is
+registered in the shared conformance battery. One row is red, on a defect in how
+the runtime dispatches an event whose target a previous event's own state write
+removed. It is written out under "The one thing still broken" with the
+measurement that shows it.
 
 Research: `goals/headless-components/notes/U488-calendar-research.md` — React Aria's
 `useCalendar*`, Zag/Ark, Bits UI, Melt, Mantine, react-day-picker, the WAI-ARIA APG
@@ -129,17 +130,19 @@ follows it.
    at every read instead. Carried from the previous build; not re-tested on this
    tip.
 
-4. **`[...held, iso].sort()` inside a shared method is read as a write target**
-   (`MARKLESS_STATE_UNRESOLVED_WRITE`). `toggledList` in `calendar-math.ts` is that
-   expression moved into a pure function. Carried from the previous build; not
-   re-tested on this tip.
+4. **`[...held, iso].sort()` inside a shared method is read as a write target.**
+   Re-tested on this tip: `MARKLESS_STATE_UNRESOLVED_WRITE: Cannot write to
+   "[...held, iso]" because the compiler cannot resolve that target.` `toggledList`
+   in `calendar-math.ts` is that expression moved into a pure function.
 
 5. **A shared factory's `computed()` may not import from another file.** Every
    `computed()` on `calendarState` is written out of platform globals rather than
    out of `./calendar-math.ts`, which is why `days`, `weeks`, `title` and `focused`
    each re-derive the visible month instead of calling `visibleMonth`. That
    duplication is the price, and `calendar.browser.ts` pins the two against each
-   other. Carried from the previous build; not re-tested on this tip.
+   other. Re-tested on this tip by pointing `title` at `visibleMonth`: every row
+   in the family's own lanes fails with `ReferenceError: visibleMonth is not
+   defined`.
 
 6. **A component may not be shared across scenario modules**
    (`MARKLESS_PRERENDER_DATA_COMPONENT_MISSING`), and **a consumer cannot call a
@@ -157,54 +160,91 @@ rows are green.
 
 ## The one thing still broken
 
-**A `@for` row built after the first render gets a detached widget of its own.**
+**A keydown is refused when the key before it removed the day it landed on.**
 
-Move the month forward once, then press a day that only exists in the new month.
-Measured on `scenarios/controlled.tsrx`, where the page holds the value and counts
-the calls:
+Press Shift+PageUp twice with nothing between the presses. The first press steps
+the year, which replaces all 42 rows — the keys are the dates — and the second
+press is dispatched at the day the first press was standing on, which by then is
+gone from the page. Verbatim, twice per run:
 
-| what was read                       | what came back           | what it should be |
-| ----------------------------------- | ------------------------ | ----------------- |
-| the page's `onChange` call count     | `0`                      | `1`               |
-| the page's value                     | `2026-08-14` (the seed)  | `2026-09-14`      |
-| the pressed day's `ui-*`             | `ui-outside ui-selected` | `ui-selected`     |
-| a row carried over from the old grid | correct                  | correct           |
-| which day carries `tabindex="0"`     | unmoved                  | the pressed day   |
+```
+RuntimeResumeError: MARKLESS_EVENT_DISPATCH_UNMATCHED: No event record matched keydown dispatch at button.
+ ❯ unmatchedDispatchError packages/web/src/resume-events.ts:581:14
+ ❯ Object.dispatch packages/web/src/resume-events.ts:173:3
+ ❯ Object.dispatch packages/web/src/resume-runtime.ts:385:32
+ ❯ Object.dispatch packages/web/src/resume.ts:35:4
+```
 
-The new row does react — its own `ui-selected` appeared — but it is reacting to a
-**second instance**. Inside it, `calendarState()` hands back cells at their seed
-values (`monthAt` reads `''`, never `'2026-09-01'`) and the factory's derived cells
-as `undefined`, which is why `sameMonth` throws
-`TypeError: Cannot read properties of undefined (reading 'slice')` from the item's
-`isOutside`, and why a keydown bubbling out of such a row is
-`MARKLESS_EVENT_DISPATCH_UNMATCHED: No event record matched keydown dispatch at
-button`. Its writes never reach the widget the ancestors hold.
+The mechanism, measured on this tip with a capture-phase listener recording each
+keydown's target and whether that element was still in the document afterwards:
 
-Routing the item through `calendar.month` and `calendar.focused` — the family's own
-derived cells — rather than rebuilding the month from `monthAt` does **not** fix
-it; the derived cells are simply absent from the detached copy. That routing was
-kept anyway, because it removes a real duplication between the factory and the
-item, but it is not a cure and must not be read as one.
+| # | keydown    | target               | what happened                |
+| - | ---------- | -------------------- | ---------------------------- |
+| 1 | `Shift`    | `button[2026-08-14]` | landed                       |
+| 2 | `PageDown` | `button[2026-08-14]` | landed; title to August 2027 |
+| 3 | `Shift`    | `button[2027-08-14]` | landed                       |
+| 4 | `PageUp`   | `button[2027-08-14]` | landed; title to August 2026 |
+| 5 | `Shift`    | `button[2027-08-14]` | threw                        |
+| 6 | `PageUp`   | `button[2027-08-14]` | threw                        |
 
-The two red rows in `calendar.browser.ts` are written as what should happen:
+Keydowns 3 to 6 were all dispatched against the August 2027 grid, and their target
+was still connected both synchronously and one microtask after each was pressed:
+the rewrite keydown 4 caused had not happened yet when 5 and 6 were pressed.
+`dispatch` in `resume-events.ts` is `async` — it awaits the runtime module before
+it looks at anything — and by the time it runs for the last two the rewrite has
+removed their target, so the guard that asks whether the target is still inside
+the resume root refuses them. The runtime
+already holds the idea that this is not a defect: `ignoredDisposedEventTargets`
+exists so that "a dispatch after container teardown is never an unmatched
+defect", but it is filled only when a whole container is torn down, never when a
+keyed repeat disposes a row.
 
-- `CSR: PageDown crosses the month and takes the focus with it` — after the month
-  crosses, no day carries `tabindex="0"` (0 tab stops, not 1).
+Nothing in the family's shape avoids it. The keys must change when the month
+changes — they are the dates — so the rows must be rebuilt, and a family cannot
+order a browser's keystrokes against a rewrite its own previous keystroke caused.
+The one red row is written as what should happen:
+
 - `CSR: Shift with the page keys steps a year` — the second Shift+PageUp never
   reaches the handler, so the title stops at August 2026 instead of August 2025.
 
-Nothing in the family's shape avoids this. The keys must change when the month
-changes — they are the dates — so the rows must be rebuilt, and the ruled consumer
-shape has no index to key by.
+The previous note's defect — a `@for` row built after the first render getting its
+own detached copy of the widget — is **gone on this tip** and its entry has been
+deleted. Re-measured: `scenarios/controlled.tsrx` now reports the `onChange` call,
+carries the new month's date, writes `ui-selected` without `ui-outside`, and moves
+the tab stop onto the pressed day; `CSR: PageDown crosses the month and takes the
+focus with it` is green; and the `TypeError: Cannot read properties of undefined
+(reading 'slice')` that `sameMonth` used to throw out of a minted row's
+`isOutside` no longer appears in the lane at all.
 
-## Not yet written
+Routing the item through `calendar.month` and `calendar.focused` rather than
+rebuilding the month from `monthAt` was kept: it removes a real duplication
+between the factory and the item, and on this tip those derived cells do reach a
+minted row.
 
-The NVDA and VoiceOver transcript files. Both real-reader lanes navigate to
-`FAMILY_ANCHORS.<family>` in `apps/sr-gallery/preview-server.ts`, which has no
-`calendar` entry and no calendar section on the gallery page. That file is outside
-this family, and a literal `'/#calendar'` here would restate a config fact its
-owner should hold. The virtual reader's lane, `calendar.sr.ts`, is green and its
-transcript is quoted above.
+## The real reader lanes
+
+`calendar.nvda.ts` and `calendar.voiceover.ts` run the shared
+`calendar-transcript.ts` against `FAMILY_ANCHORS.calendar`, whose section is last
+on the gallery page and pins August 2026 with one day chosen and one a person may
+not choose, so what a reader hears is the same on every run. What is asserted is
+the divergence itself: each day announced as a button carrying its whole date,
+the day nobody may choose saying so and still refusing when pressed, and the
+month's group renamed by the title whenever the month moves. A day's expected name
+is read off the element rather than rebuilt from `Intl`, because the page's locale
+is the browser's and the transcript runs in node.
+
+`aria-pressed` is asserted on the element, not in a phrase: neither reader has a
+`Vocabulary` slot for it, and datebox records the same reason for `spinbutton`.
+
+Neither reader has run against this markup. On this machine the lane prints
+`Error: NVDA is not supported` and `Error: VoiceOver cannot be started` /
+`Failed to mount Guidepup preferences`, so every wording in the tables above is
+the virtual reader's, and the real lanes are unmeasured.
+
+The virtual reader's own lane, `calendar.sr.ts`, is green. One row there needed a
+change on this tip: `calendar.title` is a polite live region, and a click that
+rewrites it can leave its phrase as the last one spoken, so `readDay` steps off
+the day and back onto it when the phrase it gets is not the day's own.
 
 ## What v1 refuses regardless
 
