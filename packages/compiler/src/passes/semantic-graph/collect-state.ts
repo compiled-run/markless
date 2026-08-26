@@ -6,6 +6,8 @@ import {
 	type AnyNode,
 } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
+import { parseModule } from '../../js-ast.ts';
+import { getComponentFunction } from '../../ast/tsrx.ts';
 import type {
 	ModuleGraphInterfaceArtifact,
 	ModuleGraphInterfaceExport,
@@ -788,9 +790,84 @@ function graphBindingId(
 		const call = state.currentHelperCall;
 		return `${kind}:${call.componentName}.${call.localName}.${call.helperName}.${name}`;
 	}
-	return state.currentSharedDefinitionId
-		? `${state.currentSharedDefinitionId}/${kind}:${name}`
+	if (state.currentSharedDefinitionId) {
+		return `${state.currentSharedDefinitionId}/${kind}:${name}`;
+	}
+	const componentName = state.currentComponentName;
+	return componentName && collidingComponentLocalCells(state).has(`${kind}:${name}`)
+		? `${kind}:${componentName}.${name}`
 		: `${kind}:${name}`;
+}
+
+// The id is a serialized wire key: emitted verbatim and read back across the
+// SSR/resume boundary. Two components in one module declaring the same local
+// cell name minted the same key, so one runtime cell answered both formulas and
+// the loser's binding was silently wrong. Qualifying costs emitted bytes, so it
+// happens only for a name a SECOND component in the module also declares -
+// every other module keeps the key it has always emitted.
+const collidingCellsByWalk = new WeakMap<WalkState, ReadonlySet<string>>();
+
+function collidingComponentLocalCells(state: WalkState): ReadonlySet<string> {
+	const cached = collidingCellsByWalk.get(state);
+	if (cached) return cached;
+
+	const declarers = new Map<string, Set<string>>();
+	const ast = parseModule(state.source, state.filename) as unknown as AnyNode;
+	for (const statement of asNodes(ast.body)) {
+		const componentFunction = getComponentFunction(statement);
+		if (!componentFunction) continue;
+		collectComponentLocalCellDeclarers(
+			componentFunction.node.body as AnyNode | undefined,
+			componentFunction.name,
+			declarers,
+			state,
+		);
+	}
+
+	const colliding = new Set<string>();
+	for (const [cell, components] of declarers) {
+		if (components.size > 1) colliding.add(cell);
+	}
+	collidingCellsByWalk.set(state, colliding);
+	return colliding;
+}
+
+function collectComponentLocalCellDeclarers(
+	node: AnyNode | undefined,
+	componentName: string,
+	declarers: Map<string, Set<string>>,
+	state: WalkState,
+): void {
+	if (!node) return;
+	// A cell declared inside a nested function is never component-local: a
+	// shared() factory, a computed body and a handler each mint under their own
+	// scope, so descending into one would count a name this rule cannot qualify.
+	if (
+		node.type === 'ArrowFunctionExpression' ||
+		node.type === 'FunctionExpression' ||
+		node.type === 'FunctionDeclaration'
+	) {
+		return;
+	}
+
+	if (node.type === 'VariableDeclaration') {
+		for (const declaration of asNodes(node.declarations)) {
+			const name = getIdentifierName(declaration.id as AnyNode | undefined);
+			const api = getFrameworkApiForCall(
+				declaration.init as AnyNode | undefined,
+				state.frameworkApiImports,
+			);
+			if (!name || (api !== 'state' && api !== 'computed' && api !== 'element')) continue;
+			const cell = `${api}:${name}`;
+			const components = declarers.get(cell) ?? new Set<string>();
+			components.add(componentName);
+			declarers.set(cell, components);
+		}
+	}
+
+	for (const child of childNodes(node)) {
+		collectComponentLocalCellDeclarers(child, componentName, declarers, state);
+	}
 }
 
 function graphBindingName(name: string, state: WalkState): string {
