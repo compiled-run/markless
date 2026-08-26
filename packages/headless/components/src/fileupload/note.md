@@ -44,7 +44,7 @@ Written the other way round — `if (upload.disabled) return; event.preventDefau
 call as unconditional. `preventDefault()` on `dragover` is what makes a drop
 happen at all, so getting this backwards produces an upload that looks right and
 silently accepts drops while disabled. The disabled-drop row in
-`fileupload-disabled.browser.ts` is what holds it.
+`fileupload.browser.ts` is what holds it.
 
 ## Accessibility
 
@@ -84,14 +84,20 @@ never takes one away. The same shape over page-scoped state is fine, which is wh
 toaster's dismiss row is green; this family cannot be page-scoped, because
 `for={upload.fieldEl}` on the label is refused outside widget scope
 (`MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT`). The two pinned `test.fails` rows in
-`fileupload.browser.ts` and `fileupload-multiple.browser.ts` turn red the day this
-closes.
+`fileupload.browser.ts` turn red the day this closes.
 
 **The list lives inside the root.** A component that reads the upload's state is
 part of that upload's widget; one placed outside the root starts a second upload
 of its own and repeats over its empty list. Every scenario therefore puts its
 repeat in a small component *inside* `fileupload.root`. A construct may not be the
 direct child of a component tag either, so the repeat opens in a plain element.
+
+**Every scenario shares one browser file.** The family once held six, one per
+scenario, on the belief that a compiled page installs its row-minting loader into
+a single unqualified global and so two scenarios with a repeat could not share a
+suite. Measured: all six scenarios import into `fileupload.browser.ts` and every
+row that mints rows still mints them, twice over. There is no page-module
+isolation constraint here.
 
 **A row is a `div`, not an `li`.** A `<ul>` may hold nothing but `<li>`, and the
 repeat needs an element to open in, so a list-semantics row would need a wrapper

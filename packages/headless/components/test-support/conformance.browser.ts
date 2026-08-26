@@ -335,7 +335,7 @@ const descriptors: readonly FamilyDescriptor[] = [
 		family: 'progress',
 		mount: { CSR: () => render(Progress), SSR: () => renderSSR(Progress) },
 		root: 'root',
-		parts: ['root', 'label', 'track', 'indicator'],
+		parts: ['root', 'label', 'valuelabel', 'track', 'indicator'],
 		rootAria: {
 			role: 'progressbar',
 			'aria-valuemin': '0',

@@ -6,11 +6,14 @@ import Complete from './scenarios/complete.tsrx';
 import CustomRange from './scenarios/custom-range.tsrx';
 import Indeterminate from './scenarios/indeterminate.tsrx';
 import Live from './scenarios/live.tsrx';
+import Moving from './scenarios/moving.tsrx';
+import OwnText from './scenarios/own-text.tsrx';
 
 const Root = page.getByTestId('root');
 const Label = page.getByTestId('label');
 const Track = page.getByTestId('track');
 const Indicator = page.getByTestId('indicator');
+const ValueLabel = page.getByTestId('valuelabel');
 const Advance = page.getByTestId('advance');
 const Amount = page.getByTestId('amount');
 const StepsRoot = page.getByTestId('steps-root');
@@ -38,7 +41,10 @@ function expectBasicRendered() {
 	expect(el(Root).getAttribute('aria-valuemax')).toBe('100');
 	expect(el(Root).getAttribute('aria-valuenow')).toBe('30');
 	expect(el(Root).getAttribute('aria-valuetext')).toBe('30%');
-	expect(el(Label).textContent).toBe('Export data 30%');
+	expect(el(Label).textContent).toBe('Export data');
+	expect(el(ValueLabel).textContent?.trim()).toBe('30%');
+	expect(el(ValueLabel).getAttribute('ui-progress')).toBe('loading');
+	expect(el(ValueLabel).getAttribute('ui-value')).toBe('30');
 	expect(el(Track).contains(el(Indicator))).toBe(true);
 	expect(el(Indicator).getAttribute('ui-progress')).toBe('loading');
 	expect(el(Indicator).getAttribute('ui-value')).toBe('30');
@@ -53,6 +59,9 @@ function expectIndeterminateRendered() {
 	expect(el(Root).hasAttribute('aria-valuenow')).toBe(false);
 	expect(el(Root).hasAttribute('aria-valuetext')).toBe(false);
 	expect(el(Root).hasAttribute('ui-value')).toBe(false);
+	// No percentage exists to show, so the part renders nothing rather than a made-up 0%.
+	expect(el(ValueLabel).textContent?.trim()).toBe('');
+	expect(el(ValueLabel).getAttribute('ui-progress')).toBe('indeterminate');
 	expect(el(Indicator).getAttribute('style')).toBe('transform: translateX(-100%)');
 }
 
@@ -128,6 +137,24 @@ for (const mode of MODES) {
 		if (mode === 'CSR') await render(CustomRange);
 		else await renderSSR(CustomRange);
 		expectCustomRangeRootsDropDestructuredProps();
+	});
+
+	test(`${mode}: children replace the percentage the value label writes`, async () => {
+		if (mode === 'CSR') await render(OwnText);
+		else await renderSSR(OwnText);
+		expect(el(ValueLabel).textContent?.trim()).toBe('30 of 100 rows');
+		expect(el(ValueLabel).getAttribute('ui-value')).toBe('30');
+		expect(el(Root).getAttribute('aria-valuetext')).toBe('30%');
+	});
+
+	test(`${mode}: the value label follows the amount the bar is moved to`, async () => {
+		if (mode === 'CSR') await render(Moving);
+		else await renderSSR(Moving);
+		expect(el(ValueLabel).textContent?.trim()).toBe('30%');
+
+		el<HTMLButtonElement>(Advance).click();
+		await expect.poll(() => el(ValueLabel).textContent?.trim()).toBe('70%');
+		expect(el(Root).getAttribute('aria-valuetext')).toBe('70%');
 	});
 
 	test(`${mode}: the starter root drops the value prop it destructured`, async () => {

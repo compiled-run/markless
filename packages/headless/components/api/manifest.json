@@ -1376,6 +1376,12 @@
 				"component": "ProgressTrack",
 				"doc": "The full length of the range; the indicator sits inside it.",
 				"props": []
+			},
+			{
+				"part": "valuelabel",
+				"component": "ProgressValueLabel",
+				"doc": "The current value as text. Left empty it renders the percentage of the range\nthe bar has covered - the same number the bar reports as `aria-valuetext` -\nand nothing at all while the amount is unknown. Pass children to write the\ntext yourself.",
+				"props": []
 			}
 		]
 	},

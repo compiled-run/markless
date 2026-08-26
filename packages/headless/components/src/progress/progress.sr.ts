@@ -6,6 +6,7 @@ import Basic from './scenarios/basic.tsrx';
 import Complete from './scenarios/complete.tsrx';
 import CustomRange from './scenarios/custom-range.tsrx';
 import Indeterminate from './scenarios/indeterminate.tsrx';
+import OwnText from './scenarios/own-text.tsrx';
 
 // Rows assert the facts an announcement must convey - role, name, value - never a reader product's wording.
 const sr = virtualDriver;
@@ -34,7 +35,15 @@ test('reading the starter conveys the progressbar role and its current value', a
 test('the visible label under the bar is reachable', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'progressbar' });
-	await readUntil(sr, { name: 'Export data 30%' });
+	await readUntil(sr, { name: 'Export data' });
+});
+
+// The bar already reports the percentage as its own value; the value label is a
+// separate stop on the walk that speaks the same number as plain text.
+test('the value label is reachable and speaks the percentage', async () => {
+	await open(Basic);
+	await readUntil(sr, { role: 'progressbar' });
+	await readUntil(sr, { name: '30%' });
 });
 
 test('a finished job conveys a full bar', async () => {
@@ -58,6 +67,13 @@ test('an indeterminate bar is still conveyed as a progressbar', async () => {
 	await open(Indeterminate);
 	expectConveys(await readUntil(sr, { role: 'progressbar' }), { role: 'progressbar' });
 	await readUntil(sr, { name: 'Loading...' });
+});
+
+// Children replace the percentage, so what is spoken is the consumer's own text.
+test('a value label the consumer wrote is conveyed as its own text', async () => {
+	await open(OwnText);
+	await readUntil(sr, { role: 'progressbar' });
+	await readUntil(sr, { name: '30 of 100 rows' });
 });
 
 // The bar carries the family's own name; the visible label is a separate stop on the walk.

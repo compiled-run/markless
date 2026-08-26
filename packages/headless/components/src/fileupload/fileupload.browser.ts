@@ -8,12 +8,12 @@ import {
 	dropOn,
 	fileOf,
 } from '../../test-support/drag.ts';
+import Accept from './scenarios/accept.tsrx';
 import Basic from './scenarios/basic.tsrx';
-
-// One page module per file: a compiled page installs its row-minting loader into
-// a single unqualified global, so a second scenario with a repeat imported here
-// would leave only the last one able to mint rows. Every other fileupload
-// scenario holds its own browser file for that reason.
+import Disabled from './scenarios/disabled.tsrx';
+import Form from './scenarios/form.tsrx';
+import Multiple from './scenarios/multiple.tsrx';
+import TwoUploads from './scenarios/two-uploads.tsrx';
 
 afterEach(async () => {
 	await cleanup();
@@ -25,12 +25,16 @@ function el<T extends Element = HTMLElement>(testid: string): T {
 	return found as unknown as T;
 }
 
-function names() {
-	return page.getByTestId('itemlabel').elements().map((one) => one.textContent);
+// The side is optional so the two-upload rows can ask for one upload's own parts
+// while every single-upload row asks for the only ones on the page.
+function names(side?: string) {
+	const testid = side === undefined ? 'itemlabel' : `${side}-itemlabel`;
+	return page.getByTestId(testid).elements().map((one) => one.textContent);
 }
 
-function fieldNames() {
-	return [...(el<HTMLInputElement>('field').files ?? [])].map((one) => one.name);
+function fieldNames(side?: string) {
+	const testid = side === undefined ? 'field' : `${side}-field`;
+	return [...(el<HTMLInputElement>(testid).files ?? [])].map((one) => one.name);
 }
 
 // The first two rows are the cold ones: on a freshly resumed served document the
@@ -173,4 +177,167 @@ test('SSR: a drop on the resumed page renders a row and fills the field', async 
 	dropOn(el('droparea'), fileOf('resumed.txt'));
 	await expect.poll(() => names()).toEqual(['resumed.txt']);
 	expect(fieldNames()).toEqual(['resumed.txt']);
+});
+
+test('CSR: with multiple, a second drop adds to the list', async () => {
+	await render(Multiple);
+	dropOn(el('droparea'), fileOf('first.txt'));
+	await expect.poll(() => names()).toEqual(['first.txt']);
+	dropOn(el('droparea'), fileOf('second.txt'));
+	await expect.poll(() => names()).toEqual(['first.txt', 'second.txt']);
+	expect(fieldNames()).toEqual(['first.txt', 'second.txt']);
+});
+
+test('CSR: one drop of several files becomes several rows', async () => {
+	await render(Multiple);
+	dropOn(el('droparea'), fileOf('a.txt'), fileOf('b.txt'), fileOf('c.txt'));
+	await expect.poll(() => names()).toEqual(['a.txt', 'b.txt', 'c.txt']);
+	expect(el<HTMLInputElement>('field').multiple).toBe(true);
+});
+
+// The same wall the basic suite pins: a repeat over widget-scoped state adds rows
+// and never takes one away. The store underneath is right, which is what the row
+// below this one measures.
+test.fails('CSR: a remove button takes off its own row and leaves the rest', async () => {
+	await render(Multiple);
+	dropOn(el('droparea'), fileOf('a.txt'), fileOf('b.txt'), fileOf('c.txt'));
+	await expect.poll(() => names()).toEqual(['a.txt', 'b.txt', 'c.txt']);
+	(page.getByTestId('itemclose').elements()[1] as HTMLButtonElement).click();
+	await expect.poll(() => names()).toEqual(['a.txt', 'c.txt']);
+});
+
+test('CSR: a remove takes its own file off the field and leaves the rest', async () => {
+	await render(Multiple);
+	dropOn(el('droparea'), fileOf('a.txt'), fileOf('b.txt'), fileOf('c.txt'));
+	await expect.poll(() => fieldNames()).toEqual(['a.txt', 'b.txt', 'c.txt']);
+	(page.getByTestId('itemclose').elements()[1] as HTMLButtonElement).click();
+	await expect.poll(() => fieldNames()).toEqual(['a.txt', 'c.txt']);
+});
+
+// Two files can share a name, so the row a remove acts on is identified by the id
+// minted for it rather than by what it is called.
+test('CSR: two files of the same name are told apart by the remove', async () => {
+	await render(Multiple);
+	dropOn(el('droparea'), fileOf('same.txt', 'text/plain', 'first'));
+	dropOn(el('droparea'), fileOf('same.txt', 'text/plain', 'second'));
+	await expect.poll(() => names()).toEqual(['same.txt', 'same.txt']);
+	(page.getByTestId('itemclose').elements()[0] as HTMLButtonElement).click();
+	await expect.poll(() => fieldNames()).toEqual(['same.txt']);
+	expect([...(el<HTMLInputElement>('field').files ?? [])][0]?.size).toBe(6);
+});
+
+test('CSR: the accept list is on the field the picker opens from', async () => {
+	await render(Accept);
+	expect(el<HTMLInputElement>('field').accept).toBe('image/*');
+});
+
+// The browser applies accept to the picker and never to a drop, so without the
+// family filtering it a dropped text file would land in an images-only upload.
+test('CSR: a dropped file the accept list rejects never arrives', async () => {
+	await render(Accept);
+	dropOn(el('droparea'), fileOf('notes.txt', 'text/plain'));
+	dropOn(el('droparea'), fileOf('photo.png', 'image/png'));
+	await expect.poll(() => names()).toEqual(['photo.png']);
+	expect([...(el<HTMLInputElement>('field').files ?? [])].map((one) => one.name)).toEqual([
+		'photo.png',
+	]);
+});
+
+test('CSR: one drop keeps what the accept list allows and drops the rest', async () => {
+	await render(Accept);
+	dropOn(el('droparea'), fileOf('a.png', 'image/png'), fileOf('b.pdf', 'application/pdf'));
+	await expect.poll(() => names()).toEqual(['a.png']);
+});
+
+test('CSR: a disabled upload reports it on every part that can be pressed', async () => {
+	await render(Disabled);
+	expect(el('root').hasAttribute('ui-disabled')).toBe(true);
+	expect(el<HTMLButtonElement>('trigger').disabled).toBe(true);
+	expect(el<HTMLInputElement>('field').disabled).toBe(true);
+	expect(el('droparea').hasAttribute('ui-disabled')).toBe(true);
+});
+
+// The guard is written as a positive `if` around preventDefault for exactly this
+// row: written as an early return the compiler would hoist the cancel as
+// unconditional, the browser would hand the page the drop, and a disabled upload
+// would quietly accept files.
+test('CSR: a drop on a disabled upload adds nothing', async () => {
+	await render(Disabled);
+	dropOn(el('droparea'), fileOf('notes.txt'));
+	await new Promise((resolve) => setTimeout(resolve, 300));
+	expect(names()).toEqual([]);
+	expect([...(el<HTMLInputElement>('field').files ?? [])]).toEqual([]);
+});
+
+test('CSR: a drag over a disabled upload never marks it', async () => {
+	await render(Disabled);
+	dragEnter(el('droparea'));
+	await new Promise((resolve) => setTimeout(resolve, 300));
+	expect(el('droparea').hasAttribute('ui-dragging')).toBe(false);
+});
+
+test('CSR: a disabled upload never opens the picker', async () => {
+	const showPicker = vi.fn();
+	const original = HTMLInputElement.prototype.showPicker;
+	HTMLInputElement.prototype.showPicker = showPicker;
+	try {
+		await render(Disabled);
+		el<HTMLButtonElement>('trigger').click();
+		await new Promise((resolve) => setTimeout(resolve, 300));
+		expect(showPicker).not.toHaveBeenCalled();
+	} finally {
+		HTMLInputElement.prototype.showPicker = original;
+	}
+});
+
+// The whole point of keeping the real input's own list in step: a file that only
+// ever arrived by drop is not in it otherwise, and the form would send nothing.
+// The form's own FormData is read rather than submitted, because a real submit
+// navigates the test page away.
+test('CSR: the form would send the dropped files', async () => {
+	await render(Form);
+	dropOn(el('droparea'), fileOf('one.txt'), fileOf('two.txt'));
+	await expect
+		.poll(() => [...(el<HTMLInputElement>('field').files ?? [])].map((one) => one.name))
+		.toEqual(['one.txt', 'two.txt']);
+	const data = new FormData(el<HTMLFormElement>('form'));
+	expect(data.getAll('attachment').map((one) => (one instanceof File ? one.name : one))).toEqual([
+		'one.txt',
+		'two.txt',
+	]);
+});
+
+test('CSR: an upload with nothing chosen sends no file', async () => {
+	await render(Form);
+	const data = new FormData(el<HTMLFormElement>('form'));
+	const sent = data.getAll('attachment').filter((one) => one instanceof File && one.size > 0);
+	expect(sent).toEqual([]);
+});
+
+test('CSR: the field submits under the name the root was given', async () => {
+	await render(Form);
+	expect(el<HTMLInputElement>('field').name).toBe('attachment');
+});
+
+test('CSR: two uploads on one page keep their own files', async () => {
+	await render(TwoUploads);
+	dropOn(el('left-droparea'), fileOf('left.txt'));
+	await expect.poll(() => names('left')).toEqual(['left.txt']);
+	expect(names('right')).toEqual([]);
+	dropOn(el('right-droparea'), fileOf('right.txt'));
+	await expect.poll(() => names('right')).toEqual(['right.txt']);
+	expect(names('left')).toEqual(['left.txt']);
+	expect(fieldNames('left')).toEqual(['left.txt']);
+	expect(fieldNames('right')).toEqual(['right.txt']);
+});
+
+test('CSR: two uploads on one page keep their own names and labels', async () => {
+	await render(TwoUploads);
+	const left = el<HTMLInputElement>('left-field');
+	const right = el<HTMLInputElement>('right-field');
+	expect(left.name).toBe('left');
+	expect(right.name).toBe('right');
+	expect(left.id).not.toBe(right.id);
+	expect(el<HTMLLabelElement>('left-label').getAttribute('for')).toBe(left.id);
+	expect(el<HTMLLabelElement>('right-label').getAttribute('for')).toBe(right.id);
 });

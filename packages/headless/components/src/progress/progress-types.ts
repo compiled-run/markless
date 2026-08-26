@@ -34,3 +34,11 @@ export type ProgressTrackProps = PropsOf<'div'>;
  * stylesheet rather than a `style` prop.
  */
 export type ProgressIndicatorProps = PropsOf<'div'>;
+
+/**
+ * The current value as text. Left empty it renders the percentage of the range
+ * the bar has covered - the same number the bar reports as `aria-valuetext` -
+ * and nothing at all while the amount is unknown. Pass children to write the
+ * text yourself.
+ */
+export type ProgressValueLabelProps = PropsOf<'span'>;
