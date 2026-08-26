@@ -50,7 +50,7 @@ import type {
 	MarklessRolldownOptions,
 	MarklessTransformManifest,
 } from './types.ts';
-import { isRelativeImport, pathname } from './virtual-ids.ts';
+import { TSRX_SOURCE_FILE, isRelativeImport, pathname } from './virtual-ids.ts';
 
 type ResolvedImport = { readonly id: string; readonly external?: unknown } | string | null;
 
@@ -193,15 +193,27 @@ export async function linkBarrelComponentInterfaces(
 }> {
 	const resolution: Record<string, string | null> = {};
 	const interfacesByFile = new Map<string, ModuleGraphInterfaceArtifact | null>();
+	const rebase = (target: string) => {
+		const specifier = relative(dirname(parent), target);
+		return specifier.startsWith('.') ? specifier : `./${specifier}`;
+	};
+	const packageBarrels = await packageBarrelSpecifiers(context, parent, moduleImports, rebase);
+	const passImports =
+		packageBarrels.size === 0
+			? moduleImports
+			: moduleImports.map((moduleImport) => {
+					const barrel = packageBarrels.get(moduleImport.source);
+					return barrel ? { ...moduleImport, source: barrel.specifier } : moduleImport;
+				});
+	for (const barrel of packageBarrels.values()) {
+		resolution[moduleLinkResolutionKey(barrel.specifier, parent)] = barrel.id;
+	}
 	const passInput = () => ({
 		parent,
-		moduleImports,
+		moduleImports: passImports,
 		resolution,
 		moduleInterface: (filename: string) => interfacesByFile.get(filename),
-		rebase: (target: string) => {
-			const specifier = relative(dirname(parent), target);
-			return specifier.startsWith('.') ? specifier : `./${specifier}`;
-		},
+		rebase,
 	});
 
 	let artifact = linkBarrelComponents(passInput());
@@ -236,7 +248,100 @@ export async function linkBarrelComponentInterfaces(
 	// The pass decides; a barrel it could not follow stays fail-closed.
 	const [diagnostic] = artifact.diagnostics;
 	if (diagnostic) throw new Error(diagnostic.message);
-	return { interfaces: artifact.interfaces, children: artifact.children };
+	return {
+		interfaces: republishPackageBarrels(artifact.interfaces, packageBarrels),
+		children: artifact.children,
+	};
+}
+
+// The walk saw the dependency barrel under the path spelling it was offered;
+// the importing module wrote the package specifier, so that is the key its
+// compile looks the interface up by.
+function republishPackageBarrels(
+	linked: Record<string, ModuleGraphInterfaceArtifact>,
+	packageBarrels: ReadonlyMap<string, PackageBarrel>,
+): Record<string, ModuleGraphInterfaceArtifact> {
+	if (packageBarrels.size === 0) return linked;
+	const reexported = new Set(
+		Object.values(linked).flatMap((entry) =>
+			(entry.reexports ?? []).map((reexport) => reexport.source),
+		),
+	);
+	const interfaces = { ...linked };
+	for (const [source, barrel] of packageBarrels) {
+		const entry = linked[barrel.specifier];
+		if (!entry) continue;
+		interfaces[source] = entry;
+		// One key per interface: a second spelling of the same file makes the
+		// compiler's filename fallback ambiguous.
+		if (!reexported.has(barrel.specifier)) delete interfaces[barrel.specifier];
+	}
+	return interfaces;
+}
+
+type PackageBarrel = { readonly specifier: string; readonly id: string };
+
+/**
+ * A dependency package's barrel, offered to the walk under the path spelling it
+ * follows. Only a package that declares it ships Markless source is followed:
+ * its modules compile in this build, so an interface for them can exist. Any
+ * other dependency contributes none and the call behind it stays fail-closed.
+ */
+async function packageBarrelSpecifiers(
+	context: LinkResolveContext,
+	parent: string,
+	moduleImports: ReadonlyArray<{ readonly source: string }>,
+	rebase: (target: string) => string,
+): Promise<ReadonlyMap<string, PackageBarrel>> {
+	const specifiers = [...new Set(moduleImports.map((moduleImport) => moduleImport.source))].filter(
+		(source) =>
+			!isRelativeImport(source) &&
+			!isAbsolute(source) &&
+			!source.startsWith('\0') &&
+			!TSRX_SOURCE_FILE.test(source),
+	);
+	const entries = await Promise.all(
+		specifiers.map(async (source) => {
+			const resolved = await context.resolve(source, parent, { skipSelf: true });
+			if (typeof resolved === 'object' && resolved !== null && Boolean(resolved.external)) {
+				return null;
+			}
+			const raw = typeof resolved === 'string' ? resolved : resolved?.id;
+			if (!raw) return null;
+			const id = pathname(String(raw));
+			if (!isAbsolute(id) || !MARKLESS_SOURCE_FILE.test(id)) return null;
+			if (!existsSync(id) || !statSync(id).isFile()) return null;
+			if (!shipsMarklessSource(dirname(id))) return null;
+			return [source, { specifier: rebase(id), id }] as const;
+		}),
+	);
+	return new Map(entries.filter((entry) => entry !== null));
+}
+
+const MARKLESS_SOURCE_FILE = /\.(?:m?ts|tsx|tsrx)$/;
+
+const shipsMarklessSourceByDirectory = new Map<string, boolean>();
+
+// `publishConfig.marklessShipsSource` is the package's own declaration that its
+// tarball is source compiled by the consumer's build.
+function shipsMarklessSource(directory: string): boolean {
+	const cached = shipsMarklessSourceByDirectory.get(directory);
+	if (cached !== undefined) return cached;
+	const manifest = resolve(directory, 'package.json');
+	const parent = dirname(directory);
+	let ships = false;
+	if (existsSync(manifest)) {
+		try {
+			const parsed = JSON.parse(readFileSync(manifest, 'utf8'));
+			ships = parsed?.publishConfig?.marklessShipsSource === true;
+		} catch {
+			ships = false;
+		}
+	} else if (parent !== directory) {
+		ships = shipsMarklessSource(parent);
+	}
+	shipsMarklessSourceByDirectory.set(directory, ships);
+	return ships;
 }
 
 async function barrelModuleInterface(
