@@ -26,6 +26,7 @@ import Tabs from '../src/tabs/scenarios/basic.tsrx';
 import Textbox from '../src/textbox/scenarios/basic.tsrx';
 import Toaster from '../src/toaster/scenarios/basic.tsrx';
 import Toggle from '../src/toggle/scenarios/basic.tsrx';
+import ToggleGroup from '../src/togglegroup/scenarios/basic.tsrx';
 import Tooltip from '../src/tooltip/scenarios/basic.tsrx';
 import Tree from '../src/tree/scenarios/basic.tsrx';
 import { runConformance, type FamilyDescriptor } from './conformance.ts';
@@ -554,6 +555,14 @@ const descriptors: readonly FamilyDescriptor[] = [
 		root: 'root',
 		parts: ['root', 'label', 'trigger', 'thumb'],
 		rootAria: { role: null },
+		supportsDisabled: true,
+	},
+	{
+		family: 'togglegroup',
+		mount: { CSR: () => render(ToggleGroup), SSR: () => renderSSR(ToggleGroup) },
+		root: 'root',
+		parts: ['root', 'label', 'left', 'center', 'right'],
+		rootAria: { role: 'group' },
 		supportsDisabled: true,
 	},
 	{
