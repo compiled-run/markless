@@ -12,6 +12,10 @@
  * is about the reader or the announcement. Exit 1 names what was missing, and
  * the workflow falls back to the drivability smoke.
  *
+ * The server's first compile of the entry graph costs minutes, so the check
+ * fetches that graph from node first and only then launches the browser. What
+ * the browser is timed against is rendering, never compiling.
+ *
  *   node apps/sr-gallery/scripts/boot-check.ts
  *   SR_GALLERY_PORT=4325 node apps/sr-gallery/scripts/boot-check.ts
  *
@@ -65,6 +69,7 @@ const RENDERED_COUNT: Partial<Record<FamilyName, number>> = {
 const appDir = fileURLToPath(new URL('..', import.meta.url));
 const BOOT_TIMEOUT_MS = 120_000;
 const POLL_INTERVAL_MS = 250;
+const PREWARM_TIMEOUT_MS = 600_000;
 
 // A squatter on the port would answer waitForBoot for a server that never
 // bound, so the check would read someone else's tree and go green. Probe
@@ -138,8 +143,94 @@ async function waitForBoot(): Promise<void> {
 	);
 }
 
+/** Same-origin requests a served document or module makes a browser issue next. */
+function nextRequests(body: string): string[] {
+	const specifiers: string[] = [];
+	for (const [tag] of body.matchAll(/<script\b[^>]*>/gi)) {
+		if (!/\btype\s*=\s*["']module["']/i.test(tag)) continue;
+		const src = /\bsrc\s*=\s*["']([^"']+)["']/i.exec(tag);
+		if (src) specifiers.push(src[1]);
+	}
+	for (const pattern of [/\bfrom\s*["']([^"'\n]+)["']/g, /\bimport\s*["']([^"'\n]+)["']/g]) {
+		for (const [, specifier] of body.matchAll(pattern)) specifiers.push(specifier);
+	}
+	const paths: string[] = [];
+	for (const specifier of specifiers) {
+		if (!/^(?:\/|\.{1,2}\/|https?:)/.test(specifier)) continue;
+		let url: URL;
+		try {
+			url = new URL(specifier, PREVIEW_ORIGIN);
+		} catch {
+			continue;
+		}
+		if (url.origin !== new URL(PREVIEW_ORIGIN).origin) continue;
+		paths.push(`${url.pathname}${url.search}`);
+	}
+	return paths;
+}
+
+/**
+ * Pays the server's first compile of the entry graph from node, so the browser
+ * phase below measures whether the page renders rather than how slow the
+ * compiler is. Measured cold, that first compile is minutes; warm it is
+ * milliseconds, and Chromium only ever gets the 30s below.
+ */
+async function prewarm(): Promise<void> {
+	const deadline = Date.now() + PREWARM_TIMEOUT_MS;
+	const started = Date.now();
+	const queue = ['/'];
+	const seen = new Set(queue);
+	const fetched: string[] = [];
+
+	while (queue.length > 0) {
+		const path = queue.shift() as string;
+		const remaining = deadline - Date.now();
+		if (remaining <= 0) {
+			throw new Error(
+				`The dev server did not finish serving the entry module chain within ${PREWARM_TIMEOUT_MS / 60_000} minutes; ${path} was still unserved.`,
+			);
+		}
+		const requestStarted = Date.now();
+		let response: Response;
+		let body: string;
+		try {
+			response = await fetch(`${PREVIEW_ORIGIN}${path}`, {
+				signal: AbortSignal.timeout(remaining),
+			});
+			body = await response.text();
+		} catch (error) {
+			const name = error instanceof Error ? error.name : '';
+			if (name === 'TimeoutError' || name === 'AbortError') {
+				throw new Error(
+					`The dev server was still compiling ${path} after ${PREWARM_TIMEOUT_MS / 60_000} minutes, so the pre-warm gave up before the browser was launched.`,
+				);
+			}
+			throw error;
+		}
+		const ms = Date.now() - requestStarted;
+		console.log(`Pre-warm: ${path} answered ${response.status} in ${ms} ms (${body.length} bytes).`);
+		if (path === '/' && !response.ok) {
+			throw new Error(`The dev server answered ${response.status} for ${PREVIEW_ORIGIN}.`);
+		}
+		fetched.push(path);
+		// Only the app's own source is walked further: a dependency chunk's imports
+		// fan into the whole node_modules graph without warming anything more.
+		if (!response.ok || (path !== '/' && !path.startsWith('/src/'))) continue;
+		for (const next of nextRequests(body)) {
+			if (seen.has(next)) continue;
+			seen.add(next);
+			queue.push(next);
+		}
+	}
+
+	console.log(
+		`Pre-warmed ${fetched.length} entry-graph requests in ${((Date.now() - started) / 1000).toFixed(1)}s: ${fetched.join(', ')}`,
+	);
+}
+
 async function main() {
 	await waitForBoot();
+	await prewarm();
 
 	const browser = await chromium.launch();
 	try {
