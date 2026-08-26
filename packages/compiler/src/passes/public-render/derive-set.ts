@@ -2,12 +2,16 @@ import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import type { CompilerDiagnostic } from '../../diagnostics.ts';
 import {
 	carryForeignFactoryScope,
+	computedReadCallRefusals,
 	consumerBindingOrigins,
 	crossModuleRefusal,
 	sharedDefinitionFilename,
+	COMPUTED_READ_CALLED_CODE,
+	type ComputedDeriveExpression,
+	type ComputedReadCallRefusal,
 	type ForeignCopiedBody,
 } from '../foreign-scope.ts';
-import { serverDeriveUnreachableDiagnostic } from './diagnostics.ts';
+import { PUBLIC_RENDER_PLAN_PASS_ID, serverDeriveUnreachableDiagnostic } from './diagnostics.ts';
 import { collectSsrSharedComputedSources } from './html.ts';
 import {
 	authoredResidueSources,
@@ -269,12 +273,76 @@ export function collectSsrDeriveSetDiagnostics(
 		).cyclic)
 			report(graphNodeId, 'cycle');
 	}
-	return [...diagnostics, ...foreignSharedComputedScope(input).diagnostics];
+	return [
+		...diagnostics,
+		...foreignSharedComputedScope(input).diagnostics,
+		...servedComputedReadCallRefusals(input).map(servedComputedReadCalledDiagnostic),
+	];
 }
 
 // Owned by the shared foreign-scope helper; re-exported here because this pass
 // is where readers of the served derive set look for it.
-export { SHARED_COMPUTED_CROSS_MODULE_CODE } from '../foreign-scope.ts';
+export { COMPUTED_READ_CALLED_CODE, SHARED_COMPUTED_CROSS_MODULE_CODE } from '../foreign-scope.ts';
+
+/** Every derive expression this module compiles, and what each one reads. */
+function derivedComputedExpressions(
+	input: PublicRenderModuleInput,
+): ReadonlyArray<ComputedDeriveExpression> {
+	return input.symbolResolver.symbols.flatMap((symbol) =>
+		symbol.kind === 'sync-computed-derive' || symbol.kind === 'async-computed-runner'
+			? [
+					{
+						graphNodeId: symbol.graphNodeId,
+						name: symbol.name,
+						source: symbol.source,
+						dependencies: symbol.dependencies ?? [],
+					},
+				]
+			: [],
+	);
+}
+
+function servedComputedReadCallRefusals(
+	input: PublicRenderModuleInput,
+): ReadonlyArray<ComputedReadCallRefusal> {
+	return computedReadCallRefusals({
+		derives: derivedComputedExpressions(input),
+		computedGraphNodeIds: new Set(
+			input.semanticGraph.graphBindings.flatMap((binding) =>
+				binding.kind === 'computed' ? [binding.id] : [],
+			),
+		),
+	});
+}
+
+/**
+ * Both emitters compile a derive from the same authored expression, and both
+ * bind its cell reads to the values those cells already hold - the served module
+ * as a local, the browser module as `context.graph.read(...)`. So a read the
+ * expression spells as a call has no sound emission on either side, and the one
+ * refusal covers both.
+ */
+function servedComputedReadCalledDiagnostic(refusal: ComputedReadCallRefusal): CompilerDiagnostic {
+	return {
+		code: COMPUTED_READ_CALLED_CODE,
+		severity: 'error',
+		phase: 'public-render',
+		passId: PUBLIC_RENDER_PLAN_PASS_ID,
+		artifactKeys: ['publicRenderModule', 'symbolModules'],
+		title: `A computed() is read as a value, not called ("${refusal.called}")`,
+		message: `Deriving "${refusal.name}" reads "${refusal.called}" off its cell, so "${refusal.called}" is bound to the value that cell already holds - and the expression spells it "${refusal.called}()". Calling a derived value throws a TypeError: while the page is being served, or in the browser the first time a write re-derives "${refusal.name}".`,
+		why: "computed() answers with the derived VALUE rather than a handle to call - its declared type is the value's own type - so the compiler lowers every read of a computed into a read of its cell. Parentheses written around that read are applied to the value the read answers with, not to the expression that produced it, and nothing at build time pointed at the difference.",
+		suggestions: [
+			{
+				message: `Drop the parentheses: write "${refusal.called}" where the expression writes "${refusal.called}()".`,
+			},
+			{
+				message: `If "${refusal.called}" was meant to run per call, write it as a plain function beside the factory and call that instead - a computed() is a cell, and the graph derives it once per change.`,
+			},
+		],
+		docsUrl: `https://markless.dev/errors/${COMPUTED_READ_CALLED_CODE}`,
+	};
+}
 
 function syncComputedNamesByGraphNodeId(
 	input: PublicRenderModuleInput,
