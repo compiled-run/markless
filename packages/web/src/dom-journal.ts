@@ -148,8 +148,13 @@ function renderInsertRangeFragment(
 	return fragment;
 }
 
+// Rewriting a node with what it already holds is still a mutation, and an
+// aria-live region announces on it; every write below elides a no-op.
 function setText(target: unknown, value: unknown): void {
-	(target as { textContent: string }).textContent = stringifyDomValue(value);
+	const host = target as { textContent: string };
+	const text = stringifyDomValue(value);
+	if (host.textContent === text) return;
+	host.textContent = text;
 }
 
 function setAttr(target: unknown, name: string, value: unknown): void {
@@ -160,7 +165,13 @@ function setAttr(target: unknown, name: string, value: unknown): void {
 		return;
 	}
 
+	if (readAttribute(element, name) === text) return;
 	element.setAttribute?.(name, text);
+}
+
+function readAttribute(element: DomJournalApplyTarget, name: string): string | null | undefined {
+	const read = (element as { getAttribute?: (name: string) => string | null }).getAttribute;
+	return typeof read === 'function' ? read.call(element, name) : undefined;
 }
 
 function setProp(target: unknown, name: string, value: unknown): void {
