@@ -398,16 +398,13 @@ test('CSR: Space on the focused trigger toggles the checkbox', async () => {
 	await expect.poll(() => el(Indicator).textContent).toBe('Checked');
 });
 
-// A Markless handler runs after dispatch returns, so the trigger's
-// `event.preventDefault()` on Enter lands after the browser has already decided
-// whether to activate the button. This row asserts that timing, not either outcome:
-// `defaultPrevented` is false when the dispatch is made and true a tick later.
-test('CSR: the trigger asks to prevent Enter, and the request lands too late', async () => {
+// The trigger's `event.preventDefault()` on Enter is applied as synchronous policy, so it
+// lands before the dispatch returns rather than a tick later.
+test('CSR: the trigger prevents Enter before the dispatch returns', async () => {
 	await render(Basic);
 	el(Trigger).focus();
 
 	const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
 	el(Trigger).dispatchEvent(enter);
-	expect(enter.defaultPrevented).toBe(false);
-	await expect.poll(() => enter.defaultPrevented).toBe(true);
+	expect(enter.defaultPrevented).toBe(true);
 });

@@ -167,8 +167,7 @@ test('the error and the help text are both conveyed with the box', async () => {
 	);
 });
 
-// Expected red: the trigger does call preventDefault() on Enter, but it lands after dispatch returns, so Enter still toggles.
-test.fails('pressing enter leaves a checkbox alone', async () => {
+test('pressing enter leaves a checkbox alone', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'checkbox' });
 	await sr.press(sr.keys.enter);
