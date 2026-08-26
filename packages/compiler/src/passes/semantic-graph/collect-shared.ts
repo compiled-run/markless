@@ -3,6 +3,7 @@ import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import type {
 	ModuleGraphInterfaceArtifact,
 	ModuleGraphInterfaceSharedDefinition,
+	SemanticGraphAlias,
 	SemanticGraphBinding,
 	SemanticGraphDiagnostic,
 	SemanticModuleImport,
@@ -729,7 +730,33 @@ export type SharedInstanceGraph = {
 	readonly graphBindings: ReadonlyArray<SemanticGraphBinding>;
 	readonly sharedDefinitions: ReadonlyArray<SemanticSharedDefinition>;
 	readonly sharedInstances: ReadonlyArray<SemanticSharedInstance>;
+	readonly aliases?: ReadonlyArray<SemanticGraphAlias>;
 };
+
+/**
+ * The authored instance path a component-local `const` was declared from, when
+ * the name is one. Component-local, so an alias another component declared under
+ * the same name never answers here.
+ */
+function sharedInstancePathAlias(
+	name: string,
+	graph: SharedInstanceGraph,
+	componentName?: string | null,
+): string | null {
+	const alias = findLast(
+		graph.aliases ?? [],
+		(item) =>
+			item.name === name &&
+			item.sharedDefinitionId === undefined &&
+			item.componentName !== undefined &&
+			(componentName === undefined ||
+				componentName === null ||
+				item.componentName === componentName) &&
+			findSharedInstance(splitStaticGraphPath(item.target)[0] ?? '', graph, componentName) !==
+				null,
+	);
+	return alias?.target ?? null;
+}
 
 /**
  * Whether a read inside `componentName` can see this instance local. An instance
@@ -779,6 +806,19 @@ export function resolveSharedInstanceGraphPath(
 	componentName?: string | null,
 ): ResolvedGraphPath | null {
 	const segments = splitStaticGraphPath(source);
+	if (segments.length === 0) return null;
+
+	// `const days = cal.days` puts the whole instance path behind one name, so the
+	// alias is substituted before the head is read as an instance local. Bare
+	// `days` is the shape a repeat header and a template read both take.
+	const aliased = sharedInstancePathAlias(segments[0]!, graph, componentName);
+	if (aliased) {
+		return resolveSharedInstanceGraphPath(
+			[aliased, ...segments.slice(1)].join('.'),
+			graph,
+			componentName,
+		);
+	}
 	if (segments.length < 2) return null;
 
 	const [localName, propertyName, ...propertyPath] = segments;
