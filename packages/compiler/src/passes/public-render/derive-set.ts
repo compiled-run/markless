@@ -7,7 +7,7 @@ import {
 	crossModuleRefusal,
 	sharedDefinitionFilename,
 	COMPUTED_READ_CALLED_CODE,
-	type ComputedDeriveExpression,
+	type ComputedReadingExpression,
 	type ComputedReadCallRefusal,
 	type ForeignCopiedBody,
 } from '../foreign-scope.ts';
@@ -276,7 +276,7 @@ export function collectSsrDeriveSetDiagnostics(
 	return [
 		...diagnostics,
 		...foreignSharedComputedScope(input).diagnostics,
-		...servedComputedReadCallRefusals(input).map(servedComputedReadCalledDiagnostic),
+		...computedReadCallSiteRefusals(input).map(computedReadCalledDiagnostic),
 	];
 }
 
@@ -284,29 +284,62 @@ export function collectSsrDeriveSetDiagnostics(
 // is where readers of the served derive set look for it.
 export { COMPUTED_READ_CALLED_CODE, SHARED_COMPUTED_CROSS_MODULE_CODE } from '../foreign-scope.ts';
 
-/** Every derive expression this module compiles, and what each one reads. */
-function derivedComputedExpressions(
+/**
+ * Every expression this module compiles by copying its authored text, and the
+ * cells each one reads: the derives, and the callbacks whose reads the browser
+ * module rewrites the same way.
+ */
+function computedReadingExpressions(
 	input: PublicRenderModuleInput,
-): ReadonlyArray<ComputedDeriveExpression> {
-	return input.symbolResolver.symbols.flatMap((symbol) =>
-		symbol.kind === 'sync-computed-derive' || symbol.kind === 'async-computed-runner'
-			? [
+): ReadonlyArray<ComputedReadingExpression> {
+	return input.symbolResolver.symbols.flatMap(
+		(symbol): ReadonlyArray<ComputedReadingExpression> => {
+			if (symbol.kind === 'sync-computed-derive' || symbol.kind === 'async-computed-runner')
+				return [
 					{
-						graphNodeId: symbol.graphNodeId,
-						name: symbol.name,
+						id: symbol.graphNodeId,
+						emission: { kind: 'derive', name: symbol.name },
 						source: symbol.source,
-						dependencies: symbol.dependencies ?? [],
+						reads: symbol.dependencies ?? [],
 					},
-				]
-			: [],
+				];
+			if (symbol.kind === 'event-handler')
+				return [
+					{
+						id: symbol.id,
+						emission: { kind: 'callback', description: `"${symbol.eventName}" handler` },
+						source: symbol.source,
+						reads: symbol.reads ?? [],
+					},
+				];
+			if (symbol.kind === 'callback-prop')
+				return [
+					{
+						id: symbol.id,
+						emission: { kind: 'callback', description: `"${symbol.propName}" callback` },
+						source: symbol.source,
+						reads: symbol.reads ?? [],
+					},
+				];
+			if (symbol.kind === 'branch-update')
+				return [
+					{
+						id: symbol.id,
+						emission: { kind: 'callback', description: 'test of this @if' },
+						source: symbol.testSource,
+						reads: symbol.testReads,
+					},
+				];
+			return [];
+		},
 	);
 }
 
-function servedComputedReadCallRefusals(
+function computedReadCallSiteRefusals(
 	input: PublicRenderModuleInput,
 ): ReadonlyArray<ComputedReadCallRefusal> {
 	return computedReadCallRefusals({
-		derives: derivedComputedExpressions(input),
+		expressions: computedReadingExpressions(input),
 		computedGraphNodeIds: new Set(
 			input.semanticGraph.graphBindings.flatMap((binding) =>
 				binding.kind === 'computed' ? [binding.id] : [],
@@ -316,13 +349,20 @@ function servedComputedReadCallRefusals(
 }
 
 /**
- * Both emitters compile a derive from the same authored expression, and both
- * bind its cell reads to the values those cells already hold - the served module
- * as a local, the browser module as `context.graph.read(...)`. So a read the
- * expression spells as a call has no sound emission on either side, and the one
- * refusal covers both.
+ * Every emitter compiles these expressions from the same authored text, and each
+ * binds their cell reads to the values those cells already hold - the served
+ * module as a local, the browser module as `context.graph.read(...)`. So a read
+ * the expression spells as a call has no sound emission anywhere, and the one
+ * refusal covers them all.
  */
-function servedComputedReadCalledDiagnostic(refusal: ComputedReadCallRefusal): CompilerDiagnostic {
+function computedReadCalledDiagnostic(refusal: ComputedReadCallRefusal): CompilerDiagnostic {
+	const { emission } = refusal;
+	const subject =
+		emission.kind === 'derive' ? `Deriving "${emission.name}"` : `The ${emission.description}`;
+	const throwsWhen =
+		emission.kind === 'derive'
+			? `while the page is being served, or in the browser the first time a write re-derives "${emission.name}"`
+			: `the first time the ${emission.description} runs`;
 	return {
 		code: COMPUTED_READ_CALLED_CODE,
 		severity: 'error',
@@ -330,7 +370,7 @@ function servedComputedReadCalledDiagnostic(refusal: ComputedReadCallRefusal): C
 		passId: PUBLIC_RENDER_PLAN_PASS_ID,
 		artifactKeys: ['publicRenderModule', 'symbolModules'],
 		title: `A computed() is read as a value, not called ("${refusal.called}")`,
-		message: `Deriving "${refusal.name}" reads "${refusal.called}" off its cell, so "${refusal.called}" is bound to the value that cell already holds - and the expression spells it "${refusal.called}()". Calling a derived value throws a TypeError: while the page is being served, or in the browser the first time a write re-derives "${refusal.name}".`,
+		message: `${subject} reads "${refusal.called}" off its cell, so "${refusal.called}" is bound to the value that cell already holds - and the expression spells it "${refusal.called}()". Calling a derived value throws a TypeError: ${throwsWhen}.`,
 		why: "computed() answers with the derived VALUE rather than a handle to call - its declared type is the value's own type - so the compiler lowers every read of a computed into a read of its cell. Parentheses written around that read are applied to the value the read answers with, not to the expression that produced it, and nothing at build time pointed at the difference.",
 		suggestions: [
 			{

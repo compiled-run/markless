@@ -282,47 +282,54 @@ export function crossModuleRefusal(refusal: ForeignScopeRefusal): CompilerDiagno
 // builds `context.graph.read(...)()`. Both throw a TypeError with nothing at
 // build time to point at, so the shape is refused instead.
 //
-// The served module and the client symbol module derive from the same authored
-// text, so they share the detection; each turns the refusals into its own
-// diagnostic.
+// A derive is not the only expression the compiler copies whole. An event
+// handler, a callback prop, and a branch test each ship their authored text with
+// their cell reads rewritten in the same way, so the same call has the same
+// crash there; one detection covers them, and the public-render pass turns the
+// refusals into the single diagnostic that stands in front of every emission.
 
 /** This helper owns the code; readers import it rather than restating the string. */
 export const COMPUTED_READ_CALLED_CODE = 'MARKLESS_COMPUTED_READ_CALLED';
 
-/** One derive expression and the cell read inside it that is spelled as a call. */
+/** What the compiler emits from the expression that spells the call. */
+export type ComputedReadCallEmission =
+	| { readonly kind: 'derive'; readonly name: string }
+	/** A handler, callback prop, or branch test, named the way the author sees it. */
+	| { readonly kind: 'callback'; readonly description: string };
+
+/** One copied expression and the cell read inside it that is spelled as a call. */
 export type ComputedReadCallRefusal = {
-	readonly graphNodeId: string;
-	/** The authored name of the computed whose expression spells the call. */
-	readonly name: string;
+	readonly emission: ComputedReadCallEmission;
 	/** The authored text of the read that is called, as the author wrote it. */
 	readonly called: string;
 };
 
-/** One derive expression as the compiler copies it: authored text plus its reads. */
-export type ComputedDeriveExpression = {
-	readonly graphNodeId: string;
-	readonly name: string;
+/** One expression as the compiler copies it: authored text plus the cells it reads. */
+export type ComputedReadingExpression = {
+	/** Whatever identifies the expression to the compiler; only ever compared. */
+	readonly id: string;
+	readonly emission: ComputedReadCallEmission;
 	readonly source: string;
-	readonly dependencies: ReadonlyArray<SemanticGraphDependency>;
+	readonly reads: ReadonlyArray<Pick<SemanticGraphDependency, 'source' | 'graphNodeId'>>;
 };
 
 export function computedReadCallRefusals(input: {
-	readonly derives: ReadonlyArray<ComputedDeriveExpression>;
+	readonly expressions: ReadonlyArray<ComputedReadingExpression>;
 	readonly computedGraphNodeIds: ReadonlySet<string>;
 }): ReadonlyArray<ComputedReadCallRefusal> {
 	const refusals: ComputedReadCallRefusal[] = [];
 	const seen = new Set<string>();
-	for (const derive of input.derives) {
-		const computedReads = derive.dependencies.flatMap((dependency) =>
-			input.computedGraphNodeIds.has(dependency.graphNodeId) ? [dependency.source] : [],
+	for (const expression of input.expressions) {
+		const computedReads = expression.reads.flatMap((read) =>
+			input.computedGraphNodeIds.has(read.graphNodeId) ? [read.source] : [],
 		);
 		if (computedReads.length === 0) continue;
-		const called = calledSourceTexts(derive.source);
+		const called = calledSourceTexts(expression.source);
 		for (const read of computedReads) {
-			const key = `${derive.graphNodeId} ${read}`;
+			const key = `${expression.id} ${read}`;
 			if (!called.has(read) || seen.has(key)) continue;
 			seen.add(key);
-			refusals.push({ graphNodeId: derive.graphNodeId, name: derive.name, called: read });
+			refusals.push({ emission: expression.emission, called: read });
 		}
 	}
 	return refusals;
