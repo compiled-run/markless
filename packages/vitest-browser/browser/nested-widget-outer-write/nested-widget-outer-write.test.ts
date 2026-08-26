@@ -2,6 +2,8 @@ import { cleanup, render, renderSSR } from '@markless/vitest-browser';
 import { afterEach, expect, test } from 'vitest';
 import DeepPage from './deep-page.tsrx';
 import OuterPage from './outer-page.tsrx';
+import OwnTemplatePage from './own-template-page.tsrx';
+import OwnTemplateSiblingsPage from './own-template-siblings-page.tsrx';
 import SiblingsPage from './siblings-page.tsrx';
 
 // A component that ROOTS one widget-scoped family is still an ordinary part of
@@ -155,4 +157,79 @@ test('CSR: an outer write flows down into a part inside a nested widget', async 
 test('SSR resume: an outer write flows down into a part inside a nested widget', async () => {
 	const screen = await renderSSR(DeepPage);
 	await expectDeepWriteFlowsDown(screen.container);
+});
+
+// The un-projected writer: the nested widget root renders the outer family's
+// parts in its own template, so no consumer projects them through it. Both
+// render paths must land that write in the enclosing outer instance.
+function ownInners(container: ParentNode) {
+	return [...container.querySelectorAll<HTMLElement>('[data-own-inner]')];
+}
+
+function expectOwnTemplateRegisteredCount(container: ParentNode) {
+	expect(ownInners(container).length).toBe(3);
+	expect(counts(container)).toEqual(['3']);
+	expect(labels(container).map((label) => label.getAttribute('data-seen-count'))).toEqual([
+		'3',
+		'3',
+		'3',
+	]);
+}
+
+test('CSR: a part a nested widget renders in its own template registers in the outer instance', async () => {
+	const screen = await render(OwnTemplatePage);
+	expectOwnTemplateRegisteredCount(screen.container as HTMLElement);
+});
+
+test('SSR resume: a part a nested widget renders in its own template registers in the outer instance', async () => {
+	const screen = await renderSSR(OwnTemplatePage);
+	expectOwnTemplateRegisteredCount(screen.container);
+});
+
+function expectOwnTemplateSiblingCounts(container: ParentNode) {
+	expect(outers(container).map((outer) => outer.getAttribute('data-label'))).toEqual([
+		'left',
+		'right',
+	]);
+	expect(counts(container)).toEqual(['3', '2']);
+}
+
+test('CSR: sibling outers each count only their own own-template writers', async () => {
+	const screen = await render(OwnTemplateSiblingsPage);
+	expectOwnTemplateSiblingCounts(screen.container as HTMLElement);
+});
+
+test('SSR resume: sibling outers each count only their own own-template writers', async () => {
+	const screen = await renderSSR(OwnTemplateSiblingsPage);
+	expectOwnTemplateSiblingCounts(screen.container);
+});
+
+// The nested root's OWN family stays per instance: reaching the outer instance
+// must not merge the two.
+async function expectOwnInnerWriteStaysLocal(container: ParentNode) {
+	expect(ownInners(container).map((inner) => inner.getAttribute('data-slot'))).toEqual([
+		'0',
+		'1',
+		'2',
+	]);
+	expect(ownInners(container).map((inner) => inner.getAttribute('data-taps'))).toEqual([
+		'0',
+		'0',
+		'0',
+	]);
+
+	ownInners(container)[1]?.click();
+	await expect
+		.poll(() => ownInners(container).map((inner) => inner.getAttribute('data-taps')))
+		.toEqual(['0', '1', '0']);
+}
+
+test('CSR: an own-template nested widget keeps its own write local', async () => {
+	const screen = await render(OwnTemplatePage);
+	await expectOwnInnerWriteStaysLocal(screen.container as HTMLElement);
+});
+
+test('SSR resume: an own-template nested widget keeps its own write local', async () => {
+	const screen = await renderSSR(OwnTemplatePage);
+	await expectOwnInnerWriteStaysLocal(screen.container);
 });

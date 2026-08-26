@@ -12,6 +12,7 @@ import {
 	staticProjectionChildren,
 	type ChildrenProjectionLink,
 	renderedWidgetRootsOf,
+	widgetRootsOf,
 } from '../prerender/children-projection.ts';
 import { marklessInstancePath } from './instance-scope.ts';
 import { MARKLESS_SSR_CALLBACKS_PROP, marklessSsrSpreadProps } from './ssr.ts';
@@ -63,24 +64,39 @@ const seedProjectingChild: SharedSeedPass = async (
 		rootedDefinitions.length > 0
 			? inheritedSeeds.set(MARKLESS_WIDGET_INSTANCE_KEY, base + composedRoot)
 			: inheritedSeeds;
-	await applySharedSeeds(context, context.surface, context.symbolPrefix, rootEdge, read, seeded);
-	// The composed roots the child's own composition put this widget's parts
-	// inside seed the same instance, so they run before any part does.
-	await applyComposedChainSeeds(
-		context,
-		chain,
-		rootEdge,
-		context.symbolPrefix + rootEdge.symbolPrefix,
-		edgeChildProps(context, context.surface, rootEdge, read),
-		seeded,
-	);
+	await seedEdgeAndOwnTemplate(context, rootEdge, read, seeded);
 	// U-H: every part of this widget instance contributes before any part
 	// renders, so a seed a part writes is what its siblings read whatever the
 	// document order.
 	for (const edge of projectedEdges(context.surface, definition, componentEdgeId, read))
-		await applySharedSeeds(context, context.surface, context.symbolPrefix, edge, read, seeded);
+		await seedEdgeAndOwnTemplate(context, edge, read, seeded);
 	return roster(seeded);
 };
+
+/**
+ * One placed child's whole seed contribution to the instance now open: the seeds
+ * its own body writes, and then the seeds of every component its OWN TEMPLATE
+ * wraps its `children` in. The served twin is `marklessSsrSeedChild`, which runs
+ * the child's seed pass and its `seedForward` lines over the caller's map — so a
+ * writer the child renders itself, rather than one the consumer projects into it,
+ * still lands in the enclosing instance.
+ */
+async function seedEdgeAndOwnTemplate(
+	context: SeedContext,
+	edge: SeedEdge,
+	read: PrerenderReadSeed,
+	seeded: Map<string, unknown>,
+): Promise<void> {
+	await applySharedSeeds(context, context.surface, context.symbolPrefix, edge, read, seeded);
+	await applyComposedChainSeeds(
+		context,
+		childrenForwardChain(context.surface, edge.childComponentName),
+		edge,
+		context.symbolPrefix + edge.symbolPrefix,
+		edgeChildProps(context, context.surface, edge, read),
+		seeded,
+	);
+}
 
 /**
  * The composed roots between a placed child's own template and the slot that
@@ -164,6 +180,78 @@ async function composedScopeRead(
 		);
 	}
 	return read;
+}
+
+/**
+ * Every composed link from a placed child's own template down to the slot that
+ * renders its `children`, outermost first — untruncated.
+ *
+ * `childrenProjectionChain` answers a different question with the same walk: the
+ * composition seam wants the innermost link that ROOTS a widget, so it cuts the
+ * chain there and answers nothing when no link roots one. The seed forward wants
+ * every link, rooting or not, because each one's body may write into the
+ * instance already open. The compiler's twin is `childrenProjectionChain` in
+ * public-render's shared-seed-pass, whose `seedForward` uses the whole chain.
+ */
+function childrenForwardChain(
+	surface: PrerenderDataSurface,
+	componentName: string,
+): ChildrenProjectionLink[] {
+	const own = childSurfaceOf(surface, componentName);
+	const definition = own?.components[componentName];
+	if (!own || !definition) return [];
+	const chunks = own.renderData.chunks.filter((chunk) => chunk.componentName === componentName);
+	const byId = new Map(chunks.map((chunk) => [chunk.id, chunk]));
+	const edges = definition.edges ?? [];
+	const chain: ChildrenProjectionLink[] = [];
+	let found: ChildrenProjectionLink[] = [];
+	// A self-composing component's projection chunks reach themselves; how deep it
+	// unrolls is a render-time answer, so the build-time walk visits each once.
+	const walked = new Set<string>();
+	const walk = (chunkId: string): boolean => {
+		if (walked.has(chunkId)) return false;
+		walked.add(chunkId);
+		for (const slot of byId.get(chunkId)?.slots ?? []) {
+			if (slot.kind === 'text' && isOwnChildrenRead(slot.residue)) return true;
+			if (slot.kind !== 'child-component' || !slot.projectionChunkId) continue;
+			const edge = edges.find((candidate) => candidate.id === slot.componentEdgeId);
+			if (!edge || edge.materialized) continue;
+			const owner = chain[chain.length - 1];
+			const ownerSurface = owner
+				? childSurfaceOf(owner.surface, owner.edge.childComponentName)
+				: own;
+			const ownerDefinition = owner
+				? ownerSurface?.components[owner.edge.childComponentName]
+				: definition;
+			if (!ownerSurface || !ownerDefinition) continue;
+			chain.push({
+				edge,
+				surface: ownerSurface,
+				definition: ownerDefinition,
+				rootsWidget: widgetRootsOf(ownerSurface, edge.childComponentName).length > 0,
+			});
+			if (walk(slot.projectionChunkId)) {
+				found = [...chain];
+				return true;
+			}
+			chain.pop();
+		}
+		return false;
+	};
+	for (const chunk of chunks) if (chunk.kind === 'template' && walk(chunk.id)) break;
+	return found;
+}
+
+// Restates the one slot that renders a component's own `children` prop, raw —
+// the same shape `isOwnChildrenResidue` reads in prerender/children-projection.
+function isOwnChildrenRead(residue: { readonly kind: string; readonly [key: string]: unknown }) {
+	return (
+		residue.kind === 'graph-read' &&
+		residue.graphNodeId === 'prop:props' &&
+		Array.isArray(residue.path) &&
+		residue.path.length === 1 &&
+		residue.path[0] === 'children'
+	);
 }
 
 // The component edges placed inside the projecting child, outermost first: its
