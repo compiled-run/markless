@@ -26,6 +26,7 @@ export const FAMILY_ANCHORS = {
 	tooltip: '/#tooltip',
 	'slider-range': '/#slider-range',
 	datebox: '/#datebox',
+	fileupload: '/#fileupload',
 } as const;
 
 export type FamilyName = keyof typeof FAMILY_ANCHORS;

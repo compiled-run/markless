@@ -31,6 +31,7 @@
 		"./collapsible": "./src/collapsible/index.ts",
 		"./combobox": "./src/combobox/index.ts",
 		"./datebox": "./src/datebox/index.ts",
+		"./fileupload": "./src/fileupload/index.ts",
 		"./modal": "./src/modal/index.ts",
 		"./otp": "./src/otp/index.ts",
 		"./navbar": "./src/navbar/index.ts",

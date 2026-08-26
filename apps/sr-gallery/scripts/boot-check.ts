@@ -42,6 +42,9 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	tooltip: 'tooltip',
 	'slider-range': 'slider',
 	datebox: 'spinbutton',
+	// The browse button is the family's whole keyboard route; the real file input
+	// is aria-hidden, so the button is what has to be in the tree.
+	fileupload: 'button',
 };
 
 /** Sections whose point is how many of that role they serve, not merely that they serve one. */

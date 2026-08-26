@@ -860,6 +860,107 @@
 			}
 		]
 	},
+	"fileupload": {
+		"parts": [
+			{
+				"part": "droparea",
+				"component": "FileUploadDropArea",
+				"doc": "The region a file can be dropped onto. It carries no role and no tabindex on\npurpose: dropping is a pointer enhancement and the browse button is the\nkeyboard route, so a second tab stop here would do nothing the button does not.\nIt reports `ui-dragging` and `ui-disabled`.",
+				"props": []
+			},
+			{
+				"part": "field",
+				"component": "FileUploadField",
+				"doc": "The real `<input type=\"file\">`. It is clipped, `aria-hidden` and out of the tab\norder, so nothing but the family and the picker ever touch it — but it is the\nelement that actually submits, and the family keeps its `files` in step with\nthe rows on the page, dropped files included.",
+				"props": []
+			},
+			{
+				"part": "item",
+				"component": "FileUploadItem",
+				"doc": "One chosen file's row. Everything it shows comes from the `file` record it is given.",
+				"props": [
+					{
+						"name": "file",
+						"type": "FileRecord",
+						"required": true,
+						"doc": "The file this row shows."
+					}
+				]
+			},
+			{
+				"part": "itemclose",
+				"component": "FileUploadItemClose",
+				"doc": "The button that takes the file it sits in off the list. It takes no id: the\nitem around it holds one. Give it an `aria-label` — the visible character is\nusually a cross, which a reader would otherwise announce as \"times\".",
+				"props": []
+			},
+			{
+				"part": "itemlabel",
+				"component": "FileUploadItemLabel",
+				"doc": "The file's name. Leave it empty and it renders the name the record carries;\ngive it children and they are shown instead.",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "FileUploadLabel",
+				"doc": "The upload's name. Its `for` points at the real field, which is what names it for a reader.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "FileUploadRoot",
+				"doc": "The upload itself; the label, the drop area, the browse button, the real field\nand the list of chosen files all go inside it. It holds the restrictions and\nreports `ui-disabled` for styling.\n\nThere is no `value` prop: a `FileList` cannot be built from markup, so the\nchosen files always start empty and are only ever added by a person.",
+				"props": [
+					{
+						"name": "accept",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "What the picker offers and what a drop is filtered against, e.g. `image/*,.pdf`."
+					},
+					{
+						"name": "multiple",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "More than one file may be chosen; without it a new choice replaces the old one."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nothing can be chosen: the button is disabled and drops are ignored."
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "A file must be chosen before a form submits."
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "Submitted under this name by the real field the family renders."
+					},
+					{
+						"name": "onChange",
+						"type": "(files: readonly FileRecord[]) => void",
+						"required": false,
+						"doc": "Called with the chosen files whenever they change."
+					}
+				]
+			},
+			{
+				"part": "trigger",
+				"component": "FileUploadTrigger",
+				"doc": "The button that opens the file picker. This is the keyboard and reader route in.",
+				"props": []
+			}
+		]
+	},
 	"modal": {
 		"parts": [
 			{
