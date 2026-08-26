@@ -5,6 +5,7 @@ export * as carousel from './carousel/index.ts';
 export * as checkbox from './checkbox/index.ts';
 export * as checklist from './checklist/index.ts';
 export * as collapsible from './collapsible/index.ts';
+export * as colorpicker from './colorpicker/index.ts';
 export * as combobox from './combobox/index.ts';
 export * as datebox from './datebox/index.ts';
 export * as fileupload from './fileupload/index.ts';

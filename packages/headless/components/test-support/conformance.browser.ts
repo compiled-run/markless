@@ -6,6 +6,7 @@ import Carousel from '../src/carousel/scenarios/basic.tsrx';
 import Checkbox from '../src/checkbox/scenarios/basic.tsrx';
 import Checklist from '../src/checklist/scenarios/basic.tsrx';
 import Collapsible from '../src/collapsible/scenarios/basic.tsrx';
+import Colorpicker from '../src/colorpicker/scenarios/basic.tsrx';
 import DateBox from '../src/datebox/scenarios/basic.tsrx';
 import FileUpload from '../src/fileupload/scenarios/basic.tsrx';
 import Hovercard from '../src/hovercard/scenarios/basic.tsrx';
@@ -154,6 +155,31 @@ const descriptors: readonly FamilyDescriptor[] = [
 			focusLands: false,
 			focusReturns: false,
 		},
+		supportsDisabled: true,
+	},
+	{
+		family: 'colorpicker',
+		mount: { CSR: () => render(Colorpicker), SSR: () => renderSSR(Colorpicker) },
+		root: 'root',
+		// The Basic scenario is the inline picker; `trigger` only exists under
+		// `popup`, so there is no openCycle here. The popup shape - open, focus in,
+		// Escape back to the trigger, outside press - is held in
+		// src/colorpicker/colorpicker.browser.ts, where a `popup` root is on the page.
+		parts: [
+			'root',
+			'label',
+			'content',
+			'area',
+			'area-thumb',
+			'hue-track',
+			'hue-thumb',
+			'valuelabel',
+			'field',
+		],
+		rootAria: { role: null },
+		// Which channel a rail carries, which axis of the plane a control moves, and
+		// the colour in force: each is information a consumer styles against.
+		valuedAttributes: ['ui-channel', 'ui-axis', 'ui-value'],
 		supportsDisabled: true,
 	},
 	{
