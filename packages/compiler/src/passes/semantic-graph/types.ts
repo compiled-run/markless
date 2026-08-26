@@ -101,6 +101,8 @@ export type WalkState = {
 	readonly frameworkApiImports: ReadonlyMap<string, FrameworkApiName>;
 	readonly importedModuleInterfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 	readonly hostIds: WeakMap<object, string>;
+	/** Template values already refused at their use site; the walk must not treat them as markup again. */
+	readonly handledTemplateValues: WeakSet<object>;
 	currentComponentName: string | null;
 	currentComponentId: string | null;
 	/** The <style> scope class of the component being walked; every class this component writes carries it. */
@@ -230,6 +232,7 @@ export function createWalkState(input: {
 		frameworkApiImports: input.frameworkApiImports,
 		importedModuleInterfaces: input.importedModuleInterfaces ?? {},
 		hostIds: new WeakMap<object, string>(),
+		handledTemplateValues: new WeakSet<object>(),
 		currentComponentName: null,
 		currentComponentId: null,
 		currentStyleScopeClass: null,
