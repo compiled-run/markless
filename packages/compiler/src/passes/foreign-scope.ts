@@ -1,5 +1,6 @@
 import type {
 	PublicRenderModuleInput,
+	SemanticGraphDependency,
 	SemanticModuleImport,
 	SemanticSharedDefinition,
 	SemanticSharedModuleDeclaration,
@@ -271,6 +272,88 @@ export function crossModuleRefusal(refusal: ForeignScopeRefusal): CompilerDiagno
 	};
 }
 
+// ---------------------------------------------------------------------------
+// A cell read the author spelled as a call.
+//
+// `computed(() => ...)` answers with the derived VALUE - its type is the value's
+// own - so every read of it lowers to a read of the cell. An expression that
+// spells one of its reads `loud()` therefore calls that value: the served module
+// builds `const loud=read(...)` and calls the derived string, the browser module
+// builds `context.graph.read(...)()`. Both throw a TypeError with nothing at
+// build time to point at, so the shape is refused instead.
+//
+// The served module and the client symbol module derive from the same authored
+// text, so they share the detection; each turns the refusals into its own
+// diagnostic.
+
+/** This helper owns the code; readers import it rather than restating the string. */
+export const COMPUTED_READ_CALLED_CODE = 'MARKLESS_COMPUTED_READ_CALLED';
+
+/** One derive expression and the cell read inside it that is spelled as a call. */
+export type ComputedReadCallRefusal = {
+	readonly graphNodeId: string;
+	/** The authored name of the computed whose expression spells the call. */
+	readonly name: string;
+	/** The authored text of the read that is called, as the author wrote it. */
+	readonly called: string;
+};
+
+/** One derive expression as the compiler copies it: authored text plus its reads. */
+export type ComputedDeriveExpression = {
+	readonly graphNodeId: string;
+	readonly name: string;
+	readonly source: string;
+	readonly dependencies: ReadonlyArray<SemanticGraphDependency>;
+};
+
+export function computedReadCallRefusals(input: {
+	readonly derives: ReadonlyArray<ComputedDeriveExpression>;
+	readonly computedGraphNodeIds: ReadonlySet<string>;
+}): ReadonlyArray<ComputedReadCallRefusal> {
+	const refusals: ComputedReadCallRefusal[] = [];
+	const seen = new Set<string>();
+	for (const derive of input.derives) {
+		const computedReads = derive.dependencies.flatMap((dependency) =>
+			input.computedGraphNodeIds.has(dependency.graphNodeId) ? [dependency.source] : [],
+		);
+		if (computedReads.length === 0) continue;
+		const called = calledSourceTexts(derive.source);
+		for (const read of computedReads) {
+			const key = `${derive.graphNodeId} ${read}`;
+			if (!called.has(read) || seen.has(key)) continue;
+			seen.add(key);
+			refusals.push({ graphNodeId: derive.graphNodeId, name: derive.name, called: read });
+		}
+	}
+	return refusals;
+}
+
+/** The callee text of every call the expression spells, minus names it binds itself. */
+function calledSourceTexts(source: string): ReadonlySet<string> {
+	const called = new Set<string>();
+	const bound = new Set<string>();
+	walkParsedNodes(`(${source})`, (node) => {
+		if (BINDING_PARENT_TYPES.has(String(node.type))) collectPatternNames(node.id, bound);
+		for (const parameter of asNodes(node.params)) collectPatternNames(parameter, bound);
+		if (node.type !== 'CallExpression' && node.type !== 'NewExpression') return;
+		const text = staticCalleeText(node.callee);
+		if (text !== null) called.add(text);
+	});
+	return new Set([...called].filter((text) => !bound.has(text.split('.')[0] ?? text)));
+}
+
+/** `loud` or `b.loud`, spelled the way a recorded read spells it; null for anything else. */
+function staticCalleeText(node: unknown): string | null {
+	if (!isNode(node)) return null;
+	if (node.type === 'Identifier') return typeof node.name === 'string' ? node.name : null;
+	if (node.type !== 'MemberExpression' || node.computed === true || node.optional === true) {
+		return null;
+	}
+	const object = staticCalleeText(node.object);
+	const property = isNode(node.property) ? staticCalleeText(node.property) : null;
+	return object !== null && property !== null ? `${object}.${property}` : null;
+}
+
 function isRelativeSpecifier(specifier: string): boolean {
 	return specifier.startsWith('./') || specifier.startsWith('../');
 }
@@ -344,16 +427,29 @@ function freeDeclarationNames(source: string): ReadonlySet<string> {
 }
 
 function freeNamesOfParse(source: string): ReadonlySet<string> {
+	const bound = new Set<string>();
+	const referenced = new Set<string>();
+	walkParsedNodes(source, (node) => {
+		if (node.type === 'Identifier') {
+			if (typeof node.name === 'string') referenced.add(node.name);
+			return;
+		}
+		if (BINDING_PARENT_TYPES.has(String(node.type))) collectPatternNames(node.id, bound);
+		for (const parameter of asNodes(node.params)) collectPatternNames(parameter, bound);
+	});
+	return new Set([...referenced].filter((name) => !bound.has(name)));
+}
+
+/** Every value-position node of `source`, once each, parents before children. */
+function walkParsedNodes(source: string, visit: (node: AnyNode) => void): void {
 	let ast: AnyNode;
 	try {
 		ast = parseModule(source, 'generated.ts') as unknown as AnyNode;
 	} catch {
 		// Text the compiler just built and cannot reparse is a different defect;
 		// it is no evidence of this one, so claim nothing.
-		return new Set();
+		return;
 	}
-	const bound = new Set<string>();
-	const referenced = new Set<string>();
 	const seen = new Set<object>();
 	const stack: unknown[] = [ast];
 	while (stack.length > 0) {
@@ -365,12 +461,8 @@ function freeNamesOfParse(source: string): ReadonlySet<string> {
 			continue;
 		}
 		const node = value as AnyNode;
-		if (node.type === 'Identifier' && typeof node.name === 'string') {
-			referenced.add(node.name);
-			continue;
-		}
-		if (BINDING_PARENT_TYPES.has(String(node.type))) collectPatternNames(node.id, bound);
-		for (const parameter of asNodes(node.params)) collectPatternNames(parameter, bound);
+		visit(node);
+		if (node.type === 'Identifier') continue;
 		for (const [key, child] of Object.entries(node)) {
 			if (WALK_IGNORED_KEYS.has(key)) continue;
 			if (node.computed !== true && key === 'property' && node.type === 'MemberExpression')
@@ -379,7 +471,6 @@ function freeNamesOfParse(source: string): ReadonlySet<string> {
 			stack.push(child);
 		}
 	}
-	return new Set([...referenced].filter((name) => !bound.has(name)));
 }
 
 const BINDING_PARENT_TYPES: ReadonlySet<string> = new Set([

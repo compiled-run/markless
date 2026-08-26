@@ -273,8 +273,8 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 // that copy arrives without the scope it was written in. The served module
 // already carries that scope off the definition record; this carries the same
 // one into the client module and refuses what it cannot. A sibling cell needs
-// nothing here: the lowering turns `other()` into a graph read, and the
-// sibling's own derive module gets this carry in its own right.
+// nothing here: the lowering turns `other` into a graph read, and the sibling's
+// own derive module gets this carry in its own right.
 
 function foreignFactoryScopeCarry(
 	input: SymbolModulesInput,
