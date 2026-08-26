@@ -40,6 +40,7 @@ export const FAMILY_ANCHORS = {
 	datebox: '/#datebox',
 	fileupload: '/#fileupload',
 	hovercard: '/#hovercard',
+	calendar: '/#calendar',
 } as const;
 
 export type FamilyName = keyof typeof FAMILY_ANCHORS;

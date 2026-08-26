@@ -117,9 +117,13 @@ function dayEl(iso: string): HTMLButtonElement {
 }
 
 // What the reader says about one day, read where a person meets it: on focus.
-async function readDay(iso: string): Promise<string> {
+// The month's title is a polite live region, so a gesture that rewrote it can
+// leave its phrase as the last one spoken; stepping off the day and back on is
+// what makes the day's own announcement the answer.
+async function readDay(iso: string, name: string): Promise<string> {
 	dayEl(iso).focus();
-	return sr.settleOnFocus();
+	const spoken = await sr.settleOnFocus();
+	return spoken.includes(name) ? spoken : sr.reannounce();
 }
 
 /**
@@ -158,13 +162,13 @@ test('the title is announced when the month moves under it', async () => {
 
 test('a day is a button named by its whole date', async () => {
 	await open(Basic);
-	expectDayConveys(await readDay('2026-08-25'), dayName(25), [say.button]);
+	expectDayConveys(await readDay('2026-08-25', dayName(25)), dayName(25), [say.button]);
 });
 
 test('the chosen day conveys that it is pressed and the others that they are not', async () => {
 	await open(Controlled);
-	expectDayConveys(await readDay('2026-08-14'), dayName(14), [say.button, say.pressed]);
-	expectDayConveys(await readDay('2026-08-15'), dayName(15), [say.button, say.notPressed]);
+	expectDayConveys(await readDay('2026-08-14', dayName(14)), dayName(14), [say.button, say.pressed]);
+	expectDayConveys(await readDay('2026-08-15', dayName(15)), dayName(15), [say.button, say.notPressed]);
 });
 
 test('choosing a day moves what is conveyed as pressed', async () => {
@@ -173,14 +177,14 @@ test('choosing a day moves what is conveyed as pressed', async () => {
 	await expect.poll(() => dayEl('2026-08-20').getAttribute('aria-pressed')).toBe('true');
 	expect(dayEl('2026-08-14').getAttribute('aria-pressed')).toBe('false');
 
-	expectDayConveys(await readDay('2026-08-20'), dayName(20), [say.button, say.pressed]);
+	expectDayConveys(await readDay('2026-08-20', dayName(20)), dayName(20), [say.button, say.pressed]);
 });
 
 test('a day outside the bounds conveys that it is unavailable and stays reachable', async () => {
 	await open(Bounded);
 	// 2026-08-04 is before `min` and 2026-08-12 is named in `unavailable`: both are
 	// announced as unavailable, and neither leaves the tab order.
-	expectDayConveys(await readDay('2026-08-04'), dayName(4), [say.button, say.disabled]);
+	expectDayConveys(await readDay('2026-08-04', dayName(4)), dayName(4), [say.button, say.disabled]);
 	expect(dayEl('2026-08-04').hasAttribute('disabled')).toBe(false);
 	expect(dayEl('2026-08-12').getAttribute('aria-disabled')).toBe('true');
 	expect(dayEl('2026-08-12').hasAttribute('disabled')).toBe(false);

@@ -1,4 +1,5 @@
 import {
+	calendar,
 	checkbox,
 	checklist,
 	datebox,
@@ -20,7 +21,7 @@ import {
 // page, each in a section a reader can jump to by its anchor: /#checkbox,
 // /#toggle, /#textbox, /#progress, /#checklist, /#select, /#modal,
 // /#radio-group, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
-// /#fileupload, /#hovercard. A family
+// /#fileupload, /#hovercard, /#calendar. A family
 // whose second shape a reader announces differently gets its own section too:
 // /#slider-range.
 //
@@ -281,7 +282,49 @@ export function Gallery() @{
 				</hovercard.root>
 			</div>
 		</section>
+
+		<section id="calendar">
+			<h2>Calendar</h2>
+			{/* A fixed month, one day already chosen and one a person may not choose, so what a reader hears on each is the same on every run. */}
+			<div class="scenario">
+				<calendar.root
+					month="2026-08-01"
+					value="2026-08-14"
+					unavailable={['2026-08-19']}
+					name="starts"
+				>
+					<calendar.label>Pick a date</calendar.label>
+					<CalendarMonth />
+					<calendar.field />
+				</calendar.root>
+			</div>
+		</section>
 	</main>
+}
+
+// The month is the consumer's own markup and sits inside the root, for the reason
+// the file rows below carry: a component that reads the calendar's state is a
+// part of that calendar's widget.
+function CalendarMonth() @{
+	const cal = calendar.state();
+
+	<calendar.content>
+		<div>
+			<calendar.backtrigger>Back</calendar.backtrigger>
+			<calendar.title />
+			<calendar.forwardtrigger>Forward</calendar.forwardtrigger>
+		</div>
+		<div aria-hidden="true">
+			@for (const name of cal.weekdays; key name) {
+				<span>{name}</span>
+			}
+		</div>
+		<div>
+			@for (const day of cal.days; key day) {
+				<calendar.item value={day} />
+			}
+		</div>
+	</calendar.content>
 }
 
 // The list is the consumer's own markup and sits inside the root: a component that
