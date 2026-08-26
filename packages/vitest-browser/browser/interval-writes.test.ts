@@ -51,10 +51,10 @@ async function expectTicksAdvanceTheDom(container: ParentNode) {
 
 		// The old failure was a throw out of the timer callback, so an empty error
 		// log is part of the proof rather than decoration. The tick also invokes a
-		// filled callback slot, which the band emits as `await
-		// context.capture.invoke(...)`: the callback the author wrote was not async,
-		// so the timer callback has to be emitted `async` or the module is a
-		// SyntaxError in module goal and nothing below would run at all.
+		// filled callback slot, which the band emits as an awaited dispatch: the
+		// callback the author wrote was not async, so the timer callback has to be
+		// emitted `async` or the module is a SyntaxError in module goal and nothing
+		// below would run at all.
 		expect(errors).toEqual([]);
 	} finally {
 		window.removeEventListener('error', onError);
@@ -72,16 +72,12 @@ test('SSR: an interval callback write advances the DOM after resume', async () =
 	await expectTicksAdvanceTheDom(screen.container);
 });
 
-// A SEPARATE defect, measured while pinning defect 79 and not fixed here: the
-// tick's `t.onTick?.(t.count)` compiles to
-// `await (context.capture ? context.capture.invoke("...") : undefined)`, and at
-// tick time `context.capture` is not there, so the guard takes the `undefined`
-// arm and the parent is never told. Nothing reports it — the count still
-// advances, so only the parent's own output shows the loss. The compiled bytes
-// are correct (`packages/compiler/test/interval-callback-writes.test.ts` pins
-// the emitted invoke), so this is a runtime-route defect, not an emission one.
-// When it lands, this row turns red: drop `.fails`.
-test.fails('a callback slot invoked from a timer tick reaches the parent', async () => {
+// A timer tick carries no event and no capture context, so a dispatch that
+// needed one folded away silently: the count still advanced, and only the
+// parent's own output showed the loss. The tick's `t.onTick?.(t.count)` now
+// lowers into a dispatch through the slot's own graph node, which the tick
+// resolves the way it resolves the rest of the widget's state.
+test('a callback slot invoked from a timer tick reaches the parent', async () => {
 	const screen = await render(TickerApp);
 	const container = screen.container as HTMLElement;
 

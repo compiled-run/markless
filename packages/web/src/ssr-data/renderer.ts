@@ -21,17 +21,12 @@ export type SsrDataResidue =
 			readonly handleGraphNodeId: string;
 			readonly idref?: true;
 	  }
-	// One element's whole inline style value, when a CSS anchor position on it
-	// named an element() handle. The compiled reader spells each declaration from
-	// the same per-instance token it spells minted ids from, so the anchor and
-	// the element that declares it cannot disagree.
+	// Several handles named by one IDREF position HTML defines as a list. The
+	// compiled reader joins the ids of the handles this render actually bound, so
+	// a description and an error are named together and neither dangles.
 	| {
-			readonly kind: 'element-handle-anchor-style';
-			readonly declarations: ReadonlyArray<{
-				readonly property: string;
-				readonly handleGraphNodeId: string;
-			}>;
-			readonly staticStyle?: string;
+			readonly kind: 'element-handle-id-list';
+			readonly handleGraphNodeIds: ReadonlyArray<string>;
 	  };
 
 export type SsrDataCoordinate =
@@ -147,6 +142,9 @@ export type SsrDataReadContext = {
 	readonly asyncError?: unknown;
 	readonly projectionHtml?: string;
 	readonly sharedSeeds?: ReadonlyMap<string, unknown>;
+	// Inside an arm this render is bringing into the DOM for the first time, so
+	// the components it holds are new instances rather than live ones.
+	readonly freshInstances?: true;
 };
 
 export type SsrDataStructure = {
@@ -185,6 +183,16 @@ export type SsrDataCoordinates = {
 export type RenderSsrDataInput = {
 	readonly renderData: SsrRenderData;
 	readonly idPrefix?: string;
+	// The repeat row the root chunk renders inside, for a caller that starts the
+	// render partway down a component's tree: a `@for` row's projection chunk.
+	readonly rootContext?: {
+		readonly item?: unknown;
+		readonly index?: number;
+		readonly key?: unknown;
+	};
+	// The branch whose arm this render is bringing into the DOM: everything
+	// inside it is a new instance, so its own state starts from its declaration.
+	readonly freshBranchSiteId?: string;
 	// What the component that placed this one seeded: it travels the composed
 	// edge as well as the projection, because a part may sit behind either.
 	readonly sharedSeeds?: ReadonlyMap<string, unknown>;
@@ -331,7 +339,25 @@ function spliceTokensAtMark(
 	return [...tokens.slice(0, index), ...projectionTokens, ...tokens.slice(index)];
 }
 
-function projectionNotRenderedError(
+/**
+ * Runs one child render with a projection's token span registered, for a caller
+ * that places a projection itself rather than through `renderChunk` - the client
+ * mint of a `@for` row whose component projects children. `consumed` answers
+ * whether the child's own `{children}` slot reported the span back.
+ */
+export async function withProjectionSpan<T>(
+	tokens: ReadonlyArray<StructureToken>,
+	render: (mark: string) => Promise<T>,
+): Promise<{ readonly result: T; readonly consumed: boolean }> {
+	const span = openProjectionSpan(tokens);
+	try {
+		return { result: await render(span.mark), consumed: span.consumed };
+	} finally {
+		projectionSpans.delete(span.key);
+	}
+}
+
+export function projectionNotRenderedError(
 	componentName: string,
 	edgeId: string,
 ): Error & Record<string, unknown> {
@@ -353,7 +379,7 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 	const anchors: Array<SsrDataCoordinates['anchors'][number]> = [];
 	const rootId = input.renderData.root?.templateId;
 	const rendered = rootId
-		? await renderChunk(rootId, { sharedSeeds: input.sharedSeeds })
+		? await renderChunk(rootId, { ...input.rootContext, sharedSeeds: input.sharedSeeds })
 		: { html: '', tokens: [] };
 	const html = rendered.html;
 	const structure = materializeStructure(rendered.tokens);
@@ -403,6 +429,7 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 					...(repeat.item !== undefined ? { repeatItem: repeat.item } : {}),
 					...(repeat.index !== undefined ? { repeatIndex: repeat.index } : {}),
 					...(repeat.key !== undefined ? { repeatKey: repeat.key } : {}),
+					...(repeat.freshInstances ? { freshInstances: repeat.freshInstances } : {}),
 					sharedSeeds: repeat.sharedSeeds,
 				};
 				const renderedSlot = await renderSlot(slot, context);
@@ -438,7 +465,11 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 			case 'attribute': {
 				const value = await input.read(slot.residue, context);
 				return {
-					html: slot.alwaysPresent ? escapeHtml(value) : renderAttribute(slot.name, value),
+					// The name and quotes are already in the statics, so an absent value
+					// writes nothing rather than the word "undefined" into them.
+					html: slot.alwaysPresent
+						? escapeHtml(marklessAttributeValue(slot.name, value) ?? '')
+						: renderAttribute(slot.name, value),
 					tokens: [],
 				};
 			}
@@ -525,6 +556,9 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 							item: context.repeatItem,
 							index: context.repeatIndex,
 							key: context.repeatKey,
+							...(context.freshInstances || slot.branchSiteId === input.freshBranchSiteId
+								? { freshInstances: true as const }
+								: {}),
 						})
 					: { html: '', tokens: [] };
 				const id = `${idPrefix}${slot.branchSiteId}`;

@@ -4,6 +4,7 @@ import { afterEach, expect, test } from 'vitest';
 import { missingFacts, readUntil, type Conveys } from '../../test-support/driver.ts';
 import { virtualDriver } from '../../test-support/virtual-driver.ts';
 import Basic from './scenarios/basic.tsrx';
+import HelpAndError from './scenarios/help-and-error.tsrx';
 import Invalid from './scenarios/invalid.tsrx';
 import Locked from './scenarios/locked.tsrx';
 import Prefilled from './scenarios/prefilled.tsrx';
@@ -95,4 +96,16 @@ test('the reason a field is invalid is conveyed with the field', async () => {
 	await open(Invalid);
 	const announcement = await readUntil(sr, { role: 'textbox', name: 'Password' });
 	expect(missingFacts(sr, announcement, { name: 'Password is required' })).toEqual([]);
+});
+
+// Both messages bind handles the control names, so both are part of the field rather than separate items down the page.
+test('the error and the help text are both conveyed with the field', async () => {
+	await open(HelpAndError);
+	const phrase = await readUntil(sr, { role: 'textbox', name: 'Email' });
+	expect(phrase, `${sr.name} announced "${phrase}"`).toContain('Email format is invalid');
+	expect(phrase, `${sr.name} announced "${phrase}"`).toContain('Enter a valid email address');
+	// What is wrong is conveyed before the hint, though the hint is written above the error in this page.
+	expect(phrase.indexOf('Email format is invalid')).toBeLessThan(
+		phrase.indexOf('Enter a valid email address'),
+	);
 });
