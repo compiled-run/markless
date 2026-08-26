@@ -2,7 +2,7 @@
 
 Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
 
-197 codes.
+198 codes.
 
 | Code | Package | Pass / phase | Title | Message |
 | --- | --- | --- | --- | --- |
@@ -32,7 +32,7 @@ Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not ed
 | `MARKLESS_CALLBACK_SLOT_UNRESOLVED` | web | fns | TODO: no builder title | … was dispatched from a part whose widget instance no rendered widget owns, so the consumer's callback could never be reached. |
 | `MARKLESS_CANONICAL_SYMBOL_MISSING` | web | render-canonical | TODO: no builder title | TODO: no builder message |
 | `MARKLESS_CAPTURE_METADATA_MISSING` | compiler | link | Imported child has no current capture metadata | Parent module … composes imported child …, but its compiled artifact has no current capture metadata. Rebuild the child with the current Markless compiler and clear any stale build cache. |
-| `MARKLESS_CAPTURE_OPAQUE_PROP` | compiler | capture-analysis | Lazy handler prop capture is not resumable | Cannot bind lazy symbol "…" on component edge "…" because prop "…" for "…" is the runtime expression "…". (+1 more) |
+| `MARKLESS_CAPTURE_OPAQUE_PROP` | compiler | capture-analysis | Lazy handler prop capture is not resumable | Cannot bind lazy symbol "…" because prop "…" for "…" is read through a path the compiler cannot reduce to a capture slot, so "…" would reach the browser unbound. (+2 more) |
 | `MARKLESS_CAPTURE_UNSUPPORTED_VALUE` | compiler | capture-analysis | Cannot capture local … in lazy symbol; Cannot check the captures of this lazy symbol | Cannot capture "…" in lazy … symbol "…" because local … values cannot cross a resume boundary. (+1 more) |
 | `MARKLESS_CHILDREN_OPAQUE` | compiler | public-render | children cannot be inspected or transformed | children is an opaque template projection: place it with \{children\}, wrap it, or pass it through — mapping, counting, indexing, or mutating it is not supported. |
 | `MARKLESS_CHILD_SYMBOL_MISSING` | bundler | hooks | TODO: no builder title | Linked child … does not provide requested symbol module …. Rebuild the child with the current Markless compiler and clear any stale build cache. |
@@ -76,7 +76,7 @@ Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not ed
 | `MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED` | compiler | semantic-graph | Nested prop-forwarded element handles are not supported yet | Cannot bind el=\{…\} because this slice only supports element handles passed as direct component props, not through arrays or nested object props. |
 | `MARKLESS_ELEMENT_HANDLE_RENDER_READ` | compiler | semantic-graph | DOM handles cannot be read while rendering | Cannot render "…" because "…" is an element() handle, not serializable graph state. |
 | `MARKLESS_ELEMENT_HANDLE_REQUIRED` | compiler | semantic-graph | el expects an element() handle | Cannot bind el=\{…\} because "…" is …, not an element() handle. |
-| `MARKLESS_ELEMENT_HANDLE_UNBOUND` | compiler | semantic-graph | element() handle is read before it is bound | Reading element handle "…" will produce undefined because "…" is never bound with el=\{…\} in this component. |
+| `MARKLESS_ELEMENT_HANDLE_UNBOUND` | compiler | semantic-graph | element() handle is read before it is bound | Cannot read element handle "…" inside computed "…" in …: element() handles are DOM-bound and readable only in event handlers, so "…" is undefined on every derivation. (+1 more) |
 | `MARKLESS_ELEMENT_MODULE_SCOPE` | compiler | semantic-graph | element() cannot be created at module scope | Cannot create element handle "…" at module scope. |
 | `MARKLESS_EVENT_DISPATCH_UNMATCHED` | web | resume-events | TODO: no builder title | No event record matched … dispatch…. |
 | `MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED` | compiler | capture-analysis | This event handler cannot run in the browser yet | Cannot emit lazy … symbol "…" because it reads component-local "…", a local … value that cannot cross a resume boundary. (+1 more) |
@@ -138,6 +138,7 @@ Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not ed
 | `MARKLESS_SCALAR_WRITE_CELL_MISSING` | web | fns | TODO: no builder title | TODO: no builder message |
 | `MARKLESS_SCALAR_WRITE_GRAPH_MISSING` | web | fns | TODO: no builder title | TODO: no builder message |
 | `MARKLESS_SCALAR_WRITE_SHAPE` | web | fns | TODO: no builder title | TODO: no builder message |
+| `MARKLESS_SEED_CHILDREN_UNAVAILABLE` | compiler | public-render | These children cannot be seeded into shared state | \<…\> seeds "…" from its children, but the children written here contain markup or a value that is worked out while they render, so the seed would read nothing. |
 | `MARKLESS_SERIALIZE_UNSUPPORTED_VALUE` | serializer | protocol-state, serialization, value | Cannot serialize graph state value | Cannot serialize value at … because unknown values are not durable graph state. (+2 more) |
 | `MARKLESS_SERVER_DERIVE_UNREACHABLE` | compiler | public-render | This computed value cannot be worked out on the server | … Anything reading it would render as if the value were missing. |
 | `MARKLESS_SETTLE_KERNEL_UNSUPPORTED` | web | settle-kernel | TODO: no builder title | TODO: no builder message |

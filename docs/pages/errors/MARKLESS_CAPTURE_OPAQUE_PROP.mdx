@@ -8,11 +8,15 @@ Lazy handler prop capture is not resumable
 
 ## Message
 
+Cannot bind lazy symbol "…" because prop "…" for "…" is read through a path the compiler cannot reduce to a capture slot, so "…" would reach the browser unbound.
+
 Cannot bind lazy symbol "…" on component edge "…" because prop "…" for "…" is the runtime expression "…".
 
 Cannot bind lazy symbol "…" on component edge "…" because prop "…" is not passed by the parent that renders "…", and this call site invokes it unconditionally.
 
 ## Why
+
+A demanded capture slot must route to a graph node, a compiler-known constant, or a callback symbol. A prop path state lowering cannot reduce - an indexed element, a computed key, or an optional-chained call with no plain read beside it - produces no route at all, and the emitted handler would throw a ReferenceError on its first dispatch.
 
 A demanded capture slot must route to a graph node, a compiler-known constant, or a callback symbol. This opaque runtime value cannot be reduced without adding a serialized capture protocol.
 
