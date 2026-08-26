@@ -189,15 +189,19 @@ export type ResumeArmBranchRecord = {
 	readonly symbolId?: string;
 	readonly armTests?: ReadonlyArray<unknown>;
 	readonly declaredEmptyArms?: ReadonlyArray<number>;
+	// A composed child's branch keeps the `dom-order-comment` anchors its own
+	// module counted; they resolve by anchor text inside the arm, not by index.
 	readonly startAnchor?:
-		| { readonly strategy: 'arm-branch-comment'; readonly index: number }
+		| { readonly strategy: 'arm-branch-comment' | 'dom-order-comment'; readonly index: number }
 		| ResumeDomComment;
 	readonly endAnchor?:
-		| { readonly strategy: 'arm-branch-comment'; readonly index: number }
+		| { readonly strategy: 'arm-branch-comment' | 'dom-order-comment'; readonly index: number }
 		| ResumeDomComment;
 	readonly armRecords?: ReadonlyArray<ResumeBranchArmRecordSet>;
 	// Present once the record is bound to its live boundary at registration.
 	readonly armBoundaryId?: string;
+	readonly composedInstancePath?: ResumeBranchRecord['composedInstancePath'];
+	readonly composedGraphProps?: ResumeBranchRecord['composedGraphProps'];
 };
 export type ResumeArmRecordSet = {
 	readonly locators: ReadonlyArray<ResumeArmLocator>;
