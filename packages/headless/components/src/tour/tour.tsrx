@@ -29,12 +29,23 @@ import type {
 // Every graph read in this file stands on its own line before it is used: an
 // expression nesting one under a call is emitted as written and crashes the
 // handler module (MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE).
+// DECLARATION ORDER IS LOAD-BEARING, and it is why the item, the root and the
+// card sit in this order: a shared() factory's widget root is the FIRST
+// component in the module that resolves it. `tour.item` must come before the
+// card so the step's own instance is rooted above the element carrying its
+// IDREFs; `tour.root` must come before the card so the tour's instance is rooted
+// at the root and not at a card. Moving any of the three renames a widget root
+// and breaks the family - see note.md.
 
 export const tourState = shared(
 	() => {
 		const tour: TourInstanceState = state({
 			open: false,
 			step: 0,
+			// Each step writes `index + 1` here as it renders, so the last one leaves
+			// the length behind. A plural handle cannot do this job: it reads back
+			// empty inside a computed(), so it is a handler-time registry only.
+			count: 0,
 			loop: false,
 			closeOnInteractOutside: true,
 			disabled: false,
@@ -42,18 +53,13 @@ export const tourState = shared(
 			// can lower, and the current target is read in four of them.
 			target: undefined as HTMLElement | undefined,
 		});
-		// The array type argument makes the handle plural: bound on every card, read
-		// back as the live cards in document order. It is the whole registry - a step
-		// carries no value and there is no creation-order counter.
+		// Bound on every card and read back in document order, for the one job a
+		// handler does with it: landing focus on the card a step change moved to.
 		const itemEls = element<HTMLDivElement[]>();
 
 		return {
 			...tour,
 			itemEls,
-			count: computed(() => {
-				const cards = itemEls;
-				return cards === undefined ? 0 : cards.length;
-			}),
 			// literal function types: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((step: number) => void) | undefined,
 			onOpenChange: undefined as ((open: boolean) => void) | undefined,
@@ -140,6 +146,7 @@ export const tourState = shared(
 export const tourItemState = shared(
 	() => {
 		const item: TourItemInstanceState = state({
+			index: 0,
 			side: 'bottom',
 			target: undefined as HTMLElement | undefined,
 		});
@@ -152,30 +159,54 @@ export const tourItemState = shared(
 	{ scope: 'widget' },
 );
 
-export function TourItem({ target, side = 'bottom', children, ...rest }: TourItemProps) @{
+export function TourItem({ index, target, side = 'bottom', children, ...rest }: TourItemProps) @{
 	const item = tourItemState();
+	item.index = index;
 	item.side = side;
 	item.target = target;
 
 	<TourCard {...rest}>{children}</TourCard>
 }
 
-// A separate part rather than the item's own element: a widget root cannot read
-// its own instance token, so the title and description IDREFs only resolve one
-// component deeper.
+export function TourRoot({
+	open = false,
+	loop = false,
+	closeOnInteractOutside = true,
+	disabled = false,
+	onChange,
+	onOpenChange,
+	children,
+	...rest
+}: TourRootProps) @{
+	const tour = tourState();
+	tour.onChange = onChange;
+	tour.onOpenChange = onOpenChange;
+	tour.open = open;
+	tour.loop = loop;
+	tour.closeOnInteractOutside = closeOnInteractOutside;
+	tour.disabled = disabled;
+
+	<div
+		{...rest}
+		ui-open={tour.open}
+		ui-closed={tour.open !== true}
+		ui-disabled={tour.disabled}
+	>{children}</div>
+}
+
+// A separate component from `tour.item`: the card points aria-labelledby and
+// aria-describedby at handles the step's own widget owns, and a widget's root
+// component cannot read its own instance token.
 function TourCard({ children, onDismiss, onFocus, onKeydown, ...rest }: TourCardProps) @{
 	const tour = tourState();
 	const item = tourItemState();
-	// Which step this is, from the plural handle rather than a prop: the cards read
-	// back in document order, so a step's place is where it was written.
+	// The step's own `index` prop, not a lookup: a card has to know its place while
+	// it renders, and every registry this library has is handler-time only.
 	const isCurrent = computed(() => {
-		const card = item.el;
-		if (card === undefined) return false;
 		const showing = tour.open;
-		const bound = tour.itemEls;
-		const cards = bound === undefined ? [] : bound;
 		const at = tour.step;
-		return showing === true && cards.indexOf(card) === at;
+		const mine = item.index;
+		return showing === true && at === mine;
 	});
 
 	// No `aria-modal`, in any configuration. The APG allows it only when nothing
@@ -192,6 +223,9 @@ function TourCard({ children, onDismiss, onFocus, onKeydown, ...rest }: TourCard
 		aria-labelledby={item.titleEl}
 		aria-describedby={item.descriptionEl}
 		hidden={isCurrent !== true}
+		ui-current={isCurrent}
+		// The same cell as `ui-current`, under the name every overlay surface in
+		// the library writes when it is the one showing.
 		ui-open={isCurrent}
 		ui-closed={isCurrent !== true}
 		ui-side={item.side}
@@ -243,32 +277,6 @@ function TourCard({ children, onDismiss, onFocus, onKeydown, ...rest }: TourCard
 		</style>
 		{children}
 	</div>
-}
-
-export function TourRoot({
-	open = false,
-	loop = false,
-	closeOnInteractOutside = true,
-	disabled = false,
-	onChange,
-	onOpenChange,
-	children,
-	...rest
-}: TourRootProps) @{
-	const tour = tourState();
-	tour.onChange = onChange;
-	tour.onOpenChange = onOpenChange;
-	tour.open = open;
-	tour.loop = loop;
-	tour.closeOnInteractOutside = closeOnInteractOutside;
-	tour.disabled = disabled;
-
-	<div
-		{...rest}
-		ui-open={tour.open}
-		ui-closed={tour.open !== true}
-		ui-disabled={tour.disabled}
-	>{children}</div>
 }
 
 export function TourBackdrop({ children, ...rest }: TourBackdropProps) @{

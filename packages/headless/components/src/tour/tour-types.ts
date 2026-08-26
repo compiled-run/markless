@@ -45,6 +45,16 @@ export type TourRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
  */
 export type TourItemProps = PropsOf<'div'> & {
 	/**
+	 * Where this step comes in the tour, counting from zero.
+	 *
+	 * Required, because `step` is an ordinal and a step has to know its own place
+	 * while it renders to decide whether it is the one showing. Number the steps
+	 * `0`, `1`, `2`… in the order you write them: the tour's length is one past
+	 * the highest number registered, and moving a step lands focus on the card in
+	 * that document position.
+	 */
+	readonly index: number;
+	/**
 	 * The element this step is about, as an `element()` handle you bound on it.
 	 *
 	 * Pass the handle itself, never inside an array or an object: a handle only
@@ -98,6 +108,8 @@ export type TourInstanceState = Seeded<
 > & {
 	/** Which step is showing, counting from zero. */
 	step: number;
+	/** How many steps the tour has. Each step registers `index + 1` as it renders, so the last one leaves the length behind. */
+	count: number;
 	/**
 	 * The current step's target element, or `undefined` for a centred step.
 	 *
@@ -111,7 +123,7 @@ export type TourInstanceState = Seeded<
 	onOpenChange?: TourRootProps['onOpenChange'];
 };
 
-/** One instance per rendered `tour.item`, holding that step's own side and target. */
-export type TourItemInstanceState = Seeded<TourItemProps, 'side'> & {
+/** One instance per rendered `tour.item`, holding that step's own place, side and target. */
+export type TourItemInstanceState = Seeded<TourItemProps, 'side' | 'index'> & {
 	target?: TourItemProps['target'];
 };

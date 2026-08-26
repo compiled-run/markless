@@ -6,9 +6,10 @@ description and back/forward controls. Built from
 `goals/headless-components/notes/U568-tour-research.md` and the measured gates in
 `packages/vitest-browser/browser/tour-gates/`.
 
-**This family does not ship yet.** The build stopped on a missing owner decision,
-recorded under "The blocking gap" below. Everything else here is built and
-typechecks; the browser lane is written and red behind that one gap.
+**This family does not ship yet.** Opening, closing, dismissal and every step's
+card are built and green; what is missing is the tour's length, and the reason is
+a framework wall recorded under "The blocking gap" below. It needs an owner
+decision that changes the public shape.
 
 ## Shape
 
@@ -16,70 +17,102 @@ typechecks; the browser lane is written and red behind that one gap.
 | --- | --- | --- |
 | `tour.root` | `div` | the family's state; `ui-open`, `ui-closed`, `ui-disabled`. **No `anchor-scope`, ever** |
 | `tour.backdrop` | `div` | the spotlight - anchored to the current target, `box-shadow` dim, `pointer-events: none`, `hidden` with the tour |
-| `tour.item` | `div` | one step: `target`, `side`. Renders the card one component deeper |
+| `tour.item` | `div` | one step: `index`, `target`, `side`. Renders the card one component deeper |
 | `tour.title` | `h2` | the step's accessible name |
 | `tour.description` | `p` | wired through `aria-describedby` |
 | `tour.valuelabel` | `span` | "2 of 5", or the consumer's own text |
 | `tour.backtrigger` / `tour.forwardtrigger` | `button` | previous / next, `disabled` at the ends |
 | `tour.close` | `button` | dismisses the tour |
 
-`tour.state()` per widget: `open`, `step` (an index), `count`, `target`, and
-`next()`, `prev()`, `skip()`, `close()`. `tour.itemstate()` per step: `side`,
+`tour.state()` per widget: `open`, `step` (an index), `count` (registered by
+nothing today - see the blocking gap), `target`, and `next()`, `prev()`, `skip()`,
+`close()`. `tour.itemstate()` per step: `side`,
 `target`.
 
 Root props: `open`, `loop`, `closeOnInteractOutside`, `disabled`, `onChange`,
-`onOpenChange`. Item props: `target`, `side`.
+`onOpenChange`. Item props: `index` (required), `target`, `side`.
 
-## The blocking gap: a step cannot learn its own place
+## A step learns its own place from a required `index` prop
 
-The card is `hidden` unless it is the current step, and `step` is an index, so a
-step has to know its ordinal at **render** time. Three routes exist in this
-library and all three are closed:
+Ruled, and built: `tour.item` takes a required `index`, counting from zero, the
+same shape `otp.item` has. Currency is
+`computed(() => tour.open === true && tour.step === item.index)`, and it drives
+`hidden` and `ui-current` on the card. This works in CSR and SSR: the tour opens
+on the first step, the other cards stay hidden, Escape and an outside press close
+it, and axe is clean on the served page.
 
-1. **A plural `element()` handle as the registry**, the way `togglegroup` and
-   `tree` use one. Measured on this tip, and the measurement is the finding:
-   inside a `computed()`, `tour.itemEls` reads back empty and the item's own
-   `item.el` reads back `undefined` - even after the graph has re-derived, since
-   the same derivation reported the live `open` and `step` on the same pass. The
-   identical read **from a handler** answers all three cards. So a plural handle
-   is a handler-time registry only, exactly as `tree/note.md` says ("readable and
-   indexable from any handler inside that widget"), and it cannot drive a
-   render-time `hidden`. A `computed()` written in the shared factory over the
-   same handle renders as the string `undefined`.
-2. **A shared write from the item body**, the way `otp.item` registers
-   `otp.length = index + 1`. That idiom works - a later part's write refreshes an
-   earlier part's read, in both modes - but its right-hand side may not read the
-   shared instance (`otp/note.md`: the SSR emitter copies the expression into the
-   seed function verbatim, where the instance local is out of scope), so an item
-   can only register a number it was **given**. `otp.item` is given one: it takes
-   a required `index` prop. `tour.item`, as ruled, is given nothing ordinal.
-3. **A creation-order counter.** Ruled out for this library twice, in
-   `select/note.md` and `radio-group/note.md`: markless seeds are
-   order-independent and there is no runtime construction-order counter.
+The three routes the earlier build measured as closed - a plural handle read
+inside a `computed()`, a shared write whose right-hand side reads the instance,
+and a creation-order counter - are all still closed. The prop is what replaces
+them.
 
-So the ruled shape - one card per step, hidden unless current, `step` an index,
-item props `target` and `side` - has no way to decide which card shows. This is
-not the known handle-prop gap, which is about `target` reaching a handler: this
-one bites before any target is involved, and it is red on a step with no target
-at all. Re-measured after the handle-prop fix landed, and unchanged: that fix
-routes a consumer's handle into the item's **handlers**, and the read that fails
-here is a `computed()` derivation.
+## Declaration order names every widget root, and it is the whole ballgame
 
-**The exact row:** `CSR/SSR: opening shows the first step alone, and closing puts
-it away` in `tour.browser.ts`. Every other behavioural row fails behind it,
-because none of them can open the tour.
+**A `shared()` factory's widget root is the first component in the module that
+resolves it** (`widgetRootComponentName` in the compiler's
+`passes/semantic-graph/collect-elements.ts` takes the first recorded instance).
+Not the outermost component at render, not the one that seeds the most fields -
+the first one written down. Three consequences this family is built around:
 
-**The decision needed, two options, both one word at the call site:**
+1. `tour.item` is declared **first**, so it roots the step's own instance. The
+   card is declared after it, so the card may point `aria-labelledby` and
+   `aria-describedby` at that instance's handles. Put the card first and the
+   compiler refuses both IDREFs with
+   `MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT` - a widget's root cannot read its
+   own instance token.
+2. `tour.root` is declared **between the item and the card**, so the tour's
+   instance is rooted at the root rather than at a card. In the earlier build the
+   card was the first `tourState()` caller, and that is what made the whole family
+   red: a write from the widget-root component seeds a fresh copy per rendered
+   card, so `open` and `step` set by the root never reached the cards.
+3. A component may only forward-reference another component in the same module
+   when it is the module's first component. `tour.item` renders the card, so
+   `tour.item` first is the only order that satisfies both 1 and 3 at once. The
+   orders `[root, item, card]` and `[step, card, item]` both die at module
+   evaluation with `ReferenceError: Cannot access '__marklessSsrComponent0'
+   before initialization`; `[root, card, item]` and `[card, step, item]` both die
+   on the IDREF refusal.
 
-- **An `index` prop on `tour.item`** - `otp.item`'s exact shape, and the direct
-  consequence of `step` being an ordinal: `<tour.item index={0} target={saveEl}>`.
-  Registration is then `tour.count = index + 1` and currency is
-  `computed(() => tour.step === item.index)`, both shipped idioms.
-- **A `value` prop on `tour.item`**, with `step` becoming that value. That is
-  what `carousel`, `tabs`, `togglegroup`, `select` and `radio-group` all do, and
-  what the research memo recommended before the index ruling. `count` and the
-  ordinal in "2 of 5" still need route 2's registration, so this option needs an
-  ordinal as well unless `valuelabel` is dropped.
+## The blocking gap: the tour's length cannot be registered
+
+`tour.count` has no writer, so `tour.valuelabel` renders "1 of 0" and
+`tour.forwardtrigger` is `disabled` on every step. Four measurements, on this
+tip, say why - and they compose into a wall rather than a preference:
+
+- **A write from the component that roots the factory seeds a private copy.**
+  `tour.count = index + 1` from a card, when the card was `tourState`'s first
+  caller, gave `ui-max` 1, 2 and 3 on the three cards and left `open` false in
+  all of them.
+- **A write from inside a nested widget never reaches the outer instance.** With
+  the rooting fixed as above, the same write from the card - now a plain part of
+  the tour, but sitting inside the step's own widget - lands nowhere: every
+  `ui-max` reads 0.
+- **`tour.item` cannot write it either.** The item roots the step's widget, so a
+  write there is that widget's seed, and it forks exactly as the first
+  measurement did.
+- **`otp.item` gets away with it because it roots nothing.** `otpState` has one
+  widget and the boxes are ordinary parts of it, so `otp.length = index + 1`
+  lands. The tour needs a per-step widget for the title and description IDREFs,
+  and every component that knows `index` is therefore inside one.
+
+So the count needs an owner decision, and all three candidates change the public
+shape:
+
+- **A `count` prop on `tour.root`.** One number at the call site, and it
+  contradicts the family's own "no length prop anywhere" row.
+- **Drop `tour.title` and `tour.description` as parts**, naming the card from
+  props instead. The step then needs no widget of its own and `tour.item` can
+  register the length the way `otp.item` does.
+- **Drop `tour.valuelabel` and end-of-tour disabling**, leaving the consumer to
+  write "2 of 5" and the tour always looping.
+
+**The exact red rows**, all four downstream of this one gap, in CSR and SSR
+alike: `the count comes from the cards, with no length prop anywhere`,
+`next and prev walk the steps and report each one`,
+`focus lands in the incoming card on a step change`, and
+`axe finds no wcag2a/wcag21a violation, closed or on any step` - the last three
+because the forward trigger is disabled while the count reads 0. Eight of the
+sixteen rows pass.
 
 ## Compiler constraints this family met, so the next one does not rediscover them
 
@@ -106,9 +139,10 @@ because none of them can open the tour.
   module's first component, and compile. With `tour.item` sitting fourth,
   rendering a `TourCard` declared below it fails at module evaluation with
   `ReferenceError: Cannot access '__marklessSsrComponent0' before initialization`.
-  Moving the item/card pair to the top of the module fixes it, which is why they
-  are declared before the root here. `colorpicker` reaches the same place from the
-  other side, declaring `ColorpickerAxis` above its caller.
+  Moving `tour.item` to the top of the module fixes it, which is why it is
+  declared first here - and the root then sits between it and the card, for the
+  widget-rooting reason above. `colorpicker` reaches the same place from the other
+  side, declaring `ColorpickerAxis` above its caller.
 
 ## Anchoring, and the trap beside it
 
