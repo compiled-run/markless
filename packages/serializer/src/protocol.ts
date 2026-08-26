@@ -209,6 +209,18 @@ export type ProtocolBranchContentRead = {
 	readonly source: string;
 };
 
+/**
+ * One prop a composed part's own arm-update symbol can read: the name the part
+ * spells and the graph node the caller passed it. Only props with a live route
+ * are listed; a name missing from the table was passed statically, so the value
+ * the part mounted with is already its final one.
+ */
+export type ProtocolComposedGraphProp = {
+	readonly name: string;
+	readonly graphNodeId: string;
+	readonly path?: ReadonlyArray<string>;
+};
+
 export type ProtocolArmBranchRecord = {
 	readonly id: string;
 	readonly testReads: ReadonlyArray<{
@@ -474,6 +486,17 @@ export type ProtocolViewPayload = {
 		 * above stays the compiler's per-arm plan for every other branch.
 		 */
 		readonly servedArmRecords?: ProtocolArmRecordSet;
+		/**
+		 * The instance path of the part that authored this branch, present on
+		 * every branch that travelled through composition and absent on every
+		 * branch that did not. An arm's own update symbol reads the part-local
+		 * prop ids its module spells, and only the two fields here say which
+		 * instance it is running as and where its props now live: the record's
+		 * `testReads`/`contentReads` were rewritten to the caller's nodes, but
+		 * the symbol's own read has no other route.
+		 */
+		readonly composedInstancePath?: string;
+		readonly composedGraphProps?: ReadonlyArray<ProtocolComposedGraphProp>;
 	}>;
 	readonly asyncBoundaries: ReadonlyArray<{
 		readonly id: string;

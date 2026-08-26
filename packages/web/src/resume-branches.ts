@@ -128,7 +128,7 @@ function createBranchRegistration(
 			const painted = currentArm;
 			const symbol = await input.loadSymbol(branch.symbolId);
 			const update = await symbol({
-				graph: input.graph,
+				graph: composedBranchGraph(input.graph, branch),
 				arm,
 				branchId: branch.sourceId ?? branch.id,
 				composedBranchId: branch.id,
@@ -245,6 +245,31 @@ function createBranchRegistration(
 	}
 
 	return { registerArmBranches, wireBranchRecord, wireEscalatedRecord };
+}
+
+// An arm symbol rebuilds from the part-local prop ids its own module spells,
+// which the record's rewritten reads never touch. Reading the served table here
+// rather than through fns/composition.ts keeps the compose path out of resume's
+// static closure; composed-arm-projection.test.ts pins the two ends together.
+export function composedBranchGraph(graph: RuntimeGraph, branch: ResumeBranchRecord): RuntimeGraph {
+	const routes = branch.composedGraphProps;
+	if (!routes?.length) return graph;
+	const scope = branch.composedInstancePath ?? '';
+	return {
+		...graph,
+		read(id: string, path: ReadonlyArray<string> = []) {
+			// Resume scoped this symbol, so the id arrives carrying the instance
+			// path; `prop:` is not page space, so taking it back off is exact.
+			const local = id.startsWith(scope) ? id.slice(scope.length) : id;
+			const spread = local === 'prop:props';
+			const prop = local.startsWith('prop:') && local.slice('prop:'.length);
+			// No route means a prop passed statically, or no prop read at all.
+			const route = routes.find((one) => one.name === (spread ? path[0] : prop));
+			return route
+				? graph.read(route.graphNodeId, [...(route.path ?? []), ...path.slice(+spread)])
+				: graph.read(id, path);
+		},
+	};
 }
 
 function onceRelease(release: () => void): () => void {

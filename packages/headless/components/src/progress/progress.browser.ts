@@ -192,11 +192,7 @@ for (const mode of MODES) {
 	});
 }
 
-// Expected red: the bar follows a changed measurement through the seeded cell, but
-// the value label's `@if` arm rebuilds from the branch-update symbol's own read of
-// the part-local children prop, which composition never routes to the page's cell.
-// So the page keeps the first wording while the bar already reports the new one.
-test.fails('CSR: the value label shows a measurement the consumer changes', async () => {
+test('CSR: the value label shows a measurement the consumer changes', async () => {
 	await render(Measurement);
 
 	el<HTMLButtonElement>(Advance).click();

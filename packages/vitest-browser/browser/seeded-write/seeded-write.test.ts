@@ -62,12 +62,11 @@ for (const mode of ['CSR', 'SSR'] as const) {
 		expect(text(container, '[data-gauge-note]')).toBe('60 of 100 rows');
 	});
 
-	// Expected red: the arm's text comes from the branch-update symbol's own read of
-	// the part-local `children` prop, and the composition that rewrote the record's
-	// reads to the caller's node never routes that symbol's read, so the arm rebuilds
-	// from the value the part mounted with. The bare projection above is the control:
-	// it takes its value from the rewritten record and follows.
-	test.fails(`${mode}: an arm projection of the changed children prop re-renders`, async () => {
+	// The arm's text comes from the branch-update symbol's OWN read of the part-local
+	// `children` prop, which the rewritten record reads never touch: the served branch
+	// record carries the child's prop route table so that read reaches the caller's
+	// node too. The bare projection above is the control - it follows the record.
+	test(`${mode}: an arm projection of the changed children prop re-renders`, async () => {
 		const screen =
 			mode === 'CSR' ? await render(SoleReaderPage) : await renderSSR(SoleReaderPage);
 		const container = screen.container as ParentNode;
