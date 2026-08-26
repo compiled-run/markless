@@ -7,6 +7,7 @@ import CustomRange from './scenarios/custom-range.tsrx';
 import Indeterminate from './scenarios/indeterminate.tsrx';
 import Live from './scenarios/live.tsrx';
 import Moving from './scenarios/moving.tsrx';
+import OwnName from './scenarios/own-name.tsrx';
 import OwnText from './scenarios/own-text.tsrx';
 
 const Root = page.getByTestId('root');
@@ -35,8 +36,9 @@ function el<T extends Element = HTMLElement>(locator: { element(): Element | nul
 
 function expectBasicRendered() {
 	expect(el(Root).getAttribute('role')).toBe('progressbar');
-	expect(el(Root).getAttribute('aria-label')).toBe('progress');
-	expect(el(Root).hasAttribute('aria-labelledby')).toBe(false);
+	expect(el(Root).hasAttribute('aria-label')).toBe(false);
+	expect(el(Root).getAttribute('aria-labelledby')).toBe(el(Label).id);
+	expect(el(Label).id).toBeTruthy();
 	expect(el(Root).getAttribute('aria-valuemin')).toBe('0');
 	expect(el(Root).getAttribute('aria-valuemax')).toBe('100');
 	expect(el(Root).getAttribute('aria-valuenow')).toBe('30');
@@ -155,6 +157,14 @@ for (const mode of MODES) {
 		el<HTMLButtonElement>(Advance).click();
 		await expect.poll(() => el(ValueLabel).textContent?.trim()).toBe('70%');
 		expect(el(Root).getAttribute('aria-valuetext')).toBe('70%');
+	});
+
+	test(`${mode}: a bar with no label part is left for the consumer to name`, async () => {
+		if (mode === 'CSR') await render(OwnName);
+		else await renderSSR(OwnName);
+		expect(el(Root).getAttribute('role')).toBe('progressbar');
+		expect(el(Root).hasAttribute('aria-labelledby')).toBe(false);
+		expect(el(Root).getAttribute('aria-label')).toBe('Export data');
 	});
 
 	test(`${mode}: the starter root drops the value prop it destructured`, async () => {
