@@ -112,6 +112,9 @@ type InlineRoot = HTMLElement &
 		__marklessSettledArms?: Array<MarklessSettledArmHandoff>;
 		__marklessEventOnlyGraph?: Map<string, unknown>;
 		__marklessEventOnlyGraphInitialized?: boolean;
+		// The control a crossing woke this page on. A resting pointer sends no
+		// second crossing, so the runtime's own preload would otherwise miss it.
+		__marklessPrimedHover?: Element;
 	};
 type InlineDispatchInput = {
 	readonly root: InlineRoot;
@@ -1004,7 +1007,11 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 	// below, queued behind this same import promise. Names restated because this
 	// body is serialized by toString().
 	const focusPreloadEventNames = ['keydown', 'keyup', 'keypress', 'beforeinput', 'input'];
-	if (focusPreloadEventNames.some((eventName) => eventNames.has(eventName))) {
+	// A focused control still reaches a press through Enter and Space, so a focus
+	// onto a press-only record names a handler this page needs next too.
+	const pressPreloadEventNames = ['click', 'pointerdown', 'pointerup'];
+	const focusWakeEventNames = [...focusPreloadEventNames, ...pressPreloadEventNames];
+	if (focusWakeEventNames.some((eventName) => eventNames.has(eventName))) {
 		const primeFocus = (event: Event) => {
 			if (root.__marklessDelegatedDispatch) return;
 			let primes = false;
@@ -1020,7 +1027,7 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 						element.tagName === 'INPUT' ||
 						element.tagName === 'TEXTAREA' ||
 						element.tagName === 'SELECT';
-					primes = focusPreloadEventNames.some(
+					primes = focusWakeEventNames.some(
 						(eventName) =>
 							(editable ||
 								(eventName !== 'beforeinput' && eventName !== 'input')) &&
@@ -1034,7 +1041,7 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 			if (
 				!primes &&
 				(mintsComponentRows ||
-					focusPreloadEventNames.some((eventName) => nestedEventNames.has(eventName)))
+					focusWakeEventNames.some((eventName) => nestedEventNames.has(eventName)))
 			)
 				primes = true;
 			if (!primes) return;
@@ -1045,6 +1052,40 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 			);
 		};
 		root.addEventListener('focusin', primeFocus, true);
+	}
+	// A pointer crosses onto a control before it presses it, and Safari focuses no
+	// button on click, so hover is what precedes a first press. Same wake, and
+	// pointerenter is unusable here because it does not bubble.
+	if (pressPreloadEventNames.some((eventName) => eventNames.has(eventName))) {
+		const primeHover = (event: Event) => {
+			if (root.__marklessDelegatedDispatch) return;
+			let primed: Element | undefined;
+			for (
+				let element = event.target as Element | null;
+				element && !primed;
+				element = element.parentElement
+			) {
+				const hostNodeId = hostIds.get(element);
+				if (
+					hostNodeId &&
+					pressPreloadEventNames.some((eventName) =>
+						events.has(`${hostNodeId}\n${eventName}`),
+					)
+				)
+					primed = element;
+				if (element === root) break;
+			}
+			if (!primed) return;
+			// A resting pointer sends no second crossing, so the control the wake was
+			// spent on is left where the runtime's own preload can read it.
+			root.__marklessPrimedHover = primed;
+			root.removeEventListener('pointerover', primeHover, true);
+			root.__marklessDelegatedDispatch = true;
+			(loaded ||= loadModule(resumeModuleUrl)).then((module) =>
+				module.resumeContainerEvent({ root, event: 0 }),
+			);
+		};
+		root.addEventListener('pointerover', primeHover, true);
 	}
 	for (const eventName of eventNames) {
 		if (eventName === 'visible') continue;

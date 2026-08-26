@@ -281,8 +281,20 @@ export async function startResumeRuntime(input: {
 				}),
 			);
 		}
-	events.armFocusPreload();
-	storeContainerSubscription(() => events.releaseFocusPreload());
+	// Preload listeners are per container, not per wiring: staged trigger groups
+	// build several wirings on one root. Its own marker, never the dispatch one -
+	// the inline resumer sets that, and the runtime still owes this root a listener.
+	const preloadHost = runtimeInput.root as typeof runtimeInput.root & {
+		__marklessPreloadArmed?: boolean;
+	};
+	if (!preloadHost.__marklessPreloadArmed) {
+		preloadHost.__marklessPreloadArmed = true;
+		events.armFocusPreload();
+		storeContainerSubscription(() => {
+			events.releaseFocusPreload();
+			preloadHost.__marklessPreloadArmed = undefined;
+		});
+	}
 	// The focus that woke this runtime fired its focusin before the wiring existed.
 	events.preloadFocusKeySymbols(marklessActiveElement(runtimeInput.root));
 	if ((runtimeInput.graph.listSharedDefinitions?.() ?? []).length > 0) {

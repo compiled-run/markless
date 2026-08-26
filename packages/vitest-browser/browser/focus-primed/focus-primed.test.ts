@@ -75,16 +75,18 @@ test('CSR: an arrow 50ms after focus moves the selection, and the focus dispatch
 	}
 });
 
-test('SSR: focus onto a host with no key record loads nothing', async () => {
+test('SSR: focus onto a press-only host fetches the handler Enter would reach', async () => {
 	await renderSSR(KeylessPage);
 	resetExecutedModules();
 
 	await focusThenWait(Keyless.element());
 
-	expect(executedModules()).toEqual([]);
+	expect(executedModules().length).toBeGreaterThan(0);
+	// Fetched, never dispatched.
+	expect(Number(page.getByTestId('clicks').element().textContent)).toBe(0);
 });
 
-test('CSR: focus onto a host with no key record runs no handler', async () => {
+test('CSR: focus onto a press-only host runs no handler', async () => {
 	await render(KeylessPage);
 
 	await focusThenWait(Keyless.element());

@@ -59,6 +59,10 @@ type ExecutionLogGlobal = typeof globalThis & {
 // boot: neither can reach a shared module without paying a chunk for it.
 const FOCUS_KEY_EVENT_NAMES = ['keydown', 'keyup', 'keypress'];
 const FOCUS_EDITABLE_EVENT_NAMES = ['beforeinput', 'input'];
+// A pointer crosses onto a control before it presses it, and Safari focuses no
+// button on click - so hover, not focus, is what reliably precedes a first
+// press. A focused control still reaches these through Enter and Space.
+const PRESS_EVENT_NAMES = ['click', 'pointerdown', 'pointerup'];
 
 function focusPreloadEventNames(element: {
 	readonly tagName?: unknown;
@@ -69,13 +73,15 @@ function focusPreloadEventNames(element: {
 		tagName === 'INPUT' ||
 		tagName === 'TEXTAREA' ||
 		tagName === 'SELECT'
-		? [...FOCUS_KEY_EVENT_NAMES, ...FOCUS_EDITABLE_EVENT_NAMES]
-		: FOCUS_KEY_EVENT_NAMES;
+		? [...FOCUS_KEY_EVENT_NAMES, ...FOCUS_EDITABLE_EVENT_NAMES, ...PRESS_EVENT_NAMES]
+		: [...FOCUS_KEY_EVENT_NAMES, ...PRESS_EVENT_NAMES];
 }
 
 function isFocusPreloadEventName(eventName: string): boolean {
 	return (
-		FOCUS_KEY_EVENT_NAMES.includes(eventName) || FOCUS_EDITABLE_EVENT_NAMES.includes(eventName)
+		FOCUS_KEY_EVENT_NAMES.includes(eventName) ||
+		FOCUS_EDITABLE_EVENT_NAMES.includes(eventName) ||
+		PRESS_EVENT_NAMES.includes(eventName)
 	);
 }
 
@@ -149,13 +155,13 @@ export function createEventWiring(input: {
 			});
 			input.eventTypes.add(record.eventName);
 			input.registerDelegatedEventRecord?.(element, record);
-			if (isFocusPreloadEventName(record.eventName)) wantFocusPreload();
+			wantPreload(record.eventName);
 			return;
 		}
 		byName.set(record.eventName, record);
 		input.eventTypes.add(record.eventName);
 		input.registerDelegatedEventRecord?.(element, record);
-		if (isFocusPreloadEventName(record.eventName)) wantFocusPreload();
+		wantPreload(record.eventName);
 		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 			trackDebug(
 				recordDebugInteraction(
@@ -173,28 +179,11 @@ export function createEventWiring(input: {
 	// Fetch only, never a dispatch: a rejection is left for the dispatch that
 	// actually needs the symbol to report.
 	const preloadedSymbolIds = new Set<string>();
-	let focusPreloadWanted = false,
-		focusPreloadArmed = false,
-		releaseFocusPreload: (() => void) | undefined;
-	const focusPreloadListener = (event: ResumeDomEvent) =>
-		preloadFocusKeySymbols(event.target as ResumeDomElement | null);
-	// Armed by startup, after the container's dispatch listeners: this one only
-	// fetches modules and must never sit ahead of the authority that dispatches.
-	const wireFocusPreload = (): void => {
-		if (!focusPreloadWanted || !focusPreloadArmed || releaseFocusPreload) return;
-		input.root.addEventListener?.('focusin', focusPreloadListener, { capture: true });
-		releaseFocusPreload = () =>
-			input.root.removeEventListener?.('focusin', focusPreloadListener, { capture: true });
-	};
-	const wantFocusPreload = (): void => {
-		focusPreloadWanted = true;
-		wireFocusPreload();
-	};
-	const armFocusPreload = (): void => {
-		focusPreloadArmed = true;
-		wireFocusPreload();
-	};
-	const preloadFocusKeySymbols = (target: ResumeDomElement | null | undefined): void => {
+	let preloadArmed = false;
+	const preloadSymbolsFor = (
+		target: ResumeDomElement | null | undefined,
+		namesFor: (element: ResumeDomElement) => ReadonlyArray<string>,
+	): void => {
 		for (
 			let element: ResumeDomElement | null | undefined = target;
 			element;
@@ -202,7 +191,7 @@ export function createEventWiring(input: {
 		) {
 			const byName = eventRecords.get(element);
 			if (byName)
-				for (const eventName of focusPreloadEventNames(element)) {
+				for (const eventName of namesFor(element)) {
 					const record = byName.get(eventName);
 					if (!record) continue;
 					for (const symbolId of record.symbolIds) {
@@ -213,6 +202,57 @@ export function createEventWiring(input: {
 				}
 			if (element === input.root) break;
 		}
+	};
+	// Armed by startup, after the container's dispatch listeners: these only
+	// fetch modules and must never sit ahead of the authority that dispatches.
+	const preloadTrigger = (
+		triggerName: string,
+		namesFor: (element: ResumeDomElement) => ReadonlyArray<string>,
+	) => {
+		let wanted = false,
+			release: (() => void) | undefined;
+		const listener = (event: ResumeDomEvent) =>
+			preloadSymbolsFor(event.target as ResumeDomElement | null, namesFor);
+		const wire = (): void => {
+			if (!wanted || !preloadArmed || release) return;
+			input.root.addEventListener?.(triggerName, listener, { capture: true });
+			release = () =>
+				input.root.removeEventListener?.(triggerName, listener, { capture: true });
+		};
+		return {
+			want: () => {
+				wanted = true;
+				wire();
+			},
+			wire,
+			release: () => release?.(),
+		};
+	};
+	const focusPreload = preloadTrigger('focusin', focusPreloadEventNames);
+	// pointerenter does not bubble, so a delegated listener would only ever see
+	// the container's own crossing.
+	const pressPreload = preloadTrigger('pointerover', () => PRESS_EVENT_NAMES);
+	const wantPreload = (eventName: string): void => {
+		if (isFocusPreloadEventName(eventName)) focusPreload.want();
+		if (PRESS_EVENT_NAMES.includes(eventName)) pressPreload.want();
+	};
+	const armFocusPreload = (): void => {
+		preloadArmed = true;
+		focusPreload.wire();
+		pressPreload.wire();
+		// The crossing that woke this runtime happened before the wiring existed,
+		// and a resting pointer sends no second one; the boot leaves it here.
+		preloadSymbolsFor(
+			(input.root as unknown as { readonly __marklessPrimedHover?: ResumeDomElement })
+				.__marklessPrimedHover,
+			() => PRESS_EVENT_NAMES,
+		);
+	};
+	const preloadFocusKeySymbols = (target: ResumeDomElement | null | undefined): void =>
+		preloadSymbolsFor(target, focusPreloadEventNames);
+	const releaseFocusPreload = (): void => {
+		focusPreload.release();
+		pressPreload.release();
 	};
 	const addRowEvent = (host: ResumeDomElement, match: ResumeRowEventMatch) => {
 		let byName = rowEventRecords.get(host);
@@ -516,7 +556,7 @@ export function createEventWiring(input: {
 		addRowEvent,
 		armFocusPreload,
 		preloadFocusKeySymbols,
-		releaseFocusPreload: () => releaseFocusPreload?.(),
+		releaseFocusPreload,
 		prepareSyncPolicy,
 		...(typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
 			? { whenDebugRegistered: () => Promise.all(debugRegistrations ?? []) }

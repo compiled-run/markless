@@ -106,13 +106,25 @@ test('focus preloads the handler modules the focused element names for keys', as
 	page.runtime.dispose();
 });
 
-test('focus onto an element with no key record loads nothing', async () => {
+test('focus onto a press-only element preloads it: Enter and Space reach a press', async () => {
 	const host = element('DIV');
 	const root = element('SECTION', [host]);
 	const page = boot({ host, root, eventName: 'click' });
 	await page.runtime.start();
 
-	// No key record on the page means no focus listener at all.
+	expect(page.focusIn()).toBe(true);
+	expect(page.loadedSymbols).toEqual(['symbol:key']);
+	expect(page.ranSymbols).toEqual([]);
+	page.runtime.dispose();
+});
+
+test('focus onto an element whose only record is neither key nor press loads nothing', async () => {
+	const host = element('DIV');
+	const root = element('SECTION', [host]);
+	const page = boot({ host, root, eventName: 'change' });
+	await page.runtime.start();
+
+	// Nothing focus can lead to means no focus listener at all.
 	expect(page.focusIn()).toBe(false);
 	expect(page.loadedSymbols).toEqual([]);
 	page.runtime.dispose();

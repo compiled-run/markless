@@ -1,6 +1,7 @@
 import { state } from '@markless/core';
 
-// A focusable host whose only record is a click: focus must fetch nothing.
+// A focusable host whose only record is a press: Enter and Space reach it, so a
+// focus must fetch it - and must never spend it as a dispatch.
 export default function FocusPrimedKeylessPage() @{
 	let clicks = state(0);
 
