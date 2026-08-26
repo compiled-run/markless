@@ -1,12 +1,13 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import BarePropPage from './bare-prop-page.tsrx';
-import IndexedArrayPage from './indexed-array-page.tsrx';
+import LayeredPage from './layered-page.tsrx';
+import SteppingPage from './stepping-page.tsrx';
 
 // Gate 1. A tour cannot query for its target, so the family rests on a consumer
-// minting an element() handle and handing it to a part. No scenario in this
-// library had ever done that. Measured here: the handle is live in the module
-// that minted it, and it is dropped on the way across a component edge.
+// minting an element() handle and handing it to a part. The handle is a graph
+// node with no value in the graph: the live element lives only in the page's
+// handle registry, so a prop route that lands on one is answered there.
 afterEach(() => cleanup());
 
 async function moduleStatus(specifier: string) {
@@ -31,7 +32,7 @@ async function expectTheControlsHold(container: ParentNode) {
 	await expect.poll(() => target.getAttribute('data-tg-own-seen')).toBe('object');
 
 	spot.click();
-	await expect.poll(() => spot.getAttribute('data-tg-probe')).toBe('undefined|object|save-step');
+	await expect.poll(() => spot.getAttribute('data-tg-probe')).toBe('object|object|save-step');
 }
 
 test('CSR: the minted handle is live in its own module, and a string prop crosses the edge', async () => {
@@ -44,18 +45,12 @@ test('SSR resume: the same two controls hold after resume', async () => {
 	await expectTheControlsHold(screen.container as HTMLElement);
 });
 
-// The part's own handle (`rootEl`, bound by its own markup) resolves; the
-// consumer's, handed over as `target={target}`, does not. The emitted
-// render-data shows why: the page's `view.elementHandles` records the handle
-// against the page's own host node, and the component-edge slot for <Spot>
-// carries no prop record for `target` at all - so the child's props object has
-// no such key and the read is a plain `undefined`. Nothing is reported: the prop
-// classifies as `kind: 'graph-reference'` with `graphBindingKind: 'element'`
-// (collect-components.ts:325), and the only lowering that consumes that pairing
-// resolves a handle a CHILD binds with `el=` back to the parent that minted it
-// (resolvePropForwardedElementHandle, collect-elements.ts:967). Reading the
-// handle as a value in the child's handler is not that shape, and no pass
-// substitutes for it.
+// The part's own handle (`rootEl`, bound by its own markup) resolves, and so
+// does the consumer's, handed over as `target={target}`: the edge's route table
+// carries `target -> element:target`, and the read that lands on a handle id is
+// answered by the handle registry rather than by a graph read that has no DOM
+// node to give. A method read off that path comes back bound to the element, so
+// `target.setAttribute(...)` still acts on the button.
 async function expectTheHandleCrosses(container: ParentNode) {
 	const { target, spot } = parts(container);
 
@@ -70,19 +65,35 @@ async function expectTheHandleCrosses(container: ParentNode) {
 	expect(spot.style.getPropertyValue('--width')).toBe(`${Math.round(box.width)}px`);
 }
 
-test.fails('CSR: a bare handle prop reaches the part as a DOM object', async () => {
+test('CSR: a bare handle prop reaches the part as a DOM object', async () => {
 	const screen = await render(BarePropPage);
 	await expectTheHandleCrosses(screen.container as HTMLElement);
 });
 
-test.fails('SSR resume: a bare handle prop reaches the resumed handler', async () => {
+test('SSR resume: a bare handle prop reaches the resumed handler', async () => {
 	const screen = await renderSSR(BarePropPage);
 	await expectTheHandleCrosses(screen.container as HTMLElement);
 });
 
-// Declaring the part in the SAME module as the consumer does not rescue it: the
-// compiler refuses the page outright, and the diagnostic names the one shape it
-// does support.
+// The tour card sits inside the tour root: the part is projected through two
+// components before the consumer's handle reaches it.
+test('CSR: the handle crosses two projection layers', async () => {
+	const screen = await render(LayeredPage);
+	await expectTheHandleCrosses(screen.container as HTMLElement);
+});
+
+test('SSR resume: the handle crosses two projection layers', async () => {
+	const screen = await renderSSR(LayeredPage);
+	await expectTheHandleCrosses(screen.container as HTMLElement);
+});
+
+// Declaring the part in the SAME module as the consumer is still refused. Both
+// resolvers that decide it - the handle-binding walk and the payload arena's
+// handle records - look the name up module-wide, so the part's own destructured
+// `target` prop answers for the page's handle and the page reads as a nested
+// forward. The page's own `element:target` never reaches the served handle
+// records either, which is why widening this shape needs the arena's resolution
+// scoped, not just the walk's.
 test('a part declared in the consumer module is refused, and the refusal names the supported shape', async () => {
 	const { status, body } = await moduleStatus('./same-module-page.tsrx?import');
 	expect(status).toBe(500);
@@ -93,10 +104,40 @@ test('a part declared in the consumer module is refused, and the refusal names t
 	expect(body).toContain('or bind it in the component that renders the host element.');
 });
 
-// The memo predicted the array-of-objects shape is refused. It is - but only
-// when the handler reads the array as a whole. `steps.length` demands the opaque
-// value and is refused; `steps[0]` is an indexed path the capture pass reduces,
-// and that variant compiles.
+// The shape the refusal's text actually names: a handle reached through a nested
+// object prop never resolves to one parent-owned handle the compiler can prove.
+test('a handle reached through a nested object prop is refused too', async () => {
+	const { status, body } = await moduleStatus('./nested-handle-page.tsrx?import');
+	expect(status).toBe(500);
+	expect(body).toContain('MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED');
+	expect(body).toContain(
+		'this slice only supports element handles passed as direct component props, not through arrays or nested object props.',
+	);
+	expect(body).toContain('or bind it in the component that renders the host element.');
+});
+
+// What the child reads is the element as it stands at dispatch, not the value
+// its own render was handed: a parent write that moves the tour on is visible
+// to the part's next read.
+test('a parent write to the target is visible to the part that reads the handle', async () => {
+	const screen = await render(SteppingPage);
+	const container = screen.container as HTMLElement;
+	const advance = container.querySelector<HTMLButtonElement>('[data-tg-advance]');
+	const spot = container.querySelector<HTMLElement>('[data-tg-spot-step]');
+	if (!advance || !spot) throw new Error('Expected the advance button and the step spot.');
+
+	spot.click();
+	await expect.poll(() => spot.getAttribute('data-tg-step-seen')).toBe('one');
+
+	advance.click();
+	await expect.poll(() => container.querySelector('[data-tg-target]')?.getAttribute('data-tg-step')).toBe('two');
+
+	spot.click();
+	await expect.poll(() => spot.getAttribute('data-tg-step-seen')).toBe('two');
+});
+
+// The memo predicted the array-of-objects shape is refused. It is - when the
+// handler reads the array as a whole, `steps.length` demands the opaque value...
 test('an array of objects carrying the handle is refused when the handler reads the array', async () => {
 	const { status, body } = await moduleStatus('./steps-array-page.tsrx?import');
 	expect(status).toBe(500);
@@ -109,36 +150,15 @@ test('an array of objects carrying the handle is refused when the handler reads 
 	);
 });
 
-test('the same array read one entry at a time compiles', async () => {
-	const { status } = await moduleStatus('./indexed-array-page.tsrx?import');
-	expect(status).toBe(200);
-});
-
-// ...and delivers nothing. The prop name is emitted into the handler's own
-// module with nothing bound to it, so the first press is a ReferenceError - a
-// build that passed turning into a runtime crash.
-test('an indexed read of the array prop crashes the handler module', async () => {
-	const seen: string[] = [];
-	const onRejection = (event: PromiseRejectionEvent) => {
-		seen.push(String((event.reason as Error)?.message ?? event.reason));
-		event.preventDefault();
-	};
-	const onError = (event: ErrorEvent) => {
-		seen.push(String(event.message));
-		event.preventDefault();
-	};
-	window.addEventListener('unhandledrejection', onRejection);
-	window.addEventListener('error', onError);
-	try {
-		const screen = await render(IndexedArrayPage);
-		const list = (screen.container as HTMLElement).querySelector<HTMLElement>(
-			'[data-tg-list-indexed]',
-		);
-		list?.click();
-		await expect.poll(() => seen.join('\n')).toContain('steps is not defined');
-		expect(list?.getAttribute('data-tg-probe')).toBeNull();
-	} finally {
-		window.removeEventListener('unhandledrejection', onRejection);
-		window.removeEventListener('error', onError);
-	}
+// ...and when it reads one entry at a time. `steps[0]` reduced to no route at
+// all, so the prop name reached the browser unbound and the first press threw a
+// ReferenceError. A build that passes and then crashes is refused instead.
+test('the same array read one entry at a time is refused too', async () => {
+	const { status, body } = await moduleStatus('./spot-indexed.tsrx?import');
+	expect(status).toBe(500);
+	expect(body).toContain('MARKLESS_CAPTURE_OPAQUE_PROP');
+	expect(body).toContain(
+		'because prop \\"steps\\" for \\"SpotListIndexed\\" is read through a path the compiler cannot reduce',
+	);
+	expect(body).toContain('would reach the browser unbound');
 });
