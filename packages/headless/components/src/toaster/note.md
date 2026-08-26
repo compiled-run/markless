@@ -132,13 +132,26 @@ being a namespace call.
    twelve pinned rows in the suite were waiting on it and are now plain `test`.
    Two smaller measurements replaced it, both recorded at the row that pins them:
 
-   - **One page module per browser test file.** A compiled page installs its
-     row-minting loader into a single unqualified global (`__marklessRowMint`,
-     written by `packages/bundler/src/source-module.ts`), capturing that module's
-     own render-data id. Import two page modules into one test file and only the
-     last one loaded can mint; every other page throws
-     `MARKLESS_PRERENDER_DATA_COMPONENT_MISSING: <OwnerName>`. That is why the
-     suite is three files rather than one.
+   - **There is no one-page-module-per-test-file rule.** The suite was three
+     browser files on the reading that a compiled page installs its row-minting
+     loader into a single unqualified global (`__marklessRowMint`, written by
+     `packages/bundler/src/source-module.ts`) capturing that module's own
+     render-data id, so that importing a second page would leave only the last
+     one able to mint and every other one throwing
+     `MARKLESS_PRERENDER_DATA_COMPONENT_MISSING: <OwnerName>`. Measured false on
+     2026-08-25, the same way fileupload measured it: all four scenario pages
+     import into one `toaster.browser.ts` and every row that mints rows still
+     mints them, five runs over.
+
+     One thing the merge did surface: in one of those five runs the lane ended
+     with a stray unhandled error while every row still passed — `Markless async
+     arm DOM update record expected live host r:upload:c2:h1`, raised from
+     `registerArmDomUpdates` in `packages/web/src/resume-commit-arm.ts` by way of
+     `commitMintedRow`. It is a row the mint commits for a page a later
+     `cleanup()` has already torn down, and vitest counts it as an error, so a
+     run that hits it exits non-zero on green rows. Four split-file runs did not
+     raise it, which is not proof the split never would. Named here rather than
+     silenced: it is the runtime's teardown ordering, not an assertion.
    - **A minted row's `computed()` cells are one flush stale.** The row is
      evaluated before the page-scoped queue it reads is live, so
      `positionOf(queue, item.id)` answers -1: `stackingStyle` clamps that to

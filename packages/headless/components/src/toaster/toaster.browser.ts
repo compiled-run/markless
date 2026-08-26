@@ -2,7 +2,9 @@ import { cleanup, render, renderSSR } from '@markless/vitest-browser';
 import { page } from 'vite-plus/test/browser';
 import { afterEach, expect, test } from 'vitest';
 import Basic from './scenarios/basic.tsrx';
+import Limits from './scenarios/limits.tsrx';
 import OneMessage from './scenarios/one-message.tsrx';
+import OverModal from './scenarios/over-modal.tsrx';
 
 const Root = page.getByTestId('root');
 const Save = page.getByTestId('save');
@@ -23,13 +25,6 @@ function titles() {
 	return [...el(Root).querySelectorAll('[ui-toasttitle]')].map((one) => one.textContent);
 }
 
-// One page module per file: a compiled page installs its row-minting loader into
-// a single unqualified global, so importing a second page's module here leaves
-// only the last one able to mint rows and every other page throws
-// MARKLESS_PRERENDER_DATA_COMPONENT_MISSING. `one-message.tsrx` has no repeat, so
-// it installs nothing and is safe to sit beside `basic.tsrx`; `limits.tsrx` and
-// `over-modal.tsrx` each hold their own file.
-//
 // A repeat body may hold only ONE element: two siblings inside `@for` is
 // MARKLESS_PARSE_ERROR ("Expected '</' to close the JSX element, but found '@'"),
 // and a construct may not be the direct child of a component tag, which is why
@@ -163,6 +158,45 @@ test('CSR: a written-out item carries its place in the stack', async () => {
 	expect(rows[0]?.hasAttribute('ui-front')).toBe(true);
 	expect(rows[1]?.getAttribute('style')).toBe('--index: 1; --offset: 100%');
 	expect(rows[1]?.hasAttribute('ui-front')).toBe(false);
+});
+
+test('CSR: more messages than a capped region shows are queued, not dropped', async () => {
+	await render(Limits);
+	el<HTMLButtonElement>(page.getByTestId('four')).click();
+	// All four are held: the repeat shows two, the queue keeps everything.
+	await expect.poll(() => el(page.getByTestId('queued')).textContent).toBe('4');
+});
+
+test('CSR: a capped region shows its cap, and dismissing brings the next forward', async () => {
+	await render(Limits);
+	el<HTMLButtonElement>(page.getByTestId('four')).click();
+	await expect.poll(() => titles()).toEqual(['One', 'Two']);
+	(el(Root).querySelector('[ui-toastclose]') as HTMLButtonElement).click();
+	await expect.poll(() => titles()).toEqual(['Two', 'Three']);
+	expect(el(page.getByTestId('queued')).textContent).toBe('3');
+});
+
+test('CSR: a dialog leaves the messages behind it reachable', async () => {
+	await render(OverModal);
+	el<HTMLButtonElement>(page.getByTestId('modal-trigger')).click();
+	await expect.poll(() => el(page.getByTestId('modal-backdrop')).hasAttribute('hidden')).toBe(false);
+	el<HTMLButtonElement>(page.getByTestId('say')).click();
+	await expect.poll(() => titles()).toEqual(['Deleted']);
+	// The live region is neither inert nor hidden while the dialog holds the page.
+	expect(el(Root).hasAttribute('inert')).toBe(false);
+	expect(el(Root).getAttribute('aria-hidden')).toBe(null);
+	expect((el(Root).querySelector('[ui-toast]') as HTMLElement).closest('[inert]')).toBe(null);
+});
+
+// The half of the row above that does NOT need a rendered message: a dialog must
+// not take the live region out of reach, whether or not anything has been said.
+test('CSR: a dialog does not take the live region out of reach', async () => {
+	await render(OverModal);
+	el<HTMLButtonElement>(page.getByTestId('modal-trigger')).click();
+	await expect.poll(() => el(page.getByTestId('modal-backdrop')).hasAttribute('hidden')).toBe(false);
+	expect(el(Root).hasAttribute('inert')).toBe(false);
+	expect(el(Root).getAttribute('aria-hidden')).toBe(null);
+	expect(el(Root).closest('[inert]')).toBe(null);
 });
 
 // A shared() method called from a handler in another module is text-spliced
