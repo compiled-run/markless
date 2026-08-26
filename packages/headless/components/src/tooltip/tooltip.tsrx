@@ -114,7 +114,9 @@ export function TooltipRoot({
 		}}
 	>
 		<style>
-			div:not([ui-side]) { anchor-scope: --ui-tooltip; }
+			@layer markless {
+				div:not([ui-side]) { anchor-scope: --ui-tooltip; }
+			}
 		</style>
 		{children}
 	</div>
@@ -142,7 +144,9 @@ export function TooltipTrigger({ children, onFocus, onBlur, ...rest }: TooltipTr
 		}}
 	>
 		<style>
-			button { anchor-name: --ui-tooltip; }
+			@layer markless {
+				button { anchor-name: --ui-tooltip; }
+			}
 		</style>
 		{children}
 	</button>
@@ -170,7 +174,9 @@ export function TooltipContent({ children, onDismiss, ...rest }: TooltipContentP
 		}}
 	>
 		<style>
-			[ui-side] { position: absolute; position-anchor: --ui-tooltip; }
+			@layer markless {
+				[ui-side] { --ui-anchor: --ui-tooltip; position: absolute; position-anchor: --ui-tooltip; }
+			}
 		</style>
 		{children}
 	</div>
