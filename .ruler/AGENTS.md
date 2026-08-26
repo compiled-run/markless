@@ -66,3 +66,7 @@ Family source in packages/headless/components (`*.tsrx` and helper `.ts` beside 
 ## @markless/ui CSS and recursion
 
 Family CSS defaults (anchor positioning, hidden-until-open, stacking) live in a `<style>` block inside the part's `.tsrx` under `@layer markless`, keyed off `ui-*` attributes; JS never builds CSS strings. Nesting families recurse with the same parts (`item` > `content` > `item`), each nesting `item` rooting its own instance — no second root. See `packages/headless/components/SPEC.md` "CSS defaults" and "Recursive composition".
+
+## @markless/ui timing
+
+Family source in packages/headless/components never polls frames: no `requestAnimationFrame` retry loops waiting for the DOM to reflect a write the handler just made. That is a runtime defect to witness and fix (the write commits, then focus lands). Hover-intent and long-press `setTimeout`s are behaviour and stay. See `packages/headless/components/SPEC.md` "Timing".

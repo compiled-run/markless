@@ -123,3 +123,13 @@ same parts — `item` containing `content` containing `item` — and every nesti
 `item` roots its own item-level instance (tree's `treeItemState` precedent).
 There is no second root and no `sub*` prefix; activation reports to the one
 root.
+
+## Timing
+
+Family source never polls frames. A `requestAnimationFrame` retry loop that
+waits for the DOM to show a write the handler just made (`open = true`, a
+keyed row's new key) is a framework defect: the runtime commits the write so
+`focus()` lands, and a family that cannot focus what it just revealed files a
+witness against the runtime instead of retrying. Intent delays that are the
+behaviour itself (hover-intent open/close, long-press) are ordinary
+`setTimeout`s and stay.
