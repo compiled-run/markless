@@ -47,6 +47,7 @@ export const FAMILY_ANCHORS = {
 	numberbox: '/#numberbox',
 	'numberbox-min-max-step': '/#numberbox-min-max-step',
 	'numberbox-currency': '/#numberbox-currency',
+	tour: '/#tour',
 } as const;
 
 export type FamilyName = keyof typeof FAMILY_ANCHORS;

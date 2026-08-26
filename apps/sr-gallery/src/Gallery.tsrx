@@ -1,3 +1,4 @@
+import { element, state } from '@markless/core';
 import {
 	calendar,
 	checkbox,
@@ -19,6 +20,7 @@ import {
 	toggle,
 	togglegroup,
 	tooltip,
+	tour,
 } from '@markless/ui';
 
 // Every shipped family's Basic scenario - the starter a consumer copies - on one
@@ -26,8 +28,8 @@ import {
 // /#toggle, /#textbox, /#progress, /#checklist, /#select, /#modal,
 // /#radio-group, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
 // /#fileupload, /#hovercard, /#calendar, /#menu, /#colorpicker,
-// /#togglegroup, /#numberbox. A family whose second shape a reader announces
-// differently gets its own section too: /#slider-range,
+// /#togglegroup, /#numberbox, /#tour. A family whose second shape a reader
+// announces differently gets its own section too: /#slider-range,
 // /#numberbox-min-max-step, /#numberbox-currency.
 //
 // This is consumer code, not test code. It imports through the package barrel
@@ -396,7 +398,78 @@ export function Gallery() @{
 				</numberbox.root>
 			</div>
 		</section>
+
+		{/* The tour's targets are the section's own buttons, reached through handles the page mints: a step may not look its target up, and a handle only crosses a component edge as a bare prop. The tour ships no trigger part, so "Take the tour" is the page's own button flipping `open`. */}
+		<section id="tour">
+			<h2>Tour</h2>
+			<div class="scenario">
+				<TourSection />
+			</div>
+		</section>
 	</main>
+}
+
+function TourSection() @{
+	const saveEl = element<HTMLButtonElement>();
+	const shareEl = element<HTMLButtonElement>();
+	const trashEl = element<HTMLButtonElement>();
+	const page = state({ isOpen: false });
+
+	<div>
+		<div class="tour-toolbar">
+			<button type="button" el={saveEl}>Save</button>
+			<button type="button" el={shareEl}>Share</button>
+			<button type="button" el={trashEl}>Delete</button>
+		</div>
+		<button
+			type="button"
+			onClick={() => {
+				page.isOpen = true;
+			}}
+		>Take the tour</button>
+
+		<tour.root
+			open={page.isOpen}
+			onOpenChange={(open) => {
+				page.isOpen = open;
+			}}
+		>
+			<tour.backdrop />
+
+			<tour.item index={0} target={saveEl}>
+				<tour.title>Save your work</tour.title>
+				<tour.description>
+					The Save button in the toolbar keeps a copy of the document.
+				</tour.description>
+				<tour.valuelabel />
+				<tour.backtrigger>Back</tour.backtrigger>
+				<tour.forwardtrigger>Next</tour.forwardtrigger>
+				<tour.close>Skip the tour</tour.close>
+			</tour.item>
+
+			<tour.item index={1} target={shareEl} side="top">
+				<tour.title>Share it</tour.title>
+				<tour.description>
+					The Share button beside Save sends a read-only link.
+				</tour.description>
+				<tour.valuelabel />
+				<tour.backtrigger>Back</tour.backtrigger>
+				<tour.forwardtrigger>Next</tour.forwardtrigger>
+				<tour.close>Skip the tour</tour.close>
+			</tour.item>
+
+			<tour.item index={2} target={trashEl}>
+				<tour.title>Delete it</tour.title>
+				<tour.description>
+					The Delete button at the end of the toolbar throws the document away.
+				</tour.description>
+				<tour.valuelabel />
+				<tour.backtrigger>Back</tour.backtrigger>
+				<tour.forwardtrigger>Next</tour.forwardtrigger>
+				<tour.close>Done</tour.close>
+			</tour.item>
+		</tour.root>
+	</div>
 }
 
 // The month is the consumer's own markup and sits inside the root, for the reason

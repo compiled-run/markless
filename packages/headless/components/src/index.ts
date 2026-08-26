@@ -28,4 +28,5 @@ export * as toaster from './toaster/index.ts';
 export * as toggle from './toggle/index.ts';
 export * as togglegroup from './togglegroup/index.ts';
 export * as tooltip from './tooltip/index.ts';
+export * as tour from './tour/index.ts';
 export * as tree from './tree/index.ts';

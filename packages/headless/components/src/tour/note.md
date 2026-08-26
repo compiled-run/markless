@@ -5,9 +5,7 @@ owns, dimming the rest of the page, and showing a positioned card with a title, 
 description and back/forward controls. The measured gates behind the decisions
 here are in `packages/vitest-browser/browser/tour-gates/`.
 
-The family is complete and its lanes are green in both render modes. What is left
-is registration - the barrel, the api manifest and the gallery section - under
-"Not registered, and not wired into the gallery" below.
+The family is complete, registered, and its lanes are green in both render modes.
 
 ## Shape
 
@@ -253,16 +251,42 @@ conveys which element a step means is `tour.description`, in words: "the Save
 button in the toolbar" is accessible and "this button" is not. The scenarios are
 written that way on purpose.
 
-## Not registered, and not wired into the gallery
+## A consumer module cannot move a tour, and that decides what "controlled" means
 
-`src/index.ts`, the test-support conformance descriptor, the api manifest, the
-package export and the sr-gallery section all belong to a follow-up unit. The
-scenarios and the browser lane therefore import the family through `../index.ts`
-rather than the library barrel.
+Measured while writing `scenarios/controlled.tsrx`: a handler in any module other
+than `tour.tsrx` may not call `tour.state().next()`, `prev()` or `skip()`. The
+build refuses with `MARKLESS_SHARED_METHOD_CROSS_MODULE`, because calling a
+`shared()` method compiles by copying the method's authored body into the calling
+handler, and the copy arrives without this module's imports - `focusIntoCard`,
+`releaseTarget`, `stepAfter` and the module's own `tour` binding are all names the
+copied text expects and the consumer's module does not have. The diagnostic names
+the route: compose the part the family publishes.
 
-`tour-transcript.ts` spells its own gallery anchor in `TOUR_ANCHOR` rather than
-reading `FAMILY_ANCHORS`, because the tour has no entry in that table yet. The
-registration unit moves it there.
+So a "controlled" tour is the page owning `open` and composing the family's own
+`tour.backtrigger` / `tour.forwardtrigger` / `tour.close` wherever it wants them.
+Those three parts read `tourState()` only, never `tourItemState()`, so they work
+as page chrome directly under the root as readily as inside a card - one set for
+the whole tour instead of a set repeated per step. That is what the scenario
+shows. Reading `tour.state()` in markup is unaffected; only a handler's *call* of
+a shared method is refused.
+
+The consequence for the public surface: **`skip()` has no part and no reachable
+caller.** It is on `tour.state()`, its body is identical to `close()`, and the
+only module that could call it is `tour.tsrx` itself, which does not. Either give
+it a `tour.skiptrigger` part that means something `close` does not, or drop it -
+an owner call, not a thing to improvise.
+
+## Registration
+
+The barrel, the package export, the conformance descriptor, the api manifest, the
+`FAMILY_ANCHORS` entry, the gallery section, the boot check and the three
+screen-reader matrices all carry the family. `tour-transcript.ts` reads
+`FAMILY_ANCHORS.tour` and reaches each card by role and name, because the gallery
+is consumer code and carries no test hooks.
+
+The scenarios and the browser lane still import through `../index.ts` rather than
+`@markless/ui`: the barrel would pull every other family into this family's own
+browser bundle for nothing.
 
 ## Lanes
 

@@ -3,6 +3,9 @@ import axe from 'axe-core';
 import { page } from 'vite-plus/test/browser';
 import { afterEach, expect, test } from 'vitest';
 import Basic from './scenarios/basic.tsrx';
+import Controlled from './scenarios/controlled.tsrx';
+import Disabled from './scenarios/disabled.tsrx';
+import Side from './scenarios/side.tsrx';
 
 const Root = page.getByTestId('root');
 const Backdrop = page.getByTestId('backdrop');
@@ -18,6 +21,19 @@ const SaveForward = page.getByTestId('save-forward');
 const SaveBack = page.getByTestId('save-back');
 const ShareBack = page.getByTestId('share-back');
 const SaveClose = page.getByTestId('save-close');
+const Opener = page.getByTestId('opener');
+const Closer = page.getByTestId('closer');
+const Opens = page.getByTestId('opens');
+const ChromeBack = page.getByTestId('chrome-back');
+const ChromeForward = page.getByTestId('chrome-forward');
+const ChromeClose = page.getByTestId('chrome-close');
+const ChromeCount = page.getByTestId('chrome-count');
+const StepTop = page.getByTestId('step-top');
+const StepBottom = page.getByTestId('step-bottom');
+const StepStart = page.getByTestId('step-start');
+const StepEnd = page.getByTestId('step-end');
+const StepDefault = page.getByTestId('step-default');
+const TopForward = page.getByTestId('top-forward');
 
 // The SSR harness rewrites a literal `renderSSR` call site, so each test branches
 // on the mode rather than taking the mount by reference.
@@ -58,6 +74,13 @@ function press(target: HTMLElement, button = 0) {
 	target.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button }));
 	target.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button }));
 	target.dispatchEvent(new MouseEvent('click', { bubbles: true, button }));
+}
+
+// A card is shown for the DOM a tick before the overlay behaviour has enlisted
+// it, so every row that goes on to press or dismiss waits for both.
+async function shown(locator: { element(): Element | null }) {
+	await expect.poll(() => el(locator).hasAttribute('hidden')).toBe(false);
+	await new Promise((resolve) => setTimeout(resolve, 20));
 }
 
 async function openBasic() {
@@ -173,5 +196,162 @@ for (const mode of MODES) {
 		await expect.poll(() => el(StepShare).hasAttribute('hidden')).toBe(false);
 		await settled();
 		await expectNoAxeViolations(where, 'on the second step');
+	});
+
+	test(`${mode}: the page opens and closes a controlled tour with no gesture of the family's own`, async () => {
+		const { container } = mode === 'CSR' ? await render(Controlled) : await renderSSR(Controlled);
+		void container;
+
+		expect(el(StepSave).hasAttribute('hidden')).toBe(true);
+		el(Opener).click();
+		await shown(StepSave);
+		expect(el(Root).getAttribute('ui-open')).toBe('');
+		expect(el(ChromeCount).textContent?.trim()).toBe('1 of 3');
+
+		el(Closer).click();
+		await expect.poll(() => el(StepSave).hasAttribute('hidden')).toBe(true);
+		// The family reports the closes it performs. This one was the page's own
+		// write to `open`, so there is nothing for it to report back.
+		expect(el(Closes).textContent).toBe('0');
+		expect(el(Opens).textContent).toBe('0');
+	});
+
+	test(`${mode}: one set of step controls outside the cards walks every step`, async () => {
+		const { container } = mode === 'CSR' ? await render(Controlled) : await renderSSR(Controlled);
+		void container;
+
+		el(Opener).click();
+		await shown(StepSave);
+		expect(el(ChromeBack).hasAttribute('disabled')).toBe(true);
+
+		el(ChromeForward).click();
+		await shown(StepShare);
+		expect(el(StepSave).hasAttribute('hidden')).toBe(true);
+		expect(el(Step).textContent).toBe('1');
+		expect(el(ChromeCount).textContent?.trim()).toBe('2 of 3');
+		expect(el(ChromeBack).hasAttribute('disabled')).toBe(false);
+
+		el(ChromeBack).click();
+		await shown(StepSave);
+		expect(el(Step).textContent).toBe('0');
+		expect(el(ChromeCount).textContent?.trim()).toBe('1 of 3');
+	});
+
+	test(`${mode}: closing from outside the card reports the step the person gave up on`, async () => {
+		const { container } = mode === 'CSR' ? await render(Controlled) : await renderSSR(Controlled);
+		void container;
+
+		el(Opener).click();
+		await shown(StepSave);
+		el(ChromeForward).click();
+		await shown(StepShare);
+
+		el(ChromeClose).click();
+		await expect.poll(() => el(StepShare).hasAttribute('hidden')).toBe(true);
+		expect(el(Closes).textContent).toBe('1');
+		expect(el(Step).textContent).toBe('1');
+	});
+
+	test(`${mode}: axe finds no violation in a controlled tour, closed or open`, async () => {
+		const { container } = mode === 'CSR' ? await render(Controlled) : await renderSSR(Controlled);
+		const where = container as unknown as HTMLElement;
+
+		await expectNoAxeViolations(where, 'the controlled tour is closed');
+		el(Opener).click();
+		await shown(StepSave);
+		await settled();
+		await expectNoAxeViolations(where, 'the controlled tour is open');
+	});
+
+	test(`${mode}: a disabled tour shows its step and reports itself locked`, async () => {
+		const { container } = mode === 'CSR' ? await render(Disabled) : await renderSSR(Disabled);
+		void container;
+
+		await shown(StepSave);
+		expect(el(Root).getAttribute('ui-disabled')).toBe('');
+		for (const trigger of [SaveBack, SaveForward]) {
+			expect(el(trigger).hasAttribute('disabled')).toBe(true);
+			expect(el(trigger).getAttribute('ui-disabled')).toBe('');
+		}
+	});
+
+	test(`${mode}: neither the triggers nor the arrow keys move a disabled tour`, async () => {
+		const { container } = mode === 'CSR' ? await render(Disabled) : await renderSSR(Disabled);
+		void container;
+
+		await shown(StepSave);
+		el(SaveForward).click();
+		const card = el<HTMLElement>(StepSave);
+		card.focus();
+		card.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+		await settled();
+
+		expect(el(StepSave).hasAttribute('hidden')).toBe(false);
+		expect(el(StepShare).hasAttribute('hidden')).toBe(true);
+		expect(el(Step).textContent).toBe('0');
+	});
+
+	test(`${mode}: a disabled tour still closes, because a tour nobody can leave is a trap`, async () => {
+		const { container } = mode === 'CSR' ? await render(Disabled) : await renderSSR(Disabled);
+		void container;
+
+		await shown(StepSave);
+		el(SaveClose).click();
+		await expect.poll(() => el(StepSave).hasAttribute('hidden')).toBe(true);
+		expect(el(Closes).textContent).toBe('1');
+	});
+
+	test(`${mode}: axe finds no violation in a disabled tour showing its step`, async () => {
+		const { container } = mode === 'CSR' ? await render(Disabled) : await renderSSR(Disabled);
+		const where = container as unknown as HTMLElement;
+
+		await shown(StepSave);
+		await settled();
+		await expectNoAxeViolations(where, 'the disabled tour shows its step');
+	});
+
+	test(`${mode}: each step writes its own placement as ui-side before it is the one showing`, async () => {
+		const { container } = mode === 'CSR' ? await render(Side) : await renderSSR(Side);
+		void container;
+
+		const placements: [{ element(): Element | null }, string][] = [
+			[StepTop, 'top'],
+			[StepBottom, 'bottom'],
+			[StepStart, 'start'],
+			[StepEnd, 'end'],
+			[StepDefault, 'bottom'],
+		];
+		for (const [card, side] of placements) {
+			expect(el(card).hasAttribute('hidden')).toBe(true);
+			expect(el(card).getAttribute('ui-side')).toBe(side);
+		}
+	});
+
+	test(`${mode}: the placement travels with the step as the tour walks`, async () => {
+		const { container } = mode === 'CSR' ? await render(Side) : await renderSSR(Side);
+		void container;
+
+		el(Start).click();
+		await shown(StepTop);
+		expect(el(StepTop).getAttribute('ui-current')).toBe('');
+		expect(el(StepTop).getAttribute('ui-side')).toBe('top');
+
+		el(TopForward).click();
+		await shown(StepBottom);
+		expect(el(StepTop).hasAttribute('ui-current')).toBe(false);
+		expect(el(StepBottom).getAttribute('ui-current')).toBe('');
+		expect(el(StepBottom).getAttribute('ui-side')).toBe('bottom');
+		expect(el(Step).textContent).toBe('1');
+	});
+
+	test(`${mode}: axe finds no violation on a placed step`, async () => {
+		const { container } = mode === 'CSR' ? await render(Side) : await renderSSR(Side);
+		const where = container as unknown as HTMLElement;
+
+		await expectNoAxeViolations(where, 'the placed tour is closed');
+		el(Start).click();
+		await shown(StepTop);
+		await settled();
+		await expectNoAxeViolations(where, 'the tour is on its top-placed step');
 	});
 }
