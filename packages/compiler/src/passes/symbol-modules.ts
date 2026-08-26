@@ -37,6 +37,7 @@ import {
 	carryForeignFactoryScope,
 	isPlatformGlobal,
 	sharedDefinitionFilename,
+	SHARED_COMPUTED_CROSS_MODULE_CODE,
 	type BindingOrigin,
 	type ForeignScopeRefusal,
 } from './foreign-scope.ts';
@@ -371,7 +372,7 @@ function foreignFactoryScopeDiagnostic(
 ): SymbolModulesDiagnostic {
 	const { body, name, held } = refusal;
 	return {
-		code: SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE,
+		code: SHARED_COMPUTED_CROSS_MODULE_CODE,
 		severity: 'error',
 		phase: 'public-render',
 		passId: 'symbol-modules',
@@ -393,7 +394,7 @@ function foreignFactoryScopeDiagnostic(
 				message: `Or read "${body.name}" from a part that ${body.definedIn} publishes and compose that part here. Inside its own module the same expression copies back into the scope it was written in.`,
 			},
 		],
-		docsUrl: `https://markless.dev/errors/${SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE}`,
+		docsUrl: `https://markless.dev/errors/${SHARED_COMPUTED_CROSS_MODULE_CODE}`,
 	};
 }
 

@@ -1258,8 +1258,6 @@ const REACTIVE_READ_NOUN = {
 	prop: 'component prop',
 } as const;
 
-// Same code as the other collection refusals: the collection is again what the
-// repeat cannot read - here it reads once and never again, so the rows freeze.
 export function repeatFrozenRowsDiagnostic(input: {
 	readonly node: AnyNode;
 	readonly itemName: string;
@@ -1270,13 +1268,13 @@ export function repeatFrozenRowsDiagnostic(input: {
 	readonly filename: string;
 }): SemanticGraphDiagnostic {
 	return semanticGraphDiagnostic({
-		code: 'MARKLESS_REPEAT_COLLECTION_UNREADABLE',
+		code: 'MARKLESS_REPEAT_ROWS_FROZEN',
 		title: 'This @for renders its rows once and never updates them',
 		message: `@for (const ${input.itemName} of ${input.collectionSource}) takes its rows from \`${input.rootName}\`, which is neither a state cell nor a computed, so the repeat resolves to no graph node and its rows are built on the server and never rebuilt in the browser. The row body reads \`${input.readSource}\`, a ${REACTIVE_READ_NOUN[input.readKind]} that can change after that render, and those rows would silently keep their first-render values.`,
 		why: 'A keyed repeat reconciles through the graph node its collection resolves to; a collection that resolves to none renders its rows once, so any reactive read inside a row is frozen at its first-render value with nothing said at build time.',
 		span: sourceSpan(input.node, input.filename),
 		suggestion: `Put the collection on the graph - \`const ${input.rootName} = state([...])\` or \`const ${input.rootName} = computed(() => ...)\` inside the component - so the rows rebuild when \`${input.readSource}\` changes; or keep the rows static by reading only \`${input.itemName}\` inside them.`,
-		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_COLLECTION_UNREADABLE',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_ROWS_FROZEN',
 	});
 }
 
