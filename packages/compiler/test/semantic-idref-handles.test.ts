@@ -322,10 +322,11 @@ export function App() @{
 	]);
 });
 
-test('a multi-value IDREF is refused rather than silently joined', async () => {
-	// v1 is one handle per IDREF position. A space-separated list would make the
-	// compiler mint and order several ids, which is the id spelling this record
-	// deliberately does not own.
+test('a multi-value IDREF records one relationship per handle', async () => {
+	// `aria-labelledby` is a list of ids on the platform, so a static array of
+	// handles is the richer relationship rather than a broken value.
+	// idref-handle-lists.test.ts pins the lowering; this side pins that the
+	// refusal these records used to carry is gone for the list positions.
 	const source = `import { element } from '@markless/core';
 export function App() @{
 	const first = element<HTMLSpanElement>();
@@ -334,6 +335,28 @@ export function App() @{
 		<span el={first}>A</span>
 		<span el={second}>B</span>
 		<p aria-labelledby={[first, second]}>Body</p>
+	</div>
+}`;
+	const graph = await graphOf('MultiIdref', source);
+
+	expect(graph.diagnostics).toEqual([]);
+	expect(
+		graph.elementHandleIdrefs.map((idref) => [idref.handleName, idref.boundHostNodeId]),
+	).toEqual([
+		['first', 'h1'],
+		['second', 'h2'],
+	]);
+});
+
+test('a multi-value IDREF is still refused where the platform takes one id', async () => {
+	const source = `import { element } from '@markless/core';
+export function App() @{
+	const first = element<HTMLDivElement>();
+	const second = element<HTMLDivElement>();
+	<div>
+		<div el={first} popover="auto">A</div>
+		<div el={second} popover="auto">B</div>
+		<button popovertarget={[first, second]}>Open</button>
 	</div>
 }`;
 	const graph = await graphOf('MultiIdref', source);

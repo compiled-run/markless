@@ -1,4 +1,4 @@
-import * as slider from '../index.ts';
+import { slider } from '../../index.ts';
 
 // Two thumbs written out rather than repeated: a component inside a repeat
 // renders nothing today, and a slider never holds a list of values anyway.

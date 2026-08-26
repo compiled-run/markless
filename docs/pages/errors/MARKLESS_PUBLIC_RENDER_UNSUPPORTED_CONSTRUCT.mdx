@@ -1,0 +1,32 @@
+# MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT
+
+… is not rendered by the public render path yet
+
+- Package: compiler
+- Pass or phase: public-render
+
+## Message
+
+\<…\> contains an @try block, but \<…\> is a helper component in the same file as the page. Its @try/@pending/@catch content is dropped from the rendered HTML.
+
+@empty content with components or control flow is dropped from rendered HTML; only host elements, text, and expressions render in the empty branch.
+
+Member-expression component references render nothing because same-module child components are not supported yet.
+
+This \<style\> block could not be scope-compiled (selector offsets unavailable), so it is dropped from the build.
+
+This \<style\> block sits outside any component markup this module renders, so its rules would never reach the page.
+
+… markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package
+
+## Why
+
+The public render module only emits compiler-proven output. Content inside an unsupported construct would silently disappear from rendered HTML, so the compiler reports it instead.
+
+## Emitted from
+
+- `packages/compiler/src/passes/public-render/diagnostics.ts`
+- `packages/compiler/src/passes/public-render/style-scopes.ts`
+- `packages/compiler/src/passes/public-render/validation.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

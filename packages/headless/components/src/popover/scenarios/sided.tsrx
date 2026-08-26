@@ -1,4 +1,4 @@
-import * as popover from '../index.ts';
+import { popover } from '../../index.ts';
 
 // The room around the triggers is the consumer's to give: a surface placed
 // against a trigger with nothing above it is kept on screen rather than run off

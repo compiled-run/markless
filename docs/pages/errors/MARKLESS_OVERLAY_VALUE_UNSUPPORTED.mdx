@@ -1,0 +1,21 @@
+# MARKLESS_OVERLAY_VALUE_UNSUPPORTED
+
+overlay accepts only a literal
+
+- Package: compiler
+- Pass or phase: semantic-graph
+
+## Message
+
+…. overlay must be written on the element itself as bare `overlay`, `overlay={true}`, or `overlay={false}`.
+
+## Why
+
+Elevation is structural, not reactive. The overlay record carries no inputs, so it has no dependencies and can never re-run; a value that varies at runtime would have nothing to re-elevate the element.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

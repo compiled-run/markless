@@ -1,4 +1,4 @@
-import * as slider from '../index.ts';
+import { slider } from '../../index.ts';
 
 // Steps are counted from `min`, so this one reaches 5, 15, 25 and never 10.
 export default function CustomRange() @{

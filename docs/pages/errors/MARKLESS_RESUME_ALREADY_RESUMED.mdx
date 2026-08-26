@@ -1,0 +1,21 @@
+# MARKLESS_RESUME_ALREADY_RESUMED
+
+This container was already resumed
+
+- Package: web
+- Pass or phase: payload-resume-registry, resume, resume-already-resumed-warning
+- Severity: warning
+
+## Message
+
+resumeFromPayloadDocument was called again on an already live container.
+
+## Why
+
+Resume attaches graph and event wiring once per payload container.
+
+## Emitted from
+
+- `packages/web/src/payload-resume-registry.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
