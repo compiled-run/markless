@@ -16,9 +16,9 @@ module, and every consumer of this family imports the part, so that placement is
 not refused here — it silently leaves the bar on its percentage, which is why there
 is no scenario for it and why the guard in `valueText` checks for a string. A
 measurement passed as a `children` prop stays live: `scenarios/measurement.tsrx`
-changes it from a click and the bar follows, but that scenario has to keep a second
-reader of the value on the page, because with the value label as the only reader
-the click's write is folded away and nothing moves. Only the seeded cell follows:
-the value label's own projection of those children does not re-render, so the page
-keeps showing the first wording while the bar already reports the new one, pinned
-as an expected red in `progress.browser.ts`.
+changes it from a click and the bar follows even when the value label is the only
+reader. What does not follow is the value label's own projection of those children
+when it sits inside an `@if` arm: the arm-update symbol reads the part-local prop
+id and composition routes only the record's reads, so the page keeps showing the
+first wording while the bar already reports the new one, pinned as an expected red
+in `progress.browser.ts` and witnessed in `browser/seeded-write`.
