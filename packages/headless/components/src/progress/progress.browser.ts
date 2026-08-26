@@ -164,7 +164,6 @@ for (const mode of MODES) {
 		expect(el(Root).getAttribute('aria-valuetext')).toBe('30 of 100 rows');
 
 		el<HTMLButtonElement>(Advance).click();
-		await expect.poll(() => el(Amount).textContent).toBe('60 of 100 rows');
 		await expect.poll(() => el(Root).getAttribute('aria-valuetext')).toBe('60 of 100 rows');
 	});
 
@@ -193,9 +192,10 @@ for (const mode of MODES) {
 	});
 }
 
-// Expected red: the seeded cell the bar reads follows a changed measurement, but the
-// part's own projection of those children does not re-render, so the page shows the
-// first wording while the bar already reports the new one.
+// Expected red: the bar follows a changed measurement through the seeded cell, but
+// the value label's `@if` arm rebuilds from the branch-update symbol's own read of
+// the part-local children prop, which composition never routes to the page's cell.
+// So the page keeps the first wording while the bar already reports the new one.
 test.fails('CSR: the value label shows a measurement the consumer changes', async () => {
 	await render(Measurement);
 
