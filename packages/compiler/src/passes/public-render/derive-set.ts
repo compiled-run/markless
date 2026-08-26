@@ -2,7 +2,7 @@ import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import type { CompilerDiagnostic } from '../../diagnostics.ts';
 import { serverDeriveUnreachableDiagnostic } from './diagnostics.ts';
 import { collectSsrSharedComputedSources } from './html.ts';
-import { componentEdgesFor } from './shared.ts';
+import { componentEdgesFor, repeatCollectionGraphNodeIds } from './shared.ts';
 
 export function rowScopedEdgeIds(
 	chunks: PublicRenderModuleInput['renderData']['chunks'],
@@ -130,6 +130,10 @@ function directDeriveRootGraphNodeIds(
 					: [],
 			),
 		),
+		// A `@for` reads its collection through the repeat record, not through a
+		// slot residue, so the walk above cannot see it. Left out, a component
+		// whose only read is the collection derived nothing and served no rows.
+		...repeatCollectionGraphNodeIds(chunks, input.renderData.repeats),
 		// A node this component reads ONLY to hand to the child it composes is
 		// still read by this render: without it the child is composed from the
 		// factory placeholder rather than from what this body just seeded. Row

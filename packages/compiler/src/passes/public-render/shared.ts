@@ -683,6 +683,29 @@ function isPageSpaceGraphNodeId(graphNodeId: string): boolean {
 	return graphNodeId.startsWith('shared:') || graphNodeId.startsWith('storage:');
 }
 
+/**
+ * The collection every `@for` in a set of chunks reads.
+ *
+ * A repeat slot carries no residue - it names the repeat, and the repeat record
+ * names the node - so a component whose only read of a cell is through a `@for`
+ * collection is invisible to the slot walk above. It seeds nothing, and the
+ * collection derives from an undefined cell on the served page.
+ */
+export function repeatCollectionGraphNodeIds(
+	chunks: PublicRenderModuleInput['renderData']['chunks'],
+	repeats: PublicRenderModuleInput['renderData']['repeats'],
+): ReadonlyArray<string> {
+	return chunks.flatMap((chunk) =>
+		chunk.slots.flatMap((slot) => {
+			if (slot.kind !== 'repeat') return [];
+			const collection = repeats.find(
+				(candidate) => candidate.repeatId === slot.repeatId,
+			)?.collectionGraphNodeId;
+			return collection ? [collection] : [];
+		}),
+	);
+}
+
 function chunkGraphNodeIds(
 	chunks: PublicRenderModuleInput['renderData']['chunks'],
 ): ReadonlyArray<string> {
@@ -757,10 +780,14 @@ export function componentOwnedStateNodes(
 	// A page-space node the component only reads stays owned by the page, but its
 	// value must still seed this component's render — including a node it reaches
 	// only through a shared computed it derives.
+	const ownChunks = input.renderData.chunks.filter(
+		(chunk) => chunk.componentName === componentName,
+	);
 	const readGraphNodeIds = graphReadClosure(
-		chunkGraphNodeIds(
-			input.renderData.chunks.filter((chunk) => chunk.componentName === componentName),
-		),
+		[
+			...chunkGraphNodeIds(ownChunks),
+			...repeatCollectionGraphNodeIds(ownChunks, input.renderData.repeats),
+		],
 		input.semanticGraph,
 	);
 	return {
