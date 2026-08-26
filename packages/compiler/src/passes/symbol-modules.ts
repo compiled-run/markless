@@ -32,6 +32,14 @@ import {
 } from './arm-child-content.ts';
 import { asNodes, isNode, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
+import {
+	bindingOrigins,
+	carryForeignFactoryScope,
+	isPlatformGlobal,
+	sharedDefinitionFilename,
+	type BindingOrigin,
+	type ForeignScopeRefusal,
+} from './foreign-scope.ts';
 import { isClassInstanceValue } from './semantic-graph/collect-state.ts';
 import { ownedModuleAstOrNull } from './semantic-graph/shared-ast.ts';
 import {
@@ -182,7 +190,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 	const boundaryArmsById = renderBoundaryArms(input.renderData, asyncComputedNodeIds);
 	const sourceFileName = input.source?.filename ?? 'markless-module.tsrx';
 	const authoredSource = input.source?.source ?? '';
-	const modules: GeneratedSymbolModule[] = input.symbolResolver.symbols.flatMap((symbol) => {
+	const emittedModules: GeneratedSymbolModule[] = input.symbolResolver.symbols.flatMap((symbol) => {
 			if (unsupportedCaptureSymbolIds.has(symbol.id)) return [];
 			if (symbol.kind === 'branch-update') {
 				const arms = branchArms.armsBySite.get(symbol.branchSiteId);
@@ -228,6 +236,9 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 			);
 	});
 
+	const foreignScope = foreignFactoryScopeCarry(input, emittedModules, captureSlotsBySymbol);
+	const modules = foreignScope.modules;
+
 	return {
 		passId: 'symbol-modules',
 		modules,
@@ -237,6 +248,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 		diagnostics: [
 			...input.captureAnalysis.diagnostics,
 			...branchArms.diagnostics,
+			...foreignScope.diagnostics,
 			...divergentModuleInstanceCarries(modules).map(divergentModuleInstanceDiagnostic),
 			...sharedResolvingExportedFunctions(input.source).map(
 				sharedInstanceExportedFunctionDiagnostic,
@@ -250,6 +262,138 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 				sourceModuleScopeDeclaredNames(input.source),
 			).map(unresolvedGraphReferenceDiagnostic),
 		],
+	};
+}
+
+// ---------------------------------------------------------------------------
+// A factory computed's expression, copied into a module of another file.
+//
+// A shared() computed has no instance in a symbol module to ask, so the browser
+// re-derives it from a copy of the factory's expression — and from another file
+// that copy arrives without the scope it was written in. The served module
+// already carries that scope off the definition record; this carries the same
+// one into the client module and refuses what it cannot. A sibling cell needs
+// nothing here: the lowering turns `other()` into a graph read, and the
+// sibling's own derive module gets this carry in its own right.
+
+function foreignFactoryScopeCarry(
+	input: SymbolModulesInput,
+	modules: ReadonlyArray<GeneratedSymbolModule>,
+	captureSlotsBySymbol: ReadonlyMap<string, ReadonlyArray<CaptureSlot>>,
+): {
+	readonly modules: ReadonlyArray<GeneratedSymbolModule>;
+	readonly diagnostics: ReadonlyArray<SymbolModulesDiagnostic>;
+} {
+	const source = input.source;
+	const semanticGraph = input.semanticGraph;
+	const definitions = semanticGraph?.sharedDefinitions ?? [];
+	if (!source || !semanticGraph || definitions.length === 0) return { modules, diagnostics: [] };
+
+	const symbolsById = new Map(input.symbolResolver.symbols.map((symbol) => [symbol.id, symbol]));
+	const diagnostics: SymbolModulesDiagnostic[] = [];
+	let origins: ReadonlyMap<string, BindingOrigin> | undefined;
+
+	const carried = modules.map((module) => {
+		const symbol = symbolsById.get(module.symbolId);
+		if (symbol?.kind !== 'sync-computed-derive') return module;
+		const definedIn = sharedDefinitionFilename(symbol.graphNodeId);
+		if (definedIn === null || definedIn === source.filename) return module;
+
+		const freeNames = unboundForeignBodyNames(
+			symbol,
+			captureSlotsBySymbol.get(symbol.id) ?? [],
+		);
+		if (freeNames.size === 0) return module;
+
+		origins ??= bindingOrigins({
+			filename: source.filename,
+			declarations: consumerModuleScopeDeclarations(source),
+			imports: semanticGraph.moduleImports,
+		});
+		const scope = carryForeignFactoryScope({
+			bodies: [
+				{
+					graphNodeId: symbol.graphNodeId,
+					name: symbol.name,
+					source: symbol.source,
+					definedIn,
+					freeNames,
+				},
+			],
+			sharedDefinitions: definitions,
+			consumerOrigins: origins,
+			consumerFilename: source.filename,
+		});
+		for (const refusal of scope.refusals)
+			diagnostics.push(foreignFactoryScopeDiagnostic(refusal, module));
+		if (scope.importLines.length === 0 && scope.declarations.length === 0) return module;
+
+		return {
+			...module,
+			source: [...scope.importLines, ...scope.declarations, '', module.source].join('\n'),
+		};
+	});
+
+	return { modules: carried, diagnostics };
+}
+
+/**
+ * The names the copied expression still needs from a module scope, read off the
+ * derive module emitted with this file's own carries suppressed: those carries
+ * are matched to the copy by name alone, so with them in place a consumer
+ * binding that happens to share a name hides the gap and the capture both.
+ */
+function unboundForeignBodyNames(
+	symbol: Extract<PlannedSymbol, { readonly kind: 'sync-computed-derive' }>,
+	captureSlots: ReadonlyArray<CaptureSlot>,
+): ReadonlySet<string> {
+	const bare: GeneratedSymbolModule = {
+		symbolId: symbol.id,
+		kind: symbol.kind,
+		exportName: symbolExportName(symbol.id),
+		source: emitSyncComputedDeriveModule({ ...symbol, moduleImports: [] }, captureSlots, true, [], []),
+	};
+	return new Set([...freeIdentifierNames(bare)].filter((name) => !isPlatformGlobal(name)));
+}
+
+function consumerModuleScopeDeclarations(source: NonNullable<SymbolModulesInput['source']>) {
+	try {
+		return moduleScopeDeclarations(source.source, source.filename);
+	} catch {
+		// An authored file that will not parse is a different defect; claim nothing.
+		return [];
+	}
+}
+
+function foreignFactoryScopeDiagnostic(
+	refusal: ForeignScopeRefusal,
+	module: GeneratedSymbolModule,
+): SymbolModulesDiagnostic {
+	const { body, name, held } = refusal;
+	return {
+		code: SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE,
+		severity: 'error',
+		phase: 'public-render',
+		passId: 'symbol-modules',
+		artifactKeys: ['symbolModules'],
+		title: `A shared() computed cannot be re-derived from another module yet ("${body.name}")`,
+		message: held
+			? `The browser re-derives "${body.name}" by fetching a module built from a copy of its expression in ${body.definedIn} (${module.symbolId}). The copied expression names "${name}", which ${body.definedIn} means as its own, and THIS file already binds "${name}" as ${held.text}; one module scope cannot hold both, and matched against it by name alone the browser would re-derive the value from this module's "${name}" rather than the one ${body.definedIn} means.`
+			: `The browser re-derives "${body.name}" by fetching a module built from a copy of its expression in ${body.definedIn} (${module.symbolId}). The copied expression names "${name}", and nothing in that module binds it, so the first re-derive in the browser would throw a ReferenceError.`,
+		why: 'A shared() factory has no instance inside a symbol module to ask for a computed value, so the browser re-derives the value from a copy of the factory\'s own expression. Copying text moves the statements but not the scope they were written in. The imports and module-scope constants the expression names travel with the definition and are emitted beside the copy, but a name the reading file already binds from somewhere else cannot be: the emitted module would bind it twice, and matching by name alone would re-derive the value from this file\'s value instead. The server renders the first paint correctly either way, so the failure would first appear on a refresh or a client write.',
+		suggestions: [
+			held
+				? {
+						message: `Rename this module's "${name}", or import it under another local name, so the one ${body.definedIn} means can be carried in beside the copy.`,
+					}
+				: {
+						message: `Write "${body.name}" so it needs nothing from ${body.definedIn}'s module scope - out of the factory's own state and platform globals only - and it copies into any module unchanged.`,
+					},
+			{
+				message: `Or read "${body.name}" from a part that ${body.definedIn} publishes and compose that part here. Inside its own module the same expression copies back into the scope it was written in.`,
+			},
+		],
+		docsUrl: `https://markless.dev/errors/${SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE}`,
 	};
 }
 
