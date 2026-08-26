@@ -27,13 +27,12 @@ function expectDoesNotConvey(phrase: string, conveys: Conveys) {
 	expect(missingFacts(sr, phrase, conveys), `${sr.name} announced "${phrase}"`).not.toEqual([]);
 }
 
-// A page with a site nav, a breadcrumb and a pagination has three navigation landmarks; unnamed, a reader lists three identical entries.
-test('the pagination conveys the navigation landmark and its name', async () => {
+// The family emits no landmark name of its own; a page with several navigation landmarks names each one from the consumer's side.
+test('the pagination conveys the navigation landmark, unnamed by the family', async () => {
 	await open(Basic);
-	expectConveys(await readUntil(sr, { role: 'navigation' }), {
-		role: 'navigation',
-		name: 'Pagination',
-	});
+	const announcement = await readUntil(sr, { role: 'navigation' });
+	expectConveys(announcement, { role: 'navigation' });
+	expect(announcement, `${sr.name} announced "${announcement}"`).not.toContain('Pagination');
 });
 
 // Asserted as an absence: `aria-current`'s default is "false" and no reader speaks it.
@@ -119,8 +118,7 @@ test('a locked pagination conveys every control as unavailable, links included',
 	});
 });
 
-// Expected red: a spread does not overwrite an attribute written before it, so a consumer's aria-label never reaches the `<nav>` and both landmarks announce the default name.
-test.fails('a consumer replaces the landmark name so two paginations differ', async () => {
+test('a consumer names the landmark so two paginations differ', async () => {
 	await open(TwoWidgets);
 	expect(missingFacts(sr, await readUntil(sr, { role: 'navigation' }), {
 		role: 'navigation',

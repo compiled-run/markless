@@ -418,8 +418,9 @@ export function App() @{
 		(candidate) => candidate.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
 	);
 	expect(diagnostic?.severity).toBe('error');
+	// The refusal names the value that kept the flip out, not just the shape.
 	expect(diagnostic?.message).toBe(
-		'this @if (armed) cannot be rebuilt when armed changes because <Panel> has to run to produce its content.',
+		'this @if (armed) cannot be rebuilt when armed changes because <Panel> keeps a `hits` of its own that only running it works out.',
 	);
 	expect(diagnostic?.symbolId).toBe(record?.symbolId);
 	// D4: the message names the author's @if, test, and component — never a
@@ -548,9 +549,11 @@ export function App() @{
 	).toBe(false);
 });
 
-// T057 wall 2 is NOT lifted: a cell the child declares joins the page graph
-// only when the child renders, so a component with state() of its own still has
-// nothing this file can rebuild, and the refusal stays fail-closed.
+// T057 wall 2 is NOT lifted, and the reason is the NAME the value reaches the
+// page under: a rendered child's cell is composed as `c0:state:hits`, while an
+// arm the parent rebuilds addresses the plain `state:hits`. A closed arm has no
+// value to read and an open one reads a node the child never wrote, so the
+// refusal stays fail-closed and now names the value that blocked it.
 test('a page-level @if whose component brings state of its own still refuses', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/OwnStatePanel.tsrx',
@@ -575,6 +578,14 @@ export function App() @{
 	});
 	const diagnostic = result.symbolModules.diagnostics[0];
 	expect(diagnostic?.code).toBe('MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED');
-	expect(diagnostic?.message).toContain('<Panel> has to run to produce its content');
+	expect(diagnostic?.message).toContain(
+		'<Panel> keeps a `hits` of its own that only running it works out',
+	);
+	// No record pointing at a flip module the build refused to write.
+	expect(
+		result.symbolModules.modules.some(
+			(candidate) => candidate.symbolId === result.protocolView.branches?.[0]?.symbolId,
+		),
+	).toBe(false);
 });
 

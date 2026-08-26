@@ -1,0 +1,21 @@
+# MARKLESS_FRAMEWORK_API_ALIAS_UNSUPPORTED
+
+Framework APIs cannot be aliased or passed as values
+
+- Package: compiler
+- Pass or phase: semantic-graph
+
+## Message
+
+`… … = …` copies the framework API `…` into a plain variable. `…(5)` would not create graph state — the compiler only rewrites calls made through the imported name.
+
+## Why
+
+…() is compiled away into graph cells; it has no runtime function value that an alias could call.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

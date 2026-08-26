@@ -52,11 +52,16 @@ export type CheckboxIndicatorProps = PropsOf<'span'>;
 /** The checkbox's label. Its `for` points at `checkbox.trigger`, so clicking the text toggles. */
 export type CheckboxLabelProps = PropsOf<'label'>;
 
-/** Supporting text beside the checkbox. It renders its children and changes nothing else. */
+/**
+ * Supporting text beside the checkbox, named by `checkbox.trigger`'s
+ * `aria-describedby`. Mount it alongside `checkbox.error` and the trigger names
+ * both, the error first.
+ */
 export type CheckboxDescriptionProps = PropsOf<'div'>;
 
 /**
- * The validation message. Mounting it is what marks the checkbox invalid -
+ * The validation message, named by `checkbox.trigger`'s `aria-describedby` ahead
+ * of `checkbox.description`. Mounting it is what marks the checkbox invalid -
  * `checkbox.trigger` reports `aria-invalid` for as long as this part is in the
  * page - so render it only when there is an error to show.
  */
