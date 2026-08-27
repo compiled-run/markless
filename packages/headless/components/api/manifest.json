@@ -1168,12 +1168,14 @@
 						"name": "maxWidth",
 						"type": "number",
 						"required": false,
+						"default": "Number.POSITIVE_INFINITY",
 						"doc": "The widest the rectangle may be resized. Defaults to no limit but the area."
 					},
 					{
 						"name": "maxHeight",
 						"type": "number",
 						"required": false,
+						"default": "Number.POSITIVE_INFINITY",
 						"doc": "The tallest the rectangle may be resized. Defaults to no limit but the area."
 					},
 					{
