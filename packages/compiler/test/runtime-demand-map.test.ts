@@ -363,6 +363,20 @@ test('a repeat that only reorders served rows demands no row mint', () => {
 	expect(modules).not.toContain('web/fns/row-mint');
 });
 
+test('a repeat carrying a component identity demands the component mint', () => {
+	const modules = repeatRecordModules(
+		repeatDemandMap({ rowComponent: { componentEdgeId: 'edge:0', componentName: 'App' } }),
+	);
+	expect(modules).toContain('web/fns/row-component-mint');
+	// The markup mint and the component mint are separate halves: a component row
+	// carries no markup, so it must not drag the markup builder in.
+	expect(modules).not.toContain('web/fns/row-mint');
+});
+
+test('a repeat that only reorders served rows demands no component mint', () => {
+	expect(repeatRecordModules(repeatDemandMap({}))).not.toContain('web/fns/row-component-mint');
+});
+
 test('a repeat carrying row markup demands the row mint', () => {
 	expect(
 		repeatRecordModules(

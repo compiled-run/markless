@@ -7,10 +7,8 @@
 
 type Triggers = ReadonlyArray<HTMLButtonElement>;
 
-export function walkableTriggers(triggers: Triggers | undefined): HTMLButtonElement[] {
-	return Array.from(triggers ?? []).filter(
-		(trigger) => trigger.disabled !== true && trigger.getAttribute('aria-disabled') !== 'true',
-	);
+function isWalkable(trigger: HTMLButtonElement): boolean {
+	return trigger.disabled !== true && trigger.getAttribute('aria-disabled') !== 'true';
 }
 
 /**
@@ -22,21 +20,34 @@ export function nextTriggerToFocus(
 	here: Element | null,
 	key: string,
 ): HTMLButtonElement | undefined {
-	const walkable = walkableTriggers(triggers);
-	const last = walkable.length - 1;
-	if (last < 0) return undefined;
-
-	if (key === 'Home') return walkable[0];
-	if (key === 'End') return walkable[last];
-
+	// Before any read of the triggers: most keydowns on a trigger are not ours.
 	const isForwardKey = key === 'ArrowDown';
-	if (isForwardKey !== true && key !== 'ArrowUp') return undefined;
+	const isStepKey = isForwardKey || key === 'ArrowUp';
+	if (!isStepKey && key !== 'Home' && key !== 'End') return undefined;
+	if (!triggers) return undefined;
 
-	const at = walkable.findIndex((trigger) => trigger === here);
-	if (at < 0) return walkable[isForwardKey ? 0 : last];
+	let first: HTMLButtonElement | undefined;
+	let last: HTMLButtonElement | undefined;
+	let before: HTMLButtonElement | undefined;
+	let after: HTMLButtonElement | undefined;
+	let isHereWalkable = false;
 
-	const raw = at + (isForwardKey ? 1 : -1);
-	if (raw < 0) return walkable[last];
-	if (raw > last) return walkable[0];
-	return walkable[raw];
+	for (const trigger of triggers) {
+		if (!isWalkable(trigger)) continue;
+		first ??= trigger;
+		last = trigger;
+		if (trigger === here) {
+			isHereWalkable = true;
+			continue;
+		}
+		if (isHereWalkable) after ??= trigger;
+		else before = trigger;
+	}
+
+	if (first === undefined) return undefined;
+	if (key === 'Home') return first;
+	if (key === 'End') return last;
+	// Focus sitting outside the walk starts it at the end the key comes from.
+	if (!isHereWalkable) return isForwardKey ? first : last;
+	return isForwardKey ? (after ?? first) : (before ?? last);
 }
