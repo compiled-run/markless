@@ -74,7 +74,7 @@ import {
 	hasElementHandleIdList,
 	hasSharedElementHandle,
 	MARKLESS_WIDGET_INSTANCE_KEY,
-	MARKLESS_ELEMENT_BOUND_KEY_PREFIX,
+	elementBoundKeySource,
 	widgetInstanceReadSource,
 	renderDecisionSources,
 	sharedInstancePreludeLines,
@@ -874,6 +874,14 @@ function emitSsrDataLines(
 		// answered. Every part the projection can reach counts, arms and rows
 		// included: being told about a part that does not render leaves the IDREF
 		// as it is today, being told about none drops a real relationship.
+		//
+		// Keyed by the same per-family token the mint reads, computed AFTER this
+		// case registered its own instance: a handle of a nested family reached by
+		// walking through that family's root is filed under THIS widget's token,
+		// where the nested instance's own read never looks.
+		const boundToken = widgetInstanceReadSource(
+			(key) => `marklessSsrSeeds.get(${key})`,
+		)('marklessSsrHandle');
 		const handleLines = [
 			...new Set(
 				[edgeId, ...projectedHandleEdgeIdsUnder(input.renderData.chunks, projectionChunkId)].flatMap(
@@ -885,9 +893,10 @@ function emitSsrDataLines(
 			),
 		].map(
 			(source) =>
-				`for(const marklessSsrHandle of ${source})marklessSsrSeeds.set(${JSON.stringify(
-					MARKLESS_ELEMENT_BOUND_KEY_PREFIX,
-				)}+marklessSsrHandle,true);`,
+				`for(const marklessSsrHandle of ${source})marklessSsrSeeds.set(${elementBoundKeySource(
+					boundToken,
+					'marklessSsrHandle',
+				)},true);`,
 		);
 		if (blocks.length === 0 && handleLines.length === 0) return [];
 		// Pay-per-use: the family lookup is emitted only where a projected part can

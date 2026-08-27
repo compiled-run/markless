@@ -32,20 +32,18 @@ function expectPerInstancePresence(container: ParentNode) {
 	expect(danglingIdrefs(container)).toEqual([]);
 }
 
-// Pinned as expected-fail, not hidden. The enclosing widget's seed phase walks
-// its whole projection and files one roster entry per handle any part under it
-// binds - including handles of the INNER family, reached by walking through the
-// nesting item's own projection. Every inner instance then inherits that map, so
-// a plain command reads "bound" for a handle its own instance never bound and
-// writes an id resolving to nothing. Dropping the enclosing widget makes the
-// same items correct: see no-bar.test.ts. These flip red once presence is
-// per instance; delete the `.fails` then.
-test.fails('CSR: only the nesting item writes the IDREF to its content', async () => {
+// The enclosing widget's seed phase walks its whole projection and files one
+// roster entry per handle any part under it binds - including handles of the
+// INNER family, reached by walking through the nesting item's own projection.
+// Every inner instance inherits that map, so the roster entry carries the
+// filing instance's token: an inherited entry names another widget and a plain
+// command reads "unbound" for a handle its own instance never bound.
+test('CSR: only the nesting item writes the IDREF to its content', async () => {
 	const screen = await render(NestedFamilyPage);
 	expectPerInstancePresence(screen.container as HTMLElement);
 });
 
-test.fails('SSR resume: only the nesting item writes the IDREF to its content', async () => {
+test('SSR resume: only the nesting item writes the IDREF to its content', async () => {
 	const screen = await renderSSR(NestedFamilyPage);
 	expectPerInstancePresence(screen.container as HTMLElement);
 });
