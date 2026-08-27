@@ -8,6 +8,7 @@ import { Prefilled } from './scenarios/prefilled.tsrx';
 import { SignupForm } from './scenarios/signup-form.tsrx';
 import { UnavailableOptions } from './scenarios/unavailable-options.tsrx';
 import { WithError } from './scenarios/with-error.tsrx';
+import { WithHelpAndError } from './scenarios/with-help-and-error.tsrx';
 
 // Rows assert the facts an announcement must convey - role, name, state - never a reader product's wording.
 const sr = virtualDriver;
@@ -144,6 +145,19 @@ test.fails('an inline combobox claims no expanded state', async () => {
 test('an invalid combobox conveys its message', async () => {
 	await open(WithError);
 	expectConveys(await readFor(['Pick a fruit that exists.']), ['Pick a fruit that exists.']);
+});
+
+// Both messages bind handles the input names, so both are part of the field rather than separate items down the page.
+test('the error and the help text are both conveyed with the field, error first', async () => {
+	await open(WithHelpAndError);
+	const phrase = await readFor([say.combobox, 'Favorite Fruit']);
+	// Whole-phrase containment: the two messages arrive as one segment, and the driver splits an announcement into facts on commas.
+	expect(phrase, `${sr.name} announced "${phrase}"`).toContain('Pick a fruit that exists.');
+	expect(phrase, `${sr.name} announced "${phrase}"`).toContain('Pick one you have tasted.');
+	// What is wrong is conveyed before the hint, though the hint is written above the error in this page.
+	expect(phrase.indexOf('Pick a fruit that exists.')).toBeLessThan(
+		phrase.indexOf('Pick one you have tasted.'),
+	);
 });
 
 // A bare `<select>` carries the combobox role natively, so failing to hide it puts the same choice in the tree twice - proven here by counting.

@@ -1,3 +1,5 @@
+import type { NonFiniteNumberName } from '@markless/serializer';
+
 // Slot/record encoding of one graph value: primitives inline, everything with
 // identity becomes an indexed record so shared and cyclic references survive.
 export type MarklessSerializedSlot =
@@ -7,6 +9,7 @@ export type MarklessSerializedSlot =
 	| null
 	| { readonly $type: 'undefined' }
 	| { readonly $type: 'bigint'; readonly value: string }
+	| { readonly $type: 'number'; readonly value: NonFiniteNumberName }
 	| { readonly $ref: number };
 export type MarklessSerializedRecord =
 	| { readonly id: number; readonly type: 'date'; readonly value: string }
@@ -29,13 +32,13 @@ export function marklessSerializeSlot(
 	records: MarklessSerializedRecord[],
 	seen: Map<unknown, number>,
 ): MarklessSerializedSlot {
-	if (
-		value === null ||
-		typeof value === 'string' ||
-		typeof value === 'number' ||
-		typeof value === 'boolean'
-	)
-		return value;
+	// JSON has no form for a non-finite number, so a bare slot would print as
+	// `null`; the tag's value is the number's own string form.
+	if (typeof value === 'number')
+		return Number.isFinite(value)
+			? value
+			: { $type: 'number', value: String(value) as NonFiniteNumberName };
+	if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
 	if (value === undefined) return { $type: 'undefined' };
 	if (typeof value === 'bigint') return { $type: 'bigint', value: String(value) };
 	if (typeof value === 'function' || typeof value === 'symbol')

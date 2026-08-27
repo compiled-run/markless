@@ -69,7 +69,7 @@ function el<T extends Element = HTMLElement>(locator: { element(): Element | nul
 
 function expectBasicRendered() {
 	expect(el(List).getAttribute('role')).toBe('tablist');
-	expect(el(List).getAttribute('aria-orientation')).toBe('horizontal');
+	expect(el(List).getAttribute('aria-orientation')).toBe(null);
 	expect(el(OverviewTrigger).getAttribute('role')).toBe('tab');
 	expect(el(UsageTrigger).getAttribute('role')).toBe('tab');
 	expect(el(BillingTrigger).getAttribute('role')).toBe('tab');
@@ -116,7 +116,7 @@ function expectRovingTabindexBeforeAnyGesture() {
 function expectVerticalRendered() {
 	expect(el(Root).getAttribute('ui-vertical')).toBe('');
 	expect(el(List).getAttribute('ui-vertical')).toBe('');
-	expect(el(List).getAttribute('aria-orientation')).toBe('vertical');
+	expect(el(List).getAttribute('aria-orientation')).toBe(null);
 	expect(el(InboxTrigger).getAttribute('ui-vertical')).toBe('');
 }
 

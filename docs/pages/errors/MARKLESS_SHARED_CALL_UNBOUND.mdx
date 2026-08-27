@@ -1,0 +1,22 @@
+# MARKLESS_SHARED_CALL_UNBOUND
+
+a shared() call must be bound to a name
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: error
+
+## Message
+
+shared() definition "…" is called but its result is discarded.
+
+## Why
+
+Reads and writes of a shared instance resolve through the name the call was bound to. An unbound call names nothing, so it lowers to no client behavior while the server render still tries to run it and throws.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

@@ -1,0 +1,22 @@
+# MARKLESS_ASYNC_BOUNDARY_REQUIRED
+
+Async computed reads need an async boundary
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: error
+
+## Message
+
+Cannot read … "…" outside @try/@pending/@catch. Wrap the read in an async boundary.
+
+## Why
+
+Async computed values can be pending or rejected during initial render and resume. The runtime needs an explicit TSRX async boundary to render pending and error UI.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

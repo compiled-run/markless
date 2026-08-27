@@ -1,0 +1,25 @@
+export {
+	TourBackdrop as backdrop,
+	TourBackTrigger as backtrigger,
+	TourClose as close,
+	TourDescription as description,
+	TourForwardTrigger as forwardtrigger,
+	TourItem as item,
+	tourItemState as itemstate,
+	TourRoot as root,
+	tourState,
+	tourState as state,
+	TourTitle as title,
+	TourValueLabel as valuelabel,
+} from './tour.tsrx';
+export type {
+	TourBackdropProps,
+	TourBackTriggerProps,
+	TourCloseProps,
+	TourDescriptionProps,
+	TourForwardTriggerProps,
+	TourItemProps,
+	TourRootProps,
+	TourTitleProps,
+	TourValueLabelProps,
+} from './tour-types.ts';
