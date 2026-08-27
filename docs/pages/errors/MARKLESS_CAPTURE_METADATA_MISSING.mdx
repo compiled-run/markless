@@ -1,0 +1,21 @@
+# MARKLESS_CAPTURE_METADATA_MISSING
+
+Imported child has no current capture metadata
+
+- Package: compiler
+- Pass or phase: link
+- Severity: error
+
+## Message
+
+Parent module … composes imported child …, but its compiled artifact has no current capture metadata. Rebuild the child with the current Markless compiler and clear any stale build cache.
+
+## Why
+
+Composing a child whose capture metadata is stale or absent would link captures against an artifact this compiler did not produce.
+
+## Emitted from
+
+- `packages/compiler/src/passes/link/module-link.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

@@ -1,5 +1,9 @@
 import type { PrerenderDataDefinition, PrerenderDataSurface } from '../prerender/evaluator.ts';
 import { childSurfaceOf } from '../prerender/children-projection.ts';
+import {
+	MARKLESS_WIDGET_INSTANCE_KEY,
+	marklessWidgetInstanceKey,
+} from '../prerender/shared-seed-slot.ts';
 
 /**
  * The seed-map key prefix under which a widget's seed phase files one entry per
@@ -9,6 +13,30 @@ import { childSurfaceOf } from '../prerender/children-projection.ts';
  * an IDREF naming it writes no attribute at all rather than an id naming nothing.
  */
 export const MARKLESS_ELEMENT_BOUND_KEY_PREFIX = 'markless:element-bound|';
+
+/**
+ * The full roster key, restating `elementBoundKeySource` in @markless/compiler:
+ * the prefix, the widget-instance token, then the handle.
+ *
+ * The token is what makes the entry per instance. An enclosing widget's seed
+ * walk descends THROUGH a nested family's root and files that family's handles
+ * onto its own map, which every nested instance inherits; carrying the filing
+ * instance's token, such an entry answers only for the widget that filed it.
+ */
+export function marklessElementBoundKey(instanceToken: unknown, handle: string): string {
+	return `${MARKLESS_ELEMENT_BOUND_KEY_PREFIX}${instanceToken}|${handle}`;
+}
+
+/**
+ * Which rendered widget a handle belongs to, asked of its own family exactly as
+ * the compiled reader asks it: a handle's graph node id is
+ * `<definitionId>/element:<name>`, and the definition id carries a module path,
+ * so the family is everything up to the LAST slash.
+ */
+function widgetInstanceTokenOf(seeds: ReadonlyMap<string, unknown>, handle: string): unknown {
+	const family = handle.slice(0, handle.lastIndexOf('/'));
+	return seeds.get(marklessWidgetInstanceKey(family)) ?? seeds.get(MARKLESS_WIDGET_INSTANCE_KEY);
+}
 
 /**
  * Every shared() element() handle a rendered instance of a placed child binds:
@@ -114,6 +142,7 @@ export function fileBoundElementHandles(
 	];
 	if (handles.length === 0) return seeded;
 	const filed = new Map(seeded ?? inherited ?? []);
-	for (const handle of handles) filed.set(MARKLESS_ELEMENT_BOUND_KEY_PREFIX + handle, true);
+	for (const handle of handles)
+		filed.set(marklessElementBoundKey(widgetInstanceTokenOf(filed, handle), handle), true);
 	return filed;
 }

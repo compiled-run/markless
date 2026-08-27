@@ -1,10 +1,11 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
+import { KEYED_REPEAT_ROW_MINT_UNSUPPORTED_CODE } from '../src/passes/public-render/diagnostics.ts';
 
-// Spike T065. The build-time half of "can a widget family root be authored
-// inside a keyed `@for`?". The compile is accepted in full - no diagnostic of
-// any severity - and the artifact it produces is what the two render paths then
-// fail on. The browser witness is packages/vitest-browser/browser/widget-in-repeat.test.ts.
+// The build-time half of "can a widget family root be authored inside a keyed
+// `@for`?". The compile is accepted, and the artifact it produces is what the
+// two render paths then fail on. The browser witness is
+// packages/vitest-browser/browser/widget-in-repeat.test.ts.
 
 const pageSource = `
 import { state } from '@markless/core';
@@ -35,13 +36,19 @@ async function compilePage() {
 	});
 }
 
-// Nothing refuses this shape at build time, so every failure it produces is a
-// render-time one. A gate would belong here.
-test('a widget root inside a keyed @for compiles with no diagnostic at all', async () => {
+// The row wraps an imported widget root in an element, so no row template and no
+// row component ship: the list serves and reorders its rows and never grows.
+// Nothing else refuses the shape, so its remaining failures are render-time ones.
+test('a widget root inside a keyed @for compiles, warning only that the list can never grow', async () => {
 	const compiled = await compilePage();
 
 	expect(compiled.semanticGraph.diagnostics).toEqual([]);
-	expect(compiled.publicRenderModule.diagnostics ?? []).toEqual([]);
+	expect(
+		(compiled.publicRenderModule.diagnostics ?? []).map((entry) => [
+			entry.code,
+			entry.severity,
+		]),
+	).toEqual([[KEYED_REPEAT_ROW_MINT_UNSUPPORTED_CODE, 'warning']]);
 });
 
 // The root's prop is left as authored source naming the ROW binding. The CSR

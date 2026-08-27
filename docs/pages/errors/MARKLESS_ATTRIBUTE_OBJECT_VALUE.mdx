@@ -1,0 +1,24 @@
+# MARKLESS_ATTRIBUTE_OBJECT_VALUE
+
+Lowercase on* attributes are plain HTML attributes; This attribute renders "[object Object]"
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: warning
+
+## Message
+
+`…={…}` is a plain attribute, not a Markless event. It would serialize the function source into HTML.…
+
+`…={…}` writes an object into an attribute, so the page renders …="[object Object]".
+
+## Why
+
+Attribute bindings serialize to plain text in HTML and DOM updates; only graph cells keep structured values across resume.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
