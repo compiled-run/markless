@@ -67,6 +67,11 @@ and a consumer reading it needs the same normaliser the family uses.
 
 ## Roving focus with no DOM selectors
 
+Inside a `toolbar.root` each item is one of the bar's stops: it binds the bar's
+plural handle as a third slot and stands its own roving rule down, so the bar
+owns the tabindex and an arrow off the group's last item leaves the group
+(`toolbar/note.md`).
+
 The item binds `el={[item.el, group.itemEls]}` — its own singular handle and the
 group's plural one — and the walk in `togglegroup-walk.ts` reads the plural
 handle live at handler time. Nothing here queries the DOM, which `tabs` and

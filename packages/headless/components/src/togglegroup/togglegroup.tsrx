@@ -1,4 +1,5 @@
 import { computed, element, shared, state } from '@markless/core';
+import { toolbarState } from '../toolbar/toolbar.tsrx';
 import type {
 	ToggleGroupBoxProps,
 	ToggleGroupInstanceState,
@@ -128,6 +129,10 @@ export function ToggleGroupItem({
 }: ToggleGroupItemProps) @{
 	const group = togglegroupState();
 	const item = togglegroupItemState();
+	// Mixed into an enclosing toolbar: every item is one of the bar's stops.
+	// Outside every toolbar this resolves to no bar instance, so `mounted` is the
+	// seed and the group keeps its own roving focus.
+	const toolbar = toolbarState();
 	item.value = value;
 	// Own prop only: a seed is built from this component's props, so the group's own `disabled` is added at every read site.
 	item.disabled = disabled;
@@ -137,6 +142,9 @@ export function ToggleGroupItem({
 	// While nothing is pressed every enabled item is tabbable, until a focus says
 	// which one owns the stop - no index, so no construction-order counter.
 	const isTabStop = computed(() => {
+		// Before any other read, so an enclosed item's tabindex depends on this cell
+		// alone and never re-renders over the stop the bar wrote.
+		if (toolbar.mounted === true) return false;
 		if (item.disabled || group.disabled) return false;
 		if (group.focused !== '') return group.focused === item.value;
 		const held = heldValues(group.value);
@@ -145,7 +153,7 @@ export function ToggleGroupItem({
 
 	<button
 		{...rest}
-		el={[item.el, group.itemEls]}
+		el={[item.el, group.itemEls, toolbar.itemEls]}
 		type="button"
 		value={item.value}
 		aria-pressed={isPressed ? 'true' : 'false'}
