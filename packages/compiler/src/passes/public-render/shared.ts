@@ -14,7 +14,7 @@ import {
 	memberTagRootName,
 } from '../../ast/tsrx.ts';
 import type { ComponentEdge } from './types.ts';
-import { widgetRootComponents } from './shared-seed-pass.ts';
+import { adoptedWidgetDefinitionIds, widgetRootComponents } from './shared-seed-pass.ts';
 
 export { componentEdgeInstanceSegment } from '../../component-edge-instance.ts';
 
@@ -863,8 +863,8 @@ function graphReadClosure(
 // cell and computed order. A duplicated id is resolved positionally: the Nth
 // binding spelling that id owns the Nth node spelling it.
 type PayloadNodeOwners = {
-	readonly cells: ReadonlyArray<string>;
-	readonly computed: ReadonlyArray<string>;
+	readonly cells: ReadonlyArray<string | undefined>;
+	readonly computed: ReadonlyArray<string | undefined>;
 };
 
 // `componentOwnedStateNodes` asks this once per component from three emit sites,
@@ -937,13 +937,21 @@ function resolvePayloadNodeOwners(
 	// nodes belong to the widget root, not the module root: that component's
 	// composed instance path is the widget root.
 	const widgetOwner = widgetRootComponents(input);
-	const resolveOwners = (graphNodeIds: ReadonlyArray<string>): ReadonlyArray<string> => {
+	// A widget family this module only imported is rooted where it was declared,
+	// so `undefined` is the honest owner: no component here may claim its nodes.
+	const adoptedWidgets = adoptedWidgetDefinitionIds(input);
+	const resolveOwners = (
+		graphNodeIds: ReadonlyArray<string>,
+	): ReadonlyArray<string | undefined> => {
 		const pending = declaringComponents();
 		return graphNodeIds.map((graphNodeId) => {
-			if (isPageSpaceGraphNodeId(graphNodeId))
+			if (isPageSpaceGraphNodeId(graphNodeId)) {
+				const definitionId = graphNodeId.slice(0, graphNodeId.lastIndexOf('/'));
 				return (
-					widgetOwner.get(graphNodeId.slice(0, graphNodeId.lastIndexOf('/'))) ?? rootComponentName
+					widgetOwner.get(definitionId) ??
+					(adoptedWidgets.has(definitionId) ? undefined : rootComponentName)
 				);
+			}
 			const queue = pending.get(graphNodeId);
 			const declared = queue && queue.length > 1 ? queue.shift() : queue?.[0];
 			return (

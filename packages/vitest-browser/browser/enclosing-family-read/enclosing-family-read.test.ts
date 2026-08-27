@@ -7,13 +7,13 @@ import OtherModulePage from './other-module-page.tsrx';
 import OtherModuleTwoBarsPage from './other-module-two-bars-page.tsrx';
 import SameModulePage from './same-module-page.tsrx';
 import SameModuleTwoBarsPage from './same-module-two-bars-page.tsrx';
+import SolePartTwoBarsPage from './sole-part-two-bars-page.tsrx';
 import TwoBarsPage from './two-bars-page.tsrx';
 
 // A part of family A that ROOTS a widget of its own, reading family B's
-// ENCLOSING instance to register its focusable element in B's roster. State
-// reaches the enclosing instance (nested-widget-outer-write already pins that);
-// an element() registration does NOT, and the two tests marked DEFECT below pin
-// what the tip actually does today so the fix has something to flip.
+// ENCLOSING instance to register its focusable element in B's roster. Both the
+// state read and the element() registration resolve to the enclosing instance,
+// and a part standing outside every instance of B registers in none of them.
 afterEach(() => cleanup());
 
 function bars(container: ParentNode) {
@@ -120,33 +120,42 @@ test('SSR resume: Left/Right rove over the registered knobs', async () => {
 	await expectRovingOverTheRoster(screen.container);
 });
 
-// DEFECT, pinned as measured: a knob that roots its own family registers on the
-// UNQUALIFIED handle id, so the registration reaches no bar instance in
-// particular. With one bar the raw fallback still answers correctly; with two
-// bars both read the same page-wide list and each bar sees every knob.
-// Same-module and other-module parts on the pages above stay isolated, so
-// rooting a family of one's own is what loses the qualification.
-test('CSR: DEFECT two bars of own-family knobs share one roster', async () => {
+// Each knob's registration is qualified to the bar its `barState()` read
+// resolved to, so two bars of knobs stay as isolated as two bars of parts that
+// root nothing. A knob's own family never claims the enclosing family's nodes.
+test('CSR: two bars of own-family knobs keep separate rosters', async () => {
 	const screen = await render(TwoBarsPage);
-	expect(await rosters(screen.container as HTMLElement)).toEqual(['a,b,c,d,e', 'a,b,c,d,e']);
+	expect(await rosters(screen.container as HTMLElement)).toEqual(['a,b,c', 'd,e']);
 });
 
-test('SSR resume: DEFECT two bars of own-family knobs share one roster', async () => {
+test('SSR resume: two bars of own-family knobs keep separate rosters', async () => {
 	const screen = await renderSSR(TwoBarsPage);
-	expect(await rosters(screen.container)).toEqual(['a,b,c,d,e', 'a,b,c,d,e']);
+	expect(await rosters(screen.container)).toEqual(['a,b,c', 'd,e']);
 });
 
-// DEFECT, pinned as measured, and the same cause: a knob with NO enclosing bar
-// does not resolve to none. Its registration lands on that same unqualified id,
-// so an unrelated bar on the page reads the loose knob as one of its items.
-test('CSR: DEFECT a knob outside every bar lands in a bar roster', async () => {
+// The same qualification answered from the other end: a knob with no enclosing
+// bar resolves to no bar instance, so no bar on the page reads it as an item.
+test('CSR: a knob outside every bar stays out of the bar roster', async () => {
 	const screen = await render(MixedPage);
-	expect(await rosters(screen.container as HTMLElement)).toEqual(['a,b,loose']);
+	expect(await rosters(screen.container as HTMLElement)).toEqual(['a,b']);
 });
 
-test('SSR resume: DEFECT a knob outside every bar lands in a bar roster', async () => {
+test('SSR resume: a knob outside every bar stays out of the bar roster', async () => {
 	const screen = await renderSSR(MixedPage);
-	expect(await rosters(screen.container)).toEqual(['a,b,loose']);
+	expect(await rosters(screen.container)).toEqual(['a,b']);
+});
+
+// The axis that has nothing to do with rooting: a registering part that is its
+// module's ONLY component, so the module partitions no payload nodes between
+// components. It must still claim none of the imported family's nodes.
+test('CSR: two bars of sole-export parts keep separate rosters', async () => {
+	const screen = await render(SolePartTwoBarsPage);
+	expect(await rosters(screen.container as HTMLElement)).toEqual(['a,b,c', 'd,e']);
+});
+
+test('SSR resume: two bars of sole-export parts keep separate rosters', async () => {
+	const screen = await renderSSR(SolePartTwoBarsPage);
+	expect(await rosters(screen.container)).toEqual(['a,b,c', 'd,e']);
 });
 
 // What the same read does NOT do: reading a widget family no rendered widget
