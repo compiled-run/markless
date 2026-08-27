@@ -192,11 +192,11 @@ export function Panel() @{
 });
 
 test('a timer callback that invokes a callback slot is emitted async', async () => {
-	// The band turns a filled callback slot into `await context.capture.invoke(...)`.
-	// The author's timer callback is not async, and in a module `await` outside an
-	// async function is a reserved word — the emitted module was a SyntaxError, and
-	// the read-back check did not catch it because it does not reparse in module
-	// goal. This is the carousel's own `onChange?.(next)` inside `setInterval`.
+	// The band turns a filled callback slot into an AWAITED dispatch. The author's
+	// timer callback is not async, and in a module `await` outside an async
+	// function is a reserved word — the emitted module was a SyntaxError, and the
+	// read-back check did not catch it because it does not reparse in module goal.
+	// This is the carousel's own `onChange?.(next)` inside `setInterval`.
 	const result = await compile(`
 import { shared, state } from '@markless/core';
 
@@ -241,7 +241,7 @@ export default function Page() @{
 	expect(result.symbolModules.diagnostics).toEqual([]);
 	const starter = eventSymbolSources(result).find((source) => source.includes('setInterval'));
 	expect(starter).toContain('window.setInterval(async () => {');
-	expect(starter).toContain('await (context.capture ? context.capture.invoke(');
+	expect(starter).toContain('await marklessInvokeCallbackSlot(context, "');
 });
 
 test('a timer callback with no await is left synchronous', async () => {

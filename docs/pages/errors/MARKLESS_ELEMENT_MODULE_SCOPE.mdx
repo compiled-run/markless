@@ -1,0 +1,21 @@
+# MARKLESS_ELEMENT_MODULE_SCOPE
+
+element() cannot be created at module scope
+
+- Package: compiler
+- Pass or phase: semantic-graph
+
+## Message
+
+Cannot create element handle "…" at module scope.
+
+## Why
+
+Element handles are per-render DOM locators. A module-scope handle would be shared across requests and cannot point at one document-owned host element.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

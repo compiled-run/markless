@@ -107,7 +107,13 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'			const slot = requiredCaptureSlot(slots, slotId);',
 		'			const route = slot.route;',
 		'			if (route.kind === "compiler-known-constant") return (slot.path ?? []).reduce((value, key) => value == null ? value : value[key], route.value);',
-		'			if (route.kind === "graph-reference") return context.graph.read(route.graphNodeId, route.path ?? []);',
+		// A consumer's element() handle passed as a prop routes to the handle's
+		// graph node, and the graph holds no DOM node: the page's handle registry
+		// is the only place the live element lives.
+		'			if (route.kind === "graph-reference") {',
+		'				const handle = elementHandleRoute(context, route);',
+		'				return handle ? handle.value : context.graph.read(route.graphNodeId, route.path ?? []);',
+		'			}',
 		'			throw new Error(`Capture slot ${slotId} is a callback route`);',
 		'		},',
 		'		invoke(slotId, args) {',
@@ -125,9 +131,11 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'			}',
 		// The widget root wrote the answering symbol id into the slot's node, and the
 		// part's own instance resolves that node the way it resolves its other reads.
+		// The row's instance path is what a root answering its OWN slot needs: its
+		// handler spells the node module-level, and the node is on its instance.
 		...(routesCallbackSlots
 			? [
-					'			if (route.kind === "callback-slot-route") return marklessInvokeCallbackSlot(context, route.graphNodeId, args);',
+					'			if (route.kind === "callback-slot-route") return marklessInvokeCallbackSlot(context, route.graphNodeId, args, bound.instancePath);',
 				]
 			: []),
 		'			if (route.kind !== callbackRoute) throw new Error(`Capture slot ${slotId} is not a callback route`);',
@@ -135,6 +143,22 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'			return context.invokeSymbol(route.callbackSymbolId, { ...context, event: context.event, args });',
 		'		},',
 		'	};',
+		'}',
+		'',
+		// The resolver stays self-contained (it is loaded from a data: URL in some
+		// hosts), so the handle read is emitted rather than imported.
+		'function elementHandleRoute(context, route) {',
+		'	if (typeof context.getElementHandle !== "function") return undefined;',
+		'	const element = context.getElementHandle(route.graphNodeId);',
+		'	if (element === undefined || element === null) return undefined;',
+		'	let receiver = element;',
+		'	let value = element;',
+		'	for (const key of route.path ?? []) {',
+		'		if (value === undefined || value === null) return { value: undefined };',
+		'		receiver = value;',
+		'		value = value[key];',
+		'	}',
+		'	return { value: typeof value === "function" ? value.bind(receiver) : value };',
 		'}',
 		'',
 		'function requiredCaptureSlot(slots, slotId) {',
@@ -198,7 +222,14 @@ function instanceScopeLines(widgetAware: boolean): string[] {
 		// A graph-less context still has an answer: the runtime hands back the
 		// `active` pointer, which is what an older payload's resolver read anyway.
 		...(widgetAware ? ['		const registry = marklessGraphWidgetRegistry(graph);'] : []),
-		`		const wrapped = { ...graph, read: (graphNodeId, readPath) => graph.read(${scoped('graphNodeId', 'registry')}, readPath) };`,
+		// Reads chain one adapter into the next, so the id a read really lands on is
+		// every adapter's answer applied in turn - not this one's. A dispatch that
+		// resolves a symbol id OUT of the graph needs that whole answer, so the
+		// wrapper carries the composed qualifier alongside its own path and the page
+		// graph it qualifies against.
+		'		const outerQualify = graph.marklessQualifyGraphNodeId;',
+		`		const qualify = (graphNodeId) => { const scopedId = ${scoped('graphNodeId', 'registry')}; return typeof outerQualify === "function" ? outerQualify(scopedId) : scopedId; };`,
+		`		const wrapped = { ...graph, marklessInstancePath: path, marklessPageGraph: graph.marklessPageGraph ?? graph, marklessQualifyGraphNodeId: qualify, read: (graphNodeId, readPath) => graph.read(${scoped('graphNodeId', 'registry')}, readPath) };`,
 		'		for (const name of ["write", "update", "call", "delete", "subscribe"]) {',
 		'			const method = graph[name];',
 		`			if (typeof method === "function") wrapped[name] = (record) => method.call(graph, { ...record, graphNodeId: ${scoped('record.graphNodeId', 'registry')} });`,

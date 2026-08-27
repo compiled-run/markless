@@ -1,0 +1,21 @@
+# MARKLESS_ROUTE_ARTIFACT_REGISTERED_LATE
+
+Client route artifact registered after its primary module transformed
+
+- Package: compiler
+- Pass or phase: link
+- Severity: error
+
+## Message
+
+Client route artifact … was registered after its primary module transformed. Register every production route artifact before transformation begins.
+
+## Why
+
+The primary module has already been compiled without knowing it composes a route artifact, so its emitted graph would be wrong.
+
+## Emitted from
+
+- `packages/compiler/src/passes/link/claim-manifest.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

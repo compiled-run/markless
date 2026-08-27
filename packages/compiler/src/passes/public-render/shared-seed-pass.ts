@@ -1,8 +1,30 @@
-import type { PublicRenderModuleInput } from '../../artifacts.ts';
+import type { PublicRenderModuleInput, SemanticMarkupChunk } from '../../artifacts.ts';
 import {
 	resolveSharedInstanceGraphPath,
 	sharedDefinitionId,
+	sharedDefinitionIdOf,
 } from '../semantic-graph/collect-shared.ts';
+import { MARKLESS_WIDGET_INSTANCE_KEY } from './residue-reader.ts';
+
+/** The prop a projection is written as, whichever way the consumer spells it. */
+export const PROJECTION_PROP_NAME = 'children' as const;
+
+/**
+ * The `children` a projection already has BEFORE it renders. The seed pass runs
+ * ahead of the projection, so a part that seeds from `children` normally sees
+ * undefined; a projection of static text alone is spelled in the chunk's statics
+ * and is therefore the exact string the render will hand that part. Anything
+ * with an element or a read has no value until it renders, and returns nothing.
+ */
+export function staticProjectionChildren(
+	chunks: ReadonlyArray<SemanticMarkupChunk>,
+	projectionChunkId: string | undefined,
+): string | undefined {
+	if (projectionChunkId === undefined) return undefined;
+	const chunk = chunks.find((candidate) => candidate.id === projectionChunkId);
+	if (!chunk || chunk.hosts.length > 0 || chunk.slots.length > 0) return undefined;
+	return chunk.statics.join('');
+}
 
 type SharedSeedSymbol = {
 	readonly graphNodeId: string;
@@ -168,6 +190,57 @@ export function rowProjectedEdgeIdsUnder(
 	};
 	walk(projectionChunkId, false);
 	return edgeIds;
+}
+
+/**
+ * The projecting children whose projections enclose one component edge in this
+ * module, innermost first.
+ *
+ * A projecting child that roots no widget family is a PART, and the families in
+ * scope for its boundary check are the enclosing widget's — without them a root
+ * written into that part's own children is not recognised as an instance
+ * boundary, and its seeds land in the enclosing instance's map on top of the
+ * seed that instance's root wrote. Arm, row, and async chunks are stepped
+ * THROUGH: they change whether a part renders, never which widget encloses it.
+ * The CSR twin is `enclosingProjectingChildNames` in @markless/web.
+ */
+export function enclosingProjectingEdgeIds(
+	chunks: PublicRenderModuleInput['renderData']['chunks'],
+	componentEdgeId: string,
+): string[] {
+	const ownerEdgeOfChunk = new Map<string, string>();
+	const parentChunkOf = new Map<string, string>();
+	const chunkOfEdge = new Map<string, string>();
+	for (const chunk of chunks)
+		for (const slot of chunk.slots) {
+			if (slot.kind === 'child-component') {
+				chunkOfEdge.set(slot.componentEdgeId, chunk.id);
+				if (slot.projectionChunkId)
+					ownerEdgeOfChunk.set(slot.projectionChunkId, slot.componentEdgeId);
+			} else if (slot.kind === 'branch') {
+				for (const armChunkId of slot.armTemplateIds) parentChunkOf.set(armChunkId, chunk.id);
+			} else if (slot.kind === 'repeat') {
+				parentChunkOf.set(slot.rowTemplateId, chunk.id);
+				if (slot.emptyTemplateId) parentChunkOf.set(slot.emptyTemplateId, chunk.id);
+			} else if (slot.kind === 'async') {
+				for (const armChunkId of Object.values(slot.armTemplateIds))
+					if (typeof armChunkId === 'string') parentChunkOf.set(armChunkId, chunk.id);
+			}
+		}
+	const found: string[] = [];
+	const walked = new Set<string>();
+	let chunkId = chunkOfEdge.get(componentEdgeId);
+	while (chunkId !== undefined && !walked.has(chunkId)) {
+		walked.add(chunkId);
+		const ownerEdgeId = ownerEdgeOfChunk.get(chunkId);
+		if (ownerEdgeId === undefined) {
+			chunkId = parentChunkOf.get(chunkId);
+			continue;
+		}
+		found.push(ownerEdgeId);
+		chunkId = chunkOfEdge.get(ownerEdgeId);
+	}
+	return found;
 }
 
 /**
@@ -494,7 +567,7 @@ export function sharedSeedPassLines(
 		// default seeds undefined the way plain JavaScript would.
 		...seeds.map((seed) => {
 			const id = JSON.stringify(seed.graphNodeId);
-			return `		{ const marklessSharedSeed = (${sharedSeedSource(seed)}); marklessSsrSeeds.set(${id}, ${sharedSeedValueSource(
+			return `		if (${seedFamilyOpenSource(seed.graphNodeId)}) { const marklessSharedSeed = (${sharedSeedSource(seed)}); marklessSsrSeeds.set(${id}, ${sharedSeedValueSource(
 				`marklessSsrSeeds.get(${id})`,
 				seed.path,
 				'marklessSharedSeed',
@@ -504,6 +577,25 @@ export function sharedSeedPassLines(
 		'		return;',
 		'	}',
 	];
+}
+
+/**
+ * Whether the pass now running is the one that roots this seed's family.
+ *
+ * Rooting is per family, not per component: a child that roots one widget family
+ * is still an ordinary part of every other family enclosing it, and its writes
+ * belong to those enclosing instances. The pass root files its own token under
+ * the plain key AND under its own families; a family whose filed token is some
+ * other instance is therefore one this pass does not root, and re-running its
+ * seeds here would mint a private copy. A family with no filed token at all is
+ * nobody's yet, so it stays open.
+ */
+function seedFamilyOpenSource(graphNodeId: string): string {
+	const plain = JSON.stringify(MARKLESS_WIDGET_INSTANCE_KEY);
+	const family = JSON.stringify(
+		`${MARKLESS_WIDGET_INSTANCE_KEY}|${sharedDefinitionIdOf(graphNodeId)}`,
+	);
+	return `(marklessSsrSeeds.get(${family}) ?? marklessSsrSeeds.get(${plain})) === marklessSsrSeeds.get(${plain})`;
 }
 
 /**

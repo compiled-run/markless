@@ -114,6 +114,7 @@ async function startDecodedResume(
 		applyDomJournal,
 		renderBranchHtml: input.renderBranchHtml,
 		renderAsyncBoundary: input.renderAsyncBoundary,
+		renderData: input.renderData,
 	});
 	await runtime.start();
 	// Reuse the existing streamed or staged dispatch authority.
