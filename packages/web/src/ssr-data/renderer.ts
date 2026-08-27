@@ -515,10 +515,8 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 				anchors.push(anchorRecord(idPrefix, context.chunkId, slot, slot.componentEdgeId));
 				// The widget root reads the same seed map its projected parts read, so the
 				// pass runs once and its answer travels the root edge as well as the projection.
-				// It runs with no projection too: a childless widget root still has to learn
-				// which instance it is before anything inside it mints an id.
 				return marklessThen(
-					input.seedChild?.(slot, context),
+					slot.projectionChunkId ? input.seedChild?.(slot, context) : undefined,
 					(childSeeds) => marklessThen(
 						// A projection renders inside the row that placed it, so the row travels with it.
 						slot.projectionChunkId

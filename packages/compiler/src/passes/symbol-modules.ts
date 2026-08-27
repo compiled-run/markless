@@ -22,10 +22,7 @@ import type {
 	SymbolModulesInput,
 	SymbolResolverPlan,
 } from '../artifacts.ts';
-import {
-	PROTOCOL_ELEMENT_HANDLE_ID_READ_PREFIX,
-	PROTOCOL_PROPS_GRAPH_NODE_ID,
-} from '@markless/serializer';
+import { PROTOCOL_PROPS_GRAPH_NODE_ID } from '@markless/serializer';
 import type { SourceSpan } from '../diagnostics.ts';
 import {
 	armChildDescent,
@@ -1449,23 +1446,6 @@ function renderChunkParts(
 				parts.push({ repeat: {
 					read: { graphNodeId: repeat.collectionGraphNodeId, path: repeat.collectionPath },
 					rowParts,
-				} });
-				continue;
-			}
-			// The id a bound element carries is minted from the rendered widget's
-			// token, which no flip can reach; the render that served the arm resolves
-			// it onto the branch record and the symbol reads it back through the same
-			// read channel its value parts use.
-			if (
-				slot.kind === 'attribute' &&
-				slot.alwaysPresent === true &&
-				slot.residue.kind === 'element-handle-id' &&
-				slot.residue.idref !== true &&
-				!child
-			) {
-				parts.push({ read: {
-					graphNodeId: `${PROTOCOL_ELEMENT_HANDLE_ID_READ_PREFIX}${slot.residue.handleGraphNodeId}`,
-					path: [],
 				} });
 				continue;
 			}

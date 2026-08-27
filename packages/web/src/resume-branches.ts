@@ -1,4 +1,3 @@
-import { PROTOCOL_ELEMENT_HANDLE_ID_READ_PREFIX } from '@markless/serializer/protocol';
 import type { DomJournalEntry, DomJournalResult, RuntimeGraph } from '@markless/runtime';
 import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
 import type {
@@ -90,10 +89,6 @@ export function wireBranches(input: any) {
 					? asyncBoundaries.get(entry.locator.slice('async-boundary:'.length))
 					: undefined);
 			if (!range) continue;
-			// Against the arm now painted, not a blanket clear: this runs after the
-			// flip that replaced the range, so clearing here would strip the
-			// attribute the incoming arm just earned.
-			if (branch) syncBranchIdrefSites(input, branch, currentArmByBranchId.get(branch.id));
 			for (const id of hostIdsInsideRange(
 				input.root,
 				range.startAnchor,
@@ -129,14 +124,11 @@ function createBranchRegistration(
 			for (const armEvent of armRecordSet.events) input.eventTypes.add(armEvent.eventName);
 		let currentArm = wiredBranchArm(input.graph, branch);
 		currentArmByBranchId.set(branch.id, currentArm);
-		// The arm the render served is already in the DOM and never materializes
-		// here, so this is the only place its IDREF is answered.
-		syncBranchIdrefSites(input, branch, currentArm);
 		async function replaceArmRange(arm: number) {
 			const painted = currentArm;
 			const symbol = await input.loadSymbol(branch.symbolId);
 			const update = await symbol({
-				graph: armElementHandleIdGraph(composedBranchGraph(input.graph, branch), branch),
+				graph: composedBranchGraph(input.graph, branch),
 				arm,
 				branchId: branch.sourceId ?? branch.id,
 				composedBranchId: branch.id,
@@ -146,7 +138,6 @@ function createBranchRegistration(
 			if (!isResumeBranchUpdate(update)) return;
 			currentArm = update.arm;
 			currentArmByBranchId.set(branch.id, update.arm);
-			syncBranchIdrefSites(input, branch, update.arm);
 			const html = branchHtmlToString(update.html);
 			// Escalated arms are arm-relative against DOM that does not exist yet.
 			if (update.armRecords) return input.commitArm(branch, { ...update, html });
@@ -281,55 +272,6 @@ export function composedBranchGraph(graph: RuntimeGraph, branch: ResumeBranchRec
 	};
 }
 
-// The one channel a flip has to a minted element() id. The id belongs to the
-// rendered widget, not to the graph, so the render that served the arm resolved
-// it onto the record and this answers the symbol's read from there.
-function armElementHandleIdGraph(graph: RuntimeGraph, branch: ResumeBranchRecord): RuntimeGraph {
-	const ids = branch.elementHandleIds;
-	if (!ids) return graph;
-	return {
-		...graph,
-		read(id: string, path: ReadonlyArray<string> = []) {
-			// The resume loader scopes a composed symbol's reads by PREPENDING the
-			// instance path, so this namespace arrives offset rather than at the
-			// front. The record is already this instance's own, so the handle after
-			// the namespace is the whole question.
-			const at = id.indexOf(PROTOCOL_ELEMENT_HANDLE_ID_READ_PREFIX);
-			return at >= 0
-				? ids[id.slice(at + PROTOCOL_ELEMENT_HANDLE_ID_READ_PREFIX.length)]
-				: graph.read(id, path);
-		},
-	};
-}
-
-type AttributeWritableElement = ResumeDomElement & {
-	readonly setAttribute?: (name: string, value: string) => void;
-	readonly removeAttribute?: (name: string) => void;
-};
-
-/**
- * An IDREF outside the arm names an element only while the arm that binds it is
- * the painted one, so the attribute follows the arm rather than being served
- * naming nothing. Keyed on the painted arm rather than on what a given pass
- * filed: an arm the RENDER already served is never re-materialized, and a
- * refresh that repaints the same arm carries no handle records of its own.
- */
-function syncBranchIdrefSites(
-	input: any,
-	branch: ResumeBranchRecord,
-	arm: number | undefined,
-): void {
-	for (const site of branch.idrefSites ?? []) {
-		const host = input.elementsByHostId.get(site.hostNodeId) as
-			| AttributeWritableElement
-			| undefined;
-		if (!host) continue;
-		const id = branch.elementHandleIds?.[site.handleGraphNodeId];
-		if (id !== undefined && arm === site.armIndex) host.setAttribute?.(site.attributeName, id);
-		else host.removeAttribute?.(site.attributeName);
-	}
-}
-
 function onceRelease(release: () => void): () => void {
 	let released = false;
 	return () => {
@@ -449,8 +391,7 @@ function materializeBranchArmRecords(
 		Hosted<ResumeViewRecord['elementHandles'][number]>
 	>) {
 		const host = claim(handle.hostPath);
-		if (!host) continue;
-		input.elementHandles.register(host.hostNodeId, handle, host.element);
+		if (host) input.elementHandles.register(host.hostNodeId, handle, host.element);
 	}
 	return [...byHost.keys()];
 }

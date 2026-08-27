@@ -152,12 +152,6 @@ export type ResumeBranchRecord = {
 	readonly composedGraphProps?: NonNullable<
 		NonNullable<ProtocolViewPayload['branches']>[number]['composedGraphProps']
 	>;
-	readonly elementHandleIds?: NonNullable<
-		NonNullable<ProtocolViewPayload['branches']>[number]['elementHandleIds']
-	>;
-	readonly idrefSites?: NonNullable<
-		NonNullable<ProtocolViewPayload['branches']>[number]['idrefSites']
-	>;
 };
 export type ResumeBranchHtml = string | ReadonlyArray<string | { readonly text: string }>;
 export type ResumeBranchUpdate = {
