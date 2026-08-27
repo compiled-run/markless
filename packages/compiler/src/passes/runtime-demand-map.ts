@@ -60,6 +60,10 @@ const OVERLAY = ['web/fns/overlay'];
 // row or raise an `@empty` arm at all, so recording the demand per record is
 // what lets the bundler keep the chunk off every app whose repeats only reorder.
 const ROW_MINT = ['web/fns/row-mint'];
+// The component-rooted half of the same building step. It reaches the render
+// closure, so it is folded per record for the same reason: an app whose rows
+// root no component never names it and never emits its chunk.
+const ROW_COMPONENT_MINT = ['web/fns/row-component-mint'];
 const FULL_RESUME_CORE = ['web/resume-locators'];
 const FULL_TIER_COMMON = [
 	'web/resume-runtime',
@@ -614,6 +618,7 @@ function payloadDemandRecords(
 				...rowDispatchCore,
 				...KEYED_REPEAT,
 				...(record.rowTemplate ?? record.emptyArm ? ROW_MINT : []),
+				...(record.rowComponent ? ROW_COMPONENT_MINT : []),
 				...(replacement.scalarRows ? [] : renderRuntimeModuleIds),
 			]),
 		})),

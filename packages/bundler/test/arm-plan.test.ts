@@ -236,7 +236,7 @@ const LIVE_FEED_BOUND_ROW = {
 	],
 	captureSlots: [
 		{
-			slotId: 'capture-slot:binding:76:83:136:150',
+			slotId: 'capture-slot:prop:UpdateSummary:updates.length#0',
 			path: ['length'],
 			route: {
 				kind: 'graph-reference',
@@ -248,7 +248,7 @@ const LIVE_FEED_BOUND_ROW = {
 			legacyGraphRead: { graphNodeId: 'prop:props', path: ['updates', 'length'] },
 		},
 		{
-			slotId: 'capture-slot:binding:85:91:153:159',
+			slotId: 'capture-slot:prop:UpdateSummary:weight#0',
 			path: [],
 			route: {
 				kind: 'graph-reference',
