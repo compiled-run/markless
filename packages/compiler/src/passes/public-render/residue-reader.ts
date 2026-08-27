@@ -87,18 +87,26 @@ export const MARKLESS_WIDGET_INSTANCE_KEY = 'markless:widget-instance';
 export const MARKLESS_ELEMENT_BOUND_KEY_PREFIX = 'markless:element-bound|';
 
 /**
- * Every element() handle one chunk set has to spell, in either rendering: as a
- * minted `mx-` id, or as the `--mx-` dashed-ident a CSS anchor position needs.
- * One collection because it answers one question - whether this chunk set needs
- * the widget-instance token - and both renderings need it for the same handles.
+ * The full roster key: the prefix, the widget-instance token the minting side
+ * uses, then the handle.
+ *
+ * The token is what makes the entry per instance. An enclosing widget's seed
+ * walk descends THROUGH a nested family's root and files that family's handles
+ * onto its own map, which every nested instance then inherits; keyed by the
+ * enclosing instance's token, such an entry answers only for the widget that
+ * filed it, and a nested instance that bound nothing still reads "unbound".
  */
+export function elementBoundKeySource(tokenSource: string, handleSource: string): string {
+	return `${JSON.stringify(MARKLESS_ELEMENT_BOUND_KEY_PREFIX)}+${tokenSource}+'|'+${handleSource}`;
+}
+
+/** Every element() handle one chunk set spells as a minted `mx-` id. */
 export function elementHandleIdSources(chunks: RenderChunks): ReadonlyArray<string> {
 	const handles = new Set<string>();
 	const add = (residue: SemanticMarkupResidue) => {
 		if (residue.kind === 'element-handle-id') handles.add(residue.handleGraphNodeId);
-		if (residue.kind === 'element-handle-anchor-style')
-			for (const declaration of residue.declarations)
-				handles.add(declaration.handleGraphNodeId);
+		if (residue.kind === 'element-handle-id-list')
+			for (const handle of residue.handleGraphNodeIds) handles.add(handle);
 	};
 	for (const chunk of chunks) {
 		for (const slot of chunk.slots) {
@@ -108,31 +116,6 @@ export function elementHandleIdSources(chunks: RenderChunks): ReadonlyArray<stri
 		}
 	}
 	return [...handles];
-}
-
-/**
- * Which of the two renderings a chunk set actually asks for. Pay-per-use: a
- * module with no anchor position carries no anchor branch, and a module with no
- * IDREF carries no mint at all.
- */
-export function elementHandleResidueKinds(chunks: RenderChunks): {
-	readonly id: boolean;
-	readonly anchorStyle: boolean;
-} {
-	let id = false;
-	let anchorStyle = false;
-	const see = (residue: SemanticMarkupResidue) => {
-		if (residue.kind === 'element-handle-id') id = true;
-		if (residue.kind === 'element-handle-anchor-style') anchorStyle = true;
-	};
-	for (const chunk of chunks) {
-		for (const slot of chunk.slots) {
-			if ('residue' in slot) see(slot.residue);
-			if (slot.kind !== 'dynamic-host') continue;
-			for (const attribute of slot.attributeSlots) see(attribute.residue);
-		}
-	}
-	return { id, anchorStyle };
 }
 
 /**
@@ -151,42 +134,54 @@ export function elementHandleResidueKinds(chunks: RenderChunks): {
 export function elementHandleIdReadCase(input: {
 	readonly idPrefixSource: string;
 	readonly widgetInstanceRead: ((handleExpression: string) => string) | null;
-	/** Defaults to the id rendering only; the anchor branch is opt-in. */
-	readonly kinds?: { readonly id: boolean; readonly anchorStyle: boolean };
 	/** Reads one seed-map key; supplied wherever a shared() IDREF can be omitted. */
 	readonly boundRead?: (keyExpression: string) => string;
+	/** Emitted only for a chunk set that writes an IDREF list somewhere. */
+	readonly lists?: boolean;
 }): string {
-	// One slug expression, two renderings. `mx-<slug>` is the id an IDREF names;
-	// `--mx-<slug>` is the CSS dashed-ident an anchor position names. The
-	// existing sanitizer already reduces the slug to [A-Za-z0-9-], so prefixing
-	// `--` always yields a valid <dashed-ident> and the two spellings of one
-	// identity cannot drift.
 	const slug = (handle: string) => {
 		const prefix = input.widgetInstanceRead
 			? `(${handle}.startsWith('shared:')?(${input.widgetInstanceRead(handle)}??${missingWidgetInstance(handle)}):${input.idPrefixSource})`
 			: input.idPrefixSource;
 		return `(${prefix}+${handle}).replace(/\\W+/g,'-')`;
 	};
-	const kinds = input.kinds ?? { id: true, anchorStyle: false };
+	// The token is read WITHOUT the mint's throw: an omitted IDREF is the right
+	// answer for a part that resolved no instance, and the mint still refuses.
+	const unbound = (handle: string) =>
+		input.widgetInstanceRead && input.boundRead
+			? `${handle}.startsWith('shared:')&&${input.boundRead(
+					elementBoundKeySource(input.widgetInstanceRead(handle), handle),
+				)}!==true`
+			: null;
 	// Only an IDREF position can be omitted. The element that CARRIES the id mints
 	// unconditionally: it renders only when its own part renders, and an omission
 	// there would write `id="undefined"` instead of nothing.
-	const omitUnbound =
-		input.widgetInstanceRead && input.boundRead
-			? `if(residue.idref&&residue.handleGraphNodeId.startsWith('shared:')&&${input.boundRead(
-					`${JSON.stringify(MARKLESS_ELEMENT_BOUND_KEY_PREFIX)}+residue.handleGraphNodeId`,
-				)}!==true)return undefined;`
-			: '';
-	return [
-		kinds.id
-			? `if(residue.kind==='element-handle-id'){${omitUnbound}return 'mx-'+${slug('residue.handleGraphNodeId')};}`
-			: '',
-		// The consumer's own declarations come first so the anchor names, which
-		// are plumbing rather than design, win the cascade.
-		kinds.anchorStyle
-			? `if(residue.kind==='element-handle-anchor-style')return (residue.staticStyle?residue.staticStyle+';':'')+residue.declarations.map(a=>a.property+':--mx-'+${slug('a.handleGraphNodeId')}).join(';');`
-			: '',
-	].join('');
+	const singleUnbound = unbound('residue.handleGraphNodeId');
+	const omitUnbound = singleUnbound ? `if(residue.idref&&${singleUnbound})return undefined;` : '';
+	const single = `if(residue.kind==='element-handle-id'){${omitUnbound}return 'mx-'+${slug('residue.handleGraphNodeId')};}`;
+	if (!input.lists) return single;
+	// A list is a referencing side by construction, so every entry is omitted on
+	// the same terms; an attribute naming nothing at all is absent rather than
+	// empty, which is what the single form already does.
+	const entryUnbound = unbound('h');
+	const kept = entryUnbound
+		? `residue.handleGraphNodeIds.filter(h=>!(${entryUnbound}))`
+		: 'residue.handleGraphNodeIds';
+	return `${single}if(residue.kind==='element-handle-id-list'){const ids=${kept}.map(h=>'mx-'+${slug('h')});return ids.length?ids.join(' '):undefined;}`;
+}
+
+/** Whether a chunk set writes any IDREF list, so its reader needs the branch. */
+export function hasElementHandleIdList(chunks: RenderChunks): boolean {
+	const isList = (residue: SemanticMarkupResidue) =>
+		residue.kind === 'element-handle-id-list';
+	return chunks.some((chunk) =>
+		chunk.slots.some(
+			(slot) =>
+				('residue' in slot && isList(slot.residue)) ||
+				(slot.kind === 'dynamic-host' &&
+					slot.attributeSlots.some((attribute) => isList(attribute.residue))),
+		),
+	);
 }
 
 /**
@@ -202,8 +197,10 @@ export function widgetInstanceReadSource(
 	get: (keyExpression: string) => string,
 ): (handleExpression: string) => string {
 	const plain = JSON.stringify(MARKLESS_WIDGET_INSTANCE_KEY);
+	// The LAST slash: a definition id carries its module's path, so cutting at the
+	// first one names a directory, and every family under it collapses to one key.
 	return (handle) =>
-		`(${get(`${plain}+'|'+${handle}.slice(0,${handle}.indexOf('/'))`)}??${get(plain)})`;
+		`(${get(`${plain}+'|'+${handle}.slice(0,${handle}.lastIndexOf('/'))`)}??${get(plain)})`;
 }
 
 // A part rendered outside every widget root has no token; refusing loudly is
@@ -216,11 +213,61 @@ export function hasSharedElementHandle(handles: ReadonlyArray<string>): boolean 
 	return handles.some((handle) => handle.startsWith('shared:'));
 }
 
-// A component's shared-instance local (`const checkbox = checkboxState()`) is
-// not a graph binding: it names a factory whose returned properties each stand
-// for one graph node. A composite residue over that local (`checkbox.checked
-// === true`) can only run once the local is rebuilt from those nodes, so both
-// readers declare it from the same description.
+type SharedInstanceMember = {
+	readonly name: string;
+	readonly graphNodeId: string;
+	readonly path: ReadonlyArray<string>;
+};
+
+type SharedInstanceRebuild = {
+	readonly localName: string;
+	readonly members: ReadonlyArray<SharedInstanceMember>;
+};
+
+/**
+ * A component's shared-instance local (`const checkbox = checkboxState()`) is
+ * not a graph binding: it names a factory whose returned properties each stand
+ * for one graph node. A composite residue over that local (`checkbox.checked
+ * === true`) can only run once the local is rebuilt from those nodes, so every
+ * reader takes the members from this one description.
+ *
+ * Only the cells the text names: a member is read out of the state map by its
+ * own node, never through a sibling member, so the reachable set is the reads
+ * themselves.
+ */
+function sharedInstanceReads(
+	semanticGraph: PublicRenderModuleInput['semanticGraph'],
+	componentName: string | undefined,
+	text: string,
+	bound: ReadonlySet<string>,
+): ReadonlyArray<SharedInstanceRebuild> {
+	const rebuilds: SharedInstanceRebuild[] = [];
+	const declared = new Set<string>();
+	for (const instance of semanticGraph.sharedInstances ?? []) {
+		if (declared.has(instance.localName) || bound.has(instance.localName)) continue;
+		// Only the locals this component's body actually declares: a sibling
+		// component's same-named instance would rebuild the wrong widget's members
+		// under that name, and the emitted scope would read them.
+		if (!sharedInstanceVisibleFrom(instance, componentName)) continue;
+		if (!references(text, instance.localName)) continue;
+
+		const definition = semanticGraph.sharedDefinitions.find(
+			(candidate) => candidate.id === instance.definitionId,
+		);
+		const reads = instanceMemberReads(text, instance.localName);
+		const members = (definition?.returnProperties ?? []).flatMap((property) =>
+			property.kind === 'graph' && (reads === null || reads.has(property.name))
+				? [{ name: property.name, graphNodeId: property.graphNodeId, path: property.path }]
+				: [],
+		);
+		if (members.length === 0) continue;
+
+		declared.add(instance.localName);
+		rebuilds.push({ localName: instance.localName, members });
+	}
+	return rebuilds;
+}
+
 export function sharedInstancePreludeLines(
 	semanticGraph: PublicRenderModuleInput['semanticGraph'],
 	componentName: string | undefined,
@@ -228,35 +275,30 @@ export function sharedInstancePreludeLines(
 	bound: ReadonlySet<string>,
 	readSource: (graphNodeId: string, path: ReadonlyArray<string>) => string,
 ): string[] {
-	const lines: string[] = [];
-	const declared = new Set<string>();
-	for (const instance of semanticGraph.sharedInstances ?? []) {
-		if (declared.has(instance.localName) || bound.has(instance.localName)) continue;
-		// Only the locals this component's body actually declares: a sibling
-		// component's same-named instance would rebuild the wrong widget's members
-		// under that name, and the emitted scope would read them (defect 46).
-		if (!sharedInstanceVisibleFrom(instance, componentName)) continue;
-		if (!references(text, instance.localName)) continue;
+	return sharedInstanceReads(semanticGraph, componentName, text, bound).map(
+		(rebuild) =>
+			`const ${rebuild.localName} = {${rebuild.members
+				.map(
+					(member) =>
+						`${JSON.stringify(member.name)}: ${readSource(member.graphNodeId, member.path)}`,
+				)
+				.join(', ')}};`,
+	);
+}
 
-		const definition = semanticGraph.sharedDefinitions.find(
-			(candidate) => candidate.id === instance.definitionId,
-		);
-		const members = (definition?.returnProperties ?? []).flatMap((property) =>
-			property.kind === 'graph'
-				? [
-						`${JSON.stringify(property.name)}: ${readSource(
-							property.graphNodeId,
-							property.path,
-						)}`,
-					]
-				: [],
-		);
-		if (members.length === 0) continue;
-
-		declared.add(instance.localName);
-		lines.push(`const ${instance.localName} = {${members.join(', ')}};`);
-	}
-	return lines;
+/**
+ * The graph nodes this text reads through a shared instance local. A composite
+ * residue names no node the render data can see, so without these the server
+ * derived nothing for it and the rebuilt local read undefined.
+ */
+export function sharedInstanceReadGraphNodeIds(
+	semanticGraph: PublicRenderModuleInput['semanticGraph'],
+	componentName: string | undefined,
+	text: string,
+): ReadonlyArray<string> {
+	return sharedInstanceReads(semanticGraph, componentName, text, new Set()).flatMap((rebuild) =>
+		rebuild.members.map((member) => member.graphNodeId),
+	);
 }
 
 const CONTEXT = 'marklessResidueContext';
@@ -332,8 +374,8 @@ export function emitClientResidueReader(
 					widgetInstanceRead: hasSharedElementHandle(handles)
 						? widgetInstanceReadSource((key) => `${CONTEXT}.read(${key})`)
 						: null,
-					kinds: elementHandleResidueKinds(componentChunks),
 					boundRead: (key) => `${CONTEXT}.read(${key})`,
+					...(hasElementHandleIdList(componentChunks) ? { lists: true } : {}),
 				})
 			: '';
 	return [
@@ -402,4 +444,24 @@ export function componentAstsForResidueReaders(source: string, filename: string)
 function references(text: string, name: string): boolean {
 	if (!/^[A-Za-z_$][\w$]*$/.test(name)) return false;
 	return new RegExp(`(^|[^\\w$.])${name}([^\\w$]|$)`).test(text);
+}
+
+/**
+ * Which members of `localName` this text reads, or null when it cannot be said.
+ *
+ * Every mention has to be a plain `.member` read for the answer to be complete.
+ * A spread, a bare mention passed on, or an indexed read can reach any member,
+ * so those give up and the whole instance is rebuilt.
+ */
+function instanceMemberReads(text: string, localName: string): ReadonlySet<string> | null {
+	if (!/^[A-Za-z_$][\w$]*$/.test(localName)) return null;
+	const members = new Set<string>();
+	for (const match of text.matchAll(new RegExp(`(^|[^\\w$.])${localName}(?![\\w$])`, 'g'))) {
+		const member = /^\s*\??\.\s*([A-Za-z_$][\w$]*)/.exec(
+			text.slice((match.index ?? 0) + match[0].length),
+		);
+		if (!member?.[1]) return null;
+		members.add(member[1]);
+	}
+	return members;
 }

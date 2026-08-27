@@ -1,0 +1,21 @@
+# MARKLESS_ELEMENT_HANDLE_IDREF_UNBOUND
+
+element() handle is referenced but never bound
+
+- Package: compiler
+- Pass or phase: semantic-graph
+
+## Message
+
+Cannot resolve …=\{…\} because "…" is never bound with el=\{…\} in this component.
+
+## Why
+
+An IDREF position names another element. With no el=\{handle\} binding there is no element to name, so the compiler would emit an attribute pointing at nothing - a silently broken relationship that renders correctly and helps nobody.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
