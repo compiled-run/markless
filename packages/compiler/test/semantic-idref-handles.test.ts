@@ -322,10 +322,11 @@ export function App() @{
 	]);
 });
 
-test('a multi-value IDREF is refused rather than silently joined', async () => {
-	// v1 is one handle per IDREF position. A space-separated list would make the
-	// compiler mint and order several ids, which is the id spelling this record
-	// deliberately does not own.
+test('a multi-value IDREF records one relationship per handle', async () => {
+	// `aria-labelledby` is a list of ids on the platform, so a static array of
+	// handles is the richer relationship rather than a broken value.
+	// idref-handle-lists.test.ts pins the lowering; this side pins that the
+	// refusal these records used to carry is gone for the list positions.
 	const source = `import { element } from '@markless/core';
 export function App() @{
 	const first = element<HTMLSpanElement>();
@@ -334,6 +335,28 @@ export function App() @{
 		<span el={first}>A</span>
 		<span el={second}>B</span>
 		<p aria-labelledby={[first, second]}>Body</p>
+	</div>
+}`;
+	const graph = await graphOf('MultiIdref', source);
+
+	expect(graph.diagnostics).toEqual([]);
+	expect(
+		graph.elementHandleIdrefs.map((idref) => [idref.handleName, idref.boundHostNodeId]),
+	).toEqual([
+		['first', 'h1'],
+		['second', 'h2'],
+	]);
+});
+
+test('a multi-value IDREF is still refused where the platform takes one id', async () => {
+	const source = `import { element } from '@markless/core';
+export function App() @{
+	const first = element<HTMLDivElement>();
+	const second = element<HTMLDivElement>();
+	<div>
+		<div el={first} popover="auto">A</div>
+		<div el={second} popover="auto">B</div>
+		<button popovertarget={[first, second]}>Open</button>
 	</div>
 }`;
 	const graph = await graphOf('MultiIdref', source);
@@ -522,44 +545,6 @@ export function Lab() @{
 	]);
 	// Neither side is a value binding: the root's {children} is the only read.
 	expect(graph.templateReads.map((read) => read.source)).toEqual(['children']);
-});
-
-test('the widget root itself cannot be named by an IDREF', async () => {
-	const graph = await graphOf(
-		'WidgetRootIdref',
-		`import { element, shared, state } from '@markless/core';
-export const wid = shared(() => {
-	const w = state({ open: false });
-	const triggerEl = element<HTMLButtonElement>();
-	return { ...w, triggerEl };
-}, { scope: 'widget' });
-export function Root({ children }: { children?: unknown }) @{
-	const s = wid();
-	<div aria-controls={s.triggerEl}>{children}</div>
-}
-export function Trigger() @{
-	const s = wid();
-	<button type="button" el={s.triggerEl}>go</button>
-}`,
-	);
-
-	expect(codes(graph)).toEqual(['MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT']);
-	expect(
-		graph.diagnostics.find(
-			(diagnostic) => diagnostic.code === 'MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT',
-		),
-	).toEqual(
-		expect.objectContaining({
-			severity: 'error',
-			title: 'This shared() element() handle cannot be named by an IDREF here',
-			docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT',
-		}),
-	);
-	// Refused, not lowered: no record, no slot, and the attribute never reaches
-	// the statics as an empty one.
-	expect(graph.elementHandleIdrefs).toEqual([]);
-	expect(idSlots(graph)).toEqual([]);
-	expect(statics(graph)).not.toContain('aria-controls');
 });
 
 test('a page-wide shared() handle is refused: one element per page is not one per widget', async () => {

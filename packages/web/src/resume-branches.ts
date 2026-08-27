@@ -10,13 +10,7 @@ import type {
 	ResumeViewRecord,
 } from './resume-types.ts';
 
-type ArmDomUpdate = ResumeViewRecord['domUpdates'][number] & {
-	readonly hostPath: ReadonlyArray<number>;
-};
-type ArmBehavior = ResumeBehaviorRecord & { readonly hostPath: ReadonlyArray<number> };
-type ArmHandle = ResumeViewRecord['elementHandles'][number] & {
-	readonly hostPath: ReadonlyArray<number>;
-};
+type Hosted<T> = T & { readonly hostPath: ReadonlyArray<number> };
 type RegisteredResumeBranch = ResumeBranchRecord & {
 	readonly armBoundaryId?: string;
 };
@@ -71,7 +65,7 @@ export function wireBranches(input: any) {
 				await activate(hostNodeId);
 		}
 	}
-	function disposeRemovedRangeHosts(
+	async function disposeRemovedRangeHosts(
 		entries: ReadonlyArray<DomJournalEntry>,
 		disposeHost: (hostNodeId: string) => void,
 		asyncBoundaries: Map<
@@ -81,9 +75,28 @@ export function wireBranches(input: any) {
 				readonly endAnchor: ResumeDomComment;
 			}
 		>,
-	): void {
+	): Promise<void> {
 		if (!entries.some((entry) => entry.type === 'removeRange')) return;
-		disposeRemovedHosts(input, entries, disposeHost, branchesById, asyncBoundaries);
+		const { hostIdsInsideRange } = await import('./dom-journal.ts');
+		for (const entry of entries) {
+			if (entry.type !== 'removeRange') continue;
+			const branch = entry.locator.startsWith('branch:')
+				? branchesById.get(entry.locator.slice('branch:'.length))
+				: undefined;
+			const range =
+				branch ??
+				(entry.locator.startsWith('async-boundary:')
+					? asyncBoundaries.get(entry.locator.slice('async-boundary:'.length))
+					: undefined);
+			if (!range) continue;
+			for (const id of hostIdsInsideRange(
+				input.root,
+				range.startAnchor,
+				range.endAnchor,
+				input.elementsByHostId,
+			))
+				disposeHost(id);
+		}
 	}
 	return {
 		branchesById,
@@ -111,46 +124,60 @@ function createBranchRegistration(
 			for (const armEvent of armRecordSet.events) input.eventTypes.add(armEvent.eventName);
 		let currentArm = wiredBranchArm(input.graph, branch);
 		currentArmByBranchId.set(branch.id, currentArm);
-		for (const testRead of branch.testReads) {
+		async function replaceArmRange(arm: number) {
+			const painted = currentArm;
+			const symbol = await input.loadSymbol(branch.symbolId);
+			const update = await symbol({
+				graph: composedBranchGraph(input.graph, branch),
+				arm,
+				branchId: branch.sourceId ?? branch.id,
+				composedBranchId: branch.id,
+				element: input.root,
+				getElementHandle: input.elementHandles.get,
+			});
+			if (!isResumeBranchUpdate(update)) return;
+			currentArm = update.arm;
+			currentArmByBranchId.set(branch.id, update.arm);
+			const html = branchHtmlToString(update.html);
+			// Escalated arms are arm-relative against DOM that does not exist yet.
+			if (update.armRecords) return input.commitArm(branch, { ...update, html });
+			const fragment = input.renderBranchHtml ? input.renderBranchHtml(html) : html;
+			// `resolved` means the module found this arm's parts, so empty text is a value.
+			if (
+				branchFragmentEmpty(fragment) &&
+				update.resolved !== true &&
+				!branch.declaredEmptyArms?.includes(update.arm)
+			)
+				throw branchArmEmptyError(branch, update.arm);
+			// A replay that would put this arm back exactly as it stands is not
+			// emitted: nothing moves, so no census is spliced and nothing announces.
+			if (update.arm === painted) {
+				const { domRangeMatchesFragment } = await import('./dom-journal.ts');
+				if (domRangeMatchesFragment(branch.startAnchor, branch.endAnchor, fragment)) return;
+			}
+			return [
+				{ type: 'removeRange', locator: `branch:${branch.id}` },
+				{ type: 'insertRange', locator: `branch:${branch.id}:start`, fragment },
+			] as DomJournalResult;
+		}
+		function wireRead(kind: 'test' | 'content', read: ResumeBranchRecord['testReads'][number]) {
 			const release = onceRelease(
 				input.graph.subscribe({
-					id: `branch-test:${branch.id}:${testRead.graphNodeId}:${testRead.path.join('.')}`,
-					graphNodeId: testRead.graphNodeId,
-					path: testRead.path,
+					id: `branch-${kind}:${branch.id}:${read.graphNodeId}:${read.path.join('.')}`,
+					graphNodeId: read.graphNodeId,
+					path: read.path,
 					async run() {
-						// Spec D8: pending is for FIRST APPEARANCES only — including flips.
-						// While the deciding read's async computed is re-running the flip
-						// holds its prior arm (see resume-runtime.ts holdPendingFlip). The
-						// compiler emits at most one test read per branch (symbol-resolver),
-						// so this subscription's read IS the arm decider readBranchArm uses.
-						if (input.holdPendingFlip?.(testRead.graphNodeId)) return;
-						const newArm = readBranchArm(input.graph, branch);
-						if (newArm === currentArm) return;
-						const symbol = await input.loadSymbol(branch.symbolId);
-						const update = await symbol({
-							graph: input.graph,
-							arm: newArm,
-							branchId: branch.sourceId ?? branch.id,
-							composedBranchId: branch.id,
-							element: input.root,
-							getElementHandle: input.elementHandles.get,
-						});
-						if (!isResumeBranchUpdate(update)) return;
-						currentArm = update.arm;
-						currentArmByBranchId.set(branch.id, update.arm);
-						const html = branchHtmlToString(update.html);
-						const fragment = input.renderBranchHtml
-							? input.renderBranchHtml(html)
-							: html;
-						if (
-							branchFragmentEmpty(fragment) &&
-							!branch.declaredEmptyArms?.includes(update.arm)
-						)
-							throw branchArmEmptyError(branch, update.arm);
-						return [
-							{ type: 'removeRange', locator: `branch:${branch.id}` },
-							{ type: 'insertRange', locator: `branch:${branch.id}:start`, fragment },
-						] as DomJournalResult;
+						// Pending is for FIRST APPEARANCES only, flips included: while the
+						// deciding read's async computed re-runs, the flip holds its prior
+						// arm (resume-runtime.ts holdPendingFlip). One test read per branch,
+						// so this subscription IS the arm decider readBranchArm uses.
+						if (kind === 'test' && input.holdPendingFlip?.(read.graphNodeId)) return;
+						// Decide-less: no test to re-read, so it holds its painted arm.
+						const arm = branch.testReads.length
+							? readBranchArm(input.graph, branch)
+							: currentArm;
+						if (kind === 'test' ? arm === currentArm : arm !== currentArm) return;
+						return replaceArmRange(arm);
 					},
 				}),
 			);
@@ -161,6 +188,8 @@ function createBranchRegistration(
 			}
 			input.storeContainerSubscription(release);
 		}
+		for (const testRead of branch.testReads) wireRead('test', testRead);
+		for (const contentRead of branch.contentReads ?? []) wireRead('content', contentRead);
 	}
 
 	// Escalated arm-scoped toggles (content needs component execution): the
@@ -186,9 +215,8 @@ function createBranchRegistration(
 			);
 	}
 
-	// Re-registration API for commitArm (T103/T104): a fresh arm brings fresh
-	// arm-branch anchors, so previous flip subscriptions release first (no
-	// leaks) and the current arm's in-branch records register like startup.
+	// A fresh arm brings fresh arm-branch anchors, so previous flip
+	// subscriptions release first or they leak.
 	function registerArmBranches(
 		boundaryId: string,
 		records: ReadonlyArray<RegisteredResumeBranch>,
@@ -197,15 +225,16 @@ function createBranchRegistration(
 		armFlipReleasesByBoundary.delete(boundaryId);
 		const behaviorHostIds: string[] = [];
 		for (const record of records) {
-			if (!record.testReads?.length) continue;
-			if (
-				!record.symbolId ||
-				!isLiveComment(record.startAnchor) ||
-				!isLiveComment(record.endAnchor)
-			) {
+			// A decided branch wires with no test at all; what nothing can wire is a
+			// record with neither a test to read nor an arm the render painted.
+			const flips = Boolean(record.testReads?.length);
+			if (!flips && typeof record.takenArm !== 'number') continue;
+			const live = isLiveComment(record.startAnchor) && isLiveComment(record.endAnchor);
+			if (flips && (!record.symbolId || !live)) {
 				wireEscalatedRecord({ ...record, armBoundaryId: boundaryId });
 				continue;
 			}
+			if (!live) continue;
 			const branch = { ...record, armBoundaryId: boundaryId };
 			wireBranchRecord(branch);
 			const arm = currentArmByBranchId.get(branch.id);
@@ -218,6 +247,31 @@ function createBranchRegistration(
 	return { registerArmBranches, wireBranchRecord, wireEscalatedRecord };
 }
 
+// An arm symbol rebuilds from the part-local prop ids its own module spells,
+// which the record's rewritten reads never touch. Reading the served table here
+// rather than through fns/composition.ts keeps the compose path out of resume's
+// static closure; composed-arm-projection.test.ts pins the two ends together.
+export function composedBranchGraph(graph: RuntimeGraph, branch: ResumeBranchRecord): RuntimeGraph {
+	const routes = branch.composedGraphProps;
+	if (!routes?.length) return graph;
+	const scope = branch.composedInstancePath ?? '';
+	return {
+		...graph,
+		read(id: string, path: ReadonlyArray<string> = []) {
+			// Resume scoped this symbol, so the id arrives carrying the instance
+			// path; `prop:` is not page space, so taking it back off is exact.
+			const local = id.startsWith(scope) ? id.slice(scope.length) : id;
+			const spread = local === 'prop:props';
+			const prop = local.startsWith('prop:') && local.slice('prop:'.length);
+			// No route means a prop passed statically, or no prop read at all.
+			const route = routes.find((one) => one.name === (spread ? path[0] : prop));
+			return route
+				? graph.read(route.graphNodeId, [...(route.path ?? []), ...path.slice(+spread)])
+				: graph.read(id, path);
+		},
+	};
+}
+
 function onceRelease(release: () => void): () => void {
 	let released = false;
 	return () => {
@@ -227,13 +281,11 @@ function onceRelease(release: () => void): () => void {
 	};
 }
 
-// The arm the render PAINTED, which the guard has to compare against. A minted
-// condition computed is cell-backed here and holds no value until its first
-// demand refresh, so reading the graph answers the else arm for a branch painted
-// at arm 0 and the first real update is then discarded as a no-change.
+// The arm the render PAINTED wins: a minted condition computed holds no value
+// until its first demand refresh, so the graph answers the else arm for a branch
+// painted at arm 0 and the first real update is discarded as a no-change.
 function wiredBranchArm(graph: RuntimeGraph, branch: ResumeBranchRecord): number {
-	const painted = (branch as { readonly takenArm?: number }).takenArm;
-	return typeof painted === 'number' ? painted : readBranchArm(graph, branch);
+	return typeof branch.takenArm === 'number' ? branch.takenArm : readBranchArm(graph, branch);
 }
 
 function readBranchArm(graph: RuntimeGraph, branch: ResumeBranchRecord): number {
@@ -298,7 +350,9 @@ function materializeBranchArmRecords(
 				symbolIds: armEvent.symbolIds,
 			});
 	}
-	for (const update of set.domUpdates as ReadonlyArray<ArmDomUpdate>) {
+	for (const update of set.domUpdates as ReadonlyArray<
+		Hosted<ResumeViewRecord['domUpdates'][number]>
+	>) {
 		if (!update.symbolId) continue;
 		const host = claim(update.hostPath);
 		if (!host) continue;
@@ -325,7 +379,7 @@ function materializeBranchArmRecords(
 		);
 	}
 	const byHost = new Map<string, ResumeBehaviorRecord[]>();
-	for (const behavior of set.behaviors as ReadonlyArray<ArmBehavior>) {
+	for (const behavior of set.behaviors as ReadonlyArray<Hosted<ResumeBehaviorRecord>>) {
 		const host = claim(behavior.hostPath);
 		if (!host) continue;
 		const records = byHost.get(host.hostNodeId) ?? [];
@@ -333,7 +387,9 @@ function materializeBranchArmRecords(
 		byHost.set(host.hostNodeId, records);
 	}
 	for (const [hostNodeId, records] of byHost) input.addBehaviorRecords(hostNodeId, records);
-	for (const handle of set.elementHandles as ReadonlyArray<ArmHandle>) {
+	for (const handle of set.elementHandles as ReadonlyArray<
+		Hosted<ResumeViewRecord['elementHandles'][number]>
+	>) {
 		const host = claim(handle.hostPath);
 		if (host) input.elementHandles.register(host.hostNodeId, handle, host.element);
 	}
@@ -434,85 +490,6 @@ function rowEventHost(
 	return current.nodeType === 1 ? (current as ResumeDomElement) : undefined;
 }
 
-function disposeRemovedHosts(
-	input: any,
-	entries: ReadonlyArray<DomJournalEntry>,
-	disposeHost: (hostNodeId: string) => void,
-	branchesById: Map<string, ResumeBranchRecord>,
-	asyncBoundaries: Map<
-		string,
-		{
-			readonly startAnchor: ResumeDomComment;
-			readonly endAnchor: ResumeDomComment;
-		}
-	>,
-): void {
-	for (const entry of entries) {
-		if (entry.type !== 'removeRange') continue;
-		const branch = entry.locator.startsWith('branch:')
-			? branchesById.get(entry.locator.slice('branch:'.length))
-			: undefined;
-		const range =
-			branch ??
-			(entry.locator.startsWith('async-boundary:')
-				? asyncBoundaries.get(entry.locator.slice('async-boundary:'.length))
-				: undefined);
-		if (!range) continue;
-		for (const id of hostIdsInsideRemovedElements(
-			input.elementsByHostId,
-			elementsBetweenAnchors(input.root, range.startAnchor, range.endAnchor),
-		))
-			disposeHost(id);
-	}
-}
-
-// Local copies of the resume-locators DOM-walk helpers: importing that module
-// here regroups it (plus the resume-errors chunk) into this wall-counted
-// chunk, which costs more than the duplication saves (T120 measurement).
-function elementsBetweenAnchors(
-	root: ResumeDomElement,
-	startAnchor: ResumeDomComment,
-	endAnchor: ResumeDomComment,
-): Set<ResumeDomElement> {
-	const inside = new Set<ResumeDomElement>();
-	let within = false;
-	function visit(node: ResumeDomNode): void {
-		if (node === startAnchor) {
-			within = true;
-			return;
-		}
-		if (node === endAnchor) {
-			within = false;
-			return;
-		}
-		if (within && node.nodeType === 1) inside.add(node as ResumeDomElement);
-		for (const child of node.childNodes ?? []) visit(child);
-	}
-	visit(root);
-	return inside;
-}
-
-function hostIdsInsideRemovedElements(
-	elementsByHostId: Map<string, ResumeDomElement>,
-	removed: Set<ResumeDomElement>,
-): string[] {
-	const ids: string[] = [];
-	for (const [id, element] of elementsByHostId)
-		for (const removedElement of removed)
-			if (containsElement(removedElement, element)) {
-				ids.push(id);
-				break;
-			}
-	return ids;
-}
-
-function containsElement(root: ResumeDomElement, target: ResumeDomElement): boolean {
-	if (root === target) return true;
-	for (const child of root.childNodes ?? [])
-		if (child.nodeType === 1 && containsElement(child as ResumeDomElement, target)) return true;
-	return false;
-}
-
 function walkComments(root: ResumeDomElement): ResumeDomComment[] {
 	// Arm-branch anchors index in their boundary's own census, never here.
 	const comments: ResumeDomComment[] = [];
@@ -536,8 +513,6 @@ function missingCommentAnchorError(
 	);
 }
 
-// Shared diagnostic shape (message text stays authored per site; docsUrl
-// always mirrors the code).
 function branchRuntimeError(message: string, code: string, fields: Record<string, unknown>): Error {
 	const error = new Error(message) as Error & Record<string, unknown>;
 	error.name = 'RuntimeResumeError';

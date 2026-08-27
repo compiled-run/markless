@@ -231,6 +231,9 @@ export async function resumeFullEventOnly(
 	});
 	await runtime.dispatch(input.event, {
 		syncPolicyAlreadyApplied: input.syncPolicyAlreadyApplied === true,
+		// Escalation reaches here for a record-less forward too, which is the entry
+		// capture's broad sweep and passes through the live listener the same way.
+		ignoreUnmatched: input.eventRecord == null,
 	});
 	return undefined as unknown as EventOnlyResumeContainer;
 }

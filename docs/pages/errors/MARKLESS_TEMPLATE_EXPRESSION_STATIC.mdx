@@ -1,0 +1,22 @@
+# MARKLESS_TEMPLATE_EXPRESSION_STATIC
+
+This expression reads state but never updates
+
+- Package: compiler
+- Pass or phase: state-lowering
+- Severity: warning
+
+## Message
+
+This text reads `…`, but only plain reads like `{…}` update the page today. The expression renders its initial value and never changes when `…` changes.
+
+## Why
+
+Each template read compiles to a graph subscription with a DOM-update record; composite expressions are not lowered yet, so no subscription exists to wake this text.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/state-lowering.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
