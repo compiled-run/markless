@@ -12,6 +12,7 @@ import { TwoComboboxes } from './scenarios/two-comboboxes.tsrx';
 import { UnavailableOptions } from './scenarios/unavailable-options.tsrx';
 import { WithCallbacks } from './scenarios/with-callbacks.tsrx';
 import { WithError } from './scenarios/with-error.tsrx';
+import { WithHelpAndError } from './scenarios/with-help-and-error.tsrx';
 
 const Root = page.getByTestId('root');
 const Label = page.getByTestId('label');
@@ -130,6 +131,9 @@ function expectNamedWithNoDanglingIdref() {
 	expect(el(Label).getAttribute('for')).toBe(el(Input).getAttribute('id'));
 	expect(document.getElementById(labelId as string)).toBe(el(Label));
 	expect(document.getElementById(contentId as string)).toBe(el(Content));
+	// Neither message part is placed, so both handles drop out and no empty
+	// attribute is left behind.
+	expect(el(Input).hasAttribute('aria-describedby')).toBe(false);
 }
 
 function expectOneElementPerPart() {
@@ -375,6 +379,7 @@ function expectFormPartsRendered() {
 	expect(el<HTMLSelectElement>(Field).required).toBe(true);
 	const describedId = el(Description).getAttribute('id');
 	expect(describedId).toBeTruthy();
+	// Only the description was placed, so the error drops out of the list.
 	expect(el(Input).getAttribute('aria-describedby')).toBe(describedId);
 }
 
@@ -664,7 +669,23 @@ for (const mode of MODES) {
 		else await renderSSR(WithError);
 		expect(el(Input).getAttribute('aria-invalid')).toBe('true');
 		expect(el(ErrorMessage).getAttribute('role')).toBe('alert');
+		// Only the error was placed, so it is named alone - no stray space, no
+		// dangling id.
 		expect(el(Input).getAttribute('aria-describedby')).toBe(el(ErrorMessage).getAttribute('id'));
+	});
+
+	test(`${mode}: both messages are named by the input, error first`, async () => {
+		if (mode === 'CSR') await render(WithHelpAndError);
+		else await renderSSR(WithHelpAndError);
+		const description = el(Description);
+		const error = el(ErrorMessage);
+		expect(description.id).toBeTruthy();
+		expect(error.id).toBeTruthy();
+		expect(description.id).not.toBe(error.id);
+		// Both ids, error first: the hint is written above the error in this page,
+		// so the order is the family's rather than the document's.
+		expect(el(Input).getAttribute('aria-describedby')).toBe(`${error.id} ${description.id}`);
+		expect(el(ErrorMessage).getAttribute('role')).toBe('alert');
 	});
 
 	// `inline` is a boolean on the root: the list is always showing and nothing
@@ -712,14 +733,6 @@ test.fails('the field names the highlighted option for a screen reader', async (
 	const named = el(Input).getAttribute('aria-activedescendant');
 	expect(named).toBeTruthy();
 	expect(named).toBe(el(Apple).getAttribute('id'));
-});
-
-// PENDING CAPABILITY - an IDREF list is MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE, so
-// this family names ONE handle and the second message goes undescribed.
-test.fails('a combobox mounting both messages is described by both', async () => {
-	await render(SignupForm);
-	const describedBy = el(Input).getAttribute('aria-describedby') ?? '';
-	expect(describedBy.split(' ').length).toBe(2);
 });
 
 // PENDING BEHAVIOUR - scroll the highlight into view. Not blocked, just unbuilt: one

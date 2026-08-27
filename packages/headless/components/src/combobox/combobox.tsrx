@@ -48,7 +48,8 @@ export const comboboxState = shared(
 		const inputEl = element<HTMLInputElement>();
 		const triggerEl = element<HTMLButtonElement>();
 		const contentEl = element<HTMLDivElement>();
-		const describedEl = element<HTMLDivElement>();
+		const descriptionEl = element<HTMLDivElement>();
+		const errorEl = element<HTMLDivElement>();
 		// The array type argument is what makes this handle plural: one handle bound on every option, read back in document order.
 		const optionEls = element<HTMLDivElement[]>();
 
@@ -58,7 +59,8 @@ export const comboboxState = shared(
 			inputEl,
 			triggerEl,
 			contentEl,
-			describedEl,
+			descriptionEl,
+			errorEl,
 			optionEls,
 			// literal function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string | readonly string[]) => void) | undefined,
@@ -199,7 +201,9 @@ export function ComboboxInput({
 		aria-autocomplete="list"
 		aria-labelledby={combobox.labelEl}
 		aria-controls={combobox.contentEl}
-		aria-describedby={combobox.describedEl}
+		// Error before description: what is wrong is conveyed before the hint,
+		// wherever the two parts sit in the page.
+		aria-describedby={[combobox.errorEl, combobox.descriptionEl]}
 		aria-invalid={combobox.invalid ? 'true' : 'false'}
 		// An inline list is part of the page, so neither word is written; `false` removes the attribute where `undefined` writes no record at all.
 		aria-expanded={combobox.inline === true ? false : combobox.open === true ? 'true' : 'false'}
@@ -432,20 +436,17 @@ export function ComboboxItemIndicator({ children, ...rest }: ComboboxItemIndicat
 	<span {...rest} aria-hidden="true" ui-hidden={isChosen !== true}>{children}</span>
 }
 
-// One part stands behind both `combobox.description` and `combobox.error`: a handle binds in one place and `aria-describedby` names one id (an IDREF list is MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE), so mounting both describes by the first.
-function ComboboxMessage({ children, ...rest }: ComboboxDescriptionProps) @{
+export function ComboboxDescription({ children, ...rest }: ComboboxDescriptionProps) @{
 	const combobox = comboboxState();
 
-	<div {...rest} el={combobox.describedEl}>{children}</div>
-}
-
-export function ComboboxDescription({ children, ...rest }: ComboboxDescriptionProps) @{
-	<ComboboxMessage {...rest}>{children}</ComboboxMessage>
+	<div {...rest} el={combobox.descriptionEl}>{children}</div>
 }
 
 // `role="alert"` so the message is spoken when it appears.
 export function ComboboxError({ children, ...rest }: ComboboxErrorProps) @{
-	<ComboboxMessage {...rest} role="alert">{children}</ComboboxMessage>
+	const combobox = comboboxState();
+
+	<div {...rest} el={combobox.errorEl} role="alert">{children}</div>
 }
 
 // A single-option `<select>` submits the same name/value pair a rebuilt option list would; the value rides as text because the option element's attribute type does not yet take one.
