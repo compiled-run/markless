@@ -1,0 +1,24 @@
+# MARKLESS_COMPONENT_BARREL_UNRESOLVED
+
+Component barrel re-export does not resolve
+
+- Package: bundler, compiler
+- Pass or phase: link, link-driver
+- Severity: error
+
+## Message
+
+Module … re-exports through more than … chained barrels.
+
+… re-exports … from …, which does not resolve to a module.
+
+## Why
+
+A barrel names the parts module rather than the components, so a re-export that resolves to nothing would silently drop every component behind it.
+
+## Emitted from
+
+- `packages/bundler/src/link-driver.ts`
+- `packages/compiler/src/passes/link/module-link.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

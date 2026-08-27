@@ -10,8 +10,8 @@ export type PopoverSide = 'top' | 'bottom' | 'start' | 'end';
 /**
  * The popover itself; the trigger and the surface go inside it. It holds whether
  * the surface is showing and which side it is placed on, and it is the anchor
- * end of the CSS anchor placement, so the family owns this element's `style`
- * attribute - style the root from a stylesheet rather than a `style` prop.
+ * end of the CSS anchor placement, which lives in the part's own scoped
+ * stylesheet - your `style` and `class` compose untouched.
  */
 export type PopoverRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/** Whether the surface is showing. Omit it and the popover starts closed. */
@@ -21,9 +21,11 @@ export type PopoverRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	 * `popover.content` as `ui-side`, so styling can follow the placement.
 	 *
 	 * The placement is a CSS anchor, so it holds while the page scrolls and
-	 * reflows without any script. The family owns the `style` attribute on
-	 * `popover.root`, `popover.trigger` and `popover.content` to carry it -
-	 * style those three parts from a stylesheet rather than a `style` prop.
+	 * reflows without any script. The anchor binding and one default
+	 * `position-area` per side ship in the parts' own scoped stylesheets, inside
+	 * `@layer markless` - so any unlayered rule of yours keyed off `ui-side`
+	 * replaces the default without a specificity fight. `--ui-anchor` on
+	 * `popover.content` names the anchor for your own `anchor()` geometry.
 	 */
 	readonly side?: PopoverSide;
 	/**
