@@ -239,8 +239,8 @@ test('the smallest and largest sizes are what a resize stops at', () => {
 			300,
 			40,
 			40,
-			undefined,
-			undefined,
+			Number.POSITIVE_INFINITY,
+			Number.POSITIVE_INFINITY,
 			free,
 		).width,
 	).toBe(400);

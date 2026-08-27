@@ -57,10 +57,9 @@ export function heldRect(
 }
 
 /** The widest a rectangle may be on one axis: the declared cap, never past the area. */
-function sizeCeiling(areaSize: number, cap: number | undefined): number {
-	const limit = cap === undefined ? Number.POSITIVE_INFINITY : cap;
-	if (areaSize > 0 && areaSize < limit) return areaSize;
-	return limit;
+function sizeCeiling(areaSize: number, cap: number): number {
+	if (areaSize > 0 && areaSize < cap) return areaSize;
+	return cap;
 }
 
 /** The furthest a rectangle of this size may start on one axis. */
@@ -95,8 +94,8 @@ export function boundedRect(
 	areaBlock: number,
 	minWidth: number,
 	minHeight: number,
-	maxWidth: number | undefined,
-	maxHeight: number | undefined,
+	maxWidth: number,
+	maxHeight: number,
 	aspect: number | undefined,
 ): CropRect {
 	const highWidth = sizeCeiling(areaInline, maxWidth);
@@ -152,7 +151,7 @@ function resizedAxis(
 	delta: number,
 	areaSize: number,
 	low: number,
-	high: number | undefined,
+	high: number,
 ): { readonly start: number; readonly size: number } {
 	const edge = areaSize > 0 ? areaSize : Number.POSITIVE_INFINITY;
 	const from = movesStart ? clamp(start + delta, 0, edge) : start;
@@ -180,8 +179,8 @@ export function resizedRect(
 	areaBlock: number,
 	minWidth: number,
 	minHeight: number,
-	maxWidth: number | undefined,
-	maxHeight: number | undefined,
+	maxWidth: number,
+	maxHeight: number,
 	aspect: number | undefined,
 ): CropRect {
 	const inline = resizedAxis(
