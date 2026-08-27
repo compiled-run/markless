@@ -19,8 +19,8 @@ export function wireBranches(input: any) {
 	const branchesById = new Map<string, ResumeBranchRecord>(),
 		currentArmByBranchId = new Map<string, number>(),
 		startupArmBehaviorHostIds: string[] = [];
-	// Arm-scoped flip subscriptions dispose and rewire on every arm commit
-	// (the anchors are replaced); escalated records wire once per site.
+	// Arm-scoped flips rewire on every commit (anchors are replaced); escalated
+	// records wire once per site.
 	const armFlipReleasesByBoundary = new Map<string, Array<() => void>>(),
 		wiredEscalationIds = new Set<string>();
 	const { registerArmBranches, wireBranchRecord, wireEscalatedRecord } = createBranchRegistration(
@@ -122,13 +122,25 @@ function createBranchRegistration(
 		branchesById.set(branch.id, branch);
 		for (const armRecordSet of branch.armRecords ?? [])
 			for (const armEvent of armRecordSet.events) input.eventTypes.add(armEvent.eventName);
+		// An IDREF outside the arms follows the PAINTED arm, and the served arm never
+		// materializes, so every paint answers it.
+		const paintArm = (arm: number) => {
+			currentArmByBranchId.set(branch.id, arm);
+			if (branch.idrefSites?.length)
+				void import('./resume-arm-records.ts').then((records) =>
+					records.syncBranchIdrefSites(input.elementsByHostId, branch, arm),
+				);
+		};
 		let currentArm = wiredBranchArm(input.graph, branch);
-		currentArmByBranchId.set(branch.id, currentArm);
+		paintArm(currentArm);
 		async function replaceArmRange(arm: number) {
 			const painted = currentArm;
 			const symbol = await input.loadSymbol(branch.symbolId);
+			let graph = composedBranchGraph(input.graph, branch);
+			if (branch.elementHandleIds)
+				graph = (await import('./resume-arm-records.ts')).armElementHandleIdGraph(graph, branch);
 			const update = await symbol({
-				graph: composedBranchGraph(input.graph, branch),
+				graph,
 				arm,
 				branchId: branch.sourceId ?? branch.id,
 				composedBranchId: branch.id,
@@ -137,7 +149,7 @@ function createBranchRegistration(
 			});
 			if (!isResumeBranchUpdate(update)) return;
 			currentArm = update.arm;
-			currentArmByBranchId.set(branch.id, update.arm);
+			paintArm(update.arm);
 			const html = branchHtmlToString(update.html);
 			// Escalated arms are arm-relative against DOM that does not exist yet.
 			if (update.armRecords) return input.commitArm(branch, { ...update, html });
@@ -149,8 +161,8 @@ function createBranchRegistration(
 				!branch.declaredEmptyArms?.includes(update.arm)
 			)
 				throw branchArmEmptyError(branch, update.arm);
-			// A replay that would put this arm back exactly as it stands is not
-			// emitted: nothing moves, so no census is spliced and nothing announces.
+			// A replay putting this arm back as it stands moves nothing, so nothing
+			// splices and nothing announces.
 			if (update.arm === painted) {
 				const { domRangeMatchesFragment } = await import('./dom-journal.ts');
 				if (domRangeMatchesFragment(branch.startAnchor, branch.endAnchor, fragment)) return;
@@ -167,12 +179,10 @@ function createBranchRegistration(
 					graphNodeId: read.graphNodeId,
 					path: read.path,
 					async run() {
-						// Pending is for FIRST APPEARANCES only, flips included: while the
-						// deciding read's async computed re-runs, the flip holds its prior
-						// arm (resume-runtime.ts holdPendingFlip). One test read per branch,
-						// so this subscription IS the arm decider readBranchArm uses.
+						// While the deciding read's async computed re-runs, the flip holds
+						// its prior arm; one test read per branch, so this subscription IS
+						// the decider readBranchArm uses.
 						if (kind === 'test' && input.holdPendingFlip?.(read.graphNodeId)) return;
-						// Decide-less: no test to re-read, so it holds its painted arm.
 						const arm = branch.testReads.length
 							? readBranchArm(input.graph, branch)
 							: currentArm;
@@ -192,8 +202,8 @@ function createBranchRegistration(
 		for (const contentRead of branch.contentReads ?? []) wireRead('content', contentRead);
 	}
 
-	// Escalated arm-scoped toggles (content needs component execution): the
-	// test read re-renders the whole arm through the boundary's update module.
+	// Escalated toggles need component execution, so the test read re-renders the
+	// arm through the boundary's update module.
 	function wireEscalatedRecord(record: {
 		readonly id: string;
 		readonly testReads?: ResumeBranchRecord['testReads'];
@@ -202,8 +212,7 @@ function createBranchRegistration(
 		if (!record.armBoundaryId || !record.testReads?.length || wiredEscalationIds.has(record.id))
 			return;
 		wiredEscalationIds.add(record.id);
-		// Pending re-runs need no hold here: resettleBoundary routes through
-		// settleAsyncBoundaryRange, which ignores non-settled snapshots.
+		// No hold needed: resettleBoundary ignores non-settled snapshots.
 		for (const testRead of record.testReads)
 			input.storeContainerSubscription(
 				input.graph.subscribe({
@@ -215,8 +224,8 @@ function createBranchRegistration(
 			);
 	}
 
-	// A fresh arm brings fresh arm-branch anchors, so previous flip
-	// subscriptions release first or they leak.
+	// A fresh arm brings fresh anchors, so prior flip subscriptions leak unless
+	// they release first.
 	function registerArmBranches(
 		boundaryId: string,
 		records: ReadonlyArray<RegisteredResumeBranch>,
@@ -225,8 +234,8 @@ function createBranchRegistration(
 		armFlipReleasesByBoundary.delete(boundaryId);
 		const behaviorHostIds: string[] = [];
 		for (const record of records) {
-			// A decided branch wires with no test at all; what nothing can wire is a
-			// record with neither a test to read nor an arm the render painted.
+			// A decided branch wires with no test; unwirable is a record with neither
+			// a test to read nor an arm the render painted.
 			const flips = Boolean(record.testReads?.length);
 			if (!flips && typeof record.takenArm !== 'number') continue;
 			const live = isLiveComment(record.startAnchor) && isLiveComment(record.endAnchor);
@@ -247,10 +256,10 @@ function createBranchRegistration(
 	return { registerArmBranches, wireBranchRecord, wireEscalatedRecord };
 }
 
-// An arm symbol rebuilds from the part-local prop ids its own module spells,
-// which the record's rewritten reads never touch. Reading the served table here
-// rather than through fns/composition.ts keeps the compose path out of resume's
-// static closure; composed-arm-projection.test.ts pins the two ends together.
+// An arm symbol rebuilds from the part-local prop ids its own module spells, which
+// the record's rewritten reads never touch. Reading the served table here rather than
+// through fns/composition.ts keeps the compose path out of resume's static closure;
+// composed-arm-projection.test.ts pins the two ends together.
 export function composedBranchGraph(graph: RuntimeGraph, branch: ResumeBranchRecord): RuntimeGraph {
 	const routes = branch.composedGraphProps;
 	if (!routes?.length) return graph;
@@ -263,7 +272,6 @@ export function composedBranchGraph(graph: RuntimeGraph, branch: ResumeBranchRec
 			const local = id.startsWith(scope) ? id.slice(scope.length) : id;
 			const spread = local === 'prop:props';
 			const prop = local.startsWith('prop:') && local.slice('prop:'.length);
-			// No route means a prop passed statically, or no prop read at all.
 			const route = routes.find((one) => one.name === (spread ? path[0] : prop));
 			return route
 				? graph.read(route.graphNodeId, [...(route.path ?? []), ...path.slice(+spread)])
@@ -281,9 +289,9 @@ function onceRelease(release: () => void): () => void {
 	};
 }
 
-// The arm the render PAINTED wins: a minted condition computed holds no value
-// until its first demand refresh, so the graph answers the else arm for a branch
-// painted at arm 0 and the first real update is discarded as a no-change.
+// The PAINTED arm wins: a minted condition computed holds no value until its first
+// demand refresh, so the graph would answer the else arm and the first real update
+// would be discarded as a no-change.
 function wiredBranchArm(graph: RuntimeGraph, branch: ResumeBranchRecord): number {
 	return typeof branch.takenArm === 'number' ? branch.takenArm : readBranchArm(graph, branch);
 }
@@ -369,8 +377,7 @@ function materializeBranchArmRecords(
 						graph: input.graph,
 						element: host.element,
 						getElementHandle: input.elementHandles.get,
-						// The arm claimed this element under its own id; the page id
-						// the record carries names nothing while the arm is live.
+						// The page id the record carries names nothing while the arm is live.
 						domUpdate: { ...update, hostNodeId: host.hostNodeId },
 						value,
 					})) as DomJournalResult | void;
@@ -428,8 +435,8 @@ function materializeBranchLocators(
 		if (!branch.symbolId || !branch.testReads?.length) {
 			if (!isDecidedBranch(branch)) continue;
 		}
-		// Arm-scoped records arrive with LIVE anchors (resolved in the owning
-		// boundary's own arm-branch census by expandBoundaryArmRecords).
+		// Arm-scoped records arrive with LIVE anchors, resolved by
+		// expandBoundaryArmRecords in the owning boundary's own census.
 		const live = isLiveComment(branch.startAnchor) && isLiveComment(branch.endAnchor);
 		const startAnchor = live
 				? (branch.startAnchor as unknown as ResumeDomComment)

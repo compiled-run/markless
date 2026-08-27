@@ -9,6 +9,7 @@ import type {
 	ResumeArmBranchRecord,
 	ResumeArmRecordSet,
 	ResumeAsyncBoundaryPayload,
+	ResumeBranchRecord,
 	ResumeDomComment,
 	ResumeDomElement,
 	ResumeDomNode,
@@ -266,4 +267,47 @@ export function installComposedArmRecordQualifier(qualifier: ComposedArmRecordQu
 
 export function composedArmRecordQualifier(): ComposedArmRecordQualifier | undefined {
 	return installedQualifier;
+}
+
+/**
+ * An IDREF outside the arms names a handle one arm binds, so the attribute is
+ * earned exactly while that arm is the painted one. Keyed on the PAINTED arm,
+ * never on what a materialization filed: the arm the render served is never
+ * re-materialized, and a refresh repainting the same arm files no handle records
+ * of its own. `handleReadId` keys both the site and the record's minted ids.
+ */
+export function syncBranchIdrefSites(
+	elementsByHostId: ReadonlyMap<string, ResumeDomElement>,
+	branch: ResumeBranchRecord,
+	arm: number | undefined,
+): void {
+	for (const site of branch.idrefSites ?? []) {
+		const host = elementsByHostId.get(site.hostNodeId);
+		if (!host) continue;
+		const id = branch.elementHandleIds?.[site.handleReadId];
+		if (id !== undefined && arm === site.armIndex) host.setAttribute?.(site.attributeName, id);
+		else host.removeAttribute?.(site.attributeName);
+	}
+}
+
+/**
+ * The one channel a flip has to a minted element() id: the id belongs to the
+ * rendered widget and its instance token is a seed-map value no flip can reach,
+ * so the render that served the arm resolved it onto the record. A composed
+ * symbol's reads arrive with the instance path PREPENDED, which is why the
+ * record's key is a SUFFIX of the id the symbol asks under rather than all of it.
+ */
+export function armElementHandleIdGraph(
+	graph: RuntimeGraph,
+	branch: ResumeBranchRecord,
+): RuntimeGraph {
+	const ids = branch.elementHandleIds;
+	if (!ids) return graph;
+	return {
+		...graph,
+		read(id: string, path: ReadonlyArray<string> = []) {
+			for (const key in ids) if (id.endsWith(key)) return ids[key];
+			return graph.read(id, path);
+		},
+	};
 }

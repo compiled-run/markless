@@ -29,6 +29,8 @@ export type ResumeDomElement = ResumeDomNode & {
 		options?: { readonly capture?: boolean },
 	) => void;
 	readonly dispatchEvent?: (event: ResumeSharedPatchEvent) => boolean;
+	readonly setAttribute?: (name: string, value: string) => void;
+	readonly removeAttribute?: (name: string) => void;
 	// The build-complete bootstrap owns DOM capture for the container lifetime.
 	// Full and staged runtimes register records only; they never add a second
 	// listener authority while this marker is present.
@@ -151,6 +153,12 @@ export type ResumeBranchRecord = {
 	readonly composedInstancePath?: string;
 	readonly composedGraphProps?: NonNullable<
 		NonNullable<ProtocolViewPayload['branches']>[number]['composedGraphProps']
+	>;
+	readonly elementHandleIds?: NonNullable<
+		NonNullable<ProtocolViewPayload['branches']>[number]['elementHandleIds']
+	>;
+	readonly idrefSites?: NonNullable<
+		NonNullable<ProtocolViewPayload['branches']>[number]['idrefSites']
 	>;
 };
 export type ResumeBranchHtml = string | ReadonlyArray<string | { readonly text: string }>;

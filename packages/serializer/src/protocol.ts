@@ -221,6 +221,35 @@ export type ProtocolComposedGraphProp = {
 	readonly path?: ReadonlyArray<string>;
 };
 
+/**
+ * The graph read id an arm-update symbol asks under for a minted element() id.
+ *
+ * A minted id is `idPrefix + handle` where the prefix is the rendered widget's
+ * instance token, a seed-map value no flip can reach. The render that served the
+ * arm resolves the id and files it on the branch record under this key; the
+ * symbol asks for it through the read channel it already has, so the mint keeps
+ * exactly one spelling. Resume matches the key as a SUFFIX of the id it is
+ * handed, because a composed symbol's reads arrive with the instance path
+ * prepended — that is why the key carries the namespace and not the bare handle.
+ */
+export function protocolElementHandleReadId(handleGraphNodeId: string): string {
+	return `markless:element-handle-id|${handleGraphNodeId}`;
+}
+
+/**
+ * One IDREF position naming a handle some branch arm binds. `armIndex` is the
+ * arm that binds it: the attribute is earned exactly while that arm is the
+ * painted one, which is the only test that also answers for an arm the render
+ * already served and no flip ever re-materializes. `handleReadId` is the same
+ * key the branch record's `elementHandleIds` uses.
+ */
+export type ProtocolBranchIdrefSite = {
+	readonly hostNodeId: string;
+	readonly attributeName: string;
+	readonly handleReadId: string;
+	readonly armIndex: number;
+};
+
 export type ProtocolArmBranchRecord = {
 	readonly id: string;
 	readonly testReads: ReadonlyArray<{
@@ -508,6 +537,23 @@ export type ProtocolViewPayload = {
 		 */
 		readonly composedInstancePath?: string;
 		readonly composedGraphProps?: ReadonlyArray<ProtocolComposedGraphProp>;
+		/**
+		 * Minted element() ids for the handles this branch's arms bind, resolved by
+		 * the render that served the branch. The token they were minted from is a
+		 * seed-map value, so a flip has no second way to spell them. Keyed by
+		 * `protocolElementHandleReadId`, the whole read id the arm symbol asks
+		 * under, so the resume side answers by matching a key it was handed rather
+		 * than re-deriving the namespace. Absent on every branch whose arms bind no
+		 * handle an IDREF names, which keeps those payloads byte-identical.
+		 */
+		readonly elementHandleIds?: Readonly<Record<string, string>>;
+		/**
+		 * IDREF positions OUTSIDE the arms that name a handle an arm binds. The
+		 * element they sit on outlives the flip, so the attribute is written when
+		 * the arm files its handle and removed when the arm takes it away, rather
+		 * than served naming an element that is not there.
+		 */
+		readonly idrefSites?: ReadonlyArray<ProtocolBranchIdrefSite>;
 	}>;
 	readonly asyncBoundaries: ReadonlyArray<{
 		readonly id: string;
