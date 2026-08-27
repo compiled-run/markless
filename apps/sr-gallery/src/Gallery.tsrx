@@ -1,4 +1,5 @@
-import { element, state } from '@markless/core';
+import { computed, element, state } from '@markless/core';
+import type { PadPoint } from '@markless/ui/pad';
 import {
 	calendar,
 	checkbox,
@@ -11,6 +12,7 @@ import {
 	menu,
 	modal,
 	numberbox,
+	pad,
 	popover,
 	progress,
 	radiogroup,
@@ -29,7 +31,7 @@ import {
 // /#toggle, /#textbox, /#progress, /#checklist, /#select, /#modal,
 // /#radio-group, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
 // /#fileupload, /#hovercard, /#calendar, /#menu, /#colorpicker,
-// /#togglegroup, /#numberbox, /#ink, /#tour. A family whose second shape a reader
+// /#togglegroup, /#numberbox, /#ink, /#pad, /#tour. A family whose second shape a reader
 // announces differently gets its own section too: /#slider-range,
 // /#numberbox-min-max-step, /#numberbox-currency.
 //
@@ -431,6 +433,33 @@ export function Gallery() @{
 			</div>
 		</section>
 
+		<section id="pad">
+			<h2>Pad</h2>
+			<div class="scenario">
+				<pad.root defaultValue={SHADOW}>
+					<pad.label>Shadow offset</pad.label>
+					<pad.description>Drag the handle, or move it with the arrow keys.</pad.description>
+					<pad.area class="pad-plane">
+						<pad.indicator class="pad-grid" />
+						<pad.thumb class="pad-handle" />
+					</pad.area>
+					<pad.valuelabel />
+					<pad.field name="offset" />
+				</pad.root>
+			</div>
+
+			{/* Two control points in one pad: two tab stops, which is the claim a real reader is here to settle. */}
+			<div class="scenario">
+				<pad.root defaultValue={CONTROLS}>
+					<pad.label>Easing curve</pad.label>
+					<pad.area class="pad-plane">
+						<CurveHandles />
+					</pad.area>
+					<pad.valuelabel />
+				</pad.root>
+			</div>
+		</section>
+
 		{/* The tour's targets are the section's own buttons, reached through handles the page mints: a step may not look its target up, and a handle only crosses a component edge as a bare prop. The tour ships no trigger part, so "Take the tour" is the page's own button flipping `open`. */}
 		<section id="tour">
 			<h2>Tour</h2>
@@ -541,6 +570,37 @@ function FileRows() @{
 				<fileupload.itemlabel />
 				<fileupload.itemclose aria-label="Remove">×</fileupload.itemclose>
 			</fileupload.item>
+		}
+	</div>
+}
+
+const SHADOW = [{ id: 'offset', x: 0.25, y: 0.75 }];
+const CONTROLS = [
+	{ id: 'p1', x: 0.25, y: 0.1 },
+	{ id: 'p2', x: 0.75, y: 0.9 },
+];
+
+// The curve is the page's own drawing: the family holds two points and knows
+// nothing about easing.
+function curvePath(points: readonly PadPoint[]): string {
+	const first = points[0] ?? { id: 'p1', x: 0, y: 0 };
+	const second = points[1] ?? { id: 'p2', x: 1, y: 1 };
+	return `M 0 100 C ${first.x * 100} ${100 - first.y * 100} ${second.x * 100} ${100 - second.y * 100} 100 0`;
+}
+
+// A component that reads the pad's state is a part of that pad's widget, so it
+// sits inside the root; a construct may not be a component tag's direct child
+// either, which is why the repeat opens in a plain element.
+function CurveHandles() @{
+	const held = pad.state();
+	const drawn = computed(() => curvePath(held.points));
+
+	<div style="display: contents">
+		<svg class="pad-curve" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+			<path d={drawn} fill="none" stroke="currentColor" />
+		</svg>
+		@for (const point of held.points; key point.id) {
+			<pad.thumb value={point} class="pad-handle" />
 		}
 	</div>
 }

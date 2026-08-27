@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { FAMILY_ANCHORS } from '../../../../../apps/sr-gallery/preview-server.ts';
 import type { ScreenReaderDriver } from '../../test-support/driver.ts';
 
 /**
@@ -22,14 +23,8 @@ const NAME = 'Shadow offset';
 const RESTING = 'X 0.25, Y 0.75';
 const STEPPED = 'X 0.26';
 
-/**
- * Where the pad sits on the gallery page.
- *
- * Written out rather than read from `FAMILY_ANCHORS`: the gallery has no pad
- * section yet, and registering the family is the follow-up that adds the key.
- * Point this at `FAMILY_ANCHORS.pad` the moment that lands.
- */
-export const PAD_ANCHOR = '/#pad';
+/** Where the pad sits on the gallery page. */
+export const PAD_ANCHOR = FAMILY_ANCHORS.pad;
 
 function missing(phrase: string, facts: readonly string[]): string[] {
 	return facts.filter((fact) => !phrase.includes(fact));

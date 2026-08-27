@@ -42,6 +42,7 @@ export const FAMILY_ANCHORS = {
 	hovercard: '/#hovercard',
 	calendar: '/#calendar',
 	ink: '/#ink',
+	pad: '/#pad',
 	menu: '/#menu',
 	colorpicker: '/#colorpicker',
 	togglegroup: '/#togglegroup',

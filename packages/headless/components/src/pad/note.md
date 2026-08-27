@@ -210,10 +210,12 @@ prefers `aria-valuetext` over the number it would otherwise read, whether it
 speaks the replacement role word from `aria-roledescription`, and whether Tab
 really lands on each handle in turn.
 
-They are not runnable yet. `PAD_ANCHOR` is written out as `/#pad` rather than
-read from the gallery's `FAMILY_ANCHORS`, because the gallery has no pad section
-and this family is not registered in `src/index.ts`. Registration is the
-follow-up; point the anchor at `FAMILY_ANCHORS.pad` when it lands.
+They are runnable. `PAD_ANCHOR` reads `FAMILY_ANCHORS.pad` from the gallery's own
+`preview-server.ts`, so the section the readers walk to and the section the
+gallery serves cannot drift apart. The gallery's `#pad` carries both shapes the
+lanes need: the one-handle starter named "Shadow offset", resting at
+`X 0.25, Y 0.75`, and the two-point easing curve whose handles are the two tab
+stops.
 
 ## What v1 refuses
 
