@@ -86,6 +86,20 @@ export const MARKLESS_WIDGET_INSTANCE_KEY = 'markless:widget-instance';
  */
 export const MARKLESS_ELEMENT_BOUND_KEY_PREFIX = 'markless:element-bound|';
 
+/**
+ * The full roster key: the prefix, the widget-instance token the minting side
+ * uses, then the handle.
+ *
+ * The token is what makes the entry per instance. An enclosing widget's seed
+ * walk descends THROUGH a nested family's root and files that family's handles
+ * onto its own map, which every nested instance then inherits; keyed by the
+ * enclosing instance's token, such an entry answers only for the widget that
+ * filed it, and a nested instance that bound nothing still reads "unbound".
+ */
+export function elementBoundKeySource(tokenSource: string, handleSource: string): string {
+	return `${JSON.stringify(MARKLESS_ELEMENT_BOUND_KEY_PREFIX)}+${tokenSource}+'|'+${handleSource}`;
+}
+
 /** Every element() handle one chunk set spells as a minted `mx-` id. */
 export function elementHandleIdSources(chunks: RenderChunks): ReadonlyArray<string> {
 	const handles = new Set<string>();
@@ -131,10 +145,12 @@ export function elementHandleIdReadCase(input: {
 			: input.idPrefixSource;
 		return `(${prefix}+${handle}).replace(/\\W+/g,'-')`;
 	};
+	// The token is read WITHOUT the mint's throw: an omitted IDREF is the right
+	// answer for a part that resolved no instance, and the mint still refuses.
 	const unbound = (handle: string) =>
 		input.widgetInstanceRead && input.boundRead
 			? `${handle}.startsWith('shared:')&&${input.boundRead(
-					`${JSON.stringify(MARKLESS_ELEMENT_BOUND_KEY_PREFIX)}+${handle}`,
+					elementBoundKeySource(input.widgetInstanceRead(handle), handle),
 				)}!==true`
 			: null;
 	// Only an IDREF position can be omitted. The element that CARRIES the id mints
