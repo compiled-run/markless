@@ -138,3 +138,11 @@ keyed row's new key) is a framework defect: the runtime commits the write so
 witness against the runtime instead of retrying. Intent delays that are the
 behaviour itself (hover-intent open/close, long-press) are ordinary
 `setTimeout`s and stay.
+
+## Testing
+
+A gesture settles through a lazily woken handler module, so a synchronous read
+straight after a press, key or drag sees the pre-gesture value. Browser rows
+assert after the gesture settles (`expect.poll`, or a read after the dispatch
+resolves), never on the next statement; a row that reads synchronously looks
+exactly like a broken family and is not one.
