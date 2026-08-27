@@ -18,7 +18,7 @@ export function CbranchValueLabel({ children }) @{
 
 	<output data-cb-value ui-value={s.value}>
 		@if (children) {
-			{children}
+			<>{children}</>
 		} @else {
 			<span data-cb-own>{s.value}</span>
 		}
@@ -28,23 +28,23 @@ export function CbranchValueLabel({ children }) @{
 export function CbranchStaticLabel({ children }) @{
 	<output data-cb-static>
 		@if (children) {
-			{children}
+			<>{children}</>
 		} @else {
 			<span data-cb-static-own>own</span>
 		}
 	</output>
 }
 
-// Both arms are bare expressions with no element of their own: the shape that
-// served an empty branch pair beside a live attribute.
+// Both arms are fragments with no element of their own: the shape whose text
+// must refresh inside the arm's own markers, never on the enclosing element.
 export function CbranchBareLabel({ children }) @{
 	const s = cbranchState();
 
 	<output data-cb-bare ui-value={s.value}>
 		@if (children) {
-			{children}
+			<>{children}</>
 		} @else {
-			{s.value}
+			<>{s.value}</>
 		}
 	</output>
 }

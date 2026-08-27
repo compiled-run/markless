@@ -1,0 +1,21 @@
+# MARKLESS_RENDER_BODY_UNSUPPORTED
+
+Component body statement is not supported by the render module
+
+- Package: compiler
+- Pass or phase: public-render
+- Severity: error
+
+## Message
+
+TODO: this code has no builder message in source.
+
+## Why
+
+Component bodies execute during initial render. A body statement the emitter cannot represent would otherwise be deleted from CSR and SSR output.
+
+## Emitted from
+
+- `packages/compiler/src/passes/public-render/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

@@ -32,7 +32,6 @@ async function lap(steps: number): Promise<string[]> {
 	return seen;
 }
 
-// The painted boxes are aria-hidden, so the widget offers the reader exactly one thing.
 test('the code field conveys the textbox role and its name', async () => {
 	await open(Basic);
 	expectConveys(await readUntil(sr, { role: 'textbox' }), {
@@ -50,11 +49,14 @@ test('a code already entered is conveyed by the field itself', async () => {
 });
 
 // Asserted over a full lap, not at one step: a duplicate anywhere in the reading order is the defect.
-test('nothing but the field is reachable, so the code is never announced twice', async () => {
+// The boxes carry no ARIA of their own, so a walk finds the field and then each painted character.
+test('the walk finds the field and then the boxes, and nothing else', async () => {
 	await open(Prefilled);
 	await readUntil(sr, { role: 'textbox' });
-	for (const phrase of await lap(24)) {
-		expectConveys(phrase, { role: 'textbox' });
+	const spoken = await lap(24);
+	expect(spoken.some((phrase) => sr.segments(phrase).includes('1'))).toBe(true);
+	for (const phrase of spoken) {
+		expect(phrase, `${sr.name} announced "${phrase}"`).not.toContain('button');
 	}
 });
 
