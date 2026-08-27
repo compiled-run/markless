@@ -2,6 +2,7 @@ import { cleanup, render, renderSSR } from '@markless/vitest-browser';
 import axe from 'axe-core';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { afterEach, expect, test } from 'vitest';
+import { clearDevServerErrorOverlay } from '../../test-support/dev-error-overlay.ts';
 import {
 	heldPaths,
 	joinPaths,
@@ -716,15 +717,15 @@ test('a drawing served with strokes carries them in the served markup', async ()
 	expect(liveRegion().textContent).toBe('2 strokes');
 });
 
-// Last in the file on purpose: the refused module raises a build error the dev
-// server paints over the page, and a real gesture after it would be intercepted.
-//
-// A shared() method called from a handler in another module is text-spliced
-// without the family's imports or graph wiring, so the compiler refuses it at
-// build time. This row pins the refusal: the quarantined scenario cannot even
-// load. It becomes the shape the note recommends once the compiler can carry the
-// definition context. The diagnostic text itself is pinned in
+// A shared() method called from a handler in another module is text-spliced without
+// the family's imports or graph wiring, so the compiler refuses it at build time.
+// This row pins the refusal: the quarantined scenario cannot even load. It becomes
+// the shape the note recommends once the compiler can carry the definition context.
+// The diagnostic text itself is pinned in
 // packages/compiler/test/cross-module-shared-method.test.ts.
 test('undo() called from a consumer module is refused at build time', async () => {
 	await expect(import('./scenarios/method.tsrx')).rejects.toThrow();
+	// The dev server paints the refusal over the tester page, outside the iframe
+	// cleanup() owns; left up it swallows every later real gesture in the lane.
+	await expect.poll(() => clearDevServerErrorOverlay()).toBeGreaterThan(0);
 });
