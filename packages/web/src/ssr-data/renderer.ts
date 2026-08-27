@@ -669,23 +669,20 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 }
 
 /**
- * What the widget ROOT edge reads: every seed its parts wrote, but still the
- * instance token of the widget it was PLACED IN. The root's own template belongs
- * to the enclosing instance the way it did before it read seeds at all, so the
- * ids it mints stay put while the values its parts seeded reach it. Placed in
- * nothing, it keeps the instance it started itself — that token is the only one
- * its own handles can mint from.
+ * What the widget ROOT edge reads: every seed its parts wrote, plus the plain
+ * fallback instance token of the widget it was PLACED IN, so a handle of a
+ * family this root does not root still names the enclosing instance. Placed in
+ * nothing, it keeps the instance it started itself.
  */
 function rootEdgeSeeds(
 	childSeeds: ReadonlyMap<string, unknown>,
 	inherited: ReadonlyMap<string, unknown> | undefined,
 ): ReadonlyMap<string, unknown> {
-	// Every instance-token key, not only the plain one: a nested widget root sits
-	// inside another family's instance, and that family's own token has to keep
-	// naming the enclosing instance while this root's names its own.
+	// Only the plain key: a per-definition key is written solely for a family the
+	// child roots, and that root's own element must mint from its own token.
 	let restored: Map<string, unknown> | undefined;
 	for (const [key, enclosing] of inherited ?? []) {
-		if (!key.startsWith(MARKLESS_WIDGET_INSTANCE_KEY)) continue;
+		if (key !== MARKLESS_WIDGET_INSTANCE_KEY) continue;
 		if (enclosing === undefined || enclosing === childSeeds.get(key)) continue;
 		(restored ??= new Map(childSeeds)).set(key, enclosing);
 	}

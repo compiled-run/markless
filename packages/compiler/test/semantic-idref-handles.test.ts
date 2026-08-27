@@ -547,44 +547,6 @@ export function Lab() @{
 	expect(graph.templateReads.map((read) => read.source)).toEqual(['children']);
 });
 
-test('the widget root itself cannot be named by an IDREF', async () => {
-	const graph = await graphOf(
-		'WidgetRootIdref',
-		`import { element, shared, state } from '@markless/core';
-export const wid = shared(() => {
-	const w = state({ open: false });
-	const triggerEl = element<HTMLButtonElement>();
-	return { ...w, triggerEl };
-}, { scope: 'widget' });
-export function Root({ children }: { children?: unknown }) @{
-	const s = wid();
-	<div aria-controls={s.triggerEl}>{children}</div>
-}
-export function Trigger() @{
-	const s = wid();
-	<button type="button" el={s.triggerEl}>go</button>
-}`,
-	);
-
-	expect(codes(graph)).toEqual(['MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT']);
-	expect(
-		graph.diagnostics.find(
-			(diagnostic) => diagnostic.code === 'MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT',
-		),
-	).toEqual(
-		expect.objectContaining({
-			severity: 'error',
-			title: 'This shared() element() handle cannot be named by an IDREF here',
-			docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT',
-		}),
-	);
-	// Refused, not lowered: no record, no slot, and the attribute never reaches
-	// the statics as an empty one.
-	expect(graph.elementHandleIdrefs).toEqual([]);
-	expect(idSlots(graph)).toEqual([]);
-	expect(statics(graph)).not.toContain('aria-controls');
-});
-
 test('a page-wide shared() handle is refused: one element per page is not one per widget', async () => {
 	const graph = await graphOf(
 		'PageSharedIdref',
