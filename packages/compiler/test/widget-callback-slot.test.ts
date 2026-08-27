@@ -144,13 +144,13 @@ test('the dispatching handler carries a widget-callback capture slot', async () 
 test('the emitted handler writes the state before it dispatches to the consumer', async () => {
 	const family = await compileFamily();
 	const handler = family.symbolModules.modules.find((module) =>
-		module.source.includes('capture.invoke'),
+		module.source.includes('marklessInvokeCallbackSlot('),
 	)!;
 
 	const write = handler.source.indexOf('graph.write');
-	const invoke = handler.source.indexOf('capture.invoke');
+	const dispatch = handler.source.indexOf('marklessInvokeCallbackSlot(');
 	expect(write).toBeGreaterThanOrEqual(0);
-	expect(invoke).toBeGreaterThan(write);
+	expect(dispatch).toBeGreaterThan(write);
 });
 
 test('a composing module resolves the slot against the enclosing root, per instance', async () => {

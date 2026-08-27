@@ -115,6 +115,79 @@ export function tryBlockToggleRerenderDiagnostic(input: {
 	};
 }
 
+// A list that renders its served rows but can never grow still ships, and the
+// set of shapes that reach this shrinks as row growth covers more of them, so
+// this warns rather than blocks. Change this one constant to move it.
+export const KEYED_REPEAT_ROW_MINT_UNSUPPORTED_SEVERITY: 'error' | 'warning' = 'warning';
+
+export const KEYED_REPEAT_ROW_MINT_UNSUPPORTED_CODE =
+	'MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED' as const;
+
+/**
+ * One clause of the row-template mint's refusal, in the author's own terms.
+ *
+ * A refused row still serves whatever the server rendered, and it still
+ * reorders and removes. What it cannot do is GROW: an item appended to the
+ * collection after resume has no markup, because the client carries no
+ * renderer and the payload carries no template for it. Every channel is
+ * otherwise silent about that, which is what this says out loud.
+ */
+export type KeyedRepeatRowMintRefusal =
+	| { readonly kind: 'component'; readonly componentName: string }
+	| { readonly kind: 'nested-construct'; readonly label: string }
+	| { readonly kind: 'attribute'; readonly attributeName: string }
+	| { readonly kind: 'outside-read' };
+
+export function keyedRepeatRowMintUnsupportedDiagnostic(input: {
+	readonly itemName: string;
+	readonly refusal: KeyedRepeatRowMintRefusal;
+	readonly node: AnyNode;
+	readonly filename: string;
+}): CompilerDiagnostic {
+	const cause = refusalCause(input.itemName, input.refusal);
+	return {
+		code: KEYED_REPEAT_ROW_MINT_UNSUPPORTED_CODE,
+		severity: KEYED_REPEAT_ROW_MINT_UNSUPPORTED_SEVERITY,
+		phase: PUBLIC_RENDER_PHASE,
+		title: 'This list can never grow in the browser',
+		message: `${cause.message} The browser has no renderer, so a row that arrives after the page loads has no markup to be built from: this list will render the rows the server sent, reorder them and remove them, and silently ignore every new one.`,
+		why: 'The payload carries one row of finished markup so the browser can build a row the server never rendered. It can fill text read off the row item and nothing else, so a row needing anything more ships no template at all.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: PUBLIC_RENDER_PLAN_PASS_ID,
+		artifactKeys: ['publicRenderPlan'],
+		suggestions: [{ message: cause.suggestion }],
+		docsUrl: `https://markless.dev/errors/${KEYED_REPEAT_ROW_MINT_UNSUPPORTED_CODE}`,
+	};
+}
+
+function refusalCause(
+	itemName: string,
+	refusal: KeyedRepeatRowMintRefusal,
+): { readonly message: string; readonly suggestion: string } {
+	switch (refusal.kind) {
+		case 'component':
+			return {
+				message: `This @for row renders <${refusal.componentName}>, and what <${refusal.componentName}> renders either reaches a branch or an async boundary or could not be seen from here - so the browser cannot tell how many anchors a new row would need.`,
+				suggestion: `Keep <${refusal.componentName}> and everything it renders free of @if, @switch and @try - and make sure the module declaring it is part of this build - or move <${refusal.componentName}> outside the @for and keep the row to plain elements and text read off ${itemName}.`,
+			};
+		case 'nested-construct':
+			return {
+				message: `This @for row holds ${refusal.label}, and a construct inside the row is wiring the browser would have to register per row.`,
+				suggestion: `Lift ${refusal.label} outside the @for, or keep the row to plain elements and text read off ${itemName}.`,
+			};
+		case 'attribute':
+			return {
+				message: `This @for row sets the ${refusal.attributeName} attribute from a value, and the row template fills text only.`,
+				suggestion: `Render the value as text inside the row instead of as the ${refusal.attributeName} attribute, or wait for attribute rows.`,
+			};
+		case 'outside-read':
+			return {
+				message: `This @for row reads a value that is not a property of ${itemName}, and the browser builds a row from the row item alone.`,
+				suggestion: `Read the value off ${itemName} - put it on the item before the list is built - or keep the row to text read off ${itemName}.`,
+			};
+	}
+}
+
 export function repeatRowStateScopeUnsupportedDiagnostic(input: {
 	readonly apiName: 'state' | 'computed';
 	readonly name: string;
@@ -189,6 +262,42 @@ export function childrenOpacityDiagnostic(input: {
 			{ message: 'Render {children} directly or move per-item rendering to the parent.' },
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_CHILDREN_OPAQUE',
+	};
+}
+
+export const SERVER_DERIVE_UNREACHABLE_CODE = 'MARKLESS_SERVER_DERIVE_UNREACHABLE' as const;
+
+/**
+ * A `computed()` the server render reaches but cannot derive. The value it would
+ * have carried is simply missing from the served HTML - an attribute reading it
+ * disappears - so the refusal is loud rather than an empty attribute.
+ */
+export function serverDeriveUnreachableDiagnostic(input: {
+	readonly name: string;
+	readonly reason: 'cycle' | 'no-source';
+}): CompilerDiagnostic {
+	const cause =
+		input.reason === 'cycle'
+			? `"${input.name}" is part of a loop of computed values that read each other, so there is no order in which the server can work them out.`
+			: `"${input.name}" is read while this page is rendered on the server, but the compiler has no expression to work it out from.`;
+	return {
+		code: SERVER_DERIVE_UNREACHABLE_CODE,
+		severity: 'error',
+		phase: 'public-render',
+		title: 'This computed value cannot be worked out on the server',
+		message: `${cause} Anything reading it would render as if the value were missing.`,
+		why: 'Server rendering works each computed value out once and puts it in the state the page is served with. A value it cannot work out reads as undefined, and every attribute and piece of text built from it silently disappears from the HTML.',
+		passId: PUBLIC_RENDER_PLAN_PASS_ID,
+		artifactKeys: ['publicRenderModule'],
+		suggestions: [
+			{
+				message:
+					input.reason === 'cycle'
+						? 'Break the loop: have one of these computed values read state directly instead of reading the other computed value.'
+						: 'Compute the value from state the component can read, or pass it in as a prop.',
+			},
+		],
+		docsUrl: `https://markless.dev/errors/${SERVER_DERIVE_UNREACHABLE_CODE}`,
 	};
 }
 

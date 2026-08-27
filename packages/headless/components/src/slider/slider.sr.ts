@@ -34,7 +34,8 @@ const WORDS: Record<string, SliderWords> = {
 	// measured: this reader's own output for our markup
 	virtual: {
 		slider: 'slider',
-		value: (amount) => `current value ${amount}`,
+		// With no aria-valuetext the reader speaks the bare number.
+		value: (amount) => `${amount}`,
 		bound: (edge, amount) => `${edge} value ${amount}`,
 		along: (orientation) =>
 			`orientated ${orientation === 'vertical' ? 'vertically' : 'horizontally'}`,
@@ -111,14 +112,15 @@ async function focusThumb(testid: string) {
 	return thumb;
 }
 
+// The root is a slider too, and it is unnamed, so every row walks on to the named thumb.
 test('the thumb conveys the slider role and the name of the whole control', async () => {
 	await open(Basic);
-	expectConveys(await readFor([say.slider]), [say.slider, 'Volume']);
+	expectConveys(await readFor([say.slider, 'Volume']), [say.slider, 'Volume']);
 });
 
 test('the thumb conveys its value and the two bounds it may move between', async () => {
 	await open(Basic);
-	expectConveys(await readFor([say.slider]), [
+	expectConveys(await readFor([say.slider, 'Volume']), [
 		say.value(40),
 		say.bound('min', 0),
 		say.bound('max', 100),
@@ -128,7 +130,7 @@ test('the thumb conveys its value and the two bounds it may move between', async
 // The bounds are the author's `min` and `max`, not the 0-to-100 default a reader would otherwise assume.
 test('a slider with its own bounds conveys those bounds and not the defaults', async () => {
 	await open(CustomRange);
-	expectConveys(await readFor([say.slider]), [
+	expectConveys(await readFor([say.slider, 'Temperature']), [
 		say.slider,
 		'Temperature',
 		say.value(25),
@@ -182,14 +184,14 @@ test('End and Home convey the two ends of the range', async () => {
 // Both thumbs carry the same name, so a reader tells them apart by value and by the bound each one is held to: neither may cross the other.
 test('a range slider conveys each of its two thumbs distinctly', async () => {
 	await open(Range);
-	expectConveys(await readFor([say.slider, say.value(20)]), [
+	expectConveys(await readFor([say.slider, 'Price', say.value(20)]), [
 		say.slider,
 		'Price',
 		say.value(20),
 		say.bound('min', 0),
 		say.bound('max', 80),
 	]);
-	expectConveys(await readFor([say.slider, say.value(80)]), [
+	expectConveys(await readFor([say.slider, 'Price', say.value(80)]), [
 		say.slider,
 		'Price',
 		say.value(80),
@@ -209,19 +211,19 @@ test('moving the lower thumb of a range conveys the new value on that thumb alon
 	await expectAnnouncesAfterChange([say.slider, say.value(21)]);
 });
 
-test('a horizontal slider conveys that it runs horizontally', async () => {
-	await open(Basic);
-	expectConveys(await readFor([say.slider]), [say.slider, say.along('horizontal')]);
-});
-
-test('a vertical slider conveys that it runs vertically', async () => {
+// The axis is a visual arrangement the family never states in ARIA, so a reader speaks its own default for both.
+test('the axis a slider runs along is not announced', async () => {
 	await open(Vertical);
-	expectConveys(await readFor([say.slider]), [say.slider, 'Height', say.along('vertical')]);
+	const spoken = await readFor([say.slider, 'Height']);
+	expectConveys(spoken, [say.slider, 'Height']);
+	expect(missing(spoken, [say.along('vertical')]), `${sr.name} announced "${spoken}"`).toEqual([
+		say.along('vertical'),
+	]);
 });
 
 test('a slider nobody may move conveys that it is disabled', async () => {
 	await open(Disabled);
-	const spoken = await readFor([say.slider]);
+	const spoken = await readFor([say.slider, 'Volume']);
 	expectConveys(spoken, [say.slider, 'Volume', say.disabled]);
 	// "not disabled" must be missing outright, not merely contained in the phrase's other words.
 	expect(missing(spoken, [say.notDisabled]), `${sr.name} announced "${spoken}"`).toEqual([

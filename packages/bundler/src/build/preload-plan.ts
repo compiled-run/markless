@@ -32,15 +32,15 @@ export type ModulePreloadPlanEntry = {
 	readonly probability: number;
 };
 
-type BundleGraphEdgeKind = 'static' | 'dynamic';
+export type BundleGraphEdgeKind = 'static' | 'dynamic';
 
-type ParsedBundleGraphEdge = {
+export type ParsedBundleGraphEdge = {
 	readonly name: string;
 	readonly kind: BundleGraphEdgeKind;
 	readonly probability: number;
 };
 
-type ParsedBundleGraphRecord = {
+export type ParsedBundleGraphRecord = {
 	readonly name: string;
 	readonly deps: readonly ParsedBundleGraphEdge[];
 };
@@ -189,7 +189,7 @@ export function planModulePreloads(input: ModulePreloadPlanInput): ModulePreload
 		.map(({ order: _order, ...preload }) => preload);
 }
 
-function parseBundleGraph(
+export function parseBundleGraph(
 	graph: MarklessBundleGraph | undefined,
 ): ReadonlyMap<string, ParsedBundleGraphRecord> {
 	const records = new Map<string, ParsedBundleGraphRecord>();

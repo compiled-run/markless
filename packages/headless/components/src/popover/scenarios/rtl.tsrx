@@ -1,4 +1,4 @@
-import * as popover from '../index.ts';
+import { popover } from '../../index.ts';
 
 // `start` and `end` are the writing direction's sides, so this page is the one
 // where they are not left and right.

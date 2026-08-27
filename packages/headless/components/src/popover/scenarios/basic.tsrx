@@ -1,4 +1,4 @@
-import * as popover from '../index.ts';
+import { popover } from '../../index.ts';
 
 export default function Basic() @{
 	<section>
