@@ -7,6 +7,10 @@ import HideAndReturnPage from './hide-and-return-page.tsrx';
 
 import InertInvokerPage from './inert-invoker-page.tsrx';
 
+import InertLiftHandlePage from './inert-lift-handle-page.tsrx';
+
+import InertLiftPage from './inert-lift-page.tsrx';
+
 import KeyedRemintPage from './keyed-remint-page.tsrx';
 
 
@@ -23,7 +27,19 @@ import KeyedRemintPage from './keyed-remint-page.tsrx';
 // nothing.
 
 afterEach(async () => {
-	await cleanup();
+	// The overlay rows below leave document-wide state - a scroll-lock count and
+	// the background marks - that outlives the container. Hiding every marked
+	// element through the same `hidden` transition the behaviour watches is what
+	// hands that state back, instead of leaking it into the next row.
+	try {
+		for (const surface of [...document.querySelectorAll<HTMLElement>('[overlay]')].reverse())
+			surface.hidden = true;
+		await sleep(0);
+	} finally {
+		await cleanup();
+		document.body.style.overflow = '';
+		document.body.style.paddingRight = '';
+	}
 });
 
 function el(testid: string): HTMLElement {
@@ -130,4 +146,62 @@ test('SSR: hiding the surface focus is in and returning focus to the trigger hol
 	expect(document.activeElement).toBe(el('trigger'));
 	await sleep(100);
 	expect(document.activeElement).toBe(el('trigger'));
+});
+
+// Closing an overlay is the same write-then-focus shape with a blocker the
+// handler does not own: the surface's own behaviour marked the background
+// `inert` when it enlisted, and lifts that mark from a mutation callback that
+// runs after the hide reaches the DOM. So the focus the closing handler asks for
+// is refused, and the thing that would let it land happens after the flush the
+// dispatch awaits. Both spellings of "where focus was" are covered - the raw
+// element the behaviour captured at enlist, and an ordinary handle read.
+async function openAndClose(): Promise<void> {
+	el('origin').focus();
+	expect(document.activeElement).toBe(el('origin'));
+
+	await userEvent.click(el('origin'));
+	await expect.poll(hiddenOf('surface')).toBe(false);
+	// The background really is out of reach: without this the row would pass on a
+	// page that never marked anything.
+	await expect.poll(inertOf('origin')).toBe(true);
+
+	await userEvent.click(el('close'));
+	await expect.poll(hiddenOf('surface')).toBe(true);
+	await expect.poll(inertOf('origin')).toBe(false);
+}
+
+test('CSR: closing an overlay returns focus to the element captured at enlist', async () => {
+	await render(InertLiftPage);
+	await openAndClose();
+
+	expect(document.activeElement).toBe(el('origin'));
+	await sleep(100);
+	expect(document.activeElement).toBe(el('origin'));
+});
+
+test('SSR: closing an overlay returns focus to the element captured at enlist', async () => {
+	await renderSSR(InertLiftPage);
+	await openAndClose();
+
+	expect(document.activeElement).toBe(el('origin'));
+	await sleep(100);
+	expect(document.activeElement).toBe(el('origin'));
+});
+
+test('CSR: closing an overlay returns focus to a handle the handler read', async () => {
+	await render(InertLiftHandlePage);
+	await openAndClose();
+
+	expect(document.activeElement).toBe(el('origin'));
+	await sleep(100);
+	expect(document.activeElement).toBe(el('origin'));
+});
+
+test('SSR: closing an overlay returns focus to a handle the handler read', async () => {
+	await renderSSR(InertLiftHandlePage);
+	await openAndClose();
+
+	expect(document.activeElement).toBe(el('origin'));
+	await sleep(100);
+	expect(document.activeElement).toBe(el('origin'));
 });
