@@ -1,6 +1,12 @@
 import { shared, state } from '@markless/core';
 
-export const betaState = shared(() => state({ tone: 'plain' }), { scope: 'widget' });
+export const betaState = shared(
+	() => {
+		const tones = state({ tone: 'plain' });
+		return { ...tones, mark() { tones.tone = 'marked'; } };
+	},
+	{ scope: 'widget' },
+);
 
 export function BetaRoot({ children }) @{
 	const beta = betaState();
