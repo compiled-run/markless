@@ -70,8 +70,8 @@ export type SelectLabelProps = PropsOf<'label'>;
 
 /**
  * The control a person opens the list from, and the family's only tab stop. It
- * shows the current choice and reports `role="combobox"`; a consumer's `onClick`
- * and `onKeydown` run after the family's.
+ * shows the current choice and declares `aria-haspopup="listbox"`; a consumer's
+ * `onClick` and `onKeydown` run after the family's.
  */
 export type SelectTriggerProps = PropsOf<'button'>;
 

@@ -1,0 +1,26 @@
+# MARKLESS_ELEMENT_HANDLE_UNBOUND
+
+element() handle is read before it is bound
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: warning
+
+## Message
+
+Cannot read element handle "…" inside computed "…" in …: element() handles are DOM-bound and readable only in event handlers, so "…" is undefined on every derivation.
+
+Reading element handle "…" will produce undefined because "…" is never bound with el=\{…\} in this component.
+
+## Why
+
+A derive body runs on the graph, where an element node holds no value. Only handler-shaped reads are rewritten into the DOM lookup that answers a handle, so a handle read in a derive compiles and then publishes a value built out of undefined.
+
+element() handles are DOM locator references, not state. A read is only useful after the handle has a host element binding that resume can locate.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

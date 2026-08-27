@@ -1,0 +1,21 @@
+# MARKLESS_CSS_ANCHOR_ATTRIBUTE
+
+CSS anchoring is regular CSS
+
+- Package: compiler
+- Pass or phase: semantic-graph
+
+## Message
+
+Cannot write … as an attribute. CSS anchoring is regular CSS - declare anchor-name/position-anchor in a \<style\> block or your stylesheet.
+
+## Why
+
+An element takes the attributes HTML defines. anchor-name and position-anchor are CSS properties with no HTML attribute of the same name, so nothing on the page would read them.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

@@ -1,0 +1,22 @@
+# MARKLESS_SPREAD_STATIC_SNAPSHOT
+
+Spread attributes render once
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: warning
+
+## Message
+
+\{...…\} copies attributes during initial render. When … changes later, these attributes do not update.
+
+## Why
+
+The compiler plans DOM-update records for graph-backed attributes it can see; a spread hides which attributes exist, so no update records are planned for it.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

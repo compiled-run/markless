@@ -1,0 +1,21 @@
+# MARKLESS_STATE_REPEAT_ROW_SCOPE_UNSUPPORTED
+
+Per-row state in keyed repeats is not supported yet
+
+- Package: compiler
+- Pass or phase: public-render
+- Severity: error
+
+## Message
+
+…() creates "…" inside a keyed @for row. Per-row cells need per-row graph scopes, which do not exist yet.
+
+## Why
+
+Keys give rows identity, but each row would need its own cell keyed by row identity across reorder and resume. The current graph payload can only plan stable component-owned cells.
+
+## Emitted from
+
+- `packages/compiler/src/passes/public-render/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
