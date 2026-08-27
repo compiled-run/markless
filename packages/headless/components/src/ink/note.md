@@ -146,65 +146,76 @@ Two things a consumer has to get right, both measured:
 
 ## What the compiler forced — measured on this tip
 
-1. **No `shared()` method may read a `computed` declared beside it.** `finish()`
-   read `paths` to append the new stroke. In CSR that worked; on a served page the
-   read came back empty, so the append built a one-element array and the second
-   stroke silently replaced the first — nothing red, one browser row (`a drawing
-   served whole takes a stroke once the page resumes`) caught it. Every method
-   now rebuilds the drawing from its cells through `heldPaths(given, own, seed)`.
-   This is the same class as colorpicker's finding 2 and it is the largest one
-   here.
+1. **A method a consumer calls may reference nothing but its own cells.** Beyond
+   the cross-module refusal above, the copied body may not name a module import or
+   a factory-level computed; the diagnostic names each absent identifier. Since
+   `undo`, `redo`, `clear`, `finish`, `toSvg` and `toDataUrl` read the `paths`
+   computed, the refusal on `scenarios/method.tsrx` now names `paths` alongside
+   `pad`. Nothing was ever callable across modules, so no capability was lost.
 
-2. **A method a consumer calls may reference nothing but its own cells.** Beyond
-   the refusal above, the copied body may not name a module import or a
-   factory-level computed; the diagnostic names each absent identifier. `undo`,
-   `redo` and `clear` are written out of instance cells and builtins alone so they
-   are ready the day the capability ships.
-
-3. **The instance binding is `pad`, not `ink`.** A consumer module importing the
+2. **The instance binding is `pad`, not `ink`.** A consumer module importing the
    family as `ink` is matched against the copied method text *by name*, and the
    compiler says so: "the copied body calls THIS module's `ink` rather than the one
    the definition file means." Renaming the binding removes the collision.
 
-4. **`index i; key i` renders nothing.** The area's repeat over the strokes was
+3. **`index i; key i` renders nothing.** The area's repeat over the strokes was
    written `@for (const drawn of pad.paths; index at; key at)` and produced zero
    `<path>` elements with no diagnostic at all. `key <expression>` over a value
    works. The repeat is now over `rows` — `{ id, d }` pairs whose id carries the
    index — because two strokes can be byte-identical and a repeat keyed on the
    path data alone would draw one row where there are two.
 
-5. **A destructuring default cannot be read from a template position.**
+4. **A destructuring default cannot be read from a template position.**
    `MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED`. `ink.indicator` writes its
    `x1`/`y1`/`x2`/`y2` defaults *before* the spread instead, so a consumer's own
    coordinates replace them.
 
-6. **A `preventDefault` guard must compare event fields to literals.**
+5. **A `preventDefault` guard must compare event fields to literals.**
    `event.metaKey` on its own is `MARKLESS_SYNC_POLICY_UNEXTRACTABLE`; a local
    holding the same expression is too. The area's guard is written
    `event.metaKey === true || event.ctrlKey === true`.
 
-7. **A shared method read as a value leaves the instance name standing.**
+6. **A shared method read as a value leaves the instance name standing.**
    `const listener = pad.onDraw; if (listener) listener(...)` is
    `MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE`. `pad.onDraw?.(…)` is the
    shape, and it short-circuits, so a consumer with no `onDraw` never builds the
    path twice.
 
-8. **`before[before.length - 1]` is `MARKLESS_STATE_DYNAMIC_PATH_READ`.** Index
+7. **`before[before.length - 1]` is `MARKLESS_STATE_DYNAMIC_PATH_READ`.** Index
    reads off a graph value go through `.slice()` or a helper.
 
-9. **A `<style>` block inside an `<svg>` works, and is scoped.** The compiler
+8. **A `<style>` block inside an `<svg>` works, and is scoped.** The compiler
    lifts it out and stamps a class on the elements its selectors match, so
    `[ui-surface] { touch-action: none }` lands on the area and
    `[ui-current]:not([ui-drawing]) { display: none }` hides the in-flight path.
    No JS builds a CSS string anywhere in this family.
 
-10. **A served page does not wake on a synthetic `dispatchEvent`.** The SSR
+9. **A served page does not wake on a synthetic `dispatchEvent`.** The SSR
     gesture rows make one real gesture first (`userEvent.click`) and dispatch
     after it. Worth knowing before writing any pointer row against `renderSSR`.
 
-11. **A build-refused module paints a dev-server error overlay over the page.**
+10. **A build-refused module paints a dev-server error overlay over the page.**
     The quarantined `scenarios/method.tsrx` row therefore sits last in the browser
     file: a real gesture after it is intercepted by the overlay and times out.
+
+## What the methods read, and what it costs
+
+Every method that needs the committed drawing reads the `paths` computed declared
+beside it — `const before = paths;` — rather than rebuilding it from
+`pad.given` / `pad.strokes` / `pad.seed`. That read used to come back empty on a
+served page; `goals/headless-components/notes/U617-method-reads-computed.md` is
+the compiler fix that made it answer, and
+`goals/headless-components/notes/U621-ink-heldpaths.md` is the retirement.
+
+`paths` and not `rows`, `value` or `countText`: all four are equally correct to
+read, but the other three walk into `ink-stroke.ts`, and the root now derives
+whichever one a method names at every server render whether or not its own markup
+needs it. `paths` is a three-branch pick with no walk under it.
+
+Measured on the family's own SSR module: **57,649 bytes before, 59,354 after —
++1,705.** The whole delta is `InkRoot` deriving `paths` and emitting the one
+`marklessSsrServeComputed` line for it; the six other parts emit no serve call,
+and the compiled `scenarios/basic.tsrx` page module is unchanged at 14,931 bytes.
 
 ## The stroke algorithm
 
