@@ -1,3 +1,4 @@
+import { PROTOCOL_ELEMENT_HANDLE_ID_READ_PREFIX } from '@markless/serializer/protocol';
 import type { DomJournalEntry, DomJournalResult, RuntimeGraph } from '@markless/runtime';
 import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
 import type {
@@ -89,6 +90,7 @@ export function wireBranches(input: any) {
 					? asyncBoundaries.get(entry.locator.slice('async-boundary:'.length))
 					: undefined);
 			if (!range) continue;
+			if (branch) clearBranchIdrefSites(input, branch);
 			for (const id of hostIdsInsideRange(
 				input.root,
 				range.startAnchor,
@@ -128,7 +130,7 @@ function createBranchRegistration(
 			const painted = currentArm;
 			const symbol = await input.loadSymbol(branch.symbolId);
 			const update = await symbol({
-				graph: composedBranchGraph(input.graph, branch),
+				graph: armElementHandleIdGraph(composedBranchGraph(input.graph, branch), branch),
 				arm,
 				branchId: branch.sourceId ?? branch.id,
 				composedBranchId: branch.id,
@@ -272,6 +274,54 @@ export function composedBranchGraph(graph: RuntimeGraph, branch: ResumeBranchRec
 	};
 }
 
+// The one channel a flip has to a minted element() id. The id belongs to the
+// rendered widget, not to the graph, so the render that served the arm resolved
+// it onto the record and this answers the symbol's read from there.
+function armElementHandleIdGraph(graph: RuntimeGraph, branch: ResumeBranchRecord): RuntimeGraph {
+	const ids = branch.elementHandleIds;
+	if (!ids) return graph;
+	return {
+		...graph,
+		read(id: string, path: ReadonlyArray<string> = []) {
+			return id.startsWith(PROTOCOL_ELEMENT_HANDLE_ID_READ_PREFIX)
+				? ids[id.slice(PROTOCOL_ELEMENT_HANDLE_ID_READ_PREFIX.length)]
+				: graph.read(id, path);
+		},
+	};
+}
+
+type AttributeWritableElement = ResumeDomElement & {
+	readonly setAttribute?: (name: string, value: string) => void;
+	readonly removeAttribute?: (name: string) => void;
+};
+
+// An IDREF outside the arm names an element only while the arm renders one, so
+// the attribute follows the arm rather than being served naming nothing.
+function writeBranchIdrefSites(
+	input: any,
+	branch: ResumeBranchRecord,
+	handles: ReadonlySet<string>,
+): void {
+	for (const site of branch.idrefSites ?? []) {
+		if (!handles.has(site.handleGraphNodeId)) continue;
+		const id = branch.elementHandleIds?.[site.handleGraphNodeId];
+		const host = input.elementsByHostId.get(site.hostNodeId) as
+			| AttributeWritableElement
+			| undefined;
+		if (!host || id === undefined) continue;
+		host.setAttribute?.(site.attributeName, id);
+	}
+}
+
+function clearBranchIdrefSites(input: any, branch: ResumeBranchRecord): void {
+	for (const site of branch.idrefSites ?? []) {
+		const host = input.elementsByHostId.get(site.hostNodeId) as
+			| AttributeWritableElement
+			| undefined;
+		host?.removeAttribute?.(site.attributeName);
+	}
+}
+
 function onceRelease(release: () => void): () => void {
 	let released = false;
 	return () => {
@@ -387,12 +437,16 @@ function materializeBranchArmRecords(
 		byHost.set(host.hostNodeId, records);
 	}
 	for (const [hostNodeId, records] of byHost) input.addBehaviorRecords(hostNodeId, records);
+	const filed = new Set<string>();
 	for (const handle of set.elementHandles as ReadonlyArray<
 		Hosted<ResumeViewRecord['elementHandles'][number]>
 	>) {
 		const host = claim(handle.hostPath);
-		if (host) input.elementHandles.register(host.hostNodeId, handle, host.element);
+		if (!host) continue;
+		input.elementHandles.register(host.hostNodeId, handle, host.element);
+		filed.add(handle.handleId);
 	}
+	if (filed.size) writeBranchIdrefSites(input, branch, filed);
 	return [...byHost.keys()];
 }
 

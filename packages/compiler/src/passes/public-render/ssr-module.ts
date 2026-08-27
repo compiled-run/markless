@@ -1,5 +1,5 @@
 import { parseModule } from '../../js-ast.ts';
-import type { PublicRenderModuleInput } from '../../artifacts.ts';
+import type { PublicRenderModuleInput, SemanticMarkupChunk } from '../../artifacts.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
 import {
 	collectSsrAsyncRunnerDefinitions,
@@ -97,6 +97,80 @@ function elementHandleIdSource(handleGraphNodeId: string): string {
 			: null,
 	});
 	return `(residue=>{${readCase}})({kind:'element-handle-id',handleGraphNodeId:${JSON.stringify(handleGraphNodeId)}})`;
+}
+
+/** Every element() handle a branch's arms bind and give a minted id to. */
+export function branchArmMintedHandles(
+	chunks: ReadonlyArray<SemanticMarkupChunk>,
+	armChunkIds: ReadonlyArray<string>,
+): ReadonlyArray<string> {
+	const handles = new Set<string>();
+	for (const chunkId of armChunkIds)
+		for (const slot of chunks.find((candidate) => candidate.id === chunkId)?.slots ?? [])
+			if (
+				slot.kind === 'attribute' &&
+				slot.residue.kind === 'element-handle-id' &&
+				slot.residue.idref !== true
+			)
+				handles.add(slot.residue.handleGraphNodeId);
+	return [...handles];
+}
+
+/** The IDREF positions in this module that name one of those handles. */
+function idrefSitesNaming(
+	chunks: ReadonlyArray<SemanticMarkupChunk>,
+	handles: ReadonlySet<string>,
+): ReadonlyArray<{
+	readonly hostNodeId: string;
+	readonly attributeName: string;
+	readonly handleGraphNodeId: string;
+}> {
+	const sites: Array<{
+		readonly hostNodeId: string;
+		readonly attributeName: string;
+		readonly handleGraphNodeId: string;
+	}> = [];
+	for (const chunk of chunks)
+		for (const slot of chunk.slots) {
+			if (slot.kind !== 'attribute' || slot.residue.kind !== 'element-handle-id') continue;
+			if (slot.residue.idref !== true || !handles.has(slot.residue.handleGraphNodeId)) continue;
+			const path = slot.coordinate.path.join('.');
+			const host = (chunk.hosts ?? []).find(
+				(candidate) => candidate.coordinate.path.join('.') === path,
+			);
+			if (host)
+				sites.push({
+					hostNodeId: host.hostNodeId,
+					attributeName: slot.name,
+					handleGraphNodeId: slot.residue.handleGraphNodeId,
+				});
+		}
+	return sites;
+}
+
+/**
+ * The two fields a served branch record carries when its arms bind a handle an
+ * IDREF names: the ids this render minted, and the outside positions that name
+ * them. Empty for every other branch, so those payloads stay byte-identical.
+ */
+function branchArmHandleResolution(
+	chunks: ReadonlyArray<SemanticMarkupChunk>,
+	armChunkIds: ReadonlyArray<string>,
+): string {
+	const handles = branchArmMintedHandles(chunks, armChunkIds);
+	if (handles.length === 0) return '';
+	const sites = idrefSitesNaming(chunks, new Set(handles));
+	if (sites.length === 0) return '';
+	const ids = handles
+		.map((handle) => `${JSON.stringify(handle)}:${elementHandleIdSource(handle)}`)
+		.join(',');
+	const siteSources = sites
+		.map(
+			(site) =>
+				`{hostNodeId:marklessSsrIdPrefix+${JSON.stringify(site.hostNodeId)},attributeName:${JSON.stringify(site.attributeName)},handleGraphNodeId:${JSON.stringify(site.handleGraphNodeId)}}`,
+		)
+		.join(',');
+	return `,elementHandleIds:{${ids}},idrefSites:[${siteSources}]`;
 }
 
 export function emitPublicSsrRenderModule(
@@ -551,10 +625,11 @@ function emitSsrDataLines(
 	);
 	const branchCases = input.renderData.branches
 		.filter((branch) => branchIds.has(branch.branchSiteId))
-		.map(
-			(branch) =>
-				`case ${JSON.stringify(branch.branchSiteId)}:{const arm=${branchArmSources.get(branch.branchSiteId)?.source ?? '1'};marklessSsrBranches.push({id:marklessSsrDataSlot.branchSiteId,takenArm:arm});return arm;}`,
-		);
+		.map((branch) => {
+			const arm = branchArmSources.get(branch.branchSiteId)?.source ?? '1';
+			const resolved = branchArmHandleResolution(input.renderData.chunks, branch.armChunkIds);
+			return `case ${JSON.stringify(branch.branchSiteId)}:{const arm=${arm};marklessSsrBranches.push({id:marklessSsrDataSlot.branchSiteId,takenArm:arm${resolved}});return arm;}`;
+		});
 	const repeatIds = new Set(chunks.flatMap((chunk) =>
 		chunk.slots.flatMap((slot) => slot.kind === 'repeat' ? [slot.repeatId] : []),
 	));

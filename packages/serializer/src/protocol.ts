@@ -221,6 +221,24 @@ export type ProtocolComposedGraphProp = {
 	readonly path?: ReadonlyArray<string>;
 };
 
+/**
+ * The graph-read namespace an arm-update symbol asks for a minted element() id.
+ *
+ * A minted id is `idPrefix + handle` where the prefix is the rendered widget's
+ * instance token, a seed-map value no flip can reach. The render that served the
+ * arm resolves the id and files it on the branch record; the symbol asks for it
+ * through the read channel it already has, under this prefix plus the handle's
+ * graph node id, so the mint keeps exactly one spelling.
+ */
+export const PROTOCOL_ELEMENT_HANDLE_ID_READ_PREFIX = 'markless:element-handle-id|';
+
+/** One IDREF position naming a handle some branch arm binds. */
+export type ProtocolBranchIdrefSite = {
+	readonly hostNodeId: string;
+	readonly attributeName: string;
+	readonly handleGraphNodeId: string;
+};
+
 export type ProtocolArmBranchRecord = {
 	readonly id: string;
 	readonly testReads: ReadonlyArray<{
@@ -508,6 +526,21 @@ export type ProtocolViewPayload = {
 		 */
 		readonly composedInstancePath?: string;
 		readonly composedGraphProps?: ReadonlyArray<ProtocolComposedGraphProp>;
+		/**
+		 * Minted element() ids for the handles this branch's arms bind, resolved by
+		 * the render that served the branch and keyed by handle graph node id. The
+		 * token they were minted from is a seed-map value, so a flip has no second
+		 * way to spell them. Absent on every branch whose arms bind no handle an
+		 * IDREF names, which keeps those payloads byte-identical.
+		 */
+		readonly elementHandleIds?: Readonly<Record<string, string>>;
+		/**
+		 * IDREF positions OUTSIDE the arms that name a handle an arm binds. The
+		 * element they sit on outlives the flip, so the attribute is written when
+		 * the arm files its handle and removed when the arm takes it away, rather
+		 * than served naming an element that is not there.
+		 */
+		readonly idrefSites?: ReadonlyArray<ProtocolBranchIdrefSite>;
 	}>;
 	readonly asyncBoundaries: ReadonlyArray<{
 		readonly id: string;
