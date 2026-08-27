@@ -535,9 +535,14 @@ test('resume runtime materializes view records and dispatches lazy symbols after
 
 	await resume.start();
 
+	// The focus-primed preload rides behind the dispatch listener, never ahead of it.
 	expect(root.listeners).toEqual([
 		expect.objectContaining({
 			type: 'keydown',
+			options: { capture: true },
+		}),
+		expect.objectContaining({
+			type: 'focusin',
 			options: { capture: true },
 		}),
 	]);
@@ -934,9 +939,19 @@ test('resume runtime startup installs container wiring without importing app sym
 
 	await resume.start();
 
+	// The preload triggers ride alongside the dispatch authority: a click record
+	// is reachable by hover and, once focused, by Enter and Space.
 	expect(root.listeners).toEqual([
 		expect.objectContaining({
 			type: 'click',
+			options: { capture: true },
+		}),
+		expect.objectContaining({
+			type: 'focusin',
+			options: { capture: true },
+		}),
+		expect.objectContaining({
+			type: 'pointerover',
 			options: { capture: true },
 		}),
 	]);
@@ -3520,7 +3535,11 @@ test('resume runtime dispose removes listeners, subscriptions, and host cleanups
 	await resume.start();
 	await resume.activateBehaviors('h0');
 
-	expect(root.listeners.map((listener) => listener.type)).toEqual(['click']);
+	expect(root.listeners.map((listener) => listener.type)).toEqual([
+		'click',
+		'focusin',
+		'pointerover',
+	]);
 	resume.dispose();
 	graph.write({ graphNodeId: 'state:count', value: 1 });
 	await graph.flush();

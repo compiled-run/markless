@@ -1,0 +1,22 @@
+# MARKLESS_BRANCH_ELSE_SPELLING
+
+A branch alternative is spelled `else` instead of `@else`
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: error
+
+## Message
+
+This `else` follows an @if arm but is not written as `@else`, so it is not read as a branch at all. TSRX parses it as literal text next to the @if, and the block after it becomes a separate expression, so the page renders the word "else" followed by the arm's own source as escaped text.
+
+## Why
+
+Markless branches are spelled with the `@` sigil — `@if`, `@else if`, `@else` — because that sigil is what tells the parser a construct starts here. Without it the parser has no branch to attach the alternative to, and the mistake is silent: the module compiles and ships visible garbage instead of failing.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

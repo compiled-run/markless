@@ -97,7 +97,7 @@ test('an option nobody may choose conveys that it is disabled', async () => {
 	});
 });
 
-// `disabled` on the fieldset disables every option natively, so the reader conveys it on the group and on each option.
+// The group's `disabled` reaches the group's own aria and every option's input, so the reader conveys it on both.
 test('a group nobody may touch conveys disabled on the group and on its options', async () => {
 	await open(UnavailableOptions);
 	expectConveys(await readUntil(sr, { role: 'radiogroup', name: 'Support Plan' }), {

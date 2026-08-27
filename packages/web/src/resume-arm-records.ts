@@ -27,19 +27,47 @@ export function registerServedArmEventRecords(
 	root: ResumeDomElement,
 	boundaries: ReadonlyArray<ResumeAsyncBoundaryPayload>,
 	register: (element: object, record: ResumeArmRecordSet['events'][number]) => void,
+	// An escalating branch open at first render serves its arm the same way, so
+	// its records need the same pre-runtime pass or its first click is dropped.
+	branches: ReadonlyArray<{
+		readonly startAnchor: ResumeAsyncBoundaryPayload['startAnchor'];
+		readonly endAnchor: ResumeAsyncBoundaryPayload['endAnchor'];
+		readonly servedArmRecords?: unknown;
+	}> = [],
 ): void {
 	let comments: ReadonlyArray<ResumeDomComment> | undefined;
+	const ranges: Array<{
+		readonly startAnchor: ResumeAsyncBoundaryPayload['startAnchor'];
+		readonly endAnchor: ResumeAsyncBoundaryPayload['endAnchor'];
+		readonly armRecords: ResumeArmRecordSet;
+	}> = [];
 	for (const boundary of boundaries) {
 		const armRecords = boundaryArmRecordSet(boundary.armRecords);
-		if (!armRecords?.events.length) continue;
+		if (armRecords?.events.length)
+			ranges.push({
+				startAnchor: boundary.startAnchor,
+				endAnchor: boundary.endAnchor,
+				armRecords,
+			});
+	}
+	for (const branch of branches) {
+		const armRecords = boundaryArmRecordSet(branch.servedArmRecords);
+		if (armRecords?.events.length)
+			ranges.push({
+				startAnchor: branch.startAnchor,
+				endAnchor: branch.endAnchor,
+				armRecords,
+			});
+	}
+	for (const range of ranges) {
 		comments ??= pageCommentCensus(root);
-		const startAnchor = comments[boundary.startAnchor.index];
+		const startAnchor = comments[range.startAnchor.index];
 		if (!startAnchor) continue;
 		const arm = materializeArmRecords({
 			root,
 			startAnchor,
-			endAnchor: comments[boundary.endAnchor.index],
-			armRecords,
+			endAnchor: comments[range.endAnchor.index],
+			armRecords: range.armRecords,
 		});
 		for (const record of arm.events) {
 			const element = arm.elementsByHostId.get(record.hostNodeId);
@@ -112,24 +140,50 @@ export function materializeArmRecords(input: ArmMaterializeInput) {
 
 // Resolves each flip record's anchor pair by position in the arm-local census.
 // A missing anchor is a corrupt census — fail loud (D2), never register half a
-// flip. Escalated records (no anchors) pass through untouched.
+// flip. A record with no index left to read passes through: an escalated record
+// carries no anchors, and a caller that owns its own census — a client-minted
+// row, counting its comments in its own fragment — hands over live ones.
 function materializeArmBranchRecords(
 	input: ArmMaterializeInput,
 ): ReadonlyArray<ResumeArmBranchRecord> {
 	const records = input.armRecords.branches ?? [];
 	if (!records.length) return [];
-	const census = records.some((record) => record.startAnchor)
+	const planned = (anchor: ResumeArmBranchRecord['startAnchor']) =>
+		anchor as { readonly strategy?: string; readonly index?: number } | undefined;
+	// A composed child's own branch arrives still spelling the index it counted in
+	// its OWN module's census, which names nothing here; its anchors carry its
+	// instance-prefixed id, so the anchor text is the exact page-wide address.
+	const composed = (record: ResumeArmBranchRecord) =>
+		planned(record.startAnchor)?.strategy === 'dom-order-comment';
+	const census = records.some(
+		(record) => !composed(record) && planned(record.startAnchor)?.index !== undefined,
+	)
 		? armBranchCommentCensus(input.root, input.startAnchor, input.endAnchor)
 		: [];
+	let pageComments: ReadonlyArray<ResumeDomComment> | undefined;
+	const anchorNamed = (text: string): ResumeDomComment | undefined => {
+		pageComments ??= pageCommentCensus(input.root);
+		return pageComments.find((comment) => commentText(comment) === text);
+	};
 	return records.map((record) => {
-		if (!record.startAnchor || !record.endAnchor) return record;
-		const startIndex = (record.startAnchor as { readonly index: number }).index;
-		const endIndex = (record.endAnchor as { readonly index: number }).index;
+		if (composed(record)) {
+			const startAnchor = anchorNamed(`markless:branch:${record.id}`);
+			const endAnchor = anchorNamed(`/markless:branch:${record.id}`);
+			if (!startAnchor || !endAnchor) throw missingComposedArmBranchAnchorError(record.id);
+			return { ...record, startAnchor, endAnchor };
+		}
+		const startIndex = planned(record.startAnchor)?.index;
+		const endIndex = planned(record.endAnchor)?.index;
+		if (startIndex === undefined || endIndex === undefined) return record;
 		const startAnchor = census[startIndex];
 		const endAnchor = census[endIndex];
 		if (!startAnchor || !endAnchor) throw missingArmBranchAnchorError(record.id, startIndex);
 		return { ...record, startAnchor, endAnchor };
 	});
+}
+
+function commentText(comment: ResumeDomComment): string {
+	return comment.data ?? (comment as { readonly textContent?: string }).textContent ?? '';
 }
 
 function armBranchCommentCensus(
@@ -162,6 +216,13 @@ function missingArmBranchAnchorError(id: string, index: number): Error {
 	return runtimeResumeError(
 		'MARKLESS_RESUME_LOCATOR_MISSING',
 		`Arm-scoped branch ${id} expected an arm-branch comment anchor at arm-local index ${index}.`,
+	);
+}
+
+function missingComposedArmBranchAnchorError(id: string): Error {
+	return runtimeResumeError(
+		'MARKLESS_RESUME_LOCATOR_MISSING',
+		`Composed arm-scoped branch ${id} expected its own comment anchor pair inside this arm.`,
 	);
 }
 

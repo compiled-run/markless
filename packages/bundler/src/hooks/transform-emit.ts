@@ -8,6 +8,7 @@ import {
 } from '@markless/compiler';
 import { invalidateAllGeneratedModules } from '../dev-invalidation.ts';
 import {
+	delegateLoadOptions,
 	linkedInterfaceClaims,
 	linkedInterfaces,
 	materializeDelegateChildren,
@@ -36,6 +37,7 @@ export async function emitClientRouteArtifact(
 		pluginContext,
 		source,
 		transformed.artifactChildren,
+		delegateLoadOptions(ctx, pluginContext),
 	);
 	warnDelegateImportFailures(pluginContext, delegates);
 	const artifactChildMaterializations = delegates.materializations;
@@ -237,8 +239,16 @@ export async function emitTransformResult(
 	}
 
 	if (currentEnvironment === 'client' && !internalOptions.dev) {
+		// A bundled symbol reaches the graph through its bundle's chunk root; emitting
+		// it as its own entry too would restore the per-symbol chunk it replaces.
+		const bundledSymbolModuleIds = new Set(
+			transformed.virtualModules.flatMap((item) =>
+				item.type === 'symbol-bundle' ? [...(item.bundledSymbolModuleIds ?? [])] : [],
+			),
+		);
 		for (const module of transformed.virtualModules.filter((item) => {
-			if (item.type === 'symbol') return true;
+			if (item.type === 'symbol') return !bundledSymbolModuleIds.has(item.id);
+			if (item.type === 'symbol-bundle') return true;
 			if (item.type === 'trigger-group') return true;
 			if (item.type === 'settle') return clientSymbolEntrySources.has(source);
 			if (item.type === 'resolver') {
