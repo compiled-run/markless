@@ -201,10 +201,17 @@ export function wireKeyedRepeats(
 				registerRowEvents,
 			);
 		};
-		// Wrapped: absent means this pass has to await something - a mint module
-		// still in flight, or a component row, whose render is async.
-		const settledMint = (): { readonly mint: RowMint | undefined } | undefined =>
-			!builds ? { mint: undefined } : cell?.mint && !cell.mint.rows ? { mint: cell.mint } : undefined;
+		// Absent means this pass has to await: a mint still in flight, or a component
+		// row for a key never built - its html comes from an async render. Asked of
+		// the REPEAT, not the loaded module, and a departed key keeps its row.
+		const settledMint = (): { readonly mint: RowMint | undefined } | undefined => {
+			if (!builds) return { mint: undefined };
+			if (!cell?.mint) return undefined;
+			if (repeat.rowComponent)
+				for (const item of readKeyedRepeatCollection(input.graph, repeat))
+					if (!rowRootsByKey.has(repeatItemKey(item, repeat))) return undefined;
+			return { mint: cell.mint };
+		};
 		// Rows minted AT the write, so a handler that replaces a collection reads
 		// the new rows off an element() handle on its next statement. Same apply,
 		// same rowRootsByKey as the flush below, so the flush finds them placed and
