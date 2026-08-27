@@ -1,3 +1,4 @@
+import { clearDevServerErrorOverlay } from '../../test-support/dev-error-overlay.ts';
 import { cleanup, render, renderSSR } from '@markless/vitest-browser';
 import { page } from 'vite-plus/test/browser';
 import { afterEach, expect, test } from 'vitest';
@@ -209,4 +210,5 @@ test('CSR: a dialog does not take the live region out of reach', async () => {
 // in packages/compiler/test/cross-module-shared-method.test.ts.
 test('the imperative surface is refused at build time until the capability ships', async () => {
 	await expect(import('./scenarios/method.tsrx')).rejects.toThrow();
+	await expect.poll(() => clearDevServerErrorOverlay()).toBeGreaterThan(0);
 });
