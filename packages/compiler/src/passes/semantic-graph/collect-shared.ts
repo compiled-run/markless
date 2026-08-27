@@ -26,6 +26,7 @@ import {
 	implicitFamilyScopeDiagnostic,
 	invalidSharedScopeDiagnostic,
 	sharedDefinitionCycleDiagnostic,
+	sharedSeedUnresolvedValueDiagnostic,
 	unboundCallbackSlotDiagnostic,
 	unboundSharedCallDiagnostic,
 	unnamedSharedReturnDiagnostic,
@@ -661,6 +662,7 @@ export function collectSharedFactoryGraph(
 		});
 		state.currentSharedDefinitionId = previousSharedDefinitionId;
 		reportUnnamedSharedReturn({ factory: declaration.factory, definition, state });
+		reportUnresolvedSharedSeeds({ factory: declaration.factory, definition, state });
 		if (returnProperties.length === 0) continue;
 
 		const index = state.graph.sharedDefinitions.findIndex((item) => item.id === definition.id);
@@ -1041,6 +1043,7 @@ function collectSharedReturnProperties(input: {
 	const returns = sharedReturnExpressions(input.factory);
 	if (returns.length === 0) return [];
 
+	const seeds = factorySeedObjects(input.factory, input.state);
 	const properties: SemanticSharedReturnProperty[] = [];
 	for (const returned of returns) {
 		if (returned.type === 'ObjectExpression') {
@@ -1048,6 +1051,7 @@ function collectSharedReturnProperties(input: {
 				...collectReturnedObjectProperties({
 					node: returned,
 					definitionId: input.definitionId,
+					seeds,
 					state: input.state,
 				}),
 			);
@@ -1062,12 +1066,55 @@ function collectSharedReturnProperties(input: {
 				source: expressionSource(returned, input.state.source),
 				bindings: graphBindingMap(input.state.graph, input.definitionId),
 				aliases: semanticAliasMap(input.state.graph, input.definitionId),
+				seeds,
 				state: input.state,
 			}),
 		);
 	}
 
 	return properties;
+}
+
+/**
+ * The `state({…})` seed objects a factory declares, by the local each was bound
+ * to. The field set a factory publishes is authored text, so it is readable here
+ * whether or not the evaluator could fold the seed's VALUES into a constant.
+ */
+function factorySeedObjects(
+	factory: AnyNode | undefined,
+	state: WalkState,
+): ReadonlyMap<string, AnyNode> {
+	const seeds = new Map<string, AnyNode>();
+	const body = factory?.body as AnyNode | undefined;
+	if (!body) return seeds;
+
+	walkFactoryBody(body, (node) => {
+		if (node.type !== 'VariableDeclarator') return;
+		const init = node.init as AnyNode | undefined;
+		if (!init || getFrameworkApiForCall(init, state.frameworkApiImports) !== 'state') return;
+
+		const name = getIdentifierName(node.id as AnyNode | undefined);
+		if (!name) return;
+
+		const seed = unwrapSeedAssertion(asNodes(init.arguments)[0]);
+		if (seed?.type === 'ObjectExpression') seeds.set(name, seed);
+	});
+
+	return seeds;
+}
+
+function unwrapSeedAssertion(node: AnyNode | undefined): AnyNode | undefined {
+	let current = node;
+	while (
+		current &&
+		(current.type === 'TSAsExpression' ||
+			current.type === 'TSSatisfiesExpression' ||
+			current.type === 'TSNonNullExpression' ||
+			current.type === 'ParenthesizedExpression')
+	) {
+		current = current.expression as AnyNode | undefined;
+	}
+	return current;
 }
 
 /**
@@ -1096,6 +1143,112 @@ function reportUnnamedSharedReturn(input: {
 	}
 }
 
+/**
+ * A seed value the factory's own copy could not bind. The seed is re-evaluated
+ * in a module carrying this file's module scope and imports and nothing else, so
+ * a free name outside that set throws there. Refused AT the seed, naming the
+ * factory, the field and the expression: the cost of leaving it silent was that
+ * the shape lost every field and the error surfaced at each consumer instead.
+ */
+function reportUnresolvedSharedSeeds(input: {
+	readonly factory: AnyNode | undefined;
+	readonly definition: SemanticSharedDefinition;
+	readonly state: WalkState;
+}): void {
+	const seeds = factorySeedObjects(input.factory, input.state);
+	if (seeds.size === 0) return;
+
+	const bindable = bindableSeedNames(input.factory, input.state);
+	for (const seed of seeds.values()) {
+		for (const property of asNodes(seed.properties)) {
+			if (property.type !== 'Property') continue;
+
+			const fieldName = objectPropertyKey(property.key as AnyNode | undefined);
+			const value = property.value as AnyNode | undefined;
+			if (fieldName === null || !value) continue;
+
+			const freeName = unbindableSeedName(value, bindable);
+			if (freeName === null) continue;
+
+			input.state.graph.diagnostics.push(
+				sharedSeedUnresolvedValueDiagnostic({
+					definitionName: input.definition.name,
+					fieldName,
+					valueSource: expressionSource(value, input.state.source),
+					freeName,
+					span: sourceSpan(value, input.state.filename),
+				}),
+			);
+		}
+	}
+}
+
+/** Every name a seed expression may stand on: factory locals, this file's carried module scope, its imports. */
+function bindableSeedNames(factory: AnyNode | undefined, state: WalkState): ReadonlySet<string> {
+	const names = new Set<string>();
+	for (const declaration of carryableModuleScopeDeclarations(state)) {
+		for (const name of declaration.names) names.add(name);
+	}
+	for (const moduleImport of state.graph.moduleImports) names.add(moduleImport.localName);
+
+	const body = factory?.body as AnyNode | undefined;
+	if (body) {
+		walkFactoryBody(body, (node) => {
+			if (node.type === 'VariableDeclarator') {
+				const name = getIdentifierName(node.id as AnyNode | undefined);
+				if (name) names.add(name);
+				return;
+			}
+			if (node.type !== 'FunctionDeclaration' && node.type !== 'ClassDeclaration') return;
+			const name = getIdentifierName(node.id as AnyNode | undefined);
+			if (name) names.add(name);
+		});
+	}
+
+	return names;
+}
+
+/** The first name in a seed value that nothing would bind, or null when every name resolves. */
+function unbindableSeedName(value: AnyNode, bindable: ReadonlySet<string>): string | null {
+	let free: string | null = null;
+	const visit = (node: AnyNode | undefined) => {
+		if (!node || typeof node !== 'object' || free !== null) return;
+
+		// A type annotation names types, not values: `null as { x: number } | null`
+		// spells `x` and binds nothing at runtime.
+		if (typeof node.type === 'string' && node.type.startsWith('TSType')) return;
+		if (
+			node.type === 'TSAsExpression' ||
+			node.type === 'TSSatisfiesExpression' ||
+			node.type === 'TSNonNullExpression'
+		) {
+			visit(node.expression as AnyNode | undefined);
+			return;
+		}
+		if (node.type === 'MemberExpression' && node.computed !== true) {
+			// `Number.POSITIVE_INFINITY` binds on `Number`; the property name is not a reference.
+			visit(node.object as AnyNode | undefined);
+			return;
+		}
+		if (node.type === 'Property' && node.computed !== true) {
+			visit(node.value as AnyNode | undefined);
+			return;
+		}
+		if (node.type === 'Identifier') {
+			const name = getIdentifierName(node);
+			if (!name || name === 'undefined' || bindable.has(name)) return;
+			if (Object.hasOwn(globalThis, name)) return;
+			free = name;
+			return;
+		}
+
+		for (const child of childNodes(node)) visit(child);
+	};
+	visit(value);
+
+	return free;
+}
+
 function sharedReturnExpressions(factory: AnyNode | undefined): AnyNode[] {
 	const body = factory?.body as AnyNode | undefined;
 	if (!body) return [];
@@ -1116,6 +1269,7 @@ function sharedReturnExpressions(factory: AnyNode | undefined): AnyNode[] {
 function collectReturnedObjectProperties(input: {
 	readonly node: AnyNode;
 	readonly definitionId: string;
+	readonly seeds: ReadonlyMap<string, AnyNode>;
 	readonly state: WalkState;
 }): SemanticSharedReturnProperty[] {
 	const properties: SemanticSharedReturnProperty[] = [];
@@ -1129,6 +1283,7 @@ function collectReturnedObjectProperties(input: {
 					node: property,
 					bindings,
 					aliases,
+					seeds: input.seeds,
 					state: input.state,
 				}),
 			);
@@ -1214,6 +1369,7 @@ function spreadReturnProperties(input: {
 	readonly node: AnyNode;
 	readonly bindings: ReadonlyMap<string, SemanticGraphBinding>;
 	readonly aliases: ReturnType<typeof semanticAliasMap>;
+	readonly seeds: ReadonlyMap<string, AnyNode>;
 	readonly state: WalkState;
 }): SemanticSharedReturnProperty[] {
 	const argument = input.node.argument as AnyNode | undefined;
@@ -1222,6 +1378,7 @@ function spreadReturnProperties(input: {
 		source: argument ? expressionSource(argument, input.state.source) : '',
 		bindings: input.bindings,
 		aliases: input.aliases,
+		seeds: input.seeds,
 		state: input.state,
 	});
 }
@@ -1236,12 +1393,13 @@ function graphPathReturnProperties(input: {
 	readonly source: string;
 	readonly bindings: ReadonlyMap<string, SemanticGraphBinding>;
 	readonly aliases: ReturnType<typeof semanticAliasMap>;
+	readonly seeds: ReadonlyMap<string, AnyNode>;
 	readonly state: WalkState;
 }): SemanticSharedReturnProperty[] {
 	const resolved = resolveGraphPath(input.source, input.bindings, input.aliases);
 	if (!resolved) return [];
 
-	const keys = graphObjectReturnKeys(resolved.binding);
+	const keys = graphObjectReturnKeys(resolved.binding, input.seeds);
 	if (keys.length === 0) return [];
 
 	return keys.map((name) => ({
@@ -1254,11 +1412,33 @@ function graphPathReturnProperties(input: {
 	}));
 }
 
-function graphObjectReturnKeys(binding: SemanticGraphBinding): string[] {
+// The field set is authored text, never the folded value: a seed the evaluator
+// could not fold (a module const, `Number.POSITIVE_INFINITY`) used to unregister
+// every field of the shape, literal-seeded ones included.
+function graphObjectReturnKeys(
+	binding: SemanticGraphBinding,
+	seeds: ReadonlyMap<string, AnyNode>,
+): string[] {
 	if (binding.valueKind !== 'object') return [];
-	if (!isPlainRecord(binding.initialValue)) return [];
+	if (isPlainRecord(binding.initialValue)) return Object.keys(binding.initialValue);
 
-	return Object.keys(binding.initialValue);
+	const seed = seeds.get(binding.name);
+	return seed ? seedObjectKeys(seed) : [];
+}
+
+function seedObjectKeys(node: AnyNode): string[] {
+	const keys: string[] = [];
+	for (const property of asNodes(node.properties)) {
+		// A spread or a computed key makes the field set a runtime answer; a
+		// partial key list would register some fields and drop others silently.
+		if (property.type !== 'Property') return [];
+
+		const key = objectPropertyKey(property.key as AnyNode | undefined);
+		if (key === null || property.computed === true) return [];
+		keys.push(key);
+	}
+
+	return keys;
 }
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {

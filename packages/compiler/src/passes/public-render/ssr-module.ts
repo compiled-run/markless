@@ -340,6 +340,40 @@ export function emitPublicSsrRenderModule(
 // The child surface a marker or a boundary check names, spelled exactly as the
 // render and seed calls spell it: the module reference, and the component name
 // when a named import says WHICH component of that module's surface composes.
+/**
+ * A shared() seed the evaluator could not fold to a constant — a module-scope
+ * `const`, `Number.POSITIVE_INFINITY` — has no protocol value to print, so its
+ * cell was missing from the printed state map and every server read of the shape
+ * came back undefined. The authored expression is evaluated in the render body
+ * instead: the module carries the factory's module scope, so the names it stands
+ * on are in scope, and `Infinity` survives where a printed JSON value would not.
+ *
+ * Emitted per render and only when the id is still unset, so a component-body
+ * seed and a forwarded root seed both keep precedence over the factory default.
+ */
+function unfoldedSharedSeedLines(input: PublicRenderModuleInput): string[] {
+	const initializers = new Map(
+		input.semanticGraph.graphBindings.flatMap((binding) =>
+			binding.kind === 'state' &&
+			binding.sharedDefinitionId !== undefined &&
+			binding.initializerSource !== undefined
+				? [[binding.id, binding.initializerSource] as const]
+				: [],
+		),
+	);
+	if (initializers.size === 0) return [];
+
+	return input.protocolState.cells.flatMap((cell) => {
+		if (cell.value !== undefined) return [];
+
+		const initializer = initializers.get(cell.graphNodeId);
+		if (initializer === undefined) return [];
+
+		const key = JSON.stringify(cell.graphNodeId);
+		return `if(!marklessSsrRenderStateValues.has(${key}))marklessSsrRenderStateValues.set(${key},${initializer});`;
+	});
+}
+
 function childSurfaceArgs(
 	edge: { readonly childComponentName: string; readonly importKind?: string; readonly importSource?: string; readonly importedName?: string },
 	referenceByName: ReadonlyMap<string, string>,
@@ -1002,11 +1036,13 @@ function emitSsrDataLines(
 		const args = childSurfaceArgsByEdgeId.get(edgeId);
 		return args ? [args] : [];
 	});
+	const unfoldedSeedLines = unfoldedSharedSeedLines(input);
 	const seedForwardLines =
 		seedForward.length === 0
 			? []
 			: [
 					"marklessSsrRenderStateValues.set('prop:props',props);",
+					...unfoldedSeedLines,
 					...bindingLines,
 					...sharedComputedLines,
 					...templateComputedLines,
@@ -1032,7 +1068,9 @@ function emitSsrDataLines(
 	);
 	return {
 		seedForward: seedForwardLines,
-		bodySharedComputed: hoistsSharedComputed ? allSharedComputedLines : [],
+		bodySharedComputed: hoistsSharedComputed
+			? [...unfoldedSeedLines, ...allSharedComputedLines]
+			: [],
 		composedRootSurfaceArgs,
 		importedChildSurfaceArgs,
 		serveComputed:
@@ -1045,6 +1083,7 @@ function emitSsrDataLines(
 					],
 		render: [
 		"marklessSsrRenderStateValues.set('prop:props',props);",
+		...unfoldedSeedLines,
 		...bindingLines,
 		...sharedComputedLines,
 		...templateComputedLines,

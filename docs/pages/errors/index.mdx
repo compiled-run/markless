@@ -2,7 +2,7 @@
 
 Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
 
-199 codes.
+200 codes.
 
 | Code | Package | Pass / phase | Title | Message |
 | --- | --- | --- | --- | --- |
@@ -157,6 +157,7 @@ Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not ed
 | `MARKLESS_SHARED_RETURN_UNNAMED` | compiler | semantic-graph | a shared() factory must return named state | shared() definition "…" returns …() directly, so the cells it returns have no name. |
 | `MARKLESS_SHARED_SCOPE_INVALID` | compiler | semantic-graph | shared() scope must be valid | Unknown shared() scope …. Valid scopes are …. (+1 more) |
 | `MARKLESS_SHARED_SEED_UNKNOWN_FIELD` | compiler | state-lowering | Shared instance has no such field to seed | Cannot write to "…" because "…()" declares no graph field named "…". Instance callback fields such as "…" are not supported yet (tracked). |
+| `MARKLESS_SHARED_SEED_UNRESOLVED_VALUE` | compiler | semantic-graph | a shared() seed value has nothing to bind to | The state() seed for "…" in shared() definition "…" is `…`, and "…" is not a literal, a module-scope declaration of this file, an import, or a global. |
 | `MARKLESS_SHARED_SEED_UNSUPPORTED` | compiler | state-lowering | Cannot seed shared state from this expression | Cannot seed "…" from "…" because a component body seeds a shared instance only from its own props or from constants. |
 | `MARKLESS_SOURCE_SYMBOL_CLAIMS_DIVERGED` | compiler | link | Emitted symbol claims for one source disagree | Source … has incompatible emitted symbol claims in … and …. |
 | `MARKLESS_SOURCE_SYMBOL_CLAIMS_FINAL_WITHOUT_START` | bundler | module-metadata-registry | TODO: no builder title | Source … published final claims without an active emitted variant. |

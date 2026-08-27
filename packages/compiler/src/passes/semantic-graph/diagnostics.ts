@@ -813,6 +813,36 @@ export function unnamedSharedReturnDiagnostic(input: {
 	};
 }
 
+export function sharedSeedUnresolvedValueDiagnostic(input: {
+	readonly definitionName: string;
+	readonly fieldName: string;
+	readonly valueSource: string;
+	readonly freeName: string;
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_SHARED_SEED_UNRESOLVED_VALUE',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'a shared() seed value has nothing to bind to',
+		message: `The state() seed for "${input.fieldName}" in shared() definition "${input.definitionName}" is \`${input.valueSource}\`, and "${input.freeName}" is not a literal, a module-scope declaration of this file, an import, or a global.`,
+		why: 'A factory seed is re-evaluated in a module of its own, carrying only this file\'s module scope and imports. A name that is none of those has nothing to bind to there, so the seed throws a ReferenceError and the whole shape loses its fields — which then reads as an error at every consumer of the shape rather than here.',
+		primarySpan: input.span,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		source: input.valueSource,
+		suggestions: [
+			{
+				message: `Seed "${input.fieldName}" with a literal, or with a module-scope \`const\` of this file that "${input.freeName}" can resolve to.`,
+			},
+			{
+				message: 'Compute the value inside a factory method or a computed() instead, where the instance is live.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_SEED_UNRESOLVED_VALUE',
+	};
+}
+
 // A shared() definition that several components of its own module resolve is a
 // widget family shape. Left without a scope it is page-scoped, so two of those
 // widgets on one page silently share one graph. The warning makes the scope a
