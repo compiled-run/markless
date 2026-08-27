@@ -46,12 +46,40 @@ const clientBuild = resolve(clientPublic, MARKLESS_BUILD_PREFIX);
 // serves as payload inside the HTML the client lane ships as JS instead (the
 // prerender data chunk and one staged trigger-group chunk per dispatching
 // element).
+// Re-measured 2026-08-27 on this tree, same conditions. One line per stage, each
+// naming what moved it:
+// MEASUREMENT LANDMINE, found while re-anchoring: this lane's page-load download
+// is NOT reproducible run to run. Three consecutive builds on one unchanged tree
+// measured 135,182 across 106 chunks, 135,982 across 107, and 135,788 across
+// 107. The chunk count itself moves, so this is build nondeterminism and not the
+// gzip run variance the margin was sized for. The anchor below is the highest of
+// the three; every other stage on this lane held to within 1 B across the same
+// three runs. Do not tighten this one stage on a single sample, and do not read
+// a sub-800 B move here as a regression until the nondeterminism is chased down.
+//   page-load download  128,534 -> 135,982 (+7,448; the +6,648 line below is the
+//     lowest of the three samples). The eager
+//     set carries the dispatch-core chunk this demo shares with the vite
+//     fixtures (5,699 gzip here, holding both marklessNativeFocus/
+//     marklessOverlayFocusOrigin/marklessPrimedHover from 529caa2d and
+//     marklessQualifyGraphNodeId/marklessWidgetHostGraph/marklessRowParent from
+//     9fbedb5c + 65ab93e3 + c288d956), plus one staged trigger chunk per
+//     dispatching element, each of which now inlines the qualification wrapper.
+//   page-load execute   15,316 -> 14,221 (-1,095). Walks DOWN: the roster no
+//     longer sits in the eager static closure - it is reached on demand.
+//   interaction 1       2,254 -> 2,416 (+162)
+//   interaction 2       2,513 -> 2,705 (+192)
+//   interaction 3       2,514 -> 2,706 (+192). All three per-trigger chunks
+//     carry marklessQualifyGraphNodeId and none of the focus keys, so the whole
+//     marginal growth is the widget-instance qualification family.
+// Attribution here is by named change over the anchor..tip window, confirmed by
+// which identifiers each measured chunk actually contains; it is not a
+// revert-measurement, and the window is ~100 merges wide.
 const STAGE_ANCHORS = {
-	'page-load download': { gzipBytes: 128_534, margin: 128 },
-	'page-load execute': { gzipBytes: 15_316, margin: 128 },
-	'interaction 1 marginal': { gzipBytes: 2_254, margin: 32 },
-	'interaction 2 marginal': { gzipBytes: 2_513, margin: 32 },
-	'interaction 3 marginal': { gzipBytes: 2_514, margin: 32 },
+	'page-load download': { gzipBytes: 135_982, margin: 128 },
+	'page-load execute': { gzipBytes: 14_221, margin: 128 },
+	'interaction 1 marginal': { gzipBytes: 2_416, margin: 32 },
+	'interaction 2 marginal': { gzipBytes: 2_705, margin: 32 },
+	'interaction 3 marginal': { gzipBytes: 2_706, margin: 32 },
 } as const satisfies Record<string, StageAnchor>;
 
 let measured: BudgetMeasurement;

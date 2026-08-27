@@ -217,13 +217,30 @@ const MAX_SHIPPED_JS_GZIP_BYTES = 69_800;
 // per the measurement landmine above, MARKLESS_CONSUMER_BUILD=1). Each is a
 // must-not-exceed ceiling of anchor + margin; the margin absorbs gzip run
 // variance and the few bytes an absolute build path costs. Walk them DOWN.
+// Re-measured 2026-08-27 on this tree, same conditions. One line per stage, each
+// naming what moved it:
+//   page-load download  65,067 -> 69,588 (+4,521 across 97 chunks). The served
+//     page's fetch set carries the same shared dispatch-core chunk the vite
+//     fixtures measure: focus replay moved into it (529caa2d) and the
+//     widget-instance qualification landed in it (9fbedb5c, 65ab93e3,
+//     c288d956).
+//   page-load execute   4,010 -> 4,214 (+204). Same dispatch core, which is in
+//     this stage's static import closure.
+//   interaction 1       1,931 -> 1,932 (+1)
+//   interaction 2       1,567 -> 1,568 (+1)
+//   interaction 3       1,094 -> 1,092 (-2). All three were already inside their
+//     margins; restated to the measured value so the margin means what it says.
+//   first-navigation    23,860 -> 23,333 (-527). Walks DOWN with the client
+//     render path the router link imports.
+// Attribution here is by named change over the anchor..tip window, confirmed by
+// which identifiers the measured chunks contain; it is not a revert-measurement.
 const STAGE_ANCHORS = {
-	'page-load download': { gzipBytes: 65_067, margin: 128 },
-	'page-load execute': { gzipBytes: 4_010, margin: 32 },
-	'interaction 1 marginal': { gzipBytes: 1_931, margin: 32 },
-	'interaction 2 marginal': { gzipBytes: 1_567, margin: 32 },
-	'interaction 3 marginal': { gzipBytes: 1_094, margin: 32 },
-	'first-navigation marginal': { gzipBytes: 23_860, margin: 128 },
+	'page-load download': { gzipBytes: 69_588, margin: 128 },
+	'page-load execute': { gzipBytes: 4_214, margin: 32 },
+	'interaction 1 marginal': { gzipBytes: 1_932, margin: 32 },
+	'interaction 2 marginal': { gzipBytes: 1_568, margin: 32 },
+	'interaction 3 marginal': { gzipBytes: 1_092, margin: 32 },
+	'first-navigation marginal': { gzipBytes: 23_333, margin: 128 },
 } as const satisfies Record<string, StageAnchor>;
 
 let measured: BudgetMeasurement;
