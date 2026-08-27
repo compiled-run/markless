@@ -45,6 +45,7 @@ import {
 	templateAsValueDiagnostic,
 	unstableStateCreationSiteDiagnostic,
 } from './diagnostics.ts';
+import { ownedModuleAst } from './shared-ast.ts';
 import type { SemanticView } from 'yuku-tsrx';
 import type { WalkState } from './types.ts';
 import { collectSharedInstance, resolveSharedCall } from './collect-shared.ts';
@@ -216,7 +217,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 				markTemplateValueHandled(templateValue, state);
 				continue;
 			}
-			const evaluatedInitial = evaluateInitialStateValue(initial);
+			const evaluatedInitial = evaluateInitialStateValue(initial, state);
 			const elementHandle = findElementHandleStateValue(initial, state);
 			if (elementHandle) {
 				state.graph.diagnostics.push(
@@ -504,7 +505,7 @@ function directHelperGraphReturn(
 
 			if (frameworkApi === 'state') {
 				const initial = firstArgument(init!);
-				const evaluatedInitial = evaluateInitialStateValue(initial);
+				const evaluatedInitial = evaluateInitialStateValue(initial, state);
 				return {
 					kind: 'state',
 					localName: returnedName,
@@ -1396,26 +1397,30 @@ function initialValueKind(rawNode: AnyNode | undefined): SemanticGraphBinding['v
 
 function evaluateInitialStateValue(
 	rawNode: AnyNode | undefined,
+	state?: WalkState,
+	visiting?: ReadonlySet<string>,
 ): { readonly ok: true; readonly value: unknown } | { readonly ok: false } {
 	const node = unwrapTypeAssertion(rawNode);
 	if (!node) return { ok: false };
 
 	if (node.type === 'Literal') return { ok: true, value: node.value };
-	if (node.type === 'Identifier' && getIdentifierName(node) === 'undefined') {
-		return { ok: true, value: undefined };
+	if (node.type === 'Identifier') {
+		if (getIdentifierName(node) === 'undefined') return { ok: true, value: undefined };
+		return evaluateNamedConstant(node, state, visiting);
 	}
-	if (node.type === 'ObjectExpression') return evaluateObjectExpression(node);
+	if (node.type === 'MemberExpression') return evaluateGlobalMemberConstant(node, state);
+	if (node.type === 'ObjectExpression') return evaluateObjectExpression(node, state, visiting);
 	if (node.type === 'ArrayExpression') {
 		const values: unknown[] = [];
 		for (const element of asNodes(node.elements)) {
-			const value = evaluateInitialStateValue(element);
+			const value = evaluateInitialStateValue(element, state, visiting);
 			if (!value.ok) return { ok: false };
 			values.push(value.value);
 		}
 		return { ok: true, value: values };
 	}
 	if (node.type === 'UnaryExpression') {
-		const argument = evaluateInitialStateValue(node.argument as AnyNode | undefined);
+		const argument = evaluateInitialStateValue(node.argument as AnyNode | undefined, state, visiting);
 		if (!argument.ok) return { ok: false };
 		if (node.operator === '-') return { ok: true, value: -Number(argument.value) };
 		if (node.operator === '+') return { ok: true, value: Number(argument.value) };
@@ -1423,6 +1428,105 @@ function evaluateInitialStateValue(
 	}
 
 	return { ok: false };
+}
+
+// A folded seed is printed into the render-data module with JSON, which has no
+// form for a non-finite number: those stay on the carried-expression path.
+function foldedConstant(value: unknown): { readonly ok: true; readonly value: unknown } | { readonly ok: false } {
+	if (typeof value === 'number' && !Number.isFinite(value)) return { ok: false };
+	return { ok: true, value };
+}
+
+/** A frozen data property on a global object — `Number.MAX_SAFE_INTEGER`, `Math.PI`. */
+function frozenGlobalProperty(
+	holderName: string,
+	propertyName: string,
+): { readonly ok: true; readonly value: unknown } | { readonly ok: false } {
+	const holder =
+		holderName === 'globalThis'
+			? (globalThis as object)
+			: (globalThis as unknown as Record<string, unknown>)[holderName];
+	if (holder === null || (typeof holder !== 'object' && typeof holder !== 'function'))
+		return { ok: false };
+
+	const descriptor = Object.getOwnPropertyDescriptor(holder, propertyName);
+	if (!descriptor || descriptor.writable !== false || descriptor.configurable !== false)
+		return { ok: false };
+	if (typeof descriptor.value !== 'number' && typeof descriptor.value !== 'string')
+		return { ok: false };
+
+	return foldedConstant(descriptor.value);
+}
+
+// Only these bases: a seed naming anything else wants the value it holds at
+// render time, not the one this build read.
+const FOLDABLE_GLOBAL_BASES = new Set(['Number', 'Math']);
+
+function evaluateGlobalMemberConstant(
+	node: AnyNode,
+	state: WalkState | undefined,
+): { readonly ok: true; readonly value: unknown } | { readonly ok: false } {
+	if (!state || node.computed === true) return { ok: false };
+
+	const object = node.object as AnyNode | undefined;
+	const property = node.property as AnyNode | undefined;
+	if (object?.type !== 'Identifier' || !property) return { ok: false };
+
+	const holderName = getIdentifierName(object);
+	const propertyName = getIdentifierName(property);
+	if (!holderName || !propertyName || !FOLDABLE_GLOBAL_BASES.has(holderName)) return { ok: false };
+	// A module that declares its own `Number` means that one, not the global.
+	if (typeof object.start !== 'number') return { ok: false };
+	if (resolvedSymbolAt(state.semantic(), object.start) !== null) return { ok: false };
+
+	return frozenGlobalProperty(holderName, propertyName);
+}
+
+function evaluateNamedConstant(
+	node: AnyNode,
+	state: WalkState | undefined,
+	visiting: ReadonlySet<string> | undefined,
+): { readonly ok: true; readonly value: unknown } | { readonly ok: false } {
+	const name = getIdentifierName(node);
+	if (!state || !name) return { ok: false };
+
+	if (typeof node.start !== 'number') return { ok: false };
+	const semantic = state.semantic();
+	const symbolId = resolvedSymbolAt(semantic, node.start);
+	if (symbolId === null) return frozenGlobalProperty('globalThis', name);
+	if (visiting?.has(name)) return { ok: false };
+
+	const init = moduleConstantInitializer(name, symbolId, state);
+	if (!init) return { ok: false };
+
+	const evaluated = evaluateInitialStateValue(init, state, new Set([...(visiting ?? []), name]));
+	return evaluated.ok ? foldedConstant(evaluated.value) : evaluated;
+}
+
+/** The initializer of a module-scope `const` this identifier actually resolves to. */
+function moduleConstantInitializer(
+	name: string,
+	symbolId: number,
+	state: WalkState,
+): AnyNode | undefined {
+	const ast = ownedModuleAst(state, state.source, state.filename);
+	for (const statement of asNodes(ast.body)) {
+		const declaration =
+			statement.type === 'ExportNamedDeclaration'
+				? (statement.declaration as AnyNode | undefined)
+				: statement;
+		if (declaration?.type !== 'VariableDeclaration') continue;
+		if (variableDeclarationKind(declaration) !== 'const') continue;
+
+		for (const declarator of asNodes(declaration.declarations)) {
+			const id = declarator.id as AnyNode | undefined;
+			if (!id || typeof id.start !== 'number' || getIdentifierName(id) !== name) continue;
+			if (declaredSymbolAt(state.semantic(), id.start) !== symbolId) continue;
+			return declarator.init as AnyNode | undefined;
+		}
+	}
+
+	return undefined;
 }
 
 export function evaluateSyncPolicyConstant(
@@ -1554,6 +1658,8 @@ function evaluateSyncPolicyAddConstant(
 
 function evaluateObjectExpression(
 	node: AnyNode,
+	state?: WalkState,
+	visiting?: ReadonlySet<string>,
 ): { readonly ok: true; readonly value: Record<string, unknown> } | { readonly ok: false } {
 	const output: Record<string, unknown> = {};
 
@@ -1563,7 +1669,7 @@ function evaluateObjectExpression(
 		const key = objectPropertyKey(property.key as AnyNode | undefined);
 		if (!key) return { ok: false };
 
-		const value = evaluateInitialStateValue(property.value as AnyNode | undefined);
+		const value = evaluateInitialStateValue(property.value as AnyNode | undefined, state, visiting);
 		if (!value.ok) return { ok: false };
 		output[key] = value.value;
 	}

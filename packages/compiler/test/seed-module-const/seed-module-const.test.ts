@@ -97,12 +97,16 @@ test('a seed naming something nothing would bind is refused at the seed', async 
 // A derive module resumes off the payload, not off the SSR render map, so a seed
 // that only reached the render map derived NaN on the resumed page.
 test('an unfoldable seed writes the served cell, not only the render map', async () => {
-	const compiled = await compile('{ minWidth: MIN, maxWidth: 9, x: 2 }');
+	// Imported, so this build cannot read it: a same-module const now folds.
+	const compiled = await compile(
+		'{ minWidth: 1, maxWidth: LIMIT, x: 2 }',
+		"import { LIMIT } from './limits.ts';",
+	);
 	const cellId = compiled.payloadArena.state.cells[0]?.graphNodeId;
 
 	expect(cellId).toBeDefined();
 	expect(compiled.publicRenderModule.ssrModuleSource).toContain(
-		`marklessStateValue(marklessSsrRenderStateValues,marklessSsrPayloadState,${JSON.stringify(cellId)},{ minWidth: MIN, maxWidth: 9, x: 2 })`,
+		`marklessStateValue(marklessSsrRenderStateValues,marklessSsrPayloadState,${JSON.stringify(cellId)},{ minWidth: 1, maxWidth: LIMIT, x: 2 })`,
 	);
 	// The write runs through the state helper, so the module has to import it.
 	expect(compiled.publicRenderModule.ssrModuleSource).toContain('marklessStateValue');
