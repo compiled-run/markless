@@ -1,0 +1,28 @@
+export {
+	PadArea as area,
+	PadDescription as description,
+	PadError as error,
+	PadField as field,
+	PadIndicator as indicator,
+	PadLabel as label,
+	PadRoot as root,
+	padState,
+	padState as state,
+	PadThumb as thumb,
+	PadValueLabel as valuelabel,
+} from './pad.tsrx';
+export type {
+	PadAreaProps,
+	PadAxis,
+	PadBounds,
+	PadBox,
+	PadDescriptionProps,
+	PadErrorProps,
+	PadFieldProps,
+	PadIndicatorProps,
+	PadLabelProps,
+	PadPoint,
+	PadRootProps,
+	PadThumbProps,
+	PadValueLabelProps,
+} from './pad-types.ts';

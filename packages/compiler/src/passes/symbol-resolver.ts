@@ -347,6 +347,24 @@ function resolveBranchTestRead(
 	);
 }
 
+/**
+ * Whether every edge answers this slot with the SAME compile-time value. Such a
+ * slot is emitted as that value, so it needs no bound row to read it from —
+ * and one whose edges disagree does, or the instances would share one answer.
+ */
+export function captureSlotFoldsToConstant(slot: {
+	readonly routes: ReadonlyArray<{ readonly kind: string; readonly value?: unknown }>;
+}): boolean {
+	const constants = slot.routes.flatMap((route) =>
+		route.kind === 'compiler-known-constant' ? [route.value] : [],
+	);
+	return (
+		constants.length > 0 &&
+		constants.length === slot.routes.length &&
+		new Set(constants.map((value) => JSON.stringify(value) ?? 'undefined')).size === 1
+	);
+}
+
 export function planBoundSymbolResolver(
 	input: BoundSymbolResolverInput,
 ): BoundSymbolResolverArtifact {
@@ -400,7 +418,11 @@ export function planBoundSymbolResolver(
 				if (
 					symbol.kind !== 'event-handler' &&
 					symbol.kind !== 'callback-prop' &&
-					captureSlots.every((slot) => slot.route.kind === 'compiler-known-constant')
+					captureSlots.every((slot) => slot.route.kind === 'compiler-known-constant') &&
+					// A derive's constant slot is emitted as its value, which only works
+					// when every edge agrees; edges that disagree need a row each.
+					(symbol.kind !== 'sync-computed-derive' ||
+						edgeDependentSlots.every(captureSlotFoldsToConstant))
 				)
 					continue;
 				const ancestry = path.map((edge) => ({

@@ -1,0 +1,22 @@
+# MARKLESS_STATE_DYNAMIC_PATH_READ
+
+Cannot read from a dynamic graph path
+
+- Package: compiler
+- Pass or phase: state-lowering
+- Severity: error
+
+## Message
+
+Cannot read "…" because graph read paths must be statically resolvable.
+
+## Why
+
+The resumable state graph records path-level subscriptions in the payload. A dynamic property expression cannot be represented as a stable graph subscription by the current compiler pass.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/state-lowering.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

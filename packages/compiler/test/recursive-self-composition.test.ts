@@ -64,6 +64,43 @@ export function Inner({ depth }) @{
 }
 `;
 
+// The outer call site and the self call site live in ONE module, so the prop has
+// a compile-time value at the outer edge and a per-level value at the self edge.
+const foldableSelfCompose = `
+export default function Page() @{
+	<main><Node depth={3} /></main>
+}
+
+export function Node({ depth }) @{
+	<div data-node data-depth={depth}>
+		@if (depth > 1) {
+			<Node depth={depth - 1} />
+		}
+	</div>
+}
+`;
+
+// The same shape with the recursion removed: the arm still passes the prop down,
+// so the read is still routed through an edge, but ONE call site now means one
+// runtime instance and the literal really is the value every instance receives.
+const foldableNoRecursion = `
+export default function Page() @{
+	<main><Node depth={3} /></main>
+}
+
+export function Node({ depth }) @{
+	<div data-node data-depth={depth}>
+		@if (depth > 1) {
+			<Leaf depth={depth - 1} />
+		}
+	</div>
+}
+
+export function Leaf({ depth }) @{
+	<span data-leaf data-leaf-depth={depth}>leaf</span>
+}
+`;
+
 async function compile(source: string, filename = 'src/tree-node.tsrx') {
 	return compileTsrxModule({
 		filename,
@@ -168,6 +205,62 @@ test('a same-module cycle through two components routes recursively too', async 
 		{ prefix: 'c0:', recursive: true },
 		{ prefix: 'c1:', recursive: true },
 	]);
+});
+
+function depthSlot(compiled: Awaited<ReturnType<typeof compile>>, symbolKind: string) {
+	return compiled.captureAnalysis.extractedSymbols.find((symbol) => symbol.kind === symbolKind)
+		?.captureSlots[0];
+}
+
+test('the self edge answers the prop per instance, so the outer literal cannot stand for every level', async () => {
+	const compiled = await compile(foldableSelfCompose, 'src/page.tsrx');
+	const slot = depthSlot(compiled, 'sync-computed-derive');
+
+	// The outer literal is gone from the slot: it was only ever level 1's value,
+	// and the base symbol it folded into is the code every level runs. What is
+	// left is the per-instance read, which is right at every level.
+	expect(slot?.routes).toEqual([
+		{ kind: 'graph-reference', graphNodeId: 'prop:props', path: ['depth'] },
+	]);
+});
+
+test('the emitted derive reads the slot rather than baking the outermost literal', async () => {
+	const compiled = await compile(foldableSelfCompose, 'src/page.tsrx');
+	const slot = depthSlot(compiled, 'sync-computed-derive');
+	const derive = compiled.symbolModules.modules.find(
+		(candidate) => candidate.kind === 'sync-computed-derive',
+	);
+
+	expect(slot?.id).toBeDefined();
+	expect(derive?.source).toContain('context.graph.read("prop:props", ["depth"])');
+	// The bug this pins: with the self edge's route missing, the slot looked
+	// all-constant and the derive emitted `3 > 1` — true at every level, so the
+	// recursion never terminated.
+	expect(derive?.source).not.toContain('3 > 1');
+});
+
+test('one call site with no recursion still folds its constant', async () => {
+	const compiled = await compile(foldableNoRecursion, 'src/page.tsrx');
+	const slot = depthSlot(compiled, 'sync-computed-derive');
+	const derive = compiled.symbolModules.modules.find(
+		(candidate) => candidate.kind === 'sync-computed-derive',
+	);
+
+	expect(slot?.routes.map((route) => route.kind)).toEqual(['compiler-known-constant']);
+	expect(derive?.source).toContain('3 > 1');
+});
+
+test('the non-recursive derive keeps its folded bytes exactly', async () => {
+	const compiled = await compile(foldableNoRecursion, 'src/page.tsrx');
+	const derive = compiled.symbolModules.modules.find(
+		(candidate) => candidate.kind === 'sync-computed-derive',
+	);
+
+	// Byte discipline: widening the unsound case must not cost the sound one a
+	// single character, so the whole emitted derive is pinned, not just a substring.
+	expect(derive?.source).toBe(
+		'export const authoredSource = "() => depth > 1";\n\nexport function symbol_2(context) {\n  return 3 > 1;\n}\n',
+	);
 });
 
 test('a same-module child that closes no cycle keeps its plain local route', async () => {
