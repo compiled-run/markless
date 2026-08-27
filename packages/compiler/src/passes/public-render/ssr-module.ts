@@ -350,6 +350,12 @@ export function emitPublicSsrRenderModule(
  *
  * Emitted per render and only when the id is still unset, so a component-body
  * seed and a forwarded root seed both keep precedence over the factory default.
+ *
+ * The evaluated value goes through `marklessStateValue`, which writes the served
+ * cell as well as the render map: a derive module resumes off the payload, not
+ * off the render map, so a render-map-only seed derived NaN on the client. The
+ * write lands only in the renderer that OWNS the cell — every other selection
+ * has dropped that record — so one line per render is correct.
  */
 function unfoldedSharedSeedLines(input: PublicRenderModuleInput): string[] {
 	const initializers = new Map(
@@ -370,7 +376,7 @@ function unfoldedSharedSeedLines(input: PublicRenderModuleInput): string[] {
 		if (initializer === undefined) return [];
 
 		const key = JSON.stringify(cell.graphNodeId);
-		return `if(!marklessSsrRenderStateValues.has(${key}))marklessSsrRenderStateValues.set(${key},${initializer});`;
+		return `if(!marklessSsrRenderStateValues.has(${key}))marklessStateValue(marklessSsrRenderStateValues,marklessSsrPayloadState,${key},${initializer});`;
 	});
 }
 
