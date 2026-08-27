@@ -1,7 +1,9 @@
 import postcss, { type AtRule, type Container, type Document, type Rule } from 'postcss';
 import selectorParser, { type Selector } from 'postcss-selector-parser';
-import type { AnyNode } from '../../ast/nodes.ts';
+import { asNodes, type AnyNode } from '../../ast/nodes.ts';
+import { getComponentFunction } from '../../ast/tsrx.ts';
 import type { CompilerDiagnostic } from '../../diagnostics.ts';
+import { componentMarkupRoot } from './component-markup-root.ts';
 import { unsupportedRenderConstructDiagnostic } from './diagnostics.ts';
 
 // Scoped <style> blocks per the accepted Option A draft in
@@ -13,13 +15,53 @@ export type PublicRenderStyleScope = {
 	readonly cssText: string;
 };
 
-export function collectStyleScopes(
-	root: AnyNode,
-	filename: string,
-): {
+type StyleScopeCollection = {
 	readonly styleScopes: ReadonlyArray<PublicRenderStyleScope>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
-} {
+};
+
+export function collectStyleScopes(root: AnyNode, filename: string): StyleScopeCollection {
+	return compileStyleNodes(findStyleNodes(root), filename);
+}
+
+// The module, not the selected render root, owns the shipped CSS: every
+// component mints the module's scope class onto its own elements, so a block
+// left behind here paints nothing while its class is still stamped in the HTML.
+export function collectModuleStyleScopes(ast: AnyNode, filename: string): StyleScopeCollection {
+	const shipped: AnyNode[] = [];
+	const covered = new Set<AnyNode>();
+	for (const statement of asNodes(ast.body)) {
+		const component = getComponentFunction(statement);
+		if (!component) continue;
+		const root = componentMarkupRoot(component.node);
+		if (!root) continue;
+		for (const styleNode of findStyleNodes(root)) {
+			if (covered.has(styleNode)) continue;
+			covered.add(styleNode);
+			shipped.push(styleNode);
+		}
+	}
+	const strayDiagnostics = findStyleNodes(ast)
+		.filter((styleNode) => !covered.has(styleNode))
+		.map((styleNode) =>
+			unsupportedRenderConstructDiagnostic({
+				label: '<style>',
+				message:
+					'This <style> block sits outside any component markup this module renders, so its rules would never reach the page.',
+				node: styleNode,
+				filename,
+				suggestion:
+					'Move the block inside the markup a component returns, or into an imported stylesheet.',
+			}),
+		);
+	const compiled = compileStyleNodes(shipped, filename);
+	return {
+		styleScopes: compiled.styleScopes,
+		diagnostics: [...compiled.diagnostics, ...strayDiagnostics],
+	};
+}
+
+function findStyleNodes(root: AnyNode): AnyNode[] {
 	const styleNodes: AnyNode[] = [];
 	const visit = (node: AnyNode): void => {
 		if (node.type === 'JSXStyleElement') {
@@ -47,7 +89,13 @@ export function collectStyleScopes(
 		}
 	};
 	visit(root);
+	return styleNodes;
+}
 
+function compileStyleNodes(
+	styleNodes: ReadonlyArray<AnyNode>,
+	filename: string,
+): StyleScopeCollection {
 	if (styleNodes.length === 0) return { styleScopes: [], diagnostics: [] };
 
 	const scopeId = styleScopeId(filename);

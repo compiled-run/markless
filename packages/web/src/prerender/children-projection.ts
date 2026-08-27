@@ -56,6 +56,35 @@ export function renderedWidgetRootsOf(
 	return [...new Set([...widgetRootsOf(surface, componentName), ...composed])];
 }
 
+/**
+ * The `children` one placed child's projection already has BEFORE it renders.
+ * The seed pass runs ahead of the projection, so a part that seeds from
+ * `children` normally sees undefined; a projection of static text alone is
+ * spelled in the chunk's statics and is therefore the exact string the render
+ * will hand that part. Anything with an element or a read has no value until it
+ * renders, and returns nothing. The CSR twin of the compiler's
+ * `staticProjectionChildren`, over the same build-time chunks.
+ */
+export function staticProjectionChildren(
+	surface: PrerenderDataSurface,
+	componentEdgeId: string,
+): string | undefined {
+	const chunks = surface.renderData.chunks;
+	const projectionChunkId = chunks.flatMap((chunk) =>
+		chunk.slots.flatMap((slot) =>
+			slot.kind === 'child-component' &&
+			slot.componentEdgeId === componentEdgeId &&
+			slot.projectionChunkId
+				? [slot.projectionChunkId]
+				: [],
+		),
+	)[0];
+	if (projectionChunkId === undefined) return undefined;
+	const projection = chunks.find((chunk) => chunk.id === projectionChunkId);
+	if (!projection || projection.hosts.length > 0 || projection.slots.length > 0) return undefined;
+	return projection.statics.join('');
+}
+
 // The surface that publishes a placed child: its own module when the child is
 // declared there, otherwise the module it was imported from.
 export function childSurfaceOf(

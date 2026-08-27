@@ -10,9 +10,14 @@ import { testSSR } from './src/ssr-plugin.ts';
 // rewrites string and first-flush streaming markers into SSR browser commands.
 export default defineProject({
 	plugins: [testSSR(), executedModulesPlugin(), markless()],
+	// A fixture that fails to compile must not cover the page a real pointer drives.
+	server: { hmr: { overlay: false } },
 	test: {
 		name: 'browser',
 		include: ['browser/**/*.test.ts'],
+		// Serial on purpose: 136 files sharing one dev server push cold demand-loaded
+		// symbol modules past the 1000ms poll ceiling (green 2/2 serial, ~9 red parallel).
+		fileParallelism: false,
 		browser: {
 			enabled: true,
 			headless: true,
