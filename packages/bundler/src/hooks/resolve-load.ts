@@ -3,6 +3,7 @@
 // build state no longer holds.
 import type { PluginContext } from 'rolldown';
 import { withQuery } from 'ufo';
+import { marklessRuntimeSpecifierId } from '../build/delegate-loader.ts';
 import { MARKLESS_EXECUTION_SIZES } from '../build/execution-sizes.ts';
 import {
 	MARKLESS_EXECUTION_LOG_MODULE_ID,
@@ -33,27 +34,8 @@ export async function resolveIdHook(
 	importer: string | undefined,
 ) {
 	const { importedChildSources } = ctx.state;
-	// Emitted modules import runtime catalog functions as '@markless/web/fns/*'
-	// and conditional inline helpers as '@markless/web/inline/*'.
-	// Apps depend on @markless/core only, so the bundler resolves the catalog
-	// from its own dependency on @markless/web (generated-code-only surface).
-	if (source.startsWith('@markless/web/fns/')) {
-		const resolved = import.meta.resolve(source);
-		if (resolved?.startsWith('file://')) {
-			return { id: decodeURIComponent(resolved.slice('file://'.length)) };
-		}
-	}
-	if (source.startsWith('@markless/web/inline/')) {
-		const resolvedRoot = import.meta.resolve('@markless/web');
-		if (resolvedRoot?.startsWith('file://') && resolvedRoot.endsWith('/index.ts')) {
-			const helperPath = source.slice('@markless/web/'.length);
-			return {
-				id: decodeURIComponent(
-					resolvedRoot.slice('file://'.length, -'index.ts'.length) + `${helperPath}.ts`,
-				),
-			};
-		}
-	}
+	const runtimeCatalogId = marklessRuntimeSpecifierId(source);
+	if (runtimeCatalogId) return { id: runtimeCatalogId };
 	const normalized = normalizeVirtualId(source);
 	if (normalized === MARKLESS_EXECUTION_LOG_MODULE_ID) {
 		return {
