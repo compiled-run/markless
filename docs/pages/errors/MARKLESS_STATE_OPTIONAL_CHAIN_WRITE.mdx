@@ -1,0 +1,22 @@
+# MARKLESS_STATE_OPTIONAL_CHAIN_WRITE
+
+Cannot write graph state through optional chaining
+
+- Package: compiler
+- Pass or phase: state-lowering
+- Severity: error
+
+## Message
+
+Cannot write to "…" through optional chaining because graph writes must have definite targets.
+
+## Why
+
+Optional chaining can skip the method call and its arguments at runtime. The current graph write artifact cannot preserve that short-circuit behavior safely across resume.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/state-lowering.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

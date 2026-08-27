@@ -1,0 +1,21 @@
+# MARKLESS_REPEAT_ROWS_FROZEN
+
+This @for renders its rows once and never updates them
+
+- Package: compiler
+- Pass or phase: semantic-graph
+
+## Message
+
+@for (const … of …) takes its rows from `…`, which is neither a state cell nor a computed, so the repeat resolves to no graph node and its rows are built on the server and never rebuilt in the browser. The row body reads `…`, a … that can change after that render, and those rows would silently keep their first-render values.
+
+## Why
+
+A keyed repeat reconciles through the graph node its collection resolves to; a collection that resolves to none renders its rows once, so any reactive read inside a row is frozen at its first-render value with nothing said at build time.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

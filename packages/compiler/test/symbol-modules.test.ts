@@ -2816,8 +2816,13 @@ export function App() @{
 	expect(run({ graph: graph(true, 'On') })).toEqual({
 		arm: 0,
 		html: '<p class="badge">On</p>',
+		resolved: true,
 	});
-	expect(run({ graph: graph(false, 'On') })).toEqual({ arm: 1, html: '<p>Off</p>' });
+	expect(run({ graph: graph(false, 'On') })).toEqual({
+		arm: 1,
+		html: '<p>Off</p>',
+		resolved: true,
+	});
 });
 
 test('emitSymbolModules emits switch flip modules selecting arms by case tests', async () => {
@@ -2854,9 +2859,9 @@ export function App() @{
 	const run = imported[branchModule!.exportName]!;
 	const graph = (kind: string) => ({ read: () => kind });
 
-	expect(run({ graph: graph('a') })).toEqual({ arm: 0, html: '<p>A</p>' });
-	expect(run({ graph: graph('b') })).toEqual({ arm: 1, html: '<p>B</p>' });
-	expect(run({ graph: graph('zzz') })).toEqual({ arm: 2, html: '<p>D</p>' });
+	expect(run({ graph: graph('a') })).toEqual({ arm: 0, html: '<p>A</p>', resolved: true });
+	expect(run({ graph: graph('b') })).toEqual({ arm: 1, html: '<p>B</p>', resolved: true });
+	expect(run({ graph: graph('zzz') })).toEqual({ arm: 2, html: '<p>D</p>', resolved: true });
 });
 
 test('emitSymbolModules keeps element-handle calls in event handlers, in statement order', async () => {
@@ -3023,8 +3028,8 @@ export function Badge({ active }) @{
 	// composed graph does not have. The runtime computes the arm from the
 	// remapped reads and passes it; the module must defer to it.
 	const graph = { read: () => undefined };
-	expect(run({ graph, arm: 0 })).toEqual({ arm: 0, html: '<em>Live</em>' });
-	expect(run({ graph, arm: 1 })).toEqual({ arm: 1, html: '<em>Idle</em>' });
+	expect(run({ graph, arm: 0 })).toEqual({ arm: 0, html: '<em>Live</em>', resolved: true });
+	expect(run({ graph, arm: 1 })).toEqual({ arm: 1, html: '<em>Idle</em>', resolved: true });
 });
 
 test('branch-update arm parts read a bare async computed through its snapshot value', async () => {
@@ -3086,9 +3091,11 @@ export function App() @{
 	expect(run({ graph: graph(true) })).toEqual({
 		arm: 0,
 		html: '<kbd data-beacon-reading="">Vega signal</kbd>',
+		resolved: true,
 	});
 	expect(run({ graph: graph(false) })).toEqual({
 		arm: 1,
 		html: '<samp data-beacon-reading="">Vega signal</samp>',
+		resolved: true,
 	});
 });
