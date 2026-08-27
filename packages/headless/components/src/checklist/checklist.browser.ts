@@ -317,13 +317,7 @@ for (const mode of MODES) {
 		await expectDisabledBlocks();
 	});
 
-	// CSR is expected red. `checklist.root` composes `CheckboxRoot` around its own
-	// children, and only the SSR module excludes that composed wrapper from the
-	// widget-root seed forward; the CSR prerender path forwards to every projecting
-	// edge alike, so the delegating wrapper contributes no seed block and the trigger
-	// reads `aria-invalid="false"`. `test.fails` rather than skip because it is
-	// deterministic: the row turns red the day CSR gets the same exclusion.
-	(mode === 'CSR' ? test.fails : test)(`${mode}: a mounted error marks the group invalid, written after the items or before them`, async () => {
+	test(`${mode}: a mounted error marks the group invalid, written after the items or before them`, async () => {
 		if (mode === 'CSR') await render(WithError);
 		else await renderSSR(WithError);
 		expectGroupErrorRendered();
