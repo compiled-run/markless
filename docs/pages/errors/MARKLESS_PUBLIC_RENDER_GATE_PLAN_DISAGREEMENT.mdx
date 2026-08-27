@@ -1,0 +1,21 @@
+# MARKLESS_PUBLIC_RENDER_GATE_PLAN_DISAGREEMENT
+
+… passed render support checks but has no usable render plan
+
+- Package: compiler
+- Pass or phase: public-render
+- Severity: error
+
+## Message
+
+TODO: this code has no builder message in source.
+
+## Why
+
+The public render gate admitted this authored construct, so silently omitting its render plan would produce output that can fail or remain permanently unsettled at request time.
+
+## Emitted from
+
+- `packages/compiler/src/passes/public-render/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

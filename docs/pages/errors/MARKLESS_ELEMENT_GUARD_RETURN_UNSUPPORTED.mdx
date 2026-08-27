@@ -1,0 +1,21 @@
+# MARKLESS_ELEMENT_GUARD_RETURN_UNSUPPORTED
+
+Element-valued guard returns are not supported
+
+- Package: compiler
+- Pass or phase: public-render
+- Severity: error
+
+## Message
+
+… uses an element-valued guard return before its template root, so the public render plan cannot preserve both outcomes.
+
+## Why
+
+The public render module needs one planned component root with stable locators. An earlier element-valued return creates another root whose conditional statement flow is not represented by that plan.
+
+## Emitted from
+
+- `packages/compiler/src/passes/public-render/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

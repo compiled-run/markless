@@ -1,0 +1,21 @@
+# MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED
+
+This list can never grow in the browser
+
+- Package: compiler
+- Pass or phase: public-render
+- Severity: warning
+
+## Message
+
+… The browser has no renderer, so a row that arrives after the page loads has no markup to be built from: this list will render the rows the server sent, reorder them and remove them, and silently ignore every new one.
+
+## Why
+
+The payload carries one row of finished markup so the browser can build a row the server never rendered. It can fill text read off the row item and nothing else, so a row needing anything more ships no template at all.
+
+## Emitted from
+
+- `packages/compiler/src/passes/public-render/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

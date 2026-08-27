@@ -1,0 +1,21 @@
+# MARKLESS_COMPONENT_PROP_EXPRESSION_UNSUPPORTED
+
+A prop expression that reads state needs a route the child can follow
+
+- Package: compiler
+- Pass or phase: semantic-graph
+
+## Message
+
+Prop `…` on `<…>` is written as `…`, which reads state but is not an expression this compiler can route.
+
+## Why
+
+A child reads a prop through the graph node the parent named. An expression with no node behind it can only be seeded once, from whatever the value happened to be at render - so the child would show a stale value forever and nothing would say so.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as popover from '../index.ts';
+import { popover } from '../../index.ts';
 
 export default function WithoutOnChange() @{
 	const log = state({ calls: 0 });

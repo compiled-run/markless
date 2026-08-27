@@ -1,0 +1,21 @@
+# MARKLESS_ELEMENT_HANDLE_IDREF_ROW_OWNED
+
+A repeated element() handle cannot be named by an IDREF
+
+- Package: compiler
+- Pass or phase: semantic-graph
+
+## Message
+
+Cannot resolve …=\{…\} because "…" is bound inside a keyed repeat, so it names one element per row rather than one element.
+
+## Why
+
+Every row owns its own element and would need its own id. One authored handle cannot name one of them, and picking a row silently would make the relationship point at whichever row happened to render first.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
