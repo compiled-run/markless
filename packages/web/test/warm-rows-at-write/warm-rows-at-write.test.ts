@@ -175,7 +175,7 @@ test('a refusal still answers as a rejection, not a throw', async () => {
 // any live widget still cannot be built at the write. Flip this to `test` when
 // that holder takes the then-or-continue spelling the renderer, the seed pass and
 // the evaluator now use.
-test.fails('a row inside a live widget answers without a statement', () => {
+test('a row inside a live widget answers without a statement', () => {
 	const answer = renderRow({
 		rowKey: 'a',
 		enclosingWidgetRoots: new Map([['shared:ccr', 'w0:']]),

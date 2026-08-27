@@ -1038,13 +1038,11 @@ export type RepeatRowComponentInput = {
 export function renderRepeatRowComponent(
 	input: RepeatRowComponentInput,
 ): Awaitable<RepeatRowComponentRender> {
-	// Nothing to hold around a row with no ancestor widget, and the holder is an
-	// async function: taking it costs the caller a statement it may not have. A
-	// refusal still answers as a rejection, so only a warm render skips the wait.
+	// A refusal still answers as a rejection, so only a warm render skips the wait.
 	try {
 		if (!input.enclosingWidgetRoots?.size) return renderRowComponentEdge(input);
 		return marklessWithEnclosingWidgetRoots(rowSegmentOf(input), input.enclosingWidgetRoots, () =>
-			Promise.resolve(renderRowComponentEdge(input)),
+			renderRowComponentEdge(input),
 		);
 	} catch (error) {
 		return Promise.reject(error);

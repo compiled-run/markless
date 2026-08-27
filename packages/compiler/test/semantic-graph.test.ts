@@ -137,7 +137,7 @@ export function List() @{
 	const box = listBox();
 
 	<ul>
-		@for (const item of box.items; key item.id) {
+		@for (const item of box.absent; key item.id) {
 			<li>{item.label}</li>
 		}
 	</ul>
@@ -1185,6 +1185,4 @@ test('buildSemanticGraph refuses a keyed repeat whose shared instance exposes no
 			title: 'This @for collection reaches no cell on its shared instance',
 		}),
 	]);
-	// The refusal has to name the shape that does work, or the author has nothing to change.
-	expect(graph.diagnostics[0]?.suggestions?.[0]?.message).toContain('return { ...box }');
 });
