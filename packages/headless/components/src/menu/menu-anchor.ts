@@ -2,9 +2,9 @@
  * Placing the surface.
  *
  * The placement itself is CSS: `menu.content` ships a scoped `<style>` block in
- * `@layer markless` that anchors the surface to the trigger and picks a
- * `position-area` off the `ui-side` attribute the part already writes. Nothing
- * here builds a `position-area`, an anchor name, or a `position` any more.
+ * `@layer markless` that anchors the surface to the trigger and gives it a
+ * default `position-area` a consumer's unlayered rule replaces. Nothing here
+ * builds a `position-area`, an anchor name, or a `position` any more.
  *
  * What CSS cannot say is where a pointer was, so a context menu's point arrives
  * as the two custom properties the block reads. A menu with no `menu.trigger`

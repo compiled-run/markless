@@ -8,6 +8,5 @@ export {
 export type {
 	HovercardContentProps,
 	HovercardRootProps,
-	HovercardSide,
 	HovercardTriggerProps,
 } from './hovercard-types.ts';

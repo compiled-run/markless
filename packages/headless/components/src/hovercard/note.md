@@ -12,8 +12,11 @@ from that one difference.
 Three parts: `hovercard.root`, `hovercard.trigger`, `hovercard.content`. All
 three are established roles in `SPEC.md`; nothing new was named.
 
-Five props on the root, and no more: `open`, `delay` (700), `closeDelay` (300),
-`side` (`bottom`), `onChange`.
+Four props on the root, and no more: `open`, `delay` (700), `closeDelay` (300),
+`onChange`. Placement is not among them: the family ships one default
+`position-area` inside `@layer markless` and the consumer overrides it with an
+unlayered rule of their own, so there is no `side`, `placement`, `align` or
+`offset`.
 
 `hovercard.trigger` renders an `<a>` and only an `<a>`. That is the family's
 central doctrine made structural rather than advisory: **the card must never hold
@@ -137,9 +140,10 @@ part** — `style` and `class` on all three are the consumer's and compose
 untouched:
 
 ```css
-/* hovercard.root */    div:not([ui-side]) { anchor-scope: --ui-hovercard; }
+/* hovercard.root */    div:not([overlay]) { anchor-scope: --ui-hovercard; }
 /* hovercard.trigger */ a                  { anchor-name: --ui-hovercard; }
-/* hovercard.content */ [ui-side]          { position: absolute; position-anchor: --ui-hovercard; }
+/* hovercard.content */ [overlay]          { position: absolute; position-anchor: --ui-hovercard;
+                                             position-area: block-end; }
 ```
 
 One anchor name for every card on the page, with `anchor-scope` on each root
@@ -149,7 +153,7 @@ trigger, which the geometry row catches.
 
 The compiled scope class is per **module**, not per component, so each block's
 subject is chosen to be structurally unique inside this module: the trigger is
-the only `a`, the card is the only element carrying `ui-side`, and the root is the
+the only `a`, the card is the only element carrying `overlay`, and the root is the
 `div` left over. Rename a part's element and the discriminator has to be re-picked
 in the same change.
 
@@ -163,14 +167,16 @@ Tooltip states this as a property of the scoping; here it is load-bearing, so
 `two-cards.tsrx` measures it — the consumer link's computed `anchor-name` is
 `none`.
 
-Everything about where the card lands is the consumer's, keyed off `ui-side`:
+Everything about where the card lands beyond the `block-end` default is the
+consumer's, and one unlayered rule beats the default with no specificity fight:
 
 ```css
 .card {
 	position-try-fallbacks: flip-block, flip-inline;
 	position-visibility: anchors-visible;
+	position-area: block-start;
+	margin-bottom: 8px;
 }
-.card[ui-side='bottom'] { position-area: bottom span-all; margin-top: 8px; }
 ```
 
 A large card overflows more readily than a tip, which makes
@@ -229,12 +235,13 @@ served shape, served-showing placement, first crossing after resume and Tab into
 the card after resume.
 
 The geometry rows carry the consumer half of the contract themselves — a
-stylesheet appended in `beforeEach` — because the family emits no `position-area`
-of its own, and **every one asserts a placement static flow cannot produce**.
-`served-open.tsrx` and `two-cards.tsrx` are `side="top"` with the card authored
-last for exactly that reason: an absolutely positioned box with no resolved anchor
-lands at its static position, which for `side="bottom"` is where a *working*
-anchor would put it. That is tooltip's false-green lesson, applied up front.
+stylesheet appended in `beforeEach` that puts every card ABOVE its trigger — and
+**every one asserts a placement static flow cannot produce**. `served-open.tsrx`
+and `two-cards.tsrx` author the card last for exactly that reason: an absolutely
+positioned box with no resolved anchor lands at its static position, which is
+where a *working* below-the-trigger placement would put it. That is tooltip's
+false-green lesson, applied up front, and it is why those rows override the
+family's own `block-end` default rather than lean on it.
 
 `hovercard.sr.ts` — 5 rows on the virtual reader: the trigger conveying link, its
 own name and **collapsed**; opening flipping it to **expanded**; the open card

@@ -3,7 +3,6 @@ import type {
 	HovercardContentProps,
 	HovercardInstanceState,
 	HovercardRootProps,
-	HovercardSide,
 	HovercardTriggerProps,
 } from './hovercard-types.ts';
 
@@ -12,7 +11,7 @@ import type {
 // The scope class these <style> blocks compile against is per MODULE, so each
 // block's subject must be structurally unique across all three parts: the trigger
 // is this module's only anchor element, the card is its only element carrying
-// `ui-side`, and the root is the div that is left.
+// `overlay`, and the root is the div that is left.
 // Nothing here writes `aria-describedby` or `role="tooltip"`: a card holding links
 // and buttons flattened into a description is one unreachable run-on string.
 
@@ -22,7 +21,6 @@ export const hovercardState = shared(
 			open: false,
 			delay: 700,
 			closeDelay: 300,
-			side: 'bottom' as HovercardSide,
 			openTimer: 0,
 			restingUntil: 0,
 			closeTimer: 0,
@@ -53,7 +51,6 @@ export function HovercardRoot({
 	open = false,
 	delay = 700,
 	closeDelay = 300,
-	side = 'bottom',
 	onChange,
 	children,
 	onPointerover,
@@ -67,7 +64,6 @@ export function HovercardRoot({
 	hovercard.open = open;
 	hovercard.delay = delay;
 	hovercard.closeDelay = closeDelay;
-	hovercard.side = side;
 
 	// Every handler sits on the root, which wraps both parts, so trigger -> card is
 	// an intra-root move for the pointer and for Tab alike. That is WCAG 1.4.13
@@ -210,7 +206,7 @@ export function HovercardRoot({
 	>
 		<style>
 			@layer markless {
-				div:not([ui-side]) { anchor-scope: --ui-hovercard; }
+				div:not([overlay]) { anchor-scope: --ui-hovercard; }
 			}
 		</style>
 		{children}
@@ -253,7 +249,6 @@ export function HovercardContent({ children, onDismiss, ...rest }: HovercardCont
 		hidden={hovercard.open !== true}
 		ui-open={hovercard.open}
 		ui-closed={hovercard.open !== true}
-		ui-side={hovercard.side}
 		onDismiss={(event) => {
 			const surface = hovercard.contentEl;
 			const back = hovercard.triggerEl;
@@ -267,7 +262,12 @@ export function HovercardContent({ children, onDismiss, ...rest }: HovercardCont
 	>
 		<style>
 			@layer markless {
-				[ui-side] { --ui-anchor: --ui-hovercard; position: absolute; position-anchor: --ui-hovercard; }
+				[overlay] {
+					--ui-anchor: --ui-hovercard;
+					position: absolute;
+					position-anchor: --ui-hovercard;
+					position-area: block-end;
+				}
 			}
 		</style>
 		{children}

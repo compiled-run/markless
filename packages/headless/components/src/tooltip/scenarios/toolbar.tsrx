@@ -9,7 +9,7 @@ export default function Toolbar() @{
 			<tooltip.trigger data-testid="bold-trigger">B</tooltip.trigger>
 			<tooltip.content data-testid="bold-content">Bold</tooltip.content>
 		</tooltip.root>
-		<tooltip.root data-testid="italic-root" delay={0} side="bottom">
+		<tooltip.root data-testid="italic-root" delay={0}>
 			<tooltip.trigger data-testid="italic-trigger">I</tooltip.trigger>
 			<tooltip.content data-testid="italic-content">Italic</tooltip.content>
 		</tooltip.root>

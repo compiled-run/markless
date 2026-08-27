@@ -13,7 +13,7 @@ The family is complete, registered, and its lanes are green in both render modes
 | --- | --- | --- |
 | `tour.root` | `div` | the family's state; `ui-open`, `ui-closed`, `ui-disabled`, `ui-max` (the tour's length). **No `anchor-scope`, ever** |
 | `tour.backdrop` | `div` | the spotlight - anchored to the current target, `box-shadow` dim, `pointer-events: none`, `hidden` with the tour |
-| `tour.item` | `div` | one step: `index`, `target`, `side`. Renders the card one component deeper |
+| `tour.item` | `div` | one step: `index`, `target`. Renders the card one component deeper |
 | `tour.title` | `h2` | the step's accessible name |
 | `tour.description` | `p` | wired through `aria-describedby` |
 | `tour.valuelabel` | `span` | "2 of 5", or the consumer's own text |
@@ -22,11 +22,12 @@ The family is complete, registered, and its lanes are green in both render modes
 
 `tour.state()` per widget: `open`, `step` (an index), `count` (each card writes
 `index + 1` as it renders), `target`, and `next()`, `prev()`,
-`close()`. `tour.itemstate()` per step: `side`,
-`target`.
+`close()`. `tour.itemstate()` per step: `target`.
 
 Root props: `open`, `loop`, `closeOnInteractOutside`, `disabled`, `onChange`,
-`onOpenChange`. Item props: `index` (required), `target`, `side`.
+`onOpenChange`. Item props: `index` (required), `target`. No placement prop: the
+card ships `position-area: block-end` inside `@layer markless` and the consumer
+replaces it with one unlayered rule of their own.
 
 ## A step learns its own place from a required `index` prop
 
@@ -147,6 +148,12 @@ tour's own name breaks a card outside that subtree.
 Because there is no scope, `--tour-target` is one global name. One tour at a time,
 therefore, documented rather than defended: two open tours would stack both cards
 on the second one's target.
+
+Where the card lands against that anchor is the consumer's. The family ships
+`position: fixed`, `position-anchor: --tour-target` and a default
+`position-area: block-end` in the card's own `<style>` block; a rule outside
+`@layer markless` beats all of the last one with no specificity fight, and brings
+its own `position-try-fallbacks`. `placed.tsrx` is that scenario.
 
 ## The spotlight is the hole, not the layer
 

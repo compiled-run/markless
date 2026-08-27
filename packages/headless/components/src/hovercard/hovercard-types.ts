@@ -1,17 +1,10 @@
 import type { PropsOf, Seeded } from '@markless/core';
 
 /**
- * Which side of the trigger the card sits on. `start` and `end` are the writing
- * direction's sides, so they swap in a right-to-left page; `top` and `bottom`
- * are the same everywhere.
- */
-export type HovercardSide = 'top' | 'bottom' | 'start' | 'end';
-
-/**
  * The hover card itself; the trigger and the card go inside it, in that order.
  * It holds whether the card is showing, how long the pointer has to rest or
- * focus has to stay before it shows, how long it lingers after the pointer
- * leaves, and which side it sits on.
+ * focus has to stay before it shows, and how long it lingers after the pointer
+ * leaves. Where the card sits is your CSS, never a prop.
  *
  * The pointer and focus handlers live here rather than on the trigger, so moving
  * from the trigger into the card - with the pointer or with Tab - never counts
@@ -33,11 +26,6 @@ export type HovercardRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	 * and the card without the card going away.
 	 */
 	readonly closeDelay?: number;
-	/**
-	 * Where the card sits against the trigger. It is written on
-	 * `hovercard.content` as `ui-side`; the placement itself is your CSS.
-	 */
-	readonly side?: HovercardSide;
 	/**
 	 * Called with the new value when the card shows or hides, including when
 	 * Escape or a press elsewhere hides it.
@@ -85,10 +73,12 @@ export type HovercardTriggerProps = PropsOf<'a'>;
  * element removed from the document while showing leaves the overlay stack's
  * marks behind.
  *
- * Its `position: absolute` and anchor binding live in the part's own scoped
- * stylesheet - your `style` and `class` compose untouched. Everything about
- * where the card lands - `position-area`, `@position-try`, `position-visibility`,
- * offsets - is your CSS, keyed off `ui-side`.
+ * Its `position: absolute`, anchor binding and a default `position-area` of
+ * `block-end` live in the part's own scoped stylesheet, inside
+ * `@layer markless` - your `style` and `class` compose untouched. One unlayered
+ * rule of your own moves it: `.my-card { position-area: block-start }`. Everything
+ * else about where the card lands - `@position-try`, `position-visibility`,
+ * offsets - is your CSS too.
  */
 export type HovercardContentProps = PropsOf<'div'>;
 
@@ -99,7 +89,7 @@ export type HovercardContentProps = PropsOf<'div'>;
  */
 export type HovercardInstanceState = Seeded<
 	HovercardRootProps,
-	'open' | 'delay' | 'closeDelay' | 'side'
+	'open' | 'delay' | 'closeDelay'
 > & {
 	onChange?: HovercardRootProps['onChange'];
 	/** The pending show timer, zero when nothing is pending. */

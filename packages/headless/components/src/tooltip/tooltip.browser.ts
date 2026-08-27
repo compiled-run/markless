@@ -14,6 +14,7 @@ const Background = page.getByTestId('background');
 const Root = page.getByTestId('root');
 const Trigger = page.getByTestId('trigger');
 const Content = page.getByTestId('content');
+const ReversedContent = page.getByTestId('reversed-content');
 const BoldTrigger = page.getByTestId('bold-trigger');
 const BoldContent = page.getByTestId('bold-content');
 const ItalicContent = page.getByTestId('italic-content');
@@ -38,12 +39,11 @@ const DELAY = 600;
 // Where an anchored box may land and still be the placement the CSS asked for.
 const SLACK = 1.5;
 
-// The family emits the anchor identity and nothing else, so the geometry rows
-// need the placement a consumer's stylesheet would own. This IS the consumer
-// half of the contract, written the way the docs write it.
+// The family ships `position-area: block-start` inside `@layer markless`, so one
+// unlayered rule of the consumer's own moves a tip. This IS the consumer half of
+// the contract, written the way the docs write it.
 const CONSUMER_CSS = `
-[data-testid$="content"][ui-side="top"] { position-area: top span-all; }
-[data-testid$="content"][ui-side="bottom"] { position-area: bottom span-all; }
+[data-testid="reversed-content"] { position-area: block-end; }
 `;
 
 let sheet: HTMLStyleElement | undefined;
@@ -120,10 +120,9 @@ function expectAnchorWired(root: HTMLElement, trigger: HTMLElement, content: HTM
 	expect(tip.getPropertyValue('position-anchor')).toBe(ANCHOR);
 }
 
-// A `side="top"` tip sitting above a trigger it is authored after: static flow
-// would put it below, so this placement is unreachable without a resolved
-// anchor. The computed value is asserted beside it so a miss says which half
-// broke.
+// A tip sitting above a trigger it is authored after: static flow would put it
+// below, so this placement is unreachable without a resolved anchor. The
+// computed value is asserted beside it so a miss says which half broke.
 function expectPlacedAbove(content: Element, trigger: Element) {
 	expect(getComputedStyle(content).getPropertyValue('position-anchor')).toBe(ANCHOR);
 	const tip = content.getBoundingClientRect();
@@ -157,7 +156,6 @@ for (const mode of MODES) {
 
 		expect(el(Content).getAttribute('role')).toBe('tooltip');
 		expect(el(Content).hasAttribute('overlay')).toBe(true);
-		expect(el(Content).getAttribute('ui-side')).toBe('top');
 		expect(el(Trigger).getAttribute('type')).toBe('button');
 		expect(el(Root).getAttribute('ui-closed')).toBe('');
 		expectHidden(el(Content));
@@ -177,7 +175,26 @@ for (const mode of MODES) {
 		const root = el(Root);
 		expect(root.hasAttribute('open')).toBe(false);
 		expect(root.hasAttribute('delay')).toBe(false);
-		expect(root.hasAttribute('side')).toBe(false);
+	});
+
+	// Placement is CSS, never a prop: the family ships one default inside its own
+	// layer, and any unlayered rule the consumer writes beats it with no
+	// specificity fight.
+	test(`${mode}: the tip takes the family default placement, and a consumer's rule wins`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+
+		const content = el(Content);
+		expect(getComputedStyle(content).getPropertyValue('position-area')).toBe('block-start');
+
+		const own = document.createElement('style');
+		own.textContent = '[data-testid="content"] { position-area: inline-end; }';
+		document.head.appendChild(own);
+		try {
+			expect(getComputedStyle(content).getPropertyValue('position-area')).toBe('inline-end');
+		} finally {
+			own.remove();
+		}
 	});
 
 	// Every tooltip on the page declares the SAME anchor name, so isolation is the
@@ -347,11 +364,11 @@ test('CSR: leaving the page with a pending show timer throws nothing', async () 
 
 // The only way to catch a `position-anchor` that silently did not resolve: an
 // unresolved anchor leaves the tip at its static position instead of beside the
-// trigger, and CSS reports nothing either way. `ServedOpen` is `side="top"`
-// while the tip is authored last, so static flow would put it BELOW the trigger
-// and "above" is a placement only a resolved anchor can produce. Chromium is the
-// lane this project runs; the mechanism is Baseline but the pixel assertion is
-// engine-specific.
+// trigger, and CSS reports nothing either way. `ServedOpen` takes the family's
+// `block-start` default while the tip is authored last, so static flow would put
+// it BELOW the trigger and "above" is a placement only a resolved anchor can
+// produce. Chromium is the lane this project runs; the mechanism is Baseline but
+// the pixel assertion is engine-specific.
 test('CSR: an open tip lands against the trigger it names', async () => {
 	await render(ServedOpen);
 	expectShowing(el(Content));
@@ -368,9 +385,9 @@ test('CSR: an open tip lands against the trigger it names', async () => {
 // trigger, which is what the family's docs warn about.
 test('CSR: a tip authored before its trigger is still placed against it', async () => {
 	await render(Reversed);
-	expectShowing(el(Content));
+	expectShowing(el(ReversedContent));
 
-	const tip = el(Content).getBoundingClientRect();
+	const tip = el(ReversedContent).getBoundingClientRect();
 	const anchor = el(Trigger).getBoundingClientRect();
 	expect(Math.abs(tip.top - anchor.bottom)).toBeLessThanOrEqual(SLACK);
 });

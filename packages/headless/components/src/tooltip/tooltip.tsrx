@@ -3,7 +3,6 @@ import type {
 	TooltipContentProps,
 	TooltipInstanceState,
 	TooltipRootProps,
-	TooltipSide,
 	TooltipTriggerProps,
 } from './tooltip-types.ts';
 
@@ -12,7 +11,7 @@ import type {
 // measures a box, so a tip served already showing is placed on its first layout.
 // The scope class these <style> blocks compile against is per MODULE, so each
 // block's subject must be structurally unique across all three parts: the trigger
-// is this module's only button, the tip is its only element carrying `ui-side`,
+// is this module's only button, the tip is its only element carrying `overlay`,
 // and the root is the div that is left.
 
 export const tooltipState = shared(
@@ -20,7 +19,6 @@ export const tooltipState = shared(
 		const tooltip: TooltipInstanceState = state({
 			open: false,
 			delay: 600,
-			side: 'top' as TooltipSide,
 			openTimer: 0,
 			restingUntil: 0,
 		});
@@ -48,7 +46,6 @@ export const tooltipState = shared(
 export function TooltipRoot({
 	open = false,
 	delay = 600,
-	side = 'top',
 	onChange,
 	children,
 	onPointerover,
@@ -59,7 +56,6 @@ export function TooltipRoot({
 	tooltip.onChange = onChange;
 	tooltip.open = open;
 	tooltip.delay = delay;
-	tooltip.side = side;
 
 	// The pointer handlers sit on the root, not the trigger, so moving from the trigger onto the tip never counts as leaving - WCAG 1.4.13 hoverable, from the structure rather than from a tracked polygon.
 	<div
@@ -115,7 +111,7 @@ export function TooltipRoot({
 	>
 		<style>
 			@layer markless {
-				div:not([ui-side]) { anchor-scope: --ui-tooltip; }
+				div:not([overlay]) { anchor-scope: --ui-tooltip; }
 			}
 		</style>
 		{children}
@@ -166,7 +162,6 @@ export function TooltipContent({ children, onDismiss, ...rest }: TooltipContentP
 		hidden={tooltip.open !== true}
 		ui-open={tooltip.open}
 		ui-closed={tooltip.open !== true}
-		ui-side={tooltip.side}
 		onDismiss={(event) => {
 			// No focus return: the tip never holds focus, so there is nowhere to hand it back from.
 			tooltip.setOpen(false);
@@ -175,7 +170,7 @@ export function TooltipContent({ children, onDismiss, ...rest }: TooltipContentP
 	>
 		<style>
 			@layer markless {
-				[ui-side] { --ui-anchor: --ui-tooltip; position: absolute; position-anchor: --ui-tooltip; }
+				[overlay] { --ui-anchor: --ui-tooltip; position: absolute; position-anchor: --ui-tooltip; position-area: block-start; }
 			}
 		</style>
 		{children}

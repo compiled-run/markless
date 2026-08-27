@@ -8,6 +8,5 @@ export {
 export type {
 	TooltipContentProps,
 	TooltipRootProps,
-	TooltipSide,
 	TooltipTriggerProps,
 } from './tooltip-types.ts';

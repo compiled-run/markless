@@ -117,7 +117,6 @@ export const tourItemState = shared(
 	() => {
 		const item: TourItemInstanceState = state({
 			index: 0,
-			side: 'bottom',
 			target: undefined as HTMLElement | undefined,
 		});
 		const el = element<HTMLDivElement>();
@@ -129,10 +128,9 @@ export const tourItemState = shared(
 	{ scope: 'widget' },
 );
 
-export function TourItem({ index, target, side = 'bottom', children, ...rest }: TourItemProps) @{
+export function TourItem({ index, target, children, ...rest }: TourItemProps) @{
 	const item = tourItemState();
 	item.index = index;
-	item.side = side;
 	item.target = target;
 
 	<TourCard {...rest} index={index}>{children}</TourCard>
@@ -201,7 +199,6 @@ function TourCard({ index, children, onDismiss, onFocus, onKeydown, ...rest }: T
 		// the library writes when it is the one showing.
 		ui-open={isCurrent}
 		ui-closed={isCurrent !== true}
-		ui-side={item.side}
 		onFocus={(event) => {
 			const own = item.target;
 			tour.enter(own);
@@ -240,12 +237,7 @@ function TourCard({ index, children, onDismiss, onFocus, onKeydown, ...rest }: T
 		<style>
 			@layer markless {
 				/* Fixed rather than absolute, so the card escapes whatever overflow container the target sits in. A step with no target resolves no anchor, which leaves `position-area` inert and the card wherever the consumer's own ungated rule puts it. */
-				[ui-side] { position: fixed; position-anchor: --tour-target; }
-				[ui-side="top"] { position-area: top span-right; }
-				[ui-side="bottom"] { position-area: bottom span-right; }
-				/* `self-inline-*` reads the card's own writing direction; plain `inline-*` reads the containing block's, which for an out-of-flow card never flips. */
-				[ui-side="start"] { position-area: span-self-block-end self-inline-start; }
-				[ui-side="end"] { position-area: span-self-block-end self-inline-end; }
+				[overlay] { position: fixed; position-anchor: --tour-target; position-area: block-end; }
 			}
 		</style>
 		{children}

@@ -20,7 +20,6 @@ export type {
 	TourForwardTriggerProps,
 	TourItemProps,
 	TourRootProps,
-	TourSide,
 	TourTitleProps,
 	TourValueLabelProps,
 } from './tour-types.ts';

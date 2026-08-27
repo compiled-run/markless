@@ -5,7 +5,7 @@ import { afterEach, expect, test } from 'vitest';
 import Basic from './scenarios/basic.tsrx';
 import Controlled from './scenarios/controlled.tsrx';
 import Disabled from './scenarios/disabled.tsrx';
-import Side from './scenarios/side.tsrx';
+import Placed from './scenarios/placed.tsrx';
 
 const Root = page.getByTestId('root');
 const Backdrop = page.getByTestId('backdrop');
@@ -310,48 +310,52 @@ for (const mode of MODES) {
 		await expectNoAxeViolations(where, 'the disabled tour shows its step');
 	});
 
-	test(`${mode}: each step writes its own placement as ui-side before it is the one showing`, async () => {
-		const { container } = mode === 'CSR' ? await render(Side) : await renderSSR(Side);
+	// Placement is CSS, never a prop: the card ships one default inside the family's
+	// own layer, and any unlayered rule the consumer writes beats it with no
+	// specificity fight.
+	test(`${mode}: every card takes the family default placement, and a consumer's rule wins`, async () => {
+		const { container } = mode === 'CSR' ? await render(Placed) : await renderSSR(Placed);
 		void container;
 
-		const placements: [{ element(): Element | null }, string][] = [
-			[StepTop, 'top'],
-			[StepBottom, 'bottom'],
-			[StepStart, 'start'],
-			[StepEnd, 'end'],
-			[StepDefault, 'bottom'],
-		];
-		for (const [card, side] of placements) {
+		for (const card of [StepTop, StepBottom, StepStart, StepEnd, StepDefault]) {
 			expect(el(card).hasAttribute('hidden')).toBe(true);
-			expect(el(card).getAttribute('ui-side')).toBe(side);
+			expect(getComputedStyle(el(card)).getPropertyValue('position-area')).toBe('block-end');
+		}
+
+		const own = document.createElement('style');
+		own.textContent = '[data-testid="step-top"] { position-area: block-start; }';
+		document.head.appendChild(own);
+		try {
+			expect(getComputedStyle(el(StepTop)).getPropertyValue('position-area')).toBe('block-start');
+			expect(getComputedStyle(el(StepBottom)).getPropertyValue('position-area')).toBe('block-end');
+		} finally {
+			own.remove();
 		}
 	});
 
-	test(`${mode}: the placement travels with the step as the tour walks`, async () => {
-		const { container } = mode === 'CSR' ? await render(Side) : await renderSSR(Side);
+	test(`${mode}: the showing step travels as the tour walks`, async () => {
+		const { container } = mode === 'CSR' ? await render(Placed) : await renderSSR(Placed);
 		void container;
 
 		el(Start).click();
 		await shown(StepTop);
 		expect(el(StepTop).getAttribute('ui-current')).toBe('');
-		expect(el(StepTop).getAttribute('ui-side')).toBe('top');
 
 		el(TopForward).click();
 		await shown(StepBottom);
 		expect(el(StepTop).hasAttribute('ui-current')).toBe(false);
 		expect(el(StepBottom).getAttribute('ui-current')).toBe('');
-		expect(el(StepBottom).getAttribute('ui-side')).toBe('bottom');
 		expect(el(Step).textContent).toBe('1');
 	});
 
 	test(`${mode}: axe finds no violation on a placed step`, async () => {
-		const { container } = mode === 'CSR' ? await render(Side) : await renderSSR(Side);
+		const { container } = mode === 'CSR' ? await render(Placed) : await renderSSR(Placed);
 		const where = container as unknown as HTMLElement;
 
 		await expectNoAxeViolations(where, 'the placed tour is closed');
 		el(Start).click();
 		await shown(StepTop);
 		await settled();
-		await expectNoAxeViolations(where, 'the tour is on its top-placed step');
+		await expectNoAxeViolations(where, 'the tour is on its first placed step');
 	});
 }

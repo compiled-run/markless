@@ -110,11 +110,15 @@ instance scoping that makes handles resolve to the right widget.
 Anything a family needs from CSS — anchor positioning, hidden-until-open,
 overlay stacking — ships as a `<style>` block inside the part's `.tsrx`,
 wrapped in `@layer markless`, written as ordinary CSS keyed off the `ui-*`
-attributes the part already writes (`[ui-side="start"] { position-area: … }`).
+attributes the part already writes (`[ui-open] { … }`).
 Geometry the consumer styles against is exposed as `--*` custom properties.
 JS never builds CSS strings (`position-area` values, inset math, `style=`
 concatenation) for what CSS can express. The layer is the whole point: a
 consumer's unlayered rule beats the default without `!important`.
+
+Placement is never a prop — no `side`, `align` or `offset` under any name. A
+family ships one default `position-area` in its layer and the consumer overrides
+it in CSS, with `position-try-fallbacks` of their own.
 
 ## Recursive composition
 
