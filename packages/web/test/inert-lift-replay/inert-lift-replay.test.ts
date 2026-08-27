@@ -3,7 +3,7 @@ import {
 	marklessBeginFocusCommit,
 	marklessEndFocusCommit,
 	marklessHandleFocusReader,
-} from '../../src/fns/element-handle.ts';
+} from '../../src/resume-events.ts';
 import type { ResumeElementHandleValue } from '../../src/resume-types.ts';
 
 /**
