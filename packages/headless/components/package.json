@@ -32,6 +32,7 @@
 		"./collapsible": "./src/collapsible/index.ts",
 		"./colorpicker": "./src/colorpicker/index.ts",
 		"./combobox": "./src/combobox/index.ts",
+		"./crop": "./src/crop/index.ts",
 		"./datebox": "./src/datebox/index.ts",
 		"./fileupload": "./src/fileupload/index.ts",
 		"./ink": "./src/ink/index.ts",

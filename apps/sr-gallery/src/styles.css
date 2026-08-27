@@ -248,3 +248,35 @@ input {
 	height: 100%;
 	pointer-events: none;
 }
+
+.crop-area {
+	width: 400px;
+	height: 300px;
+	border: 1px solid var(--line);
+	border-radius: 0.35rem;
+	color: var(--ink);
+}
+
+.crop-picture {
+	display: block;
+	width: 400px;
+	height: 300px;
+	object-fit: fill;
+}
+
+.crop-rect {
+	outline: 2px solid var(--ink);
+}
+
+.crop-grid {
+	background:
+		repeating-linear-gradient(to right, var(--line) 0 1px, transparent 1px 33.34%),
+		repeating-linear-gradient(to bottom, var(--line) 0 1px, transparent 1px 33.34%);
+}
+
+.crop-handle {
+	width: 12px;
+	height: 12px;
+	border: 1px solid var(--paper);
+	background: var(--ink);
+}

@@ -5,6 +5,7 @@ import {
 	checkbox,
 	checklist,
 	colorpicker,
+	crop,
 	datebox,
 	fileupload,
 	hovercard,
@@ -31,9 +32,9 @@ import {
 // /#toggle, /#textbox, /#progress, /#checklist, /#select, /#modal,
 // /#radio-group, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
 // /#fileupload, /#hovercard, /#calendar, /#menu, /#colorpicker,
-// /#togglegroup, /#numberbox, /#ink, /#pad, /#tour. A family whose second shape a reader
+// /#togglegroup, /#numberbox, /#ink, /#pad, /#crop, /#tour. A family whose second shape a reader
 // announces differently gets its own section too: /#slider-range,
-// /#numberbox-min-max-step, /#numberbox-currency.
+// /#numberbox-min-max-step, /#numberbox-currency, /#crop-image.
 //
 // This is consumer code, not test code. It imports through the package barrel
 // the way a reader of the docs would, carries no test hooks, and the markup is
@@ -460,6 +461,38 @@ export function Gallery() @{
 			</div>
 		</section>
 
+		<section id="crop">
+			<h2>Crop</h2>
+			<div class="scenario">
+				<crop.root name="crop" defaultValue={CROP_START}>
+					<crop.label>Crop</crop.label>
+					<crop.description>Drag the rectangle, or move it with the arrow keys. Each handle resizes one edge.</crop.description>
+					<crop.area class="crop-area">
+						<crop.selection class="crop-rect">
+							<crop.indicator class="crop-grid" />
+							<crop.thumb blockStart class="crop-handle" />
+							<crop.thumb blockEnd class="crop-handle" />
+							<crop.thumb inlineStart class="crop-handle" />
+							<crop.thumb inlineEnd class="crop-handle" />
+							<crop.thumb blockStart inlineStart class="crop-handle" />
+							<crop.thumb blockStart inlineEnd class="crop-handle" />
+							<crop.thumb blockEnd inlineStart class="crop-handle" />
+							<crop.thumb blockEnd inlineEnd class="crop-handle" />
+						</crop.selection>
+					</crop.area>
+					<crop.field />
+				</crop.root>
+			</div>
+		</section>
+
+		{/* The picture recipe gets its own section because the section a reader walks for the crop must serve the eight handles and nothing more; the corner handle here would be a ninth. The family knows nothing about bitmaps - the scale from area pixels to the picture's own pixels is the consumer's few lines below. */}
+		<section id="crop-image">
+			<h2>Crop over a picture</h2>
+			<div class="scenario">
+				<PhotoCrop />
+			</div>
+		</section>
+
 		{/* The tour's targets are the section's own buttons, reached through handles the page mints: a step may not look its target up, and a handle only crosses a component edge as a bare prop. The tour ships no trigger part, so "Take the tour" is the page's own button flipping `open`. */}
 		<section id="tour">
 			<h2>Tour</h2>
@@ -602,5 +635,58 @@ function CurveHandles() @{
 		@for (const point of held.points; key point.id) {
 			<pad.thumb value={point} class="pad-handle" />
 		}
+	</div>
+}
+
+const CROP_START = { x: 40, y: 30, width: 200, height: 150 };
+
+// An 800×600 picture shown at 400×300, so the scale from area pixels to the
+// picture's own pixels is exactly 2. Inline, so the gallery serves no asset.
+const PHOTO =
+	'data:image/svg+xml;charset=utf-8,' +
+	encodeURIComponent(
+		'<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">' +
+			'<rect width="800" height="600" fill="#4a6"/>' +
+			'<rect x="200" y="150" width="400" height="300" fill="#136"/>' +
+			'</svg>',
+	);
+
+function PhotoCrop() @{
+	const picture = element<HTMLImageElement>();
+	const sheet = element<HTMLCanvasElement>();
+	let cut = state('');
+
+	<div style="display: contents">
+		<crop.root
+			name="photo"
+			defaultValue={CROP_START}
+			onChange={(rect) => {
+				const shown = picture;
+				const board = sheet;
+				if (!shown || !board) return;
+
+				const scale = shown.naturalWidth / shown.clientWidth;
+				const x = Math.round(rect.x * scale);
+				const y = Math.round(rect.y * scale);
+				const width = Math.round(rect.width * scale);
+				const height = Math.round(rect.height * scale);
+				board.setAttribute('width', String(width));
+				board.setAttribute('height', String(height));
+				board.getContext('2d')?.drawImage(shown, x, y, width, height, 0, 0, width, height);
+				cut = `${x}, ${y}, ${width}×${height}`;
+			}}
+		>
+			<crop.label>Photo</crop.label>
+			<crop.description>Drag the rectangle over the picture, or move it with the arrow keys.</crop.description>
+			<crop.area class="crop-area">
+				<img el={picture} src={PHOTO} alt="" class="crop-picture" />
+				<crop.selection class="crop-rect">
+					<crop.thumb blockEnd inlineEnd class="crop-handle" />
+				</crop.selection>
+			</crop.area>
+			<crop.field />
+		</crop.root>
+		<p>Cut in the picture's own pixels: <output>{cut}</output></p>
+		<canvas el={sheet} />
 	</div>
 }

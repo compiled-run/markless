@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { FAMILY_ANCHORS } from '../../../../../apps/sr-gallery/preview-server.ts';
 import type { ScreenReaderDriver } from '../../test-support/driver.ts';
 
 /**
@@ -25,12 +26,8 @@ const ROLE_DESCRIPTION = 'crop area';
 const AT_REST = '40, 30, 200×150';
 const AFTER_NUDGE = '50, 30, 200×150';
 
-/**
- * Where the crop sits on the gallery page. Registering it in the gallery's own
- * `FAMILY_ANCHORS` belongs to the registration unit, so the anchor is written out
- * here rather than imported from a map that has no key for it yet.
- */
-export const CROP_ANCHOR = '/#crop';
+/** Where the crop sits on the gallery page. */
+export const CROP_ANCHOR = FAMILY_ANCHORS.crop;
 
 function missing(phrase: string, facts: readonly string[]): string[] {
 	return facts.filter((fact) => !phrase.includes(fact));

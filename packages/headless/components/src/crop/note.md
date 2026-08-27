@@ -4,13 +4,15 @@ A movable, resizable rectangle over a bounded area, reported in area pixels. An
 image cropper is one styled consumer of it; the family knows nothing about
 bitmaps.
 
-**Status: built, not registered.** 58 browser rows green in CSR and SSR, 10
-virtual-reader rows green, real reader lanes written and **not run** — an owner
-rule forbids starting NVDA or VoiceOver on a development machine, so they are
-unmeasured locally and belong to CI. Registration (`src/index.ts`,
-`package.json`, the shared conformance battery, the API manifest, the `#crop`
-gallery section, and the `crop` key in the gallery's `FAMILY_ANCHORS`) is the
-follow-up unit; nothing outside `src/crop/**` was touched.
+**Status: registered.** 58 browser rows green in CSR and SSR, 10 virtual-reader
+rows green, and the shared conformance battery green in both modes. Real reader
+lanes are written and **not run** — an owner rule forbids starting NVDA or
+VoiceOver on a development machine, so they are unmeasured locally and belong to
+CI, where all three reader matrices now carry `crop`.
+
+The picture recipe sits in the gallery's own `#crop-image` section rather than
+inside `#crop`: the reader transcript asserts `#crop` serves exactly eight
+sliders, and the recipe's corner handle would be a ninth.
 
 Research (the crop research memo in the goal notes): Ark UI's image
 cropper, react-easy-crop, react-image-crop, Cropper.js v2 and d3-brush, read
