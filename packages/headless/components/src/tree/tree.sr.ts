@@ -31,21 +31,22 @@ test('reading a closed tree conveys the container, the closed parent and the end
 	const container = await readUntil(sr, { name: 'Project files' });
 	expect(container, `${sr.name} announced "${container}"`).toContain('tree');
 
-	// With aria-expanded omitted while closed, a folder announces as an end node and nothing signals it can be opened.
-	const parent = await readUntil(sr, { name: 'src', state: ['notExpanded'] });
-	expectConveys(parent, { name: 'src', state: ['notExpanded'] });
+	// A closed folder omits aria-expanded, so no open state is announced for it.
+	const parent = await readUntil(sr, { name: 'src' });
+	expectConveys(parent, { name: 'src' });
+	expect(parent, `${sr.name} announced "${parent}"`).not.toContain('collapsed');
 	expect(parent, `${sr.name} announced "${parent}"`).toContain('treeitem');
 	expect(parent, `${sr.name} announced "${parent}"`).toContain('level 1');
 
 	// The opening control is named by its node through a compiler-resolved handle, not an id anyone spelled.
 	expectConveys(await readUntil(sr, { role: 'button' }), { role: 'button', name: 'src' });
 
-	// An end node carries no open state and no selection state - a disclosure tree does not select.
+	// An end node carries no open state, and aria-selected="false" reads as "not selected".
 	const leaf = await readUntil(sr, { name: 'README.md' });
 	expect(leaf, `${sr.name} announced "${leaf}"`).toContain('treeitem');
 	expect(leaf, `${sr.name} announced "${leaf}"`).toContain('level 1');
 	expect(leaf).not.toContain('expanded');
-	expect(leaf).not.toContain('selected');
+	expect(leaf, `${sr.name} announced "${leaf}"`).toContain('not selected');
 
 	// The children of the closed folder were never on screen, so the walk passed over them rather than through them.
 	const spoken = (await sr.spokenPhraseLog()).join(' | ');

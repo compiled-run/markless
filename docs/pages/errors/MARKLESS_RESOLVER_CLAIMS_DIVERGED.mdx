@@ -1,0 +1,21 @@
+# MARKLESS_RESOLVER_CLAIMS_DIVERGED
+
+Resolver claim sets disagree
+
+- Package: compiler
+- Pass or phase: link
+- Severity: error
+
+## Message
+
+Resolver … has incompatible final claim sets.
+
+## Why
+
+Neither claim set contains the other, so accepting either would drop symbol routes the resolver still owns.
+
+## Emitted from
+
+- `packages/compiler/src/passes/link/claim-manifest.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

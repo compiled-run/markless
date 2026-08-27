@@ -12,6 +12,7 @@ import FieldWithHelp from './scenarios/with-help.tsrx';
 
 const Root = page.getByTestId('root');
 const Input = page.getByTestId('input');
+const Textarea = page.getByTestId('textarea');
 const Label = page.getByTestId('label');
 const Description = page.getByTestId('description');
 const TextboxError = page.getByTestId('error');
@@ -45,15 +46,18 @@ function expectBasicRendered() {
 	expect(control.tagName).toBe('INPUT');
 	expect(control.getAttribute('name')).toBe('username');
 	expect(control.value).toBe('');
-	expect(control.getAttribute('aria-invalid')).toBe('false');
+	expect(control.hasAttribute('aria-invalid')).toBe(false);
 	expect(el(Root).getAttribute('ui-empty')).toBe('');
 	expect(el(Root).hasAttribute('ui-disabled')).toBe(false);
 	expect(el(Root).hasAttribute('ui-required')).toBe(false);
 	expect(el(Root).hasAttribute('ui-readonly')).toBe(false);
-	// The label and control name each other by a minted id nobody spelled.
+	// The label names the control by a minted id nobody spelled, and nothing else does.
 	expect(el(Label).getAttribute('for')).toBe(control.getAttribute('id'));
 	expect(control.id).toBeTruthy();
-	expect(control.getAttribute('aria-labelledby')).toBe(el(Label).id);
+	expect(control.hasAttribute('aria-labelledby')).toBe(false);
+	// Neither message part is placed, so both handles drop out and no empty
+	// attribute is left behind.
+	expect(control.hasAttribute('aria-describedby')).toBe(false);
 }
 
 function expectSignupFormRendered() {
@@ -62,8 +66,10 @@ function expectSignupFormRendered() {
 	expect(username.tagName).toBe('INPUT');
 	expect(bio.tagName).toBe('TEXTAREA');
 	expect(bio.getAttribute('name')).toBe('bio');
-	expect(username.getAttribute('aria-labelledby')).toBe(el(UsernameLabel).id);
+	expect(el(UsernameLabel).getAttribute('for')).toBe(username.id);
+	// A textarea is named by aria-labelledby: one handle cannot also bind the input's `for`.
 	expect(bio.getAttribute('aria-labelledby')).toBe(el(BioLabel).id);
+	expect(username.hasAttribute('aria-labelledby')).toBe(false);
 	// Two instances mint two labels, so neither names the other's control.
 	expect(el(BioLabel).id).not.toBe(el(UsernameLabel).id);
 }
@@ -97,7 +103,8 @@ function expectPartRestrictions() {
 
 function expectHelpRendered() {
 	expect(el(Description).textContent).toBe("We'll never share your email");
-	expect(el<HTMLInputElement>(Input).getAttribute('aria-invalid')).toBe('false');
+	expect(el<HTMLInputElement>(Input).hasAttribute('aria-invalid')).toBe(false);
+	// Only the description was placed, so the error drops out of the list.
 	expect(el<HTMLInputElement>(Input).getAttribute('aria-describedby')).toBe(el(Description).id);
 	expect(el(Description).id).toBeTruthy();
 }
@@ -107,6 +114,8 @@ function expectInvalidRendered() {
 	// Every part of one widget instance seeds before any part renders, so document
 	// order does not decide what a part reads - the error marks the control either way.
 	expect(el<HTMLInputElement>(AfterInput).getAttribute('aria-invalid')).toBe('true');
+	// Only the error was placed, so the description drops out and the error is
+	// named alone - no stray space, no dangling id.
 	expect(el<HTMLInputElement>(AfterInput).getAttribute('aria-describedby')).toBe(
 		el(AfterError).id,
 	);
@@ -114,16 +123,25 @@ function expectInvalidRendered() {
 
 	expect(el(BeforeError).textContent).toBe('Password is required');
 	expect(el<HTMLInputElement>(BeforeInput).getAttribute('aria-invalid')).toBe('true');
+	expect(el<HTMLInputElement>(BeforeInput).getAttribute('aria-describedby')).toBe(
+		el(BeforeError).id,
+	);
 }
 
 function expectHelpAndErrorRendered() {
 	expect(el(Description).textContent).toBe('Enter a valid email address');
 	expect(el(TextboxError).textContent).toBe('Email format is invalid');
-	// aria-describedby names exactly one id, so the second message sits unattached
-	// until a handle list is expressible.
-	const described = el<HTMLInputElement>(Input).getAttribute('aria-describedby');
-	expect(described).toBeTruthy();
-	expect(document.getElementById(described as string)).toBe(el(Description));
+	expect(el(Description).id).toBeTruthy();
+	expect(el(TextboxError).id).toBeTruthy();
+	expect(el(Description).id).not.toBe(el(TextboxError).id);
+	// Both ids, error first, on the single-line control and the multi-line one
+	// alike: the hint is written above the error in this page, so the order is
+	// the family's rather than the document's.
+	const named = `${el(TextboxError).id} ${el(Description).id}`;
+	expect(el<HTMLInputElement>(Input).getAttribute('aria-describedby')).toBe(named);
+	expect(el<HTMLTextAreaElement>(Textarea).getAttribute('aria-describedby')).toBe(named);
+	expect(el<HTMLInputElement>(Input).getAttribute('aria-invalid')).toBe('true');
+	expect(el<HTMLTextAreaElement>(Textarea).getAttribute('aria-invalid')).toBe('true');
 }
 
 for (const mode of MODES) {
@@ -169,7 +187,7 @@ for (const mode of MODES) {
 		expectInvalidRendered();
 	});
 
-	test(`${mode}: help text and an error render together, the first of them naming the control`, async () => {
+	test(`${mode}: both messages are named by the input and the textarea, error first`, async () => {
 		if (mode === 'CSR') await render(FieldWithHelpAndError);
 		else await renderSSR(FieldWithHelpAndError);
 		expectHelpAndErrorRendered();

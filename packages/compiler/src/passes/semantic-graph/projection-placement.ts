@@ -92,9 +92,17 @@ export function projectionPlacementFields(
 	const parentPath = site.path.slice(0, -1);
 	const index = site.path[site.path.length - 1] ?? 0;
 	const insideConstruct = site.chunk.id !== input.rootChunkId;
+	const parentHost = parentPath.length
+		? site.chunk.hosts.find(
+				(host) =>
+					host.coordinate.path.length === parentPath.length &&
+					parentPath.every((step, depth) => host.coordinate.path[depth] === step),
+			)
+		: undefined;
 	return {
 		elementCount,
 		projection: {
+			...(parentHost ? { parentHostNodeId: parentHost.hostNodeId } : {}),
 			elementsBeforeProjection: countSiblings(
 				scope,
 				site.chunk,

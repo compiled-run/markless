@@ -89,6 +89,7 @@ test('the unfilled dispatch folds to undefined', async () => {
 	const handler = handlerModuleSource(await compileFamily(UNBOUND_FAMILY_SOURCE));
 
 	expect(handler).toContain('undefined;');
+	expect(handler).not.toContain('marklessInvokeCallbackSlot');
 	expect(handler).not.toContain('context.capture.invoke');
 });
 
@@ -135,12 +136,14 @@ test('the audit still errors on a factory-local name the compiler leaves unlower
 });
 
 // The fold is keyed on the slot being unfilled, so a filled slot is untouched:
-// it still routes through the capture context every family's callbacks ride.
+// it still lowers into a routed dispatch through the slot's own graph node.
 test('a filled slot still lowers into its routed invoke', async () => {
 	const family = await compileFamily(BOUND_FAMILY_SOURCE);
 	const handler = handlerModuleSource(family);
 
-	expect(handler).toContain('context.capture.invoke');
+	expect(handler).toContain(
+		'marklessInvokeCallbackSlot(context, "shared:src/box.tsrx#boxState/slot:onChange"',
+	);
 	expect(handler).not.toMatch(/\bbox\.onChange\b/);
 	expect(diagnosticCodes(family)).not.toContain('MARKLESS_CALLBACK_SLOT_UNBOUND');
 	expect(diagnosticCodes(family)).not.toContain(SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE);
@@ -157,7 +160,9 @@ test('one filled and one unfilled slot on the same definition are lowered separa
 	);
 	const handler = handlerModuleSource(family);
 
-	expect(handler).toContain('context.capture.invoke');
+	expect(handler).toContain(
+		'marklessInvokeCallbackSlot(context, "shared:src/box.tsrx#boxState/slot:onChange"',
+	);
 	expect(handler).not.toMatch(/\bbox\.onSettle\b/);
 	expect(codeOutsideStrings(handler)).not.toMatch(/\bbox\b/);
 	expect(diagnosticCodes(family)).toContain('MARKLESS_CALLBACK_SLOT_UNBOUND');
