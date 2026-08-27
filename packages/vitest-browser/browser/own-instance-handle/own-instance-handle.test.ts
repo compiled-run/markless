@@ -76,9 +76,9 @@ test('SSR resume: a keydown handler reaches its own instance element', async () 
 	await expectKeydownOwnElement(screen.container as HTMLElement);
 });
 
-// The shape a menu needs: the ROOT part seeds the level family as well as the
-// item, so the root's own surface is one level and the item's surface is the
-// next. Both content parts have to reach their own element.
+// The shape a root-plus-items surface actually takes: the root seeds one family
+// and every item seeds a second, so the root's surface and the item's surface
+// are separate instances. Each content part has to reach its own element.
 async function expectPairOwnElement(container: ParentNode) {
 	const contents = levels(container, 'pair', 2);
 
@@ -87,18 +87,18 @@ async function expectPairOwnElement(container: ParentNode) {
 	expect(contents[0]!.getAttribute('data-clicked')).toBeNull();
 }
 
-test('CSR: a root-seeded level and an item-seeded level each reach their own element', async () => {
+test('CSR: the root family and the item family each reach their own element', async () => {
 	const screen = await render(PairPage);
 	await expectPairOwnElement(screen.container as HTMLElement);
 });
 
-test('SSR resume: a root-seeded level and an item-seeded level each reach their own element', async () => {
+test('SSR resume: the root family and the item family each reach their own element', async () => {
 	const screen = await renderSSR(PairPage);
 	await expectPairOwnElement(screen.container as HTMLElement);
 });
 
-// The same page, asked of the cells: two levels means two instances, so the
-// item's own click must leave the root's count alone.
+// The same page, asked of the cells: two families means two instances, so a
+// click on the inner content counts on the inner level alone.
 async function expectPairOwnCell(container: ParentNode) {
 	const contents = levels(container, 'pair', 2);
 
@@ -109,8 +109,13 @@ async function expectPairOwnCell(container: ParentNode) {
 	expect(container.querySelector('[data-pair-root]')?.getAttribute('data-hits')).toBe('0');
 }
 
-test('CSR: a root-seeded level and an item-seeded level are two instances', async () => {
+test('CSR: the root family and the item family are two instances', async () => {
 	const screen = await render(PairPage);
+	await expectPairOwnCell(screen.container as HTMLElement);
+});
+
+test('SSR resume: the root family and the item family are two instances', async () => {
+	const screen = await renderSSR(PairPage);
 	await expectPairOwnCell(screen.container as HTMLElement);
 });
 
