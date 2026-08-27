@@ -124,6 +124,188 @@
 			}
 		]
 	},
+	"calendar": {
+		"parts": [
+			{
+				"part": "backtrigger",
+				"component": "CalendarBackTrigger",
+				"doc": "Steps the month back one.",
+				"props": []
+			},
+			{
+				"part": "content",
+				"component": "CalendarContent",
+				"doc": "The month itself: the one surface, whether it is shown in place or revealed by\na `calendar.trigger`.\n\nIt is the group a reader announces, named by `calendar.title`, and it owns the\nwhole keyboard model - arrows walk days and weeks, `Home` and `End` reach the\nweek's ends, `PageUp` and `PageDown` step a month, and with Shift a year. Put\nthe title, the two month triggers, the weekday names and the days inside it.",
+				"props": []
+			},
+			{
+				"part": "description",
+				"component": "CalendarDescription",
+				"doc": "Supporting text, named by the month's `aria-describedby` behind `calendar.error`.",
+				"props": []
+			},
+			{
+				"part": "error",
+				"component": "CalendarError",
+				"doc": "The validation message, named by the month's `aria-describedby` ahead of `calendar.description`.",
+				"props": []
+			},
+			{
+				"part": "field",
+				"component": "CalendarField",
+				"doc": "The element a form submits. It is clipped, out of the tab order and hidden from\nreaders, and it carries the chosen date as `yyyy-mm-dd` under the root's\n`name`. A `multiple` or `range` calendar submits nothing through it.",
+				"props": []
+			},
+			{
+				"part": "forwardtrigger",
+				"component": "CalendarForwardTrigger",
+				"doc": "Steps the month on one.",
+				"props": []
+			},
+			{
+				"part": "item",
+				"component": "CalendarItem",
+				"doc": "A real `<button>`, not a grid cell: the whole date is its name, so a voice\ncontrol user can say it and a reader conveys the day without depending on the\ncolumn it sits in. `aria-pressed` rather than `aria-selected`, which a button\ndoes not support.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": true,
+						"doc": "Which day this is, as `yyyy-mm-dd`. One of `calendar.state().days`."
+					}
+				]
+			},
+			{
+				"part": "label",
+				"component": "CalendarLabel",
+				"doc": "A visible caption for the calendar. The month's group is named by\n`calendar.title` rather than by this, so that the name a reader hears follows\nthe month on show.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "CalendarRoot",
+				"doc": "A month of days a person can choose from.\n\nIt holds the date, the month on show and the day the keyboard is on, and it\ndraws nothing itself: put a `calendar.content` inside it, and inside that a\n`calendar.title`, a `calendar.backtrigger`, a `calendar.forwardtrigger` and one\n`calendar.item` per day of `calendar.state().days`. Add a `calendar.field` when\na form has to submit the date, and `popup` with a `calendar.trigger` when the\nmonth should be revealed rather than always shown.\n\nIt reports `ui-disabled`, `ui-readonly`, `ui-required`, `ui-invalid`,\n`ui-multiple`, `ui-range`, `ui-popup`, `ui-open` and `ui-closed` for styling.",
+				"props": [
+					{
+						"name": "value",
+						"type": "CalendarValue",
+						"required": false,
+						"default": "null",
+						"doc": "The date chosen, as `yyyy-mm-dd`. An array of them under `multiple`, and\n`{ start, end }` under `range`. Omit it and nothing is chosen to begin with."
+					},
+					{
+						"name": "month",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The month on show, as any `yyyy-mm-dd` date inside it. Defaults to the month\ntoday is in. Once somebody moves the month, this is no longer what is shown."
+					},
+					{
+						"name": "multiple",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "More than one day can be chosen, and `value` is a list of them."
+					},
+					{
+						"name": "range",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Two days bound a span, and `value` is `{ start, end }`. The first press sets\nan endpoint and reports nothing; the second completes the span and reports\nit once. Not to be set alongside `multiple`."
+					},
+					{
+						"name": "min",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The earliest day that can be chosen, as `yyyy-mm-dd`. Earlier days stay reachable and refuse to be chosen."
+					},
+					{
+						"name": "max",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The latest day that can be chosen, as `yyyy-mm-dd`. Later days stay reachable and refuse to be chosen."
+					},
+					{
+						"name": "unavailable",
+						"type": "readonly IsoDate[]",
+						"required": false,
+						"default": "[]",
+						"doc": "Days that cannot be chosen, as `yyyy-mm-dd`. They stay focusable so a person\nreading with the keyboard can land on one and hear that it is unavailable."
+					},
+					{
+						"name": "startofweek",
+						"type": "number",
+						"required": false,
+						"default": "0",
+						"doc": "Which weekday a row starts on, `0` for Sunday through `6` for Saturday. Defaults to `0`."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nothing can be chosen and no day is a tab stop."
+					},
+					{
+						"name": "readonly",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The days can be walked and read, and none of them will change the date."
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "A date is needed before a form submits."
+					},
+					{
+						"name": "invalid",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The date chosen is not an acceptable one. Reported as `ui-invalid` and on `calendar.field`."
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "Submitted under this name by `calendar.field`."
+					},
+					{
+						"name": "popup",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The month is revealed by a `calendar.trigger` rather than shown in place.\nEscape and a press outside close it; choosing a single date closes it too,\nwhile a range or a list of days stays open."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: CalendarValue) => void",
+						"required": false,
+						"doc": "Called with the whole date once a choice is complete - once per press for a\nsingle date and for `multiple`, and once for a range, on the press that\ncompletes it. Omit it and the days still work."
+					}
+				]
+			},
+			{
+				"part": "title",
+				"component": "CalendarTitle",
+				"doc": "The month and year on show, as text. With no children it draws that text\nitself; give it children and they are shown instead.\n\nIt is announced when it changes, which is how moving the month is conveyed\nwithout moving anybody's focus, and it is the name the month's group carries.",
+				"props": []
+			},
+			{
+				"part": "trigger",
+				"component": "CalendarTrigger",
+				"doc": "Reveals the month. Only for a root that was given `popup`.",
+				"props": []
+			}
+		]
+	},
 	"carousel": {
 		"parts": [
 			{
@@ -284,13 +466,13 @@
 			{
 				"part": "description",
 				"component": "CheckboxDescription",
-				"doc": "Supporting text beside the checkbox. It renders its children and changes nothing else.",
+				"doc": "Supporting text beside the checkbox, named by `checkbox.trigger`'s\n`aria-describedby`. Mount it alongside `checkbox.error` and the trigger names\nboth, the error first.",
 				"props": []
 			},
 			{
 				"part": "error",
 				"component": "CheckboxError",
-				"doc": "The validation message. Mounting it is what marks the checkbox invalid -\n`checkbox.trigger` reports `aria-invalid` for as long as this part is in the\npage - so render it only when there is an error to show.",
+				"doc": "The validation message, named by `checkbox.trigger`'s `aria-describedby` ahead\nof `checkbox.description`. Mounting it is what marks the checkbox invalid -\n`checkbox.trigger` reports `aria-invalid` for as long as this part is in the\npage - so render it only when there is an error to show.",
 				"props": []
 			},
 			{
@@ -534,6 +716,193 @@
 			}
 		]
 	},
+	"colorpicker": {
+		"parts": [
+			{
+				"part": "area",
+				"component": "ColorpickerArea",
+				"doc": "The saturation-by-brightness plane. It is `role=\"group\"` and renders its own two\none-axis `role=\"slider\"` controls, because one element carries one\n`aria-valuenow` — a single slider would leave brightness unreachable to anyone\nadjusting it with a reader. Put a `colorpicker.thumb` with no `channel` inside\nit as the visible marker.",
+				"props": []
+			},
+			{
+				"part": "content",
+				"component": "ColorpickerContent",
+				"doc": "The one surface both shapes use: in place when the picker is inline, revealed by the trigger under `popup`.",
+				"props": []
+			},
+			{
+				"part": "description",
+				"component": "ColorpickerDescription",
+				"doc": "Supporting text, named by the area's `aria-describedby` after any error.",
+				"props": []
+			},
+			{
+				"part": "error",
+				"component": "ColorpickerError",
+				"doc": "The validation message, named ahead of the description. `invalid` on the root is what marks the control invalid.",
+				"props": []
+			},
+			{
+				"part": "field",
+				"component": "ColorpickerField",
+				"doc": "The element a form submits: an `<input type=\"text\">`, clipped and out of the tab order.",
+				"props": []
+			},
+			{
+				"part": "input",
+				"component": "ColorpickerInput",
+				"doc": "A box a person types into. The graph writes attributes and an input's shown\ntext is its `value` property, so this part only exists because the write was\nmeasured to re-display a box a person had already typed into - the gate is\n`packages/vitest-browser/browser/colorpicker-gates`.",
+				"props": [
+					{
+						"name": "channel",
+						"type": "| 'hue'\n\t| 'saturation'\n\t| 'brightness'\n\t| 'alpha'\n\t| 'red'\n\t| 'green'\n\t| 'blue'\n\t| 'lightness'",
+						"required": false,
+						"doc": "Which number this box carries. Omit it and the box holds the hex."
+					}
+				]
+			},
+			{
+				"part": "item",
+				"component": "ColorpickerItem",
+				"doc": "A real `<button>` carrying `aria-pressed`, boxNamed by the colour and the value it\nstands for. `aria-selected` is not supported on `button`, which is calendar's\nshipped ruling applied unchanged.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": true,
+						"doc": "The colour this swatch chooses, in any notation `value` accepts."
+					}
+				]
+			},
+			{
+				"part": "label",
+				"component": "ColorpickerLabel",
+				"doc": "Names the picker for a reader: `colorpicker.area` and `colorpicker.content` point their `aria-labelledby` here.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "ColorpickerRoot",
+				"doc": "The colour picker itself; the label, the area, the rails, the swatches and the\nform element all go inside it.\n\n`value` is a seed, not a controlled mirror: once a gesture has run the picker\nholds its own colour and the prop is never read again. Feeding every `onChange`\nback into `value` is redundant rather than harmful — and it is what would make\nthe 8-bit hex quantisation visible, since `#5A8FB3` parses back a fraction of a\ndegree off the hue it was written from.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The colour to start on: `#rgb`, `#rrggbb`, `rgb()`, `hsl()` or `hsb()`, with or without alpha. Omit it and the picker starts white."
+					},
+					{
+						"name": "swatches",
+						"type": "readonly string[]",
+						"required": false,
+						"default": "[]",
+						"doc": "The colours `colorpicker.state().swatches` hands back for the consumer to repeat over."
+					},
+					{
+						"name": "alpha",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Keep and show the alpha channel. HTML's own spelling, from `<input type=\"color\" alpha>`."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nobody can change the colour, and every control drops out of the tab order."
+					},
+					{
+						"name": "readonly",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The colour can be read but not changed."
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The form element must carry a colour before a form submits."
+					},
+					{
+						"name": "invalid",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Report the control as invalid. A prop, not a consequence of mounting `colorpicker.error`."
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "Submitted under this name by `colorpicker.field`."
+					},
+					{
+						"name": "popup",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The picker lives behind `colorpicker.trigger` instead of rendering in place."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: string) => void",
+						"required": false,
+						"doc": "Called with the new colour every time it changes, including during a drag."
+					},
+					{
+						"name": "onChangeEnd",
+						"type": "(value: string) => void",
+						"required": false,
+						"doc": "Called once the change settles: the pointer released, the key that moved it, or a typed entry committed."
+					}
+				]
+			},
+			{
+				"part": "thumb",
+				"component": "ColorpickerThumb",
+				"doc": "Inside a rail this is that channel's control; inside the area it is the marker\nthe family positions and nothing more. One part rather than two because the\nconsumer writes the same tag either way - what it is follows from where it sits.",
+				"props": [
+					{
+						"name": "channel",
+						"type": "| 'hue'\n\t| 'saturation'\n\t| 'brightness'\n\t| 'alpha'\n\t| 'red'\n\t| 'green'\n\t| 'blue'\n\t| 'lightness'",
+						"required": false,
+						"doc": "The rail this handle belongs to. Omit it inside `colorpicker.area`."
+					}
+				]
+			},
+			{
+				"part": "track",
+				"component": "ColorpickerTrack",
+				"doc": "One channel's rail and the hit area its pointer gesture runs on. The family\npublishes `--colorpicker-start` and `--colorpicker-end` for the gradient rather\nthan painting one, so the stylesheet owns the look.",
+				"props": [
+					{
+						"name": "channel",
+						"type": "| 'hue'\n\t| 'saturation'\n\t| 'brightness'\n\t| 'alpha'\n\t| 'red'\n\t| 'green'\n\t| 'blue'\n\t| 'lightness'",
+						"required": false,
+						"default": "'hue'",
+						"doc": "Which number this rail carries. Omit it and the rail is the hue rail."
+					}
+				]
+			},
+			{
+				"part": "trigger",
+				"component": "ColorpickerTrigger",
+				"doc": "Opens the popup shape. Only rendered when the root carries `popup`.",
+				"props": []
+			},
+			{
+				"part": "valuelabel",
+				"component": "ColorpickerValueLabel",
+				"doc": "The colour as words and as hex, or whatever the consumer writes instead.",
+				"props": []
+			}
+		]
+	},
 	"combobox": {
 		"parts": [
 			{
@@ -545,13 +914,13 @@
 			{
 				"part": "description",
 				"component": "ComboboxDescription",
-				"doc": "Supporting text for the field, named by the input's `aria-describedby`. One\nelement can be named that way, so mounting this alongside `combobox.error`\ndescribes by whichever renders first.",
+				"doc": "Supporting text for the field, named by the input's `aria-describedby`. Mount\nit alongside `combobox.error` and the input names both, the error first.",
 				"props": []
 			},
 			{
 				"part": "error",
 				"component": "ComboboxError",
-				"doc": "Its presence is what a reader is told about first.",
+				"doc": "The validation message, named by the input's `aria-describedby` ahead of\n`combobox.description`. It carries `role=\"alert\"`, so a reader speaks it when\nit appears. Unlike the other families, mounting it does not mark the field\ninvalid: `invalid` is a prop on `combobox.root`.",
 				"props": []
 			},
 			{
@@ -720,6 +1089,721 @@
 			}
 		]
 	},
+	"crop": {
+		"parts": [
+			{
+				"part": "area",
+				"component": "CropArea",
+				"doc": "The box the rectangle lives in. It owns the gesture in flight — pointer capture\nis taken here, so a drag that leaves the area keeps arriving — and it is what\nthe family measures.",
+				"props": []
+			},
+			{
+				"part": "description",
+				"component": "CropDescription",
+				"doc": "Supporting text. It reaches the selection through `aria-describedby`.",
+				"props": []
+			},
+			{
+				"part": "error",
+				"component": "CropError",
+				"doc": "The validation message. Mounting it is what marks the crop invalid.",
+				"props": []
+			},
+			{
+				"part": "field",
+				"component": "CropField",
+				"doc": "The element that submits. It carries `x,y,width,height` as text, and it is\nclipped, `aria-hidden` and out of the tab order, so the selection and its\nhandles are the only things a person reaches.",
+				"props": []
+			},
+			{
+				"part": "indicator",
+				"component": "CropIndicator",
+				"doc": "The rule-of-thirds grid, or any other purely-presentational overlay on the\nrectangle. `aria-hidden`, no behaviour, and it covers the selection it sits in.",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "CropLabel",
+				"doc": "The crop's name. It names the selection and every handle for a reader.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "CropRoot",
+				"doc": "A movable, resizable rectangle over a bounded area. An image cropper is one\nstyled consumer of it: the family knows nothing about bitmaps, only about a\nrectangle and the box it lives in.\n\nThe label, description, error, area, selection, handles and the form field all\ngo inside the root, which holds the rectangle and reports `ui-disabled`,\n`ui-fixed`, `ui-dragging` and `ui-resizing` for styling.\n\nThe family owns this element's `style` attribute to carry `--pan-x` and\n`--pan-y`, so style the root from a stylesheet rather than a `style` prop.\nCustom properties inherit, so content anywhere inside the area can apply them.",
+				"props": [
+					{
+						"name": "value",
+						"type": "CropRect",
+						"required": false,
+						"doc": "Where the rectangle sits now. Passing this makes the crop controlled: a\ngesture reports through `onChange` and nothing moves until the new rect\ncomes back in. Leave it out and the crop keeps its own."
+					},
+					{
+						"name": "defaultValue",
+						"type": "CropRect",
+						"required": false,
+						"doc": "The rectangle an uncontrolled crop starts with."
+					},
+					{
+						"name": "aspect",
+						"type": "number",
+						"required": false,
+						"doc": "Width over height. Set it and a resize keeps that ratio; leave it out and\nthe two axes are free. A declared `value` is never rewritten to fit — the\nlock applies to what a gesture produces."
+					},
+					{
+						"name": "minWidth",
+						"type": "number",
+						"required": false,
+						"default": "40",
+						"doc": "The narrowest the rectangle may be resized, in area pixels. Defaults to 40."
+					},
+					{
+						"name": "minHeight",
+						"type": "number",
+						"required": false,
+						"default": "40",
+						"doc": "The shortest the rectangle may be resized, in area pixels. Defaults to 40."
+					},
+					{
+						"name": "maxWidth",
+						"type": "number",
+						"required": false,
+						"default": "Number.POSITIVE_INFINITY",
+						"doc": "The widest the rectangle may be resized. Defaults to no limit but the area."
+					},
+					{
+						"name": "maxHeight",
+						"type": "number",
+						"required": false,
+						"default": "Number.POSITIVE_INFINITY",
+						"doc": "The tallest the rectangle may be resized. Defaults to no limit but the area."
+					},
+					{
+						"name": "fixed",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The rectangle stays where it is and the content pans underneath it. The\narea publishes `--pan-x` and `--pan-y`, which the consumer applies to their\nown content — the family never moves anything it does not own."
+					},
+					{
+						"name": "step",
+						"type": "number",
+						"required": false,
+						"default": "1",
+						"doc": "How far one arrow key moves an edge or the rectangle, in area pixels.\nDefaults to 1. Shift multiplies it by 10 and Ctrl/Cmd by 50."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nothing can be moved or resized."
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The form will not submit without a rectangle."
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "Submitted under this name by the field the family renders."
+					},
+					{
+						"name": "onChange",
+						"type": "(rect: CropRect) => void",
+						"required": false,
+						"doc": "Called with the rectangle once a move or resize settles: the pointer released, or the key that moved it."
+					},
+					{
+						"name": "onDrag",
+						"type": "(rect: CropRect) => void",
+						"required": false,
+						"doc": "Called with the rectangle on every pointer move while a gesture is in flight."
+					}
+				]
+			},
+			{
+				"part": "selection",
+				"component": "CropSelection",
+				"doc": "The rectangle itself: a `role=\"group\"` named by `crop.label`, described by the\nerror, the description and a live rect readout the root keeps, and carrying\n`aria-roledescription=\"crop area\"`. It is a tab stop and it owns the move keys.\n\nThe family owns its `style` attribute to carry `--x`, `--y`, `--width` and\n`--height`, so style it from a stylesheet rather than a `style` prop.\n\nKeys, when it has focus: arrows move it by `step`, Shift by ten steps,\nCtrl/Cmd by fifty; Home and End send it to the area's edges on the axis the\nlast arrow used. A drag moves it too.",
+				"props": []
+			},
+			{
+				"part": "thumb",
+				"component": "CropThumb",
+				"doc": "One resize handle. The edges it owns are written as booleans, and the name a\nreader hears sits before the spread so a consumer's own `aria-label` wins.",
+				"props": [
+					{
+						"name": "inlineStart",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The handle owns the rectangle's inline-start edge."
+					},
+					{
+						"name": "inlineEnd",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The handle owns the rectangle's inline-end edge."
+					},
+					{
+						"name": "blockStart",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The handle owns the rectangle's block-start edge."
+					},
+					{
+						"name": "blockEnd",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The handle owns the rectangle's block-end edge."
+					}
+				]
+			}
+		]
+	},
+	"datebox": {
+		"parts": [
+			{
+				"part": "dayinput",
+				"component": "DateBoxDayInput",
+				"doc": "The day of the month, 1 to whatever the chosen month and year allow.",
+				"props": [
+					{
+						"name": "placeholder",
+						"type": "string",
+						"required": false,
+						"doc": "The text an empty box shows. Defaults to the box's own shape: `dd`, `mm`, `yyyy`."
+					},
+					{
+						"name": "showLeadingZero",
+						"type": "boolean",
+						"required": false,
+						"doc": "Show a single-digit day or month as `04` rather than `4`."
+					}
+				]
+			},
+			{
+				"part": "description",
+				"component": "DateBoxDescription",
+				"doc": "Supporting text for the group, named by every box's `aria-describedby`. Mount\nit alongside `datebox.error` and the boxes name both, the error first.",
+				"props": []
+			},
+			{
+				"part": "error",
+				"component": "DateBoxError",
+				"doc": "The validation message, named by every box's `aria-describedby` ahead of\n`datebox.description`. Mounting it is what marks the boxes invalid - they\nreport `aria-invalid` for as long as this part is in the page - so render it\nonly when there is an error to show.",
+				"props": []
+			},
+			{
+				"part": "field",
+				"component": "DateBoxField",
+				"doc": "The element a form submits. It is clipped, out of the tab order and hidden\nfrom readers, and it carries the whole date as `yyyy-mm-dd` under the root's\n`name`.",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "DateBoxLabel",
+				"doc": "The group's name: the element `role=\"group\"` points its `aria-labelledby` at.\nThree boxes have no single control for a `for` to point at, so the name is\ncarried by the IDREF rather than a `for`.",
+				"props": []
+			},
+			{
+				"part": "monthinput",
+				"component": "DateBoxMonthInput",
+				"doc": "The month, 1 to 12.",
+				"props": [
+					{
+						"name": "placeholder",
+						"type": "string",
+						"required": false,
+						"doc": "The text an empty box shows. Defaults to the box's own shape: `dd`, `mm`, `yyyy`."
+					},
+					{
+						"name": "showLeadingZero",
+						"type": "boolean",
+						"required": false,
+						"doc": "Show a single-digit day or month as `04` rather than `4`."
+					}
+				]
+			},
+			{
+				"part": "root",
+				"component": "DateBoxRoot",
+				"doc": "A date typed one part at a time, as three number boxes rather than one text\nfield. It is the group the three boxes sit in and the home of the date they\nspell: put a `datebox.label`, a `datebox.dayinput`, a\n`datebox.monthinput` and a `datebox.yearinput` inside it, in whichever\norder the date should read, and a `datebox.field` when a form has to submit\nit.\n\nIt reports `ui-disabled`, `ui-required` and `ui-empty` for styling, and it is\nthe element a reader announces as the group the boxes belong to.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The date the boxes show, as `yyyy-mm-dd`. Omit it and they start empty."
+					},
+					{
+						"name": "min",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The earliest date the boxes will settle on, as `yyyy-mm-dd`."
+					},
+					{
+						"name": "max",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The latest date the boxes will settle on, as `yyyy-mm-dd`."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nothing can be typed in any box, and they all drop out of the tab order."
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "A whole date is needed before a form submits."
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "Submitted under this name by `datebox.field`."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: string | null) => void",
+						"required": false,
+						"doc": "Called with the whole date as `yyyy-mm-dd` whenever the boxes spell one, and\nwith `null` while they do not. Omit it and the boxes still work; the call\nsite simply does nothing."
+					}
+				]
+			},
+			{
+				"part": "yearinput",
+				"component": "DateBoxYearInput",
+				"doc": "The year.",
+				"props": [
+					{
+						"name": "placeholder",
+						"type": "string",
+						"required": false,
+						"doc": "The text an empty box shows. Defaults to the box's own shape: `dd`, `mm`, `yyyy`."
+					},
+					{
+						"name": "showLeadingZero",
+						"type": "boolean",
+						"required": false,
+						"doc": "Show a single-digit day or month as `04` rather than `4`."
+					}
+				]
+			}
+		]
+	},
+	"fileupload": {
+		"parts": [
+			{
+				"part": "droparea",
+				"component": "FileUploadDropArea",
+				"doc": "The region a file can be dropped onto. It carries no role and no tabindex on\npurpose: dropping is a pointer enhancement and the browse button is the\nkeyboard route, so a second tab stop here would do nothing the button does not.\nIt reports `ui-dragging` and `ui-disabled`.",
+				"props": []
+			},
+			{
+				"part": "field",
+				"component": "FileUploadField",
+				"doc": "The real `<input type=\"file\">`. It is clipped, `aria-hidden` and out of the tab\norder, so nothing but the family and the picker ever touch it — but it is the\nelement that actually submits, and the family keeps its `files` in step with\nthe rows on the page, dropped files included.",
+				"props": []
+			},
+			{
+				"part": "item",
+				"component": "FileUploadItem",
+				"doc": "One chosen file's row. Everything it shows comes from the `file` record it is given.",
+				"props": [
+					{
+						"name": "file",
+						"type": "FileRecord",
+						"required": true,
+						"doc": "The file this row shows."
+					}
+				]
+			},
+			{
+				"part": "itemclose",
+				"component": "FileUploadItemClose",
+				"doc": "The button that takes the file it sits in off the list. It takes no id: the\nitem around it holds one. Give it an `aria-label` — the visible character is\nusually a cross, which a reader would otherwise announce as \"times\".",
+				"props": []
+			},
+			{
+				"part": "itemlabel",
+				"component": "FileUploadItemLabel",
+				"doc": "The file's name. Leave it empty and it renders the name the record carries;\ngive it children and they are shown instead.",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "FileUploadLabel",
+				"doc": "The upload's name. Its `for` points at the real field, which is what names it for a reader.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "FileUploadRoot",
+				"doc": "The upload itself; the label, the drop area, the browse button, the real field\nand the list of chosen files all go inside it. It holds the restrictions and\nreports `ui-disabled` for styling.\n\nThere is no `value` prop: a `FileList` cannot be built from markup, so the\nchosen files always start empty and are only ever added by a person.",
+				"props": [
+					{
+						"name": "accept",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "What the picker offers and what a drop is filtered against, e.g. `image/*,.pdf`."
+					},
+					{
+						"name": "multiple",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "More than one file may be chosen; without it a new choice replaces the old one."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nothing can be chosen: the button is disabled and drops are ignored."
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "A file must be chosen before a form submits."
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "Submitted under this name by the real field the family renders."
+					},
+					{
+						"name": "onChange",
+						"type": "(files: readonly FileRecord[]) => void",
+						"required": false,
+						"doc": "Called with the chosen files whenever they change."
+					}
+				]
+			},
+			{
+				"part": "trigger",
+				"component": "FileUploadTrigger",
+				"doc": "The button that opens the file picker. This is the keyboard and reader route in.",
+				"props": []
+			}
+		]
+	},
+	"hovercard": {
+		"parts": [
+			{
+				"part": "content",
+				"component": "HovercardContent",
+				"doc": "The card. Unlike a tooltip's tip this is a surface a person can work in: put\nlinks, buttons and images in it freely.\n\nIt carries no `role`. It is not a description of the trigger and not a dialog;\nits contents are read as themselves. Nothing here writes `aria-describedby`,\nwhich would flatten the whole card into one run-on string with every link\nwelded together and none of them reachable.\n\n**Write it after `hovercard.trigger`.** A CSS anchor has to be laid out\nstrictly before the element that points at it. An ordinary in-flow trigger\nsatisfies that from anywhere in the markup, so the order is only advice -\nuntil you absolutely position the trigger yourself, at which point a card\nwritten first silently lands at its containing block instead of beside it. CSS\nhas no way to report that, so put the card last and the question never comes\nup.\n\nIt stays in the page when the card is hidden - `hidden` decides whether it\nshows, never an arm - because the trigger points at its minted id, because\n`hidden` is what takes its links out of the tab order, and because an elevated\nelement removed from the document while showing leaves the overlay stack's\nmarks behind.\n\nIts `position: absolute`, anchor binding and a default `position-area` of\n`block-end` live in the part's own scoped stylesheet, inside\n`@layer markless` - your `style` and `class` compose untouched. One unlayered\nrule of your own moves it: `.my-card { position-area: block-start }`. Everything\nelse about where the card lands - `@position-try`, `position-visibility`,\noffsets - is your CSS too.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "HovercardRoot",
+				"doc": "The hover card itself; the trigger and the card go inside it, in that order.\nIt holds whether the card is showing, how long the pointer has to rest or\nfocus has to stay before it shows, and how long it lingers after the pointer\nleaves. Where the card sits is your CSS, never a prop.\n\nThe pointer and focus handlers live here rather than on the trigger, so moving\nfrom the trigger into the card - with the pointer or with Tab - never counts\nas leaving.",
+				"props": [
+					{
+						"name": "open",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Whether the card is showing. Omit it and it starts hidden."
+					},
+					{
+						"name": "delay",
+						"type": "number",
+						"required": false,
+						"default": "700",
+						"doc": "How long the pointer must rest on the trigger, or focus must stay on it,\nbefore the card shows, in milliseconds. Omit it and it is 700. Focus waits\nthe same time as the pointer: a person tabbing through a paragraph of links\nhas declared no interest in any one of them."
+					},
+					{
+						"name": "closeDelay",
+						"type": "number",
+						"required": false,
+						"default": "300",
+						"doc": "How long the card stays after the pointer leaves, in milliseconds. Omit it\nand it is 300. It is what lets the pointer cross the gap between the trigger\nand the card without the card going away."
+					},
+					{
+						"name": "onChange",
+						"type": "(open: boolean) => void",
+						"required": false,
+						"doc": "Called with the new value when the card shows or hides, including when\nEscape or a press elsewhere hides it."
+					}
+				]
+			},
+			{
+				"part": "trigger",
+				"component": "HovercardTrigger",
+				"doc": "The link the card previews. It renders an `<a>` and only an `<a>`, because the\ncard is a shortcut to where the link goes: **never put anything in the card\nthat is not also behind the link.** That is what makes the family defensible\nfor a person on a touch screen, or reading with a virtual cursor, who will\nnever see the card at all - they follow the link and get everything.\n\nIt carries `aria-expanded` and `aria-controls` pointing at the card, so a\nreader is told the surface exists and can be entered. Tab from the trigger\nmoves into the card, because the card is the trigger's next DOM sibling and\nnothing takes it out of the tab order.\n\nIt also carries the CSS anchor the card is placed against, declared in the\npart's own scoped stylesheet - your `style` and `class` compose untouched.",
+				"props": []
+			}
+		]
+	},
+	"ink": {
+		"parts": [
+			{
+				"part": "area",
+				"component": "InkArea",
+				"doc": "The surface. Pointer capture rather than window listeners, so a stroke that\nleaves the area keeps arriving here; the keys are the drawing's edit history,\nbecause there is no keyboard way to draw a line freehand.",
+				"props": []
+			},
+			{
+				"part": "description",
+				"component": "InkDescription",
+				"doc": "Supporting text. It reaches the area through `aria-describedby`.",
+				"props": []
+			},
+			{
+				"part": "error",
+				"component": "InkError",
+				"doc": "The validation message. Mounting it is what marks the drawing invalid.",
+				"props": []
+			},
+			{
+				"part": "field",
+				"component": "InkField",
+				"doc": "The element that submits. It carries every stroke's path data joined into one\n`d` string, and it is clipped, `aria-hidden` and out of the tab order, so the\narea is the only thing a person reaches.",
+				"props": []
+			},
+			{
+				"part": "indicator",
+				"component": "InkIndicator",
+				"doc": "The guide line a signature is written on: an SVG `<line>`, `aria-hidden`, with\nno behaviour at all. Give it `x1`/`y1`/`x2`/`y2` — percentages work — or leave\nthem and it spans the area three quarters of the way down.",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "InkLabel",
+				"doc": "The drawing's name. It names the area for a reader.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "InkRoot",
+				"doc": "A freehand drawing surface. A signature pad is one styled consumer of it: the\nfamily knows nothing about signatures, only about strokes.\n\nThe label, description, error, drawing area, guide line and the form field all\ngo inside the root, which holds the drawing and reports `ui-disabled`,\n`ui-readonly`, `ui-empty` and `ui-drawing` for styling.\n\nThere is no clear or undo part. Both are one line in a consumer's own button —\n`ink.state().clear()`, `ink.state().undo()` — and a button the family owned\nwould only be a button the consumer had to restyle.",
+				"props": [
+					{
+						"name": "paths",
+						"type": "readonly string[]",
+						"required": false,
+						"doc": "The strokes, as SVG path data. Passing this makes the drawing controlled:\na gesture reports through `onChange` and nothing appears until the new array\ncomes back in. Leave it out and the drawing keeps its own strokes."
+					},
+					{
+						"name": "defaultPaths",
+						"type": "readonly string[]",
+						"required": false,
+						"default": "[]",
+						"doc": "The strokes an uncontrolled drawing starts with."
+					},
+					{
+						"name": "size",
+						"type": "number",
+						"required": false,
+						"default": "2",
+						"doc": "Stroke width in px at full pressure. Defaults to 2."
+					},
+					{
+						"name": "pressure",
+						"type": "boolean",
+						"required": false,
+						"default": "true",
+						"doc": "Vary the stroke width with pointer pressure. On by default. A device that\nreports no pressure of its own has it derived from how fast the pointer\nmoved, which is what gives a mouse or a trackpad the same tapering."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nothing can be drawn, undone or cleared."
+					},
+					{
+						"name": "readonly",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The drawing is shown but cannot be changed."
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Something must be drawn before a form submits."
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "Submitted under this name by the field the family renders."
+					},
+					{
+						"name": "onChange",
+						"type": "(paths: readonly string[]) => void",
+						"required": false,
+						"doc": "Called with the whole drawing whenever a stroke lands, or is undone, redone or cleared."
+					},
+					{
+						"name": "onDraw",
+						"type": "(current: string) => void",
+						"required": false,
+						"doc": "Called with the in-progress stroke's path data as it is being drawn."
+					}
+				]
+			}
+		]
+	},
+	"menu": {
+		"parts": [
+			{
+				"part": "content",
+				"component": "MenuContent",
+				"doc": "The top surface the items go in, `role=\"menu\"`. It is never modal: it writes\nno `aria-modal`, so the page behind it keeps its focus and is never made\ninert, and a wheel does not dismiss it.\n\nIt stays in the page when the menu is closed - `hidden` decides whether it\nshows, never an arm - because an enlisted element removed from the document\nleaves the overlay stack's marks behind.\n\nIt owns the keyboard walk over the items IT holds. A submenu's own items\nbelong to that submenu's `menu.itemcontent`.\n\nPlacement is CSS, never a prop. The anchor binding and a default\n`position-area` of `block-end span-inline-end` ship in the part's own scoped\nstylesheet, inside `@layer markless`, so one unlayered rule of yours replaces\nthe default without a specificity fight:\n`.my-menu { position-area: block-start span-inline-end }`. A menu opened from\n`menu.contextarea` resolves no anchor, which leaves the `position-area` inert\nand puts the surface at the pointer instead.",
+				"props": []
+			},
+			{
+				"part": "contextarea",
+				"component": "MenuContextarea",
+				"doc": "A region that opens the menu where the pointer is: right-click, a touch long\npress, `Shift+F10` or the ContextMenu key on anything focused inside it.\n\nIt carries no role, no name and no ARIA state at all. `aria-haspopup` says a\ncontrol opens a menu when it is activated, which a region that answers a\nright-click does not do, and a context menu is equally discoverable to\neveryone without an announcement of its own (React Aria's reasoning, and\nw3c/aria#1971 is the open discussion). Give `menu.content` an `aria-label`:\nwith no trigger there is nothing else to name the surface.",
+				"props": []
+			},
+			{
+				"part": "item",
+				"component": "MenuItem",
+				"doc": "One command. Given `checked` it is a `menuitemcheckbox` that toggles without\nclosing; inside a `radio` menu it is a `menuitemradio`. Given `submenu` it\nholds a `menu.itemcontent` and opens it instead of activating.\n\nA disabled item is still reachable with the arrows and still announced - the\nAPG's rule, and the divergence from `select`, whose walk skips a disabled\noption - it simply cannot be activated.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": true,
+						"doc": "Reported to `onChange` when this item is activated. Required: no index stands in for it."
+					},
+					{
+						"name": "checked",
+						"type": "boolean",
+						"required": false,
+						"doc": "This item carries a checked state, so it renders as a `menuitemcheckbox`.\nWhich items ARE checked is `menu.root`'s `checked`; writing the prop is what\nsays this item has the state at all."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nobody can activate this item; the arrows still land on it."
+					},
+					{
+						"name": "submenu",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "This item holds a submenu: it reports `aria-haspopup=\"menu\"` and\n`aria-expanded`, and opening it is what activation does.\n\nWritten rather than inferred from the `menu.itemcontent` inside it, for\ntree's `leaf` reason: a component cannot see its own children while it\nrenders, and a served page has to carry both attributes in its HTML before\nanything inside the item exists."
+					}
+				]
+			},
+			{
+				"part": "itemcontent",
+				"component": "MenuItemContent",
+				"doc": "The submenu one item holds, `role=\"menu\"`, named by that item. It is the same\nsurface part one level down: a `menu.item` inside it may hold a\n`menu.itemcontent` of its own, to any depth.\n\nLike `menu.content` it stays in the page when closed, it is an `overlay`, and\nit owns the keyboard walk over the items it holds. Its default\n`position-area` is `inline-end span-block-end` - beside the item that opened\nit - and an unlayered rule of yours replaces that the same way.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "MenuRoot",
+				"doc": "The menu itself. Everything the family renders goes inside it, and it is the\nanchor scope the surface is placed within.\n\nThere is one root however deep the menu nests: a submenu is a\n`menu.itemcontent` written inside a `menu.item`, and an item activated at any\ndepth reports to this root's `onChange`.",
+				"props": [
+					{
+						"name": "open",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Whether the surface is showing. Omit it and the menu starts closed."
+					},
+					{
+						"name": "checked",
+						"type": "readonly string[]",
+						"required": false,
+						"default": "[]",
+						"doc": "The values of the items that start checked - checkbox items, or the one\nchosen radio item. The checked set lives here rather than on each item\nbecause a radio choice unchecks its siblings, which is one decision about\nthe whole menu, and because a seed may only read its own component's props."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nobody can open the menu, and no item may be activated."
+					},
+					{
+						"name": "loop",
+						"type": "boolean",
+						"required": false,
+						"default": "true",
+						"doc": "The arrow walk wraps at both ends, on every surface. Menus wrap; a listbox does not."
+					},
+					{
+						"name": "radio",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The items of this menu are one radio group: each renders\n`role=\"menuitemradio\"`, and choosing one unchecks the rest. Without it an\nitem carrying `checked` is a `menuitemcheckbox` and the rest are plain\ncommands. An item carrying `submenu` stays a plain `menuitem` either way."
+					},
+					{
+						"name": "delay",
+						"type": "number",
+						"required": false,
+						"default": "700",
+						"doc": "How long a pointer rests on a `submenu` item before its submenu opens, in milliseconds."
+					},
+					{
+						"name": "closeDelay",
+						"type": "number",
+						"required": false,
+						"default": "300",
+						"doc": "How long a submenu stays open after the pointer leaves its item, in milliseconds."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: string) => void",
+						"required": false,
+						"doc": "Called with the item's `value` when an item is activated - a command, a\ncheckbox item toggling, or a radio item being chosen - at any depth."
+					},
+					{
+						"name": "onOpenChange",
+						"type": "(open: boolean) => void",
+						"required": false,
+						"doc": "Called when the surface opens or closes, including when Escape or a press outside closes it."
+					}
+				]
+			},
+			{
+				"part": "trigger",
+				"component": "MenuTrigger",
+				"doc": "The control the menu opens from, and the family's only tab stop. It declares\n`aria-haspopup=\"menu\"`, so a reader says a menu is there before it is opened.",
+				"props": []
+			}
+		]
+	},
 	"modal": {
 		"parts": [
 			{
@@ -877,6 +1961,139 @@
 			}
 		]
 	},
+	"numberbox": {
+		"parts": [
+			{
+				"part": "backtrigger",
+				"component": "NumberboxBackTrigger",
+				"doc": "Steps the number down by one `step`. It is out of the tab order and points its\n`aria-controls` at the input, because the input is the only tab stop and the\narrow keys already do what this button does. Holding it repeats.",
+				"props": []
+			},
+			{
+				"part": "description",
+				"component": "NumberboxDescription",
+				"doc": "Supporting text for the field, named by the input's `aria-describedby`. With no\n`role=\"spinbutton\"` there is no `aria-valuemin`/`aria-valuemax`, so this is\nwhere a range reaches a reader: write it out here when the field has bounds.",
+				"props": []
+			},
+			{
+				"part": "error",
+				"component": "NumberboxError",
+				"doc": "The validation message, named by the input's `aria-describedby` ahead of\n`numberbox.description`. Mounting it is what marks the field invalid - it\nreports `aria-invalid` for as long as this part is in the page - so render it\nonly when there is an error to show.",
+				"props": []
+			},
+			{
+				"part": "field",
+				"component": "NumberboxField",
+				"doc": "The element a form submits. It is clipped, out of the tab order and hidden from\nreaders, and it carries the plain number - no grouping, no currency symbol,\n`.` for a decimal point - under the root's `name`.",
+				"props": []
+			},
+			{
+				"part": "forwardtrigger",
+				"component": "NumberboxForwardTrigger",
+				"doc": "Steps the number up by one `step`. Otherwise `numberbox.backtrigger`, upward.",
+				"props": []
+			},
+			{
+				"part": "input",
+				"component": "NumberboxInput",
+				"doc": "The control a person types into: a real text input, so text review, selection\nand a soft keyboard all behave normally. `disabled`, `readonly` and `required`\nmay be set here as well as on the root, and a restriction set in either place\nstands - a part can add one, never remove one.\n\nIt carries no `name`: what a form submits is `numberbox.field`, because the\ntext here is grouped and may carry a currency symbol.",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "NumberboxLabel",
+				"doc": "The field's name. Its `for` points at the input, so clicking the text focuses it.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "NumberboxRoot",
+				"doc": "One number in one field: a real text input a person types into, two step\nbuttons, and a canonical number on the wire. Put a `numberbox.label`, a\n`numberbox.input` and whichever of `numberbox.backtrigger`,\n`numberbox.forwardtrigger`, `numberbox.valuelabel`, `numberbox.description`,\n`numberbox.error` and `numberbox.field` the page needs inside it.\n\nIt reports `ui-disabled`, `ui-readonly`, `ui-required`, `ui-invalid` and\n`ui-empty` for styling.",
+				"props": [
+					{
+						"name": "value",
+						"type": "number | null",
+						"required": false,
+						"default": "null",
+						"doc": "The number the field shows. `null`, or omitted, and it starts empty."
+					},
+					{
+						"name": "min",
+						"type": "number",
+						"required": false,
+						"doc": "The lowest number the field settles on. Omit it and the field is unbounded below."
+					},
+					{
+						"name": "max",
+						"type": "number",
+						"required": false,
+						"doc": "The highest number the field settles on. Omit it and the field is unbounded above."
+					},
+					{
+						"name": "step",
+						"type": "number",
+						"required": false,
+						"default": "1",
+						"doc": "How far one arrow press moves. `Shift` and the page keys move ten of these."
+					},
+					{
+						"name": "currency",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "An ISO 4217 currency code, such as `USD` or `EUR`. It is data, not a format:\nthe family asks `Intl` where this currency's symbol goes in the reader's own\nlanguage, shows the number that way, and accepts the same characters back\nwhen somebody types or pastes them. A code `Intl` does not know is ignored."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nobody can type in the field or step it, and it drops out of the tab order."
+					},
+					{
+						"name": "readonly",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The number can be read and selected but not changed. The field stays focusable."
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "A number is needed before a form submits."
+					},
+					{
+						"name": "invalid",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The field is reported as holding something wrong. Mounting `numberbox.error` also sets it."
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "Submitted under this name by `numberbox.field`."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: number | null) => void",
+						"required": false,
+						"doc": "Called with the number the field settles on - on blur, on `Enter`, and on\nevery step - or with `null` once it holds none. It does not fire per\nkeystroke; the half-typed value is on `numberbox.state()` for anyone who\nwants it live."
+					}
+				]
+			},
+			{
+				"part": "valuelabel",
+				"component": "NumberboxValueLabel",
+				"doc": "The formatted number as text. It renders the value rather than accepting\nchildren, so there is nothing to keep in step by hand.",
+				"props": []
+			}
+		]
+	},
 	"otp": {
 		"parts": [
 			{
@@ -943,6 +2160,146 @@
 						"doc": "Called once with the whole code the moment it holds one character per box."
 					}
 				]
+			}
+		]
+	},
+	"pad": {
+		"parts": [
+			{
+				"part": "area",
+				"component": "PadArea",
+				"doc": "The field. It is a group rather than a control of its own: the handles inside\nit carry the values, and this owns the pointer gesture on their behalf so that\nN handles never overlap each other's hit testing.",
+				"props": []
+			},
+			{
+				"part": "description",
+				"component": "PadDescription",
+				"doc": "Supporting text. It reaches the area through `aria-describedby`.",
+				"props": []
+			},
+			{
+				"part": "error",
+				"component": "PadError",
+				"doc": "The validation message. It reaches the area before the description.",
+				"props": []
+			},
+			{
+				"part": "field",
+				"component": "PadField",
+				"doc": "One handle's value as a form field. Write one per handle, each under its own name.",
+				"props": [
+					{
+						"name": "value",
+						"type": "PadPoint",
+						"required": false,
+						"doc": "The handle this field submits. Omit it on a one-handle pad."
+					}
+				]
+			},
+			{
+				"part": "indicator",
+				"component": "PadIndicator",
+				"doc": "A grid, a crosshair or whatever else the field is drawn with. It carries no value.",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "PadLabel",
+				"doc": "Names the pad. `pad.area` and every `pad.thumb` point their labelling here.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "PadRoot",
+				"doc": "A two-dimensional value control - an XY pad. Cartesian only: there is no polar\nmode and no third axis, because ARIA exposes one value per control, so a third\naxis is a `slider` composed beside this rather than an axis inside it.\n\nThe label, the area, the handles, the readout and the form elements all go\ninside the root. Units are the value range, not pixels: an audio pad holds Hz\nand a pan/tilt pad holds degrees without rescaling in every callback.",
+				"props": [
+					{
+						"name": "value",
+						"type": "readonly PadPoint[]",
+						"required": false,
+						"doc": "The points. Passing this makes the pad controlled: a gesture reports\nthrough `onChange` and nothing moves until the new array comes back in.\nLeave it out and the pad keeps its own points."
+					},
+					{
+						"name": "defaultValue",
+						"type": "readonly PadPoint[]",
+						"required": false,
+						"default": "[]",
+						"doc": "The points an uncontrolled pad starts with."
+					},
+					{
+						"name": "minX",
+						"type": "number",
+						"required": false,
+						"default": "0",
+						"doc": "The low end of the x axis. Defaults to 0."
+					},
+					{
+						"name": "maxX",
+						"type": "number",
+						"required": false,
+						"default": "1",
+						"doc": "The high end of the x axis. Defaults to 1."
+					},
+					{
+						"name": "minY",
+						"type": "number",
+						"required": false,
+						"default": "0",
+						"doc": "The low end of the y axis. Defaults to 0."
+					},
+					{
+						"name": "maxY",
+						"type": "number",
+						"required": false,
+						"default": "1",
+						"doc": "The high end of the y axis. Defaults to 1."
+					},
+					{
+						"name": "step",
+						"type": "number",
+						"required": false,
+						"default": "0.01",
+						"doc": "How far one arrow key moves a handle, on both axes. Defaults to 0.01."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nothing can be moved, and every handle drops out of the tab order."
+					},
+					{
+						"name": "onChange",
+						"type": "(points: readonly PadPoint[]) => void",
+						"required": false,
+						"doc": "Called with every point once a move settles: the pointer released, or the key that moved it."
+					},
+					{
+						"name": "onDrag",
+						"type": "(points: readonly PadPoint[]) => void",
+						"required": false,
+						"doc": "Called with every point as a drag moves one, before it settles. The name\nshadows the DOM's own `ondrag`, which the root drops in exchange - a pad's\narea is not an HTML drag source, and `onChange` is dropped the same way."
+					}
+				]
+			},
+			{
+				"part": "thumb",
+				"component": "PadThumb",
+				"doc": "One handle, and one tab stop. `role=\"slider\"` with `aria-roledescription`\nrather than two axis elements: colorpicker can afford full-plane axis overlays\nbecause a colour plane has one thumb, and N of them would intercept each\nother's pointer events. What colorpicker measured is kept instead - both axes\nalways reachable, and the long-then-short value text - by reporting the axis\nthe last key moved and naming both axes whenever the axis changes.",
+				"props": [
+					{
+						"name": "value",
+						"type": "PadPoint",
+						"required": false,
+						"doc": "The point this handle draws. Omit it on a one-handle pad and it takes the first point."
+					}
+				]
+			},
+			{
+				"part": "valuelabel",
+				"component": "PadValueLabel",
+				"doc": "The focused handle's value as text, or the first handle's on a pad nobody has touched.",
+				"props": []
 			}
 		]
 	},
@@ -1038,7 +2395,7 @@
 			{
 				"part": "content",
 				"component": "PopoverContent",
-				"doc": "The surface. It is not modal: it carries no `aria-modal`, so the page behind it\nstays reachable, keeps its focus, and is never made inert.\n\nIt stays in the page when the popover is closed - `hidden` decides whether it\nshows, never an arm - because an elevated element removed from the document\nwhile it is showing leaves the overlay stack's marks behind.\n\nA consumer's `onDismiss` runs after the family has closed the popover, so a\nhandler can see which way the family went.",
+				"doc": "The surface. It is not modal: it carries no `aria-modal`, so the page behind it\nstays reachable, keeps its focus, and is never made inert.\n\nIt stays in the page when the popover is closed - `hidden` decides whether it\nshows, never an arm - because an elevated element removed from the document\nwhile it is showing leaves the overlay stack's marks behind.\n\nA consumer's `onDismiss` runs after the family has closed the popover, so a\nhandler can see which way the family went.\n\nThe placement is a CSS anchor, so it holds while the page scrolls and reflows\nwithout any script. The anchor binding and a default `position-area` of\n`block-end` ship in the parts' own scoped stylesheets, inside `@layer markless`\n- so one unlayered rule of yours replaces the default without a specificity\nfight: `.my-surface { position-area: inline-end }`. `--ui-anchor` names the\nanchor for your own `anchor()` geometry.",
 				"props": []
 			},
 			{
@@ -1050,7 +2407,7 @@
 			{
 				"part": "root",
 				"component": "PopoverRoot",
-				"doc": "The popover itself; the trigger and the surface go inside it. It holds whether\nthe surface is showing and which side it is placed on, and it is the anchor\nend of the CSS anchor placement, so the family owns this element's `style`\nattribute - style the root from a stylesheet rather than a `style` prop.",
+				"doc": "The popover itself; the trigger and the surface go inside it. It holds whether\nthe surface is showing, and it is the anchor end of the CSS anchor placement,\nwhich lives in the part's own scoped stylesheet - your `style` and `class`\ncompose untouched.",
 				"props": [
 					{
 						"name": "open",
@@ -1058,13 +2415,6 @@
 						"required": false,
 						"default": "false",
 						"doc": "Whether the surface is showing. Omit it and the popover starts closed."
-					},
-					{
-						"name": "side",
-						"type": "'top' | 'bottom' | 'start' | 'end'",
-						"required": false,
-						"default": "'bottom'",
-						"doc": "Where the surface is placed against the trigger. It is also written on\n`popover.content` as `ui-side`, so styling can follow the placement.\n\nThe placement is a CSS anchor, so it holds while the page scrolls and\nreflows without any script. The family owns the `style` attribute on\n`popover.root`, `popover.trigger` and `popover.content` to carry it -\nstyle those three parts from a stylesheet rather than a `style` prop."
 					},
 					{
 						"name": "onChange",
@@ -1134,6 +2484,12 @@
 				"part": "track",
 				"component": "ProgressTrack",
 				"doc": "The full length of the range; the indicator sits inside it.",
+				"props": []
+			},
+			{
+				"part": "valuelabel",
+				"component": "ProgressValueLabel",
+				"doc": "The current value as text. Left empty it renders the percentage of the range\nthe bar has covered - the same number the bar reports as `aria-valuetext` -\nand nothing at all while the amount is unknown. Pass children to write the\ntext yourself. Plain text you pass becomes what the bar reports as\n`aria-valuetext`, so a reader speaks your wording rather than the percentage.",
 				"props": []
 			}
 		]
@@ -1247,13 +2603,13 @@
 			{
 				"part": "label",
 				"component": "RadioGroupLabel",
-				"doc": "The group's name, rendered as the `<legend>` a `<fieldset>` is named by.",
+				"doc": "The group's name: the element `role=\"radiogroup\"` points its `aria-labelledby` at.",
 				"props": []
 			},
 			{
 				"part": "root",
 				"component": "RadioGroupRoot",
-				"doc": "The group is a `<fieldset>` so its `<legend>` names it natively: no id, no\nIDREF, and better support than `aria-labelledby` on a `role=\"radiogroup\"` div.",
+				"doc": "The group: a `role=\"radiogroup\"` element named by `radiogroup.label` through\n`aria-labelledby`.",
 				"props": [
 					{
 						"name": "value",
@@ -1416,7 +2772,7 @@
 			{
 				"part": "trigger",
 				"component": "SelectTrigger",
-				"doc": "The control a person opens the list from, and the family's only tab stop. It\nshows the current choice and reports `role=\"combobox\"`; a consumer's `onClick`\nand `onKeydown` run after the family's.",
+				"doc": "The control a person opens the list from, and the family's only tab stop. It\nshows the current choice and declares `aria-haspopup=\"listbox\"`; a consumer's\n`onClick` and `onKeydown` run after the family's.",
 				"props": []
 			}
 		]
@@ -1599,13 +2955,13 @@
 			{
 				"part": "description",
 				"component": "TextboxDescription",
-				"doc": "Supporting text for the box, named by the control's `aria-describedby`. One\nelement can be named that way, so mounting this alongside `textbox.error`\ndescribes by whichever renders first.",
+				"doc": "Supporting text for the box, named by the control's `aria-describedby`. Mount\nit alongside `textbox.error` and the control names both, the error first.",
 				"props": []
 			},
 			{
 				"part": "error",
 				"component": "TextboxError",
-				"doc": "The validation message. Mounting it is what marks the control invalid - it\nreports `aria-invalid` for as long as this part is in the page - so render it\nonly when there is an error to show.",
+				"doc": "The validation message, named by the control's `aria-describedby` ahead of\n`textbox.description`. Mounting it is what marks the control invalid - it\nreports `aria-invalid` for as long as this part is in the page - so render it\nonly when there is an error to show.",
 				"props": []
 			},
 			{
@@ -1734,13 +3090,13 @@
 			{
 				"part": "description",
 				"component": "ToggleDescription",
-				"doc": "Supporting text for the switch, named by the trigger's `aria-describedby`. One\nelement can be named that way, so mounting this alongside `toggle.error`\ndescribes by whichever renders first.",
+				"doc": "Supporting text for the switch, named by the trigger's `aria-describedby`.\nMount it alongside `toggle.error` and the trigger names both, the error first.",
 				"props": []
 			},
 			{
 				"part": "error",
 				"component": "ToggleError",
-				"doc": "The validation message. Mounting it is what marks the switch invalid - the\ntrigger reports `aria-invalid` for as long as this part is in the page - so\nrender it only when there is an error to show.",
+				"doc": "The validation message, named by the trigger's `aria-describedby` ahead of\n`toggle.description`. Mounting it is what marks the switch invalid - the\ntrigger reports `aria-invalid` for as long as this part is in the page - so\nrender it only when there is an error to show.",
 				"props": []
 			},
 			{
@@ -1813,6 +3169,259 @@
 				"part": "trigger",
 				"component": "ToggleTrigger",
 				"doc": "A consumer's `onClick` runs after the switch has flipped.",
+				"props": []
+			}
+		]
+	},
+	"togglegroup": {
+		"parts": [
+			{
+				"part": "item",
+				"component": "ToggleGroupItem",
+				"doc": "One toggle button. A real `<button aria-pressed>`, not a switch: a switch is a\nsetting that takes effect at once, which is what `toggle` is for, while this\nis a control a person presses on and off inside a set.\n\nThe button's own content is its accessible name, so it takes label content and\nneeds no label part. A consumer's `onClick`, `onFocus` and `onKeydown` all run\nafter the family's.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": true,
+						"doc": "What this item contributes to the group's value. Required: position is never identity."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nobody can press this item, and the arrow keys walk past it."
+					}
+				]
+			},
+			{
+				"part": "itemfield",
+				"component": "ToggleGroupItemField",
+				"doc": "The hidden input that carries one pressed item into a form. Written inside the\nitem whose value it submits, it takes no configuration of its own: `name`\ncomes from `togglegroup.root` and `value` from `togglegroup.item`, so one\nplace decides what a form receives. It is in the page only while its item is\npressed, which is what makes a `multiple` group submit its name once per\npressed value with no special handling.",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "ToggleGroupLabel",
+				"doc": "The group's name: the element `role=\"group\"` points its `aria-labelledby` at.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "ToggleGroupRoot",
+				"doc": "A set of toggle buttons - text alignment, or bold/italic/underline. The group\nis a `role=\"group\"` element named by `togglegroup.label`, and every item\ninside it is a real button reporting `aria-pressed`.\n\nArrows move focus and never press: that is the whole difference from\n`radiogroup`, where an arrow also chooses. Enter and Space press the focused\nitem, because the item is a button and the browser activates it.",
+				"props": [
+					{
+						"name": "value",
+						"type": "ToggleGroupValue",
+						"required": false,
+						"default": "''",
+						"doc": "The pressed value, or the pressed values when the group is `multiple`.\nOmit it and nothing is pressed."
+					},
+					{
+						"name": "multiple",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Any number of items may be pressed at once. Omit it and pressing one unpresses the rest."
+					},
+					{
+						"name": "orientation",
+						"type": "'horizontal' | 'vertical'",
+						"required": false,
+						"default": "'horizontal'",
+						"doc": "Which axis the arrow keys walk. Omit it and the items run left to right."
+					},
+					{
+						"name": "loop",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Arrow past the last item and land on the first. Omit it and the ends stop."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nobody can press any item."
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The group keeps at least one pressed item: pressing the last pressed one\ndoes nothing. Omit it and a person can leave the group with nothing pressed."
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The name every `togglegroup.itemfield` submits under, declared once here\nrather than repeated per item. Omit it and the group submits nothing."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: ToggleGroupValue) => void",
+						"required": false,
+						"doc": "Intended to be called with what is pressed now - one value, or the whole\nlist when the group is `multiple`, and `''` or `[]` once nothing is left\npressed. The shape mirrors the shape `value` was written in. Omit it and\npressing still works; the call site simply does nothing."
+					}
+				]
+			}
+		]
+	},
+	"tooltip": {
+		"parts": [
+			{
+				"part": "content",
+				"component": "TooltipContent",
+				"doc": "The tip. It is text, not a surface a person can work in: no links, no buttons,\nnothing to focus.\n\n**Write it after `tooltip.trigger`.** A CSS anchor has to be laid out strictly\nbefore the element that points at it. An ordinary in-flow trigger satisfies\nthat from anywhere in the markup, so the order is only advice - until you\nabsolutely position the trigger yourself, at which point a tip written first\nsilently lands at its containing block instead of beside it. CSS has no way to\nreport that, so put the tip last and the question never comes up.\n\nIt stays in the page when the tooltip is hidden - `hidden` decides whether it\nshows, never an arm - because the trigger points at its minted id and because\nan elevated element removed from the document while showing leaves the overlay\nstack's marks behind.\n\nIts `position: absolute`, anchor binding and a default `position-area` of\n`block-start` live in the part's own scoped stylesheet, inside\n`@layer markless` - your `style` and `class` compose untouched. One unlayered\nrule of your own moves it: `.my-tip { position-area: inline-end }`. Everything\nelse about where the tip lands - `@position-try`, `position-visibility`,\noffsets - is your CSS too.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "TooltipRoot",
+				"doc": "The tooltip itself; the trigger and the tip go inside it, in that order. It\nholds whether the tip is showing and how long the pointer has to rest before\nit shows. Where the tip sits is your CSS, never a prop.\n\nThe pointer handlers live here rather than on the trigger, so moving the\npointer from the trigger onto the tip never counts as leaving.",
+				"props": [
+					{
+						"name": "open",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Whether the tooltip is showing. Omit it and it starts hidden."
+					},
+					{
+						"name": "delay",
+						"type": "number",
+						"required": false,
+						"default": "600",
+						"doc": "How long the pointer must rest on the trigger before the tooltip shows, in\nmilliseconds. Omit it and it is 600. Focus shows it at once, with no wait."
+					},
+					{
+						"name": "onChange",
+						"type": "(open: boolean) => void",
+						"required": false,
+						"doc": "Called with the new value when the tooltip shows or hides, including when\nEscape or a press elsewhere hides it."
+					}
+				]
+			},
+			{
+				"part": "trigger",
+				"component": "TooltipTrigger",
+				"doc": "The control the tooltip describes. It carries the CSS anchor the tip is\nplaced against, declared in the part's own scoped stylesheet - your `style`\nand `class` compose untouched.\n\nIt points at the tip with `aria-describedby` at all times, showing or not: a\ndirectly referenced hidden element still contributes its text to the\ndescription, so tabbing to the trigger conveys the tip without it ever being\nshown.\n\nAn icon-only trigger needs its own accessible name - write `aria-label` on it.\nThe tooltip describes the control; it never names it.",
+				"props": []
+			}
+		]
+	},
+	"tour": {
+		"parts": [
+			{
+				"part": "backdrop",
+				"component": "TourBackdrop",
+				"doc": "The spotlight. It is not a layer with a hole in it - it *is* the hole, sized\nand placed by the anchor, and the dim is its own `box-shadow` spread. The\ncolour, the corner radius and any transition are ordinary CSS of yours.\n\nIt takes no pointer events, so the target underneath stays pressable.",
+				"props": []
+			},
+			{
+				"part": "backtrigger",
+				"component": "TourBackTrigger",
+				"doc": "The previous step. Disabled on the first step unless the tour loops.",
+				"props": []
+			},
+			{
+				"part": "close",
+				"component": "TourClose",
+				"doc": "A consumer's `onClick` runs after the tour has closed.",
+				"props": []
+			},
+			{
+				"part": "description",
+				"component": "TourDescription",
+				"doc": "A sentence the reader announces after the name. Say which element the step means in words - the dim is not accessible, the description is.",
+				"props": []
+			},
+			{
+				"part": "forwardtrigger",
+				"component": "TourForwardTrigger",
+				"doc": "The next step. Disabled on the last step unless the tour loops.",
+				"props": []
+			},
+			{
+				"part": "item",
+				"component": "TourItem",
+				"doc": "One step: the card the person reads, and the element on the page it is about.\n\nThe card is placed by CSS anchoring against the target, so it holds while the\npage scrolls and reflows with no script. Placement is CSS, never a prop: the\ncard ships a default `position-area` of `block-end` inside `@layer markless`,\nand one unlayered rule of yours replaces it -\n`.my-card { position-area: block-start }`. A step with no `target` anchors to\nnothing, which leaves the `position-area` inert and the card wherever your own\nungated rule puts it - `inset: 0; margin: auto` for a centred step.",
+				"props": [
+					{
+						"name": "index",
+						"type": "number",
+						"required": true,
+						"doc": "Where this step comes in the tour, counting from zero.\n\nRequired, because `step` is an ordinal and a step has to know its own place\nwhile it renders to decide whether it is the one showing. Number the steps\n`0`, `1`, `2`… in the order you write them: the tour's length is one past\nthe highest number registered, and moving a step lands focus on the card in\nthat document position."
+					},
+					{
+						"name": "target",
+						"type": "HTMLElement",
+						"required": false,
+						"doc": "The element this step is about, as an `element()` handle you bound on it.\n\nPass the handle itself, never inside an array or an object: a handle only\ncrosses a component edge as a bare prop."
+					}
+				]
+			},
+			{
+				"part": "root",
+				"component": "TourRoot",
+				"doc": "The tour itself; the spotlight and every step's card go inside it. It holds\nwhether the tour is showing and which step it is on.\n\nThe root deliberately carries no anchor scope. A tour's target is an element\nthe consumer owns, somewhere else on the page entirely, so confining the\nanchor name to this subtree would hide it from the card that needs it.",
+				"props": [
+					{
+						"name": "open",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Whether the tour is showing. Omit it and the tour starts closed."
+					},
+					{
+						"name": "loop",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Whether the last step advances to the first and the first goes back to the last. Off by default: a tour has a beginning and an end."
+					},
+					{
+						"name": "closeOnInteractOutside",
+						"type": "boolean",
+						"required": false,
+						"default": "true",
+						"doc": "Whether a press outside the card closes the tour. On by default.\n\nA press inside the current step's own target never closes it whatever this\nsays - the tour just told the person to click that."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Whether the tour refuses to move. The card still shows the step it is on."
+					},
+					{
+						"name": "onChange",
+						"type": "(step: number) => void",
+						"required": false,
+						"doc": "Called with the new step's position when the tour moves."
+					},
+					{
+						"name": "onOpenChange",
+						"type": "(open: boolean) => void",
+						"required": false,
+						"doc": "Called with the new value when the tour opens or closes - including when Escape or a press outside closes it."
+					}
+				]
+			},
+			{
+				"part": "title",
+				"component": "TourTitle",
+				"doc": "The step's name. Mounting it is what names the card.",
+				"props": []
+			},
+			{
+				"part": "valuelabel",
+				"component": "TourValueLabel",
+				"doc": "Where the person is up to. Renders \"2 of 5\" unless you write your own text inside it.",
 				"props": []
 			}
 		]

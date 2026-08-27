@@ -1,0 +1,23 @@
+# MARKLESS_CAPTURE_UNSUPPORTED_VALUE
+
+Cannot capture local … in lazy symbol; Cannot check the captures of this lazy symbol
+
+- Package: compiler
+- Pass or phase: capture-analysis
+
+## Message
+
+Cannot capture "…" in lazy … symbol "…" because local … values cannot cross a resume boundary.
+
+Cannot emit lazy … symbol "…" because the compiler could not read its source, so the values it captures across the resume boundary are unknown.
+
+## Why
+
+Lazy symbols run after browser resume. Captures must be graph references, element handles, props/shared values, module imports, or serializable constants.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/capture-analysis.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

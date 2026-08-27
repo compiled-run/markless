@@ -143,6 +143,15 @@ export function assertProtocolStatePayload(
 		assertBooleanField(computed, 'async', context);
 		assertOptionalComputedDependencies(computed, context);
 		assertOptionalAsyncComputedSnapshot(computed, context);
+		if ('value' in computed) assertSerializedGraphPayload(computed.value, `${context}.value`);
+		// The live-value channel, as on cells: a served payload still carrying one
+		// is a host bug, not something the browser should try to read.
+		if ('directValue' in computed) {
+			throw invalidPayloadShapeError(
+				contextPayloadType(context),
+				`Invalid ${context}: live directValue computeds must be serialized before serving.`,
+			);
+		}
 	}
 
 	assertOptionalSharedDefinitions(payload);
@@ -450,6 +459,15 @@ function assertOptionalStringArrayField(
 	}
 }
 
+function assertArrayField(record: Record<string, unknown>, key: string, context: string): void {
+	if (!Array.isArray(record[key])) {
+		throw invalidPayloadShapeError(
+			contextPayloadType(context),
+			`Invalid ${context}: expected ${key} array.`,
+		);
+	}
+}
+
 function assertOptionalArrayField(
 	record: Record<string, unknown>,
 	key: string,
@@ -477,6 +495,7 @@ function assertOptionalKeyedRepeats(record: Record<string, unknown>): void {
 		assertRecordShape(repeat, context);
 		assertStringField(repeat, 'id', context);
 		assertStringField(repeat, 'parentHostNodeId', context);
+		assertOptionalStringField(repeat, 'ownerHostNodeId', context);
 		assertOptionalStringField(repeat, 'collectionGraphNodeId', context);
 		assertStringArrayField(repeat, 'collectionPath', context);
 		assertStringArrayField(repeat, 'keyPath', context);
@@ -488,7 +507,19 @@ function assertOptionalKeyedRepeats(record: Record<string, unknown>): void {
 		assertOptionalRowElementHandles(repeat, `${context}.rowElementHandles`);
 		assertOptionalEmptyArm(repeat, `${context}.emptyArm`);
 		assertOptionalRowTemplate(repeat, `${context}.rowTemplate`);
+		assertOptionalRowComponent(repeat, `${context}.rowComponent`);
 	}
+}
+
+function assertOptionalRowComponent(record: Record<string, unknown>, context: string): void {
+	const rowComponent = record.rowComponent;
+	if (rowComponent === undefined) return;
+	assertRecordShape(rowComponent, context);
+	assertStringField(rowComponent, 'componentEdgeId', context);
+	assertStringField(rowComponent, 'componentName', context);
+	assertOptionalStringField(rowComponent, 'itemPropName', context);
+	if (rowComponent.slotPath !== undefined)
+		assertNonNegativeIntegerArrayField(rowComponent, 'slotPath', context);
 }
 
 function assertOptionalRowTemplate(record: Record<string, unknown>, context: string): void {
@@ -496,18 +527,27 @@ function assertOptionalRowTemplate(record: Record<string, unknown>, context: str
 	if (template === undefined) return;
 	assertRecordShape(template, context);
 	assertStringField(template, 'html', context);
-	const textSlots = template.textSlots;
-	if (textSlots === undefined) return;
-	if (!Array.isArray(textSlots)) {
+	assertOptionalRowTemplateSlots(template.textSlots, `${context}.textSlots`);
+	assertOptionalRowTemplateSlots(template.attributeSlots, `${context}.attributeSlots`, true);
+}
+
+function assertOptionalRowTemplateSlots(
+	slots: unknown,
+	context: string,
+	named = false,
+): void {
+	if (slots === undefined) return;
+	if (!Array.isArray(slots)) {
 		throw invalidPayloadShapeError(
 			contextPayloadType(context),
-			`Invalid ${context}: expected textSlots array.`,
+			`Invalid ${context}: expected array.`,
 		);
 	}
-	for (const [index, slot] of textSlots.entries()) {
-		const slotContext = `${context}.textSlots[${index}]`;
+	for (const [index, slot] of slots.entries()) {
+		const slotContext = `${context}[${index}]`;
 		assertRecordShape(slot, slotContext);
 		assertNonNegativeIntegerArrayField(slot, 'path', slotContext);
+		if (named) assertStringField(slot, 'name', slotContext);
 		assertStringArrayField(slot, 'itemPath', slotContext);
 	}
 }
@@ -571,6 +611,7 @@ function assertOptionalBranches(record: Record<string, unknown>): void {
 		assertCommentAnchor(branch.endAnchor, `${context}.endAnchor`);
 		assertOptionalStringField(branch, 'symbolId', context);
 		assertOptionalGraphReads(branch, 'testReads', context);
+		assertOptionalGraphReads(branch, 'contentReads', context);
 		if (branch.armTests !== undefined && !Array.isArray(branch.armTests)) {
 			throw invalidPayloadShapeError(
 				contextPayloadType(context),
@@ -578,6 +619,43 @@ function assertOptionalBranches(record: Record<string, unknown>): void {
 			);
 		}
 		assertOptionalBranchArmRecords(branch, context);
+		assertOptionalServedArmRecords(branch, context);
+	}
+}
+
+// An escalating branch replaces its arm wholesale, so the record set it serves
+// must be arm-relative or the runtime would re-register against page indexes.
+function assertOptionalServedArmRecords(record: Record<string, unknown>, context: string): void {
+	if (record.servedArmRecords === undefined) return;
+	if (record.escalates !== true) {
+		throw invalidPayloadShapeError(
+			contextPayloadType(context),
+			`Invalid ${context}: servedArmRecords requires escalates.`,
+		);
+	}
+	const armContext = `${context}.servedArmRecords`;
+	assertRecordShape(record.servedArmRecords, armContext);
+	const arm = record.servedArmRecords as Record<string, unknown>;
+	assertArrayField(arm, 'events', armContext);
+	assertArrayField(arm, 'behaviors', armContext);
+	assertArrayField(arm, 'elementHandles', armContext);
+	assertOptionalArrayField(arm, 'domUpdates', armContext);
+	assertOptionalArrayField(arm, 'keyedRepeats', armContext);
+	assertOptionalArrayField(arm, 'branches', armContext);
+	assertArrayField(arm, 'locators', armContext);
+	for (const [index, locator] of (arm.locators as ReadonlyArray<unknown>).entries()) {
+		const locatorContext = `${armContext}.locators[${index}]`;
+		assertRecordShape(locator, locatorContext);
+		const entry = locator as Record<string, unknown>;
+		assertStringField(entry, 'hostNodeId', locatorContext);
+		assertStringField(entry, 'tagName', locatorContext);
+		if (entry.strategy !== 'arm-relative') {
+			throw invalidPayloadShapeError(
+				contextPayloadType(locatorContext),
+				`Invalid ${locatorContext}: expected arm-relative strategy.`,
+			);
+		}
+		assertNonNegativeIntegerField(entry, 'index', locatorContext);
 	}
 }
 
@@ -1197,6 +1275,11 @@ function assertSerializedSlot(value: unknown, context: string): void {
 		assertBigIntString(value.value, context);
 		return;
 	}
+	if (value.$type === 'number') {
+		assertStringField(value, 'value', context);
+		assertNonFiniteNumberName(value.value, context);
+		return;
+	}
 	if (value.$type === 'date' || value.$type === 'url') {
 		assertStringField(value, 'value', context);
 		if (value.$type === 'date') assertIsoDateString(value.value, context);
@@ -1235,6 +1318,15 @@ function assertBigIntString(value: unknown, context: string): void {
 	throw invalidPayloadShapeError(
 		contextPayloadType(context),
 		`Invalid ${context}: expected bigint string.`,
+	);
+}
+
+function assertNonFiniteNumberName(value: unknown, context: string): void {
+	if (value === 'Infinity' || value === '-Infinity' || value === 'NaN') return;
+
+	throw invalidPayloadShapeError(
+		contextPayloadType(context),
+		`Invalid ${context}: expected non-finite number name.`,
 	);
 }
 

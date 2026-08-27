@@ -22,7 +22,11 @@ const INSTALL_CALL = 'installMarklessSharedSeedPass();';
 const NO_WIDGET_SOURCE = `
 import { shared, state } from '@markless/core';
 
-export const zcTheme = shared(() => state({ tone: 'calm' }));
+export const zcTheme = shared(() => {
+	const theme = state({ tone: 'calm' });
+
+	return theme;
+});
 
 export function ZcBadge({ label }) @{
 	const theme = zcTheme();
@@ -86,11 +90,12 @@ async function renderDataSource(name: string, source: string): Promise<string> {
 	return renderData.source;
 }
 
-// Byte-identity, the same way `rolldown.test.ts` pins the resume emission: this
-// snapshot was taken before the gate was widened and is unchanged after it
-// (5,207 bytes on both sides, measured by emitting the same fixture from the
-// parent commit). A module that needs nothing from the pass pays nothing for it,
-// and any byte the gate ever starts adding here shows up as a snapshot diff.
+// Byte-identity, the same way `rolldown.test.ts` pins the resume emission: a
+// module that needs nothing from the pass pays nothing for it, and any byte the
+// gate ever starts adding here shows up as a snapshot diff. The snapshot was
+// re-taken when `MARKLESS_SHARED_RETURN_UNNAMED` forced the fixture's factory to
+// name its cell before returning it; the three assertions above it, not the byte
+// count, are what say the gate stayed off.
 test('a module that roots no widget keeps its render-data emission byte-identical', async () => {
 	const source = await renderDataSource('zeroCost', NO_WIDGET_SOURCE);
 
