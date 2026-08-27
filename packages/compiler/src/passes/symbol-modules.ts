@@ -1449,10 +1449,21 @@ function renderChunkParts(
 				} });
 				continue;
 			}
-			return refuse(`it holds a ${slot.kind} binding`);
+			return refuse(armSlotRefusalDetail(slot));
 		}
 	}
 	return parts;
+}
+
+// `el={handle}` alone leaves no slot behind and flips fine; what a flip cannot
+// answer is the id an IDREF elsewhere made the bound element carry, since that
+// id is minted per rendered widget and the arm module has no widget to ask.
+function armSlotRefusalDetail(slot: SemanticMarkupSlot): string {
+	if ('residue' in slot && slot.residue.kind === 'element-handle-id')
+		return 'an element() handle it binds is named by an IDREF, and that id is minted for the rendered widget, which a flip has no way to mint again';
+	if ('residue' in slot && slot.residue.kind === 'element-handle-id-list')
+		return 'an element() handle it binds is named by an IDREF list, and those ids are minted for the rendered widget, which a flip has no way to mint again';
+	return `it holds ${slot.kind === 'attribute' || slot.kind === 'async' ? 'an' : 'a'} ${slot.kind} binding`;
 }
 
 // One prop name to the value a flip rebuilds the child's markup with.
