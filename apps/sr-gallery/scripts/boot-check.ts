@@ -62,6 +62,9 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	// The drawing surface is one graphic and nothing inside it is a stop of its
 	// own: no keyboard draws freehand, so role="img" is the whole exposure.
 	ink: 'img',
+	// Each handle is one role="slider" carrying both axes in aria-valuetext, so
+	// the handles are what has to be in the tree.
+	pad: 'slider',
 	// The surface is hidden until the trigger is pressed, so the trigger is the
 	// part that has to be in the tree at rest.
 	menu: 'button',
@@ -99,6 +102,9 @@ const RENDERED_COUNT: Partial<Record<FamilyName, number>> = {
 	// The plain drawing and the signature pad: a count catches a section that
 	// rendered one surface and lost the other.
 	ink: 2,
+	// The one-handle pad plus the curve's two control points: a count catches a
+	// section that rendered the starter and lost the multi-handle repeat.
+	pad: 3,
 	// One card per step: a count catches a tour that rendered its first step and
 	// lost the rest, which is what a mis-rooted widget instance looks like here.
 	tour: 3,
@@ -406,6 +412,40 @@ async function main() {
 			failures.push("#ink's signature field is not required, so an empty pad would submit.");
 		} else {
 			console.log('#ink mounts the required field that submits the signature.');
+		}
+
+		// The role count above cannot see the two facts this family turns on: that
+		// a handle is announced with a replacement role word rather than as a plain
+		// slider, and that a form has something to submit.
+		const handles = page.locator('#pad [role="slider"]');
+		const spoken: string[] = [];
+		for (let index = 0; index < (await handles.count()); index++) {
+			const handle = handles.nth(index);
+			const described = await handle.getAttribute('aria-roledescription');
+			if (described !== '2D slider') {
+				failures.push(
+					`#pad handle ${index} reads aria-roledescription="${described}", not "2D slider".`,
+				);
+				continue;
+			}
+			const text = await handle.getAttribute('aria-valuetext');
+			if (text === null) {
+				failures.push(`#pad handle ${index} announces no aria-valuetext, so one axis is lost.`);
+				continue;
+			}
+			spoken.push(text);
+		}
+		if (spoken.length === (await handles.count())) {
+			console.log(`#pad serves handles announced as "2D slider": ${spoken.join(' / ')}`);
+		}
+
+		const offsetField = page.locator('#pad input[name="offset"]');
+		if ((await offsetField.count()) !== 1) {
+			failures.push(
+				'#pad mounts no single field named "offset", so no pad value can be submitted.',
+			);
+		} else {
+			console.log('#pad mounts the field that submits the handle\'s two numbers.');
 		}
 
 		// The role count above sees the cards and nothing else the tour needs: the

@@ -14,6 +14,7 @@ export * as ink from './ink/index.ts';
 export * as menu from './menu/index.ts';
 export * as modal from './modal/index.ts';
 export * as otp from './otp/index.ts';
+export * as pad from './pad/index.ts';
 export * as navbar from './navbar/index.ts';
 export * as numberbox from './numberbox/index.ts';
 export * as pagination from './pagination/index.ts';

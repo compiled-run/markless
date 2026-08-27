@@ -214,3 +214,37 @@ input {
 	border-radius: 0.35rem;
 	color: var(--ink);
 }
+
+/* The pad ships no dimensions: the field's size and the handle's look are the
+   consumer's, and the family places the handle from `--pad-x` / `--pad-y`. */
+.pad-plane {
+	display: block;
+	width: 200px;
+	height: 200px;
+	border: 1px solid var(--line);
+	border-radius: 0.35rem;
+	color: var(--ink);
+}
+
+.pad-handle {
+	width: 16px;
+	height: 16px;
+	translate: -50% 50%;
+	border: 1px solid var(--ink);
+	border-radius: 50%;
+	background: var(--paper);
+}
+
+.pad-grid {
+	background:
+		repeating-linear-gradient(to right, var(--line) 0 1px, transparent 1px 25%),
+		repeating-linear-gradient(to top, var(--line) 0 1px, transparent 1px 25%);
+}
+
+.pad-curve {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	pointer-events: none;
+}

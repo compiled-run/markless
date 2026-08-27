@@ -1982,6 +1982,146 @@
 			}
 		]
 	},
+	"pad": {
+		"parts": [
+			{
+				"part": "area",
+				"component": "PadArea",
+				"doc": "The field. It is a group rather than a control of its own: the handles inside\nit carry the values, and this owns the pointer gesture on their behalf so that\nN handles never overlap each other's hit testing.",
+				"props": []
+			},
+			{
+				"part": "description",
+				"component": "PadDescription",
+				"doc": "Supporting text. It reaches the area through `aria-describedby`.",
+				"props": []
+			},
+			{
+				"part": "error",
+				"component": "PadError",
+				"doc": "The validation message. It reaches the area before the description.",
+				"props": []
+			},
+			{
+				"part": "field",
+				"component": "PadField",
+				"doc": "One handle's value as a form field. Write one per handle, each under its own name.",
+				"props": [
+					{
+						"name": "value",
+						"type": "PadPoint",
+						"required": false,
+						"doc": "The handle this field submits. Omit it on a one-handle pad."
+					}
+				]
+			},
+			{
+				"part": "indicator",
+				"component": "PadIndicator",
+				"doc": "A grid, a crosshair or whatever else the field is drawn with. It carries no value.",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "PadLabel",
+				"doc": "Names the pad. `pad.area` and every `pad.thumb` point their labelling here.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "PadRoot",
+				"doc": "A two-dimensional value control - an XY pad. Cartesian only: there is no polar\nmode and no third axis, because ARIA exposes one value per control, so a third\naxis is a `slider` composed beside this rather than an axis inside it.\n\nThe label, the area, the handles, the readout and the form elements all go\ninside the root. Units are the value range, not pixels: an audio pad holds Hz\nand a pan/tilt pad holds degrees without rescaling in every callback.",
+				"props": [
+					{
+						"name": "value",
+						"type": "readonly PadPoint[]",
+						"required": false,
+						"doc": "The points. Passing this makes the pad controlled: a gesture reports\nthrough `onChange` and nothing moves until the new array comes back in.\nLeave it out and the pad keeps its own points."
+					},
+					{
+						"name": "defaultValue",
+						"type": "readonly PadPoint[]",
+						"required": false,
+						"default": "[]",
+						"doc": "The points an uncontrolled pad starts with."
+					},
+					{
+						"name": "minX",
+						"type": "number",
+						"required": false,
+						"default": "0",
+						"doc": "The low end of the x axis. Defaults to 0."
+					},
+					{
+						"name": "maxX",
+						"type": "number",
+						"required": false,
+						"default": "1",
+						"doc": "The high end of the x axis. Defaults to 1."
+					},
+					{
+						"name": "minY",
+						"type": "number",
+						"required": false,
+						"default": "0",
+						"doc": "The low end of the y axis. Defaults to 0."
+					},
+					{
+						"name": "maxY",
+						"type": "number",
+						"required": false,
+						"default": "1",
+						"doc": "The high end of the y axis. Defaults to 1."
+					},
+					{
+						"name": "step",
+						"type": "number",
+						"required": false,
+						"default": "0.01",
+						"doc": "How far one arrow key moves a handle, on both axes. Defaults to 0.01."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nothing can be moved, and every handle drops out of the tab order."
+					},
+					{
+						"name": "onChange",
+						"type": "(points: readonly PadPoint[]) => void",
+						"required": false,
+						"doc": "Called with every point once a move settles: the pointer released, or the key that moved it."
+					},
+					{
+						"name": "onDrag",
+						"type": "(points: readonly PadPoint[]) => void",
+						"required": false,
+						"doc": "Called with every point as a drag moves one, before it settles. The name\nshadows the DOM's own `ondrag`, which the root drops in exchange - a pad's\narea is not an HTML drag source, and `onChange` is dropped the same way."
+					}
+				]
+			},
+			{
+				"part": "thumb",
+				"component": "PadThumb",
+				"doc": "One handle, and one tab stop. `role=\"slider\"` with `aria-roledescription`\nrather than two axis elements: colorpicker can afford full-plane axis overlays\nbecause a colour plane has one thumb, and N of them would intercept each\nother's pointer events. What colorpicker measured is kept instead - both axes\nalways reachable, and the long-then-short value text - by reporting the axis\nthe last key moved and naming both axes whenever the axis changes.",
+				"props": [
+					{
+						"name": "value",
+						"type": "PadPoint",
+						"required": false,
+						"doc": "The point this handle draws. Omit it on a one-handle pad and it takes the first point."
+					}
+				]
+			},
+			{
+				"part": "valuelabel",
+				"component": "PadValueLabel",
+				"doc": "The focused handle's value as text, or the first handle's on a pad nobody has touched.",
+				"props": []
+			}
+		]
+	},
 	"pagination": {
 		"parts": [
 			{

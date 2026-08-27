@@ -17,6 +17,7 @@ import Modal from '../src/modal/scenarios/basic.tsrx';
 import Navbar from '../src/navbar/scenarios/basic.tsrx';
 import Numberbox from '../src/numberbox/scenarios/basic.tsrx';
 import Otp from '../src/otp/scenarios/basic.tsrx';
+import Pad from '../src/pad/scenarios/basic.tsrx';
 import Pagination from '../src/pagination/scenarios/basic.tsrx';
 import Popover from '../src/popover/scenarios/basic.tsrx';
 import Progress from '../src/progress/scenarios/basic.tsrx';
@@ -399,6 +400,22 @@ const descriptors: readonly FamilyDescriptor[] = [
 			'indicator-5',
 		],
 		rootAria: { role: null },
+		supportsDisabled: true,
+	},
+	{
+		family: 'pad',
+		mount: { CSR: () => render(Pad), SSR: () => renderSSR(Pad) },
+		root: 'root',
+		parts: ['root', 'label', 'description', 'area', 'indicator', 'thumb', 'valuelabel', 'field'],
+		rootAria: { role: null },
+		// No openCycle: the field is a role="group" that is always on the page, so
+		// the battery's click-a-trigger cycle has nothing of the family's own to
+		// click. Every handle is its own tab stop and nothing roves - that is how a
+		// second control point is reached. The keys, the gesture and the two-axis
+		// announcement live in src/pad/pad.browser.ts.
+		// The readout's text is what a consumer styles against, so it stays
+		// key-value; every other mark this family writes is a presence attribute.
+		valuedAttributes: ['ui-value'],
 		supportsDisabled: true,
 	},
 	{

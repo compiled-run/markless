@@ -38,6 +38,7 @@
 		"./menu": "./src/menu/index.ts",
 		"./modal": "./src/modal/index.ts",
 		"./otp": "./src/otp/index.ts",
+		"./pad": "./src/pad/index.ts",
 		"./navbar": "./src/navbar/index.ts",
 		"./numberbox": "./src/numberbox/index.ts",
 		"./pagination": "./src/pagination/index.ts",
