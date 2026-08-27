@@ -1,9 +1,7 @@
-// Two measured walls shape this file. Every computed carries a name unique to the
+// One measured wall shapes this file. Every computed carries a name unique to the
 // whole module and reads its cells into locals before calling anything: two parts
 // sharing a computed name resolve to one symbol, and a cell read nested inside a
-// call has no name to lower to. And no shared() method reads a computed declared
-// beside it — on a served page that read comes back empty and the write built on
-// it is silently wrong — so every method rebuilds the drawing from its cells.
+// call has no name to lower to.
 
 import { computed, element, shared, state } from '@markless/core';
 import VisuallyHidden from '../base/visually-hidden.tsrx';
@@ -176,10 +174,7 @@ export const inkState = shared(
 				pad.pointerId = -1;
 				if (drawn === '') return;
 
-				const given = pad.given;
-				const own = pad.strokes;
-				const seed = pad.seed;
-				const before = heldPaths(given, own, seed);
+				const before = paths;
 				const next = before.concat(drawn);
 				pad.undone = [];
 				pad.strokes = next;
@@ -201,10 +196,7 @@ export const inkState = shared(
 				const locked = pad.readonly;
 				if (off || locked) return;
 
-				const given = pad.given;
-				const own = pad.strokes;
-				const seed = pad.seed;
-				const before = given !== undefined ? given : own !== null ? own : seed;
+				const before = paths;
 				if (before.length === 0) return;
 
 				const stack = pad.undone;
@@ -222,10 +214,7 @@ export const inkState = shared(
 				const lifted = pad.undone;
 				if (lifted.length === 0) return;
 
-				const given = pad.given;
-				const own = pad.strokes;
-				const seed = pad.seed;
-				const before = given !== undefined ? given : own !== null ? own : seed;
+				const before = paths;
 				pad.undone = lifted.slice(0, lifted.length - 1);
 				pad.strokes = before.concat(lifted.slice(lifted.length - 1));
 				pad.onChange?.(before.concat(lifted.slice(lifted.length - 1)));
@@ -237,10 +226,7 @@ export const inkState = shared(
 				const locked = pad.readonly;
 				if (off || locked) return;
 
-				const given = pad.given;
-				const own = pad.strokes;
-				const seed = pad.seed;
-				const before = given !== undefined ? given : own !== null ? own : seed;
+				const before = paths;
 				const wasDrawing = pad.drawing;
 				if (before.length === 0 && wasDrawing !== true) return;
 
@@ -255,10 +241,7 @@ export const inkState = shared(
 			/** The drawing as a standalone SVG document, in the area's own pixel coordinates. */
 			toSvg(): string {
 				const surface = areaEl;
-				const given = pad.given;
-				const own = pad.strokes;
-				const seed = pad.seed;
-				const drawn = heldPaths(given, own, seed);
+				const drawn = paths;
 				if (!surface) return svgDocument(drawn, 0, 0, 'currentColor');
 
 				const box = surface.getBoundingClientRect();
@@ -269,10 +252,7 @@ export const inkState = shared(
 			/** The drawing rasterised through a canvas. `image/png` unless asked otherwise. */
 			toDataUrl(type: string, quality: number | undefined): Promise<string> {
 				const surface = areaEl;
-				const given = pad.given;
-				const own = pad.strokes;
-				const seed = pad.seed;
-				const drawn = heldPaths(given, own, seed);
+				const drawn = paths;
 				if (!surface) return Promise.reject(new Error('The ink area is not on the page.'));
 
 				const box = surface.getBoundingClientRect();
