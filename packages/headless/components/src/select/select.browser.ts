@@ -359,11 +359,9 @@ test('CSR: ArrowUp opens the popup and lands on the last option', async () => {
 });
 
 // Enter and Space reach the popup through the button's own activation, because
-// preventDefault() from a deferred handler cannot suppress the native click.
-// PINNED: the keydown handler asks for the landing, but the popup is opened by the
-// button's own click one dispatch later, so the option still has no box when the
-// ask happens and the refused focus is not carried across into that later dispatch.
-test.fails('CSR: Enter and Space open the popup and land on the first option', async () => {
+// preventDefault() from a deferred handler cannot suppress the native click. The
+// landing is therefore asked for from that click, which is the dispatch that opens.
+test('CSR: Enter and Space open the popup and land on the first option', async () => {
 	await render(Basic);
 	await openWith('{Enter}');
 	await expect.poll(async () => await focused()).toBe(el(Apple));

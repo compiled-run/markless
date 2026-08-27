@@ -126,7 +126,12 @@ export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectT
 		ui-open={select.open}
 		ui-closed={select.open !== true}
 		onClick={(event) => {
-			select.setOpen(select.open !== true);
+			const isOpening = select.open !== true;
+			select.setOpen(isOpening);
+			// A click synthesised from Enter or Space carries no click count, and this is the dispatch that opens: asked for from the keydown before it, the landing would want a box the listbox does not have yet.
+			if (isOpening && event.detail === 0 && select.disabled !== true) {
+				focusOpeningOption(select.optionEls, select.optionLabelEls, '', false);
+			}
 			onClick?.(event);
 		}}
 		onKeydown={(event) => {
@@ -143,14 +148,10 @@ export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectT
 			const key = event.key;
 			const isOpenAtFirstKey = key === 'ArrowDown' || key === 'Home';
 			const isOpenAtLastKey = key === 'ArrowUp' || key === 'End';
-			// Enter and Space stay the button's own activation: a lazy handler's preventDefault lands after the native dispatch, so also opening here would toggle straight back shut.
-			const isActivationKey = key === 'Enter' || key === ' ';
+			// Enter and Space stay the button's own activation - a lazy handler's preventDefault lands after the native dispatch, so also opening here would toggle straight back shut - and the click they synthesise carries the landing.
 			const isTypeaheadChar = key.length === 1 && key !== ' ';
 
-			if (
-				!select.disabled &&
-				(isOpenAtFirstKey || isOpenAtLastKey || isActivationKey || isTypeaheadChar)
-			) {
+			if (!select.disabled && (isOpenAtFirstKey || isOpenAtLastKey || isTypeaheadChar)) {
 				const now = Date.now();
 				const isSearchStale = now - select.searchAt > TYPEAHEAD_WINDOW;
 				const search = isTypeaheadChar
@@ -161,7 +162,7 @@ export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectT
 					select.search = search;
 					select.searchAt = now;
 				}
-				if (!isActivationKey) select.setOpen(true);
+				select.setOpen(true);
 
 				// Alt+ArrowDown opens the popup and leaves focus on the combobox.
 				if (!event.altKey) {
