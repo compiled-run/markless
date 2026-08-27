@@ -1,5 +1,6 @@
-import { element, shared, state } from '@markless/core';
+import { computed, element, shared, state } from '@markless/core';
 import VisuallyHidden from '../base/visually-hidden.tsrx';
+import { toolbarState } from '../toolbar/toolbar.tsrx';
 import type {
 	ToggleDescriptionProps,
 	ToggleErrorProps,
@@ -64,12 +65,21 @@ export function ToggleRoot({
 	<div {...rest} ui-checked={toggle.checked} ui-disabled={toggle.disabled}>{children}</div>
 }
 
+// The switch mixes into a toolbar here rather than at the root, because a
+// toolbar's roster holds focusable elements and `toggle.root` renders a div: the
+// trigger is the switch's focusable element. Outside every toolbar the read
+// resolves to no bar instance, so `mounted` is the seed and nothing changes.
 export function ToggleTrigger({ children, onClick, ...rest }: ToggleTriggerProps) @{
 	const toggle = toggleState();
+	const toolbar = toolbarState();
+	// Read once, off a cell no bar writes twice: in a toolbar the bar owns the
+	// roving stop and writes it from its own handlers.
+	const stop = computed(() => (toolbar.mounted === true ? -1 : undefined));
 
 	<button
 		{...rest}
-		el={toggle.triggerEl}
+		el={[toggle.triggerEl, toolbar.itemEls]}
+		tabindex={stop}
 		type="button"
 		role="switch"
 		aria-labelledby={toggle.labelEl}

@@ -1,5 +1,6 @@
 import { computed, element, shared, state } from '@markless/core';
 import VisuallyHidden from '../base/visually-hidden.tsrx';
+import { toolbarState } from '../toolbar/toolbar.tsrx';
 import {
 	commitFocusedOption,
 	focusMatchingOption,
@@ -113,10 +114,16 @@ export function SelectLabel({ children, ...rest }: SelectLabelProps) @{
 
 export function SelectTrigger({ children, onClick, onKeydown, ...rest }: SelectTriggerProps) @{
 	const select = selectState();
+	// Mixed into an enclosing toolbar: the trigger registers as one of the bar's
+	// stops and hands its tabindex over. Outside every toolbar this resolves to no
+	// bar instance, so `mounted` is the seed and nothing changes.
+	const toolbar = toolbarState();
+	const stop = computed(() => (toolbar.mounted === true ? -1 : undefined));
 
 	<button
 		{...rest}
-		el={select.triggerEl}
+		el={[select.triggerEl, toolbar.itemEls]}
+		tabindex={stop}
 		type="button"
 		aria-haspopup="listbox"
 		aria-expanded={select.open ? 'true' : 'false'}

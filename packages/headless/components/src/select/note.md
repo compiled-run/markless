@@ -77,6 +77,10 @@ Bits. The compiler settles it outright:
 one row of a live collection. So the activedescendant model is not expressible
 today and roving is the only model this family could ship.
 
+Inside a `toolbar.root` the trigger registers as one of the bar's stops and hands
+its tabindex to the bar, while keeping its own keyboard: ArrowDown still opens the
+listbox, so a vertical bar must put the select last (`toolbar/note.md`).
+
 ## The `displayValue` claim, measured — and disproved
 
 Research §7 predicted that because the popup is never unmounted, the option list
