@@ -28,6 +28,7 @@ import {
 	sharedDefinitionCycleDiagnostic,
 	unboundCallbackSlotDiagnostic,
 	unboundSharedCallDiagnostic,
+	unnamedSharedReturnDiagnostic,
 } from './diagnostics.ts';
 import { collectComputedBinding } from './collect-state.ts';
 import { collectExpressionReads } from './collect-expressions.ts';
@@ -659,6 +660,7 @@ export function collectSharedFactoryGraph(
 			state,
 		});
 		state.currentSharedDefinitionId = previousSharedDefinitionId;
+		reportUnnamedSharedReturn({ factory: declaration.factory, definition, state });
 		if (returnProperties.length === 0) continue;
 
 		const index = state.graph.sharedDefinitions.findIndex((item) => item.id === definition.id);
@@ -1041,12 +1043,25 @@ function collectSharedReturnProperties(input: {
 
 	const properties: SemanticSharedReturnProperty[] = [];
 	for (const returned of returns) {
-		if (returned.type !== 'ObjectExpression') continue;
+		if (returned.type === 'ObjectExpression') {
+			properties.push(
+				...collectReturnedObjectProperties({
+					node: returned,
+					definitionId: input.definitionId,
+					state: input.state,
+				}),
+			);
+			continue;
+		}
 
+		// A factory's return IS its cell set. `return s` names the same nodes
+		// `return { ...s }` does, so it expands through the same keys.
 		properties.push(
-			...collectReturnedObjectProperties({
+			...graphPathReturnProperties({
 				node: returned,
-				definitionId: input.definitionId,
+				source: expressionSource(returned, input.state.source),
+				bindings: graphBindingMap(input.state.graph, input.definitionId),
+				aliases: semanticAliasMap(input.state.graph, input.definitionId),
 				state: input.state,
 			}),
 		);
@@ -1055,10 +1070,37 @@ function collectSharedReturnProperties(input: {
 	return properties;
 }
 
+/**
+ * The one return shape a factory's cell set cannot take. Every other shape —
+ * the state object by name, a wrapper spreading it, an inline `computed()` under
+ * a property key — reaches a node named by authored text; `return state({…})`
+ * reaches none, and used to compile to an attribute residue reading an unbound
+ * local that threw at render.
+ */
+function reportUnnamedSharedReturn(input: {
+	readonly factory: AnyNode | undefined;
+	readonly definition: SemanticSharedDefinition;
+	readonly state: WalkState;
+}): void {
+	for (const returned of sharedReturnExpressions(input.factory)) {
+		const apiName = getFrameworkApiForCall(returned, input.state.frameworkApiImports);
+		if (apiName !== 'state' && apiName !== 'computed') continue;
+
+		input.state.graph.diagnostics.push(
+			unnamedSharedReturnDiagnostic({
+				definitionName: input.definition.name,
+				apiName,
+				span: sourceSpan(returned, input.state.filename),
+			}),
+		);
+	}
+}
+
 function sharedReturnExpressions(factory: AnyNode | undefined): AnyNode[] {
 	const body = factory?.body as AnyNode | undefined;
 	if (!body) return [];
-	if (body.type === 'ObjectExpression') return [body];
+	// A concise arrow body IS the return; only a block body carries statements.
+	if (body.type !== 'BlockStatement') return [body];
 
 	const returns: AnyNode[] = [];
 	walkFactoryBody(body, (node) => {
@@ -1175,8 +1217,28 @@ function spreadReturnProperties(input: {
 	readonly state: WalkState;
 }): SemanticSharedReturnProperty[] {
 	const argument = input.node.argument as AnyNode | undefined;
-	const source = argument ? expressionSource(argument, input.state.source) : '';
-	const resolved = resolveGraphPath(source, input.bindings, input.aliases);
+	return graphPathReturnProperties({
+		node: input.node,
+		source: argument ? expressionSource(argument, input.state.source) : '',
+		bindings: input.bindings,
+		aliases: input.aliases,
+		state: input.state,
+	});
+}
+
+/**
+ * One returned graph object expanded into one property per key. `source` is the
+ * path text to resolve, `node` the span the properties are attributed to — they
+ * differ for a spread, whose text is `...s` but whose path is `s`.
+ */
+function graphPathReturnProperties(input: {
+	readonly node: AnyNode;
+	readonly source: string;
+	readonly bindings: ReadonlyMap<string, SemanticGraphBinding>;
+	readonly aliases: ReturnType<typeof semanticAliasMap>;
+	readonly state: WalkState;
+}): SemanticSharedReturnProperty[] {
+	const resolved = resolveGraphPath(input.source, input.bindings, input.aliases);
 	if (!resolved) return [];
 
 	const keys = graphObjectReturnKeys(resolved.binding);
