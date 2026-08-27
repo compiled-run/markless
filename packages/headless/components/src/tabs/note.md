@@ -37,13 +37,10 @@ in `index.ts`: it is a workaround, not consumer surface.
    Repo convention (owner ruling 2026-08-18 on attributes); scroll-area and
    radio-group already spell it this way, and CSS reads `[ui-vertical]` either
    way. Only the non-default axis carries a flag, as in radio-group.
-4. **`aria-orientation` on the list.** QDS emits only `ui-orientation`, which no
-   assistive technology reads; the APG requires the ARIA attribute. Emitted in
-   both directions rather than only for vertical, matching radio-group.
-5. **`{...rest}` is spread first.** QDS spreads `{...props}` last on the trigger
+4. **`{...rest}` is spread first.** QDS spreads `{...props}` last on the trigger
    and the content, after `aria-selected` and `tabIndex`, so a consumer silently
    overwrites the ARIA state. Pinned by `consumer-attributes.tsrx`.
-6. **No handler arrays.** QDS composes with `onClick$={[a, b]}`; each handler
+5. **No handler arrays.** QDS composes with `onClick$={[a, b]}`; each handler
    here is an authored closure that calls the family's rule and then the
    consumer's.
 

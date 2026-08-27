@@ -30,7 +30,7 @@ export function createDomUpdateEntry(input: DomUpdateEntryInput): DomJournalEntr
 			type: 'setAttr',
 			locator: input.locator,
 			name: 'class',
-			value: conditionalTargetValue(input.target, input.value),
+			value: classTargetValue(input.target, input.value),
 		};
 	}
 
@@ -59,6 +59,17 @@ function textTargetValue(
 	if (target.prefix === undefined && target.suffix === undefined) return mapped;
 
 	return `${target.prefix ?? ''}${mapped == null ? '' : String(mapped)}${target.suffix ?? ''}`;
+}
+
+// A class write replaces the whole attribute, so the module's style scope has to
+// be composed back in or the first update strips every scoped rule off the element.
+function classTargetValue(
+	target: Extract<DomUpdateEntryInput['target'], { readonly kind: 'class' }>,
+	value: unknown,
+): unknown {
+	const mapped = conditionalTargetValue(target, value);
+	if (target.constantClass === undefined) return mapped;
+	return mapped ? `${mapped} ${target.constantClass}` : target.constantClass;
 }
 
 function conditionalTargetValue(
