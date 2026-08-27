@@ -802,10 +802,12 @@ function expressionResidue(
 	const resolved = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(source)
 		? // Component scope only: a factory local and a component's shared-instance
 			// local routinely share a name, and the instance is what markup names.
+			// The declaring component narrows it further: two sibling parts may each
+			// declare the same local, and a module-wide map keeps only the last.
 			(resolveGraphPath(
 				source,
-				graphBindingMap(context.graph, null),
-				semanticAliasMap(context.graph, null),
+				graphBindingMap(context.graph, null, componentName),
+				semanticAliasMap(context.graph, null, componentName),
 			) ?? resolveSharedInstanceGraphPath(source, context.graph, componentName))
 		: null;
 	if (resolved) {

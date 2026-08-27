@@ -5,7 +5,7 @@ import { componentOwnedStateNodes } from '../src/passes/public-render/shared.ts'
 
 const filename = 'src/Accordion.tsrx';
 
-// Three components spelling one computed id, the accordion Item/Trigger/Content shape.
+// Three components declaring one computed name, the accordion Item/Trigger/Content shape.
 const source = `
 import { computed, state } from '@markless/core';
 
@@ -57,13 +57,13 @@ function computedOwners(input: PublicRenderModuleInput): Record<string, Readonly
 	);
 }
 
-test('same-module components spelling one computed id each own their own record', async () => {
+test('same-module components declaring one computed name each own their own record', async () => {
 	const input = await accordionRenderInput();
 
 	expect(input.protocolState.computed.map((computed) => computed.graphNodeId)).toEqual([
-		'computed:isOpen',
-		'computed:isOpen',
-		'computed:isOpen',
+		'computed:AccordionItem.isOpen',
+		'computed:AccordionTrigger.isOpen',
+		'computed:AccordionContent.isOpen',
 	]);
 	expect(computedOwners(input)).toEqual({
 		AccordionItem: [0],
@@ -80,7 +80,7 @@ test('a cell spelling a shared computed id does not steal the computed records',
 	const input = await accordionRenderInput();
 	const servedComputedCell = {
 		...input.protocolState.cells[0]!,
-		graphNodeId: 'computed:isOpen',
+		graphNodeId: 'computed:AccordionItem.isOpen',
 		name: 'isOpen',
 	};
 	const spliced: PublicRenderModuleInput = {

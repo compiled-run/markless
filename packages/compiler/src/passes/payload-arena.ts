@@ -6,6 +6,7 @@ import type {
 	PayloadKeyedRepeat,
 	SemanticComponentPropBinding,
 	SemanticGraphBinding,
+	SemanticTemplateRead,
 } from '../artifacts.ts';
 import {
 	graphBindingMap,
@@ -34,8 +35,10 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 	const bindings = new Map<string, SemanticGraphBinding>();
 	const bindingsById = new Map<string, SemanticGraphBinding>();
 	const aliases = semanticAliasMap(input.semanticGraph);
-	const componentBindings = graphBindingMap(input.semanticGraph, null);
-	const componentAliases = semanticAliasMap(input.semanticGraph, null);
+	const moduleScopeBindings = {
+		bindings: graphBindingMap(input.semanticGraph, null),
+		aliases: semanticAliasMap(input.semanticGraph, null),
+	};
 	// The component a host element belongs to. Its chunk is the only record of
 	// which component body a hostNodeId-keyed read was authored in.
 	const componentByHostNodeId = new Map<string, string>(
@@ -43,6 +46,23 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			chunk.hosts.map((host) => [host.hostNodeId, chunk.componentName] as const),
 		),
 	);
+	const readScopeOf = componentGraphScopes(input.semanticGraph, moduleScopeBindings, null);
+	// Component scope only: a factory local and the instance local markup names
+	// routinely collide, and two sibling parts may each declare the same local, so
+	// a module-wide map answers with whichever came last (defect 46). The reading
+	// component is the read's own when it carries one, else the one that renders
+	// the host it is bound to.
+	const resolveTemplateRead = (read: SemanticTemplateRead) => {
+		const scope = readScopeOf(read.componentName ?? componentByHostNodeId.get(read.hostNodeId));
+		return (
+			resolveGraphPath(read.source, scope.bindings, scope.aliases) ??
+			resolveSharedInstanceGraphPath(
+				read.source,
+				input.semanticGraph,
+				componentByHostNodeId.get(read.hostNodeId),
+			)
+		);
+	};
 
 	for (const binding of input.semanticGraph.graphBindings) {
 		bindings.set(binding.name, binding);
@@ -173,17 +193,7 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 			];
 		}
 
-		// Component scope only: a factory local and the instance local markup names
-		// routinely collide. A template read carries no component of its own, so the
-		// reading component is the one that renders the host it is bound to; without
-		// it a read resolves to a sibling component's same-named local (defect 46).
-		const resolved =
-			resolveGraphPath(read.source, componentBindings, componentAliases) ??
-			resolveSharedInstanceGraphPath(
-				read.source,
-				input.semanticGraph,
-				componentByHostNodeId.get(read.hostNodeId),
-			);
+		const resolved = resolveTemplateRead(read);
 		if (!resolved) return [];
 
 		return [
@@ -201,13 +211,7 @@ export function planPayloadArena(input: PayloadArenaInput): PayloadArenaArtifact
 		const entry = { branchSiteId: read.armScopeBranchSiteId, source: read.source };
 		if (read.computedGraphNodeId)
 			return [{ ...entry, graphNodeId: read.computedGraphNodeId, path: [] }];
-		const resolved =
-			resolveGraphPath(read.source, componentBindings, componentAliases) ??
-			resolveSharedInstanceGraphPath(
-				read.source,
-				input.semanticGraph,
-				componentByHostNodeId.get(read.hostNodeId),
-			);
+		const resolved = resolveTemplateRead(read);
 		if (!resolved) return [];
 		return [
 			{
@@ -347,6 +351,7 @@ type ComponentGraphScope = {
 function componentGraphScopes(
 	graph: PayloadArenaInput['semanticGraph'],
 	moduleWide: ComponentGraphScope,
+	sharedDefinitionId?: string | null,
 ): (componentName: string | undefined) => ComponentGraphScope {
 	const cache = new Map<string, ComponentGraphScope>();
 
@@ -356,8 +361,8 @@ function componentGraphScopes(
 		if (cached) return cached;
 
 		const scope = {
-			bindings: graphBindingMap(graph, undefined, componentName),
-			aliases: semanticAliasMap(graph, undefined, componentName),
+			bindings: graphBindingMap(graph, sharedDefinitionId, componentName),
+			aliases: semanticAliasMap(graph, sharedDefinitionId, componentName),
 		};
 		cache.set(componentName, scope);
 		return scope;

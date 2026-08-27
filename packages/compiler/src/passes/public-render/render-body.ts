@@ -15,6 +15,22 @@ import type { PublicRenderRoot } from './types.ts';
 type GraphBinding = PublicRenderModuleInput['semanticGraph']['graphBindings'][number];
 const loweredFrameworkCalls = new Set(['computed', 'element', 'handler', 'storage']);
 
+// Same-named cells in sibling parts are distinct bindings, so a rendering
+// component only ever sees its own declaration plus the module-scope ones.
+function componentBindingMap(
+	input: PublicRenderModuleInput,
+	kind: GraphBinding['kind'],
+	componentName: string,
+): Map<string, GraphBinding> {
+	const bindings = new Map<string, GraphBinding>();
+	for (const binding of input.semanticGraph.graphBindings) {
+		if (binding.kind !== kind) continue;
+		if (binding.componentName !== undefined && binding.componentName !== componentName) continue;
+		bindings.set(binding.name, binding);
+	}
+	return bindings;
+}
+
 export function renderBodyLines(
 	input: PublicRenderModuleInput,
 	rootInfo: PublicRenderRoot,
@@ -27,16 +43,8 @@ export function renderBodyLines(
 	const body = rootInfo.component.body as AnyNode | undefined;
 	if (!body) return indentLines(rootLines);
 
-	const stateBindings = new Map<string, GraphBinding>(
-		input.semanticGraph.graphBindings.flatMap((binding) =>
-			binding.kind === 'state' ? [[binding.name, binding]] : [],
-		),
-	);
-	const computedBindings = new Map<string, GraphBinding>(
-		input.semanticGraph.graphBindings.flatMap((binding) =>
-			binding.kind === 'computed' ? [[binding.name, binding]] : [],
-		),
-	);
+	const stateBindings = componentBindingMap(input, 'state', rootInfo.componentName);
+	const computedBindings = componentBindingMap(input, 'computed', rootInfo.componentName);
 	const sharedInstanceNames = sharedInstanceLocalNames(input.semanticGraph, rootInfo.componentName);
 	const lines: string[] = [];
 	let emittedRoot = false;
@@ -420,16 +428,8 @@ export function renderValuePreludeLines(
 ): string[] {
 	const body = rootInfo.component.body as AnyNode | undefined;
 	if (!body) return [];
-	const stateBindings = new Map(
-		input.semanticGraph.graphBindings.flatMap((binding) =>
-			binding.kind === 'state' ? [[binding.name, binding] as const] : [],
-		),
-	);
-	const computedBindings = new Map(
-		input.semanticGraph.graphBindings.flatMap((binding) =>
-			binding.kind === 'computed' ? [[binding.name, binding] as const] : [],
-		),
-	);
+	const stateBindings = componentBindingMap(input, 'state', rootInfo.componentName);
+	const computedBindings = componentBindingMap(input, 'computed', rootInfo.componentName);
 	const sharedInstanceNames = sharedInstanceLocalNames(input.semanticGraph, rootInfo.componentName);
 	const statements = childNodes(body).filter((statement) => {
 		if (isIgnorableTextNode(statement)) return false;

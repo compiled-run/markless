@@ -3,10 +3,10 @@ import { bindingOf, compileModule, dependencyEdges, errorCodes } from './support
 
 /**
  * Two parts in one module may each declare `state`, `element()` and `computed()`
- * under the same local name. The graph node id is a serialized wire key minted
- * from the local name alone, so both parts mint `state:s` and `computed:label`.
- * Everything that consumes the id must therefore ask which component declared
- * the binding; matching on the id alone cross-wires the two parts.
+ * under the same local name. Such a name mints `kind:Component.name`, so the two
+ * parts carry two distinct wire keys, and every consumer of the id resolves the
+ * name against the component that declared it; a module-wide lookup would keep
+ * only whichever part came last and cross-wire the two.
  */
 
 const SIBLINGS = `
@@ -36,19 +36,23 @@ test('each sibling derive keeps only the cells its own body reads', async () => 
 	const compiled = await compileModule('src/Siblings.tsrx', SIBLINGS);
 
 	expect(errorCodes(compiled)).toEqual([]);
-	expect(dependencyEdges(bindingOf(compiled, 'Reader', 'label'))).toEqual(['state:s:tick']);
-	expect(dependencyEdges(bindingOf(compiled, 'Writer', 'label'))).toEqual(['state:s:beat']);
+	expect(dependencyEdges(bindingOf(compiled, 'Reader', 'label'))).toEqual([
+		'state:Reader.s:tick',
+	]);
+	expect(dependencyEdges(bindingOf(compiled, 'Writer', 'label'))).toEqual([
+		'state:Writer.s:beat',
+	]);
 });
 
-test('the colliding ids themselves are left alone', async () => {
+test('each declaring component mints its own id for the shared local name', async () => {
 	const compiled = await compileModule('src/Siblings.tsrx', SIBLINGS);
 
-	expect(bindingOf(compiled, 'Reader', 's')?.id).toBe('state:s');
-	expect(bindingOf(compiled, 'Writer', 's')?.id).toBe('state:s');
-	expect(bindingOf(compiled, 'Reader', 'label')?.id).toBe('computed:label');
-	expect(bindingOf(compiled, 'Writer', 'label')?.id).toBe('computed:label');
-	expect(bindingOf(compiled, 'Reader', 'boxEl')?.id).toBe('element:boxEl');
-	expect(bindingOf(compiled, 'Writer', 'boxEl')?.id).toBe('element:boxEl');
+	expect(bindingOf(compiled, 'Reader', 's')?.id).toBe('state:Reader.s');
+	expect(bindingOf(compiled, 'Writer', 's')?.id).toBe('state:Writer.s');
+	expect(bindingOf(compiled, 'Reader', 'label')?.id).toBe('computed:Reader.label');
+	expect(bindingOf(compiled, 'Writer', 'label')?.id).toBe('computed:Writer.label');
+	expect(bindingOf(compiled, 'Reader', 'boxEl')?.id).toBe('element:Reader.boxEl');
+	expect(bindingOf(compiled, 'Writer', 'boxEl')?.id).toBe('element:Writer.boxEl');
 });
 
 test('a derive still collects every cell its own body reads', async () => {
@@ -75,11 +79,13 @@ export default function Large() @{
 
 	expect(errorCodes(compiled)).toEqual([]);
 	expect(dependencyEdges(bindingOf(compiled, 'Large', 'label'))).toEqual([
-		'state:s:first',
-		'state:s:second',
-		'state:s:third',
+		'state:Large.s:first',
+		'state:Large.s:second',
+		'state:Large.s:third',
 	]);
-	expect(dependencyEdges(bindingOf(compiled, 'Small', 'label'))).toEqual(['state:s:tick']);
+	expect(dependencyEdges(bindingOf(compiled, 'Small', 'label'))).toEqual([
+		'state:Small.s:tick',
+	]);
 });
 
 test('a shared-factory cell still reaches the sibling derives that read it', async () => {
@@ -117,11 +123,11 @@ export default function Writer() @{
 	expect(errorCodes(compiled)).toEqual([]);
 	expect(dependencyEdges(bindingOf(compiled, 'Reader', 'label'))).toEqual([
 		'shared:src/Widget.tsrx#widget/state:w:theme',
-		'state:s:tick',
+		'state:Reader.s:tick',
 	]);
 	expect(dependencyEdges(bindingOf(compiled, 'Writer', 'label'))).toEqual([
 		'shared:src/Widget.tsrx#widget/state:w:theme',
-		'state:s:beat',
+		'state:Writer.s:beat',
 	]);
 });
 
@@ -149,7 +155,13 @@ export default function Writer() @{
 	);
 
 	expect(errorCodes(compiled)).toEqual([]);
-	expect(dependencyEdges(bindingOf(compiled, 'Reader', 'shout'))).toEqual(['computed:label:']);
-	expect(dependencyEdges(bindingOf(compiled, 'Writer', 'label'))).toEqual(['state:s:beat']);
-	expect(dependencyEdges(bindingOf(compiled, 'Reader', 'label'))).toEqual(['state:s:tick']);
+	expect(dependencyEdges(bindingOf(compiled, 'Reader', 'shout'))).toEqual([
+		'computed:Reader.label:',
+	]);
+	expect(dependencyEdges(bindingOf(compiled, 'Writer', 'label'))).toEqual([
+		'state:Writer.s:beat',
+	]);
+	expect(dependencyEdges(bindingOf(compiled, 'Reader', 'label'))).toEqual([
+		'state:Reader.s:tick',
+	]);
 });
