@@ -1,5 +1,6 @@
 import type { RuntimeGraph } from '@markless/runtime';
 import { installComposedArmRecordQualifier } from '../resume-arm-records.ts';
+import { marklessSettled, type Awaitable } from '../ssr-data/awaitable.ts';
 import type {
 	ResumeArmBranchRecord,
 	ResumeArmRecordSet,
@@ -640,22 +641,31 @@ export function marklessEnclosingWidgetRoots(
 	return roots;
 }
 
-export async function marklessWithEnclosingWidgetRoots<T>(
+export function marklessWithEnclosingWidgetRoots<T>(
 	rowSegment: string,
 	roots: ReadonlyMap<string, string> | undefined,
-	render: () => Promise<T>,
-): Promise<T> {
+	render: () => Awaitable<T>,
+): Awaitable<T> {
 	if (!roots?.size) return render();
 	const heldSegment = enclosingWidgetScope.rowSegment,
 		heldRoots = enclosingWidgetScope.roots;
 	enclosingWidgetScope.rowSegment = rowSegment;
 	enclosingWidgetScope.roots = roots;
-	try {
-		return await render();
-	} finally {
+	const release = () => {
 		enclosingWidgetScope.rowSegment = heldSegment;
 		enclosingWidgetScope.roots = heldRoots;
+	};
+	let answered: Awaitable<T>;
+	// The synchronous prologue of a render that never returns is the one edge
+	// marklessSettled cannot see, and leaving the roots installed there would
+	// hand them to whatever renders next.
+	try {
+		answered = render();
+	} catch (error) {
+		release();
+		throw error;
 	}
+	return marklessSettled(answered, release, (settled) => settled);
 }
 
 /** The ancestor root for a bare widget id, or the id untouched when none owns it. */
