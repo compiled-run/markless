@@ -1,6 +1,11 @@
 import type { RuntimeGraph } from '@markless/runtime';
 import { protocolEventDispatchesMarkless } from '@markless/serializer/protocol';
 import {
+	marklessBeginFocusCommit,
+	marklessEndFocusCommit,
+	marklessHandleFocusReader,
+} from './fns/element-handle.ts';
+import {
 	marklessInstancePath,
 	marklessRecordRowScope,
 	marklessRowScopedGraph,
@@ -105,6 +110,7 @@ export function createEventWiring(input: {
 	readonly behaviorHostIdsForAncestors: (element: ResumeDomElement | undefined) => string[];
 	readonly registerDelegatedEventRecord?: ResumeRuntimeInput['registerDelegatedEventRecord'];
 }) {
+	const readHandle = marklessHandleFocusReader(input.elementHandles.get);
 	const eventRecords = new WeakMap<ResumeDomElement, Map<string, ResumeEventRecord>>();
 	const rowEventRecords: ResumeRowEventRecords = new WeakMap();
 	// The detached subtree's own top is the row the repeat took out, and it carries
@@ -371,7 +377,9 @@ export function createEventWiring(input: {
 		if (eventRecord.syncPolicy && !options.syncPolicyAlreadyApplied)
 			runPolicy?.(eventRecord.syncPolicy, input.graph, event);
 		let activeSymbolId: string | undefined;
+		let focusCommit = 0;
 		try {
+			focusCommit = marklessBeginFocusCommit();
 			await input.prepareRuntimeShared();
 			for (const hostNodeId of input.behaviorHostIdsForAncestors(element)) {
 				const activation = input.activateBehaviorsFromTrigger(hostNodeId);
@@ -423,7 +431,7 @@ export function createEventWiring(input: {
 				graph: input.graph,
 				event,
 				element,
-				getElementHandle: input.elementHandles.get,
+				getElementHandle: readHandle,
 			} as DispatchSymbolContext;
 			const invokeCallback = (symbolId: string, args: ReadonlyArray<unknown>) =>
 				invokeSymbol(symbolId, { ...baseContext, args, invokeCallback, invokeSymbol });
@@ -446,6 +454,7 @@ export function createEventWiring(input: {
 			throw error;
 		} finally {
 			await input.flushRuntimeGraph();
+			if (focusCommit !== 0) marklessEndFocusCommit(focusCommit);
 			await marklessLogInteraction({
 				eventName: event.type,
 				eventRecord,
@@ -479,7 +488,9 @@ export function createEventWiring(input: {
 		if (rowEvent.syncPolicy && !options.syncPolicyAlreadyApplied)
 			runPolicy?.(rowEvent.syncPolicy, input.graph, event);
 		let activeSymbolId: string | undefined;
+		let focusCommit = 0;
 		try {
+			focusCommit = marklessBeginFocusCommit();
 			await input.prepareRuntimeShared();
 			validateOneRepeat(input.graph, repeat);
 			const locals = {
@@ -514,7 +525,7 @@ export function createEventWiring(input: {
 				graph: input.graph,
 				event,
 				element,
-				getElementHandle: input.elementHandles.get,
+				getElementHandle: readHandle,
 				locals,
 			} as DispatchSymbolContext;
 			const invokeCallback = (symbolId: string, args: ReadonlyArray<unknown>) =>
@@ -539,6 +550,7 @@ export function createEventWiring(input: {
 			throw error;
 		} finally {
 			await input.flushRuntimeGraph();
+			if (focusCommit !== 0) marklessEndFocusCommit(focusCommit);
 			await marklessLogInteraction({
 				eventName: event.type,
 				eventRecord: rowEvent,
