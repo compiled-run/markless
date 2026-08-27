@@ -218,6 +218,9 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 				continue;
 			}
 			const evaluatedInitial = evaluateInitialStateValue(initial, state);
+			const partialInitial = evaluatedInitial.ok
+				? null
+				: partialInitialStateValue(initial, state);
 			const elementHandle = findElementHandleStateValue(initial, state);
 			if (elementHandle) {
 				state.graph.diagnostics.push(
@@ -244,7 +247,10 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 				...(evaluatedInitial.ok
 					? { initialValue: evaluatedInitial.value, initialValueKnown: true }
 					: initial
-						? { initializerSource: expressionSource(initial, state.source) }
+						? {
+								...(partialInitial ? { initialValue: partialInitial.value } : {}),
+								initializerSource: expressionSource(initial, state.source),
+							}
 						: {}),
 			};
 			state.graph.graphBindings.push(binding);
@@ -1428,6 +1434,39 @@ function evaluateInitialStateValue(
 	}
 
 	return { ok: false };
+}
+
+/**
+ * The properties of a seed that DO fold, when at least one of its siblings does
+ * not. The authored expression is carried beside this subset rather than instead
+ * of it, so a folded property still reaches the page as a constant.
+ *
+ * An unfoldable property is kept with an `undefined` value: the field set of the
+ * shape is read off these keys, and dropping one unregisters a field the factory
+ * plainly declares. A spread or a computed key makes the key set a runtime
+ * answer, so neither admits a partial fold at all.
+ */
+function partialInitialStateValue(
+	rawNode: AnyNode | undefined,
+	state: WalkState | undefined,
+): { readonly value: Record<string, unknown> } | null {
+	const node = unwrapTypeAssertion(rawNode);
+	if (node?.type !== 'ObjectExpression') return null;
+
+	const output: Record<string, unknown> = {};
+	let folded = 0;
+	for (const property of asNodes(node.properties)) {
+		if (property.type !== 'Property' || property.computed === true) return null;
+
+		const key = objectPropertyKey(property.key as AnyNode | undefined);
+		if (key === null) return null;
+
+		const value = evaluateInitialStateValue(property.value as AnyNode | undefined, state);
+		if (value.ok) folded++;
+		output[key] = value.ok ? value.value : undefined;
+	}
+
+	return folded > 0 ? { value: output } : null;
 }
 
 // A folded seed is printed into the render-data module with JSON, which has no

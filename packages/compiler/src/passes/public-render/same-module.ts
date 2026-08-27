@@ -3,7 +3,11 @@ import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
 import { firstComponentRoot } from './plan.ts';
 import { renderBodyLines } from './render-body.ts';
-import { ssrSeedForwardBlockLines, type SsrDataLines } from './ssr-module.ts';
+import {
+	carriedSharedSeedSources,
+	ssrSeedForwardBlockLines,
+	type SsrDataLines,
+} from './ssr-module.ts';
 import {
 	componentSharedSeeds,
 	sharedSeedConsumeLine,
@@ -111,10 +115,12 @@ export function emitSameModuleSsrComponents(
 					dataLines.seedForward,
 					dataLines.bodySharedComputed,
 				),
+				carriedSharedSeedSources(input),
 			),
 			`	const marklessSsrPayloadState = ${payloadStateExpression};`,
 			`	const marklessSsrRenderStateValues = new Map(${valuesName});`,
 			sharedSeedConsumeLine(input, componentName, 'marklessSsrRenderStateValues'),
+			...dataLines.carriedSeed,
 			...renderBodyLines(
 				input,
 				rootInfo,
