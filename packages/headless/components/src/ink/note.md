@@ -10,15 +10,11 @@ section, and all three reader matrices in the workflow. The real reader lanes ar
 written and **not run** here: an owner rule forbids starting NVDA or VoiceOver on
 a development machine, so they are unmeasured locally and belong to CI.
 
-`scenarios/signature.tsrx` stopped compiling when the family joined the root
-barrel: it names `ink` through `../index.ts` and `textbox` through `../../index.ts`,
-and the root barrel now re-exports the first, so every part resolves to nothing
-with `MARKLESS_COMPONENT_TAG_UNRESOLVED`. It is the only scenario in the package
-with that double-barrel shape. Until it is repointed at `../../textbox/index.ts`
-or the resolver handles two aliases of one module, the family's own 59 browser
-rows cannot run — they were green on the same tip with the barrel line removed.
-`goals/headless-components/notes/U616-ink-registration.md` carries the
-measurement.
+`scenarios/signature.tsrx` names `ink` through `../index.ts` and `textbox`
+through `../../index.ts`, and the root barrel re-exports the first. That
+double-barrel shape once lost the family's parts at compile time; the link pass
+now merges the two aliases of one module, so the scenario compiles and the
+family's 59 browser rows run.
 
 Research: `goals/headless-components/notes/U611-ink.md` — Ark UI's signature pad,
 `szimek/signature_pad`, `steveruizok/perfect-freehand`, `embiem/react-canvas-draw`,
