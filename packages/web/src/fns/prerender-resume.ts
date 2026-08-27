@@ -35,6 +35,23 @@ function isPrerenderDataSurface(value: unknown): boolean {
 	return !!value && typeof value === 'object' && 'renderData' in value && 'components' in value;
 }
 
+// No settle-kernel shortcut here: the whole point of a branch escalation is
+// that the arm holds a component the kernel cannot express without running it.
+export async function renderPrerenderBranch(
+	page: unknown,
+	branchSiteId: string,
+	graph: { readonly read: (graphNodeId: string, path?: ReadonlyArray<string>) => unknown },
+	propsOrLoadSymbol?: unknown,
+) {
+	const evaluator = await loadPrerenderEvaluator();
+	return evaluator.renderPrerenderBranch(
+		page as never,
+		branchSiteId,
+		graph as never,
+		propsOrLoadSymbol,
+	);
+}
+
 export async function renderPrerenderBoundary(
 	page: unknown,
 	boundaryId: string,

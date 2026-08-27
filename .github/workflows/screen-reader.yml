@@ -64,14 +64,23 @@ jobs:
                 family:
                     [
                         accordion,
+                        calendar,
                         carousel,
                         checkbox,
                         checklist,
                         collapsible,
+                        colorpicker,
                         combobox,
+                        datebox,
+                        fileupload,
+                        hovercard,
+                        ink,
+                        menu,
                         modal,
                         navbar,
+                        numberbox,
                         otp,
+                        pad,
                         pagination,
                         popover,
                         progress,
@@ -81,7 +90,11 @@ jobs:
                         slider,
                         tabs,
                         textbox,
+                        toaster,
                         toggle,
+                        togglegroup,
+                        tooltip,
+                        tour,
                         tree,
                     ]
 
@@ -125,7 +138,27 @@ jobs:
                 # Only families with a real-reader spec. A family joins this list
                 # when its src/<family>/<family>.nvda.ts exists, not before: a
                 # name with no spec file makes the run find no tests.
-                family: [checkbox, modal, popover, radio-group, select, slider, tabs]
+                family:
+                    [
+                        calendar,
+                        checkbox,
+                        colorpicker,
+                        datebox,
+                        hovercard,
+                        ink,
+                        menu,
+                        modal,
+                        numberbox,
+                        pad,
+                        popover,
+                        radio-group,
+                        select,
+                        slider,
+                        tabs,
+                        togglegroup,
+                        tooltip,
+                        tour,
+                    ]
 
         steps:
             - uses: actions/checkout@v4
@@ -158,9 +191,54 @@ jobs:
               continue-on-error: true
               run: node apps/sr-gallery/scripts/boot-check.ts
 
+            # continue-on-error so the transcript is still uploaded and summarised
+            # when the read fails; the gate step below turns that back into red.
             - name: Read the ${{ matrix.family }} family with NVDA
+              id: read
               if: steps.gallery.outcome == 'success'
-              run: pnpm test:sr-real -- --project=nvda ${{ matrix.family }}/${{ matrix.family }}.nvda.ts
+              continue-on-error: true
+              shell: bash
+              run: |
+                  mkdir -p sr-transcripts
+                  set -o pipefail
+                  pnpm test:sr-real -- --project=nvda ${{ matrix.family }}/${{ matrix.family }}.nvda.ts 2>&1 \
+                      | tee sr-transcripts/nvda-${{ matrix.family }}.txt
+
+            - name: Upload the ${{ matrix.family }} NVDA transcript
+              if: always() && steps.gallery.outcome == 'success'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: nvda-transcript-${{ matrix.family }}
+                  path: |
+                      sr-transcripts/
+                      packages/headless/components/test-support/test-results/
+                  if-no-files-found: warn
+
+            - name: Summarise the ${{ matrix.family }} NVDA read
+              if: always()
+              shell: bash
+              env:
+                  FAMILY: ${{ matrix.family }}
+                  GALLERY: ${{ steps.gallery.outcome }}
+                  READ: ${{ steps.read.outcome }}
+              run: |
+                  {
+                      echo "### NVDA - $FAMILY"
+                      if [ "$GALLERY" != 'success' ]; then
+                          echo 'not read: the gallery did not render, so only the drivability smoke ran.'
+                      elif [ "$READ" = 'success' ]; then
+                          echo 'pass'
+                      else
+                          echo 'FAIL - end of the transcript:'
+                          echo '```'
+                          tail -n 40 "sr-transcripts/nvda-$FAMILY.txt" 2>/dev/null || echo 'no transcript was captured.'
+                          echo '```'
+                      fi
+                  } >> "$GITHUB_STEP_SUMMARY"
+
+            - name: Fail when NVDA could not read the ${{ matrix.family }} family
+              if: steps.gallery.outcome == 'success' && steps.read.outcome != 'success'
+              run: exit 1
 
             # Fallback, not a pass: the gallery did not render, so this proves
             # only that the runner can drive the reader at all.
@@ -186,7 +264,27 @@ jobs:
             fail-fast: false
             matrix:
                 # See the nvda job: only families with a real-reader spec.
-                family: [checkbox, modal, popover, radio-group, select, slider, tabs]
+                family:
+                    [
+                        calendar,
+                        checkbox,
+                        colorpicker,
+                        datebox,
+                        hovercard,
+                        ink,
+                        menu,
+                        modal,
+                        numberbox,
+                        pad,
+                        popover,
+                        radio-group,
+                        select,
+                        slider,
+                        tabs,
+                        togglegroup,
+                        tooltip,
+                        tour,
+                    ]
 
         steps:
             - uses: actions/checkout@v4
@@ -216,9 +314,54 @@ jobs:
               continue-on-error: true
               run: node apps/sr-gallery/scripts/boot-check.ts
 
+            # See the nvda job: the read is allowed to fail so its transcript is
+            # still uploaded and summarised, and the gate step below re-reds it.
             - name: Read the ${{ matrix.family }} family with VoiceOver
+              id: read
               if: steps.gallery.outcome == 'success'
-              run: pnpm test:sr-real -- --project=voiceover ${{ matrix.family }}/${{ matrix.family }}.voiceover.ts
+              continue-on-error: true
+              shell: bash
+              run: |
+                  mkdir -p sr-transcripts
+                  set -o pipefail
+                  pnpm test:sr-real -- --project=voiceover ${{ matrix.family }}/${{ matrix.family }}.voiceover.ts 2>&1 \
+                      | tee sr-transcripts/voiceover-${{ matrix.family }}.txt
+
+            - name: Upload the ${{ matrix.family }} VoiceOver transcript
+              if: always() && steps.gallery.outcome == 'success'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: voiceover-transcript-${{ matrix.family }}
+                  path: |
+                      sr-transcripts/
+                      packages/headless/components/test-support/test-results/
+                  if-no-files-found: warn
+
+            - name: Summarise the ${{ matrix.family }} VoiceOver read
+              if: always()
+              shell: bash
+              env:
+                  FAMILY: ${{ matrix.family }}
+                  GALLERY: ${{ steps.gallery.outcome }}
+                  READ: ${{ steps.read.outcome }}
+              run: |
+                  {
+                      echo "### VoiceOver - $FAMILY"
+                      if [ "$GALLERY" != 'success' ]; then
+                          echo 'not read: the gallery did not render, so only the drivability smoke ran.'
+                      elif [ "$READ" = 'success' ]; then
+                          echo 'pass'
+                      else
+                          echo 'FAIL - end of the transcript:'
+                          echo '```'
+                          tail -n 40 "sr-transcripts/voiceover-$FAMILY.txt" 2>/dev/null || echo 'no transcript was captured.'
+                          echo '```'
+                      fi
+                  } >> "$GITHUB_STEP_SUMMARY"
+
+            - name: Fail when VoiceOver could not read the ${{ matrix.family }} family
+              if: steps.gallery.outcome == 'success' && steps.read.outcome != 'success'
+              run: exit 1
 
             - name: Prove the runner can drive VoiceOver
               if: steps.gallery.outcome != 'success'
