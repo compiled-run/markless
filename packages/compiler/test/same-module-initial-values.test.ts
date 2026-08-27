@@ -1,10 +1,10 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
 
-// Two components of one module may each declare the same state name. The
-// module-wide initial-value list then spells that graph node id twice, so each
-// component definition must carry only the initial value it declared: the
-// browser evaluator seeds its render from this list keyed by graph node id.
+// Two components of one module may each declare the same state name. Each such
+// name mints its own graph node id under the declaring component, and the
+// browser evaluator seeds its render from this list keyed by that id, so a
+// component definition must carry the initial value it declared under its own key.
 
 type InitialValue = {
 	readonly graphNodeId: string;
@@ -49,14 +49,16 @@ export default function SameNamePage() @{
 	});
 	const definitions = result.publicRenderModule.componentDefinitions;
 
-	expect(constantsFor(definitions, 'SameNameLeft', 'state:report')).toEqual([0]);
-	expect(constantsFor(definitions, 'SameNameRight', 'state:report')).toEqual([10]);
+	expect(constantsFor(definitions, 'SameNameLeft', 'state:SameNameLeft.report')).toEqual([0]);
+	expect(constantsFor(definitions, 'SameNameRight', 'state:SameNameRight.report')).toEqual([
+		10,
+	]);
 });
 
 // Same structural pattern, different names, element, value kinds, declaration
-// order, and component count: the partition must come from positions, not from
-// anything spelled in the fixture above.
-test('positional partition survives a differently shaped same-name module', async () => {
+// order, and component count: the separation must come from the declaring
+// component, not from anything spelled in the fixture above.
+test('each initial value stays with its own part in a differently shaped module', async () => {
 	const result = await compileTsrxModule({
 		filename: 'pages/alternate.tsrx',
 		source: `import { state } from '@markless/core';
@@ -84,9 +86,15 @@ export default function AlternatePage() @{
 	});
 	const definitions = result.publicRenderModule.componentDefinitions;
 
-	expect(constantsFor(definitions, 'AlternateThird', 'state:label')).toEqual(['gamma']);
-	expect(constantsFor(definitions, 'AlternateSecond', 'state:label')).toEqual(['beta']);
-	expect(constantsFor(definitions, 'AlternateFirst', 'state:label')).toEqual(['alpha']);
-	// A name only one component spells is untouched by the partition.
+	expect(constantsFor(definitions, 'AlternateThird', 'state:AlternateThird.label')).toEqual([
+		'gamma',
+	]);
+	expect(constantsFor(definitions, 'AlternateSecond', 'state:AlternateSecond.label')).toEqual([
+		'beta',
+	]);
+	expect(constantsFor(definitions, 'AlternateFirst', 'state:AlternateFirst.label')).toEqual([
+		'alpha',
+	]);
+	// A name only one component spells keeps its bare key.
 	expect(constantsFor(definitions, 'AlternateThird', 'state:onlyHere')).toEqual([7]);
 });

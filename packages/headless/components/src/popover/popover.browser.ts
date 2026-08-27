@@ -4,7 +4,6 @@ import { afterEach, expect, test } from 'vitest';
 import Basic from './scenarios/basic.tsrx';
 import Rtl from './scenarios/rtl.tsrx';
 import ServedOpen from './scenarios/served-open.tsrx';
-import Sided from './scenarios/sided.tsrx';
 import Unnamed from './scenarios/unnamed.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
 import WithoutOnChange from './scenarios/without-onchange.tsrx';
@@ -21,8 +20,6 @@ const Calls = page.getByTestId('calls');
 const Order = page.getByTestId('order');
 const EndTrigger = page.getByTestId('end-trigger');
 const EndContent = page.getByTestId('end-content');
-const TopTrigger = page.getByTestId('top-trigger');
-const TopContent = page.getByTestId('top-content');
 const FirstTrigger = page.getByTestId('first-trigger');
 const FirstContent = page.getByTestId('first-content');
 const FirstClose = page.getByTestId('first-close');
@@ -82,9 +79,11 @@ async function openBasic() {
 }
 
 // The placement is a CSS anchor, so the surface is in place on the layout that
-// shows it - there is nothing to wait for beyond reading a box.
+// shows it - there is nothing to wait for beyond reading a box. Read computed,
+// not inline: the anchor binding and the default placement live in the part's own
+// scoped stylesheet, so this also proves that sheet reached the element.
 function expectAnchored(content: Element) {
-	const style = (content as HTMLElement).style;
+	const style = getComputedStyle(content);
 	expect(style.position).toBe('absolute');
 	expect(style.getPropertyValue('position-anchor')).toBe('--ui-popover');
 	expect(style.getPropertyValue('position-area')).not.toBe('');
@@ -95,7 +94,6 @@ function expectBasicRendered() {
 	expect(el(Trigger).getAttribute('type')).toBe('button');
 	expect(el(Trigger).getAttribute('aria-haspopup')).toBe('dialog');
 	expect(el(Content).getAttribute('role')).toBe('dialog');
-	expect(el(Content).getAttribute('ui-side')).toBe('bottom');
 	expect(el(Root).getAttribute('ui-closed')).toBe('');
 	expect(el(Root).hasAttribute('ui-open')).toBe(false);
 	expect(el(Content).textContent).toContain('Anyone with the link');
@@ -121,7 +119,6 @@ function expectNotModal() {
 
 function expectRootDropsDestructuredProps() {
 	expect(el(Root).hasAttribute('open')).toBe(false);
-	expect(el(Root).hasAttribute('side')).toBe(false);
 	expect(el(Root).hasAttribute('ui-closed')).toBe(true);
 }
 
@@ -133,7 +130,7 @@ for (const mode of MODES) {
 		expectNamingWired();
 	});
 
-	test(`${mode}: a root drops the open and side props it destructured`, async () => {
+	test(`${mode}: a root drops the open prop it destructured`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 		expectRootDropsDestructuredProps();
@@ -190,42 +187,52 @@ test('CSR: the surface is placed under the trigger it belongs to', async () => {
 	expect(Math.abs(surface.left - anchor.left)).toBeLessThanOrEqual(SLACK);
 });
 
-// Two popovers on one page each carry the same anchor name, so this is also the
-// row that would catch a surface finding the other popover's trigger.
-test('CSR: side places the surface beside or above the trigger, and says which on the surface', async () => {
-	await render(Sided);
-	expect(el(EndContent).getAttribute('ui-side')).toBe('end');
-	expect(el(TopContent).getAttribute('ui-side')).toBe('top');
+// Placement is CSS, never a prop: the family ships one default inside its own
+// layer, and any unlayered rule the consumer writes beats it with no specificity
+// fight.
+test("CSR: the surface takes the family default placement, and a consumer's rule wins", async () => {
+	await render(Basic);
+	await openBasic();
 
-	el(EndTrigger).click();
-	await expect.poll(() => el(EndContent).hasAttribute('hidden')).toBe(false);
-	const beside = el(EndContent).getBoundingClientRect();
-	const endAnchor = el(EndTrigger).getBoundingClientRect();
-	expect(Math.abs(beside.left - endAnchor.right)).toBeLessThanOrEqual(SLACK);
-	expect(Math.abs(beside.top - endAnchor.top)).toBeLessThanOrEqual(SLACK);
+	const content = el(Content);
+	expect(getComputedStyle(content).getPropertyValue('position-area')).toBe('block-end');
 
-	el(TopTrigger).click();
-	await expect.poll(() => el(TopContent).hasAttribute('hidden')).toBe(false);
-	const above = el(TopContent).getBoundingClientRect();
-	const topAnchor = el(TopTrigger).getBoundingClientRect();
-	expect(Math.abs(above.bottom - topAnchor.top)).toBeLessThanOrEqual(SLACK);
-	expect(Math.abs(above.left - topAnchor.left)).toBeLessThanOrEqual(SLACK);
+	const own = document.createElement('style');
+	own.textContent = '[data-testid="content"] { position-area: block-start; }';
+	document.head.appendChild(own);
+	try {
+		expect(getComputedStyle(content).getPropertyValue('position-area')).toBe('block-start');
+	} finally {
+		own.remove();
+	}
 });
 
-// `start` and `end` are the writing direction's sides, and only a right-to-left
-// page tells them apart from left and right.
-test('CSR: start and end follow the writing direction', async () => {
+// The reading-order sides are a consumer's `self-inline-*` placement now, and only
+// a right-to-left page tells them apart from left and right. Two popovers on one
+// page each carry the same anchor name, so this is also the row that would catch a
+// surface finding the other popover's trigger.
+test('CSR: a consumer placement on the reading-order sides follows the writing direction', async () => {
 	await render(Rtl);
 
-	const startSurface = el(StartContent).getBoundingClientRect();
-	const startAnchor = el(StartTrigger).getBoundingClientRect();
-	expect(Math.abs(startSurface.left - startAnchor.right)).toBeLessThanOrEqual(SLACK);
-	expect(Math.abs(startSurface.top - startAnchor.top)).toBeLessThanOrEqual(SLACK);
+	const own = document.createElement('style');
+	own.textContent = `
+[data-testid="start-content"] { position-area: span-self-block-end self-inline-start; }
+[data-testid="end-content"] { position-area: span-self-block-end self-inline-end; }
+`;
+	document.head.appendChild(own);
+	try {
+		const startSurface = el(StartContent).getBoundingClientRect();
+		const startAnchor = el(StartTrigger).getBoundingClientRect();
+		expect(Math.abs(startSurface.left - startAnchor.right)).toBeLessThanOrEqual(SLACK);
+		expect(Math.abs(startSurface.top - startAnchor.top)).toBeLessThanOrEqual(SLACK);
 
-	const endSurface = el(EndContent).getBoundingClientRect();
-	const endAnchor = el(EndTrigger).getBoundingClientRect();
-	expect(Math.abs(endSurface.right - endAnchor.left)).toBeLessThanOrEqual(SLACK);
-	expect(Math.abs(endSurface.top - endAnchor.top)).toBeLessThanOrEqual(SLACK);
+		const endSurface = el(EndContent).getBoundingClientRect();
+		const endAnchor = el(EndTrigger).getBoundingClientRect();
+		expect(Math.abs(endSurface.right - endAnchor.left)).toBeLessThanOrEqual(SLACK);
+		expect(Math.abs(endSurface.top - endAnchor.top)).toBeLessThanOrEqual(SLACK);
+	} finally {
+		own.remove();
+	}
 });
 
 test('CSR: Escape closes the surface and hands focus back to the trigger', async () => {
