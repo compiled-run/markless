@@ -1,5 +1,5 @@
 import * as ink from '../index.ts';
-import * as textbox from '../../textbox/index.ts';
+import { textbox } from '../../index.ts';
 
 const SURFACE = 'display: block; width: 320px; height: 140px; color: #111';
 
