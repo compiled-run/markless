@@ -273,7 +273,7 @@ const descriptors: readonly FamilyDescriptor[] = [
 		// gesture this family deliberately refuses. The disclosure wiring, the
 		// delays, Tab into the card and both dismissal paths live in
 		// src/hovercard/hovercard.browser.ts.
-		valuedAttributes: ['ui-side'],
+		valuedAttributes: [],
 		supportsDisabled: false,
 	},
 	{
@@ -299,7 +299,7 @@ const descriptors: readonly FamilyDescriptor[] = [
 			focusReturns: false,
 		},
 		// Which way the surface settled is information a consumer styles against.
-		valuedAttributes: ['ui-side'],
+		valuedAttributes: [],
 		supportsDisabled: true,
 	},
 	{
@@ -426,7 +426,7 @@ const descriptors: readonly FamilyDescriptor[] = [
 			focusReturns: false,
 		},
 		// Which edge the surface settles against is what a consumer styles on.
-		valuedAttributes: ['ui-side'],
+		valuedAttributes: [],
 		supportsDisabled: false,
 	},
 	{
@@ -591,7 +591,7 @@ const descriptors: readonly FamilyDescriptor[] = [
 		// trigger of a showing tip closes it rather than toggling — so the battery's
 		// click-to-open cycle would be testing a gesture this family refuses. The
 		// dismissal, hover and focus rows live in src/tooltip/tooltip.browser.ts.
-		valuedAttributes: ['ui-side'],
+		valuedAttributes: [],
 		supportsDisabled: false,
 	},
 	{
@@ -628,7 +628,7 @@ const descriptors: readonly FamilyDescriptor[] = [
 		// consumer flipping `open`, so the battery's click-a-part cycle has nothing
 		// of the family's own to click. The open, dismissal and step rows live in
 		// src/tour/tour.browser.ts.
-		valuedAttributes: ['ui-max', 'ui-side', 'ui-value'],
+		valuedAttributes: ['ui-max', 'ui-value'],
 		supportsDisabled: true,
 	},
 	{
