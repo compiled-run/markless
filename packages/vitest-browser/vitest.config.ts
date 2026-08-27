@@ -10,6 +10,8 @@ import { testSSR } from './src/ssr-plugin.ts';
 // rewrites string and first-flush streaming markers into SSR browser commands.
 export default defineProject({
 	plugins: [testSSR(), executedModulesPlugin(), markless()],
+	// A fixture that fails to compile must not cover the page a real pointer drives.
+	server: { hmr: { overlay: false } },
 	test: {
 		name: 'browser',
 		include: ['browser/**/*.test.ts'],
