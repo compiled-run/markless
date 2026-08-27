@@ -23,11 +23,17 @@ import {
 	marklessBaseSymbolId,
 	marklessBoundSymbolId,
 	marklessDomUpdateSymbolId,
+	marklessLiveBoundGraphRoute,
 } from './bound-symbol.ts';
-import { marklessRowSegment, marklessWidgetHandleId } from './instance-scope.ts';
+import {
+	marklessInstancePath,
+	marklessRowSegment,
+	marklessWidgetHandleId,
+} from './instance-scope.ts';
 import { marklessSerializeGraphValue } from './state-serialize.ts';
 import type { SsrDataStructure } from '../ssr-data/renderer.ts';
 import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
+import type { ProtocolComposedGraphProp } from '@markless/serializer';
 
 // SSR composition works on DRAFT payload records: the shapes the protocol
 // eventually serializes, still mutable and still carrying producer-only fields.
@@ -61,6 +67,7 @@ type SsrRowEventRecord = SsrRecord & { readonly symbolIds: ReadonlyArray<string>
 type SsrKeyedRepeatRecord = SsrRecord & {
 	readonly id: string;
 	readonly parentHostNodeId: string;
+	readonly ownerHostNodeId?: string;
 	readonly collectionGraphNodeId?: string;
 	readonly collectionPath: ReadonlyArray<string>;
 	readonly rowEvents: ReadonlyArray<SsrRowEventRecord>;
@@ -72,9 +79,14 @@ type SsrAnchoredRecord = SsrRecord & {
 };
 type SsrBranchRecord = SsrAnchoredRecord & {
 	readonly testReads?: ReadonlyArray<ComposeGraphRead>;
+	readonly contentReads?: ReadonlyArray<ComposeGraphRead>;
 	readonly symbolId?: string;
 	readonly takenArm?: number;
 	readonly armRecords?: ReadonlyArray<SsrArmRecordSet>;
+	readonly escalates?: true;
+	readonly servedArmRecords?: SsrArmRecordSet;
+	readonly composedInstancePath?: string;
+	readonly composedGraphProps?: ReadonlyArray<ProtocolComposedGraphProp>;
 };
 type SsrArmRecordSet = SsrRecord & {
 	readonly locators?: ReadonlyArray<SsrLocatorRecord>;
@@ -763,8 +775,11 @@ function marklessSsrUnbindLocalView(view: SsrViewDraft, localHostIds: ReadonlySe
 	const domUpdates = view.domUpdates.filter((update) => localHostIds.has(update.hostNodeId));
 	for (const update of domUpdates)
 		if (update.symbolId) update.symbolId = marklessSsrUnbindLocalSymbolId(update.symbolId);
+	// Whose repeat this is, is a question about the markup that WROTE it: a
+	// projected repeat renders into a child's element, so its parent host is never
+	// one of this render's own locators.
 	const keyedRepeats = (view.keyedRepeats ?? [])
-		.filter((repeat) => localHostIds.has(repeat.parentHostNodeId))
+		.filter((repeat) => localHostIds.has(repeat.ownerHostNodeId ?? repeat.parentHostNodeId))
 		.map((repeat) => ({
 			...repeat,
 			rowEvents: repeat.rowEvents.map((event) => ({
@@ -911,6 +926,17 @@ function marklessSsrComposedView(
 			.filter((anchor) => anchor.kind === 'branch')
 			.map((anchor) => anchor.id),
 	);
+	const composedBranches = marklessSsrArmizeBranches(
+		structure,
+		marklessSsrResolveAnchorRecords(
+			structure,
+			'branch',
+			branches.filter((branch) => renderedBranchIds.has(idPrefix + branch.id)),
+			idPrefix,
+		),
+		{ locators, events, domUpdates, behaviors, elementHandles, keyedRepeats },
+		idPrefix,
+	);
 	return {
 		view: {
 			...view,
@@ -920,12 +946,7 @@ function marklessSsrComposedView(
 			keyedRepeats,
 			behaviors,
 			elementHandles,
-			branches: marklessSsrResolveAnchorRecords(
-				structure,
-				'branch',
-				branches.filter((branch) => renderedBranchIds.has(idPrefix + branch.id)),
-				idPrefix,
-			),
+			branches: composedBranches,
 			asyncBoundaries: armizedBoundaries,
 			...(Object.keys(asyncRunners).length > 0 ? { asyncRunners } : {}),
 		},
@@ -1065,6 +1086,95 @@ export function marklessSsrArmizeBoundaries(
 		};
 	});
 }
+// An escalating branch holds a component that has to run, so a flip replaces its
+// range wholesale rather than rebuilding markup. Its served records therefore
+// have to leave the page-absolute streams and become arm-relative, exactly as a
+// boundary arm's do. Nothing else armizes: a page with no escalating branch
+// keeps every record where it was, byte for byte.
+export function marklessSsrArmizeBranches(
+	structure: SsrDataStructure,
+	branches: ReadonlyArray<SsrBranchRecord>,
+	streams: {
+		locators: SsrLocatorRecord[];
+		events: SsrEventRecord[];
+		domUpdates: SsrDomUpdateRecord[];
+		behaviors: SsrBehaviorRecord[];
+		elementHandles: SsrHostedRecord[];
+		keyedRepeats: SsrKeyedRepeatRecord[];
+	},
+	idPrefix = '',
+): ReadonlyArray<SsrBranchRecord> {
+	if (!branches.some((branch) => branch.escalates === true)) return branches;
+	const anchorById = new Map(
+		structure.anchors
+			.filter((anchor) => anchor.kind === 'branch')
+			.map((anchor) => [anchor.id, anchor] as const),
+	);
+	return branches.map((branch) => {
+		if (branch.escalates !== true) return branch;
+		// A branch lifted from a child already armized its own arm inside that
+		// child's composition; its records left these streams there, so moving
+		// the range again would overwrite the set with an empty one.
+		if (branch.servedArmRecords) return branch;
+		const anchor = anchorById.get(idPrefix + branch.id);
+		if (!anchor) throw new Error(`MARKLESS_SSR_DATA_ANCHOR_MISSING: branch:${branch.id}`);
+		return { ...branch, servedArmRecords: marklessSsrMoveArmRange(streams, anchor) };
+	});
+}
+
+function marklessSsrMoveArmRange(
+	streams: {
+		locators: SsrLocatorRecord[];
+		events: SsrEventRecord[];
+		domUpdates: SsrDomUpdateRecord[];
+		behaviors: SsrBehaviorRecord[];
+		elementHandles: SsrHostedRecord[];
+		keyedRepeats: SsrKeyedRepeatRecord[];
+	},
+	anchor: { readonly elementStart: number; readonly elementEnd: number },
+): SsrArmRecordSet {
+	const armLocators: SsrLocatorRecord[] = [];
+	for (let i = streams.locators.length - 1; i >= 0; i--) {
+		const locator = streams.locators[i];
+		if (locator.index < anchor.elementStart || locator.index >= anchor.elementEnd) continue;
+		armLocators.unshift({
+			...locator,
+			strategy: 'arm-relative',
+			index: locator.index - anchor.elementStart,
+		});
+		streams.locators.splice(i, 1);
+	}
+	const armHostIds = new Set(armLocators.map((locator) => locator.hostNodeId));
+	const moved: {
+		events: SsrEventRecord[];
+		domUpdates: SsrDomUpdateRecord[];
+		behaviors: SsrBehaviorRecord[];
+		elementHandles: SsrHostedRecord[];
+	} = { events: [], domUpdates: [], behaviors: [], elementHandles: [] };
+	for (const key of Object.keys(moved) as ReadonlyArray<keyof typeof moved>) {
+		const records: SsrHostedRecord[] = streams[key] ?? [];
+		for (let i = records.length - 1; i >= 0; i--) {
+			if (armHostIds.has(records[i].hostNodeId))
+				(moved[key] as SsrHostedRecord[]).unshift(...records.splice(i, 1));
+		}
+	}
+	const keyedRepeats: SsrKeyedRepeatRecord[] = [];
+	for (let i = (streams.keyedRepeats ?? []).length - 1; i >= 0; i--) {
+		if (armHostIds.has(streams.keyedRepeats[i].parentHostNodeId))
+			keyedRepeats.unshift(...streams.keyedRepeats.splice(i, 1));
+	}
+	armLocators.sort((left, right) => left.index - right.index);
+	return {
+		locators: armLocators,
+		events: moved.events,
+		domUpdates: moved.domUpdates,
+		behaviors: moved.behaviors,
+		elementHandles: moved.elementHandles,
+		...(keyedRepeats.length > 0 ? { keyedRepeats } : {}),
+		branches: [],
+	};
+}
+
 export function marklessSsrIsArmBranchAnchor(text: unknown) {
 	return (
 		typeof text === 'string' &&
@@ -1224,6 +1334,9 @@ export function marklessSsrAppendChildView(context: {
 			...repeat,
 			id: context.child.hostPrefix + repeat.id,
 			parentHostNodeId: context.child.hostPrefix + repeat.parentHostNodeId,
+			...(repeat.ownerHostNodeId
+				? { ownerHostNodeId: context.child.hostPrefix + repeat.ownerHostNodeId }
+				: {}),
 			collectionGraphNodeId: mapped.graphNodeId,
 			collectionPath: mapped.path,
 			rowEvents,
@@ -1268,12 +1381,31 @@ export function marklessSsrAppendChildView(context: {
 		const armRecords = branch.armRecords?.map((arm) =>
 			marklessSsrPrefixArmRecord(arm, context.child),
 		);
+		// An arm that renders text with no element of its own has no dom update to
+		// carry; its content read refreshes the arm range through the branch
+		// symbol, so it needs the same prop routing every other read gets.
+		const liveContentReads = (branch.contentReads ?? []).filter(
+			(read) => !marklessCsrChildReadIsStatic(read, context.child.graphProps),
+		);
 		// A branch decided only by an explicitly constant/absent prop has no live
 		// parent route to re-decide it, but the arm it painted still owns records
 		// that have to follow their values; it stays as a decide-less record.
 		const decided = liveTestReads.length === 0;
-		if (decided && !marklessSsrDecidedArmIsLive(branch, armRecords)) continue;
-		const { symbolId: childSymbolId, ...unwired } = branch;
+		const {
+			symbolId: childSymbolId,
+			contentReads: _unmappedContentReads,
+			composedInstancePath: _unroutedInstancePath,
+			composedGraphProps: _unroutedGraphProps,
+			...unwired
+		} = branch;
+		// Only the branch symbol can rebuild an arm, so a content read without one
+		// has nothing to drive and never justifies keeping the record.
+		const contentDriven = liveContentReads.length > 0 && Boolean(childSymbolId);
+		if (decided && !contentDriven && !marklessSsrDecidedArmIsLive(branch, armRecords)) continue;
+		const keepSymbol = Boolean(childSymbolId) && (!decided || contentDriven);
+		const composedRoutes = keepSymbol
+			? marklessSsrComposedBranchRoutes(branch, context.child, childInstancePath)
+			: undefined;
 		const mappedBranch = {
 			...unwired,
 			id: context.child.hostPrefix + branch.id,
@@ -1285,10 +1417,36 @@ export function marklessSsrAppendChildView(context: {
 						context.child.hostPrefix + branch.id,
 						childInstancePath,
 					),
-			...(childSymbolId && !decided
-				? { symbolId: marklessBoundSymbolId(context.child, childSymbolId) }
+			...(keepSymbol && liveContentReads.length > 0
+				? {
+						contentReads: marklessSsrRemapChildReads(
+							liveContentReads,
+							context.child.graphProps,
+							context.child.hostPrefix + branch.id,
+							childInstancePath,
+						),
+					}
+				: {}),
+			...(keepSymbol
+				? { symbolId: marklessBoundSymbolId(context.child, childSymbolId!) }
 				: {}),
 			...(armRecords ? { armRecords } : {}),
+			...(composedRoutes?.props.length
+				? {
+						composedInstancePath: composedRoutes.instancePath,
+						composedGraphProps: composedRoutes.props,
+					}
+				: {}),
+			// The arm this child already served keeps its arm-relative
+			// coordinates; only ids and symbols take the child's prefixes.
+			...(branch.servedArmRecords
+				? {
+						servedArmRecords: marklessSsrPrefixBoundaryArmRecords(
+							branch.servedArmRecords,
+							context.child,
+						),
+					}
+				: {}),
 		};
 		if (context.child.asyncBoundaryId) {
 			const armBranches = context.boundaryArmBranches.get(context.child.asyncBoundaryId) ?? [];
@@ -1440,6 +1598,9 @@ export function marklessSsrPrefixBoundaryArmRecords(
 							...repeat,
 							id: child.hostPrefix + repeat.id,
 							parentHostNodeId: child.hostPrefix + repeat.parentHostNodeId,
+							...(repeat.ownerHostNodeId
+								? { ownerHostNodeId: child.hostPrefix + repeat.ownerHostNodeId }
+								: {}),
 							collectionGraphNodeId: mapped.graphNodeId,
 							collectionPath: mapped.path,
 							rowEvents: repeat.rowEvents.map((event) => ({
@@ -1510,6 +1671,55 @@ export function marklessSsrRemapChildReads<T extends ComposeGraphRead>(
 		if (!mapped) throw new Error('MARKLESS_COMPOSED_READ_UNMAPPED: ' + recordId);
 		return { ...read, graphNodeId: mapped.graphNodeId, path: mapped.path };
 	});
+}
+/**
+ * The route table and instance path a composed branch's own update symbol
+ * needs, as this level of composition can spell them.
+ *
+ * The symbol reads the part-local prop ids its module spells, and the record's
+ * reads being rewritten leaves it nothing: only this table says where those
+ * props now live. A branch that already carries a path was authored deeper than
+ * this child, so its table names that module and travels this level exactly as
+ * a read does; a branch whose id carries no instance path at all is this
+ * child's own, and this child's route table is the answer. `undefined` means
+ * there is nothing for this level to say.
+ */
+function marklessSsrComposedBranchRoutes(
+	branch: SsrBranchRecord,
+	child: SsrPrefixChild,
+	childInstancePath: string,
+): { readonly instancePath: string; readonly props: ProtocolComposedGraphProp[] } | undefined {
+	if (branch.composedInstancePath !== undefined)
+		return {
+			instancePath: childInstancePath + branch.composedInstancePath,
+			props: (branch.composedGraphProps ?? []).flatMap((prop) => {
+				const mapped = marklessCsrRemapChildGraph(
+					{ graphNodeId: prop.graphNodeId, path: prop.path ?? [] },
+					child.graphProps,
+					childInstancePath,
+				);
+				return mapped ? [marklessSsrComposedGraphProp(prop.name, mapped)] : [];
+			}),
+		};
+	if (marklessInstancePath(branch.id) !== '') return undefined;
+	return {
+		instancePath: childInstancePath,
+		props: (child.graphProps ?? []).flatMap((prop) => {
+			const route = marklessLiveBoundGraphRoute(prop);
+			return route ? [marklessSsrComposedGraphProp(prop.name, route)] : [];
+		}),
+	};
+}
+
+function marklessSsrComposedGraphProp(
+	name: string,
+	route: { readonly graphNodeId: string; readonly path: ReadonlyArray<string> },
+): ProtocolComposedGraphProp {
+	return {
+		name,
+		graphNodeId: route.graphNodeId,
+		...(route.path.length ? { path: route.path } : {}),
+	};
 }
 function marklessSsrArmRecordSetIsLive(arm: SsrArmRecordSet | undefined): boolean {
 	return Boolean(

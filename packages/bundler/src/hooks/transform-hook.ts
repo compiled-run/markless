@@ -17,6 +17,7 @@ import {
 	mergeLinkedModuleChildren,
 	resolveImportedModuleInterfaces,
 } from '../link-driver.ts';
+import { yieldToEventLoop } from '../event-loop.ts';
 import { MARKLESS_VIRTUAL_PREFIX, transformTsrxModule } from '../transform.ts';
 import type {
 	MarklessEnvironment,
@@ -207,6 +208,9 @@ async function runFirstPassTransform(
 	// Same predicate as `!reusedLinkedTransform`, phrased so the result is provably assigned.
 	if (linkedTransformResult === undefined) {
 		try {
+			// Past `beginSourceSymbolClaims`, so a sibling that starts in this gap
+			// waits on the barrier instead of racing the claims this compile publishes.
+			await yieldToEventLoop();
 			linkedTransformResult = await transformTsrxModule(transformInput);
 		} catch (error) {
 			// Imported graph helpers can diagnose before their interface is linked.

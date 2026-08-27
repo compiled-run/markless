@@ -297,7 +297,11 @@ function repeatRecord(
 				: [],
 		);
 	});
-	const rowStartOffset = repeatRowStartOffset(chunks, repeat.id);
+	const ownOffset = repeatRowStartOffset(chunks, repeat.id);
+	// A projected repeat counts from inside the child's element, so the elements
+	// the child renders in front of the hole stand in front of the rows too.
+	const rowStartOffset =
+		ownOffset === 'unknown' ? ownOffset : ownOffset + (repeat.projectedElementsBefore ?? 0);
 	const payloadRepeat = payloadArena?.view.keyedRepeats.find((item) => item.id === repeat.id);
 	const rowElementHandles = payloadRepeat?.rowElementHandles?.flatMap((handle) => {
 		const hostPath = rowHostPaths.get(handle.hostNodeId);
@@ -327,6 +331,7 @@ function repeatRecord(
 	return {
 		repeatId: repeat.id,
 		parentHostNodeId: repeat.parentHostNodeId,
+		...(repeat.ownerHostNodeId ? { ownerHostNodeId: repeat.ownerHostNodeId } : {}),
 		...(repeat.rowHostNodeId ? { rowHostNodeId: repeat.rowHostNodeId } : {}),
 		itemName: repeat.itemName,
 		...(repeat.collectionGraphNodeId
