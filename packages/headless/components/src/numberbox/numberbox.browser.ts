@@ -501,6 +501,16 @@ test('CSR: home and end jump to the bounds when the field has them', async () =>
 	await expect.poll(() => shown(Input)).toBe('0.50');
 });
 
+test('SSR: home and end jump to the bounds on a served page before any other write', async () => {
+	await renderSSR(MinMaxStep);
+
+	await typeInto(Input, '{End}');
+	await expect.poll(() => shown(Input)).toBe('3.00');
+
+	await userEvent.keyboard('{Home}');
+	await expect.poll(() => shown(Input)).toBe('0.50');
+});
+
 // Without a bound there is nothing to jump to, so the browser's own Home and End
 // keep the caret behaviour an editable field should have.
 test('CSR: home is inert on a field with no floor, and the caret still moves', async () => {
