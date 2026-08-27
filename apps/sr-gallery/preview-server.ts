@@ -43,6 +43,8 @@ export const FAMILY_ANCHORS = {
 	calendar: '/#calendar',
 	ink: '/#ink',
 	pad: '/#pad',
+	crop: '/#crop',
+	'crop-image': '/#crop-image',
 	menu: '/#menu',
 	colorpicker: '/#colorpicker',
 	togglegroup: '/#togglegroup',

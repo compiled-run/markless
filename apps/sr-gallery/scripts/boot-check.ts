@@ -65,6 +65,11 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	// Each handle is one role="slider" carrying both axes in aria-valuetext, so
 	// the handles are what has to be in the tree.
 	pad: 'slider',
+	// There is no APG pattern for a movable, resizable rectangle, so the rectangle
+	// ships as a role="group" wearing a roledescription; that group is the part
+	// that has to be in the tree.
+	crop: 'group',
+	'crop-image': 'group',
 	// The surface is hidden until the trigger is pressed, so the trigger is the
 	// part that has to be in the tree at rest.
 	menu: 'button',
@@ -446,6 +451,52 @@ async function main() {
 			);
 		} else {
 			console.log('#pad mounts the field that submits the handle\'s two numbers.');
+		}
+
+		// The group count above says a rectangle rendered; it cannot say the three
+		// facts a reader lane then turns on. The rectangle is announced by a
+		// replacement role word rather than as a plain group, every edge is its own
+		// stop, and a form has something to submit.
+		const rectangle = page.locator('#crop [role="group"]');
+		const roledescription =
+			(await rectangle.count()) === 1
+				? await rectangle.getAttribute('aria-roledescription')
+				: null;
+		if (roledescription !== 'crop area') {
+			failures.push(
+				`#crop's rectangle reads aria-roledescription="${roledescription}", not "crop area".`,
+			);
+		} else if ((await rectangle.getAttribute('tabindex')) !== '0') {
+			failures.push('#crop\'s rectangle is not a tab stop, so no keyboard can move it.');
+		} else {
+			console.log('#crop serves the rectangle announced as a "crop area", and it is a tab stop.');
+		}
+
+		const edges = page.locator('#crop [role="slider"]');
+		if ((await edges.count()) !== 8) {
+			failures.push(
+				`#crop serves ${await edges.count()} resize handles, not the 8 its edges and corners need.`,
+			);
+		} else {
+			const named: string[] = [];
+			for (let index = 0; index < 8; index++) {
+				const label = await edges.nth(index).getAttribute('aria-label');
+				if (label === null) {
+					failures.push(`#crop handle ${index} has no accessible name, so no edge is named.`);
+					continue;
+				}
+				named.push(label);
+			}
+			if (named.length === 8) console.log(`#crop serves 8 named handles: ${named.join(' / ')}`);
+		}
+
+		const cropField = page.locator('#crop input[name="crop"]');
+		if ((await cropField.count()) !== 1) {
+			failures.push(
+				'#crop mounts no single field named "crop", so no rectangle can be submitted.',
+			);
+		} else {
+			console.log('#crop mounts the field that submits the rectangle.');
 		}
 
 		// The role count above sees the cards and nothing else the tour needs: the

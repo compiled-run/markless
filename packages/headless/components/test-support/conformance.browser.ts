@@ -7,6 +7,7 @@ import Checkbox from '../src/checkbox/scenarios/basic.tsrx';
 import Checklist from '../src/checklist/scenarios/basic.tsrx';
 import Collapsible from '../src/collapsible/scenarios/basic.tsrx';
 import Colorpicker from '../src/colorpicker/scenarios/basic.tsrx';
+import Crop from '../src/crop/scenarios/basic.tsrx';
 import DateBox from '../src/datebox/scenarios/basic.tsrx';
 import FileUpload from '../src/fileupload/scenarios/basic.tsrx';
 import Hovercard from '../src/hovercard/scenarios/basic.tsrx';
@@ -224,6 +225,35 @@ const descriptors: readonly FamilyDescriptor[] = [
 		// The family's note names this the one place an item's value appears in
 		// the markup, so it is key-value by design.
 		valuedAttributes: ['ui-value'],
+		supportsDisabled: true,
+	},
+	{
+		family: 'crop',
+		mount: { CSR: () => render(Crop), SSR: () => renderSSR(Crop) },
+		root: 'root',
+		parts: [
+			'root',
+			'label',
+			'description',
+			'area',
+			'selection',
+			'handle-block-start',
+			'handle-block-end',
+			'handle-inline-start',
+			'handle-inline-end',
+			'handle-top-start',
+			'handle-top-end',
+			'handle-bottom-start',
+			'handle-bottom-end',
+			'field',
+		],
+		rootAria: { role: null },
+		// No openCycle: the rectangle is a role="group" that is always on the page,
+		// so the battery's click-a-trigger cycle has nothing of the family's own to
+		// click. The selection and all eight handles are tab stops — that is how a
+		// rectangle is moved and each edge resized without a pointer. The keys, the
+		// drag and the live readout live in src/crop/crop.browser.ts.
+		valuedAttributes: [],
 		supportsDisabled: true,
 	},
 	{
