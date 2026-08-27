@@ -3,13 +3,22 @@
 A freehand drawing surface: pointer strokes with pressure, rendered as SVG paths,
 carried into a form as path data. A signature pad is one styled consumer of it.
 
-**Status: built, not registered.** All 59 browser rows are green in both CSR and
-SSR, the virtual screen-reader lane's 9 rows are green, and the family is not yet
-in `src/index.ts`, the shared conformance battery, or the API manifest — that is
-a follow-up unit. The real reader lanes are written and **not run**: an owner rule
-forbids starting NVDA or VoiceOver on a development machine, so they are
-unmeasured locally and belong to CI. The gallery section they read does not exist
-yet.
+**Status: registered, with one scenario blocked.** The family is wired into the
+`ink` namespace and the `./ink` subpath export, the shared conformance battery
+(twelve rows, green in both CSR and SSR), the API manifest, the `#ink` gallery
+section, and all three reader matrices in the workflow. The real reader lanes are
+written and **not run** here: an owner rule forbids starting NVDA or VoiceOver on
+a development machine, so they are unmeasured locally and belong to CI.
+
+`scenarios/signature.tsrx` stopped compiling when the family joined the root
+barrel: it names `ink` through `../index.ts` and `textbox` through `../../index.ts`,
+and the root barrel now re-exports the first, so every part resolves to nothing
+with `MARKLESS_COMPONENT_TAG_UNRESOLVED`. It is the only scenario in the package
+with that double-barrel shape. Until it is repointed at `../../textbox/index.ts`
+or the resolver handles two aliases of one module, the family's own 59 browser
+rows cannot run — they were green on the same tip with the barrel line removed.
+`goals/headless-components/notes/U616-ink-registration.md` carries the
+measurement.
 
 Research: `goals/headless-components/notes/U611-ink.md` — Ark UI's signature pad,
 `szimek/signature_pad`, `steveruizok/perfect-freehand`, `embiem/react-canvas-draw`,
@@ -254,9 +263,9 @@ live count when a stroke lands on a surface whose name never changes, and whethe
 it walks into the strokes inside `role="img"`.
 
 **Neither has been run**, by an owner rule that forbids starting a screen reader on
-a development machine. They are unmeasured locally and belong to CI. The gallery
-has no ink section yet, so the anchor is written in the transcript rather than
-imported from `FAMILY_ANCHORS`.
+a development machine. They are unmeasured locally and belong to CI. The anchor
+they walk to is `FAMILY_ANCHORS.ink`, imported from the gallery's own
+`preview-server.ts`.
 
 Every wording in this note is therefore the virtual reader's.
 

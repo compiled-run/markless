@@ -10,6 +10,7 @@ import Colorpicker from '../src/colorpicker/scenarios/basic.tsrx';
 import DateBox from '../src/datebox/scenarios/basic.tsrx';
 import FileUpload from '../src/fileupload/scenarios/basic.tsrx';
 import Hovercard from '../src/hovercard/scenarios/basic.tsrx';
+import Ink from '../src/ink/scenarios/basic.tsrx';
 import Menu from '../src/menu/scenarios/basic.tsrx';
 import { Basic as Combobox } from '../src/combobox/scenarios/basic.tsrx';
 import Modal from '../src/modal/scenarios/basic.tsrx';
@@ -275,6 +276,19 @@ const descriptors: readonly FamilyDescriptor[] = [
 		// src/hovercard/hovercard.browser.ts.
 		valuedAttributes: [],
 		supportsDisabled: false,
+	},
+	{
+		family: 'ink',
+		mount: { CSR: () => render(Ink), SSR: () => renderSSR(Ink) },
+		root: 'root',
+		parts: ['root', 'label', 'description', 'area', 'field'],
+		rootAria: { role: null },
+		// No openCycle: the surface is a role="img" that is always on the page, so
+		// the battery's click-a-trigger cycle has nothing of the family's own to
+		// click. The area is still a tab stop — that is how undo and redo are
+		// reached. The stroke and form rows live in src/ink/ink.browser.ts.
+		valuedAttributes: [],
+		supportsDisabled: true,
 	},
 	{
 		family: 'menu',

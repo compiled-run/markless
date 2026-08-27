@@ -203,3 +203,14 @@ input {
 	border-radius: 50%;
 	background: var(--paper);
 }
+
+/* The drawing surface ships no size and paints its strokes in `currentColor`,
+   so both are the consumer's. */
+.ink-surface {
+	display: block;
+	width: 300px;
+	height: 150px;
+	border: 1px solid var(--line);
+	border-radius: 0.35rem;
+	color: var(--ink);
+}

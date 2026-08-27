@@ -1380,6 +1380,120 @@
 			}
 		]
 	},
+	"ink": {
+		"parts": [
+			{
+				"part": "area",
+				"component": "InkArea",
+				"doc": "The surface. Pointer capture rather than window listeners, so a stroke that\nleaves the area keeps arriving here; the keys are the drawing's edit history,\nbecause there is no keyboard way to draw a line freehand.",
+				"props": []
+			},
+			{
+				"part": "description",
+				"component": "InkDescription",
+				"doc": "Supporting text. It reaches the area through `aria-describedby`.",
+				"props": []
+			},
+			{
+				"part": "error",
+				"component": "InkError",
+				"doc": "The validation message. Mounting it is what marks the drawing invalid.",
+				"props": []
+			},
+			{
+				"part": "field",
+				"component": "InkField",
+				"doc": "The element that submits. It carries every stroke's path data joined into one\n`d` string, and it is clipped, `aria-hidden` and out of the tab order, so the\narea is the only thing a person reaches.",
+				"props": []
+			},
+			{
+				"part": "indicator",
+				"component": "InkIndicator",
+				"doc": "The guide line a signature is written on: an SVG `<line>`, `aria-hidden`, with\nno behaviour at all. Give it `x1`/`y1`/`x2`/`y2` — percentages work — or leave\nthem and it spans the area three quarters of the way down.",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "InkLabel",
+				"doc": "The drawing's name. It names the area for a reader.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "InkRoot",
+				"doc": "A freehand drawing surface. A signature pad is one styled consumer of it: the\nfamily knows nothing about signatures, only about strokes.\n\nThe label, description, error, drawing area, guide line and the form field all\ngo inside the root, which holds the drawing and reports `ui-disabled`,\n`ui-readonly`, `ui-empty` and `ui-drawing` for styling.\n\nThere is no clear or undo part. Both are one line in a consumer's own button —\n`ink.state().clear()`, `ink.state().undo()` — and a button the family owned\nwould only be a button the consumer had to restyle.",
+				"props": [
+					{
+						"name": "paths",
+						"type": "readonly string[]",
+						"required": false,
+						"doc": "The strokes, as SVG path data. Passing this makes the drawing controlled:\na gesture reports through `onChange` and nothing appears until the new array\ncomes back in. Leave it out and the drawing keeps its own strokes."
+					},
+					{
+						"name": "defaultPaths",
+						"type": "readonly string[]",
+						"required": false,
+						"default": "[]",
+						"doc": "The strokes an uncontrolled drawing starts with."
+					},
+					{
+						"name": "size",
+						"type": "number",
+						"required": false,
+						"default": "2",
+						"doc": "Stroke width in px at full pressure. Defaults to 2."
+					},
+					{
+						"name": "pressure",
+						"type": "boolean",
+						"required": false,
+						"default": "true",
+						"doc": "Vary the stroke width with pointer pressure. On by default. A device that\nreports no pressure of its own has it derived from how fast the pointer\nmoved, which is what gives a mouse or a trackpad the same tapering."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nothing can be drawn, undone or cleared."
+					},
+					{
+						"name": "readonly",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The drawing is shown but cannot be changed."
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Something must be drawn before a form submits."
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "Submitted under this name by the field the family renders."
+					},
+					{
+						"name": "onChange",
+						"type": "(paths: readonly string[]) => void",
+						"required": false,
+						"doc": "Called with the whole drawing whenever a stroke lands, or is undone, redone or cleared."
+					},
+					{
+						"name": "onDraw",
+						"type": "(current: string) => void",
+						"required": false,
+						"doc": "Called with the in-progress stroke's path data as it is being drawn."
+					}
+				]
+			}
+		]
+	},
 	"menu": {
 		"parts": [
 			{

@@ -59,6 +59,9 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	hovercard: 'link',
 	// The days are real buttons and no grid: there is no gridcell to look for.
 	calendar: 'button',
+	// The drawing surface is one graphic and nothing inside it is a stop of its
+	// own: no keyboard draws freehand, so role="img" is the whole exposure.
+	ink: 'img',
 	// The surface is hidden until the trigger is pressed, so the trigger is the
 	// part that has to be in the tree at rest.
 	menu: 'button',
@@ -93,6 +96,9 @@ const RENDERED_COUNT: Partial<Record<FamilyName, number>> = {
 	numberbox: 2,
 	'numberbox-min-max-step': 2,
 	'numberbox-currency': 2,
+	// The plain drawing and the signature pad: a count catches a section that
+	// rendered one surface and lost the other.
+	ink: 2,
 	// One card per step: a count catches a tour that rendered its first step and
 	// lost the rest, which is what a mis-rooted widget instance looks like here.
 	tour: 3,
@@ -368,6 +374,38 @@ async function main() {
 			);
 		} else {
 			console.log(`#numberbox-min-max-step describes its range: ${description.trim()}`);
+		}
+
+		// A drawing has no text and no value a reader can read back, so what has to
+		// be on the page beside the surface is the live stroke count that says a
+		// stroke landed, and the field that carries the strokes into a form.
+		const counts = page.locator('#ink output[aria-live="polite"]');
+		if ((await counts.count()) !== 2) {
+			failures.push(
+				`#ink serves ${await counts.count()} live stroke counts, not the 2 its two drawings need.`,
+			);
+		} else {
+			const resting = await counts.first().textContent();
+			if (resting?.trim() !== 'Empty') {
+				failures.push(
+					`#ink's live stroke count reads "${resting?.trim()}" at rest, not "Empty".`,
+				);
+			} else {
+				console.log(
+					'#ink serves a live stroke count per drawing, reading "Empty" at rest.',
+				);
+			}
+		}
+
+		const signatureField = page.locator('#ink input[name="signature"]');
+		if ((await signatureField.count()) !== 1) {
+			failures.push(
+				'#ink mounts no single field named "signature", so no drawing can be submitted.',
+			);
+		} else if ((await signatureField.getAttribute('required')) === null) {
+			failures.push("#ink's signature field is not required, so an empty pad would submit.");
+		} else {
+			console.log('#ink mounts the required field that submits the signature.');
 		}
 
 		// The role count above sees the cards and nothing else the tour needs: the
