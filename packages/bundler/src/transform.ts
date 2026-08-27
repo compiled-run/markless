@@ -22,6 +22,7 @@ import {
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
 } from '@markless/serializer';
+import { jsonSourceWithNonFiniteNumbers } from './non-finite-json.ts';
 import type {
 	MarklessTransformManifest,
 	MarklessVirtualModule,
@@ -719,7 +720,7 @@ async function prerenderDataModuleSource(
 				await stripEmittedTypesFromFragment(line, `${renderDataId}:reader-declaration`),
 			);
 		}
-		const data = JSON.stringify(record);
+		const data = jsonSourceWithNonFiniteNumbers(record);
 		const reader = residueReaderSource
 			? await stripEmittedTypesFromExpression(
 					residueReaderSource,
