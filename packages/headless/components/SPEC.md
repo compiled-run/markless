@@ -37,6 +37,7 @@ Established roles (shipped in 3+ families, or ruled by the owner):
 | `track` | the rail a value moves along | slider (ruled); candidates: progress, scroll area |
 | `thumb` | the handle a person drags along a track | slider (ruled) |
 | `area` | a bounded region with its own interaction rules | scroll area; candidates as they earn it |
+| `selection` | the chosen region inside an area, movable and resizable by the person | crop (ruled); candidates: slider range, calendar range |
 
 Explicitly **not** roles: `arrow` (no behavior here — anchored arrows are
 consumer CSS over the anchor data surface; revisit only if three families need a
