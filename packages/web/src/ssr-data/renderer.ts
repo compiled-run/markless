@@ -10,6 +10,42 @@ import {
 
 type Awaitable<T> = T | Promise<T>;
 
+// An `async function` hands back a promise however warm its inputs are, and an
+// `await` on a settled promise still yields the statement its caller is inside.
+// A client minting a `@for` row at the write has no statement to spare, so this
+// renderer's own chain is spelled as continuations instead: every step answers
+// with a value when nothing had to be waited for, and with a promise when
+// something did. Callers may keep awaiting it either way.
+function marklessIsThenable<T>(value: Awaitable<T>): value is Promise<T> {
+	return typeof (value as { readonly then?: unknown } | null | undefined)?.then === 'function';
+}
+
+function marklessThen<A, B>(value: Awaitable<A>, next: (value: A) => Awaitable<B>): Awaitable<B> {
+	return marklessIsThenable(value) ? value.then(next) : next(value);
+}
+
+/** `then` with the `finally` of the await it replaces: released on both edges. */
+function marklessSettled<A, B>(
+	value: Awaitable<A>,
+	release: () => void,
+	next: (value: A) => B,
+): Awaitable<B> {
+	if (!marklessIsThenable(value)) {
+		release();
+		return next(value);
+	}
+	return value.then(
+		(settled) => {
+			release();
+			return next(settled);
+		},
+		(error) => {
+			release();
+			throw error;
+		},
+	);
+}
+
 export type SsrDataResidue =
 	| { readonly kind: 'graph-read'; readonly graphNodeId: string; readonly path: ReadonlyArray<string> }
 	| { readonly kind: 'repeat-item'; readonly repeatId: string; readonly path: ReadonlyArray<string> }
@@ -345,16 +381,20 @@ function spliceTokensAtMark(
  * mint of a `@for` row whose component projects children. `consumed` answers
  * whether the child's own `{children}` slot reported the span back.
  */
-export async function withProjectionSpan<T>(
+export function withProjectionSpan<T>(
 	tokens: ReadonlyArray<StructureToken>,
-	render: (mark: string) => Promise<T>,
-): Promise<{ readonly result: T; readonly consumed: boolean }> {
+	render: (mark: string) => Awaitable<T>,
+): Awaitable<{ readonly result: T; readonly consumed: boolean }> {
 	const span = openProjectionSpan(tokens);
+	const release = () => projectionSpans.delete(span.key);
+	let rendered;
 	try {
-		return { result: await render(span.mark), consumed: span.consumed };
-	} finally {
-		projectionSpans.delete(span.key);
+		rendered = render(span.mark);
+	} catch (error) {
+		release();
+		throw error;
 	}
+	return marklessSettled(rendered, release, (result) => ({ result, consumed: span.consumed }));
 }
 
 export function projectionNotRenderedError(
@@ -372,37 +412,40 @@ export function projectionNotRenderedError(
 	return error;
 }
 
-export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSsrDataOutput> {
+export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDataOutput> {
 	const idPrefix = input.idPrefix ?? '';
 	const chunks = new Map(input.renderData.chunks.map((chunk) => [chunk.id, chunk]));
 	const locators: Array<SsrDataCoordinates['locators'][number]> = [];
 	const anchors: Array<SsrDataCoordinates['anchors'][number]> = [];
 	const rootId = input.renderData.root?.templateId;
-	const rendered = rootId
-		? await renderChunk(rootId, { ...input.rootContext, sharedSeeds: input.sharedSeeds })
-		: { html: '', tokens: [] };
-	const html = rendered.html;
-	const structure = materializeStructure(rendered.tokens);
-	const payloadScripts = input.state && input.view
-		? renderPayloadScripts({ state: input.state, view: input.view })
-		: undefined;
 
-	return {
-		html,
-		...(input.state ? { state: input.state } : {}),
-		...(input.view ? { view: input.view } : {}),
-		...(payloadScripts ? { payloadScripts } : {}),
-		coordinates: { locators, anchors },
-		structure,
-		structureTokens: rendered.tokens,
-	};
+	return marklessThen(
+		rootId
+			? renderChunk(rootId, { ...input.rootContext, sharedSeeds: input.sharedSeeds })
+			: ({ html: '', tokens: [] } as RenderedPart),
+		(rendered): RenderSsrDataOutput => {
+			const payloadScripts = input.state && input.view
+				? renderPayloadScripts({ state: input.state, view: input.view })
+				: undefined;
 
-	async function renderChunk(
+			return {
+				html: rendered.html,
+				...(input.state ? { state: input.state } : {}),
+				...(input.view ? { view: input.view } : {}),
+				...(payloadScripts ? { payloadScripts } : {}),
+				coordinates: { locators, anchors },
+				structure: materializeStructure(rendered.tokens),
+				structureTokens: rendered.tokens,
+			};
+		},
+	);
+
+	function renderChunk(
 		chunkId: string,
 		// The async-arm path forwards the caller's read context; only item/index
 		// are read here.
 		repeat: { readonly item?: unknown; readonly index?: number; readonly key?: unknown } & Partial<SsrDataReadContext>,
-	): Promise<RenderedPart> {
+	): Awaitable<RenderedPart> {
 		const chunk = chunks.get(chunkId);
 		if (!chunk) throw new Error(`MARKLESS_SSR_DATA_CHUNK_MISSING: ${chunkId}`);
 		for (const host of chunk.hosts) locators.push({
@@ -418,191 +461,243 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 			slotsByStatic.set(slot.staticIndex, group);
 		}
 
-		let html = '';
-		const renderedSlots = new Map<SsrDataSlot, RenderedPart>();
+		const context: SsrDataReadContext = {
+			chunkId,
+			...(repeat.item !== undefined ? { repeatItem: repeat.item } : {}),
+			...(repeat.index !== undefined ? { repeatIndex: repeat.index } : {}),
+			...(repeat.key !== undefined ? { repeatKey: repeat.key } : {}),
+			...(repeat.freshInstances ? { freshInstances: repeat.freshInstances } : {}),
+			sharedSeeds: repeat.sharedSeeds,
+		};
+		// Statics and slots as one ordered stream, so a slot that answers with a
+		// promise resumes the walk exactly where it stopped.
+		const parts: Array<string | SsrDataSlot> = [];
 		for (let index = 0; index < chunk.statics.length; index++) {
 			const slots = slotsByStatic.get(index) ?? [];
-			html += withoutSlotMarker(chunk.statics[index] ?? '', index, slots);
-			for (const slot of slots) {
-				const context = {
-					chunkId,
-					...(repeat.item !== undefined ? { repeatItem: repeat.item } : {}),
-					...(repeat.index !== undefined ? { repeatIndex: repeat.index } : {}),
-					...(repeat.key !== undefined ? { repeatKey: repeat.key } : {}),
-					...(repeat.freshInstances ? { freshInstances: repeat.freshInstances } : {}),
-					sharedSeeds: repeat.sharedSeeds,
-				};
-				const renderedSlot = await renderSlot(slot, context);
-				renderedSlots.set(slot, renderedSlot);
-				html += renderedSlot.html;
-			}
+			parts.push(withoutSlotMarker(chunk.statics[index] ?? '', index, slots));
+			for (const slot of slots) parts.push(slot);
 		}
-		const ordered = [
-			...chunk.hosts.map((host) => ({
-				path: host.coordinate.path,
-				order: 0,
-				tokens: [{ kind: 'element', hostNodeId: `${idPrefix}${host.hostNodeId}`, tagName: host.tagName }] as StructureToken[],
-			})),
-			...chunk.slots.flatMap((slot, order) => {
-				const tokens = renderedSlots.get(slot)?.tokens ?? [];
-				return tokens.length > 0 ? [{ path: slot.coordinate.path, order: order + 1, tokens }] : [];
-			}),
-		].sort((left, right) => comparePath(left.path, right.path) || left.order - right.order);
-		return { html, tokens: ordered.flatMap((entry) => entry.tokens) };
+
+		let html = '';
+		const renderedSlots = new Map<SsrDataSlot, RenderedPart>();
+		const walk = (from: number): Awaitable<void> => {
+			for (let index = from; index < parts.length; index++) {
+				const part = parts[index]!;
+				if (typeof part === 'string') {
+					html += part;
+					continue;
+				}
+				const rendered = renderSlot(part, context);
+				if (marklessIsThenable(rendered)) {
+					const next = index + 1;
+					return rendered.then((settled) => {
+						renderedSlots.set(part, settled);
+						html += settled.html;
+						return walk(next);
+					});
+				}
+				renderedSlots.set(part, rendered);
+				html += rendered.html;
+			}
+			return undefined;
+		};
+
+		return marklessThen(walk(0), (): RenderedPart => {
+			const ordered = [
+				...chunk.hosts.map((host) => ({
+					path: host.coordinate.path,
+					order: 0,
+					tokens: [{ kind: 'element', hostNodeId: `${idPrefix}${host.hostNodeId}`, tagName: host.tagName }] as StructureToken[],
+				})),
+				...chunk.slots.flatMap((slot, order) => {
+					const tokens = renderedSlots.get(slot)?.tokens ?? [];
+					return tokens.length > 0 ? [{ path: slot.coordinate.path, order: order + 1, tokens }] : [];
+				}),
+			].sort((left, right) => comparePath(left.path, right.path) || left.order - right.order);
+			return { html, tokens: ordered.flatMap((entry) => entry.tokens) };
+		});
 	}
 
-	async function renderSlot(slot: SsrDataSlot, context: SsrDataReadContext): Promise<RenderedPart> {
+	function renderSlot(slot: SsrDataSlot, context: SsrDataReadContext): Awaitable<RenderedPart> {
 		switch (slot.kind) {
-			case 'text': {
-				const value = await input.read(slot.residue, context);
-				// The `{children}` of a projecting component is exactly this slot: it
-				// reports the projection's token span so `renderChunk` can sort it into
-				// the child's own stream by this slot's coordinate.
-				const claimed = claimProjectionSpans(String(value ?? ''), slot.raw === true);
-				if (slot.raw) return { html: claimed.text, tokens: claimed.tokens };
-				return { html: value == null ? '' : escapeHtml(claimed.text), tokens: [] };
-			}
-			case 'attribute': {
-				const value = await input.read(slot.residue, context);
-				return {
+			case 'text':
+				return marklessThen(input.read(slot.residue, context), (value) => {
+					// The `{children}` of a projecting component is exactly this slot: it
+					// reports the projection's token span so `renderChunk` can sort it into
+					// the child's own stream by this slot's coordinate.
+					const claimed = claimProjectionSpans(String(value ?? ''), slot.raw === true);
+					if (slot.raw) return { html: claimed.text, tokens: claimed.tokens };
+					return { html: value == null ? '' : escapeHtml(claimed.text), tokens: [] };
+				});
+			case 'attribute':
+				return marklessThen(input.read(slot.residue, context), (value) => ({
 					// The name and quotes are already in the statics, so an absent value
 					// writes nothing rather than the word "undefined" into them.
 					html: slot.alwaysPresent
 						? escapeHtml(marklessAttributeValue(slot.name, value) ?? '')
 						: renderAttribute(slot.name, value),
 					tokens: [],
-				};
-			}
+				}));
 			case 'spread-attributes':
-				return { html: renderSpreadAttributes(await input.read(slot.residue, context), slot.excludeNames), tokens: [] };
+				return marklessThen(input.read(slot.residue, context), (value) => ({
+					html: renderSpreadAttributes(value, slot.excludeNames),
+					tokens: [],
+				}));
 			case 'child-component': {
 				anchors.push(anchorRecord(idPrefix, context.chunkId, slot, slot.componentEdgeId));
 				// The widget root reads the same seed map its projected parts read, so the
 				// pass runs once and its answer travels the root edge as well as the projection.
-				const childSeeds = slot.projectionChunkId
-					? await input.seedChild?.(slot, context)
-					: undefined;
-				// A projection renders inside the row that placed it, so the row travels with it.
-				const projection = slot.projectionChunkId
-					? await renderChunk(slot.projectionChunkId, {
-							item: context.repeatItem,
-							index: context.repeatIndex,
-							key: context.repeatKey,
-							sharedSeeds: childSeeds,
-						})
-					: undefined;
-				if (!input.renderChild)
-					throw new Error(`MARKLESS_SSR_DATA_CHILD_RENDERER_MISSING: ${slot.componentEdgeId}`);
-				// Nothing to splice when the projection contributes no structure, so the
-				// mark is spent only where it buys something.
-				const span = projection && projection.tokens.length > 0
-					? openProjectionSpan(projection.tokens)
-					: undefined;
-				let child;
-				try {
-					child = await input.renderChild(slot, {
-						...context,
-						...(childSeeds ? { sharedSeeds: rootEdgeSeeds(childSeeds, context.sharedSeeds) } : {}),
-						...(projection ? { projectionHtml: (span?.mark ?? '') + projection.html } : {}),
-					});
-				} finally {
-					if (span) projectionSpans.delete(span.key);
-				}
-				if (!child || typeof child !== 'object')
-					throw new Error(`MARKLESS_SSR_DATA_CHILD_STRUCTURE_MISSING: ${slot.componentEdgeId}`);
-				if (child.coordinates) {
-					locators.push(...child.coordinates.locators);
-					anchors.push(...child.coordinates.anchors);
-				}
-				const childTokens = 'structureTokens' in child
-					? (child as { readonly structureTokens?: ReadonlyArray<StructureToken> }).structureTokens
-					: undefined;
-				const childElementCount = 'elementCount' in child && typeof child.elementCount === 'number'
-					? child.elementCount
-					: undefined;
-				if (!childTokens && childElementCount === undefined)
-					throw new Error(`MARKLESS_SSR_DATA_CHILD_STRUCTURE_MISSING: ${slot.componentEdgeId}`);
-				const countTokens = Array.from({ length: childElementCount ?? 0 }, (_, index) => ({
-					kind: 'element' as const,
-					hostNodeId: `${idPrefix}__child:${slot.componentEdgeId}:${index}`,
-					tagName: '*',
-				}));
-				const baseTokens = childTokens ?? countTokens;
-				const html = withoutProjectionMarks(child.html);
-				// Spliced: the child's own `{children}` slot already placed the projection
-				// where the HTML puts it, so appending it again would double-count it.
-				if (span?.consumed) return { html, tokens: baseTokens };
-				if (span) {
-					const markAt = child.html.indexOf(span.mark);
-					if (markAt < 0)
-						throw projectionNotRenderedError(slot.childComponentName, slot.componentEdgeId);
-					return {
-						html,
-						tokens: spliceTokensAtMark(baseTokens, child.html.slice(0, markAt), span.tokens),
-					};
-				}
-				return { html, tokens: [...baseTokens, ...(projection?.tokens ?? [])] };
+				return marklessThen(
+					slot.projectionChunkId ? input.seedChild?.(slot, context) : undefined,
+					(childSeeds) => marklessThen(
+						// A projection renders inside the row that placed it, so the row travels with it.
+						slot.projectionChunkId
+							? renderChunk(slot.projectionChunkId, {
+									item: context.repeatItem,
+									index: context.repeatIndex,
+									key: context.repeatKey,
+									sharedSeeds: childSeeds,
+								})
+							: undefined,
+						(projection): Awaitable<RenderedPart> => {
+							if (!input.renderChild)
+								throw new Error(`MARKLESS_SSR_DATA_CHILD_RENDERER_MISSING: ${slot.componentEdgeId}`);
+							// Nothing to splice when the projection contributes no structure, so the
+							// mark is spent only where it buys something.
+							const span = projection && projection.tokens.length > 0
+								? openProjectionSpan(projection.tokens)
+								: undefined;
+							const release = () => {
+								if (span) projectionSpans.delete(span.key);
+							};
+							let pending;
+							try {
+								pending = input.renderChild(slot, {
+									...context,
+									...(childSeeds ? { sharedSeeds: rootEdgeSeeds(childSeeds, context.sharedSeeds) } : {}),
+									...(projection ? { projectionHtml: (span?.mark ?? '') + projection.html } : {}),
+								});
+							} catch (error) {
+								release();
+								throw error;
+							}
+							return marklessSettled(pending, release, (child): RenderedPart => {
+								if (!child || typeof child !== 'object')
+									throw new Error(`MARKLESS_SSR_DATA_CHILD_STRUCTURE_MISSING: ${slot.componentEdgeId}`);
+								if (child.coordinates) {
+									locators.push(...child.coordinates.locators);
+									anchors.push(...child.coordinates.anchors);
+								}
+								const childTokens = 'structureTokens' in child
+									? (child as { readonly structureTokens?: ReadonlyArray<StructureToken> }).structureTokens
+									: undefined;
+								const childElementCount = 'elementCount' in child && typeof child.elementCount === 'number'
+									? child.elementCount
+									: undefined;
+								if (!childTokens && childElementCount === undefined)
+									throw new Error(`MARKLESS_SSR_DATA_CHILD_STRUCTURE_MISSING: ${slot.componentEdgeId}`);
+								const countTokens = Array.from({ length: childElementCount ?? 0 }, (_, index) => ({
+									kind: 'element' as const,
+									hostNodeId: `${idPrefix}__child:${slot.componentEdgeId}:${index}`,
+									tagName: '*',
+								}));
+								const baseTokens = childTokens ?? countTokens;
+								const html = withoutProjectionMarks(child.html);
+								// Spliced: the child's own `{children}` slot already placed the projection
+								// where the HTML puts it, so appending it again would double-count it.
+								if (span?.consumed) return { html, tokens: baseTokens };
+								if (span) {
+									const markAt = child.html.indexOf(span.mark);
+									if (markAt < 0)
+										throw projectionNotRenderedError(slot.childComponentName, slot.componentEdgeId);
+									return {
+										html,
+										tokens: spliceTokensAtMark(baseTokens, child.html.slice(0, markAt), span.tokens),
+									};
+								}
+								return { html, tokens: [...baseTokens, ...(projection?.tokens ?? [])] };
+							});
+						},
+					),
+				);
 			}
 			case 'branch': {
 				anchors.push(anchorRecord(idPrefix, context.chunkId, slot, slot.branchSiteId));
 				if (!input.selectBranchArm)
 					throw new Error(`MARKLESS_SSR_DATA_BRANCH_SELECTOR_MISSING: ${slot.branchSiteId}`);
-				const arm = await input.selectBranchArm(slot, context);
-				const armChunkId = slot.armTemplateIds[arm];
-				// An arm decides WHETHER its body renders, never which row it is inside.
-				const body = armChunkId
-					? await renderChunk(armChunkId, {
-							...context,
-							item: context.repeatItem,
-							index: context.repeatIndex,
-							key: context.repeatKey,
-							...(context.freshInstances || slot.branchSiteId === input.freshBranchSiteId
-								? { freshInstances: true as const }
-								: {}),
-						})
-					: { html: '', tokens: [] };
-				const id = `${idPrefix}${slot.branchSiteId}`;
-				const marker = input.renderData.branches?.some(
-					(branch) =>
-						branch.branchSiteId === slot.branchSiteId && branch.asyncBoundaryId !== undefined,
-				)
-					? 'arm-branch'
-					: 'branch';
-				return {
-					html: `<!--markless:${marker}:${id}-->${body.html}<!--/markless:${marker}:${id}-->`,
-					tokens: [commentToken(marker, id, 'start', body.html), ...body.tokens, commentToken(marker, id, 'end')],
-				};
+				return marklessThen(input.selectBranchArm(slot, context), (arm) => {
+					const armChunkId = slot.armTemplateIds[arm];
+					// An arm decides WHETHER its body renders, never which row it is inside.
+					return marklessThen(
+						armChunkId
+							? renderChunk(armChunkId, {
+									...context,
+									item: context.repeatItem,
+									index: context.repeatIndex,
+									key: context.repeatKey,
+									...(context.freshInstances || slot.branchSiteId === input.freshBranchSiteId
+										? { freshInstances: true as const }
+										: {}),
+								})
+							: ({ html: '', tokens: [] } as RenderedPart),
+						(body): RenderedPart => {
+							const id = `${idPrefix}${slot.branchSiteId}`;
+							const marker = input.renderData.branches?.some(
+								(branch) =>
+									branch.branchSiteId === slot.branchSiteId && branch.asyncBoundaryId !== undefined,
+							)
+								? 'arm-branch'
+								: 'branch';
+							return {
+								html: `<!--markless:${marker}:${id}-->${body.html}<!--/markless:${marker}:${id}-->`,
+								tokens: [commentToken(marker, id, 'start', body.html), ...body.tokens, commentToken(marker, id, 'end')],
+							};
+						},
+					);
+				});
 			}
 			case 'repeat': {
 				anchors.push(anchorRecord(idPrefix, context.chunkId, slot, slot.repeatId));
 				const record = input.renderData.repeats.find((candidate) => candidate.repeatId === slot.repeatId);
-				const items = input.repeatItems
-					? await input.repeatItems(slot, context)
-					: record?.collectionGraphNodeId
-						? await input.read({
-								kind: 'graph-read',
-								graphNodeId: record.collectionGraphNodeId,
-								path: record.collectionPath ?? [],
-							}, context)
-						: [];
-				if (!Array.isArray(items) || items.length === 0)
-					return slot.emptyTemplateId ? renderChunk(slot.emptyTemplateId, {}) : { html: '', tokens: [] };
-				const keyPath = record?.keyPath;
-				// `key row` reads the item itself, so an empty path is still a key.
-				const keyed = record?.itemKey === true || (keyPath?.length ?? 0) > 0;
-				const rows = await Promise.all(
-					items.map((item, index) =>
-						renderChunk(slot.rowTemplateId, {
-							item,
-							index,
-							// Rows mint fresh item/index but must not drop the seed map the
-							// way branch and async keep it: a part's pre-row write rides here.
-							sharedSeeds: context.sharedSeeds,
-							...(keyed ? { key: readValuePath(item, keyPath ?? []) } : {}),
-						}),
-					),
+				return marklessThen(
+					input.repeatItems
+						? input.repeatItems(slot, context)
+						: record?.collectionGraphNodeId
+							? input.read({
+									kind: 'graph-read',
+									graphNodeId: record.collectionGraphNodeId,
+									path: record.collectionPath ?? [],
+								}, context)
+							: [],
+					(items): Awaitable<RenderedPart> => {
+						if (!Array.isArray(items) || items.length === 0)
+							return slot.emptyTemplateId ? renderChunk(slot.emptyTemplateId, {}) : { html: '', tokens: [] };
+						const keyPath = record?.keyPath;
+						// `key row` reads the item itself, so an empty path is still a key.
+						const keyed = record?.itemKey === true || (keyPath?.length ?? 0) > 0;
+						// Started in row order, exactly as the `Promise.all` spelling started
+						// them; a row that never waits simply finishes where it started.
+						const started = items.map((item, index) =>
+							renderChunk(slot.rowTemplateId, {
+								item,
+								index,
+								// Rows mint fresh item/index but must not drop the seed map the
+								// way branch and async keep it: a part's pre-row write rides here.
+								sharedSeeds: context.sharedSeeds,
+								...(keyed ? { key: readValuePath(item, keyPath ?? []) } : {}),
+							}),
+						);
+						return marklessThen(
+							started.some(marklessIsThenable)
+								? Promise.all(started)
+								: (started as ReadonlyArray<RenderedPart>),
+							(rows): RenderedPart => ({
+								html: rows.map((row) => row.html).join(''),
+								tokens: rows.flatMap((row) => row.tokens),
+							}),
+						);
+					},
 				);
-				return { html: rows.map((row) => row.html).join(''), tokens: rows.flatMap((row) => row.tokens) };
 			}
 			case 'async': {
 				anchors.push(anchorRecord(idPrefix, context.chunkId, slot, slot.boundaryId));
@@ -613,56 +708,82 @@ export async function renderSsrData(input: RenderSsrDataInput): Promise<RenderSs
 				const protocolBoundary = input.view?.asyncBoundaries.find(
 					(candidate) => candidate.id === slot.boundaryId,
 				);
-				const selected = input.selectAsyncArm
-					? await input.selectAsyncArm(slot, context)
-					: protocolBoundary?.initiallyServedArm ?? boundary.initiallyServedArm;
-				const arm = typeof selected === 'number' ? selected : selected.arm;
-				const armChunkId = servedArmChunk(
-					arm,
-					slot.armTemplateIds,
+				return marklessThen(
+					input.selectAsyncArm
+						? input.selectAsyncArm(slot, context)
+						: protocolBoundary?.initiallyServedArm ?? boundary.initiallyServedArm,
+					(selected) => {
+						const arm = typeof selected === 'number' ? selected : selected.arm;
+						const armChunkId = servedArmChunk(
+							arm,
+							slot.armTemplateIds,
+						);
+						return marklessThen(
+							armChunkId
+								? renderChunk(armChunkId, { ...context, ...(typeof selected === 'number' ? {} : { asyncError: selected.error }) })
+								: ({ html: '', tokens: [] } as RenderedPart),
+							(body): RenderedPart => {
+								const id = `${idPrefix}${slot.boundaryId}`;
+								return {
+									html: `<!--markless:async:${id}-->${body.html}<!--/markless:async:${id}-->`,
+									tokens: [commentToken('async', id, 'start', body.html), ...body.tokens, commentToken('async', id, 'end')],
+								};
+							},
+						);
+					},
 				);
-				const body = armChunkId
-					? await renderChunk(armChunkId, { ...context, ...(typeof selected === 'number' ? {} : { asyncError: selected.error }) })
-					: { html: '', tokens: [] };
-				const id = `${idPrefix}${slot.boundaryId}`;
-				return {
-					html: `<!--markless:async:${id}-->${body.html}<!--/markless:async:${id}-->`,
-					tokens: [commentToken('async', id, 'start', body.html), ...body.tokens, commentToken('async', id, 'end')],
-				};
 			}
 			case 'dynamic-host': {
 				anchors.push(anchorRecord(idPrefix, context.chunkId, slot, slot.hostNodeId));
-				const tag = dynamicTag(await input.read(slot.tag, context));
-				if (tag === null) return { html: '', tokens: [] };
-				locators.push({
-					chunkId: `${idPrefix}${context.chunkId}`,
-					hostNodeId: `${idPrefix}${slot.hostNodeId}`,
-					tagName: tag,
-					coordinate: slot.coordinate,
+				return marklessThen(input.read(slot.tag, context), (tagValue): Awaitable<RenderedPart> => {
+					const tag = dynamicTag(tagValue);
+					if (tag === null) return { html: '', tokens: [] };
+					locators.push({
+						chunkId: `${idPrefix}${context.chunkId}`,
+						hostNodeId: `${idPrefix}${slot.hostNodeId}`,
+						tagName: tag,
+						coordinate: slot.coordinate,
+					});
+					let attributes = '';
+					for (const [name, value] of Object.entries(slot.staticAttributes))
+						attributes += renderAttribute(name, value);
+					const place = (attribute: (typeof slot.attributeSlots)[number], value: unknown) => {
+						attributes += attribute.kind === 'attribute'
+							? renderAttribute(attribute.name, value)
+							: renderSpreadAttributes(value);
+					};
+					const walkAttributes = (from: number): Awaitable<void> => {
+						for (let index = from; index < slot.attributeSlots.length; index++) {
+							const attribute = slot.attributeSlots[index]!;
+							const value = input.read(attribute.residue, context);
+							if (marklessIsThenable(value)) {
+								const next = index + 1;
+								return value.then((settled) => {
+									place(attribute, settled);
+									return walkAttributes(next);
+								});
+							}
+							place(attribute, value);
+						}
+						return undefined;
+					};
+					return marklessThen(walkAttributes(0), () => marklessThen(
+						// A dynamic host picks the tag around its children, never their row.
+						renderChunk(slot.childChunkId, {
+							...context,
+							item: context.repeatItem,
+							index: context.repeatIndex,
+							key: context.repeatKey,
+						}),
+						(body): RenderedPart => ({
+							html: `<${tag}${attributes}>${body.html}</${tag}>`,
+							tokens: [
+								{ kind: 'element', hostNodeId: `${idPrefix}${slot.hostNodeId}`, tagName: tag },
+								...body.tokens,
+							],
+						}),
+					));
 				});
-				let attributes = '';
-				for (const [name, value] of Object.entries(slot.staticAttributes))
-					attributes += renderAttribute(name, value);
-				for (const attribute of slot.attributeSlots) {
-					const value = await input.read(attribute.residue, context);
-					attributes += attribute.kind === 'attribute'
-						? renderAttribute(attribute.name, value)
-						: renderSpreadAttributes(value);
-				}
-				// A dynamic host picks the tag around its children, never their row.
-				const body = await renderChunk(slot.childChunkId, {
-					...context,
-					item: context.repeatItem,
-					index: context.repeatIndex,
-					key: context.repeatKey,
-				});
-				return {
-					html: `<${tag}${attributes}>${body.html}</${tag}>`,
-					tokens: [
-					{ kind: 'element', hostNodeId: `${idPrefix}${slot.hostNodeId}`, tagName: tag },
-					...body.tokens,
-				],
-				};
 			}
 		}
 	}
