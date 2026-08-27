@@ -170,7 +170,18 @@ type SsrPrefixChild = {
 	readonly graphProps?: ComposeGraphProps;
 	readonly externalSymbolIds?: ReadonlySet<string>;
 };
-type SsrBranchArmSelection = { readonly id: string; readonly takenArm: number };
+type SsrBranchArmSelection = {
+	readonly id: string;
+	readonly takenArm: number;
+	// Present only where the branch's arms bind an element() handle an IDREF
+	// names: this render minted the ids, and no flip can mint them again.
+	readonly elementHandleIds?: Readonly<Record<string, string>>;
+	readonly idrefSites?: ReadonlyArray<{
+		readonly hostNodeId: string;
+		readonly attributeName: string;
+		readonly handleGraphNodeId: string;
+	}>;
+};
 type SsrAsyncSnapshot = {
 	readonly status: string;
 	readonly version: number;
@@ -654,10 +665,13 @@ export function marklessSsrMergeBranches(
 	payloadBranches: ReadonlyArray<SsrBranchRecord> | undefined,
 	runtimeBranches: ReadonlyArray<SsrBranchArmSelection>,
 ) {
-	const takenById = new Map(runtimeBranches.map((branch) => [branch.id, branch.takenArm]));
-	return (payloadBranches ?? []).map((branch) =>
-		takenById.has(branch.id) ? { ...branch, takenArm: takenById.get(branch.id) } : branch,
-	);
+	const servedById = new Map(runtimeBranches.map((branch) => [branch.id, branch]));
+	return (payloadBranches ?? []).map((branch) => {
+		const served = servedById.get(branch.id);
+		if (!served) return branch;
+		const { id: _id, ...resolved } = served;
+		return { ...branch, ...resolved };
+	});
 }
 export function marklessSsrAsyncArm(snapshot?: { readonly status?: string } | null) {
 	return snapshot?.status === 'fulfilled'
