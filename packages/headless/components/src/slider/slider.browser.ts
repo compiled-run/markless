@@ -82,8 +82,8 @@ function expectBasicRendered() {
 	expect(thumb.getAttribute('aria-valuemin')).toBe('0');
 	expect(thumb.getAttribute('aria-valuemax')).toBe('100');
 	expect(thumb.getAttribute('aria-valuenow')).toBe('40');
-	expect(thumb.getAttribute('aria-valuetext')).toBe('40');
-	expect(thumb.getAttribute('aria-orientation')).toBe('horizontal');
+	expect(thumb.hasAttribute('aria-valuetext')).toBe(false);
+	expect(thumb.hasAttribute('aria-orientation')).toBe(false);
 	expect(thumb.getAttribute('aria-disabled')).toBe('false');
 	expect(thumb.getAttribute('aria-labelledby')).toBe(el(Label).id);
 	expect(el(Label).id).toBeTruthy();
@@ -159,7 +159,7 @@ function expectCustomRangeRendered() {
 }
 
 function expectVerticalRendered() {
-	expect(el(Thumb).getAttribute('aria-orientation')).toBe('vertical');
+	expect(el(Thumb).hasAttribute('aria-orientation')).toBe(false);
 	expect(el(Root).getAttribute('ui-orientation')).toBe('vertical');
 	expect(el(Track).getAttribute('ui-orientation')).toBe('vertical');
 }
@@ -215,6 +215,28 @@ for (const mode of MODES) {
 		expectDisabledRendered();
 	});
 }
+
+// The thumb's keydown reads its own `now` computed. A resume re-derives a sync
+// computed only when a dependency is written, so this first keystroke - no
+// pointer, no earlier key - is the read that answered undefined and stepped to NaN.
+test('SSR: the first keystroke after a resume steps from the rendered value', async () => {
+	await renderSSR(Basic);
+	el<HTMLElement>(Thumb).focus();
+
+	await userEvent.keyboard('{ArrowRight}');
+	await expect.poll(() => el(Thumb).getAttribute('aria-valuenow')).toBe('41');
+	expect(el(ValueLabel).textContent?.trim()).toBe('41');
+	expect(customProperty(el(Root), '--slider-end')).toBe('41%');
+});
+
+test('SSR: the first keystroke on a two-value slider steps that thumb alone', async () => {
+	await renderSSR(Range);
+	el<HTMLElement>(StartThumb).focus();
+
+	await userEvent.keyboard('{ArrowRight}');
+	await expect.poll(() => el(StartThumb).getAttribute('aria-valuenow')).toBe('21');
+	expect(el(EndThumb).getAttribute('aria-valuenow')).toBe('80');
+});
 
 test('CSR: an arrow moves the value by one step in either direction', async () => {
 	await render(Basic);
@@ -287,7 +309,7 @@ test('CSR: a keystroke refreshes the value everywhere it is published', async ()
 	await userEvent.keyboard('{PageUp}');
 	await expect.poll(() => el(ValueLabel).textContent?.trim()).toBe('50');
 	expect(el(Thumb).getAttribute('ui-value')).toBe('50');
-	expect(el(Thumb).getAttribute('aria-valuetext')).toBe('50');
+	expect(el(Thumb).getAttribute('aria-valuenow')).toBe('50');
 	expect(customProperty(el(Root), '--slider-end')).toBe('50%');
 	expect(customProperty(el(Thumb), '--slider-offset')).toBe('50%');
 });

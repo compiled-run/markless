@@ -1,0 +1,23 @@
+# MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED
+
+No renderable component root was found; This component root cannot be rendered yet
+
+- Package: compiler
+- Pass or phase: public-render
+- Severity: error, warning
+
+## Message
+
+No component with a TSRX template root was found, so the compiled module would render nothing.
+
+## Why
+
+Markless anchors each component's HTML and interactivity to a single root element. Without a supported root the component would silently render nothing, so the compiler stops with an error instead.
+
+The render module anchors one root component structure and its locators for resume; without a template root there is nothing to anchor.
+
+## Emitted from
+
+- `packages/compiler/src/passes/public-render/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

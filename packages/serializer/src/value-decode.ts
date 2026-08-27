@@ -75,6 +75,7 @@ function decodeSlot(slot: SerializedSlot, shells: ReadonlyMap<number, unknown>):
 	if ('$ref' in slot) return shells.get(slot.$ref);
 	if (slot.$type === 'undefined') return undefined;
 	if (slot.$type === 'bigint') return BigInt(slot.value);
+	if (slot.$type === 'number') return Number(slot.value);
 	if (slot.$type === 'date') return new Date(slot.value);
 	if (slot.$type === 'regexp') return new RegExp(slot.source, slot.flags);
 	if (slot.$type === 'url') return new URL(slot.value);
