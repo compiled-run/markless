@@ -27,6 +27,18 @@ function factoryReadout(container: ParentNode) {
 	return one(container, '[data-gate-factory-readout]').textContent?.trim();
 }
 
+// A derive resumes off the served cell, not off the render map, so the seed has
+// to be in the payload the page ships — not only in the HTML it printed.
+test('SSR: the served cell carries the seed the render evaluated', async () => {
+	const screen = await renderSSR(SeedModuleConstPage);
+	const container = screen.container as ParentNode;
+	const state = one(container, 'script[type="markless/state"]').textContent ?? '';
+
+	expect(state).toContain('["minWidth",1]');
+	expect(state).toContain('["width",3]');
+	expect(state).toContain('["x",2]');
+});
+
 for (const mode of ['CSR', 'SSR'] as const) {
 	test(`${mode}: every seed shape reaches the DOM`, async () => {
 		const screen =
@@ -48,8 +60,7 @@ for (const mode of ['CSR', 'SSR'] as const) {
 		expect(factoryReadout(container)).toBe('5');
 	});
 
-	// SSR is red until an unfoldable seed reaches a protocol cell: the factory computed derives NaN after resume.
-	(mode === 'SSR' ? test.fails : test)(`${mode}: a factory method's write moves every reader of the shape`, async () => {
+	test(`${mode}: a factory method's write moves every reader of the shape`, async () => {
 		const screen =
 			mode === 'CSR' ? await render(SeedModuleConstPage) : await renderSSR(SeedModuleConstPage);
 		const container = screen.container as ParentNode;

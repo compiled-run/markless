@@ -1275,6 +1275,11 @@ function assertSerializedSlot(value: unknown, context: string): void {
 		assertBigIntString(value.value, context);
 		return;
 	}
+	if (value.$type === 'number') {
+		assertStringField(value, 'value', context);
+		assertNonFiniteNumberName(value.value, context);
+		return;
+	}
 	if (value.$type === 'date' || value.$type === 'url') {
 		assertStringField(value, 'value', context);
 		if (value.$type === 'date') assertIsoDateString(value.value, context);
@@ -1313,6 +1318,15 @@ function assertBigIntString(value: unknown, context: string): void {
 	throw invalidPayloadShapeError(
 		contextPayloadType(context),
 		`Invalid ${context}: expected bigint string.`,
+	);
+}
+
+function assertNonFiniteNumberName(value: unknown, context: string): void {
+	if (value === 'Infinity' || value === '-Infinity' || value === 'NaN') return;
+
+	throw invalidPayloadShapeError(
+		contextPayloadType(context),
+		`Invalid ${context}: expected non-finite number name.`,
 	);
 }
 
