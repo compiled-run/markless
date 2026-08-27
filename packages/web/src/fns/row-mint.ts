@@ -1,3 +1,4 @@
+import { marklessAttributeValue } from '../dom-attribute.ts';
 import type { ResumeDomElement, ResumeDomNode, ResumeKeyedRepeatRecord } from '../resume-types.ts';
 
 /**
@@ -11,7 +12,9 @@ import type { ResumeDomElement, ResumeDomNode, ResumeKeyedRepeatRecord } from '.
  * repeats only reorder never writes this module's specifier and never emits its
  * chunk at all. Every helper below is therefore spelled locally: an
  * import from the repeat module would pull that module's whole closure back in
- * and there would be nothing left to gate.
+ * and there would be nothing left to gate. The one import is `dom-attribute`, a
+ * leaf holding the attribute presence rule every render path shares - forking
+ * that rule would be worse than the handful of bytes it costs.
  */
 
 /**
@@ -57,6 +60,21 @@ export function mintRow(
 	repeat: ResumeKeyedRepeatRecord,
 	item: unknown,
 ): ResumeDomElement {
+	return mintRowNodes(parent, repeat, item).rowRoot;
+}
+
+/**
+ * The same mint, answering with the whole fragment as well as the row root.
+ *
+ * A row element that WRAPS a child component is minted here and finished by the
+ * component bridge, which needs the fragment to walk `rowComponent.slotPath` to
+ * the marker the child's nodes replace.
+ */
+export function mintRowNodes(
+	parent: ResumeDomElement,
+	repeat: ResumeKeyedRepeatRecord,
+	item: unknown,
+): { readonly rowRoot: ResumeDomElement; readonly nodes: ReadonlyArray<ResumeDomNode> } {
 	const rowTemplate = repeat.rowTemplate!,
 		host = parent.ownerDocument as MintingDocument | undefined,
 		template = host?.createElement?.('template');
@@ -68,24 +86,39 @@ export function mintRow(
 		);
 	template.innerHTML = rowTemplate.html;
 	const nodes = Array.from(template.content?.childNodes ?? []) as ReadonlyArray<ResumeDomNode>;
+	// Every path is walked before any fill: replacing a marker rewrites the
+	// childNodes a later path would have counted through.
 	const rowRoot = nodes.find((node) => node.nodeType === 1) as ResumeDomElement | undefined,
 		slots = rowTemplate.textSlots ?? [],
-		anchors = slots.map((slot) => nodeAtPath(nodes, slot.path) as ReplaceableNode | undefined);
-	if (!rowRoot || anchors.some((anchor) => !anchor?.replaceWith))
+		anchors = slots.map((slot) => nodeAtPath(nodes, slot.path) as ReplaceableNode | undefined),
+		attributeSlots = rowTemplate.attributeSlots ?? [],
+		hosts = attributeSlots.map(
+			(slot) => nodeAtPath(nodes, slot.path) as AttributableNode | undefined,
+		);
+	if (
+		!rowRoot ||
+		anchors.some((anchor) => !anchor?.replaceWith) ||
+		hosts.some((element) => !element?.setAttribute)
+	)
 		throw repeatRuntimeError(
 			repeat,
 			'MARKLESS_REPEAT_ROW_MINT_EMPTY',
 			'built no row from its markup, and half a row is worse than none.',
 		);
+	for (const [at, slot] of attributeSlots.entries()) {
+		const value = marklessAttributeValue(slot.name, readPath(item, slot.itemPath));
+		if (value === null) hosts[at]!.removeAttribute?.(slot.name);
+		else hosts[at]!.setAttribute!(slot.name, value);
+	}
 	for (const [at, slot] of slots.entries())
 		anchors[at]!.replaceWith!(host.createTextNode(String(readPath(item, slot.itemPath) ?? '')));
-	return rowRoot;
+	return { rowRoot, nodes };
 }
 
 // A local copy of fns/direct's walk, for the reason this whole module is local:
 // importing that module pulls it into this on-demand module's static closure,
 // which the leanness guard measures.
-function nodeAtPath(
+export function nodeAtPath(
 	nodes: ReadonlyArray<ResumeDomNode>,
 	path: ReadonlyArray<number>,
 ): ResumeDomNode | undefined {
@@ -102,6 +135,10 @@ type MintingDocument = NonNullable<ResumeDomElement['ownerDocument']> & {
 	readonly createTextNode?: (data: string) => ResumeDomNode;
 };
 type ReplaceableNode = ResumeDomNode & { readonly replaceWith?: (node: ResumeDomNode) => void };
+type AttributableNode = ResumeDomNode & {
+	readonly setAttribute?: (name: string, value: string) => void;
+	readonly removeAttribute?: (name: string) => void;
+};
 function readPath(value: unknown, path: ReadonlyArray<string>): unknown {
 	let cursor = value as Record<string, unknown> | null | undefined;
 	for (const key of path) {

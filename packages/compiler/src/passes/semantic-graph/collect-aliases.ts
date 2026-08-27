@@ -5,8 +5,10 @@ import {
 	graphPathSource,
 	resolveGraphPath,
 	semanticAliasMap,
+	splitStaticGraphPath,
 } from '../../artifact-helpers/graph-paths.ts';
 import type { SemanticGraphBinding } from '../../artifacts.ts';
+import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import { graphDestructureDefaultUnsupportedDiagnostic } from './diagnostics.ts';
 import type { WalkState } from './types.ts';
 
@@ -43,18 +45,59 @@ export function collectWholeBindingAlias(
 	const local = localAliasIdentifier(id);
 	if (!local) return;
 
+	const initSource = expressionSource(init, state.source);
 	const resolved = resolveGraphPath(
-		expressionSource(init, state.source),
+		initSource,
 		graphBindingMap(state.graph, currentGraphScope(state)),
 		semanticAliasMap(state.graph, currentGraphScope(state)),
 	);
-	if (!resolved) return;
-	if (resolved.path.length > 0) return;
+	if (!resolved) {
+		collectSharedInstancePathAlias(local, initSource, declarationKind, state);
+		return;
+	}
+	// A `let` naming a path can be reassigned to something off the graph, and a
+	// name declared inside a nested callback is that callback's local, not the
+	// component's - so only a `const` in the body itself is the path it names.
+	if (resolved.path.length > 0 && (declarationKind !== 'const' || state.currentFunctionSite)) {
+		return;
+	}
 
 	state.graph.aliases.push({
 		name: local.name,
 		target: graphPathSource(resolved.binding, resolved.path),
 		...sharedScope(state),
+		declarationKind,
+		sourceSpan: sourceSpan(local, state.filename),
+	});
+}
+
+/**
+ * `const days = cal.days` where `cal` is a shared-instance local.
+ *
+ * The instance local exists only inside the component function, so the target is
+ * kept as the authored path and `resolveSharedInstanceGraphPath` walks it: the
+ * shared graph is scoped to the definition, and its bindings are filtered out of
+ * the component's own binding map, so the alias cannot name one directly.
+ */
+function collectSharedInstancePathAlias(
+	local: { readonly name: string } & AnyNode,
+	initSource: string,
+	declarationKind: SemanticGraphBinding['declarationKind'],
+	state: WalkState,
+): void {
+	if (declarationKind !== 'const' || state.currentFunctionSite) return;
+	if (state.currentSharedDefinitionId) return;
+
+	const segments = splitStaticGraphPath(initSource);
+	if (segments.length < 2 || segments[0] === local.name) return;
+	if (!resolveSharedInstanceGraphPath(initSource, state.graph, state.currentComponentName)) {
+		return;
+	}
+
+	state.graph.aliases.push({
+		name: local.name,
+		target: initSource,
+		...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
 		declarationKind,
 		sourceSpan: sourceSpan(local, state.filename),
 	});

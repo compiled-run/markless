@@ -1,0 +1,22 @@
+# MARKLESS_SHARED_SEED_UNKNOWN_FIELD
+
+Shared instance has no such field to seed
+
+- Package: compiler
+- Pass or phase: state-lowering
+- Severity: error
+
+## Message
+
+Cannot write to "…" because "…()" declares no graph field named "…". Instance callback fields such as "…" are not supported yet (tracked).
+
+## Why
+
+A component body seed is lowered into an initial value for a graph node the shared definition declared. With no matching node there is nothing to seed, and the authored assignment cannot run on the server because the emitted body keeps no local for the shared instance.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/state-lowering.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

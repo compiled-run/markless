@@ -1,0 +1,22 @@
+# MARKLESS_SHARED_CALL_UNRESOLVED
+
+Shared definition call does not resolve
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: error
+
+## Message
+
+`…` reaches no shared() definition. …
+
+## Why
+
+A call the compiler cannot resolve to a shared() definition creates no graph instance, so every read of it would render a dead value and every write would go nowhere — silently, at runtime.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/collect-shared.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

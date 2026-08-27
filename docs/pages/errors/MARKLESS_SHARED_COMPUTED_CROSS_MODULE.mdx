@@ -1,0 +1,24 @@
+# MARKLESS_SHARED_COMPUTED_CROSS_MODULE
+
+A shared() computed cannot be read from another module yet ("…")
+
+- Package: compiler
+- Pass or phase: foreign-scope, symbol-modules
+- Severity: error
+
+## Message
+
+Serving this page works "…" out by copying its expression from … into this file. The copied expression names "…", and nothing in this module binds it, so rendering this page on the server would throw a ReferenceError.
+
+Serving this page works "…" out by copying its expression from … into this file. The copied expression names "…", which … means as its own, and THIS file already binds "…" as …; one module scope cannot hold both, and matched against it by name alone the served value would be built from this module's "…" rather than the one … means.
+
+## Why
+
+A shared() factory has no instance on the server to ask for a computed value, so the server works the value out by copying the factory's own expression into the module of every page that reads it. The imports and module-scope constants that expression names travel with the definition and are emitted beside the copy, but a name this file already binds from somewhere else cannot be: the emitted module would bind it twice, and matching by name alone would build the served value from this module's value instead.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/foreign-scope.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
