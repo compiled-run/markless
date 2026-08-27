@@ -13,6 +13,9 @@ export default defineProject({
 	test: {
 		name: 'browser',
 		include: ['browser/**/*.test.ts'],
+		// Serial on purpose: 136 files sharing one dev server push cold demand-loaded
+		// symbol modules past the 1000ms poll ceiling (green 2/2 serial, ~9 red parallel).
+		fileParallelism: false,
 		browser: {
 			enabled: true,
 			headless: true,

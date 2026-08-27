@@ -31,7 +31,17 @@
  *
  * An enlisted element must still be attached when it hides. An element removed
  * from the document while it is on the stack leaves its background marks behind,
- * so families hide their surface rather than unmounting it.
+ * so families hide their surface rather than unmounting it. Teardown makes that
+ * violation inevitable anyway - a navigation or a test unwind detaches whatever
+ * was open - so the stack drops a detached entry the moment it would receive a
+ * dismissal, and says so with a dev-build console.error naming the element.
+ * Pruning is the repair, not the rule: without it the corpse is topmost and
+ * every gesture aimed at the live surface underneath it disappears.
+ *
+ * A dismissal that finds nothing live to report to is not spent. It is left
+ * primed for the next installation, the same way the resumer leaves the Escape
+ * that woke a served-open page - a lost gesture is silent wrongness, while a
+ * primer no page ever consumes costs nothing.
  */
 
 import type {
@@ -67,6 +77,12 @@ type OverlayEntry = {
 	readonly undo: Array<() => void>;
 };
 
+/** A dismissal waiting for something live to report it to. */
+type PrimedDismissal = {
+	readonly reason: OverlayDismissReason;
+	readonly pressTarget?: Element;
+};
+
 type BackgroundAttribute = 'inert' | 'aria-hidden';
 
 // Topmost last. Every document-level decision reads only the last entry.
@@ -89,6 +105,10 @@ const authoredMarks: Record<BackgroundAttribute, WeakSet<Element>> = {
 let listeningDocument: Document | undefined;
 let scrollLocks = 0;
 let releaseScroll: (() => void) | undefined;
+
+// Rides with the unkeyed primer, whose reason stays a plain string on the global
+// so anything that clears the handoff clears this too.
+let primedPressTarget: Element | undefined;
 
 /**
  * Watch one rendered root for marked elements becoming shown.
@@ -138,9 +158,7 @@ export function installOverlayBehavior(root: Element | Document): (() => void) |
 	// it to. Reporting it now, to whatever the enlistment above left topmost, is
 	// what makes the FIRST press on a served-open page dismiss rather than the
 	// second. Taken once: a page has one primer and one wake.
-	const primed = takePrimedDismissal();
-	const top = stack[stack.length - 1];
-	if (primed && top) reportDismiss(top.element, primed);
+	replayPrimedDismissal(root);
 
 	return () => {
 		observer.disconnect();
@@ -164,11 +182,59 @@ function hiddenBoundSurfaces(root: Element | Document): ReadonlyArray<HTMLElemen
 	);
 }
 
-function takePrimedDismissal(): OverlayDismissReason | undefined {
+/** Hand this root whatever gesture was swallowed before it could be reported. */
+function replayPrimedDismissal(root: Element | Document): void {
+	const host = root as OverlayPrimedDismissalHost;
+	const keyed = host.__marklessOverlayPrimedDismissal;
+	if (keyed) host.__marklessOverlayPrimedDismissal = undefined;
+	const primed: PrimedDismissal | undefined = keyed ? { reason: keyed } : takePrimedDismissal();
+	if (!primed) return;
+	const top = liveTop();
+	// An unkeyed replay goes back rather than being eaten by a root with nothing
+	// of its own live.
+	if (!top) {
+		if (!keyed) primeDismissal(primed);
+		return;
+	}
+	// The press that woke a served-open page usually landed INSIDE it, and nothing
+	// was on the stack to ask when it did.
+	if (primed.pressTarget && top.element.contains(primed.pressTarget)) return;
+	reportDismiss(top.element, primed.reason, primed.pressTarget);
+}
+
+function takePrimedDismissal(): PrimedDismissal | undefined {
 	const host = globalThis as OverlayPrimedDismissalHost;
-	const primed = host.__marklessOverlayPrimedDismissal;
+	const reason = host.__marklessOverlayPrimedDismissal;
+	if (!reason) return undefined;
 	host.__marklessOverlayPrimedDismissal = undefined;
-	return primed;
+	const pressTarget = primedPressTarget;
+	primedPressTarget = undefined;
+	return pressTarget ? { reason, pressTarget } : { reason };
+}
+
+function primeDismissal(primed: PrimedDismissal): void {
+	(globalThis as OverlayPrimedDismissalHost).__marklessOverlayPrimedDismissal = primed.reason;
+	primedPressTarget = primed.pressTarget;
+}
+
+/** The topmost entry still in the document, dropping the dead ones on the way. */
+function liveTop(): OverlayEntry | undefined {
+	for (let index = stack.length - 1; index >= 0; index -= 1) {
+		const entry = stack[index];
+		if (!entry) continue;
+		if (entry.element.isConnected) return entry;
+		reportDetachedEntry(entry.element);
+		release(entry.element);
+	}
+	return undefined;
+}
+
+function reportDetachedEntry(element: HTMLElement): void {
+	if (!import.meta.env?.DEV) return;
+	console.error(
+		'markless: an overlay element was removed from the document while it was still enlisted, so it was dropped from the overlay stack. An enlisted element must still be attached when it hides - hide the surface instead of unmounting it.',
+		element,
+	);
 }
 
 function enlist(element: HTMLElement, owner: Document): void {
@@ -347,20 +413,25 @@ function stopListening(): void {
 
 function onKeyDown(event: KeyboardEvent): void {
 	if (event.key !== 'Escape' || event.defaultPrevented) return;
-	const top = stack[stack.length - 1];
+	const top = liveTop();
 	// Escape is reported to the topmost element and nothing below it, so a nested
 	// surface's handler answers for it rather than every open surface at once.
 	if (top) reportDismiss(top.element, 'escape');
+	else primeDismissal({ reason: 'escape' });
 }
 
 function onPointerDown(event: Event): void {
-	const top = stack[stack.length - 1];
-	if (!top) return;
+	const top = liveTop();
 	const target = event.target;
+	const pressTarget = target instanceof Element ? target : undefined;
+	if (!top) {
+		primeDismissal({ reason: 'outside-press', pressTarget });
+		return;
+	}
 	if (target instanceof Node && top.element.contains(target)) return;
 	// The report is made on the press, not the click, so a drag that starts
 	// inside the surface and ends outside it never counts as an outside press.
 	// The pressed element rides along, so a family can tell a press on its own
 	// trigger from an unrelated one by asking where it landed.
-	reportDismiss(top.element, 'outside-press', target instanceof Element ? target : undefined);
+	reportDismiss(top.element, 'outside-press', pressTarget);
 }

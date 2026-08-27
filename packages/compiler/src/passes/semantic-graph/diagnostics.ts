@@ -10,11 +10,7 @@ import type {
 	SourceSpan,
 } from '../../artifacts.ts';
 import type { FrameworkApiName } from './imports.ts';
-import type {
-	PendingElementHandleAnchor,
-	PendingElementHandleIdref,
-	WalkState,
-} from './types.ts';
+import type { PendingElementHandleIdref, WalkState } from './types.ts';
 
 export function storageKeyStaticDiagnostic(input: {
 	readonly argument: 'key' | 'fallback';
@@ -196,7 +192,7 @@ export function componentSpreadUnsupportedDiagnostic(input: {
 		why: 'What a spread carries onto a child component is decided at build time, from the signature that produced it. An object assembled anywhere else has no build-time contents, so the child would render without the entries and nothing would say so.',
 		span: sourceSpan(input.node, input.filename),
 		suggestion:
-			'Spread the rest binding of this component\'s own props (`function Part({ known, ...rest })` then `<Child {...rest} />`), or write the props you mean out by name on the tag.',
+			"Spread the rest binding of this component's own props (`function Part({ known, ...rest })` then `<Child {...rest} />`), or write the props you mean out by name on the tag.",
 		docsUrl: 'https://markless.dev/errors/MARKLESS_COMPONENT_SPREAD_UNSUPPORTED',
 	});
 }
@@ -787,6 +783,36 @@ export function unboundSharedCallDiagnostic(input: {
 	};
 }
 
+// A shared() node id is a wire key spelled from the authored declaration name,
+// so a returned cell set with no name has nothing to spell.
+export function unnamedSharedReturnDiagnostic(input: {
+	readonly definitionName: string;
+	readonly apiName: string;
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_SHARED_RETURN_UNNAMED',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'a shared() factory must return named state',
+		message: `shared() definition "${input.definitionName}" returns ${input.apiName}() directly, so the cells it returns have no name.`,
+		why: 'A shared() cell is serialized under an id spelled from the name it was declared with, and every read of the instance resolves through that id. An inline call in return position declares no name, so no node exists, and each read of the instance falls back to the authored text and throws at render.',
+		primarySpan: input.span,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		source: input.definitionName,
+		suggestions: [
+			{
+				message: `Name the cells and return the name: \`const s = ${input.apiName}(...); return s;\`.`,
+			},
+			{
+				message: 'Return a wrapper that spreads them when the factory also exposes methods: `return { ...s, toggle() { … } };`.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_RETURN_UNNAMED',
+	};
+}
+
 // A shared() definition that several components of its own module resolve is a
 // widget family shape. Left without a scope it is page-scoped, so two of those
 // widgets on one page silently share one graph. The warning makes the scope a
@@ -945,6 +971,30 @@ export function unboundElementHandleDiagnostic(input: {
 }
 
 /**
+ * A derive body can never observe a handle: the element is bound on the DOM and
+ * only a handler-shaped symbol is rewritten into the lookup that answers it, so
+ * the derivation reads `undefined` and publishes a value built out of it. That
+ * is refused rather than warned, because there is no reading of the code where
+ * the author wanted the word "undefined".
+ */
+export function elementHandleDeriveReadDiagnostic(input: {
+	readonly handleName: string;
+	readonly source: string;
+	readonly derivedName: string;
+	readonly componentName: string;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_ELEMENT_HANDLE_UNBOUND',
+		title: 'element() handle is read before it is bound',
+		message: `Cannot read element handle "${input.source}" inside computed "${input.derivedName}" in ${input.componentName}: element() handles are DOM-bound and readable only in event handlers, so "${input.handleName}" is undefined on every derivation.`,
+		why: 'A derive body runs on the graph, where an element node holds no value. Only handler-shaped reads are rewritten into the DOM lookup that answers a handle, so a handle read in a derive compiles and then publishes a value built out of undefined.',
+		suggestion:
+			'Measure the element in an event handler and write the result to a state cell the derive reads, or drop the handle read from the derive body.',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_UNBOUND',
+	});
+}
+
+/**
  * A dangling IDREF handle is an error, not a warning, and it is its own code
  * rather than a promotion of MARKLESS_ELEMENT_HANDLE_UNBOUND.
  *
@@ -971,26 +1021,36 @@ export function unboundIdrefElementHandleDiagnostic(
 }
 
 /**
- * An IDREF position takes exactly one handle, written directly. Lists
- * (`aria-labelledby={[a, b]}`), joins, and choices are refused in this slice
- * rather than lowered.
+ * An IDREF position takes handles written directly: one, or a static array of
+ * them where the platform defines the attribute as a list. Joins, choices, and
+ * arrays the compiler cannot read at build time are refused rather than lowered.
  *
- * Refusal is a decision about ownership, not difficulty. Joining ids would make
- * the compiler mint several ids, choose their order, and pick a separator - all
- * of which are id SPELLING, which these records deliberately do not own. A
- * refusal is loud and reversible; a silent join would bake one emitter's
- * spelling into the graph.
+ * Refusal is a decision about ownership, not difficulty. A recombined value
+ * would make the compiler mint ids it cannot see the order of, and id SPELLING
+ * is not something these records own. A refusal is loud and reversible; a silent
+ * join would bake one emitter's spelling into the graph.
+ *
+ * `reason` narrows the message for the two places a static list is still wrong:
+ * an attribute HTML defines as single-valued, and a component tag, where the id
+ * crosses the edge as one prop value rather than as markup this module writes.
  */
 export function compositeIdrefElementHandleDiagnostic(input: {
 	readonly attributeName: string;
 	readonly source: string;
 	readonly span?: SourceSpan;
+	readonly reason?: 'single-valued' | 'component-edge';
 }): SemanticGraphDiagnostic {
+	const message =
+		input.reason === 'single-valued'
+			? `Cannot resolve ${input.attributeName}={${input.source}}. ${input.attributeName} names exactly one element, so it takes one element() handle rather than a list.`
+			: input.reason === 'component-edge'
+				? `Cannot resolve ${input.attributeName}={${input.source}}. The id crosses the component edge as one value, so a list of handles is only available on an element this component renders itself.`
+				: `Cannot resolve ${input.attributeName}={${input.source}}. An IDREF position takes element() handles written directly, not a join, a choice between handles, or an array the compiler cannot read while compiling.`;
 	return semanticGraphDiagnostic({
 		code: 'MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE',
 		title: 'One element() handle per IDREF attribute',
-		message: `Cannot resolve ${input.attributeName}={${input.source}}. An IDREF position takes exactly one element() handle written directly, not a list, a join, or a choice between handles.`,
-		why: 'The compiler resolves the relationship and the emitter mints the id. Combining handles would require the compiler to spell and order several ids inside one attribute value, and id spelling is not something this record owns.',
+		message,
+		why: 'The compiler resolves the relationship and the emitter mints the id. Combining handles would require the compiler to spell and order ids it cannot see, and id spelling is not something this record owns.',
 		span: input.span,
 		suggestion: `Reference one element() handle directly, as ${input.attributeName}={handle}.`,
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE',
@@ -1012,7 +1072,8 @@ export function rowOwnedIdrefElementHandleDiagnostic(
 		message: `Cannot resolve ${reference.attributeName}={${reference.source}} because "${reference.handleName}" is bound inside a keyed repeat, so it names one element per row rather than one element.`,
 		why: 'Every row owns its own element and would need its own id. One authored handle cannot name one of them, and picking a row silently would make the relationship point at whichever row happened to render first.',
 		span: reference.sourceSpan,
-		suggestion: 'Bind a separate element() handle outside the repeat for the element this attribute names, or move the relationship inside the row so each row names its own element.',
+		suggestion:
+			'Bind a separate element() handle outside the repeat for the element this attribute names, or move the relationship inside the row so each row names its own element.',
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_ROW_OWNED',
 	});
 }
@@ -1030,10 +1091,11 @@ export function widgetRootIdrefElementHandleDiagnostic(
 	return semanticGraphDiagnostic({
 		code: 'MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT',
 		title: 'This shared() element() handle cannot be named by an IDREF here',
-		message: `Cannot resolve ${reference.attributeName}={${reference.source}} because "${reference.handleName}" is declared in a shared() factory that this component roots, or in a factory that is not { scope: 'widget' }.`,
-		why: 'A widget-scoped factory is one graph per rendered widget, so the minted id has to carry which widget it belongs to. That token is written when the widget root seeds the parts placed inside it, which happens after the root itself has started rendering and never happens at all for a page-wide factory.',
+		message: `Cannot resolve ${reference.attributeName}={${reference.source}} because "${reference.handleName}" is declared in a shared() factory that is not { scope: 'widget' }.`,
+		why: 'A widget-scoped factory is one graph per rendered widget, so the minted id has to carry which widget it belongs to. That token exists for every rendered widget, its root included, and never exists for a page-wide factory.',
 		span: reference.sourceSpan,
-		suggestion: "Move the element() handle and both ends of the relationship into parts placed inside the widget root, and give the factory { scope: 'widget' }.",
+		suggestion:
+			"Give the factory { scope: 'widget' } and keep both ends of the relationship inside one rendered widget.",
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT',
 	});
 }
@@ -1053,135 +1115,31 @@ export function idrefElementHandleIdConflictDiagnostic(input: {
 		message: `Cannot mint the id for el={${input.handleName}} because this element already declares an id attribute.`,
 		why: 'An IDREF position is written from the id the compiler mints for the bound element. A second, authored id on the same element would emit two id attributes and leave the relationship pointing at whichever one the HTML parser kept.',
 		span: input.span,
-		suggestion: 'Remove the authored id from this element, or drop the element() handle and write the IDREF attribute with your own id string.',
+		suggestion:
+			'Remove the authored id from this element, or drop the element() handle and write the IDREF attribute with your own id string.',
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_ID_CONFLICT',
 	});
 }
 
 /**
- * `anchorName` and `positionAnchor` are not DOM attributes: they lower to an
- * inline CSS declaration whose value is the per-instance name minted for one
- * element() handle. A value that is not one handle written directly has no name
- * to spell, and letting it fall through would write a bogus `anchorname="..."`
- * attribute into the HTML that no browser reads.
+ * `anchorName` / `positionAnchor` as an attribute. Refused rather than written:
+ * neither is an HTML attribute, so a browser reading the emitted markup would
+ * find `anchorname="..."` and ignore it, leaving the popup positioned against
+ * its containing block and looking merely misplaced.
  */
-export function anchorElementHandleValueDiagnostic(input: {
-	readonly attributeName: string;
-	readonly source: string;
-	readonly span?: SourceSpan;
-}): SemanticGraphDiagnostic {
-	return semanticGraphDiagnostic({
-		code: 'MARKLESS_ELEMENT_HANDLE_ANCHOR_VALUE',
-		title: 'A CSS anchor position takes one element() handle',
-		message: `Cannot resolve ${input.attributeName}={${input.source}}. ${input.attributeName} takes exactly one element() handle written directly, not a string, a list, or a choice between handles.`,
-		why: 'The anchor name is minted per rendered widget so two widgets on one page cannot collide, and only an element() handle names the element it is minted for. There is no authored spelling of that name to accept here.',
-		span: input.span,
-		suggestion: `Write ${input.attributeName}={handle} with an element() handle, and put every other positioning declaration in your own CSS.`,
-		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_ANCHOR_VALUE',
-	});
-}
-
-/**
- * An anchor position lowers to an inline style on the element that carries it.
- * On a component or part tag there is no element of this markup to style: the
- * value would have to cross the edge and be merged into whatever style the
- * child writes, which is the child's markup to decide, not this one's.
- */
-export function anchorElementHandleHostRequiredDiagnostic(input: {
-	readonly attributeName: string;
-	readonly ownerTagName: string | null;
-	readonly span?: SourceSpan;
-}): SemanticGraphDiagnostic {
-	return semanticGraphDiagnostic({
-		code: 'MARKLESS_ELEMENT_HANDLE_ANCHOR_HOST_REQUIRED',
-		title: 'A CSS anchor position belongs on an element',
-		message: `Cannot resolve ${input.attributeName} on <${input.ownerTagName ?? 'component'}> because it is a component, not an element.`,
-		why: 'The anchor name lowers to an inline style declaration on the element that carries the attribute. A component tag renders no element of its own here, so there is nothing to declare the style on.',
-		span: input.span,
-		suggestion: `Move ${input.attributeName} onto the element inside that component that should carry the anchor.`,
-		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_ANCHOR_HOST_REQUIRED',
-	});
-}
-
-/**
- * The anchor half of MARKLESS_ELEMENT_HANDLE_IDREF_UNBOUND, and it fails the
- * same silent way: an unbound handle would emit an anchor name naming no
- * element, so the popup lays out against its containing block and looks merely
- * misplaced rather than broken.
- */
-export function unboundAnchorElementHandleDiagnostic(
-	reference: PendingElementHandleAnchor,
-): SemanticGraphDiagnostic {
-	return semanticGraphDiagnostic({
-		code: 'MARKLESS_ELEMENT_HANDLE_ANCHOR_UNBOUND',
-		title: 'element() handle is used as a CSS anchor but never bound',
-		message: `Cannot resolve ${reference.attributeName}={${reference.source}} because "${reference.handleName}" is never bound with el={${reference.handleName}} in this component.`,
-		why: 'A CSS anchor position names another element. With no el={handle} binding there is no element to name, so the compiler would emit an anchor name pointing at nothing and the browser would silently fall back to positioning against the containing block.',
-		span: reference.sourceSpan,
-		suggestion: `Bind the handle to the element it names with el={${reference.handleName}}, or remove the ${reference.attributeName} attribute.`,
-		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_ANCHOR_UNBOUND',
-	});
-}
-
-/**
- * A handle bound inside a keyed repeat locates one element per row, so one
- * authored anchor name would be declared on every row. CSS resolves a duplicate
- * anchor-name to the LAST element in source order, silently, which is the same
- * ambiguity the IDREF row refusal exists to keep visible.
- */
-export function rowOwnedAnchorElementHandleDiagnostic(
-	reference: PendingElementHandleAnchor,
-): SemanticGraphDiagnostic {
-	return semanticGraphDiagnostic({
-		code: 'MARKLESS_ELEMENT_HANDLE_ANCHOR_ROW_OWNED',
-		title: 'A repeated element() handle cannot be a CSS anchor',
-		message: `Cannot resolve ${reference.attributeName}={${reference.source}} because "${reference.handleName}" is bound inside a keyed repeat, so it names one element per row rather than one element.`,
-		why: 'Every row would declare the same anchor name, and CSS resolves a duplicated anchor-name to whichever element comes last in source order. Nothing reports that, so the popup would anchor to the last row.',
-		span: reference.sourceSpan,
-		suggestion: 'Bind a separate element() handle outside the repeat for the element this attribute anchors to, or move both ends of the relationship inside the row.',
-		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_ANCHOR_ROW_OWNED',
-	});
-}
-
-/**
- * Same boundary as the IDREF widget-root refusal: the token naming a rendered
- * widget instance is written into the seed map the root hands its parts, so the
- * root itself cannot read it and a page-scoped factory never gets one. Minting
- * without it would give two widgets on one page the same anchor name.
- */
-export function widgetRootAnchorElementHandleDiagnostic(
-	reference: PendingElementHandleAnchor,
-): SemanticGraphDiagnostic {
-	return semanticGraphDiagnostic({
-		code: 'MARKLESS_ELEMENT_HANDLE_ANCHOR_WIDGET_ROOT',
-		title: 'This shared() element() handle cannot be a CSS anchor here',
-		message: `Cannot resolve ${reference.attributeName}={${reference.source}} because "${reference.handleName}" is declared in a shared() factory that this component roots, or in a factory that is not { scope: 'widget' }.`,
-		why: 'A widget-scoped factory is one graph per rendered widget, so the anchor name has to carry which widget it belongs to. That token is written when the widget root seeds the parts placed inside it, which happens after the root itself has started rendering and never happens at all for a page-wide factory.',
-		span: reference.sourceSpan,
-		suggestion: "Move the element() handle and both ends of the relationship into parts placed inside the widget root, and give the factory { scope: 'widget' }.",
-		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_ANCHOR_WIDGET_ROOT',
-	});
-}
-
-/**
- * The anchor declarations and the consumer's own style share one inline style
- * attribute, so they are composed into one value at compile time. A style whose
- * value is only known at render time cannot be composed that way without
- * emitting two style attributes, where the browser keeps the first and drops
- * the other silently.
- */
-export function anchorElementHandleDynamicStyleDiagnostic(input: {
+export function cssAnchorAttributeDiagnostic(input: {
 	readonly attributeName: string;
 	readonly span?: SourceSpan;
 }): SemanticGraphDiagnostic {
 	return semanticGraphDiagnostic({
-		code: 'MARKLESS_ELEMENT_HANDLE_ANCHOR_STYLE_DYNAMIC',
-		title: 'A CSS anchor cannot share an element with a computed style',
-		message: `Cannot compose ${input.attributeName} with the style attribute on this element, because that style is computed at render time rather than written as a literal or an object of literals.`,
-		why: 'Both end up in the same inline style attribute. The compiler merges them into one value so the element carries exactly one style attribute; a render-time value would have to be merged in the browser, and emitting two style attributes instead would let the parser drop one without saying so.',
+		code: 'MARKLESS_CSS_ANCHOR_ATTRIBUTE',
+		title: 'CSS anchoring is regular CSS',
+		message: `Cannot write ${input.attributeName} as an attribute. CSS anchoring is regular CSS - declare anchor-name/position-anchor in a <style> block or your stylesheet.`,
+		why: 'An element takes the attributes HTML defines. anchor-name and position-anchor are CSS properties with no HTML attribute of the same name, so nothing on the page would read them.',
 		span: input.span,
-		suggestion: 'Move the computed declarations into a class, or move the anchor attribute onto a wrapper element that carries no computed style.',
-		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_ANCHOR_STYLE_DYNAMIC',
+		suggestion:
+			'Declare the anchor in a <style> block in this file, or in your stylesheet, and select the element the way you select it for any other style.',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_CSS_ANCHOR_ATTRIBUTE',
 	});
 }
 
@@ -1203,20 +1161,20 @@ export function elementHandleRenderReadDiagnostic(input: {
 }
 
 /**
- * An IDREF or CSS anchor position names exactly ONE element, and an array-typed
- * handle names a set. This is the boundary Option C-prime kept: lifting the
- * duplicate refusal for ordinary `el=` bindings answered "which element does a
- * resumed handle locate" with an order, but `aria-labelledby` has no order to
- * ride — it would have to pick a member, and picking silently is the defect.
+ * An IDREF names exactly ONE element, and an array-typed handle names a set.
+ * Lifting the duplicate refusal for ordinary `el=` bindings answered "which
+ * element does a resumed handle locate" with an order, but `aria-labelledby`
+ * has no order to ride - it would have to pick a member, and picking silently
+ * is the defect.
  */
 export function pluralIdrefElementHandleDiagnostic(
-	reference: PendingElementHandleIdref | PendingElementHandleAnchor,
+	reference: PendingElementHandleIdref,
 ): SemanticGraphDiagnostic {
 	return semanticGraphDiagnostic({
 		code: 'MARKLESS_ELEMENT_HANDLE_PLURAL_IDREF',
 		title: 'An array-typed element() handle cannot fill this position',
 		message: `Cannot resolve ${reference.attributeName}={${reference.source}} because "${reference.handleName}" is declared as an array (element<T[]>()), so it names an ordered set of elements rather than one.`,
-		why: 'This attribute points at exactly one element. A handle declared with an array type argument may be bound on many elements, and there is no order in an IDREF or an anchor name to say which member it means, so the compiler would have to pick one silently.',
+		why: 'This attribute points at exactly one element. A handle declared with an array type argument may be bound on many elements, and an IDREF carries no order to say which member it means, so the compiler would have to pick one silently.',
 		span: reference.sourceSpan,
 		suggestion: `Declare a second, single element() handle for the one element this attribute points at and bind it there, leaving "${reference.handleName}" for the set.`,
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_PLURAL_IDREF',
@@ -1325,6 +1283,53 @@ export function repeatCollectionUnreadableDiagnostic(input: {
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_COLLECTION_UNREADABLE',
 	} as SemanticGraphDiagnostic;
+}
+
+// Same code as the unreadable-collection refusal: both say this @for has no
+// source of rows it could evaluate. The text is specific to the undeclared root
+// so the fix is the one the author actually needs.
+export function repeatCollectionUndeclaredDiagnostic(input: {
+	readonly node: AnyNode;
+	readonly itemName: string;
+	readonly collectionSource: string;
+	readonly rootName: string;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_REPEAT_COLLECTION_UNREADABLE',
+		title: 'This @for collection names nothing',
+		message: `@for (const ${input.itemName} of ${input.collectionSource}) is rooted in \`${input.rootName}\`, which this module declares nowhere and imports nowhere. The repeat has no graph cell to read and no binding its authored expression could evaluate against.`,
+		why: 'The collection expression is re-emitted into the server render module, where an undeclared name throws a ReferenceError on the first render.',
+		span: sourceSpan(input.node, input.filename),
+		suggestion: `Declare \`${input.rootName}\` as a \`state()\` cell or a \`computed()\` in this component or its shared family, or correct the spelling if it was meant to name one that exists.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_COLLECTION_UNREADABLE',
+	});
+}
+
+const REACTIVE_READ_NOUN = {
+	state: 'state cell',
+	computed: 'computed value',
+	prop: 'component prop',
+} as const;
+
+export function repeatFrozenRowsDiagnostic(input: {
+	readonly node: AnyNode;
+	readonly itemName: string;
+	readonly collectionSource: string;
+	readonly rootName: string;
+	readonly readSource: string;
+	readonly readKind: keyof typeof REACTIVE_READ_NOUN;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_REPEAT_ROWS_FROZEN',
+		title: 'This @for renders its rows once and never updates them',
+		message: `@for (const ${input.itemName} of ${input.collectionSource}) takes its rows from \`${input.rootName}\`, which is neither a state cell nor a computed, so the repeat resolves to no graph node and its rows are built on the server and never rebuilt in the browser. The row body reads \`${input.readSource}\`, a ${REACTIVE_READ_NOUN[input.readKind]} that can change after that render, and those rows would silently keep their first-render values.`,
+		why: 'A keyed repeat reconciles through the graph node its collection resolves to; a collection that resolves to none renders its rows once, so any reactive read inside a row is frozen at its first-render value with nothing said at build time.',
+		span: sourceSpan(input.node, input.filename),
+		suggestion: `Put the collection on the graph - \`const ${input.rootName} = state([...])\` or \`const ${input.rootName} = computed(() => ...)\` inside the component - so the rows rebuild when \`${input.readSource}\` changes; or keep the rows static by reading only \`${input.itemName}\` inside them.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_ROWS_FROZEN',
+	});
 }
 
 export function repeatKeyIsIndexDiagnostic(input: {
@@ -1640,6 +1645,35 @@ export function branchElseSpellingDiagnostic(input: {
 			{ message: 'For a chained condition, write `@else if (condition) { ... }`.' },
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_BRANCH_ELSE_SPELLING',
+	};
+}
+
+// Owner-adjustable: the spec is unambiguous that a bare container is not a
+// template output node, but the in-repo @markless/ui families still spell arms
+// that way. `warning` until that migration lands, then `error`.
+export const BARE_ARM_INTERPOLATION_SEVERITY: 'error' | 'warning' = 'error';
+
+export const BARE_ARM_INTERPOLATION_CODE = 'MARKLESS_BARE_ARM_INTERPOLATION' as const;
+
+export function bareArmInterpolationDiagnostic(input: {
+	readonly expressionSource: string;
+	readonly node: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	const wrapped = `<>{${input.expressionSource}}</>`;
+	return {
+		code: BARE_ARM_INTERPOLATION_CODE,
+		severity: BARE_ARM_INTERPOLATION_SEVERITY,
+		phase: 'semantic-graph',
+		title: 'A branch arm renders a bare expression instead of a fragment',
+		message: `\`{${input.expressionSource}}\` stands alone as this arm's whole body. A standalone expression container is not a template output node, so the arm has no markup of its own and its text has nowhere to live but the element around it — which erases whatever the other arm rendered there.`,
+		why: 'Template output is an element, a fragment, or a control-flow construct. A statement container that needs to render text says so with a fragment, which gives the text its own marker range inside the arm.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		source: `{${input.expressionSource}}`,
+		suggestions: [{ message: `Wrap it in a fragment: ${wrapped}` }],
+		docsUrl: `https://markless.dev/errors/${BARE_ARM_INTERPOLATION_CODE}`,
 	};
 }
 

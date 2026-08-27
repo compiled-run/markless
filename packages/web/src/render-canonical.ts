@@ -23,6 +23,7 @@ export async function renderCanonicalClientOutput(
 			state: output.state,
 			view: output.view,
 			loadSymbol,
+			renderData: () => surface,
 		});
 	}
 	if (!component.renderSsr) {
@@ -41,7 +42,7 @@ export async function renderCanonicalClientOutput(
 function clientOutputFromHtml(
 	ownerDocument: Document,
 	html: string,
-	records: Pick<CsrRenderOutput, 'state' | 'view' | 'loadSymbol'>,
+	records: Pick<CsrRenderOutput, 'state' | 'view' | 'loadSymbol' | 'renderData'>,
 ): CsrRenderOutput {
 	const template = ownerDocument.createElement('template');
 	template.innerHTML = html;
