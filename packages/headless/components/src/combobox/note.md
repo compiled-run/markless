@@ -58,10 +58,13 @@ models converge and a shared base is worth re-pricing.
 4. **No `displayValue` and no `scrollOptions`.** The first is reachable as
    `combobox.state().input`; the second is behaviour 5.14, deferred with a pinned
    row rather than half-built.
-5. **`aria-describedby` names one handle.** An IDREF list is
-   `MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE`, so a combobox mounting both a
-   description and an error is described by the first. Same call select made for
-   `aria-labelledby` and textbox made for this attribute. Pinned row.
+5. **`aria-describedby` names both handles, error first.** `description` and
+   `error` stand behind separate handles and the input names them as a list:
+   `aria-describedby={[errorEl, descriptionEl]}`. A field that mounts both is
+   described by both, error first — standard announcement order, so what is
+   wrong is conveyed before the hint, whichever order the two parts are written
+   in. A part that was never placed drops out of the list rather than dangling,
+   and a field that placed neither carries no attribute at all.
 6. **`combobox.field` carries the chosen value, not the option list.** Select's
    shape. `multiple` wants one option per chosen value; see the repeat wall below.
 7. **`{...rest}` is spread first**, so a consumer cannot silently overwrite the
@@ -196,7 +199,7 @@ suite carries it in both modes so nobody "fixes" it later.
 This family makes no DOM query. Nothing calls `querySelector`,
 `querySelectorAll`, or `closest`. Every element a handler touches arrives as an
 `element()` handle read off the handler's own widget instance: `inputEl`,
-`triggerEl`, `contentEl`, `labelEl`, `describedEl`, and `optionEls` — one
+`triggerEl`, `contentEl`, `labelEl`, `descriptionEl`, `errorEl`, and `optionEls` — one
 array-typed handle bound on every option, read back as the live options in
 document order. `option-walk.ts` is plain functions handed those options.
 

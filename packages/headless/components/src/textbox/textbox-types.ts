@@ -39,14 +39,14 @@ export type TextboxTextareaProps = PropsOf<'textarea'>;
 export type TextboxLabelProps = PropsOf<'label'>;
 
 /**
- * Supporting text for the box, named by the control's `aria-describedby`. One
- * element can be named that way, so mounting this alongside `textbox.error`
- * describes by whichever renders first.
+ * Supporting text for the box, named by the control's `aria-describedby`. Mount
+ * it alongside `textbox.error` and the control names both, the error first.
  */
 export type TextboxDescriptionProps = PropsOf<'div'>;
 
 /**
- * The validation message. Mounting it is what marks the control invalid - it
+ * The validation message, named by the control's `aria-describedby` ahead of
+ * `textbox.description`. Mounting it is what marks the control invalid - it
  * reports `aria-invalid` for as long as this part is in the page - so render it
  * only when there is an error to show.
  */

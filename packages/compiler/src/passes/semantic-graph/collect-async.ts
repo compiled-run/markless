@@ -101,17 +101,22 @@ export function propagateAsyncComputedCapability(graph: MutableSemanticGraphArti
 
 export function finalizeComputedDependencies(state: WalkState): void {
 	for (const pending of state.pendingComputedDependencies) {
+		const owner = pendingDeriveOwner(pending, state);
 		const previousSharedDefinitionId = state.currentSharedDefinitionId;
 		state.currentSharedDefinitionId = pending.sharedDefinitionId;
+		const declaringComponentName = owner?.componentName;
 		const directBindingNames = new Set(
-			graphBindingMap(state.graph, currentGraphScope(state)).keys(),
+			graphBindingMap(state.graph, currentGraphScope(state), declaringComponentName).keys(),
 		);
-		const finalizedDependencies = collectGraphDependencies(pending.body, state).filter(
-			(dependency) => directBindingNames.has(dependency.source.split('.')[0] ?? ''),
-		);
+		const finalizedDependencies = collectGraphDependencies(
+			pending.body,
+			state,
+			declaringComponentName,
+		).filter((dependency) => directBindingNames.has(dependency.source.split('.')[0] ?? ''));
 		state.currentSharedDefinitionId = previousSharedDefinitionId;
 		state.graph.graphBindings = state.graph.graphBindings.map((binding) => {
 			if (binding.id !== pending.graphNodeId) return binding;
+			if (owner && binding !== owner) return binding;
 			const dependencies = uniqueBy(
 				[...(binding.dependencies ?? []), ...finalizedDependencies],
 				(dependency) =>
@@ -120,6 +125,44 @@ export function finalizeComputedDependencies(state: WalkState): void {
 			return { ...binding, dependencies };
 		});
 	}
+}
+
+/**
+ * The binding a pending derive was declared as. Sibling components declaring the
+ * same local name mint the same graph node id, so the id alone names more than
+ * one binding; the derive body sits lexically inside exactly one component, and
+ * `componentId` carries that component's span.
+ */
+function pendingDeriveOwner(
+	pending: { readonly graphNodeId: string; readonly body: AnyNode | undefined },
+	state: WalkState,
+): SemanticGraphBinding | undefined {
+	const candidates = state.graph.graphBindings.filter(
+		(binding) => binding.id === pending.graphNodeId,
+	);
+	if (candidates.length <= 1) return candidates[0];
+
+	const span = pending.body ? sourceSpan(pending.body, state.filename) : null;
+	if (!span) return undefined;
+
+	const declaring = candidates.filter((binding) =>
+		componentSpanContains(binding.componentId, span.start, span.end),
+	);
+	return declaring.length === 1 ? declaring[0] : undefined;
+}
+
+function componentSpanContains(
+	componentId: string | undefined,
+	start: number,
+	end: number,
+): boolean {
+	if (!componentId) return false;
+	const [, rawStart, rawEnd] = componentId.split(':');
+	const componentStart = Number(rawStart);
+	const componentEnd = Number(rawEnd);
+	if (!Number.isFinite(componentStart) || !Number.isFinite(componentEnd)) return false;
+
+	return start >= componentStart && end <= componentEnd;
 }
 
 export function collectComputedDependencyCycleDiagnostics(
@@ -189,10 +232,11 @@ export function collectAsyncBoundaryDiagnostics(graph: MutableSemanticGraphArtif
 export function collectGraphDependencies(
 	node: AnyNode | undefined,
 	state: WalkState,
+	componentName?: string | undefined,
 ): ReadonlyArray<SemanticGraphDependency> {
 	const dependencies: SemanticGraphDependency[] = [];
-	const bindings = graphBindingMap(state.graph, currentGraphScope(state));
-	const aliases = semanticAliasMap(state.graph, currentGraphScope(state));
+	const bindings = graphBindingMap(state.graph, currentGraphScope(state), componentName);
+	const aliases = semanticAliasMap(state.graph, currentGraphScope(state), componentName);
 	const bodyRegion = readRegion(node);
 
 	const visit = (candidate: AnyNode | undefined): void => {

@@ -273,6 +273,14 @@ function validateScalarSlot(slot: unknown, context: string): void {
 			BigInt(tagged.value);
 			return;
 		} catch {}
+	// A non-finite number's tag carries the number's own string form, so the
+	// round trip back through Number() is the check.
+	if (
+		tagged.$type === 'number' &&
+		!Number.isFinite(Number(tagged.value)) &&
+		String(Number(tagged.value)) === tagged.value
+	)
+		return;
 	if (
 		tagged.$type === 'date' &&
 		typeof tagged.value === 'string' &&
@@ -360,6 +368,8 @@ function decodeScalarSlot(slot: unknown): unknown {
 	if ((slot as { readonly $type?: unknown }).$type === 'undefined') return undefined;
 	if ((slot as { readonly $type?: unknown }).$type === 'bigint')
 		return BigInt((slot as { readonly value: string }).value);
+	if ((slot as { readonly $type?: unknown }).$type === 'number')
+		return Number((slot as { readonly value: string }).value);
 	return new Date((slot as { readonly value: string }).value);
 }
 

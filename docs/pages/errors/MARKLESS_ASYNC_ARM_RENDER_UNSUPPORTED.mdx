@@ -1,0 +1,20 @@
+# MARKLESS_ASYNC_ARM_RENDER_UNSUPPORTED
+
+The settled @try content cannot render in the browser yet
+
+- Package: compiler
+- Pass or phase: public-render
+
+## Message
+
+TODO: this code has no builder message in source.
+
+## Why
+
+The compiler emits a browser-side render module for @try/@catch content so it can update after the data settles. A shape the module cannot render would silently stay frozen, so the compiler reports it instead.
+
+## Emitted from
+
+- `packages/compiler/src/passes/public-render/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
