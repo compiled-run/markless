@@ -1,31 +1,14 @@
 import type { PropsOf, Seeded } from '@markless/core';
 
 /**
- * Which side of the trigger the surface is placed on. `start` and `end` are the
- * writing direction's sides, so they swap in a right-to-left page; `top` and
- * `bottom` are the same everywhere.
- */
-export type PopoverSide = 'top' | 'bottom' | 'start' | 'end';
-
-/**
  * The popover itself; the trigger and the surface go inside it. It holds whether
- * the surface is showing and which side it is placed on, and it is the anchor
- * end of the CSS anchor placement, so the family owns this element's `style`
- * attribute - style the root from a stylesheet rather than a `style` prop.
+ * the surface is showing, and it is the anchor end of the CSS anchor placement,
+ * which lives in the part's own scoped stylesheet - your `style` and `class`
+ * compose untouched.
  */
 export type PopoverRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/** Whether the surface is showing. Omit it and the popover starts closed. */
 	readonly open?: boolean;
-	/**
-	 * Where the surface is placed against the trigger. It is also written on
-	 * `popover.content` as `ui-side`, so styling can follow the placement.
-	 *
-	 * The placement is a CSS anchor, so it holds while the page scrolls and
-	 * reflows without any script. The family owns the `style` attribute on
-	 * `popover.root`, `popover.trigger` and `popover.content` to carry it -
-	 * style those three parts from a stylesheet rather than a `style` prop.
-	 */
-	readonly side?: PopoverSide;
 	/**
 	 * Called with the new value when the popover opens or closes - including when
 	 * Escape or a press outside closes it. Omit it and the popover still opens and
@@ -47,6 +30,13 @@ export type PopoverTriggerProps = PropsOf<'button'>;
  *
  * A consumer's `onDismiss` runs after the family has closed the popover, so a
  * handler can see which way the family went.
+ *
+ * The placement is a CSS anchor, so it holds while the page scrolls and reflows
+ * without any script. The anchor binding and a default `position-area` of
+ * `block-end` ship in the parts' own scoped stylesheets, inside `@layer markless`
+ * - so one unlayered rule of yours replaces the default without a specificity
+ * fight: `.my-surface { position-area: inline-end }`. `--ui-anchor` names the
+ * anchor for your own `anchor()` geometry.
  */
 export type PopoverContentProps = PropsOf<'div'>;
 
@@ -64,7 +54,7 @@ export type PopoverCloseProps = PropsOf<'button'>;
  * fields, plus the consumer's `onChange`, stored by the root for `setOpen()` to
  * call.
  */
-export type PopoverInstanceState = Seeded<PopoverRootProps, 'open' | 'side'> & {
+export type PopoverInstanceState = Seeded<PopoverRootProps, 'open'> & {
 	onChange?: PopoverRootProps['onChange'];
 	/**
 	 * When the trigger's next click is ignored, as a timestamp.

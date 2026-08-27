@@ -1,0 +1,12 @@
+{
+	"name": "@fixture/ships-source",
+	"private": true,
+	"version": "0.0.0",
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"publishConfig": {
+		"marklessShipsSource": true
+	}
+}

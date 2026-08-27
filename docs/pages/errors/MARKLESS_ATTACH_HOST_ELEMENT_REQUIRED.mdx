@@ -1,0 +1,22 @@
+# MARKLESS_ATTACH_HOST_ELEMENT_REQUIRED
+
+attach can only be bound to host elements
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: error
+
+## Message
+
+Cannot bind attach=\{…\} on component …. attach installs DOM behavior and needs a concrete host element owner.
+
+## Why
+
+Element behaviors are resumed by locating the owning DOM element. A component is not a DOM locator and may render zero, one, or many host nodes.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

@@ -121,9 +121,16 @@ test('the widget local still resolves inside the part that declares it', async (
 });
 
 // The compile stays fully accepted: this is a resolution fix, not a new refusal.
-test('the colliding module compiles with no diagnostic', async () => {
+// The row wraps <Chair> in an element whose own slots read off the item, which
+// the mint builds, so nothing here warns about growth either.
+test('the colliding module compiles with no diagnostic at all', async () => {
 	const compiled = await compile('seat');
 
 	expect(compiled.semanticGraph.diagnostics).toEqual([]);
-	expect(compiled.publicRenderModule.diagnostics ?? []).toEqual([]);
+	expect(
+		(compiled.publicRenderModule.diagnostics ?? []).map((entry) => [
+			entry.code,
+			entry.severity,
+		]),
+	).toEqual([]);
 });

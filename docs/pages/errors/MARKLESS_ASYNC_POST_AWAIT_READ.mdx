@@ -1,0 +1,22 @@
+# MARKLESS_ASYNC_POST_AWAIT_READ
+
+Reactive reads after await are not resumable
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: error
+
+## Message
+
+Cannot read "…" after await in async computed "…". Snapshot the value before awaiting.
+
+## Why
+
+Async computed dependency keys are captured before the first await. Reading graph state after suspension would make revalidation and resume depend on hidden async timing.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
