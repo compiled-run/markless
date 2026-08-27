@@ -1,4 +1,4 @@
-import * as slider from '../index.ts';
+import { slider } from '../../index.ts';
 
 export default function Vertical() @{
 	<slider.root value={40} orientation="vertical" data-testid="root">

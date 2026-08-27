@@ -714,6 +714,7 @@ function deserializeSlot(
 	}
 	if (slot.$type === 'undefined') return undefined;
 	if (slot.$type === 'bigint' && typeof slot.value === 'string') return BigInt(slot.value);
+	if (slot.$type === 'number' && typeof slot.value === 'string') return Number(slot.value);
 	return undefined;
 }
 

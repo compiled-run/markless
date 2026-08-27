@@ -1,0 +1,25 @@
+# MARKLESS_STATE_NESTED_CREATION
+
+A framework API call cannot be a graph value; state() cannot be the initial value of another state()
+
+- Package: compiler
+- Pass or phase: semantic-graph
+
+## Message
+
+`…` creates a computed whose value would be another …() call. `…` derives a value; it cannot derive graph nodes.
+
+`…` declares graph state whose initial value is another state() call. `…` cannot store graph state as its value.
+
+## Why
+
+A graph cell serializes plain data across the resume boundary; a state() call declares a cell and has no serializable value form.
+
+…() declares a graph node at compile time; it has no runtime value form that a cell or derive result can hold.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

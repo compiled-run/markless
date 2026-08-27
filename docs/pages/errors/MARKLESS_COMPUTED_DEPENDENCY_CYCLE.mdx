@@ -1,0 +1,23 @@
+# MARKLESS_COMPUTED_DEPENDENCY_CYCLE
+
+A computed cannot depend on itself; Computed dependencies cannot form a cycle
+
+- Package: compiler
+- Pass or phase: semantic-graph
+
+## Message
+
+Cannot create computed dependency cycle `…`.
+
+`…` reads `…` — the value it is defining. `…` cannot be derived from `…`.
+
+## Why
+
+A derive is a pull-based graph node; a cycle in its dependencies means there is no order in which the graph can produce the value.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

@@ -1,0 +1,22 @@
+# MARKLESS_STATE_STALE_LOCAL_WRITE
+
+Handler write would leave the template stale
+
+- Package: compiler
+- Pass or phase: state-lowering
+- Severity: error
+
+## Message
+
+Cannot write to "…" from a handler because the template reads the component local "…" only during initial render.
+
+## Why
+
+Component bodies run for initial render only. Template reads re-render after events only when they subscribe through state(), so this handler write would leave the UI stale after resume.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/state-lowering.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

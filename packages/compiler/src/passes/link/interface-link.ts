@@ -174,6 +174,18 @@ export function linkedRenderDataBoundarySymbols(
 		input.link.artifactChildMaterializations,
 	);
 
+	return [
+		...linkedBoundaryUpdateSymbols(input, emittedSymbolIds, plannedSymbols, routes),
+		...linkedBranchEscalationSymbols(input, emittedSymbolIds, routes),
+	];
+}
+
+function linkedBoundaryUpdateSymbols(
+	input: LinkedBoundarySymbolsInput,
+	emittedSymbolIds: ReadonlySet<string>,
+	plannedSymbols: ReadonlyMap<string, { readonly kind: string }>,
+	routes: ReadonlyArray<ComponentEdgeSymbolRoute>,
+): ReadonlyArray<LinkedBoundarySymbol> {
 	return input.compiled.protocolView.asyncBoundaries.flatMap((boundary, index) => {
 		const symbolId = boundary.updateSymbolId;
 		if (!symbolId || emittedSymbolIds.has(symbolId)) return [];
@@ -210,6 +222,55 @@ export function linkedRenderDataBoundarySymbols(
 	});
 }
 
+/**
+ * The escalation symbols for branches whose arms hold a component that has to
+ * run. Rebuilding such an arm from compiled markup is impossible, so the flip
+ * re-renders the page through the prerender evaluator — which runs the
+ * component under its own instance identity — and commits the arm range from
+ * what that render produced. A linker that names no branch export fulfills
+ * nothing, leaving the symbol-modules refusal in force.
+ */
+function linkedBranchEscalationSymbols(
+	input: LinkedBoundarySymbolsInput,
+	emittedSymbolIds: ReadonlySet<string>,
+	routes: ReadonlyArray<ComponentEdgeSymbolRoute>,
+): ReadonlyArray<LinkedBoundarySymbol> {
+	const branchExportName = input.branchExportName;
+	if (!branchExportName) return [];
+	return (input.compiled.symbolModules.armEscalationCandidates ?? []).flatMap(
+		(candidate, index) => {
+			if (emittedSymbolIds.has(candidate.symbolId)) return [];
+			const virtualModuleId = input.symbolModuleId(candidate.symbolId);
+			const exportName = branchExportName(index);
+			return [
+				{
+					row: { id: candidate.symbolId, chunk: virtualModuleId, exportName },
+					branchSiteId: candidate.branchSiteId,
+					manifest: {
+						symbolId: candidate.symbolId,
+						kind: 'branch-update' as const,
+						exportName,
+						virtualModuleId,
+					},
+					module: {
+						id: virtualModuleId,
+						type: 'symbol' as const,
+						symbolId: candidate.symbolId,
+						exportName,
+						source: linkedRenderDataBranchSymbolSource({
+							branchSiteId: candidate.branchSiteId,
+							exportName,
+							renderDataId: input.renderDataId,
+							resolverId: input.resolverId,
+							routes,
+						}),
+					},
+				},
+			];
+		},
+	);
+}
+
 function linkedRenderDataBoundarySymbolSource(input: {
 	readonly boundaryId: string;
 	readonly exportName: string;
@@ -218,9 +279,46 @@ function linkedRenderDataBoundarySymbolSource(input: {
 	readonly routes: ReadonlyArray<ComponentEdgeSymbolRoute>;
 }): string {
 	return [
+		...linkedRenderDataSymbolPreamble(input, 'renderPrerenderBoundary'),
+		`export async function ${input.exportName}(context) {`,
+		`\tconst rendered = await renderPrerenderBoundary(marklessPrerenderData, ${JSON.stringify(input.boundaryId)}, context.status, context.graph, marklessLoadLinkedSymbol);`,
+		'\treturn { ...rendered, arm: context.status === "rejected" ? 2 : 0 };',
+		'}',
+	].join('\n');
+}
+
+function linkedRenderDataBranchSymbolSource(input: {
+	readonly branchSiteId: string;
+	readonly exportName: string;
+	readonly renderDataId: string;
+	readonly resolverId: string;
+	readonly routes: ReadonlyArray<ComponentEdgeSymbolRoute>;
+}): string {
+	return [
+		...linkedRenderDataSymbolPreamble(input, 'renderPrerenderBranch'),
+		`export async function ${input.exportName}(context) {`,
+		`\tconst rendered = await renderPrerenderBranch(marklessPrerenderData, ${JSON.stringify(input.branchSiteId)}, context.graph, marklessLoadLinkedSymbol);`,
+		// `resolved` marks the render authoritative: an arm that legitimately shows
+		// nothing must not be mistaken for a module that found no parts.
+		'\treturn { ...rendered, arm: context.arm, resolved: true };',
+		'}',
+	].join('\n');
+}
+
+// The render-data surface, the local resolver, and the prefix routing that
+// reaches an imported module's symbols: identical for either escalation entry.
+function linkedRenderDataSymbolPreamble(
+	input: {
+		readonly renderDataId: string;
+		readonly resolverId: string;
+		readonly routes: ReadonlyArray<ComponentEdgeSymbolRoute>;
+	},
+	entry: 'renderPrerenderBoundary' | 'renderPrerenderBranch',
+): ReadonlyArray<string> {
+	return [
 		`import { marklessPrerenderData } from ${JSON.stringify(input.renderDataId)};`,
 		`import { loadSymbol as marklessLoadLocalSymbol } from ${JSON.stringify(input.resolverId)};`,
-		"import { renderPrerenderBoundary } from '@markless/web/fns/prerender-resume';",
+		`import { ${entry} } from '@markless/web/fns/prerender-resume';`,
 		'function marklessLoadLinkedSymbol(symbolId) {',
 		...input.routes.flatMap((route) => [
 			`\tif (symbolId.startsWith(${JSON.stringify(route.prefix)})) {`,
@@ -231,11 +329,7 @@ function linkedRenderDataBoundarySymbolSource(input: {
 		]),
 		'\treturn marklessLoadLocalSymbol(symbolId);',
 		'}',
-		`export async function ${input.exportName}(context) {`,
-		`\tconst rendered = await renderPrerenderBoundary(marklessPrerenderData, ${JSON.stringify(input.boundaryId)}, context.status, context.graph, marklessLoadLinkedSymbol);`,
-		'\treturn { ...rendered, arm: context.status === "rejected" ? 2 : 0 };',
-		'}',
-	].join('\n');
+	];
 }
 
 function linkedRenderDataSymbolRouteSource(importSource: string): string {
