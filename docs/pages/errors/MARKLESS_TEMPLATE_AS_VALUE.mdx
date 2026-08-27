@@ -1,0 +1,22 @@
+# MARKLESS_TEMPLATE_AS_VALUE
+
+A template is not a value
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: error
+
+## Message
+
+… puts a template… where Markless needs runtime data. Templates compile into page structure with locators, not values to store, pass, or serialize.
+
+## Why
+
+Markless has no VDOM. Templates compile to DOM structure and resume locators, so there is no render-output object that can live in state, a computed value, a local variable, or an array.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

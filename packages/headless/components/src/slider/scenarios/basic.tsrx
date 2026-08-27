@@ -1,4 +1,4 @@
-import * as slider from '../index.ts';
+import { slider } from '../../index.ts';
 
 // The family ships no CSS, so every scenario gives the rail its own size and
 // turns off touch scrolling the way a consumer's stylesheet would.

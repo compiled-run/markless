@@ -4,6 +4,7 @@ import ComputedPage from './fixtures/krg-computed-page.tsrx';
 import HandlerPage from './fixtures/krg-handler-page.tsrx';
 import SiblingPage from './fixtures/krg-sibling-page.tsrx';
 import EmptyArmPage from './pages/krg-empty-arm-page.tsrx';
+import MintAttributePage from './pages/krg-mint-attribute-page.tsrx';
 import MintComputedPage from './pages/krg-mint-computed-page.tsrx';
 import MintPage from './pages/krg-mint-page.tsrx';
 
@@ -70,25 +71,11 @@ test('CSR: a served key that comes back is rendered again in both lists', async 
 	expect(widget(container)).toEqual(['alpha', 'bravo', 'charlie']);
 });
 
-// PENDING CAPABILITY, and narrower than it was. Minting a row for a key that was
-// never served now works - the mint witnesses at the bottom of this file are the
-// proof - but only for a row the client can finish from the item alone: static
-// markup plus text positions. NEITHER list on this page is that row.
-//
-// The plain list's row carries `data-krg-value={item.label}`, a dynamic
-// ATTRIBUTE, and the widget list's row roots a component. The compiler refuses
-// `rowTemplate` for both (packages/compiler/test/keyed-repeat-row-mint.test.ts
-// names each refusal), so growth here still finds no markup to build from and
-// the list stays as served. Measured, not assumed: with the pin lifted, `count`
-// reaches 4 and the plain rows stay at three.
-//
-// Closing the attribute half means shipping attribute slots and their fill in
-// the row template; closing the widget half means a minted row starting a widget
-// instance with a graph of its own, which is a different capability again.
-// A key that WAS served and comes back is a third case and it works: the
-// detached row is held in rowRootsByKey and re-appended, which is what the
-// `restore` rows above assert. Deterministic, so test.fails.
-test.fails('CSR: a handler write that admits an unserved key grows both lists', async () => {
+// Minting a row for a key that was never served works for both shapes: a plain
+// row finished from the item alone, and a widget row whose root is a component
+// (the component mint starts the widget instance). A key that WAS served and
+// comes back is held in rowRootsByKey and re-appended - the `restore` rows above.
+test('CSR: a handler write that admits an unserved key grows both lists', async () => {
 	const screen = await render(HandlerPage);
 	const container = screen.container as HTMLElement;
 
@@ -98,7 +85,7 @@ test.fails('CSR: a handler write that admits an unserved key grows both lists', 
 	expect(widget(container)).toEqual(['alpha', 'bravo', 'charlie', 'delta']);
 });
 
-test.fails('CSR: one write that admits an unserved key and drops a served one does both', async () => {
+test('CSR: one write that admits an unserved key and drops a served one does both', async () => {
 	const screen = await render(HandlerPage);
 	const container = screen.container as HTMLElement;
 
@@ -120,7 +107,7 @@ test('SSR resume: a handler write that drops a served key takes its row out of b
 	expect(widget(container)).toEqual(['alpha', 'bravo']);
 });
 
-test.fails('SSR resume: a handler write that admits an unserved key grows both lists', async () => {
+test('SSR resume: a handler write that admits an unserved key grows both lists', async () => {
 	const screen = await renderSSR(HandlerPage);
 	const container = screen.container;
 
@@ -130,7 +117,7 @@ test.fails('SSR resume: a handler write that admits an unserved key grows both l
 	expect(widget(container)).toEqual(['alpha', 'bravo', 'charlie', 'delta']);
 });
 
-test.fails('SSR resume: one write that admits an unserved key and drops a served one does both', async () => {
+test('SSR resume: one write that admits an unserved key and drops a served one does both', async () => {
 	const screen = await renderSSR(HandlerPage);
 	const container = screen.container;
 
@@ -141,12 +128,9 @@ test.fails('SSR resume: one write that admits an unserved key and drops a served
 
 // ============================================================ computed-driven
 
-// This page's two lists are the SAME two unmintable row shapes as the handler
-// page's - a dynamic attribute on the plain row, a component at the widget row's
-// root - so its growth stays pinned for that reason and not because a `computed`
-// collection behaves differently. The computed mint witnesses at the bottom of
-// this file drive the same `computed()` filter over a mintable row and pass.
-test.fails('CSR: widening a computed filter grows both lists past what was served', async () => {
+// This page's two lists are the same two row shapes as the handler page's, so a
+// `computed()` collection is shown to mint exactly as a handler write does.
+test('CSR: widening a computed filter grows both lists past what was served', async () => {
 	const screen = await render(ComputedPage);
 	const container = screen.container as HTMLElement;
 	expect(plain(container)).toEqual(['charlie']);
@@ -158,7 +142,7 @@ test.fails('CSR: widening a computed filter grows both lists past what was serve
 	expect(widget(container)).toEqual(['alpha', 'bravo', 'charlie', 'delta']);
 });
 
-test.fails('CSR: moving a computed filter sideways swaps the row set', async () => {
+test('CSR: moving a computed filter sideways swaps the row set', async () => {
 	const screen = await render(ComputedPage);
 	const container = screen.container as HTMLElement;
 
@@ -177,7 +161,7 @@ test('CSR: a computed filter that matches nothing empties both lists', async () 
 	expect(widget(container)).toEqual([]);
 });
 
-test.fails('SSR resume: widening a computed filter grows both lists past what was served', async () => {
+test('SSR resume: widening a computed filter grows both lists past what was served', async () => {
 	const screen = await renderSSR(ComputedPage);
 	const container = screen.container;
 	expect(plain(container)).toEqual(['charlie']);
@@ -188,7 +172,7 @@ test.fails('SSR resume: widening a computed filter grows both lists past what wa
 	expect(widget(container)).toEqual(['alpha', 'bravo', 'charlie', 'delta']);
 });
 
-test.fails('SSR resume: moving a computed filter sideways swaps the row set', async () => {
+test('SSR resume: moving a computed filter sideways swaps the row set', async () => {
 	const screen = await renderSSR(ComputedPage);
 	const container = screen.container;
 
@@ -529,4 +513,72 @@ test('SSR resume: moving a computed filter sideways swaps the row set', async ()
 test('SSR resume: a minted row takes back down the `@empty` arm the client raised', async () => {
 	const screen = await renderSSR(MintComputedPage);
 	await expectAMintLowersTheArmTheClientRaised(screen.container);
+});
+
+// ------------------------------- a minted row that carries its own attributes
+
+// The list here is seeded EMPTY, so the server paints no row: every row these
+// assertions read is one the client built, and they read the row's ATTRIBUTE,
+// which is the part a minted row used to be missing. `data-row={item.id}` is
+// also the key, so a row wearing another row's attribute is visible rather than
+// plausible.
+function attrRows(container: ParentNode) {
+	return [...container.querySelectorAll<HTMLElement>('[data-krg-attr-row]')].map((row) => [
+		row.getAttribute('data-row'),
+		row.textContent,
+	]);
+}
+
+async function expectAnEmptyListMintsAttributedRows(container: ParentNode) {
+	expect(attrRows(container)).toEqual([]);
+
+	press(container, 'data-krg-attr-grow');
+	await expect.poll(() => container.querySelector('[data-krg-attr-count]')?.textContent).toBe('2');
+	await expect.poll(() => attrRows(container)).toEqual([
+		['a', 'alpha'],
+		['b', 'bravo'],
+	]);
+	// In the row span, behind the header, with the tail outside it.
+	const list = container.querySelector('[data-krg-attr-list]');
+	expect([...list!.children].map((child) => child.textContent)).toEqual([
+		'header',
+		'alpha',
+		'bravo',
+	]);
+	expect(container.querySelector('[data-krg-attr-tail]')?.textContent).toBe('tail');
+}
+
+async function expectAFurtherWriteMintsTheNextAttributedRow(container: ParentNode) {
+	press(container, 'data-krg-attr-grow');
+	await expect.poll(() => attrRows(container)).toHaveLength(2);
+
+	press(container, 'data-krg-attr-more');
+	await expect.poll(() => attrRows(container)).toEqual([
+		['a', 'alpha'],
+		['b', 'bravo'],
+		['c', 'charlie'],
+	]);
+
+	press(container, 'data-krg-attr-clear');
+	await expect.poll(() => attrRows(container)).toEqual([]);
+}
+
+test('CSR: a list seeded empty mints rows carrying their own attributes', async () => {
+	const screen = await render(MintAttributePage);
+	await expectAnEmptyListMintsAttributedRows(screen.container as HTMLElement);
+});
+
+test('CSR: a further write mints the next attributed row', async () => {
+	const screen = await render(MintAttributePage);
+	await expectAFurtherWriteMintsTheNextAttributedRow(screen.container as HTMLElement);
+});
+
+test('SSR resume: a list seeded empty mints rows carrying their own attributes', async () => {
+	const screen = await renderSSR(MintAttributePage);
+	await expectAnEmptyListMintsAttributedRows(screen.container);
+});
+
+test('SSR resume: a further write mints the next attributed row', async () => {
+	const screen = await renderSSR(MintAttributePage);
+	await expectAFurtherWriteMintsTheNextAttributedRow(screen.container);
 });

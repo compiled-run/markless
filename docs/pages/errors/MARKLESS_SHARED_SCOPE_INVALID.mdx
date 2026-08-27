@@ -1,0 +1,23 @@
+# MARKLESS_SHARED_SCOPE_INVALID
+
+shared() scope must be valid
+
+- Package: compiler
+- Pass or phase: semantic-graph
+
+## Message
+
+Unknown shared() scope …. Valid scopes are ….
+
+shared() scope must be a string literal. Valid scopes are ….
+
+## Why
+
+shared() scope controls graph lifetime. Silently dropping an unknown scope changes whether data is request, container, page, or widget owned.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
