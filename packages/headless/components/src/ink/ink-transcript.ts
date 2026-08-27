@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { FAMILY_ANCHORS } from '../../../../../apps/sr-gallery/preview-server.ts';
 import type { ScreenReaderDriver } from '../../test-support/driver.ts';
 
 /**
@@ -15,19 +16,15 @@ import type { ScreenReaderDriver } from '../../test-support/driver.ts';
 
 // The gallery is one page of many families, so a walk that starts at the top of
 // the document needs far more steps than the virtual lane's container walk.
-const WALK_LIMIT = 200;
+const WALK_LIMIT = 240;
 const CHANGE_TIMEOUT_MS = 15_000;
 
 const NAME = 'Drawing';
 const EMPTY = 'Empty';
 const ONE_STROKE = '1 stroke';
 
-/**
- * Where the drawing sits on the gallery page. Spelled here rather than read from
- * `FAMILY_ANCHORS`, because the gallery section this walk needs lands with the
- * gallery registration and this file ships before it.
- */
-export const INK_ANCHOR = '/#ink';
+/** Where the drawing sits on the gallery page. */
+export const INK_ANCHOR = FAMILY_ANCHORS.ink;
 
 function missing(phrase: string, facts: readonly string[]): string[] {
 	return facts.filter((fact) => !phrase.includes(fact));
@@ -61,7 +58,13 @@ export async function readInkTranscript(sr: ScreenReaderDriver, page: Page) {
 	await expect(area).toHaveCount(1);
 	await expect(area).toHaveAttribute('tabindex', '0');
 
-	const described = section.locator('output[aria-live]');
+	// The section serves two drawings, so the count is reached through the one
+	// this surface is described by rather than by picking an output off the page.
+	// The area names its error, then its description, then the count.
+	const describedBy = (await area.getAttribute('aria-describedby')) ?? '';
+	const countId = describedBy.split(/\s+/).filter(Boolean).at(-1);
+	if (!countId) throw new Error('The drawing area is described by nothing, so it has no count.');
+	const described = page.locator(`[id="${countId}"]`);
 	await expect(described).toHaveText(EMPTY);
 
 	const resting = await readForPhrase(sr, [NAME], WALK_LIMIT);

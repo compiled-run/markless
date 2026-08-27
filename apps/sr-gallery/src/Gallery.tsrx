@@ -7,6 +7,7 @@ import {
 	datebox,
 	fileupload,
 	hovercard,
+	ink,
 	menu,
 	modal,
 	numberbox,
@@ -28,7 +29,7 @@ import {
 // /#toggle, /#textbox, /#progress, /#checklist, /#select, /#modal,
 // /#radio-group, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
 // /#fileupload, /#hovercard, /#calendar, /#menu, /#colorpicker,
-// /#togglegroup, /#numberbox, /#tour. A family whose second shape a reader
+// /#togglegroup, /#numberbox, /#ink, /#tour. A family whose second shape a reader
 // announces differently gets its own section too: /#slider-range,
 // /#numberbox-min-max-step, /#numberbox-currency.
 //
@@ -396,6 +397,37 @@ export function Gallery() @{
 					<numberbox.valuelabel />
 					<numberbox.field />
 				</numberbox.root>
+			</div>
+		</section>
+
+		<section id="ink">
+			<h2>Ink</h2>
+			<div class="scenario">
+				<ink.root name="drawing">
+					<ink.label>Drawing</ink.label>
+					<ink.description>Draw with a mouse, pen or finger. Undo with Control or Command and Z.</ink.description>
+					<ink.area class="ink-surface" />
+					<ink.field />
+				</ink.root>
+			</div>
+
+			{/* A drawn signature carries no text, so WCAG 1.1.1 makes the equivalent the consumer's: the typed name beside the pad is what a reader gets instead of the scrawl. */}
+			<div class="scenario">
+				<form>
+					<ink.root name="signature" required>
+						<ink.label>Signature</ink.label>
+						<ink.description>Sign on the line.</ink.description>
+						<ink.area class="ink-surface">
+							<ink.indicator />
+						</ink.area>
+						<ink.field />
+					</ink.root>
+					<textbox.root name="signed-name" required>
+						<textbox.label>Type your name</textbox.label>
+						<textbox.input />
+					</textbox.root>
+					<button type="submit">Sign</button>
+				</form>
 			</div>
 		</section>
 

@@ -41,6 +41,7 @@ export const FAMILY_ANCHORS = {
 	fileupload: '/#fileupload',
 	hovercard: '/#hovercard',
 	calendar: '/#calendar',
+	ink: '/#ink',
 	menu: '/#menu',
 	colorpicker: '/#colorpicker',
 	togglegroup: '/#togglegroup',
