@@ -342,6 +342,51 @@ test('record parity: a value carrying markup characters survives as text', async
 	expect(kernel.armRecords).toEqual(full.armRecords);
 });
 
+// Two components of one module can both derive a computed of the same name, so
+// the graph-node id set cannot partition them; only the compiler's indexes can.
+function collidingComputedSurface() {
+	const surface = feedSurface() as unknown as {
+		components: Record<
+			string,
+			{
+				state: { computed: Array<Record<string, unknown>> };
+				stateGraphNodeIds: Array<string>;
+				stateComputedIndexes?: Array<number>;
+			}
+		>;
+	};
+	surface.components.Feed!.state.computed = [
+		{ graphNodeId: 'computed:feed', name: 'feed', async: true },
+		{ graphNodeId: 'computed:isOpen', name: 'isOpen', async: false, owner: 'Feed' },
+		{ graphNodeId: 'computed:isOpen', name: 'isOpen', async: false, owner: 'FeedItem' },
+	];
+	surface.components.Feed!.stateGraphNodeIds = ['computed:feed', 'computed:isOpen'];
+	surface.components.Feed!.stateComputedIndexes = [0, 1];
+	return surface;
+}
+
+test('the settled computed partition follows the compiler indexes, not the id set', async () => {
+	const graph = fulfilledGraph({ source: 'live', updates: [{ id: 1, label: 'one' }] });
+	const { kernel, full } = await bothPaths(collidingComputedSurface(), graph);
+
+	expect(kernel.computed).toEqual(full.computed);
+	expect(
+		(kernel.computed as ReadonlyArray<{ readonly owner?: string }>).map((entry) => entry.owner),
+	).toEqual([undefined, 'Feed']);
+});
+
+test('the settled computed partition still falls back to the id set without indexes', async () => {
+	const surface = collidingComputedSurface();
+	delete surface.components.Feed!.stateComputedIndexes;
+	const graph = fulfilledGraph({ source: 'live', updates: [{ id: 1, label: 'one' }] });
+	const { kernel, full } = await bothPaths(surface, graph);
+
+	expect(kernel.computed).toEqual(full.computed);
+	expect(
+		(kernel.computed as ReadonlyArray<{ readonly owner?: string }>).map((entry) => entry.owner),
+	).toEqual([undefined, 'Feed', 'FeedItem']);
+});
+
 test('arm-relative locator indices track the rendered row count', async () => {
 	const one = renderSettledArm({
 		surface: feedSurface() as never,

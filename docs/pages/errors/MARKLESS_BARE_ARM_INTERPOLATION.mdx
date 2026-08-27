@@ -1,0 +1,22 @@
+# MARKLESS_BARE_ARM_INTERPOLATION
+
+A branch arm renders a bare expression instead of a fragment
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: error
+
+## Message
+
+`{…}` stands alone as this arm's whole body. A standalone expression container is not a template output node, so the arm has no markup of its own and its text has nowhere to live but the element around it — which erases whatever the other arm rendered there.
+
+## Why
+
+Template output is an element, a fragment, or a control-flow construct. A statement container that needs to render text says so with a fragment, which gives the text its own marker range inside the arm.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

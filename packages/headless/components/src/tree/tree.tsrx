@@ -118,6 +118,22 @@ export function TreeRoot({
 				return;
 			}
 
+			// Before the rows are walked: a key this handler never acts on - Tab, Escape,
+			// a modifier - must not pay for the walk. Length one is the typeahead's range.
+			const isHandledKey =
+				key === 'ArrowDown' ||
+				key === 'ArrowUp' ||
+				key === 'ArrowRight' ||
+				key === 'ArrowLeft' ||
+				key === 'Home' ||
+				key === 'End' ||
+				key === 'Enter' ||
+				key.length === 1;
+			if (!isHandledKey) {
+				onKeydown?.(event);
+				return;
+			}
+
 			// Read at the handler's top level: a shared read inside the typeahead closure below is a ReferenceError.
 			const rowEls = tree.rowEls;
 			const labelEls = tree.labelEls;
@@ -133,7 +149,9 @@ export function TreeRoot({
 
 			// The row's own trigger, and only its own: "first focusable inside" follows a link instead of opening a folder.
 			const trigger = ownPart(tree.triggerEls, rowEls, here);
-			const expanded = here.getAttribute('aria-expanded');
+			// A closed node reports no aria-expanded, so the state attribute is what tells it from a leaf.
+			const expanded = here.getAttribute('aria-expanded') === 'true';
+			const collapsed = here.hasAttribute('ui-closed');
 			const at = rows.indexOf(here);
 			const last = rows.length - 1;
 			let next: HTMLElement | null = null;
@@ -143,14 +161,14 @@ export function TreeRoot({
 			else if (key === 'Home') next = rows[0] ?? null;
 			else if (key === 'End') next = rows[last] ?? null;
 			else if (key === 'ArrowRight') {
-				if (expanded === 'false') trigger?.click();
-				else if (expanded === 'true') {
+				if (collapsed) trigger?.click();
+				else if (expanded) {
 					// Containment, not a child selector: the arm and loop wrappers a scenario needs sit between row and child.
 					const below = rows[at + 1];
 					next = below && here.contains(below) ? below : null;
 				}
 			} else if (key === 'ArrowLeft') {
-				if (expanded === 'true') trigger?.click();
+				if (expanded) trigger?.click();
 				else next = parentRow(tree.rowEls, here);
 			} else if (target === here && (key === 'Enter' || key === ' ')) {
 				// Gated on the row itself: the trigger inside it is a native button, and handling here too would toggle twice.
@@ -201,12 +219,12 @@ export function TreeItem({
 	const isClosed = computed(() => item.leaf !== true && item.open !== true);
 	const isShowing = computed(() => item.leaf !== true && item.open === true);
 
-	// A leaf reports no aria-expanded at all, or a reader cannot tell it from a closed parent.
 	<div
 		{...rest}
 		el={tree.rowEls}
 		role="treeitem"
-		aria-expanded={isShowing ? 'true' : isClosed ? 'false' : undefined}
+		aria-expanded={isShowing ? 'true' : undefined}
+		aria-selected="false"
 		aria-level={item.level}
 		tabindex={-1}
 		ui-open={isShowing}
@@ -262,10 +280,8 @@ export function TreeItemLabel({ children, ...rest }: TreeItemLabelProps) @{
 export function TreeItemIndicator({ children, ...rest }: TreeItemIndicatorProps) @{
 	const item = treeItemState();
 
-	// Decorative: the row beside it already reports the state to a reader.
 	<span
 		{...rest}
-		aria-hidden="true"
 		ui-open={item.open}
 		ui-closed={item.open !== true}
 	>{children}</span>

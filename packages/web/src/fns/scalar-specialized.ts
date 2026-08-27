@@ -1,8 +1,11 @@
+import type { NonFiniteNumberName } from '@markless/serializer';
+
 // The specialized scalar reader decodes ONE cell straight out of the served
 // state script, so it names only the payload fields it inspects.
 type MarklessScalarRoot =
 	| { readonly $type: 'undefined' }
 	| { readonly $type: 'bigint'; readonly value: string }
+	| { readonly $type: 'number'; readonly value: NonFiniteNumberName }
 	| { readonly $type: 'date'; readonly value: string }
 	| { readonly $type?: undefined };
 type MarklessScalarCell = {
@@ -54,6 +57,7 @@ export const marklessDecodeScalarCell = (
 		if (r == null || typeof r !== 'object') return r;
 		if (r.$type === 'undefined') return undefined;
 		if (r.$type === 'bigint') return BigInt(r.value);
+		if (r.$type === 'number') return Number(r.value);
 		if (r.$type === 'date') {
 			const d = new Date(r.value);
 			if (!Number.isNaN(d.getTime())) return d;

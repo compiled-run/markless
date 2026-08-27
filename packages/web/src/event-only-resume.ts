@@ -53,6 +53,10 @@ async function resumeFullEventOnly(
 	});
 	await runtime.dispatch(input.event, {
 		syncPolicyAlreadyApplied: input.syncPolicyAlreadyApplied === true,
+		// A record-less forward is the entry capture's broad sweep, which the live
+		// listener passes through; a forward that DID name a record and matches
+		// nothing here is the routing defect the refusal exists for.
+		ignoreUnmatched: input.eventRecord == null,
 	});
 	return undefined as unknown as EventOnlyResumeContainer;
 }
