@@ -6,10 +6,11 @@ type RenderComponent = ModuleGraphInterfaceArtifact['render']['components'][numb
 
 // The module-graph interface publishes where a component's `{children}` hole
 // sits among the elements beside it, so an importer can place the children it
-// passes while compiling. Nothing reads these fields yet: these tests pin the
-// facts. The counts are of ELEMENTS in document order - text renders none, and
-// an element counts with everything nested inside it, so a DOM census walking
-// the served markup meets the same number.
+// passes while compiling, and which element of the component's own markup the
+// hole sits inside - the one an importer's `@for` renders its rows into. The
+// counts are of ELEMENTS in document order - text renders none, and an element
+// counts with everything nested inside it, so a DOM census walking the served
+// markup meets the same number.
 async function components(source: string): Promise<ReadonlyArray<RenderComponent>> {
 	const result = await compileTsrxModule({ filename: 'src/App.tsrx', source, symbols: [] });
 	expect(result.semanticGraph.diagnostics).toEqual([]);
@@ -34,6 +35,7 @@ test('a navbar that ends in {children} reports nothing after the hole', async ()
 	// how many elements Navbar renders is the caller's answer, not this module's.
 	expect(navbar.elementCount).toBe('unknown');
 	expect(navbar.projection).toEqual({
+		parentHostNodeId: 'h0',
 		elementsBeforeProjection: 1,
 		elementsAfterProjection: 0,
 		projectionInsideConstruct: false,
@@ -51,6 +53,7 @@ test('static text beside the hole never shifts the projected children', async ()
 	// One element before it - the <b>. The bare text and the `{label}` slot each
 	// occupy a child index and render no element.
 	expect(banner.projection).toEqual({
+		parentHostNodeId: 'h0',
 		elementsBeforeProjection: 1,
 		elementsAfterProjection: 0,
 		projectionInsideConstruct: false,
@@ -96,6 +99,7 @@ test('nested elements beside the hole count with their subtrees', async () => {
 	// Before: the `<header>` and its `<h1>`. After: the `<footer>`, its `<nav>`,
 	// and the `<a>` inside that. A sibling sweep would have said one and one.
 	expect(shell.projection).toEqual({
+		parentHostNodeId: 'h0',
 		elementsBeforeProjection: 2,
 		elementsAfterProjection: 3,
 		projectionInsideConstruct: false,
@@ -116,6 +120,7 @@ test('a toaster whose @if arms disagree reports an unknown count after the hole'
 	// The `else` arm is empty, so the site renders one element or none: nothing
 	// this module can state, and 'unknown' absorbs the whole side.
 	expect(toaster.projection).toEqual({
+		parentHostNodeId: 'h0',
 		elementsBeforeProjection: 0,
 		elementsAfterProjection: 'unknown',
 		projectionInsideConstruct: false,
@@ -140,6 +145,7 @@ test('an @if whose arms agree on one element resolves the count after the hole',
 	);
 
 	expect(toast.projection).toEqual({
+		parentHostNodeId: 'h0',
 		elementsBeforeProjection: 0,
 		elementsAfterProjection: 1,
 		projectionInsideConstruct: false,
@@ -157,6 +163,7 @@ test('a hole inside an @if arm says so and names the arm chunk', async () => {
 	);
 
 	expect(panel.projection).toEqual({
+		parentHostNodeId: 'h1',
 		elementsBeforeProjection: 1,
 		elementsAfterProjection: 0,
 		projectionInsideConstruct: true,
@@ -174,6 +181,7 @@ export function Panel({ children }) @{
 	);
 
 	expect(panel.projection).toEqual({
+		parentHostNodeId: 'h1',
 		elementsBeforeProjection: 0,
 		elementsAfterProjection: 1,
 		projectionInsideConstruct: false,
@@ -192,6 +200,7 @@ export function Outer({ children }) @{
 
 	// Middle renders Inner renders one element, so the whole chain is one.
 	expect(outer.projection).toEqual({
+		parentHostNodeId: 'h1',
 		elementsBeforeProjection: 0,
 		elementsAfterProjection: 1,
 		projectionInsideConstruct: false,
@@ -208,6 +217,7 @@ export function Panel({ children }) @{
 	);
 
 	expect(panel.projection).toEqual({
+		parentHostNodeId: 'h0',
 		elementsBeforeProjection: 0,
 		elementsAfterProjection: 'unknown',
 		projectionInsideConstruct: false,

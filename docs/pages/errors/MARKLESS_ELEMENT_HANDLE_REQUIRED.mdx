@@ -1,0 +1,22 @@
+# MARKLESS_ELEMENT_HANDLE_REQUIRED
+
+el expects an element() handle
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: error
+
+## Message
+
+Cannot bind el=\{…\} because "…" is …, not an element() handle.
+
+## Why
+
+DOM elements are host resources. el can only bind element() handles so resume can recover the current DOM locator without serializing a DOM node.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
