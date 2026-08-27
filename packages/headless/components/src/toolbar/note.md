@@ -3,14 +3,14 @@
 A bar of controls that keep their own roles and share one tab stop: three toggle
 buttons, a switch, a select and a plain button, reachable with one Tab and then
 the arrows. Built from
-`goals/headless-components/notes/U651-menubar-toolbar-research.md`.
+the menubar/toolbar research memo in the goal notes.
 
 The family exists because of a framework fact that landed first
-(`U656-enclosing-registration.md`): a part of family A, even one rooting its own
+(the enclosing-registration memo in the goal notes): a part of family A, even one rooting its own
 widget, that reads family B's enclosing `state()` resolves B's instance, and its
 `element()` registration lands in that instance's roster. That is what lets a
 `toggle` or a `select` join a bar with no wrapper part in between — the thing
-U651 said a toolbar could not be built without.
+the research memo said a toolbar could not be built without.
 
 ## Shape
 
@@ -199,7 +199,7 @@ lanes are written and have never been run.
 
 There is no Qwik UI toolbar. The references are the APG pattern, Radix Toolbar,
 Base UI Toolbar and React Aria Toolbar (Kobalte, Ark/Zag and Headless UI ship
-none), surveyed in U651.
+none), surveyed in an earlier unit.
 
 | Reference | Here | Why |
 | --- | --- | --- |
