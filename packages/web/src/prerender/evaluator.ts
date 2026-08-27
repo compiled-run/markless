@@ -40,6 +40,7 @@ import { prerenderBranchArm } from './branch-arm.ts';
 import { registerPrerenderStagedComputeds } from './staged-graph.ts';
 import { marklessThen, marklessWalk, type Awaitable } from '../ssr-data/awaitable.ts';
 import { sharedSeedPass } from './shared-seed-slot.ts';
+import { branchArmIdrefResolution } from '../ssr-data/branch-arm-idrefs.ts';
 
 // This evaluator is the seam where a SERIALIZED protocol payload meets the
 // mutable draft the SSR composer works on. They describe the same records; the
@@ -775,7 +776,20 @@ function evaluatePrerenderDataComponent(input: {
 							);
 							arm = match >= 0 ? match : branch.armTests.indexOf(null);
 						}
-						branches.push({ id: slot.branchSiteId, takenArm: arm });
+						branches.push({
+							id: slot.branchSiteId,
+							takenArm: arm,
+							...branchArmIdrefResolution(
+								renderData.chunks,
+								slot.armTemplateIds,
+								input.idPrefix,
+								(handleGraphNodeId) =>
+									definition.readResidue?.(
+										{ kind: 'element-handle-id', handleGraphNodeId },
+										{ read, idPrefix: input.idPrefix },
+									),
+							),
+						});
 						return arm;
 					},
 					selectAsyncArm: (slot) => {

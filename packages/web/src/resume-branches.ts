@@ -90,7 +90,10 @@ export function wireBranches(input: any) {
 					? asyncBoundaries.get(entry.locator.slice('async-boundary:'.length))
 					: undefined);
 			if (!range) continue;
-			if (branch) clearBranchIdrefSites(input, branch);
+			// Against the arm now painted, not a blanket clear: this runs after the
+			// flip that replaced the range, so clearing here would strip the
+			// attribute the incoming arm just earned.
+			if (branch) syncBranchIdrefSites(input, branch, currentArmByBranchId.get(branch.id));
 			for (const id of hostIdsInsideRange(
 				input.root,
 				range.startAnchor,
@@ -126,6 +129,9 @@ function createBranchRegistration(
 			for (const armEvent of armRecordSet.events) input.eventTypes.add(armEvent.eventName);
 		let currentArm = wiredBranchArm(input.graph, branch);
 		currentArmByBranchId.set(branch.id, currentArm);
+		// The arm the render served is already in the DOM and never materializes
+		// here, so this is the only place its IDREF is answered.
+		syncBranchIdrefSites(input, branch, currentArm);
 		async function replaceArmRange(arm: number) {
 			const painted = currentArm;
 			const symbol = await input.loadSymbol(branch.symbolId);
@@ -140,6 +146,7 @@ function createBranchRegistration(
 			if (!isResumeBranchUpdate(update)) return;
 			currentArm = update.arm;
 			currentArmByBranchId.set(branch.id, update.arm);
+			syncBranchIdrefSites(input, branch, update.arm);
 			const html = branchHtmlToString(update.html);
 			// Escalated arms are arm-relative against DOM that does not exist yet.
 			if (update.armRecords) return input.commitArm(branch, { ...update, html });
@@ -283,8 +290,13 @@ function armElementHandleIdGraph(graph: RuntimeGraph, branch: ResumeBranchRecord
 	return {
 		...graph,
 		read(id: string, path: ReadonlyArray<string> = []) {
-			return id.startsWith(PROTOCOL_ELEMENT_HANDLE_ID_READ_PREFIX)
-				? ids[id.slice(PROTOCOL_ELEMENT_HANDLE_ID_READ_PREFIX.length)]
+			// The resume loader scopes a composed symbol's reads by PREPENDING the
+			// instance path, so this namespace arrives offset rather than at the
+			// front. The record is already this instance's own, so the handle after
+			// the namespace is the whole question.
+			const at = id.indexOf(PROTOCOL_ELEMENT_HANDLE_ID_READ_PREFIX);
+			return at >= 0
+				? ids[id.slice(at + PROTOCOL_ELEMENT_HANDLE_ID_READ_PREFIX.length)]
 				: graph.read(id, path);
 		},
 	};
@@ -295,30 +307,26 @@ type AttributeWritableElement = ResumeDomElement & {
 	readonly removeAttribute?: (name: string) => void;
 };
 
-// An IDREF outside the arm names an element only while the arm renders one, so
-// the attribute follows the arm rather than being served naming nothing.
-function writeBranchIdrefSites(
+/**
+ * An IDREF outside the arm names an element only while the arm that binds it is
+ * the painted one, so the attribute follows the arm rather than being served
+ * naming nothing. Keyed on the painted arm rather than on what a given pass
+ * filed: an arm the RENDER already served is never re-materialized, and a
+ * refresh that repaints the same arm carries no handle records of its own.
+ */
+function syncBranchIdrefSites(
 	input: any,
 	branch: ResumeBranchRecord,
-	handles: ReadonlySet<string>,
+	arm: number | undefined,
 ): void {
 	for (const site of branch.idrefSites ?? []) {
-		if (!handles.has(site.handleGraphNodeId)) continue;
+		const host = input.elementsByHostId.get(site.hostNodeId) as
+			| AttributeWritableElement
+			| undefined;
+		if (!host) continue;
 		const id = branch.elementHandleIds?.[site.handleGraphNodeId];
-		const host = input.elementsByHostId.get(site.hostNodeId) as
-			| AttributeWritableElement
-			| undefined;
-		if (!host || id === undefined) continue;
-		host.setAttribute?.(site.attributeName, id);
-	}
-}
-
-function clearBranchIdrefSites(input: any, branch: ResumeBranchRecord): void {
-	for (const site of branch.idrefSites ?? []) {
-		const host = input.elementsByHostId.get(site.hostNodeId) as
-			| AttributeWritableElement
-			| undefined;
-		host?.removeAttribute?.(site.attributeName);
+		if (id !== undefined && arm === site.armIndex) host.setAttribute?.(site.attributeName, id);
+		else host.removeAttribute?.(site.attributeName);
 	}
 }
 
@@ -437,16 +445,13 @@ function materializeBranchArmRecords(
 		byHost.set(host.hostNodeId, records);
 	}
 	for (const [hostNodeId, records] of byHost) input.addBehaviorRecords(hostNodeId, records);
-	const filed = new Set<string>();
 	for (const handle of set.elementHandles as ReadonlyArray<
 		Hosted<ResumeViewRecord['elementHandles'][number]>
 	>) {
 		const host = claim(handle.hostPath);
 		if (!host) continue;
 		input.elementHandles.register(host.hostNodeId, handle, host.element);
-		filed.add(handle.handleId);
 	}
-	if (filed.size) writeBranchIdrefSites(input, branch, filed);
 	return [...byHost.keys()];
 }
 

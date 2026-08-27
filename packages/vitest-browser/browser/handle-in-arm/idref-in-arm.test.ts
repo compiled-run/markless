@@ -22,7 +22,11 @@ function parts(container: ParentNode, label: string) {
 
 async function expectClosed(container: ParentNode, label: string) {
 	const { panel, controls } = parts(container, label);
-	expect(panel(), `${label} renders no panel while closed`).toBe(null);
+	// A flip is async, so closing is polled exactly as opening is: asserting the
+	// arm is gone the instant after the click reads the DOM before the flip lands.
+	await expect
+		.poll(() => panel(), { timeout: 2000 })
+		.toBe(null);
 	await expect
 		.poll(() => controls(), { timeout: 2000 })
 		.toBe(null);

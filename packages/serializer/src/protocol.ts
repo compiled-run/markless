@@ -232,11 +232,17 @@ export type ProtocolComposedGraphProp = {
  */
 export const PROTOCOL_ELEMENT_HANDLE_ID_READ_PREFIX = 'markless:element-handle-id|';
 
-/** One IDREF position naming a handle some branch arm binds. */
+/**
+ * One IDREF position naming a handle some branch arm binds. `armIndex` is the
+ * arm that binds it: the attribute is earned exactly while that arm is the
+ * painted one, which is the only test that also answers for an arm the render
+ * already served and no flip ever re-materializes.
+ */
 export type ProtocolBranchIdrefSite = {
 	readonly hostNodeId: string;
 	readonly attributeName: string;
 	readonly handleGraphNodeId: string;
+	readonly armIndex: number;
 };
 
 export type ProtocolArmBranchRecord = {
