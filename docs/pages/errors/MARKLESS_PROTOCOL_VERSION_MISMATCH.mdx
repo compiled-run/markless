@@ -1,0 +1,24 @@
+# MARKLESS_PROTOCOL_VERSION_MISMATCH
+
+Unsupported resumability protocol version
+
+- Package: serializer
+- Pass or phase: payload, protocol-client, protocol-validation
+- Severity: error
+
+## Message
+
+Unsupported … protocol version ….
+
+## Why
+
+The … payload must use a supported protocol version.
+
+The … payload was produced for protocol version …, but this runtime can only decode version ….
+
+## Emitted from
+
+- `packages/serializer/src/protocol-client.ts`
+- `packages/serializer/src/protocol-validation.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

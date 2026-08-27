@@ -2,7 +2,6 @@ import { computed, element, shared, state } from '@markless/core';
 import {
 	boundedValue,
 	currentEnd,
-	currentOf,
 	currentStart,
 	keyTarget,
 	nearerSide,
@@ -47,11 +46,16 @@ export const sliderState = shared(
 		const trackEl = element<HTMLDivElement>();
 		const thumbEls = element<HTMLDivElement[]>();
 
+		const start = computed(() => currentStart(slider.startAt, slider.seed, slider.min));
+		const end = computed(() => currentEnd(slider.endAt, slider.seed, slider.min));
+
 		return {
 			...slider,
 			labelEl,
 			trackEl,
 			thumbEls,
+			start,
+			end,
 			// literal function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: number | [number, number]) => void) | undefined,
 			onChangeEnd: undefined as ((value: number | [number, number]) => void) | undefined,
@@ -61,8 +65,8 @@ export const sliderState = shared(
 				if (slider.disabled) return;
 
 				const isRange = Array.isArray(slider.seed);
-				const from = currentStart(slider.startAt, slider.seed, slider.min);
-				const to = currentEnd(slider.endAt, slider.seed, slider.min);
+				const from = start;
+				const to = end;
 				const bounded = boundedValue(
 					next,
 					slider.min,
@@ -73,16 +77,15 @@ export const sliderState = shared(
 					side,
 					isRange,
 				);
-				if (bounded === currentOf(side, slider.startAt, slider.endAt, slider.seed, slider.min))
-					return;
+				if (bounded === (side === 'start' ? from : to)) return;
 
 				if (side === 'start') slider.startAt = bounded;
 				else slider.endAt = bounded;
 
 				const landed = reportedValue(
 					isRange,
-					currentStart(slider.startAt, slider.seed, slider.min),
-					currentEnd(slider.endAt, slider.seed, slider.min),
+					side === 'start' ? bounded : from,
+					side === 'start' ? to : bounded,
 				);
 				slider.onChange?.(landed);
 				slider.onChangeEnd?.(landed);
@@ -102,12 +105,7 @@ export const sliderState = shared(
 				const along = slider.orientation === 'vertical' ? clientY : clientX;
 				const fraction = pointerFraction(along, axis.start, axis.size, axis.isFlipped);
 				const landed = valueAtFraction(fraction, slider.min, slider.max, slider.step);
-				const side = nearerSide(
-					landed,
-					currentStart(slider.startAt, slider.seed, slider.min),
-					currentEnd(slider.endAt, slider.seed, slider.min),
-					Array.isArray(slider.seed),
-				);
+				const side = nearerSide(landed, start, end, Array.isArray(slider.seed));
 				slider.dragSide = side;
 				slider.isDragging = true;
 
@@ -132,18 +130,19 @@ export const sliderState = shared(
 				const aimed = valueAtFraction(fraction, slider.min, slider.max, slider.step);
 				const side = slider.dragSide;
 				const isRange = Array.isArray(slider.seed);
+				const from = start;
+				const to = end;
 				const bounded = boundedValue(
 					aimed,
 					slider.min,
 					slider.max,
 					slider.step,
-					currentStart(slider.startAt, slider.seed, slider.min),
-					currentEnd(slider.endAt, slider.seed, slider.min),
+					from,
+					to,
 					side,
 					isRange,
 				);
-				if (bounded === currentOf(side, slider.startAt, slider.endAt, slider.seed, slider.min))
-					return;
+				if (bounded === (side === 'start' ? from : to)) return;
 
 				if (side === 'start') slider.startAt = bounded;
 				else slider.endAt = bounded;
@@ -151,8 +150,8 @@ export const sliderState = shared(
 				slider.onChange?.(
 					reportedValue(
 						isRange,
-						currentStart(slider.startAt, slider.seed, slider.min),
-						currentEnd(slider.endAt, slider.seed, slider.min),
+						side === 'start' ? bounded : from,
+						side === 'start' ? to : bounded,
 					),
 				);
 			},
@@ -161,13 +160,7 @@ export const sliderState = shared(
 				if (!slider.isDragging) return;
 
 				slider.isDragging = false;
-				slider.onChangeEnd?.(
-					reportedValue(
-						Array.isArray(slider.seed),
-						currentStart(slider.startAt, slider.seed, slider.min),
-						currentEnd(slider.endAt, slider.seed, slider.min),
-					),
-				);
+				slider.onChangeEnd?.(reportedValue(Array.isArray(slider.seed), start, end));
 			},
 		};
 	},
@@ -199,12 +192,7 @@ export function SliderRoot({
 	// A group only when there are two thumbs: one thumb is the whole control and needs no wrapper role.
 	const groupRole = computed(() => (Array.isArray(slider.seed) ? 'group' : undefined));
 	const filled = computed(() =>
-		rootStyleText(
-			currentStart(slider.startAt, slider.seed, slider.min),
-			currentEnd(slider.endAt, slider.seed, slider.min),
-			slider.min,
-			slider.max,
-		),
+		rootStyleText(slider.start, slider.end, slider.min, slider.max),
 	);
 
 	<div
@@ -264,28 +252,15 @@ export function SliderThumb({ side = 'end', children, onKeydown, ...rest }: Slid
 	// The side as a graph cell: compared against the prop instead, the comparison stops refreshing once the page has resumed.
 	const thumb: SliderThumbInstanceState = state({ side });
 
-	const now = computed(() =>
-		currentOf(thumb.side, slider.startAt, slider.endAt, slider.seed, slider.min),
-	);
+	const now = computed(() => (thumb.side === 'start' ? slider.start : slider.end));
 	const lowest = computed(() =>
-		thumb.side === 'end' && Array.isArray(slider.seed)
-			? currentStart(slider.startAt, slider.seed, slider.min)
-			: slider.min,
+		thumb.side === 'end' && Array.isArray(slider.seed) ? slider.start : slider.min,
 	);
 	const highest = computed(() =>
-		thumb.side === 'start' && Array.isArray(slider.seed)
-			? currentEnd(slider.endAt, slider.seed, slider.min)
-			: slider.max,
-	);
-	const nowText = computed(
-		() => `${currentOf(thumb.side, slider.startAt, slider.endAt, slider.seed, slider.min)}`,
+		thumb.side === 'start' && Array.isArray(slider.seed) ? slider.end : slider.max,
 	);
 	const offset = computed(() =>
-		thumbStyleText(
-			currentOf(thumb.side, slider.startAt, slider.endAt, slider.seed, slider.min),
-			slider.min,
-			slider.max,
-		),
+		thumbStyleText(thumb.side === 'start' ? slider.start : slider.end, slider.min, slider.max),
 	);
 	const sideName = computed(() => (Array.isArray(slider.seed) ? thumb.side : undefined));
 	const isActive = computed(() => slider.isDragging && slider.dragSide === thumb.side);
@@ -299,11 +274,9 @@ export function SliderThumb({ side = 'end', children, onKeydown, ...rest }: Slid
 		tabindex={tabStop}
 		style={offset}
 		aria-labelledby={slider.labelEl}
-		aria-orientation={slider.orientation}
 		aria-valuemin={lowest}
 		aria-valuemax={highest}
 		aria-valuenow={now}
-		aria-valuetext={nowText}
 		aria-disabled={ariaDisabled}
 		ui-orientation={slider.orientation}
 		ui-disabled={slider.disabled}
@@ -327,11 +300,10 @@ export function SliderThumb({ side = 'end', children, onKeydown, ...rest }: Slid
 				event.preventDefault();
 			}
 
-			const from = currentOf(thumb.side, slider.startAt, slider.endAt, slider.seed, slider.min);
 			const next = keyTarget(
 				event.key,
 				event.shiftKey,
-				from,
+				now,
 				slider.min,
 				slider.max,
 				slider.step,
@@ -352,13 +324,7 @@ export function SliderThumb({ side = 'end', children, onKeydown, ...rest }: Slid
 // was given any, so a fallback branch would render nothing for everybody.
 export function SliderValueLabel({ ...rest }: SliderValueLabelProps) @{
 	const slider = sliderState();
-	const text = computed(() =>
-		valueText(
-			Array.isArray(slider.seed),
-			currentStart(slider.startAt, slider.seed, slider.min),
-			currentEnd(slider.endAt, slider.seed, slider.min),
-		),
-	);
+	const text = computed(() => valueText(Array.isArray(slider.seed), slider.start, slider.end));
 
 	<output
 		{...rest}

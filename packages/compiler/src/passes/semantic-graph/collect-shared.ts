@@ -3,12 +3,14 @@ import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import type {
 	ModuleGraphInterfaceArtifact,
 	ModuleGraphInterfaceSharedDefinition,
+	SemanticGraphAlias,
 	SemanticGraphBinding,
 	SemanticGraphDiagnostic,
 	SemanticModuleImport,
 	SemanticSharedDefinition,
 	SemanticSharedDependency,
 	SemanticSharedInstance,
+	SemanticSharedModuleDeclaration,
 	SemanticSharedReturnProperty,
 	SemanticSharedScope,
 } from '../../artifacts.ts';
@@ -26,10 +28,13 @@ import {
 	sharedDefinitionCycleDiagnostic,
 	unboundCallbackSlotDiagnostic,
 	unboundSharedCallDiagnostic,
+	unnamedSharedReturnDiagnostic,
 } from './diagnostics.ts';
 import { collectComputedBinding } from './collect-state.ts';
 import { collectExpressionReads } from './collect-expressions.ts';
 import { getCallName, getFrameworkApiForCall, isFrameworkApiName } from './imports.ts';
+import { ownedModuleAst } from './shared-ast.ts';
+import { getComponentFunction } from '../../ast/tsrx.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
 
 export function collectSharedDefinition(input: {
@@ -40,16 +45,126 @@ export function collectSharedDefinition(input: {
 	const args = asNodes(input.init.arguments);
 	const factory = args[0];
 	const scope = sharedScopeFromOptions(args[1], input.state);
+	const factorySource = factory ? expressionSource(factory, input.state.source) : '';
+	const carried = factoryModuleScopeCarry(input.state, factorySource);
 	const definition: SemanticSharedDefinition = {
 		id: sharedDefinitionId(input.state.filename, input.name),
 		name: input.name,
 		exportedName: input.name,
 		...(scope ? { scope } : {}),
-		factorySource: factory ? expressionSource(factory, input.state.source) : '',
+		factorySource,
+		...(carried.imports.length > 0 ? { factoryModuleImports: carried.imports } : {}),
+		...(carried.declarations.length > 0 ? { factoryModuleScope: carried.declarations } : {}),
 		sourceSpan: sourceSpan(input.init, input.state.filename),
 	};
 
 	input.state.graph.sharedDefinitions.push(definition);
+}
+
+/**
+ * The module scope this factory's expressions were written in, narrowed to what
+ * the factory text names. A page in another file serves a factory computed by
+ * copying its expression, and the copy arrives with the defining file's scope
+ * stripped off, so the definition record carries the part of that scope the copy
+ * can still need.
+ *
+ * Narrowing is by identifier text, which over-reaches into member names and
+ * strings. That only costs record bytes: the module that emits the copy narrows
+ * again, precisely, against the copied expression's own free names.
+ */
+function factoryModuleScopeCarry(
+	state: WalkState,
+	factorySource: string,
+): {
+	readonly imports: ReadonlyArray<SemanticModuleImport>;
+	readonly declarations: ReadonlyArray<SemanticSharedModuleDeclaration>;
+} {
+	if (factorySource === '') return { imports: [], declarations: [] };
+	const candidates = carryableModuleScopeDeclarations(state);
+	if (candidates.length === 0 && state.graph.moduleImports.length === 0)
+		return { imports: [], declarations: [] };
+
+	const declarations = new Set<SemanticSharedModuleDeclaration>();
+	const imports = new Set<SemanticModuleImport>();
+	let text = factorySource;
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const declaration of candidates) {
+			if (declarations.has(declaration)) continue;
+			if (!declaration.names.some((name) => namesIdentifier(text, name))) continue;
+			declarations.add(declaration);
+			text += `\n${declaration.source}`;
+			changed = true;
+		}
+		for (const moduleImport of state.graph.moduleImports) {
+			if (imports.has(moduleImport)) continue;
+			if (!namesIdentifier(text, moduleImport.localName)) continue;
+			imports.add(moduleImport);
+			changed = true;
+		}
+	}
+	// Carried in this file's own order: a constant written out of another one has
+	// to be emitted after it or the copy reads it before it is initialized.
+	return {
+		imports: state.graph.moduleImports.filter((moduleImport) => imports.has(moduleImport)),
+		declarations: candidates.filter((declaration) => declarations.has(declaration)),
+	};
+}
+
+/**
+ * The module-scope declarations of this file a copied expression could bind to.
+ * A declaration whose initializer is a framework API call is graph data rather
+ * than module code — it ships as payload nodes — so it is not among them, and a
+ * copy that names one stays refused.
+ */
+function carryableModuleScopeDeclarations(
+	state: WalkState,
+): ReadonlyArray<SemanticSharedModuleDeclaration> {
+	const ast = ownedModuleAst(state, state.source, state.filename);
+	return asNodes(ast.body).flatMap((statement) => {
+		if (statement.type === 'ImportDeclaration' || getComponentFunction(statement)) return [];
+		const declaration =
+			statement.type === 'ExportNamedDeclaration'
+				? (statement.declaration as AnyNode | undefined)
+				: statement;
+		if (!declaration) return [];
+		if (
+			declaration.type !== 'VariableDeclaration' &&
+			declaration.type !== 'FunctionDeclaration' &&
+			declaration.type !== 'ClassDeclaration'
+		)
+			return [];
+		const names = moduleDeclaredNames(declaration);
+		if (names.length === 0) return [];
+		if (
+			declaration.type === 'VariableDeclaration' &&
+			asNodes(declaration.declarations).some(
+				(declarator) =>
+					getFrameworkApiForCall(
+						declarator.init as AnyNode | undefined,
+						state.frameworkApiImports,
+					) !== null,
+			)
+		)
+			return [];
+		return [{ names, source: expressionSource(declaration, state.source) }];
+	});
+}
+
+function moduleDeclaredNames(declaration: AnyNode): ReadonlyArray<string> {
+	if (declaration.type === 'VariableDeclaration')
+		return asNodes(declaration.declarations).flatMap((declarator) => {
+			const name = getIdentifierName(declarator.id as AnyNode | undefined);
+			return name ? [name] : [];
+		});
+	const name = getIdentifierName(declaration.id as AnyNode | undefined);
+	return name ? [name] : [];
+}
+
+function namesIdentifier(text: string, name: string): boolean {
+	if (!/^[A-Za-z_$][\w$]*$/.test(name)) return false;
+	return new RegExp(`(^|[^\\w$.])${name}([^\\w$]|$)`).test(text);
 }
 
 export function collectSharedInstance(input: {
@@ -545,6 +660,7 @@ export function collectSharedFactoryGraph(
 			state,
 		});
 		state.currentSharedDefinitionId = previousSharedDefinitionId;
+		reportUnnamedSharedReturn({ factory: declaration.factory, definition, state });
 		if (returnProperties.length === 0) continue;
 
 		const index = state.graph.sharedDefinitions.findIndex((item) => item.id === definition.id);
@@ -722,6 +838,18 @@ export function sharedDefinitionId(filename: string, exportedName: string): stri
 	return `shared:${filename}#${exportedName}`;
 }
 
+/**
+ * The definition one shared graph node belongs to. A node id is its definition
+ * id followed by `/` and the node's own name, and an exported name carries no
+ * `/`, so the first slash after the `#` ends the definition id.
+ */
+export function sharedDefinitionIdOf(graphNodeId: string): string {
+	const named = graphNodeId.indexOf('#');
+	if (named === -1) return graphNodeId;
+	const end = graphNodeId.indexOf('/', named);
+	return end === -1 ? graphNodeId : graphNodeId.slice(0, end);
+}
+
 // What the semantic graph knows about `const s = session()`: the local name, the
 // definition it came from, and the graph nodes the factory declared. Every
 // consumer that turns `s.status` into a graph node id reads it through here.
@@ -729,7 +857,33 @@ export type SharedInstanceGraph = {
 	readonly graphBindings: ReadonlyArray<SemanticGraphBinding>;
 	readonly sharedDefinitions: ReadonlyArray<SemanticSharedDefinition>;
 	readonly sharedInstances: ReadonlyArray<SemanticSharedInstance>;
+	readonly aliases?: ReadonlyArray<SemanticGraphAlias>;
 };
+
+/**
+ * The authored instance path a component-local `const` was declared from, when
+ * the name is one. Component-local, so an alias another component declared under
+ * the same name never answers here.
+ */
+function sharedInstancePathAlias(
+	name: string,
+	graph: SharedInstanceGraph,
+	componentName?: string | null,
+): string | null {
+	const alias = findLast(
+		graph.aliases ?? [],
+		(item) =>
+			item.name === name &&
+			item.sharedDefinitionId === undefined &&
+			item.componentName !== undefined &&
+			(componentName === undefined ||
+				componentName === null ||
+				item.componentName === componentName) &&
+			findSharedInstance(splitStaticGraphPath(item.target)[0] ?? '', graph, componentName) !==
+				null,
+	);
+	return alias?.target ?? null;
+}
 
 /**
  * Whether a read inside `componentName` can see this instance local. An instance
@@ -779,6 +933,19 @@ export function resolveSharedInstanceGraphPath(
 	componentName?: string | null,
 ): ResolvedGraphPath | null {
 	const segments = splitStaticGraphPath(source);
+	if (segments.length === 0) return null;
+
+	// `const days = cal.days` puts the whole instance path behind one name, so the
+	// alias is substituted before the head is read as an instance local. Bare
+	// `days` is the shape a repeat header and a template read both take.
+	const aliased = sharedInstancePathAlias(segments[0]!, graph, componentName);
+	if (aliased) {
+		return resolveSharedInstanceGraphPath(
+			[aliased, ...segments.slice(1)].join('.'),
+			graph,
+			componentName,
+		);
+	}
 	if (segments.length < 2) return null;
 
 	const [localName, propertyName, ...propertyPath] = segments;
@@ -876,12 +1043,25 @@ function collectSharedReturnProperties(input: {
 
 	const properties: SemanticSharedReturnProperty[] = [];
 	for (const returned of returns) {
-		if (returned.type !== 'ObjectExpression') continue;
+		if (returned.type === 'ObjectExpression') {
+			properties.push(
+				...collectReturnedObjectProperties({
+					node: returned,
+					definitionId: input.definitionId,
+					state: input.state,
+				}),
+			);
+			continue;
+		}
 
+		// A factory's return IS its cell set. `return s` names the same nodes
+		// `return { ...s }` does, so it expands through the same keys.
 		properties.push(
-			...collectReturnedObjectProperties({
+			...graphPathReturnProperties({
 				node: returned,
-				definitionId: input.definitionId,
+				source: expressionSource(returned, input.state.source),
+				bindings: graphBindingMap(input.state.graph, input.definitionId),
+				aliases: semanticAliasMap(input.state.graph, input.definitionId),
 				state: input.state,
 			}),
 		);
@@ -890,10 +1070,37 @@ function collectSharedReturnProperties(input: {
 	return properties;
 }
 
+/**
+ * The one return shape a factory's cell set cannot take. Every other shape —
+ * the state object by name, a wrapper spreading it, an inline `computed()` under
+ * a property key — reaches a node named by authored text; `return state({…})`
+ * reaches none, and used to compile to an attribute residue reading an unbound
+ * local that threw at render.
+ */
+function reportUnnamedSharedReturn(input: {
+	readonly factory: AnyNode | undefined;
+	readonly definition: SemanticSharedDefinition;
+	readonly state: WalkState;
+}): void {
+	for (const returned of sharedReturnExpressions(input.factory)) {
+		const apiName = getFrameworkApiForCall(returned, input.state.frameworkApiImports);
+		if (apiName !== 'state' && apiName !== 'computed') continue;
+
+		input.state.graph.diagnostics.push(
+			unnamedSharedReturnDiagnostic({
+				definitionName: input.definition.name,
+				apiName,
+				span: sourceSpan(returned, input.state.filename),
+			}),
+		);
+	}
+}
+
 function sharedReturnExpressions(factory: AnyNode | undefined): AnyNode[] {
 	const body = factory?.body as AnyNode | undefined;
 	if (!body) return [];
-	if (body.type === 'ObjectExpression') return [body];
+	// A concise arrow body IS the return; only a block body carries statements.
+	if (body.type !== 'BlockStatement') return [body];
 
 	const returns: AnyNode[] = [];
 	walkFactoryBody(body, (node) => {
@@ -1010,8 +1217,28 @@ function spreadReturnProperties(input: {
 	readonly state: WalkState;
 }): SemanticSharedReturnProperty[] {
 	const argument = input.node.argument as AnyNode | undefined;
-	const source = argument ? expressionSource(argument, input.state.source) : '';
-	const resolved = resolveGraphPath(source, input.bindings, input.aliases);
+	return graphPathReturnProperties({
+		node: input.node,
+		source: argument ? expressionSource(argument, input.state.source) : '',
+		bindings: input.bindings,
+		aliases: input.aliases,
+		state: input.state,
+	});
+}
+
+/**
+ * One returned graph object expanded into one property per key. `source` is the
+ * path text to resolve, `node` the span the properties are attributed to — they
+ * differ for a spread, whose text is `...s` but whose path is `s`.
+ */
+function graphPathReturnProperties(input: {
+	readonly node: AnyNode;
+	readonly source: string;
+	readonly bindings: ReadonlyMap<string, SemanticGraphBinding>;
+	readonly aliases: ReturnType<typeof semanticAliasMap>;
+	readonly state: WalkState;
+}): SemanticSharedReturnProperty[] {
+	const resolved = resolveGraphPath(input.source, input.bindings, input.aliases);
 	if (!resolved) return [];
 
 	const keys = graphObjectReturnKeys(resolved.binding);

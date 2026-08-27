@@ -1,0 +1,22 @@
+# MARKLESS_SHARED_RETURN_UNNAMED
+
+a shared() factory must return named state
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: error
+
+## Message
+
+shared() definition "…" returns …() directly, so the cells it returns have no name.
+
+## Why
+
+A shared() cell is serialized under an id spelled from the name it was declared with, and every read of the instance resolves through that id. An inline call in return position declares no name, so no node exists, and each read of the instance falls back to the authored text and throws at render.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

@@ -10,6 +10,7 @@ import HoverTiming from './scenarios/hover-timing.tsrx';
 import ItemsFromData from './scenarios/items-from-data.tsrx';
 import SiteHeader from './scenarios/site-header.tsrx';
 import TwoNavbars from './scenarios/two-navbars.tsrx';
+import WithOnChangeLeaving from './scenarios/with-onchange-leaving.tsrx';
 import WithOnChange from './scenarios/with-onchange.tsrx';
 
 // Colocated browser suite for the navbar family. Each test renders a realistic
@@ -714,4 +715,59 @@ test('CSR: a real press on the trigger of an open dropdown closes it and leaves 
 	// And the entry still opens on the next press, now that the window is over.
 	await userEvent.click(el(ProductsTrigger));
 	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('true');
+});
+
+// Closing by leaving is the root's OWN handler: the callback its render stored on
+// the shared instance is what these two read from inside it.
+test('CSR: focus leaving the landmark reports the close to the consumer', async () => {
+	await render(WithOnChangeLeaving);
+	el<HTMLElement>(ProductsTrigger).focus();
+	el(ProductsTrigger).click();
+	await expect.poll(() => el(Value).textContent).toBe('products');
+	await expect.poll(() => el(Calls).textContent).toBe('1');
+
+	el<HTMLElement>(SignIn).focus();
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('false');
+	expect(el(Calls).textContent).toBe('2');
+	expect(el(Value).textContent).toBe('none');
+});
+
+test('SSR: focus leaving the landmark reports the close to the consumer', async () => {
+	await renderSSR(WithOnChangeLeaving);
+	el<HTMLElement>(ProductsTrigger).focus();
+	el(ProductsTrigger).click();
+	await expect.poll(() => el(Value).textContent).toBe('products');
+	await expect.poll(() => el(Calls).textContent).toBe('1');
+
+	el<HTMLElement>(SignIn).focus();
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('false');
+	expect(el(Calls).textContent).toBe('2');
+	expect(el(Value).textContent).toBe('none');
+});
+
+// The other route: the runtime hands the crossing to the nearest part that
+// declared a handler, so it is the ITEM that closes here - a different component
+// from the one that stored the callback.
+test('CSR: the pointer leaving the landmark reports the close to the consumer', async () => {
+	await render(WithOnChangeLeaving);
+	await userEvent.hover(el(ProductsTrigger));
+	await expect.poll(() => el(Value).textContent).toBe('products');
+	await expect.poll(() => el(Calls).textContent).toBe('1');
+
+	await userEvent.hover(el(SignIn));
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('false');
+	expect(el(Calls).textContent).toBe('2');
+	expect(el(Value).textContent).toBe('none');
+});
+
+test('SSR: the pointer leaving the landmark reports the close to the consumer', async () => {
+	await renderSSR(WithOnChangeLeaving);
+	await userEvent.hover(el(ProductsTrigger));
+	await expect.poll(() => el(Value).textContent).toBe('products');
+	await expect.poll(() => el(Calls).textContent).toBe('1');
+
+	await userEvent.hover(el(SignIn));
+	await expect.poll(() => el(ProductsTrigger).getAttribute('aria-expanded')).toBe('false');
+	expect(el(Calls).textContent).toBe('2');
+	expect(el(Value).textContent).toBe('none');
 });

@@ -63,12 +63,7 @@ export function armChildDescent(
 	if (!edge || edge.children.childCount > 0) return null;
 	const material = edge.importSource
 		? importedArmMaterial(interfaces, edge)
-		: // A cell a child declares joins the page graph only when the child renders,
-			// so an arm that was closed at first render has nothing for the flip to read.
-			semanticGraph.graphBindings.some(
-					(binding) =>
-						binding.componentName === edge.childComponentName && binding.kind !== 'prop',
-				)
+		: armChildOwnValueRefusal(semanticGraph, edge.childComponentName)
 			? null
 			: { chunkId: slot.childTemplateId, chunks: renderData.chunks };
 	if (!material) return null;
@@ -98,6 +93,25 @@ export function armChildDescent(
 		chunks: material.chunks,
 		imported: edge.importSource !== undefined,
 	};
+}
+
+/**
+ * Why a flip cannot rebuild a same-module child from its own values, in author
+ * words, naming the value that blocked it — `undefined` when nothing does.
+ *
+ * A value a component keeps of its own reaches the page under the instance name
+ * its render mints (`c0:state:hits`), while an arm the PARENT rebuilds addresses
+ * the plain one, so a closed arm has no value to read and an open one reads a
+ * node the child never wrote. Both stay refused until the two spellings agree.
+ */
+export function armChildOwnValueRefusal(
+	semanticGraph: SemanticGraphArtifact,
+	componentName: string,
+): string | undefined {
+	const own = semanticGraph.graphBindings.find(
+		(binding) => binding.componentName === componentName && binding.kind !== 'prop',
+	);
+	return own && `keeps a \`${own.name}\` of its own that only running it works out`;
 }
 
 /**
