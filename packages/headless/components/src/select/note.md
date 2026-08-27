@@ -40,37 +40,32 @@ handler cannot reach" records both walls and the dates they closed.
 
 ## Deviations from QDS, and the constraint that forced each
 
-1. **`role="combobox"` on the trigger.** QDS ships `aria-haspopup="listbox"` on
-   a bare `<button>`, which a reader announces as "button, collapsed" and which
-   fails aria-at's `Role 'combobox' is conveyed` assertion. This is a deliberate
-   behaviour deviation, argued in research §2.1, and `select.sr.ts` is what
-   holds it.
-2. **`aria-labelledby` on the trigger names the label part only.** QDS writes a
+1. **`aria-labelledby` on the trigger names the label part only.** QDS writes a
    two-id list, `"{label} {trigger}"`, including a label id that may not exist.
    A handle list in an IDREF position is `MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE`,
    so the trigger names one handle — the one `select.label` binds. That is also
    the APG select-only example's own shape, and it removes the dangling
    reference a select written without a label part would carry.
-3. **`value` is required on `select.item`.** QDS falls back to `value ?? String(index)`
+2. **`value` is required on `select.item`.** QDS falls back to `value ?? String(index)`
    from a construction-order counter. Markless seeds are order-independent and
    the owner ruled out a runtime creation-order counter, so an option is named
    by its value and nothing counts positions. Same ruling as tabs, radio group
    and otp.
-4. **No `multiple`.** Research §9 question 3, recommended "later": it is the one
+3. **No `multiple`.** Research §9 question 3, recommended "later": it is the one
    prop that turns `value` into a union and doubles the keyboard table. Six of
    seven surveyed libraries carry it, so this is a scope decision, not a
    capability one.
-5. **No `displayValue`, and no `value` part to replace it.** See below.
-6. **`select.field` carries the chosen value, not the whole option list.** QDS
+4. **No `displayValue`, and no `value` part to replace it.** See below.
+5. **`select.field` carries the chosen value, not the whole option list.** QDS
    rebuilds a `<select>` with an `<option>` per registered item. There is no item
    registry here, and none is needed: a single-option `<select>` submits the same
    name/value pair, which is what `only the chosen option appears in what the form
    submits` proves. The empty value submits as `{"plan":""}`, which is what a
    native `<select>` with no choice does.
-7. **No `ui-highlighted`.** QDS tracks a `highlightedIndex` cell and reflects it.
+6. **No `ui-highlighted`.** QDS tracks a `highlightedIndex` cell and reflects it.
    This family roves real DOM focus, so `:focus` is the highlight and a consumer
    styles it with the platform's own selector.
-8. **`{...rest}` is spread first**, so a consumer cannot silently overwrite the
+7. **`{...rest}` is spread first**, so a consumer cannot silently overwrite the
    ARIA state. QDS spreads it last on several parts. Same call tabs made.
 
 ## Roving DOM focus, not aria-activedescendant
@@ -155,12 +150,15 @@ Everything below was measured by running the suite, not assumed.
    toggled it straight back shut. They are now absent from both the prevented
    set and the opening set: the button's own activation opens the popup, and the
    key rule only lands the roving focus. What a person experiences is unchanged.
-5. **Focus into a freshly opened listbox needs more than one frame.** The
+5. **Focus into a freshly opened listbox used to need more than one frame.** The
    listbox is `hidden` until the open cell reaches the DOM, and nothing inside a
-   hidden subtree can take focus. A single `requestAnimationFrame` landed the
-   first open and raced later ones (4 intermittently red rows). The landing is
-   now retried per frame, up to twelve, until `document.activeElement` is the
-   option it aimed at.
+   hidden subtree can take focus, so the landing was retried per frame. That
+   retry is gone: the runtime now holds a focus the browser refused inside a
+   dispatch and replays it once that dispatch's write has committed, and
+   `focusOpeningOption` just calls `focus()`. One row does not survive the
+   change — see the pin on `CSR: Enter and Space open the popup and land on the
+   first option`, where the opening write lands in the button's own click, a
+   dispatch later than the keydown that asks for the landing.
 
 ## What a handler cannot reach — measured on this tip
 

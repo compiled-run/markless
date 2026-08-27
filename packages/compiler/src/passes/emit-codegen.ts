@@ -20,7 +20,7 @@
  *   is a named compiler diagnostic instead of an upstream crash
  * - the determinism helper (invariant 7), which every migrated site's test uses
  *
- * Evidence, re-run against the installed `yuku-codegen@0.9.0` while writing
+ * Evidence, re-run against the installed `yuku-codegen@0.9.1` while writing
  * this module and asserted in `test/emission-foundation.test.ts`:
  * `preserveParens: false` removes `ParenthesizedExpression` nodes and the
  * printer still derives correct parentheses; comments survive only when
@@ -127,7 +127,7 @@ export const EMISSION_PRINT_OPTIONS = Object.freeze({
  * invariant 4 requires that premise be asserted rather than assumed.
  *
  * Plain JSX (`JSXElement`, `JSXExpressionContainer`, ...) is deliberately not
- * in this set: `yuku-codegen@0.9.0` prints those without error, so refusing
+ * in this set: `yuku-codegen@0.9.1` prints those without error, so refusing
  * them would be a false positive. `TSModuleDeclaration` and `TSModuleBlock`
  * also print without error today; they are kept because the specification
  * enumerates them, and no stage-1 extracted symbol contains a namespace.
@@ -610,7 +610,7 @@ export function optionalMemberNode(object: EmissionNode, property: string): Emis
  *
  * The printer takes comments from a node's own `comments` array, in the shape
  * the parser attaches — `leadingComments` is ignored, which was checked against
- * the installed `yuku-codegen@0.9.0` while writing this. `value` is the text
+ * the installed `yuku-codegen@0.9.1` while writing this. `value` is the text
  * between the delimiters and excludes them: passing `" marker "` prints a block
  * comment whose body is `" marker "`, with the printer supplying `slash-star`
  * and `star-slash` itself.

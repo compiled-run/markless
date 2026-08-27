@@ -5,9 +5,13 @@ import type {
 	ProtocolViewPayloadInput,
 	ProtocolViewPayloadWithArmRecords,
 	RenderDataArtifact,
+	SemanticMarkupChunk,
+	SemanticMarkupSlot,
 } from '../artifacts.ts';
 import { armChildRead, armHostPaths, type ArmHostPlacement } from './arm-child-content.ts';
+import { resolveRowComponentMint, type RowComponentMint } from './row-mint.ts';
 import { forwardedSpreadViewRecords } from './spread-forwarding.ts';
+import { armEscalationCandidateSiteIds } from './symbol-modules.ts';
 
 function renderDataOf(input: ProtocolViewPayloadInput): RenderDataArtifact {
 	if (!input.renderData) {
@@ -249,8 +253,27 @@ function emittedPairRank(input: ProtocolViewPayloadInput, id: string): number {
 	return emittedAnchorPairs(input).findIndex((pair) => pair.id === id);
 }
 
+// A branch whose arms the symbol-modules pass could build no parts for, and
+// whose every refusal a page re-render answers. Its flip replaces the range
+// wholesale, so the per-arm plan below would double-register what the served
+// arm already carries.
+function escalatingBranchIds(input: ProtocolViewPayloadInput): ReadonlySet<string> {
+	return armEscalationCandidateSiteIds({
+		source: input.source,
+		semanticGraph: input.semanticGraph,
+		symbolResolver: input.symbolResolver,
+		captureAnalysis: input.captureAnalysis ?? {
+			passId: 'capture-analysis',
+			extractedSymbols: [],
+			diagnostics: [],
+		},
+		renderData: input.renderData,
+	} as Parameters<typeof armEscalationCandidateSiteIds>[0]);
+}
+
 function supportedBranchRecords(input: ProtocolViewPayloadInput) {
 	const branchIds = supportedBranchIds(input);
+	const escalatingIds = escalatingBranchIds(input);
 	const branchSymbols = new Map(
 		input.symbolResolver.symbols.flatMap((symbol) =>
 			symbol.kind === 'branch-update' ? [[symbol.branchSiteId, symbol] as const] : [],
@@ -288,8 +311,34 @@ function supportedBranchRecords(input: ProtocolViewPayloadInput) {
 			},
 			symbolId: branchSymbols.get(site.id)?.id,
 			testReads: branchSymbols.get(site.id)?.testReads ?? [],
-			armRecords: branchArmRecords(input, site.id),
+			...branchContentReadsField(input, site.id),
+			...(escalatingIds.has(site.id)
+				? { escalates: true as const }
+				: { armRecords: branchArmRecords(input, site.id) }),
 		}));
+}
+
+/**
+ * Reads an arm renders directly, with no element of its own to bind to.
+ *
+ * `@if (open) { <>{count}</> }` has text but no host: bound to the enclosing
+ * element the update would set that element's text and erase both arms'
+ * markers. These reads refresh the arm's own marker range instead, through the
+ * branch's existing update symbol, so nothing outside the served arm moves.
+ */
+function branchContentReadsField(input: ProtocolViewPayloadInput, branchSiteId: string) {
+	const reads = (input.payloadArena.view.branchContentReads ?? []).filter(
+		(read) => read.branchSiteId === branchSiteId,
+	);
+	return reads.length > 0
+		? {
+				contentReads: reads.map((read) => ({
+					graphNodeId: read.graphNodeId,
+					path: read.path,
+					source: read.source,
+				})),
+			}
+		: {};
 }
 
 // Row event symbols already exist on the row host nodes; the record maps
@@ -349,6 +398,7 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 				id: repeat.id,
 				...(rowElementHandles.length > 0 ? { rowElementHandles } : {}),
 				parentHostNodeId: repeat.parentHostNodeId,
+				...(repeat.ownerHostNodeId ? { ownerHostNodeId: repeat.ownerHostNodeId } : {}),
 				collectionGraphNodeId: repeat.collectionGraphNodeId,
 				collectionPath: repeat.collectionPath,
 				keyPath: repeat.keyPath,
@@ -359,7 +409,8 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 					? { rowStartOffset: render.rowStartOffset }
 					: {}),
 				...mintableEmptyArm(input, render),
-				...mintableRowTemplate(input, render),
+				...mintableRowTemplate(input, render, rowComponentMint(input, render)),
+				...mintableRowComponent(input, render),
 				rowEvents: oneRecordPerEvent(input.payloadArena.view.events)
 					.filter((event) => rowHostPaths.has(event.hostNodeId))
 					.map((event) => ({
@@ -423,13 +474,21 @@ function mintableEmptyArm(
  * way it can exist is for the client to build it - and the client has no
  * renderer, only the payload. This ships the row chunk's finished markup, which
  * is honest for exactly two shapes: a row with NO slots, and a row whose every
- * slot is text read off the repeated item. Anything else is a part the mint
- * cannot fill - a value from outside the row, an attribute, a nested construct,
- * a child component - and half a row is worse than none.
+ * slot - text or attribute - reads off the repeated item. Anything else is a
+ * part the mint cannot fill - a value from outside the row, an attribute value
+ * an expression computes, a nested construct, a child component - and half a row
+ * is worse than none.
+ *
+ * A third shape joins them once a row element WRAPS a child component: the
+ * wrapper is this markup, and the child is named by identity in `rowComponent`,
+ * which also carries the path of the marker its nodes replace. The mint that
+ * builds such a row runs both halves.
  *
  * The slot markers stay in the html on purpose: they are the positions the row's
  * text occupies, and `textSlots` addresses them by the same fragment-relative
  * path the chunk records, so the mint walks to each one instead of re-parsing.
+ * An attribute has no marker - its statics join around the missing value - so
+ * `attributeSlots` addresses the element and names the attribute to write.
  * These are FRAGMENT-relative coordinates - `[0]` is the row root - not the
  * ROW-ROOT-relative ones `rowEvents[].hostPath` carries.
  *
@@ -439,11 +498,17 @@ function mintableEmptyArm(
 function mintableRowTemplate(
 	input: ProtocolViewPayloadInput,
 	render: RenderDataArtifact['repeats'][number],
+	mint: RowComponentMint | null,
 ): {
 	readonly rowTemplate?: {
 		readonly html: string;
 		readonly textSlots?: ReadonlyArray<{
 			readonly path: ReadonlyArray<number>;
+			readonly itemPath: ReadonlyArray<string>;
+		}>;
+		readonly attributeSlots?: ReadonlyArray<{
+			readonly path: ReadonlyArray<number>;
+			readonly name: string;
 			readonly itemPath: ReadonlyArray<string>;
 		}>;
 	};
@@ -452,22 +517,37 @@ function mintableRowTemplate(
 		(candidate) => candidate.id === render.rowChunkId,
 	);
 	if (!chunk) return {};
-	// A repeat whose row roots a widget is refused outright, in the same terms the
-	// record gate already answers widget-rooting for repeats: the row's content is
-	// a child component, whose graph is one instance per rendered row. The slot
-	// whitelist below refuses a child-component slot too, so this costs nothing
-	// today - it is stated so that widening the whitelist later cannot quietly
-	// open the widget hole, where a minted row would be a widget with no graph.
-	if (chunk.slots.some((slot) => slot.kind === 'child-component')) return {};
+	// A child component has a graph, not a template - one instance per rendered
+	// row - so markup could never finish it. It is named by identity instead, in
+	// `rowComponent`; markup carries only the row element that wraps it, and a row
+	// that IS the component has no wrapper to carry.
+	const wrappedComponentSlot = mint?.slotPath ? componentSlotAt(chunk, mint.slotPath) : undefined;
+	if (chunk.slots.some((slot) => slot.kind === 'child-component' && slot !== wrappedComponentSlot))
+		return {};
 	const textSlots: Array<{
 		readonly path: ReadonlyArray<number>;
 		readonly itemPath: ReadonlyArray<string>;
 	}> = [];
+	const attributeSlots: Array<{
+		readonly path: ReadonlyArray<number>;
+		readonly name: string;
+		readonly itemPath: ReadonlyArray<string>;
+	}> = [];
 	for (const slot of chunk.slots) {
+		if (slot === wrappedComponentSlot) continue;
 		// A row that reads anything but its own item cannot be minted from the item
-		// alone, and every non-text slot is wiring the mint does not do.
-		if (slot.kind !== 'text' || slot.residue.kind !== 'repeat-item') return {};
-		textSlots.push({ path: slot.coordinate.path, itemPath: slot.residue.path });
+		// alone, and every slot that is neither text nor an attribute is wiring the
+		// mint does not do.
+		if (slot.kind !== 'text' && slot.kind !== 'attribute') return {};
+		if (slot.residue.kind !== 'repeat-item') return {};
+		if (slot.kind === 'text')
+			textSlots.push({ path: slot.coordinate.path, itemPath: slot.residue.path });
+		else
+			attributeSlots.push({
+				path: slot.coordinate.path,
+				name: slot.name,
+				itemPath: slot.residue.path,
+			});
 	}
 	const html = chunk.statics.join('');
 	if (!html) return {};
@@ -475,8 +555,56 @@ function mintableRowTemplate(
 		rowTemplate: {
 			html,
 			...(textSlots.length > 0 ? { textSlots } : {}),
+			...(attributeSlots.length > 0 ? { attributeSlots } : {}),
 		},
 	};
+}
+
+// A refusal emits no field at all, so the record stays byte-identical.
+function mintableRowComponent(
+	input: ProtocolViewPayloadInput,
+	render: RenderDataArtifact['repeats'][number],
+): {
+	readonly rowComponent?: {
+		readonly componentEdgeId: string;
+		readonly componentName: string;
+		readonly itemPropName?: string;
+		readonly slotPath?: ReadonlyArray<number>;
+	};
+} {
+	const rowComponent = rowComponentMint(input, render);
+	return rowComponent ? { rowComponent } : {};
+}
+
+// The row template and the row component are two halves of one decision, so both
+// read the same answer rather than each deciding what the row is.
+function rowComponentMint(
+	input: ProtocolViewPayloadInput,
+	render: RenderDataArtifact['repeats'][number],
+): RowComponentMint | null {
+	return resolveRowComponentMint({
+		chunks: renderDataOf(input).chunks,
+		componentEdges: input.semanticGraph?.componentEdges ?? [],
+		componentNames: (input.semanticGraph?.components ?? []).map((component) => component.name),
+		...(input.source?.importedModuleInterfaces
+			? { importedModuleInterfaces: input.source.importedModuleInterfaces }
+			: {}),
+		rowChunkId: render.rowChunkId,
+		rowElementCount: render.rowElementCount,
+		itemName: render.itemName,
+	});
+}
+
+function componentSlotAt(
+	chunk: SemanticMarkupChunk,
+	slotPath: ReadonlyArray<number>,
+): SemanticMarkupSlot | undefined {
+	return chunk.slots.find(
+		(slot) =>
+			slot.kind === 'child-component' &&
+			slot.coordinate.path.length === slotPath.length &&
+			slot.coordinate.path.every((step, at) => step === slotPath[at]),
+	);
 }
 
 function boundaryUpdateSymbols(input: ProtocolViewPayloadInput): ReadonlyMap<string, string> {
@@ -680,6 +808,7 @@ function armScopedBranchRecords(
 		testReads: branchSymbols.get(branch.branchSiteId)?.testReads ?? [],
 		startAnchor: { strategy: 'arm-branch-comment', index: rank * 2 },
 		endAnchor: { strategy: 'arm-branch-comment', index: rank * 2 + 1 },
+		...branchContentReadsField(input, branch.branchSiteId),
 		armRecords: branchArmRecords(input, branch.branchSiteId),
 		...(branch.armTests ? { armTests: branch.armTests } : {}),
 		...(branch.declaredEmptyArms

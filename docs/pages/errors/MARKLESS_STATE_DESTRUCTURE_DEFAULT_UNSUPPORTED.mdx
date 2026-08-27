@@ -1,0 +1,27 @@
+# MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED
+
+Graph destructuring defaults are not supported yet; This prop default is only supported where the body assigns it
+
+- Package: compiler
+- Pass or phase: semantic-graph, state-lowering
+- Severity: error
+
+## Message
+
+Cannot create graph alias "…" from "…" with a default value.
+
+Cannot read "…" because the prop "…" has a destructuring default, and this position reads the prop the consumer passed instead of the default.
+
+## Why
+
+A destructuring default must run only when the property value is undefined. The current graph alias artifact can represent a graph path, but not a fallback expression without changing JavaScript semantics.
+
+A destructuring default runs only when the prop is undefined. The component body materializes the defaulted local, so a component-body assignment sees it; a template position, an event handler and a computed read the raw prop cell and would silently render undefined where a default was authored.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+- `packages/compiler/src/passes/state-lowering.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
