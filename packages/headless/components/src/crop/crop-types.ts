@@ -105,9 +105,9 @@ export type CropInstanceState = Seeded<
 	own: CropRect | undefined;
 	/** The `aspect` prop. Undefined means the two axes are free. */
 	aspect: number | undefined;
-	/** The `maxWidth` / `maxHeight` props. Undefined means no cap but the area. */
-	maxWidth: number | undefined;
-	maxHeight: number | undefined;
+	/** The `maxWidth` / `maxHeight` props; `Number.POSITIVE_INFINITY` when the area is the only cap. */
+	maxWidth: number;
+	maxHeight: number;
 	/** Set by mounting `crop.error`, the same way textbox does it. */
 	invalid: boolean;
 	moving: boolean;

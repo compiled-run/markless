@@ -113,28 +113,25 @@ family author reads this file rather than the goal notes.
    only diagnostic named a consumer of the shape rather than the seed. Fields now
    register from the authored keys, so a module constant is a legal seed again.
 
-   One limit survives the fix, and it is why the two size caps are still
-   `undefined`-means-no-limit rather than `Number.POSITIVE_INFINITY`: an
-   unfoldable seed registers its fields but its *value* never reaches the protocol
-   cell. Measured here — seeding `maxWidth` and `maxHeight` with
-   `Number.POSITIVE_INFINITY` turns 8 of the 58 rows red, and not only cap rows:
-   `name` comes back `''`, a disabled crop reports `tabindex="0"`, and the
-   rectangle falls back to `0, 0, 40×40`, because the fold is all-or-nothing over
-   the whole seed object and one unfoldable property empties the lot. Leaving the
-   seed `undefined` and defaulting the two props to `Number.POSITIVE_INFINITY`
-   instead keeps all 58 green, which is what pins the breakage to the seed rather
-   than to the written value. `sizeCeiling` in `crop-math.ts` already reads
-   `undefined` as no cap, so nothing is lost by waiting.
+   The residue that outlived that fix is closed too, and the two size caps no
+   longer trade in `undefined`. The seed used to be all-or-nothing over the whole
+   object: one property the build could not fold emptied the lot, so seeding
+   `maxWidth` and `maxHeight` with `Number.POSITIVE_INFINITY` turned 8 of the 58
+   rows red and not only cap rows — `name` came back `''`, a disabled crop
+   reported `tabindex="0"`, and the rectangle fell back to `0, 0, 40×40`. The
+   fold is now per property: the literal-seeded fields fold, the two infinities
+   ride beside them as a carried expression, and the root's per-instance writes
+   land on top of both on CSR and on SSR. So the family seeds both caps
+   `Number.POSITIVE_INFINITY` outright, `sizeCeiling` takes a plain `number`, and
+   the instance fields are `number` rather than `number | undefined`. All 58 rows
+   are green with the infinity seed in place.
 
-   What the surviving limit turns on is the *form the seed is written in*, not the
-   number it denotes. Seeding both caps with `1e400` — a numeric literal that
-   evaluates to `Infinity` — keeps all 58 green, while seeding them with
-   `Number.MAX_SAFE_INTEGER`, an ordinary finite number written as a member
-   expression, turns the same 8 rows red; bare `Infinity` is red too. A literal
-   folds and a name does not, whatever it holds, so no amount of work on
-   non-finite *values* reaches this. Nothing is reported when the fold gives up:
-   the build is clean, the family renders, and the seeded fields quietly hold the
-   `state()` defaults.
+   The caps carry their `Number.POSITIVE_INFINITY` as a destructuring default on
+   `CropRoot`, the same way `minWidth` carries `40`, because a component body may
+   seed a shared instance only from a bare prop or a constant —
+   `crop.maxWidth = maxWidth ?? Number.POSITIVE_INFINITY` is refused at compile
+   time with `MARKLESS_SHARED_SEED_UNSUPPORTED`. The prop stays optional and its
+   public type is unchanged; only the recorded default is new.
 
 2. **A cell read nested inside a call argument does not lower.** Passing
    `crop.minWidth` straight into `resizedRect(...)` leaves the instance name
