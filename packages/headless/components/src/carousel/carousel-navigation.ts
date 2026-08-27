@@ -8,7 +8,11 @@ import type { CarouselMove } from './carousel-types.ts';
 export const SLIDE_VALUE_ATTRIBUTE = 'ui-value';
 
 export function slideValues(slideEls: readonly HTMLElement[]): string[] {
-	return slideEls.map((slide) => slide.getAttribute(SLIDE_VALUE_ATTRIBUTE) ?? '');
+	return slideEls.map(slideValue);
+}
+
+function slideValue(slide: HTMLElement | undefined): string {
+	return slide?.getAttribute(SLIDE_VALUE_ATTRIBUTE) ?? '';
 }
 
 /**
@@ -27,19 +31,20 @@ export function reachableValues(
 	move: CarouselMove,
 	isLoop: boolean,
 ): string[] {
-	const values = slideValues(slideEls);
 	const step = move === 'view' ? Math.max(1, slidesPerView) : Math.max(1, move);
-	const last = isLoop ? values.length - 1 : values.length - Math.max(1, slidesPerView);
+	const last = isLoop ? slideEls.length - 1 : slideEls.length - Math.max(1, slidesPerView);
 
-	if (values.length === 0) return [];
+	if (slideEls.length === 0) return [];
 	if (last < 0) return [];
 
+	// Read straight off the reachable slides: naming every slide first reads an
+	// attribute per slide to keep one in `step` of them.
 	const reachable: string[] = [];
 	for (let index = 0; index <= last; index += step) {
-		reachable.push(values[index] ?? '');
+		reachable.push(slideValue(slideEls[index]));
 	}
 
-	if (last % step !== 0) reachable.push(values[last] ?? '');
+	if (last % step !== 0) reachable.push(slideValue(slideEls[last]));
 
 	return reachable;
 }

@@ -12,7 +12,7 @@ import {
  * runs unchanged against NVDA and VoiceOver.
  */
 
-// The popover section is the tenth of eleven on the gallery page, so a walk that
+// The popover section is the tenth of twelve on the gallery page, so a walk that
 // starts at the top of the document needs more steps than the earlier families'.
 const WALK_LIMIT = 200;
 const CHANGE_TIMEOUT_MS = 15_000;

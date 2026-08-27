@@ -6,6 +6,8 @@
 	"scripts": {
 		"build": "vp pack && pnpm --filter @markless/router run build:cjs && pnpm --filter @markless/typescript-plugin run build:cjs",
 		"check": "vp check",
+		"docs:errors": "node scripts/diagnostics-catalogue.mjs",
+		"docs:errors:check": "node scripts/diagnostics-catalogue.mjs --check",
 		"typecheck": "node packages/typescript-plugin/src/tsc.ts -p tsconfig.json",
 		"markless-tsc": "node packages/typescript-plugin/src/tsc.ts",
 		"fmt": "vp fmt",

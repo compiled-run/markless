@@ -1,3 +1,4 @@
+import type { Awaitable } from '../ssr-data/awaitable.ts';
 import type {
 	PrerenderDataDefinition,
 	PrerenderDataSurface,
@@ -66,7 +67,7 @@ export type SharedSeedPass = {
 	slot: { readonly componentEdgeId: string; readonly projectionChunkId?: string },
 	read: PrerenderRead,
 	inherited: ReadonlyMap<string, unknown> | undefined,
-) => Promise<ReadonlyMap<string, unknown> | undefined>);
+) => Awaitable<ReadonlyMap<string, unknown> | undefined>);
 
 let installedPass: SharedSeedPass | undefined;
 
