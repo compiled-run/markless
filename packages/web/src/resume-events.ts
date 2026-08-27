@@ -387,6 +387,11 @@ export function createEventWiring(input: {
 			}
 			const activation = input.activateBehaviorsFromTrigger(eventRecord.hostNodeId);
 			if (activation) await activation;
+			// What the graph's write observers are already loading. A handler's write
+			// is answered synchronously only by an observer whose module has arrived,
+			// so a gesture that got here first would read its own write stale.
+			const settling = input.graph.settleWriteObservers?.();
+			if (settling) await settling;
 			// Which rendered row this record belongs to. A bound symbol's id names
 			// only the component edge, so without this the handler for row B would
 			// spell the same node as the handler for row A - the write lands
@@ -492,6 +497,8 @@ export function createEventWiring(input: {
 		try {
 			focusCommit = marklessBeginFocusCommit();
 			await input.prepareRuntimeShared();
+			const settling = input.graph.settleWriteObservers?.();
+			if (settling) await settling;
 			validateOneRepeat(input.graph, repeat);
 			const locals = {
 				[repeat.itemName]: findRepeatItemByKey(
