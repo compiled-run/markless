@@ -1,14 +1,5 @@
 import type { PropsOf, Seeded } from '@markless/core';
 
-/**
- * Which side of the trigger the surface is placed on. `start` and `end` are the
- * writing direction's sides, so they swap in a right-to-left page; `top` and
- * `bottom` are the same everywhere. A menu opened from `menu.contextarea` is
- * placed at the pointer instead, and ignores this. A submenu is always placed at
- * its item's inline end.
- */
-export type MenuSide = 'top' | 'bottom' | 'start' | 'end';
-
 /** Where a context menu was asked for, in client coordinates. */
 export type MenuPoint = { readonly x: number; readonly y: number };
 
@@ -41,11 +32,6 @@ export type MenuRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	 * commands. An item carrying `submenu` stays a plain `menuitem` either way.
 	 */
 	readonly radio?: boolean;
-	/**
-	 * Where the top surface is placed against the trigger. It is also written on
-	 * `menu.content` as `ui-side`, so styling can follow the placement.
-	 */
-	readonly side?: MenuSide;
 	/** How long a pointer rests on a `submenu` item before its submenu opens, in milliseconds. */
 	readonly delay?: number;
 	/** How long a submenu stays open after the pointer leaves its item, in milliseconds. */
@@ -89,6 +75,14 @@ export type MenuContextareaProps = PropsOf<'div'>;
  *
  * It owns the keyboard walk over the items IT holds. A submenu's own items
  * belong to that submenu's `menu.itemcontent`.
+ *
+ * Placement is CSS, never a prop. The anchor binding and a default
+ * `position-area` of `block-end span-inline-end` ship in the part's own scoped
+ * stylesheet, inside `@layer markless`, so one unlayered rule of yours replaces
+ * the default without a specificity fight:
+ * `.my-menu { position-area: block-start span-inline-end }`. A menu opened from
+ * `menu.contextarea` resolves no anchor, which leaves the `position-area` inert
+ * and puts the surface at the pointer instead.
  */
 export type MenuContentProps = PropsOf<'div'>;
 
@@ -130,7 +124,9 @@ export type MenuItemProps = PropsOf<'div'> & {
  * `menu.itemcontent` of its own, to any depth.
  *
  * Like `menu.content` it stays in the page when closed, it is an `overlay`, and
- * it owns the keyboard walk over the items it holds.
+ * it owns the keyboard walk over the items it holds. Its default
+ * `position-area` is `inline-end span-block-end` - beside the item that opened
+ * it - and an unlayered rule of yours replaces that the same way.
  */
 export type MenuItemContentProps = PropsOf<'div'>;
 
@@ -142,7 +138,7 @@ export type MenuItemContentProps = PropsOf<'div'>;
  */
 export type MenuInstanceState = Seeded<
 	MenuRootProps,
-	'open' | 'checked' | 'disabled' | 'loop' | 'radio' | 'side' | 'delay' | 'closeDelay'
+	'open' | 'checked' | 'disabled' | 'loop' | 'radio' | 'delay' | 'closeDelay'
 > & {
 	/** The `value` of the item holding the roving focus, or `''`. */
 	focused: string;

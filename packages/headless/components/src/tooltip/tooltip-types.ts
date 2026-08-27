@@ -1,16 +1,9 @@
 import type { PropsOf, Seeded } from '@markless/core';
 
 /**
- * Which side of the trigger the tooltip sits on. `start` and `end` are the
- * writing direction's sides, so they swap in a right-to-left page; `top` and
- * `bottom` are the same everywhere.
- */
-export type TooltipSide = 'top' | 'bottom' | 'start' | 'end';
-
-/**
  * The tooltip itself; the trigger and the tip go inside it, in that order. It
- * holds whether the tip is showing, how long the pointer has to rest before it
- * shows, and which side it sits on.
+ * holds whether the tip is showing and how long the pointer has to rest before
+ * it shows. Where the tip sits is your CSS, never a prop.
  *
  * The pointer handlers live here rather than on the trigger, so moving the
  * pointer from the trigger onto the tip never counts as leaving.
@@ -23,11 +16,6 @@ export type TooltipRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	 * milliseconds. Omit it and it is 600. Focus shows it at once, with no wait.
 	 */
 	readonly delay?: number;
-	/**
-	 * Where the tooltip sits against the trigger. It is written on
-	 * `tooltip.content` as `ui-side`; the placement itself is your CSS.
-	 */
-	readonly side?: TooltipSide;
 	/**
 	 * Called with the new value when the tooltip shows or hides, including when
 	 * Escape or a press elsewhere hides it.
@@ -66,10 +54,12 @@ export type TooltipTriggerProps = PropsOf<'button'>;
  * an elevated element removed from the document while showing leaves the overlay
  * stack's marks behind.
  *
- * Its `position: absolute` and anchor binding live in the part's own scoped
- * stylesheet - your `style` and `class` compose untouched. Everything about
- * where the tip lands - `position-area`, `@position-try`, `position-visibility`,
- * offsets - is your CSS, keyed off `ui-side`.
+ * Its `position: absolute`, anchor binding and a default `position-area` of
+ * `block-start` live in the part's own scoped stylesheet, inside
+ * `@layer markless` - your `style` and `class` compose untouched. One unlayered
+ * rule of your own moves it: `.my-tip { position-area: inline-end }`. Everything
+ * else about where the tip lands - `@position-try`, `position-visibility`,
+ * offsets - is your CSS too.
  */
 export type TooltipContentProps = PropsOf<'div'>;
 
@@ -78,7 +68,7 @@ export type TooltipContentProps = PropsOf<'div'>;
  * fields, plus the consumer's `onChange`, stored by the root for `setOpen()` to
  * call.
  */
-export type TooltipInstanceState = Seeded<TooltipRootProps, 'open' | 'delay' | 'side'> & {
+export type TooltipInstanceState = Seeded<TooltipRootProps, 'open' | 'delay'> & {
 	onChange?: TooltipRootProps['onChange'];
 	/** The pending show timer, zero when nothing is pending. */
 	openTimer: number;

@@ -43,7 +43,7 @@ export default function Disabled() @{
 				<tour.close data-testid="save-close">Skip the tour</tour.close>
 			</tour.item>
 
-			<tour.item index={1} data-testid="step-share" target={shareEl} side="top">
+			<tour.item index={1} data-testid="step-share" target={shareEl}>
 				<tour.title data-testid="share-title">Share it</tour.title>
 				<tour.description data-testid="share-description">
 					The Share button beside Save sends a read-only link.

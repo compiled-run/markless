@@ -1335,13 +1335,13 @@
 			{
 				"part": "content",
 				"component": "HovercardContent",
-				"doc": "The card. Unlike a tooltip's tip this is a surface a person can work in: put\nlinks, buttons and images in it freely.\n\nIt carries no `role`. It is not a description of the trigger and not a dialog;\nits contents are read as themselves. Nothing here writes `aria-describedby`,\nwhich would flatten the whole card into one run-on string with every link\nwelded together and none of them reachable.\n\n**Write it after `hovercard.trigger`.** A CSS anchor has to be laid out\nstrictly before the element that points at it. An ordinary in-flow trigger\nsatisfies that from anywhere in the markup, so the order is only advice -\nuntil you absolutely position the trigger yourself, at which point a card\nwritten first silently lands at its containing block instead of beside it. CSS\nhas no way to report that, so put the card last and the question never comes\nup.\n\nIt stays in the page when the card is hidden - `hidden` decides whether it\nshows, never an arm - because the trigger points at its minted id, because\n`hidden` is what takes its links out of the tab order, and because an elevated\nelement removed from the document while showing leaves the overlay stack's\nmarks behind.\n\nIts `position: absolute` and anchor binding live in the part's own scoped\nstylesheet - your `style` and `class` compose untouched. Everything about\nwhere the card lands - `position-area`, `@position-try`, `position-visibility`,\noffsets - is your CSS, keyed off `ui-side`.",
+				"doc": "The card. Unlike a tooltip's tip this is a surface a person can work in: put\nlinks, buttons and images in it freely.\n\nIt carries no `role`. It is not a description of the trigger and not a dialog;\nits contents are read as themselves. Nothing here writes `aria-describedby`,\nwhich would flatten the whole card into one run-on string with every link\nwelded together and none of them reachable.\n\n**Write it after `hovercard.trigger`.** A CSS anchor has to be laid out\nstrictly before the element that points at it. An ordinary in-flow trigger\nsatisfies that from anywhere in the markup, so the order is only advice -\nuntil you absolutely position the trigger yourself, at which point a card\nwritten first silently lands at its containing block instead of beside it. CSS\nhas no way to report that, so put the card last and the question never comes\nup.\n\nIt stays in the page when the card is hidden - `hidden` decides whether it\nshows, never an arm - because the trigger points at its minted id, because\n`hidden` is what takes its links out of the tab order, and because an elevated\nelement removed from the document while showing leaves the overlay stack's\nmarks behind.\n\nIts `position: absolute`, anchor binding and a default `position-area` of\n`block-end` live in the part's own scoped stylesheet, inside\n`@layer markless` - your `style` and `class` compose untouched. One unlayered\nrule of your own moves it: `.my-card { position-area: block-start }`. Everything\nelse about where the card lands - `@position-try`, `position-visibility`,\noffsets - is your CSS too.",
 				"props": []
 			},
 			{
 				"part": "root",
 				"component": "HovercardRoot",
-				"doc": "The hover card itself; the trigger and the card go inside it, in that order.\nIt holds whether the card is showing, how long the pointer has to rest or\nfocus has to stay before it shows, how long it lingers after the pointer\nleaves, and which side it sits on.\n\nThe pointer and focus handlers live here rather than on the trigger, so moving\nfrom the trigger into the card - with the pointer or with Tab - never counts\nas leaving.",
+				"doc": "The hover card itself; the trigger and the card go inside it, in that order.\nIt holds whether the card is showing, how long the pointer has to rest or\nfocus has to stay before it shows, and how long it lingers after the pointer\nleaves. Where the card sits is your CSS, never a prop.\n\nThe pointer and focus handlers live here rather than on the trigger, so moving\nfrom the trigger into the card - with the pointer or with Tab - never counts\nas leaving.",
 				"props": [
 					{
 						"name": "open",
@@ -1365,13 +1365,6 @@
 						"doc": "How long the card stays after the pointer leaves, in milliseconds. Omit it\nand it is 300. It is what lets the pointer cross the gap between the trigger\nand the card without the card going away."
 					},
 					{
-						"name": "side",
-						"type": "'top' | 'bottom' | 'start' | 'end'",
-						"required": false,
-						"default": "'bottom'",
-						"doc": "Where the card sits against the trigger. It is written on\n`hovercard.content` as `ui-side`; the placement itself is your CSS."
-					},
-					{
 						"name": "onChange",
 						"type": "(open: boolean) => void",
 						"required": false,
@@ -1392,7 +1385,7 @@
 			{
 				"part": "content",
 				"component": "MenuContent",
-				"doc": "The top surface the items go in, `role=\"menu\"`. It is never modal: it writes\nno `aria-modal`, so the page behind it keeps its focus and is never made\ninert, and a wheel does not dismiss it.\n\nIt stays in the page when the menu is closed - `hidden` decides whether it\nshows, never an arm - because an enlisted element removed from the document\nleaves the overlay stack's marks behind.\n\nIt owns the keyboard walk over the items IT holds. A submenu's own items\nbelong to that submenu's `menu.itemcontent`.",
+				"doc": "The top surface the items go in, `role=\"menu\"`. It is never modal: it writes\nno `aria-modal`, so the page behind it keeps its focus and is never made\ninert, and a wheel does not dismiss it.\n\nIt stays in the page when the menu is closed - `hidden` decides whether it\nshows, never an arm - because an enlisted element removed from the document\nleaves the overlay stack's marks behind.\n\nIt owns the keyboard walk over the items IT holds. A submenu's own items\nbelong to that submenu's `menu.itemcontent`.\n\nPlacement is CSS, never a prop. The anchor binding and a default\n`position-area` of `block-end span-inline-end` ship in the part's own scoped\nstylesheet, inside `@layer markless`, so one unlayered rule of yours replaces\nthe default without a specificity fight:\n`.my-menu { position-area: block-start span-inline-end }`. A menu opened from\n`menu.contextarea` resolves no anchor, which leaves the `position-area` inert\nand puts the surface at the pointer instead.",
 				"props": []
 			},
 			{
@@ -1437,7 +1430,7 @@
 			{
 				"part": "itemcontent",
 				"component": "MenuItemContent",
-				"doc": "The submenu one item holds, `role=\"menu\"`, named by that item. It is the same\nsurface part one level down: a `menu.item` inside it may hold a\n`menu.itemcontent` of its own, to any depth.\n\nLike `menu.content` it stays in the page when closed, it is an `overlay`, and\nit owns the keyboard walk over the items it holds.",
+				"doc": "The submenu one item holds, `role=\"menu\"`, named by that item. It is the same\nsurface part one level down: a `menu.item` inside it may hold a\n`menu.itemcontent` of its own, to any depth.\n\nLike `menu.content` it stays in the page when closed, it is an `overlay`, and\nit owns the keyboard walk over the items it holds. Its default\n`position-area` is `inline-end span-block-end` - beside the item that opened\nit - and an unlayered rule of yours replaces that the same way.",
 				"props": []
 			},
 			{
@@ -1479,13 +1472,6 @@
 						"required": false,
 						"default": "false",
 						"doc": "The items of this menu are one radio group: each renders\n`role=\"menuitemradio\"`, and choosing one unchecks the rest. Without it an\nitem carrying `checked` is a `menuitemcheckbox` and the rest are plain\ncommands. An item carrying `submenu` stays a plain `menuitem` either way."
-					},
-					{
-						"name": "side",
-						"type": "'top' | 'bottom' | 'start' | 'end'",
-						"required": false,
-						"default": "'bottom'",
-						"doc": "Where the top surface is placed against the trigger. It is also written on\n`menu.content` as `ui-side`, so styling can follow the placement."
 					},
 					{
 						"name": "delay",
@@ -1974,7 +1960,7 @@
 			{
 				"part": "content",
 				"component": "PopoverContent",
-				"doc": "The surface. It is not modal: it carries no `aria-modal`, so the page behind it\nstays reachable, keeps its focus, and is never made inert.\n\nIt stays in the page when the popover is closed - `hidden` decides whether it\nshows, never an arm - because an elevated element removed from the document\nwhile it is showing leaves the overlay stack's marks behind.\n\nA consumer's `onDismiss` runs after the family has closed the popover, so a\nhandler can see which way the family went.",
+				"doc": "The surface. It is not modal: it carries no `aria-modal`, so the page behind it\nstays reachable, keeps its focus, and is never made inert.\n\nIt stays in the page when the popover is closed - `hidden` decides whether it\nshows, never an arm - because an elevated element removed from the document\nwhile it is showing leaves the overlay stack's marks behind.\n\nA consumer's `onDismiss` runs after the family has closed the popover, so a\nhandler can see which way the family went.\n\nThe placement is a CSS anchor, so it holds while the page scrolls and reflows\nwithout any script. The anchor binding and a default `position-area` of\n`block-end` ship in the parts' own scoped stylesheets, inside `@layer markless`\n- so one unlayered rule of yours replaces the default without a specificity\nfight: `.my-surface { position-area: inline-end }`. `--ui-anchor` names the\nanchor for your own `anchor()` geometry.",
 				"props": []
 			},
 			{
@@ -1986,7 +1972,7 @@
 			{
 				"part": "root",
 				"component": "PopoverRoot",
-				"doc": "The popover itself; the trigger and the surface go inside it. It holds whether\nthe surface is showing and which side it is placed on, and it is the anchor\nend of the CSS anchor placement, which lives in the part's own scoped\nstylesheet - your `style` and `class` compose untouched.",
+				"doc": "The popover itself; the trigger and the surface go inside it. It holds whether\nthe surface is showing, and it is the anchor end of the CSS anchor placement,\nwhich lives in the part's own scoped stylesheet - your `style` and `class`\ncompose untouched.",
 				"props": [
 					{
 						"name": "open",
@@ -1994,13 +1980,6 @@
 						"required": false,
 						"default": "false",
 						"doc": "Whether the surface is showing. Omit it and the popover starts closed."
-					},
-					{
-						"name": "side",
-						"type": "'top' | 'bottom' | 'start' | 'end'",
-						"required": false,
-						"default": "'bottom'",
-						"doc": "Where the surface is placed against the trigger. It is also written on\n`popover.content` as `ui-side`, so styling can follow the placement.\n\nThe placement is a CSS anchor, so it holds while the page scrolls and\nreflows without any script. The anchor binding and one default\n`position-area` per side ship in the parts' own scoped stylesheets, inside\n`@layer markless` - so any unlayered rule of yours keyed off `ui-side`\nreplaces the default without a specificity fight. `--ui-anchor` on\n`popover.content` names the anchor for your own `anchor()` geometry."
 					},
 					{
 						"name": "onChange",
@@ -2862,13 +2841,13 @@
 			{
 				"part": "content",
 				"component": "TooltipContent",
-				"doc": "The tip. It is text, not a surface a person can work in: no links, no buttons,\nnothing to focus.\n\n**Write it after `tooltip.trigger`.** A CSS anchor has to be laid out strictly\nbefore the element that points at it. An ordinary in-flow trigger satisfies\nthat from anywhere in the markup, so the order is only advice - until you\nabsolutely position the trigger yourself, at which point a tip written first\nsilently lands at its containing block instead of beside it. CSS has no way to\nreport that, so put the tip last and the question never comes up.\n\nIt stays in the page when the tooltip is hidden - `hidden` decides whether it\nshows, never an arm - because the trigger points at its minted id and because\nan elevated element removed from the document while showing leaves the overlay\nstack's marks behind.\n\nIts `position: absolute` and anchor binding live in the part's own scoped\nstylesheet - your `style` and `class` compose untouched. Everything about\nwhere the tip lands - `position-area`, `@position-try`, `position-visibility`,\noffsets - is your CSS, keyed off `ui-side`.",
+				"doc": "The tip. It is text, not a surface a person can work in: no links, no buttons,\nnothing to focus.\n\n**Write it after `tooltip.trigger`.** A CSS anchor has to be laid out strictly\nbefore the element that points at it. An ordinary in-flow trigger satisfies\nthat from anywhere in the markup, so the order is only advice - until you\nabsolutely position the trigger yourself, at which point a tip written first\nsilently lands at its containing block instead of beside it. CSS has no way to\nreport that, so put the tip last and the question never comes up.\n\nIt stays in the page when the tooltip is hidden - `hidden` decides whether it\nshows, never an arm - because the trigger points at its minted id and because\nan elevated element removed from the document while showing leaves the overlay\nstack's marks behind.\n\nIts `position: absolute`, anchor binding and a default `position-area` of\n`block-start` live in the part's own scoped stylesheet, inside\n`@layer markless` - your `style` and `class` compose untouched. One unlayered\nrule of your own moves it: `.my-tip { position-area: inline-end }`. Everything\nelse about where the tip lands - `@position-try`, `position-visibility`,\noffsets - is your CSS too.",
 				"props": []
 			},
 			{
 				"part": "root",
 				"component": "TooltipRoot",
-				"doc": "The tooltip itself; the trigger and the tip go inside it, in that order. It\nholds whether the tip is showing, how long the pointer has to rest before it\nshows, and which side it sits on.\n\nThe pointer handlers live here rather than on the trigger, so moving the\npointer from the trigger onto the tip never counts as leaving.",
+				"doc": "The tooltip itself; the trigger and the tip go inside it, in that order. It\nholds whether the tip is showing and how long the pointer has to rest before\nit shows. Where the tip sits is your CSS, never a prop.\n\nThe pointer handlers live here rather than on the trigger, so moving the\npointer from the trigger onto the tip never counts as leaving.",
 				"props": [
 					{
 						"name": "open",
@@ -2883,13 +2862,6 @@
 						"required": false,
 						"default": "600",
 						"doc": "How long the pointer must rest on the trigger before the tooltip shows, in\nmilliseconds. Omit it and it is 600. Focus shows it at once, with no wait."
-					},
-					{
-						"name": "side",
-						"type": "'top' | 'bottom' | 'start' | 'end'",
-						"required": false,
-						"default": "'top'",
-						"doc": "Where the tooltip sits against the trigger. It is written on\n`tooltip.content` as `ui-side`; the placement itself is your CSS."
 					},
 					{
 						"name": "onChange",
@@ -2942,7 +2914,7 @@
 			{
 				"part": "item",
 				"component": "TourItem",
-				"doc": "One step: the card the person reads, and the element on the page it is about.\n\nThe card is placed by CSS anchoring against the target, so it holds while the\npage scrolls and reflows with no script. A step with no `target` anchors to\nnothing, which leaves its `position-area` inert and the card wherever your own\nungated rule puts it - `inset: 0; margin: auto` for a centred step.",
+				"doc": "One step: the card the person reads, and the element on the page it is about.\n\nThe card is placed by CSS anchoring against the target, so it holds while the\npage scrolls and reflows with no script. Placement is CSS, never a prop: the\ncard ships a default `position-area` of `block-end` inside `@layer markless`,\nand one unlayered rule of yours replaces it -\n`.my-card { position-area: block-start }`. A step with no `target` anchors to\nnothing, which leaves the `position-area` inert and the card wherever your own\nungated rule puts it - `inset: 0; margin: auto` for a centred step.",
 				"props": [
 					{
 						"name": "index",
@@ -2955,13 +2927,6 @@
 						"type": "HTMLElement",
 						"required": false,
 						"doc": "The element this step is about, as an `element()` handle you bound on it.\n\nPass the handle itself, never inside an array or an object: a handle only\ncrosses a component edge as a bare prop."
-					},
-					{
-						"name": "side",
-						"type": "'top' | 'bottom' | 'start' | 'end'",
-						"required": false,
-						"default": "'bottom'",
-						"doc": "Where the card is placed against the target. It is also written on the card\nas `ui-side`, so styling can follow the placement."
 					}
 				]
 			},

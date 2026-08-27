@@ -110,11 +110,12 @@ input {
 	touch-action: none;
 }
 
-/* The tooltip family emits only the anchor identity and which side was asked
-   for, so every bit of the placement is here: the grid cell against the anchor,
-   where to go when that cell runs off screen, and when to disappear with an
-   anchor that scrolled away. */
+/* The tooltip family emits the anchor identity and one default grid cell in its
+   own layer, so the rest of the placement is here: where to go when that cell
+   runs off screen, and when to disappear with an anchor that scrolled away. */
 .tip {
+	position-area: block-start;
+	margin-bottom: 0.35rem;
 	position-try-fallbacks: flip-block, flip-inline;
 	position-visibility: anchors-visible;
 	max-width: 16rem;
@@ -126,30 +127,11 @@ input {
 	font-size: 0.9rem;
 }
 
-.tip[ui-side='top'] {
-	position-area: top span-all;
-	margin-bottom: 0.35rem;
-}
-
-.tip[ui-side='bottom'] {
-	position-area: bottom span-all;
-	margin-top: 0.35rem;
-}
-
-.tip[ui-side='start'] {
-	position-area: inline-start span-all;
-	margin-inline-end: 0.35rem;
-}
-
-.tip[ui-side='end'] {
-	position-area: inline-end span-all;
-	margin-inline-start: 0.35rem;
-}
-
-/* Same split as the tip: the hovercard family emits the anchor identity and the
-   asked-for side, and the consumer places it. A card occludes more than a tip
-   does, so the fallbacks matter more here. */
+/* Same split as the tip: the hovercard family emits the anchor identity and one
+   default grid cell, and the consumer owns the rest. A card occludes more than a
+   tip does, so the fallbacks matter more here. */
 .card {
+	margin-top: 0.5rem;
 	position-try-fallbacks: flip-block, flip-inline;
 	position-visibility: anchors-visible;
 	width: 18rem;
@@ -158,11 +140,6 @@ input {
 	border-radius: 0.5rem;
 	background: var(--paper);
 	color: var(--ink);
-}
-
-.card[ui-side='bottom'] {
-	position-area: bottom span-all;
-	margin-top: 0.5rem;
 }
 
 /* The menu family places and hides its own surface; the paint is the consumer's. */

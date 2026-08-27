@@ -25,8 +25,8 @@ consumer knows the ground is softer here than under `checkbox`.
 Three parts: `tooltip.root`, `tooltip.trigger`, `tooltip.content`. All three are
 established roles in `SPEC.md`; nothing new was named.
 
-Four props on the root, and no more: `open`, `delay` (600), `side` (`top`),
-`onChange`. What every other library ships and this one does not:
+Three props on the root, and no more: `open`, `delay` (600), `onChange`. What
+every other library ships and this one does not:
 
 - **`arrow` / pointer part** — `SPEC.md` lists it under "explicitly not roles".
   An anchored arrow is consumer CSS over the anchor the family already emits.
@@ -53,10 +53,12 @@ Four props on the root, and no more: `open`, `delay` (600), `side` (`top`),
   so it cannot satisfy hoverable. Chart tooltips are a different problem.
 - **`closeOnClick`** — free from the overlay primitive; see below.
 - **an auto-hide timeout** — never. WCAG 1.4.13 persistent.
+- **`side` / `placement` / `align` / `offset`** — placement is CSS. The family
+  ships one default `position-area` inside `@layer markless` and the consumer
+  overrides it with an unlayered rule of their own.
 
-`delay` and `side` are the names `navbar.root` and `popover.root` already ship,
-per `SPEC.md`'s capability-naming rule — not `delayDuration`, not `openDelay`,
-not `placement`.
+`delay` is the name `navbar.root` and `popover.root` already ship, per
+`SPEC.md`'s capability-naming rule — not `delayDuration`, not `openDelay`.
 
 ## The permanent `aria-describedby`, and why it is legal
 
@@ -85,9 +87,10 @@ components. **The family writes no `style` attribute on any part** — `style` a
 `class` on all three are entirely the consumer's, and compose untouched:
 
 ```css
-/* tooltip.root */    div:not([ui-side]) { anchor-scope: --ui-tooltip; }
+/* tooltip.root */    div:not([overlay]) { anchor-scope: --ui-tooltip; }
 /* tooltip.trigger */ button             { anchor-name: --ui-tooltip; }
-/* tooltip.content */ [ui-side]          { position: absolute; position-anchor: --ui-tooltip; }
+/* tooltip.content */ [overlay]          { position: absolute; position-anchor: --ui-tooltip;
+                                           position-area: block-start; }
 ```
 
 One anchor name for every tooltip on the page, and `anchor-scope` on each root
@@ -103,7 +106,7 @@ The compiled scope class is per **module**, not per component, so all three
 blocks share one class and each block's rules can reach the other parts'
 elements. The subjects are therefore chosen to be structurally unique inside this
 module: the trigger is the only `button`, the tip is the only element carrying
-`ui-side`, and the root is the `div` that is left (`div:not([ui-side])`). Rename
+`overlay`, and the root is the `div` that is left (`div:not([overlay])`). Rename
 a part's element and the discriminator has to be re-picked in the same change.
 
 **Consumer children are not reachable by these rules and never will be.** The
@@ -126,8 +129,9 @@ geometry belongs to the consumer either way:
 	position-try-fallbacks: flip-block, flip-inline;
 	position-visibility: anchors-visible;
 }
-.tip[ui-side='top'] { position-area: top span-all; margin-bottom: 4px; }
-.tip[ui-side='bottom'] { position-area: bottom span-all; margin-top: 4px; }
+/* Beats the family's `block-start` default: `@layer markless` loses to any
+   unlayered rule, with no specificity fight. */
+.tip { position-area: block-end; margin-top: 4px; }
 ```
 
 `position-area`, `@position-try`, `position-visibility`, offsets and any polyfill
@@ -282,15 +286,16 @@ stylesheet appended in `beforeEach` — because the family emits no
 that silently did not resolve.
 
 **Every geometry row asserts a placement static flow cannot produce.** An earlier
-pair of them was false green: `served-open.tsrx` was `side="bottom"` with the tip
+pair of them was false green: `served-open.tsrx` placed the tip below with the tip
 authored last, so an absolutely positioned box with no resolved anchor lands at
 its static position — directly below the trigger — which is precisely where a
-working `position-area: bottom span-all` puts it. The two rows passed with the
-anchoring entirely dead. The scenario is now `side="top"`, so "above the trigger"
-is a placement only a resolved anchor reaches, and the rows were confirmed red by
-renaming the trigger's anchor to something nothing points at: 39px off, not
-green. `reversed.tsrx` keeps `side="bottom"` and stays honest by the opposite
-trick — it authors the tip *first*, so static flow would put it above.
+working below-the-trigger placement puts it. The two rows passed with the
+anchoring entirely dead. The scenario now takes the family's `block-start`
+default, so "above the trigger" is a placement only a resolved anchor reaches, and
+the rows were confirmed red by renaming the trigger's anchor to something nothing
+points at: 39px off, not green. `reversed.tsrx` stays honest by the opposite trick
+— it authors the tip *first*, so static flow would put it above, and the suite's
+own consumer rule puts it below.
 
 `tooltip.sr.ts` — 5 rows on the virtual reader: reaching the trigger conveys role,
 name and the tip with the tip verified hidden; the icon-only trigger conveying

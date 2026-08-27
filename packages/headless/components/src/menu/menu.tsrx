@@ -21,7 +21,6 @@ import type {
 	MenuItemInstanceState,
 	MenuItemProps,
 	MenuRootProps,
-	MenuSide,
 	MenuTriggerProps,
 } from './menu-types.ts';
 
@@ -42,8 +41,8 @@ const CLICK_GRACE = 300;
 // The scope class these <style> blocks compile against is per MODULE, so each
 // block's subject must be structurally unique across every part: the trigger is
 // the module's only plain button, an item the only element carrying a
-// `menuitem*` role, a surface the only kind carrying `ui-side`, and the root the
-// div that is left. `@layer markless` is what keeps these defaults losing to a
+// `menuitem*` role, a surface the only kind carrying `role="menu"` - a submenu
+// told apart by sitting inside an item - and the root the div that is left. `@layer markless` is what keeps these defaults losing to a
 // consumer's own unlayered rules without a specificity fight.
 
 export const menuState = shared(
@@ -53,7 +52,6 @@ export const menuState = shared(
 			disabled: false,
 			loop: true,
 			radio: false,
-			side: 'bottom' as MenuSide,
 			delay: 700,
 			closeDelay: 300,
 			focused: '',
@@ -158,7 +156,6 @@ export function MenuRoot({
 	disabled = false,
 	loop = true,
 	radio = false,
-	side = 'bottom',
 	delay = 700,
 	closeDelay = 300,
 	onChange,
@@ -174,7 +171,6 @@ export function MenuRoot({
 	menu.disabled = disabled;
 	menu.loop = loop;
 	menu.radio = radio;
-	menu.side = side;
 	menu.delay = delay;
 	menu.closeDelay = closeDelay;
 
@@ -188,7 +184,7 @@ export function MenuRoot({
 		<style>
 			@layer markless {
 				/* Root and contextarea are not separable by structure, and neither is harmed by the other's declaration. */
-				div:not([role]):not([ui-side]) {
+				div:not([role]) {
 					anchor-scope: --ui-menu;
 					-webkit-touch-callout: none;
 				}
@@ -392,7 +388,6 @@ export function MenuContent({
 		hidden={menu.open !== true}
 		ui-open={menu.open}
 		ui-closed={menu.open !== true}
-		ui-side={menu.side}
 		onContextmenu={(event) => {
 			// A right-click on the menu itself would otherwise put the browser's own menu on top of ours.
 			event.preventDefault();
@@ -462,17 +457,13 @@ export function MenuContent({
 		<style>
 			@layer markless {
 				/* Fixed on both paths: anchoring works the same, and a context menu's point is in client coordinates. */
-				[ui-side] {
+				[role="menu"] {
 					position: fixed;
 					position-anchor: --ui-menu;
 					left: var(--x);
 					top: var(--y);
+					position-area: block-end span-inline-end;
 				}
-				/* `self-inline-*` reads the surface's own writing direction; plain `inline-*` never flips out of flow. */
-				[ui-side="top"] { position-area: top span-right; }
-				[ui-side="bottom"] { position-area: bottom span-right; }
-				[ui-side="start"] { position-area: span-self-block-end self-inline-start; }
-				[ui-side="end"] { position-area: span-self-block-end self-inline-end; }
 			}
 		</style>
 		{children}
@@ -740,7 +731,6 @@ export function MenuItemContent({
 		hidden={item.expanded !== true}
 		ui-open={item.expanded}
 		ui-closed={item.expanded !== true}
-		ui-side="end"
 		onContextmenu={(event) => {
 			event.preventDefault();
 			onContextmenu?.(event);
@@ -808,5 +798,13 @@ export function MenuItemContent({
 			}
 			onKeydown?.(event);
 		}}
-	>{children}</div>
+	>
+		<style>
+			@layer markless {
+				/* A submenu is the module's only `role="menu"` inside an item, which is what tells it apart from the top surface. */
+				[role^="menuitem"] [role="menu"] { position-area: inline-end span-block-end; }
+			}
+		</style>
+		{children}
+	</div>
 }

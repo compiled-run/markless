@@ -15,9 +15,9 @@ two values of a mode prop.
 | `menu.root`         | `div`    | the menu's state; `ui-open`, `ui-closed`, `ui-disabled`; the anchor scope                                                                  |
 | `menu.trigger`      | `button` | `aria-haspopup="menu"`, `aria-expanded`, `aria-controls`, the opening keys, the anchor name                                                |
 | `menu.contextarea`  | `div`    | `ui-open`/`ui-closed` and **no ARIA at all**; right-click, long press, `Shift+F10`, the ContextMenu key                                    |
-| `menu.content`      | `div`    | `overlay`, `role="menu"`, `aria-labelledby`, `hidden`, `ui-side`; the walk over the items IT holds                                         |
+| `menu.content`      | `div`    | `overlay`, `role="menu"`, `aria-labelledby`, `hidden`; the walk over the items IT holds                                                    |
 | `menu.item`         | `div`    | `role="menuitem"` (or `menuitemcheckbox` / `menuitemradio`), `aria-checked`, `aria-disabled`, roving `tabindex`, the activation, the hover intent; with `submenu`, also `aria-haspopup="menu"`, `aria-expanded` and `aria-controls` |
-| `menu.itemcontent`  | `div`    | one item's submenu: `overlay`, `role="menu"`, `aria-labelledby` naming that item, `hidden`, `ui-side`; the walk over the items IT holds    |
+| `menu.itemcontent`  | `div`    | one item's submenu: `overlay`, `role="menu"`, `aria-labelledby` naming that item, `hidden`; the walk over the items IT holds               |
 
 **Separators and groups are the consumer's markup.** `<div role="separator"
 aria-orientation="horizontal">` carries one attribute and no behaviour, and
@@ -55,8 +55,8 @@ menu.itemstate() // rooted by EVERY menu.item - one per item, at any depth
 ## Props
 
 `menu.root`: `open`, `checked`, `disabled`, `loop` (arrow wrap, on), `radio`,
-`side`, `delay` (700), `closeDelay` (300), `onChange(value)`,
-`onOpenChange(open)`.
+`delay` (700), `closeDelay` (300), `onChange(value)`, `onOpenChange(open)`.
+No placement prop of any kind - see below.
 `menu.item`: `value` (required), `checked`, `disabled`, `submenu`.
 
 `onChange` fires on every activation at every depth - a command, a checkbox item
@@ -239,18 +239,24 @@ often a whole page body.
 The placement is CSS, not JavaScript. Each part ships a scoped `<style>` block
 in `@layer markless` - a named layer a consumer's unlayered rule always beats -
 carrying `anchor-scope` on the root, `anchor-name` on the trigger, and
-`position: fixed` plus `position-anchor` plus one `position-area` per `ui-side`
-value on the surface. So the surface is placed on its first layout with no
-script, and a surface served already open is placed before anything runs.
+`position: fixed` plus `position-anchor` plus one default `position-area` on the
+surface. So the surface is placed on its first layout with no script, and a
+surface served already open is placed before anything runs.
+
+`menu.content` defaults to `block-end span-inline-end` and `menu.itemcontent` to
+`inline-end span-block-end`. A consumer moves either with one unlayered rule of
+their own - `.my-menu { position-area: block-start span-inline-end }` - and
+brings their own `position-try-fallbacks`. There is no `side` prop, and there is
+no `placement`, `align` or `offset` under another name.
 
 **One anchor name, re-scoped per item.** `menu.item` declares both
 `anchor-name: --ui-menu` and `anchor-scope: --ui-menu`, so inside an item the
 name resolves to that item and outside it resolves to the trigger. That is what
 lets one `position-anchor` rule place the top surface against the trigger and
 every submenu against its own item, at any depth, with no per-instance name and
-no identity attribute. `menu.itemcontent` is always `ui-side="end"`: the
-inline-end placement is the submenu convention, and `side` stays the top
-surface's.
+no identity attribute. The two surfaces are told apart in CSS by structure: a
+submenu is the module's only `role="menu"` sitting inside a `menuitem*`, which is
+what gives it the inline-end default the submenu convention asks for.
 
 The context-opened surface has no anchor to resolve against - a context menu has
 no `menu.trigger` - which leaves the `position-area` inert and hands the
@@ -371,7 +377,7 @@ exactly a dismissal. An outside press reaches only the topmost surface, so a
 | React Aria's `submenuLevel`, Base UI's floating tree                                          | one item instance per item, depth is only markup depth     | tree's `treeItemState` precedent; measured to three levels                            |
 | Zag's `aria-activedescendant`                                                                 | roving DOM focus                                           | the attribute is deliberately absent from `IDREF_ATTRIBUTES`                          |
 | `Separator` / `Group` / `GroupLabel` parts                                                    | consumer markup                                            | not roles in SPEC; no behaviour to own                                                |
-| Radix `data-highlighted`, `data-state`                                                        | `ui-open`, `ui-checked`, `ui-disabled`, `ui-side`          | SPEC's `ui-*` rule                                                                    |
+| Radix `data-highlighted`, `data-state`                                                        | `ui-open`, `ui-checked`, `ui-disabled`                     | SPEC's `ui-*` rule                                                                    |
 | Base UI `LONG_PRESS_DELAY = 500`                                                              | 500                                                        | the packet's ruling; Radix and Kobalte use 700                                        |
 | Base UI drops `aria-expanded` on a submenu under VoiceOver                                    | kept always                                                | we cannot sniff the reader and would not; recorded as an inherited VoiceOver defect   |
 | Radix `onCloseAutoFocus`, `onEntryFocus`, `onEscapeKeyDown`, and three more                   | one `onDismiss`, forwarded                                 | one primitive event; SPEC has no name for the others                                  |

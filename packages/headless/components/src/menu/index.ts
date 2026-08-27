@@ -18,6 +18,5 @@ export type {
 	MenuItemProps,
 	MenuPoint,
 	MenuRootProps,
-	MenuSide,
 	MenuTriggerProps,
 } from './menu-types.ts';

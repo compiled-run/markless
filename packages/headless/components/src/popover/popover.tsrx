@@ -5,19 +5,18 @@ import type {
 	PopoverDescriptionProps,
 	PopoverInstanceState,
 	PopoverRootProps,
-	PopoverSide,
 	PopoverTitleProps,
 	PopoverTriggerProps,
 } from './popover-types.ts';
 
 // The surface is placed by CSS anchoring alone: the trigger declares the anchor,
-// the surface points at it, and the per-side geometry is one rule apiece keyed off
-// `ui-side`. Nothing here measures a box, so a surface served already showing is
-// placed on its first layout.
+// the surface points at it, and the geometry beyond one default `position-area`
+// is the consumer's stylesheet. Nothing here measures a box, so a surface served
+// already showing is placed on its first layout.
 // The scope class these <style> blocks compile against is per MODULE, so each
 // block's subject must be structurally unique across every part: the trigger is
 // the module's only button carrying `aria-haspopup`, the surface its only element
-// carrying `ui-side`, and the root the div that is left.
+// carrying `overlay`, and the root the div that is left.
 // `@layer markless` is what keeps these defaults losing to a consumer's own
 // unlayered rules without a specificity fight.
 
@@ -28,7 +27,6 @@ export const popoverState = shared(
 	() => {
 		const popover: PopoverInstanceState = state({
 			open: false,
-			side: 'bottom' as PopoverSide,
 			graceUntil: 0,
 		});
 		const triggerEl = element<HTMLButtonElement>();
@@ -58,7 +56,6 @@ export const popoverState = shared(
 
 export function PopoverRoot({
 	open = false,
-	side = 'bottom',
 	onChange,
 	children,
 	...rest
@@ -66,7 +63,6 @@ export function PopoverRoot({
 	const popover = popoverState();
 	popover.onChange = onChange;
 	popover.open = open;
-	popover.side = side;
 
 	<div
 		{...rest}
@@ -75,7 +71,7 @@ export function PopoverRoot({
 	>
 		<style>
 			@layer markless {
-				div:not([ui-side]) { anchor-scope: --ui-popover; }
+				div:not([overlay]) { anchor-scope: --ui-popover; }
 			}
 		</style>
 		{children}
@@ -123,7 +119,6 @@ export function PopoverContent({ children, onDismiss, ...rest }: PopoverContentP
 		hidden={popover.open !== true}
 		ui-open={popover.open}
 		ui-closed={popover.open !== true}
-		ui-side={popover.side}
 		onDismiss={(event) => {
 			const surface = popover.contentEl;
 			const back = popover.triggerEl;
@@ -142,12 +137,12 @@ export function PopoverContent({ children, onDismiss, ...rest }: PopoverContentP
 	>
 		<style>
 			@layer markless {
-				[ui-side] { --ui-anchor: --ui-popover; position: absolute; position-anchor: --ui-popover; }
-				[ui-side="top"] { position-area: top span-right; }
-				[ui-side="bottom"] { position-area: bottom span-right; }
-				/* `self-inline-*` reads the surface's own writing direction; plain `inline-*` reads the containing block's, which for an out-of-flow surface never flips. */
-				[ui-side="start"] { position-area: span-self-block-end self-inline-start; }
-				[ui-side="end"] { position-area: span-self-block-end self-inline-end; }
+				[overlay] {
+					--ui-anchor: --ui-popover;
+					position: absolute;
+					position-anchor: --ui-popover;
+					position-area: block-end;
+				}
 			}
 		</style>
 		{children}

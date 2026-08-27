@@ -40,12 +40,12 @@ const CLOSE_DELAY = 300;
 // Where an anchored box may land and still be the placement the CSS asked for.
 const SLACK = 1.5;
 
-// The family emits the anchor identity and nothing else, so the geometry rows
-// need the placement a consumer's stylesheet would own. This IS the consumer
-// half of the contract, written the way the docs write it.
+// The family ships `position-area: block-end` inside `@layer markless`, and the
+// geometry rows need a placement static flow cannot produce, so every card is put
+// ABOVE its trigger by one unlayered rule. This IS the consumer half of the
+// contract, written the way the docs write it.
 const CONSUMER_CSS = `
-[data-testid$="content"][ui-side="top"] { position-area: top span-all; }
-[data-testid$="content"][ui-side="bottom"] { position-area: bottom span-all; }
+[data-testid$="content"] { position-area: block-start; }
 `;
 
 let sheet: HTMLStyleElement | undefined;
@@ -123,8 +123,8 @@ function expectAnchorWired(root: HTMLElement, trigger: HTMLElement, content: HTM
 	expect(card.getPropertyValue('position-anchor')).toBe(ANCHOR);
 }
 
-// A `side="top"` card sitting above a trigger it is authored after: static flow
-// would put it below, so this placement is unreachable without a resolved anchor.
+// A card sitting above a trigger it is authored after: static flow would put it
+// below, so this placement is unreachable without a resolved anchor.
 function expectPlacedAbove(content: Element, trigger: Element) {
 	expect(getComputedStyle(content).getPropertyValue('position-anchor')).toBe(ANCHOR);
 	const card = content.getBoundingClientRect();
@@ -166,7 +166,6 @@ for (const mode of MODES) {
 		expect(el(Root).querySelector('[aria-describedby]')).toBe(null);
 		expect(el(Root).querySelector('[role="tooltip"]')).toBe(null);
 		expect(el(Content).hasAttribute('overlay')).toBe(true);
-		expect(el(Content).getAttribute('ui-side')).toBe('bottom');
 	});
 
 	test(`${mode}: the trigger declares the anchor the card points at`, async () => {
@@ -185,7 +184,21 @@ for (const mode of MODES) {
 		expect(root.hasAttribute('delay')).toBe(false);
 		expect(root.hasAttribute('closeDelay')).toBe(false);
 		expect(root.hasAttribute('closedelay')).toBe(false);
-		expect(root.hasAttribute('side')).toBe(false);
+	});
+
+	// Placement is CSS, never a prop: the family ships one default inside its own
+	// layer, and any unlayered rule the consumer writes beats it with no
+	// specificity fight - which is what the suite's own sheet is doing to every
+	// other geometry row here.
+	test(`${mode}: the card takes the family default placement, and a consumer's rule wins`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+
+		const content = el(Content);
+		expect(getComputedStyle(content).getPropertyValue('position-area')).toBe('block-start');
+
+		sheet?.remove();
+		expect(getComputedStyle(content).getPropertyValue('position-area')).toBe('block-end');
 	});
 
 	// Every card on the page declares the SAME anchor name, so isolation is the
@@ -433,9 +446,9 @@ test('CSR: Escape reports the close to the consumer once', async () => {
 
 // The only way to catch a `position-anchor` that silently did not resolve: an
 // unresolved anchor leaves the card at its static position instead of beside the
-// trigger, and CSS reports nothing either way. `ServedOpen` is `side="top"` while
-// the card is authored last, so static flow would put it BELOW and "above" is a
-// placement only a resolved anchor can produce.
+// trigger, and CSS reports nothing either way. `ServedOpen` is placed above by the
+// suite's consumer rule while the card is authored last, so static flow would put
+// it BELOW and "above" is a placement only a resolved anchor can produce.
 test('CSR: an open card lands against the trigger it names', async () => {
 	await render(ServedOpen);
 	expectShowing(el(Content), el(Trigger));

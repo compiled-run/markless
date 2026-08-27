@@ -180,7 +180,6 @@ for (const mode of MODES) {
 		expect(content.getAttribute('aria-labelledby')).toBe(trigger.id);
 		expect(content.hasAttribute('overlay')).toBe(true);
 		expect(content.hasAttribute('aria-modal')).toBe(false);
-		expect(content.getAttribute('ui-side')).toBe('bottom');
 		expectHidden(content, trigger);
 	});
 
@@ -209,11 +208,35 @@ for (const mode of MODES) {
 			'disabled',
 			'loop',
 			'radio',
-			'side',
 			'delay',
 			'closedelay',
 		]) {
 			expect(root.hasAttribute(attribute), attribute).toBe(false);
+		}
+	});
+
+	// Placement is CSS, never a prop: each surface ships one default inside the
+	// family's own layer, and any unlayered rule the consumer writes beats it with
+	// no specificity fight.
+	test(`${mode}: each surface takes its own default placement, and a consumer's rule wins`, async () => {
+		if (mode === 'CSR') await render(Submenu);
+		else await renderSSR(Submenu);
+
+		const content = el('content');
+		const subContent = el('sub-content');
+		// Chromium serialises the logical keywords back in block-then-inline order,
+		// so these are `block-end span-inline-end` and `inline-end span-block-end`
+		// as written in the parts' own stylesheets.
+		expect(getComputedStyle(content).getPropertyValue('position-area')).toBe('end span-end');
+		expect(getComputedStyle(subContent).getPropertyValue('position-area')).toBe('span-end end');
+
+		const own = document.createElement('style');
+		own.textContent = '[data-testid="content"] { position-area: block-start span-inline-end; }';
+		document.head.appendChild(own);
+		try {
+			expect(getComputedStyle(content).getPropertyValue('position-area')).toBe('start span-end');
+		} finally {
+			own.remove();
 		}
 	});
 

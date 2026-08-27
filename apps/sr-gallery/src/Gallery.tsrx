@@ -447,7 +447,7 @@ function TourSection() @{
 				<tour.close>Skip the tour</tour.close>
 			</tour.item>
 
-			<tour.item index={1} target={shareEl} side="top">
+			<tour.item index={1} target={shareEl}>
 				<tour.title>Share it</tour.title>
 				<tour.description>
 					The Share button beside Save sends a read-only link.

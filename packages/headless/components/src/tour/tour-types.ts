@@ -1,13 +1,6 @@
 import type { PropsOf, Seeded } from '@markless/core';
 
 /**
- * Which side of the step's target the card is placed on. `start` and `end` are
- * the writing direction's sides, so they swap in a right-to-left page; `top` and
- * `bottom` are the same everywhere.
- */
-export type TourSide = 'top' | 'bottom' | 'start' | 'end';
-
-/**
  * The tour itself; the spotlight and every step's card go inside it. It holds
  * whether the tour is showing and which step it is on.
  *
@@ -39,8 +32,11 @@ export type TourRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
  * One step: the card the person reads, and the element on the page it is about.
  *
  * The card is placed by CSS anchoring against the target, so it holds while the
- * page scrolls and reflows with no script. A step with no `target` anchors to
- * nothing, which leaves its `position-area` inert and the card wherever your own
+ * page scrolls and reflows with no script. Placement is CSS, never a prop: the
+ * card ships a default `position-area` of `block-end` inside `@layer markless`,
+ * and one unlayered rule of yours replaces it -
+ * `.my-card { position-area: block-start }`. A step with no `target` anchors to
+ * nothing, which leaves the `position-area` inert and the card wherever your own
  * ungated rule puts it - `inset: 0; margin: auto` for a centred step.
  */
 export type TourItemProps = PropsOf<'div'> & {
@@ -61,11 +57,6 @@ export type TourItemProps = PropsOf<'div'> & {
 	 * crosses a component edge as a bare prop.
 	 */
 	readonly target?: HTMLElement;
-	/**
-	 * Where the card is placed against the target. It is also written on the card
-	 * as `ui-side`, so styling can follow the placement.
-	 */
-	readonly side?: TourSide;
 };
 
 /** The card is a non-modal dialog: it carries no `aria-modal`, so the page behind it stays reachable and the target stays clickable. */
@@ -126,7 +117,7 @@ export type TourInstanceState = Seeded<
 	onOpenChange?: TourRootProps['onOpenChange'];
 };
 
-/** One instance per rendered `tour.item`, holding that step's own place, side and target. */
-export type TourItemInstanceState = Seeded<TourItemProps, 'side' | 'index'> & {
+/** One instance per rendered `tour.item`, holding that step's own place and target. */
+export type TourItemInstanceState = Seeded<TourItemProps, 'index'> & {
 	target?: TourItemProps['target'];
 };
