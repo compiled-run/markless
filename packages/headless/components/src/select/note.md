@@ -150,12 +150,15 @@ Everything below was measured by running the suite, not assumed.
    toggled it straight back shut. They are now absent from both the prevented
    set and the opening set: the button's own activation opens the popup, and the
    key rule only lands the roving focus. What a person experiences is unchanged.
-5. **Focus into a freshly opened listbox needs more than one frame.** The
+5. **Focus into a freshly opened listbox used to need more than one frame.** The
    listbox is `hidden` until the open cell reaches the DOM, and nothing inside a
-   hidden subtree can take focus. A single `requestAnimationFrame` landed the
-   first open and raced later ones (4 intermittently red rows). The landing is
-   now retried per frame, up to twelve, until `document.activeElement` is the
-   option it aimed at.
+   hidden subtree can take focus, so the landing was retried per frame. That
+   retry is gone: the runtime now holds a focus the browser refused inside a
+   dispatch and replays it once that dispatch's write has committed, and
+   `focusOpeningOption` just calls `focus()`. One row does not survive the
+   change — see the pin on `CSR: Enter and Space open the popup and land on the
+   first option`, where the opening write lands in the button's own click, a
+   dispatch later than the keydown that asks for the landing.
 
 ## What a handler cannot reach — measured on this tip
 
