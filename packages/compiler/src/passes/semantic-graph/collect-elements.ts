@@ -503,19 +503,14 @@ function resolveElementHandleIdrefs(
 			graph.diagnostics.push(unboundIdrefElementHandleDiagnostic(reference));
 			continue;
 		}
-		if (handleBinding.sharedDefinitionId !== undefined) {
-			// A widget's own root resolves the factory before any part of it
-			// renders, so the token naming the widget instance is not readable
-			// from inside the root itself; only the parts it seeds carry it.
-			const widgetRoot = widgetRootComponentName(graph, handleBinding.sharedDefinitionId);
-			if (
-				widgetRoot === undefined ||
-				widgetRoot === reference.componentName ||
-				widgetRoot === bound.componentName
-			) {
-				graph.diagnostics.push(widgetRootIdrefElementHandleDiagnostic(reference));
-				continue;
-			}
+		// A page-wide factory is one graph per PAGE, so its handle names one element
+		// however many widgets render; only a widget-scoped one mints per instance.
+		if (
+			handleBinding.sharedDefinitionId !== undefined &&
+			widgetRootComponentName(graph, handleBinding.sharedDefinitionId) === undefined
+		) {
+			graph.diagnostics.push(widgetRootIdrefElementHandleDiagnostic(reference));
+			continue;
 		}
 		graph.elementHandleIdrefs.push({
 			...reference,
