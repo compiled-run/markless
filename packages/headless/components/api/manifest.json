@@ -1089,6 +1089,185 @@
 			}
 		]
 	},
+	"crop": {
+		"parts": [
+			{
+				"part": "area",
+				"component": "CropArea",
+				"doc": "The box the rectangle lives in. It owns the gesture in flight — pointer capture\nis taken here, so a drag that leaves the area keeps arriving — and it is what\nthe family measures.",
+				"props": []
+			},
+			{
+				"part": "description",
+				"component": "CropDescription",
+				"doc": "Supporting text. It reaches the selection through `aria-describedby`.",
+				"props": []
+			},
+			{
+				"part": "error",
+				"component": "CropError",
+				"doc": "The validation message. Mounting it is what marks the crop invalid.",
+				"props": []
+			},
+			{
+				"part": "field",
+				"component": "CropField",
+				"doc": "The element that submits. It carries `x,y,width,height` as text, and it is\nclipped, `aria-hidden` and out of the tab order, so the selection and its\nhandles are the only things a person reaches.",
+				"props": []
+			},
+			{
+				"part": "indicator",
+				"component": "CropIndicator",
+				"doc": "The rule-of-thirds grid, or any other purely-presentational overlay on the\nrectangle. `aria-hidden`, no behaviour, and it covers the selection it sits in.",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "CropLabel",
+				"doc": "The crop's name. It names the selection and every handle for a reader.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "CropRoot",
+				"doc": "A movable, resizable rectangle over a bounded area. An image cropper is one\nstyled consumer of it: the family knows nothing about bitmaps, only about a\nrectangle and the box it lives in.\n\nThe label, description, error, area, selection, handles and the form field all\ngo inside the root, which holds the rectangle and reports `ui-disabled`,\n`ui-fixed`, `ui-dragging` and `ui-resizing` for styling.\n\nThe family owns this element's `style` attribute to carry `--pan-x` and\n`--pan-y`, so style the root from a stylesheet rather than a `style` prop.\nCustom properties inherit, so content anywhere inside the area can apply them.",
+				"props": [
+					{
+						"name": "value",
+						"type": "CropRect",
+						"required": false,
+						"doc": "Where the rectangle sits now. Passing this makes the crop controlled: a\ngesture reports through `onChange` and nothing moves until the new rect\ncomes back in. Leave it out and the crop keeps its own."
+					},
+					{
+						"name": "defaultValue",
+						"type": "CropRect",
+						"required": false,
+						"doc": "The rectangle an uncontrolled crop starts with."
+					},
+					{
+						"name": "aspect",
+						"type": "number",
+						"required": false,
+						"doc": "Width over height. Set it and a resize keeps that ratio; leave it out and\nthe two axes are free. A declared `value` is never rewritten to fit — the\nlock applies to what a gesture produces."
+					},
+					{
+						"name": "minWidth",
+						"type": "number",
+						"required": false,
+						"default": "40",
+						"doc": "The narrowest the rectangle may be resized, in area pixels. Defaults to 40."
+					},
+					{
+						"name": "minHeight",
+						"type": "number",
+						"required": false,
+						"default": "40",
+						"doc": "The shortest the rectangle may be resized, in area pixels. Defaults to 40."
+					},
+					{
+						"name": "maxWidth",
+						"type": "number",
+						"required": false,
+						"doc": "The widest the rectangle may be resized. Defaults to no limit but the area."
+					},
+					{
+						"name": "maxHeight",
+						"type": "number",
+						"required": false,
+						"doc": "The tallest the rectangle may be resized. Defaults to no limit but the area."
+					},
+					{
+						"name": "fixed",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The rectangle stays where it is and the content pans underneath it. The\narea publishes `--pan-x` and `--pan-y`, which the consumer applies to their\nown content — the family never moves anything it does not own."
+					},
+					{
+						"name": "step",
+						"type": "number",
+						"required": false,
+						"default": "1",
+						"doc": "How far one arrow key moves an edge or the rectangle, in area pixels.\nDefaults to 1. Shift multiplies it by 10 and Ctrl/Cmd by 50."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nothing can be moved or resized."
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The form will not submit without a rectangle."
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "Submitted under this name by the field the family renders."
+					},
+					{
+						"name": "onChange",
+						"type": "(rect: CropRect) => void",
+						"required": false,
+						"doc": "Called with the rectangle once a move or resize settles: the pointer released, or the key that moved it."
+					},
+					{
+						"name": "onDrag",
+						"type": "(rect: CropRect) => void",
+						"required": false,
+						"doc": "Called with the rectangle on every pointer move while a gesture is in flight."
+					}
+				]
+			},
+			{
+				"part": "selection",
+				"component": "CropSelection",
+				"doc": "The rectangle itself: a `role=\"group\"` named by `crop.label`, described by the\nerror, the description and a live rect readout the root keeps, and carrying\n`aria-roledescription=\"crop area\"`. It is a tab stop and it owns the move keys.\n\nThe family owns its `style` attribute to carry `--x`, `--y`, `--width` and\n`--height`, so style it from a stylesheet rather than a `style` prop.\n\nKeys, when it has focus: arrows move it by `step`, Shift by ten steps,\nCtrl/Cmd by fifty; Home and End send it to the area's edges on the axis the\nlast arrow used. A drag moves it too.",
+				"props": []
+			},
+			{
+				"part": "thumb",
+				"component": "CropThumb",
+				"doc": "One resize handle. The edges it owns are written as booleans, and the name a\nreader hears sits before the spread so a consumer's own `aria-label` wins.",
+				"props": [
+					{
+						"name": "inlineStart",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The handle owns the rectangle's inline-start edge."
+					},
+					{
+						"name": "inlineEnd",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The handle owns the rectangle's inline-end edge."
+					},
+					{
+						"name": "blockStart",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The handle owns the rectangle's block-start edge."
+					},
+					{
+						"name": "blockEnd",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The handle owns the rectangle's block-end edge."
+					}
+				]
+			}
+		]
+	},
 	"datebox": {
 		"parts": [
 			{
