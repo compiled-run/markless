@@ -1,0 +1,28 @@
+# MARKLESS_SERIALIZE_UNSUPPORTED_VALUE
+
+Cannot serialize graph state value
+
+- Package: serializer
+- Pass or phase: protocol-state, serialization, value
+- Severity: error
+
+## Message
+
+Cannot serialize value at … because unknown values are not durable graph state.
+
+Cannot serialize value at … because … is a live host/class resource that is not durable graph state and would resume as an empty/plain object.
+
+Cannot serialize value at … because … values are not durable graph state.
+
+## Why
+
+Serialization is for durable graph state. Functions and host/runtime resources cannot be restored during resume.
+
+Serialization is for durable graph state. Host and runtime resources cannot be reconstructed from a payload during resume.
+
+## Emitted from
+
+- `packages/serializer/src/protocol-state.ts`
+- `packages/serializer/src/value.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

@@ -1,0 +1,22 @@
+# MARKLESS_STATE_REST_ALIAS_EXCLUDED_PATH
+
+Cannot write through an object-rest excluded path
+
+- Package: compiler
+- Pass or phase: state-lowering
+- Severity: error
+
+## Message
+
+Cannot write to "…" because "…" was excluded when "…" was created.
+
+## Why
+
+Object rest destructuring creates an alias for the remaining graph paths only. Paths explicitly destructured out of the source object are not owned by the rest alias.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/state-lowering.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

@@ -3,7 +3,9 @@ import { checklist } from '../../index.ts';
 
 // The consumer's handler writes what it was called with into page state the page
 // renders, so what the DOM shows is the whole new ticked set the checklist
-// handed over, and how many times it handed one over.
+// handed over, and how many times it handed one over. `String` rather than
+// `join` so a wrong argument is reported rather than thrown; for a list of
+// strings the two spell the same thing.
 export default function WithOnChange() @{
 	const log = state({ value: '', calls: 0 });
 
@@ -12,7 +14,7 @@ export default function WithOnChange() @{
 			values={['lettuce', 'tomato']}
 			data-testid="root"
 			onChange={(next: readonly string[]) => {
-				log.value = next.join(',');
+				log.value = String(next);
 				log.calls = log.calls + 1;
 			}}
 		>
