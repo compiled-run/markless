@@ -2,6 +2,12 @@ import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serial
 import type { RuntimeGraph } from '@markless/runtime';
 import type { SerializedGraphPayload } from '../../../serializer/src/value-decode-client.ts';
 import type { PrerenderDataSurface } from '../prerender/evaluator.ts';
+import {
+	marklessIsThenable,
+	marklessThen,
+	marklessWalk,
+	type Awaitable,
+} from '../ssr-data/awaitable.ts';
 import type { ArmRegistrationDeps } from '../resume-commit-arm.ts';
 import { isArmBranchAnchorComment } from '../resume-anchor-census.ts';
 import { readKeyedRepeatCollection } from '../resume-keyed-repeats.ts';
@@ -70,7 +76,7 @@ export type RowComponentMintApi = {
 		repeat: ResumeKeyedRepeatRecord,
 		parent: ResumeDomElement,
 		served: ReadonlyMap<unknown, ResumeDomElement>,
-	): Promise<() => Promise<void>>;
+	): Awaitable<() => Promise<void>>;
 };
 
 export function marklessRowComponentMint(
@@ -79,57 +85,151 @@ export function marklessRowComponentMint(
 	host?: RowComponentMintHost,
 ): RowComponentMintApi {
 	let prepared = new Map<unknown, MintedRow>();
+	// Rows built but not yet registered. A repeat asked to build twice before the
+	// flush behind it runs - a second write in one statement - must not drop the
+	// first batch's registration on the floor.
+	let awaitingCommit: MintedRow[] = [];
+	let surface: PrerenderDataSurface | undefined;
 	let surfacePromise: Promise<PrerenderDataSurface> | undefined;
+	const primeSurface = (): void => {
+		if (!renderData || surface || surfacePromise) return;
+		const answered = renderData();
+		if (!marklessIsThenable(answered)) {
+			surface = answered;
+			return;
+		}
+		surfacePromise = answered.then((loaded) => (surface = loaded));
+		void surfacePromise.catch(() => undefined);
+	};
 	// The page is threaded in per container, so a record naming a component with
 	// no page behind it cannot be rendered at all - and a half-built list is
 	// worse than a loud refusal.
-	const pageSurface = (repeat: ResumeKeyedRepeatRecord): Promise<PrerenderDataSurface> => {
+	const pageSurface = (repeat: ResumeKeyedRepeatRecord): Awaitable<PrerenderDataSurface> => {
 		if (!renderData)
 			throw rowComponentError(
 				repeat,
 				'MARKLESS_REPEAT_ROW_COMPONENT_SURFACE_MISSING',
 				'names a component row, but this container was resumed with no render-data surface to render it against.',
 			);
-		return (surfacePromise ??= Promise.resolve(renderData()));
+		primeSurface();
+		return surface ?? surfacePromise!;
 	};
+	// A gesture is not the place to fetch: this module is loaded when the repeat
+	// wires, so what its first render needs is fetched from here, not from the
+	// write that needs it settled.
+	primeSurface();
+	void Promise.resolve(loadEvaluator()).catch(() => undefined);
+	void Promise.resolve(loadInstanceScope()).catch(() => undefined);
 	return {
 		renderEmptyArm,
 		mintRow(parent, repeat, item) {
 			if (!repeat.rowComponent) return mintTemplateRow(parent, repeat, item);
 			return prepared.get(rowKeyOf(item, repeat))?.rowRoot;
 		},
-		async rows(repeat, parent, served) {
-			prepared = new Map();
-			if (repeat.rowComponent && graph && host) {
-				const surface = await pageSurface(repeat);
-				const enclosing = await enclosingWidgetsFor(graph, repeat);
-				for (const [rowIndex, item] of readKeyedRepeatCollection(graph, repeat).entries()) {
-					const rowKey = rowKeyOf(item, repeat);
-					if (served.has(rowKey) || prepared.has(rowKey)) continue;
-					prepared.set(
-						rowKey,
-						await mintComponentRow({
-							surface,
-							parent,
-							repeat,
-							item,
-							rowKey,
-							rowIndex,
-							graph,
-							enclosing,
-							loadSymbol: host.runtimeInput.loadSymbol,
-							registration: host,
-						}),
-					);
-				}
-			}
-			const minted = [...prepared.values()];
-			return async () => {
+		rows(repeat, parent, served) {
+			// A refusal answers as a rejection, the shape every caller already has;
+			// only a warm build skips the wait.
+			try {
 				prepared = new Map();
-				for (const row of minted) await row.commit();
-			};
+				const rowGraph = graph,
+					rowHost = host;
+				const built =
+					repeat.rowComponent && rowGraph && rowHost
+						? marklessThen(pageSurface(repeat), (pageSurfaceValue) =>
+								marklessThen(enclosingWidgetsFor(rowGraph, repeat), (enclosing) => {
+									const items = readKeyedRepeatCollection(rowGraph, repeat);
+									return marklessWalk(items.length, (rowIndex) => {
+										const item = items[rowIndex];
+										const rowKey = rowKeyOf(item, repeat);
+										if (served.has(rowKey) || prepared.has(rowKey)) return undefined;
+										return marklessThen(
+											mintComponentRow({
+												surface: pageSurfaceValue,
+												parent,
+												repeat,
+												item,
+												rowKey,
+												rowIndex,
+												graph: rowGraph,
+												enclosing,
+												loadSymbol: settledSymbol(rowHost.runtimeInput.loadSymbol),
+												registration: rowHost,
+											}),
+											(row) => {
+												prepared.set(rowKey, row);
+											},
+										);
+									});
+								}),
+							)
+						: undefined;
+				return marklessThen(built, () => {
+					awaitingCommit = [...awaitingCommit, ...prepared.values()];
+					return async () => {
+						prepared = new Map();
+						const settling = awaitingCommit;
+						awaitingCommit = [];
+						for (const row of settling) await row.commit();
+					};
+				});
+			} catch (error) {
+				return Promise.reject(error);
+			}
 		},
 	};
+}
+
+/**
+ * The page's symbol loader, holding what it has already answered.
+ *
+ * The app's emitted loader hands back a promise per call, so a symbol this
+ * document fetched long ago still costs the row a statement. Holding the settled
+ * value means only the FIRST row that needs a symbol waits for it; the rows and
+ * the gestures behind it read it where they stand. Per loader, because two page
+ * modules in one document each resolve their own symbol ids.
+ */
+const settledSymbols = new WeakMap<object, Map<string, unknown>>();
+function settledSymbol(load: (symbolId: string) => unknown): (symbolId: string) => unknown {
+	let held = settledSymbols.get(load);
+	if (!held) settledSymbols.set(load, (held = new Map()));
+	const settled = held;
+	return (symbolId) => {
+		if (settled.has(symbolId)) return settled.get(symbolId);
+		const answered = load(symbolId);
+		if (!marklessIsThenable(answered as never)) {
+			settled.set(symbolId, answered);
+			return answered;
+		}
+		return (answered as Promise<unknown>).then((symbol) => {
+			settled.set(symbolId, symbol);
+			return symbol;
+		});
+	};
+}
+
+type EvaluatorModule = typeof import('../prerender/evaluator.ts');
+type InstanceScopeModule = typeof import('./instance-scope.ts');
+// Held once loaded: a settled dynamic import still yields the statement a row
+// built at the write does not have.
+let evaluatorModule: EvaluatorModule | undefined;
+let evaluatorLoad: Promise<EvaluatorModule> | undefined;
+let instanceScopeModule: InstanceScopeModule | undefined;
+let instanceScopeLoad: Promise<InstanceScopeModule> | undefined;
+
+// Loaded here, not named at the top: this module is the demand gate, and a
+// static edge would put the evaluator's closure inside every page that has one.
+function loadEvaluator(): Awaitable<EvaluatorModule> {
+	return (evaluatorModule ??
+		(evaluatorLoad ??= import('../prerender/evaluator.ts').then(
+			(module) => (evaluatorModule = module),
+		)));
+}
+
+function loadInstanceScope(): Awaitable<InstanceScopeModule> {
+	return (instanceScopeModule ??
+		(instanceScopeLoad ??= import('./instance-scope.ts').then(
+			(module) => (instanceScopeModule = module),
+		)));
 }
 
 function rowKeyOf(item: unknown, repeat: ResumeKeyedRepeatRecord): unknown {
@@ -143,7 +243,7 @@ function rowKeyOf(item: unknown, repeat: ResumeKeyedRepeatRecord): unknown {
 
 type RowRegistration = RowComponentMintHost;
 
-async function mintComponentRow(input: {
+function mintComponentRow(input: {
 	readonly surface: PrerenderDataSurface;
 	readonly parent: ResumeDomElement;
 	readonly repeat: ResumeKeyedRepeatRecord;
@@ -154,29 +254,49 @@ async function mintComponentRow(input: {
 	readonly enclosing: EnclosingWidgets;
 	readonly loadSymbol: (symbolId: string) => unknown;
 	readonly registration: RowRegistration;
-}): Promise<MintedRow> {
+}): Awaitable<MintedRow> {
 	const rowComponent = input.repeat.rowComponent!;
-	// Loaded here, not named at the top: this module is the demand gate, and a
-	// static edge would put the evaluator's closure inside every page that has one.
-	const { renderRepeatRowComponent, rowSegmentOf } = await import('../prerender/evaluator.ts');
-	const rowSegment = rowSegmentOf({
-		rowKey: input.rowKey,
-		enclosingInstancePath: input.enclosing.instancePath,
+	return marklessThen(loadEvaluator(), ({ renderRepeatRowComponent, rowSegmentOf }) => {
+		const rowSegment = rowSegmentOf({
+			rowKey: input.rowKey,
+			enclosingInstancePath: input.enclosing.instancePath,
+		});
+		return marklessThen(
+			renderRepeatRowComponent({
+				surface: input.surface,
+				ownerComponentName: rowComponent.componentName,
+				componentEdgeId: rowComponent.componentEdgeId,
+				itemPropName: rowComponent.itemPropName,
+				item: input.item,
+				rowKey: input.rowKey,
+				rowIndex: input.rowIndex,
+				loadSymbol: input.loadSymbol,
+				read: (graphNodeId, path = []) => input.graph.read(graphNodeId, path),
+				idPrefix: ownerIdPrefix(input.surface, rowComponent.componentName, input.repeat),
+				enclosingWidgetRoots: input.enclosing.roots,
+				enclosingInstancePath: input.enclosing.instancePath,
+			}),
+			(rendered) => placeMintedRow(input, rowComponent, rowSegment, rendered),
+		);
 	});
-	const rendered = await renderRepeatRowComponent({
-		surface: input.surface,
-		ownerComponentName: rowComponent.componentName,
-		componentEdgeId: rowComponent.componentEdgeId,
-		itemPropName: rowComponent.itemPropName,
-		item: input.item,
-		rowKey: input.rowKey,
-		rowIndex: input.rowIndex,
-		loadSymbol: input.loadSymbol,
-		read: (graphNodeId, path = []) => input.graph.read(graphNodeId, path),
-		idPrefix: ownerIdPrefix(input.surface, rowComponent.componentName, input.repeat),
-		enclosingWidgetRoots: input.enclosing.roots,
-		enclosingInstancePath: input.enclosing.instancePath,
-	});
+}
+
+function placeMintedRow(
+	input: {
+		readonly parent: ResumeDomElement;
+		readonly repeat: ResumeKeyedRepeatRecord;
+		readonly item: unknown;
+		readonly rowKey: unknown;
+		readonly registration: RowRegistration;
+	},
+	rowComponent: NonNullable<ResumeKeyedRepeatRecord['rowComponent']>,
+	rowSegment: string,
+	rendered: {
+		readonly html: string;
+		readonly state: ProtocolStatePayload;
+		readonly view: ProtocolViewPayload;
+	},
+): MintedRow {
 	assertRowWidgetsResolved(input.repeat, rendered.state);
 	const childNodes = parseRowNodes(input.parent, input.repeat, rendered.html);
 	assertMintableRowRecords(input.repeat, rendered.view);
@@ -292,18 +412,19 @@ type EnclosingWidgets = {
  * nothing, and a row that then reads a widget is refused below rather than
  * silently forked.
  */
-async function enclosingWidgetsFor(
+function enclosingWidgetsFor(
 	graph: RuntimeGraph,
 	repeat: ResumeKeyedRepeatRecord,
-): Promise<EnclosingWidgets> {
-	const instanceScope = await import('./instance-scope.ts');
-	const instancePath = instanceScope.marklessInstancePath(repeat.collectionGraphNodeId);
-	const registry = instanceScope.marklessGraphWidgetRegistry(graph);
-	if (registry.rootPaths.size === 0) return { instancePath, roots: new Map() };
-	return {
-		instancePath,
-		roots: instanceScope.marklessEnclosingWidgetRoots(instancePath, registry),
-	};
+): Awaitable<EnclosingWidgets> {
+	return marklessThen(loadInstanceScope(), (instanceScope) => {
+		const instancePath = instanceScope.marklessInstancePath(repeat.collectionGraphNodeId);
+		const registry = instanceScope.marklessGraphWidgetRegistry(graph);
+		if (registry.rootPaths.size === 0) return { instancePath, roots: new Map() };
+		return {
+			instancePath,
+			roots: instanceScope.marklessEnclosingWidgetRoots(instancePath, registry),
+		};
+	});
 }
 
 // A widget-scoped definition whose composed id still names no instance belongs

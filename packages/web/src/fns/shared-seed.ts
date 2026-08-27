@@ -17,6 +17,7 @@ import {
 import { marklessInstancePath } from './instance-scope.ts';
 import { MARKLESS_SSR_CALLBACKS_PROP, marklessSsrSpreadProps } from './ssr.ts';
 import { fileBoundElementHandles } from './element-handle-roster.ts';
+import { marklessThen, marklessWalk, type Awaitable } from '../ssr-data/awaitable.ts';
 
 type SeedEdge = NonNullable<PrerenderDataDefinition['edges']>[number];
 type SeedContext = Parameters<SharedSeedPass>[0];
@@ -24,13 +25,7 @@ type PrerenderReadSeed = (graphNodeId: string, path?: ReadonlyArray<string>) => 
 
 // A seed is a per-instance initial value built from the child's own props, so
 // running it needs those props and the factory initial, not the child's markup.
-const seedProjectingChild: SharedSeedPass = async (
-	context,
-	definition,
-	slot,
-	read,
-	inherited,
-) => {
+const seedProjectingChild: SharedSeedPass = (context, definition, slot, read, inherited) => {
 	const componentEdgeId = slot.componentEdgeId;
 	// Every exit files the roster: an unseeded projection still renders parts, and
 	// their IDREF positions still have to be told which handles bind an element.
@@ -64,13 +59,18 @@ const seedProjectingChild: SharedSeedPass = async (
 		rootedDefinitions.length > 0
 			? inheritedSeeds.set(MARKLESS_WIDGET_INSTANCE_KEY, base + composedRoot)
 			: inheritedSeeds;
-	await seedEdgeAndOwnTemplate(context, rootEdge, read, seeded);
-	// U-H: every part of this widget instance contributes before any part
-	// renders, so a seed a part writes is what its siblings read whatever the
-	// document order.
-	for (const edge of projectedEdges(context.surface, definition, componentEdgeId, read))
-		await seedEdgeAndOwnTemplate(context, edge, read, seeded);
-	return roster(seeded);
+	return marklessThen(seedEdgeAndOwnTemplate(context, rootEdge, read, seeded), () => {
+		// U-H: every part of this widget instance contributes before any part
+		// renders, so a seed a part writes is what its siblings read whatever the
+		// document order.
+		const projected = projectedEdges(context.surface, definition, componentEdgeId, read);
+		return marklessThen(
+			marklessWalk(projected.length, (index) =>
+				seedEdgeAndOwnTemplate(context, projected[index]!, read, seeded),
+			),
+			() => roster(seeded),
+		);
+	});
 };
 
 /**
@@ -81,20 +81,23 @@ const seedProjectingChild: SharedSeedPass = async (
  * writer the child renders itself, rather than one the consumer projects into it,
  * still lands in the enclosing instance.
  */
-async function seedEdgeAndOwnTemplate(
+function seedEdgeAndOwnTemplate(
 	context: SeedContext,
 	edge: SeedEdge,
 	read: PrerenderReadSeed,
 	seeded: Map<string, unknown>,
-): Promise<void> {
-	await applySharedSeeds(context, context.surface, context.symbolPrefix, edge, read, seeded);
-	await applyComposedChainSeeds(
-		context,
-		childrenForwardChain(context.surface, edge.childComponentName),
-		edge,
-		context.symbolPrefix + edge.symbolPrefix,
-		edgeChildProps(context, context.surface, edge, read),
-		seeded,
+): Awaitable<void> {
+	return marklessThen(
+		applySharedSeeds(context, context.surface, context.symbolPrefix, edge, read, seeded),
+		() =>
+			applyComposedChainSeeds(
+				context,
+				childrenForwardChain(context.surface, edge.childComponentName),
+				edge,
+				context.symbolPrefix + edge.symbolPrefix,
+				edgeChildProps(context, context.surface, edge, read),
+				seeded,
+			),
 	);
 }
 
@@ -106,31 +109,32 @@ async function seedEdgeAndOwnTemplate(
  * is a computed read, so the scope evaluates the same staged reads the render
  * would — no seed-time derive of its own.
  */
-async function applyComposedChainSeeds(
+function applyComposedChainSeeds(
 	context: SeedContext,
 	chain: ReadonlyArray<ChildrenProjectionLink>,
 	rootEdge: SeedEdge,
 	symbolPrefix: string,
 	props: Record<string, unknown>,
 	seeded: Map<string, unknown>,
-): Promise<void> {
+): Awaitable<void> {
 	let ownerProps = props;
 	let ownerPrefix = symbolPrefix;
 	let ownerEdge = rootEdge;
-	for (const link of chain) {
-		const read = await composedScopeRead(
-			context,
-			link.definition,
-			ownerEdge,
-			ownerPrefix,
-			ownerProps,
-			seeded,
+	return marklessWalk(chain.length, (index) => {
+		const link = chain[index]!;
+		return marklessThen(
+			composedScopeRead(context, link.definition, ownerEdge, ownerPrefix, ownerProps, seeded),
+			(read) =>
+				marklessThen(
+					applySharedSeeds(context, link.surface, ownerPrefix, link.edge, read, seeded),
+					() => {
+						ownerProps = edgeChildProps(context, link.surface, link.edge, read);
+						ownerPrefix += link.edge.symbolPrefix;
+						ownerEdge = link.edge;
+					},
+				),
 		);
-		await applySharedSeeds(context, link.surface, ownerPrefix, link.edge, read, seeded);
-		ownerProps = edgeChildProps(context, link.surface, link.edge, read);
-		ownerPrefix += link.edge.symbolPrefix;
-		ownerEdge = link.edge;
-	}
+	});
 }
 
 /**
@@ -140,14 +144,14 @@ async function applyComposedChainSeeds(
  * instance the composing body already seeded answers from the seed map, so a
  * derive over it reads the seeded value rather than the factory placeholder.
  */
-async function composedScopeRead(
+function composedScopeRead(
 	context: SeedContext,
 	definition: PrerenderDataDefinition,
 	edge: SeedEdge,
 	symbolPrefix: string,
 	props: Record<string, unknown>,
 	seeded: ReadonlyMap<string, unknown>,
-): Promise<PrerenderReadSeed> {
+): Awaitable<PrerenderReadSeed> {
 	const values = new Map<string, unknown>();
 	const read: PrerenderReadSeed = (graphNodeId, path = []) =>
 		readPath(
@@ -160,26 +164,37 @@ async function composedScopeRead(
 						: values.get(graphNodeId),
 			path,
 		);
-	for (const initial of definition.initialValues ?? []) {
-		// A shared seed is this widget's own value, already written by the seed pass.
-		if (definition.initialValueKinds?.[initial.graphNodeId] === 'shared-seed') continue;
-		if (initial.value.kind === 'constant') {
-			values.set(initial.graphNodeId, structuredClone(initial.value.value));
-			continue;
-		}
-		if (initial.value.kind !== 'symbol-function') continue;
-		const loaded = await context.loadSymbol(
-			edge.boundSymbols?.[initial.value.symbolId] ?? symbolPrefix + initial.value.symbolId,
-		);
-		// A derive this build did not publish leaves the node unseeded rather than
-		// failing the render: the composed root still gets every prop that resolved.
-		if (typeof loaded !== 'function') continue;
-		values.set(
-			initial.graphNodeId,
-			loaded.length > 0 ? await loaded({ graph: { read }, read }) : await loaded(),
-		);
-	}
-	return read;
+	const initials = definition.initialValues ?? [];
+	return marklessThen(
+		marklessWalk(initials.length, (index) => {
+			const initial = initials[index]!;
+			// A shared seed is this widget's own value, already written by the seed pass.
+			if (definition.initialValueKinds?.[initial.graphNodeId] === 'shared-seed') return undefined;
+			if (initial.value.kind === 'constant') {
+				values.set(initial.graphNodeId, structuredClone(initial.value.value));
+				return undefined;
+			}
+			const symbolValue = initial.value;
+			if (symbolValue.kind !== 'symbol-function') return undefined;
+			return marklessThen(
+				context.loadSymbol(
+					edge.boundSymbols?.[symbolValue.symbolId] ?? symbolPrefix + symbolValue.symbolId,
+				) as Awaitable<unknown>,
+				(loaded) => {
+					// A derive this build did not publish leaves the node unseeded rather than
+					// failing the render: the composed root still gets every prop that resolved.
+					if (typeof loaded !== 'function') return undefined;
+					return marklessThen(
+						(loaded.length > 0 ? loaded({ graph: { read }, read }) : loaded()) as Awaitable<unknown>,
+						(value) => {
+							values.set(initial.graphNodeId, value);
+						},
+					);
+				},
+			);
+		}),
+		() => read,
+	);
 }
 
 /**
@@ -447,14 +462,14 @@ function edgeChildProps(
 	return childProps;
 }
 
-async function applySharedSeeds(
+function applySharedSeeds(
 	context: SeedContext,
 	surface: PrerenderDataSurface,
 	symbolPrefix: string,
 	edge: SeedEdge,
 	read: PrerenderReadSeed,
 	seeded: Map<string, unknown>,
-): Promise<void> {
+): Awaitable<void> {
 	const child = childSurfaceOf(surface, edge.childComponentName)?.components[
 		edge.childComponentName
 	];
@@ -477,9 +492,11 @@ async function applySharedSeeds(
 	};
 	const readSeed: PrerenderReadSeed = (graphNodeId, path = []) =>
 		readPath(seedSource(graphNodeId), path);
-	for (const initial of seeds) {
-		if (initial.value.kind !== 'symbol-function') continue;
-		if (!seedFamilyOpen(seeded, initial.graphNodeId)) continue;
+	return marklessWalk(seeds.length, (index) => {
+		const initial = seeds[index]!;
+		const symbolValue = initial.value;
+		if (symbolValue.kind !== 'symbol-function') return undefined;
+		if (!seedFamilyOpen(seeded, initial.graphNodeId)) return undefined;
 		const factory = initials.find(
 			(candidate) =>
 				candidate.graphNodeId === initial.graphNodeId && candidate.value.kind === 'constant',
@@ -488,14 +505,23 @@ async function applySharedSeeds(
 			seeded.set(initial.graphNodeId, structuredClone(factory.value));
 		// The caller hands in a row-free symbolPrefix: the row rides the seed's
 		// identity, never its symbol id, which routes match as a compile-time literal.
-		const loaded = await context.loadSymbol(
-			edge.boundSymbols?.[initial.value.symbolId] ??
-				symbolPrefix + edge.symbolPrefix + initial.value.symbolId,
+		return marklessThen(
+			context.loadSymbol(
+				edge.boundSymbols?.[symbolValue.symbolId] ??
+					symbolPrefix + edge.symbolPrefix + symbolValue.symbolId,
+			) as Awaitable<unknown>,
+			(loaded) => {
+				if (typeof loaded !== 'function')
+					throw new Error(`MARKLESS_PRERENDER_DATA_SYMBOL_MISSING: ${symbolValue.symbolId}`);
+				return marklessThen(
+					loaded({ graph: { read: readSeed }, read: readSeed }) as Awaitable<unknown>,
+					(value) => {
+						seeded.set(initial.graphNodeId, value);
+					},
+				);
+			},
 		);
-		if (typeof loaded !== 'function')
-			throw new Error(`MARKLESS_PRERENDER_DATA_SYMBOL_MISSING: ${initial.value.symbolId}`);
-		seeded.set(initial.graphNodeId, await loaded({ graph: { read: readSeed }, read: readSeed }));
-	}
+	});
 }
 
 /**

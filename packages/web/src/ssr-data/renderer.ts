@@ -1,4 +1,10 @@
 import { marklessAttributeValue } from '../dom-attribute.ts';
+import {
+	marklessIsThenable,
+	marklessSettled,
+	marklessThen,
+	type Awaitable,
+} from './awaitable.ts';
 import { MARKLESS_WIDGET_INSTANCE_KEY } from '../prerender/shared-seed-slot.ts';
 import {
 	ASYNC_BOUNDARY_ARM,
@@ -7,44 +13,6 @@ import {
 	type ProtocolViewPayload,
 	type RenderedPayloadScripts,
 } from '@markless/serializer';
-
-type Awaitable<T> = T | Promise<T>;
-
-// An `async function` hands back a promise however warm its inputs are, and an
-// `await` on a settled promise still yields the statement its caller is inside.
-// A client minting a `@for` row at the write has no statement to spare, so this
-// renderer's own chain is spelled as continuations instead: every step answers
-// with a value when nothing had to be waited for, and with a promise when
-// something did. Callers may keep awaiting it either way.
-function marklessIsThenable<T>(value: Awaitable<T>): value is Promise<T> {
-	return typeof (value as { readonly then?: unknown } | null | undefined)?.then === 'function';
-}
-
-function marklessThen<A, B>(value: Awaitable<A>, next: (value: A) => Awaitable<B>): Awaitable<B> {
-	return marklessIsThenable(value) ? value.then(next) : next(value);
-}
-
-/** `then` with the `finally` of the await it replaces: released on both edges. */
-function marklessSettled<A, B>(
-	value: Awaitable<A>,
-	release: () => void,
-	next: (value: A) => B,
-): Awaitable<B> {
-	if (!marklessIsThenable(value)) {
-		release();
-		return next(value);
-	}
-	return value.then(
-		(settled) => {
-			release();
-			return next(settled);
-		},
-		(error) => {
-			release();
-			throw error;
-		},
-	);
-}
 
 export type SsrDataResidue =
 	| { readonly kind: 'graph-read'; readonly graphNodeId: string; readonly path: ReadonlyArray<string> }
