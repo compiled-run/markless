@@ -1,4 +1,5 @@
 import { marklessBoundSymbolId, marklessLiveBoundGraphRoute } from './bound-symbol.ts';
+import { marklessElementHandlePropValue } from './element-handle-prop.ts';
 import {
 	marklessComposedGraphNodeId,
 	marklessGraphWidgetRegistry,
@@ -522,6 +523,22 @@ function marklessComposedSymbol(
 				instancePath,
 				registry,
 			);
+			// A prop route that has stopped being a prop id has reached the module
+			// that owns the value. If that is an element() handle, only the handle
+			// registry holds the live node; a forward through another prop keeps
+			// travelling and is answered by the level above.
+			if (
+				mapped &&
+				marklessCompositionPropName(graphNodeId, path) !== null &&
+				marklessCompositionPropName(mapped.graphNodeId, mapped.path) === null
+			) {
+				const handle = marklessElementHandlePropValue(
+					context.getElementHandle,
+					mapped.graphNodeId,
+					mapped.path,
+				);
+				if (handle) return handle.value;
+			}
 			return graph.read(mapped?.graphNodeId ?? graphNodeId, mapped?.path ?? path);
 		};
 		return symbol({

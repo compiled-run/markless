@@ -1,0 +1,22 @@
+# MARKLESS_SHARED_SEED_UNSUPPORTED
+
+Cannot seed shared state from this expression
+
+- Package: compiler
+- Pass or phase: state-lowering
+- Severity: error
+
+## Message
+
+Cannot seed "…" from "…" because a component body seeds a shared instance only from its own props or from constants.
+
+## Why
+
+A component body runs once during initial render. The compiler turns a shared-state assignment there into a per-instance initial value, which it can only build from values the render already has: this component's props and constants.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/state-lowering.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
