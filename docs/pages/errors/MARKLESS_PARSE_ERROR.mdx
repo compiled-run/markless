@@ -1,0 +1,22 @@
+# MARKLESS_PARSE_ERROR
+
+TSRX parser rejected this source
+
+- Package: compiler
+- Pass or phase: compile-module, parse, semantic-graph
+- Severity: error
+
+## Message
+
+yuku-tsrx reported: …
+
+## Why
+
+The source could not enter the Markless compiler because the yuku-tsrx parser failed at phase parse. Markless preserves the parser message and adapts its source location into the compiler diagnostic.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/compile-module.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

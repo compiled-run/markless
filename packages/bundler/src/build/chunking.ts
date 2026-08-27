@@ -33,7 +33,12 @@ const WEB_RUNTIME_CAPABILITY_GROUPS = [
 	{ name: 'markless-resume-runtime-shared', test: fileBasenamePattern('resume-runtime-shared') },
 	{ name: 'markless-resume-events', test: fileBasenamePattern('resume-events') },
 	{ name: 'markless-resume-handoff', test: fileBasenamePattern('resume-handoff') },
-	{ name: 'markless-resume-locators', test: fileBasenamePattern('resume-locators') },
+	// The census splice chunks with the module that pins the census: a chunk of
+	// its own would cost every importer a preload for ~40 lines.
+	{
+		name: 'markless-resume-locators',
+		test: fileBasenamePattern('resume-locators', 'resume-census'),
+	},
 	{ name: 'markless-resume-errors', test: fileBasenamePattern('resume-errors') },
 	{ name: 'markless-resume-sync-computed', test: fileBasenamePattern('resume-sync-computed') },
 	{ name: 'markless-resume-sync-demand', test: fileBasenamePattern('resume-sync-demand') },

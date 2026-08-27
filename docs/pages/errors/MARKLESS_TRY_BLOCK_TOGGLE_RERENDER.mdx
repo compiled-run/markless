@@ -1,0 +1,21 @@
+# MARKLESS_TRY_BLOCK_TOGGLE_RERENDER
+
+Toggling this … re-renders the whole @try block
+
+- Package: compiler
+- Pass or phase: public-render
+- Severity: warning
+
+## Message
+
+TODO: this code has no builder message in source.
+
+## Why
+
+Content with a component cannot be rebuilt from static parts and value slots, so the toggle falls back to re-rendering the whole @try block. That works, but it re-runs the component and replaces DOM the toggle did not touch.
+
+## Emitted from
+
+- `packages/compiler/src/passes/public-render/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

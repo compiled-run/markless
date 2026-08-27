@@ -20,7 +20,7 @@ function Label({ children }) @{
 
 	<output data-out ui-value={s.value}>
 		@if (children) {
-			{children}
+			<>{children}</>
 		} @else {
 			<span data-own>{s.value}</span>
 		}
