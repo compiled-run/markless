@@ -45,17 +45,13 @@ export function inlineAt(clientX: number, origin: number, sign: number): number 
 /** The rectangle in force: the controlled one, then the family's own, then the seed. */
 export function heldRect(
 	given: CropRect | undefined,
-	hasOwn: boolean,
-	ownX: number,
-	ownY: number,
-	ownWidth: number,
-	ownHeight: number,
+	own: CropRect | undefined,
 	seed: CropRect | undefined,
 	minWidth: number,
 	minHeight: number,
 ): CropRect {
 	if (given !== undefined) return given;
-	if (hasOwn) return { x: ownX, y: ownY, width: ownWidth, height: ownHeight };
+	if (own !== undefined) return own;
 	if (seed !== undefined) return seed;
 	return { x: 0, y: 0, width: minWidth, height: minHeight };
 }

@@ -101,39 +101,54 @@ The family owns the `style` attribute on **`crop.root`** (the pan offsets) and o
 **`crop.selection`** (`--x`, `--y`, `--width`, `--height`). Style those two from a
 stylesheet; `crop.area` and `crop.thumb` are yours.
 
-## Four measured framework walls
+## The framework walls this family met
 
-Every one of these cost a bisect. They are the reason this file is shaped the way
-it is, and none of them is a style preference.
+Every one of these cost a bisect during the build. Two of the four turned out not
+to be walls at all once they were chased with a witness, and one has since been
+fixed in the compiler; what is left is recorded here honestly, because the next
+family author reads this file rather than the goal notes.
 
-1. **A module-scope `const` inside `state()` unregisters every field.**
-   `maxWidth: NO_LIMIT` where `NO_LIMIT` is a module constant made the compiler
-   report `MARKLESS_SHARED_SEED_UNKNOWN_FIELD` for all thirty-odd cells at once —
-   `crop.given`, `crop.minWidth`, everything — and every part-level `computed()`
-   reading the instance then failed to lower as well. `Number.POSITIVE_INFINITY`
-   in the same position fails identically. The seed has to be a bare literal, so
-   the two size caps are `undefined`-means-no-limit, the shape `aspect` already
-   had.
+1. **A seed that is not a bare literal — fixed.** Seeding a `state()` cell from a
+   module-scope `const` used to unregister *every* field on the instance, and the
+   only diagnostic named a consumer of the shape rather than the seed. Fields now
+   register from the authored keys, so a module constant is a legal seed again.
+
+   One limit survives the fix, and it is why the two size caps are still
+   `undefined`-means-no-limit rather than `Number.POSITIVE_INFINITY`: an
+   unfoldable seed registers its fields but its *value* never reaches the protocol
+   cell. Measured here — seeding `maxWidth` and `maxHeight` with
+   `Number.POSITIVE_INFINITY` turns 8 of the 58 rows red, and not only cap rows:
+   `name` comes back `''`, a disabled crop reports `tabindex="0"`, and the
+   rectangle falls back to `0, 0, 40×40`, because the fold is all-or-nothing over
+   the whole seed object and one unfoldable property empties the lot. Leaving the
+   seed `undefined` and defaulting the two props to `Number.POSITIVE_INFINITY`
+   instead keeps all 58 green, which is what pins the breakage to the seed rather
+   than to the written value. `sizeCeiling` in `crop-math.ts` already reads
+   `undefined` as no cap, so nothing is lost by waiting.
 
 2. **A cell read nested inside a call argument does not lower.** Passing
    `crop.minWidth` straight into `resizedRect(...)` leaves the instance name
    standing in the emitted handler module. Every cell is hoisted into a local
    first, throughout every shared method.
 
-3. **A whole-object write to a state cell never reaches the graph.** `crop.own =
-   rect` was accepted, ran, and changed nothing a reader or a form could see. The
-   rectangle the family owns is therefore five scalar cells — `hasOwn`, `ownX`,
-   `ownY`, `ownWidth`, `ownHeight` — and never one object.
+3. **Not a wall: a whole-object write to a state cell.** `crop.own = rect` was
+   reported here as compiling, running and reaching nothing. It does not
+   reproduce; the rectangle the family owns is one `own` cell holding a
+   `CropRect`, written whole by every gesture, and the readers see it.
 
-4. **A `computed()` declared in the `shared()` factory does not re-derive after a
-   method writes its dependency.** The value is right on first render and frozen
-   afterwards, silently. Every derived value a part renders — the live readout,
-   the field text, the selection's geometry, the pan offsets — is a `computed()`
-   declared **in the part that renders it**, reading the cells directly. Nothing
-   derived lives on the instance.
+4. **Not a wall: a `computed()` declared in the `shared()` factory.** This file
+   reported such a computed as frozen after a method writes its dependency. It
+   does not reproduce either — it was the seed defect above, whose symptom was
+   every derived read on the instance coming back empty at once. `held`, the live
+   readout, the field text, the selection geometry and the pan offsets are all
+   factory `computed()`s again, and they follow a method's write in CSR and SSR.
 
-The first three are compile-time and loud. The fourth is silent, ships, and is
-the dangerous one.
+Retiring 3 and 4 costs one thing worth naming. The widget root serves whatever
+factory computed a method reads, so `held` — the only one the methods read — adds
+one `marklessSsrServeComputed` call to the root's server render. The module still
+shrank, because five copies of the same nine-cell derivation collapsed into one:
+`crop.tsrx`'s served module went **78,099 → 69,998 bytes**, and the object cell
+and the factory move each paid for themselves (−6,016 and −2,085).
 
 ## Measurement, and what it costs
 
@@ -156,7 +171,5 @@ family does not.
 
 ## Tests read after a gesture, never during
 
-A gesture settles through a lazily woken handler module, so a synchronous read
-straight after `press(...)` or a drag sees the old rectangle. Every
-post-gesture assertion in `crop.browser.ts` polls. This is not flakiness
-insurance; a plain `expect` there fails every time.
+SPEC "Testing" carries this rule now: a gesture settles through a lazily woken
+handler module, so every post-gesture assertion in `crop.browser.ts` polls.

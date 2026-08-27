@@ -54,11 +54,7 @@ export const cropState = shared(
 		const crop: CropInstanceState = state({
 			seed: undefined,
 			given: undefined,
-			hasOwn: false,
-			ownX: 0,
-			ownY: 0,
-			ownWidth: 0,
-			ownHeight: 0,
+			own: undefined,
 			aspect: undefined,
 			minWidth: 40,
 			minHeight: 40,
@@ -100,6 +96,33 @@ export const cropState = shared(
 		const selectionEl = element<HTMLDivElement>();
 		const thumbEls = element<HTMLDivElement[]>();
 
+		const held = computed(() => {
+			const given = crop.given;
+			const own = crop.own;
+			const seed = crop.seed;
+			const narrowest = crop.minWidth;
+			const shortest = crop.minHeight;
+			return heldRect(given, own, seed, narrowest, shortest);
+		});
+		const readoutText = computed(() => {
+			const now = held;
+			return rectText(now);
+		});
+		const fieldValue = computed(() => {
+			const now = held;
+			return fieldText(now);
+		});
+		const panStyle = computed(() => {
+			const now = held;
+			const pinned = crop.fixed;
+			return areaStyleText(now, pinned);
+		});
+		const selectionStyle = computed(() => {
+			const now = held;
+			const pinned = crop.fixed;
+			return selectionStyleText(now, pinned);
+		});
+
 		return {
 			...crop,
 			areaEl,
@@ -110,6 +133,11 @@ export const cropState = shared(
 			fieldEl,
 			selectionEl,
 			thumbEls,
+			held,
+			readoutText,
+			fieldValue,
+			panStyle,
+			selectionStyle,
 			// literal function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((rect: { x: number; y: number; width: number; height: number }) => void) | undefined,
 			onDrag: undefined as ((rect: { x: number; y: number; width: number; height: number }) => void) | undefined,
@@ -148,16 +176,6 @@ export const cropState = shared(
 				crop.originBlock = box.originBlock;
 				crop.inlineSign = box.inlineSign;
 
-				const given = crop.given;
-				const written = crop.hasOwn;
-				const atX = crop.ownX;
-				const atY = crop.ownY;
-				const spanX = crop.ownWidth;
-				const spanY = crop.ownHeight;
-				const seed = crop.seed;
-				const narrowest = crop.minWidth;
-				const shortest = crop.minHeight;
-				const held = heldRect(given, written, atX, atY, spanX, spanY, seed, narrowest, shortest);
 				crop.grabX = held.x;
 				crop.grabY = held.y;
 				crop.grabWidth = held.width;
@@ -195,16 +213,6 @@ export const cropState = shared(
 				crop.originBlock = box.originBlock;
 				crop.inlineSign = box.inlineSign;
 
-				const given = crop.given;
-				const written = crop.hasOwn;
-				const atX = crop.ownX;
-				const atY = crop.ownY;
-				const spanX = crop.ownWidth;
-				const spanY = crop.ownHeight;
-				const seed = crop.seed;
-				const narrowest = crop.minWidth;
-				const shortest = crop.minHeight;
-				const held = heldRect(given, written, atX, atY, spanX, spanY, seed, narrowest, shortest);
 				crop.grabX = held.x;
 				crop.grabY = held.y;
 				crop.grabWidth = held.width;
@@ -247,25 +255,11 @@ export const cropState = shared(
 				const grabbed = { x: grabX, y: grabY, width: grabWidth, height: grabHeight };
 				const across = crop.areaInline;
 				const down = crop.areaBlock;
-				const given = crop.given;
-				const written = crop.hasOwn;
-				const atX = crop.ownX;
-				const atY = crop.ownY;
-				const spanX = crop.ownWidth;
-				const spanY = crop.ownHeight;
-				const seed = crop.seed;
-				const narrowest = crop.minWidth;
-				const shortest = crop.minHeight;
-				const showing = heldRect(given, written, atX, atY, spanX, spanY, seed, narrowest, shortest);
 
 				if (isMoving) {
 					const moved = movedRect(grabbed, deltaInline, deltaBlock, across, down);
-					if (sameRect(moved, showing)) return;
-					crop.ownX = moved.x;
-					crop.ownY = moved.y;
-					crop.ownWidth = moved.width;
-					crop.ownHeight = moved.height;
-					crop.hasOwn = true;
+					if (sameRect(moved, held)) return;
+					crop.own = moved;
 					crop.changed = true;
 					crop.onDrag?.(moved);
 					return;
@@ -296,12 +290,8 @@ export const cropState = shared(
 					tall,
 					ratio,
 				);
-				if (sameRect(sized, showing)) return;
-				crop.ownX = sized.x;
-					crop.ownY = sized.y;
-					crop.ownWidth = sized.width;
-					crop.ownHeight = sized.height;
-					crop.hasOwn = true;
+				if (sameRect(sized, held)) return;
+				crop.own = sized;
 				crop.changed = true;
 				crop.onDrag?.(sized);
 			},
@@ -313,18 +303,15 @@ export const cropState = shared(
 				if (!isMoving && !isResizing) return;
 
 				const moved = crop.changed;
-				const atX = crop.ownX;
-				const atY = crop.ownY;
-				const spanX = crop.ownWidth;
-				const spanY = crop.ownHeight;
+				const own = crop.own;
 				crop.moving = false;
 				crop.resizing = false;
 				crop.changed = false;
 				crop.pointerId = -1;
-				if (!moved) return;
+				if (!moved || own === undefined) return;
 				// What the gesture produced, not what is on screen: a controlled crop
 				// has not been handed the new rectangle yet.
-				crop.onChange?.({ x: atX, y: atY, width: spanX, height: spanY });
+				crop.onChange?.(own);
 			},
 
 			/** Drops the gesture in flight without reporting it. */
@@ -365,16 +352,6 @@ export const cropState = shared(
 				crop.originBlock = box.originBlock;
 				crop.inlineSign = box.inlineSign;
 
-				const given = crop.given;
-				const written = crop.hasOwn;
-				const atX = crop.ownX;
-				const atY = crop.ownY;
-				const spanX = crop.ownWidth;
-				const spanY = crop.ownHeight;
-				const seed = crop.seed;
-				const narrowest = crop.minWidth;
-				const shortest = crop.minHeight;
-				const held = heldRect(given, written, atX, atY, spanX, spanY, seed, narrowest, shortest);
 				const across = box.inlineSize;
 				const down = box.blockSize;
 				const stepping = crop.step;
@@ -387,11 +364,7 @@ export const cropState = shared(
 					const moved = movedRect(held, alongInline, alongBlock, across, down);
 					crop.keyAxis = axis;
 					if (sameRect(moved, held)) return;
-					crop.ownX = moved.x;
-					crop.ownY = moved.y;
-					crop.ownWidth = moved.width;
-					crop.ownHeight = moved.height;
-					crop.hasOwn = true;
+					crop.own = moved;
 					crop.onChange?.(moved);
 					return;
 				}
@@ -401,11 +374,7 @@ export const cropState = shared(
 				const lastAxis = crop.keyAxis;
 				const parked = endStopRect(held, key, lastAxis, across, down);
 				if (sameRect(parked, held)) return;
-				crop.ownX = parked.x;
-					crop.ownY = parked.y;
-					crop.ownWidth = parked.width;
-					crop.ownHeight = parked.height;
-					crop.hasOwn = true;
+				crop.own = parked;
 				crop.onChange?.(parked);
 			},
 
@@ -432,16 +401,6 @@ export const cropState = shared(
 				crop.originBlock = box.originBlock;
 				crop.inlineSign = box.inlineSign;
 
-				const given = crop.given;
-				const written = crop.hasOwn;
-				const atX = crop.ownX;
-				const atY = crop.ownY;
-				const spanX = crop.ownWidth;
-				const spanY = crop.ownHeight;
-				const seed = crop.seed;
-				const narrowest = crop.minWidth;
-				const shortest = crop.minHeight;
-				const held = heldRect(given, written, atX, atY, spanX, spanY, seed, narrowest, shortest);
 				const across = box.inlineSize;
 				const down = box.blockSize;
 				const stepping = crop.step;
@@ -483,11 +442,7 @@ export const cropState = shared(
 					ratio,
 				);
 				if (sameRect(sized, held)) return;
-				crop.ownX = sized.x;
-					crop.ownY = sized.y;
-					crop.ownWidth = sized.width;
-					crop.ownHeight = sized.height;
-					crop.hasOwn = true;
+				crop.own = sized;
 				crop.onChange?.(sized);
 			},
 		};
@@ -529,37 +484,9 @@ export function CropRoot({
 	crop.required = required;
 	crop.name = name;
 
-	const rootReadout = computed(() => {
-		const given = crop.given;
-		const written = crop.hasOwn;
-		const atX = crop.ownX;
-		const atY = crop.ownY;
-		const spanX = crop.ownWidth;
-		const spanY = crop.ownHeight;
-		const seed = crop.seed;
-		const low = crop.minWidth;
-		const short = crop.minHeight;
-		const held = heldRect(given, written, atX, atY, spanX, spanY, seed, low, short);
-		return rectText(held);
-	});
-	const rootPan = computed(() => {
-		const given = crop.given;
-		const written = crop.hasOwn;
-		const atX = crop.ownX;
-		const atY = crop.ownY;
-		const spanX = crop.ownWidth;
-		const spanY = crop.ownHeight;
-		const seed = crop.seed;
-		const low = crop.minWidth;
-		const short = crop.minHeight;
-		const held = heldRect(given, written, atX, atY, spanX, spanY, seed, low, short);
-		const pinned = crop.fixed;
-		return areaStyleText(held, pinned);
-	});
-
 	<div
 		{...rest}
-		style={rootPan}
+		style={crop.panStyle}
 		ui-disabled={crop.disabled}
 		ui-fixed={crop.fixed}
 		ui-dragging={crop.moving}
@@ -568,7 +495,7 @@ export function CropRoot({
 		{/* Always rendered, not a part: a rectangle that moves has no text of its
 		    own, so this is the only thing that tells a reader where it went. */}
 		<VisuallyHidden>
-			<output el={crop.readoutEl} aria-live="polite" aria-atomic="true">{rootReadout}</output>
+			<output el={crop.readoutEl} aria-live="polite" aria-atomic="true">{crop.readoutText}</output>
 		</VisuallyHidden>
 		{children}
 	</div>
@@ -656,20 +583,6 @@ export function CropSelection({
 	...rest
 }: CropSelectionProps) @{
 	const crop = cropState();
-	const selectionBox = computed(() => {
-		const given = crop.given;
-		const written = crop.hasOwn;
-		const atX = crop.ownX;
-		const atY = crop.ownY;
-		const spanX = crop.ownWidth;
-		const spanY = crop.ownHeight;
-		const seed = crop.seed;
-		const low = crop.minWidth;
-		const short = crop.minHeight;
-		const held = heldRect(given, written, atX, atY, spanX, spanY, seed, low, short);
-		const pinned = crop.fixed;
-		return selectionStyleText(held, pinned);
-	});
 	const selectionTabStop = computed(() => (crop.disabled ? -1 : 0));
 	const selectionAriaDisabled = computed(() => (crop.disabled ? 'true' : 'false'));
 
@@ -679,7 +592,7 @@ export function CropSelection({
 		role="group"
 		aria-roledescription="crop area"
 		tabindex={selectionTabStop}
-		style={selectionBox}
+		style={crop.selectionStyle}
 		aria-labelledby={crop.labelEl}
 		// Error before description: what is wrong is conveyed before the hint,
 		// wherever the two parts sit in the page.
@@ -769,16 +682,7 @@ export function CropThumb({
 		return edgeOrientation(atStart, atEnd, atTop, atBottom);
 	});
 	const handleNow = computed(() => {
-		const given = crop.given;
-		const written = crop.hasOwn;
-		const atX = crop.ownX;
-		const atY = crop.ownY;
-		const spanX = crop.ownWidth;
-		const spanY = crop.ownHeight;
-		const seed = crop.seed;
-		const low = crop.minWidth;
-		const short = crop.minHeight;
-		const held = heldRect(given, written, atX, atY, spanX, spanY, seed, low, short);
+		const held = crop.held;
 		const atStart = handle.inlineStart;
 		const atEnd = handle.inlineEnd;
 		const atTop = handle.blockStart;
@@ -786,16 +690,7 @@ export function CropThumb({
 		return edgeValue(held, atStart, atEnd, atTop, atBottom);
 	});
 	const handleText = computed(() => {
-		const given = crop.given;
-		const written = crop.hasOwn;
-		const atX = crop.ownX;
-		const atY = crop.ownY;
-		const spanX = crop.ownWidth;
-		const spanY = crop.ownHeight;
-		const seed = crop.seed;
-		const low = crop.minWidth;
-		const short = crop.minHeight;
-		const held = heldRect(given, written, atX, atY, spanX, spanY, seed, low, short);
+		const held = crop.held;
 		const atStart = handle.inlineStart;
 		const atEnd = handle.inlineEnd;
 		const atTop = handle.blockStart;
@@ -803,16 +698,7 @@ export function CropThumb({
 		return edgeValueText(held, atStart, atEnd, atTop, atBottom);
 	});
 	const handleHighest = computed(() => {
-		const given = crop.given;
-		const written = crop.hasOwn;
-		const atX = crop.ownX;
-		const atY = crop.ownY;
-		const spanX = crop.ownWidth;
-		const spanY = crop.ownHeight;
-		const seed = crop.seed;
-		const low = crop.minWidth;
-		const short = crop.minHeight;
-		const held = heldRect(given, written, atX, atY, spanX, spanY, seed, low, short);
+		const held = crop.held;
 		const across = crop.areaInline;
 		const down = crop.areaBlock;
 		const atStart = handle.inlineStart;
@@ -932,19 +818,6 @@ export function CropIndicator({ children, ...rest }: CropIndicatorProps) @{
 
 export function CropField({ ...rest }: CropFieldProps) @{
 	const crop = cropState();
-	const fieldRect = computed(() => {
-		const given = crop.given;
-		const written = crop.hasOwn;
-		const atX = crop.ownX;
-		const atY = crop.ownY;
-		const spanX = crop.ownWidth;
-		const spanY = crop.ownHeight;
-		const seed = crop.seed;
-		const low = crop.minWidth;
-		const short = crop.minHeight;
-		const held = heldRect(given, written, atX, atY, spanX, spanY, seed, low, short);
-		return fieldText(held);
-	});
 	const fieldAriaInvalid = computed(() => (crop.invalid ? 'true' : 'false'));
 
 	<VisuallyHidden>
@@ -955,7 +828,7 @@ export function CropField({ ...rest }: CropFieldProps) @{
 			tabindex={-1}
 			aria-hidden="true"
 			name={crop.name}
-			value={fieldRect}
+			value={crop.fieldValue}
 			aria-invalid={fieldAriaInvalid}
 			required={crop.required}
 			disabled={crop.disabled}
