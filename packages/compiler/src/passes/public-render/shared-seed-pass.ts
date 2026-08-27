@@ -457,7 +457,22 @@ export function componentBoundElementHandles(
 	const rootName = input.renderData.root?.componentName;
 	const ownedBy = (owner: string | undefined) => owner ?? rootName;
 	const direct = new Map<string, string[]>();
+	// A handle bound inside a branch arm has an element only while that arm
+	// renders, so the roster cannot promise one before the render decides. The
+	// arm's own records file it when the arm arrives and take it away when the
+	// arm goes, which is what keeps an IDREF from naming an element that is not
+	// there.
+	const armHostIds = new Set(
+		input.renderData.branches.flatMap((branch) =>
+			branch.armChunkIds.flatMap((chunkId) =>
+				(
+					input.renderData.chunks.find((candidate) => candidate.id === chunkId)?.hosts ?? []
+				).map((host) => host.hostNodeId),
+			),
+		),
+	);
 	for (const binding of graph.elementHandleBindings) {
+		if (armHostIds.has(binding.hostNodeId)) continue;
 		// `el={toggle.triggerEl}` spells a path through the shared instance, never
 		// the handle's bare declared name, so the id has to come from the same
 		// resolution the arena uses rather than from a name lookup.

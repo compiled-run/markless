@@ -1,5 +1,9 @@
 import { parseModule } from '../../js-ast.ts';
-import type { PublicRenderModuleInput } from '../../artifacts.ts';
+import {
+	protocolElementHandleReadId,
+	type ProtocolBranchIdrefSite,
+} from '@markless/serializer/protocol';
+import type { PublicRenderModuleInput, SemanticMarkupChunk } from '../../artifacts.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
 import {
 	collectSsrAsyncRunnerDefinitions,
@@ -97,6 +101,79 @@ function elementHandleIdSource(handleGraphNodeId: string): string {
 			: null,
 	});
 	return `(residue=>{${readCase}})({kind:'element-handle-id',handleGraphNodeId:${JSON.stringify(handleGraphNodeId)}})`;
+}
+
+/** Every element() handle a branch's arms bind, against the arm that binds it. */
+export function branchArmMintedHandles(
+	chunks: ReadonlyArray<SemanticMarkupChunk>,
+	armChunkIds: ReadonlyArray<string>,
+): ReadonlyMap<string, number> {
+	const handles = new Map<string, number>();
+	for (const [armIndex, chunkId] of armChunkIds.entries())
+		for (const slot of chunks.find((candidate) => candidate.id === chunkId)?.slots ?? [])
+			if (
+				slot.kind === 'attribute' &&
+				slot.residue.kind === 'element-handle-id' &&
+				slot.residue.idref !== true &&
+				!handles.has(slot.residue.handleGraphNodeId)
+			)
+				handles.set(slot.residue.handleGraphNodeId, armIndex);
+	return handles;
+}
+
+/** The IDREF positions in this module that name one of those handles. */
+function idrefSitesNaming(
+	chunks: ReadonlyArray<SemanticMarkupChunk>,
+	handles: ReadonlyMap<string, number>,
+): ReadonlyArray<ProtocolBranchIdrefSite> {
+	const sites: Array<ProtocolBranchIdrefSite> = [];
+	for (const chunk of chunks)
+		for (const slot of chunk.slots) {
+			if (slot.kind !== 'attribute' || slot.residue.kind !== 'element-handle-id') continue;
+			if (slot.residue.idref !== true) continue;
+			const armIndex = handles.get(slot.residue.handleGraphNodeId);
+			if (armIndex === undefined) continue;
+			const path = slot.coordinate.path.join('.');
+			const host = (chunk.hosts ?? []).find(
+				(candidate) => candidate.coordinate.path.join('.') === path,
+			);
+			if (host)
+				sites.push({
+					hostNodeId: host.hostNodeId,
+					attributeName: slot.name,
+					handleReadId: protocolElementHandleReadId(slot.residue.handleGraphNodeId),
+					armIndex,
+				});
+		}
+	return sites;
+}
+
+/**
+ * The two fields a served branch record carries when its arms bind a handle an
+ * IDREF names: the ids this render minted, and the outside positions that name
+ * them. Empty for every other branch, so those payloads stay byte-identical.
+ */
+function branchArmHandleResolution(
+	chunks: ReadonlyArray<SemanticMarkupChunk>,
+	armChunkIds: ReadonlyArray<string>,
+): string {
+	const handles = branchArmMintedHandles(chunks, armChunkIds);
+	if (handles.size === 0) return '';
+	const sites = idrefSitesNaming(chunks, handles);
+	if (sites.length === 0) return '';
+	const ids = [...handles.keys()]
+		.map(
+			(handle) =>
+				`${JSON.stringify(protocolElementHandleReadId(handle))}:${elementHandleIdSource(handle)}`,
+		)
+		.join(',');
+	const siteSources = sites
+		.map(
+			(site) =>
+				`{hostNodeId:marklessSsrIdPrefix+${JSON.stringify(site.hostNodeId)},attributeName:${JSON.stringify(site.attributeName)},handleReadId:${JSON.stringify(site.handleReadId)},armIndex:${String(site.armIndex)}}`,
+		)
+		.join(',');
+	return `,elementHandleIds:{${ids}},idrefSites:[${siteSources}]`;
 }
 
 export function emitPublicSsrRenderModule(
@@ -591,10 +668,11 @@ function emitSsrDataLines(
 	);
 	const branchCases = input.renderData.branches
 		.filter((branch) => branchIds.has(branch.branchSiteId))
-		.map(
-			(branch) =>
-				`case ${JSON.stringify(branch.branchSiteId)}:{const arm=${branchArmSources.get(branch.branchSiteId)?.source ?? '1'};marklessSsrBranches.push({id:marklessSsrDataSlot.branchSiteId,takenArm:arm});return arm;}`,
-		);
+		.map((branch) => {
+			const arm = branchArmSources.get(branch.branchSiteId)?.source ?? '1';
+			const resolved = branchArmHandleResolution(input.renderData.chunks, branch.armChunkIds);
+			return `case ${JSON.stringify(branch.branchSiteId)}:{const arm=${arm};marklessSsrBranches.push({id:marklessSsrDataSlot.branchSiteId,takenArm:arm${resolved}});return arm;}`;
+		});
 	const repeatIds = new Set(chunks.flatMap((chunk) =>
 		chunk.slots.flatMap((slot) => slot.kind === 'repeat' ? [slot.repeatId] : []),
 	));
@@ -692,6 +770,17 @@ function emitSsrDataLines(
 	// its parts' seeds too. An edge nobody projects never reaches an emitted case.
 	const seedBlockByEdgeId = new Map<string, string>();
 	const projectionChunkByEdgeId = new Map<string, string>();
+	// A widget root placed with no projection still needs its instance token and
+	// its handle roster before it renders; it has no projected parts to seed.
+	// Pay-per-use: only a module that actually mints or names an element() id can
+	// need one, so a page without handles emits exactly the cases it emitted
+	// before, byte for byte.
+	const mintsElementHandleId = input.renderData.chunks.some((chunk) =>
+		chunk.slots.some(
+			(slot) => slot.kind === 'attribute' && slot.residue.kind === 'element-handle-id',
+		),
+	);
+	const instanceOnlyEdgeIds = new Set<string>();
 	const widgetInstanceLineByEdgeId = new Map<string, string>();
 	// What the emitted seed pass hands the boundary check to ask a placed child
 	// whether it roots a widget: the child's module surface and the name it
@@ -788,9 +877,12 @@ function emitSsrDataLines(
 			);
 		// Static registration before descent: the widget root's instance token
 		// is written into the seed map the parts placed inside it read, so a
-		// part mints an id that names WHICH rendered widget it belongs to.
-		if (projectionChunkId !== undefined) {
-			projectionChunkByEdgeId.set(edge.id, projectionChunkId);
+		// part mints an id that names WHICH rendered widget it belongs to. A root
+		// placed with no children registers on the same terms: the parts its own
+		// template renders ask the same question, and nothing else answers it.
+		if (projectionChunkId !== undefined || (seedCall && mintsElementHandleId)) {
+			if (projectionChunkId !== undefined) projectionChunkByEdgeId.set(edge.id, projectionChunkId);
+			else if (mintsElementHandleId) instanceOnlyEdgeIds.add(edge.id);
 			const surfaceArgs = childSurfaceArgsByEdgeId.get(edge.id) ?? `${component},undefined`;
 			const registerInstance = `marklessSsrSeeds.set(${JSON.stringify(
 				MARKLESS_WIDGET_INSTANCE_KEY,
@@ -857,6 +949,7 @@ function emitSsrDataLines(
 					// instance it was composed in.
 					projectedEdgeIds.has(edge.id) ||
 					rowProjectedEdgeIds.has(edge.id) ||
+					instanceOnlyEdgeIds.has(edge.id) ||
 					(projectionChunkId !== undefined && !childrenRootEdgeIds.includes(edge.id))
 						? ',sharedSeeds:marklessSsrDataContext.sharedSeeds'
 						: ''
@@ -869,7 +962,11 @@ function emitSsrDataLines(
 	// an instance boundary — it and everything under it seed their own instance,
 	// so this pass skips them. Which child roots a widget is answered where that
 	// child was compiled, so the chain is asked at render time.
-	const seedCases = [...projectionChunkByEdgeId].flatMap(([edgeId, projectionChunkId]) => {
+	const seedCaseEdges: Array<readonly [string, string | undefined]> = [
+		...projectionChunkByEdgeId,
+		...[...instanceOnlyEdgeIds].map((edgeId) => [edgeId, undefined] as const),
+	];
+	const seedCases = seedCaseEdges.flatMap(([edgeId, projectionChunkId]) => {
 		const rootSurfaceArgs = childSurfaceArgsByEdgeId.get(edgeId);
 		// Every link from the root's projection down to the part, the part itself
 		// last: any of them rooting one of this root's families ends the walk.
@@ -887,9 +984,17 @@ function emitSsrDataLines(
 		};
 		const guarded = (guards: ReadonlyArray<string>, block: string) =>
 			guards.length > 0 ? `if(${guards.join('&&')}){${block}}` : block;
-		const rootBlock = seedBlockByEdgeId.get(edgeId);
-		const parts = projectedSeedPartsUnder(input.renderData.chunks, projectionChunkId);
-		const armRefs = armScopedSeedRefsUnder(input.renderData.chunks, projectionChunkId);
+		// A childless root renders its own body, which runs its own seed lines, so
+		// this case only registers the instance and files the roster.
+		const rootBlock = projectionChunkId === undefined ? undefined : seedBlockByEdgeId.get(edgeId);
+		const parts =
+			projectionChunkId === undefined
+				? []
+				: projectedSeedPartsUnder(input.renderData.chunks, projectionChunkId);
+		const armRefs =
+			projectionChunkId === undefined
+				? []
+				: armScopedSeedRefsUnder(input.renderData.chunks, projectionChunkId);
 		const blocks = [
 			...(rootBlock ? [rootBlock] : []),
 			...parts.flatMap((part) => {
@@ -924,7 +1029,12 @@ function emitSsrDataLines(
 		)('marklessSsrHandle');
 		const handleLines = [
 			...new Set(
-				[edgeId, ...projectedHandleEdgeIdsUnder(input.renderData.chunks, projectionChunkId)].flatMap(
+				[
+					edgeId,
+					...(projectionChunkId === undefined
+						? []
+						: projectedHandleEdgeIdsUnder(input.renderData.chunks, projectionChunkId)),
+				].flatMap(
 					(partEdgeId) => {
 						const args = childSurfaceArgsByEdgeId.get(partEdgeId);
 						return args ? [elementHandleMarkerSource(args)] : [];

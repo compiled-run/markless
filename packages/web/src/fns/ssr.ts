@@ -33,7 +33,7 @@ import {
 import { marklessSerializeGraphValue } from './state-serialize.ts';
 import type { SsrDataStructure } from '../ssr-data/renderer.ts';
 import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
-import type { ProtocolComposedGraphProp } from '@markless/serializer';
+import type { ProtocolBranchIdrefSite, ProtocolComposedGraphProp } from '@markless/serializer';
 
 // SSR composition works on DRAFT payload records: the shapes the protocol
 // eventually serializes, still mutable and still carrying producer-only fields.
@@ -87,6 +87,8 @@ type SsrBranchRecord = SsrAnchoredRecord & {
 	readonly servedArmRecords?: SsrArmRecordSet;
 	readonly composedInstancePath?: string;
 	readonly composedGraphProps?: ReadonlyArray<ProtocolComposedGraphProp>;
+	readonly elementHandleIds?: Readonly<Record<string, string>>;
+	readonly idrefSites?: ReadonlyArray<ProtocolBranchIdrefSite>;
 };
 type SsrArmRecordSet = SsrRecord & {
 	readonly locators?: ReadonlyArray<SsrLocatorRecord>;
@@ -170,7 +172,14 @@ type SsrPrefixChild = {
 	readonly graphProps?: ComposeGraphProps;
 	readonly externalSymbolIds?: ReadonlySet<string>;
 };
-type SsrBranchArmSelection = { readonly id: string; readonly takenArm: number };
+type SsrBranchArmSelection = {
+	readonly id: string;
+	readonly takenArm: number;
+	// Present only where the branch's arms bind an element() handle an IDREF
+	// names: this render minted the ids, and no flip can mint them again.
+	readonly elementHandleIds?: Readonly<Record<string, string>>;
+	readonly idrefSites?: ReadonlyArray<ProtocolBranchIdrefSite>;
+};
 type SsrAsyncSnapshot = {
 	readonly status: string;
 	readonly version: number;
@@ -654,10 +663,13 @@ export function marklessSsrMergeBranches(
 	payloadBranches: ReadonlyArray<SsrBranchRecord> | undefined,
 	runtimeBranches: ReadonlyArray<SsrBranchArmSelection>,
 ) {
-	const takenById = new Map(runtimeBranches.map((branch) => [branch.id, branch.takenArm]));
-	return (payloadBranches ?? []).map((branch) =>
-		takenById.has(branch.id) ? { ...branch, takenArm: takenById.get(branch.id) } : branch,
-	);
+	const servedById = new Map(runtimeBranches.map((branch) => [branch.id, branch]));
+	return (payloadBranches ?? []).map((branch) => {
+		const served = servedById.get(branch.id);
+		if (!served) return branch;
+		const { id: _id, ...resolved } = served;
+		return { ...branch, ...resolved };
+	});
 }
 export function marklessSsrAsyncArm(snapshot?: { readonly status?: string } | null) {
 	return snapshot?.status === 'fulfilled'
@@ -1401,7 +1413,17 @@ export function marklessSsrAppendChildView(context: {
 		// Only the branch symbol can rebuild an arm, so a content read without one
 		// has nothing to drive and never justifies keeping the record.
 		const contentDriven = liveContentReads.length > 0 && Boolean(childSymbolId);
-		if (decided && !contentDriven && !marklessSsrDecidedArmIsLive(branch, armRecords)) continue;
+		// An IDREF outside the arms is answered from the record, so a branch that
+		// carries one is kept even when a constant decided its arm: the attribute is
+		// gained at resume, and dropping the record is what leaves it null.
+		const namesIdrefs = Boolean(branch.idrefSites?.length);
+		if (
+			decided &&
+			!contentDriven &&
+			!namesIdrefs &&
+			!marklessSsrDecidedArmIsLive(branch, armRecords)
+		)
+			continue;
 		const keepSymbol = Boolean(childSymbolId) && (!decided || contentDriven);
 		const composedRoutes = keepSymbol
 			? marklessSsrComposedBranchRoutes(branch, context.child, childInstancePath)
