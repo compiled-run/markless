@@ -30,12 +30,6 @@ function expectSeededFromChildren(container: ParentNode) {
 	expect(bar(container, 'prop').getAttribute('aria-valuetext')).toBe('40 of 100 rows');
 	expect(label(container, 'prop').textContent).toBe('40 of 100 rows');
 
-	// Children carrying markup have no value until they render, which is after the
-	// seed pass, so the bar carries nothing. The compiler refuses this placement
-	// where it can prove it (MARKLESS_SEED_CHILDREN_UNAVAILABLE); a part imported
-	// from another module, as here, is not provable at the placement.
-	expect(bar(container, 'markup').getAttribute('aria-valuetext') ?? '').toBe('');
-	expect(label(container, 'markup').querySelector('em')?.textContent).toBe('50');
 }
 
 test('CSR: JSX text content reaches the seed the sibling bar reads', async () => {
@@ -56,5 +50,9 @@ test('each placement seeds its own widget, not its neighbour', async () => {
 		[...container.querySelectorAll('[data-meter-bar]')].map((node) =>
 			node.getAttribute('aria-valuetext'),
 		),
-	).toEqual(['30 of 100 rows', '40 of 100 rows', null]);
+	).toEqual(['30 of 100 rows', '40 of 100 rows']);
+});
+
+test('children carrying markup are refused at the placement - they have no value until they render, after the seed pass', async () => {
+	await expect(import('./markup-page.tsrx')).rejects.toThrow();
 });
