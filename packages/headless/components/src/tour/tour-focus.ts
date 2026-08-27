@@ -1,24 +1,4 @@
-/**
- * The two focus moves the overlay behaviour leaves to the family, in the shape
- * `modal-focus.ts` already proved: retried per frame rather than done on the
- * call, because the incoming card is still `hidden` when the handler that
- * advanced the step runs.
- */
-
-const TRIES = 12;
-
-function land(target: HTMLElement | undefined): void {
-	if (!target) return;
-
-	let tries = TRIES;
-	const step = () => {
-		if (document.activeElement === target) return;
-		target.focus();
-		tries = tries - 1;
-		if (tries > 0 && document.activeElement !== target) requestAnimationFrame(step);
-	};
-	requestAnimationFrame(step);
-}
+/** The two focus moves the overlay behaviour leaves to the family. */
 
 /**
  * Land focus on the step's card.
@@ -28,7 +8,7 @@ function land(target: HTMLElement | undefined): void {
  * library does not do. The card carries `tabindex="-1"` so it can hold it.
  */
 export function focusIntoCard(cards: readonly HTMLElement[], at: number): void {
-	land(cards[at]);
+	cards[at]?.focus();
 }
 
 /**
@@ -54,8 +34,8 @@ export function focusBackToTarget(
 	cards: readonly HTMLElement[],
 	at: number,
 ): void {
-	if (target && target.tabIndex >= 0) return land(target);
-	land(capturedOpener(cards[at]));
+	if (target && target.tabIndex >= 0) return target.focus();
+	capturedOpener(cards[at])?.focus();
 }
 
 function capturedOpener(card: HTMLElement | undefined): HTMLElement | undefined {

@@ -11,12 +11,7 @@
 
 type Options = ReadonlyArray<HTMLElement>;
 
-/**
- * Land the roving focus among `options`, on a chosen one or at an end.
- *
- * The listbox is still `hidden` when the trigger's key handler runs and nothing
- * inside a hidden subtree can take focus, so the landing is retried per frame.
- */
+/** Land the roving focus among `options`, on a chosen one or at an end. */
 export function focusOpeningOption(
 	options: Options | undefined,
 	labels: Options | undefined,
@@ -25,8 +20,6 @@ export function focusOpeningOption(
 ): void {
 	if (!options) return;
 
-	// Settled before the retries: nothing the landing reads changes while the
-	// listbox is coming out of `hidden`, so reading it per frame reads it twelve times.
 	let wanted: HTMLElement | undefined;
 	if (search === '') {
 		let end: HTMLElement | undefined;
@@ -41,15 +34,7 @@ export function focusOpeningOption(
 	} else {
 		wanted = matchingOption(options, labels, search);
 	}
-	if (!wanted) return;
-
-	let tries = 12;
-	const land = () => {
-		wanted?.focus();
-		tries = tries - 1;
-		if (tries > 0 && document.activeElement !== wanted) requestAnimationFrame(land);
-	};
-	requestAnimationFrame(land);
+	wanted?.focus();
 }
 
 /** Move the roving focus to the first option whose own words start with `search`. */

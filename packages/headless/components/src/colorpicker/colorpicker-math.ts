@@ -506,21 +506,7 @@ export function isAmong(
 }
 
 
-const FOCUS_TRIES = 12;
-
-/**
- * A popup's content is still `hidden` when the trigger's handler runs, so the
- * move is retried per frame and then gives up rather than spinning. The shape is
- * `calendar-focus.ts`'s, which took it from `modal-focus.ts`.
- */
+/** Land focus on one of the family's own elements. */
 export function landFocus(target: HTMLElement | undefined | null): void {
-	if (!target) return;
-
-	let tries = FOCUS_TRIES;
-	const step = () => {
-		if (document.activeElement !== target) target.focus();
-		tries = tries - 1;
-		if (tries > 0) requestAnimationFrame(step);
-	};
-	requestAnimationFrame(step);
+	target?.focus();
 }
