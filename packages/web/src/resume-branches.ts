@@ -339,6 +339,7 @@ function materializeBranchArmRecords(
 ): string[] {
 	const set = branch.armRecords?.[armIndex];
 	if (!set) return [];
+	const { elementHandles, graph } = input;
 	const armNodes = nodesBetweenAnchors(input.root, branch.startAnchor, branch.endAnchor);
 	const claim = (hostPath: ReadonlyArray<number>) => {
 		const element = armRecordHost(armNodes, hostPath);
@@ -366,7 +367,7 @@ function materializeBranchArmRecords(
 		if (!host) continue;
 		input.storeHostSubscription(
 			host.hostNodeId,
-			input.graph.subscribe({
+			graph.subscribe({
 				// Target in the id: one graph node can drive two attributes on a host.
 				id: `arm-dom-update:${host.hostNodeId}:${update.target?.kind ?? ''}:${update.target && 'name' in update.target ? update.target.name : ''}:${update.graphNodeId}:${update.path.join('.')}`,
 				graphNodeId: update.graphNodeId,
@@ -374,9 +375,9 @@ function materializeBranchArmRecords(
 				async run(value: unknown) {
 					const symbol = await input.loadSymbol(update.symbolId!);
 					return (await symbol({
-						graph: input.graph,
+						graph,
 						element: host.element,
-						getElementHandle: input.elementHandles.get,
+						getElementHandle: elementHandles.get,
 						// The page id the record carries names nothing while the arm is live.
 						domUpdate: { ...update, hostNodeId: host.hostNodeId },
 						value,
@@ -398,7 +399,8 @@ function materializeBranchArmRecords(
 		Hosted<ResumeViewRecord['elementHandles'][number]>
 	>) {
 		const host = claim(handle.hostPath);
-		if (host) input.elementHandles.register(host.hostNodeId, handle, host.element);
+		// The branch id names the instance the arm rendered in.
+		if (host) elementHandles.register(host.hostNodeId, handle, host.element, branch.id, graph);
 	}
 	return [...byHost.keys()];
 }

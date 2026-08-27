@@ -1,5 +1,6 @@
 import type { RuntimeGraph } from '@markless/runtime';
 import { installComposedArmRecordQualifier } from '../resume-arm-records.ts';
+import { installElementHandleQualifier } from '../resume-locators.ts';
 import { marklessSettled, type Awaitable } from '../ssr-data/awaitable.ts';
 import type {
 	ResumeArmBranchRecord,
@@ -393,12 +394,10 @@ export function marklessWidgetHandleId(
  * The reading half of the same key.
  *
  * The compiled symbol asks for the module-level id, so the instance it is
- * running in is what has to be added here. The qualified id is asked first; the
- * id exactly as compiled answers when this page registered no qualified handle
- * at all - a single-instance page, or a handle whose host never travelled
- * through composition. The registry itself refuses a raw id that more than one
- * rendered widget registered, so the fallback can never hand back an arbitrary
- * instance's element.
+ * running in is what has to be added here. Every registration a rendered widget
+ * makes is qualified the same way - the page-level ones at composition, the
+ * ones an `@if` arm files at resume - so a reader whose instance is named asks
+ * the qualified key and nothing else.
  */
 export function marklessInstanceScopedElementHandle(
 	getElementHandle: ResumeSymbolContext['getElementHandle'],
@@ -417,10 +416,11 @@ export function marklessInstanceScopedElementHandle(
 			instancePath,
 			graph ? marklessGraphWidgetRegistry(graph) : marklessWidgetScope.active,
 		);
-		return (
-			(scoped === handleIdOrName ? undefined : getElementHandle(scoped)) ??
-			getElementHandle(handleIdOrName)
-		);
+		// The qualified key alone: the compiled id names every instance on the page,
+		// and `scoped === handleIdOrName` is exactly the id no rendered widget owns.
+		return scoped === handleIdOrName
+			? getElementHandle(handleIdOrName)
+			: getElementHandle(scoped);
 	};
 }
 
@@ -954,4 +954,13 @@ function composedBoundaryArmRecords(
  */
 export function installMarklessComposedArmRecords(): void {
 	installComposedArmRecordQualifier(composedBoundaryArmRecords);
+	// An `@if` arm's handles are filed at resume from the arm record, which the
+	// serializer never qualified: the record's owning id carries the instance.
+	installElementHandleQualifier((handleId, ownerId, graph) =>
+		marklessWidgetHandleId(
+			handleId,
+			marklessInstancePath(ownerId),
+			marklessGraphWidgetRegistry(graph as RuntimeGraph | undefined),
+		),
+	);
 }

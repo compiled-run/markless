@@ -40,14 +40,35 @@ export function materializeDomLocators(
 const HANDLE_INSTANCE_PATH = /^(?:[cp]\d+:|r:[^:]*:)+(?=shared:)/;
 
 /**
+ * Re-spells a handle id in the rendered widget's own key space, given the id of
+ * the record that filed it — a branch id, whose instance path names the widget.
+ *
+ * Composition qualifies every handle the served payload carries; a handle bound
+ * inside a flippable `@if` arm is filed here at resume instead, from an arm
+ * record the serializer left in module space. Only a composing page installs
+ * this, on the pay-per-use gate the widget registry itself rides.
+ */
+export type ElementHandleQualifier = (
+	handleId: string,
+	ownerRecordId: string,
+	graph?: unknown,
+) => string;
+
+let elementHandleQualifier: ElementHandleQualifier | undefined;
+
+export function installElementHandleQualifier(qualifier: ElementHandleQualifier): void {
+	elementHandleQualifier = qualifier;
+}
+
+/**
  * One element per key, and a loud refusal when a key names more than one.
  *
  * A widget-scoped handle is one element PER RENDERED WIDGET, so composition
  * qualifies its id with the rendered widget's own root path and the reading
  * handler asks with the same path. Every registration is filed under three keys
  * all the same: that qualified id, the id exactly as the module compiled it, and
- * the handle's name — the last two are how a single-instance page, and a handler
- * whose instance the qualification could not name, still resolve.
+ * the handle's name — the last two are how a handler standing outside every
+ * instance of the family, and a compiled id no rendered widget owns, resolve.
  *
  * Which is why the multi-registration case throws instead of answering. Two
  * rendered widgets file the same compiled id and the same name; handing back
@@ -92,29 +113,37 @@ export function materializeElementHandles(
 		hostNodeId: string,
 		handle: { readonly handleId: string; readonly name: string },
 		element: ResumeDomElement,
+		// The record that filed this handle, when its id is what names the rendered
+		// widget: an arm's handles reach resume in module space, so the qualified key
+		// the reading handler asks under has to be minted here.
+		ownerRecordId?: string,
+		graph?: unknown,
 	): void {
+		const handleId =
+			ownerRecordId && elementHandleQualifier
+				? elementHandleQualifier(handle.handleId, ownerRecordId, graph)
+				: handle.handleId;
 		const held = heldByHostId.get(hostNodeId) ?? [];
 		// The same handle registered again on the same host replaces its own entry
 		// rather than doubling it, which would read as two rendered widgets and
 		// refuse. Every OTHER handle on that host stays exactly where it is.
 		for (let index = held.length - 1; index >= 0; index--)
-			if (held[index]!.handleId === handle.handleId) {
+			if (held[index]!.handleId === handleId) {
 				unfile(held[index]!);
 				held.splice(index, 1);
 			}
 		const keys = [
-			...new Set([
-				handle.handleId,
-				handle.handleId.replace(HANDLE_INSTANCE_PATH, ''),
-				handle.name,
-			]),
+			...new Set([handleId, handleId.replace(HANDLE_INSTANCE_PATH, ''), handle.name]),
 		];
+		// An array handle declares its plural-ness on the record, never on the key,
+		// so a key minted here inherits it from the id it was minted from.
+		if (pluralKeys.has(handle.handleId)) for (const key of keys) pluralKeys.add(key);
 		for (const key of keys) {
 			const filed = byKey.get(key);
 			if (filed) filed.push(element);
 			else byKey.set(key, [element]);
 		}
-		held.push({ handleId: handle.handleId, keys, element });
+		held.push({ handleId, keys, element });
 		heldByHostId.set(hostNodeId, held);
 	}
 	// The keys that answer as a SET, declared at `element<T[]>()` and stamped on
