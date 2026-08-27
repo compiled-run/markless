@@ -21,9 +21,9 @@ export function optionValue(option: HTMLElement): string {
 	return option.getAttribute('ui-value') ?? '';
 }
 
-/** The options a walk may land on. An option nobody may choose is stepped past. */
-export function walkableOptions(options: Options): HTMLElement[] {
-	return options.filter((option) => option.getAttribute('aria-disabled') !== 'true');
+/** An option nobody may choose is stepped past. */
+function isWalkable(option: HTMLElement): boolean {
+	return option.getAttribute('aria-disabled') !== 'true';
 }
 
 /**
@@ -39,24 +39,40 @@ export function nextHighlightValue(
 	isLooping: boolean,
 ): string | undefined {
 	if (!options) return undefined;
-	const walkable = walkableOptions(options);
-	const last = walkable.length - 1;
-	if (last < 0) return undefined;
-
-	if (key === 'Home') return optionValue(walkable[0] as HTMLElement);
-	if (key === 'End') return optionValue(walkable[last] as HTMLElement);
 
 	const isForwardKey = key === 'ArrowDown';
-	const at = walkable.findIndex((option) => optionValue(option) === current);
+	let first: HTMLElement | undefined;
+	let last: HTMLElement | undefined;
+	let before: HTMLElement | undefined;
+	let after: HTMLElement | undefined;
+	let isCurrentWalkable = false;
+
+	for (const option of options) {
+		if (!isWalkable(option)) continue;
+		first ??= option;
+		last = option;
+		if (!isCurrentWalkable && optionValue(option) === current) {
+			isCurrentWalkable = true;
+			continue;
+		}
+		if (isCurrentWalkable) after ??= option;
+		else before = option;
+	}
+
+	if (first === undefined || last === undefined) return undefined;
+	if (key === 'Home') return optionValue(first);
+	if (key === 'End') return optionValue(last);
 	// Nothing highlighted yet: down lands on the first, up lands on the LAST.
 	// That asymmetry is Qwik UI's, and it is what makes ArrowUp from a closed
 	// field open on the end of the list.
-	if (at < 0) return optionValue(walkable[isForwardKey ? 0 : last] as HTMLElement);
+	if (!isCurrentWalkable) return optionValue(isForwardKey ? first : last);
 
-	const raw = at + (isForwardKey ? 1 : -1);
-	if (raw < 0) return isLooping ? optionValue(walkable[last] as HTMLElement) : undefined;
-	if (raw > last) return isLooping ? optionValue(walkable[0] as HTMLElement) : undefined;
-	return optionValue(walkable[raw] as HTMLElement);
+	if (isForwardKey) {
+		if (after) return optionValue(after);
+		return isLooping ? optionValue(first) : undefined;
+	}
+	if (before) return optionValue(before);
+	return isLooping ? optionValue(last) : undefined;
 }
 
 /**

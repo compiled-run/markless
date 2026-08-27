@@ -39,11 +39,66 @@ export type MarklessParseOptions = Omit<ParseModuleOptions, 'errors' | 'comments
 	comments?: MarklessParserComment[];
 };
 
+const PARSE_CACHE_LIMIT = 256;
+
+/**
+ * The same `(filename, source)` gets the same tree back rather than a re-parse:
+ * vite asks for a module under `?markless-symbols` and under its plain id, and a
+ * barrel walk re-reaches every dependency. Sound only while every pass on this
+ * path treats the tree as read-only; the freeze mode below is what proves that.
+ */
+const parseCache = new Map<string, Program>();
+let parseCacheHits = 0;
+let parseCacheMisses = 0;
+let freezeParsedTrees = false;
+
+export type ParseCacheStats = {
+	readonly hits: number;
+	readonly misses: number;
+	readonly size: number;
+};
+
+export function parseCacheStats(): ParseCacheStats {
+	return { hits: parseCacheHits, misses: parseCacheMisses, size: parseCache.size };
+}
+
+export function resetParseCache(): void {
+	parseCache.clear();
+	parseCacheHits = 0;
+	parseCacheMisses = 0;
+}
+
+/** Test-only. Deep-freezes every shared tree, so a pass that mutates one throws here instead of leaking into the next compile of the same source. */
+export function setParseTreeFreezing(enabled: boolean): void {
+	freezeParsedTrees = enabled;
+	resetParseCache();
+}
+
 export function parseModule(
 	source: string,
 	filename = 'module.tsrx',
 	options: MarklessParseOptions = {},
 ): Program {
+	return parseModuleWith(source, filename, options, Object.keys(options).length === 0);
+}
+
+function parseModuleWith(
+	source: string,
+	filename: string,
+	options: MarklessParseOptions,
+	cacheable: boolean,
+): Program {
+	const cacheKey = cacheable ? `${filename}\u0000${source}` : null;
+	if (cacheKey !== null) {
+		const cached = parseCache.get(cacheKey);
+		if (cached !== undefined) {
+			parseCache.delete(cacheKey);
+			parseCache.set(cacheKey, cached);
+			parseCacheHits += 1;
+			return cached;
+		}
+		parseCacheMisses += 1;
+	}
 	const diagnostics: Diagnostic[] = [];
 	const comments: Comment[] = [];
 	const {
@@ -79,12 +134,43 @@ export function parseModule(
 		const fatal = compileErrors.find((error) => error.type === 'fatal');
 		if (fatal) throw fatal;
 	}
-	return normalizeProgram(program, {
+	const normalized = normalizeProgram(program, {
 		onNode: (node) => {
 			blankMarklessAllowDirective(node);
 			dropCommentContainers(node);
 		},
 	});
+	if (cacheKey === null) return normalized;
+	const shared = freezeParsedTrees ? deepFreeze(normalized) : normalized;
+	parseCache.set(cacheKey, shared);
+	if (parseCache.size > PARSE_CACHE_LIMIT) {
+		const oldest = parseCache.keys().next();
+		if (!oldest.done) parseCache.delete(oldest.value);
+	}
+	return shared;
+}
+
+// Data properties only: reading an accessor would run it, and a lazily
+// memoising one would then fail against the object just frozen.
+function deepFreeze<T>(root: T): T {
+	const seen = new Set<object>();
+	const pending: unknown[] = [root];
+	while (pending.length > 0) {
+		const value = pending.pop();
+		if (!value || typeof value !== 'object') continue;
+		if (seen.has(value)) continue;
+		seen.add(value);
+		if (Array.isArray(value)) {
+			for (const entry of value) pending.push(entry);
+		} else {
+			for (const key of Object.getOwnPropertyNames(value)) {
+				const descriptor = Object.getOwnPropertyDescriptor(value, key);
+				if (descriptor && 'value' in descriptor) pending.push(descriptor.value);
+			}
+		}
+		Object.freeze(value);
+	}
+	return root;
 }
 
 /**
@@ -168,9 +254,10 @@ export type JavaScriptAstNode = {
 	readonly [key: string]: unknown;
 };
 
+// Never cached: its callers rewrite the tree they get back.
 export function parseJavaScriptModule(
 	source: string,
 	filename = 'generated.js',
 ): JavaScriptAstNode {
-	return parseModule(source, filename) as unknown as JavaScriptAstNode;
+	return parseModuleWith(source, filename, {}, false) as unknown as JavaScriptAstNode;
 }
