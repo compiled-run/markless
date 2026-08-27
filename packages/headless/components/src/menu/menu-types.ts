@@ -4,7 +4,8 @@ import type { PropsOf, Seeded } from '@markless/core';
  * Which side of the trigger the surface is placed on. `start` and `end` are the
  * writing direction's sides, so they swap in a right-to-left page; `top` and
  * `bottom` are the same everywhere. A menu opened from `menu.contextarea` is
- * placed at the pointer instead, and ignores this.
+ * placed at the pointer instead, and ignores this. A submenu is always placed at
+ * its item's inline end.
  */
 export type MenuSide = 'top' | 'bottom' | 'start' | 'end';
 
@@ -15,9 +16,9 @@ export type MenuPoint = { readonly x: number; readonly y: number };
  * The menu itself. Everything the family renders goes inside it, and it is the
  * anchor scope the surface is placed within.
  *
- * A submenu is a `menu.root` written inside another menu's `menu.content`: the
- * nested root starts a menu instance of its own, holding its own open state, its
- * own roving focus and its own `onChange`.
+ * There is one root however deep the menu nests: a submenu is a
+ * `menu.itemcontent` written inside a `menu.item`, and an item activated at any
+ * depth reports to this root's `onChange`.
  */
 export type MenuRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/** Whether the surface is showing. Omit it and the menu starts closed. */
@@ -31,28 +32,27 @@ export type MenuRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	readonly checked?: readonly string[];
 	/** Nobody can open the menu, and no item may be activated. */
 	readonly disabled?: boolean;
-	/** The arrow walk wraps at both ends. Menus wrap; a listbox does not. */
+	/** The arrow walk wraps at both ends, on every surface. Menus wrap; a listbox does not. */
 	readonly loop?: boolean;
 	/**
 	 * The items of this menu are one radio group: each renders
 	 * `role="menuitemradio"`, and choosing one unchecks the rest. Without it an
 	 * item carrying `checked` is a `menuitemcheckbox` and the rest are plain
-	 * commands.
+	 * commands. An item carrying `submenu` stays a plain `menuitem` either way.
 	 */
 	readonly radio?: boolean;
 	/**
-	 * Where the surface is placed against the trigger. It is also written on
+	 * Where the top surface is placed against the trigger. It is also written on
 	 * `menu.content` as `ui-side`, so styling can follow the placement.
 	 */
 	readonly side?: MenuSide;
-	/** How long a pointer rests on `menu.itemtrigger` before its submenu opens, in milliseconds. */
+	/** How long a pointer rests on a `submenu` item before its submenu opens, in milliseconds. */
 	readonly delay?: number;
-	/** How long a submenu stays open after the pointer leaves it, in milliseconds. */
+	/** How long a submenu stays open after the pointer leaves its item, in milliseconds. */
 	readonly closeDelay?: number;
 	/**
 	 * Called with the item's `value` when an item is activated - a command, a
-	 * checkbox item toggling, or a radio item being chosen. A submenu is its own
-	 * root, so its activations reach the callback written on the submenu's root.
+	 * checkbox item toggling, or a radio item being chosen - at any depth.
 	 */
 	readonly onChange?: (value: string) => void;
 	/** Called when the surface opens or closes, including when Escape or a press outside closes it. */
@@ -79,19 +79,23 @@ export type MenuTriggerProps = PropsOf<'button'>;
 export type MenuContextareaProps = PropsOf<'div'>;
 
 /**
- * The surface the items go in, `role="menu"`. It is never modal: it writes no
- * `aria-modal`, so the page behind it keeps its focus and is never made inert,
- * and a wheel does not dismiss it.
+ * The top surface the items go in, `role="menu"`. It is never modal: it writes
+ * no `aria-modal`, so the page behind it keeps its focus and is never made
+ * inert, and a wheel does not dismiss it.
  *
  * It stays in the page when the menu is closed - `hidden` decides whether it
  * shows, never an arm - because an enlisted element removed from the document
  * leaves the overlay stack's marks behind.
+ *
+ * It owns the keyboard walk over the items IT holds. A submenu's own items
+ * belong to that submenu's `menu.itemcontent`.
  */
 export type MenuContentProps = PropsOf<'div'>;
 
 /**
  * One command. Given `checked` it is a `menuitemcheckbox` that toggles without
- * closing; inside a `radio` menu it is a `menuitemradio`.
+ * closing; inside a `radio` menu it is a `menuitemradio`. Given `submenu` it
+ * holds a `menu.itemcontent` and opens it instead of activating.
  *
  * A disabled item is still reachable with the arrows and still announced - the
  * APG's rule, and the divergence from `select`, whose walk skips a disabled
@@ -108,19 +112,32 @@ export type MenuItemProps = PropsOf<'div'> & {
 	readonly checked?: boolean;
 	/** Nobody can activate this item; the arrows still land on it. */
 	readonly disabled?: boolean;
+	/**
+	 * This item holds a submenu: it reports `aria-haspopup="menu"` and
+	 * `aria-expanded`, and opening it is what activation does.
+	 *
+	 * Written rather than inferred from the `menu.itemcontent` inside it, for
+	 * tree's `leaf` reason: a component cannot see its own children while it
+	 * renders, and a served page has to carry both attributes in its HTML before
+	 * anything inside the item exists.
+	 */
+	readonly submenu?: boolean;
 };
 
 /**
- * An item that opens a submenu. It is the parent menu's item and the submenu's
- * trigger at once, so it is written inside the nested `menu.root` it opens,
- * beside that root's `menu.content`.
+ * The submenu one item holds, `role="menu"`, named by that item. It is the same
+ * surface part one level down: a `menu.item` inside it may hold a
+ * `menu.itemcontent` of its own, to any depth.
+ *
+ * Like `menu.content` it stays in the page when closed, it is an `overlay`, and
+ * it owns the keyboard walk over the items it holds.
  */
-export type MenuItemTriggerProps = PropsOf<'button'>;
+export type MenuItemContentProps = PropsOf<'div'>;
 
 /**
- * The graph cells every menu part reads and writes: the root's seeded fields,
- * plus the roving focus, the typeahead buffer, the checked set and the point a
- * context menu was asked for. The `element()` handles and the consumer's
+ * The graph cells every part of one MENU reads and writes: the root's seeded
+ * fields, plus the roving focus, the typeahead buffer, the checked set and the
+ * point a context menu was asked for. The `element()` handles and the consumer's
  * callbacks are not cells; they are added to the instance the factory returns.
  */
 export type MenuInstanceState = Seeded<
@@ -129,17 +146,11 @@ export type MenuInstanceState = Seeded<
 > & {
 	/** The `value` of the item holding the roving focus, or `''`. */
 	focused: string;
-	/** The live typeahead buffer, and when its last character arrived. */
+	/** The live typeahead buffer, and when its last character arrived. One buffer for the whole menu, whichever surface is being typed at. */
 	typeahead: string;
 	typeaheadAt: number;
 	/** Where a context menu was asked for, or `null` when the trigger opened it. */
 	position: MenuPoint | null;
-	/** Whether a pointer resting on `menu.itemtrigger` is what opened this submenu. */
-	byHover: boolean;
-	openTimer: number;
-	closeTimer: number;
-	restingUntil: number;
-	closingUntil: number;
 	pressTimer: number;
 	pressX: number;
 	pressY: number;
@@ -155,4 +166,22 @@ export type MenuInstanceState = Seeded<
 	graceUntil: number;
 	onChange?: MenuRootProps['onChange'];
 	onOpenChange?: MenuRootProps['onOpenChange'];
+};
+
+/**
+ * One rendered `menu.item`. Its own `menu.itemcontent` reads this; the items
+ * inside that submenu root their own instances of the same family and never see
+ * this one.
+ */
+export type MenuItemInstanceState = Seeded<MenuItemProps, 'value' | 'disabled' | 'submenu'> & {
+	/** This item's submenu is showing. */
+	expanded: boolean;
+	/** This item was written with `checked`, so it carries a checked state at all. */
+	checkable: boolean;
+	/** Whether a pointer resting on this item is what opened its submenu. */
+	byHover: boolean;
+	openTimer: number;
+	closeTimer: number;
+	restingUntil: number;
+	closingUntil: number;
 };

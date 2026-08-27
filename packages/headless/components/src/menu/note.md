@@ -10,14 +10,14 @@ two values of a mode prop.
 
 ## Parts
 
-| Part               | Element  | Carries                                                                                                                                   |
-| ------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `menu.root`        | `div`    | the family's state; `ui-open`, `ui-closed`, `ui-disabled`; the anchor scope                                                               |
-| `menu.trigger`     | `button` | `aria-haspopup="menu"`, `aria-expanded`, `aria-controls`, the opening keys, the anchor name                                               |
-| `menu.contextarea` | `div`    | `ui-open`/`ui-closed` and **no ARIA at all**; right-click, long press, `Shift+F10`, the ContextMenu key                                   |
-| `menu.content`     | `div`    | `overlay`, `role="menu"`, `aria-labelledby`, `hidden`, `ui-side`                                                                          |
-| `menu.item`        | `div`    | `role="menuitem"` (or `menuitemcheckbox` / `menuitemradio`), `aria-checked`, `aria-disabled`, roving `tabindex`, the walk, the activation |
-| `menu.itemtrigger` | `button` | `role="menuitem"` **plus** `aria-haspopup="menu"`, `aria-expanded`, `aria-controls`; opens the submenu it is written in                   |
+| Part                | Element  | Carries                                                                                                                                    |
+| ------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `menu.root`         | `div`    | the menu's state; `ui-open`, `ui-closed`, `ui-disabled`; the anchor scope                                                                  |
+| `menu.trigger`      | `button` | `aria-haspopup="menu"`, `aria-expanded`, `aria-controls`, the opening keys, the anchor name                                                |
+| `menu.contextarea`  | `div`    | `ui-open`/`ui-closed` and **no ARIA at all**; right-click, long press, `Shift+F10`, the ContextMenu key                                    |
+| `menu.content`      | `div`    | `overlay`, `role="menu"`, `aria-labelledby`, `hidden`, `ui-side`; the walk over the items IT holds                                         |
+| `menu.item`         | `div`    | `role="menuitem"` (or `menuitemcheckbox` / `menuitemradio`), `aria-checked`, `aria-disabled`, roving `tabindex`, the activation, the hover intent; with `submenu`, also `aria-haspopup="menu"`, `aria-expanded` and `aria-controls` |
+| `menu.itemcontent`  | `div`    | one item's submenu: `overlay`, `role="menu"`, `aria-labelledby` naming that item, `hidden`, `ui-side`; the walk over the items IT holds    |
 
 **Separators and groups are the consumer's markup.** `<div role="separator"
 aria-orientation="horizontal">` carries one attribute and no behaviour, and
@@ -32,14 +32,24 @@ fails if `menu.item` ever renders as an `<a href>` carrying `role="menuitem"`.
 
 ## State
 
+Two widget-scoped families, one per level of ownership.
+
 ```ts
-menu.state() // per widget instance
-  open: boolean            // whether this menu's surface is showing
-  focused: string          // the `value` of the item holding the roving focus, or ''
-  typeahead: string        // the live typeahead buffer
+menu.state() // rooted by menu.root - one per menu, however deep it nests
+  open: boolean               // whether the top surface is showing
+  focused: string             // the `value` of the item holding the roving focus, or ''
+  typeahead: string           // the live typeahead buffer, shared by every surface
   checked: readonly string[]  // the checked values of this menu's checkbox or radio items
   position: { x, y } | null   // where a context menu was asked for; null when the trigger opened it
   show() / hide()
+  // plural rosters every walk is asked of: every item and every submenu surface,
+  // at every depth, live and in document order
+  itemEls / itemContentEls
+
+menu.itemstate() // rooted by EVERY menu.item - one per item, at any depth
+  expanded: boolean           // this item's submenu is showing
+  value / checkable / disabled / submenu
+  itemEl / itemContentEl      // this item's own element, and the submenu it opens
 ```
 
 ## Props
@@ -47,28 +57,38 @@ menu.state() // per widget instance
 `menu.root`: `open`, `checked`, `disabled`, `loop` (arrow wrap, on), `radio`,
 `side`, `delay` (700), `closeDelay` (300), `onChange(value)`,
 `onOpenChange(open)`.
-`menu.item`: `value` (required), `checked`, `disabled`.
+`menu.item`: `value` (required), `checked`, `disabled`, `submenu`.
 
-`onChange` fires on every activation - a command, a checkbox item toggling, a
-radio item being chosen - carrying the item's `value`. `onOpenChange` fires for
-the surface. Select is the only shipped family with both things to report and it
-ships both callbacks, so this matches it.
+`onChange` fires on every activation at every depth - a command, a checkbox item
+toggling, a radio item being chosen - carrying the item's `value`.
+`onOpenChange` fires for the top surface. Select is the only shipped family with
+both things to report and it ships both callbacks, so this matches it.
+
+`submenu` is written rather than inferred from the `menu.itemcontent` inside the
+item, for tree's `leaf` reason: a component cannot see its own children while it
+renders, and a served page has to carry `aria-haspopup` and `aria-expanded` in
+its HTML before anything inside the item exists.
 
 ## The keyboard
 
 On the trigger, `Enter` and `Space` are the button's own activation and open the
 menu on the first item; `ArrowDown` does the same and `ArrowUp` opens on the
-last. Inside the menu the arrows walk **wrapping** at both ends - the deliberate
+last. Inside a surface the arrows walk **wrapping** at both ends - the deliberate
 divergence from `select`, whose note says a listbox has a top and a bottom -
 `Home`/`End` jump to the ends, printable characters are typeahead over a 750 ms
 window, `Enter` and `Space` activate, `Escape` closes the surface holding focus
 and hands focus back, and `Tab` closes and keeps its native move.
 
 `Space` on a checkbox or radio item toggles it and leaves the menu up; `Enter`
-takes the whole menu down. `ArrowRight` on `menu.itemtrigger` opens its submenu
-on the first item; `ArrowLeft` inside a submenu closes it back onto that
-trigger. `ArrowLeft` in a root menu does nothing, which is what the APG asks for
-when there is no menubar.
+takes the whole chain down. On an item carrying `submenu`, `ArrowRight`, `Enter`
+and `Space` all open its submenu on the first command inside; `ArrowLeft` inside
+a submenu closes it back onto the item that opened it. `ArrowLeft` in the top
+surface does nothing, which is what the APG asks for when there is no menubar.
+
+**Every surface owns the walk over its own items**, and no surface can see
+another's. What a surface holds is the item roster filtered by containment: an
+item belongs to the deepest surface holding it, so a submenu's commands are the
+submenu's and the nesting item stays a command of the surface above it.
 
 **A disabled item is a destination.** The arrows land on it and a reader
 announces it; only activation is refused. That is the APG's rule and a straight
@@ -80,53 +100,89 @@ native click, so `Enter`/`Space` on the trigger stay the button's own
 activation; and every prevented-key guard is written from `event.key` alone so
 the decision is readable before the handler module loads.
 
-## Submenus: a nested `menu.root`
+## Submenus: `menu.item` > `menu.itemcontent` > `menu.item`
 
-A submenu is a `menu.root` written inside another menu's `menu.content`, holding
-its `menu.itemtrigger` and its own `menu.content`:
+A submenu is a `menu.itemcontent` written inside a `menu.item` that says
+`submenu`. It recurses with the same two parts, to any depth:
 
 ```html
 <menu.content>
 	<menu.item value="new">New</menu.item>
-	<menu.root side="end">
-		<menu.itemtrigger>Share</menu.itemtrigger>
-		<menu.content>
+	<menu.item value="share" submenu>
+		Share
+		<menu.itemcontent>
 			<menu.item value="email">Email</menu.item>
-		</menu.content>
-	</menu.root>
+			<menu.item value="social" submenu>
+				Social
+				<menu.itemcontent>
+					<menu.item value="bluesky">Bluesky</menu.item>
+				</menu.itemcontent>
+			</menu.item>
+		</menu.itemcontent>
+	</menu.item>
 </menu.content>
 ```
 
-The nested root is a real second instance of the family, measured on this tip in
-both render modes by
-`packages/vitest-browser/browser/menu-gates/nested-scope.test.ts`, and that is
-what gives the submenu its own open state, its own roving focus and its own
-`onChange`. **A submenu's activations reach the callback written on the
-submenu's root**, not the menu above it, because no handle and no read crosses an
-instance boundary.
+**There is one root.** `menu.state()`, `checked` and `onChange` are the root's,
+and an activation at any depth reports to it. There is no second `menu.root`, no
+`sub*` part, and no `menu.itemtrigger`: the item IS the opener.
 
-That boundary is also why this family reads the DOM where `select` and `navbar`
-read `element()` handles. A `menu.itemtrigger` is an item of the menu _above_
-it while belonging to the submenu's instance, so no plural handle can hold one
-surface's items. `menu-walk.ts` asks for `[role="menu"]` and the three
-`menuitem*` roles instead - the family's own output, read back - and the whole
-walk, in and out of submenus, falls out of that one question.
+Every `menu.item` roots its own `menu.itemstate()` - tree's `treeItemState`
+precedent - which is what gives each item its own `expanded`, its own element
+handles and its own submenu, while leaving it an ordinary part of the enclosing
+menu. Four framework facts this shape stands on, each with a witness:
 
-**Hover intent without a safe polygon.** The pointer handlers sit on the nested
-root, which wraps the trigger and the surface, so a move from a submenu's
-trigger into that submenu is never a leave. `delay` opens, `closeDelay` closes,
-and a timer re-delivers the crossing rather than opening from inside a callback
-that cannot reach the graph. Every reference builds a geometric guard here -
-Radix's five-point grace polygon, React Aria's `atan2` intent tracker, Base UI's
-`safePolygon` - and all three measure boxes and install document-level pointer
-listeners, which this library does neither of. **Revisit trigger:** if the
-diagonal path across a _sibling_ item to an overhanging submenu is measured
+- a component rooting one family is still a plain part of every other family
+  enclosing it, and its writes land in that enclosing instance, CSR and SSR
+  alike (`vitest-browser/browser/nested-widget-outer-write`);
+- a handler reads its OWN instance's singular `element()` handle at any depth
+  (`vitest-browser/browser/handler-instance-handle`) - the wall the previous
+  attempt at this shape hit, now closed;
+- a widget root's own element can carry an IDREF to a part it seeds, and be
+  named back by it (`vitest-browser/browser/root-idref`) - which is exactly
+  `menu.item`'s `aria-controls` and `menu.itemcontent`'s `aria-labelledby`;
+- a family's widget root is the FIRST component in the module that seeds it, so
+  `menu.root` is declared before `menu.item` and never lets `menu.item` seed
+  `menuState`.
+
+**No DOM query anywhere.** `menu-walk.ts` is asked only of the handles this
+family binds: the top surface, the plural roster of every `menu.itemcontent`,
+and the plural roster of every `menu.item`, all live and in document order.
+`contains` is the one platform question, and only of a bound handle about a node
+the platform handed over.
+
+**A gesture inside a submenu bubbles through every item and surface above it.**
+Each handler first asks whether the target is in its own level - an item checks
+its own `itemContentEl`, a surface checks that it is the deepest surface holding
+the target - and leaves the event alone when it is not. The surface that
+answered a key then calls `stopPropagation()`, and an item that answered a click
+does the same, so nothing above ever sees a gesture as its own. The guards alone
+are sufficient; stopping is the second lock.
+
+**Hover intent without a safe polygon.** The submenu is written INSIDE its item,
+so a pointer crossing from the item into its own submenu is never a leave and
+needs no geometry at all. `delay` opens, `closeDelay` closes, and a timer
+re-delivers the crossing rather than acting from inside a callback that cannot
+reach the graph. Focus leaving the item entirely - a keyboard walk onto a
+sibling, or the whole menu closing - closes its submenu at once, which is what
+makes a walk across siblings behave. Every reference builds a geometric guard
+here (Radix's five-point grace polygon, React Aria's `atan2` intent tracker,
+Base UI's `safePolygon`) and all three measure boxes and install document-level
+pointer listeners, which this library does neither of. **Revisit trigger:** if
+the diagonal path across a _sibling_ item to an overhanging submenu is measured
 failing at `closeDelay: 300`, that is a framework-capability conversation, not a
 family edit.
 
-**One level.** Two-deep submenus are where React Aria's `submenuLevel` and Base
-UI's floating-tree bookkeeping start earning their keep; nothing here forbids
-the markup, and nothing here has measured it.
+**Typeahead reads the item's whole text.** An item holding a submenu contains
+every command inside it, and a decoration marked `aria-hidden` is in there too.
+Subtracting either would mean walking child nodes, which this family may not do;
+a match is `startsWith`, and both follow the item's own label rather than
+preceding it, so the label is still what answers. A consumer writing a
+decoration BEFORE the label makes that decoration typeable.
+
+**Three levels are measured**, in both render modes: `scenarios/deep.tsrx` plus
+the arrow-in/arrow-out, per-surface-walk, deepest-activation and step-out-Escape
+rows.
 
 ## The context menu
 
@@ -170,9 +226,7 @@ action here to lose.
 threshold: cancelling on any movement makes the gesture fail for anyone whose
 finger is not perfectly still). The timer synthesises the `contextmenu` event
 rather than opening, both because a scheduled callback cannot reach the graph
-and because iOS sends no `contextmenu` for a long press at all. The area carries
-`-webkit-touch-callout: none` inline, which is the one place this family writes
-a `style` on a part for behaviour rather than placement.
+and because iOS sends no `contextmenu` for a long press at all.
 
 **Focus return, with no trigger to return to.** What held focus when the menu
 was asked for is remembered in a `WeakMap` keyed by the surface, in
@@ -189,6 +243,15 @@ carrying `anchor-scope` on the root, `anchor-name` on the trigger, and
 value on the surface. So the surface is placed on its first layout with no
 script, and a surface served already open is placed before anything runs.
 
+**One anchor name, re-scoped per item.** `menu.item` declares both
+`anchor-name: --ui-menu` and `anchor-scope: --ui-menu`, so inside an item the
+name resolves to that item and outside it resolves to the trigger. That is what
+lets one `position-anchor` rule place the top surface against the trigger and
+every submenu against its own item, at any depth, with no per-instance name and
+no identity attribute. `menu.itemcontent` is always `ui-side="end"`: the
+inline-end placement is the submenu convention, and `side` stays the top
+surface's.
+
 The context-opened surface has no anchor to resolve against - a context menu has
 no `menu.trigger` - which leaves the `position-area` inert and hands the
 placement to `left`/`top`. Those read `--x` and `--y`, the only thing JavaScript
@@ -201,12 +264,9 @@ bottom right corner overflows. The anchored path can be given
 Base UI and Radix get flipping free from floating-ui, and this is the price of
 not carrying a positioner.
 
-`menu.content` owns its own `style` attribute, which carries `--x`/`--y` and
-nothing else. The other parts leave `style` alone.
-
 ## Dismissal
 
-`menu.content` carries the bare `overlay` attribute, so the primitive reports
+Both surfaces carry the bare `overlay` attribute, so the primitive reports
 Escape and outside presses and moves no focus itself. Escape hands focus back;
 an outside press is a person choosing where to be, so it does not. **The menu is
 never modal**: it writes no `aria-modal`, from which the primitive derives
@@ -215,16 +275,17 @@ divergence from Radix and Base UI, which default to modal. A wheel does not
 dismiss, and there is a row for it.
 
 The overlay stack reports to the topmost surface only, which here is exactly
-what the APG asks for: with a submenu open, Escape closes the submenu and leaves
-its parent up. There is a row asserting that, so a future change to the stack
-cannot silently take it away.
+what the APG asks for: with a submenu open, Escape closes the submenu, hands
+focus to the item that opened it, and leaves every surface above it up. Three
+levels step out one at a time, and there are rows for both.
 
-**Activation closes the chain.** A command in a submenu has to take the whole
-menu down, and it cannot reach the instances above it - so it reports the same
-`dismiss` the primitive reports, on each surface above it in turn. That is not a
+**Activation closes the chain.** A command at any depth has to take the whole
+menu down. It reports the same `dismiss` the primitive reports, on each surface
+holding it, innermost first - every level answers for itself, and the outermost
+runs last, so focus ends on the control that opened the menu. That is not a
 workaround dressed up: the outcome those surfaces are being told about is
-exactly a dismissal, and each one closes and hands its focus back the way it
-would for Escape.
+exactly a dismissal. An outside press reaches only the topmost surface, so a
+`menu.itemcontent` receiving one passes it up the same way.
 
 ## What v1 refuses, and why
 
@@ -255,9 +316,8 @@ would for Escape.
 1. **A repeat row may not read the menu's shared state.** A keyed `@for` whose
    row body reads the enclosing widget's shared instance mints **zero rows**,
    silently, with no diagnostic - measured on this tip and pinned in
-   `menu-gates/nested-scope.test.ts`, and not about nesting: a single root is
-   the same red. This is why items are parts. A part rendered from a loop
-   variable is fine; a plain row reading menu state is not.
+   `menu-gates/nested-scope.test.ts`. This is why items are parts. A part
+   rendered from a loop variable is fine; a plain row reading menu state is not.
 2. **A seed may only read its own component's props.** `menu.item` cannot report
    its own initial checked state to the root: the emitted shared-seed module
    names neither the component's local `state()` nor the shared instance
@@ -265,17 +325,19 @@ would for Escape.
    method from a component body throws `ReferenceError` on a served page. So the
    checked set is `menu.root`'s `checked` prop, which is also what a radio
    choice needs - unchecking a sibling is one decision about the whole menu.
-   `checked` on an item says the item _has_ a checked state, which is what
-   selects `menuitemcheckbox`; the root's `checked` says which items are in it.
-3. **One `element()` handle cannot be bound by two parts**, even two that never
-   render together: `menu.trigger` and `menu.itemtrigger` are the same role in
-   this family's life and still need separate handles
-   (`MARKLESS_ELEMENT_HANDLE_DUPLICATE`), and a plural handle is refused in an
-   IDREF position (`MARKLESS_ELEMENT_HANDLE_PLURAL_IDREF`). So `menu.content`
-   names itself with a two-handle `aria-labelledby` list, of which the opener
-   this instance never rendered contributes an id that resolves to nothing.
-   Inert for the platform, and no axe violation - measured by the submenu and
-   context axe rows.
+3. **An IDREF attribute's PRESENCE is decided for the module, not for the
+   instance.** `menu.item` writes `aria-controls={item.itemContentEl}`, and once
+   any item anywhere on the page renders a `menu.itemcontent`, every item of the
+   family emits the attribute - including the plain commands whose own instance
+   never bound that handle, which then point at an id that resolves to nothing.
+   Axe calls that a critical `aria-valid-attr-value` violation, and it is the one
+   red in this family's accessibility bar, **pinned as such** by the two submenu
+   axe rows rather than hidden. Neither escape works today: a choice in an IDREF
+   position is `MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE`, and reading the id off
+   the handle inside a `computed()` is
+   `MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE`. Both measured on this
+   tip. The capability to raise: emit an IDREF only where the handle is bound in
+   the reading instance.
 4. **A scheduled callback cannot reach the graph.** Every timer here re-delivers
    the gesture instead of acting: the submenu's open and close re-dispatch
    `pointerover`/`pointerout`, and the long press dispatches `contextmenu`. This
@@ -283,7 +345,13 @@ would for Escape.
 5. **A synchronous policy guard is `===` against a literal.** A bare event field
    (`event.shiftKey`) is not a condition the policy can carry, which is what
    flattened the context-key guard.
-6. **`@if` and `@for` cannot be direct children of a component tag**, and a
+6. **The gesture that WAKES a served page cannot also be measured for where it
+   left focus.** The handler runs after the demand load, and the focus it asks
+   for inside that first dispatch is refused and not replayed. Two rows warm the
+   page with one open/close before measuring the opening focus, and say so. No
+   frame polling anywhere in the family: the reveal-then-focus that every other
+   family retries per frame lands on the first call here, in both render modes.
+7. **`@if` and `@for` cannot be direct children of a component tag**, and a
    widget-rooting part inside a _flipping_ `@if` arm is
    `MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED`. "This item appears only when signed
    in" is the everyday menu, and it is a framework wall this family sits closer
@@ -291,30 +359,43 @@ would for Escape.
 
 ## Divergences from the references, with mappings
 
-| Reference                                                                                     | Ours                                                         | Why                                                                                   |
-| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| Base UI: ~20 menu parts plus 2 context-menu parts                                             | 6                                                            | `portal`, `positioner`, `viewport`, `arrow`, `group` are explicitly not roles in SPEC |
-| React Aria `trigger: 'press' \| 'longPress' \| 'contextMenu'`                                 | two parts                                                    | SPEC: no mode/role/type enum props                                                    |
-| React Aria `onAction` + `onSelectionChange`; Base UI `onCheckedChange`; Radix `onValueChange` | one `onChange(value)`                                        | SPEC's primary-callback rule                                                          |
-| Radix `preventDefault`s Tab; Base UI and React Aria trap in a focus scope                     | Tab closes and keeps its native move                         | the APG says so, and the surface is neither portalled nor trapped, so it is free      |
-| Radix and Base UI default `modal = true`                                                      | never modal                                                  | modality is derived from `aria-modal`, which a menu never writes                      |
-| The safe polygon, three ways                                                                  | pointer handlers scoped to the nested root plus `closeDelay` | all three measure boxes and install document listeners                                |
-| Zag's `aria-activedescendant`                                                                 | roving DOM focus                                             | the attribute is deliberately absent from `IDREF_ATTRIBUTES`                          |
-| `Separator` / `Group` / `GroupLabel` parts                                                    | consumer markup                                              | not roles in SPEC; no behaviour to own                                                |
-| Radix `data-highlighted`, `data-state`                                                        | `ui-open`, `ui-checked`, `ui-disabled`, `ui-side`            | SPEC's `ui-*` rule                                                                    |
-| Base UI `LONG_PRESS_DELAY = 500`                                                              | 500                                                          | the packet's ruling; Radix and Kobalte use 700                                        |
-| Base UI drops `aria-expanded` on a submenu under VoiceOver                                    | kept always                                                  | we cannot sniff the reader and would not; recorded as an inherited VoiceOver defect   |
-| Radix `onCloseAutoFocus`, `onEntryFocus`, `onEscapeKeyDown`, and three more                   | one `onDismiss`, forwarded                                   | one primitive event; SPEC has no name for the others                                  |
-| Radix and React Aria portal to `document.body`                                                | never portalled                                              | the library's standing rule, and what makes the two rows above free                   |
+| Reference                                                                                     | Ours                                                       | Why                                                                                   |
+| --------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Base UI: ~20 menu parts plus 2 context-menu parts                                             | 6                                                          | `portal`, `positioner`, `viewport`, `arrow`, `group` are explicitly not roles in SPEC |
+| Radix `SubTrigger` / `SubContent`; Base UI `SubmenuRoot`                                      | `menu.item` with `submenu`, holding `menu.itemcontent`     | SPEC: a family that nests recurses with the same parts, no `sub*` prefix, one root    |
+| React Aria `trigger: 'press' \| 'longPress' \| 'contextMenu'`                                 | two parts                                                  | SPEC: no mode/role/type enum props                                                    |
+| React Aria `onAction` + `onSelectionChange`; Base UI `onCheckedChange`; Radix `onValueChange` | one `onChange(value)`                                      | SPEC's primary-callback rule                                                          |
+| Radix `preventDefault`s Tab; Base UI and React Aria trap in a focus scope                     | Tab closes and keeps its native move                       | the APG says so, and the surface is neither portalled nor trapped, so it is free      |
+| Radix and Base UI default `modal = true`                                                      | never modal                                                | modality is derived from `aria-modal`, which a menu never writes                      |
+| The safe polygon, three ways                                                                  | the submenu is inside its item, plus `closeDelay`          | crossing into your own child is not a leave; all three references measure boxes       |
+| React Aria's `submenuLevel`, Base UI's floating tree                                          | one item instance per item, depth is only markup depth     | tree's `treeItemState` precedent; measured to three levels                            |
+| Zag's `aria-activedescendant`                                                                 | roving DOM focus                                           | the attribute is deliberately absent from `IDREF_ATTRIBUTES`                          |
+| `Separator` / `Group` / `GroupLabel` parts                                                    | consumer markup                                            | not roles in SPEC; no behaviour to own                                                |
+| Radix `data-highlighted`, `data-state`                                                        | `ui-open`, `ui-checked`, `ui-disabled`, `ui-side`          | SPEC's `ui-*` rule                                                                    |
+| Base UI `LONG_PRESS_DELAY = 500`                                                              | 500                                                        | the packet's ruling; Radix and Kobalte use 700                                        |
+| Base UI drops `aria-expanded` on a submenu under VoiceOver                                    | kept always                                                | we cannot sniff the reader and would not; recorded as an inherited VoiceOver defect   |
+| Radix `onCloseAutoFocus`, `onEntryFocus`, `onEscapeKeyDown`, and three more                   | one `onDismiss`, forwarded                                 | one primitive event; SPEC has no name for the others                                  |
+| Radix and React Aria portal to `document.body`                                                | never portalled                                            | the library's standing rule, and what makes the two rows above free                   |
 
 ## Lanes
 
 `menu.browser.ts` runs every row in a CSR and an SSR mode loop, including the
-four axe rows (`wcag2a` + `wcag21a`, no exemptions, on a closed menu, an open
-menu, checkbox and radio menus, an open submenu and an open context menu).
-`menu.sr.ts` is the virtual reader. `menu-transcript.ts` is the reader-agnostic
+six axe rows (`wcag2a` + `wcag21a`, no exemptions, on a closed menu, an open
+menu, checkbox and radio menus, an open submenu, three open levels and an open
+context menu). Four of those six are zero; the two submenu ones are pinned to
+the one `aria-valid-attr-value` violation described above, so the pin fails the
+moment that framework behaviour changes in either direction.
+
+`menu.sr.ts` is the virtual reader, and covers the nesting item announcing its
+popup and expanded state, the submenu announcing itself under that item's name,
+and Escape returning to the item. `menu-transcript.ts` is the reader-agnostic
 transcript that `menu.nvda.ts` and `menu.voiceover.ts` run against real readers
 on the sr-gallery page - **which does not have a menu section yet**: adding it,
 along with the `menu` and `menuitem` words in the shared `Vocabulary` and the
 `FAMILY_ANCHORS` entry the transcript names locally in the meantime, belongs to
-the unit that registers this family.
+the unit that registers this family. The real-reader lanes are never run
+locally; CI only.
+
+`api/**` and the gallery still carry `menu.itemtrigger`. Re-extracting the API
+manifest after this drop, and moving the gallery section onto the new markup,
+are the follow-up unit's.

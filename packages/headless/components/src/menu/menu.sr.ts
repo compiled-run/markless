@@ -154,17 +154,22 @@ test('a radio item conveys the radio role and which one is chosen', async () => 
 	expectConveys(await readFor(['Date']), ['Date', say.menuitemradio, say.notChecked]);
 });
 
-test('a submenu trigger conveys that it has a menu, and that the menu is not open', async () => {
+test('a nesting item conveys that it is a menu item holding a menu, and that the menu is not open', async () => {
 	await readOpened(Submenu);
-	expectConveys(await readFor(['Share']), ['Share', say.menuitem, say.collapsed]);
+	expectConveys(await readFor(['Share']), [
+		'Share',
+		say.menuitem,
+		say.haspopup,
+		say.collapsed,
+	]);
 });
 
 test('opening a submenu flips its trigger to expanded and its items are conveyed', async () => {
 	const { container } = await render(Submenu);
 	el('trigger').click();
 	await expect.poll(() => el('content').hasAttribute('hidden'), { timeout: 5000 }).toBe(false);
-	el('sub-trigger').focus();
-	el('sub-trigger').dispatchEvent(
+	el('sub-item').focus();
+	el('sub-item').dispatchEvent(
 		new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }),
 	);
 	await expect
@@ -173,5 +178,43 @@ test('opening a submenu flips its trigger to expanded and its items are conveyed
 	await sr.start(container as unknown as HTMLElement);
 
 	expectConveys(await readFor(['Share']), ['Share', say.expanded]);
+	// Entering the submenu announces the surface under the name of the item that opened it.
+	expectConveys(await readFor([say.menu, 'Share']), [say.menu, 'Share']);
 	expectConveys(await readFor(['Email']), ['Email', say.menuitem]);
+});
+
+test('the submenu is a menu named by its own item, and its item is the one that carries the popup', async () => {
+	const { container } = await render(Submenu);
+	el('trigger').click();
+	await expect.poll(() => el('content').hasAttribute('hidden'), { timeout: 5000 }).toBe(false);
+	el('sub-item').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+	await expect
+		.poll(() => el('sub-content').hasAttribute('hidden'), { timeout: 5000 })
+		.toBe(false);
+	await sr.start(container as unknown as HTMLElement);
+
+	expect(el('sub-content').getAttribute('role')).toBe('menu');
+	expect(el('sub-content').getAttribute('aria-labelledby')).toBe(el('sub-item').id);
+	expect(el('sub-item').getAttribute('aria-haspopup')).toBe('menu');
+	// A plain command in the same menu carries neither, so the popup is the nesting item's alone.
+	expect(el('item-new').hasAttribute('aria-haspopup')).toBe(false);
+	expect(el('item-new').hasAttribute('aria-expanded')).toBe(false);
+});
+
+test('Escape in a submenu returns to the item that opened it, which conveys the menu closed again', async () => {
+	const { container } = await render(Submenu);
+	el('trigger').click();
+	await expect.poll(() => el('content').hasAttribute('hidden'), { timeout: 5000 }).toBe(false);
+	el('sub-item').focus();
+	el('sub-item').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+	await expect
+		.poll(() => el('sub-content').hasAttribute('hidden'), { timeout: 5000 })
+		.toBe(false);
+
+	document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+	await expect.poll(() => el('sub-content').hasAttribute('hidden'), { timeout: 5000 }).toBe(true);
+	await expect.poll(() => document.activeElement, { timeout: 5000 }).toBe(el('sub-item'));
+	await sr.start(container as unknown as HTMLElement);
+
+	expectConveys(await readFor(['Share']), ['Share', say.menuitem, say.collapsed]);
 });
