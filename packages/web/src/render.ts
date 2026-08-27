@@ -22,6 +22,8 @@ export type CsrRenderOutput = {
 	readonly liveHostNodes?: ReadonlyMap<string, ResumeDomElement>;
 	readonly loadSymbol?: ResumeRuntimeInput['loadSymbol'];
 	readonly loadBehaviorSymbol?: ResumeRuntimeInput['loadSymbol'];
+	// The page this output was rendered from, for a component row minted later.
+	readonly renderData?: ResumeRuntimeInput['renderData'];
 };
 
 export type CsrRenderArtifact = {

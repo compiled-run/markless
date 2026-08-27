@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as popover from '../index.ts';
+import { popover } from '../../index.ts';
 
 // Two popovers with their own consumer handlers. Each handler writes into page
 // state the page renders, so what the DOM shows is what the consumer's callback
