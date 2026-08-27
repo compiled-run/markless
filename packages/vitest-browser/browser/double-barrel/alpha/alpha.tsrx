@@ -1,6 +1,15 @@
 import { shared, state } from '@markless/core';
 
-export const alphaState = shared(() => state({ tone: 'plain' }), { scope: 'widget' });
+// A `shared()` factory that returns `state(...)` itself leaves this family's
+// attribute residue reading an unbound local, so the ratified wrapper-object
+// shape is what this witness pins the barrel behaviour on.
+export const alphaState = shared(
+	() => {
+		const tones = state({ tone: 'plain' });
+		return { ...tones, mark() { tones.tone = 'marked'; } };
+	},
+	{ scope: 'widget' },
+);
 
 export function AlphaRoot({ children }) @{
 	const alpha = alphaState();
