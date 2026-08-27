@@ -9,6 +9,7 @@ import {
 	sharedInstanceVisibleFrom,
 } from '../semantic-graph/collect-shared.ts';
 import { splitStaticGraphPath } from '../../artifact-helpers/graph-paths.ts';
+import { jsonSourceWithNonFiniteNumbers } from './non-finite-json.ts';
 import { sharedInstancePreludeLines } from './residue-reader.ts';
 import type { PublicRenderRoot } from './types.ts';
 
@@ -288,7 +289,7 @@ function stateDeclarationLine(
 		return null;
 	const initializerSource =
 		(binding as GraphBinding & { readonly initializerSource?: string }).initializerSource ??
-		(binding.storage ? JSON.stringify(binding.initialValue) : undefined);
+		(binding.storage ? jsonSourceWithNonFiniteNumbers(binding.initialValue) : undefined);
 	const args = [
 		stateValuesName,
 		statePayloadName,
