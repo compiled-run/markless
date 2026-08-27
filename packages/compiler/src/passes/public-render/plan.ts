@@ -1,17 +1,11 @@
 import { parseModule } from '../../js-ast.ts';
 import { childNodes, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { getElementTagName, isHostTagName } from '../../ast/tsrx.ts';
-import { parseJavaScriptModule } from '../../js-ast.ts';
 import type {
-	PlannedSymbol,
 	PublicRenderPlanArtifact,
 	PublicRenderPlanInput,
-	SemanticGraphArtifact,
-	SemanticSyncPolicy,
-	SemanticSyncPolicyAction,
 } from '../../artifacts.ts';
-import { extractedSyncPolicyActionCalls } from '../semantic-graph/collect-sync-policy.ts';
-import { collectStyleScopes } from './style-scopes.ts';
+import { collectModuleStyleScopes } from './style-scopes.ts';
 import { collectAsyncBoundaryNodes } from './async-boundaries.ts';
 import { resolveBoundaryRunners } from './boundary-runner.ts';
 import { gatePlanDisagreementDiagnostic, tryBlockToggleRerenderDiagnostic } from './diagnostics.ts';
@@ -26,6 +20,7 @@ import {
 	emptyPlan,
 	sameModuleChildBoundaryDiagnostics,
 } from './validation.ts';
+import { collectKeyedRepeatRowMintDiagnostics } from './row-mint-diagnostics.ts';
 import { selectPublicRenderRoot } from './template.ts';
 
 // The compatibility plan now owns only fail-closed diagnostics and style
@@ -48,7 +43,6 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 	const selectedRoot = selectPublicRenderRoot(ast);
 	if (!selectedRoot) return emptyPlan(componentRootDiagnostics(ast, input.source.filename));
 
-	stripExtractedSyncPolicyCalls(input.symbolResolver.symbols, input.semanticGraph);
 	const repeatBindingConflictDiagnostics = collectRepeatBindingConflictDiagnostics({
 		// Module-wide, because the emitted row prelude is built from the module's
 		// whole keyed-repeat list rather than one component's slice of it.
@@ -73,7 +67,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 		return emptyPlan(undeclaredTemplateReadDiagnostics);
 	}
 
-	const styles = collectStyleScopes(selectedRoot.root, input.source.filename);
+	const styles = collectModuleStyleScopes(ast, input.source.filename);
 	const boundaryNodes = collectAsyncBoundaryNodes(selectedRoot.root);
 	const boundaryRunners = resolveBoundaryRunners(input.semanticGraph);
 	const boundaryRunnerDiagnostics = input.semanticGraph.asyncBoundaries.flatMap(
@@ -128,6 +122,15 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 			}),
 		];
 	});
+	const rowMintDiagnostics = collectKeyedRepeatRowMintDiagnostics({
+		root: ast,
+		semanticGraph: input.semanticGraph,
+		filename: input.source.filename,
+		source: input.source.source,
+		...(input.source.importedModuleInterfaces
+			? { importedModuleInterfaces: input.source.importedModuleInterfaces }
+			: {}),
+	});
 	return {
 		passId: 'public-render-plan',
 		styleScopes: styles.styleScopes,
@@ -142,6 +145,7 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 			...collectChildrenOpacityDiagnostics(ast, input.source.filename),
 			...boundaryRunnerDiagnostics,
 			...armEscalationDiagnostics,
+			...rowMintDiagnostics,
 		],
 	};
 }
@@ -156,98 +160,6 @@ function firstComponentName(node: AnyNode): string | null {
 		if (found) return found;
 	}
 	return null;
-}
-
-function stripExtractedSyncPolicyCalls(
-	symbols: ReadonlyArray<PlannedSymbol>,
-	semanticGraph: SemanticGraphArtifact,
-): void {
-	for (const event of semanticGraph.events) {
-		if (!event.syncPolicy) continue;
-		const actions = syncPolicyActionSet(event.syncPolicy);
-		if (actions.size === 0) continue;
-		for (const symbol of symbols) {
-			if (
-				symbol.kind !== 'event-handler' ||
-				symbol.hostNodeId !== event.hostNodeId ||
-				symbol.eventName !== event.eventName
-			)
-				continue;
-			const stripped = stripSyncPolicyCallsFromHandlerSource(
-				symbol.source,
-				symbol.parameters[0] ?? 'event',
-				actions,
-				semanticGraph,
-			);
-			if (stripped !== symbol.source) (symbol as { source: string }).source = stripped;
-		}
-	}
-}
-
-function syncPolicyActionSet(policy: SemanticSyncPolicy): ReadonlySet<SemanticSyncPolicyAction> {
-	const actions = new Set<SemanticSyncPolicyAction>();
-	const branches = 'branches' in policy ? policy.branches : [policy];
-	for (const branch of branches) for (const action of branch.actions) actions.add(action);
-	return actions;
-}
-
-function stripSyncPolicyCallsFromHandlerSource(
-	source: string,
-	eventParam: string,
-	actions: ReadonlySet<SemanticSyncPolicyAction>,
-	semanticGraph: SemanticGraphArtifact,
-): string {
-	const prefix = 'const __marklessHandler = ';
-	const wrappedSource = `${prefix}${source};`;
-	let handler: AnyNode | undefined;
-	try {
-		const ast = parseJavaScriptModule(wrappedSource, 'markless-handler.js') as AnyNode;
-		walkNode(ast, (node) => {
-			if (
-				!handler &&
-				(node.type === 'ArrowFunctionExpression' ||
-					node.type === 'FunctionExpression' ||
-					node.type === 'FunctionDeclaration')
-			)
-				handler = node;
-		});
-	} catch {
-		return source;
-	}
-	const body = handler?.body as AnyNode | undefined;
-	const replacements = extractedSyncPolicyActionCalls(body, eventParam, actions, {
-		graph: semanticGraph as never,
-		source: wrappedSource,
-	})
-		.flatMap((node) =>
-			removableCallSpan(
-				source,
-				(node.start ?? 0) - prefix.length,
-				(node.end ?? 0) - prefix.length,
-			),
-		)
-		.sort((left, right) => right.start - left.start);
-	let stripped = source;
-	for (const replacement of replacements) {
-		stripped = stripped.slice(0, replacement.start) + stripped.slice(replacement.end);
-	}
-	return stripped;
-}
-
-function removableCallSpan(
-	source: string,
-	start: number,
-	end: number,
-): Array<{ readonly start: number; readonly end: number }> {
-	if (start < 0 || end <= start || end > source.length) return [];
-	let removeEnd = end;
-	while (source[removeEnd] === ' ' || source[removeEnd] === '\t') removeEnd++;
-	if (source[removeEnd] === ';') removeEnd++;
-	const lineStart = source.lastIndexOf('\n', start - 1) + 1;
-	if (/^[\t ]*$/.test(source.slice(lineStart, start)) && source[removeEnd] === '\n') {
-		return [{ start: lineStart, end: removeEnd + 1 }];
-	}
-	return [{ start, end: removeEnd }];
 }
 
 export { firstComponentRoot, selectPublicRenderRoot } from './template.ts';

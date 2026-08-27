@@ -5,12 +5,15 @@ import type {
 	InlineResumerSourceVariants,
 	PrerenderBootArtifact,
 } from '@markless/web/inline/resumer';
+import { MARKLESS_COMPONENT_PART_BRAND } from '@markless/web/render-to-string';
 import type { StorageSeedMetadata } from '@markless/serializer';
 import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
 
 export const MARKLESS_VIRTUAL_PREFIX = 'virtual:markless:';
 
-const SMALL_SYMBOL_DIRECT_LOAD_LIMIT = 8;
+// At or below this count the loader spells one literal `import()` per symbol, so
+// those symbol modules are dynamic-import roots and cannot be coalesced.
+export const SMALL_SYMBOL_DIRECT_LOAD_LIMIT = 8;
 
 export type SourceSymbolRow = {
 	readonly id: string;
@@ -252,6 +255,7 @@ export function emitSourceModule(input: {
 	/** Whether the app's serialized state defines computed nodes. */
 	readonly hasComputedState?: boolean;
 	readonly hasOverlayMarks?: boolean;
+	readonly runtimeDemandMap?: unknown;
 }) {
 	if (input.directCsr && input.prerenderRecords) input = { ...input, prerenderRecords: false };
 	const symbolsOnly = input.environment === 'client' && input.clientOutput === 'symbols-only';
@@ -314,6 +318,15 @@ export function emitSourceModule(input: {
 		// has to name the behaviour here or it would never install.
 		input.environment === 'client' && input.hasOverlayMarks === true
 			? emitOverlayLoaderInstall()
+			: null,
+		// And the same split again for the component-row mint. A CSR mount reaches
+		// the resume runtime through THIS module and never evaluates a resume
+		// module, so without the loader here its rows silently never build in
+		// production - dev only worked because the dev-only resume re-export below
+		// dragged the resume module in. The line is page-agnostic, so installing it
+		// twice on a resumed page is the same assignment, not a second page's.
+		input.environment === 'client' && demandsRowComponentMint(input.runtimeDemandMap)
+			? emitRowComponentMintLoaderInstall()
 			: null,
 		'',
 		emitLoadSymbol(input),
@@ -468,7 +481,7 @@ function emitOverlayLoaderInstall(): string {
  * global and refuses to build without one.
  */
 function emitRowMintLoaderInstall(): string {
-	return "globalThis.__marklessRowMint = () => import('@markless/web/fns/row-mint');";
+	return "globalThis.__marklessRowMint ??= () => import('@markless/web/fns/row-mint');";
 }
 
 /**
@@ -495,7 +508,61 @@ function demandsRowMint(runtimeDemandMap: unknown): boolean {
 	);
 }
 
+/**
+ * The component-rooted mint, which also needs this page's render-data surface.
+ *
+ * It answers the SAME global as the template mint, whose builders it re-exports:
+ * the repeat runtime carries no second loader, so a page with no component row
+ * ships not one byte of this path. Nothing page-specific is written here - every
+ * page emits this same line - because one document can hold two page modules and
+ * the last one evaluated owns the global. The surface travels on the runtime
+ * input instead and arrives as the loader's first argument.
+ */
+function emitRowComponentMintLoaderInstall(): string {
+	return [
+		'globalThis.__marklessRowMint = (...input) =>',
+		"\timport('@markless/web/fns/row-component-mint').then((mint) =>",
+		'\t\tmint.marklessRowComponentMint(...input),',
+		'\t);',
+	].join('\n');
+}
+
+// Fail closed: without a canonical render-data module there is no surface to
+// render a row against, so naming the bridge would only fetch a dead chunk.
+function componentRowLoader(input: {
+	readonly renderDataId?: string;
+	readonly runtimeDemandMap?: unknown;
+}): string | undefined {
+	return input.renderDataId && demandsRowComponentMint(input.runtimeDemandMap)
+		? emitRowComponentMintLoaderInstall()
+		: undefined;
+}
+
+/**
+ * True when the compiler folded the component mint into a keyed-repeat record -
+ * which it does exactly for a record carrying `rowComponent`.
+ */
+function demandsRowComponentMint(runtimeDemandMap: unknown): boolean {
+	const records = (
+		runtimeDemandMap as {
+			readonly payloadRecords?: ReadonlyArray<{
+				readonly kind?: string;
+				readonly runtimeModuleIds?: ReadonlyArray<string>;
+			}>;
+		}
+	)?.payloadRecords;
+	return (
+		Array.isArray(records) &&
+		records.some(
+			(record) =>
+				record.kind === 'keyed-repeat' &&
+				record.runtimeModuleIds?.includes(ROW_COMPONENT_MINT_RUNTIME_MODULE_ID) === true,
+		)
+	);
+}
+
 const ROW_MINT_RUNTIME_MODULE_ID = 'web/fns/row-mint';
+const ROW_COMPONENT_MINT_RUNTIME_MODULE_ID = 'web/fns/row-component-mint';
 
 /** True when the compiler recorded an `overlay` mark for this module. */
 function demandsOverlay(runtimeDemandMap: unknown): boolean {
@@ -523,6 +590,10 @@ export function emitResumeModule(input: {
 	// their document bytes and no execution.
 	readonly boundSymbolDescriptors?: BoundSymbolDescriptorMap;
 	readonly prerenderDataId?: string;
+	// The page's canonical render-data module, for the component-row mint alone.
+	// `prerenderDataId` is gated on prerendered records, so a plain resumed page
+	// has none - and a component row still has to reach the surface.
+	readonly renderDataId?: string;
 	readonly installResumeSummary?: boolean;
 	// The wake variant serves pages whose container carries no payload
 	// scripts; lean routes read the payload document and must never emit.
@@ -561,6 +632,7 @@ export function emitResumeModule(input: {
 			input.executionLog !== 'never',
 			input.prerenderDataId,
 			stagedPrerender,
+			componentRowLoader(input) ? input.renderDataId : undefined,
 		),
 	);
 	return [
@@ -598,7 +670,10 @@ export function emitResumeModule(input: {
 		// `rowTemplate` nor `emptyArm` never emits its chunk. The loader stays
 		// unresolved until a repeat that can build actually wires, so having a
 		// mintable repeat somewhere is still not fetching it.
-		demandsRowMint(input.runtimeDemandMap) ? emitRowMintLoaderInstall() : null,
+		// One global, so a page whose rows are components installs the bridge that
+		// re-exports the template mint instead of a second loader beside it.
+		componentRowLoader(input) ??
+			(demandsRowMint(input.runtimeDemandMap) ? emitRowMintLoaderInstall() : null),
 		scalarSpecializations.length > 0
 			? [
 					"import { marklessDecodeScalarCell, marklessReadScalarCell, marklessScalarSpecializedError } from '@markless/web/fns/scalar-specialized';",
@@ -883,9 +958,10 @@ const RESERVED_MODULE_BINDINGS: ReadonlySet<string> = new Set([
  * `renderSsr` - because both consumers reach it by that one name: `render(Gallery,
  * { target })` reads the surface (`renderCsr`/`renderData`/`loadSymbol`), while a
  * barrel re-export composed as a member tag reads the part. Every other component
- * is published as exactly the part `marklessSsrComponentPart` hands a composed
- * child, through the same access path, so a named import and a member tag reach
- * one object.
+ * is published as the part `marklessSsrComponentPart` hands a composed child,
+ * carrying nothing of the module surface. A part rendered AS A PAGE would
+ * therefore be served inert, so the export is branded and `renderSsrOutput`
+ * refuses it; composition reads the unbranded map entry and is untouched.
  */
 function emitComponentExports(input: {
 	readonly ssrComponents: ReadonlyArray<{
@@ -901,9 +977,12 @@ function emitComponentExports(input: {
 		}
 		const part = `marklessCompiledApp.renderSsrComponents[${JSON.stringify(component.exportName)}]`;
 		const isRoot = component.exportName === input.rootExportName;
+		const brand = `${MARKLESS_COMPONENT_PART_BRAND}: ${JSON.stringify(component.exportName)}`;
 		if (input.servesSsr) {
 			return `export const ${component.exportName} = ${
-				isRoot ? `{ ...marklessCompiledApp, renderSsr: ${part}.renderSsr }` : part
+				isRoot
+					? `{ ...marklessCompiledApp, renderSsr: ${part}.renderSsr }`
+					: `{ ...${part}, ${brand} }`
 			};`;
 		}
 		// SSR dropped (a client production CSR build): the surface carries the
@@ -913,7 +992,7 @@ function emitComponentExports(input: {
 		// inert instead, so composing or rendering it fails loudly.
 		return isRoot
 			? `export const ${component.exportName} = marklessCompiledApp;`
-			: `export const ${component.exportName} = { marklessCsrOnlyPart: ${JSON.stringify(component.exportName)} };`;
+			: `export const ${component.exportName} = { marklessCsrOnlyPart: ${JSON.stringify(component.exportName)}, ${brand} };`;
 	});
 }
 
@@ -927,10 +1006,16 @@ function emitResumeContainerEvent(
 	executionLogEnabled: boolean,
 	prerenderDataId?: string,
 	stagedPrerender = false,
+	componentRowRenderDataId?: string,
 ): string {
 	const resumeEntry = storageFreePayload
 		? '@markless/core/web/resume-storage-free'
 		: '@markless/core/web/resume';
+	// The page a component row is rendered against, handed to the resume runtime
+	// so the mint reads it off this container instead of off a shared global.
+	// Lazy: a page that never mints never fetches the render-data chunk.
+	const renderDataEntry = (indent: string, expression: string): ReadonlyArray<string> =>
+		componentRowRenderDataId ? [`${indent}renderData: () => ${expression},`] : [];
 	const fullResumeHandoff =
 		stagedPrerender && prerenderDataId
 			? [
@@ -953,6 +1038,7 @@ function emitResumeContainerEvent(
 					'\t\t\t\troot: handoff.root,',
 					`\t\t\t\tloadSymbol: ${loadSymbolName},`,
 					`\t\t\t\trenderAsyncBoundary: (boundaryId, status, graph) => renderPrerenderBoundary(marklessPrerenderData, boundaryId, status, graph, ${loadSymbolName}),`,
+					...renderDataEntry('\t\t\t\t', 'marklessPrerenderData'),
 					'\t\t\t})).runtime;',
 					'\t\t})();',
 					'\t\tconst marklessFullRuntime = await handoff.root.__marklessFullResumeRuntime;',
@@ -972,15 +1058,20 @@ function emitResumeContainerEvent(
 						'async function marklessFullResumeHandoff(handoff) {',
 						'\thandoff.root.__marklessLinkedRenderDataBoot = true;',
 						'\thandoff.root.__asyncResumeRuntimeStarted = true;',
-						"\tconst { derivePrerenderResumeRecords, mergePrerenderPayloadRecords, renderPrerenderBoundary, resumeFromPrerenderRecords } = await import('@markless/web/fns/prerender-resume');",
-						`\tconst records = await derivePrerenderResumeRecords(marklessPrerenderData, ${loadSymbolName});`,
-						'\tconst mergedRecords = mergePrerenderPayloadRecords(records, handoff.root);',
-						'\tconst { runtime } = await resumeFromPrerenderRecords({',
-						'\t\t...mergedRecords,',
-						'\t\troot: handoff.root,',
-						`\t\tloadSymbol: ${loadSymbolName},`,
-						`\t\trenderAsyncBoundary: (boundaryId, status, graph) => renderPrerenderBoundary(marklessPrerenderData, boundaryId, status, graph, ${loadSymbolName}),`,
-						'\t});',
+						// One runtime per container: this runs on EVERY event, so an
+						// uncached body re-derives the whole render-data surface each time.
+						'\tconst runtime = await (handoff.root.__marklessFullResumeRuntime ??= (async () => {',
+						"\t\tconst { derivePrerenderResumeRecords, mergePrerenderPayloadRecords, renderPrerenderBoundary, resumeFromPrerenderRecords } = await import('@markless/web/fns/prerender-resume');",
+						`\t\tconst records = await derivePrerenderResumeRecords(marklessPrerenderData, ${loadSymbolName});`,
+						'\t\tconst mergedRecords = mergePrerenderPayloadRecords(records, handoff.root);',
+						'\t\treturn (await resumeFromPrerenderRecords({',
+						'\t\t\t...mergedRecords,',
+						'\t\t\troot: handoff.root,',
+						`\t\t\tloadSymbol: ${loadSymbolName},`,
+						`\t\t\trenderAsyncBoundary: (boundaryId, status, graph) => renderPrerenderBoundary(marklessPrerenderData, boundaryId, status, graph, ${loadSymbolName}),`,
+						...renderDataEntry('\t\t\t', 'marklessPrerenderData'),
+						'\t\t})).runtime;',
+						'\t})());',
 						'\tawait runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
 						'}',
 					].join('\n')
@@ -992,6 +1083,10 @@ function emitResumeContainerEvent(
 						'		document: handoff.document,',
 						'		root: handoff.root,',
 						`		loadSymbol: ${loadSymbolName},`,
+						...renderDataEntry(
+							'\t\t',
+							`import('${componentRowRenderDataId}').then((data) => data.marklessPrerenderData)`,
+						),
 						'	});',
 						'	await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });',
 						'}',
