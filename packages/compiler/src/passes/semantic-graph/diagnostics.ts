@@ -1061,11 +1061,11 @@ export function widgetRootIdrefElementHandleDiagnostic(
 	return semanticGraphDiagnostic({
 		code: 'MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT',
 		title: 'This shared() element() handle cannot be named by an IDREF here',
-		message: `Cannot resolve ${reference.attributeName}={${reference.source}} because "${reference.handleName}" is declared in a shared() factory that this component roots, or in a factory that is not { scope: 'widget' }.`,
-		why: 'A widget-scoped factory is one graph per rendered widget, so the minted id has to carry which widget it belongs to. That token is written when the widget root seeds the parts placed inside it, which happens after the root itself has started rendering and never happens at all for a page-wide factory.',
+		message: `Cannot resolve ${reference.attributeName}={${reference.source}} because "${reference.handleName}" is declared in a shared() factory that is not { scope: 'widget' }.`,
+		why: 'A widget-scoped factory is one graph per rendered widget, so the minted id has to carry which widget it belongs to. That token exists for every rendered widget, its root included, and never exists for a page-wide factory.',
 		span: reference.sourceSpan,
 		suggestion:
-			"Move the element() handle and both ends of the relationship into parts placed inside the widget root, and give the factory { scope: 'widget' }.",
+			"Give the factory { scope: 'widget' } and keep both ends of the relationship inside one rendered widget.",
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT',
 	});
 }

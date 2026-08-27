@@ -7,11 +7,11 @@ This shared() element() handle cannot be named by an IDREF here
 
 ## Message
 
-Cannot resolve …=\{…\} because "…" is declared in a shared() factory that this component roots, or in a factory that is not \{ scope: 'widget' \}.
+Cannot resolve …=\{…\} because "…" is declared in a shared() factory that is not \{ scope: 'widget' \}.
 
 ## Why
 
-A widget-scoped factory is one graph per rendered widget, so the minted id has to carry which widget it belongs to. That token is written when the widget root seeds the parts placed inside it, which happens after the root itself has started rendering and never happens at all for a page-wide factory.
+A widget-scoped factory is one graph per rendered widget, so the minted id has to carry which widget it belongs to. That token exists for every rendered widget, its root included, and never exists for a page-wide factory.
 
 ## Emitted from
 
