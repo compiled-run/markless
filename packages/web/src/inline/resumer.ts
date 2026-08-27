@@ -839,6 +839,7 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 			const tagged = slot as { readonly $type?: string; readonly value?: string };
 			if (tagged.$type === 'undefined') return undefined;
 			if (tagged.$type === 'bigint') return BigInt(tagged.value!);
+			if (tagged.$type === 'number') return Number(tagged.value!);
 			if (tagged.$type === 'date') return new Date(tagged.value!);
 			if (tagged.$type === 'regexp') {
 				const regexp = slot as { readonly source: string; readonly flags?: string };

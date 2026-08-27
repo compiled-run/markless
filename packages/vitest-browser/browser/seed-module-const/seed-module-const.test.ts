@@ -27,6 +27,10 @@ function factoryReadout(container: ParentNode) {
 	return one(container, '[data-gate-factory-readout]').textContent?.trim();
 }
 
+function headroomReadout(container: ParentNode) {
+	return one(container, '[data-gate-headroom-readout]').textContent?.trim();
+}
+
 // A derive resumes off the served cell, not off the render map, so the seed has
 // to be in the payload the page ships — not only in the HTML it printed.
 test('SSR: the served cell carries the seed the render evaluated', async () => {
@@ -37,6 +41,17 @@ test('SSR: the served cell carries the seed the render evaluated', async () => {
 	expect(state).toContain('["minWidth",1]');
 	expect(state).toContain('["width",3]');
 	expect(state).toContain('["x",2]');
+});
+
+// JSON has no form for a non-finite number, so the served cell carries the
+// serializer's tag; a bare slot printed the no-limit field as `null`.
+test('SSR: the served cell carries a non-finite seed as its tag', async () => {
+	const screen = await renderSSR(SeedModuleConstPage);
+	const container = screen.container as ParentNode;
+	const state = one(container, 'script[type="markless/state"]').textContent ?? '';
+
+	expect(state).toContain('["maxWidth",{"$type":"number","value":"Infinity"}]');
+	expect(state).not.toContain('["maxWidth",null]');
 });
 
 for (const mode of ['CSR', 'SSR'] as const) {
@@ -69,6 +84,19 @@ for (const mode of ['CSR', 'SSR'] as const) {
 		await expect.poll(() => attr(container, 'ui-width')).toBe('4');
 		await expect.poll(() => readout(container)).toBe('2-6');
 		await expect.poll(() => factoryReadout(container)).toBe('6');
+	});
+
+	test(`${mode}: a derive over the non-finite seed resumes non-finite`, async () => {
+		const screen =
+			mode === 'CSR' ? await render(SeedModuleConstPage) : await renderSSR(SeedModuleConstPage);
+		const container = screen.container as ParentNode;
+
+		expect(headroomReadout(container)).toBe('Infinity');
+		// The click is what forces the derive to re-run off the SERVED cell
+		// rather than off the render map the page printed from.
+		one(container, '[data-gate-trigger]').click();
+		await expect.poll(() => attr(container, 'ui-width')).toBe('4');
+		await expect.poll(() => headroomReadout(container)).toBe('Infinity');
 	});
 
 	test(`${mode}: a const-seeded field is writable from a part handler`, async () => {
