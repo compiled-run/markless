@@ -1,61 +1,78 @@
 /**
- * Moving the roving focus among a menu's items, and finding which menu an event
- * happened in.
+ * Moving the roving focus among one surface's items, and answering which level
+ * of a nested menu an event landed on.
  *
- * This family asks the DOM where `select` and `navbar` ask an `element()`
- * handle, and the reason is structural rather than a preference: a submenu is a
- * nested `menu.root`, so its parts belong to a DIFFERENT widget instance than
- * the menu it hangs off. No handle spans that boundary - a `menu.itemtrigger`
- * binds the submenu's handles, while the walk it takes part in belongs to the
- * menu above it - so the only thing both surfaces share is the document. The
- * roles are the family's own output, so reading them back is reading what this
- * module just wrote.
+ * Every question here is asked of the `element()` handles the family binds: the
+ * top surface, the plural roster of every `menu.itemcontent`, and the plural
+ * roster of every `menu.item`, all live and in document order. Nothing is looked
+ * up and nothing is walked to. `contains` is the one platform question asked,
+ * and only of a handle this family bound, about a node the platform handed over.
  */
 
-const ITEM_SELECTOR = '[role="menuitem"],[role="menuitemcheckbox"],[role="menuitemradio"]';
-const SURFACE_SELECTOR = '[role="menu"]';
+type Parts<Part extends HTMLElement> = ReadonlyArray<Part> | undefined;
 
 /** How long a typeahead buffer stays open, in milliseconds. Select's window, so a consumer using both meets one. */
 export const TYPEAHEAD_WINDOW = 750;
 
-/** The surface an event happened in: the nearest enclosing `role="menu"`. */
-export function surfaceOf(target: Node | null | undefined): HTMLElement | undefined {
-	const from =
-		target instanceof Element ? target : target instanceof Node ? target.parentElement : null;
-	return from?.closest<HTMLElement>(SURFACE_SELECTOR) ?? undefined;
-}
-
-/** The surface this one hangs off, or `undefined` for a menu that is nobody's submenu. */
-export function parentSurfaceOf(surface: HTMLElement | undefined): HTMLElement | undefined {
-	return surfaceOf(surface?.parentElement);
-}
-
 /**
- * One surface's own items, in document order. A submenu's items belong to the
- * submenu, and a `menu.itemtrigger` belongs to the menu it is written in, which
- * is what the nearest-surface test answers.
+ * Every surface of one menu, outermost first: `menu.content`, then every
+ * `menu.itemcontent` in document order, which puts a nested surface after the
+ * one holding it.
  */
-export function itemsOf(surface: HTMLElement | undefined): HTMLElement[] {
-	if (!surface) return [];
-	const items: HTMLElement[] = [];
-	for (const item of surface.querySelectorAll<HTMLElement>(ITEM_SELECTOR)) {
-		if (item.closest(SURFACE_SELECTOR) === surface) items.push(item);
-	}
-	return items;
+export function surfacesOf(
+	content: HTMLElement | undefined,
+	itemContents: Parts<HTMLElement>,
+): HTMLElement[] {
+	const all: HTMLElement[] = [];
+	if (content !== undefined) all.push(content);
+	for (const one of itemContents ?? []) all.push(one);
+	return all;
 }
 
-/**
- * Which item the event happened on: the DEEPEST holder, because a consumer may
- * put an icon or a span inside an item and the event lands on that.
- */
-export function itemAt(
-	surface: HTMLElement | undefined,
-	target: Node | null,
+/** The surface an event landed in: the DEEPEST one holding the target. */
+export function surfaceOf(
+	surfaces: readonly HTMLElement[],
+	target: Node | null | undefined,
 ): HTMLElement | undefined {
-	if (target === null) return undefined;
+	if (target === null || target === undefined) return undefined;
 	let found: HTMLElement | undefined;
-	for (const item of itemsOf(surface)) if (item.contains(target)) found = item;
+	for (const surface of surfaces) if (surface.contains(target)) found = surface;
 	return found;
+}
+
+/** Which item the event landed on: the DEEPEST holder, because a consumer may put an icon inside an item. */
+export function itemAt(
+	items: readonly HTMLElement[],
+	target: Node | null | undefined,
+): HTMLElement | undefined {
+	if (target === null || target === undefined) return undefined;
+	let found: HTMLElement | undefined;
+	for (const item of items) if (item.contains(target)) found = item;
+	return found;
+}
+
+/** One surface's OWN items: the ones no deeper surface holds. */
+export function ownItems(
+	surfaces: readonly HTMLElement[],
+	items: Parts<HTMLElement>,
+	surface: HTMLElement | undefined,
+): HTMLElement[] {
+	if (surface === undefined) return [];
+	const own: HTMLElement[] = [];
+	for (const item of items ?? [])
+		if (surface.contains(item) && surfaceOf(surfaces, item) === surface) own.push(item);
+	return own;
+}
+
+/** Every surface holding this node, innermost first. */
+export function surfacesHolding(
+	surfaces: readonly HTMLElement[],
+	node: Node | null | undefined,
+): HTMLElement[] {
+	if (node === null || node === undefined) return [];
+	const held: HTMLElement[] = [];
+	for (const surface of surfaces) if (surface.contains(node)) held.push(surface);
+	return held.reverse();
 }
 
 export type Step = 'next' | 'previous' | 'first' | 'last';
@@ -86,19 +103,16 @@ export function stepTo(
 }
 
 /**
- * An item's own words. A decoration marked `aria-hidden` is not part of them:
- * reading "Checked" out of an indicator would make that word typeable.
+ * An item's own words, for typeahead.
+ *
+ * A nesting item holds its whole submenu, so its text carries every command
+ * inside it too - and a decoration marked `aria-hidden` is in there as well. A
+ * match is `startsWith`, and both of those follow the item's own label rather
+ * than preceding it, so what answers is still the label. Subtracting them would
+ * mean walking child nodes, which this family may not do.
  */
 export function itemWords(item: HTMLElement): string {
-	let words = '';
-	for (const node of item.childNodes) {
-		const isDecoration =
-			node.nodeType === 1 && (node as Element).getAttribute('aria-hidden') === 'true';
-		const isNestedSurface = node.nodeType === 1 && (node as Element).matches(SURFACE_SELECTOR);
-		if (isDecoration || isNestedSurface) continue;
-		words += node.textContent ?? '';
-	}
-	return words.trim().toLowerCase();
+	return (item.textContent ?? '').trim().toLowerCase();
 }
 
 /** The first item whose own words start with `search`, looked for after `here` and wrapping. */
@@ -116,24 +130,6 @@ export function matchingItem(
 	return undefined;
 }
 
-/**
- * Land the roving focus on `wanted`.
- *
- * The surface is still `hidden` when the opening handler runs and nothing inside
- * a hidden subtree can take focus, so the landing is retried per frame. Select
- * measured a single frame landing the first open and racing later ones.
- */
-export function focusItem(wanted: HTMLElement | undefined): void {
-	if (!wanted) return;
-	let tries = 12;
-	const land = () => {
-		wanted.focus();
-		tries = tries - 1;
-		if (tries > 0 && document.activeElement !== wanted) requestAnimationFrame(land);
-	};
-	requestAnimationFrame(land);
-}
-
 /** Where a movement key lands among `items`, or `undefined` for a key that moves nothing. */
 export function walkTarget(
 	items: readonly HTMLElement[],
@@ -146,6 +142,18 @@ export function walkTarget(
 	if (key === 'ArrowDown') return stepTo(items, here, 'next', loop);
 	if (key === 'ArrowUp') return stepTo(items, here, 'previous', loop);
 	return undefined;
+}
+
+/**
+ * Land the roving focus on a surface's first or last item as it is revealed.
+ *
+ * One call, no retry: the runtime commits the `hidden` write the opening handler
+ * just made, so the item is focusable by the time this runs. A family that has
+ * to poll frames for that is reporting a runtime defect, not fixing one.
+ */
+export function focusEdge(items: readonly HTMLElement[], fromEnd: boolean): void {
+	const wanted = fromEnd ? items[items.length - 1] : items[0];
+	wanted?.focus();
 }
 
 /**
@@ -169,28 +177,25 @@ export function takeReturn(surface: HTMLElement): HTMLElement | undefined {
 	return back;
 }
 
-/** Land the roving focus on a surface's first or last item as it opens. */
-export function focusOpening(surface: HTMLElement | undefined, fromEnd: boolean): void {
-	const items = itemsOf(surface);
-	focusItem(fromEnd ? items[items.length - 1] : items[0]);
-}
-
 /**
- * Close every surface above this one, by reporting the same `dismiss` the
- * overlay primitive reports. Activating a command closes the whole menu, and a
- * submenu's item can only reach the menus above it through the document: each
- * of them is a separate widget instance with no handle into this one.
+ * Close the whole chain a node sits in, by reporting the same `dismiss` the
+ * overlay primitive reports, on each surface holding the node, innermost first.
+ *
+ * Every level answers for itself - a `menu.itemcontent` collapses its own item,
+ * `menu.content` closes the menu - and the outermost runs last, so focus ends on
+ * the control that opened the menu rather than on an intermediate item.
  */
-export function dismissAbove(surface: HTMLElement | undefined): void {
-	let above = parentSurfaceOf(surface);
-	while (above) {
-		above.dispatchEvent(
+export function dismissChain(
+	surfaces: readonly HTMLElement[],
+	node: Node | null | undefined,
+): void {
+	for (const surface of surfacesHolding(surfaces, node)) {
+		surface.dispatchEvent(
 			new CustomEvent('dismiss', {
 				bubbles: false,
 				cancelable: true,
 				detail: { reason: 'escape' },
 			}),
 		);
-		above = parentSurfaceOf(above);
 	}
 }

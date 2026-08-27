@@ -5,7 +5,7 @@ import { nvdaSpec } from '../../test-support/vocabularies.ts';
 import { MENU_SECTION, readMenuTranscript } from './menu-transcript.ts';
 
 nvdaTest(
-	'NVDA conveys the trigger as a button holding a menu, follows the roving focus through the items, and reports the surface going',
+	'NVDA conveys the trigger as a button holding a menu, follows the roving focus through the items, opens the submenu the nesting item holds, and reports each level going',
 	async ({ page, nvda }) => {
 		await page.goto(`${PREVIEW_ORIGIN}${MENU_SECTION}`);
 		await page.waitForFunction(() => document.documentElement.dataset.galleryReady === 'true');

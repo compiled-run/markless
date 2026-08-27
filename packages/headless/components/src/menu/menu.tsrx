@@ -2,13 +2,14 @@ import { computed, element, shared, state } from '@markless/core';
 import { surfaceStyle } from './menu-anchor.ts';
 import {
 	TYPEAHEAD_WINDOW,
-	dismissAbove,
-	focusOpening,
+	dismissChain,
+	focusEdge,
 	itemAt,
-	itemsOf,
 	matchingItem,
+	ownItems,
 	rememberReturn,
 	surfaceOf,
+	surfacesOf,
 	takeReturn,
 	walkTarget,
 } from './menu-walk.ts';
@@ -16,8 +17,9 @@ import type {
 	MenuContentProps,
 	MenuContextareaProps,
 	MenuInstanceState,
+	MenuItemContentProps,
+	MenuItemInstanceState,
 	MenuItemProps,
-	MenuItemTriggerProps,
 	MenuRootProps,
 	MenuSide,
 	MenuTriggerProps,
@@ -26,6 +28,7 @@ import type {
 // Every preventDefault guard reads event fields alone, so it decides before the handler symbol loads.
 // Walks start at `event.target`: a lazily loaded handler has no `currentTarget`.
 // One computed() cell per comparison - a comparison written inline in an attribute renders once and then goes stale.
+// A gesture inside a submenu bubbles through every item and surface above it, so each handler first asks whether the target is in ITS OWN level and leaves the event alone when it is not; the surface that answered then stops it.
 
 /** How long a touch rests before the context menu opens, in milliseconds. */
 const LONG_PRESS = 500;
@@ -35,6 +38,13 @@ const LONG_PRESS_SLACK = 10;
 const KEYBOARD_GRACE = 300;
 /** How long a press that closed the surface keeps the click behind it from re-opening, in milliseconds. */
 const CLICK_GRACE = 300;
+
+// The scope class these <style> blocks compile against is per MODULE, so each
+// block's subject must be structurally unique across every part: the trigger is
+// the module's only plain button, an item the only element carrying a
+// `menuitem*` role, a surface the only kind carrying `ui-side`, and the root the
+// div that is left. `@layer markless` is what keeps these defaults losing to a
+// consumer's own unlayered rules without a specificity fight.
 
 export const menuState = shared(
 	() => {
@@ -51,11 +61,6 @@ export const menuState = shared(
 			typeaheadAt: 0,
 			checked: [] as readonly string[],
 			position: null as { readonly x: number; readonly y: number } | null,
-			byHover: false,
-			openTimer: 0,
-			closeTimer: 0,
-			restingUntil: 0,
-			closingUntil: 0,
 			pressTimer: 0,
 			pressX: 0,
 			pressY: 0,
@@ -63,20 +68,22 @@ export const menuState = shared(
 			graceUntil: 0,
 		});
 		const rootEl = element<HTMLDivElement>();
-		// Two openers, one of them per menu: a root menu has the button, a submenu has the itemtrigger. Which one answered is also what says whether this menu IS a submenu.
-		// Two handles for what is one opener per menu: binding one from both parts is refused at compile time, even though only ever one is rendered.
 		const triggerEl = element<HTMLButtonElement>();
-		const itemtriggerEl = element<HTMLButtonElement>();
 		const contentEl = element<HTMLDivElement>();
 		const contextEl = element<HTMLDivElement>();
+		// The two rosters every walk is asked of: every submenu surface and every
+		// item of this menu, at every depth, live and in document order.
+		const itemContentEls = element<HTMLDivElement[]>();
+		const itemEls = element<HTMLDivElement[]>();
 
 		return {
 			...menu,
 			rootEl,
 			triggerEl,
-			itemtriggerEl,
 			contentEl,
 			contextEl,
+			itemContentEls,
+			itemEls,
 			// literal function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
 			onOpenChange: undefined as ((open: boolean) => void) | undefined,
@@ -92,8 +99,15 @@ export const menuState = shared(
 				menu.focused = '';
 				menu.typeahead = '';
 				menu.position = null;
-				menu.byHover = false;
 				menu.onOpenChange?.(false);
+			},
+			rove(next = '') {
+				menu.focused = next;
+			},
+			// One method for the buffer and its clock: a shared method of arity two aborts the handler.
+			type(next = '') {
+				menu.typeahead = next;
+				menu.typeaheadAt = Date.now();
 			},
 			choose(next = '') {
 				menu.onChange?.(next);
@@ -113,7 +127,31 @@ export const menuState = shared(
 	{ scope: 'widget' },
 );
 
-// A submenu is a nested `menu.root`: its own instance, so its open state, roving focus and `onChange` are the submenu's.
+// Rooted by every `menu.item`, so an item written inside another item's submenu
+// gets an instance of its own. `menu.root` is declared first and is what seeds
+// `menuState`, which leaves an item an ordinary PART of the enclosing menu.
+export const menuItemState = shared(
+	() => {
+		const item: MenuItemInstanceState = state({
+			expanded: false,
+			value: '',
+			checkable: false,
+			disabled: false,
+			submenu: false,
+			byHover: false,
+			openTimer: 0,
+			closeTimer: 0,
+			restingUntil: 0,
+			closingUntil: 0,
+		});
+		const itemEl = element<HTMLDivElement>();
+		const itemContentEl = element<HTMLDivElement>();
+
+		return { ...item, itemEl, itemContentEl };
+	},
+	{ scope: 'widget' },
+);
+
 export function MenuRoot({
 	open = false,
 	checked = [],
@@ -126,7 +164,6 @@ export function MenuRoot({
 	onChange,
 	onOpenChange,
 	children,
-	onPointerout,
 	...rest
 }: MenuRootProps) @{
 	const menu = menuState();
@@ -141,45 +178,12 @@ export function MenuRoot({
 	menu.delay = delay;
 	menu.closeDelay = closeDelay;
 
-	// The pointer handler sits on the root, which wraps an itemtrigger and its own surface, so a move from a submenu's trigger into that submenu is never a leave.
 	<div
 		{...rest}
 		el={menu.rootEl}
 		ui-open={menu.open}
 		ui-closed={menu.open !== true}
 		ui-disabled={menu.disabled}
-		onPointerout={(event) => {
-			const box = menu.rootEl;
-			const went = event.relatedTarget as Node | null;
-			if (
-				menu.byHover !== true ||
-				box === undefined ||
-				(went !== null && box.contains(went) === true)
-			) {
-				onPointerout?.(event);
-				return;
-			}
-
-			window.clearTimeout(menu.openTimer);
-			menu.openTimer = 0;
-			menu.restingUntil = 0;
-			const now = Date.now();
-			const isElapsed =
-				menu.closeDelay <= 0 || (menu.closingUntil !== 0 && now >= menu.closingUntil);
-			if (isElapsed) {
-				menu.closeTimer = 0;
-				menu.closingUntil = 0;
-				menu.hide();
-			} else if (menu.closingUntil === 0) {
-				// The timer re-delivers the crossing rather than closing: shared reads are rewritten only at the handler's top level, so `menu.hide()` inside this closure is a ReferenceError.
-				const wait = menu.closeDelay;
-				menu.closingUntil = now + wait;
-				menu.closeTimer = window.setTimeout(() => {
-					box.dispatchEvent(new PointerEvent('pointerout', { bubbles: true }));
-				}, wait + 5);
-			}
-			onPointerout?.(event);
-		}}
 	>
 		<style>
 			@layer markless {
@@ -187,6 +191,13 @@ export function MenuRoot({
 				div:not([role]):not([ui-side]) {
 					anchor-scope: --ui-menu;
 					-webkit-touch-callout: none;
+				}
+				/* One anchor name for both surfaces. An item re-scopes it to its own
+				   subtree, so `--ui-menu` is the trigger for `menu.content` and the
+				   item itself for the `menu.itemcontent` written inside it. */
+				div[role^="menuitem"] {
+					anchor-name: --ui-menu;
+					anchor-scope: --ui-menu;
 				}
 			}
 		</style>
@@ -213,12 +224,15 @@ export function MenuTrigger({ children, onClick, onKeydown, ...rest }: MenuTrigg
 				onClick?.(event);
 				return;
 			}
+			const surfaces = surfacesOf(menu.contentEl, menu.itemContentEls);
 			const surface = menu.contentEl;
 			const wasOpen = menu.open === true;
 			if (wasOpen) menu.hide();
 			else menu.show();
 			// A click with no click count came from Enter or Space, which the APG opens focusing the first item; a mouse click leaves focus on the trigger.
-			if (wasOpen !== true && event.detail === 0) focusOpening(surface, false);
+			if (wasOpen !== true && event.detail === 0) {
+				focusEdge(ownItems(surfaces, menu.itemEls, surface), false);
+			}
 			onClick?.(event);
 		}}
 		onKeydown={(event) => {
@@ -239,10 +253,11 @@ export function MenuTrigger({ children, onClick, onKeydown, ...rest }: MenuTrigg
 				return;
 			}
 
+			const surfaces = surfacesOf(menu.contentEl, menu.itemContentEls);
 			const surface = menu.contentEl;
 			const isFromEnd = key === 'ArrowUp' || key === 'End';
 			menu.show();
-			focusOpening(surface, isFromEnd);
+			focusEdge(ownItems(surfaces, menu.itemEls, surface), isFromEnd);
 			onKeydown?.(event);
 		}}
 	>
@@ -283,12 +298,13 @@ export function MenuContextarea({
 				return;
 			}
 
+			const surfaces = surfacesOf(menu.contentEl, menu.itemContentEls);
 			const surface = menu.contentEl;
 			const held = document.activeElement;
 			if (surface !== undefined && held instanceof HTMLElement) rememberReturn(surface, held);
 			menu.position = { x: event.clientX, y: event.clientY };
 			menu.show();
-			focusOpening(surface, false);
+			focusEdge(ownItems(surfaces, menu.itemEls, surface), false);
 			onContextmenu?.(event);
 		}}
 		onKeydown={(event) => {
@@ -306,13 +322,14 @@ export function MenuContextarea({
 
 			const here = event.target as HTMLElement;
 			const box = here.getBoundingClientRect();
+			const surfaces = surfacesOf(menu.contentEl, menu.itemContentEls);
 			const surface = menu.contentEl;
 			if (surface !== undefined) rememberReturn(surface, here);
 			menu.keyboardAt = Date.now();
 			// A keyboard invocation has no pointer, so the surface goes to the middle of what is focused.
 			menu.position = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
 			menu.show();
-			focusOpening(surface, false);
+			focusEdge(ownItems(surfaces, menu.itemEls, surface), false);
 			onKeydown?.(event);
 		}}
 		onPointerdown={(event) => {
@@ -371,7 +388,7 @@ export function MenuContent({
 		style={placement}
 		overlay
 		role="menu"
-		aria-labelledby={[menu.triggerEl, menu.itemtriggerEl]}
+		aria-labelledby={menu.triggerEl}
 		hidden={menu.open !== true}
 		ui-open={menu.open}
 		ui-closed={menu.open !== true}
@@ -383,7 +400,7 @@ export function MenuContent({
 		}}
 		onDismiss={(event) => {
 			const surface = menu.contentEl;
-			const back = menu.triggerEl ?? menu.itemtriggerEl;
+			const back = menu.triggerEl;
 			// Read before the close: a hidden subtree cannot hold focus, so afterwards the answer is gone.
 			const isFocusInside = surface !== undefined && surface.contains(document.activeElement);
 			// `contains` rather than `===`: a consumer may put an icon inside the trigger, and the press lands on that.
@@ -402,7 +419,6 @@ export function MenuContent({
 			onDismiss?.(event);
 		}}
 		onKeydown={(event) => {
-			// The fallback walk, for a consumer's own focusable written inside the surface: an item's own handler shadows this one.
 			if (
 				event.key === 'ArrowDown' ||
 				event.key === 'ArrowUp' ||
@@ -412,11 +428,34 @@ export function MenuContent({
 				event.preventDefault();
 			}
 
-			const key = event.key;
 			const here = event.target as HTMLElement;
-			const surface = surfaceOf(here);
-			const next = walkTarget(itemsOf(surface), itemAt(surface, here), key, menu.loop === true);
-			next?.focus();
+			const surfaces = surfacesOf(menu.contentEl, menu.itemContentEls);
+			const mine = menu.contentEl;
+			// A key inside a submenu belongs to that submenu's own surface.
+			if (mine === undefined || surfaceOf(surfaces, here) !== mine) {
+				onKeydown?.(event);
+				return;
+			}
+
+			const key = event.key;
+			const items = ownItems(surfaces, menu.itemEls, mine);
+			const at = itemAt(items, here);
+			// Space is a typeahead character only while a buffer is live, so typing "save as" never activates "Save".
+			const isTypeaheadChar = key.length === 1 && (key !== ' ' || menu.typeahead !== '');
+			const isWalkKey = key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End';
+
+			if (isWalkKey) {
+				walkTarget(items, at, key, menu.loop === true)?.focus();
+			} else if (key === 'Tab') {
+				// The APG's rule, and free here: the surface is not portalled and not trapped, so Tab keeps its native move.
+				menu.hide();
+			} else if (isTypeaheadChar) {
+				const now = Date.now();
+				const isStale = now - menu.typeaheadAt > TYPEAHEAD_WINDOW;
+				const search = (isStale ? '' : menu.typeahead) + key.toLowerCase();
+				menu.type(search);
+				matchingItem(items, search, at)?.focus();
+			}
 			onKeydown?.(event);
 		}}
 	>
@@ -444,168 +483,281 @@ export function MenuItem({
 	value,
 	checked,
 	disabled = false,
+	submenu = false,
 	children,
 	onClick,
 	onFocusin,
+	onFocusout,
 	onKeydown,
 	onPointermove,
+	onPointerout,
+	onPointerover,
 	...rest
 }: MenuItemProps) @{
 	const menu = menuState();
-	// Own props only: a seed is built from this component's props, so the menu's own `disabled` is added at every read site.
-	const item = state({ value, checkable: checked !== undefined, disabled });
+	const item = menuItemState();
+	item.value = value;
+	item.checkable = checked !== undefined;
+	item.disabled = disabled;
+	item.submenu = submenu;
 	const isChecked = computed(() => menu.checked.includes(item.value));
 	const isLocked = computed(() => item.disabled || menu.disabled);
+	// A nesting item is a plain `menuitem` whatever the menu's selection mode is: what it does is open, not choose.
 	const itemRole = computed(() =>
-		menu.radio ? 'menuitemradio' : item.checkable ? 'menuitemcheckbox' : 'menuitem',
+		item.submenu ? 'menuitem' : menu.radio ? 'menuitemradio' : item.checkable ? 'menuitemcheckbox' : 'menuitem',
 	);
 	// `false` removes the attribute: a plain command carries no checked state at all.
 	const checkedMark = computed(() =>
-		menu.radio || item.checkable ? (menu.checked.includes(item.value) ? 'true' : 'false') : false,
+		item.submenu !== true && (menu.radio || item.checkable)
+			? menu.checked.includes(item.value)
+				? 'true'
+				: 'false'
+			: false,
+	);
+	const hasPopup = computed(() => (item.submenu ? 'menu' : false));
+	const isExpanded = computed(() =>
+		item.submenu ? (item.expanded ? 'true' : 'false') : false,
 	);
 
 	<div
 		{...rest}
+		el={[item.itemEl, menu.itemEls]}
 		role={itemRole}
 		tabindex={-1}
 		aria-checked={checkedMark}
+		aria-haspopup={hasPopup}
+		aria-expanded={isExpanded}
+		aria-controls={item.itemContentEl}
 		aria-disabled={isLocked ? 'true' : 'false'}
 		ui-checked={isChecked}
+		ui-open={item.expanded}
 		ui-disabled={isLocked}
 		onClick={(event) => {
+			const here = event.target as HTMLElement;
+			const panel = item.itemContentEl;
+			// A press inside this item's submenu belongs to the item it landed on.
+			if (panel !== undefined && panel.contains(here)) {
+				onClick?.(event);
+				return;
+			}
 			// The two cells, not the `isLocked` computed: a computed() read from a handler body does not guard.
 			if (item.disabled === true || menu.disabled === true) {
 				onClick?.(event);
 				return;
 			}
 
+			const surfaces = surfacesOf(menu.contentEl, menu.itemContentEls);
 			const isSelection = menu.radio === true || item.checkable === true;
-			if (isSelection && menu.radio !== true && menu.checked.includes(item.value)) {
+			if (item.submenu === true) {
+				const wasOpen = item.expanded === true;
+				item.expanded = wasOpen !== true;
+				item.byHover = false;
+				// A pointer opening a submenu leaves focus where it is; a keyboard activation, which carries no click count, goes in.
+				if (wasOpen !== true && event.detail === 0) {
+					focusEdge(ownItems(surfaces, menu.itemEls, panel), false);
+				}
+			} else if (isSelection && menu.radio !== true && menu.checked.includes(item.value)) {
 				menu.uncheck(item.value);
 			} else if (isSelection) {
 				menu.check(item.value);
 			} else {
-				// A command closes the whole menu, this surface and every one above it.
-				const surface = menu.contentEl;
-				const back = menu.triggerEl ?? menu.itemtriggerEl;
+				// A command closes the whole chain it sits in, this surface and every one above it.
 				menu.choose(item.value);
-				menu.hide();
-				back?.focus();
-				dismissAbove(surface);
+				dismissChain(surfaces, item.itemEl);
+				// The chain hands focus back level by level; the trigger is where it ends, whether or not the press had focus to begin with.
+				menu.triggerEl?.focus();
 			}
+			// The deepest item answered, so no item above it sees this press as its own.
+			event.stopPropagation();
 			onClick?.(event);
 		}}
 		onFocusin={(event) => {
-			menu.focused = item.value;
+			const here = event.target as HTMLElement;
+			const panel = item.itemContentEl;
+			if (panel === undefined || panel.contains(here) !== true) menu.rove(item.value);
 			onFocusin?.(event);
 		}}
+		onFocusout={(event) => {
+			// Focus leaving this item entirely takes its submenu with it: a walk onto a sibling, or the whole menu closing.
+			const mine = item.itemEl;
+			const went = event.relatedTarget as Node | null;
+			if (mine !== undefined && (went === null || mine.contains(went) !== true)) {
+				item.expanded = false;
+				item.byHover = false;
+			}
+			onFocusout?.(event);
+		}}
 		onKeydown={(event) => {
-			if (
-				event.key === 'ArrowDown' ||
-				event.key === 'ArrowUp' ||
-				event.key === 'Home' ||
-				event.key === 'End' ||
-				event.key === 'Enter' ||
-				event.key === ' ' ||
-				event.key === 'ArrowLeft'
-			) {
+			if (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowRight') {
 				event.preventDefault();
 			}
 
-			const key = event.key;
 			const here = event.target as HTMLElement;
-			const surface = surfaceOf(here);
-			const items = itemsOf(surface);
-			const at = itemAt(surface, here);
-			// Space is a typeahead character only while a buffer is live, so typing "save as" never activates "Save".
-			const isTypeaheadChar = key.length === 1 && (key !== ' ' || menu.typeahead !== '');
-			const isWalkKey = key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End';
-			const isSelection = menu.radio === true || item.checkable === true;
-			// The itemtrigger answers only in a submenu, which is what makes ArrowLeft a submenu key and nothing at the root.
-			const back = menu.triggerEl ?? menu.itemtriggerEl;
-			const up = menu.itemtriggerEl;
+			const panel = item.itemContentEl;
+			// A key inside this item's submenu belongs to the item it landed on.
+			if (panel !== undefined && panel.contains(here)) {
+				onKeydown?.(event);
+				return;
+			}
 
-			if (isWalkKey) {
-				walkTarget(items, at, key, menu.loop === true)?.focus();
+			const key = event.key;
+			const surfaces = surfacesOf(menu.contentEl, menu.itemContentEls);
+			const isSelection = menu.radio === true || item.checkable === true;
+			const isOpenKey = key === 'ArrowRight' || key === 'Enter' || key === ' ';
+
+			if (item.submenu === true) {
+				if (isOpenKey && item.disabled !== true && menu.disabled !== true) {
+					item.expanded = true;
+					item.byHover = false;
+					focusEdge(ownItems(surfaces, menu.itemEls, panel), false);
+				}
 			} else if (key === 'Enter' || key === ' ') {
 				// Routed through the item's own click rule, so one place in this family activates.
-				at?.click();
-				// Space toggles a selection item and leaves the menu up; Enter takes the whole menu down.
-				if (key === 'Enter' && isSelection) {
-					menu.hide();
-					back?.focus();
-					dismissAbove(menu.contentEl);
-				}
-			} else if (key === 'Tab') {
-				// The APG's rule, and free here: the surface is not portalled and not trapped, so Tab keeps its native move.
-				menu.hide();
-				dismissAbove(menu.contentEl);
-			} else if (key === 'ArrowLeft') {
-				// A submenu closes back onto its itemtrigger; a root menu has no itemtrigger, and ArrowLeft does nothing there.
-				if (up !== undefined) {
-					menu.hide();
-					up.focus();
-				}
-			} else if (isTypeaheadChar) {
-				const now = Date.now();
-				const isStale = now - menu.typeaheadAt > TYPEAHEAD_WINDOW;
-				const search = (isStale ? '' : menu.typeahead) + key.toLowerCase();
-				// Two cell assignments rather than one method taking both: a shared method of arity two aborts the handler.
-				menu.typeahead = search;
-				menu.typeaheadAt = now;
-				matchingItem(items, search, at)?.focus();
+				item.itemEl?.click();
+				// Space toggles a selection item and leaves the menu up; Enter takes the whole chain down.
+				if (key === 'Enter' && isSelection) dismissChain(surfaces, item.itemEl);
 			}
 			onKeydown?.(event);
 		}}
 		onPointermove={(event) => {
 			// pointermove, not pointerover: a mouse wiggling on an item a keyboard walk left must put focus back on it, which an enter event cannot report.
 			const here = event.target as HTMLElement;
-			const at = itemAt(surfaceOf(here), here);
-			if (at !== undefined && document.activeElement !== at) at.focus();
+			const panel = item.itemContentEl;
+			if (panel !== undefined && panel.contains(here)) {
+				onPointermove?.(event);
+				return;
+			}
+			const mine = item.itemEl;
+			if (mine !== undefined && document.activeElement !== mine) mine.focus();
 			onPointermove?.(event);
+		}}
+		onPointerover={(event) => {
+			const here = event.target as HTMLElement;
+			const panel = item.itemContentEl;
+			const mine = item.itemEl;
+			if (
+				item.submenu !== true ||
+				item.disabled === true ||
+				menu.disabled === true ||
+				mine === undefined ||
+				(panel !== undefined && panel.contains(here))
+			) {
+				onPointerover?.(event);
+				return;
+			}
+
+			window.clearTimeout(item.closeTimer);
+			item.closeTimer = 0;
+			item.closingUntil = 0;
+			if (item.expanded === true) {
+				onPointerover?.(event);
+				return;
+			}
+
+			const now = Date.now();
+			const isRested = menu.delay <= 0 || (item.restingUntil !== 0 && now >= item.restingUntil);
+			if (isRested) {
+				window.clearTimeout(item.openTimer);
+				item.openTimer = 0;
+				item.restingUntil = 0;
+				item.byHover = true;
+				item.expanded = true;
+			} else if (item.restingUntil === 0) {
+				// The timer re-delivers the crossing rather than opening: shared reads are rewritten only at the handler's top level, so `item.expanded = true` inside this closure is a ReferenceError.
+				const wait = menu.delay;
+				item.restingUntil = now + wait;
+				item.openTimer = window.setTimeout(() => {
+					mine.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+				}, wait + 5);
+			}
+			onPointerover?.(event);
+		}}
+		onPointerout={(event) => {
+			const here = event.target as HTMLElement;
+			const panel = item.itemContentEl;
+			const mine = item.itemEl;
+			if (
+				item.submenu !== true ||
+				mine === undefined ||
+				(panel !== undefined && panel.contains(here))
+			) {
+				onPointerout?.(event);
+				return;
+			}
+
+			// The submenu is written INSIDE the item, so a pointer crossing into it never leaves.
+			const went = event.relatedTarget as Node | null;
+			if (went !== null && mine.contains(went) === true) {
+				onPointerout?.(event);
+				return;
+			}
+
+			window.clearTimeout(item.openTimer);
+			item.openTimer = 0;
+			item.restingUntil = 0;
+			if (item.expanded !== true) {
+				onPointerout?.(event);
+				return;
+			}
+
+			const now = Date.now();
+			const isElapsed =
+				menu.closeDelay <= 0 || (item.closingUntil !== 0 && now >= item.closingUntil);
+			if (isElapsed) {
+				item.closeTimer = 0;
+				item.closingUntil = 0;
+				item.byHover = false;
+				item.expanded = false;
+			} else if (item.closingUntil === 0) {
+				const wait = menu.closeDelay;
+				item.closingUntil = now + wait;
+				item.closeTimer = window.setTimeout(() => {
+					mine.dispatchEvent(new PointerEvent('pointerout', { bubbles: true }));
+				}, wait + 5);
+			}
+			onPointerout?.(event);
 		}}
 	>{children}</div>
 }
 
-// The parent menu's item and this submenu's trigger at once, so `menu.contentEl` here is the submenu's surface while the walk it joins belongs to the surface it is written in.
-export function MenuItemTrigger({
+// The submenu one item holds: the same surface part one level down, named by the item that opens it and anchored to it.
+export function MenuItemContent({
 	children,
-	onClick,
-	onFocusin,
+	onContextmenu,
+	onDismiss,
 	onKeydown,
-	onPointerover,
 	...rest
-}: MenuItemTriggerProps) @{
+}: MenuItemContentProps) @{
 	const menu = menuState();
+	const item = menuItemState();
 
-	<button
+	<div
 		{...rest}
-		el={menu.itemtriggerEl}
-		type="button"
-		role="menuitem"
-		tabindex={-1}
-		aria-haspopup="menu"
-		aria-expanded={menu.open ? 'true' : 'false'}
-		aria-controls={menu.contentEl}
-		aria-disabled={menu.disabled ? 'true' : 'false'}
-		ui-open={menu.open}
-		ui-closed={menu.open !== true}
-		onClick={(event) => {
-			if (menu.disabled === true) {
-				onClick?.(event);
-				return;
-			}
-			const surface = menu.contentEl;
-			const wasOpen = menu.open === true;
-			if (wasOpen) menu.hide();
-			else menu.show();
-			// A pointer opening a submenu leaves focus where it is; a keyboard activation, which carries no click count, goes in.
-			if (wasOpen !== true && event.detail === 0) focusOpening(surface, false);
-			onClick?.(event);
+		el={[item.itemContentEl, menu.itemContentEls]}
+		overlay
+		role="menu"
+		aria-labelledby={item.itemEl}
+		hidden={item.expanded !== true}
+		ui-open={item.expanded}
+		ui-closed={item.expanded !== true}
+		ui-side="end"
+		onContextmenu={(event) => {
+			event.preventDefault();
+			onContextmenu?.(event);
 		}}
-		onFocusin={(event) => {
-			menu.focused = '';
-			onFocusin?.(event);
+		onDismiss={(event) => {
+			const surface = item.itemContentEl;
+			const back = item.itemEl;
+			const isFocusInside = surface !== undefined && surface.contains(document.activeElement);
+			item.expanded = false;
+			item.byHover = false;
+			// Escape steps out one level and hands focus to the item that opened this submenu.
+			if (event.detail.reason === 'escape' && isFocusInside) back?.focus();
+			// The primitive reports an outside press to the topmost surface only, and a press outside the whole menu closes all of it.
+			if (event.detail.reason === 'outside-press') {
+				dismissChain(surfacesOf(menu.contentEl, menu.itemContentEls), back);
+			}
+			onDismiss?.(event);
 		}}
 		onKeydown={(event) => {
 			if (
@@ -613,69 +765,48 @@ export function MenuItemTrigger({
 				event.key === 'ArrowUp' ||
 				event.key === 'Home' ||
 				event.key === 'End' ||
-				event.key === 'ArrowRight'
+				event.key === 'ArrowLeft'
 			) {
 				event.preventDefault();
 			}
 
-			const key = event.key;
 			const here = event.target as HTMLElement;
-			// The surface this trigger is written IN, not the one it opens.
-			const surface = surfaceOf(here);
-			const isWalkKey = key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End';
-			// Enter and Space stay the button's own activation, which the click rule below opens on.
-			const isOpenKey = key === 'ArrowRight';
-			const isTypeaheadChar = key.length === 1 && (key !== ' ' || menu.typeahead !== '');
-			const panel = menu.contentEl;
+			const surfaces = surfacesOf(menu.contentEl, menu.itemContentEls);
+			const mine = item.itemContentEl;
+			// A key inside a deeper submenu belongs to that submenu's own surface.
+			if (mine === undefined || surfaceOf(surfaces, here) !== mine) {
+				onKeydown?.(event);
+				return;
+			}
 
-			if (isOpenKey) {
-				menu.show();
-				focusOpening(panel, false);
-			} else if (isWalkKey) {
-				const items = itemsOf(surface);
-				walkTarget(items, itemAt(surface, here), key, menu.loop === true)?.focus();
+			const key = event.key;
+			const items = ownItems(surfaces, menu.itemEls, mine);
+			const at = itemAt(items, here);
+			const isTypeaheadChar = key.length === 1 && (key !== ' ' || menu.typeahead !== '');
+			const isWalkKey = key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End';
+
+			if (isWalkKey) {
+				walkTarget(items, at, key, menu.loop === true)?.focus();
+				event.stopPropagation();
+			} else if (key === 'ArrowLeft') {
+				// One level out, onto the item that opened this submenu. Escape does the same through the overlay's own report.
+				item.expanded = false;
+				item.byHover = false;
+				item.itemEl?.focus();
+				event.stopPropagation();
 			} else if (key === 'Tab') {
+				item.expanded = false;
 				menu.hide();
-				dismissAbove(panel);
+				event.stopPropagation();
 			} else if (isTypeaheadChar) {
 				const now = Date.now();
 				const isStale = now - menu.typeaheadAt > TYPEAHEAD_WINDOW;
 				const search = (isStale ? '' : menu.typeahead) + key.toLowerCase();
-				menu.typeahead = search;
-				menu.typeaheadAt = now;
-				const items = itemsOf(surface);
-				matchingItem(items, search, itemAt(surface, here))?.focus();
+				menu.type(search);
+				matchingItem(items, search, at)?.focus();
+				event.stopPropagation();
 			}
 			onKeydown?.(event);
 		}}
-		onPointerover={(event) => {
-			const opener = menu.itemtriggerEl;
-			if (menu.open === true || menu.disabled === true || opener === undefined) {
-				onPointerover?.(event);
-				return;
-			}
-
-			window.clearTimeout(menu.closeTimer);
-			menu.closeTimer = 0;
-			menu.closingUntil = 0;
-			const now = Date.now();
-			const isRested =
-				menu.delay <= 0 || (menu.restingUntil !== 0 && now >= menu.restingUntil);
-			if (isRested) {
-				window.clearTimeout(menu.openTimer);
-				menu.openTimer = 0;
-				menu.restingUntil = 0;
-				menu.byHover = true;
-				menu.show();
-			} else if (menu.restingUntil === 0) {
-				// The timer re-delivers the crossing rather than opening: shared reads are rewritten only at the handler's top level, so `menu.show()` inside this closure is a ReferenceError.
-				const wait = menu.delay;
-				menu.restingUntil = now + wait;
-				menu.openTimer = window.setTimeout(() => {
-					opener.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
-				}, wait + 5);
-			}
-			onPointerover?.(event);
-		}}
-	>{children}</button>
+	>{children}</div>
 }
