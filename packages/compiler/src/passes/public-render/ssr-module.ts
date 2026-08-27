@@ -71,8 +71,11 @@ import {
 	ssrComposeStateExpression,
 } from './shared.ts';
 import {
+	armBoundHandleReadSource,
+	armBoundIdrefHandles,
 	authoredResidueReadCases,
 	authoredResidueSources,
+	branchArmIndexSource,
 	elementHandleIdReadCase,
 	elementHandleIdSources,
 	hasElementHandleIdList,
@@ -85,7 +88,7 @@ import {
 } from './residue-reader.ts';
 import { collectSsrPropEvents } from './component-wiring.ts';
 import { boundSymbolsForEdge, componentEdgeGraphRoutes } from './component-wiring.ts';
-import type { PublicRenderRoot } from './types.ts';
+import type { ComponentEdge, PublicRenderRoot } from './types.ts';
 
 /**
  * The minted id for one handle, as an expression usable anywhere this module's
@@ -633,17 +636,6 @@ function emitSsrDataLines(
 	// Pay-per-use: a module with no IDREF record emits no mint at all, so the
 	// shared renderer never carries one for the pages that never ask for an id.
 	const handleIds = elementHandleIdSources(chunks);
-	const mintCase =
-		handleIds.length > 0
-			? elementHandleIdReadCase({
-					idPrefixSource: 'marklessSsrIdPrefix',
-					widgetInstanceRead: hasSharedElementHandle(handleIds)
-						? widgetInstanceReadSource((key) => `marklessSsrRenderStateValues.get(${key})`)
-						: null,
-					boundRead: (key) => `marklessSsrRenderStateValues.get(${key})`,
-					...(hasElementHandleIdList(chunks) ? { lists: true } : {}),
-				})
-			: '';
 	const branchIds = new Set(chunks.flatMap((chunk) =>
 		chunk.slots.flatMap((slot) => slot.kind === 'branch' ? [slot.branchSiteId] : []),
 	));
@@ -656,9 +648,7 @@ function emitSsrDataLines(
 			return [
 				branch.branchSiteId,
 				{
-					source: branch.kind === 'switch' && branch.armTests
-						? `(()=>{const value=(${testSource});const tests=${JSON.stringify(branch.armTests)};const match=tests.findIndex((test)=>test!==null&&Object.is(test,value));return match===-1?Math.max(0,tests.indexOf(null)):match;})()`
-						: `((${testSource})?0:1)`,
+					source: branchArmIndexSource(branch, testSource),
 					// A test the emitted seed pass can also ask: it reads the same state
 					// map, where an authored local the render body declares is not in scope.
 					readable: testRead !== undefined,
@@ -666,6 +656,27 @@ function emitSsrDataLines(
 			] as const;
 		}),
 	);
+	// The mint runs ahead of the render body's locals, so only a test the state
+	// map answers on its own can be asked here; a test standing on an authored
+	// local keeps the roster's answer.
+	const armBoundRead = armBoundHandleReadSource(
+		armBoundIdrefHandles(chunks, input.renderData.branches).flatMap((entry) => {
+			const arm = branchArmSources.get(entry.branchSiteId);
+			return arm?.readable ? [{ ...entry, armSource: arm.source }] : [];
+		}),
+	);
+	const mintCase =
+		handleIds.length > 0
+			? elementHandleIdReadCase({
+					idPrefixSource: 'marklessSsrIdPrefix',
+					widgetInstanceRead: hasSharedElementHandle(handleIds)
+						? widgetInstanceReadSource((key) => `marklessSsrRenderStateValues.get(${key})`)
+						: null,
+					boundRead: (key) => `marklessSsrRenderStateValues.get(${key})`,
+					...(armBoundRead ? { armBoundRead } : {}),
+					...(hasElementHandleIdList(chunks) ? { lists: true } : {}),
+				})
+			: '';
 	const branchCases = input.renderData.branches
 		.filter((branch) => branchIds.has(branch.branchSiteId))
 		.map((branch) => {
@@ -780,6 +791,21 @@ function emitSsrDataLines(
 			(slot) => slot.kind === 'attribute' && slot.residue.kind === 'element-handle-id',
 		),
 	);
+	// The mint that needs the token is inside the CHILD's module when the child is
+	// a root placed with no children, so this module's own chunks cannot answer
+	// for it. Its interface can: a module declaring a widget-scoped family with an
+	// element() handle is one whose parts mint per-instance ids. A page importing
+	// no such module emits what it emitted before, byte for byte.
+	const importedWidgetHandleFamily = (edge: ComponentEdge): boolean =>
+		(
+			(edge.importSource
+				? input.source.importedModuleInterfaces?.[edge.importSource]?.sharedDefinitions
+				: undefined) ?? []
+		).some(
+			(entry) =>
+				entry.definition.scope === 'widget' &&
+				entry.graphBindings.some((binding) => binding.kind === 'element'),
+		);
 	const instanceOnlyEdgeIds = new Set<string>();
 	const widgetInstanceLineByEdgeId = new Map<string, string>();
 	// What the emitted seed pass hands the boundary check to ask a placed child
@@ -880,9 +906,12 @@ function emitSsrDataLines(
 		// part mints an id that names WHICH rendered widget it belongs to. A root
 		// placed with no children registers on the same terms: the parts its own
 		// template renders ask the same question, and nothing else answers it.
-		if (projectionChunkId !== undefined || (seedCall && mintsElementHandleId)) {
+		if (
+			projectionChunkId !== undefined ||
+			(seedCall && (mintsElementHandleId || importedWidgetHandleFamily(edge)))
+		) {
 			if (projectionChunkId !== undefined) projectionChunkByEdgeId.set(edge.id, projectionChunkId);
-			else if (mintsElementHandleId) instanceOnlyEdgeIds.add(edge.id);
+			else instanceOnlyEdgeIds.add(edge.id);
 			const surfaceArgs = childSurfaceArgsByEdgeId.get(edge.id) ?? `${component},undefined`;
 			const registerInstance = `marklessSsrSeeds.set(${JSON.stringify(
 				MARKLESS_WIDGET_INSTANCE_KEY,

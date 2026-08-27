@@ -118,6 +118,73 @@ export function elementHandleIdSources(chunks: RenderChunks): ReadonlyArray<stri
 	return [...handles];
 }
 
+/** The arm index one branch takes, from an expression that reads its test. */
+export function branchArmIndexSource(
+	branch: PublicRenderModuleInput['renderData']['branches'][number],
+	testSource: string | undefined,
+): string {
+	return branch.kind === 'switch' && branch.armTests
+		? `(()=>{const value=(${testSource});const tests=${JSON.stringify(branch.armTests)};const match=tests.findIndex((test)=>test!==null&&Object.is(test,value));return match===-1?Math.max(0,tests.indexOf(null)):match;})()`
+		: `((${testSource})?0:1)`;
+}
+
+export type ArmBoundIdrefHandle = {
+	readonly handleGraphNodeId: string;
+	readonly branchSiteId: string;
+	readonly armIndex: number;
+};
+
+/**
+ * A handle bound inside a flippable arm that an IDREF outside the arms names.
+ *
+ * The seed-time roster cannot promise an element for one of these — it is filed
+ * before the render decides which arm it takes — so the roster answers "no" and
+ * the IDREF is omitted. That is right for the arm the render did NOT take and
+ * wrong for the one it did: a served-open disclosure must name its panel in the
+ * markup, before any script runs. The arm this render took is the only honest
+ * answer, and the module that owns the IDREF owns the branch that decides it.
+ */
+export function armBoundIdrefHandles(
+	chunks: RenderChunks,
+	branches: PublicRenderModuleInput['renderData']['branches'],
+): ReadonlyArray<ArmBoundIdrefHandle> {
+	const named = new Set<string>();
+	for (const chunk of chunks)
+		for (const slot of chunk.slots)
+			if (
+				slot.kind === 'attribute' &&
+				slot.residue.kind === 'element-handle-id' &&
+				slot.residue.idref === true
+			)
+				named.add(slot.residue.handleGraphNodeId);
+	if (named.size === 0) return [];
+	const entries: ArmBoundIdrefHandle[] = [];
+	for (const branch of branches)
+		for (const [armIndex, chunkId] of branch.armChunkIds.entries())
+			for (const slot of chunks.find((candidate) => candidate.id === chunkId)?.slots ?? []) {
+				if (slot.kind !== 'attribute' || slot.residue.kind !== 'element-handle-id') continue;
+				const handleGraphNodeId = slot.residue.handleGraphNodeId;
+				if (slot.residue.idref === true || !named.has(handleGraphNodeId)) continue;
+				if (entries.some((entry) => entry.handleGraphNodeId === handleGraphNodeId)) continue;
+				entries.push({ handleGraphNodeId, branchSiteId: branch.branchSiteId, armIndex });
+			}
+	return entries;
+}
+
+/** Reading "is this handle's arm the one this render took", or undefined for any other handle. */
+export function armBoundHandleReadSource(
+	entries: ReadonlyArray<ArmBoundIdrefHandle & { readonly armSource: string }>,
+): ((handleExpression: string) => string) | undefined {
+	if (entries.length === 0) return undefined;
+	return (handle) =>
+		`(${entries
+			.map(
+				(entry) =>
+					`${handle}===${JSON.stringify(entry.handleGraphNodeId)}?(${entry.armSource})===${String(entry.armIndex)}:`,
+			)
+			.join('')}undefined)`;
+}
+
 /**
  * The one spelling of a minted element() id, compiled into the server module's
  * reader and the client one from this single description: the element that
@@ -136,6 +203,8 @@ export function elementHandleIdReadCase(input: {
 	readonly widgetInstanceRead: ((handleExpression: string) => string) | null;
 	/** Reads one seed-map key; supplied wherever a shared() IDREF can be omitted. */
 	readonly boundRead?: (keyExpression: string) => string;
+	/** Answers for a handle an arm binds, ahead of the roster; undefined for any other. */
+	readonly armBoundRead?: (handleExpression: string) => string;
 	/** Emitted only for a chunk set that writes an IDREF list somewhere. */
 	readonly lists?: boolean;
 }): string {
@@ -147,12 +216,15 @@ export function elementHandleIdReadCase(input: {
 	};
 	// The token is read WITHOUT the mint's throw: an omitted IDREF is the right
 	// answer for a part that resolved no instance, and the mint still refuses.
-	const unbound = (handle: string) =>
-		input.widgetInstanceRead && input.boundRead
-			? `${handle}.startsWith('shared:')&&${input.boundRead(
-					elementBoundKeySource(input.widgetInstanceRead(handle), handle),
-				)}!==true`
-			: null;
+	const unbound = (handle: string) => {
+		if (!input.widgetInstanceRead || !input.boundRead) return null;
+		const roster = input.boundRead(
+			elementBoundKeySource(input.widgetInstanceRead(handle), handle),
+		);
+		return `${handle}.startsWith('shared:')&&${
+			input.armBoundRead ? `(${input.armBoundRead(handle)}??${roster})` : roster
+		}!==true`;
+	};
 	// Only an IDREF position can be omitted. The element that CARRIES the id mints
 	// unconditionally: it renders only when its own part renders, and an omission
 	// there would write `id="undefined"` instead of nothing.
@@ -367,6 +439,27 @@ export function emitClientResidueReader(
 				`${CONTEXT}.read(${JSON.stringify(graphNodeId)}, ${JSON.stringify(path)})`,
 		),
 	);
+	// The browser has no render body, so only a test the graph answers on its own
+	// can decide an arm here; any other keeps the roster's answer.
+	const armBoundRead = armBoundHandleReadSource(
+		armBoundIdrefHandles(componentChunks, input.renderData.branches).flatMap((entry) => {
+			const branch = input.renderData.branches.find(
+				(candidate) => candidate.branchSiteId === entry.branchSiteId,
+			);
+			const testRead = branch?.testReads.length === 1 ? branch.testReads[0] : undefined;
+			return branch && testRead
+				? [
+						{
+							...entry,
+							armSource: branchArmIndexSource(
+								branch,
+								`${CONTEXT}.read(${JSON.stringify(testRead.graphNodeId)},${JSON.stringify(testRead.path)})`,
+							),
+						},
+					]
+				: [];
+		}),
+	);
 	const mintCase =
 		handles.length > 0
 			? elementHandleIdReadCase({
@@ -375,6 +468,7 @@ export function emitClientResidueReader(
 						? widgetInstanceReadSource((key) => `${CONTEXT}.read(${key})`)
 						: null,
 					boundRead: (key) => `${CONTEXT}.read(${key})`,
+					...(armBoundRead ? { armBoundRead } : {}),
 					...(hasElementHandleIdList(componentChunks) ? { lists: true } : {}),
 				})
 			: '';
