@@ -1,0 +1,24 @@
+# MARKLESS_STATE_WRITE_IN_TEMPLATE
+
+Cannot write state inside a template expression
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: error
+
+## Message
+
+TODO: this code has no builder message in source.
+
+## Why
+
+DOM updates are the only effects in the demand-driven graph; a write inside a DOM read creates a self-waking cycle that cannot resume.
+
+DOM updates are the only effects in the demand-driven graph; a write inside a branch test creates a self-waking cycle that cannot resume.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

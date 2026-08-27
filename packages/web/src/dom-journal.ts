@@ -1,5 +1,7 @@
 import type { DomJournalEntry } from '@markless/runtime';
+import type { ResumeDomComment, ResumeDomElement, ResumeDomNode } from './resume-types.ts';
 import { marklessAttributeValue } from './dom-attribute.ts';
+import { spliceCensus } from './resume-census.ts';
 
 type InsertRangeEntry = Extract<DomJournalEntry, { readonly type: 'insertRange' }>;
 type RemoveRangeEntry = Extract<DomJournalEntry, { readonly type: 'removeRange' }>;
@@ -122,11 +124,8 @@ export function applyDomJournalEntries(
 	}
 }
 
-// Range mutation renumbers the served shape, so every ancestor's pinned element
-// census is spliced by exactly what moved — re-deriving it from the live tree
-// would renumber around foreign nodes the framework does not own. The slot name
-// is shared with resume-locators by literal, not import: a value edge from here
-// regroups the chunk graph.
+// Every ancestor's pinned census is spliced, not re-derived: this module moves
+// ranges anywhere under a resumed root.
 function spliceDomOrderCensus(
 	parent: DomRangeParent,
 	removed: ReadonlyArray<DomRangeNode>,
@@ -134,44 +133,8 @@ function spliceDomOrderCensus(
 ): void {
 	for (let node: DomRangeParent | null | undefined = parent; node; node = node.parentNode) {
 		const census = (node as { __marklessCensus?: DomRangeNode[] }).__marklessCensus;
-		if (!census) continue;
-		for (const one of removed) {
-			const at = census.indexOf(one);
-			if (at >= 0) census.splice(at, blockEnd(census, at) - at);
-		}
-		if (inserted.length)
-			census.splice(insertionSlot(census, inserted[0]!), 0, ...censusElements(inserted));
+		if (census) spliceCensus(census, removed, inserted);
 	}
-}
-
-function blockEnd(census: DomRangeNode[], at: number): number {
-	const inside = new Set<DomRangeNode>(censusElements([census[at]!]));
-	let end = at + 1;
-	while (end < census.length && inside.has(census[end]!)) end++;
-	return end;
-}
-
-function insertionSlot(census: DomRangeNode[], first: DomRangeNode): number {
-	const parent = first.parentNode;
-	if (!parent) return census.length;
-	let slot = -1;
-	for (const child of Array.from(parent.childNodes)) {
-		if (child === first) break;
-		const at = census.indexOf(child);
-		if (at >= 0) slot = blockEnd(census, at);
-	}
-	if (slot >= 0) return slot;
-	const at = census.indexOf(parent as DomRangeNode);
-	return at >= 0 ? at + 1 : census.length;
-}
-
-function censusElements(nodes: ArrayLike<DomRangeNode>): DomRangeNode[] {
-	const elements: DomRangeNode[] = [];
-	for (const node of Array.from(nodes)) {
-		if (node.nodeType === 1) elements.push(node);
-		if (node.childNodes) elements.push(...censusElements(node.childNodes));
-	}
-	return elements;
 }
 
 function renderInsertRangeFragment(
@@ -186,8 +149,13 @@ function renderInsertRangeFragment(
 	return fragment;
 }
 
+// Rewriting a node with what it already holds is still a mutation, and an
+// aria-live region announces on it; every write below elides a no-op.
 function setText(target: unknown, value: unknown): void {
-	(target as { textContent: string }).textContent = stringifyDomValue(value);
+	const host = target as { textContent: string };
+	const text = stringifyDomValue(value);
+	if (host.textContent === text) return;
+	host.textContent = text;
 }
 
 function setAttr(target: unknown, name: string, value: unknown): void {
@@ -198,7 +166,13 @@ function setAttr(target: unknown, name: string, value: unknown): void {
 		return;
 	}
 
+	if (readAttribute(element, name) === text) return;
 	element.setAttribute?.(name, text);
+}
+
+function readAttribute(element: DomJournalApplyTarget, name: string): string | null | undefined {
+	const read = (element as { getAttribute?: (name: string) => string | null }).getAttribute;
+	return typeof read === 'function' ? read.call(element, name) : undefined;
 }
 
 function setProp(target: unknown, name: string, value: unknown): void {
@@ -284,6 +258,100 @@ function isAsyncBoundarySnapshotFragment(value: unknown): value is AsyncBoundary
 		value !== null &&
 		(value as { readonly type?: unknown }).type === 'async-boundary-snapshot'
 	);
+}
+
+type ComparableNode = DomRangeNode & {
+	readonly nodeName?: string;
+	readonly nodeValue?: string | null;
+	readonly attributes?: ArrayLike<{ readonly name: string; readonly value: string }>;
+};
+
+// Whether a range already holds, node for node, what a fragment would put back.
+// Replacing a range with itself is still a mutation an aria-live region
+// announces on, and it still drops the focus, selection and claimed hosts the
+// standing nodes carry. An empty range has none of those, so it is not compared.
+export function domRangeMatchesFragment(start: unknown, end: unknown, fragment: unknown): boolean {
+	if (!isDomRangeNode(start) || !isDomRangeNode(end)) return false;
+	const live = rangeContents(start, end);
+	const fresh = fragmentNodes(fragment);
+	if (live.length === 0 || live.length !== fresh.length) return false;
+	for (let index = 0; index < live.length; index++)
+		if (!sameRenderedNode(live[index]!, fresh[index]!)) return false;
+	return true;
+}
+
+function sameRenderedNode(live: ComparableNode, fresh: ComparableNode): boolean {
+	if (live.nodeType !== fresh.nodeType) return false;
+	if (live.nodeType !== 1) return (live.nodeValue ?? '') === (fresh.nodeValue ?? '');
+	if (live.nodeName !== fresh.nodeName || !sameAttributes(live, fresh)) return false;
+	const liveChildren = live.childNodes ?? [];
+	const freshChildren = fresh.childNodes ?? [];
+	if (liveChildren.length !== freshChildren.length) return false;
+	for (let index = 0; index < liveChildren.length; index++)
+		if (!sameRenderedNode(liveChildren[index]!, freshChildren[index]!)) return false;
+	return true;
+}
+
+// A host that answers no attributes cannot be compared, so it never matches.
+function sameAttributes(live: ComparableNode, fresh: ComparableNode): boolean {
+	const standing = live.attributes;
+	const rendered = fresh.attributes;
+	if (!standing || !rendered || standing.length !== rendered.length) return false;
+	const byName = new Map<string, string>();
+	for (let index = 0; index < standing.length; index++)
+		byName.set(standing[index]!.name, standing[index]!.value);
+	for (let index = 0; index < rendered.length; index++)
+		if (byName.get(rendered[index]!.name) !== rendered[index]!.value) return false;
+	return true;
+}
+
+// The removal walk lives here rather than in the branch runtime, whose static
+// closure is byte-walled; a removal flush loads this module anyway.
+export function hostIdsInsideRange(
+	root: ResumeDomElement,
+	startAnchor: ResumeDomComment,
+	endAnchor: ResumeDomComment,
+	elementsByHostId: Map<string, ResumeDomElement>,
+): string[] {
+	const inside = elementsBetweenAnchors(root, startAnchor, endAnchor);
+	const ids: string[] = [];
+	for (const [id, element] of elementsByHostId)
+		for (const removed of inside)
+			if (containsElement(removed, element)) {
+				ids.push(id);
+				break;
+			}
+	return ids;
+}
+
+function elementsBetweenAnchors(
+	root: ResumeDomElement,
+	startAnchor: ResumeDomComment,
+	endAnchor: ResumeDomComment,
+): Set<ResumeDomElement> {
+	const inside = new Set<ResumeDomElement>();
+	let within = false;
+	function visit(node: ResumeDomNode): void {
+		if (node === startAnchor) {
+			within = true;
+			return;
+		}
+		if (node === endAnchor) {
+			within = false;
+			return;
+		}
+		if (within && node.nodeType === 1) inside.add(node as ResumeDomElement);
+		for (const child of node.childNodes ?? []) visit(child);
+	}
+	visit(root);
+	return inside;
+}
+
+function containsElement(root: ResumeDomElement, target: ResumeDomElement): boolean {
+	if (root === target) return true;
+	for (const child of root.childNodes ?? [])
+		if (child.nodeType === 1 && containsElement(child as ResumeDomElement, target)) return true;
+	return false;
 }
 
 function stringifyDomValue(value: unknown): string {
