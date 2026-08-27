@@ -1,0 +1,22 @@
+# MARKLESS_CALLBACK_SLOT_SOURCE_UNSUPPORTED
+
+A callback slot can only be filled by the widget root’s own callback prop
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: error
+
+## Message
+
+"…" assigns … into the "…" callback slot of shared() "…", and … is not one of this component's callback props.
+
+## Why
+
+A callback slot is a compile-time route, not a stored value: the build records that this widget root’s callback prop answers the slot, and a part invoking the slot dispatches straight to the consumer’s handler. A local function has no consumer to route to, so nothing could be recorded and the call would silently do nothing.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
