@@ -1,3 +1,4 @@
+import type { OverlayFocusOriginHost } from '../overlay-handoff.ts';
 import type { ResumeElementHandleValue } from '../resume-types.ts';
 
 /**
@@ -11,9 +12,15 @@ import type { ResumeElementHandleValue } from '../resume-types.ts';
  * hidden or inert target is a silent no-op, so a call the target REFUSED is
  * remembered and replayed once the commit the same dispatch performs has landed.
  *
- * Only elements a handler reached through an `element()` handle get this, and
- * only a refused call is ever held: a focus that took is left exactly where it
- * happened, so the families' own frame loops keep working unchanged.
+ * Only elements a handler reached through the runtime get this, and only a
+ * refused call is ever held: a focus that took is left exactly where it
+ * happened.
+ *
+ * Reaching through the runtime has two spellings, because an overlay's closing
+ * handler has no handle for where focus was. It reads the element the overlay
+ * behaviour captured at enlist off the surface, and that surface IS a handle
+ * read - so handing out a surface hands out its captured origin too, or the one
+ * focus that most needs holding is the one nothing is watching.
  */
 
 type FocusOptions = { readonly preventScroll?: boolean };
@@ -59,16 +66,33 @@ function installFocusShim(target: HandleElement | undefined): void {
 	}
 }
 
+/**
+ * An enlisted surface carries the focus the page had when it enlisted, and that
+ * reading is a raw node the behaviour stored, not a handle. Handing out the
+ * surface therefore has to hand out the origin as well: it is done on every
+ * read, not once with the shim, because the capture happens at enlist and the
+ * surface's handle is usually read long before that.
+ */
+function reachCapturedFocusOrigin(target: HandleElement | undefined): void {
+	const captured = (target as OverlayFocusOriginHost | undefined)?.__marklessOverlayFocusOrigin;
+	if (captured) installFocusShim(captured as HandleElement);
+}
+
 /** Wraps a dispatch's handle reader so every element it hands out focuses through the runtime. */
 export function marklessHandleFocusReader(
 	read: (handleIdOrName: string) => ResumeElementHandleValue,
 ): (handleIdOrName: string) => ResumeElementHandleValue {
 	return (handleIdOrName) => {
 		const value = read(handleIdOrName);
-		if (Array.isArray(value)) for (const item of value) installFocusShim(item as HandleElement);
-		else installFocusShim(value as HandleElement | undefined);
+		if (Array.isArray(value)) for (const item of value) reachThroughRuntime(item as HandleElement);
+		else reachThroughRuntime(value as HandleElement | undefined);
 		return value;
 	};
+}
+
+function reachThroughRuntime(target: HandleElement | undefined): void {
+	installFocusShim(target);
+	reachCapturedFocusOrigin(target);
 }
 
 /** Opens the window in which this dispatch's refused `focus()` is held for its commit. */
