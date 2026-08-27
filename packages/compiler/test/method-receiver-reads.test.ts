@@ -115,6 +115,71 @@ export function Scalar() @{
 	expect(module?.source).toContain('context.graph.read("state:code").slice(0, 3)');
 });
 
+test('a non-mutating method on a state array reads the cell and calls the method on it', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Cards.tsrx',
+		source: `import { computed, state } from '@markless/core';
+export function Cards() @{
+	let cards = state([{ key: 'north' }, { key: 'south' }]);
+	const titles = computed(() => cards.map((card) => card.key));
+	let note = state('');
+	<section>
+		<button onClick={() => cards = cards.filter((card) => card.key !== 'south')}>filter</button>
+		<button onClick={() => cards = cards.slice(0, 1)}>slice</button>
+		<button onClick={() => note = titles.join('|')}>derived</button>
+		<p>{cards.length}{note}</p>
+	</section>
+}`,
+		symbols: [],
+	});
+
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	expect(result.stateLowering.diagnostics).toEqual([]);
+
+	const sources = result.semanticGraph.stateReads.map((read) => read.source);
+	expect(sources).not.toContain('cards.filter');
+	expect(sources).not.toContain('cards.slice');
+	expect(sources).not.toContain('titles.join');
+
+	const moduleFor = (snippet: string): string => {
+		const symbol = result.symbolResolver.symbols.find(
+			(candidate) => candidate.kind === 'event-handler' && candidate.source.includes(snippet),
+		);
+		expect(symbol, snippet).toBeDefined();
+		return (
+			result.symbolModules.modules.find((module) => module.symbolId === symbol?.id)?.source ?? ''
+		);
+	};
+
+	expect(moduleFor('cards.filter')).toContain('context.graph.read("state:cards").filter(');
+	expect(moduleFor('cards.slice')).toContain('context.graph.read("state:cards").slice(0, 1)');
+	// A computed cell holds the derive's result, so its members are the value's too.
+	expect(moduleFor('titles.join')).toContain(`context.graph.read("computed:titles").join('|')`);
+});
+
+test('a mutating method on a state array still lowers to a graph call write', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Rows.tsrx',
+		source: `import { state } from '@markless/core';
+export function Rows() @{
+	let rows = state([{ key: 'north' }]);
+	<section>
+		<button onClick={() => rows.push({ key: 'south' })}>add</button>
+		<p>{rows.length}</p>
+	</section>
+}`,
+		symbols: [],
+	});
+
+	const symbol = result.symbolResolver.symbols.find(
+		(candidate) => candidate.kind === 'event-handler' && candidate.source.includes('rows.push'),
+	);
+	const module = result.symbolModules.modules.find((entry) => entry.symbolId === symbol?.id);
+	expect(module?.source).toContain('context.graph.call({');
+	expect(module?.source).toContain('method: "push"');
+	expect(result.semanticGraph.stateReads.map((read) => read.source)).not.toContain('rows.push');
+});
+
 test('a callable the graph itself declares keeps its read at the member', async () => {
 	// A callback slot and a shared method are the callable; the read has to stay
 	// on the member so the slot and method paths keep matching it, and so the

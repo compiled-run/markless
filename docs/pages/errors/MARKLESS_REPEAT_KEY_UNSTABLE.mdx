@@ -1,0 +1,22 @@
+# MARKLESS_REPEAT_KEY_UNSTABLE
+
+@for key must identify the item stably
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: error
+
+## Message
+
+key … does not derive identity from … or an explicit index alias. Row state, event wiring, and DOM reuse follow the key, so rows of … could not be matched with themselves reliably.
+
+## Why
+
+The key is the stable identity root for a repeated graph scope across reorder, insert, delete, and resume; a value that is not derived from the item or its position cannot identify anything.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
