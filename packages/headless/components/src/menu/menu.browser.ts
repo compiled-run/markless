@@ -1,4 +1,5 @@
 import { render, renderSSR } from '@markless/vitest-browser';
+import { parkPointerClearOfMount } from '../../test-support/pointer-parking.ts';
 import axe from 'axe-core';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { afterEach, expect, test } from 'vitest';
@@ -9,6 +10,9 @@ import ContextKeyboard from './scenarios/context-keyboard.tsrx';
 import Controlled from './scenarios/controlled.tsrx';
 import Deep from './scenarios/deep.tsrx';
 import Disabled from './scenarios/disabled.tsrx';
+import Menubar from './scenarios/menubar.tsrx';
+import MenubarServed from './scenarios/menubar-served.tsrx';
+import MenubarTrigger from './scenarios/menubar-trigger.tsrx';
 import RadioItems from './scenarios/radio-items.tsrx';
 import Submenu from './scenarios/submenu.tsrx';
 
@@ -27,6 +31,9 @@ const COLD_POLL = { timeout: 5000 };
 const QUIET_MS = 800;
 // The family's own typeahead window, restated here so a row that waits one out says why.
 const TYPEAHEAD_WINDOW = 750;
+// Shorter than the family's stock 700 ms hover intent. A bar menu that arrives
+// inside this budget cannot have consulted `delay`, which is the whole claim.
+const DELAY_FREE = { timeout: 400 };
 
 // The overlay behaviour keeps one module-level stack for the whole page, so a row
 // that leaves a surface enlisted leaves the next row's dismissals going to it.
@@ -91,6 +98,17 @@ function expectShowing(content: Element, trigger: Element) {
 async function openByClick(triggerId = 'trigger', contentId = 'content') {
 	press(el(triggerId));
 	await expect.poll(() => el(contentId).hasAttribute('hidden'), COLD_POLL).toBe(false);
+}
+
+function escape() {
+	document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+}
+
+/** Open one bar menu the way a keyboard does, and wait for its dropdown. */
+async function openBar(barId: string, panelId: string) {
+	el(barId).focus();
+	keyOn(el(barId), 'ArrowDown');
+	await expect.poll(() => el(panelId).hasAttribute('hidden'), COLD_POLL).toBe(false);
 }
 
 async function expectFocused(testid: string) {
@@ -957,6 +975,367 @@ for (const mode of MODES) {
 		await expect.poll(() => el('content').hasAttribute('hidden'), COLD_POLL).toBe(false);
 		await expectNoAxeViolations(screen.container as Element, 'context menu open');
 	});
+
+	// -- The menu bar ---------------------------------------------------------
+
+	test(`${mode}: the bar is the root itself, and each bar item declares the menu it holds`, async () => {
+		if (mode === 'CSR') await render(Menubar);
+		else await renderSSR(Menubar);
+		// The bar's hover-after-open is unconditional by design, so the trusted
+		// `pointerover` Chromium delivers when a tree mounts under the cursor is
+		// enough to open a menu no row asked for. The shared setup parks before the
+		// mount; a bar has to be parked clear of after it too.
+		await parkPointerClearOfMount();
+
+		const root = el('root');
+		expect(root.getAttribute('role')).toBe('menubar');
+		expect(root.getAttribute('aria-orientation')).toBe('horizontal');
+		// The bar is always showing: it is not a surface, so it is neither enlisted nor hidden.
+		expect(root.hasAttribute('hidden')).toBe(false);
+		expect(root.hasAttribute('overlay')).toBe(false);
+		// No trigger anywhere: the page's own background button sits outside the bar.
+		expect(root.querySelector('button')).toBe(null);
+
+		for (const id of ['bar-file', 'bar-edit', 'bar-view']) {
+			expect(el(id).getAttribute('role'), id).toBe('menuitem');
+			expect(el(id).getAttribute('aria-haspopup'), id).toBe('menu');
+			expect(el(id).getAttribute('aria-expanded'), id).toBe('false');
+		}
+		expect(el('bar-file').getAttribute('aria-controls')).toBe(el('panel-file').id);
+		expect(el('panel-file').getAttribute('role')).toBe('menu');
+		expect(el('panel-file').getAttribute('aria-labelledby')).toBe(el('bar-file').id);
+		expectHidden(el('panel-file'), el('bar-file'));
+		// Measured on this tip rather than assumed: a plain command in a bar menu
+		// emits no `aria-controls` at all, so nothing points at an id that resolves
+		// to nothing and the family's accessibility bar stays at zero.
+		expect(el('item-new').hasAttribute('aria-controls')).toBe(false);
+	});
+
+	test(`${mode}: a menubar root drops the flag it destructured`, async () => {
+		if (mode === 'CSR') await render(Menubar);
+		else await renderSSR(Menubar);
+		// The bar's hover-after-open is unconditional by design, so the trusted
+		// `pointerover` Chromium delivers when a tree mounts under the cursor is
+		// enough to open a menu no row asked for. The shared setup parks before the
+		// mount; a bar has to be parked clear of after it too.
+		await parkPointerClearOfMount();
+
+		const root = el('root');
+		for (const attribute of ['menubar', 'open', 'checked', 'loop', 'radio', 'delay']) {
+			expect(root.hasAttribute(attribute), attribute).toBe(false);
+		}
+	});
+
+	// togglegroup's rule: until a focus says which item owns the stop, every one of
+	// them is tabbable - and the items inside a closed dropdown are unreachable
+	// anyway, so the bar is what a Tab actually lands on.
+	test(`${mode}: the bar is a tab stop, and the stop moves with the roving focus`, async () => {
+		if (mode === 'CSR') await render(Menubar);
+		else await renderSSR(Menubar);
+		// The bar's hover-after-open is unconditional by design, so the trusted
+		// `pointerover` Chromium delivers when a tree mounts under the cursor is
+		// enough to open a menu no row asked for. The shared setup parks before the
+		// mount; a bar has to be parked clear of after it too.
+		await parkPointerClearOfMount();
+
+		for (const id of ['bar-file', 'bar-edit', 'bar-view']) {
+			expect(el(id).getAttribute('tabindex'), id).toBe('0');
+		}
+
+		el('bar-edit').focus();
+		await expect.poll(() => el('bar-file').getAttribute('tabindex'), COLD_POLL).toBe('-1');
+		expect(el('bar-edit').getAttribute('tabindex')).toBe('0');
+		expect(el('bar-view').getAttribute('tabindex')).toBe('-1');
+	});
+
+	test(`${mode}: ArrowDown opens a bar menu on its first command and ArrowUp on its last`, async () => {
+		if (mode === 'CSR') await render(Menubar);
+		else await renderSSR(Menubar);
+		// The bar's hover-after-open is unconditional by design, so the trusted
+		// `pointerover` Chromium delivers when a tree mounts under the cursor is
+		// enough to open a menu no row asked for. The shared setup parks before the
+		// mount; a bar has to be parked clear of after it too.
+		await parkPointerClearOfMount();
+
+		await openBar('bar-file', 'panel-file');
+		expectShowing(el('panel-file'), el('bar-file'));
+		await expectFocused('item-new');
+
+		escape();
+		await expect.poll(() => el('panel-file').hasAttribute('hidden'), COLD_POLL).toBe(true);
+
+		el('bar-view').focus();
+		keyOn(el('bar-view'), 'ArrowUp');
+		await expect.poll(() => el('panel-view').hasAttribute('hidden'), COLD_POLL).toBe(false);
+		await expectFocused('item-zoom');
+	});
+
+	test(`${mode}: Enter and Space open a bar menu on its first command`, async () => {
+		if (mode === 'CSR') await render(Menubar);
+		else await renderSSR(Menubar);
+		// The bar's hover-after-open is unconditional by design, so the trusted
+		// `pointerover` Chromium delivers when a tree mounts under the cursor is
+		// enough to open a menu no row asked for. The shared setup parks before the
+		// mount; a bar has to be parked clear of after it too.
+		await parkPointerClearOfMount();
+
+		el('bar-edit').focus();
+		keyOn(el('bar-edit'), 'Enter');
+		await expect.poll(() => el('panel-edit').hasAttribute('hidden'), COLD_POLL).toBe(false);
+		await expectFocused('item-undo');
+
+		escape();
+		await expect.poll(() => el('panel-edit').hasAttribute('hidden'), COLD_POLL).toBe(true);
+
+		el('bar-view').focus();
+		keyOn(el('bar-view'), ' ');
+		await expect.poll(() => el('panel-view').hasAttribute('hidden'), COLD_POLL).toBe(false);
+		await expectFocused('item-wrap');
+	});
+
+	test(`${mode}: the arrows walk the bar and wrap at both ends`, async () => {
+		if (mode === 'CSR') await render(Menubar);
+		else await renderSSR(Menubar);
+		// The bar's hover-after-open is unconditional by design, so the trusted
+		// `pointerover` Chromium delivers when a tree mounts under the cursor is
+		// enough to open a menu no row asked for. The shared setup parks before the
+		// mount; a bar has to be parked clear of after it too.
+		await parkPointerClearOfMount();
+
+		el('bar-file').focus();
+		keyOn(el('bar-file'), 'ArrowRight');
+		await expectFocused('bar-edit');
+		keyOn(el('bar-edit'), 'ArrowRight');
+		await expectFocused('bar-view');
+		keyOn(el('bar-view'), 'ArrowRight');
+		await expectFocused('bar-file');
+		keyOn(el('bar-file'), 'ArrowLeft');
+		await expectFocused('bar-view');
+		// Walking the bar opens nothing: the arrows move, and ArrowDown is what opens.
+		expect(el('panel-view').hasAttribute('hidden')).toBe(true);
+	});
+
+	test(`${mode}: Home and End jump to the ends of the bar`, async () => {
+		if (mode === 'CSR') await render(Menubar);
+		else await renderSSR(Menubar);
+		// The bar's hover-after-open is unconditional by design, so the trusted
+		// `pointerover` Chromium delivers when a tree mounts under the cursor is
+		// enough to open a menu no row asked for. The shared setup parks before the
+		// mount; a bar has to be parked clear of after it too.
+		await parkPointerClearOfMount();
+
+		el('bar-edit').focus();
+		keyOn(el('bar-edit'), 'End');
+		await expectFocused('bar-view');
+		keyOn(el('bar-view'), 'Home');
+		await expectFocused('bar-file');
+	});
+
+	test(`${mode}: typeahead moves across the bar`, async () => {
+		if (mode === 'CSR') await render(Menubar);
+		else await renderSSR(Menubar);
+		// The bar's hover-after-open is unconditional by design, so the trusted
+		// `pointerover` Chromium delivers when a tree mounts under the cursor is
+		// enough to open a menu no row asked for. The shared setup parks before the
+		// mount; a bar has to be parked clear of after it too.
+		await parkPointerClearOfMount();
+
+		el('bar-file').focus();
+		keyOn(el('bar-file'), 'v');
+		await expectFocused('bar-view');
+		// One buffer for the whole menu, the bar included, so a stale one starts over.
+		await wait(TYPEAHEAD_WINDOW + 50);
+		keyOn(el('bar-view'), 'e');
+		await expectFocused('bar-edit');
+	});
+
+	// Radix's placement: the travel is answered where focus is - inside the open
+	// dropdown - not on the bar item, so it works however the menu was opened.
+	test(`${mode}: an arrow inside an open bar menu closes it and opens the neighbour's`, async () => {
+		if (mode === 'CSR') await render(Menubar);
+		else await renderSSR(Menubar);
+		// The bar's hover-after-open is unconditional by design, so the trusted
+		// `pointerover` Chromium delivers when a tree mounts under the cursor is
+		// enough to open a menu no row asked for. The shared setup parks before the
+		// mount; a bar has to be parked clear of after it too.
+		await parkPointerClearOfMount();
+
+		await openBar('bar-file', 'panel-file');
+		await expectFocused('item-new');
+
+		keyOn(el('item-new'), 'ArrowRight');
+		await expect.poll(() => el('panel-edit').hasAttribute('hidden'), COLD_POLL).toBe(false);
+		await expect.poll(() => el('panel-file').hasAttribute('hidden'), COLD_POLL).toBe(true);
+		await expectFocused('item-undo');
+
+		keyOn(el('item-undo'), 'ArrowLeft');
+		await expect.poll(() => el('panel-file').hasAttribute('hidden'), COLD_POLL).toBe(false);
+		await expect.poll(() => el('panel-edit').hasAttribute('hidden'), COLD_POLL).toBe(true);
+		await expectFocused('item-new');
+	});
+
+	test(`${mode}: Escape closes the open bar menu and hands focus back to its bar item`, async () => {
+		if (mode === 'CSR') await render(Menubar);
+		else await renderSSR(Menubar);
+		// The bar's hover-after-open is unconditional by design, so the trusted
+		// `pointerover` Chromium delivers when a tree mounts under the cursor is
+		// enough to open a menu no row asked for. The shared setup parks before the
+		// mount; a bar has to be parked clear of after it too.
+		await parkPointerClearOfMount();
+
+		await openBar('bar-edit', 'panel-edit');
+		await expectFocused('item-undo');
+
+		escape();
+		await expect.poll(() => el('panel-edit').hasAttribute('hidden'), COLD_POLL).toBe(true);
+		await expectFocused('bar-edit');
+		// The bar is not a surface, so Escape has nothing further to take down.
+		expect(el('root').getAttribute('role')).toBe('menubar');
+	});
+
+	test(`${mode}: nothing opens on hover until a bar menu is open, and then the neighbour does at once`, async () => {
+		if (mode === 'CSR') await render(MenubarServed);
+		else await renderSSR(MenubarServed);
+		// The bar's hover-after-open is unconditional by design, so the trusted
+		// `pointerover` Chromium delivers when a tree mounts under the cursor is
+		// enough to open a menu no row asked for. The shared setup parks before the
+		// mount; a bar has to be parked clear of after it too.
+		await parkPointerClearOfMount();
+
+		// The gesture that WAKES a served page cannot also be measured for time, so
+		// the page is woken once before the delay-free budget below is asked for.
+		await openBar('bar-file', 'panel-file');
+		escape();
+		await expect.poll(() => el('panel-file').hasAttribute('hidden'), COLD_POLL).toBe(true);
+
+		hover(el('bar-view'));
+		await wait(QUIET_MS);
+		expect(el('panel-view').hasAttribute('hidden')).toBe(true);
+
+		await openBar('bar-file', 'panel-file');
+		hover(el('bar-edit'), el('bar-file'));
+		await expect.poll(() => el('panel-edit').hasAttribute('hidden'), DELAY_FREE).toBe(false);
+		// The one showing closes itself: the focus the neighbour takes is what its own focusout answers.
+		await expect.poll(() => el('panel-file').hasAttribute('hidden'), DELAY_FREE).toBe(true);
+	});
+
+	test(`${mode}: a nested submenu under a bar menu keeps the shipped ArrowRight walk`, async () => {
+		if (mode === 'CSR') await render(Menubar);
+		else await renderSSR(Menubar);
+		// The bar's hover-after-open is unconditional by design, so the trusted
+		// `pointerover` Chromium delivers when a tree mounts under the cursor is
+		// enough to open a menu no row asked for. The shared setup parks before the
+		// mount; a bar has to be parked clear of after it too.
+		await parkPointerClearOfMount();
+
+		await openBar('bar-file', 'panel-file');
+		el('level-recent').focus();
+		keyOn(el('level-recent'), 'ArrowRight');
+		await expect.poll(() => el('panel-recent').hasAttribute('hidden'), COLD_POLL).toBe(false);
+		await expectFocused('item-draft');
+		// ArrowRight opened the level below rather than travelling to the next bar menu.
+		expect(el('panel-edit').hasAttribute('hidden')).toBe(true);
+
+		keyOn(el('item-draft'), 'ArrowLeft');
+		await expect.poll(() => el('panel-recent').hasAttribute('hidden'), COLD_POLL).toBe(true);
+		await expectFocused('level-recent');
+		expect(el('panel-file').hasAttribute('hidden')).toBe(false);
+	});
+
+	test(`${mode}: each bar menu hangs under its own item, where a nested one sits beside its`, async () => {
+		if (mode === 'CSR') await render(Menubar);
+		else await renderSSR(Menubar);
+		// The bar's hover-after-open is unconditional by design, so the trusted
+		// `pointerover` Chromium delivers when a tree mounts under the cursor is
+		// enough to open a menu no row asked for. The shared setup parks before the
+		// mount; a bar has to be parked clear of after it too.
+		await parkPointerClearOfMount();
+
+		await openBar('bar-file', 'panel-file');
+		el('level-recent').focus();
+		keyOn(el('level-recent'), 'ArrowRight');
+		await expect.poll(() => el('panel-recent').hasAttribute('hidden'), COLD_POLL).toBe(false);
+
+		// Chromium serialises the logical keywords back in block-then-inline order.
+		expect(getComputedStyle(el('panel-file')).getPropertyValue('position-area')).toBe(
+			'end span-end',
+		);
+		expect(getComputedStyle(el('panel-recent')).getPropertyValue('position-area')).toBe(
+			'span-end end',
+		);
+	});
+
+	test(`${mode}: a checkbox item in a bar menu toggles and leaves the menu up`, async () => {
+		if (mode === 'CSR') await render(Menubar);
+		else await renderSSR(Menubar);
+		// The bar's hover-after-open is unconditional by design, so the trusted
+		// `pointerover` Chromium delivers when a tree mounts under the cursor is
+		// enough to open a menu no row asked for. The shared setup parks before the
+		// mount; a bar has to be parked clear of after it too.
+		await parkPointerClearOfMount();
+
+		await openBar('bar-view', 'panel-view');
+		expect(el('item-wrap').getAttribute('role')).toBe('menuitemcheckbox');
+		expect(el('item-wrap').getAttribute('aria-checked')).toBe('true');
+
+		press(el('item-wrap'));
+		await expect.poll(() => el('item-wrap').getAttribute('aria-checked'), COLD_POLL).toBe('false');
+		expect(text('last')).toBe('wrap');
+		expect(el('panel-view').hasAttribute('hidden')).toBe(false);
+	});
+
+	test(`${mode}: a command in a bar menu reports to the one root and returns focus to its bar item`, async () => {
+		if (mode === 'CSR') await render(Menubar);
+		else await renderSSR(Menubar);
+		// The bar's hover-after-open is unconditional by design, so the trusted
+		// `pointerover` Chromium delivers when a tree mounts under the cursor is
+		// enough to open a menu no row asked for. The shared setup parks before the
+		// mount; a bar has to be parked clear of after it too.
+		await parkPointerClearOfMount();
+
+		await openBar('bar-edit', 'panel-edit');
+		press(el('item-undo'));
+		await expect.poll(() => text('last'), COLD_POLL).toBe('undo');
+		await expect.poll(() => el('panel-edit').hasAttribute('hidden'), COLD_POLL).toBe(true);
+		await expectFocused('bar-edit');
+	});
+
+	test(`${mode}: a menu.trigger written under a menubar refuses at runtime`, async () => {
+		let refusal: unknown;
+		try {
+			if (mode === 'CSR') await render(MenubarTrigger);
+			else await renderSSR(MenubarTrigger);
+		} catch (error) {
+			refusal = error;
+		}
+		expect(String(refusal)).toContain('menu.trigger cannot be written under a menubar');
+	});
+
+	test(`${mode}: axe finds no wcag2a/wcag21a violation on the bar at rest`, async () => {
+		const screen = mode === 'CSR' ? await render(Menubar) : await renderSSR(Menubar);
+		// The bar's hover-after-open is unconditional by design, so the trusted
+		// `pointerover` Chromium delivers when a tree mounts under the cursor is
+		// enough to open a menu no row asked for. The shared setup parks before the
+		// mount; a bar has to be parked clear of after it too.
+		await parkPointerClearOfMount();
+		await expectNoAxeViolations(screen.container as Element, 'the bar at rest');
+	});
+
+	test(`${mode}: axe finds no violation with a bar menu and a nested submenu open`, async () => {
+		const screen = mode === 'CSR' ? await render(Menubar) : await renderSSR(Menubar);
+		// The bar's hover-after-open is unconditional by design, so the trusted
+		// `pointerover` Chromium delivers when a tree mounts under the cursor is
+		// enough to open a menu no row asked for. The shared setup parks before the
+		// mount; a bar has to be parked clear of after it too.
+		await parkPointerClearOfMount();
+		await openBar('bar-file', 'panel-file');
+		await expectNoAxeViolations(screen.container as Element, 'a bar menu open');
+
+		el('level-recent').focus();
+		keyOn(el('level-recent'), 'ArrowRight');
+		await expect.poll(() => el('panel-recent').hasAttribute('hidden'), COLD_POLL).toBe(false);
+		await expectNoAxeViolations(screen.container as Element, 'a nested submenu open');
+	});
 }
 
 // ── Resume parity ──────────────────────────────────────────────────────────
@@ -985,4 +1364,17 @@ test('SSR: a pending long-press timer does not throw when the page goes', async 
 	await wait(20);
 	el('root').remove();
 	await wait(700);
+});
+
+test('SSR: the served bar already carries its role, its items and their hidden menus', async () => {
+	const screen = await renderSSR(Menubar);
+	const served = screen.container.innerHTML;
+	expect(served).toContain('role="menubar"');
+	expect(served).toContain('aria-orientation="horizontal"');
+	expect(served).toContain('role="menuitem"');
+	expect(served).toContain('aria-haspopup="menu"');
+	expect(served).toContain('hidden');
+	// The bar is the only tab stop the served HTML offers, before any focus has said which item owns it.
+	expect(served).toContain('tabindex="0"');
+	expect(el('panel-file').getAttribute('aria-labelledby')).toBe(el('bar-file').id);
 });
