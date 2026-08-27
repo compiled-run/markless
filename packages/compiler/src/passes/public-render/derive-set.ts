@@ -18,7 +18,11 @@ import {
 	renderDecisionSources,
 	sharedInstanceReadGraphNodeIds,
 } from './residue-reader.ts';
-import { componentEdgesFor, repeatCollectionGraphNodeIds } from './shared.ts';
+import {
+	componentEdgesFor,
+	componentOwnedStateNodes,
+	repeatCollectionGraphNodeIds,
+} from './shared.ts';
 
 export function rowScopedEdgeIds(
 	chunks: PublicRenderModuleInput['renderData']['chunks'],
@@ -80,6 +84,49 @@ function authoredHandlerReads(
  */
 export function handlerReadGraphNodeIds(input: PublicRenderModuleInput): ReadonlySet<string> {
 	return new Set(input.symbolResolver.symbols.flatMap(authoredHandlerReads));
+}
+
+/**
+ * The sync computeds this component has to serve: the ones a handler reads AND
+ * whose payload record this component's own selection carries. A served value
+ * can only be written into a record the payload holds, so a component that
+ * derives a computed it does not own serves nothing at all, and the owner has to
+ * derive it whether or not its own markup names it. The factory computeds of a
+ * widget family belong to the widget root, while the handler reading one - often
+ * through a shared() method spliced into it - sits on a part beside it.
+ */
+export function payloadServedComputedGraphNodeIds(
+	input: PublicRenderModuleInput,
+	componentName: string,
+): ReadonlySet<string> {
+	const handlerReads = handlerReadGraphNodeIds(input);
+	const rootComponentName = input.renderData.root?.componentName;
+	const owned =
+		rootComponentName === undefined
+			? undefined
+			: new Set(
+					componentOwnedStateNodes(
+						input,
+						componentName,
+						rootComponentName,
+					).computedIndexes.flatMap((index) => {
+						const computed = input.protocolState.computed[index];
+						return computed ? [computed.graphNodeId] : [];
+					}),
+				);
+	const indexed = new Set(input.protocolState.computed.map((computed) => computed.graphNodeId));
+	return new Set([
+		...input.protocolState.computed.flatMap((computed) =>
+			computed.async === false &&
+			handlerReads.has(computed.graphNodeId) &&
+			(owned === undefined || owned.has(computed.graphNodeId))
+				? [computed.graphNodeId]
+				: [],
+		),
+		// A read the payload indexes no record for narrows to nothing: the serve is
+		// a no-op wherever it lands, and dropping it here would move served bytes.
+		...[...handlerReads].filter((graphNodeId) => !indexed.has(graphNodeId)),
+	]);
 }
 
 /** The same reads, narrowed to the handlers one component's own render places. */

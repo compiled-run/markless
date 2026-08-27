@@ -11,7 +11,7 @@ import {
 import {
 	componentDeriveGraphNodeIds,
 	computedDependencyEdges,
-	handlerReadGraphNodeIds,
+	payloadServedComputedGraphNodeIds,
 	foreignSharedComputedScope,
 	orderComputedDerives,
 	rowScopedEdgeIds,
@@ -942,10 +942,16 @@ function emitSsrDataLines(
 	const sharedComputedSources = collectSsrSharedComputedSources(input);
 	// A factory computed another one reads derives first: emitted in declaration
 	// order, the reader saw the state map's `undefined` instead of the value.
+	// The owner of a served computed's payload record derives it even when its own
+	// markup never names it: nothing else on the page can put the value in that
+	// record, and a handler's first read after a resume has nowhere else to answer
+	// from.
+	const servedComputedGraphNodeIds = payloadServedComputedGraphNodeIds(input, componentName);
 	const allSharedComputedLines = orderComputedDerives(
 		input.protocolState.computed.flatMap((computed) =>
 			sharedComputedSources.has(computed.graphNodeId) &&
-			componentGraphNodeIds.has(computed.graphNodeId)
+			(componentGraphNodeIds.has(computed.graphNodeId) ||
+				servedComputedGraphNodeIds.has(computed.graphNodeId))
 				? [computed.graphNodeId]
 				: [],
 		),
@@ -1021,9 +1027,8 @@ function emitSsrDataLines(
 			),
 		),
 	];
-	const handlerReads = handlerReadGraphNodeIds(input);
 	const servedComputedIds = [...new Set(derivedComputedIds)].filter((graphNodeId) =>
-		handlerReads.has(graphNodeId),
+		servedComputedGraphNodeIds.has(graphNodeId),
 	);
 	return {
 		seedForward: seedForwardLines,
