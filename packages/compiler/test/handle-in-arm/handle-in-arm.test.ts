@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { PROTOCOL_ELEMENT_HANDLE_ID_READ_PREFIX } from '@markless/serializer';
 import { buildSemanticGraph, compileTsrxModule } from '../../src/index.ts';
 
 // An element() handle bound inside a flippable @if arm. The binding itself
@@ -76,20 +77,24 @@ test('a handle bound inside a flippable arm compiles, and the arm record carries
 	expect(arm?.elementHandles.map((handle) => handle.name)).toEqual(['panelEl']);
 });
 
-test('an IDREF naming a handle bound inside the arm refuses, and says the id is what a flip cannot respell', async () => {
+test('an IDREF naming a handle bound inside the arm compiles, and the arm reads the id the render resolved', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/NamedByIdref.tsrx',
 		source: namedByIdref,
 		symbols: [],
 	});
-	const refusal = result.symbolModules.diagnostics.find(
-		(entry) => entry.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
-	);
-	expect(refusal?.severity).toBe('error');
-	// Not "it holds a attribute binding": the cause is the minted id, and naming
-	// the slot kind instead sent a reader looking for a binding that is not there.
-	expect(refusal?.message).toContain('named by an IDREF');
-	expect(refusal?.message).toContain('minted for the rendered widget');
+	expect(
+		result.symbolModules.diagnostics.filter(
+			(entry) =>
+				entry.severity === 'error' &&
+				entry.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
+		),
+	).toEqual([]);
+
+	// The flip cannot mint the id — the token is a seed-map value it never sees —
+	// so the arm asks for it through the read channel its value parts already use.
+	const flip = result.symbolModules.modules.find((module) => module.kind === 'branch-update');
+	expect(flip?.source).toContain(PROTOCOL_ELEMENT_HANDLE_ID_READ_PREFIX);
 });
 
 test('one handle bound in both arms of a branch is still a duplicate', async () => {
