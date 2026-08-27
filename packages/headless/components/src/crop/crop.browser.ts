@@ -161,11 +161,11 @@ test('the rectangle is the controlled prop, else what a gesture wrote, else the 
 	const given = { x: 1, y: 1, width: 10, height: 10 };
 	const own = { x: 2, y: 2, width: 20, height: 20 };
 	const seed = { x: 3, y: 3, width: 30, height: 30 };
-	expect(heldRect(given, true, own.x, own.y, own.width, own.height, seed, 40, 40)).toEqual(given);
-	expect(heldRect(undefined, true, own.x, own.y, own.width, own.height, seed, 40, 40)).toEqual(own);
-	expect(heldRect(undefined, false, 0, 0, 0, 0, seed, 40, 40)).toEqual(seed);
+	expect(heldRect(given, own, seed, 40, 40)).toEqual(given);
+	expect(heldRect(undefined, own, seed, 40, 40)).toEqual(own);
+	expect(heldRect(undefined, undefined, seed, 40, 40)).toEqual(seed);
 	// Nothing declared at all still has a rectangle: the smallest one allowed.
-	expect(heldRect(undefined, false, 0, 0, 0, 0, undefined, 40, 25)).toEqual({
+	expect(heldRect(undefined, undefined, undefined, 40, 25)).toEqual({
 		x: 0,
 		y: 0,
 		width: 40,

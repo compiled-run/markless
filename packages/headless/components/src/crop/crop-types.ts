@@ -101,16 +101,8 @@ export type CropInstanceState = Seeded<
 	seed: CropRect | undefined;
 	/** The `value` prop. Defined means controlled. */
 	given: CropRect | undefined;
-	/**
-	 * The family's own copy of the rectangle, as four numbers rather than one
-	 * object: a whole-object write to a state cell does not reach the graph, so a
-	 * gesture that replaced a rect cell would leave the page showing the old one.
-	 */
-	hasOwn: boolean;
-	ownX: number;
-	ownY: number;
-	ownWidth: number;
-	ownHeight: number;
+	/** The family's own copy of the rectangle. Undefined until a gesture writes one. */
+	own: CropRect | undefined;
 	/** The `aspect` prop. Undefined means the two axes are free. */
 	aspect: number | undefined;
 	/** The `maxWidth` / `maxHeight` props. Undefined means no cap but the area. */
