@@ -41,6 +41,8 @@ import {
 } from '@markless/compiler';
 import { dirname, relative, resolve } from 'pathe';
 import { withQuery } from 'ufo';
+import type { BuildDelegateLoader, DelegateSpecifierResolve } from './build/delegate-loader.ts';
+import { yieldToEventLoop } from './event-loop.ts';
 import type { ModuleMetadataRegistry } from './module-metadata-registry.ts';
 import { MARKLESS_VIRTUAL_PREFIX } from './transform.ts';
 import type {
@@ -49,7 +51,7 @@ import type {
 	MarklessRolldownOptions,
 	MarklessTransformManifest,
 } from './types.ts';
-import { isRelativeImport, pathname } from './virtual-ids.ts';
+import { TSRX_SOURCE_FILE, isRelativeImport, pathname } from './virtual-ids.ts';
 
 type ResolvedImport = { readonly id: string; readonly external?: unknown } | string | null;
 
@@ -192,15 +194,27 @@ export async function linkBarrelComponentInterfaces(
 }> {
 	const resolution: Record<string, string | null> = {};
 	const interfacesByFile = new Map<string, ModuleGraphInterfaceArtifact | null>();
+	const rebase = (target: string) => {
+		const specifier = relative(dirname(parent), target);
+		return specifier.startsWith('.') ? specifier : `./${specifier}`;
+	};
+	const packageBarrels = await packageBarrelSpecifiers(context, parent, moduleImports, rebase);
+	const passImports =
+		packageBarrels.size === 0
+			? moduleImports
+			: moduleImports.map((moduleImport) => {
+					const barrel = packageBarrels.get(moduleImport.source);
+					return barrel ? { ...moduleImport, source: barrel.specifier } : moduleImport;
+				});
+	for (const barrel of packageBarrels.values()) {
+		resolution[moduleLinkResolutionKey(barrel.specifier, parent)] = barrel.id;
+	}
 	const passInput = () => ({
 		parent,
-		moduleImports,
+		moduleImports: passImports,
 		resolution,
 		moduleInterface: (filename: string) => interfacesByFile.get(filename),
-		rebase: (target: string) => {
-			const specifier = relative(dirname(parent), target);
-			return specifier.startsWith('.') ? specifier : `./${specifier}`;
-		},
+		rebase,
 	});
 
 	let artifact = linkBarrelComponents(passInput());
@@ -235,7 +249,100 @@ export async function linkBarrelComponentInterfaces(
 	// The pass decides; a barrel it could not follow stays fail-closed.
 	const [diagnostic] = artifact.diagnostics;
 	if (diagnostic) throw new Error(diagnostic.message);
-	return { interfaces: artifact.interfaces, children: artifact.children };
+	return {
+		interfaces: republishPackageBarrels(artifact.interfaces, packageBarrels),
+		children: artifact.children,
+	};
+}
+
+// The walk saw the dependency barrel under the path spelling it was offered;
+// the importing module wrote the package specifier, so that is the key its
+// compile looks the interface up by.
+function republishPackageBarrels(
+	linked: Record<string, ModuleGraphInterfaceArtifact>,
+	packageBarrels: ReadonlyMap<string, PackageBarrel>,
+): Record<string, ModuleGraphInterfaceArtifact> {
+	if (packageBarrels.size === 0) return linked;
+	const reexported = new Set(
+		Object.values(linked).flatMap((entry) =>
+			(entry.reexports ?? []).map((reexport) => reexport.source),
+		),
+	);
+	const interfaces = { ...linked };
+	for (const [source, barrel] of packageBarrels) {
+		const entry = linked[barrel.specifier];
+		if (!entry) continue;
+		interfaces[source] = entry;
+		// One key per interface: a second spelling of the same file makes the
+		// compiler's filename fallback ambiguous.
+		if (!reexported.has(barrel.specifier)) delete interfaces[barrel.specifier];
+	}
+	return interfaces;
+}
+
+type PackageBarrel = { readonly specifier: string; readonly id: string };
+
+/**
+ * A dependency package's barrel, offered to the walk under the path spelling it
+ * follows. Only a package that declares it ships Markless source is followed:
+ * its modules compile in this build, so an interface for them can exist. Any
+ * other dependency contributes none and the call behind it stays fail-closed.
+ */
+async function packageBarrelSpecifiers(
+	context: LinkResolveContext,
+	parent: string,
+	moduleImports: ReadonlyArray<{ readonly source: string }>,
+	rebase: (target: string) => string,
+): Promise<ReadonlyMap<string, PackageBarrel>> {
+	const specifiers = [...new Set(moduleImports.map((moduleImport) => moduleImport.source))].filter(
+		(source) =>
+			!isRelativeImport(source) &&
+			!isAbsolute(source) &&
+			!source.startsWith('\0') &&
+			!TSRX_SOURCE_FILE.test(source),
+	);
+	const entries = await Promise.all(
+		specifiers.map(async (source) => {
+			const resolved = await context.resolve(source, parent, { skipSelf: true });
+			if (typeof resolved === 'object' && resolved !== null && Boolean(resolved.external)) {
+				return null;
+			}
+			const raw = typeof resolved === 'string' ? resolved : resolved?.id;
+			if (!raw) return null;
+			const id = pathname(String(raw));
+			if (!isAbsolute(id) || !MARKLESS_SOURCE_FILE.test(id)) return null;
+			if (!existsSync(id) || !statSync(id).isFile()) return null;
+			if (!shipsMarklessSource(dirname(id))) return null;
+			return [source, { specifier: rebase(id), id }] as const;
+		}),
+	);
+	return new Map(entries.filter((entry) => entry !== null));
+}
+
+const MARKLESS_SOURCE_FILE = /\.(?:m?ts|tsx|tsrx)$/;
+
+const shipsMarklessSourceByDirectory = new Map<string, boolean>();
+
+// `publishConfig.marklessShipsSource` is the package's own declaration that its
+// tarball is source compiled by the consumer's build.
+function shipsMarklessSource(directory: string): boolean {
+	const cached = shipsMarklessSourceByDirectory.get(directory);
+	if (cached !== undefined) return cached;
+	const manifest = resolve(directory, 'package.json');
+	const parent = dirname(directory);
+	let ships = false;
+	if (existsSync(manifest)) {
+		try {
+			const parsed = JSON.parse(readFileSync(manifest, 'utf8'));
+			ships = parsed?.publishConfig?.marklessShipsSource === true;
+		} catch {
+			ships = false;
+		}
+	} else if (parent !== directory) {
+		ships = shipsMarklessSource(parent);
+	}
+	shipsMarklessSourceByDirectory.set(directory, ships);
+	return ships;
 }
 
 async function barrelModuleInterface(
@@ -246,6 +353,7 @@ async function barrelModuleInterface(
 	const known = artifacts.get(filename)?.moduleGraphInterface;
 	if (known) return known;
 	if (!existsSync(filename) || !statSync(filename).isFile()) return null;
+	await yieldToEventLoop();
 	const linked = await compileTsrxModuleLinkArtifact({
 		filename,
 		source: readFileSync(filename, 'utf8'),
@@ -408,15 +516,111 @@ export function warnDelegateImportFailures(
 	}
 }
 
+// A dependency that ships TypeScript source: Node refuses to type-strip under
+// node_modules, so a plain `import()` can never load one of these.
+const SOURCE_SHIPPED_DELEGATE = /\.(?:m|c)?tsx?$|\.tsrx$/;
+
+// How a delegate module is executed. The build environment's module runner is
+// the only loader that can run a source-shipped package, because it applies the
+// same transform pipeline the app's own modules go through.
+export type DelegateModuleImport = (source: string) => Promise<unknown>;
+
+// One module table per build: a delegate imported by several pages is executed
+// once, and a delegate that failed once is not retried on every later edge.
+export type DelegateModuleCache = ReturnType<typeof createDelegateModuleCache>;
+
+export function createDelegateModuleCache() {
+	const loaded = new Map<string, Record<string, unknown>>();
+	const failures = new Map<string, string>();
+	return {
+		failureFor(source: string) {
+			return failures.get(source);
+		},
+		moduleFor(source: string) {
+			return loaded.get(source);
+		},
+		async load(
+			source: string,
+			importModule: DelegateModuleImport | undefined,
+		): Promise<Record<string, unknown> | undefined> {
+			const cached = loaded.get(source);
+			if (cached) return cached;
+			if (failures.has(source)) return undefined;
+			let firstMessage: string | undefined;
+			// The runner runs first for source-shipped delegates; a plain `import()`
+			// of raw TypeScript is refused before it can produce a module.
+			for (const load of importModule && SOURCE_SHIPPED_DELEGATE.test(source)
+				? [importModule, nodeImport]
+				: [nodeImport, ...(importModule ? [importModule] : [])]) {
+				try {
+					const module = (await load(source)) as Record<string, unknown>;
+					loaded.set(source, module);
+					return module;
+				} catch (error) {
+					firstMessage ??= error instanceof Error ? error.message : String(error);
+				}
+			}
+			failures.set(source, firstMessage ?? 'the delegate module could not be loaded.');
+			return undefined;
+		},
+		clear() {
+			loaded.clear();
+			failures.clear();
+		},
+	};
+}
+
+function nodeImport(source: string): Promise<unknown> {
+	return import(pathToFileURL(source).href);
+}
+
+// The build's own module table and loader, so every delegate edge in a build
+// shares one execution of a given dependency. A dev server hands over its module
+// runner; `vite build` has none, so the build-mode loader compiles the delegate
+// itself and resolves its imports through the build's own resolver.
+export function delegateLoadOptions(
+	ctx: {
+		readonly state: {
+			readonly delegateModules: DelegateModuleCache;
+			readonly buildDelegateLoader: BuildDelegateLoader;
+		};
+		readonly internalOptions: {
+			readonly devServer?: { readonly importModule?: DelegateModuleImport };
+		};
+	},
+	resolveContext: LinkResolveContext,
+) {
+	const { buildDelegateLoader } = ctx.state;
+	const resolve = buildDelegateSpecifierResolve(resolveContext);
+	return {
+		modules: ctx.state.delegateModules,
+		importModule:
+			ctx.internalOptions.devServer?.importModule ??
+			((source: string) => buildDelegateLoader.load(source, resolve)),
+	};
+}
+
+function buildDelegateSpecifierResolve(context: LinkResolveContext): DelegateSpecifierResolve {
+	return async (specifier, importer) => {
+		const resolved = await context.resolve(specifier, importer, { skipSelf: true });
+		if (typeof resolved === 'string') return resolved;
+		if (!resolved || resolved.external) return undefined;
+		return String(resolved.id);
+	};
+}
+
 // Performs the I/O the `delegate-children` pass may not: resolves each edge,
-// imports the dependency's compiled JavaScript, and calls its `renderSsr`. The
-// build-time `import()` of a dependency's dist is pre-existing; it is the one
-// place a linker executes code the compiler did not produce, which is exactly
-// why it lives here and not in the pass.
+// loads the dependency's module, and calls its `renderSsr`. It is the one place
+// a linker executes code the compiler did not produce, which is exactly why it
+// lives here and not in the pass.
 export async function materializeDelegateChildren(
 	context: LinkResolveContext,
 	parent: string,
 	candidates: ReadonlyArray<LinkedArtifactChild>,
+	options: {
+		readonly modules?: DelegateModuleCache;
+		readonly importModule?: DelegateModuleImport;
+	} = {},
 ): Promise<DelegateChildMaterializationResult> {
 	const resolution: Record<string, string> = {};
 	for (const candidate of delegateChildResolutionRequests(candidates)) {
@@ -426,7 +630,7 @@ export async function materializeDelegateChildren(
 	}
 	const children = planDelegateChildren(candidates, resolution);
 	const byEdge = new Map(candidates.map((candidate) => [candidate.edgeId, candidate]));
-	const loaded = new Map<string, Record<string, unknown>>();
+	const modules = options.modules ?? createDelegateModuleCache();
 	const unloadable = new Map<string, { readonly message: string; readonly edgeIds: string[] }>();
 	const renderings: Record<string, ArtifactChildMaterialization> = {};
 	for (const child of children) {
@@ -439,19 +643,14 @@ export async function materializeDelegateChildren(
 			failed.edgeIds.push(child.edgeId);
 			continue;
 		}
-		let module = loaded.get(source);
+		// A delegate no loader could execute is not materialized, never a crash.
+		const module = await modules.load(source, options.importModule);
 		if (!module) {
-			// Unimportable here (e.g. raw .ts without type stripping): not materialized, never a crash.
-			try {
-				module = (await import(pathToFileURL(source).href)) as Record<string, unknown>;
-			} catch (error) {
-				unloadable.set(source, {
-					message: error instanceof Error ? error.message : String(error),
-					edgeIds: [child.edgeId],
-				});
-				continue;
-			}
-			loaded.set(source, module);
+			unloadable.set(source, {
+				message: modules.failureFor(source) ?? 'the delegate module could not be loaded.',
+				edgeIds: [child.edgeId],
+			});
+			continue;
 		}
 		const component =
 			candidate.importKind === 'default'

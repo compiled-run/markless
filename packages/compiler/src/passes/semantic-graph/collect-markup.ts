@@ -29,17 +29,17 @@ import type {
 } from '../../artifacts.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
-	anchorElementHandleDynamicStyleDiagnostic,
 	branchElseSpellingDiagnostic,
 	idrefElementHandleIdConflictDiagnostic,
 } from './diagnostics.ts';
-import { anchorStyleProperty, isIdrefAttribute } from './idref-attributes.ts';
+import { isCssAnchorAttribute, isIdrefAttribute } from './idref-attributes.ts';
 import { OVERLAY_DOM_ATTRIBUTE, overlayLiteralValue } from './overlay-attribute.ts';
 import {
 	createStyleConstResolver,
 	lowerStyleObject,
 	type StyleConstResolver,
 } from './style-object.ts';
+import { componentMarkupRoot } from '../public-render/component-markup-root.ts';
 import { collectStyleScopes } from '../public-render/style-scopes.ts';
 import { propsRestSignature } from './spread-event-guard.ts';
 import type { MutableSemanticGraphArtifact } from './types.ts';
@@ -113,7 +113,7 @@ export function collectSemanticMarkup(input: {
 	for (const statement of asNodes(input.ast.body)) {
 		const component = getComponentFunction(statement);
 		if (!component) continue;
-		const root = firstMarkupOutput(component.node);
+		const root = componentMarkupRoot(component.node);
 		if (!root) continue;
 		components.push({
 			name: component.name,
@@ -396,10 +396,6 @@ function emitNode(
 		});
 		append(builder, '"');
 	}
-	// One residue for the whole style attribute when a CSS anchor position named
-	// a handle here: the consumer's style rides inside it rather than in a second
-	// style attribute the parser would drop.
-	const anchorStyle = anchorStyleResidue(context, node, elementAttributes);
 	const declaredAttributeNames = elementAttributes.flatMap((candidate) => {
 		if (isSpreadAttribute(candidate)) return [];
 		const name = getIdentifierName(candidate.name as AnyNode | undefined);
@@ -439,36 +435,23 @@ function emitNode(
 			if (isElevated(attribute)) append(builder, ` ${OVERLAY_DOM_ATTRIBUTE}=""`);
 			continue;
 		}
-		if (
-			!name ||
-			isEventAttribute(name) ||
-			name === 'attach' ||
-			name === 'el' ||
-			// A CSS anchor position is not a DOM attribute: it lowers to the one
-			// style slot below, so writing it here would leak `anchorname="..."`.
-			anchorStyleProperty(name) !== undefined ||
-			(name === 'style' && anchorStyle !== null)
-		)
+		// A CSS anchor spelled as an attribute is refused by the semantic pass; it
+		// is dropped here so a refused module never leaks `anchorname="..."`.
+		if (!name || isEventAttribute(name) || name === 'attach' || name === 'el' || isCssAnchorAttribute(name))
 			continue;
-		const idrefHandle = elementHandleIdrefTarget(context, node, name);
-		if (idrefHandle) {
-			// A shared() handle names an element some OTHER part of the widget
-			// renders, and whether that part was placed is not a build-time fact of
-			// this file. So the slot writes the whole attribute or nothing, rather
-			// than baking the name into the statics around an id that may name
-			// nothing. A component-local handle is bound in this same markup, so it
-			// keeps the statics it always had.
-			const omittable = idrefHandle.startsWith('shared:');
+		const idrefHandles = elementHandleIdrefTarget(context, node, name);
+		if (idrefHandles) {
+			// An omittable reference writes the whole attribute or nothing, rather
+			// than baking the name into the statics around ids that may name nothing.
+			// Component-local handles are bound in this same markup, so they keep the
+			// statics they always had.
+			const omittable = idrefOmittable(idrefHandles);
 			if (!omittable) append(builder, ` ${name}="`);
 			addSlot(builder, {
 				kind: 'attribute',
 				name,
 				coordinate: { kind: 'child-index', path },
-				residue: {
-					kind: 'element-handle-id',
-					handleGraphNodeId: idrefHandle,
-					...(omittable ? { idref: true as const } : {}),
-				},
+				residue: elementHandleIdrefResidue(idrefHandles),
 				...(omittable ? {} : { alwaysPresent: true as const }),
 			});
 			if (!omittable) append(builder, '"');
@@ -493,9 +476,12 @@ function emitNode(
 			continue;
 		}
 		if (!expression) continue;
+		// In a scoped module every element carries the scope class, so a dynamic
+		// class is always present and the constant rides the statics after the slot.
+		const scopeSuffix = name === 'class' ? context.styleScopeClass : null;
 		// A value that cannot be absent keeps its name in the statics; otherwise
 		// the slot emits the whole attribute so the runtime decides presence.
-		const alwaysPresent = isAlwaysPresentValue(expression);
+		const alwaysPresent = isAlwaysPresentValue(expression) || scopeSuffix !== null;
 		if (alwaysPresent) append(builder, ` ${name}="`);
 		addSlot(builder, {
 			kind: 'attribute',
@@ -510,22 +496,12 @@ function emitNode(
 							context,
 							repeat,
 							builder.componentName,
+							context.styleScopeClass,
 						),
 					}
 				: {}),
 		});
-		if (alwaysPresent) append(builder, '"');
-	}
-	if (anchorStyle) {
-		append(builder, ' style="');
-		addSlot(builder, {
-			kind: 'attribute',
-			name: 'style',
-			coordinate: { kind: 'child-index', path },
-			residue: anchorStyle,
-			alwaysPresent: true,
-		});
-		append(builder, '"');
+		if (alwaysPresent) append(builder, scopeSuffix ? ` ${scopeSuffix}"` : '"');
 	}
 	if (context.styleScopeClass && !classSeen)
 		append(builder, ` class="${context.styleScopeClass}"`);
@@ -536,92 +512,43 @@ function emitNode(
 }
 
 /**
- * The one inline style value for an element whose CSS anchor positions named
- * element() handles, consumer declarations included.
- *
- * One residue rather than one per declaration, because an element carries
- * exactly one style attribute: two would leave the browser keeping the first
- * and dropping the rest without saying so, and the dynamic-host path writes
- * attributes by name, where a second `style` really would clobber. Composing
- * here also fixes the precedence: the consumer's declarations come first, so
- * the anchor names - which are plumbing, not design - win the cascade.
- *
- * Returns null when this element declares no anchor, and also when it declares
- * one alongside a style the compiler cannot read at compile time, which is
- * refused rather than merged in the browser.
- */
-function anchorStyleResidue(
-	context: CollectionContext,
-	node: AnyNode,
-	attributes: ReadonlyArray<AnyNode>,
-): SemanticMarkupResidue | null {
-	const hostNodeId = context.hostIds.get(node);
-	if (!hostNodeId) return null;
-	const anchors = context.graph.elementHandleAnchors
-		.filter((anchor) => anchor.hostNodeId === hostNodeId)
-		.slice()
-		.sort((left, right) => left.order - right.order);
-	if (anchors.length === 0) return null;
-	const declarations = anchors.flatMap((anchor) => {
-		const property = anchorStyleProperty(anchor.attributeName);
-		return property ? [{ property, handleGraphNodeId: anchor.handleGraphNodeId }] : [];
-	});
-	if (declarations.length === 0) return null;
-
-	const styleAttribute = attributes.find(
-		(candidate) =>
-			!isSpreadAttribute(candidate) &&
-			getIdentifierName(candidate.name as AnyNode | undefined) === 'style',
-	);
-	let staticStyle = '';
-	if (styleAttribute) {
-		const value = styleAttribute.value as AnyNode | undefined;
-		const expression = unwrapExpressionContainer(value);
-		const objectCss = staticStyleObjectCss('style', expression, context);
-		if (objectCss !== null) staticStyle = objectCss;
-		else {
-			const literal = staticAttributeValue(value, expression);
-			const text = literal ? staticAttributeText('style', literal.value) : null;
-			if (text === null) {
-				context.graph.diagnostics.push(
-					anchorElementHandleDynamicStyleDiagnostic({
-						attributeName: anchors[0]!.attributeName,
-						span: sourceSpan(styleAttribute, context.filename),
-					}),
-				);
-				return null;
-			}
-			staticStyle = text;
-		}
-	}
-	// The lowered style object ends in `;`; the composed value supplies its own
-	// separators, so a trailing one would emit an empty declaration.
-	const consumerStyle = staticStyle.replace(/;\s*$/, '');
-	return {
-		kind: 'element-handle-anchor-style',
-		declarations,
-		...(consumerStyle ? { staticStyle: consumerStyle } : {}),
-	};
-}
-
-/**
- * An IDREF attribute whose value resolved to an element() handle is a recorded
- * relationship, not a value binding: its value is the id minted for the handle,
- * so the slot renders from the record rather than from the authored expression.
- * Returns the handle's graph node, or undefined when this attribute is an
- * ordinary value binding.
+ * An IDREF attribute whose value resolved to element() handles is a recorded
+ * relationship, not a value binding: its value is the ids minted for them, so
+ * the slot renders from the records rather than from the authored expression.
+ * Returns the handles' graph nodes in authored order, or undefined when this
+ * attribute is an ordinary value binding.
  */
 function elementHandleIdrefTarget(
 	context: CollectionContext,
 	node: AnyNode,
 	name: string,
-): string | undefined {
+): ReadonlyArray<string> | undefined {
 	if (!isIdrefAttribute(name)) return undefined;
 	const hostNodeId = context.hostIds.get(node);
 	if (!hostNodeId) return undefined;
-	return context.graph.elementHandleIdrefs.find(
-		(idref) => idref.hostNodeId === hostNodeId && idref.attributeName === name,
-	)?.handleGraphNodeId;
+	const handles = context.graph.elementHandleIdrefs
+		.filter((idref) => idref.hostNodeId === hostNodeId && idref.attributeName === name)
+		.map((idref) => idref.handleGraphNodeId);
+	return handles.length > 0 ? handles : undefined;
+}
+
+/** One residue for however many handles an IDREF position named. */
+function elementHandleIdrefResidue(handles: ReadonlyArray<string>): SemanticMarkupResidue {
+	if (handles.length > 1)
+		return { kind: 'element-handle-id-list', handleGraphNodeIds: handles };
+	const handleGraphNodeId = handles[0]!;
+	return {
+		kind: 'element-handle-id',
+		handleGraphNodeId,
+		...(handleGraphNodeId.startsWith('shared:') ? { idref: true as const } : {}),
+	};
+}
+
+// Whether the whole attribute has to be slot-written: a shared() handle names an
+// element some OTHER part renders, and whether that part was placed is not a
+// build-time fact of this file.
+function idrefOmittable(handles: ReadonlyArray<string>): boolean {
+	return handles.some((handle) => handle.startsWith('shared:'));
 }
 
 /**
@@ -662,6 +589,7 @@ function directClassMatch(
 	context: CollectionContext,
 	repeat: { readonly id: string; readonly itemName: string },
 	componentName: string,
+	styleScopeClass: string | null,
 ) {
 	if (expression.type !== 'ConditionalExpression') return undefined;
 	const test = expression.test as AnyNode | undefined;
@@ -687,8 +615,8 @@ function directClassMatch(
 		stateGraphNodeId: graph.graphNodeId,
 		statePath: graph.path,
 		itemPath: item.path,
-		trueClass: consequent.value,
-		falseClass: alternate.value,
+		trueClass: styleScopeClass ? `${consequent.value} ${styleScopeClass}` : consequent.value,
+		falseClass: styleScopeClass ? `${alternate.value} ${styleScopeClass}` : alternate.value,
 	};
 }
 
@@ -710,7 +638,6 @@ function emitDynamicHost(
 		| { readonly kind: 'spread'; readonly residue: SemanticMarkupResidue }
 	> = [];
 	const elementAttributes = getElementAttributes(node);
-	const anchorStyle = anchorStyleResidue(context, node, elementAttributes);
 	for (const attribute of elementAttributes) {
 		if (isSpreadAttribute(attribute)) {
 			const expression = unwrapExpressionContainer(
@@ -730,25 +657,14 @@ function emitDynamicHost(
 			if (isElevated(attribute)) staticAttributes[OVERLAY_DOM_ATTRIBUTE] = '';
 			continue;
 		}
-		if (
-			!name ||
-			isEventAttribute(name) ||
-			name === 'attach' ||
-			name === 'el' ||
-			anchorStyleProperty(name) !== undefined ||
-			(name === 'style' && anchorStyle !== null)
-		)
+		if (!name || isEventAttribute(name) || name === 'attach' || name === 'el' || isCssAnchorAttribute(name))
 			continue;
-		const idrefHandle = elementHandleIdrefTarget(context, node, name);
-		if (idrefHandle) {
+		const idrefHandles = elementHandleIdrefTarget(context, node, name);
+		if (idrefHandles) {
 			attributeSlots.push({
 				kind: 'attribute',
 				name,
-				residue: {
-					kind: 'element-handle-id',
-					handleGraphNodeId: idrefHandle,
-					...(idrefHandle.startsWith('shared:') ? { idref: true as const } : {}),
-				},
+				residue: elementHandleIdrefResidue(idrefHandles),
 			});
 			continue;
 		}
@@ -781,9 +697,6 @@ function emitDynamicHost(
 			residue: { kind: 'element-handle-id', handleGraphNodeId: mintedIdHandle },
 		});
 	}
-	// The composed value carries the consumer's static style too, so it replaces
-	// the static entry rather than adding a second style attribute after it.
-	if (anchorStyle) attributeSlots.push({ kind: 'attribute', name: 'style', residue: anchorStyle });
 	if (context.styleScopeClass) {
 		staticAttributes.class = staticAttributes.class
 			? `${staticAttributes.class} ${context.styleScopeClass}`
@@ -910,26 +823,11 @@ function expressionResidue(
 		: { kind: 'authored-expression', source };
 }
 
-function firstMarkupOutput(component: AnyNode): AnyNode | null {
-	const body = component.body as AnyNode | undefined;
-	for (const node of body ? childNodes(body) : []) {
-		if (
-			node.type === 'Element' ||
-			node.type === 'JSXElement' ||
-			node.type === 'Fragment' ||
-			node.type === 'JSXFragment' ||
-			node.type === 'JSXIfExpression' ||
-			node.type === 'JSXSwitchExpression' ||
-			node.type === 'JSXForExpression' ||
-			node.type === 'JSXTryExpression'
-		)
-			return node;
-		if (node.type === 'ReturnStatement') {
-			const argument = node.argument as AnyNode | undefined;
-			if (argument) return argument;
-		}
-	}
-	return null;
+/** The scope class every element of this component carries, or null when it declares no <style>. */
+export function componentStyleScopeClass(component: AnyNode, filename: string): string | null {
+	const root = componentMarkupRoot(component);
+	if (!root) return null;
+	return collectStyleScopes(root, filename).styleScopes[0]?.scopeId ?? null;
 }
 
 function isPublicRoot(node: AnyNode): boolean {

@@ -1,0 +1,22 @@
+# MARKLESS_ROW_ELEMENT_HANDLE_UNSUPPORTED
+
+This is not a row-ownable element() handle
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: error
+
+## Message
+
+Cannot bind el=\{…\} inside a keyed repeat. A row host takes a declared element() handle, named directly (el=\{row\}) or as one member off a shared() instance (el=\{select.optionEls\}). markless debugging playbook: run pnpm doctor, or read agent/markless.md in the installed @markless/core package
+
+## Why
+
+The keyed row record owns one host slot per authored handle and repeat key. Forwarded props, deeper paths, and nested repeat scopes do not identify one compiler-proven row-owned slot.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
