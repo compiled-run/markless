@@ -21,9 +21,18 @@ export const gateState = shared(
 			return at + span;
 		});
 
+		// The no-limit seed is non-finite, and JSON has no form for that: a bare
+		// number slot serves `null`, which this derive would read as a finite 0.
+		const headroom = computed(() => {
+			const limit = gate.maxWidth;
+			const span = gate.width;
+			return limit - span;
+		});
+
 		return {
 			...gate,
 			right,
+			headroom,
 
 			grow() {
 				const span = gate.width;
@@ -70,6 +79,12 @@ export function GateFactoryReadout() @{
 	const gate = gateState();
 
 	<output data-gate-factory-readout>{gate.right}</output>
+}
+
+export function GateHeadroomReadout() @{
+	const gate = gateState();
+
+	<output data-gate-headroom-readout>{gate.headroom}</output>
 }
 
 export function GateTrigger() @{

@@ -1,6 +1,7 @@
 import {
 	GateArea,
 	GateFactoryReadout,
+	GateHeadroomReadout,
 	GateReadout,
 	GateRoot,
 	GateTrigger,
@@ -13,6 +14,7 @@ export default function SeedModuleConstPage() @{
 			<GateArea />
 			<GateReadout />
 			<GateFactoryReadout />
+			<GateHeadroomReadout />
 			<GateTrigger />
 			<GateWriteTrigger />
 		</GateRoot>
