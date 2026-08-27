@@ -14,3 +14,25 @@ export function marklessSetStatePayloadValue(
 	const cell = state.cells?.find((candidate) => candidate.graphNodeId === graphNodeId);
 	if (cell) cell.value = marklessSerializeGraphValue(value);
 }
+
+export type MarklessComputedPayloadDraft = {
+	computed?: Array<{ readonly graphNodeId: string; readonly value?: unknown }>;
+};
+
+// `marklessCloneState` copies the computed ARRAY but not the records in it, so a
+// served value replaces its record rather than mutating one the module still shares.
+export function marklessSsrServeComputed(
+	state: MarklessComputedPayloadDraft,
+	values: ReadonlyMap<string, unknown>,
+	graphNodeIds: ReadonlyArray<string>,
+) {
+	const computed = state.computed;
+	if (!computed) return;
+	for (const graphNodeId of graphNodeIds) {
+		if (!values.has(graphNodeId)) continue;
+		const index = computed.findIndex((record) => record.graphNodeId === graphNodeId);
+		const record = index < 0 ? undefined : computed[index];
+		if (!record) continue;
+		computed[index] = { ...record, value: marklessSerializeGraphValue(values.get(graphNodeId)) };
+	}
+}

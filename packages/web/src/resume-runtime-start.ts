@@ -4,6 +4,7 @@ import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import type { OverlayHiddenBoundRoot } from './overlay-handoff.ts';
 import type {
 	ResumeAsyncBoundaryRecord,
+	ResumeDomElement,
 	ResumePreparedCore,
 	ResumeRuntimeInput,
 } from './resume-types.ts';
@@ -76,6 +77,12 @@ export async function startResumeRuntime(input: {
 	}) => void;
 	readonly receiveSharedPatch: RuntimeShared['receiveSharedPatch'];
 	readonly sharedPatchEventType: string;
+	// Handed straight to the repeat runtime, which hands it to a component row's
+	// bridge: the registrar a row born after boot registers its records through.
+	readonly armRegistrationDeps: (
+		records: import('./resume-commit-arm.ts').ArmCommitUpdate['armRecords'],
+	) => Promise<import('./resume-commit-arm.ts').ArmRegistrationDeps>;
+	readonly installArmEventType: (eventType: string) => void;
 }): Promise<AsyncBoundarySettleTracker | undefined> {
 	const {
 		runtimeInput,
@@ -123,13 +130,21 @@ export async function startResumeRuntime(input: {
 			loadSymbol: runtimeInput.loadSymbol,
 			elementHandles: prepared.elementHandles,
 		});
-		keyedRepeats.wireKeyedRepeats({
-			graph: runtimeInput.graph,
-			view: runtimeInput.view,
-			elementsByHostId: prepared.elementsByHostId,
-			events,
-			storeContainerSubscription,
-		});
+		keyedRepeats.wireKeyedRepeats(
+			{
+				graph: runtimeInput.graph,
+				view: runtimeInput.view,
+				elementsByHostId: prepared.elementsByHostId,
+				events,
+				storeContainerSubscription,
+				renderData: runtimeInput.renderData,
+			},
+			{
+				runtimeInput,
+				armRegistrationDeps: input.armRegistrationDeps,
+				installArmEventType: input.installArmEventType,
+			},
+		);
 	}
 	let settleTracker: AsyncBoundarySettleTracker | undefined;
 	if (runtimeInput.view.asyncBoundaries.length > 0) {
@@ -217,7 +232,23 @@ export async function startResumeRuntime(input: {
 		behaviors.installVisibilityObserver();
 		behaviors.installRemovalObserver();
 	}
-	if ((runtimeInput.view.branches ?? []).length > 0) await loadBranchRuntime();
+	if ((runtimeInput.view.branches ?? []).length > 0) {
+		const branches = await loadBranchRuntime();
+		// An escalating branch's served arm is already in the DOM; it registers the
+		// way a served boundary arm does, against the branch's own anchor pair.
+		let registerArm: typeof import('./resume-commit-arm.ts').registerArmRecordSet | undefined;
+		for (const branch of branches.branchesById.values()) {
+			const armRecords = branch.servedArmRecords;
+			if (!armRecords) continue;
+			registerArm ??= (await import('./resume-commit-arm.ts')).registerArmRecordSet;
+			await registerArm(
+				await input.armRegistrationDeps(armRecords),
+				input.installArmEventType,
+				branch,
+				{ armRecords },
+			);
+		}
+	}
 	// Pay-per-use in two stages, because fetching less is not the same as shipping
 	// less. The chunk is EMITTED only for an app the compiler recorded an `overlay`
 	// demand for: that app's own module is the ONLY place the `import()` specifier
@@ -250,6 +281,22 @@ export async function startResumeRuntime(input: {
 				}),
 			);
 		}
+	// Preload listeners are per container, not per wiring: staged trigger groups
+	// build several wirings on one root. Its own marker, never the dispatch one -
+	// the inline resumer sets that, and the runtime still owes this root a listener.
+	const preloadHost = runtimeInput.root as typeof runtimeInput.root & {
+		__marklessPreloadArmed?: boolean;
+	};
+	if (!preloadHost.__marklessPreloadArmed) {
+		preloadHost.__marklessPreloadArmed = true;
+		events.armFocusPreload();
+		storeContainerSubscription(() => {
+			events.releaseFocusPreload();
+			preloadHost.__marklessPreloadArmed = undefined;
+		});
+	}
+	// The focus that woke this runtime fired its focusin before the wiring existed.
+	events.preloadFocusKeySymbols(marklessActiveElement(runtimeInput.root));
 	if ((runtimeInput.graph.listSharedDefinitions?.() ?? []).length > 0) {
 		runtimeInput.root.addEventListener?.(sharedPatchEventType, receiveSharedPatch, {
 			capture: true,
@@ -280,4 +327,14 @@ async function disposeRemovedAsyncRangeHosts(
 		for (const id of locators.hostIdsInsideRemovedElements(prepared.elementsByHostId, removed))
 			disposeHost(id);
 	}
+}
+
+// The resume DOM surface deliberately names only what resume writes to; the
+// focused element is read straight off the host document instead.
+function marklessActiveElement(root: ResumeDomElement): ResumeDomElement | null {
+	const owner = root.ownerDocument as { readonly activeElement?: unknown } | undefined;
+	const active = owner?.activeElement;
+	return active && (active as ResumeDomElement).nodeType === 1
+		? (active as ResumeDomElement)
+		: null;
 }

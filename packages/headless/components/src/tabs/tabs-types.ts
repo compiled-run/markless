@@ -1,6 +1,6 @@
 import type { PropsOf, Seeded } from '@markless/core';
 
-/** Which axis the arrow keys walk, and the axis `aria-orientation` reports. */
+/** Which axis the arrow keys walk, and the axis `ui-vertical` reflects. */
 export type TabsOrientation = 'horizontal' | 'vertical';
 
 /**

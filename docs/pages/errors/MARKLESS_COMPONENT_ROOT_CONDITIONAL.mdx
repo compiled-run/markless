@@ -1,0 +1,21 @@
+# MARKLESS_COMPONENT_ROOT_CONDITIONAL
+
+Component root is conditional
+
+- Package: compiler
+- Pass or phase: public-render
+- Severity: error
+
+## Message
+
+… has a second template return, so the public render module cannot choose one component root without deleting statement flow.
+
+## Why
+
+Initial render executes component bodies, but resume needs one planned root with stable locators. Multiple or conditional template returns need branch records before they can render.
+
+## Emitted from
+
+- `packages/compiler/src/passes/public-render/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

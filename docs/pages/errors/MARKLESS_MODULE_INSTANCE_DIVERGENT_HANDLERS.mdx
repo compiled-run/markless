@@ -1,0 +1,22 @@
+# MARKLESS_MODULE_INSTANCE_DIVERGENT_HANDLERS
+
+This module-scope instance would become one instance per handler
+
+- Package: compiler
+- Pass or phase: symbol-modules
+- Severity: error
+
+## Message
+
+Module-scope instance "…" is carried into … handler modules (…). Each of those modules runs its own constructor, so they hold … separate instances and anything one of them records is invisible to the others.
+
+## Why
+
+Every handler symbol module is loaded on its own when its handler first fires, so a declaration in the authoring file has to be copied into each one that names it. One handler gets the intended browser-side instance. Two or more get a copy each, and nothing at runtime reveals that they have drifted apart.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/symbol-modules.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

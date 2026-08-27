@@ -1,0 +1,23 @@
+# MARKLESS_BEHAVIOR_SYMBOL_EMIT_UNSUPPORTED
+
+This element behavior cannot run in the browser yet
+
+- Package: compiler
+- Pass or phase: capture-analysis
+
+## Message
+
+Cannot emit lazy behavior symbol "…" because it reads component-local "…", a local … value that cannot cross a resume boundary.
+
+Cannot emit lazy behavior symbol "…" because the compiler could not read its source, so the values it captures across the resume boundary are unknown.
+
+## Why
+
+Element behavior symbols run after browser resume. Behavior factories may use module functions, graph inputs, element handles, props/shared values, or serializable capture-plane inputs; unsupported body locals would otherwise become missing behavior code.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/capture-analysis.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
