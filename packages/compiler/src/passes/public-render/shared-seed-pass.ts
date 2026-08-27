@@ -405,6 +405,27 @@ export function widgetRootComponents(input: PublicRenderModuleInput): Map<string
 	return roots;
 }
 
+/**
+ * The widget-scoped definitions this module only ADOPTED from an import.
+ *
+ * Their cells belong to whichever rendered widget the ENCLOSING instance rooted,
+ * so no component here owns one. Handing them to the module root instead makes
+ * every rendered instance of that component a second root of somebody else's
+ * family, and the family's element() rosters then merge across sibling widgets.
+ */
+export function adoptedWidgetDefinitionIds(
+	input: PublicRenderModuleInput,
+): ReadonlySet<string> {
+	return new Set(
+		input.semanticGraph.sharedDefinitions.flatMap((definition) =>
+			definition.scope === 'widget' &&
+			definition.id !== sharedDefinitionId(input.semanticGraph.filename, definition.exportedName)
+				? [definition.id]
+				: [],
+		),
+	);
+}
+
 /** The widget-scoped definitions one component roots, spelled as the payload spells them. */
 export function widgetRootDefinitionIds(
 	input: PublicRenderModuleInput,

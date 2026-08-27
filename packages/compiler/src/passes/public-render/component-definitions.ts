@@ -6,6 +6,7 @@ import { sharedCallbackSlotGraphNodeId } from '../semantic-graph/collect-shared.
 import { emitClientResidueReader, emitClientResidueReaderPrelude } from './residue-reader.ts';
 import { handlerReadGraphNodeIds } from './derive-set.ts';
 import {
+	adoptedWidgetDefinitionIds,
 	componentBoundElementHandles,
 	widgetRootDefinitionIds,
 } from './shared-seed-pass.ts';
@@ -221,9 +222,11 @@ export function collectPublicRenderComponentDefinitions(
 			nativeTemplateId: `markless-render-data:${encodeURIComponent(input.source.filename)}:${encodeURIComponent(componentName)}:template:${encodeURIComponent(chunk.id)}`,
 		}));
 		// Positions resolve a state name two components of one module both
-		// declare; a single-component module needs no partition at all.
+		// declare; a single-component module needs no partition at all, unless it
+		// adopted a widget family - those nodes belong to the enclosing instance
+		// and this module must claim none of them.
 		const ownedNodes =
-			componentNames.size > 1
+			componentNames.size > 1 || adoptedWidgetDefinitionIds(input).size > 0
 				? componentOwnedStateNodes(input, componentName, rootInfo.componentName)
 				: undefined;
 		// Positions, the way stateComputedIndexes already spells a node set: a full

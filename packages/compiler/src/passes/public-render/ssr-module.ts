@@ -33,6 +33,7 @@ import {
 	staticProjectionChildren,
 	sharedSeedConsumeLine,
 	sharedSeedMarkerLine,
+	adoptedWidgetDefinitionIds,
 	sharedSeedPassLines,
 	widgetRootDefinitionIds,
 	elementHandleMarkerLine,
@@ -224,9 +225,10 @@ export function emitPublicSsrRenderModule(
 		(componentName) => emitSsrDataLines(input, componentName, references),
 	);
 	// Each component seeds only the payload nodes it declares; a module with no
-	// same-module child owns every node, so it emits no selection at all.
+	// same-module child owns every node, so it emits no selection at all - unless
+	// it adopted a widget family, whose nodes belong to the enclosing instance.
 	const ownedNodes =
-		sameModuleComponents.length === 0
+		sameModuleComponents.length === 0 && adoptedWidgetDefinitionIds(input).size === 0
 			? undefined
 			: componentOwnedStateNodes(input, rootInfo.componentName, rootInfo.componentName);
 	const body = [
