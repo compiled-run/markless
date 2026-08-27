@@ -23,6 +23,7 @@ import {
 import { collectComponentProps } from './collect-components.ts';
 import { spreadHostsField } from './spread-hosts.ts';
 import { armMaterialField } from './arm-material.ts';
+import { componentConstructReach } from '../construct-reach.ts';
 import { chunkElementCount, projectionPlacementFields } from './projection-placement.ts';
 import { getComponentFunction, markupInterpolationExpression } from '../../ast/tsrx.ts';
 import {
@@ -41,7 +42,7 @@ import {
 	collectUpdate,
 } from './collect-expressions.ts';
 import { collectModuleScopeGraphCreation } from './collect-module-scope.ts';
-import { submoduleUnsupportedDiagnostic } from './diagnostics.ts';
+import { bareArmInterpolationDiagnostic, submoduleUnsupportedDiagnostic } from './diagnostics.ts';
 import {
 	collectSharedDefinitionDependencies,
 	collectImplicitFamilyScopeDiagnostics,
@@ -52,10 +53,11 @@ import {
 	moduleInterfaceSharedDefinitions,
 } from './collect-shared.ts';
 import { attachKeyedRepeatRowHost, collectKeyedRepeat } from './collect-repeat.ts';
+import { retargetProjectedRepeatHosts } from './projected-repeat-host.ts';
 import { collectBranchSite } from './collect-branches.ts';
 import { collectModuleGraphInterface, collectVariableDeclaration } from './collect-state.ts';
 import { createMutableSemanticGraphArtifact, createWalkState, type WalkState } from './types.ts';
-import { collectSemanticMarkup } from './collect-markup.ts';
+import { collectSemanticMarkup, componentStyleScopeClass } from './collect-markup.ts';
 
 export async function buildSemanticGraph(
 	input: SemanticGraphInput,
@@ -107,6 +109,7 @@ export async function buildSemanticGraph(
 		});
 		const previousComponentName = state.currentComponentName;
 		const previousComponentId = state.currentComponentId;
+		const previousStyleScopeClass = state.currentStyleScopeClass;
 		const componentSpan = sourceSpan(componentFunction.node, input.filename);
 		if (!componentSpan) {
 			throw new Error(
@@ -115,12 +118,17 @@ export async function buildSemanticGraph(
 		}
 		state.currentComponentName = componentFunction.name;
 		state.currentComponentId = `component:${componentSpan.start}:${componentSpan.end}`;
+		state.currentStyleScopeClass = componentStyleScopeClass(
+			componentFunction.node,
+			input.filename,
+		);
 		prepareComponentLocalBindings(componentFunction.node.body as AnyNode, state);
 		collectComponentProps(componentFunction.node, state);
 		walk(componentFunction.node.body as AnyNode, state);
 		mergeComponentLocalDeclarations(state);
 		state.currentComponentName = previousComponentName;
 		state.currentComponentId = previousComponentId;
+		state.currentStyleScopeClass = previousStyleScopeClass;
 	}
 
 	collectSharedCallbackBindings(state);
@@ -129,11 +137,7 @@ export async function buildSemanticGraph(
 	finalizeComputedDependencies(state);
 	propagateAsyncComputedCapability(graph);
 	collectComputedDependencyCycleDiagnostics(graph);
-	collectElementHandleDiagnostics(
-		graph,
-		state.pendingElementHandleIdrefs,
-		state.pendingElementHandleAnchors,
-	);
+	collectElementHandleDiagnostics(graph, state.pendingElementHandleIdrefs);
 	collectAsyncBoundaryDiagnostics(graph);
 	graph.markup = collectSemanticMarkup({
 		ast,
@@ -141,6 +145,15 @@ export async function buildSemanticGraph(
 		filename: input.filename,
 		graph,
 		hostIds: state.hostIds,
+	});
+	// Needs the chunks, so it runs after them: a repeat inside a child's
+	// `{children}` renders into that child's markup, not the enclosing element of
+	// the tag that projected it.
+	retargetProjectedRepeatHosts({
+		graph,
+		...(input.importedModuleInterfaces
+			? { importedModuleInterfaces: input.importedModuleInterfaces }
+			: {}),
 	});
 	// Shared definitions publish here rather than with the rest of the interface:
 	// a definition's returned properties and the factory nodes they name are
@@ -151,6 +164,16 @@ export async function buildSemanticGraph(
 		sharedDefinitions: graph.sharedDefinitions,
 		graphBindings: graph.graphBindings,
 	});
+	// Answered here, where this module's chunks and its own imported interfaces
+	// are both in hand; an importer has neither.
+	const constructReachInput = {
+		chunks: graph.markup.chunks,
+		componentEdges: graph.componentEdges,
+		componentNames: graph.components.map((component) => component.name),
+		...(input.importedModuleInterfaces
+			? { importedModuleInterfaces: input.importedModuleInterfaces }
+			: {}),
+	};
 	graph.moduleGraphInterface = {
 		...graph.moduleGraphInterface,
 		...(sharedDefinitions.length > 0 ? { sharedDefinitions } : {}),
@@ -185,6 +208,7 @@ export async function buildSemanticGraph(
 								localName: binding.localName,
 								path: binding.propPath,
 							})),
+						constructReach: componentConstructReach(constructReachInput, root.id),
 						...spreadHostsField(chunks),
 						...projectionPlacementFields({
 							chunks: graph.markup.chunks,
@@ -364,6 +388,10 @@ function mergeComponentLocalDeclarations(state: WalkState): void {
 
 function walk(node: AnyNode | null | undefined, state: WalkState): void {
 	if (!node || typeof node !== 'object') return;
+	if (state.handledTemplateValues.has(node)) {
+		for (const child of childNodes(node)) walk(child, state);
+		return;
+	}
 
 	switch (node.type) {
 		case 'Element':
@@ -387,32 +415,43 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 				walk(node.alternate as AnyNode | undefined, state);
 			});
 			return;
-		case 'JSXIfExpression':
+		case 'JSXIfExpression': {
 			collectBranchSite(node, state);
-			walkBranch(node.consequent as AnyNode | undefined, state);
-			walkBranch(node.alternate as AnyNode | undefined, state);
+			const site = lastBranchSiteId(state);
+			withArmScope(state, site, () => {
+				walkBranch(node.consequent as AnyNode | undefined, state);
+				walkBranch(node.alternate as AnyNode | undefined, state);
+			});
 			collectConditionalBranchText(node, state);
 			return;
-		case 'JSXSwitchExpression':
+		}
+		case 'JSXSwitchExpression': {
 			collectBranchSite(node, state);
+			const site = lastBranchSiteId(state);
 			walk(node.discriminant as AnyNode | undefined, state);
-			for (const switchCase of asNodes(node.cases)) {
-				walk(switchCase.test as AnyNode | undefined, state);
-				const caseBranchId = `branch:${state.nextBranchId++}`;
-				state.currentBranchScopeIds.push(caseBranchId);
-				for (const caseChild of asNodes(switchCase.consequent)) {
-					walkMarkupStatement(caseChild, state);
+			withArmScope(state, site, () => {
+				for (const switchCase of asNodes(node.cases)) {
+					walk(switchCase.test as AnyNode | undefined, state);
+					const caseBranchId = `branch:${state.nextBranchId++}`;
+					state.currentBranchScopeIds.push(caseBranchId);
+					for (const caseChild of asNodes(switchCase.consequent)) {
+						walkMarkupStatement(caseChild, state);
+					}
+					state.currentBranchScopeIds.pop();
 				}
-				state.currentBranchScopeIds.pop();
-			}
+			});
 			return;
+		}
 		case 'JSXForExpression':
 			const repeatIndex = collectKeyedRepeat(node, state);
 			const repeat = repeatIndex === null ? null : state.graph.keyedRepeats[repeatIndex];
 			if (repeat) state.currentKeyedRepeatScopeIds.push(repeat.id);
-			for (const child of childNodes(node)) {
-				walk(child, state);
-			}
+			// A row's reads belong to the row template, not to any arm around it.
+			withArmScope(state, null, () => {
+				for (const child of childNodes(node)) {
+					walk(child, state);
+				}
+			});
 			if (repeat) state.currentKeyedRepeatScopeIds.pop();
 			attachKeyedRepeatRowHost(node, state, repeatIndex);
 			return;
@@ -555,17 +594,39 @@ function walkBranch(node: AnyNode | undefined, state: WalkState): void {
 	state.currentBranchScopeIds.pop();
 }
 
-// Only for positions where markup takes statements: there a bare `{expr}` is
-// interpolation, while the same shape inside a handler body is a real block.
+// Only for positions where markup takes statements: there a bare `{expr}` has
+// the shape of a block holding one expression statement, while the same shape
+// inside a handler body is a real block. The spec spells such an arm with a
+// fragment, so recognising it here is how the refusal finds it.
 function walkMarkupStatement(node: AnyNode | undefined, state: WalkState): void {
 	if (!node) return;
 	const interpolated = markupInterpolationExpression(node);
 	if (interpolated) {
+		state.graph.diagnostics.push(
+			bareArmInterpolationDiagnostic({
+				expressionSource: expressionSource(interpolated, state.source),
+				node: interpolated,
+				filename: state.filename,
+			}),
+		);
 		collectTemplateExpression(interpolated, state);
 		walk(interpolated, state);
 		return;
 	}
 	walk(node, state);
+}
+
+function lastBranchSiteId(state: WalkState): string | null {
+	return state.graph.branchSites[state.graph.branchSites.length - 1]?.id ?? null;
+}
+
+function withArmScope(state: WalkState, branchSiteId: string | null, run: () => void): void {
+	const previous = state.currentArmScope;
+	state.currentArmScope = branchSiteId
+		? { branchSiteId, hostNodeId: state.currentHostNodeId }
+		: null;
+	run();
+	state.currentArmScope = previous;
 }
 
 function withCreationSite(
