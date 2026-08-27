@@ -12,7 +12,7 @@ unmeasured locally and belong to CI. Registration (`src/index.ts`,
 gallery section, and the `crop` key in the gallery's `FAMILY_ANCHORS`) is the
 follow-up unit; nothing outside `src/crop/**` was touched.
 
-Research: `goals/headless-components/notes/U624-crop.md` — Ark UI's image
+Research (the crop research memo in the goal notes): Ark UI's image
 cropper, react-easy-crop, react-image-crop, Cropper.js v2 and d3-brush, read
 against this library's own SPEC, with the divergence table SPEC requires.
 
