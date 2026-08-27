@@ -13,13 +13,10 @@ import type { DisposedRepeatRow, ResumeEventWiring } from './resume-events.ts';
 /**
  * Give every computed-backed repeat collection a readable value before wiring.
  *
- * `wireKeyedRepeats` keys the SERVED rows by reading the collection once. A
- * `computed()` collection has no value in the resumed graph until something
- * writes it - the payload carries the derive symbol, not the result - so that
- * read answered an empty list, no served row was ever keyed, and the repeat
- * could never reconcile: growth found no row to reuse and shrink found no row
- * to remove. Deriving it here reproduces the served collection exactly, because
- * no dependency has moved yet.
+ * The payload carries a `computed()` collection's derive symbol, not its result,
+ * so the read that keys the SERVED rows answered an empty list and the repeat
+ * could never reconcile. No dependency has moved yet, so deriving here
+ * reproduces the served collection exactly.
  */
 export async function primeKeyedRepeatCollections(input: {
 	readonly graph: RuntimeGraph;
@@ -58,16 +55,14 @@ type RepeatReadableGraph = Pick<RuntimeGraph, 'read'>;
 /**
  * The node-BUILDING half of a repeat, loaded only by a repeat that can build.
  *
- * The `import()` specifier is NOT written here: this module is loaded by every
- * repeat, so naming the mint would emit its chunk for every app with any keyed
- * repeat. The app's own resume module writes the loader into `__marklessRowMint`
- * instead, and only for a page the compiler recorded a mintable repeat for. An
- * absent loader is a page that cannot build nodes, and every mint site refuses
- * without one. A page with a component row answers the same global with
- * `fns/row-component-mint`, a superset carrying every byte of that path, which
- * is what keeps a page without a component row shipping none of it. The loader
- * is page-AGNOSTIC - two page modules in one document write the same one - so
- * the page a row renders against arrives on the wiring, not the global.
+ * The `import()` specifier is NOT written here: every repeat loads this module,
+ * so naming the mint would emit its chunk for every app with any keyed repeat.
+ * The app's own resume module writes the loader into `__marklessRowMint`, and
+ * only for a page the compiler recorded a mintable repeat for; an absent loader
+ * is a page that cannot build nodes, and every mint site refuses without one. A
+ * page with a component row answers that global with `fns/row-component-mint`, a
+ * superset. The loader is page-AGNOSTIC - two page modules in one document write
+ * the same one - so the page a row renders against arrives on the wiring.
  */
 type RowMint = typeof import('./fns/row-mint.ts') &
 	Partial<import('./fns/row-component-mint.ts').RowComponentMintApi>;
@@ -80,11 +75,9 @@ type RowMintHost = {
 	) => Promise<RowMint>;
 };
 type RowMintCell = { mint?: RowMint; load?: Promise<RowMint> };
-// The bridge BINDS the graph and the registrar it is handed, so the memo is per
-// graph: one module-wide memo gave a second container the FIRST container's
-// registrar, and a row minted there registered its events on a roster that
-// container's dispatch never reads. `cell.load ||=` still joins a second repeat
-// of the same container to one load.
+// Per graph, because the bridge BINDS the graph and registrar it is handed: one
+// module-wide memo gave a second container the FIRST container's registrar, and
+// rows minted there registered events that container's dispatch never reads.
 const rowMintCells = new WeakMap<object, RowMintCell>();
 const noGraphKey = {};
 function rowMintCell(graph?: RuntimeGraph): RowMintCell {
@@ -172,8 +165,7 @@ export function wireKeyedRepeats(
 		if (!parent) continue;
 		const items = readKeyedRepeatCollection(input.graph, repeat),
 			rowRootsByKey = new Map<unknown, ResumeDomElement>();
-		// One row-event loop, run for a served row at boot and for a minted row the
-		// moment it exists. The wiring lives here, so the reconcile is handed this.
+		// One row-event loop: a served row at boot, a minted row the moment it exists.
 		const registerRowEvents = (rowRoot: ResumeDomElement, rowKey: unknown): void => {
 			for (const rowEvent of repeat.rowEvents) {
 				const host = rowEventHost(rowRoot, rowEvent.hostPath);
@@ -181,14 +173,11 @@ export function wireKeyedRepeats(
 				input.events.addRowEvent(host, { repeat, parent, rowRoot, rowKey, rowEvent });
 			}
 		};
-		// A page served with no rows already shows whatever the server painted for
-		// the `@empty` arm, so this runtime must not paint a second one - and it
-		// keeps no handle on those nodes, because it did not make them. `mounted`
-		// with no `nodes` is exactly that state, and the mint declines in it.
+		// A page served with no rows already shows the server's `@empty` arm, and
+		// this runtime holds no handle on nodes it did not make: the mint declines.
 		const arm: MountedEmptyArm = { mounted: items.length === 0, nodes: [] };
-		// The three fields that need the building half. Read once, off the record, so
-		// a repeat that only reorders never touches the import at all - and a repeat
-		// that does starts the fetch at wiring time, not at the first gesture.
+		// The three fields that need the building half: a repeat that only reorders
+		// never touches the import, and one that does fetches at wiring time.
 		const builds = Boolean(repeat.rowTemplate ?? repeat.emptyArm ?? repeat.rowComponent),
 			cell = builds ? rowMintCell(input.graph) : undefined;
 		if (builds)
@@ -201,6 +190,41 @@ export function wireKeyedRepeats(
 			registerRowEvents(rowRoot, rowKey);
 		}
 		if (!repeat.collectionGraphNodeId) continue;
+		const apply = (mint: RowMint | undefined): void => {
+			applyKeyedRepeatRowOrder(
+				input.graph,
+				repeat,
+				parent,
+				rowRootsByKey,
+				arm,
+				mint,
+				registerRowEvents,
+			);
+		};
+		// Wrapped: absent means this pass has to await something - a mint module
+		// still in flight, or a component row, whose render is async.
+		const settledMint = (): { readonly mint: RowMint | undefined } | undefined =>
+			!builds ? { mint: undefined } : cell?.mint && !cell.mint.rows ? { mint: cell.mint } : undefined;
+		// Rows minted AT the write, so a handler that replaces a collection reads
+		// the new rows off an element() handle on its next statement. Same apply,
+		// same rowRootsByKey as the flush below, so the flush finds them placed and
+		// returns: one mint. `settle` waits on the load this wiring already began -
+		// it starts none - because a gesture that beat it would read stale rows.
+		const observeWrites = input.graph.subscribeWrite?.({
+			graphNodeId: repeat.collectionGraphNodeId,
+			path: repeat.collectionPath,
+			settle: () => (builds && !cell?.mint ? cell?.load?.then(() => undefined) : undefined),
+			run(): void {
+				const settled = settledMint();
+				if (!settled) return;
+				// A duplicate key, and anything the mint throws, is the flush's to report.
+				if (!uniqueRepeatKeys(repeat, readKeyedRepeatCollection(input.graph, repeat))) return;
+				try {
+					apply(settled.mint);
+				} catch {}
+			},
+		});
+		if (observeWrites) input.storeContainerSubscription(observeWrites);
 		input.storeContainerSubscription(
 			input.graph.subscribe({
 				id: `keyed-repeat:${repeat.id}:${repeat.collectionGraphNodeId}:${repeat.collectionPath.join('.')}`,
@@ -208,26 +232,12 @@ export function wireKeyedRepeats(
 				path: repeat.collectionPath,
 				run(): void | Promise<void> {
 					validateOneRepeat(input.graph, repeat);
-					const apply = (mint: RowMint | undefined): void => {
-						applyKeyedRepeatRowOrder(
-							input.graph,
-							repeat,
-							parent,
-							rowRootsByKey,
-							arm,
-							mint,
-							registerRowEvents,
-						);
-					};
 					// Ordering across the await is the graph's own: `runFlush` awaits this
-					// run before it runs another subscription or takes another dirty pass,
-					// and a write landing meanwhile joins the same active flush. So no
-					// collection write can apply ahead of a pending mint, and the apply
-					// itself never yields - it reads the collection and finishes every DOM
-					// and census move in one turn. A component row is rendered BEFORE that
-					// turn, for the same reason: its render is async and the apply is not,
-					// and its registration follows the apply that attaches it.
-					if (!builds || (cell?.mint && !cell.mint.rows)) return apply(cell?.mint);
+					// run before any other subscription or dirty pass, so no collection
+					// write applies ahead of a pending mint. The apply itself never yields.
+					// A component row renders BEFORE it, and registers after it attaches.
+					const settled = settledMint();
+					if (settled) return apply(settled.mint);
 					return (
 						loadRowMint(input.renderData, input.graph, rowComponentHost)?.then(async (mint) => {
 							const commit = await mint.rows?.(repeat, parent, rowRootsByKey);
@@ -246,27 +256,22 @@ function applyKeyedRepeatRowOrder(
 	parent: ResumeDomElement,
 	rowRootsByKey: Map<unknown, ResumeDomElement>,
 	arm: MountedEmptyArm,
-	// Absent exactly when the record carries neither `rowTemplate` nor `emptyArm`,
-	// so every refusal below reads `!mint` as the same fact its own guard states.
+	// Absent exactly when the record carries neither `rowTemplate` nor `emptyArm`.
 	mint: RowMint | undefined,
 	registerRowEvents?: (rowRoot: ResumeDomElement, rowKey: unknown) => void,
 ): void {
 	const nextRows: ResumeDomElement[] = [];
-	// Compare against every attached row THIS repeat owns, not the first
-	// nextRows.length children. A prefix comparison calls [A,B,C] -> [A,B]
-	// already-in-order and returns before the removal pass below, so a row
-	// dropped off the END of the collection stayed in the document forever
-	// while a row dropped from the middle left correctly.
+	// Every attached row THIS repeat owns, not the first nextRows.length children:
+	// a prefix comparison calls [A,B,C] -> [A,B] already-in-order and returns
+	// before the removal pass, stranding a row dropped off the END forever.
 	const knownRows = new Set(rowRootsByKey.values());
 	for (const item of readKeyedRepeatCollection(graph, repeat)) {
 		const rowKey = repeatItemKey(item, repeat);
 		let rowRoot = rowRootsByKey.get(rowKey);
 		if (!rowRoot) {
-			// A key that was never served. The record carries this row's markup only
-			// when the compiler proved the client can finish it alone; without it the
-			// list stays as served, because half a row is worse than none. Same
-			// refusal for a server-painted `@empty` arm this runtime cannot take out:
-			// rows standing behind a live "nothing matches" is worse than no growth.
+			// A key never served. Without markup the compiler proved the client can
+			// finish alone, the list stays as served: half a row is worse than none.
+			// Same refusal behind a server-painted `@empty` arm this cannot take out.
 			if (!(repeat.rowTemplate ?? repeat.rowComponent) || !mint) return;
 			if (repeat.emptyArm && arm.mounted && arm.nodes.length === 0) return;
 			rowRoot = mint.mintRow(parent, repeat, item);
@@ -288,11 +293,8 @@ function applyKeyedRepeatRowOrder(
 		// arm: nothing-to-nothing still has to raise the arm the first time.
 		(nextRows.length > 0 || arm.mounted || !repeat.emptyArm)
 	) return;
-	// The pinned element census is the shipped shape as the framework has moved
-	// it since (see spliceDomOrderCensus). Rows and the `@empty` arm are exactly
-	// such a move, so every attach and detach below is reported to it - a mint
-	// that entered the document without one would shift the index of every
-	// element after this repeat.
+	// Every attach and detach below is reported to the pinned census: a mint that
+	// entered without one shifts the index of every element after this repeat.
 	const census = censusRoot(parent);
 	// The arm speaks only while nothing matches, so it leaves before the rows do
 	// anything, and the row span is its own again by the time rows re-enter.
@@ -302,22 +304,17 @@ function applyKeyedRepeatRowOrder(
 		arm.mounted = false;
 		arm.nodes = [];
 	}
-	// A key that left the collection takes its row out of the document. Without
-	// this the served row stayed attached and every read of the rows - an
-	// ordered element() set most of all - kept answering a row that is gone.
-	// The record is kept in rowRootsByKey so the same key can return, and where
-	// the row hung is kept ON the row: dispatch runs microtasks behind the press
-	// it answers, so an event still holding this row finishes its walk across it.
+	// A key that left takes its row out; the record stays in rowRootsByKey so the
+	// key can return. Where the row hung is kept ON the row, because a dispatch
+	// runs microtasks behind its press and still walks across it.
 	const staying = new Set(nextRows);
 	for (const rowRoot of currentRows)
 		if (!staying.has(rowRoot)) {
 			mutableParent.removeChild?.(rowRoot);
 			(rowRoot as DisposedRepeatRow).__marklessRowParent = parent;
 		}
-	// Rows go back into their own span, not onto the end of the parent. Appending
-	// was right only while a repeat owned every child; with a sibling in front of
-	// the rows the anchor is the first element after the row span that this
-	// repeat does not own, and appending past it would put the rows behind it.
+	// Rows go back into their own span: the anchor is the first element after the
+	// span this repeat does not own, and appending past it would trail a sibling.
 	const anchor = elementChildren(parent)
 		.slice(repeat.rowStartOffset ?? 0)
 		.find((child) => !knownRows.has(child));
@@ -334,10 +331,7 @@ function applyKeyedRepeatRowOrder(
 }
 /**
  * The `@empty` arm this runtime raised, and the nodes it has to take back out.
- *
- * `mounted` with no `nodes` is the server's own arm on a page served with an
- * empty collection: it is up, and this runtime never removes what it did not
- * make.
+ * `mounted` with no `nodes` is the server's own arm: up, and never removed here.
  */
 type MountedEmptyArm = { mounted: boolean; nodes: ReadonlyArray<ResumeDomNode> };
 type MutableRepeatParent = ResumeDomElement & {
@@ -354,12 +348,9 @@ function insertRepeatNode(
 	else if (parent.appendChild) parent.appendChild(node);
 	else parent.insertBefore?.(node, null);
 }
-// A local copy of resume-locators' census splice, for the reason resume-branches
-// keeps its own DOM-walk helpers: importing that module here pulls it and the
-// resume-errors chunk into this on-demand module's static closure, which the
-// leanness guard measured at 28,554 source bytes against a 20,983 wall. The
-// SEMANTICS are the one definition - this is the same splice, spelled twice, not
-// a second way to renumber the census.
+// A local copy of resume-locators' census splice: importing that module pulls it
+// and the resume-errors chunk into this on-demand closure, measured at 28,554
+// source bytes against a 20,983 wall. Same splice spelled twice, one semantics.
 function spliceDomOrderCensus(
 	root: ResumeDomElement,
 	removed: Iterable<ResumeDomNode>,
@@ -427,16 +418,29 @@ function repeatItemKey(item: unknown, repeat: ResumeKeyedRepeatRecord): unknown 
 	}
 	return cursor;
 }
+function firstDuplicateRepeatKey(
+	repeat: ResumeKeyedRepeatRecord,
+	items: ReadonlyArray<unknown>,
+): { readonly key: unknown } | undefined {
+	const seen = new Set<unknown>();
+	for (const item of items) {
+		const key = repeatItemKey(item, repeat);
+		if (seen.has(key)) return { key };
+		seen.add(key);
+	}
+}
+function uniqueRepeatKeys(
+	repeat: ResumeKeyedRepeatRecord,
+	items: ReadonlyArray<unknown>,
+): boolean {
+	return !firstDuplicateRepeatKey(repeat, items);
+}
 function assertUniqueRepeatKeys(
 	repeat: ResumeKeyedRepeatRecord,
 	items: ReadonlyArray<unknown>,
 ): void {
-	const seen = new Set<unknown>();
-	for (const item of items) {
-		const key = repeatItemKey(item, repeat);
-		if (seen.has(key)) throw duplicateRepeatKeyError(repeat, key);
-		seen.add(key);
-	}
+	const duplicate = firstDuplicateRepeatKey(repeat, items);
+	if (duplicate) throw duplicateRepeatKeyError(repeat, duplicate.key);
 }
 function duplicateRepeatKeyError(repeat: ResumeKeyedRepeatRecord, key: unknown): Error {
 	const error = new Error(
