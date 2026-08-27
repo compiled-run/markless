@@ -4,10 +4,10 @@ import type { PropsOf, Seeded } from '@markless/core';
 export type RadioGroupOrientation = 'horizontal' | 'vertical';
 
 /**
- * The group is a `<fieldset>` so its `<legend>` names it natively: no id, no
- * IDREF, and better support than `aria-labelledby` on a `role="radiogroup"` div.
+ * The group: a `role="radiogroup"` element named by `radiogroup.label` through
+ * `aria-labelledby`.
  */
-export type RadioGroupRootProps = Omit<PropsOf<'fieldset'>, 'onChange'> & {
+export type RadioGroupRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/** The value of the chosen option. Omit it and nothing is chosen. */
 	readonly value?: string;
 	/** Which axis the arrow keys walk. Omit it and the options stack top to bottom. */
@@ -64,8 +64,11 @@ export type RadioGroupItemProps = PropsOf<'div'> & {
  */
 export type RadioGroupItemInstanceState = Seeded<RadioGroupItemProps, 'value' | 'disabled'>;
 
-/** The group's name, rendered as the `<legend>` a `<fieldset>` is named by. */
-export type RadioGroupLabelProps = PropsOf<'legend'>;
+/** What `radiogroup.root` hands the group element it renders: everything it was given. */
+export type RadioGroupBoxProps = PropsOf<'div'>;
+
+/** The group's name: the element `role="radiogroup"` points its `aria-labelledby` at. */
+export type RadioGroupLabelProps = PropsOf<'label'>;
 
 /** Supporting text for the group. It renders its children and changes nothing else. */
 export type RadioGroupDescriptionProps = PropsOf<'div'>;

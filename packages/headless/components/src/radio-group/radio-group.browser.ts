@@ -71,12 +71,14 @@ function submit() {
 }
 
 function expectBasicRendered() {
-	expect(el(Root).tagName).toBe('FIELDSET');
+	expect(el(Root).tagName).toBe('DIV');
 	expect(el(Root).getAttribute('role')).toBe('radiogroup');
-	// The legend names the group natively: no id, no IDREF, nothing dangling.
-	expect(el(Label).tagName).toBe('LEGEND');
+	// The label names the group by IDREF, and the id it points at is on the page.
+	expect(el(Label).tagName).toBe('LABEL');
+	expect(el(Root).getAttribute('aria-labelledby')).toBe(el(Label).id);
+	expect(el(Label).id).not.toBe('');
 	expect(el(Label).textContent).toBe('Billing Period');
-	expect(el(Root).getAttribute('aria-orientation')).toBe('vertical');
+	expect(el(Root).hasAttribute('aria-orientation')).toBe(false);
 	expect(el(Root).hasAttribute('ui-horizontal')).toBe(false);
 
 	expect(page.getByRole('radio').elements().length).toBe(3);
@@ -86,6 +88,7 @@ function expectBasicRendered() {
 	}
 	expect(el(MonthlyIndicator).textContent).toBe('');
 	expect(el(Monthly).hasAttribute('ui-selected')).toBe(false);
+	expect(el(Root).hasAttribute('aria-disabled')).toBe(false);
 
 	// Every item mints its own field id, so a label names exactly one option.
 	expect(el(MonthlyLabel).getAttribute('for')).toBe(field(MonthlyField).getAttribute('id'));
@@ -155,10 +158,14 @@ function expectDisabledRendered() {
 	expect(field(LifetimeField).disabled).toBe(true);
 	expect(field(MonthlyField).disabled).toBe(false);
 
-	// A fieldset's own `disabled` is what locks every control inside it.
+	// No native cascade left to lean on: the group's `disabled` reaches every
+	// option's own input, trigger and item.
 	expect(el(LockedRoot).getAttribute('ui-disabled')).toBe('');
-	expect(el<HTMLFieldSetElement>(LockedRoot).disabled).toBe(true);
+	expect(el(LockedRoot).getAttribute('aria-disabled')).toBe('true');
 	expect(field(LockedBasicField).disabled).toBe(true);
+	expect(el(page.getByTestId('locked-basic')).getAttribute('ui-disabled')).toBe('');
+	expect(el(page.getByTestId('locked-basic-trigger')).getAttribute('ui-disabled')).toBe('');
+	expect(el(page.getByTestId('locked-premium-field')).hasAttribute('disabled')).toBe(true);
 }
 
 async function expectDisabledBlocks() {
@@ -175,9 +182,9 @@ function expectHelpRendered() {
 	expect(el(AfterError).textContent).toBe('Pick a billing period');
 	// Every part of one instance seeds before any part renders, so document order
 	// does not decide - the error marks the group either way.
-	expect(el(AfterRoot).getAttribute('aria-invalid')).toBe('true');
+	expect(el(AfterRoot).hasAttribute('aria-invalid')).toBe(false);
 	expect(el(BeforeError).textContent).toBe('Pick a support plan');
-	expect(el(BeforeRoot).getAttribute('aria-invalid')).toBe('true');
+	expect(el(BeforeRoot).hasAttribute('aria-invalid')).toBe(false);
 }
 
 function expectFormConfigRendered() {
@@ -186,8 +193,7 @@ function expectFormConfigRendered() {
 	expect(field(AnnualField).getAttribute('name')).toBe('plan');
 	expect(field(MonthlyField).getAttribute('value')).toBe('monthly');
 	expect(field(AnnualField).getAttribute('value')).toBe('annual');
-	// aria-required goes on the group, per the cross-library convention.
-	expect(el(Root).getAttribute('aria-required')).toBe('true');
+	expect(el(Root).hasAttribute('aria-required')).toBe(false);
 	expect(field(MonthlyField).required).toBe(true);
 	expect(field(AnnualField).required).toBe(true);
 }
@@ -203,7 +209,7 @@ function expectRootConfigAddsNoControl() {
 function expectNamelessGroupSubmitsNothing() {
 	expect(field(MonthlyField).getAttribute('name')).toBe('');
 	expect(field(MonthlyField).required).toBe(false);
-	expect(el(Root).getAttribute('aria-required')).toBe('false');
+	expect(el(Root).hasAttribute('aria-required')).toBe(false);
 }
 
 async function expectChosenOptionSubmits() {
@@ -435,7 +441,7 @@ test('CSR: the arrow keys walk past an option nobody may choose', async () => {
 
 test('CSR: a horizontal group walks the horizontal axis and leaves the other alone', async () => {
 	await render(SegmentedControl);
-	expect(el(Root).getAttribute('aria-orientation')).toBe('horizontal');
+	expect(el(Root).hasAttribute('aria-orientation')).toBe(false);
 	expect(el(Root).getAttribute('ui-horizontal')).toBe('');
 	field(WeekField).focus();
 

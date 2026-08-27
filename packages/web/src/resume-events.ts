@@ -1,6 +1,11 @@
 import type { RuntimeGraph } from '@markless/runtime';
 import { protocolEventDispatchesMarkless } from '@markless/serializer/protocol';
 import {
+	marklessBeginFocusCommit,
+	marklessEndFocusCommit,
+	marklessHandleFocusReader,
+} from './fns/element-handle.ts';
+import {
 	marklessInstancePath,
 	marklessRecordRowScope,
 	marklessRowScopedGraph,
@@ -33,6 +38,10 @@ export type ResumeRowEventMatch = {
 	readonly rowEvent: ResumeKeyedRepeatRowEvent;
 };
 export type ResumeRowEventRecords = WeakMap<ResumeDomElement, Map<string, ResumeRowEventMatch>>;
+/** A row a keyed repeat took out, carrying the parent it hung from. */
+export type DisposedRepeatRow = ResumeDomElement & {
+	__marklessRowParent?: ResumeDomElement;
+};
 export type ResumeEventWiring = ReturnType<typeof createEventWiring>;
 type ExecutionLogGlobal = typeof globalThis & {
 	__mxLog?: Set<string>;
@@ -48,6 +57,38 @@ type ExecutionLogGlobal = typeof globalThis & {
 		readonly noMatch?: boolean;
 	}) => void | Promise<void>;
 };
+
+// Focus reaches an element before any key event can. These are the names a
+// focused element can still receive, so a record naming one is a handler the
+// page is about to need. Restated in render-csr and in the serialized inline
+// boot: neither can reach a shared module without paying a chunk for it.
+const FOCUS_KEY_EVENT_NAMES = ['keydown', 'keyup', 'keypress'];
+const FOCUS_EDITABLE_EVENT_NAMES = ['beforeinput', 'input'];
+// A pointer crosses onto a control before it presses it, and Safari focuses no
+// button on click - so hover, not focus, is what reliably precedes a first
+// press. A focused control still reaches these through Enter and Space.
+const PRESS_EVENT_NAMES = ['click', 'pointerdown', 'pointerup'];
+
+function focusPreloadEventNames(element: {
+	readonly tagName?: unknown;
+	readonly isContentEditable?: unknown;
+}): ReadonlyArray<string> {
+	const tagName = typeof element.tagName === 'string' ? element.tagName.toUpperCase() : '';
+	return element.isContentEditable === true ||
+		tagName === 'INPUT' ||
+		tagName === 'TEXTAREA' ||
+		tagName === 'SELECT'
+		? [...FOCUS_KEY_EVENT_NAMES, ...FOCUS_EDITABLE_EVENT_NAMES, ...PRESS_EVENT_NAMES]
+		: [...FOCUS_KEY_EVENT_NAMES, ...PRESS_EVENT_NAMES];
+}
+
+function isFocusPreloadEventName(eventName: string): boolean {
+	return (
+		FOCUS_KEY_EVENT_NAMES.includes(eventName) ||
+		FOCUS_EDITABLE_EVENT_NAMES.includes(eventName) ||
+		PRESS_EVENT_NAMES.includes(eventName)
+	);
+}
 
 export function createEventWiring(input: {
 	readonly root: ResumeDomElement;
@@ -69,8 +110,20 @@ export function createEventWiring(input: {
 	readonly behaviorHostIdsForAncestors: (element: ResumeDomElement | undefined) => string[];
 	readonly registerDelegatedEventRecord?: ResumeRuntimeInput['registerDelegatedEventRecord'];
 }) {
+	const readHandle = marklessHandleFocusReader(input.elementHandles.get);
 	const eventRecords = new WeakMap<ResumeDomElement, Map<string, ResumeEventRecord>>();
 	const rowEventRecords: ResumeRowEventRecords = new WeakMap();
+	// The detached subtree's own top is the row the repeat took out, and it carries
+	// where it hung. That is what lets a dispatch several microtasks behind its
+	// press finish the walk the DOM would have given it at press time.
+	const detachedRowAnchor = (target: ResumeDomElement): ResumeDomElement | undefined => {
+		let current: ResumeDomElement = target;
+		for (;;) {
+			const parent = current.parentElement;
+			if (!parent) return (current as DisposedRepeatRow).__marklessRowParent;
+			current = parent;
+		}
+	};
 	let debugRegistrations: Set<Promise<unknown>> | undefined;
 	const trackDebug = (pending: Promise<unknown>) => {
 		(debugRegistrations ??= new Set()).add(pending);
@@ -108,11 +161,13 @@ export function createEventWiring(input: {
 			});
 			input.eventTypes.add(record.eventName);
 			input.registerDelegatedEventRecord?.(element, record);
+			wantPreload(record.eventName);
 			return;
 		}
 		byName.set(record.eventName, record);
 		input.eventTypes.add(record.eventName);
 		input.registerDelegatedEventRecord?.(element, record);
+		wantPreload(record.eventName);
 		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 			trackDebug(
 				recordDebugInteraction(
@@ -126,6 +181,84 @@ export function createEventWiring(input: {
 					},
 				),
 			);
+	};
+	// Fetch only, never a dispatch: a rejection is left for the dispatch that
+	// actually needs the symbol to report.
+	const preloadedSymbolIds = new Set<string>();
+	let preloadArmed = false;
+	const preloadSymbolsFor = (
+		target: ResumeDomElement | null | undefined,
+		namesFor: (element: ResumeDomElement) => ReadonlyArray<string>,
+	): void => {
+		for (
+			let element: ResumeDomElement | null | undefined = target;
+			element;
+			element = element.parentElement
+		) {
+			const byName = eventRecords.get(element);
+			if (byName)
+				for (const eventName of namesFor(element)) {
+					const record = byName.get(eventName);
+					if (!record) continue;
+					for (const symbolId of record.symbolIds) {
+						if (preloadedSymbolIds.has(symbolId)) continue;
+						preloadedSymbolIds.add(symbolId);
+						void Promise.resolve(input.loadSymbol(symbolId)).catch(() => {});
+					}
+				}
+			if (element === input.root) break;
+		}
+	};
+	// Armed by startup, after the container's dispatch listeners: these only
+	// fetch modules and must never sit ahead of the authority that dispatches.
+	const preloadTrigger = (
+		triggerName: string,
+		namesFor: (element: ResumeDomElement) => ReadonlyArray<string>,
+	) => {
+		let wanted = false,
+			release: (() => void) | undefined;
+		const listener = (event: ResumeDomEvent) =>
+			preloadSymbolsFor(event.target as ResumeDomElement | null, namesFor);
+		const wire = (): void => {
+			if (!wanted || !preloadArmed || release) return;
+			input.root.addEventListener?.(triggerName, listener, { capture: true });
+			release = () =>
+				input.root.removeEventListener?.(triggerName, listener, { capture: true });
+		};
+		return {
+			want: () => {
+				wanted = true;
+				wire();
+			},
+			wire,
+			release: () => release?.(),
+		};
+	};
+	const focusPreload = preloadTrigger('focusin', focusPreloadEventNames);
+	// pointerenter does not bubble, so a delegated listener would only ever see
+	// the container's own crossing.
+	const pressPreload = preloadTrigger('pointerover', () => PRESS_EVENT_NAMES);
+	const wantPreload = (eventName: string): void => {
+		if (isFocusPreloadEventName(eventName)) focusPreload.want();
+		if (PRESS_EVENT_NAMES.includes(eventName)) pressPreload.want();
+	};
+	const armFocusPreload = (): void => {
+		preloadArmed = true;
+		focusPreload.wire();
+		pressPreload.wire();
+		// The crossing that woke this runtime happened before the wiring existed,
+		// and a resting pointer sends no second one; the boot leaves it here.
+		preloadSymbolsFor(
+			(input.root as unknown as { readonly __marklessPrimedHover?: ResumeDomElement })
+				.__marklessPrimedHover,
+			() => PRESS_EVENT_NAMES,
+		);
+	};
+	const preloadFocusKeySymbols = (target: ResumeDomElement | null | undefined): void =>
+		preloadSymbolsFor(target, focusPreloadEventNames);
+	const releaseFocusPreload = (): void => {
+		focusPreload.release();
+		pressPreload.release();
 	};
 	const addRowEvent = (host: ResumeDomElement, match: ResumeRowEventMatch) => {
 		let byName = rowEventRecords.get(host);
@@ -164,17 +297,23 @@ export function createEventWiring(input: {
 		if (!target) throw unmatchedDispatchError(event, undefined);
 		const selector = describeResumeEventTarget(target);
 		const ignoredDisposed = input.ignoredDisposedEventTargets.has(target);
-		if (!containsElement(input.root, target) && !ignoredDisposed)
+		// The browser aimed this event at a page where the row was still there; a
+		// keyed repeat has taken the row out since. The parent it left stands in for
+		// the link the walk would have crossed at press time.
+		const attached = containsElement(input.root, target);
+		const anchor = attached ? undefined : detachedRowAnchor(target);
+		const rowAnchor = anchor && containsElement(input.root, anchor) ? anchor : undefined;
+		if (!attached && !ignoredDisposed && !rowAnchor)
 			throw unmatchedDispatchError(event, selector);
-		const path = collectDispatchPath(
-			target,
-			event.type,
-			eventRecords,
-			rowEventRecords,
-			event.bubbles !== false,
-		);
+		const bubbles = event.bubbles !== false;
+		const path = collectDispatchPath(target, event.type, eventRecords, rowEventRecords, bubbles);
 		if (path.length === 0) {
 			if (ignoredDisposed) return;
+			// A capture listener on the container receives a non-bubbling event from
+			// every descendant in turn, so "the target itself carries no record" is the
+			// ordinary case rather than a routing defect: the element that does carry
+			// one gets its own event when the pointer enters it.
+			if (!bubbles) return;
 			await marklessLogInteraction({
 				eventName: event.type,
 				eventRecord: null,
@@ -188,6 +327,9 @@ export function createEventWiring(input: {
 			// forwards every captured event; non-markless clicks (e.g. router
 			// links) must pass through silently rather than throw.
 			if (options.ignoreUnmatched === true) return;
+			// Reported above before it is let go: a row the app itself removed is
+			// not a routing defect, but the no-match still belongs in the log.
+			if (rowAnchor) return;
 			throw unmatchedDispatchError(event, selector);
 		}
 		const propagation = trackPropagationStops(event);
@@ -235,7 +377,9 @@ export function createEventWiring(input: {
 		if (eventRecord.syncPolicy && !options.syncPolicyAlreadyApplied)
 			runPolicy?.(eventRecord.syncPolicy, input.graph, event);
 		let activeSymbolId: string | undefined;
+		let focusCommit = 0;
 		try {
+			focusCommit = marklessBeginFocusCommit();
 			await input.prepareRuntimeShared();
 			for (const hostNodeId of input.behaviorHostIdsForAncestors(element)) {
 				const activation = input.activateBehaviorsFromTrigger(hostNodeId);
@@ -243,6 +387,11 @@ export function createEventWiring(input: {
 			}
 			const activation = input.activateBehaviorsFromTrigger(eventRecord.hostNodeId);
 			if (activation) await activation;
+			// What the graph's write observers are already loading. A handler's write
+			// is answered synchronously only by an observer whose module has arrived,
+			// so a gesture that got here first would read its own write stale.
+			const settling = input.graph.settleWriteObservers?.();
+			if (settling) await settling;
 			// Which rendered row this record belongs to. A bound symbol's id names
 			// only the component edge, so without this the handler for row B would
 			// spell the same node as the handler for row A - the write lands
@@ -287,7 +436,7 @@ export function createEventWiring(input: {
 				graph: input.graph,
 				event,
 				element,
-				getElementHandle: input.elementHandles.get,
+				getElementHandle: readHandle,
 			} as DispatchSymbolContext;
 			const invokeCallback = (symbolId: string, args: ReadonlyArray<unknown>) =>
 				invokeSymbol(symbolId, { ...baseContext, args, invokeCallback, invokeSymbol });
@@ -310,6 +459,7 @@ export function createEventWiring(input: {
 			throw error;
 		} finally {
 			await input.flushRuntimeGraph();
+			if (focusCommit !== 0) marklessEndFocusCommit(focusCommit);
 			await marklessLogInteraction({
 				eventName: event.type,
 				eventRecord,
@@ -331,11 +481,24 @@ export function createEventWiring(input: {
 		const { findRepeatItemByKey, readKeyedRepeatCollection, validateOneRepeat } =
 			await import('./resume-keyed-repeats.ts');
 		const { repeat, rowKey, rowEvent } = match;
+		// The row is out of the document AND its item is out of the collection, so
+		// this record has no item left to act on. The walk carries on, so an
+		// enclosing record still answers the gesture rather than it being dropped.
+		if (
+			!match.rowRoot.parentElement &&
+			findRepeatItemByKey(readKeyedRepeatCollection(input.graph, repeat), repeat, rowKey) ===
+				undefined
+		)
+			return;
 		if (rowEvent.syncPolicy && !options.syncPolicyAlreadyApplied)
 			runPolicy?.(rowEvent.syncPolicy, input.graph, event);
 		let activeSymbolId: string | undefined;
+		let focusCommit = 0;
 		try {
+			focusCommit = marklessBeginFocusCommit();
 			await input.prepareRuntimeShared();
+			const settling = input.graph.settleWriteObservers?.();
+			if (settling) await settling;
 			validateOneRepeat(input.graph, repeat);
 			const locals = {
 				[repeat.itemName]: findRepeatItemByKey(
@@ -369,7 +532,7 @@ export function createEventWiring(input: {
 				graph: input.graph,
 				event,
 				element,
-				getElementHandle: input.elementHandles.get,
+				getElementHandle: readHandle,
 				locals,
 			} as DispatchSymbolContext;
 			const invokeCallback = (symbolId: string, args: ReadonlyArray<unknown>) =>
@@ -394,6 +557,7 @@ export function createEventWiring(input: {
 			throw error;
 		} finally {
 			await input.flushRuntimeGraph();
+			if (focusCommit !== 0) marklessEndFocusCommit(focusCommit);
 			await marklessLogInteraction({
 				eventName: event.type,
 				eventRecord: rowEvent,
@@ -409,6 +573,9 @@ export function createEventWiring(input: {
 		rowEventRecords,
 		addEventRecord,
 		addRowEvent,
+		armFocusPreload,
+		preloadFocusKeySymbols,
+		releaseFocusPreload,
 		prepareSyncPolicy,
 		...(typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
 			? { whenDebugRegistered: () => Promise.all(debugRegistrations ?? []) }
@@ -502,7 +669,12 @@ function collectDispatchPath(
 			const eventRecord = eventRecords.get(current)?.get(eventName);
 			if (eventRecord) path.push({ element: current, eventRecord });
 		}
-		current = bubbles ? current.parentElement : null;
+		// A detached row root has no parent left, so the walk crosses on the parent
+		// it was removed from - the same link the DOM would have handed it had the
+		// removal not beaten this dispatch to it.
+		current = bubbles
+			? (current.parentElement ?? (current as DisposedRepeatRow).__marklessRowParent ?? null)
+			: null;
 	}
 	return path;
 }
