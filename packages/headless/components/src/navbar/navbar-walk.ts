@@ -20,17 +20,19 @@ function isInsideAny(panels: Parts, part: HTMLElement): boolean {
 
 /** The controls a person reaches with ArrowLeft/ArrowRight along the bar. */
 export function topLevelControls(controls: Parts, panels: Parts): HTMLElement[] {
-	return Array.from(controls ?? []).filter(
-		(control) => isWalkable(control) && !isInsideAny(panels, control),
-	);
+	const walk: HTMLElement[] = [];
+	for (const control of controls ?? [])
+		if (isWalkable(control) && !isInsideAny(panels, control)) walk.push(control);
+	return walk;
 }
 
 /** One dropdown's own controls, in document order. */
 export function controlsInside(controls: Parts, panel: HTMLElement | undefined): HTMLElement[] {
-	if (!panel) return [];
-	return Array.from(controls ?? []).filter(
-		(control) => isWalkable(control) && panel.contains(control),
-	);
+	const walk: HTMLElement[] = [];
+	if (!panel) return walk;
+	for (const control of controls ?? [])
+		if (isWalkable(control) && panel.contains(control)) walk.push(control);
+	return walk;
 }
 
 /**
@@ -38,17 +40,18 @@ export function controlsInside(controls: Parts, panel: HTMLElement | undefined):
  * may put an icon or a span inside a trigger and the event lands on that.
  */
 export function controlAt(controls: Parts, target: Node | null): HTMLElement | undefined {
+	if (target === null) return undefined;
 	let found: HTMLElement | undefined;
 	for (const control of controls ?? [])
-		if (isWalkable(control) && target !== null && control.contains(target)) found = control;
+		if (isWalkable(control) && control.contains(target)) found = control;
 	return found;
 }
 
 /** Which dropdown the event happened inside, or `undefined` at the top level. */
 export function panelAt(panels: Parts, target: Node | null): HTMLElement | undefined {
+	if (target === null) return undefined;
 	let found: HTMLElement | undefined;
-	for (const panel of panels ?? [])
-		if (target !== null && panel.contains(target)) found = panel;
+	for (const panel of panels ?? []) if (panel.contains(target)) found = panel;
 	return found;
 }
 

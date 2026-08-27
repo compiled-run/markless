@@ -13,14 +13,27 @@ export function visibleRows<Row extends HTMLElement>(
 	rows: Parts<Row>,
 	groups: Parts<HTMLElement>,
 ): Row[] {
-	const closed = Array.from(groups ?? []).filter((group) => group.hasAttribute('hidden'));
-	return Array.from(rows ?? []).filter((row) => !closed.some((group) => group.contains(row)));
+	const closed: HTMLElement[] = [];
+	for (const group of groups ?? []) if (group.hasAttribute('hidden')) closed.push(group);
+
+	const visible: Row[] = [];
+	for (const row of rows ?? []) {
+		let isHidden = false;
+		for (const group of closed)
+			if (group.contains(row)) {
+				isHidden = true;
+				break;
+			}
+		if (!isHidden) visible.push(row);
+	}
+	return visible;
 }
 
 /** Which row the event happened on: the DEEPEST holder, because rows nest. */
 export function rowAt<Row extends HTMLElement>(rows: Parts<Row>, target: Node | null): Row | null {
+	if (target === null) return null;
 	let found: Row | null = null;
-	for (const row of rows ?? []) if (target !== null && row.contains(target)) found = row;
+	for (const row of rows ?? []) if (row.contains(target)) found = row;
 	return found;
 }
 
