@@ -119,6 +119,8 @@ export type ResumeAsyncBoundaryRecord = {
 	readonly asyncReads: ProtocolViewPayload['asyncBoundaries'][number]['asyncReads'];
 	readonly armRecords?: ResumeArmRecordSet | ReadonlyArray<unknown>;
 };
+// The range an arm commit addresses: boundaries and escalating branches alike.
+export type ResumeArmRange = Pick<ResumeAsyncBoundaryRecord, 'id' | 'startAnchor' | 'endAnchor'>;
 export type ResumeBehaviorRecord = ProtocolViewPayload['behaviors'][number];
 export type ResumeKeyedRepeatRecord = NonNullable<ProtocolViewPayload['keyedRepeats']>[number];
 export type ResumeKeyedRepeatRowEvent = ResumeKeyedRepeatRecord['rowEvents'][number];
@@ -128,18 +130,40 @@ export type ResumeBranchArmRecordSet = NonNullable<
 export type ResumeBranchRecord = {
 	readonly id: string;
 	readonly sourceId?: string;
+	// The arm the render PAINTED, when composition decided the branch outright.
+	readonly takenArm?: number;
 	readonly startAnchor: ResumeDomComment;
 	readonly endAnchor: ResumeDomComment;
 	readonly symbolId: string;
 	readonly testReads: NonNullable<
 		NonNullable<ProtocolViewPayload['branches']>[number]['testReads']
 	>;
+	// Reads the arm renders with no element of its own; they refresh its range.
+	readonly contentReads?: ResumeBranchRecord['testReads'];
 	readonly armTests?: ReadonlyArray<unknown>;
 	readonly declaredEmptyArms?: ReadonlyArray<number>;
 	readonly armRecords?: ReadonlyArray<ResumeBranchArmRecordSet>;
+	// A branch whose arm holds a component that has to run: flips commit a range.
+	readonly escalates?: true;
+	readonly servedArmRecords?: ResumeArmRecordSet;
+	// Which instance this branch's update symbol runs as, and where the props it
+	// reads now live. Present only on a branch that travelled through composition.
+	readonly composedInstancePath?: string;
+	readonly composedGraphProps?: NonNullable<
+		NonNullable<ProtocolViewPayload['branches']>[number]['composedGraphProps']
+	>;
 };
 export type ResumeBranchHtml = string | ReadonlyArray<string | { readonly text: string }>;
-export type ResumeBranchUpdate = { readonly arm: number; readonly html: ResumeBranchHtml };
+export type ResumeBranchUpdate = {
+	readonly arm: number;
+	readonly html: ResumeBranchHtml;
+	readonly resolved?: boolean;
+	// Present only from an escalation symbol: the re-rendered arm's own records.
+	readonly armRecords?: ResumeArmRecordSet;
+	readonly computed?: ProtocolStatePayload['computed'];
+	// State cells of components the escalated render created.
+	readonly cells?: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
+};
 // Async-arm records use indexes relative to the boundary's start anchor.
 export type ResumeArmLocator = {
 	readonly hostNodeId: string;
@@ -154,21 +178,30 @@ export type ResumeArmLocator = {
 // re-render. Materialization resolves the payload indexes to live comments.
 export type ResumeArmBranchRecord = {
 	readonly id: string;
+	readonly sourceId?: string;
 	readonly testReads: NonNullable<
 		NonNullable<ProtocolViewPayload['branches']>[number]['testReads']
 	>;
+	readonly contentReads?: NonNullable<ProtocolViewPayload['branches']>[number]['contentReads'];
+	// The arm the render PAINTED. A branch composition decided - a constant or an
+	// absent prop for a test - has no flip to wire and nothing else names its arm.
+	readonly takenArm?: number;
 	readonly symbolId?: string;
 	readonly armTests?: ReadonlyArray<unknown>;
 	readonly declaredEmptyArms?: ReadonlyArray<number>;
+	// A composed child's branch keeps the `dom-order-comment` anchors its own
+	// module counted; they resolve by anchor text inside the arm, not by index.
 	readonly startAnchor?:
-		| { readonly strategy: 'arm-branch-comment'; readonly index: number }
+		| { readonly strategy: 'arm-branch-comment' | 'dom-order-comment'; readonly index: number }
 		| ResumeDomComment;
 	readonly endAnchor?:
-		| { readonly strategy: 'arm-branch-comment'; readonly index: number }
+		| { readonly strategy: 'arm-branch-comment' | 'dom-order-comment'; readonly index: number }
 		| ResumeDomComment;
 	readonly armRecords?: ReadonlyArray<ResumeBranchArmRecordSet>;
 	// Present once the record is bound to its live boundary at registration.
 	readonly armBoundaryId?: string;
+	readonly composedInstancePath?: ResumeBranchRecord['composedInstancePath'];
+	readonly composedGraphProps?: ResumeBranchRecord['composedGraphProps'];
 };
 export type ResumeArmRecordSet = {
 	readonly locators: ReadonlyArray<ResumeArmLocator>;
@@ -251,6 +284,16 @@ export type ResumeRuntimeErrorHook = (
 	context: ResumeRuntimeErrorContext,
 ) => void | Promise<void>;
 export type ResumeSharedPatchDispatcher = (patch: RuntimeGraphSharedPatch) => void | Promise<void>;
+/**
+ * This page's render-data surface, which a component row is rendered from.
+ *
+ * Per CONTAINER, never a global: a global holds one page, and the second page
+ * module a client-routed document evaluated took the slot from the first. Lazy
+ * so a page that never mints never fetches the render-data chunk.
+ */
+export type ResumeRenderDataThunk = () =>
+	| import('./prerender/evaluator.ts').PrerenderDataSurface
+	| Promise<import('./prerender/evaluator.ts').PrerenderDataSurface>;
 export type ResumeRuntimeInput = {
 	readonly root: ResumeDomElement;
 	readonly graph: RuntimeGraph;
@@ -286,6 +329,7 @@ export type ResumeRuntimeInput = {
 	) => void;
 	readonly onError?: ResumeRuntimeErrorHook;
 	readonly demandAsyncBoundaries?: boolean;
+	readonly renderData?: ResumeRenderDataThunk;
 };
 export type ResumeDispatchOptions = {
 	readonly syncPolicyAlreadyApplied?: boolean;

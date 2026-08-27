@@ -1,5 +1,5 @@
-import { isRunnableDevEnvironment } from 'vite';
-import type { Environment, ViteDevServer } from 'vite';
+import { createServerModuleRunner, isRunnableDevEnvironment } from 'vite';
+import type { DevEnvironment, Environment, ViteDevServer } from 'vite';
 import type { MarklessEnvironment } from '../types.ts';
 
 type ViteEnvironmentConfig = {
@@ -77,6 +77,28 @@ export function transformMarklessRequest(
 	options?: MarklessViteEnvironmentOptions,
 ) {
 	return server.environments[viteEnvironmentName(environment, options)]?.transformRequest(url);
+}
+
+const serverModuleRunners = new WeakMap<
+	object,
+	Map<string, ReturnType<typeof createServerModuleRunner>>
+>();
+
+// One runner per server environment. A source-shipped dependency is executed
+// through it because Node cannot import raw TypeScript out of node_modules.
+export function serverModuleRunner(server: ViteDevServer, environmentName: string) {
+	const environment = server.environments[environmentName] as DevEnvironment | undefined;
+	if (!environment || !isRunnableDevEnvironment(environment)) {
+		throw new Error(`MARKLESS_DEV_MODULE_RUNNER_UNAVAILABLE: ${environmentName}`);
+	}
+	const byName = serverModuleRunners.get(server) ?? new Map();
+	serverModuleRunners.set(server, byName);
+	const existing = byName.get(environmentName);
+	if (existing) return existing;
+	const runner = createServerModuleRunner(environment);
+	byName.set(environmentName, runner);
+	server.httpServer?.once('close', () => void runner.close());
+	return runner;
 }
 
 // True when this process owns the environment's module runner, so a hot payload we

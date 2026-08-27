@@ -1,0 +1,25 @@
+# MARKLESS_STATE_UNRESOLVED_WRITE
+
+Cannot resolve graph write target; Host-object write is not tracked as state
+
+- Package: compiler
+- Pass or phase: state-lowering
+
+## Message
+
+Cannot write to "…" because the compiler cannot resolve that target.
+
+The write to "…" runs imperatively, but Markless does not track it as graph state.
+
+## Why
+
+Member-expression writes can update host objects at runtime, but they do not produce resumable state graph updates.
+
+This write is not a known state() graph path, graph alias, declared plain local, or classified module-scope binding.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/state-lowering.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

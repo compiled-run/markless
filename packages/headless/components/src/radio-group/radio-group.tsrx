@@ -1,6 +1,8 @@
 import { computed, element, shared, state } from '@markless/core';
 import VisuallyHidden from '../base/visually-hidden.tsrx';
+import { nextFieldToFocus } from './radio-group-walk.ts';
 import type {
+	RadioGroupBoxProps,
 	RadioGroupDescriptionProps,
 	RadioGroupErrorProps,
 	RadioGroupInstanceState,
@@ -29,10 +31,12 @@ export const radiogroupState = shared(
 		});
 		// The array type argument makes the handle plural: bound on every option's input, read back live and in document order.
 		const fieldEls = element<HTMLInputElement[]>();
+		const labelEl = element<HTMLLabelElement>();
 
 		return {
 			...group,
 			fieldEls,
+			labelEl,
 			// literal function type: a callback slot is only recognised from the written annotation
 			onChange: undefined as ((value: string) => void) | undefined,
 			// One way only: nothing a person does returns a group to nothing chosen.
@@ -57,7 +61,6 @@ export const radiogroupItemState = shared(
 	{ scope: 'widget' },
 );
 
-// A fieldset named by its legend: an accessible name with no id, IDREF or minted token, plus native disabling of every option it holds.
 export function RadioGroupRoot({
 	value = '',
 	orientation = 'vertical',
@@ -78,21 +81,29 @@ export function RadioGroupRoot({
 	group.name = name;
 	group.required = required;
 
-	<fieldset
+	<RadioGroupBox {...rest}>{children}</RadioGroupBox>
+}
+
+// A separate part rather than the root's own element: a widget root cannot read its
+// own instance token, so the label IDREF only resolves one component deeper.
+function RadioGroupBox({ children, ...rest }: RadioGroupBoxProps) @{
+	const group = radiogroupState();
+
+	<div
 		{...rest}
 		role="radiogroup"
-		aria-orientation={group.orientation === 'horizontal' ? 'horizontal' : 'vertical'}
-		aria-required={group.required ? 'true' : 'false'}
-		aria-invalid={group.invalid ? 'true' : 'false'}
-		disabled={group.disabled}
+		aria-labelledby={group.labelEl}
+		aria-disabled={group.disabled ? 'true' : undefined}
 		ui-horizontal={group.orientation === 'horizontal'}
 		ui-disabled={group.disabled}
 		ui-required={group.required}
-	>{children}</fieldset>
+	>{children}</div>
 }
 
 export function RadioGroupLabel({ children, ...rest }: RadioGroupLabelProps) @{
-	<legend {...rest}>{children}</legend>
+	const group = radiogroupState();
+
+	<label {...rest} el={group.labelEl}>{children}</label>
 }
 
 export function RadioGroupDescription({ children, ...rest }: RadioGroupDescriptionProps) @{
@@ -121,7 +132,7 @@ export function RadioGroupItem({ value, disabled = false, children, ...rest }: R
 	>{children}</div>
 }
 
-// No role and no aria-checked: the radio semantics live on the native input this sits beside, and a half-stated role is worse than none.
+// No role: the radio semantics live on the native input this sits beside.
 export function RadioGroupItemTrigger({ children, onClick, ...rest }: RadioGroupItemTriggerProps) @{
 	const group = radiogroupState();
 	const item = radiogroupItemState();
@@ -196,27 +207,15 @@ export function RadioGroupItemField({ onChange, onFocus, onKeydown, ...rest }: R
 					event.preventDefault();
 				}
 
-				const isHorizontal = group.orientation === 'horizontal';
-				const forward = isHorizontal ? 'ArrowRight' : 'ArrowDown';
-				const backward = isHorizontal ? 'ArrowLeft' : 'ArrowUp';
-				const key = event.key;
 				// `target`, not `currentTarget`: a lazy handler symbol runs after the native dispatch, when `currentTarget` is null.
-				const here = event.target as HTMLInputElement;
-				const isNavigationKey =
-					key === forward || key === backward || key === 'Home' || key === 'End';
-				if (!isNavigationKey) {
-					onKeydown?.(event);
-					return;
-				}
-
-				const fields = Array.from(group.fieldEls ?? []).filter((field) => !field.disabled);
-				const at = fields.indexOf(here);
-				const last = fields.length - 1;
-				const step = key === 'Home' ? -at : key === 'End' ? last - at : key === forward ? 1 : -1;
-				const raw = at + step;
-				const to = raw < 0 ? (group.loop ? last : 0) : raw > last ? (group.loop ? 0 : last) : raw;
-				const next = fields[to];
-				if (at >= 0 && next) {
+				const next = nextFieldToFocus(
+					group.fieldEls,
+					event.target as HTMLInputElement,
+					event.key,
+					group.orientation === 'horizontal',
+					group.loop,
+				);
+				if (next) {
 					next.focus();
 					// APG: an arrow moves focus AND chooses. Unlike tabs, selection is not optional.
 					group.choose(next.value);
