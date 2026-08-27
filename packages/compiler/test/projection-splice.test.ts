@@ -23,7 +23,11 @@ async function renderFixture(source: string): Promise<{
 	};
 }> {
 	const result = await compileTsrxModule({ filename: 'src/Page.tsrx', source, symbols: [] });
-	expect(result.publicRenderPlan.diagnostics).toEqual([]);
+	// These fixtures are about the served locator table. A component-rooted row
+	// warns that it can never grow, which is true and unrelated.
+	expect(
+		result.publicRenderPlan.diagnostics.filter((entry) => entry.severity === 'error'),
+	).toEqual([]);
 	const testSource = [
 		`const payloadState = ${JSON.stringify(result.protocolState)};`,
 		`const payloadView = ${JSON.stringify(result.protocolView)};`,

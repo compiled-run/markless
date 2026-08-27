@@ -1,0 +1,22 @@
+# MARKLESS_STATE_CONST_REASSIGNMENT
+
+Cannot reassign a const graph binding
+
+- Package: compiler
+- Pass or phase: state-lowering
+- Severity: error
+
+## Message
+
+Cannot update "…" because it was declared with const. JavaScript const binding semantics are preserved for state().
+
+## Why
+
+state() removes marker syntax, but it does not change JavaScript binding rules. A const binding cannot be reassigned during resume or initial render.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/state-lowering.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

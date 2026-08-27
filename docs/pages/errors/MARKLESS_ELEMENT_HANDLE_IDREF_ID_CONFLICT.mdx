@@ -1,0 +1,21 @@
+# MARKLESS_ELEMENT_HANDLE_IDREF_ID_CONFLICT
+
+An element named by an IDREF cannot also declare an id
+
+- Package: compiler
+- Pass or phase: semantic-graph
+
+## Message
+
+Cannot mint the id for el=\{…\} because this element already declares an id attribute.
+
+## Why
+
+An IDREF position is written from the id the compiler mints for the bound element. A second, authored id on the same element would emit two id attributes and leave the relationship pointing at whichever one the HTML parser kept.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

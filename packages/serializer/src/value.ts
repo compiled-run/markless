@@ -6,7 +6,11 @@ export type SerializedPrimitive =
 	| number
 	| boolean
 	| { readonly $type: 'undefined' }
-	| { readonly $type: 'bigint'; readonly value: string };
+	| { readonly $type: 'bigint'; readonly value: string }
+	| { readonly $type: 'number'; readonly value: NonFiniteNumberName };
+
+/** JSON has no form for these, so a bare number slot would print as `null`. */
+export type NonFiniteNumberName = 'Infinity' | '-Infinity' | 'NaN';
 
 export type SerializedSlot =
 	| SerializedPrimitive
@@ -151,9 +155,10 @@ function encodeSlot(
 	diagnostics: SerializationDiagnostic[],
 ): SerializedSlot | undefined {
 	if (value === null) return null;
-	if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-		return value;
+	if (typeof value === 'number') {
+		return Number.isFinite(value) ? value : { $type: 'number', value: nonFiniteName(value) };
 	}
+	if (typeof value === 'string' || typeof value === 'boolean') return value;
 	if (typeof value === 'undefined') return { $type: 'undefined' };
 	if (typeof value === 'bigint') return { $type: 'bigint', value: String(value) };
 
@@ -335,6 +340,11 @@ function encodeSlot(
 	}
 
 	return { $ref: id };
+}
+
+export function nonFiniteName(value: number): NonFiniteNumberName {
+	if (Number.isNaN(value)) return 'NaN';
+	return value > 0 ? 'Infinity' : '-Infinity';
 }
 
 function typedArrayName(value: object): TypedArrayName | null {

@@ -13,7 +13,6 @@ export type {
 	PopoverContentProps,
 	PopoverDescriptionProps,
 	PopoverRootProps,
-	PopoverSide,
 	PopoverTitleProps,
 	PopoverTriggerProps,
 } from './popover-types.ts';
