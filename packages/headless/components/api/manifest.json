@@ -1392,7 +1392,7 @@
 			{
 				"part": "content",
 				"component": "MenuContent",
-				"doc": "The surface the items go in, `role=\"menu\"`. It is never modal: it writes no\n`aria-modal`, so the page behind it keeps its focus and is never made inert,\nand a wheel does not dismiss it.\n\nIt stays in the page when the menu is closed - `hidden` decides whether it\nshows, never an arm - because an enlisted element removed from the document\nleaves the overlay stack's marks behind.",
+				"doc": "The top surface the items go in, `role=\"menu\"`. It is never modal: it writes\nno `aria-modal`, so the page behind it keeps its focus and is never made\ninert, and a wheel does not dismiss it.\n\nIt stays in the page when the menu is closed - `hidden` decides whether it\nshows, never an arm - because an enlisted element removed from the document\nleaves the overlay stack's marks behind.\n\nIt owns the keyboard walk over the items IT holds. A submenu's own items\nbelong to that submenu's `menu.itemcontent`.",
 				"props": []
 			},
 			{
@@ -1404,7 +1404,7 @@
 			{
 				"part": "item",
 				"component": "MenuItem",
-				"doc": "One command. Given `checked` it is a `menuitemcheckbox` that toggles without\nclosing; inside a `radio` menu it is a `menuitemradio`.\n\nA disabled item is still reachable with the arrows and still announced - the\nAPG's rule, and the divergence from `select`, whose walk skips a disabled\noption - it simply cannot be activated.",
+				"doc": "One command. Given `checked` it is a `menuitemcheckbox` that toggles without\nclosing; inside a `radio` menu it is a `menuitemradio`. Given `submenu` it\nholds a `menu.itemcontent` and opens it instead of activating.\n\nA disabled item is still reachable with the arrows and still announced - the\nAPG's rule, and the divergence from `select`, whose walk skips a disabled\noption - it simply cannot be activated.",
 				"props": [
 					{
 						"name": "value",
@@ -1424,19 +1424,26 @@
 						"required": false,
 						"default": "false",
 						"doc": "Nobody can activate this item; the arrows still land on it."
+					},
+					{
+						"name": "submenu",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "This item holds a submenu: it reports `aria-haspopup=\"menu\"` and\n`aria-expanded`, and opening it is what activation does.\n\nWritten rather than inferred from the `menu.itemcontent` inside it, for\ntree's `leaf` reason: a component cannot see its own children while it\nrenders, and a served page has to carry both attributes in its HTML before\nanything inside the item exists."
 					}
 				]
 			},
 			{
-				"part": "itemtrigger",
-				"component": "MenuItemTrigger",
-				"doc": "An item that opens a submenu. It is the parent menu's item and the submenu's\ntrigger at once, so it is written inside the nested `menu.root` it opens,\nbeside that root's `menu.content`.",
+				"part": "itemcontent",
+				"component": "MenuItemContent",
+				"doc": "The submenu one item holds, `role=\"menu\"`, named by that item. It is the same\nsurface part one level down: a `menu.item` inside it may hold a\n`menu.itemcontent` of its own, to any depth.\n\nLike `menu.content` it stays in the page when closed, it is an `overlay`, and\nit owns the keyboard walk over the items it holds.",
 				"props": []
 			},
 			{
 				"part": "root",
 				"component": "MenuRoot",
-				"doc": "The menu itself. Everything the family renders goes inside it, and it is the\nanchor scope the surface is placed within.\n\nA submenu is a `menu.root` written inside another menu's `menu.content`: the\nnested root starts a menu instance of its own, holding its own open state, its\nown roving focus and its own `onChange`.",
+				"doc": "The menu itself. Everything the family renders goes inside it, and it is the\nanchor scope the surface is placed within.\n\nThere is one root however deep the menu nests: a submenu is a\n`menu.itemcontent` written inside a `menu.item`, and an item activated at any\ndepth reports to this root's `onChange`.",
 				"props": [
 					{
 						"name": "open",
@@ -1464,41 +1471,41 @@
 						"type": "boolean",
 						"required": false,
 						"default": "true",
-						"doc": "The arrow walk wraps at both ends. Menus wrap; a listbox does not."
+						"doc": "The arrow walk wraps at both ends, on every surface. Menus wrap; a listbox does not."
 					},
 					{
 						"name": "radio",
 						"type": "boolean",
 						"required": false,
 						"default": "false",
-						"doc": "The items of this menu are one radio group: each renders\n`role=\"menuitemradio\"`, and choosing one unchecks the rest. Without it an\nitem carrying `checked` is a `menuitemcheckbox` and the rest are plain\ncommands."
+						"doc": "The items of this menu are one radio group: each renders\n`role=\"menuitemradio\"`, and choosing one unchecks the rest. Without it an\nitem carrying `checked` is a `menuitemcheckbox` and the rest are plain\ncommands. An item carrying `submenu` stays a plain `menuitem` either way."
 					},
 					{
 						"name": "side",
 						"type": "'top' | 'bottom' | 'start' | 'end'",
 						"required": false,
 						"default": "'bottom'",
-						"doc": "Where the surface is placed against the trigger. It is also written on\n`menu.content` as `ui-side`, so styling can follow the placement."
+						"doc": "Where the top surface is placed against the trigger. It is also written on\n`menu.content` as `ui-side`, so styling can follow the placement."
 					},
 					{
 						"name": "delay",
 						"type": "number",
 						"required": false,
 						"default": "700",
-						"doc": "How long a pointer rests on `menu.itemtrigger` before its submenu opens, in milliseconds."
+						"doc": "How long a pointer rests on a `submenu` item before its submenu opens, in milliseconds."
 					},
 					{
 						"name": "closeDelay",
 						"type": "number",
 						"required": false,
 						"default": "300",
-						"doc": "How long a submenu stays open after the pointer leaves it, in milliseconds."
+						"doc": "How long a submenu stays open after the pointer leaves its item, in milliseconds."
 					},
 					{
 						"name": "onChange",
 						"type": "(value: string) => void",
 						"required": false,
-						"doc": "Called with the item's `value` when an item is activated - a command, a\ncheckbox item toggling, or a radio item being chosen. A submenu is its own\nroot, so its activations reach the callback written on the submenu's root."
+						"doc": "Called with the item's `value` when an item is activated - a command, a\ncheckbox item toggling, or a radio item being chosen - at any depth."
 					},
 					{
 						"name": "onOpenChange",
