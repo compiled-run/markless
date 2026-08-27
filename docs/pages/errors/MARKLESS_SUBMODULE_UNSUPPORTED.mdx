@@ -1,0 +1,24 @@
+# MARKLESS_SUBMODULE_UNSUPPORTED
+
+TSRX submodules are not supported by this host yet
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: error
+
+## Message
+
+The identifier-source import "import ... from …;" has no submodule resolution in markless yet; nothing is split out of the client bundle.
+
+The submodule block "module … \{ ... \}" has no server/client boundary semantics in markless yet; its code runs wherever this module runs.
+
+## Why
+
+TSRX defines submodule syntax but defers boundary semantics to the host. Until markless implements splitting, treating this as supported would silently ship server-intended code to the client.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
