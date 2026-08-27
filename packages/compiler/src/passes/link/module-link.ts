@@ -480,6 +480,19 @@ export function linkBarrelComponents(
 		return known;
 	};
 
+	// A module's identity is its resolved `filename`; the key is only the name
+	// this importer calls it by. One file reached under one spelling twice — a
+	// folder barrel named directly and again through a root barrel that
+	// re-exports it — must not have its halves overwrite each other.
+	const publishInterface = (key: string, published: ModuleGraphInterfaceArtifact): void => {
+		const existing = interfaces[key];
+		if (!existing || existing === published || existing.filename !== published.filename) {
+			interfaces[key] = published;
+			return;
+		}
+		interfaces[key] = mergeBarrelInterfaces(existing, published);
+	};
+
 	// One child per module the walk reached, however many exports reached it.
 	const linkChild = (source: string, specifier: string): void => {
 		const child = { parent: input.parent, specifier, source, externalized: false };
@@ -516,13 +529,13 @@ export function linkBarrelComponents(
 				// The nested barrel is republished under the specifier this module
 				// would import it by, so one re-export segment steps into it.
 				if (nested.sharedReexports.length > 0) {
-					interfaces[specifier] = {
+					publishInterface(specifier, {
 						passId: 'module-graph-interface',
 						filename: target,
 						exports: [],
 						reexports: nested.sharedReexports,
 						render: { version: 1, components: [] },
-					};
+					});
 					sharedReexports.push({
 						exportName: reexport.exportName,
 						importedName: reexport.importedName,
@@ -540,7 +553,7 @@ export function linkBarrelComponents(
 				(candidate) => candidate.exportName === reexport.importedName,
 			);
 			if (!component && !sharedDefinition) continue;
-			interfaces[specifier] = targetInterface;
+			publishInterface(specifier, targetInterface);
 			linkChild(target, specifier);
 			if (component) {
 				linkedComponents.push({
@@ -572,14 +585,14 @@ export function linkBarrelComponents(
 		if (barrel === undefined || barrel === null) continue;
 		const { linkedComponents, sharedReexports } = walkBarrel(barrel, [], new Set());
 		if (linkedComponents.length === 0 && sharedReexports.length === 0) continue;
-		interfaces[moduleImport.source] = {
+		publishInterface(moduleImport.source, {
 			passId: 'module-graph-interface',
 			filename: barrel,
 			exports: [],
 			linkedComponents,
 			...(sharedReexports.length > 0 ? { reexports: sharedReexports } : {}),
 			render: { version: 1, components: [] },
-		};
+		});
 	}
 
 	return {
@@ -590,6 +603,42 @@ export function linkBarrelComponents(
 		pendingResolutions,
 		pendingInterfaces,
 	};
+}
+
+// Two interfaces published under one key for one resolved file: the halves the
+// walk gathered separately (components under one spelling, shared re-exports
+// under the other) become one interface instead of the second erasing the first.
+function mergeBarrelInterfaces(
+	existing: ModuleGraphInterfaceArtifact,
+	published: ModuleGraphInterfaceArtifact,
+): ModuleGraphInterfaceArtifact {
+	// The half that actually read the module owns the render and the rest of the
+	// surface; a republished barrel carries an empty one by construction.
+	const base = published.render.components.length > existing.render.components.length
+		? published
+		: existing;
+	const other = base === existing ? published : existing;
+	const linkedComponents = dedupeBy(
+		[...(existing.linkedComponents ?? []), ...(published.linkedComponents ?? [])],
+		(component) => `${component.exportPath.join('\0')}\0${component.source}`,
+	);
+	const reexports = dedupeBy(
+		[...(existing.reexports ?? []), ...(published.reexports ?? [])],
+		(reexport) => `${reexport.exportName}\0${reexport.source}`,
+	);
+	return {
+		...base,
+		...(base.exports.length === 0 && other.exports.length > 0 ? { exports: other.exports } : {}),
+		...(base.sharedDefinitions === undefined && other.sharedDefinitions !== undefined
+			? { sharedDefinitions: other.sharedDefinitions }
+			: {}),
+		...(linkedComponents.length > 0 ? { linkedComponents } : {}),
+		...(reexports.length > 0 ? { reexports } : {}),
+	};
+}
+
+function dedupeBy<Entry>(entries: ReadonlyArray<Entry>, key: (entry: Entry) => string): Entry[] {
+	return [...new Map(entries.map((entry) => [key(entry), entry])).values()];
 }
 
 function barrelUnresolvedDiagnostic(

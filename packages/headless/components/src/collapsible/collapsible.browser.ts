@@ -68,9 +68,8 @@ function expectBasicRendered() {
 	expect(el(Root).getAttribute('ui-closed')).toBe('');
 	expect(el(Root).hasAttribute('ui-open')).toBe(false);
 	expect(el(Content).getAttribute('ui-closed')).toBe('');
-	// No live region: aria-expanded already conveys the change, and a live region
-	// would announce the whole revealed panel on top of it.
-	expect(el(Root).hasAttribute('aria-live')).toBe(false);
+	expect(el(Root).getAttribute('aria-live')).toBe('polite');
+	expect(el(Trigger).getAttribute('aria-disabled')).toBe('false');
 }
 
 function expectFaqRendered() {
@@ -98,6 +97,7 @@ function expectEachWidgetMintsItsOwnId() {
 
 function expectUnavailableRendered() {
 	expect(el(ShutTrigger).getAttribute('disabled')).toBe('');
+	expect(el(ShutTrigger).getAttribute('aria-disabled')).toBe('true');
 	expect(el(ShutRoot).getAttribute('ui-disabled')).toBe('');
 	expectClosed(el(ShutTrigger), el(ShutContent));
 	expect(el(OpenTrigger).getAttribute('disabled')).toBe('');

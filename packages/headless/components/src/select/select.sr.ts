@@ -16,6 +16,7 @@ const WORDS: Record<string, Record<string, string>> = {
 	// measured: this reader's own output for our markup
 	virtual: {
 		combobox: 'combobox',
+		button: 'button',
 		listbox: 'listbox',
 		option: 'option',
 		selected: 'selected',
@@ -27,6 +28,7 @@ const WORDS: Record<string, Record<string, string>> = {
 	// unverified against our markup
 	NVDA: {
 		combobox: 'combo box',
+		button: 'button',
 		listbox: 'list box',
 		option: '',
 		selected: 'selected',
@@ -38,6 +40,7 @@ const WORDS: Record<string, Record<string, string>> = {
 	// unverified against our markup
 	VoiceOver: {
 		combobox: 'combo box',
+		button: 'button',
 		listbox: 'list box',
 		option: '',
 		selected: 'selected',
@@ -90,19 +93,19 @@ async function expectAnnouncesAfterChange(facts: readonly string[]) {
 	expectConveys(await sr.settleOnFocus(), facts);
 }
 
-test('entering the select conveys the combobox role and the select name', async () => {
+test('entering the select conveys the button role and the select name', async () => {
 	await open(Basic);
-	expectConveys(await readFor([say.combobox]), [say.combobox, 'Favorite Fruit']);
+	expectConveys(await readFor([say.button]), [say.button, 'Favorite Fruit']);
 });
 
 test('a select that is not showing its popup conveys that it is collapsed', async () => {
 	await open(Basic);
-	expectConveys(await readFor([say.combobox]), [say.combobox, say.collapsed]);
+	expectConveys(await readFor([say.button]), [say.button, say.collapsed]);
 });
 
 test('a select showing its popup conveys expanded and a named listbox', async () => {
 	await open(OpenList);
-	expectConveys(await readFor([say.combobox]), [say.combobox, say.expanded]);
+	expectConveys(await readFor([say.button]), [say.button, say.expanded]);
 	expectConveys(await readFor([say.listbox]), [say.listbox, 'Favorite Fruit']);
 });
 
@@ -166,14 +169,14 @@ test('arrowing off the chosen option announces the next one as not selected', as
 // Escape must also leave the value untouched, but that is behind a hidden listbox this reader cannot walk into, so select.browser.ts carries it.
 test('Escape leaves the select conveying collapsed', async () => {
 	await open(Prefilled);
-	await readFor([say.combobox]);
-	const trigger = document.querySelector('[role="combobox"]') as HTMLElement;
+	await readFor([say.button]);
+	const trigger = document.querySelector('[aria-haspopup="listbox"]') as HTMLElement;
 	await sr.press(sr.keys.arrowDown);
 	await expect.poll(() => trigger.getAttribute('aria-expanded')).toBe('true');
 
 	await sr.press('Escape');
 	await expect.poll(() => trigger.getAttribute('aria-expanded')).toBe('false');
-	await expectAnnouncesAfterChange([say.combobox, say.collapsed]);
+	await expectAnnouncesAfterChange([say.button, say.collapsed]);
 });
 
 test('an option nobody may choose conveys that it is disabled', async () => {
@@ -181,25 +184,24 @@ test('an option nobody may choose conveys that it is disabled', async () => {
 	expectConveys(await readFor(['Banana']), ['Banana', say.disabled]);
 });
 
-// The trigger is a native disabled button, so the reader conveys it on the combobox itself.
-test('a select nobody may touch conveys disabled on the combobox', async () => {
+test('a select nobody may touch conveys disabled on its trigger', async () => {
 	await open(UnavailableOptions);
-	expectConveys(await readFor([say.combobox, 'Support Plan']), [
-		say.combobox,
+	expectConveys(await readFor([say.button, 'Support Plan']), [
+		say.button,
 		'Support Plan',
 		say.disabled,
 	]);
 });
 
-// A bare `<select>` carries the combobox role natively, so failing to hide it puts the same choice in the tree twice - proven here by counting.
-test('the hidden native control is never announced beside the real combobox', async () => {
+// A bare `<select>` carries the combobox role natively; hidden, nothing in the walk is a combobox at all.
+test('the hidden native control puts no combobox in the tree', async () => {
 	await open(SignupForm);
 	const log: string[] = [];
 	for (let step = 0; step < 60; step++) {
 		log.push(await sr.lastSpokenPhrase());
 		await sr.next();
 	}
-	const spoken = log.filter((phrase) => sr.segments(phrase)[0] === say.combobox);
-	expect(spoken.length).toBeGreaterThan(0);
-	expect(new Set(spoken).size).toBe(1);
+	expect(log.filter((phrase) => sr.segments(phrase)[0] === say.combobox)).toEqual([]);
+	const triggers = log.filter((phrase) => sr.segments(phrase)[0] === say.button);
+	expect(triggers.length).toBeGreaterThan(0);
 });

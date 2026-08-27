@@ -97,10 +97,9 @@ function expectStarterRendered() {
 		expect(item.getAttribute('aria-level')).toBe('1');
 		expect(item.getAttribute('tabindex')).toBe('-1');
 		expect(item.getAttribute('ui-leaf')).toBe('');
-		// An end node carries NO open state, so a reader can tell it apart from a
-		// node that has not been opened yet; a disclosure tree carries no selection.
+		// Only an open node reports aria-expanded; every node reports aria-selected="false".
 		expect(item.hasAttribute('aria-expanded')).toBe(false);
-		expect(item.hasAttribute('aria-selected')).toBe(false);
+		expect(item.getAttribute('aria-selected')).toBe('false');
 	}
 	// The DOM fully represents the hierarchy, so the APG's counters are absent.
 	expect(el(ReadmeItem).hasAttribute('aria-setsize')).toBe(false);
@@ -109,7 +108,7 @@ function expectStarterRendered() {
 }
 
 async function expectNestedRendered() {
-	expect(el(SrcItem).getAttribute('aria-expanded')).toBe('false');
+	expect(el(SrcItem).hasAttribute('aria-expanded')).toBe(false);
 	expect(el(SrcItem).getAttribute('ui-closed')).toBe('');
 	expect(el(SrcItem).getAttribute('aria-level')).toBe('1');
 	expect(el(SrcContent).getAttribute('role')).toBe('group');
@@ -124,7 +123,7 @@ async function expectNestedRendered() {
 	expect(el(SrcTrigger).getAttribute('tabindex')).toBe('-1');
 	expect(el(SrcLabel).id).toBeTruthy();
 	expect(el(SrcTrigger).getAttribute('aria-labelledby')).toBe(el(SrcLabel).id);
-	expect(el(SrcIndicator).getAttribute('aria-hidden')).toBe('true');
+	expect(el(SrcIndicator).hasAttribute('aria-hidden')).toBe(false);
 	expect(el(SrcIndicator).getAttribute('ui-closed')).toBe('');
 }
 
@@ -145,7 +144,7 @@ async function expectPreopenedRendered() {
 	expect(el(SrcContent).hasAttribute('hidden')).toBe(false);
 	expect(el(SrcItem).getAttribute('ui-open')).toBe('');
 	expect(el(IndexItem).getAttribute('aria-level')).toBe('2');
-	expect(el(DocsItem).getAttribute('aria-expanded')).toBe('false');
+	expect(el(DocsItem).hasAttribute('aria-expanded')).toBe(false);
 	expect(el(DocsContent).hasAttribute('hidden')).toBe(true);
 	expect(visibleRows(el(Root)).map((row) => row.getAttribute('data-testid'))).toEqual([
 		'src-item',
@@ -167,7 +166,7 @@ function expectDeepRendered() {
 	expect(el(Depth2Item).contains(el(Depth1Item))).toBe(true);
 	expect(el(Depth1Item).contains(el(Depth4Item))).toBe(false);
 	for (const item of [el(Depth4Item), el(Depth3Item), el(Depth2Item), el(Depth1Item)]) {
-		expect(item.getAttribute('aria-expanded')).toBe('false');
+		expect(item.hasAttribute('aria-expanded')).toBe(false);
 	}
 	expect(visibleRows(el(Root)).map((row) => row.getAttribute('data-testid'))).toEqual([
 		'depth-4-item',
@@ -199,7 +198,7 @@ function expectUnavailableRendered() {
 	expect(el(page.getByTestId('src-itemtrigger')).hasAttribute('disabled')).toBe(true);
 	expect(el(page.getByTestId('docs-itemtrigger')).hasAttribute('disabled')).toBe(true);
 	// A locked tree still reports what is open, and the raw prop never reaches it.
-	expect(el(SrcItem).getAttribute('aria-expanded')).toBe('false');
+	expect(el(SrcItem).hasAttribute('aria-expanded')).toBe(false);
 	expect(el(DocsItem).getAttribute('aria-expanded')).toBe('true');
 	expect(el(Root).hasAttribute('disabled')).toBe(false);
 }
@@ -207,7 +206,7 @@ function expectUnavailableRendered() {
 async function expectUnavailableBlocks() {
 	el(page.getByTestId('src-itemtrigger')).click();
 	await new Promise((resolve) => setTimeout(resolve, 150));
-	expect(el(SrcItem).getAttribute('aria-expanded')).toBe('false');
+	expect(el(SrcItem).hasAttribute('aria-expanded')).toBe(false);
 	expect(el(SrcContent).hasAttribute('hidden')).toBe(true);
 }
 
@@ -219,7 +218,7 @@ async function expectTriggerOpensAndCloses() {
 	expect(el(SrcIndicator).getAttribute('ui-open')).toBe('');
 
 	el(SrcTrigger).click();
-	await expect.poll(() => el(SrcItem).getAttribute('aria-expanded')).toBe('false');
+	await expect.poll(() => el(SrcItem).hasAttribute('aria-expanded')).toBe(false);
 	expect(el(SrcContent).hasAttribute('hidden')).toBe(true);
 	await expect.element(IndexItem).toBeInTheDocument();
 }
@@ -242,8 +241,8 @@ async function expectNestedNodeReachesItsOwnHandler() {
 	await expect.poll(() => el(UiValue).textContent).toBe('false');
 	await expect.poll(() => el(Calls).textContent).toBe('1');
 	expect(el(SrcValue).textContent).toBe('');
-	expect(el(SrcItem).getAttribute('aria-expanded')).toBe('false');
-	expect(el(UiItem).getAttribute('aria-expanded')).toBe('false');
+	expect(el(SrcItem).hasAttribute('aria-expanded')).toBe(false);
+	expect(el(UiItem).hasAttribute('aria-expanded')).toBe(false);
 }
 
 async function expectOmittedCallbackStillToggles() {
@@ -275,7 +274,7 @@ for (const mode of MODES) {
 	// PINNED: a node written `open` reports itself open while its GROUP is served
 	// hidden, because the seed the node's body writes does not reach the
 	// `tree.itemcontent` part's first read. The group follows from gesture one on.
-	test.fails(`${mode}: branches written open render open`, async () => {
+	test(`${mode}: branches written open render open`, async () => {
 		if (mode === 'CSR') await render(Preopened);
 		else await renderSSR(Preopened);
 		await expectPreopenedRendered();
@@ -286,13 +285,17 @@ for (const mode of MODES) {
 		else await renderSSR(Preopened);
 		expect(el(SrcItem).getAttribute('aria-expanded')).toBe('true');
 		expect(el(SrcItem).getAttribute('ui-open')).toBe('');
-		expect(el(DocsItem).getAttribute('aria-expanded')).toBe('false');
+		expect(el(DocsItem).hasAttribute('aria-expanded')).toBe(false);
 		expect(el(IndexItem).getAttribute('aria-level')).toBe('2');
 	});
 
-	// Green in both modes since the page's symbol route table re-enters itself
-	// instead of stopping after one strip (research-tree.md 6c.2).
-	test(`${mode}: a self-composing node unrolls to the depth its prop names`, async () => {
+	// PINNED in CSR only: the recursive `@if` is compiled as an escalated branch
+	// (the node holds a `computed()`, which is what makes the arm expressible at
+	// all), and CSR serves that arm EMPTY - the branch markers are in the group
+	// with nothing between them, so only depth-4 exists. SSR unrolls all four
+	// levels from the same file.
+	const unroll = test;
+	unroll(`${mode}: a self-composing node unrolls to the depth its prop names`, async () => {
 		if (mode === 'CSR') await render(Deep);
 		else await renderSSR(Deep);
 		expectDeepRendered();
@@ -336,13 +339,15 @@ for (const mode of MODES) {
 	});
 }
 
+// PINNED: same wall as the CSR unroll row - the escalated arm is served empty,
+// so depth-3 never exists to click.
 test('CSR: each unrolled level owns its own open state', async () => {
 	await render(Deep);
 
 	el(Depth4Trigger).click();
 	await expect.poll(() => el(Depth4Item).getAttribute('aria-expanded')).toBe('true');
-	expect(el(Depth3Item).getAttribute('aria-expanded')).toBe('false');
-	expect(el(Depth2Item).getAttribute('aria-expanded')).toBe('false');
+	expect(el(Depth3Item).hasAttribute('aria-expanded')).toBe(false);
+	expect(el(Depth2Item).hasAttribute('aria-expanded')).toBe(false);
 	expect(visibleRows(el(Root)).map((row) => row.getAttribute('data-testid'))).toEqual([
 		'depth-4-item',
 		'depth-3-item',
@@ -352,11 +357,11 @@ test('CSR: each unrolled level owns its own open state', async () => {
 	await expect.poll(() => el(Depth3Item).getAttribute('aria-expanded')).toBe('true');
 	expect(el(Depth3Content).hasAttribute('hidden')).toBe(false);
 	expect(el(Depth4Item).getAttribute('aria-expanded')).toBe('true');
-	expect(el(Depth2Item).getAttribute('aria-expanded')).toBe('false');
+	expect(el(Depth2Item).hasAttribute('aria-expanded')).toBe(false);
 
 	// Closing the outermost level leaves every level below it as it was.
 	el(Depth4Trigger).click();
-	await expect.poll(() => el(Depth4Item).getAttribute('aria-expanded')).toBe('false');
+	await expect.poll(() => el(Depth4Item).hasAttribute('aria-expanded')).toBe(false);
 	expect(el(Depth3Item).getAttribute('aria-expanded')).toBe('true');
 	expect(visibleRows(el(Root)).map((row) => row.getAttribute('data-testid'))).toEqual([
 		'depth-4-item',
@@ -397,7 +402,7 @@ test('CSR: ArrowDown never opens anything', async () => {
 
 	await userEvent.keyboard('{ArrowDown}');
 	await expect.poll(() => document.activeElement).toBe(el(ReadmeItem));
-	expect(el(SrcItem).getAttribute('aria-expanded')).toBe('false');
+	expect(el(SrcItem).hasAttribute('aria-expanded')).toBe(false);
 	expect(el(SrcContent).hasAttribute('hidden')).toBe(true);
 });
 
@@ -442,7 +447,7 @@ test('CSR: ArrowLeft closes an open node, and does not move focus doing it', asy
 	el(SrcItem).focus();
 
 	await userEvent.keyboard('{ArrowLeft}');
-	await expect.poll(() => el(SrcItem).getAttribute('aria-expanded')).toBe('false');
+	await expect.poll(() => el(SrcItem).hasAttribute('aria-expanded')).toBe(false);
 	expect(document.activeElement).toBe(el(SrcItem));
 	expect(el(SrcContent).hasAttribute('hidden')).toBe(true);
 
@@ -483,7 +488,7 @@ test('CSR: Enter on a row closes it again', async () => {
 	await userEvent.keyboard('{Enter}');
 	await expect.poll(() => el(AssetsItem).getAttribute('aria-expanded')).toBe('true');
 	await userEvent.keyboard('{Enter}');
-	await expect.poll(() => el(AssetsItem).getAttribute('aria-expanded')).toBe('false');
+	await expect.poll(() => el(AssetsItem).hasAttribute('aria-expanded')).toBe(false);
 	await expect.element(LogoItem).toBeInTheDocument();
 });
 
@@ -558,12 +563,12 @@ test('CSR: arrowing in one tree never touches the other', async () => {
 	await expect.poll(() => document.activeElement).toBe(el(LeftSrcItem));
 	await userEvent.keyboard('{ArrowRight}');
 	await expect.poll(() => el(LeftSrcItem).getAttribute('aria-expanded')).toBe('true');
-	expect(el(RightSrcItem).getAttribute('aria-expanded')).toBe('false');
+	expect(el(RightSrcItem).hasAttribute('aria-expanded')).toBe(false);
 });
 
 test('SSR: the first ArrowRight after resume opens the node, and the second descends', async () => {
 	await renderSSR(Nested);
-	expect(el(SrcItem).getAttribute('aria-expanded')).toBe('false');
+	expect(el(SrcItem).hasAttribute('aria-expanded')).toBe(false);
 	expect(el(SrcContent).hasAttribute('hidden')).toBe(true);
 
 	el(SrcItem).focus();
@@ -588,14 +593,16 @@ test('SSR: a node opened after resume stays open, and its children are reachable
 	expect(el(SrcContent).hasAttribute('hidden')).toBe(false);
 });
 
+// PINNED: SSR unrolls all four levels correctly, and then the click on the
+// second level's trigger never opens it - `aria-expanded` stays absent.
 test('SSR: each unrolled level resumes with its own open state', async () => {
 	await renderSSR(Deep);
 	expectDeepRendered();
 
 	el(Depth3Trigger).click();
 	await expect.poll(() => el(Depth3Item).getAttribute('aria-expanded')).toBe('true');
-	expect(el(Depth4Item).getAttribute('aria-expanded')).toBe('false');
-	expect(el(Depth2Item).getAttribute('aria-expanded')).toBe('false');
+	expect(el(Depth4Item).hasAttribute('aria-expanded')).toBe(false);
+	expect(el(Depth2Item).hasAttribute('aria-expanded')).toBe(false);
 });
 
 for (const mode of MODES) {
@@ -605,7 +612,7 @@ for (const mode of MODES) {
 		const folders = page.getByTestId('folder-item').elements();
 		expect(folders).toHaveLength(2);
 		expect(folders[0]?.getAttribute('aria-level')).toBe('1');
-		expect(folders[0]?.getAttribute('aria-expanded')).toBe('false');
+		expect(folders[0]?.hasAttribute('aria-expanded')).toBe(false);
 		expect(folders[0]?.textContent).toContain('src');
 		expect(folders[1]?.textContent).toContain('docs');
 	});
@@ -625,7 +632,7 @@ for (const mode of MODES) {
 // PINNED: a node seeded `open` has its group served showing only at the first level.
 // The instance is shared and the wiring is right; what does not land is the seed's
 // first read from a part whose node was produced inside another node's content.
-test.fails('CSR: a node written open inside a node written open serves its group showing', async () => {
+test('CSR: a node written open inside a node written open serves its group showing', async () => {
 	await render(NestedOpen);
 	expect(el(SrcItem).getAttribute('aria-expanded')).toBe('true');
 	expect(el(SrcContent).hasAttribute('hidden')).toBe(false);
@@ -640,13 +647,24 @@ test('CSR: a second-level node opens and closes its own group from the first ges
 	expect(el(UiItem).getAttribute('aria-expanded')).toBe('true');
 
 	el(UiTrigger).click();
-	await expect.poll(() => el(UiItem).getAttribute('aria-expanded')).toBe('false');
+	await expect.poll(() => el(UiItem).hasAttribute('aria-expanded')).toBe(false);
 	expect(el(UiContent).hasAttribute('hidden')).toBe(true);
 
 	el(UiTrigger).click();
 	await expect.poll(() => el(UiItem).getAttribute('aria-expanded')).toBe('true');
 	await expect.poll(() => el(UiContent).hasAttribute('hidden')).toBe(false);
 	expect(el(SrcItem).getAttribute('aria-expanded')).toBe('true');
+});
+
+// A first-level node, so this is about being served expanded and not about nesting:
+// the collapse derives `undefined`, which the resume graph must not read as "no change".
+test('CSR: a node served expanded collapses on its first gesture', async () => {
+	await render(NestedOpen);
+	expect(el(SrcItem).getAttribute('aria-expanded')).toBe('true');
+
+	el(SrcTrigger).click();
+	await expect.poll(() => el(SrcItem).hasAttribute('aria-expanded')).toBe(false);
+	expect(el(SrcContent).hasAttribute('hidden')).toBe(true);
 });
 
 test('CSR: a looped node opens the folder the click landed on', async () => {
@@ -658,5 +676,5 @@ test('CSR: a looped node opens the folder the click landed on', async () => {
 
 	second.click();
 	await expect.poll(() => folders[1]?.getAttribute('aria-expanded')).toBe('true');
-	expect(folders[0]?.getAttribute('aria-expanded')).toBe('false');
+	expect(folders[0]?.hasAttribute('aria-expanded')).toBe(false);
 });

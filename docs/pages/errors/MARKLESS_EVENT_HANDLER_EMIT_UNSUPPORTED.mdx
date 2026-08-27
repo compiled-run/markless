@@ -1,0 +1,23 @@
+# MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED
+
+This event handler cannot run in the browser yet
+
+- Package: compiler
+- Pass or phase: capture-analysis
+
+## Message
+
+Cannot emit lazy … symbol "…" because it reads component-local "…", a local … value that cannot cross a resume boundary.
+
+Cannot emit lazy … symbol "…" because the compiler could not read its source, so the values it captures across the resume boundary are unknown.
+
+## Why
+
+Lazy handler symbols run after browser resume. Handler bodies may use graph references, element handles, props/shared values, module imports, or serializable capture-plane inputs; unsupported body locals would otherwise become silent no-op code.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/capture-analysis.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
