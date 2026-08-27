@@ -117,26 +117,37 @@ function initialValue(
 			: [];
 	}
 	if (binding.kind !== 'state') return [];
-	if (binding.initialValueKnown === true || 'initialValue' in binding) {
-		return [
-			{
-				graphNodeId: binding.id,
-				value: { kind: 'constant', value: binding.initialValue },
-			},
-		];
+	if (binding.initialValueKnown === true || !binding.initializerSource) {
+		return binding.initialValueKnown === true || 'initialValue' in binding
+			? [{ graphNodeId: binding.id, value: { kind: 'constant', value: binding.initialValue } }]
+			: [];
 	}
-	return binding.initializerSource
-		? symbolResolver.symbols.flatMap((symbol) =>
-				symbol.kind === 'state-initializer' && symbol.graphNodeId === binding.id
-					? [
-				{
-					graphNodeId: binding.id,
-					value: { kind: 'symbol-function', symbolId: symbol.id },
-				},
+	// A seed whose properties do not all fold publishes BOTH where a per-instance
+	// write will merge onto it: the folded subset as the constant that write starts
+	// from, and the authored expression beside it for the rest. A shape nobody
+	// writes needs no base, and a constant answering for it would stand in for the
+	// live value every reader of the shape is owed.
+	const folded: RenderDataInitialValue[] =
+		'initialValue' in binding &&
+		symbolResolver.symbols.some(
+			(symbol) => symbol.kind === 'shared-seed' && symbol.graphNodeId === binding.id,
+		)
+			? [{ graphNodeId: binding.id, value: { kind: 'constant', value: binding.initialValue } }]
+			: [];
+
+	return [
+		...folded,
+		...symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'state-initializer' && symbol.graphNodeId === binding.id
+				? [
+						{
+							graphNodeId: binding.id,
+							value: { kind: 'symbol-function' as const, symbolId: symbol.id },
+						},
 					]
-					: [],
-			)
-		: [];
+				: [],
+		),
+	];
 }
 
 function branchRecord(

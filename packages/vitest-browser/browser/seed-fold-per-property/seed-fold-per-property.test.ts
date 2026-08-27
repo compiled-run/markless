@@ -82,14 +82,12 @@ for (const [label, page] of pages) {
 	}
 }
 
-// The residue this unit could not close. A seed property that cannot be folded —
-// a non-finite constant, an imported const — is carried as the authored
-// expression, and that carry emits a `state-initializer` record into the same
-// component's `initialValues` beside the root's per-instance `shared-seed`
-// records. `initialValueKinds` holds one kind per graph node id, so the runtime
-// cannot tell the factory default from a per-instance seed: it runs the factory
-// record as a seed and finds no `constant` record to merge onto, and the root's
-// prop values are lost.
+// A seed property that cannot be folded — a non-finite constant, an imported
+// const — is carried as the authored expression, and that carry emits a
+// `state-initializer` record into the same component's `initialValues` beside the
+// root's per-instance `shared-seed` records. Those two records wear one graph node
+// id, so the kinds map keys them by symbol id: run as if it were a seed, the
+// factory default landed on top of the real ones and ate the root's props.
 async function openCarried(mode: 'CSR' | 'SSR'): Promise<ParentNode> {
 	const screen =
 		mode === 'CSR' ? await render(SeedFoldCarriedPage) : await renderSSR(SeedFoldCarriedPage);
@@ -102,16 +100,16 @@ test('CSR: a carried seed property still serves its own value', async () => {
 	expect(limitReadout(container)).toBe('Infinity');
 });
 
-// SSR has a second residue of its own: `unfoldedSharedSeedLines` emits the carried
-// expression as a set-if-absent, and the root's per-instance writes have already
-// set the cell by the time it runs, so the factory default never lands.
-test.fails('SSR: a carried seed property still serves its own value', async () => {
+// The carried expression is a set-if-absent, so it has to land BEFORE the root's
+// per-instance writes: emitted after them, the cell was already set and the
+// factory default never landed.
+test('SSR: a carried seed property still serves its own value', async () => {
 	const container = await openCarried('SSR');
 
 	expect(limitReadout(container)).toBe('Infinity');
 });
 
-test.fails("CSR: a carried seed property keeps the root's prop-derived values", async () => {
+test("CSR: a carried seed property keeps the root's prop-derived values", async () => {
 	const container = await openCarried('CSR');
 
 	expect(attr(container, 'ui-name')).toBe('frame');

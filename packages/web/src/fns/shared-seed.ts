@@ -20,6 +20,27 @@ import { fileBoundElementHandles } from './element-handle-roster.ts';
 import { marklessThen, marklessWalk, type Awaitable } from '../ssr-data/awaitable.ts';
 
 type SeedEdge = NonNullable<PrerenderDataDefinition['edges']>[number];
+type SeedInitialValue = NonNullable<PrerenderDataDefinition['initialValues']>[number];
+
+/**
+ * What one initial-value RECORD is, not what its graph node is.
+ *
+ * A node carrying its factory default beside the root's per-instance seeds
+ * offers two symbol records under one id, so the compiler keys those by symbol
+ * id; every other node is still keyed by graph node id, which is the fallback.
+ */
+function initialValueKind(
+	definition: PrerenderDataDefinition | undefined,
+	initial: SeedInitialValue,
+): string | undefined {
+	const kinds = definition?.initialValueKinds;
+	if (!kinds) return undefined;
+	const value = initial.value;
+	return (
+		(value.kind === 'symbol-function' ? kinds[value.symbolId] : undefined) ??
+		kinds[initial.graphNodeId]
+	);
+}
 type SeedContext = Parameters<SharedSeedPass>[0];
 type PrerenderReadSeed = (graphNodeId: string, path?: ReadonlyArray<string>) => unknown;
 
@@ -169,7 +190,7 @@ function composedScopeRead(
 		marklessWalk(initials.length, (index) => {
 			const initial = initials[index]!;
 			// A shared seed is this widget's own value, already written by the seed pass.
-			if (definition.initialValueKinds?.[initial.graphNodeId] === 'shared-seed') return undefined;
+			if (initialValueKind(definition, initial) === 'shared-seed') return undefined;
 			if (initial.value.kind === 'constant') {
 				values.set(initial.graphNodeId, structuredClone(initial.value.value));
 				return undefined;
@@ -474,9 +495,7 @@ function applySharedSeeds(
 		edge.childComponentName
 	];
 	const initials = child?.initialValues ?? [];
-	const seeds = initials.filter(
-		(initial) => child?.initialValueKinds?.[initial.graphNodeId] === 'shared-seed',
-	);
+	const seeds = initials.filter((initial) => initialValueKind(child, initial) === 'shared-seed');
 	if (!child || seeds.length === 0) return;
 
 	const childProps = edgeChildProps(context, surface, edge, read);
@@ -492,36 +511,85 @@ function applySharedSeeds(
 	};
 	const readSeed: PrerenderReadSeed = (graphNodeId, path = []) =>
 		readPath(seedSource(graphNodeId), path);
-	return marklessWalk(seeds.length, (index) => {
-		const initial = seeds[index]!;
-		const symbolValue = initial.value;
-		if (symbolValue.kind !== 'symbol-function') return undefined;
-		if (!seedFamilyOpen(seeded, initial.graphNodeId)) return undefined;
-		const factory = initials.find(
-			(candidate) =>
-				candidate.graphNodeId === initial.graphNodeId && candidate.value.kind === 'constant',
-		)?.value;
-		if (!seeded.has(initial.graphNodeId) && factory?.kind === 'constant')
-			seeded.set(initial.graphNodeId, structuredClone(factory.value));
-		// The caller hands in a row-free symbolPrefix: the row rides the seed's
-		// identity, never its symbol id, which routes match as a compile-time literal.
+	// The merge base every per-instance seed writes onto, laid down before the
+	// first of them runs: the folded constant, and then the carried expression for
+	// the properties that could not fold. A factory default that ran as if it were
+	// a seed instead landed on top of the real ones and ate them.
+	const primed = new Set<string>();
+	const primeMergeBase = (graphNodeId: string): Awaitable<void> => {
+		if (primed.has(graphNodeId) || seeded.has(graphNodeId)) return undefined;
+		primed.add(graphNodeId);
+		const own = initials.filter((candidate) => candidate.graphNodeId === graphNodeId);
+		const factory = own.find((candidate) => candidate.value.kind === 'constant')?.value;
+		if (factory?.kind === 'constant') seeded.set(graphNodeId, structuredClone(factory.value));
+		const carried = own.find(
+			(candidate) => initialValueKind(child, candidate) === 'state-initializer',
+		);
+		const carriedValue = carried?.value;
+		if (carriedValue?.kind !== 'symbol-function') return undefined;
 		return marklessThen(
 			context.loadSymbol(
-				edge.boundSymbols?.[symbolValue.symbolId] ??
-					symbolPrefix + edge.symbolPrefix + symbolValue.symbolId,
+				edge.boundSymbols?.[carriedValue.symbolId] ??
+					symbolPrefix + edge.symbolPrefix + carriedValue.symbolId,
 			) as Awaitable<unknown>,
 			(loaded) => {
-				if (typeof loaded !== 'function')
-					throw new Error(`MARKLESS_PRERENDER_DATA_SYMBOL_MISSING: ${symbolValue.symbolId}`);
+				// A carry this build did not publish leaves the folded base standing.
+				if (typeof loaded !== 'function') return undefined;
 				return marklessThen(
-					loaded({ graph: { read: readSeed }, read: readSeed }) as Awaitable<unknown>,
+					(loaded.length > 0
+						? loaded({ graph: { read: readSeed }, read: readSeed })
+						: loaded()) as Awaitable<unknown>,
 					(value) => {
-						seeded.set(initial.graphNodeId, value);
+						const base = seeded.get(graphNodeId);
+						seeded.set(
+							graphNodeId,
+							isPlainSeedRecord(base) && isPlainSeedRecord(value) ? { ...base, ...value } : value,
+						);
 					},
 				);
 			},
 		);
-	});
+	};
+	return marklessThen(
+		marklessWalk(seeds.length, (index) => {
+			const initial = seeds[index]!;
+			if (initial.value.kind !== 'symbol-function') return undefined;
+			if (!seedFamilyOpen(seeded, initial.graphNodeId)) return undefined;
+			return primeMergeBase(initial.graphNodeId);
+		}),
+		() => runSharedSeeds(),
+	);
+
+	function runSharedSeeds(): Awaitable<void> {
+		return marklessWalk(seeds.length, (index) => {
+			const initial = seeds[index]!;
+			const symbolValue = initial.value;
+			if (symbolValue.kind !== 'symbol-function') return undefined;
+			if (!seedFamilyOpen(seeded, initial.graphNodeId)) return undefined;
+			// The caller hands in a row-free symbolPrefix: the row rides the seed's
+			// identity, never its symbol id, which routes match as a compile-time literal.
+			return marklessThen(
+				context.loadSymbol(
+					edge.boundSymbols?.[symbolValue.symbolId] ??
+						symbolPrefix + edge.symbolPrefix + symbolValue.symbolId,
+				) as Awaitable<unknown>,
+				(loaded) => {
+					if (typeof loaded !== 'function')
+						throw new Error(`MARKLESS_PRERENDER_DATA_SYMBOL_MISSING: ${symbolValue.symbolId}`);
+					return marklessThen(
+						loaded({ graph: { read: readSeed }, read: readSeed }) as Awaitable<unknown>,
+						(value) => {
+							seeded.set(initial.graphNodeId, value);
+						},
+					);
+				},
+			);
+		});
+	}
+}
+
+function isPlainSeedRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**

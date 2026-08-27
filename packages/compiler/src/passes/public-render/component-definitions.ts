@@ -185,6 +185,18 @@ export function collectPublicRenderComponentDefinitions(
 			input,
 			componentName,
 		);
+		// A node carrying its factory default AND the root's per-instance seeds offers
+		// two symbol records under one id, and one kind per id cannot tell them
+		// apart: those are keyed by symbol id instead, which the reader falls back
+		// from. Every other node keeps the id key, so no existing module moves a byte.
+		const symbolRecordCounts = new Map<string, number>();
+		for (const initial of initialValues) {
+			if (initial.value.kind !== 'symbol-function') continue;
+			symbolRecordCounts.set(
+				initial.graphNodeId,
+				(symbolRecordCounts.get(initial.graphNodeId) ?? 0) + 1,
+			);
+		}
 		const initialValueKinds = Object.fromEntries(
 			initialValues.flatMap((initial) => {
 				// Held in a const so the discriminated narrowing survives into the callback.
@@ -193,7 +205,15 @@ export function collectPublicRenderComponentDefinitions(
 				const symbol = input.symbolResolver.symbols.find(
 					(candidate) => candidate.id === value.symbolId,
 				);
-				return symbol ? [[initial.graphNodeId, symbol.kind]] : [];
+				if (!symbol) return [];
+				return [
+					[
+						(symbolRecordCounts.get(initial.graphNodeId) ?? 0) > 1
+							? value.symbolId
+							: initial.graphNodeId,
+						symbol.kind,
+					],
+				];
 			}),
 		);
 		const nativeChunks = chunks.map(({ statics: _statics, ...chunk }) => ({

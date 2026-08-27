@@ -253,6 +253,7 @@ export function emitPublicSsrRenderModule(
 				rootDataLines.seedForward,
 				rootDataLines.bodySharedComputed,
 			),
+			carriedSharedSeedSources(input),
 		),
 		// A module that composes no same-module child owns every payload node, so
 		// it keeps the whole clone and emits no selection list.
@@ -263,6 +264,7 @@ export function emitPublicSsrRenderModule(
 				)}, ${JSON.stringify(ownedNodes.computedIndexes)});`,
 		'	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);',
 		sharedSeedConsumeLine(input, rootInfo.componentName, 'marklessSsrRenderStateValues'),
+		...rootDataLines.carriedSeed,
 		...renderBodyLines(
 			input,
 			rootInfo,
@@ -437,8 +439,10 @@ export function emitPublicSsrRenderModule(
  * write lands only in the renderer that OWNS the cell — every other selection
  * has dropped that record — so one line per render is correct.
  */
-function unfoldedSharedSeedLines(input: PublicRenderModuleInput): string[] {
-	const initializers = new Map(
+export function carriedSharedSeedSources(
+	input: PublicRenderModuleInput,
+): ReadonlyMap<string, string> {
+	return new Map(
 		input.semanticGraph.graphBindings.flatMap((binding) =>
 			binding.kind === 'state' &&
 			binding.sharedDefinitionId !== undefined &&
@@ -447,6 +451,10 @@ function unfoldedSharedSeedLines(input: PublicRenderModuleInput): string[] {
 				: [],
 		),
 	);
+}
+
+function unfoldedSharedSeedLines(input: PublicRenderModuleInput): string[] {
+	const initializers = carriedSharedSeedSources(input);
 	if (initializers.size === 0) return [];
 
 	return input.protocolState.cells.flatMap((cell) => {
@@ -505,6 +513,12 @@ function childrenWidgetRootMarkerLines(
 export type SsrDataLines = {
 	readonly render: string[];
 	readonly seedForward: string[];
+	/**
+	 * A shared() seed the evaluator could not fold whole. It lands in the prelude,
+	 * before the body's own per-instance writes: emitted after them, a set-if-absent
+	 * never fired once the root had written any property of the shape.
+	 */
+	readonly carriedSeed: string[];
 	/**
 	 * Factory computed derives a component-body `computed()` reads. The body local
 	 * is evaluated where it is declared, which is before the render lines run, so
@@ -1213,9 +1227,8 @@ function emitSsrDataLines(
 	);
 	return {
 		seedForward: seedForwardLines,
-		bodySharedComputed: hoistsSharedComputed
-			? [...unfoldedSeedLines, ...allSharedComputedLines]
-			: [],
+		carriedSeed: unfoldedSeedLines,
+		bodySharedComputed: hoistsSharedComputed ? [...allSharedComputedLines] : [],
 		composedRootSurfaceArgs,
 		importedChildSurfaceArgs,
 		serveComputed:
@@ -1228,7 +1241,6 @@ function emitSsrDataLines(
 					],
 		render: [
 		"marklessSsrRenderStateValues.set('prop:props',props);",
-		...unfoldedSeedLines,
 		...bindingLines,
 		...sharedComputedLines,
 		...templateComputedLines,

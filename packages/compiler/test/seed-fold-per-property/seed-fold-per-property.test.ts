@@ -184,3 +184,135 @@ test('a folded seed blames no consumer', async () => {
 	expect(codes).not.toContain('MARKLESS_SHARED_SEED_UNKNOWN_FIELD');
 	expect(codes).not.toContain('MARKLESS_SHARED_SEED_UNRESOLVED_VALUE');
 });
+
+// A seed mixing foldable properties with one that cannot fold publishes both
+// layers: the folded subset as the constant a per-instance write merges onto,
+// and the authored expression beside it for the rest.
+const carried = '{ minWidth: MIN, maxWidth: Number.POSITIVE_INFINITY, x: 2, label: "" }';
+
+test('a partly foldable seed folds the properties that fold', async () => {
+	const binding = seedBinding(await compile(carried));
+
+	expect(binding?.initialValueKnown).toBeUndefined();
+	expect(binding?.initialValue).toEqual({
+		minWidth: 1,
+		maxWidth: undefined,
+		x: 2,
+		label: '',
+	});
+	expect(binding?.initializerSource).toContain('Number.POSITIVE_INFINITY');
+});
+
+// The field set of the shape is read off these keys, so an unfoldable property
+// has to keep its key rather than disappear from the subset.
+test('a carried property keeps its key in the folded subset', async () => {
+	const binding = seedBinding(await compile(carried));
+
+	expect(Object.keys(binding?.initialValue as Record<string, unknown>)).toEqual([
+		'minWidth',
+		'maxWidth',
+		'x',
+		'label',
+	]);
+});
+
+test('a partly foldable seed publishes the constant and the carry together', async () => {
+	const compiled = await compile(carried);
+	const records = compiled.renderData.initialValues.filter(
+		(initial) => initial.graphNodeId === seedBinding(compiled)?.id,
+	);
+
+	expect(records.map((record) => record.value.kind)).toEqual(['constant', 'symbol-function']);
+});
+
+// A shape nobody writes per instance needs no merge base, and a constant standing
+// in for it would answer for the live value every reader of the shape is owed.
+test('a carried seed no root writes publishes no constant record', async () => {
+	const compiled = await compileTsrxModule({
+		filename: 'src/seed.tsrx',
+		source: `
+import { shared, state } from '@markless/core';
+export const gate = shared(() => {
+	const g = state({ minWidth: 1, maxWidth: Number.POSITIVE_INFINITY });
+	return { ...g };
+}, { scope: 'widget' });
+
+export function Root() @{
+	const g = gate();
+
+	<div data-root ui-min={g.minWidth} />
+}
+`,
+		buildId: 'build',
+		resolverId: 'resolver',
+		symbols: [],
+	});
+	const kinds = compiled.renderData.initialValues.map((initial) => initial.value.kind);
+
+	expect(kinds).not.toContain('constant');
+});
+
+// Two records under one graph node id cannot both be described by one kind per
+// id, so those are keyed by symbol id; the reader falls back to the id key.
+test('a node carrying a factory default beside its seeds keys kinds by symbol id', async () => {
+	const compiled = await compile(carried);
+	const root = compiled.publicRenderModule.componentDefinitions?.find(
+		(definition) => definition.name === 'Root',
+	);
+	const kinds = (root?.initialValueKinds ?? {}) as Record<string, string>;
+
+	expect(Object.keys(kinds).every((key) => key.startsWith('symbol:'))).toBe(true);
+	expect(Object.values(kinds)).toContain('state-initializer');
+	expect(Object.values(kinds)).toContain('shared-seed');
+});
+
+// A folded-only seed offers one symbol record per node, so its kinds keep the
+// graph node id key they have always had.
+test('a folded seed keeps its kinds keyed by graph node id', async () => {
+	const compiled = await compile('{ minWidth: MIN, maxWidth: 9, x: 2, label: "" }');
+	const root = compiled.publicRenderModule.componentDefinitions?.find(
+		(definition) => definition.name === 'Root',
+	);
+	const kinds = (root?.initialValueKinds ?? {}) as Record<string, string>;
+
+	expect(Object.keys(kinds).some((key) => key.startsWith('symbol:'))).toBe(false);
+});
+
+// The carry is a set-if-absent, so a root that writes any property of the shape
+// had already set the cell by the time it ran.
+test('the carried expression lands before the root per-instance writes', async () => {
+	const compiled = await compile(carried);
+	const ssr = compiled.publicRenderModule.ssrModuleSource ?? '';
+	const carry = ssr.indexOf('Number.POSITIVE_INFINITY');
+	const write = ssr.indexOf('const marklessSharedSeed = (label)');
+
+	expect(carry).toBeGreaterThan(-1);
+	expect(write).toBeGreaterThan(carry);
+});
+
+// The seed pass primes the caller's map from the static values map, which holds
+// nothing for a seed that did not fold.
+test('the seed pass primes a carried seed from its own expression', async () => {
+	const ssr = (await compile(carried)).publicRenderModule.ssrModuleSource ?? '';
+
+	expect(ssr).toMatch(/marklessSsrSeeds\.set\([^;]*Number\.POSITIVE_INFINITY/);
+});
+
+// JSON prints a non-finite number as `null`, which reaches the page as a silent
+// wrong number. The render-data module is JavaScript, where the name the
+// serializer gives that value denotes it exactly.
+test('a folded non-finite number reaches the render-data module as a name', async () => {
+	const compiled = await compile('{ minWidth: 1, maxWidth: 1e400, x: 2, label: "" }');
+	const module = compiled.publicRenderModule.renderDataModuleSource;
+
+	expect(module).toContain('"maxWidth":Infinity');
+	expect(module).not.toContain('"maxWidth":null');
+});
+
+test('a payload with no non-finite number still prints as JSON', async () => {
+	const compiled = await compile('{ minWidth: MIN, maxWidth: 9, x: 2, label: "" }');
+
+	expect(compiled.publicRenderModule.renderDataModuleSource).toBe(
+		`export const marklessRenderData = ${JSON.stringify(compiled.renderData)};`,
+	);
+});

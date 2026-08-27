@@ -568,6 +568,9 @@ export function sharedSeedPassLines(
 	// children: that root is composed during this component's render, which is
 	// after the consumer rendered those children, so the seed phase runs it.
 	forwardLines: ReadonlyArray<string> = [],
+	// A seed the evaluator could not fold has no entry in the static map, so the
+	// prime laid down `undefined` and the per-instance writes below spread onto it.
+	carriedSources: ReadonlyMap<string, string> = new Map(),
 ): string[] {
 	if (seeds.length === 0 && forwardLines.length === 0) return [];
 	const nodeIds = [...new Set(seeds.map((seed) => seed.graphNodeId))];
@@ -576,7 +579,11 @@ export function sharedSeedPassLines(
 		'		const marklessSsrSeeds = marklessSsrRenderContext.marklessSharedSeeds;',
 		...nodeIds.map((graphNodeId) => {
 			const id = JSON.stringify(graphNodeId);
-			return `		if (!marklessSsrSeeds.has(${id})) marklessSsrSeeds.set(${id}, ${staticValuesName}.get(${id}));`;
+			const carried = carriedSources.get(graphNodeId);
+			const value = carried
+				? `${staticValuesName}.has(${id}) ? ${staticValuesName}.get(${id}) : (${carried})`
+				: `${staticValuesName}.get(${id})`;
+			return `		if (!marklessSsrSeeds.has(${id})) marklessSsrSeeds.set(${id}, ${value});`;
 		}),
 		// An assignment always assigns, so an omitted prop with no destructuring
 		// default seeds undefined the way plain JavaScript would.
