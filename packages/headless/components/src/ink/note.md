@@ -16,7 +16,7 @@ double-barrel shape once lost the family's parts at compile time; the link pass
 now merges the two aliases of one module, so the scenario compiles and the
 family's 59 browser rows run.
 
-Research: `goals/headless-components/notes/U611-ink.md` — Ark UI's signature pad,
+Research (the ink research memo in the goal notes): Ark UI's signature pad,
 `szimek/signature_pad`, `steveruizok/perfect-freehand`, `embiem/react-canvas-draw`,
 the WAI-ARIA APG (which has no drawing pattern) and WCAG 1.1.1, read against this
 library's own SPEC.
@@ -199,9 +199,9 @@ Two things a consumer has to get right, both measured:
 Every method that needs the committed drawing reads the `paths` computed declared
 beside it — `const before = paths;` — rather than rebuilding it from
 `pad.given` / `pad.strokes` / `pad.seed`. That read used to come back empty on a
-served page; `goals/headless-components/notes/U617-method-reads-computed.md` is
+served page; the served-computed fix memo in the goal notes is
 the compiler fix that made it answer, and
-`goals/headless-components/notes/U621-ink-heldpaths.md` is the retirement.
+the retirement memo sits beside it.
 
 `paths` and not `rows`, `value` or `countText`: all four are equally correct to
 read, but the other three walk into `ink-stroke.ts`, and the root now derives
