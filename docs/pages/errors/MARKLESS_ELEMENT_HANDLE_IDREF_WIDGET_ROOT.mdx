@@ -1,0 +1,21 @@
+# MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT
+
+This shared() element() handle cannot be named by an IDREF here
+
+- Package: compiler
+- Pass or phase: semantic-graph
+
+## Message
+
+Cannot resolve …=\{…\} because "…" is declared in a shared() factory that is not \{ scope: 'widget' \}.
+
+## Why
+
+A widget-scoped factory is one graph per rendered widget, so the minted id has to carry which widget it belongs to. That token exists for every rendered widget, its root included, and never exists for a page-wide factory.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

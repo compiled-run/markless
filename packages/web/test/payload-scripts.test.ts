@@ -1298,9 +1298,14 @@ test('runtime resumes directly from async payload scripts', async () => {
 		},
 	});
 
+	// The focus-primed preload rides behind the dispatch listener, never ahead of it.
 	expect(root.listeners).toEqual([
 		expect.objectContaining({
 			type: 'keydown',
+			options: { capture: true },
+		}),
+		expect.objectContaining({
+			type: 'focusin',
 			options: { capture: true },
 		}),
 	]);
@@ -1436,7 +1441,11 @@ test('runtime treats a second payload resume for one container as an already-res
 
 	expect(second.runtime).toBe(first.runtime);
 	expect(second.graph).toBe(first.graph);
-	expect(root.listeners).toHaveLength(1);
+	expect(root.listeners.map((listener) => listener.type)).toEqual([
+		'click',
+		'focusin',
+		'pointerover',
+	]);
 	expect(second.warnings).toEqual([
 		expect.objectContaining({
 			code: 'MARKLESS_RESUME_ALREADY_RESUMED',
@@ -1614,7 +1623,9 @@ test('prerender trigger groups stage graph segments without adding a second capt
 	});
 	expect(first.graph.read('state:playing')).toBe(false);
 	expect(second.graph.read('state:playing')).toBe(false);
-	expect(root.listeners).toEqual([]);
+	// No dispatch authority, and the two staged wirings share one set of preload
+	// triggers: they are armed per container, not per wiring.
+	expect(root.listeners.map((listener) => listener.type)).toEqual(['focusin', 'pointerover']);
 });
 
 test('a later trigger group still resolves its hosts after foreign DOM replaced a tracked element', async () => {
@@ -1920,7 +1931,11 @@ test('concurrent payload resumes for one container share a single runtime startu
 
 	expect(second.runtime).toBe(first.runtime);
 	expect(second.graph).toBe(first.graph);
-	expect(root.listeners).toHaveLength(1);
+	expect(root.listeners.map((listener) => listener.type)).toEqual([
+		'click',
+		'focusin',
+		'pointerover',
+	]);
 });
 
 function captureThrown(run: () => unknown): unknown {

@@ -27,12 +27,17 @@ registry and no construction-order index.
    has in checkbox, toggle and textbox — the hidden native control. Research §7
    argues this, §9.1 flagged it as wanting a ruling, and the ruling is that the
    family has one field part, `itemfield`.
-2. **`root` is a `<fieldset>` and `label` is its `<legend>`.** The group's
-   accessible name with no id, no IDREF and no minted token, which is what
-   `MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT` makes impossible via
-   `aria-labelledby` today. It also gives group `disabled` natively: a disabled
-   fieldset disables every control inside it. QDS emits an `aria-labelledby`
-   that points at an id which may not exist; that is not copied.
+2. **`root` is a `<div role="radiogroup">` and `label` is a `<label>`.** No
+   `<fieldset>`, no `<legend>`: a consumer who wanted native HTML would write
+   native HTML. The group's name rides `aria-labelledby` to the label's handle.
+   The root cannot carry that IDREF itself
+   (`MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT`), so the root renders one private
+   component a level down that owns the role and the IDREF — the `progress.bar`
+   idiom. Group `disabled` is explicit rather than the fieldset cascade: it
+   reaches each option's input, item and trigger through the same read the
+   option's own `disabled` prop takes. QDS emits an `aria-labelledby` that points
+   at an id which may not exist; a handle that was never bound drops the
+   attribute instead.
 3. **`itemtrigger` carries no `aria-checked` and no `role`.** QDS puts
    `aria-checked` on a plain div, where it is inert. The radio semantics live on
    the native input beside it; the trigger reports `ui-selected` instead.
