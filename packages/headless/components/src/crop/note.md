@@ -126,6 +126,16 @@ family author reads this file rather than the goal notes.
    than to the written value. `sizeCeiling` in `crop-math.ts` already reads
    `undefined` as no cap, so nothing is lost by waiting.
 
+   What the surviving limit turns on is the *form the seed is written in*, not the
+   number it denotes. Seeding both caps with `1e400` — a numeric literal that
+   evaluates to `Infinity` — keeps all 58 green, while seeding them with
+   `Number.MAX_SAFE_INTEGER`, an ordinary finite number written as a member
+   expression, turns the same 8 rows red; bare `Infinity` is red too. A literal
+   folds and a name does not, whatever it holds, so no amount of work on
+   non-finite *values* reaches this. Nothing is reported when the fold gives up:
+   the build is clean, the family renders, and the seeded fields quietly hold the
+   `state()` defaults.
+
 2. **A cell read nested inside a call argument does not lower.** Passing
    `crop.minWidth` straight into `resizedRect(...)` leaves the instance name
    standing in the emitted handler module. Every cell is hoisted into a local
