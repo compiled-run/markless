@@ -210,6 +210,38 @@ export type RuntimeGraphSubscription = {
 	readonly run: (value: unknown) => DomJournalResult | void | Promise<DomJournalResult | void>;
 };
 
+/**
+ * Told about a write the moment it lands, before the flush that write schedules.
+ *
+ * The flush is a microtask behind the statement that wrote, so a handler reading
+ * back what its own write produced - a keyed repeat's rows most of all - reads
+ * the pre-write answer. An observer runs synchronously inside the write instead,
+ * so the next statement of the same handler sees the result.
+ *
+ * It runs for a write to `graphNodeId` under an intersecting path, and for a
+ * write to anything `graphNodeId` derives from, so a computed-backed collection
+ * is reached through the state write behind it. It never runs during a flush -
+ * the flush's own subscription pass is the single answer there - and never
+ * re-enters: a write made from inside an observer notifies nobody.
+ *
+ * `run` is handed no value and answers with none: it is a place to react, not a
+ * second subscription channel, and reads whatever it needs off the graph. The
+ * graph does not catch what it throws.
+ */
+export type RuntimeGraphWriteObserver = {
+	readonly graphNodeId: string;
+	readonly path?: ReadonlyArray<string>;
+	/**
+	 * Work ALREADY in flight that this observer needs settled before it can
+	 * answer a write synchronously - a demand-loaded module, above all. It starts
+	 * nothing, so a caller awaiting it adds no fetch to the gesture; it only
+	 * stops the gesture racing a load its own wiring began. `undefined` is
+	 * nothing to wait for, and costs no microtask.
+	 */
+	readonly settle?: () => Promise<void> | undefined;
+	readonly run: () => void;
+};
+
 export type RuntimeGraph = {
 	readonly read: (graphNodeId: string, path?: ReadonlyArray<string>) => unknown;
 	/** Available only in debug-enabled builds (`__MARKLESS_DEBUG_ENABLED__`). */
@@ -231,6 +263,16 @@ export type RuntimeGraph = {
 	readonly call: (call: RuntimeGraphCall) => unknown;
 	readonly delete: (deletion: RuntimeGraphDelete) => boolean;
 	readonly subscribe: (subscription: RuntimeGraphSubscription) => () => void;
+	/**
+	 * Optional so a facade over a subset of this contract stays a `RuntimeGraph`;
+	 * a caller without it gets the flush-time answer it always had.
+	 */
+	readonly subscribeWrite?: (observer: RuntimeGraphWriteObserver) => () => void;
+	/**
+	 * Settles what the write observers are already loading, so a write made after
+	 * it is answered synchronously. `undefined` when nothing is in flight.
+	 */
+	readonly settleWriteObservers?: () => Promise<void> | undefined;
 	readonly subscribeJournal: (listener: DomJournalListener) => () => void;
 	readonly flush: () => Promise<void>;
 	readonly takeJournal: () => DomJournalEntry[];
@@ -244,11 +286,13 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const computedNodes = createRuntimeComputedNodes(input.computed);
 	const asyncComputedNodes = createRuntimeAsyncComputedNodes(input.asyncComputed);
 	const subscriptions: RuntimeGraphSubscription[] = [];
+	const writeObservers: RuntimeGraphWriteObserver[] = [];
 	const journalListeners: DomJournalListener[] = [];
 	const dirtyPaths: DirtyPath[] = [];
 	const journal: DomJournalEntry[] = [];
 	let flushScheduled = false;
 	let flushing = false;
+	let notifyingWrite = false;
 	let activeFlush: Promise<void> | undefined;
 
 	for (const cell of input.cells) {
@@ -298,6 +342,56 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			reconcile: plane,
 			invalidateAsyncComputed,
 		});
+		// Last, so an observer that reads back finds every computed this write
+		// invalidated already marked and answering afresh.
+		notifyWriteObservers(graphNodeId, path);
+	};
+
+	/**
+	 * Whether `graphNodeId` is derived, however deeply, from the written path.
+	 *
+	 * A computed collection carries no dependency of its own on the state a
+	 * handler writes; the chain of `dependencies` is the only thing that says so,
+	 * and with a reconcile plane installed the write dirties no path under the
+	 * computed for a path test to find.
+	 */
+	const derivesFromWrite = (
+		graphNodeId: string,
+		write: DirtyPath,
+		seen: Set<string>,
+	): boolean => {
+		if (seen.has(graphNodeId)) return false;
+		seen.add(graphNodeId);
+		const computed = computedNodes.get(graphNodeId);
+		if (!computed) return false;
+		for (const dependency of computed.dependencies) {
+			if (
+				dependency.graphNodeId === write.graphNodeId &&
+				pathsIntersect(write.path, dependency.path ?? [])
+			)
+				return true;
+			if (derivesFromWrite(dependency.graphNodeId, write, seen)) return true;
+		}
+		return false;
+	};
+
+	const notifyWriteObservers = (graphNodeId: string, path: ReadonlyArray<string>): void => {
+		if (writeObservers.length === 0 || flushing || notifyingWrite) return;
+
+		const write: DirtyPath = { graphNodeId, path };
+		notifyingWrite = true;
+		try {
+			// A copy: an observer is free to release itself or another.
+			for (const observer of writeObservers.slice()) {
+				const reaches =
+					observer.graphNodeId === graphNodeId
+						? pathsIntersect(path, observer.path ?? [])
+						: derivesFromWrite(observer.graphNodeId, write, new Set());
+				if (reaches) observer.run();
+			}
+		} finally {
+			notifyingWrite = false;
+		}
 	};
 
 	const scheduleFlush = (): void => {
@@ -426,8 +520,11 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		write(write) {
 			const path = write.path ?? [];
 			const current = cells.get(write.graphNodeId);
-			if (plane?.commitDerived(write, path)) return;
-			if (Object.is(readPath(current, path), write.value)) return;
+			// Map presence separates an unseeded node from one holding undefined; computeds
+			// carry no payload value, so their first derive to undefined must not read as a no-op.
+			const seeded = cells.has(write.graphNodeId);
+			if (seeded && plane?.commitDerived(write, path)) return;
+			if (seeded && Object.is(readPath(current, path), write.value)) return;
 			cells.set(write.graphNodeId, writePath(current, path, write.value));
 			markDirtyPath(write.graphNodeId, dirtyPathForGraphWrite(current, path));
 			scheduleFlush();
@@ -475,6 +572,22 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 				const index = subscriptions.indexOf(subscription);
 				if (index >= 0) subscriptions.splice(index, 1);
 			};
+		},
+		subscribeWrite(observer) {
+			writeObservers.push(observer);
+			return () => {
+				const index = writeObservers.indexOf(observer);
+				if (index >= 0) writeObservers.splice(index, 1);
+			};
+		},
+		settleWriteObservers() {
+			let pending: Promise<unknown>[] | undefined;
+			for (const observer of writeObservers) {
+				const settling = observer.settle?.();
+				// A failed load is the flush's to report, from the pass that needs it.
+				if (settling) (pending ??= []).push(settling.catch(() => undefined));
+			}
+			return pending && Promise.all(pending).then(() => undefined);
 		},
 		subscribeJournal(listener) {
 			journalListeners.push(listener);

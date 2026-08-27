@@ -22,10 +22,14 @@ export const checkboxState = shared(
 			value: '',
 		});
 		const triggerEl = element<HTMLButtonElement>();
+		const descriptionEl = element<HTMLDivElement>();
+		const errorEl = element<HTMLDivElement>();
 
 		return {
 			...checkbox,
 			triggerEl,
+			descriptionEl,
+			errorEl,
 			onChange: undefined as ((checked: boolean | 'mixed') => void) | undefined,
 			toggle() {
 				checkbox.checked = checkbox.checked !== true;
@@ -56,6 +60,7 @@ export function CheckboxRoot({
 
 	<div
 		{...rest}
+		aria-disabled={checkbox.disabled ? 'true' : 'false'}
 		ui-checked={checkbox.checked === true}
 		ui-mixed={checkbox.checked === 'mixed'}
 		ui-disabled={checkbox.disabled}
@@ -73,6 +78,9 @@ export function CheckboxTrigger({ children, onClick, onKeydown, ...rest }: Check
 		aria-checked={
 			checkbox.checked === 'mixed' ? 'mixed' : checkbox.checked === true ? 'true' : 'false'
 		}
+		// Error before description: what is wrong is conveyed before the hint,
+		// wherever the two parts sit in the page.
+		aria-describedby={[checkbox.errorEl, checkbox.descriptionEl]}
 		aria-invalid={checkbox.invalid ? 'true' : 'false'}
 		ui-checked={checkbox.checked === true}
 		ui-mixed={checkbox.checked === 'mixed'}
@@ -107,7 +115,9 @@ export function CheckboxLabel({ children, ...rest }: CheckboxLabelProps) @{
 }
 
 export function CheckboxDescription({ children, ...rest }: CheckboxDescriptionProps) @{
-	<div {...rest}>{children}</div>
+	const checkbox = checkboxState();
+
+	<div {...rest} el={checkbox.descriptionEl}>{children}</div>
 }
 
 export function CheckboxError({ children, ...rest }: CheckboxErrorProps) @{
@@ -115,7 +125,7 @@ export function CheckboxError({ children, ...rest }: CheckboxErrorProps) @{
 	// Mounting the error part is what marks the trigger invalid.
 	checkbox.invalid = true;
 
-	<div {...rest}>{children}</div>
+	<div {...rest} el={checkbox.errorEl}>{children}</div>
 }
 
 // No change handler of its own: the input is clipped, aria-hidden and out of the

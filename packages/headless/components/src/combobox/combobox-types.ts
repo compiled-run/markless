@@ -149,13 +149,17 @@ export type ComboboxItemLabelProps = PropsOf<'span'>;
 export type ComboboxItemIndicatorProps = PropsOf<'span'>;
 
 /**
- * Supporting text for the field, named by the input's `aria-describedby`. One
- * element can be named that way, so mounting this alongside `combobox.error`
- * describes by whichever renders first.
+ * Supporting text for the field, named by the input's `aria-describedby`. Mount
+ * it alongside `combobox.error` and the input names both, the error first.
  */
 export type ComboboxDescriptionProps = PropsOf<'div'>;
 
-/** Its presence is what a reader is told about first. */
+/**
+ * The validation message, named by the input's `aria-describedby` ahead of
+ * `combobox.description`. It carries `role="alert"`, so a reader speaks it when
+ * it appears. Unlike the other families, mounting it does not mark the field
+ * invalid: `invalid` is a prop on `combobox.root`.
+ */
 export type ComboboxErrorProps = PropsOf<'div'>;
 
 /**

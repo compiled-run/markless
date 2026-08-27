@@ -1,0 +1,21 @@
+# MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE
+
+One element() handle per IDREF attribute
+
+- Package: compiler
+- Pass or phase: semantic-graph
+
+## Message
+
+TODO: this code has no builder message in source.
+
+## Why
+
+The compiler resolves the relationship and the emitter mints the id. Combining handles would require the compiler to spell and order ids it cannot see, and id spelling is not something this record owns.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

@@ -1,4 +1,4 @@
-import * as popover from '../index.ts';
+import { popover } from '../../index.ts';
 
 // With neither a title nor a description, the naming references are still
 // emitted and resolve to nothing.

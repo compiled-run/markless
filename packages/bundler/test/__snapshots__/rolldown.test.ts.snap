@@ -28,15 +28,17 @@ function readMarklessSourceSymbol(mod, exportName) {
 async function marklessFullResumeHandoff(handoff) {
 	handoff.root.__marklessLinkedRenderDataBoot = true;
 	handoff.root.__asyncResumeRuntimeStarted = true;
-	const { derivePrerenderResumeRecords, mergePrerenderPayloadRecords, renderPrerenderBoundary, resumeFromPrerenderRecords } = await import('@markless/web/fns/prerender-resume');
-	const records = await derivePrerenderResumeRecords(marklessPrerenderData, loadSymbol);
-	const mergedRecords = mergePrerenderPayloadRecords(records, handoff.root);
-	const { runtime } = await resumeFromPrerenderRecords({
-		...mergedRecords,
-		root: handoff.root,
-		loadSymbol: loadSymbol,
-		renderAsyncBoundary: (boundaryId, status, graph) => renderPrerenderBoundary(marklessPrerenderData, boundaryId, status, graph, loadSymbol),
-	});
+	const runtime = await (handoff.root.__marklessFullResumeRuntime ??= (async () => {
+		const { derivePrerenderResumeRecords, mergePrerenderPayloadRecords, renderPrerenderBoundary, resumeFromPrerenderRecords } = await import('@markless/web/fns/prerender-resume');
+		const records = await derivePrerenderResumeRecords(marklessPrerenderData, loadSymbol);
+		const mergedRecords = mergePrerenderPayloadRecords(records, handoff.root);
+		return (await resumeFromPrerenderRecords({
+			...mergedRecords,
+			root: handoff.root,
+			loadSymbol: loadSymbol,
+			renderAsyncBoundary: (boundaryId, status, graph) => renderPrerenderBoundary(marklessPrerenderData, boundaryId, status, graph, loadSymbol),
+		})).runtime;
+	})());
 	await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });
 }
 async function marklessResumeContainerEvent(input) {
