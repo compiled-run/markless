@@ -202,31 +202,38 @@ export function wireKeyedRepeats(
 			);
 		};
 		// Absent means this pass has to await: a mint still in flight, or a component
-		// row for a key never built - its html comes from an async render. Asked of
-		// the REPEAT, not the loaded module, and a departed key keeps its row.
+		// row whose render answered with a promise. Asked of the REPEAT, not the
+		// loaded module, and a departed key keeps its row.
+		let pending: ReturnType<NonNullable<RowMint['rows']>> | undefined;
 		const settledMint = (): { readonly mint: RowMint | undefined } | undefined => {
 			if (!builds) return { mint: undefined };
 			if (!cell?.mint) return undefined;
 			if (repeat.rowComponent)
 				for (const item of readKeyedRepeatCollection(input.graph, repeat))
-					if (!rowRootsByKey.has(repeatItemKey(item, repeat))) return undefined;
+					if (!rowRootsByKey.has(repeatItemKey(item, repeat))) {
+						if (!pending || typeof pending === 'function')
+							pending = cell.mint.rows?.(repeat, parent, rowRootsByKey);
+						return typeof pending === 'function' ? { mint: cell.mint } : undefined;
+					}
 			return { mint: cell.mint };
 		};
 		// Rows minted AT the write, so a handler that replaces a collection reads
 		// the new rows off an element() handle on its next statement. Same apply,
 		// same rowRootsByKey as the flush below, so the flush finds them placed and
-		// returns: one mint. `settle` waits on the load this wiring already began -
-		// it starts none - because a gesture that beat it would read stale rows.
+		// returns: one mint. `settle` waits on work this wiring already began - a
+		// load, or a render that answered late - and starts none of its own.
 		const observeWrites = input.graph.subscribeWrite?.({
 			graphNodeId: repeat.collectionGraphNodeId,
 			path: repeat.collectionPath,
-			settle: () => (builds && !cell?.mint ? cell?.load?.then(() => undefined) : undefined),
+			settle: () =>
+				(builds && !cell?.mint ? cell?.load : typeof pending === 'object' ? pending : undefined)
+					?.then(() => undefined),
+			// A duplicate key, and anything the render throws, is the flush's to report.
 			run(): void {
-				const settled = settledMint();
-				if (!settled) return;
-				// A duplicate key, and anything the mint throws, is the flush's to report.
-				if (!uniqueRepeatKeys(repeat, readKeyedRepeatCollection(input.graph, repeat))) return;
 				try {
+					const settled = settledMint();
+					if (!settled) return;
+					if (!uniqueRepeatKeys(repeat, readKeyedRepeatCollection(input.graph, repeat))) return;
 					apply(settled.mint);
 				} catch {}
 			},
@@ -241,13 +248,17 @@ export function wireKeyedRepeats(
 					validateOneRepeat(input.graph, repeat);
 					// Ordering across the await is the graph's own: `runFlush` awaits this
 					// run before any other subscription or dirty pass, so no collection
-					// write applies ahead of a pending mint. The apply itself never yields.
-					// A component row renders BEFORE it, and registers after it attaches.
-					const settled = settledMint();
-					if (settled) return apply(settled.mint);
+					// write applies ahead of a pending mint. A row registers once attached.
+					const settled = settledMint(),
+						held = pending;
+					pending = undefined;
+					if (settled) {
+						apply(settled.mint);
+						return typeof held === 'function' ? held() : undefined;
+					}
 					return (
 						loadRowMint(input.renderData, input.graph, rowComponentHost)?.then(async (mint) => {
-							const commit = await mint.rows?.(repeat, parent, rowRootsByKey);
+							const commit = await (held ?? mint.rows?.(repeat, parent, rowRootsByKey));
 							apply(mint);
 							await commit?.();
 						}) ?? apply(undefined)
