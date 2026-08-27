@@ -2,7 +2,7 @@
 
 Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
 
-198 codes.
+199 codes.
 
 | Code | Package | Pass / phase | Title | Message |
 | --- | --- | --- | --- | --- |
@@ -154,6 +154,7 @@ Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not ed
 | `MARKLESS_SHARED_INSTANCE_EXPORTED_FUNCTION` | compiler | symbol-modules | The exported function "…" resolves a shared() definition at module scope | "…" is exported from this file and calls `…()` in its body. A shared() instance is resolved by a component as it renders, and this function is not a component, so there is no instance for the call to return. Compiling this file drops the `export` keyword from "…" and carries the rest into the emitted symbol modules, where `…` is not carried at all — the definition ships as payload graph nodes rather than as code. The copy that lands would throw the moment it runs, and the export a consumer imported is gone. |
 | `MARKLESS_SHARED_MEMBER_UNKNOWN` | compiler | state-lowering | Shared state has no such member | Cannot read "…" because the …() shared state declares no member named "…". |
 | `MARKLESS_SHARED_METHOD_CROSS_MODULE` | compiler | symbol-modules | A shared() method cannot be called from another module yet (…) | The emitted … module for … was built by copying the body of … out of … into this file. … … |
+| `MARKLESS_SHARED_RETURN_UNNAMED` | compiler | semantic-graph | a shared() factory must return named state | shared() definition "…" returns …() directly, so the cells it returns have no name. |
 | `MARKLESS_SHARED_SCOPE_INVALID` | compiler | semantic-graph | shared() scope must be valid | Unknown shared() scope …. Valid scopes are …. (+1 more) |
 | `MARKLESS_SHARED_SEED_UNKNOWN_FIELD` | compiler | state-lowering | Shared instance has no such field to seed | Cannot write to "…" because "…()" declares no graph field named "…". Instance callback fields such as "…" are not supported yet (tracked). |
 | `MARKLESS_SHARED_SEED_UNSUPPORTED` | compiler | state-lowering | Cannot seed shared state from this expression | Cannot seed "…" from "…" because a component body seeds a shared instance only from its own props or from constants. |

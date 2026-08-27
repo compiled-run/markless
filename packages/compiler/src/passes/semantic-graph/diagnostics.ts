@@ -783,6 +783,36 @@ export function unboundSharedCallDiagnostic(input: {
 	};
 }
 
+// A shared() node id is a wire key spelled from the authored declaration name,
+// so a returned cell set with no name has nothing to spell.
+export function unnamedSharedReturnDiagnostic(input: {
+	readonly definitionName: string;
+	readonly apiName: string;
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_SHARED_RETURN_UNNAMED',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'a shared() factory must return named state',
+		message: `shared() definition "${input.definitionName}" returns ${input.apiName}() directly, so the cells it returns have no name.`,
+		why: 'A shared() cell is serialized under an id spelled from the name it was declared with, and every read of the instance resolves through that id. An inline call in return position declares no name, so no node exists, and each read of the instance falls back to the authored text and throws at render.',
+		primarySpan: input.span,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		source: input.definitionName,
+		suggestions: [
+			{
+				message: `Name the cells and return the name: \`const s = ${input.apiName}(...); return s;\`.`,
+			},
+			{
+				message: 'Return a wrapper that spreads them when the factory also exposes methods: `return { ...s, toggle() { … } };`.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_RETURN_UNNAMED',
+	};
+}
+
 // A shared() definition that several components of its own module resolve is a
 // widget family shape. Left without a scope it is page-scoped, so two of those
 // widgets on one page silently share one graph. The warning makes the scope a
