@@ -11,11 +11,26 @@ type StatePayload = {
 	readonly computed: ReadonlyArray<{ readonly graphNodeId: string }>;
 };
 
-function statePayloadIds(container: HTMLElement): string[] {
+function statePayloadIds(container: ParentNode): string[] {
 	const script = container.querySelector<HTMLScriptElement>('script[type="markless/state"]');
 	if (!script) throw new Error('Expected markless/state payload script.');
 	const payload = JSON.parse(script.textContent ?? 'null') as StatePayload;
 	return [...payload.cells, ...payload.computed].map((node) => node.graphNodeId);
+}
+
+// A served id is a per-instance prefix over a wire key. The key is `state:name`
+// for a name only one component in the module declares, and `state:Component.name`
+// once a sibling declares it too, so a match on the bare form alone silently
+// filters a qualified page down to nothing.
+function servedStateIds(container: ParentNode, name: string): string[] {
+	const wanted = new RegExp(`(?:^|:)state:(?:[^.:]+\\.)?${name}$`);
+	return statePayloadIds(container).filter((id) => wanted.test(id));
+}
+
+function wireKeyOf(graphNodeId: string): string {
+	const at = graphNodeId.indexOf('state:');
+	if (at < 0) throw new Error(`Expected a state wire key in "${graphNodeId}".`);
+	return graphNodeId.slice(at);
 }
 
 function button(container: ParentNode, selector: string): HTMLButtonElement {
@@ -38,7 +53,8 @@ test('same-module siblings: two instances of one component keep separate state',
 test('same-module siblings: SSR resume qualifies each instance in the payload', async () => {
 	const screen = await renderSSR(SiblingsPage);
 	const container = screen.container;
-	const stepIds = statePayloadIds(container).filter((id) => id.endsWith('state:steps'));
+	const stepIds = servedStateIds(container, 'steps');
+	expect(stepIds).toHaveLength(2);
 	expect(new Set(stepIds).size).toBe(2);
 
 	const a = button(container, '[data-row="a"] button');
@@ -67,13 +83,20 @@ test('same-module components with one state name keep separate CSR state', async
 
 test('same-module components with one state name keep distinct SSR payload ids', async () => {
 	const screen = await renderSSR(SameNamePage);
-	const reportIds = statePayloadIds(screen.container).filter((id) =>
-		id.endsWith('state:report'),
-	);
+	const reportIds = servedStateIds(screen.container, 'report');
+	expect(reportIds).toHaveLength(2);
 	expect(new Set(reportIds).size).toBe(2);
+	// Both components declare `report`, so each is served under its own key.
+	expect(reportIds.map(wireKeyOf).sort()).toEqual([
+		'state:SameNameLeft.report',
+		'state:SameNameRight.report',
+	]);
 
 	const left = button(screen.container, '[data-left]');
 	const right = button(screen.container, '[data-right]');
+	expect(left.textContent).toBe('0');
+	expect(right.textContent).toBe('10');
+
 	left.click();
 	await expect.poll(() => left.textContent).toBe('1');
 	expect(right.textContent).toBe('10');
@@ -100,7 +123,8 @@ test('projected and own children of one imported root stay four distinct instanc
 
 test('projected and own children keep four distinct SSR payload ids', async () => {
 	const screen = await renderSSR(CollisionPage);
-	const countIds = statePayloadIds(screen.container).filter((id) => id.endsWith('state:count'));
+	const countIds = servedStateIds(screen.container, 'count');
+	expect(countIds).toHaveLength(4);
 	expect(new Set(countIds).size).toBe(4);
 
 	const parts = [...screen.container.querySelectorAll<HTMLButtonElement>('button.part')];

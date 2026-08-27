@@ -1,0 +1,27 @@
+# MARKLESS_STATE_ELEMENT_HANDLE_UNSERIALIZABLE
+
+element() handles cannot be stored in state
+
+- Package: compiler
+- Pass or phase: semantic-graph, state-lowering
+- Severity: error
+
+## Message
+
+Cannot store element handle "…" in state "…" because element handles are DOM locators, not serializable graph data.
+
+Cannot write element handle "…" into state path "…" because element handles are DOM locators, not serializable graph data.
+
+## Why
+
+state() values are serialized into markless/state and resumed without running component bodies. An element() handle resolves through DOM locator metadata and must stay outside serialized graph state.
+
+state() writes are serialized into markless/state and replayed without running component bodies. An element() handle resolves through DOM locator metadata and must stay outside serialized graph state.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+- `packages/compiler/src/passes/state-lowering.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

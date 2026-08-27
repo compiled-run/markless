@@ -1,18 +1,26 @@
 /**
- * A bare `{expr}` written inside an `@if` arm sits in statement position, so the
- * parser hands the compiler a block holding one expression statement rather than
- * an expression container. Markup collection recognised only the container, so
- * such an arm compiled to a chunk with no statics and no slots - the branch site
- * then served an empty marker pair while attributes on the same element stayed
- * live. These pin the arm chunk carrying its slot, and the same shape inside a
- * handler body staying a real block.
+ * Template output is an element, a fragment, or a control-flow construct — a
+ * standalone expression container is none of those. A bare `{expr}` written as
+ * an arm's whole body parses as a block holding one expression statement, and
+ * compiling it as interpolation left the arm's text bound to the element around
+ * the branch, which erases whatever the other arm rendered there. These pin the
+ * refusal with its fragment hint, the fragment spelling compiling clean, and
+ * the identical shape inside a handler body staying a real block.
  */
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
 import type { SemanticMarkupChunk } from '../src/artifacts.ts';
+import {
+	BARE_ARM_INTERPOLATION_CODE,
+	BARE_ARM_INTERPOLATION_SEVERITY,
+} from '../src/passes/semantic-graph/diagnostics.ts';
+
+async function compile(source: string) {
+	return compileTsrxModule({ filename: 'src/Page.tsrx', source, symbols: [] });
+}
 
 async function chunks(source: string): Promise<ReadonlyArray<SemanticMarkupChunk>> {
-	const result = await compileTsrxModule({ filename: 'src/Page.tsrx', source, symbols: [] });
+	const result = await compile(source);
 	expect(result.semanticGraph.diagnostics).toEqual([]);
 	return result.renderData.chunks;
 }
@@ -23,13 +31,36 @@ function arm(all: ReadonlyArray<SemanticMarkupChunk>, index: number): SemanticMa
 	return found;
 }
 
-test('a bare {children} arm carries the children read, not an empty chunk', async () => {
-	const all = await chunks(`export default function Label({ children, fallback }) @{
+test('a bare {expr} arm is refused with the fragment spelling as the hint', async () => {
+	const result = await compile(`export default function Label({ children, fallback }) @{
 	<output>
 		@if (children) {
 			{children}
 		} @else {
 			{fallback}
+		}
+	</output>
+}
+`);
+
+	const refusals = result.semanticGraph.diagnostics.filter(
+		(diagnostic) => diagnostic.code === BARE_ARM_INTERPOLATION_CODE,
+	);
+	expect(refusals).toHaveLength(2);
+	expect(refusals[0]).toMatchObject({ severity: BARE_ARM_INTERPOLATION_SEVERITY });
+	expect(refusals.map((diagnostic) => diagnostic.suggestions?.[0]?.message)).toEqual([
+		'Wrap it in a fragment: <>{children}</>',
+		'Wrap it in a fragment: <>{fallback}</>',
+	]);
+});
+
+test('a fragment arm compiles clean and carries its own text slot', async () => {
+	const all = await chunks(`export default function Label({ children, fallback }) @{
+	<output>
+		@if (children) {
+			<>{children}</>
+		} @else {
+			<>{fallback}</>
 		}
 	</output>
 }
@@ -47,26 +78,23 @@ test('a bare {children} arm carries the children read, not an empty chunk', asyn
 	expect(arm(all, 1).statics[0]).toContain('markless-slot:0');
 });
 
-test('a bare arm expression reaches the template reads that drive refresh', async () => {
-	const result = await compileTsrxModule({
-		filename: 'src/Page.tsrx',
-		source: `import { state } from '@markless/core';
+test('a fragment arm expression reaches the template reads that drive refresh', async () => {
+	const result = await compile(`import { state } from '@markless/core';
 
 export default function Label({ children }) @{
 	let count = state(0);
 
 	<output>
 		@if (children) {
-			{children}
+			<>{children}</>
 		} @else {
-			{count}
+			<>{count}</>
 		}
 	</output>
 }
-`,
-		symbols: [],
-	});
+`);
 
+	expect(result.semanticGraph.diagnostics).toEqual([]);
 	expect(result.semanticGraph.templateReads.map((read) => read.source)).toContain('count');
 });
 

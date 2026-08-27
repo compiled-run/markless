@@ -1,4 +1,4 @@
-import * as slider from '../index.ts';
+import { slider } from '../../index.ts';
 
 // The direction is on the element; the family reads it there rather than taking a prop.
 export default function Rtl() @{

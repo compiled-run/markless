@@ -555,3 +555,75 @@ the page's own registration ran.
    handle the label part carries — which needs the spread graph half from limit 1,
    because `checklist.label` forwards `el` through `{...rest}` across a component
    edge. Not landed.
+
+## Measured: the callback slot is reachable here, and the argument is not
+
+Hovercard's note records that a callback a component stores on its shared instance
+is invisible to that same component's handler modules. **Checklist does not repeat
+that.** The route measured is the select-all's: the composed checkbox calls the
+root's `onChange` prop, the arrow at `checklist.tsrx:85` calls `checklist.setAll`,
+and `setAll` at `checklist.tsrx:56` reads the slot the root stored at
+`checklist.tsrx:74`.
+
+That arrow **does** compile into a handler module of its own — a `callback-prop`
+module, `checklist.tsrx:symbol:0`, exported as `symbol_0_11rwg7y`. Read from the
+dev server during a browser run (fetched by URL out of the page's resource timing
+entries, so the bytes are the ones that actually executed), it holds `setAll`'s
+body copied in and, at the end of it:
+
+```js
+await marklessInvokeCallbackSlot(context, "…#checklistState/slot:onChange", [next]);
+```
+
+So the slot read is not compiled as a plain read that comes back empty — it is
+lowered to an explicit slot invocation, and it runs: a single click on the
+select-all reaches the consumer's callback exactly once, in both CSR and SSR. Two
+rows are green on that.
+
+**What is wrong is the argument.** The consumer's own callback, in
+`with-onchange.tsrx`, compiles to `const next = context.event` — the older binding
+— while the module above invokes the slot with `[next]`, the new ticked set. The
+same checklist module binds its own parameter the new way, `context.args?.[0]`,
+and carries a comment recording the legacy spelling it replaced. So the two sides
+of one call disagree about where a callback's argument comes from, and the page's
+handler is handed the click: the spy reads `[object PointerEvent]` instead of
+`lettuce,tomato`. That is the pinned red row, one per mode.
+
+**Why the consumer binds the event, measured in the compiler rather than inferred
+here.** A callback prop is lowered to `context.args?.[i]` only when the module
+being emitted can see that some other symbol binds it as a callback route
+(`packages/compiler/src/passes/symbol-modules.ts:143` builds that set;
+`:5242` and `:5264` are the two places it decides between the argument vector and
+`context.event`). Inside `checklist.tsrx` that reading works: the composed
+`CheckboxRoot` comes from another module, so its claim resolves here to a
+`callback-route` naming the arrow, and the arrow binds `context.args?.[0]`. The
+consumer page gets no such reading. `ChecklistRoot` answers its own slot through
+the slot's graph node and therefore publishes no claim onward, so
+`with-onchange.tsrx` compiles with nothing that says its `onChange` answers a
+slot — and the second reading, which matches a page's callback prop against the
+route's `rootComponentName`, cannot fire either: it names the INNER family's root
+(`CheckboxRoot`), never the one the page actually wrote.
+
+The contract the runtime already promises is the one to unify on:
+`marklessInvokeCallbackSlot` and the resolver's `callback-route` branch both hand
+the symbol `args` while leaving `event` beside it, and a DOM dispatch sets `event`
+with no `args` at all. So the binding a callback prop needs is the presence test —
+the argument vector when the dispatcher supplied one, the event otherwise — which
+needs no name matching and moves nothing that works today. That edit is in
+`symbol-modules.ts`, which this family's own sources cannot reach.
+
+Pinned in the compiler at
+`packages/compiler/test/callback-slot/consumer-callback-argument.test.ts`: three
+green rows for the invoking side and the family-side binding, one red row for the
+consumer's.
+
+The consequence for the family: the split hovercard had to make — the root's
+handlers calling the `onChange` prop they close over, `setAll` reserved for another
+component — is not needed here. `setAll` reaches the slot fine. When the argument
+binding is fixed on the consumer side, the pinned rows go green with no source
+change in this family.
+
+Separately, and not the same gap: `setAll` **does** write the group's value onto
+the shared instance, and the items bound to it still read `false` afterwards. That
+is the limitation the file's skipped rows rest on, restated accurately — the
+dispatch arrives, the re-read does not happen.
