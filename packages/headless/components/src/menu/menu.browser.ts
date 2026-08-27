@@ -118,21 +118,8 @@ async function expectNoAxeViolations(scope: Element, phase: string) {
 	expect(reported, `axe ${AXE_TAGS.join('+')} violations while ${phase}`).toEqual([]);
 }
 
-/**
- * A pin, not a pass: with a submenu on the page every item of the family emits
- * `aria-controls`, including the plain commands whose own instance never bound
- * the surface handle, so those point at an id that resolves to nothing.
- *
- * The attribute's presence is decided once for the module rather than per item
- * instance, and an IDREF position takes a handle written directly - a choice
- * between a handle and nothing is refused at compile time, and reading the id
- * off the handle inside a computed cannot be lowered either. Both refusals are
- * measured; until the presence decision is per instance, this is the shape.
- */
-async function expectOnlyTheUnboundIdrefViolation(scope: Element, phase: string) {
-	expect(await axeViolationIds(scope), `axe ${AXE_TAGS.join('+')} while ${phase}`).toEqual([
-		'aria-valid-attr-value',
-	]);
+async function expectNoViolation(scope: Element, phase: string) {
+	expect(await axeViolationIds(scope), `axe ${AXE_TAGS.join('+')} while ${phase}`).toEqual([]);
 }
 
 type ContextProbe = {
@@ -949,7 +936,7 @@ for (const mode of MODES) {
 		el('sub-item').focus();
 		keyOn(el('sub-item'), 'ArrowRight');
 		await expect.poll(() => el('sub-content').hasAttribute('hidden'), COLD_POLL).toBe(false);
-		await expectOnlyTheUnboundIdrefViolation(screen.container as Element, 'submenu open');
+		await expectNoViolation(screen.container as Element, 'submenu open');
 	});
 
 	test(`${mode}: axe finds no violation with all three levels open`, async () => {
@@ -961,7 +948,7 @@ for (const mode of MODES) {
 		el('level-2').focus();
 		keyOn(el('level-2'), 'ArrowRight');
 		await expect.poll(() => el('content-2').hasAttribute('hidden'), COLD_POLL).toBe(false);
-		await expectOnlyTheUnboundIdrefViolation(screen.container as Element, 'three levels open');
+		await expectNoViolation(screen.container as Element, 'three levels open');
 	});
 
 	test(`${mode}: axe finds no violation on an open context menu`, async () => {
