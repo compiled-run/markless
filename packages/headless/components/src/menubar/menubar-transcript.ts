@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { FAMILY_ANCHORS } from '../../../../../apps/sr-gallery/preview-server.ts';
 import {
 	missingFacts,
 	readUntil,
@@ -17,19 +18,19 @@ import {
  * walking the one it is in, and Escape returns to the trigger while the bar
  * itself stays where it is.
  *
- * `menu` and `menuitem` have no word in the shared `Vocabulary` yet - that file
- * belongs to the unit that registers the family - so the roles are asserted from
- * the page and the reader is held to the name and the state.
+ * `menubar`, `menu` and `menuitem` have no word in the shared `Vocabulary` in
+ * test-support/driver.ts - the same standing gap toolbar records for its own role
+ * word - so the roles are asserted from the page and the reader is held to the
+ * name and the state.
  */
 
-// The bar is not on the gallery page yet: adding it, and its entry in
-// FAMILY_ANCHORS, is the registration unit's. This limit is sized for a section
-// near the end of that page.
 const WALK_LIMIT = 220;
 const CHANGE_TIMEOUT_MS = 15_000;
-const MENUBAR_ANCHOR = '/#menubar';
 
-/** The anchor the gallery section will carry. It moves to FAMILY_ANCHORS with the section itself. */
+/** The gallery section this family is read on, named by the gallery itself. */
+export const MENUBAR_ANCHOR = FAMILY_ANCHORS.menubar;
+
+/** The name the reader lanes import. */
 export const MENUBAR_SECTION = MENUBAR_ANCHOR;
 
 /** The bar's own names, matching `scenarios/basic.tsrx`. */

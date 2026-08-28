@@ -73,6 +73,9 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	// The surface is hidden until the trigger is pressed, so the trigger is the
 	// part that has to be in the tree at rest.
 	menu: 'button',
+	// The bar is the only role this family adds; the menus inside it are the menu
+	// family's own, and the rows below check what they become on a bar.
+	menubar: 'menubar',
 	colorpicker: 'slider',
 	// The group is a role="group" div; its items are the real buttons.
 	togglegroup: 'button',
@@ -570,6 +573,69 @@ async function main() {
 			);
 		} else {
 			console.log('#toolbar rests with exactly one tab stop.');
+		}
+
+		// The role count above says a bar rendered. What a reader lane then turns on
+		// is what the bar makes of the menus inside it: the bar is named, each menu's
+		// own trigger is announced as a menu item holding a menu, and the three of
+		// them cost one tab instead of three.
+		const menubar = page.locator('#menubar').getByRole('menubar', { name: 'Application' });
+		if ((await menubar.count()) !== 1) {
+			failures.push('#menubar serves no role="menubar" named "Application".');
+		} else {
+			console.log('#menubar serves the bar named by its label part.');
+		}
+
+		// `ui-menubar` is what an enclosed trigger writes, so this counts the bar's
+		// own items rather than the commands inside the menus they open.
+		const barItems = page.locator('#menubar [role="menuitem"][ui-menubar]');
+		if ((await barItems.count()) !== 3) {
+			failures.push(
+				`#menubar serves ${await barItems.count()} role="menuitem" triggers, not the 3 its menus need.`,
+			);
+		} else {
+			const popups: string[] = [];
+			for (const name of ['File', 'Edit', 'View']) {
+				const trigger = page.locator('#menubar [role="menuitem"][ui-menubar]', { hasText: name });
+				if ((await trigger.count()) !== 1) {
+					failures.push(`#menubar serves no single menu item named "${name}".`);
+					continue;
+				}
+				const haspopup = await trigger.getAttribute('aria-haspopup');
+				if (haspopup === null) {
+					failures.push(`#menubar's "${name}" item declares no aria-haspopup, so it holds nothing.`);
+					continue;
+				}
+				popups.push(`${name} (${haspopup})`);
+			}
+			if (popups.length === 3) {
+				console.log(`#menubar's menus are announced as items holding a menu: ${popups.join(' / ')}`);
+			}
+		}
+
+		// A name on a wrapper between the bar and its items exposes that wrapper
+		// instead of flattening it, and the bar loses every required child.
+		const named = page.locator(
+			'#menubar [role="menubar"] > [aria-label], #menubar [role="menubar"] > [aria-labelledby]',
+		);
+		if ((await named.count()) !== 0) {
+			failures.push(
+				`#menubar puts ${await named.count()} named wrapper(s) between the bar and its items, which costs the bar its required children.`,
+			);
+		} else {
+			console.log('#menubar keeps the wrappers between the bar and its items unnamed.');
+		}
+
+		const menubarStops = await page
+			.locator('#menubar')
+			.locator('[tabindex]:not([tabindex="-1"]), button:not([tabindex]), a[href]:not([tabindex])')
+			.count();
+		if (menubarStops !== 1) {
+			failures.push(
+				`#menubar rests with ${menubarStops} tab stops, not the 1 a bar of menus collapses into.`,
+			);
+		} else {
+			console.log('#menubar rests with exactly one tab stop.');
 		}
 
 		if (failures.length > 0) throw new Error(failures.join(' '));

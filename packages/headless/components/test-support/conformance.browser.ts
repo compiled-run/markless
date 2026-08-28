@@ -13,6 +13,7 @@ import FileUpload from '../src/fileupload/scenarios/basic.tsrx';
 import Hovercard from '../src/hovercard/scenarios/basic.tsrx';
 import Ink from '../src/ink/scenarios/basic.tsrx';
 import Menu from '../src/menu/scenarios/basic.tsrx';
+import Menubar from '../src/menubar/scenarios/basic.tsrx';
 import { Basic as Combobox } from '../src/combobox/scenarios/basic.tsrx';
 import Modal from '../src/modal/scenarios/basic.tsrx';
 import Navbar from '../src/navbar/scenarios/basic.tsrx';
@@ -35,6 +36,7 @@ import Toolbar from '../src/toolbar/scenarios/basic.tsrx';
 import Tooltip from '../src/tooltip/scenarios/basic.tsrx';
 import Tour from '../src/tour/scenarios/basic.tsrx';
 import Tree from '../src/tree/scenarios/basic.tsrx';
+import { describe, expect, test } from 'vitest';
 import { runConformance, type FamilyDescriptor } from './conformance.ts';
 
 // Every family's Basic scenario, held against the one shared battery in
@@ -347,6 +349,43 @@ const descriptors: readonly FamilyDescriptor[] = [
 		// Which way the surface settled is information a consumer styles against.
 		valuedAttributes: [],
 		supportsDisabled: true,
+	},
+	{
+		family: 'menubar',
+		mount: { CSR: () => render(Menubar), SSR: () => renderSSR(Menubar) },
+		root: 'root',
+		// Three whole menus stand inside the bar and each one's surface is hidden
+		// rather than detached, so every panel and item below is on the page at rest.
+		parts: [
+			'root',
+			'label',
+			'menu-file',
+			'bar-file',
+			'panel-file',
+			'item-new',
+			'level-recent',
+			'panel-recent',
+			'item-draft',
+			'item-notes',
+			'menu-edit',
+			'bar-edit',
+			'panel-edit',
+			'item-undo',
+			'item-redo',
+			'menu-view',
+			'bar-view',
+			'panel-view',
+			'item-wrap',
+			'item-zoom',
+		],
+		rootAria: { role: 'menubar', 'aria-orientation': 'horizontal' },
+		// No openCycle: a bar opens nothing of its own. What opens is each enclosed
+		// menu, through that family's own trigger, and `menu` already holds that
+		// cycle in its own descriptor. The bar's roving stop, its arrow walk and the
+		// travel between open menus live in src/menubar/menubar.browser.ts.
+		valuedAttributes: [],
+		// The family takes no props at all, `disabled` included.
+		supportsDisabled: false,
 	},
 	{
 		family: 'modal',
@@ -727,3 +766,45 @@ const descriptors: readonly FamilyDescriptor[] = [
 ];
 
 for (const descriptor of descriptors) runConformance(descriptor);
+
+// axe grants the bar its `aria-required-children` only because it flattens the
+// roleless, unnamed wrapper each enclosed menu renders, so the triggers inside
+// count as the bar's own items. An accessible name on one of those wrappers -
+// `aria-label` on a `menu.root` is the easy way - exposes it as a named generic,
+// the bar loses every child, and the axe row above goes red far from the cause.
+// The gallery's own copy of this shape is held in apps/sr-gallery/scripts/boot-check.ts.
+describe('menubar wrappers', () => {
+	for (const [mode, mount] of [
+		['CSR', () => render(Menubar)],
+		['SSR', () => renderSSR(Menubar)],
+	] as const) {
+		test(`${mode}: nothing between the bar and its items carries a name or a role`, async () => {
+			const { container } = await mount();
+			if (!(container instanceof Element)) {
+				throw new Error('The mount did not hand back a real DOM container.');
+			}
+
+			const bar = container.querySelector('[role="menubar"]');
+			expect(bar, 'the scenario renders a role="menubar"').not.toBeNull();
+			if (!bar) return;
+
+			// `ui-menubar` is what an enclosed trigger writes, so this is the bar's own
+			// items rather than the commands inside the menus they open.
+			const items = bar.querySelectorAll('[role="menuitem"][ui-menubar]');
+			expect(items.length, "one menuitem per enclosed menu's trigger").toBe(3);
+
+			for (const item of items) {
+				const where = `between the bar and "${item.textContent}"`;
+				for (
+					let wrapper = item.parentElement;
+					wrapper !== null && wrapper !== bar;
+					wrapper = wrapper.parentElement
+				) {
+					expect(wrapper.getAttribute('aria-label'), `aria-label ${where}`).toBe(null);
+					expect(wrapper.getAttribute('aria-labelledby'), `aria-labelledby ${where}`).toBe(null);
+					expect(wrapper.getAttribute('role'), `role ${where}`).toBe(null);
+				}
+			}
+		});
+	}
+});
