@@ -8,6 +8,7 @@ import type {
 } from '@markless/serializer/protocol';
 import { PROTOCOL_EVENT_ACTION_KIND } from '@markless/serializer/protocol';
 import type { MarklessExecutionLogMode } from '../dev-log.ts';
+import type { OverlayPrimedDismissalHost } from '../overlay-handoff.ts';
 
 type InlineDebugControls = {
 	record(
@@ -104,13 +105,17 @@ export type MarklessSettledArmHandoff = {
 	readonly read: (graphNodeId: string, path?: ReadonlyArray<string>) => unknown;
 };
 
-type InlineRoot = HTMLElement & {
-	__asyncResumeRuntimeStarted?: boolean;
-	__marklessDelegatedDispatch?: boolean;
-	__marklessSettledArms?: Array<MarklessSettledArmHandoff>;
-	__marklessEventOnlyGraph?: Map<string, unknown>;
-	__marklessEventOnlyGraphInitialized?: boolean;
-};
+type InlineRoot = HTMLElement &
+	OverlayPrimedDismissalHost & {
+		__asyncResumeRuntimeStarted?: boolean;
+		__marklessDelegatedDispatch?: boolean;
+		__marklessSettledArms?: Array<MarklessSettledArmHandoff>;
+		__marklessEventOnlyGraph?: Map<string, unknown>;
+		__marklessEventOnlyGraphInitialized?: boolean;
+		// The control a crossing woke this page on. A resting pointer sends no
+		// second crossing, so the runtime's own preload would otherwise miss it.
+		__marklessPrimedHover?: Element;
+	};
 type InlineDispatchInput = {
 	readonly root: InlineRoot;
 	readonly event: Event | 0;
@@ -689,10 +694,8 @@ function runInlineResumerOverlayPrimer(
 		// behaviour is installed and owns the keyboard; leaving a reason behind
 		// would dismiss something twice.
 		if (root.__marklessDelegatedDispatch) return;
-		if ((event as KeyboardEvent).key === 'Escape') {
-			(globalThis as { __marklessOverlayPrimedDismissal?: 'escape' })
-				.__marklessOverlayPrimedDismissal = 'escape';
-		}
+		if ((event as KeyboardEvent).key === 'Escape')
+			root.__marklessOverlayPrimedDismissal = 'escape';
 		setTimeout(() => {
 			if (root.__marklessDelegatedDispatch) return;
 			root.__marklessDelegatedDispatch = true;
@@ -836,6 +839,7 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 			const tagged = slot as { readonly $type?: string; readonly value?: string };
 			if (tagged.$type === 'undefined') return undefined;
 			if (tagged.$type === 'bigint') return BigInt(tagged.value!);
+			if (tagged.$type === 'number') return Number(tagged.value!);
 			if (tagged.$type === 'date') return new Date(tagged.value!);
 			if (tagged.$type === 'regexp') {
 				const regexp = slot as { readonly source: string; readonly flags?: string };
@@ -956,30 +960,104 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 		} catch {}
 	}
 
+	// Array.isArray cannot narrow the readonly per-arm plan out of the union.
+	const armRecordSets = view.asyncBoundaries.flatMap((boundary) => {
+		const armRecords = boundary.armRecords as ProtocolArmRecordSet | undefined;
+		return armRecords && !Array.isArray(armRecords) ? [armRecords] : [];
+	});
+	const branches = view.branches ?? [];
+	const keyedRepeats = [
+		...(view.keyedRepeats ?? []),
+		...armRecordSets.flatMap((armRecords) => armRecords.keyedRepeats ?? []),
+	];
 	const nestedEventNames = new Set([
-		...(view.keyedRepeats ?? []).flatMap((repeat) =>
-			repeat.rowEvents.map((event) => event.eventName),
+		...keyedRepeats.flatMap((repeat) => repeat.rowEvents.map((event) => event.eventName)),
+		// An escalating branch serves one arm record set instead of a per-arm plan,
+		// and a flip brings in elements no payload record names.
+		...branches.flatMap((branch) =>
+			[...(branch.armRecords ?? []), ...(branch.servedArmRecords ? [branch.servedArmRecords] : [])]
+				.flatMap((arm) => arm.events.map((event) => event.eventName)),
 		),
-		...(view.branches ?? []).flatMap((branch) =>
-			(branch.armRecords ?? []).flatMap((arm) => arm.events.map((event) => event.eventName)),
-		),
-		...view.asyncBoundaries.flatMap((boundary) => {
-			// Array.isArray cannot narrow the readonly per-arm plan out of the union.
-			const armRecords = boundary.armRecords as ProtocolArmRecordSet | undefined;
-			return armRecords && !Array.isArray(armRecords)
-				? [
-						...(armRecords.events ?? []).map((event) => event.eventName),
-						...(armRecords.keyedRepeats ?? []).flatMap((repeat) =>
-							repeat.rowEvents.map((event) => event.eventName),
-						),
-					]
-				: [];
-		}),
+		...armRecordSets.flatMap((arm) => (arm.events ?? []).map((event) => event.eventName)),
 	]);
+	// A row that IS a component owns no element of the row chunk, so its gestures
+	// ride the child's own records and `rowEvents` is empty by construction: the
+	// unknown-element hatch below has to open on the record that says the list can
+	// mint such a row, or a row born after boot is never forwarded at all.
+	// An escalating branch replaces its arm from a fresh render, so a flip brings
+	// in elements this payload names no record for: same hatch, same reason.
+	const mintsComponentRows =
+		keyedRepeats.some((repeat) => repeat.rowComponent !== undefined) ||
+		branches.some((branch) => branch.escalates === true);
 	const eventNames = new Set([
 		...view.events.map((event) => event.eventName),
 		...nestedEventNames,
 	]);
+	// A key event only reaches an element that already holds focus, and a pointer
+	// crosses a control before pressing it (Safari focuses no button on click), so
+	// focus and hover are what precede a first gesture. A wake, not a dispatch: the
+	// real event arrives through the capture listener below, queued behind this
+	// same import promise. Names are restated because this body ships by toString();
+	// pointerenter is unusable here because it does not bubble.
+	const pressPreloadEventNames = ['click', 'pointerdown', 'pointerup'];
+	const focusWakeEventNames = [
+		'keydown',
+		'keyup',
+		'keypress',
+		'beforeinput',
+		'input',
+		...pressPreloadEventNames,
+	];
+	// Same hatch the dispatch listener opens on: a row minted after boot owns no
+	// element this payload names a record for.
+	const wakeOnUnknownElement =
+		mintsComponentRows ||
+		focusWakeEventNames.some((eventName) => nestedEventNames.has(eventName));
+	const primeEventNames = ['focusin', 'pointerover'].filter((_name, hover) =>
+		(hover ? pressPreloadEventNames : focusWakeEventNames).some((eventName) =>
+			eventNames.has(eventName),
+		),
+	);
+	if (primeEventNames.length > 0) {
+		const prime = (event: Event) => {
+			if (root.__marklessDelegatedDispatch) return;
+			const hover = event.type === 'pointerover';
+			let primed: Element | undefined;
+			for (
+				let element = event.target as Element | null;
+				element && !primed;
+				element = element.parentElement
+			) {
+				const hostNodeId = hostIds.get(element);
+				const editable =
+					(element as HTMLElement).isContentEditable === true ||
+					element.tagName === 'INPUT' ||
+					element.tagName === 'TEXTAREA' ||
+					element.tagName === 'SELECT';
+				if (
+					hostNodeId &&
+					(hover ? pressPreloadEventNames : focusWakeEventNames).some(
+						(eventName) =>
+							(editable ||
+								(eventName !== 'beforeinput' && eventName !== 'input')) &&
+							events.has(`${hostNodeId}\n${eventName}`),
+					)
+				)
+					primed = element;
+				if (element === root) break;
+			}
+			if (!primed && !hover && wakeOnUnknownElement) primed = root;
+			if (!primed) return;
+			// A resting pointer sends no second crossing, so the control the wake was
+			// spent on is left where the runtime's own preload can read it.
+			if (hover) root.__marklessPrimedHover = primed;
+			for (const primeEventName of primeEventNames)
+				root.removeEventListener(primeEventName, prime, true);
+			forward({ event: 0 });
+		};
+		for (const primeEventName of primeEventNames)
+			root.addEventListener(primeEventName, prime, true);
+	}
 	for (const eventName of eventNames) {
 		if (eventName === 'visible') continue;
 		root.addEventListener(
@@ -1015,7 +1093,7 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 					}
 					if (element === root) break;
 				}
-				if (nestedEventNames.has(event.type)) {
+				if (mintsComponentRows || nestedEventNames.has(event.type)) {
 					return forward({ event, element: event.target, eventRecord: null });
 				}
 				if (__MARKLESS_INLINE_EXECUTION_LOG__ !== 'never' && globalScope.__mxLog) {

@@ -27,26 +27,34 @@ export function isIdrefAttribute(attributeName: string): boolean {
 }
 
 /**
- * The attribute positions that name an element() handle as a CSS anchor, and
- * the inline style property each one lowers to.
+ * The IDREF positions HTML defines as a space-separated LIST of ids, so a static
+ * array of handles is a richer relationship there rather than a broken value. A
+ * description and an error are separate elements, and one control has to be able
+ * to name both.
  *
- * Same identity as an IDREF, second rendering: an IDREF spells the handle as
- * `mx-<slug>` in an id attribute, an anchor position spells the SAME slug as
- * the `--mx-<slug>` dashed-ident CSS anchor positioning needs. Neither is a
- * string the author ever writes.
- *
- * The value has to reach CSS as a dashed-ident, which rules out both other
- * carriers: a custom property inherits, so a select nested in a modal would
- * pick up the outer widget's anchor, and CSS cannot cast an attribute string to
- * a dashed-ident (`attr()` with a type argument is Values 5 and Chromium-only).
- * An inline style declaration applies to exactly one element and needs no
- * consumer plumbing, so that is what these lower to.
+ * `popovertarget` and `for` are deliberately absent: both take exactly one id,
+ * and a list written there is a dangling attribute no browser resolves.
  */
-export const ANCHOR_STYLE_ATTRIBUTES: ReadonlyMap<string, string> = new Map([
-	['anchorName', 'anchor-name'],
-	['positionAnchor', 'position-anchor'],
+export const IDREF_LIST_ATTRIBUTES: ReadonlySet<string> = new Set([
+	'aria-labelledby',
+	'aria-controls',
+	'aria-describedby',
 ]);
 
-export function anchorStyleProperty(attributeName: string): string | undefined {
-	return ANCHOR_STYLE_ATTRIBUTES.get(attributeName);
+export function acceptsIdrefList(attributeName: string): boolean {
+	return IDREF_LIST_ATTRIBUTES.has(attributeName);
+}
+
+/**
+ * Attribute spellings of CSS anchor positioning. They are not HTML attributes,
+ * so they are refused rather than written: the set exists to name what the
+ * compiler must reject, not a position it fills.
+ */
+export const CSS_ANCHOR_ATTRIBUTES: ReadonlySet<string> = new Set([
+	'anchorName',
+	'positionAnchor',
+]);
+
+export function isCssAnchorAttribute(attributeName: string): boolean {
+	return CSS_ANCHOR_ATTRIBUTES.has(attributeName);
 }
