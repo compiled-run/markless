@@ -1,3 +1,4 @@
+import { jsonSourceWithNonFiniteNumbers } from '@markless/serializer';
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
@@ -9,7 +10,6 @@ import {
 	sharedInstanceVisibleFrom,
 } from '../semantic-graph/collect-shared.ts';
 import { splitStaticGraphPath } from '../../artifact-helpers/graph-paths.ts';
-import { jsonSourceWithNonFiniteNumbers } from './non-finite-json.ts';
 import { sharedInstancePreludeLines } from './residue-reader.ts';
 import type { PublicRenderRoot } from './types.ts';
 

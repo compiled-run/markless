@@ -1,6 +1,10 @@
 import { parseModule } from '../../js-ast.ts';
 import { createSourceMemo, ownedModuleAst } from '../semantic-graph/shared-ast.ts';
-import { deserializeGraphValue, type SerializedGraphPayload } from '@markless/serializer';
+import {
+	deserializeGraphValue,
+	jsonSourceWithNonFiniteNumbers,
+	type SerializedGraphPayload,
+} from '@markless/serializer';
 import type { PublicRenderModuleInput, SemanticModuleImport } from '../../artifacts.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
@@ -674,7 +678,7 @@ export function stateEntries(
 		if (cell.value === undefined) return [];
 		if (cellIndexes && !cellIndexes.includes(index)) return [];
 		const value = deserializeGraphValue(cell.value as SerializedGraphPayload);
-		return `	[${JSON.stringify(cell.graphNodeId)}, ${JSON.stringify(value)}]`;
+		return `	[${JSON.stringify(cell.graphNodeId)}, ${jsonSourceWithNonFiniteNumbers(value) ?? 'undefined'}]`;
 	});
 }
 
