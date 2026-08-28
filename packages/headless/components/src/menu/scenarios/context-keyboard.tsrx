@@ -1,4 +1,5 @@
-import * as menu from '../index.ts';
+import { menu } from '../../index.ts';
+
 
 // A focusable row inside the region: Shift+F10 and the ContextMenu key open the
 // menu at the row's own box, and Escape hands focus back to the row.

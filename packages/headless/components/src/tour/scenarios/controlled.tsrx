@@ -1,5 +1,5 @@
 import { element, state } from '@markless/core';
-import * as tour from '../index.ts';
+import { tour } from '../../index.ts';
 
 // The family ships no trigger part, so every opener is the page flipping `open`,
 // and the page hears each move back through `onChange`.

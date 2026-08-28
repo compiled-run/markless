@@ -1,5 +1,5 @@
 import { element, state } from '@markless/core';
-import * as tour from '../index.ts';
+import { tour } from '../../index.ts';
 
 // `disabled` freezes the walk, not the tour: the card still shows the step it is
 // on, both triggers report themselves off, the arrow keys move nothing, and the

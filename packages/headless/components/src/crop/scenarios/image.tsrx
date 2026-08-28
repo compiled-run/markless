@@ -1,5 +1,5 @@
 import { element, state } from '@markless/core';
-import * as crop from '../index.ts';
+import { crop } from '../../index.ts';
 
 const AREA = 'position: relative; width: 400px; height: 300px';
 const PICTURE = 'display: block; width: 400px; height: 300px; object-fit: fill';

@@ -1,5 +1,4 @@
-import { toggle } from '../../index.ts';
-import * as toolbar from '../index.ts';
+import { toggle, toolbar } from '../../index.ts';
 
 // Two bars on one page, and a switch standing outside both.
 //

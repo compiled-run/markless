@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as crop from '../index.ts';
+import { crop } from '../../index.ts';
 
 const AREA = 'position: relative; width: 400px; height: 300px; background: #eee';
 const HANDLE = 'width: 12px; height: 12px; background: #111';

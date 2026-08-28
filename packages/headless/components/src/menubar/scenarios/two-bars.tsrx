@@ -1,5 +1,5 @@
-import * as menu from '../../menu/index.ts';
-import * as menubar from '../index.ts';
+import { menu, menubar } from '../../index.ts';
+
 
 // Two bars and a loose menu, which is the qualification measured from both ends:
 // each item walks only the bar its own `menubarState()` read resolved to, and a

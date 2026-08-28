@@ -1,6 +1,5 @@
 import { state } from '@markless/core';
-import * as menu from '../../menu/index.ts';
-import * as menubar from '../index.ts';
+import { menu, menubar } from '../../index.ts';
 
 // Three menus on one bar, written as the bar's own recursion: an item carries the
 // label and holds the menu it drops down, and the menu family's parts - a

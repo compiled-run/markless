@@ -1,4 +1,5 @@
-import * as ink from '../index.ts';
+import { ink } from '../../index.ts';
+
 
 // Quarantined: `drawing.undo()` and `drawing.clear()` are shared() methods called
 // from another module, which the compiler refuses loudly. This file must never be

@@ -1799,13 +1799,68 @@
 			{
 				"part": "trigger",
 				"component": "MenuTrigger",
-				"doc": "The control the menu opens from, and the family's only tab stop. It declares\n`aria-haspopup=\"menu\"`, so a reader says a menu is there before it is opened.\n\nInside a `menubar` it is that bar's item: it renders `role=\"menuitem\"`, keeps\nevery popup attribute, and takes its `tabindex` from the bar's roving stop.\nInside a `toolbar` it stays `role=\"button\"` and only gives up its tab stop -\na toolbar does not change what its controls are.",
+				"doc": "The control the menu opens from, and the family's only tab stop. It declares\n`aria-haspopup=\"menu\"`, so a reader says a menu is there before it is opened.\n\nInside a `toolbar` it stays `role=\"button\"` and only gives up its tab stop - a\ntoolbar does not change what its controls are. A menu bar takes no trigger at\nall: `menubar.item` is the item level there, and the menu family's commands go\nstraight inside its `menubar.itemcontent`.",
 				"props": []
 			}
 		]
 	},
 	"menubar": {
 		"parts": [
+			{
+				"part": "item",
+				"component": "MenubarItem",
+				"doc": "One menu on the bar: the `role=\"menuitem\"` a person meets, carrying the label\ntext, and the level its `menubar.itemcontent` drops down.\n\nIt is the item level of the recursion, so the menu family's own parts go\ninside it unchanged: a `menu.item` is one command, and a `menu.item submenu`\nholding a `menu.itemcontent` nests as deep as it likes. Activation at any\ndepth reports to `menubar.root`.",
+				"props": [
+					{
+						"name": "open",
+						"type": "boolean",
+						"required": false,
+						"doc": "Whether this item's menu is showing. Omit it and the item starts closed."
+					},
+					{
+						"name": "checked",
+						"type": "readonly string[]",
+						"required": false,
+						"doc": "The values of the commands in this menu that start checked - checkbox items,\nor the one chosen radio item. The checked set lives on the item because a\nradio choice unchecks its siblings, which is one decision about one menu."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"doc": "This menu cannot be opened, and no command in it may be activated."
+					},
+					{
+						"name": "loop",
+						"type": "boolean",
+						"required": false,
+						"doc": "The arrow walk wraps at both ends, on every surface of this menu."
+					},
+					{
+						"name": "radio",
+						"type": "boolean",
+						"required": false,
+						"doc": "The commands of this menu are one radio group: each renders\n`role=\"menuitemradio\"`, and choosing one unchecks the rest."
+					},
+					{
+						"name": "delay",
+						"type": "number",
+						"required": false,
+						"doc": "How long a pointer rests on a `submenu` command before its submenu opens, in milliseconds."
+					},
+					{
+						"name": "closeDelay",
+						"type": "number",
+						"required": false,
+						"doc": "How long a submenu stays open after the pointer leaves its command, in milliseconds."
+					}
+				]
+			},
+			{
+				"part": "itemcontent",
+				"component": "MenubarItemContent",
+				"doc": "The menu one bar item drops down, `role=\"menu\"`, named by that item.\n\nIt owns the keyboard walk over the commands IT holds; a `menu.itemcontent`\nwritten deeper owns its own. Left and Right from inside it close it and open\nthe neighbouring item's menu, which is what a menu bar does with those keys.\n\nPlacement is CSS, never a prop: it anchors to its item with a default\n`position-area` of `block-end`, inside `@layer markless`, so one unlayered\nrule of yours replaces the default without a specificity fight.",
+				"props": []
+			},
 			{
 				"part": "label",
 				"component": "MenubarLabel",
@@ -1815,8 +1870,15 @@
 			{
 				"part": "root",
 				"component": "MenubarRoot",
-				"doc": "An application's menu bar. Whole `menu.root`s go inside it, unchanged: each\nkeeps its own `menu.trigger`, its own `menu.content` and its own submenus, and\nthe bar collects the triggers into one roving tab stop and drives travel\nbetween the menus.\n\nThe bar is a grouping and a tab-stop policy. It holds no value, reports no\nchange, and takes no props: an application menu bar is always horizontal, and\nevery menu inside it already reports for itself through its own `onChange`.\n\nName it with `aria-label`, or with a `menubar.label` beside the menus.\n\nA menu bar is for an application's own commands - File, Edit, View. Site\nnavigation is a disclosure (see `navbar/note.md`), not a bar of menus.",
-				"props": []
+				"doc": "An application's menu bar: a row of `menubar.item`s, each holding the commands\nit drops down in its own `menubar.itemcontent`.\n\nThe bar is the one root. It owns the walk across its items, the roving tab\nstop, and the `onChange` every command at every depth reports to. A menu bar\nis always horizontal, so there is no orientation to choose.\n\nName it with `aria-label`, or with a `menubar.label` beside the items.\n\nA menu bar is for an application's own commands - File, Edit, View. Site\nnavigation is a disclosure (see `navbar/note.md`), not a bar of menus.",
+				"props": [
+					{
+						"name": "onChange",
+						"type": "(value: string) => void",
+						"required": false,
+						"doc": "Called with the item's `value` when a command anywhere in the bar is\nactivated - a command, a checkbox item toggling, a radio item being chosen -\nat any depth of any item's menu."
+					}
+				]
 			}
 		]
 	},

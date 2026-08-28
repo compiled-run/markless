@@ -1,5 +1,5 @@
 import { element, state } from '@markless/core';
-import * as tour from '../index.ts';
+import { tour } from '../../index.ts';
 
 // Five steps, each anchored to its own target. Placement is the consumer's CSS:
 // every card takes the family's `block-end` default until a rule of the

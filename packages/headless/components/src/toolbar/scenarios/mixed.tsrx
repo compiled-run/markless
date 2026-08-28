@@ -1,5 +1,4 @@
-import { select, toggle, togglegroup } from '../../index.ts';
-import * as toolbar from '../index.ts';
+import { select, toggle, togglegroup, toolbar } from '../../index.ts';
 
 // The point of the family: four controls from four families sharing one tab stop,
 // with no wrapper part around any of them. Each one registers itself by reading

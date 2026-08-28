@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as menu from '../index.ts';
+import { menu } from '../../index.ts';
 
 // `role="group"` with a name of its own is the consumer's markup: it carries one
 // attribute and no behaviour, and it is what makes a reader say "1 of 3".

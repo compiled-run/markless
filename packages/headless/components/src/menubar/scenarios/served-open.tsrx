@@ -1,5 +1,5 @@
-import * as menu from '../../menu/index.ts';
-import * as menubar from '../index.ts';
+import { menu, menubar } from '../../index.ts';
+
 
 // The bar with the menu family's stock 700 ms hover intent, and one item served
 // already open. The stock delay is what proves the bar's hover-after-open never

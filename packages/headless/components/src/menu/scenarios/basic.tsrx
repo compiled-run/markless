@@ -1,4 +1,5 @@
-import * as menu from '../index.ts';
+import { menu } from '../../index.ts';
+
 
 export default function Basic() @{
 	<section style="padding: 40px">

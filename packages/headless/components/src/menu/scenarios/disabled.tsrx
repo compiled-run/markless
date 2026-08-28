@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as menu from '../index.ts';
+import { menu } from '../../index.ts';
 
 // A disabled item is reachable and announced - the APG's rule - and refuses to
 // be activated. The second menu is disabled whole, so its trigger is a disabled

@@ -1,5 +1,4 @@
-import { select } from '../../index.ts';
-import * as toolbar from '../index.ts';
+import { select, toolbar } from '../../index.ts';
 
 // A stacked bar: Up and Down walk it, Left and Right do nothing.
 //

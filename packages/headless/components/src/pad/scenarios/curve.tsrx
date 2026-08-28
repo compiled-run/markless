@@ -1,6 +1,6 @@
 import { computed } from '@markless/core';
 import type { PadPoint } from '../index.ts';
-import * as pad from '../index.ts';
+import { pad } from '../../index.ts';
 
 const FIELD = 'display: block; width: 200px; height: 200px';
 const SHEET = 'position: absolute; inset: 0; width: 100%; height: 100%';

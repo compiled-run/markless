@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as menu from '../index.ts';
+import { menu } from '../../index.ts';
 
 // A submenu is a `menu.itemcontent` written inside a `menu.item`: one root, one
 // `onChange`, and an item marked `submenu` opens it instead of activating.

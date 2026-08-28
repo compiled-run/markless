@@ -1,4 +1,5 @@
-import * as ink from '../index.ts';
+import { ink } from '../../index.ts';
+
 
 const SURFACE = 'display: block; width: 300px; height: 150px; color: #111';
 const KEPT = ['M 10 10 h 40 v 6 h -40 z', 'M 60 20 h 30 v 4 h -30 z'];

@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as menu from '../index.ts';
+import { menu } from '../../index.ts';
 
 // Three levels of the same two parts. Every `menu.item` roots its own item
 // instance, so the depth is only how deep the markup goes - there is no second

@@ -1,6 +1,5 @@
-import * as menu from '../../menu/index.ts';
-import * as menubar from '../index.ts';
-import * as toolbar from '../../toolbar/index.ts';
+import { menu, menubar, toolbar } from '../../index.ts';
+
 
 // A whole menu bar standing in a toolbar, beside a lone menu. The bar is one of
 // the toolbar's controls - one stop, which hands focus on to its own items - and

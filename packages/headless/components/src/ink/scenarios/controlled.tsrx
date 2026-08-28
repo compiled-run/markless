@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as ink from '../index.ts';
+import { ink } from '../../index.ts';
 
 const SURFACE = 'display: block; width: 300px; height: 150px; color: #111';
 

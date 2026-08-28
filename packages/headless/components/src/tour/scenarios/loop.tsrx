@@ -1,5 +1,5 @@
 import { element, state } from '@markless/core';
-import * as tour from '../index.ts';
+import { tour } from '../../index.ts';
 
 // `loop` turns the two ends into a ring: neither trigger is ever disabled, so a
 // person can keep going round the same three steps.

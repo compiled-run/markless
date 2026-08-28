@@ -1,5 +1,5 @@
 import { element, state } from '@markless/core';
-import * as tour from '../index.ts';
+import { tour } from '../../index.ts';
 
 // A tour that is already showing on the first paint, which is how a product tour
 // served to a first-time visitor arrives: no press happens before the reader

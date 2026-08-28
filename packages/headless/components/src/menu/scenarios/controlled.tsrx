@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as menu from '../index.ts';
+import { menu } from '../../index.ts';
 
 // The consumer's own handlers, writing into page state the page renders, so what
 // the DOM shows is what the callbacks were actually called with and how often.

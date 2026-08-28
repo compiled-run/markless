@@ -1,5 +1,5 @@
 import { element, state } from '@markless/core';
-import * as tour from '../index.ts';
+import { tour } from '../../index.ts';
 
 // The starter a consumer copies: three steps, each about a button the page owns.
 // The consumer mints the handle and hands it to the step as a bare prop, because

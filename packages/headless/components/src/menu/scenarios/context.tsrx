@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as menu from '../index.ts';
+import { menu } from '../../index.ts';
 
 // No trigger at all: the region opens the menu where the pointer is, and the
 // surface takes its name from the consumer's `aria-label` because there is no

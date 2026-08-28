@@ -1,4 +1,5 @@
-import * as pad from '../index.ts';
+import { pad } from '../../index.ts';
+
 
 const FIELD = 'display: block; width: 200px; height: 200px';
 const START = [{ id: 'aim', x: 90, y: 0 }];

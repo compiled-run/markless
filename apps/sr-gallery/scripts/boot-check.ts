@@ -586,9 +586,8 @@ async function main() {
 			console.log('#menubar serves the bar named by its label part.');
 		}
 
-		// `ui-menubar` is what an enclosed trigger writes, so this counts the bar's
-		// own items rather than the commands inside the menus they open.
-		const barItems = page.locator('#menubar [role="menuitem"][ui-menubar]');
+		// The bar's own items open menus and sit outside every surface.
+		const barItems = page.locator('#menubar [role="menuitem"][aria-haspopup="menu"]:not([role="menu"] *)');
 		if ((await barItems.count()) !== 3) {
 			failures.push(
 				`#menubar serves ${await barItems.count()} role="menuitem" triggers, not the 3 its menus need.`,
@@ -596,7 +595,7 @@ async function main() {
 		} else {
 			const popups: string[] = [];
 			for (const name of ['File', 'Edit', 'View']) {
-				const trigger = page.locator('#menubar [role="menuitem"][ui-menubar]', { hasText: name });
+				const trigger = page.locator('#menubar [role="menuitem"][aria-haspopup="menu"]:not([role="menu"] *)', { hasText: name });
 				if ((await trigger.count()) !== 1) {
 					failures.push(`#menubar serves no single menu item named "${name}".`);
 					continue;

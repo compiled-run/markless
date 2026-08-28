@@ -1,5 +1,4 @@
-import { toggle } from '../../index.ts';
-import * as toolbar from '../index.ts';
+import { toggle, toolbar } from '../../index.ts';
 
 // Two kinds of unavailable control, and the bar treats them differently.
 //

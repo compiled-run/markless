@@ -788,10 +788,9 @@ describe('menubar wrappers', () => {
 			expect(bar, 'the scenario renders a role="menubar"').not.toBeNull();
 			if (!bar) return;
 
-			// `ui-menubar` is what an enclosed trigger writes, so this is the bar's own
-			// items rather than the commands inside the menus they open.
-			const items = bar.querySelectorAll('[role="menuitem"][ui-menubar]');
-			expect(items.length, "one menuitem per enclosed menu's trigger").toBe(3);
+			// The bar's own items open menus and sit outside every surface; commands inside a surface do not count.
+			const items = bar.querySelectorAll('[role="menuitem"][aria-haspopup="menu"]:not([role="menu"] *)');
+			expect(items.length, 'one menuitem per menubar.item').toBe(3);
 
 			for (const item of items) {
 				const where = `between the bar and "${item.textContent}"`;

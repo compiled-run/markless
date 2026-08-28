@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as menu from '../index.ts';
+import { menu } from '../../index.ts';
 
 export default function CheckboxItems() @{
 	const log = state({ last: '', calls: 0 });

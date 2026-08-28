@@ -1,4 +1,5 @@
-import * as crop from '../index.ts';
+import { crop } from '../../index.ts';
+
 
 const AREA = 'position: relative; width: 400px; height: 300px; overflow: hidden';
 const CONTENT =

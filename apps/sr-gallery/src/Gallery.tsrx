@@ -327,16 +327,15 @@ export function Gallery() @{
 			</div>
 		</section>
 
-		{/* Three whole, ordinary menus standing inside a bar: nothing about a menu changes to go in one, so each keeps its own trigger, surface and nesting. What a reader meets on the bar is a menu item rather than the button each menu offers on its own, and no menu.root carries a name - a named wrapper between the bar and its items stops axe flattening it and costs the bar its required children. */}
+		{/* A bar is the item level's own recursion: each menubar.item is a menu item on the bar and holds the menu it drops down, and the menu family's parts go inside unchanged. */}
 		<section id="menubar">
 			<h2>Menubar</h2>
 			<div class="scenario">
 				<menubar.root>
 					<menubar.label>Application</menubar.label>
-
-					<menu.root>
-						<menu.trigger>File</menu.trigger>
-						<menu.content class="menu-surface">
+					<menubar.item>
+						File
+						<menubar.itemcontent class="menu-surface">
 							<menu.item value="new">New</menu.item>
 							<menu.item value="recent" submenu>
 								Open Recent
@@ -345,24 +344,22 @@ export function Gallery() @{
 									<menu.item value="notes">notes.md</menu.item>
 								</menu.itemcontent>
 							</menu.item>
-						</menu.content>
-					</menu.root>
-
-					<menu.root>
-						<menu.trigger>Edit</menu.trigger>
-						<menu.content class="menu-surface">
+						</menubar.itemcontent>
+					</menubar.item>
+					<menubar.item>
+						Edit
+						<menubar.itemcontent class="menu-surface">
 							<menu.item value="undo">Undo</menu.item>
 							<menu.item value="redo">Redo</menu.item>
-						</menu.content>
-					</menu.root>
-
-					<menu.root checked={['wrap']}>
-						<menu.trigger>View</menu.trigger>
-						<menu.content class="menu-surface">
+						</menubar.itemcontent>
+					</menubar.item>
+					<menubar.item checked={['wrap']}>
+						View
+						<menubar.itemcontent class="menu-surface">
 							<menu.item value="wrap" checked>Word wrap</menu.item>
 							<menu.item value="zoom">Zoom in</menu.item>
-						</menu.content>
-					</menu.root>
+						</menubar.itemcontent>
+					</menubar.item>
 				</menubar.root>
 			</div>
 		</section>

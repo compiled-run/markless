@@ -1,4 +1,5 @@
-import * as toolbar from '../index.ts';
+import { toolbar } from '../../index.ts';
+
 
 // The starter a consumer copies: a named bar of plain buttons sharing one tab stop.
 export default function Basic() @{
