@@ -419,10 +419,15 @@ export function widgetRootComponents(input: PublicRenderModuleInput): Map<string
 export function adoptedWidgetDefinitionIds(
 	input: PublicRenderModuleInput,
 ): ReadonlySet<string> {
+	// Only a family carrying an element() handle has a roster to merge; a page
+	// adopting a handle-less family is its outermost owner and keeps its derives.
 	return new Set(
 		input.semanticGraph.sharedDefinitions.flatMap((definition) =>
 			definition.scope === 'widget' &&
-			definition.id !== sharedDefinitionId(input.semanticGraph.filename, definition.exportedName)
+			definition.id !== sharedDefinitionId(input.semanticGraph.filename, definition.exportedName) &&
+			(definition.returnProperties ?? []).some(
+				(property) => property.kind === 'graph' && property.graphNodeId.includes('/element:'),
+			)
 				? [definition.id]
 				: [],
 		),
