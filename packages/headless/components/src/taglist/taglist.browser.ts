@@ -308,9 +308,10 @@ for (const mode of MODES) {
 		await expect.poll(() => el(Held).textContent).toBe('alpha|beta|gamma|delta');
 	});
 
-	// Pinned: the field's keyed repeat over the family's own value never mints a
-	// row for a tag the first render did not carry. Dropping a rendered tag and
-	// re-admitting it both work.
+	// Pinned: the row's `name={taglist.name}` reads a cell outside the repeated
+	// tag, which takes the row's markup off the payload, so a tag the first render
+	// did not carry can never be built. Dropping and re-admitting a rendered tag
+	// need no markup and both work.
 	test.fails(`${mode}: the form field hands back one entry per tag under one name`, async () => {
 		if (mode === 'CSR') await render(TopicsForm);
 		else await renderSSR(TopicsForm);
@@ -351,8 +352,9 @@ for (const mode of MODES) {
 		expect(summary.textContent).toBe('alpha|beta');
 	});
 
-	// Pinned: the attribute on this element refreshes on the same write, so the
-	// cell is subscribed - it is the text child over the same array that does not.
+	// Pinned: the text CALLS a method on the array (`join`), and an expression
+	// that calls a method in a template position is wired to nothing. The position
+	// is not the ingredient - an attribute spelled the same way stays stale too.
 	test.fails(`${mode}: a consumer component's text over the family's value refreshes`, async () => {
 		if (mode === 'CSR') await render(ConsumerState);
 		else await renderSSR(ConsumerState);
