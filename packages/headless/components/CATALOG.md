@@ -42,7 +42,14 @@ Charter notes:
 - The per-item edit mode is the editable family's machinery (see editable).
 - Good stress test for the keyed-reconcile follow-up queue.
 
-### 2. rating-group
+### 2. rating (owner ruling 2026-08-28: renamed from rating-group)
+
+Named `rating`, not `rating-group` and not `review`. `review` is a use-case name (a review is
+stars plus author and text; the docs recipe owns that word — the prompt/tokenbox precedent).
+`-group` described the implementation (radiogroup semantics under the hood), not the concept: the
+root owns its items, so unlike radio-group the consumer never composes independent parts into a
+group. Half the ecosystem already says just Rating (MUI, PrimeVue, Ant's Rate); RatingGroup is
+the Ark/Zag spelling.
 
 Standalone family with radiogroup semantics under the hood — explicitly NOT an extension of the
 radio family, which it breaks in three places: transient preview state (hover highlights a value
