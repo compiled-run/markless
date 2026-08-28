@@ -22,9 +22,18 @@ type ResumeSyncComputedRecord = {
 	}>;
 };
 
-// An element() binding's graph node id, restating the compiler's spelling.
-const ELEMENT_BINDING_SEGMENT = '/element:';
-const ROW_SEGMENT = /r:[^:]*:/g;
+/**
+ * The live-roster reader, loaded through the app's own resume module.
+ *
+ * The `import()` specifier is NOT written here: every sync computed on every
+ * resumed page runs this file, so naming the module - or `fns/instance-scope`
+ * behind it - would emit a chunk for all of them. Reached through the global,
+ * the roster module imports instance-scope STATICALLY, so it links the chunk
+ * the dispatch core already carries instead of forcing a re-export shim.
+ */
+type RosterResumeHost = {
+	readonly __marklessRosterResume?: () => Promise<typeof import('./fns/roster-resume.ts')>;
+};
 
 export async function refreshSyncComputed(input: {
 	readonly computed: ResumeSyncComputedRecord;
@@ -39,62 +48,14 @@ export async function refreshSyncComputed(input: {
 		read: graph.read,
 		element: input.root,
 		getElementHandle: input.elementHandles.get,
-		rosterPosition: await rosterPositionReader(input),
+		rosterPosition: (
+			await (globalThis as RosterResumeHost).__marklessRosterResume?.()
+		)?.createRosterPositionReader(input),
 	});
 	input.graph.write({
 		graphNodeId: input.computed.graphNodeId,
 		value: await result,
 	});
-}
-
-/**
- * Where this part stands in its family's roster, now that there is a DOM: the
- * roster answers its live members in document order and the part's own bound
- * element is one of them.
- *
- * Loaded only for a derivation that depends on an element() binding, because
- * scoping the roster to THIS rendered widget is what keeps a second collection
- * on the page from answering, and that scoping is not on the lean path.
- */
-async function rosterPositionReader(input: {
-	readonly computed: ResumeSyncComputedRecord;
-	readonly graph: RuntimeGraph;
-	readonly elementHandles: ElementHandleRegistry;
-}): Promise<((rosterGraphNodeId: string, handleGraphNodeId: string) => number) | undefined> {
-	if (
-		!input.computed.dependencies?.some((dependency) =>
-			dependency.graphNodeId.includes(ELEMENT_BINDING_SEGMENT),
-		)
-	)
-		return undefined;
-	const scope = await import('./fns/instance-scope.ts');
-	const instancePath = scope.marklessInstancePath(input.computed.graphNodeId);
-	const rosterOf = scope.marklessInstanceScopedElementHandle(
-		input.elementHandles.get,
-		instancePath,
-		input.graph,
-	);
-	// The member handle's own id names no instance, so the rows this derivation
-	// stands in are what separate its element from every sibling part's.
-	const rows = instancePath.match(ROW_SEGMENT)?.join('') ?? '';
-	return (rosterGraphNodeId, handleGraphNodeId) => {
-		const roster = rosterOf?.(rosterGraphNodeId);
-		const member =
-			oneElement(input.elementHandles.get, rows + handleGraphNodeId) ??
-			oneElement(input.elementHandles.get, handleGraphNodeId);
-		return Array.isArray(roster) && member ? roster.indexOf(member) : -1;
-	};
-}
-
-// A key naming more than one rendered part answers no part, and the caller has
-// another key to try; the registry says so by refusing rather than by answering.
-function oneElement(get: ElementHandleRegistry['get'], key: string): unknown {
-	try {
-		const value = get(key);
-		return Array.isArray(value) ? undefined : value;
-	} catch {
-		return undefined;
-	}
 }
 
 // A shared seed re-runs its own authored expression, so its prop reads have to

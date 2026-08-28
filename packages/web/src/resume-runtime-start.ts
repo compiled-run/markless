@@ -21,6 +21,19 @@ type RuntimeShared = ReturnType<
 >;
 
 /**
+ * The live-roster half, loaded through the app's own resume module.
+ *
+ * The `import()` specifier is NOT written here: every resumed page with a keyed
+ * repeat runs this file, so naming the module would emit its chunk for all of
+ * them. The app's resume module writes the loader, and only for a payload that
+ * carries computed nodes - a page with none can hold no roster derivation, so
+ * an absent loader means there is nothing to renumber.
+ */
+type RosterResumeHost = {
+	readonly __marklessRosterResume?: () => Promise<typeof import('./fns/roster-resume.ts')>;
+};
+
+/**
  * Where the app's own emitted module leaves its overlay installer, and the whole
  * cost of elevation to an app that has no `overlay` mark: one optional call.
  *
@@ -146,7 +159,7 @@ export async function startResumeRuntime(input: {
 				elementsByHostId: prepared.elementsByHostId,
 			},
 		);
-		(await import('./fns/roster-position.ts')).wireRosterRevisions({
+		(await (globalThis as RosterResumeHost).__marklessRosterResume?.())?.wireRosterRevisions({
 			graph: runtimeInput.graph,
 			computed: runtimeInput.state?.computed ?? [],
 			keyedRepeats: runtimeInput.view.keyedRepeats ?? [],

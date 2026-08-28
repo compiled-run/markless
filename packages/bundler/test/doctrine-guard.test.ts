@@ -103,6 +103,8 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Compiled app metadata omits server document fields from client output.',
 	"packages/bundler/src/source-module.ts :: input.environment === 'client' && input.directCsr === true && input.hasComputedState === true":
 		'A CSR mount builds its graph from client output that has no resume module, so the derived reconcile plane installs there instead of in the resume module.',
+	"packages/bundler/src/source-module.ts :: input.environment === 'client' && input.hasComputedState === true":
+		'Same reason for the live roster: a CSR mount reaches the runtime start through client output, so the roster loader is named there or a row added after mount is never renumbered.',
 	"packages/bundler/src/source-module.ts :: input.environment === 'client' && input.hasOverlayMarks === true":
 		'Same reason for elevation: a CSR mount reaches the runtime start without a resume module, and the overlay behaviour must be named by client output or its chunk is never emitted.',
 	"packages/bundler/src/source-module.ts :: input.environment === 'client' && demandsRowComponentMint(input.runtimeDemandMap)":
