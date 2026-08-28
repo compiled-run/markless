@@ -36,7 +36,7 @@ import {
 // Every shipped family's Basic scenario - the starter a consumer copies - on one
 // page, each in a section a reader can jump to by its anchor: /#checkbox,
 // /#toggle, /#textbox, /#progress, /#checklist, /#select, /#modal,
-// /#radio-group, /#rating-group, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
+// /#radio-group, /#rating, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
 // /#fileupload, /#hovercard, /#calendar, /#menu, /#menubar, /#colorpicker,
 // /#buttongroup, /#editable, /#taglist, /#numberbox, /#ink, /#pad, /#crop, /#tour, /#toolbar, /#drawer. A family whose
 // second shape a reader announces differently gets its own section too: /#slider-range,
@@ -192,8 +192,8 @@ export function Gallery() @{
 			</div>
 		</section>
 
-		<section id="rating-group">
-			<h2>Rating group</h2>
+		<section id="rating">
+			<h2>Rating</h2>
 			{/* Already rated, because the claim the real readers settle here is that a fill covering three marks is still one checked radio and four unchecked ones. */}
 			<div class="scenario">
 				<ratinggroup.root defaultValue={3}>
