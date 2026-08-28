@@ -5,7 +5,10 @@ import {
 	marklessThen,
 	type Awaitable,
 } from './awaitable.ts';
-import { MARKLESS_WIDGET_INSTANCE_KEY } from '../prerender/shared-seed-slot.ts';
+import {
+	MARKLESS_WIDGET_INSTANCE_KEY,
+	marklessRosterPositions,
+} from '../prerender/shared-seed-slot.ts';
 import {
 	ASYNC_BOUNDARY_ARM,
 	renderPayloadScripts,
@@ -542,11 +545,17 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 							};
 							let pending;
 							try {
-								pending = input.renderChild(slot, {
+								const childContext = {
 									...context,
 									...(childSeeds ? { sharedSeeds: rootEdgeSeeds(childSeeds, context.sharedSeeds) } : {}),
 									...(projection ? { projectionHtml: (span?.mark ?? '') + projection.html } : {}),
-								});
+								};
+								// A derive-time roster position is asked with two ids and no context,
+								// so the seeds it counts within are published here — one statement
+								// before the child body that asks, with nothing async between.
+								const positions = marklessRosterPositions(childContext.sharedSeeds);
+								if (positions) positions.seeds = childContext.sharedSeeds;
+								pending = input.renderChild(slot, childContext);
 							} catch (error) {
 								release();
 								throw error;

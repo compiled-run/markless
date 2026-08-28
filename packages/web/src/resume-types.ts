@@ -249,6 +249,11 @@ export type ResumeSymbolContext = {
 	readonly event?: ResumeDomEvent;
 	readonly element: ResumeDomElement;
 	readonly getElementHandle: (handleIdOrName: string) => ResumeElementHandleValue;
+	/** Where the part this symbol derives for stands in its family's roster. */
+	readonly rosterPosition?: (
+		rosterGraphNodeId: string,
+		handleGraphNodeId: string,
+	) => number;
 	readonly locals?: Readonly<Record<string, unknown>>;
 	readonly arm?: number;
 	readonly branchId?: string;
