@@ -7,6 +7,12 @@ import { defineProject } from 'vitest/config';
 // colocated in its own src/<family>/ folder beside the component, next to the
 // .tsrx test apps it renders. The markless plugin compiles those apps; testSSR
 // turns the SSR markers in the shared harness into browser commands.
+//
+// The chaos lane in chaos/vitest.config.ts is this package's second browser
+// lane, on the same provider and the same setup file. It is a standalone config
+// rather than a second project here: a project config file contributes exactly
+// one project, and this file is named in the root vite.config.ts projects list,
+// which would ungate a lane that is meant to be run on request.
 export default defineProject({
 	plugins: [testSSR(), markless()],
 	test: {

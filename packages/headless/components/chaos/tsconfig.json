@@ -1,0 +1,25 @@
+{
+	"extends": "../../../../tsconfig.json",
+	"exclude": [
+		"../../../../dist",
+		"../../../../node_modules",
+		"../../../../poc",
+		"../../../../packages/*/test",
+		"../../../../packages/headless/*/test",
+		"../../../../packages/bundler/fixtures",
+		"vitest.config.ts"
+	],
+	"include": [
+		"./*.ts",
+		"./*.d.ts",
+		"../../../../packages/*/src/**/*.d.ts",
+		"../../../../packages/*/src/**/*.ts",
+		"../../../../packages/*/src/**/*.tsrx",
+		"../../../../packages/headless/*/src/**/*.d.ts",
+		"../../../../packages/headless/*/src/**/*.ts",
+		"../../../../packages/headless/*/src/**/*.tsrx"
+	],
+	"tsrx": {
+		"compiler": "@markless/typescript-plugin/volar"
+	}
+}
