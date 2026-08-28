@@ -1,7 +1,15 @@
 import { jsonSourceWithNonFiniteNumbers } from '@markless/serializer';
-import type { PublicRenderModuleInput } from '../../artifacts.ts';
+import type {
+	PublicRenderModuleInput,
+	SemanticElementRosterPosition,
+} from '../../artifacts.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
+import {
+	stripAuthoredExpression,
+	stripAuthoredStatements,
+	strippedExpressionSource,
+} from './authored-strip.ts';
 import { isIgnorableJsxTextNode as isIgnorableTextNode } from '../../ast/tsrx.ts';
 import {
 	findSharedInstance,
@@ -68,6 +76,7 @@ export function renderBodyLines(
 			stateValueFunctionName,
 			stateValuesName,
 			statePayloadName,
+			input.source.filename,
 		);
 		if (stateLine) {
 			lines.push(stateLine);
@@ -118,7 +127,13 @@ export function renderBodyLines(
 		if (isSharedInstanceAssignment(statement, input, sharedInstanceNames)) continue;
 
 		const source = expressionSource(statement, input.source.source);
-		if (source) lines.push(source);
+		if (source)
+			lines.push(
+				stripAuthoredStatements(source, {
+					filename: input.source.filename,
+					what: 'a component-body statement carried into the SSR module',
+				}),
+			);
 	}
 	if (!emittedRoot) {
 		if (!derivedSharedComputed) lines.push(...bodySharedComputedLines);
@@ -155,7 +170,10 @@ function sharedStateSeedLine(
 		);
 	}
 
-	const value = expressionSource(assignment.right as AnyNode, input.source.source);
+	const value = strippedExpressionSource(assignment.right as AnyNode, input.source.source, {
+		filename: input.source.filename,
+		what: 'a shared-state seed value',
+	});
 	const read = `${stateValuesName}.get(${JSON.stringify(resolved.binding.id)})`;
 	// The seed writes the served payload too: resume never re-runs the body, so a
 	// payload left holding the factory initial resumes a value nobody rendered.
@@ -252,6 +270,11 @@ function computedDeclarationLine(
 	}
 
 	const declarationKind = binding.declarationKind ?? 'const';
+	const roster = (input.semanticGraph.elementRosterPositions ?? []).find(
+		(record) =>
+			record.computedGraphNodeId === binding.id && record.componentName === componentName,
+	);
+	if (roster) return rosterPositionDeclarationLine(declarationKind, binding.name, roster);
 	// No instance local exists here; rebuild it from the graph, as the residue readers do.
 	const prelude = sharedInstancePreludeLines(
 		input.semanticGraph,
@@ -261,11 +284,35 @@ function computedDeclarationLine(
 		(graphNodeId, path) =>
 			`marklessSsrReadPublicPath(${stateValuesName}.get(${JSON.stringify(graphNodeId)}), ${JSON.stringify(path)})`,
 	);
+	const derive = stripAuthoredExpression(binding.functionSource, {
+		filename: input.source.filename,
+		what: 'a computed derive carried into the SSR module',
+	});
 	if (prelude.length === 0) {
-		return `${declarationKind} ${binding.name} = (${binding.functionSource})();`;
+		return `${declarationKind} ${binding.name} = (${derive})();`;
 	}
 
-	return `${declarationKind} ${binding.name} = (() => { ${prelude.join(' ')} return (${binding.functionSource})(); })();`;
+	return `${declarationKind} ${binding.name} = (() => { ${prelude.join(' ')} return (${derive})(); })();`;
+}
+
+/**
+ * The server-render half of a roster position: the same two ids the resume
+ * derive passes, asked of the render context, which answers from the order this
+ * widget instance emitted its parts in. It does not answer it yet - an
+ * unanswered position throws by name rather than standing in as a number,
+ * because every part would otherwise silently render position 0.
+ */
+function rosterPositionDeclarationLine(
+	declarationKind: string,
+	name: string,
+	record: SemanticElementRosterPosition,
+): string {
+	const unanswered = `(()=>{throw new Error(${JSON.stringify(
+		`MARKLESS_SSR_ROSTER_POSITION_UNANSWERED: ${record.computedGraphNodeId}`,
+	)});})`;
+	return `${declarationKind} ${name} = (marklessSsrRenderContext?.rosterPosition ?? ${unanswered})(${JSON.stringify(
+		record.rosterGraphNodeId,
+	)}, ${JSON.stringify(record.handleGraphNodeId)});`;
 }
 
 function stateDeclarationLine(
@@ -274,6 +321,7 @@ function stateDeclarationLine(
 	stateValueFunctionName: string,
 	stateValuesName: string,
 	statePayloadName: string,
+	filename: string,
 ): string | null {
 	if (statement.type !== 'VariableDeclaration') return null;
 	const declarations = asNodes(statement.declarations);
@@ -287,8 +335,15 @@ function stateDeclarationLine(
 		(!isFrameworkCall(init, 'state') && !(binding.storage && isFrameworkCall(init, 'storage')))
 	)
 		return null;
+	const authoredInitializer = (binding as GraphBinding & { readonly initializerSource?: string })
+		.initializerSource;
 	const initializerSource =
-		(binding as GraphBinding & { readonly initializerSource?: string }).initializerSource ??
+		(authoredInitializer === undefined
+			? undefined
+			: stripAuthoredExpression(authoredInitializer, {
+					filename,
+					what: 'a state initializer',
+				})) ??
 		(binding.storage ? jsonSourceWithNonFiniteNumbers(binding.initialValue) : undefined);
 	const args = [
 		stateValuesName,

@@ -234,8 +234,29 @@ const MAX_SHIPPED_JS_GZIP_BYTES = 69_800;
 //     render path the router link imports.
 // Attribution here is by named change over the anchor..tip window, confirmed by
 // which identifiers the measured chunks contain; it is not a revert-measurement.
+//   page-load download  69,588 -> 69,722 (+134, render-order ordinals). This one
+//     IS a revert-measurement: the same worktree builds 69,632 with the whole
+//     change set reverted and 69,766 with it in, 97 eager chunks either way, so
+//     the delta is +134 and the absolute readings carry this worktree's own
+//     absolute-path offset (the margin covers it, per the 64,514 entry's note).
+//     The three chunks that moved, and nothing else did:
+//       +35  the locator registry files one more element-handle key per
+//            registration, the row segments of the host it was registered on -
+//            which is what lets a component-local handle name one rendered part.
+//       +43  the resume start-up wiring reading the live-roster loader off the
+//            global, and calling it.
+//       +54  a sync computed's re-derive reading the same loader for the
+//            position reader it hands the derive symbol.
+//     Cost class: the same pay-per-use shape as the row mint. An earlier form of
+//     this change measured +1,423 here and +301 on first-navigation, all of it
+//     chunk GROUPING rather than code - two `import()` specifiers written inside
+//     modules every resumed page runs turned `fns/instance-scope` (already in the
+//     eager dispatch core) into a dynamic entry, and rolldown answered with
+//     re-export shim chunks the preload planner then fetched. Moving the
+//     specifiers into the app's own resume module, gated on the payload carrying
+//     computed nodes, gave 1,346 of that back and returned the chunk count to 97.
 const STAGE_ANCHORS = {
-	'page-load download': { gzipBytes: 69_588, margin: 128 },
+	'page-load download': { gzipBytes: 69_722, margin: 128 },
 	'page-load execute': { gzipBytes: 4_214, margin: 32 },
 	'interaction 1 marginal': { gzipBytes: 1_932, margin: 32 },
 	'interaction 2 marginal': { gzipBytes: 1_568, margin: 32 },

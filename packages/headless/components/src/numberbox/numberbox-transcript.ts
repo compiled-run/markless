@@ -1,5 +1,7 @@
 import { expect, type Page } from '@playwright/test';
+import { FAMILY_ANCHORS } from '../../../../../apps/sr-gallery/preview-server.ts';
 import type { ScreenReaderDriver } from '../../test-support/driver.ts';
+import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
 
 /**
  * Expectations are the facts an announcement must convey rather than any reader's
@@ -18,9 +20,6 @@ import type { ScreenReaderDriver } from '../../test-support/driver.ts';
  * bounded scenario is where that row lives, in the virtual lane.
  */
 
-// The gallery is one page of many families, so a walk that starts at the top of
-// the document needs far more steps than the virtual lane's container walk.
-const WALK_LIMIT = 200;
 const CHANGE_TIMEOUT_MS = 15_000;
 
 const NAME = 'Quantity';
@@ -30,12 +29,7 @@ const INCREASE = 'Increase';
 // U+2212, not a hyphen: the sign a reader is meant to speak.
 const MINUS_ONE = '\u22121';
 
-/**
- * Where the numberbox sits on the gallery page. Spelled here rather than read
- * from `FAMILY_ANCHORS`, because the gallery section this walk needs lands with
- * the gallery registration and this file ships before it.
- */
-export const NUMBERBOX_ANCHOR = '/#numberbox';
+export const NUMBERBOX_ANCHOR = FAMILY_ANCHORS.numberbox;
 
 function missing(phrase: string, facts: readonly string[]): string[] {
 	return facts.filter((fact) => !phrase.includes(fact));
@@ -79,7 +73,7 @@ export async function readNumberboxTranscript(sr: ScreenReaderDriver, page: Page
 	const fieldId = await field.getAttribute('id');
 	await expect(back).toHaveAttribute('aria-controls', fieldId ?? '');
 
-	const resting = await readForPhrase(sr, [ROLE_DESCRIPTION, NAME], WALK_LIMIT);
+	const resting = await readForPhrase(sr, [ROLE_DESCRIPTION, NAME], GALLERY_WALK_LIMIT);
 	expect(missing(resting, [ROLE_DESCRIPTION, NAME]), `${sr.name} announced "${resting}"`).toEqual(
 		[],
 	);

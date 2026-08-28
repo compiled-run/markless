@@ -138,8 +138,8 @@ export function ModalTrigger({ onChange }) @{
 	// The handler's own call keeps its `await`, so what the author wrote after it
 	// still runs after it; the callback's call is the last thing that callback
 	// does, so it is inlined unawaited rather than making the callback async.
-	expect(source).toContain('await (async (next: boolean) =>');
-	expect(source).toContain('onDismiss: () => {\n    (async (next: boolean) =>');
+	expect(source).toContain('await (async (next) =>');
+	expect(source).toContain('onDismiss: () => {\n    (async (next) =>');
 });
 
 test('a shared-instance method called only inside the callback lowers', async () => {
@@ -278,7 +278,7 @@ export function ModalTrigger({ onChange }) @{
 	expect(eventSymbolSources(result)[0]).toContain('modal.closeAll()');
 });
 
-test('the unresolved-reference check reads a module carrying inlined TypeScript', async () => {
+test('the unresolved-reference check reads a module carrying an inlined setter body', async () => {
 	// The copied method keeps `(next: boolean)`. Parsed as plain JavaScript the
 	// module threw and the check claimed nothing, which is what made an unlowered
 	// instance reference ship in silence. Both are in this one module: a call that
@@ -295,7 +295,9 @@ export function ModalTrigger() @{
 `);
 
 	const [source] = eventSymbolSources(result);
-	expect(source).toContain('(next: boolean)');
+	// The annotation the setter was authored with is stripped at emission; the
+	// inlined body is what the check reads.
+	expect(source).toContain('((next) => {');
 	expect(result.symbolModules.diagnostics.map((item) => item.code)).toContain(
 		SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE,
 	);

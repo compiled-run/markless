@@ -10,6 +10,7 @@ import Collapsible from '../src/collapsible/scenarios/basic.tsrx';
 import Colorpicker from '../src/colorpicker/scenarios/basic.tsrx';
 import Crop from '../src/crop/scenarios/basic.tsrx';
 import DateBox from '../src/datebox/scenarios/basic.tsrx';
+import Editable from '../src/editable/scenarios/basic.tsrx';
 import FileUpload from '../src/fileupload/scenarios/basic.tsrx';
 import Hovercard from '../src/hovercard/scenarios/basic.tsrx';
 import Ink from '../src/ink/scenarios/basic.tsrx';
@@ -27,9 +28,11 @@ import Popover from '../src/popover/scenarios/basic.tsrx';
 import Progress from '../src/progress/scenarios/basic.tsrx';
 import QrCode from '../src/qr-code/scenarios/basic.tsrx';
 import { Basic as RadioGroup } from '../src/radio-group/scenarios/basic.tsrx';
+import { Basic as RatingGroup } from '../src/rating-group/scenarios/basic.tsrx';
 import { Basic as Select } from '../src/select/scenarios/basic.tsrx';
 import Slider from '../src/slider/scenarios/basic.tsrx';
 import Tabs from '../src/tabs/scenarios/basic.tsrx';
+import TagList from '../src/taglist/scenarios/basic.tsrx';
 import Textbox from '../src/textbox/scenarios/basic.tsrx';
 import Toaster from '../src/toaster/scenarios/basic.tsrx';
 import Toggle from '../src/toggle/scenarios/basic.tsrx';
@@ -291,6 +294,20 @@ const descriptors: readonly FamilyDescriptor[] = [
 		// Which part of the date a box holds, and what it holds now: both carry
 		// information a consumer styles on, so both stay key-value.
 		valuedAttributes: ['ui-type', 'ui-value'],
+		supportsDisabled: true,
+	},
+	{
+		family: 'editable',
+		mount: { CSR: () => render(Editable), SSR: () => renderSSR(Editable) },
+		root: 'root',
+		parts: ['root', 'label', 'trigger', 'input', 'field'],
+		// Preview and edit are the same room, swapped by `hidden` on two elements
+		// that are both always in the DOM. That is not an openCycle: there is no
+		// surface a trigger reports through aria-expanded, and nothing to dismiss.
+		rootAria: { role: 'group', 'aria-disabled': null },
+		// The words themselves, which is the one thing about this family a
+		// consumer styles against; every other mark here is presence.
+		valuedAttributes: ['ui-value'],
 		supportsDisabled: true,
 	},
 	{
@@ -609,6 +626,20 @@ const descriptors: readonly FamilyDescriptor[] = [
 		supportsDisabled: true,
 	},
 	{
+		family: 'rating-group',
+		mount: { CSR: () => render(RatingGroup), SSR: () => renderSSR(RatingGroup) },
+		root: 'root',
+		// The five marks are one repeat under a single `star` testid, which is what
+		// the family's own suite counts them by, so the wrapper is the part a
+		// one-element-per-testid list can name.
+		parts: ['root', 'label', 'stars', 'valuelabel'],
+		rootAria: { role: 'radiogroup' },
+		// How many marks there are and where the rating sits are numbers a consumer
+		// styles against, so they are key-value by design rather than presence marks.
+		valuedAttributes: ['ui-count', 'ui-value'],
+		supportsDisabled: true,
+	},
+	{
 		family: 'select',
 		mount: { CSR: () => render(Select), SSR: () => renderSSR(Select) },
 		root: 'root',
@@ -668,6 +699,22 @@ const descriptors: readonly FamilyDescriptor[] = [
 			'billing-content',
 		],
 		rootAria: { role: null },
+		supportsDisabled: true,
+	},
+	{
+		family: 'taglist',
+		mount: { CSR: () => render(TagList), SSR: () => renderSSR(TagList) },
+		root: 'root',
+		// The chips are the consumer's own markup keyed by each tag's words, so
+		// their testids carry a value and are not fixed part names; what is named
+		// here is what the family itself puts on the page at rest.
+		parts: ['root', 'label', 'input', 'field'],
+		// No openCycle: the row has no surface, and the edit field a tag can open
+		// is `hidden` in the same room rather than a thing a trigger expands.
+		rootAria: { role: 'group', 'aria-disabled': null },
+		// The tag's own words, which is the identity every part inside a chip is
+		// keyed by; every other mark this family writes is presence.
+		valuedAttributes: ['ui-value'],
 		supportsDisabled: true,
 	},
 	{

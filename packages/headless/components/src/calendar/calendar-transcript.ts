@@ -6,6 +6,7 @@ import {
 	type Conveys,
 	type ScreenReaderDriver,
 } from '../../test-support/driver.ts';
+import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
 
 /**
  * Expectations are `Conveys` facts rather than any reader's wording, so this file
@@ -27,10 +28,6 @@ import {
  * chosen-ness is asserted on the element instead, the way datebox asserts bounds.
  */
 
-// The calendar section is the last on the gallery page and serves 42 days, so a
-// walk that starts at the top of the document needs more steps than any other
-// family's.
-const WALK_LIMIT = 420;
 const CHANGE_TIMEOUT_MS = 15_000;
 
 // The gallery pins August 2026 and one day in it that may not be chosen.
@@ -77,7 +74,7 @@ export async function readCalendarTranscript(sr: ScreenReaderDriver, page: Page)
 	// The whole date is in the name, which is the fact a grid's row and column
 	// position exists to convey - and the reason this family ships neither.
 	const plain: Conveys = { role: 'button', name: plainName };
-	expectConveys(sr, await readUntil(sr, plain, WALK_LIMIT), plain);
+	expectConveys(sr, await readUntil(sr, plain, GALLERY_WALK_LIMIT), plain);
 
 	// A day already chosen. `aria-pressed`, never `aria-selected`: a button does
 	// not support the latter.

@@ -121,7 +121,7 @@ test('a two-parameter method binds both parameters and writes both cells', async
 	);
 
 	expect(errors).toEqual([]);
-	expect(module).toContain('((text: string, now: number) => {');
+	expect(module).toContain('((text, now) => {');
 	expect(module).toContain(SEARCH_WRITE);
 	expect(module).toContain(
 		'context.graph.write({ graphNodeId: "shared:src/box.tsrx#buf/state:s", path: ["searchAt"], value: now })',
@@ -137,7 +137,7 @@ test('a parameter carrying parentheses of its own keeps its whole parameter list
 		"b.typed('a', () => {});",
 	);
 	expect(fnTyped.errors).toEqual([]);
-	expect(fnTyped.module).toContain('((text: string, done: () => void) => {');
+	expect(fnTyped.module).toContain('((text, done) => {');
 	expect(fnTyped.module).toContain(SEARCH_WRITE);
 	expect(fnTyped.module).toContain('done();');
 
@@ -146,7 +146,7 @@ test('a parameter carrying parentheses of its own keeps its whole parameter list
 		"b.typed('a');",
 	);
 	expect(defaulted.errors).toEqual([]);
-	expect(defaulted.module).toContain('((text: string, now: number = Date.now()) => {');
+	expect(defaulted.module).toContain('((text, now = Date.now()) => {');
 	expect(defaulted.module).toContain(SEARCH_WRITE);
 });
 
@@ -168,7 +168,7 @@ test('one-parameter and zero-argument emission is byte-unchanged', async () => {
 	expect(one.inlined).toContain("((text: string) => { s.search = text; })('a')");
 	expect(one.module).toBe(
 		`export function symbol_0(context) {
-  ((text: string) => {
+  ((text) => {
     ${SEARCH_WRITE};
   })('a');
   ${ECHO_WRITE};

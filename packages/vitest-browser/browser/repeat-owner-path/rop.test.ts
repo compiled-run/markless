@@ -7,19 +7,17 @@ import Page from './rop-page.tsrx';
  * inside.
  *
  * The collection is a page-level cell, so the collection graph node names no
- * instance; the widget root is the panel the rows render inside. The mint
- * anchors its widget-registry walk on the collection node, finds no root from
- * there, and refuses every widget-scoped definition the row reads. Served rows
- * resolve the same widget through the render path and are correct, which is what
- * makes the refusal attributable to the anchor alone.
+ * instance; the widget root is the panel the rows render inside. The mint used
+ * to anchor its widget-registry walk on the collection node alone and refused
+ * every widget-scoped definition the row reads; it now also reads the live host
+ * census, so the panel whose element holds the repeat's parent names the
+ * instance the rows stand in. The left panel mints its fourth row with owner
+ * "left".
  *
- * Pinned at the refusal: the anchor has to become the repeat host's own graph
- * instance path, and the record carries no field spelling it. Host node ids
- * carry a HOST prefix, a different id space from the graph instance path the
- * widget registry is keyed by - the two coincide on some trees and diverge
- * wherever a projection segment appears - so no reading of `parentHostNodeId`
- * answers it. Once the path is carried, these two flip to a fourth row per panel
- * whose owner is that panel.
+ * The right panel is pinned at a second guard: a row is keyed on
+ * enclosingInstancePath + rowKey, page space for both panels, so two family
+ * roots over one collection mint the same segment. That needs the repeat's own
+ * graph instance path on the compiler's keyed-repeat record.
  */
 afterEach(async () => {
 	await cleanup();
@@ -76,18 +74,29 @@ test('CSR: served rows read the panel root they stand inside', async () => {
 	expect(owners(container, 'data-rop-right')).toEqual(['right', 'right', 'right']);
 });
 
-test('CSR: the row appended after render is refused, not minted', async () => {
+test('CSR: the row appended after render mints under the panel it stands in', async () => {
 	const screen = await render(Page);
 	const container = screen.container as HTMLElement;
 
 	add(container);
 	await expect
-		.poll(() => refusals)
-		.toContain('MARKLESS_REPEAT_ROW_COMPONENT_WIDGET_UNRESOLVED');
-	expect(rows(container, 'data-rop-left')).toEqual(['alpha', 'bravo', 'charlie']);
+		.poll(() => rows(container, 'data-rop-left'))
+		.toEqual(['alpha', 'bravo', 'charlie', 'delta']);
+	expect(owners(container, 'data-rop-left')).toEqual(['left', 'left', 'left', 'left']);
 });
 
-test('SSR: a resumed page refuses the same row for the same reason', async () => {
+test.fails('CSR: two panels over one collection each mint their own fourth row', async () => {
+	const screen = await render(Page);
+	const container = screen.container as HTMLElement;
+
+	add(container);
+	await expect
+		.poll(() => rows(container, 'data-rop-right'))
+		.toEqual(['alpha', 'bravo', 'charlie', 'delta']);
+	expect(refusals).not.toContain('MARKLESS_REPEAT_ROW_COMPONENT_WIDGET_COLLISION');
+});
+
+test('SSR: a resumed page mints the appended row under the panel it stands in', async () => {
 	const screen = await renderSSR(Page);
 	const container = screen.container as HTMLElement;
 
@@ -95,7 +104,7 @@ test('SSR: a resumed page refuses the same row for the same reason', async () =>
 
 	add(container);
 	await expect
-		.poll(() => refusals, { timeout: 5000 })
-		.toContain('MARKLESS_REPEAT_ROW_COMPONENT_WIDGET_UNRESOLVED');
-	expect(rows(container, 'data-rop-left')).toEqual(['alpha', 'bravo', 'charlie']);
+		.poll(() => rows(container, 'data-rop-left'), { timeout: 5000 })
+		.toEqual(['alpha', 'bravo', 'charlie', 'delta']);
+	expect(owners(container, 'data-rop-left')).toEqual(['left', 'left', 'left', 'left']);
 });

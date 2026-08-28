@@ -1,6 +1,10 @@
 import { transformSync } from 'rolldown/experimental';
 import { expect, test } from 'vitest';
-import { stripEmittedTypes, transformTsrxModule } from '../src/transform.ts';
+import {
+	stripEmittedTypes,
+	stripEmittedTypesFromFragment,
+	transformTsrxModule,
+} from '../src/transform.ts';
 
 // The render-data virtual module is generated JSON with three authored slices
 // spliced in: the residue reader, its module-scope declarations, and its
@@ -42,6 +46,27 @@ export default function UntypedTonePage() @{
 	const view = state({ tone: 'calm' });
 
 	<main data-label={TONES[view.tone]}>{view.tone}</main>
+}
+`;
+
+// Three shapes a JavaScript parse accepts or the printer would otherwise wave
+// through: a generic call reads as two comparisons, an `as` cast and a non-null
+// `!` sit inside a declaration the reader lifts whole.
+const AMBIGUOUS_MODULE_SOURCE = `
+import { state } from '@markless/core';
+
+type Limit = number;
+const WIDTH = 4;
+function pick<T>(value: T): T { return value; }
+const CAP = pick<Limit>(WIDTH);
+const LOUD = (WIDTH as Limit) + 1;
+const BOX: { n?: number } = { n: 3 };
+const FORCED = BOX.n!;
+
+export default function AmbiguousTonePage() @{
+	const view = state({ tone: 'calm' });
+
+	<main data-label={\`\${CAP}-\${LOUD}-\${FORCED}-\${view.tone}\`}>{view.tone}</main>
 }
 `;
 
@@ -130,4 +155,55 @@ test('a fragment the stripper cannot parse fails loudly and names the module', a
 	await expect(
 		stripEmittedTypes('const = ;', 'virtual:markless:render-data:probe'),
 	).rejects.toThrow(/MARKLESS_TYPE_STRIP_FAILED: virtual:markless:render-data:probe/);
+});
+
+// A generic call is TypeScript that is also valid JavaScript with a different
+// meaning: `pick<Limit>(WIDTH)` reads as `(pick < Limit) > (WIDTH)`. Deciding by
+// a JavaScript parse shipped it verbatim, so the browser evaluated comparisons.
+test('a generic call in a reader declaration is stripped, not shipped as two comparisons', async () => {
+	const source = await renderDataSource('ambiguousTone', AMBIGUOUS_MODULE_SOURCE);
+
+	expect(source).toContain('const CAP = pick(WIDTH);');
+	expect(source).not.toContain('pick<Limit>');
+	expect(javaScriptParseErrors(source)).toEqual([]);
+});
+
+test('an `as` assertion and a non-null `!` in reader declarations are stripped', async () => {
+	const source = await renderDataSource('ambiguousTone', AMBIGUOUS_MODULE_SOURCE);
+
+	expect(source).toContain('const LOUD = WIDTH + 1;');
+	expect(source).toContain('const FORCED = BOX.n;');
+	expect(source).not.toContain('as Limit');
+	expect(source).not.toContain('BOX.n!');
+});
+
+test('the fragment stripper reads each shape as TypeScript, not as JavaScript', async () => {
+	const at = 'virtual:markless:render-data:probe';
+
+	expect(await stripEmittedTypesFromFragment('const CAP = pick<Limit>(WIDTH);', at)).toBe(
+		'const CAP = pick(WIDTH);',
+	);
+	expect(await stripEmittedTypesFromFragment('const LOUD = (WIDTH as Limit) + 1;', at)).toBe(
+		'const LOUD = WIDTH + 1;',
+	);
+	expect(await stripEmittedTypesFromFragment('const FORCED = BOX.n!;', at)).toBe(
+		'const FORCED = BOX.n;',
+	);
+});
+
+test('a fragment with no TypeScript comes back byte-identical, spacing and all', async () => {
+	const at = 'virtual:markless:render-data:probe';
+	const untouched = [
+		"const TONES = { calm: 'Calm', loud: 'Loud' };",
+		'const  spaced   =  1 ;',
+		'import { pick } from "./pick.js";',
+		'function pick(value) {\n    return value;\n}',
+	];
+
+	for (const fragment of untouched) {
+		expect(await stripEmittedTypesFromFragment(fragment, at)).toBe(fragment);
+	}
+	expect(await stripEmittedTypesFromFragment('import { pick } from "./pick.js";', at, true)).toBe(
+		'import { pick } from "./pick.js";',
+	);
 });

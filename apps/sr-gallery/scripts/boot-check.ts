@@ -26,8 +26,9 @@
 
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { chromium, type Page } from '@playwright/test';
+import { chromium, type Locator, type Page } from '@playwright/test';
 import { FAMILY_ANCHORS, PREVIEW_ORIGIN, type FamilyName } from '../preview-server.ts';
+import { anchorTableDrift } from './anchor-table.ts';
 
 type AriaRole = Parameters<Page['getByRole']>[0];
 
@@ -43,6 +44,7 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	// the DOM whether or not the trigger has been pressed.
 	modal: 'dialog',
 	'radio-group': 'radiogroup',
+	'rating-group': 'radiogroup',
 	tabs: 'tablist',
 	// Closed hides the surface but never detaches it, so the dialog role is in the
 	// DOM before the trigger is pressed.
@@ -79,6 +81,13 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	colorpicker: 'slider',
 	// The group is a role="group" div; its items are the real buttons.
 	buttongroup: 'button',
+	// Each editable root is a role="group"; the preview button and the field it
+	// swaps with are both always in the DOM, so the group is what counts a shape.
+	editable: 'group',
+	// Each taglist root is a role="group" and the chips inside carry no collection
+	// role at all, so the group is the only thing a shape puts in the tree
+	// whether or not it mounts a field.
+	taglist: 'group',
 	// A real text input and no role of its own; the submitted field beside it is a
 	// second, aria-hidden one, which includeHidden counts too.
 	numberbox: 'textbox',
@@ -125,12 +134,29 @@ const RENDERED_COUNT: Partial<Record<FamilyName, number>> = {
 	// The plain drawer, the snapped one, and the nested pair: a count catches a
 	// nested inner root that never became a widget instance of its own.
 	drawer: 4,
+	// The plain rating, the half-value one and the read-only aggregate: a count
+	// catches a section that rendered the starter and lost the other two shapes.
+	'rating-group': 3,
+	// The starter, the double-click one and the read-only one: a count catches a
+	// section that rendered the starter and lost the other two shapes.
+	editable: 3,
+	// The tags input, the display-only filter row and the editable one: a count
+	// catches a section that rendered the starter and lost the other two shapes.
+	taglist: 3,
 };
 
 const appDir = fileURLToPath(new URL('..', import.meta.url));
 const BOOT_TIMEOUT_MS = 120_000;
 const POLL_INTERVAL_MS = 250;
 const PREWARM_TIMEOUT_MS = 600_000;
+
+// Cheap and server-free, so it runs before anything is spawned.
+const drift = await anchorTableDrift();
+if (drift !== null) {
+	console.error(`::error::${drift}`);
+	process.exit(1);
+}
+console.log('apps/sr-gallery/README.md lists the anchors this server serves.');
 
 // A squatter on the port would answer waitForBoot for a server that never
 // bound, so the check would read someone else's tree and go green. Probe
@@ -689,6 +715,132 @@ async function main() {
 				);
 			} else {
 				console.log('#drawer serves the trigger announced as holding a dialog.');
+			}
+		}
+
+		// The role count above says three groups rendered. What a reader lane then
+		// turns on is that a group is named by its label part, that every position
+		// is a stop of its own rather than one control carrying a number, and that
+		// the read-only aggregate still reads its value back.
+		const rating = page.locator('#rating-group [role="radiogroup"]').first();
+		const ratingLabelledBy = await rating.getAttribute('aria-labelledby');
+		if (ratingLabelledBy === null) {
+			failures.push('#rating-group\'s group points at no label through aria-labelledby.');
+		} else {
+			const title = await page.locator(`[id="${ratingLabelledBy}"]`).textContent();
+			if (title?.trim() !== 'Overall rating') {
+				failures.push(
+					`#rating-group's aria-labelledby reaches "${title?.trim()}", not its label part.`,
+				);
+			} else {
+				console.log('#rating-group serves a group named by its label part.');
+			}
+		}
+
+		const marks = page.locator('#rating-group [role="radio"]');
+		if ((await marks.count()) !== 15) {
+			failures.push(
+				`#rating-group serves ${await marks.count()} role="radio" marks, not the 15 its three groups of five need.`,
+			);
+		} else {
+			console.log('#rating-group serves five marks per group.');
+		}
+
+		const readOnly = page.locator('#rating-group [role="radiogroup"][aria-readonly="true"]');
+		if ((await readOnly.count()) !== 1) {
+			failures.push(
+				`#rating-group serves ${await readOnly.count()} groups reading aria-readonly="true", not the 1 its aggregate needs.`,
+			);
+		} else {
+			const readout = await readOnly.locator('output').textContent();
+			if (readout?.trim() !== '4.5 of 5') {
+				failures.push(
+					`#rating-group's read-only group reads back "${readout?.trim()}", not "4.5 of 5".`,
+				);
+			} else {
+				console.log('#rating-group\'s read-only group reads its value back as "4.5 of 5".');
+			}
+		}
+
+		// The role count above says three shapes rendered. What a reader lane then
+		// turns on is that a row carrying no collection role is still navigable:
+		// the group is named by its label part, each tag's own words reach a
+		// person through the button that removes it, and the live region that
+		// speaks every add and removal is mounted per shape.
+		const taglistSection = page.locator('#taglist');
+		const taglistGroup = taglistSection.getByRole('group').first();
+		const taglistLabelledBy = await taglistGroup.getAttribute('aria-labelledby');
+		if (taglistLabelledBy === null) {
+			failures.push('#taglist\'s group points at no label through aria-labelledby.');
+		} else {
+			const title = await page.locator(`[id="${taglistLabelledBy}"]`).textContent();
+			if (title?.trim() !== 'Topics') {
+				failures.push(
+					`#taglist's aria-labelledby reaches "${title?.trim()}", not its label part.`,
+				);
+			} else {
+				console.log('#taglist serves a group named by its label part.');
+			}
+		}
+
+		for (const tag of ['alpha', 'beta']) {
+			const remove = taglistSection.getByRole('button', { name: `Remove ${tag}` });
+			if ((await remove.count()) !== 1) {
+				failures.push(
+					`#taglist serves ${await remove.count()} buttons named "Remove ${tag}", not the 1 that carries the tag's own words.`,
+				);
+			} else {
+				console.log(`#taglist names its delete button "Remove ${tag}".`);
+			}
+		}
+
+		const spokenTags = taglistSection.locator('output[aria-live="polite"]');
+		if ((await spokenTags.count()) !== 3) {
+			failures.push(
+				`#taglist serves ${await spokenTags.count()} live regions, not the 3 its three shapes need to speak a change.`,
+			);
+		} else {
+			console.log('#taglist mounts the live region that speaks a change, one per shape.');
+		}
+
+		// The role count above says three shapes rendered. What a reader lane then
+		// turns on is that the preview carries the value's own words, that
+		// activating it puts a real field in the same room, and that Enter puts the
+		// new words back on the preview. These rows run last because the commit
+		// changes the value the page is serving.
+		const showed = async (target: Locator) => {
+			try {
+				await target.waitFor({ state: 'visible', timeout: 5_000 });
+				return true;
+			} catch {
+				return false;
+			}
+		};
+
+		const editableSection = page.locator('#editable');
+		const preview = editableSection.getByRole('button', { name: 'Quarterly plan' });
+		if ((await preview.count()) !== 1) {
+			failures.push(
+				`#editable serves ${await preview.count()} preview buttons reading "Quarterly plan", not the 1 its starter needs.`,
+			);
+		} else {
+			console.log('#editable serves a preview button named by the value it holds.');
+
+			await preview.click();
+			const field = editableSection.getByRole('textbox', { name: 'Document name' });
+			if (!(await showed(field))) {
+				failures.push('#editable reveals no field named "Document name" when its preview is pressed.');
+			} else {
+				console.log('#editable opens a session on the field its label names.');
+
+				await field.fill('Annual plan');
+				await field.press('Enter');
+				const committed = editableSection.getByRole('button', { name: 'Annual plan' });
+				if (!(await showed(committed))) {
+					failures.push('#editable does not put the committed words back on its preview when Enter closes the session.');
+				} else {
+					console.log('#editable commits on Enter and reads the new words back on its preview.');
+				}
 			}
 		}
 

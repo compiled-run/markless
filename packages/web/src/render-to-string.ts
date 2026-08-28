@@ -27,6 +27,7 @@ import {
 	type PrerenderBootArtifact,
 } from './inline/resumer.ts';
 import { prepareSsrResumeRecords } from './prerender/records.ts';
+import { marklessSsrRosterPositionContext } from './fns/roster-position.ts';
 import { derivePrerenderResumeRecords } from './prerender/evaluator.ts';
 
 export { prepareSsrResumeRecords } from './prerender/records.ts';
@@ -312,16 +313,19 @@ export async function renderSsrOutput(
 	renderContext: unknown,
 ): Promise<SsrRenderOutput> {
 	assertPageRenderable(component);
+	// One position counter per render, minted here because this is the one place
+	// a served page's render context is made.
+	const context = marklessSsrRosterPositionContext(renderContext);
 	if (typeof component === 'function') {
 		return (component as (props?: unknown, renderContext?: unknown) => SsrRenderOutput)(
 			props,
-			renderContext,
+			context,
 		);
 	}
 	if (component && typeof component.renderSsr === 'function') {
 		return (
 			component.renderSsr as (props?: unknown, renderContext?: unknown) => SsrRenderOutput
-		)(props, renderContext);
+		)(props, context);
 	}
 	throw new TypeError('renderToString(App) requires a compiled TSRX artifact.');
 }

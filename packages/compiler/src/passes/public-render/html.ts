@@ -1,4 +1,5 @@
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
+import { stripAuthoredExpression } from './authored-strip.ts';
 import { resolveBoundaryRunners } from './boundary-runner.ts';
 
 // Retained only as a type-compatible import for dead component-wiring helpers;
@@ -76,7 +77,11 @@ export function collectSsrAsyncRunnerDefinitions(
 						[
 							symbol.graphNodeId,
 							{
-								source: ssrAsyncRunnerSource(symbol, registeredGraphNodeIds),
+								source: ssrAsyncRunnerSource(
+										symbol,
+										registeredGraphNodeIds,
+										input.source.filename,
+									),
 								dependencies: (
 									computedByGraphNode.get(symbol.graphNodeId)?.dependencies ?? []
 								)
@@ -99,6 +104,7 @@ function ssrAsyncRunnerSource(
 		{ readonly kind: 'async-computed-runner' | 'sync-computed-derive' }
 	>,
 	registeredGraphNodeIds: ReadonlySet<string>,
+	filename: string,
 ): string {
 	// One local per read root. A dependency whose node sits BELOW that root (a
 	// shared instance's `allChecked` resolves to the computed itself) contributes
@@ -128,11 +134,15 @@ function ssrAsyncRunnerSource(
 		const spread = entry.root ? [`...${entry.root}`] : [];
 		return [`const ${name}={${[...spread, ...members].join(',')}};`];
 	});
+	const authored = stripAuthoredExpression(symbol.source, {
+		filename,
+		what: 'a computed runner carried into the SSR module',
+	});
 	if (symbol.kind === 'sync-computed-derive') {
-		return `({read})=>{${declarations.join('')}const derive=${symbol.source};return derive()}`;
+		return `({read})=>{${declarations.join('')}const derive=${authored};return derive()}`;
 	}
-	if (declarations.length === 0) return symbol.source;
-	return `({key,signal,read})=>{${declarations.join('')}const run=${symbol.source};return run({key,signal,read})}`;
+	if (declarations.length === 0) return authored;
+	return `({key,signal,read})=>{${declarations.join('')}const run=${authored};return run({key,signal,read})}`;
 }
 
 // A shared() computed lives in the factory, so SSR has no render-body local to
@@ -151,7 +161,10 @@ export function collectSsrSharedComputedSources(
 		input.symbolResolver.symbols.flatMap((symbol) =>
 			symbol.kind === 'sync-computed-derive' && sharedGraphNodeIds.has(symbol.graphNodeId)
 				? ([
-						[symbol.graphNodeId, ssrAsyncRunnerSource(symbol, sharedGraphNodeIds)],
+						[
+							symbol.graphNodeId,
+							ssrAsyncRunnerSource(symbol, sharedGraphNodeIds, input.source.filename),
+						],
 					] as const)
 				: [],
 		),
@@ -183,7 +196,10 @@ export function collectSsrTemplateComputedSources(
 				sharedGraphNodeIds.has(dependency.graphNodeId),
 			)
 				? ([
-						[symbol.graphNodeId, ssrAsyncRunnerSource(symbol, sharedGraphNodeIds)],
+						[
+							symbol.graphNodeId,
+							ssrAsyncRunnerSource(symbol, sharedGraphNodeIds, input.source.filename),
+						],
 					] as const)
 				: [],
 		),

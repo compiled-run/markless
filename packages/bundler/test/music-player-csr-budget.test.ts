@@ -1,7 +1,8 @@
 import { readFile, rm } from 'node:fs/promises';
 import { resolve } from 'pathe';
-import { beforeAll, expect, test } from 'vitest';
+import { afterAll, beforeAll, expect, test } from 'vitest';
 import { MARKLESS_BUILD_PREFIX } from '../src/build/chunking.ts';
+import { acquireDemoBuildLock, releaseDemoBuildLock } from './helpers/demo-build-lock.ts';
 import {
 	chunkName,
 	createStageLadder,
@@ -90,7 +91,18 @@ const STAGE_ANCHORS = {
 	// 1,053 B the qualifier move recovered from the fixtures' largest runtime chunk
 	// does NOT come back here - splitting one eager chunk into two eager chunks
 	// costs this stage a little rather than saving it.
-	'page-load download': { gzipBytes: 136_775, margin: 128 },
+	// 136,775 -> 137,128 (+353, render-order ordinals), by revert-measurement on
+	// this tree: 136,700 with the change set out, 137,053 with it in, 108 eager
+	// chunks BOTH ways. Nothing regrouped, so all of it is code in chunks this
+	// lane already preloads, at the three sites the SSR wall's entry names - the
+	// locator registry's extra element-handle key, and the two reads of the
+	// live-roster loader. The roster module itself is absent from this build:
+	// the loader specifier is written only for a payload with computed nodes and
+	// this demo has none, which is why the chunk count did not move. The
+	// per-site split is not restated here because it was measured on the SSR
+	// lane, not this one; this lane prices the same source delta higher because
+	// it modulepreloads nearly every chunk it emits.
+	'page-load download': { gzipBytes: 137_128, margin: 128 },
 	'page-load execute': { gzipBytes: 14_221, margin: 128 },
 	'interaction 1 marginal': { gzipBytes: 2_416, margin: 32 },
 	'interaction 2 marginal': { gzipBytes: 2_705, margin: 32 },
@@ -99,9 +111,15 @@ const STAGE_ANCHORS = {
 
 let measured: BudgetMeasurement;
 
+// build-determinism.test.ts builds this same demo into this same dist/, and
+// vitest runs the two files in parallel workers. The lock spans the whole file
+// because the last test reads dist/index.html long after the build.
 beforeAll(async () => {
+	await acquireDemoBuildLock(demo);
 	measured = await measureBuiltDemo();
 }, 240_000);
+
+afterAll(() => releaseDemoBuildLock(demo));
 
 test('music-player CSR production build holds every staged budget', () => {
 	expect(measured.stages.length, 'staged measurement must produce stages').toBe(

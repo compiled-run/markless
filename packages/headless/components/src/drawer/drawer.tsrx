@@ -18,8 +18,10 @@ import {
 import {
 	activeSnapOf,
 	axisAt,
+	CLOSE_THRESHOLD,
 	closeSign,
 	decideRelease,
+	DEFAULT_SNAP_POINTS,
 	hiddenDuringDrag,
 	isRightToLeft,
 	keyIntent,
@@ -48,11 +50,8 @@ export const drawerState = shared(
 			modal: true,
 			orientation: 'vertical' as DrawerOrientation,
 			start: false,
-			// Written out rather than read from `drawer-swipe.ts`: a `state()` seed
-			// is lowered into a symbol module of its own, where an imported binding
-			// is not in scope. The root's own defaults are the ones consumers meet.
-			snapPoints: [1],
-			closeThreshold: 0.25,
+			snapPoints: DEFAULT_SNAP_POINTS,
+			closeThreshold: CLOSE_THRESHOLD,
 			given: undefined,
 			seed: undefined,
 			own: undefined,
@@ -279,12 +278,10 @@ export function DrawerRoot({
 	modal = true,
 	orientation = 'vertical',
 	start = false,
-	snapPoints = [1],
+	snapPoints = DEFAULT_SNAP_POINTS,
 	snapPoint,
 	defaultSnapPoint,
-	// 0.25 is `CLOSE_THRESHOLD` in `drawer-swipe.ts`, written out because a prop
-	// default is lowered into a symbol module where an import is not in scope.
-	closeThreshold = 0.25,
+	closeThreshold = CLOSE_THRESHOLD,
 	onChange,
 	onSnapPointChange,
 	children,

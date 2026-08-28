@@ -133,7 +133,7 @@ export function finalizeComputedDependencies(state: WalkState): void {
  * one binding; the derive body sits lexically inside exactly one component, and
  * `componentId` carries that component's span.
  */
-function pendingDeriveOwner(
+export function pendingDeriveOwner(
 	pending: { readonly graphNodeId: string; readonly body: AnyNode | undefined },
 	state: WalkState,
 ): SemanticGraphBinding | undefined {

@@ -1,10 +1,10 @@
-import { element, shared, state } from '@markless/core';
-import { orderedRoster, stampPositions } from './ic-order.ts';
+import { computed, element, shared, state } from '@markless/core';
+import { orderedRoster, readPositions } from './ic-order.ts';
 
 // A widget family reduced to the one thing under test: a root and a repeated
-// part whose position is the family's own business. No part takes an index prop,
-// and `survey()` is a handler because a handler is the only place an element()
-// roster can be read - which is exactly the gap the suite beside this pins.
+// part whose position is the family's own business. No part takes an index
+// prop - the item asks the family's roster where it stands, and `survey()`
+// walks the same roster from a handler so the two readings can be compared.
 export const ic = shared(
 	() => {
 		const s = state({ seen: 'unread', count: 0 });
@@ -13,11 +13,11 @@ export const ic = shared(
 		return {
 			...s,
 			itemEls,
-			/** Walk the roster and stamp every item with its place in this instance. */
+			/** Report what the roster holds, in this instance's document order. */
 			survey() {
 				const bound = itemEls;
 				const roster = orderedRoster(bound);
-				s.seen = stampPositions(roster);
+				s.seen = readPositions(roster);
 				s.count = roster.length;
 			},
 		};
@@ -40,6 +40,8 @@ export function IcRoot({ children }) @{
 
 export function IcItem({ children }) @{
 	const w = ic();
+	const mine = element<HTMLDivElement>();
+	const pos = computed(() => w.itemEls.indexOf(mine as HTMLDivElement));
 
-	<div data-ic-item el={w.itemEls}>{children}</div>
+	<div data-ic-item el={[w.itemEls, mine]} ui-pos={pos}>{children}</div>
 }

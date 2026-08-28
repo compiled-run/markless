@@ -13,12 +13,11 @@ export function orderedRoster(items: unknown): HTMLElement[] {
 	});
 }
 
-/** Stamp each item with its place in the roster and report what was stamped. */
-export function stampPositions(items: readonly HTMLElement[]): string {
-	const places: string[] = [];
-	for (let at = 0; at < items.length; at += 1) {
-		items[at]?.setAttribute('ui-pos', `${at}`);
-		places.push(`${at}`);
-	}
-	return places.join(',');
+/**
+ * The places the roster holds, reported and never written: `ui-pos` is the
+ * family's own derived attribute, so a handler that stamped it would hide
+ * whether the derivation answered.
+ */
+export function readPositions(items: readonly HTMLElement[]): string {
+	return items.map((_one, at) => `${at}`).join(',');
 }

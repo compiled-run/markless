@@ -641,6 +641,39 @@ export function marklessEnclosingWidgetRoots(
 	return roots;
 }
 
+/**
+ * The same roots, asked of where the rows physically STAND.
+ *
+ * A repeat authored outside a widget and projected into it - a consumer's `@for`
+ * inside a family root's children - iterates a collection the widget never owns,
+ * so the collection's instance path is page space and the anchor walk above
+ * answers nothing. The rendered widget is still real: the live hosts around the
+ * repeat carry its root path, which is the same instance the server resolved the
+ * served rows' parts through. Deepest root wins, so a nested widget answers with
+ * its own.
+ */
+export function marklessWidgetRootsAroundPaths(
+	registry: MarklessWidgetRegistry,
+	instancePaths: ReadonlySet<string>,
+): ReadonlyMap<string, string> {
+	const roots = new Map<string, string>();
+	if (instancePaths.size === 0) return roots;
+	for (const [id, rootPath] of registry.rootPaths) {
+		if (!rootPath) continue;
+		let encloses = false;
+		for (const path of instancePaths)
+			if (path.startsWith(rootPath)) {
+				encloses = true;
+				break;
+			}
+		if (!encloses) continue;
+		const definitionId = id.slice(marklessInstancePath(id).length);
+		const held = roots.get(definitionId);
+		if (held === undefined || rootPath.length > held.length) roots.set(definitionId, rootPath);
+	}
+	return roots;
+}
+
 export function marklessWithEnclosingWidgetRoots<T>(
 	rowSegment: string,
 	roots: ReadonlyMap<string, string> | undefined,

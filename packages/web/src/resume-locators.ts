@@ -39,6 +39,7 @@ export function materializeDomLocators(
 // for the reason fns/instance-scope.ts restates the serializer's grammar: the
 // lean resume chunk strips one prefix rather than taking an import edge for it.
 const HANDLE_INSTANCE_PATH = /^(?:[cp]\d+:|r:[^:]*:)+(?=shared:)/;
+const ROW_SEGMENT = /r:[^:]*:/g;
 
 /**
  * One element per key, and a loud refusal when a key names more than one.
@@ -109,9 +110,10 @@ export function materializeElementHandles(
 				unfile(held[index]!);
 				held.splice(index, 1);
 			}
-		const keys = [
-			...new Set([handleId, handleId.replace(HANDLE_INSTANCE_PATH, ''), handle.name]),
-		];
+		// A component-local handle id names no instance; its host's rows do.
+		const rows = hostNodeId.match(ROW_SEGMENT)?.join('') ?? '';
+		const bare = handleId.replace(HANDLE_INSTANCE_PATH, '');
+		const keys = [...new Set([handleId, bare, handle.name, rows + handleId])];
 		// An array handle declares its plural-ness on the record, never on the key,
 		// so a key minted here inherits it from the id it was minted from.
 		if (pluralKeys.has(handle.handleId)) for (const key of keys) pluralKeys.add(key);

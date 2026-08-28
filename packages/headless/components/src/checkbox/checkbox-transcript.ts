@@ -5,6 +5,7 @@ import {
 	type Conveys,
 	type ScreenReaderDriver,
 } from '../../test-support/driver.ts';
+import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
 
 /**
  * Expectations are `Conveys` facts rather than any reader's wording, so this file
@@ -46,7 +47,8 @@ export async function readCheckboxTranscript(
 	sr: ScreenReaderDriver,
 	options: { readonly changeTimeoutMs: number },
 ) {
-	const announcement = await readUntil(sr, { role: 'checkbox' });
+	// Named, not merely a checkbox: the gallery's checklist section serves four more.
+	const announcement = await readUntil(sr, { role: 'checkbox', name: BOX }, GALLERY_WALK_LIMIT);
 	expect(
 		missingFacts(sr, announcement, unchecked),
 		`${sr.name} announced "${announcement}"`,

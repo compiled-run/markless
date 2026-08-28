@@ -313,6 +313,13 @@ export function emitSourceModule(input: {
 					'installMarklessDerivedReconcile();',
 				].join('\n')
 			: null,
+		// Same split for the live roster: a CSR mount reaches the runtime's start
+		// through THIS module, so without the loader here a row added after mount
+		// would never be renumbered. The line is page-agnostic, so a resumed page
+		// writing it twice is the same assignment.
+		input.environment === 'client' && input.hasComputedState === true
+			? emitRosterResumeLoaderInstall()
+			: null,
 		// Same split for elevation, and for the same reason: a CSR mount reaches the
 		// runtime's start without ever loading a resume module, so a marked CSR app
 		// has to name the behaviour here or it would never install.
@@ -469,6 +476,18 @@ function emitOverlayLoaderInstall(): string {
 		"\t\t? import('@markless/web/fns/overlay').then((m) => m.installOverlayBehavior(root))",
 		'\t\t: undefined;',
 	].join('\n');
+}
+
+/**
+ * The same one line for the live roster, gated on the same fact the reconcile
+ * plane is gated on: a payload with no computed nodes can hold no roster
+ * derivation, so it never names the module and never emits its chunk.
+ *
+ * Both call sites (the start-up wiring and a sync computed's re-derive) sit in
+ * modules every resumed page runs, which is why neither may write the specifier.
+ */
+function emitRosterResumeLoaderInstall(): string {
+	return "globalThis.__marklessRosterResume ??= () => import('@markless/web/fns/roster-resume');";
 }
 
 /**
@@ -657,6 +676,7 @@ export function emitResumeModule(input: {
 			? [
 					"import { installMarklessDerivedReconcile } from '@markless/web/fns/reconcile-plane';",
 					'installMarklessDerivedReconcile();',
+					emitRosterResumeLoaderInstall(),
 				].join('\n')
 			: null,
 		// Elevation is pay-per-use the same way, but one step further: this module

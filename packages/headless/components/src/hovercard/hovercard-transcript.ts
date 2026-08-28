@@ -6,6 +6,7 @@ import {
 	type Conveys,
 	type ScreenReaderDriver,
 } from '../../test-support/driver.ts';
+import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
 
 /**
  * Expectations are `Conveys` facts rather than any reader's wording, so this file
@@ -23,9 +24,6 @@ import {
  * announcement, or where the card lands on screen.
  */
 
-// The hovercard section is the last on the gallery page, so a walk that starts
-// at the top of the document needs more steps than any other family's.
-const WALK_LIMIT = 340;
 // The gallery runs the family's real defaults, so opening waits out `delay`
 // (700ms) on top of whatever the reader and the runner cost.
 const CHANGE_TIMEOUT_MS = 15_000;
@@ -68,7 +66,7 @@ export async function readHovercardTranscript(sr: ScreenReaderDriver, page: Page
 	// than passing on a locator that matched nothing.
 	const inCard = section.getByRole('link', { name: CARD_LINK, includeHidden: true });
 
-	expectConveys(sr, await readUntil(sr, collapsedTrigger, WALK_LIMIT), collapsedTrigger);
+	expectConveys(sr, await readUntil(sr, collapsedTrigger, GALLERY_WALK_LIMIT), collapsedTrigger);
 
 	// Focus rather than the reading cursor, and for the same reason datebox uses
 	// it: a reading cursor standing on the link is not the browser's focus, and

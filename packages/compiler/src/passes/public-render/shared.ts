@@ -1,5 +1,6 @@
 import { parseModule } from '../../js-ast.ts';
 import { createSourceMemo, ownedModuleAst } from '../semantic-graph/shared-ast.ts';
+import { valueModuleImports } from '../semantic-graph/imports.ts';
 import {
 	deserializeGraphValue,
 	jsonSourceWithNonFiniteNumbers,
@@ -8,6 +9,7 @@ import {
 import type { PublicRenderModuleInput, SemanticModuleImport } from '../../artifacts.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
+import { strippedExpressionSource } from './authored-strip.ts';
 import {
 	getComponentFunction,
 	getDynamicTagExpression,
@@ -310,6 +312,7 @@ export function destructureProps(
 	propNames: ReadonlyArray<string>,
 	component: AnyNode | undefined,
 	source: string,
+	filename = 'module.tsrx',
 ): string | null {
 	if (propNames.length === 0) return null;
 	const param = component ? asNodes(component.params)[0] : undefined;
@@ -331,7 +334,10 @@ export function destructureProps(
 		const fallback = getIdentifierName(local) ?? getIdentifierName(key);
 		if (!fallback) return [];
 		const defaultSource = pattern?.right
-			? ` = ${expressionSource(pattern.right as AnyNode, source)}`
+			? ` = ${strippedExpressionSource(pattern.right as AnyNode, source, {
+					filename,
+					what: "a prop's authored default",
+				})}`
 			: '';
 		if (
 			property.type === 'Property' &&
@@ -618,7 +624,7 @@ export function publicRenderValueImports(
 	moduleScopeSource = '',
 ): ReadonlyArray<SemanticModuleImport> {
 	const componentLocalNames = new Set(componentEdges.map((edge) => edge.childComponentName));
-	return moduleImports.filter(
+	return valueModuleImports(moduleImports).filter(
 		(moduleImport) =>
 			!componentLocalNames.has(moduleImport.localName) ||
 			referencesIdentifier(moduleScopeSource, moduleImport.localName),

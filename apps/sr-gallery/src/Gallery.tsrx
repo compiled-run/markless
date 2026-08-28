@@ -9,6 +9,7 @@ import {
 	crop,
 	datebox,
 	drawer,
+	editable,
 	fileupload,
 	hovercard,
 	ink,
@@ -20,9 +21,11 @@ import {
 	popover,
 	progress,
 	radiogroup,
+	ratinggroup,
 	select,
 	slider,
 	tabs,
+	taglist,
 	textbox,
 	toggle,
 	toolbar,
@@ -33,9 +36,9 @@ import {
 // Every shipped family's Basic scenario - the starter a consumer copies - on one
 // page, each in a section a reader can jump to by its anchor: /#checkbox,
 // /#toggle, /#textbox, /#progress, /#checklist, /#select, /#modal,
-// /#radio-group, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
+// /#radio-group, /#rating-group, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
 // /#fileupload, /#hovercard, /#calendar, /#menu, /#menubar, /#colorpicker,
-// /#buttongroup, /#numberbox, /#ink, /#pad, /#crop, /#tour, /#toolbar, /#drawer. A family whose
+// /#buttongroup, /#editable, /#taglist, /#numberbox, /#ink, /#pad, /#crop, /#tour, /#toolbar, /#drawer. A family whose
 // second shape a reader announces differently gets its own section too: /#slider-range,
 // /#numberbox-min-max-step, /#numberbox-currency, /#crop-image.
 //
@@ -186,6 +189,36 @@ export function Gallery() @{
 						<radiogroup.itemlabel>Lifetime</radiogroup.itemlabel>
 					</radiogroup.item>
 				</radiogroup.root>
+			</div>
+		</section>
+
+		<section id="rating-group">
+			<h2>Rating group</h2>
+			{/* Already rated, because the claim the real readers settle here is that a fill covering three marks is still one checked radio and four unchecked ones. */}
+			<div class="scenario">
+				<ratinggroup.root defaultValue={3}>
+					<ratinggroup.label>Overall rating</ratinggroup.label>
+					<RatingMarks />
+					<ratinggroup.valuelabel />
+				</ratinggroup.root>
+			</div>
+
+			{/* Half values: the near half of a mark is worth half of it. */}
+			<div class="scenario">
+				<ratinggroup.root half defaultValue={2.5}>
+					<ratinggroup.label>Cleanliness</ratinggroup.label>
+					<RatingMarks />
+					<ratinggroup.valuelabel />
+				</ratinggroup.root>
+			</div>
+
+			{/* The display-only aggregate: still a rating a reader can read, and nothing a person does changes it. */}
+			<div class="scenario">
+				<ratinggroup.root readonly half value={4.5}>
+					<ratinggroup.label>Average guest rating</ratinggroup.label>
+					<RatingMarks />
+					<ratinggroup.valuelabel />
+				</ratinggroup.root>
 			</div>
 		</section>
 
@@ -394,6 +427,55 @@ export function Gallery() @{
 					<buttongroup.item value="center">Center</buttongroup.item>
 					<buttongroup.item value="right">Right</buttongroup.item>
 				</buttongroup.root>
+			</div>
+		</section>
+
+		{/* After #buttongroup on purpose: the buttongroup transcript walks to the first role="group" on the page by role alone, and an editable root is a role="group" too. */}
+		<section id="editable">
+			<h2>Editable</h2>
+			<div class="scenario">
+				<editable.root name="title" defaultValue="Quarterly plan">
+					<editable.label>Document name</editable.label>
+					<editable.trigger />
+					<editable.input />
+					<editable.field />
+				</editable.root>
+			</div>
+
+			{/* Two clicks open this one; Enter and Space on the preview still do, because a gesture only a mouse can make is not a keyboard-operable control. */}
+			<div class="scenario">
+				<editable.root editOnDoubleClick defaultValue="notes.md">
+					<editable.label>File name</editable.label>
+					<editable.trigger />
+					<editable.input />
+				</editable.root>
+			</div>
+
+			{/* Read-only: still focusable and still readable, and no gesture opens a session. */}
+			<div class="scenario">
+				<editable.root readonly defaultValue="published">
+					<editable.label>Published name</editable.label>
+					<editable.trigger />
+					<editable.input />
+				</editable.root>
+			</div>
+		</section>
+
+		{/* After #buttongroup for the reason #editable carries: a taglist root is a role="group" too, and NVDA says "grouping" for a radiogroup as well, so a section of groups before #radio-group would end that lane's walk on the wrong widget. */}
+		<section id="taglist">
+			<h2>Tag list</h2>
+			<div class="scenario">
+				<TopicTags />
+			</div>
+
+			{/* No field at all: nothing here adds a tag, and the delete buttons are still ordinary tab stops carrying the whole arrow walk. */}
+			<div class="scenario">
+				<FilterTags />
+			</div>
+
+			{/* Per-tag inline edit, opt in: Enter on a highlighted tag opens its own field, F2 opens the tag that has focus. */}
+			<div class="scenario">
+				<StageTags />
 			</div>
 		</section>
 
@@ -692,6 +774,21 @@ function TourSection() @{
 	</div>
 }
 
+// The marks are the consumer's own markup and sit inside the root, for the reason
+// the month below carries. A construct may not be the direct child of a component
+// tag either, so the repeat opens in a plain element.
+function RatingMarks() @{
+	const rating = ratinggroup.state();
+
+	<div>
+		@for (const position of rating.positions; key position) {
+			<ratinggroup.item value={position}>
+				<span aria-hidden="true">★</span>
+			</ratinggroup.item>
+		}
+	</div>
+}
+
 // The month is the consumer's own markup and sits inside the root, for the reason
 // the file rows below carry: a component that reads the calendar's state is a
 // part of that calendar's widget.
@@ -731,6 +828,79 @@ function FileRows() @{
 			</fileupload.item>
 		}
 	</div>
+}
+
+// The chips are the page's own markup over the page's own array, repeated inside
+// the root. The array lives on a state OBJECT rather than a reassigned binding,
+// because a repeat follows a property write; a construct may not be a component
+// tag's direct child either, which is why the repeat opens in a plain element.
+function TopicTags() @{
+	const own = state({ tags: ['alpha', 'beta'] as readonly string[] });
+
+	<taglist.root
+		name="topics"
+		value={own.tags}
+		onChange={(next: readonly string[]) => {
+			own.tags = next;
+		}}
+	>
+		<taglist.label>Topics</taglist.label>
+		<div role="presentation">
+			@for (const tag of own.tags; key tag) {
+				<taglist.item value={tag}>
+					<taglist.itemlabel />
+					<taglist.itemclose>×</taglist.itemclose>
+				</taglist.item>
+			}
+		</div>
+		<taglist.input placeholder="Add a topic" />
+		<taglist.field />
+	</taglist.root>
+}
+
+function FilterTags() @{
+	const own = state({ tags: ['red', 'green', 'blue'] as readonly string[] });
+
+	<taglist.root
+		value={own.tags}
+		onChange={(next: readonly string[]) => {
+			own.tags = next;
+		}}
+	>
+		<taglist.label>Active filters</taglist.label>
+		<div role="presentation">
+			@for (const tag of own.tags; key tag) {
+				<taglist.item value={tag}>
+					<taglist.itemlabel />
+					<taglist.itemclose>×</taglist.itemclose>
+				</taglist.item>
+			}
+		</div>
+	</taglist.root>
+}
+
+function StageTags() @{
+	const own = state({ tags: ['draft', 'review'] as readonly string[] });
+
+	<taglist.root
+		editable
+		value={own.tags}
+		onChange={(next: readonly string[]) => {
+			own.tags = next;
+		}}
+	>
+		<taglist.label>Stages</taglist.label>
+		<div role="presentation">
+			@for (const tag of own.tags; key tag) {
+				<taglist.item value={tag}>
+					<taglist.itemlabel />
+					<taglist.iteminput />
+					<taglist.itemclose>×</taglist.itemclose>
+				</taglist.item>
+			}
+		</div>
+		<taglist.input />
+	</taglist.root>
 }
 
 const SHADOW = [{ id: 'offset', x: 0.25, y: 0.75 }];
