@@ -4,6 +4,7 @@ import {
 	type ProtocolViewPayload,
 } from '@markless/serializer/protocol';
 import { marklessAttributeValue } from './dom-attribute.ts';
+import { marklessControlWriteHeld, marklessNoteControlEdits } from './control-edit-hold.ts';
 import type {
 	DomJournalEntry,
 	DomJournalResult,
@@ -379,6 +380,7 @@ async function dispatchEvent(input: {
 
 	const propagation = trackPropagationStops(input.event);
 	let stopAfterElement: EventResumeDomElement | undefined;
+	const releaseControlEdits = marklessNoteControlEdits(input.event.target);
 	try {
 		for (const matched of path) {
 			if (!matched.element) return;
@@ -392,6 +394,7 @@ async function dispatchEvent(input: {
 		}
 	} finally {
 		propagation.release();
+		releaseControlEdits();
 	}
 }
 
@@ -529,6 +532,7 @@ function applyDomJournalEntry(
 		return;
 	}
 	if (entry.type === 'setProp') {
+		if (marklessControlWriteHeld(target, entry.name, entry.value)) return;
 		(target as Record<string, unknown>)[entry.name] = entry.value;
 	}
 }

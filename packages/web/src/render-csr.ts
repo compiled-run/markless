@@ -9,6 +9,7 @@ import {
 import type { DomJournalEntry } from '@markless/runtime';
 import type { RuntimeGraph } from '@markless/runtime';
 import { marklessAttributeValue } from './dom-attribute.ts';
+import { marklessControlWriteHeld } from './control-edit-hold.ts';
 import type { CsrRenderContainer, CsrRenderOptions, CsrRenderOutput } from './render.ts';
 import { marklessInstanceScopedLoadSymbol } from './fns/instance-scope.ts';
 import {
@@ -558,7 +559,8 @@ async function applyDefaultCsrDomJournal(
 			const target = runtime.getElement(String(entry.locator)) as
 				| Record<string, unknown>
 				| undefined;
-			if (target) target[entry.name] = entry.value;
+			if (target && !marklessControlWriteHeld(target, entry.name, entry.value))
+				target[entry.name] = entry.value;
 			continue;
 		}
 		deferred.push(entry);

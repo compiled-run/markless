@@ -1,6 +1,7 @@
 import type { DomJournalEntry } from '@markless/runtime';
 import type { ResumeDomComment, ResumeDomElement, ResumeDomNode } from './resume-types.ts';
 import { marklessAttributeValue } from './dom-attribute.ts';
+import { marklessControlWriteHeld } from './control-edit-hold.ts';
 import { spliceCensus } from './resume-census.ts';
 
 type InsertRangeEntry = Extract<DomJournalEntry, { readonly type: 'insertRange' }>;
@@ -176,6 +177,7 @@ function readAttribute(element: DomJournalApplyTarget, name: string): string | n
 }
 
 function setProp(target: unknown, name: string, value: unknown): void {
+	if (marklessControlWriteHeld(target, name, value)) return;
 	(target as Record<string, unknown>)[name] = value;
 }
 

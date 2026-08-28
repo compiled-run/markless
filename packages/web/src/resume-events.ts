@@ -5,6 +5,7 @@ import {
 	marklessRecordRowScope,
 	marklessRowScopedGraph,
 } from './fns/instance-scope.ts';
+import { marklessNoteControlEdits } from './control-edit-hold.ts';
 import type { OverlayFocusOriginHost } from './overlay-handoff.ts';
 import type {
 	ElementHandleRegistry,
@@ -483,6 +484,7 @@ export function createEventWiring(input: {
 		}
 		const propagation = trackPropagationStops(event);
 		let stopAfterElement: ResumeDomElement | undefined;
+		const releaseControlEdits = marklessNoteControlEdits(target);
 		try {
 			for (const matched of path) {
 				if (stopAfterElement && matched.element !== stopAfterElement) return;
@@ -512,6 +514,7 @@ export function createEventWiring(input: {
 			}
 		} finally {
 			propagation.release();
+			releaseControlEdits();
 		}
 	}
 	async function dispatchViewEvent(
