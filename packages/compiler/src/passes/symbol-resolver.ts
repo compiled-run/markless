@@ -58,7 +58,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 	];
 	// Every handle this module can name, by the graph node state lowering resolves
 	// its reads to. A read that lands here is a handle read, not a state read.
-	const handlesByGraphNodeId = elementHandlesByGraphNodeId(input.payloadArena);
+	const handlesByGraphNodeId = elementHandlesByGraphNodeId(input.payloadArena, input.semanticGraph);
 
 	const handleReadsOf = (reads: ReadonlyArray<LoweredStateRead> | undefined) =>
 		elementHandleReads(reads, handlesByGraphNodeId);
@@ -1030,15 +1030,23 @@ function findModuleImport(
 }
 
 /**
- * Every element() handle this module renders, keyed by the graph node that state
- * lowering resolves a read of it to.
+ * Every element() handle this module can name, keyed by the graph node that
+ * state lowering resolves a read of it to.
  *
  * Handles bound in a keyed row and handles inside an async boundary arm are
  * collected too: a handler in either place still names the same authored handle,
  * and the resume registry answers by the same name.
+ *
+ * A handle a shared() factory DECLARES is admitted whether or not this module
+ * binds it. Binding sites alone are not the right set: a family module can
+ * declare a handle, hand it to parts that live in other modules, and only read
+ * it back in a handler. The registry answers such a handle per instance, so the
+ * read must lower to `getElementHandle` — resolving it against the binding sites
+ * lowered it to `graph.read`, and a handle is not a graph value.
  */
 function elementHandlesByGraphNodeId(
 	payloadArena: SymbolResolverInput['payloadArena'],
+	semanticGraph: SymbolResolverInput['semanticGraph'],
 ): ReadonlyMap<string, { readonly handleId: string; readonly name: string }> {
 	const byGraphNodeId = new Map<string, { handleId: string; name: string }>();
 	for (const handle of [
@@ -1050,6 +1058,11 @@ function elementHandlesByGraphNodeId(
 	]) {
 		if (!byGraphNodeId.has(handle.handleId))
 			byGraphNodeId.set(handle.handleId, { handleId: handle.handleId, name: handle.name });
+	}
+	for (const binding of semanticGraph.graphBindings) {
+		if (binding.kind !== 'element' || binding.sharedDefinitionId === undefined) continue;
+		if (!byGraphNodeId.has(binding.id))
+			byGraphNodeId.set(binding.id, { handleId: binding.id, name: binding.name });
 	}
 	return byGraphNodeId;
 }
