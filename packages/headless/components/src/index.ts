@@ -34,6 +34,7 @@ export * as slider from './slider/index.ts';
 export * as tabs from './tabs/index.ts';
 export * as taglist from './taglist/index.ts';
 export * as textbox from './textbox/index.ts';
+export * as timebox from './timebox/index.ts';
 export * as toaster from './toaster/index.ts';
 export * as toggle from './toggle/index.ts';
 export * as toolbar from './toolbar/index.ts';
