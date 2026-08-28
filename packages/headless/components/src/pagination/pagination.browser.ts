@@ -184,10 +184,9 @@ test('pageRange: the range is seven entries wide at every page of a long count',
 });
 
 function expectBasicRendered() {
-	// The root is a navigation landmark, and a landmark on a page that has several of
-	// them carries a name.
+	// The root is a navigation landmark; naming it is the consumer's.
 	expect(el(Root).tagName).toBe('NAV');
-	expect(el(Root).getAttribute('aria-label')).toBe('Pagination');
+	expect(el(Root).hasAttribute('aria-label')).toBe(false);
 
 	expectOnlyCurrent('itemtrigger-1');
 	// Absent on the other pages, never "false".
@@ -277,9 +276,8 @@ function expectLinksRendered() {
 }
 
 function expectTwoWidgetsRendered() {
-	// Both roots are named navigation landmarks.
 	expect(el(FirstRoot).tagName).toBe('NAV');
-	expect(el(SecondRoot).getAttribute('aria-label')).toBe('Pagination');
+	expect(el(SecondRoot).tagName).toBe('NAV');
 
 	// Two paginations, two pages, no shared cell between them.
 	expect(at('first-itemtrigger-1').getAttribute('aria-current')).toBe('page');
@@ -451,12 +449,7 @@ for (const mode of MODES) {
 		expectClampedRendered();
 	});
 
-	// Expected red: a spread never overwrites an attribute written before it, so
-	// `<nav aria-label="Pagination" {...rest}>` keeps the family's label even when
-	// `rest` carries the consumer's. The family keeps that order because it is what
-	// stops a consumer overwriting aria-current and disabled; what it cannot yet
-	// offer is a REPLACEABLE default, which a second pagination on a page needs.
-	test.fails(`${mode}: a consumer aria-label replaces the default landmark name`, async () => {
+	test(`${mode}: a consumer aria-label names the landmark`, async () => {
 		if (mode === 'CSR') await render(TwoWidgets);
 		else await renderSSR(TwoWidgets);
 		expect(el(FirstRoot).getAttribute('aria-label')).toBe('Reviews pages');

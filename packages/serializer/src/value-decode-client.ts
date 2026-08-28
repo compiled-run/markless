@@ -84,6 +84,7 @@ function decodeSlot(
 	if ('$ref' in slot) return shells.get(slot.$ref);
 	if (slot.$type === 'undefined') return undefined;
 	if (slot.$type === 'bigint') return BigInt(slot.value);
+	if (slot.$type === 'number') return Number(slot.value);
 	if (slot.$type === 'date') return new Date(slot.value);
 	return extensions?.slot(slot);
 }

@@ -117,26 +117,37 @@ function initialValue(
 			: [];
 	}
 	if (binding.kind !== 'state') return [];
-	if (binding.initialValueKnown === true || 'initialValue' in binding) {
-		return [
-			{
-				graphNodeId: binding.id,
-				value: { kind: 'constant', value: binding.initialValue },
-			},
-		];
+	if (binding.initialValueKnown === true || !binding.initializerSource) {
+		return binding.initialValueKnown === true || 'initialValue' in binding
+			? [{ graphNodeId: binding.id, value: { kind: 'constant', value: binding.initialValue } }]
+			: [];
 	}
-	return binding.initializerSource
-		? symbolResolver.symbols.flatMap((symbol) =>
-				symbol.kind === 'state-initializer' && symbol.graphNodeId === binding.id
-					? [
-				{
-					graphNodeId: binding.id,
-					value: { kind: 'symbol-function', symbolId: symbol.id },
-				},
+	// A seed whose properties do not all fold publishes BOTH where a per-instance
+	// write will merge onto it: the folded subset as the constant that write starts
+	// from, and the authored expression beside it for the rest. A shape nobody
+	// writes needs no base, and a constant answering for it would stand in for the
+	// live value every reader of the shape is owed.
+	const folded: RenderDataInitialValue[] =
+		'initialValue' in binding &&
+		symbolResolver.symbols.some(
+			(symbol) => symbol.kind === 'shared-seed' && symbol.graphNodeId === binding.id,
+		)
+			? [{ graphNodeId: binding.id, value: { kind: 'constant', value: binding.initialValue } }]
+			: [];
+
+	return [
+		...folded,
+		...symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'state-initializer' && symbol.graphNodeId === binding.id
+				? [
+						{
+							graphNodeId: binding.id,
+							value: { kind: 'symbol-function' as const, symbolId: symbol.id },
+						},
 					]
-					: [],
-			)
-		: [];
+				: [],
+		),
+	];
 }
 
 function branchRecord(
@@ -297,7 +308,11 @@ function repeatRecord(
 				: [],
 		);
 	});
-	const rowStartOffset = repeatRowStartOffset(chunks, repeat.id);
+	const ownOffset = repeatRowStartOffset(chunks, repeat.id);
+	// A projected repeat counts from inside the child's element, so the elements
+	// the child renders in front of the hole stand in front of the rows too.
+	const rowStartOffset =
+		ownOffset === 'unknown' ? ownOffset : ownOffset + (repeat.projectedElementsBefore ?? 0);
 	const payloadRepeat = payloadArena?.view.keyedRepeats.find((item) => item.id === repeat.id);
 	const rowElementHandles = payloadRepeat?.rowElementHandles?.flatMap((handle) => {
 		const hostPath = rowHostPaths.get(handle.hostNodeId);
@@ -327,6 +342,7 @@ function repeatRecord(
 	return {
 		repeatId: repeat.id,
 		parentHostNodeId: repeat.parentHostNodeId,
+		...(repeat.ownerHostNodeId ? { ownerHostNodeId: repeat.ownerHostNodeId } : {}),
 		...(repeat.rowHostNodeId ? { rowHostNodeId: repeat.rowHostNodeId } : {}),
 		itemName: repeat.itemName,
 		...(repeat.collectionGraphNodeId

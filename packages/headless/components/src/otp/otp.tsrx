@@ -95,7 +95,6 @@ export function OtpField({ onInput, onFocus, ...rest }: OtpFieldProps) @{
 	/>
 }
 
-// aria-hidden: the input already carries the code, so an exposed item would put every character in the tree twice.
 export function OtpItem({ index, children, ...rest }: OtpItemProps) @{
 	const otp = otpState();
 	const item = state({ index });
@@ -106,7 +105,6 @@ export function OtpItem({ index, children, ...rest }: OtpItemProps) @{
 
 	<div
 		{...rest}
-		aria-hidden="true"
 		ui-empty={char === ''}
 		ui-disabled={otp.disabled}
 	>{char}{children}</div>

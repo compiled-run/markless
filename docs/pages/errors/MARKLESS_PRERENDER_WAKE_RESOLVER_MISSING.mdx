@@ -1,0 +1,21 @@
+# MARKLESS_PRERENDER_WAKE_RESOLVER_MISSING
+
+Prerender wake variant has no resolver to own its routes
+
+- Package: compiler
+- Pass or phase: link
+- Severity: error
+
+## Message
+
+MARKLESS_PRERENDER_WAKE_RESOLVER_MISSING
+
+## Why
+
+A wake variant that carries symbols must hand its symbol routes to a generated resolver; without one the routes would have no owner.
+
+## Emitted from
+
+- `packages/compiler/src/passes/link/claim-manifest.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

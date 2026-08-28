@@ -137,8 +137,7 @@ test('a box with only help text under it is never conveyed as invalid', async ()
 	await readUntil(sr, { name: "We'll send you updates about new features" });
 });
 
-// Expected red: the description part writes a plain div and wires no aria-describedby, so the reader announces it as a separate item further down.
-test.fails('the help text under a box is conveyed with the box itself', async () => {
+test('the help text under a box is conveyed with the box itself', async () => {
 	await open(WithHelp);
 	expectConveys(await readUntil(sr, { role: 'checkbox' }), {
 		role: 'checkbox',
@@ -152,8 +151,23 @@ test.fails('the help text under a box is conveyed with the box itself', async ()
 	).toEqual([]);
 });
 
-// Expected red: the trigger does call preventDefault() on Enter, but it lands after dispatch returns, so Enter still toggles.
-test.fails('pressing enter leaves a checkbox alone', async () => {
+// Both messages bind handles the trigger names, so both are part of the box rather than separate items down the page.
+test('the error and the help text are both conveyed with the box', async () => {
+	await open(Invalid);
+	const phrase = await readUntil(sr, { role: 'checkbox', name: 'Accept Terms' });
+	expect(phrase, `${sr.name} announced "${phrase}"`).toContain(
+		'Please accept the terms and conditions',
+	);
+	expect(phrase, `${sr.name} announced "${phrase}"`).toContain(
+		'Read our terms and conditions before accepting',
+	);
+	// What is wrong is conveyed before the hint, though the hint is written above the error in this page.
+	expect(phrase.indexOf('Please accept the terms and conditions')).toBeLessThan(
+		phrase.indexOf('Read our terms and conditions before accepting'),
+	);
+});
+
+test('pressing enter leaves a checkbox alone', async () => {
 	await open(Basic);
 	await readUntil(sr, { role: 'checkbox' });
 	await sr.press(sr.keys.enter);
