@@ -46,6 +46,20 @@ export function boxOf(left: number, top: number, width: number, height: number):
 	return { left, top, width, height };
 }
 
+/**
+ * Captures the pointer, tolerating an id the platform is not tracking: a press
+ * replayed after its handler loaded can arrive with the pointer already lifted,
+ * and capturing one of those throws `NotFoundError` rather than doing nothing.
+ * The drag runs without capture; only samples that reach the area are seen.
+ */
+export function capturePointer(area: HTMLElement, pointerId: number): void {
+	try {
+		area.setPointerCapture(pointerId);
+	} catch (error) {
+		if (!(error instanceof DOMException) || error.name !== 'NotFoundError') throw error;
+	}
+}
+
 /** A handle with no `value` prop draws the first point, which is the one-handle case. */
 export function idOf(point: PadPoint | undefined): string {
 	if (point === undefined) return '';

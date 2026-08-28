@@ -12,6 +12,7 @@ import {
 	axisValue,
 	boundsOf,
 	boxOf,
+	capturePointer,
 	fieldText,
 	heldPoint,
 	heldPoints,
@@ -173,7 +174,7 @@ export const padState = shared(
 				pad.stepping = false;
 
 				// Pointer capture rather than window listeners: the gesture keeps arriving here once the pointer leaves the area.
-				surface.setPointerCapture(pointerId);
+				capturePointer(surface, pointerId);
 
 				const handles = thumbEls ?? [];
 				handles[pointIndex(list, id)]?.focus();

@@ -49,7 +49,10 @@ function customProperty(target: Element, name: string) {
 	return window.getComputedStyle(target).getPropertyValue(name).trim();
 }
 
-function pointer(target: Element, type: string, clientX: number, clientY: number) {
+// The mouse is pointer 1 and the platform always holds it; nothing holds this one.
+const UNTRACKED_POINTER = 9101;
+
+function pointer(target: Element, type: string, clientX: number, clientY: number, pointerId = 1) {
 	target.dispatchEvent(
 		new PointerEvent(type, {
 			bubbles: true,
@@ -57,7 +60,7 @@ function pointer(target: Element, type: string, clientX: number, clientY: number
 			buttons: 1,
 			clientX,
 			clientY,
-			pointerId: 1,
+			pointerId,
 			isPrimary: true,
 		}),
 	);
@@ -418,6 +421,40 @@ for (const mode of MODES) {
 		expect(el(Root).hasAttribute('ui-dragging')).toBe(false);
 	});
 }
+
+// A press can reach the family with its pointer already lifted - the runtime
+// replays a recorded press once its handler has loaded - and capturing a pointer
+// the platform is no longer tracking throws.
+test('CSR: a press from a pointer the platform is not tracking throws nothing', async () => {
+	await render(Basic);
+	const area = el(Area);
+	const [thumb] = handles();
+
+	const failures: string[] = [];
+	const record = (event: ErrorEvent) => failures.push(event.message);
+	const recordRejection = (event: PromiseRejectionEvent) => failures.push(String(event.reason));
+	window.addEventListener('error', record);
+	window.addEventListener('unhandledrejection', recordRejection);
+	try {
+		const from = inArea(0.5, 0.5);
+		pointer(area, 'pointerdown', from.x, from.y, UNTRACKED_POINTER);
+		await expect.poll(() => thumb.getAttribute('aria-valuetext')).toBe('X 0.5, Y 0.5');
+		expect(failures).toEqual([]);
+		pointer(area, 'pointerup', from.x, from.y, UNTRACKED_POINTER);
+		await expect.poll(() => el(Root).hasAttribute('ui-dragging')).toBe(false);
+
+		// And the next ordinary gesture still moves the handle.
+		const to = inArea(0.8, 0.2);
+		pointer(area, 'pointerdown', to.x, to.y);
+		pointer(area, 'pointermove', to.x, to.y);
+		await expect.poll(() => thumb.getAttribute('aria-valuetext')).toBe('X 0.8, Y 0.2');
+		pointer(area, 'pointerup', to.x, to.y);
+		expect(failures).toEqual([]);
+	} finally {
+		window.removeEventListener('error', record);
+		window.removeEventListener('unhandledrejection', recordRejection);
+	}
+});
 
 // ------------------------------------------------------------------ controlled
 

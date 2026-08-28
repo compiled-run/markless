@@ -13,6 +13,20 @@ export function isRightToLeft(track: HTMLElement | null | undefined): boolean {
 	return window.getComputedStyle(track).direction === 'rtl';
 }
 
+/**
+ * Captures the pointer, tolerating an id the platform is not tracking: a press
+ * replayed after its handler loaded can arrive with the pointer already lifted,
+ * and capturing one of those throws `NotFoundError` rather than doing nothing.
+ * The drag runs without capture; only samples that reach the track are seen.
+ */
+export function capturePointer(track: HTMLElement, pointerId: number): void {
+	try {
+		track.setPointerCapture(pointerId);
+	} catch (error) {
+		if (!(error instanceof DOMException) || error.name !== 'NotFoundError') throw error;
+	}
+}
+
 export function measureTrack(track: HTMLElement, orientation: SliderOrientation): SliderAxis {
 	const box = track.getBoundingClientRect();
 	const isVertical = orientation === 'vertical';

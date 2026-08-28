@@ -10,6 +10,7 @@ import { focusBackToOpener, focusIntoSurface } from './drawer-focus.ts';
 import {
 	armBackdropPress,
 	beginSwipeReading,
+	capturePointer,
 	endSwipeReading,
 	isBackdropPressFinished,
 	recordSwipeReading,
@@ -167,9 +168,8 @@ export const drawerState = shared(
 				drawer.dragging = true;
 				beginSwipeReading(surface, along * sign, time);
 				// Last, and pointer capture rather than window listeners: the swipe
-				// keeps arriving here once the pointer leaves the surface, and a
-				// pointer id the platform does not know throws.
-				surface.setPointerCapture(pointerId);
+				// keeps arriving here once the pointer leaves the surface.
+				capturePointer(surface, pointerId);
 			},
 
 			/**

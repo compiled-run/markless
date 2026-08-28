@@ -310,6 +310,20 @@ export function outlinePath(outline: readonly Vec[]): string {
 }
 
 /**
+ * Captures the pointer, tolerating an id the platform is not tracking: a press
+ * replayed after its handler loaded can arrive with the pointer already lifted,
+ * and capturing one of those throws `NotFoundError` rather than doing nothing.
+ * The stroke runs without capture; only samples that reach the area are seen.
+ */
+export function capturePointer(area: Element, pointerId: number): void {
+	try {
+		area.setPointerCapture(pointerId);
+	} catch (error) {
+		if (!(error instanceof DOMException) || error.name !== 'NotFoundError') throw error;
+	}
+}
+
+/**
  * The path data for one stroke. `usePressure` off gives one width the whole way;
  * `simulate` is for a device that reports no pressure of its own, where the width
  * comes from how fast the pointer was moving instead.

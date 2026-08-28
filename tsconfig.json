@@ -32,7 +32,8 @@
 		"packages/headless/*/test",
 		"packages/bundler/fixtures",
 		"packages/headless/*/test-support/vitest.config.ts",
-		"packages/headless/*/test-support/playwright.config.ts"
+		"packages/headless/*/test-support/playwright.config.ts",
+		"packages/headless/*/chaos/vitest.config.ts"
 	],
 	"include": [
 		"packages/*/src/**/*.d.ts",
@@ -42,6 +43,7 @@
 		"packages/headless/*/src/**/*.ts",
 		"packages/headless/*/src/**/*.tsrx",
 		"packages/headless/*/test-support/**/*.ts",
+		"packages/headless/*/chaos/**/*.ts",
 		"vite.config.ts"
 	],
 	"tsrx": {

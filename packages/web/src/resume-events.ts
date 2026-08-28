@@ -93,14 +93,17 @@ type HandleElement = {
 const NATIVE_FOCUS = '__marklessNativeFocus';
 
 // The dispatch currently holding uncommitted writes, or 0 for none. A record is
-// stamped with the dispatch that made it and is landed only by that same
-// dispatch: a focus refused inside an abandoned or superseded dispatch must
-// never be replayed onto a page some later gesture has moved on.
+// held under the dispatch that made it and is landed only by that same dispatch:
+// a focus refused inside an abandoned or superseded dispatch must never be
+// replayed onto a page some later gesture has moved on, and dispatches overlap -
+// a handler that dispatches a synthetic event opens a second window inside the
+// first - so one ending must not take the other's hold with it.
 let openFocusDispatch = 0;
 let nextFocusDispatch = 0;
-let pendingFocus:
-	| { readonly at: number; readonly target: HandleElement; readonly options?: FocusOptions }
-	| undefined;
+const pendingFocus = new Map<
+	number,
+	{ readonly target: HandleElement; readonly options?: FocusOptions }
+>();
 
 function installFocusShim(target: HandleElement | undefined): void {
 	if (!target || typeof target.focus !== 'function' || target[NATIVE_FOCUS]) return;
@@ -117,7 +120,7 @@ function installFocusShim(target: HandleElement | undefined): void {
 				// while its own dispatch still holds uncommitted writes is worth
 				// replaying: the last such call is the one the handler meant.
 				if (openFocusDispatch !== 0 && target.ownerDocument?.activeElement !== target)
-					pendingFocus = { at: openFocusDispatch, target, options };
+					pendingFocus.set(openFocusDispatch, { target, options });
 			},
 		});
 	} catch {
@@ -162,10 +165,11 @@ export function marklessBeginFocusCommit(): number {
  * already fired.
  */
 export function marklessEndFocusCommit(dispatch: number): void {
-	const held = pendingFocus;
-	pendingFocus = undefined;
 	if (openFocusDispatch === dispatch) openFocusDispatch = 0;
-	if (held?.at !== dispatch || held.target.isConnected === false) return;
+	const held = pendingFocus.get(dispatch);
+	if (!held) return;
+	pendingFocus.delete(dispatch);
+	if (held.target.isConnected === false) return;
 	held.target[NATIVE_FOCUS]?.call(held.target, held.options);
 }
 

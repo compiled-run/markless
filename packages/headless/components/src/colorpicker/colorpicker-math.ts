@@ -376,6 +376,20 @@ export function measureBounds(target: HTMLElement): Bounds {
 	};
 }
 
+/**
+ * Captures the pointer, tolerating an id the platform is not tracking: a press
+ * replayed after its handler loaded can arrive with the pointer already lifted,
+ * and capturing one of those throws `NotFoundError` rather than doing nothing.
+ * The drag runs without capture; only samples that reach the element are seen.
+ */
+export function capturePointer(target: HTMLElement, pointerId: number): void {
+	try {
+		target.setPointerCapture(pointerId);
+	} catch (error) {
+		if (!(error instanceof DOMException) || error.name !== 'NotFoundError') throw error;
+	}
+}
+
 /** The x axis mirrors in right-to-left text; the y axis always mirrors, because screen y grows downward. */
 export function areaFraction(
 	clientX: number,

@@ -4,6 +4,7 @@ import {
 	type ColorChannel,
 	areaFraction,
 	areaKeyMove,
+	capturePointer,
 	channelName,
 	channelRange,
 	channelValue,
@@ -243,7 +244,7 @@ export const colorpickerState = shared(
 				picker.dragging = true;
 				picker.dragChannel = '';
 				picker.stepping = false;
-				area.setPointerCapture(pointerId);
+				capturePointer(area, pointerId);
 				const stops = axisEls ?? [];
 				landFocus(picker.axisAt === 'y' ? stops[1] : stops[0]);
 			},
@@ -285,7 +286,7 @@ export const colorpickerState = shared(
 				picker.dragging = true;
 				picker.dragChannel = channel;
 				picker.stepping = false;
-				rail.setPointerCapture(pointerId);
+				capturePointer(rail, pointerId);
 			},
 
 			dragRail(clientX: number) {

@@ -56,9 +56,11 @@ open state, which `scenarios/controlled.tsrx` is.
 
 ## Focus
 
-The family moves focus in two places and both retry per frame (`modal-focus.ts`): the surface is
-still `hidden` when the opening handler runs, and the invoker is still `inert` when the closing one
-does, so neither target can take focus on the call itself.
+The family moves focus in two places and both call `focus()` once (`modal-focus.ts`). Neither target
+can take it on the call itself - the surface is still `hidden` when the opening handler runs, and the
+invoker is still `inert` when the closing one does - so both calls are refused and the runtime
+replays them once the dispatch's writes reach the DOM (`marklessEndFocusCommit` in
+`packages/web/src/resume-events.ts`). The family polls no frames.
 
 **The surface takes the opening focus, not its first control.** Naming the first focusable would
 mean asking the DOM for the surface's focusable descendants, and the owner's ban on DOM selectors
