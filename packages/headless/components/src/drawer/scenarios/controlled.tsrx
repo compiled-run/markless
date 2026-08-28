@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as drawer from '../index.ts';
+import { drawer } from '../../index.ts';
 
 const PANEL = 'block-size: 320px; inline-size: 320px';
 

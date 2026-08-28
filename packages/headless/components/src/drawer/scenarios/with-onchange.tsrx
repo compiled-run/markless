@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as drawer from '../index.ts';
+import { drawer } from '../../index.ts';
 
 // Two drawers on one page, each with its own consumer handlers. Every handler
 // writes into page state the page renders, so what the DOM shows is what the

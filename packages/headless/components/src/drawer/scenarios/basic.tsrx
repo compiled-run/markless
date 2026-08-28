@@ -1,7 +1,4 @@
-// The family is not in the package barrel yet - registration is its own unit -
-// so every scenario here imports the family's own index instead of
-// `import { drawer } from '../../index.ts'`, which is the consumer form.
-import * as drawer from '../index.ts';
+import { drawer } from '../../index.ts';
 
 // The surface owns its `style` attribute (it carries `--offset`), so a scenario
 // gives the drawer a size through something inside it rather than on it.

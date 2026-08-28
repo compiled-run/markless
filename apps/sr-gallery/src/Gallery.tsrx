@@ -8,6 +8,7 @@ import {
 	colorpicker,
 	crop,
 	datebox,
+	drawer,
 	fileupload,
 	hovercard,
 	ink,
@@ -34,8 +35,8 @@ import {
 // /#toggle, /#textbox, /#progress, /#checklist, /#select, /#modal,
 // /#radio-group, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
 // /#fileupload, /#hovercard, /#calendar, /#menu, /#menubar, /#colorpicker,
-// /#buttongroup, /#numberbox, /#ink, /#pad, /#crop, /#tour, /#toolbar. A family whose second shape a reader
-// announces differently gets its own section too: /#slider-range,
+// /#buttongroup, /#numberbox, /#ink, /#pad, /#crop, /#tour, /#toolbar, /#drawer. A family whose
+// second shape a reader announces differently gets its own section too: /#slider-range,
 // /#numberbox-min-max-step, /#numberbox-currency, /#crop-image.
 //
 // This is consumer code, not test code. It imports through the package barrel
@@ -572,6 +573,57 @@ export function Gallery() @{
 
 					<toolbar.item>Print</toolbar.item>
 				</toolbar.root>
+			</div>
+		</section>
+
+		<section id="drawer">
+			<h2>Drawer</h2>
+			<div class="scenario">
+				<drawer.root>
+					<drawer.trigger>Filter results</drawer.trigger>
+					<drawer.backdrop>
+						<drawer.content>
+							<drawer.title>Narrow these results</drawer.title>
+							<button type="button">Apply</button>
+							<drawer.close>Cancel</drawer.close>
+						</drawer.content>
+					</drawer.backdrop>
+				</drawer.root>
+			</div>
+
+			{/* A bottom sheet that rests half open before it rests fully open: the claim a real reader is here to settle is that the rest position changes nothing it announces. */}
+			<div class="scenario">
+				<drawer.root snapPoints={[0.5, 1]} defaultSnapPoint={0.5}>
+					<drawer.trigger>Nearby stops</drawer.trigger>
+					<drawer.backdrop>
+						<drawer.content>
+							<drawer.title>Where to next?</drawer.title>
+							<drawer.close>Done</drawer.close>
+						</drawer.content>
+					</drawer.backdrop>
+				</drawer.root>
+			</div>
+
+			{/* A drawer inside a drawer's surface is the same parts, and the inner root is its own instance. */}
+			<div class="scenario">
+				<drawer.root>
+					<drawer.trigger>Payment method</drawer.trigger>
+					<drawer.backdrop>
+						<drawer.content>
+							<drawer.title>Choose a payment method</drawer.title>
+							<drawer.root>
+								<drawer.trigger>Add a card</drawer.trigger>
+								<drawer.backdrop>
+									<drawer.content>
+										<drawer.title>Card added</drawer.title>
+										<drawer.close>OK</drawer.close>
+									</drawer.content>
+								</drawer.backdrop>
+							</drawer.root>
+							<drawer.close>Cancel</drawer.close>
+						</drawer.content>
+					</drawer.backdrop>
+				</drawer.root>
 			</div>
 		</section>
 	</main>

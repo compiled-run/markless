@@ -1,4 +1,4 @@
-import * as drawer from '../index.ts';
+import { drawer } from '../../index.ts';
 
 export default function ServedOpen() @{
 	<section>

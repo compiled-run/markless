@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { FAMILY_ANCHORS } from '../../../../../apps/sr-gallery/preview-server.ts';
 import { readUntil, type ScreenReaderDriver } from '../../test-support/driver.ts';
 
 /**
@@ -17,12 +18,8 @@ const CHANGE_TIMEOUT_MS = 15_000;
 const TRIGGER = 'Filter results';
 const TITLE = 'Narrow these results';
 
-/**
- * Where the drawer sits on the gallery page. Spelled here rather than read from
- * `FAMILY_ANCHORS`, because the gallery section this walk needs lands with the
- * gallery registration and this file ships before it.
- */
-export const DRAWER_ANCHOR = '/#drawer';
+/** Where the drawer sits on the gallery page. */
+export const DRAWER_ANCHOR = FAMILY_ANCHORS.drawer;
 
 // Opening reshapes the tree rather than flipping an attribute, so every step here
 // walks forward; re-reading in place would land somewhere else entirely.

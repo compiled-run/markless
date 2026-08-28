@@ -1508,6 +1508,119 @@
 			}
 		]
 	},
+	"drawer": {
+		"parts": [
+			{
+				"part": "backdrop",
+				"component": "DrawerBackdrop",
+				"doc": "The dimming layer, and the element that is actually elevated: it carries the\n`overlay` mark, the `hidden` gating, and the dismissal reports the overlay\nbehaviour delivers. It wraps `drawer.content` rather than sitting beside it.\n\nA consumer's `onDismiss` runs after the family has applied its own policy.",
+				"props": []
+			},
+			{
+				"part": "close",
+				"component": "DrawerClose",
+				"doc": "A consumer's `onClick` runs after the drawer has closed.",
+				"props": []
+			},
+			{
+				"part": "content",
+				"component": "DrawerContent",
+				"doc": "The drawer surface, and the thing a swipe moves. It stays in the page when the\ndrawer is closed - `hidden` on the backdrop decides whether it shows - because\nthe overlay behaviour marks the background off an attached element.\n\nThe family owns this element's `style` attribute to carry `--offset`, the\nunitless fraction of the drawer's own size by which it is currently displaced\nalong its axis. Style the surface from a stylesheet rather than a `style` prop.",
+				"props": []
+			},
+			{
+				"part": "description",
+				"component": "DrawerDescription",
+				"doc": "A sentence the reader announces after the name.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "DrawerRoot",
+				"doc": "A dialog that slides in from an edge and can be swiped back out. The trigger,\nbackdrop, surface, naming parts and close control all go inside it.\n\nThe root renders no elevated layer of its own - `drawer.backdrop` is the\nelement that is elevated, the same division `drawer.modal` uses.",
+				"props": [
+					{
+						"name": "open",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Whether the drawer is showing. Omit it and the drawer starts closed."
+					},
+					{
+						"name": "modal",
+						"type": "boolean",
+						"required": false,
+						"default": "true",
+						"doc": "The page behind cannot be reached, read or scrolled while the drawer shows.\nDefaults to true. Turning it off keeps the surface elevated and dismissible\nand leaves the rest of the page live."
+					},
+					{
+						"name": "orientation",
+						"type": "'horizontal' | 'vertical'",
+						"required": false,
+						"default": "'vertical'",
+						"doc": "The axis the drawer travels on. `vertical` (the default) is the bottom\nsheet every reference defaults to; `horizontal` is the side panel."
+					},
+					{
+						"name": "start",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Anchor the drawer at the start edge of its axis - block-start for a\nvertical drawer, inline-start for a horizontal one - rather than the end\nedge. Logical, so a right-to-left page gets the correct side without a\nsecond prop."
+					},
+					{
+						"name": "snapPoints",
+						"type": "readonly number[]",
+						"required": false,
+						"default": "[1]",
+						"doc": "The rest positions the drawer settles at, as fractions of the drawer's own\nsize along its axis. A value above 1 is read as pixels instead. Defaults to\n`[1]`: one position, fully open. Order does not matter."
+					},
+					{
+						"name": "snapPoint",
+						"type": "number",
+						"required": false,
+						"doc": "The rest position the drawer is at now, as one of the values in\n`snapPoints`. Passing this makes the snap point controlled: a gesture\nreports through `onSnapPointChange` and nothing moves until the new value\ncomes back in."
+					},
+					{
+						"name": "defaultSnapPoint",
+						"type": "number",
+						"required": false,
+						"doc": "The rest position an uncontrolled drawer starts at. Defaults to the largest."
+					},
+					{
+						"name": "closeThreshold",
+						"type": "number",
+						"required": false,
+						"default": "0.25",
+						"doc": "How far past its lowest rest position the drawer has to be pulled before\nreleasing closes it, as a fraction of that position. Defaults to 0.25."
+					},
+					{
+						"name": "onChange",
+						"type": "(open: boolean) => void",
+						"required": false,
+						"doc": "Called with the new value when the drawer opens or closes - including when\na dismissal or a swipe closes it."
+					},
+					{
+						"name": "onSnapPointChange",
+						"type": "(snapPoint: number) => void",
+						"required": false,
+						"doc": "Called with the authored snap point value once a gesture or a key settles on it."
+					}
+				]
+			},
+			{
+				"part": "title",
+				"component": "DrawerTitle",
+				"doc": "The drawer's name. Mounting it is what names the surface.",
+				"props": []
+			},
+			{
+				"part": "trigger",
+				"component": "DrawerTrigger",
+				"doc": "A consumer's `onClick` runs after the drawer has opened.",
+				"props": []
+			}
+		]
+	},
 	"fileupload": {
 		"parts": [
 			{
@@ -3220,12 +3333,6 @@
 						"type": "ToastRecord",
 						"required": true,
 						"doc": "The message this row shows."
-					},
-					{
-						"name": "index",
-						"type": "number",
-						"required": false,
-						"doc": "Where it stands in the stack: 0 is the front one."
 					}
 				]
 			},

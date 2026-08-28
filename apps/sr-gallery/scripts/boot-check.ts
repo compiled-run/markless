@@ -90,6 +90,9 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	// The bar is the only role the family adds; everything inside it belongs to
 	// another family and keeps its own role, which the rows below check.
 	toolbar: 'toolbar',
+	// A closed drawer sits behind a hidden backdrop that never detaches it, so the
+	// dialog role is in the DOM before any trigger is pressed.
+	drawer: 'dialog',
 };
 
 /** Sections whose point is how many of that role they serve, not merely that they serve one. */
@@ -119,6 +122,9 @@ const RENDERED_COUNT: Partial<Record<FamilyName, number>> = {
 	// One card per step: a count catches a tour that rendered its first step and
 	// lost the rest, which is what a mis-rooted widget instance looks like here.
 	tour: 3,
+	// The plain drawer, the snapped one, and the nested pair: a count catches a
+	// nested inner root that never became a widget instance of its own.
+	drawer: 4,
 };
 
 const appDir = fileURLToPath(new URL('..', import.meta.url));
@@ -635,6 +641,55 @@ async function main() {
 			);
 		} else {
 			console.log('#menubar rests with exactly one tab stop.');
+		}
+
+		// The role count above says four dialogs rendered. What a reader lane then
+		// turns on is that each one is a named dialog at rest: the surface carries
+		// the role, the title part is what names it, the backdrop that gates the
+		// subtree is mounted, and the trigger that opens it is on the page.
+		const sheet = page
+			.locator('#drawer')
+			.getByRole('dialog', { name: 'Narrow these results', includeHidden: true });
+		if ((await sheet.count()) !== 1) {
+			failures.push('#drawer serves no single dialog named "Narrow these results".');
+		} else {
+			const labelledBy = await sheet.getAttribute('aria-labelledby');
+			if (labelledBy === null) {
+				failures.push('#drawer\'s surface points at no title through aria-labelledby.');
+			} else {
+				const title = await page.locator(`[id="${labelledBy}"]`).textContent();
+				if (title?.trim() !== 'Narrow these results') {
+					failures.push(
+						`#drawer's aria-labelledby reaches "${title?.trim()}", not its title part.`,
+					);
+				} else {
+					console.log('#drawer serves a dialog named by its title part.');
+				}
+			}
+		}
+
+		// Four roots, counting the nested pair's inner one.
+		const backdrops = page.locator('#drawer [ui-backdrop]');
+		if ((await backdrops.count()) !== 4) {
+			failures.push(
+				`#drawer mounts ${await backdrops.count()} backdrops, not the 4 its drawers gate their subtrees with.`,
+			);
+		} else {
+			console.log('#drawer mounts a backdrop per drawer.');
+		}
+
+		const opener = page.locator('#drawer').getByRole('button', { name: 'Filter results' });
+		if ((await opener.count()) !== 1) {
+			failures.push('#drawer serves no single "Filter results" trigger, so no reader can open it.');
+		} else {
+			const haspopup = await opener.getAttribute('aria-haspopup');
+			if (haspopup !== 'dialog') {
+				failures.push(
+					`#drawer's trigger reads aria-haspopup="${haspopup}", not "dialog", so it holds nothing.`,
+				);
+			} else {
+				console.log('#drawer serves the trigger announced as holding a dialog.');
+			}
 		}
 
 		if (failures.length > 0) throw new Error(failures.join(' '));

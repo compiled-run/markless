@@ -54,6 +54,7 @@ export const FAMILY_ANCHORS = {
 	'numberbox-currency': '/#numberbox-currency',
 	tour: '/#tour',
 	toolbar: '/#toolbar',
+	drawer: '/#drawer',
 } as const;
 
 export type FamilyName = keyof typeof FAMILY_ANCHORS;

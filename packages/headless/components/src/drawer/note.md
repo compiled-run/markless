@@ -156,8 +156,8 @@ renders drawer markup but never enlists`, which asserts what actually happens.
 2. **`start` as a capability name.** `orientation` is the enum shape the spec blesses. `start` is a
    new boolean in the same grammar as `crop.thumb`'s `inlineStart`/`blockStart` and the spec's own
    `ui-side="start"` example, but it is not itself an established name.
-3. **Registration.** The barrel, the package export map, the conformance battery, the sr-gallery
-   section, the CI matrix and the api manifest are all a follow-up unit. Until the barrel carries
-   `drawer`, the scenarios import `../index.ts` rather than the consumer form
-   `import { drawer } from '../../index.ts'`, and `drawer-transcript.ts` spells `/#drawer` itself
-   rather than reading `FAMILY_ANCHORS.drawer` - the same shape `numberbox-transcript.ts` shipped in.
+3. **Registration.** Done, except the conformance battery: the barrel, the package export map, the
+   api manifest, the sr-gallery section and the three CI reader matrices all carry `drawer`, the
+   scenarios import the consumer form `import { drawer } from '../../index.ts'`, and
+   `drawer-transcript.ts` reads `FAMILY_ANCHORS.drawer`. The conformance descriptor in
+   `test-support/` is the one piece still outstanding.
