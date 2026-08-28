@@ -6,6 +6,7 @@ import {
 	type Conveys,
 	type ScreenReaderDriver,
 } from '../../test-support/driver.ts';
+import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
 
 /**
  * Expectations are `Conveys` facts rather than any reader's wording, so this file
@@ -15,9 +16,6 @@ import {
 export const TOUR_ANCHOR = FAMILY_ANCHORS.tour;
 export const TOUR_URL = `${PREVIEW_ORIGIN}${TOUR_ANCHOR}`;
 
-// The tour section sits after every earlier family on the gallery page, so a walk
-// that starts at the top of the document needs a long limit.
-const WALK_LIMIT = 240;
 const CHANGE_TIMEOUT_MS = 15_000;
 const START = 'Take the tour';
 const FIRST_TITLE = 'Save your work';
@@ -42,7 +40,7 @@ export async function readTourTranscript(sr: ScreenReaderDriver, page: Page) {
 	const secondCard = section.getByRole('dialog', { name: SECOND_TITLE });
 
 	const startButton: Conveys = { role: 'button', name: START };
-	expectConveys(sr, await readUntil(sr, startButton, WALK_LIMIT), startButton);
+	expectConveys(sr, await readUntil(sr, startButton, GALLERY_WALK_LIMIT), startButton);
 
 	await sr.press(sr.keys.enter);
 	await expect(firstCard).toBeVisible({ timeout: CHANGE_TIMEOUT_MS });
@@ -50,7 +48,7 @@ export async function readTourTranscript(sr: ScreenReaderDriver, page: Page) {
 	// A card that is not the current step is `hidden`, which takes the whole
 	// subtree out of the tree a reader walks, so reaching the dialog by role and
 	// name is the proof it opened for the reader and not only for the DOM.
-	expectConveys(sr, await readUntil(sr, { role: 'dialog', name: FIRST_TITLE }, WALK_LIMIT), {
+	expectConveys(sr, await readUntil(sr, { role: 'dialog', name: FIRST_TITLE }, GALLERY_WALK_LIMIT), {
 		role: 'dialog',
 		name: FIRST_TITLE,
 	});

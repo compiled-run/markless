@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 import { FAMILY_ANCHORS } from '../../../../../apps/sr-gallery/preview-server.ts';
 import { missingFacts, readUntil, type Conveys, type ScreenReaderDriver } from '../../test-support/driver.ts';
+import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
 
 /**
  * Expectations are `Conveys` facts rather than any reader's wording, so this file
@@ -19,9 +20,6 @@ import { missingFacts, readUntil, type Conveys, type ScreenReaderDriver } from '
  * overlay.
  */
 
-// The tooltip section is the eleventh of thirteen on the gallery page, so a walk
-// that starts at the top of the document needs about as many steps as popover's.
-const WALK_LIMIT = 210;
 const TRIGGER = 'Save';
 const TIP = 'Save this draft';
 
@@ -39,7 +37,7 @@ export async function readTooltipTranscript(sr: ScreenReaderDriver, page: Page) 
 	// referenced hidden node still contributes its text to the description.
 	await expect(tip).toBeHidden();
 
-	const phrase = await readUntil(sr, describedTrigger, WALK_LIMIT);
+	const phrase = await readUntil(sr, describedTrigger, GALLERY_WALK_LIMIT);
 	expectConveys(sr, phrase, describedTrigger);
 	expectConveys(sr, phrase, { name: TIP });
 

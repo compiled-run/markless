@@ -5,29 +5,54 @@ The page a real screen reader reads.
 Every shipped `@markless/ui` family's Basic scenario — the starter a consumer
 copies — one section each, on an anchor a driver can be sent to:
 
-| section      | anchor           |
-| ------------ | ---------------- |
-| checkbox     | `/#checkbox`     |
-| toggle       | `/#toggle`       |
-| textbox      | `/#textbox`      |
-| progress     | `/#progress`     |
-| checklist    | `/#checklist`    |
-| select       | `/#select`       |
-| modal        | `/#modal`        |
-| radio-group  | `/#radio-group`  |
-| tabs         | `/#tabs`         |
-| popover      | `/#popover`      |
-| slider       | `/#slider`       |
-| slider-range | `/#slider-range` |
-| tooltip      | `/#tooltip`      |
-| datebox      | `/#datebox`      |
-| fileupload   | `/#fileupload`   |
-| hovercard    | `/#hovercard`    |
-| menu         | `/#menu`         |
-| colorpicker  | `/#colorpicker`  |
+<!-- anchors:start -->
 
-The slider appears twice: the one-thumb starter, and the two-thumb range shape,
-which a reader announces differently and so gets a section of its own.
+| section                | anchor                     |
+| ---------------------- | -------------------------- |
+| checkbox               | `/#checkbox`               |
+| toggle                 | `/#toggle`                 |
+| textbox                | `/#textbox`                |
+| progress               | `/#progress`               |
+| checklist              | `/#checklist`              |
+| select                 | `/#select`                 |
+| modal                  | `/#modal`                  |
+| radio-group            | `/#radio-group`            |
+| rating-group           | `/#rating-group`           |
+| tabs                   | `/#tabs`                   |
+| popover                | `/#popover`                |
+| slider                 | `/#slider`                 |
+| tooltip                | `/#tooltip`                |
+| slider-range           | `/#slider-range`           |
+| datebox                | `/#datebox`                |
+| fileupload             | `/#fileupload`             |
+| hovercard              | `/#hovercard`              |
+| calendar               | `/#calendar`               |
+| ink                    | `/#ink`                    |
+| pad                    | `/#pad`                    |
+| crop                   | `/#crop`                   |
+| crop-image             | `/#crop-image`             |
+| menu                   | `/#menu`                   |
+| menubar                | `/#menubar`                |
+| colorpicker            | `/#colorpicker`            |
+| buttongroup            | `/#buttongroup`            |
+| editable               | `/#editable`               |
+| numberbox              | `/#numberbox`              |
+| numberbox-min-max-step | `/#numberbox-min-max-step` |
+| numberbox-currency     | `/#numberbox-currency`     |
+| tour                   | `/#tour`                   |
+| toolbar                | `/#toolbar`                |
+| drawer                 | `/#drawer`                 |
+
+<!-- anchors:end -->
+
+That table is generated from `FAMILY_ANCHORS` in `preview-server.ts` by
+`scripts/anchor-table.ts`, in the order that constant declares — not the order
+the page serves. Run the script after adding a family; the boot check runs it
+with `--check` and fails when the table is stale.
+
+A family gets a second section when a reader announces one of its shapes
+differently: the slider's two-thumb range, and the number box's bounded and
+currency shapes, each read differently enough to be worth their own anchor.
 
 It is deliberately ordinary consumer code: imports come through the
 `@markless/ui` barrel, the markup is each family's real starter, and there are
@@ -60,13 +85,18 @@ reports what it was still waiting on if it runs out. The browser then meets a
 warm server and keeps its 30-second budget, which is what makes a red boot check
 mean "a family did not render" rather than "the compiler was slow".
 
-## It does not render yet
+## How far into the page a family sits
 
-`pnpm --dir apps/sr-gallery build` fails and `dev` serves a page that never
-mounts. The cause is in the compiler, not here: a component that uses a member
-tag (`<checkbox.root>`) loses its own export through the public-render pass.
-`packages/headless/components/test-support/README.md` has the exact errors and the
-narrowing that shows it is the member tag rather than the package boundary.
+A real reader lands here, is sent to the top of web content, and walks forward,
+so the cost of reaching a family is the whole document ahead of it. Every
+transcript shares one limit on that walk,
+`packages/headless/components/test-support/gallery-walk.ts`, and the number in it
+is measured rather than guessed:
 
-The screen-reader workflow already runs the boot check as its gate, so these
-lanes start reading this page the day that is fixed, with no workflow edit.
+```sh
+node apps/sr-gallery/scripts/measure-walk.ts
+```
+
+That serves the page, runs @guidepup/virtual-screen-reader over it, and prints
+the step each section is reached at. Re-run it when the gallery grows, and raise
+the shared limit if a family has moved past it.

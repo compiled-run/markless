@@ -1,10 +1,12 @@
 import { expect, type Page } from '@playwright/test';
+import { FAMILY_ANCHORS } from '../../../../../apps/sr-gallery/preview-server.ts';
 import {
 	missingFacts,
 	readUntil,
 	type Conveys,
 	type ScreenReaderDriver,
 } from '../../test-support/driver.ts';
+import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
 
 /**
  * Expectations are `Conveys` facts rather than any reader's wording, so this file
@@ -21,18 +23,11 @@ import {
  * chosen day.
  */
 
-// The gallery is one page of many families, so a walk that starts at the top of
-// the document needs far more steps than the virtual lane's container walk.
-const WALK_LIMIT = 140;
 const CHANGE_TIMEOUT_MS = 15_000;
 const ITEMS = ['Left', 'Center', 'Right'] as const;
+const GROUP = 'Text alignment';
 
-/**
- * Where the button group sits on the gallery page. Spelled here rather than read
- * from `FAMILY_ANCHORS`, because the gallery section this walk needs lands with
- * the gallery registration and this file ships before it.
- */
-export const BUTTONGROUP_ANCHOR = '/#buttongroup';
+export const BUTTONGROUP_ANCHOR = FAMILY_ANCHORS.buttongroup;
 
 function expectConveys(sr: ScreenReaderDriver, phrase: string, conveys: Conveys) {
 	expect(missingFacts(sr, phrase, conveys), `${sr.name} announced "${phrase}"`).toEqual([]);
@@ -42,13 +37,13 @@ export async function readButtonGroupTranscript(sr: ScreenReaderDriver, page: Pa
 	const section = page.locator(`#${BUTTONGROUP_ANCHOR.slice(2)}`);
 	const itemFor = (name: string) => section.getByRole('button', { name });
 
-	// The group is named by its label part, and an unnamed group announces nothing
-	// a person can act on - which is why the label is not optional here.
-	const group = await readUntil(sr, { role: 'group' }, WALK_LIMIT);
-	expectConveys(sr, group, { role: 'group', name: 'Text alignment' });
+	// Named, not merely a group: checklist, editable and crop serve one too, and
+	// NVDA calls a radiogroup "grouping" as well.
+	const group = await readUntil(sr, { role: 'group', name: GROUP }, GALLERY_WALK_LIMIT);
+	expectConveys(sr, group, { role: 'group', name: GROUP });
 
 	for (const name of ITEMS) {
-		const item = await readUntil(sr, { role: 'button', name }, WALK_LIMIT);
+		const item = await readUntil(sr, { role: 'button', name }, GALLERY_WALK_LIMIT);
 		expectConveys(sr, item, { role: 'button', name });
 	}
 

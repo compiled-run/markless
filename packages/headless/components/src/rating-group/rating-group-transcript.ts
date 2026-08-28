@@ -6,6 +6,7 @@ import {
 	type Conveys,
 	type ScreenReaderDriver,
 } from '../../test-support/driver.ts';
+import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
 
 /**
  * Expectations are `Conveys` facts rather than any reader's wording, so this file
@@ -18,9 +19,6 @@ import {
  * checked ones.
  */
 
-// The gallery is one page of many families, so a walk that starts at the top of
-// the document needs far more steps than the virtual lane's container walk.
-const WALK_LIMIT = 200;
 const CHANGE_TIMEOUT_MS = 15_000;
 const GROUP = 'Overall rating';
 
@@ -29,7 +27,7 @@ export async function readRatingGroupTranscript(sr: ScreenReaderDriver, page: Pa
 
 	// Named, not merely a radiogroup: the gallery serves the radio-group family's
 	// own group earlier in the same document, and a walk from the top reaches it first.
-	const group = await readUntil(sr, { role: 'radiogroup', name: GROUP }, WALK_LIMIT);
+	const group = await readUntil(sr, { role: 'radiogroup', name: GROUP }, GALLERY_WALK_LIMIT);
 	expect(
 		missingFacts(sr, group, { role: 'radiogroup', name: GROUP }),
 		`${sr.name} announced "${group}"`,
@@ -45,7 +43,7 @@ export async function readRatingGroupTranscript(sr: ScreenReaderDriver, page: Pa
 		{ role: 'radio', name: '5 of 5', state: ['notChecked'] },
 	];
 	for (const conveys of checkedMarks) {
-		const mark = await readUntil(sr, { role: 'radio', name: conveys.name }, WALK_LIMIT);
+		const mark = await readUntil(sr, { role: 'radio', name: conveys.name }, GALLERY_WALK_LIMIT);
 		expect(missingFacts(sr, mark, conveys), `${sr.name} announced "${mark}"`).toEqual([]);
 	}
 

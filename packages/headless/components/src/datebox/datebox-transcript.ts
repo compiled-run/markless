@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 import { FAMILY_ANCHORS } from '../../../../../apps/sr-gallery/preview-server.ts';
 import type { ScreenReaderDriver } from '../../test-support/driver.ts';
+import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
 
 /**
  * Expectations are the facts an announcement must convey rather than any reader's
@@ -14,9 +15,6 @@ import type { ScreenReaderDriver } from '../../test-support/driver.ts';
  * prints one.
  */
 
-// The datebox section is the last on the gallery page, so a walk that starts at
-// the top of the document needs more steps than any other family's.
-const WALK_LIMIT = 280;
 const CHANGE_TIMEOUT_MS = 15_000;
 const NAME = 'Start date';
 
@@ -68,7 +66,7 @@ export async function readDateBoxTranscript(sr: ScreenReaderDriver, page: Page) 
 	await expect(boxes.nth(1)).toHaveAttribute('aria-valuemax', '31');
 	await expect(section.getByRole('group')).toHaveAccessibleName(NAME);
 
-	const resting = await readForPhrase(sr, [MONTH], WALK_LIMIT);
+	const resting = await readForPhrase(sr, [MONTH], GALLERY_WALK_LIMIT);
 	expect(missing(resting, [MONTH]), `${sr.name} announced "${resting}"`).toEqual([]);
 
 	// Focus rather than the reading cursor: an arrow only steps a box once it is

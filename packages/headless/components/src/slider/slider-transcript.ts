@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 import { FAMILY_ANCHORS } from '../../../../../apps/sr-gallery/preview-server.ts';
 import type { ScreenReaderDriver } from '../../test-support/driver.ts';
+import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
 
 /**
  * Expectations are the facts an announcement must convey rather than any reader's
@@ -14,10 +15,6 @@ import type { ScreenReaderDriver } from '../../test-support/driver.ts';
  * what can be asserted honestly until a CI run prints one.
  */
 
-// The slider section is the twelfth of thirteen on the gallery page, so a walk
-// that starts at the top of the document needs more steps than any other
-// family's.
-const WALK_LIMIT = 250;
 // The range section is the next one down, so its walk starts where the first
 // walk stopped rather than at the top.
 const RANGE_WALK_LIMIT = 40;
@@ -131,7 +128,7 @@ export async function readSliderTranscript(sr: ScreenReaderDriver, page: Page) {
 	await expect(thumb).toHaveAttribute('aria-valuemax', String(RANGE_MAX));
 	await expect(thumb).toHaveAttribute('aria-valuenow', String(RESTING));
 
-	const resting = await readForPhrase(sr, [ROLE, NAME, String(RESTING)], WALK_LIMIT);
+	const resting = await readForPhrase(sr, [ROLE, NAME, String(RESTING)], GALLERY_WALK_LIMIT);
 	expect(
 		missing(resting, [ROLE, NAME, String(RESTING)]),
 		`${sr.name} announced "${resting}"`,
