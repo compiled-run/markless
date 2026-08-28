@@ -73,7 +73,22 @@ const resumeOnDemandEntries = [
 // 20,996 -> 20,983 (re-anchor 2026-08-22, teardown-dispatch fix): the disposed
 // flag went unconditional and hosts dispose with ignoreFutureEvents; comment
 // trims inside resume-runtime.ts paid for the logic, net -13.
-const sourceByteLimit = 20983;
+// 20,983 -> 33,510 (2026-08-27): the element-handle qualifier slot moved out of
+// resume-locators.ts into resume-arm-records.ts, the only module the then-contract
+// allowed that fns/instance-scope.ts already imported. resume.ts's closure gained
+// the whole of resume-arm-records.ts for a ~330-char slot. The proxy over-priced
+// the edge - the shipped chunk moved the other way, 6,202 -> 5,149 gzip on vite-csr
+// - but the wall was still raised without real code behind it, and that was named
+// as debt owed at the time.
+// 33,510 -> 20,970 (2026-08-27, repaid): the slot now lives in its own module,
+// resume-handle-qualifier.ts, which resume-locators.ts and fns/instance-scope.ts
+// both import. resume-arm-records.ts leaves resume.ts's closure entirely and the
+// 846-char module takes its place: resume.ts measures 20,728, and the largest
+// closure this wall governs is once more resume-runtime.ts at 20,970 - a
+// single-file closure nothing here touches. Every governed entry re-measured.
+// The chunk anchors that justified the move are unchanged: the dispatch core still
+// never reaches resume-locators, so the locator registry stays demand-loaded.
+const sourceByteLimit = 20970;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',
@@ -133,6 +148,24 @@ test.each([
 	for (const forbidden of forbiddenResumeSerializerFiles) {
 		expect(relativeClosure).not.toContain(forbidden);
 	}
+});
+
+// The qualifier slot has its own module so neither side drags the other in: the
+// locator registry must not pull the arm-record fold into browser resume, and the
+// dispatch core (which reaches fns/instance-scope.ts) must not pull the locator
+// registry into the always-loaded chunk.
+test('the element-handle qualifier slot stands in its own module', () => {
+	const closure = collectStaticImportClosure(resumeEntry);
+	const relativeClosure = closure.files.map((file) => toRepoPath(file)).sort();
+
+	expect(relativeClosure).toContain('packages/web/src/resume-handle-qualifier.ts');
+	expect(relativeClosure).not.toContain('packages/web/src/resume-arm-records.ts');
+
+	const qualifier = readFileSync(
+		join(repoRoot, 'packages/web/src/resume-handle-qualifier.ts'),
+		'utf8',
+	);
+	expect(staticRuntimeImportSpecifiers(qualifier)).toEqual([]);
 });
 
 test('resume core and on-demand runtime modules keep static source closures lean', () => {

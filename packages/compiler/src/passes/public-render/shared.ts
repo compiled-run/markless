@@ -1,5 +1,10 @@
 import { parseModule } from '../../js-ast.ts';
-import { deserializeGraphValue, type SerializedGraphPayload } from '@markless/serializer';
+import { createSourceMemo, ownedModuleAst } from '../semantic-graph/shared-ast.ts';
+import {
+	deserializeGraphValue,
+	jsonSourceWithNonFiniteNumbers,
+	type SerializedGraphPayload,
+} from '@markless/serializer';
 import type { PublicRenderModuleInput, SemanticModuleImport } from '../../artifacts.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
@@ -13,7 +18,7 @@ import {
 	memberTagRootName,
 } from '../../ast/tsrx.ts';
 import type { ComponentEdge } from './types.ts';
-import { widgetRootComponents } from './shared-seed-pass.ts';
+import { adoptedWidgetDefinitionIds, widgetRootComponents } from './shared-seed-pass.ts';
 
 export { componentEdgeInstanceSegment } from '../../component-edge-instance.ts';
 
@@ -53,10 +58,28 @@ export function moduleScopeLines(source: string, filename: string): string[] {
 	return moduleScopeDeclarations(source, filename).map((declaration) => declaration.source);
 }
 
+export type ModuleScopeDeclaration = {
+	readonly names: ReadonlyArray<string>;
+	readonly source: string;
+};
+
+// Asked once per emitted symbol module and once per residue read, all from the
+// same source text; the answer is plain strings, so it is memoized whole.
+const moduleScopeDeclarationsMemo = createSourceMemo<ReadonlyArray<ModuleScopeDeclaration>>();
+
 export function moduleScopeDeclarations(
 	source: string,
 	filename: string,
-): ReadonlyArray<{ readonly names: ReadonlyArray<string>; readonly source: string }> {
+): ReadonlyArray<ModuleScopeDeclaration> {
+	return moduleScopeDeclarationsMemo(filename, source, () =>
+		collectModuleScopeDeclarations(source, filename),
+	);
+}
+
+function collectModuleScopeDeclarations(
+	source: string,
+	filename: string,
+): ReadonlyArray<ModuleScopeDeclaration> {
 	const ast = parseModule(source, filename) as unknown as AnyNode;
 	const storageImports = frameworkApiImportNames(ast, 'storage');
 	const sharedImports = frameworkApiImportNames(ast, 'shared');
@@ -98,10 +121,27 @@ export function moduleScopeDeclarations(
  * family publishes, or a plain helper that takes the instance as an argument —
  * is not something this seam can decide.
  */
+export type ExportedSharedResolvingFunction = {
+	readonly name: string;
+	readonly definitionName: string;
+};
+
+const exportedSharedResolvingFunctionsMemo =
+	createSourceMemo<ReadonlyArray<ExportedSharedResolvingFunction>>();
+
 export function exportedSharedResolvingFunctions(
 	source: string,
 	filename: string,
-): ReadonlyArray<{ readonly name: string; readonly definitionName: string }> {
+): ReadonlyArray<ExportedSharedResolvingFunction> {
+	return exportedSharedResolvingFunctionsMemo(filename, source, () =>
+		collectExportedSharedResolvingFunctions(source, filename),
+	);
+}
+
+function collectExportedSharedResolvingFunctions(
+	source: string,
+	filename: string,
+): ReadonlyArray<ExportedSharedResolvingFunction> {
 	const ast = parseModule(source, filename) as unknown as AnyNode;
 	const sharedImports = frameworkApiImportNames(ast, 'shared');
 	if (sharedImports.size === 0) return [];
@@ -638,7 +678,7 @@ export function stateEntries(
 		if (cell.value === undefined) return [];
 		if (cellIndexes && !cellIndexes.includes(index)) return [];
 		const value = deserializeGraphValue(cell.value as SerializedGraphPayload);
-		return `	[${JSON.stringify(cell.graphNodeId)}, ${JSON.stringify(value)}]`;
+		return `	[${JSON.stringify(cell.graphNodeId)}, ${jsonSourceWithNonFiniteNumbers(value) ?? 'undefined'}]`;
 	});
 }
 
@@ -681,6 +721,29 @@ export function isFragmentNode(node: AnyNode | undefined): boolean {
 // belong to the page, never to one composed component instance.
 function isPageSpaceGraphNodeId(graphNodeId: string): boolean {
 	return graphNodeId.startsWith('shared:') || graphNodeId.startsWith('storage:');
+}
+
+/**
+ * The collection every `@for` in a set of chunks reads.
+ *
+ * A repeat slot carries no residue - it names the repeat, and the repeat record
+ * names the node - so a component whose only read of a cell is through a `@for`
+ * collection is invisible to the slot walk above. It seeds nothing, and the
+ * collection derives from an undefined cell on the served page.
+ */
+export function repeatCollectionGraphNodeIds(
+	chunks: PublicRenderModuleInput['renderData']['chunks'],
+	repeats: PublicRenderModuleInput['renderData']['repeats'],
+): ReadonlyArray<string> {
+	return chunks.flatMap((chunk) =>
+		chunk.slots.flatMap((slot) => {
+			if (slot.kind !== 'repeat') return [];
+			const collection = repeats.find(
+				(candidate) => candidate.repeatId === slot.repeatId,
+			)?.collectionGraphNodeId;
+			return collection ? [collection] : [];
+		}),
+	);
 }
 
 function chunkGraphNodeIds(
@@ -757,16 +820,34 @@ export function componentOwnedStateNodes(
 	// A page-space node the component only reads stays owned by the page, but its
 	// value must still seed this component's render — including a node it reaches
 	// only through a shared computed it derives.
+	const ownChunks = input.renderData.chunks.filter(
+		(chunk) => chunk.componentName === componentName,
+	);
 	const readGraphNodeIds = graphReadClosure(
-		chunkGraphNodeIds(
-			input.renderData.chunks.filter((chunk) => chunk.componentName === componentName),
-		),
+		[
+			...chunkGraphNodeIds(ownChunks),
+			...repeatCollectionGraphNodeIds(ownChunks, input.renderData.repeats),
+		],
 		input.semanticGraph,
 	);
+	// An adopted family's nodes are owned by no component here, which is what
+	// keeps a part from composing as a second root of it. A computed record
+	// carries no such identity, and without one somewhere the chain never
+	// re-derives - so the components that RENDER the value carry it, and an
+	// outermost adopter, which is the only instance of the family on the page,
+	// is one of them.
+	const adopted = adoptedWidgetDefinitionIds(input);
+	const rendersAdoptedComputed = (graphNodeId: string, index: number) =>
+		owner.computed[index] === undefined &&
+		adopted.has(graphNodeId.slice(0, graphNodeId.lastIndexOf('/'))) &&
+		readGraphNodeIds.has(graphNodeId);
 	return {
 		cellIndexes,
-		computedIndexes: input.protocolState.computed.flatMap((_computed, index) =>
-			owner.computed[index] === componentName ? [index] : [],
+		computedIndexes: input.protocolState.computed.flatMap((computed, index) =>
+			owner.computed[index] === componentName ||
+			rendersAdoptedComputed(computed.graphNodeId, index)
+				? [index]
+				: [],
 		),
 		seedCellIndexes: input.protocolState.cells.flatMap((cell, index) =>
 			cellIndexes.includes(index) ||
@@ -799,11 +880,40 @@ function graphReadClosure(
 // The declaring component of every payload node, aligned with the payload's own
 // cell and computed order. A duplicated id is resolved positionally: the Nth
 // binding spelling that id owns the Nth node spelling it.
+type PayloadNodeOwners = {
+	readonly cells: ReadonlyArray<string | undefined>;
+	readonly computed: ReadonlyArray<string | undefined>;
+};
+
+// `componentOwnedStateNodes` asks this once per component from three emit sites,
+// and the answer does not depend on which component asked. Held against the
+// input so it cannot outlive the compile it describes.
+const payloadNodeOwnersByInput = new WeakMap<
+	PublicRenderModuleInput,
+	Map<string, PayloadNodeOwners>
+>();
+
 function payloadNodeOwners(
 	input: PublicRenderModuleInput,
 	rootComponentName: string,
-): { readonly cells: ReadonlyArray<string>; readonly computed: ReadonlyArray<string> } {
-	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
+): PayloadNodeOwners {
+	let byRoot = payloadNodeOwnersByInput.get(input);
+	if (!byRoot) {
+		byRoot = new Map<string, PayloadNodeOwners>();
+		payloadNodeOwnersByInput.set(input, byRoot);
+	}
+	const memoized = byRoot.get(rootComponentName);
+	if (memoized) return memoized;
+	const owners = resolvePayloadNodeOwners(input, rootComponentName);
+	byRoot.set(rootComponentName, owners);
+	return owners;
+}
+
+function resolvePayloadNodeOwners(
+	input: PublicRenderModuleInput,
+	rootComponentName: string,
+): PayloadNodeOwners {
+	const ast = ownedModuleAst(input, input.source.source, input.source.filename);
 	const componentMap = sameModuleComponentMap(ast);
 	const chunkOwner = new Map<string, string>();
 	for (const component of input.semanticGraph.components) {
@@ -816,13 +926,19 @@ function payloadNodeOwners(
 			if (!chunkOwner.has(graphNodeId)) chunkOwner.set(graphNodeId, component.name);
 		}
 	}
-	const pending = new Map<string, string[]>();
-	for (const binding of input.semanticGraph.graphBindings) {
-		if (!binding.componentName) continue;
-		const queue = pending.get(binding.id);
-		if (queue) queue.push(binding.componentName);
-		else pending.set(binding.id, [binding.componentName]);
-	}
+	// Rebuilt per pass: the cells and the computed each resolve duplicate ids from
+	// a full queue, so a cell spelling an id a computed also spells cannot drain
+	// the declarations the computed pass still needs.
+	const declaringComponents = (): Map<string, string[]> => {
+		const pending = new Map<string, string[]>();
+		for (const binding of input.semanticGraph.graphBindings) {
+			if (!binding.componentName) continue;
+			const queue = pending.get(binding.id);
+			if (queue) queue.push(binding.componentName);
+			else pending.set(binding.id, [binding.componentName]);
+		}
+		return pending;
+	};
 	// A branch-condition computed is read by the branch record, not by any chunk
 	// slot, so chunk ownership cannot see it. The component whose arms the branch
 	// decides declares it.
@@ -839,20 +955,30 @@ function payloadNodeOwners(
 	// nodes belong to the widget root, not the module root: that component's
 	// composed instance path is the widget root.
 	const widgetOwner = widgetRootComponents(input);
-	const ownerOf = (graphNodeId: string): string => {
-		if (isPageSpaceGraphNodeId(graphNodeId))
+	// A widget family this module only imported is rooted where it was declared,
+	// so `undefined` is the honest owner: no component here may claim its nodes.
+	const adoptedWidgets = adoptedWidgetDefinitionIds(input);
+	const resolveOwners = (
+		graphNodeIds: ReadonlyArray<string>,
+	): ReadonlyArray<string | undefined> => {
+		const pending = declaringComponents();
+		return graphNodeIds.map((graphNodeId) => {
+			if (isPageSpaceGraphNodeId(graphNodeId)) {
+				const definitionId = graphNodeId.slice(0, graphNodeId.lastIndexOf('/'));
+				return (
+					widgetOwner.get(definitionId) ??
+					(adoptedWidgets.has(definitionId) ? undefined : rootComponentName)
+				);
+			}
+			const queue = pending.get(graphNodeId);
+			const declared = queue && queue.length > 1 ? queue.shift() : queue?.[0];
 			return (
-				widgetOwner.get(graphNodeId.slice(0, graphNodeId.lastIndexOf('/'))) ??
-				rootComponentName
+				declared ?? chunkOwner.get(graphNodeId) ?? branchOwner.get(graphNodeId) ?? rootComponentName
 			);
-		const queue = pending.get(graphNodeId);
-		const declared = queue && queue.length > 1 ? queue.shift() : queue?.[0];
-		return (
-			declared ?? chunkOwner.get(graphNodeId) ?? branchOwner.get(graphNodeId) ?? rootComponentName
-		);
+		});
 	};
 	return {
-		cells: input.protocolState.cells.map((cell) => ownerOf(cell.graphNodeId)),
-		computed: input.protocolState.computed.map((computed) => ownerOf(computed.graphNodeId)),
+		cells: resolveOwners(input.protocolState.cells.map((cell) => cell.graphNodeId)),
+		computed: resolveOwners(input.protocolState.computed.map((computed) => computed.graphNodeId)),
 	};
 }

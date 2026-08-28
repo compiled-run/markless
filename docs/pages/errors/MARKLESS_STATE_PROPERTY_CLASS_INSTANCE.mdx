@@ -1,0 +1,22 @@
+# MARKLESS_STATE_PROPERTY_CLASS_INSTANCE
+
+A class instance cannot be a field of a shared() or state() value
+
+- Package: compiler
+- Pass or phase: capture-analysis
+- Severity: error
+
+## Message
+
+TODO: this code has no builder message in source.
+
+## Why
+
+Only declared graph fields cross the boundary. A class instance is not one, so the rebuilt object has a hole where the field was, and any method reached through the graph arrives unbound.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/capture-analysis.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
