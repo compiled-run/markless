@@ -1,6 +1,5 @@
 import { state } from '@markless/core';
-// Registration is a follow-up unit, so the barrel has no `taglist` export yet.
-import * as taglist from '../index.ts';
+import { taglist } from '../../index.ts';
 
 // A consumer's own component, mounted inside the root, reading the family's
 // instance. This is the shape a chip row in a multi-select combobox would take.

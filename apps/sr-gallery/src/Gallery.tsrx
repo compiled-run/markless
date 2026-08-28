@@ -25,6 +25,7 @@ import {
 	select,
 	slider,
 	tabs,
+	taglist,
 	textbox,
 	toggle,
 	toolbar,
@@ -37,7 +38,7 @@ import {
 // /#toggle, /#textbox, /#progress, /#checklist, /#select, /#modal,
 // /#radio-group, /#rating-group, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
 // /#fileupload, /#hovercard, /#calendar, /#menu, /#menubar, /#colorpicker,
-// /#buttongroup, /#editable, /#numberbox, /#ink, /#pad, /#crop, /#tour, /#toolbar, /#drawer. A family whose
+// /#buttongroup, /#editable, /#taglist, /#numberbox, /#ink, /#pad, /#crop, /#tour, /#toolbar, /#drawer. A family whose
 // second shape a reader announces differently gets its own section too: /#slider-range,
 // /#numberbox-min-max-step, /#numberbox-currency, /#crop-image.
 //
@@ -460,6 +461,24 @@ export function Gallery() @{
 			</div>
 		</section>
 
+		{/* After #buttongroup for the reason #editable carries: a taglist root is a role="group" too, and NVDA says "grouping" for a radiogroup as well, so a section of groups before #radio-group would end that lane's walk on the wrong widget. */}
+		<section id="taglist">
+			<h2>Tag list</h2>
+			<div class="scenario">
+				<TopicTags />
+			</div>
+
+			{/* No field at all: nothing here adds a tag, and the delete buttons are still ordinary tab stops carrying the whole arrow walk. */}
+			<div class="scenario">
+				<FilterTags />
+			</div>
+
+			{/* Per-tag inline edit, opt in: Enter on a highlighted tag opens its own field, F2 opens the tag that has focus. */}
+			<div class="scenario">
+				<StageTags />
+			</div>
+		</section>
+
 		{/* One numberbox per section: the step buttons are named "Decrease" and "Increase" whatever the field is called, and each root serves one live region, so two shapes under one anchor would leave a reader's walk with no way to tell which control it had reached. */}
 		<section id="numberbox">
 			<h2>Number box</h2>
@@ -809,6 +828,79 @@ function FileRows() @{
 			</fileupload.item>
 		}
 	</div>
+}
+
+// The chips are the page's own markup over the page's own array, repeated inside
+// the root. The array lives on a state OBJECT rather than a reassigned binding,
+// because a repeat follows a property write; a construct may not be a component
+// tag's direct child either, which is why the repeat opens in a plain element.
+function TopicTags() @{
+	const own = state({ tags: ['alpha', 'beta'] as readonly string[] });
+
+	<taglist.root
+		name="topics"
+		value={own.tags}
+		onChange={(next: readonly string[]) => {
+			own.tags = next;
+		}}
+	>
+		<taglist.label>Topics</taglist.label>
+		<div role="presentation">
+			@for (const tag of own.tags; key tag) {
+				<taglist.item value={tag}>
+					<taglist.itemlabel />
+					<taglist.itemclose>×</taglist.itemclose>
+				</taglist.item>
+			}
+		</div>
+		<taglist.input placeholder="Add a topic" />
+		<taglist.field />
+	</taglist.root>
+}
+
+function FilterTags() @{
+	const own = state({ tags: ['red', 'green', 'blue'] as readonly string[] });
+
+	<taglist.root
+		value={own.tags}
+		onChange={(next: readonly string[]) => {
+			own.tags = next;
+		}}
+	>
+		<taglist.label>Active filters</taglist.label>
+		<div role="presentation">
+			@for (const tag of own.tags; key tag) {
+				<taglist.item value={tag}>
+					<taglist.itemlabel />
+					<taglist.itemclose>×</taglist.itemclose>
+				</taglist.item>
+			}
+		</div>
+	</taglist.root>
+}
+
+function StageTags() @{
+	const own = state({ tags: ['draft', 'review'] as readonly string[] });
+
+	<taglist.root
+		editable
+		value={own.tags}
+		onChange={(next: readonly string[]) => {
+			own.tags = next;
+		}}
+	>
+		<taglist.label>Stages</taglist.label>
+		<div role="presentation">
+			@for (const tag of own.tags; key tag) {
+				<taglist.item value={tag}>
+					<taglist.itemlabel />
+					<taglist.iteminput />
+					<taglist.itemclose>×</taglist.itemclose>
+				</taglist.item>
+			}
+		</div>
+		<taglist.input />
+	</taglist.root>
 }
 
 const SHADOW = [{ id: 'offset', x: 0.25, y: 0.75 }];

@@ -3604,7 +3604,7 @@
 						"type": "boolean",
 						"required": false,
 						"default": "false",
-						"doc": "A tag can be opened for editing in place: Enter on a highlighted tag, or a\ndouble-click on the tag itself. Off by default, like every other\nbehavioural boolean in this package."
+						"doc": "A tag can be opened for editing in place: Enter on a highlighted tag while\nthe caret is in the field, F2 on a tag that has focus, or a double-click on\nthe tag itself. Off by default, like every other behavioural boolean in this\npackage."
 					},
 					{
 						"name": "name",

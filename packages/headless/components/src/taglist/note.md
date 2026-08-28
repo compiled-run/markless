@@ -117,6 +117,9 @@ collision, which is what a keyed row of an array needs and a single string does 
 - **No `<style>` block.** SPEC calls for CSS defaults where the family needs them — anchor
   positioning, hidden-until-open, stacking. taglist needs none: the edit field is hidden with the
   `hidden` attribute and chip layout is entirely the consumer's.
-- **Registration is a follow-up.** Scenarios import `* as taglist from '../index.ts'` because the
-  barrel has no `taglist` export yet, and `taglist-transcript.ts` spells its own gallery anchor
-  because `FAMILY_ANCHORS` has no `taglist` key. Both are marked in place for the registration unit.
+- **Registered.** The barrel exports `taglist`, `package.json` exports `./taglist`, the conformance
+  battery carries a descriptor, and the sr-gallery serves `#taglist` with the tags input, the
+  display-only row and the editable one. Scenarios import `{ taglist }` from the barrel the way a
+  consumer would, and `taglist-transcript.ts` reads `FAMILY_ANCHORS.taglist` and the shared
+  `GALLERY_WALK_LIMIT`. What that unit found is in
+  `goals/headless-components/notes/U706-taglist-registration.md`.

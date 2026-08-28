@@ -1,8 +1,5 @@
 import { state } from '@markless/core';
-// Registration is a follow-up unit, so the barrel has no `taglist` export yet.
-// This is the same namespace object `import { taglist } from '../../index.ts'`
-// will hand back once it does.
-import * as taglist from '../index.ts';
+import { taglist } from '../../index.ts';
 
 // Per-tag inline edit, opt in. Enter on a highlighted tag or a double-click on
 // the tag itself opens its own field; Enter takes the words, Escape gives the tag

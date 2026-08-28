@@ -84,6 +84,10 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	// Each editable root is a role="group"; the preview button and the field it
 	// swaps with are both always in the DOM, so the group is what counts a shape.
 	editable: 'group',
+	// Each taglist root is a role="group" and the chips inside carry no collection
+	// role at all, so the group is the only thing a shape puts in the tree
+	// whether or not it mounts a field.
+	taglist: 'group',
 	// A real text input and no role of its own; the submitted field beside it is a
 	// second, aria-hidden one, which includeHidden counts too.
 	numberbox: 'textbox',
@@ -136,6 +140,9 @@ const RENDERED_COUNT: Partial<Record<FamilyName, number>> = {
 	// The starter, the double-click one and the read-only one: a count catches a
 	// section that rendered the starter and lost the other two shapes.
 	editable: 3,
+	// The tags input, the display-only filter row and the editable one: a count
+	// catches a section that rendered the starter and lost the other two shapes.
+	taglist: 3,
 };
 
 const appDir = fileURLToPath(new URL('..', import.meta.url));
@@ -753,6 +760,47 @@ async function main() {
 			} else {
 				console.log('#rating-group\'s read-only group reads its value back as "4.5 of 5".');
 			}
+		}
+
+		// The role count above says three shapes rendered. What a reader lane then
+		// turns on is that a row carrying no collection role is still navigable:
+		// the group is named by its label part, each tag's own words reach a
+		// person through the button that removes it, and the live region that
+		// speaks every add and removal is mounted per shape.
+		const taglistSection = page.locator('#taglist');
+		const taglistGroup = taglistSection.getByRole('group').first();
+		const taglistLabelledBy = await taglistGroup.getAttribute('aria-labelledby');
+		if (taglistLabelledBy === null) {
+			failures.push('#taglist\'s group points at no label through aria-labelledby.');
+		} else {
+			const title = await page.locator(`[id="${taglistLabelledBy}"]`).textContent();
+			if (title?.trim() !== 'Topics') {
+				failures.push(
+					`#taglist's aria-labelledby reaches "${title?.trim()}", not its label part.`,
+				);
+			} else {
+				console.log('#taglist serves a group named by its label part.');
+			}
+		}
+
+		for (const tag of ['alpha', 'beta']) {
+			const remove = taglistSection.getByRole('button', { name: `Remove ${tag}` });
+			if ((await remove.count()) !== 1) {
+				failures.push(
+					`#taglist serves ${await remove.count()} buttons named "Remove ${tag}", not the 1 that carries the tag's own words.`,
+				);
+			} else {
+				console.log(`#taglist names its delete button "Remove ${tag}".`);
+			}
+		}
+
+		const spokenTags = taglistSection.locator('output[aria-live="polite"]');
+		if ((await spokenTags.count()) !== 3) {
+			failures.push(
+				`#taglist serves ${await spokenTags.count()} live regions, not the 3 its three shapes need to speak a change.`,
+			);
+		} else {
+			console.log('#taglist mounts the live region that speaks a change, one per shape.');
 		}
 
 		// The role count above says three shapes rendered. What a reader lane then
