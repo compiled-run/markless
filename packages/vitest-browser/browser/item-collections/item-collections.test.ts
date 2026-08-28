@@ -2,6 +2,7 @@ import { userEvent } from 'vite-plus/test/browser';
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import ComposedPage from './ic-composed-page.tsrx';
+import FlatPage from './ic-flat-page.tsrx';
 import KeyedPage from './ic-keyed-page.tsrx';
 import MutatingPage from './ic-mutating-page.tsrx';
 import StaticPage from './ic-static-page.tsrx';
@@ -214,4 +215,81 @@ test('SSR: a position is never global - the second roster starts at zero', async
 	expect(seen(1)).toBe('0,1,2');
 	expect(positions('[data-ic-first]')).toEqual(['0', '1']);
 	expect(positions('[data-ic-second]')).toEqual(['0', '1', '2']);
+});
+
+// --- flat items, no keyed repeat --------------------------------------------
+
+// The shape a consumer actually writes for `tour` and `otp`: the parts are
+// siblings in the consumer's own markup. Their handle is component-local, so
+// before this was qualified per component instance every flat part filed under
+// one bare key, the key named several elements, and the re-derive answered -1.
+const flatAdd = () => document.querySelector('[data-ic-flat-add]') as HTMLElement;
+const flatDrop = () => document.querySelector('[data-ic-flat-drop]') as HTMLElement;
+
+test('CSR: flat items in two instances each count from zero at first paint', async () => {
+	await render(FlatPage);
+
+	expect(positions('[data-ic-first]')).toEqual(['0', '1', '2']);
+	expect(positions('[data-ic-second]')).toEqual(['0', '1']);
+});
+
+test('SSR: flat items in two instances each count from zero at first paint', async () => {
+	await renderSSR(FlatPage);
+
+	expect(positions('[data-ic-first]')).toEqual(['0', '1', '2']);
+	expect(positions('[data-ic-second]')).toEqual(['0', '1']);
+});
+
+test('CSR: a flat item behind an arrival renumbers and never answers -1', async () => {
+	await render(FlatPage);
+	await userEvent.click(flatAdd());
+	await expect.poll(() => items('[data-ic-first]').length, { timeout: 5000 }).toBe(4);
+
+	expect(positions('[data-ic-first]')).toEqual(['0', '1', '2', '3']);
+	expect(positions('[data-ic-second]')).toEqual(['0', '1']);
+});
+
+test('SSR: a flat item behind an arrival renumbers and never answers -1', async () => {
+	await renderSSR(FlatPage);
+	await userEvent.click(flatAdd());
+	await expect.poll(() => items('[data-ic-first]').length, { timeout: 5000 }).toBe(4);
+
+	expect(positions('[data-ic-first]')).toEqual(['0', '1', '2', '3']);
+	expect(positions('[data-ic-second]')).toEqual(['0', '1']);
+});
+
+test('CSR: a flat item behind a removal renumbers and never answers -1', async () => {
+	await render(FlatPage);
+	await userEvent.click(flatDrop());
+	await expect.poll(() => items('[data-ic-first]').length, { timeout: 5000 }).toBe(2);
+
+	expect(positions('[data-ic-first]')).toEqual(['0', '1']);
+	expect(positions('[data-ic-second]')).toEqual(['0', '1']);
+});
+
+test('SSR: a flat item behind a removal renumbers and never answers -1', async () => {
+	await renderSSR(FlatPage);
+	await userEvent.click(flatDrop());
+	await expect.poll(() => items('[data-ic-first]').length, { timeout: 5000 }).toBe(2);
+
+	expect(positions('[data-ic-first]')).toEqual(['0', '1']);
+	expect(positions('[data-ic-second]')).toEqual(['0', '1']);
+});
+
+test('CSR: the roster of a flat instance reads its own items only', async () => {
+	await render(FlatPage);
+	await surveyed(0);
+	await surveyed(1);
+
+	expect(seen(0)).toBe('0,1,2');
+	expect(seen(1)).toBe('0,1');
+});
+
+test('SSR: the roster of a flat instance reads its own items only', async () => {
+	await renderSSR(FlatPage);
+	await surveyed(0);
+	await surveyed(1);
+
+	expect(seen(0)).toBe('0,1,2');
+	expect(seen(1)).toBe('0,1');
 });
