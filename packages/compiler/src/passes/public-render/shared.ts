@@ -830,10 +830,24 @@ export function componentOwnedStateNodes(
 		],
 		input.semanticGraph,
 	);
+	// An adopted family's nodes are owned by no component here, which is what
+	// keeps a part from composing as a second root of it. A computed record
+	// carries no such identity, and without one somewhere the chain never
+	// re-derives - so the components that RENDER the value carry it, and an
+	// outermost adopter, which is the only instance of the family on the page,
+	// is one of them.
+	const adopted = adoptedWidgetDefinitionIds(input);
+	const rendersAdoptedComputed = (graphNodeId: string, index: number) =>
+		owner.computed[index] === undefined &&
+		adopted.has(graphNodeId.slice(0, graphNodeId.lastIndexOf('/'))) &&
+		readGraphNodeIds.has(graphNodeId);
 	return {
 		cellIndexes,
-		computedIndexes: input.protocolState.computed.flatMap((_computed, index) =>
-			owner.computed[index] === componentName ? [index] : [],
+		computedIndexes: input.protocolState.computed.flatMap((computed, index) =>
+			owner.computed[index] === componentName ||
+			rendersAdoptedComputed(computed.graphNodeId, index)
+				? [index]
+				: [],
 		),
 		seedCellIndexes: input.protocolState.cells.flatMap((cell, index) =>
 			cellIndexes.includes(index) ||

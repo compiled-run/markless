@@ -411,23 +411,25 @@ export function widgetRootComponents(input: PublicRenderModuleInput): Map<string
 /**
  * The widget-scoped definitions this module only ADOPTED from an import.
  *
- * Their cells belong to whichever rendered widget the ENCLOSING instance rooted,
- * so no component here owns one. Handing them to the module root instead makes
- * every rendered instance of that component a second root of somebody else's
- * family, and the family's element() rosters then merge across sibling widgets.
+ * A family's CELLS are its instance identity: the runtime reads "this component
+ * roots that family" off the cells a composed child owns
+ * (`marklessRegisterComposedWidgets`, `widgetRootsOf`), so an adopting component
+ * that owns one composes as a second root beside the instance it meant to read
+ * and the two element() rosters merge. No component here owns one.
+ *
+ * Nothing infers rooting from a COMPUTED record, so the same answer must not be
+ * given for those: unowning them leaves an outermost adopter - a page nothing
+ * encloses - with no record to re-derive from, which is why
+ * `componentOwnedStateNodes` hands an adopted family's computeds to the
+ * components that render them.
  */
 export function adoptedWidgetDefinitionIds(
 	input: PublicRenderModuleInput,
 ): ReadonlySet<string> {
-	// Only a family carrying an element() handle has a roster to merge; a page
-	// adopting a handle-less family is its outermost owner and keeps its derives.
 	return new Set(
 		input.semanticGraph.sharedDefinitions.flatMap((definition) =>
 			definition.scope === 'widget' &&
-			definition.id !== sharedDefinitionId(input.semanticGraph.filename, definition.exportedName) &&
-			(definition.returnProperties ?? []).some(
-				(property) => property.kind === 'graph' && property.graphNodeId.includes('/element:'),
-			)
+			definition.id !== sharedDefinitionId(input.semanticGraph.filename, definition.exportedName)
 				? [definition.id]
 				: [],
 		),
