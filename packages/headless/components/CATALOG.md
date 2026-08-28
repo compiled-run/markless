@@ -14,6 +14,10 @@ Pure CSS, pure logic, and visual skins do not qualify.
 - `-box` — textbox-lineage editing surfaces (tokenbox, datebox, timebox).
 - Bare nouns where HTML/ARIA already owns the word (table, menu, modal).
 - Behavior names belong to families; use-case names belong to docs recipes (see tokenbox).
+- `toggle` is this library's switch: `switch` is a JS reserved word and cannot be an export name.
+  Consequence (owner, 2026-08-28): the pressed-buttons group is `buttongroup`, never `togglegroup` —
+  "group of toggles" would falsely read as a group of switches. The radio-group item-symmetry
+  rule yields to the reserved-word substitution.
 - Rejected patterns: visual-skin names (chips, cards, gallery), single-use-case names (prompt),
   names colliding with framework vocabulary (bare `grid` = CSS Grid; `tags-input` was renamed
   because "tag" means element in a markup framework — "taglist" reads as its own noun).
