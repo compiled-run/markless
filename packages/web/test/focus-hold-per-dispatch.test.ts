@@ -17,7 +17,7 @@ import type { ResumeElementHandleValue } from '../src/resume-types.ts';
  * leaving the active element where it was.
  */
 
-type FakeDocument = { activeElement: unknown };
+type FakeDocument = { activeElement: unknown; body?: unknown };
 
 type FakeElement = {
 	readonly name: string;
@@ -165,4 +165,36 @@ test('a focus that took is not replayed at the commit', () => {
 	marklessEndFocusCommit(dispatch);
 
 	expect(owner.activeElement).toBe(other);
+});
+
+// A commit that re-inserts the row it kept takes the focused node out of the
+// document on the way, and the browser answers that by resetting to the body -
+// so a focus that took is lost exactly as a refused one is.
+test('a focus the commit dropped to the body is re-landed', () => {
+	const body = { name: 'body' };
+	const owner: FakeDocument = { activeElement: body, body };
+	const landed = makeElement('landed', owner, false);
+
+	const dispatch = marklessBeginFocusCommit();
+	handOut(landed).focus();
+	expect(owner.activeElement).toBe(landed);
+
+	owner.activeElement = body;
+	marklessEndFocusCommit(dispatch);
+
+	expect(owner.activeElement).toBe(landed);
+});
+
+test('a focus the commit dropped is not re-landed onto a node the commit removed', () => {
+	const body = { name: 'body' };
+	const owner: FakeDocument = { activeElement: body, body };
+	const gone = makeElement('gone', owner, false);
+
+	const dispatch = marklessBeginFocusCommit();
+	handOut(gone).focus();
+	owner.activeElement = body;
+	gone.isConnected = false;
+	marklessEndFocusCommit(dispatch);
+
+	expect(owner.activeElement).toBe(body);
 });

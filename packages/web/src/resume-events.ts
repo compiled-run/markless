@@ -66,9 +66,12 @@ type ExecutionLogGlobal = typeof globalThis & {
  * hidden or inert target is a silent no-op, so a call the target REFUSED is
  * remembered and replayed once the commit the same dispatch performs has landed.
  *
- * Only elements a handler reached through the runtime get this, and only a
- * refused call is ever held: a focus that took is left exactly where it
- * happened.
+ * A call the target TOOK is held too, because a commit can undo it: a keyed
+ * repeat re-inserts the rows it keeps, and moving or removing the focused node
+ * resets the page to `<body>`. Such a hold lands only if the document fell back
+ * to its body - focus that some other element claimed is left alone.
+ *
+ * Only elements a handler reached through the runtime get this.
  *
  * Reaching through the runtime has two spellings, because an overlay's closing
  * handler has no handle for where focus was. It reads the element the overlay
@@ -86,7 +89,10 @@ type FocusCall = (options?: FocusOptions) => void;
 type HandleElement = {
 	focus?: FocusCall;
 	readonly isConnected?: boolean;
-	readonly ownerDocument?: { readonly activeElement?: unknown } | null;
+	readonly ownerDocument?: {
+		readonly activeElement?: unknown;
+		readonly body?: unknown;
+	} | null;
 	__marklessNativeFocus?: FocusCall;
 };
 
@@ -102,7 +108,11 @@ let openFocusDispatch = 0;
 let nextFocusDispatch = 0;
 const pendingFocus = new Map<
 	number,
-	{ readonly target: HandleElement; readonly options?: FocusOptions }
+	{
+		readonly target: HandleElement;
+		readonly options?: FocusOptions;
+		readonly took: boolean;
+	}
 >();
 
 function installFocusShim(target: HandleElement | undefined): void {
@@ -115,12 +125,15 @@ function installFocusShim(target: HandleElement | undefined): void {
 			writable: true,
 			value(options?: FocusOptions) {
 				native(options);
-				// A focus that took needs nothing more, and one asked for outside a
-				// dispatch has no commit to wait for. Only a call the target refused
-				// while its own dispatch still holds uncommitted writes is worth
-				// replaying: the last such call is the one the handler meant.
-				if (openFocusDispatch !== 0 && target.ownerDocument?.activeElement !== target)
-					pendingFocus.set(openFocusDispatch, { target, options });
+				// A call outside a dispatch has no commit to wait for. Inside one, the
+				// last call is the one the handler meant, whether the target refused it
+				// or took it: the commit can undo either.
+				if (openFocusDispatch !== 0)
+					pendingFocus.set(openFocusDispatch, {
+						target,
+						options,
+						took: target.ownerDocument?.activeElement === target,
+					});
 			},
 		});
 	} catch {
@@ -161,8 +174,8 @@ export function marklessBeginFocusCommit(): number {
 /**
  * Closes it, landing what this dispatch asked for. Called only once the
  * dispatch's flush has resolved, so the writes that unhid or un-inerted the
- * target are in the DOM and the blur that hiding a focused subtree causes has
- * already fired.
+ * target are in the DOM, the blur that hiding a focused subtree causes has
+ * already fired, and the rows a keyed repeat re-inserted are back in place.
  */
 export function marklessEndFocusCommit(dispatch: number): void {
 	if (openFocusDispatch === dispatch) openFocusDispatch = 0;
@@ -170,6 +183,13 @@ export function marklessEndFocusCommit(dispatch: number): void {
 	if (!held) return;
 	pendingFocus.delete(dispatch);
 	if (held.target.isConnected === false) return;
+	// A hold whose call took is landed only when the commit dropped focus to the
+	// body: an element that claimed focus in the meantime keeps it.
+	if (
+		held.took &&
+		held.target.ownerDocument?.activeElement !== held.target.ownerDocument?.body
+	)
+		return;
 	held.target[NATIVE_FOCUS]?.call(held.target, held.options);
 }
 
@@ -177,12 +197,30 @@ export function marklessEndFocusCommit(dispatch: number): void {
 // focused element can still receive, so a record naming one is a handler the
 // page is about to need. Restated in render-csr and in the serialized inline
 // boot: neither can reach a shared module without paying a chunk for it.
-const FOCUS_KEY_EVENT_NAMES = ['keydown', 'keyup', 'keypress'];
-const FOCUS_EDITABLE_EVENT_NAMES = ['beforeinput', 'input'];
 // A pointer crosses onto a control before it presses it, and Safari focuses no
 // button on click - so hover, not focus, is what reliably precedes a first
 // press. A focused control still reaches these through Enter and Space.
 const PRESS_EVENT_NAMES = ['click', 'pointerdown', 'pointerup'];
+// The two lists are written out rather than spread together: they are read on
+// every focusin, so they are built once, and the caller only ever iterates them.
+const FOCUS_PRELOAD_EVENT_NAMES = [
+	'keydown',
+	'keyup',
+	'keypress',
+	'click',
+	'pointerdown',
+	'pointerup',
+];
+const EDITABLE_PRELOAD_EVENT_NAMES = [
+	'keydown',
+	'keyup',
+	'keypress',
+	'beforeinput',
+	'input',
+	'click',
+	'pointerdown',
+	'pointerup',
+];
 
 function focusPreloadEventNames(element: {
 	readonly tagName?: unknown;
@@ -193,16 +231,12 @@ function focusPreloadEventNames(element: {
 		tagName === 'INPUT' ||
 		tagName === 'TEXTAREA' ||
 		tagName === 'SELECT'
-		? [...FOCUS_KEY_EVENT_NAMES, ...FOCUS_EDITABLE_EVENT_NAMES, ...PRESS_EVENT_NAMES]
-		: [...FOCUS_KEY_EVENT_NAMES, ...PRESS_EVENT_NAMES];
+		? EDITABLE_PRELOAD_EVENT_NAMES
+		: FOCUS_PRELOAD_EVENT_NAMES;
 }
 
 function isFocusPreloadEventName(eventName: string): boolean {
-	return (
-		FOCUS_KEY_EVENT_NAMES.includes(eventName) ||
-		FOCUS_EDITABLE_EVENT_NAMES.includes(eventName) ||
-		PRESS_EVENT_NAMES.includes(eventName)
-	);
+	return EDITABLE_PRELOAD_EVENT_NAMES.includes(eventName);
 }
 
 export function createEventWiring(input: {
@@ -492,9 +526,10 @@ export function createEventWiring(input: {
 		if (eventRecord.syncPolicy && !options.syncPolicyAlreadyApplied)
 			runPolicy?.(eventRecord.syncPolicy, input.graph, event);
 		let activeSymbolId: string | undefined;
-		let focusCommit = 0;
+		// Opened before the try: beginning the window cannot throw, and the finally
+		// that closes it then needs no guard.
+		const focusCommit = marklessBeginFocusCommit();
 		try {
-			focusCommit = marklessBeginFocusCommit();
 			await input.prepareRuntimeShared();
 			for (const hostNodeId of input.behaviorHostIdsForAncestors(element)) {
 				const activation = input.activateBehaviorsFromTrigger(hostNodeId);
@@ -574,7 +609,7 @@ export function createEventWiring(input: {
 			throw error;
 		} finally {
 			await input.flushRuntimeGraph();
-			if (focusCommit !== 0) marklessEndFocusCommit(focusCommit);
+			marklessEndFocusCommit(focusCommit);
 			await marklessLogInteraction({
 				eventName: event.type,
 				eventRecord,
@@ -608,9 +643,8 @@ export function createEventWiring(input: {
 		if (rowEvent.syncPolicy && !options.syncPolicyAlreadyApplied)
 			runPolicy?.(rowEvent.syncPolicy, input.graph, event);
 		let activeSymbolId: string | undefined;
-		let focusCommit = 0;
+		const focusCommit = marklessBeginFocusCommit();
 		try {
-			focusCommit = marklessBeginFocusCommit();
 			await input.prepareRuntimeShared();
 			const settling = input.graph.settleWriteObservers?.();
 			if (settling) await settling;
@@ -672,7 +706,7 @@ export function createEventWiring(input: {
 			throw error;
 		} finally {
 			await input.flushRuntimeGraph();
-			if (focusCommit !== 0) marklessEndFocusCommit(focusCommit);
+			marklessEndFocusCommit(focusCommit);
 			await marklessLogInteraction({
 				eventName: event.type,
 				eventRecord: rowEvent,
