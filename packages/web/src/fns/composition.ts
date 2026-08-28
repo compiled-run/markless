@@ -295,18 +295,18 @@ export function marklessQualifyChildState(
 export function marklessRegisterComposedWidgets(children: ReadonlyArray<ComposeChild>): void {
 	const roots: string[] = [];
 	const projections: Array<readonly [string, string]> = [];
+	const designated = marklessDesignatedWidgetPaths(children);
 	for (const child of children) {
 		const instancePath = marklessComposedInstancePath(child);
 		if (!instancePath) continue;
 		for (const definition of child.output?.state?.sharedDefinitions ?? []) {
 			if (definition.scope !== 'widget') continue;
+			if (!marklessCarriesWidgetCells(child, definition.id)) continue;
 			if (
-				!(child.output?.state?.cells ?? []).some((cell) =>
-					cell.graphNodeId.startsWith(definition.id + '/'),
-				)
+				!marklessDesignatesWidget(child, definition.id) &&
+				!marklessCarrierRootsWidget(children, child, instancePath, definition.id, designated)
 			)
 				continue;
-			if (!marklessDesignatesWidget(child, definition.id)) continue;
 			roots.push(instancePath + definition.id);
 			// The same widget, registered again under the projection site a part sits at.
 			const rootPath = instancePath + marklessInstancePath(definition.id);
@@ -316,6 +316,82 @@ export function marklessRegisterComposedWidgets(children: ReadonlyArray<ComposeC
 	}
 	marklessRegisterWidgetInstanceIds(roots);
 	marklessRegisterWidgetProjections(projections);
+}
+
+function marklessCarriesWidgetCells(child: ComposeChild, definitionId: string): boolean {
+	return (child.output?.state?.cells ?? []).some((cell) =>
+		cell.graphNodeId.startsWith(definitionId + '/'),
+	);
+}
+
+// Where each widget family this level composes is already rooted: the paths of
+// the children that DESIGNATE it, which is the answer the carrier rule below
+// has to defer to.
+function marklessDesignatedWidgetPaths(
+	children: ReadonlyArray<ComposeChild>,
+): Map<string, string[]> {
+	const paths = new Map<string, string[]>();
+	for (const child of children) {
+		const instancePath = marklessComposedInstancePath(child);
+		if (!instancePath) continue;
+		for (const definition of child.output?.state?.sharedDefinitions ?? [])
+			if (
+				definition.scope === 'widget' &&
+				marklessCarriesWidgetCells(child, definition.id) &&
+				marklessDesignatesWidget(child, definition.id)
+			) {
+				const held = paths.get(definition.id);
+				if (held) held.push(instancePath);
+				else paths.set(definition.id, [instancePath]);
+			}
+	}
+	return paths;
+}
+
+/**
+ * Whether a CARRIER is nevertheless the root of the family it carries.
+ *
+ * A family nothing seeds hands its cells to every resolver and designates one,
+ * so a page rendering a second root-shaped component of that family - a variant
+ * root beside the designated one - would leave that whole half of the page
+ * rooted nowhere, reading the same cells every other instance reads. Two facts
+ * make a carrier that root, and it needs both.
+ *
+ * It has to ENCLOSE another part of the family: a carrier standing at a proper
+ * prefix of another resolver's instance path is what those parts resolve into.
+ * Co-maximal carriers - siblings enclosing nobody - stay page-wide, because
+ * which single instance they share is unobservable and rooting each of them
+ * separately is the several-instances-of-one-widget defect this rule avoids.
+ *
+ * And nothing may root the family ABOVE it, because a content part wrapping a
+ * family's options inside the family's own designated root encloses them too,
+ * and is a part of that widget rather than the start of a second one nested in
+ * it. A row's carrier never roots either; its cells are dropped below.
+ */
+function marklessCarrierRootsWidget(
+	children: ReadonlyArray<ComposeChild>,
+	carrier: ComposeChild,
+	instancePath: string,
+	definitionId: string,
+	designated: ReadonlyMap<string, ReadonlyArray<string>>,
+): boolean {
+	if (instancePath.includes('r:')) return false;
+	if (
+		(designated.get(definitionId) ?? []).some(
+			(rootPath) => instancePath.length > rootPath.length && instancePath.startsWith(rootPath),
+		)
+	)
+		return false;
+	return children.some((other) => {
+		if (other === carrier) return false;
+		const otherPath = marklessComposedInstancePath(other);
+		return (
+			otherPath.length > instancePath.length &&
+			otherPath.startsWith(instancePath) &&
+			marklessCarriesWidgetCells(other, definitionId) &&
+			!marklessDesignatesWidget(other, definitionId)
+		);
+	});
 }
 
 /**
@@ -467,6 +543,10 @@ function marklessComposedState<T extends ComposeStateDraft>(
 			),
 		),
 	]);
+	const cells = marklessMergedWidgetCells(
+		[...(state.cells ?? []), ...childStates.flatMap((childState) => childState.cells ?? [])],
+		sharedDefinitions,
+	);
 	const sharedSeeds = [
 		...(state.sharedSeeds ?? []),
 		...children.flatMap((child) =>
@@ -478,10 +558,7 @@ function marklessComposedState<T extends ComposeStateDraft>(
 	];
 	return {
 		...state,
-		cells: marklessMergedWidgetCells(
-			[...(state.cells ?? []), ...childStates.flatMap((childState) => childState.cells ?? [])],
-			sharedDefinitions,
-		),
+		cells,
 		computed: [
 			...(state.computed ?? []),
 			...children.flatMap((child) =>

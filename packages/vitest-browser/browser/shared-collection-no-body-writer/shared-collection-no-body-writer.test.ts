@@ -6,6 +6,8 @@ import EmptyPage from './empty-page.tsrx';
 import FirstResolverPage from './first-resolver-page.tsrx';
 import NestedPage from './nested-page.tsrx';
 import SeededPage from './no-writer-page.tsrx';
+import RootlessPage from './rootless-page.tsrx';
+import SeededRootPage from './seeded-page.tsrx';
 
 /**
  * A widget-scope `shared()` collection no component body ever writes, pushed to
@@ -99,5 +101,50 @@ for (const mode of ['CSR', 'SSR'] as const) {
 		else await renderSSR(NestedPage);
 
 		await takesTheWrite([]);
+	});
+
+	// Still unresolved, and pinned so it stays visible. This page renders a part
+	// of a family whose cells only its SEEDING root owns, and that root is
+	// nowhere - so the handler's `[...box.items, 'gamma']` spreads undefined and
+	// V8 spells that "context.graph.read is not a function or its return value is
+	// not iterable". Refusing it by name needs a signal composition does not have:
+	// a part of a family declared in its own module whose cells went to a
+	// component the page never rendered, and a part ADOPTING a family declared in
+	// another module - which is page-wide on purpose and green today in
+	// browser/adopted-family-derives - reach composition looking identical, each
+	// shipping the definition record and carrying none of its cells.
+	test.fails(`${mode}: a part whose family rendered no root or carrier names its failure`, async () => {
+		if (mode === 'CSR') await render(RootlessPage);
+		else await renderSSR(RootlessPage);
+
+		click('add');
+
+		await expect
+			.poll(() => thrown.join('\n'))
+			.toMatch(/MARKLESS_WIDGET_INSTANCE_UNRESOLVED/);
+	});
+
+	test(`${mode}: that page reads undefined rather than writing into the void`, async () => {
+		if (mode === 'CSR') await render(RootlessPage);
+		else await renderSSR(RootlessPage);
+
+		expect(fieldValues()).toEqual([]);
+		click('add');
+
+		await expect
+			.poll(() => thrown.join('\n'))
+			.toContain('is not a function or its return value is not iterable');
+		expect(fieldValues()).toEqual([]);
+	});
+
+	test(`${mode}: the same part takes the write once its family's root renders`, async () => {
+		if (mode === 'CSR') await render(SeededRootPage);
+		else await renderSSR(SeededRootPage);
+
+		expect(fieldValues()).toEqual(['alpha', 'beta']);
+		click('add');
+		await expect.poll(() => count()).toBe('3');
+		await expect.poll(() => fieldValues()).toEqual(['alpha', 'beta', 'gamma']);
+		expect(thrown).toEqual([]);
 	});
 }
