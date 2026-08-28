@@ -273,17 +273,23 @@ What the storms turned up. Nothing here is fixed in this lane — the lane's job
 is to produce the reproduction, and the families and the runtime are owned
 elsewhere. Every family below stays in the exploratory set.
 
-The pinned CI seed `20260828` is red on 13 of 71 rows as this lands. That is the
-lane doing its job on its first full pass, not a lane to weaken: the storms and
-the invariants are unchanged from the pilot, and the recoveries are the families'
-own pinned gestures. Read the exclusion note under each finding before making CI
+The pinned CI seed `20260828` was red on 13 of 71 rows on the first full pass.
+That is the lane doing its job, not a lane to weaken: the storms and the
+invariants are unchanged from the pilot, and the recoveries are the families' own
+pinned gestures. Read the exclusion note under each finding before making CI
 green with it.
+
+Three of those reds were the lane's own model rather than a family, and are
+refuted below with the reason: fileupload (both rows) and radio-group's keyboard
+row, fixed by making `type-into` write only where a keyboard could type, and
+otp's box/field disagreement, which was the recovery reading the field before the
+family committed. The count above has not been re-measured by a full run.
 
 ### The runtime's error reporter destroys the error it was handed
 
-- **Families:** colorpicker, crop, fileupload, ink, pad
+- **Families:** colorpicker, crop, ink, pad
 - **Seed:** `CHAOS_SEED=20260828`; storm seeds 1618785780 (colorpicker/pointer),
-  1015029678 (colorpicker/mixed), and the crop and fileupload rows of the same run
+  1015029678 (colorpicker/mixed), and the crop rows of the same run
 - **Storms:** pointer and mixed
 - **Gesture excerpts:**
   - colorpicker/pointer: `01 jitter-drag 5 steps within 11px on [data-testid="root"]`,
@@ -292,8 +298,6 @@ green with it.
   - colorpicker/mixed: `01 toggle-thrash x6 on div[role="slider"]` — one gesture is enough
   - crop/pointer: `01 jitter-drag 9 steps within 19px on [data-testid="handle-block-start"]`,
     `02 rage-click x4 on [data-testid="root"]`
-  - fileupload/mixed: `03 interrupt: hold [data-testid="trigger"], then PageDown + click [data-testid="field"], then release`,
-    `04 toggle-thrash x6 on [data-testid="trigger"]`
 - **What is reported:**
   `TypeError: Cannot set property code of  which has only a getter`, thrown at
   `packages/web/src/runtime-error-reporting.ts:25` (`reportable.code = code`),
@@ -305,14 +309,17 @@ green with it.
   `setPointerCapture(pointerId)` for a pointer id with no active pointer
   (`crop.tsrx:191`, `crop.tsrx:230`, `colorpicker.tsrx:246`, `colorpicker.tsrx:288`),
   but that is a hypothesis: the masking is what makes it one rather than a
-  reading. fileupload calls `setPointerCapture` nowhere, so its throw is
-  something else, equally masked.
-- **Why this is the first finding to fix:** every other defect these three
+  reading.
+- **Why this is the first finding to fix:** every other defect these four
   families have is invisible until the reporter stops eating it.
 
+fileupload was on this list until 2026-08-28 and is off it: its throw was the
+lane's own (see below), not a family handler's, and both its rows are green on
+`20260828` now.
+
 If a CI run has to be green before that lands, exclude `colorpicker`, `crop`,
-`fileupload`, `ink` and `pad` by name — and record here that the exclusion is
-standing, with the date, so it does not quietly become permanent.
+`ink` and `pad` by name — and record here that the exclusion is standing, with
+the date, so it does not quietly become permanent.
 
 ### A keyboard storm leaves menubar's focus behind its own menu
 
@@ -352,23 +359,20 @@ standing, with the date, so it does not quietly become permanent.
   focus move, is green in both runs — so this is modal's own, not the lane's
   reading of what a dialog owes.
 
-### A keyboard storm stops radio-group's arrow from choosing
+### Refuted: a keyboard storm stops radio-group's arrow from choosing
 
-- **Family:** radio-group
-- **Seed:** `CHAOS_SEED=20260828`; storm seed 1407382990
-- **Storm:** keyboard (the mixed storm of the same run is green)
-- **Gesture excerpt:** `01 type "tsn" into [data-testid="monthly-field"]`,
-  `09 key-mash ArrowLeft Shift+Tab p PageDown PageUp PageDown at [data-testid="monthly-field"]`
-  (`Shift+Tab` walks off the page), then repeated `type ... after clearing` into
-  the option fields.
-- **What is reported:** `ArrowDown` from `monthly-field` moves focus to
-  `annual-field`, but `annual-indicator` stays empty instead of reading `Chosen`.
-  The move happened; the choice did not.
-- **Cause hypothesis:** the storm writes directly to the hidden option inputs'
-  `value` (that is what `type-into` does, because a dispatched keydown changes no
-  input value), and the group's chosen-option cell and the inputs' own checked
-  state come apart — after which an arrow moves the roving focus without the
-  group agreeing anything was chosen.
+Reported on `CHAOS_SEED=20260828`, storm seed 1407382990: `ArrowDown` from
+`monthly-field` moved focus to `annual-field` while `annual-indicator` stayed
+empty instead of reading `Chosen` — the move happened, the choice did not.
+
+The cause was the lane, not the family. `type-into` assigned to the option
+inputs' `value`, and on a radio the `value` IDL attribute is in default mode, so
+each assignment rewrote the `value=` **content** attribute — the storm was
+renaming the options it was typing at, which no keyboard can do, and the group's
+chosen-option cell and the inputs' identities came apart for that reason.
+`type-into` now sends the keys and writes nothing on a radio (see the caveat
+under "Known limits"), and both radio-group rows are green on `20260828` and on
+`1853720671`.
 
 ### The storm used to navigate the page away
 
@@ -379,21 +383,48 @@ iframe. Received URL: .../users/jane`. `holdTheLinksOnThePage` in
 [`actions.ts`](./actions.ts) now cancels navigation last in the bubble phase, so
 every family handler still sees the untouched click.
 
-### An otp box shows a character the field no longer holds
+### The storm used to crash on a file input
+
+The lane's own defect again, and fileupload's remaining red on `20260828`:
+`type-into` assigned to `input type="file"`'s `value`, which the browser answers
+with `InvalidStateError`. The throw came out of the storm, not out of a family
+handler, so the row read as fileupload breaking under a mixed storm when nothing
+of fileupload's had run. `type-into` no longer writes a value anywhere a keyboard
+could not type it; fileupload's pointer and mixed rows are green on `20260828`
+and on `1853720671`.
+
+### The storm can leave otp holding more characters than a keyboard could type
+
+Replaces "An otp box shows a character the field no longer holds", which was the
+row's own read order and is refuted. That row emptied the code with six
+`Backspace`s, polled **the field** to `''` — which returns immediately, because
+the browser edits `input.value` before any handler runs — and then typed `4` and
+read a box still painting `'e'`. The box was not disagreeing with the field; the
+gate was reading the field before the family had committed anything.
+`src/otp/note.md` records the same landmine for `CSR: typing past the last box
+adds nothing`. The recovery now polls the six boxes — the committed write — to
+empty and asserts the field after it, which is the order otp's own suite uses.
+
+What the truthful gate finds instead, on the same seed:
 
 - **Family:** otp
-- **Seed:** run seed `1853720671` (the exploratory run; the pinned CI seed does
+- **Seed:** run seed `1853720671`, storm seed 2506455599 (the pinned CI seed does
   not reach it)
 - **Storm:** keyboard
-- **What is reported:** recovery empties the code with six `Backspace`s and polls
-  the field to `''` — which passes — then types `4`, and box zero reads `'e'`.
-- **Cause hypothesis:** the box's painted character is a cell that did not follow
-  the field back to empty, so the box and the field disagree.
-- **Caveat worth carrying:** the letters came from the storm's `type-into`, which
-  writes `input.value` directly because a dispatched `keydown` changes no value —
-  so the family's own character guard never saw them, and a real keyboard could
-  not have put an `e` there. The disagreement between the box and the field is
-  still real; how a person would reach it is not established.
+- **Intermittent:** it failed on 2 of 6 runs of that seed on one machine; the
+  gestures are fixed by the seed, the handler scheduling is not.
+- **What is reported:** after the six `Backspace`s the boxes still paint `'e'` —
+  and so does the field (measured: `field="e"`, caret 1). Box and field **agree**;
+  what fails is the assumption that six `Backspace`s empty a six-box code.
+- **Cause:** the storm typed more than six characters in. A person's typing is
+  truncated by `maxlength`, which the field carries; `type-into`'s direct `value`
+  write is not, so the field can start recovery seven characters long and six
+  `Backspace`s leave one behind.
+- **What would settle it:** truncating `type-into`'s write against the target's
+  `maxLength`, the same realism argument that removed the value writes on radios
+  and file inputs. That was outside this change's scope and is not done — until
+  it is, read this row as the lane overfilling the field, not as otp losing a
+  character.
 
 ### Which seed to run
 
@@ -404,6 +435,13 @@ set, which is why it is worth pinning one rather than chasing the dice:
 | ----------------------- | -------- | ----------------------------------------------------------- |
 | `CHAOS_SEED=20260828`   | 13 of 71 | colorpicker, crop, fileupload, ink, pad, menubar, modal, radio-group |
 | run seed `1853720671`   | 15 of 71 | colorpicker, crop, fileupload, ink, pad, modal, otp, radio-group     |
+
+Those counts are from the runs before the `type-into` fix of 2026-08-28 and are
+now high by whatever fileupload and radio-group contributed. Re-measured directly
+after the fix, running only these three families on both seeds: fileupload
+(pointer, mixed) and radio-group (keyboard, mixed) are green on both, and otp is
+green except for the intermittent keyboard row above. The other families were not
+re-run here — a full run on both seeds is what should replace this table.
 
 ## Known limits, v1
 
@@ -426,11 +464,23 @@ set, which is why it is worth pinning one rather than chasing the dice:
   navigation last in the bubble phase. Every family handler still sees the
   untouched click; what is not covered is a family whose contract is what happens
   *after* the page changes.
-- **`type-into` writes the value directly**, because a dispatched `keydown`
-  changes no input value. That reaches a family's `input` handler, but not its
-  character guard — so a storm can put a character into a field that a real
-  keyboard could not. Weigh that when reading a finding that turns on a field's
-  contents.
+- **`type-into` writes the value directly where a keyboard could type**, because
+  a dispatched `keydown` changes no field value. The write is restricted to the
+  places a person's keystroke really lands: a `textarea`, a contenteditable
+  element, and an `input` whose type is `text`, `search`, `url`, `tel`, `email`,
+  `password` or `number`. Every other target — a radio, a checkbox, a file input
+  — takes the key events and nothing else, which is all a real keyboard delivers
+  there. Two measured reasons the restriction exists rather than being a
+  nicety: assigning to a file input's `value` throws `InvalidStateError` and
+  killed the run, and on a radio or a checkbox the `value` IDL attribute is in
+  default mode, so the assignment rewrites the `value=` **content** attribute and
+  silently changes what the option *is*. Both produced findings about families
+  that were really the lane.
+  What the write still does not model is `maxlength`: the browser truncates a
+  person's typing against it and a direct `value` write is not truncated, so a
+  storm can leave more characters in a field than a keyboard could — see the otp
+  finding below. The `input` handler still sees the write; a family's own
+  character guard still does not.
 
 ## Typechecking
 

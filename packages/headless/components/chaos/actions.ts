@@ -328,27 +328,67 @@ function keyMash(rng: Rng, root: HTMLElement): ChaosAction {
 	};
 }
 
-// A dispatched keydown never changes an input's value, so a family that filters
-// on what was typed would see nothing: write the value and fire `input` too.
+/** Input types a keyboard can put characters into. */
+const TEXT_EDITABLE_INPUT_TYPES = new Set([
+	'text',
+	'search',
+	'url',
+	'tel',
+	'email',
+	'password',
+	'number',
+]);
+
+// A `value` write on a `file` input throws InvalidStateError, and on a radio or a
+// checkbox it rewrites the `value=` content attribute rather than what is typed.
+function takesTypedText(node: HTMLElement): boolean {
+	if (node instanceof HTMLInputElement) return TEXT_EDITABLE_INPUT_TYPES.has(node.type);
+	return node instanceof HTMLTextAreaElement || node.isContentEditable;
+}
+
+function typedTextOf(node: HTMLElement): string {
+	if (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement) return node.value;
+	return node.textContent ?? '';
+}
+
+function writeTypedText(node: HTMLElement, text: string): void {
+	if (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement) node.value = text;
+	else node.textContent = text;
+}
+
+// A dispatched keydown never changes a field's value, so a family that filters on
+// what was typed would see nothing: where a keyboard could really type, write the
+// value and fire `input` too. Everywhere else the keys go out on their own —
+// which is all a real keyboard delivers there.
 function typeInto(rng: Rng, root: HTMLElement): ChaosAction {
-	const fields = stormTargets(root).filter(
-		(node): node is HTMLInputElement => node instanceof HTMLInputElement && !node.disabled,
+	const fields = stormTargets(root).filter((node) =>
+		node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement
+			? !node.disabled
+			: node.isContentEditable,
 	);
 	if (fields.length === 0) return keyMash(rng, root);
 	const field = rng.pick(fields);
+	const takesText = takesTypedText(field);
 	const typed = Array.from({ length: rng.between(1, 4) }, () => rng.pick(TYPED_CHARACTERS)).join(
 		'',
 	);
-	const clearFirst = rng.chance(0.3);
+	// Drawn either way, so a seed's gesture stream is the same whether or not this
+	// target takes text.
+	const clearFirst = rng.chance(0.3) && takesText;
+	const where = describeTarget(field);
 	return {
-		note: `type ${JSON.stringify(typed)}${clearFirst ? ' after clearing' : ''} into ${describeTarget(field)}`,
+		note: takesText
+			? `type ${JSON.stringify(typed)}${clearFirst ? ' after clearing' : ''} into ${where}`
+			: `type ${JSON.stringify(typed)} at ${where} - keys only, nothing a keyboard types goes in there`,
 		async run() {
 			field.focus();
-			if (clearFirst) field.value = '';
+			if (clearFirst) writeTypedText(field, '');
 			for (const character of typed) {
-				field.value += character;
+				if (takesText) writeTypedText(field, typedTextOf(field) + character);
 				fireKey(field, character);
-				field.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true }));
+				if (takesText) {
+					field.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true }));
+				}
 				await tick();
 			}
 		},

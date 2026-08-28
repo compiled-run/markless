@@ -538,11 +538,16 @@ export const families: readonly ChaosFamily[] = [
 		storms: ['keyboard', 'mixed'],
 		async recover() {
 			const field = el<HTMLInputElement>('field');
+			const painted = () =>
+				[0, 1, 2, 3, 4, 5].map((box) => el(`item-${box}`).textContent ?? '').join('');
 			field.focus();
 			// Backspace takes the last character back out of its box: six of them
 			// empty a six-box code however far the storm filled it.
 			for (let box = 0; box < 6; box++) await userEvent.keyboard('{Backspace}');
-			await expect.poll(() => field.value).toBe('');
+			// The boxes are the committed write; the browser empties the field before
+			// any handler runs, so polling it first passes while the boxes are stale.
+			await expect.poll(painted).toBe('');
+			expect(field.value).toBe('');
 
 			await userEvent.keyboard('4');
 			await expect.poll(() => el('item-0').textContent).toBe('4');
