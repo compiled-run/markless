@@ -7,7 +7,7 @@ import { orderedRoster, readPositions } from './ic-order.ts';
 // walks the same roster from a handler so the two readings can be compared.
 export const ic = shared(
 	() => {
-		const s = state({ seen: 'unread', count: 0 });
+		const s = state({ seen: 'unread', count: 0, code: 'abcdef' });
 		const itemEls = element<HTMLDivElement[]>();
 
 		return {
@@ -39,13 +39,24 @@ export function IcRoot({ children }) @{
 		onClick={() => {
 			w.survey();
 		}}
-	>{children}<span data-ic-total>{total}</span></div>
+	>{children}<span data-ic-total>{total}</span><button
+		type="button"
+		data-ic-write
+		onClick={(event) => {
+			event.stopPropagation();
+			w.code = w.code.toUpperCase();
+		}}
+	>write</button></div>
 }
 
 export function IcItem({ children }) @{
 	const w = ic();
 	const mine = element<HTMLDivElement>();
 	const pos = computed(() => w.itemEls.indexOf(mine as HTMLDivElement));
+	// The second derivation, and the one every real family actually writes: a
+	// place is worth nothing unless another expression can USE it. It has to
+	// answer after a write to `code`, not only at first paint.
+	const char = computed(() => w.code.slice(pos, pos + 1));
 
-	<div data-ic-item el={[w.itemEls, mine]} ui-pos={pos}>{children}</div>
+	<div data-ic-item el={[w.itemEls, mine]} ui-pos={pos} ui-mine={char}>{children}</div>
 }

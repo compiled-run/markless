@@ -102,6 +102,9 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	// A closed drawer sits behind a hidden backdrop that never detaches it, so the
 	// dialog role is in the DOM before any trigger is pressed.
 	drawer: 'dialog',
+	// The divider is a focusable role="separator": the panels either side carry no
+	// role of their own, so the separator is the whole exposure.
+	resizable: 'separator',
 };
 
 /** Sections whose point is how many of that role they serve, not merely that they serve one. */
@@ -143,6 +146,9 @@ const RENDERED_COUNT: Partial<Record<FamilyName, number>> = {
 	// The tags input, the display-only filter row and the editable one: a count
 	// catches a section that rendered the starter and lost the other two shapes.
 	taglist: 3,
+	// One divider per group: a count catches a section that rendered the starter
+	// and lost the collapsible shape.
+	resizable: 2,
 };
 
 const appDir = fileURLToPath(new URL('..', import.meta.url));
@@ -801,6 +807,53 @@ async function main() {
 			);
 		} else {
 			console.log('#taglist mounts the live region that speaks a change, one per shape.');
+		}
+
+		// The role count above says two dividers rendered. What a reader lane then
+		// turns on is the family's central bet: a focusable role="separator" that
+		// carries a value a person can act on, and reaches its primary panel.
+		const resizableSection = page.locator('#resizable');
+		const divider = resizableSection.getByRole('separator', { name: 'Resize navigation' });
+		if ((await divider.count()) !== 1) {
+			failures.push(
+				`#resizable serves ${await divider.count()} separators named "Resize navigation", not the 1 its starter needs.`,
+			);
+		} else {
+			const stop = await divider.getAttribute('tabindex');
+			if (stop !== '0') {
+				failures.push(
+					`#resizable's divider reads tabindex="${stop}", not "0", so no keyboard reaches it.`,
+				);
+			} else {
+				console.log('#resizable serves a named divider a keyboard can reach.');
+			}
+
+			const now = await divider.getAttribute('aria-valuenow');
+			if (now === null) {
+				failures.push('#resizable\'s divider carries no aria-valuenow, so it announces no value.');
+			} else {
+				console.log(`#resizable's divider announces the boundary at ${now}.`);
+			}
+
+			// A dangling aria-controls is silent in the DOM and only shows up as a
+			// reader that cannot reach the panel, which is what this catches early.
+			const controls = await divider.getAttribute('aria-controls');
+			if (controls === null) {
+				failures.push('#resizable\'s divider points at no panel through aria-controls.');
+			} else {
+				const panel = page.locator(`[id="${controls}"]`);
+				if ((await panel.count()) !== 1) {
+					failures.push(
+						`#resizable's aria-controls names "${controls}", which resolves to ${await panel.count()} elements.`,
+					);
+				} else if ((await panel.getAttribute('ui-panel')) === null) {
+					failures.push(
+						`#resizable's aria-controls reaches "${controls}", which is not one of its panels.`,
+					);
+				} else {
+					console.log('#resizable\'s divider reaches the panel it controls.');
+				}
+			}
 		}
 
 		// The role count above says three shapes rendered. What a reader lane then

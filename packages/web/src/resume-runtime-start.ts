@@ -33,6 +33,10 @@ type RosterResumeHost = {
 	readonly __marklessRosterResume?: () => Promise<typeof import('./fns/roster-resume.ts')>;
 };
 
+// The gate that keeps the roster chunk off a page with nothing to derive; the
+// spelling is the compiler's, and fns/roster-resume.ts owns the reads that use it.
+const ELEMENT_BINDING_SEGMENT = '/element:';
+
 /**
  * Where the app's own emitted module leaves its overlay installer, and the whole
  * cost of elevation to an app that has no `overlay` mark: one optional call.
@@ -159,6 +163,17 @@ export async function startResumeRuntime(input: {
 				elementsByHostId: prepared.elementsByHostId,
 			},
 		);
+	}
+	// Not gated on a keyed repeat: a family whose parts are written flat has a
+	// roster to derive against too, and it is resume itself that first makes the
+	// roster live.
+	if (
+		(runtimeInput.state?.computed ?? []).some((computed) =>
+			computed.dependencies?.some((dependency) =>
+				dependency.graphNodeId.includes(ELEMENT_BINDING_SEGMENT),
+			),
+		)
+	) {
 		(await (globalThis as RosterResumeHost).__marklessRosterResume?.())?.wireRosterRevisions({
 			graph: runtimeInput.graph,
 			computed: runtimeInput.state?.computed ?? [],

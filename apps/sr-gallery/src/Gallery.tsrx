@@ -21,7 +21,8 @@ import {
 	popover,
 	progress,
 	radiogroup,
-	ratinggroup,
+	rating,
+	resizable,
 	select,
 	slider,
 	tabs,
@@ -38,7 +39,8 @@ import {
 // /#toggle, /#textbox, /#progress, /#checklist, /#select, /#modal,
 // /#radio-group, /#rating, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
 // /#fileupload, /#hovercard, /#calendar, /#menu, /#menubar, /#colorpicker,
-// /#buttongroup, /#editable, /#taglist, /#numberbox, /#ink, /#pad, /#crop, /#tour, /#toolbar, /#drawer. A family whose
+// /#buttongroup, /#editable, /#taglist, /#numberbox, /#ink, /#pad, /#crop, /#tour, /#toolbar, /#drawer,
+// /#resizable. A family whose
 // second shape a reader announces differently gets its own section too: /#slider-range,
 // /#numberbox-min-max-step, /#numberbox-currency, /#crop-image.
 //
@@ -196,29 +198,29 @@ export function Gallery() @{
 			<h2>Rating</h2>
 			{/* Already rated, because the claim the real readers settle here is that a fill covering three marks is still one checked radio and four unchecked ones. */}
 			<div class="scenario">
-				<ratinggroup.root defaultValue={3}>
-					<ratinggroup.label>Overall rating</ratinggroup.label>
+				<rating.root defaultValue={3}>
+					<rating.label>Overall rating</rating.label>
 					<RatingMarks />
-					<ratinggroup.valuelabel />
-				</ratinggroup.root>
+					<rating.valuelabel />
+				</rating.root>
 			</div>
 
 			{/* Half values: the near half of a mark is worth half of it. */}
 			<div class="scenario">
-				<ratinggroup.root half defaultValue={2.5}>
-					<ratinggroup.label>Cleanliness</ratinggroup.label>
+				<rating.root half defaultValue={2.5}>
+					<rating.label>Cleanliness</rating.label>
 					<RatingMarks />
-					<ratinggroup.valuelabel />
-				</ratinggroup.root>
+					<rating.valuelabel />
+				</rating.root>
 			</div>
 
 			{/* The display-only aggregate: still a rating a reader can read, and nothing a person does changes it. */}
 			<div class="scenario">
-				<ratinggroup.root readonly half value={4.5}>
-					<ratinggroup.label>Average guest rating</ratinggroup.label>
+				<rating.root readonly half value={4.5}>
+					<rating.label>Average guest rating</rating.label>
 					<RatingMarks />
-					<ratinggroup.valuelabel />
-				</ratinggroup.root>
+					<rating.valuelabel />
+				</rating.root>
 			</div>
 		</section>
 
@@ -708,6 +710,47 @@ export function Gallery() @{
 				</drawer.root>
 			</div>
 		</section>
+
+		<section id="resizable">
+			<h2>Resizable</h2>
+			{/* The family ships the flex defaults but no size, so the group gets its own box and the divider something to grab, the way a consumer's stylesheet would. */}
+			<div class="scenario">
+				<resizable.root
+					defaultSizes={{ nav: 30, main: 70 }}
+					style="inline-size: 400px; block-size: 120px"
+				>
+					<resizable.item value="nav">Navigation</resizable.item>
+					<resizable.thumb
+						value="nav"
+						min={10}
+						max={80}
+						aria-label="Resize navigation"
+						style="inline-size: 8px; background: #ccc"
+					/>
+					<resizable.item value="main">Content</resizable.item>
+				</resizable.root>
+			</div>
+
+			{/* A collapsible boundary: the claim a real reader is here to settle is that Enter shutting the panel to 5% is a value change it speaks, not a disappearance. */}
+			<div class="scenario">
+				<resizable.root
+					defaultSizes={{ sidebar: 30, editor: 70 }}
+					style="inline-size: 400px; block-size: 120px"
+				>
+					<resizable.item value="sidebar">Files</resizable.item>
+					<resizable.thumb
+						value="sidebar"
+						min={15}
+						max={60}
+						collapsible={true}
+						collapsedSize={5}
+						aria-label="Resize files"
+						style="inline-size: 8px; background: #ccc"
+					/>
+					<resizable.item value="editor">Editor</resizable.item>
+				</resizable.root>
+			</div>
+		</section>
 	</main>
 }
 
@@ -778,13 +821,13 @@ function TourSection() @{
 // the month below carries. A construct may not be the direct child of a component
 // tag either, so the repeat opens in a plain element.
 function RatingMarks() @{
-	const rating = ratinggroup.state();
+	const marks = rating.state();
 
 	<div>
-		@for (const position of rating.positions; key position) {
-			<ratinggroup.item value={position}>
+		@for (const position of marks.positions; key position) {
+			<rating.item value={position}>
 				<span aria-hidden="true">★</span>
-			</ratinggroup.item>
+			</rating.item>
 		}
 	</div>
 }

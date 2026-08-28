@@ -32,6 +32,7 @@ import PadBasic from '../src/pad/scenarios/basic.tsrx';
 import PaginationBasic from '../src/pagination/scenarios/basic.tsrx';
 import PopoverBasic from '../src/popover/scenarios/basic.tsrx';
 import { Basic as RadioGroupBasic } from '../src/radio-group/scenarios/basic.tsrx';
+import ResizableBasic from '../src/resizable/scenarios/basic.tsrx';
 import { Basic as SelectBasic } from '../src/select/scenarios/basic.tsrx';
 import SliderBasic from '../src/slider/scenarios/basic.tsrx';
 import TabsBasic from '../src/tabs/scenarios/basic.tsrx';
@@ -631,6 +632,25 @@ export const families: readonly ChaosFamily[] = [
 			await userEvent.keyboard('{ArrowUp}');
 			await expect.poll(() => document.activeElement).toBe(el('monthly-field'));
 			await expect.poll(() => el('monthly-indicator').textContent).toBe('Chosen');
+		},
+	},
+	{
+		name: 'resizable',
+		mount: () => render(ResizableBasic),
+		rootTestId: 'root',
+		keyboardEntryTestId: 'thumb',
+		storms: ['pointer', 'mixed'],
+		async recover() {
+			// The storm's drags leave the boundary anywhere, so Home takes it to the
+			// bound it declares and the one step measured is the same number each run.
+			el<HTMLElement>('thumb').focus();
+			await userEvent.keyboard('{Home}');
+			await expect.poll(() => el('thumb').getAttribute('aria-valuenow')).toBe('10');
+
+			await userEvent.keyboard('{ArrowRight}');
+			await expect.poll(() => el('thumb').getAttribute('aria-valuenow')).toBe('11');
+			await expect.poll(() => el('nav').getAttribute('ui-size')).toBe('11');
+			expect(el('main').getAttribute('ui-size')).toBe('89');
 		},
 	},
 	{

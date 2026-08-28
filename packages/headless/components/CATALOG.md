@@ -22,6 +22,16 @@ Pure CSS, pure logic, and visual skins do not qualify.
   names colliding with framework vocabulary (bare `grid` = CSS Grid; `tags-input` was renamed
   because "tag" means element in a markup framework — "taglist" reads as its own noun).
 
+## Separator ruling (owner, 2026-08-28)
+
+A display separator belongs to base: `base.separator`, static `role="separator"` (or decorative),
+no focus, no machinery — not yet built (base has button/label/visually-hidden today; add it with
+a registration pass). The resizable family's divider is NOT a reuse of it: ARIA gives
+`role="separator"` two natures — non-focusable is structure, focusable is the window-splitter
+widget with value semantics — and the interactive one is family-owned machinery that only shares
+the role string (the modal-content/role=dialog precedent). Never compose interactive machinery
+onto a base display part.
+
 ## Active queue (build in this order)
 
 ### 1. taglist (core catalog)

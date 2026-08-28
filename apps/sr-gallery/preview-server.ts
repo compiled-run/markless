@@ -58,6 +58,7 @@ export const FAMILY_ANCHORS = {
 	tour: '/#tour',
 	toolbar: '/#toolbar',
 	drawer: '/#drawer',
+	resizable: '/#resizable',
 } as const;
 
 export type FamilyName = keyof typeof FAMILY_ANCHORS;

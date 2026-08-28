@@ -28,6 +28,7 @@ export * as progress from './progress/index.ts';
 export * as qrcode from './qr-code/index.ts';
 export * as radiogroup from './radio-group/index.ts';
 export * as rating from './rating/index.ts';
+export * as resizable from './resizable/index.ts';
 export * as select from './select/index.ts';
 export * as slider from './slider/index.ts';
 export * as tabs from './tabs/index.ts';

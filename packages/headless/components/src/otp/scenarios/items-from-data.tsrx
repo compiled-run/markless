@@ -11,7 +11,7 @@ export default function ItemsFromData() @{
 		<div data-testid="boxes">
 			@for (const slot of slots; key slot) {
 				<div data-slot={slot}>
-					<otp.item index={slot} data-testid="looped-item" />
+					<otp.item data-testid="looped-item" />
 				</div>
 			}
 		</div>

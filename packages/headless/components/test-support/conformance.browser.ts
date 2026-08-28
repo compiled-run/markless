@@ -29,6 +29,7 @@ import Progress from '../src/progress/scenarios/basic.tsrx';
 import QrCode from '../src/qr-code/scenarios/basic.tsrx';
 import { Basic as RadioGroup } from '../src/radio-group/scenarios/basic.tsrx';
 import { Basic as Rating } from '../src/rating/scenarios/basic.tsrx';
+import Resizable from '../src/resizable/scenarios/basic.tsrx';
 import { Basic as Select } from '../src/select/scenarios/basic.tsrx';
 import Slider from '../src/slider/scenarios/basic.tsrx';
 import Tabs from '../src/tabs/scenarios/basic.tsrx';
@@ -637,6 +638,21 @@ const descriptors: readonly FamilyDescriptor[] = [
 		// How many marks there are and where the rating sits are numbers a consumer
 		// styles against, so they are key-value by design rather than presence marks.
 		valuedAttributes: ['ui-count', 'ui-value'],
+		supportsDisabled: true,
+	},
+	{
+		family: 'resizable',
+		mount: { CSR: () => render(Resizable), SSR: () => renderSSR(Resizable) },
+		root: 'root',
+		parts: ['root', 'nav', 'thumb', 'main'],
+		rootAria: { role: null },
+		// No openCycle: nothing here opens. The divider is a focusable
+		// role="separator" that moves a boundary, which the family's own suite drives.
+		//
+		// Which way the group runs, which panel a part speaks for, the share a panel
+		// holds and the bounds the divider declares are all numbers and names a
+		// consumer styles against, so they are key-value by design.
+		valuedAttributes: ['ui-orientation', 'ui-value', 'ui-size', 'ui-min', 'ui-max'],
 		supportsDisabled: true,
 	},
 	{

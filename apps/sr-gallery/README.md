@@ -17,7 +17,7 @@ copies — one section each, on an anchor a driver can be sent to:
 | select                 | `/#select`                 |
 | modal                  | `/#modal`                  |
 | radio-group            | `/#radio-group`            |
-| rating           | `/#rating`           |
+| rating                 | `/#rating`                 |
 | tabs                   | `/#tabs`                   |
 | popover                | `/#popover`                |
 | slider                 | `/#slider`                 |
@@ -43,6 +43,7 @@ copies — one section each, on an anchor a driver can be sent to:
 | tour                   | `/#tour`                   |
 | toolbar                | `/#toolbar`                |
 | drawer                 | `/#drawer`                 |
+| resizable              | `/#resizable`              |
 
 <!-- anchors:end -->
 
