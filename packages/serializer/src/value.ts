@@ -6,7 +6,11 @@ export type SerializedPrimitive =
 	| number
 	| boolean
 	| { readonly $type: 'undefined' }
-	| { readonly $type: 'bigint'; readonly value: string };
+	| { readonly $type: 'bigint'; readonly value: string }
+	| { readonly $type: 'number'; readonly value: NonFiniteNumberName };
+
+/** JSON has no form for these, so a bare number slot would print as `null`. */
+export type NonFiniteNumberName = 'Infinity' | '-Infinity' | 'NaN';
 
 export type SerializedSlot =
 	| SerializedPrimitive
@@ -151,9 +155,10 @@ function encodeSlot(
 	diagnostics: SerializationDiagnostic[],
 ): SerializedSlot | undefined {
 	if (value === null) return null;
-	if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-		return value;
+	if (typeof value === 'number') {
+		return Number.isFinite(value) ? value : { $type: 'number', value: nonFiniteName(value) };
 	}
+	if (typeof value === 'string' || typeof value === 'boolean') return value;
 	if (typeof value === 'undefined') return { $type: 'undefined' };
 	if (typeof value === 'bigint') return { $type: 'bigint', value: String(value) };
 
@@ -335,6 +340,44 @@ function encodeSlot(
 	}
 
 	return { $ref: id };
+}
+
+export function nonFiniteName(value: number): NonFiniteNumberName {
+	if (Number.isNaN(value)) return 'NaN';
+	return value > 0 ? 'Infinity' : '-Infinity';
+}
+
+/**
+ * A value printed as the JavaScript that denotes it, where JSON would print a
+ * non-finite number as `null`.
+ *
+ * Emitted modules are JavaScript, so the name this module gives `Infinity` /
+ * `-Infinity` / `NaN` denotes those values exactly. A payload with no non-finite
+ * number returns `JSON.stringify`'s own bytes, and `undefined` where
+ * `JSON.stringify` returns nothing.
+ */
+export function jsonSourceWithNonFiniteNumbers(value: unknown): string | undefined {
+	let found = false;
+	const json = JSON.stringify(value, (_key, entry: unknown) => {
+		if (typeof entry === 'number' && !Number.isFinite(entry)) found = true;
+		return entry;
+	});
+	if (!found) return json;
+
+	const tokens: string[] = [];
+	let placeholder = ' markless-non-finite';
+	while (json !== undefined && json.includes(placeholder)) placeholder += '_';
+	const tagged = JSON.stringify(value, (_key, entry: unknown) => {
+		if (typeof entry !== 'number' || Number.isFinite(entry)) return entry;
+		tokens.push(nonFiniteName(entry));
+		return `${placeholder}${String(tokens.length - 1)}`;
+	});
+	if (tagged === undefined) return undefined;
+	return tokens.reduce(
+		(source, name, index) =>
+			source.replace(JSON.stringify(`${placeholder}${String(index)}`), name),
+		tagged,
+	);
 }
 
 function typedArrayName(value: object): TypedArrayName | null {

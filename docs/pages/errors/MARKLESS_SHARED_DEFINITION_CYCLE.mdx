@@ -1,0 +1,22 @@
+# MARKLESS_SHARED_DEFINITION_CYCLE
+
+Shared definitions cannot depend on each other circularly
+
+- Package: compiler
+- Pass or phase: semantic-graph
+- Severity: error
+
+## Message
+
+Cannot create shared definition cycle "…".
+
+## Why
+
+shared() instances are created from graph context during initial render and resume. A cycle would require one shared instance before its own dependency graph can be created.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

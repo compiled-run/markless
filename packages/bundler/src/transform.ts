@@ -22,6 +22,7 @@ import {
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
 } from '@markless/serializer';
+import { jsonSourceWithNonFiniteNumbers } from './non-finite-json.ts';
 import type {
 	MarklessTransformManifest,
 	MarklessVirtualModule,
@@ -30,6 +31,7 @@ import type {
 } from './types.ts';
 import {
 	MARKLESS_VIRTUAL_PREFIX,
+	SMALL_SYMBOL_DIRECT_LOAD_LIMIT,
 	emitResumeModule,
 	emitSettleModule,
 	emitSourceModule,
@@ -58,6 +60,7 @@ import {
 	triggerGroupVirtualModuleId,
 } from './trigger-groups.ts';
 import { adaptImportedCaptureResolver } from './bound-resolver.ts';
+import { emitSymbolBundleModule, planSymbolBundles } from './build/symbol-bundles.ts';
 
 // Authored TS (param annotations, assertions, type aliases) survives compilation
 // into emitted module code, but downstream consumers (Vite builtins, symbol
@@ -208,16 +211,9 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		chunk: symbolVirtualModuleId(input.filename, module.symbolId),
 		exportName: scopedSymbolExportName(input.filename, module.exportName),
 	}));
-	const linkedBoundarySymbols = linkedRenderDataBoundarySymbols({
-		compiled,
-		link: input,
-		clientLink: input.environment === 'client',
-		renderDataId,
-		resolverId,
-		symbolModuleId: (symbolId) => symbolVirtualModuleId(input.filename, symbolId),
-		boundaryExportName: (index) =>
-			scopedSymbolExportName(input.filename, `marklessLinkedBoundaryUpdate${index}`),
-	});
+	const linkedBoundarySymbols = linkedRenderDataBoundarySymbols(
+		linkedSymbolInput(compiled, input, renderDataId, resolverId, input.environment === 'client'),
+	);
 	const symbolRows = [
 		...compilerSymbolRows,
 		...linkedBoundarySymbols.map((symbol) => symbol.row),
@@ -271,10 +267,32 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	const selfWakeArmRendererId = prerenderTriggerGroups.some((group) => group.id === 'self-wake')
 		? triggerGroupVirtualModuleId(input.filename, prerenderTriggerGroups.length)
 		: undefined;
+	// The prerender wake closure is the richer wake set when a page has one; the
+	// compiler's trigger groups answer for every other page.
+	const symbolBundles =
+		symbolRows.length > SMALL_SYMBOL_DIRECT_LOAD_LIMIT
+			? planSymbolBundles({
+					filename: input.filename,
+					symbols: compiled.symbolModules.modules.map((module) => ({
+						symbolId: module.symbolId,
+						moduleId: symbolVirtualModuleId(input.filename, module.symbolId),
+					})),
+					interactions:
+						prerenderTriggerGroups.length > 0
+							? prerenderTriggerGroups
+							: compiled.triggerGroups.groups,
+				})
+			: [];
 	// Scoped <style> CSS ships through the bundler's CSS pipeline: a virtual
 	// .css module imported by the transformed module, never inline JS.
-	const styleScope = compiled.publicRenderPlan.styleScopes[0];
-	const styleId = styleScope ? `${MARKLESS_VIRTUAL_PREFIX}style:${encodedFilename}.css` : null;
+	// Every scope in the plan ships; taking only the first would drop CSS silently.
+	const styleCss = compiled.publicRenderPlan.styleScopes
+		.map((scope) => scope.cssText)
+		.join('\n');
+	const styleId =
+		compiled.publicRenderPlan.styleScopes.length > 0
+			? `${MARKLESS_VIRTUAL_PREFIX}style:${encodedFilename}.css`
+			: null;
 	const pageNeedsFullResume = needsFullResume(
 		compiled.protocolState,
 		compiled.protocolView,
@@ -366,9 +384,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					},
 				]
 			: []),
-		...(styleScope && styleId
-			? [{ id: styleId, type: 'style' as const, source: styleScope.cssText }]
-			: []),
+		...(styleId ? [{ id: styleId, type: 'style' as const, source: styleCss }] : []),
 		{
 			id: payloadId,
 			type: 'payload',
@@ -410,6 +426,12 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				// surface, so staged modules keep their prerenderDataId.
 				prerenderDataId:
 					input.prerenderRecords && prerenderInterfacesComplete(compiled, input)
+						? renderDataId
+						: undefined,
+				// Only the canonical emission exports `marklessPrerenderData`, so a page
+				// without one has no surface a component row could be minted against.
+				renderDataId:
+					canonicalRenderData && compiled.publicRenderModule.renderDataModuleSource
 						? renderDataId
 						: undefined,
 				hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
@@ -481,6 +503,14 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					},
 				]
 			: []),
+		...symbolBundles.map(
+			(bundle): MarklessVirtualModule => ({
+				id: bundle.id,
+				type: 'symbol-bundle',
+				source: emitSymbolBundleModule(bundle.symbolModuleIds),
+				bundledSymbolModuleIds: bundle.symbolModuleIds,
+			}),
+		),
 		...linkedBoundarySymbols.map((symbol) => symbol.module),
 		...(await Promise.all(
 			compiled.symbolModules.modules.map(
@@ -568,6 +598,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					hasOverlayMarks: compiled.runtimeDemandMap.payloadRecords.some(
 						(record) => record.kind === 'overlay',
 					),
+					runtimeDemandMap: compiled.runtimeDemandMap,
 					resumeModuleUrl: input.resumeModuleUrl,
 					prerenderWakeModuleUrl: input.prerenderWakeModuleUrl,
 					publicRenderModuleSource: compiled.publicRenderModule.moduleSource,
@@ -689,7 +720,7 @@ async function prerenderDataModuleSource(
 				await stripEmittedTypesFromFragment(line, `${renderDataId}:reader-declaration`),
 			);
 		}
-		const data = JSON.stringify(record);
+		const data = jsonSourceWithNonFiniteNumbers(record);
 		const reader = residueReaderSource
 			? await stripEmittedTypesFromExpression(
 					residueReaderSource,
@@ -758,6 +789,53 @@ export async function preflightTsrxModuleDiagnostics(
 	throwIfBlocked(input, blockingDiagnostics);
 }
 
+// The naming closures that decide what this bundler links. Naming a branch
+// export is what fulfils an escalation candidate, so the same call answers both
+// "what do we emit" and "which refusal still stands".
+function linkedSymbolInput(
+	compiled: CompileTsrxModuleResult,
+	input: Pick<
+		TransformTsrxModuleInput,
+		'filename' | 'importedModuleInterfaces' | 'artifactChildMaterializations'
+	>,
+	renderDataId: string,
+	resolverId: string,
+	clientLink: boolean,
+) {
+	return {
+		compiled,
+		link: input,
+		clientLink,
+		renderDataId,
+		resolverId,
+		symbolModuleId: (symbolId: string) => symbolVirtualModuleId(input.filename, symbolId),
+		boundaryExportName: (index: number) =>
+			scopedSymbolExportName(input.filename, `marklessLinkedBoundaryUpdate${index}`),
+		branchExportName: (index: number) =>
+			scopedSymbolExportName(input.filename, `marklessLinkedBranchUpdate${index}`),
+	} satisfies Parameters<typeof linkedRenderDataBoundarySymbols>[0];
+}
+
+// The client link ships the escalation symbol, so it decides the refusal for
+// every environment: a server build must not refuse the shape its own client
+// build knows how to flip.
+function fulfilledEscalationSymbolIds(
+	compiled: CompileTsrxModuleResult,
+	input: Pick<
+		TransformTsrxModuleInput,
+		'filename' | 'importedModuleInterfaces' | 'artifactChildMaterializations'
+	>,
+	resolverId: string,
+): ReadonlySet<string> {
+	if ((compiled.symbolModules.armEscalationCandidates ?? []).length === 0) return new Set();
+	const renderDataId = `${MARKLESS_VIRTUAL_PREFIX}render-data:${encodeURIComponent(input.filename)}`;
+	return new Set(
+		linkedRenderDataBoundarySymbols(
+			linkedSymbolInput(compiled, input, renderDataId, resolverId, true),
+		).flatMap((symbol) => (symbol.manifest.kind === 'branch-update' ? [symbol.row.id] : [])),
+	);
+}
+
 async function compileWithBlockingDiagnostics(
 	input: Pick<
 		TransformTsrxModuleInput,
@@ -783,10 +861,17 @@ async function compileWithBlockingDiagnostics(
 		// default 'auto' keeps the authored-source strings for dev tooling.
 		omitAuthoredSource: normalizeExecutionLogMode(input.executionLog) === 'never',
 	});
+	const fulfilled = fulfilledEscalationSymbolIds(compiled, input, resolverId);
 	return {
 		compiled,
 		blockingDiagnostics: collectTsrxModuleDiagnostics(compiled).filter(
-			(diagnostic) => diagnostic.severity === 'error',
+			(diagnostic) =>
+				diagnostic.severity === 'error' &&
+				!(
+					diagnostic.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED' &&
+					typeof diagnostic.symbolId === 'string' &&
+					fulfilled.has(diagnostic.symbolId)
+				),
 		),
 	};
 }

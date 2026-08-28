@@ -1,0 +1,29 @@
+# MARKLESS_COMPONENT_TAG_UNRESOLVED
+
+Member component tag must come from an import; Member component tag must name a component that module serves; Member component tag must name one component of a module surface
+
+- Package: compiler
+- Pass or phase: semantic-graph
+
+## Message
+
+Cannot resolve `<… />` because `…` does not export a component named `…`.
+
+Cannot resolve `<… />` because `…` is not imported in this file.
+
+Cannot resolve `<… />` because `…` serves its components one level deep and `…` walks … levels into it.
+
+## Why
+
+That module serves …, each under a single export name. Nothing on its surface holds a nested group, so this tag names no component, and composing only `…` would silently render a different one.
+
+That module serves …. A compiled .tsrx module publishes its components under the names it exports them as, so a tag naming anything else has no component to render, and emitting it anyway moves the failure to bundle time.
+
+The compiler links a child component to the module it comes from at build time. Without an import it cannot find the component to render, and dropping the tag silently would delete the subtree.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

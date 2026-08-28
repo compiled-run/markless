@@ -1,0 +1,21 @@
+# MARKLESS_SOURCE_SYMBOL_CLAIMS_DIVERGED
+
+Emitted symbol claims for one source disagree
+
+- Package: compiler
+- Pass or phase: link
+- Severity: error
+
+## Message
+
+Source … has incompatible emitted symbol claims in … and ….
+
+## Why
+
+Merging contradictory claims would let one emitted sibling silently redefine a symbol another sibling already routes to.
+
+## Emitted from
+
+- `packages/compiler/src/passes/link/claim-manifest.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.

@@ -53,19 +53,16 @@ describe('dense async generated symbol tables', () => {
 	test('retains a genuinely missing row from a packed resolver table', async () => {
 		const result = await buildDenseAsyncShape({ computeds: 10, boundaries: 10 });
 		const bundle = cloneBundle(result.rawBundle);
-		const missingId = result.manifestSymbolIds.at(-1)!;
-
-		for (const [fileName, chunk] of Object.entries(bundle)) {
-			if (!isCapturedChunk(chunk)) continue;
-			const ids = [chunk.facadeModuleId, ...chunk.moduleIds]
-				.filter((id): id is string => !!id)
-				.map(normalizeVirtualId);
-			if (ids.includes(missingId)) delete bundle[fileName];
-		}
+		// Symbols that wake together ship as one coalesced chunk, so deleting the
+		// chunk of an arbitrary symbol takes most of the table with it. What this
+		// row pins is ONE missing among many resolved, so drop a chunk that carries
+		// a single symbol.
+		const [solitaryFile, missingId] = soleOccupantChunk(bundle, result.bundleShape);
+		delete bundle[solitaryFile];
 
 		rewriteGeneratedSymbolFacadeImports(bundle);
 		expect(rewriteGeneratedSymbolTableUrls(bundle)).toEqual({
-			rewritten: 30,
+			rewritten: result.manifestSymbolIds.length - 1,
 			unresolved: [missingId],
 		});
 	});
@@ -224,6 +221,22 @@ function isCapturedChunk(value: unknown): value is CapturedChunk {
 		typeof chunk.code === 'string' &&
 		Array.isArray(chunk.moduleIds)
 	);
+}
+
+/** The one chunk carrying exactly one symbol module, and the id it carries. */
+function soleOccupantChunk(
+	bundle: Record<string, unknown>,
+	bundleShape: string,
+): [file: string, symbolId: string] {
+	const byFile = new Map<string, string[]>();
+	for (const [symbolId, fileName] of collectSymbolFiles(bundle)) {
+		const ids = byFile.get(fileName);
+		if (ids) ids.push(symbolId);
+		else byFile.set(fileName, [symbolId]);
+	}
+	const solitary = [...byFile].find(([, ids]) => ids.length === 1);
+	expect(solitary, bundleShape).toBeDefined();
+	return [solitary![0], solitary![1][0]!];
 }
 
 function collectSymbolFiles(bundle: Record<string, unknown>): Map<string, string> {

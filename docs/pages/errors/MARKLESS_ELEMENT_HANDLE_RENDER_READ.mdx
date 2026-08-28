@@ -1,0 +1,21 @@
+# MARKLESS_ELEMENT_HANDLE_RENDER_READ
+
+DOM handles cannot be read while rendering
+
+- Package: compiler
+- Pass or phase: semantic-graph
+
+## Message
+
+Cannot render "…" because "…" is an element() handle, not serializable graph state.
+
+## Why
+
+During initial render the browser DOM element does not exist, and browser resume does not rerun component bodies. Element handles are available to lazy event or behavior code after resume locates the host node.
+
+## Emitted from
+
+- `packages/compiler/src/artifacts.ts`
+- `packages/compiler/src/passes/semantic-graph/diagnostics.ts`
+
+Generated from package sources by `scripts/diagnostics-catalogue.mjs`. Do not edit by hand.
