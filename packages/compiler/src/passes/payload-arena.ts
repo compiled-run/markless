@@ -542,6 +542,9 @@ function literalBehaviorInputValue(source: string): BehaviorInputValue | undefin
 	if (valueSource === 'null') return { value: null };
 	if (/^[+-]?(?:\d+|\d*\.\d+)(?:e[+-]?\d+)?$/i.test(valueSource)) {
 		const value = Number(valueSource);
+		// The view payload script is real JSON the runtime `JSON.parse`s, and it
+		// hands `inputValues` to the behavior undecoded, so a non-finite input
+		// would reach the page as `null`.
 		if (Number.isFinite(value)) return { value };
 	}
 

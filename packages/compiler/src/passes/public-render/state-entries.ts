@@ -1,4 +1,4 @@
-import { deserializeGraphValue } from '@markless/serializer';
+import { deserializeGraphValue, jsonSourceWithNonFiniteNumbers } from '@markless/serializer';
 import type { SerializedGraphPayload } from '@markless/serializer';
 import type { PublicRenderModuleInput } from '../../artifacts.ts';
 
@@ -24,8 +24,8 @@ export function emitDirectPublicStateEntries(protocolState: ProtocolState): stri
 export function isDirectPublicLiteralValue(value: unknown, seen = new Set<object>()): boolean {
 	if (value === undefined) return true;
 	if (value === null) return true;
-	if (typeof value === 'string' || typeof value === 'boolean') return true;
-	if (typeof value === 'number') return Number.isFinite(value);
+	if (typeof value === 'string' || typeof value === 'boolean' || typeof value === 'number')
+		return true;
 
 	if (Array.isArray(value)) {
 		if (seen.has(value)) return false;
@@ -45,8 +45,7 @@ export function isDirectPublicLiteralValue(value: unknown, seen = new Set<object
 }
 
 function literalExpression(value: unknown): string {
-	if (value === undefined) return 'undefined';
-	return JSON.stringify(value);
+	return jsonSourceWithNonFiniteNumbers(value) ?? 'undefined';
 }
 
 function isDirectPublicPlainObject(value: object): value is Record<string, unknown> {

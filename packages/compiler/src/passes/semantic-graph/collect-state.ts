@@ -1469,13 +1469,6 @@ function partialInitialStateValue(
 	return folded > 0 ? { value: output } : null;
 }
 
-// A folded seed is printed into the render-data module with JSON, which has no
-// form for a non-finite number: those stay on the carried-expression path.
-function foldedConstant(value: unknown): { readonly ok: true; readonly value: unknown } | { readonly ok: false } {
-	if (typeof value === 'number' && !Number.isFinite(value)) return { ok: false };
-	return { ok: true, value };
-}
-
 /** A frozen data property on a global object — `Number.MAX_SAFE_INTEGER`, `Math.PI`. */
 function frozenGlobalProperty(
 	holderName: string,
@@ -1494,7 +1487,7 @@ function frozenGlobalProperty(
 	if (typeof descriptor.value !== 'number' && typeof descriptor.value !== 'string')
 		return { ok: false };
 
-	return foldedConstant(descriptor.value);
+	return { ok: true, value: descriptor.value };
 }
 
 // Only these bases: a seed naming anything else wants the value it holds at
@@ -1538,8 +1531,7 @@ function evaluateNamedConstant(
 	const init = moduleConstantInitializer(name, symbolId, state);
 	if (!init) return { ok: false };
 
-	const evaluated = evaluateInitialStateValue(init, state, new Set([...(visiting ?? []), name]));
-	return evaluated.ok ? foldedConstant(evaluated.value) : evaluated;
+	return evaluateInitialStateValue(init, state, new Set([...(visiting ?? []), name]));
 }
 
 /** The initializer of a module-scope `const` this identifier actually resolves to. */

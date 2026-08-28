@@ -119,9 +119,12 @@ family author reads this file rather than the goal notes.
    `maxWidth` and `maxHeight` with `Number.POSITIVE_INFINITY` turned 8 of the 58
    rows red and not only cap rows — `name` came back `''`, a disabled crop
    reported `tabindex="0"`, and the rectangle fell back to `0, 0, 40×40`. The
-   fold is now per property: the literal-seeded fields fold, the two infinities
-   ride beside them as a carried expression, and the root's per-instance writes
-   land on top of both on CSR and on SSR. So the family seeds both caps
+   fold is now per property, and it folds a non-finite number too: both caps land
+   in the constant record as `Infinity`, printed as the name that denotes it
+   rather than through JSON, which has no form for one and would write `null`.
+   The two infinities used to ride beside the folded subset as a carried
+   expression; there is no carry left, so the seed publishes one constant record
+   instead of a constant plus a factory default. So the family seeds both caps
    `Number.POSITIVE_INFINITY` outright, `sizeCeiling` takes a plain `number`, and
    the instance fields are `number` rather than `number | undefined`. All 58 rows
    are green with the infinity seed in place.
