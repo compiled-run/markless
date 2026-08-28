@@ -46,7 +46,7 @@ test('a repeat whose row is not mintable carries no row markup', async () => {
 export function App() @{
 	let rows = state([{ id: 'a' }]);
 	let theme = state('dark');
-	<ul>@for (const row of rows; key row.id) { <li class={theme}>t</li> }</ul>
+	<ul>@for (const row of rows; key row.id) { <li class={theme.toUpperCase()}>t</li> }</ul>
 }
 `);
 	expect(view.keyedRepeats).toHaveLength(1);
@@ -93,14 +93,31 @@ export function App() @{
 	});
 });
 
-// Fail closed: the value comes from outside the row, so a minted row cannot fill
-// it from the item it was minted for. Half a row is worse than none.
-test('a row that reads state outside the item ships no markup', async () => {
+// A read outside the item names the graph node instead of an item property, and
+// the mint takes it once, when it builds the row - which is what a served row's
+// own outside read does too, since a row host carries no dom-update record.
+test('a row that reads state outside the item ships the graph node and the path', async () => {
 	const view = await viewOf(`${preamble}
 export function App() @{
 	let rows = state([{ id: 'a' }]);
 	let note = state('x');
 	<ul>@for (const row of rows; key row.id) { <li>{note}</li> }</ul>
+}
+`);
+	expect(view.keyedRepeats).toHaveLength(1);
+	expect(view.keyedRepeats?.[0]?.rowTemplate?.textSlots).toEqual([
+		{ path: [0, 0], graphNodeId: expect.stringContaining('note'), graphPath: [] },
+	]);
+});
+
+// Fail closed on what is left: a value only rendering produces has no channel in
+// the record at all, so the whole template stays off.
+test('a row whose value only rendering produces ships no markup', async () => {
+	const view = await viewOf(`${preamble}
+export function App() @{
+	let rows = state([{ id: 'a' }]);
+	let note = state('x');
+	<ul>@for (const row of rows; key row.id) { <li>{note.toUpperCase()}</li> }</ul>
 }
 `);
 	expect(view.keyedRepeats).toHaveLength(1);
@@ -136,10 +153,8 @@ export function App() @{
 	expect(view.keyedRepeats?.[0]?.rowTemplate).not.toHaveProperty('attributeSlots');
 });
 
-// Fail closed for the other reason: every slot that is neither text nor an
-// attribute is a part the mint does not fill. One test per slot kind the row can
-// hold, plus the two attribute values the mint cannot reach.
-test('a row whose attribute reads state outside the item ships no markup', async () => {
+// An attribute reads outside the item on the same terms its text does.
+test('a row whose attribute reads state outside the item ships the graph pair', async () => {
 	const view = await viewOf(`${preamble}
 export function App() @{
 	let rows = state([{ id: 'a' }]);
@@ -147,9 +162,14 @@ export function App() @{
 	<ul>@for (const row of rows; key row.id) { <li class={theme}>t</li> }</ul>
 }
 `);
-	expect(view.keyedRepeats).toHaveLength(1);
-	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowTemplate');
+	expect(view.keyedRepeats?.[0]?.rowTemplate?.attributeSlots).toEqual([
+		{ path: [0], name: 'class', graphNodeId: 'state:theme', graphPath: [] },
+	]);
 });
+
+// Fail closed for the other reason: every slot that is neither text nor an
+// attribute is a part the mint does not fill. One test per slot kind the row can
+// hold, plus the two attribute values the mint cannot reach.
 
 // The mint reads paths off the item; it does not evaluate expressions, so an
 // attribute value computed from the item is still outside what it can finish.

@@ -9,10 +9,9 @@ import SeededPage from './seeded-page.tsrx';
  * factory, a root writing the collection from its own prop, one part repeating
  * over it, one sibling part writing it.
  *
- * The first six rows are green and are the floor a fix must not break. The last
- * two are pinned, and each isolates one ingredient the earlier reduction was
- * missing — they reproduce taglist's two pinned rows with no family involved. The
- * mechanisms are in goals/headless-components/notes/U711-keyed-repeat-new-keys.md.
+ * Two rows stay pinned. One calls a method on the collection, which mints no
+ * computed, so nothing is wired to refresh it. The other reads a cell outside the
+ * repeated item: the row now mints, and only its outside read is still empty.
  */
 afterEach(() => cleanup());
 
@@ -80,9 +79,11 @@ for (const mode of ['CSR', 'SSR'] as const) {
 		await expect.poll(() => el('joined').textContent).toBe('alpha|beta|gamma');
 	});
 
-	// Pinned: one row attribute reading a cell outside the repeated item - which
-	// is exactly taglist.field's `name={taglist.name}` - takes the row's markup
-	// off the record, so a key the first render never carried is never built.
+	// Pinned on its LAST step only: the row template now names the graph node the
+	// attribute reads and the mint builds the row, so the three values arrive. The
+	// name does not - the slot's graph node id crosses the wire in the child's own
+	// id space and composition qualifies only the repeat's collection id, so the
+	// read lands on a node the live graph does not hold.
 	test.fails(`${mode}: a row whose attribute reads a cell outside the item still mints`, async () => {
 		if (mode === 'CSR') await render(NamedRowPage);
 		else await renderSSR(NamedRowPage);

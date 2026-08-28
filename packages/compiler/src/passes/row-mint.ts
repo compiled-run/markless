@@ -1,3 +1,4 @@
+import type { ProtocolRowTemplateSlotValue } from '@markless/serializer';
 import type { SemanticComponentEdge, SemanticMarkupSlot } from '../artifacts.ts';
 import { childConstructReach, type ConstructReachInput } from './construct-reach.ts';
 
@@ -25,7 +26,8 @@ export type RowComponentMint = {
  * element of its own - or a row element can WRAP it, which is the checklist
  * idiom: `<li data-row={item.id}><Card ... /></li>`. A wrapper is admitted only
  * when the wrapper's own slots are ones the row template already mints (text or
- * attribute values read off the repeated item), and the record then carries both
+ * attribute values off the repeated item or off the page's graph), and the record
+ * then carries both
  * halves: the wrapper markup in `rowTemplate`, the child identity here, and
  * `slotPath` naming the marker inside the wrapper the child's nodes replace.
  *
@@ -68,7 +70,7 @@ export function resolveRowComponentMint(
 		// The wrapper is minted from markup, so its own slots have to be ones that
 		// markup plus the item can finish - and the child needs a marker to land on.
 		if (slot.coordinate.kind !== 'comment-anchor') return null;
-		if (!chunk.slots.every((candidate) => candidate === slot || mintableFromItem(candidate)))
+		if (!chunk.slots.every((candidate) => candidate === slot || mintableSlotValue(candidate) !== null))
 			return null;
 	} else if (chunk.slots.length !== 1) return null;
 	const componentName = chunk.componentName;
@@ -100,10 +102,10 @@ export function resolveRowComponentMint(
  * the mint CAN rebuild is a projection made of components: each one renders in
  * the row's own identity and composes its whole record set beside the row's, the
  * same crossing the row's own child already makes. So the shape admitted here is
- * component parts, a value read off the repeated item, and the static text
- * between them; each part answers the same reach question the row's own child
- * answers. A value read off the item needs no record at all - the row render
- * fills it from the item it was handed, exactly as a row template fills its own.
+ * component parts, a value the row template itself could fill, and the static
+ * text between them; each part answers the same reach question the row's own
+ * child answers. Such a value needs no record at all - the row render fills it
+ * from the item it was handed and the live graph, as a row template does.
  */
 function projectionIsMintable(
 	input: ConstructReachInput,
@@ -115,7 +117,7 @@ function projectionIsMintable(
 	const chunk = input.chunks.find((candidate) => candidate.id === projectionChunkId);
 	if (!chunk || chunk.hosts.length > 0) return false;
 	return chunk.slots.every((slot) => {
-		if (mintableFromItem(slot)) return true;
+		if (mintableSlotValue(slot)) return true;
 		if (slot.kind !== 'child-component') return false;
 		if (
 			slot.projectionChunkId !== undefined &&
@@ -129,11 +131,20 @@ function projectionIsMintable(
 	});
 }
 
-/** The one slot shape a row template fills alone: a text or attribute read off the row's item. */
-export function mintableFromItem(slot: SemanticMarkupSlot): boolean {
-	return (
-		(slot.kind === 'text' || slot.kind === 'attribute') && slot.residue.kind === 'repeat-item'
-	);
+/**
+ * Where a row template would take this slot's value, or null for a slot no
+ * template can fill.
+ *
+ * Two channels: a property of the repeated item, and a read of a graph node the
+ * page already holds. What stays refused is a value only the render produces -
+ * an authored expression, an element handle's id - which no record can name.
+ */
+export function mintableSlotValue(slot: SemanticMarkupSlot): ProtocolRowTemplateSlotValue | null {
+	if (slot.kind !== 'text' && slot.kind !== 'attribute') return null;
+	if (slot.residue.kind === 'repeat-item') return { itemPath: slot.residue.path };
+	return slot.residue.kind === 'graph-read'
+		? { graphNodeId: slot.residue.graphNodeId, graphPath: slot.residue.path }
+		: null;
 }
 
 /**

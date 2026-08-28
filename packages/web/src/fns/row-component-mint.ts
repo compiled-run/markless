@@ -16,6 +16,7 @@ import {
 	mintRowNodes,
 	nodeAtPath,
 	renderEmptyArm,
+	type RowMintGraph,
 } from './row-mint.ts';
 import type {
 	ResumeArmBranchRecord,
@@ -68,6 +69,7 @@ export type RowComponentMintApi = {
 		parent: ResumeDomElement,
 		repeat: ResumeKeyedRepeatRecord,
 		item: unknown,
+		graph?: RowMintGraph,
 	): ResumeDomElement | undefined;
 	/**
 	 * Renders every unserved key's row before the apply that places rows runs, and
@@ -124,8 +126,9 @@ export function marklessRowComponentMint(
 	void Promise.resolve(loadInstanceScope()).catch(() => undefined);
 	return {
 		renderEmptyArm,
-		mintRow(parent, repeat, item) {
-			if (!repeat.rowComponent) return mintTemplateRow(parent, repeat, item);
+		mintRow(parent, repeat, item, rowMintGraph) {
+			if (!repeat.rowComponent)
+				return mintTemplateRow(parent, repeat, item, rowMintGraph ?? graph);
 			return prepared.get(rowKeyOf(item, repeat))?.rowRoot;
 		},
 		rows(repeat, parent, served) {
@@ -304,6 +307,7 @@ function placeMintedRow(
 		readonly repeat: ResumeKeyedRepeatRecord;
 		readonly item: unknown;
 		readonly rowKey: unknown;
+		readonly graph: RuntimeGraph;
 		readonly registration: RowRegistration;
 	},
 	rowComponent: NonNullable<ResumeKeyedRepeatRecord['rowComponent']>,
@@ -356,11 +360,12 @@ function placeInWrapper(
 		readonly parent: ResumeDomElement;
 		readonly repeat: ResumeKeyedRepeatRecord;
 		readonly item: unknown;
+		readonly graph: RuntimeGraph;
 	},
 	childNodes: ReadonlyArray<ResumeDomNode>,
 	slotPath: ReadonlyArray<number>,
 ): { readonly nodes: ReadonlyArray<ResumeDomNode>; readonly rowRoot: ResumeDomElement } {
-	const wrapper = mintRowNodes(input.parent, input.repeat, input.item);
+	const wrapper = mintRowNodes(input.parent, input.repeat, input.item, input.graph);
 	const marker = nodeAtPath(wrapper.nodes, slotPath) as ReplaceableNode | undefined;
 	if (!marker?.replaceWith || childNodes.length === 0)
 		throw rowComponentError(

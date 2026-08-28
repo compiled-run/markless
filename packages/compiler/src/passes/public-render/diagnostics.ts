@@ -136,7 +136,12 @@ export type KeyedRepeatRowMintRefusal =
 	| { readonly kind: 'component'; readonly componentName: string }
 	| { readonly kind: 'nested-construct'; readonly label: string }
 	| { readonly kind: 'attribute'; readonly attributeName: string }
-	| { readonly kind: 'outside-read' };
+	| {
+			readonly kind: 'unfillable-read';
+			/** The read in the author's own words, so the clause names it, not its category. */
+			readonly read: string;
+			readonly attributeName?: string;
+	  };
 
 export function keyedRepeatRowMintUnsupportedDiagnostic(input: {
 	readonly itemName: string;
@@ -151,7 +156,7 @@ export function keyedRepeatRowMintUnsupportedDiagnostic(input: {
 		phase: PUBLIC_RENDER_PHASE,
 		title: 'This list can never grow in the browser',
 		message: `${cause.message} The browser has no renderer, so a row that arrives after the page loads has no markup to be built from: this list will render the rows the server sent, reorder them and remove them, and silently ignore every new one.`,
-		why: 'The payload carries one row of finished markup so the browser can build a row the server never rendered. It can fill text read off the row item and nothing else, so a row needing anything more ships no template at all.',
+		why: 'The payload carries one row of finished markup so the browser can build a row the server never rendered. It can fill text and attributes read off the row item or off a state cell the page holds, and nothing else, so a row needing anything more ships no template at all.',
 		primarySpan: sourceSpan(input.node, input.filename),
 		passId: PUBLIC_RENDER_PLAN_PASS_ID,
 		artifactKeys: ['publicRenderPlan'],
@@ -180,10 +185,10 @@ function refusalCause(
 				message: `This @for row sets the ${refusal.attributeName} attribute from a value, and the row template fills text only.`,
 				suggestion: `Render the value as text inside the row instead of as the ${refusal.attributeName} attribute, or wait for attribute rows.`,
 			};
-		case 'outside-read':
+		case 'unfillable-read':
 			return {
-				message: `This @for row reads a value that is not a property of ${itemName}, and the browser builds a row from the row item alone.`,
-				suggestion: `Read the value off ${itemName} - put it on the item before the list is built - or keep the row to text read off ${itemName}.`,
+				message: `This @for row over ${itemName} ${refusal.attributeName ? `sets ${refusal.attributeName} from` : 'renders'} ${refusal.read}, which only rendering produces - the browser fills a row from ${itemName} and from state the page holds, and this is neither.`,
+				suggestion: `Read the value off ${itemName} or off a state cell directly - move the expression into a computed, or put the value on the item before the list is built.`,
 			};
 	}
 }

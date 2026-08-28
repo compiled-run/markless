@@ -1,4 +1,4 @@
-import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer';
+import { ASYNC_PROTOCOL_VERSION, type ProtocolViewPayload } from '@markless/serializer';
 import type {
 	PlannedSymbol,
 	ProtocolViewArmRecordSet,
@@ -9,7 +9,7 @@ import type {
 	SemanticMarkupSlot,
 } from '../artifacts.ts';
 import { armChildRead, armHostPaths, type ArmHostPlacement } from './arm-child-content.ts';
-import { resolveRowComponentMint, type RowComponentMint } from './row-mint.ts';
+import { mintableSlotValue, resolveRowComponentMint, type RowComponentMint } from './row-mint.ts';
 import { forwardedSpreadViewRecords } from './spread-forwarding.ts';
 import { armEscalationCandidateSiteIds } from './symbol-modules.ts';
 
@@ -474,10 +474,15 @@ function mintableEmptyArm(
  * way it can exist is for the client to build it - and the client has no
  * renderer, only the payload. This ships the row chunk's finished markup, which
  * is honest for exactly two shapes: a row with NO slots, and a row whose every
- * slot - text or attribute - reads off the repeated item. Anything else is a
- * part the mint cannot fill - a value from outside the row, an attribute value
- * an expression computes, a nested construct, a child component - and half a row
- * is worse than none.
+ * slot - text or attribute - reads off the repeated item or off a graph node the
+ * page holds. Anything else is a part the mint cannot fill - an attribute value
+ * an expression computes, an element handle's id, a nested construct, a child
+ * component - and half a row is worse than none.
+ *
+ * A graph read is taken once, at mint. A served row's outside read does not
+ * refresh either - a row host carries no per-instance locator, so the repeat
+ * ships no `domUpdates` for it - and a minted row that kept itself current would
+ * disagree with the rows beside it.
  *
  * A third shape joins them once a row element WRAPS a child component: the
  * wrapper is this markup, and the child is named by identity in `rowComponent`,
@@ -495,24 +500,17 @@ function mintableEmptyArm(
  * Pay-per-use: a row this refuses emits no field at all, so its record is
  * byte-identical to what it was before this existed.
  */
+type MintableRowTemplate = NonNullable<
+	NonNullable<ProtocolViewPayload['keyedRepeats']>[number]['rowTemplate']
+>;
+type RowTemplateTextSlot = NonNullable<MintableRowTemplate['textSlots']>[number];
+type RowTemplateAttributeSlot = NonNullable<MintableRowTemplate['attributeSlots']>[number];
+
 function mintableRowTemplate(
 	input: ProtocolViewPayloadInput,
 	render: RenderDataArtifact['repeats'][number],
 	mint: RowComponentMint | null,
-): {
-	readonly rowTemplate?: {
-		readonly html: string;
-		readonly textSlots?: ReadonlyArray<{
-			readonly path: ReadonlyArray<number>;
-			readonly itemPath: ReadonlyArray<string>;
-		}>;
-		readonly attributeSlots?: ReadonlyArray<{
-			readonly path: ReadonlyArray<number>;
-			readonly name: string;
-			readonly itemPath: ReadonlyArray<string>;
-		}>;
-	};
-} {
+): { readonly rowTemplate?: MintableRowTemplate } {
 	const chunk = renderDataOf(input).chunks.find(
 		(candidate) => candidate.id === render.rowChunkId,
 	);
@@ -524,30 +522,17 @@ function mintableRowTemplate(
 	const wrappedComponentSlot = mint?.slotPath ? componentSlotAt(chunk, mint.slotPath) : undefined;
 	if (chunk.slots.some((slot) => slot.kind === 'child-component' && slot !== wrappedComponentSlot))
 		return {};
-	const textSlots: Array<{
-		readonly path: ReadonlyArray<number>;
-		readonly itemPath: ReadonlyArray<string>;
-	}> = [];
-	const attributeSlots: Array<{
-		readonly path: ReadonlyArray<number>;
-		readonly name: string;
-		readonly itemPath: ReadonlyArray<string>;
-	}> = [];
+	const textSlots: Array<RowTemplateTextSlot> = [];
+	const attributeSlots: Array<RowTemplateAttributeSlot> = [];
 	for (const slot of chunk.slots) {
 		if (slot === wrappedComponentSlot) continue;
-		// A row that reads anything but its own item cannot be minted from the item
-		// alone, and every slot that is neither text nor an attribute is wiring the
-		// mint does not do.
+		// Every slot that is neither text nor an attribute is wiring the mint does
+		// not do, and a value only the render can produce has no channel at all.
 		if (slot.kind !== 'text' && slot.kind !== 'attribute') return {};
-		if (slot.residue.kind !== 'repeat-item') return {};
-		if (slot.kind === 'text')
-			textSlots.push({ path: slot.coordinate.path, itemPath: slot.residue.path });
-		else
-			attributeSlots.push({
-				path: slot.coordinate.path,
-				name: slot.name,
-				itemPath: slot.residue.path,
-			});
+		const value = mintableSlotValue(slot);
+		if (!value) return {};
+		if (slot.kind === 'text') textSlots.push({ path: slot.coordinate.path, ...value });
+		else attributeSlots.push({ path: slot.coordinate.path, name: slot.name, ...value });
 	}
 	const html = chunk.statics.join('');
 	if (!html) return {};
