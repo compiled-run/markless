@@ -49,10 +49,10 @@ export type MenuRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
  * The control the menu opens from, and the family's only tab stop. It declares
  * `aria-haspopup="menu"`, so a reader says a menu is there before it is opened.
  *
- * Inside a `menubar` it is that bar's item: it renders `role="menuitem"`, keeps
- * every popup attribute, and takes its `tabindex` from the bar's roving stop.
- * Inside a `toolbar` it stays `role="button"` and only gives up its tab stop -
- * a toolbar does not change what its controls are.
+ * Inside a `toolbar` it stays `role="button"` and only gives up its tab stop - a
+ * toolbar does not change what its controls are. A menu bar takes no trigger at
+ * all: `menubar.item` is the item level there, and the menu family's commands go
+ * straight inside its `menubar.itemcontent`.
  */
 export type MenuTriggerProps = PropsOf<'button'>;
 
