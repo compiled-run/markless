@@ -192,9 +192,7 @@ test('the month is one tab stop, so Tab passes it rather than walking 42 days', 
 	expect(dayEls().filter((one) => one.getAttribute('tabindex') === '-1').length).toBe(41);
 });
 
-// Red until the client's month rewrite reaches the day the same handler wrote.
-
-test.fails('the tab stop follows the day the keyboard walks onto, across a month crossing', async () => {
+test('the tab stop follows the day the keyboard walks onto, across a month crossing', async () => {
 	await open(Basic);
 	dayEl('2026-08-31').focus();
 	await expect.poll(() => tabStops()).toEqual(['2026-08-31']);
