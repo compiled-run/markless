@@ -310,8 +310,12 @@ family committed. The count above has not been re-measured by a full run.
   (`crop.tsrx:191`, `crop.tsrx:230`, `colorpicker.tsrx:246`, `colorpicker.tsrx:288`),
   but that is a hypothesis: the masking is what makes it one rather than a
   reading.
-- **Why this is the first finding to fix:** every other defect these four
-  families have is invisible until the reporter stops eating it.
+- **Resolution (both halves fixed):** the reporter no longer throws on a
+  non-writable `code` (guarded write, `marklessCode` fallback —
+  `runtime-error-reporting.ts`, node-tested), and the hypothesis proved right:
+  the originals were unguarded `setPointerCapture` calls, now routed through
+  each family's `capturePointer` guard (colorpicker, crop, ink, pad), with one
+  pin per family. All four families' storms are green on the CI seed.
 
 fileupload was on this list until 2026-08-28 and is off it: its throw was the
 lane's own (see below), not a family handler's, and both its rows are green on
@@ -420,11 +424,10 @@ What the truthful gate finds instead, on the same seed:
   truncated by `maxlength`, which the field carries; `type-into`'s direct `value`
   write is not, so the field can start recovery seven characters long and six
   `Backspace`s leave one behind.
-- **What would settle it:** truncating `type-into`'s write against the target's
-  `maxLength`, the same realism argument that removed the value writes on radios
-  and file inputs. That was outside this change's scope and is not done — until
-  it is, read this row as the lane overfilling the field, not as otp losing a
-  character.
+- **Resolution:** `type-into` now truncates its write against the target's
+  `maxLength` (the same realism argument that removed the value writes on radios
+  and file inputs). With the truncation and the truthful recovery gate the otp
+  rows are green — five consecutive repeats on the seed that flaked 1-in-3.
 
 ### Which seed to run
 
@@ -476,11 +479,9 @@ re-run here — a full run on both seeds is what should replace this table.
   default mode, so the assignment rewrites the `value=` **content** attribute and
   silently changes what the option *is*. Both produced findings about families
   that were really the lane.
-  What the write still does not model is `maxlength`: the browser truncates a
-  person's typing against it and a direct `value` write is not truncated, so a
-  storm can leave more characters in a field than a keyboard could — see the otp
-  finding below. The `input` handler still sees the write; a family's own
-  character guard still does not.
+  The write is also truncated against the target's `maxLength`, as the browser
+  truncates a person's typing. The `input` handler still sees the write; a
+  family's own character guard still does not.
 
 ## Typechecking
 
