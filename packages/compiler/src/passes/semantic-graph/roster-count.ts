@@ -550,6 +550,12 @@ function spentAt(read: AnyNode, ancestors: ReadonlyArray<AnyNode>): Verdict | nu
 			child = parent;
 			continue;
 		}
+		// Authored parentheses are kept as nodes, and they change no verdict: the
+		// same expression written with and without them must defer alike.
+		if (parent.type === 'ParenthesizedExpression') {
+			child = parent;
+			continue;
+		}
 		if (isPrintedPosition(parent, child)) {
 			if (!innermost) {
 				// Only a BARE pass routes: a template slot would hand the child a
