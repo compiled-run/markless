@@ -68,7 +68,9 @@
 	},
 	"scripts": {
 		"api:extract": "node api-extract/write.ts",
-		"api:check": "vp test run --config api-extract/vitest.config.ts"
+		"api:check": "vp test run --config api-extract/vitest.config.ts",
+		"chaos": "vitest --run --config chaos/vitest.config.ts",
+		"chaos:ci": "CHAOS_SEED=20260828 vitest --run --config chaos/vitest.config.ts"
 	},
 	"dependencies": {
 		"@markless/core": "workspace:*"
