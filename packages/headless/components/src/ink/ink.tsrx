@@ -6,6 +6,7 @@
 import { computed, element, shared, state } from '@markless/core';
 import VisuallyHidden from '../base/visually-hidden.tsrx';
 import {
+	capturePointer,
 	heldPaths,
 	joinPaths,
 	rasterise,
@@ -129,7 +130,7 @@ export const inkState = shared(
 				pad.drawing = true;
 				pad.pointerId = pointerId;
 				pad.points = [{ x: clientX - box.left, y: clientY - box.top, pressure }];
-				surface.setPointerCapture(pointerId);
+				capturePointer(surface, pointerId);
 			},
 
 			/** Adds samples to the stroke in flight. Coalesced moves arrive as a batch. */

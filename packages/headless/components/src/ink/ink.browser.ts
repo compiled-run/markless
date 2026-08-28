@@ -79,12 +79,17 @@ function liveRegion(): Element {
 	return found;
 }
 
+// The mouse is pointer 1 and the platform always holds it; nothing holds this one.
+const UNTRACKED_POINTER = 9101;
+
+type StrokeOptions = { pressure?: number; pointerType?: string; pointerId?: number };
+
 function pointer(
 	target: Element,
 	type: string,
 	x: number,
 	y: number,
-	options: { pressure?: number; pointerType?: string } = {},
+	options: StrokeOptions = {},
 ) {
 	target.dispatchEvent(
 		new PointerEvent(type, {
@@ -96,14 +101,14 @@ function pointer(
 			clientY: y,
 			pressure: options.pressure ?? 0.5,
 			pointerType: options.pointerType ?? 'mouse',
-			pointerId: 1,
+			pointerId: options.pointerId ?? 1,
 			isPrimary: true,
 		}),
 	);
 }
 
 /** A whole stroke: press, twelve moves along a diagonal, lift. */
-function drawStroke(from = 20, options: { pressure?: number; pointerType?: string } = {}) {
+function drawStroke(from = 20, options: StrokeOptions = {}) {
 	const area = el<SVGSVGElement>(Area);
 	const box = area.getBoundingClientRect();
 	pointer(area, 'pointerdown', box.left + from, box.top + 20, options);
@@ -358,6 +363,33 @@ test('the stroke in flight is drawn before it is committed', async () => {
 	await expect.poll(() => committed().length).toBe(1);
 	expect(currentPath().getAttribute('d')).toBe('');
 	expect(el(Root).hasAttribute('ui-drawing')).toBe(false);
+});
+
+// A press can reach the family with its pointer already lifted - the runtime
+// replays a recorded press once its handler has loaded - and capturing a pointer
+// the platform is no longer tracking throws.
+test('a press from a pointer the platform is not tracking throws nothing', async () => {
+	await render(Basic);
+
+	const failures: string[] = [];
+	const record = (event: ErrorEvent) => failures.push(event.message);
+	const recordRejection = (event: PromiseRejectionEvent) => failures.push(String(event.reason));
+	window.addEventListener('error', record);
+	window.addEventListener('unhandledrejection', recordRejection);
+	try {
+		drawStroke(20, { pointerId: UNTRACKED_POINTER });
+		await expect.poll(() => committed().length).toBe(1);
+		expect(failures).toEqual([]);
+
+		// And the next ordinary stroke still lands.
+		drawStroke(140);
+		await expect.poll(() => committed().length).toBe(2);
+		expect(liveRegion().textContent).toBe('2 strokes');
+		expect(failures).toEqual([]);
+	} finally {
+		window.removeEventListener('error', record);
+		window.removeEventListener('unhandledrejection', recordRejection);
+	}
 });
 
 test('two strokes are two paths and one joined value', async () => {

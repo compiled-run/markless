@@ -87,7 +87,10 @@ function custom(target: Element, property: string): number {
 	return Number.parseFloat((target as HTMLElement).style.getPropertyValue(property));
 }
 
-function pointer(target: Element, type: string, x: number, y: number) {
+// The mouse is pointer 1 and the platform always holds it; nothing holds this one.
+const UNTRACKED_POINTER = 9101;
+
+function pointer(target: Element, type: string, x: number, y: number, pointerId = 1) {
 	target.dispatchEvent(
 		new PointerEvent(type, {
 			bubbles: true,
@@ -97,7 +100,7 @@ function pointer(target: Element, type: string, x: number, y: number) {
 			clientX: x,
 			clientY: y,
 			pointerType: 'mouse',
-			pointerId: 1,
+			pointerId,
 			isPrimary: true,
 		}),
 	);
@@ -107,15 +110,21 @@ function pointer(target: Element, type: string, x: number, y: number) {
  * A whole gesture: press on `grabbed`, travel, lift. The moves and the lift go to
  * the area because that is where the family took pointer capture.
  */
-function drag(grabbed: Element, deltaX: number, deltaY: number, options: { lift?: boolean } = {}) {
+function drag(
+	grabbed: Element,
+	deltaX: number,
+	deltaY: number,
+	options: { lift?: boolean; pointerId?: number } = {},
+) {
 	const area = el(Area);
+	const id = options.pointerId ?? 1;
 	const box = grabbed.getBoundingClientRect();
 	const fromX = box.left + box.width / 2;
 	const fromY = box.top + box.height / 2;
-	pointer(grabbed, 'pointerdown', fromX, fromY);
-	pointer(area, 'pointermove', fromX + deltaX / 2, fromY + deltaY / 2);
-	pointer(area, 'pointermove', fromX + deltaX, fromY + deltaY);
-	if (options.lift !== false) pointer(area, 'pointerup', fromX + deltaX, fromY + deltaY);
+	pointer(grabbed, 'pointerdown', fromX, fromY, id);
+	pointer(area, 'pointermove', fromX + deltaX / 2, fromY + deltaY / 2, id);
+	pointer(area, 'pointermove', fromX + deltaX, fromY + deltaY, id);
+	if (options.lift !== false) pointer(area, 'pointerup', fromX + deltaX, fromY + deltaY, id);
 }
 
 function press(
@@ -474,6 +483,35 @@ test('a cancelled gesture reports nothing and leaves the rectangle where the las
 	pointer(area, 'pointercancel', 0, 0);
 	expect(Number(el(Calls).textContent)).toBe(0);
 	await expect.poll(() => Number(el(Dragged).textContent)).toBeGreaterThan(0);
+});
+
+// A press can reach the family with its pointer already lifted - the runtime
+// replays a recorded press once its handler has loaded - and capturing a pointer
+// the platform is no longer tracking throws. Both a move and a resize capture.
+test('a press from a pointer the platform is not tracking throws nothing', async () => {
+	await render(Basic);
+
+	const failures: string[] = [];
+	const record = (event: ErrorEvent) => failures.push(event.message);
+	const recordRejection = (event: PromiseRejectionEvent) => failures.push(String(event.reason));
+	window.addEventListener('error', record);
+	window.addEventListener('unhandledrejection', recordRejection);
+	try {
+		drag(el(Selection), 30, 20, { pointerId: UNTRACKED_POINTER });
+		await expect.poll(() => shown()).toEqual({ x: 70, y: 50, width: 200, height: 150 });
+
+		drag(handle('handle-inline-end'), 40, 0, { pointerId: UNTRACKED_POINTER });
+		await expect.poll(() => shown()).toEqual({ x: 70, y: 50, width: 240, height: 150 });
+		expect(failures).toEqual([]);
+
+		// And the next ordinary gesture still moves the rectangle.
+		drag(el(Selection), -30, -20);
+		await expect.poll(() => shown()).toEqual({ x: 40, y: 30, width: 240, height: 150 });
+		expect(failures).toEqual([]);
+	} finally {
+		window.removeEventListener('error', record);
+		window.removeEventListener('unhandledrejection', recordRejection);
+	}
 });
 
 // ------------------------------------------------------------------ keyboard

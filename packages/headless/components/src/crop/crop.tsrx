@@ -10,6 +10,7 @@ import { computed, element, shared, state } from '@markless/core';
 import VisuallyHidden from '../base/visually-hidden.tsrx';
 import {
 	areaStyleText,
+	capturePointer,
 	edgeMax,
 	edgeName,
 	edgeOrientation,
@@ -188,7 +189,7 @@ export const cropState = shared(
 				crop.pointerId = pointerId;
 				// Pointer capture rather than window listeners: the gesture keeps
 				// arriving here once the pointer leaves the area.
-				surface.setPointerCapture(pointerId);
+				capturePointer(surface, pointerId);
 			},
 
 			/** Starts a resize on the edges the handle owns. */
@@ -227,7 +228,7 @@ export const cropState = shared(
 				crop.resizing = true;
 				crop.changed = false;
 				crop.pointerId = pointerId;
-				surface.setPointerCapture(pointerId);
+				capturePointer(surface, pointerId);
 			},
 
 			/**

@@ -144,11 +144,20 @@ export function pointerOutside(
 	);
 }
 
-/** Opens the OS file picker. `showPicker` is the modern route; older engines take the click. */
+/**
+ * Opens the OS file picker. `showPicker` is the modern route; older engines take
+ * the click. A press the browser does not count as a gesture - a replayed press,
+ * or one a script dispatched - makes `showPicker` throw `NotAllowedError`, and
+ * the click route is what those engines are left with anyway.
+ */
 export function openPicker(field: HTMLInputElement): void {
 	if (typeof field.showPicker === 'function') {
-		field.showPicker();
-		return;
+		try {
+			field.showPicker();
+			return;
+		} catch (error) {
+			if (!(error instanceof DOMException) || error.name !== 'NotAllowedError') throw error;
+		}
 	}
 	field.click();
 }

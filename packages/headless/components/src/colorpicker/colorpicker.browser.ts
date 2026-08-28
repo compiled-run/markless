@@ -66,7 +66,10 @@ function customProperty(target: Element, name: string) {
 	return window.getComputedStyle(target).getPropertyValue(name).trim();
 }
 
-function pointer(target: Element, type: string, clientX: number, clientY: number) {
+// The mouse is pointer 1 and the platform always holds it; nothing holds this one.
+const UNTRACKED_POINTER = 9101;
+
+function pointer(target: Element, type: string, clientX: number, clientY: number, pointerId = 1) {
 	target.dispatchEvent(
 		new PointerEvent(type, {
 			bubbles: true,
@@ -74,7 +77,7 @@ function pointer(target: Element, type: string, clientX: number, clientY: number
 			buttons: 1,
 			clientX,
 			clientY,
-			pointerId: 1,
+			pointerId,
 			isPrimary: true,
 		}),
 	);
@@ -341,6 +344,46 @@ test('CSR: a drag along the hue rail moves hue and leaves the plane where it was
 
 	pointer(rail, 'pointerup', at.x, at.y);
 	await expect.poll(() => rail.hasAttribute('ui-dragging')).toBe(false);
+});
+
+// A press can reach the family with its pointer already lifted - the runtime
+// replays a recorded press once its handler has loaded - and capturing a pointer
+// the platform is no longer tracking throws. Both the plane and the rails capture.
+test('CSR: a press from a pointer the platform is not tracking throws nothing', async () => {
+	await render(Basic);
+
+	const failures: string[] = [];
+	const record = (event: ErrorEvent) => failures.push(event.message);
+	const recordRejection = (event: PromiseRejectionEvent) => failures.push(String(event.reason));
+	window.addEventListener('error', record);
+	window.addEventListener('unhandledrejection', recordRejection);
+	try {
+		const start = inArea(0.8, 1);
+		pointer(el(Area), 'pointerdown', start.x, start.y, UNTRACKED_POINTER);
+		const mid = inArea(0.5, 0.5);
+		pointer(el(Area), 'pointermove', mid.x, mid.y, UNTRACKED_POINTER);
+		await expect.poll(() => axes()[0].getAttribute('aria-valuenow')).toBe('50');
+		pointer(el(Area), 'pointerup', mid.x, mid.y, UNTRACKED_POINTER);
+
+		const rail = el(HueTrack);
+		const at = alongRail(rail, 0.5);
+		pointer(rail, 'pointerdown', at.x, at.y, UNTRACKED_POINTER);
+		await expect.poll(() => el(HueThumb).getAttribute('aria-valuenow')).toBe('180');
+		pointer(rail, 'pointerup', at.x, at.y, UNTRACKED_POINTER);
+		await expect.poll(() => rail.hasAttribute('ui-dragging')).toBe(false);
+		expect(failures).toEqual([]);
+
+		// And the next ordinary gesture still moves the plane.
+		const back = inArea(0.2, 0.2);
+		pointer(el(Area), 'pointerdown', back.x, back.y);
+		pointer(el(Area), 'pointermove', back.x, back.y);
+		await expect.poll(() => axes()[0].getAttribute('aria-valuenow')).toBe('20');
+		pointer(el(Area), 'pointerup', back.x, back.y);
+		expect(failures).toEqual([]);
+	} finally {
+		window.removeEventListener('error', record);
+		window.removeEventListener('unhandledrejection', recordRejection);
+	}
 });
 
 test('CSR: a drag to the grey edge keeps the hue the picker started on', async () => {

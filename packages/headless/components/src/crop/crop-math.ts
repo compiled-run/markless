@@ -37,6 +37,20 @@ export function measureArea(area: HTMLElement): CropAreaBox {
 	};
 }
 
+/**
+ * Captures the pointer, tolerating an id the platform is not tracking: a press
+ * replayed after its handler loaded can arrive with the pointer already lifted,
+ * and capturing one of those throws `NotFoundError` rather than doing nothing.
+ * The gesture runs without capture; only samples that reach the area are seen.
+ */
+export function capturePointer(area: HTMLElement, pointerId: number): void {
+	try {
+		area.setPointerCapture(pointerId);
+	} catch (error) {
+		if (!(error instanceof DOMException) || error.name !== 'NotFoundError') throw error;
+	}
+}
+
 /** Where a pointer landed, in area units on the inline axis. */
 export function inlineAt(clientX: number, origin: number, sign: number): number {
 	return (clientX - origin) * sign;

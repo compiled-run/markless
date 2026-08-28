@@ -106,6 +106,41 @@ test('CSR: pressing the browse button opens the picker', async () => {
 	}
 });
 
+// A press can reach the family with the browser no longer counting it as a
+// gesture - the runtime replays a recorded press once its handler has loaded -
+// and `showPicker` refuses one of those by throwing rather than doing nothing.
+test('CSR: a press the browser will not count as a gesture throws nothing', async () => {
+	await render(Basic);
+	const field = el<HTMLInputElement>('field');
+	const clicked = vi.spyOn(field, 'click').mockImplementation(() => {});
+	const original = HTMLInputElement.prototype.showPicker;
+	HTMLInputElement.prototype.showPicker = () => {
+		throw new DOMException('requires a user gesture', 'NotAllowedError');
+	};
+
+	const failures: string[] = [];
+	const record = (event: ErrorEvent) => failures.push(event.message);
+	const recordRejection = (event: PromiseRejectionEvent) => failures.push(String(event.reason));
+	window.addEventListener('error', record);
+	window.addEventListener('unhandledrejection', recordRejection);
+	try {
+		el<HTMLButtonElement>('trigger').click();
+		// The click route is what an engine without `showPicker` gets anyway.
+		await expect.poll(() => clicked.mock.calls.length).toBe(1);
+		expect(failures).toEqual([]);
+
+		// And the next ordinary gesture still lands a file.
+		dropOn(el('droparea'), fileOf('notes.txt'));
+		await expect.poll(() => names()).toEqual(['notes.txt']);
+		expect(failures).toEqual([]);
+	} finally {
+		window.removeEventListener('error', record);
+		window.removeEventListener('unhandledrejection', recordRejection);
+		HTMLInputElement.prototype.showPicker = original;
+		clicked.mockRestore();
+	}
+});
+
 test('CSR: a drag arriving over the area marks it, and leaving clears it', async () => {
 	await render(Basic);
 	const droparea = el('droparea');
