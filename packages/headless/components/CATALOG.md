@@ -83,6 +83,14 @@ frame gap.
 Reassess after taglist lands: its item-edit mode is the same machinery, so editable may reduce to
 a recomposition rather than a from-scratch family.
 
+## Unparked 2026-08-28 (owner go, building now)
+
+- **timebox** — charter decisions taken as the recorded recommendations: segmented spinbuttons
+  (React Aria lineage) and platform `Intl.DateTimeFormat.formatToParts`, plain time-of-day value.
+  Segment engine stays internal to the family, liftable when datebox arrives.
+- **tokenbox** — the owner unparked it; the consumer is the docs "prompt field" recipe. v1 scope
+  fences recorded in the family note (plain-text paste, composition-guarded IME, honest undo).
+
 ## Parked charters (in the catalog; each needs a prerequisite or an up-front decision)
 
 ### gridlist, then table (collection lineage)
