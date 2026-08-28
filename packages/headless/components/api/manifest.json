@@ -2529,15 +2529,8 @@
 			{
 				"part": "item",
 				"component": "OtpItem",
-				"doc": "One box of the code. It draws its own character and reports `ui-empty` and\n`ui-disabled` for styling, and it is `aria-hidden`: the boxes are decoration\nover the single real input, which is what a reader announces instead.",
-				"props": [
-					{
-						"name": "index",
-						"type": "number",
-						"required": true,
-						"doc": "Which character of the code this box shows, counting from 0. Writing the\nboxes is what sets the length of the code: six boxes, a six-character code."
-					}
-				]
+				"doc": "One box of the code. It draws its own character and reports `ui-empty` and\n`ui-disabled` for styling, and it is `aria-hidden`: the boxes are decoration\nover the single real input, which is what a reader announces instead.\n\nWhich character it shows is where it stands among the boxes, so nothing is\nauthored: writing the boxes is what sets the length of the code — six boxes,\na six-character code.",
+				"props": []
 			},
 			{
 				"part": "itemindicator",
@@ -3199,6 +3192,128 @@
 				"component": "RatingValueLabel",
 				"doc": "The rating as text - `3 of 5`, and `0 of 5` when nothing is rated. It takes\nno children: a consumer who wants their own wording writes their own element\nand reads `ui-value` off it.",
 				"props": []
+			}
+		]
+	},
+	"resizable": {
+		"parts": [
+			{
+				"part": "item",
+				"component": "ResizableItem",
+				"doc": "One panel. Its name is minted as the element's `id` so a divider's\n`aria-controls` reaches it; a consumer who writes their own `id` owes\nthemselves the matching `aria-controls`.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": true,
+						"doc": "This panel's name."
+					},
+					{
+						"name": "orientation",
+						"type": "'horizontal' | 'vertical'",
+						"required": false,
+						"doc": "Set it to host a nested group inside this panel, laid along that axis."
+					}
+				]
+			},
+			{
+				"part": "root",
+				"component": "ResizableRoot",
+				"doc": "A row or column of panels a person can resize by dragging or arrowing the\ndividers between them.\n\nThe panels and the dividers go inside the root, in the order they appear.\nA panel is `resizable.item` and carries the name its size is keyed by; a\ndivider is `resizable.thumb` and carries the name of the panel it resizes,\nalong with that panel's limits.",
+				"props": [
+					{
+						"name": "sizes",
+						"type": "ResizableSizes",
+						"required": false,
+						"doc": "The sizes in force. Passing this makes the widget controlled: a gesture\nreports through `onChange` and nothing moves until the new record comes\nback in. Leave it out and the widget keeps its own."
+					},
+					{
+						"name": "defaultSizes",
+						"type": "ResizableSizes",
+						"required": false,
+						"doc": "The sizes an uncontrolled widget starts with. A panel left out is an equal share."
+					},
+					{
+						"name": "orientation",
+						"type": "'horizontal' | 'vertical'",
+						"required": false,
+						"default": "'horizontal'",
+						"doc": "Which axis the panels are laid along. Omit it and they sit side by side."
+					},
+					{
+						"name": "step",
+						"type": "number",
+						"required": false,
+						"default": "1",
+						"doc": "How far one arrow key moves a divider, in points of the group. Defaults to 1; Shift multiplies it by ten."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nothing can be resized."
+					},
+					{
+						"name": "onChange",
+						"type": "(sizes: ResizableSizes) => void",
+						"required": false,
+						"doc": "Called with every panel's size each time one changes, including during a drag."
+					},
+					{
+						"name": "onChangeEnd",
+						"type": "(sizes: ResizableSizes) => void",
+						"required": false,
+						"doc": "Called once a change settles: the pointer released, or the key that moved it."
+					}
+				]
+			},
+			{
+				"part": "thumb",
+				"component": "ResizableThumb",
+				"doc": "The divider: APG's window splitter, wearing the size of the panel it names.\nNo invented default name: attributes resolve first-wins, so a family-written\nlabel would silence the consumer's, and identical invented labels on two\ndividers are landmarks a reader cannot tell apart (the navbar rule). The\nconsumer labels it; aria-valuetext still reads the size.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": true,
+						"doc": "The name of the primary panel: the one this divider resizes and reports."
+					},
+					{
+						"name": "min",
+						"type": "number",
+						"required": false,
+						"default": "0",
+						"doc": "The smallest the primary panel may be, as a share of the group. Defaults to 0."
+					},
+					{
+						"name": "max",
+						"type": "number",
+						"required": false,
+						"default": "100",
+						"doc": "The largest the primary panel may be. Defaults to 100."
+					},
+					{
+						"name": "collapsible",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Enter collapses the primary panel and restores it."
+					},
+					{
+						"name": "collapsedSize",
+						"type": "number",
+						"required": false,
+						"default": "0",
+						"doc": "What the primary panel measures when collapsed. Defaults to 0."
+					},
+					{
+						"name": "orientation",
+						"type": "'horizontal' | 'vertical'",
+						"required": false,
+						"doc": "The axis of the group this divider sits in. Omit it and the root's axis is used."
+					}
+				]
 			}
 		]
 	},
