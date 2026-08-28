@@ -26,10 +26,6 @@ export const tourState = shared(
 		const tour: TourInstanceState = state({
 			open: false,
 			step: 0,
-			// Each step writes `index + 1` here as it renders, so the last one leaves
-			// the length behind. A plural handle cannot do this job: it reads back
-			// empty inside a computed(), so it is a handler-time registry only.
-			count: 0,
 			loop: false,
 			closeOnInteractOutside: true,
 			disabled: false,
@@ -37,8 +33,8 @@ export const tourState = shared(
 			// can lower, and the current target is read in four of them.
 			target: undefined as HTMLElement | undefined,
 		});
-		// Bound on every card and read back in document order, for the one job a
-		// handler does with it: landing focus on the card a step change moved to.
+		// Every card binds itself here, in document order: a step's place is where it
+		// stands in this roster and the tour's length is how long the roster is.
 		const itemEls = element<HTMLDivElement[]>();
 
 		return {
@@ -61,30 +57,23 @@ export const tourState = shared(
 				revealTarget(target);
 			},
 
-			next() {
+			/**
+			 * Move one step in `direction`, over a tour `steps` long.
+			 *
+			 * The length is handed in rather than taken off the handle: the part that
+			 * asked to move derives it from the roster, which is what puts a
+			 * roster-dependent cell in the served payload and makes the page's roster
+			 * live at resume. Without one, a card's own place is never banked on a
+			 * tour that is already showing before the first gesture.
+			 */
+			walk(direction: number, steps: number) {
 				const locked = tour.disabled;
 				if (locked === true) return;
 				const bound = itemEls;
 				const cards = bound === undefined ? [] : bound;
 				const at = tour.step;
 				const wraps = tour.loop;
-				const to = stepAfter(at, 1, cards.length, wraps === true);
-				if (to === at) return;
-				const leaving = tour.target;
-				releaseTarget(leaving);
-				tour.step = to;
-				tour.onChange?.(to);
-				focusIntoCard(cards, to);
-			},
-
-			prev() {
-				const locked = tour.disabled;
-				if (locked === true) return;
-				const bound = itemEls;
-				const cards = bound === undefined ? [] : bound;
-				const at = tour.step;
-				const wraps = tour.loop;
-				const to = stepAfter(at, -1, cards.length, wraps === true);
+				const to = stepAfter(at, direction, steps, wraps === true);
 				if (to === at) return;
 				const leaving = tour.target;
 				releaseTarget(leaving);
@@ -116,7 +105,6 @@ export const tourState = shared(
 export const tourItemState = shared(
 	() => {
 		const item: TourItemInstanceState = state({
-			index: 0,
 			target: undefined as HTMLElement | undefined,
 		});
 		const el = element<HTMLDivElement>();
@@ -128,12 +116,11 @@ export const tourItemState = shared(
 	{ scope: 'widget' },
 );
 
-export function TourItem({ index, target, children, ...rest }: TourItemProps) @{
+export function TourItem({ target, children, ...rest }: TourItemProps) @{
 	const item = tourItemState();
-	item.index = index;
 	item.target = target;
 
-	<TourCard {...rest} index={index}>{children}</TourCard>
+	<TourCard {...rest}>{children}</TourCard>
 }
 
 export function TourRoot({
@@ -153,31 +140,33 @@ export function TourRoot({
 	tour.loop = loop;
 	tour.closeOnInteractOutside = closeOnInteractOutside;
 	tour.disabled = disabled;
+	// The root asks its length before a single card has rendered, so the served
+	// page answers it rather than the render.
+	const rootCount = computed(() => tour.itemEls.length);
 
 	<div
 		{...rest}
 		ui-open={tour.open}
 		ui-closed={tour.open !== true}
 		ui-disabled={tour.disabled}
-		ui-max={tour.count}
+		ui-max={rootCount}
 	>{children}</div>
 }
 
 // A separate component from `tour.item`: the card points aria-labelledby and
 // aria-describedby at handles the step's own widget owns, and a widget's root
 // component cannot read its own instance token.
-function TourCard({ index, children, onDismiss, onFocus, onKeydown, ...rest }: TourCardProps) @{
+function TourCard({ children, onDismiss, onFocus, onKeydown, ...rest }: TourCardProps) @{
 	const tour = tourState();
-	// Registration by index: the last step to render leaves the tour's length behind.
-	tour.count = index + 1;
 	const item = tourItemState();
-	// The step's own `index` prop, not a lookup: a card has to know its place while
-	// it renders, and every registry this library has is handler-time only.
+	const mine = element<HTMLDivElement>();
+	// Which step this is, is where it stands among the cards: nobody numbers them.
+	const at = computed(() => tour.itemEls.indexOf(mine as HTMLDivElement));
+	const cardCount = computed(() => tour.itemEls.length);
 	const isCurrent = computed(() => {
 		const showing = tour.open;
-		const at = tour.step;
-		const mine = item.index;
-		return showing === true && at === mine;
+		const on = tour.step;
+		return showing === true && on === at;
 	});
 
 	// No `aria-modal`, in any configuration. The APG allows it only when nothing
@@ -187,7 +176,7 @@ function TourCard({ index, children, onDismiss, onFocus, onKeydown, ...rest }: T
 	// tour needs to bring an off-screen target into view.
 	<div
 		{...rest}
-		el={[item.el, tour.itemEls]}
+		el={[item.el, tour.itemEls, mine]}
 		overlay
 		role="dialog"
 		tabindex={-1}
@@ -214,9 +203,11 @@ function TourCard({ index, children, onDismiss, onFocus, onKeydown, ...rest }: T
 			// consumer's own listbox or slider inside a step keeps its own arrows and
 			// there is no `keyboardNavigation` knob to get wrong.
 			const card = item.el;
+			// Coerced: a count rendered before its cards existed is patched into the payload as text.
+			const steps = Number(cardCount);
 			if (event.target === card) {
-				if (event.key === 'ArrowRight') tour.next();
-				if (event.key === 'ArrowLeft') tour.prev();
+				if (event.key === 'ArrowRight') tour.walk(1, steps);
+				if (event.key === 'ArrowLeft') tour.walk(-1, steps);
 			}
 			onKeydown?.(event);
 		}}
@@ -296,32 +287,31 @@ export function TourValueLabel({ children, ...rest }: TourValueLabelProps) @{
 		const at = tour.step;
 		return at + 1;
 	});
-	const text = computed(() => {
-		const at = tour.step;
-		const total = tour.count;
-		return `${at + 1} of ${total}`;
-	});
+	// The count is spent where it is printed, never inside a second computed(): a
+	// derived binding holding it publishes a placeholder nothing downstream resolves.
+	const labelCount = computed(() => tour.itemEls.length);
 
-	<span {...rest} ui-value={position} ui-max={tour.count}>
+	<span {...rest} ui-value={position} ui-max={labelCount}>
 		@if (children) {
 			<>{children}</>
 		} @else {
-			<>{text}</>
+			<>{`${tour.step + 1} of ${labelCount}`}</>
 		}
 	</span>
 }
 
 export function TourBackTrigger({ children, onClick, ...rest }: TourBackTriggerProps) @{
 	const tour = tourState();
-	// Each trigger's gate cell carries its own name: two components in one module
-	// declaring the same `const` name collapse to one cell, and the survivor's
-	// formula silently answers for both.
+	// Every derived cell in this module carries its own name: two components
+	// declaring the same `const` collapse to one cell, and the survivor's formula
+	// silently answers for both.
 	const isBackOff = computed(() => {
 		const locked = tour.disabled;
 		const wraps = tour.loop;
 		const at = tour.step;
 		return locked === true || (wraps !== true && at <= 0);
 	});
+	const backCount = computed(() => tour.itemEls.length);
 
 	<button
 		{...rest}
@@ -329,7 +319,8 @@ export function TourBackTrigger({ children, onClick, ...rest }: TourBackTriggerP
 		disabled={isBackOff}
 		ui-disabled={isBackOff}
 		onClick={(event) => {
-			tour.prev();
+			const steps = Number(backCount);
+			tour.walk(-1, steps);
 			onClick?.(event);
 		}}
 	>{children}</button>
@@ -337,21 +328,16 @@ export function TourBackTrigger({ children, onClick, ...rest }: TourBackTriggerP
 
 export function TourForwardTrigger({ children, onClick, ...rest }: TourForwardTriggerProps) @{
 	const tour = tourState();
-	const isForwardOff = computed(() => {
-		const locked = tour.disabled;
-		const wraps = tour.loop;
-		const at = tour.step;
-		const total = tour.count;
-		return locked === true || (wraps !== true && at >= total - 1);
-	});
+	const forwardCount = computed(() => tour.itemEls.length);
 
 	<button
 		{...rest}
 		type="button"
-		disabled={isForwardOff}
-		ui-disabled={isForwardOff}
+		disabled={tour.disabled === true || tour.loop !== true && tour.step >= forwardCount - 1}
+		ui-disabled={tour.disabled === true || tour.loop !== true && tour.step >= forwardCount - 1}
 		onClick={(event) => {
-			tour.next();
+			const steps = Number(forwardCount);
+			tour.walk(1, steps);
 			onClick?.(event);
 		}}
 	>{children}</button>

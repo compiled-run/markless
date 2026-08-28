@@ -133,8 +133,7 @@ An item's position is derived from render order — its place in the family's ow
 roster of bound elements — and a family never takes an index prop for it: a
 consumer numbering its own parts by hand is a rename, a reorder or a loop away
 from lying, and the family already knows. The count follows from the same
-roster. `tour.item` is the one part still taking `index`, migrating behind
-T042.
+roster. No family takes one: `tour.item` was the last, and it does not.
 
 ## Timing
 

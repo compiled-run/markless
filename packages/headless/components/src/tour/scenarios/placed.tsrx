@@ -44,7 +44,7 @@ export default function Placed() @{
 		>
 			<tour.backdrop data-testid="backdrop" />
 
-			<tour.item index={0} data-testid="step-top" target={topEl}>
+			<tour.item data-testid="step-top" target={topEl}>
 				<tour.title data-testid="top-title">Above the target</tour.title>
 				<tour.description data-testid="top-description">
 					This card sits over the Above button in the toolbar.
@@ -52,7 +52,7 @@ export default function Placed() @{
 				<tour.forwardtrigger data-testid="top-forward">Next</tour.forwardtrigger>
 			</tour.item>
 
-			<tour.item index={1} data-testid="step-bottom" target={bottomEl}>
+			<tour.item data-testid="step-bottom" target={bottomEl}>
 				<tour.title data-testid="bottom-title">Below the target</tour.title>
 				<tour.description data-testid="bottom-description">
 					This card sits under the Below button in the toolbar.
@@ -60,7 +60,7 @@ export default function Placed() @{
 				<tour.forwardtrigger data-testid="bottom-forward">Next</tour.forwardtrigger>
 			</tour.item>
 
-			<tour.item index={2} data-testid="step-start" target={startEl}>
+			<tour.item data-testid="step-start" target={startEl}>
 				<tour.title data-testid="start-title">Before the target</tour.title>
 				<tour.description data-testid="start-description">
 					This card sits on the reading-order start side of the Before button.
@@ -68,7 +68,7 @@ export default function Placed() @{
 				<tour.forwardtrigger data-testid="start-forward">Next</tour.forwardtrigger>
 			</tour.item>
 
-			<tour.item index={3} data-testid="step-end" target={endEl}>
+			<tour.item data-testid="step-end" target={endEl}>
 				<tour.title data-testid="end-title">After the target</tour.title>
 				<tour.description data-testid="end-description">
 					This card sits on the reading-order end side of the After button.
@@ -76,7 +76,7 @@ export default function Placed() @{
 				<tour.close data-testid="end-close">Done</tour.close>
 			</tour.item>
 
-			<tour.item index={4} data-testid="step-default" target={topEl}>
+			<tour.item data-testid="step-default" target={topEl}>
 				<tour.title data-testid="default-title">The default placement</tour.title>
 				<tour.description data-testid="default-description">
 					A step nobody wrote a rule for is placed under the Above button.

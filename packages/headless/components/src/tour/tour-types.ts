@@ -31,6 +31,11 @@ export type TourRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 /**
  * One step: the card the person reads, and the element on the page it is about.
  *
+ * Where the step comes in the tour is where you wrote it. There is no `index`:
+ * the step's place is its place among the cards the tour has bound, and the
+ * tour's length is how many of them there are, so a reorder or a loop cannot
+ * make a hand-written number lie.
+ *
  * The card is placed by CSS anchoring against the target, so it holds while the
  * page scrolls and reflows with no script. Placement is CSS, never a prop: the
  * card ships a default `position-area` of `block-end` inside `@layer markless`,
@@ -41,16 +46,6 @@ export type TourRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
  */
 export type TourItemProps = PropsOf<'div'> & {
 	/**
-	 * Where this step comes in the tour, counting from zero.
-	 *
-	 * Required, because `step` is an ordinal and a step has to know its own place
-	 * while it renders to decide whether it is the one showing. Number the steps
-	 * `0`, `1`, `2`… in the order you write them: the tour's length is one past
-	 * the highest number registered, and moving a step lands focus on the card in
-	 * that document position.
-	 */
-	readonly index: number;
-	/**
 	 * The element this step is about, as an `element()` handle you bound on it.
 	 *
 	 * Pass the handle itself, never inside an array or an object: a handle only
@@ -60,10 +55,7 @@ export type TourItemProps = PropsOf<'div'> & {
 };
 
 /** The card is a non-modal dialog: it carries no `aria-modal`, so the page behind it stays reachable and the target stays clickable. */
-export type TourCardProps = PropsOf<'div'> & {
-	/** The step's own place, handed down from `tour.item`. */
-	readonly index: number;
-};
+export type TourCardProps = PropsOf<'div'>;
 
 /**
  * The spotlight. It is not a layer with a hole in it - it *is* the hole, sized
@@ -102,8 +94,6 @@ export type TourInstanceState = Seeded<
 > & {
 	/** Which step is showing, counting from zero. */
 	step: number;
-	/** How many steps the tour has. Each step registers `index + 1` as it renders, so the last one leaves the length behind. */
-	count: number;
 	/**
 	 * The current step's target element, or `undefined` for a centred step.
 	 *
@@ -117,7 +107,7 @@ export type TourInstanceState = Seeded<
 	onOpenChange?: TourRootProps['onOpenChange'];
 };
 
-/** One instance per rendered `tour.item`, holding that step's own place and target. */
-export type TourItemInstanceState = Seeded<TourItemProps, 'index'> & {
+/** One instance per rendered `tour.item`, holding that step's own target. */
+export type TourItemInstanceState = {
 	target?: TourItemProps['target'];
 };
