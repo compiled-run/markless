@@ -858,6 +858,13 @@ export type SemanticElementRosterCount = {
 	readonly deferred?: ReadonlyArray<{
 		readonly source: string;
 		readonly thunkSource: string;
+		/**
+		 * Which component's render prints it, when that is not the one that derived
+		 * the count: a bare count handed to a child as a prop carries the
+		 * placeholder across the edge, so the child's spend defers under its own
+		 * name. Absent means the deriving component, which is the usual case.
+		 */
+		readonly componentName?: string;
 	}>;
 };
 

@@ -73,10 +73,10 @@ export function deferredRosterCountCases(
 	deferCall: string,
 ): DeferredCountCases | undefined {
 	const bySource = new Map<string, string>();
-	for (const record of input.semanticGraph.elementRosterCounts ?? []) {
-		if (record.componentName !== componentName) continue;
-		for (const entry of record.deferred ?? []) bySource.set(entry.source, entry.thunkSource);
-	}
+	for (const record of input.semanticGraph.elementRosterCounts ?? [])
+		for (const entry of record.deferred ?? [])
+			if ((entry.componentName ?? record.componentName) === componentName)
+				bySource.set(entry.source, entry.thunkSource);
 	return bySource.size > 0 ? { bySource, deferCall } : undefined;
 }
 
