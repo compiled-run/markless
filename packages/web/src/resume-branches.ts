@@ -50,6 +50,7 @@ export function wireBranches(input: any) {
 		entries: ReadonlyArray<DomJournalEntry>,
 		activate: (hostNodeId: string) => Promise<void>,
 	): Promise<void> {
+		const flipped: ResumeBranchRecord[] = [];
 		for (const entry of entries) {
 			if (
 				entry.type !== 'insertRange' ||
@@ -60,10 +61,14 @@ export function wireBranches(input: any) {
 			const branchId = entry.locator.slice('branch:'.length, -':start'.length),
 				branch = branchesById.get(branchId),
 				arm = currentArmByBranchId.get(branchId);
-			if (!branch || arm === undefined || !branch.armRecords?.[arm]) continue;
+			if (!branch) continue;
+			flipped.push(branch);
+			if (arm === undefined || !branch.armRecords?.[arm]) continue;
 			for (const hostNodeId of materializeBranchArmRecords(input, branch, arm))
 				await activate(hostNodeId);
 		}
+		if (flipped.length)
+			await (await import('./resume-arm-records.ts')).bumpArmRosterRevisions(input.graph, flipped);
 	}
 	async function disposeRemovedRangeHosts(
 		entries: ReadonlyArray<DomJournalEntry>,
@@ -122,8 +127,6 @@ function createBranchRegistration(
 		branchesById.set(branch.id, branch);
 		for (const armRecordSet of branch.armRecords ?? [])
 			for (const armEvent of armRecordSet.events) input.eventTypes.add(armEvent.eventName);
-		// An IDREF outside the arms follows the PAINTED arm, and the served arm never
-		// materializes, so every paint answers it.
 		const paintArm = (arm: number) => {
 			currentArmByBranchId.set(branch.id, arm);
 			if (branch.idrefSites?.length)
@@ -413,8 +416,7 @@ function isLiveComment(value: unknown): value is ResumeDomComment {
 	);
 }
 
-// Composition strips the flip machinery off a branch whose test is a constant
-// or absent prop; the arm it painted keeps its records and still has to wire.
+// A branch whose test is a constant or absent prop keeps the arm it painted.
 function isDecidedBranch(branch: {
 	readonly testReads?: ReadonlyArray<unknown>;
 	readonly takenArm?: number;

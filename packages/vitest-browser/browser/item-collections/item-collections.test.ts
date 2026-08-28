@@ -1,6 +1,7 @@
 import { userEvent } from 'vite-plus/test/browser';
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
+import ArmPage from './ic-arm-page.tsrx';
 import ComposedPage from './ic-composed-page.tsrx';
 import FlatPage from './ic-flat-page.tsrx';
 import KeyedPage from './ic-keyed-page.tsrx';
@@ -553,4 +554,110 @@ test('SSR: a flat instance spends its own places and leaves its sibling alone', 
 
 	await expect.poll(() => mines('[data-ic-first]'), { timeout: 5000 }).toEqual(['A', 'B', 'C']);
 	expect(mines('[data-ic-second]')).toEqual(['a', 'b']);
+});
+
+// --- flat items gated by an @if arm ------------------------------------------
+
+// No keyed repeat anywhere on this page, so the arm applying or dropping is the
+// only thing that moves the collection and the only channel that can tell the
+// parts to count again. The arm's own member joins the roster ahead of the flat
+// items and carries no attribute of its own, which an arm cannot hold - what is
+// asserted is the flat items behind it renumbering, and the root recounting.
+const armToggle = () => document.querySelector('[data-ic-arm-toggle]') as HTMLElement;
+const extras = () => document.querySelectorAll('[data-ic-extra]').length;
+
+test('CSR: an @if arm joining the roster renumbers the flat items behind it', async () => {
+	await render(ArmPage);
+
+	expect(positions('[data-ic-first]')).toEqual(['0', '1', '2']);
+
+	await userEvent.click(armToggle());
+	await expect.poll(extras, { timeout: 5000 }).toBe(1);
+
+	await expect
+		.poll(() => positions('[data-ic-first]'), { timeout: 5000 })
+		.toEqual(['1', '2', '3']);
+	expect(positions('[data-ic-second]')).toEqual(['0', '1']);
+});
+
+test('SSR: an @if arm joining the roster renumbers the flat items behind it', async () => {
+	await renderSSR(ArmPage);
+
+	expect(positions('[data-ic-first]')).toEqual(['0', '1', '2']);
+
+	await userEvent.click(armToggle());
+	await expect.poll(extras, { timeout: 5000 }).toBe(1);
+
+	await expect
+		.poll(() => positions('[data-ic-first]'), { timeout: 5000 })
+		.toEqual(['1', '2', '3']);
+	expect(positions('[data-ic-second]')).toEqual(['0', '1']);
+});
+
+test('CSR: dropping the @if arm renumbers the flat items behind it', async () => {
+	await render(ArmPage);
+	await userEvent.click(armToggle());
+	await expect.poll(extras, { timeout: 5000 }).toBe(1);
+	await expect
+		.poll(() => positions('[data-ic-first]'), { timeout: 5000 })
+		.toEqual(['1', '2', '3']);
+
+	await userEvent.click(armToggle());
+	await expect.poll(extras, { timeout: 5000 }).toBe(0);
+
+	await expect
+		.poll(() => positions('[data-ic-first]'), { timeout: 5000 })
+		.toEqual(['0', '1', '2']);
+	expect(positions('[data-ic-second]')).toEqual(['0', '1']);
+});
+
+test('SSR: dropping the @if arm renumbers the flat items behind it', async () => {
+	await renderSSR(ArmPage);
+	await userEvent.click(armToggle());
+	await expect.poll(extras, { timeout: 5000 }).toBe(1);
+	await expect
+		.poll(() => positions('[data-ic-first]'), { timeout: 5000 })
+		.toEqual(['1', '2', '3']);
+
+	await userEvent.click(armToggle());
+	await expect.poll(extras, { timeout: 5000 }).toBe(0);
+
+	await expect
+		.poll(() => positions('[data-ic-first]'), { timeout: 5000 })
+		.toEqual(['0', '1', '2']);
+	expect(positions('[data-ic-second]')).toEqual(['0', '1']);
+});
+
+// The count half is NOT reached yet, and these two rows say so. The bump fires
+// and the root's `w.itemEls.length` re-derives, but at that moment the widget
+// registry the roster reader scopes through is empty ({rootPaths:{},rowRooted:{}}),
+// so the reader falls back to the unqualified key and counts every item on the
+// page - 6 rather than 4. The positions above are right because instance one
+// stands first in the document. Qualifying that read is a separate card.
+test.fails('CSR: the count follows an @if arm applying and dropping', async () => {
+	await render(ArmPage);
+
+	expect(maxes()).toEqual(['3', '2']);
+
+	await userEvent.click(armToggle());
+	await expect.poll(maxes, { timeout: 5000 }).toEqual(['4', '2']);
+	expect(totals()).toEqual(['4', '2']);
+
+	await userEvent.click(armToggle());
+	await expect.poll(maxes, { timeout: 5000 }).toEqual(['3', '2']);
+	expect(totals()).toEqual(['3', '2']);
+});
+
+test.fails('SSR: the count follows an @if arm applying and dropping', async () => {
+	await renderSSR(ArmPage);
+
+	expect(maxes()).toEqual(['3', '2']);
+
+	await userEvent.click(armToggle());
+	await expect.poll(maxes, { timeout: 5000 }).toEqual(['4', '2']);
+	expect(totals()).toEqual(['4', '2']);
+
+	await userEvent.click(armToggle());
+	await expect.poll(maxes, { timeout: 5000 }).toEqual(['3', '2']);
+	expect(totals()).toEqual(['3', '2']);
 });
