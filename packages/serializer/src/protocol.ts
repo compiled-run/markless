@@ -299,6 +299,22 @@ export type ProtocolStreamedArmPatch = readonly [
 	records: ProtocolArmRecordSet,
 ];
 
+/**
+ * Where one row-template slot's value comes from: the repeated item, or a graph
+ * node the page already holds.
+ *
+ * Exactly one of the two, never both and never neither. `itemPath` is a property
+ * path off the item the mint was handed. The `graphNodeId`/`graphPath` pair is a
+ * read of the page's own state - a row spelling `name={list.name}` - and the mint
+ * takes it ONCE, when it builds the row: a served row's outside read does not
+ * refresh either (a row host carries no per-instance locator, so the repeat ships
+ * no `domUpdates` for it), and a minted row that kept itself current would
+ * disagree with the rows beside it.
+ */
+export type ProtocolRowTemplateSlotValue =
+	| { readonly itemPath: ReadonlyArray<string> }
+	| { readonly graphNodeId: string; readonly graphPath: ReadonlyArray<string> };
+
 export type ProtocolViewPayload = {
 	readonly version: typeof ASYNC_PROTOCOL_VERSION;
 	// Async runner transport is independent from authored boundary reads. The
@@ -406,23 +422,24 @@ export type ProtocolViewPayload = {
 		 * comments are where the row's own text lives, so the mint finds each text
 		 * position by walking to it rather than by re-parsing. `textSlots` names
 		 * those positions - `path` is FRAGMENT-relative (`[0]` is the row root),
-		 * `itemPath` is the property path to read off the item - and is omitted
+		 * the value channel is `ProtocolRowTemplateSlotValue` - and is omitted
 		 * when the row has none, which is the fully static row.
 		 *
 		 * `attributeSlots` names the row's dynamic attributes the same way, with the
 		 * attribute `name` to write and a `path` addressing the ELEMENT that carries
 		 * it. The attribute's value is not in the html at all: the statics join
-		 * around it, and the mint writes it from the item under the presence rule
-		 * every other render path uses (absent for null, undefined and false).
+		 * around it, and the mint writes it under the presence rule every other
+		 * render path uses (absent for null, undefined and false).
 		 *
 		 * Carried only for a row the client can finish alone: static markup, or
-		 * markup whose every slot - text or attribute - reads off the repeated item.
-		 * A row holding anything else - a value from outside the row, an attribute
-		 * value computed by an expression, a nested construct - needs wiring the
-		 * mint cannot do, so it ships nothing and the served behaviour stands. One
-		 * child component is the exception: a row element wrapping one is markup
-		 * here plus identity in `rowComponent`, whose `slotPath` names the marker in
-		 * this html the child's rendered nodes replace.
+		 * markup whose every slot - text or attribute - reads off the repeated item
+		 * or off a graph node the page already holds. A row holding anything else -
+		 * an attribute value computed by an expression, an element handle's id, a
+		 * nested construct - needs wiring the mint cannot do, so it ships nothing
+		 * and the served behaviour stands. One child component is the exception: a
+		 * row element wrapping one is markup here plus identity in `rowComponent`,
+		 * whose `slotPath` names the marker in this html the child's rendered nodes
+		 * replace.
 		 *
 		 * Pay-per-use: a repeat whose row is not mintable emits no field at all, so
 		 * its record is byte-identical to what it was before this existed, and a row
@@ -430,15 +447,15 @@ export type ProtocolViewPayload = {
 		 */
 		readonly rowTemplate?: {
 			readonly html: string;
-			readonly textSlots?: ReadonlyArray<{
-				readonly path: ReadonlyArray<number>;
-				readonly itemPath: ReadonlyArray<string>;
-			}>;
-			readonly attributeSlots?: ReadonlyArray<{
-				readonly path: ReadonlyArray<number>;
-				readonly name: string;
-				readonly itemPath: ReadonlyArray<string>;
-			}>;
+			readonly textSlots?: ReadonlyArray<
+				{ readonly path: ReadonlyArray<number> } & ProtocolRowTemplateSlotValue
+			>;
+			readonly attributeSlots?: ReadonlyArray<
+				{
+					readonly path: ReadonlyArray<number>;
+					readonly name: string;
+				} & ProtocolRowTemplateSlotValue
+			>;
 		};
 		/**
 		 * The component a row of this repeat roots, named by identity alone.

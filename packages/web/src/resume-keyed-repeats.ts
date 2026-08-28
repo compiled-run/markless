@@ -292,7 +292,7 @@ function applyKeyedRepeatRowOrder(
 			// Same refusal behind a server-painted `@empty` arm this cannot take out.
 			if (!(repeat.rowTemplate ?? repeat.rowComponent) || !mint) return;
 			if (repeat.emptyArm && arm.mounted && arm.nodes.length === 0) return;
-			rowRoot = mint.mintRow(parent, repeat, item);
+			rowRoot = mint.mintRow(parent, repeat, item, graph);
 			if (!rowRoot) return;
 			rowRootsByKey.set(rowKey, rowRoot);
 			// The anchor walk below puts following rows in front of anything it does
