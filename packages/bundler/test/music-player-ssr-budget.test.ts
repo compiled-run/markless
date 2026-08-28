@@ -257,13 +257,15 @@ const MAX_SHIPPED_JS_GZIP_BYTES = 69_800;
 //     computed nodes, gave 1,346 of that back and returned the chunk count to 97.
 const STAGE_ANCHORS = {
 	// +8: keyed-repeat row-template slots qualified through composition (rows may read outside their item).
-	'page-load download': { gzipBytes: 69_730, margin: 128 },
+	// +273: control-edit-hold - held property writes onto edited controls (runtime chunk).
+	'page-load download': { gzipBytes: 70_003, margin: 128 },
 	'page-load execute': { gzipBytes: 4_214, margin: 32 },
 	'interaction 1 marginal': { gzipBytes: 1_932, margin: 32 },
 	'interaction 2 marginal': { gzipBytes: 1_568, margin: 32 },
 	'interaction 3 marginal': { gzipBytes: 1_092, margin: 32 },
 	// +79: row-template slot qualification in the child keyed-repeat composition sites (+54) and component-local handles keyed by host scope (+25).
-	'first-navigation marginal': { gzipBytes: 23_412, margin: 128 },
+	// +363: control-edit-hold rides the client render path (dom-journal + render-csr + event-resume).
+	'first-navigation marginal': { gzipBytes: 23_775, margin: 128 },
 } as const satisfies Record<string, StageAnchor>;
 
 let measured: BudgetMeasurement;
