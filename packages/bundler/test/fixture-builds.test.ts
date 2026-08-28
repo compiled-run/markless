@@ -59,7 +59,7 @@ const fixtures = [
 			// SPLIT: 1,053 gzip recovered here (6,202 -> 5,149, two under the 5,151 this
 			// chunk measured before the qualifier existed - the slot's own bytes left too).
 			// The residue is on the emitted wall below, not this one.
-			maxRuntimeChunkGzipBytes: 5_160, // re-anchor 2026-08-27: measured 5,149, margin 11 for gzip run variance. prior 5,162 (measured 5,151) - see the attribution above. prior 3,750 (measured 3,739, dispatch-ordering + row-mint + stop-threading). prior 3,730 (multi-binding chain).
+			maxRuntimeChunkGzipBytes: 5_190, // re-anchor 2026-08-27 (late): measured 5,178, margin 12 - one module wrapper for the dedicated handle-qualifier module that took 12,540 chars off the resume.ts source closure. prior 5,160 (measured 5,149), margin 11 for gzip run variance. prior 5,162 (measured 5,151) - see the attribution above. prior 3,750 (measured 3,739, dispatch-ordering + row-mint + stop-threading). prior 3,730 (multi-binding chain).
 			// anti-bloat wall — tightened by the runtime-stdlib goal; any increase must be justified
 			// Recalibrated to actuals for chained-async key-phase gating (runtime gate + self-wake + single-flight); zero slack.
 			// DE-MINIMIS INTERIM chain (settlement bridge +94); REPAYMENT OBLIGATION
@@ -143,7 +143,7 @@ const fixtures = [
 			// re-anchor 2026-08-27: same shared runtime chunk as vite-csr, byte-identical
 			// raw size (13,933), same qualifier move and same attribution as that entry.
 			// 1,054 gzip recovered (6,201 -> 5,147); residue on the emitted wall below.
-			maxRuntimeChunkGzipBytes: 5_159, // re-anchor 2026-08-27: measured 5,147, margin 12 for gzip run variance. prior 5,165 (measured 5,153) - see the attribution above. prior 3,745 (measured 3,733). prior 3,725.
+			maxRuntimeChunkGzipBytes: 5_190, // re-anchor 2026-08-27 (late): measured 5,178, margin 12 - same handle-qualifier module wrapper as vite-csr. prior 5,159 (measured 5,147), margin 12 for gzip run variance. prior 5,165 (measured 5,153) - see the attribution above. prior 3,745 (measured 3,733). prior 3,725.
 			// anti-bloat wall — tightened by the runtime-stdlib goal; any increase must be justified
 			// Recalibrated to actuals for chained-async key-phase gating (runtime gate + self-wake + single-flight); zero slack. CI (Linux) emits slightly larger bytes than local macOS; wall tracks CI actuals.
 			// DE-MINIMIS INTERIM chain (settlement bridge +94); REPAYMENT OBLIGATION
