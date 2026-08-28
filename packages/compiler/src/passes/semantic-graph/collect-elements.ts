@@ -91,12 +91,15 @@ import type {
  * record was dropped. The reads under the operator are already decomposed exactly
  * as `board.wide === false` decomposes them.
  *
- * `methodCalls` stays off: nothing in a template is unexpressible without it, and
- * a computed minted for every `.format()` and `.toFixed()` in a page's text is
- * bytes with no behavior behind them. Widening it is its own change with its own
- * byte measurement.
+ * `methodCalls` is on, and the byte measurement its old refusal owed is in
+ * goals/headless-components/notes/U721-method-call-template-reads.md: a read
+ * spelled with a call rendered once and never moved, because no computed was
+ * minted, so no update record was emitted and nothing subscribed the write.
+ * A newly reactive call costs about 1.4 kB raw and 100 B gzip, pinned in
+ * test/emit-byte-equality/template-method-call-bytes.test.ts; the bound is
+ * `requireWritableRead` below, which keeps a props-only call minting nothing.
  */
-const TEMPLATE_READ_OPTIONS: CompositeReadOptions = { unaryOperators: true };
+const TEMPLATE_READ_OPTIONS: CompositeReadOptions = { methodCalls: true, unaryOperators: true };
 
 export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGraphWalk): void {
 	collectComponentEdge(node, state, walk);
@@ -154,7 +157,13 @@ export function collectTemplateExpression(
 	state: WalkState,
 ): void {
 	if (!state.currentHostNodeId || !expression) return;
-	const composite = collectCompositeTemplateExpression(expression, state, TEMPLATE_READ_OPTIONS);
+	// Same bound the attribute branch already takes: no write can move a prop after
+	// the render that read it, so a props-only text read owes no record - and with
+	// method calls lifted, minting one would demand a capture slot for the receiver.
+	const composite = collectCompositeTemplateExpression(expression, state, {
+		...TEMPLATE_READ_OPTIONS,
+		requireWritableRead: true,
+	});
 
 	const armScoped =
 		!!state.currentArmScope && state.currentArmScope.hostNodeId === state.currentHostNodeId;

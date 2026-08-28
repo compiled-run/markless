@@ -10,10 +10,9 @@
  * disagreed.
  *
  * This is the same gap fixed at component edges in defect 26; the flag it added
- * (`unaryOperators`) is what the element collector now asks for too. The narrower
- * `methodCalls` gate stays off in template positions on purpose: nothing there is
- * unexpressible without it, and a computed for every `.toFixed()` in a page's
- * text is bytes with no behavior behind them.
+ * (`unaryOperators`) is what the element collector now asks for too. `methodCalls`
+ * was the other flag left off here, and it went the same way for the same reason -
+ * see template-method-call-lift.test.ts.
  */
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/compile-module.ts';
@@ -159,22 +158,19 @@ test('delete in a template mints no computed', async () => {
 	expect(mintedComputeds(result)).toEqual([]);
 });
 
-// The deliberate narrowing, asserted unchanged: template positions still do not
-// lift method calls, so this widening bought the unary operators and nothing else.
-test('method calls in a template stay un-lifted', async () => {
-	const attribute = await compilePanel('\t\t<div ui-tall={board.items.includes(1)}>x</div>');
-	expect(templateRead(attribute, 'board.items.includes(1)')?.computedGraphNodeId).toBeUndefined();
-	expect(mintedComputeds(attribute)).toEqual([]);
+// The two widenings compose: a negation wrapping a method call needs the unary
+// gate to reach the lift and the method-call gate to resolve the read under it.
+test('a negated method call in a template lifts through both gates', async () => {
+	const result = await compilePanel('\t\t<div ui-tall={!board.items.includes(1)}>x</div>');
 
-	const text = await compilePanel('\t\t<p>{board.items.includes(1)}</p>');
-	expect(templateRead(text, 'board.items.includes(1)')?.computedGraphNodeId).toBeUndefined();
-	expect(mintedComputeds(text)).toEqual([]);
-
-	// A negation wrapping a method call is still not liftable: the call under it
-	// has nothing to subscribe, so the unary widening must not rescue it.
-	const negated = await compilePanel('\t\t<div ui-tall={!board.items.includes(1)}>x</div>');
-	expect(templateRead(negated, '!board.items.includes(1)')?.computedGraphNodeId).toBeUndefined();
-	expect(mintedComputeds(negated)).toEqual([]);
+	const read = templateRead(result, '!board.items.includes(1)');
+	expect(read?.computedGraphNodeId).toMatch(/^computed:templateExpression:/);
+	expect(
+		mintedComputeds(result).find((binding) => binding.id === read?.computedGraphNodeId)
+			?.functionSource,
+	).toBe('() => !board.items.includes(1)');
+	expect(domUpdates(result, read?.computedGraphNodeId ?? '')).toHaveLength(1);
+	expect(errorDiagnostics(result)).toEqual([]);
 });
 
 // The shapes that already worked keep working, so nothing regressed under the
