@@ -70,8 +70,6 @@ export type ToasterInstanceState = {
 export type ToasterItemProps = PropsOf<'div'> & {
 	/** The message this row shows. */
 	readonly toast: ToastRecord;
-	/** Where it stands in the stack: 0 is the front one. */
-	readonly index?: number;
 };
 
 /** One instance per rendered `toaster.item`, read by the parts inside it. */
@@ -81,7 +79,6 @@ export type ToasterItemInstanceState = {
 	description: string;
 	tone: ToastTone;
 	icon: string;
-	index: number;
 };
 
 /**

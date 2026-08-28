@@ -87,7 +87,6 @@ export const toasterItemState = shared(
 			description: '',
 			tone: 'neutral',
 			icon: '',
-			index: 0,
 		});
 
 		return { ...item };
