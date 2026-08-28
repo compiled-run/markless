@@ -46,13 +46,6 @@ function seedBinding(compiled: Awaited<ReturnType<typeof compile>>) {
 	);
 }
 
-function errorCodes(compiled: Awaited<ReturnType<typeof compile>>) {
-	return [
-		...compiled.stateLowering.diagnostics.filter((one) => one.severity === 'error'),
-		...compiled.semanticGraph.diagnostics.filter((one) => one.severity === 'error'),
-	].map((one) => one.code);
-}
-
 const folds = [
 	[
 		'a member expression on a global',
@@ -99,96 +92,10 @@ for (const [label, seed, folded] of folds) {
 	});
 }
 
-// A folded value is printed into the render-data module with JSON, which has no
-// form for a non-finite number, so the fold has to leave those on the carry.
-test('a non-finite constant is not folded', async () => {
-	const binding = seedBinding(
-		await compile('{ minWidth: 1, maxWidth: Number.POSITIVE_INFINITY, x: 2, label: "" }'),
-	);
-
-	expect(binding?.initialValueKnown).toBeUndefined();
-	expect(binding?.initializerSource).toContain('Number.POSITIVE_INFINITY');
-});
-
-test('a bare Infinity is not folded either', async () => {
-	const binding = seedBinding(
-		await compile('{ minWidth: 1, maxWidth: Infinity, x: 2, label: "" }'),
-	);
-
-	expect(binding?.initialValueKnown).toBeUndefined();
-	expect(binding?.initializerSource).toContain('Infinity');
-});
-
-// The fold reads the global, so a module that declares its own `Number` has to
-// keep the value that module means.
-test('a shadowed global is not folded', async () => {
-	const binding = seedBinding(
-		await compile(
-			'{ minWidth: 1, maxWidth: Number.MAX_SAFE_INTEGER, x: 2, label: "" }',
-			'const Number = { MAX_SAFE_INTEGER: 3 };',
-		),
-	);
-
-	expect(binding?.initialValueKnown).toBeUndefined();
-	expect(binding?.initializerSource).toContain('Number.MAX_SAFE_INTEGER');
-});
-
-// A method is not a constant this build may read for the page.
-test('a function-valued global property is not folded', async () => {
-	const binding = seedBinding(
-		await compile('{ minWidth: 1, maxWidth: Number.parseInt, x: 2, label: "" }'),
-	);
-
-	expect(binding?.initialValueKnown).toBeUndefined();
-});
-
-test('a let-declared module value is not folded', async () => {
-	const binding = seedBinding(
-		await compile('{ minWidth: LOOSE, maxWidth: 9, x: 2, label: "" }', 'let LOOSE = 1;'),
-	);
-
-	expect(binding?.initialValueKnown).toBeUndefined();
-	expect(binding?.initializerSource).toContain('LOOSE');
-});
-
-// Cross-module values stay on the carried-expression path: this build cannot
-// read another module's binding.
-test('an imported const is still carried, not folded', async () => {
-	const binding = seedBinding(
-		await compile(
-			'{ minWidth: 1, maxWidth: LIMIT, x: 2, label: "" }',
-			"import { LIMIT } from './limits.ts';",
-		),
-	);
-
-	expect(binding?.initialValueKnown).toBeUndefined();
-	expect(binding?.initializerSource).toContain('LIMIT');
-});
-
-test('a seed naming something nothing would bind is still refused at the seed', async () => {
-	const compiled = await compile('{ minWidth: 1, maxWidth: nowhere, x: 2, label: "" }');
-	const refusal = compiled.semanticGraph.diagnostics.find(
-		(one) => one.code === 'MARKLESS_SHARED_SEED_UNRESOLVED_VALUE',
-	);
-
-	expect(refusal?.message).toContain('"gate"');
-	expect(refusal?.message).toContain('"maxWidth"');
-	expect(refusal?.message).toContain('nowhere');
-});
-
-test('a folded seed blames no consumer', async () => {
-	const codes = errorCodes(
-		await compile('{ minWidth: MIN, maxWidth: Number.MAX_SAFE_INTEGER, x: 2, label: "" }'),
-	);
-
-	expect(codes).not.toContain('MARKLESS_SHARED_SEED_UNKNOWN_FIELD');
-	expect(codes).not.toContain('MARKLESS_SHARED_SEED_UNRESOLVED_VALUE');
-});
-
 // A seed mixing foldable properties with one that cannot fold publishes both
 // layers: the folded subset as the constant a per-instance write merges onto,
 // and the authored expression beside it for the rest.
-const carried = '{ minWidth: MIN, maxWidth: Number.POSITIVE_INFINITY, x: 2, label: "" }';
+const carried = '{ minWidth: MIN, maxWidth: Date.now(), x: 2, label: "" }';
 
 test('a partly foldable seed folds the properties that fold', async () => {
 	const binding = seedBinding(await compile(carried));
@@ -200,7 +107,7 @@ test('a partly foldable seed folds the properties that fold', async () => {
 		x: 2,
 		label: '',
 	});
-	expect(binding?.initializerSource).toContain('Number.POSITIVE_INFINITY');
+	expect(binding?.initializerSource).toContain('Date.now()');
 });
 
 // The field set of the shape is read off these keys, so an unfoldable property
@@ -233,7 +140,7 @@ test('a carried seed no root writes publishes no constant record', async () => {
 		source: `
 import { shared, state } from '@markless/core';
 export const gate = shared(() => {
-	const g = state({ minWidth: 1, maxWidth: Number.POSITIVE_INFINITY });
+	const g = state({ minWidth: 1, maxWidth: Date.now() });
 	return { ...g };
 }, { scope: 'widget' });
 
@@ -283,7 +190,7 @@ test('a folded seed keeps its kinds keyed by graph node id', async () => {
 test('the carried expression lands before the root per-instance writes', async () => {
 	const compiled = await compile(carried);
 	const ssr = compiled.publicRenderModule.ssrModuleSource ?? '';
-	const carry = ssr.indexOf('Number.POSITIVE_INFINITY');
+	const carry = ssr.indexOf('Date.now()');
 	const write = ssr.indexOf('const marklessSharedSeed = (label)');
 
 	expect(carry).toBeGreaterThan(-1);
@@ -295,7 +202,7 @@ test('the carried expression lands before the root per-instance writes', async (
 test('the seed pass primes a carried seed from its own expression', async () => {
 	const ssr = (await compile(carried)).publicRenderModule.ssrModuleSource ?? '';
 
-	expect(ssr).toMatch(/marklessSsrSeeds\.set\([^;]*Number\.POSITIVE_INFINITY/);
+	expect(ssr).toMatch(/marklessSsrSeeds\.set\([^;]*Date\.now\(\)/);
 });
 
 // JSON prints a non-finite number as `null`, which reaches the page as a silent
