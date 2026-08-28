@@ -376,8 +376,10 @@ export function ResizableItem({ value, orientation, children, ...rest }: Resizab
 
 /**
  * The divider: APG's window splitter, wearing the size of the panel it names.
- * The name a reader hears sits before the spread so a consumer's own
- * `aria-label` wins.
+ * No invented default name: attributes resolve first-wins, so a family-written
+ * label would silence the consumer's, and identical invented labels on two
+ * dividers are landmarks a reader cannot tell apart (the navbar rule). The
+ * consumer labels it; aria-valuetext still reads the size.
  */
 export function ResizableThumb({
 	value,
@@ -438,7 +440,6 @@ export function ResizableThumb({
 	const dividerAriaDisabled = computed(() => (resizable.disabled ? 'true' : 'false'));
 
 	<div
-		aria-label="Resize"
 		{...rest}
 		el={resizable.thumbEls}
 		role="separator"
