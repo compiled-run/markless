@@ -37,7 +37,7 @@ correctly on a drawer the server sent open, before any pointer has touched it, b
 element is something CSS can work out on its own. The family measures only when a gesture starts (and
 on `focusin`, which is the route an opening drawer takes anyway).
 
-A pixel snap point is the exception and it is a real limitation - see Finding 2.
+A pixel snap point is the exception and it is a real limitation - see Finding 1.
 
 ## The release rule
 
@@ -104,20 +104,7 @@ line of consumer CSS instead of a timer.
 The surface owns its `style` attribute, so size and skin it from a stylesheet rather than a `style`
 prop; the scenarios put the size on a child instead.
 
-## Finding 1 - a `state()` seed and a prop default cannot read a module constant
-
-`snapPoints: [1]` and `closeThreshold: 0.25` are written out in `drawer.tsrx` rather than imported
-from `drawer-swipe.ts`, where `CLOSE_THRESHOLD` lives. Both a `state({...})` seed and a component's
-default parameter value are lowered into symbol modules of their own, and an imported binding is not
-in scope there: the first build failed with `ReferenceError: DEFAULT_SNAP_POINTS is not defined` and
-`ReferenceError: CLOSE_THRESHOLD is not defined` from `shared-seed.ts`, at CSR render time rather
-than at compile time.
-
-The repo's standing rule is that a shared fact is imported, never restated, so this is a divergence
-forced by the compiler and not a choice. It is also a sharp edge: the failure is a runtime
-`ReferenceError` in every row that mounts the family, with no compile-time signal at all.
-
-## Finding 2 - a pixel rest position needs a measurement the family only takes during a gesture
+## Finding 1 - a pixel rest position needs a measurement the family only takes during a gesture
 
 `snapPoints={[160]}` has to be divided by the surface's measured size to become the fraction
 `--offset` speaks, and the family measures on `pointerdown` and on `focusin`. Before either has
@@ -125,7 +112,7 @@ happened, `openFractionOf()` resolves a pixel snap to fully open rather than to 
 rest positions have no such problem and are the documented default; Base UI and Vaul both accept
 pixel and `rem` snap points and both measure eagerly to do it.
 
-## Finding 3 - a drawer served already open never enlists
+## Finding 2 - a drawer served already open never enlists
 
 Carried unchanged from `src/modal/note.md` Finding 4. The overlay behaviour enlists an element that
 _becomes_ shown and deliberately never enlists one that was shown at first render, so a served
