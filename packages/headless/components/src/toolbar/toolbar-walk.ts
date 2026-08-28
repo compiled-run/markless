@@ -56,7 +56,7 @@ export function applyStops(roster: readonly HTMLElement[], active: number): void
 /**
  * The bar's answer to a movement key: the position the stop moves to, or
  * `undefined` for "not ours, or nowhere to go". Off the ends the walk stays put
- * - the bar does not wrap, following `tabs` and `togglegroup`.
+ * - the bar does not wrap, following `tabs` and `buttongroup`.
  */
 export function nextStop(
 	roster: readonly HTMLElement[],

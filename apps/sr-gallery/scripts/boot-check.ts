@@ -78,7 +78,7 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	menubar: 'menubar',
 	colorpicker: 'slider',
 	// The group is a role="group" div; its items are the real buttons.
-	togglegroup: 'button',
+	buttongroup: 'button',
 	// A real text input and no role of its own; the submitted field beside it is a
 	// second, aria-hidden one, which includeHidden counts too.
 	numberbox: 'textbox',
@@ -104,7 +104,7 @@ const RENDERED_COUNT: Partial<Record<FamilyName, number>> = {
 	// third: a count catches a plane that rendered only one of its axes.
 	colorpicker: 3,
 	// One button per alignment: a count catches a group that rendered only its label.
-	togglegroup: 3,
+	buttongroup: 3,
 	// The typed input plus the clipped field a form submits: a count catches a box
 	// that rendered its text input and nothing to submit.
 	numberbox: 2,

@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import { togglegroup } from '../../index.ts';
+import { buttongroup } from '../../index.ts';
 
 // Two groups with their own consumer handlers, one of each shape. Each handler
 // writes into page state the page renders, so what the DOM shows is what the
@@ -9,7 +9,7 @@ export default function WithOnChange() @{
 	const log = state({ single: '', many: '', calls: 0, order: '' });
 
 	<section>
-		<togglegroup.root
+		<buttongroup.root
 			value="left"
 			data-testid="root"
 			onChange={(next: string | readonly string[]) => {
@@ -18,17 +18,17 @@ export default function WithOnChange() @{
 				log.order = log.order + 'change';
 			}}
 		>
-			<togglegroup.label data-testid="label">Text alignment</togglegroup.label>
-			<togglegroup.item value="left" data-testid="left">Left</togglegroup.item>
-			<togglegroup.item
+			<buttongroup.label data-testid="label">Text alignment</buttongroup.label>
+			<buttongroup.item value="left" data-testid="left">Left</buttongroup.item>
+			<buttongroup.item
 				value="center"
 				data-testid="center"
 				onClick={() => {
 					log.order = log.order + '-click';
 				}}
-			>Center</togglegroup.item>
-		</togglegroup.root>
-		<togglegroup.root
+			>Center</buttongroup.item>
+		</buttongroup.root>
+		<buttongroup.root
 			multiple
 			value={['bold']}
 			data-testid="many-root"
@@ -37,10 +37,10 @@ export default function WithOnChange() @{
 				log.calls = log.calls + 1;
 			}}
 		>
-			<togglegroup.label data-testid="many-label">Text style</togglegroup.label>
-			<togglegroup.item value="bold" data-testid="bold">Bold</togglegroup.item>
-			<togglegroup.item value="italic" data-testid="italic">Italic</togglegroup.item>
-		</togglegroup.root>
+			<buttongroup.label data-testid="many-label">Text style</buttongroup.label>
+			<buttongroup.item value="bold" data-testid="bold">Bold</buttongroup.item>
+			<buttongroup.item value="italic" data-testid="italic">Italic</buttongroup.item>
+		</buttongroup.root>
 		<p data-testid="single-value">{log.single}</p>
 		<p data-testid="many-value">{log.many}</p>
 		<p data-testid="calls">{log.calls}</p>

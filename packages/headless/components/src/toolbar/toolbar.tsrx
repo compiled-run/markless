@@ -98,7 +98,7 @@ function ToolbarBar({ children, onKeydown, onFocusin, ...rest }: ToolbarBarProps
 			// policy before the handler module loads, so a guard over the bar's
 			// orientation would be MARKLESS_SYNC_POLICY_UNEXTRACTABLE. The off-axis
 			// arrows are prevented too, which costs a page scroll the way `tabs` and
-			// `togglegroup` already pay it.
+			// `buttongroup` already pay it.
 			if (
 				event.key === 'ArrowRight' ||
 				event.key === 'ArrowLeft' ||
@@ -113,7 +113,7 @@ function ToolbarBar({ children, onKeydown, onFocusin, ...rest }: ToolbarBarProps
 			const roster = orderedRoster(toolbar.itemEls);
 			const from = event.target as HTMLElement;
 			// The control took the key for itself - a select opened its listbox, a
-			// toggle group stepped between its own items - so focus has already moved
+			// button group stepped between its own items - so focus has already moved
 			// and the bar only records where the stop now sits. That is the whole
 			// composition rule, and it asks nothing of the control: no shared flag, no
 			// stopped propagation, no cooperation at all.

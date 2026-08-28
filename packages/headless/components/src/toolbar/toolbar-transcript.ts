@@ -55,7 +55,7 @@ export async function readToolbarTranscript(sr: ScreenReaderDriver, page: Page) 
 	const print = await readUntil(sr, { role: 'button', name: 'Print' }, WALK_LIMIT);
 	expectConveys(sr, print, { role: 'button', name: 'Print' });
 
-	// An arrow moves the stop and activates nothing. The toggle group's own value
+	// An arrow moves the stop and activates nothing. The button group's own value
 	// is the visible proof: the bar walks over its items without pressing one.
 	await expect(buttonFor('Left')).toHaveAttribute('aria-pressed', 'true', {
 		timeout: CHANGE_TIMEOUT_MS,

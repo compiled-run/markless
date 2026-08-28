@@ -1,22 +1,22 @@
-# togglegroup — implementation notes
+# buttongroup — implementation notes
 
 A set of toggle buttons a person presses on and off: text alignment (one at a
 time), or bold/italic/underline (any number at once). Built from
-`goals/headless-components/notes/U569-togglegroup-research.md`.
+`goals/headless-components/notes/U569-buttongroup-research.md`.
 
 ## Shape
 
 | Part | Element | Carries |
 | --- | --- | --- |
-| `togglegroup.root` | `div` | the family's state; renders one private component a level down that owns `role="group"`, `aria-labelledby`, `ui-multiple`, `ui-vertical`, `ui-disabled`, `ui-required` |
-| `togglegroup.label` | `label` | the group's accessible name |
-| `togglegroup.item` | `button` | `type="button"`, `value`, `aria-pressed`, native `disabled`, the roving `tabindex`, `ui-pressed`, the click, the focus and the keyboard |
-| `togglegroup.itemfield` | `input` | the hidden input that carries one pressed item into a form |
+| `buttongroup.root` | `div` | the family's state; renders one private component a level down that owns `role="group"`, `aria-labelledby`, `ui-multiple`, `ui-vertical`, `ui-disabled`, `ui-required` |
+| `buttongroup.label` | `label` | the group's accessible name |
+| `buttongroup.item` | `button` | `type="button"`, `value`, `aria-pressed`, native `disabled`, the roving `tabindex`, `ui-pressed`, the click, the focus and the keyboard |
+| `buttongroup.itemfield` | `input` | the hidden input that carries one pressed item into a form |
 
-`togglegroup.state()` per widget instance: `value` (raw, see below), `multiple`,
+`buttongroup.state()` per widget instance: `value` (raw, see below), `multiple`,
 `orientation`, `loop`, `disabled`, `required`, `name`, `focused` (the value of
 the item holding the roving tab stop, `''` for nobody), and `toggle(value)`.
-`togglegroup.itemstate()` per item: `value`, `disabled`.
+`buttongroup.itemstate()` per item: `value`, `disabled`.
 
 Root props: `value`, `multiple`, `orientation`, `loop`, `disabled`, `required`,
 `name`, `onChange`. Item props: `value` (required), `disabled`.
@@ -31,7 +31,7 @@ is the owner ruling `tabs` and `carousel` already follow.
 `toggle`, the family next door, is `role="switch"` with `aria-checked` and a
 `thumb`: an on/off setting that takes effect at once. A toggle button is a
 `button` reporting `aria-pressed`, and the two are different roles with
-different announcements. So `togglegroup.item` is a new button modelled on
+different announcements. So `buttongroup.item` is a new button modelled on
 `calendar.item`, not a composed `toggle` — composing one would produce a row of
 switches, which is the wrong control, and a shared factory cannot be called from
 another module anyway (`MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED`).
@@ -39,7 +39,7 @@ another module anyway (`MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED`).
 ## Arrows move focus and never press
 
 This is the family's largest divergence from `radiogroup`, whose note says arrows
-"move focus **and** choose — the APG rule for this pattern". A toggle group is
+"move focus **and** choose — the APG rule for this pattern". A button group is
 the opposite rule, and both are correct: two families in this library, arrows
 doing different things.
 
@@ -73,7 +73,7 @@ owns the tabindex and an arrow off the group's last item leaves the group
 (`toolbar/note.md`).
 
 The item binds `el={[item.el, group.itemEls]}` — its own singular handle and the
-group's plural one — and the walk in `togglegroup-walk.ts` reads the plural
+group's plural one — and the walk in `buttongroup-walk.ts` reads the plural
 handle live at handler time. Nothing here queries the DOM, which `tabs` and
 `radiogroup` both still have to: their walk target is an element whose single
 `el` slot is already taken by an IDREF binding. A toggle button is its own label,
@@ -94,7 +94,7 @@ order-independent by design and there is no runtime creation-order counter.
 
 ## Forms
 
-`togglegroup.itemfield` is written **inside** the item whose value it submits,
+`buttongroup.itemfield` is written **inside** the item whose value it submits,
 and is legal there because `type="hidden"` is the one input state that is not
 interactive content — it takes no focus and never reaches the accessibility tree,
 so a button holding one is still a button holding only its own label. An
@@ -104,7 +104,7 @@ no special handling, and single-select submits it once.
 
 `name`, `multiple`, `orientation`, `loop`, `disabled` and `required` are declared
 by the root and by nothing else. What a *part* writes to the group instance never
-reaches parts built inside a keyed `@for` row, and toggle group items are usually
+reaches parts built inside a keyed `@for` row, and button group items are usually
 written from a loop, so this is the common case rather than a corner —
 `scenarios/items-from-data.tsrx` is the row that holds it.
 
@@ -154,6 +154,6 @@ attributes, so roving DOM focus is the only model.
 
 ## Not wired into the gallery yet
 
-`togglegroup-transcript.ts` spells its own gallery anchor rather than reading
+`buttongroup-transcript.ts` spells its own gallery anchor rather than reading
 `FAMILY_ANCHORS`, because the sr-gallery section and the CI matrix entry land in
 a follow-up. The two real-reader lanes are written and have never been run.

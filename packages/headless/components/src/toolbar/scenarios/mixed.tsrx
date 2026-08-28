@@ -1,4 +1,4 @@
-import { select, toggle, togglegroup, toolbar } from '../../index.ts';
+import { buttongroup, select, toggle, toolbar } from '../../index.ts';
 
 // The point of the family: four controls from four families sharing one tab stop,
 // with no wrapper part around any of them. Each one registers itself by reading
@@ -7,10 +7,10 @@ export default function Mixed() @{
 	<toolbar.root data-testid="root">
 		<toolbar.label data-testid="label">Document</toolbar.label>
 
-		<togglegroup.root value="left" data-testid="align">
-			<togglegroup.item value="left" data-testid="left">Left</togglegroup.item>
-			<togglegroup.item value="center" data-testid="center">Center</togglegroup.item>
-		</togglegroup.root>
+		<buttongroup.root value="left" data-testid="align">
+			<buttongroup.item value="left" data-testid="left">Left</buttongroup.item>
+			<buttongroup.item value="center" data-testid="center">Center</buttongroup.item>
+		</buttongroup.root>
 
 		<toggle.root data-testid="wrap-root">
 			<toggle.label data-testid="wrap-label">Wrap lines</toggle.label>

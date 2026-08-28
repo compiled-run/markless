@@ -30,7 +30,7 @@ control in it already reports for itself.
 
 `ui-vertical` on a stacked bar and every part of it; `ui-disabled` on an
 unavailable item. Only the non-default axis carries a flag, the ruling `tabs`,
-`carousel` and `togglegroup` already follow. `aria-orientation` is written out in
+`carousel` and `buttongroup` already follow. `aria-orientation` is written out in
 both directions, because unlike `role="group"` the toolbar role does support it.
 
 No `<style>` block: nothing in a toolbar is positioned, hidden or stacked, so the
@@ -48,7 +48,7 @@ const stop = computed(() => (toolbar.mounted === true ? -1 : undefined));
 <button el={[select.triggerEl, toolbar.itemEls]} tabindex={stop} …>
 ```
 
-Three controls ship wired this way: `toggle.trigger`, `togglegroup.item` (each
+Three controls ship wired this way: `toggle.trigger`, `buttongroup.item` (each
 item is its own stop) and `select.trigger`. `menu.trigger` is **not** wired yet —
 see the follow-up below.
 
@@ -63,7 +63,7 @@ resolves to no toolbar instance, so it registers in no bar's roster and reads
 `mounted` as the seed — `false` — and renders the tabindex it always had. That is
 measured from both ends: `two-bars.tsrx` puts a loose switch beside two bars and
 asserts the arrows never reach it and its `tabindex` attribute is absent, and all
-147 existing rows of `toggle`, `togglegroup` and `select` stayed green under the
+147 existing rows of `toggle`, `buttongroup` and `select` stayed green under the
 registration edits.
 
 ## The bar owns the roving tabindex, because nothing else can
@@ -109,9 +109,9 @@ told it is in a toolbar. Three cases fall out of it, all measured:
 
 - **A select's ArrowDown** opens its listbox and moves focus, so the bar records
   and stands down. In a horizontal bar it was never the bar's key anyway.
-- **A toggle group's interior ArrowRight** steps to the next item in the group,
+- **A button group's interior ArrowRight** steps to the next item in the group,
   which is also the next stop in the bar, so the two answers coincide.
-- **A toggle group's ArrowRight on its last item** returns that same item — the
+- **A button group's ArrowRight on its last item** returns that same item — the
   group does not loop — so focus does not move, the bar takes the key, and focus
   leaves the group. The edge of a nested walk becomes the bar's step for free.
 
@@ -127,7 +127,7 @@ of arrow keys used for toolbar navigation; if unavoidable, include only one and
 make it the last element" — and `scenarios/vertical.tsrx` is that arrangement,
 with a pinned row asserting what happens.
 
-**Home and End inside a toggle group reach the group's ends first.** The group
+**Home and End inside a button group reach the group's ends first.** The group
 handles them and moves focus, so the bar records rather than jumping to the bar's
 ends; a second Home, pressed where focus no longer moves, reaches the bar's first
 control. Two presses instead of one, and the alternative would be asking the
@@ -160,7 +160,7 @@ order regardless of how the page was assembled.
 ## What v1 refuses
 
 No `loop`. The APG calls arrow wrapping optional for this pattern, and `tabs` and
-`togglegroup` both default it off; a bar that wraps would also hide the "you are
+`buttongroup` both default it off; a bar that wraps would also hide the "you are
 at the end" feedback that makes Tab-out discoverable.
 
 No `separator` or `group` part. `menu/note.md` already ruled that separators and
@@ -186,7 +186,7 @@ file.
 
 **A `toolbar` slot in `test-support/driver.ts`'s `Vocabulary`.** The virtual
 reader announces "toolbar" and `toolbar.sr.ts` asserts it from a local word table,
-the way `togglegroup.sr.ts` does for `pressed`. The real-reader transcript cannot
+the way `buttongroup.sr.ts` does for `pressed`. The real-reader transcript cannot
 assert the role word at all, because `Conveys.role` is keyed by `Vocabulary` and
 there is no slot; it asserts the bar's name instead.
 
@@ -207,8 +207,8 @@ none), surveyed in an earlier unit.
 | `orientation`, `role="toolbar"`, `aria-orientation`, roving tabindex, Home/End | kept | the pattern everyone agrees on |
 | Radix `Toolbar.Button` / `.ToggleGroup` / `.Link` / `.Separator` wrapper parts | dropped | the controls are other families' already; a wrapper `div` cannot carry a stop and would be a second, roleless one |
 | Base UI `Toolbar.Group`, everyone's `Separator` | dropped | consumer markup, per `menu/note.md` |
-| `asChild` / `render` prop-merging | dropped | no such mechanism, and `togglegroup/note.md` refuses `asChild` by name |
+| `asChild` / `render` prop-merging | dropped | no such mechanism, and `buttongroup/note.md` refuses `asChild` by name |
 | React Aria's DOM subtree walk for the roster | the plural `element()` handle, registered by each control | SPEC bans selectors and walks in family source |
-| `loop` (Radix defaults it on) | dropped | `tabs` and `togglegroup` default it off |
+| `loop` (Radix defaults it on) | dropped | `tabs` and `buttongroup` default it off |
 | `dir` / RTL | dropped | no locale source in the dependency graph |
 | `data-*` identity attributes | dropped | `ui-*` state only |

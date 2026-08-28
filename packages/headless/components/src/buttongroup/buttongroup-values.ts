@@ -1,4 +1,4 @@
-import type { ToggleGroupValue } from './togglegroup-types.ts';
+import type { ButtonGroupValue } from './buttongroup-types.ts';
 
 /**
  * What is pressed, as a list, out of the raw cell the root seeded and a press
@@ -6,7 +6,7 @@ import type { ToggleGroupValue } from './togglegroup-types.ts';
  * shared cell is seeded from a bare prop and nothing else, so every read
  * normalises here rather than trusting a shape.
  */
-export function heldValues(held: ToggleGroupValue | undefined): readonly string[] {
+export function heldValues(held: ButtonGroupValue | undefined): readonly string[] {
 	if (held === undefined) return [];
 	if (typeof held === 'string') return held === '' ? [] : [held];
 	return held;
