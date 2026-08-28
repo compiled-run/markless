@@ -687,8 +687,10 @@ test('a barrel re-export carries the construct answer through unchanged', async 
 	).toBe('branches');
 });
 
-// Pay-per-use in the interface: the entry gains this one field and nothing else.
-test('the interface entry grows exactly one field', async () => {
+// Pay-per-use in the interface: the entry gains no field it has no use for.
+// `propSpends` is here because this row prints `item.label` - a property read
+// off a prop is a spend, which a module routing a roster count into it needs.
+test('the interface entry grows only the fields this component needs', async () => {
 	const child = await buildSemanticGraph({
 		filename: 'src/row.tsrx',
 		source: plainImportedRow,
@@ -701,6 +703,7 @@ test('the interface entry grows exactly one field', async () => {
 		'elementCount',
 		'exportName',
 		'inputs',
+		'propSpends',
 		'rootChunkId',
 	]);
 });
