@@ -548,8 +548,28 @@ function assertOptionalRowTemplateSlots(
 		assertRecordShape(slot, slotContext);
 		assertNonNegativeIntegerArrayField(slot, 'path', slotContext);
 		if (named) assertStringField(slot, 'name', slotContext);
-		assertStringArrayField(slot, 'itemPath', slotContext);
+		assertRowTemplateSlotValue(slot, slotContext);
 	}
+}
+
+// A slot's value is the item's or the graph's, never both and never neither: a
+// mint handed both would have two answers for one position, and one handed
+// neither would write undefined where the server wrote a value.
+function assertRowTemplateSlotValue(slot: Record<string, unknown>, context: string): void {
+	const fromItem = slot.itemPath !== undefined,
+		fromGraph = slot.graphNodeId !== undefined || slot.graphPath !== undefined;
+	if (fromItem === fromGraph) {
+		throw invalidPayloadShapeError(
+			contextPayloadType(context),
+			`Invalid ${context}: expected exactly one of itemPath or graphNodeId with graphPath.`,
+		);
+	}
+	if (fromItem) {
+		assertStringArrayField(slot, 'itemPath', context);
+		return;
+	}
+	assertStringField(slot, 'graphNodeId', context);
+	assertStringArrayField(slot, 'graphPath', context);
 }
 
 function assertOptionalEmptyArm(record: Record<string, unknown>, context: string): void {

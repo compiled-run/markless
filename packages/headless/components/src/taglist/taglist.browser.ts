@@ -308,11 +308,10 @@ for (const mode of MODES) {
 		await expect.poll(() => el(Held).textContent).toBe('alpha|beta|gamma|delta');
 	});
 
-	// Pinned: the row's `name={taglist.name}` reads a cell outside the repeated
-	// tag, which takes the row's markup off the payload, so a tag the first render
-	// did not carry can never be built. Dropping and re-admitting a rendered tag
-	// need no markup and both work.
-	test.fails(`${mode}: the form field hands back one entry per tag under one name`, async () => {
+	// The row's `name={taglist.name}` reads a cell outside the repeated tag, and
+	// the row template carries that read, so a tag the first render did not carry
+	// is built with the name the served rows have.
+	test(`${mode}: the form field hands back one entry per tag under one name`, async () => {
 		if (mode === 'CSR') await render(TopicsForm);
 		else await renderSSR(TopicsForm);
 

@@ -1,3 +1,5 @@
+import type { ProtocolRowTemplateSlotValue } from '@markless/serializer';
+import type { RuntimeGraph } from '@markless/runtime';
 import { marklessAttributeValue } from '../dom-attribute.ts';
 import type { ResumeDomElement, ResumeDomNode, ResumeKeyedRepeatRecord } from '../resume-types.ts';
 
@@ -14,8 +16,12 @@ import type { ResumeDomElement, ResumeDomNode, ResumeKeyedRepeatRecord } from '.
  * import from the repeat module would pull that module's whole closure back in
  * and there would be nothing left to gate. The one import is `dom-attribute`, a
  * leaf holding the attribute presence rule every render path shares - forking
- * that rule would be worse than the handful of bytes it costs.
+ * that rule would be worse than the handful of bytes it costs. The two other
+ * imports are types, which erase.
  */
+
+/** The read half of the live graph: a row's outside reads, taken once at mint. */
+export type RowMintGraph = Pick<RuntimeGraph, 'read'>;
 
 /**
  * Build the `@empty` arm's nodes from the markup the payload carries.
@@ -59,8 +65,9 @@ export function mintRow(
 	parent: ResumeDomElement,
 	repeat: ResumeKeyedRepeatRecord,
 	item: unknown,
+	graph?: RowMintGraph,
 ): ResumeDomElement {
-	return mintRowNodes(parent, repeat, item).rowRoot;
+	return mintRowNodes(parent, repeat, item, graph).rowRoot;
 }
 
 /**
@@ -74,6 +81,7 @@ export function mintRowNodes(
 	parent: ResumeDomElement,
 	repeat: ResumeKeyedRepeatRecord,
 	item: unknown,
+	graph?: RowMintGraph,
 ): { readonly rowRoot: ResumeDomElement; readonly nodes: ReadonlyArray<ResumeDomNode> } {
 	const rowTemplate = repeat.rowTemplate!,
 		host = parent.ownerDocument as MintingDocument | undefined,
@@ -106,13 +114,30 @@ export function mintRowNodes(
 			'built no row from its markup, and half a row is worse than none.',
 		);
 	for (const [at, slot] of attributeSlots.entries()) {
-		const value = marklessAttributeValue(slot.name, readPath(item, slot.itemPath));
+		const value = marklessAttributeValue(slot.name, slotValue(slot, item, graph));
 		if (value === null) hosts[at]!.removeAttribute?.(slot.name);
 		else hosts[at]!.setAttribute!(slot.name, value);
 	}
 	for (const [at, slot] of slots.entries())
-		anchors[at]!.replaceWith!(host.createTextNode(String(readPath(item, slot.itemPath) ?? '')));
+		anchors[at]!.replaceWith!(host.createTextNode(String(slotValue(slot, item, graph) ?? '')));
 	return { rowRoot, nodes };
+}
+
+/**
+ * One slot's value: off the item, or off the page's graph, read ONCE here.
+ *
+ * A served row's outside read does not refresh - a row host carries no
+ * per-instance locator, so the repeat ships no `domUpdates` for it - so a minted
+ * row that kept itself current would disagree with the rows beside it.
+ */
+function slotValue(
+	slot: ProtocolRowTemplateSlotValue,
+	item: unknown,
+	graph: RowMintGraph | undefined,
+): unknown {
+	return 'itemPath' in slot
+		? readPath(item, slot.itemPath)
+		: graph?.read(slot.graphNodeId, slot.graphPath);
 }
 
 // A local copy of fns/direct's walk, for the reason this whole module is local:

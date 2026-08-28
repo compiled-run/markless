@@ -113,7 +113,7 @@ export function App() @{
 	const label = state('tag');
 	const rows = computed(() => ['0', '1', '2'].map((at) => \`x-\${gate.offset * 3 + Number(at)}\`));
 
-	<div>@for (const iso of rows; key iso) { <GateItem value={iso}>{label}</GateItem> }</div>
+	<div>@for (const iso of rows; key iso) { <GateItem value={iso}>{label.toUpperCase()}</GateItem> }</div>
 }
 `);
 	expect(repeatRecord(result.protocolView, 'repeat:0')).not.toHaveProperty('rowComponent');

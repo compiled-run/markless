@@ -3,12 +3,16 @@ import { compileTsrxModule } from '../../src/index.ts';
 import { KEYED_REPEAT_ROW_MINT_UNSUPPORTED_CODE } from '../../src/passes/public-render/diagnostics.ts';
 
 /**
- * A plain-element row that reads the enclosing widget's shared state cannot be
- * built from the row item alone, and the payload's row template fills from the
- * item alone. The refusal has to be LOUD and total: no row template at all, plus
- * the diagnostic - because the runtime's no-growth path leaves the DOM untouched
- * and says nothing, so a half-shipped template would grow the list silently
- * wrong and a silently withheld one would grow it not at all.
+ * A plain-element row that reads the enclosing widget's shared state mints: the
+ * slot names the graph node instead of an item property, and the mint takes that
+ * read once, when it builds the row. Served rows behave the same way - a row host
+ * carries no per-instance locator, so nothing refreshes such a read in a row the
+ * server rendered either, and a minted row that kept itself current would
+ * disagree with the rows beside it.
+ *
+ * What stays refused is a value only rendering produces, and that refusal is
+ * LOUD and total: no row template at all, plus the diagnostic - the runtime's
+ * no-growth path leaves the DOM untouched and says nothing.
  */
 
 const widgetSource = (rowBody: string) => `import { shared, state } from '@markless/core';
@@ -49,24 +53,36 @@ const rowMintDiagnostics = (compiled: Compiled) =>
 
 const repeats = (compiled: Compiled) => compiled.protocolView.keyedRepeats ?? [];
 
-test('a row whose attribute reads the widget shared state ships no row template and says so', async () => {
+test('a row whose attribute reads the widget shared state mints from the graph', async () => {
 	const compiled = await compileRow(`<span data-owner={n.label}>{item.id}</span>`);
 
-	expect(rowMintDiagnostics(compiled)).toEqual([
-		['warning', expect.stringContaining('reads a value that is not a property of item')],
-	]);
+	expect(rowMintDiagnostics(compiled)).toEqual([]);
 	expect(repeats(compiled)).toHaveLength(1);
-	expect(repeats(compiled)[0]?.rowTemplate).toBeUndefined();
-	expect(repeats(compiled)[0]?.rowComponent).toBeUndefined();
+	expect(repeats(compiled)[0]?.rowTemplate?.attributeSlots).toEqual([
+		{ path: [0], name: 'data-owner', graphNodeId: expect.any(String), graphPath: ['label'] },
+	]);
 });
 
-test('a row whose TEXT reads the widget shared state is refused on the same terms', async () => {
+test('a row whose TEXT reads the widget shared state mints on the same terms', async () => {
 	const compiled = await compileRow(`<span>{n.label}{item.id}</span>`);
 
+	expect(rowMintDiagnostics(compiled)).toEqual([]);
+	expect(repeats(compiled)[0]?.rowTemplate?.textSlots).toEqual([
+		{ path: [0, 0], graphNodeId: expect.any(String), graphPath: ['label'] },
+		{ path: [0, 1], itemPath: ['id'] },
+	]);
+});
+
+// A value only rendering produces has no channel in the record, so the whole
+// template stays off and the diagnostic names the read.
+test('a row whose widget read only rendering produces is refused, loudly', async () => {
+	const compiled = await compileRow(`<span>{n.label.toUpperCase()}{item.id}</span>`);
+
 	expect(rowMintDiagnostics(compiled)).toEqual([
-		['warning', expect.stringContaining('reads a value that is not a property of item')],
+		['warning', expect.stringContaining('n.label.toUpperCase()')],
 	]);
 	expect(repeats(compiled)[0]?.rowTemplate).toBeUndefined();
+	expect(repeats(compiled)[0]?.rowComponent).toBeUndefined();
 });
 
 test('the refusal is the widget read alone: the same row without it mints', async () => {
@@ -82,10 +98,10 @@ test('the refusal is the widget read alone: the same row without it mints', asyn
 });
 
 // Two repeats over ONE widget cell, differing only in what the ROW reads. The
-// refusal is per repeat, so a widget read inside one row never costs the other
-// its template - and the count binding on the host element (a widget read
-// OUTSIDE the row) is not a row slot and never reaches the refusal at all.
-test('a widget read inside one row leaves its twin over the same cell mintable', async () => {
+// refusal is per repeat, so an unfillable read inside one row never costs the
+// other its template - and the count binding on the host element is not a row
+// slot and never reaches the refusal at all.
+test('an unfillable read inside one row leaves its twin over the same cell mintable', async () => {
 	const compiled = await compileTsrxModule({
 		filename: 'src/nest.tsrx',
 		source: `import { shared, state } from '@markless/core';
@@ -113,7 +129,7 @@ export function NestOwnedItems({ testid }) @{
 
 	<div data-testid={testid}>
 		@for (const item of n.items; key item.id) {
-			<span data-nest-owned-item data-nest-owner={n.label}>{item.id}</span>
+			<span data-nest-owned-item data-nest-owner={n.label.toUpperCase()}>{item.id}</span>
 		}
 	</div>
 }
