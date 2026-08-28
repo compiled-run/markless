@@ -1,26 +1,4 @@
-/**
- * The two focus moves the overlay behaviour deliberately leaves to the family.
- *
- * Both are retried per frame rather than done on the call: the surface is still
- * `hidden` when the opening handler runs, and the invoker is still `inert` when
- * the closing one does, so neither target can take focus yet. The retry gives
- * up rather than spinning.
- */
-
-const TRIES = 12;
-
-function land(target: HTMLElement | undefined): void {
-	if (!target) return;
-
-	let tries = TRIES;
-	const step = () => {
-		if (document.activeElement === target) return;
-		target.focus();
-		tries = tries - 1;
-		if (tries > 0 && document.activeElement !== target) requestAnimationFrame(step);
-	};
-	requestAnimationFrame(step);
-}
+/** The two focus moves the overlay behaviour deliberately leaves to the family. */
 
 /**
  * Land focus in the dialog.
@@ -34,8 +12,8 @@ export function focusIntoSurface(
 	close: HTMLElement | undefined,
 	isAlert: boolean,
 ): void {
-	if (isAlert && close) return land(close);
-	land(content);
+	if (isAlert && close) return close.focus();
+	content?.focus();
 }
 
 /**
@@ -65,7 +43,8 @@ export function focusBackToOpener(
 	surface: HTMLElement | undefined,
 	isTriggerOpened: boolean,
 ): void {
-	land(isTriggerOpened ? trigger : capturedOpener(surface));
+	const target = isTriggerOpened ? trigger : capturedOpener(surface);
+	target?.focus();
 }
 
 function capturedOpener(surface: HTMLElement | undefined): HTMLElement | undefined {

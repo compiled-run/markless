@@ -1,5 +1,6 @@
-import { element, shared, state } from '@markless/core';
+import { computed, element, shared, state } from '@markless/core';
 import VisuallyHidden from '../base/visually-hidden.tsrx';
+import { toolbarState } from '../toolbar/toolbar.tsrx';
 import type {
 	ToggleDescriptionProps,
 	ToggleErrorProps,
@@ -22,12 +23,16 @@ export const toggleState = shared(
 			value: '',
 		});
 		const triggerEl = element<HTMLButtonElement>();
-		const describedEl = element<HTMLDivElement>();
+		const descriptionEl = element<HTMLDivElement>();
+		const errorEl = element<HTMLDivElement>();
+		const labelEl = element<HTMLLabelElement>();
 
 		return {
 			...toggle,
 			triggerEl,
-			describedEl,
+			descriptionEl,
+			errorEl,
+			labelEl,
 			onChange: undefined as ((checked: boolean) => void) | undefined,
 			flip() {
 				if (toggle.disabled) return;
@@ -60,15 +65,27 @@ export function ToggleRoot({
 	<div {...rest} ui-checked={toggle.checked} ui-disabled={toggle.disabled}>{children}</div>
 }
 
+// The switch mixes into a toolbar here rather than at the root, because a
+// toolbar's roster holds focusable elements and `toggle.root` renders a div: the
+// trigger is the switch's focusable element. Outside every toolbar the read
+// resolves to no bar instance, so `mounted` is the seed and nothing changes.
 export function ToggleTrigger({ children, onClick, ...rest }: ToggleTriggerProps) @{
 	const toggle = toggleState();
+	const toolbar = toolbarState();
+	// Read once, off a cell no bar writes twice: in a toolbar the bar owns the
+	// roving stop and writes it from its own handlers.
+	const stop = computed(() => (toolbar.mounted === true ? -1 : undefined));
 
 	<button
 		{...rest}
-		el={toggle.triggerEl}
+		el={[toggle.triggerEl, toolbar.itemEls]}
+		tabindex={stop}
 		type="button"
 		role="switch"
-		aria-describedby={toggle.describedEl}
+		aria-labelledby={toggle.labelEl}
+		// Error before description: what is wrong is conveyed before the hint,
+		// wherever the two parts sit in the page.
+		aria-describedby={[toggle.errorEl, toggle.descriptionEl]}
 		aria-checked={toggle.checked ? 'true' : 'false'}
 		aria-disabled={toggle.disabled ? 'true' : 'false'}
 		aria-invalid={toggle.invalid ? 'true' : 'false'}
@@ -89,27 +106,21 @@ export function ToggleThumb({ children, ...rest }: ToggleThumbProps) @{
 export function ToggleLabel({ children, ...rest }: ToggleLabelProps) @{
 	const toggle = toggleState();
 
-	<label {...rest} for={toggle.triggerEl}>{children}</label>
-}
-
-// One part stands behind both `toggle.description` and `toggle.error`: an element()
-// handle binds in exactly one place, and aria-describedby here names exactly one id.
-// A switch that mounts both messages is therefore described by the first of them.
-function ToggleMessage({ children, ...rest }: ToggleDescriptionProps) @{
-	const toggle = toggleState();
-
-	<div {...rest} el={toggle.describedEl}>{children}</div>
+	<label {...rest} el={toggle.labelEl} for={toggle.triggerEl}>{children}</label>
 }
 
 export function ToggleDescription({ children, ...rest }: ToggleDescriptionProps) @{
-	<ToggleMessage {...rest}>{children}</ToggleMessage>
+	const toggle = toggleState();
+
+	<div {...rest} el={toggle.descriptionEl}>{children}</div>
 }
 
 export function ToggleError({ children, ...rest }: ToggleErrorProps) @{
 	const toggle = toggleState();
+	// Mounting the error part is what marks the switch invalid.
 	toggle.invalid = true;
 
-	<ToggleMessage {...rest}>{children}</ToggleMessage>
+	<div {...rest} el={toggle.errorEl}>{children}</div>
 }
 
 // No change handler of its own: the input is clipped, aria-hidden and out of the

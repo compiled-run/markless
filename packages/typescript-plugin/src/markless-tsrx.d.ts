@@ -12,12 +12,19 @@ declare namespace __MarklessTypeService {
 	type Child = Element | string | number | null | undefined | readonly Child[];
 	type AttributeValue = string | number | boolean | undefined;
 	/**
-	 * An IDREF position - an attribute that names another element by id. An
-	 * element() handle is valid here: the compiler resolves the relationship and
-	 * the emitter mints the id, so the author never spells one. A plain string id
-	 * still works for elements markless did not render.
+	 * An IDREF position that names exactly one element by id. An element() handle
+	 * is valid here: the compiler resolves the relationship and the emitter mints
+	 * the id, so the author never spells one. A plain string id still works for
+	 * elements markless did not render.
 	 */
-	type IdrefValue = AttributeValue | globalThis.Element;
+	type SingleIdrefValue = AttributeValue | globalThis.Element;
+	/**
+	 * An IDREF position HTML defines as a space-separated LIST of ids, so a static
+	 * array of handles names them all in the order written - one control described
+	 * by both its error and its hint. `popovertarget` and `for` take exactly one
+	 * id and keep SingleIdrefValue.
+	 */
+	type IdrefValue = SingleIdrefValue | readonly globalThis.Element[];
 	type StyleValue = string | number | undefined;
 	/**
 	 * Named CSS properties from csstype (camelCase and hyphenated spellings) plus
@@ -251,7 +258,7 @@ declare namespace __MarklessTypeService {
 		multiple?: boolean;
 		pattern?: string;
 		placeholder?: string;
-		popovertarget?: IdrefValue;
+		popovertarget?: SingleIdrefValue;
 		popovertargetaction?: 'hide' | 'show' | 'toggle';
 		readonly?: boolean;
 		required?: boolean;
@@ -320,7 +327,7 @@ declare namespace __MarklessTypeService {
 				: Tag extends 'button'
 					? FormAttributes & {
 							disabled?: boolean;
-							popovertarget?: IdrefValue;
+							popovertarget?: SingleIdrefValue;
 							popovertargetaction?: 'hide' | 'show' | 'toggle';
 							type?: 'button' | 'reset' | 'submit';
 							value?: string;
@@ -358,7 +365,7 @@ declare namespace __MarklessTypeService {
 										: Tag extends 'input'
 											? InputAttributes
 											: Tag extends 'label'
-												? { for?: IdrefValue }
+												? { for?: SingleIdrefValue }
 												: Tag extends 'link'
 													? AnchorAttributes & {
 															as?: string;
