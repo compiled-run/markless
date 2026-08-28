@@ -67,7 +67,7 @@ for (const mode of ['CSR', 'SSR'] as const) {
 	// Pinned: an expression that CALLS a method on the collection is wired to
 	// nothing, in a text child and in an attribute alike, so neither ever
 	// refreshes while every other read on the same element does.
-	test.fails(`${mode}: an expression calling a method on the collection refreshes`, async () => {
+	test(`${mode}: an expression calling a method on the collection refreshes`, async () => {
 		if (mode === 'CSR') await render(SeededPage);
 		else await renderSSR(SeededPage);
 

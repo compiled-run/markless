@@ -354,7 +354,7 @@ for (const mode of MODES) {
 	// Pinned: the text CALLS a method on the array (`join`), and an expression
 	// that calls a method in a template position is wired to nothing. The position
 	// is not the ingredient - an attribute spelled the same way stays stale too.
-	test.fails(`${mode}: a consumer component's text over the family's value refreshes`, async () => {
+	test(`${mode}: a consumer component's text over the family's value refreshes`, async () => {
 		if (mode === 'CSR') await render(ConsumerState);
 		else await renderSSR(ConsumerState);
 
