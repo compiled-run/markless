@@ -103,34 +103,6 @@ export function stepTo(
 }
 
 /**
- * Where a MENU BAR's own movement keys land among the bar's items. The axis is
- * the only difference from `walkTarget`: a bar walks inline, a surface blocks.
- */
-export function barTarget(
-	items: readonly HTMLElement[],
-	here: HTMLElement | undefined,
-	key: string,
-	loop: boolean,
-): HTMLElement | undefined {
-	if (key === 'Home') return stepTo(items, here, 'first', loop);
-	if (key === 'End') return stepTo(items, here, 'last', loop);
-	if (key === 'ArrowRight') return stepTo(items, here, 'next', loop);
-	if (key === 'ArrowLeft') return stepTo(items, here, 'previous', loop);
-	return undefined;
-}
-
-/**
- * Whether any surface of this menu is showing, asked of the bound roster rather
- * than of any one instance: a bar item cannot see its siblings' `expanded`, and
- * "is a menu already open" is what makes a menubar's hover open the next one
- * with no delay.
- */
-export function isAnyShowing(itemContents: Parts<HTMLElement>): boolean {
-	for (const one of itemContents ?? []) if (one.hidden !== true) return true;
-	return false;
-}
-
-/**
  * An item's own words, for typeahead.
  *
  * A nesting item holds its whole submenu, so its text carries every command

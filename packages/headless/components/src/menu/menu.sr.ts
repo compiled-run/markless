@@ -1,11 +1,9 @@
 import { render } from '@markless/vitest-browser';
 import { afterEach, expect, test } from 'vitest';
-import { parkPointerClearOfMount } from '../../test-support/pointer-parking.ts';
 import { virtualDriver } from '../../test-support/virtual-driver.ts';
 import Basic from './scenarios/basic.tsrx';
 import CheckboxItems from './scenarios/checkbox-items.tsrx';
 import Disabled from './scenarios/disabled.tsrx';
-import Menubar from './scenarios/menubar.tsrx';
 import RadioItems from './scenarios/radio-items.tsrx';
 import Submenu from './scenarios/submenu.tsrx';
 
@@ -20,8 +18,6 @@ const WORDS: Record<string, Record<string, string>> = {
 	virtual: {
 		button: 'button',
 		menu: 'menu',
-		menubar: 'menubar',
-		horizontal: 'orientated horizontally',
 		menuitem: 'menuitem',
 		menuitemcheckbox: 'menuitemcheckbox',
 		menuitemradio: 'menuitemradio',
@@ -36,8 +32,6 @@ const WORDS: Record<string, Record<string, string>> = {
 	NVDA: {
 		button: 'button',
 		menu: 'menu',
-		menubar: 'menu bar',
-		horizontal: 'horizontal',
 		menuitem: 'menu item',
 		menuitemcheckbox: 'check menu item',
 		menuitemradio: 'radio menu item',
@@ -52,8 +46,6 @@ const WORDS: Record<string, Record<string, string>> = {
 	VoiceOver: {
 		button: 'menu button',
 		menu: 'menu',
-		menubar: 'menu bar',
-		horizontal: 'horizontal',
 		menuitem: 'menu item',
 		menuitemcheckbox: 'menu item',
 		menuitemradio: 'menu item',
@@ -86,24 +78,6 @@ async function readOpened(component: Parameters<typeof render>[0], triggerId = '
 	const { container } = await render(component);
 	el(triggerId).click();
 	await expect.poll(() => el('content').hasAttribute('hidden'), { timeout: 5000 }).toBe(false);
-	await sr.start(container as unknown as HTMLElement);
-}
-
-// A menubar is always showing, so the reader can be started on the page as
-// served. The pointer is parked first because the bar's hover-after-open is
-// unconditional, and a tree mounting under the cursor takes a real `pointerover`.
-async function readBar() {
-	const { container } = await render(Menubar);
-	await parkPointerClearOfMount();
-	await sr.start(container as unknown as HTMLElement);
-}
-
-async function readBarOpened(barId: string, panelId: string) {
-	const { container } = await render(Menubar);
-	await parkPointerClearOfMount();
-	el(barId).focus();
-	el(barId).dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
-	await expect.poll(() => el(panelId).hasAttribute('hidden'), { timeout: 5000 }).toBe(false);
 	await sr.start(container as unknown as HTMLElement);
 }
 
@@ -243,27 +217,4 @@ test('Escape in a submenu returns to the item that opened it, which conveys the 
 	await sr.start(container as unknown as HTMLElement);
 
 	expectConveys(await readFor(['Share']), ['Share', say.menuitem, say.collapsed]);
-});
-
-test('the bar is conveyed as a menu bar under its own name, on its own axis', async () => {
-	await readBar();
-	expect(el('root').getAttribute('role')).toBe('menubar');
-	// Measured: this reader speaks the role, the name and the axis, and no count -
-	// how many menus the bar holds is what walking it conveys, which is the row below.
-	expectConveys(await readFor([say.menubar]), [say.menubar, 'Application', say.horizontal]);
-	expect(el('root').querySelectorAll(':scope > [role="menuitem"]')).toHaveLength(3);
-});
-
-test('every menu on the bar is conveyed as a menu item that holds a menu', async () => {
-	await readBar();
-	for (const name of ['File', 'Edit', 'View']) {
-		expectConveys(await readFor([name, say.menuitem]), [name, say.menuitem, say.haspopup]);
-	}
-});
-
-test('opening a bar menu flips its item to expanded and announces the menu under its name', async () => {
-	await readBarOpened('bar-file', 'panel-file');
-	expectConveys(await readFor(['File', say.expanded]), ['File', say.menuitem, say.expanded]);
-	expectConveys(await readFor([say.menu, 'File']), [say.menu, 'File']);
-	expectConveys(await readFor(['New']), ['New', say.menuitem]);
 });

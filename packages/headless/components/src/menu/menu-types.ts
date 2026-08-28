@@ -32,21 +32,6 @@ export type MenuRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	 * commands. An item carrying `submenu` stays a plain `menuitem` either way.
 	 */
 	readonly radio?: boolean;
-	/**
-	 * This menu is an application menu bar: the root itself renders
-	 * `role="menubar"` with `aria-orientation="horizontal"` and is always
-	 * visible, and the `menu.item`s written directly inside it are the bar's
-	 * items - each one a `submenu` item whose `menu.itemcontent` is its dropdown.
-	 *
-	 * Write no `menu.trigger` and no `menu.content`: the bar is the surface, so
-	 * `open` says nothing here, and a `menu.trigger` under the flag throws. Which
-	 * dropdown is showing is each bar item's own `expanded`, and everything below
-	 * the dropdowns is the ordinary recursion.
-	 *
-	 * A menu bar is for an application's own commands. Site navigation is a
-	 * disclosure - see `navbar/note.md` - not a bar of menus.
-	 */
-	readonly menubar?: boolean;
 	/** How long a pointer rests on a `submenu` item before its submenu opens, in milliseconds. */
 	readonly delay?: number;
 	/** How long a submenu stays open after the pointer leaves its item, in milliseconds. */
@@ -64,9 +49,10 @@ export type MenuRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
  * The control the menu opens from, and the family's only tab stop. It declares
  * `aria-haspopup="menu"`, so a reader says a menu is there before it is opened.
  *
- * A menubar has no trigger - its bar items are always visible - so writing one
- * under `menu.root menubar` throws as the part renders. A component cannot see
- * its own children, so the refusal can only be a runtime one.
+ * Inside a `menubar` it is that bar's item: it renders `role="menuitem"`, keeps
+ * every popup attribute, and takes its `tabindex` from the bar's roving stop.
+ * Inside a `toolbar` it stays `role="button"` and only gives up its tab stop -
+ * a toolbar does not change what its controls are.
  */
 export type MenuTriggerProps = PropsOf<'button'>;
 
@@ -157,7 +143,7 @@ export type MenuItemContentProps = PropsOf<'div'>;
  */
 export type MenuInstanceState = Seeded<
 	MenuRootProps,
-	'open' | 'checked' | 'disabled' | 'loop' | 'radio' | 'menubar' | 'delay' | 'closeDelay'
+	'open' | 'checked' | 'disabled' | 'loop' | 'radio' | 'delay' | 'closeDelay'
 > & {
 	/** The `value` of the item holding the roving focus, or `''`. */
 	focused: string;
