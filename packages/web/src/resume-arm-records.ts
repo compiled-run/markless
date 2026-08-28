@@ -15,20 +15,6 @@ import type {
 	ResumeDomNode,
 } from './resume-types.ts';
 
-type RosterResumeHost = {
-	readonly __marklessRosterResume?: () => Promise<typeof import('./fns/roster-resume.ts')>;
-};
-
-// The trigger side of the arm's roster channel; the fold and the write live in
-// fns/roster-resume.ts, which nothing eagerly loaded names.
-export async function bumpArmRosterRevisions(
-	graph: RuntimeGraph,
-	branches: ReadonlyArray<ResumeBranchRecord>,
-): Promise<void> {
-	const roster = await (globalThis as RosterResumeHost).__marklessRosterResume?.();
-	roster?.bumpArmRosterRevisions(graph, branches);
-}
-
 export function boundaryArmRecordSet(value: unknown): ResumeArmRecordSet | null {
 	if (!value || Array.isArray(value)) return null;
 	const set = value as ResumeArmRecordSet;

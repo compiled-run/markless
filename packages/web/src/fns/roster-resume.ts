@@ -38,6 +38,7 @@ type RosterRevisionGraph = {
 		readonly path: ReadonlyArray<string>;
 		readonly run: () => void;
 	}) => () => void;
+	readonly subscribeJournal: RuntimeGraph['subscribeJournal'];
 };
 
 /**
@@ -129,59 +130,15 @@ function oneElement(get: ElementHandleRegistry['get'], key: string): unknown {
 }
 
 /**
- * Nothing else writes an element() binding node and every reader of one answers
- * from the handle registry, so the binding's cell carries a revision: bumping it
- * is how the parts deriving a place in that roster are told to derive it again.
- *
- * The ids an arm hands over are its own registered handles, which is a superset
- * of the rosters among them; a bump on a binding no derivation depends on is a
- * number written into a cell nobody reads.
- */
-export function bumpRosterRevisions(
-	graph: Pick<RosterRevisionGraph, 'read' | 'write'>,
-	rosterGraphNodeIds: Iterable<string>,
-): void {
-	for (const roster of rosterGraphNodeIds) {
-		if (!isElementBinding(roster)) continue;
-		const revision = graph.read(roster, []);
-		graph.write({
-			graphNodeId: roster,
-			value: (typeof revision === 'number' ? revision : 0) + 1,
-		});
-	}
-}
-
-/**
- * The arm channel. A roster whose member is gated by an `@if` arm moves when the
- * arm does and no collection is written, so this is the only thing that can tell
- * the parts standing in that roster to derive their place again.
- *
- * Every element() binding any arm of the branch can hold is bumped: which of
- * them are registered is exactly what a flip changes. Called after the arm's own
- * materialization, when the registry has settled - the removed hosts are unfiled
- * and the arriving ones are filed.
- */
-export function bumpArmRosterRevisions(
-	graph: Pick<RosterRevisionGraph, 'read' | 'write'>,
-	branches: ReadonlyArray<{
-		readonly armRecords?: ReadonlyArray<{
-			readonly elementHandles: ReadonlyArray<{ readonly handleId?: unknown }>;
-		}>;
-	}>,
-): void {
-	const rosters = new Set<string>();
-	for (const branch of branches)
-		for (const set of branch.armRecords ?? [])
-			for (const handle of set.elementHandles)
-				if (typeof handle.handleId === 'string') rosters.add(handle.handleId);
-	bumpRosterRevisions(graph, rosters);
-}
-
-/**
  * After resume the roster is live, and a part's place in it changes when a row
- * arrives, leaves or moves. This is the keyed-repeat channel: a collection write
- * is what moves the rows. An `@if` arm adopting or dropping its host elements is
- * the other one, and it bumps from resume-branches.ts through the same cell.
+ * arrives, leaves or moves. Nothing else writes an element() binding node and
+ * every reader of one answers from the handle registry, so the binding's cell
+ * carries a revision: bumping it is how the parts deriving a place in that
+ * roster are told to derive it again.
+ *
+ * A keyed repeat's collection write is one channel; an `@if` arm adopting or
+ * dropping its host elements is the other, and it writes no collection at all,
+ * so the journal is the only thing that reports it.
  *
  * Resume is itself the first revision. A render answers a place from emission
  * order and paints it, but the number never reaches the derivation's graph cell,
@@ -206,7 +163,15 @@ export function wireRosterRevisions(input: {
 		for (const dependency of record.dependencies ?? [])
 			if (isElementBinding(dependency.graphNodeId)) rosters.add(dependency.graphNodeId);
 	if (rosters.size === 0) return;
-	const bump = () => bumpRosterRevisions(input.graph, rosters);
+	const bump = () => {
+		for (const roster of rosters) {
+			const revision = input.graph.read(roster, []);
+			input.graph.write({
+				graphNodeId: roster,
+				value: (typeof revision === 'number' ? revision : 0) + 1,
+			});
+		}
+	};
 	for (const repeat of input.keyedRepeats) {
 		const collection = repeat.collectionGraphNodeId;
 		if (!collection) continue;
@@ -221,6 +186,14 @@ export function wireRosterRevisions(input: {
 			}),
 		);
 	}
+	// The arm channel. Registered after the start module's own journal listener,
+	// which is what materializes an arriving arm's handles, so the registry has
+	// settled by the time this runs - removed hosts unfiled, arriving ones filed.
+	input.storeContainerSubscription(
+		input.graph.subscribeJournal((entries) => {
+			if (entries.some((entry) => entry.locator.startsWith('branch:'))) bump();
+		}),
+	);
 	bump();
 }
 

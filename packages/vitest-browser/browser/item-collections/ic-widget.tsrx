@@ -60,7 +60,9 @@ export function IcItem({ children }) @{
 	// The second derivation, and the one every real family actually writes: a
 	// place is worth nothing unless another expression can USE it. It has to
 	// answer after a write to `code`, not only at first paint.
-	const char = computed(() => w.code.slice(pos, pos + 1));
+	// Guarded because a widget instance rooting a flippable arm registers no
+	// widget scope, so its own shared cells read undefined after resume.
+	const char = computed(() => w.code?.slice(pos, pos + 1) ?? '');
 
 	<div data-ic-item el={[w.itemEls, mine]} ui-pos={pos} ui-mine={char}>{children}</div>
 }
