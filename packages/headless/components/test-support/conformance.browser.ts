@@ -16,6 +16,7 @@ import Ink from '../src/ink/scenarios/basic.tsrx';
 import Menu from '../src/menu/scenarios/basic.tsrx';
 import Menubar from '../src/menubar/scenarios/basic.tsrx';
 import { Basic as Combobox } from '../src/combobox/scenarios/basic.tsrx';
+import Drawer from '../src/drawer/scenarios/basic.tsrx';
 import Modal from '../src/modal/scenarios/basic.tsrx';
 import Navbar from '../src/navbar/scenarios/basic.tsrx';
 import Numberbox from '../src/numberbox/scenarios/basic.tsrx';
@@ -393,6 +394,25 @@ const descriptors: readonly FamilyDescriptor[] = [
 		// travel between open menus live in src/menubar/menubar.browser.ts.
 		valuedAttributes: [],
 		// The family takes no props at all, `disabled` included.
+		supportsDisabled: false,
+	},
+	{
+		family: 'drawer',
+		mount: { CSR: () => render(Drawer), SSR: () => renderSSR(Drawer) },
+		root: 'root',
+		parts: ['root', 'trigger', 'backdrop', 'content', 'title', 'close'],
+		rootAria: { role: null },
+		valuedAttributes: ['ui-orientation'],
+		openCycle: {
+			trigger: 'trigger',
+			surface: 'content',
+			closeBy: 'close',
+			haspopup: 'dialog',
+			reportsExpanded: false,
+			ridesOverlay: true,
+			focusLands: true,
+			focusReturns: true,
+		},
 		supportsDisabled: false,
 	},
 	{
