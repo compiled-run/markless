@@ -417,7 +417,10 @@ export async function forceImportedModules(
 					),
 				);
 			} else if (typeof context.load === 'function') {
-				await Promise.all(plan.claimSources.map((id) => context.load?.({ id })));
+				// Sequential, and it has to stay that way: loading these in parallel let
+				// module registration land in completion order, so an unchanged tree built
+				// different chunk contents (and a different chunk COUNT) run to run.
+				for (const id of plan.claimSources) await context.load({ id });
 			}
 		}
 		if (plan.seal) await metadata.sealSourceSymbolClaims(child.source);

@@ -75,7 +75,22 @@ const clientBuild = resolve(clientPublic, MARKLESS_BUILD_PREFIX);
 // which identifiers each measured chunk actually contains; it is not a
 // revert-measurement, and the window is ~100 merges wide.
 const STAGE_ANCHORS = {
-	'page-load download': { gzipBytes: 135_982, margin: 128 },
+	// 135,982 -> 136,775 (2026-08-27). The LANDMINE ABOVE IS CLOSED, and closing it
+	// is most of this move. That anchor was the highest of three nondeterministic
+	// samples (135,182 / 135,982 / 135,788, chunk count 106/107/107); the build now
+	// emits the same chunk graph every run (build-determinism.test.ts pins it), and
+	// the reproducible value on this tree is 136,775. So the old anchor was not a
+	// smaller build, it was a luckier sample - the parallel claim loading it came
+	// from could register modules in completion order and sometimes collapse the
+	// graph further than a real build does.
+	// Of the +793, a revert-measurement of the three element-handle-qualifier web
+	// files on this tree puts ~77 B on the qualifier family (the same order as the
+	// +40 / +31 residue the vite fixtures show for it); the rest is the graph
+	// settling. This lane modulepreloads nearly every chunk it emits, so the
+	// 1,053 B the qualifier move recovered from the fixtures' largest runtime chunk
+	// does NOT come back here - splitting one eager chunk into two eager chunks
+	// costs this stage a little rather than saving it.
+	'page-load download': { gzipBytes: 136_775, margin: 128 },
 	'page-load execute': { gzipBytes: 14_221, margin: 128 },
 	'interaction 1 marginal': { gzipBytes: 2_416, margin: 32 },
 	'interaction 2 marginal': { gzipBytes: 2_705, margin: 32 },

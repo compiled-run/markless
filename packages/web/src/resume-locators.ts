@@ -11,6 +11,7 @@ import {
 	missingElementLocatorError,
 } from './inline/resume-errors.ts';
 import { censusElements, spliceCensus } from './resume-census.ts';
+import { qualifiedElementHandleId } from './resume-arm-records.ts';
 
 export function materializeDomLocators(
 	root: ResumeDomElement,
@@ -38,27 +39,6 @@ export function materializeDomLocators(
 // for the reason fns/instance-scope.ts restates the serializer's grammar: the
 // lean resume chunk strips one prefix rather than taking an import edge for it.
 const HANDLE_INSTANCE_PATH = /^(?:[cp]\d+:|r:[^:]*:)+(?=shared:)/;
-
-/**
- * Re-spells a handle id in the rendered widget's own key space, given the id of
- * the record that filed it — a branch id, whose instance path names the widget.
- *
- * Composition qualifies every handle the served payload carries; a handle bound
- * inside a flippable `@if` arm is filed here at resume instead, from an arm
- * record the serializer left in module space. Only a composing page installs
- * this, on the pay-per-use gate the widget registry itself rides.
- */
-export type ElementHandleQualifier = (
-	handleId: string,
-	ownerRecordId: string,
-	graph?: unknown,
-) => string;
-
-let elementHandleQualifier: ElementHandleQualifier | undefined;
-
-export function installElementHandleQualifier(qualifier: ElementHandleQualifier): void {
-	elementHandleQualifier = qualifier;
-}
 
 /**
  * One element per key, and a loud refusal when a key names more than one.
@@ -119,10 +99,7 @@ export function materializeElementHandles(
 		ownerRecordId?: string,
 		graph?: unknown,
 	): void {
-		const handleId =
-			ownerRecordId && elementHandleQualifier
-				? elementHandleQualifier(handle.handleId, ownerRecordId, graph)
-				: handle.handleId;
+		const handleId = qualifiedElementHandleId(handle.handleId, ownerRecordId, graph);
 		const held = heldByHostId.get(hostNodeId) ?? [];
 		// The same handle registered again on the same host replaces its own entry
 		// rather than doubling it, which would read as two rendered widgets and
