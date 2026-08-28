@@ -113,6 +113,7 @@ function familyModules(): ReadonlyArray<{ readonly name: string; readonly source
 
 // The shipped families are the real corpus: widget-scoped shared() definitions,
 // several components per module, methods called from the family's own parts.
+// One compile per shipped family: the budget scales with the catalog.
 test('no shipped family module changes what it emits when a function moves above its first component', async () => {
 	const modules = familyModules();
 	expect(modules.length).toBeGreaterThan(10);
@@ -132,4 +133,4 @@ test('no shipped family module changes what it emits when a function moves above
 	}
 
 	expect(differing).toEqual([]);
-});
+}, 60_000);
