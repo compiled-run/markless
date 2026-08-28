@@ -40,9 +40,9 @@ import { prerenderBranchArm } from './branch-arm.ts';
 import { registerPrerenderStagedComputeds } from './staged-graph.ts';
 import { marklessThen, marklessWalk, type Awaitable } from '../ssr-data/awaitable.ts';
 import {
-	marklessRenderRosterPosition,
 	marklessRosterPositions,
 	marklessRosterPositionSeeds,
+	marklessRosterRenderContext,
 	sharedSeedPass,
 } from './shared-seed-slot.ts';
 import { branchArmIdrefResolution } from '../ssr-data/branch-arm-idrefs.ts';
@@ -395,7 +395,8 @@ async function evaluatePrerenderDataSurface(
 ): Promise<SsrRenderOutput & { readonly structure?: SsrDataStructure }> {
 	const rootName = surface.rootComponentName;
 	if (!rootName) throw new Error('MARKLESS_PRERENDER_DATA_ROOT_MISSING');
-	return evaluatePrerenderDataComponent({
+	const sharedSeeds = marklessRosterPositionSeeds();
+	const rendered = await evaluatePrerenderDataComponent({
 		surface,
 		componentName: rootName,
 		props,
@@ -404,10 +405,20 @@ async function evaluatePrerenderDataSurface(
 		loadSymbol,
 		graph,
 		requireHtml,
-		sharedSeeds: marklessRosterPositionSeeds(),
+		sharedSeeds,
 		...(fresh ? { freshBranchSiteId: fresh.branchSiteId, freshCellIds: fresh.cellIds } : {}),
 	});
+	// A count is asked before the members it counts have rendered, so the page
+	// this render produced is where it becomes a number.
+	if (!marklessRosterPositions(sharedSeeds)?.counted) return rendered;
+	const roster = await (globalThis as RosterResumeHost).__marklessRosterResume?.();
+	if (!roster) throw new Error('MARKLESS_ROSTER_COUNT_UNRESOLVED');
+	return roster.marklessResolveRosterCounts(rendered);
 }
+
+type RosterResumeHost = {
+	readonly __marklessRosterResume?: () => Promise<typeof import('../fns/roster-resume.ts')>;
+};
 
 function asPropsRecord(value: unknown): Readonly<Record<string, unknown>> {
 	return value !== null && typeof value === 'object'
@@ -607,15 +618,7 @@ function evaluatePrerenderDataComponent(input: {
 	const positions =
 		marklessRosterPositions(input.sharedSeeds) ??
 		marklessRosterPositions(marklessRosterPositionSeeds())!;
-	const rosterPositionContext = {
-		rosterPosition: (rosterGraphNodeId: string, handleGraphNodeId: string) =>
-			marklessRenderRosterPosition(
-				positions,
-				input.sharedSeeds,
-				rosterGraphNodeId,
-				handleGraphNodeId,
-			),
-	};
+	const rosterPositionContext = marklessRosterRenderContext(positions, input.sharedSeeds);
 	const initials = definition.initialValues ?? [];
 	const derived = marklessWalk(initials.length, (index) => {
 		const initial = initials[index]!;

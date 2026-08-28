@@ -34,6 +34,9 @@ const items = (within?: string) =>
 const positions = (within?: string) => items(within).map((one) => one.getAttribute('ui-pos'));
 const roots = () => [...document.querySelectorAll('[data-ic-root]')];
 const seen = (at = 0) => roots()[at]?.getAttribute('ui-seen');
+const maxes = () => roots().map((one) => one.getAttribute('ui-max'));
+const totals = () =>
+	[...document.querySelectorAll('[data-ic-total]')].map((one) => one.textContent);
 
 const surveyed = async (at = 0) => {
 	roots()[at]!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -132,15 +135,16 @@ test('SSR: a component edge does not change an item position', async () => {
 
 // --- added and removed after resume -----------------------------------------
 
-// Red for the ordinal, not the mint: the row is built and attached now, and its
-// four items are in the DOM - nothing stamps `ui-pos` until a handler walks the
-// roster, which is the same reason the drop row below is red.
+// A row minted after resume derives its place twice: once with no page seeds,
+// which answers 0, and again when the roster's revision renumbers it. The DOM
+// holding the row is not yet the DOM holding the answer, so this waits for the
+// derivation rather than for the element.
 test('SSR: an item added after resume takes the next position by itself', async () => {
 	await renderSSR(MutatingPage);
 	await userEvent.click(document.querySelector('[data-ic-add]') as HTMLElement);
 	await expect.poll(() => items().length, { timeout: 5000 }).toBe(4);
 
-	expect(positions()).toEqual(['0', '1', '2', '3']);
+	await expect.poll(positions, { timeout: 5000 }).toEqual(['0', '1', '2', '3']);
 });
 
 test('SSR: dropping the first item renumbers the ones behind it', async () => {
@@ -292,4 +296,171 @@ test('SSR: the roster of a flat instance reads its own items only', async () => 
 
 	expect(seen(0)).toBe('0,1,2');
 	expect(seen(1)).toBe('0,1');
+});
+
+// --- how many are there ------------------------------------------------------
+
+// The second question a family asks its roster, and the one an authored `index`
+// prop was standing in for: `otp` sets `maxlength`, `tour` writes "2 of 5". The
+// root derives `w.itemEls.length` and writes it twice - into an attribute and
+// into a text child - and it asks BEFORE any item of the instance has rendered,
+// which is the whole difficulty on the server's single forward pass.
+
+test('CSR: the root counts its items at first paint', async () => {
+	await render(StaticPage);
+
+	expect(maxes()).toEqual(['3']);
+	expect(totals()).toEqual(['3']);
+});
+
+test('SSR: the root counts its items at first paint', async () => {
+	await renderSSR(StaticPage);
+
+	expect(maxes()).toEqual(['3']);
+	expect(totals()).toEqual(['3']);
+});
+
+test('CSR: keyed rows are counted the same as static items', async () => {
+	await render(KeyedPage);
+
+	expect(maxes()).toEqual(['3']);
+	expect(totals()).toEqual(['3']);
+});
+
+test('SSR: keyed rows are counted the same as static items', async () => {
+	await renderSSR(KeyedPage);
+
+	expect(maxes()).toEqual(['3']);
+	expect(totals()).toEqual(['3']);
+});
+
+test('CSR: a component edge does not change the count', async () => {
+	await render(ComposedPage);
+
+	expect(maxes()).toEqual(['3']);
+	expect(totals()).toEqual(['3']);
+});
+
+test('SSR: a component edge does not change the count', async () => {
+	await renderSSR(ComposedPage);
+
+	expect(maxes()).toEqual(['3']);
+	expect(totals()).toEqual(['3']);
+});
+
+test('CSR: each instance counts only its own items', async () => {
+	await render(TwoInstancesPage);
+
+	expect(maxes()).toEqual(['2', '3']);
+	expect(totals()).toEqual(['2', '3']);
+});
+
+test('SSR: each instance counts only its own items', async () => {
+	await renderSSR(TwoInstancesPage);
+
+	expect(maxes()).toEqual(['2', '3']);
+	expect(totals()).toEqual(['2', '3']);
+});
+
+test('CSR: flat items in two instances each count their own', async () => {
+	await render(FlatPage);
+
+	expect(maxes()).toEqual(['3', '2']);
+	expect(totals()).toEqual(['3', '2']);
+});
+
+test('SSR: flat items in two instances each count their own', async () => {
+	await renderSSR(FlatPage);
+
+	expect(maxes()).toEqual(['3', '2']);
+	expect(totals()).toEqual(['3', '2']);
+});
+
+test('CSR: the count follows an item arriving after resume', async () => {
+	await render(MutatingPage);
+	await userEvent.click(document.querySelector('[data-ic-add]') as HTMLElement);
+	await expect.poll(() => items().length, { timeout: 5000 }).toBe(4);
+
+	await expect.poll(maxes, { timeout: 5000 }).toEqual(['4']);
+	expect(totals()).toEqual(['4']);
+});
+
+test('SSR: the count follows an item arriving after resume', async () => {
+	await renderSSR(MutatingPage);
+	await userEvent.click(document.querySelector('[data-ic-add]') as HTMLElement);
+	await expect.poll(() => items().length, { timeout: 5000 }).toBe(4);
+
+	await expect.poll(maxes, { timeout: 5000 }).toEqual(['4']);
+	expect(totals()).toEqual(['4']);
+});
+
+test('CSR: the count follows an item leaving after resume', async () => {
+	await render(MutatingPage);
+	await userEvent.click(document.querySelector('[data-ic-drop-first]') as HTMLElement);
+	await expect.poll(() => items().length, { timeout: 5000 }).toBe(2);
+
+	await expect.poll(maxes, { timeout: 5000 }).toEqual(['2']);
+	expect(totals()).toEqual(['2']);
+});
+
+test('SSR: the count follows an item leaving after resume', async () => {
+	await renderSSR(MutatingPage);
+	await userEvent.click(document.querySelector('[data-ic-drop-first]') as HTMLElement);
+	await expect.poll(() => items().length, { timeout: 5000 }).toBe(2);
+
+	await expect.poll(maxes, { timeout: 5000 }).toEqual(['2']);
+	expect(totals()).toEqual(['2']);
+});
+
+test('CSR: a flat instance recounts behind an arrival and leaves its sibling alone', async () => {
+	await render(FlatPage);
+	await userEvent.click(flatAdd());
+	await expect.poll(() => items('[data-ic-first]').length, { timeout: 5000 }).toBe(4);
+
+	await expect.poll(maxes, { timeout: 5000 }).toEqual(['4', '2']);
+	expect(totals()).toEqual(['4', '2']);
+});
+
+test('SSR: a flat instance recounts behind an arrival and leaves its sibling alone', async () => {
+	await renderSSR(FlatPage);
+	await userEvent.click(flatAdd());
+	await expect.poll(() => items('[data-ic-first]').length, { timeout: 5000 }).toBe(4);
+
+	await expect.poll(maxes, { timeout: 5000 }).toEqual(['4', '2']);
+	expect(totals()).toEqual(['4', '2']);
+});
+
+test('CSR: a flat instance recounts behind a removal', async () => {
+	await render(FlatPage);
+	await userEvent.click(flatDrop());
+	await expect.poll(() => items('[data-ic-first]').length, { timeout: 5000 }).toBe(2);
+
+	await expect.poll(maxes, { timeout: 5000 }).toEqual(['2', '2']);
+	expect(totals()).toEqual(['2', '2']);
+});
+
+test('SSR: a flat instance recounts behind a removal', async () => {
+	await renderSSR(FlatPage);
+	await userEvent.click(flatDrop());
+	await expect.poll(() => items('[data-ic-first]').length, { timeout: 5000 }).toBe(2);
+
+	await expect.poll(maxes, { timeout: 5000 }).toEqual(['2', '2']);
+	expect(totals()).toEqual(['2', '2']);
+});
+
+// A count is a placeholder while the render is still emitting the members it
+// counts. Nothing the page ships may still be holding one - not the markup, and
+// not the resume payload a resumed page rewrites the attribute from.
+const PLACEHOLDER = /[\uE000\uE001]/;
+
+test('CSR: no placeholder count survives the render', async () => {
+	await render(TwoInstancesPage);
+
+	expect(PLACEHOLDER.test(document.body.innerHTML)).toBe(false);
+});
+
+test('SSR: no placeholder count survives the render', async () => {
+	await renderSSR(TwoInstancesPage);
+
+	expect(PLACEHOLDER.test(document.body.innerHTML)).toBe(false);
 });

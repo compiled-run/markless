@@ -27,10 +27,17 @@ import {
 	type PrerenderBootArtifact,
 } from './inline/resumer.ts';
 import { prepareSsrResumeRecords } from './prerender/records.ts';
-import { marklessSsrRosterPositionContext } from './fns/roster-position.ts';
+import {
+	marklessSsrRosterCounted,
+	marklessSsrRosterPositionContext,
+} from './fns/roster-position.ts';
 import { derivePrerenderResumeRecords } from './prerender/evaluator.ts';
 
 export { prepareSsrResumeRecords } from './prerender/records.ts';
+
+type RosterResumeHost = {
+	__marklessRosterResume?: () => Promise<typeof import('./fns/roster-resume.ts')>;
+};
 
 export type SsrRenderOutput = {
 	readonly html: string;
@@ -313,19 +320,29 @@ export async function renderSsrOutput(
 	renderContext: unknown,
 ): Promise<SsrRenderOutput> {
 	assertPageRenderable(component);
+	// The server has no emitted source module to write the roster loader, and a
+	// count is answered through it on this side too.
+	(globalThis as RosterResumeHost).__marklessRosterResume ??= () =>
+		import('./fns/roster-resume.ts');
 	// One position counter per render, minted here because this is the one place
 	// a served page's render context is made.
 	const context = marklessSsrRosterPositionContext(renderContext);
 	if (typeof component === 'function') {
-		return (component as (props?: unknown, renderContext?: unknown) => SsrRenderOutput)(
-			props,
+		return marklessSsrRosterCounted(
 			context,
+			await (component as (props?: unknown, renderContext?: unknown) => SsrRenderOutput)(
+				props,
+				context,
+			),
 		);
 	}
 	if (component && typeof component.renderSsr === 'function') {
-		return (
-			component.renderSsr as (props?: unknown, renderContext?: unknown) => SsrRenderOutput
-		)(props, context);
+		return marklessSsrRosterCounted(
+			context,
+			await (
+				component.renderSsr as (props?: unknown, renderContext?: unknown) => SsrRenderOutput
+			)(props, context),
+		);
 	}
 	throw new TypeError('renderToString(App) requires a compiled TSRX artifact.');
 }

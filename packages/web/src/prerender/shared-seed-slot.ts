@@ -104,6 +104,13 @@ export type MarklessRosterPositions = {
 	 */
 	seeds?: ReadonlyMap<string, unknown>;
 	readonly taken: Map<string, number>;
+	/**
+	 * Whether some part of this render asked a COUNT. A count is not knowable
+	 * while the render is still emitting the members it counts, so the ask writes
+	 * a placeholder and the surface resolves it once composition is done - which
+	 * is work only a render that asked has to load or do.
+	 */
+	counted?: boolean;
 };
 
 export function marklessRosterPositions(
@@ -125,25 +132,81 @@ export function marklessRosterPositionSeeds(
 }
 
 /**
+ * Which rendered widget a roster belongs to, asked of its own family exactly as
+ * a minted handle id asks it: a handle's graph node id carries a module path, so
+ * the family is everything up to the LAST slash.
+ */
+function rosterInstance(
+	scope: ReadonlyMap<string, unknown> | undefined,
+	rosterGraphNodeId: string,
+): unknown {
+	const family = rosterGraphNodeId.slice(0, rosterGraphNodeId.lastIndexOf('/'));
+	return scope?.get(marklessWidgetInstanceKey(family)) ?? scope?.get(MARKLESS_WIDGET_INSTANCE_KEY);
+}
+
+/**
  * The nth member of this instance's roster to ask is the nth in it.
  *
  * Render walks a widget instance in document order, so counting the asks IS
  * that order — there is no DOM yet to compare against. The count is per widget
  * instance, which is what keeps a second collection on the page starting at
- * zero; the token is asked per family, exactly as a minted handle id asks it.
+ * zero.
  */
-export function marklessRenderRosterPosition(
+function renderRosterPosition(
 	positions: MarklessRosterPositions,
 	seeds: ReadonlyMap<string, unknown> | undefined,
 	rosterGraphNodeId: string,
 	handleGraphNodeId: string,
 ): number {
-	const scope = seeds ?? positions.seeds;
-	const family = rosterGraphNodeId.slice(0, rosterGraphNodeId.lastIndexOf('/'));
-	const instance =
-		scope?.get(marklessWidgetInstanceKey(family)) ?? scope?.get(MARKLESS_WIDGET_INSTANCE_KEY);
+	const instance = rosterInstance(seeds ?? positions.seeds, rosterGraphNodeId);
 	const key = `${String(instance)}|${rosterGraphNodeId}|${handleGraphNodeId}`;
 	const taken = positions.taken.get(key) ?? 0;
 	positions.taken.set(key, taken + 1);
 	return taken;
+}
+
+// A placeholder count, delimited by two private-use code points so nothing an
+// author can write collides with it and neither HTML escaping nor JSON changes
+// it. It never survives a render: the surface resolves every one it minted.
+export const MARKLESS_ROSTER_COUNT_OPEN = '\uE000';
+export const MARKLESS_ROSTER_COUNT_CLOSE = '\uE001';
+
+/**
+ * How many parts this instance puts in the roster - asked, unlike a position,
+ * by a part that may render BEFORE the members it is counting. The root asking
+ * `ui-max` is exactly that: server render is one forward pass.
+ *
+ * So the ask does not answer. It writes a placeholder naming the roster's own
+ * registration key — the widget instance's path then the module-level handle id,
+ * which is how marklessWidgetHandleId qualifies it at composition — and the
+ * surface resolves it once composition has made the count a fact.
+ */
+function renderRosterCount(
+	positions: MarklessRosterPositions,
+	seeds: ReadonlyMap<string, unknown> | undefined,
+	rosterGraphNodeId: string,
+): string {
+	const instance = rosterInstance(seeds ?? positions.seeds, rosterGraphNodeId);
+	const key = (typeof instance === 'string' ? instance : '') + rosterGraphNodeId;
+	positions.counted = true;
+	return MARKLESS_ROSTER_COUNT_OPEN + key + MARKLESS_ROSTER_COUNT_CLOSE;
+}
+
+/**
+ * The two roster questions a derive may ask at render time, on one context.
+ * Every render-side evaluation site hands the symbol this same object, so a
+ * compiled call cannot reach a regime that answers only one of them.
+ */
+export function marklessRosterRenderContext(
+	positions: MarklessRosterPositions | undefined,
+	seeds: ReadonlyMap<string, unknown> | undefined,
+): {
+	readonly rosterPosition?: (roster: string, handle: string) => number;
+	readonly rosterCount?: (roster: string) => string;
+} {
+	if (!positions) return {};
+	return {
+		rosterPosition: (roster, handle) => renderRosterPosition(positions, seeds, roster, handle),
+		rosterCount: (roster) => renderRosterCount(positions, seeds, roster),
+	};
 }
