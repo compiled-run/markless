@@ -1,14 +1,13 @@
 import { state } from '@markless/core';
 import { tokenbox } from '../../index.ts';
-import type { TokenBoxKeyedSegment } from '../tokenbox-types.ts';
+import type { TokenBoxSegment } from '../tokenbox-types.ts';
 
-// The controlled shape, and the one caret rule that comes with it: hold the
-// value on a state object and hand back exactly what `onChange` gave you. An
-// array the family emitted is passed over on the way back in, so the surface is
-// never re-rendered under the caret; a genuinely different array — the reset
+// The controlled shape: hold the value on a state object and hand back what
+// `onChange` gave you. The surface keys its runs on content and position, so an
+// echo patches nothing under the caret; a genuinely different value — the reset
 // button below — does re-render, which is the point of controlling it.
 export default function Controlled() @{
-	const own = state({ value: [] as readonly TokenBoxKeyedSegment[] });
+	const own = state({ value: [] as readonly TokenBoxSegment[] });
 	let held = state('');
 
 	<main>
@@ -17,7 +16,7 @@ export default function Controlled() @{
 			name="prompt"
 			triggers={['@']}
 			value={own.value}
-			onChange={(next: readonly TokenBoxKeyedSegment[]) => {
+			onChange={(next: readonly TokenBoxSegment[]) => {
 				own.value = next;
 				held = next
 					.map((one) => (one.kind === 'token' ? `[${one.value}]` : one.text))
@@ -32,8 +31,8 @@ export default function Controlled() @{
 			data-testid="reset"
 			onClick={() => {
 				own.value = [
-					{ kind: 'text', text: 'from ', id: 'r1' },
-					{ kind: 'token', value: 'u_9', label: 'Reset', id: 'r2' },
+					{ kind: 'text', text: 'from ' },
+					{ kind: 'token', value: 'u_9', label: 'Reset' },
 				];
 				held = 'from [u_9]';
 			}}

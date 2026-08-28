@@ -17,7 +17,7 @@
  */
 
 import { fromParts } from './token-walk.ts';
-import type { TokenBoxKeyedSegment } from './tokenbox-types.ts';
+import type { TokenBoxRect, TokenBoxSegment } from './tokenbox-types.ts';
 
 /** One token as the DOM currently has it: what it is, and the offsets it occupies. */
 export type PlacedToken = {
@@ -32,6 +32,19 @@ function documentOf(surface: HTMLElement): Document | undefined {
 }
 
 /**
+ * A run of the surface's text as a value, with the editor's own padding undone.
+ *
+ * Every engine stores a space that would collapse at the end of a line as U+00A0
+ * instead. That is how a contenteditable renders, not what the person typed, so
+ * it is normalised here — the one place the DOM's text becomes the value. The
+ * substitution is one character for one, so every offset the caret is measured in
+ * survives it.
+ */
+function asValueText(text: string): string {
+	return text.replace(/ /g, ' ');
+}
+
+/**
  * Where each token sits in the surface's flattened text, in document order.
  *
  * The width is measured off the token element rather than assumed from its
@@ -40,10 +53,11 @@ function documentOf(surface: HTMLElement): Document | undefined {
  */
 export function placedTokens(
 	surface: HTMLElement,
-	tokens: readonly HTMLElement[],
+	tokens: readonly HTMLElement[] | undefined,
 ): readonly PlacedToken[] {
 	const doc = documentOf(surface);
-	if (!doc) return [];
+	// A plural handle reads back undefined until the repeat has bound one.
+	if (!doc || tokens === undefined) return [];
 
 	const placed: PlacedToken[] = [];
 	for (const token of tokens) {
@@ -53,7 +67,7 @@ export function placedTokens(
 		upTo.setEndBefore(token);
 		const own = doc.createRange();
 		own.selectNode(token);
-		const rendered = own.toString();
+		const rendered = asValueText(own.toString());
 		placed.push({
 			start: upTo.toString().length,
 			end: upTo.toString().length + rendered.length,
@@ -67,10 +81,10 @@ export function placedTokens(
 /** Everything the surface currently reads as, tokens included. */
 export function surfaceText(surface: HTMLElement): string {
 	const doc = documentOf(surface);
-	if (!doc) return surface.textContent ?? '';
+	if (!doc) return asValueText(surface.textContent ?? '');
 	const whole = doc.createRange();
 	whole.selectNodeContents(surface);
-	return whole.toString();
+	return asValueText(whole.toString());
 }
 
 function selectionIn(surface: HTMLElement): Selection | undefined {
@@ -107,9 +121,25 @@ export function caretOffset(surface: HTMLElement): number | undefined {
  */
 export function readValue(
 	surface: HTMLElement,
-	tokens: readonly HTMLElement[],
-): readonly TokenBoxKeyedSegment[] {
+	tokens: readonly HTMLElement[] | undefined,
+): readonly TokenBoxSegment[] {
 	return fromParts(surfaceText(surface), placedTokens(surface, tokens));
+}
+
+/**
+ * The element at a position in a roster the family bound.
+ *
+ * The indexing happens here rather than at the call site because a graph read
+ * path has to be statically resolvable: `roster[someExpression]` cannot be
+ * recorded as a subscription, so the whole roster is handed over and a plain
+ * module picks from it — the same shape taglist's `elementForValue` uses.
+ */
+export function elementAt(
+	elements: readonly HTMLElement[] | undefined,
+	index: number,
+): HTMLElement | undefined {
+	if (elements === undefined || index < 0) return undefined;
+	return elements[index];
 }
 
 /**
@@ -151,7 +181,10 @@ export function selectionRange(
  * instead, which is a worse anchor but never a wrong one. A collapsed range
  * still reports a rect in every engine that ships anchor positioning.
  */
-export function rectBehindCaret(surface: HTMLElement, back: number): DOMRect | undefined {
+export function rectBehindCaret(
+	surface: HTMLElement,
+	back: number,
+): TokenBoxRect | undefined {
 	const doc = documentOf(surface);
 	const selection = selectionIn(surface);
 	const node = selection?.focusNode ?? undefined;
@@ -165,7 +198,16 @@ export function rectBehindCaret(surface: HTMLElement, back: number): DOMRect | u
 	} catch {
 		return undefined;
 	}
-	return run.getBoundingClientRect();
+	const box = run.getBoundingClientRect();
+	// Plain numbers: this rides in a graph cell, and a DOMRect does not serialize.
+	return {
+		top: box.top,
+		left: box.left,
+		width: box.width,
+		height: box.height,
+		bottom: box.bottom,
+		right: box.right,
+	};
 }
 
 /**

@@ -1,6 +1,6 @@
 import { state } from '@markless/core';
 import { tokenbox } from '../../index.ts';
-import type { TokenBoxKeyedSegment } from '../tokenbox-types.ts';
+import type { TokenBoxSegment } from '../tokenbox-types.ts';
 
 // A real form: one hidden input under the root's name carrying the whole value
 // as JSON, so a submit handler reads it back with `formData.get(name)` and
@@ -26,7 +26,7 @@ export default function PromptForm() @{
 				{ kind: 'text', text: 'hi ' },
 				{ kind: 'token', value: 'u_1', label: 'Alice Chen' },
 			]}
-			onChange={(next: readonly TokenBoxKeyedSegment[]) => {
+			onChange={(next: readonly TokenBoxSegment[]) => {
 				void next;
 			}}
 		>

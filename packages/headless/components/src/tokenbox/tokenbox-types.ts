@@ -1,17 +1,9 @@
 import type { PropsOf, Seeded } from '@markless/core';
 
-/**
- * One run of ordinary text in a tokenbox value.
- *
- * `id` is the family's own key for the rendered run. A consumer writing a
- * prefilled value leaves it out and the root mints one; a consumer echoing back
- * what `onChange` handed them keeps the one it carries, which is what stops an
- * echo from re-rendering the surface under the caret.
- */
+/** One run of ordinary text in a tokenbox value. */
 export type TokenBoxTextSegment = {
 	readonly kind: 'text';
 	readonly text: string;
-	readonly id?: string;
 };
 
 /**
@@ -26,7 +18,6 @@ export type TokenBoxTokenSegment = {
 	readonly kind: 'token';
 	readonly value: string;
 	readonly label: string;
-	readonly id?: string;
 };
 
 /**
@@ -35,9 +26,6 @@ export type TokenBoxTokenSegment = {
  * `string[]` with the typed text held outside it.
  */
 export type TokenBoxSegment = TokenBoxTextSegment | TokenBoxTokenSegment;
-
-/** A segment after the root has minted its key: the shape `onChange` reports. */
-export type TokenBoxKeyedSegment = TokenBoxSegment & { readonly id: string };
 
 /**
  * Where an autocomplete popover belongs, and what to search for.
@@ -55,6 +43,25 @@ export type TokenBoxTrigger = {
 	readonly start: number;
 	/** The caret's offset in the flattened value. */
 	readonly end: number;
+	/**
+	 * Where the trigger run sits on screen, for a popover to be anchored against.
+	 *
+	 * Plain numbers rather than a `DOMRect`, because this rides in a graph cell
+	 * that has to survive serialization. It spans trigger-to-caret when the
+	 * caret's own text node holds those characters, and falls back to the
+	 * collapsed caret rect when it does not — a worse anchor, never a wrong one.
+	 */
+	readonly rect: TokenBoxRect | undefined;
+};
+
+/** A screen rectangle as plain numbers, in viewport coordinates. */
+export type TokenBoxRect = {
+	readonly top: number;
+	readonly left: number;
+	readonly width: number;
+	readonly height: number;
+	readonly bottom: number;
+	readonly right: number;
 };
 
 /**
@@ -76,9 +83,10 @@ export type TokenBoxRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/**
 	 * The value, in order. Omit it and the box starts empty.
 	 *
-	 * Hold it on a state object rather than building a fresh array literal each
-	 * render: the root re-renders the surface when it is handed an array it did
-	 * not itself emit, and re-rendering a contenteditable moves the caret.
+	 * Handing back what `onChange` gave you is safe under the caret: the surface
+	 * keys its runs on content and position, so a value that comes back
+	 * structurally unchanged patches nothing. A genuinely different value does
+	 * re-render, which is what controlling it is for.
 	 */
 	readonly value?: readonly TokenBoxSegment[];
 	/**
@@ -108,7 +116,7 @@ export type TokenBoxRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
 	/** Submitted under this name by `tokenbox.field`, as one JSON string. */
 	readonly name?: string;
 	/** Called with the whole value every time it changes. */
-	readonly onChange?: (value: readonly TokenBoxKeyedSegment[]) => void;
+	readonly onChange?: (value: readonly TokenBoxSegment[]) => void;
 };
 
 /**
@@ -118,23 +126,21 @@ export type TokenBoxRootProps = Omit<PropsOf<'div'>, 'onChange'> & {
  *
  * `segments` is what the surface RENDERS. It is deliberately not written while a
  * person types: the browser is editing those text nodes, and a write would
- * re-render them out from under the caret. `emitted` is the last array handed to
- * `onChange`, and comparing it against the `value` prop by identity is what
- * tells a consumer's echo apart from a real external change.
+ * re-render them out from under the caret.
  */
 export type TokenBoxInstanceState = Seeded<
 	TokenBoxRootProps,
 	'disabled' | 'required' | 'invalid' | 'multiline' | 'triggers' | 'name'
 > & {
 	/** The rendered value. Written on structural changes only. */
-	segments: readonly TokenBoxKeyedSegment[];
+	segments: readonly TokenBoxSegment[];
 	/**
 	 * The value as it stands right now, including text the browser has typed into
 	 * the surface since the last structural change. This is what `tokenbox.field`
 	 * submits and what a consumer's own summary should read; `segments` is only
 	 * what was last rendered.
 	 */
-	reported: readonly TokenBoxKeyedSegment[];
+	reported: readonly TokenBoxSegment[];
 	/** The trigger context under the caret, or `undefined` when there is none. */
 	trigger: TokenBoxTrigger | undefined;
 	/** True between `compositionstart` and `compositionend`. Nothing mutates while it is up. */
@@ -161,6 +167,34 @@ export type TokenBoxLabelProps = PropsOf<'label'>;
  * and the family does not derive anything from them.
  */
 export type TokenBoxInputProps = PropsOf<'div'>;
+
+/**
+ * One choice in an autocomplete list: pressing it puts that token in the box,
+ * replacing whatever the trigger was searching on.
+ *
+ * This is a part rather than a method a consumer calls, and the reason is a hard
+ * compiler rule, not a style preference. Calling a `shared()` method compiles to
+ * copying the method's authored body into the calling handler's module; across
+ * files the definition's imports do not travel with the copy, so the build
+ * refuses (`MARKLESS_SHARED_METHOD_CROSS_MODULE`). The family therefore publishes
+ * the control that performs the insertion, and a consumer composes it.
+ *
+ * Everything else an autocomplete needs is ordinary state a consumer reads from
+ * `tokenbox.state()`: `trigger` carries the character, the query and the rect to
+ * anchor a popover against. Reads cross module boundaries fine; only calls do not.
+ */
+export type TokenBoxItemTriggerProps = Omit<PropsOf<'button'>, 'value'> & {
+	/** The token's value — what `onChange` reports and what the markup carries. */
+	readonly value: string;
+	/** The token's rendered text, and its accessible text. */
+	readonly label: string;
+};
+
+/**
+ * One instance per rendered `tokenbox.itemtrigger`, so the button's own handler
+ * reads the token it inserts off its instance rather than off a prop identifier.
+ */
+export type TokenBoxItemInstanceState = Seeded<TokenBoxItemTriggerProps, 'value' | 'label'>;
 
 /**
  * Supporting text, named by the surface's `aria-describedby`. Mount it alongside
