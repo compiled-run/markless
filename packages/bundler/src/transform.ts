@@ -67,15 +67,19 @@ import { emitSymbolBundleModule, planSymbolBundles } from './build/symbol-bundle
 // virtual modules) parse it as JS. Strip types at emission — Rolldown-native.
 // Loaded lazily: rolldown/experimental binds native code that must never enter
 // the browser module graph (dev client imports this file's module scope).
-let oxcTransformSyncPromise:
-	| Promise<typeof import('rolldown/experimental').transformSync | undefined>
+let oxcExperimentalPromise:
+	| Promise<typeof import('rolldown/experimental') | undefined>
 	| undefined;
-function loadOxcTransformSync() {
-	oxcTransformSyncPromise ??= import('rolldown/experimental').then(
-		(mod) => mod.transformSync,
+function loadOxcExperimental() {
+	oxcExperimentalPromise ??= import('rolldown/experimental').then(
+		(mod) => mod,
 		() => undefined,
 	);
-	return oxcTransformSyncPromise;
+	return oxcExperimentalPromise;
+}
+
+async function loadOxcTransformSync() {
+	return (await loadOxcExperimental())?.transformSync;
 }
 
 // Returning the raw code on failure ships TypeScript to a JS parser, so every
@@ -111,14 +115,17 @@ export async function stripEmittedTypes(
 }
 
 // An authored slice spliced into generated code. Reprinting one that carries no
-// TypeScript would inflate every module that has one, so a fragment oxc already
-// accepts as JS keeps its exact bytes and only a genuinely-TS one is rewritten.
-async function stripEmittedTypesFromFragment(
+// TypeScript would inflate every module that has one, so the fragment is parsed
+// as TypeScript and only a tree holding TypeScript-only syntax is rewritten.
+// A JavaScript parse cannot answer this: `pick<Limit>(x)` is valid JavaScript
+// with a different meaning — `(pick < Limit) > (x)` — so sniffing one shipped
+// the generic call verbatim.
+export async function stripEmittedTypesFromFragment(
 	code: string,
 	moduleId: string,
 	onlyRemoveTypeImports = false,
 ): Promise<string> {
-	if (await parsesAsJavaScript(code)) return code;
+	if (!(await fragmentCarriesTypeScript(code))) return code;
 	return (await stripEmittedTypes(code, moduleId, onlyRemoveTypeImports)).trim();
 }
 
@@ -132,14 +139,42 @@ async function stripEmittedTypesFromExpression(
 	return stripped.endsWith(';') ? stripped.slice(0, -1).trimEnd() : stripped;
 }
 
-async function parsesAsJavaScript(code: string): Promise<boolean> {
-	const oxcTransformSync = await loadOxcTransformSync();
-	if (!oxcTransformSync) return false;
+// A tree that will not parse as TypeScript is answered `true`, not `false`: the
+// verdict then belongs to the fail-closed strip, never to a silent pass-through.
+async function fragmentCarriesTypeScript(code: string): Promise<boolean> {
+	const parseSync = (await loadOxcExperimental())?.parseSync;
+	if (!parseSync) return true;
 	try {
-		return (oxcTransformSync('markless-emitted.js', code).errors?.length ?? 0) === 0;
+		const parsed = parseSync('markless-emitted.ts', code, { lang: 'ts' });
+		if ((parsed.errors?.length ?? 0) > 0) return true;
+		return carriesTypeScript(parsed.program);
 	} catch {
-		return false;
+		return true;
 	}
+}
+
+// The node fields that spell TypeScript on a node type JavaScript also has;
+// every purely type-level node already answers to the `TS` type-name prefix.
+const TYPESCRIPT_FLAGS = ['declare', 'abstract', 'definite', 'override', 'accessibility'] as const;
+
+function carriesTypeScript(node: unknown): boolean {
+	if (!node || typeof node !== 'object') return false;
+	if (Array.isArray(node)) return node.some((child) => carriesTypeScript(child));
+
+	const record = node as Record<string, unknown>;
+	if (typeof record.type === 'string' && record.type.startsWith('TS')) return true;
+	if (record.importKind === 'type' || record.exportKind === 'type') return true;
+	if (TYPESCRIPT_FLAGS.some((flag) => record[flag])) return true;
+	// `readonly` is TypeScript-only on a class member; an ordinary node never
+	// carries the field at all.
+	if (record.readonly === true) return true;
+	if (Array.isArray(record.implements) && record.implements.length > 0) return true;
+
+	for (const [key, value] of Object.entries(record)) {
+		if (key === 'type' || key === 'loc' || key === 'range' || key === 'parent') continue;
+		if (carriesTypeScript(value)) return true;
+	}
+	return false;
 }
 
 function typeStripError(moduleId: string, message: string): MarklessCompileError {
