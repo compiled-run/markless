@@ -29,12 +29,12 @@ export type GraphReadScope = {
 /**
  * Whether a method call on a read value counts as part of the read.
  *
- * A component edge says yes: `checked={group.value.includes(item.value)}` is the
- * only way to say "this item's membership", and with no route the child is seeded
- * once from a placeholder. A template position says no, deliberately: nothing
- * there is unexpressible without it, and a computed minted for every `.format()`
- * and `.toFixed()` in a page's text is cost with no behavior behind it. Widening
- * the template positions is its own change, with its own byte measurement.
+ * Both positions say yes. A component edge needs it for
+ * `checked={group.value.includes(item.value)}`, the only way to say "this item's
+ * membership"; a template position needs it because `{list.value.join('|')}` in
+ * markup otherwise renders once and never moves. Callers bound the cost with
+ * `requireWritableRead`, which drops a props-only call - nothing can move it after
+ * the render that read it.
  */
 /**
  * Whether a unary operator standing over the whole expression counts as part of
@@ -44,8 +44,7 @@ export type GraphReadScope = {
  * inverted flag, and the reads under the operator are already decomposed exactly
  * as `board.wide === false` decomposes them. Left out, the negation missed the
  * lift and fell through to the refusal, so the prop never reached the child. A
- * template position keeps the narrower gate: its byte output is measured, and
- * widening it is its own change with its own measurement.
+ * template position says yes for the same reason.
  */
 export type CompositeReadOptions = {
 	readonly methodCalls?: boolean;
