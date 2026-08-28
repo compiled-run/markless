@@ -471,7 +471,7 @@ test('CSR: a time stepped past a bound is pulled back to it', async () => {
 	await typeInto(Hour, '{Home}');
 	// Midnight is before the 09:00 floor, so the whole time settles on the bound.
 	await expect.poll(() => shown(Hour)).toBe('9');
-	expect(shown(Minute)).toBe('0');
+	await expect.poll(() => shown(Minute)).toBe('0');
 	expect(el<HTMLInputElement>(Field).value).toBe('09:00');
 
 	await typeInto(Hour, '{End}');
