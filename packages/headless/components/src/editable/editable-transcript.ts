@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 import { FAMILY_ANCHORS } from '../../../../../apps/sr-gallery/preview-server.ts';
 import { readUntil, type ScreenReaderDriver } from '../../test-support/driver.ts';
+import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
 
 /**
  * Expectations are `Conveys` facts rather than any reader's wording, so this file
@@ -12,9 +13,6 @@ import { readUntil, type ScreenReaderDriver } from '../../test-support/driver.ts
  * leaving it stranded on a control that just went `hidden`.
  */
 
-// The gallery is one page of many families, so a walk that starts at the top of
-// the document needs far more steps than the virtual lane's container walk.
-const WALK_LIMIT = 200;
 const LABEL = 'Document name';
 const VALUE = 'Quarterly plan';
 
@@ -22,14 +20,14 @@ export async function readEditableTranscript(sr: ScreenReaderDriver, page: Page)
 	const section = page.locator(`#${FAMILY_ANCHORS.editable.slice(2)}`);
 
 	// The preview carries the words, which is the whole naming decision.
-	await readUntil(sr, { role: 'button', name: VALUE }, WALK_LIMIT);
+	await readUntil(sr, { role: 'button', name: VALUE }, GALLERY_WALK_LIMIT);
 
 	await section.getByRole('button', { name: VALUE }).click();
 	const field = section.getByRole('textbox', { name: LABEL });
 	await expect(field).toBeVisible();
 	await expect(field).toBeFocused();
 
-	await readUntil(sr, { role: 'textbox', name: LABEL }, WALK_LIMIT);
+	await readUntil(sr, { role: 'textbox', name: LABEL }, GALLERY_WALK_LIMIT);
 
 	// And back: Escape returns the person to the control they started from, with
 	// the value they started with.

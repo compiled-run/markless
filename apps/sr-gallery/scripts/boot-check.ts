@@ -28,6 +28,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { chromium, type Locator, type Page } from '@playwright/test';
 import { FAMILY_ANCHORS, PREVIEW_ORIGIN, type FamilyName } from '../preview-server.ts';
+import { anchorTableDrift } from './anchor-table.ts';
 
 type AriaRole = Parameters<Page['getByRole']>[0];
 
@@ -141,6 +142,14 @@ const appDir = fileURLToPath(new URL('..', import.meta.url));
 const BOOT_TIMEOUT_MS = 120_000;
 const POLL_INTERVAL_MS = 250;
 const PREWARM_TIMEOUT_MS = 600_000;
+
+// Cheap and server-free, so it runs before anything is spawned.
+const drift = await anchorTableDrift();
+if (drift !== null) {
+	console.error(`::error::${drift}`);
+	process.exit(1);
+}
+console.log('apps/sr-gallery/README.md lists the anchors this server serves.');
 
 // A squatter on the port would answer waitForBoot for a server that never
 // bound, so the check would read someone else's tree and go green. Probe

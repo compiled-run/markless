@@ -6,6 +6,7 @@ import {
 	type Conveys,
 	type ScreenReaderDriver,
 } from '../../test-support/driver.ts';
+import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
 
 /**
  * Expectations are `Conveys` facts rather than any reader's wording, so this file
@@ -24,9 +25,6 @@ import {
  * that fails loudly if the `aria-labelledby` wiring breaks.
  */
 
-// The gallery is one page of many families, so a walk that starts at the top of
-// the document needs far more steps than the virtual lane's container walk.
-const WALK_LIMIT = 140;
 const CHANGE_TIMEOUT_MS = 15_000;
 
 /** Where the toolbar sits on the gallery page. */
@@ -42,17 +40,17 @@ export async function readToolbarTranscript(sr: ScreenReaderDriver, page: Page) 
 
 	// The bar is named by its label part. An unnamed toolbar tells a person only
 	// that some controls belong together, which is why the label is not optional.
-	const bar = await readUntil(sr, { name: 'Document' }, WALK_LIMIT);
+	const bar = await readUntil(sr, { name: 'Document' }, GALLERY_WALK_LIMIT);
 	expectConveys(sr, bar, { name: 'Document' });
 
 	// Three families' controls, three roles, one bar. This is the whole claim.
-	const align = await readUntil(sr, { role: 'button', name: 'Left' }, WALK_LIMIT);
+	const align = await readUntil(sr, { role: 'button', name: 'Left' }, GALLERY_WALK_LIMIT);
 	expectConveys(sr, align, { role: 'button', name: 'Left' });
 
-	const wrap = await readUntil(sr, { role: 'switch', name: 'Wrap lines' }, WALK_LIMIT);
+	const wrap = await readUntil(sr, { role: 'switch', name: 'Wrap lines' }, GALLERY_WALK_LIMIT);
 	expectConveys(sr, wrap, { role: 'switch', name: 'Wrap lines' });
 
-	const print = await readUntil(sr, { role: 'button', name: 'Print' }, WALK_LIMIT);
+	const print = await readUntil(sr, { role: 'button', name: 'Print' }, GALLERY_WALK_LIMIT);
 	expectConveys(sr, print, { role: 'button', name: 'Print' });
 
 	// An arrow moves the stop and activates nothing. The button group's own value

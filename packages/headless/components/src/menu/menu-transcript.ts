@@ -1,10 +1,12 @@
 import { expect, type Page } from '@playwright/test';
+import { FAMILY_ANCHORS } from '../../../../../apps/sr-gallery/preview-server.ts';
 import {
 	missingFacts,
 	readUntil,
 	type Conveys,
 	type ScreenReaderDriver,
 } from '../../test-support/driver.ts';
+import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
 
 /**
  * Expectations are `Conveys` facts rather than any reader's wording, so this file
@@ -21,11 +23,8 @@ import {
  * named by that item, and Escape steps out one level onto the item again.
  */
 
-// The menu section is not on the gallery page yet: adding it is the registration
-// unit's, and this limit is sized for a section near the end of that page.
-const WALK_LIMIT = 220;
 const CHANGE_TIMEOUT_MS = 15_000;
-const MENU_ANCHOR = '/#menu';
+const MENU_ANCHOR = FAMILY_ANCHORS.menu;
 const TRIGGER = 'Actions';
 const FIRST_ITEM = 'Cut';
 const SECOND_ITEM = 'Copy';
@@ -33,7 +32,6 @@ const SECOND_ITEM = 'Copy';
 const NESTING_ITEM = 'Share';
 const SUBMENU_ITEM = 'Email';
 
-/** The anchor the gallery section will carry. It moves to FAMILY_ANCHORS with the section itself. */
 export const MENU_SECTION = MENU_ANCHOR;
 const collapsedTrigger: Conveys = { role: 'button', name: TRIGGER, state: ['notExpanded'] };
 const collapsedNestingItem: Conveys = { name: NESTING_ITEM, state: ['notExpanded'] };
@@ -59,7 +57,7 @@ export async function readMenuTranscript(sr: ScreenReaderDriver, page: Page) {
 	const surface = section.getByRole('menu', { name: TRIGGER });
 
 	// Closed, the trigger is the whole message: a button, its name, and a surface that is not showing.
-	expectConveys(sr, await readUntil(sr, collapsedTrigger, WALK_LIMIT), collapsedTrigger);
+	expectConveys(sr, await readUntil(sr, collapsedTrigger, GALLERY_WALK_LIMIT), collapsedTrigger);
 	await expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
 
 	await sr.press(sr.keys.enter);
@@ -78,7 +76,7 @@ export async function readMenuTranscript(sr: ScreenReaderDriver, page: Page) {
 
 	// The nesting item is still a menu item, and it says a menu is there before it is opened.
 	const nesting = section.getByRole('menuitem', { name: NESTING_ITEM });
-	expectConveys(sr, await readUntil(sr, collapsedNestingItem, WALK_LIMIT), collapsedNestingItem);
+	expectConveys(sr, await readUntil(sr, collapsedNestingItem, GALLERY_WALK_LIMIT), collapsedNestingItem);
 	await expect(nesting).toHaveAttribute('aria-haspopup', 'menu');
 
 	// ArrowRight opens the submenu on its first command, and the item flips to expanded.
