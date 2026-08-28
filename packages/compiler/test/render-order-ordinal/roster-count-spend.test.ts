@@ -263,3 +263,43 @@ export function IcRoot({ children }) @{
 	expect(refusals(result)).toEqual([]);
 	expect(result.semanticGraph.elementRosterCounts).toBeUndefined();
 });
+
+/**
+ * tour's real forward gate, which is written with parentheses around the second
+ * arm. Authored parentheses are kept as AST nodes, and the walk out from the
+ * read has to step through one: without that, the same expression defers
+ * unparenthesized and is refused parenthesized - same precedence, opposite
+ * verdict, and nothing in the message names the parentheses.
+ */
+test('parentheses around a spend do not change the verdict', async () => {
+	const parenthesized = await compile(`
+export function IcTrigger({ off = false, loop = false }) @{
+	const w = ic();
+	const total = computed(() => w.itemEls.length);
+
+	<button type="button" disabled={off === true || (loop !== true && w.step >= total - 1)}>next</button>
+}
+`);
+	const bare = await compile(`
+export function IcTrigger({ off = false, loop = false }) @{
+	const w = ic();
+	const total = computed(() => w.itemEls.length);
+
+	<button type="button" disabled={off === true || loop !== true && w.step >= total - 1}>next</button>
+}
+`);
+
+	expect(refusals(parenthesized)).toEqual([]);
+	expect(refusals(bare)).toEqual([]);
+	expect(deferred(parenthesized)).toEqual([
+		{
+			source: 'off === true || (loop !== true && w.step >= total - 1)',
+			thunkSource:
+				'off === true || (loop !== true && w.step >= marklessCountValue(total) - 1)',
+		},
+	]);
+	// The two spellings defer the same expression, parentheses aside.
+	expect(deferred(parenthesized)[0]?.thunkSource.replace(/[()]/g, '')).toBe(
+		deferred(bare)[0]?.thunkSource.replace(/[()]/g, ''),
+	);
+});
