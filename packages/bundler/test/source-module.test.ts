@@ -798,6 +798,50 @@ test('a CSR mount installs the reconcile plane only when the payload carries com
 	).not.toContain('reconcile-plane');
 });
 
+// The live-roster half is pay-per-use through the specifier, not through a
+// runtime branch: the two modules that call it (the resume start-up wiring and a
+// sync computed's re-derive) run on every resumed page, so if either wrote
+// `import('@markless/web/fns/roster-resume')` every app would emit its chunk -
+// and, because the preload planner is exhaustive over dynamic edges, fetch it.
+// Writing the specifier here instead keeps it out of a build whose payload has
+// no computed nodes, which is exactly a payload that can hold no roster
+// derivation. Measured on the music-player-ssr fixture: naming it from the
+// runtime cost 1,423 gzip on page-load download, almost none of it code.
+test('the live-roster loader is named only where a roster derivation can exist', () => {
+	const withComputed = emitResumeModule({
+		...baseInput,
+		needsFullResume: true,
+		payloadState: {
+			cells: [{ graphNodeId: 'state:list' }],
+			computed: [{ graphNodeId: 'computed:rows', dependencies: [] }],
+		},
+	});
+	expect(withComputed).toContain(
+		"globalThis.__marklessRosterResume ??= () => import('@markless/web/fns/roster-resume');",
+	);
+
+	expect(
+		emitResumeModule({
+			...baseInput,
+			needsFullResume: true,
+			payloadState: { cells: [{ graphNodeId: 'state:count' }], computed: [] },
+		}),
+	).not.toContain('roster-resume');
+	expect(emitResumeModule({ ...baseInput, needsFullResume: true })).not.toContain('roster-resume');
+
+	// A CSR mount evaluates no resume module, so its rows would never be
+	// renumbered without the same line on the client source module.
+	expect(emitSourceModule({ ...baseInput, directCsr: true, hasComputedState: true })).toContain(
+		"globalThis.__marklessRosterResume ??= () => import('@markless/web/fns/roster-resume');",
+	);
+	expect(
+		emitSourceModule({ ...baseInput, directCsr: true, hasComputedState: false }),
+	).not.toContain('roster-resume');
+	expect(
+		emitSourceModule({ ...baseInput, environment: 'server', hasComputedState: true }),
+	).not.toContain('roster-resume');
+});
+
 /**
  * The row mint's specifier is written HERE or nowhere: `resume-keyed-repeats` is
  * loaded by every repeat, so naming the mint there would put its chunk in every

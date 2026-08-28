@@ -22,6 +22,19 @@ type ResumeSyncComputedRecord = {
 	}>;
 };
 
+/**
+ * The live-roster reader, loaded through the app's own resume module.
+ *
+ * The `import()` specifier is NOT written here: every sync computed on every
+ * resumed page runs this file, so naming the module - or `fns/instance-scope`
+ * behind it - would emit a chunk for all of them. Reached through the global,
+ * the roster module imports instance-scope STATICALLY, so it links the chunk
+ * the dispatch core already carries instead of forcing a re-export shim.
+ */
+type RosterResumeHost = {
+	readonly __marklessRosterResume?: () => Promise<typeof import('./fns/roster-resume.ts')>;
+};
+
 export async function refreshSyncComputed(input: {
 	readonly computed: ResumeSyncComputedRecord;
 	readonly graph: RuntimeGraph;
@@ -35,6 +48,9 @@ export async function refreshSyncComputed(input: {
 		read: graph.read,
 		element: input.root,
 		getElementHandle: input.elementHandles.get,
+		rosterPosition: (
+			await (globalThis as RosterResumeHost).__marklessRosterResume?.()
+		)?.createRosterPositionReader(input),
 	});
 	input.graph.write({
 		graphNodeId: input.computed.graphNodeId,

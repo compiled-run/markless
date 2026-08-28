@@ -3,6 +3,7 @@ import { readdir, readFile, rm } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { resolve } from 'pathe';
 import { expect, test } from 'vitest';
+import { withDemoBuildLock } from './helpers/demo-build-lock.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
@@ -23,8 +24,12 @@ const build = resolve(dist, 'build');
  * chunk COUNT moves under it, so this test guards the walls as much as the build.
  */
 test('the music-player build emits the same chunk graph twice from one tree', async () => {
-	const first = await buildOnce();
-	const second = await buildOnce();
+	// music-player-csr-budget.test.ts builds this same demo into this same dist/,
+	// and vitest runs the two files in parallel workers.
+	const { first, second } = await withDemoBuildLock(demo, async () => ({
+		first: await buildOnce(),
+		second: await buildOnce(),
+	}));
 
 	expect(second.chunkNames).toEqual(first.chunkNames);
 	expect(second.modulesByChunk).toEqual(first.modulesByChunk);
