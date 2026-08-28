@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import { tokenbox } from '../barrel.ts';
+import { tokenbox } from '../../index.ts';
 import type { TokenBoxKeyedSegment } from '../tokenbox-types.ts';
 
 // Two of them alive in one document: every handle read, every minted id and

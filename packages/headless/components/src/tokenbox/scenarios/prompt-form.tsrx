@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import { tokenbox } from '../barrel.ts';
+import { tokenbox } from '../../index.ts';
 import type { TokenBoxKeyedSegment } from '../tokenbox-types.ts';
 
 // A real form: one hidden input under the root's name carrying the whole value

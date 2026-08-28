@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import { tokenbox } from '../barrel.ts';
+import { tokenbox } from '../../index.ts';
 import type { TokenBoxKeyedSegment } from '../tokenbox-types.ts';
 
 // The controlled shape, and the one caret rule that comes with it: hold the

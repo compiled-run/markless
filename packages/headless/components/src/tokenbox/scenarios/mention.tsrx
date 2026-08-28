@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import { tokenbox } from '../barrel.ts';
+import { tokenbox } from '../../index.ts';
 import type { TokenBoxKeyedSegment } from '../tokenbox-types.ts';
 
 // The docs "prompt field" recipe in miniature, and the starter a consumer

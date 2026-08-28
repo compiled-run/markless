@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import { tokenbox } from '../barrel.ts';
+import { tokenbox } from '../../index.ts';
 import type { TokenBoxKeyedSegment } from '../tokenbox-types.ts';
 
 // A value that already interleaves text and tokens: the shape a saved draft is
