@@ -13,42 +13,62 @@ const sr = virtualDriver;
 /**
  * What one reader calls the facts a window splitter's announcement has to convey.
  *
- * None of these are slots in the shared `Vocabulary`, and unlike slider's table
- * **none of the role wording here has been captured yet**: the splitter is the
- * first `role="separator"` widget in this package, and this file was written
- * before the lane could be run on this tree. Every word nobody has heard is
- * `unobserved`, which `missing` skips rather than failing against a guess, so
- * these rows assert the name and the number and leave the role word to the first
- * run that captures it. Filling the role word in is the first job of whoever
- * runs this lane.
+ * None of these are slots in the shared `Vocabulary`: the role has no slot, and a
+ * value, a bound and an axis are spoken as a phrase around a number rather than
+ * as a fixed word, so they are written as functions. A reader whose wording for a
+ * fact has never been observed answers with the empty string, which `missing`
+ * below skips rather than failing against a word nobody has heard.
+ *
+ * One whole announcement, captured from the virtual reader on this tree, is what
+ * the virtual column is written from: "separator, Resize navigation, orientated
+ * vertically, max value 80, min value 10, 1 control, not disabled, current value
+ * 30%". Two of those a guess would have got wrong — the value arrives wrapped in
+ * "current value" and carries the `aria-valuetext` percent sign rather than a
+ * bare decimal, and `aria-controls` is spoken as a count of controlled elements.
  */
 type SplitterWords = {
 	readonly splitter: string;
 	readonly value: (amount: number) => string;
 	readonly bound: (edge: 'min' | 'max', amount: number) => string;
+	readonly along: (orientation: 'horizontal' | 'vertical') => string;
+	readonly controls: string;
+	readonly notDisabled: string;
 	readonly disabled: string;
 };
 
 const unobserved = () => '';
 
 const WORDS: Record<string, SplitterWords> = {
+	// measured: this reader's own output for our markup
 	virtual: {
-		splitter: '',
-		// With aria-valuetext present the reader speaks the text, not the bare number.
-		value: (amount) => `${amount}%`,
-		bound: unobserved,
+		splitter: 'separator',
+		value: (amount) => `current value ${amount}%`,
+		bound: (edge, amount) => `${edge} value ${amount}`,
+		along: (orientation) =>
+			`orientated ${orientation === 'vertical' ? 'vertically' : 'horizontally'}`,
+		controls: '1 control',
+		notDisabled: 'not disabled',
 		disabled: 'disabled',
 	},
+	// unverified against our markup: these readers speak a splitter and a value,
+	// but the phrase each wraps its numbers in has never been observed here, so
+	// every numeric row skips it.
 	NVDA: {
-		splitter: '',
+		splitter: 'splitter',
 		value: unobserved,
 		bound: unobserved,
+		along: unobserved,
+		controls: '',
+		notDisabled: '',
 		disabled: 'unavailable',
 	},
 	VoiceOver: {
-		splitter: '',
+		splitter: 'splitter',
 		value: unobserved,
 		bound: unobserved,
+		along: unobserved,
+		controls: '',
+		notDisabled: '',
 		disabled: 'dimmed',
 	},
 };
@@ -102,14 +122,25 @@ async function focusThumb(testid: string) {
 	return divider;
 }
 
-test('the divider conveys the name it was given', async () => {
+test('the divider conveys the splitter role and the name it was given', async () => {
 	await open(Basic);
 	expectConveys(await readFor(['Resize navigation']), [say.splitter, 'Resize navigation']);
 });
 
-test('the divider conveys the size of the panel it resizes', async () => {
+test('the divider conveys the size of the panel it resizes and the two limits it may move between', async () => {
 	await open(Basic);
-	expectConveys(await readFor(['Resize navigation']), [say.value(30), say.bound('min', 10), say.bound('max', 80)]);
+	expectConveys(await readFor(['Resize navigation']), [
+		say.value(30),
+		say.bound('min', 10),
+		say.bound('max', 80),
+	]);
+});
+
+// aria-controls is what APG requires of a window splitter, and this is the one
+// route that says a reader receives it rather than that the markup carries it.
+test('the divider conveys that it controls the panel it resizes', async () => {
+	await open(Basic);
+	expectConveys(await readFor(['Resize navigation']), [say.splitter, say.controls]);
 });
 
 test('stepping with an arrow key conveys the new size', async () => {
@@ -139,19 +170,46 @@ test('collapsing with Enter conveys the collapsed size', async () => {
 	await expectAnnouncesAfterChange([say.splitter, say.value(5)]);
 });
 
-test('a stacked group conveys its own divider and size', async () => {
+// The splitter's own axis is the perpendicular of the group's: panels stacked one
+// above the other are parted by a horizontal splitter, and this is what a reader
+// says about it.
+test('a stacked group conveys a horizontal splitter over its own size', async () => {
 	await open(Vertical);
-	expectConveys(await readFor(['Resize preview']), [say.splitter, 'Resize preview', say.value(60)]);
+	expectConveys(await readFor(['Resize preview']), [
+		say.splitter,
+		'Resize preview',
+		say.along('horizontal'),
+		say.value(60),
+	]);
 });
 
-// Both levels are one widget with one record, so both dividers read as splitters over their own panels.
-test('a nested group conveys a divider at each level', async () => {
+// Both levels are one widget with one record, so each divider reads as a splitter
+// over its own panel, on its own axis.
+test('a nested group conveys a divider at each level, on its own axis', async () => {
 	await open(Nested);
-	expectConveys(await readFor(['Resize navigation']), [say.splitter, say.value(30)]);
-	expectConveys(await readFor(['Resize preview']), [say.splitter, say.value(60)]);
+	expectConveys(await readFor(['Resize navigation']), [
+		say.splitter,
+		say.along('vertical'),
+		say.value(30),
+	]);
+	expectConveys(await readFor(['Resize preview']), [
+		say.splitter,
+		say.along('horizontal'),
+		say.value(60),
+	]);
 });
 
 test('a widget nobody may resize conveys that it is disabled', async () => {
 	await open(Disabled);
-	expectConveys(await readFor(['Resize navigation']), ['Resize navigation', say.disabled]);
+	const spoken = await readFor(['Resize navigation']);
+	expectConveys(spoken, ['Resize navigation', say.disabled]);
+	// "not disabled" must be missing outright, not merely contained in the phrase's other words.
+	expect(missing(spoken, [say.notDisabled]), `${sr.name} announced "${spoken}"`).toEqual([
+		say.notDisabled,
+	]);
+});
+
+test('a widget that can be resized conveys that it is not disabled', async () => {
+	await open(Basic);
+	expectConveys(await readFor(['Resize navigation']), [say.splitter, say.notDisabled]);
 });

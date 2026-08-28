@@ -78,27 +78,51 @@ and a focusable separator without one is announced as 50 by definition. Give
 family cannot compute an equal share itself, because a part does not know how
 many panels its group has.
 
-## Written but not run — this whole file set
+## The divider carries no name of its own
 
-The unit that built this family could not run the browser, ui or screen-reader
-lanes (no built package in its worktree; the lanes are machine-exclusive and run
-at fan-in). `pnpm typecheck` is green, which is evidence the shapes compile and
-nothing more. Everything below is therefore a claim awaiting its first run, and
-the first person to run these lanes should expect to fix rows rather than admire
-them:
+Attributes in a `.tsrx` resolve **first-wins**: a spread that follows an
+attribute never overrides it. A family-written `aria-label` on the divider
+therefore silenced every consumer's, which is what the ui rows caught on their
+first run. It is gone, and nothing replaced it — the navbar rule. Two dividers
+wearing the same invented word are landmarks a reader cannot tell apart, so the
+consumer names each one and `aria-valuetext` carries the size.
+
+## What the reader actually says
+
+Captured from the virtual reader on this tree, one whole announcement:
+
+> separator, Resize navigation, orientated vertically, max value 80, min value
+> 10, 1 control, not disabled, current value 30%
+
+Everything the family bet on is in there: the role is spoken, the perpendicular
+axis is spoken (a side-by-side group's divider is the *vertical* one),
+`aria-controls` arrives as "1 control", and `aria-valuetext` is what carries the
+value — as **"current value 30%"**, not as a bare number.
+
+That last part is what six sr rows got wrong on their first run. They asked for
+the segment `"30%"`, and `missing()` compares whole comma-separated segments, so
+a fact the reader really does convey looked absent. The family was serving the
+value correctly the whole time; the rows were asking in a phrasing no reader
+produces. `WORDS.virtual` now spells all of it out from the capture, and the
+comparison shape follows slider's precedent exactly — its `bound()` is
+`"min value 10"` here too.
+
+`aria-valuetext` is a deliberate divergence from slider, which ships none: a bare
+`30` announced for a splitter says nothing a person can act on, and `30%` does.
+
+## Written but not run — the browser rows
+
+The build unit could not run the browser or ui lanes. The sr lane has since been
+run (10 rows, green twice in isolation and once in the full lane), and the ui
+rows were run at fan-in: 51/51 after the label fix above. What is still unwitnessed:
 
 - **The pointer arithmetic** in `resizable.browser.ts` assumes the scenario boxes
   (400px wide, 300px tall) are what the lane lays out. A row that is off by a
   rounding step is arithmetic, not behaviour.
-- **`resizable.sr.ts` has no captured wording for the role.** This is the first
-  `role="separator"` widget in the package, so the virtual reader's word for it
-  has never been heard here; every role word in that file's table is `unobserved`
-  and therefore skipped, and the rows assert the name and the value only.
-  Capturing the real word and filling the table in is the first job of whoever
-  runs that lane.
-- **`aria-valuetext` is `"30%"`**, so a reader that speaks the text speaks a
-  percentage rather than a bare decimal. Slider deliberately ships no valuetext;
-  here the bare number would be meaningless.
+- **NVDA and VoiceOver.** `resizable-transcript.ts` is written and neither real
+  reader has run it. Their `WORDS` columns say `splitter` for the role on the
+  strength of the ARIA mapping alone and `unobserved` for every number, so those
+  rows skip the numeric facts rather than assert a guess.
 
 ## Registration is a follow-up
 

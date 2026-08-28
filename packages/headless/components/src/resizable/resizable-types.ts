@@ -106,8 +106,8 @@ export type ResizableItemInstanceState = Seeded<ResizableItemProps, 'value'> & {
  * its value. It resizes the panel it names and the panel that follows it in the
  * same group.
  *
- * Its accessible name defaults to "Resize"; write `aria-label` for something
- * better when a group has several dividers.
+ * It carries no name of its own: write `aria-label` on every divider, naming the
+ * panel it resizes, since a group with several of them needs them told apart.
  */
 export type ResizableThumbProps = PropsOf<'div'> & {
 	/** The name of the primary panel: the one this divider resizes and reports. */
