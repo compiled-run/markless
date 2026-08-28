@@ -262,8 +262,8 @@ const STAGE_ANCHORS = {
 	'interaction 1 marginal': { gzipBytes: 1_932, margin: 32 },
 	'interaction 2 marginal': { gzipBytes: 1_568, margin: 32 },
 	'interaction 3 marginal': { gzipBytes: 1_092, margin: 32 },
-	// +54: row-template slot qualification in the child keyed-repeat composition sites.
-	'first-navigation marginal': { gzipBytes: 23_387, margin: 128 },
+	// +79: row-template slot qualification in the child keyed-repeat composition sites (+54) and component-local handles keyed by host scope (+25).
+	'first-navigation marginal': { gzipBytes: 23_412, margin: 128 },
 } as const satisfies Record<string, StageAnchor>;
 
 let measured: BudgetMeasurement;
