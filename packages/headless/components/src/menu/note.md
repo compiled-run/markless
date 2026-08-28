@@ -2,7 +2,7 @@
 
 One family for both menus a person meets: the one a button opens, and the one a
 right-click opens. Research memo:
-`goals/headless-components/notes/U539-menu-research.md` (read-only survey of
+the goal notes (read-only survey of
 React Aria, Base UI, Radix, Zag, Kobalte and the WAI-ARIA APG). Every reference
 that shipped both shapes ended up with one implementation and two ways in, and
 that is what this is: `menu.trigger` and `menu.contextarea` are two parts, not
