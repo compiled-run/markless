@@ -430,13 +430,16 @@ for (const mode of MODES) {
 		if (mode === 'CSR') await render(DisplayOnly);
 		else await renderSSR(DisplayOnly);
 
+		const blueBefore = closeFor('blue');
 		closeFor('green').focus();
 		await userEvent.keyboard('{Delete}');
 		await expect.poll(() => el(Held).textContent).toBe('red|blue');
-		// The highlight lands on the neighbour. Where DOM focus lands is not pinned
-		// here: the keyed repeat replaces the row's nodes, and the button this
-		// handler focused is gone by the time the browser applies it.
 		await expect.poll(() => at('item-blue').hasAttribute('ui-highlighted')).toBe(true);
+		// DOM focus, not just the highlight. The commit re-inserts the rows it
+		// keeps, so the button this handler focused is out of the document for part
+		// of it - the runtime re-lands the focus once the commit is done.
+		expect(closeFor('blue')).toBe(blueBefore);
+		expect(document.activeElement).toBe(closeFor('blue'));
 	});
 
 	test(`${mode}: focusing a tag moves the walk onto it`, async () => {
