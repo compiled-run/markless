@@ -413,19 +413,11 @@ test('CSR: typing in one field leaves its neighbour alone', async () => {
 	expect(item('app-item-', 2).getAttribute('ui-empty')).toBe('');
 });
 
-// Pinned on the construct-arm registration gap, with both halves of the
-// isolation. A box registers its place in the code by writing the family's
-// shared cell as it renders. That write lands when the box is written flat under
-// the root, and it still lands when the box is nested inside plain elements —
-// VerificationForm puts its six boxes inside a <div> and reports maxlength="6"
-// in both modes. It is dropped when the box instance comes out of a construct
-// arm: this @for scenario and the @if scenario below both paint their boxes and
-// both leave the shared length at 0, on CSR and SSR alike. Same part, same
-// statement, same index order, so the hosting construct is the whole cause.
-// Everything downstream of the count then reads empty, which is what these rows
-// see. The count claim for arm-delivered boxes lives here and in the row at the
-// bottom of this file; the arm rows that stayed green assert the painting only.
-test.skip('CSR: a box written by a loop follows the code like any other', async () => {
+// A box out of a construct arm used to leave the code's length at 0: the length
+// was a shared cell each box wrote as it rendered, and that write was dropped
+// inside an arm. The length is the family's roster of boxes now, so an arm is
+// just another place a box can stand.
+test('CSR: a box written by a loop follows the code like any other', async () => {
 	await render(ItemsFromData);
 	pasteInto(el<HTMLInputElement>(Field), '135');
 
@@ -580,8 +572,8 @@ test('SSR: a code arriving at once after resume fills every box', async () => {
 // because <otp.item> has to run to produce its content"), measured on this base
 // by compiling the scenario. That is a framework limit, not a family one, so the
 // scenario decides its arm from a module constant and this note carries the
-// verdict instead of a red row. What an arm carries is the painting; the count
-// those boxes register is dropped, so that half is the pinned row below.
+// verdict instead of a red row. An arm carries both halves now: the painting,
+// and the count the boxes make up.
 
 for (const mode of MODES) {
 	test(`${mode}: boxes delivered by an @if arm paint like boxes written flat`, async () => {
@@ -594,12 +586,9 @@ for (const mode of MODES) {
 	});
 }
 
-// The other half, pinned on the same construct-arm registration gap the @for row
-// above carries. Six boxes come out of the arm and the field still reports no
-// length at all, in both modes, where six boxes nested in a plain <div> report
-// six.
+// The other half of the arm claim: six boxes out of the arm are six boxes.
 for (const mode of MODES) {
-	test.skip(`${mode}: boxes delivered by an @if arm register the length of the code`, async () => {
+	test(`${mode}: boxes delivered by an @if arm make up the length of the code`, async () => {
 		if (mode === 'CSR') await render(ArmedLength);
 		else await renderSSR(ArmedLength);
 		expect(el<HTMLInputElement>(Field).getAttribute('maxlength')).toBe('6');
@@ -625,9 +614,7 @@ test('CSR: focusing a field that already holds a code puts the caret at the end'
 	await expect.poll(() => item('item-', 4).textContent).toBe('5');
 });
 
-// Pinned on the construct-arm registration gap: the arm paints its boxes, but
-// the length they register never reaches the field, so the code slices to empty.
-test.skip('CSR: an arm-delivered box follows the code like any other', async () => {
+test('CSR: an arm-delivered box follows the code like any other', async () => {
 	await render(ArmedLength);
 	pasteInto(el<HTMLInputElement>(Field), '13');
 

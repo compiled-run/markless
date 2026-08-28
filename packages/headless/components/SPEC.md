@@ -129,6 +129,13 @@ same parts — `item` containing `content` containing `item` — and every nesti
 There is no second root and no `sub*` prefix; activation reports to the one
 root.
 
+An item's position is derived from render order — its place in the family's own
+roster of bound elements — and a family never takes an index prop for it: a
+consumer numbering its own parts by hand is a rename, a reorder or a loop away
+from lying, and the family already knows. The count follows from the same
+roster. `tour.item` is the one part still taking `index`, migrating behind
+T042.
+
 ## Timing
 
 Family source never polls frames. A `requestAnimationFrame` retry loop that

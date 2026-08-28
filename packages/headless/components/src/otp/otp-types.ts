@@ -35,14 +35,12 @@ export type OtpFieldProps = Omit<PropsOf<'input'>, 'value' | 'style'>;
  * One box of the code. It draws its own character and reports `ui-empty` and
  * `ui-disabled` for styling, and it is `aria-hidden`: the boxes are decoration
  * over the single real input, which is what a reader announces instead.
+ *
+ * Which character it shows is where it stands among the boxes, so nothing is
+ * authored: writing the boxes is what sets the length of the code — six boxes,
+ * a six-character code.
  */
-export type OtpItemProps = PropsOf<'div'> & {
-	/**
-	 * Which character of the code this box shows, counting from 0. Writing the
-	 * boxes is what sets the length of the code: six boxes, a six-character code.
-	 */
-	readonly index: number;
-};
+export type OtpItemProps = PropsOf<'div'>;
 
 /**
  * A caret slot inside a box, for the consumer to style. It carries no state of
@@ -52,15 +50,14 @@ export type OtpItemProps = PropsOf<'div'> & {
 export type OtpItemIndicatorProps = PropsOf<'span'>;
 
 /**
- * The shared instance every otp part reads: the root's seeded fields, the length
- * the boxes register as they render, plus the two consumer callbacks the root
- * stores for `write()` to dispatch through.
+ * The shared instance every otp part reads: the root's seeded fields plus the
+ * two consumer callbacks the root stores for `commit()` to dispatch through.
+ * The length is not here — it is the family's roster of boxes.
  */
 export type OtpInstanceState = Seeded<
 	OtpRootProps,
 	'value' | 'disabled' | 'shiftPWManagers'
 > & {
-	length: number;
 	onChange?: OtpRootProps['onChange'];
 	onComplete?: OtpRootProps['onComplete'];
 };

@@ -15,10 +15,10 @@ export default function WithOnComplete() @{
 			}}
 		>
 			<otp.field data-testid="field" aria-label="Verification code" />
-			<otp.item index={0} data-testid="item-0" />
-			<otp.item index={1} data-testid="item-1" />
-			<otp.item index={2} data-testid="item-2" />
-			<otp.item index={3} data-testid="item-3" />
+			<otp.item data-testid="item-0" />
+			<otp.item data-testid="item-1" />
+			<otp.item data-testid="item-2" />
+			<otp.item data-testid="item-3" />
 		</otp.root>
 		<p data-testid="code">{log.code}</p>
 		<p data-testid="completions">{log.completions}</p>

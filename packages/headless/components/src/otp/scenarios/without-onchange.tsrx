@@ -5,9 +5,9 @@ import { otp } from '../../index.ts';
 export default function WithoutOnChange() @{
 	<otp.root data-testid="root">
 		<otp.field data-testid="field" aria-label="Verification code" />
-		<otp.item index={0} data-testid="item-0" />
-		<otp.item index={1} data-testid="item-1" />
-		<otp.item index={2} data-testid="item-2" />
-		<otp.item index={3} data-testid="item-3" />
+		<otp.item data-testid="item-0" />
+		<otp.item data-testid="item-1" />
+		<otp.item data-testid="item-2" />
+		<otp.item data-testid="item-3" />
 	</otp.root>
 }
