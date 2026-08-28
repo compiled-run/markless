@@ -477,8 +477,8 @@ export const families: readonly ChaosFamily[] = [
 			expect(document.body.style.overflow).toBe('hidden');
 
 			el('close').click();
+			// modal gates `hidden` on the backdrop, never the content (note.md; drawer identical)
 			await expect.poll(() => el('backdrop').hasAttribute('hidden')).toBe(true);
-			await expect.poll(() => el('content').hasAttribute('hidden')).toBe(true);
 			expect(document.body.style.overflow).toBe('');
 		},
 	},

@@ -495,3 +495,15 @@ node packages/typescript-plugin/src/tsc.ts -p packages/headless/components/chaos
 `test-support/vitest.config.ts` is excluded from the root config: `defineConfig`
 comes from `vitest` and `playwright()` from `vite-plus`, which ships its own copy
 of the vitest types, and the two do not unify.
+
+### Open exploratory findings (seed 96211224, filed 2026-08-28, untriaged)
+
+Found by a free exploratory run after the CI seed went fully green; replay-marginal rows vary
+with settle timing (the known residual). Each is a recovery-value mismatch — triage must first
+decide whether the recovery script assumes state the family never promised (the modal
+content-`hidden` precedent) before treating the family as defective.
+
+- numberbox / keyboard: recovery expected the committed value `'0'`, read `''`.
+- otp / mixed: recovery expected the code cleared to `''`, boxes read `'ra'`.
+- tour / mixed: recovery expected the tour dismissed (`false`), read `true`.
+- menu / keyboard: appeared in the free run at this seed, not in the pinned replay — timing-marginal.
