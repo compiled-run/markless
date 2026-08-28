@@ -1,5 +1,4 @@
 import { cleanup, render, renderSSR } from '@markless/vitest-browser';
-import { userEvent } from 'vite-plus/test/browser';
 import { afterEach, expect, test } from 'vitest';
 import Page from './page.tsrx';
 
@@ -17,11 +16,14 @@ function marks(container: ParentNode, mark: string, expected: number): HTMLEleme
 	return found;
 }
 
-// Focused rather than clicked: a click would spend the one gesture that opens
-// the demand-load window before the keydown gets there.
-async function pressArrowDownOn(control: HTMLElement): Promise<void> {
+// Dispatched synchronously rather than driven through `userEvent`: the trip out
+// to the browser driver and back is long enough for the handler module to land,
+// which closes the demand-load window this witness exists to hold open. A
+// synchronous keydown one statement after `focus()` is what a real first press
+// on a served page looks like, and what the menubar rows do.
+function pressArrowDownOn(control: HTMLElement): void {
 	control.focus();
-	await userEvent.keyboard('{ArrowDown}');
+	control.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
 }
 
 async function expectPressedItemsPanel(container: ParentNode, index: number, opens: string) {
@@ -41,7 +43,7 @@ async function expectPressedItemsPanel(container: ParentNode, index: number, ope
 async function expectColdGestureOpensItsOwnPanel(container: ParentNode) {
 	const controls = marks(container, 'bar-control', 2);
 
-	await pressArrowDownOn(controls[1]!);
+	pressArrowDownOn(controls[1]!);
 
 	await expect.poll(() => controls[1]!.getAttribute('data-presses')).toBe('1');
 	expect(controls[0]!.getAttribute('data-presses')).toBe('0');
@@ -63,10 +65,10 @@ test('SSR resume: a cold gesture on the second item opens the panel that item co
 async function expectWarmGestureOpensItsOwnPanel(container: ParentNode) {
 	const controls = marks(container, 'bar-control', 2);
 
-	await pressArrowDownOn(controls[0]!);
+	pressArrowDownOn(controls[0]!);
 	await expect.poll(() => controls[0]!.getAttribute('data-presses')).toBe('1');
 
-	await pressArrowDownOn(controls[1]!);
+	pressArrowDownOn(controls[1]!);
 	await expect.poll(() => controls[1]!.getAttribute('data-presses')).toBe('1');
 
 	const roots = marks(container, 'panel-root', 2);
