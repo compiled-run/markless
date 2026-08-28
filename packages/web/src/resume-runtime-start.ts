@@ -146,6 +146,12 @@ export async function startResumeRuntime(input: {
 				elementsByHostId: prepared.elementsByHostId,
 			},
 		);
+		(await import('./fns/roster-position.ts')).wireRosterRevisions({
+			graph: runtimeInput.graph,
+			computed: runtimeInput.state?.computed ?? [],
+			keyedRepeats: runtimeInput.view.keyedRepeats ?? [],
+			storeContainerSubscription,
+		});
 	}
 	let settleTracker: AsyncBoundarySettleTracker | undefined;
 	if (runtimeInput.view.asyncBoundaries.length > 0) {

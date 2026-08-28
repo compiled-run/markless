@@ -39,7 +39,12 @@ import {
 import { prerenderBranchArm } from './branch-arm.ts';
 import { registerPrerenderStagedComputeds } from './staged-graph.ts';
 import { marklessThen, marklessWalk, type Awaitable } from '../ssr-data/awaitable.ts';
-import { sharedSeedPass } from './shared-seed-slot.ts';
+import {
+	marklessRenderRosterPosition,
+	marklessRosterPositions,
+	marklessRosterPositionSeeds,
+	sharedSeedPass,
+} from './shared-seed-slot.ts';
 import { branchArmIdrefResolution } from '../ssr-data/branch-arm-idrefs.ts';
 
 // This evaluator is the seam where a SERIALIZED protocol payload meets the
@@ -399,6 +404,7 @@ async function evaluatePrerenderDataSurface(
 		loadSymbol,
 		graph,
 		requireHtml,
+		sharedSeeds: marklessRosterPositionSeeds(),
 		...(fresh ? { freshBranchSiteId: fresh.branchSiteId, freshCellIds: fresh.cellIds } : {}),
 	});
 }
@@ -594,6 +600,22 @@ function evaluatePrerenderDataComponent(input: {
 			return readPath(input.boundGraphValues.get(graphNodeId), path);
 		return readPath(values.get(graphNodeId), path);
 	};
+	// A part may derive where it stands in its family's roster. First paint has no
+	// DOM, so the answer is the order this widget instance emits its members.
+	// A row minted after resume is its own small render, with no page seeds to
+	// count within: it starts from zero and the roster's revision renumbers it.
+	const positions =
+		marklessRosterPositions(input.sharedSeeds) ??
+		marklessRosterPositions(marklessRosterPositionSeeds())!;
+	const rosterPositionContext = {
+		rosterPosition: (rosterGraphNodeId: string, handleGraphNodeId: string) =>
+			marklessRenderRosterPosition(
+				positions,
+				input.sharedSeeds,
+				rosterGraphNodeId,
+				handleGraphNodeId,
+			),
+	};
 	const initials = definition.initialValues ?? [];
 	const derived = marklessWalk(initials.length, (index) => {
 		const initial = initials[index]!;
@@ -620,7 +642,7 @@ function evaluatePrerenderDataComponent(input: {
 				}
 				return marklessThen(
 					(loaded.length > 0
-						? loaded({ graph: { read }, read })
+						? loaded({ graph: { read }, read, ...rosterPositionContext })
 						: loaded()) as Awaitable<unknown>,
 					(value) => {
 						values.set(initial.graphNodeId, value);
