@@ -13,35 +13,47 @@ The family is complete, registered, and its lanes are green in both render modes
 | --- | --- | --- |
 | `tour.root` | `div` | the family's state; `ui-open`, `ui-closed`, `ui-disabled`, `ui-max` (the tour's length). **No `anchor-scope`, ever** |
 | `tour.backdrop` | `div` | the spotlight - anchored to the current target, `box-shadow` dim, `pointer-events: none`, `hidden` with the tour |
-| `tour.item` | `div` | one step: `index`, `target`. Renders the card one component deeper |
+| `tour.item` | `div` | one step: `target`. Renders the card one component deeper |
 | `tour.title` | `h2` | the step's accessible name |
 | `tour.description` | `p` | wired through `aria-describedby` |
 | `tour.valuelabel` | `span` | "2 of 5", or the consumer's own text |
 | `tour.backtrigger` / `tour.forwardtrigger` | `button` | previous / next, `disabled` at the ends |
 | `tour.close` | `button` | dismisses the tour |
 
-`tour.state()` per widget: `open`, `step` (an index), `count` (each card writes
-`index + 1` as it renders), `target`, and `next()`, `prev()`,
-`close()`. `tour.itemstate()` per step: `target`.
+`tour.state()` per widget: `open`, `step` (an index), `target`, and
+`walk(direction, steps)`, `close()`. `tour.itemstate()` per step: `target`.
+There is no `count` cell: the length is `tour.itemEls.length`, derived in the
+part that spends it.
 
 Root props: `open`, `loop`, `closeOnInteractOutside`, `disabled`, `onChange`,
-`onOpenChange`. Item props: `index` (required), `target`. No placement prop: the
+`onOpenChange`. Item props: `target` only. No placement prop: the
 card ships `position-area: block-end` inside `@layer markless` and the consumer
 replaces it with one unlayered rule of their own.
 
-## A step learns its own place from a required `index` prop
+## A step learns its own place from the roster, not from a prop
 
-Ruled, and built: `tour.item` takes a required `index`, counting from zero, the
-same shape `otp.item` has. Currency is
-`computed(() => tour.open === true && tour.step === item.index)`, and it drives
-`hidden` and `ui-current` on the card. This works in CSR and SSR: the tour opens
-on the first step, the other cards stay hidden, Escape and an outside press close
-it, and axe is clean on the served page.
+`tour.item` takes no `index`. Every card binds itself into `tour.itemEls` and
+derives `at = computed(() => tour.itemEls.indexOf(mine))`; currency is
+`computed(() => tour.open === true && tour.step === at)`, driving `hidden` and
+`ui-current`. The length is `computed(() => tour.itemEls.length)`, derived once
+per part that spends it - each under its own name, because two components in one
+module declaring the same `const` collapse to a single cell.
 
-The three routes the earlier build measured as closed - a plural handle read
-inside a `computed()`, a shared write whose right-hand side reads the instance,
-and a creation-order counter - are all still closed. The prop is what replaces
-them.
+A count is a placeholder the served page resolves, so it may only be spent where
+a markup text or host attribute slot prints it. `disabled={... >= forwardCount - 1}`
+and `` {`${tour.step + 1} of ${labelCount}`} `` are written inline for that
+reason: a second `computed()` holding the count publishes a binding nothing
+downstream resolves. **Parentheses refuse it too** - the deferral walk does not
+step through a parenthesized node, so `a || (b && c - 1)` is
+`MARKLESS_ROSTER_COUNT_NOT_A_NUMBER` and `a || b && c - 1` is not.
+
+`walk(direction, steps)` takes the length from its caller rather than off the
+handle, so the part that asked to move is the one holding the roster-dependent
+cell.
+
+**The CSR first paint is red on this shape, and the cause is outside the family.**
+See `goals/headless-components/notes/U738-tour-drop-index.md`: the prerender
+position reader counts asks, and the CSR path asks more than once per card.
 
 ## Declaration order names every widget root, and it is the whole ballgame
 
@@ -208,7 +220,7 @@ dismisses. `closeOnInteractOutside` governs everything else.
 **The incoming step's target reaches the family through focus, and that is not an
 accident of implementation.** No lifecycle runs when a step becomes current, and
 the incoming step's `target` lives in the incoming item's own instance, which no
-handler on the outgoing card can reach. So `next()` and `prev()` land focus on the
+handler on the outgoing card can reach. So `walk()` lands focus on the
 incoming card, and the card's own `onFocus` is where the family names the anchor,
 scrolls the target into view and publishes `tour.state().target`. The consequence
 to record: a tour the consumer opens by flipping `open`, with no gesture the
@@ -261,7 +273,7 @@ written that way on purpose.
 ## A consumer module cannot move a tour, and that decides what "controlled" means
 
 Measured while writing `scenarios/controlled.tsrx`: a handler in any module other
-than `tour.tsrx` may not call `tour.state().next()` or `prev()`. The
+than `tour.tsrx` may not call `tour.state().walk()`. The
 build refuses with `MARKLESS_SHARED_METHOD_CROSS_MODULE`, because calling a
 `shared()` method compiles by copying the method's authored body into the calling
 handler, and the copy arrives without this module's imports - `focusIntoCard`,
