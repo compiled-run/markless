@@ -29,12 +29,29 @@ export function widgetRootsOf(surface: PrerenderDataSurface, componentName: stri
 	// and names each component's own nodes by position, so ownership is the
 	// selection, never the whole payload.
 	const owned = new Set(ownedCellIds(child));
+	// A carrier holds an unseeded family's cells without rooting it, so ownership
+	// alone would read every part of such a family as a widget root of its own.
+	const carried = new Set(widgetFallbacksOf(surface, componentName) ?? []);
 	return (state.sharedDefinitions ?? []).flatMap((definition) =>
 		definition.scope === 'widget' &&
+		!carried.has(definition.id) &&
 		[...owned].some((graphNodeId) => graphNodeId.startsWith(definition.id + '/'))
 			? [definition.id]
 			: [],
 	);
+}
+
+/**
+ * The widget families a placed child CARRIES the cells of without rooting: a
+ * part of somebody else's widget, holding them only so a page that renders no
+ * designated root still has them. The CSR twin of the SSR render output's
+ * `widgetFallbacks` field.
+ */
+export function widgetFallbacksOf(
+	surface: PrerenderDataSurface,
+	componentName: string,
+): ReadonlyArray<string> | undefined {
+	return childSurfaceOf(surface, componentName)?.components[componentName]?.widgetFallbacks;
 }
 
 /**

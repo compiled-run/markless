@@ -120,6 +120,10 @@ export type PrerenderDataDefinition = {
 	// published by the compiler so a widget's seed phase can file them before any
 	// part renders. Absent when it binds none.
 	readonly boundElementHandles?: ReadonlyArray<string>;
+	// The widget families whose cells this component carries WITHOUT rooting: a
+	// part of somebody else's widget, holding the cells only so a page that
+	// renders no designated root still has them.
+	readonly widgetFallbacks?: ReadonlyArray<string>;
 	// Compiled by the same producer as the server module's reader; the browser
 	// never parses or evaluates authored source itself.
 	readonly readResidue?: (
@@ -955,6 +959,10 @@ function evaluatePrerenderDataComponent(input: {
 										childSurface,
 										edge.childComponentName,
 									),
+									widgetFallbacks: sharedSeedPass()?.widgetFallbacks?.(
+										childSurface,
+										edge.childComponentName,
+									),
 								});
 								return output;
 							},
@@ -1317,6 +1325,10 @@ function renderRowComponentEdge(
 											partSurface,
 											projectedEdge.childComponentName,
 										),
+										widgetFallbacks: sharedSeedPass()?.widgetFallbacks?.(
+											partSurface,
+											projectedEdge.childComponentName,
+										),
 									});
 									return partOutput;
 								},
@@ -1368,6 +1380,10 @@ function renderRowComponentEdge(
 						boundSymbols: edge.boundSymbols ?? {},
 						callbackProps: callbacks,
 						childrenWidgetRoot: sharedSeedPass()?.childrenWidgetRoot?.(
+							childSurface,
+							edge.childComponentName,
+						),
+						widgetFallbacks: sharedSeedPass()?.widgetFallbacks?.(
 							childSurface,
 							edge.childComponentName,
 						),

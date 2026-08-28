@@ -16,6 +16,7 @@ import {
 	widgetRootDefinitionIds,
 	elementHandleMarkerLine,
 	componentBoundElementHandles,
+	widgetFallbacksOutputField,
 	widgetRootMarkerLine,
 } from './shared-seed-pass.ts';
 import {
@@ -139,7 +140,7 @@ export function emitSameModuleSsrComponents(
 			'	const html = marklessSsrRendered.html;',
 			'	const marklessSsrComposition = marklessSsrComposeView(marklessSsrRendered.structure, payloadView, marklessSsrChildren, marklessSsrAsyncSnapshots, marklessSsrIdPrefix);',
 			`	const marklessSsrState = ${ssrComposeStateExpression(input, rootInfo.component, componentName)};`,
-			`	return { html, state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots), view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) }, elementCount: marklessSsrComposition.elementCount, propEvents: [], externalSymbolIds: marklessSsrComposition.externalSymbolIds, structure: marklessSsrRendered.structure, structureTokens: marklessSsrRendered.structureTokens${remapsGraphProps ? ', m(graphProps, instancePath) { marklessSsrRemapGraphOutput(this, graphProps, instancePath); }' : ''} };`,
+			`	return { html, state: marklessSsrAttachSnapshots(marklessSsrState, marklessSsrAsyncSnapshots), view: { ...marklessSsrComposition.view, branches: marklessSsrMergeBranches(marklessSsrComposition.view.branches, marklessSsrBranches) }, elementCount: marklessSsrComposition.elementCount, propEvents: [], externalSymbolIds: marklessSsrComposition.externalSymbolIds, structure: marklessSsrRendered.structure, structureTokens: marklessSsrRendered.structureTokens${widgetFallbacksOutputField(input, componentName)}${remapsGraphProps ? ', m(graphProps, instancePath) { marklessSsrRemapGraphOutput(this, graphProps, instancePath); }' : ''} };`,
 			'}',
 			sharedSeedMarkerLine(
 				componentSharedSeeds(input, componentName),

@@ -105,6 +105,13 @@ export type ComposeChild = {
 	readonly output?: ComposeChildOutput;
 	/** Build-time: the child-relative path of the composed widget root its children land in. */
 	readonly childrenWidgetRoot?: string;
+	/**
+	 * Build-time: the widget families this child CARRIES the cells of without
+	 * rooting. Which families' cells a child owns is not the same question as
+	 * which it starts — every resolver of a family nothing seeds owns them.
+	 * Absent means "roots what it carries", which is every seeded family.
+	 */
+	readonly widgetFallbacks?: ReadonlyArray<string>;
 	readonly [key: string]: unknown;
 };
 
@@ -297,6 +304,7 @@ export function marklessRegisterComposedWidgets(children: ReadonlyArray<ComposeC
 				)
 			)
 				continue;
+			if (!marklessDesignatesWidget(child, definition.id)) continue;
 			roots.push(instancePath + definition.id);
 			// The same widget, registered again under the projection site a part sits at.
 			const rootPath = instancePath + marklessInstancePath(definition.id);
@@ -306,6 +314,26 @@ export function marklessRegisterComposedWidgets(children: ReadonlyArray<ComposeC
 	}
 	marklessRegisterWidgetInstanceIds(roots);
 	marklessRegisterWidgetProjections(projections);
+}
+
+/**
+ * Whether a composed child STARTS this widget family or is a part of it.
+ *
+ * The cells alone cannot answer: a family nothing seeds hands them to every
+ * component that resolves it, so a page that renders none of the designated
+ * root still has them. An id the child already composed carries a root path of
+ * its own, which is the deeper level's answer, not this one's.
+ */
+function marklessDesignatesWidget(child: ComposeChild, definitionId: string): boolean {
+	if (marklessInstancePath(definitionId).length > 0) return true;
+	// The compose child a render-data placement pushes is built by the PLACING
+	// module, which cannot see an imported child's mark; the child's own render
+	// output carries it for that path.
+	const carried =
+		child.widgetFallbacks ??
+		(child.output as { readonly widgetFallbacks?: ReadonlyArray<string> } | undefined)
+			?.widgetFallbacks;
+	return !carried?.includes(definitionId);
 }
 
 // The child-local ids a projected part spells this definition under: what deeper
@@ -417,6 +445,7 @@ function marklessComposedState<T extends ComposeStateDraft>(
 	childStates: ReadonlyArray<ComposeStateDraft>,
 ) {
 	marklessRegisterComposedWidgets(children);
+	marklessDropCarriedWidgetCells(children);
 	for (const child of children) {
 		const output = child.output;
 		if (!output?.state) continue;
@@ -447,10 +476,10 @@ function marklessComposedState<T extends ComposeStateDraft>(
 	];
 	return {
 		...state,
-		cells: [
-			...(state.cells ?? []),
-			...childStates.flatMap((childState) => childState.cells ?? []),
-		],
+		cells: marklessMergedWidgetCells(
+			[...(state.cells ?? []), ...childStates.flatMap((childState) => childState.cells ?? [])],
+			sharedDefinitions,
+		),
 		computed: [
 			...(state.computed ?? []),
 			...children.flatMap((child) =>
@@ -465,6 +494,61 @@ function marklessComposedState<T extends ComposeStateDraft>(
 		...(sharedDefinitions.length ? { sharedDefinitions } : {}),
 		...(sharedSeeds.length ? { sharedSeeds } : {}),
 	};
+}
+
+/**
+ * Drops a CARRIER's copy of a widget family's cells inside a repeat ROW.
+ *
+ * The cells are a guarantee, not an authority: a resolver of a family nothing
+ * seeds carries them so a page that roots the family nowhere still has a graph
+ * to read. A part standing in a row has that guarantee already - the row either
+ * stands inside a rendered root or the family is page-wide - and one carried
+ * copy PER ROW is a widget the row never rooted. A minted row writes every cell
+ * of its composed state into the live graph unconditionally, so the carried
+ * factory default lands back over the value the widget just advanced.
+ */
+function marklessDropCarriedWidgetCells(children: ReadonlyArray<ComposeChild>): void {
+	for (const child of children) {
+		const state = child.output?.state;
+		if (!state?.cells?.length) continue;
+		if (!marklessComposedInstancePath(child).includes('r:')) continue;
+		const carried = new Set(
+			(state.sharedDefinitions ?? []).flatMap((definition) =>
+				definition.scope === 'widget' && !marklessDesignatesWidget(child, definition.id)
+					? [definition.id]
+					: [],
+			),
+		);
+		if (carried.size === 0) continue;
+		state.cells = state.cells.filter(
+			(cell) => !carried.has(cell.graphNodeId.slice(0, cell.graphNodeId.lastIndexOf('/'))),
+		);
+	}
+}
+
+// One widget instance is one graph, and every part of a family nothing seeds
+// carries the family's cells - so several children qualify onto the same node
+// id and the collapse must leave one. Only widget nodes are asked: two page-space
+// records spelling one id are somebody else's question and ride through as they
+// always have.
+function marklessMergedWidgetCells(
+	cells: ReadonlyArray<ComposeStateNode>,
+	sharedDefinitions: ReadonlyArray<ComposeSharedDefinition>,
+): ReadonlyArray<ComposeStateNode> {
+	const widgetIds = new Set(
+		sharedDefinitions.flatMap((definition) =>
+			definition.scope === 'widget' ? [definition.id] : [],
+		),
+	);
+	if (widgetIds.size === 0) return cells;
+	const taken = new Set<string>();
+	return cells.filter((cell) => {
+		const graphNodeId = cell.graphNodeId;
+		if (!widgetIds.has(graphNodeId.slice(0, graphNodeId.lastIndexOf('/')))) return true;
+		if (taken.has(graphNodeId)) return false;
+		taken.add(graphNodeId);
+		return true;
+	});
 }
 
 export function marklessCsrRemapGraphOutput(
