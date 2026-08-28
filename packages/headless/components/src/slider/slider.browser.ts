@@ -40,7 +40,10 @@ function customProperty(target: Element, name: string) {
 	return window.getComputedStyle(target).getPropertyValue(name).trim();
 }
 
-function pointer(target: Element, type: string, clientX: number, clientY: number) {
+// The mouse is pointer 1 and the platform always holds it; nothing holds this one.
+const UNTRACKED_POINTER = 9101;
+
+function pointer(target: Element, type: string, clientX: number, clientY: number, pointerId = 1) {
 	target.dispatchEvent(
 		new PointerEvent(type, {
 			bubbles: true,
@@ -48,7 +51,7 @@ function pointer(target: Element, type: string, clientX: number, clientY: number
 			buttons: 1,
 			clientX,
 			clientY,
-			pointerId: 1,
+			pointerId,
 			isPrimary: true,
 		}),
 	);
@@ -405,6 +408,37 @@ test('CSR: a drag keeps a thumb on its own side of the other one', async () => {
 
 	await expect.poll(() => el(StartThumb).getAttribute('aria-valuenow')).toBe('80');
 	expect(el(EndThumb).getAttribute('aria-valuenow')).toBe('80');
+});
+
+// A press can reach the family with its pointer already lifted - the runtime
+// replays a recorded press once its handler has loaded - and capturing a pointer
+// the platform is no longer tracking throws.
+test('CSR: a press from a pointer the platform is not tracking throws nothing', async () => {
+	await render(Basic);
+
+	const failures: string[] = [];
+	const record = (event: ErrorEvent) => failures.push(event.message);
+	const recordRejection = (event: PromiseRejectionEvent) => failures.push(String(event.reason));
+	window.addEventListener('error', record);
+	window.addEventListener('unhandledrejection', recordRejection);
+	try {
+		const at = alongTrack(0.25);
+		pointer(el(Track), 'pointerdown', at.x, at.y, UNTRACKED_POINTER);
+
+		await expect.poll(() => el(Thumb).getAttribute('aria-valuenow')).toBe('25');
+		expect(failures).toEqual([]);
+		pointer(el(Track), 'pointerup', at.x, at.y, UNTRACKED_POINTER);
+
+		// And the next ordinary gesture still moves the value.
+		downTrack(0.6);
+		moveTrack(0.7);
+		upTrack(0.7);
+		await expect.poll(() => el(Thumb).getAttribute('aria-valuenow')).toBe('70');
+		expect(failures).toEqual([]);
+	} finally {
+		window.removeEventListener('error', record);
+		window.removeEventListener('unhandledrejection', recordRejection);
+	}
 });
 
 test('CSR: a slider nobody may change ignores the pointer and the keyboard', async () => {

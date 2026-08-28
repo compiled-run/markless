@@ -107,6 +107,8 @@ const GESTURE_ORIGIN = 1000;
 // not how long anything in this file actually took.
 const FLICK_LEGS = { first: 1, last: 2 } as const;
 const SLOW_LEGS = { first: 10, last: 510 } as const;
+// The mouse is pointer 1 and the platform always holds it; nothing holds this one.
+const UNTRACKED_POINTER = 9101;
 
 /**
  * One pointer sample.
@@ -116,7 +118,14 @@ const SLOW_LEGS = { first: 10, last: 510 } as const;
  * "this swipe was fast" has to say so in the samples; leaving it to how long a
  * macrotask happened to take makes the speed the machine's, not the row's.
  */
-function pointer(target: Element, type: string, x: number, y: number, time?: number) {
+function pointer(
+	target: Element,
+	type: string,
+	x: number,
+	y: number,
+	time?: number,
+	pointerId = 1,
+) {
 	const event = new PointerEvent(type, {
 		bubbles: true,
 		cancelable: true,
@@ -125,7 +134,7 @@ function pointer(target: Element, type: string, x: number, y: number, time?: num
 		clientX: x,
 		clientY: y,
 		pointerType: 'mouse',
-		pointerId: 1,
+		pointerId,
 		isPrimary: true,
 	});
 	if (time !== undefined) Object.defineProperty(event, 'timeStamp', { value: time });
@@ -574,6 +583,46 @@ test('CSR: a cancelled swipe puts the drawer back without reporting anything', a
 	await expect.poll(() => content.hasAttribute('ui-dragging')).toBe(false);
 	expect(el(Backdrop).hasAttribute('hidden')).toBe(false);
 	await expect.poll(() => offset(content)).toBe(0);
+});
+
+// A press can reach the family with its pointer already lifted - the runtime
+// replays a recorded press once its handler has loaded - and capturing a pointer
+// the platform is no longer tracking throws.
+test('CSR: a press from a pointer the platform is not tracking throws nothing', async () => {
+	await render(Basic);
+	await openBasic();
+	const content = el<HTMLElement>(Content);
+	const box = content.getBoundingClientRect();
+
+	const failures: string[] = [];
+	const record = (event: ErrorEvent) => failures.push(event.message);
+	const recordRejection = (event: PromiseRejectionEvent) => failures.push(String(event.reason));
+	window.addEventListener('error', record);
+	window.addEventListener('unhandledrejection', recordRejection);
+	try {
+		pointer(
+			content,
+			'pointerdown',
+			box.left + 4,
+			box.top + 4,
+			GESTURE_ORIGIN,
+			UNTRACKED_POINTER,
+		);
+
+		await expect.poll(() => content.hasAttribute('ui-dragging')).toBe(true);
+		expect(failures).toEqual([]);
+		pointer(content, 'pointerup', box.left + 4, box.top + 4, GESTURE_ORIGIN, UNTRACKED_POINTER);
+		await expect.poll(() => content.hasAttribute('ui-dragging')).toBe(false);
+		expect(el(Backdrop).hasAttribute('hidden')).toBe(false);
+
+		// And the next ordinary swipe still closes the drawer.
+		await swipe(content, 0, box.height * 0.4);
+		await expect.poll(() => el(Backdrop).hasAttribute('hidden')).toBe(true);
+		expect(failures).toEqual([]);
+	} finally {
+		window.removeEventListener('error', record);
+		window.removeEventListener('unhandledrejection', recordRejection);
+	}
 });
 
 // There is no handle part, so the surface's own area is the grab area, and a

@@ -12,7 +12,7 @@ import {
 	valueAtFraction,
 	valueText,
 } from './slider-math.ts';
-import { isRightToLeft, measureTrack } from './slider-track.ts';
+import { capturePointer, isRightToLeft, measureTrack } from './slider-track.ts';
 import type {
 	SliderInstanceState,
 	SliderLabelProps,
@@ -110,7 +110,7 @@ export const sliderState = shared(
 				slider.isDragging = true;
 
 				// Pointer capture rather than window listeners: the gesture keeps arriving here once the pointer leaves the track.
-				track.setPointerCapture(pointerId);
+				capturePointer(track, pointerId);
 
 				const thumbs = thumbEls ?? [];
 				const moved = side === 'start' ? thumbs[0] : thumbs[thumbs.length - 1];

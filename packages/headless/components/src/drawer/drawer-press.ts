@@ -52,6 +52,20 @@ export function isBackdropPressFinished(
 	return isArmed && isOnBackdrop(backdrop, target);
 }
 
+/**
+ * Captures the pointer, tolerating an id the platform is not tracking: a press
+ * replayed after its handler loaded can arrive with the pointer already lifted,
+ * and capturing one of those throws `NotFoundError` rather than doing nothing.
+ * The swipe runs without capture; only samples that reach the surface are seen.
+ */
+export function capturePointer(surface: HTMLElement, pointerId: number): void {
+	try {
+		surface.setPointerCapture(pointerId);
+	} catch (error) {
+		if (!(error instanceof DOMException) || error.name !== 'NotFoundError') throw error;
+	}
+}
+
 /** Where the swipe was last seen, in pixels toward closed, and when. */
 type SwipeReading = {
 	at: number;
