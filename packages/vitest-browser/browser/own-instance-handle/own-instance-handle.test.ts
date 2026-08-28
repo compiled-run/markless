@@ -1,5 +1,5 @@
 import { cleanup, render, renderSSR } from '@markless/vitest-browser';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test } from 'vitest';
 import NestPage from './nest-page.tsrx';
 import OutsidePage from './outside-page.tsrx';
 import PairPage from './pair-page.tsrx';
@@ -7,6 +7,35 @@ import PairPage from './pair-page.tsrx';
 // A handler on the part that BINDS a widget-scoped element() handle must reach
 // its own instance's element, at any nesting depth.
 afterEach(() => cleanup());
+
+const AMBIGUOUS = 'MARKLESS_ELEMENT_HANDLE_INSTANCE_AMBIGUOUS';
+
+// A resume refusal that runs off a handler lands on the window, and every row
+// here is a page whose handlers are supposed to resolve or to catch. Anything
+// this collects is an escaped refusal, not a passing row's business.
+const escaped: string[] = [];
+
+beforeEach(() => {
+	escaped.length = 0;
+	const note = (reason: unknown) => {
+		const code = (reason as { readonly code?: string } | null)?.code;
+		if (typeof code !== 'string') return false;
+		escaped.push(code);
+		return true;
+	};
+	const onRejection = (event: PromiseRejectionEvent) => {
+		if (note(event.reason)) event.preventDefault();
+	};
+	const onError = (event: ErrorEvent) => {
+		if (note(event.error)) event.preventDefault();
+	};
+	window.addEventListener('unhandledrejection', onRejection);
+	window.addEventListener('error', onError);
+	return () => {
+		window.removeEventListener('unhandledrejection', onRejection);
+		window.removeEventListener('error', onError);
+	};
+});
 
 function levels(container: ParentNode, mark: string, expected: number) {
 	const found = [...container.querySelectorAll<HTMLElement>(`[data-${mark}-content]`)];
@@ -131,7 +160,37 @@ async function expectOutsideRefused(container: ParentNode) {
 		.toBe('1');
 	expect(contents[0]!.getAttribute('data-outside-hit')).toBeNull();
 	expect(contents[1]!.getAttribute('data-outside-hit')).toBeNull();
+	// The refusal is loud where it was asked, and it stops there.
+	await expect
+		.poll(() => container.querySelector('[data-outside-page]')?.getAttribute('data-refused'))
+		.toBe(AMBIGUOUS);
+	expect(escaped).toEqual([]);
 }
+
+// Every level of the nest, clicked in turn: a handler reading the handle its own
+// level binds resolves that level, so no read falls back to the page-wide key
+// and no refusal runs off a handler onto the window.
+async function expectNoEscapedRefusal(container: ParentNode) {
+	const contents = levels(container, 'nest', 3);
+
+	for (const [index, content] of contents.entries()) {
+		content.click();
+		await expect.poll(() => content.getAttribute('data-clicked')).toBe('1');
+		for (const [other, sibling] of contents.entries())
+			if (other > index) expect(sibling.getAttribute('data-clicked')).toBeNull();
+	}
+	expect(escaped).toEqual([]);
+}
+
+test('CSR: no refusal escapes the nest levels onto the window', async () => {
+	const screen = await render(NestPage);
+	await expectNoEscapedRefusal(screen.container as HTMLElement);
+});
+
+test('SSR resume: no refusal escapes the nest levels onto the window', async () => {
+	const screen = await renderSSR(NestPage);
+	await expectNoEscapedRefusal(screen.container as HTMLElement);
+});
 
 test('CSR: a page-level read of a two-instance handle is refused', async () => {
 	const screen = await render(OutsidePage);
