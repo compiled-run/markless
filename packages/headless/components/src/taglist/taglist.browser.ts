@@ -4,6 +4,7 @@ import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
 import Basic from './scenarios/basic.tsrx';
 import Capped from './scenarios/capped.tsrx';
+import ConsumerState from './scenarios/consumer-state.tsrx';
 import Disabled from './scenarios/disabled.tsrx';
 import DisplayOnly from './scenarios/display-only.tsrx';
 import Editable from './scenarios/editable.tsrx';
@@ -307,6 +308,9 @@ for (const mode of MODES) {
 		await expect.poll(() => el(Held).textContent).toBe('alpha|beta|gamma|delta');
 	});
 
+	// Pinned: the field's keyed repeat over the family's own value never mints a
+	// row for a tag the first render did not carry. Dropping a rendered tag and
+	// re-admitting it both work.
 	test.fails(`${mode}: the form field hands back one entry per tag under one name`, async () => {
 		if (mode === 'CSR') await render(TopicsForm);
 		else await renderSSR(TopicsForm);
@@ -321,6 +325,41 @@ for (const mode of MODES) {
 			new Event('submit', { bubbles: true, cancelable: true }),
 		);
 		await expect.poll(() => el(Submitted).textContent).toBe('news|sport');
+	});
+
+	test(`${mode}: the form field drops a tag the row started with, and takes it back`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+
+		closeFor('alpha').click();
+		await expect
+			.poll(() => [...el(Field).querySelectorAll('input')].map((one) => one.value))
+			.toEqual(['beta']);
+		await typeInto(Input, 'alpha,');
+		await expect
+			.poll(() => [...el(Field).querySelectorAll('input')].map((one) => one.value))
+			.toEqual(['beta', 'alpha']);
+	});
+
+	test(`${mode}: a consumer component inside the root reads the family's seeded state`, async () => {
+		if (mode === 'CSR') await render(ConsumerState);
+		else await renderSSR(ConsumerState);
+
+		const summary = at('summary');
+		expect(summary.getAttribute('ui-name')).toBe('topics');
+		expect(summary.getAttribute('ui-count')).toBe('2');
+		expect(summary.textContent).toBe('alpha|beta');
+	});
+
+	// Pinned: the attribute on this element refreshes on the same write, so the
+	// cell is subscribed - it is the text child over the same array that does not.
+	test.fails(`${mode}: a consumer component's text over the family's value refreshes`, async () => {
+		if (mode === 'CSR') await render(ConsumerState);
+		else await renderSSR(ConsumerState);
+
+		await typeInto(Input, 'gamma,');
+		await expect.poll(() => at('summary').getAttribute('ui-count')).toBe('3');
+		await expect.poll(() => at('summary').textContent).toBe('alpha|beta|gamma');
 	});
 
 	test(`${mode}: the field names the error before the hint, and reports itself invalid`, async () => {
