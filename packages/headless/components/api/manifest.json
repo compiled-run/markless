@@ -1571,7 +1571,7 @@
 						"name": "snapPoints",
 						"type": "readonly number[]",
 						"required": false,
-						"default": "[1]",
+						"default": "DEFAULT_SNAP_POINTS",
 						"doc": "The rest positions the drawer settles at, as fractions of the drawer's own\nsize along its axis. A value above 1 is read as pixels instead. Defaults to\n`[1]`: one position, fully open. Order does not matter."
 					},
 					{
@@ -1590,7 +1590,7 @@
 						"name": "closeThreshold",
 						"type": "number",
 						"required": false,
-						"default": "0.25",
+						"default": "CLOSE_THRESHOLD",
 						"doc": "How far past its lowest rest position the drawer has to be pulled before\nreleasing closes it, as a fraction of that position. Defaults to 0.25."
 					},
 					{
@@ -1617,6 +1617,141 @@
 				"part": "trigger",
 				"component": "DrawerTrigger",
 				"doc": "A consumer's `onClick` runs after the drawer has opened.",
+				"props": []
+			}
+		]
+	},
+	"editable": {
+		"parts": [
+			{
+				"part": "description",
+				"component": "EditableDescription",
+				"doc": "Supporting text, named by the `aria-describedby` of both the preview and the\ninput, so the hint is there in either mode.",
+				"props": []
+			},
+			{
+				"part": "error",
+				"component": "EditableError",
+				"doc": "The validation message, named ahead of `editable.description`. It carries\n`role=\"alert\"`, so a reader speaks it when it appears. Mounting it does not\nmark the value invalid: `invalid` is a prop on `editable.root`.",
+				"props": []
+			},
+			{
+				"part": "field",
+				"component": "EditableField",
+				"doc": "The form integration: one `input type=\"hidden\"` under the root's `name`,\ncarrying the committed value.\n\nA hidden input cannot carry `required`, which is why the root's `required`\nreaches a person through `aria-required` on the editing field rather than\nthrough the browser's own validation.",
+				"props": []
+			},
+			{
+				"part": "input",
+				"component": "EditableInput",
+				"doc": "The field the words are edited in, `hidden` until a session opens. Enter\ncommits, Escape gives the previous value back, and blur commits unless\n`cancelOnBlur` says otherwise.\n\nIt carries no `name`: `editable.field` is the one element a form receives, so\nthat a value reaches the form whether or not anyone ever opened a session.\nNative attributes the family does not own — `maxlength`, `spellcheck`,\n`inputmode` — pass straight through.",
+				"props": []
+			},
+			{
+				"part": "label",
+				"component": "EditableLabel",
+				"doc": "The value's name. It points at `editable.input` with `for`, names the root\nthrough `aria-labelledby`, and a click on it lands focus on whichever of the\ntwo elements is currently showing.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "EditableRoot",
+				"doc": "Inline rename: one string shown as a control a person presses, and edited in\nplace in a text field that takes the same room.\n\nThe preview control is `editable.trigger` — a real `<button>` carrying the\nvalue's own words, which is the established role for \"the control that\nactivates\". Ark's focusable `<span>` with an `aria-label` of \"edit\" is the\necosystem's shape and it loses the value from the announcement; the reasoning,\nand the rest of the survey, is in\n`goals/headless-components/notes/U698-editable.md`.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": false,
+						"doc": "The value now. Passing this makes the family controlled: a commit reports\nthrough `onChange` and the preview shows nothing new until the words come\nback in. Leave it out and the family keeps its own."
+					},
+					{
+						"name": "defaultValue",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The value an uncontrolled editable starts with. Omit it and it starts empty."
+					},
+					{
+						"name": "placeholder",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The words the preview shows while the value is empty, and the input's own\n`placeholder`. Give one to anything that can be empty: the preview is a\nbutton, and a button with no words has no accessible name."
+					},
+					{
+						"name": "editOnDoubleClick",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Two clicks open the session rather than one. A single click then does\nnothing — but Enter and Space on the preview still open it, because a\ngesture only a mouse can make is not a keyboard-operable control."
+					},
+					{
+						"name": "editOnFocus",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Landing on the preview at all opens the session, Tab included."
+					},
+					{
+						"name": "cancelOnBlur",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Moving focus out of the input gives the previous value back instead of\ntaking the words.\n\nOff by default, so blur commits: a person who clicked away from a field\nthey were typing in meant what they had written, which is the same ruling\ntaglist's per-tag edit already ships. Ark spells this end of the knob\n`submitMode: 'enter' | 'none'`; there are no mode enums here."
+					},
+					{
+						"name": "readonly",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The value is shown, not edited. The preview stays focusable and readable —\na read-only rename target is still a value somebody has to be able to hear —\nand no gesture opens a session."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nobody can open a session, and the preview leaves the tab order."
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "A value is needed before the form submits, reported as `aria-required`."
+					},
+					{
+						"name": "invalid",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The value is in an invalid state, reported as `aria-invalid` on the input."
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The name `editable.field` submits the value under."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: string) => void",
+						"required": false,
+						"doc": "Called with the new words every time a session commits a change."
+					},
+					{
+						"name": "onEditChange",
+						"type": "(editing: boolean) => void",
+						"required": false,
+						"doc": "Called with `true` when a session opens and `false` when it closes, however\nit closed. A commit that changed something calls `onChange` first.\n\nZag's `onValueCommit`/`onValueRevert` pair maps onto these two: the commit\nis `onChange`, and a revert is the `false` that arrives without one."
+					}
+				]
+			},
+			{
+				"part": "trigger",
+				"component": "EditableTrigger",
+				"doc": "The preview control. It renders the value rather than accepting children: a\npart cannot tell whether it was given any, so a fallback branch would render\nnothing for everybody.",
 				"props": []
 			}
 		]
