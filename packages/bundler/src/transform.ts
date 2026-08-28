@@ -19,10 +19,10 @@ import {
 import {
 	PROTOCOL_EVENT_ACTION_KIND,
 	createStorageSeedMetadataFromGraphNodeId,
+	jsonSourceWithNonFiniteNumbers,
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
 } from '@markless/serializer';
-import { jsonSourceWithNonFiniteNumbers } from './non-finite-json.ts';
 import type {
 	MarklessTransformManifest,
 	MarklessVirtualModule,
@@ -720,7 +720,7 @@ async function prerenderDataModuleSource(
 				await stripEmittedTypesFromFragment(line, `${renderDataId}:reader-declaration`),
 			);
 		}
-		const data = jsonSourceWithNonFiniteNumbers(record);
+		const data = jsonSourceWithNonFiniteNumbers(record) ?? 'undefined';
 		const reader = residueReaderSource
 			? await stripEmittedTypesFromExpression(
 					residueReaderSource,

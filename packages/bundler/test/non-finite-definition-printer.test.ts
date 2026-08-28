@@ -1,6 +1,9 @@
-import { deserializeGraphValue, type SerializedGraphPayload } from '@markless/serializer';
+import {
+	deserializeGraphValue,
+	jsonSourceWithNonFiniteNumbers,
+	type SerializedGraphPayload,
+} from '@markless/serializer';
 import { expect, test } from 'vitest';
-import { jsonSourceWithNonFiniteNumbers } from '../src/non-finite-json.ts';
 import { transformTsrxModule } from '../src/transform.ts';
 
 // The component definitions the browser lanes load are printed here, not by the
@@ -94,11 +97,13 @@ test('a payload with no non-finite number prints byte for byte as JSON', () => {
 // The marker the printer swaps in has to survive an authored string that spells
 // it: the string stays a string and only the real number becomes a name.
 test('an authored string spelling the marker is left as a string', () => {
-	const marker = '\u0000markless-non-finite0';
-	const source = jsonSourceWithNonFiniteNumbers({
-		decoy: marker,
-		cap: Number.POSITIVE_INFINITY,
-	});
+	const marker = ' markless-non-finite0';
+	const source = String(
+		jsonSourceWithNonFiniteNumbers({
+			decoy: marker,
+			cap: Number.POSITIVE_INFINITY,
+		}),
+	);
 
 	expect(JSON.parse(source.replace('Infinity', '1e400')) as { decoy: string }).toEqual({
 		decoy: marker,
