@@ -59,10 +59,10 @@ async function readBar() {
 
 // A hidden surface is not in the tree the reader walks, so the menu is opened
 // before the reader starts rather than driven open through it.
-async function readBarOpened(triggerId: string, panelId: string) {
+async function readBarOpened(itemId: string, panelId: string) {
 	const { container } = await render(Basic);
-	el(triggerId).focus();
-	el(triggerId).dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+	el(itemId).focus();
+	el(itemId).dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
 	await expect.poll(() => el(panelId).hasAttribute('hidden'), { timeout: 5000 }).toBe(false);
 	await sr.start(container as unknown as HTMLElement);
 }
@@ -108,14 +108,14 @@ test('the bar is conveyed as a menu bar under its own name, on its own axis', as
 	expectConveys(await readFor([say.menubar]), [say.menubar, 'Application', say.horizontal]);
 });
 
-test("every menu on the bar is conveyed as a menu item that holds a menu", async () => {
+test('every item on the bar is conveyed as a menu item that holds a menu', async () => {
 	await readBar();
 	for (const name of ['File', 'Edit', 'View']) {
 		expectConveys(await readFor([name, say.menuitem]), [name, say.menuitem, say.haspopup]);
 	}
 });
 
-test('moving across the bar announces each menu as one that has a submenu', async () => {
+test('moving across the bar announces each item as one that has a submenu', async () => {
 	await readBar();
 	el('bar-file').focus();
 	expectConveys(await sr.settleOnFocus(), ['File', say.menuitem, say.haspopup, say.collapsed]);
@@ -125,7 +125,7 @@ test('moving across the bar announces each menu as one that has a submenu', asyn
 	expectConveys(await sr.settleOnFocus(), ['Edit', say.menuitem, say.haspopup, say.collapsed]);
 });
 
-test('opening a menu flips its trigger to expanded and announces the menu under its name', async () => {
+test('opening an item flips it to expanded and announces the menu under its name', async () => {
 	await readBarOpened('bar-file', 'panel-file');
 	expectConveys(await readFor(['File', say.expanded]), ['File', say.menuitem, say.expanded]);
 	expectConveys(await readFor([say.menu, 'File']), [say.menu, 'File']);

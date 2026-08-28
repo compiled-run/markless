@@ -1,5 +1,4 @@
 import { computed, element, shared, state } from '@markless/core';
-import { menubarState } from '../menubar/menubar.tsrx';
 import { toolbarState } from '../toolbar/toolbar.tsrx';
 import { surfaceStyle } from './menu-anchor.ts';
 import {
@@ -176,12 +175,10 @@ export function MenuRoot({
 	menu.radio = radio;
 	menu.delay = delay;
 	menu.closeDelay = closeDelay;
-	// Registered so an enclosing bar knows which menu a gesture landed in; outside every bar this resolves to no instance.
-	const menubar = menubarState();
 
 	<div
 		{...rest}
-		el={[menu.rootEl, menubar.menuEls]}
+		el={menu.rootEl}
 		ui-open={menu.open}
 		ui-closed={menu.open !== true}
 		ui-disabled={menu.disabled}
@@ -208,28 +205,20 @@ export function MenuRoot({
 
 export function MenuTrigger({ children, onClick, onKeydown, ...rest }: MenuTriggerProps) @{
 	const menu = menuState();
-	const menubar = menubarState();
 	const toolbar = toolbarState();
 	const expandedMark = computed(() => (menu.open ? 'true' : 'false'));
-	// On a menu bar the trigger IS the bar item; a toolbar does not change what its controls are.
-	const triggerRole = computed(() => (menubar.mounted === true ? 'menuitem' : undefined));
-	const inBar = computed(() => menubar.mounted === true);
-	// Either bar writes the one roving stop onto its roster from its own handlers.
-	const stop = computed(() =>
-		menubar.mounted === true || toolbar.mounted === true ? -1 : undefined,
-	);
+	// A toolbar writes the one roving stop onto its roster from its own handlers.
+	const stop = computed(() => (toolbar.mounted === true ? -1 : undefined));
 
 	<button
 		{...rest}
-		el={[menu.triggerEl, menubar.triggerEls, toolbar.itemEls]}
+		el={[menu.triggerEl, toolbar.itemEls]}
 		type="button"
-		role={triggerRole}
 		aria-haspopup="menu"
 		aria-expanded={expandedMark}
 		aria-controls={menu.contentEl}
 		disabled={menu.disabled}
 		tabindex={stop}
-		ui-menubar={inBar}
 		ui-open={menu.open}
 		ui-closed={menu.open !== true}
 		onClick={(event) => {
@@ -261,10 +250,8 @@ export function MenuTrigger({ children, onClick, onKeydown, ...rest }: MenuTrigg
 
 			const key = event.key;
 			// Enter and Space stay the button's own activation: a lazy handler's preventDefault lands after the native dispatch, so opening here as well would toggle straight back shut.
-			// On a bar, Home and End walk it, so the trigger leaves them to the menubar.
-			const isEdgeKey = key === 'Home' || key === 'End';
 			const isOpenKey =
-				key === 'ArrowDown' || key === 'ArrowUp' || (isEdgeKey && menubar.mounted !== true);
+				key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End';
 			if (isOpenKey !== true || menu.disabled === true) {
 				onKeydown?.(event);
 				return;
@@ -280,9 +267,7 @@ export function MenuTrigger({ children, onClick, onKeydown, ...rest }: MenuTrigg
 	>
 		<style>
 			@layer markless {
-				/* Two subjects, one part: on a menu bar the trigger carries `menuitem`. */
-				button:not([role]),
-				button[role="menuitem"] { anchor-name: --ui-menu; }
+				button { anchor-name: --ui-menu; }
 			}
 		</style>
 		{children}
@@ -399,9 +384,7 @@ export function MenuContent({
 	...rest
 }: MenuContentProps) @{
 	const menu = menuState();
-	const menubar = menubarState();
 	const placement = computed(() => surfaceStyle(menu.position));
-	const inBar = computed(() => menubar.mounted === true);
 
 	<div
 		{...rest}
@@ -411,7 +394,6 @@ export function MenuContent({
 		role="menu"
 		aria-labelledby={menu.triggerEl}
 		hidden={menu.open !== true}
-		ui-menubar={inBar}
 		ui-open={menu.open}
 		ui-closed={menu.open !== true}
 		onContextmenu={(event) => {
@@ -490,8 +472,6 @@ export function MenuContent({
 					top: var(--y);
 					position-area: block-end span-inline-end;
 				}
-				/* A bar menu hangs straight under its trigger rather than running off to one side. */
-				[role="menu"][ui-menubar] { position-area: block-end; }
 			}
 		</style>
 		{children}

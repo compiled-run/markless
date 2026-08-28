@@ -47,6 +47,10 @@ function keyOn(target: Element, key: string) {
 	target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
 }
 
+function click(target: Element, detail = 1) {
+	target.dispatchEvent(new MouseEvent('click', { bubbles: true, detail }));
+}
+
 function hover(target: Element, from: Element | null = null) {
 	target.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, relatedTarget: from }));
 }
@@ -76,10 +80,10 @@ async function enter(rootId: string, firstId: string) {
 	await expectFocused(firstId);
 }
 
-/** Open one menu on the bar the way a keyboard does, and wait for its surface. */
-async function openBar(triggerId: string, panelId: string) {
-	el(triggerId).focus();
-	keyOn(el(triggerId), 'ArrowDown');
+/** Open one item's menu the way a keyboard does, and wait for its surface. */
+async function openBar(itemId: string, panelId: string) {
+	el(itemId).focus();
+	keyOn(el(itemId), 'ArrowDown');
 	await expectShowing(panelId);
 }
 
@@ -99,7 +103,7 @@ async function expectNoAxeViolations(scope: Element, phase: string) {
 for (const mode of MODES) {
 	// ── The bar and its items ────────────────────────────────────────────────
 
-	test(`${mode}: the bar is a horizontal menubar and each menu's own trigger is one of its items`, async () => {
+	test(`${mode}: the bar is a horizontal menubar whose items each hold a menu`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 
@@ -111,21 +115,18 @@ for (const mode of MODES) {
 		expect(root.hasAttribute('overlay')).toBe(false);
 
 		for (const id of ['bar-file', 'bar-edit', 'bar-view']) {
-			expect(el(id).localName, id).toBe('button');
 			expect(el(id).getAttribute('role'), id).toBe('menuitem');
-			expect(el(id).getAttribute('type'), id).toBe('button');
 			expect(el(id).getAttribute('aria-haspopup'), id).toBe('menu');
 			expect(el(id).getAttribute('aria-expanded'), id).toBe('false');
-			expect(el(id).hasAttribute('ui-menubar'), id).toBe(true);
 		}
 		expect(el('bar-file').getAttribute('aria-controls')).toBe(el('panel-file').id);
 		expect(el('panel-file').getAttribute('role')).toBe('menu');
 		expect(el('panel-file').getAttribute('aria-labelledby')).toBe(el('bar-file').id);
-		expect(el('panel-file').hasAttribute('ui-menubar')).toBe(true);
 		expect(el('panel-file').hasAttribute('hidden')).toBe(true);
-		// The menus are whole and unchanged: each keeps its own root, which carries no
-		// role of its own so the triggers stay the bar's own items.
-		expect(el('menu-file').hasAttribute('role')).toBe(false);
+		// The recursion's own shape: the menu a bar item drops down is written INSIDE it.
+		expect(el('bar-file').contains(el('panel-file'))).toBe(true);
+		// No second root: nothing inside the bar declares a menubar of its own.
+		expect(el('panel-file').getAttribute('role')).not.toBe('menubar');
 	});
 
 	test(`${mode}: the bar is named by its label part`, async () => {
@@ -148,7 +149,7 @@ for (const mode of MODES) {
 		expect(stopsOf(['bar-file', 'bar-edit', 'bar-view'])).toEqual(['-1', '-1', '-1']);
 	});
 
-	test(`${mode}: entering the bar lands on the first menu and the bar leaves the tab order`, async () => {
+	test(`${mode}: entering the bar lands on the first item and the bar leaves the tab order`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 
@@ -190,12 +191,10 @@ for (const mode of MODES) {
 		await expectFocused('bar-view');
 		keyOn(el('bar-view'), 'Home');
 		await expectFocused('bar-file');
-		// The trigger's own Home/End - which open its menu when it stands alone -
-		// belong to the bar here, so nothing opened.
 		expect(el('panel-file').hasAttribute('hidden')).toBe(true);
 	});
 
-	test(`${mode}: typeahead moves across the bar's triggers`, async () => {
+	test(`${mode}: typeahead moves across the bar's items`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 
@@ -209,7 +208,7 @@ for (const mode of MODES) {
 
 	// ── Opening, travelling, closing ─────────────────────────────────────────
 
-	test(`${mode}: ArrowDown opens a menu on its first command and ArrowUp on its last`, async () => {
+	test(`${mode}: ArrowDown opens an item's menu on its first command and ArrowUp on its last`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 
@@ -226,14 +225,22 @@ for (const mode of MODES) {
 		await expectFocused('item-zoom');
 	});
 
-	test(`${mode}: Enter and Space open a menu on its first command`, async () => {
+	test(`${mode}: Enter and Space open an item's menu on its first command`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 
 		el('bar-edit').focus();
-		el('bar-edit').dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }));
+		keyOn(el('bar-edit'), 'Enter');
 		await expectShowing('panel-edit');
 		await expectFocused('item-undo');
+
+		escape();
+		await expectClosed('panel-edit');
+
+		el('bar-view').focus();
+		keyOn(el('bar-view'), ' ');
+		await expectShowing('panel-view');
+		await expectFocused('item-wrap');
 	});
 
 	test(`${mode}: an arrow inside an open menu closes it and opens the neighbour's`, async () => {
@@ -254,7 +261,7 @@ for (const mode of MODES) {
 		await expectFocused('item-new');
 	});
 
-	test(`${mode}: an arrow on an open menu's own trigger travels too`, async () => {
+	test(`${mode}: an arrow on an open item travels too`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 
@@ -265,7 +272,7 @@ for (const mode of MODES) {
 		await expectClosed('panel-edit');
 	});
 
-	test(`${mode}: Escape closes the open menu and hands focus back to its trigger`, async () => {
+	test(`${mode}: Escape closes the open menu and hands focus back to its item`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 
@@ -279,18 +286,34 @@ for (const mode of MODES) {
 		expect(el('root').getAttribute('role')).toBe('menubar');
 	});
 
-	test(`${mode}: a command reports to its own menu and returns focus to its trigger`, async () => {
+	test(`${mode}: a command reports to the bar's own root and returns focus to its item`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 
 		await openBar('bar-edit', 'panel-edit');
-		el('item-undo').dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+		click(el('item-undo'));
 		await expect.poll(() => el('last').textContent, COLD_POLL).toBe('undo');
 		await expectClosed('panel-edit');
 		await expectFocused('bar-edit');
 	});
 
-	test(`${mode}: a checkbox item in a bar menu toggles and leaves the menu up`, async () => {
+	test(`${mode}: a command in a nested submenu reports to the same root`, async () => {
+		if (mode === 'CSR') await render(Basic);
+		else await renderSSR(Basic);
+
+		await openBar('bar-file', 'panel-file');
+		el('level-recent').focus();
+		keyOn(el('level-recent'), 'ArrowRight');
+		await expectShowing('panel-recent');
+
+		click(el('item-draft'));
+		await expect.poll(() => el('last').textContent, COLD_POLL).toBe('draft');
+		await expectClosed('panel-recent');
+		await expectClosed('panel-file');
+		await expectFocused('bar-file');
+	});
+
+	test(`${mode}: a checkbox command toggles and leaves the menu up`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 
@@ -298,12 +321,12 @@ for (const mode of MODES) {
 		expect(el('item-wrap').getAttribute('role')).toBe('menuitemcheckbox');
 		expect(el('item-wrap').getAttribute('aria-checked')).toBe('true');
 
-		el('item-wrap').dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+		click(el('item-wrap'));
 		await expect.poll(() => el('item-wrap').getAttribute('aria-checked'), COLD_POLL).toBe('false');
 		expect(el('panel-view').hasAttribute('hidden')).toBe(false);
 	});
 
-	// ── The nesting below a bar menu is the menu family's own ────────────────
+	// ── The nesting below one item is the menu family's own ──────────────────
 
 	test(`${mode}: a nested submenu keeps the shipped ArrowRight walk`, async () => {
 		if (mode === 'CSR') await render(Basic);
@@ -314,7 +337,7 @@ for (const mode of MODES) {
 		keyOn(el('level-recent'), 'ArrowRight');
 		await expectShowing('panel-recent');
 		await expectFocused('item-draft');
-		// ArrowRight opened the level below rather than travelling to the next menu.
+		// ArrowRight opened the level below rather than travelling to the next item.
 		expect(el('panel-edit').hasAttribute('hidden')).toBe(true);
 
 		keyOn(el('item-draft'), 'ArrowLeft');
@@ -323,7 +346,7 @@ for (const mode of MODES) {
 		expect(el('panel-file').hasAttribute('hidden')).toBe(false);
 	});
 
-	test(`${mode}: a bar menu hangs under its trigger where a nested one sits beside its item`, async () => {
+	test(`${mode}: an item's menu hangs under it where a nested one sits beside its command`, async () => {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 
@@ -349,11 +372,11 @@ for (const mode of MODES) {
 		// The page is served with File already open, which is also what wakes it: the
 		// gesture that wakes a served page cannot also be measured for time, so the
 		// bar is taken back to rest before the delay-free budget below is asked for.
-		// The close is a press on the trigger rather than Escape, because a surface
+		// The close is a press on the item rather than Escape, because a surface
 		// served open was never opened and so was never enlisted with the overlay
 		// stack that reports Escape.
 		await expectShowing('panel-file');
-		el('bar-file').dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+		click(el('bar-file'));
 		await expectClosed('panel-file');
 
 		hover(el('bar-view'));
@@ -376,7 +399,7 @@ for (const mode of MODES) {
 		await enter('first-root', 'file');
 		keyOn(el('file'), 'ArrowRight');
 		await expectFocused('edit');
-		// The second bar's menus are not in the first bar's roster, so the wrap comes
+		// The second bar's items are not in the first bar's roster, so the wrap comes
 		// back round inside this bar.
 		keyOn(el('edit'), 'ArrowRight');
 		await expectFocused('file');
@@ -393,10 +416,9 @@ for (const mode of MODES) {
 		else await renderSSR(TwoBars);
 
 		const loose = el('loose');
+		expect(loose.localName).toBe('button');
 		expect(loose.hasAttribute('role')).toBe(false);
 		expect(loose.hasAttribute('tabindex')).toBe(false);
-		expect(loose.hasAttribute('ui-menubar')).toBe(false);
-		expect(el('panel-loose').hasAttribute('ui-menubar')).toBe(false);
 
 		// It is not a destination in either bar's walk.
 		await enter('second-root', 'row');
@@ -410,9 +432,25 @@ for (const mode of MODES) {
 		await expectShowing('panel-loose');
 	});
 
-	// ── A menu in a toolbar ──────────────────────────────────────────────────
+	// ── A bar in a toolbar ───────────────────────────────────────────────────
 
-	test(`${mode}: a menu inside a toolbar keeps role="button" and joins the bar's roster`, async () => {
+	test(`${mode}: a menu bar inside a toolbar is one stop that hands focus to its items`, async () => {
+		if (mode === 'CSR') await render(InToolbar);
+		else await renderSSR(InToolbar);
+
+		// The bar gives up its own page stop to the toolbar it stands in.
+		expect(el('bar').getAttribute('tabindex')).toBe('-1');
+		expect(el('bar').getAttribute('role')).toBe('menubar');
+
+		await enter('root', 'print');
+		keyOn(el('print'), 'ArrowRight');
+		// One stop: the toolbar focuses the bar, which hands focus straight to its first item.
+		await expectFocused('bar-file');
+		keyOn(el('bar-file'), 'ArrowRight');
+		await expectFocused('bar-edit');
+	});
+
+	test(`${mode}: a menu inside a toolbar keeps its button and joins the toolbar's roster`, async () => {
 		if (mode === 'CSR') await render(InToolbar);
 		else await renderSSR(InToolbar);
 
@@ -420,23 +458,9 @@ for (const mode of MODES) {
 		expect(share.localName).toBe('button');
 		expect(share.hasAttribute('role')).toBe(false);
 		expect(share.getAttribute('aria-haspopup')).toBe('menu');
-		expect(share.hasAttribute('ui-menubar')).toBe(false);
 		expect(share.getAttribute('tabindex')).toBe('-1');
 
-		await enter('root', 'print');
-		keyOn(el('print'), 'ArrowRight');
-		await expectFocused('share');
-		keyOn(el('share'), 'ArrowRight');
-		await expectFocused('export');
-	});
-
-	test(`${mode}: a menu in a toolbar still opens on its own keys`, async () => {
-		if (mode === 'CSR') await render(InToolbar);
-		else await renderSSR(InToolbar);
-
-		await enter('root', 'print');
-		keyOn(el('print'), 'ArrowRight');
-		await expectFocused('share');
+		share.focus();
 		keyOn(el('share'), 'ArrowDown');
 		await expectShowing('panel-share');
 		await expectFocused('item-link');
@@ -449,10 +473,10 @@ for (const mode of MODES) {
 		await expectNoAxeViolations(screen.container as Element, 'the bar at rest');
 	});
 
-	test(`${mode}: axe finds no violation with a bar menu and a nested submenu open`, async () => {
+	test(`${mode}: axe finds no violation with an item's menu and a nested submenu open`, async () => {
 		const screen = mode === 'CSR' ? await render(Basic) : await renderSSR(Basic);
 		await openBar('bar-file', 'panel-file');
-		await expectNoAxeViolations(screen.container as Element, 'a bar menu open');
+		await expectNoAxeViolations(screen.container as Element, "an item's menu open");
 
 		el('level-recent').focus();
 		keyOn(el('level-recent'), 'ArrowRight');
@@ -460,9 +484,9 @@ for (const mode of MODES) {
 		await expectNoAxeViolations(screen.container as Element, 'a nested submenu open');
 	});
 
-	test(`${mode}: axe finds no violation on a menu inside a toolbar`, async () => {
+	test(`${mode}: axe finds no violation on a menu bar inside a toolbar`, async () => {
 		const screen = mode === 'CSR' ? await render(InToolbar) : await renderSSR(InToolbar);
-		await expectNoAxeViolations(screen.container as Element, 'a menu in a toolbar');
+		await expectNoAxeViolations(screen.container as Element, 'a bar in a toolbar');
 	});
 }
 
