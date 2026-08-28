@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import * as drawer from '../index.ts';
+import { drawer } from '../../index.ts';
 
 // No `onChange` at all. The drawer still opens, swipes and closes; the counter
 // beside it is only here to prove nothing was called.

@@ -1,4 +1,4 @@
-import * as drawer from '../index.ts';
+import { drawer } from '../../index.ts';
 
 // Recursive composition: a drawer inside a drawer's surface is the same parts,
 // and the inner root is its own widget-scoped instance. There is no nested root

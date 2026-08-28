@@ -1,4 +1,4 @@
-import * as drawer from '../index.ts';
+import { drawer } from '../../index.ts';
 
 // With neither a title nor a description, the naming references are omitted
 // rather than left pointing at ids no part put on the page.

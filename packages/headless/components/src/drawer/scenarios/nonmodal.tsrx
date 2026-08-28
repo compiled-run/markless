@@ -1,4 +1,4 @@
-import * as drawer from '../index.ts';
+import { drawer } from '../../index.ts';
 
 // The page behind stays live: no `aria-modal`, so the overlay behaviour leaves
 // the background reachable and the document scrollable. Everything else - the
