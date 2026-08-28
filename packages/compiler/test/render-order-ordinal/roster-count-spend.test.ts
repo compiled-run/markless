@@ -11,7 +11,10 @@ import { compileTsrxModule } from '../../src/index.ts';
  * not survive arithmetic or a comparison, which run against the placeholder
  * string and paint a wrong value nothing reports.
  *
- * This file pins where the compiler draws that line.
+ * A spend a markup text or attribute slot PRINTS is deferred instead of
+ * refused: the slot hands the whole expression over as a thunk and the page
+ * resolves it once the counts are facts. This file pins where the compiler
+ * draws that line, and which shapes a thunk still cannot reach.
  */
 
 const CODE = 'MARKLESS_ROSTER_COUNT_NOT_A_NUMBER';
@@ -57,7 +60,18 @@ export function IcRoot({ children }) @{
 	expect(result.semanticGraph.elementRosterCounts).toHaveLength(1);
 });
 
-test('arithmetic on the count in an attribute is refused, naming the derivation and the operation', async () => {
+function deferred(result: Awaited<ReturnType<typeof compile>>) {
+	return (result.semanticGraph.elementRosterCounts ?? []).flatMap(
+		(record) => record.deferred ?? [],
+	);
+}
+
+/**
+ * The count read inside a deferred thunk is lowered to a CALL, not left on the
+ * captured const: the const holds the placeholder this render minted and a
+ * closure cannot be rebound after composition.
+ */
+test('arithmetic on the count in an attribute is deferred, with the read lowered to a call', async () => {
 	const result = await compile(`
 export function IcRoot({ children }) @{
 	const w = ic();
@@ -67,21 +81,17 @@ export function IcRoot({ children }) @{
 }
 `);
 
-	const [refusal, ...rest] = refusals(result);
-	expect(rest).toEqual([]);
-	expect(refusal?.severity).toBe('error');
-	expect(refusal?.message).toContain('roster count "total"');
-	expect(refusal?.message).toContain('a "-" operation');
-	expect(refusal?.message).toContain('total - 1');
-	expect(refusal?.message).toContain('IcRoot');
+	expect(refusals(result)).toEqual([]);
+	expect(deferred(result)).toEqual([
+		{ source: 'total - 1', thunkSource: 'marklessCountValue(total) - 1' },
+	]);
 });
 
 /**
- * tour's forward-trigger gate, verbatim in shape. The refusal names the
- * innermost operation the count reaches, which is the one the author has to
- * move - the comparison around it is only wrong because the subtraction is.
+ * tour's forward-trigger gate, verbatim in shape. A boolean attribute defers
+ * WHOLE - presence is the value - which the renderer decides, not this pass.
  */
-test('a comparison built on the count is refused', async () => {
+test('a comparison built on the count is deferred', async () => {
 	const result = await compile(`
 export function IcTrigger() @{
 	const w = ic();
@@ -91,11 +101,77 @@ export function IcTrigger() @{
 }
 `);
 
+	expect(refusals(result)).toEqual([]);
+	expect(deferred(result)).toEqual([
+		{
+			source: 'w.step >= total - 1',
+			thunkSource: 'w.step >= marklessCountValue(total) - 1',
+		},
+	]);
+});
+
+/** Template math around the count is one expression, so it defers as one. */
+test('a template built with count arithmetic defers the whole template', async () => {
+	const result = await compile(`
+export function IcRoot({ children }) @{
+	const w = ic();
+	const total = computed(() => w.itemEls.length);
+
+	<div data-ic-root ui-label={\`\${w.step + 1} of \${total - 1}\`}>{children}</div>
+}
+`);
+
+	expect(refusals(result)).toEqual([]);
+	expect(deferred(result)[0]?.thunkSource).toContain('marklessCountValue(total) - 1');
+});
+
+/**
+ * The shapes a thunk cannot reach. A token is spliced back over the text a text
+ * or attribute slot printed; a prop crosses into another module's render as a
+ * string nobody there knows to resolve, and an arm test decides whether markup
+ * exists at all, long before there is a page to resolve against.
+ */
+test("a child component's prop spending the count is refused", async () => {
+	const result = await compile(`
+function IcLabel({ max }) @{
+	<span>{max}</span>
+}
+
+export function IcRoot() @{
+	const w = ic();
+	const total = computed(() => w.itemEls.length);
+
+	<div data-ic-root><IcLabel max={total - 1} /></div>
+}
+`);
+
 	const [refusal, ...rest] = refusals(result);
 	expect(rest).toEqual([]);
 	expect(refusal?.message).toContain('a "-" operation');
+	expect(deferred(result)).toEqual([]);
 });
 
+test('an arm test spending the count is refused', async () => {
+	const result = await compile(`
+export function IcRoot({ children }) @{
+	const w = ic();
+	const total = computed(() => w.itemEls.length);
+
+	<div data-ic-root>
+		@if (w.step >= total - 1) {
+			<span>last</span>
+		}
+		{children}
+	</div>
+}
+`);
+
+	expect(refusals(result)).toHaveLength(1);
+	expect(deferred(result)).toEqual([]);
+});
+
+/** A derive publishes a SECOND binding holding the placeholder, so it is refused
+ * however simple its body, and named by the innermost operation the count reaches. */
 test('a second computed deriving off the count is refused by its operation', async () => {
 	const result = await compile(`
 export function IcRoot({ children }) @{

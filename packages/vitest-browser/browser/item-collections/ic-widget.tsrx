@@ -5,9 +5,13 @@ import { orderedRoster, readPositions } from './ic-order.ts';
 // part whose position is the family's own business. No part takes an index
 // prop - the item asks the family's roster where it stands, and `survey()`
 // walks the same roster from a handler so the two readings can be compared.
+//
+// The root also SPENDS its count: `ui-last`, the `next` gate and the "n left"
+// text are arithmetic a render cannot do, because the count is a placeholder
+// until the page has composed. Those slots defer, and the page answers them.
 export const ic = shared(
 	() => {
-		const s = state({ seen: 'unread', count: 0, code: 'abcdef', armed: false });
+		const s = state({ seen: 'unread', count: 0, code: 'abcdef', armed: false, step: 0 });
 		const itemEls = element<HTMLDivElement[]>();
 
 		return {
@@ -24,6 +28,10 @@ export const ic = shared(
 			toggleArm() {
 				s.armed = s.armed !== true;
 			},
+			/** Walk forward one step, which is what the forward gate is measured against. */
+			next() {
+				s.step = s.step + 1;
+			},
 		};
 	},
 	{ scope: 'widget' },
@@ -39,12 +47,21 @@ export function IcRoot({ children }) @{
 		data-ic-root
 		ui-max={total}
 		ui-label={`of ${total}`}
+		ui-last={total - 1}
 		ui-count={w.count}
 		ui-seen={w.seen}
 		onClick={() => {
 			w.survey();
 		}}
-	>{children}<span data-ic-total>{total}</span><button
+	>{children}<span data-ic-total>{total}</span><span data-ic-left>{`${total - w.step - 1} left`}</span><button
+		type="button"
+		data-ic-next
+		disabled={w.step >= total - 1}
+		onClick={(event) => {
+			event.stopPropagation();
+			w.next();
+		}}
+	>next</button><button
 		type="button"
 		data-ic-write
 		onClick={(event) => {

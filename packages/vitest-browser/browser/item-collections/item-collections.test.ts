@@ -449,10 +449,123 @@ test('SSR: a flat instance recounts behind a removal', async () => {
 	expect(totals()).toEqual(['2', '2']);
 });
 
+// --- spending the count ------------------------------------------------------
+
+// The count is a placeholder while the render is still emitting the members it
+// counts, so an expression that SPENDS one cannot be evaluated where it stands.
+// The slot hands the whole expression over and the composed page answers it.
+// `ui-last` is arithmetic in an attribute value, the `next` gate is a BOOLEAN
+// attribute - where presence is the value, so the whole attribute has to defer -
+// and "n left" is template math in a text node.
+
+const lasts = () => roots().map((one) => one.getAttribute('ui-last'));
+const gates = () =>
+	[...document.querySelectorAll('[data-ic-next]')].map((one) =>
+		(one as HTMLButtonElement).disabled,
+	);
+const lefts = () =>
+	[...document.querySelectorAll('[data-ic-left]')].map((one) => one.textContent);
+
+test('CSR: the root spends its count in an attribute, a gate and text at first paint', async () => {
+	await render(StaticPage);
+
+	expect(lasts()).toEqual(['2']);
+	expect(gates()).toEqual([false]);
+	expect(lefts()).toEqual(['2 left']);
+});
+
+test('SSR: the root spends its count in an attribute, a gate and text at first paint', async () => {
+	await renderSSR(StaticPage);
+
+	expect(lasts()).toEqual(['2']);
+	expect(gates()).toEqual([false]);
+	expect(lefts()).toEqual(['2 left']);
+});
+
+// A boolean attribute answering false has to be ABSENT, not `disabled="false"`.
+test('SSR: a false gate writes no attribute at all', async () => {
+	await renderSSR(StaticPage);
+
+	expect(document.querySelector('[data-ic-next]')?.hasAttribute('disabled')).toBe(false);
+});
+
+test('CSR: a spent count follows an item arriving after resume', async () => {
+	await render(MutatingPage);
+	await userEvent.click(document.querySelector('[data-ic-add]') as HTMLElement);
+	await expect.poll(() => items().length, { timeout: 5000 }).toBe(4);
+
+	await expect.poll(lasts, { timeout: 5000 }).toEqual(['3']);
+	expect(lefts()).toEqual(['3 left']);
+});
+
+test('SSR: a spent count follows an item arriving after resume', async () => {
+	await renderSSR(MutatingPage);
+	await userEvent.click(document.querySelector('[data-ic-add]') as HTMLElement);
+	await expect.poll(() => items().length, { timeout: 5000 }).toBe(4);
+
+	await expect.poll(lasts, { timeout: 5000 }).toEqual(['3']);
+	expect(lefts()).toEqual(['3 left']);
+});
+
+test('CSR: a spent count follows an item leaving after resume', async () => {
+	await render(MutatingPage);
+	await userEvent.click(document.querySelector('[data-ic-drop-first]') as HTMLElement);
+	await expect.poll(() => items().length, { timeout: 5000 }).toBe(2);
+
+	await expect.poll(lasts, { timeout: 5000 }).toEqual(['1']);
+	expect(lefts()).toEqual(['1 left']);
+});
+
+test('SSR: a spent count follows an item leaving after resume', async () => {
+	await renderSSR(MutatingPage);
+	await userEvent.click(document.querySelector('[data-ic-drop-first]') as HTMLElement);
+	await expect.poll(() => items().length, { timeout: 5000 }).toBe(2);
+
+	await expect.poll(lasts, { timeout: 5000 }).toEqual(['1']);
+	expect(lefts()).toEqual(['1 left']);
+});
+
+// Two instances of one family each spend their OWN count, which is the whole
+// reason the answer is per widget instance rather than per page.
+test('CSR: two instances spend their own counts', async () => {
+	await render(TwoInstancesPage);
+
+	expect(lasts()).toEqual(['1', '2']);
+	expect(lefts()).toEqual(['1 left', '2 left']);
+});
+
+test('SSR: two instances spend their own counts', async () => {
+	await renderSSR(TwoInstancesPage);
+
+	expect(lasts()).toEqual(['1', '2']);
+	expect(lefts()).toEqual(['1 left', '2 left']);
+});
+
+// The gate closes exactly when the walk reaches the last member, which is the
+// shape a forward trigger is written in.
+test('CSR: the gate closes on the last step', async () => {
+	await render(StaticPage);
+	const next = document.querySelector('[data-ic-next]') as HTMLButtonElement;
+	await userEvent.click(next);
+	await userEvent.click(next);
+
+	await expect.poll(gates, { timeout: 5000 }).toEqual([true]);
+});
+
+test('SSR: the gate closes on the last step', async () => {
+	await renderSSR(StaticPage);
+	const next = document.querySelector('[data-ic-next]') as HTMLButtonElement;
+	await userEvent.click(next);
+	await userEvent.click(next);
+
+	await expect.poll(gates, { timeout: 5000 }).toEqual([true]);
+});
+
 // A count is a placeholder while the render is still emitting the members it
-// counts. Nothing the page ships may still be holding one - not the markup, and
-// not the resume payload a resumed page rewrites the attribute from.
-const PLACEHOLDER = /[\uE000\uE001]/;
+// counts, and a spent expression is a token standing for its answer. Nothing the
+// page ships may still be holding either - not the markup, and not the resume
+// payload a resumed page rewrites the attribute from.
+const PLACEHOLDER = /[\uE000-\uE004]/;
 
 test('CSR: no placeholder count survives the render', async () => {
 	await render(TwoInstancesPage);

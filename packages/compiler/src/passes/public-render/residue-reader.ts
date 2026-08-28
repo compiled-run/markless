@@ -1,4 +1,5 @@
 import { parseModule } from '../../js-ast.ts';
+import { COUNT_VALUE_PARAMETER } from '../semantic-graph/roster-count.ts';
 import type { PublicRenderModuleInput, SemanticMarkupResidue } from '../../artifacts.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
 import { sharedInstanceVisibleFrom } from '../semantic-graph/collect-shared.ts';
@@ -43,10 +44,40 @@ export function authoredResidueSources(chunks: RenderChunks): ReadonlyArray<stri
 export function authoredResidueReadCases(
 	sources: ReadonlyArray<string>,
 	strip?: (source: string) => string,
+	deferred?: DeferredCountCases,
 ): string[] {
-	return sources.map(
-		(source) => `case ${JSON.stringify(source)}:return (${strip ? strip(source) : source});`,
-	);
+	return sources.map((source) => {
+		const thunk = deferred?.bySource.get(source);
+		const body = strip ? strip(thunk ?? source) : (thunk ?? source);
+		return thunk === undefined
+			? `case ${JSON.stringify(source)}:return (${body});`
+			: `case ${JSON.stringify(source)}:return ${deferred!.deferCall}((${COUNT_VALUE_PARAMETER})=>(${body}));`;
+	});
+}
+
+export type DeferredCountCases = {
+	/** Authored residue source to the same expression with its count reads lowered. */
+	readonly bySource: ReadonlyMap<string, string>;
+	/** How this regime reaches the render's defer registry. */
+	readonly deferCall: string;
+};
+
+/**
+ * The residue expressions this component spends a roster count in. A count is a
+ * placeholder while the render is still emitting the members it counts, so the
+ * slot hands the whole expression over as a thunk and the page resolves it.
+ */
+export function deferredRosterCountCases(
+	input: PublicRenderModuleInput,
+	componentName: string,
+	deferCall: string,
+): DeferredCountCases | undefined {
+	const bySource = new Map<string, string>();
+	for (const record of input.semanticGraph.elementRosterCounts ?? []) {
+		if (record.componentName !== componentName) continue;
+		for (const entry of record.deferred ?? []) bySource.set(entry.source, entry.thunkSource);
+	}
+	return bySource.size > 0 ? { bySource, deferCall } : undefined;
 }
 
 /**
@@ -488,7 +519,17 @@ export function emitClientResidueReader(
 		mintCase,
 		lines.join(''),
 		`switch(residue.source){`,
-		authoredResidueReadCases(sources).join(''),
+		authoredResidueReadCases(
+			sources,
+			undefined,
+			// A render with no defer registry has already resolved its counts, so the
+			// thunk is due now; a placeholder reaching that reader is a bug, not a value.
+			deferredRosterCountCases(
+				input,
+				componentName,
+				`(${CONTEXT}.deferCount??((marklessThunk)=>marklessThunk((marklessHeld)=>{if(typeof marklessHeld!=='number')throw new Error('MARKLESS_ROSTER_COUNT_UNRESOLVED');return marklessHeld;})))`,
+			),
+		).join(''),
 		`default:throw new Error('MARKLESS_PRERENDER_RESIDUE_MISSING: '+residue.source);}}`,
 	].join('');
 }

@@ -1,4 +1,8 @@
 import type { Awaitable } from '../ssr-data/awaitable.ts';
+import {
+	MARKLESS_DEFERRED_COUNT_CLOSE,
+	MARKLESS_DEFERRED_COUNT_OPEN,
+} from '../ssr-data/deferred-count.ts';
 import type {
 	PrerenderDataDefinition,
 	PrerenderDataSurface,
@@ -121,6 +125,12 @@ export type MarklessRosterPositions = {
 	 * is work only a render that asked has to load or do.
 	 */
 	counted?: boolean;
+	/**
+	 * The count-spending expressions this render handed over unevaluated, in mint
+	 * order. Held per render rather than per module so two page renders in one
+	 * process never splice each other's answers.
+	 */
+	deferred?: Array<(count: (placeholder: unknown) => number) => unknown>;
 };
 
 export function marklessRosterPositions(
@@ -213,10 +223,27 @@ export function marklessRosterRenderContext(
 ): {
 	readonly rosterPosition?: (roster: string, handle: string) => number;
 	readonly rosterCount?: (roster: string) => string;
+	readonly deferCount?: (
+		thunk: (count: (placeholder: unknown) => number) => unknown,
+	) => unknown;
 } {
 	if (!positions) return {};
 	return {
 		rosterPosition: (roster, handle) => renderRosterPosition(positions, seeds, roster, handle),
 		rosterCount: (roster) => renderRosterCount(positions, seeds, roster),
+		// An expression that SPENDS a count cannot be answered where it stands, so
+		// the render keeps the expression and prints a token naming it. Nothing
+		// minted a placeholder means the counts are already numbers and it is due now.
+		deferCount: (thunk) =>
+			positions.counted
+				? MARKLESS_DEFERRED_COUNT_OPEN +
+					String((positions.deferred ??= []).push(thunk) - 1) +
+					MARKLESS_DEFERRED_COUNT_CLOSE
+				: thunk(resolvedCount),
 	};
+}
+
+function resolvedCount(value: unknown): number {
+	if (typeof value !== 'number') throw new Error('MARKLESS_ROSTER_COUNT_UNRESOLVED');
+	return value;
 }

@@ -31,6 +31,7 @@ import {
 	marklessSsrRosterCounted,
 	marklessSsrRosterPositionContext,
 } from './fns/roster-position.ts';
+import { marklessRosterPositions } from './prerender/shared-seed-slot.ts';
 import { derivePrerenderResumeRecords } from './prerender/evaluator.ts';
 
 export { prepareSsrResumeRecords } from './prerender/records.ts';
@@ -330,21 +331,45 @@ export async function renderSsrOutput(
 	if (typeof component === 'function') {
 		return marklessSsrRosterCounted(
 			context,
-			await (component as (props?: unknown, renderContext?: unknown) => SsrRenderOutput)(
-				props,
+			await marklessSsrDeferredCounted(
 				context,
+				await (component as (props?: unknown, renderContext?: unknown) => SsrRenderOutput)(
+					props,
+					context,
+				),
 			),
 		);
 	}
 	if (component && typeof component.renderSsr === 'function') {
 		return marklessSsrRosterCounted(
 			context,
-			await (
-				component.renderSsr as (props?: unknown, renderContext?: unknown) => SsrRenderOutput
-			)(props, context),
+			await marklessSsrDeferredCounted(
+				context,
+				await (
+					component.renderSsr as (props?: unknown, renderContext?: unknown) => SsrRenderOutput
+				)(props, context),
+			),
 		);
 	}
 	throw new TypeError('renderToString(App) requires a compiled TSRX artifact.');
+}
+
+/**
+ * The count-spending expressions this render handed over unevaluated. They are
+ * answered first: the placeholder resolver that runs after them only has plain
+ * count reads left to replace.
+ */
+async function marklessSsrDeferredCounted<Surface extends SsrRenderOutput>(
+	renderContext: unknown,
+	surface: Surface,
+): Promise<Surface> {
+	const seeds = (renderContext as { readonly sharedSeeds?: ReadonlyMap<string, unknown> } | null)
+		?.sharedSeeds;
+	const deferred = marklessRosterPositions(seeds)?.deferred;
+	if (!deferred || deferred.length === 0) return surface;
+	const roster = await (globalThis as RosterResumeHost).__marklessRosterResume?.();
+	if (!roster) throw new Error('MARKLESS_ROSTER_COUNT_UNRESOLVED');
+	return roster.marklessResolveDeferredCounts(surface, deferred);
 }
 
 /**

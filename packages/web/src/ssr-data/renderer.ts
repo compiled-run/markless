@@ -1,5 +1,10 @@
 import { marklessAttributeValue } from '../dom-attribute.ts';
 import {
+	MARKLESS_DEFERRED_COUNT_CLOSE,
+	MARKLESS_DEFERRED_COUNT_NAME,
+	MARKLESS_DEFERRED_COUNT_OPEN,
+} from './deferred-count.ts';
+import {
 	marklessIsThenable,
 	marklessSettled,
 	marklessThen,
@@ -905,7 +910,11 @@ function dynamicTag(value: unknown): string | null {
 	return tag;
 }
 
+// A deferred count answers after the page has composed, so an attribute
+// standing on one defers WHOLE: for a boolean, presence is the value.
 function renderAttribute(name: string, value: unknown): string {
+	if (typeof value === 'string' && value.startsWith(MARKLESS_DEFERRED_COUNT_OPEN))
+		return value.slice(0, -1) + MARKLESS_DEFERRED_COUNT_NAME + name + MARKLESS_DEFERRED_COUNT_CLOSE;
 	const text = marklessAttributeValue(name, value);
 	return text === null ? '' : ` ${name}="${escapeHtml(text)}"`;
 }
