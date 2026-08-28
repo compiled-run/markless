@@ -37,6 +37,7 @@
 		"./fileupload": "./src/fileupload/index.ts",
 		"./ink": "./src/ink/index.ts",
 		"./menu": "./src/menu/index.ts",
+		"./menubar": "./src/menubar/index.ts",
 		"./modal": "./src/modal/index.ts",
 		"./otp": "./src/otp/index.ts",
 		"./pad": "./src/pad/index.ts",

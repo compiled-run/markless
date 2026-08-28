@@ -46,6 +46,7 @@ export const FAMILY_ANCHORS = {
 	crop: '/#crop',
 	'crop-image': '/#crop-image',
 	menu: '/#menu',
+	menubar: '/#menubar',
 	colorpicker: '/#colorpicker',
 	togglegroup: '/#togglegroup',
 	numberbox: '/#numberbox',
