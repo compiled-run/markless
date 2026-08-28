@@ -18,6 +18,9 @@ export const VELOCITY_THRESHOLD = 0.4;
 /** How far past the lowest rest position a slow release closes the drawer. Ark's and Vaul's number. */
 export const CLOSE_THRESHOLD = 0.25;
 
+/** The one rest position a drawer has unless the consumer configures more. Ark's default. */
+export const DEFAULT_SNAP_POINTS: readonly number[] = [1];
+
 const EPSILON = 1e-6;
 
 /** One configured rest position: the value the consumer authored, and where it puts the drawer. */

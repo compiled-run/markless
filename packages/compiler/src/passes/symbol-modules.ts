@@ -262,6 +262,11 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 				sharedInstanceLocalNames(input.semanticGraph),
 				localNamesBySymbol,
 				sourceModuleScopeDeclaredNames(input.source),
+				new Set(
+					(input.semanticGraph?.moduleImports ?? []).map(
+						(moduleImport) => moduleImport.localName,
+					),
+				),
 			).map(unresolvedGraphReferenceDiagnostic),
 		],
 	};
@@ -558,6 +563,15 @@ type UnresolvedGraphReference = {
 	 */
 	readonly moduleDeclaration?: boolean;
 	/**
+	 * Whether an import in the same authored file binds the name.
+	 *
+	 * Same failure as `moduleDeclaration` and same blind spot — SSR evaluates the
+	 * authored module and stays green — but the repair is an import statement in
+	 * the emitted module rather than a copied declaration, so it takes its own
+	 * advice.
+	 */
+	readonly moduleImport?: boolean;
+	/**
 	 * The cross-module shared() method splice this name came out of.
 	 *
 	 * The three flags above are allowlist hits: the name is one this module
@@ -697,12 +711,14 @@ function unresolvedGraphReferences(
 	sharedInstanceNames: ReadonlySet<string>,
 	localNamesBySymbol: ReadonlyMap<string, ReadonlySet<string>>,
 	moduleDeclaredNames: ReadonlySet<string>,
+	moduleImportNames: ReadonlySet<string> = new Set(),
 ): ReadonlyArray<UnresolvedGraphReference> {
 	const anyCrossModuleInline = symbols.some((symbol) => crossModuleInlineOf(symbol) !== undefined);
 	if (
 		graphNames.size === 0 &&
 		localNamesBySymbol.size === 0 &&
 		moduleDeclaredNames.size === 0 &&
+		moduleImportNames.size === 0 &&
 		!anyCrossModuleInline
 	) {
 		return [];
@@ -716,7 +732,10 @@ function unresolvedGraphReferences(
 		const allowlisted = [...free]
 			.filter(
 				(name) =>
-					graphNames.has(name) || localNames.has(name) || moduleDeclaredNames.has(name),
+					graphNames.has(name) ||
+					localNames.has(name) ||
+					moduleDeclaredNames.has(name) ||
+					moduleImportNames.has(name),
 			)
 			.sort()
 			.map((name) => ({
@@ -738,6 +757,14 @@ function unresolvedGraphReferences(
 				!graphNames.has(name) &&
 				!localNames.has(name)
 					? { moduleDeclaration: true }
+					: {}),
+				// Lowest of all: an import is only the explanation when nothing this
+				// file declares is.
+				...(moduleImportNames.has(name) &&
+				!moduleDeclaredNames.has(name) &&
+				!graphNames.has(name) &&
+				!localNames.has(name)
+					? { moduleImport: true }
 					: {}),
 			}));
 
@@ -959,6 +986,7 @@ function unresolvedGraphReferenceDiagnostic(
 	if (reference.moduleDeclaration === true) {
 		return moduleDeclarationReferenceDiagnostic(reference, where);
 	}
+	if (reference.moduleImport === true) return moduleImportReferenceDiagnostic(reference, where);
 
 	return {
 		code: SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE,
@@ -1128,6 +1156,39 @@ function moduleDeclarationReferenceDiagnostic(
 			},
 			{
 				message: `To keep building meanwhile, move "${reference.name}" inside the component that uses it, or into a module you import from — an imported binding is carried into the emitted module already.`,
+			},
+		],
+		docsUrl: `https://markless.dev/errors/${SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE}`,
+	};
+}
+
+/**
+ * The same refusal for an import the emitter did not carry.
+ *
+ * Until this branch existed the allowlist could not see an imported name at all,
+ * so an emitted module that named one was reported by nothing: SSR evaluates the
+ * authored module, where the import is in scope, and the failure surfaced only as
+ * a client-side ReferenceError on first render.
+ */
+function moduleImportReferenceDiagnostic(
+	reference: UnresolvedGraphReference,
+	where: string,
+): SymbolModulesDiagnostic {
+	return {
+		code: SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE,
+		severity: 'error',
+		phase: 'public-render',
+		passId: 'symbol-modules',
+		artifactKeys: ['symbolModules'],
+		title: `The emitted module for ${reference.symbolId} is missing the import of "${reference.name}"`,
+		message: `The emitted ${reference.kind} module for ${reference.symbolId} still names "${reference.name}" directly. ${where} "${reference.name}" is imported at module scope in this file, and the emitted module does not import it, so this module would throw a ReferenceError the first time it runs in the browser. The server render would not: it evaluates the authored module, where the import is in scope.`,
+		why: "Every symbol is compiled into a module that is fetched and evaluated on its own, so an import its spliced text still names has to be re-declared in it. That carry is the compiler's to make, and this check exists because a missing one is invisible otherwise: the server renders from the authored module and stays green, so the gap reaches the browser and crashes on the first render rather than failing the build.",
+		suggestions: [
+			{
+				message: `This is a compiler gap, not a mistake in this file: reading an imported binding from a component is supported. Report it with the import of "${reference.name}" and the symbol kind above.`,
+			},
+			{
+				message: `To keep building meanwhile, write the value of "${reference.name}" out at the position that names it.`,
 			},
 		],
 		docsUrl: `https://markless.dev/errors/${SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE}`,
@@ -2375,7 +2436,15 @@ export function buildStateInitializerEmission(
 		input.symbol.source,
 		input.sourceFileName,
 	);
-	const referencedNames = referencedIdentifierNames(projection.program as unknown as AnyNode);
+	// The prop defaults are spliced after the projection is built, so their names
+	// are added here rather than read off it.
+	const referencedNames = new Set([
+		...referencedIdentifierNames(projection.program as unknown as AnyNode),
+		...splicedSourceReferencedNames(
+			propReadDefaultSources(input.propReads),
+			input.sourceFileName,
+		),
+	]);
 	const imports = dedupeModuleImports([
 		...(input.symbol.moduleImports ?? []),
 		...input.moduleImports.filter((moduleImport) => referencedNames.has(moduleImport.localName)),
@@ -2438,22 +2507,18 @@ export function emitStateInitializerModuleNodes(
 // ---------------------------------------------------------------------------
 
 /**
- * No module-scope declaration carry, and none is possible.
- *
- * Every other emitter that splices authored text takes `moduleDeclarations` so a
- * same-file `const`/`class` the text names travels into the module it is fetched
- * as. This one cannot need it: `isUnloweredSharedSeed` in `state-lowering.ts`
- * refuses any component-body seed whose value names anything but this
- * component's own prop locals and the six literal keywords (`true`, `false`,
- * `null`, `undefined`, `NaN`, `Infinity`). A module-scope declaration is never
- * among them, so a seed expression that would need a carry fails the build two
- * passes before this emitter sees it. `unresolvedGraphReferences` still covers
- * the emitted module, so relaxing that rule surfaces here as a build error
- * rather than as a browser ReferenceError.
+ * The seed VALUE cannot name a module-scope binding — `isUnloweredSharedSeed` in
+ * `state-lowering.ts` refuses anything but this component's prop locals and the
+ * six literal keywords — but a prop DEFAULT spliced beside it can, and that text
+ * is scanned for imports here rather than at plan time, where only the value
+ * source is known. A same-file declaration a default names is still uncarried and
+ * is refused by `unresolvedGraphReferences` instead.
  */
 export type SharedSeedEmissionInput = {
 	readonly symbol: Extract<PlannedSymbol, { readonly kind: 'shared-seed' }>;
 	readonly propReads: ReadonlyArray<StateInitializerPropRead>;
+	/** Every import this file declares; the ones the spliced text names are carried. */
+	readonly moduleImports?: readonly SemanticModuleImport[];
 	/** The authored file the seed was extracted from; names the map. */
 	readonly sourceFileName: string;
 };
@@ -2467,7 +2532,16 @@ export function buildSharedSeedEmission(input: SharedSeedEmissionInput): Emissio
 		symbolId: input.symbol.id,
 	};
 
-	const imports = dedupeModuleImports(input.symbol.moduleImports ?? []);
+	const splicedNames = splicedSourceReferencedNames(
+		propReadDefaultSources(input.propReads),
+		input.sourceFileName,
+	);
+	const imports = dedupeModuleImports([
+		...(input.symbol.moduleImports ?? []),
+		...(input.moduleImports ?? []).filter((moduleImport) =>
+			splicedNames.has(moduleImport.localName),
+		),
+	]);
 	const seedLocal = 'marklessSharedSeed';
 	// A callback slot's value is the composing edge's own answer, handed to this
 	// root among its props; there is no authored expression to read.
@@ -2840,6 +2914,33 @@ function initializerReferencedNames(initializerSource: string, filename: string)
 	const parsed = parseEmissionSource(`(${initializerSource});`, filename, 'ts')
 		.program as unknown as AnyNode;
 	return referencedIdentifierNames(parsed);
+}
+
+/**
+ * The destructuring defaults a prop read splices into the emitted module.
+ *
+ * These are authored expressions the module evaluates, so whatever they name has
+ * to travel with them — and they are NOT part of the symbol's own source, which
+ * is the only text the plan scanned when it chose the imports to carry.
+ */
+function propReadDefaultSources(
+	propReads: ReadonlyArray<StateInitializerPropRead>,
+): readonly string[] {
+	return propReads.flatMap((propRead) =>
+		propRead.defaultSource === undefined ? [] : [propRead.defaultSource],
+	);
+}
+
+/** The identifiers a set of spliced authored expressions names, parsed once each. */
+function splicedSourceReferencedNames(
+	sources: readonly string[],
+	filename: string,
+): ReadonlySet<string> {
+	const names = new Set<string>();
+	for (const source of sources) {
+		for (const name of initializerReferencedNames(source, filename)) names.add(name);
+	}
+	return names;
 }
 
 /** The names a parsed module's top-level declarations bind. */
@@ -6844,6 +6945,7 @@ export function buildSymbolModuleEmission(
 				input.semanticGraph,
 				input.sourceFileName,
 			),
+			moduleImports: input.moduleImports,
 			sourceFileName: input.sourceFileName,
 		});
 	}
@@ -6908,30 +7010,26 @@ export function emitSymbolModuleNodes(input: SymbolModuleEmissionInput): Emitted
 // ---------------------------------------------------------------------------
 
 /**
- * The widened module-declaration filter, run over emitted modules a caller
- * supplies directly.
+ * The widened module-scope filter, run over emitted modules a caller supplies
+ * directly.
  *
- * Every emitter that can splice authored text now carries the module-scope
- * declarations that text names, so no authored file reaches the filter's
- * module-declaration branch any more — which is the intent, and which also means
- * an end-to-end fixture can no longer pin it. This seam keeps it pinned by
- * handing the real filter and the real diagnostic builder one emitted module
- * that leaves a declared name free. It runs production's own code: the pass
- * still calls the private `unresolvedGraphReferences` with its full argument
- * set, and nothing here relaxes what that call reports.
+ * Every emitter that splices authored text carries the imports that text names,
+ * so the import branch is unreachable from an authored file once the carry is
+ * right — which is the intent, and which also means an end-to-end fixture can no
+ * longer pin it. This seam keeps both branches pinned by handing the real filter
+ * and the real diagnostic builder one emitted module that leaves a name free. It
+ * runs production's own code: the pass still calls the private
+ * `unresolvedGraphReferences` with its full argument set, and nothing here
+ * relaxes what that call reports.
  *
- * Four emitters have no carry channel, and none of them can need one. The
- * dom-update, branch-update, and async-boundary-update bands synthesize their
- * whole module from render data, ids, and JSON, so they splice no authored
- * identifier at all. The shared-seed band does splice authored text, but
- * `isUnloweredSharedSeed` in `state-lowering.ts` refuses any seed value naming
- * anything but this component's prop locals and six literal keywords, so a
- * module-scope declaration cannot reach it. The filter still covers all four, so
- * relaxing either rule surfaces as a build error rather than a browser crash.
+ * The declaration branch IS reachable from an authored file: the shared-seed band
+ * splices a prop's destructuring default, which may name a same-file `const`, and
+ * that band carries imports but not declarations.
  */
 export function unresolvedModuleDeclarationDiagnostics(
 	modules: ReadonlyArray<GeneratedSymbolModule>,
 	moduleDeclaredNames: ReadonlySet<string>,
+	moduleImportNames: ReadonlySet<string> = new Set(),
 ): ReadonlyArray<SymbolModulesDiagnostic> {
 	return unresolvedGraphReferences(
 		modules,
@@ -6940,6 +7038,7 @@ export function unresolvedModuleDeclarationDiagnostics(
 		new Set(),
 		new Map(),
 		moduleDeclaredNames,
+		moduleImportNames,
 	).map(unresolvedGraphReferenceDiagnostic);
 }
 
