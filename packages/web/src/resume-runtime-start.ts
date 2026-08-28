@@ -143,6 +143,7 @@ export async function startResumeRuntime(input: {
 				runtimeInput,
 				armRegistrationDeps: input.armRegistrationDeps,
 				installArmEventType: input.installArmEventType,
+				elementsByHostId: prepared.elementsByHostId,
 			},
 		);
 	}
