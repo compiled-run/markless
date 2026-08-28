@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { FAMILY_ANCHORS } from '../../../../../apps/sr-gallery/preview-server.ts';
 import {
 	missingFacts,
 	readUntil,
@@ -28,12 +29,8 @@ import {
 const WALK_LIMIT = 140;
 const CHANGE_TIMEOUT_MS = 15_000;
 
-/**
- * Where the toolbar sits on the gallery page. Spelled here rather than read from
- * `FAMILY_ANCHORS`, because the gallery section this walk needs lands with the
- * gallery registration and this file ships before it.
- */
-export const TOOLBAR_ANCHOR = '/#toolbar';
+/** Where the toolbar sits on the gallery page. */
+export const TOOLBAR_ANCHOR = FAMILY_ANCHORS.toolbar;
 
 function expectConveys(sr: ScreenReaderDriver, phrase: string, conveys: Conveys) {
 	expect(missingFacts(sr, phrase, conveys), `${sr.name} announced "${phrase}"`).toEqual([]);

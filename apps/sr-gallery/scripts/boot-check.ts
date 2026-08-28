@@ -84,6 +84,9 @@ const RENDERED_ROLE: Record<FamilyName, AriaRole> = {
 	// Every step's card is a role="dialog" that is only `hidden` until its step
 	// comes, so includeHidden finds all of them before the tour is ever started.
 	tour: 'dialog',
+	// The bar is the only role the family adds; everything inside it belongs to
+	// another family and keeps its own role, which the rows below check.
+	toolbar: 'toolbar',
 };
 
 /** Sections whose point is how many of that role they serve, not merely that they serve one. */
@@ -524,6 +527,49 @@ async function main() {
 			failures.push('#tour serves no card named "Save your work".');
 		} else {
 			console.log('#tour serves its first card by name.');
+		}
+
+		// The role count above says a bar rendered. What a reader lane then turns on
+		// is everything the bar promises around it: the bar is named, the controls
+		// mixed into it are still announced as what they are, and the four of them
+		// share one stop instead of costing four tabs.
+		const bar = page.locator('#toolbar').getByRole('toolbar', { name: 'Document' });
+		if ((await bar.count()) !== 1) {
+			failures.push('#toolbar serves no role="toolbar" named "Document".');
+		} else {
+			console.log('#toolbar serves the bar named by its label part.');
+		}
+
+		const controls: [AriaRole, string][] = [
+			['button', 'Left'],
+			['button', 'Center'],
+			['switch', 'Wrap lines'],
+			['button', 'Font'],
+			['button', 'Print'],
+		];
+		const kept: string[] = [];
+		for (const [role, label] of controls) {
+			const control = page.locator('#toolbar').getByRole(role, { name: label });
+			if ((await control.count()) !== 1) {
+				failures.push(`#toolbar serves no single role="${role}" named "${label}".`);
+				continue;
+			}
+			kept.push(`${label} (${role})`);
+		}
+		if (kept.length === controls.length) {
+			console.log(`#toolbar's controls keep their own roles: ${kept.join(' / ')}`);
+		}
+
+		const stops = await page
+			.locator('#toolbar')
+			.locator('[tabindex]:not([tabindex="-1"]), button:not([tabindex]), a[href]:not([tabindex])')
+			.count();
+		if (stops !== 1) {
+			failures.push(
+				`#toolbar rests with ${stops} tab stops, not the 1 a bar collapses its controls into.`,
+			);
+		} else {
+			console.log('#toolbar rests with exactly one tab stop.');
 		}
 
 		if (failures.length > 0) throw new Error(failures.join(' '));

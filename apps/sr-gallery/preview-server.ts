@@ -52,6 +52,7 @@ export const FAMILY_ANCHORS = {
 	'numberbox-min-max-step': '/#numberbox-min-max-step',
 	'numberbox-currency': '/#numberbox-currency',
 	tour: '/#tour',
+	toolbar: '/#toolbar',
 } as const;
 
 export type FamilyName = keyof typeof FAMILY_ANCHORS;

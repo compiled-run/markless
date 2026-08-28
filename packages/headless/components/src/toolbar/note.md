@@ -190,10 +190,11 @@ the way `togglegroup.sr.ts` does for `pressed`. The real-reader transcript canno
 assert the role word at all, because `Conveys.role` is keyed by `Vocabulary` and
 there is no slot; it asserts the bar's name instead.
 
-**Registration, gallery and CI.** `toolbar` is not exported from `src/index.ts`,
-so its scenarios import the family directly. `toolbar-transcript.ts` spells its
-own gallery anchor rather than reading `FAMILY_ANCHORS`. The two real-reader
-lanes are written and have never been run.
+**The real-reader lanes have never been run.** `toolbar` now ships from
+`src/index.ts` and `./toolbar`, sits in the conformance battery, has its own
+gallery section at `FAMILY_ANCHORS.toolbar`, and is in all three CI reader
+matrices. The NVDA and VoiceOver lanes only ever run on a CI runner, so what
+they announce is still unmeasured.
 
 ## Qwik UI and reference mapping
 
