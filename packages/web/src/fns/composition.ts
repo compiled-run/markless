@@ -10,7 +10,7 @@ import {
 	marklessNoteWidgetRoot,
 	marklessWidgetScope,
 } from './instance-scope.ts';
-import type { MarklessWidgetRegistry } from './instance-scope.ts';
+import type { MarklessRowTemplate, MarklessWidgetRegistry } from './instance-scope.ts';
 import type { ResumeSymbol, ResumeSymbolContext } from '../resume-types.ts';
 
 // Composition works on the DRAFT payload the compiled render modules build:
@@ -35,11 +35,21 @@ export type ComposeDomUpdate = ComposeGraphRead & {
 	readonly symbolId?: string;
 	readonly target?: { readonly kind?: string; readonly name?: string };
 };
+export type ComposeRowTemplate = MarklessRowTemplate;
+type RowTemplateSlot =
+	| NonNullable<ComposeRowTemplate['textSlots']>[number]
+	| NonNullable<ComposeRowTemplate['attributeSlots']>[number];
 export type ComposeKeyedRepeat = {
 	readonly id: string;
 	readonly collectionGraphNodeId?: string;
 	readonly collectionPath: ReadonlyArray<string>;
+	readonly rowTemplate?: ComposeRowTemplate;
 	readonly [key: string]: unknown;
+};
+// `rowTemplate` is present and undefined exactly when the child shipped one that
+// composition then dropped, which is what tells a caller to unset its own.
+export type ComposeMappedKeyedRepeat = ComposeGraphRead & {
+	readonly rowTemplate?: ComposeRowTemplate;
 };
 export type ComposeStateNode = {
 	readonly graphNodeId: string;
@@ -658,24 +668,73 @@ export function marklessCsrRemapChildKeyedRepeat(
 	graphProps: ComposeGraphProps,
 	hostPrefix = '',
 	instancePath = '',
-): ComposeGraphRead | null {
+): ComposeMappedKeyedRepeat | null {
 	const graphNodeId = repeat.collectionGraphNodeId;
 	if (!graphNodeId) return null;
 	const propName = marklessCompositionPropName(graphNodeId, repeat.collectionPath);
+	let mapped: ComposeGraphRead | null;
 	if (propName === null)
-		return {
+		mapped = {
 			graphNodeId: marklessComposedGraphNodeId(graphNodeId, instancePath),
 			path: repeat.collectionPath,
 		};
-	const binding = marklessCompositionGraphProp(graphProps, propName);
-	if (binding === null) return null;
-	const mapped = marklessCsrRemapChildGraph(
-		{ graphNodeId, path: repeat.collectionPath },
-		graphProps,
-		instancePath,
-	);
-	if (mapped) return mapped;
-	throw new Error('MARKLESS_COMPOSED_READ_UNMAPPED: ' + hostPrefix + repeat.id);
+	else {
+		if (marklessCompositionGraphProp(graphProps, propName) === null) return null;
+		mapped = marklessCsrRemapChildGraph(
+			{ graphNodeId, path: repeat.collectionPath },
+			graphProps,
+			instancePath,
+		);
+		if (!mapped) throw new Error('MARKLESS_COMPOSED_READ_UNMAPPED: ' + hostPrefix + repeat.id);
+	}
+	// A row's outside read is a graph node id like the collection's, so it takes
+	// the same qualification or the mint reads a node the live graph never holds.
+	return repeat.rowTemplate
+		? {
+				...mapped,
+				rowTemplate: composedRowTemplate(
+					repeat.rowTemplate,
+					graphProps,
+					hostPrefix + repeat.id,
+					instancePath,
+				),
+			}
+		: mapped;
+}
+
+// One unqualifiable slot drops the WHOLE template: a slot cannot be dropped
+// alone, because the mint would then write nothing where the server wrote a
+// value, and a repeat keeping its served rows is what it did before templates.
+function composedRowTemplate(
+	rowTemplate: ComposeRowTemplate,
+	graphProps: ComposeGraphProps,
+	repeatId: string,
+	instancePath: string,
+): ComposeRowTemplate | undefined {
+	let dropped = '';
+	const remap = <S extends RowTemplateSlot>(slot: S): S => {
+		if (!('graphNodeId' in slot)) return slot;
+		const mapped = marklessCsrRemapChildGraph(
+			{ graphNodeId: slot.graphNodeId, path: slot.graphPath },
+			graphProps,
+			instancePath,
+		);
+		if (mapped)
+			return { ...slot, graphNodeId: mapped.graphNodeId, graphPath: mapped.path } as S;
+		dropped ||= 'name' in slot ? slot.name : 'its text';
+		return slot;
+	};
+	const textSlots = rowTemplate.textSlots?.map(remap);
+	const attributeSlots = rowTemplate.attributeSlots?.map(remap);
+	if (dropped) {
+		console.warn(`markless: ${repeatId} drops its row template - ${dropped} reads an unpassed prop`);
+		return undefined;
+	}
+	return {
+		...rowTemplate,
+		...(textSlots && { textSlots }),
+		...(attributeSlots && { attributeSlots }),
+	};
 }
 
 export function marklessCsrRemapChildDomUpdate(

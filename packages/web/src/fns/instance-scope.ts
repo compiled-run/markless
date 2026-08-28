@@ -5,11 +5,17 @@ import { marklessSettled, type Awaitable } from '../ssr-data/awaitable.ts';
 import type {
 	ResumeArmBranchRecord,
 	ResumeArmRecordSet,
+	ResumeKeyedRepeatRecord,
 	ResumeSymbol,
 	ResumeSymbolContext,
 } from '../resume-types.ts';
 
 type BranchContentReads = NonNullable<ResumeArmBranchRecord['contentReads']>;
+export type MarklessRowTemplate = NonNullable<ResumeKeyedRepeatRecord['rowTemplate']>;
+type RowTemplate = MarklessRowTemplate;
+type RowTemplateSlot =
+	| NonNullable<RowTemplate['textSlots']>[number]
+	| NonNullable<RowTemplate['attributeSlots']>[number];
 
 // A composed child's compiled symbols spell the child module's own graph node
 // ids, but composition merged that child's nodes into the page graph under its
@@ -900,6 +906,18 @@ function composedBoundaryArmRecords(
 					),
 				}
 			: record;
+	// A row slot naming a graph node crosses the wire in the child module's own id
+	// space, exactly as the repeat's collection id does; a slot reading the item
+	// carries no graph id and rides through untouched.
+	const qualifyRowSlot = <S extends RowTemplateSlot>(slot: S): S =>
+		qualifyLooseRead(slot as unknown as Record<string, unknown>) as unknown as S;
+	const qualifyRowTemplate = (rowTemplate: RowTemplate): RowTemplate => ({
+		...rowTemplate,
+		...(rowTemplate.textSlots && { textSlots: rowTemplate.textSlots.map(qualifyRowSlot) }),
+		...(rowTemplate.attributeSlots && {
+			attributeSlots: rowTemplate.attributeSlots.map(qualifyRowSlot),
+		}),
+	});
 	return {
 		locators: set.locators.map(prefixHost),
 		events: set.events.map((event) => ({
@@ -937,6 +955,7 @@ function composedBoundaryArmRecords(
 						),
 					}
 				: {}),
+			...(repeat.rowTemplate && { rowTemplate: qualifyRowTemplate(repeat.rowTemplate) }),
 			rowEvents: repeat.rowEvents.map((event) => ({
 				...event,
 				symbolIds: event.symbolIds.map((symbolId) => prefix + symbolId),

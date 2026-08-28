@@ -9,9 +9,8 @@ import SeededPage from './seeded-page.tsrx';
  * factory, a root writing the collection from its own prop, one part repeating
  * over it, one sibling part writing it.
  *
- * Two rows stay pinned. One calls a method on the collection, which mints no
- * computed, so nothing is wired to refresh it. The other reads a cell outside the
- * repeated item: the row now mints, and only its outside read is still empty.
+ * One row stays pinned: it calls a method on the collection, which mints no
+ * computed, so nothing is wired to refresh it.
  */
 afterEach(() => cleanup());
 
@@ -79,12 +78,10 @@ for (const mode of ['CSR', 'SSR'] as const) {
 		await expect.poll(() => el('joined').textContent).toBe('alpha|beta|gamma');
 	});
 
-	// Pinned on its LAST step only: the row template now names the graph node the
-	// attribute reads and the mint builds the row, so the three values arrive. The
-	// name does not - the slot's graph node id crosses the wire in the child's own
-	// id space and composition qualifies only the repeat's collection id, so the
-	// read lands on a node the live graph does not hold.
-	test.fails(`${mode}: a row whose attribute reads a cell outside the item still mints`, async () => {
+	// The row template names the graph node the attribute reads, and composition
+	// qualifies that node id the way it qualifies the repeat's collection id, so
+	// the minted row's name lands on the instance's own cell.
+	test(`${mode}: a row whose attribute reads a cell outside the item still mints`, async () => {
 		if (mode === 'CSR') await render(NamedRowPage);
 		else await renderSSR(NamedRowPage);
 
