@@ -1,6 +1,7 @@
 import { computed, element, state } from '@markless/core';
 import type { PadPoint } from '@markless/ui/pad';
 import {
+	buttongroup,
 	calendar,
 	checkbox,
 	checklist,
@@ -23,7 +24,6 @@ import {
 	tabs,
 	textbox,
 	toggle,
-	togglegroup,
 	toolbar,
 	tooltip,
 	tour,
@@ -34,7 +34,7 @@ import {
 // /#toggle, /#textbox, /#progress, /#checklist, /#select, /#modal,
 // /#radio-group, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
 // /#fileupload, /#hovercard, /#calendar, /#menu, /#menubar, /#colorpicker,
-// /#togglegroup, /#numberbox, /#ink, /#pad, /#crop, /#tour, /#toolbar. A family whose second shape a reader
+// /#buttongroup, /#numberbox, /#ink, /#pad, /#crop, /#tour, /#toolbar. A family whose second shape a reader
 // announces differently gets its own section too: /#slider-range,
 // /#numberbox-min-max-step, /#numberbox-currency, /#crop-image.
 //
@@ -384,15 +384,15 @@ export function Gallery() @{
 			</div>
 		</section>
 
-		<section id="togglegroup">
-			<h2>Toggle group</h2>
+		<section id="buttongroup">
+			<h2>Button group</h2>
 			<div class="scenario">
-				<togglegroup.root value="left">
-					<togglegroup.label>Text alignment</togglegroup.label>
-					<togglegroup.item value="left">Left</togglegroup.item>
-					<togglegroup.item value="center">Center</togglegroup.item>
-					<togglegroup.item value="right">Right</togglegroup.item>
-				</togglegroup.root>
+				<buttongroup.root value="left">
+					<buttongroup.label>Text alignment</buttongroup.label>
+					<buttongroup.item value="left">Left</buttongroup.item>
+					<buttongroup.item value="center">Center</buttongroup.item>
+					<buttongroup.item value="right">Right</buttongroup.item>
+				</buttongroup.root>
 			</div>
 		</section>
 
@@ -547,10 +547,10 @@ export function Gallery() @{
 				<toolbar.root>
 					<toolbar.label>Document</toolbar.label>
 
-					<togglegroup.root value="left">
-						<togglegroup.item value="left">Left</togglegroup.item>
-						<togglegroup.item value="center">Center</togglegroup.item>
-					</togglegroup.root>
+					<buttongroup.root value="left">
+						<buttongroup.item value="left">Left</buttongroup.item>
+						<buttongroup.item value="center">Center</buttongroup.item>
+					</buttongroup.root>
 
 					<toggle.root>
 						<toggle.label>Wrap lines</toggle.label>

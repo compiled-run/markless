@@ -28,18 +28,18 @@ const CHANGE_TIMEOUT_MS = 15_000;
 const ITEMS = ['Left', 'Center', 'Right'] as const;
 
 /**
- * Where the toggle group sits on the gallery page. Spelled here rather than read
+ * Where the button group sits on the gallery page. Spelled here rather than read
  * from `FAMILY_ANCHORS`, because the gallery section this walk needs lands with
  * the gallery registration and this file ships before it.
  */
-export const TOGGLEGROUP_ANCHOR = '/#togglegroup';
+export const BUTTONGROUP_ANCHOR = '/#buttongroup';
 
 function expectConveys(sr: ScreenReaderDriver, phrase: string, conveys: Conveys) {
 	expect(missingFacts(sr, phrase, conveys), `${sr.name} announced "${phrase}"`).toEqual([]);
 }
 
-export async function readToggleGroupTranscript(sr: ScreenReaderDriver, page: Page) {
-	const section = page.locator(`#${TOGGLEGROUP_ANCHOR.slice(2)}`);
+export async function readButtonGroupTranscript(sr: ScreenReaderDriver, page: Page) {
+	const section = page.locator(`#${BUTTONGROUP_ANCHOR.slice(2)}`);
 	const itemFor = (name: string) => section.getByRole('button', { name });
 
 	// The group is named by its label part, and an unnamed group announces nothing

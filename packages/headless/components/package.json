@@ -25,6 +25,7 @@
 		".": "./src/index.ts",
 		"./api/manifest.json": "./api/manifest.json",
 		"./accordion": "./src/accordion/index.ts",
+		"./buttongroup": "./src/buttongroup/index.ts",
 		"./calendar": "./src/calendar/index.ts",
 		"./carousel": "./src/carousel/index.ts",
 		"./checkbox": "./src/checkbox/index.ts",
@@ -55,7 +56,6 @@
 		"./textbox": "./src/textbox/index.ts",
 		"./toaster": "./src/toaster/index.ts",
 		"./toggle": "./src/toggle/index.ts",
-		"./togglegroup": "./src/togglegroup/index.ts",
 		"./toolbar": "./src/toolbar/index.ts",
 		"./tour": "./src/tour/index.ts",
 		"./tree": "./src/tree/index.ts"

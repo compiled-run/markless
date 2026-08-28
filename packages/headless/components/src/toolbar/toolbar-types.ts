@@ -5,7 +5,7 @@ export type ToolbarOrientation = 'horizontal' | 'vertical';
 
 /**
  * The bar itself. Controls go inside it - `toolbar.item` buttons, and any other
- * family that registers itself (`toggle.root`, `togglegroup.item`,
+ * family that registers itself (`toggle.root`, `buttongroup.item`,
  * `select.trigger`). It holds the roster of registered controls and which one
  * owns the bar's single tab stop.
  */
@@ -53,7 +53,7 @@ export type ToolbarItemProps = Omit<PropsOf<'button'>, 'disabled'> & {
 
 /**
  * Rooted by `toolbar.item` so the item owns a singular element handle of its
- * own, the way `togglegroup.item` does: its `el` slot is free because a toolbar
+ * own, the way `buttongroup.item` does: its `el` slot is free because a toolbar
  * button is its own label and nothing points at it.
  */
 export type ToolbarItemInstanceState = Seeded<ToolbarItemProps, 'disabled'>;

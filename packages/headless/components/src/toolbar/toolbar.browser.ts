@@ -165,7 +165,7 @@ async function expectRovingAcrossMixedControls() {
 	await userEvent.keyboard('{ArrowRight}');
 	await expect.poll(() => document.activeElement).toBe(el(Center));
 
-	// The toggle group's own walk stops at its last item, so the bar takes the key
+	// The button group's own walk stops at its last item, so the bar takes the key
 	// and leaves the group. Nothing was stopped or flagged to arrange that.
 	await userEvent.keyboard('{ArrowRight}');
 	await expect.poll(() => document.activeElement).toBe(el(Wrap));

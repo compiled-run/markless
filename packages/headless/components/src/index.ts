@@ -1,5 +1,6 @@
 export * as accordion from './accordion/index.ts';
 export * as base from './base/index.ts';
+export * as buttongroup from './buttongroup/index.ts';
 export * as calendar from './calendar/index.ts';
 export * as carousel from './carousel/index.ts';
 export * as checkbox from './checkbox/index.ts';
@@ -30,7 +31,6 @@ export * as tabs from './tabs/index.ts';
 export * as textbox from './textbox/index.ts';
 export * as toaster from './toaster/index.ts';
 export * as toggle from './toggle/index.ts';
-export * as togglegroup from './togglegroup/index.ts';
 export * as toolbar from './toolbar/index.ts';
 export * as tooltip from './tooltip/index.ts';
 export * as tour from './tour/index.ts';

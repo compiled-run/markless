@@ -1,26 +1,26 @@
 import { computed, element, shared, state } from '@markless/core';
 import { toolbarState } from '../toolbar/toolbar.tsrx';
 import type {
-	ToggleGroupBoxProps,
-	ToggleGroupInstanceState,
-	ToggleGroupItemFieldProps,
-	ToggleGroupItemInstanceState,
-	ToggleGroupItemProps,
-	ToggleGroupLabelProps,
-	ToggleGroupOrientation,
-	ToggleGroupRootProps,
-} from './togglegroup-types.ts';
-import { heldValues, nextHeld } from './togglegroup-values.ts';
-import { nextItemToFocus } from './togglegroup-walk.ts';
+	ButtonGroupBoxProps,
+	ButtonGroupInstanceState,
+	ButtonGroupItemFieldProps,
+	ButtonGroupItemInstanceState,
+	ButtonGroupItemProps,
+	ButtonGroupLabelProps,
+	ButtonGroupOrientation,
+	ButtonGroupRootProps,
+} from './buttongroup-types.ts';
+import { heldValues, nextHeld } from './buttongroup-values.ts';
+import { nextItemToFocus } from './buttongroup-walk.ts';
 
-export const togglegroupState = shared(
+export const buttongroupState = shared(
 	() => {
-		const group: ToggleGroupInstanceState = state({
+		const group: ButtonGroupInstanceState = state({
 			// Raw, in whichever shape the call site wrote it: a shared cell is seeded
 			// from a bare prop and nothing else, so `heldValues` normalises every read.
 			value: '',
 			multiple: false,
-			orientation: 'horizontal' as ToggleGroupOrientation,
+			orientation: 'horizontal' as ButtonGroupOrientation,
 			loop: false,
 			disabled: false,
 			required: false,
@@ -56,11 +56,11 @@ export const togglegroupState = shared(
 	{ scope: 'widget' },
 );
 
-// Rooted by `togglegroup.item`: the field inside one item reads this instance,
+// Rooted by `buttongroup.item`: the field inside one item reads this instance,
 // while the item's own body still reads the group's.
-export const togglegroupItemState = shared(
+export const buttongroupItemState = shared(
 	() => {
-		const item: ToggleGroupItemInstanceState = state({ value: '', disabled: false });
+		const item: ButtonGroupItemInstanceState = state({ value: '', disabled: false });
 		const el = element<HTMLButtonElement>();
 
 		return { ...item, el };
@@ -68,7 +68,7 @@ export const togglegroupItemState = shared(
 	{ scope: 'widget' },
 );
 
-export function ToggleGroupRoot({
+export function ButtonGroupRoot({
 	value = '',
 	multiple = false,
 	orientation = 'horizontal',
@@ -79,8 +79,8 @@ export function ToggleGroupRoot({
 	onChange,
 	children,
 	...rest
-}: ToggleGroupRootProps) @{
-	const group = togglegroupState();
+}: ButtonGroupRootProps) @{
+	const group = buttongroupState();
 	group.onChange = onChange;
 	group.value = value;
 	group.multiple = multiple;
@@ -90,13 +90,13 @@ export function ToggleGroupRoot({
 	group.required = required;
 	group.name = name;
 
-	<ToggleGroupBox {...rest}>{children}</ToggleGroupBox>
+	<ButtonGroupBox {...rest}>{children}</ButtonGroupBox>
 }
 
 // A separate part rather than the root's own element: a widget root cannot read
 // its own instance token, so the label IDREF only resolves one component deeper.
-function ToggleGroupBox({ children, ...rest }: ToggleGroupBoxProps) @{
-	const group = togglegroupState();
+function ButtonGroupBox({ children, ...rest }: ButtonGroupBoxProps) @{
+	const group = buttongroupState();
 
 	// No `aria-orientation`: ARIA does not support it on `group`, and the axis
 	// reaches CSS through `ui-vertical` instead.
@@ -112,13 +112,13 @@ function ToggleGroupBox({ children, ...rest }: ToggleGroupBoxProps) @{
 	>{children}</div>
 }
 
-export function ToggleGroupLabel({ children, ...rest }: ToggleGroupLabelProps) @{
-	const group = togglegroupState();
+export function ButtonGroupLabel({ children, ...rest }: ButtonGroupLabelProps) @{
+	const group = buttongroupState();
 
 	<label {...rest} el={group.labelEl}>{children}</label>
 }
 
-export function ToggleGroupItem({
+export function ButtonGroupItem({
 	value,
 	disabled = false,
 	children,
@@ -126,9 +126,9 @@ export function ToggleGroupItem({
 	onFocus,
 	onKeydown,
 	...rest
-}: ToggleGroupItemProps) @{
-	const group = togglegroupState();
-	const item = togglegroupItemState();
+}: ButtonGroupItemProps) @{
+	const group = buttongroupState();
+	const item = buttongroupItemState();
 	// Mixed into an enclosing toolbar: every item is one of the bar's stops.
 	// Outside every toolbar this resolves to no bar instance, so `mounted` is the
 	// seed and the group keeps its own roving focus.
@@ -202,9 +202,9 @@ export function ToggleGroupItem({
 	>{children}</button>
 }
 
-export function ToggleGroupItemField({ ...rest }: ToggleGroupItemFieldProps) @{
-	const group = togglegroupState();
-	const item = togglegroupItemState();
+export function ButtonGroupItemField({ ...rest }: ButtonGroupItemFieldProps) @{
+	const group = buttongroupState();
+	const item = buttongroupItemState();
 	const isPressed = computed(() => heldValues(group.value).indexOf(item.value) !== -1);
 
 	// `type="hidden"` is what keeps this legal inside the button: an input in the

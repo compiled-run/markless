@@ -64,6 +64,7 @@ jobs:
                 family:
                     [
                         accordion,
+                        buttongroup,
                         calendar,
                         carousel,
                         checkbox,
@@ -94,7 +95,6 @@ jobs:
                         textbox,
                         toaster,
                         toggle,
-                        togglegroup,
                         toolbar,
                         tooltip,
                         tour,
@@ -143,6 +143,7 @@ jobs:
                 # name with no spec file makes the run find no tests.
                 family:
                     [
+                        buttongroup,
                         calendar,
                         checkbox,
                         colorpicker,
@@ -160,7 +161,6 @@ jobs:
                         select,
                         slider,
                         tabs,
-                        togglegroup,
                         toolbar,
                         tooltip,
                         tour,
@@ -272,6 +272,7 @@ jobs:
                 # See the nvda job: only families with a real-reader spec.
                 family:
                     [
+                        buttongroup,
                         calendar,
                         checkbox,
                         colorpicker,
@@ -289,7 +290,6 @@ jobs:
                         select,
                         slider,
                         tabs,
-                        togglegroup,
                         toolbar,
                         tooltip,
                         tour,

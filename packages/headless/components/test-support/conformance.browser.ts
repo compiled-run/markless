@@ -1,6 +1,7 @@
 import { render, renderSSR } from '@markless/vitest-browser';
 import Accordion from '../src/accordion/scenarios/basic.tsrx';
 import BaseParts from '../src/base/scenarios/basic.tsrx';
+import ButtonGroup from '../src/buttongroup/scenarios/basic.tsrx';
 import Calendar from '../src/calendar/scenarios/basic.tsrx';
 import Carousel from '../src/carousel/scenarios/basic.tsrx';
 import Checkbox from '../src/checkbox/scenarios/basic.tsrx';
@@ -31,7 +32,6 @@ import Tabs from '../src/tabs/scenarios/basic.tsrx';
 import Textbox from '../src/textbox/scenarios/basic.tsrx';
 import Toaster from '../src/toaster/scenarios/basic.tsrx';
 import Toggle from '../src/toggle/scenarios/basic.tsrx';
-import ToggleGroup from '../src/togglegroup/scenarios/basic.tsrx';
 import Toolbar from '../src/toolbar/scenarios/basic.tsrx';
 import Tooltip from '../src/tooltip/scenarios/basic.tsrx';
 import Tour from '../src/tour/scenarios/basic.tsrx';
@@ -91,6 +91,14 @@ const descriptors: readonly FamilyDescriptor[] = [
 		// contract to hold it to beyond the wrapper the scenario writes.
 		rootAria: {},
 		supportsDisabled: false,
+	},
+	{
+		family: 'buttongroup',
+		mount: { CSR: () => render(ButtonGroup), SSR: () => renderSSR(ButtonGroup) },
+		root: 'root',
+		parts: ['root', 'label', 'left', 'center', 'right'],
+		rootAria: { role: 'group' },
+		supportsDisabled: true,
 	},
 	{
 		family: 'carousel',
@@ -671,14 +679,6 @@ const descriptors: readonly FamilyDescriptor[] = [
 		root: 'root',
 		parts: ['root', 'label', 'trigger', 'thumb'],
 		rootAria: { role: null },
-		supportsDisabled: true,
-	},
-	{
-		family: 'togglegroup',
-		mount: { CSR: () => render(ToggleGroup), SSR: () => renderSSR(ToggleGroup) },
-		root: 'root',
-		parts: ['root', 'label', 'left', 'center', 'right'],
-		rootAria: { role: 'group' },
 		supportsDisabled: true,
 	},
 	{

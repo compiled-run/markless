@@ -12,7 +12,7 @@ const sr = virtualDriver;
  * What one reader calls the facts a toolbar announcement has to convey.
  *
  * `toolbar` has no slot in the shared `Vocabulary`, for the reason
- * `togglegroup.sr.ts` records for `pressed`: no slot exists, and a reader whose
+ * `buttongroup.sr.ts` records for `pressed`: no slot exists, and a reader whose
  * word for the fact has never been observed against our markup answers with the
  * empty string, which `missing` skips rather than failing against an invented
  * phrase.
