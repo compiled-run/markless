@@ -820,9 +820,25 @@ function expressionResidue(
 			read.sourceSpan?.start === span?.start &&
 			read.computedGraphNodeId,
 	);
-	return computedRead?.computedGraphNodeId
+	// An expression that SPENDS a roster count cannot be read from the graph at
+	// render: the count is still a placeholder there. It renders through its own
+	// deferred thunk instead. The synthetic computed behind it stays - it is what
+	// wakes the update once the count is a live number.
+	return computedRead?.computedGraphNodeId && !spendsRosterCount(context, componentName, source)
 		? { kind: 'graph-read', graphNodeId: computedRead.computedGraphNodeId, path: [] }
 		: { kind: 'authored-expression', source };
+}
+
+function spendsRosterCount(
+	context: CollectionContext,
+	componentName: string | undefined,
+	source: string,
+): boolean {
+	return (context.graph.elementRosterCounts ?? []).some(
+		(record) =>
+			record.componentName === componentName &&
+			(record.deferred ?? []).some((entry) => entry.source === source),
+	);
 }
 
 /** The scope class every element of this component carries, or null when it declares no <style>. */

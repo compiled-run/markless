@@ -846,6 +846,19 @@ export type SemanticElementRosterCount = {
 	/** The authored `roster.length` this replaces, matched verbatim when lowering. */
 	readonly source: string;
 	readonly sourceSpan?: SourceSpan;
+	/**
+	 * The markup expressions that SPEND this count and are printed by a text or
+	 * attribute slot. A render cannot answer them - the count is a placeholder
+	 * until the page has composed - so each is emitted as a thunk the resolver
+	 * calls once the counts are facts. `source` is the residue text the render
+	 * data names the expression by; `thunkSource` is the same expression with
+	 * every count read lowered to `marklessCountValue(<name>)`, because the
+	 * captured const still holds the placeholder and cannot be rebound.
+	 */
+	readonly deferred?: ReadonlyArray<{
+		readonly source: string;
+		readonly thunkSource: string;
+	}>;
 };
 
 export type SemanticBehavior = {

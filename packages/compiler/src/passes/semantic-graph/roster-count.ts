@@ -69,61 +69,131 @@ export function collectElementRosterCounts(state: WalkState): void {
 	}
 
 	if (records.length === 0) return;
-	graph.elementRosterCounts = records;
-	for (const record of records) refuseSpentRosterCount(state, record);
+	const deferred = deferredAndRefusedCountSpends(state, records);
+	graph.elementRosterCounts = records.map((record) => {
+		const entries = deferred.get(record) ?? [];
+		return entries.length > 0 ? { ...record, deferred: entries } : record;
+	});
 }
 
 /**
- * The count is exact when it is PRINTED and wrong when it is SPENT, so the
- * compiler draws that line rather than letting a page ship the difference.
+ * The count is exact when it is PRINTED, and at render time it is a placeholder
+ * the page resolves after composition - so an expression that SPENDS it is only
+ * answerable if the render can hand the whole expression over unevaluated.
  *
- * Allowed at render time: the bare read, as a whole attribute value, as a whole
- * text interpolation, or as one `${}` slot of a template literal. Everything
- * else in a render position - arithmetic, a comparison, a call, a second
- * computed deriving off it - is refused by name. Handler bodies are untouched:
- * by the time one runs the count is a number in the graph.
+ * A spend a markup text or attribute slot prints is DEFERRED: the slot emits a
+ * thunk, the resolver calls it once the counts are facts, and the count read
+ * inside it is lowered to a call rather than left on the captured const, which
+ * cannot be rebound. Everything else in a render position is refused by name -
+ * a second computed deriving off it, a local the render carries forward, an
+ * assignment, a composite, a child component's prop, an arm test - because
+ * nothing downstream knows to resolve the second binding it publishes.
+ *
+ * Handler bodies are untouched: by the time one runs the count is a number.
  */
-function refuseSpentRosterCount(state: WalkState, record: SemanticElementRosterCount): void {
-	const component = componentFunction(state, record.componentName);
-	if (!component) return;
-	const declared = countDeclarationId(component, record.computedName);
-	if (typeof declared?.start !== 'number') return;
+function deferredAndRefusedCountSpends(
+	state: WalkState,
+	records: ReadonlyArray<SemanticElementRosterCount>,
+): ReadonlyMap<SemanticElementRosterCount, SemanticElementRosterCount['deferred']> {
 	const semantic = state.semantic();
-	const symbolId = declaredSymbolAt(semantic, declared.start);
-	if (symbolId === null) return;
-
-	const seen = new Set<AnyNode>();
-	const visit = (node: AnyNode, ancestors: ReadonlyArray<AnyNode>): void => {
-		if (seen.has(node)) return;
-		seen.add(node);
-		if (
-			node.type === 'Identifier' &&
-			node !== declared &&
-			typeof node.start === 'number' &&
-			getIdentifierName(node) === record.computedName &&
-			resolvedSymbolAt(semantic, node.start) === symbolId
-		) {
-			const spend = renderTime(ancestors) ? spentAt(node, ancestors) : null;
-			if (spend) {
-				state.graph.diagnostics.push(
-					rosterCountSpentDiagnostic({
-						computedName: record.computedName,
-						componentName: record.componentName,
-						operation: spend.operation,
-						source: expressionSource(spend.node, state.source) ?? record.computedName,
-						...(sourceSpan(spend.node, state.filename)
-							? { span: sourceSpan(spend.node, state.filename)! }
-							: {}),
-					}),
-				);
-			}
-			return;
+	const answers = new Map<SemanticElementRosterCount, DeferredExpression[]>();
+	// One walk per component, so an expression spending two counts is rewritten
+	// once with both of them replaced rather than twice from the same original.
+	for (const componentName of new Set(records.map((record) => record.componentName))) {
+		const component = componentFunction(state, componentName);
+		if (!component) continue;
+		const bySymbol = new Map<number, SemanticElementRosterCount>();
+		const declarations = new Set<AnyNode>();
+		for (const record of records) {
+			if (record.componentName !== componentName) continue;
+			const declared = countDeclarationId(component, record.computedName);
+			if (typeof declared?.start !== 'number') continue;
+			const symbolId = declaredSymbolAt(semantic, declared.start);
+			if (symbolId === null) continue;
+			bySymbol.set(symbolId, record);
+			declarations.add(declared);
 		}
-		const chain = [...ancestors, node];
-		for (const child of markupChildNodes(node)) visit(child, chain);
-	};
-	visit(component, []);
+		if (bySymbol.size === 0) continue;
+
+		const deferred = new Map<
+			AnyNode,
+			Array<{ readonly read: AnyNode; readonly record: SemanticElementRosterCount }>
+		>();
+		const seen = new Set<AnyNode>();
+		const visit = (node: AnyNode, ancestors: ReadonlyArray<AnyNode>): void => {
+			if (seen.has(node)) return;
+			seen.add(node);
+			if (node.type === 'Identifier' && !declarations.has(node) && typeof node.start === 'number') {
+				const record = bySymbol.get(resolvedSymbolAt(semantic, node.start) ?? -1);
+				if (!record || getIdentifierName(node) !== record.computedName) {
+					const chain = [...ancestors, node];
+					for (const child of markupChildNodes(node)) visit(child, chain);
+					return;
+				}
+				const verdict = renderTime(ancestors) ? spentAt(node, ancestors) : null;
+				if (verdict?.kind === 'defer') {
+					deferred.set(verdict.printed, [
+						...(deferred.get(verdict.printed) ?? []),
+						{ read: node, record },
+					]);
+				} else if (verdict?.kind === 'refuse') {
+					state.graph.diagnostics.push(
+						rosterCountSpentDiagnostic({
+							computedName: record.computedName,
+							componentName,
+							operation: verdict.operation,
+							source: expressionSource(verdict.node, state.source) ?? record.computedName,
+							...(sourceSpan(verdict.node, state.filename)
+								? { span: sourceSpan(verdict.node, state.filename)! }
+								: {}),
+						}),
+					);
+				}
+				return;
+			}
+			const chain = [...ancestors, node];
+			for (const child of markupChildNodes(node)) visit(child, chain);
+		};
+		visit(component, []);
+
+		for (const [printed, reads] of deferred) {
+			const entry = deferredExpression(state.source, printed, reads);
+			if (!entry) continue;
+			for (const record of new Set(reads.map((one) => one.record)))
+				answers.set(record, [...(answers.get(record) ?? []), entry]);
+		}
+	}
+	return answers;
 }
+
+type DeferredExpression = { readonly source: string; readonly thunkSource: string };
+
+/**
+ * The printed expression as the render data names it, beside the same
+ * expression with every count read replaced by a call the resolver binds.
+ */
+function deferredExpression(
+	source: string,
+	printed: AnyNode,
+	reads: ReadonlyArray<{ readonly read: AnyNode; readonly record: SemanticElementRosterCount }>,
+): DeferredExpression | null {
+	const start = printed.start;
+	const end = printed.end;
+	if (typeof start !== 'number' || typeof end !== 'number') return null;
+	const raw = source.slice(start, end);
+	let thunk = raw;
+	for (const one of [...reads].sort((left, right) => (right.read.start ?? 0) - (left.read.start ?? 0))) {
+		if (typeof one.read.start !== 'number' || typeof one.read.end !== 'number') return null;
+		thunk =
+			thunk.slice(0, one.read.start - start) +
+			`${COUNT_VALUE_PARAMETER}(${one.record.computedName})` +
+			thunk.slice(one.read.end - start);
+	}
+	return { source: raw.trim(), thunkSource: thunk.trim() };
+}
+
+/** The one name both regimes bind the resolved count reader to inside a thunk. */
+export const COUNT_VALUE_PARAMETER = 'marklessCountValue';
 
 // The shared walk skips `openingElement`, so an attribute expression is only
 // reachable through it - and an attribute is where a count is usually spent.
@@ -133,6 +203,11 @@ function markupChildNodes(node: AnyNode): AnyNode[] {
 }
 
 type Spend = { readonly node: AnyNode; readonly operation: string };
+
+type Verdict =
+	| { readonly kind: 'print' }
+	| { readonly kind: 'defer'; readonly printed: AnyNode }
+	| ({ readonly kind: 'refuse' } & Spend);
 
 /**
  * Whether the render itself performs this read. A read the render never
@@ -152,30 +227,43 @@ function renderTime(ancestors: ReadonlyArray<AnyNode>): boolean {
 }
 
 /**
- * Walks out from the read to the first node that decides how the value is
- * used. A template literal slot is transparent - the count is stringified into
- * the text either way - so the walk steps through it and judges what holds the
- * template.
+ * Walks out from the read until something decides how the value is used. A
+ * template literal slot is transparent - the count is stringified into the text
+ * either way - so the walk steps through it and judges what holds the template.
+ *
+ * It keeps walking through the operations a thunk can carry, remembering the
+ * INNERMOST one, because that is the operation an author has to move if the
+ * walk ends somewhere a thunk cannot reach. Reaching a markup text or attribute
+ * slot with an operation behind it is the deferrable shape.
  *
  * A read the render never performs is not a spend: by the time a handler runs,
  * the count is a number in the graph. So the walk stops at the nearest function
  * that is not a derive, and says nothing.
  */
-function spentAt(read: AnyNode, ancestors: ReadonlyArray<AnyNode>): Spend | null {
+function spentAt(read: AnyNode, ancestors: ReadonlyArray<AnyNode>): Verdict | null {
 	let child = read;
+	let innermost: Spend | null = null;
 	for (let at = ancestors.length - 1; at >= 0; at -= 1) {
 		const parent = ancestors[at]!;
 		if (parent.type === 'TemplateLiteral' && asNodes(parent.expressions).includes(child)) {
 			child = parent;
 			continue;
 		}
-		if (isPrintedPosition(parent, child)) return null;
+		if (isPrintedPosition(parent, child)) {
+			if (!innermost) return { kind: 'print' };
+			return printsMarkupValue(ancestors, at)
+				? { kind: 'defer', printed: child }
+				: { kind: 'refuse', ...innermost };
+		}
 		if (parent.type === 'ArrowFunctionExpression' || parent.type === 'FunctionExpression') {
 			// A derive is the one function the render runs, and the value it
 			// publishes is a second binding holding the placeholder.
-			return isDeriveFunction(ancestors[at - 1], parent)
-				? { node: parent, operation: 'a derivation of the count' }
-				: null;
+			if (!isDeriveFunction(ancestors[at - 1], parent)) return null;
+			// The innermost operation is still the one the author has to move; a
+			// derive that only FORWARDS the count has no other, and is named itself.
+			return innermost
+				? { kind: 'refuse', ...innermost }
+				: { kind: 'refuse', node: parent, operation: 'a derivation of the count' };
 		}
 		// Statement scaffolding inside a derive body carries the value out unchanged.
 		if (parent.type === 'ReturnStatement' || parent.type === 'BlockStatement') {
@@ -183,9 +271,31 @@ function spentAt(read: AnyNode, ancestors: ReadonlyArray<AnyNode>): Spend | null
 			continue;
 		}
 		const operation = operationName(parent, child);
-		return operation ? { node: parent, operation } : null;
+		if (!operation) return innermost ? { kind: 'refuse', ...innermost } : null;
+		if (!innermost) innermost = { node: parent, operation };
+		if (!thunkable(parent, child)) return { kind: 'refuse', ...innermost };
+		child = parent;
 	}
-	return null;
+	return innermost ? { kind: 'refuse', ...innermost } : null;
+}
+
+/** Whether a thunk called after the page composed can still carry this value out. */
+function thunkable(parent: AnyNode, child: AnyNode): boolean {
+	switch (parent.type) {
+		case 'BinaryExpression':
+		case 'LogicalExpression':
+		case 'UnaryExpression':
+		case 'ConditionalExpression':
+			return true;
+		case 'MemberExpression':
+			return parent.object === child;
+		case 'CallExpression':
+			return parent.callee !== child;
+		default:
+			// An assignment, an update, a composite and a carried local all publish
+			// the value somewhere the resolver has no token to find it in.
+			return false;
+	}
 }
 
 // A markup slot: the value the renderer prints, verbatim, wherever it stands.
@@ -195,6 +305,28 @@ function isPrintedPosition(parent: AnyNode, child: AnyNode): boolean {
 	// The block-with-one-expression form a bare arm interpolation parses as.
 	if (parent.type === 'ExpressionStatement') return parent.expression === child;
 	return false;
+}
+
+/**
+ * Whether the printed position is one the renderer prints as TEXT or as a host
+ * attribute - the two slots a deferred token can stand in until the resolver
+ * splices it. A child component's prop is not one: the token would cross into
+ * another module's render as a string nobody there knows to resolve.
+ */
+function printsMarkupValue(ancestors: ReadonlyArray<AnyNode>, at: number): boolean {
+	const holder = ancestors[at - 1];
+	if (!holder) return true;
+	if (holder.type !== 'JSXAttribute') return !isComponentElement(holder);
+	const element = ancestors[at - 2];
+	return !element || !isComponentElement(element);
+}
+
+function isComponentElement(node: AnyNode): boolean {
+	if (node.type !== 'JSXElement') return false;
+	const name = getIdentifierName(
+		(node.openingElement as AnyNode | undefined)?.name as AnyNode | undefined,
+	);
+	return !!name && /^[A-Z]/.test(name);
 }
 
 function isDeriveFunction(grandparent: AnyNode | undefined, fn: AnyNode): boolean {

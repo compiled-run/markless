@@ -145,6 +145,12 @@ export type PrerenderDataDefinition = {
 			// widget a part belongs to arrives through the seed map, so `read`
 			// already answers it.
 			readonly idPrefix?: string;
+			// Where an expression that SPENDS a roster count goes: the count is a
+			// placeholder until the page has composed, so the whole expression is
+			// handed over and the resolver splices its answer.
+			readonly deferCount?: (
+				thunk: (count: (placeholder: unknown) => number) => unknown,
+			) => unknown;
 		},
 	) => unknown;
 };
@@ -414,10 +420,15 @@ async function evaluatePrerenderDataSurface(
 	});
 	// A count is asked before the members it counts have rendered, so the page
 	// this render produced is where it becomes a number.
-	if (!marklessRosterPositions(sharedSeeds)?.counted) return rendered;
+	const positions = marklessRosterPositions(sharedSeeds);
+	if (!positions?.counted) return rendered;
 	const roster = await (globalThis as RosterResumeHost).__marklessRosterResume?.();
 	if (!roster) throw new Error('MARKLESS_ROSTER_COUNT_UNRESOLVED');
-	return roster.marklessResolveRosterCounts(rendered);
+	// The spent expressions first: what the placeholder resolver then sees is only
+	// the counts that were printed as they stood.
+	return roster.marklessResolveRosterCounts(
+		roster.marklessResolveDeferredCounts(rendered, positions.deferred ?? []),
+	);
 }
 
 type RosterResumeHost = {
@@ -787,6 +798,7 @@ function evaluatePrerenderDataComponent(input: {
 								asyncError: context.asyncError,
 								read,
 								idPrefix: input.idPrefix,
+								deferCount: rosterPositionContext.deferCount,
 							});
 						throw new Error('MARKLESS_PRERENDER_RESIDUE_MISSING');
 					},
