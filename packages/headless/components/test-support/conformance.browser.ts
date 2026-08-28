@@ -31,6 +31,7 @@ import Textbox from '../src/textbox/scenarios/basic.tsrx';
 import Toaster from '../src/toaster/scenarios/basic.tsrx';
 import Toggle from '../src/toggle/scenarios/basic.tsrx';
 import ToggleGroup from '../src/togglegroup/scenarios/basic.tsrx';
+import Toolbar from '../src/toolbar/scenarios/basic.tsrx';
 import Tooltip from '../src/tooltip/scenarios/basic.tsrx';
 import Tour from '../src/tour/scenarios/basic.tsrx';
 import Tree from '../src/tree/scenarios/basic.tsrx';
@@ -639,6 +640,20 @@ const descriptors: readonly FamilyDescriptor[] = [
 		root: 'root',
 		parts: ['root', 'label', 'left', 'center', 'right'],
 		rootAria: { role: 'group' },
+		supportsDisabled: true,
+	},
+	{
+		family: 'toolbar',
+		mount: { CSR: () => render(Toolbar), SSR: () => renderSSR(Toolbar) },
+		root: 'root',
+		parts: ['root', 'label', 'copy', 'cut', 'paste'],
+		rootAria: { role: 'toolbar', 'aria-orientation': 'horizontal' },
+		// No openCycle: a toolbar opens nothing of its own. It groups controls that
+		// keep their own roles and collapses their tab stops into one, so the
+		// battery's click-a-trigger cycle has no part of this family's to click. The
+		// roving stop, the arrow walk and the foreign-control registration live in
+		// src/toolbar/toolbar.browser.ts.
+		valuedAttributes: [],
 		supportsDisabled: true,
 	},
 	{

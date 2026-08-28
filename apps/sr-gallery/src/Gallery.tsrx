@@ -23,6 +23,7 @@ import {
 	textbox,
 	toggle,
 	togglegroup,
+	toolbar,
 	tooltip,
 	tour,
 } from '@markless/ui';
@@ -32,7 +33,7 @@ import {
 // /#toggle, /#textbox, /#progress, /#checklist, /#select, /#modal,
 // /#radio-group, /#tabs, /#popover, /#tooltip, /#slider, /#datebox,
 // /#fileupload, /#hovercard, /#calendar, /#menu, /#colorpicker,
-// /#togglegroup, /#numberbox, /#ink, /#pad, /#crop, /#tour. A family whose second shape a reader
+// /#togglegroup, /#numberbox, /#ink, /#pad, /#crop, /#tour, /#toolbar. A family whose second shape a reader
 // announces differently gets its own section too: /#slider-range,
 // /#numberbox-min-max-step, /#numberbox-currency, /#crop-image.
 //
@@ -498,6 +499,41 @@ export function Gallery() @{
 			<h2>Tour</h2>
 			<div class="scenario">
 				<TourSection />
+			</div>
+		</section>
+
+		{/* The mixed bar is the shape worth reading: controls from three other families keep their own roles - button, switch, button - and share the bar's single tab stop, with no wrapper part around any of them. Each registers itself by reading the enclosing toolbar. */}
+		<section id="toolbar">
+			<h2>Toolbar</h2>
+			<div class="scenario">
+				<toolbar.root>
+					<toolbar.label>Document</toolbar.label>
+
+					<togglegroup.root value="left">
+						<togglegroup.item value="left">Left</togglegroup.item>
+						<togglegroup.item value="center">Center</togglegroup.item>
+					</togglegroup.root>
+
+					<toggle.root>
+						<toggle.label>Wrap lines</toggle.label>
+						<toggle.trigger><toggle.thumb /></toggle.trigger>
+					</toggle.root>
+
+					<select.root>
+						<select.label>Font</select.label>
+						<select.trigger>Serif</select.trigger>
+						<select.content>
+							<select.item value="serif">
+								<select.itemlabel>Serif</select.itemlabel>
+							</select.item>
+							<select.item value="mono">
+								<select.itemlabel>Mono</select.itemlabel>
+							</select.item>
+						</select.content>
+					</select.root>
+
+					<toolbar.item>Print</toolbar.item>
+				</toolbar.root>
 			</div>
 		</section>
 	</main>

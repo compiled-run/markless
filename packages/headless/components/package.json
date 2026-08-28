@@ -55,6 +55,7 @@
 		"./toaster": "./src/toaster/index.ts",
 		"./toggle": "./src/toggle/index.ts",
 		"./togglegroup": "./src/togglegroup/index.ts",
+		"./toolbar": "./src/toolbar/index.ts",
 		"./tour": "./src/tour/index.ts",
 		"./tree": "./src/tree/index.ts"
 	},
