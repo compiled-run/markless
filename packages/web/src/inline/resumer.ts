@@ -960,28 +960,25 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 		} catch {}
 	}
 
+	// Array.isArray cannot narrow the readonly per-arm plan out of the union.
+	const armRecordSets = view.asyncBoundaries.flatMap((boundary) => {
+		const armRecords = boundary.armRecords as ProtocolArmRecordSet | undefined;
+		return armRecords && !Array.isArray(armRecords) ? [armRecords] : [];
+	});
+	const branches = view.branches ?? [];
+	const keyedRepeats = [
+		...(view.keyedRepeats ?? []),
+		...armRecordSets.flatMap((armRecords) => armRecords.keyedRepeats ?? []),
+	];
 	const nestedEventNames = new Set([
-		...(view.keyedRepeats ?? []).flatMap((repeat) =>
-			repeat.rowEvents.map((event) => event.eventName),
-		),
+		...keyedRepeats.flatMap((repeat) => repeat.rowEvents.map((event) => event.eventName)),
 		// An escalating branch serves one arm record set instead of a per-arm plan,
 		// and a flip brings in elements no payload record names.
-		...(view.branches ?? []).flatMap((branch) =>
+		...branches.flatMap((branch) =>
 			[...(branch.armRecords ?? []), ...(branch.servedArmRecords ? [branch.servedArmRecords] : [])]
 				.flatMap((arm) => arm.events.map((event) => event.eventName)),
 		),
-		...view.asyncBoundaries.flatMap((boundary) => {
-			// Array.isArray cannot narrow the readonly per-arm plan out of the union.
-			const armRecords = boundary.armRecords as ProtocolArmRecordSet | undefined;
-			return armRecords && !Array.isArray(armRecords)
-				? [
-						...(armRecords.events ?? []).map((event) => event.eventName),
-						...(armRecords.keyedRepeats ?? []).flatMap((repeat) =>
-							repeat.rowEvents.map((event) => event.eventName),
-						),
-					]
-				: [];
-		}),
+		...armRecordSets.flatMap((arm) => (arm.events ?? []).map((event) => event.eventName)),
 	]);
 	// A row that IS a component owns no element of the row chunk, so its gestures
 	// ride the child's own records and `rowEvents` is empty by construction: the
@@ -990,76 +987,41 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 	// An escalating branch replaces its arm from a fresh render, so a flip brings
 	// in elements this payload names no record for: same hatch, same reason.
 	const mintsComponentRows =
-		[
-			...(view.keyedRepeats ?? []),
-			...view.asyncBoundaries.flatMap((boundary) => {
-				const armRecords = boundary.armRecords as ProtocolArmRecordSet | undefined;
-				return armRecords && !Array.isArray(armRecords) ? (armRecords.keyedRepeats ?? []) : [];
-			}),
-		].some((repeat) => repeat.rowComponent !== undefined) ||
-		(view.branches ?? []).some((branch) => branch.escalates === true);
+		keyedRepeats.some((repeat) => repeat.rowComponent !== undefined) ||
+		branches.some((branch) => branch.escalates === true);
 	const eventNames = new Set([
 		...view.events.map((event) => event.eventName),
 		...nestedEventNames,
 	]);
-	// A key event can only reach an element that already holds focus, so a focus
-	// onto an element with a key record names the handler this page needs next.
-	// A wake, not a dispatch: the real key arrives through the capture listener
-	// below, queued behind this same import promise. Names restated because this
-	// body is serialized by toString().
-	const focusPreloadEventNames = ['keydown', 'keyup', 'keypress', 'beforeinput', 'input'];
-	// A focused control still reaches a press through Enter and Space, so a focus
-	// onto a press-only record names a handler this page needs next too.
-	const pressPreloadEventNames = ['click', 'pointerdown', 'pointerup'];
-	const focusWakeEventNames = [...focusPreloadEventNames, ...pressPreloadEventNames];
-	if (focusWakeEventNames.some((eventName) => eventNames.has(eventName))) {
-		const primeFocus = (event: Event) => {
-			if (root.__marklessDelegatedDispatch) return;
-			let primes = false;
-			for (
-				let element = event.target as Element | null;
-				element && !primes;
-				element = element.parentElement
-			) {
-				const hostNodeId = hostIds.get(element);
-				if (hostNodeId) {
-					const editable =
-						(element as HTMLElement).isContentEditable === true ||
-						element.tagName === 'INPUT' ||
-						element.tagName === 'TEXTAREA' ||
-						element.tagName === 'SELECT';
-					primes = focusWakeEventNames.some(
-						(eventName) =>
-							(editable ||
-								(eventName !== 'beforeinput' && eventName !== 'input')) &&
-							events.has(`${hostNodeId}\n${eventName}`),
-					);
-				}
-				if (element === root) break;
-			}
-			// Same hatch the dispatch listener opens on: a row minted after boot owns
-			// no element this payload names a record for.
-			if (
-				!primes &&
-				(mintsComponentRows ||
-					focusWakeEventNames.some((eventName) => nestedEventNames.has(eventName)))
-			)
-				primes = true;
-			if (!primes) return;
-			root.removeEventListener('focusin', primeFocus, true);
-			root.__marklessDelegatedDispatch = true;
-			(loaded ||= loadModule(resumeModuleUrl)).then((module) =>
-				module.resumeContainerEvent({ root, event: 0 }),
-			);
-		};
-		root.addEventListener('focusin', primeFocus, true);
-	}
-	// A pointer crosses onto a control before it presses it, and Safari focuses no
-	// button on click, so hover is what precedes a first press. Same wake, and
+	// A key event only reaches an element that already holds focus, and a pointer
+	// crosses a control before pressing it (Safari focuses no button on click), so
+	// focus and hover are what precede a first gesture. A wake, not a dispatch: the
+	// real event arrives through the capture listener below, queued behind this
+	// same import promise. Names are restated because this body ships by toString();
 	// pointerenter is unusable here because it does not bubble.
-	if (pressPreloadEventNames.some((eventName) => eventNames.has(eventName))) {
-		const primeHover = (event: Event) => {
+	const pressPreloadEventNames = ['click', 'pointerdown', 'pointerup'];
+	const focusWakeEventNames = [
+		'keydown',
+		'keyup',
+		'keypress',
+		'beforeinput',
+		'input',
+		...pressPreloadEventNames,
+	];
+	// Same hatch the dispatch listener opens on: a row minted after boot owns no
+	// element this payload names a record for.
+	const wakeOnUnknownElement =
+		mintsComponentRows ||
+		focusWakeEventNames.some((eventName) => nestedEventNames.has(eventName));
+	const primeEventNames = ['focusin', 'pointerover'].filter((_name, hover) =>
+		(hover ? pressPreloadEventNames : focusWakeEventNames).some((eventName) =>
+			eventNames.has(eventName),
+		),
+	);
+	if (primeEventNames.length > 0) {
+		const prime = (event: Event) => {
 			if (root.__marklessDelegatedDispatch) return;
+			const hover = event.type === 'pointerover';
 			let primed: Element | undefined;
 			for (
 				let element = event.target as Element | null;
@@ -1067,26 +1029,34 @@ function runInlineResumer(loadModule: (url: string) => Promise<InlineResumeModul
 				element = element.parentElement
 			) {
 				const hostNodeId = hostIds.get(element);
+				const editable =
+					(element as HTMLElement).isContentEditable === true ||
+					element.tagName === 'INPUT' ||
+					element.tagName === 'TEXTAREA' ||
+					element.tagName === 'SELECT';
 				if (
 					hostNodeId &&
-					pressPreloadEventNames.some((eventName) =>
-						events.has(`${hostNodeId}\n${eventName}`),
+					(hover ? pressPreloadEventNames : focusWakeEventNames).some(
+						(eventName) =>
+							(editable ||
+								(eventName !== 'beforeinput' && eventName !== 'input')) &&
+							events.has(`${hostNodeId}\n${eventName}`),
 					)
 				)
 					primed = element;
 				if (element === root) break;
 			}
+			if (!primed && !hover && wakeOnUnknownElement) primed = root;
 			if (!primed) return;
 			// A resting pointer sends no second crossing, so the control the wake was
 			// spent on is left where the runtime's own preload can read it.
-			root.__marklessPrimedHover = primed;
-			root.removeEventListener('pointerover', primeHover, true);
-			root.__marklessDelegatedDispatch = true;
-			(loaded ||= loadModule(resumeModuleUrl)).then((module) =>
-				module.resumeContainerEvent({ root, event: 0 }),
-			);
+			if (hover) root.__marklessPrimedHover = primed;
+			for (const primeEventName of primeEventNames)
+				root.removeEventListener(primeEventName, prime, true);
+			forward({ event: 0 });
 		};
-		root.addEventListener('pointerover', primeHover, true);
+		for (const primeEventName of primeEventNames)
+			root.addEventListener(primeEventName, prime, true);
 	}
 	for (const eventName of eventNames) {
 		if (eventName === 'visible') continue;
