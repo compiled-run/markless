@@ -1,11 +1,11 @@
 import { computed, element, shared, state } from '@markless/core';
+import { menubarState } from '../menubar/menubar.tsrx';
+import { toolbarState } from '../toolbar/toolbar.tsrx';
 import { surfaceStyle } from './menu-anchor.ts';
 import {
 	TYPEAHEAD_WINDOW,
-	barTarget,
 	dismissChain,
 	focusEdge,
-	isAnyShowing,
 	itemAt,
 	matchingItem,
 	ownItems,
@@ -45,8 +45,7 @@ const CLICK_GRACE = 300;
 // the module's only plain button, an item the only element carrying a
 // `menuitem*` role, a surface the only kind carrying `role="menu"` - a submenu
 // told apart by sitting inside an item - and the root the div that is left.
-// Under `menubar` the ROOT is the top surface, so every walk asks for its top
-// handle rather than assuming `menu.content` was written at all. `@layer markless` is what keeps these defaults losing to a
+// `@layer markless` is what keeps these defaults losing to a
 // consumer's own unlayered rules without a specificity fight.
 
 export const menuState = shared(
@@ -56,7 +55,6 @@ export const menuState = shared(
 			disabled: false,
 			loop: true,
 			radio: false,
-			menubar: false,
 			delay: 700,
 			closeDelay: 300,
 			focused: '',
@@ -161,7 +159,6 @@ export function MenuRoot({
 	disabled = false,
 	loop = true,
 	radio = false,
-	menubar = false,
 	delay = 700,
 	closeDelay = 300,
 	onChange,
@@ -177,19 +174,14 @@ export function MenuRoot({
 	menu.disabled = disabled;
 	menu.loop = loop;
 	menu.radio = radio;
-	menu.menubar = menubar;
 	menu.delay = delay;
 	menu.closeDelay = closeDelay;
-	// Under the flag the root IS the bar: always visible, never an overlay, and
-	// the surface the bar items belong to.
-	const barRole = computed(() => (menu.menubar ? 'menubar' : undefined));
-	const barAxis = computed(() => (menu.menubar ? 'horizontal' : false));
+	// Registered so an enclosing bar knows which menu a gesture landed in; outside every bar this resolves to no instance.
+	const menubar = menubarState();
 
 	<div
 		{...rest}
-		el={menu.rootEl}
-		role={barRole}
-		aria-orientation={barAxis}
+		el={[menu.rootEl, menubar.menuEls]}
 		ui-open={menu.open}
 		ui-closed={menu.open !== true}
 		ui-disabled={menu.disabled}
@@ -198,11 +190,6 @@ export function MenuRoot({
 			@layer markless {
 				/* Root and contextarea are not separable by structure, and neither is harmed by the other's declaration. */
 				div:not([role]) {
-					anchor-scope: --ui-menu;
-					-webkit-touch-callout: none;
-				}
-				/* A menubar root carries a role, so the rule above no longer reaches it. */
-				div[role="menubar"] {
 					anchor-scope: --ui-menu;
 					-webkit-touch-callout: none;
 				}
@@ -221,27 +208,28 @@ export function MenuRoot({
 
 export function MenuTrigger({ children, onClick, onKeydown, ...rest }: MenuTriggerProps) @{
 	const menu = menuState();
-	// A menubar has no trigger, and a component cannot see its own children, so
-	// the refusal has to be the trigger's own. It rides in the cell that renders
-	// the state because a component BODY may not read the shared instance: on a
-	// served page that read is a ReferenceError.
-	const expandedMark = computed(() => {
-		if (menu.menubar === true) {
-			throw new Error(
-				'menu.trigger cannot be written under a menubar: the bar is always showing, and each top-level menu.item opens its own menu.',
-			);
-		}
-		return menu.open ? 'true' : 'false';
-	});
+	const menubar = menubarState();
+	const toolbar = toolbarState();
+	const expandedMark = computed(() => (menu.open ? 'true' : 'false'));
+	// On a menu bar the trigger IS the bar item; a toolbar does not change what its controls are.
+	const triggerRole = computed(() => (menubar.mounted === true ? 'menuitem' : undefined));
+	const inBar = computed(() => menubar.mounted === true);
+	// Either bar writes the one roving stop onto its roster from its own handlers.
+	const stop = computed(() =>
+		menubar.mounted === true || toolbar.mounted === true ? -1 : undefined,
+	);
 
 	<button
 		{...rest}
-		el={menu.triggerEl}
+		el={[menu.triggerEl, menubar.triggerEls, toolbar.itemEls]}
 		type="button"
+		role={triggerRole}
 		aria-haspopup="menu"
 		aria-expanded={expandedMark}
 		aria-controls={menu.contentEl}
 		disabled={menu.disabled}
+		tabindex={stop}
+		ui-menubar={inBar}
 		ui-open={menu.open}
 		ui-closed={menu.open !== true}
 		onClick={(event) => {
@@ -273,7 +261,10 @@ export function MenuTrigger({ children, onClick, onKeydown, ...rest }: MenuTrigg
 
 			const key = event.key;
 			// Enter and Space stay the button's own activation: a lazy handler's preventDefault lands after the native dispatch, so opening here as well would toggle straight back shut.
-			const isOpenKey = key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End';
+			// On a bar, Home and End walk it, so the trigger leaves them to the menubar.
+			const isEdgeKey = key === 'Home' || key === 'End';
+			const isOpenKey =
+				key === 'ArrowDown' || key === 'ArrowUp' || (isEdgeKey && menubar.mounted !== true);
 			if (isOpenKey !== true || menu.disabled === true) {
 				onKeydown?.(event);
 				return;
@@ -289,7 +280,9 @@ export function MenuTrigger({ children, onClick, onKeydown, ...rest }: MenuTrigg
 	>
 		<style>
 			@layer markless {
-				button:not([role]) { anchor-name: --ui-menu; }
+				/* Two subjects, one part: on a menu bar the trigger carries `menuitem`. */
+				button:not([role]),
+				button[role="menuitem"] { anchor-name: --ui-menu; }
 			}
 		</style>
 		{children}
@@ -406,7 +399,9 @@ export function MenuContent({
 	...rest
 }: MenuContentProps) @{
 	const menu = menuState();
+	const menubar = menubarState();
 	const placement = computed(() => surfaceStyle(menu.position));
+	const inBar = computed(() => menubar.mounted === true);
 
 	<div
 		{...rest}
@@ -416,6 +411,7 @@ export function MenuContent({
 		role="menu"
 		aria-labelledby={menu.triggerEl}
 		hidden={menu.open !== true}
+		ui-menubar={inBar}
 		ui-open={menu.open}
 		ui-closed={menu.open !== true}
 		onContextmenu={(event) => {
@@ -494,6 +490,8 @@ export function MenuContent({
 					top: var(--y);
 					position-area: block-end span-inline-end;
 				}
+				/* A bar menu hangs straight under its trigger rather than running off to one side. */
+				[role="menu"][ui-menubar] { position-area: block-end; }
 			}
 		</style>
 		{children}
@@ -539,19 +537,12 @@ export function MenuItem({
 	const isExpanded = computed(() =>
 		item.submenu ? (item.expanded ? 'true' : 'false') : false,
 	);
-	// A menubar is a tab stop, an ordinary menu is not - its trigger is. Which bar
-	// item owns the stop is togglegroup's rule: until a focus says, every item is
-	// tabbable, and the ones inside a closed dropdown are unreachable anyway. No
-	// index, so no construction-order counter and no sibling to ask.
-	const isTabStop = computed(() =>
-		menu.menubar !== true ? false : menu.focused === '' || menu.focused === item.value,
-	);
 
 	<div
 		{...rest}
 		el={[item.itemEl, menu.itemEls]}
 		role={itemRole}
-		tabindex={isTabStop ? 0 : -1}
+		tabindex={-1}
 		aria-checked={checkedMark}
 		aria-haspopup={hasPopup}
 		aria-expanded={isExpanded}
@@ -574,8 +565,7 @@ export function MenuItem({
 				return;
 			}
 
-			const top = menu.menubar === true ? menu.rootEl : menu.contentEl;
-			const surfaces = surfacesOf(top, menu.itemContentEls);
+			const surfaces = surfacesOf(menu.contentEl, menu.itemContentEls);
 			const isSelection = menu.radio === true || item.checkable === true;
 			if (item.submenu === true) {
 				const wasOpen = item.expanded === true;
@@ -593,10 +583,8 @@ export function MenuItem({
 				// A command closes the whole chain it sits in, this surface and every one above it.
 				menu.choose(item.value);
 				dismissChain(surfaces, item.itemEl);
-				// The chain hands focus back level by level; the trigger is where it ends, whether or not the press had focus to begin with. A menubar has no trigger, so it ends on the bar item the command sat under.
-				if (menu.menubar === true) {
-					itemAt(ownItems(surfaces, menu.itemEls, top), item.itemEl)?.focus();
-				} else menu.triggerEl?.focus();
+				// The chain hands focus back level by level; the trigger is where it ends, whether or not the press had focus to begin with.
+				menu.triggerEl?.focus();
 			}
 			// The deepest item answered, so no item above it sees this press as its own.
 			event.stopPropagation();
@@ -619,8 +607,6 @@ export function MenuItem({
 			onFocusout?.(event);
 		}}
 		onKeydown={(event) => {
-			// The bar's own keys are here rather than on the root: the root wraps a
-			// contextarea's whole content too, and a caret must keep its arrows.
 			if (
 				event.key === 'Enter' ||
 				event.key === ' ' ||
@@ -643,42 +629,18 @@ export function MenuItem({
 			}
 
 			const key = event.key;
-			const mine = item.itemEl;
-			const top = menu.menubar === true ? menu.rootEl : menu.contentEl;
-			const surfaces = surfacesOf(top, menu.itemContentEls);
-			// A bar item is one the top surface owns; anything deeper is an ordinary
-			// item of the dropdown holding it and keeps the shipped keyboard.
-			const isBar =
-				menu.menubar === true && mine !== undefined && surfaceOf(surfaces, mine) === top;
+			const surfaces = surfacesOf(menu.contentEl, menu.itemContentEls);
 			const isSelection = menu.radio === true || item.checkable === true;
-			// On the bar the axis turns: the arrows that walk it are inline, and the block arrows are what open a menu.
-			const isOpenKey = isBar
-				? key === 'ArrowDown' || key === 'ArrowUp' || key === 'Enter' || key === ' '
-				: key === 'ArrowRight' || key === 'Enter' || key === ' ';
-			const isTypeaheadChar = key.length === 1 && (key !== ' ' || menu.typeahead !== '');
-			const isBarWalk =
-				isBar && (key === 'ArrowLeft' || key === 'ArrowRight' || key === 'Home' || key === 'End');
+			const isOpenKey = key === 'ArrowRight' || key === 'Enter' || key === ' ';
 
-			if (isBarWalk) {
-				barTarget(ownItems(surfaces, menu.itemEls, top), mine, key, menu.loop === true)?.focus();
-				event.stopPropagation();
-			} else if (isBar && isTypeaheadChar) {
-				// One buffer for the whole menu, the bar included, so a typed name finds a bar item the same way it finds a command.
-				const now = Date.now();
-				const isStale = now - menu.typeaheadAt > TYPEAHEAD_WINDOW;
-				const search = (isStale ? '' : menu.typeahead) + key.toLowerCase();
-				menu.type(search);
-				matchingItem(ownItems(surfaces, menu.itemEls, top), search, mine)?.focus();
-				event.stopPropagation();
-			} else if (item.submenu === true) {
+			if (item.submenu === true) {
 				if (isOpenKey) {
 					if (item.disabled !== true && menu.disabled !== true) {
 						item.expanded = true;
 						item.byHover = false;
-						// ArrowUp opens on the last command, which is the trigger's own rule one level up.
-						focusEdge(ownItems(surfaces, menu.itemEls, panel), isBar && key === 'ArrowUp');
+						focusEdge(ownItems(surfaces, menu.itemEls, panel), false);
 					}
-					// A bar's dropdown reads a bare ArrowRight as travel to the next menu; opening a nesting item's own submenu is not that.
+					// An enclosing menubar reads a bare ArrowRight as travel to the next menu; opening a nesting item's own submenu is not that.
 					event.stopPropagation();
 				}
 			} else if (key === 'Enter' || key === ' ') {
@@ -724,23 +686,6 @@ export function MenuItem({
 				return;
 			}
 
-			const top = menu.menubar === true ? menu.rootEl : menu.contentEl;
-			const surfaces = surfacesOf(top, menu.itemContentEls);
-			const isBar = menu.menubar === true && surfaceOf(surfaces, mine) === top;
-			if (isBar) {
-				// Hover-after-open, Radix's rule: on a bar nothing opens on hover until
-				// something is open, and from then on every neighbour opens at once. The
-				// hover intent below is the nested submenus' alone. The sibling showing
-				// closes itself: the focus this takes is what its own focusout answers.
-				if (isAnyShowing(menu.itemContentEls)) {
-					item.byHover = true;
-					item.expanded = true;
-					mine.focus();
-				}
-				onPointerover?.(event);
-				return;
-			}
-
 			const now = Date.now();
 			const isRested = menu.delay <= 0 || (item.restingUntil !== 0 && now >= item.restingUntil);
 			if (isRested) {
@@ -775,14 +720,6 @@ export function MenuItem({
 			// The submenu is written INSIDE the item, so a pointer crossing into it never leaves.
 			const went = event.relatedTarget as Node | null;
 			if (went !== null && mine.contains(went) === true) {
-				onPointerout?.(event);
-				return;
-			}
-
-			const top = menu.menubar === true ? menu.rootEl : menu.contentEl;
-			const surfaces = surfacesOf(top, menu.itemContentEls);
-			// A pointer wandering off the bar leaves the open menu up; only the next bar item, or a dismissal, takes it down.
-			if (menu.menubar === true && surfaceOf(surfaces, mine) === top) {
 				onPointerout?.(event);
 				return;
 			}
@@ -849,8 +786,7 @@ export function MenuItemContent({
 			if (event.detail.reason === 'escape' && isFocusInside) back?.focus();
 			// The primitive reports an outside press to the topmost surface only, and a press outside the whole menu closes all of it.
 			if (event.detail.reason === 'outside-press') {
-				const top = menu.menubar === true ? menu.rootEl : menu.contentEl;
-				dismissChain(surfacesOf(top, menu.itemContentEls), back);
+				dismissChain(surfacesOf(menu.contentEl, menu.itemContentEls), back);
 			}
 			onDismiss?.(event);
 		}}
@@ -866,8 +802,7 @@ export function MenuItemContent({
 			}
 
 			const here = event.target as HTMLElement;
-			const top = menu.menubar === true ? menu.rootEl : menu.contentEl;
-			const surfaces = surfacesOf(top, menu.itemContentEls);
+			const surfaces = surfacesOf(menu.contentEl, menu.itemContentEls);
 			const mine = item.itemContentEl;
 			// A key inside a deeper submenu belongs to that submenu's own surface.
 			if (mine === undefined || surfaceOf(surfaces, here) !== mine) {
@@ -876,34 +811,12 @@ export function MenuItemContent({
 			}
 
 			const key = event.key;
-			const owner = item.itemEl;
 			const items = ownItems(surfaces, menu.itemEls, mine);
 			const at = itemAt(items, here);
 			const isTypeaheadChar = key.length === 1 && (key !== ' ' || menu.typeahead !== '');
 			const isWalkKey = key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End';
-			// Only a BAR's own dropdown travels sideways. A deeper submenu keeps ArrowLeft as the step back out, which is the shipped recursion.
-			const isBarPanel =
-				menu.menubar === true && owner !== undefined && surfaceOf(surfaces, owner) === top;
-			const isBarTravel = isBarPanel && (key === 'ArrowLeft' || key === 'ArrowRight');
 
-			if (isBarTravel) {
-				const next = barTarget(
-					ownItems(surfaces, menu.itemEls, top),
-					owner,
-					key,
-					menu.loop === true,
-				);
-				// Radix's placement: the travel is answered where focus is, not on the bar
-				// item. The neighbour is opened by re-delivering the gesture that opens
-				// it, because an item's instance cannot reach a sibling's; this handler is
-				// that component's own, so the module answering it is already loaded.
-				if (next !== undefined && next !== owner) {
-					next.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
-					item.expanded = false;
-					item.byHover = false;
-				}
-				event.stopPropagation();
-			} else if (isWalkKey) {
+			if (isWalkKey) {
 				walkTarget(items, at, key, menu.loop === true)?.focus();
 				event.stopPropagation();
 			} else if (key === 'ArrowLeft') {
@@ -914,9 +827,7 @@ export function MenuItemContent({
 				event.stopPropagation();
 			} else if (key === 'Tab') {
 				item.expanded = false;
-				// The bar itself has nothing to hide, and the stop goes back to the bar item so Tab can reach the menubar again.
-				if (menu.menubar === true) menu.rove(item.value);
-				else menu.hide();
+				menu.hide();
 				event.stopPropagation();
 			} else if (isTypeaheadChar) {
 				const now = Date.now();
@@ -933,8 +844,6 @@ export function MenuItemContent({
 			@layer markless {
 				/* A submenu is the module's only `role="menu"` inside an item, which is what tells it apart from the top surface. */
 				[role^="menuitem"] [role="menu"] { position-area: inline-end span-block-end; }
-				/* A bar's dropdown hangs UNDER its bar item; only the nested ones sit beside theirs. */
-				[role="menubar"] > [role^="menuitem"] > [role="menu"] { position-area: block-end span-inline-end; }
 			}
 		</style>
 		{children}
