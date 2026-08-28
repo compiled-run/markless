@@ -1036,13 +1036,8 @@ function findModuleImport(
  * Handles bound in a keyed row and handles inside an async boundary arm are
  * collected too: a handler in either place still names the same authored handle,
  * and the resume registry answers by the same name.
- *
- * A handle a shared() factory DECLARES is admitted whether or not this module
- * binds it. Binding sites alone are not the right set: a family module can
- * declare a handle, hand it to parts that live in other modules, and only read
- * it back in a handler. The registry answers such a handle per instance, so the
- * read must lower to `getElementHandle` — resolving it against the binding sites
- * lowered it to `graph.read`, and a handle is not a graph value.
+ * Handles a shared() factory declares are admitted even when this module never
+ * binds them: a read of one must still lower to getElementHandle, not graph.read.
  */
 function elementHandlesByGraphNodeId(
 	payloadArena: SymbolResolverInput['payloadArena'],
