@@ -466,6 +466,90 @@ test('SSR: no placeholder count survives the render', async () => {
 	expect(PLACEHOLDER.test(document.body.innerHTML)).toBe(false);
 });
 
+// --- "2 of 5" ----------------------------------------------------------------
+
+// The count spent the way tour actually spends it: printed into surrounding text
+// through a template slot, by a part standing IN the roster it is counting. The
+// root's `of ${total}` is the same shape from the asker that renders FIRST, and
+// the item's is the asker that renders in the MIDDLE of its own members - a
+// forward pass answers neither, and both are exact because the served page
+// answers the placeholder rather than the render answering the question.
+//
+// This is the boundary the compiler now draws. `${total}` is a bare read spent
+// as string and is admitted; `total - 1` and `step >= total - 1` are refused by
+// MARKLESS_ROSTER_COUNT_NOT_A_NUMBER, pinned in the compiler's own suite.
+
+const labels = (within?: string) => items(within).map((one) => one.getAttribute('ui-label'));
+const rootLabels = () => roots().map((one) => one.getAttribute('ui-label'));
+
+test('CSR: a part prints "n of m" at first paint', async () => {
+	await render(StaticPage);
+
+	expect(labels()).toEqual(['1 of 3', '2 of 3', '3 of 3']);
+	expect(rootLabels()).toEqual(['of 3']);
+});
+
+test('SSR: a part prints "n of m" at first paint', async () => {
+	await renderSSR(StaticPage);
+
+	expect(labels()).toEqual(['1 of 3', '2 of 3', '3 of 3']);
+	expect(rootLabels()).toEqual(['of 3']);
+});
+
+test('CSR: every "n of m" moves when an item arrives', async () => {
+	await render(MutatingPage);
+	await userEvent.click(document.querySelector('[data-ic-add]') as HTMLElement);
+	await expect.poll(() => items().length, { timeout: 5000 }).toBe(4);
+
+	await expect
+		.poll(labels, { timeout: 5000 })
+		.toEqual(['1 of 4', '2 of 4', '3 of 4', '4 of 4']);
+	expect(rootLabels()).toEqual(['of 4']);
+});
+
+test('SSR: every "n of m" moves when an item arrives', async () => {
+	await renderSSR(MutatingPage);
+	await userEvent.click(document.querySelector('[data-ic-add]') as HTMLElement);
+	await expect.poll(() => items().length, { timeout: 5000 }).toBe(4);
+
+	await expect
+		.poll(labels, { timeout: 5000 })
+		.toEqual(['1 of 4', '2 of 4', '3 of 4', '4 of 4']);
+	expect(rootLabels()).toEqual(['of 4']);
+});
+
+test('CSR: every "n of m" moves when the first item leaves', async () => {
+	await render(MutatingPage);
+	await userEvent.click(document.querySelector('[data-ic-drop-first]') as HTMLElement);
+	await expect.poll(() => items().length, { timeout: 5000 }).toBe(2);
+
+	await expect.poll(labels, { timeout: 5000 }).toEqual(['1 of 2', '2 of 2']);
+	expect(rootLabels()).toEqual(['of 2']);
+});
+
+test('SSR: every "n of m" moves when the first item leaves', async () => {
+	await renderSSR(MutatingPage);
+	await userEvent.click(document.querySelector('[data-ic-drop-first]') as HTMLElement);
+	await expect.poll(() => items().length, { timeout: 5000 }).toBe(2);
+
+	await expect.poll(labels, { timeout: 5000 }).toEqual(['1 of 2', '2 of 2']);
+	expect(rootLabels()).toEqual(['of 2']);
+});
+
+test('CSR: two instances print their own "n of m" and not each other\'s', async () => {
+	await render(TwoInstancesPage);
+
+	expect(labels('[data-ic-first]')).toEqual(['1 of 2', '2 of 2']);
+	expect(labels('[data-ic-second]')).toEqual(['1 of 3', '2 of 3', '3 of 3']);
+});
+
+test('SSR: two instances print their own "n of m" and not each other\'s', async () => {
+	await renderSSR(TwoInstancesPage);
+
+	expect(labels('[data-ic-first]')).toEqual(['1 of 2', '2 of 2']);
+	expect(labels('[data-ic-second]')).toEqual(['1 of 3', '2 of 3', '3 of 3']);
+});
+
 // --- a place another expression can USE --------------------------------------
 
 // Painting a position proves it derived; it does not prove it can be READ. Every

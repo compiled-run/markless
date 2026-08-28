@@ -38,6 +38,7 @@ export function IcRoot({ children }) @{
 	<div
 		data-ic-root
 		ui-max={total}
+		ui-label={`of ${total}`}
 		ui-count={w.count}
 		ui-seen={w.seen}
 		onClick={() => {
@@ -63,8 +64,18 @@ export function IcItem({ children }) @{
 	// Guarded because a widget instance rooting a flippable arm registers no
 	// widget scope, so its own shared cells read undefined after resume.
 	const char = computed(() => w.code?.slice(pos, pos + 1) ?? '');
+	// tour's "2 of 5": the count asked by a part standing IN the roster it is
+	// counting, so no forward pass can answer it - and printed into surrounding
+	// text, which is the one shape a resolved-after-composition count survives.
+	const total = computed(() => w.itemEls.length);
 
-	<div data-ic-item el={[w.itemEls, mine]} ui-pos={pos} ui-mine={char}>{children}</div>
+	<div
+		data-ic-item
+		el={[w.itemEls, mine]}
+		ui-pos={pos}
+		ui-mine={char}
+		ui-label={`${pos + 1} of ${total}`}
+	>{children}</div>
 }
 
 // The same root, with its FIRST roster member gated by an `@if` arm. An arm
