@@ -44,7 +44,7 @@ export function watchForFailures(): FailureWatch {
 	};
 }
 
-function isVisible(node: Element): boolean {
+export function isVisible(node: Element): boolean {
 	if (!node.isConnected) return false;
 	if (node instanceof HTMLElement && node.hidden) return false;
 	if (node.getClientRects().length === 0) return false;
@@ -62,13 +62,19 @@ function isFocusable(node: Element): boolean {
 /**
  * Where focus ended up after a keyboard-only storm. Falling back to `<body>` is
  * the failure: a keyboard user is stranded with no way back into the widget.
+ *
+ * The one exception is `walkedOffTheEnd`: the storm's last focus move was `Tab`
+ * on the last tabbable element, which in a browser hands focus to the chrome and
+ * leaves the document with none. That is where a keyboard user asked to go, and
+ * the next `Tab` brings them back to the top of the page.
  */
-export function lostFocusReports(): string[] {
+export function lostFocusReports(walkedOffTheEnd = false): string[] {
 	const active = document.activeElement;
 	if (!active || !active.isConnected) {
-		return ['focus is on nothing that is still in the document'];
+		return walkedOffTheEnd ? [] : ['focus is on nothing that is still in the document'];
 	}
 	if (active === document.body || active === document.documentElement) {
+		if (walkedOffTheEnd) return [];
 		return [
 			`focus fell back to <${active.localName}>: the storm dropped it and nobody caught it`,
 		];

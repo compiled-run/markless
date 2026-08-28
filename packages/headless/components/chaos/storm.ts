@@ -6,6 +6,7 @@ import { type StormKind, nextAction, tick } from './actions.ts';
 import type { ChaosFamily } from './families.ts';
 import { ariaStateMismatches, lostFocusReports, watchForFailures } from './invariants.ts';
 import { RUN_SEED, replayHint, rngFrom, stormSeedFor } from './seed.ts';
+import { watchTabOut } from './tab-order.ts';
 
 /** Three storms per family per run, forty gestures each: the lane stays in minutes. */
 export const STORM_KINDS: readonly StormKind[] = ['pointer', 'keyboard', 'mixed'];
@@ -62,6 +63,7 @@ export async function runStorm(family: ChaosFamily, kind: StormKind): Promise<vo
 
 	// Opened after the mount so a mount's own output is not charged to the storm.
 	const watch = watchForFailures();
+	const tabs = watchTabOut();
 	const log: string[] = [];
 	const problems: string[] = [];
 
@@ -72,6 +74,10 @@ export async function runStorm(family: ChaosFamily, kind: StormKind): Promise<vo
 			const action = nextAction(rng, root, kind);
 			log.push(action.note);
 			await action.run();
+			// Folded into the gesture's own line so the log stays one line per gesture.
+			if (action.trace && action.trace.length > 0) {
+				log[log.length - 1] = `${action.note} [${action.trace.join('; ')}]`;
+			}
 			// Checked as the storm runs, not only at the end: a page that threw on
 			// gesture 3 should not be blamed on gesture 40.
 			if (watch.reports.length > 0) break;
@@ -80,7 +86,7 @@ export async function runStorm(family: ChaosFamily, kind: StormKind): Promise<vo
 		await tick(SETTLE_MS);
 
 		problems.push(...watch.reports);
-		if (kind === 'keyboard') problems.push(...lostFocusReports());
+		if (kind === 'keyboard') problems.push(...lostFocusReports(tabs.walkedOffTheEnd()));
 		problems.push(...ariaStateMismatches(root));
 
 		if (problems.length === 0) {
@@ -98,6 +104,7 @@ export async function runStorm(family: ChaosFamily, kind: StormKind): Promise<vo
 		}
 	} finally {
 		watch.stop();
+		tabs.stop();
 	}
 
 	if (problems.length > 0) throw new Error(report(family, kind, stormSeed, log, problems));
