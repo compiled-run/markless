@@ -104,7 +104,8 @@ const STAGE_ANCHORS = {
 	// it modulepreloads nearly every chunk it emits.
 	// +106: keyed-repeat row-template slots qualified through composition (rows may read outside their item); +9: component-local handles keyed by host scope.
 	'page-load download': { gzipBytes: 137_243, margin: 128 },
-	'page-load execute': { gzipBytes: 14_221, margin: 128 },
+	// +5: roster-count placeholder minted in the eager seed slot (the resolver itself is demand-loaded).
+	'page-load execute': { gzipBytes: 14_226, margin: 128 },
 	'interaction 1 marginal': { gzipBytes: 2_416, margin: 32 },
 	'interaction 2 marginal': { gzipBytes: 2_705, margin: 32 },
 	'interaction 3 marginal': { gzipBytes: 2_706, margin: 32 },
