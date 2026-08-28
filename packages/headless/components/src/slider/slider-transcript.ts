@@ -14,10 +14,10 @@ import type { ScreenReaderDriver } from '../../test-support/driver.ts';
  * what can be asserted honestly until a CI run prints one.
  */
 
-// The slider section is the eleventh of twelve on the gallery page, so a walk
+// The slider section is the twelfth of thirteen on the gallery page, so a walk
 // that starts at the top of the document needs more steps than any other
 // family's.
-const WALK_LIMIT = 220;
+const WALK_LIMIT = 250;
 // The range section is the next one down, so its walk starts where the first
 // walk stopped rather than at the top.
 const RANGE_WALK_LIMIT = 40;
@@ -29,7 +29,7 @@ const RANGE_NAME = 'Price';
 // fact whose wording either one has on record.
 const ROLE = 'slider';
 
-// The thumb carries `aria-valuetext` as the bare number, so the value a reader
+// The thumb carries `aria-valuenow` as the bare number, so the value a reader
 // speaks is that number however it wraps it.
 const RESTING = 40;
 const STEPPED_UP = 41;

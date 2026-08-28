@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { marklessSsrComponentPart } from '@markless/web/fns/ssr';
+import { renderToString } from '@markless/web/render-to-string';
 import { transformTsrxModule } from '../src/transform.ts';
 import { MARKLESS_SHARED_CALL_UNCOMPILED } from '../src/source-module.ts';
 
@@ -198,15 +199,33 @@ test('a barrel re-export composes as the part the module publishes it as', async
 	const stub = compiledAppStub();
 	const published = publishedExports(await emit(FAMILY, { environment: 'server' }), stub);
 
-	expect(published.Trigger).toBe(stub.renderSsrComponents.Trigger);
-	expect(marklessSsrComponentPart(published.Trigger as never, 'Trigger')).toBe(
-		stub.renderSsrComponents.Trigger,
+	// The published binding is the part plus the brand that lets the render path
+	// refuse it AS A PAGE; what composition reads off it is the part's own function.
+	expect((published.Trigger as { renderSsr?: unknown }).renderSsr).toBe(
+		stub.renderSsrComponents.Trigger.renderSsr,
+	);
+	expect(published.Trigger).toMatchObject({ marklessComponentPart: 'Trigger' });
+	expect(marklessSsrComponentPart(published.Trigger as never, 'Trigger')?.renderSsr).toBe(
+		stub.renderSsrComponents.Trigger.renderSsr,
 	);
 	// The merged root still carries the map, so a barrel that re-exports the root
 	// and composes a sibling part off it resolves that sibling too.
 	expect(marklessSsrComponentPart(published.Root as never, 'Trigger')).toBe(
 		stub.renderSsrComponents.Trigger,
 	);
+});
+
+// A bare part has none of the module surface, so a page rendered from one is
+// served complete and INERT: no resume module, so no client runtime is ever
+// fetched and no gesture on it can dispatch. It is refused instead.
+test('rendering a published non-root part AS A PAGE is refused; the root is not', async () => {
+	const stub = compiledAppStub();
+	const published = publishedExports(await emit(FAMILY, { environment: 'server' }), stub);
+
+	await expect(renderToString(published.Trigger as never)).rejects.toThrow(
+		/MARKLESS_COMPONENT_PART_AS_PAGE: "Trigger"/,
+	);
+	expect(await renderToString(published.Root as never)).toContain('<root>');
 });
 
 test('a client production build publishes the root as its client render surface', async () => {
@@ -232,7 +251,10 @@ test('a non-root part a client production build cannot serve is published inert'
 	const stub = compiledAppStub();
 	const published = publishedExports(await emit(FAMILY, { environment: 'client' }), stub);
 
-	expect(published.Trigger).toEqual({ marklessCsrOnlyPart: 'Trigger' });
+	expect(published.Trigger).toEqual({
+		marklessCsrOnlyPart: 'Trigger',
+		marklessComponentPart: 'Trigger',
+	});
 	expect(marklessSsrComponentPart(published.Trigger as never, 'Trigger')).toBe(
 		published.Trigger,
 	);
