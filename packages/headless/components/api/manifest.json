@@ -3839,6 +3839,185 @@
 			}
 		]
 	},
+	"timebox": {
+		"parts": [
+			{
+				"part": "dayperiodinput",
+				"component": "TimeBoxDayPeriodInput",
+				"doc": "Which half of the day the time falls in. It shows whatever words the locale's\nown data gives for them, and `a` and `p` set it directly, as well as the\narrows. Write it only on a 12-hour clock; a 24-hour time already says which\nhalf of the day it means.",
+				"props": [
+					{
+						"name": "placeholder",
+						"type": "string",
+						"required": false,
+						"doc": "The text an empty box shows. Defaults to the box's own shape: `hh`, `mm`, `ss`, `--`."
+					},
+					{
+						"name": "showLeadingZero",
+						"type": "boolean",
+						"required": false,
+						"doc": "Show a single-digit part as `04` rather than `4`."
+					}
+				]
+			},
+			{
+				"part": "description",
+				"component": "TimeBoxDescription",
+				"doc": "Supporting text for the group, named by every box's `aria-describedby`. Mount\nit alongside `timebox.error` and the boxes name both, the error first.",
+				"props": []
+			},
+			{
+				"part": "error",
+				"component": "TimeBoxError",
+				"doc": "The validation message, named by every box's `aria-describedby` ahead of\n`timebox.description`. Mounting it is what marks the boxes invalid - they\nreport `aria-invalid` for as long as this part is in the page - so render it\nonly when there is an error to show.",
+				"props": []
+			},
+			{
+				"part": "field",
+				"component": "TimeBoxField",
+				"doc": "The element a form submits. It is clipped, out of the tab order and hidden\nfrom readers, and it carries the whole time as `HH:mm` or `HH:mm:ss` under the\nroot's `name` - the same string a native `<input type=\"time\">` would submit.",
+				"props": []
+			},
+			{
+				"part": "hourinput",
+				"component": "TimeBoxHourInput",
+				"doc": "The hour: 1 to 12 on a 12-hour clock, 0 to 23 on a 24-hour one.",
+				"props": [
+					{
+						"name": "placeholder",
+						"type": "string",
+						"required": false,
+						"doc": "The text an empty box shows. Defaults to the box's own shape: `hh`, `mm`, `ss`, `--`."
+					},
+					{
+						"name": "showLeadingZero",
+						"type": "boolean",
+						"required": false,
+						"doc": "Show a single-digit part as `04` rather than `4`."
+					}
+				]
+			},
+			{
+				"part": "label",
+				"component": "TimeBoxLabel",
+				"doc": "The group's name: the element `role=\"group\"` points its `aria-labelledby` at.\nSeveral boxes have no single control for a `for` to point at, so the name is\ncarried by the IDREF rather than a `for`.",
+				"props": []
+			},
+			{
+				"part": "minuteinput",
+				"component": "TimeBoxMinuteInput",
+				"doc": "The minute, 0 to 59.",
+				"props": [
+					{
+						"name": "placeholder",
+						"type": "string",
+						"required": false,
+						"doc": "The text an empty box shows. Defaults to the box's own shape: `hh`, `mm`, `ss`, `--`."
+					},
+					{
+						"name": "showLeadingZero",
+						"type": "boolean",
+						"required": false,
+						"doc": "Show a single-digit part as `04` rather than `4`."
+					}
+				]
+			},
+			{
+				"part": "root",
+				"component": "TimeBoxRoot",
+				"doc": "A time of day typed one part at a time, as separate number boxes rather than\none text field. It is the group the boxes sit in and the home of the time they\nspell: put a `timebox.label`, a `timebox.hourinput`, a `timebox.minuteinput`\nand whichever of `timebox.secondinput`, `timebox.dayperiodinput`,\n`timebox.description`, `timebox.error` and `timebox.field` the page needs\ninside it.\n\nMounting a `timebox.secondinput` is what makes the time carry seconds - the\nparts written are the granularity, so there is no separate prop for it.\n\nIt reports `ui-disabled`, `ui-readonly`, `ui-required`, `ui-empty`,\n`ui-hour12` and `ui-order` for styling, and it is the element a reader\nannounces as the group the boxes belong to.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The time the boxes show, as `HH:mm` or `HH:mm:ss` on a 24-hour clock\nwhatever the locale displays. Omit it and they start empty."
+					},
+					{
+						"name": "min",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The earliest time the boxes will settle on, in the same shape as `value`."
+					},
+					{
+						"name": "max",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "The latest time the boxes will settle on, in the same shape as `value`."
+					},
+					{
+						"name": "locale",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "A BCP 47 language tag. It decides whether the boxes show a 12-hour or a\n24-hour clock, which words the AM/PM box shows, and the order `ui-order`\nreports. Omit it and the runtime's own locale answers."
+					},
+					{
+						"name": "hour12",
+						"type": "boolean",
+						"required": false,
+						"doc": "Show a 12-hour clock with an AM/PM box, or a 24-hour one. Omit it and the\nlocale decides - which is the usual case, and the reason this is not a\nrequired prop."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nothing can be typed in any box, and they all drop out of the tab order."
+					},
+					{
+						"name": "readonly",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The time can be read and walked but not changed. The boxes stay focusable."
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "A whole time is needed before a form submits."
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "Submitted under this name by `timebox.field`."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: string | null) => void",
+						"required": false,
+						"doc": "Called with the whole time as `HH:mm` or `HH:mm:ss` whenever the boxes spell\none, and with `null` while they do not. Omit it and the boxes still work;\nthe call site simply does nothing."
+					}
+				]
+			},
+			{
+				"part": "secondinput",
+				"component": "TimeBoxSecondInput",
+				"doc": "The second, 0 to 59. Mounting it is what makes the reported time carry seconds.",
+				"props": [
+					{
+						"name": "placeholder",
+						"type": "string",
+						"required": false,
+						"doc": "The text an empty box shows. Defaults to the box's own shape: `hh`, `mm`, `ss`, `--`."
+					},
+					{
+						"name": "showLeadingZero",
+						"type": "boolean",
+						"required": false,
+						"doc": "Show a single-digit part as `04` rather than `4`."
+					}
+				]
+			}
+		]
+	},
 	"toaster": {
 		"parts": [
 			{
@@ -3971,6 +4150,126 @@
 				"component": "ToggleTrigger",
 				"doc": "A consumer's `onClick` runs after the switch has flipped.",
 				"props": []
+			}
+		]
+	},
+	"tokenbox": {
+		"parts": [
+			{
+				"part": "description",
+				"component": "TokenBoxDescription",
+				"doc": "Supporting text, named by the surface's `aria-describedby`. Mount it alongside\n`tokenbox.error` and the surface names both, the error first.",
+				"props": []
+			},
+			{
+				"part": "error",
+				"component": "TokenBoxError",
+				"doc": "The validation message, named ahead of `tokenbox.description`. It carries\n`role=\"alert\"`, so a reader speaks it when it appears. Mounting it does not\nmark the box invalid: `invalid` is a prop on `tokenbox.root`.",
+				"props": []
+			},
+			{
+				"part": "field",
+				"component": "TokenBoxField",
+				"doc": "The form integration: one hidden input under the root's `name`, carrying the\nwhole value as JSON.\n\nThe format is the segment array as `JSON.stringify` writes it, keys omitted —\n`[{\"kind\":\"text\",\"text\":\"hi \"},{\"kind\":\"token\",\"value\":\"u_1\",\"label\":\"Alice\"}]`.\nA delimited flat string was rejected: a label may contain any character, so\nevery delimiter needs escaping, and an escape scheme is a worse contract than\nJSON. Read it back with `JSON.parse` and hand it straight to `value`.",
+				"props": []
+			},
+			{
+				"part": "input",
+				"component": "TokenBoxInput",
+				"doc": "The editing surface. It renders the value itself: tokens as\n`contenteditable=\"false\"` islands, which is what makes them atomic to the\nbrowser's own editing engine rather than to key handling this family would\nhave to write.",
+				"props": []
+			},
+			{
+				"part": "itemtrigger",
+				"component": "TokenBoxItemTrigger",
+				"doc": "One choice in an autocomplete list: pressing it puts that token in the box,\nreplacing whatever the trigger was searching on.\n\nThis is a part rather than a method a consumer calls, and the reason is a hard\ncompiler rule, not a style preference. Calling a `shared()` method compiles to\ncopying the method's authored body into the calling handler's module; across\nfiles the definition's imports do not travel with the copy, so the build\nrefuses (`MARKLESS_SHARED_METHOD_CROSS_MODULE`). The family therefore publishes\nthe control that performs the insertion, and a consumer composes it.\n\nEverything else an autocomplete needs is ordinary state a consumer reads from\n`tokenbox.state()`: `trigger` carries the character, the query and the rect to\nanchor a popover against. Reads cross module boundaries fine; only calls do not.",
+				"props": [
+					{
+						"name": "value",
+						"type": "string",
+						"required": true,
+						"doc": "The token's value — what `onChange` reports and what the markup carries."
+					},
+					{
+						"name": "label",
+						"type": "string",
+						"required": true,
+						"doc": "The token's rendered text, and its accessible text."
+					}
+				]
+			},
+			{
+				"part": "label",
+				"component": "TokenBoxLabel",
+				"doc": "The box's name. It names the surface through `aria-labelledby`; a click on it\nlands the caret in the surface, which a `for` cannot do because a\ncontenteditable `div` is not a labelable element.",
+				"props": []
+			},
+			{
+				"part": "root",
+				"component": "TokenBoxRoot",
+				"doc": "A contenteditable `role=\"textbox\"` whose value is text interrupted by atomic\ntokens: mentions, slash commands, structured search, an AI prompt field.\n\nIt is not a taglist with extra steps. The value model inverts (interleaved\ntext and tokens rather than a committed `string[]`), and the accessibility\ncontract inverts with it: one textbox whose tokens are atomic characters,\nrather than a list with per-item focus and real delete buttons.\n\n**The v1 bet, worth knowing before you adopt it:** the browser owns text\nediting and the family owns structure. Typing, deleting and composing run\nnatively and the value is derived back from the DOM afterwards; only token\ninsertion and paste rewrite the surface. `note.md` records what that buys and\nwhat it costs.",
+				"props": [
+					{
+						"name": "value",
+						"type": "readonly TokenBoxSegment[]",
+						"required": false,
+						"doc": "The value, in order. Omit it and the box starts empty.\n\nHanding back what `onChange` gave you is safe under the caret: the surface\nkeys its runs on content and position, so a value that comes back\nstructurally unchanged patches nothing. A genuinely different value does\nre-render, which is what controlling it is for."
+					},
+					{
+						"name": "defaultValue",
+						"type": "readonly TokenBoxSegment[]",
+						"required": false,
+						"doc": "What the box starts with when nothing controls it. Read once, on the first\nrender; after that the surface owns itself and reports out through\n`onChange`. Pass `value` instead to control it."
+					},
+					{
+						"name": "disabled",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "Nobody can type, delete or insert a token."
+					},
+					{
+						"name": "required",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The value is needed before the form submits, reported as `aria-required`."
+					},
+					{
+						"name": "invalid",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The control is in an invalid state, reported as `aria-invalid`."
+					},
+					{
+						"name": "multiline",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "The box accepts hard breaks, and reports `aria-multiline=\"true\"`. Off by\ndefault: a prompt field is one line until its author says otherwise."
+					},
+					{
+						"name": "triggers",
+						"type": "readonly string[]",
+						"required": false,
+						"default": "[]",
+						"doc": "The characters that open a trigger context — `['@']` for mentions,\n`['@', '/']` for a prompt field. Empty by default, like every other\nbehavioural opt-in in this package: with no triggers, `trigger` is never set\nand the box is a plain token-bearing text field."
+					},
+					{
+						"name": "name",
+						"type": "string",
+						"required": false,
+						"default": "''",
+						"doc": "Submitted under this name by `tokenbox.field`, as one JSON string."
+					},
+					{
+						"name": "onChange",
+						"type": "(value: readonly TokenBoxSegment[]) => void",
+						"required": false,
+						"doc": "Called with the whole value every time it changes."
+					}
+				]
 			}
 		]
 	},

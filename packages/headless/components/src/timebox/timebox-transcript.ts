@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { FAMILY_ANCHORS } from '../../../../../apps/sr-gallery/preview-server.ts';
 import type { ScreenReaderDriver } from '../../test-support/driver.ts';
 import { GALLERY_WALK_LIMIT } from '../../test-support/gallery-walk.ts';
 
@@ -20,12 +21,8 @@ const NAME = 'Start time';
 const HOUR = 'hour input';
 const PERIOD = 'AM or PM';
 
-/**
- * Written out rather than read from `FAMILY_ANCHORS`: the gallery has no timebox
- * key yet, because registering the family is a follow-up unit. That unit swaps
- * this literal for `FAMILY_ANCHORS.timebox`.
- */
-export const TIMEBOX_ANCHOR = '/#timebox';
+/** Where the empty starter sits on the gallery page. */
+export const TIMEBOX_ANCHOR = FAMILY_ANCHORS.timebox;
 
 function missing(phrase: string, facts: readonly string[]): string[] {
 	return facts.filter((fact) => !phrase.includes(fact));

@@ -37,6 +37,7 @@ import { Basic as SelectBasic } from '../src/select/scenarios/basic.tsrx';
 import SliderBasic from '../src/slider/scenarios/basic.tsrx';
 import TabsBasic from '../src/tabs/scenarios/basic.tsrx';
 import TextboxBasic from '../src/textbox/scenarios/basic.tsrx';
+import TimeBoxBasic from '../src/timebox/scenarios/basic.tsrx';
 import ToasterBasic from '../src/toaster/scenarios/basic.tsrx';
 import ToggleBasic from '../src/toggle/scenarios/basic.tsrx';
 import ToolbarBasic from '../src/toolbar/scenarios/basic.tsrx';
@@ -722,6 +723,30 @@ export const families: readonly ChaosFamily[] = [
 
 			await userEvent.clear(el<HTMLInputElement>('input'));
 			await expect.poll(() => el('root').getAttribute('ui-empty')).toBe('');
+		},
+	},
+	{
+		name: 'timebox',
+		mount: () => render(TimeBoxBasic),
+		rootTestId: 'root',
+		keyboardEntryTestId: 'hourinput',
+		storms: ['keyboard', 'mixed'],
+		async recover() {
+			// A storm's arrows leave text in the box, and a digit appends to whatever
+			// is there, so Delete empties it first and the two digits below then mean
+			// the same thing every run.
+			el<HTMLElement>('hourinput').focus();
+			await userEvent.keyboard('{Delete}');
+			await expect.poll(() => el('hourinput').textContent).toBe('hh');
+
+			await userEvent.keyboard('1');
+			await expect.poll(() => el('hourinput').textContent).toBe('1');
+			expect(document.activeElement).toBe(el('hourinput'));
+
+			await userEvent.keyboard('2');
+			await expect.poll(() => el('hourinput').textContent).toBe('12');
+			await expect.poll(() => el('hourinput').getAttribute('aria-valuenow')).toBe('12');
+			await expect.poll(() => document.activeElement).toBe(el('minuteinput'));
 		},
 	},
 	{

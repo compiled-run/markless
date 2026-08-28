@@ -39,8 +39,8 @@ Playwright can drive, and no other browser lane running at the same time.
 
 ### How long a run is
 
-Every family gets exactly **two** storms of **30** gestures. With 36 families
-that is 72 storms and 2,160 gestures, and the guard row at the top of
+Every family gets exactly **two** storms of **30** gestures. With 37 families
+that is 74 storms and 2,220 gestures, and the guard row at the top of
 `families.chaos.ts` fails if a family ever declares a third — the arithmetic is
 pinned rather than described.
 
@@ -54,7 +54,7 @@ Which two a family gets is stated in its own entry:
   hover-and-press surface, and a keyboard-only storm would never reach it.
 
 The lane was 6 families x 3 storms x 40 gestures when it was a pilot. Three
-storms and forty gestures across 36 families would have been 4,320 gestures and
+storms and forty gestures across 37 families would have been 4,440 gestures and
 took the run past the budget; two storms of thirty keeps it there while adding
 five times the families. Measured: **84 seconds of tests**, 96 seconds wall clock
 including the module import, on one headless Chromium.
@@ -199,6 +199,7 @@ copy, used unchanged.
 | slider      | `src/slider/scenarios/basic.tsrx`        | pointer, mixed     |
 | tabs        | `src/tabs/scenarios/basic.tsrx`          | keyboard, mixed    |
 | textbox     | `src/textbox/scenarios/basic.tsrx`       | keyboard, mixed    |
+| timebox     | `src/timebox/scenarios/basic.tsrx`       | keyboard, mixed    |
 | toaster     | `src/toaster/scenarios/basic.tsrx`       | pointer, mixed     |
 | toggle      | `src/toggle/scenarios/basic.tsrx`        | pointer, mixed     |
 | toolbar     | `src/toolbar/scenarios/basic.tsrx`       | keyboard, mixed    |

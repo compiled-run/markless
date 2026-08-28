@@ -1,4 +1,7 @@
-import type { SemanticElementRosterCount } from '../../artifacts.ts';
+import type {
+	ModuleGraphInterfacePropSpend,
+	SemanticElementRosterCount,
+} from '../../artifacts.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import { getComponentFunction } from '../../ast/tsrx.ts';
@@ -112,18 +115,41 @@ function deferredAndRefusedCountSpends(
 		if (symbolId === null) continue;
 		holdCount(scopes, record.componentName, component, symbolId, record, declared);
 	}
+	routeCountScopes(state, semantic, scopes);
 
-	// Routing is a fixpoint over BARE prop passes only, run to completion before
-	// anything is emitted: a component reached from two parents is judged once,
-	// with every count that arrives at it in hand.
+	const answers = new Map<SemanticElementRosterCount, DeferredExpression[]>();
+	for (const scope of scopes.values()) {
+		const found = walkCountScope(state, semantic, scope);
+		for (const refusal of found.refusals)
+			state.graph.diagnostics.push(spentDiagnostic(state, scope.componentName, refusal));
+		for (const route of found.routes)
+			for (const spend of importedPropSpends(state, route.target))
+				state.graph.diagnostics.push(importedSpentDiagnostic(state, route, spend));
+		for (const [printed, reads] of found.deferred) {
+			const entry = deferredExpression(state.source, printed, reads, scope.componentName);
+			if (!entry) continue;
+			for (const record of new Set(reads.map((one) => one.record)))
+				answers.set(record, [...(answers.get(record) ?? []), entry]);
+		}
+	}
+	return answers;
+}
+
+/**
+ * Routing is a fixpoint over BARE prop passes to a child THIS module declares,
+ * run to completion before anything is emitted: a component reached from two
+ * parents is judged once, with every count that arrives at it in hand.
+ */
+function routeCountScopes(
+	state: WalkState,
+	semantic: ReturnType<WalkState['semantic']>,
+	scopes: Map<string, CountScope>,
+): void {
 	for (let round = 0; round < scopes.size + 1; round += 1) {
 		// Collected before any is applied: filing a route grows `scopes`, and a walk
 		// that iterated it live would judge a component mid-way through learning
 		// which counts reach it.
-		const routes: Array<{
-			readonly target: PropTarget;
-			readonly record: SemanticElementRosterCount;
-		}> = [];
+		const routes: ScopeRoute[] = [];
 		for (const scope of scopes.values())
 			for (const route of walkCountScope(state, semantic, scope).routes) routes.push(route);
 		let grew = false;
@@ -145,19 +171,162 @@ function deferredAndRefusedCountSpends(
 		}
 		if (!grew) break;
 	}
+}
 
-	const answers = new Map<SemanticElementRosterCount, DeferredExpression[]>();
-	for (const scope of scopes.values()) {
-		const found = walkCountScope(state, semantic, scope);
-		for (const refusal of found.refusals) state.graph.diagnostics.push(refusal);
-		for (const [printed, reads] of found.deferred) {
-			const entry = deferredExpression(state.source, printed, reads, scope.componentName);
-			if (!entry) continue;
-			for (const record of new Set(reads.map((one) => one.record)))
-				answers.set(record, [...(answers.get(record) ?? []), entry]);
+/**
+ * What another module's component does with a count this module routes into one
+ * of its props, read off the interface that component's own module published.
+ *
+ * Every one of them is a refusal here, including the shapes a same-module child
+ * DEFERS. A deferral is a case in the spending component's compiled reader, and
+ * that module was emitted before this one learned a count reaches it; the thunk
+ * has nowhere to be written. Refusing names the spend instead of painting the
+ * placeholder's arithmetic.
+ */
+function importedPropSpends(
+	state: WalkState,
+	target: ResolvedPropTarget,
+): ReadonlyArray<ModuleGraphInterfacePropSpend> {
+	if (!target.importSource) return [];
+	const linked = state.importedModuleInterfaces[target.importSource];
+	const component = linked?.render.components.find(
+		(candidate) => candidate.componentName === target.childComponentName,
+	);
+	return (component?.propSpends ?? []).filter((spend) => spend.prop === target.propName);
+}
+
+/**
+ * Which of this module's components spend which of their props, published so a
+ * module routing a count into one of them can judge a spend it cannot walk.
+ *
+ * Each prop is asked the same question the count pass asks a real count: hold
+ * it in that binding, route it on through this module the way a real one would
+ * route, and record every position that is not a bare print. A prop forwarded
+ * to a child in a THIRD module carries that child's published spends up under
+ * this component's own prop name, so the chain is answered wherever it ends.
+ */
+export function collectComponentPropSpends(
+	state: WalkState,
+): ReadonlyMap<string, ReadonlyArray<ModuleGraphInterfacePropSpend>> {
+	const byComponent = new Map<string, ModuleGraphInterfacePropSpend[]>();
+	for (const component of state.graph.components) {
+		const node = componentFunction(state, component.name);
+		if (!node) continue;
+		for (const propName of destructuredPropNames(node)) {
+			const spends = propSpends(state, node, component.name, propName);
+			if (spends.length === 0) continue;
+			byComponent.set(component.name, [...(byComponent.get(component.name) ?? []), ...spends]);
 		}
 	}
-	return answers;
+	return byComponent;
+}
+
+function propSpends(
+	state: WalkState,
+	component: AnyNode,
+	componentName: string,
+	propName: string,
+): ModuleGraphInterfacePropSpend[] {
+	const semantic = state.semantic();
+	const declared = propBindingId(component, propName);
+	if (typeof declared?.start !== 'number') return [];
+	const symbolId = declaredSymbolAt(semantic, declared.start);
+	if (symbolId === null) return [];
+	const scopes = new Map<string, CountScope>();
+	const holder = propHolder(componentName, propName);
+	holdCount(scopes, componentName, component, symbolId, holder, declared);
+	routeCountScopes(state, semantic, scopes);
+
+	const spends: ModuleGraphInterfacePropSpend[] = [];
+	for (const scope of scopes.values()) {
+		const found = walkCountScope(state, semantic, scope);
+		for (const refusal of found.refusals)
+			spends.push({
+				prop: propName,
+				componentName: scope.componentName,
+				localName: refusal.localName,
+				operation: refusal.operation,
+				source: expressionSource(refusal.node, state.source) ?? refusal.localName,
+			});
+		// A spend a markup slot prints is deferrable only where the count's own
+		// module can still emit the thunk, so it crosses an edge as a spend too.
+		for (const [printed, spend] of found.deferredSpends) {
+			const read = found.deferred.get(printed)?.[0]?.read;
+			const localName = read ? getIdentifierName(read) : undefined;
+			if (!localName) continue;
+			spends.push({
+				prop: propName,
+				componentName: scope.componentName,
+				localName,
+				operation: spend.operation,
+				source: expressionSource(printed, state.source) ?? localName,
+			});
+		}
+		for (const route of found.routes)
+			for (const spend of importedPropSpends(state, route.target))
+				spends.push({ ...spend, prop: propName });
+	}
+	return spends;
+}
+
+/** The stand-in count a prop is asked to hold while its spends are measured. */
+function propHolder(componentName: string, propName: string): SemanticElementRosterCount {
+	return {
+		computedGraphNodeId: '',
+		computedName: propName,
+		componentName,
+		rosterGraphNodeId: '',
+		rosterSource: '',
+		source: '',
+	};
+}
+
+/** The prop names a signature takes out under a plain destructured local. */
+function destructuredPropNames(component: AnyNode): string[] {
+	const parameter = asNodes(component.params)[0];
+	if (parameter?.type !== 'ObjectPattern') return [];
+	return asNodes(parameter.properties).flatMap((property) => {
+		if (property.type !== 'Property' || property.computed === true) return [];
+		const name = getIdentifierName(property.key as AnyNode | undefined);
+		return name && propBindingId(component, name) ? [name] : [];
+	});
+}
+
+function spentDiagnostic(
+	state: WalkState,
+	componentName: string,
+	refusal: ScopeRefusal,
+): ReturnType<typeof rosterCountSpentDiagnostic> {
+	const span = sourceSpan(refusal.node, state.filename);
+	return rosterCountSpentDiagnostic({
+		computedName: refusal.localName,
+		componentName,
+		operation: refusal.operation,
+		source: expressionSource(refusal.node, state.source) ?? refusal.localName,
+		...(refusal.record.componentName === componentName
+			? {}
+			: { heldBy: refusal.record.computedName, derivedIn: refusal.record.componentName }),
+		...(span ? { span } : {}),
+	});
+}
+
+// The span is the placement this module wrote: the spend itself is another
+// module's line, which this compile has no source for.
+function importedSpentDiagnostic(
+	state: WalkState,
+	route: ScopeRoute,
+	spend: ModuleGraphInterfacePropSpend,
+): ReturnType<typeof rosterCountSpentDiagnostic> {
+	const span = sourceSpan(route.read, state.filename);
+	return rosterCountSpentDiagnostic({
+		computedName: spend.localName,
+		componentName: spend.componentName,
+		operation: spend.operation,
+		source: spend.source,
+		heldBy: route.record.computedName,
+		derivedIn: route.record.componentName,
+		...(span ? { span } : {}),
+	});
 }
 
 type CountScope = {
@@ -192,13 +361,25 @@ function holdCount(
 
 type CountRead = { readonly read: AnyNode; readonly record: SemanticElementRosterCount };
 
+type ScopeRefusal = {
+	readonly localName: string;
+	readonly record: SemanticElementRosterCount;
+	readonly node: AnyNode;
+	readonly operation: string;
+};
+
+type ScopeRoute = {
+	readonly target: ResolvedPropTarget;
+	readonly record: SemanticElementRosterCount;
+	readonly read: AnyNode;
+};
+
 type ScopeFindings = {
 	readonly deferred: ReadonlyMap<AnyNode, ReadonlyArray<CountRead>>;
-	readonly refusals: ReadonlyArray<ReturnType<typeof rosterCountSpentDiagnostic>>;
-	readonly routes: ReadonlyArray<{
-		readonly target: PropTarget;
-		readonly record: SemanticElementRosterCount;
-	}>;
+	/** The innermost operation behind each deferred expression, by printed node. */
+	readonly deferredSpends: ReadonlyMap<AnyNode, Spend>;
+	readonly refusals: ReadonlyArray<ScopeRefusal>;
+	readonly routes: ReadonlyArray<ScopeRoute>;
 };
 
 /** Every count read in one component, sorted into deferrals, refusals and routes. */
@@ -208,8 +389,9 @@ function walkCountScope(
 	scope: CountScope,
 ): ScopeFindings {
 	const deferred = new Map<AnyNode, CountRead[]>();
-	const refusals: Array<ReturnType<typeof rosterCountSpentDiagnostic>> = [];
-	const routes: Array<{ target: PropTarget; record: SemanticElementRosterCount }> = [];
+	const deferredSpends = new Map<AnyNode, Spend>();
+	const refusals: ScopeRefusal[] = [];
+	const routes: ScopeRoute[] = [];
 	const seen = new Set<AnyNode>();
 	const visit = (node: AnyNode, ancestors: ReadonlyArray<AnyNode>): void => {
 		if (seen.has(node)) return;
@@ -219,27 +401,23 @@ function walkCountScope(
 			const record = scope.bySymbol.get(resolvedSymbolAt(semantic, node.start) ?? -1);
 			if (record) {
 				const verdict = renderTime(ancestors) ? spentAt(node, ancestors) : null;
-				if (verdict?.kind === 'defer')
+				if (verdict?.kind === 'defer') {
 					deferred.set(verdict.printed, [
 						...(deferred.get(verdict.printed) ?? []),
 						{ read: node, record },
 					]);
-				else if (verdict?.kind === 'route') routes.push({ target: verdict.target, record });
-				else if (verdict?.kind === 'refuse')
-					refusals.push(
-						rosterCountSpentDiagnostic({
-							computedName: localName,
-							componentName: scope.componentName,
-							operation: verdict.operation,
-							source: expressionSource(verdict.node, state.source) ?? localName,
-							...(record.componentName === scope.componentName
-								? {}
-								: { heldBy: record.computedName, derivedIn: record.componentName }),
-							...(sourceSpan(verdict.node, state.filename)
-								? { span: sourceSpan(verdict.node, state.filename)! }
-								: {}),
-						}),
-					);
+					if (!deferredSpends.has(verdict.printed))
+						deferredSpends.set(verdict.printed, verdict.spend);
+				} else if (verdict?.kind === 'route') {
+					const target = resolvedPropTarget(state, verdict.target);
+					if (target) routes.push({ target, record, read: node });
+				} else if (verdict?.kind === 'refuse')
+					refusals.push({
+						localName,
+						record,
+						node: verdict.node,
+						operation: verdict.operation,
+					});
 				return;
 			}
 		}
@@ -247,7 +425,27 @@ function walkCountScope(
 		for (const child of markupChildNodes(node)) visit(child, chain);
 	};
 	visit(scope.component, []);
-	return { deferred, refusals, routes };
+	return { deferred, deferredSpends, refusals, routes };
+}
+
+/**
+ * The child a placement names, as the component-edge collector already resolved
+ * it: that is the one reading that answers a member tag (`<checkbox.Item />`)
+ * and the module its component actually lives in.
+ */
+function resolvedPropTarget(state: WalkState, target: PropTarget): ResolvedPropTarget | null {
+	const edge = state.graph.componentEdges.find(
+		(candidate) =>
+			candidate.sourceSpan?.start === target.element.start &&
+			candidate.sourceSpan?.end === target.element.end,
+	);
+	const childComponentName = edge?.childComponentName ?? componentElementName(target.element);
+	if (!childComponentName) return null;
+	return {
+		childComponentName,
+		propName: target.propName,
+		...(edge?.importSource ? { importSource: edge.importSource } : {}),
+	};
 }
 
 type DeferredExpression = NonNullable<SemanticElementRosterCount['deferred']>[number];
@@ -298,12 +496,18 @@ function markupChildNodes(node: AnyNode): AnyNode[] {
 
 type Spend = { readonly node: AnyNode; readonly operation: string };
 
-type PropTarget = { readonly childComponentName: string; readonly propName: string };
+type PropTarget = { readonly element: AnyNode; readonly propName: string };
+
+type ResolvedPropTarget = {
+	readonly childComponentName: string;
+	readonly propName: string;
+	readonly importSource?: string;
+};
 
 type Verdict =
 	| { readonly kind: 'print' }
 	| { readonly kind: 'route'; readonly target: PropTarget }
-	| { readonly kind: 'defer'; readonly printed: AnyNode }
+	| { readonly kind: 'defer'; readonly printed: AnyNode; readonly spend: Spend }
 	| ({ readonly kind: 'refuse' } & Spend);
 
 /**
@@ -355,7 +559,7 @@ function spentAt(read: AnyNode, ancestors: ReadonlyArray<AnyNode>): Verdict | nu
 				return target ? { kind: 'route', target } : { kind: 'print' };
 			}
 			return printsMarkupValue(ancestors, at)
-				? { kind: 'defer', printed: child }
+				? { kind: 'defer', printed: child, spend: innermost }
 				: { kind: 'refuse', ...innermost };
 		}
 		if (parent.type === 'ArrowFunctionExpression' || parent.type === 'FunctionExpression') {
@@ -445,9 +649,9 @@ function componentPropTarget(ancestors: ReadonlyArray<AnyNode>, at: number): Pro
 	const holder = ancestors[at - 1];
 	if (holder?.type !== 'JSXAttribute') return null;
 	const element = ancestors[at - 2];
-	const childComponentName = element ? componentElementName(element) : null;
+	if (element?.type !== 'JSXElement') return null;
 	const propName = getIdentifierName(holder.name as AnyNode | undefined);
-	return childComponentName && propName ? { childComponentName, propName } : null;
+	return propName ? { element, propName } : null;
 }
 
 /**
@@ -531,17 +735,28 @@ function countDeclarationId(component: AnyNode, computedName: string): AnyNode |
 	return found;
 }
 
+// Asked once per count and once per prop of every component in the module, so
+// the table is indexed rather than scanned again for each.
+const declaredSymbols = new WeakMap<object, ReadonlyMap<number, number>>();
+
 /** The binding a declaration site introduces, found by where its name starts. */
 function declaredSymbolAt(
 	semantic: ReturnType<WalkState['semantic']>,
 	offset: number,
 ): number | null {
-	for (let symbolId = 0; symbolId < semantic.symbol.count; symbolId += 1) {
-		for (let declIndex = 0; declIndex < semantic.symbol.declCount(symbolId); declIndex += 1) {
-			if (semantic.symbol.declNode(symbolId, declIndex).start === offset) return symbolId;
+	let byOffset = declaredSymbols.get(semantic);
+	if (!byOffset) {
+		const index = new Map<number, number>();
+		for (let symbolId = 0; symbolId < semantic.symbol.count; symbolId += 1) {
+			for (let declIndex = 0; declIndex < semantic.symbol.declCount(symbolId); declIndex += 1) {
+				const start = semantic.symbol.declNode(symbolId, declIndex).start;
+				if (typeof start === 'number' && !index.has(start)) index.set(start, symbolId);
+			}
 		}
+		byOffset = index;
+		declaredSymbols.set(semantic, byOffset);
 	}
-	return null;
+	return byOffset.get(offset) ?? null;
 }
 
 type CountQuery = {

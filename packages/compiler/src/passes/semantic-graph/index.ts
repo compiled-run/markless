@@ -21,7 +21,7 @@ import {
 	getFrameworkApiForCall,
 } from './imports.ts';
 import { collectComponentProps } from './collect-components.ts';
-import { collectElementRosterCounts } from './roster-count.ts';
+import { collectComponentPropSpends, collectElementRosterCounts } from './roster-count.ts';
 import { collectElementRosterPositions } from './roster-position.ts';
 import { spreadHostsField } from './spread-hosts.ts';
 import { armMaterialField } from './arm-material.ts';
@@ -180,6 +180,10 @@ export async function buildSemanticGraph(
 			? { importedModuleInterfaces: input.importedModuleInterfaces }
 			: {}),
 	};
+	// Published for a module that routes a roster count into one of these props:
+	// the count is a placeholder until the page composes, and only this module
+	// knows what its own components do with the value once it lands.
+	const propSpends = collectComponentPropSpends(state);
 	graph.moduleGraphInterface = {
 		...graph.moduleGraphInterface,
 		...(sharedDefinitions.length > 0 ? { sharedDefinitions } : {}),
@@ -223,6 +227,9 @@ export async function buildSemanticGraph(
 							rootChunkId: root.id,
 						}),
 						...armMaterialField(graph, component.name, chunks),
+						...(propSpends.get(component.name)?.length
+							? { propSpends: propSpends.get(component.name)! }
+							: {}),
 					},
 				];
 			}),
