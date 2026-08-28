@@ -58,8 +58,12 @@ export function collectModuleImports(
 		if (statement.type !== 'ImportDeclaration') continue;
 		const source = importSource(statement);
 		if (!source) continue;
+		const declarationIsTypeOnly = statement.importKind === 'type';
 
 		for (const specifier of asNodes(statement.specifiers)) {
+			const typeOnly = declarationIsTypeOnly || specifier.importKind === 'type';
+			const typeOnlyField = typeOnly ? { typeOnly: true as const } : {};
+
 			if (specifier.type === 'ImportSpecifier') {
 				const importedName = getIdentifierName(specifier.imported as AnyNode | undefined);
 				const localName = getIdentifierName(specifier.local as AnyNode | undefined);
@@ -72,6 +76,7 @@ export function collectModuleImports(
 					importedName,
 					source,
 					kind: 'named',
+					...typeOnlyField,
 				});
 				continue;
 			}
@@ -84,6 +89,7 @@ export function collectModuleImports(
 					localName,
 					source,
 					kind: 'default',
+					...typeOnlyField,
 				});
 				continue;
 			}
@@ -96,12 +102,24 @@ export function collectModuleImports(
 					localName,
 					source,
 					kind: 'namespace',
+					...typeOnlyField,
 				});
 			}
 		}
 	}
 
 	return imports;
+}
+
+/**
+ * The imports an emitted module may carry. A type-only binding is erased before
+ * anything runs, so carrying one emits a value import for a specifier the source
+ * module may not export at all — a throw at module load rather than at first use.
+ */
+export function valueModuleImports<T extends { readonly typeOnly?: boolean }>(
+	moduleImports: ReadonlyArray<T>,
+): ReadonlyArray<T> {
+	return moduleImports.filter((moduleImport) => moduleImport.typeOnly !== true);
 }
 
 export function getFrameworkApiForCall(

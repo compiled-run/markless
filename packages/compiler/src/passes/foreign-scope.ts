@@ -130,12 +130,17 @@ export function carryForeignFactoryScope(input: {
 				if (held.key !== origin.key) refuse(body, moduleImport.localName, held);
 				continue;
 			}
-			importLines.push(
-				emitValueImport({
-					...moduleImport,
-					source: rebaseSpecifier(moduleImport.source, body.definedIn, consumerFilename),
-				}),
-			);
+			// A type-only binding satisfies the copied body's free name without
+			// being emitted: it is erased before anything runs, and its specifier
+			// need not have a runtime export behind it.
+			if (moduleImport.typeOnly !== true) {
+				importLines.push(
+					emitValueImport({
+						...moduleImport,
+						source: rebaseSpecifier(moduleImport.source, body.definedIn, consumerFilename),
+					}),
+				);
+			}
 			carried.set(moduleImport.localName, { origin });
 		}
 	}
