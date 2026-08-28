@@ -1,8 +1,12 @@
 import { render, renderSSR } from '@markless/vitest-browser';
+import axe from 'axe-core';
 import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
 import Basic from './scenarios/basic.tsrx';
+import Separators from './scenarios/separators.tsrx';
 import ToggleButtons from './scenarios/toggle-buttons.tsrx';
+
+const AXE_TAGS = ['wcag2a', 'wcag21a'] as const;
 
 const Button = page.getByRole('button', { name: 'Press' });
 const Label = page.getByText('Name');
@@ -14,6 +18,9 @@ const Locked = page.getByRole('button', { name: 'Locked' });
 const Plain = page.getByRole('button', { name: 'Plain' });
 const Value = page.getByTestId('value');
 const Calls = page.getByTestId('calls');
+const Rule = page.getByTestId('rule');
+const ColumnRule = page.getByTestId('column-rule');
+const Paint = page.getByTestId('paint');
 
 // The SSR harness rewrites a literal `renderSSR` call site, so the mount cannot be
 // passed by reference or hidden in a helper: each test branches on the mode instead.
@@ -38,6 +45,67 @@ function expectBasicRendered() {
 	expect(el(Hidden).tagName).toBe('SPAN');
 	expect(getComputedStyle(el(Hidden)).position).toBe('absolute');
 	expect(el(Hidden).hasAttribute('class')).toBe(false);
+}
+
+/** The separator itself, which sits under the wrapper the test id is on. */
+function separatorIn(locator: { element(): Element | null }): Element {
+	const found = el(locator).firstElementChild;
+	if (!found) throw new Error('Expected a separator under the wrapper.');
+	return found;
+}
+
+async function expectNoAxeViolations(container: Element, phase: string) {
+	const results = await axe.run(container as HTMLElement, {
+		runOnly: { type: 'tag', values: [...AXE_TAGS] },
+		resultTypes: ['violations'],
+	});
+	const reported = results.violations.map((violation) => {
+		const nodes = violation.nodes.map((node) => `      ${node.html}`).join('\n');
+		return `  ${violation.id} (${violation.impact ?? 'unknown impact'}): ${violation.help}\n${nodes}`;
+	});
+	expect(reported, `axe violations while ${phase}`).toEqual([]);
+}
+
+function scopeOf(result: { container: unknown }): Element {
+	const container = result.container;
+	if (!(container instanceof Element)) throw new Error('The mount handed back no DOM container.');
+	return container;
+}
+
+function expectSeparatorsRendered() {
+	const rule = separatorIn(Rule);
+	expect(rule.getAttribute('role')).toBe('separator');
+	expect(rule.getAttribute('aria-orientation')).toBe('horizontal');
+	expect(rule.getAttribute('ui-orientation')).toBe('horizontal');
+	expect(rule.hasAttribute('ui-separator')).toBe(true);
+	expect(rule.hasAttribute('ui-decorative')).toBe(false);
+
+	const column = separatorIn(ColumnRule);
+	expect(column.getAttribute('role')).toBe('separator');
+	expect(column.getAttribute('aria-orientation')).toBe('vertical');
+	expect(column.getAttribute('ui-orientation')).toBe('vertical');
+}
+
+// The owner ruling: this part divides, it never splits. The focusable
+// window-splitter with a value belongs to the resizable family.
+function expectSeparatorCarriesNoMachinery() {
+	for (const wrapper of [Rule, ColumnRule, Paint]) {
+		const separator = separatorIn(wrapper);
+		expect(separator.hasAttribute('tabindex')).toBe(false);
+		expect(separator.hasAttribute('aria-valuenow')).toBe(false);
+		expect(separator.hasAttribute('aria-controls')).toBe(false);
+		expect(separator.hasAttribute('aria-disabled')).toBe(false);
+	}
+}
+
+// Paint only: no role for a reader to stop on, and nothing to announce.
+function expectDecorativeSeparatorIsSilent() {
+	const paint = separatorIn(Paint);
+	expect(paint.hasAttribute('role')).toBe(false);
+	expect(paint.getAttribute('aria-hidden')).toBe('true');
+	expect(paint.hasAttribute('aria-orientation')).toBe(false);
+	expect(paint.getAttribute('ui-decorative')).toBe('');
+	expect(page.getByRole('separator').elements()).toHaveLength(2);
 }
 
 function expectToggleButtonsRendered() {
@@ -114,6 +182,19 @@ for (const mode of MODES) {
 		if (mode === 'CSR') await render(Basic);
 		else await renderSSR(Basic);
 		expectBasicRendered();
+	});
+
+	test(`${mode}: a separator declares its axis and a decorative one says nothing`, async () => {
+		if (mode === 'CSR') await render(Separators);
+		else await renderSSR(Separators);
+		expectSeparatorsRendered();
+		expectDecorativeSeparatorIsSilent();
+		expectSeparatorCarriesNoMachinery();
+	});
+
+	test(`${mode}: the separators report no axe violations`, async () => {
+		const mounted = mode === 'CSR' ? await render(Separators) : await renderSSR(Separators);
+		await expectNoAxeViolations(scopeOf(mounted), `${mode} separators at rest`);
 	});
 
 	test(`${mode}: a pressed button reports its state, a plain one carries none`, async () => {

@@ -52,6 +52,7 @@
 		"./qrcode": "./src/qr-code/index.ts",
 		"./radiogroup": "./src/radio-group/index.ts",
 		"./rating": "./src/rating/index.ts",
+		"./resizable": "./src/resizable/index.ts",
 		"./select": "./src/select/index.ts",
 		"./slider": "./src/slider/index.ts",
 		"./tooltip": "./src/tooltip/index.ts",

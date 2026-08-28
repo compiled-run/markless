@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { FAMILY_ANCHORS } from '../../../../../apps/sr-gallery/preview-server.ts';
 import type { ScreenReaderDriver } from '../../test-support/driver.ts';
 
 /**
@@ -22,12 +23,8 @@ const NAME = 'Resize navigation';
 const AT_REST = '30';
 const AFTER_STEP = '31';
 
-/**
- * Where the panels sit on the gallery page. Written here rather than imported
- * from `FAMILY_ANCHORS` because the gallery entry lands with registration, which
- * is a separate unit; that unit swaps this for the imported anchor.
- */
-export const RESIZABLE_ANCHOR = '/#resizable';
+/** Where the panels sit on the gallery page. */
+export const RESIZABLE_ANCHOR = FAMILY_ANCHORS.resizable;
 
 function missing(phrase: string, facts: readonly string[]): string[] {
 	return facts.filter((fact) => !phrase.includes(fact));

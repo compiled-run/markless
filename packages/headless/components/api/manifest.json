@@ -117,6 +117,25 @@
 				"props": []
 			},
 			{
+				"part": "separator",
+				"component": "Separator",
+				"doc": "A display separator: a static `role=\"separator\"` that divides content, with\nno focus, no keys and no value. Give it `decorative` and it drops the role\nentirely and hides from readers, for a rule that is only paint.\n\nA separator a person can move is not this part. ARIA gives `role=\"separator\"`\ntwo natures, and the focusable one is a window-splitter widget with value\nsemantics; that lives in the `resizable` family, which shares only the role\nstring.",
+				"props": [
+					{
+						"name": "orientation",
+						"type": "'horizontal' | 'vertical'",
+						"required": false,
+						"doc": "Which way the separator runs, as the reader announces it. Defaults to\n`horizontal`, matching ARIA's own default for the role."
+					},
+					{
+						"name": "decorative",
+						"type": "boolean",
+						"required": false,
+						"doc": "Provide it and the separator is paint only: no role and `aria-hidden`, so\nno reader stops on a line that carries no meaning."
+					}
+				]
+			},
+			{
 				"part": "visuallyhidden",
 				"component": "VisuallyHidden",
 				"doc": "Content that is hidden from sight but still reached by screen readers and\nstill focusable. The clipping style is written inline and no class ships, so\nno consumer stylesheet can collide with it.",
