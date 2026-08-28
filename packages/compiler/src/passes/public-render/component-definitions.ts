@@ -4,7 +4,9 @@ import { asNodes, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { firstComponentRoot } from './plan.ts';
 import { sharedCallbackSlotGraphNodeId } from '../semantic-graph/collect-shared.ts';
 import { emitClientResidueReader, emitClientResidueReaderPrelude } from './residue-reader.ts';
+import { handlerReadGraphNodeIds } from './derive-set.ts';
 import {
+	adoptedWidgetDefinitionIds,
 	componentBoundElementHandles,
 	widgetRootDefinitionIds,
 } from './shared-seed-pass.ts';
@@ -42,6 +44,16 @@ export function collectPublicRenderComponentDefinitions(
 	});
 
 	const residueReaderPrelude = emitClientResidueReaderPrelude(input, [...componentNames]);
+	// A CSR mount derives these for the render and then drops the value, leaving a
+	// handler's first read undefined the way a resumed page's is.
+	const handlerReads = handlerReadGraphNodeIds(input);
+	const handlerReadComputedIds = new Set(
+		input.protocolState.computed.flatMap((computed) =>
+			computed.async === false && handlerReads.has(computed.graphNodeId)
+				? [computed.graphNodeId]
+				: [],
+		),
+	);
 
 	return [...componentNames].flatMap((componentName) => {
 		const componentNode = componentMap.get(componentName);
@@ -113,6 +125,7 @@ export function collectPublicRenderComponentDefinitions(
 		);
 		const usedGraphNodeIds = new Set([
 			...chunkGraphNodeIds(chunks),
+			...branchDecisionGraphNodeIds(chunks, input.renderData.branches),
 			...edges.flatMap((edge) =>
 				edge.props.flatMap((prop) =>
 					'graphNodeId' in prop && typeof prop.graphNodeId === 'string'
@@ -121,13 +134,13 @@ export function collectPublicRenderComponentDefinitions(
 				),
 			),
 		]);
-		const childGraphNodeIds = new Set(
-			chunkGraphNodeIds(
-				input.renderData.chunks.filter(
-					(chunk) => chunk.componentName !== rootInfo.componentName,
-				),
-			),
+		const childChunks = input.renderData.chunks.filter(
+			(chunk) => chunk.componentName !== rootInfo.componentName,
 		);
+		const childGraphNodeIds = new Set([
+			...chunkGraphNodeIds(childChunks),
+			...branchDecisionGraphNodeIds(childChunks, input.renderData.branches),
+		]);
 		// A widget-scoped shared() graph is one instance per rendered widget, so its
 		// nodes travel with the components that resolve it, not with the module root.
 		const widgetScoped = new Set(
@@ -173,6 +186,18 @@ export function collectPublicRenderComponentDefinitions(
 			input,
 			componentName,
 		);
+		// A node carrying its factory default AND the root's per-instance seeds offers
+		// two symbol records under one id, and one kind per id cannot tell them
+		// apart: those are keyed by symbol id instead, which the reader falls back
+		// from. Every other node keeps the id key, so no existing module moves a byte.
+		const symbolRecordCounts = new Map<string, number>();
+		for (const initial of initialValues) {
+			if (initial.value.kind !== 'symbol-function') continue;
+			symbolRecordCounts.set(
+				initial.graphNodeId,
+				(symbolRecordCounts.get(initial.graphNodeId) ?? 0) + 1,
+			);
+		}
 		const initialValueKinds = Object.fromEntries(
 			initialValues.flatMap((initial) => {
 				// Held in a const so the discriminated narrowing survives into the callback.
@@ -181,7 +206,15 @@ export function collectPublicRenderComponentDefinitions(
 				const symbol = input.symbolResolver.symbols.find(
 					(candidate) => candidate.id === value.symbolId,
 				);
-				return symbol ? [[initial.graphNodeId, symbol.kind]] : [];
+				if (!symbol) return [];
+				return [
+					[
+						(symbolRecordCounts.get(initial.graphNodeId) ?? 0) > 1
+							? value.symbolId
+							: initial.graphNodeId,
+						symbol.kind,
+					],
+				];
 			}),
 		);
 		const nativeChunks = chunks.map(({ statics: _statics, ...chunk }) => ({
@@ -189,11 +222,26 @@ export function collectPublicRenderComponentDefinitions(
 			nativeTemplateId: `markless-render-data:${encodeURIComponent(input.source.filename)}:${encodeURIComponent(componentName)}:template:${encodeURIComponent(chunk.id)}`,
 		}));
 		// Positions resolve a state name two components of one module both
-		// declare; a single-component module needs no partition at all.
+		// declare; a single-component module needs no partition at all, unless it
+		// adopted a widget family - those nodes belong to the enclosing instance
+		// and this module must claim none of them.
 		const ownedNodes =
-			componentNames.size > 1
+			componentNames.size > 1 || adoptedWidgetDefinitionIds(input).size > 0
 				? componentOwnedStateNodes(input, componentName, rootInfo.componentName)
 				: undefined;
+		// Positions, the way stateComputedIndexes already spells a node set: a full
+		// graph node id costs far more per page.
+		const ownedComputedIndexes =
+			ownedNodes?.computedIndexes ??
+			input.protocolState.computed.flatMap((computed, index) =>
+				stateGraphNodeIds.length === 0 || stateGraphNodeIds.includes(computed.graphNodeId)
+					? [index]
+					: [],
+			);
+		const servedComputedIndexes = ownedComputedIndexes.filter((index) => {
+			const computed = input.protocolState.computed[index];
+			return !!computed && handlerReadComputedIds.has(computed.graphNodeId);
+		});
 		return [
 			{
 				name: componentName,
@@ -204,6 +252,7 @@ export function collectPublicRenderComponentDefinitions(
 							stateComputedIndexes: ownedNodes.computedIndexes,
 						}
 					: {}),
+				...(servedComputedIndexes.length > 0 ? { servedComputedIndexes } : {}),
 				view: input.protocolView,
 				rootChunkId: rootChunk.id,
 				chunks: nativeChunks,
@@ -213,7 +262,9 @@ export function collectPublicRenderComponentDefinitions(
 				repeatIds: [...repeatIds],
 				initialValues,
 				initialValueKinds,
-				stateGraphNodeIds: [...stateGraphNodeIds, ...slotGraphNodeIds],
+				// A set: every component binds its props under one id, so a module
+				// with several of them offers the same node more than once.
+				stateGraphNodeIds: [...new Set([...stateGraphNodeIds, ...slotGraphNodeIds])],
 				branches: input.renderData.branches.filter((branch) =>
 					branchIds.has(branch.branchSiteId),
 				),
@@ -345,6 +396,34 @@ function projectionProp(source: string, node: AnyNode | undefined): Record<strin
 	return {
 		projection: { kind: 'static-markup', markup: source.slice(start, end), elementCount },
 	};
+}
+
+/**
+ * The nodes a branch test reads, for the branches these chunks hold.
+ *
+ * A test the compiler lifts into a computed declares no component of its own,
+ * and an unattributed node otherwise travels with the module root. The root
+ * cannot evaluate a derive written over a child's prop, so counting the test as
+ * a read of the chunk that holds the branch is what keeps the node with the
+ * component whose render answers it.
+ */
+function branchDecisionGraphNodeIds(
+	chunks: PublicRenderModuleInput['renderData']['chunks'],
+	branches: PublicRenderModuleInput['renderData']['branches'],
+): string[] {
+	const held = new Set(
+		chunks.flatMap((chunk) =>
+			chunk.slots.flatMap((slot) => (slot.kind === 'branch' ? [slot.branchSiteId] : [])),
+		),
+	);
+	return branches.flatMap((branch) =>
+		held.has(branch.branchSiteId)
+			? [
+					...(branch.testComputedGraphNodeId ? [branch.testComputedGraphNodeId] : []),
+					...(branch.testReads ?? []).map((read) => read.graphNodeId),
+				]
+			: [],
+	);
 }
 
 function chunkGraphNodeIds(chunks: PublicRenderModuleInput['renderData']['chunks']): string[] {

@@ -46,14 +46,14 @@ export type ToggleThumbProps = PropsOf<'span'>;
 export type ToggleLabelProps = PropsOf<'label'>;
 
 /**
- * Supporting text for the switch, named by the trigger's `aria-describedby`. One
- * element can be named that way, so mounting this alongside `toggle.error`
- * describes by whichever renders first.
+ * Supporting text for the switch, named by the trigger's `aria-describedby`.
+ * Mount it alongside `toggle.error` and the trigger names both, the error first.
  */
 export type ToggleDescriptionProps = PropsOf<'div'>;
 
 /**
- * The validation message. Mounting it is what marks the switch invalid - the
+ * The validation message, named by the trigger's `aria-describedby` ahead of
+ * `toggle.description`. Mounting it is what marks the switch invalid - the
  * trigger reports `aria-invalid` for as long as this part is in the page - so
  * render it only when there is an error to show.
  */

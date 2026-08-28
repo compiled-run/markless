@@ -8,11 +8,29 @@ import {
 	sharedCallbackSlotGraphNodeId,
 	sharedInstanceVisibleFrom,
 } from '../semantic-graph/collect-shared.ts';
+import { splitStaticGraphPath } from '../../artifact-helpers/graph-paths.ts';
+import { jsonSourceWithNonFiniteNumbers } from './non-finite-json.ts';
 import { sharedInstancePreludeLines } from './residue-reader.ts';
 import type { PublicRenderRoot } from './types.ts';
 
 type GraphBinding = PublicRenderModuleInput['semanticGraph']['graphBindings'][number];
 const loweredFrameworkCalls = new Set(['computed', 'element', 'handler', 'storage']);
+
+// Same-named cells in sibling parts are distinct bindings, so a rendering
+// component only ever sees its own declaration plus the module-scope ones.
+function componentBindingMap(
+	input: PublicRenderModuleInput,
+	kind: GraphBinding['kind'],
+	componentName: string,
+): Map<string, GraphBinding> {
+	const bindings = new Map<string, GraphBinding>();
+	for (const binding of input.semanticGraph.graphBindings) {
+		if (binding.kind !== kind) continue;
+		if (binding.componentName !== undefined && binding.componentName !== componentName) continue;
+		bindings.set(binding.name, binding);
+	}
+	return bindings;
+}
 
 export function renderBodyLines(
 	input: PublicRenderModuleInput,
@@ -26,16 +44,8 @@ export function renderBodyLines(
 	const body = rootInfo.component.body as AnyNode | undefined;
 	if (!body) return indentLines(rootLines);
 
-	const stateBindings = new Map<string, GraphBinding>(
-		input.semanticGraph.graphBindings.flatMap((binding) =>
-			binding.kind === 'state' ? [[binding.name, binding]] : [],
-		),
-	);
-	const computedBindings = new Map<string, GraphBinding>(
-		input.semanticGraph.graphBindings.flatMap((binding) =>
-			binding.kind === 'computed' ? [[binding.name, binding]] : [],
-		),
-	);
+	const stateBindings = componentBindingMap(input, 'state', rootInfo.componentName);
+	const computedBindings = componentBindingMap(input, 'computed', rootInfo.componentName);
 	const sharedInstanceNames = sharedInstanceLocalNames(input.semanticGraph, rootInfo.componentName);
 	const lines: string[] = [];
 	let emittedRoot = false;
@@ -82,6 +92,15 @@ export function renderBodyLines(
 		}
 		if (isLoweredFrameworkDeclaration(statement)) continue;
 		if (isSharedInstanceDeclaration(statement, sharedInstanceNames)) continue;
+		if (
+			isSharedInstancePathAliasDeclaration(
+				statement,
+				input.semanticGraph.aliases ?? [],
+				sharedInstanceNames,
+				rootInfo.componentName,
+			)
+		)
+			continue;
 
 		const seedLine = sharedStateSeedLine(
 			statement,
@@ -270,7 +289,7 @@ function stateDeclarationLine(
 		return null;
 	const initializerSource =
 		(binding as GraphBinding & { readonly initializerSource?: string }).initializerSource ??
-		(binding.storage ? JSON.stringify(binding.initialValue) : undefined);
+		(binding.storage ? jsonSourceWithNonFiniteNumbers(binding.initialValue) : undefined);
 	const args = [
 		stateValuesName,
 		statePayloadName,
@@ -306,6 +325,40 @@ export function isSharedInstanceDeclaration(
 	return declarators.every((declarator) => {
 		const name = getIdentifierName(declarator.id as AnyNode | undefined);
 		return !!name && sharedInstanceNames.has(name);
+	});
+}
+
+/**
+ * `const days = cal.days` beside `const cal = calendarState()`. The instance
+ * local is dropped from the emitted body, so a name declared from a path through
+ * it would read an undeclared receiver; every read through the alias is already
+ * a graph node id, so the declaration goes with it.
+ */
+export function isSharedInstancePathAliasDeclaration(
+	statement: AnyNode,
+	aliases: ReadonlyArray<{
+		readonly name: string;
+		readonly target: string;
+		readonly componentName?: string;
+		readonly sharedDefinitionId?: string;
+	}>,
+	sharedInstanceNames: ReadonlySet<string>,
+	componentName?: string,
+): boolean {
+	if (statement.type !== 'VariableDeclaration' || sharedInstanceNames.size === 0) return false;
+	const declarators = asNodes(statement.declarations);
+	if (declarators.length === 0) return false;
+	return declarators.every((declarator) => {
+		const name = getIdentifierName(declarator.id as AnyNode | undefined);
+		if (!name) return false;
+		return aliases.some(
+			(alias) =>
+				alias.name === name &&
+				alias.sharedDefinitionId === undefined &&
+				alias.componentName !== undefined &&
+				alias.componentName === componentName &&
+				sharedInstanceNames.has(splitStaticGraphPath(alias.target)[0] ?? ''),
+		);
 	});
 }
 
@@ -376,16 +429,8 @@ export function renderValuePreludeLines(
 ): string[] {
 	const body = rootInfo.component.body as AnyNode | undefined;
 	if (!body) return [];
-	const stateBindings = new Map(
-		input.semanticGraph.graphBindings.flatMap((binding) =>
-			binding.kind === 'state' ? [[binding.name, binding] as const] : [],
-		),
-	);
-	const computedBindings = new Map(
-		input.semanticGraph.graphBindings.flatMap((binding) =>
-			binding.kind === 'computed' ? [[binding.name, binding] as const] : [],
-		),
-	);
+	const stateBindings = componentBindingMap(input, 'state', rootInfo.componentName);
+	const computedBindings = componentBindingMap(input, 'computed', rootInfo.componentName);
 	const sharedInstanceNames = sharedInstanceLocalNames(input.semanticGraph, rootInfo.componentName);
 	const statements = childNodes(body).filter((statement) => {
 		if (isIgnorableTextNode(statement)) return false;

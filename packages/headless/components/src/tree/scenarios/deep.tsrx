@@ -1,3 +1,4 @@
+import { computed } from '@markless/core';
 import { tree } from '../../index.ts';
 
 type FileNodeProps = {
@@ -7,22 +8,24 @@ type FileNodeProps = {
 	readonly level: number;
 };
 
-// A component that composes ITSELF, with widget-rooting parts inside it. The
-// recursion receipts in packages/vitest-browser/browser cover a PLAIN component
-// doing this; `tree.item` roots a widget instance, so every level here roots one
-// more instance of the same family. The arm is decided by a prop, never by
-// state, so it is settled at render time and never flips.
+// A component that composes ITSELF, with widget-rooting parts inside it: every
+// level roots one more `tree.item` instance. The arm is decided by a prop, so it
+// is settled at render time and never flips.
 //
 // The `role="none"` div inside the content is forced: an arm cannot be a direct
 // child of a component tag (MARKLESS_PARSE_ERROR, the same limit
 // `tabs/scenarios/arm-tabs.tsrx` records), so the intrinsic wrapper it needs is
 // taken back out of the accessibility tree and the group still owns its rows.
 function FileNode({ depth, level }: FileNodeProps) @{
+	// Load-bearing: without a value of its own, a node inside the arm below is refused
+	// (MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED) — the widget instance is not one.
+	const name = computed(() => 'Folder ' + depth);
+
 	<tree.item level={level} data-testid={'depth-' + depth + '-item'}>
 		<tree.itemtrigger data-testid={'depth-' + depth + '-itemtrigger'}>
 			<tree.itemindicator data-testid={'depth-' + depth + '-itemindicator'}>▾</tree.itemindicator>
 		</tree.itemtrigger>
-		<tree.itemlabel data-testid={'depth-' + depth + '-itemlabel'}>Folder {depth}</tree.itemlabel>
+		<tree.itemlabel data-testid={'depth-' + depth + '-itemlabel'}>{name}</tree.itemlabel>
 		<tree.itemcontent data-testid={'depth-' + depth + '-itemcontent'}>
 			<div role="none">
 				@if (depth > 1) {
