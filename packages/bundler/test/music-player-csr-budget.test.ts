@@ -102,8 +102,9 @@ const STAGE_ANCHORS = {
 	// per-site split is not restated here because it was measured on the SSR
 	// lane, not this one; this lane prices the same source delta higher because
 	// it modulepreloads nearly every chunk it emits.
-	// +106: keyed-repeat row-template slots qualified through composition (rows may read outside their item); +9: component-local handles keyed by host scope.
-	'page-load download': { gzipBytes: 137_243, margin: 128 },
+	// +106: keyed-repeat row-template slots qualified through composition (rows may read outside their item); +9: component-local handles keyed by host scope;
+	// +134: deferred count-dependent bindings (thunk registry + resolver splice); +21: carrier-rooting rule in composition; +3: shared carrier predicate.
+	'page-load download': { gzipBytes: 137_401, margin: 128 },
 	// +5: roster-count placeholder minted in the eager seed slot (the resolver itself is demand-loaded).
 	'page-load execute': { gzipBytes: 14_226, margin: 128 },
 	'interaction 1 marginal': { gzipBytes: 2_416, margin: 32 },

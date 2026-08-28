@@ -1,4 +1,5 @@
 import { marklessSsrEscape } from '../fns/html.ts';
+import { marklessCarrierRootsWidget, type MarklessWidgetSite } from '../fns/composition.ts';
 import type { PrerenderDataDefinition, PrerenderDataSurface } from './evaluator.ts';
 
 type ProjectionEdge = NonNullable<PrerenderDataDefinition['edges']>[number];
@@ -21,7 +22,11 @@ export type ChildrenProjectionLink = {
  * instance of its own. A part reads the innermost root that encloses it, which
  * is why a root nested in another root's projection ends the outer seed phase.
  */
-export function widgetRootsOf(surface: PrerenderDataSurface, componentName: string): string[] {
+export function widgetRootsOf(
+	surface: PrerenderDataSurface,
+	componentName: string,
+	placement?: WidgetPlacement,
+): string[] {
 	const child = childSurfaceOf(surface, componentName)?.components[componentName];
 	const state = child?.state;
 	if (!child || !state) return [];
@@ -29,12 +34,102 @@ export function widgetRootsOf(surface: PrerenderDataSurface, componentName: stri
 	// and names each component's own nodes by position, so ownership is the
 	// selection, never the whole payload.
 	const owned = new Set(ownedCellIds(child));
-	return (state.sharedDefinitions ?? []).flatMap((definition) =>
-		definition.scope === 'widget' &&
-		[...owned].some((graphNodeId) => graphNodeId.startsWith(definition.id + '/'))
+	// A carrier holds an unseeded family's cells without rooting it, so ownership
+	// alone would read every part of such a family as a widget root of its own.
+	const carried = new Set(widgetFallbacksOf(surface, componentName) ?? []);
+	return (state.sharedDefinitions ?? []).flatMap((definition) => {
+		if (definition.scope !== 'widget') return [];
+		if (![...owned].some((graphNodeId) => graphNodeId.startsWith(definition.id + '/'))) return [];
+		if (!carried.has(definition.id)) return [definition.id];
+		// A carrier still roots when the page it stands on gives it the standing
+		// composition would: it encloses other parts of the family and nothing
+		// designates the family above it. Without a placement the standing is
+		// unknown, and the answer stays the conservative no.
+		return placement &&
+			marklessCarrierRootsWidget(placementSites(placement, definition.id), {
+				path: carrierPath(placement),
+				designates: false,
+				inRow: placement.inRow,
+			})
 			? [definition.id]
-			: [],
-	);
+			: [];
+	});
+}
+
+/** A component placed on a page, named in the surface that placed it. */
+export type PlacedChild = {
+	readonly surface: PrerenderDataSurface;
+	readonly componentName: string;
+};
+
+/**
+ * Where one placed child STANDS among the other children placed around it: the
+ * placed children whose projections enclose it (innermost first), the ones its
+ * own projection encloses at any depth, and whether it stands in a repeat row.
+ * The build-time twin of the sibling instance paths composition reads.
+ */
+export type WidgetPlacement = {
+	readonly enclosing: ReadonlyArray<PlacedChild>;
+	readonly enclosed: ReadonlyArray<PlacedChild>;
+	readonly inRow: boolean;
+};
+
+// The nesting spelled as paths whose prefix relation is the one composition
+// reads off instance paths: one depth mark per enclosing child, and a distinct
+// tail per enclosed one.
+function carrierPath(placement: WidgetPlacement): string {
+	return ':'.repeat(placement.enclosing.length + 1);
+}
+
+function placementSites(
+	placement: WidgetPlacement,
+	definitionId: string,
+): ReadonlyArray<MarklessWidgetSite> {
+	const depth = placement.enclosing.length;
+	return [
+		...placement.enclosing.map((placed, index) =>
+			widgetSiteOf(placed, definitionId, ':'.repeat(depth - index)),
+		),
+		...placement.enclosed.map((placed, index) =>
+			widgetSiteOf(placed, definitionId, `${carrierPath(placement)}@${index}`),
+		),
+	].flatMap((site) => (site ? [site] : []));
+}
+
+// A placed child is a site of this family only when its own payload owns the
+// family's cells, which is the ownership test composition makes on a compose
+// child's composed state.
+function widgetSiteOf(
+	placed: PlacedChild,
+	definitionId: string,
+	path: string,
+): MarklessWidgetSite | undefined {
+	const child = childSurfaceOf(placed.surface, placed.componentName)?.components[
+		placed.componentName
+	];
+	if (!child) return undefined;
+	if (!ownedCellIds(child).some((graphNodeId) => graphNodeId.startsWith(definitionId + '/')))
+		return undefined;
+	return {
+		path,
+		designates: !(widgetFallbacksOf(placed.surface, placed.componentName) ?? []).includes(
+			definitionId,
+		),
+		inRow: false,
+	};
+}
+
+/**
+ * The widget families a placed child CARRIES the cells of without rooting: a
+ * part of somebody else's widget, holding them only so a page that renders no
+ * designated root still has them. The CSR twin of the SSR render output's
+ * `widgetFallbacks` field.
+ */
+export function widgetFallbacksOf(
+	surface: PrerenderDataSurface,
+	componentName: string,
+): ReadonlyArray<string> | undefined {
+	return childSurfaceOf(surface, componentName)?.components[componentName]?.widgetFallbacks;
 }
 
 /**
@@ -50,11 +145,12 @@ export function widgetRootsOf(surface: PrerenderDataSurface, componentName: stri
 export function renderedWidgetRootsOf(
 	surface: PrerenderDataSurface,
 	componentName: string,
+	placement?: WidgetPlacement,
 ): string[] {
 	const composed = childrenProjectionChain(surface, componentName).flatMap((link) =>
 		widgetRootsOf(link.surface, link.edge.childComponentName),
 	);
-	return [...new Set([...widgetRootsOf(surface, componentName), ...composed])];
+	return [...new Set([...widgetRootsOf(surface, componentName, placement), ...composed])];
 }
 
 // The escaper's own table, read back off it, so the decode cannot drift from the

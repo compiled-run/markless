@@ -20,7 +20,11 @@ import {
 	memberTagRootName,
 } from '../../ast/tsrx.ts';
 import type { ComponentEdge } from './types.ts';
-import { adoptedWidgetDefinitionIds, widgetRootComponents } from './shared-seed-pass.ts';
+import {
+	adoptedWidgetDefinitionIds,
+	widgetFallbackComponents,
+	widgetRootComponents,
+} from './shared-seed-pass.ts';
 
 export { componentEdgeInstanceSegment } from '../../component-edge-instance.ts';
 
@@ -820,8 +824,18 @@ export function componentOwnedStateNodes(
 	readonly seedCellIndexes: ReadonlyArray<number>;
 } {
 	const owner = payloadNodeOwners(input, rootComponentName);
-	const cellIndexes = input.protocolState.cells.flatMap((_cell, index) =>
-		owner.cells[index] === componentName ? [index] : [],
+	// Every resolver of an unseeded widget family carries its cells, so a page
+	// that renders no designated root still has them; the emitted mark is what
+	// keeps the extra carriers from composing as roots of their own.
+	const fallbacks = widgetFallbackComponents(input);
+	const carriesFallbackCells = (graphNodeId: string) =>
+		fallbacks
+			.get(graphNodeId.slice(0, graphNodeId.lastIndexOf('/')))
+			?.includes(componentName) ?? false;
+	const cellIndexes = input.protocolState.cells.flatMap((cell, index) =>
+		owner.cells[index] === componentName || carriesFallbackCells(cell.graphNodeId)
+			? [index]
+			: [],
 	);
 	// A page-space node the component only reads stays owned by the page, but its
 	// value must still seed this component's render — including a node it reaches

@@ -1001,6 +1001,42 @@ export function unboundElementHandleDiagnostic(input: {
 }
 
 /**
+ * A roster count is answered late on the server, and that is the whole reason
+ * this refusal exists.
+ *
+ * Server render is one forward pass, and the part asking how many members the
+ * family has renders before - or in the middle of - the members it is counting.
+ * So the render writes a placeholder and the composed page answers it. A
+ * placeholder survives being PRINTED and does not survive being SPENT: the
+ * arithmetic runs on the placeholder string, ships whatever that produces, and
+ * nothing downstream can tell the difference.
+ */
+export function rosterCountSpentDiagnostic(input: {
+	readonly computedName: string;
+	readonly componentName: string;
+	readonly operation: string;
+	readonly source: string;
+	/** Set when the count reached this component as a prop, so the author can find it. */
+	readonly heldBy?: string;
+	readonly derivedIn?: string;
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	const arrivedAs =
+		input.heldBy && input.derivedIn
+			? ` The prop carries "${input.heldBy}", the roster count ${input.derivedIn} derives.`
+			: '';
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_ROSTER_COUNT_NOT_A_NUMBER',
+		title: 'roster count is spent as a number before the page can answer it',
+		message: `Cannot spend the roster count "${input.computedName}" in ${input.operation} ("${input.source}") in ${input.componentName}: at server render the count is a placeholder the renderer resolves once the page has composed, so only a bare read printed as text or as an attribute value carries it.${arrivedAs}`,
+		why: 'A count is how many parts END UP in the family instance, and a single forward render pass cannot know that when the asker renders. The render writes a placeholder and the served page answers every one it wrote, which a printed value carries and an operation destroys - the comparison or the arithmetic runs against the placeholder string and paints a wrong value silently.',
+		...(input.span ? { span: input.span } : {}),
+		suggestion: `Print ${input.computedName} on its own - {${input.computedName}}, an attribute value, or a \${${input.computedName}} slot in a template literal - and do the arithmetic in an event handler or in CSS, where the count is a number.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ROSTER_COUNT_NOT_A_NUMBER',
+	});
+}
+
+/**
  * A derive body can never observe a handle: the element is bound on the DOM and
  * only a handler-shaped symbol is rewritten into the lookup that answers it, so
  * the derivation reads `undefined` and publishes a value built out of it. That

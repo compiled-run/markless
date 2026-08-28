@@ -120,6 +120,10 @@ export type PrerenderDataDefinition = {
 	// published by the compiler so a widget's seed phase can file them before any
 	// part renders. Absent when it binds none.
 	readonly boundElementHandles?: ReadonlyArray<string>;
+	// The widget families whose cells this component carries WITHOUT rooting: a
+	// part of somebody else's widget, holding the cells only so a page that
+	// renders no designated root still has them.
+	readonly widgetFallbacks?: ReadonlyArray<string>;
 	// Compiled by the same producer as the server module's reader; the browser
 	// never parses or evaluates authored source itself.
 	readonly readResidue?: (
@@ -141,6 +145,12 @@ export type PrerenderDataDefinition = {
 			// widget a part belongs to arrives through the seed map, so `read`
 			// already answers it.
 			readonly idPrefix?: string;
+			// Where an expression that SPENDS a roster count goes: the count is a
+			// placeholder until the page has composed, so the whole expression is
+			// handed over and the resolver splices its answer.
+			readonly deferCount?: (
+				thunk: (count: (placeholder: unknown) => number) => unknown,
+			) => unknown;
 		},
 	) => unknown;
 };
@@ -410,10 +420,15 @@ async function evaluatePrerenderDataSurface(
 	});
 	// A count is asked before the members it counts have rendered, so the page
 	// this render produced is where it becomes a number.
-	if (!marklessRosterPositions(sharedSeeds)?.counted) return rendered;
+	const positions = marklessRosterPositions(sharedSeeds);
+	if (!positions?.counted) return rendered;
 	const roster = await (globalThis as RosterResumeHost).__marklessRosterResume?.();
 	if (!roster) throw new Error('MARKLESS_ROSTER_COUNT_UNRESOLVED');
-	return roster.marklessResolveRosterCounts(rendered);
+	// The spent expressions first: what the placeholder resolver then sees is only
+	// the counts that were printed as they stood.
+	return roster.marklessResolveRosterCounts(
+		roster.marklessResolveDeferredCounts(rendered, positions.deferred ?? []),
+	);
 }
 
 type RosterResumeHost = {
@@ -783,6 +798,7 @@ function evaluatePrerenderDataComponent(input: {
 								asyncError: context.asyncError,
 								read,
 								idPrefix: input.idPrefix,
+								deferCount: rosterPositionContext.deferCount,
 							});
 						throw new Error('MARKLESS_PRERENDER_RESIDUE_MISSING');
 					},
@@ -952,6 +968,10 @@ function evaluatePrerenderDataComponent(input: {
 									// Where this child's own composition puts the children written into it,
 									// so composition can register the widget a projected part sits beside.
 									childrenWidgetRoot: sharedSeedPass()?.childrenWidgetRoot?.(
+										childSurface,
+										edge.childComponentName,
+									),
+									widgetFallbacks: sharedSeedPass()?.widgetFallbacks?.(
 										childSurface,
 										edge.childComponentName,
 									),
@@ -1317,6 +1337,10 @@ function renderRowComponentEdge(
 											partSurface,
 											projectedEdge.childComponentName,
 										),
+										widgetFallbacks: sharedSeedPass()?.widgetFallbacks?.(
+											partSurface,
+											projectedEdge.childComponentName,
+										),
 									});
 									return partOutput;
 								},
@@ -1368,6 +1392,10 @@ function renderRowComponentEdge(
 						boundSymbols: edge.boundSymbols ?? {},
 						callbackProps: callbacks,
 						childrenWidgetRoot: sharedSeedPass()?.childrenWidgetRoot?.(
+							childSurface,
+							edge.childComponentName,
+						),
+						widgetFallbacks: sharedSeedPass()?.widgetFallbacks?.(
 							childSurface,
 							edge.childComponentName,
 						),

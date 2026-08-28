@@ -629,3 +629,55 @@ test('served arm records need the escalates mark and arm-relative locators', () 
 		),
 	).toThrow(/servedArmRecords\.locators\[0\]: expected arm-relative strategy/);
 });
+
+// The repeat's own instance path is what tells two renderings of one `@for`
+// apart, and a minted row's identity is built from it, so a malformed one is
+// refused at the payload boundary like every other record field.
+test('keyed repeat instance path round-trips and refuses a malformed shape', () => {
+	const repeat = {
+		id: 'c1:repeat:rows',
+		parentHostNodeId: 'c1:h0',
+		instancePath: 'c1:p2:',
+		collectionGraphNodeId: 'state:rows',
+		collectionPath: [],
+		keyPath: ['id'],
+		itemName: 'row',
+		rowElementCount: 1,
+		rowEvents: [],
+	};
+	const view: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		keyedRepeats: [repeat],
+		asyncBoundaries: [],
+	};
+	const state: ProtocolStatePayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		cells: [],
+		computed: [],
+	};
+
+	const decoded = decodePayloadScripts(renderPayloadScripts({ state, view }));
+	expect(decoded.view.keyedRepeats?.[0]?.instancePath).toBe('c1:p2:');
+
+	// A repeat the root module authored omits the field entirely.
+	const { instancePath: _omitted, ...rootRepeat } = repeat;
+	expect(
+		decodePayloadScripts(
+			renderPayloadScripts({ state, view: { ...view, keyedRepeats: [rootRepeat] } }),
+		).view.keyedRepeats?.[0],
+	).not.toHaveProperty('instancePath');
+
+	expect(() =>
+		decodePayloadScripts(
+			renderPayloadScripts({
+				state,
+				view: { ...view, keyedRepeats: [{ ...repeat, instancePath: 7 }] } as never,
+			}),
+		),
+	).toThrow(/keyedRepeat\[0\]/);
+});

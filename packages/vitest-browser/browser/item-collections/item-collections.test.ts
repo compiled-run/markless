@@ -1,6 +1,7 @@
 import { userEvent } from 'vite-plus/test/browser';
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
+import ArmPage from './ic-arm-page.tsrx';
 import ComposedPage from './ic-composed-page.tsrx';
 import FlatPage from './ic-flat-page.tsrx';
 import KeyedPage from './ic-keyed-page.tsrx';
@@ -448,10 +449,123 @@ test('SSR: a flat instance recounts behind a removal', async () => {
 	expect(totals()).toEqual(['2', '2']);
 });
 
+// --- spending the count ------------------------------------------------------
+
+// The count is a placeholder while the render is still emitting the members it
+// counts, so an expression that SPENDS one cannot be evaluated where it stands.
+// The slot hands the whole expression over and the composed page answers it.
+// `ui-last` is arithmetic in an attribute value, the `next` gate is a BOOLEAN
+// attribute - where presence is the value, so the whole attribute has to defer -
+// and "n left" is template math in a text node.
+
+const lasts = () => roots().map((one) => one.getAttribute('ui-last'));
+const gates = () =>
+	[...document.querySelectorAll('[data-ic-next]')].map((one) =>
+		(one as HTMLButtonElement).disabled,
+	);
+const lefts = () =>
+	[...document.querySelectorAll('[data-ic-left]')].map((one) => one.textContent);
+
+test('CSR: the root spends its count in an attribute, a gate and text at first paint', async () => {
+	await render(StaticPage);
+
+	expect(lasts()).toEqual(['2']);
+	expect(gates()).toEqual([false]);
+	expect(lefts()).toEqual(['2 left']);
+});
+
+test('SSR: the root spends its count in an attribute, a gate and text at first paint', async () => {
+	await renderSSR(StaticPage);
+
+	expect(lasts()).toEqual(['2']);
+	expect(gates()).toEqual([false]);
+	expect(lefts()).toEqual(['2 left']);
+});
+
+// A boolean attribute answering false has to be ABSENT, not `disabled="false"`.
+test('SSR: a false gate writes no attribute at all', async () => {
+	await renderSSR(StaticPage);
+
+	expect(document.querySelector('[data-ic-next]')?.hasAttribute('disabled')).toBe(false);
+});
+
+test('CSR: a spent count follows an item arriving after resume', async () => {
+	await render(MutatingPage);
+	await userEvent.click(document.querySelector('[data-ic-add]') as HTMLElement);
+	await expect.poll(() => items().length, { timeout: 5000 }).toBe(4);
+
+	await expect.poll(lasts, { timeout: 5000 }).toEqual(['3']);
+	expect(lefts()).toEqual(['3 left']);
+});
+
+test('SSR: a spent count follows an item arriving after resume', async () => {
+	await renderSSR(MutatingPage);
+	await userEvent.click(document.querySelector('[data-ic-add]') as HTMLElement);
+	await expect.poll(() => items().length, { timeout: 5000 }).toBe(4);
+
+	await expect.poll(lasts, { timeout: 5000 }).toEqual(['3']);
+	expect(lefts()).toEqual(['3 left']);
+});
+
+test('CSR: a spent count follows an item leaving after resume', async () => {
+	await render(MutatingPage);
+	await userEvent.click(document.querySelector('[data-ic-drop-first]') as HTMLElement);
+	await expect.poll(() => items().length, { timeout: 5000 }).toBe(2);
+
+	await expect.poll(lasts, { timeout: 5000 }).toEqual(['1']);
+	expect(lefts()).toEqual(['1 left']);
+});
+
+test('SSR: a spent count follows an item leaving after resume', async () => {
+	await renderSSR(MutatingPage);
+	await userEvent.click(document.querySelector('[data-ic-drop-first]') as HTMLElement);
+	await expect.poll(() => items().length, { timeout: 5000 }).toBe(2);
+
+	await expect.poll(lasts, { timeout: 5000 }).toEqual(['1']);
+	expect(lefts()).toEqual(['1 left']);
+});
+
+// Two instances of one family each spend their OWN count, which is the whole
+// reason the answer is per widget instance rather than per page.
+test('CSR: two instances spend their own counts', async () => {
+	await render(TwoInstancesPage);
+
+	expect(lasts()).toEqual(['1', '2']);
+	expect(lefts()).toEqual(['1 left', '2 left']);
+});
+
+test('SSR: two instances spend their own counts', async () => {
+	await renderSSR(TwoInstancesPage);
+
+	expect(lasts()).toEqual(['1', '2']);
+	expect(lefts()).toEqual(['1 left', '2 left']);
+});
+
+// The gate closes exactly when the walk reaches the last member, which is the
+// shape a forward trigger is written in.
+test('CSR: the gate closes on the last step', async () => {
+	await render(StaticPage);
+	const next = document.querySelector('[data-ic-next]') as HTMLButtonElement;
+	await userEvent.click(next);
+	await userEvent.click(next);
+
+	await expect.poll(gates, { timeout: 5000 }).toEqual([true]);
+});
+
+test('SSR: the gate closes on the last step', async () => {
+	await renderSSR(StaticPage);
+	const next = document.querySelector('[data-ic-next]') as HTMLButtonElement;
+	await userEvent.click(next);
+	await userEvent.click(next);
+
+	await expect.poll(gates, { timeout: 5000 }).toEqual([true]);
+});
+
 // A count is a placeholder while the render is still emitting the members it
-// counts. Nothing the page ships may still be holding one - not the markup, and
-// not the resume payload a resumed page rewrites the attribute from.
-const PLACEHOLDER = /[\uE000\uE001]/;
+// counts, and a spent expression is a token standing for its answer. Nothing the
+// page ships may still be holding either - not the markup, and not the resume
+// payload a resumed page rewrites the attribute from.
+const PLACEHOLDER = /[\uE000-\uE004]/;
 
 test('CSR: no placeholder count survives the render', async () => {
 	await render(TwoInstancesPage);
@@ -463,6 +577,90 @@ test('SSR: no placeholder count survives the render', async () => {
 	await renderSSR(TwoInstancesPage);
 
 	expect(PLACEHOLDER.test(document.body.innerHTML)).toBe(false);
+});
+
+// --- "2 of 5" ----------------------------------------------------------------
+
+// The count spent the way tour actually spends it: printed into surrounding text
+// through a template slot, by a part standing IN the roster it is counting. The
+// root's `of ${total}` is the same shape from the asker that renders FIRST, and
+// the item's is the asker that renders in the MIDDLE of its own members - a
+// forward pass answers neither, and both are exact because the served page
+// answers the placeholder rather than the render answering the question.
+//
+// This is the boundary the compiler now draws. `${total}` is a bare read spent
+// as string and is admitted; `total - 1` and `step >= total - 1` are refused by
+// MARKLESS_ROSTER_COUNT_NOT_A_NUMBER, pinned in the compiler's own suite.
+
+const labels = (within?: string) => items(within).map((one) => one.getAttribute('ui-label'));
+const rootLabels = () => roots().map((one) => one.getAttribute('ui-label'));
+
+test('CSR: a part prints "n of m" at first paint', async () => {
+	await render(StaticPage);
+
+	expect(labels()).toEqual(['1 of 3', '2 of 3', '3 of 3']);
+	expect(rootLabels()).toEqual(['of 3']);
+});
+
+test('SSR: a part prints "n of m" at first paint', async () => {
+	await renderSSR(StaticPage);
+
+	expect(labels()).toEqual(['1 of 3', '2 of 3', '3 of 3']);
+	expect(rootLabels()).toEqual(['of 3']);
+});
+
+test('CSR: every "n of m" moves when an item arrives', async () => {
+	await render(MutatingPage);
+	await userEvent.click(document.querySelector('[data-ic-add]') as HTMLElement);
+	await expect.poll(() => items().length, { timeout: 5000 }).toBe(4);
+
+	await expect
+		.poll(labels, { timeout: 5000 })
+		.toEqual(['1 of 4', '2 of 4', '3 of 4', '4 of 4']);
+	expect(rootLabels()).toEqual(['of 4']);
+});
+
+test('SSR: every "n of m" moves when an item arrives', async () => {
+	await renderSSR(MutatingPage);
+	await userEvent.click(document.querySelector('[data-ic-add]') as HTMLElement);
+	await expect.poll(() => items().length, { timeout: 5000 }).toBe(4);
+
+	await expect
+		.poll(labels, { timeout: 5000 })
+		.toEqual(['1 of 4', '2 of 4', '3 of 4', '4 of 4']);
+	expect(rootLabels()).toEqual(['of 4']);
+});
+
+test('CSR: every "n of m" moves when the first item leaves', async () => {
+	await render(MutatingPage);
+	await userEvent.click(document.querySelector('[data-ic-drop-first]') as HTMLElement);
+	await expect.poll(() => items().length, { timeout: 5000 }).toBe(2);
+
+	await expect.poll(labels, { timeout: 5000 }).toEqual(['1 of 2', '2 of 2']);
+	expect(rootLabels()).toEqual(['of 2']);
+});
+
+test('SSR: every "n of m" moves when the first item leaves', async () => {
+	await renderSSR(MutatingPage);
+	await userEvent.click(document.querySelector('[data-ic-drop-first]') as HTMLElement);
+	await expect.poll(() => items().length, { timeout: 5000 }).toBe(2);
+
+	await expect.poll(labels, { timeout: 5000 }).toEqual(['1 of 2', '2 of 2']);
+	expect(rootLabels()).toEqual(['of 2']);
+});
+
+test('CSR: two instances print their own "n of m" and not each other\'s', async () => {
+	await render(TwoInstancesPage);
+
+	expect(labels('[data-ic-first]')).toEqual(['1 of 2', '2 of 2']);
+	expect(labels('[data-ic-second]')).toEqual(['1 of 3', '2 of 3', '3 of 3']);
+});
+
+test('SSR: two instances print their own "n of m" and not each other\'s', async () => {
+	await renderSSR(TwoInstancesPage);
+
+	expect(labels('[data-ic-first]')).toEqual(['1 of 2', '2 of 2']);
+	expect(labels('[data-ic-second]')).toEqual(['1 of 3', '2 of 3', '3 of 3']);
 });
 
 // --- a place another expression can USE --------------------------------------
@@ -553,4 +751,109 @@ test('SSR: a flat instance spends its own places and leaves its sibling alone', 
 
 	await expect.poll(() => mines('[data-ic-first]'), { timeout: 5000 }).toEqual(['A', 'B', 'C']);
 	expect(mines('[data-ic-second]')).toEqual(['a', 'b']);
+});
+
+// --- flat items gated by an @if arm ------------------------------------------
+
+// No keyed repeat anywhere on this page, so the arm applying or dropping is the
+// only thing that moves the collection and the only channel that can tell the
+// parts to count again. The arm's own member joins the roster ahead of the flat
+// items and carries no attribute of its own, which an arm cannot hold - what is
+// asserted is the flat items behind it renumbering, and the root recounting.
+const armToggle = () => document.querySelector('[data-ic-arm-toggle]') as HTMLElement;
+const extras = () => document.querySelectorAll('[data-ic-extra]').length;
+
+test('CSR: an @if arm joining the roster renumbers the flat items behind it', async () => {
+	await render(ArmPage);
+
+	expect(positions('[data-ic-first]')).toEqual(['0', '1', '2']);
+
+	await userEvent.click(armToggle());
+	await expect.poll(extras, { timeout: 5000 }).toBe(1);
+
+	await expect
+		.poll(() => positions('[data-ic-first]'), { timeout: 5000 })
+		.toEqual(['1', '2', '3']);
+	expect(positions('[data-ic-second]')).toEqual(['0', '1']);
+});
+
+test('SSR: an @if arm joining the roster renumbers the flat items behind it', async () => {
+	await renderSSR(ArmPage);
+
+	expect(positions('[data-ic-first]')).toEqual(['0', '1', '2']);
+
+	await userEvent.click(armToggle());
+	await expect.poll(extras, { timeout: 5000 }).toBe(1);
+
+	await expect
+		.poll(() => positions('[data-ic-first]'), { timeout: 5000 })
+		.toEqual(['1', '2', '3']);
+	expect(positions('[data-ic-second]')).toEqual(['0', '1']);
+});
+
+test('CSR: dropping the @if arm renumbers the flat items behind it', async () => {
+	await render(ArmPage);
+	await userEvent.click(armToggle());
+	await expect.poll(extras, { timeout: 5000 }).toBe(1);
+	await expect
+		.poll(() => positions('[data-ic-first]'), { timeout: 5000 })
+		.toEqual(['1', '2', '3']);
+
+	await userEvent.click(armToggle());
+	await expect.poll(extras, { timeout: 5000 }).toBe(0);
+
+	await expect
+		.poll(() => positions('[data-ic-first]'), { timeout: 5000 })
+		.toEqual(['0', '1', '2']);
+	expect(positions('[data-ic-second]')).toEqual(['0', '1']);
+});
+
+test('SSR: dropping the @if arm renumbers the flat items behind it', async () => {
+	await renderSSR(ArmPage);
+	await userEvent.click(armToggle());
+	await expect.poll(extras, { timeout: 5000 }).toBe(1);
+	await expect
+		.poll(() => positions('[data-ic-first]'), { timeout: 5000 })
+		.toEqual(['1', '2', '3']);
+
+	await userEvent.click(armToggle());
+	await expect.poll(extras, { timeout: 5000 }).toBe(0);
+
+	await expect
+		.poll(() => positions('[data-ic-first]'), { timeout: 5000 })
+		.toEqual(['0', '1', '2']);
+	expect(positions('[data-ic-second]')).toEqual(['0', '1']);
+});
+
+test('CSR: the count follows an @if arm applying and dropping', async () => {
+	await render(ArmPage);
+
+	expect(maxes()).toEqual(['3', '2']);
+
+	await userEvent.click(armToggle());
+	await expect.poll(maxes, { timeout: 5000 }).toEqual(['4', '2']);
+	expect(totals()).toEqual(['4', '2']);
+
+	await userEvent.click(armToggle());
+	await expect.poll(maxes, { timeout: 5000 }).toEqual(['3', '2']);
+	expect(totals()).toEqual(['3', '2']);
+});
+
+// The first-paint count stands in CSR, where the seed pass asks the carrier rule
+// with where this child stands on the page. SSR files the instance token from the
+// compiler's per-component `marklessWidgetRoots` marker instead, which cannot see
+// a placement, so the count placeholder is keyed with the bare handle id and the
+// ask answers 0 until the first flip. Measured: ['0','2'] at paint here.
+test.fails('SSR: the count follows an @if arm applying and dropping', async () => {
+	await renderSSR(ArmPage);
+
+	expect(maxes()).toEqual(['3', '2']);
+
+	await userEvent.click(armToggle());
+	await expect.poll(maxes, { timeout: 5000 }).toEqual(['4', '2']);
+	expect(totals()).toEqual(['4', '2']);
+
+	await userEvent.click(armToggle());
+	await expect.poll(maxes, { timeout: 5000 }).toEqual(['3', '2']);
+	expect(totals()).toEqual(['3', '2']);
 });

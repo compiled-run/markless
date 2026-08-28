@@ -8,6 +8,7 @@ import { handlerReadGraphNodeIds } from './derive-set.ts';
 import {
 	adoptedWidgetDefinitionIds,
 	componentBoundElementHandles,
+	widgetFallbackDefinitionIds,
 	widgetRootDefinitionIds,
 } from './shared-seed-pass.ts';
 import {
@@ -289,6 +290,14 @@ export function collectPublicRenderComponentDefinitions(
 				// record is serialised, so it costs the payload nothing.
 				...(widgetRootDefinitionIds(input, componentName).length > 0
 					? { rootsWidget: true }
+					: {}),
+				// This component carries these families' cells so a page that renders
+				// no designated root still has them, but composes as a part of the
+				// widget rather than the start of one. Only an unseeded family has
+				// carriers, so a family that writes its shared state in a body pays
+				// nothing.
+				...(widgetFallbackDefinitionIds(input, componentName).length > 0
+					? { widgetFallbacks: widgetFallbackDefinitionIds(input, componentName) }
 					: {}),
 				// The CSR twin of the compiled `marklessElementHandles` marker: which
 				// shared() element() handles a rendered instance of this component

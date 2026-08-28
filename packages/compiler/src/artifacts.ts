@@ -621,6 +621,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED'
 		| 'MARKLESS_ELEMENT_MODULE_SCOPE'
 		| 'MARKLESS_ELEMENT_HANDLE_RENDER_READ'
+		| 'MARKLESS_ROSTER_COUNT_NOT_A_NUMBER'
 		| 'MARKLESS_ELEMENT_HANDLE_IDREF_UNBOUND'
 		| 'MARKLESS_ELEMENT_HANDLE_IDREF_COMPOSITE'
 		| 'MARKLESS_ELEMENT_HANDLE_IDREF_ROW_OWNED'
@@ -845,6 +846,26 @@ export type SemanticElementRosterCount = {
 	/** The authored `roster.length` this replaces, matched verbatim when lowering. */
 	readonly source: string;
 	readonly sourceSpan?: SourceSpan;
+	/**
+	 * The markup expressions that SPEND this count and are printed by a text or
+	 * attribute slot. A render cannot answer them - the count is a placeholder
+	 * until the page has composed - so each is emitted as a thunk the resolver
+	 * calls once the counts are facts. `source` is the residue text the render
+	 * data names the expression by; `thunkSource` is the same expression with
+	 * every count read lowered to `marklessCountValue(<name>)`, because the
+	 * captured const still holds the placeholder and cannot be rebound.
+	 */
+	readonly deferred?: ReadonlyArray<{
+		readonly source: string;
+		readonly thunkSource: string;
+		/**
+		 * Which component's render prints it, when that is not the one that derived
+		 * the count: a bare count handed to a child as a prop carries the
+		 * placeholder across the edge, so the child's spend defers under its own
+		 * name. Absent means the deriving component, which is the usual case.
+		 */
+		readonly componentName?: string;
+	}>;
 };
 
 export type SemanticBehavior = {

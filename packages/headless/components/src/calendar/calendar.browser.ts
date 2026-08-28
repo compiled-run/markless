@@ -346,7 +346,9 @@ test('CSR: every key of the roving model moves the focused day', async () => {
 	await expect.poll(() => focused(), { timeout: 5000 }).toBe('2026-08-15');
 });
 
-// Red until the client's month rewrite reaches the day the same handler wrote (CSR only; SSR lands).
+// Red in CSR because a page-key crossing lands on a day the shown grid does not
+// hold yet, so the handler has no day handle to focus and the commit drops the
+// page to <body>; the keys after it then go nowhere. SSR lands.
 test.fails('CSR: PageDown crosses the month and takes the focus with it', async () => {
 	await render(Basic);
 	await expect.poll(() => days().length, { timeout: 5000 }).toBe(42);
@@ -365,7 +367,6 @@ test.fails('CSR: PageDown crosses the month and takes the focus with it', async 
 	await expect.poll(() => text(Title), { timeout: 5000 }).toBe('August 2026');
 });
 
-// Red until the client's month rewrite reaches the day the same handler wrote (CSR only; SSR lands).
 test.fails('CSR: Shift with the page keys steps a year', async () => {
 	await render(Basic);
 	await expect.poll(() => days().length, { timeout: 5000 }).toBe(42);
@@ -378,8 +379,7 @@ test.fails('CSR: Shift with the page keys steps a year', async () => {
 	await expect.poll(() => text(Title), { timeout: 5000 }).toBe('August 2025');
 });
 
-// Red until the client's month rewrite reaches the day the same handler wrote (CSR only; SSR lands).
-test.fails('CSR: an arrow off the end of the month crosses into the next one', async () => {
+test('CSR: an arrow off the end of the month crosses into the next one', async () => {
 	await render(Basic);
 	await expect.poll(() => days().length, { timeout: 5000 }).toBe(42);
 

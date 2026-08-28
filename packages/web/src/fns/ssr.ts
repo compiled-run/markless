@@ -1351,6 +1351,7 @@ export function marklessSsrAppendChildView(context: {
 			...(repeat.ownerHostNodeId
 				? { ownerHostNodeId: context.child.hostPrefix + repeat.ownerHostNodeId }
 				: {}),
+			...(mapped.instancePath ? { instancePath: mapped.instancePath } : {}),
 			collectionGraphNodeId: mapped.graphNodeId,
 			collectionPath: mapped.path,
 			...(repeat.rowTemplate ? { rowTemplate: mapped.rowTemplate } : {}),
@@ -1625,6 +1626,9 @@ export function marklessSsrPrefixBoundaryArmRecords(
 							parentHostNodeId: child.hostPrefix + repeat.parentHostNodeId,
 							...(repeat.ownerHostNodeId
 								? { ownerHostNodeId: child.hostPrefix + repeat.ownerHostNodeId }
+								: {}),
+							...(mapped.instancePath
+								? { instancePath: mapped.instancePath }
 								: {}),
 							collectionGraphNodeId: mapped.graphNodeId,
 							collectionPath: mapped.path,

@@ -4,6 +4,12 @@ import {
 	MARKLESS_ROSTER_COUNT_CLOSE,
 	MARKLESS_ROSTER_COUNT_OPEN,
 } from '../prerender/shared-seed-slot.ts';
+import { marklessAttributeValue } from '../dom-attribute.ts';
+import {
+	MARKLESS_DEFERRED_COUNT_CLOSE,
+	MARKLESS_DEFERRED_COUNT_NAME,
+	MARKLESS_DEFERRED_COUNT_OPEN,
+} from '../ssr-data/deferred-count.ts';
 import { marklessInstancePath, marklessInstanceScopedElementHandle } from './instance-scope.ts';
 
 /**
@@ -38,6 +44,7 @@ type RosterRevisionGraph = {
 		readonly path: ReadonlyArray<string>;
 		readonly run: () => void;
 	}) => () => void;
+	readonly subscribeJournal: RuntimeGraph['subscribeJournal'];
 };
 
 /**
@@ -135,6 +142,10 @@ function oneElement(get: ElementHandleRegistry['get'], key: string): unknown {
  * carries a revision: bumping it is how the parts deriving a place in that
  * roster are told to derive it again.
  *
+ * A keyed repeat's collection write is one channel; an `@if` arm adopting or
+ * dropping its host elements is the other, and it writes no collection at all,
+ * so the journal is the only thing that reports it.
+ *
  * Resume is itself the first revision. A render answers a place from emission
  * order and paints it, but the number never reaches the derivation's graph cell,
  * so an expression that SPENDS the place - `code.slice(pos, pos + 1)` - reads
@@ -181,12 +192,29 @@ export function wireRosterRevisions(input: {
 			}),
 		);
 	}
+	// The arm channel. Registered after the start module's own journal listener,
+	// which is what materializes an arriving arm's handles, so the registry has
+	// settled by the time this runs - removed hosts unfiled, arriving ones filed.
+	input.storeContainerSubscription(
+		input.graph.subscribeJournal((entries) => {
+			if (entries.some((entry) => entry.locator.startsWith('branch:'))) bump();
+		}),
+	);
 	bump();
 }
 
 function isElementBinding(graphNodeId: string): boolean {
 	return graphNodeId.includes(ELEMENT_BINDING_SEGMENT);
 }
+
+const DEFERRED_COUNT = new RegExp(
+	`${MARKLESS_DEFERRED_COUNT_OPEN}(\\d+)(?:${MARKLESS_DEFERRED_COUNT_NAME}([^${MARKLESS_DEFERRED_COUNT_CLOSE}]*))?${MARKLESS_DEFERRED_COUNT_CLOSE}`,
+	'g',
+);
+
+const ROSTER_COUNT_KEY = new RegExp(
+	`^${MARKLESS_ROSTER_COUNT_OPEN}([^${MARKLESS_ROSTER_COUNT_CLOSE}]*)${MARKLESS_ROSTER_COUNT_CLOSE}$`,
+);
 
 const ROSTER_COUNT = new RegExp(
 	`${MARKLESS_ROSTER_COUNT_OPEN}([^${MARKLESS_ROSTER_COUNT_CLOSE}]*)${MARKLESS_ROSTER_COUNT_CLOSE}`,
@@ -222,6 +250,61 @@ export function marklessResolveRosterCounts<
 		html: answer(surface.html),
 		...(surface.state === undefined ? {} : { state: answered(surface.state, answer) }),
 	} as Surface;
+}
+
+/**
+ * The expressions this render handed over unevaluated, answered from the page it
+ * produced.
+ *
+ * A count is a placeholder while the render is still emitting the members it
+ * counts, so an expression that SPENDS one - `count - 1`, `step >= count - 1` -
+ * is registered as a thunk and printed as a token. Composition has since made
+ * the counts facts, so each thunk runs with a reader that turns the placeholder
+ * it captured into the number, and the answer is spliced over its token.
+ *
+ * A token standing for a whole ATTRIBUTE carries the name: for a boolean
+ * attribute presence is the value, so an expression answering false has to
+ * erase the name and the quotes, not write `disabled="false"`.
+ *
+ * Runs before the placeholder resolver, and off the same tally: both read the
+ * roster's members as its element-handle registrations.
+ */
+export function marklessResolveDeferredCounts<
+	Surface extends {
+		readonly html: string;
+		readonly view?: { readonly elementHandles?: ReadonlyArray<{ readonly handleId: string }> };
+	},
+>(
+	surface: Surface,
+	deferred: ReadonlyArray<(count: (placeholder: unknown) => number) => unknown>,
+): Surface {
+	if (deferred.length === 0) return surface;
+	const handles = surface.view?.elementHandles ?? [];
+	const count = (placeholder: unknown) => {
+		const key = ROSTER_COUNT_KEY.exec(String(placeholder ?? ''))?.[1];
+		if (key === undefined) throw new Error('MARKLESS_ROSTER_COUNT_UNRESOLVED');
+		return handles.filter((handle) => handle.handleId === key).length;
+	};
+	const html = surface.html.replace(
+		DEFERRED_COUNT,
+		(all, index: string, name: string | undefined) => {
+			const thunk = deferred[Number(index)];
+			if (!thunk) return all;
+			const value = thunk(count);
+			if (name === undefined) return value == null ? '' : escapeHtml(String(value));
+			const text = marklessAttributeValue(name, value);
+			return text === null ? '' : ` ${name}="${escapeHtml(text)}"`;
+		},
+	);
+	return html === surface.html ? surface : ({ ...surface, html } as Surface);
+}
+
+function escapeHtml(value: string): string {
+	return value
+		.replaceAll('&', '&amp;')
+		.replaceAll('<', '&lt;')
+		.replaceAll('>', '&gt;')
+		.replaceAll('"', '&quot;');
 }
 
 // Rebuilt only where a placeholder was found, so a payload holding none is the

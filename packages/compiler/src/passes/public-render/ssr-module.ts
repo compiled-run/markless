@@ -41,6 +41,7 @@ import {
 	elementHandleMarkerSource,
 	componentBoundElementHandles,
 	projectedHandleEdgeIdsUnder,
+	widgetFallbacksOutputField,
 	widgetRootMarkerLine,
 } from './shared-seed-pass.ts';
 import { emitCatalogHelperImports, stateRuntimeImports } from './runtime-helpers.ts';
@@ -77,6 +78,7 @@ import {
 	armBoundIdrefHandles,
 	authoredResidueReadCases,
 	authoredResidueSources,
+	deferredRosterCountCases,
 	branchArmIndexSource,
 	elementHandleIdReadCase,
 	elementHandleIdSources,
@@ -318,6 +320,9 @@ export function emitPublicSsrRenderModule(
 		'		externalSymbolIds: marklessSsrComposition.externalSymbolIds,',
 		'		structure: marklessSsrRendered.structure,',
 		'		structureTokens: marklessSsrRendered.structureTokens,',
+		...(widgetFallbacksOutputField(input, rootInfo.componentName)
+			? [`	${widgetFallbacksOutputField(input, rootInfo.componentName).slice(2)},`]
+			: []),
 		'	};',
 		remapsInternalGraphProps
 			? `	marklessSsrRemapGraphOutput(marklessSsrOutput, ${JSON.stringify(internalGraphProps)});`
@@ -658,10 +663,25 @@ function emitSsrDataLines(
 	];
 	const stripSpan = (what: string) => (span: string) =>
 		stripAuthoredExpression(span, { filename: input.source.filename, what });
+	const deferredCounts = deferredRosterCountCases(
+		input,
+		componentName,
+		'marklessSsrDeferRosterCount',
+	);
 	const readCases = authoredResidueReadCases(
 		residueSources,
 		stripSpan('an authored residue expression'),
+		deferredCounts,
 	);
+	// A count spent at render is a placeholder until the page has composed, so the
+	// slot registers a thunk on the render's own registry and prints its token.
+	const deferLine = deferredCounts
+		? [
+				`const marklessSsrDeferRosterCount=(marklessSsrThunk)=>(marklessSsrRenderContext?.deferCount??(()=>{throw new Error(${JSON.stringify(
+					'MARKLESS_SSR_ROSTER_COUNT_UNANSWERED: ' + componentName,
+				)});}))(marklessSsrThunk);`,
+			]
+		: [];
 	// Pay-per-use: a module with no IDREF record emits no mint at all, so the
 	// shared renderer never carries one for the pages that never ask for an id.
 	const handleIds = elementHandleIdSources(chunks);
@@ -1273,6 +1293,7 @@ function emitSsrDataLines(
 		...sharedComputedLines,
 		...templateComputedLines,
 		"const marklessSsrIdPrefix=marklessSsrRenderContext?.idPrefix??'';",
+		...deferLine,
 		`const marklessSsrReadData=(residue,marklessSsrDataContext)=>{${mintCase}if(residue.kind==='graph-read')return marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(residue.graphNodeId),residue.path);if(residue.kind==='repeat-item')return marklessSsrReadPublicPath(marklessSsrDataContext.repeatItem,residue.path);${localLines.join('')}switch(residue.source){${readCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_RESIDUE_MISSING: '+residue.source);}};`,
 		// A component placed inside a widget root renders that widget's parts from
 		// its own template, and their seed pass reads this context, not the values map.
