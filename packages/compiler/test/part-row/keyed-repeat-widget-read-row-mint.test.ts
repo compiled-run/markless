@@ -25,6 +25,10 @@ export const nest = shared(
 	{ scope: 'widget' },
 );
 
+// A bare call is the value only rendering produces: nothing sees inside it, so no
+// computed stands behind it. A method call on the same read is lifted instead.
+function shout(value: string) { return String(value).toUpperCase(); }
+
 export function NestItems({ testid }) @{
 	const n = nest();
 
@@ -76,13 +80,30 @@ test('a row whose TEXT reads the widget shared state mints on the same terms', a
 // A value only rendering produces has no channel in the record, so the whole
 // template stays off and the diagnostic names the read.
 test('a row whose widget read only rendering produces is refused, loudly', async () => {
-	const compiled = await compileRow(`<span>{n.label.toUpperCase()}{item.id}</span>`);
+	const compiled = await compileRow(`<span>{shout(n.label)}{item.id}</span>`);
 
 	expect(rowMintDiagnostics(compiled)).toEqual([
-		['warning', expect.stringContaining('n.label.toUpperCase()')],
+		['warning', expect.stringContaining('shout(n.label)')],
 	]);
 	expect(repeats(compiled)[0]?.rowTemplate).toBeUndefined();
 	expect(repeats(compiled)[0]?.rowComponent).toBeUndefined();
+});
+
+// The lift reaches shared widget state too: a method call on the same read
+// becomes a computed the record can name, so this row mints where the bare call
+// above does not.
+test('a row calling a method on the widget read mints from the lifted node', async () => {
+	const compiled = await compileRow(`<span>{n.label.toUpperCase()}{item.id}</span>`);
+
+	expect(rowMintDiagnostics(compiled)).toEqual([]);
+	expect(repeats(compiled)[0]?.rowTemplate?.textSlots).toEqual([
+		{
+			path: [0, 0],
+			graphNodeId: expect.stringContaining('templateExpression'),
+			graphPath: [],
+		},
+		{ path: [0, 1], itemPath: ['id'] },
+	]);
 });
 
 test('the refusal is the widget read alone: the same row without it mints', async () => {
@@ -114,6 +135,8 @@ export const nest = shared(
 	{ scope: 'widget' },
 );
 
+function shout(value: string) { return String(value).toUpperCase(); }
+
 export function NestItems({ testid }) @{
 	const n = nest();
 
@@ -129,7 +152,7 @@ export function NestOwnedItems({ testid }) @{
 
 	<div data-testid={testid}>
 		@for (const item of n.items; key item.id) {
-			<span data-nest-owned-item data-nest-owner={n.label.toUpperCase()}>{item.id}</span>
+			<span data-nest-owned-item data-nest-owner={shout(n.label)}>{item.id}</span>
 		}
 	</div>
 }

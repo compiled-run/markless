@@ -108,12 +108,16 @@ test('a part row projecting a value the mint cannot fill is refused loudly', asy
 import { computed, state } from '@markless/core';
 import { GateItem, gateState } from './parts.tsrx';
 
+// A bare call mints no computed - the read collector cannot see inside it - so
+// the projected value exists only where rendering produced it.
+function shout(value: string) { return String(value).toUpperCase(); }
+
 export function App() @{
 	const gate = gateState();
 	const label = state('tag');
 	const rows = computed(() => ['0', '1', '2'].map((at) => \`x-\${gate.offset * 3 + Number(at)}\`));
 
-	<div>@for (const iso of rows; key iso) { <GateItem value={iso}>{label.toUpperCase()}</GateItem> }</div>
+	<div>@for (const iso of rows; key iso) { <GateItem value={iso}>{shout(label)}</GateItem> }</div>
 }
 `);
 	expect(repeatRecord(result.protocolView, 'repeat:0')).not.toHaveProperty('rowComponent');

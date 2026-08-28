@@ -31,8 +31,8 @@ test('every refusal clause names itself in the author’s own words', () => {
 		'sets the data-row attribute from a value',
 	);
 	// The read itself, in the author's own words - not its category.
-	expect(messageFor({ kind: 'unfillable-read', read: "tags.join('|')" })).toContain(
-		"This @for row over item renders tags.join('|')",
+	expect(messageFor({ kind: 'unfillable-read', read: 'shout(tags)' })).toContain(
+		'This @for row over item renders shout(tags)',
 	);
 	expect(
 		messageFor({ kind: 'unfillable-read', read: 'the id of the box element handle', attributeName: 'aria-controls' }),
@@ -44,7 +44,7 @@ test('every clause says the consequence: the list renders and reorders but never
 		messageFor({ kind: 'component', componentName: 'Row' }),
 		messageFor({ kind: 'nested-construct', label: 'a nested @for' }),
 		messageFor({ kind: 'attribute', attributeName: 'href' }),
-		messageFor({ kind: 'unfillable-read', read: "tags.join('|')" }),
+		messageFor({ kind: 'unfillable-read', read: 'shout(tags)' }),
 	]) {
 		expect(message).toContain('silently ignore every new one');
 	}
@@ -55,7 +55,7 @@ test('every clause says the consequence: the list renders and reorders but never
 test('the diagnostic carries the single owner-adjustable severity and its own code', () => {
 	const diagnostic = keyedRepeatRowMintUnsupportedDiagnostic({
 		itemName: 'item',
-		refusal: { kind: 'unfillable-read', read: "tags.join('|')" },
+		refusal: { kind: 'unfillable-read', read: 'shout(tags)' },
 		node,
 		filename: 'page.tsrx',
 	});

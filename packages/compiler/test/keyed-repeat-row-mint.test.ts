@@ -38,15 +38,21 @@ async function viewOf(source: string) {
 
 const preamble = `import { state } from '@markless/core';\n`;
 
+// A bare call is the stand-in for a value only rendering produces: the read
+// collector cannot see inside the function, so nothing says what would move the
+// answer and no computed is minted for it. A method call ON a read value is a
+// different shape - it lifts, and the rows below pin that it mints.
+const renderOnlyHelper = `function shout(value: string) { return String(value).toUpperCase(); }\n`;
+
 // Pay-per-use, and the byte-equality half of it: a repeat whose row this refuses
 // emits the same record it emitted before this field existed, so nothing about
 // its payload moved.
 test('a repeat whose row is not mintable carries no row markup', async () => {
-	const view = await viewOf(`${preamble}
+	const view = await viewOf(`${preamble}${renderOnlyHelper}
 export function App() @{
 	let rows = state([{ id: 'a' }]);
 	let theme = state('dark');
-	<ul>@for (const row of rows; key row.id) { <li class={theme.toUpperCase()}>t</li> }</ul>
+	<ul>@for (const row of rows; key row.id) { <li class={shout(theme)}>t</li> }</ul>
 }
 `);
 	expect(view.keyedRepeats).toHaveLength(1);
@@ -113,15 +119,36 @@ export function App() @{
 // Fail closed on what is left: a value only rendering produces has no channel in
 // the record at all, so the whole template stays off.
 test('a row whose value only rendering produces ships no markup', async () => {
-	const view = await viewOf(`${preamble}
+	const view = await viewOf(`${preamble}${renderOnlyHelper}
 export function App() @{
 	let rows = state([{ id: 'a' }]);
 	let note = state('x');
-	<ul>@for (const row of rows; key row.id) { <li>{note.toUpperCase()}</li> }</ul>
+	<ul>@for (const row of rows; key row.id) { <li>{shout(note)}</li> }</ul>
 }
 `);
 	expect(view.keyedRepeats).toHaveLength(1);
 	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowTemplate');
+});
+
+// The other side of that line, and why the refusal above is about the read and
+// not about the punctuation: a method call ON an outside cell is lifted into a
+// computed before the mint looks, so the row template fills it from the graph
+// like any other outside read.
+test('a row whose text calls a method on an outside cell ships the lifted graph pair', async () => {
+	const view = await viewOf(`${preamble}
+export function App() @{
+	let rows = state([{ id: 'a' }]);
+	let list = state(['x', 'y']);
+	<ul>@for (const row of rows; key row.id) { <li>{list.join('|')}</li> }</ul>
+}
+`);
+	expect(view.keyedRepeats?.[0]?.rowTemplate?.textSlots).toEqual([
+		{
+			path: [0, 0],
+			graphNodeId: expect.stringContaining('templateExpression'),
+			graphPath: [],
+		},
+	]);
 });
 
 // The third shape: an attribute whose value is read off the item. There is no

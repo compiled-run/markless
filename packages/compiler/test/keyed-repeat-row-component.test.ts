@@ -160,13 +160,14 @@ export function App() @{
 // refuses the whole row rather than shipping a half of each.
 test('a wrapper whose value only rendering produces ships neither half', async () => {
 	const view = await viewOf(`import { state } from '@markless/core';
+function shout(value: string) { return String(value).toUpperCase(); }
 function Row({ label }) @{
 	<span>{label}</span>
 }
 export function App() @{
 	let rows = state([{ id: 'a', label: 'A' }]);
 	let title = state('t');
-	<ul>@for (const row of rows; key row.id) { <li data-row={title.toUpperCase()}><Row label={row.label} /></li> }</ul>
+	<ul>@for (const row of rows; key row.id) { <li data-row={shout(title)}><Row label={row.label} /></li> }</ul>
 }
 `);
 	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
