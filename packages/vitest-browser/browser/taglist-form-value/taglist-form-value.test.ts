@@ -1,28 +1,26 @@
 import { page } from 'vite-plus/test/browser';
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
+import NamedRowPage from './named-row-page.tsrx';
 import SeededPage from './seeded-page.tsrx';
 
 /**
- * Built while diagnosing `@markless/ui`'s taglist, whose `taglist.field` renders
- * one hidden input per tag and never carries a tag added after the first render,
- * while an attribute over the same cell on the same host element refreshes.
+ * `@markless/ui`'s taglist with taglist taken out: a widget-scope `shared()`
+ * factory, a root writing the collection from its own prop, one part repeating
+ * over it, one sibling part writing it.
  *
- * This is that shape with taglist taken out: a widget-scope `shared()` factory, a
- * root writing the collection from its own prop, one part repeating over it, one
- * sibling part writing it. Every row is green — so the reduction does NOT
- * reproduce the failure, and that is the finding it records. The ingredient is
- * something taglist still adds; the candidates and the two compiler diagnostics
- * that blocked reducing further are in
- * goals/headless-components/notes/U697-taglist-defects.md.
- *
- * Keep these rows: they are the floor a fix for the taglist repeat must not
- * break, and they say precisely which half of the behaviour already works.
+ * The first six rows are green and are the floor a fix must not break. The last
+ * two are pinned, and each isolates one ingredient the earlier reduction was
+ * missing — they reproduce taglist's two pinned rows with no family involved. The
+ * mechanisms are in goals/headless-components/notes/U711-keyed-repeat-new-keys.md.
  */
 afterEach(() => cleanup());
 
 const el = (testid: string) => page.getByTestId(testid).element() as HTMLElement;
 const fieldValues = () => [...el('field').querySelectorAll('input')].map((one) => one.value);
+const namedFieldInputs = () => [...el('named-field').querySelectorAll('input')];
+const namedFieldValues = () => namedFieldInputs().map((one) => one.value);
+const namedFieldNames = () => namedFieldInputs().map((one) => one.name);
 const count = () => el('field').getAttribute('ui-count');
 const seen = () => el('field').getAttribute('ui-seen');
 const click = (testid: string) => (el(testid) as HTMLButtonElement).click();
@@ -54,5 +52,45 @@ for (const mode of ['CSR', 'SSR'] as const) {
 		click('add');
 		await expect.poll(() => count()).toBe('3');
 		await expect.poll(() => fieldValues()).toEqual(['alpha', 'beta', 'gamma']);
+	});
+
+	// A plain cell and a property of the collection both refresh in a text child,
+	// so the pinned row below is not about the text position.
+	test(`${mode}: a text child over a cell and over a property of the collection refreshes`, async () => {
+		if (mode === 'CSR') await render(SeededPage);
+		else await renderSSR(SeededPage);
+
+		expect(el('len').textContent).toBe('2');
+		click('add');
+		await expect.poll(() => el('plain').textContent).toBe('gamma added');
+		await expect.poll(() => el('len').textContent).toBe('3');
+	});
+
+	// Pinned: an expression that CALLS a method on the collection is wired to
+	// nothing, in a text child and in an attribute alike, so neither ever
+	// refreshes while every other read on the same element does.
+	test.fails(`${mode}: an expression calling a method on the collection refreshes`, async () => {
+		if (mode === 'CSR') await render(SeededPage);
+		else await renderSSR(SeededPage);
+
+		expect(el('joined').textContent).toBe('alpha|beta');
+		click('add');
+		await expect.poll(() => count()).toBe('3');
+		await expect.poll(() => el('joined').getAttribute('ui-joined')).toBe('alpha|beta|gamma');
+		await expect.poll(() => el('joined').textContent).toBe('alpha|beta|gamma');
+	});
+
+	// Pinned: one row attribute reading a cell outside the repeated item - which
+	// is exactly taglist.field's `name={taglist.name}` - takes the row's markup
+	// off the record, so a key the first render never carried is never built.
+	test.fails(`${mode}: a row whose attribute reads a cell outside the item still mints`, async () => {
+		if (mode === 'CSR') await render(NamedRowPage);
+		else await renderSSR(NamedRowPage);
+
+		expect(namedFieldValues()).toEqual(['alpha', 'beta']);
+		click('add');
+		await expect.poll(() => el('named-field').getAttribute('ui-count')).toBe('3');
+		await expect.poll(() => namedFieldValues()).toEqual(['alpha', 'beta', 'gamma']);
+		expect(namedFieldNames()).toEqual(['topics', 'topics', 'topics']);
 	});
 }

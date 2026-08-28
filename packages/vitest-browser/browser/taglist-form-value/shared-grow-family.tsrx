@@ -3,6 +3,7 @@ import { computed, shared, state } from '@markless/core';
 type BoxInstanceState = {
 	items: readonly string[];
 	seen: string;
+	name: string;
 };
 
 // @markless/ui's taglist reduced to its skeleton: a widget-scope spread-object
@@ -11,16 +12,21 @@ type BoxInstanceState = {
 // writes it.
 export const listBox = shared(
 	() => {
-		const box: BoxInstanceState = state({ items: [] as readonly string[], seen: '' });
+		const box: BoxInstanceState = state({
+			items: [] as readonly string[],
+			seen: '',
+			name: '',
+		});
 
 		return { ...box };
 	},
 	{ scope: 'widget' },
 );
 
-export function BoxSeededRoot({ value = [], children }) @{
+export function BoxSeededRoot({ value = [], name = '', children }) @{
 	const box = listBox();
 	box.items = value;
+	box.name = name;
 
 	<div data-testid="root" ui-empty={box.items.length === 0}>{children}</div>
 }
@@ -50,7 +56,8 @@ export function BoxAdder() @{
 	</div>
 }
 
-/** The repeat, plus attribute reads of the same cells on the same element. */
+// The repeat, plus four other reads of the same cells: a computed, a plain cell,
+// a property of the collection, and a method call on it in both positions.
 export function BoxField() @{
 	const box = listBox();
 	const size = computed(() => box.items.length);
@@ -58,6 +65,21 @@ export function BoxField() @{
 	<div data-testid="field" ui-count={size} ui-seen={box.seen}>
 		@for (const item of box.items; key item) {
 			<input type="hidden" name="topics" value={item} />
+		}
+		<span data-testid="joined" ui-joined={box.items.join('|')}>{box.items.join('|')}</span>
+		<span data-testid="plain">{box.seen}</span>
+		<span data-testid="len">{box.items.length}</span>
+	</div>
+}
+
+/** taglist's own field: one row attribute reads an instance cell, not the item. */
+export function BoxNamedField() @{
+	const box = listBox();
+	const size = computed(() => box.items.length);
+
+	<div data-testid="named-field" ui-count={size}>
+		@for (const item of box.items; key item) {
+			<input type="hidden" name={box.name} value={item} />
 		}
 	</div>
 }
