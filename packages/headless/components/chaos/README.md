@@ -340,6 +340,70 @@ the date, so it does not quietly become permanent.
 - **Cause hypothesis:** a `Shift+Tab` out of an open panel leaves the bar's
   roving state pointing at the item the storm walked off, so the next open moves
   focus relative to that stale position rather than to the panel's first command.
+- **Now intermittent, measured 2026-08-28** on the tree that folded the peer tip
+  in: five consecutive runs of this row alone at `CHAOS_SEED=20260828` gave two
+  reds and three greens, so 2 in 5 at a fixed seed. The red is the same
+  `document.activeElement` identity poll as above (one `div` where another was
+  expected); the green runs reach it and pass. A fixed seed no longer fixes the
+  outcome, which puts this row in the timing-marginal class: the storm's
+  `SETTLE_MS` budget and the family's focus landing are close enough together
+  that machine load decides. Recorded, not chased further.
+
+### Calendar's day grid commits a month behind its own title, and keeps moving after the last click
+
+- **Family:** calendar (the lane's `calendar` rows; the recovery script is not at
+  fault and was left unchanged)
+- **Seed:** `CHAOS_SEED=20260828`; storm seed 621867743 (calendar/mixed). The
+  keyboard row of the same run is green and the calendar is quiescent after it.
+- **Storm:** mixed. Reproduces on every run of that row on this tree.
+- **What is reported:** `the widget did not come back: expected '2026-05-02' to
+  be '2026-06-29'`. The recovery reads the day holding the roving stop, presses
+  `ArrowRight`, and expects the stop on the next day. It never gets there,
+  because the widget is still moving when the recovery samples.
+- **The storm is not needed to see it.** Mount
+  `src/calendar/scenarios/basic.tsrx` (August 2026), let it settle, dispatch one
+  ordinary `pointerdown`/`pointerup`/`click` on `back`, then sample
+  `title.textContent` and the first `day` cell's `value` every 25ms:
+
+      t=  0ms  title=August 2026  grid=2026-07-26   (nothing has moved yet)
+      t=100ms  title=August 2026  grid=2026-06-28   (days are on July, title is not)
+      t=200ms  title=July 2026    grid=2026-06-28   (settled, and correct)
+
+  One click takes about 200ms to commit, and for roughly 100ms of that the month
+  the title names and the days on screen disagree. Six clicks 8ms apart do not
+  coalesce: they drain one month per ~100ms for 650ms, and land on the right
+  month (February 2026) at the end. The end state is always correct; only the
+  pacing and the split commit are wrong.
+- **It is not a general slowdown.** The same probe on accordion — a family with
+  no keyed list — flips `aria-expanded` within the first 25ms sample. The lag
+  tracks the keyed `@for (const day of cal.days; key day)` roster, not the
+  runtime as a whole.
+- **Why the storm row goes red.** The lane gives a widget `SETTLE_MS` (150ms in
+  `storm.ts`) plus the unwind's Escapes before it measures recovery. A mixed
+  storm queues 30 gestures at that pace, so the calendar is still draining month
+  steps a full second after the last one: traced over 3s of no input at all, the
+  title walked September → August → July → June → May → April → May while the
+  committed `field` value went 2026-09-01 → 2026-10-03 → 2026-10-08 → 2026-10-18
+  → 2026-10-03 → 2026-10-14, and for the first 250ms no day cell held
+  `tabindex="0"` at all. It does settle, and then stays put — but it settles
+  somewhere other than where the recovery sampled `from`.
+- **Owner, and why this is not the lane's to fix:** the fold brought three peer
+  commits into exactly this path —
+  `6d01ccb2 feat(web): a part derives where it stands - render order at first paint, the live roster after resume`,
+  `d627ec6f fix(web): a row minted after resume reads the family it stands in, not the one its collection names`,
+  and `72d48f79 perf(web,bundler): the roster's resume half is named by the app, not the runtime`
+  — touching `packages/web/src/fns/roster-position.ts`,
+  `packages/web/src/fns/row-component-mint.ts` and
+  `packages/web/src/fns/roster-resume.ts`. **Not yet confirmed against the
+  pre-fold tree:** this was measured only on the folded tree, so the attribution
+  is by area and by the row's before/after colour, not by a bisect. Someone who
+  can check out the pre-fold commit should run the three-line single-click probe
+  above there; if the title and the days commit together in one frame, these
+  commits are the cause.
+- **Do not paper over it in the lane.** Making the recovery wait for quiescence
+  first (about 1.8s) turns both calendar rows green, which is how the mechanism
+  was confirmed — but it would hide a widget that shows the wrong month for
+  100ms after every click, which is a defect a user sees.
 
 ### A keyboard storm stops modal from taking focus into its dialog
 
