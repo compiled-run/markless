@@ -38,6 +38,7 @@ type RosterRevisionGraph = {
 		readonly path: ReadonlyArray<string>;
 		readonly run: () => void;
 	}) => () => void;
+	readonly subscribeJournal: RuntimeGraph['subscribeJournal'];
 };
 
 /**
@@ -135,6 +136,10 @@ function oneElement(get: ElementHandleRegistry['get'], key: string): unknown {
  * carries a revision: bumping it is how the parts deriving a place in that
  * roster are told to derive it again.
  *
+ * A keyed repeat's collection write is one channel; an `@if` arm adopting or
+ * dropping its host elements is the other, and it writes no collection at all,
+ * so the journal is the only thing that reports it.
+ *
  * Resume is itself the first revision. A render answers a place from emission
  * order and paints it, but the number never reaches the derivation's graph cell,
  * so an expression that SPENDS the place - `code.slice(pos, pos + 1)` - reads
@@ -181,6 +186,14 @@ export function wireRosterRevisions(input: {
 			}),
 		);
 	}
+	// The arm channel. Registered after the start module's own journal listener,
+	// which is what materializes an arriving arm's handles, so the registry has
+	// settled by the time this runs - removed hosts unfiled, arriving ones filed.
+	input.storeContainerSubscription(
+		input.graph.subscribeJournal((entries) => {
+			if (entries.some((entry) => entry.locator.startsWith('branch:'))) bump();
+		}),
+	);
 	bump();
 }
 
