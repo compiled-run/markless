@@ -26,6 +26,7 @@ import {
 const WALK_LIMIT = 220;
 const CHANGE_TIMEOUT_MS = 15_000;
 const MENU_ANCHOR = '/#menu';
+const MENUBAR_ANCHOR = '/#menubar';
 const TRIGGER = 'Actions';
 const FIRST_ITEM = 'Cut';
 const SECOND_ITEM = 'Copy';
@@ -35,6 +36,14 @@ const SUBMENU_ITEM = 'Email';
 
 /** The anchor the gallery section will carry. It moves to FAMILY_ANCHORS with the section itself. */
 export const MENU_SECTION = MENU_ANCHOR;
+/** The menubar arrangement's own section, which the same registration unit adds. */
+export const MENUBAR_SECTION = MENUBAR_ANCHOR;
+
+/** The bar's own names, matching `scenarios/menubar.tsrx`. */
+const BAR_FIRST = 'File';
+const BAR_SECOND = 'Edit';
+const BAR_FIRST_COMMAND = 'New';
+const BAR_SECOND_COMMAND = 'Undo';
 
 const collapsedTrigger: Conveys = { role: 'button', name: TRIGGER, state: ['notExpanded'] };
 const collapsedNestingItem: Conveys = { name: NESTING_ITEM, state: ['notExpanded'] };
@@ -104,4 +113,62 @@ export async function readMenuTranscript(sr: ScreenReaderDriver, page: Page) {
 	await expect(surface).toBeHidden({ timeout: CHANGE_TIMEOUT_MS });
 	await expect(trigger).toBeFocused({ timeout: CHANGE_TIMEOUT_MS });
 	await expectAnnouncesAfterChange(sr, collapsedTrigger);
+}
+
+/**
+ * The menubar arrangement of the same family: `menu.root menubar`, no trigger,
+ * and each bar item holding its own menu.
+ *
+ * The facts that differ from the transcript above are the ones worth a real
+ * reader: the first thing met is a bar item rather than a button, ArrowDown is
+ * what opens, ArrowRight inside an open menu travels to the NEXT menu rather
+ * than walking the one it is in, and Escape returns to the bar item while the
+ * bar itself stays where it is.
+ */
+export async function readMenubarTranscript(sr: ScreenReaderDriver, page: Page) {
+	const section = page.locator(`#${MENUBAR_ANCHOR.slice(2)}`);
+	const bar = section.getByRole('menubar');
+	const firstItem = section.getByRole('menuitem', { name: BAR_FIRST });
+	const secondItem = section.getByRole('menuitem', { name: BAR_SECOND });
+	const firstMenu = section.getByRole('menu', { name: BAR_FIRST });
+	const secondMenu = section.getByRole('menu', { name: BAR_SECOND });
+
+	const collapsedFirst: Conveys = { name: BAR_FIRST, state: ['notExpanded'] };
+	const collapsedSecond: Conveys = { name: BAR_SECOND, state: ['notExpanded'] };
+
+	// The bar is always showing, so the first thing met is a bar item that says it
+	// holds a menu - there is no trigger to meet first.
+	await expect(bar).toBeVisible();
+	await expect(bar).toHaveAttribute('aria-orientation', 'horizontal');
+	expectConveys(sr, await readUntil(sr, collapsedFirst, WALK_LIMIT), collapsedFirst);
+	await expect(firstItem).toHaveAttribute('aria-haspopup', 'menu');
+
+	await sr.press(sr.keys.arrowDown);
+	await expect(firstItem).toHaveAttribute('aria-expanded', 'true', {
+		timeout: CHANGE_TIMEOUT_MS,
+	});
+	await expect(firstMenu).toBeVisible({ timeout: CHANGE_TIMEOUT_MS });
+	await expect(firstMenu.getByRole('menuitem', { name: BAR_FIRST_COMMAND })).toBeFocused({
+		timeout: CHANGE_TIMEOUT_MS,
+	});
+	expectConveys(sr, await sr.settleOnFocus(), { name: BAR_FIRST_COMMAND });
+
+	// ArrowRight inside an open bar menu is travel to the next menu, not a walk
+	// inside this one: the menu showing goes and the neighbour's opens on its first
+	// command.
+	await sr.press(sr.keys.arrowRight);
+	await expect(firstMenu).toBeHidden({ timeout: CHANGE_TIMEOUT_MS });
+	await expect(secondMenu).toBeVisible({ timeout: CHANGE_TIMEOUT_MS });
+	await expect(secondMenu.getByRole('menuitem', { name: BAR_SECOND_COMMAND })).toBeFocused({
+		timeout: CHANGE_TIMEOUT_MS,
+	});
+	expectConveys(sr, await sr.settleOnFocus(), { name: BAR_SECOND_COMMAND });
+
+	// Escape closes the open menu onto the bar item that opened it. The bar is not
+	// a surface, so it is still there and there is no second Escape to press.
+	await sr.press('Escape');
+	await expect(secondMenu).toBeHidden({ timeout: CHANGE_TIMEOUT_MS });
+	await expect(secondItem).toBeFocused({ timeout: CHANGE_TIMEOUT_MS });
+	await expect(bar).toBeVisible();
+	await expectAnnouncesAfterChange(sr, collapsedSecond);
 }

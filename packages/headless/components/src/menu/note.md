@@ -12,7 +12,7 @@ two values of a mode prop.
 
 | Part                | Element  | Carries                                                                                                                                    |
 | ------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `menu.root`         | `div`    | the menu's state; `ui-open`, `ui-closed`, `ui-disabled`; the anchor scope                                                                  |
+| `menu.root`         | `div`    | the menu's state; `ui-open`, `ui-closed`, `ui-disabled`; the anchor scope. With `menubar`, also `role="menubar"` and `aria-orientation="horizontal"` - the root IS the bar |
 | `menu.trigger`      | `button` | `aria-haspopup="menu"`, `aria-expanded`, `aria-controls`, the opening keys, the anchor name                                                |
 | `menu.contextarea`  | `div`    | `ui-open`/`ui-closed` and **no ARIA at all**; right-click, long press, `Shift+F10`, the ContextMenu key                                    |
 | `menu.content`      | `div`    | `overlay`, `role="menu"`, `aria-labelledby`, `hidden`; the walk over the items IT holds                                                    |
@@ -29,6 +29,15 @@ renders one attribute is the wrapper recent families have refused to own.
 is a disclosure and must never be a menubar; this family is the mirror image of
 that rule, not an exception to it. Menu items _do_ something. A browser row
 fails if `menu.item` ever renders as an `<a href>` carrying `role="menuitem"`.
+
+That rule survives the `menubar` flag below, and is the reason the flag is
+described the way it is: **a menu bar is for an application's own commands** -
+File, Edit, View - not for the links across the top of a site. The APG does ship
+a navigation menubar example, so the caution is a calibrated one rather than an
+absolute: the pattern is legal for navigation, and it is still the wrong choice
+for site navigation, because it takes a set of links a person can Tab through and
+puts it behind a menu keyboard they have to learn. `navbar/note.md` points site
+navigation at a disclosure; nothing here moves it.
 
 ## State
 
@@ -55,7 +64,8 @@ menu.itemstate() // rooted by EVERY menu.item - one per item, at any depth
 ## Props
 
 `menu.root`: `open`, `checked`, `disabled`, `loop` (arrow wrap, on), `radio`,
-`delay` (700), `closeDelay` (300), `onChange(value)`, `onOpenChange(open)`.
+`menubar`, `delay` (700), `closeDelay` (300), `onChange(value)`,
+`onOpenChange(open)`.
 No placement prop of any kind - see below.
 `menu.item`: `value` (required), `checked`, `disabled`, `submenu`.
 
@@ -99,6 +109,82 @@ Two shipped constraints this family did not have to rediscover, both from
 native click, so `Enter`/`Space` on the trigger stay the button's own
 activation; and every prevented-key guard is written from `event.key` alone so
 the decision is readable before the handler module loads.
+
+## The menu bar: `menu.root menubar`
+
+A menu bar is the same family with one more boolean, on the precedent `radio`
+already set here - a boolean on `menu.root` that changes what an ARIA role is.
+Under it the **root itself is the bar**: it renders `role="menubar"` with
+`aria-orientation="horizontal"`, it is always showing, and the `menu.item`s
+written directly inside it are the bar's items. Each of those is a `submenu`
+item, and the `menu.itemcontent` inside it is that menu's dropdown. Everything
+below the dropdowns is the recursion described above, unchanged.
+
+```html
+<menu.root menubar aria-label="Application" onChange={run}>
+	<menu.item value="file" submenu>
+		File
+		<menu.itemcontent>
+			<menu.item value="new">New</menu.item>
+			<menu.item value="recent" submenu>
+				Open Recent
+				<menu.itemcontent>
+					<menu.item value="draft">draft.md</menu.item>
+				</menu.itemcontent>
+			</menu.item>
+		</menu.itemcontent>
+	</menu.item>
+	<menu.item value="edit" submenu>Edit<menu.itemcontent>…</menu.itemcontent></menu.item>
+</menu.root>
+```
+
+**No `menu.trigger` and no `menu.content`.** The bar is the surface, so there is
+nothing to open and `open` says nothing under the flag. `menu.trigger` cannot be
+refused at compile time - a component cannot see its own children - so it refuses
+itself at runtime with a plain message, and a browser row in both render modes
+pins that.
+
+**Which menu is showing is each bar item's own `expanded`.** No new cell, no
+`value` on the root, no second source of truth: the flag adds one seeded field
+and nothing else. Mutual exclusion is not written anywhere either - opening a
+neighbour takes focus, and the item that had focus closes its own menu from its
+`focusout`, which is behaviour this family already shipped.
+
+The bar's keyboard, and where each piece lives:
+
+| Gesture | What happens | Answered by |
+| --- | --- | --- |
+| `ArrowLeft` / `ArrowRight` on a bar item | move along the bar, wrapping with `loop` | `menu.item` |
+| `Home` / `End` on a bar item | the ends of the bar | `menu.item` |
+| a printable character on a bar item | typeahead across the bar, one shared 750 ms buffer | `menu.item` |
+| `ArrowDown`, `Enter`, `Space` on a bar item | open its menu on the first command | `menu.item` |
+| `ArrowUp` on a bar item | open its menu on the last command | `menu.item` |
+| `ArrowLeft` / `ArrowRight` inside an open bar menu | close it and open the neighbour's, on that menu's first command | `menu.itemcontent` |
+| `ArrowRight` on a nesting item inside a bar menu | open that submenu, and travel nothing | `menu.item`, which stops the event |
+| `Escape` | close the open menu, focus back on its bar item; the bar stays | `menu.itemcontent`'s dismissal |
+| hover | nothing until a menu is open; from then on, every bar item opens on the crossing, with no delay | `menu.item` |
+
+Two of those are worth their reasons. The **cross-menu travel is answered on the
+content, not on the bar item**, which is where Radix puts it: the gesture is made
+where focus is, inside the open menu. And it opens the neighbour by
+**re-delivering the gesture that opens it** - an `ArrowDown` dispatched at the
+neighbouring bar item - because an item instance cannot reach a sibling's, the
+same wall the hover timers already work around.
+
+**Hover-after-open ignores `delay` on purpose.** `delay` and `closeDelay` are the
+nested submenus' hover intent and stay theirs; a bar whose menus followed the
+pointer on a timer would feel broken. Radix gates the same behaviour on "some
+menu is already open", and the bar asks that of the live `menu.itemcontent`
+roster rather than of any one instance. A pointer wandering off the bar leaves
+the open menu up; only the next bar item, or a dismissal, takes it down.
+
+**The bar is a tab stop; an ordinary menu's trigger is.** Which bar item owns the
+stop is togglegroup's rule - until a focus says, every item is tabbable, and the
+items inside a closed dropdown are unreachable anyway - so there is no
+construction-order counter and no sibling to ask.
+
+Kobalte's `focusOnAlt` is deliberately not here: it is a desktop convention
+neither Radix nor Base UI ships.
 
 ## Submenus: `menu.item` > `menu.itemcontent` > `menu.item`
 
@@ -295,9 +381,6 @@ exactly a dismissal. An outside press reaches only the topmost surface, so a
 
 ## What v1 refuses, and why
 
-- **No menubar.** It needs a `menubar` role, an orientation, and a cross-menu
-  walk - and the one obvious consumer, site navigation, is ruled out by
-  `navbar/note.md`.
 - **No safe polygon** (above), **no portal**, **no arrow**, **no positioner**,
   **no backdrop**, **no scroll lock**.
 - **No `aria-activedescendant`.** It is deliberately absent from the compiler's
@@ -331,8 +414,13 @@ exactly a dismissal. An outside press reaches only the topmost surface, so a
    method from a component body throws `ReferenceError` on a served page. So the
    checked set is `menu.root`'s `checked` prop, which is also what a radio
    choice needs - unchecking a sibling is one decision about the whole menu.
-3. **An IDREF attribute's PRESENCE is decided for the module, not for the
-   instance.** `menu.item` writes `aria-controls={item.itemContentEl}`, and once
+3. **~~An IDREF attribute's PRESENCE is decided for the module, not for the
+   instance.~~ No longer true on this tip - re-measured 2026-08-27.** A plain
+   `menu.item` in the shipped submenu scenario, and in a bar menu, emits **no**
+   `aria-controls` at all, so nothing points at an id that resolves to nothing
+   and every axe row in this family is at zero. The paragraph below is kept as
+   the record of what the behaviour was when the family was built. What was
+   measured then: `menu.item` writes `aria-controls={item.itemContentEl}`, and once
    any item anywhere on the page renders a `menu.itemcontent`, every item of the
    family emits the attribute - including the plain commands whose own instance
    never bound that handle, which then point at an id that resolves to nothing.
@@ -351,13 +439,19 @@ exactly a dismissal. An outside press reaches only the topmost surface, so a
 5. **A synchronous policy guard is `===` against a literal.** A bare event field
    (`event.shiftKey`) is not a condition the policy can carry, which is what
    flattened the context-key guard.
-6. **The gesture that WAKES a served page cannot also be measured for where it
+6. **A component BODY may not read the shared instance.** The mirror of fact 2:
+   `menu.trigger`'s refusal under `menubar` was first written as an `if` over
+   `menu.menubar` before the JSX, and every SSR row in the family turned red with
+   `ReferenceError: menu is not defined` - measured on this tip. The read has to
+   sit inside a `computed()`, which is where the refusal now throws from. A part
+   that has to refuse itself therefore needs an attribute to ride in.
+7. **The gesture that WAKES a served page cannot also be measured for where it
    left focus.** The handler runs after the demand load, and the focus it asks
    for inside that first dispatch is refused and not replayed. Two rows warm the
    page with one open/close before measuring the opening focus, and say so. No
    frame polling anywhere in the family: the reveal-then-focus that every other
    family retries per frame lands on the first call here, in both render modes.
-7. **`@if` and `@for` cannot be direct children of a component tag**, and a
+8. **`@if` and `@for` cannot be direct children of a component tag**, and a
    widget-rooting part inside a _flipping_ `@if` arm is
    `MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED`. "This item appears only when signed
    in" is the everyday menu, and it is a framework wall this family sits closer
@@ -382,26 +476,40 @@ exactly a dismissal. An outside press reaches only the topmost surface, so a
 | Base UI drops `aria-expanded` on a submenu under VoiceOver                                    | kept always                                                | we cannot sniff the reader and would not; recorded as an inherited VoiceOver defect   |
 | Radix `onCloseAutoFocus`, `onEntryFocus`, `onEscapeKeyDown`, and three more                   | one `onDismiss`, forwarded                                 | one primitive event; SPEC has no name for the others                                  |
 | Radix and React Aria portal to `document.body`                                                | never portalled                                            | the library's standing rule, and what makes the two rows above free                   |
+| Radix's and Kobalte's second `Menubar` namespace (~15-17 parts); Base UI's one `Menubar` part wrapping N `Menu.Root`s | one `menubar` boolean on `menu.root` | SPEC: recursion reuses the same parts, no second root - and Base UI's shape needs a `render` prop we do not have |
+| Radix and Kobalte hold "which menu is open" as a `value` on the menubar root | each bar item's own `expanded` | the cell already exists; a second source of truth would have to be kept in step with it |
+| Kobalte's `focusOnAlt` | not shipped | a desktop convention neither Radix nor Base UI ships |
 
 ## Lanes
 
 `menu.browser.ts` runs every row in a CSR and an SSR mode loop, including the
-six axe rows (`wcag2a` + `wcag21a`, no exemptions, on a closed menu, an open
-menu, checkbox and radio menus, an open submenu, three open levels and an open
-context menu). Four of those six are zero; the two submenu ones are pinned to
-the one `aria-valid-attr-value` violation described above, so the pin fails the
-moment that framework behaviour changes in either direction.
+axe rows (`wcag2a` + `wcag21a`, no exemptions, on a closed menu, an open menu,
+checkbox and radio menus, an open submenu, three open levels, an open context
+menu, the menu bar at rest, and a bar menu with a nested submenu open). All of
+them are at zero on this tip.
+
+The menubar rows cover the bar's shape and its tab stop, all four of its
+movement keys, its typeahead, the three opening keys, the cross-menu travel in
+both directions, Escape, hover-after-open (including that nothing opens on hover
+before a menu is), the nested submenu's own walk, the placement default, a
+checkbox item, an activation, and the `menu.trigger` refusal. They park the real
+pointer clear of the mount after rendering as well as before: the bar's
+hover-after-open is unconditional, so the trusted `pointerover` Chromium
+delivers when a tree mounts under the cursor is enough to open a menu no row
+asked for - the hazard `test-support/pointer-parking.ts` documents.
 
 `menu.sr.ts` is the virtual reader, and covers the nesting item announcing its
 popup and expanded state, the submenu announcing itself under that item's name,
-and Escape returning to the item. `menu-transcript.ts` is the reader-agnostic
-transcript that `menu.nvda.ts` and `menu.voiceover.ts` run against real readers
-on the sr-gallery page - **which does not have a menu section yet**: adding it,
+Escape returning to the item, and the bar - which that reader announces as
+`"menubar, Application, orientated horizontally"`, measured, with no item count
+of its own, so how many menus the bar holds is what walking it conveys. `menu-transcript.ts` carries two reader-agnostic
+transcripts - the menu and the bar - that `menu.nvda.ts` and `menu.voiceover.ts`
+run against real readers on the sr-gallery page - **which does not have a menu section yet**: adding it,
 along with the `menu` and `menuitem` words in the shared `Vocabulary` and the
 `FAMILY_ANCHORS` entry the transcript names locally in the meantime, belongs to
 the unit that registers this family. The real-reader lanes are never run
 locally; CI only.
 
-`api/**` and the gallery still carry `menu.itemtrigger`. Re-extracting the API
-manifest after this drop, and moving the gallery section onto the new markup,
-are the follow-up unit's.
+The gallery has no menu section and no menubar section yet; adding both, and the
+`menubar` word alongside `menu` and `menuitem` in the shared `Vocabulary`, is the
+registration unit's. `api/manifest.json` is re-extracted and carries `menubar`.

@@ -1769,6 +1769,13 @@
 						"doc": "The items of this menu are one radio group: each renders\n`role=\"menuitemradio\"`, and choosing one unchecks the rest. Without it an\nitem carrying `checked` is a `menuitemcheckbox` and the rest are plain\ncommands. An item carrying `submenu` stays a plain `menuitem` either way."
 					},
 					{
+						"name": "menubar",
+						"type": "boolean",
+						"required": false,
+						"default": "false",
+						"doc": "This menu is an application menu bar: the root itself renders\n`role=\"menubar\"` with `aria-orientation=\"horizontal\"` and is always\nvisible, and the `menu.item`s written directly inside it are the bar's\nitems - each one a `submenu` item whose `menu.itemcontent` is its dropdown.\n\nWrite no `menu.trigger` and no `menu.content`: the bar is the surface, so\n`open` says nothing here, and a `menu.trigger` under the flag throws. Which\ndropdown is showing is each bar item's own `expanded`, and everything below\nthe dropdowns is the ordinary recursion.\n\nA menu bar is for an application's own commands. Site navigation is a\ndisclosure - see `navbar/note.md` - not a bar of menus."
+					},
+					{
 						"name": "delay",
 						"type": "number",
 						"required": false,
@@ -1799,7 +1806,7 @@
 			{
 				"part": "trigger",
 				"component": "MenuTrigger",
-				"doc": "The control the menu opens from, and the family's only tab stop. It declares\n`aria-haspopup=\"menu\"`, so a reader says a menu is there before it is opened.",
+				"doc": "The control the menu opens from, and the family's only tab stop. It declares\n`aria-haspopup=\"menu\"`, so a reader says a menu is there before it is opened.\n\nA menubar has no trigger - its bar items are always visible - so writing one\nunder `menu.root menubar` throws as the part renders. A component cannot see\nits own children, so the refusal can only be a runtime one.",
 				"props": []
 			}
 		]
