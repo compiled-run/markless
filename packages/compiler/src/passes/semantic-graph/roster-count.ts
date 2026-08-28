@@ -86,8 +86,13 @@ export function collectElementRosterCounts(state: WalkState): void {
  * inside it is lowered to a call rather than left on the captured const, which
  * cannot be rebound. Everything else in a render position is refused by name -
  * a second computed deriving off it, a local the render carries forward, an
- * assignment, a composite, a child component's prop, an arm test - because
- * nothing downstream knows to resolve the second binding it publishes.
+ * assignment, a composite, an arm test - because nothing downstream knows to
+ * resolve the second binding it publishes.
+ *
+ * A bare read handed to a child component as a named prop is neither: the prop
+ * carries the placeholder itself, so the child's own markup is judged by the
+ * same rule under the name the child gave it. That is what makes `{total}` in
+ * the child legal and `{total - 1}` there answerable rather than silently wrong.
  *
  * Handler bodies are untouched: by the time one runs the count is a number.
  */
@@ -96,68 +101,57 @@ function deferredAndRefusedCountSpends(
 	records: ReadonlyArray<SemanticElementRosterCount>,
 ): ReadonlyMap<SemanticElementRosterCount, SemanticElementRosterCount['deferred']> {
 	const semantic = state.semantic();
-	const answers = new Map<SemanticElementRosterCount, DeferredExpression[]>();
-	// One walk per component, so an expression spending two counts is rewritten
+	const scopes = new Map<string, CountScope>();
+	// One scope per component, so an expression spending two counts is rewritten
 	// once with both of them replaced rather than twice from the same original.
-	for (const componentName of new Set(records.map((record) => record.componentName))) {
-		const component = componentFunction(state, componentName);
-		if (!component) continue;
-		const bySymbol = new Map<number, SemanticElementRosterCount>();
-		const declarations = new Set<AnyNode>();
-		for (const record of records) {
-			if (record.componentName !== componentName) continue;
-			const declared = countDeclarationId(component, record.computedName);
-			if (typeof declared?.start !== 'number') continue;
+	for (const record of records) {
+		const component = componentFunction(state, record.componentName);
+		const declared = component ? countDeclarationId(component, record.computedName) : null;
+		if (!component || typeof declared?.start !== 'number') continue;
+		const symbolId = declaredSymbolAt(semantic, declared.start);
+		if (symbolId === null) continue;
+		holdCount(scopes, record.componentName, component, symbolId, record, declared);
+	}
+
+	// Routing is a fixpoint over BARE prop passes only, run to completion before
+	// anything is emitted: a component reached from two parents is judged once,
+	// with every count that arrives at it in hand.
+	for (let round = 0; round < scopes.size + 1; round += 1) {
+		// Collected before any is applied: filing a route grows `scopes`, and a walk
+		// that iterated it live would judge a component mid-way through learning
+		// which counts reach it.
+		const routes: Array<{
+			readonly target: PropTarget;
+			readonly record: SemanticElementRosterCount;
+		}> = [];
+		for (const scope of scopes.values())
+			for (const route of walkCountScope(state, semantic, scope).routes) routes.push(route);
+		let grew = false;
+		for (const route of routes) {
+			const child = componentFunction(state, route.target.childComponentName);
+			const declared = child ? propBindingId(child, route.target.propName) : null;
+			if (!child || typeof declared?.start !== 'number') continue;
 			const symbolId = declaredSymbolAt(semantic, declared.start);
 			if (symbolId === null) continue;
-			bySymbol.set(symbolId, record);
-			declarations.add(declared);
+			grew =
+				holdCount(
+					scopes,
+					route.target.childComponentName,
+					child,
+					symbolId,
+					route.record,
+					declared,
+				) || grew;
 		}
-		if (bySymbol.size === 0) continue;
+		if (!grew) break;
+	}
 
-		const deferred = new Map<
-			AnyNode,
-			Array<{ readonly read: AnyNode; readonly record: SemanticElementRosterCount }>
-		>();
-		const seen = new Set<AnyNode>();
-		const visit = (node: AnyNode, ancestors: ReadonlyArray<AnyNode>): void => {
-			if (seen.has(node)) return;
-			seen.add(node);
-			if (node.type === 'Identifier' && !declarations.has(node) && typeof node.start === 'number') {
-				const record = bySymbol.get(resolvedSymbolAt(semantic, node.start) ?? -1);
-				if (!record || getIdentifierName(node) !== record.computedName) {
-					const chain = [...ancestors, node];
-					for (const child of markupChildNodes(node)) visit(child, chain);
-					return;
-				}
-				const verdict = renderTime(ancestors) ? spentAt(node, ancestors) : null;
-				if (verdict?.kind === 'defer') {
-					deferred.set(verdict.printed, [
-						...(deferred.get(verdict.printed) ?? []),
-						{ read: node, record },
-					]);
-				} else if (verdict?.kind === 'refuse') {
-					state.graph.diagnostics.push(
-						rosterCountSpentDiagnostic({
-							computedName: record.computedName,
-							componentName,
-							operation: verdict.operation,
-							source: expressionSource(verdict.node, state.source) ?? record.computedName,
-							...(sourceSpan(verdict.node, state.filename)
-								? { span: sourceSpan(verdict.node, state.filename)! }
-								: {}),
-						}),
-					);
-				}
-				return;
-			}
-			const chain = [...ancestors, node];
-			for (const child of markupChildNodes(node)) visit(child, chain);
-		};
-		visit(component, []);
-
-		for (const [printed, reads] of deferred) {
-			const entry = deferredExpression(state.source, printed, reads);
+	const answers = new Map<SemanticElementRosterCount, DeferredExpression[]>();
+	for (const scope of scopes.values()) {
+		const found = walkCountScope(state, semantic, scope);
+		for (const refusal of found.refusals) state.graph.diagnostics.push(refusal);
+		for (const [printed, reads] of found.deferred) {
+			const entry = deferredExpression(state.source, printed, reads, scope.componentName);
 			if (!entry) continue;
 			for (const record of new Set(reads.map((one) => one.record)))
 				answers.set(record, [...(answers.get(record) ?? []), entry]);
@@ -166,16 +160,109 @@ function deferredAndRefusedCountSpends(
 	return answers;
 }
 
-type DeferredExpression = { readonly source: string; readonly thunkSource: string };
+type CountScope = {
+	readonly componentName: string;
+	readonly component: AnyNode;
+	/** The local binding, by symbol, that holds a count inside this component. */
+	readonly bySymbol: Map<number, SemanticElementRosterCount>;
+	readonly declarations: Set<AnyNode>;
+};
+
+/** Files "this component's local holds that count", answering whether it is new. */
+function holdCount(
+	scopes: Map<string, CountScope>,
+	componentName: string,
+	component: AnyNode,
+	symbolId: number,
+	record: SemanticElementRosterCount,
+	declared: AnyNode,
+): boolean {
+	const scope = scopes.get(componentName) ?? {
+		componentName,
+		component,
+		bySymbol: new Map<number, SemanticElementRosterCount>(),
+		declarations: new Set<AnyNode>(),
+	};
+	scopes.set(componentName, scope);
+	if (scope.bySymbol.has(symbolId)) return false;
+	scope.bySymbol.set(symbolId, record);
+	scope.declarations.add(declared);
+	return true;
+}
+
+type CountRead = { readonly read: AnyNode; readonly record: SemanticElementRosterCount };
+
+type ScopeFindings = {
+	readonly deferred: ReadonlyMap<AnyNode, ReadonlyArray<CountRead>>;
+	readonly refusals: ReadonlyArray<ReturnType<typeof rosterCountSpentDiagnostic>>;
+	readonly routes: ReadonlyArray<{
+		readonly target: PropTarget;
+		readonly record: SemanticElementRosterCount;
+	}>;
+};
+
+/** Every count read in one component, sorted into deferrals, refusals and routes. */
+function walkCountScope(
+	state: WalkState,
+	semantic: ReturnType<WalkState['semantic']>,
+	scope: CountScope,
+): ScopeFindings {
+	const deferred = new Map<AnyNode, CountRead[]>();
+	const refusals: Array<ReturnType<typeof rosterCountSpentDiagnostic>> = [];
+	const routes: Array<{ target: PropTarget; record: SemanticElementRosterCount }> = [];
+	const seen = new Set<AnyNode>();
+	const visit = (node: AnyNode, ancestors: ReadonlyArray<AnyNode>): void => {
+		if (seen.has(node)) return;
+		seen.add(node);
+		const localName = node.type === 'Identifier' ? getIdentifierName(node) : undefined;
+		if (localName && !scope.declarations.has(node) && typeof node.start === 'number') {
+			const record = scope.bySymbol.get(resolvedSymbolAt(semantic, node.start) ?? -1);
+			if (record) {
+				const verdict = renderTime(ancestors) ? spentAt(node, ancestors) : null;
+				if (verdict?.kind === 'defer')
+					deferred.set(verdict.printed, [
+						...(deferred.get(verdict.printed) ?? []),
+						{ read: node, record },
+					]);
+				else if (verdict?.kind === 'route') routes.push({ target: verdict.target, record });
+				else if (verdict?.kind === 'refuse')
+					refusals.push(
+						rosterCountSpentDiagnostic({
+							computedName: localName,
+							componentName: scope.componentName,
+							operation: verdict.operation,
+							source: expressionSource(verdict.node, state.source) ?? localName,
+							...(record.componentName === scope.componentName
+								? {}
+								: { heldBy: record.computedName, derivedIn: record.componentName }),
+							...(sourceSpan(verdict.node, state.filename)
+								? { span: sourceSpan(verdict.node, state.filename)! }
+								: {}),
+						}),
+					);
+				return;
+			}
+		}
+		const chain = [...ancestors, node];
+		for (const child of markupChildNodes(node)) visit(child, chain);
+	};
+	visit(scope.component, []);
+	return { deferred, refusals, routes };
+}
+
+type DeferredExpression = NonNullable<SemanticElementRosterCount['deferred']>[number];
 
 /**
  * The printed expression as the render data names it, beside the same
- * expression with every count read replaced by a call the resolver binds.
+ * expression with every count read replaced by a call the resolver binds. The
+ * call takes the read's OWN name: a count that arrived through a prop is spelled
+ * by the child's parameter, and the placeholder it holds is the same value.
  */
 function deferredExpression(
 	source: string,
 	printed: AnyNode,
-	reads: ReadonlyArray<{ readonly read: AnyNode; readonly record: SemanticElementRosterCount }>,
+	reads: ReadonlyArray<CountRead>,
+	componentName: string,
 ): DeferredExpression | null {
 	const start = printed.start;
 	const end = printed.end;
@@ -184,12 +271,19 @@ function deferredExpression(
 	let thunk = raw;
 	for (const one of [...reads].sort((left, right) => (right.read.start ?? 0) - (left.read.start ?? 0))) {
 		if (typeof one.read.start !== 'number' || typeof one.read.end !== 'number') return null;
+		const name = getIdentifierName(one.read);
+		if (!name) return null;
 		thunk =
 			thunk.slice(0, one.read.start - start) +
-			`${COUNT_VALUE_PARAMETER}(${one.record.computedName})` +
+			`${COUNT_VALUE_PARAMETER}(${name})` +
 			thunk.slice(one.read.end - start);
 	}
-	return { source: raw.trim(), thunkSource: thunk.trim() };
+	const routed = reads.some((one) => one.record.componentName !== componentName);
+	return {
+		source: raw.trim(),
+		thunkSource: thunk.trim(),
+		...(routed ? { componentName } : {}),
+	};
 }
 
 /** The one name both regimes bind the resolved count reader to inside a thunk. */
@@ -204,8 +298,11 @@ function markupChildNodes(node: AnyNode): AnyNode[] {
 
 type Spend = { readonly node: AnyNode; readonly operation: string };
 
+type PropTarget = { readonly childComponentName: string; readonly propName: string };
+
 type Verdict =
 	| { readonly kind: 'print' }
+	| { readonly kind: 'route'; readonly target: PropTarget }
 	| { readonly kind: 'defer'; readonly printed: AnyNode }
 	| ({ readonly kind: 'refuse' } & Spend);
 
@@ -250,7 +347,13 @@ function spentAt(read: AnyNode, ancestors: ReadonlyArray<AnyNode>): Verdict | nu
 			continue;
 		}
 		if (isPrintedPosition(parent, child)) {
-			if (!innermost) return { kind: 'print' };
+			if (!innermost) {
+				// Only a BARE pass routes: a template slot would hand the child a
+				// string with the placeholder buried in it, which reads as text and
+				// not as a number.
+				const target = child === read ? componentPropTarget(ancestors, at) : null;
+				return target ? { kind: 'route', target } : { kind: 'print' };
+			}
 			return printsMarkupValue(ancestors, at)
 				? { kind: 'defer', printed: child }
 				: { kind: 'refuse', ...innermost };
@@ -322,11 +425,48 @@ function printsMarkupValue(ancestors: ReadonlyArray<AnyNode>, at: number): boole
 }
 
 function isComponentElement(node: AnyNode): boolean {
-	if (node.type !== 'JSXElement') return false;
+	return componentElementName(node) !== null;
+}
+
+function componentElementName(node: AnyNode): string | null {
+	if (node.type !== 'JSXElement') return null;
 	const name = getIdentifierName(
 		(node.openingElement as AnyNode | undefined)?.name as AnyNode | undefined,
 	);
-	return !!name && /^[A-Z]/.test(name);
+	return name && /^[A-Z]/.test(name) ? name : null;
+}
+
+/**
+ * The child component and prop name a printed position hands the value to, when
+ * that is what it is. A `{children}` projection is not one: it carries no name
+ * the child's signature can take the count out under.
+ */
+function componentPropTarget(ancestors: ReadonlyArray<AnyNode>, at: number): PropTarget | null {
+	const holder = ancestors[at - 1];
+	if (holder?.type !== 'JSXAttribute') return null;
+	const element = ancestors[at - 2];
+	const childComponentName = element ? componentElementName(element) : null;
+	const propName = getIdentifierName(holder.name as AnyNode | undefined);
+	return childComponentName && propName ? { childComponentName, propName } : null;
+}
+
+/**
+ * The local a component's signature takes one prop out under. Only a plain
+ * destructured name, with or without a default: a rest binding or a nested
+ * pattern reaches the value through a shape this walk does not follow, and a
+ * count arriving that way stays unrouted rather than routed wrongly.
+ */
+function propBindingId(component: AnyNode, propName: string): AnyNode | null {
+	const parameter = asNodes(component.params)[0];
+	if (parameter?.type !== 'ObjectPattern') return null;
+	for (const property of asNodes(parameter.properties)) {
+		if (property.type !== 'Property' || property.computed === true) continue;
+		if (getIdentifierName(property.key as AnyNode | undefined) !== propName) continue;
+		const value = property.value as AnyNode | undefined;
+		const local = value?.type === 'AssignmentPattern' ? (value.left as AnyNode) : value;
+		return local?.type === 'Identifier' ? local : null;
+	}
+	return null;
 }
 
 function isDeriveFunction(grandparent: AnyNode | undefined, fn: AnyNode): boolean {

@@ -834,10 +834,12 @@ function spendsRosterCount(
 	componentName: string | undefined,
 	source: string,
 ): boolean {
-	return (context.graph.elementRosterCounts ?? []).some(
-		(record) =>
-			record.componentName === componentName &&
-			(record.deferred ?? []).some((entry) => entry.source === source),
+	return (context.graph.elementRosterCounts ?? []).some((record) =>
+		(record.deferred ?? []).some(
+			(entry) =>
+				entry.source === source &&
+				(entry.componentName ?? record.componentName) === componentName,
+		),
 	);
 }
 
