@@ -1,5 +1,4 @@
-// Registration is a follow-up unit, so the barrel has no `editable` export yet.
-import * as editable from '../index.ts';
+import { editable } from '../../index.ts';
 
 // An uncontrolled editable with nothing in it: the placeholder is what the
 // preview button says, and it is what gives that button an accessible name.

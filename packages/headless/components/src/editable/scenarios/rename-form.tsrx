@@ -1,6 +1,5 @@
 import { state } from '@markless/core';
-// Registration is a follow-up unit, so the barrel has no `editable` export yet.
-import * as editable from '../index.ts';
+import { editable } from '../../index.ts';
 
 // A real form. The editable is UNCONTROLLED here on purpose: the sibling taglist
 // suite has a pinned red row where a controlled write inside a `<form>` ancestor

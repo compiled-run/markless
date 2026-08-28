@@ -85,8 +85,8 @@ Two things about that shape are load-bearing:
   none: mode switching is the `hidden` attribute on the two elements, there is nothing anchored and
   nothing stacked. A consumer who sets `display` on the preview or the field defeats `hidden` and
   owns that.
-- **Registration is a follow-up.** Scenarios import `* as editable from '../index.ts'` because the
-  barrel has no `editable` export yet, and `editable-transcript.ts` spells its own gallery anchor
-  because `FAMILY_ANCHORS` has no `editable` key. Both are marked in place for that unit, which is
-  also what makes the `.nvda.ts` / `.voiceover.ts` lanes runnable — the gallery has no editable
-  section today.
+- **Registered.** The barrel exports `editable`, the package export map carries `./editable`, the
+  conformance battery has a descriptor, the gallery serves `#editable` and the three reader
+  matrices run this family. Scenarios import the consumer form `{ editable } from '../../index.ts'`
+  and `editable-transcript.ts` reads `FAMILY_ANCHORS.editable`. What that unit found and where it
+  put each piece is in `goals/headless-components/notes/U700-editable-registration.md`.

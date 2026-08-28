@@ -36,6 +36,7 @@
 		"./crop": "./src/crop/index.ts",
 		"./datebox": "./src/datebox/index.ts",
 		"./drawer": "./src/drawer/index.ts",
+		"./editable": "./src/editable/index.ts",
 		"./fileupload": "./src/fileupload/index.ts",
 		"./ink": "./src/ink/index.ts",
 		"./menu": "./src/menu/index.ts",

@@ -1,6 +1,5 @@
 import { state } from '@markless/core';
-// Registration is a follow-up unit, so the barrel has no `editable` export yet.
-import * as editable from '../index.ts';
+import { editable } from '../../index.ts';
 
 // Two of them alive in one document: every handle read, every minted id and every
 // instance write has to answer for its OWN widget. Opening one must not open the

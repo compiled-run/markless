@@ -10,6 +10,7 @@ import Collapsible from '../src/collapsible/scenarios/basic.tsrx';
 import Colorpicker from '../src/colorpicker/scenarios/basic.tsrx';
 import Crop from '../src/crop/scenarios/basic.tsrx';
 import DateBox from '../src/datebox/scenarios/basic.tsrx';
+import Editable from '../src/editable/scenarios/basic.tsrx';
 import FileUpload from '../src/fileupload/scenarios/basic.tsrx';
 import Hovercard from '../src/hovercard/scenarios/basic.tsrx';
 import Ink from '../src/ink/scenarios/basic.tsrx';
@@ -292,6 +293,20 @@ const descriptors: readonly FamilyDescriptor[] = [
 		// Which part of the date a box holds, and what it holds now: both carry
 		// information a consumer styles on, so both stay key-value.
 		valuedAttributes: ['ui-type', 'ui-value'],
+		supportsDisabled: true,
+	},
+	{
+		family: 'editable',
+		mount: { CSR: () => render(Editable), SSR: () => renderSSR(Editable) },
+		root: 'root',
+		parts: ['root', 'label', 'trigger', 'input', 'field'],
+		// Preview and edit are the same room, swapped by `hidden` on two elements
+		// that are both always in the DOM. That is not an openCycle: there is no
+		// surface a trigger reports through aria-expanded, and nothing to dismiss.
+		rootAria: { role: 'group', 'aria-disabled': null },
+		// The words themselves, which is the one thing about this family a
+		// consumer styles against; every other mark here is presence.
+		valuedAttributes: ['ui-value'],
 		supportsDisabled: true,
 	},
 	{

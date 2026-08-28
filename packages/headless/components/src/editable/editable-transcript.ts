@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test';
+import { FAMILY_ANCHORS } from '../../../../../apps/sr-gallery/preview-server.ts';
 import { readUntil, type ScreenReaderDriver } from '../../test-support/driver.ts';
 
 /**
@@ -17,17 +18,8 @@ const WALK_LIMIT = 200;
 const LABEL = 'Document name';
 const VALUE = 'Quarterly plan';
 
-/**
- * Where the editable sits on the gallery page.
- *
- * Spelled here rather than imported from `FAMILY_ANCHORS` because registration is
- * a follow-up unit and the gallery has no `editable` key yet. That unit moves this
- * constant into `apps/sr-gallery/preview-server.ts` and imports it back.
- */
-export const EDITABLE_ANCHOR = '/#editable';
-
 export async function readEditableTranscript(sr: ScreenReaderDriver, page: Page) {
-	const section = page.locator(`#${EDITABLE_ANCHOR.slice(2)}`);
+	const section = page.locator(`#${FAMILY_ANCHORS.editable.slice(2)}`);
 
 	// The preview carries the words, which is the whole naming decision.
 	await readUntil(sr, { role: 'button', name: VALUE }, WALK_LIMIT);

@@ -11,6 +11,7 @@ export * as combobox from './combobox/index.ts';
 export * as crop from './crop/index.ts';
 export * as datebox from './datebox/index.ts';
 export * as drawer from './drawer/index.ts';
+export * as editable from './editable/index.ts';
 export * as fileupload from './fileupload/index.ts';
 export * as hovercard from './hovercard/index.ts';
 export * as ink from './ink/index.ts';
